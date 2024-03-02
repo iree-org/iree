@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <list>
 #include "iree/compiler/Dialect/Util/Analysis/DFX/Element.h"
 #include "iree/compiler/Dialect/Util/Analysis/DFX/Solver.h"
 #include "iree/compiler/Dialect/Util/Analysis/DFX/State.h"
@@ -11,13 +12,18 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTraits.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Dialect/Util/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
+#include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "mlir/IR/OpDefinition.h"
+#include "mlir/IR/SymbolTable.h"
 #include "mlir/Interfaces/CallInterfaces.h"
 #include "mlir/Interfaces/LoopLikeInterface.h"
 #include "mlir/Pass/Pass.h"
@@ -29,6 +35,16 @@
 namespace mlir::iree_compiler::IREE::Util {
 
 namespace {
+
+static bool isPotentialAccessor(Operation *op) {
+  return isa<IREE::Util::GlobalLoadOpInterface,
+             IREE::Util::GlobalStoreOpInterface,
+             IREE::Util::GlobalLoadIndirectOpInterface,
+             IREE::Util::GlobalStoreIndirectOpInterface, mlir::CallOpInterface,
+             mlir::CallableOpInterface>(op) ||
+         op->hasTrait<OpTrait::IREE::Util::YieldPoint>() ||
+         (op->getNumRegions() > 0 && !op->hasTrait<OpTrait::SymbolTable>());
+}
 
 // Builds symbol ref set for all immutable globals in |moduleOp|.
 static DenseSet<StringRef> gatherImmutableGlobals(mlir::ModuleOp moduleOp) {
@@ -129,58 +145,71 @@ private:
   explicit GlobalAccessor(const Position &pos) : BaseType(pos) {}
   // Initialize global (indirect) loads/stores and calls to external functions.
   void initializeOperation(Operation *op, DFX::Solver &solver) override {
-    // Direct globals loads/stores only perform a single access of the
-    // associated global.
-    if (auto load = dyn_cast<IREE::Util::GlobalLoadOpInterface>(op)) {
-      unionAssumed(load.getGlobalAttr().getAttr(), 1);
-      indicateOptimisticFixpoint();
-    } else if (auto store = dyn_cast<IREE::Util::GlobalStoreOpInterface>(op)) {
-      unionAssumed(store.getGlobalAttr().getAttr(), 1);
-      indicateOptimisticFixpoint();
-    } else if (isa<IREE::Util::GlobalLoadIndirectOpInterface,
-                   IREE::Util::GlobalStoreIndirectOpInterface>(op)) {
-      // Indirect global accessors can access any global and need to be treated
-      // as pessimistically as possible.
-      indicatePessimisticFixpoint();
-    } else if (auto callOp = dyn_cast<mlir::CallOpInterface>(op)) {
-      auto callableOp = llvm::dyn_cast_if_present<mlir::CallableOpInterface>(
-          callOp.resolveCallable(&solver.getExplorer().getSymbolTables()));
-      // If we cannot resolve the callee of a call op, we block all global
-      // movement around it.
-      if (!callableOp) {
-        indicatePessimisticFixpoint();
-      } else if (callableOp
-                     ->getParentWithTrait<OpTrait::IREE::Util::ObjectLike>()) {
-        // Calls into executables are non-blocking.
-        indicateOptimisticFixpoint();
-      } else if (!callableOp.getCallableRegion() ||
-                 callableOp.getCallableRegion()->empty()) {
-        // No assumptions can be made about an external calls.
-        indicatePessimisticFixpoint();
-      } else {
-        return;
-      }
-    } else if (op->hasTrait<OpTrait::IREE::Util::YieldPoint>()) {
-      // Asynchronous yield points need to maintain global accessor order before
-      // and after the yield.
-      indicatePessimisticFixpoint();
-    } else if (op->hasTrait<OpTrait::IREE::Util::ObjectLike>()) {
-      // Object-like (i.e. *.executable) operations cannot access globals within
-      // the module so we can resolve it optimistically.
-      indicateOptimisticFixpoint();
-    } else if (auto callableOp = dyn_cast<mlir::CallableOpInterface>(op)) {
-      // External callable ops can potentially call back in to the current
-      // module and thus we pessimistically assume it can access any global.
-      if (!callableOp.getCallableRegion() ||
-          callableOp.getCallableRegion()->empty()) {
-        indicatePessimisticFixpoint();
-      }
-    } else if (!op->getNumRegions()) {
-      // All other regionless operations are non-blocking.
-      indicateOptimisticFixpoint();
-    } else {
-      return;
-    }
+    llvm::TypeSwitch<Operation *, void>(op)
+        // Direct globals loads/stores only perform a single access of the
+        // associated global.
+        .Case([&](IREE::Util::GlobalLoadOpInterface load) {
+          unionAssumed(load.getGlobalAttr().getAttr(), 1);
+          indicateOptimisticFixpoint();
+        })
+        .Case([&](IREE::Util::GlobalStoreOpInterface store) {
+          unionAssumed(store.getGlobalAttr().getAttr(), 1);
+          indicateOptimisticFixpoint();
+        })
+        .Case<IREE::Util::GlobalLoadIndirectOpInterface,
+              IREE::Util::GlobalStoreIndirectOpInterface>([&](Operation *) {
+          // Indirect global accessors can access any global and need to be
+          // treated as pessimistically as possible.
+          indicatePessimisticFixpoint();
+        })
+        .Case([&](mlir::CallOpInterface callOp) {
+          // Treat calls as blocking if the root op is not a symbol table.
+          if (!solver.getExplorer()
+                   .getRootOp()
+                   ->hasTrait<OpTrait::SymbolTable>()) {
+            indicatePessimisticFixpoint();
+            return;
+          }
+          auto callableOp =
+              llvm::dyn_cast_if_present<mlir::CallableOpInterface>(
+                  callOp.resolveCallable(
+                      &solver.getExplorer().getSymbolTables()));
+          // If we cannot resolve the callee of a call op, we block all global
+          // movement around it.
+          if (!callableOp) {
+            indicatePessimisticFixpoint();
+          } else if (callableOp->getParentWithTrait<
+                         OpTrait::IREE::Util::ObjectLike>()) {
+            // Calls into executables are non-blocking.
+            indicateOptimisticFixpoint();
+          } else if (!callableOp.getCallableRegion() ||
+                     callableOp.getCallableRegion()->empty()) {
+            // No assumptions can be made about an external call.
+            indicatePessimisticFixpoint();
+          }
+        })
+        .Case([&](mlir::CallableOpInterface callableOp) {
+          // External callable ops can potentially call back in to the current
+          // module and thus we pessimistically assume it can access any global.
+          if (!callableOp.getCallableRegion() ||
+              callableOp.getCallableRegion()->empty()) {
+            indicatePessimisticFixpoint();
+          }
+        })
+        .Default([&](Operation *op) {
+          if (op->hasTrait<OpTrait::IREE::Util::YieldPoint>()) {
+            // Asynchronous yield points need to maintain global accessor order
+            // before and after the yield.
+            indicatePessimisticFixpoint();
+          } else if (op->hasTrait<OpTrait::IREE::Util::ObjectLike>()) {
+            // Object-like (i.e. *.executable) operations cannot access globals
+            // within the module so we can resolve it optimistically.
+            indicateOptimisticFixpoint();
+          } else if (!op->getNumRegions()) {
+            // All other regionless operations are non-blocking.
+            indicateOptimisticFixpoint();
+          }
+        });
 
     LLVM_DEBUG({
       llvm::dbgs() << "[simplify-globals] initialized global accessor ";
@@ -226,10 +255,12 @@ private:
     for (auto &region : op->getRegions()) {
       for (auto &block : region) {
         for (auto &containedOp : block) {
-          auto accessor = solver.getElementFor<GlobalAccessor>(
-              *this, Position::forOperation(&containedOp),
-              DFX::Resolution::REQUIRED);
-          bestState ^= accessor;
+          if (isPotentialAccessor(&containedOp)) {
+            auto accessor = solver.getElementFor<GlobalAccessor>(
+                *this, Position::forOperation(&containedOp),
+                DFX::Resolution::REQUIRED);
+            bestState ^= accessor;
+          }
         }
       }
     }
@@ -255,14 +286,36 @@ public:
         solver(explorer, allocator) {
     explorer.initialize();
 
-    assert(rootOp->getNumRegions() == 1 && "expected module-like root op");
-
     // Populate the list of globals to optimize. This is primarily to force the
     // order in which globals are processed to be deterministic, reducing minor
     // ordering variations in the resulting IR.
-    rootOp->walk([&](IREE::Util::GlobalOpInterface global) {
-      globalNames.push_back(global.getGlobalName());
-    });
+    if (rootOp->hasTrait<OpTrait::SymbolTable>()) {
+      assert(rootOp->getNumRegions() == 1 &&
+             "expected module-like symbol table root op");
+
+      rootOp->walk([&](IREE::Util::GlobalOpInterface global) {
+        globalNames.push_back(global.getGlobalName());
+      });
+    } else if (isa<FunctionOpInterface>(rootOp)) {
+      llvm::DenseSet<StringAttr> nameSet;
+      rootOp->walk([&](Operation *op) {
+        StringAttr name =
+            llvm::TypeSwitch<Operation *, StringAttr>(op)
+                .Case([&](IREE::Util::GlobalLoadOpInterface load) {
+                  return load.getGlobalAttr().getAttr();
+                })
+                .Case([&](IREE::Util::GlobalStoreOpInterface store) {
+                  return store.getGlobalAttr().getAttr();
+                })
+                .Default([](Operation *) { return StringAttr(); });
+        if (name && !nameSet.contains(name)) {
+          globalNames.push_back(name);
+          nameSet.insert(name);
+        }
+      });
+    } else {
+      assert(false && "expected module-like or function-like root op");
+    }
   }
 
   AsmState &getAsmState() { return solver.getAsmState(); }
@@ -271,17 +324,11 @@ public:
   // Runs analysis and populates the state cache.
   // May fail if analysis cannot be completed due to unsupported or unknown IR.
   LogicalResult run() {
-    // Initialize all potential accessors.
-    explorer.walk([&](Operation *op) {
-      if (isa<IREE::Util::GlobalLoadOpInterface>(op) ||
-          isa<IREE::Util::GlobalStoreOpInterface>(op) ||
-          isa<IREE::Util::GlobalLoadIndirectOpInterface,
-              IREE::Util::GlobalStoreIndirectOpInterface>(op) ||
-          isa<mlir::CallOpInterface>(op) ||
-          isa<mlir::CallableOpInterface>(op) ||
-          op->hasTrait<OpTrait::IREE::Util::YieldPoint>() ||
-          op->hasTrait<OpTrait::IREE::Util::ObjectLike>() ||
-          op->getNumRegions() > 0) {
+    // Initialize all potential accessors. We walk the root op instead of the
+    // explorer because we don't want to walk through the call graph if the root
+    // is a function.
+    explorer.getRootOp()->walk([&](Operation *op) {
+      if (isPotentialAccessor(op)) {
         solver.getOrCreateElementFor<GlobalAccessor>(
             Position::forOperation(op));
       }
@@ -318,10 +365,10 @@ public:
           globalAccessors.insert(op);
         }
         if (auto store = dyn_cast<IREE::Util::GlobalStoreOpInterface>(op)) {
-          bucketedAccessors[store.getGlobalAttr().getAttr()].insert(store);
+          bucketedAccessors[store.getGlobalAttr().getAttr()].push_back(store);
         } else if (auto load =
                        dyn_cast<IREE::Util::GlobalLoadOpInterface>(op)) {
-          bucketedAccessors[load.getGlobalAttr().getAttr()].insert(load);
+          bucketedAccessors[load.getGlobalAttr().getAttr()].push_back(load);
         } else if (auto loop = dyn_cast<LoopLikeOpInterface>(op)) {
           compositeAccessors.push_back(loop);
         }
@@ -360,7 +407,7 @@ private:
   // referenced by |globalName|.
   void moveOpDownInBlock(Operation *op, StringAttr globalName);
 
-  StringAttr getGlobalName(Operation *op) {
+  StringAttr getGlobalName(Operation *op) const {
     StringAttr globalName;
     if (auto store = dyn_cast<IREE::Util::GlobalStoreOpInterface>(op)) {
       globalName = store.getGlobalAttr().getAttr();
@@ -393,7 +440,6 @@ private:
   }
 
   void eraseAccessor(StringAttr globalName, Operation *op) {
-    bucketedAccessors[globalName].erase(op);
     Operation *parent = op->getParentOp();
     // Decrement the accessor count for this global and propagate to all
     // parents.
@@ -408,7 +454,24 @@ private:
     op->erase();
   }
 
-  DFX::SaturatedInteger getAccessorCount(Operation *op, StringAttr globalName) {
+  bool operationDoesAccessGlobal(Operation *op, StringAttr globalName) const {
+    if (!globalAccessors.contains(op)) {
+      return false;
+    }
+    // If the access counts are unknown, assume it does access the global.
+    if (!accessorCounts.contains(op)) {
+      return true;
+    }
+    // If there is no entry for this global by this accessor, then this accessor
+    // does not access this global.
+    if (!accessorCounts.at(op).contains(globalName)) {
+      return false;
+    }
+    return accessorCounts.at(op).at(globalName) != 0;
+  }
+
+  DFX::SaturatedInteger getAccessorCount(Operation *op,
+                                         StringAttr globalName) const {
     // If not an accessor, the number of accesses is necessarily zero.
     if (!globalAccessors.contains(op)) {
       return DFX::SaturatedInteger{false, 0};
@@ -420,10 +483,10 @@ private:
     }
     // If there is no entry for this global by this accessor, then this accessor
     // does not access this global.
-    if (!accessorCounts[op].contains(globalName)) {
+    if (!accessorCounts.at(op).contains(globalName)) {
       return DFX::SaturatedInteger{false, 0};
     }
-    return accessorCounts[op][globalName];
+    return accessorCounts.at(op).at(globalName);
   }
 
   Explorer explorer;
@@ -452,7 +515,7 @@ private:
       accessorCounts;
 
   SmallVector<StringAttr> globalNames;
-  DenseMap<StringAttr, DenseSet<Operation *>> bucketedAccessors;
+  DenseMap<StringAttr, std::list<Operation *>> bucketedAccessors;
   SmallVector<Operation *> compositeAccessors;
 };
 
@@ -464,7 +527,7 @@ void GlobalAccessorAnalysis::moveOpUpInBlock(Operation *op,
     auto prev = earliestValidNode->getPrevNode();
     // If the accessor is invalid or is known to access the given global,
     // block propagation through that operation.
-    if (getAccessorCount(prev, globalName) != 0) {
+    if (!prev || operationDoesAccessGlobal(prev, globalName)) {
       break;
     }
     earliestValidNode = prev;
@@ -489,7 +552,7 @@ void GlobalAccessorAnalysis::moveOpDownInBlock(Operation *op,
   while (!latestValidNode->getNextNode()->hasTrait<OpTrait::IsTerminator>()) {
     auto next = latestValidNode->getNextNode();
     // Check if the accessor might access the given global.
-    if (getAccessorCount(next, globalName) != 0) {
+    if (operationDoesAccessGlobal(next, globalName)) {
       break;
     }
     latestValidNode = next;
@@ -527,7 +590,6 @@ bool GlobalAccessorAnalysis::processGlobalLoad(
       llvm::dbgs() << "->\n" << storedValue;
     });
     load->replaceAllUsesWith(ValueRange{storedValue});
-    eraseAccessor(load.getGlobalAttr().getAttr(), load);
     changedLoad = true;
   } else if (isa<IREE::Util::GlobalLoadOpInterface>(prev)) {
     // RAR - forward the loaded global to the following use.
@@ -539,7 +601,6 @@ bool GlobalAccessorAnalysis::processGlobalLoad(
       llvm::dbgs() << "\n";
     });
     load->replaceAllUsesWith(prev);
-    eraseAccessor(load.getGlobalAttr().getAttr(), load);
     changedLoad = true;
   }
   return changedLoad;
@@ -563,7 +624,6 @@ bool GlobalAccessorAnalysis::processGlobalStore(
       nextStore->print(llvm::dbgs(), solver.getAsmState());
       llvm::dbgs() << "\n";
     });
-    eraseAccessor(store.getGlobalAttr().getAttr(), store);
     changedStore = true;
   }
   return changedStore;
@@ -668,20 +728,49 @@ bool GlobalAccessorAnalysis::processDirectAccessors(StringAttr globalName) {
     return false;
   }
   bool directAccessorsDidChange = false;
-  auto accessors = bucketedAccessors[globalName];
-  // Record the current set of loads/stores for this global.
-  SmallVector<Operation *> directAccessors = llvm::to_vector(accessors);
-  for (auto accessor : directAccessors) {
+  auto &accessors = bucketedAccessors[globalName];
+  // Iterate the list of direct accessors for this global and perform WaW and
+  // RaW forwarding.
+  accessors.remove_if([&](Operation *accessor) {
     // Process loads/stores one at a time, tracking whether any were removed.
     if (auto store = dyn_cast<IREE::Util::GlobalStoreOpInterface>(accessor)) {
-      directAccessorsDidChange |= processGlobalStore(store);
+      if (auto parent = store->getParentOp()) {
+        DFX::SaturatedInteger accessCount =
+            getAccessorCount(parent, globalName);
+        // Shortcut the common case of the enclosing operation only writing the
+        // global once.
+        if (accessCount == 1) {
+          store->moveBefore(store->getBlock()->getTerminator());
+          return false;
+        }
+      }
+      if (processGlobalStore(store)) {
+        eraseAccessor(globalName, store);
+        directAccessorsDidChange = true;
+        return true;
+      }
     } else if (auto load =
                    dyn_cast<IREE::Util::GlobalLoadOpInterface>(accessor)) {
-      directAccessorsDidChange |= processGlobalLoad(load);
+      if (auto parent = load->getParentOp()) {
+        DFX::SaturatedInteger accessCount =
+            getAccessorCount(parent, globalName);
+        // Shortcut the common case of the enclosing operation only reading the
+        // global once.
+        if (accessCount == 1) {
+          load->moveBefore(&load->getBlock()->front());
+          return false;
+        }
+      }
+      if (processGlobalLoad(load)) {
+        eraseAccessor(globalName, load);
+        directAccessorsDidChange = true;
+        return true;
+      }
     } else {
       llvm_unreachable("unexpected direct accessor type");
     }
-  }
+    return false;
+  });
   return directAccessorsDidChange;
 }
 
@@ -717,29 +806,36 @@ class SimplifyGlobalAccessesPass
     : public SimplifyGlobalAccessesBase<SimplifyGlobalAccessesPass> {
 public:
   void runOnOperation() override {
-    auto moduleOp = getOperation();
-    if (moduleOp.getBody()->empty())
+    Operation *rootOp = getOperation();
+    if (rootOp->getRegion(0).empty())
       return;
-
-    // Build a set of all immutable globals for fast lookup.
-    DenseSet<StringRef> immutableGlobals = gatherImmutableGlobals(moduleOp);
 
     // Hoist immutable globals first. These have no hazards and don't care
     // about control flow - like `constant` - so getting them handled first
     // avoids the need for us to do the full analysis.
-    moduleOp.walk([&](CallableOpInterface callableOp) {
-      if (!callableOp.getCallableRegion() ||
-          callableOp.getCallableRegion()->empty()) {
-        return;
-      }
-      auto &region = *callableOp.getCallableRegion();
-      // Skip initializers as we might be initializing the immutable global. In
-      // such cases we fall back to treating it like normal global accessors.
-      if (region.getParentOfType<IREE::Util::InitializerOp>()) {
-        return;
-      }
-      hoistImmutableLoads(region, immutableGlobals);
-    });
+    if (auto moduleOp = dyn_cast<ModuleOp>(rootOp)) {
+      DenseSet<StringRef> immutableGlobals = gatherImmutableGlobals(moduleOp);
+      moduleOp.walk([&](CallableOpInterface callableOp) {
+        if (!callableOp.getCallableRegion() ||
+            callableOp.getCallableRegion()->empty()) {
+          return;
+        }
+        auto &region = *callableOp.getCallableRegion();
+        // Skip initializers as we might be initializing the immutable global.
+        // In such cases we fall back to treating it like normal global
+        // accessors.
+        if (region.getParentOfType<IREE::Util::InitializerOp>()) {
+          return;
+        }
+        hoistImmutableLoads(region, immutableGlobals);
+      });
+    } else if (!isa<IREE::Util::InitializerOp>(rootOp)) {
+      assert(isa<mlir::FunctionOpInterface>(rootOp) &&
+             "Expected function-like root if not a module op");
+      DenseSet<StringRef> immutableGlobals =
+          gatherImmutableGlobals(rootOp->getParentOfType<ModuleOp>());
+      hoistImmutableLoads(rootOp->getRegion(0), immutableGlobals);
+    }
 
     // This runs an analysis to count the number of unique accessors per region
     // operation.  Execution order of direct accesses relative to external
@@ -748,9 +844,9 @@ public:
     // The result of the analysis caches a map describing the number of unique
     // direct accessors each operation contains. This is used to inform the
     // propagation logic of whether an operation blocks motion.
-    GlobalAccessorAnalysis analysis(moduleOp);
+    GlobalAccessorAnalysis analysis(rootOp);
     if (failed(analysis.run())) {
-      moduleOp.emitError() << "failed to solve for global accessors";
+      rootOp->emitError() << "failed to solve for global accessors";
       return signalPassFailure();
     }
 
@@ -772,8 +868,7 @@ public:
 
 } // namespace
 
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createSimplifyGlobalAccessesPass() {
+std::unique_ptr<OperationPass<void>> createSimplifyGlobalAccessesPass() {
   return std::make_unique<SimplifyGlobalAccessesPass>();
 }
 

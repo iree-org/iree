@@ -564,7 +564,7 @@ struct SaturatedInteger {
   bool operator==(const int64_t other) const {
     return !saturated && (v == other);
   }
-  bool operator!=(const int64_t other) const { return !(*this == other); }
+  bool operator!=(const int64_t other) const { return saturated || v != other; }
   SaturatedInteger operator+(const SaturatedInteger other) const {
     if (saturated || other.saturated)
       return SaturatedInteger{true, 0};

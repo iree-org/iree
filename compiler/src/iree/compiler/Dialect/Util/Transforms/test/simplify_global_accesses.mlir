@@ -1,4 +1,5 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-util-simplify-global-accesses)' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-util-simplify-global-accesses)' %s | FileCheck %s --check-prefixes=CHECK,MODULE
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(util.func(iree-util-simplify-global-accesses))' %s | FileCheck %s --check-prefixes=CHECK,FUNC
 
 util.global private @varA = dense<1> : tensor<2xi32>
 util.global private @varB = dense<3> : tensor<2x4xi32>
@@ -154,8 +155,6 @@ util.func public @ordering() {
   // CHECK-DAG: %[[T1:.+]] = util.global.load @varB {id = 1
   // CHECK-NEXT: arith.constant
 
-  // CHECK-NOT: NOT
-
   // Stores should be moved down (in any order).
   // CHECK-NEXT: arith.constant
   // CHECK-DAG: util.global.store %[[T0]], @varA {id = 0
@@ -189,6 +188,14 @@ util.func public @blocking_scf(%steps: index) {
     scf.yield
   }
 
+  // All function calls block motion when nested on the function.
+  // FUNC:      scf.for
+  // FUNC-NEXT: util.call @copy_global_a
+  // FUNC:      util.global.load
+  // FUNC-NEXT: util.global.store
+  // FUNC-NEXT: scf.for
+  // FUNC-NEXT: util.call @copy_global_b
+
   %varA_1 = util.global.load @varA : tensor<2xi32>
   util.global.store %varA_1, @varA : tensor<2xi32>
 
@@ -203,18 +210,18 @@ util.func public @blocking_scf(%steps: index) {
   }
 
   // The first loop accesses @varA and blocks motion.
-  //      CHECK: scf.for
-  // CHECK-NEXT: util.call @copy_global_a
-  // CHECK: %[[T0:.+]] = util.global.load @varA
+  //      MODULE: scf.for
+  // MODULE-NEXT: util.call @copy_global_a
+  // MODULE: %[[T0:.+]] = util.global.load @varA
 
   // The second loop only accesses @varB and does not block motion.
-  //      CHECK: scf.for
-  // CHECK-NEXT: util.call @copy_global_b
-  //      CHECK: util.global.store %[[T0]], @varA
+  //      MODULE: scf.for
+  // MODULE-NEXT: util.call @copy_global_b
+  //      MODULE: util.global.store %[[T0]], @varA
 
   // External calls are always blocking.
-  //      CHECK: scf.for
-  // CHECK-NEXT: util.call @external
+  //      MODULE: scf.for
+  // MODULE-NEXT: util.call @external
   util.return
 }
 
