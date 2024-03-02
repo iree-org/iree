@@ -96,8 +96,8 @@ typedef struct iree_hal_cuda_queue_action_t {
   // Scratch fields for analyzing whether actions are ready to issue.
   CUevent events[IREE_HAL_CUDA_MAX_WAIT_EVENT_COUNT];
   iree_host_size_t event_count;
-  bool is_pending;
   // Whether the current action is still not ready for releasing to the GPU.
+  bool is_pending;
 } iree_hal_cuda_queue_action_t;
 
 //===----------------------------------------------------------------------===//
@@ -219,7 +219,11 @@ typedef struct iree_hal_cuda_working_area_t {
   iree_hal_cuda_ready_action_slist_t ready_worklist;  // atomic
   iree_atomic_int32_t worker_state;                   // atomic
   iree_atomic_intptr_t error_code;                    // atomic
-  iree_allocator_t host_allocator;                    // const
+  // The number of actions that have been issued to the GPU but not yet fully
+  // completed both execution and cleanup. We don't need this field to be atomic
+  // given it is modified only from the worker thread.
+  int32_t pending_action_count;
+  iree_allocator_t host_allocator;  // const
 } iree_hal_cuda_working_area_t;
 
 static void iree_hal_cuda_working_area_initialize(
@@ -233,6 +237,7 @@ static void iree_hal_cuda_working_area_initialize(
                           iree_memory_order_release);
   iree_atomic_store_int32(&working_area->error_code, IREE_STATUS_OK,
                           iree_memory_order_release);
+  working_area->pending_action_count = 0;
   working_area->host_allocator = host_allocator;
 }
 
@@ -547,6 +552,18 @@ static void iree_hal_cuda_execution_device_signal_host_callback(
   iree_hal_cuda_queue_action_list_push_back(&actions->action_list, action);
   iree_slim_mutex_unlock(&actions->action_mutex);
 
+  // Notify the worker thread again that we have the cleanup action enqueued.
+  // Only overwrite the idle waiting state, which has lower priority.
+  iree_hal_cuda_worker_state_t prev_state =
+      IREE_HAL_CUDA_WORKER_STATE_IDLE_WAITING;
+  iree_atomic_compare_exchange_strong_int32(
+      &actions->working_area.worker_state, /*expected=*/&prev_state,
+      /*desired=*/IREE_HAL_CUDA_WORKER_STATE_WORKLOAD_PENDING,
+      /*order_succ=*/iree_memory_order_acq_rel,
+      /*order_fail=*/iree_memory_order_acquire);
+  iree_notification_post(&actions->working_area.state_notification,
+                         IREE_ALL_WAITERS);
+
   // Advance semaphore timelines by calling into the host signaling function.
   // This will internally try to release more workload to the GPU.
   IREE_IGNORE_ERROR(
@@ -627,6 +644,10 @@ static iree_status_t iree_hal_cuda_pending_queue_actions_issue_execution(
         "cuStreamWaitEvent");
   }
 
+  // Increase the pending action counter. We decrease it once it fully
+  // compeletes and gets cleaned up.
+  ++action->owning_actions->working_area.pending_action_count;
+
   // Now launch a host function on the callback stream to advance the semaphore
   // timeline.
   IREE_CUDA_RETURN_AND_END_ZONE_IF_ERROR(
@@ -663,6 +684,10 @@ static iree_status_t iree_hal_cuda_pending_queue_actions_issue_cleanup(
   iree_hal_resource_release(actions);
 
   iree_allocator_free(host_allocator, action);
+
+  // Now we fully executed and cleaned up this action. Decrease the pending
+  // action counter.
+  --actions->working_area.pending_action_count;
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
@@ -850,13 +875,13 @@ static iree_status_t iree_hal_cuda_worker_process_ready_list(
       switch (action->state) {
         case IREE_HAL_cuda_QUEUE_ACTION_STATE_ALIVE:
           status = iree_hal_cuda_pending_queue_actions_issue_execution(action);
+          if (iree_status_is_ok(status)) action->event_count = 0;
           break;
         case IREE_HAL_cuda_QUEUE_ACTION_STATE_ZOMBIE:
           status = iree_hal_cuda_pending_queue_actions_issue_cleanup(action);
           break;
       }
       if (!iree_status_is_ok(status)) break;
-      action->event_count = 0;
 
       action = next_action;
     }
@@ -916,7 +941,7 @@ static int iree_hal_cuda_worker_execute(
       return -1;
     }
 
-    if (should_exit) {
+    if (should_exit && working_area->pending_action_count == 0) {
       // Signal that this thread is committed to exit. This state has a priority
       // that is only lower than error exit. And we just checked error exit in
       // the above. So also just overwrite.
