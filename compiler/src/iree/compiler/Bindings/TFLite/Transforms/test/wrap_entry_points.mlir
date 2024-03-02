@@ -151,11 +151,11 @@
 
 
 // CHECK-LABEL: util.func public @_tflite_main(
-//  CHECK-SAME:   %[[IN0_BUFFER:.+]]: !hal.buffer {iree.identifier = "input0"},
-//  CHECK-SAME:   %[[IN1_BUFFER:.+]]: !hal.buffer {iree.identifier = "input1"})
+//  CHECK-SAME:   %[[IN0_BUFFER:.+]]: !hal.buffer {iree.abi.name = "input0"},
+//  CHECK-SAME:   %[[IN1_BUFFER:.+]]: !hal.buffer {iree.abi.name = "input1"})
 //  CHECK-SAME: -> (
-//  CHECK-SAME:   !hal.buffer {iree.identifier = "output0"},
-//  CHECK-SAME:   !hal.buffer {iree.identifier = "output1"}
+//  CHECK-SAME:   !hal.buffer {iree.abi.name = "output0"},
+//  CHECK-SAME:   !hal.buffer {iree.abi.name = "output1"}
 //  CHECK-SAME: ) attributes {
 //  CHECK-SAME:   iree.abi.stub,
 //  CHECK-SAME:   iree.reflection = {
@@ -194,11 +194,11 @@
 
 // CHECK-LABEL: util.func private @dynamicEntry(
 util.func public @dynamicEntry(
-  %arg0: tensor<?x8x8x3xf32> {iree.identifier = "input0"},
-  %arg1: tensor<?x8x8x3xf32> {iree.identifier = "input1"}
+  %arg0: tensor<?x8x8x3xf32> {iree.abi.name = "input0"},
+  %arg1: tensor<?x8x8x3xf32> {iree.abi.name = "input1"}
 ) -> (
-  tensor<?x8x8x3xf32> {iree.identifier = "output0"},
-  tensor<?x8x8x3xf32> {iree.identifier = "output1"}
+  tensor<?x8x8x3xf32> {iree.abi.name = "output0"},
+  tensor<?x8x8x3xf32> {iree.abi.name = "output1"}
 ) {
   // CHECK: = arith.addf
   %0 = arith.addf %arg0, %arg1 : tensor<?x8x8x3xf32>

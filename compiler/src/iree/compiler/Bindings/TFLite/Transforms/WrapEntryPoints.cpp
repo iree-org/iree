@@ -61,14 +61,13 @@ public:
   static StringAttr getArgId(IREE::Util::FuncOp funcOp, int i) {
     StringAttr id =
         funcOp.getArgAttrOfType<StringAttr>(i, "ml_program.identifier");
-    return id ? id : funcOp.getArgAttrOfType<StringAttr>(i, "iree.identifier");
+    return id ? id : funcOp.getArgAttrOfType<StringAttr>(i, "iree.abi.name");
   }
 
   static StringAttr getResultId(IREE::Util::FuncOp funcOp, int i) {
     StringAttr id =
         funcOp.getResultAttrOfType<StringAttr>(i, "ml_program.identifier");
-    return id ? id
-              : funcOp.getResultAttrOfType<StringAttr>(i, "iree.identifier");
+    return id ? id : funcOp.getResultAttrOfType<StringAttr>(i, "iree.abi.name");
   }
 
   void runOnOperation() override {
@@ -141,7 +140,7 @@ private:
     auto funcType = funcOp.getFunctionType();
 
     // TFLite requires the tensor names at runtime. If they've previously been
-    // extracted into iree.identifiers we use those and otherwise fallback to
+    // extracted into iree.abi.names we use those and otherwise fallback to
     // a generic naming scheme that matches the IR (somewhat).
     SmallVector<std::string> inputNames;
     SmallVector<std::string> outputNames;
