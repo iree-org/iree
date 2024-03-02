@@ -426,6 +426,7 @@ option(IREE_ENABLE_SPLIT_DWARF "Enable gsplit-dwarf for debug information if the
 option(IREE_ENABLE_THIN_ARCHIVES "Enables thin ar archives (elf systems only). Disable for released static archives" OFF)
 option(IREE_LINK_COMPILER_SHARED_LIBRARY "Links IREE tools using the compiler compiled into a shared library" ON)
 option(IREE_ENABLE_WERROR_FLAG "Enable `-Werror` flag, treat error as warning" ON)
+option(IREE_ENABLE_POSITION_INDEPENDENT_CODE "Enable position independent code" TRUE)
 
 if(IREE_LINK_COMPILER_SHARED_LIBRARY AND IREE_ENABLE_COMPILER_TRACING)
   message(SEND_ERROR
@@ -450,6 +451,8 @@ if(IREE_ENABLE_CCACHE)
         "IREE_ENABLE_CCACHE was set, but executable `ccache` was not found.")
   endif()
 endif()
+
+set (CMAKE_POSITION_INDEPENDENT_CODE ${IREE_ENABLE_POSITION_INDEPENDENT_CODE})
 
 option(IREE_DEV_MODE "Configure settings to optimize for IREE development (as opposed to CI or release)" OFF)
 
@@ -542,8 +545,6 @@ include(iree_plugin_register)
 # to derive it relative to this directory and prefixed with iree/.
 set(IREE_PACKAGE_ROOT_DIR "${CMAKE_CURRENT_LIST_DIR}")
 set(IREE_PACKAGE_ROOT_PREFIX "iree")
-
-set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 
 #-------------------------------------------------------------------------------
 # Experimental ROCM HAL driver
