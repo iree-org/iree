@@ -9,6 +9,8 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/flags.h"
 #include "iree/builtins/ukernel/api.h"
+#include "iree/builtins/ukernel/exported_bits.h"
+#include "iree/builtins/ukernel/mmt4d.h"
 #include "iree/builtins/ukernel/mmt4d_internal.h"
 #include "iree/builtins/ukernel/tools/benchmark.h"
 #include "iree/builtins/ukernel/tools/util.h"
@@ -95,7 +97,8 @@ static void iree_uk_benchmark_register_mmt4d_impl(
   snprintf(name, sizeof name, "mmt4d_%s_tile_%dx%dx%d%s", type_str, M0, N0, K0,
            code_path_suffix);
   iree_uk_mmt4d_params_t params = {
-      .flags = flags | IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS,
+      .flags = flags | IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS |
+               IREE_UK_FLAG_MMT4D_ALLOW_GENERIC_FALLBACK_TILE_FUNCTION,
       .M0 = M0,
       .N0 = N0,
       .K0 = K0};
@@ -106,15 +109,6 @@ static void iree_uk_benchmark_register_mmt4d_impl(
 static void iree_uk_benchmark_register_mmt4d(iree_uk_uint32_t flags, int M0,
                                              int N0, int K0,
                                              const char* cpu_features) {
-  // For non-fallback benchmarks, i.e. benchmarks for architecture-specific
-  // cases, stop here if we haven't linked architecture-specific code, which is
-  // the case in Bazel builds.
-  if (!(flags & IREE_UK_FLAG_MMT4D_ALLOW_GENERIC_FALLBACK_TILE_FUNCTION)) {
-    if (!iree_uk_mmt4d_linked_arch_code) {
-      return;
-    }
-  }
-
   // Test narrowed, power-of-two values of M0, as mmt4d kernels tend to have
   // narrow variants for handling these cases.
   for (int narrowM0 = 1; narrowM0 < M0; narrowM0 *= 2) {
