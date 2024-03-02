@@ -101,7 +101,7 @@ jobs:
 
   build_test_all_windows:
     needs: setup
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_all')
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_test_all_windows')
     runs-on: windows-2022-64core
     defaults:
       run:
