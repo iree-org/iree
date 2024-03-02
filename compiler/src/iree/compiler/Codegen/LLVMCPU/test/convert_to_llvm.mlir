@@ -75,7 +75,7 @@ module {
   }
 }
 
-// Make sure we can lowering multi-dimensional `vector.interleave` and its
+// Make sure we can lower multi-dimensional `vector.interleave` and its
 // corresponding multi-dimensional `vector.bitcast`.
 
 // CHECK-LABEL: llvm.func @interleave_and_bitcast_lowering(
