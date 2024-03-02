@@ -114,7 +114,7 @@ def HoistIntoGlobals : Pass<"iree-util-hoist-into-globals", "mlir::ModuleOp"> {
 }
 
 def SimplifyGlobalAccesses :
-    Pass<"iree-util-simplify-global-accesses", ""> {
+    Pass<"iree-util-simplify-global-accesses", "mlir::ModuleOp"> {
   let summary = "Hoists loads and sinks stores to variables to decrease data dependency regions.";
   let constructor = [{
     mlir::iree_compiler::IREE::Util::createSimplifyGlobalAccessesPass()

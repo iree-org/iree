@@ -163,13 +163,6 @@ private:
           indicatePessimisticFixpoint();
         })
         .Case([&](mlir::CallOpInterface callOp) {
-          // Treat calls as blocking if the root op is not a symbol table.
-          if (!solver.getExplorer()
-                   .getRootOp()
-                   ->hasTrait<OpTrait::SymbolTable>()) {
-            indicatePessimisticFixpoint();
-            return;
-          }
           auto callableOp =
               llvm::dyn_cast_if_present<mlir::CallableOpInterface>(
                   callOp.resolveCallable(
@@ -286,36 +279,15 @@ public:
         solver(explorer, allocator) {
     explorer.initialize();
 
+    assert(rootOp->getNumRegions() == 1 &&
+           "expected module-like symbol table root op");
+
     // Populate the list of globals to optimize. This is primarily to force the
     // order in which globals are processed to be deterministic, reducing minor
     // ordering variations in the resulting IR.
-    if (rootOp->hasTrait<OpTrait::SymbolTable>()) {
-      assert(rootOp->getNumRegions() == 1 &&
-             "expected module-like symbol table root op");
-
-      rootOp->walk([&](IREE::Util::GlobalOpInterface global) {
-        globalNames.push_back(global.getGlobalName());
-      });
-    } else if (isa<FunctionOpInterface>(rootOp)) {
-      llvm::DenseSet<StringAttr> nameSet;
-      rootOp->walk([&](Operation *op) {
-        StringAttr name =
-            llvm::TypeSwitch<Operation *, StringAttr>(op)
-                .Case([&](IREE::Util::GlobalLoadOpInterface load) {
-                  return load.getGlobalAttr().getAttr();
-                })
-                .Case([&](IREE::Util::GlobalStoreOpInterface store) {
-                  return store.getGlobalAttr().getAttr();
-                })
-                .Default([](Operation *) { return StringAttr(); });
-        if (name && !nameSet.contains(name)) {
-          globalNames.push_back(name);
-          nameSet.insert(name);
-        }
-      });
-    } else {
-      assert(false && "expected module-like or function-like root op");
-    }
+    rootOp->walk([&](IREE::Util::GlobalOpInterface global) {
+      globalNames.push_back(global.getGlobalName());
+    });
   }
 
   AsmState &getAsmState() { return solver.getAsmState(); }
@@ -327,7 +299,7 @@ public:
     // Initialize all potential accessors. We walk the root op instead of the
     // explorer because we don't want to walk through the call graph if the root
     // is a function.
-    explorer.getRootOp()->walk([&](Operation *op) {
+    explorer.walk([&](Operation *op) {
       if (isPotentialAccessor(op)) {
         solver.getOrCreateElementFor<GlobalAccessor>(
             Position::forOperation(op));
@@ -806,36 +778,28 @@ class SimplifyGlobalAccessesPass
     : public SimplifyGlobalAccessesBase<SimplifyGlobalAccessesPass> {
 public:
   void runOnOperation() override {
-    Operation *rootOp = getOperation();
-    if (rootOp->getRegion(0).empty())
+    auto moduleOp = getOperation();
+    if (moduleOp.getBody()->empty())
       return;
 
     // Hoist immutable globals first. These have no hazards and don't care
     // about control flow - like `constant` - so getting them handled first
     // avoids the need for us to do the full analysis.
-    if (auto moduleOp = dyn_cast<ModuleOp>(rootOp)) {
-      DenseSet<StringRef> immutableGlobals = gatherImmutableGlobals(moduleOp);
-      moduleOp.walk([&](CallableOpInterface callableOp) {
-        if (!callableOp.getCallableRegion() ||
-            callableOp.getCallableRegion()->empty()) {
-          return;
-        }
-        auto &region = *callableOp.getCallableRegion();
-        // Skip initializers as we might be initializing the immutable global.
-        // In such cases we fall back to treating it like normal global
-        // accessors.
-        if (region.getParentOfType<IREE::Util::InitializerOp>()) {
-          return;
-        }
-        hoistImmutableLoads(region, immutableGlobals);
-      });
-    } else if (!isa<IREE::Util::InitializerOp>(rootOp)) {
-      assert(isa<mlir::FunctionOpInterface>(rootOp) &&
-             "Expected function-like root if not a module op");
-      DenseSet<StringRef> immutableGlobals =
-          gatherImmutableGlobals(rootOp->getParentOfType<ModuleOp>());
-      hoistImmutableLoads(rootOp->getRegion(0), immutableGlobals);
-    }
+    DenseSet<StringRef> immutableGlobals = gatherImmutableGlobals(moduleOp);
+    moduleOp.walk([&](CallableOpInterface callableOp) {
+      if (!callableOp.getCallableRegion() ||
+          callableOp.getCallableRegion()->empty()) {
+        return;
+      }
+      auto &region = *callableOp.getCallableRegion();
+      // Skip initializers as we might be initializing the immutable global.
+      // In such cases we fall back to treating it like normal global
+      // accessors.
+      if (region.getParentOfType<IREE::Util::InitializerOp>()) {
+        return;
+      }
+      hoistImmutableLoads(region, immutableGlobals);
+    });
 
     // This runs an analysis to count the number of unique accessors per region
     // operation.  Execution order of direct accesses relative to external
@@ -844,9 +808,9 @@ public:
     // The result of the analysis caches a map describing the number of unique
     // direct accessors each operation contains. This is used to inform the
     // propagation logic of whether an operation blocks motion.
-    GlobalAccessorAnalysis analysis(rootOp);
+    GlobalAccessorAnalysis analysis(moduleOp);
     if (failed(analysis.run())) {
-      rootOp->emitError() << "failed to solve for global accessors";
+      moduleOp->emitError() << "failed to solve for global accessors";
       return signalPassFailure();
     }
 
@@ -868,7 +832,8 @@ public:
 
 } // namespace
 
-std::unique_ptr<OperationPass<void>> createSimplifyGlobalAccessesPass() {
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createSimplifyGlobalAccessesPass() {
   return std::make_unique<SimplifyGlobalAccessesPass>();
 }
 
