@@ -20,4 +20,10 @@ IREE_UK_EXPORT void iree_uk_mmt4d(
     iree_uk_int32_t N0, iree_uk_int32_t K0, iree_uk_uint32_t flags,
     const iree_uk_uint64_t* cpu_data);
 
+// Returns a bit-field of information about how a mmt4d with the given
+// parameters would run.
+IREE_UK_EXPORT iree_uk_uint32_t
+iree_uk_mmt4d_info(iree_uk_int32_t M0, iree_uk_int32_t N0, iree_uk_int32_t K0,
+                   iree_uk_uint32_t flags, const iree_uk_uint64_t* cpu_data);
+
 #endif  // IREE_BUILTINS_UKERNEL_MMT4D_H_

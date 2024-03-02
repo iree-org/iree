@@ -42,7 +42,11 @@
 
 // bit flags
 #define IREE_UK_FLAG_MMT4D_ACCUMULATE 0x100
+#define IREE_UK_FLAG_MMT4D_ALLOW_GENERIC_FALLBACK_TILE_FUNCTION 0x200
 #define IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS 0x400
+
+// output bit flags for iree_uk_mmt4d_info
+#define IREE_UK_FLAG_MMT4D_INFO_HAVE_ARCHITECTURE_SPECIFIC_TILE_FUNCTION 0x1
 
 //===----------------------------------------------------------------------===//
 // pack

@@ -4,11 +4,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-if(IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER)
-  set(EXECUTABLE_FORMAT_PREFIX "system")
-else()
-  set(EXECUTABLE_FORMAT_PREFIX "embedded")
-endif()
+set(EXECUTABLE_FORMAT_PREFIX "embedded")
+# set(EXECUTABLE_FORMAT_PREFIX "system")
 set(NATIVE_EXECUTABLE_FORMAT "\"${EXECUTABLE_FORMAT_PREFIX}-elf-\" IREE_ARCH")
 
 if(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF)

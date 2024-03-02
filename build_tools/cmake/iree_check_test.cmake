@@ -242,10 +242,6 @@ function(iree_check_single_backend_test_suite)
     return()
   endif()
 
-  # Note: we could check IREE_BUILD_COMPILER here, but cross compilation makes
-  # that a little tricky. Instead, we let iree_check_test handle the checks,
-  # meaning this function may run some configuration but generate no targets.
-
   cmake_parse_arguments(
     _RULE
     ""
@@ -257,30 +253,77 @@ function(iree_check_single_backend_test_suite)
   foreach(_SRC IN LISTS _RULE_SRCS)
     get_filename_component(_BASE_NAME ${_SRC} NAME)
     set(_TEST_NAME "${_RULE_NAME}_${_BASE_NAME}")
-    iree_check_test(
-      NAME
-        ${_TEST_NAME}
-      SRC
-        ${_SRC}
-      TARGET_BACKEND
-        ${_RULE_TARGET_BACKEND}
-      DRIVER
-        ${_RULE_DRIVER}
-      COMPILER_FLAGS
-        ${_RULE_COMPILER_FLAGS}
-      INPUT_TYPE
-        ${_RULE_INPUT_TYPE}
-      RUNNER_ARGS
-        ${_RULE_RUNNER_ARGS}
-      LABELS
-        ${_RULE_LABELS}
-      TARGET_CPU_FEATURES
-        ${_RULE_TARGET_CPU_FEATURES}
-      DEPENDS
-        ${_RULE_DEPENDS}
-      TIMEOUT
-        ${_RULE_TIMEOUT}
-    )
+
+    # When using the llvm-cpu backend, the runtime build config may need to
+    # match the compiled executable config using (`--iree-llvmcpu-sanitize=`):
+    #
+    # | Runtime type         | Compatible with these executable types |
+    # | -------------------- | -------------------------------------- |
+    # | Base (no sanitizers) | Base, ASan                             |
+    # | ASan                 | Base, ASan                             |
+    # | TSan                 | TSan (ABI break)                       |
+
+    # Define the regular test suite, unless the config is llvm-cpu + TSan.
+    if(NOT _RULE_TARGET_BACKEND STREQUAL "llvm-cpu" OR NOT IREE_ENABLE_TSAN)
+      iree_check_test(
+        NAME ${_TEST_NAME}
+        SRC ${_SRC}
+        TARGET_BACKEND ${_RULE_TARGET_BACKEND}
+        DRIVER ${_RULE_DRIVER}
+        COMPILER_FLAGS ${_RULE_COMPILER_FLAGS}
+        INPUT_TYPE ${_RULE_INPUT_TYPE}
+        RUNNER_ARGS ${_RULE_RUNNER_ARGS}
+        LABELS ${_RULE_LABELS}
+        TARGET_CPU_FEATURES ${_RULE_TARGET_CPU_FEATURES}
+        DEPENDS ${_RULE_DEPENDS}
+        TIMEOUT ${_RULE_TIMEOUT}
+      )
+    endif()
+
+    # Define tests for AddressSanitizer (ASan) and ThreadSanitizer (TSan).
+    # Normally test suites should do this sort of branching at the leaves rather
+    # than modify the base CMake function directly, but sanitizers are applied
+    # at the build system uniformly, so until we decouple the test suites from
+    # source builds further this felt like a reasonable compromise.
+    if(_RULE_TARGET_BACKEND STREQUAL "llvm-cpu")
+      if(IREE_ENABLE_ASAN)
+        set(_ASAN_COMPILER_FLAGS ${_RULE_COMPILER_FLAGS})
+        list(APPEND _ASAN_COMPILER_FLAGS "--iree-llvmcpu-link-embedded=false")
+        list(APPEND _ASAN_COMPILER_FLAGS "--iree-llvmcpu-sanitize=address")
+        iree_check_test(
+          NAME "${_TEST_NAME}_asan"
+          SRC ${_SRC}
+          TARGET_BACKEND ${_RULE_TARGET_BACKEND}
+          DRIVER ${_RULE_DRIVER}
+          COMPILER_FLAGS ${_ASAN_COMPILER_FLAGS}
+          INPUT_TYPE ${_RULE_INPUT_TYPE}
+          RUNNER_ARGS ${_RULE_RUNNER_ARGS}
+          LABELS ${_RULE_LABELS}
+          TARGET_CPU_FEATURES ${_RULE_TARGET_CPU_FEATURES}
+          DEPENDS ${_RULE_DEPENDS}
+          TIMEOUT ${_RULE_TIMEOUT}
+        )
+      endif()
+
+      if(IREE_ENABLE_TSAN)
+        set(_TSAN_COMPILER_FLAGS ${_RULE_COMPILER_FLAGS})
+        list(APPEND _TSAN_COMPILER_FLAGS "--iree-llvmcpu-link-embedded=false")
+        list(APPEND _TSAN_COMPILER_FLAGS "--iree-llvmcpu-sanitize=thread")
+        iree_check_test(
+          NAME "${_TEST_NAME}_tsan"
+          SRC ${_SRC}
+          TARGET_BACKEND ${_RULE_TARGET_BACKEND}
+          DRIVER ${_RULE_DRIVER}
+          COMPILER_FLAGS ${_TSAN_COMPILER_FLAGS}
+          INPUT_TYPE ${_RULE_INPUT_TYPE}
+          RUNNER_ARGS ${_RULE_RUNNER_ARGS}
+          LABELS ${_RULE_LABELS}
+          TARGET_CPU_FEATURES ${_RULE_TARGET_CPU_FEATURES}
+          DEPENDS ${_RULE_DEPENDS}
+          TIMEOUT ${_RULE_TIMEOUT}
+        )
+      endif()
+    endif()
   endforeach()
 endfunction()
 

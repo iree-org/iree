@@ -12,7 +12,6 @@
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
-#include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -33,9 +32,10 @@ namespace mlir::iree_compiler {
 class TileConsumerAndFuseInputProducer final
     : public OpInterfaceRewritePattern<TilingInterface> {
 public:
-  TileConsumerAndFuseInputProducer(
-      MLIRContext *context, IREE::LinalgExt::LinalgTransformationFilter filter,
-      bool fuseInputProducer, PatternBenefit benefit = 1)
+  TileConsumerAndFuseInputProducer(MLIRContext *context,
+                                   LinalgTransformationFilter filter,
+                                   bool fuseInputProducer,
+                                   PatternBenefit benefit = 1)
       : OpInterfaceRewritePattern<TilingInterface>(context, benefit),
         filter(std::move(filter)), fuseInputProducer(fuseInputProducer) {}
 
@@ -146,7 +146,7 @@ private:
         // Mark the fused input producer for distribution when writing to shared
         // memory. We cannot use the current matmul op's tiling scheme here
         // given dimensions are different.
-        IREE::LinalgExt::LinalgTransformationFilter f(
+        LinalgTransformationFilter f(
             ArrayRef<StringAttr>(),
             rewriter.getStringAttr(getCopyToWorkgroupMemoryMarker()));
         f.replaceLinalgTransformationFilter(
@@ -156,7 +156,7 @@ private:
     return tilingResult;
   }
 
-  IREE::LinalgExt::LinalgTransformationFilter filter;
+  LinalgTransformationFilter filter;
   bool fuseInputProducer;
 };
 
@@ -167,7 +167,7 @@ static void populateTilingPatterns(RewritePatternSet &patterns,
                                    bool fuseInputProducer) {
   MLIRContext *context = patterns.getContext();
 
-  IREE::LinalgExt::LinalgTransformationFilter filter(
+  LinalgTransformationFilter filter(
       ArrayRef<StringAttr>{
           StringAttr::get(context, getWorkgroupMemoryMarker())},
       StringAttr::get(context, getWorkgroupKTiledMarker()));
@@ -221,8 +221,7 @@ static LogicalResult tileParallelDims(mlir::FunctionOpInterface funcOp,
       StringAttr::get(funcOp.getContext(), getCopyToWorkgroupMemoryMarker());
 
   for (TilingInterface tilingOp : computeOps) {
-    auto attr = tilingOp->getAttr(
-        IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker);
+    auto attr = tilingOp->getAttr(LinalgTransforms::kLinalgTransformMarker);
     if (attr == marker)
       continue;
 

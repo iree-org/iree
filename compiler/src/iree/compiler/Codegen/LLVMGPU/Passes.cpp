@@ -496,13 +496,13 @@ void addGPUVectorDistributePassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(
       createGPUTensorTileToSerialLoops());
 
-  // Generalize convolutions and fold away unit extent dims. All convolutions
-  // are expected to have the kernel dimensions tiled to 1 by this point, so
-  // folding unit dims like this directly maps it to a matrix multiplication.
-  // After vectorization we expect to get a pure matmul (or a transposed
-  // variant) as a `vector.contract`.
+  // Generalize convolutions and contraction ops so that we can fold away unit
+  // extent dims. All convolutions are expected to have the kernel dimensions
+  // tiled to 1 by this point, so folding unit dims like this directly maps it
+  // to a matrix multiplication. After vectorization we expect to get a pure
+  // matmul (or a transposed variant) as a `vector.contract`.
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createGPUGeneralizeNamedConvolutionOpsPass());
+      createGPUGeneralizeNamedConvolutionAndContractionOpsPass());
   LinalgFoldUnitExtentDimsPassOptions options;
   options.useRankReducingSlices = true;
   nestedModulePM.addNestedPass<func::FuncOp>(

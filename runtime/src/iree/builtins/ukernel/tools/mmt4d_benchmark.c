@@ -9,6 +9,8 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/flags.h"
 #include "iree/builtins/ukernel/api.h"
+#include "iree/builtins/ukernel/exported_bits.h"
+#include "iree/builtins/ukernel/mmt4d.h"
 #include "iree/builtins/ukernel/mmt4d_internal.h"
 #include "iree/builtins/ukernel/tools/benchmark.h"
 #include "iree/builtins/ukernel/tools/util.h"
@@ -95,7 +97,8 @@ static void iree_uk_benchmark_register_mmt4d_impl(
   snprintf(name, sizeof name, "mmt4d_%s_tile_%dx%dx%d%s", type_str, M0, N0, K0,
            code_path_suffix);
   iree_uk_mmt4d_params_t params = {
-      .flags = flags | IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS,
+      .flags = flags | IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS |
+               IREE_UK_FLAG_MMT4D_ALLOW_GENERIC_FALLBACK_TILE_FUNCTION,
       .M0 = M0,
       .N0 = N0,
       .K0 = K0};
@@ -180,10 +183,14 @@ int main(int argc, char** argv) {
 #else   // defined(IREE_ARCH_ARM_64)
   // Architectures on which we do not have any optimized ukernel code.
   // Benchmark some arbitrary tile shape.
-  iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 8, 8, 1,
-                                   "");
-  iree_uk_benchmark_register_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 8, 8, 1,
-                                   "");
+  iree_uk_benchmark_register_mmt4d(
+      IREE_UK_FLAG_MMT4D_ALLOW_GENERIC_FALLBACK_TILE_FUNCTION |
+          IREE_UK_FLAG_MMT4D_TYPE_F32F32F32,
+      8, 8, 1, "");
+  iree_uk_benchmark_register_mmt4d(
+      IREE_UK_FLAG_MMT4D_ALLOW_GENERIC_FALLBACK_TILE_FUNCTION |
+          IREE_UK_FLAG_MMT4D_TYPE_S8S8S32,
+      8, 8, 1, "");
 #endif  // defined(IREE_ARCH_ARM_64)
 
   iree_uk_benchmark_run_and_cleanup();

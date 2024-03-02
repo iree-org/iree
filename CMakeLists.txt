@@ -75,8 +75,6 @@ option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
 option(IREE_BUILD_TRACY "Builds tracy server tools." OFF)
 option(IREE_BUILD_BUNDLED_LLVM "Builds the bundled llvm-project (vs using installed)" ON)
 
-option(IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER "Use the system linker when generating IREE modules in tests/samples/benchmarks (useful for Tracy)." OFF)
-
 # Properties controlling version and naming of release artifacts.
 set(IREE_RELEASE_PACKAGE_SUFFIX "" CACHE STRING "Suffix to append to distributed package names")
 set(IREE_RELEASE_VERSION "0.1a1" CACHE STRING "Version to embed in distributed packages")
@@ -281,13 +279,6 @@ if(EMSCRIPTEN)
   set(IREE_HAL_EXECUTABLE_PLUGIN_EMBEDDED_ELF_DEFAULT OFF)
 endif()
 
-# If forcing system libraries (for TSAN/debugging tools/etc) then ensure the
-# system library loader is linked in.
-if(IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER)
-  set(IREE_HAL_EXECUTABLE_LOADER_SYSTEM_LIBRARY_DEFAULT ON)
-  set(IREE_HAL_EXECUTABLE_PLUGIN_SYSTEM_LIBRARY_DEFAULT ON)
-endif()
-
 # If no local driver is enabled then we force all the loaders/imports off; this
 # allows for simpler checks that don't need to see if both the driver and
 # feature is available.
@@ -430,36 +421,12 @@ endif()
 option(IREE_ENABLE_ASAN "Enable address sanitizer" OFF)
 option(IREE_ENABLE_MSAN "Enable memory sanitizer" OFF)
 option(IREE_ENABLE_TSAN "Enable thread sanitizer" OFF)
-option(IREE_BYTECODE_MODULE_ENABLE_ASAN "Enable address sanitizer in IREE modules in tests" OFF)
-option(IREE_BYTECODE_MODULE_ENABLE_TSAN "Enable thread sanitizer in IREE modules in tests" OFF)
 option(IREE_ENABLE_UBSAN "Enable undefined behavior sanitizer" OFF)
 option(IREE_ENABLE_SPLIT_DWARF "Enable gsplit-dwarf for debug information if the platform supports it" OFF)
 option(IREE_ENABLE_THIN_ARCHIVES "Enables thin ar archives (elf systems only). Disable for released static archives" OFF)
 option(IREE_LINK_COMPILER_SHARED_LIBRARY "Links IREE tools using the compiler compiled into a shared library" ON)
 option(IREE_ENABLE_WERROR_FLAG "Enable `-Werror` flag, treat error as warning" ON)
-
-# STREQUAL feels wrong here - we don't care about the exact true-value used,
-# ON or TRUE or something else. But we haven't been able to think of a less bad
-# alternative. https://github.com/openxla/iree/pull/8474#discussion_r840790062
-if(NOT IREE_ENABLE_TSAN STREQUAL IREE_BYTECODE_MODULE_ENABLE_TSAN)
-  message(SEND_ERROR
-      "IREE_ENABLE_TSAN and IREE_BYTECODE_MODULE_ENABLE_TSAN must be "
-      "simultaneously ON or OFF. "
-      "A discrepancy between the two would cause tests to crash as IREE "
-      "runtime code (controlled by IREE_ENABLE_TSAN) calls into test IREE "
-      "modules (controlled by IREE_BYTECODE_MODULE_ENABLE_TSAN)")
-endif()
-
-if(IREE_BUILD_COMPILER)
-  if(IREE_BYTECODE_MODULE_ENABLE_ASAN OR IREE_BYTECODE_MODULE_ENABLE_TSAN)
-    if(NOT IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER)
-      message(SEND_ERROR
-          "When IREE_BYTECODE_MODULE_ENABLE_ASAN or IREE_BYTECODE_MODULE_ENABLE_TSAN is ON, "
-          "IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER must also be ON. "
-          "ASAN/TSAN instrumentation is not currently supported in embedded modules.")
-    endif()
-  endif()
-endif()
+option(IREE_ENABLE_POSITION_INDEPENDENT_CODE "Enable position independent code" TRUE)
 
 if(IREE_LINK_COMPILER_SHARED_LIBRARY AND IREE_ENABLE_COMPILER_TRACING)
   message(SEND_ERROR
@@ -484,6 +451,8 @@ if(IREE_ENABLE_CCACHE)
         "IREE_ENABLE_CCACHE was set, but executable `ccache` was not found.")
   endif()
 endif()
+
+set (CMAKE_POSITION_INDEPENDENT_CODE ${IREE_ENABLE_POSITION_INDEPENDENT_CODE})
 
 option(IREE_DEV_MODE "Configure settings to optimize for IREE development (as opposed to CI or release)" OFF)
 
@@ -576,8 +545,6 @@ include(iree_plugin_register)
 # to derive it relative to this directory and prefixed with iree/.
 set(IREE_PACKAGE_ROOT_DIR "${CMAKE_CURRENT_LIST_DIR}")
 set(IREE_PACKAGE_ROOT_PREFIX "iree")
-
-set(CMAKE_POSITION_INDEPENDENT_CODE TRUE)
 
 #-------------------------------------------------------------------------------
 # Experimental ROCM HAL driver

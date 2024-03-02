@@ -941,8 +941,9 @@ public:
   TestVectorLayoutOptions(Operation *root)
       : VectorLayoutOptions(root, /*fullConversion=*/false) {}
 
-  void setAnchorOps(VectorLayoutAnalysis &analysis) override {
+  LogicalResult setAnchorOps(VectorLayoutAnalysis &analysis) override {
     setAnchorOpsFromAttributes(analysis, root);
+    return success();
   }
 };
 

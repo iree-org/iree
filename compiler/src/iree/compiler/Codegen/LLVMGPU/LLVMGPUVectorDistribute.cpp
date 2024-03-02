@@ -65,17 +65,23 @@ public:
     populateGPUDistributeNestedLayoutAttrPatterns(laneId, patterns);
   }
 
-  void setAnchorOps(VectorLayoutAnalysis &analysis) override {
+  LogicalResult setAnchorOps(VectorLayoutAnalysis &analysis) override {
     MLIRContext *context = root->getContext();
-    root->walk([&](Operation *op) {
-      llvm::TypeSwitch<Operation *>(op)
-          .Case([&](vector::ContractionOp contract) {
-            setContractionAnchor(context, analysis, contract);
-          })
-          .Case([&](vector::TransferReadOp transfer) {
-            setTransferReadAnchor(context, analysis, transfer);
-          });
+    WalkResult walkResult = root->walk([&](Operation *op) {
+      LogicalResult setResult =
+          llvm::TypeSwitch<Operation *, LogicalResult>(op)
+              .Case([&](vector::ContractionOp contract) {
+                return setContractionAnchor(context, analysis, contract);
+              })
+              .Case([&](vector::TransferReadOp transfer) {
+                setTransferReadAnchor(context, analysis, transfer);
+                return success();
+              })
+              .Default([](Operation *) { return success(); });
+      return failed(setResult) ? WalkResult::interrupt()
+                               : WalkResult::advance();
     });
+    return failure(walkResult.wasInterrupted());
   }
 
   RewritePatternSet &getPatterns() { return patterns; }
@@ -84,14 +90,18 @@ private:
   // Sets an anchoring layout for the given contraction op. Looks for a
   // supported mma type from the cached list of mma types and populates the
   // necessary distribution pattern for those contractions.
-  void setContractionAnchor(MLIRContext *context,
-                            VectorLayoutAnalysis &analysis,
-                            vector::ContractionOp contract) {
+  LogicalResult setContractionAnchor(MLIRContext *context,
+                                     VectorLayoutAnalysis &analysis,
+                                     vector::ContractionOp contract) {
     // TODO: Add SIMT fallback.
-    assert(schedule && "incompatible contraction op");
+    if (!schedule) {
+      return contract->emitError("missing mma schedule for contraction");
+    }
 
     auto layouts = schedule.getContractionLayout(contract);
-    assert(layouts && "cannot get concrete layout for contraction");
+    if (!layouts) {
+      return contract->emitError("cannot get concrete layout for contraction");
+    }
 
     auto [aLayout, bLayout, cLayout] = *layouts;
     analysis.setAnchor(contract.getLhs(), aLayout);
@@ -119,6 +129,7 @@ private:
     } else {
       llvm_unreachable("Unsupported mma type");
     }
+    return success();
   }
 
   // Sets a layout anchor for reads from global memory.

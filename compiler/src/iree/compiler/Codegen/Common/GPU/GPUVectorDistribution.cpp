@@ -231,7 +231,8 @@ LogicalResult distributeVectorOps(Operation *root,
   // Run the analysis and determine the layouts.
   LLVM_DEBUG(llvm::dbgs() << "Running Layout Analysis\n");
   VectorLayoutAnalysis analysis(root);
-  options.setAnchorOps(analysis);
+  if (failed(options.setAnchorOps(analysis)))
+    return failure();
   if (failed(analysis.run()))
     return failure();
   LLVM_DEBUG(llvm::dbgs() << "Layout Analysis Succeded\n");
