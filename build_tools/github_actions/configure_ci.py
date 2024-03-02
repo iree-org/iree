@@ -140,7 +140,7 @@ PRESUBMIT_TOUCH_ONLY_JOBS = [
     ("build_test_all_macos_arm64", ["runtime/src/iree/hal/drivers/metal/*"]),
     (
         "build_test_all_windows",
-        ["*win32*", "*windows*", "*msvc*", "runtime/src/iree/builtins/ukernel/*"]
+        ["*win32*", "*windows*", "*msvc*", "runtime/src/iree/builtins/ukernel/*"],
     ),
 ]
 
