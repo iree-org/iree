@@ -684,6 +684,8 @@ static iree_status_t iree_hal_cuda_pending_queue_actions_issue_cleanup(
 
   iree_allocator_free(host_allocator, action);
 
+  // Now we fully executed and cleaned up this action. Decrease the pending
+  // action counter.
   --actions->working_area.pending_action_count;
 
   IREE_TRACE_ZONE_END(z0);
