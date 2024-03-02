@@ -525,15 +525,6 @@ static void iree_uk_test_mmt4d_impl(iree_uk_uint32_t flags, int M0, int N0,
 
 static void iree_uk_test_mmt4d(iree_uk_uint32_t flags, int M0, int N0, int K0,
                                const char* cpu_features) {
-  // For non-fallback tests, i.e. tests for architecture-specific cases, stop
-  // here if we haven't linked architecture-specific code, which is the case in
-  // Bazel builds.
-  if (!(flags & IREE_UK_FLAG_MMT4D_ALLOW_GENERIC_FALLBACK_TILE_FUNCTION)) {
-    if (!iree_uk_mmt4d_linked_arch_code) {
-      return;
-    }
-  }
-
   // Test narrowed, power-of-two values of M0, as mmt4d kernels tend to have
   // narrow variants for handling these cases.
   for (int narrowM0 = 1; narrowM0 < M0; narrowM0 *= 2) {
@@ -578,49 +569,71 @@ int main(int argc, char** argv) {
                      2, 9, 3, "");
 
 #if defined(IREE_ARCH_ARM_64)
+
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 8, 8, 1, "");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F32, 8, 8, 1, "");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F32, 8, 8, 1, "fp16fml");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS |
                          IREE_UK_FLAG_MMT4D_TYPE_F16F16F16,
                      8, 8, 1, "");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 8, 8, 1, "");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S4S32, 4, 16, 2, "");
+#if defined(IREE_UK_BUILD_ARM_64_FP16FML)
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F32, 8, 8, 1, "fp16fml");
+#endif  // defined(IREE_UK_BUILD_ARM_64_FP16FML)
+#if defined(IREE_UK_BUILD_ARM_64_FULLFP16)
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS |
                          IREE_UK_FLAG_MMT4D_TYPE_F16F16F16,
                      8, 8, 1, "fullfp16");
+#endif  // defined(IREE_UK_BUILD_ARM_64_FULLFP16)
+#if defined(IREE_UK_BUILD_ARM_64_BF16)
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_BF16BF16BF16, 8, 8, 4, "bf16");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_BF16BF16F32, 8, 8, 4, "bf16");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 8, 8, 1, "");
+#endif  // defined(IREE_UK_BUILD_ARM_64_BF16)
+#if defined(IREE_UK_BUILD_ARM_64_DOTPROD)
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 8, 8, 4, "dotprod");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 8, 8, 8, "i8mm");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S4S32, 4, 16, 2, "");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S4S32, 8, 8, 8, "dotprod");
+#endif  // defined(IREE_UK_BUILD_ARM_64_DOTPROD)
+#if defined(IREE_UK_BUILD_ARM_64_I8MM)
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 8, 8, 8, "i8mm");
+#endif  // defined(IREE_UK_BUILD_ARM_64_I8MM)
+
 #elif defined(IREE_ARCH_X86_64)
+
+#if defined(IREE_UK_BUILD_X86_64_AVX2_FMA)
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 8, 8, 1, "avx2_fma");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F32, 8, 8, 1, "avx2_fma");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS |
+                         IREE_UK_FLAG_MMT4D_TYPE_F16F16F16,
+                     8, 8, 1, "avx2_fma");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 8, 8, 2, "avx2_fma");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S16S16S32, 8, 8, 2, "avx2_fma");
+#endif  // defined(IREE_UK_BUILD_X86_64_AVX2_FMA)
+#if defined(IREE_UK_BUILD_X86_64_AVX512_BASE)
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 16, 16, 1,
                      "avx512_base");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F32, 8, 8, 1, "avx2_fma");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F32, 16, 16, 1,
                      "avx512_base");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS |
                          IREE_UK_FLAG_MMT4D_TYPE_F16F16F16,
-                     8, 8, 1, "avx2_fma");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS |
-                         IREE_UK_FLAG_MMT4D_TYPE_F16F16F16,
                      16, 16, 1, "avx512_base");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 16, 16, 2, "avx512_base");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S16S16S32, 16, 16, 2,
+                     "avx512_base");
+#endif  // defined(IREE_UK_BUILD_X86_64_AVX512_BASE)
+#if defined(IREE_UK_BUILD_X86_64_AVX512_BF16)
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_BF16BF16F32, 16, 16, 2,
                      "avx512_bf16");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS |
                          IREE_UK_FLAG_MMT4D_TYPE_BF16BF16BF16,
                      16, 16, 2, "avx512_bf16");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 8, 8, 2, "avx2_fma");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 16, 16, 2, "avx512_base");
+#endif  // defined(IREE_UK_BUILD_X86_64_AVX512_BF16)
+#if defined(IREE_UK_BUILD_X86_64_AVX512_VNNI)
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 16, 16, 2, "avx512_vnni");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S16S16S32, 8, 8, 2, "avx2_fma");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S16S16S32, 16, 16, 2,
-                     "avx512_base");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S16S16S32, 16, 16, 2,
                      "avx512_vnni");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S16U4S32, 1, 32, 8, "avx512_vnni");
+#endif  // defined(IREE_UK_BUILD_X86_64_AVX512_VNNI)
+
 #endif  // defined(IREE_ARCH_ARM_64)
 
   return iree_uk_test_exit_status();

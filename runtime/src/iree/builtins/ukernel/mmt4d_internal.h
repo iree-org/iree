@@ -154,9 +154,6 @@ typedef void (*iree_uk_mmt4d_tile_func_t)(
 iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func_arch(
     const iree_uk_mmt4d_params_t* params);
 
-// Indicator of architecture-specific implementation.
-extern const bool iree_uk_mmt4d_linked_arch_code;
-
 // Generic fallback.
 iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func_generic(
     const iree_uk_mmt4d_params_t* params);

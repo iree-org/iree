@@ -14,8 +14,6 @@ iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func_arch(
   return 0;
 }
 
-const bool iree_uk_mmt4d_linked_arch_code = false;
-
 iree_uk_pack_tile_func_t iree_uk_pack_select_tile_func_arch(
     const iree_uk_pack_params_t* params) {
   return 0;
