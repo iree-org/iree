@@ -9,6 +9,25 @@
 
 #include "iree/builtins/ukernel/unpack.h"
 
+typedef struct iree_uk_unpack_params_t {
+  const void* in_buffer;
+  iree_uk_index_t in_offset;
+  iree_uk_index_t in_stride0;
+  void* out_buffer;
+  iree_uk_index_t out_offset;
+  iree_uk_index_t out_stride0;
+  iree_uk_index_t in_size0;
+  iree_uk_index_t in_size1;
+  iree_uk_index_t in_size2;
+  iree_uk_index_t in_size3;
+  iree_uk_index_t out_size0;
+  iree_uk_index_t out_size1;
+  iree_uk_uint32_t flags;
+  const iree_uk_uint64_t* cpu_data;
+} iree_uk_unpack_params_t;
+
+void iree_uk_unpack_p(const iree_uk_unpack_params_t* params);
+
 typedef enum iree_uk_unpack_type_t {
   iree_uk_unpack_type_f32f32 = IREE_UK_TIE_2_TYPES_LITERAL(FLOAT_32, FLOAT_32),
   iree_uk_unpack_type_i32i32 = IREE_UK_TIE_2_TYPES_LITERAL(INT_32, INT_32),

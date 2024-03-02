@@ -1325,14 +1325,26 @@ static TileSizesListType getMmt4dTileSizes(linalg::LinalgOp op) {
 
   SmallVector<int64_t> distTileSizes =
       getDefaultDistributedLevelTileSizes(op, distConfig);
-  SmallVector<int64_t> parallelTileSizes(op.getNumLoops(), 1);
+  // Cache-level sizes are set to the distribution tile sizes for now. This will
+  // allow us to change distribution tile sizes while still preserving the
+  // existing cache behavior to some extent.
+  unsigned numLoops = op.getNumLoops();
+  SmallVector<int64_t> cacheParallelTileSizes(distTileSizes.begin(),
+                                              distTileSizes.end());
+  SmallVector<int64_t> cacheReductionTileSizes(numLoops, 0);
+
+  SmallVector<int64_t> parallelTileSizes(numLoops, 1);
   assert(parallelTileSizes.size() == mmt4dDimBase + 6);
   parallelTileSizes[mmt4dDimBase + 3] = M0;
   parallelTileSizes[mmt4dDimBase + 4] = N0;
   parallelTileSizes[mmt4dDimBase + 5] = K0;
   SmallVector<int64_t> reductionTileSizes;
   splitParallelAndReductionTiles(op, parallelTileSizes, reductionTileSizes);
-  return {distTileSizes, parallelTileSizes, reductionTileSizes};
+
+  SmallVector<int64_t> vectorInnerParallelTileSizes(numLoops, 0);
+  return {distTileSizes,           cacheParallelTileSizes,
+          cacheReductionTileSizes, parallelTileSizes,
+          reductionTileSizes,      vectorInnerParallelTileSizes};
 }
 
 /// Sets the lowering configuration for dispatch region for linalg.mmt4d

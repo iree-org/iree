@@ -304,7 +304,32 @@ NestedLayoutAttr::project(ArrayRef<bool> droppedDims) const {
 
 VectorLayoutInterface
 NestedLayoutAttr::permute(ArrayRef<int64_t> permutation) const {
-  llvm_unreachable("Not yet implemented");
+  SmallVector<int64_t> subgroupCount =
+      applyPermutation(getSubgroupsPerWorkgroup(), permutation);
+  SmallVector<int64_t> subgroupOrder =
+      applyPermutation(getSubgroupOrder(), permutation);
+  SmallVector<int64_t> batchCount =
+      applyPermutation(getBatchesPerSubgroup(), permutation);
+  SmallVector<int64_t> batchOrder =
+      applyPermutation(getBatchOrder(), permutation);
+  SmallVector<int64_t> outerCount =
+      applyPermutation(getOutersPerBatch(), permutation);
+  SmallVector<int64_t> outerOrder =
+      applyPermutation(getOuterOrder(), permutation);
+  SmallVector<int64_t> threadCount =
+      applyPermutation(getThreadsPerOuter(), permutation);
+  SmallVector<int64_t> threadOrder =
+      applyPermutation(getThreadOrder(), permutation);
+  SmallVector<int64_t> elementCount =
+      applyPermutation(getElementsPerThread(), permutation);
+  SmallVector<int64_t> elementOrder =
+      applyPermutation(getElementOrder(), permutation);
+
+  return NestedLayoutAttr::get(
+      getContext(), subgroupCount, subgroupOrder, batchCount, batchOrder,
+      outerCount, outerOrder, threadCount, threadOrder, elementCount,
+      elementOrder, getSubgroupBasis(), getSubgroupActiveIds(),
+      getThreadBasis(), getThreadActiveIds());
 }
 
 /// We distribute to:

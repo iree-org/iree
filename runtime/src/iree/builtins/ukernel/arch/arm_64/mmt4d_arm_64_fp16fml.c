@@ -12,7 +12,7 @@
 // Notes:
 // 1. The key to this work-around is the "x" constraint on the C operand,
 //    which restricts it to registers v0 .. v15, as opposed to the "w"
-//    constraint used here for the A and B operands, allowing v0 .. v31. See:
+//    constraint used here for the A and B operands, allowing v0.. v31. See:
 //      https://llvm.org/docs/LangRef.html#supported-constraint-code-list
 // 2. The ({...}) syntax is GCC-compatible "statement expressions". See:
 //      https://gcc.gnu.org/onlinedocs/gcc/Statement-Exprs.html
@@ -34,7 +34,8 @@
   vfmlalq_laneq_high_f16(A, X, Y, L)
 #endif
 
-void iree_uk_mmt4d_tile_f16f16f32_1x8x1_to_8x8x1_arm_64_fp16fml(
+IREE_UK_ATTRIBUTE_ALWAYS_INLINE static inline void
+iree_uk_mmt4d_tile_f16f16f32_1x8x1_to_8x8x1_arm_64_fp16fml(
     void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
     const void* IREE_UK_RESTRICT rhs_panel,
     const iree_uk_mmt4d_params_t* params, int M0) {
@@ -43,13 +44,11 @@ void iree_uk_mmt4d_tile_f16f16f32_1x8x1_to_8x8x1_arm_64_fp16fml(
   const float16_t* IREE_UK_RESTRICT rhs_ptr = rhs_panel;
   float32x4_t acc[16];
   if (params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
-    for (int i = 0; i < 2 * M0; ++i) {
+    IREE_UK_UNROLL for (int i = 0; i < 2 * M0; ++i) {
       acc[i] = vld1q_f32(out_ptr + 4 * i);
     }
   } else {
-    for (int i = 0; i < 2 * M0; ++i) {
-      acc[i] = vdupq_n_f32(0);
-    }
+    IREE_UK_UNROLL for (int i = 0; i < 2 * M0; ++i) { acc[i] = vdupq_n_f32(0); }
   }
   for (int k = 0; k < params->K; ++k) {
     float16x8_t rhs = vld1q_f16(rhs_ptr);
@@ -86,7 +85,7 @@ void iree_uk_mmt4d_tile_f16f16f32_1x8x1_to_8x8x1_arm_64_fp16fml(
     acc[14] = iree_vfmlalq_laneq_low_f16(acc[14], rhs, lhs, 7);
     acc[15] = iree_vfmlalq_laneq_high_f16(acc[15], rhs, lhs, 7);
   }
-  for (int i = 0; i < 2 * M0; ++i) {
+  IREE_UK_UNROLL for (int i = 0; i < 2 * M0; ++i) {
     vst1q_f32(out_ptr + 4 * i, acc[i]);
   }
 }

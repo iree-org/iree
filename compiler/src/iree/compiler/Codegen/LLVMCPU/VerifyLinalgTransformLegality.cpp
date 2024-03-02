@@ -7,7 +7,6 @@
 #include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
-#include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Pass/Pass.h"
@@ -25,8 +24,7 @@ void VerifyLinalgTransformLegalityPass::runOnOperation() {
   auto moduleOp = getOperation();
   // For now only check that there are no Linalg transform markers.
   auto walkResult = moduleOp.walk([](linalg::LinalgOp op) -> WalkResult {
-    if (op->hasAttr(
-            IREE::LinalgExt::LinalgTransforms::kLinalgTransformMarker)) {
+    if (op->hasAttr(LinalgTransforms::kLinalgTransformMarker)) {
       return op.emitError("expected no Linalg transform markers");
     }
     return WalkResult::advance();

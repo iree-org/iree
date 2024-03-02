@@ -85,7 +85,7 @@ static iree_status_t iree_uk_benchmark_pack(
   int64_t batch_count = 1;
   while (iree_benchmark_keep_running(benchmark_state, batch_count)) {
     for (int i = 0; i < batch_count; ++i) {
-      iree_uk_pack(&params);
+      iree_uk_pack_p(&params);
     }
     total_iterations += batch_count;
     batch_count *= 2;

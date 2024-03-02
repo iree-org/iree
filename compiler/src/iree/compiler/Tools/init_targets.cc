@@ -23,7 +23,6 @@ namespace mlir::iree_compiler {
 // need.
 void registerHALTargetBackends() {
   static bool init_once = []() {
-
 #ifdef IREE_HAVE_LLVM_CPU_TARGET
     IREE::HAL::registerLLVMCPUTargetBackends(
         []() { return IREE::HAL::LLVMTargetOptions::getFromFlags(); });

@@ -110,7 +110,7 @@ static void iree_uk_test_pack_for_shape_params(
                              (params.out_offset * iree_uk_type_size(out_type));
 
   iree_pack_reference(&reference_params);
-  iree_uk_pack(&actual_params);
+  iree_uk_pack_p(&actual_params);
 
   if (memcmp(actual_out_buffer, reference_out_buffer, out_buffer_size)) {
     IREE_UK_TEST_FAIL(test);

@@ -31,7 +31,8 @@ using namespace llvm;
 using namespace mlir;
 
 using mlir::iree_compiler::IREE::HAL::TargetBackendList;
-using mlir::iree_compiler::IREE::HAL::TargetBackendRegistry;
+using mlir::iree_compiler::IREE::HAL::TargetDeviceList;
+using mlir::iree_compiler::IREE::HAL::TargetRegistry;
 
 #if defined(_MSC_VER)
 #define fileno _fileno
@@ -99,10 +100,14 @@ static LogicalResult ireeOptMainFromCL(int argc, char **argv,
   // of target backends. However, no such layering exists for the opt tool.
   // Since it tests passes that are default initialized, we just configure the
   // global registry that such constructors depend on.
-  TargetBackendList pluginBackendList;
-  pluginSession.populateHALTargetBackends(pluginBackendList);
-  const_cast<TargetBackendRegistry &>(TargetBackendRegistry::getGlobal())
-      .mergeFrom(pluginBackendList);
+  TargetBackendList pluginTargetBackendList;
+  pluginSession.populateHALTargetBackends(pluginTargetBackendList);
+  const_cast<TargetRegistry &>(TargetRegistry::getGlobal())
+      .mergeFrom(pluginTargetBackendList);
+  TargetDeviceList pluginTargetDeviceList;
+  pluginSession.populateHALTargetDevices(pluginTargetDeviceList);
+  const_cast<TargetRegistry &>(TargetRegistry::getGlobal())
+      .mergeFrom(pluginTargetDeviceList);
 
   // When reading from stdin and the input is a tty, it is often a user mistake
   // and the process "appears to be stuck". Print a message to let the user know

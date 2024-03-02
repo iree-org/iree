@@ -6,7 +6,6 @@
 
 #include "CommonExtensions.h"
 
-#include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "iree-dialects/Transforms/TransformMatchers.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
@@ -942,8 +941,9 @@ public:
   TestVectorLayoutOptions(Operation *root)
       : VectorLayoutOptions(root, /*fullConversion=*/false) {}
 
-  void setAnchorOps(VectorLayoutAnalysis &analysis) override {
+  LogicalResult setAnchorOps(VectorLayoutAnalysis &analysis) override {
     setAnchorOpsFromAttributes(analysis, root);
+    return success();
   }
 };
 

@@ -132,11 +132,72 @@ static void addPreloadKernArgHint(llvm::Function *F) {
   }
 }
 
+class ROCMTargetDevice final : public TargetDevice {
+public:
+  ROCMTargetDevice(const ROCMOptions &options) : options(options) {}
+
+  IREE::HAL::DeviceTargetAttr
+  getDefaultDeviceTarget(MLIRContext *context,
+                         const TargetRegistry &targetRegistry) const override {
+    Builder b(context);
+    SmallVector<NamedAttribute> configItems;
+    auto addConfig = [&](StringRef name, Attribute value) {
+      configItems.emplace_back(b.getStringAttr(name), value);
+    };
+
+    // Indicates that the runtime HAL driver operates only in the legacy
+    // synchronous mode.
+    addConfig("legacy_sync", b.getUnitAttr());
+
+    auto configAttr = b.getDictionaryAttr(configItems);
+
+    // If we had multiple target environments we would generate one target attr
+    // per environment, with each setting its own environment attribute.
+    SmallVector<IREE::HAL::ExecutableTargetAttr> executableTargetAttrs;
+    targetRegistry.getTargetBackend("rocm")->getDefaultExecutableTargets(
+        context, "rocm", configAttr, executableTargetAttrs);
+
+    return IREE::HAL::DeviceTargetAttr::get(context, b.getStringAttr("rocm"),
+                                            configAttr, executableTargetAttrs);
+  }
+
+private:
+  const ROCMOptions &options;
+};
+
 class ROCMTargetBackend final : public TargetBackend {
 public:
   ROCMTargetBackend(const ROCMOptions &options) : options(options) {}
 
-  std::string name() const override { return "rocm"; }
+  std::string getLegacyDefaultDeviceID() const override { return "rocm"; }
+
+  void getDefaultExecutableTargets(
+      MLIRContext *context, StringRef deviceID, DictionaryAttr deviceConfigAttr,
+      SmallVectorImpl<IREE::HAL::ExecutableTargetAttr> &executableTargetAttrs)
+      const override {
+    executableTargetAttrs.push_back(getExecutableTarget(context));
+  }
+
+  IREE::HAL::ExecutableTargetAttr
+  getExecutableTarget(MLIRContext *context) const {
+    Builder b(context);
+    SmallVector<NamedAttribute> configItems;
+    auto addConfig = [&](StringRef name, Attribute value) {
+      configItems.emplace_back(b.getStringAttr(name), value);
+    };
+
+    addConfig("target_arch", b.getStringAttr(options.targetChip));
+    addConfig("ukernels", b.getStringAttr(options.enableROCMUkernels));
+
+    ArrayAttr mmaAttrs = getROCMSupportedMmaAttrs(context, options.targetChip);
+    if (mmaAttrs) {
+      addConfig("mma_intrinsics", mmaAttrs);
+    }
+
+    return b.getAttr<IREE::HAL::ExecutableTargetAttr>(
+        b.getStringAttr("rocm"), b.getStringAttr("rocm-hsaco-fb"),
+        b.getDictionaryAttr(configItems));
+  }
 
   void getDependentDialects(DialectRegistry &registry) const override {
     mlir::registerBuiltinDialectTranslation(registry);
@@ -148,25 +209,27 @@ public:
     registry.insert<amdgpu::AMDGPUDialect>();
   }
 
-  IREE::HAL::DeviceTargetAttr
-  getDefaultDeviceTarget(MLIRContext *context) const override {
-    Builder b(context);
-    SmallVector<NamedAttribute> configItems;
+  void buildConfigurationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
+                                      OpPassManager &passManager) override {
+    // For now we disable configuration if the variant has external object
+    // files.
+    if (variantOp.isExternal())
+      return;
 
-    // Indicates that the runtime HAL driver operates only in the legacy
-    // synchronous mode.
-    configItems.emplace_back(b.getStringAttr("legacy_sync"), b.getUnitAttr());
-
-    auto configAttr = b.getDictionaryAttr(configItems);
-
-    // If we had multiple target environments we would generate one target attr
-    // per environment, with each setting its own environment attribute.
-    SmallVector<IREE::HAL::ExecutableTargetAttr> targetAttrs;
-    targetAttrs.push_back(getExecutableTarget(context));
-
-    return IREE::HAL::DeviceTargetAttr::get(
-        context, b.getStringAttr(deviceID()), configAttr, targetAttrs);
+    buildLLVMGPUCodegenConfigurationPassPipeline(passManager);
   }
+
+  void buildTranslationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
+                                    OpPassManager &passManager) override {
+    // For now we disable translation if the variant has external object files.
+    // We could instead perform linking with those objects (if they're bitcode
+    // ala libdevice.bc, etc).
+    if (variantOp.isExternal())
+      return;
+
+    buildLLVMGPUCodegenPassPipeline(passManager, true);
+  }
+
   // Performs optimizations on |module| (including LTO-style whole-program
   // ones). Inspired by code section in
   // https://github.com/openxla/iree/blob/main/compiler/plugins/target/CUDA/CUDATarget.cpp
@@ -202,27 +265,6 @@ public:
     mpm.addPass(llvm::VerifierPass());
 
     mpm.run(module, mam);
-  }
-
-  void buildConfigurationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
-                                      OpPassManager &passManager) override {
-    // For now we disable configuration if the variant has external object
-    // files.
-    if (variantOp.isExternal())
-      return;
-
-    buildLLVMGPUCodegenConfigurationPassPipeline(passManager);
-  }
-
-  void buildTranslationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
-                                    OpPassManager &passManager) override {
-    // For now we disable translation if the variant has external object files.
-    // We could instead perform linking with those objects (if they're bitcode
-    // ala libdevice.bc, etc).
-    if (variantOp.isExternal())
-      return;
-
-    buildLLVMGPUCodegenPassPipeline(passManager, true);
   }
 
   LogicalResult serializeExecutable(const SerializationOptions &serOptions,
@@ -460,30 +502,6 @@ public:
   }
 
 private:
-  IREE::HAL::ExecutableTargetAttr
-  getExecutableTarget(MLIRContext *context) const {
-    Builder b(context);
-    SmallVector<NamedAttribute> configItems;
-    // Add some configurations to the `hal.executable.target` attribute.
-    auto addConfig = [&](StringRef name, Attribute value) {
-      configItems.emplace_back(StringAttr::get(context, name), value);
-    };
-    // Set target arch
-    addConfig("target_arch", StringAttr::get(context, options.targetChip));
-
-    addConfig("ukernels", StringAttr::get(context, options.enableROCMUkernels));
-
-    ArrayAttr mmaAttrs = getROCMSupportedMmaAttrs(context, options.targetChip);
-    if (mmaAttrs) {
-      addConfig("mma_intrinsics", mmaAttrs);
-    }
-
-    auto configAttr = b.getDictionaryAttr(configItems);
-    return IREE::HAL::ExecutableTargetAttr::get(
-        context, b.getStringAttr("rocm"), b.getStringAttr("rocm-hsaco-fb"),
-        configAttr);
-  }
-
   const ROCMOptions &options;
 };
 
@@ -491,12 +509,20 @@ namespace {
 struct ROCMSession
     : public PluginSession<ROCMSession, ROCMOptions,
                            PluginActivationPolicy::DefaultActivated> {
-  void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {
+  void populateHALTargetDevices(IREE::HAL::TargetDeviceList &targets) {
     if (options.bitcodeDirectory.empty()) {
       options.bitcodeDirectory = findPlatformLibDirectory("rocm");
     }
 
     // #hal.device.target<"rocm", ...
+    targets.add("rocm",
+                [&]() { return std::make_shared<ROCMTargetDevice>(options); });
+  }
+  void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {
+    if (options.bitcodeDirectory.empty()) {
+      options.bitcodeDirectory = findPlatformLibDirectory("rocm");
+    }
+
     // #hal.executable.target<"rocm", ...
     targets.add("rocm", [&]() {
       LLVMInitializeAMDGPUTarget();

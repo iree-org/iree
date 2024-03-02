@@ -32,51 +32,43 @@ TSan   | Data races | Many bugs in multi-thread code | 5x-15x | 5x-10x | [No](ht
 
 ### ASan (AddressSanitizer)
 
-Enabling ASan in the IREE build is a simple matter of setting the
-`IREE_ENABLE_ASAN` CMake option:
+To enable ASan:
 
 ```shell
 cmake -DIREE_ENABLE_ASAN=ON ...
 ```
 
-### TSan (ThreadSanitizer)
-
-To enable TSan, at the moment, the following 3 CMake options must be set:
+Several `_asan` tests like
+`iree/tests/e2e/stablehlo_ops/check_llvm-cpu_local-task_asan_abs.mlir` are
+also defined when using this configuration. These tests include AddressSanitizer
+in compiled CPU code as well by using these `iree-compile` flags:
 
 ```shell
-cmake \
-  -DIREE_ENABLE_TSAN=ON \
-  -DIREE_BYTECODE_MODULE_ENABLE_TSAN=ON \
-  -DIREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER=ON \
-  -DIREE_BUILD_SAMPLES=OFF \
-  ...
+--iree-llvmcpu-link-embedded=false
+--iree-llvmcpu-sanitize=address
 ```
 
-In practice, `IREE_ENABLE_TSAN` alone would be enough for many targets, but not
-all. The problem is that a IREE runtime built with `IREE_ENABLE_TSAN` cannot
-load a IREE compiled LLVM/CPU module unless the following flags were passed to
-the IREE compiler: `--iree-llvmcpu-sanitize=thread` and
-`--iree-llvmcpu-link-embedded=false`.
+### TSan (ThreadSanitizer)
 
-The CMake options `IREE_BYTECODE_MODULE_ENABLE_TSAN` and
-`IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER` ensure that the above flags are
-passed to the IREE compiler when building modules used in tests, benchmarks,
-etc. (anything that internally uses the CMake `iree_bytecode_module` macro).
+To enable TSan:
 
-The CMake option `IREE_BUILD_SAMPLES=OFF` is needed because samples [currently
-assume](https://github.com/openxla/iree/pull/8893) that the embedded linker is
-used, so they are incompatible with
-`IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER=ON`.
+```shell
+cmake -DIREE_ENABLE_TSAN=ON ...
+```
 
-At the moment, CMake logic heavy-handedly enforces that whenever
-`IREE_ENABLE_TSAN` is set, these other two CMake variables are also set.
-That ensures that all tests succeed: no test is expected to fail with TSan.
+Several `_tsan` tests like
+`iree/tests/e2e/stablehlo_ops/check_llvm-cpu_local-task_tsan_abs.mlir` are
+also defined when using this configuration. These tests include ThreadSanitizer
+in compiled CPU code as well by using these `iree-compile` flags:
 
-If you know what you're doing (i.e. if you are not building targets that
-internally involve a LLVM/CPU `iree_bytecode_module`), feel free to locally
-comment out the CMake error and only set `IREE_ENABLE_TSAN`. Also see a
-[past attempt](https://github.com/openxla/iree/pull/8966) to relax that CMake
-validation.
+```shell
+--iree-llvmcpu-link-embedded=false
+--iree-llvmcpu-sanitize=address
+```
+
+Note that a IREE runtime built with TSan cannot load a IREE compiled LLVM/CPU
+module unless those flags are used, so other tests are excluded using the
+`notsan` label.
 
 ### MSan (MemorySanitizer)
 

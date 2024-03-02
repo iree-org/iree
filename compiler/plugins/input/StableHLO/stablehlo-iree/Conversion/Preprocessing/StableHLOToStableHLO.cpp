@@ -1244,8 +1244,8 @@ struct DotToMul final : OpRewritePattern<mlir::stablehlo::DotOp> {
 
   LogicalResult matchAndRewrite(mlir::stablehlo::DotOp op,
                                 PatternRewriter &rewriter) const override {
-    auto lhs = op.getLhs();
-    auto rhs = op.getRhs();
+    Value lhs = op.getLhs();
+    Value rhs = op.getRhs();
     auto lhsTy = dyn_cast<RankedTensorType>(lhs.getType());
     auto rhsTy = dyn_cast<RankedTensorType>(rhs.getType());
     auto resultTy = dyn_cast<RankedTensorType>(op.getType());

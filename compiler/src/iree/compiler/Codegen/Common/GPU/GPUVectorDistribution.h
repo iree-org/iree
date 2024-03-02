@@ -98,7 +98,7 @@ public:
   virtual ~VectorLayoutOptions() = default;
 
   /// Set the anchor ops in the analysis rooted on the root operation.
-  virtual void setAnchorOps(VectorLayoutAnalysis &analysis) = 0;
+  virtual LogicalResult setAnchorOps(VectorLayoutAnalysis &analysis) = 0;
 
   bool verifyConversion() const { return fullConversion; }
 

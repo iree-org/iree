@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/builtins/ukernel/unpack.h"
+
 #include "iree/builtins/ukernel/unpack_internal.h"
 
 enum { iree_uk_unpack_tmp_buf_size = 4096 };
@@ -192,13 +194,37 @@ static void iree_uk_unpack_using_tile_func(
   }
 }
 
-IREE_UK_EXPORT int iree_uk_unpack(const iree_uk_unpack_params_t* params) {
+void iree_uk_unpack_p(const iree_uk_unpack_params_t* params) {
   iree_uk_unpack_validate(params);
 
-  if (iree_uk_unpack_early(params)) return 0;
+  if (iree_uk_unpack_early(params)) return;
 
   // Select a target-specific tile_func and use that with generic outer loops.
   iree_uk_unpack_tile_func_t func = iree_uk_unpack_select_tile_func(params);
   iree_uk_unpack_using_tile_func(params, func);
-  return 0;
+}
+
+IREE_UK_EXPORT void iree_uk_unpack(
+    const void* in_buffer, iree_uk_index_t in_offset,
+    iree_uk_index_t in_stride0, void* out_buffer, iree_uk_index_t out_offset,
+    iree_uk_index_t out_stride0, iree_uk_index_t in_size0,
+    iree_uk_index_t in_size1, iree_uk_index_t in_size2,
+    iree_uk_index_t in_size3, iree_uk_index_t out_size0,
+    iree_uk_index_t out_size1, iree_uk_uint32_t flags,
+    const iree_uk_uint64_t* cpu_data) {
+  iree_uk_unpack_params_t params = {.in_buffer = in_buffer,
+                                    .in_offset = in_offset,
+                                    .in_stride0 = in_stride0,
+                                    .out_buffer = out_buffer,
+                                    .out_offset = out_offset,
+                                    .out_stride0 = out_stride0,
+                                    .in_size0 = in_size0,
+                                    .in_size1 = in_size1,
+                                    .in_size2 = in_size2,
+                                    .in_size3 = in_size3,
+                                    .out_size0 = out_size0,
+                                    .out_size1 = out_size1,
+                                    .flags = flags,
+                                    .cpu_data = cpu_data};
+  iree_uk_unpack_p(&params);
 }

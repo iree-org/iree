@@ -108,6 +108,7 @@ iree_compiler_cc_library(
         "LLVMTargetOptions.h",
     ],
     deps = [
+        "@llvm-project//llvm:Analysis",
         "@llvm-project//llvm:MC",
         "@llvm-project//llvm:Passes",
         "@llvm-project//llvm:Support",

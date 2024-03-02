@@ -17,17 +17,15 @@ static inline void iree_uk_mmt4d_tile_s8s8s32_1x8x4_to_8x8x4_arm_64_dotprod(
   iree_uk_int32_t* IREE_UK_RESTRICT out_ptr = out_tile;
   int32x4_t acc[16];
   if (params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
-    for (int i = 0; i < 2 * M0; ++i) {
+    IREE_UK_UNROLL for (int i = 0; i < 2 * M0; ++i) {
       acc[i] = vld1q_s32(out_ptr + 4 * i);
     }
   } else {
-    for (int i = 0; i < 2 * M0; ++i) {
-      acc[i] = vdupq_n_s32(0);
-    }
+    IREE_UK_UNROLL for (int i = 0; i < 2 * M0; ++i) { acc[i] = vdupq_n_s32(0); }
   }
   for (int k = 0; k < params->K; ++k) {
     int8x16_t rhs[2];
-    for (int i = 0; i < 2; ++i) {
+    IREE_UK_UNROLL for (int i = 0; i < 2; ++i) {
       rhs[i] = vld1q_s8(rhs_ptr + 16 * i);
     }
     rhs_ptr += 32;
@@ -39,7 +37,7 @@ static inline void iree_uk_mmt4d_tile_s8s8s32_1x8x4_to_8x8x4_arm_64_dotprod(
     } else if (M0 == 2) {
       lhs[0] = vcombine_s8(vld1_s8(lhs_ptr), vdup_n_s8(0));
     } else
-      for (int i = 0; i < 2; ++i) {
+      IREE_UK_UNROLL for (int i = 0; i < 2; ++i) {
         lhs[i] = vld1q_s8(lhs_ptr + 16 * i);
       }
     lhs_ptr += 4 * M0;
@@ -64,7 +62,7 @@ static inline void iree_uk_mmt4d_tile_s8s8s32_1x8x4_to_8x8x4_arm_64_dotprod(
     acc[15] = vdotq_lane_s32(acc[15], rhs[1], vget_high_s8(lhs[1]), 1);
   }
 
-  for (int i = 0; i < 2 * M0; ++i) {
+  IREE_UK_UNROLL for (int i = 0; i < 2 * M0; ++i) {
     vst1q_s32(out_ptr + 4 * i, acc[i]);
   }
 }

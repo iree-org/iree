@@ -64,21 +64,6 @@ util.func public @target_func(%arg0: tensor<4xf32>) -> !hal.buffer_view {
 
 // -----
 
-// Break/trace on a dispatch not found in the target function should do nothing.
-
-// CHECK-LABEL: util.func public @target_func
-util.func public @target_func(%arg0: tensor<4xf32>) -> !hal.buffer_view {
-  %c4 = arith.constant 4 : index
-  // CHECK: %[[D0:.+]] = flow.dispatch @dispatch_0::@dispatch_0_entry
-  %0 = flow.dispatch @dispatch_0::@dispatch_0_entry[%c4] (%arg0) : (tensor<4xf32>) -> tensor<4xf32>
-  // CHECK: %[[D1:.+]] = hal.tensor.export %[[D0]] : tensor<4xf32> -> !hal.buffer_view
-  %1 = hal.tensor.export %0 : tensor<4xf32> -> !hal.buffer_view
-  // CHECK: util.return %[[D1]] : !hal.buffer_view
-  util.return %1 : !hal.buffer_view
-}
-
-// -----
-
 // Combines tracing and breaking on the same dispatch.
 
 // CHECK-LABEL: util.func public @target_func

@@ -97,6 +97,12 @@
 #define IREE_UK_ATTRIBUTE_NOINLINE
 #endif  // IREE_UK_HAVE_ATTRIBUTE(noinline)
 
+#if IREE_UK_HAVE_ATTRIBUTE(always_inline) || defined(IREE_UK_COMPILER_GCC)
+#define IREE_UK_ATTRIBUTE_ALWAYS_INLINE __attribute__((always_inline))
+#else
+#define IREE_UK_ATTRIBUTE_ALWAYS_INLINE
+#endif  // IREE_UK_HAVE_ATTRIBUTE(always_inline)
+
 #if defined(IREE_UK_COMPILER_CLANG_OR_GCC)
 #define IREE_UK_LIKELY(x) (__builtin_expect(!!(x), 1))
 #define IREE_UK_UNLIKELY(x) (__builtin_expect(!!(x), 0))
@@ -118,6 +124,17 @@
 #else
 #define IREE_UK_ATTRIBUTE_UNUSED
 #endif  // IREE_UK_HAVE_ATTRIBUTE(maybe_unused / unused)
+
+// IREE_UK_UNROLL: request full unrolling of loops with constant trip count.
+#if defined(IREE_UK_COMPILER_CLANG)
+#define IREE_UK_UNROLL _Pragma("clang loop unroll(full)")
+#elif defined(IREE_UK_COMPILER_GCC)
+// GCC requires passing a max unroll factor. 64 should be enough for anybody.
+#define IREE_UK_UNROLL _Pragma("GCC unroll 64")
+#else
+// MSVC doesn't have a pragma unroll.
+#define IREE_UK_UNROLL
+#endif  // defined(IREE_UK_COMPILER_CLANG)
 
 //===----------------------------------------------------------------------===//
 // Local replacement for stdbool.h

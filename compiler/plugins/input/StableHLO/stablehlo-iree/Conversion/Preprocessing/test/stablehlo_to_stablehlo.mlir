@@ -64,10 +64,10 @@ func.func @reorder_broadcast_in_dim_scalar_binary(%arg0: tensor<f32>, %arg1: ten
   // CHECK: stablehlo.broadcast_in_dim %[[OR]], dims = [] : (tensor<i32>) -> tensor<1x8x8x64xi32>
   // CHECK: %[[XOR:.*]] = stablehlo.xor %[[ARG2]], %[[ARG3]] : tensor<i32>
   // CHECK: stablehlo.broadcast_in_dim %[[XOR]], dims = [] : (tensor<i32>) -> tensor<1x8x8x64xi32>
-  %0 = "stablehlo.broadcast_in_dim"(%arg0) {broadcast_dimensions = dense<[]> : tensor<0xi64>} : (tensor<f32>) -> tensor<1x8x8x64xf32>
-  %1 = "stablehlo.broadcast_in_dim"(%arg1) {broadcast_dimensions = dense<[]> : tensor<0xi64>} : (tensor<f32>) -> tensor<1x8x8x64xf32>
-  %2 = "stablehlo.broadcast_in_dim"(%arg2) {broadcast_dimensions = dense<[]> : tensor<0xi64>} : (tensor<i32>) -> tensor<1x8x8x64xi32>
-  %3 = "stablehlo.broadcast_in_dim"(%arg3) {broadcast_dimensions = dense<[]> : tensor<0xi64>} : (tensor<i32>) -> tensor<1x8x8x64xi32>
+  %0 = "stablehlo.broadcast_in_dim"(%arg0) {broadcast_dimensions = array<i64>} : (tensor<f32>) -> tensor<1x8x8x64xf32>
+  %1 = "stablehlo.broadcast_in_dim"(%arg1) {broadcast_dimensions = array<i64>} : (tensor<f32>) -> tensor<1x8x8x64xf32>
+  %2 = "stablehlo.broadcast_in_dim"(%arg2) {broadcast_dimensions = array<i64>} : (tensor<i32>) -> tensor<1x8x8x64xi32>
+  %3 = "stablehlo.broadcast_in_dim"(%arg3) {broadcast_dimensions = array<i64>} : (tensor<i32>) -> tensor<1x8x8x64xi32>
   %4 = stablehlo.add %0, %1 : tensor<1x8x8x64xf32>
   %5 = stablehlo.atan2 %0, %1 : tensor<1x8x8x64xf32>
   %6 = stablehlo.divide %0, %1 : tensor<1x8x8x64xf32>
@@ -92,8 +92,8 @@ func.func @reorder_broadcast_in_dim_scalar_binary(%arg0: tensor<f32>, %arg1: ten
 func.func @reorder_broadcast_in_dim_scalar_binary_diff_type(%arg0: tensor<f32>, %arg1: tensor<f32>) -> tensor<1x8x8x64xcomplex<f32>> {
   // CHECK: %[[X:.+]] = stablehlo.complex %[[ARG0]], %[[ARG1]] : tensor<complex<f32>>
   // CHECK: stablehlo.broadcast_in_dim %[[X]], dims = [] : (tensor<complex<f32>>) -> tensor<1x8x8x64xcomplex<f32>>
-  %0 = "stablehlo.broadcast_in_dim"(%arg0) {broadcast_dimensions = dense<[]> : tensor<0xi64>} : (tensor<f32>) -> tensor<1x8x8x64xf32>
-  %1 = "stablehlo.broadcast_in_dim"(%arg1) {broadcast_dimensions = dense<[]> : tensor<0xi64>} : (tensor<f32>) -> tensor<1x8x8x64xf32>
+  %0 = "stablehlo.broadcast_in_dim"(%arg0) {broadcast_dimensions = array<i64>} : (tensor<f32>) -> tensor<1x8x8x64xf32>
+  %1 = "stablehlo.broadcast_in_dim"(%arg1) {broadcast_dimensions = array<i64>} : (tensor<f32>) -> tensor<1x8x8x64xf32>
   %2 = "stablehlo.complex"(%0, %1) : (tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>) -> tensor<1x8x8x64xcomplex<f32>>
   return %2 : tensor<1x8x8x64xcomplex<f32>>
 }
@@ -104,8 +104,8 @@ func.func @reorder_broadcast_in_dim_scalar_binary_diff_type(%arg0: tensor<f32>, 
 func.func @reorder_broadcast_in_dim_1d_binary(%arg0: tensor<3xf32>, %arg1: tensor<3xf32>) -> tensor<4x3xf32> {
   // CHECK: %[[ATAN2:.*]] = stablehlo.atan2 %[[ARG0]], %[[ARG1]] : tensor<3xf32>
   // CHECK: %[[BCAST:.*]] = stablehlo.broadcast_in_dim %[[ATAN2]], dims = [1] : (tensor<3xf32>) -> tensor<4x3xf32>
-  %0 = "stablehlo.broadcast_in_dim"(%arg0) {broadcast_dimensions = dense<[1]> : tensor<1xi64>} : (tensor<3xf32>) -> tensor<4x3xf32>
-  %1 = "stablehlo.broadcast_in_dim"(%arg1) {broadcast_dimensions = dense<[1]> : tensor<1xi64>} : (tensor<3xf32>) -> tensor<4x3xf32>
+  %0 = "stablehlo.broadcast_in_dim"(%arg0) {broadcast_dimensions = array<i64: 1>} : (tensor<3xf32>) -> tensor<4x3xf32>
+  %1 = "stablehlo.broadcast_in_dim"(%arg1) {broadcast_dimensions = array<i64: 1>} : (tensor<3xf32>) -> tensor<4x3xf32>
   %2 = stablehlo.atan2 %0, %1 : tensor<4x3xf32>
   // CHECK: return %[[BCAST]]
   return %2 : tensor<4x3xf32>
@@ -117,8 +117,8 @@ func.func @reorder_broadcast_in_dim_1d_binary(%arg0: tensor<3xf32>, %arg1: tenso
 func.func @reorder_broadcast_in_dim_2d_binary(%arg0: tensor<2x4xi32>, %arg1: tensor<2x4xi32>) -> tensor<3x2x4xi32> {
   // CHECK: %[[POWER:.*]] = stablehlo.power %[[ARG0]], %[[ARG1]] : tensor<2x4xi32>
   // CHECK: %[[BCAST:.*]] = stablehlo.broadcast_in_dim %[[POWER]], dims = [1, 2] : (tensor<2x4xi32>) -> tensor<3x2x4xi32>
-  %0 = "stablehlo.broadcast_in_dim"(%arg0) {broadcast_dimensions = dense<[1, 2]> : tensor<2xi64>} : (tensor<2x4xi32>) -> tensor<3x2x4xi32>
-  %1 = "stablehlo.broadcast_in_dim"(%arg1) {broadcast_dimensions = dense<[1, 2]> : tensor<2xi64>} : (tensor<2x4xi32>) -> tensor<3x2x4xi32>
+  %0 = "stablehlo.broadcast_in_dim"(%arg0) {broadcast_dimensions = array<i64: 1, 2>} : (tensor<2x4xi32>) -> tensor<3x2x4xi32>
+  %1 = "stablehlo.broadcast_in_dim"(%arg1) {broadcast_dimensions = array<i64: 1, 2>} : (tensor<2x4xi32>) -> tensor<3x2x4xi32>
   %2 = stablehlo.power %0, %1 : tensor<3x2x4xi32>
   // CHECK: return %[[BCAST]]
   return %2 : tensor<3x2x4xi32>
@@ -154,7 +154,7 @@ func.func @reorder_broadcast_in_dim_scalar_unary(%arg0: tensor<f32>) -> (tensor<
   // CHECK: stablehlo.broadcast_in_dim %[[SQRT]], dims = [] : (tensor<f32>) -> tensor<1x8x8x64xf32>
   // CHECK: %[[TANH:.*]] = stablehlo.tanh %[[ARG0]] : tensor<f32>
   // CHECK: stablehlo.broadcast_in_dim %[[TANH]], dims = [] : (tensor<f32>) -> tensor<1x8x8x64xf32>
-  %0 = "stablehlo.broadcast_in_dim"(%arg0) {broadcast_dimensions = dense<[]> : tensor<0xi64>} : (tensor<f32>) -> tensor<1x8x8x64xf32>
+  %0 = "stablehlo.broadcast_in_dim"(%arg0) {broadcast_dimensions = array<i64> } : (tensor<f32>) -> tensor<1x8x8x64xf32>
   %1 = stablehlo.abs %0 : tensor<1x8x8x64xf32>
   %2 = stablehlo.ceil %0 : tensor<1x8x8x64xf32>
   %3 = stablehlo.cosine %0 : tensor<1x8x8x64xf32>
@@ -177,7 +177,7 @@ func.func @reorder_broadcast_in_dim_scalar_unary(%arg0: tensor<f32>) -> (tensor<
 func.func @reorder_broadcast_in_dim_1d_unary(%arg0: tensor<3xf32>) -> tensor<4x3xf32> {
   // CHECK: %[[COS:.*]] = stablehlo.cosine %[[ARG0]] : tensor<3xf32>
   // CHECK: %[[BCAST:.*]] = stablehlo.broadcast_in_dim %[[COS]], dims = [1] : (tensor<3xf32>) -> tensor<4x3xf32>
-  %0 = "stablehlo.broadcast_in_dim"(%arg0) {broadcast_dimensions = dense<[1]> : tensor<1xi64>} : (tensor<3xf32>) -> tensor<4x3xf32>
+  %0 = "stablehlo.broadcast_in_dim"(%arg0) {broadcast_dimensions = array<i64: 1>} : (tensor<3xf32>) -> tensor<4x3xf32>
   %1 = stablehlo.cosine %0 : tensor<4x3xf32>
   // CHECK: return %[[BCAST]]
   return %1 : tensor<4x3xf32>
@@ -189,7 +189,7 @@ func.func @reorder_broadcast_in_dim_1d_unary(%arg0: tensor<3xf32>) -> tensor<4x3
 func.func @reorder_in_dim_2d_unary(%arg0: tensor<2x4xf32>) -> tensor<3x2x4xf32> {
   // CHECK: %[[LOG:.*]] = stablehlo.log %[[ARG0]] : tensor<2x4xf32>
   // CHECK: %[[BCAST:.*]] = stablehlo.broadcast_in_dim %[[LOG]], dims = [1, 2] : (tensor<2x4xf32>) -> tensor<3x2x4xf32>
-  %0 = "stablehlo.broadcast_in_dim"(%arg0) {broadcast_dimensions = dense<[1, 2]> : tensor<2xi64>} : (tensor<2x4xf32>) -> tensor<3x2x4xf32>
+  %0 = "stablehlo.broadcast_in_dim"(%arg0) {broadcast_dimensions = array<i64: 1, 2>} : (tensor<2x4xf32>) -> tensor<3x2x4xf32>
   %1 = stablehlo.log %0 : tensor<3x2x4xf32>
   // CHECK: return %[[BCAST]]
   return %1 : tensor<3x2x4xf32>
@@ -203,7 +203,7 @@ func.func @reorder_broadcast_in_dim_scalar_unary_diff_type(%arg0: tensor<complex
   // CHECK: stablehlo.broadcast_in_dim %[[REAL]], dims = [] : (tensor<f32>) -> tensor<1x8x8x64xf32>
   // CHECK: %[[IMAG:.*]] = stablehlo.imag %[[ARG0]] : (tensor<complex<f32>>) -> tensor<f32>
   // CHECK: stablehlo.broadcast_in_dim %[[IMAG]], dims = [] : (tensor<f32>) -> tensor<1x8x8x64xf32>
-  %0 = "stablehlo.broadcast_in_dim"(%arg0) {broadcast_dimensions = dense<[]> : tensor<0xi64>} : (tensor<complex<f32>>) -> tensor<1x8x8x64xcomplex<f32>>
+  %0 = "stablehlo.broadcast_in_dim"(%arg0) {broadcast_dimensions = array<i64>} : (tensor<complex<f32>>) -> tensor<1x8x8x64xcomplex<f32>>
   %1 = stablehlo.real %0 : (tensor<1x8x8x64xcomplex<f32>>) -> tensor<1x8x8x64xf32>
   %2 = stablehlo.imag %0 : (tensor<1x8x8x64xcomplex<f32>>) -> tensor<1x8x8x64xf32>
   return %1, %2: tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>
@@ -277,7 +277,7 @@ func.func @mul_float_bool_cast(%arg0 : tensor<?xi1>, %arg1 : tensor<?xf32>) -> t
 // CHECK-LABEL: @mul_float_bool_cast_broadcast
 func.func @mul_float_bool_cast_broadcast(%arg0: tensor<5xi1>, %arg1: tensor<5x6xf32>) -> tensor<5x6xf32> {
   %0 = stablehlo.convert %arg0 : (tensor<5xi1>) -> tensor<5xf32>
-  %1 = "stablehlo.broadcast_in_dim"(%0) {broadcast_dimensions = dense<0> : tensor<1xi64>} : (tensor<5xf32>) -> tensor<5x6xf32>
+  %1 = "stablehlo.broadcast_in_dim"(%0) {broadcast_dimensions = array<i64: 0>} : (tensor<5xf32>) -> tensor<5x6xf32>
   %2 = stablehlo.multiply %1, %arg1 : tensor<5x6xf32>
   return %2 : tensor<5x6xf32>
 }
@@ -290,7 +290,7 @@ func.func @mul_float_bool_cast_broadcast(%arg0: tensor<5xi1>, %arg1: tensor<5x6x
 func.func @mul_float_bool_cast_dyn_broadcast(%arg0: tensor<?xi1>, %arg1: tensor<?x?xf32>) -> tensor<?x?xf32> {
     %0 = stablehlo.convert %arg0 : (tensor<?xi1>) -> tensor<?xf32>
     %1 = shape.shape_of %arg1 : tensor<?x?xf32> -> tensor<2xindex>
-    %2 = "stablehlo.dynamic_broadcast_in_dim"(%0, %1) {broadcast_dimensions = dense<0> : tensor<1xi64>} : (tensor<?xf32>, tensor<2xindex>) -> tensor<?x?xf32>
+    %2 = "stablehlo.dynamic_broadcast_in_dim"(%0, %1) {broadcast_dimensions = array<i64: 0>} : (tensor<?xf32>, tensor<2xindex>) -> tensor<?x?xf32>
     %3 = stablehlo.multiply %2, %arg1 : tensor<?x?xf32>
     return %3 : tensor<?x?xf32>
 }
@@ -351,11 +351,11 @@ func.func @convolution(%arg0: tensor<16x32x256xbf16>, %arg1: tensor<1x256x256xbf
      batch_group_count = 1 : i64,
      dimension_numbers = #stablehlo.conv<[b, 0, f]x[0, i, o]->[b, 0, f]>,
      feature_group_count = 1 : i64,
-     lhs_dilation = dense<1> : tensor<1xi64>,
+     lhs_dilation = array<i64: 1>,
      padding = dense<0> : tensor<1x2xi64>,
      precision_config = [#stablehlo<precision DEFAULT>, #stablehlo<precision DEFAULT>],
-     rhs_dilation = dense<1> : tensor<1xi64>,
-     window_strides = dense<[1]> : tensor<1xi64>
+     rhs_dilation = array<i64: 1>,
+     window_strides = array<i64: 1>
    } : (tensor<16x32x256xf32>, tensor<1x256x256xbf16>) -> tensor<16x32x256xf32>
   // CHECK: return %[[CONV]]
   func.return %0 : tensor<16x32x256xf32>
@@ -427,8 +427,8 @@ func.func @iota_sort_slice_is_topk(%in : tensor<16x16xf32>) -> (tensor<16x8xf32>
 
 func.func @broadcast_iota_sort_slice_is_topk(%in : tensor<16x16x16xf32>) -> (tensor<16x16x8xf32>, tensor<16x16x8xi32>) {
   %iota = "stablehlo.iota"() { iota_dimension = 0 : i64 } : () -> tensor<16xi32>
-  %broadcasted_0 = "stablehlo.broadcast_in_dim"(%iota) {broadcast_dimensions = dense<[1]> : tensor<1xi64>} : (tensor<16xi32>) -> tensor<16x16xi32>
-  %broadcasted_1 = "stablehlo.broadcast_in_dim"(%broadcasted_0) {broadcast_dimensions = dense<[1, 2]> : tensor<2xi64>} : (tensor<16x16xi32>) -> tensor<16x16x16xi32>
+  %broadcasted_0 = "stablehlo.broadcast_in_dim"(%iota) {broadcast_dimensions = array<i64: 1>} : (tensor<16xi32>) -> tensor<16x16xi32>
+  %broadcasted_1 = "stablehlo.broadcast_in_dim"(%broadcasted_0) {broadcast_dimensions = array<i64: 1, 2>} : (tensor<16x16xi32>) -> tensor<16x16x16xi32>
   %0:2 = "stablehlo.sort"(%in, %broadcasted_1) ({
   ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>, %arg2: tensor<i32>, %arg3: tensor<i32>):
     %7 = "stablehlo.compare"(%arg0, %arg1) {comparison_direction = #stablehlo<comparison_direction GT>} : (tensor<f32>, tensor<f32>) -> tensor<i1>
@@ -448,8 +448,8 @@ func.func @broadcast_iota_sort_slice_is_topk(%in : tensor<16x16x16xf32>) -> (ten
 
 func.func @broadcast_iota_sort_slice_incorrect_dims(%in : tensor<16x16x16xf32>) -> (tensor<16x16x8xf32>, tensor<16x16x8xi32>) {
   %iota = "stablehlo.iota"() { iota_dimension = 0 : i64 } : () -> tensor<16xi32>
-  %broadcasted_0 = "stablehlo.broadcast_in_dim"(%iota) {broadcast_dimensions = dense<[1]> : tensor<1xi64>} : (tensor<16xi32>) -> tensor<16x16xi32>
-  %broadcasted_1 = "stablehlo.broadcast_in_dim"(%broadcasted_0) {broadcast_dimensions = dense<[0, 1]> : tensor<2xi64>} : (tensor<16x16xi32>) -> tensor<16x16x16xi32>
+  %broadcasted_0 = "stablehlo.broadcast_in_dim"(%iota) {broadcast_dimensions = array<i64: 1>} : (tensor<16xi32>) -> tensor<16x16xi32>
+  %broadcasted_1 = "stablehlo.broadcast_in_dim"(%broadcasted_0) {broadcast_dimensions = array<i64: 0, 1>} : (tensor<16x16xi32>) -> tensor<16x16x16xi32>
   %0:2 = "stablehlo.sort"(%in, %broadcasted_1) ({
   ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>, %arg2: tensor<i32>, %arg3: tensor<i32>):
     %7 = "stablehlo.compare"(%arg0, %arg1) {comparison_direction = #stablehlo<comparison_direction GT>} : (tensor<f32>, tensor<f32>) -> tensor<i1>

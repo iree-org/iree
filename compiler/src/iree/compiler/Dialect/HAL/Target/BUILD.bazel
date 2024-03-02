@@ -16,10 +16,12 @@ iree_compiler_cc_library(
     name = "Target",
     srcs = [
         "TargetBackend.cpp",
+        "TargetDevice.cpp",
         "TargetRegistry.cpp",
     ],
     hdrs = [
         "TargetBackend.h",
+        "TargetDevice.h",
         "TargetRegistry.h",
     ],
     deps = [

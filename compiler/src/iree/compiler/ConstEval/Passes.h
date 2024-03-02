@@ -7,20 +7,20 @@
 #ifndef IREE_COMPILER_CONSTEVAL_PASSES_H_
 #define IREE_COMPILER_CONSTEVAL_PASSES_H_
 
+#include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir::iree_compiler::IREE::HAL {
-class TargetBackendRegistry;
-} // namespace mlir::iree_compiler::IREE::HAL
-
 namespace mlir::iree_compiler::ConstEval {
+
+#define GEN_PASS_DECL
+#include "iree/compiler/ConstEval/Passes.h.inc"
 
 /// Creates a pass which uses the compiler and runtime to Jit global
 /// initializers eligible for optimization and uses the actual results to
 /// simplify the globals in the module.
 std::unique_ptr<OperationPass<ModuleOp>>
-createJitGlobalsPass(const IREE::HAL::TargetBackendRegistry &targetRegistry);
+createJitGlobalsPass(const JitGlobalsOptions &options);
 
 // Creates with the global target registry (for opt and such). This
 // may only have access to the VMVX backend.
