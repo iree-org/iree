@@ -946,7 +946,7 @@ void registerCodegenROCDLPasses() {
       });
 
   static PassPipelineRegistration<> LLVMGPUBufferizePipeline(
-      "iree-codegen-llvmgpu-bufferize",
+      "iree-codegen-llvmgpu-bufferization-pipeline",
       "Runs pass pipeline to bufferize for llvmgpu backends",
       [](OpPassManager &passManager) { addBufferizePasses(passManager); });
 }

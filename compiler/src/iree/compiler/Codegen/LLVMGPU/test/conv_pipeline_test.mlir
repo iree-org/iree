@@ -143,7 +143,11 @@ hal.executable private @conv_nchw_dispatch_1 {
   }
 }
 
+// TODO: This test reflects a bug related to how the convolution is bufferized
+// for the LLVMGPUVectorize pipeline, meaning these local memory allocations are
+// not desired. This test should be dropped once the extra buffers have been
+// eliminated.
+
 //   CHECK-LABEL:  func @conv_2d_nchw_fchw_2x320x64x64x320x3x3_f16
-//         CHECK:    memref.alloc
-//         CHECK:    memref.alloc
-//         CHECK:    memref.alloc
+// CHECK-COUNT-3:    memref.alloc() : memref<1x1x1x4xf16, #gpu.address_space<private>>
+// CHECK-COUNT-3:    memref.copy %{{.*}}, %{{.*}} : memref<1x1x1x4xf16, #gpu.address_space<private>> to memref<{{.*}} #hal.descriptor_type<storage_buffer>>

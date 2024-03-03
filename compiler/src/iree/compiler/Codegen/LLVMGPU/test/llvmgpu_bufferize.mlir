@@ -1,7 +1,7 @@
-// RUN: iree-opt --iree-codegen-llvmgpu-bufferize --split-input-file %s | FileCheck %s
+// RUN: iree-opt --iree-codegen-llvmgpu-bufferization-pipeline --split-input-file %s | FileCheck %s
 
 module {
-  func.func @bufferize_thread_local(%arg0: index) {
+  func.func @bufferize_with_thread_private_memory(%arg0: index) {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f16
     %cst_ved = arith.constant dense<0.000000e+00> : vector<1x1x4x4xf16>
@@ -28,7 +28,7 @@ module {
     return
   }
 }
-// CHECK-LABEL: func.func @bufferize_thread_local
+// CHECK-LABEL: func.func @bufferize_with_thread_private_memory
 //       CHECK:   scf.forall {{.*}} in (2, 16) {
 //       CHECK:     %[[ALLOC:.+]] = memref.alloc() : memref<1x1x4x4xf16, #gpu.address_space<private>>
 //       CHECK:     memref.copy %{{.*}}, %[[ALLOC]]
