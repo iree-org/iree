@@ -34,6 +34,7 @@ iree_lit_test_suite(
     "layout_analysis_and_distribution.mlir"
     "legalize.mlir"
     "linalg_transform.mlir"
+    "llvmgpu_bufferize.mlir"
     "nvvm_extract_address_computation.mlir"
     "nvvm_mma_sync_pipeline_test.mlir"
     "nvvm_pipeline_test.mlir"
