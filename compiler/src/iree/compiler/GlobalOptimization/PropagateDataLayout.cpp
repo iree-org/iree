@@ -18,6 +18,7 @@
 #include "iree/compiler/GlobalOptimization/PassDetail.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
@@ -616,6 +617,76 @@ public:
   }
 };
 
+class BubbleUpTensorExtractSliceThroughUnPack final
+    : public OpRewritePattern<tensor::ExtractSliceOp> {
+public:
+  using OpRewritePattern<tensor::ExtractSliceOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::ExtractSliceOp extractSliceOp,
+                                PatternRewriter &rewriter) const override {
+    auto unpackOp =
+        extractSliceOp.getSource().getDefiningOp<tensor::UnPackOp>();
+    if (!unpackOp) {
+      return failure();
+    }
+    auto nodeType = getNodeTypeFromAttr(extractSliceOp);
+    if (!nodeType || nodeType.value() == DataLayoutNodeType::BARRIER) {
+      return failure();
+    }
+
+    Location loc = extractSliceOp->getLoc();
+    auto mixedTiles = unpackOp.getMixedTiles();
+    SmallVector<int64_t> innerDimsPos(unpackOp.getInnerDimsPos());
+    SmallVector<int64_t> outerDimsPerm(unpackOp.getOuterDimsPerm());
+
+    std::optional<llvm::SmallDenseSet<unsigned>> maybeRankReducingMask =
+        mlir::computeRankReductionMask(
+            extractSliceOp.getStaticSizes(),
+            extractSliceOp.getResultType().getShape());
+    if (!maybeRankReducingMask) {
+      return rewriter.notifyMatchFailure(
+          extractSliceOp,
+          "failed to compute rank reducing mask for packed extract_slice");
+    }
+    auto rankReducingMask = maybeRankReducingMask.value();
+
+    SmallVector<OpFoldResult> newMixedOffsets(extractSliceOp.getMixedOffsets());
+    SmallVector<OpFoldResult> newMixedSizes(extractSliceOp.getMixedSizes());
+    SmallVector<OpFoldResult> newMixedStrides(extractSliceOp.getMixedStrides());
+
+    if (failed(getPackedSliceMetadata(rewriter, loc, mixedTiles, innerDimsPos,
+                                      outerDimsPerm, rankReducingMask,
+                                      newMixedOffsets, newMixedSizes,
+                                      newMixedStrides))) {
+      return failure();
+    }
+
+    // Create the packed ExtractSliceOp.
+    RankedTensorType packedExtractResultType =
+        getPackedSliceType(unpackOp.getSourceType(), newMixedSizes,
+                           rankReducingMask, outerDimsPerm, innerDimsPos);
+    Value packedExtractOp = rewriter.create<tensor::ExtractSliceOp>(
+        loc, packedExtractResultType, unpackOp.getSource(), newMixedOffsets,
+        newMixedSizes, newMixedStrides);
+
+    // Unpack the extracted slice.
+    // This tensor can have unit dims in some packed dimensions. These need to
+    // be collapsed before unpacking.
+    SmallVector<OpFoldResult> sliceInnerTiles(
+        newMixedSizes.end() - mixedTiles.size(), newMixedSizes.end());
+    FailureOr<Value> unpackedSlice =
+        unPackSliceOfTensor(rewriter, packedExtractOp, sliceInnerTiles,
+                            maybeRankReducingMask.value(), unpackOp,
+                            extractSliceOp.getMixedSizes());
+    if (failed(unpackedSlice)) {
+      return rewriter.notifyMatchFailure(extractSliceOp,
+                                         "failed to unpack extracted slice");
+    }
+    rewriter.replaceOp(extractSliceOp, unpackedSlice.value());
+    return success();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Pass definition
 //===----------------------------------------------------------------------===//
@@ -687,6 +758,8 @@ void PropagateDataLayoutPass::runOnOperation() {
   {
     MLIRContext *context = &getContext();
     RewritePatternSet propagationPatterns(context);
+    propagationPatterns.insert<BubbleUpTensorExtractSliceThroughUnPack>(
+        context);
     propagationPatterns.insert<FoldCancellingPackUnPackOps>(context);
     propagationPatterns.insert<FoldCancellingUnPackPackOps>(context);
 

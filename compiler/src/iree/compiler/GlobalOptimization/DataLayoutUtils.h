@@ -7,6 +7,7 @@
 #define IREE_GLOBALOPTIMIZATION_DATALAYOUTUTILS_H_
 
 #include "iree/compiler/Dialect/Util/Analysis/Explorer.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 
 namespace mlir {
 class Location;
@@ -140,6 +141,48 @@ transformGlobalsToNewLayout(IRRewriter &rewriter, SmallVector<Value> edgeNodes,
                             DataLayoutTransformation *transform,
                             const Explorer::GlobalInfo *globalInfo,
                             SymbolTable moduleSymbols);
+
+/// Given metadata for extract_slice or insert_slice ops and its rank-reducing
+/// mask, compute the new metadata for a slice in the packed domain defined by
+/// the passed `mixedTiles`, `innerDimsPos`, and `outerDimsPerm`. This will
+/// overwrite the passed slice metadata with the packed domain metadata.
+LogicalResult
+getPackedSliceMetadata(PatternRewriter &rewriter, Location loc,
+                       SmallVector<OpFoldResult> mixedTiles,
+                       SmallVector<int64_t> innerDimsPos,
+                       SmallVector<int64_t> outerDimsPerm,
+                       llvm::SmallDenseSet<unsigned> rankReducingMask,
+                       SmallVector<OpFoldResult> &mixedOffsets,
+                       SmallVector<OpFoldResult> &mixedSizes,
+                       SmallVector<OpFoldResult> &mixedStrides);
+
+/// Given a slice of a tensor, the corresponding slice sizes, and the metadata
+/// for rank reduction and a pack of the full tensor, return the rank-reduced,
+/// packed type of the slice. Unit dims are inserted for packed rank-reduced
+/// dimensions that become inner dimensions after the pack.
+/// For example, the packed slice type for the following insert_slice would be
+/// `tensor<32x1x64x1x2xf32>`, corresponding to the packed `%0`:
+///
+/// %2 = tensor.insert_slice %0 into %1[32, 0, 0] [1, 32, 128] [1, 1, 1]
+///     : tensor<32x128xf32> into tensor<4095x32x128xf32>
+/// %4 = tensor.pack %0 outer_dims_perm = [1, 0, 2] inner_dims_pos = [0, 2]
+///     inner_tiles = [16, 2] into %3 : tensor<4095x32x128xf32>
+///     -> tensor<32x256x64x16x2xf32>
+RankedTensorType getPackedSliceType(
+    RankedTensorType packedSourceType, SmallVector<OpFoldResult> sliceSizes,
+    llvm::SmallDenseSet<unsigned> rankReductionMask,
+    ArrayRef<int64_t> outerDimsPerm, ArrayRef<int64_t> innerDimsPos);
+
+/// Given a packed slice of a tensor, some slicing and packing metadata, and
+/// the original type of the slice before packing, unpack the packed slice, and
+/// return the unpacked slice. The unpacked slice should be the same type as
+/// `originalSliceType`.
+FailureOr<Value>
+unPackSliceOfTensor(PatternRewriter &rewriter, Value packedSlice,
+                    SmallVector<OpFoldResult> sliceInnerTiles,
+                    llvm::SmallDenseSet<unsigned> rankReductionMask,
+                    tensor::UnPackOp unpackOp,
+                    SmallVector<OpFoldResult> unpackedSliceSizes);
 
 //===----------------------------------------------------------------------===//
 // Attribute helpers
