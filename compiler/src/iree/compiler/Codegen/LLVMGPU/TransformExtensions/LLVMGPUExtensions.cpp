@@ -1528,6 +1528,7 @@ transform_dialect::AMDGPUDistributeVectorsOp::applyToOne(
   populateGPUReductionDistributionPatterns(patterns);
   populateGPUDistributeNestedLayoutAttrPatterns(laneId, patterns);
   populateAMDGPUDistributionPatterns(patterns);
+  populateGPULayoutResolutionDistributionPatterns(patterns);
   if (failed(distributeVectorOps(target, patterns, options))) {
     return emitDefaultSilenceableFailure(target);
   }
