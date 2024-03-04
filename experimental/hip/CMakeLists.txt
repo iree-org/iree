@@ -73,8 +73,6 @@ iree_cc_library(
     iree::hal::utils::resource_set
     iree::hal::utils::semaphore_base
     iree::schemas::rocm_executable_def_c_fbs
-  COPTS
-    "-D__HIP_PLATFORM_HCC__=1"
   PUBLIC
 )
 
@@ -92,8 +90,6 @@ iree_cc_library(
     "status_util.c"
   INCLUDES
     "${HIP_API_HEADERS_ROOT}"
-  COPTS
-    "-D__HIP_PLATFORM_HCC__=1"
   DEPS
     iree::base
     iree::base::core_headers
@@ -113,6 +109,4 @@ iree_cc_test(
     iree::testing::gtest_main
   LABELS
     "driver=hip"
-  COPTS
-    "-D__HIP_PLATFORM_HCC__=1"
 )
