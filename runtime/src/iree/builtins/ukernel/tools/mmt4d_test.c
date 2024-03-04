@@ -4,8 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <iree/builtins/ukernel/common.h>
-
 #include "iree/base/api.h"
 #include "iree/base/internal/math.h"
 #include "iree/builtins/ukernel/api.h"
@@ -525,6 +523,13 @@ static void iree_uk_test_mmt4d_impl(iree_uk_uint32_t flags, int M0, int N0,
 
 static void iree_uk_test_mmt4d(iree_uk_uint32_t flags, int M0, int N0, int K0,
                                const char* cpu_features) {
+  // Always allow the fallback in this test. The problem with trying to enforce
+  // that no fallback is accidentally used, is that it's not easy to tell when
+  // a fallback is legitimate. It depends on the build system used (CMake or
+  // Bazel) and within the CMake case, it depends on the native toolchain. The
+  // ground truth is given by the IREE_UK_BUILD_* defines, but they are
+  // currently an implementation detail within each arch/ subdirectory.
+  flags |= IREE_UK_FLAG_MMT4D_ALLOW_GENERIC_FALLBACK_TILE_FUNCTION;
   // Test narrowed, power-of-two values of M0, as mmt4d kernels tend to have
   // narrow variants for handling these cases.
   for (int narrowM0 = 1; narrowM0 < M0; narrowM0 *= 2) {
@@ -537,36 +542,16 @@ int main(int argc, char** argv) {
   // Generic tests, not matching any particular CPU feature. This is the place
   // to test weird M0, N0, K0 to ensure e.g. that we haven't unwittingly baked
   // in a power-of-two assumption
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_ALLOW_GENERIC_FALLBACK_TILE_FUNCTION |
-                         IREE_UK_FLAG_MMT4D_TYPE_F32F32F32,
-                     3, 5, 7, "");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_ALLOW_GENERIC_FALLBACK_TILE_FUNCTION |
-                         IREE_UK_FLAG_MMT4D_TYPE_S8S8S32,
-                     9, 6, 3, "");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_ALLOW_GENERIC_FALLBACK_TILE_FUNCTION |
-                         IREE_UK_FLAG_MMT4D_TYPE_S8S4S32,
-                     9, 12, 2, "");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_ALLOW_GENERIC_FALLBACK_TILE_FUNCTION |
-                         IREE_UK_FLAG_MMT4D_TYPE_S16S16S32,
-                     7, 3, 6, "");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_ALLOW_GENERIC_FALLBACK_TILE_FUNCTION |
-                         IREE_UK_FLAG_MMT4D_TYPE_S16U4S32,
-                     5, 3, 2, "");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_ALLOW_GENERIC_FALLBACK_TILE_FUNCTION |
-                         IREE_UK_FLAG_MMT4D_TYPE_S16S8S32,
-                     7, 5, 6, "");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_ALLOW_GENERIC_FALLBACK_TILE_FUNCTION |
-                         IREE_UK_FLAG_MMT4D_TYPE_F16F16F32,
-                     4, 6, 5, "");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_ALLOW_GENERIC_FALLBACK_TILE_FUNCTION |
-                         IREE_UK_FLAG_MMT4D_TYPE_F16F16F16,
-                     3, 5, 8, "");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_ALLOW_GENERIC_FALLBACK_TILE_FUNCTION |
-                         IREE_UK_FLAG_MMT4D_TYPE_BF16BF16F32,
-                     11, 4, 1, "");
-  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_ALLOW_GENERIC_FALLBACK_TILE_FUNCTION |
-                         IREE_UK_FLAG_MMT4D_TYPE_BF16BF16BF16,
-                     2, 9, 3, "");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 3, 5, 7, "");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 9, 6, 3, "");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S4S32, 9, 12, 2, "");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S16S16S32, 7, 3, 6, "");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S16U4S32, 5, 3, 2, "");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S16S8S32, 7, 5, 6, "");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F32, 4, 6, 5, "");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F16, 3, 5, 8, "");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_BF16BF16F32, 11, 4, 1, "");
+  iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_BF16BF16BF16, 2, 9, 3, "");
 
 #if defined(IREE_ARCH_ARM_64)
 
@@ -577,29 +562,18 @@ int main(int argc, char** argv) {
                      8, 8, 1, "");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 8, 8, 1, "");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S4S32, 4, 16, 2, "");
-#if defined(IREE_UK_BUILD_ARM_64_FP16FML)
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F32, 8, 8, 1, "fp16fml");
-#endif  // defined(IREE_UK_BUILD_ARM_64_FP16FML)
-#if defined(IREE_UK_BUILD_ARM_64_FULLFP16)
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS |
                          IREE_UK_FLAG_MMT4D_TYPE_F16F16F16,
                      8, 8, 1, "fullfp16");
-#endif  // defined(IREE_UK_BUILD_ARM_64_FULLFP16)
-#if defined(IREE_UK_BUILD_ARM_64_BF16)
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_BF16BF16BF16, 8, 8, 4, "bf16");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_BF16BF16F32, 8, 8, 4, "bf16");
-#endif  // defined(IREE_UK_BUILD_ARM_64_BF16)
-#if defined(IREE_UK_BUILD_ARM_64_DOTPROD)
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 8, 8, 4, "dotprod");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S4S32, 8, 8, 8, "dotprod");
-#endif  // defined(IREE_UK_BUILD_ARM_64_DOTPROD)
-#if defined(IREE_UK_BUILD_ARM_64_I8MM)
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 8, 8, 8, "i8mm");
-#endif  // defined(IREE_UK_BUILD_ARM_64_I8MM)
 
 #elif defined(IREE_ARCH_X86_64)
 
-#if defined(IREE_UK_BUILD_X86_64_AVX2_FMA)
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 8, 8, 1, "avx2_fma");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F32, 8, 8, 1, "avx2_fma");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS |
@@ -607,8 +581,6 @@ int main(int argc, char** argv) {
                      8, 8, 1, "avx2_fma");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 8, 8, 2, "avx2_fma");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S16S16S32, 8, 8, 2, "avx2_fma");
-#endif  // defined(IREE_UK_BUILD_X86_64_AVX2_FMA)
-#if defined(IREE_UK_BUILD_X86_64_AVX512_BASE)
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F32F32F32, 16, 16, 1,
                      "avx512_base");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_F16F16F32, 16, 16, 1,
@@ -619,20 +591,15 @@ int main(int argc, char** argv) {
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 16, 16, 2, "avx512_base");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S16S16S32, 16, 16, 2,
                      "avx512_base");
-#endif  // defined(IREE_UK_BUILD_X86_64_AVX512_BASE)
-#if defined(IREE_UK_BUILD_X86_64_AVX512_BF16)
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_BF16BF16F32, 16, 16, 2,
                      "avx512_bf16");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS |
                          IREE_UK_FLAG_MMT4D_TYPE_BF16BF16BF16,
                      16, 16, 2, "avx512_bf16");
-#endif  // defined(IREE_UK_BUILD_X86_64_AVX512_BF16)
-#if defined(IREE_UK_BUILD_X86_64_AVX512_VNNI)
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S8S8S32, 16, 16, 2, "avx512_vnni");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S16S16S32, 16, 16, 2,
                      "avx512_vnni");
   iree_uk_test_mmt4d(IREE_UK_FLAG_MMT4D_TYPE_S16U4S32, 1, 32, 8, "avx512_vnni");
-#endif  // defined(IREE_UK_BUILD_X86_64_AVX512_VNNI)
 
 #endif  // defined(IREE_ARCH_ARM_64)
 
