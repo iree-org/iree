@@ -2408,6 +2408,19 @@
     ASan (AddressSanitizer)
   </a>
   
+    <nav class="md-nav" aria-label="ASan (AddressSanitizer)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#linking-to-the-dynamic-asan-runtime" class="md-nav__link">
+    Linking to the dynamic ASan runtime
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -3305,6 +3318,19 @@
     ASan (AddressSanitizer)
   </a>
   
+    <nav class="md-nav" aria-label="ASan (AddressSanitizer)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#linking-to-the-dynamic-asan-runtime" class="md-nav__link">
+    Linking to the dynamic ASan runtime
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -3449,6 +3475,52 @@ in compiled CPU code as well by using these <code>iree-compile</code> flags:</p>
 <div class="highlight"><pre><span></span><code>--iree-llvmcpu-link-embedded<span class="o">=</span><span class="nb">false</span>
 --iree-llvmcpu-sanitize<span class="o">=</span>address
 </code></pre></div>
+<h4 id="linking-to-the-dynamic-asan-runtime">Linking to the dynamic ASan runtime<a class="headerlink" href="#linking-to-the-dynamic-asan-runtime" title="Permanent link">link</a></h4>
+<p>You may want to use ASan when using the python bindings.
+One way to achieve this is to build Python (or whatever executable that is
+going to use IREE as a shared library) with Asan.
+Another option is to link to the ASan runtime dynamically instead of
+linking it statically into an executable.</p>
+<p>Using clang-12 (other versions should also work) as a example, configure IREE
+with something like:</p>
+<div class="highlight"><pre><span></span><code>cmake<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-DIREE_ENABLE_ASAN<span class="o">=</span>ON<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-DCMAKE_EXE_LINKER_FLAGS<span class="o">=</span>-shared-libasan<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-DCMAKE_SHARED_LINKER_FLAGS<span class="o">=</span>-shared-libasan<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-DCMAKE_C_COMPILER<span class="o">=</span>clang-12<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>-DCMAKE_CXX_COMPILER<span class="o">=</span>clang++-12<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>...
+</code></pre></div>
+<p>Then when running things the ASan runtime will have to be preloaded.</p>
+<div class="highlight"><pre><span></span><code><span class="nv">LD_PRELOAD</span><span class="o">=</span>/usr/lib/llvm-12/lib/clang/12.0.0/lib/linux/libclang_rt.asan-x86_64.so<span class="w"> </span><span class="se">\</span>
+<span class="nv">ASAN_SYMBOLIZER_PATH</span><span class="o">=</span>/usr/lib/llvm-12/bin/llvm-symbolizer<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>python<span class="w"> </span>...
+</code></pre></div>
+<p>On Ubuntu the corresponding ASan runtime is provided by a package like
+<code>libclang-common-12-dev</code> depending on your Clang version.
+E.g.</p>
+<div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>apt<span class="w"> </span>install<span class="w"> </span>libclang-common-12-dev<span class="w"> </span>llvm-12<span class="w"> </span>clang-12
+</code></pre></div>
+<p>Note that during building would also need to preload the ASan runtime, since
+the build executes its own binaries that are linked against the runtime.</p>
+<div class="highlight"><pre><span></span><code><span class="nv">LD_PRELOAD</span><span class="o">=</span>/usr/lib/llvm-12/lib/clang/12.0.0/lib/linux/libclang_rt.asan-x86_64.so<span class="w"> </span><span class="se">\</span>
+<span class="nv">ASAN_OPTIONS</span><span class="o">=</span><span class="nv">detect_leaks</span><span class="o">=</span><span class="m">0</span><span class="w"> </span><span class="se">\</span>
+<span class="nv">ASAN_SYMBOLIZER_PATH</span><span class="o">=</span>/usr/lib/llvm-12/bin/llvm-symbolizer<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>cmake<span class="w"> </span>--build<span class="w"> </span>...
+</code></pre></div>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>If you want to run the IREE CUDA runtime driver it is likely you would
+need.</p>
+<div class="highlight"><pre><span></span><code><span class="nv">ASAN_OPTIONS</span><span class="o">=</span><span class="s2">&quot;protect_shadow_gap=0&quot;</span>
+</code></pre></div>
+<p>Like this</p>
+<div class="highlight"><pre><span></span><code><span class="nv">LD_PRELOAD</span><span class="o">=</span>/usr/lib/llvm-12/lib/clang/12.0.0/lib/linux/libclang_rt.asan-x86_64.so<span class="w"> </span><span class="se">\</span>
+<span class="nv">ASAN_SYMBOLIZER_PATH</span><span class="o">=</span>/usr/lib/llvm-12/bin/llvm-symbolizer<span class="w"> </span><span class="se">\</span>
+<span class="nv">ASAN_OPTIONS</span><span class="o">=</span><span class="s2">&quot;protect_shadow_gap=0&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>python<span class="w"> </span>...
+</code></pre></div>
+</div>
 <h3 id="tsan-threadsanitizer">TSan (ThreadSanitizer)<a class="headerlink" href="#tsan-threadsanitizer" title="Permanent link">link</a></h3>
 <p>To enable TSan:</p>
 <div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>-DIREE_ENABLE_TSAN<span class="o">=</span>ON<span class="w"> </span>...
