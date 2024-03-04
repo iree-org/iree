@@ -78,7 +78,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 //     CHECK-DAG:   %[[C0:.*]] = arith.constant 0 : index
 //     CHECK-DAG:   %[[C32:.*]] = arith.constant 32 : index
 //     CHECK-DAG:   %[[workgroup_id_x:.*]] = hal.interface.workgroup.id[0] : index
-//     CHECK-DAG:   %[[TIDX:.]] = gpu.thread_id  x
+//     CHECK-DAG:   %[[TIDX:.+]] = gpu.thread_id  x
 
 // No allocation created for the per thread data.
 //     CHECK-NOT:   memref.alloc()
@@ -153,7 +153,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 // Fusion occurred, no barrier before the loop
 //     CHECK-NOT: gpu.barrier
 // Local per-thread scf.for-based reduction.
-//         CHECK: %[[TIDX:.]] = gpu.thread_id  x
+//         CHECK: %[[TIDX:.+]] = gpu.thread_id  x
 //         CHECK: %[[v:.*]] = scf.for {{.*}} -> (vector<1xf32>)
 //         CHECK:   vector.transfer_read {{.*}} vector<1xf32>
 //         CHECK:   arith.addf{{.*}} : vector<1xf32>
@@ -216,7 +216,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 // Fusion occurred, no barrier before the loop
 //     CHECK-NOT: gpu.barrier
 // Local per-thread scf.for-based reduction.
-//         CHECK: %[[TIDX:.]] = gpu.thread_id  x
+//         CHECK: %[[TIDX:.+]] = gpu.thread_id  x
 //         CHECK: %[[TIDX_TIMES_4:.]] = affine.apply{{.*}}[%[[TIDX]]]
 //         CHECK: scf.for {{.*}} -> (vector<1xf32>) {
 //         CHECK:   vector.transfer_read {{.*}} vector<4xf32>
@@ -366,7 +366,7 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 
 //     CHECK-DAG: %[[ALLOC0:.+]] = memref.alloc() {alignment = 64 : i64} : memref<1xi8, #gpu.address_space<workgroup>>
 // Local per-thread scf.for-based reduction.
-//         CHECK: %[[TIDX:.]] = gpu.thread_id  x
+//         CHECK: %[[TIDX:.+]] = gpu.thread_id  x
 //         CHECK: scf.for {{.*}} -> (vector<1xi8>)
 //         CHECK:   vector.transfer_read {{.*}} vector<1xi8>
 //         CHECK:   arith.addi{{.*}} : vector<1xi8>

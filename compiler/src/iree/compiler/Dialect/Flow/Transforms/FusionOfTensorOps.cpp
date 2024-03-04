@@ -398,7 +398,15 @@ struct FusionOfTensorOpsPass
             // Do not fuse producer generic op if it has more than one user.
             if (auto producerGenericOp =
                     dyn_cast<linalg::GenericOp>(producer)) {
-              return producerGenericOp->hasOneUse();
+              return producerGenericOp->hasOneUse() &&
+                     llvm::all_of(producerGenericOp.getIteratorTypesArray(),
+                                  linalg::isParallelIterator);
+            }
+
+            if (auto consumerGenericOp =
+                    dyn_cast<linalg::GenericOp>(producer)) {
+              return llvm::all_of(consumerGenericOp.getIteratorTypesArray(),
+                                  linalg::isParallelIterator);
             }
             // Fuse in all other cases.
             return true;

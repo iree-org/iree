@@ -444,8 +444,9 @@ builtin.module attributes { transform.with_named_sequence } {
   }
 }
 
-// CHECK: %[[IDS:.+]]:4 = affine.delinearize_index %0 into (%c1, %c1, %c4, %c8) : index, index, index, index
-// CHECK: %[[LANEY:.+]] = affine.apply #map()[%1#2]
+// CHECK: %[[TIDX:.+]] = gpu.thread_id  x
+// CHECK: %[[IDS:.+]]:4 = affine.delinearize_index %[[TIDX]] into (%c1, %c1, %c4, %c8) : index, index, index, index
+// CHECK: %[[LANEY:.+]] = affine.apply #map()[%[[IDS]]#2]
 // CHECK: vector.extract %{{.*}}[0, 0, 0, 0]
 // CHECK: vector.transpose %{{.*}}, [1, 0] : vector<1x4xf16> to vector<4x1xf16>
 // CHECK: vector.transfer_write %{{.*}}[%[[LANEY]], %[[IDS]]#3]
@@ -501,7 +502,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK: vector.transfer_write %{{.*}}[%c0, %c0, %[[I0]], %[[LIN_ID0]]] {{.*}} permutation_map = #[[$MAP1]]
 // CHECK: %[[LIN_ID1:.+]] = affine.apply #[[$MAP2]]()[%[[I0]]]
 // CHECK: vector.extract %{{.*}}[1, 0, 0, 0]
-// CHECK: vector.transfer_write %{{.*}}[%c0, %c0, %[[LIN_ID1]], %3] {{.*}} permutation_map = #[[$MAP1]]
+// CHECK: vector.transfer_write %{{.*}}[%c0, %c0, %[[LIN_ID1]], %[[LIN_ID0]]] {{.*}} permutation_map = #[[$MAP1]]
 // CHECK: %[[LIN_ID2:.+]] = affine.apply #[[$MAP3]]()[%[[IDS]]#2, %[[I1]]]
 // CHECK: vector.extract %{{.*}}[0, 1, 0, 0]
 // CHECK: vector.transfer_write %{{.*}}[%c0, %c0, %[[I0]], %[[LIN_ID2]]] {{.*}} permutation_map = #[[$MAP1]]
