@@ -140,16 +140,28 @@ iree_uk_mmt4d_tile_bf16bf16bf16_1x8x4_to_8x8x4_arm_64_bf16(
       out_tile, lhs_panel, rhs_panel, params, IREE_UK_TYPE_BFLOAT_16, M0);
 }
 
-IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4_8(
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
     iree_uk_mmt4d_tile_bf16bf16f32_1x8x4_to_8x8x4_arm_64_bf16,
-    iree_uk_mmt4d_tile_bf16bf16f32_1x8x4_arm_64_bf16,
-    iree_uk_mmt4d_tile_bf16bf16f32_2x8x4_arm_64_bf16,
-    iree_uk_mmt4d_tile_bf16bf16f32_4x8x4_arm_64_bf16,
-    iree_uk_mmt4d_tile_bf16bf16f32_8x8x4_arm_64_bf16)
+    iree_uk_mmt4d_tile_bf16bf16f32_1x8x4_arm_64_bf16, 1)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_bf16bf16f32_1x8x4_to_8x8x4_arm_64_bf16,
+    iree_uk_mmt4d_tile_bf16bf16f32_2x8x4_arm_64_bf16, 2)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_bf16bf16f32_1x8x4_to_8x8x4_arm_64_bf16,
+    iree_uk_mmt4d_tile_bf16bf16f32_4x8x4_arm_64_bf16, 4)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_bf16bf16f32_1x8x4_to_8x8x4_arm_64_bf16,
+    iree_uk_mmt4d_tile_bf16bf16f32_8x8x4_arm_64_bf16, 8)
 
-IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4_8(
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
     iree_uk_mmt4d_tile_bf16bf16bf16_1x8x4_to_8x8x4_arm_64_bf16,
-    iree_uk_mmt4d_tile_bf16bf16bf16_1x8x4_arm_64_bf16,
-    iree_uk_mmt4d_tile_bf16bf16bf16_2x8x4_arm_64_bf16,
-    iree_uk_mmt4d_tile_bf16bf16bf16_4x8x4_arm_64_bf16,
-    iree_uk_mmt4d_tile_bf16bf16bf16_8x8x4_arm_64_bf16)
+    iree_uk_mmt4d_tile_bf16bf16bf16_1x8x4_arm_64_bf16, 1)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_bf16bf16bf16_1x8x4_to_8x8x4_arm_64_bf16,
+    iree_uk_mmt4d_tile_bf16bf16bf16_2x8x4_arm_64_bf16, 2)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_bf16bf16bf16_1x8x4_to_8x8x4_arm_64_bf16,
+    iree_uk_mmt4d_tile_bf16bf16bf16_4x8x4_arm_64_bf16, 4)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_bf16bf16bf16_1x8x4_to_8x8x4_arm_64_bf16,
+    iree_uk_mmt4d_tile_bf16bf16bf16_8x8x4_arm_64_bf16, 8)

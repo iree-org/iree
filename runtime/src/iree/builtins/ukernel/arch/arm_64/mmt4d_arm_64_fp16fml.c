@@ -90,9 +90,15 @@ iree_uk_mmt4d_tile_f16f16f32_1x8x1_to_8x8x1_arm_64_fp16fml(
   }
 }
 
-IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4_8(
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
     iree_uk_mmt4d_tile_f16f16f32_1x8x1_to_8x8x1_arm_64_fp16fml,
-    iree_uk_mmt4d_tile_f16f16f32_1x8x1_arm_64_fp16fml,
-    iree_uk_mmt4d_tile_f16f16f32_2x8x1_arm_64_fp16fml,
-    iree_uk_mmt4d_tile_f16f16f32_4x8x1_arm_64_fp16fml,
-    iree_uk_mmt4d_tile_f16f16f32_8x8x1_arm_64_fp16fml)
+    iree_uk_mmt4d_tile_f16f16f32_1x8x1_arm_64_fp16fml, 1)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_f16f16f32_1x8x1_to_8x8x1_arm_64_fp16fml,
+    iree_uk_mmt4d_tile_f16f16f32_2x8x1_arm_64_fp16fml, 2)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_f16f16f32_1x8x1_to_8x8x1_arm_64_fp16fml,
+    iree_uk_mmt4d_tile_f16f16f32_4x8x1_arm_64_fp16fml, 4)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_f16f16f32_1x8x1_to_8x8x1_arm_64_fp16fml,
+    iree_uk_mmt4d_tile_f16f16f32_8x8x1_arm_64_fp16fml, 8)

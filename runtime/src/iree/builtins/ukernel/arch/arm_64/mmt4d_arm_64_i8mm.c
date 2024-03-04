@@ -95,9 +95,15 @@ iree_uk_mmt4d_tile_s8s8s32_1x8x8_to_8x8x8_arm_64_i8mm(
   }
 }
 
-IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4_8(
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
     iree_uk_mmt4d_tile_s8s8s32_1x8x8_to_8x8x8_arm_64_i8mm,
-    iree_uk_mmt4d_tile_s8s8s32_1x8x8_arm_64_i8mm,
-    iree_uk_mmt4d_tile_s8s8s32_2x8x8_arm_64_i8mm,
-    iree_uk_mmt4d_tile_s8s8s32_4x8x8_arm_64_i8mm,
-    iree_uk_mmt4d_tile_s8s8s32_8x8x8_arm_64_i8mm)
+    iree_uk_mmt4d_tile_s8s8s32_1x8x8_arm_64_i8mm, 1)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_s8s8s32_1x8x8_to_8x8x8_arm_64_i8mm,
+    iree_uk_mmt4d_tile_s8s8s32_2x8x8_arm_64_i8mm, 2)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_s8s8s32_1x8x8_to_8x8x8_arm_64_i8mm,
+    iree_uk_mmt4d_tile_s8s8s32_4x8x8_arm_64_i8mm, 4)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_s8s8s32_1x8x8_to_8x8x8_arm_64_i8mm,
+    iree_uk_mmt4d_tile_s8s8s32_8x8x8_arm_64_i8mm, 8)

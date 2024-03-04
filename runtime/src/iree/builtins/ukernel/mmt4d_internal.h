@@ -135,21 +135,6 @@ typedef void (*iree_uk_mmt4d_tile_func_t)(
     GENERIC_FUNC(out_tile, lhs_panel, rhs_panel, params, M0);       \
   }
 
-#define IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4(G, F1, F2, F4) \
-  IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(G, F1, 1)                  \
-  IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(G, F2, 2)                  \
-  IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(G, F4, 4)
-
-#define IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4_8(G, F1, F2, F4, F8) \
-  IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(G, F1, 1)                        \
-  IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(G, F2, 2)                        \
-  IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(G, F4, 4)                        \
-  IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(G, F8, 8)
-
-#define IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4_8_16(G, F1, F2, F4, F8, F16) \
-  IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4_8(G, F1, F2, F4, F8)               \
-  IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(G, F16, 16)
-
 // Architecture-specific implementation, or generic fallback returning null.
 iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func_arch(
     const iree_uk_mmt4d_params_t* params);

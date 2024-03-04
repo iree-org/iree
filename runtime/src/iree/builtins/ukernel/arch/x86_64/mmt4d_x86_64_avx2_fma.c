@@ -39,12 +39,18 @@ iree_uk_mmt4d_tile_f32f32f32_1x8x1_to_8x8x1_x86_64_avx2_fma(
   }
 }
 
-IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4_8(
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
     iree_uk_mmt4d_tile_f32f32f32_1x8x1_to_8x8x1_x86_64_avx2_fma,
-    iree_uk_mmt4d_tile_f32f32f32_1x8x1_x86_64_avx2_fma,
-    iree_uk_mmt4d_tile_f32f32f32_2x8x1_x86_64_avx2_fma,
-    iree_uk_mmt4d_tile_f32f32f32_4x8x1_x86_64_avx2_fma,
-    iree_uk_mmt4d_tile_f32f32f32_8x8x1_x86_64_avx2_fma)
+    iree_uk_mmt4d_tile_f32f32f32_1x8x1_x86_64_avx2_fma, 1)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_f32f32f32_1x8x1_to_8x8x1_x86_64_avx2_fma,
+    iree_uk_mmt4d_tile_f32f32f32_2x8x1_x86_64_avx2_fma, 2)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_f32f32f32_1x8x1_to_8x8x1_x86_64_avx2_fma,
+    iree_uk_mmt4d_tile_f32f32f32_4x8x1_x86_64_avx2_fma, 4)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_f32f32f32_1x8x1_to_8x8x1_x86_64_avx2_fma,
+    iree_uk_mmt4d_tile_f32f32f32_8x8x1_x86_64_avx2_fma, 8)
 
 // Shared implementation for f16f16f16 and f16f16f32.
 // In the f16f16f16 case, intermediate roundings are skipped. This function
@@ -119,19 +125,31 @@ iree_uk_mmt4d_tile_f16f16f16_1x8x1_to_8x8x1_x86_64_avx2_fma(
       out_tile, lhs_panel, rhs_panel, params, IREE_UK_TYPE_FLOAT_16, M0);
 }
 
-IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4_8(
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
     iree_uk_mmt4d_tile_f16f16f32_1x8x1_to_8x8x1_x86_64_avx2_fma,
-    iree_uk_mmt4d_tile_f16f16f32_1x8x1_x86_64_avx2_fma,
-    iree_uk_mmt4d_tile_f16f16f32_2x8x1_x86_64_avx2_fma,
-    iree_uk_mmt4d_tile_f16f16f32_4x8x1_x86_64_avx2_fma,
-    iree_uk_mmt4d_tile_f16f16f32_8x8x1_x86_64_avx2_fma)
+    iree_uk_mmt4d_tile_f16f16f32_1x8x1_x86_64_avx2_fma, 1)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_f16f16f32_1x8x1_to_8x8x1_x86_64_avx2_fma,
+    iree_uk_mmt4d_tile_f16f16f32_2x8x1_x86_64_avx2_fma, 2)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_f16f16f32_1x8x1_to_8x8x1_x86_64_avx2_fma,
+    iree_uk_mmt4d_tile_f16f16f32_4x8x1_x86_64_avx2_fma, 4)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_f16f16f32_1x8x1_to_8x8x1_x86_64_avx2_fma,
+    iree_uk_mmt4d_tile_f16f16f32_8x8x1_x86_64_avx2_fma, 8)
 
-IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4_8(
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
     iree_uk_mmt4d_tile_f16f16f16_1x8x1_to_8x8x1_x86_64_avx2_fma,
-    iree_uk_mmt4d_tile_f16f16f16_1x8x1_x86_64_avx2_fma,
-    iree_uk_mmt4d_tile_f16f16f16_2x8x1_x86_64_avx2_fma,
-    iree_uk_mmt4d_tile_f16f16f16_4x8x1_x86_64_avx2_fma,
-    iree_uk_mmt4d_tile_f16f16f16_8x8x1_x86_64_avx2_fma)
+    iree_uk_mmt4d_tile_f16f16f16_1x8x1_x86_64_avx2_fma, 1)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_f16f16f16_1x8x1_to_8x8x1_x86_64_avx2_fma,
+    iree_uk_mmt4d_tile_f16f16f16_2x8x1_x86_64_avx2_fma, 2)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_f16f16f16_1x8x1_to_8x8x1_x86_64_avx2_fma,
+    iree_uk_mmt4d_tile_f16f16f16_4x8x1_x86_64_avx2_fma, 4)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_f16f16f16_1x8x1_to_8x8x1_x86_64_avx2_fma,
+    iree_uk_mmt4d_tile_f16f16f16_8x8x1_x86_64_avx2_fma, 8)
 
 IREE_UK_ATTRIBUTE_ALWAYS_INLINE static inline void
 iree_uk_mmt4d_tile_s8s8s32_1x8x2_to_8x8x2_x86_64_avx2_fma(
@@ -222,12 +240,18 @@ iree_uk_mmt4d_tile_s8s8s32_1x8x2_to_8x8x2_x86_64_avx2_fma(
   }
 }
 
-IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4_8(
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
     iree_uk_mmt4d_tile_s8s8s32_1x8x2_to_8x8x2_x86_64_avx2_fma,
-    iree_uk_mmt4d_tile_s8s8s32_1x8x2_x86_64_avx2_fma,
-    iree_uk_mmt4d_tile_s8s8s32_2x8x2_x86_64_avx2_fma,
-    iree_uk_mmt4d_tile_s8s8s32_4x8x2_x86_64_avx2_fma,
-    iree_uk_mmt4d_tile_s8s8s32_8x8x2_x86_64_avx2_fma)
+    iree_uk_mmt4d_tile_s8s8s32_1x8x2_x86_64_avx2_fma, 1)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_s8s8s32_1x8x2_to_8x8x2_x86_64_avx2_fma,
+    iree_uk_mmt4d_tile_s8s8s32_2x8x2_x86_64_avx2_fma, 2)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_s8s8s32_1x8x2_to_8x8x2_x86_64_avx2_fma,
+    iree_uk_mmt4d_tile_s8s8s32_4x8x2_x86_64_avx2_fma, 4)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_s8s8s32_1x8x2_to_8x8x2_x86_64_avx2_fma,
+    iree_uk_mmt4d_tile_s8s8s32_8x8x2_x86_64_avx2_fma, 8)
 
 IREE_UK_ATTRIBUTE_ALWAYS_INLINE static inline void
 iree_uk_mmt4d_tile_s16s16s32_1x8x2_to_8x8x2_x86_64_avx2_fma(
@@ -316,9 +340,15 @@ iree_uk_mmt4d_tile_s16s16s32_1x8x2_to_8x8x2_x86_64_avx2_fma(
   }
 }
 
-IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4_8(
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
     iree_uk_mmt4d_tile_s16s16s32_1x8x2_to_8x8x2_x86_64_avx2_fma,
-    iree_uk_mmt4d_tile_s16s16s32_1x8x2_x86_64_avx2_fma,
-    iree_uk_mmt4d_tile_s16s16s32_2x8x2_x86_64_avx2_fma,
-    iree_uk_mmt4d_tile_s16s16s32_4x8x2_x86_64_avx2_fma,
-    iree_uk_mmt4d_tile_s16s16s32_8x8x2_x86_64_avx2_fma)
+    iree_uk_mmt4d_tile_s16s16s32_1x8x2_x86_64_avx2_fma, 1)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_s16s16s32_1x8x2_to_8x8x2_x86_64_avx2_fma,
+    iree_uk_mmt4d_tile_s16s16s32_2x8x2_x86_64_avx2_fma, 2)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_s16s16s32_1x8x2_to_8x8x2_x86_64_avx2_fma,
+    iree_uk_mmt4d_tile_s16s16s32_4x8x2_x86_64_avx2_fma, 4)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_s16s16s32_1x8x2_to_8x8x2_x86_64_avx2_fma,
+    iree_uk_mmt4d_tile_s16s16s32_8x8x2_x86_64_avx2_fma, 8)

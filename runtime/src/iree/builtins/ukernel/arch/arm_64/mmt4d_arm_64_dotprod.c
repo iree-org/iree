@@ -67,12 +67,18 @@ static inline void iree_uk_mmt4d_tile_s8s8s32_1x8x4_to_8x8x4_arm_64_dotprod(
   }
 }
 
-IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4_8(
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
     iree_uk_mmt4d_tile_s8s8s32_1x8x4_to_8x8x4_arm_64_dotprod,
-    iree_uk_mmt4d_tile_s8s8s32_1x8x4_arm_64_dotprod,
-    iree_uk_mmt4d_tile_s8s8s32_2x8x4_arm_64_dotprod,
-    iree_uk_mmt4d_tile_s8s8s32_4x8x4_arm_64_dotprod,
-    iree_uk_mmt4d_tile_s8s8s32_8x8x4_arm_64_dotprod)
+    iree_uk_mmt4d_tile_s8s8s32_1x8x4_arm_64_dotprod, 1)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_s8s8s32_1x8x4_to_8x8x4_arm_64_dotprod,
+    iree_uk_mmt4d_tile_s8s8s32_2x8x4_arm_64_dotprod, 2)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_s8s8s32_1x8x4_to_8x8x4_arm_64_dotprod,
+    iree_uk_mmt4d_tile_s8s8s32_4x8x4_arm_64_dotprod, 4)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_s8s8s32_1x8x4_to_8x8x4_arm_64_dotprod,
+    iree_uk_mmt4d_tile_s8s8s32_8x8x4_arm_64_dotprod, 8)
 
 static inline void iree_uk_mmt4d_tile_s8s4s32_1x8x8_to_8x8x8_arm_64_dotprod(
     void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
@@ -200,9 +206,15 @@ static inline void iree_uk_mmt4d_tile_s8s4s32_1x8x8_to_8x8x8_arm_64_dotprod(
   }
 }
 
-IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4_8(
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
     iree_uk_mmt4d_tile_s8s4s32_1x8x8_to_8x8x8_arm_64_dotprod,
-    iree_uk_mmt4d_tile_s8s4s32_1x8x8_arm_64_dotprod,
-    iree_uk_mmt4d_tile_s8s4s32_2x8x8_arm_64_dotprod,
-    iree_uk_mmt4d_tile_s8s4s32_4x8x8_arm_64_dotprod,
-    iree_uk_mmt4d_tile_s8s4s32_8x8x8_arm_64_dotprod)
+    iree_uk_mmt4d_tile_s8s4s32_1x8x8_arm_64_dotprod, 1)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_s8s4s32_1x8x8_to_8x8x8_arm_64_dotprod,
+    iree_uk_mmt4d_tile_s8s4s32_2x8x8_arm_64_dotprod, 2)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_s8s4s32_1x8x8_to_8x8x8_arm_64_dotprod,
+    iree_uk_mmt4d_tile_s8s4s32_4x8x8_arm_64_dotprod, 4)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_s8s4s32_1x8x8_to_8x8x8_arm_64_dotprod,
+    iree_uk_mmt4d_tile_s8s4s32_8x8x8_arm_64_dotprod, 8)
