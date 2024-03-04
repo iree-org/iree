@@ -128,13 +128,21 @@ iree_uk_mmt4d_tile_s8s8s32_1x16x2_to_16x16x2_x86_64_avx512_vnni(
   }
 }
 
-IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4_8_16(
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
     iree_uk_mmt4d_tile_s8s8s32_1x16x2_to_16x16x2_x86_64_avx512_vnni,
-    iree_uk_mmt4d_tile_s8s8s32_1x16x2_x86_64_avx512_vnni,
-    iree_uk_mmt4d_tile_s8s8s32_2x16x2_x86_64_avx512_vnni,
-    iree_uk_mmt4d_tile_s8s8s32_4x16x2_x86_64_avx512_vnni,
-    iree_uk_mmt4d_tile_s8s8s32_8x16x2_x86_64_avx512_vnni,
-    iree_uk_mmt4d_tile_s8s8s32_16x16x2_x86_64_avx512_vnni)
+    iree_uk_mmt4d_tile_s8s8s32_1x16x2_x86_64_avx512_vnni, 1)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_s8s8s32_1x16x2_to_16x16x2_x86_64_avx512_vnni,
+    iree_uk_mmt4d_tile_s8s8s32_2x16x2_x86_64_avx512_vnni, 2)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_s8s8s32_1x16x2_to_16x16x2_x86_64_avx512_vnni,
+    iree_uk_mmt4d_tile_s8s8s32_4x16x2_x86_64_avx512_vnni, 4)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_s8s8s32_1x16x2_to_16x16x2_x86_64_avx512_vnni,
+    iree_uk_mmt4d_tile_s8s8s32_8x16x2_x86_64_avx512_vnni, 8)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_s8s8s32_1x16x2_to_16x16x2_x86_64_avx512_vnni,
+    iree_uk_mmt4d_tile_s8s8s32_16x16x2_x86_64_avx512_vnni, 16)
 
 static inline void
 iree_uk_mmt4d_tile_s16s16s32_1x16x2_to_16x16x2_x86_64_avx512_vnni(
@@ -247,13 +255,21 @@ iree_uk_mmt4d_tile_s16s16s32_1x16x2_to_16x16x2_x86_64_avx512_vnni(
   }
 }
 
-IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4_8_16(
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
     iree_uk_mmt4d_tile_s16s16s32_1x16x2_to_16x16x2_x86_64_avx512_vnni,
-    iree_uk_mmt4d_tile_s16s16s32_1x16x2_x86_64_avx512_vnni,
-    iree_uk_mmt4d_tile_s16s16s32_2x16x2_x86_64_avx512_vnni,
-    iree_uk_mmt4d_tile_s16s16s32_4x16x2_x86_64_avx512_vnni,
-    iree_uk_mmt4d_tile_s16s16s32_8x16x2_x86_64_avx512_vnni,
-    iree_uk_mmt4d_tile_s16s16s32_16x16x2_x86_64_avx512_vnni)
+    iree_uk_mmt4d_tile_s16s16s32_1x16x2_x86_64_avx512_vnni, 1)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_s16s16s32_1x16x2_to_16x16x2_x86_64_avx512_vnni,
+    iree_uk_mmt4d_tile_s16s16s32_2x16x2_x86_64_avx512_vnni, 2)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_s16s16s32_1x16x2_to_16x16x2_x86_64_avx512_vnni,
+    iree_uk_mmt4d_tile_s16s16s32_4x16x2_x86_64_avx512_vnni, 4)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_s16s16s32_1x16x2_to_16x16x2_x86_64_avx512_vnni,
+    iree_uk_mmt4d_tile_s16s16s32_8x16x2_x86_64_avx512_vnni, 8)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_s16s16s32_1x16x2_to_16x16x2_x86_64_avx512_vnni,
+    iree_uk_mmt4d_tile_s16s16s32_16x16x2_x86_64_avx512_vnni, 16)
 
 // The idea of this kernel is to split the LHS s16 values into high and low
 // 8-bit components to be able to use _mm512_dpbusd_epi32.

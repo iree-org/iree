@@ -52,13 +52,21 @@ iree_uk_mmt4d_tile_f32f32f32_1x16x1_to_16x16x1_x86_64_avx512_base(
   }
 }
 
-IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4_8_16(
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
     iree_uk_mmt4d_tile_f32f32f32_1x16x1_to_16x16x1_x86_64_avx512_base,
-    iree_uk_mmt4d_tile_f32f32f32_1x16x1_x86_64_avx512_base,
-    iree_uk_mmt4d_tile_f32f32f32_2x16x1_x86_64_avx512_base,
-    iree_uk_mmt4d_tile_f32f32f32_4x16x1_x86_64_avx512_base,
-    iree_uk_mmt4d_tile_f32f32f32_8x16x1_x86_64_avx512_base,
-    iree_uk_mmt4d_tile_f32f32f32_16x16x1_x86_64_avx512_base)
+    iree_uk_mmt4d_tile_f32f32f32_1x16x1_x86_64_avx512_base, 1)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_f32f32f32_1x16x1_to_16x16x1_x86_64_avx512_base,
+    iree_uk_mmt4d_tile_f32f32f32_2x16x1_x86_64_avx512_base, 2)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_f32f32f32_1x16x1_to_16x16x1_x86_64_avx512_base,
+    iree_uk_mmt4d_tile_f32f32f32_4x16x1_x86_64_avx512_base, 4)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_f32f32f32_1x16x1_to_16x16x1_x86_64_avx512_base,
+    iree_uk_mmt4d_tile_f32f32f32_8x16x1_x86_64_avx512_base, 8)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_f32f32f32_1x16x1_to_16x16x1_x86_64_avx512_base,
+    iree_uk_mmt4d_tile_f32f32f32_16x16x1_x86_64_avx512_base, 16)
 
 // Shared implementation for f16f16f16 and f16f16f32.
 // In the f16f16f16 case, intermediate roundings are skipped. This function
@@ -101,34 +109,10 @@ iree_uk_mmt4d_tile_f16f16fXX_1x16x1_to_16x16x1_x86_64_avx512_base(
     __m512 rhs = _mm512_cvtph_ps(_mm256_loadu_si256((const __m256i*)rhs_ptr));
     _mm_prefetch((const char*)(rhs_ptr + 128), _MM_HINT_T0);
     rhs_ptr += 16;
-    // Unrolling needed to avoid 20% perf regression on Clang 15 on AMD Zen4.
-#define IREE_UK_F16F16F32_FMA_STEP(i)                                      \
-  acc[i] = _mm512_fmadd_ps(_mm512_cvtph_ps(_mm256_set1_epi16(lhs_ptr[i])), \
-                           rhs, acc[i])
-    do {
-      IREE_UK_F16F16F32_FMA_STEP(0);
-      if (M0 == 1) continue;
-      IREE_UK_F16F16F32_FMA_STEP(1);
-      if (M0 == 2) continue;
-      IREE_UK_F16F16F32_FMA_STEP(2);
-      IREE_UK_F16F16F32_FMA_STEP(3);
-      if (M0 == 4) continue;
-      IREE_UK_F16F16F32_FMA_STEP(4);
-      IREE_UK_F16F16F32_FMA_STEP(5);
-      IREE_UK_F16F16F32_FMA_STEP(6);
-      IREE_UK_F16F16F32_FMA_STEP(7);
-      if (M0 == 8) continue;
-      IREE_UK_F16F16F32_FMA_STEP(8);
-      IREE_UK_F16F16F32_FMA_STEP(9);
-      IREE_UK_F16F16F32_FMA_STEP(10);
-      IREE_UK_F16F16F32_FMA_STEP(11);
-      IREE_UK_F16F16F32_FMA_STEP(12);
-      IREE_UK_F16F16F32_FMA_STEP(13);
-      IREE_UK_F16F16F32_FMA_STEP(14);
-      IREE_UK_F16F16F32_FMA_STEP(15);
-    } while (false);
-#undef IREE_UK_F16F16F32_FMA_STEP
-
+    IREE_UK_UNROLL for (int i = 0; i < M0; ++i) {
+      acc[i] = _mm512_fmadd_ps(_mm512_cvtph_ps(_mm256_set1_epi16(lhs_ptr[i])),
+                               rhs, acc[i]);
+    }
     _mm_prefetch((const char*)(lhs_ptr + 128), _MM_HINT_T0);
     lhs_ptr += M0;
   }
@@ -166,21 +150,37 @@ iree_uk_mmt4d_tile_f16f16f16_1x16x1_to_16x16x1_x86_64_avx512_base(
       out_tile, lhs_panel, rhs_panel, params, IREE_UK_TYPE_FLOAT_16, M0);
 }
 
-IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4_8_16(
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
     iree_uk_mmt4d_tile_f16f16f32_1x16x1_to_16x16x1_x86_64_avx512_base,
-    iree_uk_mmt4d_tile_f16f16f32_1x16x1_x86_64_avx512_base,
-    iree_uk_mmt4d_tile_f16f16f32_2x16x1_x86_64_avx512_base,
-    iree_uk_mmt4d_tile_f16f16f32_4x16x1_x86_64_avx512_base,
-    iree_uk_mmt4d_tile_f16f16f32_8x16x1_x86_64_avx512_base,
-    iree_uk_mmt4d_tile_f16f16f32_16x16x1_x86_64_avx512_base)
+    iree_uk_mmt4d_tile_f16f16f32_1x16x1_x86_64_avx512_base, 1)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_f16f16f32_1x16x1_to_16x16x1_x86_64_avx512_base,
+    iree_uk_mmt4d_tile_f16f16f32_2x16x1_x86_64_avx512_base, 2)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_f16f16f32_1x16x1_to_16x16x1_x86_64_avx512_base,
+    iree_uk_mmt4d_tile_f16f16f32_4x16x1_x86_64_avx512_base, 4)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_f16f16f32_1x16x1_to_16x16x1_x86_64_avx512_base,
+    iree_uk_mmt4d_tile_f16f16f32_8x16x1_x86_64_avx512_base, 8)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_f16f16f32_1x16x1_to_16x16x1_x86_64_avx512_base,
+    iree_uk_mmt4d_tile_f16f16f32_16x16x1_x86_64_avx512_base, 16)
 
-IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4_8_16(
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
     iree_uk_mmt4d_tile_f16f16f16_1x16x1_to_16x16x1_x86_64_avx512_base,
-    iree_uk_mmt4d_tile_f16f16f16_1x16x1_x86_64_avx512_base,
-    iree_uk_mmt4d_tile_f16f16f16_2x16x1_x86_64_avx512_base,
-    iree_uk_mmt4d_tile_f16f16f16_4x16x1_x86_64_avx512_base,
-    iree_uk_mmt4d_tile_f16f16f16_8x16x1_x86_64_avx512_base,
-    iree_uk_mmt4d_tile_f16f16f16_16x16x1_x86_64_avx512_base)
+    iree_uk_mmt4d_tile_f16f16f16_1x16x1_x86_64_avx512_base, 1)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_f16f16f16_1x16x1_to_16x16x1_x86_64_avx512_base,
+    iree_uk_mmt4d_tile_f16f16f16_2x16x1_x86_64_avx512_base, 2)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_f16f16f16_1x16x1_to_16x16x1_x86_64_avx512_base,
+    iree_uk_mmt4d_tile_f16f16f16_4x16x1_x86_64_avx512_base, 4)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_f16f16f16_1x16x1_to_16x16x1_x86_64_avx512_base,
+    iree_uk_mmt4d_tile_f16f16f16_8x16x1_x86_64_avx512_base, 8)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_f16f16f16_1x16x1_to_16x16x1_x86_64_avx512_base,
+    iree_uk_mmt4d_tile_f16f16f16_16x16x1_x86_64_avx512_base, 16)
 
 IREE_UK_ATTRIBUTE_ALWAYS_INLINE
 static inline void
@@ -304,13 +304,21 @@ iree_uk_mmt4d_tile_s8s8s32_1x16x2_to_16x16x2_x86_64_avx512_base(
   }
 }
 
-IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4_8_16(
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
     iree_uk_mmt4d_tile_s8s8s32_1x16x2_to_16x16x2_x86_64_avx512_base,
-    iree_uk_mmt4d_tile_s8s8s32_1x16x2_x86_64_avx512_base,
-    iree_uk_mmt4d_tile_s8s8s32_2x16x2_x86_64_avx512_base,
-    iree_uk_mmt4d_tile_s8s8s32_4x16x2_x86_64_avx512_base,
-    iree_uk_mmt4d_tile_s8s8s32_8x16x2_x86_64_avx512_base,
-    iree_uk_mmt4d_tile_s8s8s32_16x16x2_x86_64_avx512_base)
+    iree_uk_mmt4d_tile_s8s8s32_1x16x2_x86_64_avx512_base, 1)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_s8s8s32_1x16x2_to_16x16x2_x86_64_avx512_base,
+    iree_uk_mmt4d_tile_s8s8s32_2x16x2_x86_64_avx512_base, 2)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_s8s8s32_1x16x2_to_16x16x2_x86_64_avx512_base,
+    iree_uk_mmt4d_tile_s8s8s32_4x16x2_x86_64_avx512_base, 4)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_s8s8s32_1x16x2_to_16x16x2_x86_64_avx512_base,
+    iree_uk_mmt4d_tile_s8s8s32_8x16x2_x86_64_avx512_base, 8)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_s8s8s32_1x16x2_to_16x16x2_x86_64_avx512_base,
+    iree_uk_mmt4d_tile_s8s8s32_16x16x2_x86_64_avx512_base, 16)
 
 IREE_UK_ATTRIBUTE_ALWAYS_INLINE
 static inline void
@@ -425,10 +433,18 @@ iree_uk_mmt4d_tile_s16s16s32_1x16x2_to_16x16x2_x86_64_avx512_base(
   }
 }
 
-IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0_1_2_4_8_16(
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
     iree_uk_mmt4d_tile_s16s16s32_1x16x2_to_16x16x2_x86_64_avx512_base,
-    iree_uk_mmt4d_tile_s16s16s32_1x16x2_x86_64_avx512_base,
-    iree_uk_mmt4d_tile_s16s16s32_2x16x2_x86_64_avx512_base,
-    iree_uk_mmt4d_tile_s16s16s32_4x16x2_x86_64_avx512_base,
-    iree_uk_mmt4d_tile_s16s16s32_8x16x2_x86_64_avx512_base,
-    iree_uk_mmt4d_tile_s16s16s32_16x16x2_x86_64_avx512_base)
+    iree_uk_mmt4d_tile_s16s16s32_1x16x2_x86_64_avx512_base, 1)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_s16s16s32_1x16x2_to_16x16x2_x86_64_avx512_base,
+    iree_uk_mmt4d_tile_s16s16s32_2x16x2_x86_64_avx512_base, 2)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_s16s16s32_1x16x2_to_16x16x2_x86_64_avx512_base,
+    iree_uk_mmt4d_tile_s16s16s32_4x16x2_x86_64_avx512_base, 4)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_s16s16s32_1x16x2_to_16x16x2_x86_64_avx512_base,
+    iree_uk_mmt4d_tile_s16s16s32_8x16x2_x86_64_avx512_base, 8)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_s16s16s32_1x16x2_to_16x16x2_x86_64_avx512_base,
+    iree_uk_mmt4d_tile_s16s16s32_16x16x2_x86_64_avx512_base, 16)
