@@ -34,7 +34,8 @@ IREE_HAL_HIP_REQUIRED_PFN_DECL(hipFreeAsync, void *, hipStream_t)
 IREE_HAL_HIP_REQUIRED_PFN_DECL(hipFuncSetAttribute, const void *,
                                hipFuncAttribute, int)
 IREE_HAL_HIP_REQUIRED_PFN_DECL(hipGetDeviceCount, int *)
-IREE_HAL_HIP_REQUIRED_PFN_DECL(hipGetDeviceProperties, hipDeviceProp_t *, int)
+IREE_HAL_HIP_OPTIONAL_PFN_DECL(hipGetDevicePropertiesR0600, hipDeviceProp_t *,
+                               int)
 // hipGetErrorName(hipError_t) and hipGetErrorString(hipError_t) return
 // const char* instead of hipError_t so it uses a different macro.
 IREE_HAL_HIP_REQUIRED_PFN_STR_DECL(hipGetErrorName, hipError_t)
