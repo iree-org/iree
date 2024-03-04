@@ -48,6 +48,71 @@ in compiled CPU code as well by using these `iree-compile` flags:
 --iree-llvmcpu-sanitize=address
 ```
 
+#### Linking to the dynamic ASan runtime
+
+You may want to use ASan when using the python bindings.
+One way to achieve this is to build Python (or whatever executable that is
+going to use IREE as a shared library) with Asan.
+Another option is to link to the ASan runtime dynamically instead of
+linking it statically into an executable.
+
+Using clang-12 (other versions should also work) as a example, configure IREE
+with something like:
+
+```shell
+cmake \
+  -DIREE_ENABLE_ASAN=ON \
+  -DCMAKE_EXE_LINKER_FLAGS=-shared-libasan \
+  -DCMAKE_SHARED_LINKER_FLAGS=-shared-libasan \
+  -DCMAKE_C_COMPILER=clang-12 \
+  -DCMAKE_CXX_COMPILER=clang++-12 \
+  ...
+```
+
+Then when running things the ASan runtime will have to be preloaded.
+
+```shell
+LD_PRELOAD=/usr/lib/llvm-12/lib/clang/12.0.0/lib/linux/libclang_rt.asan-x86_64.so \
+ASAN_SYMBOLIZER_PATH=/usr/lib/llvm-12/bin/llvm-symbolizer \
+  python ...
+```
+
+On Ubuntu the corresponding ASan runtime is provided by a package like
+`libclang-common-12-dev` depending on your Clang version.
+E.g.
+
+```shell
+sudo apt install libclang-common-12-dev llvm-12 clang-12
+```
+
+Note that during building would also need to preload the ASan runtime, since
+the build executes its own binaries that are linked against the runtime.
+
+```shell
+LD_PRELOAD=/usr/lib/llvm-12/lib/clang/12.0.0/lib/linux/libclang_rt.asan-x86_64.so \
+ASAN_OPTIONS=detect_leaks=0 \
+ASAN_SYMBOLIZER_PATH=/usr/lib/llvm-12/bin/llvm-symbolizer \
+  cmake --build ...
+```
+
+!!! tip
+
+    If you want to run the IREE CUDA runtime driver it is likely you would
+    need.
+
+    ```shell
+    ASAN_OPTIONS="protect_shadow_gap=0"
+    ```
+
+    Like this
+
+    ```shell
+    LD_PRELOAD=/usr/lib/llvm-12/lib/clang/12.0.0/lib/linux/libclang_rt.asan-x86_64.so \
+    ASAN_SYMBOLIZER_PATH=/usr/lib/llvm-12/bin/llvm-symbolizer \
+    ASAN_OPTIONS="protect_shadow_gap=0" \
+      python ...
+    ```
+
 ### TSan (ThreadSanitizer)
 
 To enable TSan:
