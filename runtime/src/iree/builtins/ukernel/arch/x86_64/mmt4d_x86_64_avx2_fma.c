@@ -152,11 +152,58 @@ IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
     iree_uk_mmt4d_tile_f16f16f16_8x8x1_x86_64_avx2_fma, 8)
 
 IREE_UK_ATTRIBUTE_ALWAYS_INLINE static inline void
-iree_uk_mmt4d_tile_s8s8s32_1x8x2_to_8x8x2_x86_64_avx2_fma(
+iree_uk_mmt4d_tile_s8s8s32_1x8x2_to_4x8x2_x86_64_avx2_fma(
     void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
     const void* IREE_UK_RESTRICT rhs_panel,
     const iree_uk_mmt4d_params_t* params, int M0) {
-  IREE_UK_ASSERT(M0 >= 1 && M0 <= 18 && iree_uk_is_po2_u32(M0));
+  IREE_UK_ASSERT(M0 >= 1 && M0 <= 8 && iree_uk_is_po2_u32(M0));
+  iree_uk_int32_t* IREE_UK_RESTRICT out_ptr = out_tile;
+  const iree_uk_int8_t* IREE_UK_RESTRICT lhs_ptr = lhs_panel;
+  const iree_uk_int8_t* IREE_UK_RESTRICT rhs_ptr = rhs_panel;
+  __m256i acc[8];
+  if (params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
+    IREE_UK_UNROLL for (int i = 0; i < M0; ++i) {
+      acc[i] = _mm256_loadu_si256((__m256i*)(out_ptr + i * 8));
+    }
+  } else {
+    IREE_UK_UNROLL for (int i = 0; i < M0; ++i) {
+      acc[i] = _mm256_setzero_si256();
+    }
+  }
+
+  for (int k = 0; k < params->K; ++k) {
+    // rhs_i16 is the rhs tile (2x8), sign-extended to i16.
+    __m256i rhs_i16 =
+        _mm256_cvtepi8_epi16(_mm_loadu_si128((const __m128i*)rhs_ptr));
+    rhs_ptr += 16;
+    IREE_UK_UNROLL for (int i = 0; i < M0; ++i) {
+      acc[i] = _mm256_add_epi32(
+          acc[i], _mm256_madd_epi16(_mm256_cvtepi8_epi16(_mm_set1_epi16(
+                                        *(const iree_uk_int16_t*)lhs_ptr)),
+                                    rhs_i16));
+      lhs_ptr += 2;
+    }
+  }
+
+  IREE_UK_UNROLL for (int i = 0; i < M0; ++i) {
+    _mm256_storeu_si256((__m256i*)(out_ptr + i * 8), acc[i]);
+  }
+}
+
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_s8s8s32_1x8x2_to_4x8x2_x86_64_avx2_fma,
+    iree_uk_mmt4d_tile_s8s8s32_1x8x2_x86_64_avx2_fma, 1)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_s8s8s32_1x8x2_to_4x8x2_x86_64_avx2_fma,
+    iree_uk_mmt4d_tile_s8s8s32_2x8x2_x86_64_avx2_fma, 2)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_s8s8s32_1x8x2_to_4x8x2_x86_64_avx2_fma,
+    iree_uk_mmt4d_tile_s8s8s32_4x8x2_x86_64_avx2_fma, 4)
+
+void iree_uk_mmt4d_tile_s8s8s32_8x8x2_x86_64_avx2_fma(
+    void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
+    const void* IREE_UK_RESTRICT rhs_panel,
+    const iree_uk_mmt4d_params_t* params) {
   iree_uk_int32_t* IREE_UK_RESTRICT out_ptr = out_tile;
   const iree_uk_int8_t* IREE_UK_RESTRICT lhs_ptr = lhs_panel;
   const iree_uk_int8_t* IREE_UK_RESTRICT rhs_ptr = rhs_panel;
@@ -165,22 +212,16 @@ iree_uk_mmt4d_tile_s8s8s32_1x8x2_to_8x8x2_x86_64_avx2_fma(
   // This unusual layout is chosen so that the inner arithmetic loop only needs
   // to perform cheap shuffles within 128bit groups of lanes.
   __m256i acc[4][2];
-  const int imax = M0 <= 4 ? M0 : 4;
   if (params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
-    IREE_UK_UNROLL for (int i = 0; i < imax; ++i) {
+    IREE_UK_UNROLL for (int i = 0; i < 4; ++i) {
       IREE_UK_UNROLL for (int j = 0; j < 2; ++j) {
-        if (M0 <= 4) {
-          acc[i][j] = _mm256_castsi128_si256(
-              _mm_loadu_si128((__m128i*)(out_ptr + i * 8 + j * 4)));
-        } else {
-          acc[i][j] = iree_uk_avx_loadu_2x128(
-              (__m128i*)(out_ptr + i * 8 + j * 4),
-              (__m128i*)(out_ptr + (i + 4) * 8 + (1 - j) * 4));
-        }
+        acc[i][j] = iree_uk_avx_loadu_2x128(
+            (__m128i*)(out_ptr + i * 8 + j * 4),
+            (__m128i*)(out_ptr + (i + 4) * 8 + (1 - j) * 4));
       }
     }
   } else {
-    IREE_UK_UNROLL for (int i = 0; i < imax; ++i) {
+    IREE_UK_UNROLL for (int i = 0; i < 4; ++i) {
       IREE_UK_UNROLL for (int j = 0; j < 2; ++j) {
         acc[i][j] = _mm256_setzero_si256();
       }
@@ -197,28 +238,17 @@ iree_uk_mmt4d_tile_s8s8s32_1x8x2_to_8x8x2_x86_64_avx2_fma(
     rhs_i16_perm[1] =
         _mm256_permute2x128_si256(rhs_i16_perm[0], rhs_i16_perm[0], 0x01);
     // lhs_i16 is the lhs tile (M0x2), sign-extended to i16.
-    __m256i lhs_i16;
-    if (M0 == 1) {
-      lhs_i16 = _mm256_cvtepi8_epi16(_mm_loadu_si16(lhs_ptr));
-      lhs_ptr += 2;
-    } else if (M0 == 2) {
-      lhs_i16 = _mm256_cvtepi8_epi16(_mm_loadu_si32(lhs_ptr));
-      lhs_ptr += 4;
-    } else if (M0 == 4) {
-      lhs_i16 = _mm256_cvtepi8_epi16(_mm_loadu_si64(lhs_ptr));
-      lhs_ptr += 8;
-    } else {
-      lhs_i16 = _mm256_cvtepi8_epi16(_mm_loadu_si128((const __m128i*)lhs_ptr));
-      lhs_ptr += 16;
-    }
+    __m256i lhs_i16 =
+        _mm256_cvtepi8_epi16(_mm_loadu_si128((const __m128i*)lhs_ptr));
+    lhs_ptr += 16;
     // lhs_i16_dup4[i] is lanes of lhs_i16 shuffled as:
     // (i, i, i, i, i+4, i+4, i+4, i+4).
     __m256i lhs_i16_dup4[4];
-    if (M0 >= 1) lhs_i16_dup4[0] = _mm256_shuffle_epi32(lhs_i16, 0 * 0x55);
-    if (M0 >= 2) lhs_i16_dup4[1] = _mm256_shuffle_epi32(lhs_i16, 1 * 0x55);
-    if (M0 >= 4) lhs_i16_dup4[2] = _mm256_shuffle_epi32(lhs_i16, 2 * 0x55);
-    if (M0 >= 4) lhs_i16_dup4[3] = _mm256_shuffle_epi32(lhs_i16, 3 * 0x55);
-    IREE_UK_UNROLL for (int i = 0; i < imax; ++i) {
+    lhs_i16_dup4[0] = _mm256_shuffle_epi32(lhs_i16, 0 * 0x55);
+    lhs_i16_dup4[1] = _mm256_shuffle_epi32(lhs_i16, 1 * 0x55);
+    lhs_i16_dup4[2] = _mm256_shuffle_epi32(lhs_i16, 2 * 0x55);
+    lhs_i16_dup4[3] = _mm256_shuffle_epi32(lhs_i16, 3 * 0x55);
+    IREE_UK_UNROLL for (int i = 0; i < 4; ++i) {
       IREE_UK_UNROLL for (int j = 0; j < 2; ++j) {
         acc[i][j] = _mm256_add_epi32(
             acc[i][j], _mm256_madd_epi16(lhs_i16_dup4[i], rhs_i16_perm[j]));
@@ -226,117 +256,50 @@ iree_uk_mmt4d_tile_s8s8s32_1x8x2_to_8x8x2_x86_64_avx2_fma(
     }
   }
 
-  IREE_UK_UNROLL for (int i = 0; i < imax; ++i) {
+  IREE_UK_UNROLL for (int i = 0; i < 4; ++i) {
     IREE_UK_UNROLL for (int j = 0; j < 2; ++j) {
-      if (M0 <= 4) {
-        _mm_storeu_si128((__m128i*)(out_ptr + i * 8 + j * 4),
-                         _mm256_extracti128_si256(acc[i][j], 0));
-      } else {
-        iree_uk_avx_storeu_2x128(
-            (__m128i*)(out_ptr + i * 8 + j * 4),
-            (__m128i*)(out_ptr + (i + 4) * 8 + (1 - j) * 4), acc[i][j]);
-      }
+      iree_uk_avx_storeu_2x128((__m128i*)(out_ptr + i * 8 + j * 4),
+                               (__m128i*)(out_ptr + (i + 4) * 8 + (1 - j) * 4),
+                               acc[i][j]);
     }
   }
 }
-
-IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
-    iree_uk_mmt4d_tile_s8s8s32_1x8x2_to_8x8x2_x86_64_avx2_fma,
-    iree_uk_mmt4d_tile_s8s8s32_1x8x2_x86_64_avx2_fma, 1)
-IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
-    iree_uk_mmt4d_tile_s8s8s32_1x8x2_to_8x8x2_x86_64_avx2_fma,
-    iree_uk_mmt4d_tile_s8s8s32_2x8x2_x86_64_avx2_fma, 2)
-IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
-    iree_uk_mmt4d_tile_s8s8s32_1x8x2_to_8x8x2_x86_64_avx2_fma,
-    iree_uk_mmt4d_tile_s8s8s32_4x8x2_x86_64_avx2_fma, 4)
-IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
-    iree_uk_mmt4d_tile_s8s8s32_1x8x2_to_8x8x2_x86_64_avx2_fma,
-    iree_uk_mmt4d_tile_s8s8s32_8x8x2_x86_64_avx2_fma, 8)
 
 IREE_UK_ATTRIBUTE_ALWAYS_INLINE static inline void
 iree_uk_mmt4d_tile_s16s16s32_1x8x2_to_8x8x2_x86_64_avx2_fma(
     void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
     const void* IREE_UK_RESTRICT rhs_panel,
     const iree_uk_mmt4d_params_t* params, int M0) {
-  IREE_UK_ASSERT(M0 >= 1 && M0 <= 18 && iree_uk_is_po2_u32(M0));
+  IREE_UK_ASSERT(M0 >= 1 && M0 <= 8 && iree_uk_is_po2_u32(M0));
   iree_uk_int32_t* IREE_UK_RESTRICT out_ptr = out_tile;
   const iree_uk_int16_t* IREE_UK_RESTRICT lhs_ptr = lhs_panel;
   const iree_uk_int16_t* IREE_UK_RESTRICT rhs_ptr = rhs_panel;
-  // acc[i][0] contains the 1st half of row i and the 2nd half of row (i+4).
-  // acc[i][1] contains the 2nd half of row i and the 1st half of row (i+4).
-  // This unusual layout is chosen so that the inner arithmetic loop only needs
-  // to perform cheap shuffles within 128bit groups of lanes.
-  __m256i acc[4][2];
-  const int imax = M0 <= 4 ? M0 : 4;
+  __m256i acc[8];
   if (params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
-    IREE_UK_UNROLL for (int i = 0; i < imax; ++i) {
-      IREE_UK_UNROLL for (int j = 0; j < 2; ++j) {
-        if (M0 <= 4) {
-          acc[i][j] = _mm256_castsi128_si256(
-              _mm_loadu_si128((__m128i*)(out_ptr + i * 8 + j * 4)));
-        } else {
-          acc[i][j] = iree_uk_avx_loadu_2x128(
-              (__m128i*)(out_ptr + i * 8 + j * 4),
-              (__m128i*)(out_ptr + (i + 4) * 8 + (1 - j) * 4));
-        }
-      }
+    IREE_UK_UNROLL for (int i = 0; i < M0; ++i) {
+      acc[i] = _mm256_loadu_si256((__m256i*)(out_ptr + i * 8));
     }
   } else {
-    IREE_UK_UNROLL for (int i = 0; i < imax; ++i) {
-      IREE_UK_UNROLL for (int j = 0; j < 2; ++j) {
-        acc[i][j] = _mm256_setzero_si256();
-      }
+    IREE_UK_UNROLL for (int i = 0; i < M0; ++i) {
+      acc[i] = _mm256_setzero_si256();
     }
   }
 
   for (int k = 0; k < params->K; ++k) {
-    __m256i rhs_perm[2];
-    // rhs_perm[0] is the rhs tile (2x8).
-    rhs_perm[0] = _mm256_loadu_si256((const __m256i*)rhs_ptr);
+    // rhs is the rhs tile (2x8), sign-extended to i16.
+    __m256i rhs = _mm256_loadu_si256((const __m256i*)rhs_ptr);
     rhs_ptr += 16;
-    // rhs_perm[1] is that with the halves swapped.
-    rhs_perm[1] = _mm256_permute2x128_si256(rhs_perm[0], rhs_perm[0], 0x01);
-    // lhs is the lhs tile (M0x2).
-    __m256i lhs;
-    if (M0 == 1) {
-      lhs = _mm256_castsi128_si256(_mm_loadu_si32(lhs_ptr));
+    IREE_UK_UNROLL for (int i = 0; i < M0; ++i) {
+      acc[i] = _mm256_add_epi32(
+          acc[i],
+          _mm256_madd_epi16(_mm256_set1_epi32(*(const iree_uk_int32_t*)lhs_ptr),
+                            rhs));
       lhs_ptr += 2;
-    } else if (M0 == 2) {
-      lhs = _mm256_castsi128_si256(_mm_loadu_si64(lhs_ptr));
-      lhs_ptr += 4;
-    } else if (M0 == 4) {
-      lhs = _mm256_castsi128_si256(_mm_loadu_si128((const __m128i*)lhs_ptr));
-      lhs_ptr += 8;
-    } else {
-      lhs = _mm256_loadu_si256((const __m256i*)lhs_ptr);
-      lhs_ptr += 16;
-    }
-    // lhs_dup4[i] is lanes of lhs shuffled as:
-    // (i, i, i, i, i+4, i+4, i+4, i+4).
-    __m256i lhs_dup4[4];
-    if (M0 >= 1) lhs_dup4[0] = _mm256_shuffle_epi32(lhs, 0 * 0x55);
-    if (M0 >= 2) lhs_dup4[1] = _mm256_shuffle_epi32(lhs, 1 * 0x55);
-    if (M0 >= 4) lhs_dup4[2] = _mm256_shuffle_epi32(lhs, 2 * 0x55);
-    if (M0 >= 4) lhs_dup4[3] = _mm256_shuffle_epi32(lhs, 3 * 0x55);
-    IREE_UK_UNROLL for (int i = 0; i < imax; ++i) {
-      IREE_UK_UNROLL for (int j = 0; j < 2; ++j) {
-        acc[i][j] = _mm256_add_epi32(
-            acc[i][j], _mm256_madd_epi16(lhs_dup4[i], rhs_perm[j]));
-      }
     }
   }
 
-  IREE_UK_UNROLL for (int i = 0; i < imax; ++i) {
-    IREE_UK_UNROLL for (int j = 0; j < 2; ++j) {
-      if (M0 <= 4) {
-        _mm_storeu_si128((__m128i*)(out_ptr + i * 8 + j * 4),
-                         _mm256_extracti128_si256(acc[i][j], 0));
-      } else {
-        iree_uk_avx_storeu_2x128(
-            (__m128i*)(out_ptr + i * 8 + j * 4),
-            (__m128i*)(out_ptr + (i + 4) * 8 + (1 - j) * 4), acc[i][j]);
-      }
-    }
+  IREE_UK_UNROLL for (int i = 0; i < M0; ++i) {
+    _mm256_storeu_si256((__m256i*)(out_ptr + i * 8), acc[i]);
   }
 }
 
