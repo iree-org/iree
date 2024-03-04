@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "experimental/rocm/api.h"
@@ -51,6 +52,14 @@ static iree_status_t iree_hal_rocm_driver_create_internal(
     iree_string_view_t identifier,
     const iree_hal_rocm_driver_options_t* options,
     iree_allocator_t host_allocator, iree_hal_driver_t** out_driver) {
+#if defined(IREE_PLATFORM_LINUX)
+  // Hack to force device kernel arguments to be preloaded, when available, and
+  // improve kernel latency. There doesn't seem to be any API to enable this.
+  // This option will become the default in ROCm 6.1.
+  // TODO: Remove this after upgrading to ROCm 6.1.
+  setenv("HIP_FORCE_DEV_KERNARG", "1", /*replace=*/0);
+#endif
+
   iree_hal_rocm_driver_t* driver = NULL;
   iree_host_size_t total_size = sizeof(*driver) + identifier.size;
   IREE_RETURN_IF_ERROR(
