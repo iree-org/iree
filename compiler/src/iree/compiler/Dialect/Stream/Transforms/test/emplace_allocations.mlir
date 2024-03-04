@@ -11,11 +11,12 @@ util.func public @emplaceDispatch(
     // CHECK-SAME: %[[TARGET:arg[0-9]+]]: !stream.resource<*>, %[[TARGET_SIZE:arg[0-9]+]]: index
     %target: !stream.resource<*>, %target_size: index) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
-  // CHECK-DAG: %[[UPDATE_END:.+]] = arith.addi %[[UPDATE_OFFSET]], %[[UPDATE_SIZE]]
-  %update_end = arith.addi %update_offset, %update_size : index
+  // CHECK: %[[UPDATE_END:.+]] = arith.addi %[[UPDATE_OFFSET]], %[[UPDATE_SIZE]]
   // CHECK: %[[RESULT:.+]] = stream.async.dispatch @ex::@dispatch(%[[INPUT]][{{.+}}], %[[TARGET]][%[[UPDATE_OFFSET]] to %[[UPDATE_END]] for %[[UPDATE_SIZE]]]) :
   // CHECK-SAME: (!stream.resource<*>{%[[INPUT_SIZE]]}, !stream.resource<*>{%[[TARGET_SIZE]]}) -> %[[TARGET]]{%[[TARGET_SIZE]]}
   %update = stream.async.dispatch @ex::@dispatch(%input[%c0 to %input_size for %input_size]) : (!stream.resource<*>{%input_size}) -> !stream.resource<*>{%update_size}
+  // NOTE: this gets hoisted above the dispatch.
+  %update_end = arith.addi %update_offset, %update_size : index
   // CHECK-NOT: stream.async.update
   %result = stream.async.update %update, %target[%update_offset to %update_end] : !stream.resource<*>{%update_size} -> %target as !stream.resource<*>{%target_size}
   // CHECK: util.return %[[RESULT]]
