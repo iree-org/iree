@@ -7,6 +7,7 @@
 #ifndef IREE_HAL_CTS_SEMAPHORE_TEST_H_
 #define IREE_HAL_CTS_SEMAPHORE_TEST_H_
 
+#include <chrono>
 #include <cstdint>
 #include <thread>
 
@@ -19,6 +20,7 @@
 namespace iree {
 namespace hal {
 namespace cts {
+using namespace std::chrono_literals;
 
 class semaphore_test : public CtsTestBase {};
 
@@ -95,8 +97,7 @@ TEST_P(semaphore_test, EmptyWait) {
 }
 
 // Tests waiting on a semaphore that has already been signaled.
-// **Never completes when using SwiftShader**
-TEST_P(semaphore_test, DISABLED_WaitAlreadySignaled) {
+TEST_P(semaphore_test, WaitAlreadySignaled) {
   iree_hal_semaphore_t* semaphore = NULL;
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 2ull, &semaphore));
 
@@ -124,6 +125,25 @@ TEST_P(semaphore_test, WaitUnsignaled) {
   // while others may return success.
   IREE_IGNORE_ERROR(iree_hal_semaphore_wait(
       semaphore, 3ull, iree_make_deadline(IREE_TIME_INFINITE_PAST)));
+
+  iree_hal_semaphore_release(semaphore);
+}
+
+// Tests waiting on a semaphore that has signals past the desired value.
+TEST_P(semaphore_test, WaitLaterSignaledBeyond) {
+  iree_hal_semaphore_t* semaphore = NULL;
+  IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 2ull, &semaphore));
+
+  std::thread thread([&]() {
+    // Wait for a short period before signaling.
+    std::this_thread::sleep_for(100ms);
+    // Signal beyond the desired value.
+    IREE_ASSERT_OK(iree_hal_semaphore_signal(semaphore, 10ull));
+  });
+
+  IREE_ASSERT_OK(iree_hal_semaphore_wait(
+      semaphore, 3ull, iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
+  thread.join();
 
   iree_hal_semaphore_release(semaphore);
 }
@@ -182,8 +202,7 @@ TEST_P(semaphore_test, WaitAllAndAllSignaled) {
 }
 
 // Tests IREE_HAL_WAIT_MODE_ANY.
-// **Fails on the CPU / 'local' HAL **
-TEST_P(semaphore_test, DISABLED_WaitAny) {
+TEST_P(semaphore_test, WaitAnyAlreadySignaled) {
   iree_hal_semaphore_t* semaphore_a = NULL;
   iree_hal_semaphore_t* semaphore_b = NULL;
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 0ull, &semaphore_a));
@@ -199,6 +218,34 @@ TEST_P(semaphore_test, DISABLED_WaitAny) {
   IREE_ASSERT_OK(iree_hal_device_wait_semaphores(
       device_, IREE_HAL_WAIT_MODE_ANY, semaphore_list,
       iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
+
+  iree_hal_semaphore_release(semaphore_a);
+  iree_hal_semaphore_release(semaphore_b);
+}
+
+TEST_P(semaphore_test, WaitAnyLaterSignaled) {
+  iree_hal_semaphore_t* semaphore_a = NULL;
+  iree_hal_semaphore_t* semaphore_b = NULL;
+  IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 0ull, &semaphore_a));
+  IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 0ull, &semaphore_b));
+
+  iree_hal_semaphore_list_t semaphore_list;
+  iree_hal_semaphore_t* semaphore_ptrs[] = {semaphore_a, semaphore_b};
+  semaphore_list.count = IREE_ARRAYSIZE(semaphore_ptrs);
+  semaphore_list.semaphores = semaphore_ptrs;
+  uint64_t payload_values[] = {1ull, 1ull};
+  semaphore_list.payload_values = payload_values;
+
+  std::thread thread([&]() {
+    // Wait for a short period before signaling.
+    std::this_thread::sleep_for(100ms);
+    IREE_ASSERT_OK(iree_hal_semaphore_signal(semaphore_b, 1ull));
+  });
+
+  IREE_ASSERT_OK(iree_hal_device_wait_semaphores(
+      device_, IREE_HAL_WAIT_MODE_ANY, semaphore_list,
+      iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
+  thread.join();
 
   iree_hal_semaphore_release(semaphore_a);
   iree_hal_semaphore_release(semaphore_b);

@@ -64,6 +64,7 @@ iree_cc_library(
     iree::base::internal::event_pool
     iree::base::internal::synchronization
     iree::base::internal::threading
+    iree::base::internal::wait_handle
     iree::base::internal::flatcc::parsing
     iree::hal
     iree::hal::utils::collective_batch
