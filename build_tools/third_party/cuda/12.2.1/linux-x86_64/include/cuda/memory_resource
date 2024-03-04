@@ -1,0 +1,640 @@
+//===----------------------------------------------------------------------===//
+//
+// Part of the CUDA Toolkit, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// SPDX-FileCopyrightText: Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES.
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef _CUDA_MEMORY_RESOURCE
+#define _CUDA_MEMORY_RESOURCE
+
+// clang-format off
+/*
+    memory_resource synopsis
+namespace cuda {
+namespace mr {
+template <class Resource>
+concept resource = equality_comparable<Resource>
+                && requires(Resource& res, void* ptr, size_t size, size_t alignment) {
+    { res.allocate(size, alignment) } -> same_as<void*>;
+    { res.deallocate(ptr, size, alignment) } -> same_as<void>;
+};
+
+template <class Resource>
+concept async_resource = resource<Resource>
+                      && requires(Resource& res, void* ptr, size_t size, size_t alignment, cuda_stream_ref stream) {
+    { res.allocate_async(size, alignment, stream) } -> same_as<void*>;
+    { res.deallocate_async(ptr, size, alignment, stream) } -> same_as<void>;
+};
+
+template <class Resource, class Property>
+concept has_property = resource<Resource> && requires(const Resource& res, Property prop) {
+    get_property(res, prop);
+};
+
+template <class Property>
+concept property_with_value = requires {
+    typename Property::value_type;
+};
+
+template <class Resource, class Property, class Return>
+concept has_property_with = resource<Resource>
+                         && property_with_value<Property>
+                         && same_as<Return, typename Property::value_type>
+                         && requires(const Resource& res, Property prop) {
+    get_property(res, prop) -> Return;
+};
+
+template <class Resource, class... Properties>
+concept resource_with = resource<Resource> && (has_property<Resource, Properties> && ...);
+
+template <class Resource, class... Properties>
+concept async_resource_with = async_resource<Resource> && (has_property<Resource, Properties> && ...);
+
+template <class... Properties>
+class resource_ref {
+    template <resource_with<Properties...> Resource>
+    resource_ref(Resource&) noexcept;
+
+    void* allocate(size_t size, size_t alignment);
+    void deallocate(void* ptr, size_t size, size_t alignment);
+
+    template <class... OtherProperties>
+        requires resource_with<resource_ref, OtherProperties...>
+              && resource_with<resource_ref<OtherProperties...>, Properties...>
+    friend bool operator==(const resource_ref& left, const resource_ref<OtherProperties...>& right);
+
+    template <property_with_value Property>
+        requires has_property<resource_ref, Property>
+    friend typename Property::value_type get_property(const resource_ref& ref, Property) noexcept;
+
+    template <class Property>
+        requires (has_property<resource_ref, Property> && !property_with_value<Property>)
+    friend void get_property(const resource_ref& ref, Property) noexcept;
+};
+
+}  // mr
+}  // cuda
+*/
+// clang-format on
+
+#ifdef LIBCUDACXX_ENABLE_EXPERIMENTAL_MEMORY_RESOURCE
+
+#include <cuda/stream_ref>
+
+#include <cuda/std/concepts>
+#include <cuda/std/type_traits>
+
+#include <cuda/std/detail/__config>
+
+#include <cuda/std/detail/__pragma_push>
+
+#if _LIBCUDACXX_STD_VER > 11
+_LIBCUDACXX_BEGIN_NAMESPACE_CUDA
+
+///////////////////////////////////////////////////////////////////////////////
+// properties
+
+/// \concept has_property
+/// \brief The \c has_property concept
+template <class _Resource, class _Property>
+_LIBCUDACXX_CONCEPT_FRAGMENT(
+  __has_property_,
+  requires(const _Resource& __res)(
+    get_property(__res, _Property{})
+  ));
+template <class _Resource, class _Property>
+_LIBCUDACXX_CONCEPT has_property = _LIBCUDACXX_FRAGMENT(__has_property_, _Resource, _Property);
+
+/// \concept property_with_value
+/// \brief The \c property_with_value concept
+template <class _Property>
+using __property_value_t = typename _Property::value_type;
+
+template <class _Property>
+_LIBCUDACXX_CONCEPT_FRAGMENT(
+  __property_with_value_,
+  requires()(
+    typename(__property_value_t<_Property>)
+  ));
+template <class _Property>
+_LIBCUDACXX_CONCEPT property_with_value = _LIBCUDACXX_FRAGMENT(__property_with_value_, _Property);
+
+/// \concept has_property_with
+/// \brief The \c has_property_with concept
+template <class _Resource, class _Property, class _Return>
+_LIBCUDACXX_CONCEPT_FRAGMENT(
+  __has_property_with_,
+  requires(const _Resource& __res)(
+    requires(property_with_value<_Property>),
+    requires(_CUDA_VSTD::same_as<_Return, decltype(get_property(__res, _Property{}))>)
+  ));
+template <class _Resource, class _Property, class _Return>
+_LIBCUDACXX_CONCEPT has_property_with = _LIBCUDACXX_FRAGMENT(__has_property_with_, _Resource, _Property, _Return);
+
+/// \concept __has_upstream_resource
+/// \brief The \c __has_upstream_resource concept
+template <class _Resource, class _Upstream>
+_LIBCUDACXX_CONCEPT_FRAGMENT(
+  __has_upstream_resource_,
+  requires(const _Resource& __res)(
+    requires(_CUDA_VSTD::same_as<_CUDA_VSTD::__remove_const_ref_t<decltype(__res.upstream_resource())>, _Upstream>)
+  ));
+template <class _Resource, class _Upstream>
+_LIBCUDACXX_CONCEPT __has_upstream_resource = _LIBCUDACXX_FRAGMENT(__has_upstream_resource_, _Resource, _Upstream);
+
+/// class forward_property
+/// \brief The \c forward_property crtp template simplifies the user facing side of forwarding properties
+///        We can just derive from it to properly forward all properties
+_LIBCUDACXX_BEGIN_NAMESPACE_CPO(__forward_property)
+template <class _Derived, class _Upstream>
+struct __fn {
+  #if defined(_LIBCUDACXX_COMPILER_NVCC)
+  #pragma nv_exec_check_disable
+  #endif
+  _LIBCUDACXX_TEMPLATE(class _Property)
+    (requires (!property_with_value<_Property>) _LIBCUDACXX_AND has_property<_Upstream, _Property>)
+  _LIBCUDACXX_INLINE_VISIBILITY friend constexpr void get_property(const _Derived&, _Property) noexcept {}
+
+  // The indirection is needed, otherwise the compiler might believe that _Derived is an incomplete type
+  #if defined(_LIBCUDACXX_COMPILER_NVCC)
+  #pragma nv_exec_check_disable
+  #endif
+  _LIBCUDACXX_TEMPLATE(class _Property, class _Derived2 = _Derived)
+    (requires property_with_value<_Property> _LIBCUDACXX_AND has_property<_Upstream, _Property> _LIBCUDACXX_AND
+              __has_upstream_resource<_Derived2, _Upstream>)
+  _LIBCUDACXX_INLINE_VISIBILITY friend constexpr __property_value_t<_Property> get_property(
+    const _Derived& __res, _Property __prop) {
+    return get_property(__res.upstream_resource(), __prop);
+  }
+};
+_LIBCUDACXX_END_NAMESPACE_CPO
+
+template <class _Derived, class _Upstream>
+using forward_property = __forward_property::__fn<_Derived, _Upstream>;
+
+/// class get_property
+/// \brief The \c get_property crtp temaplate simplifies the user facing side of forwarding properties
+///        We can always tell people to just derive from it to properly forward all properties
+_LIBCUDACXX_BEGIN_NAMESPACE_CPO(__get_property)
+struct __fn {
+  #if defined(_LIBCUDACXX_COMPILER_NVCC)
+  #pragma nv_exec_check_disable
+  #endif
+  _LIBCUDACXX_TEMPLATE(class _Upstream, class _Property)
+    (requires (!property_with_value<_Property>) _LIBCUDACXX_AND has_property<_Upstream, _Property>)
+  _LIBCUDACXX_INLINE_VISIBILITY constexpr void operator()(const _Upstream&, _Property) const noexcept {}
+
+  #if defined(_LIBCUDACXX_COMPILER_NVCC)
+  #pragma nv_exec_check_disable
+  #endif
+  _LIBCUDACXX_TEMPLATE(class _Upstream, class _Property)
+    (requires (property_with_value<_Property>) _LIBCUDACXX_AND has_property<_Upstream, _Property>)
+  _LIBCUDACXX_INLINE_VISIBILITY constexpr __property_value_t<_Property> operator()(
+    const _Upstream& __res, _Property __prop) const {
+    return get_property(__res, __prop);
+  }
+};
+_LIBCUDACXX_END_NAMESPACE_CPO
+
+inline namespace __cpo {
+  _LIBCUDACXX_CPO_ACCESSIBILITY auto get_property = __get_property::__fn{};
+} // namespace __cpo
+
+namespace mr
+{
+
+///////////////////////////////////////////////////////////////////////////////
+// memory_resource
+
+/// \concept resource
+/// \brief The \c resource concept
+template <class _Resource>
+_LIBCUDACXX_CONCEPT_FRAGMENT(
+  __resource_,
+  requires(_Resource& __res, void* __ptr, size_t __bytes, size_t __alignment) (
+    requires(_CUDA_VSTD::same_as<void*, decltype(__res.allocate(__bytes, __alignment))>),
+    requires(_CUDA_VSTD::same_as<void, decltype(__res.deallocate(__ptr, __bytes, __alignment))>),
+    requires(_CUDA_VSTD::equality_comparable<_Resource>)
+  ));
+
+template <class _Resource>
+_LIBCUDACXX_CONCEPT resource = _LIBCUDACXX_FRAGMENT(__resource_, _Resource);
+
+/// \concept async_resource
+/// \brief The \c async_resource concept
+template <class _Resource>
+_LIBCUDACXX_CONCEPT_FRAGMENT(
+  __async_resource_,
+  requires(_Resource& __res, void* __ptr, size_t __bytes, size_t __alignment, cuda::stream_ref __stream) (
+    requires(resource<_Resource>),
+    requires(_CUDA_VSTD::same_as<void*, decltype(__res.allocate_async(__bytes, __alignment, __stream))>),
+    requires(_CUDA_VSTD::same_as<void, decltype(__res.deallocate_async(__ptr, __bytes, __alignment, __stream))>),
+    requires(_CUDA_VSTD::equality_comparable<_Resource>)
+  ));
+
+template <class _Resource>
+_LIBCUDACXX_CONCEPT async_resource = _LIBCUDACXX_FRAGMENT(__async_resource_, _Resource);
+
+/// \concept resource_with
+/// \brief The \c resource_with concept
+template <class _Resource, class... _Properties>
+#if _LIBCUDACXX_STD_VER < 17
+_LIBCUDACXX_CONCEPT resource_with =
+  resource<_Resource>&& _CUDA_VSTD::conjunction_v<_CUDA_VSTD::bool_constant<has_property<_Resource, _Properties>>...>;
+#else
+_LIBCUDACXX_CONCEPT resource_with = resource<_Resource> && (has_property<_Resource, _Properties> && ...);
+#endif
+
+/// \concept async_resource_with
+/// \brief The \c async_resource_with concept
+template <class _Resource, class... _Properties>
+#if _LIBCUDACXX_STD_VER < 17
+_LIBCUDACXX_CONCEPT async_resource_with = async_resource<_Resource> &&
+  _CUDA_VSTD::conjunction_v<_CUDA_VSTD::bool_constant<has_property<_Resource, _Properties>>...>;
+#else
+_LIBCUDACXX_CONCEPT async_resource_with = async_resource<_Resource> &&
+  (has_property<_Resource, _Properties> && ...);
+#endif
+
+///////////////////////////////////////////////////////////////////////////////
+/// class resource_ref
+/// class async_resource_ref
+enum class _AllocType
+{
+  _Default,
+  _Async,
+};
+
+struct _Alloc_vtable
+{
+  using _AllocFn   = void* (*)(void*, size_t, size_t);
+  using _DeallocFn = void (*)(void*, void*, size_t, size_t);
+  using _EqualFn   = bool (*)(void*, void*);
+
+  _AllocFn __alloc_fn;
+  _DeallocFn __dealloc_fn;
+  _EqualFn __equal_fn;
+
+  constexpr _Alloc_vtable(_AllocFn __alloc_fn_, _DeallocFn __dealloc_fn_, _EqualFn __equal_fn_) noexcept
+      : __alloc_fn(__alloc_fn_)
+      , __dealloc_fn(__dealloc_fn_)
+      , __equal_fn(__equal_fn_)
+  {}
+};
+
+struct _Async_alloc_vtable : public _Alloc_vtable
+{
+  using _AsyncAllocFn   = void* (*)(void*, size_t, size_t, cuda::stream_ref);
+  using _AsyncDeallocFn = void (*)(void*, void*, size_t, size_t, cuda::stream_ref);
+
+  _AsyncAllocFn __async_alloc_fn;
+  _AsyncDeallocFn __async_dealloc_fn;
+
+  constexpr _Async_alloc_vtable(_Alloc_vtable::_AllocFn __alloc_fn_,
+                                _Alloc_vtable::_DeallocFn __dealloc_fn_,
+                                _Alloc_vtable::_EqualFn __equal_fn_,
+                                _AsyncAllocFn __async_alloc_fn_,
+                                _AsyncDeallocFn __async_dealloc_fn_) noexcept
+      : _Alloc_vtable(__alloc_fn_, __dealloc_fn_, __equal_fn_)
+      , __async_alloc_fn(__async_alloc_fn_)
+      , __async_dealloc_fn(__async_dealloc_fn_)
+  {}
+};
+
+// clang-format off
+struct _Resource_vtable_builder
+{
+    template <class _Resource, class _Property>
+    static __property_value_t<_Property> _Get_property(void* __res) noexcept {
+        return get_property(*static_cast<const _Resource *>(__res), _Property{});
+    }
+
+    template <class _Resource>
+    static void* _Alloc(void* __object, size_t __bytes, size_t __alignment) {
+        return static_cast<_Resource *>(__object)->allocate(__bytes, __alignment);
+    }
+
+    template <class _Resource>
+    static void _Dealloc(void* __object, void* __ptr, size_t __bytes, size_t __alignment) {
+        return static_cast<_Resource *>(__object)->deallocate(__ptr, __bytes, __alignment);
+    }
+
+    template <class _Resource>
+    static void* _Alloc_async(void* __object, size_t __bytes, size_t __alignment, cuda::stream_ref __stream) {
+        return static_cast<_Resource *>(__object)->allocate_async(__bytes, __alignment, __stream);
+    }
+
+    template <class _Resource>
+    static void _Dealloc_async(void* __object, void* __ptr, size_t __bytes, size_t __alignment, cuda::stream_ref __stream) {
+        return static_cast<_Resource *>(__object)->deallocate_async(__ptr, __bytes, __alignment, __stream);
+    }
+
+    template <class _Resource>
+    static bool _Equal(void* __left, void* __right) {
+        return *static_cast<_Resource *>(__left) == *static_cast<_Resource *>(__right);
+    }
+
+    _LIBCUDACXX_TEMPLATE(class _Resource, _AllocType _Alloc_type)
+      (requires(_Alloc_type == _AllocType::_Default)) //
+     static constexpr _Alloc_vtable _Create() noexcept
+    {
+      return {&_Resource_vtable_builder::_Alloc<_Resource>,
+              &_Resource_vtable_builder::_Dealloc<_Resource>,
+              &_Resource_vtable_builder::_Equal<_Resource>};
+    }
+
+    _LIBCUDACXX_TEMPLATE(class _Resource, _AllocType _Alloc_type)
+      (requires(_Alloc_type == _AllocType::_Async)) //
+     static constexpr _Async_alloc_vtable _Create() noexcept
+    {
+      return {&_Resource_vtable_builder::_Alloc<_Resource>,
+              &_Resource_vtable_builder::_Dealloc<_Resource>,
+              &_Resource_vtable_builder::_Equal<_Resource>,
+              &_Resource_vtable_builder::_Alloc_async<_Resource>,
+              &_Resource_vtable_builder::_Dealloc_async<_Resource>};
+    }
+};
+// clang-format on
+
+template <class _Property>
+struct _Property_vtable
+{
+  using _PropertyFn         = __property_value_t<_Property> (*)(void*);
+  _PropertyFn __property_fn = nullptr;
+
+  constexpr _Property_vtable(_PropertyFn __property_fn_) noexcept
+      : __property_fn(__property_fn_)
+  {}
+};
+
+template <_AllocType _Alloc_type, class... _Properties> //
+class basic_resource_ref;
+
+template <class... _Properties>
+struct _Resource_vtable : public _Property_vtable<_Properties>...
+{
+  template <class... _PropertyFns>
+  constexpr _Resource_vtable(_PropertyFns... __property_fn_) noexcept
+      : _Property_vtable<_Properties>(__property_fn_)...
+  {}
+
+  template <_AllocType _Alloc_type, class... _OtherProperties>
+  constexpr _Resource_vtable(basic_resource_ref<_Alloc_type, _OtherProperties...>& __ref) noexcept
+      : _Property_vtable<_Properties>(__ref._Property_vtable<_Properties>::__property_fn)...
+  {}
+
+  template <class _Resource>
+  static constexpr _Resource_vtable _Create() noexcept
+  {
+    return {&_Resource_vtable_builder::_Get_property<_Resource, _Properties>...};
+  }
+};
+
+template <class... _Properties>
+struct _Filtered;
+
+template <bool _IsUniqueProperty>
+struct _Property_filter
+{
+  template <class _Property, class... _Properties>
+  using _Filtered_properties =
+    typename _Filtered<_Properties...>::_Filtered_vtable::template _Append_property<_Property>;
+};
+template <>
+struct _Property_filter<false>
+{
+  template <class _Property, class... _Properties>
+  using _Filtered_properties = typename _Filtered<_Properties...>::_Filtered_vtable;
+};
+
+template <class _Property, class... _Properties>
+struct _Filtered<_Property, _Properties...>
+{
+  using _Filtered_vtable =
+    typename _Property_filter<property_with_value<_Property> && !_CUDA_VSTD::_One_of<_Property, _Properties...>>::
+      template _Filtered_properties<_Property, _Properties...>;
+
+  template <class _OtherPropery>
+  using _Append_property = _Filtered<_OtherPropery, _Property, _Properties...>;
+
+  using _Vtable = _Resource_vtable<_Property, _Properties...>;
+};
+
+template <>
+struct _Filtered<>
+{
+  using _Filtered_vtable = _Filtered<>;
+
+  template <class _OtherPropery>
+  using _Append_property = _Filtered<_OtherPropery>;
+
+  using _Vtable = _Resource_vtable<>;
+};
+
+template <class... _Properties>
+using _Filtered_vtable = typename _Filtered<_Properties...>::_Filtered_vtable::_Vtable;
+
+template <class _Vtable>
+struct _Alloc_base
+{
+  static_assert(cuda::std::is_base_of_v<_Alloc_vtable, _Vtable>, "");
+
+  _Alloc_base(void* __object_, const _Vtable* __static_vtabl_) noexcept
+      : __object(__object_)
+      , __static_vtable(__static_vtabl_)
+  {}
+
+  void* allocate(size_t __bytes, size_t __alignment = alignof(max_align_t))
+  {
+    return __static_vtable->__alloc_fn(__object, __bytes, __alignment);
+  }
+
+  void deallocate(void* _Ptr, size_t __bytes, size_t __alignment = alignof(max_align_t))
+  {
+    __static_vtable->__dealloc_fn(__object, _Ptr, __bytes, __alignment);
+  }
+
+protected:
+  void* __object                 = nullptr;
+  const _Vtable* __static_vtable = nullptr;
+};
+
+template <class _Vtable>
+struct _Async_alloc_base : public _Alloc_base<_Vtable>
+{
+  static_assert(cuda::std::is_base_of_v<_Async_alloc_vtable, _Vtable>, "");
+
+  _Async_alloc_base(void* __object_, const _Vtable* __static_vtabl_) noexcept
+      : _Alloc_base<_Vtable>(__object_, __static_vtabl_)
+  {}
+
+  void* allocate_async(size_t __bytes, size_t __alignment, cuda::stream_ref __stream)
+  {
+    return this->__static_vtable->__async_alloc_fn(this->__object, __bytes, __alignment, __stream);
+  }
+
+  void* allocate_async(size_t __bytes, cuda::stream_ref __stream)
+  {
+    return this->__static_vtable->__async_alloc_fn(this->__object, __bytes, alignof(max_align_t), __stream);
+  }
+
+  void deallocate_async(void* _Ptr, size_t __bytes, cuda::stream_ref __stream)
+  {
+    this->__static_vtable->__async_dealloc_fn(this->__object, _Ptr, __bytes, alignof(max_align_t), __stream);
+  }
+
+  void deallocate_async(void* _Ptr, size_t __bytes, size_t __alignment, cuda::stream_ref __stream)
+  {
+    this->__static_vtable->__async_dealloc_fn(this->__object, _Ptr, __bytes, __alignment, __stream);
+  }
+};
+
+template <_AllocType _Alloc_type>
+using _Resource_ref_base = _CUDA_VSTD::
+  _If<_Alloc_type == _AllocType::_Default, _Alloc_base<_Alloc_vtable>, _Async_alloc_base<_Async_alloc_vtable>>;
+
+template <_AllocType _Alloc_type>
+using _Vtable_store = _CUDA_VSTD::_If<_Alloc_type == _AllocType::_Default, _Alloc_vtable, _Async_alloc_vtable>;
+
+template <_AllocType _Alloc_type, class _Resource>
+_LIBCUDACXX_INLINE_VAR constexpr _Vtable_store<_Alloc_type>
+  __alloc_vtable = _Resource_vtable_builder::template _Create<_Resource, _Alloc_type>();
+
+template <class>
+_LIBCUDACXX_INLINE_VAR constexpr bool _Is_basic_resource_ref = false;
+
+template <_AllocType _Alloc_type, class... _Properties> //
+class basic_resource_ref
+    : public _Resource_ref_base<_Alloc_type>
+    , private _Filtered_vtable<_Properties...>
+{
+private:
+  template <_AllocType, class...>
+  friend class basic_resource_ref;
+
+  template <class...>
+  friend struct _Resource_vtable;
+
+public:
+  // clang-format off
+    _LIBCUDACXX_TEMPLATE(class _Resource)
+        (requires (!_Is_basic_resource_ref<_Resource>
+          && (((_Alloc_type == _AllocType::_Default) && resource_with<_Resource, _Properties...>) //
+            ||((_Alloc_type == _AllocType::_Async) && async_resource_with<_Resource, _Properties...>)))) //
+     basic_resource_ref(_Resource& __res) noexcept
+        : _Resource_ref_base<_Alloc_type>(_CUDA_VSTD::addressof(__res), &__alloc_vtable<_Alloc_type, _Resource>)
+        , _Filtered_vtable<_Properties...>(_Filtered_vtable<_Properties...>::template _Create<_Resource>())
+    {}
+
+    _LIBCUDACXX_TEMPLATE(class _Resource)
+        (requires (!_Is_basic_resource_ref<_Resource>
+          && (((_Alloc_type == _AllocType::_Default) && resource_with<_Resource, _Properties...>) //
+            ||((_Alloc_type == _AllocType::_Async) && async_resource_with<_Resource, _Properties...>)))) //
+     basic_resource_ref(_Resource* __res) noexcept
+        : _Resource_ref_base<_Alloc_type>(__res, &__alloc_vtable<_Alloc_type, _Resource>)
+        , _Filtered_vtable<_Properties...>(_Filtered_vtable<_Properties...>::template _Create<_Resource>())
+    {}
+
+    #if _LIBCUDACXX_STD_VER > 14
+    _LIBCUDACXX_TEMPLATE(class... _OtherProperties)
+      (requires (_CUDA_VSTD::_One_of<_Properties, _OtherProperties...> && ...))
+    #else
+    _LIBCUDACXX_TEMPLATE(class... _OtherProperties)
+      (requires _CUDA_VSTD::conjunction_v<_CUDA_VSTD::bool_constant<
+            _CUDA_VSTD::_One_of<_Properties, _OtherProperties...>>...>)
+    #endif
+     basic_resource_ref(
+      basic_resource_ref<_Alloc_type, _OtherProperties...> __ref) noexcept
+        : _Resource_ref_base<_Alloc_type>(__ref.__object, __ref.__static_vtable)
+        , _Filtered_vtable<_Properties...>(__ref)
+    {}
+
+    #if _LIBCUDACXX_STD_VER > 14
+    _LIBCUDACXX_TEMPLATE(class... _OtherProperties)
+      (requires (_Alloc_type == _AllocType::_Default)
+        && (_CUDA_VSTD::_One_of<_Properties, _OtherProperties...> && ...))
+    #else
+    _LIBCUDACXX_TEMPLATE(class... _OtherProperties)
+      (requires (_Alloc_type == _AllocType::_Default)
+        && _CUDA_VSTD::conjunction_v<_CUDA_VSTD::bool_constant<
+            _CUDA_VSTD::_One_of<_Properties, _OtherProperties...>>...>)
+    #endif
+     basic_resource_ref(
+      basic_resource_ref<_AllocType::_Async, _OtherProperties...> __ref) noexcept
+        : _Resource_ref_base<_Alloc_type>(__ref.__object, __ref.__static_vtable)
+        , _Filtered_vtable<_Properties...>(__ref)
+    {}
+
+    #if _LIBCUDACXX_STD_VER > 14
+    _LIBCUDACXX_TEMPLATE(class... _OtherProperties)
+      (requires(sizeof...(_Properties) == sizeof...(_OtherProperties))
+            && (_CUDA_VSTD::_One_of<_Properties, _OtherProperties...> && ...))
+    #else
+    _LIBCUDACXX_TEMPLATE(class... _OtherProperties)
+      (requires (sizeof...(_Properties) == sizeof...(_OtherProperties))
+          && _CUDA_VSTD::conjunction_v<_CUDA_VSTD::bool_constant<
+          _CUDA_VSTD::_One_of<_Properties, _OtherProperties...>>...>)
+    #endif
+     bool operator==(
+        const basic_resource_ref<_Alloc_type, _OtherProperties...> &__right) const {
+        return (this->__static_vtable->__equal_fn == __right.__static_vtable->__equal_fn) //
+            && this->__static_vtable->__equal_fn(this->__object, __right.__object);
+    }
+
+    #if _LIBCUDACXX_STD_VER > 14
+    _LIBCUDACXX_TEMPLATE(class... _OtherProperties)
+      (requires (sizeof...(_Properties) == sizeof...(_OtherProperties))
+            && (_CUDA_VSTD::_One_of<_Properties, _OtherProperties...> && ...))
+    #else
+    _LIBCUDACXX_TEMPLATE(class... _OtherProperties)
+      (requires (sizeof...(_Properties) == sizeof...(_OtherProperties))
+          && _CUDA_VSTD::conjunction_v<_CUDA_VSTD::bool_constant<
+          _CUDA_VSTD::_One_of<_Properties, _OtherProperties...>>...>)
+    #endif
+     bool operator!=(
+        const basic_resource_ref<_Alloc_type, _OtherProperties...> &__right) const {
+        return !(*this == __right);
+    }
+
+    _LIBCUDACXX_TEMPLATE(class _Property)
+        (requires (!property_with_value<_Property>) _LIBCUDACXX_AND  _CUDA_VSTD::_One_of<_Property, _Properties...>) //
+     friend void get_property(const basic_resource_ref &, _Property) noexcept {}
+
+    _LIBCUDACXX_TEMPLATE(class _Property)
+        (requires  property_with_value<_Property> _LIBCUDACXX_AND _CUDA_VSTD::_One_of<_Property, _Properties...>) //
+     friend __property_value_t<_Property> get_property(
+        const basic_resource_ref &__res, _Property) noexcept {
+        return __res._Property_vtable<_Property>::__property_fn(__res.__object);
+    }
+  // clang-format on
+};
+
+template <_AllocType _Alloc_type, class... _Properties>
+_LIBCUDACXX_INLINE_VAR constexpr bool _Is_basic_resource_ref<basic_resource_ref<_Alloc_type, _Properties...>> = true;
+
+template <class... _Properties> //
+using resource_ref = basic_resource_ref<_AllocType::_Default, _Properties...>;
+
+template <class... _Properties> //
+using async_resource_ref = basic_resource_ref<_AllocType::_Async, _Properties...>;
+
+/// \struct device_accessible
+/// \brief The \c device_accessible property signals that the allocated memory is device accessible
+struct device_accessible{};
+
+/// \struct host_accessible
+/// \brief The \c host_accessible property signals that the allocated memory is host accessible
+struct host_accessible{};
+
+} // namespace mr
+_LIBCUDACXX_END_NAMESPACE_CUDA
+#endif // _LIBCUDACXX_STD_VER > 11
+
+#include <cuda/std/detail/__pragma_pop>
+
+#endif // LIBCUDACXX_ENABLE_EXPERIMENTAL_MEMORY_RESOURCE
+
+#endif //_LIBCUDACXX_BEGIN_NAMESPACE_CUDA

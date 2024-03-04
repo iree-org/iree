@@ -1,0 +1,186 @@
+/*
+ * NVIDIA_COPYRIGHT_BEGIN
+ *
+ * Copyright (c) 2011-2023, NVIDIA CORPORATION.  All rights reserved.
+ *
+ * NVIDIA CORPORATION and its licensors retain all intellectual property
+ * and proprietary rights in and to this software, related documentation
+ * and any modifications thereto.  Any use, reproduction, disclosure or
+ * distribution of this software and related documentation without an express
+ * license agreement from NVIDIA CORPORATION is strictly prohibited.
+ *
+ * NVIDIA_COPYRIGHT_END
+ */
+
+#if !defined(__CUDA_INCLUDE_COMPILER_INTERNAL_HEADERS__)
+#if defined(_MSC_VER)
+#pragma message("crt/link.stub is an internal header file and must not be used directly.  Please use cuda_runtime_api.h or cuda_runtime.h instead.")
+#else
+#warning "crt/link.stub is an internal header file and must not be used directly.  Please use cuda_runtime_api.h or cuda_runtime.h instead."
+#endif
+#define __CUDA_INCLUDE_COMPILER_INTERNAL_HEADERS__
+#define __UNDEF_CUDA_INCLUDE_COMPILER_INTERNAL_HEADERS_LINK_STUB__
+#endif
+
+#include <stddef.h> /* for size_t */
+#include "crt/host_defines.h"
+
+#if defined(__GNUC__)
+#if defined(__clang__) || (!defined(__PGIC__) && (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6)))
+#pragma GCC diagnostic push
+#endif
+#if defined(__clang__) || (!defined(__PGIC__) && (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 2)))
+#pragma GCC diagnostic ignored "-Wcast-qual"
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Wunused-variable"
+#pragma GCC diagnostic ignored "-Wunused-function"
+#endif
+#endif
+
+static void **__cudaFatCubinHandle;
+extern "C" {
+extern void** CUDARTAPI __cudaRegisterFatBinary(
+  void *fatCubin
+);
+
+extern void CUDARTAPI __cudaRegisterFatBinaryEnd(
+  void **fatCubinHandle
+);
+
+extern void CUDARTAPI __cudaUnregisterFatBinary(
+  void **fatCubinHandle
+);
+static void __cudaUnregisterBinaryUtil(void)
+{
+  __cudaUnregisterFatBinary(__cudaFatCubinHandle);
+}
+#if defined(__HORIZON__)
+
+#define atexit(p)
+
+#elif defined(__GNUC__) && !defined(__ANDROID__)
+
+#if __cplusplus >= 202002L
+
+extern int atexit(void(*)(void)) noexcept;
+
+#else /* __cplusplus < 202002L */
+
+extern int atexit(void(*)(void)) throw();
+
+#endif /* __cplusplus >= 202002L */
+
+#else /* __GNUC__ && !__ANDROID__ */
+
+extern int __cdecl atexit(void(__cdecl *)(void));
+
+#endif /* __GNUC__ && !__ANDROID__ */
+
+}
+
+#include <fatbinary_section.h>
+
+static inline void __cudaRegisterLinkedBinary (const __fatBinC_Wrapper_t *prelinked_fatbinc, void (*callback_fp)(void **), void *);
+
+#define __REGISTERFUNCNAME_CORE(X) __cudaRegisterLinkedBinary##X
+#define __REGISTERFUNCNAME(X) __REGISTERFUNCNAME_CORE(X)
+#define __DEFSTRNAME_CORE(X) def_module_id_str##X
+#define __DEFSTRNAME(X) __DEFSTRNAME_CORE(X)
+#define __TO_STRING_CORE(X) #X
+#define __TO_STRING(X) __TO_STRING_CORE(X)
+#define __FATIDNAME_CORE(X) __fatbinwrap##X
+#define __FATIDNAME(X) __FATIDNAME_CORE(X)
+
+#if defined(_WIN32)
+#define DEFINE_REGISTER_FUNC(id) \
+extern const __fatBinC_Wrapper_t __FATIDNAME(id); \
+static const __declspec(align(1)) __declspec(allocate("__nv_module_id")) unsigned char __DEFSTRNAME(id) [] = "def " __TO_STRING(id); \
+void __REGISTERFUNCNAME(id) (void (*callback_fp)(void **), void *prelinked_fatbinc, void *, void (*dummy_ref)(void *)) \
+{ \
+  volatile static const unsigned char *__p; \
+  __p = __DEFSTRNAME(id); \
+  dummy_ref((void *)&__p); \
+  __cudaRegisterLinkedBinary(&__FATIDNAME(id), callback_fp, (void *)&__DEFSTRNAME(id)); \
+}
+#elif defined(__APPLE__)
+#define DEFINE_REGISTER_FUNC(id) \
+extern const __fatBinC_Wrapper_t __FATIDNAME(id); \
+static const unsigned char __DEFSTRNAME(id) [] __attribute__((aligned(1))) __attribute__((section ("__NV_CUDA,__nv_module_id"))) = "def " __TO_STRING(id); \
+void __REGISTERFUNCNAME(id) (void (*callback_fp)(void **), void *prelinked_fatbinc, void *, void (*dummy_ref)(void *)) \
+{ \
+  volatile static const unsigned char *__p; \
+  __p = __DEFSTRNAME(id); \
+  dummy_ref((void *)&__p); \
+ __cudaRegisterLinkedBinary(&__FATIDNAME(id), callback_fp, (void *)&__DEFSTRNAME(id)); \
+}
+#else /* linux */
+#define DEFINE_REGISTER_FUNC(id) \
+extern const __fatBinC_Wrapper_t __FATIDNAME(id); \
+static const unsigned char __DEFSTRNAME(id) [] __attribute__((aligned(1))) __attribute__((section ("__nv_module_id"))) = "def " __TO_STRING(id); \
+void __REGISTERFUNCNAME(id) (void (*callback_fp)(void **), void *prelinked_fatbinc, void *, void (*dummy_ref)(void *)) \
+{ \
+  volatile static const unsigned char *__p; \
+  __p = __DEFSTRNAME(id); \
+  dummy_ref((void *)&__p); \
+  __cudaRegisterLinkedBinary(&__FATIDNAME(id), callback_fp, (void *)&__DEFSTRNAME(id)); \
+}
+#endif
+
+extern "C" {
+#if defined(_WIN32)
+#pragma data_seg("__nv_module_id")
+#endif /* _WIN32 */
+#include REGISTERLINKBINARYFILE
+#if defined(_WIN32)
+#pragma data_seg()
+#endif /* _WIN32 */
+}
+
+static void* __cudaPrelinkedFatbins[NUM_PRELINKED_OBJECTS+1];
+
+#include FATBINFILE
+
+#if defined(__PGI)
+__attribute__((unused))
+#endif /* __PGI */
+static inline void __cudaRegisterLinkedBinary (
+  const __fatBinC_Wrapper_t *prelinked_fatbinc,
+  void (*callback_fp)(void **),
+  void *)
+{
+  static void (*__callback_array[NUM_PRELINKED_OBJECTS+1])(void **);
+  static int __i = 0;
+  __cudaPrelinkedFatbins[__i] = (void*)prelinked_fatbinc->data;
+  __callback_array[__i] = callback_fp;
+  ++__i;
+  if (__i == NUM_PRELINKED_OBJECTS) {
+    __NV_EXTRA_INITIALIZATION
+    __cudaPrelinkedFatbins[__i] = NULL;
+    __cudaFatCubinHandle = __cudaRegisterFatBinary((void*)&__fatDeviceText);
+    atexit(__cudaUnregisterBinaryUtil);
+    __NV_EXTRA_FINALIZATION
+    for (__i = 0; __i < NUM_PRELINKED_OBJECTS; ++__i) {
+      (*(__callback_array[__i]))(__cudaFatCubinHandle);
+    }
+    __cudaRegisterFatBinaryEnd(__cudaFatCubinHandle);
+  }
+}
+
+#if defined(__GNUC__)
+#if defined(__clang__) || (!defined(__PGIC__) && (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6)))
+#pragma GCC diagnostic pop
+#endif
+#endif
+
+#if defined(__REGISTERFUNCNAME_CORE) && defined(__REGISTERFUNCNAME) && \
+  defined(__DEFSTRNAME_CORE) && defined(__DEFSTRNAME) && \
+  defined(__TO_STRING_CORE) && defined(__TO_STRING) && \
+  defined(__FATIDNAME_CORE) && defined(__FATIDNAME) && \
+  defined(DEFINE_REGISTER_FUNC)
+/* Nothing; used to silence "-Wunused-macros" warnings, if specified. */
+#endif
+
+#if defined(__UNDEF_CUDA_INCLUDE_COMPILER_INTERNAL_HEADERS_LINK_STUB__)
+#undef __CUDA_INCLUDE_COMPILER_INTERNAL_HEADERS__
+#undef __UNDEF_CUDA_INCLUDE_COMPILER_INTERNAL_HEADERS_LINK_STUB__
+#endif

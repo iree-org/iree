@@ -1,0 +1,1421 @@
+Determining if the include file dlfcn.h exists failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_fd6e5/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_fd6e5.dir/build.make CMakeFiles/cmTC_fd6e5.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_fd6e5.dir/CheckIncludeFile.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_fd6e5.dir/CheckIncludeFile.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_fd6e5.dir/build.make:78: CMakeFiles/cmTC_fd6e5.dir/CheckIncludeFile.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_fd6e5/fast] Error 2
+
+
+
+Determining if the include file errno.h exists failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_56f12/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_56f12.dir/build.make CMakeFiles/cmTC_56f12.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_56f12.dir/CheckIncludeFile.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_56f12.dir/CheckIncludeFile.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_56f12.dir/build.make:78: CMakeFiles/cmTC_56f12.dir/CheckIncludeFile.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_56f12/fast] Error 2
+
+
+
+Determining if the include file fcntl.h exists failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_24c17/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_24c17.dir/build.make CMakeFiles/cmTC_24c17.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_24c17.dir/CheckIncludeFile.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_24c17.dir/CheckIncludeFile.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_24c17.dir/build.make:78: CMakeFiles/cmTC_24c17.dir/CheckIncludeFile.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_24c17/fast] Error 2
+
+
+
+Determining if the include file link.h exists failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_79bae/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_79bae.dir/build.make CMakeFiles/cmTC_79bae.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_79bae.dir/CheckIncludeFile.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_79bae.dir/CheckIncludeFile.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_79bae.dir/build.make:78: CMakeFiles/cmTC_79bae.dir/CheckIncludeFile.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_79bae/fast] Error 2
+
+
+
+Determining if the include file malloc/malloc.h exists failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_84f24/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_84f24.dir/build.make CMakeFiles/cmTC_84f24.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_84f24.dir/CheckIncludeFile.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_84f24.dir/CheckIncludeFile.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_84f24.dir/build.make:78: CMakeFiles/cmTC_84f24.dir/CheckIncludeFile.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_84f24/fast] Error 2
+
+
+
+Determining if the include file pthread.h exists failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_c71df/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_c71df.dir/build.make CMakeFiles/cmTC_c71df.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_c71df.dir/CheckIncludeFile.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_c71df.dir/CheckIncludeFile.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_c71df.dir/build.make:78: CMakeFiles/cmTC_c71df.dir/CheckIncludeFile.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_c71df/fast] Error 2
+
+
+
+Determining if the include file signal.h exists failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_eb5ed/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_eb5ed.dir/build.make CMakeFiles/cmTC_eb5ed.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_eb5ed.dir/CheckIncludeFile.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_eb5ed.dir/CheckIncludeFile.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_eb5ed.dir/build.make:78: CMakeFiles/cmTC_eb5ed.dir/CheckIncludeFile.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_eb5ed/fast] Error 2
+
+
+
+Determining if the include file sys/ioctl.h exists failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_a8f02/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_a8f02.dir/build.make CMakeFiles/cmTC_a8f02.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_a8f02.dir/CheckIncludeFile.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_a8f02.dir/CheckIncludeFile.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_a8f02.dir/build.make:78: CMakeFiles/cmTC_a8f02.dir/CheckIncludeFile.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_a8f02/fast] Error 2
+
+
+
+Determining if the include file sys/mman.h exists failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_ca646/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_ca646.dir/build.make CMakeFiles/cmTC_ca646.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_ca646.dir/CheckIncludeFile.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_ca646.dir/CheckIncludeFile.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_ca646.dir/build.make:78: CMakeFiles/cmTC_ca646.dir/CheckIncludeFile.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_ca646/fast] Error 2
+
+
+
+Determining if the include file sys/param.h exists failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_6a978/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_6a978.dir/build.make CMakeFiles/cmTC_6a978.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_6a978.dir/CheckIncludeFile.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_6a978.dir/CheckIncludeFile.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_6a978.dir/build.make:78: CMakeFiles/cmTC_6a978.dir/CheckIncludeFile.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_6a978/fast] Error 2
+
+
+
+Determining if the include file sys/resource.h exists failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_a1713/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_a1713.dir/build.make CMakeFiles/cmTC_a1713.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_a1713.dir/CheckIncludeFile.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_a1713.dir/CheckIncludeFile.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_a1713.dir/build.make:78: CMakeFiles/cmTC_a1713.dir/CheckIncludeFile.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_a1713/fast] Error 2
+
+
+
+Determining if the include file sys/stat.h exists failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_3f183/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_3f183.dir/build.make CMakeFiles/cmTC_3f183.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_3f183.dir/CheckIncludeFile.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_3f183.dir/CheckIncludeFile.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_3f183.dir/build.make:78: CMakeFiles/cmTC_3f183.dir/CheckIncludeFile.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_3f183/fast] Error 2
+
+
+
+Determining if the include file sys/time.h exists failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_3c661/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_3c661.dir/build.make CMakeFiles/cmTC_3c661.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_3c661.dir/CheckIncludeFile.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_3c661.dir/CheckIncludeFile.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_3c661.dir/build.make:78: CMakeFiles/cmTC_3c661.dir/CheckIncludeFile.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_3c661/fast] Error 2
+
+
+
+Determining if the include file sys/types.h exists failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_4d643/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_4d643.dir/build.make CMakeFiles/cmTC_4d643.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_4d643.dir/CheckIncludeFile.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_4d643.dir/CheckIncludeFile.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_4d643.dir/build.make:78: CMakeFiles/cmTC_4d643.dir/CheckIncludeFile.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_4d643/fast] Error 2
+
+
+
+Determining if the include file sysexits.h exists failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_1880e/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_1880e.dir/build.make CMakeFiles/cmTC_1880e.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_1880e.dir/CheckIncludeFile.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_1880e.dir/CheckIncludeFile.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_1880e.dir/build.make:78: CMakeFiles/cmTC_1880e.dir/CheckIncludeFile.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_1880e/fast] Error 2
+
+
+
+Determining if the include file termios.h exists failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_1712a/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_1712a.dir/build.make CMakeFiles/cmTC_1712a.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_1712a.dir/CheckIncludeFile.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_1712a.dir/CheckIncludeFile.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_1712a.dir/build.make:78: CMakeFiles/cmTC_1712a.dir/CheckIncludeFile.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_1712a/fast] Error 2
+
+
+
+Determining if the include file unistd.h exists failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_bdc55/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_bdc55.dir/build.make CMakeFiles/cmTC_bdc55.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_bdc55.dir/CheckIncludeFile.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_bdc55.dir/CheckIncludeFile.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_bdc55.dir/build.make:78: CMakeFiles/cmTC_bdc55.dir/CheckIncludeFile.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_bdc55/fast] Error 2
+
+
+
+Determining if the include file valgrind/valgrind.h exists failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_f9146/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_f9146.dir/build.make CMakeFiles/cmTC_f9146.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_f9146.dir/CheckIncludeFile.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_f9146.dir/CheckIncludeFile.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_f9146.dir/build.make:78: CMakeFiles/cmTC_f9146.dir/CheckIncludeFile.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_f9146/fast] Error 2
+
+
+
+Determining if the include file fenv.h exists failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_f11ad/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_f11ad.dir/build.make CMakeFiles/cmTC_f11ad.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_f11ad.dir/CheckIncludeFile.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_f11ad.dir/CheckIncludeFile.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_f11ad.dir/build.make:78: CMakeFiles/cmTC_f11ad.dir/CheckIncludeFile.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_f11ad/fast] Error 2
+
+
+
+Determining if the FE_ALL_EXCEPT exist failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_255ee/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_255ee.dir/build.make CMakeFiles/cmTC_255ee.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_255ee.dir/CheckSymbolExists.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_255ee.dir/CheckSymbolExists.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_255ee.dir/build.make:78: CMakeFiles/cmTC_255ee.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_255ee/fast] Error 2
+
+
+File /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <fenv.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef FE_ALL_EXCEPT
+  return ((int*)(&FE_ALL_EXCEPT))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the FE_INEXACT exist failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_ce009/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_ce009.dir/build.make CMakeFiles/cmTC_ce009.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_ce009.dir/CheckSymbolExists.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_ce009.dir/CheckSymbolExists.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_ce009.dir/build.make:78: CMakeFiles/cmTC_ce009.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_ce009/fast] Error 2
+
+
+File /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <fenv.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef FE_INEXACT
+  return ((int*)(&FE_INEXACT))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Performing C SOURCE FILE Test HAVE_BUILTIN_THREAD_POINTER failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_b900a/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_b900a.dir/build.make CMakeFiles/cmTC_b900a.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_b900a.dir/src.c.o
+/usr/bin/cc -DHAVE_BUILTIN_THREAD_POINTER  -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_b900a.dir/src.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/src.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_b900a.dir/build.make:78: CMakeFiles/cmTC_b900a.dir/src.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_b900a/fast] Error 2
+
+
+Source file was:
+
+        #if __has_attribute(used)
+        #define LLVM_ATTRIBUTE_USED __attribute__((__used__))
+        #else
+        #define LLVM_ATTRIBUTE_USED
+        #endif
+        LLVM_ATTRIBUTE_USED void *foo() {
+          return __builtin_thread_pointer();
+        }
+        int main(void) { return 0; }
+Determining if the include file mach/mach.h exists failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_1486a/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_1486a.dir/build.make CMakeFiles/cmTC_1486a.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_1486a.dir/CheckIncludeFile.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_1486a.dir/CheckIncludeFile.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_1486a.dir/build.make:78: CMakeFiles/cmTC_1486a.dir/CheckIncludeFile.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_1486a/fast] Error 2
+
+
+
+Determining if the include file CrashReporterClient.h exists failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_f3820/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_f3820.dir/build.make CMakeFiles/cmTC_f3820.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_f3820.dir/CheckIncludeFile.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_f3820.dir/CheckIncludeFile.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_f3820.dir/build.make:78: CMakeFiles/cmTC_f3820.dir/CheckIncludeFile.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_f3820/fast] Error 2
+
+
+
+Determining if the include file linux/magic.h exists failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_2072b/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_2072b.dir/build.make CMakeFiles/cmTC_2072b.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_2072b.dir/CheckIncludeFile.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_2072b.dir/CheckIncludeFile.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_2072b.dir/build.make:78: CMakeFiles/cmTC_2072b.dir/CheckIncludeFile.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_2072b/fast] Error 2
+
+
+
+Determining if the include file linux/nfs_fs.h exists failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_ea207/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_ea207.dir/build.make CMakeFiles/cmTC_ea207.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_ea207.dir/CheckIncludeFile.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_ea207.dir/CheckIncludeFile.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_ea207.dir/build.make:78: CMakeFiles/cmTC_ea207.dir/CheckIncludeFile.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_ea207/fast] Error 2
+
+
+
+Determining if the include file linux/smb.h exists failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_4a572/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_4a572.dir/build.make CMakeFiles/cmTC_4a572.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_4a572.dir/CheckIncludeFile.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_4a572.dir/CheckIncludeFile.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckIncludeFile.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_4a572.dir/build.make:78: CMakeFiles/cmTC_4a572.dir/CheckIncludeFile.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_4a572/fast] Error 2
+
+
+
+Determining if the function pthread_create exists in the pthread failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_7f2fb/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_7f2fb.dir/build.make CMakeFiles/cmTC_7f2fb.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_7f2fb.dir/CheckFunctionExists.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern -DCHECK_FUNCTION_EXISTS=pthread_create -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_7f2fb.dir/CheckFunctionExists.c.o -c /usr/share/cmake-3.22/Modules/CheckFunctionExists.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_7f2fb.dir/build.make:78: CMakeFiles/cmTC_7f2fb.dir/CheckFunctionExists.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_7f2fb/fast] Error 2
+
+
+
+Determining if the function pthread_create exists in the c failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_4643f/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_4643f.dir/build.make CMakeFiles/cmTC_4643f.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_4643f.dir/CheckFunctionExists.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern -DCHECK_FUNCTION_EXISTS=pthread_create -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_4643f.dir/CheckFunctionExists.c.o -c /usr/share/cmake-3.22/Modules/CheckFunctionExists.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_4643f.dir/build.make:78: CMakeFiles/cmTC_4643f.dir/CheckFunctionExists.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_4643f/fast] Error 2
+
+
+
+Determining if the function dlopen exists in the dl failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_bc971/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_bc971.dir/build.make CMakeFiles/cmTC_bc971.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_bc971.dir/CheckFunctionExists.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern -DCHECK_FUNCTION_EXISTS=dlopen -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_bc971.dir/CheckFunctionExists.c.o -c /usr/share/cmake-3.22/Modules/CheckFunctionExists.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_bc971.dir/build.make:78: CMakeFiles/cmTC_bc971.dir/CheckFunctionExists.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_bc971/fast] Error 2
+
+
+
+Determining if the function clock_gettime exists in the rt failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_ff552/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_ff552.dir/build.make CMakeFiles/cmTC_ff552.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_ff552.dir/CheckFunctionExists.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern -DCHECK_FUNCTION_EXISTS=clock_gettime -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_ff552.dir/CheckFunctionExists.c.o -c /usr/share/cmake-3.22/Modules/CheckFunctionExists.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_ff552.dir/build.make:78: CMakeFiles/cmTC_ff552.dir/CheckFunctionExists.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_ff552/fast] Error 2
+
+
+
+Determining if the function pfm_initialize exists in the pfm failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_78038/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_78038.dir/build.make CMakeFiles/cmTC_78038.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_78038.dir/CheckFunctionExists.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern -DCHECK_FUNCTION_EXISTS=pfm_initialize -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_78038.dir/CheckFunctionExists.c.o -c /usr/share/cmake-3.22/Modules/CheckFunctionExists.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_78038.dir/build.make:78: CMakeFiles/cmTC_78038.dir/CheckFunctionExists.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_78038/fast] Error 2
+
+
+
+Determining if the compress2 exist failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_c6fba/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_c6fba.dir/build.make CMakeFiles/cmTC_c6fba.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_c6fba.dir/CheckSymbolExists.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_c6fba.dir/CheckSymbolExists.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_c6fba.dir/build.make:78: CMakeFiles/cmTC_c6fba.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_c6fba/fast] Error 2
+
+
+File /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <zlib.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef compress2
+  return ((int*)(&compress2))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the xmlReadMemory exist failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_86f2e/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_86f2e.dir/build.make CMakeFiles/cmTC_86f2e.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_86f2e.dir/CheckSymbolExists.c.o
+/usr/bin/cc  -I/usr/include/libxml2 -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_86f2e.dir/CheckSymbolExists.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_86f2e.dir/build.make:78: CMakeFiles/cmTC_86f2e.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_86f2e/fast] Error 2
+
+
+File /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <libxml/xmlreader.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef xmlReadMemory
+  return ((int*)(&xmlReadMemory))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Performing C SOURCE FILE Test Terminfo_LINKABLE failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_da9df/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_da9df.dir/build.make CMakeFiles/cmTC_da9df.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_da9df.dir/src.c.o
+/usr/bin/cc -DTerminfo_LINKABLE  -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_da9df.dir/src.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/src.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_da9df.dir/build.make:78: CMakeFiles/cmTC_da9df.dir/src.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_da9df/fast] Error 2
+
+
+Source file was:
+    #ifdef __cplusplus
+    extern "C" {
+    #endif
+    int setupterm(char *term, int filedes, int *errret);
+    #ifdef __cplusplus
+    }
+    #endif
+    int main(void) { return setupterm(0, 0, 0); }
+    
+Determining if the arc4random exist failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_ab83b/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_ab83b.dir/build.make CMakeFiles/cmTC_ab83b.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_ab83b.dir/CheckSymbolExists.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_ab83b.dir/CheckSymbolExists.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_ab83b.dir/build.make:78: CMakeFiles/cmTC_ab83b.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_ab83b/fast] Error 2
+
+
+File /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stdlib.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef arc4random
+  return ((int*)(&arc4random))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the backtrace exist failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_d2b3d/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_d2b3d.dir/build.make CMakeFiles/cmTC_d2b3d.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_d2b3d.dir/CheckSymbolExists.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_d2b3d.dir/CheckSymbolExists.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_d2b3d.dir/build.make:78: CMakeFiles/cmTC_d2b3d.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_d2b3d/fast] Error 2
+
+
+File /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <execinfo.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef backtrace
+  return ((int*)(&backtrace))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Performing C SOURCE FILE Test C_SUPPORTS_WERROR_UNGUARDED_AVAILABILITY_NEW failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_91bc3/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_91bc3.dir/build.make CMakeFiles/cmTC_91bc3.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_91bc3.dir/src.c.o
+/usr/bin/cc -DC_SUPPORTS_WERROR_UNGUARDED_AVAILABILITY_NEW  -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE   -Werror=unguarded-availability-new -std=gnu11 -o CMakeFiles/cmTC_91bc3.dir/src.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/src.c
+cc: error: unrecognized command-line option '-ftrivial-auto-var-init=pattern'
+gmake[1]: *** [CMakeFiles/cmTC_91bc3.dir/build.make:78: CMakeFiles/cmTC_91bc3.dir/src.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_91bc3/fast] Error 2
+
+
+Source file was:
+int main(void) { return 0; }
+Determining if the __register_frame exist failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_75b2a/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_75b2a.dir/build.make CMakeFiles/cmTC_75b2a.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_75b2a.dir/CheckSymbolExists.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_75b2a.dir/CheckSymbolExists.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_75b2a.dir/build.make:78: CMakeFiles/cmTC_75b2a.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_75b2a/fast] Error 2
+
+
+File /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include </home/max/iree/third_party/llvm-project/llvm/cmake/unwind.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef __register_frame
+  return ((int*)(&__register_frame))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the __deregister_frame exist failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_c1fc8/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_c1fc8.dir/build.make CMakeFiles/cmTC_c1fc8.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_c1fc8.dir/CheckSymbolExists.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_c1fc8.dir/CheckSymbolExists.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_c1fc8.dir/build.make:78: CMakeFiles/cmTC_c1fc8.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_c1fc8/fast] Error 2
+
+
+File /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include </home/max/iree/third_party/llvm-project/llvm/cmake/unwind.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef __deregister_frame
+  return ((int*)(&__deregister_frame))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the __unw_add_dynamic_fde exist failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_757f3/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_757f3.dir/build.make CMakeFiles/cmTC_757f3.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_757f3.dir/CheckSymbolExists.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_757f3.dir/CheckSymbolExists.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_757f3.dir/build.make:78: CMakeFiles/cmTC_757f3.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_757f3/fast] Error 2
+
+
+File /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include </home/max/iree/third_party/llvm-project/llvm/cmake/unwind.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef __unw_add_dynamic_fde
+  return ((int*)(&__unw_add_dynamic_fde))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the _Unwind_Backtrace exist failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_8b989/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_8b989.dir/build.make CMakeFiles/cmTC_8b989.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_8b989.dir/CheckSymbolExists.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_8b989.dir/CheckSymbolExists.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_8b989.dir/build.make:78: CMakeFiles/cmTC_8b989.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_8b989/fast] Error 2
+
+
+File /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <unwind.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef _Unwind_Backtrace
+  return ((int*)(&_Unwind_Backtrace))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the getpagesize exist failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_a267f/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_a267f.dir/build.make CMakeFiles/cmTC_a267f.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_a267f.dir/CheckSymbolExists.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_a267f.dir/CheckSymbolExists.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_a267f.dir/build.make:78: CMakeFiles/cmTC_a267f.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_a267f/fast] Error 2
+
+
+File /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <unistd.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef getpagesize
+  return ((int*)(&getpagesize))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the sysconf exist failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_a3b6a/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_a3b6a.dir/build.make CMakeFiles/cmTC_a3b6a.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_a3b6a.dir/CheckSymbolExists.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_a3b6a.dir/CheckSymbolExists.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_a3b6a.dir/build.make:78: CMakeFiles/cmTC_a3b6a.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_a3b6a/fast] Error 2
+
+
+File /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <unistd.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef sysconf
+  return ((int*)(&sysconf))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the getrusage exist failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_c478a/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_c478a.dir/build.make CMakeFiles/cmTC_c478a.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_c478a.dir/CheckSymbolExists.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_c478a.dir/CheckSymbolExists.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_c478a.dir/build.make:78: CMakeFiles/cmTC_c478a.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_c478a/fast] Error 2
+
+
+File /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <sys/resource.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef getrusage
+  return ((int*)(&getrusage))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the setrlimit exist failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_8e510/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_8e510.dir/build.make CMakeFiles/cmTC_8e510.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_8e510.dir/CheckSymbolExists.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_8e510.dir/CheckSymbolExists.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_8e510.dir/build.make:78: CMakeFiles/cmTC_8e510.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_8e510/fast] Error 2
+
+
+File /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <sys/resource.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef setrlimit
+  return ((int*)(&setrlimit))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the isatty exist failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_95985/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_95985.dir/build.make CMakeFiles/cmTC_95985.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_95985.dir/CheckSymbolExists.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_95985.dir/CheckSymbolExists.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_95985.dir/build.make:78: CMakeFiles/cmTC_95985.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_95985/fast] Error 2
+
+
+File /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <unistd.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef isatty
+  return ((int*)(&isatty))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the futimens exist failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_aada9/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_aada9.dir/build.make CMakeFiles/cmTC_aada9.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_aada9.dir/CheckSymbolExists.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_aada9.dir/CheckSymbolExists.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_aada9.dir/build.make:78: CMakeFiles/cmTC_aada9.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_aada9/fast] Error 2
+
+
+File /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <sys/stat.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef futimens
+  return ((int*)(&futimens))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the futimes exist failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_f0ee6/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_f0ee6.dir/build.make CMakeFiles/cmTC_f0ee6.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_f0ee6.dir/CheckSymbolExists.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_f0ee6.dir/CheckSymbolExists.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_f0ee6.dir/build.make:78: CMakeFiles/cmTC_f0ee6.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_f0ee6/fast] Error 2
+
+
+File /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <sys/time.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef futimes
+  return ((int*)(&futimes))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the mallctl exist failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_98bd6/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_98bd6.dir/build.make CMakeFiles/cmTC_98bd6.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_98bd6.dir/CheckSymbolExists.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_98bd6.dir/CheckSymbolExists.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_98bd6.dir/build.make:78: CMakeFiles/cmTC_98bd6.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_98bd6/fast] Error 2
+
+
+File /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <malloc_np.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef mallctl
+  return ((int*)(&mallctl))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the mallinfo exist failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_d79a3/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_d79a3.dir/build.make CMakeFiles/cmTC_d79a3.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_d79a3.dir/CheckSymbolExists.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_d79a3.dir/CheckSymbolExists.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_d79a3.dir/build.make:78: CMakeFiles/cmTC_d79a3.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_d79a3/fast] Error 2
+
+
+File /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <malloc.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef mallinfo
+  return ((int*)(&mallinfo))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the mallinfo2 exist failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_677c8/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_677c8.dir/build.make CMakeFiles/cmTC_677c8.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_677c8.dir/CheckSymbolExists.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_677c8.dir/CheckSymbolExists.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_677c8.dir/build.make:78: CMakeFiles/cmTC_677c8.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_677c8/fast] Error 2
+
+
+File /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <malloc.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef mallinfo2
+  return ((int*)(&mallinfo2))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the malloc_zone_statistics exist failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_61b7d/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_61b7d.dir/build.make CMakeFiles/cmTC_61b7d.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_61b7d.dir/CheckSymbolExists.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_61b7d.dir/CheckSymbolExists.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_61b7d.dir/build.make:78: CMakeFiles/cmTC_61b7d.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_61b7d/fast] Error 2
+
+
+File /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <malloc/malloc.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef malloc_zone_statistics
+  return ((int*)(&malloc_zone_statistics))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the getrlimit exist failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_42fc2/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_42fc2.dir/build.make CMakeFiles/cmTC_42fc2.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_42fc2.dir/CheckSymbolExists.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_42fc2.dir/CheckSymbolExists.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_42fc2.dir/build.make:78: CMakeFiles/cmTC_42fc2.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_42fc2/fast] Error 2
+
+
+File /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <sys/types.h>
+#include <sys/time.h>
+#include <sys/resource.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef getrlimit
+  return ((int*)(&getrlimit))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the posix_spawn exist failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_4457a/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_4457a.dir/build.make CMakeFiles/cmTC_4457a.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_4457a.dir/CheckSymbolExists.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_4457a.dir/CheckSymbolExists.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_4457a.dir/build.make:78: CMakeFiles/cmTC_4457a.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_4457a/fast] Error 2
+
+
+File /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <spawn.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef posix_spawn
+  return ((int*)(&posix_spawn))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the pread exist failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_dbf7c/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_dbf7c.dir/build.make CMakeFiles/cmTC_dbf7c.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_dbf7c.dir/CheckSymbolExists.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_dbf7c.dir/CheckSymbolExists.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_dbf7c.dir/build.make:78: CMakeFiles/cmTC_dbf7c.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_dbf7c/fast] Error 2
+
+
+File /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <unistd.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef pread
+  return ((int*)(&pread))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the sbrk exist failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_c2323/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_c2323.dir/build.make CMakeFiles/cmTC_c2323.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_c2323.dir/CheckSymbolExists.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_c2323.dir/CheckSymbolExists.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_c2323.dir/build.make:78: CMakeFiles/cmTC_c2323.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_c2323/fast] Error 2
+
+
+File /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <unistd.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef sbrk
+  return ((int*)(&sbrk))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the strerror_r exist failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_d136e/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_d136e.dir/build.make CMakeFiles/cmTC_d136e.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_d136e.dir/CheckSymbolExists.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_d136e.dir/CheckSymbolExists.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_d136e.dir/build.make:78: CMakeFiles/cmTC_d136e.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_d136e/fast] Error 2
+
+
+File /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <string.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef strerror_r
+  return ((int*)(&strerror_r))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the strerror_s exist failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_5d2ed/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_5d2ed.dir/build.make CMakeFiles/cmTC_5d2ed.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_5d2ed.dir/CheckSymbolExists.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_5d2ed.dir/CheckSymbolExists.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_5d2ed.dir/build.make:78: CMakeFiles/cmTC_5d2ed.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_5d2ed/fast] Error 2
+
+
+File /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <string.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef strerror_s
+  return ((int*)(&strerror_s))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the setenv exist failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_b47de/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_b47de.dir/build.make CMakeFiles/cmTC_b47de.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_b47de.dir/CheckSymbolExists.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_b47de.dir/CheckSymbolExists.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_b47de.dir/build.make:78: CMakeFiles/cmTC_b47de.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_b47de/fast] Error 2
+
+
+File /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stdlib.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef setenv
+  return ((int*)(&setenv))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Performing C SOURCE FILE Test HAVE_STRUCT_STAT_ST_MTIMESPEC_TV_NSEC failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_da2be/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_da2be.dir/build.make CMakeFiles/cmTC_da2be.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_da2be.dir/src.c.o
+/usr/bin/cc -DHAVE_STRUCT_STAT_ST_MTIMESPEC_TV_NSEC  -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_da2be.dir/src.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/src.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_da2be.dir/build.make:78: CMakeFiles/cmTC_da2be.dir/src.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_da2be/fast] Error 2
+
+
+Source file was:
+
+#include <sys/types.h>
+#include <sys/stat.h>
+
+int main()
+{
+  (void)sizeof(((struct stat *)0)->st_mtimespec.tv_nsec);
+  return 0;
+}
+
+Performing C SOURCE FILE Test HAVE_STRUCT_STAT_ST_MTIM_TV_NSEC failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_56c3b/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_56c3b.dir/build.make CMakeFiles/cmTC_56c3b.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_56c3b.dir/src.c.o
+/usr/bin/cc -DHAVE_STRUCT_STAT_ST_MTIM_TV_NSEC  -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_56c3b.dir/src.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/src.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_56c3b.dir/build.make:78: CMakeFiles/cmTC_56c3b.dir/src.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_56c3b/fast] Error 2
+
+
+Source file was:
+
+#include <sys/types.h>
+#include <sys/stat.h>
+
+int main()
+{
+  (void)sizeof(((struct stat *)0)->st_mtim.tv_nsec);
+  return 0;
+}
+
+Determining if the __GLIBC__ exist failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_23a61/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_23a61.dir/build.make CMakeFiles/cmTC_23a61.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_23a61.dir/CheckSymbolExists.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_23a61.dir/CheckSymbolExists.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_23a61.dir/build.make:78: CMakeFiles/cmTC_23a61.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_23a61/fast] Error 2
+
+
+File /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <stdio.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef __GLIBC__
+  return ((int*)(&__GLIBC__))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the pthread_getname_np exist failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_4dc55/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_4dc55.dir/build.make CMakeFiles/cmTC_4dc55.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_4dc55.dir/CheckSymbolExists.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_4dc55.dir/CheckSymbolExists.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_4dc55.dir/build.make:78: CMakeFiles/cmTC_4dc55.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_4dc55/fast] Error 2
+
+
+File /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <pthread.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef pthread_getname_np
+  return ((int*)(&pthread_getname_np))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the pthread_setname_np exist failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_a4b1d/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_a4b1d.dir/build.make CMakeFiles/cmTC_a4b1d.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_a4b1d.dir/CheckSymbolExists.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_a4b1d.dir/CheckSymbolExists.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_a4b1d.dir/build.make:78: CMakeFiles/cmTC_a4b1d.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_a4b1d/fast] Error 2
+
+
+File /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <pthread.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef pthread_setname_np
+  return ((int*)(&pthread_setname_np))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Determining if the proc_pid_rusage exist failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_c140a/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_c140a.dir/build.make CMakeFiles/cmTC_c140a.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_c140a.dir/CheckSymbolExists.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern  -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_c140a.dir/CheckSymbolExists.c.o -c /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_c140a.dir/build.make:78: CMakeFiles/cmTC_c140a.dir/CheckSymbolExists.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_c140a/fast] Error 2
+
+
+File /home/max/iree/CMakeFiles/CMakeTmp/CheckSymbolExists.c:
+/* */
+#include <libproc.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef proc_pid_rusage
+  return ((int*)(&proc_pid_rusage))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
+Performing C++ SOURCE FILE Test HAVE_CXX_ATOMICS_WITHOUT_LIB failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_e3e0e/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_e3e0e.dir/build.make CMakeFiles/cmTC_e3e0e.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_e3e0e.dir/src.cxx.o
+/usr/bin/c++ -DHAVE_CXX_ATOMICS_WITHOUT_LIB  -fsanitize=address -ftrivial-auto-var-init=pattern  -std=c++11 -O3 -DNDEBUG -fPIE -std=c++17 -o CMakeFiles/cmTC_e3e0e.dir/src.cxx.o -c /home/max/iree/CMakeFiles/CMakeTmp/src.cxx
+c++: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_e3e0e.dir/build.make:78: CMakeFiles/cmTC_e3e0e.dir/src.cxx.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_e3e0e/fast] Error 2
+
+
+Source file was:
+
+#include <atomic>
+std::atomic<int> x;
+std::atomic<short> y;
+std::atomic<char> z;
+int main() {
+  ++z;
+  ++y;
+  return ++x;
+}
+
+Determining if the function __atomic_fetch_add_4 exists in the atomic failed with the following output:
+Change Dir: /home/max/iree/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_dc198/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_dc198.dir/build.make CMakeFiles/cmTC_dc198.dir/build
+gmake[1]: Entering directory '/home/max/iree/CMakeFiles/CMakeTmp'
+Building C object CMakeFiles/cmTC_dc198.dir/CheckFunctionExists.c.o
+/usr/bin/cc   -fsanitize=address -ftrivial-auto-var-init=pattern -DCHECK_FUNCTION_EXISTS=__atomic_fetch_add_4 -O3 -DNDEBUG -fPIE -std=gnu11 -o CMakeFiles/cmTC_dc198.dir/CheckFunctionExists.c.o -c /usr/share/cmake-3.22/Modules/CheckFunctionExists.c
+cc: error: unrecognized command-line option ‘-ftrivial-auto-var-init=pattern’
+gmake[1]: *** [CMakeFiles/cmTC_dc198.dir/build.make:78: CMakeFiles/cmTC_dc198.dir/CheckFunctionExists.c.o] Error 1
+gmake[1]: Leaving directory '/home/max/iree/CMakeFiles/CMakeTmp'
+gmake: *** [Makefile:127: cmTC_dc198/fast] Error 2
+
+
+

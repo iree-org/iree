@@ -1,0 +1,144 @@
+// -*- C++ -*-
+//===----------------------------------------------------------------------===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef _LIBCUDACXX_FUNCTIONAL_BASE
+#define _LIBCUDACXX_FUNCTIONAL_BASE
+
+#ifndef __cuda_std__
+#include <__config>
+#include <typeinfo>
+#include <exception>
+#include <new>
+#endif // __cuda_std__
+
+#include "__functional/binary_function.h"
+#include "__functional/operations.h"
+#include "__functional/reference_wrapper.h"
+#include "__functional/unary_function.h"
+#include "__functional/weak_result_type.h"
+#include "__type_traits/integral_constant.h"
+#include "__type_traits/is_constructible.h"
+#include "__type_traits/is_convertible.h"
+#include "__type_traits/remove_cvref.h"
+#include "__utility/forward.h"
+
+#ifndef __cuda_std__
+#include <__pragma_push>
+#endif // __cuda_std__
+
+#if defined(_LIBCUDACXX_USE_PRAGMA_GCC_SYSTEM_HEADER)
+#pragma GCC system_header
+#endif
+
+_LIBCUDACXX_BEGIN_NAMESPACE_STD
+
+#ifdef _LIBCUDACXX_CXX03_LANG
+
+#include <__functional_base_03>
+
+#endif  // !defined(_LIBCUDACXX_CXX03_LANG)
+
+// allocator_arg_t
+
+struct _LIBCUDACXX_TEMPLATE_VIS allocator_arg_t { explicit allocator_arg_t() = default; };
+
+#if defined(_LIBCUDACXX_CXX03_LANG) || defined(_LIBCUDACXX_BUILDING_LIBRARY)
+extern _LIBCUDACXX_EXPORTED_FROM_ABI const allocator_arg_t allocator_arg;
+#else
+/* _LIBCUDACXX_INLINE_VAR */ constexpr allocator_arg_t allocator_arg = allocator_arg_t();
+#endif
+
+// uses_allocator
+
+template <class _Tp>
+struct __has_allocator_type
+{
+private:
+    struct __two {char __lx; char __lxx;};
+    template <class _Up> _LIBCUDACXX_INLINE_VISIBILITY static __two __test(...);
+    template <class _Up> _LIBCUDACXX_INLINE_VISIBILITY static char __test(typename _Up::allocator_type* = 0);
+public:
+    static const bool value = sizeof(__test<_Tp>(0)) == 1;
+};
+
+template <class _Tp, class _Alloc, bool = __has_allocator_type<_Tp>::value>
+struct __uses_allocator
+    : public integral_constant<bool,
+        is_convertible<_Alloc, typename _Tp::allocator_type>::value>
+{
+};
+
+template <class _Tp, class _Alloc>
+struct __uses_allocator<_Tp, _Alloc, false>
+    : public false_type
+{
+};
+
+template <class _Tp, class _Alloc>
+struct _LIBCUDACXX_TEMPLATE_VIS uses_allocator
+    : public __uses_allocator<_Tp, _Alloc>
+{
+};
+
+#if _LIBCUDACXX_STD_VER > 14
+template <class _Tp, class _Alloc>
+_LIBCUDACXX_INLINE_VAR constexpr size_t uses_allocator_v = uses_allocator<_Tp, _Alloc>::value;
+#endif
+
+#ifndef _LIBCUDACXX_CXX03_LANG
+
+// allocator construction
+
+template <class _Tp, class _Alloc, class ..._Args>
+struct __uses_alloc_ctor_imp
+{
+    typedef _LIBCUDACXX_NODEBUG_TYPE __remove_cvref_t<_Alloc> _RawAlloc;
+    static const bool __ua = uses_allocator<_Tp, _RawAlloc>::value;
+    static const bool __ic =
+        is_constructible<_Tp, allocator_arg_t, _Alloc, _Args...>::value;
+    static const int value = __ua ? 2 - __ic : 0;
+};
+
+template <class _Tp, class _Alloc, class ..._Args>
+struct __uses_alloc_ctor
+    : integral_constant<int, __uses_alloc_ctor_imp<_Tp, _Alloc, _Args...>::value>
+    {};
+
+template <class _Tp, class _Allocator, class... _Args>
+inline _LIBCUDACXX_INLINE_VISIBILITY
+void __user_alloc_construct_impl (integral_constant<int, 0>, _Tp *__storage, const _Allocator &, _Args &&... __args )
+{
+    new (__storage) _Tp (_CUDA_VSTD::forward<_Args>(__args)...);
+}
+
+// FIXME: This should have a version which takes a non-const alloc.
+template <class _Tp, class _Allocator, class... _Args>
+inline _LIBCUDACXX_INLINE_VISIBILITY
+void __user_alloc_construct_impl (integral_constant<int, 1>, _Tp *__storage, const _Allocator &__a, _Args &&... __args )
+{
+    new (__storage) _Tp (allocator_arg, __a, _CUDA_VSTD::forward<_Args>(__args)...);
+}
+
+// FIXME: This should have a version which takes a non-const alloc.
+template <class _Tp, class _Allocator, class... _Args>
+inline _LIBCUDACXX_INLINE_VISIBILITY
+void __user_alloc_construct_impl (integral_constant<int, 2>, _Tp *__storage, const _Allocator &__a, _Args &&... __args )
+{
+    new (__storage) _Tp (_CUDA_VSTD::forward<_Args>(__args)..., __a);
+}
+
+#endif  // _LIBCUDACXX_CXX03_LANG
+
+_LIBCUDACXX_END_NAMESPACE_STD
+
+#ifndef __cuda_std__
+#include <__pragma_pop>
+#endif // __cuda_std__
+
+#endif  // _LIBCUDACXX_FUNCTIONAL_BASE

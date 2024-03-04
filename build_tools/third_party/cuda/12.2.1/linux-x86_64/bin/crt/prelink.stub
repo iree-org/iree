@@ -1,0 +1,95 @@
+/*
+ * NVIDIA_COPYRIGHT_BEGIN
+ *
+ * Copyright (c) 2012-2021, NVIDIA CORPORATION.  All rights reserved.
+ *
+ * NVIDIA CORPORATION and its licensors retain all intellectual property
+ * and proprietary rights in and to this software, related documentation
+ * and any modifications thereto.  Any use, reproduction, disclosure or
+ * distribution of this software and related documentation without an express
+ * license agreement from NVIDIA CORPORATION is strictly prohibited.
+ *
+ * NVIDIA_COPYRIGHT_END
+ */
+
+#if !defined(__CUDA_INCLUDE_COMPILER_INTERNAL_HEADERS__)
+#if defined(_MSC_VER)
+#pragma message("crt/prelink.stub is an internal header file and must not be used directly.  Please use cuda_runtime_api.h or cuda_runtime.h instead.")
+#else
+#warning "crt/prelink.stub is an internal header file and must not be used directly.  Please use cuda_runtime_api.h or cuda_runtime.h instead."
+#endif
+#define __CUDA_INCLUDE_COMPILER_INTERNAL_HEADERS__
+#define __UNDEF_CUDA_INCLUDE_COMPILER_INTERNAL_HEADERS_PRELINK_STUB__
+#endif
+
+#if defined(__GNUC__)
+#if defined(__clang__) || (!defined(__PGIC__) && (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6)))
+#pragma GCC diagnostic push
+#endif
+#if defined(__clang__) || (!defined(__PGIC__) && (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 2)))
+#pragma GCC diagnostic ignored "-Wcast-qual"
+#endif
+#endif
+
+#include FATBINFILE
+
+#if defined(_WIN32)
+__declspec(selectany) void *__nv__fatDeviceText_dummy = (void *)&__FATIDNAME(__NV_MODULE_ID);
+#else
+void *__nv__fatDeviceText_dummy __attribute__((weak)) = (void *)&__FATIDNAME(__NV_MODULE_ID);
+;
+#endif
+
+#define __TO_STRING_CORE(X) #X
+#define __TO_STRING(X) __TO_STRING_CORE(X)
+#define __REGISTER_IDNAME_CORE(X) __sti__cudaRegisterLocal_##X
+#define __REGISTER_IDNAME(X) __REGISTER_IDNAME_CORE(X)
+#define __REGISTER_LINKED_IDNAME_CORE(X) __cudaRegisterLinkedBinary##X
+#define __REGISTER_LINKED_IDNAME(X) __REGISTER_LINKED_IDNAME_CORE(X)
+
+static void ____nv_dummy_param_ref(void *param) { 
+#if defined(__GNUC__)
+  volatile static void **__ref __attribute__((unused)); 
+#else
+  volatile static void **__ref;
+#endif
+  __ref = (volatile void **)param; }
+
+extern "C" {
+#if defined(_WIN32)
+#pragma data_seg("__nv_module_id")
+static const __declspec(allocate("__nv_module_id")) unsigned char __module_id_str[] = __TO_STRING(__NV_MODULE_ID);
+#pragma data_seg()
+#elif defined(__APPLE__)
+static const unsigned char __module_id_str[] __attribute__((section ("__NV_CUDA,__nv_module_id"))) = __TO_STRING(__NV_MODULE_ID);
+#else /* linux */
+static const unsigned char __module_id_str[] __attribute__((section ("__nv_module_id"))) = __TO_STRING(__NV_MODULE_ID);
+#endif
+}
+
+extern "C" void __REGISTER_LINKED_IDNAME(__NV_MODULE_ID) ( void (*)(void **), void *, void *, void (*)(void *));
+static void __nv_cudaEntityRegisterCallback(void **){}
+
+#if defined(_WIN32)
+static void __sti____cudaRegisterAll_14_simple_cpp1_ii__Z3foov(void);
+static void __REGISTER_IDNAME(__NV_MODULE_ID) (void);
+#pragma section(".CRT$XCT",read)
+#define __DUMMY_INIT_CORE(X) __dumY_static_init__sti__cudaRegisterLocal_##X
+#define __DUMMY_INIT(X) __DUMMY_INIT_CORE(X)
+__declspec(allocate(".CRT$XCT")) static void (*__DUMMY_INIT(__NV_MODULE_ID)[])(void) = {__REGISTER_IDNAME(__NV_MODULE_ID)};
+#else
+static void __REGISTER_IDNAME(__NV_MODULE_ID) (void) __attribute__((__constructor__));
+#endif
+
+static void __REGISTER_IDNAME(__NV_MODULE_ID) (void){{ __REGISTER_LINKED_IDNAME(__NV_MODULE_ID)(( void (*)(void **))(__nv_cudaEntityRegisterCallback), (void *)&__FATIDNAME(__NV_MODULE_ID), (void *)&__module_id_str, (void (*)(void *))&____nv_dummy_param_ref); };}
+
+#if defined(__GNUC__)
+#if defined(__clang__) || (!defined(__PGIC__) && (__GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 6)))
+#pragma GCC diagnostic pop
+#endif
+#endif
+
+#if defined(__UNDEF_CUDA_INCLUDE_COMPILER_INTERNAL_HEADERS_PRELINK_STUB__)
+#undef __CUDA_INCLUDE_COMPILER_INTERNAL_HEADERS__
+#undef __UNDEF_CUDA_INCLUDE_COMPILER_INTERNAL_HEADERS_PRELINK_STUB__
+#endif

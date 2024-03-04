@@ -1,0 +1,9 @@
+cudaroot=/usr/local/cuda-12.2
+libdir=${cudaroot}/targets/x86_64-linux/lib
+includedir=${cudaroot}/targets/x86_64-linux/include
+
+Name: cuda
+Description: CUDA Driver Library
+Version: 12.2
+Libs: -L${libdir} -lcuda
+Cflags: -I${includedir}

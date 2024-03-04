@@ -1,0 +1,66 @@
+// -*- C++ -*-
+//===----------------------------------------------------------------------===//
+//
+// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// SPDX-FileCopyrightText: Copyright (c) 2023 NVIDIA CORPORATION & AFFILIATES.
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef _LIBCUDACXX___ASSERT
+#define _LIBCUDACXX___ASSERT
+
+#ifndef __cuda_std__
+#include <__config>
+#endif // __cuda_std__
+
+#include "__verbose_abort"
+
+#if defined(_LIBCUDACXX_USE_PRAGMA_GCC_SYSTEM_HEADER)
+#pragma GCC system_header
+#endif
+
+// This is for backwards compatibility with code that might have been enabling
+// assertions through the Debug mode previously.
+// TODO: In LLVM 16, make it an error to define _LIBCUDACXX_DEBUG
+#if defined(_LIBCUDACXX_DEBUG)
+# ifndef _LIBCUDACXX_ENABLE_ASSERTIONS
+#   define _LIBCUDACXX_ENABLE_ASSERTIONS 1
+# endif
+#endif
+
+// Automatically enable assertions when the debug mode is enabled.
+#if defined(_LIBCUDACXX_ENABLE_DEBUG_MODE)
+# ifndef _LIBCUDACXX_ENABLE_ASSERTIONS
+#   define _LIBCUDACXX_ENABLE_ASSERTIONS 1
+# endif
+#endif
+
+#ifndef _LIBCUDACXX_ENABLE_ASSERTIONS
+# define _LIBCUDACXX_ENABLE_ASSERTIONS _LIBCUDACXX_ENABLE_ASSERTIONS_DEFAULT
+#endif
+
+#if _LIBCUDACXX_ENABLE_ASSERTIONS != 0 && _LIBCUDACXX_ENABLE_ASSERTIONS != 1
+# error "_LIBCUDACXX_ENABLE_ASSERTIONS must be set to 0 or 1"
+#endif
+
+#if _LIBCUDACXX_ENABLE_ASSERTIONS
+# define _LIBCUDACXX_ASSERT(expression, message)                                \
+    (_LIBCUDACXX_DIAGNOSTIC_PUSH                                                \
+    _LIBCUDACXX_CLANG_DIAGNOSTIC_IGNORED("-Wassume")                            \
+    __builtin_expect(static_cast<bool>(expression), 1) ?                        \
+      (void)0 :                                                                 \
+      ::_CUDA_VSTD::__libcpp_verbose_abort("%s:%d: assertion %s failed: %s", __FILE__, __LINE__, #expression, message)
+    _LIBCUDACXX_DIAGNOSTIC_POP)
+#elif 0 // !defined(_LIBCUDACXX_ASSERTIONS_DISABLE_ASSUME) && __has_builtin(__builtin_assume)
+# define _LIBCUDACXX_ASSERT(expression, message)                                \
+    (_LIBCUDACXX_DIAGNOSTIC_PUSH                                                \
+    _LIBCUDACXX_CLANG_DIAGNOSTIC_IGNORED("-Wassume")                            \
+    __builtin_assume(static_cast<bool>(expression))                             \
+    _LIBCUDACXX_DIAGNOSTIC_POP)
+#else
+# define _LIBCUDACXX_ASSERT(expression, message) ((void)0)
+#endif
+
+#endif // _LIBCUDACXX___ASSERT
