@@ -185,8 +185,9 @@ static iree_status_t iree_hal_rocm_driver_dump_device_info(
   hipDevice_t device = IREE_DEVICE_ID_TO_HIPDEVICE(device_id);
 
   hipDeviceProp_t prop;
-  ROCM_RETURN_IF_ERROR(&driver->syms, hipGetDeviceProperties(&prop, device),
-                       "hipGetDeviceProperties");
+  ROCM_RETURN_IF_ERROR(&driver->syms,
+                       hipGetDevicePropertiesR0600(&prop, device),
+                       "hipGetDevicePropertiesR0600");
 
   // GPU capabilities and architecture.
   IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
