@@ -55,6 +55,10 @@ TilingConfig::TilingConfig(IREE::Codegen::LoweringConfigAttr lc)
 /// Returns the tile sizes of all the vector dimensions, including parallel
 /// and reduction dimensions.
 SizesAndScalableFlags TilingConfig::getVectorTileSizes() {
+  if (getNumTilingLevels() == 2) {
+    return getVectorCommonParallelSizes();
+  }
+
   unsigned numDims = getNumDimensions();
   SmallVector<int64_t> vectorSizes(numDims, 0);
   SmallVector<bool> scalableFlags(numDims, false);
