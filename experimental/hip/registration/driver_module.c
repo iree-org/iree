@@ -22,6 +22,12 @@ IREE_FLAG(
     bool, hip_async_allocations, true,
     "Enables HIP asynchronous stream-ordered allocations when supported.");
 
+IREE_FLAG(
+    bool, hip_tracing, true,
+    "Enables tracing of stream events when Tracy instrumentation is enabled.\n"
+    "Severely impacts benchmark timings and should only be used when\n"
+    "analyzing dispatch timings.");
+
 IREE_FLAG(int32_t, hip_default_index, 0,
           "Specifies the index of the default HIP device to use");
 
@@ -64,6 +70,7 @@ static iree_status_t iree_hal_hip_driver_factory_try_create(
   if (FLAG_hip_use_streams) {
     device_params.command_buffer_mode = IREE_HAL_HIP_COMMAND_BUFFER_MODE_STREAM;
   }
+  device_params.stream_tracing = FLAG_hip_tracing;
   device_params.async_allocations = FLAG_hip_async_allocations;
 
   driver_options.default_device_index = FLAG_hip_default_index;

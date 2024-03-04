@@ -9,6 +9,7 @@
 
 #include "experimental/hip/dynamic_symbols.h"
 #include "experimental/hip/hip_headers.h"
+#include "experimental/hip/tracing.h"
 #include "iree/base/internal/arena.h"
 #include "iree/hal/api.h"
 
@@ -30,6 +31,7 @@ extern "C" {
 iree_status_t iree_hal_hip_stream_command_buffer_create(
     iree_hal_device_t* device,
     const iree_hal_hip_dynamic_symbols_t* hip_symbols,
+    iree_hal_hip_tracing_context_t* tracing_context,
     iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
     iree_host_size_t binding_capacity, hipStream_t stream,

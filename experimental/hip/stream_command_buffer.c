@@ -11,6 +11,7 @@
 #include "experimental/hip/native_executable.h"
 #include "experimental/hip/pipeline_layout.h"
 #include "experimental/hip/status_util.h"
+#include "experimental/hip/tracing.h"
 #include "iree/hal/utils/resource_set.h"
 
 typedef struct iree_hal_hip_stream_command_buffer_t {
@@ -18,6 +19,9 @@ typedef struct iree_hal_hip_stream_command_buffer_t {
   iree_allocator_t host_allocator;
 
   const iree_hal_hip_dynamic_symbols_t* hip_symbols;
+
+  // Per-stream HIP tracing context.
+  iree_hal_hip_tracing_context_t* tracing_context;
 
   hipStream_t hip_stream;
 
@@ -50,6 +54,7 @@ iree_hal_hip_stream_command_buffer_cast(iree_hal_command_buffer_t* base_value) {
 iree_status_t iree_hal_hip_stream_command_buffer_create(
     iree_hal_device_t* device,
     const iree_hal_hip_dynamic_symbols_t* hip_symbols,
+    iree_hal_hip_tracing_context_t* tracing_context,
     iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
     iree_host_size_t binding_capacity, hipStream_t stream,
@@ -79,6 +84,7 @@ iree_status_t iree_hal_hip_stream_command_buffer_create(
       &command_buffer->base);
   command_buffer->host_allocator = host_allocator;
   command_buffer->hip_symbols = hip_symbols;
+  command_buffer->tracing_context = tracing_context;
   command_buffer->hip_stream = stream;
   iree_arena_initialize(block_pool, &command_buffer->arena);
 
@@ -112,6 +118,15 @@ bool iree_hal_hip_stream_command_buffer_isa(
 
 static iree_status_t iree_hal_hip_stream_command_buffer_begin(
     iree_hal_command_buffer_t* base_command_buffer) {
+  iree_hal_hip_stream_command_buffer_t* command_buffer =
+      iree_hal_hip_stream_command_buffer_cast(base_command_buffer);
+  (void)command_buffer;
+
+  IREE_HIP_TRACE_ZONE_BEGIN_EXTERNAL(
+      command_buffer->tracing_context, command_buffer->hip_stream,
+      /*file_name=*/NULL, 0, /*line=*/0, /*func_name=*/NULL, 0,
+      "iree_hal_hip_stream_command_buffer",
+      strlen("iree_hal_hip_stream_command_buffer"));
   return iree_ok_status();
 }
 
@@ -134,6 +149,9 @@ static iree_status_t iree_hal_hip_stream_command_buffer_end(
       z0, iree_hal_resource_set_allocate(command_buffer->arena.block_pool,
                                          &command_buffer->resource_set));
 
+  IREE_HIP_TRACE_ZONE_END(command_buffer->tracing_context,
+                          command_buffer->hip_stream);
+
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
@@ -141,10 +159,27 @@ static iree_status_t iree_hal_hip_stream_command_buffer_end(
 static void iree_hal_hip_stream_command_buffer_begin_debug_group(
     iree_hal_command_buffer_t* base_command_buffer, iree_string_view_t label,
     iree_hal_label_color_t label_color,
-    const iree_hal_label_location_t* location) {}
+    const iree_hal_label_location_t* location) {
+  iree_hal_hip_stream_command_buffer_t* command_buffer =
+      iree_hal_hip_stream_command_buffer_cast(base_command_buffer);
+  (void)command_buffer;
+
+  IREE_HIP_TRACE_ZONE_BEGIN_EXTERNAL(
+      command_buffer->tracing_context, command_buffer->hip_stream,
+      location ? location->file.data : NULL, location ? location->file.size : 0,
+      location ? location->line : 0, /*func_name=*/NULL, 0, label.data,
+      label.size);
+}
 
 static void iree_hal_hip_stream_command_buffer_end_debug_group(
-    iree_hal_command_buffer_t* base_command_buffer) {}
+    iree_hal_command_buffer_t* base_command_buffer) {
+  iree_hal_hip_stream_command_buffer_t* command_buffer =
+      iree_hal_hip_stream_command_buffer_cast(base_command_buffer);
+  (void)command_buffer;
+
+  IREE_HIP_TRACE_ZONE_END(command_buffer->tracing_context,
+                          command_buffer->hip_stream);
+}
 
 static iree_status_t iree_hal_hip_stream_command_buffer_execution_barrier(
     iree_hal_command_buffer_t* base_command_buffer,
@@ -404,6 +439,12 @@ static iree_status_t iree_hal_hip_stream_command_buffer_dispatch(
       z0, iree_hal_hip_native_executable_entry_point_kernel_info(
               executable, entry_point, &kernel_info));
 
+  IREE_HIP_TRACE_ZONE_BEGIN_EXTERNAL(
+      command_buffer->tracing_context, command_buffer->hip_stream,
+      kernel_info.source_filename.data, kernel_info.source_filename.size,
+      kernel_info.source_line, /*func_name=*/NULL, 0,
+      kernel_info.function_name.data, kernel_info.function_name.size);
+
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_resource_set_insert(command_buffer->resource_set, 1,
                                        &executable));
@@ -471,6 +512,9 @@ static iree_status_t iree_hal_hip_stream_command_buffer_dispatch(
           kernel_info.block_size[2], kernel_info.shared_memory_size,
           command_buffer->hip_stream, params_ptr, NULL),
       "hipModuleLaunchKernel");
+
+  IREE_HIP_TRACE_ZONE_END(command_buffer->tracing_context,
+                          command_buffer->hip_stream);
 
   IREE_TRACE_ZONE_END(z0);
   return status;

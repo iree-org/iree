@@ -23,6 +23,7 @@
 #include "experimental/hip/status_util.h"
 #include "experimental/hip/stream_command_buffer.h"
 #include "experimental/hip/timepoint_pool.h"
+#include "experimental/hip/tracing.h"
 #include "iree/base/internal/arena.h"
 #include "iree/base/internal/event_pool.h"
 #include "iree/base/internal/math.h"
@@ -61,6 +62,8 @@ typedef struct iree_hal_hip_device_t {
   hipStream_t hip_dispatch_stream;
   // The hipStream_t used to issue host callback functions.
   hipStream_t hip_callback_stream;
+
+  iree_hal_hip_tracing_context_t* tracing_context;
 
   iree_allocator_t host_allocator;
 
@@ -102,6 +105,7 @@ IREE_API_EXPORT void iree_hal_hip_device_params_initialize(
   out_params->event_pool_capacity = 32;
   out_params->queue_count = 1;
   out_params->command_buffer_mode = IREE_HAL_HIP_COMMAND_BUFFER_MODE_STREAM;
+  out_params->stream_tracing = false;
   out_params->async_allocations = true;
 }
 
@@ -148,6 +152,13 @@ static iree_status_t iree_hal_hip_device_create_internal(
   iree_status_t status = iree_hal_hip_pending_queue_actions_create(
       symbols, &device->block_pool, host_allocator,
       &device->pending_queue_actions);
+
+  // Enable tracing for the (currently only) stream - no-op if disabled.
+  if (iree_status_is_ok(status) && device->params.stream_tracing) {
+    status = iree_hal_hip_tracing_context_allocate(
+        device->hip_symbols, device->identifier, dispatch_stream,
+        &device->block_pool, host_allocator, &device->tracing_context);
+  }
 
   // Memory pool support is conditional.
   if (iree_status_is_ok(status) && params->async_allocations) {
@@ -298,6 +309,8 @@ static void iree_hal_hip_device_destroy(iree_hal_device_t* base_device) {
   // Destroy memory pools that hold on to reserved memory.
   iree_hal_hip_memory_pools_deinitialize(&device->memory_pools);
 
+  iree_hal_hip_tracing_context_free(device->tracing_context);
+
   // Destroy various pools for synchronization.
   if (device->timepoint_pool) {
     iree_hal_hip_timepoint_pool_free(device->timepoint_pool);
@@ -416,9 +429,9 @@ iree_status_t iree_hal_hip_device_create_stream_command_buffer(
     iree_hal_command_buffer_t** out_command_buffer) {
   iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
   return iree_hal_hip_stream_command_buffer_create(
-      base_device, device->hip_symbols, mode, command_categories,
-      binding_capacity, device->hip_dispatch_stream, &device->block_pool,
-      device->host_allocator, out_command_buffer);
+      base_device, device->hip_symbols, device->tracing_context, mode,
+      command_categories, binding_capacity, device->hip_dispatch_stream,
+      &device->block_pool, device->host_allocator, out_command_buffer);
 }
 
 static iree_status_t iree_hal_hip_device_create_command_buffer(
@@ -634,6 +647,11 @@ static iree_status_t iree_hal_hip_device_queue_write(
   return loop_status;
 }
 
+static void iree_hal_hip_device_collect_tracing_context(void* user_data) {
+  iree_hal_hip_tracing_context_collect(
+      (iree_hal_hip_tracing_context_t*)user_data);
+}
+
 static iree_status_t iree_hal_hip_device_queue_execute(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
@@ -645,8 +663,10 @@ static iree_status_t iree_hal_hip_device_queue_execute(
 
   iree_status_t status = iree_hal_hip_pending_queue_actions_enqueue_execution(
       base_device, device->hip_dispatch_stream, device->hip_callback_stream,
-      device->pending_queue_actions, NULL, NULL, wait_semaphore_list,
-      signal_semaphore_list, command_buffer_count, command_buffers);
+      device->pending_queue_actions,
+      iree_hal_hip_device_collect_tracing_context, device->tracing_context,
+      wait_semaphore_list, signal_semaphore_list, command_buffer_count,
+      command_buffers);
   if (iree_status_is_ok(status)) {
     // Try to advance the pending workload queue.
     status =
