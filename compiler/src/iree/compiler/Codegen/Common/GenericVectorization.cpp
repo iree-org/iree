@@ -238,12 +238,14 @@ void GenericVectorizationPass::runOnOperation() {
   IRRewriter rewriter(context);
   SmallVector<Operation *> candidates;
   funcOp.walk([&](Operation *op) {
-    if (isa<linalg::LinalgOp>(op))
+    if (isa<linalg::LinalgOp>(op)) {
       candidates.push_back(op);
-    if (vectorizePadding && enableVectorMasking && isa<tensor::PadOp>(op))
+    } else if (vectorizePadding && enableVectorMasking &&
+               isa<tensor::PadOp>(op)) {
       candidates.push_back(op);
-    if (enableVectorMasking && isa<tensor::PackOp>(op))
+    } else if (enableVectorMasking && isa<tensor::PackOp>(op)) {
       candidates.push_back(op);
+    }
   });
 
   // The vector input sizes inference needs to use producers, so we apply
