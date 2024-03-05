@@ -451,20 +451,8 @@ materializeEncodingForTarget(RankedTensorType tensorType,
   if (enumeratedTileMxNxK.empty()) {
     return failure();
   }
-  // Check if the encoding specifies static narrow sizes for the M/N dimensions.
-  // This can be used to choose a correspondingly narrow tile shape.
-  // With microkernels, we keep this logic in sync with the set of actual
-  // optimized microkernel tile functions to avoid a tile shape specialization
-  // causing a fallback to a slow generic tile function. At the moment,
-  // microkernel tile functions are only specialize for narrow M, not for narrow
-  // N. Accordingly, we leave matmulNarrowN as 0 (default) when microkernels are
-  // used. Generally it would be best to deal with narrow-N cases by transposing
-  // the whole matmul and swapping LHS<->RHS, reducing the narrow-N case to
-  // narrow-M.
   int64_t matmulNarrowM = getIntOrZero(encoding.getMatmulNarrow_M());
-  int64_t matmulNarrowN = hasUkernel(targetAttr, "mmt4d")
-                              ? 0
-                              : getIntOrZero(encoding.getMatmulNarrow_N());
+  int64_t matmulNarrowN = getIntOrZero(encoding.getMatmulNarrow_N());
   // Choose a final matmul TileMxNxK from the above-enumarated tile shapes,
   // taking narrow dimensions into account.
   TileMxNxK chosenTileMxNxK =
