@@ -191,6 +191,12 @@ static iree_status_t iree_hal_rocm_driver_dump_device_info(
     iree_hal_driver_t* base_driver, iree_hal_device_id_t device_id,
     iree_string_builder_t* builder) {
   iree_hal_rocm_driver_t* driver = iree_hal_rocm_driver_cast(base_driver);
+  if (!driver->syms.hipGetDevicePropertiesR0600) {
+    // ROCm 6.0 release changes the hipDeviceProp_t struct and would need to use
+    // the matching hipGetDevicePropertiesR0600() API to query it. This symbol
+    // is not available in earlier versions.
+    return iree_ok_status();
+  }
   hipDevice_t device = IREE_DEVICE_ID_TO_HIPDEVICE(device_id);
 
   hipDeviceProp_t prop;
