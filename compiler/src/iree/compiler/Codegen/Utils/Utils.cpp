@@ -1161,4 +1161,15 @@ bool hasFusedLeadingOp(linalg::LinalgOp rootOp) {
   return llvm::any_of(backwardSlice, llvm::IsaPred<linalg::LinalgOp>);
 }
 
+std::optional<VscaleRange>
+getDefaultVscaleRange(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  if (isAArch64(targetAttr)) {
+    // On AArch64 the vector length will always be between 128-bit and 2048-bit.
+    // This works out as a vscale range of 1 to 16.
+    return VscaleRange{1, 16};
+  }
+  // TODO: Implement for other architectures.
+  return std::nullopt;
+}
+
 } // namespace mlir::iree_compiler

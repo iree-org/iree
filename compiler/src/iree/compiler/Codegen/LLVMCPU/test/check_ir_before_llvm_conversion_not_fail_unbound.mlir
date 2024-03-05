@@ -29,3 +29,16 @@ module {
   }
 }
 // CHECK-LABEL: func @mix_static_and_unbound_dynamic_allocas(
+
+// -----
+
+module {
+  func.func @scalable_alloca() {
+    %c4 = arith.constant 4 : index
+    %vscale = vector.vscale
+    %c4_vscale = arith.muli %vscale, %c4 : index
+    %0 = memref.alloca(%c4_vscale) : memref<?x16xf32>
+    return
+  }
+}
+// CHECK-LABEL: func @scalable_alloca(

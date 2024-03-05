@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "llvm/Support/CommandLine.h"
+#include "mlir/Dialect/Vector/IR/ScalableValueBoundsConstraintSet.h"
 #include "mlir/Interfaces/ValueBoundsOpInterface.h"
 #include "mlir/Pass/Pass.h"
 
@@ -58,11 +59,14 @@ checkStackAllocationSize(mlir::FunctionOpInterface funcOp) {
       allocaSize *= dimSize;
     }
     for (auto operand : allocaOp.getDynamicSizes()) {
-      auto ub = ValueBoundsConstraintSet::computeConstantBound(
-          presburger::BoundType::UB, operand, /*dim=*/std::nullopt,
-          /*stopCondition=*/nullptr, /*closedUB=*/true);
-      if (succeeded(ub)) {
-        allocaSize *= ub.value();
+      // Assume vscale is 1 for determining if the alloca is within the stack
+      // limit. This should always resolve to a constant bound.
+      auto ub = vector::ScalableValueBoundsConstraintSet::computeScalableBound(
+          operand, /*dim=*/std::nullopt,
+          /*vscaleMin=*/1, /*vscaleMax=*/1, presburger::BoundType::UB);
+      FailureOr<vector::ConstantOrScalableBound::BoundSize> size;
+      if (succeeded(ub) && succeeded(size = ub->getSize())) {
+        allocaSize *= size->baseSize;
         continue;
       }
       return allocaOp.emitOpError("expected no unbounded stack allocations");

@@ -312,6 +312,17 @@ def HoistStaticallyBoundAllocations :
     InterfacePass<"iree-hoist-statically-bound-allocations", "mlir::FunctionOpInterface"> {
   let summary = "Hoist statically bound alloca ops to the entry block of functions";
   let constructor = "mlir::iree_compiler::createHoistStaticallyBoundAllocationsPass()";
+  let options = [
+    Option<"vscaleMin", "vscale-min", "unsigned",
+            /*default=*/"0",
+           "Minimum possible value of vscale.">,
+    Option<"vscaleMax", "vscale-max", "unsigned",
+            /*default=*/"0",
+           "Maximum possible value of vscale (a value of zero means unbounded).">
+  ];
+  let dependentDialects = [
+      "affine::AffineDialect"
+  ];
 }
 
 def IREEComprehensiveBufferize :
