@@ -135,7 +135,7 @@ jobs:
           # separately. `find` depth is limited at 1 to exclude the directory
           # itself and list all files and subdirectories at the first level. Let
           # gcloud cli handle the recursive file traversal.
-          find "${E2E_TEST_ARTIFACTS_DIR}" -mindepth 1 -maxdepth 1 ! -name "*.tflite" \
+          find "${E2E_TEST_ARTIFACTS_DIR}" -mindepth 1 -maxdepth 1 ! -name "*.tflite" ! -empty \
             | gcloud storage cp --read-paths-from-stdin -r \
               "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}"
           gcloud storage cp "${E2E_TEST_ARTIFACTS_BUILD_LOG}" \
