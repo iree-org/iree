@@ -173,6 +173,13 @@ RankedTensorType getPackedSliceType(
     llvm::SmallDenseSet<unsigned> rankReductionMask,
     ArrayRef<int64_t> outerDimsPerm, ArrayRef<int64_t> innerDimsPos);
 
+///
+FailureOr<Value>
+packSliceOfTensor(PatternRewriter &rewriter, Value slice,
+                  SmallVector<OpFoldResult> sliceSizes,
+                  llvm::SmallDenseSet<unsigned> rankReductionMask,
+                  tensor::PackOp packOp);
+
 /// Given a packed slice of a tensor, some slicing and packing metadata, and
 /// the original type of the slice before packing, unpack the packed slice, and
 /// return the unpacked slice. The unpacked slice should be the same type as

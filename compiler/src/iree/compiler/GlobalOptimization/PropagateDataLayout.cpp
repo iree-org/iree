@@ -22,6 +22,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
+#include "mlir/IR/Dominance.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-global-opt-propagate-data-layout"
@@ -617,6 +618,94 @@ public:
   }
 };
 
+class BubbleUpPackThroughTensorInsertSlice final
+    : public OpRewritePattern<tensor::PackOp> {
+public:
+  using OpRewritePattern<tensor::PackOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::PackOp packOp,
+                                PatternRewriter &rewriter) const override {
+    auto insertSliceOp =
+        packOp.getSource().getDefiningOp<tensor::InsertSliceOp>();
+    if (!insertSliceOp) {
+      return failure();
+    }
+    auto nodeType = getNodeTypeFromAttr(insertSliceOp);
+    if (!nodeType || nodeType.value() == DataLayoutNodeType::BARRIER) {
+      return failure();
+    }
+    Value packOpDest = packOp.getDest();
+    DominanceInfo dom(insertSliceOp);
+    if (!packOpDest.getDefiningOp<tensor::EmptyOp>() &&
+        !dom.properlyDominates(packOpDest, insertSliceOp)) {
+      return failure();
+    }
+    std::optional<llvm::SmallDenseSet<unsigned>> maybeRankReducingMask =
+        mlir::computeRankReductionMask(
+            insertSliceOp.getStaticSizes(),
+            insertSliceOp.getSourceType().getShape());
+    if (!maybeRankReducingMask) {
+      return rewriter.notifyMatchFailure(
+          packOp,
+          "failed to compute rank reducing mask for producer insert_slice");
+    }
+    auto rankReducingMask = maybeRankReducingMask.value();
+
+    // Pack the insert_slice source
+    OpBuilder::InsertionGuard guard(rewriter);
+    rewriter.setInsertionPoint(insertSliceOp);
+    Location loc = insertSliceOp->getLoc();
+    auto mixedTiles = packOp.getMixedTiles();
+    SmallVector<int64_t> innerDimsPos(packOp.getInnerDimsPos());
+    SmallVector<int64_t> outerDimsPerm(packOp.getOuterDimsPerm());
+    SmallVector<OpFoldResult> newMixedOffsets(insertSliceOp.getMixedOffsets());
+    SmallVector<OpFoldResult> newMixedSizes(insertSliceOp.getMixedSizes());
+    SmallVector<OpFoldResult> newMixedStrides(insertSliceOp.getMixedStrides());
+
+    if (failed(getPackedSliceMetadata(rewriter, loc, mixedTiles, innerDimsPos,
+                                      outerDimsPerm, rankReducingMask,
+                                      newMixedOffsets, newMixedSizes,
+                                      newMixedStrides))) {
+      return failure();
+    }
+
+    FailureOr<Value> packedSlice =
+        packSliceOfTensor(rewriter, insertSliceOp.getSource(), newMixedSizes,
+                          rankReducingMask, packOp);
+    if (failed(packedSlice)) {
+      return rewriter.notifyMatchFailure(packOp,
+                                         "failed to pack insert_slice source");
+    }
+
+    // Pack the insert_slice dest
+    Value newDest;
+    if (insertSliceOp.getDest().getDefiningOp<tensor::EmptyOp>()) {
+      newDest = tensor::PackOp::createDestinationTensor(
+          rewriter, loc, insertSliceOp.getDest(), mixedTiles, innerDimsPos,
+          outerDimsPerm);
+    } else {
+      newDest = rewriter.create<tensor::PackOp>(
+          loc, insertSliceOp.getDest(), packOpDest, innerDimsPos, mixedTiles,
+          packOp.getPaddingValue(), outerDimsPerm);
+    }
+
+    // Create the packed InsertSliceOp, and replace the pack.
+    Value packedInsertOp = rewriter.create<tensor::InsertSliceOp>(
+        loc, packedSlice.value(), newDest, newMixedOffsets, newMixedSizes,
+        newMixedStrides);
+    rewriter.replaceOp(packOp, packedInsertOp);
+
+    // Replace all other uses of the old InsertSliceOp with an UnPackOp on the
+    // packed InsertSliceOp. This should fold later with a PackOp.
+    auto unpackDest = tensor::UnPackOp::createDestinationTensor(
+        rewriter, loc, packedInsertOp, mixedTiles, innerDimsPos, outerDimsPerm);
+    rewriter.replaceOpWithNewOp<tensor::UnPackOp>(insertSliceOp, packedInsertOp,
+                                                  unpackDest, innerDimsPos,
+                                                  mixedTiles, outerDimsPerm);
+    return success();
+  }
+};
+
 class BubbleUpTensorExtractSliceThroughUnPack final
     : public OpRewritePattern<tensor::ExtractSliceOp> {
 public:
@@ -758,6 +847,7 @@ void PropagateDataLayoutPass::runOnOperation() {
   {
     MLIRContext *context = &getContext();
     RewritePatternSet propagationPatterns(context);
+    propagationPatterns.insert<BubbleUpPackThroughTensorInsertSlice>(context);
     propagationPatterns.insert<BubbleUpTensorExtractSliceThroughUnPack>(
         context);
     propagationPatterns.insert<FoldCancellingPackUnPackOps>(context);

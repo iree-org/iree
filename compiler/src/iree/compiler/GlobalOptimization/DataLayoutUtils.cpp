@@ -132,6 +132,43 @@ bool DataLayoutTransformation::isIdentity() {
 // DataLayoutTransformation transform implementations
 //===----------------------------------------------------------------------===//
 
+bool transformThroughOperation(tensor::InsertSliceOp insertOp,
+                               DataLayoutTransformation &transform,
+                               Value currentValue, Value newValue) {
+  Value dest = insertOp.getDest();
+  // If transform is dest->result or result->dest, no transform is needed.
+  // dest->source or source->dest is not handled here..
+  if (currentValue == dest || newValue == dest) {
+    return true;
+  }
+  bool isRankExtending = (newValue == insertOp.getResult() &&
+                          currentValue == insertOp.getSource());
+  bool isRankReducing = (currentValue == insertOp.getResult() &&
+                         newValue == insertOp.getSource());
+  auto originalShape = insertOp.getStaticSizes();
+  auto reducedShape = insertOp.getSourceType().getShape();
+  std::optional<llvm::SmallDenseSet<unsigned>> maybeRankReducingMask =
+      mlir::computeRankReductionMask(originalShape, reducedShape);
+  if (!maybeRankReducingMask) {
+    return false;
+  }
+  SmallVector<int64_t> currentCTf =
+      transform.getCorrespondingTransformedIndices();
+  SmallVector<int64_t> newCTf;
+  int64_t cTfInd = 0;
+  for (int64_t destIdx = 0; destIdx < originalShape.size(); destIdx++) {
+    if (!maybeRankReducingMask->count(destIdx)) {
+      newCTf.push_back(currentCTf[cTfInd++]);
+    } else if (isRankExtending) {
+      newCTf.push_back(-1);
+    } else if (isRankReducing) {
+      cTfInd++;
+    }
+  }
+  transform.setCorrespondingTransformedIndices(newCTf);
+  return true;
+}
+
 /// Compute the transformation through a tensor::ExtractSliceOp. `currentValue`
 /// can be the source or result of the `extractOp`. No transformation is needed
 /// other than rank reducing cases. For rank reductions, update the `transform`
@@ -256,6 +293,10 @@ bool transformThroughOperation(tensor::PackOp packOp,
 bool DataLayoutTransformation::transform(Operation *op, Value currentValue,
                                          Value newValue) {
   return TypeSwitch<Operation *, bool>(op)
+      .Case<tensor::InsertSliceOp>([&](tensor::InsertSliceOp insertOp) {
+        return transformThroughOperation(insertOp, *this, currentValue,
+                                         newValue);
+      })
       .Case<tensor::PackOp>([&](tensor::PackOp packOp) {
         return transformThroughOperation(packOp, *this, currentValue, newValue);
       })
@@ -301,8 +342,8 @@ SmallVector<StringRef> getTerminalNodeIDs(Value value) {
 
 /// Return true if the op can assume any possible DataLayoutTransformation.
 static bool isLayoutFlexibleOp(Operation *op) {
-  return isa<tensor::ExtractSliceOp, IREE::Util::GlobalStoreOp,
-             IREE::Util::GlobalLoadOp>(op);
+  return isa<tensor::InsertSliceOp, tensor::ExtractSliceOp,
+             IREE::Util::GlobalStoreOp, IREE::Util::GlobalLoadOp>(op);
 }
 
 /// Return true if the op defines a DataLayoutTransformation.
@@ -609,6 +650,53 @@ RankedTensorType getPackedSliceType(
   SmallVector<int64_t> packedSliceShape(
       expandedShape.begin() + firstNonReducedIdx.value(), expandedShape.end());
   return packedSourceType.clone(packedSliceShape);
+}
+
+FailureOr<Value>
+packSliceOfTensor(PatternRewriter &rewriter, Value slice,
+                  SmallVector<OpFoldResult> sliceSizes,
+                  llvm::SmallDenseSet<unsigned> rankReductionMask,
+                  tensor::PackOp packOp) {
+  SmallVector<OpFoldResult> sliceInnerTiles;
+  SmallVector<int64_t> sliceInnerDimsPos;
+  SmallVector<int64_t> sliceOuterDimsPerm;
+  // The slice may not fill the full innerTiles, so use the actual packed slice
+  // sizes instead of the packOp innerTiles.
+  SmallVector<OpFoldResult> slicedTileSizes(
+      sliceSizes.begin() + packOp.getSourceRank(), sliceSizes.end());
+  getRankReducedPackInfo(rankReductionMask, slicedTileSizes,
+                         packOp.getInnerDimsPos(), packOp.getOuterDimsPerm(),
+                         sliceInnerTiles, sliceInnerDimsPos,
+                         sliceOuterDimsPerm);
+
+  // Pack the slice.
+  Location loc = slice.getLoc();
+  auto empty = tensor::PackOp::createDestinationTensor(
+      rewriter, loc, slice, sliceInnerTiles, sliceInnerDimsPos,
+      sliceOuterDimsPerm);
+  auto pack = rewriter.create<tensor::PackOp>(
+      loc, slice, empty, sliceInnerDimsPos, sliceInnerTiles,
+      packOp.getPaddingValue(), sliceOuterDimsPerm);
+  Value packedSlice = pack.getResult();
+  setFoldablePackUnPackAttribute(pack);
+
+  // Reshape the packed slice to fit into the full rank tensor.
+  RankedTensorType expandedType =
+      getPackedSliceType(packOp.getDestType(), sliceSizes, rankReductionMask,
+                         packOp.getOuterDimsPerm(), packOp.getInnerDimsPos());
+  auto packedSliceType = cast<ShapedType>(packedSlice.getType());
+  if (llvm::equal(expandedType.getShape(), packedSliceType.getShape())) {
+    return packedSlice;
+  }
+  auto reInds =
+      getReassociationIndicesForReshape(packedSliceType, expandedType);
+  if (!reInds) {
+    return failure();
+  }
+  return rewriter
+      .create<tensor::ExpandShapeOp>(loc, expandedType, packedSlice,
+                                     reInds.value())
+      .getResult();
 }
 
 FailureOr<Value>
