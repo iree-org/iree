@@ -119,7 +119,7 @@ jobs:
             "${BUILD_E2E_TEST_ARTIFACTS_DIR}"
       - name: "Uploading e2e test artifacts"
         id: upload
-        if: always()
+        if: ${{ !cancelled() }}
         env:
           E2E_TEST_ARTIFACTS_DIR: ${{ steps.build.outputs.e2e-test-artifacts-dir }}
           E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR: ${{ env.GCS_DIR }}/e2e-test-artifacts
