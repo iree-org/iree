@@ -25,29 +25,6 @@
 namespace mlir::iree_compiler::IREE::Stream {
 
 //===----------------------------------------------------------------------===//
-// Access utilities
-//===----------------------------------------------------------------------===//
-
-// TODO(#6972): move to StreamTypes.h.
-
-static bool isReadOnly(ResourceAccessBitfield access) {
-  return access == ResourceAccessBitfield::Read;
-}
-
-static bool doesRangeOverlap(AsyncAccessRange &lhs, AsyncAccessRange &rhs) {
-  if (lhs.resource != rhs.resource)
-    return false;
-
-  if (lhs.end == rhs.start || lhs.start == rhs.end) {
-    // Adjacent but not overlapping.
-    return false;
-  }
-
-  // TODO(#6972): use adjacency tracking sets to handle out-of-order ranges.
-  return true;
-}
-
-//===----------------------------------------------------------------------===//
 // Hazard analysis
 //===----------------------------------------------------------------------===//
 
@@ -87,16 +64,8 @@ bool ResourceHazardAnalysis::hasHazard(Operation *producerOp,
     llvm::interleave(
         allProducerRanges, llvm::dbgs(),
         [&](auto range) {
-          llvm::dbgs() << "  " << stringifyResourceAccessBitfield(range.access)
-                       << " ";
-          range.resource.printAsOperand(llvm::dbgs(), *asmState);
-          llvm::dbgs() << "[";
-          range.start.printAsOperand(llvm::dbgs(), *asmState);
-          llvm::dbgs() << " to ";
-          range.end.printAsOperand(llvm::dbgs(), *asmState);
-          llvm::dbgs() << " for ";
-          range.length.printAsOperand(llvm::dbgs(), *asmState);
-          llvm::dbgs() << "]";
+          llvm::dbgs() << "  ";
+          range.print(llvm::dbgs(), *asmState);
         },
         "\n");
     llvm::dbgs() << "\n";
@@ -106,16 +75,8 @@ bool ResourceHazardAnalysis::hasHazard(Operation *producerOp,
     llvm::interleave(
         allConsumerRanges, llvm::dbgs(),
         [&](auto range) {
-          llvm::dbgs() << "  " << stringifyResourceAccessBitfield(range.access)
-                       << " ";
-          range.resource.printAsOperand(llvm::dbgs(), *asmState);
-          llvm::dbgs() << "[";
-          range.start.printAsOperand(llvm::dbgs(), *asmState);
-          llvm::dbgs() << " to ";
-          range.end.printAsOperand(llvm::dbgs(), *asmState);
-          llvm::dbgs() << " for ";
-          range.length.printAsOperand(llvm::dbgs(), *asmState);
-          llvm::dbgs() << "]";
+          llvm::dbgs() << "  ";
+          range.print(llvm::dbgs(), *asmState);
         },
         "\n");
     llvm::dbgs() << "\n";
@@ -124,12 +85,15 @@ bool ResourceHazardAnalysis::hasHazard(Operation *producerOp,
   for (auto &producerRange : allProducerRanges) {
     for (auto &consumerRange : allConsumerRanges) {
       if (producerRange.resource == consumerRange.resource) {
-        if (!doesRangeOverlap(producerRange, consumerRange)) {
+        // TODO(#6972): use adjacency tracking sets to handle out-of-order
+        // ranges. The basic overlap check only handles perfectly adjacent
+        // ranges.
+        if (!IREE::Stream::AsyncAccessRange::mayOverlap(producerRange,
+                                                        consumerRange)) {
           // No overlap - no hazard.
           continue;
         }
-        if (isReadOnly(producerRange.access) &&
-            isReadOnly(consumerRange.access)) {
+        if (producerRange.isReadOnly() && consumerRange.isReadOnly()) {
           // Read-read is not a hazard.
           continue;
         }
