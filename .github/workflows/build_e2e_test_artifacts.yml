@@ -130,7 +130,8 @@ jobs:
           # from GCS and they won't change. We can upload links instead of files
           # to save space.
           # Uploads all artifacts except for the `*.tflite`, which are the
-          # source models we imported into MLIR.
+          # source models we imported into MLIR, and empty directories (GCS
+          # doesn't accept them).
           # Not archiving the directory to allow fetching each file as needed
           # separately. `find` depth is limited at 1 to exclude the directory
           # itself and list all files and subdirectories at the first level. Let
