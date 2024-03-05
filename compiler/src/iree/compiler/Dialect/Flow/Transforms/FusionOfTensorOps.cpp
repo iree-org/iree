@@ -404,15 +404,15 @@ struct FusionOfTensorOpsPass
                                   linalg::isParallelIterator);
             }
 
-            // Do not fuse with other producer or consumer linalg ops if they
-            // have any reduction iterators.
-            if (auto producerLinalgOp = dyn_cast<linalg::LinalgOp>(producer)) {
-              return llvm::all_of(producerLinalgOp.getIteratorTypesArray(),
-                                  linalg::isParallelIterator);
+            // Do not fuse with any producer linalg named ops for now.
+            if (isa<linalg::LinalgOp>(producer)) {
+              return false;
             }
 
+            // Do not fuse with consumer linalg named ops or reductions.
             if (auto consumerLinalgOp = dyn_cast<linalg::LinalgOp>(consumer)) {
-              return llvm::all_of(consumerLinalgOp.getIteratorTypesArray(),
+              return isa<linalg::GenericOp>(consumerLinalgOp) &&
+                     llvm::all_of(consumerLinalgOp.getIteratorTypesArray(),
                                   linalg::isParallelIterator);
             }
             // Fuse in all other cases.
