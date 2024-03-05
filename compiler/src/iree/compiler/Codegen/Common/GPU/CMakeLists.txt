@@ -79,7 +79,9 @@ iree_cc_library(
     MLIRAffineDialect
     MLIRAffineTransforms
     MLIRAffineUtils
+    MLIRAnalysis
     MLIRArithDialect
+    MLIRArithUtils
     MLIRBufferizationDialect
     MLIRDestinationStyleOpInterface
     MLIRFuncDialect
@@ -103,6 +105,7 @@ iree_cc_library(
     MLIRSideEffectInterfaces
     MLIRSupport
     MLIRTensorDialect
+    MLIRTensorTransforms
     MLIRTransforms
     MLIRVectorDialect
     MLIRVectorToSCF
