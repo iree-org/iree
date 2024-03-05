@@ -39,13 +39,17 @@ using MaterializeEncodingValueFn =
 
 /// TypeConverter to use for materializing the encoding.
 struct MaterializeEncodingTypeConverter : public TypeConverter {
-  MaterializeEncodingTypeConverter(MaterializeEncodingFn fn);
+  MaterializeEncodingTypeConverter(MaterializeEncodingFn fn,
+                                   bool transposeNarrowN);
   const MaterializeEncodingFn &getMaterializeEncodingFn() const {
     return materializeEncodingFn;
   }
 
+  bool getTransposeNarrowN() const { return transposeNarrowN; }
+
 private:
   const MaterializeEncodingFn materializeEncodingFn;
+  bool transposeNarrowN;
 };
 
 /// Conversion target to use for for materializing the encoding.
@@ -107,6 +111,10 @@ void populateMaterializeEncodingIntoPackUnPackPatterns(
 
 void populateMaterializeUpperBoundTileSizePatterns(
     RewritePatternSet &patterns, MaterializeEncodingFn materializeEncodingFn);
+
+// Returns true of `encoding` represents a narrow-N matmul RESULT, e.g. the
+// result of a matvec.
+bool isNarrowNResult(IREE::LinalgExt::EncodingAttr encoding);
 
 } // namespace mlir::iree_compiler
 

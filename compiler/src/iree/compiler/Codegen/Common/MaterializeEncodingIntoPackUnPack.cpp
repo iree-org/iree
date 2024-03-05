@@ -19,6 +19,7 @@
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -143,7 +144,7 @@ static Value createElementWiseExtUIOp(RewriterBase &rewriter, Value input,
 /// create a producer Linalg::GenericOp on the input that unsigned extends the
 /// input to the output element type. This extension is required to keep the
 /// unsignedness information on the input for ukernels.
-Value getMmt4dOperand(Value value, linalg::LinalgOp linalgOp,
+Value getMmt4dOperand(Value value, linalg::LinalgOp linalgOp, bool transpose,
                       RewriterBase &rewriter,
                       SmallVectorImpl<ReassociationIndices> &ri,
                       ArrayRef<Type> elemTypes, int operandIdx) {
@@ -159,7 +160,7 @@ Value getMmt4dOperand(Value value, linalg::LinalgOp linalgOp,
     auto type = value.getType().cast<RankedTensorType>();
     RankedTensorType newType = getExpandedType(
         type, /*isBatched=*/!cDims->batch.empty(),
-        /*isTransposed=*/operandIdx == 2 && cDims->n.empty(), ri);
+        /*isTransposed=*/operandIdx == 2 && (transpose ^ cDims->n.empty()), ri);
     expandedValue =
         rewriter.create<tensor::ExpandShapeOp>(loc, newType, value, ri);
   }
@@ -168,6 +169,22 @@ Value getMmt4dOperand(Value value, linalg::LinalgOp linalgOp,
                                     elemTypes.back());
   }
   return expandedValue;
+}
+
+static void transposeInPlace(MaterializeEncodingInfo &info) {
+  // Vector cases: nothing to do.
+  if (info.innerTileSizes.size() < 2) {
+    return;
+  }
+  // Not a vector case, so all three arrays in `info` have size at least 2,
+  // outerDimsPerm may have size 3 if there is a batch dimension, but in all
+  // cases, the last 2 entries of each array are M and N, not batch.
+  auto transpose = [](SmallVector<int64_t> &a) {
+    std::swap(a[a.size() - 2], a[a.size() - 1]);
+  };
+  transpose(info.innerDimsPos);
+  transpose(info.innerTileSizes);
+  transpose(info.outerDimsPerm);
 }
 
 //===---------------------------------------------------------------------===//
@@ -199,12 +216,20 @@ static std::optional<Value> getPaddingValue(Value &source) {
 static FailureOr<tensor::PackOp> lowerSetEncodingOpToPackOp(
     RewriterBase &rewriter, SetEncodingOp encodingOp, Value source,
     MaterializeEncodingFn materializeEncodingFn,
-    MaterializeEncodingValueFn materializeEncodingValueFn) {
+    MaterializeEncodingValueFn materializeEncodingValueFn,
+    bool transposeNarrowN) {
   RankedTensorType resultType = encodingOp.getResultType();
+  auto encoding = getEncodingAttr(resultType);
+  if (!encoding) {
+    return failure();
+  }
   FailureOr<MaterializeEncodingInfo> materializeEncodingInfo =
       materializeEncodingFn(resultType);
   if (failed(materializeEncodingInfo)) {
     return rewriter.notifyMatchFailure(encodingOp, "unhandled result encoding");
+  }
+  if (transposeNarrowN && isNarrowNResult(encoding)) {
+    transposeInPlace(*materializeEncodingInfo);
   }
   // Create `tensor.empty` operation for the result of the pack operation.
   Location loc = encodingOp.getLoc();
@@ -214,10 +239,6 @@ static FailureOr<tensor::PackOp> lowerSetEncodingOpToPackOp(
   if (failed(innerTileSizesOfr)) {
     return rewriter.notifyMatchFailure(
         encodingOp, "failed to generate runtime tile size query");
-  }
-  auto encoding = getEncodingAttr(resultType);
-  if (!encoding) {
-    return failure();
   }
   std::optional<Value> paddingValue = getPaddingValue(source);
   SmallVector<OpFoldResult> sourceDims =
@@ -239,12 +260,16 @@ static FailureOr<tensor::PackOp> lowerSetEncodingOpToPackOp(
 static FailureOr<tensor::UnPackOp> lowerUnsetEncodingToUnpackOp(
     RewriterBase &rewriter, UnsetEncodingOp encodingOp, Value packedValue,
     MaterializeEncodingFn materializeEncodingFn,
-    MaterializeEncodingValueFn materializeEncodingValueFn) {
+    MaterializeEncodingValueFn materializeEncodingValueFn,
+    bool transposeNarrowN) {
   RankedTensorType sourceType = encodingOp.getSourceType();
   FailureOr<MaterializeEncodingInfo> materializeEncodingInfo =
       materializeEncodingFn(sourceType);
   if (failed(materializeEncodingInfo)) {
     return rewriter.notifyMatchFailure(encodingOp, "unhandled source encoding");
+  }
+  if (transposeNarrowN && isNarrowNResult(getEncodingAttr(sourceType))) {
+    transposeInPlace(*materializeEncodingInfo);
   }
   // Create an `tensor.empty` for the result of the unpack operation.
   Location loc = encodingOp.getLoc();
@@ -295,10 +320,9 @@ static FailureOr<SmallVector<Value>> lowerUpperBoundTileSizeOpToConstants(
   return results;
 }
 
-static FailureOr<Operation *>
-lowerContractionOpWithEncoding(RewriterBase &rewriter,
-                               linalg::LinalgOp linalgOp, ValueRange operands,
-                               MaterializeEncodingFn materializeEncodingFn) {
+static FailureOr<Operation *> lowerContractionOpWithEncoding(
+    RewriterBase &rewriter, linalg::LinalgOp linalgOp, ValueRange operands,
+    MaterializeEncodingFn materializeEncodingFn, bool transposeNarrowN) {
   if (!linalgOp.hasPureTensorSemantics())
     return failure();
 
@@ -334,22 +358,22 @@ lowerContractionOpWithEncoding(RewriterBase &rewriter,
                                     operands.take_front(inputs.size()),
                                     operands.drop_front(inputs.size()));
   } else {
+    bool transpose = transposeNarrowN && isNarrowNResult(resultEncoding);
     auto elemTypes = llvm::map_to_vector(
         lhsEncoding.getElementTypes().getValue(),
         [](Attribute a) { return a.cast<TypeAttr>().getValue(); });
     SmallVector<ReassociationIndices> ri;
-    Value newLhs =
-        getMmt4dOperand(operands[0], linalgOp, rewriter, ri, elemTypes,
-                        /*operandIdx=*/0);
-    Value newRhs =
-        getMmt4dOperand(operands[1], linalgOp, rewriter, ri, elemTypes,
-                        /*operandIdx=*/1);
+    Value newLhs = getMmt4dOperand(operands[0], linalgOp, transpose, rewriter,
+                                   ri, elemTypes, /*operandIdx=*/0);
+    Value newRhs = getMmt4dOperand(operands[1], linalgOp, transpose, rewriter,
+                                   ri, elemTypes, /*operandIdx=*/1);
     Value newResult =
-        getMmt4dOperand(operands[2], linalgOp, rewriter, ri, elemTypes,
-                        /*operandIdx=*/2);
-
+        getMmt4dOperand(operands[2], linalgOp, transpose, rewriter, ri,
+                        elemTypes, /*operandIdx=*/2);
+    if (transpose) {
+      std::swap(newLhs, newRhs);
+    }
     Type newResultType = newResult.getType();
-
     auto cDims = getEncodingContractionDims(lhsEncoding);
     if (cDims->batch.empty()) {
       result = rewriter.create<linalg::Mmt4DOp>(
@@ -374,7 +398,8 @@ static FailureOr<Operation *>
 lowerOpWithEncoding(RewriterBase &rewriter, tensor::EmptyOp emptyOp,
                     ValueRange convertedOperands,
                     MaterializeEncodingFn materializeEncodingFn,
-                    MaterializeEncodingValueFn materializeEncodingValueFn) {
+                    MaterializeEncodingValueFn materializeEncodingValueFn,
+                    bool transposeNarrowN) {
   auto emptyType = emptyOp->getResultTypes()[0].cast<RankedTensorType>();
   auto resultType =
       getOriginalTypeWithEncoding(emptyType).clone(emptyType.getElementType());
@@ -386,7 +411,9 @@ lowerOpWithEncoding(RewriterBase &rewriter, tensor::EmptyOp emptyOp,
         loc, emptyOp.getMixedSizes(), resultType.getElementType());
     return newEmptyOp;
   }
-
+  if (transposeNarrowN && isNarrowNResult(getEncodingAttr(emptyType))) {
+    transposeInPlace(*materializeEncodingInfo);
+  }
   FailureOr<SmallVector<OpFoldResult>> innerTileSizesOfr =
       getInnerTileSizesOfr(rewriter, loc, resultType, *materializeEncodingInfo,
                            materializeEncodingValueFn);
@@ -402,7 +429,6 @@ lowerOpWithEncoding(RewriterBase &rewriter, tensor::EmptyOp emptyOp,
                              materializeEncodingInfo->outerDimsPerm);
   Operation *newEmptyOp = rewriter.create<tensor::EmptyOp>(
       loc, newShape, resultType.getElementType());
-
   return newEmptyOp;
 }
 
@@ -412,18 +438,20 @@ lowerOpWithEncoding(RewriterBase &rewriter, tensor::EmptyOp emptyOp,
 ///  - linalg::LinalgOp that `isaContractionOpInterface`
 ///  - linalg::FillOp
 ///  - element-wise linalg::GenericOp with single input and output
-static FailureOr<Operation *> lowerOpWithEncoding(
-    RewriterBase &rewriter, linalg::LinalgOp linalgOp,
-    ValueRange convertedInputOperands, ValueRange convertedOutputOperands,
-    MaterializeEncodingFn materializeEncodingFn, MaterializeEncodingValueFn) {
+static FailureOr<Operation *>
+lowerOpWithEncoding(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
+                    ValueRange convertedInputOperands,
+                    ValueRange convertedOutputOperands,
+                    MaterializeEncodingFn materializeEncodingFn,
+                    MaterializeEncodingValueFn, bool transposeNarrowN) {
   if (linalg::isaContractionOpInterface(linalgOp)) {
     SmallVector<Value> operands;
     operands.append(convertedInputOperands.begin(),
                     convertedInputOperands.end());
     operands.append(convertedOutputOperands.begin(),
                     convertedOutputOperands.end());
-    return lowerContractionOpWithEncoding(rewriter, linalgOp, operands,
-                                          materializeEncodingFn);
+    return lowerContractionOpWithEncoding(
+        rewriter, linalgOp, operands, materializeEncodingFn, transposeNarrowN);
   }
 
   return TypeSwitch<Operation *, FailureOr<Operation *>>(linalgOp)
@@ -704,13 +732,13 @@ struct SetEncodingOpToPackOpConversion
   LogicalResult
   matchAndRewrite(SetEncodingOp encodingOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
+    auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
+        getTypeConverter());
     MaterializeEncodingFn materializeEncodingFn =
-        static_cast<const MaterializeEncodingTypeConverter *>(
-            getTypeConverter())
-            ->getMaterializeEncodingFn();
+        converter->getMaterializeEncodingFn();
     auto packOp = lowerSetEncodingOpToPackOp(
         rewriter, encodingOp, adaptor.getSource(), materializeEncodingFn,
-        this->materializeEncodingValueFn);
+        this->materializeEncodingValueFn, converter->getTransposeNarrowN());
     if (failed(packOp)) {
       Value result = adaptor.getSource();
       Type targetType =
@@ -736,13 +764,13 @@ struct UnsetEncodingOpToUnPackOpConversion
   LogicalResult
   matchAndRewrite(UnsetEncodingOp encodingOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
+    auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
+        this->getTypeConverter());
     MaterializeEncodingFn materializeEncodingFn =
-        static_cast<const MaterializeEncodingTypeConverter *>(
-            this->getTypeConverter())
-            ->getMaterializeEncodingFn();
+        converter->getMaterializeEncodingFn();
     auto unpackOp = lowerUnsetEncodingToUnpackOp(
         rewriter, encodingOp, adaptor.getSource(), materializeEncodingFn,
-        this->materializeEncodingValueFn);
+        this->materializeEncodingValueFn, converter->getTransposeNarrowN());
     if (failed(unpackOp)) {
       Value result = adaptor.getSource();
       Type targetType =
@@ -796,13 +824,14 @@ struct MaterializeDPSOperation : public OpMaterializeEncodingPattern<OpTy> {
   LogicalResult
   matchAndRewrite(OpTy dpsOp, typename OpTy::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
+    auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
+        this->getTypeConverter());
     MaterializeEncodingFn materializeEncodingFn =
-        static_cast<const MaterializeEncodingTypeConverter *>(
-            this->getTypeConverter())
-            ->getMaterializeEncodingFn();
+        converter->getMaterializeEncodingFn();
     FailureOr<Operation *> convertedOp = lowerOpWithEncoding(
         rewriter, dpsOp, adaptor.getInputs(), adaptor.getOutputs(),
-        materializeEncodingFn, this->materializeEncodingValueFn);
+        materializeEncodingFn, this->materializeEncodingValueFn,
+        converter->getTransposeNarrowN());
     if (failed(convertedOp)) {
       return failure();
     }
@@ -819,13 +848,13 @@ struct MaterializeOperation : public OpMaterializeEncodingPattern<OpTy> {
   LogicalResult
   matchAndRewrite(OpTy op, typename OpTy::Adaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
+    auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
+        this->getTypeConverter());
     MaterializeEncodingFn materializeEncodingFn =
-        static_cast<const MaterializeEncodingTypeConverter *>(
-            this->getTypeConverter())
-            ->getMaterializeEncodingFn();
+        converter->getMaterializeEncodingFn();
     FailureOr<Operation *> convertedOp = lowerOpWithEncoding(
         rewriter, op, adaptor.getOperands(), materializeEncodingFn,
-        this->materializeEncodingValueFn);
+        this->materializeEncodingValueFn, converter->getTransposeNarrowN());
     if (failed(convertedOp))
       return failure();
 
@@ -862,17 +891,18 @@ public:
   matchAndRewrite(mlir::linalg::ContractionOpInterface op,
                   ArrayRef<Value> operands,
                   ConversionPatternRewriter &rewriter) const override {
+    auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
+        this->getTypeConverter());
     MaterializeEncodingFn materializeEncodingFn =
-        static_cast<const MaterializeEncodingTypeConverter *>(
-            this->getTypeConverter())
-            ->getMaterializeEncodingFn();
+        converter->getMaterializeEncodingFn();
     auto linalgOp = dyn_cast<linalg::LinalgOp>(op.getOperation());
     if (!linalgOp || operands.size() != 3) {
       return failure();
     }
     FailureOr<Operation *> convertedOp = lowerOpWithEncoding(
         rewriter, linalgOp, operands.take_front(2), operands.take_back(1),
-        materializeEncodingFn, this->materializeEncodingValueFn);
+        materializeEncodingFn, this->materializeEncodingValueFn,
+        converter->getTransposeNarrowN());
     if (failed(convertedOp)) {
       return failure();
     }

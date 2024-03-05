@@ -41,7 +41,8 @@ struct MaterializeEncodingIntoNopPass
     };
 
     RewritePatternSet materializeEncodingPattern(context);
-    MaterializeEncodingTypeConverter typeConverter(materializeEncodingFn);
+    MaterializeEncodingTypeConverter typeConverter(materializeEncodingFn,
+                                                   false);
     MaterializeEncodingConversionTarget target(*context);
     populateMaterializeEncodingIntoPackUnPackPatterns(
         materializeEncodingPattern, target, typeConverter,
