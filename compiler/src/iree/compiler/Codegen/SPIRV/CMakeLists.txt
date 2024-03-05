@@ -56,7 +56,6 @@ iree_cc_library(
     "Passes.cpp"
     "SPIRVAnnotateWinogradLoops.cpp"
     "SPIRVBreakDownLargeVector.cpp"
-    "SPIRVCreateFastSlowPath.cpp"
     "SPIRVDistribute.cpp"
     "SPIRVEmulateI64.cpp"
     "SPIRVEraseStorageBufferStaticShape.cpp"

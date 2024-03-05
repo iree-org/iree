@@ -35,12 +35,6 @@ def SPIRVBreakDownLargeVector : InterfacePass<"iree-spirv-breakdown-large-vector
   let constructor = "mlir::iree_compiler::createSPIRVBreakDownLargeVectorPass()";
 }
 
-def SPIRVCreateFastSlowPath :
-    InterfacePass<"iree-spirv-create-fast-slow-path", "mlir::FunctionOpInterface"> {
-  let summary = "Create separate fast and slow paths to handle padding";
-  let constructor = "mlir::iree_compiler::createSPIRVCreateFastSlowPathPass()";
-}
-
 def SPIRVDistribute : InterfacePass<"iree-spirv-distribute", "mlir::FunctionOpInterface"> {
   let summary = "Distribute tiled loop nests to invocations";
   let constructor = "mlir::iree_compiler::createSPIRVDistributePass()";

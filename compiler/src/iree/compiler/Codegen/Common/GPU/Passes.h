@@ -77,6 +77,13 @@ std::unique_ptr<OperationPass<ModuleOp>> createGPUCheckResourceUsagePass(
     std::function<unsigned(mlir::FunctionOpInterface)> getIndexBitwidth =
         nullptr);
 
+// Uses `tensor.pad` ops as anchors to create separate fast and slow paths
+// inside the kernel. The fast path is for inner tiles where we don't need
+// padding, while the slow path is for boundary tiles where we do need
+// padding.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createGPUCreateFastSlowPathPass();
+
 /// Creates a pass to distribute scf.forall ops to GPU processors.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>> createGPUDistribute();
 

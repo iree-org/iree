@@ -13,8 +13,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Codegen/SPIRV/PassDetail.h"
-#include "iree/compiler/Codegen/SPIRV/Passes.h"
+#include "iree/compiler/Codegen/Common/GPU/PassDetail.h"
+#include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/SliceAnalysis.h"
@@ -129,8 +129,8 @@ static void applyFastSlowPathConversion(mlir::FunctionOpInterface funcOp) {
 
 namespace {
 
-struct SPIRVCreateFastSlowPathPass final
-    : public SPIRVCreateFastSlowPathBase<SPIRVCreateFastSlowPathPass> {
+struct GPUCreateFastSlowPathPass final
+    : public GPUCreateFastSlowPathBase<GPUCreateFastSlowPathPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<scf::SCFDialect>();
   }
@@ -155,8 +155,8 @@ struct SPIRVCreateFastSlowPathPass final
 } // namespace
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createSPIRVCreateFastSlowPathPass() {
-  return std::make_unique<SPIRVCreateFastSlowPathPass>();
+createGPUCreateFastSlowPathPass() {
+  return std::make_unique<GPUCreateFastSlowPathPass>();
 }
 
 } // namespace mlir::iree_compiler
