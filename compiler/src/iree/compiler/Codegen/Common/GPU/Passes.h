@@ -140,11 +140,6 @@ createWorkgroupSpecializationPass();
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createWorkGroupSwizzle(unsigned swizzleLogTile = 0);
 
-// This pass generalizes named Linalg convolution and contraction ops to allow
-// for better folding of unit dimensions.
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createGPUGeneralizeNamedConvolutionAndContractionOpsPass();
-
 // This pass generalizes named Linalg ops that are better off as generics.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createGPUGeneralizeNamedOpsPass();
