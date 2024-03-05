@@ -51,6 +51,7 @@ iree_compiler_cc_library(
     srcs = [
         "AMDGPUDistributeContract.cpp",
         "GPUCheckResourceUsage.cpp",
+        "GPUCreateFastSlowPath.cpp",
         "GPUDistribute.cpp",
         "GPUDistributeSharedMemoryCopy.cpp",
         "GPUDistributionPatterns.cpp",
