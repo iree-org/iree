@@ -67,6 +67,7 @@ iree_cc_library(
     "LLVMCPUTile.cpp"
     "LLVMCPUTileAndFuse.cpp"
     "LLVMCPUUnfuseFMAOps.cpp"
+    "LLVMCPUUnsupportedScalabilityToLoops.cpp"
     "LLVMCPUVectorShapeCastLowering.cpp"
     "LLVMCPUVectorTransferLowering.cpp"
     "LLVMCPUVectorTransposeLowering.cpp"

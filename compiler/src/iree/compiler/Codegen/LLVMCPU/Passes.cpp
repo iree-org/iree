@@ -393,6 +393,11 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
     }
   }
 
+  if (pipelineOpt.enableAArch64SSVE) {
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLLVMCPUUnsupportedScalabilityToLoopsPass());
+  }
+
   if (pipelineOpt.enablePeeling) {
     nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUPeelPass());
   }

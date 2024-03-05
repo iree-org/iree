@@ -67,6 +67,9 @@ createLLVMCPUSynchronizeSymbolVisibilityPass();
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUTileAndFusePass(int64_t tilingLevel = -1);
 
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createLLVMCPUUnsupportedScalabilityToLoopsPass();
+
 /// Pass to tile TilingInterface ops with given tilingLevel.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUTilePass(int64_t tilingLevel = -1);
