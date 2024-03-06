@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "compiler/plugins/input/TOSA/tosa-iree/InputConversion/PassDetail.h"
-#include "compiler/plugins/input/TOSA/tosa-iree/InputConversion/Passes.h"
+#include "compiler/plugins/input/TOSA/InputConversion/PassDetail.h"
+#include "compiler/plugins/input/TOSA/InputConversion/Passes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Transforms/DialectConversion.h"

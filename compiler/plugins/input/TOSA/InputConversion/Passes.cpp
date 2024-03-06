@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "compiler/plugins/input/TOSA/tosa-iree/InputConversion/Passes.h"
+#include "compiler/plugins/input/TOSA/InputConversion/Passes.h"
 
 #include "iree/compiler/InputConversion/Common/Passes.h"
 #include "mlir/Conversion/TosaToArith/TosaToArith.h"
@@ -79,7 +79,7 @@ void buildTOSAInputConversionPassPipeline(OpPassManager &passManager) {
 
 namespace {
 #define GEN_PASS_REGISTRATION
-#include "compiler/plugins/input/TOSA/tosa-iree/InputConversion/Passes.h.inc" // IWYU pragma: export
+#include "compiler/plugins/input/TOSA/InputConversion/Passes.h.inc" // IWYU pragma: export
 } // namespace
 
 void registerTOSAConversionPasses() {
