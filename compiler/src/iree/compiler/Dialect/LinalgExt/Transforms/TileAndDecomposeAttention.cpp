@@ -499,8 +499,9 @@ Value scaleQuery(Value querySlice, Value scale, RewriterBase &rewriter) {
       AffineMap::getMultiDimIdentityMap(2, rewriter.getContext());
   SmallVector<AffineMap> indexingMaps(2, identityMap);
   auto scaleOp = rewriter.create<linalg::GenericOp>(
-      loc, TypeRange{fillOp.getType()}, ValueRange{querySlice}, ValueRange{fillOp}, indexingMaps,
-      iteratorTypes, [&](OpBuilder &b, Location loc, ValueRange args) {
+      loc, TypeRange{fillOp.getType()}, ValueRange{querySlice},
+      ValueRange{fillOp}, indexingMaps, iteratorTypes,
+      [&](OpBuilder &b, Location loc, ValueRange args) {
         Value result = b.create<arith::MulFOp>(loc, args[0], args[1]);
         b.create<linalg::YieldOp>(loc, result);
       });
@@ -534,6 +535,8 @@ void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
       tileSize ? rewriter.getIndexAttr(tileSize.value()) : sequenceTileLength;
 
   querySlice = scaleQuery(querySlice, tiledAttnOp.getScale(), rewriter);
+  // Add scaled query.
+  ops.push_back(querySlice.getDefiningOp());
 
   Type elementType = tiledAttnOp.getQueryType().getElementType();
   auto [result, newMax, newSum] = createAttentionBody(
