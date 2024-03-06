@@ -95,13 +95,12 @@ private:
     indicateOptimisticFixpoint();
 
     LLVM_DEBUG({
-      AsmState asmState(value.getParentBlock()->getParentOp());
       llvm::dbgs() << "[elide-copies] initialized value last users for ";
-      value.printAsOperand(llvm::dbgs(), asmState);
+      value.printAsOperand(llvm::dbgs(), solver.getAsmState());
       llvm::dbgs() << ": " << getAssumedSet().size() << "\n";
       for (auto user : getAssumedSet()) {
         llvm::dbgs() << "  ";
-        user->print(llvm::dbgs(), OpPrintingFlags().elideLargeElementsAttrs());
+        user->print(llvm::dbgs(), solver.getAsmState());
         llvm::dbgs() << "\n";
       }
     });
@@ -289,9 +288,9 @@ const char ArgumentSemantics::ID = 0;
 // TODO(benvanik): change into something we can use for ref counting. We need
 // that to insert stream-ordered deallocs and know when timepoints have been
 // discard as they go out of scope. For now this strictly checks last use.
-class LastUseAnalysis {
+class ElisionAnalysis {
 public:
-  explicit LastUseAnalysis(Operation *rootOp)
+  explicit ElisionAnalysis(Operation *rootOp)
       : explorer(rootOp, TraversalAction::SHALLOW),
         solver(explorer, allocator) {
     explorer.setOpInterfaceAction<mlir::FunctionOpInterface>(
@@ -306,6 +305,8 @@ public:
     topLevelOps = llvm::to_vector(
         rootOp->getRegions().front().getOps<mlir::CallableOpInterface>());
   }
+
+  AsmState &getAsmState() { return solver.getAsmState(); }
 
   // Runs analysis and populates the state cache.
   // May fail if analysis cannot be completed due to unsupported or unknown IR.
@@ -359,6 +360,10 @@ private:
   SmallVector<mlir::CallableOpInterface> topLevelOps;
 };
 
+//===----------------------------------------------------------------------===//
+// IREE::Stream::AsyncCloneOp elision
+//===----------------------------------------------------------------------===//
+
 // Returns true if the given |operand| value does not need a copy on write.
 // This is a conservative check and will return false ("not safe to elide") in
 // many cases that otherwise don't need a copy. The
@@ -376,12 +381,11 @@ private:
 //   %0 ---> %1 = clone(%0) ---> use(%1)
 //      \--> %2 = clone(%0) ---> use(%2)  // last use of %0
 static bool isSafeToElideCloneOp(IREE::Stream::AsyncCloneOp cloneOp,
-                                 LastUseAnalysis &analysis) {
+                                 ElisionAnalysis &analysis) {
   LLVM_DEBUG({
     llvm::dbgs() << "isSafeToElideCloneOp:\n";
     llvm::dbgs() << "  ";
-    cloneOp.print(llvm::dbgs(),
-                  OpPrintingFlags().elideLargeElementsAttrs().assumeVerified());
+    cloneOp.print(llvm::dbgs(), analysis.getAsmState());
     llvm::dbgs() << "\n";
   });
 
@@ -395,7 +399,7 @@ static bool isSafeToElideCloneOp(IREE::Stream::AsyncCloneOp cloneOp,
   if (sourceType != targetType &&
       sourceType.getLifetime() == IREE::Stream::Lifetime::Constant) {
     LLVM_DEBUG(llvm::dbgs()
-               << "  + clone source is a constant; cannot elide\n");
+               << "  - clone source is a constant; cannot elide\n");
     return false;
   }
 
@@ -433,27 +437,227 @@ static bool isSafeToElideCloneOp(IREE::Stream::AsyncCloneOp cloneOp,
   return false;
 }
 
-// Tries to elide copies nested within |region| when safe.
-// Returns true if any ops were elided.
-static bool tryElideAsyncCopiesInRegion(Region &region,
-                                        LastUseAnalysis &analysis) {
-  bool didChange = false;
-  for (auto &block : region) {
-    for (auto cloneOp : llvm::make_early_inc_range(
-             block.getOps<IREE::Stream::AsyncCloneOp>())) {
-      if (!isSafeToElideCloneOp(cloneOp, analysis))
-        continue;
-      cloneOp.replaceAllUsesWith(cloneOp.getSource());
-      cloneOp.erase();
-      didChange = true;
+// Elides a stream.async.clone op by replacing all uses with the cloned source.
+static void elideCloneOp(IREE::Stream::AsyncCloneOp cloneOp) {
+  cloneOp.replaceAllUsesWith(cloneOp.getSource());
+  cloneOp.erase();
+}
+
+//===----------------------------------------------------------------------===//
+// IREE::Stream::AsyncSliceOp elision
+//===----------------------------------------------------------------------===//
+
+// Filter to slices that are supported by the folding code.
+static bool areSliceUsesSupported(IREE::Stream::AsyncSliceOp sliceOp) {
+  for (auto &use : sliceOp.getResult().getUses()) {
+    if (!TypeSwitch<Operation *, bool>(use.getOwner())
+             .Case<IREE::Stream::AsyncCopyOp>([&](auto copyOp) {
+               // Only support folding into source today.
+               return !copyOp.isOperandTied(use.getOperandNumber());
+             })
+             .Case<IREE::Stream::AsyncDispatchOp>([&](auto dispatchOp) {
+               // Only support folding into reads today.
+               return !dispatchOp.isOperandTied(use.getOperandNumber());
+             })
+             .Default([](auto *op) { return false; })) {
+      return false;
     }
   }
-  return didChange;
+  return true;
+}
+
+// Returns true if |sliceOp| is safe to elide.
+// This is only the case if the users are all supported ops.
+static bool isSafeToElideSliceOp(IREE::Stream::AsyncSliceOp sliceOp,
+                                 ElisionAnalysis &analysis) {
+  LLVM_DEBUG({
+    llvm::dbgs() << "isSafeToElideSliceOp:\n";
+    llvm::dbgs() << "  ";
+    sliceOp.print(llvm::dbgs(), analysis.getAsmState());
+    llvm::dbgs() << "\n";
+  });
+
+  // Ensure all uses are ones we can support.
+  if (!areSliceUsesSupported(sliceOp)) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "  - slice consumers not supported; cannot elide\n");
+    return false;
+  }
+
+  // Currently we don't analyze up a tied op chain and require the defining op
+  // to be the producer.
+  Value source = sliceOp.getSource();
+  Value sourceBase = IREE::Util::TiedOpInterface::findTiedBaseValue(source);
+  if (source != sourceBase) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "  - source is tied; cannot be elided (today)\n");
+    return false;
+  }
+
+  AsyncAccessRange sliceRange;
+  sliceRange.access = ResourceAccessBitfield::Read;
+  sliceRange.resource = source;
+  sliceRange.start = sliceOp.getSourceOffset();
+  sliceRange.end = sliceOp.getSourceEnd();
+  sliceRange.length = sliceOp.getResultSize();
+
+  // Gather all accesses of the source by all other ops (not the slice being
+  // inspected).
+  SmallVector<AsyncAccessRange> consumerRanges;
+  SmallVector<AsyncAccessRange> queryRanges;
+  for (auto user : source.getUsers()) {
+    if (user == sliceOp)
+      continue;
+    if (auto accessOp = dyn_cast<IREE::Stream::AsyncAccessOpInterface>(user)) {
+      // Async op consuming part of the resource. We can query it to see what
+      // it's doing to its operands/results and filter to just the accesses of
+      // the source value.
+      accessOp.getAsyncAccessRanges(queryRanges);
+      for (auto range : queryRanges) {
+        if (range.resource == source)
+          consumerRanges.push_back(range);
+      }
+      queryRanges.clear();
+    } else {
+      // Unknown user - for now we skip analysis. If we made the access range
+      // things elements in the solver we could traverse further.
+      LLVM_DEBUG({
+        llvm::dbgs()
+            << "  - analysis failure on unhandled user of slice source:\n";
+        user->print(llvm::dbgs(), analysis.getAsmState());
+      });
+      return false;
+    }
+  }
+
+  // If all other users don't overlap with the slice we can directly use the
+  // source resource.
+  for (auto &otherRange : consumerRanges) {
+    if (IREE::Stream::AsyncAccessRange::mayOverlap(sliceRange, otherRange)) {
+      // Potential overlap detected (or analysis failed) - if both are reads
+      // then we allow the elision (today) as there should be no hazard.
+      if (!otherRange.isReadOnly()) {
+        LLVM_DEBUG({
+          llvm::dbgs() << "  - consumer overlap, skipping elision today\n";
+          llvm::dbgs() << "    v slice ";
+          sliceRange.print(llvm::dbgs(), analysis.getAsmState());
+          llvm::dbgs() << "\n";
+          llvm::dbgs() << "    ^ conflict ";
+          otherRange.print(llvm::dbgs(), analysis.getAsmState());
+          llvm::dbgs() << "\n";
+        });
+        return false;
+      }
+    }
+  }
+
+  LLVM_DEBUG(llvm::dbgs() << "  + slice can (probably) be elided\n");
+  return true;
+}
+
+// arith.addi folders are terrible and don't handle adds of 0 so we handle that
+// here and then avoid doing the folding.
+static Value addOffset(Value lhs, Value rhs, OpBuilder &builder) {
+  if (matchPattern(lhs, m_Zero()))
+    return rhs;
+  if (matchPattern(rhs, m_Zero()))
+    return lhs;
+  return builder.createOrFold<arith::AddIOp>(
+      builder.getFusedLoc(lhs.getLoc(), rhs.getLoc()), lhs, rhs);
+}
+
+// TODO(benvanik): move these into patterns and use subview ops, maybe.
+// That would allow us to support a lot more op types but if we can't guarantee
+// a fold then we'd be left with unanalyzable subview ops. For now we handle the
+// cases we care about here.
+
+// Folds a stream.async.slice into a stream.async.copy source.
+static void foldSliceIntoCopy(IREE::Stream::AsyncSliceOp sliceOp,
+                              IREE::Stream::AsyncCopyOp copyOp,
+                              unsigned operandNumber) {
+  copyOp.getSourceMutable().set(sliceOp.getSource());
+  OpBuilder builder(copyOp);
+  copyOp.getSourceOffsetMutable().set(
+      addOffset(sliceOp.getSourceOffset(), copyOp.getSourceOffset(), builder));
+  copyOp.getSourceEndMutable().set(
+      addOffset(sliceOp.getSourceOffset(), copyOp.getSourceEnd(), builder));
+  copyOp.getSourceSizeMutable().set(sliceOp.getSourceSize());
+}
+
+// Folds a stream.async.slice into a stream.async.dispatch operand.
+static void foldSliceIntoDispatch(IREE::Stream::AsyncSliceOp sliceOp,
+                                  IREE::Stream::AsyncDispatchOp dispatchOp,
+                                  unsigned operandNumber) {
+  unsigned operandIndex =
+      operandNumber - dispatchOp.getTiedOperandsIndexAndLength().first;
+  dispatchOp.getResourceOperandsMutable()[operandIndex].set(
+      sliceOp.getSource());
+  unsigned resourceIndex = llvm::count_if(
+      dispatchOp.getResourceOperands().slice(0, operandIndex),
+      [](Value operand) {
+        return llvm::isa<IREE::Stream::ResourceType>(operand.getType());
+      });
+  OpBuilder builder(dispatchOp);
+  dispatchOp.getResourceOperandOffsetsMutable()[resourceIndex].set(addOffset(
+      sliceOp.getSourceOffset(),
+      dispatchOp.getResourceOperandOffsets()[resourceIndex], builder));
+  dispatchOp.getResourceOperandEndsMutable()[resourceIndex].set(
+      addOffset(sliceOp.getSourceOffset(),
+                dispatchOp.getResourceOperandEnds()[resourceIndex], builder));
+  dispatchOp.getResourceOperandSizesMutable()[resourceIndex].set(
+      sliceOp.getSourceSize());
+}
+
+// Elides a stream.async.slice op (assuming able) by folding it into consumers.
+static void elideSliceOp(IREE::Stream::AsyncSliceOp sliceOp) {
+  SmallVector<std::pair<Operation *, unsigned>> consumers;
+  for (auto &use : sliceOp.getResult().getUses())
+    consumers.push_back(std::make_pair(use.getOwner(), use.getOperandNumber()));
+  for (auto [owner, operandNumberIt] : consumers) {
+    unsigned operandNumber = operandNumberIt; // need C++20 to avoid this :|
+    TypeSwitch<Operation *>(owner)
+        .Case<IREE::Stream::AsyncCopyOp>([=](auto copyOp) {
+          foldSliceIntoCopy(sliceOp, copyOp, operandNumber);
+        })
+        .Case<IREE::Stream::AsyncDispatchOp>([=](auto dispatchOp) {
+          foldSliceIntoDispatch(sliceOp, dispatchOp, operandNumber);
+        })
+        .Default([](auto *op) {});
+  }
+  sliceOp.erase();
 }
 
 //===----------------------------------------------------------------------===//
 // --iree-stream-elide-async-copies
 //===----------------------------------------------------------------------===//
+
+// Tries to elide copies nested within |region| when safe.
+// Returns true if any ops were elided.
+static bool tryElideAsyncCopiesInRegion(Region &region,
+                                        ElisionAnalysis &analysis) {
+  bool didChange = false;
+  for (auto &block : region) {
+    block.walk([&](Operation *op) {
+      return TypeSwitch<Operation *, WalkResult>(op)
+          .Case<IREE::Stream::AsyncCloneOp>([&](auto cloneOp) {
+            if (isSafeToElideCloneOp(cloneOp, analysis)) {
+              elideCloneOp(cloneOp);
+              didChange = true;
+            }
+            return WalkResult::advance();
+          })
+          .Case<IREE::Stream::AsyncSliceOp>([&](auto sliceOp) {
+            if (isSafeToElideSliceOp(sliceOp, analysis)) {
+              elideSliceOp(sliceOp);
+              didChange = true;
+            }
+            return WalkResult::advance();
+          })
+          .Default([&](auto *op) { return WalkResult::advance(); });
+    });
+  }
+  return didChange;
+}
 
 // Elides async copies that perform no meaningful work - such as clones of the
 // last use of a value. This is designed to be run after
@@ -485,7 +689,7 @@ struct ElideAsyncCopiesPass
     for (; iterationCount < maxIterationCount; ++iterationCount) {
       // Perform whole-program analysis.
       // TODO(benvanik): reuse allocator across iterations.
-      LastUseAnalysis analysis(moduleOp);
+      ElisionAnalysis analysis(moduleOp);
       if (failed(analysis.run())) {
         moduleOp.emitError() << "failed to solve for last users";
         return signalPassFailure();
