@@ -59,6 +59,7 @@ class TargetConverter:
                 # MLIR
                 "@llvm-project//mlir:AllPassesAndDialects": ["MLIRAllDialects"],
                 "@llvm-project//mlir:CommonFolders": [""],
+                "@llvm-project//mlir:ConversionPasses": [""],
                 "@llvm-project//mlir:DialectUtils": [""],
                 "@llvm-project//mlir:GPUDialect": ["MLIRGPUDialect"],
                 "@llvm-project//mlir:GPUTransforms": ["MLIRGPUTransforms"],
