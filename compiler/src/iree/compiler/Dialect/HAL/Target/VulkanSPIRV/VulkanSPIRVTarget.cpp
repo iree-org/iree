@@ -40,8 +40,12 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
   static llvm::cl::opt<std::string> clVulkanTargetTriple(
       "iree-vulkan-target-triple",
       llvm::cl::desc(
-          "Vulkan target triple controlling the SPIR-V environment."),
-      llvm::cl::init("unknown-unknown-unknown"));
+          "Vulkan target triple controlling the SPIR-V environment."));
+
+  static llvm::cl::opt<std::string> clVulkanTargetEnv(
+      "iree-vulkan-target-env",
+      llvm::cl::desc(
+          "Vulkan target environment as #vk.target_env attribute assembly."));
 
   static llvm::cl::opt<bool> clVulkanIndirectBindings(
       "iree-vulkan-experimental-indirect-bindings",
@@ -49,10 +53,42 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
       llvm::cl::init(false));
 
   VulkanSPIRVTargetOptions targetOptions;
-  targetOptions.targetTriple = clVulkanTargetTriple;
+  if (!clVulkanTargetEnv.empty()) {
+    // TODO(scotttodd): assert if triple is set too? (mutually exclusive flags)
+    targetOptions.targetTripleOrEnv = clVulkanTargetEnv;
+  } else if (!clVulkanTargetTriple.empty()) {
+    targetOptions.targetTripleOrEnv = clVulkanTargetTriple;
+  } else {
+    targetOptions.targetTripleOrEnv = "unknown-unknown-unknown";
+  }
   targetOptions.indirectBindings = clVulkanIndirectBindings;
 
   return targetOptions;
+}
+
+// Returns the Vulkan target environment for conversion.
+static spirv::TargetEnvAttr
+getSPIRVTargetEnv(const std::string &vulkanTargetTripleOrEnv,
+                  MLIRContext *context) {
+  if (!vulkanTargetTripleOrEnv.empty()) {
+    if (vulkanTargetTripleOrEnv[0] != '#') {
+      // Parse target triple.
+      return convertTargetEnv(
+          Vulkan::getTargetEnvForTriple(context, vulkanTargetTripleOrEnv));
+    }
+
+    // Parse `#vk.target_env<...` attribute assembly.
+    if (auto attr = parseAttribute(vulkanTargetTripleOrEnv, context)) {
+      if (auto vkTargetEnv = llvm::dyn_cast<Vulkan::TargetEnvAttr>(attr)) {
+        return convertTargetEnv(vkTargetEnv);
+      }
+    }
+    emitError(Builder(context).getUnknownLoc())
+        << "cannot parse vulkan target environment as #vk.target_env "
+           "attribute: '"
+        << vulkanTargetTripleOrEnv << "'";
+  }
+  return {};
 }
 
 // TODO: VulkanOptions for choosing the Vulkan version and extensions/features.
@@ -93,10 +129,9 @@ public:
       MLIRContext *context, StringRef deviceID, DictionaryAttr deviceConfigAttr,
       SmallVectorImpl<IREE::HAL::ExecutableTargetAttr> &executableTargetAttrs)
       const override {
-    auto spirvTargetEnv = Vulkan::convertTargetEnv(
-        Vulkan::getTargetEnvForTriple(context, options_.targetTriple));
     executableTargetAttrs.push_back(getExecutableTarget(
-        context, spirvTargetEnv, options_.indirectBindings));
+        context, getSPIRVTargetEnv(options_.targetTripleOrEnv, context),
+        options_.indirectBindings));
   }
 
   IREE::HAL::ExecutableTargetAttr
