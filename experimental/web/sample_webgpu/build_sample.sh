@@ -51,7 +51,7 @@ compile_sample() {
   echo "  Compiling '$1' sample for WebGPU..."
   ${COMPILE_TOOL?} $3 \
     --iree-input-type=$2 \
-    --iree-hal-target-backends=webgpu \
+    --iree-hal-target-backends=webgpu-spirv \
     --iree-codegen-gpu-native-math-precision=true \
     --iree-stream-resource-alias-mutable-bindings=true \
     --o ${BINARY_DIR}/$1_webgpu.vmfb
