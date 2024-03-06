@@ -49,10 +49,10 @@ iree_cc_library(
     MLIRPass
     MLIRTensorDialect
     MLIRTransforms
-    torch-mlir::ConversionPasses
-    torch-mlir::TorchConversionDialectIR
-    torch-mlir::TorchDialectPasses
-    torch-mlir-dialects::TMTensorDialectIR
+    iree::compiler::plugins::input::Torch::torch-mlir::ConversionPasses
+    iree::compiler::plugins::input::Torch::torch-mlir::TorchConversionDialectIR
+    iree::compiler::plugins::input::Torch::torch-mlir::TorchDialectPasses
+    iree::compiler::plugins::input::Torch::torch-mlir-dialects::TMTensorDialectIR
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::LinalgExt::IR
   PUBLIC

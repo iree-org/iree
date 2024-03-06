@@ -14,7 +14,7 @@
 namespace mlir::iree_compiler::TorchInput {
 
 #define GEN_PASS_CLASSES
-#include "torch-iree/InputConversion/Passes.h.inc"
+#include "compiler/plugins/input/Torch/torch-iree/InputConversion/Passes.h.inc"
 
 } // namespace mlir::iree_compiler::TorchInput
 

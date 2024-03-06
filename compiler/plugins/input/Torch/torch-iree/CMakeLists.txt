@@ -16,13 +16,13 @@ iree_cc_library(
     MLIRMLProgramDialect
     MLIRPass
     iree::compiler::PluginAPI
-    torch-iree::InputConversion
-    torch-mlir::TorchConversionDialectIR
-    torch-mlir::TorchDialectIR
-    torch-mlir::TorchDialectPasses
-    torch-mlir::TorchOnnxToTorchPasses
-    torch-mlir::ConversionPasses
-    torch-mlir-dialects::TMTensorDialectIR
+    iree::compiler::plugins::input::Torch::torch-iree::InputConversion
+    iree::compiler::plugins::input::Torch::torch-mlir::TorchConversionDialectIR
+    iree::compiler::plugins::input::Torch::torch-mlir::TorchDialectIR
+    iree::compiler::plugins::input::Torch::torch-mlir::TorchDialectPasses
+    iree::compiler::plugins::input::Torch::torch-mlir::TorchOnnxToTorchPasses
+    iree::compiler::plugins::input::Torch::torch-mlir::ConversionPasses
+    iree::compiler::plugins::input::Torch::torch-mlir-dialects::TMTensorDialectIR
   PUBLIC
 )
 

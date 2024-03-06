@@ -12,9 +12,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "compiler/plugins/input/Torch/torch-iree/InputConversion/PassDetail.h"
+#include "compiler/plugins/input/Torch/torch-iree/InputConversion/Passes.h"
 #include "llvm/ADT/StringRef.h"
-#include "torch-iree/InputConversion/PassDetail.h"
-#include "torch-iree/InputConversion/Passes.h"
 
 static const llvm::StringLiteral kStrictSymbolsMarker =
     "torch.assume_strict_symbolic_shapes";

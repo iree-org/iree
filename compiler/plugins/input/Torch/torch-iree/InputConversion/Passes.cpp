@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "torch-iree/InputConversion/Passes.h"
+#include "compiler/plugins/input/Torch/torch-iree/InputConversion/Passes.h"
 
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
@@ -23,7 +23,7 @@ namespace mlir::iree_compiler::TorchInput {
 
 namespace {
 #define GEN_PASS_REGISTRATION
-#include "torch-iree/InputConversion/Passes.h.inc" // IWYU pragma: export
+#include "compiler/plugins/input/Torch/torch-iree/InputConversion/Passes.h.inc" // IWYU pragma: export
 } // namespace
 
 void createTorchToIREEPipeline(

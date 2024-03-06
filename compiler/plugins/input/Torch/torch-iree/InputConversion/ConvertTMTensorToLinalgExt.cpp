@@ -7,13 +7,13 @@
 #include <cstdint>
 #include <numeric>
 
+#include "compiler/plugins/input/Torch/torch-iree/InputConversion/PassDetail.h"
+#include "compiler/plugins/input/Torch/torch-iree/InputConversion/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "torch-iree/InputConversion/PassDetail.h"
-#include "torch-iree/InputConversion/Passes.h"
 #include "torch-mlir-dialects/Dialect/TMTensor/IR/TMTensorOps.h"
 
 namespace mlir::iree_compiler::TorchInput {
