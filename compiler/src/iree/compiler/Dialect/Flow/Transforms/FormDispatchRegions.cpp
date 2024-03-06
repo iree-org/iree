@@ -99,8 +99,8 @@ LogicalResult simplifyDimOps(RewriterBase &rewriter,
 
     // Try to simplify dynamic dims.
     SmallVector<Value> dynamicDims;
-    if (failed(Flow::reifyDynamicResultDims(rewriter, dimOp.getSource(),
-                                            dynamicDims)))
+    if (failed(IREE::Flow::reifyDynamicResultDims(rewriter, dimOp.getSource(),
+                                                  dynamicDims)))
       return failure();
     unsigned ctr = 0;
     for (int64_t i = 0; i < *dimOp.getConstantIndex(); ++i)
@@ -825,7 +825,7 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
 // Dispatch region formation
 //===----------------------------------------------------------------------===//
 
-/// Create Flow::DispatchGroupsOps based on a fusion heuristic.
+/// Create IREE::Flow::DispatchGroupsOps based on a fusion heuristic.
 static LogicalResult
 createFusionGroups(TensorDimTrackingRewriter &rewriter,
                    mlir::FunctionOpInterface funcOp,
@@ -860,19 +860,20 @@ createFusionGroups(TensorDimTrackingRewriter &rewriter,
 
   // Step 2. Create a DispatchRegionOp for every fusion group.
   OpBuilder::InsertionGuard g(rewriter);
-  SmallVector<Flow::DispatchRegionOp> regionOps;
+  SmallVector<IREE::Flow::DispatchRegionOp> regionOps;
   for (const auto &it : llvm::enumerate(roots)) {
     // Simplify tensor::DimOps.
     {
       SmallVector<tensor::DimOp> dimOps = rewriter.getTensorDimOps();
-      if (failed(iree_compiler::IREE::Flow::simplifyDimOps(rewriter, dimOps))) {
+      if (failed(IREE::Flow::simplifyDimOps(rewriter, dimOps))) {
         return failure();
       }
     }
 
     // Create fusion group.
-    Flow::DispatchRegionOp regionOp;
-    auto maybeRegionOp = Flow::wrapOpInDispatchRegion(rewriter, it.value());
+    IREE::Flow::DispatchRegionOp regionOp;
+    auto maybeRegionOp =
+        IREE::Flow::wrapOpInDispatchRegion(rewriter, it.value());
     if (failed(maybeRegionOp))
       return failure();
     regionOp = *maybeRegionOp;
@@ -888,8 +889,7 @@ createFusionGroups(TensorDimTrackingRewriter &rewriter,
       // Simplify tensor::DimOps.
       {
         SmallVector<tensor::DimOp> dimOps = rewriter.getTensorDimOps();
-        if (failed(
-                iree_compiler::IREE::Flow::simplifyDimOps(rewriter, dimOps))) {
+        if (failed(IREE::Flow::simplifyDimOps(rewriter, dimOps))) {
           return failure();
         }
       }
@@ -903,7 +903,7 @@ createFusionGroups(TensorDimTrackingRewriter &rewriter,
     // Simplify tensor::DimOps.
     {
       SmallVector<tensor::DimOp> dimOps = rewriter.getTensorDimOps();
-      if (failed(iree_compiler::IREE::Flow::simplifyDimOps(rewriter, dimOps))) {
+      if (failed(IREE::Flow::simplifyDimOps(rewriter, dimOps))) {
         return failure();
       }
     }
