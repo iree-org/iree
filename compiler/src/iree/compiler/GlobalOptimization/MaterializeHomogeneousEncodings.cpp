@@ -65,9 +65,9 @@ public:
     }
 
     OpPassManager passManager(moduleOp.getOperationName());
-    FunctionLikeNest(passManager).addPass([&]() {
-      return createCPUMaterializeUpperBoundTileSizePass(executableTargets);
-    });
+    // FunctionLikeNest(passManager).addPass([&]() {
+    //   return createCPUMaterializeUpperBoundTileSizePass(executableTargets);
+    // });
     FunctionLikeNest(passManager).addPass([&]() {
       return createCPUMaterializeEncodingPass(executableTarget);
     });
