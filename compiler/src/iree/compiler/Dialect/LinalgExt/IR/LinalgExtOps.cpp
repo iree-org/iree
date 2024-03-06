@@ -2472,7 +2472,8 @@ static LogicalResult checkShapeRank(Operation *op, StringRef operandName,
 
 LogicalResult AttentionOp::verify() {
   Operation *op = getOperation();
-  unsigned numOperands = getNumOperands();
+  // -1 to account for the scale operand.
+  unsigned numOperands = getNumOperands() - 1;
   unsigned rankToCompareWith = 3;
   if (numOperands == 6)
     rankToCompareWith = 2;
@@ -2556,6 +2557,13 @@ LogicalResult AttentionOp::verify() {
       return op->emitOpError("Query and max dimension-0 mismatch");
     }
   }
+
+  // Check if scale element type matches query element type.
+  if (getScale().getType() != getQueryType().getElementType()) {
+    return op->emitOpError(
+        "scale element type should match query element type");
+  }
+
   return success();
 }
 
@@ -2609,6 +2617,8 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
   keyValueSizes[0] = sizes[0];
   keyValueOffsets[0] = offsets[0];
 
+  Value scale = getScale();
+
   SmallVector<Value> tiledOperands;
   tiledOperands.emplace_back(getSlice(builder, loc, getQuery(),
                                       queryOutputOffsets, queryOutputSizes,
@@ -2620,6 +2630,7 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
   tiledOperands.emplace_back(getSlice(builder, loc, getOutput(),
                                       queryOutputOffsets, queryOutputSizes,
                                       queryOutputStrides));
+  tiledOperands.emplace_back(scale);
 
   SmallVector<Type> resultTypes;
   if (hasPureTensorSemantics())

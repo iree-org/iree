@@ -11,6 +11,7 @@
 #include "compiler/plugins/input/Torch/InputConversion/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -145,8 +146,15 @@ struct AttentionOpConversion
     Value collapsedResult = rewriter.create<tensor::EmptyOp>(
         loc, collapsedResultShape, elementType);
 
+    assert(isa<FloatType>(elementType) &&
+           "Attention only works on float types");
+    FloatType floatElementType = cast<FloatType>(elementType);
+
+    Value scale = rewriter.create<arith::ConstantFloatOp>(loc, APFloat(1.0f),
+                                                          floatElementType);
+
     auto attention = rewriter.create<IREE::LinalgExt::AttentionOp>(
-        loc, collapsedResultType, SmallVector<Value>{query, key, value},
+        loc, collapsedResultType, SmallVector<Value>{query, key, value}, scale,
         collapsedResult);
 
     if (sizes.size() > 3)

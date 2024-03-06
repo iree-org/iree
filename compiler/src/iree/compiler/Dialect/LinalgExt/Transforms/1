@@ -504,6 +504,7 @@ Value scaleQuery(Value querySlice, Value scale, RewriterBase &rewriter) {
         Value result = b.create<arith::MulFOp>(loc, args[0], args[1]);
         b.create<linalg::YieldOp>(loc, result);
       });
+  scaleOp.dump();
   return scaleOp.getResult(0);
 }
 

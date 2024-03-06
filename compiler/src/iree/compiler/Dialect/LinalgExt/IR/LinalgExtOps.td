@@ -1,4 +1,4 @@
-  // Copyright 2021 The IREE Authors
+// Copyright 2021 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -535,11 +535,12 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
 
   let arguments = (ins Variadic<AnyShaped>:$inputs,
                        Variadic<AnyShaped>:$outputs,
+                       AnyFloat:$scale,
                        DefaultValuedOptionalAttr<BoolAttr, "false">:$transpose_v
   );
 
   let builders = [
-    OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$outputs)>
+    OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$outputs, "Value":$scale)>,
   ];
 
   let results = (outs Variadic<AnyRankedTensor>:$results);
@@ -548,6 +549,7 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
     attr-dict
     `ins` `(` $inputs `:` type($inputs) `)`
     `outs` `(` $outputs `:` type($outputs) `)`
+    `scale` `(` $scale `:` type($scale) `)`
     (`->` type($results)^)?
   }];
 
