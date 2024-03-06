@@ -37,17 +37,15 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
   // llvm::cl::OptionCategory halVulkanSPIRVOptionsCategory(
   //     "IREE Vulkan/SPIR-V backend options");
 
-  static llvm::cl::list<std::string> clVulkanTargetTriples{
+  static llvm::cl::opt<std::string> clVulkanTargetTriple(
       "iree-vulkan-target-triple",
       llvm::cl::desc(
-          "Vulkan target triple controlling the SPIR-V environment."),
-  };
+          "Vulkan target triple controlling the SPIR-V environment."));
 
-  static llvm::cl::list<std::string> clVulkanTargetEnvs{
+  static llvm::cl::opt<std::string> clVulkanTargetEnv(
       "iree-vulkan-target-env",
       llvm::cl::desc(
-          "Vulkan target environment as #vk.target_env attribute assembly."),
-  };
+          "Vulkan target environment as #vk.target_env attribute assembly."));
 
   static llvm::cl::opt<bool> clVulkanIndirectBindings(
       "iree-vulkan-experimental-indirect-bindings",
@@ -55,33 +53,14 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
       llvm::cl::init(false));
 
   VulkanSPIRVTargetOptions targetOptions;
-
-  int tripleCount = clVulkanTargetTriples.getNumOccurrences();
-  int envCount = clVulkanTargetEnvs.getNumOccurrences();
-  int tripleIdx = 0;
-  int envIdx = 0;
-
-  // Get a flat list of target triples and environments following the original
-  // order specified via the command line.
-  SmallVector<std::string> vulkanTargetTriplesAndEnvs;
-  for (int i = 0, e = tripleCount + envCount; i < e; ++i) {
-    if (tripleIdx >= tripleCount) {
-      vulkanTargetTriplesAndEnvs.push_back(clVulkanTargetEnvs[envIdx++]);
-      continue;
-    }
-    if (envIdx >= envCount) {
-      vulkanTargetTriplesAndEnvs.push_back(clVulkanTargetTriples[tripleIdx++]);
-      continue;
-    }
-    if (clVulkanTargetTriples.getPosition(tripleIdx) >
-        clVulkanTargetEnvs.getPosition(envIdx)) {
-      vulkanTargetTriplesAndEnvs.push_back(clVulkanTargetEnvs[envIdx++]);
-    } else {
-      vulkanTargetTriplesAndEnvs.push_back(clVulkanTargetTriples[tripleIdx++]);
-    }
+  if (!clVulkanTargetEnv.empty()) {
+    // TODO(scotttodd): assert if triple is set too? (mutually exclusive flags)
+    targetOptions.targetTripleOrEnv = clVulkanTargetEnv;
+  } else if (!clVulkanTargetTriple.empty()) {
+    targetOptions.targetTripleOrEnv = clVulkanTargetTriple;
+  } else {
+    targetOptions.targetTripleOrEnv = "unknown-unknown-unknown";
   }
-  targetOptions.targetTriplesAndEnvs = vulkanTargetTriplesAndEnvs;
-
   targetOptions.indirectBindings = clVulkanIndirectBindings;
 
   return targetOptions;
@@ -93,10 +72,12 @@ getSPIRVTargetEnv(const std::string &vulkanTargetTripleOrEnv,
                   MLIRContext *context) {
   if (!vulkanTargetTripleOrEnv.empty()) {
     if (vulkanTargetTripleOrEnv[0] != '#') {
+      // Parse target triple.
       return convertTargetEnv(
           Vulkan::getTargetEnvForTriple(context, vulkanTargetTripleOrEnv));
     }
 
+    // Parse `#vk.target_env<...` attribute assembly.
     if (auto attr = parseAttribute(vulkanTargetTripleOrEnv, context)) {
       if (auto vkTargetEnv = llvm::dyn_cast<Vulkan::TargetEnvAttr>(attr)) {
         return convertTargetEnv(vkTargetEnv);
@@ -148,19 +129,9 @@ public:
       MLIRContext *context, StringRef deviceID, DictionaryAttr deviceConfigAttr,
       SmallVectorImpl<IREE::HAL::ExecutableTargetAttr> &executableTargetAttrs)
       const override {
-    // Select SPIR-V environments to compile for.
-    for (std::string targetTripleOrEnv : options_.targetTriplesAndEnvs) {
-      executableTargetAttrs.push_back(getExecutableTarget(
-          context, getSPIRVTargetEnv(targetTripleOrEnv, context),
-          options_.indirectBindings));
-    }
-
-    // If no environment specified, populate with a minimal target.
-    if (executableTargetAttrs.empty()) {
-      executableTargetAttrs.push_back(getExecutableTarget(
-          context, getSPIRVTargetEnv("unknown-unknown-unknown", context),
-          options_.indirectBindings));
-    }
+    executableTargetAttrs.push_back(getExecutableTarget(
+        context, getSPIRVTargetEnv(options_.targetTripleOrEnv, context),
+        options_.indirectBindings));
   }
 
   IREE::HAL::ExecutableTargetAttr
