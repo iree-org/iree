@@ -1,6 +1,7 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-global-opt-propagate-linalg-transpose))" --split-input-file %s | FileCheck %s
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-global-opt-propagate-linalg-transpose{enable-aggressive-propagation=true}))" --split-input-file %s | FileCheck %s --check-prefix=APROP
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-global-opt-propagate-linalg-transpose{test-sinking-only=true}))" --split-input-file %s | FileCheck %s --check-prefix=SINK
+// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-global-opt-propagate-linalg-transpose{test-bubbling-only=true}))" --split-input-file %s | FileCheck %s --check-prefix=BUBBLE
 
 util.func public @specialize_transpose_op(%arg0 : tensor<1x2x3xf32>,
                                    %empty : tensor<3x2x1xf32>) -> tensor<3x2x1xf32> {
@@ -286,6 +287,33 @@ util.func public @propagate_transpose_through_unary_elementwise(%arg0 : tensor<2
 //  SINK-SAME:                    outs({{.*}} : tensor<3x4x2xf32>)
 //  SINK-SAME:                    permutation = [1, 2, 0]
 //       SINK:   util.return %[[RES]] : tensor<3x4x2xf32>
+
+// -----
+
+util.func public @propagate_transpose_up_through_unary_elementwise(%arg0 : tensor<2x3x4xf32>) -> tensor<3x4x2xf32> {
+  %empty = tensor.empty(): tensor<2x3x4xf32>
+  %0 = linalg.generic {indexing_maps = [
+                    affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                    affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+                iterator_types = ["parallel", "parallel", "parallel"]}
+                ins(%arg0 : tensor<2x3x4xf32>)
+                outs(%empty : tensor<2x3x4xf32>) {
+                  ^bb0(%in: f32, %out: f32):
+                    %sqrt = math.rsqrt %in : f32
+                    linalg.yield %sqrt : f32
+                  } -> tensor<2x3x4xf32>
+  %empty1 = tensor.empty(): tensor<3x4x2xf32>
+  %transposed = linalg.transpose ins(%0 : tensor<2x3x4xf32>)
+      outs(%empty1 : tensor<3x4x2xf32>) permutation = [1, 2, 0]
+  util.return %transposed : tensor<3x4x2xf32>
+}
+// BUBBLE-LABEL: util.func public @propagate_transpose_through_unary_elementwise
+//       BUBBLE:   %[[TRANSPOSE:.+]] = linalg.transpose ins({{.*}} : tensor<2x3x4xf32>
+//  BUBBLE-SAME:                    outs({{.*}} : tensor<3x4x2xf32>)
+//  BUBBLE-SAME:                    permutation = [1, 2, 0]
+//       BUBBLE:   %[[ELEM:.+]] = linalg.generic {{.*}} ins(%[[TRANSPOSE]] : tensor<3x4x2xf32>
+//       BUBBLE:     math.rsqrt
+//       BUBBLE:   util.return %[[ELEM]] : tensor<3x4x2xf32>
 
 // -----
 

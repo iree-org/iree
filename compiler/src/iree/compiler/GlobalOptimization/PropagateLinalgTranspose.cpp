@@ -117,6 +117,8 @@ static void specializeGenericTransposeOp(RewriterBase &rewriter,
 // Other pattern helpers
 //===----------------------------------------------------------------------===//
 
+/// If the `op` is a ContractionOpInterface, return the generalized op. If the
+/// `op` is a linalg::GenericOp, then just return the generic op.
 static FailureOr<linalg::GenericOp>
 getGenericOpOrGeneralizeContraction(RewriterBase &rewriter, Operation *op) {
   auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
