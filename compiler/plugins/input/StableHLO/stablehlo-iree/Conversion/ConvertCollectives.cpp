@@ -7,6 +7,7 @@
 // Implements IREE-specific logic for lowering StableHLO collective ops to Flow
 // dialect ops.
 
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/Rewriters.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
@@ -16,7 +17,6 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include "stablehlo-iree/Conversion/Rewriters.h"
 #include "stablehlo/dialect/StablehloOps.h"
 
 namespace mlir::iree_compiler::stablehlo {

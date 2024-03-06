@@ -4,8 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "stablehlo-iree/Conversion/Passes.h"
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/Passes.h"
 
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/Preprocessing/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/InputConversion/Common/Passes.h"
 #include "mlir/Conversion/ReconcileUnrealizedCasts/ReconcileUnrealizedCasts.h"
@@ -18,12 +19,11 @@
 #include "mlir/Pass/PassOptions.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
-#include "stablehlo-iree/Conversion/Preprocessing/Passes.h"
 
 namespace mlir::iree_compiler::stablehlo {
 namespace {
 #define GEN_PASS_REGISTRATION
-#include "stablehlo-iree/Conversion/Passes.h.inc" // IWYU pragma: export
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/Passes.h.inc" // IWYU pragma: export
 } // namespace
 
 namespace {

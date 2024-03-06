@@ -4,14 +4,13 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/Passes.h"
 #include "iree/compiler/PluginAPI/Client.h"
 #include "mlir/Conversion/Passes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/PassManager.h"
 #include "stablehlo/dialect/ChloOps.h"
 #include "stablehlo/dialect/StablehloOps.h"
-
-#include "stablehlo-iree/Conversion/Passes.h"
 
 namespace mlir::iree_compiler::stablehlo {
 

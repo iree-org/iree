@@ -6,20 +6,20 @@
 
 // Implements logic for lowering the StableHLO general dot op to the dot op.
 
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/Preprocessing/Passes.h"
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/Preprocessing/Rewriters.h"
 #include "mlir/Dialect/SparseTensor/IR/SparseTensor.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "stablehlo-iree/Conversion/Preprocessing/Passes.h"
-#include "stablehlo-iree/Conversion/Preprocessing/Rewriters.h"
 #include "stablehlo/dialect/StablehloOps.h"
 
 namespace mlir::iree_compiler::stablehlo {
 
 #define GEN_PASS_DEF_DOTGENERALTODOT
-#include "stablehlo-iree/Conversion/Preprocessing/Passes.h.inc"
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/Preprocessing/Passes.h.inc"
 
 namespace {
 Value transposeReshape(Value arg, Location loc,

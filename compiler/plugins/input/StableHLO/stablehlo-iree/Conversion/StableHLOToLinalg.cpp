@@ -10,6 +10,10 @@
 #include <cstdint>
 #include <string>
 
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/LegalizeToLinalgUtils.h"
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/Passes.h"
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/Rewriters.h"
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/TypeConversion.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
@@ -41,16 +45,12 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include "stablehlo-iree/Conversion/LegalizeToLinalgUtils.h"
-#include "stablehlo-iree/Conversion/Passes.h"
-#include "stablehlo-iree/Conversion/Rewriters.h"
-#include "stablehlo-iree/Conversion/TypeConversion.h"
 #include "stablehlo/dialect/StablehloOps.h"
 
 namespace mlir::iree_compiler::stablehlo {
 
 #define GEN_PASS_DEF_CONVERTSTABLEHLOTOLINALG
-#include "stablehlo-iree/Conversion/Passes.h.inc"
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/Passes.h.inc"
 
 namespace {
 Value getResultValue(Operation *op) { return op->getResult(0); }

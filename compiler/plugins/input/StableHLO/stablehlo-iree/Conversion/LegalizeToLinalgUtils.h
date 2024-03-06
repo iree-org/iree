@@ -15,6 +15,7 @@
 #include <string>
 #include <utility>
 
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/MapStableHLOToScalarOp.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringSet.h"
@@ -34,7 +35,6 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include "stablehlo-iree/Conversion/MapStableHLOToScalarOp.h"
 #include "stablehlo/dialect/StablehloOps.h"
 
 namespace mlir::iree_compiler::stablehlo {

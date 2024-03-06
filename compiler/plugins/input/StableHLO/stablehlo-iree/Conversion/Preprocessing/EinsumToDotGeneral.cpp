@@ -6,16 +6,16 @@
 
 // Implements logic for lowering StableHLO einsum op to dot_general ops.
 
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/Preprocessing/Passes.h"
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/Preprocessing/Rewriters.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "stablehlo-iree/Conversion/Preprocessing/Passes.h"
-#include "stablehlo-iree/Conversion/Preprocessing/Rewriters.h"
 #include "stablehlo/dialect/StablehloOps.h"
 
 namespace mlir::iree_compiler::stablehlo {
 
 #define GEN_PASS_DEF_EINSUMTODOTGENERAL
-#include "stablehlo-iree/Conversion/Preprocessing/Passes.h.inc"
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/Preprocessing/Passes.h.inc"
 
 namespace {
 

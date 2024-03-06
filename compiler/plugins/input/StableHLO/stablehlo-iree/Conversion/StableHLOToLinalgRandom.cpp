@@ -7,12 +7,12 @@
 // Implements logic for lowering StableHLO random number generation to Linalg
 // dialect.
 
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/LegalizeToLinalgUtils.h"
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/Rewriters.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include "stablehlo-iree/Conversion/LegalizeToLinalgUtils.h"
-#include "stablehlo-iree/Conversion/Rewriters.h"
 #include "stablehlo/dialect/StablehloOps.h"
 
 namespace mlir::iree_compiler::stablehlo {

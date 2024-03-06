@@ -7,6 +7,9 @@
 // Implements logic for lowering CHLO ops to StableHLO and Shape dialect ops,
 // taking care of CHLO's broadcasting semantics
 
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/Passes.h"
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/Preprocessing/Rewriters.h"
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/Rewriters.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Complex/IR/Complex.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -18,9 +21,6 @@
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "stablehlo-iree/Conversion/Passes.h"
-#include "stablehlo-iree/Conversion/Preprocessing/Rewriters.h"
-#include "stablehlo-iree/Conversion/Rewriters.h"
 #include "stablehlo/dialect/BroadcastUtils.h"
 #include "stablehlo/dialect/ChloOps.h"
 #include "stablehlo/dialect/StablehloOps.h"
@@ -28,7 +28,7 @@
 namespace mlir::iree_compiler::stablehlo {
 
 #define GEN_PASS_DEF_LEGALIZECHLO
-#include "stablehlo-iree/Conversion/Passes.h.inc"
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/Passes.h.inc"
 
 namespace {
 
@@ -2225,7 +2225,7 @@ struct LegalizeChlo final : impl::LegalizeChloBase<LegalizeChlo> {
 } // namespace
 
 namespace {
-#include "stablehlo-iree/Conversion/CHLODecompositionPatterns.h.inc"
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/CHLODecompositionPatterns.h.inc"
 } // end anonymous namespace
 
 namespace {

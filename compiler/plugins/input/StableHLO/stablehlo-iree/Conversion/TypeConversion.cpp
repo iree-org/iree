@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "stablehlo-iree/Conversion/TypeConversion.h"
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/TypeConversion.h"
 
 #include <optional>
 

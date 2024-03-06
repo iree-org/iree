@@ -8,12 +8,12 @@
 // These patterns are separated out to their own file to save on the compilation
 // times.
 
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/LegalizeToLinalgUtils.h"
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/Rewriters.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include "stablehlo-iree/Conversion/LegalizeToLinalgUtils.h"
-#include "stablehlo-iree/Conversion/Rewriters.h"
 #include "stablehlo/dialect/StablehloOps.h"
 
 namespace mlir::iree_compiler::stablehlo {

@@ -6,6 +6,8 @@
 
 // Implements IREE-specific preprocessing for XLA inputs.
 
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/Preprocessing/Passes.h"
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/Preprocessing/Rewriters.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
@@ -19,14 +21,12 @@
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "stablehlo-iree/Conversion/Preprocessing/Passes.h"
-#include "stablehlo-iree/Conversion/Preprocessing/Rewriters.h"
 #include "stablehlo/dialect/StablehloOps.h"
 
 namespace mlir::iree_compiler::stablehlo {
 
 #define GEN_PASS_DEF_FLATTENTUPLESINSCF
-#include "stablehlo-iree/Conversion/Preprocessing/Passes.h.inc"
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/Preprocessing/Passes.h.inc"
 
 namespace {
 // Given a set of types, unpack to a list of a types, removing all tuples.

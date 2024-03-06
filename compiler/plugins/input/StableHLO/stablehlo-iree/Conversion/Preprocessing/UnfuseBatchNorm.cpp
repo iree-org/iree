@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/Preprocessing/Passes.h"
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/Preprocessing/Rewriters.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Shape/IR/Shape.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -11,14 +13,12 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "stablehlo-iree/Conversion/Preprocessing/Passes.h"
-#include "stablehlo-iree/Conversion/Preprocessing/Rewriters.h"
 #include "stablehlo/dialect/StablehloOps.h"
 
 namespace mlir::iree_compiler::stablehlo {
 
 #define GEN_PASS_DEF_UNFUSEBATCHNORM
-#include "stablehlo-iree/Conversion/Preprocessing/Passes.h.inc"
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/Preprocessing/Passes.h.inc"
 
 namespace {
 // Broadcasts the 1D value tensor 'value_1d' to the shape of 'result_type'. If

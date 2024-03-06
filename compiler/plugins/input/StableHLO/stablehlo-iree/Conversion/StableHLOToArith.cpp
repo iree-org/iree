@@ -6,13 +6,13 @@
 
 // Implements logic for lowering scalar StableHLO ops to arith dialect.
 
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/LegalizeToLinalgUtils.h"
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/Rewriters.h"
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/TypeConversion.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include "stablehlo-iree/Conversion/LegalizeToLinalgUtils.h"
-#include "stablehlo-iree/Conversion/Rewriters.h"
-#include "stablehlo-iree/Conversion/TypeConversion.h"
 #include "stablehlo/dialect/StablehloOps.h"
 
 namespace mlir::iree_compiler::stablehlo {

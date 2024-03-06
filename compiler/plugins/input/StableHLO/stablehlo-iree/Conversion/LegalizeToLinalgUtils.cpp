@@ -6,7 +6,7 @@
 
 // Implements utilities for lowering StableHLO dialect to Linalg dialect.
 
-#include "stablehlo-iree/Conversion/LegalizeToLinalgUtils.h"
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/LegalizeToLinalgUtils.h"
 
 #include <algorithm>
 #include <numeric>

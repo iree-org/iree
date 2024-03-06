@@ -7,8 +7,8 @@
 #ifndef STABLEHLO_IREE_CONVERSION_PASSES_H_
 #define STABLEHLO_IREE_CONVERSION_PASSES_H_
 
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/PassDetail.h"
 #include "mlir/Pass/Pass.h"
-#include "stablehlo-iree/Conversion/PassDetail.h"
 
 namespace mlir {
 class TypeConverter;

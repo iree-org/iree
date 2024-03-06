@@ -8,16 +8,16 @@
 // operations. This does not include removing complex values from function
 // argument or return types.
 
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/Preprocessing/Passes.h"
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/Preprocessing/Rewriters.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "stablehlo-iree/Conversion/Preprocessing/Passes.h"
-#include "stablehlo-iree/Conversion/Preprocessing/Rewriters.h"
 #include "stablehlo/dialect/StablehloOps.h"
 
 namespace mlir::iree_compiler::stablehlo {
 
 #define GEN_PASS_DEF_LOWERCOMPLEX
-#include "stablehlo-iree/Conversion/Preprocessing/Passes.h.inc"
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/Preprocessing/Passes.h.inc"
 
 namespace {
 
@@ -114,7 +114,7 @@ ElementsAttr getSplat(Builder *b, Value val, T constant) {
 } // end anonymous namespace
 
 namespace {
-#include "stablehlo-iree/Conversion/Preprocessing/ComplexLoweringPatterns.h.inc"
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/Preprocessing/ComplexLoweringPatterns.h.inc"
 } // end anonymous namespace
 
 void populatePreprocessingComplexPatterns(MLIRContext *context,

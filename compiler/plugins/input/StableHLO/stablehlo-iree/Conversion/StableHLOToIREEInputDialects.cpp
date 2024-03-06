@@ -7,6 +7,12 @@
 // Implements IREE-specific logic for lowering StableHLO dialect to
 // IREE dialects: Linalg, Arith, Math, Tensor, Util, ML Program, etc.
 
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/LegalizeToLinalgUtils.h"
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/PassDetail.h"
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/Passes.h"
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/Preprocessing/Rewriters.h"
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/Rewriters.h"
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/TypeConversion.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
@@ -29,19 +35,13 @@
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "stablehlo-iree/Conversion/LegalizeToLinalgUtils.h"
-#include "stablehlo-iree/Conversion/PassDetail.h"
-#include "stablehlo-iree/Conversion/Passes.h"
-#include "stablehlo-iree/Conversion/Preprocessing/Rewriters.h"
-#include "stablehlo-iree/Conversion/Rewriters.h"
-#include "stablehlo-iree/Conversion/TypeConversion.h"
 #include "stablehlo/dialect/ChloOps.h"
 #include "stablehlo/dialect/StablehloOps.h"
 
 namespace mlir::iree_compiler::stablehlo {
 
 #define GEN_PASS_DEF_CONVERTSTABLEHLOTOIREEINPUTDIALECTS
-#include "stablehlo-iree/Conversion/Passes.h.inc"
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/Passes.h.inc"
 
 namespace {
 

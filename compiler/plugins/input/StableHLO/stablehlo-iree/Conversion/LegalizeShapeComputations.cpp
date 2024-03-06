@@ -6,21 +6,21 @@
 
 // Implements logic for lowering StableHLO dialect to scalar shape operations.
 
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/MapStableHLOToScalarOp.h"
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/Passes.h"
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/Rewriters.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "stablehlo-iree/Conversion/MapStableHLOToScalarOp.h"
-#include "stablehlo-iree/Conversion/Passes.h"
-#include "stablehlo-iree/Conversion/Rewriters.h"
 #include "stablehlo/dialect/StablehloOps.h"
 
 namespace mlir::iree_compiler::stablehlo {
 
 #define GEN_PASS_DEF_LEGALIZESHAPECOMPUTATIONS
-#include "stablehlo-iree/Conversion/Passes.h.inc"
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/Passes.h.inc"
 
 namespace {
 

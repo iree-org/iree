@@ -14,7 +14,7 @@
 namespace mlir::iree_compiler::stablehlo {
 
 #define GEN_PASS_DECL
-#include "stablehlo-iree/Conversion/Preprocessing/Passes.h.inc"
+#include "compiler/plugins/input/StableHLO/stablehlo-iree/Conversion/Preprocessing/Passes.h.inc"
 
 //===----------------------------------------------------------------------===//
 // Register all Passes
