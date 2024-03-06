@@ -35,10 +35,6 @@ iree_compiler_cc_library(
         "Passes.h.inc",
         "Rewriters.h",
     ],
-    copts = [
-        "-Icompiler/plugins/input/StableHLO",
-        "-I$(GENDIR)/compiler/plugins/input/StableHLO",
-    ],
     deps = [
         ":PassesIncGen",
         "@llvm-project//mlir:Pass",
@@ -85,10 +81,6 @@ iree_compiler_cc_library(
         "TypeConversion.cpp",
         "TypeConversion.h",
         "VerifyCompilerInputLegality.cpp",
-    ],
-    copts = [
-        "-Icompiler/plugins/input/StableHLO",
-        "-I$(GENDIR)/compiler/plugins/input/StableHLO",
     ],
     deps = [
         ":CHLODecompositionPatterns",
@@ -138,10 +130,6 @@ iree_compiler_cc_library(
     ],
     hdrs = [
         "Passes.h",
-    ],
-    copts = [
-        "-Icompiler/plugins/input/StableHLO",
-        "-I$(GENDIR)/compiler/plugins/input/StableHLO",
     ],
     deps = [
         ":PassHeaders",

@@ -22,9 +22,6 @@ iree_tablegen_library(
 iree_cc_library(
   NAME
     PassHeaders
-  COPTS
-    "-Icompiler/plugins/input/TOSA"
-    "-I$(GENDIR)/compiler/plugins/input/TOSA"
   HDRS
     "PassDetail.h"
     "Passes.h"
@@ -45,9 +42,6 @@ iree_cc_library(
 iree_cc_library(
   NAME
     InputConversion
-  COPTS
-    "-Icompiler/plugins/input/TOSA"
-    "-I$(GENDIR)/compiler/plugins/input/TOSA"
   HDRS
     "Passes.h"
   SRCS

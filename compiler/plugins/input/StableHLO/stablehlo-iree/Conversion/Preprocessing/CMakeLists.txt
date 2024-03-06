@@ -45,9 +45,6 @@ iree_tablegen_library(
 iree_cc_library(
   NAME
     Preprocessing
-  COPTS
-    "-Icompiler/plugins/input/StableHLO"
-    "-I$(GENDIR)/compiler/plugins/input/StableHLO"
   HDRS
     "Passes.h"
     "Rewriters.h"

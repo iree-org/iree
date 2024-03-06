@@ -75,10 +75,6 @@ iree_compiler_cc_library(
         "Passes.h",
         "Rewriters.h",
     ],
-    copts = [
-        "-Icompiler/plugins/input/StableHLO",
-        "-I$(GENDIR)/compiler/plugins/input/StableHLO",
-    ],
     deps = [
         ":ComplexLoweringPatterns",
         ":PassHeaders",

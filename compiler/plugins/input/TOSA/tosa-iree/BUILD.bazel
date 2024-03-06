@@ -22,11 +22,9 @@ iree_compiler_cc_library(
     srcs = [
         "PluginRegistration.cpp",
     ],
-    copts = ["-Icompiler/plugins/input/TOSA"],
     deps = [
         "//compiler/plugins/input/TOSA/tosa-iree/InputConversion",
         "//compiler/src/iree/compiler/PluginAPI",
-        "@llvm-project//mlir:ConversionPasses",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:TosaDialect",

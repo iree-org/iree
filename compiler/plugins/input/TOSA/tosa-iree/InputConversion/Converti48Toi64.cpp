@@ -1,16 +1,10 @@
-//===- Converti48Toi64.cpp --------------------------------------------===//
+// Copyright 2023 The IREE Authors
 //
-// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-//
-//===----------------------------------------------------------------------===//
-//
-// Convert all i48 types to i64.
-//
-//===----------------------------------------------------------------------===//
 
-#include "tosa-iree/InputConversion/PassDetail.h"
+#include "compiler/plugins/input/TOSA/tosa-iree/InputConversion/PassDetail.h"
 
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Tosa/IR/TosaOps.h"

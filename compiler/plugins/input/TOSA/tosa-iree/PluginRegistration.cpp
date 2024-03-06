@@ -11,7 +11,7 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/PassManager.h"
 
-#include "tosa-iree/InputConversion/Passes.h"
+#include "compiler/plugins/input/TOSA/tosa-iree/InputConversion/Passes.h"
 
 namespace mlir::iree_compiler {
 

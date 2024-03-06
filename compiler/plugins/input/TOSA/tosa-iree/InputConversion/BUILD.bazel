@@ -34,10 +34,6 @@ iree_compiler_cc_library(
         "Passes.h",
         "Passes.h.inc",
     ],
-    copts = [
-        "-Icompiler/plugins/input/TOSA",
-        "-I$(GENDIR)/compiler/plugins/input/TOSA",
-    ],
     deps = [
         ":PassesIncGen",
         "//compiler/src/iree/compiler/Dialect/LinalgExt/IR",
@@ -62,10 +58,6 @@ iree_compiler_cc_library(
     ],
     hdrs = [
         "Passes.h",
-    ],
-    copts = [
-        "-Icompiler/plugins/input/TOSA",
-        "-I$(GENDIR)/compiler/plugins/input/TOSA",
     ],
     deps = [
         ":PassHeaders",

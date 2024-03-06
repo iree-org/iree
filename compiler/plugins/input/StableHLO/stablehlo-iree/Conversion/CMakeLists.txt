@@ -22,9 +22,6 @@ iree_tablegen_library(
 iree_cc_library(
   NAME
     PassHeaders
-  COPTS
-    "-Icompiler/plugins/input/StableHLO"
-    "-I$(GENDIR)/compiler/plugins/input/StableHLO"
   HDRS
     "PassDetail.h"
     "Passes.h"
@@ -49,9 +46,6 @@ iree_tablegen_library(
 iree_cc_library(
   NAME
     StableHLOLegalization
-  COPTS
-    "-Icompiler/plugins/input/StableHLO"
-    "-I$(GENDIR)/compiler/plugins/input/StableHLO"
   SRCS
     "ConvertCollectives.cpp"
     "LegalizeCHLO.cpp"
@@ -116,9 +110,6 @@ iree_cc_library(
 iree_cc_library(
   NAME
     Conversion
-  COPTS
-    "-Icompiler/plugins/input/StableHLO"
-    "-I$(GENDIR)/compiler/plugins/input/StableHLO"
   HDRS
     "Passes.h"
   SRCS
