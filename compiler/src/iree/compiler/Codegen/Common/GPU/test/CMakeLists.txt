@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "gpu_check_resource_usage.mlir"
+    "gpu_create_fast_slow_path.mlir"
     "gpu_distribute.mlir"
     "gpu_distribute_shared_memory.mlir"
     "gpu_generalize_named_ops.mlir"

@@ -33,7 +33,7 @@ static void getDimValues(OpBuilder &b, Location loc, Value v, Ty t,
                          SmallVector<OpFoldResult> &dimVals) {
   for (auto [idx, val] : llvm::enumerate(t.getShape())) {
     if (ShapedType::isDynamic(val)) {
-      dimVals.push_back(b.create<DimOpTy>(loc, v, idx).getResult());
+      dimVals.push_back(b.createOrFold<DimOpTy>(loc, v, idx));
     } else {
       dimVals.push_back(b.getIndexAttr(val));
     }

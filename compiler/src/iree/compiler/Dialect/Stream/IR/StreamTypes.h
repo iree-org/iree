@@ -86,6 +86,17 @@ struct AsyncAccessRange {
   Value start; // may be nullptr to indicate 0
   Value end;
   Value length;
+
+  // Returns true if the access is read-only.
+  bool isReadOnly() const { return access == ResourceAccessBitfield::Read; }
+
+  // Prints a textual representation of the range.
+  void print(llvm::raw_ostream &os, AsmState &asmState);
+
+  // Returns true if |lhs| and |rhs| may overlap and false only if it can be
+  // locally proven that they do not.
+  static bool mayOverlap(const AsyncAccessRange &lhs,
+                         const AsyncAccessRange &rhs);
 };
 
 #include "iree/compiler/Dialect/Stream/IR/StreamOpInterfaces.h.inc" // IWYU pragma: export
