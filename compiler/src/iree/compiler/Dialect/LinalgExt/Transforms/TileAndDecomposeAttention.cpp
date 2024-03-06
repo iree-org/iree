@@ -534,8 +534,15 @@ void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
   OpFoldResult keyValueTileLength =
       tileSize ? rewriter.getIndexAttr(tileSize.value()) : sequenceTileLength;
 
+  // In the original algorithm, the scaling is done after the softmax:
+  //        softmax(Q @ K.T / scale) @ V
+  //
+  // But, it is mathematically equivalent to do it on Q first and then multiply
+  // it by K.T. This just allows us to do the scaling once, instead of each
+  // iteratiion of the loop.
+  // (This was also verified on fp16 attention that it produces the same
+  // results).
   querySlice = scaleQuery(querySlice, tiledAttnOp.getScale(), rewriter);
-  // Add scaled query.
   ops.push_back(querySlice.getDefiningOp());
 
   Type elementType = tiledAttnOp.getQueryType().getElementType();
