@@ -131,42 +131,48 @@ void populateVectorContractCustomKernelsPatterns(
 // LLVMCPU backend Pass Pipelines.
 //----------------------------------------------------------------------------//
 
+struct LLVMCPUPipelineOptions {
+  bool enablePeeling = false;
+  bool enableVectorMasking = false;
+  bool enableAArch64SSVE = false;
+  bool enableUkernels = false;
+  bool lowerToAVX2 = false;
+};
+
 /// Populates the passes to lower linalg ops on buffers. Currenly this
 /// pipeline is only used for dispatches that just copy data from input
 /// interfaces to output interface.
-void addCPUBufferOpsTileAndVectorizePipeline(OpPassManager &passManager,
-                                             TilingConfig &tilingConfig,
-                                             bool enableVectorMasking,
-                                             bool enableAArch64SSVE = false);
+void addCPUBufferOpsTileAndVectorizePipeline(
+    OpPassManager &passManager, TilingConfig &tilingConfig,
+    LLVMCPUPipelineOptions &pipelineOpt);
 
 /// Populates the passes to lower ops through data tiling transformations.
 void addCPUDataTilingPipeline(OpPassManager &passManager,
                               TilingConfig &tilingConfig,
-                              bool enableVectorMasking);
+                              LLVMCPUPipelineOptions &pipelineOpt);
 
-void addCPULinalgExtTileAndVectorizePipeline(OpPassManager &passManager,
-                                             TilingConfig &tilingConfig);
+void addCPULinalgExtTileAndVectorizePipeline(
+    OpPassManager &passManager, TilingConfig &tilingConfig,
+    LLVMCPUPipelineOptions &pipelineOpt);
 
 /// Populates the passes to lower to scalars operations for linalg based
 /// code-generation. This pipeline does not vectorize, but instead just
 /// converts to memrefs
 void addCPUDefaultPassPipeline(OpPassManager &passManager);
 
-void addConvTileAndDecomposeExpertPassPipeline(OpPassManager &passManager,
-                                               TilingConfig &tilingConfig,
-                                               bool enableVectorMasking,
-                                               bool enableAArch64SSVE = false);
+void addConvTileAndDecomposeExpertPassPipeline(
+    OpPassManager &passManager, TilingConfig &tilingConfig,
+    LLVMCPUPipelineOptions &pipelineOpt);
 
 /// Populates the passes needed to multi level tile, fuse and vectorize
 /// lowering of linalg ops on tensors to vectors operations.
 void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
                                       TilingConfig &tilingConfig,
-                                      bool enableMicrokernels,
-                                      bool lowerToAVX2);
+                                      LLVMCPUPipelineOptions &pipelineOpt);
 
-void addMultiTilingExpertPassPipeline(
-    OpPassManager &passManager, TilingConfig &tilingConfig, bool enablePeeling,
-    bool enableVectorMasking, bool lowerToAVX2, bool enableAArch64SSVE = false);
+void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
+                                      TilingConfig &tilingConfig,
+                                      LLVMCPUPipelineOptions &pipelineOpt);
 
 void addTensorToVectorsPassPipeline(OpPassManager &passManager,
                                     bool lowerToVectors = true);
