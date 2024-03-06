@@ -154,8 +154,8 @@ struct AttentionOpConversion
                                                           floatElementType);
 
     auto attention = rewriter.create<IREE::LinalgExt::AttentionOp>(
-        loc, collapsedResultType, SmallVector<Value>{query, key, value}, scale,
-        collapsedResult);
+        loc, collapsedResultType, SmallVector<Value>{query, key, value},
+        collapsedResult, scale);
 
     if (sizes.size() > 3)
       rewriter.replaceOp(
