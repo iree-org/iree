@@ -142,11 +142,11 @@ iree_uk_mmt4d_tile_s8s4s32_1x8x8_to_8x8x8_arm_64_dotprod(
       // 4x8 * 8x8 -> 4x8.
       IREE_UK_UNROLL for (int i = 0; i < 2; i++) {
         IREE_UK_UNROLL for (int j = 0; j < 2; j++) {
-          IREE_UK_UNROLL for (int k = 0; k < 2; k++) {
-            acc[4 * k + j] = vdotq_lane_s32(acc[4 * k + j], rhs[2 * i + j],
-                                            lhs[2 * k + i], 0);
-            acc[4 * k + j + 2] = vdotq_lane_s32(
-                acc[4 * k + j + 2], rhs[2 * i + j], lhs[2 * k + i], 1);
+          IREE_UK_UNROLL for (int m = 0; m < 2; m++) {
+            acc[4 * m + j] = vdotq_lane_s32(acc[4 * m + j], rhs[2 * i + j],
+                                            lhs[2 * m + i], 0);
+            acc[4 * m + j + 2] = vdotq_lane_s32(
+                acc[4 * m + j + 2], rhs[2 * i + j], lhs[2 * m + i], 1);
           }
         }
       }
@@ -154,11 +154,11 @@ iree_uk_mmt4d_tile_s8s4s32_1x8x8_to_8x8x8_arm_64_dotprod(
       // 8x8 * 8x8 -> 8x8.
       IREE_UK_UNROLL for (int i = 0; i < 2; i++) {
         IREE_UK_UNROLL for (int j = 0; j < 2; j++) {
-          IREE_UK_UNROLL for (int k = 0; k < 2; k++) {
-            acc[8 + 4 * k + j] = vdotq_lane_s32(
-                acc[8 + 4 * k + j], rhs[2 * i + j], lhs[4 + 2 * i + k], 0);
-            acc[10 + 4 * k + j] = vdotq_lane_s32(
-                acc[10 + 4 * k + j], rhs[2 * i + j], lhs[4 + 2 * i + k], 1);
+          IREE_UK_UNROLL for (int m = 0; m < 2; m++) {
+            acc[8 + 4 * m + j] = vdotq_lane_s32(
+                acc[8 + 4 * m + j], rhs[2 * i + j], lhs[4 + 2 * i + m], 0);
+            acc[10 + 4 * m + j] = vdotq_lane_s32(
+                acc[10 + 4 * m + j], rhs[2 * i + j], lhs[4 + 2 * i + m], 1);
           }
         }
       }
