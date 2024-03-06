@@ -208,10 +208,6 @@ util.func public @propagate_to_bmm_transpose_batch(%transposed_lhs: tensor<16x2x
                             outs(%empty : tensor<2x16x16xf32>) -> tensor<2x16x16xf32>
   util.return %bmm : tensor<2x16x16xf32>
 }
-// Verify that without aggressive propagation, this stays as a batch matmul
-// CHECK-LABEL: util.func public @propagate_to_bmm_transpose_batch
-//       CHECK:   linalg.batch_matmul
-
 // APROP: #[[$MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d0, d3)>
 // APROP: #[[$MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
 // APROP: #[[$MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
@@ -395,7 +391,10 @@ util.func public @bubble_through_matmul(%lhs: tensor<16x16xf32>,
       outs(%empty : tensor<16x16xf32>) permutation = [1, 0]
   util.return %transpose : tensor<16x16xf32>
 }
-// CHECK-LABEL: util.func public @propagate_to_matmul_ops
-//       CHECK:   linalg.matmul_transpose_b
-//       CHECK:   %[[SECOND_MM:.+]] = linalg.matmul_transpose_a
-//       CHECK:   util.return %[[SECOND_MM]]
+//   CHECK-DAG: #[[MAP:.+]] = affine_map<(d0, d1, d2) -> (d1, d2)>
+//   CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d2, d0)>
+//   CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
+//       CHECK: util.func public @bubble_through_matmul
+//       CHECK:   %[[MATMUL:.+]] = linalg.generic
+//       CHECK:     indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
+//       CHECK:   util.return %[[MATMUL]]
