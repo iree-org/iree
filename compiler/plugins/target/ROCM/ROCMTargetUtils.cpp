@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "./ROCMTargetUtils.h"
+#include "compiler/plugins/target/ROCM/ROCMTargetUtils.h"
 
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/HAL/Target/LLVMLinkerUtils.h"
