@@ -120,7 +120,6 @@ iree_uk_mmt4d_tile_s8s4s32_1x8x16_arm_64_i8mm(
     void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
     const void* IREE_UK_RESTRICT rhs_panel,
     const iree_uk_mmt4d_params_t* params) {
-  IREE_UK_ASSERT(M0 == 1 && iree_uk_is_po2_u32(M0));
   IREE_UK_ASSERT(!(params->K0 % 16));
   const iree_uk_int8_t* IREE_UK_RESTRICT lhs_ptr = lhs_panel;
   const iree_uk_int8_t* IREE_UK_RESTRICT rhs_ptr = rhs_panel;
@@ -186,7 +185,7 @@ iree_uk_mmt4d_tile_s8s4s32_2x8x16_to_8x8x16_arm_64_i8mm(
   const int mtiles = M0 / 2;
 
   int32x4_t acc[4][4];
-  for (int i = 0; i < mtiles; i++) {
+  IREE_UK_UNROLL for (int i = 0; i < mtiles; i++) {
     IREE_UK_UNROLL for (int j = 0; j < 4; j++) {
       // We start with zero accumulators and add the value of *out_ptr later.
       // This is required for the int4 left shift described above.
@@ -212,7 +211,7 @@ iree_uk_mmt4d_tile_s8s4s32_2x8x16_to_8x8x16_arm_64_i8mm(
       lhs[0][0] = vcombine_s8(lhs_uzp[0].val[0], lhs_uzp[1].val[0]);
       lhs[1][0] = vcombine_s8(lhs_uzp[0].val[1], lhs_uzp[1].val[1]);
     } else {
-      for (int i = 0; i < mtiles; i++) {
+      IREE_UK_UNROLL for (int i = 0; i < mtiles; i++) {
         int8x8x2_t lhs_0 = vld2_s8(lhs_ptr + 16 * 2 * i);
         int8x8x2_t lhs_1 = vld2_s8(lhs_ptr + 16 * (2 * i + 1));
         lhs[0][i] = vcombine_s8(lhs_0.val[0], lhs_1.val[0]);
@@ -221,7 +220,7 @@ iree_uk_mmt4d_tile_s8s4s32_2x8x16_to_8x8x16_arm_64_i8mm(
     }
     lhs_ptr += 32 * mtiles;
 
-    for (int i = 0; i < mtiles; i++) {
+    IREE_UK_UNROLL for (int i = 0; i < mtiles; i++) {
       IREE_UK_UNROLL for (int j = 0; j < 4; j++) {
         IREE_UK_UNROLL for (int m = 0; m < 2; m++) {
           acc[i][j] = vmmlaq_s32(acc[i][j], lhs[m][i], rhs[m][j]);
@@ -231,7 +230,7 @@ iree_uk_mmt4d_tile_s8s4s32_2x8x16_to_8x8x16_arm_64_i8mm(
   }
 
   // Swizzle accumulator 2x2 register tiles back to row-major and store.
-  for (int i = 0; i < mtiles; i++) {
+  IREE_UK_UNROLL for (int i = 0; i < mtiles; i++) {
     IREE_UK_UNROLL for (int j = 0; j < 2; j++) {
       acc[i][2 * j + 0] = vshrq_n_s32(acc[i][2 * j + 0], 4);
       acc[i][2 * j + 1] = vshrq_n_s32(acc[i][2 * j + 1], 4);
