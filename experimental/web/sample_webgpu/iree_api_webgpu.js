@@ -24,7 +24,7 @@ async function ireeInitialize() {
 //
 // In order to call functions on the program it must be compiled in a supported
 // configuration, such as with these flags:
-//     --iree-hal-target-backends=webgpu
+//     --iree-hal-target-backends=webgpu-spirv
 //
 // Resolves with an opaque pointer to the program state on success.
 async function ireeLoadProgram(vmfbPathOrBuffer) {
