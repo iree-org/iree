@@ -18,6 +18,34 @@ target_include_directories(torch-iree_compiler_defs
 # which provides common includes and copts for the tree.
 set(IREE_IMPLICIT_DEFS_CC_DEPS torch-iree_compiler_defs)
 
-add_subdirectory(torch-iree)
 add_subdirectory(torch-mlir)
 add_subdirectory(torch-mlir-dialects)
+
+add_subdirectory(InputConversion)
+
+iree_cc_library(
+  NAME
+    registration
+  SRCS
+    "PluginRegistration.cpp"
+  DEPS
+    MLIRIR
+    MLIRMLProgramDialect
+    MLIRPass
+    iree::compiler::PluginAPI
+    iree::compiler::plugins::input::Torch::InputConversion
+    iree::compiler::plugins::input::Torch::torch-mlir::TorchConversionDialectIR
+    iree::compiler::plugins::input::Torch::torch-mlir::TorchDialectIR
+    iree::compiler::plugins::input::Torch::torch-mlir::TorchDialectPasses
+    iree::compiler::plugins::input::Torch::torch-mlir::TorchOnnxToTorchPasses
+    iree::compiler::plugins::input::Torch::torch-mlir::ConversionPasses
+    iree::compiler::plugins::input::Torch::torch-mlir-dialects::TMTensorDialectIR
+  PUBLIC
+)
+
+iree_compiler_register_plugin(
+  PLUGIN_ID
+    input_torch
+  TARGET
+    ::registration
+)

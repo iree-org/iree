@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef TORCH_IREE_INPUTCONVERSION_PASSDETAIL_H_
-#define TORCH_IREE_INPUTCONVERSION_PASSDETAIL_H_
+#ifndef IREE_COMPILER_PLUGINS_INPUT_TORCH_INPUTCONVERSION_PASSDETAIL_H_
+#define IREE_COMPILER_PLUGINS_INPUT_TORCH_INPUTCONVERSION_PASSDETAIL_H_
 
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
@@ -14,8 +14,8 @@
 namespace mlir::iree_compiler::TorchInput {
 
 #define GEN_PASS_CLASSES
-#include "compiler/plugins/input/Torch/torch-iree/InputConversion/Passes.h.inc"
+#include "compiler/plugins/input/Torch/InputConversion/Passes.h.inc"
 
 } // namespace mlir::iree_compiler::TorchInput
 
-#endif // TORCH_IREE_INPUTCONVERSION_PASSDETAIL_H_
+#endif // IREE_COMPILER_PLUGINS_INPUT_TORCH_INPUTCONVERSION_PASSDETAIL_H_

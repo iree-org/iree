@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "compiler/plugins/input/Torch/torch-iree/InputConversion/PassDetail.h"
-#include "compiler/plugins/input/Torch/torch-iree/InputConversion/Passes.h"
+#include "compiler/plugins/input/Torch/InputConversion/PassDetail.h"
+#include "compiler/plugins/input/Torch/InputConversion/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"

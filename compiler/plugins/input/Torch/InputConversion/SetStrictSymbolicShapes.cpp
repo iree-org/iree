@@ -12,8 +12,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "compiler/plugins/input/Torch/torch-iree/InputConversion/PassDetail.h"
-#include "compiler/plugins/input/Torch/torch-iree/InputConversion/Passes.h"
+#include "compiler/plugins/input/Torch/InputConversion/PassDetail.h"
+#include "compiler/plugins/input/Torch/InputConversion/Passes.h"
 #include "llvm/ADT/StringRef.h"
 
 static const llvm::StringLiteral kStrictSymbolsMarker =

@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef TORCH_IREE_INPUTCONVERSION_PASSES_H_
-#define TORCH_IREE_INPUTCONVERSION_PASSES_H_
+#ifndef IREE_COMPILER_PLUGINS_INPUT_TORCH_INPUTCONVERSION_PASSES_H_
+#define IREE_COMPILER_PLUGINS_INPUT_TORCH_INPUTCONVERSION_PASSES_H_
 
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
@@ -45,4 +45,4 @@ void registerTMTensorConversionPasses();
 
 } // namespace mlir::iree_compiler::TorchInput
 
-#endif // TORCH_IREE_INPUTCONVERSION_PASSES_H_
+#endif // IREE_COMPILER_PLUGINS_INPUT_TORCH_INPUTCONVERSION_PASSES_H_

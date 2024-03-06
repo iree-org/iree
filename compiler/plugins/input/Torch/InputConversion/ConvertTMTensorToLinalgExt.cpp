@@ -7,8 +7,8 @@
 #include <cstdint>
 #include <numeric>
 
-#include "compiler/plugins/input/Torch/torch-iree/InputConversion/PassDetail.h"
-#include "compiler/plugins/input/Torch/torch-iree/InputConversion/Passes.h"
+#include "compiler/plugins/input/Torch/InputConversion/PassDetail.h"
+#include "compiler/plugins/input/Torch/InputConversion/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"

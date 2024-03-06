@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef TORCH_IREE_INPUTCONVERSION_PASSES
-#define TORCH_IREE_INPUTCONVERSION_PASSES
+#ifndef IREE_COMPILER_PLUGINS_INPUT_TORCH_INPUTCONVERSION_PASSES
+#define IREE_COMPILER_PLUGINS_INPUT_TORCH_INPUTCONVERSION_PASSES
 
 include "mlir/Pass/PassBase.td"
 
@@ -32,9 +32,9 @@ def FuncConversion :
   let summary = "Finalizes conversion from torch to IREE";
   let constructor = "mlir::iree_compiler::TorchInput::createFuncConversionPass()";
   let description = [{
-    Conversion pass for finalizing functions and ABI. Replaces the generic 
+    Conversion pass for finalizing functions and ABI. Replaces the generic
     torch-func-backend-type-conversion pass.
   }];
 }
 
-#endif // TORCH_IREE_INPUTCONVERSION_PASSES
+#endif // IREE_COMPILER_PLUGINS_INPUT_TORCH_INPUTCONVERSION_PASSES
