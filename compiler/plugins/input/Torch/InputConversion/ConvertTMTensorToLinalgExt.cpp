@@ -147,9 +147,11 @@ struct AttentionOpConversion
         loc, collapsedResultShape, elementType);
 
     assert(isa<FloatType>(elementType) &&
-           "Attention only works on float types");
+           "Attention should have floating type input");
     FloatType floatElementType = cast<FloatType>(elementType);
 
+    // TODO: This is just a placeholder until we have proper support in
+    // torch-mlir for attention lowering.
     Value scale = rewriter.create<arith::ConstantFloatOp>(loc, APFloat(1.0f),
                                                           floatElementType);
 
