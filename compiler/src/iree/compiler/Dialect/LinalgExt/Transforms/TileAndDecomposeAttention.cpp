@@ -534,6 +534,20 @@ void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
   OpFoldResult keyValueTileLength =
       tileSize ? rewriter.getIndexAttr(tileSize.value()) : sequenceTileLength;
 
+  Type elementType = tiledAttnOp.getQueryType().getElementType();
+
+  assert(isa<FloatType>(elementType) &&
+         "Attention only works on floating types");
+  FloatType floatElementType = cast<FloatType>(elementType);
+
+  // Since we use exp2 for attention instead of the original exp, we have to
+  // multiply the scale by log2(e) = 1.44269504089. We use exp2 instead of exp
+  // as most gpus have better support for exp2.
+  Value scale = tiledAttnOp.getScale();
+  Value log2e = rewriter.create<arith::ConstantFloatOp>(
+      loc, APFloat(1.44269504089), floatElementType);
+  scale = rewriter.create<arith::MulFOp>(loc, scale, log2e);
+
   // In the original algorithm, the scaling is done after the softmax:
   //        softmax(Q @ K.T / scale) @ V
   //
@@ -545,7 +559,6 @@ void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
   querySlice = scaleQuery(querySlice, tiledAttnOp.getScale(), rewriter);
   ops.push_back(querySlice.getDefiningOp());
 
-  Type elementType = tiledAttnOp.getQueryType().getElementType();
   auto [result, newMax, newSum] = createAttentionBody(
       keySlice, valueSlice, querySlice, tiledResult, max, sum,
       sequenceTileLength, keyValueTileLength, headDimension, elementType, ops,
