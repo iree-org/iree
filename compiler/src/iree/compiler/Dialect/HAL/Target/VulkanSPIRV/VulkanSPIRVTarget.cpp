@@ -37,17 +37,11 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
   // llvm::cl::OptionCategory halVulkanSPIRVOptionsCategory(
   //     "IREE Vulkan/SPIR-V backend options");
 
-  static llvm::cl::list<std::string> clVulkanTargetTriples{
+  static llvm::cl::opt<std::string> clVulkanTargetTriple(
       "iree-vulkan-target-triple",
       llvm::cl::desc(
           "Vulkan target triple controlling the SPIR-V environment."),
-  };
-
-  static llvm::cl::list<std::string> clVulkanTargetEnvs{
-      "iree-vulkan-target-env",
-      llvm::cl::desc(
-          "Vulkan target environment as #vk.target_env attribute assembly."),
-  };
+      llvm::cl::init("unknown-unknown-unknown"));
 
   static llvm::cl::opt<bool> clVulkanIndirectBindings(
       "iree-vulkan-experimental-indirect-bindings",
@@ -55,59 +49,10 @@ VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
       llvm::cl::init(false));
 
   VulkanSPIRVTargetOptions targetOptions;
-
-  int tripleCount = clVulkanTargetTriples.getNumOccurrences();
-  int envCount = clVulkanTargetEnvs.getNumOccurrences();
-  int tripleIdx = 0;
-  int envIdx = 0;
-
-  // Get a flat list of target triples and environments following the original
-  // order specified via the command line.
-  SmallVector<std::string> vulkanTargetTriplesAndEnvs;
-  for (int i = 0, e = tripleCount + envCount; i < e; ++i) {
-    if (tripleIdx >= tripleCount) {
-      vulkanTargetTriplesAndEnvs.push_back(clVulkanTargetEnvs[envIdx++]);
-      continue;
-    }
-    if (envIdx >= envCount) {
-      vulkanTargetTriplesAndEnvs.push_back(clVulkanTargetTriples[tripleIdx++]);
-      continue;
-    }
-    if (clVulkanTargetTriples.getPosition(tripleIdx) >
-        clVulkanTargetEnvs.getPosition(envIdx)) {
-      vulkanTargetTriplesAndEnvs.push_back(clVulkanTargetEnvs[envIdx++]);
-    } else {
-      vulkanTargetTriplesAndEnvs.push_back(clVulkanTargetTriples[tripleIdx++]);
-    }
-  }
-  targetOptions.targetTriplesAndEnvs = vulkanTargetTriplesAndEnvs;
-
+  targetOptions.targetTriple = clVulkanTargetTriple;
   targetOptions.indirectBindings = clVulkanIndirectBindings;
 
   return targetOptions;
-}
-
-// Returns the Vulkan target environment for conversion.
-static spirv::TargetEnvAttr
-getSPIRVTargetEnv(const std::string &vulkanTargetTripleOrEnv,
-                  MLIRContext *context) {
-  if (!vulkanTargetTripleOrEnv.empty()) {
-    if (vulkanTargetTripleOrEnv[0] != '#') {
-      return convertTargetEnv(
-          Vulkan::getTargetEnvForTriple(context, vulkanTargetTripleOrEnv));
-    }
-
-    if (auto attr = parseAttribute(vulkanTargetTripleOrEnv, context)) {
-      if (auto vkTargetEnv = llvm::dyn_cast<Vulkan::TargetEnvAttr>(attr)) {
-        return convertTargetEnv(vkTargetEnv);
-      }
-    }
-    emitError(Builder(context).getUnknownLoc())
-        << "cannot parse vulkan target environment as #vk.target_env "
-           "attribute: '"
-        << vulkanTargetTripleOrEnv << "'";
-  }
-  return {};
 }
 
 // TODO: VulkanOptions for choosing the Vulkan version and extensions/features.
@@ -148,19 +93,10 @@ public:
       MLIRContext *context, StringRef deviceID, DictionaryAttr deviceConfigAttr,
       SmallVectorImpl<IREE::HAL::ExecutableTargetAttr> &executableTargetAttrs)
       const override {
-    // Select SPIR-V environments to compile for.
-    for (std::string targetTripleOrEnv : options_.targetTriplesAndEnvs) {
-      executableTargetAttrs.push_back(getExecutableTarget(
-          context, getSPIRVTargetEnv(targetTripleOrEnv, context),
-          options_.indirectBindings));
-    }
-
-    // If no environment specified, populate with a minimal target.
-    if (executableTargetAttrs.empty()) {
-      executableTargetAttrs.push_back(getExecutableTarget(
-          context, getSPIRVTargetEnv("unknown-unknown-unknown", context),
-          options_.indirectBindings));
-    }
+    auto spirvTargetEnv = Vulkan::convertTargetEnv(
+        Vulkan::getTargetEnvForTriple(context, options_.targetTriple));
+    executableTargetAttrs.push_back(getExecutableTarget(
+        context, spirvTargetEnv, options_.indirectBindings));
   }
 
   IREE::HAL::ExecutableTargetAttr

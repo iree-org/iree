@@ -10,15 +10,12 @@
 #include <functional>
 #include <string>
 
-#include "llvm/ADT/SmallVector.h"
-
 namespace mlir::iree_compiler::IREE::HAL {
 
 // Options controlling the SPIR-V translation.
 struct VulkanSPIRVTargetOptions {
-  // Vulkan target environments, either as #vk.target_env attribute assembly
-  // or as a Vulkan target triple.
-  llvm::SmallVector<std::string> targetTriplesAndEnvs;
+  // Vulkan target triple.
+  std::string targetTriple;
   // Whether to use indirect bindings for all generated dispatches.
   bool indirectBindings = false;
 };
