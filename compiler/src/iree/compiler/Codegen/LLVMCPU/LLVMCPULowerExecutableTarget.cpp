@@ -128,13 +128,14 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   }
 
   ModuleOp moduleOp = variantOp.getInnerModule();
-  LLVMCPUPipelineOptions options;
+  LLVMCPUPipelineOptions pipelineOpts;
   auto target = variantOp.getTarget();
-  options.lowerToAVX2 = hasAVX2Feature(target);
-  options.enableVectorMasking = isX86(target) || isRISCV(target) ||
-                                (isAArch64(target) && hasAnySVEFeature(target));
-  options.enableUkernels = hasUkernel(target);
-  options.enableAArch64SSVE =
+  pipelineOpts.lowerToAVX2 = hasAVX2Feature(target);
+  pipelineOpts.enableVectorMasking =
+      isX86(target) || isRISCV(target) ||
+      (isAArch64(target) && hasAnySVEFeature(target));
+  pipelineOpts.enableUkernels = hasUkernel(target);
+  pipelineOpts.enableAArch64SSVE =
       isAArch64(target) && hasAnySVEFeature(target) && hasSMEFeature(target);
   switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
   // No pipleline specified, nothing to do.
@@ -146,41 +147,44 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   case IREE::Codegen::DispatchLoweringPassPipeline::
       CPUBufferOpsTileAndVectorize: {
     TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
-    addCPUBufferOpsTileAndVectorizePipeline(pipeline, tilingConfig, options);
+    addCPUBufferOpsTileAndVectorizePipeline(pipeline, tilingConfig,
+                                            pipelineOpts);
     break;
   }
   case IREE::Codegen::DispatchLoweringPassPipeline::CPUDoubleTilingExpert: {
     TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
-    addMultiTilingExpertPassPipeline(pipeline, tilingConfig, options);
+    addMultiTilingExpertPassPipeline(pipeline, tilingConfig, pipelineOpts);
     break;
   }
   case IREE::Codegen::DispatchLoweringPassPipeline::
       CPUDoubleTilingPeelingExpert: {
     TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
-    options.enablePeeling = true;
-    addMultiTilingExpertPassPipeline(pipeline, tilingConfig, options);
+    pipelineOpts.enablePeeling = true;
+    addMultiTilingExpertPassPipeline(pipeline, tilingConfig, pipelineOpts);
     break;
   }
   case IREE::Codegen::DispatchLoweringPassPipeline::
       CPUConvTileAndDecomposeExpert: {
     TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
-    addConvTileAndDecomposeExpertPassPipeline(pipeline, tilingConfig, options);
+    addConvTileAndDecomposeExpertPassPipeline(pipeline, tilingConfig,
+                                              pipelineOpts);
     break;
   }
   case IREE::Codegen::DispatchLoweringPassPipeline::Mmt4dTilingExpert: {
     TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
-    addMmt4dTilingExpertPassPipeline(pipeline, tilingConfig, options);
+    addMmt4dTilingExpertPassPipeline(pipeline, tilingConfig, pipelineOpts);
     break;
   }
   case IREE::Codegen::DispatchLoweringPassPipeline::CPUDataTiling: {
     TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
-    addCPUDataTilingPipeline(pipeline, tilingConfig, options);
+    addCPUDataTilingPipeline(pipeline, tilingConfig, pipelineOpts);
     break;
   }
   case IREE::Codegen::DispatchLoweringPassPipeline::
       CPULinalgExtTileAndVectorize: {
     TilingConfig tilingConfig = getTilingConfigForPipeline(moduleOp);
-    addCPULinalgExtTileAndVectorizePipeline(pipeline, tilingConfig, options);
+    addCPULinalgExtTileAndVectorizePipeline(pipeline, tilingConfig,
+                                            pipelineOpts);
     break;
   }
   // Transform-dialect pipelines.
