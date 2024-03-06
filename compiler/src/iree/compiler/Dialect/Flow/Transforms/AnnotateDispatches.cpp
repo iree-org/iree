@@ -179,6 +179,22 @@ static std::string summarizeLinalgOp(linalg::LinalgOp op) {
     }
   }
 
+  // Categorize linalg.generic ops better.
+  if (prefix.empty() && isa<linalg::GenericOp>(op)) {
+    if (llvm::all_of(op.getIndexingMapsArray(),
+                     [](AffineMap m) { return m.isIdentity(); })) {
+      prefix = "elementwise";
+    } else if (llvm::all_of(op.getIndexingMapsArray(),
+                            [](AffineMap m) { return m.isMinorIdentity(); })) {
+      // We have checked that this is not pure elementwise in the above.
+      prefix = "broadcast";
+    } else if (linalg::isaContractionOpInterface(op)) {
+      prefix = "contract";
+    } else if (linalg::isaConvolutionOpInterface(op)) {
+      prefix = "conv";
+    }
+  }
+
   if (prefix.empty()) {
     // By default, use the op name as prefix.
     auto opName = op->getName().getStringRef();
