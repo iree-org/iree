@@ -170,11 +170,9 @@ iree_compiler_cc_library(
     hdrs = ["init_targets.h"],
     local_defines = [
         "IREE_HAVE_LLVM_CPU_TARGET",
-        "IREE_HAVE_VULKANSPIRV_TARGET",
     ],
     deps = [
         "//compiler/src/iree/compiler/Dialect/HAL/Target/LLVMCPU",
-        "//compiler/src/iree/compiler/Dialect/HAL/Target/VulkanSPIRV",
     ],
 )
 

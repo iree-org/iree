@@ -4,14 +4,13 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/HAL/Target/VulkanSPIRV/VulkanSPIRVTarget.h"
-
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanAttributes.h"
 #include "iree/compiler/Dialect/Vulkan/IR/VulkanDialect.h"
 #include "iree/compiler/Dialect/Vulkan/Utils/TargetEnvironment.h"
+#include "iree/compiler/PluginAPI/Client.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
 #include "iree/compiler/Utils/ModuleUtils.h"
 #include "iree/schemas/spirv_executable_def_builder.h"
@@ -31,40 +30,29 @@
 
 namespace mlir::iree_compiler::IREE::HAL {
 
-VulkanSPIRVTargetOptions getVulkanSPIRVTargetOptionsFromFlags() {
-  // TODO(antiagainst): Enable option categories once the following bug is
-  // fixed: https://bugs.llvm.org/show_bug.cgi?id=44223 static
-  // llvm::cl::OptionCategory halVulkanSPIRVOptionsCategory(
-  //     "IREE Vulkan/SPIR-V backend options");
+namespace {
+struct VulkanSPIRVTargetOptions {
+  std::string targetTriple = "";
+  std::string targetEnv = "";
+  bool indirectBindings = false;
 
-  static llvm::cl::opt<std::string> clVulkanTargetTriple(
-      "iree-vulkan-target-triple",
-      llvm::cl::desc(
-          "Vulkan target triple controlling the SPIR-V environment."));
-
-  static llvm::cl::opt<std::string> clVulkanTargetEnv(
-      "iree-vulkan-target-env",
-      llvm::cl::desc(
-          "Vulkan target environment as #vk.target_env attribute assembly."));
-
-  static llvm::cl::opt<bool> clVulkanIndirectBindings(
-      "iree-vulkan-experimental-indirect-bindings",
-      llvm::cl::desc("Force indirect bindings for all generated dispatches."),
-      llvm::cl::init(false));
-
-  VulkanSPIRVTargetOptions targetOptions;
-  if (!clVulkanTargetEnv.empty()) {
-    // TODO(scotttodd): assert if triple is set too? (mutually exclusive flags)
-    targetOptions.targetTripleOrEnv = clVulkanTargetEnv;
-  } else if (!clVulkanTargetTriple.empty()) {
-    targetOptions.targetTripleOrEnv = clVulkanTargetTriple;
-  } else {
-    targetOptions.targetTripleOrEnv = "unknown-unknown-unknown";
+  void bindOptions(OptionsBinder &binder) {
+    static llvm::cl::OptionCategory category("VulkanSPIRV HAL Target");
+    binder.opt<std::string>(
+        "iree-vulkan-target-triple", targetTriple,
+        llvm::cl::desc(
+            "Vulkan target triple controlling the SPIR-V environment."));
+    binder.opt<std::string>(
+        "iree-vulkan-target-env", targetEnv,
+        llvm::cl::desc(
+            "Vulkan target environment as #vk.target_env attribute assembly."));
+    binder.opt<bool>(
+        "iree-vulkan-experimental-indirect-bindings", indirectBindings,
+        llvm::cl::desc(
+            "Force indirect bindings for all generated dispatches."));
   }
-  targetOptions.indirectBindings = clVulkanIndirectBindings;
-
-  return targetOptions;
-}
+};
+} // namespace
 
 // Returns the Vulkan target environment for conversion.
 static spirv::TargetEnvAttr
@@ -94,8 +82,8 @@ getSPIRVTargetEnv(const std::string &vulkanTargetTripleOrEnv,
 // TODO: VulkanOptions for choosing the Vulkan version and extensions/features.
 class VulkanTargetDevice : public TargetDevice {
 public:
-  VulkanTargetDevice(VulkanSPIRVTargetOptions options)
-      : options_(std::move(options)) {}
+  VulkanTargetDevice(const VulkanSPIRVTargetOptions &options)
+      : options_(options) {}
 
   IREE::HAL::DeviceTargetAttr
   getDefaultDeviceTarget(MLIRContext *context,
@@ -115,13 +103,13 @@ public:
   }
 
 private:
-  VulkanSPIRVTargetOptions options_;
+  const VulkanSPIRVTargetOptions &options_;
 };
 
 class VulkanSPIRVTargetBackend : public TargetBackend {
 public:
-  VulkanSPIRVTargetBackend(VulkanSPIRVTargetOptions options)
-      : options_(std::move(options)) {}
+  VulkanSPIRVTargetBackend(const VulkanSPIRVTargetOptions &options)
+      : options_(options) {}
 
   std::string getLegacyDefaultDeviceID() const override { return "vulkan"; }
 
@@ -129,8 +117,18 @@ public:
       MLIRContext *context, StringRef deviceID, DictionaryAttr deviceConfigAttr,
       SmallVectorImpl<IREE::HAL::ExecutableTargetAttr> &executableTargetAttrs)
       const override {
+    std::string targetTripleOrEnv;
+    if (!options_.targetEnv.empty()) {
+      // TODO(scotttodd): assert if triple is set too? (mutually exclusive)
+      targetTripleOrEnv = options_.targetEnv;
+    } else if (!options_.targetTriple.empty()) {
+      targetTripleOrEnv = options_.targetTriple;
+    } else {
+      targetTripleOrEnv = "unknown-unknown-unknown";
+    }
+
     executableTargetAttrs.push_back(getExecutableTarget(
-        context, getSPIRVTargetEnv(options_.targetTripleOrEnv, context),
+        context, getSPIRVTargetEnv(targetTripleOrEnv, context),
         options_.indirectBindings));
   }
 
@@ -413,20 +411,37 @@ public:
   }
 
 private:
-  VulkanSPIRVTargetOptions options_;
+  const VulkanSPIRVTargetOptions &options_;
 };
 
-void registerVulkanSPIRVTargetBackends(
-    std::function<VulkanSPIRVTargetOptions()> queryOptions) {
-  getVulkanSPIRVTargetOptionsFromFlags();
-  // #hal.device.target<"vulkan", ...
-  static TargetDeviceRegistration registration0("vulkan", [=]() {
-    return std::make_shared<VulkanTargetDevice>(queryOptions());
-  });
-  // #hal.executable.target<"vulkan-spirv", ...
-  static TargetBackendRegistration registration1("vulkan-spirv", [=]() {
-    return std::make_shared<VulkanSPIRVTargetBackend>(queryOptions());
-  });
-}
+namespace {
+struct VulkanSPIRVSession
+    : public PluginSession<VulkanSPIRVSession, VulkanSPIRVTargetOptions,
+                           PluginActivationPolicy::DefaultActivated> {
+  void populateHALTargetDevices(IREE::HAL::TargetDeviceList &targets) {
+    // #hal.device.target<"vulkan", ...
+    targets.add("vulkan", [&]() {
+      return std::make_shared<VulkanTargetDevice>(options);
+    });
+  }
+  void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {
+    // #hal.executable.target<"vulkan-spirv", ...
+    targets.add("vulkan-spirv", [&]() {
+      return std::make_shared<VulkanSPIRVTargetBackend>(options);
+    });
+  }
+};
+
+} // namespace
 
 } // namespace mlir::iree_compiler::IREE::HAL
+
+extern "C" bool iree_register_compiler_plugin_hal_target_vulkan_spirv(
+    mlir::iree_compiler::PluginRegistrar *registrar) {
+  registrar->registerPlugin<mlir::iree_compiler::IREE::HAL::VulkanSPIRVSession>(
+      "hal_target_vulkan_spirv");
+  return true;
+}
+
+IREE_DEFINE_COMPILER_OPTION_FLAGS(
+    mlir::iree_compiler::IREE::HAL::VulkanSPIRVTargetOptions);
