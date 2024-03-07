@@ -357,10 +357,10 @@ module attributes {hal.device.targets = [#device_target_llvm_cpu]} {
 }
 ```
 
-### IR Dump After CPUMaterializeEncoding
+### IR Dump After CPUMaterializeHostEncoding
 
 ```mlir
-// -----// IR Dump After CPUMaterializeEncoding (iree-codegen-cpu-materialize-encoding) //----- //
+// -----// IR Dump After CPUMaterializeHostEncoding (iree-codegen-cpu-materialize-host-encoding) //----- //
 [...]
 // -----// IR Dump After Canonicalizer (canonicalize) //----- //
 [...]

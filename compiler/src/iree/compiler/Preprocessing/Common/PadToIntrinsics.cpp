@@ -5,9 +5,13 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <cstdint>
+#include <limits>
+
 #include "iree/compiler/Codegen/Common/GPU/GPUHeuristics.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Preprocessing/Common/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
@@ -141,10 +145,8 @@ expandMapsAndIterators(SmallVector<AffineMap> &expandedMaps,
 }
 
 static SmallVector<GPUMatmulShapeType>
-getIntrinsics(linalg::LinalgOp linalgOp) {
-  SmallVector<IREE::HAL::ExecutableTargetAttr, 4> executableTargets =
-      IREE::HAL::DeviceTargetAttr::lookupExecutableTargets(linalgOp);
-
+getIntrinsics(linalg::LinalgOp linalgOp,
+              ArrayRef<IREE::HAL::ExecutableTargetAttr> executableTargets) {
   IREE::GPU::TargetAttr target;
   if (executableTargets.size() == 1) {
     auto targetAttr = executableTargets.front();
@@ -165,7 +167,9 @@ getIntrinsics(linalg::LinalgOp linalgOp) {
   });
 }
 
-static void padConvOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp) {
+static void
+padConvOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
+          ArrayRef<IREE::HAL::ExecutableTargetAttr> executableTargets) {
   if (!isa<linalg::ConvolutionOpInterface>(*linalgOp)) {
     return;
   }
@@ -174,7 +178,8 @@ static void padConvOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp) {
     return;
 
   // Early exit if cannot find intrinsics or if multiple executable targets.
-  SmallVector<GPUMatmulShapeType> intrinsics = getIntrinsics(linalgOp);
+  SmallVector<GPUMatmulShapeType> intrinsics =
+      getIntrinsics(linalgOp, executableTargets);
   if (intrinsics.empty())
     return;
 
@@ -304,8 +309,9 @@ static void padConvOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp) {
   rewriter.replaceOp(linalgOp, extracted);
 }
 
-static void padContractionLikeOp(RewriterBase &rewriter,
-                                 linalg::LinalgOp linalgOp) {
+static void padContractionLikeOp(
+    RewriterBase &rewriter, linalg::LinalgOp linalgOp,
+    ArrayRef<IREE::HAL::ExecutableTargetAttr> executableTargets) {
   FailureOr<mlir::linalg::ContractionDimensions> contractionDims =
       mlir::linalg::inferContractionDims(linalgOp);
 
@@ -319,7 +325,8 @@ static void padContractionLikeOp(RewriterBase &rewriter,
   }
 
   // Early exit if cannot find intrinsics or if multiple executable targets.
-  SmallVector<GPUMatmulShapeType> intrinsics = getIntrinsics(linalgOp);
+  SmallVector<GPUMatmulShapeType> intrinsics =
+      getIntrinsics(linalgOp, executableTargets);
   if (intrinsics.empty())
     return;
 
@@ -536,7 +543,12 @@ struct PadToIntrinsicsPass
 void PadToIntrinsicsPass::runOnOperation() {
   MLIRContext *context = &getContext();
   RewritePatternSet patterns(context);
+
   auto funcOp = getOperation();
+  IREE::HAL::DeviceAnalysis deviceAnalysis(funcOp->getParentOp());
+  if (failed(deviceAnalysis.run()))
+    return signalPassFailure();
+
   bool padConvOps = padTargetType == PadTargetType::ConvOp ||
                     padTargetType == PadTargetType::All;
   bool padContractionOps = padTargetType == PadTargetType::ContractionOp ||
@@ -564,11 +576,16 @@ void PadToIntrinsicsPass::runOnOperation() {
   IRRewriter rewriter(context);
   for (auto convOp : targetConvOps) {
     rewriter.setInsertionPoint(convOp);
-    padConvOp(rewriter, convOp);
+    SetVector<IREE::HAL::ExecutableTargetAttr> executableTargets;
+    deviceAnalysis.gatherRequiredExecutableTargets(convOp, executableTargets);
+    padConvOp(rewriter, convOp, executableTargets.getArrayRef());
   }
   for (auto contractOp : targetContractOps) {
     rewriter.setInsertionPoint(contractOp);
-    padContractionLikeOp(rewriter, contractOp);
+    SetVector<IREE::HAL::ExecutableTargetAttr> executableTargets;
+    deviceAnalysis.gatherRequiredExecutableTargets(contractOp,
+                                                   executableTargets);
+    padContractionLikeOp(rewriter, contractOp, executableTargets.getArrayRef());
   }
 }
 
