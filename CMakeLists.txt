@@ -269,7 +269,7 @@ option(IREE_HAL_DRIVER_HIP "Enables the 'hip' runtime HAL driver" ${IREE_HAL_DRI
 
 # External HAL drivers; see runtime/src/iree/hal/drivers/CMakeLists.txt for more
 # information on how to declare external drivers.
-set(IREE_EXTERNAL_HAL_DRIVERS "List of external HAL drivers to enable" CACHE STRING "")
+set(IREE_EXTERNAL_HAL_DRIVERS "" CACHE STRING "List of external HAL drivers to enable")
 set(IREE_EXTERNAL_HAL_DRIVERS_DEFAULT)
 if(IREE_HAL_DRIVER_HIP)
   list(APPEND IREE_EXTERNAL_HAL_DRIVERS_DEFAULT "hip")
