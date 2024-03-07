@@ -116,3 +116,18 @@ module {
 // TILE16-SAME:    outs(%[[OUT]] : tensor<8x4x14x14x16xf32>) {
 // TILE16:      tensor.unpack %[[TILED_CONV]] inner_dims_pos = [1] inner_tiles = [16]
 // TILE16-SAME:   tensor<8x4x14x14x16xf32> -> tensor<8x64x14x14xf32>
+
+// -----
+
+module {
+  util.func public @generalize_outer_dims_pack(%arg0: tensor<512x512x3x3xf16>, %arg1: tensor<1x1x3x3x512x512xf16>) -> tensor<1x1x3x3x512x512xf16> {
+    %pack = tensor.pack %arg0 inner_dims_pos = [1, 0] inner_tiles = [512, 512] into %arg1 : tensor<512x512x3x3xf16> -> tensor<1x1x3x3x512x512xf16>
+    util.return %pack : tensor<1x1x3x3x512x512xf16>
+  }
+}
+
+// CHECK-LABEL: @generalize_outer_dims_pack
+// CHECK-SAME:    %[[ARG0:[A-Za-z0-9]+]]: tensor<512x512x3x3xf16>
+// CHECK:         %[[TRANSPOSE:.+]] = linalg.transpose ins(%[[ARG0:.+]] : tensor<512x512x3x3xf16>)
+// CHECK-SAME:      outs(%{{.*}} : tensor<3x3x512x512xf16>)
+// CHECK:         tensor.expand_shape %[[TRANSPOSE]] {{\[}}[0, 1, 2], [3], [4], [5]{{\]}} : tensor<3x3x512x512xf16> into tensor<1x1x3x3x512x512xf16>

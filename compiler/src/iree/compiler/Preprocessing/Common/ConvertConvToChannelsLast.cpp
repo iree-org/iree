@@ -478,22 +478,44 @@ private:
 // Generalization patterns
 //=====================================================================
 
-// Returns a reassocation map of the given |rank| such that all dimensions
-// in the set |innerDims| map to two dimensions. For example,
+// Returns a reassocation map of the given |srcRank| that collapses all
+// dimensions in the set |innerDims|.
 //
-// rank = 4, innerDims = {1, 3}
-// map = [[0], [1, 2], [3], [4, 5]]
+// srcRank = 4, innerDims = {0, 1, 3}
+// map = [[0, 1, 2], [3, 4], [5], [6]]
+//
+// or when all dims are tiled:
+//
+// srcRank = 4, innerDims = {0, 1, 2, 3}
+// map = [[0, 1, 2, 3, 4], [5], [6], [7]]
 template <typename SetTy>
 static SmallVector<ReassociationIndices>
-getTilingReassociationMap(int64_t rank, SetTy innerDims) {
+getTilingReassociationMap(int64_t srcRank, SetTy innerDims) {
+  int64_t rank = srcRank + innerDims.size();
   SmallVector<ReassociationIndices> map;
-  int64_t nTiled = 0;
-  for (int64_t i = 0, e = rank; i < e; i++) {
-    if (innerDims.contains(i)) {
-      map.push_back({i + nTiled++, i + nTiled});
-      continue;
+  ReassociationIndices group;
+  int64_t i = 0;
+  for (; i < rank; i++) {
+    if (!innerDims.contains(i)) {
+      break;
     }
-    map.push_back({i + nTiled});
+    group.push_back(i);
+  }
+  for (; i < rank;) {
+    assert(!innerDims.contains(i) && "expected non-tiled dim");
+    group.push_back(i);
+    map.push_back(group);
+    i++;
+    group.clear();
+    for (; i < rank; i++) {
+      if (!innerDims.contains(i)) {
+        break;
+      }
+      group.push_back(i);
+    }
+  }
+  if (!group.empty()) {
+    map.push_back(group);
   }
   return map;
 }
