@@ -30,6 +30,7 @@ iree_lit_test_suite(
     "preprocess_executables.mlir"
     "prune_executables.mlir"
     "repeat_dispatches.mlir"
+    "resolve_device_promises.mlir"
     "resolve_export_ordinals.mlir"
     "strip_executable_contents.mlir"
     "substitute_executables.mlir"
