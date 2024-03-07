@@ -28,10 +28,6 @@
 
 namespace mlir::iree_compiler {
 
-using namespace IREE::Encoding;
-using IREE::Encoding::getEncodingAttr;
-using IREE::HAL::ExecutableTargetAttr;
-
 //===---------------------------------------------------------------------===//
 // Utility methods
 //===---------------------------------------------------------------------===//
@@ -214,11 +210,11 @@ static std::optional<Value> getPaddingValue(Value &source) {
 /// For now this takes a `paddingValue` as input. The source is also taken
 /// as input so that these could be used with `OpConversionPatterns`.
 static FailureOr<tensor::PackOp> lowerSetEncodingOpToPackOp(
-    RewriterBase &rewriter, SetEncodingOp encodingOp, Value source,
-    MaterializeEncodingFn materializeEncodingFn,
+    RewriterBase &rewriter, IREE::Encoding::SetEncodingOp encodingOp,
+    Value source, MaterializeEncodingFn materializeEncodingFn,
     MaterializeEncodingValueFn materializeEncodingValueFn) {
   RankedTensorType resultType = encodingOp.getResultType();
-  auto encoding = getEncodingAttr(resultType);
+  auto encoding = IREE::Encoding::getEncodingAttr(resultType);
   if (!encoding) {
     return failure();
   }
@@ -238,9 +234,6 @@ static FailureOr<tensor::PackOp> lowerSetEncodingOpToPackOp(
   if (failed(innerTileSizesOfr)) {
     return rewriter.notifyMatchFailure(
         encodingOp, "failed to generate runtime tile size query");
-  }
-  if (!encoding) {
-    return failure();
   }
   std::optional<Value> paddingValue;
   if (encoding.getRoundDimsToArray().empty()) {
@@ -266,8 +259,8 @@ static FailureOr<tensor::PackOp> lowerSetEncodingOpToPackOp(
 /// The source is taken as input so that these could be used with
 /// `OpConversionPatterns`.
 static FailureOr<tensor::UnPackOp> lowerUnsetEncodingToUnpackOp(
-    RewriterBase &rewriter, UnsetEncodingOp encodingOp, Value packedValue,
-    MaterializeEncodingFn materializeEncodingFn,
+    RewriterBase &rewriter, IREE::Encoding::UnsetEncodingOp encodingOp,
+    Value packedValue, MaterializeEncodingFn materializeEncodingFn,
     MaterializeEncodingValueFn materializeEncodingValueFn) {
   RankedTensorType sourceType = encodingOp.getSourceType();
   FailureOr<MaterializeEncodingInfo> materializeEncodingInfo =
@@ -275,7 +268,7 @@ static FailureOr<tensor::UnPackOp> lowerUnsetEncodingToUnpackOp(
   if (failed(materializeEncodingInfo)) {
     return rewriter.notifyMatchFailure(encodingOp, "unhandled source encoding");
   }
-  if (isNarrowNResult(getEncodingAttr(sourceType))) {
+  if (isNarrowNResult(IREE::Encoding::getEncodingAttr(sourceType))) {
     transposeInPlace(*materializeEncodingInfo);
   }
   // Create an `tensor.empty` for the result of the unpack operation.
@@ -297,7 +290,8 @@ static FailureOr<tensor::UnPackOp> lowerUnsetEncodingToUnpackOp(
 }
 
 static FailureOr<SmallVector<Value>> lowerUpperBoundTileSizeOpToConstants(
-    RewriterBase &rewriter, UpperBoundTileSizeOp upperBoundTileSizeOp,
+    RewriterBase &rewriter,
+    IREE::Encoding::UpperBoundTileSizeOp upperBoundTileSizeOp,
     MaterializeEncodingFn materializeEncodingFn) {
   Location loc = upperBoundTileSizeOp.getLoc();
   RankedTensorType tensorType = upperBoundTileSizeOp.getTensorType();
@@ -340,16 +334,17 @@ lowerContractionOpWithEncoding(RewriterBase &rewriter,
   auto lhsType = cast<RankedTensorType>(inputs[0]->get().getType());
   auto rhsType = cast<RankedTensorType>(inputs[1]->get().getType());
   auto resultType = cast<RankedTensorType>(outputs[0].getType());
-  auto lhsEncoding = getEncodingAttr(lhsType);
-  auto rhsEncoding = getEncodingAttr(rhsType);
-  auto resultEncoding = getEncodingAttr(resultType);
+  auto lhsEncoding = IREE::Encoding::getEncodingAttr(lhsType);
+  auto rhsEncoding = IREE::Encoding::getEncodingAttr(rhsType);
+  auto resultEncoding = IREE::Encoding::getEncodingAttr(resultType);
   if (!lhsEncoding || !rhsEncoding || !resultEncoding) {
     return failure();
   }
 
-  if (lhsEncoding.getOperandIndex().getValue() != MATMUL_LHS ||
-      rhsEncoding.getOperandIndex().getValue() != MATMUL_RHS ||
-      resultEncoding.getOperandIndex().getValue() != MATMUL_RESULT) {
+  if (lhsEncoding.getOperandIndex().getValue() != IREE::Encoding::MATMUL_LHS ||
+      rhsEncoding.getOperandIndex().getValue() != IREE::Encoding::MATMUL_RHS ||
+      resultEncoding.getOperandIndex().getValue() !=
+          IREE::Encoding::MATMUL_RESULT) {
     return failure();
   }
 
@@ -415,7 +410,7 @@ lowerOpWithEncoding(RewriterBase &rewriter, tensor::EmptyOp emptyOp,
         loc, emptyOp.getMixedSizes(), resultType.getElementType());
     return newEmptyOp;
   }
-  if (isNarrowNResult(getEncodingAttr(emptyType))) {
+  if (isNarrowNResult(IREE::Encoding::getEncodingAttr(emptyType))) {
     transposeInPlace(*materializeEncodingInfo);
   }
   FailureOr<SmallVector<OpFoldResult>> innerTileSizesOfr =
@@ -524,7 +519,7 @@ static FailureOr<SmallVector<OpFoldResult>> getPackedDimsForDispatchTensor(
   if (failed(encodingInfo)) {
     return failure();
   }
-  if (isNarrowNResult(getEncodingAttr(boundTensorType))) {
+  if (isNarrowNResult(IREE::Encoding::getEncodingAttr(boundTensorType))) {
     transposeInPlace(*encodingInfo);
   }
 
@@ -731,12 +726,12 @@ struct MaterializeFlowDispatchTensorStoreOp
 
 /// Convert `set_encoding` op to `pack` op.
 struct SetEncodingOpToPackOpConversion
-    : public OpMaterializeEncodingPattern<SetEncodingOp> {
+    : public OpMaterializeEncodingPattern<IREE::Encoding::SetEncodingOp> {
   using OpMaterializeEncodingPattern<
-      SetEncodingOp>::OpMaterializeEncodingPattern;
+      IREE::Encoding::SetEncodingOp>::OpMaterializeEncodingPattern;
 
   LogicalResult
-  matchAndRewrite(SetEncodingOp encodingOp, OpAdaptor adaptor,
+  matchAndRewrite(IREE::Encoding::SetEncodingOp encodingOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
         getTypeConverter());
@@ -763,12 +758,12 @@ struct SetEncodingOpToPackOpConversion
 
 /// Convert `unset_encoding` op to `unpack` op.
 struct UnsetEncodingOpToUnPackOpConversion
-    : public OpMaterializeEncodingPattern<UnsetEncodingOp> {
+    : public OpMaterializeEncodingPattern<IREE::Encoding::UnsetEncodingOp> {
   using OpMaterializeEncodingPattern<
-      UnsetEncodingOp>::OpMaterializeEncodingPattern;
+      IREE::Encoding::UnsetEncodingOp>::OpMaterializeEncodingPattern;
 
   LogicalResult
-  matchAndRewrite(UnsetEncodingOp encodingOp, OpAdaptor adaptor,
+  matchAndRewrite(IREE::Encoding::UnsetEncodingOp encodingOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto converter = static_cast<const MaterializeEncodingTypeConverter *>(
         this->getTypeConverter());
@@ -797,14 +792,15 @@ struct UnsetEncodingOpToUnPackOpConversion
 /// `materializeEncodingFn` returns a failure, the pattern will materialize it
 /// to the same shape.
 struct UpperBoundTileSizeToConstantOpConversion
-    : public OpRewritePattern<UpperBoundTileSizeOp> {
+    : public OpRewritePattern<IREE::Encoding::UpperBoundTileSizeOp> {
   UpperBoundTileSizeToConstantOpConversion(
       MLIRContext *context, MaterializeEncodingFn materializeEncodingFn)
-      : OpRewritePattern<UpperBoundTileSizeOp>(context),
+      : OpRewritePattern<IREE::Encoding::UpperBoundTileSizeOp>(context),
         materializeEncodingFn(materializeEncodingFn) {}
 
-  LogicalResult matchAndRewrite(UpperBoundTileSizeOp upperBoundTileSizeOp,
-                                PatternRewriter &rewriter) const override {
+  LogicalResult
+  matchAndRewrite(IREE::Encoding::UpperBoundTileSizeOp upperBoundTileSizeOp,
+                  PatternRewriter &rewriter) const override {
 
     auto constants = lowerUpperBoundTileSizeOpToConstants(
         rewriter, upperBoundTileSizeOp, materializeEncodingFn);
