@@ -16,11 +16,13 @@ iree_lit_test_suite(
   SRCS
     "conv2d_to_winograd.mlir"
     "convert_to_loops.mlir"
+    "distribution.mlir"
     "pad_contraction_to_block_size.mlir"
     "resolve-shaped-type-result-dims.mlir"
     "split-reduction.mlir"
     "tile_and_decompose_attention.mlir"
     "tile_and_decompose_winograd.mlir"
+    "tiling.mlir"
   TOOLS
     FileCheck
     iree-opt

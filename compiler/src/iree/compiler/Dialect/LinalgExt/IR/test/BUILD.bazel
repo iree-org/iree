@@ -17,10 +17,8 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         [
             "canonicalize.mlir",
-            "distribution.mlir",
             "invalid.mlir",
             "roundtrip.mlir",
-            "tiling.mlir",
         ],
         include = ["*.mlir"],
     ),

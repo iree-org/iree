@@ -21,10 +21,10 @@ Value getDimValue(OpBuilder &builder, Location loc, Value v, int64_t dim) {
   }
   return TypeSwitch<Type, Value>(v.getType())
       .Case<RankedTensorType>([&](RankedTensorType t) -> Value {
-        return builder.create<tensor::DimOp>(loc, v, dim);
+        return builder.createOrFold<tensor::DimOp>(loc, v, dim);
       })
       .Case<MemRefType>([&](MemRefType t) -> Value {
-        return builder.create<memref::DimOp>(loc, v, dim);
+        return builder.createOrFold<memref::DimOp>(loc, v, dim);
       });
 }
 

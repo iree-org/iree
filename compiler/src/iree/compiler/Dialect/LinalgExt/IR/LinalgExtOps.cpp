@@ -265,11 +265,11 @@ SmallVector<utils::IteratorType> ScatterOp::getLoopIteratorTypes() {
 
 SmallVector<Range> ScatterOp::getIterationDomain(OpBuilder &builder) {
   Location loc = getLoc();
-  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
-  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
+  OpFoldResult zero = builder.getIndexAttr(0);
+  OpFoldResult one = builder.getIndexAttr(1);
   SmallVector<Range> ranges;
   for (auto dim : llvm::seq<int64_t>(0, getUpdateType().getRank())) {
-    Value ub = getDimValue(builder, loc, updates(), dim);
+    OpFoldResult ub = getDim(builder, loc, updates(), dim);
     ranges.emplace_back(Range{zero, ub, one});
   }
   return ranges;
@@ -481,12 +481,12 @@ SmallVector<Range> SortOp::getIterationDomain(OpBuilder &builder) {
   int64_t operandRank = getOperandRank();
   SmallVector<Range> loopBounds(operandRank);
   Location loc = getLoc();
-  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
-  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
+  OpFoldResult zero = builder.getIndexAttr(0);
+  OpFoldResult one = builder.getIndexAttr(1);
   Value source = operand(0);
   for (auto dim : llvm::seq<int64_t>(0, operandRank)) {
     loopBounds[dim].offset = zero;
-    loopBounds[dim].size = getDimValue(builder, loc, source, dim);
+    loopBounds[dim].size = getDim(builder, loc, source, dim);
     loopBounds[dim].stride = one;
   }
   return loopBounds;
@@ -649,20 +649,22 @@ SmallVector<utils::IteratorType> FftOp::getLoopIteratorTypes() {
 SmallVector<Range> FftOp::getIterationDomain(OpBuilder &builder) {
   SmallVector<Range> res;
   Location loc = getLoc();
-  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
-  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
+  OpFoldResult zero = builder.getIndexAttr(0);
+  OpFoldResult one = builder.getIndexAttr(1);
   for (auto [idx, val] : llvm::enumerate(getOperandShape().drop_back())) {
-    Value size;
+    OpFoldResult size;
     if (ShapedType::isDynamic(val)) {
-      size = getDimValue(builder, loc, getReal(), idx);
+      size = getDim(builder, loc, getReal(), idx);
     } else {
-      size = builder.create<arith::ConstantIndexOp>(loc, val);
+      size = builder.getIndexAttr(val);
     }
     res.emplace_back(Range{/*offset=*/zero, size, /*stride=*/one});
   }
 
-  Value size = getDimValue(builder, loc, getReal(), getOperandRank() - 1);
-  Value stride = builder.create<arith::ShLIOp>(loc, one, getStage());
+  OpFoldResult size = getDim(builder, loc, getReal(), getOperandRank() - 1);
+  Value oneVal = builder.create<arith::ConstantIndexOp>(loc, 1);
+  OpFoldResult stride =
+      builder.create<arith::ShLIOp>(loc, oneVal, getStage()).getResult();
   res.emplace_back(Range{/*offset=*/zero, size, /*stride=*/stride});
   return res;
 }
@@ -919,12 +921,12 @@ SmallVector<Range> ScanOp::getIterationDomain(OpBuilder &builder) {
   int64_t operandRank = getOperandRank();
   SmallVector<Range> loopBounds(operandRank);
   Location loc = getLoc();
-  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
-  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
+  OpFoldResult zero = builder.getIndexAttr(0);
+  OpFoldResult one = builder.getIndexAttr(1);
   Value source = input();
   for (auto dim : llvm::seq<int64_t>(0, operandRank)) {
     loopBounds[dim].offset = zero;
-    loopBounds[dim].size = getDimValue(builder, loc, source, dim);
+    loopBounds[dim].size = getDim(builder, loc, source, dim);
     loopBounds[dim].stride = one;
   }
   return loopBounds;
@@ -1145,11 +1147,11 @@ SmallVector<utils::IteratorType> ReverseOp::getLoopIteratorTypes() {
 
 SmallVector<Range> ReverseOp::getIterationDomain(OpBuilder &builder) {
   Location loc = getLoc();
-  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
-  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
+  OpFoldResult zero = builder.getIndexAttr(0);
+  OpFoldResult one = builder.getIndexAttr(1);
   SmallVector<Range> ranges;
   for (auto dim : llvm::seq<int64_t>(0, getOperandRank())) {
-    Value ub = getDimValue(builder, loc, input(), dim);
+    OpFoldResult ub = getDim(builder, loc, input(), dim);
     ranges.emplace_back(Range{zero, ub, one});
   }
   return ranges;
@@ -1159,11 +1161,15 @@ LogicalResult ReverseOp::generateScalarImplementation(OpBuilder &b,
                                                       Location loc,
                                                       ValueRange ivs) {
   SmallVector<Value> mirrorIndices(ivs.begin(), ivs.end());
+  AffineExpr d0, d1;
+  bindDims(b.getContext(), d0, d1);
+  AffineExpr mirrorExpr = d0 - (d1 - 1);
   for (auto dim : dims()) {
-    auto size = getDimValue(b, loc, input(), dim);
-    size = b.create<arith::SubIOp>(loc, size,
-                                   b.create<arith::ConstantIndexOp>(loc, 1));
-    mirrorIndices[dim] = b.create<arith::SubIOp>(loc, size, mirrorIndices[dim]);
+    auto size = getDim(b, loc, input(), dim);
+    mirrorIndices[dim] = getValueOrCreateConstantIndexOp(
+        b, loc,
+        affine::makeComposedFoldedAffineApply(b, loc, mirrorExpr,
+                                              {mirrorIndices[dim], size}));
   }
   Value val = b.create<memref::LoadOp>(loc, input(), ivs);
   b.create<memref::StoreOp>(loc, val, output(), mirrorIndices);
@@ -1215,14 +1221,11 @@ LogicalResult ReverseOp::getResultTilePosition(
   resultOffsets.assign(offsets.begin(), offsets.end());
   Location loc = getLoc();
   for (auto dim : dims()) {
-    Value size = getDimValue(builder, loc, input(), dim);
-    Value offset =
-        getValueOrCreateConstantIndexOp(builder, loc, resultOffsets[dim]);
-    Value tileSize = getValueOrCreateConstantIndexOp(builder, loc, sizes[dim]);
-    resultOffsets[dim] = builder
-                             .create<affine::AffineApplyOp>(
-                                 loc, map, ValueRange{size, offset, tileSize})
-                             .getResult();
+    OpFoldResult size = getDim(builder, loc, input(), dim);
+    OpFoldResult offset = resultOffsets[dim];
+    OpFoldResult tileSize = sizes[dim];
+    resultOffsets[dim] = affine::makeComposedFoldedAffineApply(
+        builder, loc, map, {size, offset, tileSize});
   }
   resultSizes.assign(sizes.begin(), sizes.end());
   return success();
@@ -1322,12 +1325,12 @@ SmallVector<Range> TopkOp::getIterationDomain(OpBuilder &builder) {
   int64_t operandRank = getInputRank();
   SmallVector<Range> loopBounds(operandRank);
   Location loc = getLoc();
-  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
-  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
+  OpFoldResult zero = builder.getIndexAttr(0);
+  OpFoldResult one = builder.getIndexAttr(1);
   Value source = values();
   for (auto [idx, val] : llvm::enumerate(getInputType().getShape())) {
     loopBounds[idx].offset = zero;
-    loopBounds[idx].size = getDimValue(builder, loc, source, idx);
+    loopBounds[idx].size = getDim(builder, loc, source, idx);
     loopBounds[idx].stride = one;
   }
   return loopBounds;
@@ -1462,8 +1465,8 @@ TopkOp::getTiledImplementation(OpBuilder &builder,
 
   // Replace the tile size for the K dimension to use the output size instead of
   // the input size.
-  Value kSize = getDimValue(builder, getLoc(), outputValues(), getDimension());
-  outputSizes[getDimension()] = getAsOpFoldResult(kSize);
+  outputSizes[getDimension()] =
+      getDim(builder, getLoc(), outputValues(), getDimension());
 
   tiledOperands.emplace_back(
       getSlice(builder, loc, getOutputs()[0], offsets, outputSizes, strides));
@@ -1487,9 +1490,8 @@ LogicalResult TopkOp::getResultTilePosition(
     SmallVector<OpFoldResult> &resultSizes) {
   resultOffsets.assign(offsets.begin(), offsets.end());
   resultSizes.assign(sizes.begin(), sizes.end());
-  Value kSize = getDimValue(builder, getLoc(), getDpsInits()[resultNumber],
-                            getDimension());
-  resultSizes[getDimension()] = getAsOpFoldResult(kSize);
+  resultSizes[getDimension()] =
+      getDim(builder, getLoc(), getDpsInits()[resultNumber], getDimension());
   return success();
 }
 
@@ -2179,8 +2181,8 @@ LogicalResult WinogradInputTransformOp::verify() {
 SmallVector<Range>
 WinogradInputTransformOp::getIterationDomain(OpBuilder &builder) {
   Location loc = getLoc();
-  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
-  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
+  OpFoldResult zero = builder.getIndexAttr(0);
+  OpFoldResult one = builder.getIndexAttr(1);
   Value source = input();
   SmallVector<int64_t> imageDims = imageDimensions();
   llvm::SmallSetVector<int64_t, 2> imageDimsSet(imageDims.begin(),
@@ -2190,7 +2192,7 @@ WinogradInputTransformOp::getIterationDomain(OpBuilder &builder) {
   for (auto dim : llvm::seq<int64_t>(0, getInputOperandRank())) {
     if (!imageDimsSet.contains(dim)) {
       loopBounds[count].offset = zero;
-      loopBounds[count].size = getDimValue(builder, loc, source, dim);
+      loopBounds[count].size = getDim(builder, loc, source, dim);
       loopBounds[count].stride = one;
       count++;
     }
@@ -2352,8 +2354,8 @@ LogicalResult WinogradOutputTransformOp::verify() {
 SmallVector<Range>
 WinogradOutputTransformOp::getIterationDomain(OpBuilder &builder) {
   Location loc = getLoc();
-  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
-  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
+  OpFoldResult zero = builder.getIndexAttr(0);
+  OpFoldResult one = builder.getIndexAttr(1);
   Value source = output();
   SmallVector<int64_t> imageDims = imageDimensions();
   llvm::SmallSetVector<int64_t, 2> imageDimsSet(imageDims.begin(),
@@ -2363,7 +2365,7 @@ WinogradOutputTransformOp::getIterationDomain(OpBuilder &builder) {
   for (auto dim : llvm::seq<int64_t>(0, getOutputOperandRank())) {
     if (!imageDimsSet.contains(dim)) {
       loopBounds[count].offset = zero;
-      loopBounds[count].size = getDimValue(builder, loc, source, dim);
+      loopBounds[count].size = getDim(builder, loc, source, dim);
       loopBounds[count].stride = one;
       count++;
     }
@@ -2563,12 +2565,12 @@ SmallVector<Range> AttentionOp::getIterationDomain(OpBuilder &builder) {
   int64_t iterationDomainRank = getIterationDomainRank();
   SmallVector<Range> loopBounds(iterationDomainRank);
   Location loc = getLoc();
-  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
-  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
+  OpFoldResult zero = builder.getIndexAttr(0);
+  OpFoldResult one = builder.getIndexAttr(1);
   Value source = getQuery();
   for (auto dim : llvm::seq<int64_t>(0, iterationDomainRank)) {
     loopBounds[dim].offset = zero;
-    loopBounds[dim].size = getDimValue(builder, loc, source, dim);
+    loopBounds[dim].size = getDim(builder, loc, source, dim);
     loopBounds[dim].stride = one;
   }
   return loopBounds;

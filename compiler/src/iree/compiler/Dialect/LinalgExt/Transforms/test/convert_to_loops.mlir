@@ -345,10 +345,10 @@ func.func @scatter_partial_slices(%arg0: memref<2x64x12xf32>, %arg1: memref<2x3x
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[ARG1:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[ARG2:[a-zA-Z0-9]+]]
-// CHECK-DAG: %[[C0:.+]] = arith.constant
-// CHECK-DAG: %[[C1:.+]] = arith.constant
-// CHECK-DAG: %[[C2:.+]] = arith.constant
 // CHECK-DAG: %[[C12:.+]] = arith.constant
+// CHECK-DAG: %[[C0:.+]] = arith.constant
+// CHECK-DAG: %[[C2:.+]] = arith.constant
+// CHECK-DAG: %[[C1:.+]] = arith.constant
 // CHECK:     scf.for %[[ARG3:.+]] = %[[C0]] to %[[C2]] step %[[C1]] {
 // CHECK-NEXT:   scf.for %[[ARG4:.+]] = %[[C0]] to %[[C1]] step %[[C1]] {
 // CHECK-NEXT:     scf.for %[[ARG5:.+]] = %[[C0]] to %[[C12]] step %[[C1]] {
@@ -514,7 +514,8 @@ func.func @reverse_dim_0(%arg0: memref<?x?xi32>, %arg1: memref<?x?xi32>) {
     outs(%arg1 : memref<?x?xi32>)
   return
 }
-// CHECK-LABEL: func.func @reverse_dim_0
+// CHECK:       #[[MAP:.+]] = affine_map<(d0)[s0] -> (d0 - s0 + 1)>
+// CHECK:       func.func @reverse_dim_0
 // CHECK-SAME:    %[[IN:[a-zA-Z0-9]+]]
 // CHECK-SAME:    %[[OUT:[a-zA-Z0-9]+]]
 // CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
@@ -524,8 +525,7 @@ func.func @reverse_dim_0(%arg0: memref<?x?xi32>, %arg1: memref<?x?xi32>) {
 // CHECK:         scf.for %[[I:.+]] = %[[C0]] to %[[D0]] step %[[C1]]
 // CHECK:           scf.for %[[J:.+]] = %[[C0]] to %[[D1]] step %[[C1]]
 // CHECK:             %[[T0:.+]] = memref.dim %[[IN]], %[[C0]]
-// CHECK:             %[[T1:.+]] = arith.subi %[[T0]], %[[C1]] : index
-// CHECK:             %[[T2:.+]] = arith.subi %[[T1]], %[[I]] : index
+// CHECK:             %[[T2:.+]] = affine.apply #[[MAP]](%[[I]])[%[[T0]]]
 // CHECK:             %[[V0:.+]] = memref.load %[[IN]][%[[I]], %[[J]]]
 // CHECK:             memref.store %[[V0]], %[[OUT]][%[[T2]], %[[J]]] : memref<?x?xi32>
 

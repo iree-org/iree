@@ -1085,11 +1085,11 @@ module attributes { transform.with_named_sequence } {
 // CHECK:      func.func @attention_memref(%[[ARG0:[a-zA-Z0-9_]+]]: memref<192x1024x64xf32>, %[[ARG1:[a-zA-Z0-9_]+]]:
 // CHECK-SAME:   memref<192x1024x64xf32>, %[[ARG2:[a-zA-Z0-9_]+]]: memref<192x1024x64xf32>, %[[ARG3:[a-zA-Z0-9_]+]]:
 // CHECK-SAME:   memref<192x1024x64xf32>) {
-// CHECK:        %[[C30:.+]] = arith.constant 30 : index
-// CHECK:        %[[C0:.+]] = arith.constant 0 : index
-// CHECK:        %[[C192:.+]] = arith.constant 192 : index
-// CHECK:        %[[C1024:.+]] = arith.constant 1024 : index
-// CHECK:        %[[C10:.+]] = arith.constant 10 : index
+// CHECK-DAG:    %[[C30:.+]] = arith.constant 30 : index
+// CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:    %[[C192:.+]] = arith.constant 192 : index
+// CHECK-DAG:    %[[C1024:.+]] = arith.constant 1024 : index
+// CHECK-DAG:    %[[C10:.+]] = arith.constant 10 : index
 // CHECK:        scf.for %[[ARG4:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C192]] step %[[C10]] {
 // CHECK:          scf.for %[[ARG5:[a-zA-Z0-9_]+]] = %[[C0]] to %[[C1024]] step %[[C30]] {
 // CHECK-DAG:        %[[D0:.+]] = affine.min #[[MAP]](%[[ARG4]])
