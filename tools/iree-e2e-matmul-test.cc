@@ -584,8 +584,13 @@ static bool matmul_result_elements_agree(iree_e2e_test_value_t expected,
     return false;
   }
 
-  // Negative tolerance is never satisfied: same behavior as numpy.allclose
-  if (FLAG_acceptable_fp_delta < 0.0f) return false;
+  if (FLAG_acceptable_fp_delta < 0.0f) {
+    iree_status_abort(
+        iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                         "negative tolerance (acceptable_fp_delta=%.8g)",
+                         FLAG_acceptable_fp_delta));
+    return false;
+  }
 
   switch (expected.type) {
     case IREE_E2E_TEST_VALUE_TYPE_I32:
