@@ -1094,6 +1094,113 @@ bool DeviceAffinityAttr::isLegalToInline(Operation *inlineSite,
 }
 
 //===----------------------------------------------------------------------===//
+// #hal.device.promise<*>
+//===----------------------------------------------------------------------===//
+
+// static
+Attribute DevicePromiseAttr::parse(AsmParser &p, Type type) {
+  // `<@device`
+  StringAttr deviceName;
+  int64_t queueMask = -1;
+  if (failed(p.parseLess()) || failed(p.parseSymbolName(deviceName)))
+    return {};
+  if (succeeded(p.parseOptionalComma())) {
+    // `[`queue_bit[, ...] `]`
+    queueMask = 0;
+    if (failed(p.parseCommaSeparatedList(AsmParser::Delimiter::Square, [&]() {
+          int64_t i = 0;
+          if (failed(p.parseInteger(i)))
+            return failure();
+          queueMask |= 1ll << i;
+          return success();
+        }))) {
+      return {};
+    }
+  }
+  // `>`
+  if (failed(p.parseGreater()))
+    return {};
+  return get(p.getContext(), deviceName, queueMask);
+}
+
+void DevicePromiseAttr::print(AsmPrinter &p) const {
+  auto &os = p.getStream();
+  os << "<@";
+  os << getDevice().getValue();
+  int64_t queueMask = getQueueMask();
+  if (queueMask != -1) {
+    os << ", [";
+    for (int i = 0, j = 0; i < sizeof(queueMask) * 8; ++i) {
+      if (queueMask & (1ll << i)) {
+        if (j++ > 0)
+          os << ", ";
+        os << i;
+      }
+    }
+    os << "]";
+  }
+  os << ">";
+}
+
+bool DevicePromiseAttr::isExecutableWith(
+    IREE::Stream::AffinityAttr other) const {
+  if (!other)
+    return true;
+  // Only compatible with the same exact devices today. We could support a
+  // peering model to allow operations to move across devices in a peered set
+  // but that may be best done at higher levels and avoided once we get to the
+  // "are these the same device" stage.
+  auto otherPromiseAttr = llvm::dyn_cast_if_present<DevicePromiseAttr>(other);
+  if (!otherPromiseAttr || getDevice() != otherPromiseAttr.getDevice())
+    return false;
+  // If this affinity is a subset of the target affinity then it can execute
+  // with it.
+  if ((getQueueMask() & otherPromiseAttr.getQueueMask()) == getQueueMask())
+    return true;
+  // Otherwise not compatible.
+  return false;
+}
+
+IREE::Stream::AffinityAttr
+DevicePromiseAttr::joinOR(IREE::Stream::AffinityAttr other) const {
+  if (!other)
+    return *this;
+  if (!IREE::Stream::AffinityAttr::canExecuteTogether(*this, other)) {
+    return nullptr;
+  }
+  auto otherPromiseAttr = llvm::dyn_cast_if_present<DevicePromiseAttr>(other);
+  return DevicePromiseAttr::get(getContext(), getDevice(),
+                                getQueueMask() |
+                                    otherPromiseAttr.getQueueMask());
+}
+
+IREE::Stream::AffinityAttr
+DevicePromiseAttr::joinAND(IREE::Stream::AffinityAttr other) const {
+  if (!other)
+    return *this;
+  if (!IREE::Stream::AffinityAttr::canExecuteTogether(*this, other)) {
+    return nullptr;
+  }
+  auto otherPromiseAttr = llvm::dyn_cast_if_present<DevicePromiseAttr>(other);
+  return DevicePromiseAttr::get(getContext(), getDevice(),
+                                getQueueMask() &
+                                    otherPromiseAttr.getQueueMask());
+}
+
+bool DevicePromiseAttr::isLegalToInline(Operation *inlineSite,
+                                        Operation *inlinable) const {
+  // Look up the affinity of the inlining target site and only allow inlining if
+  // it matches exactly. We could make a decision as to whether we allow
+  // inlining when queues are subsets (so if the target site allows any queue
+  // and the inlinable allows queue 2 then allow, etc). In the future we may
+  // want to allow util.scope restrictions within the inline target to keep
+  // queue specification tighter but today most queue masks are wildcarded
+  // anyway.
+  auto targetAffinityAttr = IREE::Stream::AffinityAttr::lookup(inlineSite);
+  return *this == targetAffinityAttr;
+}
+
+//===----------------------------------------------------------------------===//
 // IREE::HAL::HALDialect
 //===----------------------------------------------------------------------===//
 
