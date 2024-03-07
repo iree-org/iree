@@ -216,10 +216,6 @@ endif()
 #   -DIREE_HAL_DRIVER_DEFAULTS=OFF
 #-------------------------------------------------------------------------------
 
-# External HAL drivers; see runtime/src/iree/hal/drivers/CMakeLists.txt for more
-# information on how to declare external drivers.
-set(IREE_EXTERNAL_HAL_DRIVERS "" CACHE STRING "")
-
 # Additional executable loader deps to add dependent libraries to any target
 # using the default executable loader registration utilities.
 # TODO(benvanik): extend the deps to encompass the built-in loaders too so that
@@ -258,11 +254,31 @@ if(NOT APPLE OR NOT ${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm64")
   set(IREE_HAL_DRIVER_METAL_DEFAULT OFF)
 endif()
 
+# HIP support can be enabled on any platform.
+set(IREE_HAL_DRIVER_HIP_DEFAULT ${IREE_HAL_DRIVER_DEFAULTS})
+if(CMAKE_CROSSCOMPILING)
+  set(IREE_HAL_DRIVER_HIP_DEFAULT OFF)
+endif()
+
 option(IREE_HAL_DRIVER_CUDA "Enables the 'cuda' runtime HAL driver" ${IREE_HAL_DRIVER_CUDA_DEFAULT})
 option(IREE_HAL_DRIVER_LOCAL_SYNC "Enables the 'local-sync' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
 option(IREE_HAL_DRIVER_LOCAL_TASK "Enables the 'local-task' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
 option(IREE_HAL_DRIVER_VULKAN "Enables the 'vulkan' runtime HAL driver" ${IREE_HAL_DRIVER_VULKAN_DEFAULT})
 option(IREE_HAL_DRIVER_METAL "Enables the 'metal' runtime HAL driver" ${IREE_HAL_DRIVER_METAL_DEFAULT})
+option(IREE_HAL_DRIVER_HIP "Enables the 'hip' runtime HAL driver" ${IREE_HAL_DRIVER_HIP_DEFAULT})
+
+# External HAL drivers; see runtime/src/iree/hal/drivers/CMakeLists.txt for more
+# information on how to declare external drivers.
+set(IREE_EXTERNAL_HAL_DRIVERS "List of external HAL drivers to enable" CACHE STRING "")
+set(IREE_EXTERNAL_HAL_DRIVERS_DEFAULT)
+if(IREE_HAL_DRIVER_HIP)
+  list(APPEND IREE_EXTERNAL_HAL_DRIVERS_DEFAULT "hip")
+endif()
+# The IREE_EXTERNAL_HAL_DRIVERS_CONFIGURED list includes both user specified
+# IREE_EXTERNAL_HAL_DRIVERS and defaults added internally to 
+# IREE_EXTERNAL_HAL_DRIVERS_DEFAULT.
+list(IREE_EXTERNAL_HAL_DRIVERS_CONFIGURED ${IREE_EXTERNAL_HAL_DRIVERS} ${IREE_EXTERNAL_HAL_DRIVERS_DEFAULT})
+list(REMOVE_DUPLICATES IREE_EXTERNAL_HAL_DRIVERS_CONFIGURED)
 
 option(IREE_HAL_EXECUTABLE_LOADER_DEFAULTS "Sets the default value for all runtime HAL executable loaders" ON)
 set(IREE_HAL_EXECUTABLE_LOADER_EMBEDDED_ELF_DEFAULT ${IREE_HAL_EXECUTABLE_LOADER_DEFAULTS})
@@ -547,7 +563,7 @@ set(IREE_PACKAGE_ROOT_DIR "${CMAKE_CURRENT_LIST_DIR}")
 set(IREE_PACKAGE_ROOT_PREFIX "iree")
 
 #-------------------------------------------------------------------------------
-# Experimental ROCM HAL driver
+# Deprecated ROCM HAL driver
 # Enable with: -DIREE_EXTERNAL_HAL_DRIVERS=rocm
 #-------------------------------------------------------------------------------
 
@@ -563,8 +579,12 @@ iree_register_external_hal_driver(
 )
 
 #-------------------------------------------------------------------------------
-# Experimental HIP HAL driver
-# Enable with: -DIREE_EXTERNAL_HAL_DRIVERS=hip
+# Pre-GA HIP HAL driver
+# This driver is being qualified for use by default on AMD GPUs.
+# It can be enabled with a dedicated config setting:
+#   -DIREE_HAL_DRIVER_HIP=ON (default)
+# Or via:
+#   -DIREE_EXTERNAL_HAL_DRIVERS=hip
 #-------------------------------------------------------------------------------
 
 iree_register_external_hal_driver(
