@@ -71,4 +71,4 @@ jobs:
         run: |
           source ${VENV_DIR}/bin/activate
           export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/rocm/lib:/opt/rocm/hip/lib
-          pytest SHARK-TestSuite/iree_tests -n 4 -rpfE
+          pytest SHARK-TestSuite/iree_tests -n 4 -rpfE --timeout=60

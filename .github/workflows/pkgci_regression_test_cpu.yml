@@ -74,4 +74,4 @@ jobs:
           IREE_TEST_CONFIG_FILES: experimental/regression_suite/external_test_suite/config_cpu_llvm_sync.json
         run: |
           source ${VENV_DIR}/bin/activate
-          pytest SHARK-TestSuite/iree_tests -n auto -rpfE
+          pytest SHARK-TestSuite/iree_tests -n auto -rpfE --timeout=60
