@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "./ROCMTargetFeatures.h"
+#include "compiler/plugins/target/ROCM/ROCMTargetFeatures.h"
 
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "llvm/ADT/StringSwitch.h"

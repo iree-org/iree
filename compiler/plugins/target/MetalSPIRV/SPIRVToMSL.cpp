@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "./SPIRVToMSL.h"
+#include "compiler/plugins/target/MetalSPIRV/SPIRVToMSL.h"
 
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"

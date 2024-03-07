@@ -5,8 +5,6 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 set(TORCH_MLIR_ROOT_DIR "${IREE_SOURCE_DIR}/third_party/torch-mlir")
-set(IREE_PACKAGE_ROOT_DIR "${CMAKE_CURRENT_LIST_DIR}")
-set(IREE_PACKAGE_ROOT_PREFIX "")
 set(IREE_COMPILER_TABLEGEN_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}")
 
 add_library(torch-iree_compiler_defs INTERFACE)
@@ -20,6 +18,34 @@ target_include_directories(torch-iree_compiler_defs
 # which provides common includes and copts for the tree.
 set(IREE_IMPLICIT_DEFS_CC_DEPS torch-iree_compiler_defs)
 
-add_subdirectory(torch-iree)
 add_subdirectory(torch-mlir)
 add_subdirectory(torch-mlir-dialects)
+
+add_subdirectory(InputConversion)
+
+iree_cc_library(
+  NAME
+    registration
+  SRCS
+    "PluginRegistration.cpp"
+  DEPS
+    MLIRIR
+    MLIRMLProgramDialect
+    MLIRPass
+    iree::compiler::PluginAPI
+    iree::compiler::plugins::input::Torch::InputConversion
+    iree::compiler::plugins::input::Torch::torch-mlir::TorchConversionDialectIR
+    iree::compiler::plugins::input::Torch::torch-mlir::TorchDialectIR
+    iree::compiler::plugins::input::Torch::torch-mlir::TorchDialectPasses
+    iree::compiler::plugins::input::Torch::torch-mlir::TorchOnnxToTorchPasses
+    iree::compiler::plugins::input::Torch::torch-mlir::ConversionPasses
+    iree::compiler::plugins::input::Torch::torch-mlir-dialects::TMTensorDialectIR
+  PUBLIC
+)
+
+iree_compiler_register_plugin(
+  PLUGIN_ID
+    input_torch
+  TARGET
+    ::registration
+)
