@@ -36,6 +36,7 @@ iree_cc_library(
     "PreprocessExecutables.cpp"
     "PruneExecutables.cpp"
     "RepeatDispatches.cpp"
+    "ResolveDevicePromises.cpp"
     "ResolveExportOrdinals.cpp"
     "SerializeExecutables.cpp"
     "StripExecutableContents.cpp"

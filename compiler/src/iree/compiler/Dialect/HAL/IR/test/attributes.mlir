@@ -113,6 +113,17 @@ util.global private @device : !hal.device
 
 // -----
 
+"device.promise"() {
+  // CHECK: device_any = #hal.device.promise<@device>
+  device_any = #hal.device.promise<@device>,
+  // CHECK: device_queue_0 = #hal.device.promise<@device, [0]>
+  device_queue_0 = #hal.device.promise<@device, [0]>,
+  // CHECK: device_queue_123 = #hal.device.promise<@device, [1, 2, 3]>
+  device_queue_123 = #hal.device.promise<@device, [1, 2, 3]>
+} : () -> ()
+
+// -----
+
 // Tests that differing device affinities blocks inlining.
 // Here the @inline_target is using the default affinity specified on the
 // module and only functions also using the default affinity or a matching

@@ -983,4 +983,50 @@ def HAL_DeviceAffinityAttr : AttrDef<HAL_Dialect, "DeviceAffinity", [
   let hasCustomAssemblyFormat = 1;
 }
 
+//===----------------------------------------------------------------------===//
+// #hal.device.promise<*>
+//===----------------------------------------------------------------------===//
+
+def HAL_DevicePromiseAttr : AttrDef<HAL_Dialect, "DevicePromise", [
+  DeclareAttrInterfaceMethods<Stream_AffinityAttr, [
+    "isExecutableWith",
+    "joinOR",
+    "joinAND",
+  ]>,
+  DeclareAttrInterfaceMethods<Util_InliningPolicyAttrInterface, [
+    "isLegalToInline",
+  ]>,
+]> {
+  let mnemonic = "device.promise";
+  let summary = [{promises a named device and optional queue affinity}];
+  let description = [{
+    Specifies that an annotated operation or scope is only allowed to execute on
+    a specific device that has not yet been declared and optionally a set of
+    queues (0-64) provided. Operations will not run on other queues. If the
+    queue mask is omitted then any queue on the device is allowed to execute the
+    specified operations.
+
+    This is used in input programs to assign operations to particular devices
+    prior to the devices being declared. This allows device categories to be
+    referenced in the program as produced from the frontend and for those
+    device specifications to be provided later on during compilation.
+    Verification is performed as part of the ResolveDevicePromisesPass.
+
+    Example:
+    ```mlir
+    // Any queue on whatever @device_a will be after declaration.
+    #hal.device.promise<@device_a>
+    // Queues 4 and 5 on whatever @device_b will be after declaration.
+    #hal.device.promise<@device_b, [4, 5]>
+    ```
+  }];
+
+  let parameters = (ins
+    AttrParameter<"StringAttr", "">:$device,
+    AttrParameter<"int64_t", "">:$queue_mask
+  );
+
+  let hasCustomAssemblyFormat = 1;
+}
+
 #endif  // IREE_DIALECT_HAL_IR_HAL_ATTRS
