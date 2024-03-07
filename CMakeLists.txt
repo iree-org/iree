@@ -335,7 +335,7 @@ endif()
 if(IREE_HAL_DRIVER_METAL)
   message(STATUS "  - metal")
 endif()
-if(IREE_EXTERNAL_HAL_DRIVERS)
+if(IREE_EXTERNAL_HAL_DRIVERS_CONFIGURED)
   message(STATUS "  + external: ${IREE_EXTERNAL_HAL_DRIVERS_CONFIGURED}")
 endif()
 
