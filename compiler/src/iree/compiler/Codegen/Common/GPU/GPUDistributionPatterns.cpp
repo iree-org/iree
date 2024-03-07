@@ -372,6 +372,8 @@ struct DistributeReductions final
   DistributeReductions(MLIRContext *context, int64_t maxBitsPerShuffle)
       : OpDistributionPattern(context), maxBitsPerShuffle(maxBitsPerShuffle) {}
 
+  static constexpr int64_t kDefaultSubgroupSize = 32;
+
   // Do parallel reduction using butterfly shuffles.
   Value doThreadGlobalReduction(Value result, uint64_t shuffleOffset,
                                 int64_t laneSize,
@@ -379,16 +381,18 @@ struct DistributeReductions final
                                 int64_t entriesPerVector, Value mEmpty,
                                 OpBuilder &rewriter, Location loc) const {
     auto funcOp = result.getDefiningOp()->getParentOfType<func::FuncOp>();
-    std::optional<int64_t> subgroupSize = getSubgroupSize(funcOp);
-    if (!subgroupSize)
-      funcOp->emitError("Could not find subgroup size!");
+    std::optional<int64_t> maybeSubgroupSize = getSubgroupSize(funcOp);
+    if (!maybeSubgroupSize)
+      funcOp->emitWarning("No subgroup size specified, using default value = " +
+                          Twine(kDefaultSubgroupSize));
+    int64_t subgroupSize = maybeSubgroupSize.value_or(kDefaultSubgroupSize);
 
     Value mask;
     assert(llvm::isPowerOf2_64(laneSize));
     for (uint64_t i = shuffleOffset; i < shuffleOffset * laneSize; i <<= 1) {
       Value packed = packVectorToSupportedWidth(loc, rewriter, result);
       auto shuffleOp = rewriter.create<gpu::ShuffleOp>(
-          loc, packed, i, subgroupSize.value(), gpu::ShuffleMode::XOR);
+          loc, packed, i, subgroupSize, gpu::ShuffleMode::XOR);
       Value unpacked =
           unpackToVector(loc, rewriter, shuffleOp.getShuffleResult(),
                          result.getType().cast<VectorType>());
