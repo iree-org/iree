@@ -336,7 +336,7 @@ if(IREE_HAL_DRIVER_METAL)
   message(STATUS "  - metal")
 endif()
 if(IREE_EXTERNAL_HAL_DRIVERS)
-  message(STATUS "  + external: ${IREE_EXTERNAL_HAL_DRIVERS}")
+  message(STATUS "  + external: ${IREE_EXTERNAL_HAL_DRIVERS_CONFIGURED}")
 endif()
 
 message(STATUS "IREE HAL local executable library loaders:")
