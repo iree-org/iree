@@ -36,32 +36,27 @@ struct AssignTargetDevicesPass
           AssignTargetDevicesPass> {
   using IREE::HAL::impl::AssignTargetDevicesPassBase<
       AssignTargetDevicesPass>::AssignTargetDevicesPassBase;
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::HAL::HALDialect>();
-    for (auto &targetBackend : targetRegistry->getTargetBackends(
-             targetRegistry->getRegisteredTargetBackends())) {
-      targetBackend->getDependentDialects(registry);
-    }
-  }
 
   void runOnOperation() override {
     auto moduleOp = getOperation();
 
-    // Check to see if targets are already specified.
-    auto existingTargetsAttr =
-        moduleOp->getAttrOfType<ArrayAttr>("hal.device.targets");
-    if (existingTargetsAttr) {
-      // Targets already exist on the module; no-op the pass so that we don't
-      // mess with whatever the user intended.
+    // If no targets are specified we can't do anything - another pass earlier
+    // in the pipeline will have had to add the targets.
+    if (targetDevices.empty()) {
       return;
     }
 
-    // If no targets are specified we can't do anything - another pass earlier
-    // in the pipeline will have had to add the targets.
-    if (targetBackends.empty()) {
-      emitRemark(moduleOp.getLoc())
-          << "no target HAL target backends specified during assignment";
+    // Check to see if targets are already specified and if so then no-op the
+    // pass so that we don't mess with whatever the user intended.
+    if (moduleOp->hasAttr("hal.device.targets")) {
       return;
+    }
+
+    // If there are any device globals declared then bail as it means the user
+    // has already materialized the devices they want.
+    for (auto globalOp : moduleOp.getOps<IREE::Util::GlobalOpInterface>()) {
+      if (isa<IREE::HAL::DeviceType>(globalOp.getGlobalType()))
+        return;
     }
 
     llvm::SmallDenseSet<Attribute> targetAttrSet;
@@ -69,33 +64,33 @@ struct AssignTargetDevicesPass
     for (const auto &targetBackendName : targetBackends) {
       auto targetBackend = targetRegistry->getTargetBackend(targetBackendName);
       if (!targetBackend) {
-        std::string backends;
-        llvm::raw_string_ostream os(backends);
-        llvm::interleaveComma(targetRegistry->getRegisteredTargetBackends(), os,
-                              [&os](const std::string &name) { os << name; });
-        emitError(moduleOp.getLoc())
-            << "target backend '" << targetBackendName
-            << "' not registered; registered backends: " << os.str();
-        signalPassFailure();
-        return;
+        auto diagnostic = emitError(moduleOp.getLoc())
+                          << "target backend '" << targetBackendName
+                          << "' not registered; registered backends: [";
+        llvm::interleaveComma(targetRegistry->getRegisteredTargetBackends(),
+                              diagnostic);
+        diagnostic << "]";
+        return signalPassFailure();
       }
       auto targetDeviceName = targetBackend->getLegacyDefaultDeviceID();
       auto targetDevice = targetRegistry->getTargetDevice(targetDeviceName);
       if (!targetDevice) {
-        std::string devices;
-        llvm::raw_string_ostream os(devices);
-        llvm::interleaveComma(targetRegistry->getRegisteredTargetDevices(), os,
-                              [&os](const std::string &name) { os << name; });
-        emitError(moduleOp.getLoc())
-            << "target device '" << targetDeviceName
-            << "' not registered; registered devices: " << os.str();
-        signalPassFailure();
-        return;
+        auto diagnostic = emitError(moduleOp.getLoc())
+                          << "target device '" << targetDeviceName
+                          << "' not registered; registered devices: [";
+        llvm::interleaveComma(targetRegistry->getRegisteredTargetDevices(),
+                              diagnostic);
+        diagnostic << "]";
+        return signalPassFailure();
       }
 
       // Ask the target backend for its default device specification attribute.
       auto targetAttr = targetDevice->getDefaultDeviceTarget(
           moduleOp.getContext(), *targetRegistry.value);
+      if (!targetAttr) {
+        emitError(moduleOp.getLoc()) << "no default device targets available";
+        return signalPassFailure();
+      }
       if (!targetAttrSet.contains(targetAttr)) {
         targetAttrSet.insert(targetAttr);
         targetAttrs.push_back(targetAttr);

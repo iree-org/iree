@@ -494,6 +494,8 @@ createExportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
   // Populate the reflection attrs based on the original types.
   populateReflectionAttrs(invocationModel, exportOp, wrapperOp);
   exportOp->removeAttr("iree.reflection");
+  if (auto affinityAttr = exportOp->getAttr("stream.affinity"))
+    wrapperOp->setAttr("stream.affinity", affinityAttr);
 
   auto *entryBlock = wrapperOp.addEntryBlock();
   auto entryBuilder = OpBuilder::atBlockBegin(entryBlock);
