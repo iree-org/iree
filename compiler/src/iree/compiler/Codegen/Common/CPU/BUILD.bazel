@@ -46,7 +46,7 @@ iree_compiler_cc_library(
     name = "CommonCPUPasses",
     srcs = [
         "CPULowerToUKernels.cpp",
-        "CPUMaterializeEncodingPass.cpp",
+        "CPUMaterializeEncodings.cpp",
         "CPUPrepareUkernels.cpp",
         "Passes.cpp",
     ],
@@ -62,6 +62,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Codegen/Transforms",
         "//compiler/src/iree/compiler/Codegen/Utils",
         "//compiler/src/iree/compiler/Dialect/Encoding/IR",
+        "//compiler/src/iree/compiler/Dialect/HAL/Analysis",
         "//compiler/src/iree/compiler/Dialect/HAL/IR",
         "//runtime/src/iree/builtins/ukernel:exported_bits",
         "@llvm-project//llvm:Support",

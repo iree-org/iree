@@ -181,39 +181,6 @@ void DeviceTargetAttr::getExecutableTargets(
   }
 }
 
-// Returns a list of target devices that may be active for the given
-// operation. This will recursively walk parent operations until one with
-// the `hal.device.targets` attribute is found.
-static SmallVector<DeviceTargetAttr> lookupDeviceTargetAttrs(Operation *op) {
-  auto attrId = mlir::StringAttr::get(op->getContext(), "hal.device.targets");
-  while (op) {
-    auto targetsAttr = op->getAttrOfType<ArrayAttr>(attrId);
-    if (targetsAttr) {
-      SmallVector<IREE::HAL::DeviceTargetAttr> result;
-      for (auto targetAttr : targetsAttr) {
-        result.push_back(llvm::cast<IREE::HAL::DeviceTargetAttr>(targetAttr));
-      }
-      return result;
-    }
-    op = op->getParentOp();
-  }
-  return {}; // No devices found; let caller decide what to do.
-}
-
-// static
-SmallVector<ExecutableTargetAttr, 4>
-DeviceTargetAttr::lookupExecutableTargets(Operation *op) {
-  SmallVector<ExecutableTargetAttr> resultAttrs;
-  for (auto deviceTargetAttr : lookupDeviceTargetAttrs(op)) {
-    for (auto executableTargetAttr : deviceTargetAttr.getExecutableTargets()) {
-      if (!llvm::is_contained(resultAttrs, executableTargetAttr)) {
-        resultAttrs.push_back(executableTargetAttr);
-      }
-    }
-  }
-  return resultAttrs;
-}
-
 void IREE::HAL::DeviceTargetAttr::printStatusDescription(
     llvm::raw_ostream &os) const {
   cast<Attribute>().print(os, /*elideType=*/true);

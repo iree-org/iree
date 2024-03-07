@@ -293,9 +293,7 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
     // lowering iree_linalg_ext.upper_bound_tile_size ops that exist on the
     // host. We should be using stream ops for performing such calculations that
     // we can attach affinities to and understand what devices are being used.
-    FunctionLikeNest(passManager).addPass([]() {
-      return createCPUMaterializeUpperBoundTileSizePass();
-    });
+    passManager.addPass(createCPUMaterializeUpperBoundTileSizePass());
 
     // Preprocess executables using an external tool. The tool may mutate one or
     // more variants and even insert or remove variants.
