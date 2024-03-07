@@ -84,10 +84,8 @@ void buildIREEPrecompileTransformPassPipeline(
   // IR so that they are available for all passes that may want to use this
   // information. If trying to compile in a generic mode the user should omit
   // specifying targets.
-  if (!executableOptions.targets.empty()) {
-    passManager.addPass(IREE::HAL::createAssignTargetDevicesPass(
-        {&targetRegistry, executableOptions.targets}));
-  }
+  IREE::HAL::buildHALDeviceAssignmentPassPipeline(passManager, targetRegistry,
+                                                  executableOptions);
 
   // Input pipelines can result in changes to the exported functions and types
   // and must run before generating bindings.

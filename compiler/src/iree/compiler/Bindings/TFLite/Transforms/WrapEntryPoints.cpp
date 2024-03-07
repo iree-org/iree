@@ -499,6 +499,8 @@ private:
     wrapperFuncOp.setAllResultAttrs(resultAttrDict);
 
     populateReflectionAttrs(entryFuncOp, wrapperFuncOp);
+    if (auto affinityAttr = entryFuncOp->getAttr("stream.affinity"))
+      wrapperFuncOp->setAttr("stream.affinity", affinityAttr);
 
     // Call the entryFuncOp and return the results.
     // If we wanted to perform additional work here to invalidate cached shapes
