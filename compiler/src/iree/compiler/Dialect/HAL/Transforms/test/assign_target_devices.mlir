@@ -29,3 +29,14 @@ module @module {}
 module @module attributes {
   hal.device.targets = [#hal.device.target<"foo">]
 } {}
+
+// -----
+
+// The pass does nothing when one or more devices has already been defined.
+
+// CHECK: module @module
+// CHECK-NOT: hal.device.targets
+module @module {
+  // CHECK: @existing_device
+  util.global private @existing_device : !hal.device
+}

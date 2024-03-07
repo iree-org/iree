@@ -29,6 +29,7 @@ iree_cc_library(
     "MaterializeDispatchInstrumentation.cpp"
     "MaterializeInterfaces.cpp"
     "MaterializeResourceCaches.cpp"
+    "MaterializeTargetDevices.cpp"
     "MemoizeDeviceQueries.cpp"
     "Passes.cpp"
     "Passes.h.inc"
@@ -40,7 +41,7 @@ iree_cc_library(
     "StripExecutableContents.cpp"
     "SubstituteExecutables.cpp"
     "TranslateExecutables.cpp"
-    "VerifyTargetEnvironment.cpp"
+    "VerifyDevices.cpp"
   DEPS
     ::PassesIncGen
     LLVMSupport
