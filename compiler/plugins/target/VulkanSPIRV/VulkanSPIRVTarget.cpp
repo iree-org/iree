@@ -32,8 +32,8 @@ namespace mlir::iree_compiler::IREE::HAL {
 
 namespace {
 struct VulkanSPIRVTargetOptions {
-  std::string targetTriple;
-  std::string targetEnv;
+  std::string targetTriple = "";
+  std::string targetEnv = "";
   bool indirectBindings = false;
 
   void bindOptions(OptionsBinder &binder) {
@@ -82,8 +82,8 @@ getSPIRVTargetEnv(const std::string &vulkanTargetTripleOrEnv,
 // TODO: VulkanOptions for choosing the Vulkan version and extensions/features.
 class VulkanTargetDevice : public TargetDevice {
 public:
-  VulkanTargetDevice(VulkanSPIRVTargetOptions options)
-      : options_(std::move(options)) {}
+  VulkanTargetDevice(const VulkanSPIRVTargetOptions &options)
+      : options_(options) {}
 
   IREE::HAL::DeviceTargetAttr
   getDefaultDeviceTarget(MLIRContext *context,
@@ -103,13 +103,13 @@ public:
   }
 
 private:
-  VulkanSPIRVTargetOptions options_;
+  const VulkanSPIRVTargetOptions &options_;
 };
 
 class VulkanSPIRVTargetBackend : public TargetBackend {
 public:
-  VulkanSPIRVTargetBackend(VulkanSPIRVTargetOptions options)
-      : options_(std::move(options)) {}
+  VulkanSPIRVTargetBackend(const VulkanSPIRVTargetOptions &options)
+      : options_(options) {}
 
   std::string getLegacyDefaultDeviceID() const override { return "vulkan"; }
 
@@ -420,13 +420,13 @@ struct VulkanSPIRVSession
                            PluginActivationPolicy::DefaultActivated> {
   void populateHALTargetDevices(IREE::HAL::TargetDeviceList &targets) {
     // #hal.device.target<"vulkan", ...
-    static TargetDeviceRegistration registration0("vulkan", [=]() {
+    targets.add("vulkan", [&]() {
       return std::make_shared<VulkanTargetDevice>(options);
     });
   }
   void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {
     // #hal.executable.target<"vulkan-spirv", ...
-    static TargetBackendRegistration registration1("vulkan-spirv", [=]() {
+    targets.add("vulkan-spirv", [&]() {
       return std::make_shared<VulkanSPIRVTargetBackend>(options);
     });
   }
