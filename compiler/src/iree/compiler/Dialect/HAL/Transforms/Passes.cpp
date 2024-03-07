@@ -181,6 +181,28 @@ static void addExecutableSubstitutionPasses(OpPassManager &passManager,
 }
 
 //===----------------------------------------------------------------------===//
+// --iree-hal-device-assignment-pipeline
+//===----------------------------------------------------------------------===//
+
+void buildHALDeviceAssignmentPassPipeline(OpPassManager &passManager,
+                                          const TargetRegistry &targetRegistry,
+                                          const TargetOptions &targetOptions) {
+  // The HAL must know its targets early on in the process. This pass discovers/
+  // derives/specifies the target devices and annotates the module with that
+  // information. This allows subsequent passes to lookup which devices they are
+  // targeting.
+  if (!targetOptions.targets.empty()) {
+    // Today we just assign devices from parameters but we should instead be
+    // performing analysis at the flow level and then doing magic device
+    // database lookups here.
+    passManager.addPass(IREE::HAL::createAssignTargetDevicesPass(
+        {&targetRegistry, targetOptions.targets}));
+  }
+  passManager.addPass(IREE::HAL::createMaterializeTargetDevicesPass());
+  passManager.addPass(IREE::HAL::createVerifyDevicesPass({&targetRegistry}));
+}
+
+//===----------------------------------------------------------------------===//
 // --iree-hal-configuration-pipeline
 //===----------------------------------------------------------------------===//
 
@@ -197,22 +219,8 @@ void buildHALConfigurationPassPipeline(OpPassManager &passManager,
   addCleanupPatterns(passManager);
 
   //----------------------------------------------------------------------------
-  // Device assignment and interface materialization
+  // Device-specific interface materialization
   //----------------------------------------------------------------------------
-
-  // The HAL must know its targets early on in the process. This pass discovers/
-  // derives/specifies the target devices and annotates the module with that
-  // information. This allows subsequent passes to lookup which devices they are
-  // targeting.
-  if (!targetOptions.targets.empty()) {
-    // Today we just assign devices from parameters but we should instead be
-    // performing analysis at the flow level and then doing magic device
-    // database lookups here.
-    passManager.addPass(IREE::HAL::createAssignTargetDevicesPass(
-        {&targetRegistry, targetOptions.targets}));
-  }
-  passManager.addPass(
-      IREE::HAL::createVerifyTargetEnvironmentPass({targetRegistry}));
 
   // Add dispatch instrumentation prior to materializing interfaces so we can
   // more easily mutate the stream dispatch ops and exports.
@@ -275,6 +283,8 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
     hooks.beforePhase(PipelinePhase::ExecutableSources, passManager);
 
   if (compileFrom < PipelinePhase::ExecutableSources) {
+    buildHALDeviceAssignmentPassPipeline(passManager, targetRegistry,
+                                         targetOptions);
     buildHALConfigurationPassPipeline(passManager, targetRegistry,
                                       targetOptions, hooks);
 
@@ -566,6 +576,13 @@ void registerHALPasses() {
   registerPasses();
 
   // Pipelines.
+  PassPipelineRegistration<>("iree-hal-device-assignment-pipeline",
+                             "Runs HAL target device assignment pipeline.",
+                             [](OpPassManager &passManager) {
+                               buildHALDeviceAssignmentPassPipeline(
+                                   passManager, TargetRegistry::getGlobal(),
+                                   TargetOptions::FromFlags::get());
+                             });
   PassPipelineRegistration<>("iree-hal-configuration-pipeline",
                              "Runs HAL target configuration pipeline.",
                              [](OpPassManager &passManager) {
