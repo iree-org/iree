@@ -377,13 +377,14 @@ struct DistributeReductions final
                                 vector::CombiningKind combiningKind,
                                 int64_t entriesPerVector, Value mEmpty,
                                 OpBuilder &rewriter, Location loc) const {
-    uint32_t size = maxBitsPerShuffle;
+    // TODO: Get subgroup size from translation info.
+    uint32_t subgroupSize = 64;
     Value mask;
     assert(llvm::isPowerOf2_64(laneSize));
     for (uint64_t i = shuffleOffset; i < shuffleOffset * laneSize; i <<= 1) {
       Value packed = packVectorToSupportedWidth(loc, rewriter, result);
-      auto shuffleOp = rewriter.create<gpu::ShuffleOp>(loc, packed, i, size,
-                                                       gpu::ShuffleMode::XOR);
+      auto shuffleOp = rewriter.create<gpu::ShuffleOp>(
+          loc, packed, i, subgroupSize, gpu::ShuffleMode::XOR);
       Value unpacked =
           unpackToVector(loc, rewriter, shuffleOp.getShuffleResult(),
                          result.getType().cast<VectorType>());
