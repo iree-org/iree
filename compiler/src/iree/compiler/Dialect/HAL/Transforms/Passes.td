@@ -79,6 +79,18 @@ def MaterializeTargetDevicesPass :
   ];
 }
 
+def ResolveDevicePromisesPass :
+    Pass<"iree-hal-resolve-device-promises", "mlir::ModuleOp"> {
+  let summary = "Resolves `#hal.device.promise` attributes to their devices.";
+  let description = [{
+    Resolves promised device affinities to the materialized device globals that
+    were promised. Verifies that all promises are resolved.
+  }];
+  let dependentDialects = [
+    "IREE::HAL::HALDialect",
+  ];
+}
+
 def VerifyDevicesPass :
     Pass<"iree-hal-verify-devices", "mlir::ModuleOp"> {
   let summary = "Verifies that all devices can be targeted with the available compiler plugins.";
