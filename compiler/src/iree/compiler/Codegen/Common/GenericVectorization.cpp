@@ -344,11 +344,12 @@ void GenericVectorizationPass::runOnOperation() {
     if (enableVectorMasking) {
       std::optional<SizesAndScalableFlags> vectorSizesAndScalableDims =
           getVectorSizes(op, useConfiguredVectorSizes);
-      if (vectorSizesAndScalableDims) {
-        auto [sizes, scalableDims] = *vectorSizesAndScalableDims;
-        vectorSizes.append(sizes.begin(), sizes.end());
-        scalableVecDims.append(scalableDims.begin(), scalableDims.end());
+      if (!vectorSizesAndScalableDims) {
+        continue;
       }
+      auto [sizes, scalableDims] = *vectorSizesAndScalableDims;
+      vectorSizes.append(sizes.begin(), sizes.end());
+      scalableVecDims.append(scalableDims.begin(), scalableDims.end());
     } else if (isa<tensor::PackOp, tensor::UnPackOp>(op)) {
       // TODO(#16948): Support vectorization for static cases without passing
       // input_vector_sizes.
