@@ -13,6 +13,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Attributes.h"
@@ -377,14 +378,17 @@ struct DistributeReductions final
                                 vector::CombiningKind combiningKind,
                                 int64_t entriesPerVector, Value mEmpty,
                                 OpBuilder &rewriter, Location loc) const {
-    // TODO: Get subgroup size from translation info.
-    uint32_t subgroupSize = 64;
+    auto funcOp = result.getDefiningOp()->getParentOfType<func::FuncOp>();
+    std::optional<int64_t> subgroupSize = getSubgroupSize(funcOp);
+    if (!subgroupSize)
+      funcOp->emitError("Could not find subgroup size!");
+
     Value mask;
     assert(llvm::isPowerOf2_64(laneSize));
     for (uint64_t i = shuffleOffset; i < shuffleOffset * laneSize; i <<= 1) {
       Value packed = packVectorToSupportedWidth(loc, rewriter, result);
       auto shuffleOp = rewriter.create<gpu::ShuffleOp>(
-          loc, packed, i, subgroupSize, gpu::ShuffleMode::XOR);
+          loc, packed, i, subgroupSize.value(), gpu::ShuffleMode::XOR);
       Value unpacked =
           unpackToVector(loc, rewriter, shuffleOp.getShuffleResult(),
                          result.getType().cast<VectorType>());
