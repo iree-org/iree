@@ -583,6 +583,10 @@ static bool matmul_result_elements_agree(iree_e2e_test_value_t expected,
         iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "mismatched types"));
     return false;
   }
+
+  // Negative tolerance is never satisfied: same behavior as numpy.allclose
+  if (FLAG_acceptable_fp_delta < 0.0f) return false;
+
   switch (expected.type) {
     case IREE_E2E_TEST_VALUE_TYPE_I32:
       return actual.i32 == expected.i32;
