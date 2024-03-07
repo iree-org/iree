@@ -427,6 +427,7 @@ void retainFunctionAttributes(Operation *srcOp, IREE::Util::FuncOp destOp) {
   // Allowlist of function attributes to retain when importing funcs.
   constexpr const char *kRetainedAttributes[] = {
       "iree.reflection",
+      "stream.affinity",
   };
   auto retainedAttributes = ArrayRef<const char *>(
       kRetainedAttributes,

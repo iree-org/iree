@@ -46,9 +46,17 @@ struct PipelineHooks {
   std::function<void(PipelinePhase phase, OpPassManager &)> afterPhase;
 };
 
+// Assigns devices from flags and coarse module-level specification.
+// Frontends are encouraged to create and assign devices themselves in order to
+// support more complex configurations (multiple devices, fallbacks, etc).
+void buildHALDeviceAssignmentPassPipeline(OpPassManager &passManager,
+                                          const TargetRegistry &targetRegistry,
+                                          const TargetOptions &targetOptions);
+
 // Adds a set of passes to the given pass manager that run the head of the HAL
-// pipeline to assign devices, materialize interfaces, and translate
-// executables. The host portion of the program is annotated but not modified.
+// pipeline to materialize interfaces, import externally specified executables,
+// and translate executables. The host portion of the program is annotated but
+// not modified.
 void buildHALConfigurationPassPipeline(OpPassManager &passManager,
                                        const TargetRegistry &targetRegistry,
                                        const TargetOptions &targetOptions,

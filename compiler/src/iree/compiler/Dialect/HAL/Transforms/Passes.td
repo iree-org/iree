@@ -42,24 +42,6 @@ def ConvertToHALPass :
 // Device management
 //===----------------------------------------------------------------------===//
 
-def VerifyTargetEnvironmentPass :
-    Pass<"iree-hal-verify-target-environment", "mlir::ModuleOp"> {
-  let summary = "Verifies that the target execution environment is valid.";
-  let description = [{
-    Verifies that the target execution environment is valid.
-    `#hal.device.target` and `#hal.executable.target` attribute placement and
-    definition will be checked that they reference the available target backends
-    and that they are structurally valid.
-  }];
-  let options = [
-    Option<
-      "targetRegistry", "target-registry",
-      "llvm::cl::TargetRegistryRef", "",
-      "Target registry containing the list of available devices and backends."
-    >,
-  ];
-}
-
 def AssignTargetDevicesPass :
     Pass<"iree-hal-assign-target-devices", "mlir::ModuleOp"> {
   let summary = "Assigns the HAL devices the module will target to the given list of targets.";
@@ -76,6 +58,39 @@ def AssignTargetDevicesPass :
       "targetBackends", "targetBackends",
       "std::string",
       "List of target backends to assign as device targets."
+    >,
+  ];
+  let dependentDialects = [
+    "IREE::HAL::HALDialect",
+  ];
+}
+
+def MaterializeTargetDevicesPass :
+    Pass<"iree-hal-materialize-target-devices", "mlir::ModuleOp"> {
+  let summary = "Materializes global device handles based on a `hal.device.targets` spec.";
+  let description = [{
+    Materializes a global `!hal.device` for the devices specified by the
+    `hal.device.targets` attribute on the module. It's preferred that frontends
+    provide IR with the globals assigned as this only supports a single device.
+  }];
+  let dependentDialects = [
+    "IREE::HAL::HALDialect",
+    "IREE::Util::UtilDialect",
+  ];
+}
+
+def VerifyDevicesPass :
+    Pass<"iree-hal-verify-devices", "mlir::ModuleOp"> {
+  let summary = "Verifies that all devices can be targeted with the available compiler plugins.";
+  let description = [{
+    Verifies that `#hal.device.target` and `#hal.executable.target` attributes
+    reference targets that are registered with the compiler.
+  }];
+  let options = [
+    Option<
+      "targetRegistry", "target-registry",
+      "llvm::cl::TargetRegistryRef", "",
+      "Target registry containing the list of available devices and backends."
     >,
   ];
 }

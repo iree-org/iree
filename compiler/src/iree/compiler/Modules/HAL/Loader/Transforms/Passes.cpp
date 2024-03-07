@@ -53,6 +53,8 @@ void buildHALInlineDynamicTransformPassPipeline(
   // Device assignment and interface materialization
   //----------------------------------------------------------------------------
 
+  IREE::HAL::buildHALDeviceAssignmentPassPipeline(passManager, targetRegistry,
+                                                  targetOptions);
   IREE::HAL::buildHALConfigurationPassPipeline(passManager, targetRegistry,
                                                targetOptions);
 
