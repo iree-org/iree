@@ -4,13 +4,13 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "experimental/hip/native_executable.h"
+#include "iree/hal/drivers/hip/native_executable.h"
 
 #include <stddef.h>
 
-#include "experimental/hip/dynamic_symbols.h"
-#include "experimental/hip/status_util.h"
 #include "iree/base/api.h"
+#include "iree/hal/drivers/hip/dynamic_symbols.h"
+#include "iree/hal/drivers/hip/status_util.h"
 
 // flatcc schemas:
 #include "iree/base/internal/flatcc/parsing.h"

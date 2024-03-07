@@ -4,30 +4,30 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "experimental/hip/hip_device.h"
+#include "iree/hal/drivers/hip/hip_device.h"
 
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
-#include "experimental/hip/dynamic_symbols.h"
-#include "experimental/hip/event_pool.h"
-#include "experimental/hip/event_semaphore.h"
-#include "experimental/hip/graph_command_buffer.h"
-#include "experimental/hip/hip_allocator.h"
-#include "experimental/hip/hip_buffer.h"
-#include "experimental/hip/memory_pools.h"
-#include "experimental/hip/nop_executable_cache.h"
-#include "experimental/hip/pending_queue_actions.h"
-#include "experimental/hip/pipeline_layout.h"
-#include "experimental/hip/status_util.h"
-#include "experimental/hip/stream_command_buffer.h"
-#include "experimental/hip/timepoint_pool.h"
-#include "experimental/hip/tracing.h"
 #include "iree/base/internal/arena.h"
 #include "iree/base/internal/event_pool.h"
 #include "iree/base/internal/math.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/drivers/hip/dynamic_symbols.h"
+#include "iree/hal/drivers/hip/event_pool.h"
+#include "iree/hal/drivers/hip/event_semaphore.h"
+#include "iree/hal/drivers/hip/graph_command_buffer.h"
+#include "iree/hal/drivers/hip/hip_allocator.h"
+#include "iree/hal/drivers/hip/hip_buffer.h"
+#include "iree/hal/drivers/hip/memory_pools.h"
+#include "iree/hal/drivers/hip/nop_executable_cache.h"
+#include "iree/hal/drivers/hip/pending_queue_actions.h"
+#include "iree/hal/drivers/hip/pipeline_layout.h"
+#include "iree/hal/drivers/hip/status_util.h"
+#include "iree/hal/drivers/hip/stream_command_buffer.h"
+#include "iree/hal/drivers/hip/timepoint_pool.h"
+#include "iree/hal/drivers/hip/tracing.h"
 #include "iree/hal/utils/deferred_command_buffer.h"
 #include "iree/hal/utils/file_transfer.h"
 #include "iree/hal/utils/memory_file.h"

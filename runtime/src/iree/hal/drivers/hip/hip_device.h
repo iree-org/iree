@@ -4,13 +4,13 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_EXPERIMENTAL_HIP_DEVICE_H_
-#define IREE_EXPERIMENTAL_HIP_DEVICE_H_
+#ifndef IREE_HAL_DRIVERS_HIP_DEVICE_H_
+#define IREE_HAL_DRIVERS_HIP_DEVICE_H_
 
-#include "experimental/hip/api.h"
-#include "experimental/hip/dynamic_symbols.h"
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
+#include "iree/hal/drivers/hip/api.h"
+#include "iree/hal/drivers/hip/dynamic_symbols.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -53,4 +53,4 @@ const iree_hal_hip_dynamic_symbols_t* iree_hal_hip_device_dynamic_symbols(
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_EXPERIMENTAL_HIP_DEVICE_H_
+#endif  // IREE_HAL_DRIVERS_HIP_DEVICE_H_

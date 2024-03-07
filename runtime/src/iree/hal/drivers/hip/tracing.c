@@ -4,12 +4,12 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "experimental/hip/tracing.h"
+#include "iree/hal/drivers/hip/tracing.h"
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
-#include "experimental/hip/dynamic_symbols.h"
-#include "experimental/hip/status_util.h"
+#include "iree/hal/drivers/hip/dynamic_symbols.h"
+#include "iree/hal/drivers/hip/status_util.h"
 
 // Total number of events per tracing context. This translates to the maximum
 // number of outstanding timestamp queries before collection is required.

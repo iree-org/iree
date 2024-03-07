@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_EXPERIMENTAL_HIP_PIPELINE_LAYOUT_H_
-#define IREE_EXPERIMENTAL_HIP_PIPELINE_LAYOUT_H_
+#ifndef IREE_HAL_DRIVERS_HIP_PIPELINE_LAYOUT_H_
+#define IREE_HAL_DRIVERS_HIP_PIPELINE_LAYOUT_H_
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
@@ -89,4 +89,4 @@ iree_hal_hip_dispatch_layout_t iree_hal_hip_pipeline_layout_dispatch_layout(
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_EXPERIMENTAL_HIP_PIPELINE_LAYOUT_H_
+#endif  // IREE_HAL_DRIVERS_HIP_PIPELINE_LAYOUT_H_

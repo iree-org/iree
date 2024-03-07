@@ -4,15 +4,15 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_EXPERIMENTAL_HIP_TRACING_H_
-#define IREE_EXPERIMENTAL_HIP_TRACING_H_
+#ifndef IREE_HAL_DRIVERS_HIP_TRACING_H_
+#define IREE_HAL_DRIVERS_HIP_TRACING_H_
 
-#include "experimental/hip/dynamic_symbols.h"
-#include "experimental/hip/hip_headers.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/arena.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
+#include "iree/hal/drivers/hip/dynamic_symbols.h"
+#include "iree/hal/drivers/hip/hip_headers.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -117,4 +117,4 @@ void iree_hal_hip_tracing_zone_end_impl(iree_hal_hip_tracing_context_t* context,
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_EXPERIMENTAL_HIP_TRACING_H_
+#endif  // IREE_HAL_DRIVERS_HIP_TRACING_H_

@@ -4,12 +4,12 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "experimental/hip/status_util.h"
+#include "iree/hal/drivers/hip/status_util.h"
 
 #include <stddef.h>
 
-#include "experimental/hip/dynamic_symbols.h"
 #include "iree/base/status.h"
+#include "iree/hal/drivers/hip/dynamic_symbols.h"
 
 // The list of HIP error strings with their corresponding IREE error state
 // classification.

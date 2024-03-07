@@ -7,14 +7,14 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "experimental/hip/api.h"
-#include "experimental/hip/dynamic_symbols.h"
-#include "experimental/hip/hip_device.h"
-#include "experimental/hip/status_util.h"
 #include "iree/base/api.h"
 #include "iree/base/assert.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
+#include "iree/hal/drivers/hip/api.h"
+#include "iree/hal/drivers/hip/dynamic_symbols.h"
+#include "iree/hal/drivers/hip/hip_device.h"
+#include "iree/hal/drivers/hip/status_util.h"
 
 // Maximum device name length supported by the HIP HAL driver.
 #define IREE_HAL_HIP_MAX_DEVICE_NAME_LENGTH 128

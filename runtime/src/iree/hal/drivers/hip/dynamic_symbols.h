@@ -4,12 +4,12 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_EXPERIMENTAL_HIP_DYNAMIC_SYMBOLS_H_
-#define IREE_EXPERIMENTAL_HIP_DYNAMIC_SYMBOLS_H_
+#ifndef IREE_HAL_DRIVERS_HIP_DYNAMIC_SYMBOLS_H_
+#define IREE_HAL_DRIVERS_HIP_DYNAMIC_SYMBOLS_H_
 
-#include "experimental/hip/hip_headers.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/dynamic_library.h"
+#include "iree/hal/drivers/hip/hip_headers.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -36,7 +36,7 @@ typedef struct iree_hal_hip_dynamic_symbols_t {
   const char* (*hipSymbolName)(__VA_ARGS__);
 #define IREE_HAL_HIP_OPTIONAL_PFN_DECL(hipSymbolName, ...) \
   hipError_t (*hipSymbolName)(__VA_ARGS__);
-#include "experimental/hip/dynamic_symbol_tables.h"  // IWYU pragma: export
+#include "iree/hal/drivers/hip/dynamic_symbol_tables.h"  // IWYU pragma: export
 #undef IREE_HAL_HIP_REQUIRED_PFN_DECL
 #undef IREE_HAL_HIP_REQUIRED_PFN_STR_DECL
 #undef IREE_HAL_HIP_OPTIONAL_PFN_DECL
@@ -58,4 +58,4 @@ void iree_hal_hip_dynamic_symbols_deinitialize(
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_EXPERIMENTAL_HIP_DYNAMIC_SYMBOLS_H_
+#endif  // IREE_HAL_DRIVERS_HIP_DYNAMIC_SYMBOLS_H_

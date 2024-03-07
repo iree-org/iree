@@ -4,13 +4,13 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "experimental/hip/event_semaphore.h"
+#include "iree/hal/drivers/hip/event_semaphore.h"
 
-#include "experimental/hip/dynamic_symbols.h"
-#include "experimental/hip/status_util.h"
-#include "experimental/hip/timepoint_pool.h"
 #include "iree/base/internal/synchronization.h"
 #include "iree/base/internal/wait_handle.h"
+#include "iree/hal/drivers/hip/dynamic_symbols.h"
+#include "iree/hal/drivers/hip/status_util.h"
+#include "iree/hal/drivers/hip/timepoint_pool.h"
 #include "iree/hal/utils/semaphore_base.h"
 
 typedef struct iree_hal_hip_semaphore_t {

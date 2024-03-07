@@ -4,14 +4,14 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "experimental/hip/dynamic_symbols.h"
+#include "iree/hal/drivers/hip/dynamic_symbols.h"
 
 #include <string.h>
 
-#include "experimental/hip/status_util.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/dynamic_library.h"
 #include "iree/base/target_platform.h"
+#include "iree/hal/drivers/hip/status_util.h"
 
 //===----------------------------------------------------------------------===//
 // HIP dynamic symbols
@@ -42,7 +42,7 @@ static iree_status_t iree_hal_hip_dynamic_symbols_resolve_all(
     IREE_IGNORE_ERROR(iree_dynamic_library_lookup_symbol(    \
         syms->dylib, name, (void**)&syms->hip_symbol_name)); \
   }
-#include "experimental/hip/dynamic_symbol_tables.h"  // IWYU pragma: keep
+#include "iree/hal/drivers/hip/dynamic_symbol_tables.h"  // IWYU pragma: keep
 #undef IREE_HAL_HIP_REQUIRED_PFN_DECL
 #undef IREE_HAL_HIP_REQUIRED_PFN_STR_DECL
 #undef IREE_HAL_HIP_OPTIONAL_PFN_DECL

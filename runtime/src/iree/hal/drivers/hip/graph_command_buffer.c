@@ -4,18 +4,18 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "experimental/hip/graph_command_buffer.h"
+#include "iree/hal/drivers/hip/graph_command_buffer.h"
 
 #include <assert.h>
 #include <stddef.h>
 #include <stdint.h>
 
-#include "experimental/hip/dynamic_symbols.h"
-#include "experimental/hip/hip_buffer.h"
-#include "experimental/hip/native_executable.h"
-#include "experimental/hip/pipeline_layout.h"
-#include "experimental/hip/status_util.h"
 #include "iree/base/api.h"
+#include "iree/hal/drivers/hip/dynamic_symbols.h"
+#include "iree/hal/drivers/hip/hip_buffer.h"
+#include "iree/hal/drivers/hip/native_executable.h"
+#include "iree/hal/drivers/hip/pipeline_layout.h"
+#include "iree/hal/drivers/hip/status_util.h"
 #include "iree/hal/utils/resource_set.h"
 
 // The maximal number of HIP graph nodes that can run concurrently between

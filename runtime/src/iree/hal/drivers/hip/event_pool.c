@@ -4,18 +4,18 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "experimental/hip/event_pool.h"
+#include "iree/hal/drivers/hip/event_pool.h"
 
 #include <stdbool.h>
 #include <stddef.h>
 #include <string.h>
 
-#include "experimental/hip/dynamic_symbols.h"
-#include "experimental/hip/status_util.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/atomics.h"
 #include "iree/base/internal/synchronization.h"
 #include "iree/hal/api.h"
+#include "iree/hal/drivers/hip/dynamic_symbols.h"
+#include "iree/hal/drivers/hip/status_util.h"
 
 //===----------------------------------------------------------------------===//
 // iree_hal_hip_event_t

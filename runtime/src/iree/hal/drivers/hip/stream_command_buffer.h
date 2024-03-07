@@ -4,14 +4,14 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_EXPERIMENTAL_HIP_STREAM_COMMAND_BUFFER_H_
-#define IREE_EXPERIMENTAL_HIP_STREAM_COMMAND_BUFFER_H_
+#ifndef IREE_HAL_DRIVERS_HIP_STREAM_COMMAND_BUFFER_H_
+#define IREE_HAL_DRIVERS_HIP_STREAM_COMMAND_BUFFER_H_
 
-#include "experimental/hip/dynamic_symbols.h"
-#include "experimental/hip/hip_headers.h"
-#include "experimental/hip/tracing.h"
 #include "iree/base/internal/arena.h"
 #include "iree/hal/api.h"
+#include "iree/hal/drivers/hip/dynamic_symbols.h"
+#include "iree/hal/drivers/hip/hip_headers.h"
+#include "iree/hal/drivers/hip/tracing.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -46,4 +46,4 @@ bool iree_hal_hip_stream_command_buffer_isa(
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_EXPERIMENTAL_HIP_STREAM_COMMAND_BUFFER_H_
+#endif  // IREE_HAL_DRIVERS_HIP_STREAM_COMMAND_BUFFER_H_

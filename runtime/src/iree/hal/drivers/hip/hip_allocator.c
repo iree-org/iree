@@ -4,15 +4,15 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "experimental/hip/hip_allocator.h"
+#include "iree/hal/drivers/hip/hip_allocator.h"
 
 #include <stddef.h>
 
-#include "experimental/hip/dynamic_symbols.h"
-#include "experimental/hip/hip_buffer.h"
-#include "experimental/hip/status_util.h"
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/drivers/hip/dynamic_symbols.h"
+#include "iree/hal/drivers/hip/hip_buffer.h"
+#include "iree/hal/drivers/hip/status_util.h"
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING
 static const char* IREE_HAL_HIP_ALLOCATOR_ID = "HIP unpooled";

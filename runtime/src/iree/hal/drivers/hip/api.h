@@ -6,8 +6,8 @@
 
 // See iree/base/api.h for documentation on the API conventions used.
 
-#ifndef IREE_EXPERIMENTAL_HIP_API_H_
-#define IREE_EXPERIMENTAL_HIP_API_H_
+#ifndef IREE_HAL_DRIVERS_HIP_API_H_
+#define IREE_HAL_DRIVERS_HIP_API_H_
 
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
@@ -121,4 +121,4 @@ IREE_API_EXPORT iree_status_t iree_hal_hip_driver_create(
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_EXPERIMENTAL_HIP_API_H_
+#endif  // IREE_HAL_DRIVERS_HIP_API_H_

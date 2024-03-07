@@ -4,13 +4,13 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_EXPERIMENTAL_HIP_ALLOCATOR_H_
-#define IREE_EXPERIMENTAL_HIP_ALLOCATOR_H_
+#ifndef IREE_HAL_DRIVERS_HIP_ALLOCATOR_H_
+#define IREE_HAL_DRIVERS_HIP_ALLOCATOR_H_
 
-#include "experimental/hip/memory_pools.h"
-#include "experimental/hip/status_util.h"
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
+#include "iree/hal/drivers/hip/memory_pools.h"
+#include "iree/hal/drivers/hip/status_util.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -29,4 +29,4 @@ iree_status_t iree_hal_hip_allocator_create(
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_EXPERIMENTAL_HIP_ALLOCATOR_H_
+#endif  // IREE_HAL_DRIVERS_HIP_ALLOCATOR_H_

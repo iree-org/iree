@@ -4,16 +4,11 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "experimental/hip/pending_queue_actions.h"
+#include "iree/hal/drivers/hip/pending_queue_actions.h"
 
 #include <stdbool.h>
 #include <stddef.h>
 
-#include "experimental/hip/dynamic_symbols.h"
-#include "experimental/hip/event_semaphore.h"
-#include "experimental/hip/graph_command_buffer.h"
-#include "experimental/hip/hip_device.h"
-#include "experimental/hip/status_util.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/arena.h"
 #include "iree/base/internal/atomic_slist.h"
@@ -21,6 +16,11 @@
 #include "iree/base/internal/synchronization.h"
 #include "iree/base/internal/threading.h"
 #include "iree/hal/api.h"
+#include "iree/hal/drivers/hip/dynamic_symbols.h"
+#include "iree/hal/drivers/hip/event_semaphore.h"
+#include "iree/hal/drivers/hip/graph_command_buffer.h"
+#include "iree/hal/drivers/hip/hip_device.h"
+#include "iree/hal/drivers/hip/status_util.h"
 #include "iree/hal/utils/deferred_command_buffer.h"
 #include "iree/hal/utils/resource_set.h"
 

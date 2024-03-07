@@ -5,13 +5,13 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "experimental/hip/stream_command_buffer.h"
+#include "iree/hal/drivers/hip/stream_command_buffer.h"
 
-#include "experimental/hip/hip_buffer.h"
-#include "experimental/hip/native_executable.h"
-#include "experimental/hip/pipeline_layout.h"
-#include "experimental/hip/status_util.h"
-#include "experimental/hip/tracing.h"
+#include "iree/hal/drivers/hip/hip_buffer.h"
+#include "iree/hal/drivers/hip/native_executable.h"
+#include "iree/hal/drivers/hip/pipeline_layout.h"
+#include "iree/hal/drivers/hip/status_util.h"
+#include "iree/hal/drivers/hip/tracing.h"
 #include "iree/hal/utils/resource_set.h"
 
 typedef struct iree_hal_hip_stream_command_buffer_t {

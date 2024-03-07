@@ -4,16 +4,16 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_EXPERIMENTAL_HIP_NATIVE_EXECUTABLE_H_
-#define IREE_EXPERIMENTAL_HIP_NATIVE_EXECUTABLE_H_
+#ifndef IREE_HAL_DRIVERS_HIP_NATIVE_EXECUTABLE_H_
+#define IREE_HAL_DRIVERS_HIP_NATIVE_EXECUTABLE_H_
 
 #include <stdint.h>
 
-#include "experimental/hip/dynamic_symbols.h"
-#include "experimental/hip/hip_headers.h"
 #include "iree/base/api.h"
 #include "iree/base/tracing.h"
 #include "iree/hal/api.h"
+#include "iree/hal/drivers/hip/dynamic_symbols.h"
+#include "iree/hal/drivers/hip/hip_headers.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -47,4 +47,4 @@ iree_status_t iree_hal_hip_native_executable_entry_point_kernel_info(
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_EXPERIMENTAL_HIP_NATIVE_EXECUTABLE_H_
+#endif  // IREE_HAL_DRIVERS_HIP_NATIVE_EXECUTABLE_H_

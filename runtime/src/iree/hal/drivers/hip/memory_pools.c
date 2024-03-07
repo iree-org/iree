@@ -4,11 +4,11 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "experimental/hip/memory_pools.h"
+#include "iree/hal/drivers/hip/memory_pools.h"
 
-#include "experimental/hip/dynamic_symbols.h"
-#include "experimental/hip/hip_buffer.h"
-#include "experimental/hip/status_util.h"
+#include "iree/hal/drivers/hip/dynamic_symbols.h"
+#include "iree/hal/drivers/hip/hip_buffer.h"
+#include "iree/hal/drivers/hip/status_util.h"
 
 // NOTE: these are currently global for all devices; we could make
 // device-specific ones by malloc() and leaking (with LSAN note) unique string

@@ -4,16 +4,16 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_EXPERIMENTAL_HIP_EVENT_SEMAPHORE_H_
-#define IREE_EXPERIMENTAL_HIP_EVENT_SEMAPHORE_H_
+#ifndef IREE_HAL_DRIVERS_HIP_EVENT_SEMAPHORE_H_
+#define IREE_HAL_DRIVERS_HIP_EVENT_SEMAPHORE_H_
 
 #include <stdint.h>
 
-#include "experimental/hip/dynamic_symbols.h"
-#include "experimental/hip/pending_queue_actions.h"
-#include "experimental/hip/timepoint_pool.h"
 #include "iree/base/api.h"
 #include "iree/hal/api.h"
+#include "iree/hal/drivers/hip/dynamic_symbols.h"
+#include "iree/hal/drivers/hip/pending_queue_actions.h"
+#include "iree/hal/drivers/hip/timepoint_pool.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -60,4 +60,4 @@ iree_status_t iree_hal_hip_semaphore_multi_wait(
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_EXPERIMENTAL_HIP_EVENT_SEMAPHORE_H_
+#endif  // IREE_HAL_DRIVERS_HIP_EVENT_SEMAPHORE_H_

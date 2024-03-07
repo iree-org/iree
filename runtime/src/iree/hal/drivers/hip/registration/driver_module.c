@@ -4,16 +4,16 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "experimental/hip/registration/driver_module.h"
+#include "iree/hal/drivers/hip/registration/driver_module.h"
 
 #include <inttypes.h>
 #include <stddef.h>
 
-#include "experimental/hip/api.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/flags.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
+#include "iree/hal/drivers/hip/api.h"
 
 IREE_FLAG(bool, hip_use_streams, true,
           "Use HIP streams (instead of graphs) for executing command buffers.");
