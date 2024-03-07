@@ -522,12 +522,6 @@ def HAL_DeviceTargetAttr : AttrDef<HAL_Dialect, "DeviceTarget", [
     // Returns zero or more executable targets that this device supports.
     void getExecutableTargets(
         SetVector<IREE::HAL::ExecutableTargetAttr> &resultAttrs);
-
-    // DEPRECATED: analysis is required in order to query this information.
-    // Returns a list of all target executable configurations that may be
-    // required for the given operation.
-    static SmallVector<IREE::HAL::ExecutableTargetAttr, 4>
-    lookupExecutableTargets(Operation *op);
   }];
 
   let hasCustomAssemblyFormat = 1;

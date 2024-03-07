@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-cpu-materialize-encoding),canonicalize,cse)" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-cpu-materialize-device-encoding),canonicalize,cse)" --split-input-file %s | FileCheck %s
 
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
@@ -77,7 +77,7 @@ func.func @matmul_lowering_i8i8i32_vmvx_ukernel() attributes {
 #map3 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map4 = affine_map<(d0, d1, d2) -> (d0, d1)>
 func.func @fill_matmul(%arg0: index, %arg1: index, %arg2: index, %arg3: index, %arg4: index, %arg5: index, %arg6: index, %arg7: index) attributes {
-   hal.executable.target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb">
+  hal.executable.target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb">
 } {
   %c32_i64 = arith.constant 32 : i64
   %cst = arith.constant 0.000000e+00 : f32
@@ -123,7 +123,7 @@ func.func @fill_matmul(%arg0: index, %arg1: index, %arg2: index, %arg3: index, %
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 func.func @set_encoding_dynamic() attributes {
-   hal.executable.target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb">
+  hal.executable.target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb">
 } {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f32
@@ -177,7 +177,7 @@ func.func @set_encoding_dynamic() attributes {
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 func.func @unset_encoding_dynamic() attributes {
-   hal.executable.target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb">
+  hal.executable.target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb">
 } {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f32
@@ -225,7 +225,7 @@ func.func @unset_encoding_dynamic() attributes {
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 func.func @matmul_lowering_f32f32f32_generic() attributes {
-   hal.executable.target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb">
+  hal.executable.target = #hal.executable.target<"vmvx", "vmvx-bytecode-fb">
 } {
   %c0 = arith.constant 0 : index
   %M = hal.interface.constant.load[0] : index
