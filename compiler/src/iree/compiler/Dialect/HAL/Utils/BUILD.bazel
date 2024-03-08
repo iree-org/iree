@@ -1,4 +1,4 @@
-# Copyright 2019 The IREE Authors
+# Copyright 2024 The IREE Authors
 #
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
@@ -13,26 +13,21 @@ package(
 )
 
 iree_compiler_cc_library(
-    name = "Target",
+    name = "LLVMLinkerUtils",
     srcs = [
-        "TargetBackend.cpp",
-        "TargetDevice.cpp",
-        "TargetRegistry.cpp",
+        "LLVMLinkerUtils.cpp",
     ],
     hdrs = [
-        "TargetBackend.h",
-        "TargetDevice.h",
-        "TargetRegistry.h",
+        "LLVMLinkerUtils.h",
     ],
     deps = [
-        "//compiler/src/iree/compiler/Dialect/Flow/IR",
+        "//compiler/src/iree/compiler/Codegen/Utils",
         "//compiler/src/iree/compiler/Dialect/HAL/IR",
-        "//compiler/src/iree/compiler/Dialect/Util/IR",
-        "//compiler/src/iree/compiler/Utils",
+        "@llvm-project//llvm:BitReader",
+        "@llvm-project//llvm:Core",
+        "@llvm-project//llvm:IPO",
+        "@llvm-project//llvm:Linker",
         "@llvm-project//llvm:Support",
-        "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:Pass",
-        "@llvm-project//mlir:Support",
-        "@llvm-project//mlir:Transforms",
+        "@llvm-project//llvm:Target",
     ],
 )
