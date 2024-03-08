@@ -345,15 +345,13 @@ struct Session {
         pluginActivationStatus = pluginSession.activatePlugins(&context);
 
         // Initialize target registry, bootstrapping with the static globals.
-        // TODO(15468): remove the static registration mechanism so the merge
-        // from global is not required.
         targetRegistry.mergeFrom(IREE::HAL::TargetRegistry::getGlobal());
-        IREE::HAL::TargetBackendList pluginTargetBackendList;
-        pluginSession.populateHALTargetBackends(pluginTargetBackendList);
-        targetRegistry.mergeFrom(pluginTargetBackendList);
         IREE::HAL::TargetDeviceList pluginTargetDeviceList;
         pluginSession.populateHALTargetDevices(pluginTargetDeviceList);
         targetRegistry.mergeFrom(pluginTargetDeviceList);
+        IREE::HAL::TargetBackendList pluginTargetBackendList;
+        pluginSession.populateHALTargetBackends(pluginTargetBackendList);
+        targetRegistry.mergeFrom(pluginTargetBackendList);
       }
     }
     return pluginActivationStatus;

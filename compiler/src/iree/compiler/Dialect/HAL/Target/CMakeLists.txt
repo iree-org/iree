@@ -16,10 +16,12 @@ iree_cc_library(
   HDRS
     "TargetBackend.h"
     "TargetDevice.h"
+    "TargetOptions.h"
     "TargetRegistry.h"
   SRCS
     "TargetBackend.cpp"
     "TargetDevice.cpp"
+    "TargetOptions.cpp"
     "TargetRegistry.cpp"
   DEPS
     LLVMSupport

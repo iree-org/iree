@@ -6,8 +6,6 @@
 
 #include "iree/compiler/Dialect/HAL/Target/TargetDevice.h"
 
-#include "mlir/IR/Dialect.h"
-
 namespace mlir::iree_compiler::IREE::HAL {
 
 // TODO(benvanik): add device options.
