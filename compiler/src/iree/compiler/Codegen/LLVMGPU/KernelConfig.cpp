@@ -43,7 +43,7 @@ llvm::cl::opt<bool> clGPUEnableVectorDistribution(
 llvm::cl::opt<bool> clGPUEnableTransformDialectJit(
     "iree-codegen-llvmgpu-enable-transform-dialect-jit",
     llvm::cl::desc("enable the usage of the transform dialect JIT"),
-    llvm::cl::init(true));
+    llvm::cl::init(false));
 
 /// Flag to force using WMMA tensorcore operations.
 llvm::cl::opt<bool>
