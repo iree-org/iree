@@ -20,7 +20,7 @@ iree_hal_cts_test_suite(
   VARIANT_SUFFIX
     stream
   DRIVER_REGISTRATION_HDR
-    "experimental/hip/registration/driver_module.h"
+    "runtime/src/iree/hal/drivers/hip/registration/driver_module.h"
   DRIVER_REGISTRATION_FN
     "iree_hal_hip_driver_module_register"
   COMPILER_TARGET_BACKEND
@@ -32,7 +32,7 @@ iree_hal_cts_test_suite(
   ARGS
     "--hip_use_streams=true"
   DEPS
-    iree::experimental::hip::registration
+    iree::hal::drivers::hip::registration
   EXCLUDED_TESTS
     # HAL event is unimplemented for now.
     "event"
@@ -46,7 +46,7 @@ iree_hal_cts_test_suite(
   VARIANT_SUFFIX
     graph
   DRIVER_REGISTRATION_HDR
-    "experimental/hip/registration/driver_module.h"
+    "runtime/src/iree/hal/drivers/hip/registration/driver_module.h"
   DRIVER_REGISTRATION_FN
     "iree_hal_hip_driver_module_register"
   COMPILER_TARGET_BACKEND
@@ -58,7 +58,7 @@ iree_hal_cts_test_suite(
   ARGS
     "--hip_use_streams=false"
   DEPS
-    iree::experimental::hip::registration
+    iree::hal::drivers::hip::registration
   EXCLUDED_TESTS
     # HAL event is unimplemented for now.
     "event"

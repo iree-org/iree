@@ -4,10 +4,6 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Set the root for package namespacing to the current directory.
-set(IREE_PACKAGE_ROOT_DIR "${CMAKE_CURRENT_LIST_DIR}")
-set(IREE_PACKAGE_ROOT_PREFIX "iree/experimental/hip")
-
 iree_add_all_subdirs()
 
 if(NOT DEFINED HIP_API_HEADERS_ROOT)

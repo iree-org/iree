@@ -244,6 +244,13 @@ if(NOT IREE_CUDA_AVAILABLE OR CMAKE_CROSSCOMPILING)
   set(IREE_HAL_DRIVER_CUDA_DEFAULT OFF)
 endif()
 
+# HIP support is enabled by default if not cross compiling. Note: a HIP-compatible
+# GPU with drivers is still # required to actually run HIP workloads.
+set(IREE_HAL_DRIVER_HIP_DEFAULT ${IREE_HAL_DRIVER_DEFAULTS})
+if(CMAKE_CROSSCOMPILING)
+  set(IREE_HAL_DRIVER_HIP_DEFAULT OFF)
+endif()
+
 # Vulkan support is enabled by default if the platform might support Vulkan.
 # Apple platforms support Metal instead of Vulkan, though MoltenVK may work.
 set(IREE_HAL_DRIVER_VULKAN_DEFAULT ${IREE_HAL_DRIVER_DEFAULTS})
@@ -259,6 +266,7 @@ if(NOT APPLE OR NOT ${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm64")
 endif()
 
 option(IREE_HAL_DRIVER_CUDA "Enables the 'cuda' runtime HAL driver" ${IREE_HAL_DRIVER_CUDA_DEFAULT})
+option(IREE_HAL_DRIVER_HIP "Enables the 'hip' runtime HAL driver" ${IREE_HAL_DRIVER_HIP_DEFAULT})
 option(IREE_HAL_DRIVER_LOCAL_SYNC "Enables the 'local-sync' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
 option(IREE_HAL_DRIVER_LOCAL_TASK "Enables the 'local-task' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
 option(IREE_HAL_DRIVER_VULKAN "Enables the 'vulkan' runtime HAL driver" ${IREE_HAL_DRIVER_VULKAN_DEFAULT})
@@ -306,6 +314,9 @@ endif()
 message(STATUS "IREE HAL drivers:")
 if(IREE_HAL_DRIVER_CUDA)
   message(STATUS "  - cuda")
+endif()
+if(IREE_HAL_DRIVER_HIP)
+  message(STATUS "  - hip")
 endif()
 if(IREE_HAL_DRIVER_LOCAL_SYNC)
   message(STATUS "  - local-sync")
@@ -560,22 +571,6 @@ iree_register_external_hal_driver(
     iree::experimental::rocm::registration
   REGISTER_FN
     iree_hal_rocm_driver_module_register
-)
-
-#-------------------------------------------------------------------------------
-# Experimental HIP HAL driver
-# Enable with: -DIREE_EXTERNAL_HAL_DRIVERS=hip
-#-------------------------------------------------------------------------------
-
-iree_register_external_hal_driver(
-  NAME
-    hip
-  SOURCE_DIR
-    "${CMAKE_CURRENT_SOURCE_DIR}/experimental/hip"
-  DRIVER_TARGET
-    iree::experimental::hip::registration
-  REGISTER_FN
-    iree_hal_hip_driver_module_register
 )
 
 #-------------------------------------------------------------------------------
