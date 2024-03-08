@@ -9,10 +9,6 @@
 # Enable compiler targets based on options.
 set(IREE_COMPILER_TARGETS "")
 set(IREE_COMPILER_TARGET_COPTS "")
-if(IREE_TARGET_BACKEND_LLVM_CPU)
-  list(APPEND IREE_COMPILER_TARGETS iree::compiler::Dialect::HAL::Target::LLVMCPU)
-  list(APPEND IREE_COMPILER_TARGET_COPTS "-DIREE_HAVE_LLVM_CPU_TARGET")
-endif()
 
 set(IREE_VERSION_TARGET_COPTS "")
 if(IREE_EMBEDDED_RELEASE_INFO)
@@ -155,20 +151,6 @@ iree_cc_library(
     "init_compiler_modules.h"
   DEPS
     iree::compiler::Modules::Check::IR::CheckDialect
-)
-
-iree_cc_library(
-  NAME
-    init_targets
-  HDRS
-    "init_targets.h"
-  SRCS
-    "init_targets.cc"
-  DEPS
-    ${IREE_COMPILER_TARGETS}
-  COPTS
-    ${IREE_COMPILER_TARGET_COPTS}
-  PUBLIC
 )
 
 iree_cc_library(

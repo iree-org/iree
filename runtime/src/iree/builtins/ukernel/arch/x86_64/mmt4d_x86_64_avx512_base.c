@@ -39,7 +39,7 @@ iree_uk_mmt4d_tile_f32f32f32_1x16x1_to_16x16x1_x86_64_avx512_base(
     _mm_prefetch((const char*)(rhs_ptr + 128), _MM_HINT_T0);
     rhs_ptr += 16;
     IREE_UK_UNROLL for (int i = 0; i < M0; ++i) {
-      acc[i] = _mm512_fmadd_ps(_mm512_set1_ps(lhs_ptr[i]), rhs, acc[i]);
+      acc[i] = _mm512_fmadd_ps(rhs, _mm512_set1_ps(lhs_ptr[i]), acc[i]);
     }
     _mm_prefetch((const char*)(lhs_ptr + 128), _MM_HINT_T0);
     lhs_ptr += M0;

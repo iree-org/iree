@@ -48,7 +48,6 @@
 #include "iree/compiler/Tools/init_dialects.h"
 #include "iree/compiler/Tools/init_llvmir_translations.h"
 #include "iree/compiler/Tools/init_passes.h"
-#include "iree/compiler/Tools/init_targets.h"
 #include "iree/compiler/Tools/version.h"
 #include "iree/compiler/Utils/TracingUtils.h"
 #include "iree/compiler/embedding_api.h"
@@ -248,7 +247,6 @@ GlobalInit::GlobalInit() : threadPool(getGlobalThreadPoolStrategy()) {
   // Allegedly need to register passes to get good reproducers
   // TODO: Verify this (I think that this was fixed some time ago).
   mlir::iree_compiler::registerAllPasses();
-  mlir::iree_compiler::registerHALTargetBackends();
   mlir::iree_compiler::registerVMTargets();
 
   // MLIRContext registration and hooks.

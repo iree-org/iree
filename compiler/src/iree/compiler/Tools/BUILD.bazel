@@ -165,18 +165,6 @@ config_setting(
 )
 
 iree_compiler_cc_library(
-    name = "init_targets",
-    srcs = ["init_targets.cc"],
-    hdrs = ["init_targets.h"],
-    local_defines = [
-        "IREE_HAVE_LLVM_CPU_TARGET",
-    ],
-    deps = [
-        "//compiler/src/iree/compiler/Dialect/HAL/Target/LLVMCPU",
-    ],
-)
-
-iree_compiler_cc_library(
     name = "init_llvmir_translations",
     hdrs = [
         "init_llvmir_translations.h",
