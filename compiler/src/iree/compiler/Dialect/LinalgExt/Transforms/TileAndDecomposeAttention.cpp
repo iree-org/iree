@@ -550,7 +550,7 @@ void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
   // But, it is mathematically equivalent to do it on Q first and then multiply
   // it by K.T. This just allows us to do the scaling once, instead of each
   // iteratiion of the loop.
-  querySlice = scaleQuery(querySlice, tiledAttnOp.getScale(), rewriter);
+  querySlice = scaleQuery(querySlice, scale, rewriter);
   ops.push_back(querySlice.getDefiningOp());
 
   auto [result, newMax, newSum] = createAttentionBody(
