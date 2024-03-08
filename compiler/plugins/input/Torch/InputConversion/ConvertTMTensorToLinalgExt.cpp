@@ -12,6 +12,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -146,17 +147,35 @@ struct AttentionOpConversion
     Value collapsedResult = rewriter.create<tensor::EmptyOp>(
         loc, collapsedResultShape, elementType);
 
-    assert(isa<FloatType>(elementType) &&
-           "Attention should have floating type input");
-    FloatType floatElementType = cast<FloatType>(elementType);
+    // TODO: This is a hack. This should be replaced with a simple getScale()
+    // when support for scaling is plumbed to TMTensor on the torch-mlir side.
+    // Until then, we are using the default value used in scaled dot product
+    // attention by PyTorch (most models use the default value because it makes
+    // the variance of the result of softmax 1 when the mean of Q, K is 0).
+    // We use scale = 1 / sqrt(d), where d is the head dimension.
+    //
+    // TODO: We are currently assuming that head dimension is dim = -1. Once we
+    // have support for batch dims using more general indexing maps, we should
+    // change this and rely on more general mechanisms.
+    Value headDim = rewriter.create<tensor::DimOp>(
+        loc, op.getQuery(), op.getQueryType().getRank() - 1);
 
-    // TODO: This is just a placeholder until we have proper support in
-    // torch-mlir for attention lowering.
-    Value scale = rewriter.create<arith::ConstantFloatOp>(loc, APFloat(1.0f),
-                                                          floatElementType);
+    assert(isa<FloatType>(op.getQueryType().getElementType()) &&
+           "Attention only works for FloatType");
+    FloatType targetType = cast<FloatType>(op.getQueryType().getElementType());
+
+    // This index -> i32 -> float type is okay to use as head dimension of
+    // attention is genereally small, usually 64 or 128.
+    //
+    // index --> i32
+    headDim = rewriter.create<arith::IndexCastOp>(loc, rewriter.getI32Type(),
+                                                  headDim);
+    // i32 --> floatType
+    headDim = rewriter.create<arith::SIToFPOp>(loc, targetType, headDim);
+    Value rsqrtD = rewriter.create<math::RsqrtOp>(loc, headDim);
 
     auto attention = rewriter.create<IREE::LinalgExt::AttentionOp>(
-        loc, collapsedResultType, SmallVector<Value>{query, key, value, scale},
+        loc, collapsedResultType, SmallVector<Value>{query, key, value, rsqrtD},
         collapsedResult);
 
     if (sizes.size() > 3)
