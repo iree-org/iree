@@ -153,6 +153,7 @@ struct AttentionOpConversion
     // attention by PyTorch (most models use the default value because it makes
     // the variance of the result of softmax 1 when the mean of Q, K is 0).
     // We use scale = 1 / sqrt(d), where d is the head dimension.
+    // See https://paperswithcode.com/method/scaled for more details.
     //
     // TODO: We are currently assuming that head dimension is dim = -1. Once we
     // have support for batch dims using more general indexing maps, we should
@@ -166,8 +167,7 @@ struct AttentionOpConversion
       return op->emitOpError("NYI: Dynamic head dimension");
     }
 
-    assert(isa<FloatType>(op.getQueryType().getElementType()) &&
-           "Attention only works for FloatType");
+    // Attention only works for FloatType.
     FloatType targetType = cast<FloatType>(op.getQueryType().getElementType());
 
     double dk = static_cast<double>(headDim);

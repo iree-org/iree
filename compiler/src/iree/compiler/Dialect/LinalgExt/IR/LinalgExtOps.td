@@ -528,16 +528,16 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
     the scale to use.
 
     For self-attention, all inputs and the result have the same shape BxNxd
-    where B is the of the batch dimension, N is the sequence length and d is
-    head dimension. Typically N >>> d. Usually, this operator also performs
+    where B is the batch dimension, N is the sequence length and d is head
+    dimension. Typically N >>> d. Usually, this operator also performs
     masking and dropout, but we leave that out of the current implementation.
     For cross-attention, the query and output have the same shape (BxNxd),
     while the key and value differ in sequence length (they have shape BxLxd,
     where L != N).
 
-    This operator after tiling results in a tiled result as per 
-    FlashAttention 2 and results in the current `max` and `sum` statistics
-    while processing the current tile.
+    This operator after tiling results in a tiled result as per
+    FlashAttention 2 and optionally results in the current `max` and `sum`
+    statistics while processing the current tile.
 
     If transpose_v is speciifed, the V tensor passed as input is assumed to
     be transposed:
@@ -583,12 +583,12 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
       return getDpsInitOperand(0)->get();
     }
     std::optional<Value> getMax() {
-      if (getNumResults() == 1)
+      if (getNumResults() < 2)
         return std::nullopt;
       return getDpsInitOperand(1)->get();
     }
     std::optional<Value> getSum() {
-      if (getNumResults() == 1)
+      if (getNumResults() < 3)
         return std::nullopt;
       return getDpsInitOperand(2)->get();
     }
@@ -601,21 +601,21 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
     ShapedType getValueType() {
       return getValue().getType().cast<ShapedType>();
     }
-    FloatType getFloatType() {
+    FloatType getScaleType() {
       return getScale().getType().cast<FloatType>();
     }
     ShapedType getOutputType() {
       return getOutput().getType().cast<ShapedType>();
     }
     std::optional<ShapedType> getMaxType() {
-      if (!getMax().has_value())
-        return std::nullopt;
-      return (*getMax()).getType().cast<ShapedType>();
+      std::optional<Value> maxVal = getMax();
+      if (!maxVal) return std::nullopt;
+      return maxVal->getType().cast<ShapedType>();
     }
     std::optional<ShapedType> getSumType() {
-      if (!getSum().has_value())
-        return std::nullopt;
-      return (*getSum()).getType().cast<ShapedType>();
+      std::optional<Value> sumVal = getSum();
+      if (!sumVal) return std::nullopt;
+      return sumVal->getType().cast<ShapedType>();
     }
     int64_t getQueryRank() {
       return getQueryType().getRank();
@@ -630,14 +630,14 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
       return getOutputType().getRank();
     }
     std::optional<int64_t> getMaxRank() {
-      if (!getMax())
-        return std::nullopt;
-      return (*getMaxType()).getRank();
+      std::optional<ShapedType> maxType = getMaxType();
+      if (!maxType) return std::nullopt;
+      return maxType->getRank();
     }
     std::optional<int64_t> getSumRank() {
-      if (!getSum().has_value())
-        return std::nullopt;
-      return (*getSumType()).getRank();
+      std::optional<ShapedType> sumType = getSumType();
+      if (!sumType) return std::nullopt;
+      return sumType->getRank();
     }
     int64_t getIterationDomainRank() {
       return 2;
