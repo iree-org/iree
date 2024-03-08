@@ -2,6 +2,7 @@ third_party/benchmark
 third_party/cpuinfo
 third_party/flatcc
 third_party/googletest
+third_party/hip-build-deps
 third_party/musl
 third_party/spirv_cross
 third_party/tracy
