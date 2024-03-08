@@ -109,9 +109,8 @@ void buildGlobalOptimizationPassPipeline(
       // dims as the unit dim folding pass updates indexing maps and is better
       // at working with generics. By this point we have already done any
       // specialized raising and the op names are no longer useful.
-      .addPass(createGeneralizeLinalgNamedOpsPass);
-  mainPassManager.addPass(IREE::Flow::createFoldUnitExtentDimsPass());
-  FunctionLikeNest(mainPassManager)
+      .addPass(createGeneralizeLinalgNamedOpsPass)
+      .addPass(IREE::Flow::createFoldUnitExtentDimsPass)
       .addPredicatedPass(clEnableFuseSiluHorizontalMatmul,
                          createFuseSiluHorizontalMatmulPass)
       .addPredicatedPass(clEnableDemoteContractionInputsToBF16,

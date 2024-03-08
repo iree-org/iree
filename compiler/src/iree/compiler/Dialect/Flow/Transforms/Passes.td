@@ -58,7 +58,7 @@ def DeduplicateExecutables :
 }
 
 def FoldUnitExtentDims :
-    Pass<"iree-flow-fold-unit-extent-dims", "mlir::ModuleOp"> {
+    InterfacePass<"iree-flow-fold-unit-extent-dims", "mlir::FunctionOpInterface"> {
   let summary = "Fold unit extent dimension of operations";
   let constructor = "mlir::iree_compiler::IREE::Flow::createFoldUnitExtentDimsPass()";
 }
