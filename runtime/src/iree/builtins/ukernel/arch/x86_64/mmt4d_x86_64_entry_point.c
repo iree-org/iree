@@ -304,6 +304,34 @@ static iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func_x86_64_s8s8s32(
 }
 
 static iree_uk_mmt4d_tile_func_t
+iree_uk_mmt4d_select_tile_func_x86_64_s8s4s32_M0x8x4(
+    const iree_uk_mmt4d_params_t* params) {
+#if defined(IREE_UK_BUILD_X86_64_AVX2_FMA)
+  if (iree_uk_cpu_supports_avx2_fma(params->cpu_data)) {
+    switch (params->M0) {
+      case 1:
+        return iree_uk_mmt4d_tile_s8s4s32_1x8x4_x86_64_avx2_fma;
+      case 2:
+        return iree_uk_mmt4d_tile_s8s4s32_2x8x4_x86_64_avx2_fma;
+      case 4:
+        return iree_uk_mmt4d_tile_s8s4s32_4x8x4_x86_64_avx2_fma;
+      case 8:
+        return iree_uk_mmt4d_tile_s8s4s32_8x8x4_x86_64_avx2_fma;
+    }
+  }
+#endif
+  return 0;
+}
+
+static iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func_x86_64_s8s4s32(
+    const iree_uk_mmt4d_params_t* params) {
+  if (params->N0 == 8 && params->K0 == 4) {
+    return iree_uk_mmt4d_select_tile_func_x86_64_s8s4s32_M0x8x4(params);
+  }
+  return 0;
+}
+
+static iree_uk_mmt4d_tile_func_t
 iree_uk_mmt4d_select_tile_func_x86_64_s16s16s32_M0x16x2(
     const iree_uk_mmt4d_params_t* params) {
 #if defined(IREE_UK_BUILD_X86_64_AVX512_VNNI)
@@ -405,6 +433,8 @@ iree_uk_mmt4d_tile_func_t iree_uk_mmt4d_select_tile_func_arch(
       return iree_uk_mmt4d_select_tile_func_x86_64_bf16bf16f32(params);
     case iree_uk_mmt4d_type_bf16bf16bf16:
       return iree_uk_mmt4d_select_tile_func_x86_64_bf16bf16bf16(params);
+    case iree_uk_mmt4d_type_s8s4s32:
+      return iree_uk_mmt4d_select_tile_func_x86_64_s8s4s32(params);
     case iree_uk_mmt4d_type_s8s8s32:
       return iree_uk_mmt4d_select_tile_func_x86_64_s8s8s32(params);
     case iree_uk_mmt4d_type_s16s16s32:

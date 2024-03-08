@@ -200,6 +200,81 @@ IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
     iree_uk_mmt4d_tile_s8s8s32_1x8x2_to_4x8x2_x86_64_avx2_fma,
     iree_uk_mmt4d_tile_s8s8s32_4x8x2_x86_64_avx2_fma, 4)
 
+IREE_UK_ATTRIBUTE_ALWAYS_INLINE static inline void
+iree_uk_mmt4d_tile_s8s4s32_1x8x4_to_8x8x4_x86_64_avx2_fma(
+    void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
+    const void* IREE_UK_RESTRICT rhs_panel,
+    const iree_uk_mmt4d_params_t* params, int M0) {
+  IREE_UK_ASSERT(M0 >= 1 && M0 <= 8 && iree_uk_is_po2_u32(M0));
+  iree_uk_int32_t* IREE_UK_RESTRICT out_ptr = out_tile;
+  const iree_uk_int8_t* IREE_UK_RESTRICT lhs_ptr = lhs_panel;
+  const iree_uk_int8_t* IREE_UK_RESTRICT rhs_ptr = rhs_panel;
+  __m256i acc[8];
+  if (params->flags & IREE_UK_FLAG_MMT4D_ACCUMULATE) {
+    IREE_UK_UNROLL for (int i = 0; i < M0; ++i) {
+      acc[i] = _mm256_loadu_si256((__m256i*)(out_ptr + i * 8));
+    }
+  } else {
+    IREE_UK_UNROLL for (int i = 0; i < M0; ++i) {
+      acc[i] = _mm256_setzero_si256();
+    }
+  }
+
+  // Mask for extracting high nibbles.
+  __m128i low_nibble_mask = _mm_set1_epi16(0xf0f0);
+
+  for (int k = 0; k < params->K; ++k) {
+    // rhs_i4 is the rhs_tile 8x4xi4.
+    __m128i rhs_i4 = _mm_loadu_si128((const __m128i*)rhs_ptr);
+
+    // Mask low nibbles. The high values can now be represented in i8 but due to
+    // the mask the value is multipled by 2^4.
+    __m128i rhs_high_i8 = _mm_and_si128(rhs_i4, low_nibble_mask);
+    __m256i rhs_high_i16 = _mm256_cvtepi8_epi16(rhs_high_i8);
+
+    // To extract the low nibbles; we shift left by 4 bits and apply the
+    // same mask as above.
+    __m128i rhs_low_i4 = _mm_slli_epi16(rhs_i4, 4);
+    __m128i rhs_low_i8 = _mm_and_si128(rhs_low_i4, low_nibble_mask);
+    __m256i rhs_low_i16 = _mm256_cvtepi8_epi16(rhs_low_i8);
+
+    __m256i rhs_low_high_1st = _mm256_unpacklo_epi16(rhs_low_i16, rhs_high_i16);
+    __m256i rhs_low_high_2nd = _mm256_unpackhi_epi16(rhs_low_i16, rhs_high_i16);
+
+    rhs_ptr += 16;
+
+    IREE_UK_UNROLL for (int i = 0; i < M0; ++i) {
+      __m256i lhs_data = _mm256_cvtepi8_epi16(
+          _mm_set1_epi32(*(const iree_uk_int32_t*)lhs_ptr));
+      __m256i res_low_high_1st = _mm256_madd_epi16(lhs_data, rhs_low_high_1st);
+      __m256i res_low_high_2nd = _mm256_madd_epi16(lhs_data, rhs_low_high_2nd);
+      // Finally we right shift by 4 inorder to divide the result by 2^4.
+      __m256i res_interleaved = _mm256_srai_epi32(
+          _mm256_hadd_epi32(res_low_high_1st, res_low_high_2nd), 4);
+
+      acc[i] = _mm256_add_epi32(acc[i], res_interleaved);
+      lhs_ptr += 4;
+    }
+  }
+
+  IREE_UK_UNROLL for (int i = 0; i < M0; ++i) {
+    _mm256_storeu_si256((__m256i*)(out_ptr + i * 8), acc[i]);
+  }
+}
+
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_s8s4s32_1x8x4_to_8x8x4_x86_64_avx2_fma,
+    iree_uk_mmt4d_tile_s8s4s32_1x8x4_x86_64_avx2_fma, 1)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_s8s4s32_1x8x4_to_8x8x4_x86_64_avx2_fma,
+    iree_uk_mmt4d_tile_s8s4s32_2x8x4_x86_64_avx2_fma, 2)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_s8s4s32_1x8x4_to_8x8x4_x86_64_avx2_fma,
+    iree_uk_mmt4d_tile_s8s4s32_4x8x4_x86_64_avx2_fma, 4)
+IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
+    iree_uk_mmt4d_tile_s8s4s32_1x8x4_to_8x8x4_x86_64_avx2_fma,
+    iree_uk_mmt4d_tile_s8s4s32_8x8x4_x86_64_avx2_fma, 8)
+
 void iree_uk_mmt4d_tile_s8s8s32_8x8x2_x86_64_avx2_fma(
     void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
     const void* IREE_UK_RESTRICT rhs_panel,
