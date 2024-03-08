@@ -3872,12 +3872,12 @@ practice for targeting multiple GPU APIs in graphics programming world. For
 example, the Vulkan implmenation in macOS/iOS, <a href="https://github.com/KhronosGroup/MoltenVK">MoltenVK</a>, is also
 doing the same for shaders/kernels. The path is quite robust, as demonstrated
 by various games on top of MoltenVK.</p>
-<p>Therefore, in IREE, we have a <a href="https://github.com/openxla/iree/tree/main/compiler/src/iree/compiler/Dialect/HAL/Target/MetalSPIRV"><code>MetalSPIRVTargetBackend</code></a>,
+<p>Therefore, in IREE, we have a <a href="https://github.com/openxla/iree/tree/main/compiler/plugins/target/MetalSPIRV"><code>MetalSPIRVTargetBackend</code></a>,
 which pulls in the common SPIR-V passes to form the compilation pipeline.
 The difference would be to provide a suitable SPIR-V target environment to drive
 the compilation, which one can derive from the Metal GPU families to target.
 The serialization step differs from
-<a href="https://github.com/openxla/iree/tree/main/compiler/src/iree/compiler/Dialect/HAL/Target/VulkanSPIRV"><code>VulkanSPIRVTargetBackend</code></a> too: following the normal
+<a href="https://github.com/openxla/iree/tree/main/compiler/plugins/target/VulkanSPIRV"><code>VulkanSPIRVTargetBackend</code></a> too: following the normal
 SPIR-V serialization step, we additionally need to invoke SPRIV-Cross to
 cross compile the generated SPIR-V into MSL, and then compile and/or serialize
 the MSL source/library.</p>
