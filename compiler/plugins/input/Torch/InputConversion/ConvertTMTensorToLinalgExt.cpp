@@ -171,9 +171,9 @@ struct AttentionOpConversion
     FloatType targetType = cast<FloatType>(op.getQueryType().getElementType());
 
     double dk = static_cast<double>(headDim);
-    APFloat rsqrtD(1.0f / std::sqrt(dk));
-    Value scale =
-        rewriter.create<arith::ConstantFloatOp>(loc, rsqrtD, targetType);
+    dk = 1.0f / std::sqrt(dk);
+    Value scale = rewriter.create<arith::ConstantOp>(
+        loc, targetType, rewriter.getFloatAttr(targetType, dk));
 
     auto attention = rewriter.create<IREE::LinalgExt::AttentionOp>(
         loc, collapsedResultType, SmallVector<Value>{query, key, value, scale},
