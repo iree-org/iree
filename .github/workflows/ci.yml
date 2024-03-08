@@ -266,9 +266,9 @@ jobs:
             gcr.io/iree-oss/base-bleeding-edge@sha256:c5f28883e6c570c20128fb37d7af3a00a25df3ce4e2b3a24c3a8dcd183182a27 \
             ./build_tools/bazel/build_test_all.sh
 
-  test_gpu:
+  test_nvidia_gpu:
     needs: [setup, build_all]
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_gpu')
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_nvidia_gpu')
     env:
       BUILD_DIR: build-tests
       INSTALL_DIR: ${{ needs.build_all.outputs.install-dir }}
@@ -277,6 +277,7 @@ jobs:
       IREE_CPU_DISABLE: 1
       IREE_VULKAN_DISABLE: 0
       IREE_CUDA_DISABLE: 0
+      IREE_HIP_DISABLE: 1
     runs-on:
       - self-hosted # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -302,6 +303,7 @@ jobs:
               --env IREE_CPU_DISABLE \
               --env IREE_VULKAN_DISABLE \
               --env IREE_CUDA_DISABLE \
+              --env IREE_HIP_DISABLE \
               gcr.io/iree-oss/nvidia@sha256:82fa00b5cdda1b35634796cd0f88cb5d6d22d80328b94bfb51e5f2820598ba23 \
               ./build_tools/pkgci/build_tests_using_package.sh ${INSTALL_DIR}
       - name: "Running GPU tests"
@@ -313,6 +315,7 @@ jobs:
           ./build_tools/github_actions/docker_run.sh \
               --env IREE_VULKAN_DISABLE \
               --env IREE_CUDA_DISABLE \
+              --env IREE_HIP_DISABLE \
               --env IREE_CTEST_LABEL_REGEX \
               --env IREE_NVIDIA_SM80_TESTS_DISABLE \
               --env IREE_MULTI_DEVICE_TESTS_DISABLE \
@@ -327,9 +330,9 @@ jobs:
                 ./build_tools/scripts/check_vulkan.sh
                 ./build_tools/cmake/ctest_all.sh ${BUILD_DIR}"
 
-  test_a100:
+  test_nvidia_a100:
     needs: [setup, build_all]
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_a100')
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_nvidia_a100')
     env:
       BUILD_DIR: build-tests
       INSTALL_DIR: ${{ needs.build_all.outputs.install-dir }}
@@ -338,6 +341,7 @@ jobs:
       IREE_CPU_DISABLE: 1
       IREE_VULKAN_DISABLE: 0
       IREE_CUDA_DISABLE: 0
+      IREE_HIP_DISABLE: 1
     runs-on:
       - self-hosted # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
@@ -363,6 +367,7 @@ jobs:
               --env IREE_CPU_DISABLE \
               --env IREE_VULKAN_DISABLE \
               --env IREE_CUDA_DISABLE \
+              --env IREE_HIP_DISABLE \
               gcr.io/iree-oss/nvidia@sha256:82fa00b5cdda1b35634796cd0f88cb5d6d22d80328b94bfb51e5f2820598ba23 \
               ./build_tools/pkgci/build_tests_using_package.sh ${INSTALL_DIR}
       - name: "Running GPU tests"
@@ -374,6 +379,7 @@ jobs:
           ./build_tools/github_actions/docker_run.sh \
               --env IREE_VULKAN_DISABLE \
               --env IREE_CUDA_DISABLE \
+              --env IREE_HIP_DISABLE \
               --env IREE_CTEST_LABEL_REGEX \
               --env IREE_NVIDIA_SM80_TESTS_DISABLE \
               --env IREE_MULTI_DEVICE_TESTS_DISABLE \
@@ -1070,8 +1076,8 @@ jobs:
       - build_test_all_macos_x86_64
 
       # Accelerators
-      - test_gpu
-      - test_a100
+      - test_nvidia_gpu
+      - test_nvidia_a100
 
       # Subsets
       - build_test_runtime

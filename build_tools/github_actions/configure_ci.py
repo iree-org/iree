@@ -129,7 +129,7 @@ DEFAULT_POSTSUBMIT_ONLY_JOBS = frozenset(
         "build_test_all_macos_arm64",
         "build_test_all_macos_x86_64",
         # Due to the outstock of A100, only run this test in postsubmit.
-        "test_a100",
+        "test_nvidia_a100",
     ]
 )
 

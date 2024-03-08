@@ -294,7 +294,7 @@ runs.
 * Also run GPU tests on NVIDIA A100 runners (opt-in due to low availability):
 
     ``` text
-    ci-extra: test_a100
+    ci-extra: test_nvidia_a100
     ```
 
 * Skip all CI builds and tests, e.g. for comment-only changes:
