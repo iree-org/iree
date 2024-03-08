@@ -442,8 +442,8 @@ IREE::LinalgExt::AttentionOp tileAttention(IREE::LinalgExt::AttentionOp attnOp,
   auto tiledAttentionOp = rewriter.create<IREE::LinalgExt::AttentionOp>(
       attnOp.getLoc(),
       SmallVector<Type>{accumulatorF32.getType(), sum.getType(), max.getType()},
-      SmallVector<Value>{querySlice, keySlice, valueSlice},
-      SmallVector<Value>{iterArgResult, iterArgMax, iterArgSum}, scale);
+      SmallVector<Value>{querySlice, keySlice, valueSlice, scale},
+      SmallVector<Value>{iterArgResult, iterArgMax, iterArgSum});
 
   if (attnOp.getTransposeV())
     tiledAttentionOp.setTransposeVAttr(attnOp.getTransposeVAttr());
@@ -549,13 +549,11 @@ void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
   scale = rewriter.create<arith::MulFOp>(loc, scale, log2e);
 
   // In the original algorithm, the scaling is done after the softmax:
-  //        softmax(Q @ K.T / scale) @ V
+  //        softmax(Q @ K.T * scale) @ V
   //
   // But, it is mathematically equivalent to do it on Q first and then multiply
   // it by K.T. This just allows us to do the scaling once, instead of each
   // iteratiion of the loop.
-  // (This was also verified on fp16 attention that it produces the same
-  // results).
   querySlice = scaleQuery(querySlice, tiledAttnOp.getScale(), rewriter);
   ops.push_back(querySlice.getDefiningOp());
 
