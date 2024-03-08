@@ -59,7 +59,8 @@ createTensorPadToTensorInsertSlicePass(bool skipSingleLinalgOpUses = false);
 
 // Create a pass that imports upstream patterns to fold unit extent dims
 // but with IREE control.
-std::unique_ptr<OperationPass<ModuleOp>> createFoldUnitExtentDimsPass();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createFoldUnitExtentDimsPass();
 
 // Creates a pass to fuse Linalg operations on tensors.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
