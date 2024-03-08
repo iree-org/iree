@@ -157,25 +157,26 @@ struct AttentionOpConversion
     // TODO: We are currently assuming that head dimension is dim = -1. Once we
     // have support for batch dims using more general indexing maps, we should
     // change this and rely on more general mechanisms.
-    Value headDim = rewriter.create<tensor::DimOp>(
-        loc, op.getQuery(), op.getQueryType().getRank() - 1);
+    // TODO: We are currently not handeling dynamic shape of head dimensions at
+    // all. This is because it messes with dispatch formation. This should be
+    // fixed.
+    ArrayRef<int64_t> queryShape = op.getQueryType().getShape();
+    int64_t headDim = queryShape[queryShape.size() - 1];
+    if (headDim <= 0) {
+      return op->emitOpError("NYI: Dynamic head dimension");
+    }
 
     assert(isa<FloatType>(op.getQueryType().getElementType()) &&
            "Attention only works for FloatType");
     FloatType targetType = cast<FloatType>(op.getQueryType().getElementType());
 
-    // This index -> i32 -> float type is okay to use as head dimension of
-    // attention is genereally small, usually 64 or 128.
-    //
-    // index --> i32
-    headDim = rewriter.create<arith::IndexCastOp>(loc, rewriter.getI32Type(),
-                                                  headDim);
-    // i32 --> floatType
-    headDim = rewriter.create<arith::SIToFPOp>(loc, targetType, headDim);
-    Value rsqrtD = rewriter.create<math::RsqrtOp>(loc, headDim);
+    double dk = static_cast<double>(headDim);
+    APFloat rsqrtD(1.0f / std::sqrt(dk));
+    Value scale =
+        rewriter.create<arith::ConstantFloatOp>(loc, rsqrtD, targetType);
 
     auto attention = rewriter.create<IREE::LinalgExt::AttentionOp>(
-        loc, collapsedResultType, SmallVector<Value>{query, key, value, rsqrtD},
+        loc, collapsedResultType, SmallVector<Value>{query, key, value, scale},
         collapsedResult);
 
     if (sizes.size() > 3)
