@@ -727,7 +727,7 @@ func.func @illegal_attention_inputs(%query: tensor<6x12x20x8xf32>, %key: tensor<
   %0 = tensor.empty() : tensor<6x12x20x8xf32>
   %scale = arith.constant 1.0 : f32
   // expected-error @+1 {{'iree_linalg_ext.attention' op expected query to have rank 3 but found 4}}
-  %1 = iree_linalg_ext.attention ins(%query, %key, %value : tensor<6x12x20x8xf32>, tensor<6x12x20x8xf32>, tensor<6x12x20x8xf32>) outs(%0 : tensor<6x12x20x8xf32>) scale(%scale : f32) -> tensor<6x12x20x8xf32>
+  %1 = iree_linalg_ext.attention ins(%query, %key, %value, %scale : tensor<6x12x20x8xf32>, tensor<6x12x20x8xf32>, tensor<6x12x20x8xf32>, f32) outs(%0 : tensor<6x12x20x8xf32>) -> tensor<6x12x20x8xf32>
   return %1 : tensor<6x12x20x8xf32>
 }
 
@@ -739,7 +739,7 @@ func.func @illegal_flash_attention_inputs(%query: tensor<20xf32>, %key: tensor<2
   %sum = tensor.empty() : tensor<8xf32>
   %scale = arith.constant 1.0 : f32
   // expected-error @+1 {{'iree_linalg_ext.attention' op expected query to have rank 2 but found 1}}
-  %1:3 = iree_linalg_ext.attention ins(%query, %key, %value : tensor<20xf32>, tensor<20x8xf32>, tensor<20x8xf32>) outs(%result, %max, %sum : tensor<20x8xf32>, tensor<8xf32>, tensor<8xf32>) scale(%scale : f32) -> tensor<20x8xf32>, tensor<8xf32>, tensor<8xf32>
+  %1:3 = iree_linalg_ext.attention ins(%query, %key, %value, %scale : tensor<20xf32>, tensor<20x8xf32>, tensor<20x8xf32>, f32) outs(%result, %max, %sum : tensor<20x8xf32>, tensor<8xf32>, tensor<8xf32>) -> tensor<20x8xf32>, tensor<8xf32>, tensor<8xf32>
   return %1#0, %1#1, %1#2 : tensor<20x8xf32>, tensor<8xf32>, tensor<8xf32>
 }
 

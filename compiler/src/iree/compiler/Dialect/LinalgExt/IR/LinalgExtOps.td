@@ -548,7 +548,7 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
     can generalize which tensor is transposed and which is not.
   }];
 
-  let arguments = (ins Variadic<AnyShaped>:$inputs,
+  let arguments = (ins Variadic<AnyType>:$inputs,
                        Variadic<AnyShaped>:$outputs,
                        DefaultValuedOptionalAttr<BoolAttr, "false">:$transpose_v
   );

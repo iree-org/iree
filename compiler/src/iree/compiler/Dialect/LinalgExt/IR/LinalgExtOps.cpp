@@ -276,10 +276,9 @@ SmallVector<Range> ScatterOp::getIterationDomain(OpBuilder &builder) {
   return ranges;
 }
 
-FailureOr<TilingResult>
-ScatterOp::getTiledImplementation(OpBuilder &builder,
-                                  ArrayRef<OpFoldResult> offsets,
-                                  ArrayRef<OpFoldResult> sizes) {
+FailureOr<TilingResult> ScatterOp::getTiledImplementation(
+    OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes) {
   assert(offsets.size() >= 1 && sizes.size() >= 1);
   Location loc = getLoc();
   auto zeroAttr = builder.getI64IntegerAttr(0);
@@ -381,8 +380,7 @@ LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
 
     auto dim = dimMap[i];
 
-    if (starts[dim])
-      ret = b.create<arith::AddIOp>(loc, ret, starts[dim]);
+    if (starts[dim]) ret = b.create<arith::AddIOp>(loc, ret, starts[dim]);
     starts[dim] = ret;
   }
 
@@ -403,9 +401,8 @@ LogicalResult ScatterOp::generateScalarImplementation(OpBuilder &b,
   return success();
 }
 
-LogicalResult
-ScatterOp::reifyResultShapes(OpBuilder &b,
-                             ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+LogicalResult ScatterOp::reifyResultShapes(
+    OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
   return cast<LinalgExtOp>(getOperation())
       .reifyResultShapes(b, reifiedReturnShapes);
 }
@@ -493,10 +490,9 @@ SmallVector<Range> SortOp::getIterationDomain(OpBuilder &builder) {
   return loopBounds;
 }
 
-FailureOr<TilingResult>
-SortOp::getTiledImplementation(OpBuilder &builder,
-                               ArrayRef<OpFoldResult> offsets,
-                               ArrayRef<OpFoldResult> sizes) {
+FailureOr<TilingResult> SortOp::getTiledImplementation(
+    OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes) {
   int64_t rank = getOperandRank();
   assert(offsets.size() == static_cast<size_t>(rank) &&
          sizes.size() == static_cast<size_t>(rank));
@@ -600,9 +596,8 @@ LogicalResult SortOp::generateScalarImplementation(OpBuilder &b, Location loc,
   return success();
 }
 
-LogicalResult
-SortOp::reifyResultShapes(OpBuilder &b,
-                          ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+LogicalResult SortOp::reifyResultShapes(
+    OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
   return cast<LinalgExtOp>(getOperation())
       .reifyResultShapes(b, reifiedReturnShapes);
 }
@@ -617,8 +612,7 @@ LogicalResult FftOp::verify() {
   // After tiling, it could be dynamic shape. (Because
   // subview/subtensor does not inference the type correctly
   // on (1 << x)) cases).
-  if (ShapedType::isDynamic(length))
-    return success();
+  if (ShapedType::isDynamic(length)) return success();
   if (length & (length - 1)) {
     return op->emitOpError("only powers of 2 are handled currently");
   }
@@ -813,10 +807,9 @@ LogicalResult FftOp::generateScalarImplementation(OpBuilder &b, Location loc,
   return success();
 }
 
-FailureOr<TilingResult>
-FftOp::getTiledImplementation(OpBuilder &builder,
-                              ArrayRef<OpFoldResult> offsets,
-                              ArrayRef<OpFoldResult> sizes) {
+FailureOr<TilingResult> FftOp::getTiledImplementation(
+    OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes) {
   int64_t rank = getOperandRank();
   SmallVector<OpFoldResult> strides(rank, builder.getI64IntegerAttr(1));
   SmallVector<Value> tiledOperands(3);
@@ -847,9 +840,8 @@ LogicalResult FftOp::getResultTilePosition(
   return success();
 }
 
-LogicalResult
-FftOp::reifyResultShapes(OpBuilder &b,
-                         ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+LogicalResult FftOp::reifyResultShapes(
+    OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
   return cast<LinalgExtOp>(getOperation())
       .reifyResultShapes(b, reifiedReturnShapes);
 }
@@ -983,11 +975,9 @@ LogicalResult ScanOp::generateScalarImplementation(OpBuilder &b, Location loc,
         indices[scanDim] = ivMinusOne;
         scanBlkArgs.push_back(b.create<memref::LoadOp>(loc, output(), indices));
         Value i0;
-        if (!isInclusive)
-          i0 = b.create<memref::LoadOp>(loc, input(), indices);
+        if (!isInclusive) i0 = b.create<memref::LoadOp>(loc, input(), indices);
         indices[scanDim] = iv;
-        if (isInclusive)
-          i0 = b.create<memref::LoadOp>(loc, input(), indices);
+        if (isInclusive) i0 = b.create<memref::LoadOp>(loc, input(), indices);
         scanBlkArgs.push_back(i0);
       });
 
@@ -1015,10 +1005,9 @@ LogicalResult ScanOp::generateScalarImplementation(OpBuilder &b, Location loc,
   return success();
 }
 
-FailureOr<TilingResult>
-ScanOp::getTiledImplementation(OpBuilder &builder,
-                               ArrayRef<OpFoldResult> offsets,
-                               ArrayRef<OpFoldResult> sizes) {
+FailureOr<TilingResult> ScanOp::getTiledImplementation(
+    OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes) {
   int64_t rank = getOperandRank();
   assert(offsets.size() == static_cast<size_t>(rank) &&
          sizes.size() == static_cast<size_t>(rank));
@@ -1068,8 +1057,7 @@ LogicalResult ScanOp::getResultTilePosition(
     int64_t rank = getOperandRank();
     if (rank > 1) {
       for (auto i : llvm::seq<int64_t>(0, rank)) {
-        if (i == getDimension())
-          continue;
+        if (i == getDimension()) continue;
         resultOffsets.push_back(offsets[i]);
         resultSizes.push_back(sizes[i]);
       }
@@ -1083,9 +1071,8 @@ LogicalResult ScanOp::fold(FoldAdaptor, SmallVectorImpl<OpFoldResult> &) {
   return memref::foldMemRefCast(*this);
 }
 
-LogicalResult
-ScanOp::reifyResultShapes(OpBuilder &b,
-                          ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+LogicalResult ScanOp::reifyResultShapes(
+    OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
   return cast<LinalgExtOp>(getOperation())
       .reifyResultShapes(b, reifiedReturnShapes);
 }
@@ -1171,10 +1158,9 @@ LogicalResult ReverseOp::generateScalarImplementation(OpBuilder &b,
   return success();
 }
 
-FailureOr<TilingResult>
-ReverseOp::getTiledImplementation(OpBuilder &builder,
-                                  ArrayRef<OpFoldResult> offsets,
-                                  ArrayRef<OpFoldResult> sizes) {
+FailureOr<TilingResult> ReverseOp::getTiledImplementation(
+    OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes) {
   int64_t rank = getOperandRank();
   SmallVector<OpFoldResult> strides(rank, builder.getI64IntegerAttr(1));
   Location loc = getLoc();
@@ -1229,9 +1215,8 @@ LogicalResult ReverseOp::getResultTilePosition(
   return success();
 }
 
-LogicalResult
-ReverseOp::reifyResultShapes(OpBuilder &b,
-                             ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+LogicalResult ReverseOp::reifyResultShapes(
+    OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
   return cast<LinalgExtOp>(getOperation())
       .reifyResultShapes(b, reifiedReturnShapes);
 }
@@ -1386,8 +1371,8 @@ LogicalResult TopkOp::generateScalarImplementation(OpBuilder &b, Location loc,
 
   // Retrieve region as black box comparision function f(x,y). Plug into op.
   auto &srcBlock = getRegion().front();
-  IRMapping bvmF; // f(x,y)
-  IRMapping bvmR; // f(y,x)
+  IRMapping bvmF;  // f(x,y)
+  IRMapping bvmR;  // f(y,x)
   {
     // Save previous insertion point. Continue within loop body.
     OpBuilder::InsertionGuard guard(b);
@@ -1437,10 +1422,9 @@ LogicalResult TopkOp::generateScalarImplementation(OpBuilder &b, Location loc,
   return success();
 }
 
-FailureOr<TilingResult>
-TopkOp::getTiledImplementation(OpBuilder &builder,
-                               ArrayRef<OpFoldResult> offsets,
-                               ArrayRef<OpFoldResult> sizes) {
+FailureOr<TilingResult> TopkOp::getTiledImplementation(
+    OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes) {
   int64_t rank = getInputRank();
   assert(offsets.size() == static_cast<size_t>(rank) &&
          sizes.size() == static_cast<size_t>(rank));
@@ -1494,9 +1478,8 @@ LogicalResult TopkOp::getResultTilePosition(
   return success();
 }
 
-LogicalResult
-TopkOp::reifyResultShapes(OpBuilder &b,
-                          ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+LogicalResult TopkOp::reifyResultShapes(
+    OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
   return cast<LinalgExtOp>(getOperation())
       .reifyResultShapes(b, reifiedReturnShapes);
 }
@@ -1513,20 +1496,17 @@ static bool hasZeros(ArrayRef<OpFoldResult> tiles) {
 
 /// Check if we have enough static information to catch undefined behavior when
 /// the tile size does not divide perfectly the dimension of the input tensor.
-static bool
-areNotFullTiles(ArrayRef<int64_t> inputShape,
-                DenseMap<int64_t, OpFoldResult> const &dimAndTileMapping) {
+static bool areNotFullTiles(
+    ArrayRef<int64_t> inputShape,
+    DenseMap<int64_t, OpFoldResult> const &dimAndTileMapping) {
   int64_t rank = inputShape.size();
   for (int64_t dim = 0; dim < rank; dim++) {
-    if (ShapedType::isDynamic(inputShape[dim]))
-      continue;
+    if (ShapedType::isDynamic(inputShape[dim])) continue;
     auto it = dimAndTileMapping.find(dim);
     if (it != dimAndTileMapping.end()) {
       std::optional<int64_t> constantTile = getConstantIntValue(it->second);
-      if (!constantTile)
-        continue;
-      if (inputShape[dim] % (*constantTile) != 0)
-        return true;
+      if (!constantTile) continue;
+      if (inputShape[dim] % (*constantTile) != 0) return true;
     }
   }
   return false;
@@ -1656,8 +1636,9 @@ static LogicalResult commonVerifierPackAndUnPackOp(OpTy packOrUnPack) {
   ShapedType expectedPackedType = PackOp::getPackedType(
       unpackedType, packOrUnPack.getStaticTiles(), innerDimsPos, outerDimPerm);
   if (!isSmallerThan(expectedPackedType.getShape(), packedType.getShape())) {
-    return op->emitError("the shape of output is not large enough to hold the "
-                         "packed data. Expected at least ")
+    return op->emitError(
+               "the shape of output is not large enough to hold the "
+               "packed data. Expected at least ")
            << expectedPackedType << ", got " << packedType;
   }
   if (!llvm::all_of(
@@ -1682,8 +1663,9 @@ static LogicalResult commonVerifierPackAndUnPackOp(OpTy packOrUnPack) {
               return shape == constTileSize.value();
             }
           })) {
-    return op->emitError("mismatch in inner tile sizes specified and shaped of "
-                         "tiled dimension in the packed type");
+    return op->emitError(
+        "mismatch in inner tile sizes specified and shaped of "
+        "tiled dimension in the packed type");
   }
   return success();
 }
@@ -1728,8 +1710,9 @@ LogicalResult PackOp::verify() {
   auto dimAndTileMapping = getDimAndTileMapping();
   if (!getPaddingValue() &&
       areNotFullTiles(getInputShape(), dimAndTileMapping)) {
-    return emitOpError("invalid tile factor provided. Only full tiles are "
-                       "supported when padding_value is not set");
+    return emitOpError(
+        "invalid tile factor provided. Only full tiles are "
+        "supported when padding_value is not set");
   }
 
   if (auto paddingValue = getPaddingValue()) {
@@ -1979,9 +1962,8 @@ LogicalResult PackOp::generateScalarImplementation(OpBuilder &builder,
   return success();
 }
 
-LogicalResult
-PackOp::reifyResultShapes(OpBuilder &builder,
-                          ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+LogicalResult PackOp::reifyResultShapes(
+    OpBuilder &builder, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
   return cast<LinalgExtOp>(getOperation())
       .reifyResultShapes(builder, reifiedReturnShapes);
 }
@@ -2081,9 +2063,8 @@ LogicalResult UnPackOp::generateScalarImplementation(OpBuilder &builder,
   return success();
 }
 
-LogicalResult
-UnPackOp::reifyResultShapes(OpBuilder &builder,
-                            ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+LogicalResult UnPackOp::reifyResultShapes(
+    OpBuilder &builder, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
   return cast<LinalgExtOp>(getOperation())
       .reifyResultShapes(builder, reifiedReturnShapes);
 }
@@ -2177,8 +2158,8 @@ LogicalResult WinogradInputTransformOp::verify() {
   return success();
 }
 
-SmallVector<Range>
-WinogradInputTransformOp::getIterationDomain(OpBuilder &builder) {
+SmallVector<Range> WinogradInputTransformOp::getIterationDomain(
+    OpBuilder &builder) {
   Location loc = getLoc();
   Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
   Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
@@ -2206,10 +2187,9 @@ WinogradInputTransformOp::getLoopIteratorTypes() {
   return iteratorTypes;
 }
 
-FailureOr<TilingResult>
-WinogradInputTransformOp::getTiledImplementation(OpBuilder &builder,
-                                                 ArrayRef<OpFoldResult> offsets,
-                                                 ArrayRef<OpFoldResult> sizes) {
+FailureOr<TilingResult> WinogradInputTransformOp::getTiledImplementation(
+    OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes) {
   Location loc = getLoc();
   auto one = builder.getIndexAttr(1);
   auto zero = builder.getIndexAttr(0);
@@ -2349,8 +2329,8 @@ LogicalResult WinogradOutputTransformOp::verify() {
   return success();
 }
 
-SmallVector<Range>
-WinogradOutputTransformOp::getIterationDomain(OpBuilder &builder) {
+SmallVector<Range> WinogradOutputTransformOp::getIterationDomain(
+    OpBuilder &builder) {
   Location loc = getLoc();
   Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
   Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
@@ -2604,10 +2584,9 @@ SmallVector<utils::IteratorType> AttentionOp::getLoopIteratorTypes() {
   return iteratorTypes;
 }
 
-FailureOr<TilingResult>
-AttentionOp::getTiledImplementation(OpBuilder &builder,
-                                    ArrayRef<OpFoldResult> offsets,
-                                    ArrayRef<OpFoldResult> sizes) {
+FailureOr<TilingResult> AttentionOp::getTiledImplementation(
+    OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes) {
   assert(offsets.size() == getIterationDomainRank());
   assert(sizes.size() == getIterationDomainRank());
 
@@ -2643,14 +2622,14 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
                                       keyValueSizes, keyValueStrides));
   tiledOperands.emplace_back(getSlice(builder, loc, getValue(), keyValueOffsets,
                                       keyValueSizes, keyValueStrides));
+  tiledOperands.emplace_back(scale);
   tiledOperands.emplace_back(getSlice(builder, loc, getOutput(),
                                       queryOutputOffsets, queryOutputSizes,
                                       queryOutputStrides));
-  tiledOperands.emplace_back(scale);
 
   SmallVector<Type> resultTypes;
   if (hasPureTensorSemantics())
-    resultTypes.push_back(tiledOperands[3].getType());
+    resultTypes.push_back(tiledOperands[4].getType());
 
   Operation *tiledOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
@@ -2686,11 +2665,11 @@ LogicalResult AttentionOp::reifyResultShapes(
       .reifyResultShapes(b, reifiedReturnShapes);
 }
 
-#define DEFINE_OP_GET_EFFECTS(OP_NAME)                                         \
-  void OP_NAME::getEffects(                                                    \
-      SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>      \
-          &effects) {                                                          \
-    getEffectsImpl(effects, getDpsInputs(), getDpsInits());                    \
+#define DEFINE_OP_GET_EFFECTS(OP_NAME)                                    \
+  void OP_NAME::getEffects(                                               \
+      SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>> \
+          &effects) {                                                     \
+    getEffectsImpl(effects, getDpsInputs(), getDpsInits());               \
   }
 
 DEFINE_OP_GET_EFFECTS(ScatterOp)
