@@ -210,6 +210,28 @@ else()
 endif()
 
 #-------------------------------------------------------------------------------
+# ROCm Default Target Configuration.
+#
+# ROCm does not have a stable instruction set like NVIDIA PTX; it requires
+# binaries specific to a target chip. In IREE, we can have various tests that
+# generates and runs the final deployable code. So for such tests we need to
+# make sure we give it the proper target chip and device bitcode path to link
+# against.
+#-------------------------------------------------------------------------------
+
+set(IREE_ROCM_TEST_TARGET_CHIP \"\" CACHE STRING
+  "Target chip for ROCm tests that need to compile device code. \
+   Defaults to \"\" to disable tests.")
+set(IREE_ROCM_TEST_LINK_BITCODE_DEFAULT ON)
+set(IREE_ROCM_TEST_LINK_BITCODE ${IREE_ROCM_TEST_LINK_BITCODE_DEFAULT} CACHE BOOL
+  "Whether to link to device bitcode for tests that need to compile device code. \
+   Defaults to ${IREE_ROCM_TEST_LINK_BITCODE_DEFAULT}.")
+set(IREE_ROCM_TEST_BITCODE_DIR_DEFAULT "/opt/rocm/amdgcn/bitcode")
+set(IREE_ROCM_TEST_BITCODE_DIR "${IREE_ROCM_TEST_BITCODE_DIR_DEFAULT}" CACHE STRING
+  "Directory of ROCm device bitcode for tests that need to compile device code. \
+   Defaults to \"${IREE_ROCM_TEST_BITCODE_DIR_DEFAULT}\".")
+
+#-------------------------------------------------------------------------------
 # Runtime HAL Driver Options
 # By default, all runtime drivers supported by the current platform which do
 # not require external deps are enabled by default. This can be changed with:

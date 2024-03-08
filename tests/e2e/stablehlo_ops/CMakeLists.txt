@@ -687,15 +687,17 @@ iree_check_single_backend_test_suite(
     "--iree-input-type=stablehlo"
 )
 
+if(IREE_ROCM_TEST_TARGET_CHIP MATCHES "^gfx")
+
 unset(IREE_HIP_TEST_COMPILER_FLAGS)
-if(IREE_ROCM_LINK_BC)
+if(IREE_ROCM_TEST_LINK_BITCODE)
   list(APPEND IREE_HIP_TEST_COMPILER_FLAGS "--iree-rocm-link-bc=true")
 else()
   list(APPEND IREE_HIP_TEST_COMPILER_FLAGS "--iree-rocm-link-bc=false")
 endif()
 list(APPEND IREE_HIP_TEST_COMPILER_FLAGS
-  "--iree-rocm-target-chip=${IREE_ROCM_TARGET_CHIP}"
-  "--iree-rocm-bc-dir=${IREE_ROCM_BC_DIR}")
+  "--iree-rocm-target-chip=${IREE_ROCM_TEST_TARGET_CHIP}"
+  "--iree-rocm-bc-dir=${IREE_ROCM_TEST_BITCODE_DIR}")
 
 iree_check_single_backend_test_suite(
   NAME
@@ -862,3 +864,5 @@ iree_check_single_backend_test_suite(
     "noubsan"
     "requires-gpu-amd"
 )
+
+endif(IREE_ROCM_TEST_TARGET_CHIP MATCHES "^gfx")
