@@ -32,10 +32,9 @@ iree_uk_mmt4d_tile_s8s8s32_1x16x2_to_16x16x2_x86_64_avx512_vnni(
         _mm512_cvtepi8_epi16(_mm256_loadu_si256((const __m256i*)rhs_ptr));
     rhs_ptr += 32;
     IREE_UK_UNROLL for (int i = 0; i < M0; ++i) {
-      acc[i] = _mm512_dpwssd_epi32(acc[i],
+      acc[i] = _mm512_dpwssd_epi32(acc[i], rhs,
                                    _mm512_cvtepi8_epi16(_mm256_set1_epi16(
-                                       *(const iree_uk_int16_t*)(lhs_ptr))),
-                                   rhs);
+                                       *(const iree_uk_int16_t*)(lhs_ptr))));
       lhs_ptr += 2;
     }
   }
@@ -160,7 +159,7 @@ iree_uk_mmt4d_tile_s16s16s32_1x16x2_to_16x16x2_x86_64_avx512_vnni(
     rhs_ptr += 32;
     IREE_UK_UNROLL for (int i = 0; i < M0; ++i) {
       acc[i] = _mm512_dpwssd_epi32(
-          acc[i], _mm512_set1_epi32(*(const iree_uk_int32_t*)lhs_ptr), rhs);
+          acc[i], rhs, _mm512_set1_epi32(*(const iree_uk_int32_t*)lhs_ptr));
       lhs_ptr += 2;
     }
   }
