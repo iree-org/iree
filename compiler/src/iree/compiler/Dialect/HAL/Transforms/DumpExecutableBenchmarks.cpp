@@ -7,6 +7,7 @@
 #include <memory>
 #include <utility>
 
+#include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
@@ -74,7 +75,14 @@ static DispatchParamsMap gatherDispatchParams(mlir::ModuleOp moduleOp,
 
   for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
     funcOp.walk([&](IREE::Stream::CmdDispatchOp dispatchOp) {
-      auto affinityAttr = IREE::Stream::AffinityAttr::lookup(dispatchOp);
+      auto affinityAttr = dyn_cast_if_present<IREE::HAL::DeviceAffinityAttr>(
+          IREE::Stream::AffinityAttr::lookup(dispatchOp));
+      if (!affinityAttr) {
+        LLVM_DEBUG(
+            llvm::dbgs()
+            << "skipping dispatch because it has no affinity specified\n");
+        return;
+      }
 
       auto workloadValues = dispatchOp.getWorkload();
       SmallVector<unsigned> workload;
@@ -84,7 +92,7 @@ static DispatchParamsMap gatherDispatchParams(mlir::ModuleOp moduleOp,
         if (!matchPattern(workloadValue, m_ConstantInt(&workloadConstValue))) {
           LLVM_DEBUG({
             auto firstEntryPoint = *dispatchOp.getEntryPointRefs().begin();
-            llvm::dbgs() << "Skipping dispatch of entry point `"
+            llvm::dbgs() << "skipping dispatch of entry point `"
                          << firstEntryPoint << "` (non-constant workload)\n";
           });
           return;
@@ -123,7 +131,7 @@ static DispatchParamsMap gatherDispatchParams(mlir::ModuleOp moduleOp,
           APInt resourceLengthInt;
           if (!matchPattern(resourceLength,
                             m_ConstantInt(&resourceLengthInt))) {
-            LLVM_DEBUG(llvm::dbgs() << "Skipping dispatch of entry point `"
+            LLVM_DEBUG(llvm::dbgs() << "skipping dispatch of entry point `"
                                     << entryPointAttr
                                     << "` (non-constant resource length)\n";);
             return;
@@ -402,19 +410,21 @@ static void appendDispatchBenchmark(IREE::Stream::AffinityAttr affinityAttr,
 static mlir::OwningOpRef<mlir::ModuleOp>
 buildBenchmarkModule(IREE::HAL::ExecutableOp sourceExecutableOp,
                      IREE::HAL::ExecutableVariantOp sourceVariantOp,
-                     const DispatchParamsMap &dispatchParamsMap) {
+                     const DispatchParamsMap &dispatchParamsMap,
+                     DeviceAnalysis &deviceAnalysis) {
   // Empty module with default name.
   // We could use the original module name here to make tracking nicer.
   mlir::OwningOpRef<mlir::ModuleOp> moduleOp =
       mlir::ModuleOp::create(sourceExecutableOp.getLoc());
   auto moduleBuilder = OpBuilder::atBlockBegin(moduleOp->getBody());
 
-  // Copy over the device targets from the original module.
-  // TODO(benvanik): filter this by the target of the variant.
-  moduleOp->getOperation()->setAttr(
-      "hal.device.targets",
-      sourceExecutableOp->getParentOfType<mlir::ModuleOp>()->getAttr(
-          "hal.device.targets"));
+  // Copy over the devices from the original module. Note that not all of the
+  // devices may be used and we should prune them, but even better than that
+  // would be to generate one module per device dispatches are made on such
+  // that users can isolate to individual devices. For now we just deal with
+  // it.
+  for (auto globalOp : deviceAnalysis.getDeviceGlobals())
+    moduleBuilder.clone(*globalOp.getOperation());
 
   // Clone the executable variant into the new module.
   auto executableOp = moduleBuilder.create<IREE::HAL::ExecutableOp>(
@@ -489,6 +499,21 @@ struct DumpExecutableBenchmarksPass
     auto moduleName = moduleOp.getName().value_or("module");
     SymbolTable symbolTable(moduleOp);
 
+    DeviceAnalysis deviceAnalysis(moduleOp);
+    if (failed(deviceAnalysis.run()))
+      return signalPassFailure();
+    if (deviceAnalysis.getDeviceGlobals().empty()) {
+      mlir::emitRemark(moduleOp.getLoc())
+          << "Executable benchmarks were requested but no devices were "
+             "declared in the module.\n";
+      return;
+    } else if (deviceAnalysis.getDeviceGlobals().size() != 1) {
+      mlir::emitWarning(moduleOp.getLoc())
+          << "Executable benchmarks were requested but there are multiple "
+             "devices in the module and the pass does not support that yet.\n";
+      return;
+    }
+
     // Analyze the module to find dispatch parameters.
     // This is a full walk of all stream.cmd.dispatch ops and will handle
     // filtering out dispatches that have dynamic parameters we don't
@@ -511,8 +536,8 @@ struct DumpExecutableBenchmarksPass
     for (auto executableOp : moduleOp.getOps<IREE::HAL::ExecutableOp>()) {
       for (auto variantOp :
            executableOp.getOps<IREE::HAL::ExecutableVariantOp>()) {
-        auto benchmarkModuleOp =
-            buildBenchmarkModule(executableOp, variantOp, dispatchParamsMap);
+        auto benchmarkModuleOp = buildBenchmarkModule(
+            executableOp, variantOp, dispatchParamsMap, deviceAnalysis);
         if (!benchmarkModuleOp)
           continue;
         auto fileName = (moduleName + "_" + executableOp.getName() + "_" +
