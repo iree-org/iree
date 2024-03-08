@@ -330,7 +330,7 @@ with the current active `MTLComputeCommandEncoder`:
 [metal-driver]: https://github.com/openxla/iree/tree/main/experimental/metal/metal_driver.h
 [metal-kernel-library]: https://github.com/openxla/iree/tree/main/experimental/metal/kernel_library.h
 [metal-shared-event]: https://github.com/openxla/iree/tree/main/experimental/metal/shared_event.h
-[metal-spirv-target]: https://github.com/openxla/iree/tree/main/compiler/src/iree/compiler/Dialect/HAL/Target/MetalSPIRV
+[metal-spirv-target]: https://github.com/openxla/iree/tree/main/compiler/plugins/target/MetalSPIRV
 [metal-builtin-kernels]: https://github.com/openxla/iree/tree/main/runtime/src/iree/hal/drivers/metal/builtin/
 [mtl-argument-buffer]: https://developer.apple.com/documentation/metal/buffers/about_argument_buffers?language=objc
 [mtl-argument-encoder]: https://developer.apple.com/documentation/metal/mtlargumentencoder?language=objc
@@ -347,5 +347,5 @@ with the current active `MTLComputeCommandEncoder`:
 [mmap]: https://en.wikipedia.org/wiki/Mmap
 [moltenvk]: https://github.com/KhronosGroup/MoltenVK
 [spirv-cross]: https://github.com/KhronosGroup/SPIRV-Cross
-[vulkan-spirv-target]: https://github.com/openxla/iree/tree/main/compiler/src/iree/compiler/Dialect/HAL/Target/VulkanSPIRV
+[vulkan-spirv-target]: https://github.com/openxla/iree/tree/main/compiler/plugins/target/VulkanSPIRV
 [vulkan-cmd-dispatch]: https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/vkCmdDispatch.html
