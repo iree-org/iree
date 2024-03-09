@@ -38,6 +38,7 @@ iree_compiler_cc_library(
         "PadLinalgOps.cpp",
         "PassDetail.h",
         "Passes.cpp",
+        "TransposeAttentionValueOperand.cpp",
     ],
     hdrs = [
         "Passes.h",
