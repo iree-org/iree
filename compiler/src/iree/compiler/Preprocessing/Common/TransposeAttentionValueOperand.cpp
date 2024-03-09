@@ -78,7 +78,7 @@ void TransposeAttentionValueOperandPass::runOnOperation() {
         attnOp, attnOp.getResultTypes(),
         ValueRange({attnOp.getQuery(), attnOp.getKey(), transposedV,
                     attnOp.getScale()}),
-        attnOp.getResults(), /*transpose_v=*/true);
+        attnOp.getDpsInits(), /*transpose_v=*/true);
   }
 }
 
