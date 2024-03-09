@@ -813,8 +813,6 @@
     "test_hardsigmoid_default",
     "test_hardsigmoid_example",
     "test_hardswish_expanded",
-    "test_layer_normalization_default_axis_expanded",
-    "test_layer_normalization_default_axis_expanded_ver18",
     "test_max_float64",
     "test_max_int16",
     "test_max_int32",
