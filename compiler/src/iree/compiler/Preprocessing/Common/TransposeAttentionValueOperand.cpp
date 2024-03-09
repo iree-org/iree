@@ -5,6 +5,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <numeric>
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Preprocessing/Common/PassDetail.h"
@@ -51,7 +52,7 @@ void TransposeAttentionValueOperandPass::runOnOperation() {
     }
 
     // TODO: Add support for dynamic dimensions.
-    if (valueTensor.hasStaticShape()) {
+    if (!valueTensor.hasStaticShape()) {
       continue;
     }
 
@@ -65,7 +66,9 @@ void TransposeAttentionValueOperandPass::runOnOperation() {
     Value emptyTensor = rewriter.create<tensor::EmptyOp>(
         loc, transposedShape, valueTensor.getElementType());
 
-    SmallVector<int64_t> permutation = {rank - 1, rank - 2};
+    SmallVector<int64_t> permutation(rank);
+    std::iota(permutation.begin(), permutation.end(), 0);
+    std::swap(permutation[rank - 1], permutation[rank - 2]);
     Value transposedV =
         rewriter
             .create<linalg::TransposeOp>(loc, valueOp, emptyTensor, permutation)
