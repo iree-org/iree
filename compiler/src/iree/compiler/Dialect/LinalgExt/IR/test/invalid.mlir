@@ -744,3 +744,11 @@ func.func @illegal_flash_attention_inputs(%query: tensor<20xf32>, %key: tensor<2
 }
 
 // -----
+
+func.func @illegal_attention_inputs(%query: tensor<192x1024x64xf32>, %key: tensor<192x1024x64xf32>, %value: f32) -> tensor<192x1024x64xf32> {
+  %0 = tensor.empty() : tensor<192x1024x64xf32>
+  %scale = arith.constant 1.0 : f32
+  // expected-error @+1 {{expected Query, Key, Value inputs to be of shaped type}}
+  %1 = iree_linalg_ext.attention ins(%query, %key, %value, %scale : tensor<192x1024x64xf32>, tensor<192x1024x64xf32>, f32, f32) outs(%0 : tensor<192x1024x64xf32>) -> tensor<192x1024x64xf32>
+  return %1 : tensor<192x1024x64xf32>
+}

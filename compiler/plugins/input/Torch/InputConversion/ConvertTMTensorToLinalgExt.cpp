@@ -158,7 +158,7 @@ struct AttentionOpConversion
     // TODO: We are currently assuming that head dimension is dim = -1. Once we
     // have support for batch dims using more general indexing maps, we should
     // change this and rely on more general mechanisms.
-    // TODO: We are currently not handeling dynamic shape of head dimensions at
+    // TODO: We are currently not handling dynamic shape of head dimensions at
     // all. This is because it messes with dispatch formation. This should be
     // fixed.
     ArrayRef<int64_t> queryShape = op.getQueryType().getShape();

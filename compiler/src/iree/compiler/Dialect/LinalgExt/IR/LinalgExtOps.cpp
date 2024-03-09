@@ -2494,6 +2494,13 @@ LogicalResult AttentionOp::verify() {
     rankToCompareWith = 3;
   }
 
+  if (!llvm::all_of(llvm::drop_end(getDpsInputs()), [](Value input) {
+        return isa<ShapedType>(input.getType());
+      })) {
+    return op->emitOpError(
+        "expected Query, Key, Value inputs to be of shaped type");
+  }
+
   ShapedType queryType = getQueryType();
   ShapedType keyType = getKeyType();
   ShapedType valueType = getValueType();
@@ -2539,7 +2546,7 @@ LogicalResult AttentionOp::verify() {
       queryElementType != valueElementType ||
       queryElementType != scaleElementType) {
     return op->emitOpError(
-        "element types of (Q)uery, (K)ey and (V)value and scale should be "
+        "element types of (Q)uery, (K)ey and (V)alue and scale should be "
         "same");
   }
   if (!isTiled) {
