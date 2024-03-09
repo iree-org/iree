@@ -162,8 +162,8 @@ struct AttentionOpConversion
     // all. This is because it messes with dispatch formation. This should be
     // fixed.
     ArrayRef<int64_t> queryShape = op.getQueryType().getShape();
-    int64_t headDim = queryShape[queryShape.size() - 1];
-    if (headDim <= 0) {
+    int64_t headDim = queryShape.back();
+    if (headDim == ShapedType::kDynamic) {
       return op->emitOpError("NYI: Dynamic head dimension");
     }
 
@@ -171,7 +171,7 @@ struct AttentionOpConversion
     FloatType targetType = cast<FloatType>(op.getQueryType().getElementType());
 
     double dk = static_cast<double>(headDim);
-    dk = 1.0f / std::sqrt(dk);
+    dk = 1.0 / std::sqrt(dk);
     Value scale = rewriter.create<arith::ConstantOp>(
         loc, targetType, rewriter.getFloatAttr(targetType, dk));
 
