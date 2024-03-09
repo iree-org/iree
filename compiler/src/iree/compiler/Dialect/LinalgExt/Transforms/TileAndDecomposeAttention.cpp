@@ -8,16 +8,12 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
-#include "llvm/ADT/DenseSet.h"
-#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
-#include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/Pass/Pass.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -522,9 +518,6 @@ void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
   Value max = *tiledAttnOp.getMax();
   Value sum = *tiledAttnOp.getSum();
 
-  assert(max && "expected max statistic operand to be present");
-  assert(sum && "expected sum statistic operand to be present");
-
   OpBuilder::InsertionGuard withinScfLoop(rewriter);
   rewriter.setInsertionPointAfter(tiledAttnOp);
   SmallVector<OpFoldResult> queryDimValues =
@@ -538,7 +531,7 @@ void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
 
   // Since we use exp2 for attention instead of the original exp, we have to
   // multiply the scale by log2(e) = 1.44269504089. We use exp2 instead of exp
-  // as most gpus have better support for exp2.
+  // as most GPUs have better support for exp2.
   Value scale = tiledAttnOp.getScale();
   Value log2e = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getFloatAttr(elementType, 1.44269504089));
@@ -549,7 +542,7 @@ void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
   //
   // But, it is mathematically equivalent to do it on Q first and then multiply
   // it by K.T. This just allows us to do the scaling once, instead of each
-  // iteratiion of the loop.
+  // iteration of the loop.
   querySlice = scaleQuery(querySlice, scale, rewriter);
   ops.push_back(querySlice.getDefiningOp());
 

@@ -462,7 +462,7 @@ func.func @attention(%query: tensor<?x?x?xf32>, %key: tensor<?x?x?xf32>, %value:
 func.func @attention(%query: tensor<1x1024x64xf16>, %key: tensor<1x1024x64xf16>, %value: tensor<1x1024x64xf16>) -> tensor<1x1024x64xf16> {
   %0 = tensor.empty() : tensor<1x1024x64xf16>
   %scale = arith.constant 0.05 : f16
-  %1 = iree_linalg_ext.attention ins(%query, %key, %value, %scale : tensor<1x1024x64xf16>, tensor<1x1024x64xf16>, tensor<1x1024x64xf16>) outs(%0 : tensor<1x1024x64xf16>) -> tensor<1x1024x64xf16>
+  %1 = iree_linalg_ext.attention ins(%query, %key, %value, %scale : tensor<1x1024x64xf16>, tensor<1x1024x64xf16>, tensor<1x1024x64xf16>, f16) outs(%0 : tensor<1x1024x64xf16>) -> tensor<1x1024x64xf16>
   return %1 : tensor<1x1024x64xf16>
 }
 
