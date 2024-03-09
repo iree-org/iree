@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "llvm/ADT/STLExtras.h"
@@ -2209,7 +2210,6 @@ FailureOr<TilingResult>
 WinogradInputTransformOp::getTiledImplementation(OpBuilder &builder,
                                                  ArrayRef<OpFoldResult> offsets,
                                                  ArrayRef<OpFoldResult> sizes) {
-
   Location loc = getLoc();
   auto one = builder.getIndexAttr(1);
   auto zero = builder.getIndexAttr(0);
@@ -2381,7 +2381,6 @@ WinogradOutputTransformOp::getLoopIteratorTypes() {
 FailureOr<TilingResult> WinogradOutputTransformOp::getTiledImplementation(
     OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
     ArrayRef<OpFoldResult> sizes) {
-
   Location loc = getLoc();
   auto one = builder.getIndexAttr(1);
   auto zero = builder.getIndexAttr(0);
@@ -2460,8 +2459,8 @@ LogicalResult WinogradOutputTransformOp::reifyResultShapes(
 /// Utility function to check whether a given ShapedType has the expected rank.
 static LogicalResult checkShapeRank(Operation *op, StringRef operandName,
                                     ShapedType shapedType,
-                                    unsigned rankToCompareWith) {
-  unsigned opRank = shapedType.getRank();
+                                    int64_t rankToCompareWith) {
+  int64_t opRank = shapedType.getRank();
   if (opRank != rankToCompareWith) {
     return op->emitOpError("expected ")
            << operandName << " to have rank " << rankToCompareWith
@@ -2472,13 +2471,36 @@ static LogicalResult checkShapeRank(Operation *op, StringRef operandName,
 
 LogicalResult AttentionOp::verify() {
   Operation *op = getOperation();
-  unsigned numOperands = getNumOperands();
-  unsigned rankToCompareWith = 3;
-  if (numOperands == 6)
+
+  int numInputs = getNumDpsInputs();
+  int numOutputs = getNumDpsInits();
+
+  if (numInputs != 4) {
+    return op->emitOpError(
+        "expected 4 input operands: Query, Key, Value and Scale");
+  }
+
+  if (numOutputs != 1 && numOutputs != 3) {
+    return op->emitOpError(
+        "expected 1 or 3 output operands: Output, [Max and Sum]");
+  }
+
+  bool isTiled = numOutputs == 3;
+
+  int64_t rankToCompareWith;
+  if (isTiled) {
     rankToCompareWith = 2;
-  else if (numOperands != 4)
-    return op->emitOpError("expected operand count 4 or 6, but got")
-           << numOperands;
+  } else {
+    rankToCompareWith = 3;
+  }
+
+  if (!llvm::all_of(llvm::drop_end(getDpsInputs()), [](Value input) {
+        return isa<ShapedType>(input.getType());
+      })) {
+    return op->emitOpError(
+        "expected Query, Key, Value inputs to be of shaped type");
+  }
+
   ShapedType queryType = getQueryType();
   ShapedType keyType = getKeyType();
   ShapedType valueType = getValueType();
@@ -2487,6 +2509,12 @@ LogicalResult AttentionOp::verify() {
   Type keyElementType = keyType.getElementType();
   Type valueElementType = valueType.getElementType();
   Type outputElementType = outputType.getElementType();
+
+  FloatType scaleElementType = dyn_cast<FloatType>(getScale().getType());
+  if (!scaleElementType) {
+    return op->emitOpError("expected scale to be of floating point type");
+  }
+
   if (failed(checkShapeRank(op, "query", queryType, rankToCompareWith))) {
     return failure();
   }
@@ -2515,11 +2543,13 @@ LogicalResult AttentionOp::verify() {
     return op->emitOpError("incompatible output shape");
   }
   if (queryElementType != keyElementType ||
-      keyElementType != valueElementType) {
+      queryElementType != valueElementType ||
+      queryElementType != scaleElementType) {
     return op->emitOpError(
-        "element types of (Q)uery, (K)ey and (V)value should be same");
+        "element types of (Q)uery, (K)ey and (V)alue and scale should be "
+        "same");
   }
-  if (numOperands == 4) {
+  if (!isTiled) {
     // Vanilla attention.
     if (queryElementType != outputElementType) {
       return op->emitOpError("expected element type for Output ")
@@ -2530,7 +2560,7 @@ LogicalResult AttentionOp::verify() {
       return op->emitOpError("query and key head dimension mismatch");
     }
   }
-  if (numOperands == 6) {
+  if (isTiled) {
     // Tiled/Flash attention.
     ShapedType maxType = *getMaxType();
     ShapedType sumType = *getSumType();
@@ -2556,6 +2586,7 @@ LogicalResult AttentionOp::verify() {
       return op->emitOpError("Query and max dimension-0 mismatch");
     }
   }
+
   return success();
 }
 
@@ -2609,6 +2640,8 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
   keyValueSizes[0] = sizes[0];
   keyValueOffsets[0] = offsets[0];
 
+  Value scale = getScale();
+
   SmallVector<Value> tiledOperands;
   tiledOperands.emplace_back(getSlice(builder, loc, getQuery(),
                                       queryOutputOffsets, queryOutputSizes,
@@ -2617,13 +2650,14 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
                                       keyValueSizes, keyValueStrides));
   tiledOperands.emplace_back(getSlice(builder, loc, getValue(), keyValueOffsets,
                                       keyValueSizes, keyValueStrides));
+  tiledOperands.emplace_back(scale);
   tiledOperands.emplace_back(getSlice(builder, loc, getOutput(),
                                       queryOutputOffsets, queryOutputSizes,
                                       queryOutputStrides));
 
   SmallVector<Type> resultTypes;
   if (hasPureTensorSemantics())
-    resultTypes.push_back(tiledOperands[3].getType());
+    resultTypes.push_back(tiledOperands[4].getType());
 
   Operation *tiledOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);

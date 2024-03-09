@@ -11,6 +11,8 @@
 #include "compiler/plugins/input/Torch/InputConversion/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -145,8 +147,36 @@ struct AttentionOpConversion
     Value collapsedResult = rewriter.create<tensor::EmptyOp>(
         loc, collapsedResultShape, elementType);
 
+    // TODO: This is a hack. This should be replaced with a simple getScale()
+    // when support for scaling is plumbed to TMTensor on the torch-mlir side.
+    // Until then, we are using the default value used in scaled dot product
+    // attention by PyTorch (most models use the default value because it makes
+    // the variance of the result of softmax 1 when the mean of Q, K is 0).
+    // We use scale = 1 / sqrt(d), where d is the head dimension.
+    // See https://paperswithcode.com/method/scaled for more details.
+    //
+    // TODO: We are currently assuming that head dimension is dim = -1. Once we
+    // have support for batch dims using more general indexing maps, we should
+    // change this and rely on more general mechanisms.
+    // TODO: We are currently not handling dynamic shape of head dimensions at
+    // all. This is because it messes with dispatch formation. This should be
+    // fixed.
+    ArrayRef<int64_t> queryShape = op.getQueryType().getShape();
+    int64_t headDim = queryShape.back();
+    if (headDim == ShapedType::kDynamic) {
+      return op->emitOpError("NYI: Dynamic head dimension");
+    }
+
+    // Attention only works for FloatType.
+    FloatType targetType = cast<FloatType>(op.getQueryType().getElementType());
+
+    double dk = static_cast<double>(headDim);
+    dk = 1.0 / std::sqrt(dk);
+    Value scale = rewriter.create<arith::ConstantOp>(
+        loc, targetType, rewriter.getFloatAttr(targetType, dk));
+
     auto attention = rewriter.create<IREE::LinalgExt::AttentionOp>(
-        loc, collapsedResultType, SmallVector<Value>{query, key, value},
+        loc, collapsedResultType, SmallVector<Value>{query, key, value, scale},
         collapsedResult);
 
     if (sizes.size() > 3)
