@@ -70,7 +70,14 @@ std::optional<int64_t> getConstantIndex(Value value) {
 
 class LoopPrefetcher {
 public:
+  /// Creates an instance that plans the given scf.for |op| to be ready for
+  /// prefetching. Returns failure if unable to support the given |op|.
   static FailureOr<LoopPrefetcher> get(scf::ForOp op) {
+    if (!op.getOps<scf::ForOp>().empty()) {
+      LDBG("Loop prefetcher does not support nested loops yet");
+      return failure();
+    }
+
     LoopPrefetcher prefetcher;
     prefetcher.mapping = SmallVector<IRMapping>(4);
     prefetcher.forOp = op;
@@ -90,6 +97,9 @@ public:
     return prefetcher;
   }
 
+  // Emits the prologue before the main pipelined loop and returns the read
+  // results to be passed to the main loop as initial loop carried values, and
+  // their useages by corresponding writes in the main loop.
   std::tuple<SmallVector<Value>, SmallVector<Value>>
   emitPrologue(RewriterBase &rewriter) {
     Location loc = forOp.getLoc();
@@ -100,6 +110,9 @@ public:
     SmallVector<Value> writeArgs;
 
     if (singleStage) {
+      // If we only prefetch one step ahead, we can directly write in the
+      // prologue and use the shared memory to communicate data instead of the
+      // loop carried values.
       // Read (0)
       emitRead(mapping[0], rewriter, zero);
       // Write(0)
@@ -127,6 +140,7 @@ public:
     return {iterArgs, writeArgs};
   }
 
+  /// Emits the main pipelined loop structure.
   scf::ForOp createKernelLoop(RewriterBase &rewriter,
                               SmallVector<Value> &newIterArgs,
                               SmallVector<Value> &writeArgs) {
@@ -139,9 +153,10 @@ public:
     auto iterArgs = llvm::to_vector_of<Value>(forOp.getInitArgs());
     llvm::append_range(iterArgs, newIterArgs);
 
-    Value newStep = singleStage ? forOp.getStep()
-                                : rewriter.create<arith::AddIOp>(
-                                      loc, forOp.getStep(), forOp.getStep());
+    Value newStep = forOp.getStep();
+    if (!singleStage) {
+      newStep = rewriter.create<arith::AddIOp>(loc, newStep, newStep);
+    }
     auto newForOp = rewriter.create<scf::ForOp>(loc, forOp.getLowerBound(),
                                                 newUb, newStep, iterArgs);
 
@@ -166,6 +181,7 @@ public:
     return newForOp;
   }
 
+  /// Emits contents into the main pipelined loop structure.
   void createKernel(RewriterBase &rewriter, scf::ForOp newForOp) {
     rewriter.setInsertionPoint(newForOp.getBody(), newForOp.getBody()->begin());
     Location loc = forOp.getLoc();
@@ -207,6 +223,8 @@ public:
     updateYield(mapping[0], readRegisters, rewriter);
   }
 
+  // Emits the epilogue after the main pipelined loop and returns the final
+  // results to replace the original loop results main loop.
   SmallVector<Value> emitEpilogue(RewriterBase &rewriter, scf::ForOp newForOp,
                                   SmallVector<Value> &writeArgs) {
     rewriter.setInsertionPointAfter(newForOp);
@@ -342,22 +360,21 @@ private:
       // Stages cannot have overlapping operations.
       llvm::dbgs() << "--- Read Stage ---\n";
       for (Operation *op : readStage)
-        op->dump();
+        llvm::dbgs() << *op << "\n";
       llvm::dbgs() << "--- Write Stage ---\n";
       for (Operation *op : writeStage)
-        op->dump();
+        llvm::dbgs() << *op << "\n";
       llvm::dbgs() << "--- Compute Stage ---\n";
       for (Operation *op : computeStage)
-        op->dump();
+        llvm::dbgs() << *op << "\n";
     });
 
     return success();
   }
 
-  /// Clone `op` and call `callback` on the cloned op's oeprands as well as any
-  /// operands of nested ops that:
-  /// 1) aren't defined within the new op or
-  /// 2) are block arguments.
+  /// Clones |op| and call |callback| on the cloned op's oeprands as well as any
+  /// operands of nested ops that 1) aren't defined within the new op or 2) are
+  /// block arguments.
   static Operation *
   cloneAndUpdateOperands(RewriterBase &rewriter, Operation *op,
                          function_ref<void(OpOperand *newOperand)> callback) {
@@ -367,11 +384,17 @@ private:
     return clone;
   }
 
+  /// Creates all read stage ops for a loop iteration with |rewriter| and maps
+  /// the original loop induction variable to |iv| in |mapping|.
   SmallVector<Value> emitRead(IRMapping &mapping, RewriterBase &rewriter,
                               Value iv) {
+    // Map the original loop induction variable to |iv| for later op rewrites.
     mapping.map(forOp.getInductionVar(), iv);
+
     SmallVector<Value> results;
     for (Operation *op : readStage) {
+      // Clone the current read stage op and updates all its operands to
+      // reference newly created ops.
       Operation *newOp =
           cloneAndUpdateOperands(rewriter, op, [&](OpOperand *newOperand) {
             if (mapping.contains(newOperand->get())) {
@@ -383,7 +406,7 @@ private:
         llvm::append_range(results, newOp->getResults());
       }
 
-      // Map read operations to new read operations.
+      // Update read stage op results mapping.
       for (unsigned i = 0, e = op->getNumResults(); i != e; ++i) {
         mapping.map(op->getResult(i), newOp->getResult(i));
       }
@@ -391,9 +414,15 @@ private:
     return results;
   }
 
+  /// Creates all write stage ops for a loop iteration with |rewriter| and maps
+  /// the original loop induction variable to |iv| in |mapping|.
   void emitWrite(IRMapping &mapping, RewriterBase &rewriter, Value iv) {
+    // Map the original loop induction variable to |iv| for later op rewrites.
     mapping.map(forOp.getInductionVar(), iv);
+
     for (Operation *op : writeStage) {
+      // Clone the current read stage op and updates all its operands to
+      // reference newly created ops.
       Operation *newOp =
           cloneAndUpdateOperands(rewriter, op, [&](OpOperand *newOperand) {
             if (mapping.contains(newOperand->get())) {
@@ -411,13 +440,18 @@ private:
     }
   }
 
+  /// Creates a gpu.barrier op with |rewriter|.
   void emitBarrier(Location loc, RewriterBase &rewriter) {
     rewriter.create<gpu::BarrierOp>(loc);
   }
 
+  /// Creates all compute stage ops for a loop iteration with |rewriter| and
+  /// maps the original loop induction variable to |iv| in |mapping|.
   SmallVector<Value> emitCompute(IRMapping &mapping, RewriterBase &rewriter,
                                  Value indVar) {
+    // Map the original loop induction variable to |iv| for later op rewrites.
     mapping.map(forOp.getInductionVar(), indVar);
+
     SmallVector<Value> results;
     for (Operation *op : computeStage) {
       if (auto yieldOp = dyn_cast<scf::YieldOp>(op)) {
@@ -446,6 +480,7 @@ private:
     return results;
   }
 
+  /// Maps values in |srcValues| to |targetValues| in |mapping|.
   static void createWriteMappings(SmallVector<Value> &srcValues,
                                   SmallVector<Value> &targetValues,
                                   IRMapping &mapping) {
@@ -470,11 +505,16 @@ private:
   }
 
 private:
+  // Mapping for each pipelined stage.
   SmallVector<IRMapping, 4> mapping;
+  // The original scf.for loop to prefetch shared memory copy from.
   scf::ForOp forOp;
+  // Original static loop range and step.
   int64_t lb, ub, step;
+  // Whether we only prefetch one single step ahead.
   bool singleStage;
 
+  // Ops in the original scf.for loop that belongs to different classes.
   SmallVector<Operation *> readStage;
   SmallVector<Operation *> writeStage;
   SmallVector<Operation *> computeStage;
