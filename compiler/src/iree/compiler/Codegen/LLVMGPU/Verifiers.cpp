@@ -5,10 +5,11 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
-#include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
-#include "mlir/Dialect/Linalg/Passes.h"
+#include "llvm/ADT/STLExtras.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 
 namespace mlir::iree_compiler {
 
@@ -74,11 +75,10 @@ getInstructionShape(Operation *op, CodeGenPipeline pipeline,
 
 /// Verifies launch configuration for matmul and batchmatmul on a GPU for CUDA
 /// and Tensor Core pipelines.
-LogicalResult
-verifyGPUMatmulPipeline(Operation *op,
-                        IREE::Codegen::LoweringConfigAttr loweringConfig,
-                        IREE::Codegen::TranslationInfoAttr translationInfo,
-                        ArrayRef<int64_t> workgroupSize) {
+LogicalResult verifyGPUMatmulPipeline(
+    Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
+    IREE::Codegen::TranslationInfoAttr translationInfo,
+    ArrayRef<int64_t> workgroupSize, std::optional<int64_t> subgroupSize) {
   // This verifier only applies to matmul.
   CodeGenPipeline pipeline = translationInfo.getDispatchLoweringPassPipeline();
   if (pipeline != CodeGenPipeline::LLVMGPUMatmulSimt &&
@@ -238,6 +238,112 @@ verifyGPUMatmulPipeline(Operation *op,
     return op->emitError("Tensor Core instruction shape ")
            << instructionShape << " cannot be tiled on warp shape " << warpShape
            << " with compilation pipeline " << pipelineName;
+  }
+
+  return success();
+}
+
+LogicalResult verifyGPUVectorDistributePipeline(
+    Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
+    IREE::Codegen::TranslationInfoAttr translationInfo,
+    ArrayRef<int64_t> workgroupSize, std::optional<int64_t> subgroupSize) {
+  CodeGenPipeline pipeline = translationInfo.getDispatchLoweringPassPipeline();
+  // This verifier only handles the LLVMGPUVectorDistribute pipeline.
+  if (pipeline != CodeGenPipeline::LLVMGPUVectorDistribute) {
+    return success();
+  }
+
+  if (!subgroupSize) {
+    return op->emitError("requires subgroup_size set on the export op");
+  }
+
+  llvm::StringLiteral scheduleAttrName =
+      IREE::GPU::MMAScheduleAttr::getMnemonic();
+  auto scheduleAttr = dyn_cast_or_null<IREE::GPU::MMAScheduleAttr>(
+      translationInfo.getConfiguration().get(scheduleAttrName));
+  if (!scheduleAttr) {
+    return op->emitError("requires mma_schedule set in the translation info");
+  }
+
+  auto pairIsEqual = [](std::tuple<int64_t, int64_t> s) {
+    return std::get<0>(s) == std::get<1>(s);
+  };
+
+  SmallVector<int64_t, 3> expectedWorkgroupSize = {
+      scheduleAttr.getSubgroupNCount() * *subgroupSize,
+      scheduleAttr.getSubgroupMCount(), 1};
+
+  if (!llvm::all_of(llvm::zip_equal(workgroupSize, expectedWorkgroupSize),
+                    pairIsEqual)) {
+    return op->emitError("expected workgroup size to be [")
+           << expectedWorkgroupSize[0] << ", " << expectedWorkgroupSize[1]
+           << ", " << expectedWorkgroupSize[2] << "]";
+  }
+
+  auto linalgOp = dyn_cast<linalg::LinalgOp>(op);
+  if (!linalgOp) {
+    return success();
+  }
+
+  FailureOr<mlir::linalg::ConvolutionDimensions> convDims =
+      mlir::linalg::inferConvolutionDims(linalgOp);
+  if (succeeded(convDims)) {
+    // TODO: verify convolution cases
+    return success();
+  }
+
+  FailureOr<mlir::linalg::ContractionDimensions> contractDims =
+      mlir::linalg::inferContractionDims(linalgOp);
+  if (failed(contractDims)) {
+    return success();
+  }
+
+  SmallVector<int64_t> expectedTileSizes(linalgOp.getNumLoops(), 0);
+  int64_t mDim = contractDims->m.back();
+  int64_t nDim = contractDims->n.back();
+  int64_t kDim = contractDims->k.back();
+
+  // Right now we expect to tile all m, n, and k dimensions to 1 except the
+  // innermost.
+  for (int64_t m : llvm::drop_end(contractDims->m)) {
+    expectedTileSizes[m] = 1;
+  }
+  for (int64_t n : llvm::drop_end(contractDims->n)) {
+    expectedTileSizes[n] = 1;
+  }
+  for (int64_t k : llvm::drop_end(contractDims->k)) {
+    expectedTileSizes[k] = 1;
+  }
+
+  auto [mSize, nSize, kSize] = scheduleAttr.getIntrinsic().getMNKShape();
+  expectedTileSizes[mDim] = scheduleAttr.getSubgroupMCount() *
+                            scheduleAttr.getSubgroupMTileCount() * mSize;
+  expectedTileSizes[nDim] = scheduleAttr.getSubgroupNCount() *
+                            scheduleAttr.getSubgroupNTileCount() * nSize;
+  expectedTileSizes[kDim] = scheduleAttr.getSubgroupKTileCount() * kSize;
+
+  SmallVector<int64_t> tileShape =
+      loweringConfig.getTileSizeVals(kWorkgroupTileLevel);
+  if (tileShape.size() != expectedTileSizes.size()) {
+    return op->emitError("expected workgroup tile size to have ")
+           << expectedTileSizes.size() << " elements";
+  }
+  if (!llvm::all_of(llvm::zip_equal(tileShape, expectedTileSizes),
+                    pairIsEqual)) {
+    auto error = op->emitError("expected workgroup tile size to be [")
+                 << expectedTileSizes[0];
+    for (int i = 1, e = expectedTileSizes.size(); i < e; ++i) {
+      error << ", " << expectedTileSizes[i];
+    }
+    error << "]";
+    return error;
+  }
+
+  SmallVector<int64_t, 4> bounds = linalgOp.getStaticLoopRanges();
+  if (bounds[mDim] % expectedTileSizes[mDim] != 0 ||
+      bounds[nDim] % expectedTileSizes[nDim] != 0 ||
+      bounds[kDim] % expectedTileSizes[kDim] != 0) {
+    return op->emitError("workgroup tile size cannot divide problem size");
   }
 
   return success();

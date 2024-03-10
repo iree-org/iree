@@ -131,12 +131,15 @@ std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMGPUVectorToGPU(
     GPUTensorCoreType tensorCoreType = GPUTensorCoreType::WMMA);
 
-/// Lowering calling vectorization patterns.
-LogicalResult
-verifyGPUMatmulPipeline(Operation *op,
-                        IREE::Codegen::LoweringConfigAttr loweringConfig,
-                        IREE::Codegen::TranslationInfoAttr translationInfo,
-                        ArrayRef<int64_t> workgroupSize);
+LogicalResult verifyGPUMatmulPipeline(
+    Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
+    IREE::Codegen::TranslationInfoAttr translationInfo,
+    ArrayRef<int64_t> workgroupSize, std::optional<int64_t> subgroupSize);
+
+LogicalResult verifyGPUVectorDistributePipeline(
+    Operation *op, IREE::Codegen::LoweringConfigAttr loweringConfig,
+    IREE::Codegen::TranslationInfoAttr translationInfo,
+    ArrayRef<int64_t> workgroupSize, std::optional<int64_t> subgroupSize);
 
 /// Given a chain of matmuls with some or no operations
 /// in between, like

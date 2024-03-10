@@ -115,6 +115,7 @@ class CompilationInfo:
     mma_schedule: typing.Optional[MMASchedule]
     # Compilation info
     workgroup_size: typing.List[int]
+    subgroup_size: typing.Optional[int]
 
     # Prints the workgroup size
     def workgroup_size_str(self):
@@ -277,13 +278,15 @@ def get_rocm_test_compilation_infos(compilation_info_id: CompilationInfoId):
         else:
             raise NotImplementedError("unhandled intrinsic case")
 
+        subgroup_size = 64
         workgroup_tile = [[wg_tile_m, wg_tile_n, wg_tile_k]]
-        workgroup_size = [schedule.n_count * 64, schedule.m_count, 1]
+        workgroup_size = [schedule.n_count * subgroup_size, schedule.m_count, 1]
         infos.append(
             CompilationInfo(
                 tile_sizes=workgroup_tile,
                 dispatch_lowering_pass_pipeline=compilation_info_id.value,
                 workgroup_size=workgroup_size,
+                subgroup_size=subgroup_size,
                 software_pipeline_depth=0,
                 mma_schedule=schedule,
             )
@@ -358,6 +361,7 @@ def get_test_compilation_infos(
             CompilationInfo(
                 tile_sizes=tile_workgroup_size_pair.tile_size,
                 dispatch_lowering_pass_pipeline=compilation_info_id.value,
+                subgroup_size=None,
                 workgroup_size=tile_workgroup_size_pair.workgroup_size,
                 software_pipeline_depth=software_pipeline_depth,
                 mma_schedule=None,
@@ -530,6 +534,9 @@ def generate_function(
             # TODO: change to test SPIRVMatmulPromoteVectorize too
             compiler_pipeline = "SPIRVBaseVectorize"
 
+        subgroup_size = ""
+        if compilation_info.subgroup_size is not None:
+            subgroup_size = f", subgroup_size = {compilation_info.subgroup_size}"
         mma_schedule = ""
         if compilation_info.mma_schedule is not None:
             mma_schedule = ", {}".format(compilation_info.mma_schedule)
@@ -540,7 +547,7 @@ def generate_function(
             f"  translation_info = <{compiler_pipeline},\n"
             f"  {{ pipeline_depth = {compilation_info.software_pipeline_depth}, "
             f"  store_stage = 1{mma_schedule} }}>,\n"
-            f"  workgroup_size = {compilation_info.workgroup_size_str()}>\n"
+            f"  workgroup_size = {compilation_info.workgroup_size_str()}{subgroup_size}>\n"
         )
         compilation_info_attr = (
             f"{{compilation_info = #compilation{generate_function.compilation_index}}} "

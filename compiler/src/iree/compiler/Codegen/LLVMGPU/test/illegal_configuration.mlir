@@ -443,3 +443,110 @@ hal.executable private @matmul_tensors {
 }
 
 // -----
+
+#tile_sizes = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 64]]>
+#schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mfma_layout<F16_16x16x16_F32>,
+      subgroup_m_count = 3, subgroup_n_count = 4,
+      subgroup_m_tile_count = 1, subgroup_n_tile_count = 1, subgroup_k_tile_count = 4>
+#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute, {mma_schedule = #schedule}>
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable private @matmul_wrong_workgroup_size {
+  hal.executable.variant @cuda target(#hal.executable.target<"rocm", "rocm-hsaco-fb">) {
+    hal.executable.export @illegal layout(#pipeline_layout) attributes {
+      translation_info = #translation,
+      subgroup_size = 64 : index,
+      workgroup_size = [128 : index, 1 : index, 1 : index]
+    }
+    builtin.module {
+      func.func @illegal() {
+        %c0 = arith.constant 0 : index
+        %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<2048x1280xf16>
+        %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<1280x1280xf16>
+        %result = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<2048x1280xf32>
+        // expected-error @+1 {{expected workgroup size to be [256, 3, 1]}}
+        linalg.matmul_transpose_b {lowering_config = #tile_sizes} ins(%lhs, %rhs : memref<2048x1280xf16>, memref<1280x1280xf16>)
+          outs(%result: memref<2048x1280xf32>)
+        return
+      }
+    }
+  }
+}
+
+// -----
+
+#tile_sizes = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 64]]>
+#schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mfma_layout<F16_16x16x16_F32>,
+      subgroup_m_count = 3, subgroup_n_count = 4,
+      subgroup_m_tile_count = 3, subgroup_n_tile_count = 2, subgroup_k_tile_count = 4>
+#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute, {mma_schedule = #schedule}>
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable private @matmul_wrong_tile_size {
+  hal.executable.variant @cuda target(#hal.executable.target<"rocm", "rocm-hsaco-fb">) {
+    hal.executable.export @illegal layout(#pipeline_layout) attributes {
+      translation_info = #translation,
+      subgroup_size = 64 : index,
+      workgroup_size = [256 : index, 3 : index, 1 : index]
+    }
+    builtin.module {
+      func.func @illegal() {
+        %c0 = arith.constant 0 : index
+        %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<2048x1280xf16>
+        %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<1280x1280xf16>
+        %result = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<2048x1280xf32>
+        // expected-error @+1 {{expected workgroup tile size to be [144, 128, 64]}}
+        linalg.matmul_transpose_b {lowering_config = #tile_sizes} ins(%lhs, %rhs : memref<2048x1280xf16>, memref<1280x1280xf16>)
+          outs(%result: memref<2048x1280xf32>)
+        return
+      }
+    }
+  }
+}
+
+// -----
+
+#tile_sizes = #iree_codegen.lowering_config<tile_sizes = [[144, 128, 64]]>
+#schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mfma_layout<F16_16x16x16_F32>,
+      subgroup_m_count = 3, subgroup_n_count = 4,
+      subgroup_m_tile_count = 3, subgroup_n_tile_count = 2, subgroup_k_tile_count = 4>
+#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute, {mma_schedule = #schedule}>
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>,
+    #hal.descriptor_set.binding<2, storage_buffer>
+  ]>
+]>
+hal.executable private @matmul_tile_size_cannot_divide {
+  hal.executable.variant @cuda target(#hal.executable.target<"rocm", "rocm-hsaco-fb">) {
+    hal.executable.export @illegal layout(#pipeline_layout) attributes {
+      translation_info = #translation,
+      subgroup_size = 64 : index,
+      workgroup_size = [256 : index, 3 : index, 1 : index]
+    }
+    builtin.module {
+      func.func @illegal() {
+        %c0 = arith.constant 0 : index
+        %lhs = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<2048x1280xf16>
+        %rhs = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<1280x1280xf16>
+        %result = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : memref<2048x1280xf32>
+        // expected-error @+1 {{workgroup tile size cannot divide problem size}}
+        linalg.matmul_transpose_b {lowering_config = #tile_sizes} ins(%lhs, %rhs : memref<2048x1280xf16>, memref<1280x1280xf16>)
+          outs(%result: memref<2048x1280xf32>)
+        return
+      }
+    }
+  }
+}
+

@@ -22,8 +22,6 @@
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
-#include "mlir/Pass/PassRegistry.h"
-#include "mlir/Transforms/Passes.h"
 
 namespace mlir::iree_compiler {
 
@@ -65,15 +63,16 @@ public:
 /// Verify that valid configuration is set for all ops within the compiled
 /// module.
 template <typename F>
-static LogicalResult
-verifyLoweringConfiguration(ModuleOp module,
-                            IREE::Codegen::TranslationInfoAttr translationInfo,
-                            ArrayRef<int64_t> workgroupSize, F verificationFn) {
+static LogicalResult verifyLoweringConfiguration(
+    ModuleOp module, IREE::Codegen::TranslationInfoAttr translationInfo,
+    ArrayRef<int64_t> workgroupSize, std::optional<int64_t> subgroupSize,
+    F verificationFn) {
   auto walkResult = module.walk([&](Operation *op) -> WalkResult {
     IREE::Codegen::LoweringConfigAttr loweringConfig = getLoweringConfig(op);
     if (!loweringConfig)
       return WalkResult::advance();
-    return verificationFn(op, loweringConfig, translationInfo, workgroupSize);
+    return verificationFn(op, loweringConfig, translationInfo, workgroupSize,
+                          subgroupSize);
   });
   return failure(walkResult.wasInterrupted());
 }
@@ -82,6 +81,8 @@ static LogicalResult
 verifyEntryPoint(ModuleOp moduleOp,
                  IREE::Codegen::TranslationInfoAttr translationInfo,
                  IREE::HAL::ExecutableExportOp exportOp) {
+  using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
+
   std::optional<mlir::ArrayAttr> workgroupSizeAttr =
       exportOp.getWorkgroupSize();
 
@@ -90,8 +91,24 @@ verifyEntryPoint(ModuleOp moduleOp,
     for (auto [index, attr] : llvm::enumerate(workgroupSizeAttr.value())) {
       workgroupSizes[index] = llvm::cast<IntegerAttr>(attr).getInt();
     }
-    return verifyLoweringConfiguration(moduleOp, translationInfo,
-                                       workgroupSizes, verifyGPUMatmulPipeline);
+    std::optional<int64_t> subgroupSize;
+    if (auto subgroupSizeAttr = exportOp.getSubgroupSize()) {
+      subgroupSize = subgroupSizeAttr->getSExtValue();
+    }
+    switch (translationInfo.getPassPipeline().getValue()) {
+    case CodeGenPipeline::LLVMGPUMatmulSimt:
+    case CodeGenPipeline::LLVMGPUMatmulTensorCore:
+    case CodeGenPipeline::LLVMGPUMatmulTensorCoreMmaSync:
+      return verifyLoweringConfiguration(moduleOp, translationInfo,
+                                         workgroupSizes, subgroupSize,
+                                         verifyGPUMatmulPipeline);
+    case CodeGenPipeline::LLVMGPUVectorDistribute:
+      return verifyLoweringConfiguration(moduleOp, translationInfo,
+                                         workgroupSizes, subgroupSize,
+                                         verifyGPUVectorDistributePipeline);
+    default:
+      break;
+    }
   }
   return success();
 }
