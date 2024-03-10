@@ -11,7 +11,7 @@ from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions
 import e2e_test_framework.models.utils as model_utils
 
-GCS_ARTIFACT_ROOT_DIR = "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.23_1705868085"
+GCS_ARTIFACT_ROOT_DIR = "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.25_1709787220"
 
 ID_FORMAT = string.Template("${model_id}-batch${batch_size}")
 NAME_FORMAT = string.Template("${name}_BATCH${batch_size}")
