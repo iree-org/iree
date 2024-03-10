@@ -74,7 +74,7 @@ def LLVMGPUPackSharedMemoryAlloc :
 
 def LLVMGPUPrefetchSharedMemory :
     InterfacePass<"iree-llvmgpu-prefetch-shared-memory", "mlir::FunctionOpInterface"> {
-  let summary = "Pass pack shared memory allocation in order to reduce memory usage.";
+  let summary = "Rotate scf.for loops to prefetch shared memory with distance 1";
   let constructor = "mlir::iree_compiler::createLLVMGPUPrefetchSharedMemoryPass()";
 }
 
