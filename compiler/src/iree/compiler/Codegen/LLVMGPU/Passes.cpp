@@ -843,9 +843,9 @@ void addGPUTransformDialectPasses(OpPassManager &passManager,
 //===----------------------------------------------------------------------===//
 
 void buildLLVMGPUCodegenConfigurationPassPipeline(OpPassManager &pm) {
-  addCommonTargetExecutablePreprocessingPasses(pm);
   auto &nestedModulePM = pm.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUGeneralizeNamedOpsPass());
+  addCommonTargetExecutablePreprocessingPasses(pm);
   pm.addPass(createLLVMGPUSelectLoweringStrategyPass());
 }
 
@@ -873,9 +873,9 @@ void buildLLVMGPUCodegenPassPipeline(OpPassManager &pm, bool useROCM) {
 //===----------------------------------------------------------------------===//
 
 void buildROCDLCodegenConfigurationPassPipeline(OpPassManager &pm) {
-  addCommonTargetExecutablePreprocessingPasses(pm);
   auto &nestedModulePM = pm.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUGeneralizeNamedOpsPass());
+  addCommonTargetExecutablePreprocessingPasses(pm);
   pm.addPass(createROCDLSelectLoweringStrategyPass());
 }
 
