@@ -4218,9 +4218,14 @@ class ListGetRefOpConversion
               .getResult();
 
       // ref->type != IREE_VM_REF_TYPE_NULL
-      auto refTypeIsNotNull = emitc_builders::binaryOperator(
-          rewriter, loc, emitc_builders::BinaryOperator::NOT_EQUAL_TO, refType,
-          refTypeNull, rewriter.getI1Type());
+      auto refTypeIsNotNull = rewriter
+                                  .create<emitc::CmpOp>(
+                                      /*location=*/loc,
+                                      /*type=*/rewriter.getI1Type(),
+                                      /*predicate*/ emitc::CmpPredicate::ne,
+                                      /*lhs*/ refType,
+                                      /*rhs*/ refTypeNull)
+                                  .getResult();
 
       // (iree_vm_type_def_is_value(type_def)
       auto typedefIsValue =
@@ -4247,9 +4252,14 @@ class ListGetRefOpConversion
               .getResult(0);
 
       // ref->type != iree_vm_type_def_as_ref(type_def)
-      auto refTypesDontMatch = emitc_builders::binaryOperator(
-          rewriter, loc, emitc_builders::BinaryOperator::NOT_EQUAL_TO, refType,
-          typedefAsRef, rewriter.getI1Type());
+      auto refTypesDontMatch = rewriter
+                                   .create<emitc::CmpOp>(
+                                       /*location=*/loc,
+                                       /*type=*/rewriter.getI1Type(),
+                                       /*predicate*/ emitc::CmpPredicate::ne,
+                                       /*lhs*/ refType,
+                                       /*rhs*/ typedefAsRef)
+                                   .getResult();
 
       auto invalidRefType = rewriter
                                 .create<emitc::LogicalOrOp>(
