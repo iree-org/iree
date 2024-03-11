@@ -1,8 +1,8 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-llvmgpu-configuration-pipeline)))" \
-// RUN:   %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-llvmgpu-configuration-pipeline)))" \
+// RUN:   --split-input-file %s | FileCheck %s
 
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-rocdl-configuration-pipeline)))" \
-// RUN:   %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-rocdl-configuration-pipeline)))" \
+// RUN:   --split-input-file %s | FileCheck %s
 
 // Make sure that the GPU configuration pipelines generalize named ops, e.g., linalg.matmul_transpose_b to linalg.generic.
 
