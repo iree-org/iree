@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-codegen-llvmgpu-use-vector-distribution \
+// RUN: iree-opt --split-input-file --iree-codegen-llvmgpu-use-vector-distribution --iree-llvmgpu-enable-prefetch=true \
 // RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-select-lowering-strategy, iree-llvmgpu-lower-executable-target)))" %s | FileCheck %s
 
 // TODO: This test is still using the legacy LLVMGPU kernel config. This needs
@@ -228,8 +228,14 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 //    CHECK-LABEL: func.func @conv_nhwc
 //          CHECK:   scf.for {{.*}} = %c0 to %c3
 //          CHECK:     scf.for {{.*}} = %c0 to %c3
-//          CHECK:       scf.for {{.*}} = %c0 to %c768 step %c32 iter_args(%[[ARG:.+]] = {{.*}}) -> (vector<2x4x1x1x1x4xf32>)
+// This has more than 2 iteartions. So we have prefetching enabled for this case. Due to
+// prefetching, we have one iteration peeled of so upper bound is 768 - 32 = 736.
+//          CHECK:       scf.for {{.*}} = %c0 to %c736 step %c32 iter_args(%[[ARG:.+]] = {{.*}}) -> (vector<2x4x1x1x1x4xf32>)
 // CHECK-COUNT-16:         amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
+//          CHECK:         scf.yield
+// CHECK-COUNT-16:       amdgpu.mfma
+//          CHECK:     scf.yield
+//          CHECK:   scf.yield
 //  CHECK-COUNT-8:   vector.transfer_write {{.+}} : vector<4x1xf32>, memref<2x256x512x256xf32, #hal.descriptor_type<storage_buffer>>
 
 // -----
