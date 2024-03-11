@@ -166,7 +166,7 @@ module attributes { transform.with_named_sequence } {
     %contract1, %contract2 = transform.split_handle %contracts : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
 
     %layout16x16x16 = transform.param.constant #layout -> !transform.any_param
-    transform.iree.set_contraction_layout_attributes %contract1, %layout16x16x16 : !transform.any_op, !transform.any_param
+    transform.iree.set_contraction_layout_attributes %contract1, %layout16x16x16 { read_layout_indices = array<i64: 0, 1> } : !transform.any_op, !transform.any_param
     transform.iree.set_contraction_layout_attributes %contract2, %layout16x16x16 : !transform.any_op, !transform.any_param
 
     %distribute_func = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op

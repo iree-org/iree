@@ -1595,6 +1595,52 @@ transform_dialect::CreateMatmulMfmaTileSizesOp::apply(
 // SetContractionLayoutAttributes
 //===----------------------------------------------------------------------===//
 
+/// This function creates a modified version of the MFMA layout that allows
+/// for reading more elements from LDS. Specifically, the MFMA layout looks
+/// something like this:
+/// <<[ BATCHY,  LANEX], [2, 16]>, <[ BATCHX,  LANEY,  VECTORX], [8, 4, 4]>>
+/// Here VECTORX specifies how many elements can be read from LDS.
+/// Now, in order to read more elements from LDS, we can modify this layout
+/// while maintaining the overall shape to:
+/// <<[ BATCHY,  LANEX], [2, 16]>, <[ BATCHX,  LANEY,  VECTORX], [4, 4, 8]>>
+/// This is what this function does. In situations where the batch dimension
+/// is too small, or if we are not transferring 4 elements at a time, it
+/// returns nullopt.
+static std::optional<VectorExt::LayoutAttr>
+createReadLayout(MLIRContext *ctx, const VectorExt::LayoutAttr &layout) {
+  SmallVector<VectorExt::PerDimLayoutAttr> perDimLayouts;
+  for (VectorExt::PerDimLayoutAttr perDimLayout : layout.getLayouts()) {
+    DenseSet<VectorExt::LayoutDimension> labels;
+    for (VectorExt::LayoutDimensionAttr dim : perDimLayout.getLabels()) {
+      labels.insert(dim.getValue());
+    }
+    if (!labels.contains(VectorExt::LayoutDimension::VECTORX)) {
+      perDimLayouts.push_back(perDimLayout);
+      continue;
+    }
+    SmallVector<int64_t> newShapes;
+    for (auto [label, shape] :
+         llvm::zip_equal(perDimLayout.getLabels(), perDimLayout.getShapes())) {
+      if (VectorExt::isBatchDimension(label.getValue())) {
+        if (shape == 1)
+          return std::nullopt;
+        newShapes.push_back(shape / 2);
+        continue;
+      }
+      if (label.getValue() == VectorExt::LayoutDimension::VECTORX) {
+        if (shape != 4)
+          return std::nullopt;
+        newShapes.push_back(shape * 2);
+        continue;
+      }
+      newShapes.push_back(shape);
+    }
+    perDimLayouts.push_back(VectorExt::PerDimLayoutAttr::get(
+        ctx, perDimLayout.getLabels(), newShapes));
+  }
+  return VectorExt::LayoutAttr::get(ctx, perDimLayouts);
+}
+
 DiagnosedSilenceableFailure
 transform_dialect::SetContractionLayoutAttributes::apply(
     transform::TransformRewriter &rewriter,
@@ -1629,6 +1675,37 @@ transform_dialect::SetContractionLayoutAttributes::apply(
     contract->setAttr("__vector_layout_test_anchor_operand_0", aLayout);
     contract->setAttr("__vector_layout_test_anchor_operand_1", bLayout);
     contract->setAttr("__vector_layout_test_anchor_operand_2", cLayout);
+    ArrayRef<int64_t> operandIndices = getReadLayoutIndices();
+    if (!operandIndices.empty()) {
+      SmallVector<Value> operands;
+      SmallVector<VectorExt::VectorLayoutInterface> layouts;
+      for (int64_t index : operandIndices) {
+        operands.push_back(index == 0 ? contract.getLhs() : contract.getRhs());
+        layouts.push_back(index == 0 ? aLayout : bLayout);
+      }
+      rewriter.setInsertionPoint(contract);
+      for (const auto &idxAndVals :
+           llvm::enumerate(llvm::zip_equal(operands, layouts))) {
+        int64_t i = idxAndVals.index();
+        auto [operand, layoutInterface] = idxAndVals.value();
+        VectorExt::LayoutAttr layout =
+            dyn_cast<VectorExt::LayoutAttr>(layoutInterface);
+        std::optional<VectorExt::LayoutAttr> maybeReadLayout =
+            createReadLayout(rewriter.getContext(), layout);
+        if (!maybeReadLayout)
+          continue;
+        VectorExt::LayoutAttr readLayout = maybeReadLayout.value();
+        Operation *parentOp = operand.getDefiningOp();
+        if (!parentOp || (parentOp->getNumResults() != 1))
+          continue;
+        parentOp->setAttr("__vector_layout_test_anchor_result_0", readLayout);
+        Value resolvedOperand =
+            rewriter.create<VectorExt::LayoutConflictResolutionOp>(
+                contract.getLoc(), operand.getType(), operand, layout,
+                readLayout);
+        contract.setOperand(operandIndices[i], resolvedOperand);
+      }
+    }
   }
 
   return DiagnosedSilenceableFailure::success();
