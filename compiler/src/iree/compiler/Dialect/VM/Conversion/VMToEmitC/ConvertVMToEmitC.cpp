@@ -2271,9 +2271,12 @@ private:
       Value size =
           emitc_builders::sizeOf(builder, loc, TypeAttr::get(valueType));
 
-      result = emitc_builders::binaryOperator(
-          builder, loc, emitc_builders::BinaryOperator::ADDITION, result, size,
-          hostSizeType);
+      result = builder
+                   .create<emitc::AddOp>(
+                       /*location=*/loc,
+                       /*type=*/hostSizeType,
+                       /*operands=*/ArrayRef<Value>{result, size})
+                   .getResult();
     }
 
     return {result};
@@ -2432,9 +2435,13 @@ private:
         Type valueType = typeConverter.convertTypeAsNonPointer(argType);
         Value size =
             emitc_builders::sizeOf(builder, loc, TypeAttr::get(valueType));
-        uint8Ptr = emitc_builders::binaryOperator(
-            builder, loc, emitc_builders::BinaryOperator::ADDITION, uint8Ptr,
-            size, bytePtrType);
+
+        uint8Ptr = builder
+                       .create<emitc::AddOp>(
+                           /*location=*/loc,
+                           /*type=*/bytePtrType,
+                           /*operands=*/ArrayRef<Value>{uint8Ptr, size})
+                       .getResult();
       }
     }
     return success();
@@ -2502,9 +2509,12 @@ private:
         Type valueType = llvm::cast<emitc::PointerType>(argType).getPointee();
         Value size =
             emitc_builders::sizeOf(builder, loc, TypeAttr::get(valueType));
-        uint8Ptr = emitc_builders::binaryOperator(
-            builder, loc, emitc_builders::BinaryOperator::ADDITION, uint8Ptr,
-            size, bytePtrType);
+        uint8Ptr = builder
+                       .create<emitc::AddOp>(
+                           /*location=*/loc,
+                           /*type=*/bytePtrType,
+                           /*operands=*/ArrayRef<Value>{uint8Ptr, size})
+                       .getResult();
       }
     }
     return success();

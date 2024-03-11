@@ -433,18 +433,23 @@ vm.module @my_module {
   // Calculate the size of the arguments.
   // CHECK-NEXT: %[[ARGSIZE0:.+]] = "emitc.constant"() <{value = #emitc.opaque<"0">}> : () -> !emitc.opaque<"iree_host_size_t">
   // CHECK-NEXT: %[[ARGSIZE1:.+]] = emitc.call_opaque "sizeof"() {args = [i32]}
-  // CHECK-NEXT: %[[ARGSIZE01:.+]] = emitc.call_opaque "EMITC_BINARY"(%[[ARGSIZE0]], %[[ARGSIZE1]]) {args = [#emitc.opaque<"+">, 0 : index, 1 : index]}
+  // CHECK-NEXT: %[[ARGSIZE01:.+]] = emitc.add %[[ARGSIZE0]], %[[ARGSIZE1]]
+  // CHECK-SAME:     : (!emitc.opaque<"iree_host_size_t">, !emitc.opaque<"iree_host_size_t">) -> !emitc.opaque<"iree_host_size_t">
   // CHECK-NEXT: %[[ARGSIZE2:.+]] = emitc.call_opaque "sizeof"() {args = [i32]}
-  // CHECK-NEXT: %[[ARGSIZE012:.+]] = emitc.call_opaque "EMITC_BINARY"(%[[ARGSIZE01]], %[[ARGSIZE2]]) {args = [#emitc.opaque<"+">, 0 : index, 1 : index]}
+  // CHECK-NEXT: %[[ARGSIZE012:.+]] = emitc.add %[[ARGSIZE01]], %[[ARGSIZE2]]
+  // CHECK-SAME:     : (!emitc.opaque<"iree_host_size_t">, !emitc.opaque<"iree_host_size_t">) -> !emitc.opaque<"iree_host_size_t">
   // CHECK-NEXT: %[[ARGSIZE3:.+]] = emitc.call_opaque "sizeof"() {args = [i32]}
-  // CHECK-NEXT: %[[ARGSIZE0123:.+]] = emitc.call_opaque "EMITC_BINARY"(%[[ARGSIZE012]], %[[ARGSIZE3]]) {args = [#emitc.opaque<"+">, 0 : index, 1 : index]}
+  // CHECK-NEXT: %[[ARGSIZE0123:.+]] = emitc.add %[[ARGSIZE012]], %[[ARGSIZE3]]
+  // CHECK-SAME:     : (!emitc.opaque<"iree_host_size_t">, !emitc.opaque<"iree_host_size_t">) -> !emitc.opaque<"iree_host_size_t">
   // CHECK-NEXT: %[[ARGSIZE4:.+]] = emitc.call_opaque "sizeof"() {args = [i32]}
-  // CHECK-NEXT: %[[ARGSIZE:.+]] = emitc.call_opaque "EMITC_BINARY"(%[[ARGSIZE0123]], %[[ARGSIZE4]]) {args = [#emitc.opaque<"+">, 0 : index, 1 : index]}
+  // CHECK-NEXT: %[[ARGSIZE:.+]] = emitc.add %[[ARGSIZE0123]], %[[ARGSIZE4]]
+  // CHECK-SAME:     : (!emitc.opaque<"iree_host_size_t">, !emitc.opaque<"iree_host_size_t">) -> !emitc.opaque<"iree_host_size_t">
 
   // Calculate the size of the result.
   // CHECK-NEXT: %[[RESULTSIZE0:.+]] = "emitc.constant"() <{value = #emitc.opaque<"0">}> : () -> !emitc.opaque<"iree_host_size_t">
   // CHECK-NEXT: %[[RESULTSIZE1:.+]] = emitc.call_opaque "sizeof"() {args = [i32]}
-  // CHECK-NEXT: %[[RESULTSIZE:.+]] = emitc.call_opaque "EMITC_BINARY"(%[[RESULTSIZE0]], %[[RESULTSIZE1]]) {args = [#emitc.opaque<"+">, 0 : index, 1 : index]}
+  // CHECK-NEXT: %[[RESULTSIZE:.+]] = emitc.add %[[RESULTSIZE0]], %[[RESULTSIZE1]]
+  // CHECK-SAME:     : (!emitc.opaque<"iree_host_size_t">, !emitc.opaque<"iree_host_size_t">) -> !emitc.opaque<"iree_host_size_t">
 
   // Create a struct for the arguments and results.
   // CHECK: %[[ARGSTRUCT:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.opaque<"iree_vm_function_call_t">
@@ -481,19 +486,19 @@ vm.module @my_module {
   // CHECK-NEXT: %[[A1PTR:.+]] = emitc.apply "&"(%arg2) : (i32) -> !emitc.ptr<i32>
   // CHECK-NEXT: emitc.call_opaque "memcpy"(%[[ARGSPTR]], %[[A1PTR]], %[[ARGHOSTSIZE]])
   // CHECK-NEXT: %[[ARGHOSTSIZE2:.+]] = emitc.call_opaque "sizeof"() {args = [i32]} : () -> !emitc.opaque<"iree_host_size_t">
-  // CHECK-NEXT: %[[A1ADDR:.+]] = emitc.call_opaque "EMITC_BINARY"(%[[ARGSPTR]], %[[ARGHOSTSIZE2]]) {args = [#emitc.opaque<"+">, 0 : index, 1 : index]}
+  // CHECK-NEXT: %[[A1ADDR:.+]] = emitc.add %[[ARGSPTR]], %[[ARGHOSTSIZE2]]
   // CHECK-SAME:     : (!emitc.ptr<ui8>, !emitc.opaque<"iree_host_size_t">) -> !emitc.ptr<ui8>
   // CHECK-NEXT: %[[A1SIZE:.+]] = emitc.call_opaque "sizeof"() {args = [i32]} : () -> !emitc.opaque<"iree_host_size_t">
   // CHECK-NEXT: %[[A2PTR:.+]] = emitc.apply "&"(%arg3) : (i32) -> !emitc.ptr<i32>
   // CHECK-NEXT: emitc.call_opaque "memcpy"(%[[A1ADDR]], %[[A2PTR]], %[[A1SIZE]])
   // CHECK-NEXT: %[[A1SIZE2:.+]] = emitc.call_opaque "sizeof"() {args = [i32]} : () -> !emitc.opaque<"iree_host_size_t">
-  // CHECK-NEXT: %[[A2ADDR:.+]] = emitc.call_opaque "EMITC_BINARY"(%[[A1ADDR]], %[[A1SIZE2]]) {args = [#emitc.opaque<"+">, 0 : index, 1 : index]}
+  // CHECK-NEXT: %[[A2ADDR:.+]] = emitc.add %[[A1ADDR]], %[[A1SIZE2]]
   // CHECK-SAME:     : (!emitc.ptr<ui8>, !emitc.opaque<"iree_host_size_t">) -> !emitc.ptr<ui8>
   // CHECK-NEXT: %[[A2SIZE:.+]] = emitc.call_opaque "sizeof"() {args = [i32]} : () -> !emitc.opaque<"iree_host_size_t">
   // CHECK-NEXT: %[[A3PTR:.+]] = emitc.apply "&"(%arg4) : (i32) -> !emitc.ptr<i32>
   // CHECK-NEXT: emitc.call_opaque "memcpy"(%[[A2ADDR]], %[[A3PTR]], %[[A2SIZE]])
   // CHECK-NEXT: %[[A2SIZE2:.+]] = emitc.call_opaque "sizeof"() {args = [i32]} : () -> !emitc.opaque<"iree_host_size_t">
-  // CHECK-NEXT: %[[A3ADDR:.+]] = emitc.call_opaque "EMITC_BINARY"(%[[A2ADDR]], %[[A2SIZE2]]) {args = [#emitc.opaque<"+">, 0 : index, 1 : index]}
+  // CHECK-NEXT: %[[A3ADDR:.+]] = emitc.add %[[A2ADDR]], %[[A2SIZE2]]
   // CHECK-SAME:     : (!emitc.ptr<ui8>, !emitc.opaque<"iree_host_size_t">) -> !emitc.ptr<ui8>
   // CHECK-NEXT: %[[A3SIZE:.+]] = emitc.call_opaque "sizeof"() {args = [i32]} : () -> !emitc.opaque<"iree_host_size_t">
   // CHECK-NEXT: %[[A4PTR:.+]] = emitc.apply "&"(%arg5) : (i32) -> !emitc.ptr<i32>
@@ -536,14 +541,17 @@ vm.module @my_module {
   // Calculate the size of the arguments.
   // CHECK-NEXT: %[[ARGSIZE0:.+]] = "emitc.constant"() <{value = #emitc.opaque<"0">}> : () -> !emitc.opaque<"iree_host_size_t">
   // CHECK-NEXT: %[[ARGSIZE1:.+]] = emitc.call_opaque "sizeof"() {args = [i32]}
-  // CHECK-NEXT: %[[ARGSIZE01:.+]] = emitc.call_opaque "EMITC_BINARY"(%[[ARGSIZE0]], %[[ARGSIZE1]]) {args = [#emitc.opaque<"+">, 0 : index, 1 : index]}
+  // CHECK-NEXT: %[[ARGSIZE01:.+]] = emitc.add %[[ARGSIZE0]], %[[ARGSIZE1]]
+  // CHECK-SAME:     : (!emitc.opaque<"iree_host_size_t">, !emitc.opaque<"iree_host_size_t">) -> !emitc.opaque<"iree_host_size_t">
   // CHECK-NEXT: %[[ARGSIZE2:.+]] = emitc.call_opaque "sizeof"() {args = [i32]}
-  // CHECK-NEXT: %[[ARGSIZE:.+]] = emitc.call_opaque "EMITC_BINARY"(%[[ARGSIZE01]], %[[ARGSIZE2]]) {args = [#emitc.opaque<"+">, 0 : index, 1 : index]}
+  // CHECK-NEXT: %[[ARGSIZE:.+]] = emitc.add %[[ARGSIZE01]], %[[ARGSIZE2]]
+  // CHECK-SAME:     : (!emitc.opaque<"iree_host_size_t">, !emitc.opaque<"iree_host_size_t">) -> !emitc.opaque<"iree_host_size_t">
 
   // Calculate the size of the result.
   // CHECK-NEXT: %[[RESULTSIZE0:.+]] = "emitc.constant"() <{value = #emitc.opaque<"0">}> : () -> !emitc.opaque<"iree_host_size_t">
   // CHECK-NEXT: %[[RESULTSIZE1:.+]] = emitc.call_opaque "sizeof"() {args = [i32]}
-  // CHECK-NEXT: %[[RESULTSIZE:.+]] = emitc.call_opaque "EMITC_BINARY"(%[[RESULTSIZE0]], %[[RESULTSIZE1]]) {args = [#emitc.opaque<"+">, 0 : index, 1 : index]}
+  // CHECK-NEXT: %[[RESULTSIZE:.+]] = emitc.add %[[RESULTSIZE0]], %[[RESULTSIZE1]]
+  // CHECK-SAME:     : (!emitc.opaque<"iree_host_size_t">, !emitc.opaque<"iree_host_size_t">) -> !emitc.opaque<"iree_host_size_t">
 
   // Create a struct for the arguments and results.
   // CHECK: %[[ARGSTRUCT:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.opaque<"iree_vm_function_call_t">
@@ -580,7 +588,7 @@ vm.module @my_module {
   // CHECK-NEXT: %[[A1PTR:.+]] = emitc.apply "&"(%arg2) : (i32) -> !emitc.ptr<i32>
   // CHECK-NEXT: emitc.call_opaque "memcpy"(%[[ARGSPTR]], %[[A1PTR]], %[[ARGHOSTSIZE]])
   // CHECK-NEXT: %[[ARGHOSTSIZE2:.+]] = emitc.call_opaque "sizeof"() {args = [i32]} : () -> !emitc.opaque<"iree_host_size_t">
-  // CHECK-NEXT: %[[A1ADDR:.+]] = emitc.call_opaque "EMITC_BINARY"(%[[ARGSPTR]], %[[ARGHOSTSIZE2]]) {args = [#emitc.opaque<"+">, 0 : index, 1 : index]}
+  // CHECK-NEXT: %[[A1ADDR:.+]] = emitc.add %[[ARGSPTR]], %[[ARGHOSTSIZE2]]
   // CHECK-SAME:     : (!emitc.ptr<ui8>, !emitc.opaque<"iree_host_size_t">) -> !emitc.ptr<ui8>
   // CHECK-NEXT: %[[A1SIZE:.+]] = emitc.call_opaque "sizeof"() {args = [i32]} : () -> !emitc.opaque<"iree_host_size_t">
   // CHECK-NEXT: %[[A2PTR:.+]] = emitc.apply "&"(%arg3) : (i32) -> !emitc.ptr<i32>
@@ -623,12 +631,14 @@ vm.module @my_module {
   // Calculate the size of the arguments.
   // CHECK-NEXT: %[[ARGSIZE0:.+]] = "emitc.constant"() <{value = #emitc.opaque<"0">}> : () -> !emitc.opaque<"iree_host_size_t">
   // CHECK-NEXT: %[[ARGSIZE1:.+]] = emitc.call_opaque "sizeof"() {args = [!emitc.opaque<"iree_vm_ref_t">]}
-  // CHECK-NEXT: %[[ARGSIZE:.+]] = emitc.call_opaque "EMITC_BINARY"(%[[ARGSIZE0]], %[[ARGSIZE1]]) {args = [#emitc.opaque<"+">, 0 : index, 1 : index]}
+  // CHECK-NEXT: %[[ARGSIZE:.+]] = emitc.add %[[ARGSIZE0]], %[[ARGSIZE1]]
+  // CHECK-SAME:     : (!emitc.opaque<"iree_host_size_t">, !emitc.opaque<"iree_host_size_t">) -> !emitc.opaque<"iree_host_size_t">
 
   // Calculate the size of the result.
   // CHECK-NEXT: %[[RESULTSIZE0:.+]] = "emitc.constant"() <{value = #emitc.opaque<"0">}> : () -> !emitc.opaque<"iree_host_size_t">
   // CHECK-NEXT: %[[RESULTSIZE1:.+]] = emitc.call_opaque "sizeof"() {args = [!emitc.opaque<"iree_vm_ref_t">]}
-  // CHECK-NEXT: %[[RESULTSIZE:.+]] = emitc.call_opaque "EMITC_BINARY"(%[[RESULTSIZE0]], %[[RESULTSIZE1]]) {args = [#emitc.opaque<"+">, 0 : index, 1 : index]}
+  // CHECK-NEXT: %[[RESULTSIZE:.+]] = emitc.add %[[RESULTSIZE0]], %[[RESULTSIZE1]]
+  // CHECK-SAME:     : (!emitc.opaque<"iree_host_size_t">, !emitc.opaque<"iree_host_size_t">) -> !emitc.opaque<"iree_host_size_t">
 
   // Create a struct for the arguments and results.
   // CHECK: %[[ARGSTRUCT:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.opaque<"iree_vm_function_call_t">
