@@ -598,10 +598,8 @@ struct FuncConversionPass : public FuncConversionBase<FuncConversionPass> {
     convertedFuncInfo.funcOp = asyncFuncOp;
     asyncFuncOp.setSymVisibilityAttr(torchFunc.getSymVisibilityAttr());
     // Handle defacto attrs to specialized ones.
-    if (torchFunc->hasAttr("noinline")) {
-      asyncFuncOp.setInliningPolicyAttr(
-          rewriter.getAttr<IREE::Util::InlineNeverAttr>());
-    }
+    asyncFuncOp.setInliningPolicyAttr(
+        rewriter.getAttr<IREE::Util::InlineNeverAttr>());
     retainFunctionAttributes(torchFunc, asyncFuncOp);
     asyncFuncOp->setAttr("iree.abi.stub", rewriter.getUnitAttr());
     asyncFuncOp->setAttr("iree.abi.model",
