@@ -1033,7 +1033,7 @@ Error *Invocation::outputVMCSource(Output &output) {
     parsedModule->emitError() << "expected a vm.module or builtin.module";
   }
   if (failed(result)) {
-    return new Error("failed to generate bytecode");
+    return new Error("failed to generate C source code");
   }
   output.outputStream->flush();
   return output.getWriteError();
