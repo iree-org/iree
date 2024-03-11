@@ -1209,7 +1209,7 @@ util.func public @unit_dim_generic(%arg0 : tensor<1x?x1x1x?x?x1x?xf32>,
 
 // -----
 
-util.func public @dont_fuse_tensor_insert_dest_producer(%arg0 : tensor<2x2xf32>) -> tensor<3x3xf32> {
+util.func public @fuse_tensor_insert_source_producer(%arg0 : tensor<2x2xf32>) -> tensor<3x3xf32> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %cst = arith.constant dense<0.0> : tensor<3x3xf32>
@@ -1226,15 +1226,70 @@ util.func public @dont_fuse_tensor_insert_dest_producer(%arg0 : tensor<2x2xf32>)
       : tensor<2x2xf32> into tensor<3x3xf32>
   util.return %1 : tensor<3x3xf32>
 }
-//      CHECK: util.func public @dont_fuse_tensor_insert_dest_producer
+//      CHECK: util.func public @fuse_tensor_insert_source_producer
 // CHECK-SAME:     %[[ARG0:.+]]: tensor<2x2xf32>
 //      CHECK:   %[[CST:.+]] = arith.constant {{.+}} : tensor<3x3xf32>
+//      CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroups
+//      CHECK:       linalg.generic
+//      CHECK:       flow.dispatch.tensor.store {{.*}} sizes = [2, 2]
+// CHECK-SAME:         tensor<2x2xf32> -> !flow.dispatch.tensor<readwrite:tensor<3x3xf32>>
+// CHECK-NEXT:       flow.return
+//      CHECK:   util.return %[[DISPATCH]]
+
+// -----
+
+util.func public @dont_fuse_tensor_insert_dest_producer(%arg0 : tensor<3x3xf32>) -> tensor<3x3xf32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %cst = arith.constant dense<0.0> : tensor<2x2xf32>
+  %init = tensor.empty() : tensor<3x3xf32>
+  %0 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1, d0)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%arg0 : tensor<3x3xf32>) outs(%init : tensor<3x3xf32>) {
+    ^bb0(%b0 : f32, %b1 : f32) :
+      %1 = arith.addf %b0, %b0 : f32
+      linalg.yield %1 : f32
+    } -> tensor<3x3xf32>
+  %1 = tensor.insert_slice %cst into %0[0, 0] [2, 2] [1, 1]
+      : tensor<2x2xf32> into tensor<3x3xf32>
+  util.return %1 : tensor<3x3xf32>
+}
+//      CHECK: util.func public @dont_fuse_tensor_insert_dest_producer
 //      CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.workgroups
 //      CHECK:       linalg.generic
 //      CHECK:       flow.return
 //      CHECK:   %[[DISPATCH2:.+]] = flow.dispatch.workgroups
-// CHECK-SAME:       (%[[DISPATCH1]], %[[CST]])
+//      CHECK:       %[[CST:.+]] = arith.constant {{.+}} : tensor<2x2xf32>
+//      CHECK:       flow.return
 //      CHECK:   util.return %[[DISPATCH2]]
+
+// -----
+
+util.func public @dont_fuse_tensor_insert_multi_use(%arg0: tensor<2x2xf32>) -> (tensor<2x2xf32>, tensor<3x3xf32>) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %cst = arith.constant dense<0.0> : tensor<3x3xf32>
+  %init = tensor.empty() : tensor<2x2xf32>
+  %0 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1, d0)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%arg0 : tensor<2x2xf32>) outs(%init : tensor<2x2xf32>) {
+    ^bb0(%b0 : f32, %b1 : f32) :
+      %1 = arith.addf %b0, %b0 : f32
+      linalg.yield %1 : f32
+    } -> tensor<2x2xf32>
+  %1 = tensor.insert_slice %0 into %cst[0, 0] [2, 2] [1, 1]
+      : tensor<2x2xf32> into tensor<3x3xf32>
+  util.return %0, %1 : tensor<2x2xf32>, tensor<3x3xf32>
+}
+//      CHECK: util.func public @dont_fuse_tensor_insert_multi_use
+//      CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.workgroups
+//      CHECK:       linalg.generic
+//      CHECK:       flow.return
+//      CHECK:   %[[DISPATCH2:.+]] = flow.dispatch.workgroups
+//      CHECK:       flow.return
+//      CHECK:   util.return %[[DISPATCH1]], %[[DISPATCH2]]
 
 // -----
 
