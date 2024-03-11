@@ -42,41 +42,7 @@ std::string mapPreprocessorDirective(PreprocessorDirective directive) {
     return "XXX";
   }
 }
-
-std::string mapUnaryOperator(UnaryOperator op) {
-  switch (op) {
-  case UnaryOperator::PLUS:
-    return "+";
-  case UnaryOperator::MINUS:
-    return "-";
-  case UnaryOperator::BITWISE_NOT:
-    return "~";
-  case UnaryOperator::LOGICAL_NOT:
-    return "!";
-  default:
-    llvm_unreachable("unsupported unary operator");
-    return "XXX";
-  }
-}
 } // namespace
-
-Value unaryOperator(OpBuilder builder, Location location, UnaryOperator op,
-                    Value operand, Type resultType) {
-  auto ctx = builder.getContext();
-
-  return builder
-      .create<emitc::CallOpaqueOp>(
-          /*location=*/location,
-          /*type=*/resultType,
-          /*callee=*/StringAttr::get(ctx, "EMITC_UNARY"),
-          /*args=*/
-          ArrayAttr::get(ctx,
-                         {emitc::OpaqueAttr::get(ctx, mapUnaryOperator(op)),
-                          builder.getIndexAttr(0)}),
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{operand})
-      .getResult(0);
-}
 
 Value allocateVariable(OpBuilder builder, Location location, Type type,
                        Attribute initializer) {

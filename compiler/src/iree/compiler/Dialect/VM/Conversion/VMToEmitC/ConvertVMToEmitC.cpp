@@ -2093,9 +2093,13 @@ private:
         /*memberName=*/"module",
         /*operand=*/import);
 
-    auto conditionI1 = emitc_builders::unaryOperator(
-        builder, location, emitc_builders::UnaryOperator::LOGICAL_NOT,
-        importModule, boolType);
+    auto conditionI1 = builder
+                           .create<emitc::LogicalNotOp>(
+                               /*location=*/location,
+                               /*type=*/boolType,
+                               /*args=*/
+                               /*operands=*/importModule)
+                           .getResult();
 
     // Start by splitting the block into two. The part before will contain the
     // condition, and the part after will contain the continuation point.
@@ -3369,12 +3373,20 @@ private:
         /*operand=*/import);
 
     Type boolType = rewriter.getIntegerType(1);
-    auto conditionI1 = emitc_builders::unaryOperator(
-        rewriter, loc, emitc_builders::UnaryOperator::LOGICAL_NOT, importModule,
-        boolType);
-    auto invConditionI1 = emitc_builders::unaryOperator(
-        rewriter, loc, emitc_builders::UnaryOperator::LOGICAL_NOT, conditionI1,
-        boolType);
+    auto conditionI1 = rewriter
+                           .create<emitc::LogicalNotOp>(
+                               /*location=*/loc,
+                               /*type=*/boolType,
+                               /*args=*/
+                               /*operands=*/importModule)
+                           .getResult();
+    auto invConditionI1 = rewriter
+                              .create<emitc::LogicalNotOp>(
+                                  /*location=*/loc,
+                                  /*type=*/boolType,
+                                  /*args=*/
+                                  /*operands=*/conditionI1)
+                              .getResult();
 
     auto i32Type = rewriter.getIntegerType(32);
     auto conditionI32 = rewriter.create<emitc::CastOp>(
