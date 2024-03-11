@@ -119,11 +119,27 @@ bool iree_hal_rocm_direct_command_buffer_isa(
 
 static iree_status_t iree_hal_rocm_direct_command_buffer_begin(
     iree_hal_command_buffer_t* base_command_buffer) {
+  iree_hal_rocm_direct_command_buffer_t* command_buffer =
+      iree_hal_rocm_direct_command_buffer_cast(base_command_buffer);
+  (void)command_buffer;
+
+  IREE_ROCM_TRACE_ZONE_BEGIN_EXTERNAL(
+      command_buffer->tracing_context, 0,
+      /*file_name=*/NULL, 0, /*line=*/0, /*func_name=*/NULL, 0,
+      "iree_hal_rocm_direct_command_buffer",
+      strlen("iree_hal_rocm_direct_command_buffer"));
+
   return iree_ok_status();
 }
 
 static iree_status_t iree_hal_rocm_direct_command_buffer_end(
     iree_hal_command_buffer_t* base_command_buffer) {
+  iree_hal_rocm_direct_command_buffer_t* command_buffer =
+      iree_hal_rocm_direct_command_buffer_cast(base_command_buffer);
+  (void)command_buffer;
+
+  IREE_ROCM_TRACE_ZONE_END(command_buffer->tracing_context, 0);
+
   return iree_ok_status();
 }
 
@@ -131,12 +147,23 @@ static void iree_hal_rocm_direct_command_buffer_begin_debug_group(
     iree_hal_command_buffer_t* base_command_buffer, iree_string_view_t label,
     iree_hal_label_color_t label_color,
     const iree_hal_label_location_t* location) {
-  // TODO(benvanik): tracy event stack.
+  iree_hal_rocm_direct_command_buffer_t* command_buffer =
+      iree_hal_rocm_direct_command_buffer_cast(base_command_buffer);
+  (void)command_buffer;
+
+  IREE_ROCM_TRACE_ZONE_BEGIN_EXTERNAL(
+      command_buffer->tracing_context, 0, location ? location->file.data : NULL,
+      location ? location->file.size : 0, location ? location->line : 0,
+      /*func_name=*/NULL, 0, label.data, label.size);
 }
 
 static void iree_hal_rocm_direct_command_buffer_end_debug_group(
     iree_hal_command_buffer_t* base_command_buffer) {
-  // TODO(benvanik): tracy event stack.
+  iree_hal_rocm_direct_command_buffer_t* command_buffer =
+      iree_hal_rocm_direct_command_buffer_cast(base_command_buffer);
+  (void)command_buffer;
+
+  IREE_CUDA_TRACE_ZONE_END(command_buffer->tracing_context, 0);
 }
 
 static iree_status_t iree_hal_rocm_direct_command_buffer_execution_barrier(
@@ -193,6 +220,8 @@ static iree_status_t iree_hal_rocm_direct_command_buffer_fill_buffer(
   iree_hal_rocm_direct_command_buffer_t* command_buffer =
       iree_hal_rocm_direct_command_buffer_cast(base_command_buffer);
 
+  IREE_ROCM_TRACE_ZONE_BEGIN(command_buffer->tracing_context, 0);
+
   hipDeviceptr_t target_device_buffer = iree_hal_rocm_buffer_device_pointer(
       iree_hal_buffer_allocated_buffer(target_buffer));
   target_offset += iree_hal_buffer_byte_offset(target_buffer);
@@ -201,33 +230,38 @@ static iree_status_t iree_hal_rocm_direct_command_buffer_fill_buffer(
   size_t num_elements = length / pattern_length;
   // TODO(raikonenfnu): Currently using NULL stream, need to figure out way to
   // access proper stream from command buffer
+  iree_status_t status = iree_ok_status();
   switch (pattern_length) {
     case 4: {
-      ROCM_RETURN_IF_ERROR(
+      status = ROCM_RESULT_TO_STATUS(
           command_buffer->context->syms,
           hipMemsetD32Async(dst, *(const uint32_t*)(pattern), num_elements, 0),
           "hipMemsetD32Async");
       break;
     }
     case 2: {
-      ROCM_RETURN_IF_ERROR(
+      status = ROCM_RESULT_TO_STATUS(
           command_buffer->context->syms,
           hipMemsetD16Async(dst, *(const uint16_t*)(pattern), num_elements, 0),
           "hipMemsetD16Async");
       break;
     }
     case 1: {
-      ROCM_RETURN_IF_ERROR(
+      status = ROCM_RESULT_TO_STATUS(
           command_buffer->context->syms,
           hipMemsetD8Async(dst, *(const uint8_t*)(pattern), num_elements, 0),
           "hipMemsetD8Async");
       break;
     }
-    default:
-      return iree_make_status(IREE_STATUS_INTERNAL,
-                              "unsupported fill pattern length");
+    default: {
+      status = iree_make_status(IREE_STATUS_INTERNAL,
+                                "unsupported fill pattern length");
+      break;
+    }
   }
-  return iree_ok_status();
+
+  IREE_ROCM_TRACE_ZONE_END(command_buffer->tracing_context, 0);
+  return status;
 }
 
 static iree_status_t iree_hal_rocm_direct_command_buffer_update_buffer(
@@ -272,6 +306,8 @@ static iree_status_t iree_hal_rocm_direct_command_buffer_copy_buffer(
   iree_hal_rocm_direct_command_buffer_t* command_buffer =
       iree_hal_rocm_direct_command_buffer_cast(base_command_buffer);
 
+  IREE_ROCM_TRACE_ZONE_BEGIN(command_buffer->tracing_context, 0);
+
   hipDeviceptr_t target_device_buffer = iree_hal_rocm_buffer_device_pointer(
       iree_hal_buffer_allocated_buffer(target_buffer));
   target_offset += iree_hal_buffer_byte_offset(target_buffer);
@@ -284,11 +320,13 @@ static iree_status_t iree_hal_rocm_direct_command_buffer_copy_buffer(
       (hipDeviceptr_t)((uintptr_t)source_device_buffer + source_offset);
   // TODO(raikonenfnu): Currently using NULL stream, need to figure out way to
   // access proper stream from command buffer
-  ROCM_RETURN_IF_ERROR(
+  iree_status_t status = ROCM_RESULT_TO_STATUS(
       command_buffer->context->syms,
       hipMemcpyAsync(dst, src, length, hipMemcpyDeviceToDevice, 0),
       "hipMemcpyAsync");
-  return iree_ok_status();
+
+  IREE_ROCM_TRACE_ZONE_END(command_buffer->tracing_context, 0);
+  return status;
 }
 
 static iree_status_t iree_hal_rocm_direct_command_buffer_collective(
