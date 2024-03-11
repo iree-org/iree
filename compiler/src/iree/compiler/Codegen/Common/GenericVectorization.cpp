@@ -231,6 +231,7 @@ void GenericVectorizationPass::runOnOperation() {
     vector::TransferWriteOp::getCanonicalizationPatterns(vectorizationPatterns,
                                                          funcOp.getContext());
   }
+  tensor::populateFoldTensorSubsetOpPatterns(vectorizationPatterns);
   (void)applyPatternsAndFoldGreedily(funcOp, std::move(vectorizationPatterns));
 
   // Apply the pad tensor op vectorization separately to avoid running the

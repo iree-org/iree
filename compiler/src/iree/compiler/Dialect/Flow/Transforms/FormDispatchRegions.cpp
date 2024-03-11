@@ -19,6 +19,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -34,6 +35,7 @@
 #include "mlir/Interfaces/TilingInterface.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/TopologicalSortUtils.h"
 
 #define DEBUG_TYPE "iree-flow-form-dispatch-regions"
@@ -956,6 +958,20 @@ struct FormDispatchRegionsPass
 /// Create dispatch.region Ops based on a fusion heuristic.
 void FormDispatchRegionsPass::runOnOperation() {
   mlir::FunctionOpInterface funcOp = getOperation();
+
+  // TOOD: Find the right place.
+  {
+    MLIRContext *context = &getContext();
+    RewritePatternSet patterns(context);
+    linalg::populateDataLayoutPropagationPatterns(patterns, [](Operation *op) {
+      return isa<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(op);
+    });
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      funcOp.emitOpError("folding patterns failed");
+      return signalPassFailure();
+    }
+  }
+
   DominanceInfo const &dominanceInfo = getAnalysis<DominanceInfo>();
   TensorDimTrackingRewriter rewriter(funcOp);
   FormDispatchRegionsOptions options{fuseMultiUse, generateWorkloadRegion,
