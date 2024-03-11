@@ -52,7 +52,4 @@
 // Unary operators
 #define EMITC_UNARY(op, arg) (op(arg))
 
-// Binary operators
-#define EMITC_BINARY(op, lhs, rhs) ((lhs)op(rhs))
-
 #endif  // IREE_VM_OPS_EMITC_H_

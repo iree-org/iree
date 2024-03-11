@@ -122,24 +122,6 @@ Value unaryOperator(OpBuilder builder, Location location, UnaryOperator op,
       .getResult(0);
 }
 
-Value binaryOperator(OpBuilder builder, Location location, BinaryOperator op,
-                     Value lhs, Value rhs, Type resultType) {
-  auto ctx = builder.getContext();
-
-  return builder
-      .create<emitc::CallOpaqueOp>(
-          /*location=*/location,
-          /*type=*/resultType,
-          /*callee=*/StringAttr::get(ctx, "EMITC_BINARY"),
-          /*args=*/
-          ArrayAttr::get(ctx,
-                         {emitc::OpaqueAttr::get(ctx, mapBinaryOperator(op)),
-                          builder.getIndexAttr(0), builder.getIndexAttr(1)}),
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{lhs, rhs})
-      .getResult(0);
-}
-
 Value allocateVariable(OpBuilder builder, Location location, Type type,
                        Attribute initializer) {
   return builder
