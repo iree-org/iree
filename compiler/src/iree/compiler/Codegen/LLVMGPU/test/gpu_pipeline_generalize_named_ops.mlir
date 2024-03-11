@@ -1,4 +1,3 @@
-
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-llvmgpu-configuration-pipeline)))" \
 // RUN:   %s | FileCheck %s
 
