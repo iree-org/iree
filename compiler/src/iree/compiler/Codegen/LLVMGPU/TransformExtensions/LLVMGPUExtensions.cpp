@@ -20,16 +20,15 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
-#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
+#include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/GPU/TransformOps/GPUTransformOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
 #include "mlir/Dialect/NVGPU/Transforms/Transforms.h"
-#include "mlir/Dialect/SCF/IR/DeviceMappingInterface.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
@@ -1498,6 +1497,27 @@ void transform_dialect::PackSharedMemoryAllocOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::onlyReadsHandle(getTarget(), effects);
   transform::modifiesPayload(effects);
+}
+
+//===----------------------------------------------------------------------===//
+// PrefetchSharedMemoryCopiesOp
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+transform_dialect::PrefetchSharedMemoryCopiesOp::applyToOne(
+    transform::TransformRewriter &rewriter, scf::ForOp forOp,
+    transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+
+  FailureOr<scf::ForOp> pipelinedFor =
+      iree_compiler::prefetchSharedMemoryCopy(rewriter, forOp);
+
+  if (failed(pipelinedFor)) {
+    results.push_back(forOp);
+    return DiagnosedSilenceableFailure::success();
+  }
+  results.push_back(pipelinedFor.value());
+  return DiagnosedSilenceableFailure::success();
 }
 
 class TransformVectorLayoutOptions : public VectorLayoutOptions {

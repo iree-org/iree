@@ -53,6 +53,7 @@ iree_lit_test_suite(
             "llvmgpu_bufferize.mlir",
             "pack_pipeline_test.mlir",
             "pack_shared_memory_alloc.mlir",
+            "prefetch_shared_memory.mlir",
             "tensor_pad.mlir",
             "tensorcore_vectorization.mlir",
             "transform_dialect_bufferize.mlir",

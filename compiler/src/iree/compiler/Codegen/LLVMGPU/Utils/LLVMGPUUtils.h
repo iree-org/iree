@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_LLVMGPU_UTILS_LLVMGPUUTILS_H_
 #define IREE_COMPILER_CODEGEN_LLVMGPU_UTILS_LLVMGPUUTILS_H_
 
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 
@@ -34,6 +35,11 @@ void packSharedMemoryAlloc(mlir::FunctionOpInterface funcOp);
 
 // Add patterns to distribute contractions to MFMA ops.
 void populateAMDGPUDistributionPatterns(RewritePatternSet &patterns);
+
+// Prefetches data written to shared memory for the next iteration. Returns the
+// new loop on success or failure when the `forOp` is not supported.
+FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
+                                               scf::ForOp forOp);
 
 } // namespace mlir::iree_compiler
 
