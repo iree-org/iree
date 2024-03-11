@@ -29,6 +29,7 @@ iree_lit_test_suite(
     "distribute_to_thread.mlir"
     "elementwise_pipeline.mlir"
     "extract_address_computation_gpu.mlir"
+    "gpu_pipeline_generalize_named_ops.mlir"
     "gpu_set_num_workgroups.mlir"
     "illegal_configuration.mlir"
     "layout_analysis_and_distribution.mlir"
