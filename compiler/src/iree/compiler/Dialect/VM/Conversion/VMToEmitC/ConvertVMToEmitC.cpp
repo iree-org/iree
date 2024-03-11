@@ -4251,13 +4251,21 @@ class ListGetRefOpConversion
           rewriter, loc, emitc_builders::BinaryOperator::NOT_EQUAL_TO, refType,
           typedefAsRef, rewriter.getI1Type());
 
-      auto invalidRefType = emitc_builders::binaryOperator(
-          rewriter, loc, emitc_builders::BinaryOperator::LOGICAL_OR,
-          typedefIsValue, refTypesDontMatch, rewriter.getI1Type());
+      auto invalidRefType = rewriter
+                                .create<emitc::LogicalOrOp>(
+                                    /*location=*/loc,
+                                    /*type=*/rewriter.getI1Type(),
+                                    /*lhs*/ typedefIsValue,
+                                    /*rhs*/ refTypesDontMatch)
+                                .getResult();
 
-      invalidType = emitc_builders::binaryOperator(
-          rewriter, loc, emitc_builders::BinaryOperator::LOGICAL_AND,
-          refTypeIsNotNull, invalidRefType, rewriter.getI1Type());
+      invalidType = rewriter
+                        .create<emitc::LogicalAndOp>(
+                            /*location=*/loc,
+                            /*type=*/rewriter.getI1Type(),
+                            /*lhs*/ refTypeIsNotNull,
+                            /*rhs*/ invalidRefType)
+                        .getResult();
     }
 
     // Start by splitting the block into two. The part before will contain

@@ -86,8 +86,8 @@ vm.module @my_module {
     // CHECK: %[[D:.+]] = emitc.call_opaque "iree_vm_type_def_is_value"(%{{.+}}) : (!emitc.opaque<"iree_vm_type_def_t">) -> i1
     // CHECK: %[[E:.+]] = emitc.call_opaque "iree_vm_type_def_as_ref"(%{{.+}}) : (!emitc.opaque<"iree_vm_type_def_t">) -> !emitc.opaque<"iree_vm_ref_type_t">
     // CHECK: %[[F:.+]] = emitc.call_opaque "EMITC_BINARY"(%[[A]], %[[E]]) {args = [#emitc.opaque<"!=">, 0 : index, 1 : index]} : (!emitc.opaque<"iree_vm_ref_type_t">, !emitc.opaque<"iree_vm_ref_type_t">) -> i1
-    // CHECK: %[[G:.+]] = emitc.call_opaque "EMITC_BINARY"(%[[D]], %[[F]]) {args = [#emitc.opaque<"||">, 0 : index, 1 : index]} : (i1, i1) -> i1
-    // CHECK: %{{.+}} = emitc.call_opaque "EMITC_BINARY"(%[[C]], %[[G]]) {args = [#emitc.opaque<"&&">, 0 : index, 1 : index]} : (i1, i1) -> i1
+    // CHECK: %[[G:.+]] = emitc.logical_or %[[D]], %[[F]] : i1, i1
+    // CHECK: %{{.+}} = emitc.logical_and %[[C]], %[[G]] : i1, i1
     // CHECK: cf.cond_br %{{.+}}, ^[[FAIL:.+]], ^[[CONTINUE:.+]]
     // CHECK: ^[[FAIL]]:
     // CHECK-NEXT: emitc.call_opaque "iree_vm_ref_release"(%arg3) : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> ()
