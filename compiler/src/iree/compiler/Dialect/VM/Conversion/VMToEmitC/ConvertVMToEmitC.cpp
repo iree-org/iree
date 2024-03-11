@@ -2271,9 +2271,12 @@ private:
       Value size =
           emitc_builders::sizeOf(builder, loc, TypeAttr::get(valueType));
 
-      result = emitc_builders::binaryOperator(
-          builder, loc, emitc_builders::BinaryOperator::ADDITION, result, size,
-          hostSizeType);
+      result = builder
+                   .create<emitc::AddOp>(
+                       /*location=*/loc,
+                       /*type=*/hostSizeType,
+                       /*operands=*/ArrayRef<Value>{result, size})
+                   .getResult();
     }
 
     return {result};
@@ -2432,9 +2435,13 @@ private:
         Type valueType = typeConverter.convertTypeAsNonPointer(argType);
         Value size =
             emitc_builders::sizeOf(builder, loc, TypeAttr::get(valueType));
-        uint8Ptr = emitc_builders::binaryOperator(
-            builder, loc, emitc_builders::BinaryOperator::ADDITION, uint8Ptr,
-            size, bytePtrType);
+
+        uint8Ptr = builder
+                       .create<emitc::AddOp>(
+                           /*location=*/loc,
+                           /*type=*/bytePtrType,
+                           /*operands=*/ArrayRef<Value>{uint8Ptr, size})
+                       .getResult();
       }
     }
     return success();
@@ -2502,9 +2509,12 @@ private:
         Type valueType = llvm::cast<emitc::PointerType>(argType).getPointee();
         Value size =
             emitc_builders::sizeOf(builder, loc, TypeAttr::get(valueType));
-        uint8Ptr = emitc_builders::binaryOperator(
-            builder, loc, emitc_builders::BinaryOperator::ADDITION, uint8Ptr,
-            size, bytePtrType);
+        uint8Ptr = builder
+                       .create<emitc::AddOp>(
+                           /*location=*/loc,
+                           /*type=*/bytePtrType,
+                           /*operands=*/ArrayRef<Value>{uint8Ptr, size})
+                       .getResult();
       }
     }
     return success();
@@ -4208,9 +4218,14 @@ class ListGetRefOpConversion
               .getResult();
 
       // ref->type != IREE_VM_REF_TYPE_NULL
-      auto refTypeIsNotNull = emitc_builders::binaryOperator(
-          rewriter, loc, emitc_builders::BinaryOperator::NOT_EQUAL_TO, refType,
-          refTypeNull, rewriter.getI1Type());
+      auto refTypeIsNotNull = rewriter
+                                  .create<emitc::CmpOp>(
+                                      /*location=*/loc,
+                                      /*type=*/rewriter.getI1Type(),
+                                      /*predicate*/ emitc::CmpPredicate::ne,
+                                      /*lhs*/ refType,
+                                      /*rhs*/ refTypeNull)
+                                  .getResult();
 
       // (iree_vm_type_def_is_value(type_def)
       auto typedefIsValue =
@@ -4237,17 +4252,30 @@ class ListGetRefOpConversion
               .getResult(0);
 
       // ref->type != iree_vm_type_def_as_ref(type_def)
-      auto refTypesDontMatch = emitc_builders::binaryOperator(
-          rewriter, loc, emitc_builders::BinaryOperator::NOT_EQUAL_TO, refType,
-          typedefAsRef, rewriter.getI1Type());
+      auto refTypesDontMatch = rewriter
+                                   .create<emitc::CmpOp>(
+                                       /*location=*/loc,
+                                       /*type=*/rewriter.getI1Type(),
+                                       /*predicate*/ emitc::CmpPredicate::ne,
+                                       /*lhs*/ refType,
+                                       /*rhs*/ typedefAsRef)
+                                   .getResult();
 
-      auto invalidRefType = emitc_builders::binaryOperator(
-          rewriter, loc, emitc_builders::BinaryOperator::LOGICAL_OR,
-          typedefIsValue, refTypesDontMatch, rewriter.getI1Type());
+      auto invalidRefType = rewriter
+                                .create<emitc::LogicalOrOp>(
+                                    /*location=*/loc,
+                                    /*type=*/rewriter.getI1Type(),
+                                    /*lhs*/ typedefIsValue,
+                                    /*rhs*/ refTypesDontMatch)
+                                .getResult();
 
-      invalidType = emitc_builders::binaryOperator(
-          rewriter, loc, emitc_builders::BinaryOperator::LOGICAL_AND,
-          refTypeIsNotNull, invalidRefType, rewriter.getI1Type());
+      invalidType = rewriter
+                        .create<emitc::LogicalAndOp>(
+                            /*location=*/loc,
+                            /*type=*/rewriter.getI1Type(),
+                            /*lhs*/ refTypeIsNotNull,
+                            /*rhs*/ invalidRefType)
+                        .getResult();
     }
 
     // Start by splitting the block into two. The part before will contain

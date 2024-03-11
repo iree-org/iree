@@ -58,50 +58,6 @@ std::string mapUnaryOperator(UnaryOperator op) {
     return "XXX";
   }
 }
-
-std::string mapBinaryOperator(BinaryOperator op) {
-  switch (op) {
-  case BinaryOperator::ADDITION:
-    return "+";
-  case BinaryOperator::SUBTRACTION:
-    return "-";
-  case BinaryOperator::PRODUCT:
-    return "*";
-  case BinaryOperator::DIVISION:
-    return "/";
-  case BinaryOperator::REMAINDER:
-    return "%";
-  case BinaryOperator::BITWISE_AND:
-    return "&";
-  case BinaryOperator::BITWISE_OR:
-    return "|";
-  case BinaryOperator::BITWISE_XOR:
-    return "^";
-  case BinaryOperator::BITWISE_LEFT_SHIFT:
-    return "<<";
-  case BinaryOperator::BITWISE_RIGHT_SHIFT:
-    return ">>";
-  case BinaryOperator::LOGICAL_AND:
-    return "&&";
-  case BinaryOperator::LOGICAL_OR:
-    return "||";
-  case BinaryOperator::EQUAL_TO:
-    return "==";
-  case BinaryOperator::NOT_EQUAL_TO:
-    return "!=";
-  case BinaryOperator::LESS_THAN:
-    return "<";
-  case BinaryOperator::GREATER_THAN:
-    return ">";
-  case BinaryOperator::LESS_THAN_OR_EQUAL:
-    return "<=";
-  case BinaryOperator::GREATER_THAN_OR_EQUAL:
-    return ">=";
-  default:
-    llvm_unreachable("unsupported binary operator");
-    return "XXX";
-  }
-}
 } // namespace
 
 Value unaryOperator(OpBuilder builder, Location location, UnaryOperator op,
@@ -119,24 +75,6 @@ Value unaryOperator(OpBuilder builder, Location location, UnaryOperator op,
                           builder.getIndexAttr(0)}),
           /*templateArgs=*/ArrayAttr{},
           /*operands=*/ArrayRef<Value>{operand})
-      .getResult(0);
-}
-
-Value binaryOperator(OpBuilder builder, Location location, BinaryOperator op,
-                     Value lhs, Value rhs, Type resultType) {
-  auto ctx = builder.getContext();
-
-  return builder
-      .create<emitc::CallOpaqueOp>(
-          /*location=*/location,
-          /*type=*/resultType,
-          /*callee=*/StringAttr::get(ctx, "EMITC_BINARY"),
-          /*args=*/
-          ArrayAttr::get(ctx,
-                         {emitc::OpaqueAttr::get(ctx, mapBinaryOperator(op)),
-                          builder.getIndexAttr(0), builder.getIndexAttr(1)}),
-          /*templateArgs=*/ArrayAttr{},
-          /*operands=*/ArrayRef<Value>{lhs, rhs})
       .getResult(0);
 }
 

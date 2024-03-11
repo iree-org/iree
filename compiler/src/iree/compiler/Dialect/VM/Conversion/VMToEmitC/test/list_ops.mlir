@@ -82,12 +82,12 @@ vm.module @my_module {
     // CHECK: %{{.+}} = emitc.call_opaque "iree_vm_list_get_ref_retain"(%1, %arg4, %arg3) : (!emitc.ptr<!emitc.opaque<"iree_vm_list_t">>, i32, !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.opaque<"iree_status_t">
     // CHECK: %[[A:.+]] = emitc.call_opaque "EMITC_STRUCT_PTR_MEMBER"(%arg3) {args = [0 : index, #emitc.opaque<"type">]} : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> !emitc.opaque<"iree_vm_ref_type_t">
     // CHECK: %[[B:.+]] = "emitc.constant"() <{value = #emitc.opaque<"IREE_VM_REF_TYPE_NULL">}> : () -> !emitc.opaque<"iree_vm_ref_type_t">
-    // CHECK: %[[C:.+]] = emitc.call_opaque "EMITC_BINARY"(%[[A]], %[[B]]) {args = [#emitc.opaque<"!=">, 0 : index, 1 : index]} : (!emitc.opaque<"iree_vm_ref_type_t">, !emitc.opaque<"iree_vm_ref_type_t">) -> i1
+    // CHECK: %[[C:.+]] = emitc.cmp ne, %[[A]], %[[B]] : (!emitc.opaque<"iree_vm_ref_type_t">, !emitc.opaque<"iree_vm_ref_type_t">) -> i1
     // CHECK: %[[D:.+]] = emitc.call_opaque "iree_vm_type_def_is_value"(%{{.+}}) : (!emitc.opaque<"iree_vm_type_def_t">) -> i1
     // CHECK: %[[E:.+]] = emitc.call_opaque "iree_vm_type_def_as_ref"(%{{.+}}) : (!emitc.opaque<"iree_vm_type_def_t">) -> !emitc.opaque<"iree_vm_ref_type_t">
-    // CHECK: %[[F:.+]] = emitc.call_opaque "EMITC_BINARY"(%[[A]], %[[E]]) {args = [#emitc.opaque<"!=">, 0 : index, 1 : index]} : (!emitc.opaque<"iree_vm_ref_type_t">, !emitc.opaque<"iree_vm_ref_type_t">) -> i1
-    // CHECK: %[[G:.+]] = emitc.call_opaque "EMITC_BINARY"(%[[D]], %[[F]]) {args = [#emitc.opaque<"||">, 0 : index, 1 : index]} : (i1, i1) -> i1
-    // CHECK: %{{.+}} = emitc.call_opaque "EMITC_BINARY"(%[[C]], %[[G]]) {args = [#emitc.opaque<"&&">, 0 : index, 1 : index]} : (i1, i1) -> i1
+    // CHECK: %[[F:.+]] = emitc.cmp ne, %[[A]], %[[E]] : (!emitc.opaque<"iree_vm_ref_type_t">, !emitc.opaque<"iree_vm_ref_type_t">) -> i1
+    // CHECK: %[[G:.+]] = emitc.logical_or %[[D]], %[[F]] : i1, i1
+    // CHECK: %{{.+}} = emitc.logical_and %[[C]], %[[G]] : i1, i1
     // CHECK: cf.cond_br %{{.+}}, ^[[FAIL:.+]], ^[[CONTINUE:.+]]
     // CHECK: ^[[FAIL]]:
     // CHECK-NEXT: emitc.call_opaque "iree_vm_ref_release"(%arg3) : (!emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>) -> ()
