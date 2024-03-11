@@ -563,6 +563,13 @@ isFusableWithConsumer(OpOperand &fusedOperand,
     return false;
   }
 
+  // Insert slice ops should always be fused with their producers.
+  if (auto insertSliceOp = dyn_cast<tensor::InsertSliceOp>(consumer)) {
+    // TODO: Enable multi-use slice source fusion.
+    return insertSliceOp.getSource().hasOneUse() &&
+           insertSliceOp.getSource().getDefiningOp() == producer;
+  }
+
   // TODO(#16025): Enable mmt4d fusion. It is disabled because the backends
   // can not set multi lowering_config properly. See the issue for more details.
   if (isa<linalg::Mmt4DOp>(producer)) {
