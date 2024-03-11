@@ -20,6 +20,7 @@
 #include "mlir/Conversion/ComplexToStandard/ComplexToStandard.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
+#include "mlir/Dialect/AMDGPU/Transforms/Passes.h"
 #include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
@@ -567,18 +568,18 @@ void addGPUVectorDistributePassPipeline(OpPassManager &pm) {
   nestedModulePM.addPass(createCSEPass());
 
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createGPUReduceSharedMemoryBankConflicts());
+      memref::createFoldMemRefAliasOpsPass());
+  nestedModulePM.addPass(createCSEPass());
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      amdgpu::createOptimizeSharedMemory());
+  nestedModulePM.addPass(createCSEPass());
+  nestedModulePM.addPass(createCanonicalizerPass());
 
   if (clLLVMGPUEnablePrefetch) {
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLLVMGPUPrefetchSharedMemoryPass());
   }
-
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      memref::createFoldMemRefAliasOpsPass());
-  nestedModulePM.addPass(createCSEPass());
-  nestedModulePM.addPass(createCanonicalizerPass());
-  nestedModulePM.addPass(createCSEPass());
 }
 
 void addGPUWarpReductionPassPipeline(OpPassManager &pm) {
