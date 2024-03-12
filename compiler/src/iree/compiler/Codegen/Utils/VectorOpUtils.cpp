@@ -18,6 +18,8 @@ VectorContractOpInfo::getOperandMNIndex() const {
     return std::make_pair(0, 1);
   case OpKind::MK_NK_MN:
     return std::make_pair(0, 0);
+  case OpKind::KM_NK_MN:
+    return std::make_pair(1, 0);
   case OpKind::UNKNOWN:
     break;
   }
@@ -32,6 +34,8 @@ VectorContractOpInfo::getOperandKIndex() const {
     return std::make_pair(1, 0);
   case OpKind::MK_NK_MN:
     return std::make_pair(1, 1);
+  case OpKind::KM_NK_MN:
+    return std::make_pair(0, 1);
   case OpKind::UNKNOWN:
     break;
   }
@@ -62,6 +66,8 @@ VectorContractOpInfo::inferOpKind(MLIRContext *ctx,
     return OpKind::MK_KN_MN;
   if (maps == infer({{m, k}, {n, k}, {m, n}}))
     return OpKind::MK_NK_MN;
+  if (maps == infer({{k, m}, {n, k}, {m, n}}))
+    return OpKind::KM_NK_MN;
   return OpKind::UNKNOWN;
 }
 

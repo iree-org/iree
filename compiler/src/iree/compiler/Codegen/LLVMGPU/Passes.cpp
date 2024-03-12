@@ -561,6 +561,8 @@ void addGPUVectorDistributePassPipeline(OpPassManager &pm) {
 
   // Vector SIMD -> Vector SIMT
   nestedModulePM.addNestedPass<func::FuncOp>(
+      createLLVMGPUNormalizeContractMapsPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMGPUCastTypeToFitMMAPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUVectorDistribute());
   nestedModulePM.addPass(createCanonicalizerPass());
