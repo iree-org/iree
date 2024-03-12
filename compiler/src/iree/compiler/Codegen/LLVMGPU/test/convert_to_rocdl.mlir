@@ -97,7 +97,7 @@ hal.executable @simple_barrier {
   }
 }
 // CHECK-LABEL: llvm.func @simple_barrier
-// CHECK: llvm.inline_asm has_side_effects asm_dialect = att "s_waitcnt lgkmcnt(0)\0As_barrier", ""  : () -> ()
+// CHECK: llvm.inline_asm has_side_effects asm_dialect = att ";;;WARNING: BREAKS DEBUG WATCHES\0As_waitcnt lgkmcnt(0)\0As_barrier", ""  : () -> ()
 
 // -----
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
