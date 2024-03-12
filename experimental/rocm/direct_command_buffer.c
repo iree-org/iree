@@ -163,7 +163,7 @@ static void iree_hal_rocm_direct_command_buffer_end_debug_group(
       iree_hal_rocm_direct_command_buffer_cast(base_command_buffer);
   (void)command_buffer;
 
-  IREE_CUDA_TRACE_ZONE_END(command_buffer->tracing_context, 0);
+  IREE_ROCM_TRACE_ZONE_END(command_buffer->tracing_context, 0);
 }
 
 static iree_status_t iree_hal_rocm_direct_command_buffer_execution_barrier(
