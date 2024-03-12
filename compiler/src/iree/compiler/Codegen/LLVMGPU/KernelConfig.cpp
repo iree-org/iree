@@ -515,12 +515,19 @@ setMatmulVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
     intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType);
   }
 
+  int64_t mSize = 1;
+  for (auto dim : contractionDims->m)
+    mSize *= bounds[dim];
+  int64_t nSize = 1;
+  for (auto dim : contractionDims->n)
+    nSize *= bounds[dim];
+
   GPUMMAHeuristicSeeds seeds;
 
   // Note that the following heuristic seeds are just placeholder values.
   // We need to clean it up and make it adjusting to different targets.
   // See https://github.com/openxla/iree/issues/16341 for details.
-  if (problem.mSize * problem.nSize <= clGPUMatmulCThreshold) {
+  if (mSize * nSize <= clGPUMatmulCThreshold) {
     // For matmuls with small M*N size, we want to distribute M*N onto more
     // workgroups to fill the GPU. Use a smaller bestMNTileCountPerSubgroup
     // and a larger bestKTileCountPerSubgroup.
