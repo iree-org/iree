@@ -320,7 +320,9 @@ setConvolutionVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
   FailureOr<mlir::linalg::ConvolutionDimensions> convolutionDims =
       mlir::linalg::inferConvolutionDims(op);
-  assert(succeeded(convolutionDims) && "Could not infer contraction dims");
+  if (failed(convolutionDims)) {
+    return failure();
+  }
 
   // This strategy turns non-strided/dilated convolution problems into matmul
   // problems by tiling certain dimensions to 1:
@@ -334,8 +336,8 @@ setConvolutionVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   //  - The input channel dimension, corresponding to the K dimension.
 
   // TODO: Relax this condition to strictly alignment requirements.
-  if (convolutionDims->outputChannel.size() != 1 ||
-      convolutionDims->inputChannel.size() != 1 ||
+  if (convolutionDims->outputChannel.size() < 1 ||
+      convolutionDims->inputChannel.size() < 1 ||
       convolutionDims->filterLoop.size() < 1 ||
       convolutionDims->outputImage.size() < 1 ||
       convolutionDims->depth.size() != 0) {
@@ -353,13 +355,13 @@ setConvolutionVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   }
 
   int64_t mDim = convolutionDims->outputImage.back();
-  int64_t nDim = convolutionDims->outputChannel.front();
+  int64_t nDim = convolutionDims->outputChannel.back();
   // TODO: Support NCHW convolutions. This is just a matmul_transpose_a, however
   // the distribution patterns currently do not support that variant.
   if (mDim > nDim) {
     return failure();
   }
-  int64_t kDim = convolutionDims->inputChannel.front();
+  int64_t kDim = convolutionDims->inputChannel.back();
 
   Value lhs = op.getDpsInputOperand(0)->get();
   Value rhs = op.getDpsInputOperand(1)->get();
@@ -411,6 +413,12 @@ setConvolutionVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   // Tile all output image dimensions with unit size except the last one.
   for (int64_t oi : llvm::drop_end(convolutionDims->outputImage)) {
     workgroupTileSizes[oi] = 1;
+  }
+  for (int64_t oc : llvm::drop_end(convolutionDims->outputChannel)) {
+    workgroupTileSizes[oc] = 1;
+  }
+  for (int64_t ic : llvm::drop_end(convolutionDims->inputChannel)) {
+    workgroupTileSizes[ic] = 1;
   }
   // Compute the M/N dimension tile size by multiply subgroup information.
   workgroupTileSizes[mDim] =
@@ -596,7 +604,7 @@ setVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   if (linalg::isaContractionOpInterface(linalgOp)) {
     return setMatmulVectorDistributionConfig(entryPoint, linalgOp, targetInfo);
   }
-  if (isa<linalg::ConvolutionOpInterface>(*linalgOp)) {
+  if (linalg::isaConvolutionOpInterface(linalgOp)) {
     return setConvolutionVectorDistributionConfig(entryPoint, linalgOp,
                                                   targetInfo);
   }
