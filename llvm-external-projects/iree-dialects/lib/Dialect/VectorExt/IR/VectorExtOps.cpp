@@ -36,6 +36,18 @@ LogicalResult LayoutConflictResolutionOp::verify() {
   return failure();
 }
 
+// Validate that the desired layout has the same shape as the input.
+// TODO: We should also validate if it has the same thread layout, maybe need
+// more interface methods.
+LogicalResult LayoutReshapeOp::verify() {
+  Operation *op = getOperation();
+  ArrayRef<int64_t> inputShape =
+      cast<VectorType>(getInput().getType()).getShape();
+  if (succeeded(validateLayout(op, "source", getSourceLayout(), inputShape)))
+    return validateLayout(op, "desired", getDesiredLayout(), inputShape);
+  return failure();
+}
+
 // to_simd -> to_simt
 OpFoldResult ToSIMDOp::fold(FoldAdaptor) {
   if (auto simtOp = getOperand().getDefiningOp<ToSIMTOp>()) {

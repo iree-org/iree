@@ -514,8 +514,22 @@ static void propagateLayoutToContractionOp(
     return;
   }
 
-  // True to resolve result with init.
+  // Try to resolve result with init.
   ChangeResult changed = result->resolve(init);
+  update(result, changed);
+}
+
+static void propagateLayoutToLayoutReshapeOp(
+    LayoutReshapeOp layoutReshape,
+    ArrayRef<const DistributionLayout *> operandLattices,
+    ArrayRef<DistributionLayout *> resultLattices,
+    std::function<void(DistributionLayout *, ChangeResult)> update) {
+
+  // Layout reshape has only one vector result.
+  DistributionLayout *result = resultLattices[0];
+
+  // Try to resolve result with init.
+  ChangeResult changed = result->resolve(layoutReshape.getDesiredLayout());
   update(result, changed);
 }
 
@@ -545,6 +559,12 @@ void propagationTransferFunction(
   if (auto contraction = dyn_cast<vector::ContractionOp>(op)) {
     propagateLayoutToContractionOp(contraction, operandLattices, resultLattices,
                                    update);
+    return;
+  }
+
+  if (auto layoutReshape = dyn_cast<LayoutReshapeOp>(op)) {
+    propagateLayoutToLayoutReshapeOp(layoutReshape, operandLattices,
+                                     resultLattices, update);
     return;
   }
 
@@ -712,6 +732,20 @@ static void enforceLayoutToGatherOp(
   }
 }
 
+static void enforceLayoutToLayoutReshapeOp(
+    LayoutReshapeOp layoutReshape,
+    ArrayRef<DistributionLayout *> operandLattices,
+    ArrayRef<const DistributionLayout *> resultLattices,
+    std::function<void(DistributionLayout *, ChangeResult)> update) {
+  // Layout reshape has only one vector operand.
+  DistributionLayout *value = operandLattices[0];
+
+  // True to resolve the init value with the result layout.
+  ChangeResult changed = value->resolveWithPossibleConflict(
+      layoutReshape.getSourceLayout(), getOpOperand(layoutReshape, 0));
+  update(value, changed);
+}
+
 void enforcementTransferFunction(
     Operation *op, ArrayRef<DistributionLayout *> operandLattices,
     ArrayRef<const DistributionLayout *> resultLattices,
@@ -749,6 +783,12 @@ void enforcementTransferFunction(
 
   if (auto gather = dyn_cast<vector::GatherOp>(op)) {
     enforceLayoutToGatherOp(gather, operandLattices, resultLattices, update);
+    return;
+  }
+
+  if (auto layoutReshape = dyn_cast<LayoutReshapeOp>(op)) {
+    enforceLayoutToLayoutReshapeOp(layoutReshape, operandLattices,
+                                   resultLattices, update);
     return;
   }
 }

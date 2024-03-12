@@ -18,7 +18,6 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
@@ -33,15 +32,16 @@
 
 #define DEBUG_TYPE "iree-llvmgpu-vector-distribute"
 
-using LayoutDimension = mlir::iree_compiler::IREE::VectorExt::LayoutDimension;
-using LayoutDimensionAttr =
-    mlir::iree_compiler::IREE::VectorExt::LayoutDimensionAttr;
-using VectorLayoutInterface =
-    mlir::iree_compiler::IREE::VectorExt::VectorLayoutInterface;
-using PerDimLayoutAttr = mlir::iree_compiler::IREE::VectorExt::PerDimLayoutAttr;
-using LayoutAttr = mlir::iree_compiler::IREE::VectorExt::LayoutAttr;
-
 namespace mlir::iree_compiler {
+
+using NestedLayoutAttr = IREE::VectorExt::NestedLayoutAttr;
+using VectorValue = TypedValue<VectorType>;
+
+llvm::cl::opt<bool> clLLVMGPUEnableVectorDistributionReshape(
+    "iree-llvmgpu-enable-vector-distribution-reshape",
+    llvm::cl::desc(
+        "Enables contract lhs and rhs reshape for vector distribution"),
+    llvm::cl::init(false));
 
 namespace {
 
@@ -53,12 +53,12 @@ namespace {
 // setting for other problems like reductions is TODO.
 class ContractionVectorLayoutOptions : public VectorLayoutOptions {
 public:
-  ContractionVectorLayoutOptions(Operation *root,
+  ContractionVectorLayoutOptions(IRRewriter &rewriter, Operation *root,
                                  ArrayRef<int64_t> workgroupSize,
                                  IREE::GPU::MMAScheduleAttr schedule,
                                  Value laneId, bool printLayout)
       : VectorLayoutOptions(root, /*fullConversion=*/!printLayout),
-        workgroupSize(workgroupSize), schedule(schedule),
+        rewriter(rewriter), workgroupSize(workgroupSize), schedule(schedule),
         printLayout(printLayout), patterns(root->getContext()) {
     populateGPUDistributionPatterns(patterns);
     populateGPUDistributionLayoutAttrPatterns(laneId, patterns);
@@ -87,6 +87,43 @@ public:
   RewritePatternSet &getPatterns() { return patterns; }
 
 private:
+  VectorLayoutInterface
+  getContractionReadReshapedLayout(VectorLayoutInterface srcLayout) {
+    NestedLayoutAttr layout = dyn_cast<NestedLayoutAttr>(srcLayout);
+    if (!layout) {
+      return nullptr;
+    }
+
+    // Get the fastest changing element dim.
+    ArrayRef<int64_t> elementOrder = layout.getElementOrder();
+    auto min = std::max_element(elementOrder.begin(), elementOrder.end());
+    int fastestDim = std::distance(elementOrder.begin(), min);
+
+    // Unroll the fastest dim into:
+    // batch=[total/8] outer=[1] element=[8]
+    SmallVector<int64_t> batch(layout.getBatchesPerSubgroup());
+    SmallVector<int64_t> outer(layout.getOutersPerBatch());
+    SmallVector<int64_t> elements(layout.getElementsPerThread());
+
+    int64_t totalElements =
+        batch[fastestDim] * outer[fastestDim] * elements[fastestDim];
+
+    // Find the largest power of 2, which we can use, which is less than 8.
+    int64_t maxLoad = llvm::MinAlign(totalElements, 8);
+
+    elements[fastestDim] = maxLoad;
+    outer[fastestDim] = 1;
+    batch[fastestDim] = totalElements / maxLoad;
+
+    return NestedLayoutAttr::get(
+        layout.getContext(), layout.getSubgroupsPerWorkgroup(),
+        layout.getSubgroupOrder(), batch, layout.getBatchOrder(), outer,
+        layout.getOuterOrder(), layout.getThreadsPerOuter(),
+        layout.getThreadOrder(), elements, layout.getElementOrder(),
+        layout.getSubgroupBasis(), layout.getSubgroupActiveIds(),
+        layout.getThreadBasis(), layout.getThreadActiveIds());
+  }
+
   // Sets an anchoring layout for the given contraction op. Looks for a
   // supported mma type from the cached list of mma types and populates the
   // necessary distribution pattern for those contractions.
@@ -104,6 +141,34 @@ private:
     }
 
     auto [aLayout, bLayout, cLayout] = *layouts;
+
+    if (clLLVMGPUEnableVectorDistributionReshape) {
+      VectorLayoutInterface aFlatLayout =
+          getContractionReadReshapedLayout(aLayout);
+      VectorLayoutInterface bFlatLayout =
+          getContractionReadReshapedLayout(bLayout);
+
+      rewriter.setInsertionPoint(contract);
+
+      // Create a reshape on the lhs.
+      if (aFlatLayout) {
+        VectorValue lhs = contract.getLhs();
+        VectorValue reshapedLhs =
+            rewriter.create<IREE::VectorExt::LayoutReshapeOp>(
+                contract.getLoc(), lhs.getType(), lhs, aFlatLayout, aLayout);
+        contract.setOperand(0, reshapedLhs);
+      }
+
+      // Create a reshape on the rhs.
+      if (bFlatLayout) {
+        VectorValue rhs = contract.getRhs();
+        VectorValue reshapedRhs =
+            rewriter.create<IREE::VectorExt::LayoutReshapeOp>(
+                contract.getLoc(), rhs.getType(), rhs, bFlatLayout, bLayout);
+        contract.setOperand(1, reshapedRhs);
+      }
+    }
+
     analysis.setAnchor(contract.getLhs(), aLayout);
     analysis.setAnchor(contract.getRhs(), bLayout);
     analysis.setAnchor(contract.getAcc(), cLayout);
@@ -315,6 +380,7 @@ private:
     }
   }
 
+  IRRewriter &rewriter;
   SmallVector<int64_t, 3> workgroupSize;
   IREE::GPU::MMAScheduleAttr schedule;
   // Whether to print the chosen layout for testing purposes
@@ -375,8 +441,10 @@ public:
     Value linearThreadIdVal = affine::makeComposedAffineApply(
         builder, func.getLoc(), linearId, threadGrid);
 
-    ContractionVectorLayoutOptions options(func, workgroupSize, scheduleAttr,
-                                           linearThreadIdVal, testLayout);
+    IRRewriter rewriter(builder);
+    ContractionVectorLayoutOptions options(rewriter, func, workgroupSize,
+                                           scheduleAttr, linearThreadIdVal,
+                                           testLayout);
     if (failed(distributeVectorOps(func, options.getPatterns(), options))) {
       func->emitOpError() << "failed to distribute";
       return signalPassFailure();
