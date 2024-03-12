@@ -55,6 +55,7 @@ if [[ "${RISCV_PLATFORM}" == "linux" ]]; then
   args+=(
     -DRISCV_TOOLCHAIN_ROOT="${RISCV_RV64_LINUX_TOOLCHAIN_ROOT}"
     -DRISCV_TOOLCHAIN_PREFIX="riscv64-unknown-linux-gnu-"
+    -DRISCV_LINKER_FLAGS_EXE="-static"
   )
 elif [[ "${RISCV_PLATFORM_ARCH}" == "generic-riscv_32" ]]; then
   args+=(
