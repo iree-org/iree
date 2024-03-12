@@ -34,6 +34,9 @@ on:
           GCS path to benchmark tools archive.
         value: ${{ jobs.build_benchmark_tools.outputs.benchmark-tools-gcs-artifact-dir }}
 
+permissions:
+  contents: read
+
 env:
   # This duplicates the variable from ci.yml. The variable needs to be in env
   # instead of the outputs of setup because it contains the run attempt and we
