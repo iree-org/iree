@@ -17,10 +17,15 @@ on:
         type: string
         default: ""
 
+permissions:
+  contents: read
+
 jobs:
   linux_x86_64:
     name: Linux (x86_64)
     runs-on: ubuntu-20.04
+    permissions:
+      actions: read
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       IREERS_ARTIFACT_DIR: ${{ github.workspace }}/artifacts
