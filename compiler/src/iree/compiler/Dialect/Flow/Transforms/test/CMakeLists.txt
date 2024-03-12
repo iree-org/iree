@@ -35,6 +35,7 @@ iree_lit_test_suite(
     "fusion_of_tensor_ops.mlir"
     "initialize_empty_tensors.mlir"
     "inject_dispatch_tracing.mlir"
+    "inject_tensor_tracing.mlir"
     "insert_dispatch_debug_targets.mlir"
     "interchange_generic_ops.mlir"
     "interchange_transpose_generic_ops.mlir"
