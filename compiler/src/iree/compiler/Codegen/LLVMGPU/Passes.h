@@ -61,6 +61,9 @@ void addGPUDefaultPassPipeline(OpPassManager &pm, bool enableMicrokernels);
 /// Pass pipeline to lower IREE HAL executables without tiling and distribution.
 void addGPUBaseLoweringPassPipeline(OpPassManager &pm);
 
+/// Pass pipeline to lower IREE HAL Executables using Implicit GEMM pipeline.
+void addGPUImplicitGEMMPassPipeline(OpPassManager &pm);
+
 /// Populates passes needed to preprocess and select the translation strategy.
 void buildLLVMGPUCodegenConfigurationPassPipeline(OpPassManager &pm);
 
@@ -86,6 +89,8 @@ createLLVMGPUCastTypeToFitMMAPass();
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMGPUDistribute();
+
+std::unique_ptr<OperationPass<>> createLLVMGPUIm2ColPass();
 
 /// Create pass selecting the lowering strategy for LLVMGPU.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
