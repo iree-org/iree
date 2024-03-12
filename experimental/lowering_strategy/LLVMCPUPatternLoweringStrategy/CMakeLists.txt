@@ -24,6 +24,7 @@ iree_cc_library(
     "-Iexperimental/lowering_strategy/LLVMCPUPatternLoweringStrategy"
   SRCS
     "LLVMCPUPatternLoweringStrategy.cpp"
+    "TileSizeSelectionPattern.cpp"
   DEPS
     MLIRIR
     iree::compiler::Dialect::HAL::Target

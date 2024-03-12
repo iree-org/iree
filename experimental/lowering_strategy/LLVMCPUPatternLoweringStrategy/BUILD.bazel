@@ -21,6 +21,7 @@ iree_compiler_cc_library(
     name = "registration",
     srcs = [
         "LLVMCPUPatternLoweringStrategy.cpp",
+        "TileSizeSelectionPattern.cpp",
     ],
     copts = ["-Iexperimental/lowering_strategy/LLVMCPUPatternLoweringStrategy"],
     deps = [
