@@ -23,6 +23,7 @@
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/SymbolTable.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Support/LogicalResult.h"
 
 #define DEBUG_TYPE "iree-dispatch"
 
@@ -190,7 +191,7 @@ static std::string summarizeLinalgOp(linalg::LinalgOp op) {
       prefix = "broadcast";
     } else if (linalg::isaContractionOpInterface(op)) {
       prefix = "contract";
-    } else if (linalg::isaConvolutionOpInterface(op)) {
+    } else if (succeeded(linalg::inferConvolutionDims(op))) {
       prefix = "conv";
     }
   }
