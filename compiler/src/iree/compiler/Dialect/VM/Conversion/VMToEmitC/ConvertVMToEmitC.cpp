@@ -2290,13 +2290,8 @@ private:
     auto ctx = builder.getContext();
 
     // iree_vm_function_call_t call;
-    auto call = builder
-                    .create<emitc::VariableOp>(
-                        /*location=*/loc,
-                        /*resultType=*/
-                        emitc::OpaqueType::get(ctx, "iree_vm_function_call_t"),
-                        /*value=*/emitc::OpaqueAttr::get(ctx, ""))
-                    .getResult();
+    auto call = emitc_builders::allocateVariable(
+        builder, loc, emitc::OpaqueType::get(ctx, "iree_vm_function_call_t"));
 
     // importValue = *import;
     auto importValue = emitc_builders::contentsOf(builder, loc, import);
@@ -2829,12 +2824,10 @@ class CallOpConversion : public EmitCConversionPattern<OpTy> {
 
     Value operandRef = this->getModuleAnalysis().lookupRef(operand);
 
-    auto refOp = builder.create<emitc::VariableOp>(
-        /*location=*/loc,
-        /*resultType=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t"),
-        /*value=*/emitc::OpaqueAttr::get(ctx, ""));
+    Value ref = emitc_builders::allocateVariable(
+        builder, loc, emitc::OpaqueType::get(ctx, "iree_vm_ref_t"));
 
-    Value refPtr = emitc_builders::addressOf(builder, loc, refOp.getResult());
+    Value refPtr = emitc_builders::addressOf(builder, loc, ref);
 
     if (failed(clearStruct(builder, refPtr))) {
       return failure();
