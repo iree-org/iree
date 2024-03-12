@@ -191,6 +191,12 @@ def InjectDispatchTracing :
   let constructor = "mlir::iree_compiler::IREE::Flow::createInjectDispatchTracingPass()";
 }
 
+def InjectTensorTracing :
+    InterfacePass<"iree-flow-inject-tensor-tracing", "mlir::FunctionOpInterface"> {
+  let summary = "Injects tensor tracing on ops annotated with `iree.tensor.trace`.";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createInjectTensorTracingPass()";
+}
+
 def InsertDebugTargetAtSymbol :
     Pass<"iree-flow-insert-debug-target-at-symbol", "mlir::ModuleOp"> {
   let summary = "Crops and/or traces the program at the specified symbol";

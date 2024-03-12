@@ -48,6 +48,7 @@ iree_cc_library(
     "FusionOfTensorOps.cpp"
     "InitializeEmptyTensors.cpp"
     "InjectDispatchTracing.cpp"
+    "InjectTensorTracing.cpp"
     "InsertDispatchDebugTargets.cpp"
     "InterchangeGenericOps.cpp"
     "InterchangeTransposeGenericOps.cpp"
