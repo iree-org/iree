@@ -66,6 +66,12 @@ def LLVMGPULowerExecutableTarget :
   let constructor = "mlir::iree_compiler::createLLVMGPULowerExecutableTargetPass()";
 }
 
+def LLVMGPUNormalizeContractMaps :
+    InterfacePass<"iree-llvmgpu-normalize-contract-maps", "mlir::FunctionOpInterface"> {
+  let summary = "Normalizes the indexing maps of contraction operations";
+  let constructor = "mlir::iree_compiler::createLLVMGPUNormalizeContractMapsPass()";
+}
+
 def LLVMGPUPackSharedMemoryAlloc :
     InterfacePass<"iree-llvmgpu-pack-shared-memory-alloc", "mlir::FunctionOpInterface"> {
   let summary = "Pass pack shared memory allocation in order to reduce memory usage.";

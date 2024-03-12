@@ -11,7 +11,7 @@ namespace mlir::iree_compiler {
 /// A class for querying information about a contract op.
 class VectorContractOpInfo {
 public:
-  enum class OpKind { MK_KN_MN, MK_NK_MN, UNKNOWN };
+  enum class OpKind { MK_KN_MN, MK_NK_MN, KM_NK_MN, UNKNOWN };
 
   explicit VectorContractOpInfo(vector::ContractionOp op) {
     opKind = inferOpKind(op.getContext(), op.getIndexingMapsArray());
