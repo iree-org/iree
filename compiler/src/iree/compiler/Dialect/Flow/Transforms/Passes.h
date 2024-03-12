@@ -107,7 +107,7 @@ std::unique_ptr<Pass> createVerifyInputLegalityPass();
 // TODO(ravishankarm): Move the passes in Flow to use the auto-generated options
 // struct.
 struct FormDispatchRegionsOptions {
-  bool fuseMultiUse = false;
+  bool fuseMultiUse = true;
   bool generateWorkloadRegion = true;
   bool fusePadWithConsumers = false;
   bool fusePadWithProducers = false;
