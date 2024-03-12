@@ -10,6 +10,8 @@
 #include <numeric>
 #include <optional>
 
+#include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
+#include "iree-dialects/Transforms/TransformMatchers.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUHeuristics.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
@@ -44,6 +46,11 @@ llvm::cl::opt<bool> clGPUEnableTransformDialectJit(
     "iree-codegen-llvmgpu-enable-transform-dialect-jit",
     llvm::cl::desc("enable the usage of the transform dialect JIT"),
     llvm::cl::init(true));
+
+llvm::cl::opt<bool> clGPUEnableImplicitGemm(
+    "iree-codegen-llvmgpu-enable-implicit-gemm",
+    llvm::cl::desc("activate the convolution implicit gemm strategy"),
+    llvm::cl::init(false));
 
 /// Flag to force using WMMA tensorcore operations.
 llvm::cl::opt<bool>
@@ -1587,6 +1594,56 @@ static bool distributeToSquare(const int64_t oh, const int64_t ow,
 // Convolution Pipeline Configuration
 //====---------------------------------------------------------------------===//
 
+static LogicalResult
+setConvolutionIGemmConfig(mlir::FunctionOpInterface entryPoint,
+                          linalg::LinalgOp op, const TargetInfo &targetInfo) {
+  // 1. Match a convolution and surrounding ops.
+  transform_ext::StructuredOpMatcher *fill;
+  transform_ext::StructuredOpMatcher *convolution;
+  transform_ext::StructuredOpMatcher *trailing;
+  transform_ext::MatchedConvolutionCaptures captures;
+  transform_ext::MatcherContext matcherContext;
+  makeConvolutionMatcher(matcherContext, convolution, fill, trailing, captures,
+                         /*mustMatchEntireFunc=*/true);
+  if (!matchPattern(op, *convolution)) {
+    return failure();
+  }
+
+  // We are very peculiar about the dispatches we want to match for now:
+  //   - f32 or f16 only atm.
+  //   - Mandatory fill op.
+  //   - Require minimum tile alignment due to img2col.
+  //   - Otherwise, we take it.
+  if (!fill->getCaptured() || trailing->getCaptured()) {
+    return failure();
+  }
+
+  // Currently requires a typical 2d named convolution (conv_2d_nchw/nhwc).
+  if (captures.convolutionDims.outputChannel.size() != 1) {
+    return failure();
+  }
+  if (captures.convolutionDims.inputChannel.size() != 1) {
+    return failure();
+  }
+  if (captures.convolutionDims.outputImage.size() != 2) {
+    return failure();
+  }
+  if (captures.convolutionDims.filterLoop.size() != 2) {
+    return failure();
+  }
+  if (captures.convolutionDims.batch.size() != 1) {
+    return failure();
+  }
+
+  TileSizesListType tileSizesList;
+  std::array<int64_t, 3> workgroupSizes = {
+      targetInfo.supportedSubgroupSizes.front(), 1, 1};
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPoint, op, tileSizesList,
+      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUImplicitGEMM,
+      workgroupSizes);
+}
+
 static LogicalResult setConvolutionConfig(linalg::LinalgOp linalgOp,
                                           const int64_t subgroupSize,
                                           const int64_t bestTilingFactor) {
@@ -1704,6 +1761,12 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
     }
     if (succeeded(setWarpReductionConfig(entryPointFn, linalgOp, targetInfo))) {
       return success();
+    }
+    if (clGPUEnableImplicitGemm) {
+      if (succeeded(
+              setConvolutionIGemmConfig(entryPointFn, linalgOp, targetInfo))) {
+        return success();
+      }
     }
     if (succeeded(setConvolutionConfig(
             linalgOp, targetInfo.supportedSubgroupSizes.front(), 16))) {
