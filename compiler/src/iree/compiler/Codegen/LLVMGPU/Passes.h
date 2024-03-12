@@ -95,7 +95,7 @@ createLLVMGPUSelectLoweringStrategyPass();
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createLLVMGPULowerExecutableTargetPass();
 
-/// Normalizes the indexing maps of contraction operaions.
+/// Normalizes the indexing maps of contraction operations.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMGPUNormalizeContractMapsPass();
 

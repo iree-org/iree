@@ -48,6 +48,7 @@ VectorContractOpInfo::getResultMNIndex() const {
   switch (opKind) {
   case OpKind::MK_KN_MN:
   case OpKind::MK_NK_MN:
+  case OpKind::KM_NK_MN:
     return std::make_pair(0, 1);
   default:
     break;

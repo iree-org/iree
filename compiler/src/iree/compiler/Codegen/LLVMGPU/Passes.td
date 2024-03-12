@@ -66,8 +66,8 @@ def LLVMGPULowerExecutableTarget :
   let constructor = "mlir::iree_compiler::createLLVMGPULowerExecutableTargetPass()";
 }
 
-def LLVMGPUNormalizeContractMaps : InterfacePass<"iree-llvmgpu-normalize-contract-maps",
-                                            "mlir::FunctionOpInterface"> {
+def LLVMGPUNormalizeContractMaps :
+    InterfacePass<"iree-llvmgpu-normalize-contract-maps", "mlir::FunctionOpInterface"> {
   let summary = "Normalizes the indexing maps of contraction operations";
   let constructor = "mlir::iree_compiler::createLLVMGPUNormalizeContractMapsPass()";
 }
