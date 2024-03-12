@@ -48,6 +48,7 @@ iree_cc_library(
     "Passes.h"
   SRCS
     "AMDGPUDistributeContract.cpp"
+    "GPUAnnotateWinogradLoops.cpp"
     "GPUCheckResourceUsage.cpp"
     "GPUCreateFastSlowPath.cpp"
     "GPUDistribute.cpp"

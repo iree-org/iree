@@ -13,6 +13,11 @@ include "mlir/Pass/PassBase.td"
 // Common Passes used for GPU-like backends (keep alphabetical)
 //===---------------------------------------------------------------------===//
 
+def GPUAnnotateWinogradLoops : InterfacePass<"iree-codegen-gpu-annotate-winograd-loops", "mlir::FunctionOpInterface"> {
+  let summary = "Annotate innermost Winograd loops with distribute attribute";
+  let constructor = "mlir::iree_compiler::createGPUAnnotateWinogradLoopsPass()";
+}
+
 def GPUCheckResourceUsage :
     Pass<"iree-codegen-gpu-check-resource-usage", "ModuleOp"> {
   let summary = "Checks GPU specific resource usage constraints like shared memory limits";

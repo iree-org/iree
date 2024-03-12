@@ -65,6 +65,9 @@ LogicalResult gpuDistributeSharedMemoryCopy(mlir::FunctionOpInterface funcOp);
 // Passes
 //===----------------------------------------------------------------------===//
 
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createGPUAnnotateWinogradLoopsPass();
+
 /// Checks GPU specific resource usage constraints like shared memory limits.
 // `getSharedMemoryLimit` is for querying the shared memory limit (in bytes);
 // it takes the current entry function as the argument. 64KB will be used if

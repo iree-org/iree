@@ -15,6 +15,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
@@ -173,6 +174,141 @@ static LogicalResult tileWinogradInputTransformOp(
   return success();
 }
 
+/// Tile iree_linalg_ext.winograd.input_transform op.
+/// TODO: Adopt getTiledImplementation with this.
+static LogicalResult tileWinogradInputTransformOpWithForall(
+    WinogradInputTransformOp inputOp, RewriterBase &rewriter,
+    WinogradInputTransformOp &tiledWinogradInputTransformOp) {
+  Location loc = inputOp.getLoc();
+  auto funcOp = inputOp->getParentOfType<mlir::FunctionOpInterface>();
+  if (!funcOp) {
+    return rewriter.notifyMatchFailure(inputOp,
+                                       "Could not find parent function");
+  }
+
+  const int64_t inputTileSize = inputOp.getInputTileSize();
+  const int64_t outputTileSize = inputOp.getOutputTileSize();
+  switch (outputTileSize) {
+  case 6:
+    break;
+  default:
+    return failure();
+  }
+
+  Value input = inputOp.input();
+  Value output = inputOp.output();
+  auto outputType = output.getType().cast<ShapedType>();
+  auto inputType = input.getType().cast<ShapedType>();
+  SmallVector<int64_t> inputShape(inputType.getShape());
+  const bool isNchw = inputOp.isNchw();
+  if (isNchw) {
+    permute<Permutation::NCHW_TO_NHWC>(inputShape);
+  }
+  Type elementType = outputType.getElementType();
+  const std::array<int64_t, 2> imageDims = inputOp.nhwcImageDimensions();
+  const size_t numImageDims = imageDims.size();
+  llvm::SmallSetVector<int64_t, 2> imageDimsSet(imageDims.begin(),
+                                                imageDims.end());
+  SmallVector<int64_t> inputTileSquare(imageDims.size(), inputTileSize);
+
+  rewriter.setInsertionPointToStart(&funcOp.getFunctionBody().front());
+
+  SmallVector<Value> lbs, ubs, steps;
+  computeLoopParams(lbs, ubs, steps, output, numImageDims, loc, rewriter);
+  // Construct loops
+  rewriter.setInsertionPoint(inputOp);
+  SmallVector<Value> dest;
+  if (failed(tensor::getOrCreateDestinations(rewriter, loc, inputOp, dest)))
+    return inputOp->emitOpError("failed to get destination tensors");
+  SmallVector<Attribute> idDims;
+  auto getThreadMapping = [&](int64_t dim) {
+    auto mappingIdInt = std::min<int64_t>(
+        dim + static_cast<uint64_t>(gpu::MappingId::LinearDim0),
+        gpu::getMaxEnumValForMappingId());
+    return mlir::gpu::GPUThreadMappingAttr::get(
+        inputOp->getContext(), gpu::symbolizeMappingId(mappingIdInt).value());
+  };
+  for (int64_t threadDim = 0; threadDim < ubs.size(); ++threadDim) {
+    idDims.push_back(getThreadMapping(threadDim));
+  }
+  std::reverse(idDims.begin(), idDims.end());
+  ArrayAttr mapping = rewriter.getArrayAttr(idDims);
+  scf::ForallOp forallOp = rewriter.create<scf::ForallOp>(
+      loc, getAsOpFoldResult((ubs)), dest, mapping);
+  // Extract input slice
+  auto one = rewriter.getIndexAttr(1);
+  auto zero = rewriter.getIndexAttr(0);
+  auto inputTileSizeAttr = rewriter.getIndexAttr(inputTileSize);
+  SmallVector<OpFoldResult> strides(inputOp.getInputOperandRank(), one);
+  SmallVector<OpFoldResult> sizes(inputOp.getInputOperandRank(), one);
+  SmallVector<OpFoldResult> offsets(inputOp.getInputOperandRank(), zero);
+  SmallVector<Value> ivs = forallOp.getInductionVars();
+  rewriter.setInsertionPointToStart(forallOp.getBody());
+  for (int i = 0; i < inputShape.size(); i++) {
+    if (!imageDimsSet.contains(i)) {
+      offsets[i] = ivs[i];
+    } else {
+      AffineExpr dim0;
+      auto it = rewriter.getAffineConstantExpr(inputTileSize);
+      auto ot = rewriter.getAffineConstantExpr(outputTileSize);
+      auto delta = rewriter.getAffineConstantExpr(inputShape[i]);
+      bindDims(rewriter.getContext(), dim0);
+      AffineMap scaleMap =
+          AffineMap::get(1, 0, {dim0 * ot}, rewriter.getContext());
+      offsets[i] = rewriter.createOrFold<affine::AffineApplyOp>(
+          loc, scaleMap, ValueRange{ivs[i]});
+      AffineMap minMap =
+          AffineMap::get(1, 0, {-dim0 + delta, it}, rewriter.getContext());
+      sizes[i] = rewriter.createOrFold<affine::AffineMinOp>(
+          loc, minMap,
+          ValueRange{
+              getValueOrCreateConstantIndexOp(rewriter, loc, offsets[i])});
+    }
+  }
+  auto tensorType = RankedTensorType::get(
+      SmallVector<int64_t>(numImageDims, ShapedType::kDynamic), elementType);
+  if (isNchw) {
+    permute<Permutation::NHWC_TO_NCHW>(offsets);
+    permute<Permutation::NHWC_TO_NCHW>(sizes);
+  }
+  Value dynamicSlice = rewriter.create<tensor::ExtractSliceOp>(
+      loc, tensorType, input, offsets, sizes, strides);
+
+  // Extract output slice
+  auto stridesOutputSlice =
+      SmallVector<OpFoldResult>(inputOp.getOutputOperandRank(), one);
+  auto offsetsOutputSlice = SmallVector<OpFoldResult>(numImageDims, zero);
+  offsetsOutputSlice.append(ivs.begin(), ivs.end());
+  auto sizesOutputSlice =
+      SmallVector<OpFoldResult>(inputOp.getOutputOperandRank(), one);
+  sizesOutputSlice[0] = sizesOutputSlice[1] = inputTileSizeAttr;
+  tensorType = RankedTensorType::get(inputTileSquare, elementType);
+  Value iterArg = forallOp.getRegionOutArgs()[0];
+  Value outputSlice = rewriter.create<tensor::ExtractSliceOp>(
+      loc, tensorType, iterArg, offsetsOutputSlice, sizesOutputSlice,
+      stridesOutputSlice);
+
+  IntegerAttr outputTileSizeI64Attr =
+      rewriter.getI64IntegerAttr(inputOp.getOutputTileSize());
+  IntegerAttr kernelSizeI64Attr =
+      rewriter.getI64IntegerAttr(inputOp.getKernelSize());
+  DenseI64ArrayAttr imageDimensionsDenseI64ArrayAttr =
+      rewriter.getDenseI64ArrayAttr(inputOp.imageDimensions());
+  tiledWinogradInputTransformOp = rewriter.create<WinogradInputTransformOp>(
+      loc, tensorType, dynamicSlice, outputSlice, outputTileSizeI64Attr,
+      kernelSizeI64Attr, imageDimensionsDenseI64ArrayAttr);
+
+  // Insert results into output slice
+  rewriter.setInsertionPointToEnd(forallOp.getTerminator().getBody());
+  rewriter.create<tensor::ParallelInsertSliceOp>(
+      loc, tiledWinogradInputTransformOp.getResult()[0], iterArg,
+      offsetsOutputSlice, sizesOutputSlice, stridesOutputSlice);
+
+  inputOp.getResults()[0].replaceAllUsesWith(forallOp->getResults()[0]);
+
+  return success();
+}
+
 /// Decompose tiled iree_linalg_ext.winograd.input_transform op.
 /// TODO: Adopt decomposeOperation with this.
 static LogicalResult decomposeTiledWinogradInputTransformOp(
@@ -278,11 +414,18 @@ static LogicalResult decomposeTiledWinogradInputTransformOp(
 /// H, W) but the output to this op is always (T, T, N, H', W', C). Since the
 /// first two dimensions are used for the inner matrix multiplication, we
 /// create the loop nest over (N, H', W', C).
-LogicalResult tileAndDecomposeWinogradInputTransformOp(
-    WinogradInputTransformOp inputOp, RewriterBase &rewriter, bool onlyTile) {
+LogicalResult
+tileAndDecomposeWinogradInputTransformOp(WinogradInputTransformOp inputOp,
+                                         RewriterBase &rewriter, bool onlyTile,
+                                         bool useForall) {
   WinogradInputTransformOp tiledWinogradInputTransformOp;
-  if (failed(tileWinogradInputTransformOp(inputOp, rewriter,
-                                          tiledWinogradInputTransformOp))) {
+  if (useForall) {
+    if (failed(tileWinogradInputTransformOpWithForall(
+            inputOp, rewriter, tiledWinogradInputTransformOp))) {
+      return failure();
+    }
+  } else if (failed(tileWinogradInputTransformOp(
+                 inputOp, rewriter, tiledWinogradInputTransformOp))) {
     return failure();
   }
   if (onlyTile) {
@@ -414,6 +557,127 @@ static LogicalResult tileWinogradOutputTransformOp(
   return success();
 }
 
+/// Tile iree_linalg_ext.winograd.output_transform op.
+/// TODO: Adopt getTiledImplementation with this.
+static LogicalResult tileWinogradOutputTransformOpWithForall(
+    WinogradOutputTransformOp outputOp, RewriterBase &rewriter,
+    WinogradOutputTransformOp &tiledWinogradOutputTransformOp) {
+  Location loc = outputOp.getLoc();
+  auto funcOp = outputOp->getParentOfType<mlir::FunctionOpInterface>();
+  if (!funcOp) {
+    return rewriter.notifyMatchFailure(outputOp,
+                                       "Could not find parent function");
+  }
+
+  const int64_t inputTileSize = outputOp.getInputTileSize();
+  const int64_t outputTileSize = outputOp.getOutputTileSize();
+  switch (outputTileSize) {
+  case 6:
+    break;
+  default:
+    return failure();
+  }
+
+  Value input = outputOp.input();
+  Value output = outputOp.output();
+  auto outputType = output.getType().cast<ShapedType>();
+  ArrayRef<int64_t> outputShape = outputType.getShape();
+  Type elementType = outputType.getElementType();
+  const std::array<int64_t, 2> imageDims = outputOp.nhwcImageDimensions();
+  const size_t numImageDims = imageDims.size();
+  llvm::SmallSetVector<int64_t, 2> imageDimsSet(imageDims.begin(),
+                                                imageDims.end());
+  SmallVector<int64_t> inputTileSquare(imageDims.size(), inputTileSize);
+
+  rewriter.setInsertionPointToStart(&funcOp.getFunctionBody().front());
+
+  SmallVector<Value> lbs, ubs, steps;
+  computeLoopParams(lbs, ubs, steps, input, numImageDims, loc, rewriter);
+  // Construct loops
+  rewriter.setInsertionPoint(outputOp);
+  SmallVector<Value> dest;
+  if (failed(tensor::getOrCreateDestinations(rewriter, loc, outputOp, dest)))
+    return outputOp->emitOpError("failed to get destination tensors");
+  SmallVector<Attribute> idDims;
+  auto getThreadMapping = [&](int64_t dim) {
+    auto mappingIdInt = std::min<int64_t>(
+        dim + static_cast<uint64_t>(gpu::MappingId::LinearDim0),
+        gpu::getMaxEnumValForMappingId());
+    return mlir::gpu::GPUThreadMappingAttr::get(
+        outputOp->getContext(), gpu::symbolizeMappingId(mappingIdInt).value());
+  };
+  for (int64_t threadDim = 0; threadDim < ubs.size(); ++threadDim) {
+    idDims.push_back(getThreadMapping(threadDim));
+  }
+  std::reverse(idDims.begin(), idDims.end());
+  ArrayAttr mapping = rewriter.getArrayAttr(idDims);
+  scf::ForallOp forallOp = rewriter.create<scf::ForallOp>(
+      loc, getAsOpFoldResult((ubs)), dest, mapping);
+  SmallVector<Value> ivs = forallOp.getInductionVars();
+
+  // Extract input slice
+  rewriter.setInsertionPointToStart(forallOp.getBody());
+  auto one = rewriter.getIndexAttr(1);
+  auto zero = rewriter.getIndexAttr(0);
+  auto inputTileSizeAttr = rewriter.getIndexAttr(inputTileSize);
+  auto outputTileSizeAttr = rewriter.getIndexAttr(outputTileSize);
+  SmallVector<OpFoldResult> strides(outputOp.getInputOperandRank(), one);
+  SmallVector<OpFoldResult> sizes(outputOp.getInputOperandRank(), one);
+  SmallVector<OpFoldResult> offsets(numImageDims, zero);
+  sizes[0] = sizes[1] = inputTileSizeAttr;
+  offsets.append(ivs.begin(), ivs.end());
+  auto tensorType = RankedTensorType::get(inputTileSquare, elementType);
+  tensor::ExtractSliceOp extractSliceOp =
+      rewriter.create<tensor::ExtractSliceOp>(loc, tensorType, input, offsets,
+                                              sizes, strides);
+  Value inputSlice = extractSliceOp.getResult();
+
+  // Extract output slice
+  strides = SmallVector<OpFoldResult>(outputOp.getOutputOperandRank(), one);
+  offsets = SmallVector<OpFoldResult>(outputOp.getOutputOperandRank(), zero);
+  sizes = SmallVector<OpFoldResult>(outputOp.getOutputOperandRank(), one);
+  for (int i = 0; i < outputShape.size(); i++) {
+    if (!imageDimsSet.contains(i)) {
+      offsets[i] = ivs[i];
+    } else {
+      AffineExpr dim0;
+      auto ot = rewriter.getAffineConstantExpr(outputTileSize);
+      bindDims(rewriter.getContext(), dim0);
+      AffineMap scaleMap =
+          AffineMap::get(1, 0, {dim0 * ot}, rewriter.getContext());
+      offsets[i] = rewriter.createOrFold<affine::AffineApplyOp>(
+          loc, scaleMap, ValueRange{ivs[i]});
+      sizes[i] = outputTileSizeAttr;
+    }
+  }
+  tensorType = RankedTensorType::get(
+      SmallVector<int64_t>(numImageDims, outputTileSize), elementType);
+  if (outputOp.isNchw()) {
+    permute<Permutation::NHWC_TO_NCHW>(offsets);
+    permute<Permutation::NHWC_TO_NCHW>(sizes);
+  }
+  Value iterArg = forallOp.getRegionOutArgs()[0];
+  Value outputSlice = rewriter.create<tensor::ExtractSliceOp>(
+      loc, tensorType, iterArg, offsets, sizes, strides);
+
+  IntegerAttr outputTileSizeI64Attr =
+      rewriter.getI64IntegerAttr(outputOp.getOutputTileSize());
+  IntegerAttr kernelSizeI64Attr =
+      rewriter.getI64IntegerAttr(outputOp.getKernelSize());
+  DenseI64ArrayAttr imageDimensionsDenseI64ArrayAttr =
+      rewriter.getDenseI64ArrayAttr(outputOp.imageDimensions());
+  tiledWinogradOutputTransformOp = rewriter.create<WinogradOutputTransformOp>(
+      loc, tensorType, inputSlice, outputSlice, outputTileSizeI64Attr,
+      kernelSizeI64Attr, imageDimensionsDenseI64ArrayAttr);
+
+  rewriter.setInsertionPointToEnd(forallOp.getTerminator().getBody());
+  rewriter.create<tensor::ParallelInsertSliceOp>(
+      loc, tiledWinogradOutputTransformOp.getResult()[0], iterArg, offsets,
+      sizes, strides);
+  outputOp.getResults()[0].replaceAllUsesWith(forallOp.getResults()[0]);
+  return success();
+}
+
 /// Decompose tiled iree_linalg_ext.winograd.output_transform op.
 /// TODO: Adopt decomposeOperation with this.
 static LogicalResult decomposeTiledWinogradOutputTransformOp(
@@ -483,11 +747,18 @@ static LogicalResult decomposeTiledWinogradOutputTransformOp(
 
 /// The input to WinogradOutputTransformOp is always (T, T, N, H', W', C)
 /// but the output is either (N, H, W, C) or (N, C, H, W).
-LogicalResult tileAndDecomposeWinogradOutputTransformOp(
-    WinogradOutputTransformOp outputOp, RewriterBase &rewriter, bool onlyTile) {
+LogicalResult
+tileAndDecomposeWinogradOutputTransformOp(WinogradOutputTransformOp outputOp,
+                                          RewriterBase &rewriter, bool onlyTile,
+                                          bool useForall) {
   WinogradOutputTransformOp tiledWinogradOutputTransformOp;
-  if (failed(tileWinogradOutputTransformOp(outputOp, rewriter,
-                                           tiledWinogradOutputTransformOp))) {
+  if (useForall) {
+    if (failed(tileWinogradOutputTransformOpWithForall(
+            outputOp, rewriter, tiledWinogradOutputTransformOp))) {
+      return failure();
+    }
+  } else if (failed(tileWinogradOutputTransformOp(
+                 outputOp, rewriter, tiledWinogradOutputTransformOp))) {
     return failure();
   }
   if (onlyTile) {
@@ -510,12 +781,14 @@ struct TileAndDecomposeWinogradTransformPass
   }
 
   TileAndDecomposeWinogradTransformPass() = default;
-  TileAndDecomposeWinogradTransformPass(bool onlyTile) {
+  TileAndDecomposeWinogradTransformPass(bool onlyTile, bool useForall) {
     this->onlyTile = onlyTile;
+    this->useForall = useForall;
   }
   TileAndDecomposeWinogradTransformPass(
       const TileAndDecomposeWinogradTransformPass &pass) {
     onlyTile = pass.onlyTile;
+    useForall = pass.useForall;
   }
 
   void runOnOperation() override;
@@ -523,19 +796,19 @@ struct TileAndDecomposeWinogradTransformPass
 } // namespace
 
 LogicalResult reifyWinogradTransform(mlir::FunctionOpInterface funcOp,
-                                     bool onlyTile) {
+                                     bool onlyTile, bool useForall) {
   IRRewriter rewriter(funcOp.getContext());
   LogicalResult resultOfTransformations = success();
   funcOp.walk([&](WinogradInputTransformOp inputOp) {
     if (failed(tileAndDecomposeWinogradInputTransformOp(inputOp, rewriter,
-                                                        onlyTile))) {
+                                                        onlyTile, useForall))) {
       resultOfTransformations = failure();
     }
     return WalkResult::advance();
   });
   funcOp.walk([&](WinogradOutputTransformOp outputOp) {
-    if (failed(tileAndDecomposeWinogradOutputTransformOp(outputOp, rewriter,
-                                                         onlyTile))) {
+    if (failed(tileAndDecomposeWinogradOutputTransformOp(
+            outputOp, rewriter, onlyTile, useForall))) {
       resultOfTransformations = failure();
     }
     return WalkResult::advance();
@@ -544,14 +817,15 @@ LogicalResult reifyWinogradTransform(mlir::FunctionOpInterface funcOp,
 }
 
 void TileAndDecomposeWinogradTransformPass::runOnOperation() {
-  if (failed(reifyWinogradTransform(getOperation(), onlyTile))) {
+  if (failed(reifyWinogradTransform(getOperation(), onlyTile, useForall))) {
     return signalPassFailure();
   }
 }
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createTileAndDecomposeWinogradTransformPass() {
-  return std::make_unique<TileAndDecomposeWinogradTransformPass>();
+createTileAndDecomposeWinogradTransformPass(bool onlyTile, bool useForall) {
+  return std::make_unique<TileAndDecomposeWinogradTransformPass>(onlyTile,
+                                                                 useForall);
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt

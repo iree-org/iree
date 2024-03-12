@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/WinogradConstants.h"
 #include "llvm/ADT/SetVector.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -167,15 +168,18 @@ public:
     Value kernel = convOp.getInputs()[1];
     auto kernelType = kernel.getType().cast<ShapedType>();
     if (!kernelType) {
+      llvm::dbgs() << "kernelType\n";
       return failure();
     }
     ArrayRef<int64_t> kernelShape = kernelType.getShape();
     if (kernelShape.size() != 4) {
+      llvm::dbgs() << "kernelShape.size\n";
       return failure();
     }
     const int64_t kh = isNchw ? kernelShape[2] : kernelShape[0];
     const int64_t kw = isNchw ? kernelShape[3] : kernelShape[1];
     if ((kh != 3) || (kw != 3)) {
+      llvm::dbgs() << "not 3\n";
       return failure();
     }
     const int64_t kernelSize = kh;
@@ -183,6 +187,7 @@ public:
 
     DenseIntOrFPElementsAttr kernelAttr;
     if (!matchPattern(kernel, m_Constant(&kernelAttr))) {
+      llvm::dbgs() << "not constant\n";
       return failure();
     }
 
