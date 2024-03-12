@@ -718,6 +718,8 @@ void addGPUBaseLoweringPassPipeline(OpPassManager &pm) {
   nestedModulePM.addPass(createCSEPass());
 }
 
+void addGPUImplicitGEMMPassPipeline(OpPassManager &pm) {}
+
 // Add passes to make the address computation more explicit and optimize them.
 //
 // The idea here is to be less dependent on what the LLVM backend is able to do,

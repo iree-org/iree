@@ -54,6 +54,9 @@ public:
     case CodeGenPipeline::LLVMGPUWarpReduction:
       addGPUWarpReductionPassPipeline(pipeline);
       break;
+    case CodeGenPipeline::LLVMGPUImplicitGEMM:
+      addGPUImplicitGEMMPassPipeline(pipeline);
+      break;
     // If no pipeline specified, then nothing to do.
     case IREE::Codegen::DispatchLoweringPassPipeline::None:
       return;

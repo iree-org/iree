@@ -60,6 +60,11 @@ def LLVMGPUCastTypeToFitMMA : InterfacePass<"iree-llvmgpu-cast-type-to-fit-mma",
   let constructor = "mlir::iree_compiler::createLLVMGPUCastTypeToFitMMAPass()";
 }
 
+def LLVMGPUIm2Col : Pass<"iree-llvmgpu-im2col", ""> {
+  let summary = "Perform Im2Col conversion for convolution operations";
+  let constructor = "mlir::iree_compiler::createLLVMGPUIm2ColPass()";
+}
+
 def LLVMGPULowerExecutableTarget :
     Pass<"iree-llvmgpu-lower-executable-target", "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
   let summary = "Perform lowering of executable target using one of the IREE::HAL::DispatchLoweringPassPipeline";

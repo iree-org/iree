@@ -80,6 +80,7 @@ iree_cc_library(
     "KernelConfig.cpp"
     "LLVMGPUCastAddressSpaceFunction.cpp"
     "LLVMGPUCastTypeToFitMMA.cpp"
+    "LLVMGPUIm2ColPass.cpp"
     "LLVMGPULowerExecutableTarget.cpp"
     "LLVMGPUPackSharedMemoryAlloc.cpp"
     "LLVMGPUPrefetching.cpp"
