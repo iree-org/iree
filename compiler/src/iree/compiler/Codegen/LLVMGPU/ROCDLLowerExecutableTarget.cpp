@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -28,10 +29,10 @@ class ROCDLLowerExecutableTargetPass
     : public ROCDLLowerExecutableTargetBase<ROCDLLowerExecutableTargetPass> {
 public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry
-        .insert<IREE::HAL::HALDialect, IREE::LinalgExt::IREELinalgExtDialect,
-                gpu::GPUDialect, linalg::LinalgDialect, scf::SCFDialect,
-                tensor::TensorDialect, vector::VectorDialect>();
+    registry.insert<bufferization::BufferizationDialect, IREE::HAL::HALDialect,
+                    IREE::LinalgExt::IREELinalgExtDialect, gpu::GPUDialect,
+                    linalg::LinalgDialect, scf::SCFDialect,
+                    tensor::TensorDialect, vector::VectorDialect>();
   }
 
   void runOnOperation() override {
