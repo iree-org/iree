@@ -175,7 +175,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       // producers.
       .addPass([&]() {
         return createFormDispatchRegionsPass(FormDispatchRegionsOptions{
-            clEnableFuseMultiUse, clDispatchGenerateWorkloadRegion,
+            true, clDispatchGenerateWorkloadRegion,
             clEnableFusePaddingIntoLinalgConsumerOps,
             clEnableFusePaddingIntoLinalgProducerOps});
       })

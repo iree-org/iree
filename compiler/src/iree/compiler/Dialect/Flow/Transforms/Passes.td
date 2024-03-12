@@ -69,7 +69,7 @@ def FormDispatchRegions :
   let constructor = "mlir::iree_compiler::IREE::Flow::createFormDispatchRegionsPass()";
   let options = [
     Option<"fuseMultiUse", "fuse-multi-use", "bool",
-           /*default=*/"false", "Fuse multi-use ops">,
+           /*default=*/"true", "Fuse multi-use ops">,
     Option<"generateWorkloadRegion", "genereate-workload-region", "bool",
            /*default=*/"true", "Generate workload regions of WorkgroupOps">,
     Option<"fusePadWithConsumers", "fuse-pad-with-consumers", "bool",
