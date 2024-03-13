@@ -49,7 +49,8 @@ pipelineSharedMemoryCopy(RewriterBase &rewriter, scf::ForOp forOp,
 /// loops without distribution. If `fuseInputProducer` is true, input producers
 /// will be fused into the serial loop.
 LogicalResult tileReductionToSerialLoops(mlir::FunctionOpInterface funcOp,
-                                         bool fuseInputProducer = false);
+                                         bool fuseInputProducer = false,
+                                         bool collapseLoops = false);
 
 LogicalResult swizzleWorkgroupsInFunc(mlir::FunctionOpInterface funcOp,
                                       unsigned swizzleLogTile);
@@ -119,7 +120,7 @@ createGPUTensorTile(bool distributeToWarp = false);
 
 // Creates a pass to tile tensor (linalg) ops along reduction dimensions.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createGPUTensorTileToSerialLoops();
+createGPUTensorTileToSerialLoops(bool collapseLoops = false);
 
 /// Tile reductions and generate serial loops around reductions.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
