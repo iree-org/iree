@@ -34,6 +34,7 @@ iree_cc_library(
     "PadLinalgOps.cpp"
     "PassDetail.h"
     "Passes.cpp"
+    "TransposeAttentionValueOperand.cpp"
   DEPS
     ::PassesIncGen
     LLVMSupport

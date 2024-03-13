@@ -82,4 +82,11 @@ def PadLinalgOps :
   ];
 }
 
+def TransposeAttentionValueOperand :
+    Pass<"iree-preprocessing-transpose-attention-value-operand", ""> {
+  let summary = "Convert attention ops to attention ops with value operand transposed";
+  let constructor =
+      "mlir::iree_compiler::Preprocessing::createTransposeAttentionValueOperand()";
+}
+
 #endif  // IREE_PREPROCESSING_COMMON_PASSES
