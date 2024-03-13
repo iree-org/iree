@@ -363,6 +363,46 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // -----
 
+#layout = #iree_vector_ext.nested_layout<
+  subgroups_per_workgroup = [2],
+  batches_per_subgroup    = [1],
+  outers_per_batch        = [1],
+  threads_per_outer       = [16],
+  elements_per_thread     = [4],
+
+  subgroup_basis          = [2, 2],
+  subgroup_active_ids       = [false, true],
+  thread_basis            = [4, 16],
+  thread_active_ids       = [false, true]
+>
+
+// CHECK-DAG: #[[$MAP:.+]] = affine_map<()[s0, s1] -> (s0 * 64 + s1 * 4)>
+
+// CHECK-LABEL: @distribute_transfer_read_broadcast
+func.func @distribute_transfer_read_broadcast(%arg0: memref<32x128xf16>) -> vector<128xf16> {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.0 : f16
+  %root = vector.transfer_read %arg0[%c0, %c0], %cst
+          {in_bounds = [true],
+           "__vector_layout_test_anchor_result_0" = #layout}
+                  : memref<32x128xf16>, vector<128xf16>
+  func.return %root : vector<128xf16>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK: %[[IDS:.+]]:4 = affine.delinearize_index %{{.*}} into (%c2, %c2, %c4, %c16) : index, index, index, index
+// CHECK: %[[LANEY:.+]] = affine.apply #[[$MAP]]()[%[[IDS]]#1, %[[IDS]]#3]
+// CHECK: %[[RD:.+]] = vector.transfer_read %{{.*}}[%c0, %[[LANEY:.+]]], {{.*}} : memref<32x128xf16>, vector<4xf16>
+
+// -----
+
 #layout_row_major = #iree_vector_ext.nested_layout<
   subgroups_per_workgroup = [1, 1],
   batches_per_subgroup    = [2, 2],
