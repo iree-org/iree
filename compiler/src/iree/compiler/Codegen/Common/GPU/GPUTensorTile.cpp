@@ -34,10 +34,11 @@ class TileConsumerAndFuseInputProducer final
 public:
   TileConsumerAndFuseInputProducer(MLIRContext *context,
                                    LinalgTransformationFilter filter,
-                                   bool fuseInputProducer,
+                                   bool fuseInputProducer, bool collapseLoops,
                                    PatternBenefit benefit = 1)
       : OpInterfaceRewritePattern<TilingInterface>(context, benefit),
-        filter(std::move(filter)), fuseInputProducer(fuseInputProducer) {}
+        filter(std::move(filter)), fuseInputProducer(fuseInputProducer),
+        collapseLoops(collapseLoops) {}
 
   LogicalResult matchAndRewrite(TilingInterface op,
                                 PatternRewriter &rewriter) const override {
@@ -85,6 +86,17 @@ public:
     rewriter.replaceOp(op, tilingResult->replacements);
     filter.replaceLinalgTransformationFilter(rewriter,
                                              tilingResult->tiledOps.front());
+
+    if (collapseLoops) {
+      SmallVector<scf::ForOp> loops = llvm::map_to_vector(
+          tilingResult->loops, [](LoopLikeOpInterface loop) {
+            return cast<scf::ForOp>(loop.getOperation());
+          });
+      if (failed(coalesceLoops(rewriter, loops))) {
+        return failure();
+      }
+    }
+
     return success();
   }
 
@@ -158,13 +170,14 @@ private:
 
   LinalgTransformationFilter filter;
   bool fuseInputProducer;
+  bool collapseLoops;
 };
 
 /// Patterns for workgroup level tiling. Workgroup tiling is done at the flow
 /// level but we may have extra tiling for the reduction dimension. Therefore we
 /// tile again without distributing.
 static void populateTilingPatterns(RewritePatternSet &patterns,
-                                   bool fuseInputProducer) {
+                                   bool fuseInputProducer, bool collapseLoops) {
   MLIRContext *context = patterns.getContext();
 
   LinalgTransformationFilter filter(
@@ -173,18 +186,19 @@ static void populateTilingPatterns(RewritePatternSet &patterns,
       StringAttr::get(context, getWorkgroupKTiledMarker()));
   filter.setMatchByDefault();
 
-  patterns.add<TileConsumerAndFuseInputProducer>(context, filter,
-                                                 fuseInputProducer);
+  patterns.add<TileConsumerAndFuseInputProducer>(
+      context, filter, fuseInputProducer, collapseLoops);
 }
 
 LogicalResult tileReductionToSerialLoops(mlir::FunctionOpInterface funcOp,
-                                         bool fuseInputProducer) {
+                                         bool fuseInputProducer,
+                                         bool collapseLoops) {
   {
     // Tile again at the workgroup level since redution dimension were
     // ignored. Dimensions already tiled will be ignore since we tile to the
     // same size.
     RewritePatternSet wgTilingPatterns(funcOp.getContext());
-    populateTilingPatterns(wgTilingPatterns, fuseInputProducer);
+    populateTilingPatterns(wgTilingPatterns, fuseInputProducer, collapseLoops);
     if (failed(applyPatternsAndFoldGreedily(funcOp,
                                             std::move(wgTilingPatterns)))) {
       return failure();
