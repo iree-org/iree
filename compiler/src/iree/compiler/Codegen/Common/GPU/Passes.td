@@ -101,6 +101,10 @@ def GPUTensorTileToSerialLoops :
     InterfacePass<"iree-codegen-gpu-tensor-tile-to-serial-loops", "mlir::FunctionOpInterface"> {
   let summary = "Pass to tile reduction dimensions for certain GPU ops";
   let constructor = "mlir::iree_compiler::createGPUTensorTileToSerialLoops()";
+  let options = [
+    Option<"collapseLoops", "collapse-loops", "bool", /*default=*/"true",
+           "Collapse the loops that are generated to a single loops">,
+  ];
 }
 
 def GPUTileReduction :

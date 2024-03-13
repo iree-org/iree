@@ -17,13 +17,21 @@ struct GPUTensorTensorTileToSerialLoopsPass final
     : public GPUTensorTileToSerialLoopsBase<
           GPUTensorTensorTileToSerialLoopsPass> {
 public:
+  GPUTensorTensorTileToSerialLoopsPass(bool optionsCollapseLoops = false) {
+    collapseLoops = optionsCollapseLoops;
+  }
+  GPUTensorTensorTileToSerialLoopsPass(
+      const GPUTensorTensorTileToSerialLoopsPass &pass) {
+    collapseLoops = pass.collapseLoops;
+  }
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<scf::SCFDialect>();
   }
   void runOnOperation() override {
     // Tile reductions based on the annotated tiling configuration.
     if (failed(tileReductionToSerialLoops(getOperation(),
-                                          /*fuseInputProducer=*/true))) {
+                                          /*fuseInputProducer=*/true,
+                                          collapseLoops))) {
       return signalPassFailure();
     }
   }
@@ -31,8 +39,8 @@ public:
 } // namespace
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createGPUTensorTileToSerialLoops() {
-  return std::make_unique<GPUTensorTensorTileToSerialLoopsPass>();
+createGPUTensorTileToSerialLoops(bool collapseLoops) {
+  return std::make_unique<GPUTensorTensorTileToSerialLoopsPass>(collapseLoops);
 }
 
 } // namespace mlir::iree_compiler

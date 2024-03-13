@@ -527,7 +527,7 @@ void addGPUVectorDistributePassPipeline(OpPassManager &pm) {
 
   // Problem specific (reduction) tiling.
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createGPUTensorTileToSerialLoops());
+      createGPUTensorTileToSerialLoops(true));
 
   // Generalize all named ops so that we can fold away unit extent dims. By this
   // point, all tiling is finished so the tiling configurations on those ops can
