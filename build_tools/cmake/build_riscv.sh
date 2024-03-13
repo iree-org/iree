@@ -55,7 +55,6 @@ if [[ "${RISCV_PLATFORM}" == "linux" ]]; then
   args+=(
     -DRISCV_TOOLCHAIN_ROOT="${RISCV_RV64_LINUX_TOOLCHAIN_ROOT}"
     -DRISCV_TOOLCHAIN_PREFIX="riscv64-unknown-linux-gnu-"
-    -DRISCV_LINKER_FLAGS_EXE="-static"
   )
 elif [[ "${RISCV_PLATFORM_ARCH}" == "generic-riscv_32" ]]; then
   args+=(
@@ -81,6 +80,7 @@ case "${BUILD_PRESET}" in
       -DIREE_ENABLE_ASSERTIONS=OFF
       -DIREE_BUILD_SAMPLES=OFF
       -DIREE_BUILD_TESTS=OFF
+      -DRISCV_LINKER_FLAGS_EXE="-static"
     )
     ;;
   benchmark-with-tracing)
@@ -89,6 +89,7 @@ case "${BUILD_PRESET}" in
       -DIREE_BUILD_SAMPLES=OFF
       -DIREE_BUILD_TESTS=OFF
       -DIREE_ENABLE_RUNTIME_TRACING=ON
+      -DRISCV_LINKER_FLAGS_EXE="-static"
     )
     ;;
   benchmark-suite-test)
