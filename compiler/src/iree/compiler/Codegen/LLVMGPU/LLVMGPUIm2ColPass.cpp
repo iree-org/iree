@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler {
 
@@ -60,6 +61,13 @@ void LLVMGPUIm2ColPass::runOnOperation() {
       continue;
     }
   }
+
+  // Bubble collapse
+
+  RewritePatternSet patterns(&getContext());
+  linalg::populateFoldReshapeOpsByCollapsingPatterns(
+      patterns, [](OpOperand *) { return true; });
+  (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
 }
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
