@@ -893,7 +893,7 @@ static LogicalResult setWinogradOpConfig(mlir::FunctionOpInterface entryPoint,
   llvm::dbgs() << "using normal KenelConfig\n";
   auto pipeline =
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUWinogradVectorize;
-  std::array<int64_t, 3> workgroupSize = {32, 4, 4};
+  std::array<int64_t, 3> workgroupSize = {64, 4, 4};
   TileSizesListType tileSizes = {{1, 32}};
   return setOpConfigAndEntryPointFnTranslation(entryPoint, op, tileSizes,
                                                pipeline, workgroupSize);

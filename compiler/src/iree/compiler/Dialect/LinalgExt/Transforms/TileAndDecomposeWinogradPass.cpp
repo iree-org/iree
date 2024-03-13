@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/PassDetail.h"
@@ -11,14 +12,21 @@
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/WinogradConstants.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/Sequence.h"
+#include "llvm/ADT/SmallVectorExtras.h"
+#include "llvm/ADT/bit.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/IR/Builders.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -174,6 +182,52 @@ static LogicalResult tileWinogradInputTransformOp(
   return success();
 }
 
+static void computeForallAndForUpperBounds(OpBuilder &builder, Location loc,
+                                           SmallVector<Value> ubs,
+                                           uint64_t workgroupSize,
+                                           SmallVector<Value> &forallUbs,
+                                           SmallVector<Value> &forUbs,
+                                           SmallVector<int64_t> &forallInds,
+                                           SmallVector<int64_t> &forInds) {
+  uint64_t totalIters = 1;
+  for (int64_t idx = 0; idx < ubs.size() - 1; ++idx) {
+    auto ub = ubs[idx];
+    auto constUb = getConstantIntValue(ub);
+    if (!constUb.has_value()) {
+      forUbs.push_back(ub);
+      forInds.push_back(idx);
+      continue;
+    }
+    totalIters *= constUb.value();
+    if (totalIters <= workgroupSize) {
+      forallUbs.push_back(ub);
+      forallInds.push_back(idx);
+    } else {
+      forUbs.push_back(ub);
+      forInds.push_back(idx);
+    }
+  }
+  auto innerTile = getConstantIntValue(ubs.back());
+  if (!innerTile.has_value()) {
+    forUbs.push_back(ubs.back());
+    forInds.push_back(ubs.size() - 1);
+    return;
+  }
+  if (innerTile.value() * totalIters <= workgroupSize) {
+    forallUbs.push_back(ubs.back());
+    forallInds.push_back(ubs.size() - 1);
+    return;
+  }
+  int64_t forallInnerTile = llvm::bit_floor(workgroupSize / totalIters);
+  int64_t forInnerTile = innerTile.value() / forallInnerTile;
+  Value forallUb = builder.create<arith::ConstantIndexOp>(loc, forallInnerTile);
+  Value forUb = builder.create<arith::ConstantIndexOp>(loc, forInnerTile);
+  forallUbs.push_back(forallUb);
+  forallInds.push_back(ubs.size() - 1);
+  forUbs.push_back(forUb);
+  forInds.push_back(ubs.size() - 1);
+}
+
 /// Tile iree_linalg_ext.winograd.input_transform op.
 /// TODO: Adopt getTiledImplementation with this.
 static LogicalResult tileWinogradInputTransformOpWithForall(
@@ -186,6 +240,10 @@ static LogicalResult tileWinogradInputTransformOpWithForall(
                                        "Could not find parent function");
   }
 
+  auto workgroupSizes = llvm::map_to_vector(
+      getEntryPoint(funcOp)->getWorkgroupSize().value(),
+      [&](Attribute attr) { return llvm::cast<IntegerAttr>(attr).getInt(); });
+  int64_t workgroupSize = computeProduct(workgroupSizes);
   const int64_t inputTileSize = inputOp.getInputTileSize();
   const int64_t outputTileSize = inputOp.getOutputTileSize();
   switch (outputTileSize) {
@@ -216,11 +274,9 @@ static LogicalResult tileWinogradInputTransformOpWithForall(
   SmallVector<Value> lbs, ubs, steps;
   computeLoopParams(lbs, ubs, steps, output, numImageDims, loc, rewriter);
   // Construct loops
-  rewriter.setInsertionPoint(inputOp);
-  SmallVector<Value> dest;
-  if (failed(tensor::getOrCreateDestinations(rewriter, loc, inputOp, dest)))
-    return inputOp->emitOpError("failed to get destination tensors");
-  SmallVector<Attribute> idDims;
+  // SmallVector<Value> dest;
+  // if (failed(tensor::getOrCreateDestinations(rewriter, loc, inputOp, dest)))
+  //   return inputOp->emitOpError("failed to get destination tensors");
   auto getThreadMapping = [&](int64_t dim) {
     auto mappingIdInt = std::min<int64_t>(
         dim + static_cast<uint64_t>(gpu::MappingId::LinearDim0),
@@ -228,13 +284,71 @@ static LogicalResult tileWinogradInputTransformOpWithForall(
     return mlir::gpu::GPUThreadMappingAttr::get(
         inputOp->getContext(), gpu::symbolizeMappingId(mappingIdInt).value());
   };
-  for (int64_t threadDim = 0; threadDim < ubs.size(); ++threadDim) {
-    idDims.push_back(getThreadMapping(threadDim));
+  SmallVector<int64_t> forallInds, forInds;
+  SmallVector<Value> forallUbs, forUbs;
+  computeForallAndForUpperBounds(rewriter, loc, ubs, workgroupSize, forallUbs,
+                                 forUbs, forallInds, forInds);
+  SmallVector<Attribute> idDims;
+  for (int i = 0; i < forallUbs.size(); i++) {
+    idDims.push_back(getThreadMapping(i));
   }
   std::reverse(idDims.begin(), idDims.end());
   ArrayAttr mapping = rewriter.getArrayAttr(idDims);
+  scf::LoopNest loopNest;
+  auto loopNestSelect = [&](SmallVector<Value> vals) {
+    return llvm::map_to_vector(forInds, [&](auto ind) { return vals[ind]; });
+  };
+  if (!forInds.empty()) {
+    rewriter.setInsertionPoint(inputOp);
+    loopNest = scf::buildLoopNest(
+        rewriter, loc, loopNestSelect(lbs), forUbs, loopNestSelect(steps),
+        ValueRange({output}),
+        [&](OpBuilder &nestedBuilder, Location loc, ValueRange outputIvs,
+            ValueRange iterArgs) -> scf::ValueVector { return {iterArgs[0]}; });
+  }
+
+  Location forallLoc =
+      loopNest.loops.empty() ? loc : loopNest.loops.back()->getLoc();
+  Value forallOut = loopNest.loops.empty()
+                        ? output
+                        : loopNest.loops.back().getRegionIterArg(0);
+  if (!loopNest.loops.empty()) {
+    rewriter.setInsertionPointToStart(loopNest.loops.back().getBody());
+  } else {
+    rewriter.setInsertionPoint(inputOp);
+  }
   scf::ForallOp forallOp = rewriter.create<scf::ForallOp>(
-      loc, getAsOpFoldResult((ubs)), dest, mapping);
+      forallLoc, getAsOpFoldResult((forallUbs)), forallOut, mapping);
+  Value iterArg = forallOp.getRegionOutArgs()[0];
+  SmallVector<Value> forAllIvs = forallOp.getInductionVars();
+  int64_t forIdx = 0, forallIdx = 0;
+  SmallVector<Value> ivs;
+  SetVector<int64_t> forIndsSet(forInds.begin(), forInds.end());
+  SetVector<int64_t> forallIndsSet(forallInds.begin(), forallInds.end());
+  for (int64_t idx = 0; idx < ubs.size() - 1; ++idx) {
+    if (forIndsSet.contains(idx)) {
+      ivs.push_back(loopNest.loops[forIdx++].getInductionVar());
+    } else {
+      ivs.push_back(forAllIvs[forallIdx++]);
+    }
+  }
+  if (forallUbs.size() + forUbs.size() > ubs.size()) {
+    rewriter.setInsertionPointToStart(forallOp.getBody());
+    AffineExpr s0, s1;
+    bindSymbols(rewriter.getContext(), s0);
+    bindSymbols(rewriter.getContext(), s1);
+    AffineMap map = AffineMap::get(0, 2, {s0 * s1}, rewriter.getContext());
+    Value iv = rewriter.createOrFold<affine::AffineApplyOp>(
+        forallOp->getLoc(), map,
+        ValueRange{loopNest.loops[forIdx++].getInductionVar(),
+                   forAllIvs[forallIdx++]});
+    ivs.push_back(iv);
+  } else if (forIndsSet.contains(ubs.size() - 1)) {
+    ivs.push_back(loopNest.loops[forIdx++].getInductionVar());
+  } else {
+    ivs.push_back(forAllIvs[forallIdx++]);
+  }
+
   // Extract input slice
   auto one = rewriter.getIndexAttr(1);
   auto zero = rewriter.getIndexAttr(0);
@@ -242,9 +356,15 @@ static LogicalResult tileWinogradInputTransformOpWithForall(
   SmallVector<OpFoldResult> strides(inputOp.getInputOperandRank(), one);
   SmallVector<OpFoldResult> sizes(inputOp.getInputOperandRank(), one);
   SmallVector<OpFoldResult> offsets(inputOp.getInputOperandRank(), zero);
-  SmallVector<Value> ivs = forallOp.getInductionVars();
+  forIdx = 0;
+
   rewriter.setInsertionPointToStart(forallOp.getBody());
   for (int i = 0; i < inputShape.size(); i++) {
+    OpBuilder::InsertionGuard g(rewriter);
+    if (!forallIndsSet.contains(i)) {
+      rewriter.setInsertionPoint(
+          loopNest.loops[forIdx++].getBody()->getTerminator());
+    }
     if (!imageDimsSet.contains(i)) {
       offsets[i] = ivs[i];
     } else {
@@ -265,6 +385,7 @@ static LogicalResult tileWinogradInputTransformOpWithForall(
               getValueOrCreateConstantIndexOp(rewriter, loc, offsets[i])});
     }
   }
+  rewriter.setInsertionPoint(forallOp.getBody()->getTerminator());
   auto tensorType = RankedTensorType::get(
       SmallVector<int64_t>(numImageDims, ShapedType::kDynamic), elementType);
   if (isNchw) {
@@ -283,10 +404,11 @@ static LogicalResult tileWinogradInputTransformOpWithForall(
       SmallVector<OpFoldResult>(inputOp.getOutputOperandRank(), one);
   sizesOutputSlice[0] = sizesOutputSlice[1] = inputTileSizeAttr;
   tensorType = RankedTensorType::get(inputTileSquare, elementType);
-  Value iterArg = forallOp.getRegionOutArgs()[0];
-  Value outputSlice = rewriter.create<tensor::ExtractSliceOp>(
-      loc, tensorType, iterArg, offsetsOutputSlice, sizesOutputSlice,
-      stridesOutputSlice);
+  // Value outputSlice = rewriter.create<tensor::ExtractSliceOp>(
+  //     loc, tensorType, iterArg, offsetsOutputSlice, sizesOutputSlice,
+  //     stridesOutputSlice);
+  Value outputSlice =
+      rewriter.create<tensor::EmptyOp>(loc, tensorType.getShape(), elementType);
 
   IntegerAttr outputTileSizeI64Attr =
       rewriter.getI64IntegerAttr(inputOp.getOutputTileSize());
@@ -304,7 +426,19 @@ static LogicalResult tileWinogradInputTransformOpWithForall(
       loc, tiledWinogradInputTransformOp.getResult()[0], iterArg,
       offsetsOutputSlice, sizesOutputSlice, stridesOutputSlice);
 
-  inputOp.getResults()[0].replaceAllUsesWith(forallOp->getResults()[0]);
+  if (loopNest.loops.empty()) {
+    inputOp.getResults()[0].replaceAllUsesWith(forallOp.getResults()[0]);
+    return success();
+  }
+
+  // Replace returned value
+  if (scf::YieldOp yieldOp = dyn_cast<scf::YieldOp>(
+          loopNest.loops.back().getBody()->getTerminator())) {
+    OpBuilder::InsertionGuard yieldGuard(rewriter);
+    rewriter.setInsertionPoint(yieldOp);
+    rewriter.replaceOpWithNewOp<scf::YieldOp>(yieldOp, forallOp.getResult(0));
+  }
+  inputOp.getResults()[0].replaceAllUsesWith(loopNest.results[0]);
 
   return success();
 }
@@ -568,6 +702,10 @@ static LogicalResult tileWinogradOutputTransformOpWithForall(
     return rewriter.notifyMatchFailure(outputOp,
                                        "Could not find parent function");
   }
+  auto workgroupSizes = llvm::map_to_vector(
+      getEntryPoint(funcOp)->getWorkgroupSize().value(),
+      [&](Attribute attr) { return llvm::cast<IntegerAttr>(attr).getInt(); });
+  int64_t workgroupSize = computeProduct(workgroupSizes);
 
   const int64_t inputTileSize = outputOp.getInputTileSize();
   const int64_t outputTileSize = outputOp.getOutputTileSize();
@@ -594,11 +732,9 @@ static LogicalResult tileWinogradOutputTransformOpWithForall(
   SmallVector<Value> lbs, ubs, steps;
   computeLoopParams(lbs, ubs, steps, input, numImageDims, loc, rewriter);
   // Construct loops
-  rewriter.setInsertionPoint(outputOp);
-  SmallVector<Value> dest;
-  if (failed(tensor::getOrCreateDestinations(rewriter, loc, outputOp, dest)))
-    return outputOp->emitOpError("failed to get destination tensors");
-  SmallVector<Attribute> idDims;
+  // SmallVector<Value> dest;
+  // if (failed(tensor::getOrCreateDestinations(rewriter, loc, inputOp, dest)))
+  //   return inputOp->emitOpError("failed to get destination tensors");
   auto getThreadMapping = [&](int64_t dim) {
     auto mappingIdInt = std::min<int64_t>(
         dim + static_cast<uint64_t>(gpu::MappingId::LinearDim0),
@@ -606,17 +742,73 @@ static LogicalResult tileWinogradOutputTransformOpWithForall(
     return mlir::gpu::GPUThreadMappingAttr::get(
         outputOp->getContext(), gpu::symbolizeMappingId(mappingIdInt).value());
   };
-  for (int64_t threadDim = 0; threadDim < ubs.size(); ++threadDim) {
-    idDims.push_back(getThreadMapping(threadDim));
+  SmallVector<int64_t> forallInds, forInds;
+  SmallVector<Value> forallUbs, forUbs;
+  computeForallAndForUpperBounds(rewriter, loc, ubs, workgroupSize, forallUbs,
+                                 forUbs, forallInds, forInds);
+  SmallVector<Attribute> idDims;
+  for (int i = 0; i < forallUbs.size(); i++) {
+    idDims.push_back(getThreadMapping(i));
   }
   std::reverse(idDims.begin(), idDims.end());
   ArrayAttr mapping = rewriter.getArrayAttr(idDims);
+  scf::LoopNest loopNest;
+  auto loopNestSelect = [&](SmallVector<Value> vals) {
+    return llvm::map_to_vector(forInds, [&](auto ind) { return vals[ind]; });
+  };
+  if (!forInds.empty()) {
+    rewriter.setInsertionPoint(outputOp);
+    loopNest = scf::buildLoopNest(
+        rewriter, loc, loopNestSelect(lbs), forUbs, loopNestSelect(steps),
+        ValueRange({output}),
+        [&](OpBuilder &nestedBuilder, Location loc, ValueRange outputIvs,
+            ValueRange iterArgs) -> scf::ValueVector { return {iterArgs[0]}; });
+  }
+
+  Location forallLoc =
+      loopNest.loops.empty() ? loc : loopNest.loops.back()->getLoc();
+  Value forallOut = loopNest.loops.empty()
+                        ? output
+                        : loopNest.loops.back().getRegionIterArg(0);
+  if (!loopNest.loops.empty()) {
+    rewriter.setInsertionPointToStart(loopNest.loops.back().getBody());
+  } else {
+    rewriter.setInsertionPoint(outputOp);
+  }
   scf::ForallOp forallOp = rewriter.create<scf::ForallOp>(
-      loc, getAsOpFoldResult((ubs)), dest, mapping);
-  SmallVector<Value> ivs = forallOp.getInductionVars();
+      forallLoc, getAsOpFoldResult((forallUbs)), forallOut, mapping);
+  Value iterArg = forallOp.getRegionOutArgs()[0];
+  SmallVector<Value> forAllIvs = forallOp.getInductionVars();
+  int64_t forIdx = 0, forallIdx = 0;
+  SmallVector<Value> ivs;
+  SetVector<int64_t> forIndsSet(forInds.begin(), forInds.end());
+  SetVector<int64_t> forallIndsSet(forallInds.begin(), forallInds.end());
+  for (int64_t idx = 0; idx < ubs.size() - 1; ++idx) {
+    if (forIndsSet.contains(idx)) {
+      ivs.push_back(loopNest.loops[forIdx++].getInductionVar());
+    } else {
+      ivs.push_back(forAllIvs[forallIdx++]);
+    }
+  }
+  if (forallUbs.size() + forUbs.size() > ubs.size()) {
+    rewriter.setInsertionPointToStart(forallOp.getBody());
+    AffineExpr s0, s1;
+    bindSymbols(rewriter.getContext(), s0);
+    bindSymbols(rewriter.getContext(), s1);
+    AffineMap map = AffineMap::get(0, 2, {s0 * s1}, rewriter.getContext());
+    Value iv = rewriter.createOrFold<affine::AffineApplyOp>(
+        forallOp->getLoc(), map,
+        ValueRange{loopNest.loops[forIdx++].getInductionVar(),
+                   forAllIvs[forallIdx++]});
+    ivs.push_back(iv);
+  } else if (forIndsSet.contains(ubs.size() - 1)) {
+    ivs.push_back(loopNest.loops[forIdx++].getInductionVar());
+  } else {
+    ivs.push_back(forAllIvs[forallIdx++]);
+  }
 
   // Extract input slice
-  rewriter.setInsertionPointToStart(forallOp.getBody());
+  rewriter.setInsertionPoint(forallOp.getBody()->getTerminator());
   auto one = rewriter.getIndexAttr(1);
   auto zero = rewriter.getIndexAttr(0);
   auto inputTileSizeAttr = rewriter.getIndexAttr(inputTileSize);
@@ -636,7 +828,13 @@ static LogicalResult tileWinogradOutputTransformOpWithForall(
   strides = SmallVector<OpFoldResult>(outputOp.getOutputOperandRank(), one);
   offsets = SmallVector<OpFoldResult>(outputOp.getOutputOperandRank(), zero);
   sizes = SmallVector<OpFoldResult>(outputOp.getOutputOperandRank(), one);
+  forIdx = 0;
   for (int i = 0; i < outputShape.size(); i++) {
+    OpBuilder::InsertionGuard g(rewriter);
+    if (!forallIndsSet.contains(i)) {
+      rewriter.setInsertionPoint(
+          loopNest.loops[forIdx++].getBody()->getTerminator());
+    }
     if (!imageDimsSet.contains(i)) {
       offsets[i] = ivs[i];
     } else {
@@ -656,7 +854,6 @@ static LogicalResult tileWinogradOutputTransformOpWithForall(
     permute<Permutation::NHWC_TO_NCHW>(offsets);
     permute<Permutation::NHWC_TO_NCHW>(sizes);
   }
-  Value iterArg = forallOp.getRegionOutArgs()[0];
   Value outputSlice = rewriter.create<tensor::ExtractSliceOp>(
       loc, tensorType, iterArg, offsets, sizes, strides);
 
@@ -674,7 +871,20 @@ static LogicalResult tileWinogradOutputTransformOpWithForall(
   rewriter.create<tensor::ParallelInsertSliceOp>(
       loc, tiledWinogradOutputTransformOp.getResult()[0], iterArg, offsets,
       sizes, strides);
-  outputOp.getResults()[0].replaceAllUsesWith(forallOp.getResults()[0]);
+
+  if (loopNest.loops.empty()) {
+    outputOp.getResults()[0].replaceAllUsesWith(forallOp.getResults()[0]);
+    return success();
+  }
+
+  // Replace returned value
+  if (scf::YieldOp yieldOp = dyn_cast<scf::YieldOp>(
+          loopNest.loops.back().getBody()->getTerminator())) {
+    OpBuilder::InsertionGuard yieldGuard(rewriter);
+    rewriter.setInsertionPoint(yieldOp);
+    rewriter.replaceOpWithNewOp<scf::YieldOp>(yieldOp, forallOp.getResult(0));
+  }
+  outputOp.getResults()[0].replaceAllUsesWith(loopNest.results[0]);
   return success();
 }
 
