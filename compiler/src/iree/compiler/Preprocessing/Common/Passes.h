@@ -29,6 +29,9 @@ createMakeSingleDispatchForFunctionPass();
 /// A pass to pad linalg ops to the next integer multiple of `paddingSize`.
 std::unique_ptr<Pass> createPadLinalgOpsToIntegerMultiplePass();
 
+/// A pass to transpose the value operand for attention.
+std::unique_ptr<Pass> createTransposeAttentionValueOperand();
+
 //===----------------------------------------------------------------------===//
 // Register all Passes
 //===----------------------------------------------------------------------===//
