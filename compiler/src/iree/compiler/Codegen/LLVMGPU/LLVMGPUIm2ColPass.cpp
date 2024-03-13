@@ -25,12 +25,44 @@ public:
 
 void LLVMGPUIm2ColPass::runOnOperation() {
   auto operation = getOperation();
-  SmallVector<linalg::LinalgOp> convOps;
-  operation->walk([&](linalg::Conv2DNhwcHwcfOp convOp) { convOps.push_back(convOp);});
+  SmallVector<Operation *> convOps;
+  operation->walk([&](Operation *convOp) {
+    if (isa<linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNhwcFhwcOp,
+            linalg::DepthwiseConv2DNhwcHwcOp, linalg::Conv2DNchwFchwOp>(
+            convOp)) {
+      convOps.push_back(convOp);
+    }
+  });
 
+  IRRewriter rewriter(&getContext());
+  for (auto op : convOps) {
+    IRRewriter::InsertionGuard g(rewriter);
+    rewriter.setInsertionPointAfter(op);
+    auto maybeTransformed =
+        TypeSwitch<Operation *, FailureOr<std::pair<Operation *, Operation *>>>(
+            op)
+            .Case([&](linalg::Conv2DNhwcHwcfOp op) {
+              return rewriteInIm2Col(rewriter, op);
+            })
+            .Case([&](linalg::Conv2DNhwcFhwcOp op) {
+              return rewriteInIm2Col(rewriter, op);
+            })
+            .Case([&](linalg::DepthwiseConv2DNhwcHwcOp op) {
+              return rewriteInIm2Col(rewriter, op);
+            })
+            .Case([&](linalg::Conv2DNchwFchwOp op) {
+              return rewriteInIm2Col(rewriter, op);
+            })
+            .Default([&](Operation *op) {
+              return rewriter.notifyMatchFailure(op, "not supported");
+            });
+    if (failed(maybeTransformed)) {
+      continue;
+    }
+  }
 }
 
-std::unique_ptr<OperationPass<>>
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMGPUIm2ColPass() {
   return std::make_unique<LLVMGPUIm2ColPass>();
 }

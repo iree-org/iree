@@ -60,7 +60,7 @@ def LLVMGPUCastTypeToFitMMA : InterfacePass<"iree-llvmgpu-cast-type-to-fit-mma",
   let constructor = "mlir::iree_compiler::createLLVMGPUCastTypeToFitMMAPass()";
 }
 
-def LLVMGPUIm2Col : Pass<"iree-llvmgpu-im2col", ""> {
+def LLVMGPUIm2Col : InterfacePass<"iree-llvmgpu-im2col", "mlir::FunctionOpInterface"> {
   let summary = "Perform Im2Col conversion for convolution operations";
   let constructor = "mlir::iree_compiler::createLLVMGPUIm2ColPass()";
 }

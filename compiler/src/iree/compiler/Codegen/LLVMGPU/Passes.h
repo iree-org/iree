@@ -90,7 +90,8 @@ createLLVMGPUCastTypeToFitMMAPass();
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMGPUDistribute();
 
-std::unique_ptr<OperationPass<>> createLLVMGPUIm2ColPass();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createLLVMGPUIm2ColPass();
 
 /// Create pass selecting the lowering strategy for LLVMGPU.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
