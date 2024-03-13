@@ -465,6 +465,19 @@ def TileAndDistributeToWorkgroups :
   ];
 }
 
+def TileUsingForall :
+    InterfacePass<"iree-codegen-tile-using-for-all", "mlir::FunctionOpInterface"> {
+  let summary = "Tile using for all";
+  let constructor = "mlir::iree_compiler::createTileUsingForallPass()";
+  let options = [
+    Option<"tilingLevel", "tiling-level", "int64_t", /*default=*/"-1",
+      "Use default tiling level used to retrieve the configuration from lowering_config">,
+    Option<"distributionMethod", "distribution-method", "int32_t",
+      /*default=*/ "0",
+      "Pick the distribution method">
+  ];
+}
+
 def TransformDialectInterpreter :
     Pass<"iree-transform-dialect-interpreter"> {
   let summary = "Pass to apply transform dialect operations.";

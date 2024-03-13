@@ -1650,7 +1650,8 @@ setConvolutionIGemmConfig(mlir::FunctionOpInterface entryPoint,
     return failure();
   }
 
-  TileSizesListType tileSizesList;
+  SmallVector<int64_t> distTileSizes = {1, 128, 128};
+  TileSizesListType tileSizesList = {distTileSizes};
   std::array<int64_t, 3> workgroupSizes = {
       targetInfo.supportedSubgroupSizes.front(), 1, 1};
   return setOpConfigAndEntryPointFnTranslation(

@@ -723,8 +723,7 @@ void addGPUBaseLoweringPassPipeline(OpPassManager &pm) {
 void addGPUImplicitGEMMPassPipeline(OpPassManager &pm) {
   auto &nestedModulePM = pm.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUIm2ColPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createConvertToDestinationPassingStylePass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createTileUsingForallPass(0));
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
