@@ -134,6 +134,9 @@ void buildGlobalOptimizationPassPipeline(
                 transformOptions.options.aggressiveTransposePropagation);
           })
       .addPass(mlir::createCanonicalizerPass)
+      .addPass(mlir::createCSEPass)
+      .addPass(createFuseHorizontalContractionsPass)
+      .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass);
 
   // Enable data tiling after they are in a canonical form.
