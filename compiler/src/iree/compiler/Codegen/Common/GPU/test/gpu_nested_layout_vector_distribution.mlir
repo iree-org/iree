@@ -371,7 +371,7 @@ builtin.module attributes { transform.with_named_sequence } {
   elements_per_thread     = [4],
 
   subgroup_basis          = [2, 2],
-  subgroup_active_ids       = [false, true],
+  subgroup_active_ids     = [false, true],
   thread_basis            = [4, 16],
   thread_active_ids       = [false, true]
 >
