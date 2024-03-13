@@ -24,6 +24,23 @@ table FileLineLocDef {
   line:int32;
 }
 
+// Source location keyed by a string compilation stage name.
+table StageLocationDef {
+  stage:string;
+  location:FileLineLocDef;
+}
+
+// Table of stage locations sorted in ascending order by stage name.
+table StageLocationsDef {
+  locations:[StageLocationDef];
+}
+
+// An embedded source file referenced by locations in the file.
+table SourceFileDef {
+  path:string;
+  content:[uint8];
+}
+
 table ExecutableDef {
   // A map of entry point ordinals to string names as used in the shader
   // library.
@@ -44,6 +61,13 @@ table ExecutableDef {
   // This information is optional and may be used by debuggers and profilers to
   // associate executable entry points with the source that generated them.
   source_locations:[FileLineLocDef];
+
+  // Table of source locations per entry point keyed by a string compilation
+  // stage name. Sorted ascending by name.
+  stage_locations:[StageLocationsDef];
+
+  // Embedded source files sorted ascending by path.
+  source_files:[SourceFileDef];
 }
 
 root_type ExecutableDef;

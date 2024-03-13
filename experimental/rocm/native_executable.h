@@ -18,14 +18,18 @@
 extern "C" {
 #endif  // __cplusplus
 
+typedef struct iree_hal_rocm_source_location_t {
+  iree_string_view_t file_name;
+  int line;
+  iree_string_view_t func_name;
+} iree_hal_rocm_source_location_t;
+
 typedef struct iree_hal_rocm_kernel_params_t {
   iree_hal_pipeline_layout_t* layout;
   hipFunction_t function;
   uint32_t block_size[3];
   uint32_t shared_memory_size;
-  IREE_TRACE(iree_string_view_t function_name;)
-  IREE_TRACE(iree_string_view_t source_filename;)
-  IREE_TRACE(uint32_t source_line;)
+  IREE_TRACE(iree_hal_rocm_source_location_t source_location;)
 } iree_hal_rocm_kernel_params_t;
 
 // Creates an executable from a HSACO module. The module may contain several
