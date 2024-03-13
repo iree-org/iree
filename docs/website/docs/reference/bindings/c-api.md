@@ -485,7 +485,7 @@ hardware devices like CPUs, GPUs and other accelerators.
 [iree-org/iree-template-runtime-cmake](https://github.com/iree-org/iree-template-runtime-cmake/) | [`hello_world.c`](https://github.com/iree-org/iree-template-runtime-cmake/blob/main/hello_world.c) | Runtime application template
 [openxla/iree](https://github.com/openxla/iree/) | [`runtime/demo/`](https://github.com/openxla/iree/blob/main/runtime/src/iree/runtime/demo/) | In-tree demos of the high level runtime API
 [openxla/iree](https://github.com/openxla/iree/) | [`samples/`](https://github.com/openxla/iree/tree/main/samples) | In-tree sample applications
-[iree-org/iree-samples](https://github.com/iree-org/iree-samples/) | [`runtime-library/`](https://github.com/iree-org/iree-samples/tree/main/runtime-library) | Shared runtime library builder<br>Builds `libireert.so` to aid development
+[iree-org/iree-experimental](https://github.com/iree-org/iree-experimental/) | [`runtime-library/`](https://github.com/iree-org/iree-experimental/tree/main/runtime-library) | Shared runtime library builder<br>Builds `libireert.so` to aid development
 [iml130/iree-template-cpp](https://github.com/iml130/iree-template-cpp) | [`simple_embedding.c`](https://github.com/iml130/iree-template-cpp/blob/main/iree_simple_embedding/simple_embedding.c) | Demo integration into a project
 
 ## Compiler + Runtime = JIT
