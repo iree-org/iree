@@ -128,6 +128,10 @@ def GPUTensorTileToSerialLoopsPass :
     InterfacePass<"iree-codegen-gpu-tensor-tile-to-serial-loops", "mlir::FunctionOpInterface"> {
   let summary = "Pass to tile reduction dimensions for certain GPU ops";
   let dependentDialects = ["::mlir::scf::SCFDialect"];
+  let options = [
+    Option<"coalesceLoops", "coalesce-loops", "bool", /*default=*/"false",
+           "Collapse the loops that are generated to a single loops">,
+  ];
 }
 
 def GPUTilePass : InterfacePass<"iree-codegen-gpu-tile", "mlir::FunctionOpInterface"> {
