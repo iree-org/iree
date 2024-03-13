@@ -58,7 +58,7 @@ static constexpr int64_t outputTileSize = 6;
 /// are constants. So for large ic and oc, this function is
 /// time intensive.
 /// TODO: Codegen this as a kernel and run once at initialization
-static Optional<DenseElementsAttr>
+static std::optional<DenseElementsAttr>
 foldFilterTransform(ArrayRef<int64_t> shape, int64_t inputTileSize,
                     int64_t kernelSize, ShapedType outputType, const float *G,
                     bool isSplat, float splatValue,

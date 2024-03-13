@@ -26,7 +26,10 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/OpDefinition.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -476,8 +479,8 @@ static LogicalResult decomposeTiledWinogradInputTransformOp(
       tiledWinogradInputTransformOp.getOutputOperandType().getElementType();
   Value zeroF32 = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getZeroAttr(elementType));
-  Value scratch =
-      rewriter.create<tensor::EmptyOp>(loc, inputTileSquare, elementType);
+  // Value scratch =
+  //     rewriter.create<tensor::EmptyOp>(loc, inputTileSquare, elementType);
   const float *BT{nullptr};
   const float *B{nullptr};
   B = IREE::LinalgExt::Winograd::B_6x6_3x3;
@@ -517,18 +520,36 @@ static LogicalResult decomposeTiledWinogradInputTransformOp(
   }
   OpBuilder::InsertionGuard afterTiledWinogradInputTransformOp(rewriter);
   rewriter.setInsertionPointAfter(tiledWinogradInputTransformOp);
-  linalg::FillOp fillOp = rewriter.create<linalg::FillOp>(
-      loc, ValueRange{zeroF32}, ValueRange{scratch});
-  Value inputSlice = rewriter.create<tensor::InsertSliceOp>(
-      loc, dynamicSlice, fillOp.result(), offsets, sliceSizes, strides);
+  // linalg::FillOp fillOp = rewriter.create<linalg::FillOp>(
+  //     loc, ValueRange{zeroF32}, ValueRange{scratch});
+  // Value inputSlice = rewriter.create<tensor::InsertSliceOp>(
+  //     loc, dynamicSlice, fillOp.result(), offsets, sliceSizes, strides);
+  auto inputSliceType = RankedTensorType::get(inputTileSquare, elementType);
+  SmallVector<OpFoldResult> padLow(
+      inputTileSquare.size(), rewriter.getZeroAttr(rewriter.getIndexType()));
+  SmallVector<OpFoldResult> padHigh;
+  auto dynamicSliceSizes = tensor::getMixedSizes(rewriter, loc, dynamicSlice);
+
+  for (auto [idx, size] : llvm::enumerate(dynamicSliceSizes)) {
+    AffineExpr d0;
+    bindDims(rewriter.getContext(), d0);
+    auto ub = rewriter.getAffineConstantExpr(inputTileSquare[idx]);
+    AffineMap padHighMap =
+        AffineMap::get(1, 0, {ub - d0}, rewriter.getContext());
+    padHigh.push_back(rewriter.createOrFold<affine::AffineApplyOp>(
+        loc, padHighMap,
+        ValueRange{getValueOrCreateConstantIndexOp(rewriter, loc, size)}));
+  }
+  Value inputSlice = rewriter.create<tensor::PadOp>(
+      loc, inputSliceType, dynamicSlice, padLow, padHigh, zeroF32);
 
   // Create computation
   Value result, AMatrix, BMatrix;
   linalg::MatmulOp matmulOp;
   Type tensorType = outputSlice.getType();
   for (int i = 0; i < 2; i++) {
-    fillOp = rewriter.create<linalg::FillOp>(loc, ValueRange{zeroF32},
-                                             ValueRange{outputSlice});
+    linalg::FillOp fillOp = rewriter.create<linalg::FillOp>(
+        loc, ValueRange{zeroF32}, ValueRange{outputSlice});
     if (i == 0) {
       AMatrix = inputSlice;
       BMatrix = BV;
