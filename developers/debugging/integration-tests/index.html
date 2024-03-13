@@ -2372,8 +2372,8 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#iree-samples-repository-tests" class="md-nav__link">
-    iree-samples repository tests
+  <a href="#iree-experimental-repository-tests" class="md-nav__link">
+    iree-experimental repository tests
   </a>
   
 </li>
@@ -3279,8 +3279,8 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#iree-samples-repository-tests" class="md-nav__link">
-    iree-samples repository tests
+  <a href="#iree-experimental-repository-tests" class="md-nav__link">
+    iree-experimental repository tests
   </a>
   
 </li>
@@ -3335,17 +3335,18 @@ the dispatch function. The dispatch function can be derived after the
 manually. You'll have to put <code>flow.dispatch.tensor.load</code> variables to function
 arguments, and replace <code>flow.dispatch.tensor.store</code> with <code>return</code> op.</p>
 <p>Note: This only works when dispatch formation logics are identical between runs.</p>
-<h2 id="iree-samples-repository-tests">iree-samples repository tests<a class="headerlink" href="#iree-samples-repository-tests" title="Permanent link">link</a></h2>
-<p>Follow <a href="https://github.com/iree-org/iree-samples#readme">README</a> to run the model.
-The MLIR files will be generated. You'll find the saved file from log. E.g.,</p>
+<h2 id="iree-experimental-repository-tests">iree-experimental repository tests<a class="headerlink" href="#iree-experimental-repository-tests" title="Permanent link">link</a></h2>
+<p>Follow <a href="https://github.com/iree-org/iree-experimental#readme">README</a> to run the
+model. The MLIR files will be generated. You'll find the saved file from log.
+E.g.,</p>
 <div class="highlight"><pre><span></span><code><span class="o">[</span><span class="w"> </span>RUN<span class="w">      </span><span class="o">]</span><span class="w"> </span>MobilenetV2Int8Test.test_compile_tflite
 I0401<span class="w"> </span><span class="m">17</span>:27:04.084272<span class="w"> </span><span class="m">140182373025024</span><span class="w"> </span>test_util.py:119<span class="o">]</span><span class="w"> </span>Setting<span class="w"> </span>up<span class="w"> </span><span class="k">for</span><span class="w"> </span>IREE
 I0401<span class="w"> </span><span class="m">17</span>:27:04.085064<span class="w"> </span><span class="m">140182373025024</span><span class="w"> </span>binaries.py:218<span class="o">]</span><span class="w"> </span>Invoke<span class="w"> </span>IREE<span class="w"> </span>Pipeline:
-<span class="w">  </span>/tmp/iree-samples/iree-samples.venv/lib/python3.9/site-packages/iree/tools/tflite/iree-import-tflite
-<span class="w">    </span>/tmp/iree-samples/tflitehub/tmp/mobilenet_v2_int8_test.py/model.tflite
+<span class="w">  </span>/tmp/iree-experimental/iree-experimental.venv/lib/python3.9/site-packages/iree/tools/tflite/iree-import-tflite
+<span class="w">    </span>/tmp/iree-experimental/tflitehub/tmp/mobilenet_v2_int8_test.py/model.tflite
 <span class="w">    </span>--mlir-print-debuginfo
-<span class="w">    </span>--save-temp-tfl-input<span class="o">=</span>/tmp/iree-samples/tflitehub/tmp/mobilenet_v2_int8_test.py/tflite.mlir
-<span class="w">    </span>--save-temp-iree-input<span class="o">=</span>/tmp/iree-samples/tflitehub/tmp/mobilenet_v2_int8_test.py/tosa.mlir
+<span class="w">    </span>--save-temp-tfl-input<span class="o">=</span>/tmp/iree-experimental/tflitehub/tmp/mobilenet_v2_int8_test.py/tflite.mlir
+<span class="w">    </span>--save-temp-iree-input<span class="o">=</span>/tmp/iree-experimental/tflitehub/tmp/mobilenet_v2_int8_test.py/tosa.mlir
 </code></pre></div>
 <p>Unfortunately, the artifacts are not dumped in the runs. There is an
 <a href="https://github.com/openxla/iree/issues/8756">issue</a> for tracking this. A
