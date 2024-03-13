@@ -39,24 +39,32 @@ jobs:
 
   regression_test_cpu:
     name: Regression Test CPU
+    permissions:
+      actions: read
     needs: [setup, build_packages]
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'regression_test_cpu')
     uses: ./.github/workflows/pkgci_regression_test_cpu.yml
 
   regression_test_amdgpu_vulkan:
     name: Regression Test AMDGPU-Vulkan
+    permissions:
+      actions: read
     needs: [setup, build_packages]
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'regression_test_amdgpu_vulkan')
     uses: ./.github/workflows/pkgci_regression_test_amdgpu_vulkan.yml
 
   regression_test_amdgpu_rocm:
     name: Regression Test AMDGPU-ROCm
+    permissions:
+      actions: read
     needs: [setup, build_packages]
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'regression_test_amdgpu_rocm')
     uses: ./.github/workflows/pkgci_regression_test_amdgpu_rocm.yml
 
   test_tensorflow_cpu:
     name: Test TensorFlow CPU
+    permissions:
+      actions: read
     needs: [setup, build_packages]
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_tensorflow_cpu')
     uses: ./.github/workflows/pkgci_test_tensorflow_cpu.yml
