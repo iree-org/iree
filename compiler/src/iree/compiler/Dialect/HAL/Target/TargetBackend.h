@@ -35,7 +35,7 @@ struct TargetOptions {
   //   1: minimal debug information
   //   2: default debug information
   //   3: maximal debug information
-  int debugLevel;
+  int debugLevel = 2;
 
   // Default path to write executable files into.
   std::string executableFilesPath;

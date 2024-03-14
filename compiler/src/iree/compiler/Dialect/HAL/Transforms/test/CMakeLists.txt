@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "assign_target_devices.mlir"
+    "capture_executable_sources.mlir"
     "convert_to_hal.mlir"
     "dump_executable_benchmarks.mlir"
     "dump_executable_sources.mlir"

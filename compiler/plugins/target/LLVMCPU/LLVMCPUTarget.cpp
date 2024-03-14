@@ -37,6 +37,8 @@
 #include "mlir/Dialect/PDL/IR/PDL.h"
 #include "mlir/Dialect/PDLInterp/IR/PDLInterp.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
+#include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/DialectResourceBlobManager.h"
 #include "mlir/Target/LLVMIR/Dialect/ArmSME/ArmSMEToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Dialect/Builtin/BuiltinToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
@@ -420,17 +422,45 @@ public:
                                     .value_or(APInt(64, 0))
                                     .getSExtValue();
 
-      std::string sourceFile = "";
-      int sourceLine = 0;
+      LibraryBuilder::SourceLocation sourceLocation;
       if (options.debugLevel >= 1) {
         if (auto loc = findFirstFileLoc(exportOp.getLoc())) {
-          sourceFile = loc->getFilename().str();
-          sourceLine = loc->getLine();
+          sourceLocation = {"", loc->getFilename().str(), loc->getLine()};
         }
       }
-      libraryBuilder.addExport(
-          exportOp.getName(), sourceFile, sourceLine, /*tag=*/"",
-          LibraryBuilder::DispatchAttrs{localMemorySize}, llvmFunc);
+      SmallVector<LibraryBuilder::SourceLocation> stageLocations;
+      if (options.debugLevel >= 3) {
+        if (auto locsAttr = exportOp.getSourceLocsAttr()) {
+          for (auto locAttr : locsAttr.getValue()) {
+            if (auto loc =
+                    findFirstFileLoc(cast<LocationAttr>(locAttr.getValue()))) {
+              stageLocations.push_back({
+                  locAttr.getName().str(),
+                  loc->getFilename().str(),
+                  loc->getLine(),
+              });
+            }
+          }
+        }
+      }
+      libraryBuilder.addExport(exportOp.getName(), std::move(sourceLocation),
+                               std::move(stageLocations), /*tag=*/"",
+                               LibraryBuilder::DispatchAttrs{localMemorySize},
+                               llvmFunc);
+    }
+
+    // Embed source files (if present).
+    if (auto sourcesAttr = variantOp.getSourcesAttr()) {
+      for (auto sourceAttr : sourcesAttr.getValue()) {
+        if (auto resourceAttr = dyn_cast_if_present<DenseResourceElementsAttr>(
+                sourceAttr.getValue())) {
+          auto handle = resourceAttr.getRawHandle();
+          SmallVector<char> rawData;
+          llvm::append_range(rawData, handle.getBlob()->getData());
+          libraryBuilder.addSourceFile(sourceAttr.getName(),
+                                       std::move(rawData));
+        }
+      }
     }
 
     auto queryFunctionName = std::string(kQueryFunctionName);

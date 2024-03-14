@@ -204,8 +204,9 @@ LogicalResult linkExecutablesInto(
   auto linkedTargetBuilder =
       OpBuilder::atBlockBegin(&linkedTargetOp.getBlock());
 
-  // Aggregation of all external objects specified on variants used.
+  // Aggregation of all external objects and sources specified on variants used.
   SetVector<Attribute> objectAttrs;
+  NamedAttrList linkedSourceAttrs;
 
   // Iterate over all source executable ops, linking as many as we can.
   for (auto sourceExecutableOp : sourceExecutableOps) {
@@ -226,6 +227,12 @@ LogicalResult linkExecutablesInto(
       // Add any required object files to the set we will link in the target.
       if (auto objectsAttr = variantOp.getObjectsAttr()) {
         objectAttrs.insert(objectsAttr.begin(), objectsAttr.end());
+      }
+
+      // Merge sources into the linked source listing.
+      if (auto sourcesAttr = variantOp.getSourcesAttr()) {
+        for (auto sourceAttr : sourcesAttr.getValue())
+          linkedSourceAttrs.set(sourceAttr.getName(), sourceAttr.getValue());
       }
 
       // Remap variant refs.
@@ -266,7 +273,6 @@ LogicalResult linkExecutablesInto(
       for (auto constantBlockOp :
            llvm::make_early_inc_range(variantOp.getConstantBlockOps())) {
         constantBlockOp->moveBefore(&*linkedTargetBuilder.getInsertionPoint());
-        // linkedTargetBuilder.clone(constantBlockOp);
       }
 
       // Clone export ops and queue remapping ordinals and updating
@@ -318,6 +324,12 @@ LogicalResult linkExecutablesInto(
   if (!objectAttrs.empty()) {
     linkedTargetOp.setObjectsAttr(
         linkedTargetBuilder.getArrayAttr(objectAttrs.takeVector()));
+  }
+
+  // Attach all source files from the source variants.
+  if (!linkedSourceAttrs.empty()) {
+    linkedTargetOp.setSourcesAttr(
+        linkedTargetBuilder.getDictionaryAttr(linkedSourceAttrs));
   }
 
   // Update references to @executable::@target::@entry symbols.

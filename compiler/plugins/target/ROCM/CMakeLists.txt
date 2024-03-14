@@ -46,6 +46,7 @@ iree_cc_library(
     MLIRAMDGPUTransforms
     MLIRAMDGPUUtils
     MLIRBuiltinToLLVMIRTranslation
+    MLIRIR
     MLIRLLVMDialect
     MLIRLLVMToLLVMIRTranslation
     MLIRPass
