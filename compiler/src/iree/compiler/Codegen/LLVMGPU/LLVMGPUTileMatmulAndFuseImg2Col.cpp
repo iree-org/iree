@@ -182,13 +182,20 @@ void LLVMGPUTileMatmulAndFuseImg2ColPass::runOnOperation() {
     LLVM_DEBUG(llvm::dbgs() << "tilingLevel not set, skip tiling\n");
     return;
   }
+
   MLIRContext *ctx = &getContext();
   auto funcOp = getOperation();
+  SmallVector<Operation *> computeOps = getComputeOps(funcOp);
+  FailureOr<IREE::Codegen::LoweringConfigAttr> loweringConfig =
+      getLoweringConfig(computeOps);
+  if (failed(loweringConfig)) {
+    LLVM_DEBUG(llvm::dbgs() << "can't find lowering_config, skip tiling\n");
+    return;
+  }
 
-  // TODO: Extract tile sizes from lowering_config
   IRRewriter rewriter(ctx);
   SmallVector<OpFoldResult> tileSizes = llvm::map_to_vector(
-      SmallVector<int64_t>{0, 0, 0, 16},
+      loweringConfig->getTileSizeVals(tilingLevel),
       [&](int64_t val) -> OpFoldResult { return rewriter.getIndexAttr(val); });
   auto options = scf::SCFTilingOptions().setTileSizes(tileSizes);
 

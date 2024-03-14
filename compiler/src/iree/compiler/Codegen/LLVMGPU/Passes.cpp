@@ -733,6 +733,16 @@ void addGPUImplicitGEMMPassPipeline(OpPassManager &pm) {
         createLLVMGPUTileMatmulAndFuseImg2ColPass(1));
     nestedModulePM.addPass(createCanonicalizerPass());
     nestedModulePM.addPass(createCSEPass());
+
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLinalgGeneralizeNamedOpsPass());
+    LinalgFoldUnitExtentDimsPassOptions options;
+    options.useRankReducingSlices = true;
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        mlir::createLinalgFoldUnitExtentDimsPass(options));
+    nestedModulePM.addPass(createCanonicalizerPass());
+    nestedModulePM.addPass(createCSEPass());
+
     nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUPadIGemmPass());
     nestedModulePM.addPass(createCanonicalizerPass());
     nestedModulePM.addPass(createCSEPass());
