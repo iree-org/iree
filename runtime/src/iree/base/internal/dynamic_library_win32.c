@@ -332,7 +332,7 @@ iree_status_t iree_dynamic_library_get_symbol_path(
   IREE_RETURN_IF_ERROR(iree_string_builder_reserve(out_path, 64));
   while (1) {
     out_path->size =
-        ::GetModuleFileNameA(hm, out_path->buffer, out_path->capacity);
+        GetModuleFileNameA(hm, out_path->buffer, out_path->capacity);
     if (out_path->size == 0) {
       return iree_make_status(IREE_STATUS_NOT_FOUND);
     }

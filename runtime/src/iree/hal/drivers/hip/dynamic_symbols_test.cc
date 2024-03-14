@@ -46,9 +46,9 @@ TEST(DynamicSymbolsTest, CreateFromSystemLoader) {
 }
 
 static const iree_string_view_t non_existing_search_paths[] = {
-    iree_string_view_literal("/path/that/does/not/exist"),
-    iree_string_view_literal("file:nowhere/libamdhip64.so"),
-    iree_string_view_literal("filename_that_does_not_exist.dll"),
+    iree_make_cstring_view("/path/that/does/not/exist"),
+    iree_make_cstring_view("file:nowhere/libamdhip64.so"),
+    iree_make_cstring_view("filename_that_does_not_exist.dll"),
 };
 
 TEST(DynamicSymbolsTest, SearchPathsFail) {
