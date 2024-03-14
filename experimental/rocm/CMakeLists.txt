@@ -12,15 +12,16 @@ cmake_path(ABSOLUTE_PATH IREE_PACKAGE_ROOT_DIR
   OUTPUT_VARIABLE IREE_PACKAGE_ROOT_DIR)
 set(IREE_PACKAGE_ROOT_PREFIX iree)
 
-set(IREE_ROCM_TARGET_CHIP_DEFAULT "gfx908")
-set(IREE_ROCM_TARGET_CHIP "${IREE_ROCM_TARGET_CHIP_DEFAULT}" CACHE STRING
-  "Target chip for ROCm. This influences conformance tests that need to compile device code. Defaults to \"${IREE_ROCM_TARGET_CHIP_DEFAULT}\".")
-set(IREE_ROCM_LINK_BC_DEFAULT OFF)
-set(IREE_ROCM_LINK_BC ${IREE_ROCM_LINK_BC_DEFAULT} CACHE BOOL
-  "Whether to try Linking to AMD Bitcodes. This influences conformance tests that need to compile device code. Defaults to ${IREE_ROCM_LINK_BC}.")
-set(IREE_ROCM_BC_DIR_DEFAULT "/opt/rocm/amdgcn/bitcode")
-set(IREE_ROCM_BC_DIR "${IREE_ROCM_BC_DIR_DEFAULT}" CACHE STRING
-  "Directory of ROCM Bitcode. This influences conformance tests that need to compile device code. Defaults to \"${IREE_ROCM_TARGET_CHIP_DEFAULT}\".")
+# TODO: maybe merge these variables with the equivalent in the HIP driver.
+set(IREE_ROCM_DRIVER_TARGET_CHIP_DEFAULT "gfx908")
+set(IREE_ROCM_DRIVER_TARGET_CHIP "${IREE_ROCM_DRIVER_TARGET_CHIP_DEFAULT}" CACHE STRING
+  "Target chip for the ROCm driver. This influences conformance tests that need to compile device code. Defaults to \"${IREE_ROCM_DRIVER_TARGET_CHIP_DEFAULT}\".")
+set(IREE_ROCM_DRIVER_LINK_BC_DEFAULT OFF)
+set(IREE_ROCM_DRIVER_LINK_BC ${IREE_ROCM_DRIVER_LINK_BC_DEFAULT} CACHE BOOL
+  "Whether to try Linking to AMD Bitcodes. This influences conformance tests that need to compile device code. Defaults to ${IREE_ROCM_DRIVER_LINK_BC}.")
+set(IREE_ROCM_DRIVER_BC_DIR_DEFAULT "/opt/rocm/amdgcn/bitcode")
+set(IREE_ROCM_DRIVER_BC_DIR "${IREE_ROCM_DRIVER_BC_DIR_DEFAULT}" CACHE STRING
+  "Directory of ROCM Bitcode. This influences conformance tests that need to compile device code. Defaults to \"${IREE_ROCM_DRIVER_TARGET_CHIP_DEFAULT}\".")
 
 iree_add_all_subdirs()
 
