@@ -734,8 +734,6 @@ void addGPUImplicitGEMMPassPipeline(OpPassManager &pm) {
     nestedModulePM.addPass(createCanonicalizerPass());
     nestedModulePM.addPass(createCSEPass());
 
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createLinalgGeneralizeNamedOpsPass());
     LinalgFoldUnitExtentDimsPassOptions options;
     options.useRankReducingSlices = true;
     nestedModulePM.addNestedPass<func::FuncOp>(
