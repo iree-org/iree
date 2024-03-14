@@ -55,9 +55,6 @@ function(iree_bitcode_library)
     "-fno-ident"
     "-fdiscard-value-names"
 
-    # Limited debug information that is useful in profilers like Tracy.
-    "-gline-tables-only"
-
     # Set the size of wchar_t to 4 bytes (instead of 2 bytes).
     # This must match what the runtime is built with.
     "-fno-short-wchar"
