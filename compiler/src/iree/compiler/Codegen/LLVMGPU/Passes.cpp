@@ -741,14 +741,33 @@ void addGPUImplicitGEMMPassPipeline(OpPassManager &pm) {
 
     addGPUVectorizationPasses(nestedModulePM);
 
-    addBufferizePasses(nestedModulePM);
+    // Tensor -> Memref
+    addVectorBufferizePasses(nestedModulePM);
+    nestedModulePM.addPass(createCanonicalizerPass());
+    nestedModulePM.addPass(createCSEPass());
     nestedModulePM.addNestedPass<func::FuncOp>(
-        IREE::LinalgExt::createLinalgExtToLoopsPass());
-    nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
+        createHoistStaticallyBoundAllocationsPass());
+
+    // Vector SIMD -> Vector SIMT
     nestedModulePM.addNestedPass<func::FuncOp>(
-        createConvertLinalgToLoopsPass());
+        createLLVMGPUNormalizeContractMapsPass());
     nestedModulePM.addNestedPass<func::FuncOp>(
-        createRemoveSingleIterationLoopPass());
+        createLLVMGPUCastTypeToFitMMAPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUVectorDistribute());
+    nestedModulePM.addPass(createCanonicalizerPass());
+    nestedModulePM.addPass(createCSEPass());
+
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createGPUReduceSharedMemoryBankConflicts());
+
+    if (clLLVMGPUEnablePrefetch) {
+      nestedModulePM.addNestedPass<func::FuncOp>(
+          createLLVMGPUPrefetchSharedMemoryPass());
+    }
+
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        memref::createFoldMemRefAliasOpsPass());
+    nestedModulePM.addPass(createCSEPass());
     nestedModulePM.addPass(createCanonicalizerPass());
     nestedModulePM.addPass(createCSEPass());
   }
