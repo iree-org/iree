@@ -117,6 +117,12 @@ def LLVMGPUPadIGemm :
   let constructor = "mlir::iree_compiler::createLLVMGPUPadIGemmPass()";
 }
 
+def LLVMGPURewritePadInDestinationPassingStyle :
+    InterfacePass<"iree-llvmgpu-rewrite-pad-in-dps", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to rewrite tensor.pad in destination passing style.";
+  let constructor = "mlir::iree_compiler::createLLVMGPURewritePadInDestinationPassingStylePass()";
+}
+
 def LLVMGPUTensorPad :
     InterfacePass<"iree-llvmgpu-tensor-pad", "mlir::FunctionOpInterface"> {
   let summary = "Pass to pad out tensors up to static dimensions.";

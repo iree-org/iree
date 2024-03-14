@@ -731,6 +731,12 @@ void addGPUImplicitGEMMPassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUPadIGemmPass());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLLVMGPURewritePadInDestinationPassingStylePass());
+
+  // TODO: Add distribution on threads
+  // TODO: Add vectorization.
+  // TODO: Check if it works with existing bufferization passes.
 
   addBufferizePasses(nestedModulePM);
   nestedModulePM.addNestedPass<func::FuncOp>(

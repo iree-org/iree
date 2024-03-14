@@ -86,6 +86,7 @@ iree_cc_library(
     "LLVMGPUPackSharedMemoryAlloc.cpp"
     "LLVMGPUPadIGemm.cpp"
     "LLVMGPUPrefetching.cpp"
+    "LLVMGPURewritePadInDestinationPassingStyle.cpp"
     "LLVMGPUSelectLoweringStrategy.cpp"
     "LLVMGPUTensorCoreVectorization.cpp"
     "LLVMGPUTensorPad.cpp"

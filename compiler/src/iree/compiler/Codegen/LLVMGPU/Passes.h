@@ -129,6 +129,9 @@ createLLVMGPUTileMatmulAndFuseImg2ColPass(int tilingLevel = -1);
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMGPUPadIGemmPass();
 
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createLLVMGPURewritePadInDestinationPassingStylePass();
+
 //. Pass to pad out tensors up to static dimensions.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMGPUTensorPadPass();
