@@ -110,7 +110,6 @@ iree_cc_library(
     "TileAndDistributeToWorkgroupsPass.cpp"
     "TileDispatchUsingInterface.cpp"
     "TileSizeSelection.cpp"
-    "TileUsingForall.cpp"
     "TypePropagationPass.cpp"
     "UserConfig.cpp"
     "VectorLayoutAnalysis.cpp"
