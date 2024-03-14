@@ -41,6 +41,12 @@ static llvm::cl::opt<bool> clEnableDemoteContractionInputsToBF16(
         "Demote inputs (LHS, RHS) of linalg matmul-like ops from f32 to bf16."),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clEnablePromoteAccumulators(
+    "iree-global-opt-promote-f16-accumulators",
+    llvm::cl::desc("Promotes the accumulator type of contraction-like ops form "
+                   "f16 to f32."),
+    llvm::cl::init(false));
+
 void buildGlobalOptExprHoistingPassPipeline(
     OpPassManager &passManager, const TransformOptions &transformOptions) {
   IREE::Util::ExprHoistingOptions options;
@@ -80,6 +86,8 @@ void buildGlobalOptimizationPassPipeline(
   FunctionLikeNest(mainPassManager)
       .addPass(createRemoveZeroExtentTensorsPass)
       .addPass(createDetachElementwiseFromNamedOpsPass)
+      .addPredicatedPass(clEnablePromoteAccumulators,
+                         createPromoteConvolutionAccumulatorPass)
       .addPass(mlir::createLinalgNamedOpConversionPass)
       .addPass(createConvert1X1FilterConv2DToMatmulPass);
   mainPassManager.addPass(createEraseUnusedLinalgOperands());
