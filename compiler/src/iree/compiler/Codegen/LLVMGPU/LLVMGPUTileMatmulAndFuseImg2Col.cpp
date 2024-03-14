@@ -11,6 +11,7 @@
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Transforms/Patterns.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
+#include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/IR/Visitors.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -90,6 +91,8 @@ LogicalResult applyTileAndFuse(RewriterBase &rewriter, Operation *rootOp,
           if (!sliceOp)
             continue;
           // ========= HERE IS THE ONLY DIFFERENCE FROM LLVMCPUTileAndFuse ===
+          // TODO: This should probably only fuse the input slices and
+          // not the output slices.
           if (!sliceOp.getSource().getDefiningOp<linalg::GenericOp>())
             continue;
           candidates.push_back(sliceOp);
@@ -154,7 +157,6 @@ LogicalResult applyTileAndFuse(RewriterBase &rewriter, Operation *rootOp,
              dominanceInfo.properlyDominates(outermostLoop, use.getOwner());
     });
   }
-
   return success();
 }
 
@@ -223,6 +225,7 @@ void LLVMGPUTileMatmulAndFuseImg2ColPass::runOnOperation() {
         linalg::getLinalgTilingCanonicalizationPatterns(ctx);
     scf::populateSCFForLoopCanonicalizationPatterns(patterns);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
+    tensor::populateFoldTensorEmptyPatterns(patterns);
     ctx->getLoadedDialect<tensor::TensorDialect>()->getCanonicalizationPatterns(
         patterns);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {

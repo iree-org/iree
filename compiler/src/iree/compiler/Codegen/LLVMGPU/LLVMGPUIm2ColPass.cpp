@@ -6,8 +6,10 @@
 
 #include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
+#include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler {
@@ -24,49 +26,50 @@ public:
 
 } // namespace
 
+template <typename OpTy>
+FailureOr<std::pair<Operation *, Operation *>>
+rewriteInIm2Col(RewriterBase &rewriter, OpTy op,
+                SmallVector<NamedAttribute> &additionalAttributes) {
+  additionalAttributes = linalg::getPrunedAttributeList(op);
+  return rewriteInIm2Col(rewriter, op);
+}
+
 void LLVMGPUIm2ColPass::runOnOperation() {
   auto operation = getOperation();
-  SmallVector<Operation *> convOps;
-  operation->walk([&](Operation *convOp) {
-    if (isa<linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNhwcFhwcOp,
-            linalg::DepthwiseConv2DNhwcHwcOp, linalg::Conv2DNchwFchwOp>(
-            convOp)) {
-      convOps.push_back(convOp);
-    }
-  });
 
   IRRewriter rewriter(&getContext());
-  for (auto op : convOps) {
+  operation->walk([&](Operation *op) {
     IRRewriter::InsertionGuard g(rewriter);
     rewriter.setInsertionPointAfter(op);
+    SmallVector<NamedAttribute> additionalAttributes;
     auto maybeTransformed =
         TypeSwitch<Operation *, FailureOr<std::pair<Operation *, Operation *>>>(
             op)
-            .Case([&](linalg::Conv2DNhwcHwcfOp op) {
-              return rewriteInIm2Col(rewriter, op);
-            })
-            .Case([&](linalg::Conv2DNhwcFhwcOp op) {
-              return rewriteInIm2Col(rewriter, op);
-            })
-            .Case([&](linalg::DepthwiseConv2DNhwcHwcOp op) {
-              return rewriteInIm2Col(rewriter, op);
-            })
-            .Case([&](linalg::Conv2DNchwFchwOp op) {
-              return rewriteInIm2Col(rewriter, op);
-            })
+            .Case<linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNhwcFhwcOp,
+                  linalg::DepthwiseConv2DNhwcHwcOp, linalg::Conv2DNchwFchwOp>(
+                [&](auto op) {
+                  return rewriteInIm2Col(rewriter, op, additionalAttributes);
+                })
             .Default([&](Operation *op) {
               return rewriter.notifyMatchFailure(op, "not supported");
             });
     if (failed(maybeTransformed)) {
-      continue;
+      return;
     }
-  }
+    auto matmulOp = cast<tensor::ExpandShapeOp>(maybeTransformed->second)
+                        .getSrc()
+                        .getDefiningOp();
+    for (auto attr : additionalAttributes) {
+      matmulOp->setAttr(attr.getName(), attr.getValue());
+    }
+  });
 
   // Bubble collapse
-
   RewritePatternSet patterns(&getContext());
   linalg::populateFoldReshapeOpsByCollapsingPatterns(
       patterns, [](OpOperand *) { return true; });
+  populateReshapeToInterfaceTensorPatterns(patterns);
+  linalg::FillOp::getCanonicalizationPatterns(patterns, &getContext());
   (void)applyPatternsAndFoldGreedily(getOperation(), std::move(patterns));
 }
 

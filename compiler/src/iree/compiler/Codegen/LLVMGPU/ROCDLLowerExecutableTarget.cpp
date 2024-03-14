@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -17,6 +18,8 @@
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
+
+#define DEBUG_TYPE "iree-rocdl-lower-executable-target"
 
 namespace mlir::iree_compiler {
 
@@ -65,6 +68,11 @@ public:
       variantOp.emitOpError("unsupported pipeline on ROCDL target");
       return signalPassFailure();
     }
+
+    LLVM_DEBUG({
+      llvm::dbgs() << "Running pipeline : ";
+      pipeline.dump();
+    });
 
     if (failed(runPipeline(pipeline, variantOp))) {
       return signalPassFailure();
