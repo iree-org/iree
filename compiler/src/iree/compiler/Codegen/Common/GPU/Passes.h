@@ -53,7 +53,8 @@ LogicalResult tileReductionToSerialLoops(mlir::FunctionOpInterface funcOp,
                                          bool collapseLoops = false);
 
 LogicalResult swizzleWorkgroupsInFunc(mlir::FunctionOpInterface funcOp,
-                                      unsigned swizzleLogTile);
+                                      unsigned swizzleLogTile,
+                                      ArrayRef<int64_t> workgroupCount);
 
 // Lowers workgroup memory copies to distributed transfer_read/transfer_write
 // ops. Expects the memory copy to be marked with copy_to_workgroup_memory

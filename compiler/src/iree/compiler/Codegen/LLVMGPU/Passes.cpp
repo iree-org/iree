@@ -522,6 +522,8 @@ static void addVectorBufferizePasses(OpPassManager &passManager) {
 void addGPUVectorDistributePassPipeline(OpPassManager &pm) {
   tileAndDistributeToWorkgroup(pm);
   auto &nestedModulePM = pm.nest<ModuleOp>();
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createWorkGroupSwizzle(logSwizzleTile));
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
