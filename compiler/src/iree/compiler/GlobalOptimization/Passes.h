@@ -70,6 +70,10 @@ std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createFuseDequantizationMatmulPass(
     bool enableQuantizedMatmulReassociation = false);
 
+/// Horizontally fuses multiple contraction ops.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createFuseHorizontalContractionsPass();
+
 /// Fuses two matmul ops and a linalg.generic Silu op
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createFuseSiluHorizontalMatmulPass();
