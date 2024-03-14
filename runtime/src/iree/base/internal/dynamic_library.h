@@ -73,6 +73,13 @@ iree_status_t iree_dynamic_library_attach_symbols_from_file(
 iree_status_t iree_dynamic_library_attach_symbols_from_memory(
     iree_dynamic_library_t* library, iree_const_byte_span_t buffer);
 
+// Queries the operating system for the for the full path of the dynamic
+// library in which |for_symbol| is located. For symbols not in a dynamic
+// library, the behavior is implementation dependent (i.e. it may return
+// a failure status or it may return a path to an executable, etc).
+iree_status_t iree_dynamic_library_get_symbol_path(
+    void* for_symbol, iree_string_builder_t* out_path);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif

@@ -10,6 +10,7 @@
 
 #include "iree/base/api.h"
 #include "iree/base/internal/dynamic_library.h"
+#include "iree/base/internal/path.h"
 #include "iree/base/target_platform.h"
 #include "iree/hal/drivers/hip/status_util.h"
 
@@ -49,24 +50,112 @@ static iree_status_t iree_hal_hip_dynamic_symbols_resolve_all(
   return iree_ok_status();
 }
 
+static bool iree_hal_hip_try_load_dylib(const char* file_path,
+                                        iree_dynamic_library_flags_t flags,
+                                        iree_allocator_t allocator,
+                                        iree_status_t* pending_fail_status,
+                                        iree_dynamic_library_t** out_library) {
+  iree_status_t status = iree_dynamic_library_load_from_file(
+      file_path, flags, allocator, out_library);
+  if (iree_status_is_ok(status)) {
+    return true;
+  }
+
+  char* buffer = NULL;
+  iree_host_size_t length = 0;
+  if (iree_status_to_string(status, &allocator, &buffer, &length)) {
+    *pending_fail_status = iree_status_annotate_f(
+        *pending_fail_status, "\n  Tried: %s\n    %s", file_path, buffer);
+    iree_allocator_free(allocator, buffer);
+  }
+
+  iree_status_ignore(status);
+  return false;
+}
+
 iree_status_t iree_hal_hip_dynamic_symbols_initialize(
-    iree_allocator_t host_allocator, iree_hal_hip_dynamic_symbols_t* out_syms) {
+    iree_allocator_t host_allocator, iree_host_size_t hip_lib_search_path_count,
+    const iree_string_view_t* hip_lib_search_paths,
+    iree_hal_hip_dynamic_symbols_t* out_syms) {
   IREE_ASSERT_ARGUMENT(out_syms);
   IREE_TRACE_ZONE_BEGIN(z0);
 
   memset(out_syms, 0, sizeof(*out_syms));
-  iree_status_t status = iree_dynamic_library_load_from_files(
-      IREE_ARRAYSIZE(iree_hal_hip_dylib_names), iree_hal_hip_dylib_names,
-      IREE_DYNAMIC_LIBRARY_FLAG_NONE, host_allocator, &out_syms->dylib);
-  if (iree_status_is_not_found(status)) {
-    iree_status_ignore(status);
-    status = iree_make_status(
-        IREE_STATUS_UNAVAILABLE,
-        "HIP runtime library 'amdhip64.dll'/'libamdhip64.so' not available;"
-        "please ensure installed and in dynamic library search path");
+
+  // Load the library.
+  bool loaded_one = false;
+  iree_status_t status = iree_ok_status();
+  iree_status_t pending_fail_status = iree_make_status(
+      IREE_STATUS_UNAVAILABLE,
+      "HIP runtime library 'amdhip64.dll'/'libamdhip64.so' not available: "
+      "please ensure installed and in dynamic library search path");
+
+  if (hip_lib_search_path_count == 0) {
+    // If no explicit search path, then have the system try to find the library
+    // by filename alone.
+    for (iree_host_size_t i = 0;
+         i < IREE_ARRAYSIZE(iree_hal_hip_dylib_names) && !loaded_one; ++i) {
+      if (iree_hal_hip_try_load_dylib(
+              iree_hal_hip_dylib_names[i], IREE_DYNAMIC_LIBRARY_FLAG_NONE,
+              host_allocator, &pending_fail_status, &out_syms->dylib)) {
+        loaded_one = true;
+      }
+    }
+  } else {
+    // With an explicit path, try each entry individually.
+    iree_string_builder_t path_builder;
+    iree_string_builder_initialize(host_allocator, &path_builder);
+    for (iree_host_size_t i = 0; i < hip_lib_search_path_count && !loaded_one;
+         ++i) {
+      iree_string_view_t path_entry = hip_lib_search_paths[i];
+      iree_string_view_t file_prefix = iree_string_view_literal("file:");
+      iree_string_builder_reset(&path_builder);
+      if (iree_string_view_consume_prefix(&path_entry, file_prefix)) {
+        // Load verbatim.
+        status = iree_string_builder_append_string(&path_builder, path_entry);
+        if (!iree_status_is_ok(status)) break;
+        if (iree_hal_hip_try_load_dylib(
+                path_builder.buffer, IREE_DYNAMIC_LIBRARY_FLAG_NONE,
+                host_allocator, &pending_fail_status, &out_syms->dylib)) {
+          loaded_one = true;
+        }
+      } else {
+        // Try each variant of a platform specific library name.
+        for (iree_host_size_t j = 0;
+             j < IREE_ARRAYSIZE(iree_hal_hip_dylib_names) && !loaded_one; ++j) {
+          // Join the directory with a system specific library name.
+          iree_string_view_t sep = iree_string_view_literal("/");
+          status = iree_string_builder_append_string(&path_builder, path_entry);
+          if (!iree_status_is_ok(status)) break;
+          status = iree_string_builder_append_string(&path_builder, sep);
+          if (!iree_status_is_ok(status)) break;
+          status = iree_string_builder_append_string(
+              &path_builder,
+              iree_make_cstring_view(iree_hal_hip_dylib_names[j]));
+          if (!iree_status_is_ok(status)) break;
+          path_builder.size = iree_file_path_canonicalize(path_builder.buffer,
+                                                          path_builder.size);
+          if (iree_hal_hip_try_load_dylib(
+                  path_builder.buffer, IREE_DYNAMIC_LIBRARY_FLAG_NONE,
+                  host_allocator, &pending_fail_status, &out_syms->dylib)) {
+            loaded_one = true;
+          }
+        }
+      }
+      if (!iree_status_is_ok(status)) break;
+    }
+    iree_string_builder_deinitialize(&path_builder);
   }
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_hip_dynamic_symbols_resolve_all(out_syms);
+
+  if (!iree_status_is_ok(status)) {
+    iree_status_ignore(pending_fail_status);
+  } else {
+    if (loaded_one) {
+      status = iree_hal_hip_dynamic_symbols_resolve_all(out_syms);
+      iree_status_ignore(pending_fail_status);
+    } else {
+      status = pending_fail_status;
+    }
   }
   if (!iree_status_is_ok(status)) {
     iree_hal_hip_dynamic_symbols_deinitialize(out_syms);
@@ -84,4 +173,13 @@ void iree_hal_hip_dynamic_symbols_deinitialize(
   memset(syms, 0, sizeof(*syms));
 
   IREE_TRACE_ZONE_END(z0);
+}
+
+iree_status_t iree_hal_hip_dynamic_symbols_get_path(
+    iree_hal_hip_dynamic_symbols_t* syms, iree_string_builder_t* out_path) {
+  if (!syms->dylib) {
+    return iree_make_status(IREE_STATUS_NOT_FOUND);
+  }
+  // Specific choice of symbol is not important.
+  return iree_dynamic_library_get_symbol_path(syms->hipDeviceGet, out_path);
 }

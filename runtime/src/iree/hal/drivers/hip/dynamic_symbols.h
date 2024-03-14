@@ -45,14 +45,36 @@ typedef struct iree_hal_hip_dynamic_symbols_t {
 // Initializes |out_syms| in-place with dynamically loaded HIP symbols.
 // iree_hal_hip_dynamic_symbols_deinitialize must be used to release the
 // library resources.
+//
+// If |hip_lib_search_path_count| is non zero, then |hip_lib_search_paths|
+// is a list of paths to guide searching for the dynamic libamdhip64.so (or
+// amdhip64.dll), which contains the backing HIP runtime library. If this
+// is present, it overrides any other mechanism for finding the HIP runtime
+// library. Default search heuristics are used (i.e. ask the system to find an
+// appropriately named library) if there are zero entries.
+// Each entry can be:
+//
+// * Directory in which to find a platform specific runtime library
+//   name.
+// * Specific fully qualified path to a file that will be loaded with no
+//   further interpretation if the entry starts with "file:".
 iree_status_t iree_hal_hip_dynamic_symbols_initialize(
-    iree_allocator_t host_allocator, iree_hal_hip_dynamic_symbols_t* out_syms);
+    iree_allocator_t host_allocator, iree_host_size_t hip_lib_search_path_count,
+    const iree_string_view_t* hip_lib_search_paths,
+    iree_hal_hip_dynamic_symbols_t* out_syms);
 
 // Deinitializes |syms| by unloading the backing library. All function pointers
 // will be invalidated. They _may_ still work if there are other reasons the
 // library remains loaded so be careful.
 void iree_hal_hip_dynamic_symbols_deinitialize(
     iree_hal_hip_dynamic_symbols_t* syms);
+
+// Gets the absolute path of the shared library or DLL providing the dynamic
+// symbols. If not loaded from a shared library, the exact behavior is
+// implementation dependent (i.e. it may return a failure status or it may
+// return a path to an executable, etc).
+iree_status_t iree_hal_hip_dynamic_symbols_get_path(
+    iree_hal_hip_dynamic_symbols_t* syms, iree_string_builder_t* out_path);
 
 #ifdef __cplusplus
 }  // extern "C"

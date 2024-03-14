@@ -319,6 +319,33 @@ iree_status_t iree_dynamic_library_lookup_symbol(
   return iree_ok_status();
 }
 
+iree_status_t iree_dynamic_library_get_symbol_path(
+    void* symbol, iree_string_builder_t* out_path) {
+  HMODULE hm = NULL;
+  if (GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+                            GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                        (LPCSTR)symbol, &hm) == 0) {
+    return iree_make_status(IREE_STATUS_NOT_FOUND);
+  }
+
+  iree_string_builder_reset(out_path);
+  IREE_RETURN_IF_ERROR(iree_string_builder_reserve(out_path, 64));
+  while (1) {
+    out_path->size =
+        ::GetModuleFileNameA(hm, out_path->buffer, out_path->capacity);
+    if (out_path->size == 0) {
+      return iree_make_status(IREE_STATUS_NOT_FOUND);
+    }
+    if (out_path->size == out_path->capacity) {
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_reserve(out_path, out_path->capacity + MAX_PATH));
+      continue;
+    }
+    break;
+  }
+  return iree_ok_status();
+}
+
 #if defined(IREE_HAVE_DYNAMIC_LIBRARY_PDB_SUPPORT)
 
 typedef struct {

@@ -131,6 +131,46 @@ IREE_API_EXPORT IREE_PRINTF_ATTRIBUTE(2, 3) iree_status_t
     iree_string_builder_append_format(iree_string_builder_t* builder,
                                       const char* format, ...);
 
+// Lightweight builder for lists of iree_string_pair_t.
+// Includes a side pool for keeping dynamically allocated strings, since it is
+// common to need to create backed, temporary strings when constructing lists
+// of views.
+typedef struct iree_string_pair_builder_t {
+  // Allocator used for buffer storage.
+  iree_allocator_t allocator;
+
+  // Pairs being assembled.
+  iree_string_pair_t* pairs;
+  iree_host_size_t pairs_size;
+  iree_host_size_t pairs_capacity;
+
+  char** temp_strings;
+  iree_host_size_t temp_strings_size;
+  iree_host_size_t temp_strings_capacity;
+} iree_string_pair_builder_t;
+
+// Initializes a string pair builder in |out_builder| with the given
+// |allocator|.
+IREE_API_EXPORT void iree_string_pair_builder_initialize(
+    iree_allocator_t allocator, iree_string_pair_builder_t* out_builder);
+
+// Deinitializes |builder| and releases allocated storage.
+IREE_API_EXPORT void iree_string_pair_builder_deinitialize(
+    iree_string_pair_builder_t* builder);
+
+// Adds a string pair to |builder|.
+IREE_API_EXPORT iree_status_t iree_string_pair_builder_add(
+    iree_string_pair_builder_t* builder, iree_string_pair_t pair);
+
+// Adds a string/int pair to |builder|.
+IREE_API_EXPORT iree_status_t iree_string_pair_builder_add_int(
+    iree_string_pair_builder_t* builder, iree_string_view_t key, int value);
+
+// Adds a string to the list of temporary allocated strings, updating the
+// |inout_string| to be the allocated version.
+IREE_API_EXPORT iree_status_t iree_string_pair_builder_alloc_string(
+    iree_string_pair_builder_t* builder, iree_string_view_t* inout_string);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus
