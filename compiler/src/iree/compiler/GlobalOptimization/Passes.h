@@ -96,6 +96,10 @@ createMaterializeHomogeneousEncodingsPass();
 /// iree-global-opt-infer-numeric-narrowing.
 std::unique_ptr<Pass> createOptimizeNumericsPass();
 
+/// Promotes the accumulator type of convolutions.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createPromoteConvolutionAccumulatorPass();
+
 /// Propagates linalg.transpose ops to a restricted set of operations.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createPropagateLinalgTransposePass(bool enableAggressivePropagation = false);

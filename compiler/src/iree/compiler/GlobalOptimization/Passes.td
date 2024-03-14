@@ -102,6 +102,12 @@ def OptimizeNumerics :
   let constructor = "mlir::iree_compiler::GlobalOptimization::createOptimizeNumericsPass()";
 }
 
+def PromoteConvolutionAccumulator :
+    InterfacePass<"iree-global-opt-promote-convolution-accumulator", "mlir::FunctionOpInterface"> {
+  let summary = "Promotes the accumulator type of f16 convolutions";
+  let constructor = "mlir::iree_compiler::GlobalOptimization::createPromoteConvolutionAccumulatorPass()";
+}
+
 def PropagateLinalgTranspose :
     InterfacePass<"iree-global-opt-propagate-linalg-transpose", "mlir::FunctionOpInterface"> {
   let summary = "Propagates linalg.transpose through a restricted set of ops";
