@@ -38,18 +38,44 @@ function(iree_import_tflite_model)
 
   if(NOT TARGET "${_RULE_TARGET_NAME}")
     cmake_path(GET _RULE_SOURCE FILENAME _MODEL_BASENAME)
+
+    # See PR #15756: PoseNet mysterious errors go away when run through iree-opt.
+    if(_RULE_SOURCE MATCHES PoseNet)
+      set(_PREOPT ON)
+    else()
+      set(_PREOPT OFF)
+    endif()
+
+    if(_PREOPT)
+      set(_PREOPT_SOURCE "${_RULE_OUTPUT_MLIR_FILE}.before-preopt")
+      set(_IMPORT_DESTINATION "${_PREOPT_SOURCE}")
+    else()
+      set(_IMPORT_DESTINATION "${_RULE_OUTPUT_MLIR_FILE}")
+    endif()
+
     add_custom_command(
-      OUTPUT "${_RULE_OUTPUT_MLIR_FILE}"
+      OUTPUT "${_IMPORT_DESTINATION}"
       COMMAND
         "${IREE_IMPORT_TFLITE_PATH}"
         "${_RULE_SOURCE}"
-        "-o=${_RULE_OUTPUT_MLIR_FILE}"
+        "-o=${_IMPORT_DESTINATION}"
         ${_RULE_IMPORT_FLAGS}
       DEPENDS
         "${_RULE_SOURCE}"
       COMMENT "Importing TFLite model ${_MODEL_BASENAME}"
       VERBATIM
     )
+
+    if(_PREOPT)
+      add_custom_command(
+        OUTPUT "${_RULE_OUTPUT_MLIR_FILE}"
+        COMMAND "iree-opt" "${_PREOPT_SOURCE}" "-o" "${_RULE_OUTPUT_MLIR_FILE}"
+        DEPENDS "${_IMPORT_DESTINATION}"
+        COMMENT "Processing TFLite model ${_MODEL_BASENAME} with iree-opt"
+        VERBATIM
+      )
+    endif()
+
     add_custom_target("${_RULE_TARGET_NAME}"
       DEPENDS
         "${_RULE_OUTPUT_MLIR_FILE}"
