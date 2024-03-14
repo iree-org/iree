@@ -3681,7 +3681,7 @@ additional steps needed when Sampling is also wanted.</p>
 <tr>
 <td>Compile your IREE module (run <code>iree-compile</code>)</td>
 <td><a href="#compile-your-iree-module-run-iree-compile">Nothing particular</a></td>
-<td><a href="#additional-steps-for-sampling">Also need</a> to pass <code>--iree-llvmcpu-link-embedded=false</code> (and also, for <code>llvm-cpu</code> backend, pass <code>--iree-llvmcpu-debug-symbols=true</code>, but that is currently default).</td>
+<td><a href="#additional-steps-for-sampling">Also need</a> to pass <code>--iree-llvmcpu-link-embedded=false</code> and <code>--iree-hal-dump-executable-sources-to=...</code> (and also, for <code>llvm-cpu</code> backend, pass <code>--iree-llvmcpu-debug-symbols=true</code>, but that is currently default).</td>
 </tr>
 <tr>
 <td>Build IREE device binaries (<code>iree-run-module</code> etc)</td>
@@ -3787,8 +3787,13 @@ modules compiled with it, then rebuild it with the CMake setting
 <p>If you only want Instrumentation and not Sampling then you don't need anything
 particular here. Just run <code>iree-compile</code> as usual.</p>
 <h3 id="additional-steps-for-sampling">Additional steps for Sampling<a class="headerlink" href="#additional-steps-for-sampling" title="Permanent link">link</a></h3>
-<p>In order for Sampling to work with your compiled modules, add this flag to your
-<code>iree-compile</code> command line: <code>--iree-llvmcpu-link-embedded=false</code>.</p>
+<p>In order for Sampling to work with your compiled modules, add these flags to
+your <code>iree-compile</code> command line:</p>
+<ul>
+<li><code>--iree-llvmcpu-link-embedded=false</code>.</li>
+<li><code>--iree-hal-dump-executable-sources-to=...</code> (enter a suitable path, e.g. some
+  subdirectory below <code>/tmp</code>).</li>
+</ul>
 <p>For the <code>llvm-cpu</code> target backend, sampling features also rely on debug
 information in the compiled module, enabled by
 <code>--iree-llvmcpu-debug-symbols=true</code>, but that is currently the default.</p>
