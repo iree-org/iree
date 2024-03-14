@@ -132,10 +132,10 @@ def WorkgroupSpecialization :
   let constructor = "mlir::iree_compiler::createWorkgroupSpecializationPass()";
 }
 
-def WorkGroupSwizzle :
-    InterfacePass<"iree-workgroup-swizzle", "mlir::FunctionOpInterface"> {
-  let summary = "swizzle the workgroup ids for better cache reuse";
-  let constructor = "mlir::iree_compiler::createWorkGroupSwizzle()";
+def ReorderWorkgroups :
+    InterfacePass<"iree-codegen-reorder-workgroups", "mlir::FunctionOpInterface"> {
+  let summary = "Reorder workgroup ids for better cache reuse";
+  let constructor = "mlir::iree_compiler::createReorderWorkgroups()";
   let options = [
     Option<"logTile", "logTile", "unsigned",
             /*default=*/"0",

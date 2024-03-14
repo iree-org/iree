@@ -145,9 +145,11 @@ createConvertVectorReductionToGPUPass(
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createWorkgroupSpecializationPass();
 
-/// Converts vector ops to gpu dialect.
+/// Reorders workgroup IDs.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createWorkGroupSwizzle(unsigned swizzleLogTile = 0);
+createReorderWorkgroups(
+    unsigned swizzleLogTile = 0,
+    std::function<LogicalResult(mlir::FunctionOpInterface)> filterFn = nullptr);
 
 // This pass generalizes named Linalg ops that are better off as generics.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>

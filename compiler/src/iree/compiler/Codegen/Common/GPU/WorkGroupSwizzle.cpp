@@ -5,8 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <cassert>
-#include "iree/compiler/Codegen/Common/GPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
+#include "iree/compiler/Codegen/Common/GPU/PassDetail.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
@@ -126,10 +126,12 @@ LogicalResult swizzleWorkgroupsInFunc(mlir::FunctionOpInterface funcOp,
 }
 
 namespace {
-struct WorkGroupSwizzlePass final
-    : WorkGroupSwizzleBase<WorkGroupSwizzlePass> {
-  WorkGroupSwizzlePass(unsigned swizzleLogTile)
-      : swizzleLogTile(swizzleLogTile) {}
+struct ReorderWorkgroupsPass final
+    : ReorderWorkgroupsBase<ReorderWorkgroupsPass> {
+  ReorderWorkgroupsPass(
+      unsigned swizzleLogTile,
+      std::function<LogicalResult(mlir::FunctionOpInterface)> filterFn)
+      : swizzleLogTile(swizzleLogTile), filterFn(std::move(filterFn)) {}
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<affine::AffineDialect>();
@@ -146,6 +148,9 @@ struct WorkGroupSwizzlePass final
       return;
 
     FunctionOpInterface funcOp = getOperation();
+    if (filterFn && failed(filterFn(funcOp)))
+      return;
+
     SmallVector<int64_t> workgroupCount = getStaticNumWorkgroups(funcOp);
     if (workgroupCount.size() != 3) {
       LLVM_DEBUG(llvm::dbgs() << "Reorder Workgroups: failed to find static "
@@ -176,12 +181,15 @@ struct WorkGroupSwizzlePass final
 
 private:
   unsigned swizzleLogTile;
+  std::function<LogicalResult(mlir::FunctionOpInterface)> filterFn;
 };
 } // namespace
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createWorkGroupSwizzle(unsigned swizzleLogTile) {
-  return std::make_unique<WorkGroupSwizzlePass>(swizzleLogTile);
+createReorderWorkgroups(
+    unsigned swizzleLogTile,
+    std::function<LogicalResult(mlir::FunctionOpInterface)> filterFn) {
+  return std::make_unique<ReorderWorkgroupsPass>(swizzleLogTile, filterFn);
 }
 
 } // namespace mlir::iree_compiler
