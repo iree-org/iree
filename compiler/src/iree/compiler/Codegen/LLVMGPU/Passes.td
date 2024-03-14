@@ -111,6 +111,12 @@ def LLVMGPUTileMatmulAndFuseImg2Col :
   ];
 }
 
+def LLVMGPUPadIGemm :
+    InterfacePass<"iree-llvmgpu-pad-igemm", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to pad out matmul op from igemm.";
+  let constructor = "mlir::iree_compiler::createLLVMGPUPadIGemmPass()";
+}
+
 def LLVMGPUTensorPad :
     InterfacePass<"iree-llvmgpu-tensor-pad", "mlir::FunctionOpInterface"> {
   let summary = "Pass to pad out tensors up to static dimensions.";

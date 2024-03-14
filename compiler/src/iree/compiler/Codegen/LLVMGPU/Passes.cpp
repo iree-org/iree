@@ -728,6 +728,9 @@ void addGPUImplicitGEMMPassPipeline(OpPassManager &pm) {
   nestedModulePM.addPass(createCSEPass());
   nestedModulePM.addNestedPass<func::FuncOp>(
       createLLVMGPUTileMatmulAndFuseImg2ColPass(1));
+  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUPadIGemmPass());
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
 
   addBufferizePasses(nestedModulePM);
   nestedModulePM.addNestedPass<func::FuncOp>(
