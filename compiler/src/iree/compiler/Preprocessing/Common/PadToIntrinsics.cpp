@@ -73,7 +73,7 @@ public:
 
     // TODO: Generalize to other dimensions.
     // Try to search for pad value and check only filter dimension is blocked.
-    int64_t targetPadSize = __INT64_MAX__;
+    int64_t targetPadSize = std::numeric_limits<int64_t>::max();
     for (auto &intrinsic : intrinsics) {
       if (mSize % intrinsic.mSize == 0 && nSize % intrinsic.nSize == 0 &&
           kSize % intrinsic.kSize == 0) {
@@ -88,7 +88,7 @@ public:
           targetPadSize = candidatetargetPadSize;
       }
     }
-    if (targetPadSize == __INT64_MAX__)
+    if (targetPadSize == std::numeric_limits<int64_t>::max())
       return failure();
     // TODO: Handle other variants.
     if (!isa<linalg::Conv2DNhwcHwcfOp>(linalgOp))
