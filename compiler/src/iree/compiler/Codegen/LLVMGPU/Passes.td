@@ -101,6 +101,16 @@ def LLVMGPUTensorCoreVectorization :
   let constructor = "mlir::iree_compiler::createLLVMGPUTensorCoreVectorizationPass()";
 }
 
+def LLVMGPUTileMatmulAndFuseImg2Col :
+    InterfacePass<"iree-llvmgpu-tile-matmul-and-fuse-img2col", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to tile matmul (in generic form) and fuse img2col tensor";
+  let constructor = "mlir::iree_compiler::createLLVMGPUTileMatmulAndFuseImg2ColPass()";
+  let options = [
+    Option<"tilingLevel", "tiling-level", "int64_t", /*default=*/"-1",
+      "Use default tiling level used to retrieve the configuration from lowering_config">
+  ];
+}
+
 def LLVMGPUTensorPad :
     InterfacePass<"iree-llvmgpu-tensor-pad", "mlir::FunctionOpInterface"> {
   let summary = "Pass to pad out tensors up to static dimensions.";

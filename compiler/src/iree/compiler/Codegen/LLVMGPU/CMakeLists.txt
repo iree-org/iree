@@ -89,6 +89,7 @@ iree_cc_library(
     "LLVMGPUTensorCoreVectorization.cpp"
     "LLVMGPUTensorPad.cpp"
     "LLVMGPUTileAndDistribute.cpp"
+    "LLVMGPUTileMatmulAndFuseImg2Col.cpp"
     "LLVMGPUVectorDistribute.cpp"
     "LLVMGPUVectorLowering.cpp"
     "LLVMGPUVectorToGPU.cpp"

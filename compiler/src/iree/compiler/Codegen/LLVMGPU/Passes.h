@@ -123,6 +123,9 @@ std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMGPUTensorCoreVectorizationPass(
     GPUTensorCoreType tensorCoreType = GPUTensorCoreType::WMMA);
 
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createLLVMGPUTileMatmulAndFuseImg2ColPass(int tilingLevel = -1);
+
 //. Pass to pad out tensors up to static dimensions.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMGPUTensorPadPass();
