@@ -65,6 +65,12 @@ def FuseDequantizationMatmul:
   ];
 }
 
+def FuseHorizontalContractions:
+    InterfacePass<"iree-global-opt-fuse-horizontal-contractions", "mlir::FunctionOpInterface"> {
+  let summary = "Fuses horizontal contraction ops without fusions";
+  let constructor = "mlir::iree_compiler::GlobalOptimization::createFuseHorizontalContractionsPass()";
+}
+
 def FuseSiluHorizontalMatmul:
     InterfacePass<"iree-global-opt-fuse-silu-horizontal-matmul", "mlir::FunctionOpInterface"> {
   let summary = "Fuses matmul ops and silu linalg.generic op";
