@@ -26,6 +26,9 @@ std::unique_ptr<Pass> createConvertConvToChannelsLastPass();
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createMakeSingleDispatchForFunctionPass();
 
+/// A pass to pad linalg ops to be able to be used by target intrinsics.
+std::unique_ptr<Pass> createPadToIntrinsicsPass();
+
 /// A pass to pad linalg ops to the next integer multiple of `paddingSize`.
 std::unique_ptr<Pass> createPadLinalgOpsToIntegerMultiplePass();
 

@@ -32,6 +32,7 @@ iree_cc_library(
     "InterpreterPass.cpp"
     "MakeSingleDispatchForFunction.cpp"
     "PadLinalgOps.cpp"
+    "PadToIntrinsics.cpp"
     "PassDetail.h"
     "Passes.cpp"
   DEPS
@@ -54,6 +55,7 @@ iree_cc_library(
     MLIRTransformDialect
     MLIRTransformDialectTransforms
     MLIRTransforms
+    iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Flow::Transforms
     iree::compiler::Dialect::Stream::IR
