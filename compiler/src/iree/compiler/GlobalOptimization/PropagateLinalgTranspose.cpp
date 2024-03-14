@@ -30,6 +30,11 @@
 
 namespace mlir::iree_compiler::GlobalOptimization {
 
+static llvm::cl::opt<bool> clOnlySinkTransposes(
+    "iree-global-opt-only-sink-transposes",
+    llvm::cl::desc("Forces transpose propagation to only sink them."),
+    llvm::cl::init(false));
+
 //===----------------------------------------------------------------------===//
 // Transpose permutation helpers
 //===----------------------------------------------------------------------===//
@@ -856,7 +861,7 @@ void PropagateLinalgTransposePass::runOnOperation() {
 
   // Propagate transposes upwards, and fuse with any producer generic ops. Also
   // propagate reshapes upwards to open up more transpose fusion opportunities.
-  if (!testSinkingOnly) {
+  if (!testSinkingOnly && !clOnlySinkTransposes) {
     linalg::ControlFusionFn reshapePropagationFn = [](OpOperand *fusedOperand) {
       Operation *producer = fusedOperand->get().getDefiningOp();
       Operation *consumer = fusedOperand->getOwner();
@@ -909,35 +914,38 @@ void PropagateLinalgTransposePass::runOnOperation() {
   // or linalg named ops. Also propagate reshapes downwards to open up more
   // transpose fusion opportunities.
   if (!testBubblingOnly) {
-    linalg::ControlFusionFn reshapePropagationFn = [](OpOperand *fusedOperand) {
-      Operation *producer = fusedOperand->get().getDefiningOp();
-      Operation *consumer = fusedOperand->getOwner();
-      if (!IREE::Flow::isNonNullAndOutsideDispatch({producer, consumer})) {
-        return false;
-      }
-      auto consumerLinalgOp = dyn_cast<linalg::LinalgOp>(consumer);
-      if (!consumerLinalgOp) {
-        return false;
-      }
-      // Only reshape generic ops and contraction ops.
-      if (!linalg::isaContractionOpInterface(consumerLinalgOp) &&
-          !isa<linalg::GenericOp>(consumerLinalgOp)) {
-        return false;
-      }
-      // Only propagate reshapes down through generics in this case, hoping
-      // to increase the chance we can fuse with a nearby transpose.
-      if (!isa<tensor::ExpandShapeOp>(producer) &&
-          !isa<tensor::CollapseShapeOp>(producer)) {
-        return false;
-      }
-      return isa_and_nonnull<linalg::TransposeOp>(
-          producer->getOperand(0).getDefiningOp());
-    };
     RewritePatternSet sinkingPatterns(context);
-    linalg::populateFoldReshapeOpsByExpansionPatterns(sinkingPatterns,
-                                                      reshapePropagationFn);
-    linalg::populateFoldReshapeOpsByCollapsingPatterns(sinkingPatterns,
-                                                       reshapePropagationFn);
+    if (!clOnlySinkTransposes) {
+      linalg::ControlFusionFn reshapePropagationFn = [](OpOperand
+                                                            *fusedOperand) {
+        Operation *producer = fusedOperand->get().getDefiningOp();
+        Operation *consumer = fusedOperand->getOwner();
+        if (!IREE::Flow::isNonNullAndOutsideDispatch({producer, consumer})) {
+          return false;
+        }
+        auto consumerLinalgOp = dyn_cast<linalg::LinalgOp>(consumer);
+        if (!consumerLinalgOp) {
+          return false;
+        }
+        // Only reshape generic ops and contraction ops.
+        if (!linalg::isaContractionOpInterface(consumerLinalgOp) &&
+            !isa<linalg::GenericOp>(consumerLinalgOp)) {
+          return false;
+        }
+        // Only propagate reshapes down through generics in this case, hoping
+        // to increase the chance we can fuse with a nearby transpose.
+        if (!isa<tensor::ExpandShapeOp>(producer) &&
+            !isa<tensor::CollapseShapeOp>(producer)) {
+          return false;
+        }
+        return isa_and_nonnull<linalg::TransposeOp>(
+            producer->getOperand(0).getDefiningOp());
+      };
+      linalg::populateFoldReshapeOpsByExpansionPatterns(sinkingPatterns,
+                                                        reshapePropagationFn);
+      linalg::populateFoldReshapeOpsByCollapsingPatterns(sinkingPatterns,
+                                                         reshapePropagationFn);
+    }
     sinkingPatterns.insert<SinkTransposeThroughExtractSlice>(context);
     sinkingPatterns.insert<SinkTransposeThroughExpandShape>(context);
     sinkingPatterns.insert<FuseTransposeWithLinalgOpConsumer>(context);
