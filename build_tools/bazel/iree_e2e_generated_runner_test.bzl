@@ -4,15 +4,16 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-"""Macros for defining tests that use the iree-e2e-matmul-test runner."""
+"""Macros for defining tests that use the iree-e2e-{test_type}-test runner."""
 
 load("//build_tools/bazel:iree_bytecode_module.bzl", "iree_bytecode_module")
 load("//build_tools/bazel:native_binary.bzl", "native_test")
 
-def iree_e2e_matmul_test(
+def iree_e2e_runner_test(
         name,
-        matmul_src,
-        matmuls_vmfb,
+        test_type,
+        tests_src,
+        tests_vmfb,
         calls_src,
         calls_vmfb,
         target_backend,
@@ -28,8 +29,9 @@ def iree_e2e_matmul_test(
 
     Args:
         name: Name of the target
-        matmul_src: mlir source file with matmuls to be compiled.
-        matmuls_vmfb: specifies the path to use for the generated IREE module.
+        test_type: Name of the test (e.g., matmuls, conv2ds).
+        tests_src: mlir source file with tests to be compiled.
+        tests_vmfb: specifies the path to use for the generated IREE module.
         calls_src: mlir source file with calls to be compiled.
         calls_vmfb: specifies the path to use for the generated IREE module.
         target_backend: target backend to compile for.
@@ -51,9 +53,9 @@ def iree_e2e_matmul_test(
         fail("target_cpu_features must currently be empty")
 
     iree_bytecode_module(
-        name = name + "_matmuls_module",
-        module_name = matmuls_vmfb,
-        src = matmul_src,
+        name = name + "_%s_module" % test_type,
+        module_name = tests_vmfb,
+        src = tests_src,
         flags = [
             "--iree-hal-target-backends=%s" % target_backend,
         ] + ([
@@ -80,11 +82,11 @@ def iree_e2e_matmul_test(
         name = name,
         args = [
             "--device=%s" % driver,
-            "--module=$(location :%s)" % matmuls_vmfb,
+            "--module=$(location :%s)" % tests_vmfb,
             "--module=$(location :%s)" % calls_vmfb,
         ] + runner_args,
         data = [
-            ":%s" % matmuls_vmfb,
+            ":%s" % tests_vmfb,
             ":%s" % calls_vmfb,
         ],
         src = test_runner,
@@ -93,8 +95,9 @@ def iree_e2e_matmul_test(
         **kwargs
     )
 
-def iree_single_backend_e2e_matmul_test(
+def iree_single_backend_e2e_runner_test(
         name,
+        test_type,
         generator,
         test_runner,
         target_backend,
@@ -106,17 +109,18 @@ def iree_single_backend_e2e_matmul_test(
         target_cpu_features = None,
         timeout = None,
         **kwargs):
-    """Generates an iree_e2e_matmul_test using a custom python generator script.
+    """Generates an iree_e2e_test using a custom python generator script.
 
     The generator script produces .mlir sources which are compiled and passed to
-    iree_e2e_matmul_test.
+    iree_e2e_test.
 
     Args:
         name: Name of the target
+        test_type: Name of the test (e.g., matmuls, conv2ds).
         generator: Target to run to generate the source MLIR files.
             It will be invoked with the following standard flags, in addition
             to generator_args:
-            --output_matmuls_mlir=(current binary dir)/name_matmuls.mlir
+            --output_{$test_type}_mlir=(current binary dir)/name_{$test_type}.mlir
             --output_calls_mlir=(current binary dir)/name_calls.mlir
         generator_args: additional args to pass to the generator program.
         target_backend: target backend to compile for.
@@ -134,17 +138,17 @@ def iree_single_backend_e2e_matmul_test(
             test suite.
     """
 
-    matmul_src = "%s.mlir" % (name)
-    matmuls_vmfb = "%s.vmfb" % (name)
+    tests_src = "%s.mlir" % (name)
+    tests_vmfb = "%s.vmfb" % (name)
     calls_src = "%s_calls.mlir" % (name)
     calls_vmfb = "%s_calls.vmfb" % (name)
     native.genrule(
         name = "%s_generate" % (name),
-        outs = [matmul_src, calls_src],
+        outs = [tests_src, calls_src],
         cmd = " ".join([
             "$(location %s)" % (generator),
             " ".join([('"%s"' % arg) for arg in generator_args]),
-            "--output_matmuls_mlir=$(location %s)" % (matmul_src),
+            "--output_%s_mlir=$(location %s)" % (test_type, tests_src),
             "--output_calls_mlir=$(location %s)" % (calls_src),
         ] + [('"%s"' % arg) for arg in generator_args]),
         tools = [generator],
@@ -153,10 +157,11 @@ def iree_single_backend_e2e_matmul_test(
         testonly = True,
         **kwargs
     )
-    iree_e2e_matmul_test(
+    iree_e2e_runner_test(
         name = name,
-        matmul_src = matmul_src,
-        matmuls_vmfb = matmuls_vmfb,
+        test_type = test_type,
+        tests_src = tests_src,
+        tests_vmfb = tests_vmfb,
         calls_src = calls_src,
         calls_vmfb = calls_vmfb,
         target_backend = target_backend,
@@ -170,8 +175,9 @@ def iree_single_backend_e2e_matmul_test(
         **kwargs
     )
 
-def iree_generated_e2e_matmul_test(
+def iree_generated_e2e_runner_test(
         name,
+        test_type,
         generator,
         test_runner,
         target_backends_and_drivers,
@@ -182,14 +188,15 @@ def iree_generated_e2e_matmul_test(
         timeout = None,
         target_cpu_features_variants = [],
         **kwargs):
-    """Generates a suite of iree_e2e_matmul_test on multiple backends/drivers.
+    """Generates a suite of iree_e2e_test on multiple backends/drivers.
 
     Args:
         name: Name of the target
+        test_type: Name of the test (e.g., matmuls, conv2ds).
         generator: Target to run to generate the source MLIR files.
             It will be invoked with the following standard flags, in addition
             to generator_args:
-            --output_matmuls_mlir=(current binary dir)/name_matmuls.mlir
+            --output_{test_type}_mlir=(current binary dir)/name_{test_type}.mlir
             --output_calls_mlir=(current binary dir)/name_calls.mlir
         generator_args: additional args to pass to the generator program.
         target_backends_and_drivers: backend/driver pairs to compile and run
@@ -222,8 +229,9 @@ def iree_generated_e2e_matmul_test(
         if backend == "cuda" or driver == "cuda" or backend == "rocm" or driver == "hip":
             continue
         suite_entry_name = "_".join([name, backend, driver])
-        iree_single_backend_e2e_matmul_test(
+        iree_single_backend_e2e_runner_test(
             name = suite_entry_name,
+            test_type = test_type,
             generator = generator,
             test_runner = test_runner,
             driver = driver,

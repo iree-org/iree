@@ -150,9 +150,11 @@ class BuildFileFunctions(object):
             return ""
 
         srcs = [
-            self._normalize_label(s)
-            if s.startswith("$") or os.path.splitext(s)[1]
-            else self._filegroup_dep_filename(self._normalize_label(s))
+            (
+                self._normalize_label(s)
+                if s.startswith("$") or os.path.splitext(s)[1]
+                else self._filegroup_dep_filename(self._normalize_label(s))
+            )
             for s in srcs
         ]
 
@@ -854,12 +856,13 @@ class BuildFileFunctions(object):
             f")\n\n"
         )
 
-    def iree_generated_e2e_matmul_test(
+    def iree_generated_e2e_runner_test(
         self,
         name,
+        test_type,
         generator,
         generator_args=None,
-        test_runner=None,
+        test_runner="",
         target_backends_and_drivers=None,
         compiler_flags=None,
         runner_args=None,
@@ -876,6 +879,9 @@ class BuildFileFunctions(object):
             drivers = [it[1] for it in target_backends_and_drivers]
 
         name_block = self._convert_string_arg_block("NAME", name, quote=False)
+        test_type_block = self._convert_string_arg_block(
+            "TEST_TYPE", test_type, quote=False
+        )
         # For now we assume that the generator target is a py_binary with a single
         # source .py file named like it.
         generator_py = f"{generator.split(':')[-1]}.py"
@@ -885,6 +891,9 @@ class BuildFileFunctions(object):
         generator_args_block = self._convert_string_list_block(
             "GENERATOR_ARGS", generator_args
         )
+        # Use the fully qualified target name
+        target_name_prefix = "iree_tools_testing_e2e_"
+        test_runner = f"{target_name_prefix}{test_runner.split(':')[-1]}"
         test_runner_block = self._convert_target_block("TEST_RUNNER", test_runner)
         target_backends_block = self._convert_string_list_block(
             "TARGET_BACKENDS", target_backends
@@ -900,8 +909,9 @@ class BuildFileFunctions(object):
         )
 
         self._converter.body += (
-            f"iree_generated_e2e_matmul_test(\n"
+            f"iree_generated_e2e_runner_test(\n"
             f"{name_block}"
+            f"{test_type_block}"
             f"{generator_block}"
             f"{generator_args_block}"
             f"{test_runner_block}"
