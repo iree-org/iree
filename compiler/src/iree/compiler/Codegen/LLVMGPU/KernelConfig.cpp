@@ -441,8 +441,15 @@ setConvolutionVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
     workgroupTileSizes[filterDim] = 1;
   }
 
-  TileSizesListType tileSizes;
-  tileSizes.push_back(workgroupTileSizes);
+  SmallVector<int64_t> fstLevelTileSizes = workgroupTileSizes;
+  for (int64_t filterDim : convolutionDims->filterLoop) {
+    fstLevelTileSizes[filterDim] = 0;
+  }
+  SmallVector<int64_t> sndLevelTileSizes(fstLevelTileSizes.size(), 0);
+  for (int64_t filterDim : convolutionDims->filterLoop) {
+    sndLevelTileSizes[filterDim] = workgroupTileSizes[filterDim];
+  }
+  TileSizesListType tileSizes = {fstLevelTileSizes, sndLevelTileSizes};
 
   // Attach the MMA schedule as an attribute to the entry point export function
   // for later access in the pipeline.
