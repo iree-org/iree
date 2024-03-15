@@ -23,20 +23,26 @@ namespace mlir::iree_compiler::IREE::Flow {
 // TODO(thomasraoux): Move to attributes.
 static llvm::cl::opt<int64_t>
     splitReductionRatio("iree-flow-split-matmul-reduction",
-                        llvm::cl::desc("split ratio"), llvm::cl::init(1));
+                        llvm::cl::desc("split ratio"), llvm::cl::init(5));
 
 static llvm::cl::list<int64_t> topkSplitReductionRatio(
     "iree-flow-topk-split-reduction",
     llvm::cl::desc("comma separated list of split ratios"),
     llvm::cl::CommaSeparated);
 
+inline static SmallVector<NamedAttribute>
+getPrunedAttributeList(linalg::LinalgOp op) {
+  auto elidedAttrs = llvm::to_vector(linalg::GenericOp::getAttributeNames());
+  elidedAttrs.push_back(linalg::LinalgDialect::kMemoizedIndexingMapsAttrName);
+  return getPrunedAttributeList(op, elidedAttrs);
+}
+
 static LogicalResult splitReductionOnMatmul(
-    RewriterBase &rewriter, linalg::MatmulOp op,
+    RewriterBase &rewriter, linalg::LinalgOp op,
     linalg::ControlSplitReductionFn controlSplitReductionFn) {
   // Since user information about compilation are passed through attributes we
   // need to make sure to propagate those.
-  SmallVector<NamedAttribute> prunedAttributeList =
-      linalg::getPrunedAttributeList(op);
+  SmallVector<NamedAttribute> prunedAttributeList = getPrunedAttributeList(op);
 
   FailureOr<linalg::SplitReductionResult> result =
       linalg::splitReduction(rewriter, op, controlSplitReductionFn);
@@ -55,6 +61,7 @@ struct SplitReductionPass : public SplitReductionBase<SplitReductionPass> {
   }
 
   void runOnOperation() override {
+
     if (splitReductionRatio.getValue() <= 1 &&
         topkSplitReductionRatio.empty()) {
       return;
@@ -62,17 +69,34 @@ struct SplitReductionPass : public SplitReductionBase<SplitReductionPass> {
 
     MLIRContext *context = &getContext();
     auto funcOp = getOperation();
-
     auto matmulSplitReductionControlFn =
         [&](linalg::LinalgOp op) -> linalg::SplitReductionOptions {
       // For matmul make the new parallel dimension first so that it looks
       // like a batch_matmul and can follow the same codegen.
       return {int64_t(splitReductionRatio), 0, /*innerParallel=*/false};
     };
+    // Min 5000 is selected for SDXL
+    constexpr int64_t kReductionThresh = 5000;
+    auto hasLargeK = [&](linalg::LinalgOp op) -> bool {
+      SmallVector<unsigned> dims;
+      op.getReductionDims(dims);
+      if (dims.size() != 1)
+        return false;
+      unsigned reductionDim = dims[0];
+      SmallVector<int64_t, 4> loopRanges = op.getStaticLoopRanges();
+      int64_t reductionDimSize = loopRanges[reductionDim];
+      if (ShapedType::isDynamic(reductionDimSize) ||
+          reductionDimSize < kReductionThresh)
+        return false;
+      return true;
+    };
 
-    SmallVector<linalg::MatmulOp> matmulCandidates;
+    SmallVector<linalg::LinalgOp> matmulCandidates;
     IRRewriter rewriter(context);
-    funcOp->walk([&](linalg::MatmulOp op) { matmulCandidates.push_back(op); });
+    funcOp->walk([&](linalg::LinalgOp op) {
+      if (linalg::isaContractionOpInterface(op) && hasLargeK(op))
+        matmulCandidates.push_back(op);
+    });
     for (auto op : matmulCandidates) {
       (void)splitReductionOnMatmul(rewriter, op, matmulSplitReductionControlFn);
     }
