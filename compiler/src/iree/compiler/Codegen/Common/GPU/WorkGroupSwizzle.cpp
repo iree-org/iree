@@ -23,7 +23,7 @@ namespace mlir::iree_compiler {
 /// to top -> down then left -> right.
 static std::pair<Value, Value>
 reorderIds(Location loc, OpBuilder b, Value workgroupIdX, Value workgroupIdY,
-           ArrayRef<int64_t> workgroupCount, unsigned swizzleTile) {
+           ArrayRef<int64_t> workgroupCount, unsigned /*swizzleTile*/) {
   Value gridSizeX = b.create<arith::ConstantIndexOp>(loc, workgroupCount[0]);
   Value gridSizeY = b.create<arith::ConstantIndexOp>(loc, workgroupCount[1]);
   Value linearized = b.create<arith::MulIOp>(loc, workgroupIdY, gridSizeX);
