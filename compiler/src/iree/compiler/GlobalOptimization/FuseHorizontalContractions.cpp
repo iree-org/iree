@@ -30,7 +30,43 @@
 #define DEBUG_TYPE "iree-global-opt-fuse-horizontal-contraction"
 #define DBGS() (llvm::dbgs() << '[' << DEBUG_TYPE << "] ")
 
-namespace mlir::iree_compiler::GlobalOptimization {
+using namespace mlir;
+
+static FailureOr<linalg::GenericOp> getTruncUser(Operation *op) {
+  if (op->getNumResults() != 1) {
+    return failure();
+  }
+  Value result = op->getResult(0);
+  if (!result.hasOneUse()) {
+    return failure();
+  }
+  Operation *user = *result.user_begin();
+  auto genericOp = dyn_cast<linalg::GenericOp>(user);
+  if (!genericOp) {
+    return failure();
+  }
+  if (genericOp.getNumDpsInputs() != 1 || genericOp.getNumDpsInits() != 1) {
+    return failure();
+  }
+  if (llvm::any_of(genericOp.getIndexingMapsArray(),
+                   [](AffineMap map) { return !map.isIdentity(); })) {
+    return failure();
+  }
+  if (genericOp.getNumParallelLoops() != genericOp.getNumLoops()) {
+    return failure();
+  }
+  auto yieldOp = cast<linalg::YieldOp>(genericOp.getBody()->getTerminator());
+  auto yieldDefOp = yieldOp->getOperand(0).getDefiningOp<arith::TruncFOp>();
+  if (!yieldDefOp) {
+    return failure();
+  }
+  auto arg = dyn_cast<BlockArgument>(yieldDefOp->getOperand(0));
+  if (!arg || arg.getParentBlock() != genericOp.getBody() ||
+      arg.getArgNumber() != 0) {
+    return failure();
+  }
+  return genericOp;
+}
 
 static LogicalResult fuseGroup(RewriterBase &rewriter,
                                SmallVector<linalg::GenericOp> fusionGroup) {
@@ -46,6 +82,10 @@ static LogicalResult fuseGroup(RewriterBase &rewriter,
 
   auto rhsType = cast<RankedTensorType>(base.getOperand(1).getType());
   auto outType = cast<RankedTensorType>(base.getResult(0).getType());
+  FailureOr<linalg::GenericOp> baseTruncOp = getTruncUser(base);
+  if (failed(baseTruncOp)) {
+    return failure();
+  }
 
   SmallVector<ReassociationIndices> reassoc;
   reassoc.push_back({0, 1});
@@ -102,7 +142,28 @@ static LogicalResult fuseGroup(RewriterBase &rewriter,
   rewriter.cloneRegionBefore(base.getRegion(), newGenericOp.getRegion(),
                              newGenericOp.getRegion().begin());
 
-  Value fusedResult = newGenericOp.getResult(0);
+  // Insert truncate operator.
+  auto truncType =
+      baseTruncOp.value()->getResult(0).getType().cast<RankedTensorType>();
+  auto concatTruncType =
+      RankedTensorType::get(newShape, truncType.getElementType());
+  Value truncOuts = rewriter.create<tensor::EmptyOp>(
+      loc, concatTruncType, origEmpty.getDynamicSizes());
+  SmallVector<AffineMap> truncIndexingMaps(
+      2, AffineMap::getMultiDimIdentityMap(concatTruncType.getRank(),
+                                           rewriter.getContext()));
+  SmallVector<utils::IteratorType> truncIteratorTypes(
+      concatTruncType.getRank(), utils::IteratorType::parallel);
+  auto truncateOpBody = [&](OpBuilder &b, Location loc, ValueRange args) {
+    Value truncOp = b.create<arith::TruncFOp>(
+        loc, concatTruncType.getElementType(), args[0]);
+    rewriter.create<linalg::YieldOp>(loc, truncOp);
+  };
+  auto truncateOp = rewriter.create<linalg::GenericOp>(
+      loc, concatTruncType, newGenericOp->getResults(), truncOuts,
+      truncIndexingMaps, truncIteratorTypes, truncateOpBody);
+
+  Value fusedResult = truncateOp.getResult(0);
 
   SmallVector<Value> newOuts;
   SmallVector<OpFoldResult> sizes = newEmpty.getMixedSizes();
@@ -111,17 +172,41 @@ static LogicalResult fuseGroup(RewriterBase &rewriter,
                                     rewriter.getIndexAttr(0));
   SmallVector<OpFoldResult> strides(concatOutType.getRank(),
                                     rewriter.getIndexAttr(1));
+  auto truncOutType =
+      RankedTensorType::get(outType.getShape(), truncType.getElementType());
   for (int i = 0, e = rhsVals.size(); i < e; ++i) {
     offsets[0] = rewriter.getIndexAttr(i);
     newOuts.push_back(rewriter.create<tensor::ExtractSliceOp>(
-        loc, outType, fusedResult, offsets, sizes, strides));
+        loc, truncOutType, fusedResult, offsets, sizes, strides));
   }
 
   for (auto [op, replacement] : llvm::zip_equal(fusionGroup, newOuts)) {
-    rewriter.replaceOp(op, replacement);
+    FailureOr<linalg::GenericOp> truncUser = getTruncUser(op);
+    if (failed(truncUser)) {
+      return failure();
+    }
+    rewriter.replaceOp(truncUser.value(), replacement);
   }
   return success();
 }
+
+static bool hasTruncFollowedByCollapseShapeUser(Operation *op) {
+  FailureOr<linalg::GenericOp> truncOp = getTruncUser(op);
+  if (failed(truncOp)) {
+    return false;
+  }
+  Operation *user = truncOp.value();
+  if (!user->getResult(0).hasOneUse()) {
+    return false;
+  }
+  Operation *user2 = *user->user_begin();
+  if (!isa<tensor::CollapseShapeOp>(user2)) {
+    return false;
+  }
+  return true;
+}
+
+namespace mlir::iree_compiler::GlobalOptimization {
 
 namespace {
 
@@ -155,7 +240,7 @@ void FuseHorizontalContractionsPass::runOnOperation() {
       return;
     }
 
-    if (!generic->hasOneUse()) {
+    if (!hasTruncFollowedByCollapseShapeUser(generic)) {
       return;
     }
 
@@ -164,12 +249,6 @@ void FuseHorizontalContractionsPass::runOnOperation() {
     Value out = generic->getOperand(2);
     Type rhsType = rhs.getType();
     Type outType = generic->getResult(0).getType();
-    Operation *user = *generic->user_begin();
-
-    if (!isa<tensor::CollapseShapeOp>(user) &&
-        !isa<tensor::ExpandShapeOp>(user)) {
-      return;
-    }
 
     Operation *rhsDef = rhs.getDefiningOp();
     if (!rhsDef) {
@@ -177,6 +256,7 @@ void FuseHorizontalContractionsPass::runOnOperation() {
     }
 
     Block *block = generic->getBlock();
+    Operation *user = *generic->user_begin();
 
     SmallVector<linalg::GenericOp> fusionGroup;
     fusionGroup.push_back(generic);
