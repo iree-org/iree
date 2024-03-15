@@ -95,6 +95,12 @@ def LLVMGPUPromoteConvImgAndTileFilter :
   let constructor = "mlir::iree_compiler::createLLVMGPUPromoteConvImgAndTileFilterPass()";
 }
 
+def LLVMGPUDistributeSharedMemcpyV2 :
+    InterfacePass<"iree-llvmgpu-distribute-shared-memcpy-v2", "mlir::FunctionOpInterface"> {
+  let summary = "Distribute shared memory copy to threads";
+  let constructor = "mlir::iree_compiler::createLLVMGPUDistributeSharedMemcpyV2Pass()";
+}
+
 def LLVMGPUSelectLoweringStrategy :
     Pass<"iree-llvmgpu-select-lowering-strategy", "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
   let summary = "Select a IREE::HAL::DispatchLoweringPassPipeline for lowering the target variant";

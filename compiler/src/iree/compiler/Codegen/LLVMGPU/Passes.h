@@ -188,6 +188,9 @@ createAMDGPUPrepareForChainedMatmulPass();
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMGPUPromoteConvImgAndTileFilterPass();
 
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createLLVMGPUDistributeSharedMemcpyV2Pass();
+
 //----------------------------------------------------------------------------//
 // Register LLVMGPU Passes
 //----------------------------------------------------------------------------//
