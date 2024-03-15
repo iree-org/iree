@@ -51,6 +51,7 @@ void addGPUVectorizationPassPipeline(OpPassManager &pm);
 
 /// Lowering based on vector distribution patterns.
 void addGPUVectorDistributePassPipeline(OpPassManager &pm);
+void addGPUConvVectorDistributePassPipeline(OpPassManager &pm);
 
 /// Lowering reductions to warp reductions.
 void addGPUWarpReductionPassPipeline(OpPassManager &pm);
@@ -183,6 +184,9 @@ verifyGPUMatmulPipeline(Operation *op,
 /// on operators like Flash Attention.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createAMDGPUPrepareForChainedMatmulPass();
+
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createLLVMGPUPromoteConvImgAndTileFilterPass();
 
 //----------------------------------------------------------------------------//
 // Register LLVMGPU Passes
