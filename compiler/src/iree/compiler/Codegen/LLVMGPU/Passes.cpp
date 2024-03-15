@@ -64,6 +64,11 @@ llvm::cl::opt<bool> clLLVMGPUEnablePrefetch(
     llvm::cl::desc("Enable prefetch in the vector distribute pipeline"),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clWinogradUseForall(
+    "iree-codegen-winograd-use-forall",
+    llvm::cl::desc("use forall for LLVMGPU winograd distribution"),
+    llvm::cl::init(true));
+
 //===----------------------------------------------------------------------===//
 // Bufferization Configuration
 //===----------------------------------------------------------------------===//
@@ -197,6 +202,46 @@ void addGPUVectorizationPassPipeline(OpPassManager &pm) {
 
   // Distribute linalg onto threads within the workgroup.
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUTensorTile(false));
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
+
+  // Linalg -> vector
+  addGPUVectorizationPasses(nestedModulePM);
+
+  // tensor to memref
+  addBufferizePasses(nestedModulePM);
+  nestedModulePM.addNestedPass<func::FuncOp>(createGPUDistribute());
+
+  // Post bufferization optimizations.
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLoopInvariantCodeMotionPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      memref::createFoldMemRefAliasOpsPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createOptimizeVectorTransferPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createOptimizeTensorInsertExtractSlicesPass());
+}
+
+void addGPUWinogradVectorizePassPipeline(OpPassManager &pm) {
+  tileAndDistributeToWorkgroup(pm);
+
+  auto &nestedModulePM = pm.nest<ModuleOp>();
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      IREE::LinalgExt::createTileAndDecomposeWinogradTransformPass(
+          false, clWinogradUseForall));
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createFoldAffineMinInDistributedLoopsPass());
+  nestedModulePM.addPass(memref::createResolveShapedTypeResultDimsPass());
+
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createWorkgroupSpecializationPass());
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
+
+  // Tile to GPU invocations and vectorize.
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
