@@ -23,14 +23,14 @@ namespace mlir::iree_compiler::IREE::Flow {
 // TODO(thomasraoux): Move to attributes.
 static llvm::cl::opt<int64_t>
     splitReductionRatio("iree-flow-split-matmul-reduction",
-                        llvm::cl::desc("split ratio"), llvm::cl::init(1));
+                        llvm::cl::desc("split ratio"), llvm::cl::init(5));
 
 static llvm::cl::list<int64_t> topkSplitReductionRatio(
     "iree-flow-topk-split-reduction",
     llvm::cl::desc("comma separated list of split ratios"),
     llvm::cl::CommaSeparated);
 
-inline SmallVector<NamedAttribute> getPrunedAttributeList(linalg::LinalgOp op) {
+inline static SmallVector<NamedAttribute> getPrunedAttributeList(linalg::LinalgOp op) {
   auto elidedAttrs = llvm::to_vector(linalg::GenericOp::getAttributeNames());
   elidedAttrs.push_back(linalg::LinalgDialect::kMemoizedIndexingMapsAttrName);
   return getPrunedAttributeList(op, elidedAttrs);
@@ -75,6 +75,7 @@ struct SplitReductionPass : public SplitReductionBase<SplitReductionPass> {
       return {int64_t(splitReductionRatio), 0, /*innerParallel=*/false};
     };
     // Min 5000 is selected for SDXL
+    constexpr int64_t kReductionThresh = 5000;
     auto hasLargeK = [&](linalg::LinalgOp op) -> bool {
       SmallVector<unsigned> dims;
       op.getReductionDims(dims);
@@ -83,7 +84,7 @@ struct SplitReductionPass : public SplitReductionBase<SplitReductionPass> {
       unsigned reductionDim = dims[0];
       SmallVector<int64_t, 4> loopRanges = op.getStaticLoopRanges();
       int64_t reductionDimSize = loopRanges[reductionDim];
-      if (reductionDimSize == ShapedType::kDynamic || reductionDimSize < 5000)
+      if (ShapedType::isDynamic(reductionDimSize) || reductionDimSize < kReductionThresh)
         return false;
       return true;
     };
