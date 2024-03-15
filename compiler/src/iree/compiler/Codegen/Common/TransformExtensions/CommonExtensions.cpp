@@ -875,7 +875,11 @@ DiagnosedSilenceableFailure transform_dialect::WorkgroupSwizzleOp::applyToOne(
     transform::TransformRewriter &rewriter, mlir::FunctionOpInterface target,
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  (void)swizzleWorkgroupsInFunc(target, getLogTile());
+  SmallVector<int64_t> workgroupCount = getStaticNumWorkgroups(target);
+  if (workgroupCount.size() != 3) {
+    return DiagnosedSilenceableFailure::success();
+  }
+  (void)swizzleWorkgroupsInFunc(target, getLogTile(), workgroupCount);
   return DiagnosedSilenceableFailure::success();
 }
 

@@ -11,10 +11,12 @@
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/ROCDLPasses.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/ComplexToStandard/ComplexToStandard.h"
@@ -31,9 +33,11 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassOptions.h"
 #include "mlir/Pass/PassRegistry.h"
+#include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/Passes.h"
 
 #define DEBUG_TYPE "iree-llvm-gpu-lowering-pass-pipeline"
@@ -42,9 +46,10 @@ namespace mlir::iree_compiler {
 
 constexpr int64_t kDefaultSubgroupSize = 32;
 
-static llvm::cl::opt<unsigned>
-    logSwizzleTile("iree-codegen-log-swizzle-tile",
-                   llvm::cl::desc("log swizzle tile value"), llvm::cl::init(0));
+llvm::cl::opt<unsigned> clLogSwizzleTile(
+    "iree-codegen-log-swizzle-tile",
+    llvm::cl::desc("Reorder workgroup using strategy: log swizzle tile value"),
+    llvm::cl::init(0));
 
 llvm::cl::opt<int64_t> clLLVMGPUSharedMemoryLimit(
     "iree-llvmgpu-shared-memory-limit",
@@ -249,8 +254,8 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
 
   nestedModulePM.addNestedPass<func::FuncOp>(
       createGPUReduceSharedMemoryBankConflicts());
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createWorkGroupSwizzle(logSwizzleTile));
+  // nestedModulePM.addNestedPass<func::FuncOp>(
+  //    createWorkGroupSwizzle(logSwizzleTile));
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
@@ -297,8 +302,8 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
 
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createWorkGroupSwizzle(logSwizzleTile));
+  // nestedModulePM.addNestedPass<func::FuncOp>(
+  //    createWorkGroupSwizzle(logSwizzleTile));
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
@@ -365,8 +370,8 @@ void addGPUMatmulTensorCoreMmaSyncPassPipeline(OpPassManager &pm,
 
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createWorkGroupSwizzle(logSwizzleTile));
+  // nestedModulePM.addNestedPass<func::FuncOp>(
+  //    createWorkGroupSwizzle(logSwizzleTile));
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
@@ -522,6 +527,20 @@ static void addVectorBufferizePasses(OpPassManager &passManager) {
 void addGPUVectorDistributePassPipeline(OpPassManager &pm) {
   tileAndDistributeToWorkgroup(pm);
   auto &nestedModulePM = pm.nest<ModuleOp>();
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createReorderWorkgroups(clLogSwizzleTile, [](FunctionOpInterface funcOp) {
+        auto entryPoint = getEntryPoint(funcOp);
+        if (failed(entryPoint))
+          return failure();
+        IREE::Codegen::TranslationInfoAttr transInfo =
+            getTranslationInfo(*entryPoint);
+        if (!transInfo)
+          return failure();
+        DictionaryAttr config = transInfo.getConfiguration();
+        if (config.contains("mma_schedule"))
+          return success();
+        return failure();
+      }));
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
