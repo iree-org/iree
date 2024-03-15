@@ -5,13 +5,13 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/base/api.h"
-#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/io/formats/irpa/irpa_builder.h"
 #include "iree/tooling/parameter_util.h"
 
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Modules/IO/Parameters/Transforms/ArchiveUtils.h"
 #include "iree/compiler/Modules/IO/Parameters/Transforms/Passes.h"
 #include "llvm/ADT/ScopeExit.h"

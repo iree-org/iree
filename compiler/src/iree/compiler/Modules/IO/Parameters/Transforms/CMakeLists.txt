@@ -21,6 +21,7 @@ iree_cc_library(
     "ArchiveUtils.cpp"
     "ExportParameters.cpp"
     "GenerateSplatParameterArchive.cpp"
+    "ImportParameters.cpp"
     "Passes.cpp"
   DEPS
     ::PassesIncGen
@@ -35,7 +36,10 @@ iree_cc_library(
     iree::compiler::Dialect::Stream::IR
     iree::compiler::Dialect::Util::IR
     iree::hal
+    iree::io::file_handle
+    iree::io::formats::gguf
     iree::io::formats::irpa
+    iree::io::formats::safetensors
     iree::io::parameter_index
     iree::io::scope_map
     iree::tooling::parameter_util
