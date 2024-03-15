@@ -38,6 +38,12 @@
 
 #define DEBUG_TYPE "iree-flow-form-dispatch-regions"
 
+static llvm::cl::opt<bool> clAssumeAlwaysVectorizedLowering(
+    "iree-flow-assume-always-vectorized-lowering",
+    llvm::cl::desc(
+        "Assume all dispatches will be vectorized to allow aggressive fusion"),
+    llvm::cl::init(true));
+
 static const char kRootOpAttr[] = "__root_op__";
 static const char kFusionGroupsAttr[] = "__fused_op__";
 
@@ -467,6 +473,13 @@ static bool canUseInOperandAsInitOperand(OpOperand *inOperand,
                                          OpOperand *initOperand) {
   assert(inOperand->getOwner() == initOperand->getOwner() &&
          "expected in-operand and init-operand to be owned by same operation");
+
+  // If dispatch is always vectorized we dont need to deal with these
+  // constraints. This is only needed for non-vectorized dispatches to avoid
+  // large stack allocations.
+  if (clAssumeAlwaysVectorizedLowering) {
+    return true;
+  }
 
   // Check that the owner is a `generic` op.
   auto genericOp = dyn_cast<linalg::GenericOp>(inOperand->getOwner());
