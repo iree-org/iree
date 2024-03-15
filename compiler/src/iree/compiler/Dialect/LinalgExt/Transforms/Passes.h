@@ -39,7 +39,8 @@ createTopkSplitReductionPass();
 /// Tile and decompose the winograd transform ops into a sequence
 /// of linalg ops.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createTileAndDecomposeWinogradTransformPass();
+createTileAndDecomposeWinogradTransformPass(bool tileOnly = false,
+                                            bool useForall = false);
 
 // Creates a pass to convert linalg convolution ops into a sequence of
 // linalg_ext.winograd.* ops and linalg.batch_matmul ops using the winograd
