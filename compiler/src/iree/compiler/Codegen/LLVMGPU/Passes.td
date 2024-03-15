@@ -60,6 +60,11 @@ def LLVMGPUCastTypeToFitMMA : InterfacePass<"iree-llvmgpu-cast-type-to-fit-mma",
   let constructor = "mlir::iree_compiler::createLLVMGPUCastTypeToFitMMAPass()";
 }
 
+def LLVMGPUIm2Col : InterfacePass<"iree-llvmgpu-im2col", "mlir::FunctionOpInterface"> {
+  let summary = "Perform Im2Col conversion for convolution operations";
+  let constructor = "mlir::iree_compiler::createLLVMGPUIm2ColPass()";
+}
+
 def LLVMGPULowerExecutableTarget :
     Pass<"iree-llvmgpu-lower-executable-target", "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
   let summary = "Perform lowering of executable target using one of the IREE::HAL::DispatchLoweringPassPipeline";
@@ -94,6 +99,28 @@ def LLVMGPUTensorCoreVectorization :
     InterfacePass<"iree-llvmgpu-tensorcore-vectorization", "mlir::FunctionOpInterface"> {
   let summary = "Pass to convert linalg into Vector and transform it to a form that can be lowered to GPU MMA ops";
   let constructor = "mlir::iree_compiler::createLLVMGPUTensorCoreVectorizationPass()";
+}
+
+def LLVMGPUTileMatmulAndFuseImg2Col :
+    InterfacePass<"iree-llvmgpu-tile-matmul-and-fuse-img2col", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to tile matmul (in generic form) and fuse img2col tensor";
+  let constructor = "mlir::iree_compiler::createLLVMGPUTileMatmulAndFuseImg2ColPass()";
+  let options = [
+    Option<"tilingLevel", "tiling-level", "int64_t", /*default=*/"-1",
+      "Use default tiling level used to retrieve the configuration from lowering_config">
+  ];
+}
+
+def LLVMGPUPadIGemm :
+    InterfacePass<"iree-llvmgpu-pad-igemm", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to pad out matmul op from igemm.";
+  let constructor = "mlir::iree_compiler::createLLVMGPUPadIGemmPass()";
+}
+
+def LLVMGPURewritePadInDestinationPassingStyle :
+    InterfacePass<"iree-llvmgpu-rewrite-pad-in-dps", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to rewrite tensor.pad in destination passing style.";
+  let constructor = "mlir::iree_compiler::createLLVMGPURewritePadInDestinationPassingStylePass()";
 }
 
 def LLVMGPUTensorPad :
