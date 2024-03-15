@@ -30,7 +30,8 @@ static llvm::cl::list<int64_t> topkSplitReductionRatio(
     llvm::cl::desc("comma separated list of split ratios"),
     llvm::cl::CommaSeparated);
 
-inline static SmallVector<NamedAttribute> getPrunedAttributeList(linalg::LinalgOp op) {
+inline static SmallVector<NamedAttribute>
+getPrunedAttributeList(linalg::LinalgOp op) {
   auto elidedAttrs = llvm::to_vector(linalg::GenericOp::getAttributeNames());
   elidedAttrs.push_back(linalg::LinalgDialect::kMemoizedIndexingMapsAttrName);
   return getPrunedAttributeList(op, elidedAttrs);
@@ -84,7 +85,7 @@ struct SplitReductionPass : public SplitReductionBase<SplitReductionPass> {
       unsigned reductionDim = dims[0];
       SmallVector<int64_t, 4> loopRanges = op.getStaticLoopRanges();
       int64_t reductionDimSize = loopRanges[reductionDim];
-      if (ShapedType::isDynamic(reductionDimSize) || 
+      if (ShapedType::isDynamic(reductionDimSize) ||
           reductionDimSize < kReductionThresh)
         return false;
       return true;
