@@ -46,9 +46,11 @@ namespace mlir::iree_compiler {
 
 constexpr int64_t kDefaultSubgroupSize = 32;
 
+// TODO: Rename this flag.
 llvm::cl::opt<unsigned> clLogSwizzleTile(
     "iree-codegen-log-swizzle-tile",
-    llvm::cl::desc("Reorder workgroup using strategy: log swizzle tile value"),
+    llvm::cl::desc("Reorder workgroup using strategy: top -> bottom then left "
+                   "-> right. (0: disabled, non-0: enabled)"),
     llvm::cl::init(0));
 
 llvm::cl::opt<int64_t> clLLVMGPUSharedMemoryLimit(
