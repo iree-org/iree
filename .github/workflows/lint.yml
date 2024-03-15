@@ -93,11 +93,11 @@ jobs:
         run: ./build_tools/pytype/check_diff.sh "${GITHUB_BASE_REF?}"
 
   clang-format:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Installing dependencies
         run: |
-          wget https://raw.githubusercontent.com/llvm-mirror/clang/master/tools/clang-format/git-clang-format -O /tmp/git-clang-format
+          wget https://raw.githubusercontent.com/llvm/llvm-project/main/clang/tools/clang-format/git-clang-format -O /tmp/git-clang-format
           chmod +x /tmp/git-clang-format
       - name: Checking out repository
         uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
@@ -106,7 +106,7 @@ jobs:
         run: git fetch --no-tags --prune --depth=1 origin "${GITHUB_BASE_REF?}:${GITHUB_BASE_REF?}"
       - name: Running clang-format on changed source files
         run: |
-          /tmp/git-clang-format "${GITHUB_BASE_REF?}" --binary=clang-format-12 --style=file
+          /tmp/git-clang-format "${GITHUB_BASE_REF?}" --binary=clang-format-15 --style=file
           git diff --exit-code
 
   tabs:
