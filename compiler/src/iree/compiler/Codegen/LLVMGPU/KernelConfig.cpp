@@ -42,6 +42,11 @@ llvm::cl::opt<bool> clGPUEnableVectorDistribution(
     llvm::cl::desc("enable the usage of the vector distribution pipeline"),
     llvm::cl::init(false));
 
+llvm::cl::opt<bool> clGPUUseConvVectorDistributePipeline(
+    "iree-codegen-llvmgpu-use-conv-vector-distribute-pipeline",
+    llvm::cl::desc("enable the usage of the conv vector distribution pipeline"),
+    llvm::cl::init(false));
+
 llvm::cl::opt<bool> clGPUEnableTransformDialectJit(
     "iree-codegen-llvmgpu-enable-transform-dialect-jit",
     llvm::cl::desc("enable the usage of the transform dialect JIT"),
@@ -464,10 +469,16 @@ setConvolutionVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
       scheduleAttr);
   auto configDict = DictionaryAttr::get(context, attrs);
 
-  return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, op, tileSizes,
-      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorDistribute,
-      workgroupSize, subgroupSize, configDict);
+  auto pipeline =
+      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorDistribute;
+  if (clGPUUseConvVectorDistributePipeline) {
+    pipeline = IREE::Codegen::DispatchLoweringPassPipeline::
+        LLVMGPUConvVectorDistribute;
+  }
+
+  return setOpConfigAndEntryPointFnTranslation(entryPoint, op, tileSizes,
+                                               pipeline, workgroupSize,
+                                               subgroupSize, configDict);
 }
 
 static LogicalResult
