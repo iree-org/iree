@@ -47,6 +47,7 @@ iree_lit_test_suite(
     "reduction_pipeline_transform_cuda.mlir"
     "reduction_pipeline_transform_rocm.mlir"
     "rocdl_pipeline_test.mlir"
+    "set_experimental_igemm_config.mlir"
     "set_transform_strategy_batch_matmul.mlir"
     "set_transform_strategy_convolution.mlir"
     "set_transform_strategy_matmul.mlir"

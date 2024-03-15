@@ -739,6 +739,67 @@ void addGPUBaseLoweringPassPipeline(OpPassManager &pm) {
   nestedModulePM.addPass(createCSEPass());
 }
 
+void addGPUImplicitGEMMPassPipeline(OpPassManager &pm) {
+  {
+    auto &nestedModulePM = pm.nest<ModuleOp>();
+    nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUIm2ColPass());
+    tileAndDistributeToWorkgroup(pm);
+  }
+
+  {
+    auto &nestedModulePM = pm.nest<ModuleOp>();
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLLVMGPUTileMatmulAndFuseImg2ColPass(1));
+    nestedModulePM.addPass(createCanonicalizerPass());
+    nestedModulePM.addPass(createCSEPass());
+
+    LinalgFoldUnitExtentDimsPassOptions options;
+    options.useRankReducingSlices = true;
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        mlir::createLinalgFoldUnitExtentDimsPass(options));
+    nestedModulePM.addPass(createCanonicalizerPass());
+    nestedModulePM.addPass(createCSEPass());
+
+    nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUPadIGemmPass());
+    nestedModulePM.addPass(createCanonicalizerPass());
+    nestedModulePM.addPass(createCSEPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLLVMGPURewritePadInDestinationPassingStylePass());
+
+    addGPUVectorizationPasses(nestedModulePM);
+
+    // Tensor -> Memref
+    addVectorBufferizePasses(nestedModulePM);
+    nestedModulePM.addPass(createCanonicalizerPass());
+    nestedModulePM.addPass(createCSEPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createHoistStaticallyBoundAllocationsPass());
+
+    // Vector SIMD -> Vector SIMT
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLLVMGPUNormalizeContractMapsPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLLVMGPUCastTypeToFitMMAPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUVectorDistribute());
+    nestedModulePM.addPass(createCanonicalizerPass());
+    nestedModulePM.addPass(createCSEPass());
+
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createGPUReduceSharedMemoryBankConflicts());
+
+    if (clLLVMGPUEnablePrefetch) {
+      nestedModulePM.addNestedPass<func::FuncOp>(
+          createLLVMGPUPrefetchSharedMemoryPass());
+    }
+
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        memref::createFoldMemRefAliasOpsPass());
+    nestedModulePM.addPass(createCSEPass());
+    nestedModulePM.addPass(createCanonicalizerPass());
+    nestedModulePM.addPass(createCSEPass());
+  }
+}
+
 // Add passes to make the address computation more explicit and optimize them.
 //
 // The idea here is to be less dependent on what the LLVM backend is able to do,

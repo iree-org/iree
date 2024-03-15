@@ -137,6 +137,10 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
         pipeline, codegenSpec ? codegenSpec.getLeafReference() : StringRef(""));
     break;
   }
+  case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUImplicitGEMM: {
+    addGPUImplicitGEMMPassPipeline(pipeline);
+    break;
+  }
   // no pipeline specified, nothing to do.
   case IREE::Codegen::DispatchLoweringPassPipeline::None:
     return;
