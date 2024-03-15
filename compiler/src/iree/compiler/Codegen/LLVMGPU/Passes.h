@@ -32,6 +32,8 @@ void addGPUMatmulTensorCoreMmaSyncPassPipeline(OpPassManager &pm,
 void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
                                         unsigned pipelineDepth);
 
+void addGPUWinogradVectorizePassPipeline(OpPassManager &pm);
+
 void addGPUPackUnPackPasses(OpPassManager &pm);
 
 /// Simple lowering only distributute linalg ops on blocks and threads. This

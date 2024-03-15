@@ -62,6 +62,8 @@ def TileAndDecomposeWinogradTransform :
   let options = [
     Option<"onlyTile", "onlyTile", "bool", /*default=*/"false",
            "Choose whether to only tile or go through till decomposition">,
+    Option<"useForall", "useForall", "bool", /*default=*/"false",
+           "Choose whether to scf.forall for tiling">,
   ];
 }
 

@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/LLVMGPU/KernelConfig.h"
 #include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
+#include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
@@ -129,6 +130,9 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
     break;
   case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUWarpReduction:
     addGPUWarpReductionPassPipeline(pipeline);
+    break;
+  case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUWinogradVectorize:
+    addGPUWinogradVectorizePassPipeline(pipeline);
     break;
   case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUPackUnPack:
     addGPUPackUnPackPasses(pipeline);
