@@ -337,14 +337,13 @@ static LogicalResult tileWinogradInputTransformOpWithForall(
   }
   if (forallUbs.size() + forUbs.size() > ubs.size()) {
     rewriter.setInsertionPointToStart(forallOp.getBody());
-    AffineExpr s0, s1;
-    bindSymbols(rewriter.getContext(), s0);
-    bindSymbols(rewriter.getContext(), s1);
-    AffineMap map = AffineMap::get(0, 2, {s0 * s1}, rewriter.getContext());
+    AffineExpr s0, s1, s2;
+    bindSymbols(rewriter.getContext(), s0, s1, s2);
+    AffineMap map = AffineMap::get(0, 3, {s0 * s1 + s2}, rewriter.getContext());
     Value iv = rewriter.createOrFold<affine::AffineApplyOp>(
         forallOp->getLoc(), map,
-        ValueRange{loopNest.loops[forIdx++].getInductionVar(),
-                   forAllIvs[forallIdx++]});
+        ValueRange{forAllIvs[forallIdx++], forUbs.back(),
+                   loopNest.loops[forIdx++].getInductionVar()});
     ivs.push_back(iv);
   } else if (forIndsSet.contains(ubs.size() - 1)) {
     ivs.push_back(loopNest.loops[forIdx++].getInductionVar());
@@ -479,8 +478,6 @@ static LogicalResult decomposeTiledWinogradInputTransformOp(
       tiledWinogradInputTransformOp.getOutputOperandType().getElementType();
   Value zeroF32 = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getZeroAttr(elementType));
-  // Value scratch =
-  //     rewriter.create<tensor::EmptyOp>(loc, inputTileSquare, elementType);
   const float *BT{nullptr};
   const float *B{nullptr};
   B = IREE::LinalgExt::Winograd::B_6x6_3x3;
@@ -520,6 +517,8 @@ static LogicalResult decomposeTiledWinogradInputTransformOp(
   }
   OpBuilder::InsertionGuard afterTiledWinogradInputTransformOp(rewriter);
   rewriter.setInsertionPointAfter(tiledWinogradInputTransformOp);
+  // Value scratch =
+  //     rewriter.create<tensor::EmptyOp>(loc, inputTileSquare, elementType);
   // linalg::FillOp fillOp = rewriter.create<linalg::FillOp>(
   //     loc, ValueRange{zeroF32}, ValueRange{scratch});
   // Value inputSlice = rewriter.create<tensor::InsertSliceOp>(
@@ -813,14 +812,13 @@ static LogicalResult tileWinogradOutputTransformOpWithForall(
   }
   if (forallUbs.size() + forUbs.size() > ubs.size()) {
     rewriter.setInsertionPointToStart(forallOp.getBody());
-    AffineExpr s0, s1;
-    bindSymbols(rewriter.getContext(), s0);
-    bindSymbols(rewriter.getContext(), s1);
-    AffineMap map = AffineMap::get(0, 2, {s0 * s1}, rewriter.getContext());
+    AffineExpr s0, s1, s2;
+    bindSymbols(rewriter.getContext(), s0, s1, s2);
+    AffineMap map = AffineMap::get(0, 3, {s0 * s1 + s2}, rewriter.getContext());
     Value iv = rewriter.createOrFold<affine::AffineApplyOp>(
         forallOp->getLoc(), map,
-        ValueRange{loopNest.loops[forIdx++].getInductionVar(),
-                   forAllIvs[forallIdx++]});
+        ValueRange{forAllIvs[forallIdx++], forUbs.back(),
+                   loopNest.loops[forIdx++].getInductionVar()});
     ivs.push_back(iv);
   } else if (forIndsSet.contains(ubs.size() - 1)) {
     ivs.push_back(loopNest.loops[forIdx++].getInductionVar());
