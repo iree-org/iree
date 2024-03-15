@@ -277,9 +277,6 @@ static LogicalResult tileWinogradInputTransformOpWithForall(
   SmallVector<Value> lbs, ubs, steps;
   computeLoopParams(lbs, ubs, steps, output, numImageDims, loc, rewriter);
   // Construct loops
-  // SmallVector<Value> dest;
-  // if (failed(tensor::getOrCreateDestinations(rewriter, loc, inputOp, dest)))
-  //   return inputOp->emitOpError("failed to get destination tensors");
   auto getThreadMapping = [&](int64_t dim) {
     auto mappingIdInt = std::min<int64_t>(
         dim + static_cast<uint64_t>(gpu::MappingId::LinearDim0),
@@ -406,9 +403,6 @@ static LogicalResult tileWinogradInputTransformOpWithForall(
       SmallVector<OpFoldResult>(inputOp.getOutputOperandRank(), one);
   sizesOutputSlice[0] = sizesOutputSlice[1] = inputTileSizeAttr;
   tensorType = RankedTensorType::get(inputTileSquare, elementType);
-  // Value outputSlice = rewriter.create<tensor::ExtractSliceOp>(
-  //     loc, tensorType, iterArg, offsetsOutputSlice, sizesOutputSlice,
-  //     stridesOutputSlice);
   Value outputSlice =
       rewriter.create<tensor::EmptyOp>(loc, tensorType.getShape(), elementType);
 
@@ -517,12 +511,6 @@ static LogicalResult decomposeTiledWinogradInputTransformOp(
   }
   OpBuilder::InsertionGuard afterTiledWinogradInputTransformOp(rewriter);
   rewriter.setInsertionPointAfter(tiledWinogradInputTransformOp);
-  // Value scratch =
-  //     rewriter.create<tensor::EmptyOp>(loc, inputTileSquare, elementType);
-  // linalg::FillOp fillOp = rewriter.create<linalg::FillOp>(
-  //     loc, ValueRange{zeroF32}, ValueRange{scratch});
-  // Value inputSlice = rewriter.create<tensor::InsertSliceOp>(
-  //     loc, dynamicSlice, fillOp.result(), offsets, sliceSizes, strides);
   auto inputSliceType = RankedTensorType::get(inputTileSquare, elementType);
   SmallVector<OpFoldResult> padLow(
       inputTileSquare.size(), rewriter.getZeroAttr(rewriter.getIndexType()));
