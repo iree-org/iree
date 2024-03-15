@@ -124,6 +124,9 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
   case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorDistribute:
     addGPUVectorDistributePassPipeline(pipeline);
     break;
+  case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUConvVectorDistribute:
+    addGPUConvVectorDistributePassPipeline(pipeline);
+    break;
   case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUWarpReduction:
     addGPUWarpReductionPassPipeline(pipeline);
     break;

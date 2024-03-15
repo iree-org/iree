@@ -89,6 +89,12 @@ def LLVMGPUPrefetchSharedMemory :
   let constructor = "mlir::iree_compiler::createLLVMGPUPrefetchSharedMemoryPass()";
 }
 
+def LLVMGPUPromoteConvImgAndTileFilter :
+    InterfacePass<"iree-llvmgpu-promote-conv-img-and-tile-filter", "mlir::FunctionOpInterface"> {
+  let summary = "Pass promote convolution image operand and tile filter with tilingLevel=1.";
+  let constructor = "mlir::iree_compiler::createLLVMGPUPromoteConvImgAndTileFilterPass()";
+}
+
 def LLVMGPUSelectLoweringStrategy :
     Pass<"iree-llvmgpu-select-lowering-strategy", "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
   let summary = "Select a IREE::HAL::DispatchLoweringPassPipeline for lowering the target variant";
