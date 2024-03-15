@@ -653,9 +653,6 @@ void addGPUConvVectorDistributePassPipeline(OpPassManager &pm) {
   // Linalg -> Vector
   addGPUVectorizationPasses(nestedModulePM);
 
-  // Allocate tensors for copies to shared memory.
-  nestedModulePM.addNestedPass<func::FuncOp>(createGPUVectorAlloc());
-
   // Tensor -> Memref
   addVectorBufferizePasses(nestedModulePM);
   nestedModulePM.addPass(createCanonicalizerPass());
@@ -671,6 +668,10 @@ void addGPUConvVectorDistributePassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUVectorDistribute());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
+
+  nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createGPUDistributeSharedMemoryCopy());
 
   nestedModulePM.addNestedPass<func::FuncOp>(
       createGPUReduceSharedMemoryBankConflicts());
