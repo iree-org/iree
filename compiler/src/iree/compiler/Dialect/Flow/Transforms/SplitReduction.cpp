@@ -84,7 +84,8 @@ struct SplitReductionPass : public SplitReductionBase<SplitReductionPass> {
       unsigned reductionDim = dims[0];
       SmallVector<int64_t, 4> loopRanges = op.getStaticLoopRanges();
       int64_t reductionDimSize = loopRanges[reductionDim];
-      if (ShapedType::isDynamic(reductionDimSize) || reductionDimSize < kReductionThresh)
+      if (ShapedType::isDynamic(reductionDimSize) || 
+          reductionDimSize < kReductionThresh)
         return false;
       return true;
     };
