@@ -676,11 +676,6 @@ void addGPUConvVectorDistributePassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(
       createGPUReduceSharedMemoryBankConflicts());
 
-  if (clLLVMGPUEnablePrefetch) {
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createLLVMGPUPrefetchSharedMemoryPass());
-  }
-
   nestedModulePM.addNestedPass<func::FuncOp>(
       memref::createFoldMemRefAliasOpsPass());
   nestedModulePM.addPass(createCSEPass());
