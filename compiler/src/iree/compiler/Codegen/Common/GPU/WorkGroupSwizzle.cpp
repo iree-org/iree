@@ -19,68 +19,23 @@
 
 namespace mlir::iree_compiler {
 
-/// This function implements the following swizzling logic
-/// void getTiledId2(unsigned x, unsigned y, unsigned* tiledx,
-///                 unsigned* tiledy) {
-///  unsigned t_tiledx = (x + (y % tile) * grid_size_x) / tile;
-///  unsigned t_tiledy = (y / tile) * tile +
-///      (x + (y % tile) * grid_size_x) % tile;
-///  bool c = grid_size_y % tile != 0 &&
-///      ((y / tile) * tile + tile) > grid_size_y;
-///  *tiledx = c ? x : t_tiledx;
-///  *tiledy = c ? y : t_tiledy;
-/// }
-// TODO: Make this a callback and the core functionality in the pass a utility
-// function.
-static std::pair<Value, Value> makeSwizzledId(Location loc, OpBuilder b,
-                                              Value workgroupIdX,
-                                              Value workgroupIdY,
-                                              ArrayRef<int64_t> workgroupCount,
-                                              unsigned swizzleTile) {
+/// Changes the traversal order from left -> right then top -> bottom
+/// to top -> down then left -> right.
+static std::pair<Value, Value>
+reorderIds(Location loc, OpBuilder b, Value workgroupIdX, Value workgroupIdY,
+           ArrayRef<int64_t> workgroupCount, unsigned swizzleTile) {
   Value gridSizeX = b.create<arith::ConstantIndexOp>(loc, workgroupCount[0]);
   Value gridSizeY = b.create<arith::ConstantIndexOp>(loc, workgroupCount[1]);
-
-  Value zero = b.create<arith::ConstantIndexOp>(loc, 0);
-  Value tile = b.create<arith::ConstantIndexOp>(loc, swizzleTile);
-  Value yModTile = b.create<arith::RemUIOp>(loc, workgroupIdY, tile);
-  Value yDivTile = b.create<arith::DivUIOp>(loc, workgroupIdY, tile);
-  Value swizzleParam = b.create<arith::MulIOp>(loc, yModTile, gridSizeX);
-  Value swizzleParam2 =
-      b.create<arith::AddIOp>(loc, workgroupIdX, swizzleParam);
-  Value swizzleParam3 = b.create<arith::RemUIOp>(loc, swizzleParam2, tile);
-  Value swizzleParam4 = b.create<arith::MulIOp>(loc, yDivTile, tile);
-  Value unboundedSwizzledIdX =
-      b.create<arith::DivUIOp>(loc, swizzleParam2, tile);
-  Value unboundedSwizzledIdY =
-      b.create<arith::AddIOp>(loc, swizzleParam3, swizzleParam4);
-  Value gyModTile = b.create<arith::RemUIOp>(loc, gridSizeY, tile);
-  Value gyAddTile = b.create<arith::AddIOp>(loc, swizzleParam4, tile);
-  Value condition1 =
-      b.create<arith::CmpIOp>(loc, arith::CmpIPredicate::ne, gyModTile, zero);
-  Value condition2 = b.create<arith::CmpIOp>(loc, arith::CmpIPredicate::ugt,
-                                             gyAddTile, gridSizeY);
-  Value condition3 = b.create<arith::AndIOp>(loc, condition1, condition2);
-  Value swizzledIdX = b.create<arith::SelectOp>(loc, condition3, workgroupIdX,
-                                                unboundedSwizzledIdX);
-  Value swizzledIdY = b.create<arith::SelectOp>(loc, condition3, workgroupIdY,
-                                                unboundedSwizzledIdY);
-  return {swizzledIdX, swizzledIdY};
-
-  /*
-  Value zero = b.create<arith::ConstantIndexOp>(loc, 0);
-  Value one = b.create<arith::ConstantIndexOp>(loc, 1);
-  Value two = b.create<arith::ConstantIndexOp>(loc, 2);
-  Value last = b.create<arith::SubIOp>(loc, gridSizeX, one);
-  Value reversedX = b.create<arith::SubIOp>(loc, last, workgroupIdX);
-  Value yMod2 = b.create<arith::RemSIOp>(loc, workgroupIdY, two);
-  Value isYEven = b.create<arith::CmpIOp>(loc, arith::CmpIPredicate::eq, yMod2, zero);
-  Value newX = b.create<arith::SelectOp>(loc, isYEven, workgroupIdX, reversedX);
-  SwizzledIdX = newX;
-  SwizzledIdY = workgroupIdY; */
+  Value linearized = b.create<arith::MulIOp>(loc, workgroupIdY, gridSizeX);
+  linearized = b.create<arith::AddIOp>(loc, linearized, workgroupIdX);
+  Value newX = b.create<arith::DivUIOp>(loc, linearized, gridSizeY);
+  Value newY = b.create<arith::RemUIOp>(loc, linearized, gridSizeY);
+  return {newX, newY};
 }
 
 LogicalResult swizzleWorkgroupsInFunc(mlir::FunctionOpInterface funcOp,
-                                      unsigned swizzleLogTile, ArrayRef<int64_t> workgroupCount) {
+                                      unsigned swizzleLogTile,
+                                      ArrayRef<int64_t> workgroupCount) {
   assert(workgroupCount.size() == 3 && "Expected a 3D grid");
   if (swizzleLogTile == 0)
     return success();
@@ -116,8 +71,8 @@ LogicalResult swizzleWorkgroupsInFunc(mlir::FunctionOpInterface funcOp,
       builder.create<IREE::HAL::InterfaceWorkgroupIDOp>(funcOp.getLoc(), 0);
   Value workgroupIdY =
       builder.create<IREE::HAL::InterfaceWorkgroupIDOp>(funcOp.getLoc(), 1);
-  auto [newX, newY] = makeSwizzledId(funcOp.getLoc(), builder, workgroupIdX,
-                                     workgroupIdY, workgroupCount, swizzleTile);
+  auto [newX, newY] = reorderIds(funcOp.getLoc(), builder, workgroupIdX,
+                                 workgroupIdY, workgroupCount, swizzleTile);
   oldXId.replaceAllUsesWith(newX);
   oldYId.replaceAllUsesWith(newY);
   oldXId->erase();
