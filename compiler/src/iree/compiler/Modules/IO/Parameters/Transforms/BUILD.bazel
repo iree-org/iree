@@ -18,6 +18,7 @@ iree_compiler_cc_library(
         "ArchiveUtils.cpp",
         "ExportParameters.cpp",
         "GenerateSplatParameterArchive.cpp",
+        "ImportParameters.cpp",
         "Passes.cpp",
     ],
     hdrs = [
@@ -28,12 +29,15 @@ iree_compiler_cc_library(
     deps = [
         ":PassesIncGen",
         "//compiler/src/iree/compiler/Dialect/Stream/IR",
+        "//compiler/src/iree/compiler/Dialect/Util/Analysis",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
         "//runtime/src/iree/base",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/io:parameter_index",
         "//runtime/src/iree/io:scope_map",
+        "//runtime/src/iree/io/formats/gguf",
         "//runtime/src/iree/io/formats/irpa",
+        "//runtime/src/iree/io/formats/safetensors",
         "//runtime/src/iree/tooling:parameter_util",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ArithDialect",

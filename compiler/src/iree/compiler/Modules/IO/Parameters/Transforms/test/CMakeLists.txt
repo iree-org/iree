@@ -16,6 +16,7 @@ iree_lit_test_suite(
   SRCS
     "export_parameters.mlir"
     "generate_splat_parameter_archive.mlir"
+    "import_parameters.mlir"
   TOOLS
     FileCheck
     iree-dump-parameters
