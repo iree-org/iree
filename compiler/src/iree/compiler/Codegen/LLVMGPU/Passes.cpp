@@ -602,6 +602,91 @@ void addGPUVectorDistributePassPipeline(OpPassManager &pm) {
   nestedModulePM.addPass(createCSEPass());
 }
 
+void addGPUConvVectorDistributePassPipeline(OpPassManager &pm) {
+  tileAndDistributeToWorkgroup(pm);
+  auto &nestedModulePM = pm.nest<ModuleOp>();
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createReorderWorkgroups(clLogSwizzleTile, [](FunctionOpInterface funcOp) {
+        auto entryPoint = getEntryPoint(funcOp);
+        if (failed(entryPoint))
+          return failure();
+        IREE::Codegen::TranslationInfoAttr transInfo =
+            getTranslationInfo(*entryPoint);
+        if (!transInfo)
+          return failure();
+        DictionaryAttr config = transInfo.getConfiguration();
+        if (config.contains("mma_schedule"))
+          return success();
+        return failure();
+      }));
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
+
+  // Problem specific (reduction) tiling.
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createGPUTensorTileToSerialLoops(true));
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLLVMGPUPromoteConvImgAndTileFilterPass());
+
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLLVMGPURewritePadInDestinationPassingStylePass());
+
+  // Generalize all named ops so that we can fold away unit extent dims. By this
+  // point, all tiling is finished so the tiling configurations on those ops can
+  // be safely dropped. This additionally allows vectorization of convolution to
+  // `vector.contract` as filter dimensions are expected to be tiled to 1 by
+  // this point.
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLinalgGeneralizeNamedOpsPass());
+  LinalgFoldUnitExtentDimsPassOptions options;
+  options.useRankReducingSlices = true;
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      mlir::createLinalgFoldUnitExtentDimsPass(options));
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
+
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createOptimizeTensorInsertExtractSlicesPass());
+
+  // Linalg -> Vector
+  addGPUVectorizationPasses(nestedModulePM);
+
+  // Allocate tensors for copies to shared memory.
+  nestedModulePM.addNestedPass<func::FuncOp>(createGPUVectorAlloc());
+
+  // Tensor -> Memref
+  addVectorBufferizePasses(nestedModulePM);
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createHoistStaticallyBoundAllocationsPass());
+
+  // Vector SIMD -> Vector SIMT
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLLVMGPUNormalizeContractMapsPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLLVMGPUCastTypeToFitMMAPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUVectorDistribute());
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
+
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createGPUReduceSharedMemoryBankConflicts());
+
+  if (clLLVMGPUEnablePrefetch) {
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLLVMGPUPrefetchSharedMemoryPass());
+  }
+
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      memref::createFoldMemRefAliasOpsPass());
+  nestedModulePM.addPass(createCSEPass());
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
+}
+
 void addGPUWarpReductionPassPipeline(OpPassManager &pm) {
   tileAndDistributeToWorkgroup(pm);
   auto &nestedModulePM = pm.nest<ModuleOp>();
