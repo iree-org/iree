@@ -466,7 +466,7 @@ setConvolutionVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, tileSizes,
-      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUConvVectorDistribute,
+      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorDistribute,
       workgroupSize, subgroupSize, configDict);
 }
 
