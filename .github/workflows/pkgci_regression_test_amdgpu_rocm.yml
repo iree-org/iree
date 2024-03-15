@@ -60,7 +60,7 @@ jobs:
       #   uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
       #   with:
       #     repository: nod-ai/SHARK-TestSuite
-      #     ref: 46ab63b271fddd78e071c0590e9a073f6282b005
+      #     ref: e266c91e03734fe3148f269b02ff4b9e4bfd5df9
       #     path: SHARK-TestSuite
       #     submodules: false
       # - name: Installing external TestSuite Python requirements
@@ -69,7 +69,7 @@ jobs:
       #     python -m pip install -r SHARK-TestSuite/iree_tests/requirements.txt
       # - name: Run external TestSuite tests
       #   env:
-      #     IREE_TEST_CONFIG_FILES: experimental/regression_suite/external_test_suite/config_gpu_rocm_rdna3.json
+      #     IREE_TEST_CONFIG_FILES: experimental/regression_suite/external_test_suite/onnx_gpu_rocm_rdna3.json
       #   run: |
       #     source ${VENV_DIR}/bin/activate
       #     export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/rocm/lib:/opt/rocm/hip/lib
