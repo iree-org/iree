@@ -41,8 +41,7 @@ static LogicalResult splitReductionOnMatmul(
     linalg::ControlSplitReductionFn controlSplitReductionFn) {
   // Since user information about compilation are passed through attributes we
   // need to make sure to propagate those.
-  SmallVector<NamedAttribute> prunedAttributeList =
-      getPrunedAttributeList(op);
+  SmallVector<NamedAttribute> prunedAttributeList = getPrunedAttributeList(op);
 
   FailureOr<linalg::SplitReductionResult> result =
       linalg::splitReduction(rewriter, op, controlSplitReductionFn);
