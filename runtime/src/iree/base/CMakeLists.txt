@@ -24,6 +24,8 @@ iree_cc_library(
     "status.c"
     "status.h"
     "status_cc.h"
+    "status_payload.h"
+    "status_stack_trace.c"
     "string_builder.c"
     "string_builder.h"
     "string_view.c"
