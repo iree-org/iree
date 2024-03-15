@@ -8,6 +8,7 @@
 
 #include <inttypes.h>
 #include <stddef.h>
+#include <stdlib.h>
 
 #include "iree/base/api.h"
 #include "iree/base/internal/flags.h"
@@ -90,6 +91,33 @@ static iree_status_t iree_hal_hip_driver_parse_flags(
       builder, key_hip_tracing, FLAG_hip_tracing));
   IREE_RETURN_IF_ERROR(iree_string_pair_builder_add_int(
       builder, key_hip_default_index, FLAG_hip_default_index));
+
+  // If there were no flag-based dylib paths, consult the environment
+  // variable.
+  // Read from the IREE_HIP_DYLIB_PATH env var and split by ';' (regardless
+  // of platform).
+  if (dylib_path_list.count == 0) {
+    char* raw_dylib_path_env = getenv("IREE_HIP_DYLIB_PATH");
+    if (raw_dylib_path_env) {
+      iree_string_view_t dylib_path_env =
+          iree_make_cstring_view(raw_dylib_path_env);
+      IREE_RETURN_IF_ERROR(
+          iree_string_pair_builder_alloc_string(builder, &dylib_path_env));
+      while (true) {
+        iree_string_view_t first, rest;
+        intptr_t index =
+            iree_string_view_split(dylib_path_env, ';', &first, &rest);
+        IREE_RETURN_IF_ERROR(iree_string_pair_builder_add(
+            builder, iree_make_string_pair(key_hip_dylib_path, first)));
+
+        if (index < 0) {
+          break;
+        }
+
+        dylib_path_env = rest;
+      }
+    }
+  }
 
   return iree_ok_status();
 }
