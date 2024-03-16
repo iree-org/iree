@@ -584,6 +584,8 @@ void addGPUVectorDistributePassPipeline(OpPassManager &pm) {
         if (!transInfo)
           return failure();
         DictionaryAttr config = transInfo.getConfiguration();
+        if (config.contains("no_reorder_workgroups"))
+          return failure();
         if (config.contains("mma_schedule"))
           return success();
         return failure();
