@@ -1276,39 +1276,48 @@ getMmt4dDistributionSizes(uint64_t pressumedM1, uint64_t pressumedN1,
                           ArrayRef<int64_t> innerTileSizes, unsigned numLoops,
                           unsigned mmt4dDimBase) {
   // Compute the number of distribution level tiles per thread based on the
-  // inner level tiles. We merge multiple cache level tiles into a single
-  // distribution level tile to match the target distribution tiles per thread
-  // and minimize distribution sharding overhead.
+  // inner level tiles (cache/vectorization level). We merge multiple inner
+  // tiles into a single distribution level tile to match the target
+  // distribution tiles per thread and minimize distribution sharding overhead.
   SmallVector<int64_t> distTileSizes(numLoops, 0);
-  constexpr int64_t targetDistTilesPerThread = 8;
-  int64_t numCacheSizeTiles =
-      llvm::divideCeil(pressumedM1, innerTileSizes[mmt4dDimBase + 0]) *
-      llvm::divideCeil(pressumedN1, innerTileSizes[mmt4dDimBase + 1]);
-  int64_t numDistTilesPerThread = llvm::divideCeil(
-      numCacheSizeTiles, targetDistTilesPerThread * clNumberOfRuntimeThreads);
+  constexpr int64_t targetDistTilesPerThread = 4;
 
-  // Assign the tiles per thread along pressumedM1 and pressumedN1. We try to do
-  // it kind of proportional to their sizes: the larger the size, the more we
-  // tile it.
-  int64_t ratio = llvm::divideCeil(std::max(pressumedM1, pressumedN1),
-                                   std::min(pressumedM1, pressumedN1));
-  int64_t numM1Tiles, numN1Tiles;
-  if (pressumedN1 >= pressumedM1) {
-    numN1Tiles = llvm::divideCeil(numDistTilesPerThread, ratio);
-    numM1Tiles = numDistTilesPerThread / numN1Tiles;
+  int64_t innerMTileSize = innerTileSizes[mmt4dDimBase + 0];
+  int64_t innerNTileSize = innerTileSizes[mmt4dDimBase + 1];
+  int64_t numInnerMTiles = llvm::divideCeil(pressumedM1, innerMTileSize);
+  int64_t numInnerNTiles = llvm::divideCeil(pressumedN1, innerNTileSize);
+  int64_t numInnerTiles = numInnerMTiles * numInnerNTiles;
+  int64_t minTiles = targetDistTilesPerThread * clNumberOfRuntimeThreads;
+  int64_t blocksToDistribute = llvm::divideCeil(numInnerTiles, minTiles);
+
+  int64_t distMTileSize, distNTileSize, ratio;
+  if (numInnerMTiles >= numInnerNTiles) {
+    ratio = llvm::divideCeil(numInnerMTiles * blocksToDistribute,
+                             numInnerNTiles * numInnerMTiles);
+    distNTileSize =
+        std::ceil(std::sqrt(llvm::divideCeil(blocksToDistribute, ratio)));
+    distMTileSize = distNTileSize * ratio;
   } else {
-    numM1Tiles = llvm::divideCeil(numDistTilesPerThread, ratio);
-    numN1Tiles = numDistTilesPerThread / numM1Tiles;
+    ratio = llvm::divideCeil(numInnerNTiles * blocksToDistribute,
+                             numInnerMTiles * numInnerNTiles);
+    distMTileSize =
+        std::ceil(std::sqrt(llvm::divideCeil(blocksToDistribute, ratio)));
+    distNTileSize = distMTileSize * ratio;
   }
 
-  distTileSizes[mmt4dDimBase + 0] =
-      numM1Tiles * innerTileSizes[mmt4dDimBase + 0];
-  distTileSizes[mmt4dDimBase + 1] =
-      numN1Tiles * innerTileSizes[mmt4dDimBase + 1];
+  distMTileSize *= innerMTileSize;
+  distNTileSize *= innerNTileSize;
 
-  LLVM_DEBUG(KD_DBGS() << "Number of distribution tiles: (M=" << numM1Tiles
-                       << " x N=" << numN1Tiles
-                       << ") = " << numM1Tiles * numN1Tiles << "\n");
+  distTileSizes[mmt4dDimBase + 0] = distMTileSize;
+  distTileSizes[mmt4dDimBase + 1] = distNTileSize;
+
+  LLVM_DEBUG(
+      KD_DBGS() << "M1 = " << pressumedM1 << ", N1 = " << pressumedN1 << "\n"
+                << "Dist M1 sizes: " << distMTileSize << "\n"
+                << "Dist N1 sizes: " << distNTileSize << "\n"
+                << "Number of distribution tiles: (M="
+                << llvm::divideCeil(pressumedM1, distMTileSize) << " x N="
+                << llvm::divideCeil(pressumedN1, distNTileSize) << ")\n");
 
   return distTileSizes;
 }
@@ -1366,8 +1375,9 @@ static TileSizesListType getMmt4dTileSizes(linalg::LinalgOp op) {
                                   reductionSize, N0);
 
   unsigned numLoops = op.getNumLoops();
-  SmallVector<int64_t> cacheParallelTileSizes(numLoops, 0)
-      // = getDefaultDistributedLevelTileSizes(op, distConfig);
+
+  SmallVector<int64_t> cacheParallelTileSizes =
+      getDefaultDistributedLevelTileSizes(op, distConfig);
   SmallVector<int64_t> cacheReductionTileSizes(numLoops, 0);
 
   // Compute distribution tile sizes for mmt4d. If shapes are dynamic, we assume
@@ -1395,7 +1405,6 @@ static TileSizesListType getMmt4dTileSizes(linalg::LinalgOp op) {
                                  vectorInnerParallelTileSizes};
 
   LLVM_DEBUG(KD_DBGS() << "Final tile sizes for mmt4d: " << tileSizes << "\n");
-
   return tileSizes;
 }
 
