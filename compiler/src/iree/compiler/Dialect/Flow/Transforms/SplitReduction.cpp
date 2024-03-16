@@ -23,7 +23,12 @@ namespace mlir::iree_compiler::IREE::Flow {
 // TODO(thomasraoux): Move to attributes.
 static llvm::cl::opt<int64_t>
     splitReductionRatio("iree-flow-split-matmul-reduction",
-                        llvm::cl::desc("split ratio"), llvm::cl::init(5));
+                        llvm::cl::desc("split ratio"), llvm::cl::init(1));
+
+static llvm::cl::opt<int64_t> splitMatmulKThreshold(
+    "iree-flow-split-matmul-k-threshold",
+    llvm::cl::desc("minimal k size to participate in split"),
+    llvm::cl::init(5000)); // Min 5000 is selected for SDXL
 
 static llvm::cl::list<int64_t> topkSplitReductionRatio(
     "iree-flow-topk-split-reduction",
@@ -75,8 +80,6 @@ struct SplitReductionPass : public SplitReductionBase<SplitReductionPass> {
       // like a batch_matmul and can follow the same codegen.
       return {int64_t(splitReductionRatio), 0, /*innerParallel=*/false};
     };
-    // Min 5000 is selected for SDXL
-    constexpr int64_t kReductionThresh = 5000;
     auto hasLargeK = [&](linalg::LinalgOp op) -> bool {
       SmallVector<unsigned> dims;
       op.getReductionDims(dims);
@@ -86,7 +89,7 @@ struct SplitReductionPass : public SplitReductionBase<SplitReductionPass> {
       SmallVector<int64_t, 4> loopRanges = op.getStaticLoopRanges();
       int64_t reductionDimSize = loopRanges[reductionDim];
       if (ShapedType::isDynamic(reductionDimSize) ||
-          reductionDimSize < kReductionThresh)
+          reductionDimSize < splitMatmulKThreshold)
         return false;
       return true;
     };
