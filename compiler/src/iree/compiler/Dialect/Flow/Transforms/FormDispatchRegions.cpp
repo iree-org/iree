@@ -42,7 +42,7 @@ static llvm::cl::opt<bool> clAssumeAlwaysVectorizedLowering(
     "iree-flow-assume-always-vectorized-lowering",
     llvm::cl::desc(
         "Assume all dispatches will be vectorized to allow aggressive fusion"),
-    llvm::cl::init(true));
+    llvm::cl::init(false));
 
 static const char kRootOpAttr[] = "__root_op__";
 static const char kFusionGroupsAttr[] = "__fused_op__";
