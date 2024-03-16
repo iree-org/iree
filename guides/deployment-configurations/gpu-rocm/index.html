@@ -3489,15 +3489,14 @@ following commands to compile:</p>
 <div class="highlight"><pre><span></span><code>iree-compile<span class="w"> </span><span class="se">\</span>
 <span class="hll"><span class="w">    </span>--iree-hal-target-backends<span class="o">=</span>rocm<span class="w"> </span><span class="se">\</span>
 </span><span class="hll"><span class="w">    </span>--iree-rocm-target-chip<span class="o">=</span>&lt;...&gt;<span class="w"> </span><span class="se">\</span>
-</span><span class="hll"><span class="w">    </span>--iree-rocm-link-bc<span class="o">=</span><span class="nb">true</span><span class="w"> </span><span class="se">\</span>
-</span><span class="hll"><span class="w">    </span>--iree-rocm-bc-dir<span class="o">=</span>&lt;...&gt;<span class="w"> </span><span class="se">\</span>
-</span><span class="w">    </span>mobilenet_iree_input.mlir<span class="w"> </span>-o<span class="w"> </span>mobilenet_rocm.vmfb
-</code></pre></div>
-<p>Note ROCm Bitcode Dir (<code>iree-rocm-bc-dir</code>) path is required. If the system
-you are compiling IREE in has ROCm installed, then the default value of
-<code>/opt/rocm/amdgcn/bitcode</code> will usually suffice. If you intend on building
-ROCm compiler in a non-ROCm capable system, please set <code>iree-rocm-bc-dir</code>
-to the absolute path where you might have saved the amdgcn bitcode.</p>
+</span><span class="hll"><span class="w">    </span>mobilenet_iree_input.mlir<span class="w"> </span>-o<span class="w"> </span>mobilenet_rocm.vmfb
+</span></code></pre></div>
+<p>Note that IREE comes with bundled bitcode files, which are used for linking
+certain intrinsics on AMD GPUs. These will be used automatically or if the
+<code>--iree-rocm-bc-dir</code> is empty. As additional support may be needed for
+different chips, users can use this flag to point to an explicit directory.
+For example, in ROCm installations on Linux, this is often found under
+<code>/opt/rocm/amdgcn/bitcode</code>.</p>
 <p>Note that a ROCm target chip (<code>iree-rocm-target-chip</code>) of the form
 <code>gfx&lt;arch_number&gt;</code> is needed to compile towards each GPU architecture. If
 no architecture is specified then we will default to <code>gfx908</code>.</p>
