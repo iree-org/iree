@@ -154,17 +154,69 @@ iree_status_t iree_hal_rocm_native_executable_create(
         params->block_size[1] = block_sizes_vec[i].y;
         params->block_size[2] = block_sizes_vec[i].z;
         params->shared_memory_size = shared_memory_sizes[i];
+
         // Stash the entry point name in the string table for use when tracing.
         IREE_TRACE({
           iree_host_size_t entry_name_length =
               flatbuffers_string_len(entry_name);
           memcpy(string_table_buffer, entry_name, entry_name_length);
-          params->function_name =
+          params->source_location.func_name =
               iree_make_string_view(string_table_buffer, entry_name_length);
           string_table_buffer += entry_name_length;
         });
       }
     }
+
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+    iree_hal_rocm_FileLineLocDef_vec_t source_locations_vec =
+        iree_hal_rocm_ExecutableDef_source_locations_get(executable_def);
+    iree_hal_rocm_StageLocationsDef_vec_t stage_locations_vec =
+        iree_hal_rocm_ExecutableDef_stage_locations_get(executable_def);
+    for (iree_host_size_t i = 0; i < entry_count; ++i) {
+      iree_hal_rocm_StageLocationDef_vec_t stage_locations =
+          iree_hal_rocm_StageLocationsDef_locations_get(
+              iree_hal_rocm_StageLocationsDef_vec_at(stage_locations_vec, i));
+      iree_hal_rocm_FileLineLocDef_table_t source_location =
+          iree_hal_rocm_FileLineLocDef_vec_at(source_locations_vec, i);
+      if (stage_locations) {
+        for (size_t j = 0;
+             j < iree_hal_rocm_StageLocationDef_vec_len(stage_locations); ++j) {
+          iree_hal_rocm_StageLocationDef_table_t stage_location =
+              iree_hal_rocm_StageLocationDef_vec_at(stage_locations, j);
+          // TODO(benvanik): a way to select what location is chosen. For now
+          // we just pick the first one.
+          source_location =
+              iree_hal_rocm_StageLocationDef_location_get(stage_location);
+          break;
+        }
+      }
+      iree_hal_rocm_kernel_params_t* params = &executable->entry_points[i];
+      flatbuffers_string_t filename =
+          iree_hal_rocm_FileLineLocDef_filename_get(source_location);
+      params->source_location.file_name =
+          iree_make_string_view(filename, flatbuffers_string_len(filename));
+      params->source_location.line =
+          iree_hal_rocm_FileLineLocDef_line_get(source_location);
+    }
+
+    // Publish any embedded source files to the tracing infrastructure.
+    if (iree_hal_rocm_ExecutableDef_source_files_is_present(executable_def)) {
+      iree_hal_rocm_SourceFileDef_vec_t source_files_vec =
+          iree_hal_rocm_ExecutableDef_source_files_get(executable_def);
+      for (size_t i = 0;
+           i < iree_hal_rocm_SourceFileDef_vec_len(source_files_vec); ++i) {
+        iree_hal_rocm_SourceFileDef_table_t source_file =
+            iree_hal_rocm_SourceFileDef_vec_at(source_files_vec, i);
+        flatbuffers_string_t path =
+            iree_hal_rocm_SourceFileDef_path_get(source_file);
+        flatbuffers_uint8_vec_t content =
+            iree_hal_rocm_SourceFileDef_content_get(source_file);
+        IREE_TRACE_PUBLISH_SOURCE_FILE(path, flatbuffers_string_len(path),
+                                       content,
+                                       flatbuffers_uint8_vec_len(content));
+      }
+    }
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
   }
 
   if (iree_status_is_ok(status)) {

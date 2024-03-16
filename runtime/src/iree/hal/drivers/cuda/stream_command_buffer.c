@@ -161,9 +161,8 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_begin(
 
   IREE_CUDA_TRACE_ZONE_BEGIN_EXTERNAL(
       command_buffer->tracing_context, command_buffer->cu_stream,
-      /*file_name=*/NULL, 0, /*line=*/0, /*func_name=*/NULL, 0,
-      "iree_hal_cuda_stream_command_buffer",
-      strlen("iree_hal_cuda_stream_command_buffer"));
+      /*file_name=*/NULL, 0, /*line=*/0, "iree_hal_cuda_stream_command_buffer",
+      strlen("iree_hal_cuda_stream_command_buffer"), /*name=*/NULL, 0);
 
   return iree_ok_status();
 }
@@ -520,8 +519,9 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_dispatch(
   IREE_CUDA_TRACE_ZONE_BEGIN_EXTERNAL(
       command_buffer->tracing_context, command_buffer->cu_stream,
       kernel_info.source_filename.data, kernel_info.source_filename.size,
-      kernel_info.source_line, /*func_name=*/NULL, 0,
-      kernel_info.function_name.data, kernel_info.function_name.size);
+      kernel_info.source_line, kernel_info.function_name.data,
+      kernel_info.function_name.size,
+      /*name=*/NULL, 0);
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_resource_set_insert(command_buffer->resource_set, 1,

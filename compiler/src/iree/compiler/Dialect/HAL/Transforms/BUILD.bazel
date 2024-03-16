@@ -16,6 +16,7 @@ iree_compiler_cc_library(
     name = "Transforms",
     srcs = [
         "AssignTargetDevices.cpp",
+        "CaptureExecutableSources.cpp",
         "ConfigureExecutables.cpp",
         "ConvertToHAL.cpp",
         "DumpExecutableBenchmarks.cpp",

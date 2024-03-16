@@ -166,6 +166,10 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createAnnotateDispatchesPass();
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createInjectDispatchTracingPass();
 
+// Injects tensor tracing on ops annotated with `iree.tensor.trace`.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createInjectTensorTracingPass();
+
 // Crops the program and inserts trace markers at the specified symbols.
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createInsertDebugTargetAtSymbolPass(std::string breakDebugTarget = "",

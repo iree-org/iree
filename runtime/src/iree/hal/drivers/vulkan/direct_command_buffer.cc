@@ -201,9 +201,8 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_begin(
   IREE_VULKAN_TRACE_ZONE_BEGIN_EXTERNAL(
       command_buffer->tracing_context, command_buffer->handle,
       /*file_name=*/NULL, 0,
-      /*line=*/0, /*func_name=*/NULL, 0,
-      "iree_hal_vulkan_direct_command_buffer",
-      strlen("iree_hal_vulkan_direct_command_buffer"));
+      /*line=*/0, "iree_hal_vulkan_direct_command_buffer",
+      strlen("iree_hal_vulkan_direct_command_buffer"), /*name=*/NULL, 0);
 
   return iree_ok_status();
 }
@@ -726,8 +725,8 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_dispatch(
     IREE_VULKAN_TRACE_ZONE_BEGIN_EXTERNAL(
         command_buffer->tracing_context, command_buffer->handle,
         source_location.file_name.data, source_location.file_name.size,
-        source_location.line, /*func_name=*/NULL, 0,
-        source_location.func_name.data, source_location.func_name.size);
+        source_location.line, source_location.func_name.data,
+        source_location.func_name.size, /*name=*/NULL, 0);
   });
 
   IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
@@ -769,8 +768,8 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_dispatch_indirect(
   IREE_VULKAN_TRACE_ZONE_BEGIN_EXTERNAL(
       command_buffer->tracing_context, command_buffer->handle,
       source_location.file_name.data, source_location.file_name.size,
-      source_location.line, /*func_name=*/NULL, 0,
-      source_location.func_name.data, source_location.func_name.size);
+      source_location.line, source_location.func_name.data,
+      source_location.func_name.size, /*name=*/NULL, 0);
 
   // Get the compiled and linked pipeline for the specified entry point and
   // bind it to the command buffer.

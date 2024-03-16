@@ -269,7 +269,7 @@ StatusOr<int> CompileAndRunFile(iree_compiler_session_t* session,
                      std::string_view while_performing = "") {
       const char* msg = ireeCompilerErrorGetMessage(error);
       fprintf(stderr, "error compiling input file: %s\n", msg);
-      iree_status_t status = iree_make_status(status_code, msg);
+      iree_status_t status = iree_make_status(status_code, "%s", msg);
       if (!while_performing.empty()) {
         status = iree_status_annotate(
             status, iree_make_string_view(while_performing.data(),

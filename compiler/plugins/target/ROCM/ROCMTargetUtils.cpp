@@ -139,8 +139,7 @@ LogicalResult linkPathBitcodeFiles(Location loc, llvm::Linker &linker,
 static std::vector<std::string> getROCDLPaths(std::string targetChip,
                                               std::string bitCodeDir) {
   // AMDGPU bitcodes.
-  static const std::vector<std::string> rocdlFilenames(
-      {"opencl.bc", "ocml.bc", "ockl.bc"});
+  static const std::vector<std::string> rocdlFilenames({"ocml.bc", "ockl.bc"});
 
   // Construct full path to ROCDL bitcode libraries.
   std::vector<std::string> result;

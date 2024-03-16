@@ -12,10 +12,10 @@ from e2e_test_framework.definitions import common_definitions
 import e2e_test_framework.models.utils as model_utils
 
 # Implementations of the models listed below can be found in
-# https://github.com/iree-org/iree-samples/tree/main/iree-torch/importer.
+# https://github.com/iree-org/iree-experimental/tree/main/iree-torch/library/models.
 # We import the PyTorch models offline and make the .mlir available here for benchmarking.
 # If the mlir artifacts need to be updated, please run
-# https://github.com/iree-org/iree-samples/blob/main/iree-torch/importer/update_torch_models.sh
+# https://github.com/iree-org/iree-experimental/blob/main/iree-torch/library/import_torch_models.sh
 # Then update the `source_url` below with the new paths.
 
 # `ClipTextModel` encodes text into an embedding.

@@ -2093,9 +2093,13 @@ private:
         /*memberName=*/"module",
         /*operand=*/import);
 
-    auto conditionI1 = emitc_builders::unaryOperator(
-        builder, location, emitc_builders::UnaryOperator::LOGICAL_NOT,
-        importModule, boolType);
+    auto conditionI1 = builder
+                           .create<emitc::LogicalNotOp>(
+                               /*location=*/location,
+                               /*type=*/boolType,
+                               /*args=*/
+                               /*operands=*/importModule)
+                           .getResult();
 
     // Start by splitting the block into two. The part before will contain the
     // condition, and the part after will contain the continuation point.
@@ -2290,13 +2294,8 @@ private:
     auto ctx = builder.getContext();
 
     // iree_vm_function_call_t call;
-    auto call = builder
-                    .create<emitc::VariableOp>(
-                        /*location=*/loc,
-                        /*resultType=*/
-                        emitc::OpaqueType::get(ctx, "iree_vm_function_call_t"),
-                        /*value=*/emitc::OpaqueAttr::get(ctx, ""))
-                    .getResult();
+    auto call = emitc_builders::allocateVariable(
+        builder, loc, emitc::OpaqueType::get(ctx, "iree_vm_function_call_t"));
 
     // importValue = *import;
     auto importValue = emitc_builders::contentsOf(builder, loc, import);
@@ -2829,12 +2828,10 @@ class CallOpConversion : public EmitCConversionPattern<OpTy> {
 
     Value operandRef = this->getModuleAnalysis().lookupRef(operand);
 
-    auto refOp = builder.create<emitc::VariableOp>(
-        /*location=*/loc,
-        /*resultType=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t"),
-        /*value=*/emitc::OpaqueAttr::get(ctx, ""));
+    Value ref = emitc_builders::allocateVariable(
+        builder, loc, emitc::OpaqueType::get(ctx, "iree_vm_ref_t"));
 
-    Value refPtr = emitc_builders::addressOf(builder, loc, refOp.getResult());
+    Value refPtr = emitc_builders::addressOf(builder, loc, ref);
 
     if (failed(clearStruct(builder, refPtr))) {
       return failure();
@@ -3369,12 +3366,20 @@ private:
         /*operand=*/import);
 
     Type boolType = rewriter.getIntegerType(1);
-    auto conditionI1 = emitc_builders::unaryOperator(
-        rewriter, loc, emitc_builders::UnaryOperator::LOGICAL_NOT, importModule,
-        boolType);
-    auto invConditionI1 = emitc_builders::unaryOperator(
-        rewriter, loc, emitc_builders::UnaryOperator::LOGICAL_NOT, conditionI1,
-        boolType);
+    auto conditionI1 = rewriter
+                           .create<emitc::LogicalNotOp>(
+                               /*location=*/loc,
+                               /*type=*/boolType,
+                               /*args=*/
+                               /*operands=*/importModule)
+                           .getResult();
+    auto invConditionI1 = rewriter
+                              .create<emitc::LogicalNotOp>(
+                                  /*location=*/loc,
+                                  /*type=*/boolType,
+                                  /*args=*/
+                                  /*operands=*/conditionI1)
+                              .getResult();
 
     auto i32Type = rewriter.getIntegerType(32);
     auto conditionI32 = rewriter.create<emitc::CastOp>(

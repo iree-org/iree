@@ -83,11 +83,11 @@ void iree_hal_cuda_tracing_zone_end_impl(
     iree_hal_cuda_tracing_context_t* context, CUstream stream);
 
 // Begins a new zone with the parent function name.
-#define IREE_CUDA_TRACE_ZONE_BEGIN(context, stream)                           \
-  static const iree_tracing_location_t TracyConcat(                           \
-      __tracy_source_location, __LINE__) = {name_literal, __FUNCTION__,       \
-                                            __FILE__, (uint32_t)__LINE__, 0}; \
-  iree_hal_cuda_tracing_zone_begin_impl(                                      \
+#define IREE_CUDA_TRACE_ZONE_BEGIN(context, stream)                       \
+  static const iree_tracing_location_t TracyConcat(                       \
+      __tracy_source_location, __LINE__) = {NULL, __FUNCTION__, __FILE__, \
+                                            (uint32_t)__LINE__, 0};       \
+  iree_hal_cuda_tracing_zone_begin_impl(                                  \
       context, stream, &TracyConcat(__tracy_source_location, __LINE__));
 
 // Begins an externally defined zone with a dynamic source location.

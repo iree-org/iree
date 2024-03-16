@@ -27,20 +27,21 @@ arguments, and replace `flow.dispatch.tensor.store` with `return` op.
 
 Note: This only works when dispatch formation logics are identical between runs.
 
-## iree-samples repository tests
+## iree-experimental repository tests
 
-Follow [README](https://github.com/iree-org/iree-samples#readme) to run the model.
-The MLIR files will be generated. You'll find the saved file from log. E.g.,
+Follow [README](https://github.com/iree-org/iree-experimental#readme) to run the
+model. The MLIR files will be generated. You'll find the saved file from log.
+E.g.,
 
 ``` shell
 [ RUN      ] MobilenetV2Int8Test.test_compile_tflite
 I0401 17:27:04.084272 140182373025024 test_util.py:119] Setting up for IREE
 I0401 17:27:04.085064 140182373025024 binaries.py:218] Invoke IREE Pipeline:
-  /tmp/iree-samples/iree-samples.venv/lib/python3.9/site-packages/iree/tools/tflite/iree-import-tflite
-    /tmp/iree-samples/tflitehub/tmp/mobilenet_v2_int8_test.py/model.tflite
+  /tmp/iree-experimental/iree-experimental.venv/lib/python3.9/site-packages/iree/tools/tflite/iree-import-tflite
+    /tmp/iree-experimental/tflitehub/tmp/mobilenet_v2_int8_test.py/model.tflite
     --mlir-print-debuginfo
-    --save-temp-tfl-input=/tmp/iree-samples/tflitehub/tmp/mobilenet_v2_int8_test.py/tflite.mlir
-    --save-temp-iree-input=/tmp/iree-samples/tflitehub/tmp/mobilenet_v2_int8_test.py/tosa.mlir
+    --save-temp-tfl-input=/tmp/iree-experimental/tflitehub/tmp/mobilenet_v2_int8_test.py/tflite.mlir
+    --save-temp-iree-input=/tmp/iree-experimental/tflitehub/tmp/mobilenet_v2_int8_test.py/tosa.mlir
 ```
 
 Unfortunately, the artifacts are not dumped in the runs. There is an

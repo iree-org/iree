@@ -94,12 +94,14 @@ no architecture is specified then we will default to `gfx908`.
 
 Here is a table of commonly used architectures:
 
-| AMD GPU   | Target Chip |
-| --------- | ----------- |
-| AMD MI25  | `gfx900`    |
-| AMD MI50  | `gfx906`    |
-| AMD MI60  | `gfx906`    |
-| AMD MI100 | `gfx908`    |
+| AMD GPU    | Target Chip |
+| ---------- | ----------- |
+| AMD MI25   | `gfx900`    |
+| AMD MI50   | `gfx906`    |
+| AMD MI60   | `gfx906`    |
+| AMD MI100  | `gfx908`    |
+| AMD MI300A | `gfx940`    |
+| AMD MI300  | `gfx942`    |
 
 ### :octicons-terminal-16: Run a compiled program
 

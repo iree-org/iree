@@ -11,6 +11,7 @@
 #include <string>
 
 #include "compiler/plugins/target/LLVMCPU/LLVMTargetOptions.h"
+#include "compiler/src/iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/IR/Module.h"
 #include "llvm/TargetParser/Triple.h"
 #include "mlir/Support/LogicalResult.h"
@@ -46,10 +47,11 @@ public:
     // We may want to make this major release number, date codes (0x20220307),
     // or some semantic versioning we track in whatever spec we end up having.
     V_0_3 = 0x0000'0003u, // v0.3 - ~2022-08-08
+    V_0_4 = 0x0000'0004u, // v0.4 - ~2024-03-12
 
     // Pinned to the latest version.
     // Requires that the runtime be compiled with the same version.
-    LATEST = V_0_3,
+    LATEST = V_0_4,
   };
 
   // iree_hal_executable_library_features_t
@@ -84,6 +86,13 @@ public:
     constexpr bool isDefault() const { return localMemorySize == 0; }
   };
 
+  // iree_hal_executable_source_location_v0_t
+  struct SourceLocation {
+    std::string stage;
+    std::string path;
+    uint32_t line;
+  };
+
   LibraryBuilder(llvm::Module *module, Mode mode,
                  Version version = Version::LATEST)
       : module(module), mode(mode), version(version) {}
@@ -111,10 +120,16 @@ public:
   // |name| will be used as the library export
   // |sourceFile| and |sourceLoc| are optional source information
   // |tag| is an optional attachment
-  void addExport(StringRef name, StringRef sourceFile, uint32_t sourceLoc,
-                 StringRef tag, DispatchAttrs attrs, llvm::Function *func) {
-    exports.push_back(
-        {name.str(), sourceFile.str(), sourceLoc, tag.str(), attrs, func});
+  void addExport(StringRef name, SourceLocation sourceLocation,
+                 SmallVector<SourceLocation> stageLocations, StringRef tag,
+                 DispatchAttrs attrs, llvm::Function *func) {
+    exports.push_back({name.str(), std::move(sourceLocation),
+                       std::move(stageLocations), tag.str(), attrs, func});
+  }
+
+  // Defines a source file embedded in the library.
+  void addSourceFile(StringRef path, SmallVector<char> contents) {
+    sourceFiles.push_back({path.str(), std::move(contents)});
   }
 
   // Builds a `iree_hal_executable_library_query_fn_t` with the given
@@ -133,6 +148,7 @@ private:
   llvm::Constant *buildLibraryV0ImportTable(std::string libraryName);
   llvm::Constant *buildLibraryV0ExportTable(std::string libraryName);
   llvm::Constant *buildLibraryV0ConstantTable(std::string libraryName);
+  llvm::Constant *buildLibraryV0SourceTable(std::string libraryName);
 
   llvm::Module *module = nullptr;
   Mode mode = Mode::INCLUDE_REFLECTION_ATTRS;
@@ -148,15 +164,21 @@ private:
 
   struct Dispatch {
     std::string name;
-    std::string sourceFile;
-    uint32_t sourceLoc;
+    SourceLocation sourceLocation;
+    SmallVector<SourceLocation> stageLocations;
     std::string tag;
     DispatchAttrs attrs;
     llvm::Function *func;
   };
-  SmallVector<Dispatch> exports;
+  std::vector<Dispatch> exports;
 
   size_t constantCount = 0;
+
+  struct SourceFile {
+    std::string path;
+    SmallVector<char> contents;
+  };
+  SmallVector<SourceFile> sourceFiles;
 };
 
 } // namespace mlir::iree_compiler::IREE::HAL
