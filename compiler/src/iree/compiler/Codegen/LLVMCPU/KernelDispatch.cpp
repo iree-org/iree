@@ -46,7 +46,7 @@ static llvm::cl::opt<int> clNumberOfRuntimeThreads(
     "iree-llvmcpu-number-of-threads",
     llvm::cl::desc("number of threads that are used at runtime if codegen "
                    "thread distribution is enabled"),
-    llvm::cl::init(5));
+    llvm::cl::init(16));
 
 static llvm::cl::opt<bool> clDisableDistribution(
     "iree-llvmcpu-disable-distribution",
@@ -367,7 +367,8 @@ static void reduceDistributionWorkgroups(
         llvm::divideCeil(value, distributedTileSizes[idx]);
   }
 
-  int64_t numWorkgroupsLimit = 2 * clNumberOfRuntimeThreads;
+  constexpr int64_t threadHint = 8;
+  int64_t numWorkgroupsLimit = 2 * threadHint;
   int64_t numWorkgroups =
       std::accumulate(numWorkgroupsPerDim.begin(), numWorkgroupsPerDim.end(),
                       1LL, std::multiplies<int64_t>{});
@@ -1271,49 +1272,90 @@ setRootConfig(mlir::FunctionOpInterface entryPointFn,
                              scalableTileFlags, vectorSize, vecPreProcStrategy);
 }
 
+//static SmallVector<int64_t>
+//getMmt4dDistributionSizes(uint64_t pressumedM1, uint64_t pressumedN1,
+//                          ArrayRef<int64_t> innerTileSizes, unsigned numLoops,
+//                          unsigned mmt4dDimBase) {
+//  // Compute the number of distribution level tiles per thread based on the
+//  // inner level tiles (cache/vectorization level). We merge multiple inner
+//  // tiles into a single distribution level tile to match the target
+//  // distribution tiles per thread and minimize distribution sharding overhead.
+//  SmallVector<int64_t> distTileSizes(numLoops, 0);
+//  constexpr int64_t targetDistTilesPerThread = 2;
+//
+//  int64_t innerMTileSize = innerTileSizes[mmt4dDimBase + 0];
+//  int64_t innerNTileSize = innerTileSizes[mmt4dDimBase + 1];
+//  int64_t numInnerMTiles = llvm::divideCeil(pressumedM1, innerMTileSize);
+//  int64_t numInnerNTiles = llvm::divideCeil(pressumedN1, innerNTileSize);
+//
+//  LLVM_DEBUG(KD_DBGS() << "inner M TS: " << innerMTileSize << "\n");
+//  LLVM_DEBUG(KD_DBGS() << "inner N TS: " << innerNTileSize << "\n");
+//  LLVM_DEBUG(KD_DBGS() << "num inner m tiles: " << numInnerMTiles << "\n");
+//  LLVM_DEBUG(KD_DBGS() << "num inner n tiles: " << numInnerNTiles << "\n");
+//
+//  int64_t numInnerTiles = numInnerMTiles * numInnerNTiles;
+//  int64_t minTiles = targetDistTilesPerThread * clNumberOfRuntimeThreads;
+//  int64_t blocksToDistribute = llvm::divideCeil(numInnerTiles, minTiles);
+//
+//  int64_t distMTileSize, distNTileSize, ratio;
+//  if (numInnerMTiles >= numInnerNTiles) {
+//    ratio = llvm::divideCeil(numInnerMTiles * blocksToDistribute,
+//                             numInnerNTiles * numInnerMTiles);
+//    distNTileSize =
+//        std::ceil(std::sqrt(llvm::divideCeil(blocksToDistribute, ratio)));
+//    distMTileSize = distNTileSize * ratio;
+//  } else {
+//    ratio = llvm::divideCeil(numInnerNTiles * blocksToDistribute,
+//                             numInnerMTiles * numInnerNTiles);
+//    distMTileSize =
+//        std::ceil(std::sqrt(llvm::divideCeil(blocksToDistribute, ratio)));
+//    distNTileSize = distMTileSize * ratio;
+//  }
+//
+//  distMTileSize *= innerMTileSize;
+//  distNTileSize *= innerNTileSize;
+//
+//  distTileSizes[mmt4dDimBase + 0] = distMTileSize;
+//  distTileSizes[mmt4dDimBase + 1] = distNTileSize;
+//
+//  LLVM_DEBUG(
+//      KD_DBGS() << "M1 = " << pressumedM1 << ", N1 = " << pressumedN1 << "\n"
+//                << "Dist M1 sizes: " << distMTileSize << "\n"
+//                << "Dist N1 sizes: " << distNTileSize << "\n"
+//                << "Number of distribution tiles: (M="
+//                << llvm::divideCeil(pressumedM1, distMTileSize) << " x N="
+//                << llvm::divideCeil(pressumedN1, distNTileSize) << ")\n");
+//
+//  return distTileSizes;
+//}
+
 static SmallVector<int64_t>
 getMmt4dDistributionSizes(uint64_t pressumedM1, uint64_t pressumedN1,
                           ArrayRef<int64_t> innerTileSizes, unsigned numLoops,
                           unsigned mmt4dDimBase) {
-  // Compute the number of distribution level tiles per thread based on the
-  // inner level tiles (cache/vectorization level). We merge multiple inner
-  // tiles into a single distribution level tile to match the target
-  // distribution tiles per thread and minimize distribution sharding overhead.
   SmallVector<int64_t> distTileSizes(numLoops, 0);
   constexpr int64_t targetDistTilesPerThread = 4;
+  int64_t minTiles = targetDistTilesPerThread * clNumberOfRuntimeThreads;
 
   int64_t innerMTileSize = innerTileSizes[mmt4dDimBase + 0];
-  int64_t innerNTileSize = innerTileSizes[mmt4dDimBase + 1];
   int64_t numInnerMTiles = llvm::divideCeil(pressumedM1, innerMTileSize);
+  int64_t numDistMTiles = llvm::divideCeil(numInnerMTiles, minTiles);
+
+  int64_t numDistNTiles = 1;
+  int64_t innerNTileSize = innerTileSizes[mmt4dDimBase + 1];
   int64_t numInnerNTiles = llvm::divideCeil(pressumedN1, innerNTileSize);
 
-  LLVM_DEBUG(KD_DBGS() << "inner M TS: " << innerMTileSize << "\n");
-  LLVM_DEBUG(KD_DBGS() << "inner N TS: " << innerNTileSize << "\n");
-  LLVM_DEBUG(KD_DBGS() << "num inner m tiles: " << numInnerMTiles << "\n");
-  LLVM_DEBUG(KD_DBGS() << "num inner n tiles: " << numInnerNTiles << "\n");
+  if (numInnerMTiles < minTiles) {
+    // TODO: Try num threads, then 1.
+    numDistMTiles = 1;
 
-  int64_t numInnerTiles = numInnerMTiles * numInnerNTiles;
-  int64_t minTiles = targetDistTilesPerThread * clNumberOfRuntimeThreads;
-  int64_t blocksToDistribute = llvm::divideCeil(numInnerTiles, minTiles);
-
-  int64_t distMTileSize, distNTileSize, ratio;
-  if (numInnerMTiles >= numInnerNTiles) {
-    ratio = llvm::divideCeil(numInnerMTiles * blocksToDistribute,
-                             numInnerNTiles * numInnerMTiles);
-    distNTileSize =
-        std::ceil(std::sqrt(llvm::divideCeil(blocksToDistribute, ratio)));
-    distMTileSize = distNTileSize * ratio;
-  } else {
-    ratio = llvm::divideCeil(numInnerNTiles * blocksToDistribute,
-                             numInnerMTiles * numInnerNTiles);
-    distMTileSize =
-        std::ceil(std::sqrt(llvm::divideCeil(blocksToDistribute, ratio)));
-    distNTileSize = distMTileSize * ratio;
+    int64_t numNTilesNeeded = std::min<int64_t>(
+        numInnerNTiles, llvm::divideCeil(minTiles, numDistMTiles));
+    numDistNTiles = llvm::divideCeil(numInnerNTiles, numNTilesNeeded);
   }
 
-  distMTileSize *= innerMTileSize;
-  distNTileSize *= innerNTileSize;
-
+  int64_t distMTileSize = numDistMTiles * innerMTileSize;
+  int64_t distNTileSize = numDistNTiles * innerNTileSize;
   distTileSizes[mmt4dDimBase + 0] = distMTileSize;
   distTileSizes[mmt4dDimBase + 1] = distNTileSize;
 
@@ -1326,6 +1368,24 @@ getMmt4dDistributionSizes(uint64_t pressumedM1, uint64_t pressumedN1,
                 << llvm::divideCeil(pressumedN1, distNTileSize) << ")\n");
 
   return distTileSizes;
+}
+
+static void dropRedundantSizes(int64_t mmt4dDimBase, int64_t M1, int64_t N1,
+                               SmallVectorImpl<int64_t> &distSizes,
+                               SmallVectorImpl<int64_t> &cacheParallelSizes) {
+  SmallVector<int64_t, 2> shape;
+  shape.append({M1, N1});
+
+  for (int i = 0; i < 2; ++i) {
+    if (ShapedType::isDynamic(shape[i]))
+      continue;
+
+    if (distSizes[mmt4dDimBase + i] == cacheParallelSizes[mmt4dDimBase + i])
+      cacheParallelSizes[mmt4dDimBase + i] = 0;
+
+    if (shape[i] == distSizes[mmt4dDimBase + i])
+      distSizes[mmt4dDimBase + i] = 0;
+  }
 }
 
 static TileSizesListType getMmt4dTileSizes(linalg::LinalgOp op) {
@@ -1401,6 +1461,8 @@ static TileSizesListType getMmt4dTileSizes(linalg::LinalgOp op) {
   SmallVector<int64_t> vectorReductionTileSizes;
   splitParallelAndReductionTiles(op, vectorParallelTileSizes,
                                  vectorReductionTileSizes);
+
+  dropRedundantSizes(mmt4dDimBase, M1, N1, distTileSizes, cacheParallelTileSizes);
 
   SmallVector<int64_t> vectorInnerParallelTileSizes(numLoops, 0);
   TileSizesListType tileSizes = {distTileSizes,
