@@ -1,7 +1,5 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmcpu-select-lowering-strategy)))' --verify-diagnostics --split-input-file %s
 
-// XFAIL: *
-
 #config = #iree_codegen.lowering_config<tile_sizes = []>
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [

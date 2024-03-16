@@ -48,7 +48,6 @@ TilingConfig::TilingConfig(IREE::Codegen::LoweringConfigAttr lc)
     }
     break;
   default:
-    assert(false && "Unsupported tiling configuration");
     break;
   }
 };
