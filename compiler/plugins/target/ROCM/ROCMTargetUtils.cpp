@@ -262,8 +262,8 @@ LogicalResult linkUkernelBCFiles(Location loc, llvm::Module *module,
   // Early exit if Ukernel not supported on target chip.
   if (!iree_compiler::hasUkernelSupportedRocmArch(targetChip)) {
     return mlir::emitError(loc)
-           << "ukernel " << enabledUkernelsStr
-           << " not supported on target chip: " << targetChip;
+           << "ukernel '" << enabledUkernelsStr
+           << "' not supported on target chip: " << targetChip;
   }
   std::vector<std::string> ukernelPaths =
       getUkernelPaths(enabledUkernelsStr, targetChip, bitCodeDir);
