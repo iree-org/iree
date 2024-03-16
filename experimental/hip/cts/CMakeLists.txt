@@ -5,14 +5,9 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 unset(IREE_HIP_TEST_COMPILER_FLAGS)
-if(IREE_ROCM_LINK_BC)
-  list(APPEND IREE_HIP_TEST_COMPILER_FLAGS "--iree-rocm-link-bc=true")
-else()
-  list(APPEND IREE_HIP_TEST_COMPILER_FLAGS "--iree-rocm-link-bc=false")
-endif()
 list(APPEND IREE_HIP_TEST_COMPILER_FLAGS
   "--iree-rocm-target-chip=${IREE_ROCM_TARGET_CHIP}"
-  "--iree-rocm-bc-dir=${IREE_ROCM_BC_DIR}")
+)
 
 iree_hal_cts_test_suite(
   DRIVER_NAME

@@ -51,12 +51,19 @@ namespace mlir::iree_compiler::IREE::HAL {
 
 namespace {
 
-struct ROCMOptions {
+class ROCMOptions {
+public:
   std::string targetChip = "gfx908";
-  bool linkBitcode = false;
-  std::string bitcodeDirectory;
+  bool linkBitcode = true;
   int wavesPerEu = 0;
   std::string enableROCMUkernels = "none";
+
+  const std::string &getBitcodeDirectory() const {
+    if (bitcodeDirectory.empty()) {
+      return getDefaultBitcodeDirectory();
+    }
+    return bitcodeDirectory;
+  }
 
   void bindOptions(OptionsBinder &binder) {
     static llvm::cl::OptionCategory category("ROCM HAL Target");
@@ -80,6 +87,14 @@ struct ROCMOptions {
             "`default`, `none`, `all`, or a comma-separated list of "
             "specific unprefixed microkernels to enable, e.g. `mmt4d`."));
   }
+
+private:
+  static const std::string &getDefaultBitcodeDirectory() {
+    static std::string defaultValue =
+        mlir::iree_compiler::findPlatformLibDirectory("rocm");
+    return defaultValue;
+  }
+  std::string bitcodeDirectory;
 };
 } // namespace
 
@@ -276,6 +291,7 @@ public:
     // Perform the translation in a separate context to avoid any
     // multi-threading issues.
     llvm::LLVMContext context;
+    const std::string &bitcodeDirectory = options.getBitcodeDirectory();
 
     // We name our files after the executable name so that they are easy to
     // track both during compilation (logs/artifacts/etc), as outputs (final
@@ -412,21 +428,23 @@ public:
     if (!options.enableROCMUkernels.empty() &&
         options.enableROCMUkernels != "none") {
       auto enabledUkernelsStr = StringRef(options.enableROCMUkernels);
-      linkUkernelBCFiles(llvmModule.get(), variantOp.getLoc(),
-                         enabledUkernelsStr, options.targetChip,
-                         options.bitcodeDirectory,
-                         llvm::Linker::OverrideFromSrc, *targetMachine);
+      if (failed(linkUkernelBCFiles(
+              variantOp.getLoc(), llvmModule.get(), enabledUkernelsStr,
+              options.targetChip, bitcodeDirectory,
+              llvm::Linker::OverrideFromSrc, *targetMachine)))
+        return failure();
     }
     // Link module to Device Library
     if (options.linkBitcode) {
-      if (options.bitcodeDirectory.empty()) {
+      if (bitcodeDirectory.empty()) {
         return variantOp.emitError()
                << "cannot find ROCM bitcode files. Check your installation "
                   "consistency and in the worst case, set --iree-rocm-bc-dir= "
                   "to an explicit location on your system.";
       }
-      linkROCDLIfNecessary(llvmModule.get(), options.targetChip,
-                           options.bitcodeDirectory);
+      if (failed(linkROCDLIfNecessary(variantOp.getLoc(), llvmModule.get(),
+                                      options.targetChip, bitcodeDirectory)))
+        return failure();
     }
     if (!serOptions.dumpIntermediatesPath.empty()) {
       dumpModuleToPath(serOptions.dumpIntermediatesPath,
@@ -487,7 +505,12 @@ public:
     SmallVector<iree_hal_rocm_FileLineLocDef_ref_t> sourceLocationRefs;
     entryPointNames.resize(exportOps.size());
     for (auto exportOp : exportOps) {
-      int64_t ordinal = exportOp.getOrdinalAttr().getInt();
+      auto ordinalAttr = exportOp.getOrdinalAttr();
+      if (!ordinalAttr) {
+        return mlir::emitError(exportOp.getLoc())
+               << "could not compile rocm binary: export op is missing ordinal";
+      }
+      int64_t ordinal = ordinalAttr.getInt();
       entryPointNames[ordinal] = exportOp.getName();
 
       // Optional source location information for debugging/profiling.
@@ -594,19 +617,11 @@ struct ROCMSession
     : public PluginSession<ROCMSession, ROCMOptions,
                            PluginActivationPolicy::DefaultActivated> {
   void populateHALTargetDevices(IREE::HAL::TargetDeviceList &targets) {
-    if (options.bitcodeDirectory.empty()) {
-      options.bitcodeDirectory = findPlatformLibDirectory("rocm");
-    }
-
     // #hal.device.target<"rocm", ...
     targets.add("rocm",
                 [&]() { return std::make_shared<ROCMTargetDevice>(options); });
   }
   void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {
-    if (options.bitcodeDirectory.empty()) {
-      options.bitcodeDirectory = findPlatformLibDirectory("rocm");
-    }
-
     // #hal.executable.target<"rocm", ...
     targets.add("rocm", [&]() {
       LLVMInitializeAMDGPUTarget();
