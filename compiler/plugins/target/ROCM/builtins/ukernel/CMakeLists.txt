@@ -9,6 +9,7 @@ endif()
 
 # Check if HIP is installed on system.
 # HIP is required to compile ukernels.
+# TODO: We can do better than this and ensure that headers are always available.
 if (NOT IREE_ROCM_PATH)
   set(IREE_ROCM_PATH "/opt/rocm")
 endif()
