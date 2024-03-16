@@ -419,14 +419,17 @@ static iree_status_t iree_hal_rocm_direct_command_buffer_dispatch(
       iree_hal_rocm_native_executable_entry_point_kernel_params(
           executable, entry_point, &kernel_params));
 
-  IREE_ROCM_TRACE_ZONE_BEGIN_EXTERNAL(
-      command_buffer->tracing_context, 0,
-      kernel_params.source_location.file_name.data,
-      kernel_params.source_location.file_name.size,
-      kernel_params.source_location.line,
-      kernel_params.source_location.func_name.data,
-      kernel_params.source_location.func_name.size,
-      /*name=*/NULL, 0);
+  IREE_TRACE({
+    iree_hal_rocm_source_location_t source_location;
+    iree_hal_rocm_native_executable_entry_point_source_location(
+        executable, entry_point, &source_location);
+    IREE_ROCM_TRACE_ZONE_BEGIN_EXTERNAL(
+        command_buffer->tracing_context, /*stream=*/0,
+        source_location.file_name.data, source_location.file_name.size,
+        source_location.line, source_location.func_name.data,
+        source_location.func_name.size,
+        /*name=*/NULL, 0);
+  });
 
   // Patch the push constants in the kernel arguments.
   iree_host_size_t num_constants =
