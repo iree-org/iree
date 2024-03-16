@@ -18,6 +18,13 @@
 #include "iree/schemas/rocm_executable_def_reader.h"
 #include "iree/schemas/rocm_executable_def_verifier.h"
 
+typedef struct iree_hal_rocm_entry_point_t {
+  iree_hal_rocm_kernel_params_t kernel_params;
+  iree_string_view_t name;
+  IREE_TRACE(iree_hal_rocm_FileLineLocDef_table_t source_location;)
+  IREE_TRACE(iree_hal_rocm_StageLocationDef_vec_t stage_locations;)
+} iree_hal_rocm_entry_point_t;
+
 typedef struct iree_hal_rocm_native_executable_t {
   iree_hal_resource_t resource;
   iree_hal_rocm_context_wrapper_t* context;
@@ -25,7 +32,7 @@ typedef struct iree_hal_rocm_native_executable_t {
   iree_host_size_t entry_count;
   hipModule_t module;
   iree_host_size_t entry_point_count;
-  iree_hal_rocm_kernel_params_t entry_points[];
+  iree_hal_rocm_entry_point_t entry_points[];
 } iree_hal_rocm_native_executable_t;
 
 static const iree_hal_executable_vtable_t
@@ -132,16 +139,19 @@ iree_status_t iree_hal_rocm_native_executable_create(
               "hipFuncSetAttribute");
         }
         // Package required parameters for kernel launches for each entry point.
-        iree_hal_rocm_kernel_params_t* params = &executable->entry_points[i];
+        iree_hal_rocm_entry_point_t* entry_point_info =
+            &executable->entry_points[i];
+        iree_hal_rocm_kernel_params_t* params =
+            &entry_point_info->kernel_params;
         params->layout = executable_params->pipeline_layouts[i];
         iree_hal_pipeline_layout_retain(params->layout);
         params->function = function;
-        params->name = iree_make_string_view(
-            entry_name, flatbuffers_string_len(entry_name));
         params->block_size[0] = block_sizes_vec[i].x;
         params->block_size[1] = block_sizes_vec[i].y;
         params->block_size[2] = block_sizes_vec[i].z;
         params->shared_memory_size = shared_memory_sizes[i];
+        entry_point_info->name = iree_make_string_view(
+            entry_name, flatbuffers_string_len(entry_name));
       }
     }
 
@@ -205,7 +215,7 @@ hipFunction_t iree_hal_rocm_native_executable_for_entry_point(
     iree_hal_executable_t* base_executable, int32_t entry_point) {
   iree_hal_rocm_native_executable_t* executable =
       iree_hal_rocm_native_executable_cast(base_executable);
-  return executable->entry_points[entry_point].function;
+  return executable->entry_points[entry_point].kernel_params.function;
 }
 
 static void iree_hal_rocm_native_executable_destroy(
@@ -262,7 +272,7 @@ void iree_hal_rocm_native_executable_entry_point_source_location(
   if (entry_ordinal >= executable->entry_point_count) {
     return;
   }
-  const iree_hal_rocm_kernel_params_t* entry_point =
+  const iree_hal_rocm_entry_point_t* entry_point =
       &executable->entry_points[entry_ordinal];
 
   out_source_location->func_name = entry_point->name;
