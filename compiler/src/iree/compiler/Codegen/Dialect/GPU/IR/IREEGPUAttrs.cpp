@@ -709,12 +709,15 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
   SmallVector<int64_t> aBatchSizes(aRank, 1);
   SmallVector<int64_t> aSubgroupSizes(aRank, 1);
   SmallVector<int64_t> aSubgroupOrder(aRank, 0);
+  SmallVector<int64_t> aBatchOrder(aRank, 0);
   for (auto [i, dim] : llvm::enumerate(aMDims)) {
     aBatchSizes[dim] = batchMSizes[i];
     aSubgroupSizes[dim] = subgroupMBasis[i];
     aSubgroupOrder[dim] = i;
+    aBatchOrder[dim] = i >= afk ? i + 1 : i;
   }
   aSubgroupOrder[afk] = aRank - 1;
+  aBatchOrder[afk] = afk;
   aBatchSizes[afk] = getSubgroupKTileCount();
 
   SmallVector<bool> aActiveSubgroups(subgroupBasis.size(), false);
@@ -761,12 +764,13 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
   }
   bActiveSubgroups.back() = true;
 
-  auto bLayout = permuteAndCreateNestedLayout(
-      context, bRank, bfk, bfn, bPermute,
-      /*subgroupCount=*/bSubgroupSizes,
-      /*subgroupOrder=*/bSubgroupOrder,
-      /*batchCount=*/bBatchSizes,
-      /*batchOrder=*/{1, 0}, bCounts, bOrders, subgroupBasis, bActiveSubgroups);
+  auto bLayout =
+      permuteAndCreateNestedLayout(context, bRank, bfk, bfn, bPermute,
+                                   /*subgroupCount=*/bSubgroupSizes,
+                                   /*subgroupOrder=*/bSubgroupOrder,
+                                   /*batchCount=*/bBatchSizes,
+                                   /*batchOrder=*/bBatchOrder, bCounts, bOrders,
+                                   subgroupBasis, bActiveSubgroups);
   LLVM_DEBUG({ llvm::errs() << "B layout: " << bLayout << "\n"; });
 
   return std::make_tuple(aLayout, bLayout, cLayout);
