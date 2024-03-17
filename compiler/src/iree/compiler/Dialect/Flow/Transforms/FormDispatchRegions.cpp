@@ -469,6 +469,20 @@ static bool canUseInOperandAsInitOperand(OpOperand *inOperand,
   assert(inOperand->getOwner() == initOperand->getOwner() &&
          "expected in-operand and init-operand to be owned by same operation");
 
+  // If dispatch is always vectorized we dont need to deal with these
+  // constraints. This is only needed for non-vectorized dispatches to avoid
+  // large stack allocations.
+  // TODO: Make more robust, but for now just pick the specific case
+  // that we know is vectorized in SDXL.
+  if (auto convOp =
+          inOperand->get().getDefiningOp<linalg::Conv2DNhwcHwcfOp>()) {
+    // Only return true for stride 1 ops.
+    auto strides = convOp.getStrides();
+    if (strides.isSplat() && strides.getSplatValue<int64_t>() == 1) {
+      return true;
+    }
+  }
+
   // Check that the owner is a `generic` op.
   auto genericOp = dyn_cast<linalg::GenericOp>(inOperand->getOwner());
   if (!genericOp)
