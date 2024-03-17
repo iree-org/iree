@@ -740,7 +740,7 @@ static void printBasis(AsmPrinter &p, StringRef basisName, StringRef maskName,
   p << ']';
   if (llvm::any_of(mask, [](bool b) { return !b; })) {
     p << ',' << ' ';
-    p << maskName;
+    p << maskName << ' ';
     p << '=';
     p << ' ';
     p << '[';
