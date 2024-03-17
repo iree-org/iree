@@ -124,6 +124,7 @@ function(iree_cc_binary)
   target_compile_options(${_NAME}
     PRIVATE
       ${IREE_DEFAULT_COPTS}
+      ${IREE_INTERFACE_COPTS}
       ${_RULE_COPTS}
   )
   target_link_options(${_NAME}

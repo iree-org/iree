@@ -134,6 +134,8 @@ function(external_cc_library)
       PRIVATE
         ${_RULE_COPTS}
         ${IREE_DEFAULT_COPTS}
+      INTERFACE
+        ${IREE_INTERFACE_COPTS}
     )
     target_link_options(${_NAME}
       PRIVATE
