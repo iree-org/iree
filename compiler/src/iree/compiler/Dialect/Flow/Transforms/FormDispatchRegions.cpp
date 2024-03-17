@@ -34,6 +34,7 @@
 #include "mlir/Interfaces/TilingInterface.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/TopologicalSortUtils.h"
 
 #define DEBUG_TYPE "iree-flow-form-dispatch-regions"
@@ -959,6 +960,74 @@ struct FormDispatchRegionsPass
 
   void runOnOperation() override;
 };
+
+/// Pattern to fold
+///
+/// ```
+/// %0 = linalg.fill ins(%cst : )
+/// %1 = tensor.insert_slice %a into %0
+/// %2 = linalg.fill ins(%cst : )
+/// %3 = tensor.insert_slice %1 into %2
+/// ```
+///
+/// to
+///
+/// ```
+/// %2 = linalg.fill ins(%cst : )
+/// %3 = tensor.insert_slice %a into %2
+/// ```
+class FoldSuccessiveTensorInsertSliceOps
+    : public OpRewritePattern<tensor::InsertSliceOp> {
+public:
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::InsertSliceOp sliceOp,
+                                PatternRewriter &rewriter) const override {
+    auto sourceInsertSlice =
+        sliceOp.getSource().getDefiningOp<tensor::InsertSliceOp>();
+    if (!sourceInsertSlice) {
+      return failure();
+    }
+    auto sourceSliceFillOp =
+        sourceInsertSlice.getDest().getDefiningOp<linalg::FillOp>();
+    auto destSliceFillOp = sliceOp.getDest().getDefiningOp<linalg::FillOp>();
+    if (!sourceSliceFillOp || !destSliceFillOp) {
+      return failure();
+    }
+    if (sourceSliceFillOp.getDpsInputOperand(0)->get() !=
+        destSliceFillOp.getDpsInputOperand(0)->get()) {
+      return failure();
+    }
+
+    auto isAllConstantOne = [](OpFoldResult ofr) {
+      return isConstantIntValue(ofr, 1);
+    };
+    if (!llvm::all_of(sliceOp.getMixedStrides(), isAllConstantOne) ||
+        !llvm::all_of(sliceOp.getMixedStrides(), isAllConstantOne)) {
+      return failure();
+    }
+
+    SmallVector<OpFoldResult> sourceSliceOffsets =
+        sourceInsertSlice.getMixedOffsets();
+    SmallVector<OpFoldResult> destSliceOffsets = sliceOp.getMixedOffsets();
+    AffineExpr d0, d1;
+    bindDims(rewriter.getContext(), d0, d1);
+    AffineExpr addExpr = d0 + d1;
+    SmallVector<OpFoldResult> offsets = llvm::map_to_vector(
+        llvm::zip_equal(sourceSliceOffsets, destSliceOffsets), [&](auto it) {
+          return affine::makeComposedFoldedAffineApply(
+              rewriter, sliceOp.getLoc(), addExpr,
+              {std::get<0>(it), std::get<1>(it)});
+        });
+    SmallVector<OpFoldResult> sizes = sourceInsertSlice.getMixedSizes();
+    SmallVector<OpFoldResult> strides(offsets.size(), rewriter.getIndexAttr(1));
+    rewriter.replaceOpWithNewOp<tensor::InsertSliceOp>(
+        sliceOp, sourceInsertSlice.getSource(), sliceOp.getDest(), offsets,
+        sizes, strides);
+    return success();
+  }
+};
+
 } // namespace
 
 /// Create dispatch.region Ops based on a fusion heuristic.
@@ -971,6 +1040,14 @@ void FormDispatchRegionsPass::runOnOperation() {
                                      fusePadWithProducers};
   if (failed(createFusionGroups(rewriter, funcOp, dominanceInfo, options))) {
     funcOp->emitOpError("failed to create fusion groups");
+    return signalPassFailure();
+  }
+
+  // Post dispatch region formation cleanups.
+  MLIRContext *context = &getContext();
+  RewritePatternSet patterns(context);
+  patterns.insert<FoldSuccessiveTensorInsertSliceOps>(context);
+  if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
     return signalPassFailure();
   }
 }
