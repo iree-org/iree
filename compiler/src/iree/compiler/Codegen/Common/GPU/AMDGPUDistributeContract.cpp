@@ -195,15 +195,21 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
                                SmallVector<int64_t, 2> &rhsOffsets,
                                NestedLayoutAttr lhsLayout,
                                NestedLayoutAttr rhsLayout) const {
-    auto [lhsM, rhsN] = *opDetail.getOperandMNIndex();
-    auto [lhsK, rhsK] = *opDetail.getOperandKIndex();
-    auto [resultM, resultN] = *opDetail.getResultMNIndex();
+
     // resultOffsets contains batch indices into the C/D vector. It is a 2-D
     // index for both M and N. We need to split out for M and N, and add index
     // for K.
-    lhsOffsets[lhsM] = resultOffsets[resultM];
+    for (auto [lhsM, resultM] :
+         llvm::zip_equal(opDetail.lhsMDims, opDetail.outMDims)) {
+      lhsOffsets[lhsM] = resultOffsets[resultM];
+    }
+    for (auto [rhsN, resultN] :
+         llvm::zip_equal(opDetail.rhsNDims, opDetail.outNDims)) {
+      rhsOffsets[rhsN] = resultOffsets[resultN];
+    }
+
+    auto [lhsK, rhsK] = opDetail.getOperandFullKIndex();
     lhsOffsets[lhsK] = kOffset;
-    rhsOffsets[rhsN] = resultOffsets[resultN];
     rhsOffsets[rhsK] = kOffset;
 
     // Now apply permutation on LHS/RHS according to their batch order.
