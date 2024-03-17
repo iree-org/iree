@@ -20,144 +20,148 @@
 
 namespace mlir::iree_compiler::Preprocessing {
 
-namespace {
-/// A pattern to pad statically shaped matmul operands to the next integer
-/// multiple of padSize.
-class PadConvOpFilter : public OpInterfaceRewritePattern<linalg::LinalgOp> {
-public:
-  PadConvOpFilter(MLIRContext *context, SmallVector<GPUMatmulShapeType> &intr,
-                  PatternBenefit benefit = 1)
-      : OpInterfaceRewritePattern(context, benefit), intrinsics(intr) {}
+static Value getPaddedValue(RewriterBase &rewriter, Location loc,
+                            Value padSource, ArrayRef<int64_t> padding) {
+  auto sourceType = padSource.getType().cast<RankedTensorType>();
+  ArrayRef<int64_t> sourceShape = sourceType.getShape();
+  auto paddedShape =
+      llvm::map_to_vector(llvm::zip_equal(sourceShape, padding), [](auto it) {
+        return std::get<0>(it) + std::get<1>(it);
+      });
+  auto paddedResultType =
+      RankedTensorType::get(paddedShape, sourceType.getElementType());
+  Value paddingValue = rewriter.create<arith::ConstantOp>(
+      loc, rewriter.getZeroAttr(sourceType.getElementType()));
+  SmallVector<OpFoldResult> low(4, rewriter.getIndexAttr(0));
+  auto high = llvm::map_to_vector(padding, [&](int64_t v) -> OpFoldResult {
+    return rewriter.getIndexAttr(v);
+  });
+  Value paddedResult = rewriter.create<tensor::PadOp>(
+      loc, paddedResultType, padSource, low, high, paddingValue);
+  return paddedResult;
+}
 
-  LogicalResult matchAndRewrite(linalg::LinalgOp linalgOp,
-                                PatternRewriter &rewriter) const override {
-    // Operation *op = linalgOp.getOperation();
-    if (!isa<linalg::ConvolutionOpInterface>(*linalgOp)) {
-      return failure();
-    }
-    // Check that conv has met conditions to go down mfma.
-    SmallVector<int64_t, 4> bounds = linalgOp.getStaticLoopRanges();
-    FailureOr<mlir::linalg::ConvolutionDimensions> convolutionDims =
-        mlir::linalg::inferConvolutionDims(linalgOp);
-    assert(succeeded(convolutionDims) && "Could not infer contraction dims");
+static void padConvOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
+                      ArrayRef<GPUMatmulShapeType> intrinsics) {
+  // Operation *op = linalgOp.getOperation();
+  if (!isa<linalg::ConvolutionOpInterface>(*linalgOp)) {
+    return;
+  }
+  // Check that conv has met conditions to go down mfma.
+  SmallVector<int64_t, 4> bounds = linalgOp.getStaticLoopRanges();
+  FailureOr<mlir::linalg::ConvolutionDimensions> convolutionDims =
+      mlir::linalg::inferConvolutionDims(linalgOp);
+  assert(succeeded(convolutionDims) && "Could not infer contraction dims");
 
-    if (convolutionDims->outputChannel.size() != 1 ||
-        convolutionDims->inputChannel.size() != 1 ||
-        convolutionDims->filterLoop.size() < 1 ||
-        convolutionDims->outputImage.size() < 1 ||
-        convolutionDims->depth.size() != 0) {
-      return failure();
-    }
-
-    auto isAllOnesList = [](ArrayRef<int64_t> list) {
-      return llvm::all_of(list, [](int64_t i) { return i == 1; });
-    };
-
-    // TODO: Support non-unit strides/dilations.
-    if (!isAllOnesList(convolutionDims->strides) ||
-        !isAllOnesList(convolutionDims->dilations)) {
-      return failure();
-    }
-
-    int64_t mDim = convolutionDims->outputImage.back();
-    int64_t nDim = convolutionDims->outputChannel.front();
-    // TODO: Support NCHW convolutions. This is just a matmul_transpose_a,
-    // however the distribution patterns currently do not support that variant.
-    if (mDim > nDim) {
-      return failure();
-    }
-    int64_t kDim = convolutionDims->inputChannel.front();
-    int64_t mSize = bounds[mDim];
-    int64_t nSize = bounds[nDim];
-    int64_t kSize = bounds[kDim];
-
-    // TODO: Generalize to other dimensions.
-    // Try to search for pad value and check only filter dimension is blocked.
-    int64_t targetPadSize = std::numeric_limits<int64_t>::max();
-    for (auto &intrinsic : intrinsics) {
-      if (mSize % intrinsic.mSize == 0 && nSize % intrinsic.nSize == 0 &&
-          kSize % intrinsic.kSize == 0) {
-        return failure();
-      }
-
-      if (mSize % intrinsic.mSize == 0 && nSize % intrinsic.nSize != 0 &&
-          kSize % intrinsic.kSize == 0) {
-        int64_t candidatetargetPadSize =
-            std::ceil(float(nSize) / intrinsic.nSize) * intrinsic.nSize;
-        if (candidatetargetPadSize < targetPadSize)
-          targetPadSize = candidatetargetPadSize;
-      }
-    }
-    if (targetPadSize == std::numeric_limits<int64_t>::max())
-      return failure();
-    // TODO: Handle other variants.
-    if (!isa<linalg::Conv2DNhwcHwcfOp>(linalgOp))
-      return failure();
-
-    auto createPadding = [&](ArrayRef<int64_t> padding) {
-      SmallVector<OpFoldResult> result;
-      for (auto pad : padding) {
-        result.push_back(rewriter.getI64IntegerAttr(pad));
-      }
-      return result;
-    };
-
-    // Pad filter
-    // TODO: Generalize padding hi,lo creation for different forms.
-    const int kFDim = 3;
-    auto loc = linalgOp.getLoc();
-    Value filter = linalgOp.getDpsInputOperand(1)->get();
-    auto filterType = llvm::dyn_cast<RankedTensorType>(filter.getType());
-    if (!filterType)
-      return failure();
-    SmallVector<int64_t> filterPaddedShape(filterType.getShape());
-    filterPaddedShape[kFDim] = targetPadSize;
-    auto filterPaddedType =
-        RankedTensorType::get(filterPaddedShape, filterType.getElementType());
-    Value filterPaddingValue = rewriter.create<arith::ConstantOp>(
-        loc, rewriter.getZeroAttr(filterType.getElementType()));
-    Value filterPadOp = rewriter.create<tensor::PadOp>(
-        loc, filterPaddedType, filter, createPadding({0, 0, 0, 0}),
-        createPadding({0, 0, 0, targetPadSize - nSize}), filterPaddingValue);
-
-    // Create conv2d with padded filter
-    Value input = linalgOp.getDpsInputOperand(0)->get();
-    Value result = linalgOp.getDpsInitOperand(0)->get();
-    auto resultType = llvm::dyn_cast<RankedTensorType>(result.getType());
-    if (!resultType)
-      return failure();
-    SmallVector<int64_t> newResultShape(resultType.getShape());
-    newResultShape[kFDim] = targetPadSize;
-
-    auto newResultType =
-        RankedTensorType::get(newResultShape, resultType.getElementType());
-    Value resultPaddingValue = rewriter.create<arith::ConstantOp>(
-        loc, rewriter.getZeroAttr(resultType.getElementType()));
-    Value paddedResult = rewriter.create<tensor::PadOp>(
-        loc, newResultType, result, createPadding({0, 0, 0, 0}),
-        createPadding({0, 0, 0, targetPadSize - nSize}), resultPaddingValue);
-    auto paddedConv2dOp =
-        mlir::clone(rewriter, linalgOp, {newResultType},
-                    ArrayRef<Value>{input, filterPadOp, paddedResult});
-    // extract slice.
-    auto zero = rewriter.getI64IntegerAttr(0);
-    auto one = rewriter.getI64IntegerAttr(1);
-    SmallVector<OpFoldResult> offsets, strides, sizes;
-    offsets.assign(4, zero);
-    strides.assign(4, one);
-    auto resultShape = resultType.getShape();
-    sizes = {rewriter.getIndexAttr(resultShape[0]),
-             rewriter.getIndexAttr(resultShape[1]),
-             rewriter.getIndexAttr(resultShape[2]),
-             rewriter.getIndexAttr(resultShape[3])};
-    rewriter.replaceOpWithNewOp<tensor::ExtractSliceOp>(
-        linalgOp, paddedConv2dOp->getResults()[0], offsets, sizes, strides);
-    return success();
+  if (convolutionDims->outputChannel.size() != 1 ||
+      convolutionDims->inputChannel.size() != 1 ||
+      convolutionDims->filterLoop.size() < 1 ||
+      convolutionDims->outputImage.size() < 1 ||
+      convolutionDims->depth.size() != 0) {
+    return;
   }
 
-private:
-  SmallVector<GPUMatmulShapeType> intrinsics;
-};
+  auto isAllOnesList = [](ArrayRef<int64_t> list) {
+    return llvm::all_of(list, [](int64_t i) { return i == 1; });
+  };
+
+  // TODO: Support non-unit strides/dilations.
+  if (!isAllOnesList(convolutionDims->strides) ||
+      !isAllOnesList(convolutionDims->dilations)) {
+    return;
+  }
+
+  int64_t mDim = convolutionDims->outputImage.back();
+  int64_t nDim = convolutionDims->outputChannel.front();
+  // TODO: Support NCHW convolutions. This is just a matmul_transpose_a,
+  // however the distribution patterns currently do not support that variant.
+  if (mDim > nDim) {
+    return;
+  }
+  int64_t kDim = convolutionDims->inputChannel.front();
+  int64_t mSize = bounds[mDim];
+  int64_t nSize = bounds[nDim];
+  int64_t kSize = bounds[kDim];
+
+  // TODO: Generalize to other dimensions.
+  // Try to search for pad value and check only filter dimension is blocked.
+  SmallVector<std::array<int64_t, 3>> mnkPaddingCandidates;
+  for (auto &intrinsic : intrinsics) {
+    std::optional<int64_t> mPadding, nPadding, kPadding;
+    auto getPadding = [](int64_t value, int64_t padTo) {
+      return ((value + padTo - 1) / padTo) * padTo - value;
+    };
+
+    if (mSize % intrinsic.mSize != 0) {
+      mPadding = getPadding(mSize, intrinsic.mSize);
+    }
+
+    if (nSize % intrinsic.nSize != 0) {
+      nPadding = getPadding(nSize, intrinsic.nSize);
+    }
+
+    if (kSize % intrinsic.kSize != 0) {
+      kPadding = getPadding(kSize, intrinsic.kSize);
+    }
+
+    if (!mPadding && !nPadding && !kPadding) {
+      // Some intrinsic matches. Nothing to do.
+      return;
+    }
+    mnkPaddingCandidates.push_back(
+        {mPadding.value_or(0), nPadding.value_or(0), kPadding.value_or(0)});
+  }
+  if (mnkPaddingCandidates.empty()) {
+    return;
+  }
+
+  std::array<int64_t, 3> mnkPadding = mnkPaddingCandidates.front();
+  // TODO: Handle other variants.
+  if (!isa<linalg::Conv2DNhwcHwcfOp>(linalgOp))
+    return;
+
+  Value newInput = linalgOp.getDpsInputOperand(0)->get();
+  Value newFilter = linalgOp.getDpsInputOperand(1)->get();
+  Value newOuts = linalgOp.getDpsInitOperand(0)->get();
+
+  Location loc = linalgOp.getLoc();
+  int64_t mPadding = mnkPadding[0];
+  int64_t nPadding = mnkPadding[1];
+  int64_t kPadding = mnkPadding[2];
+  if (mPadding != 0 || kPadding != 0) {
+    // For NHWC, the m-padding is for W and k-padding is for C
+    newInput =
+        getPaddedValue(rewriter, loc, newInput, {0, 0, mPadding, kPadding});
+  }
+  if (nPadding != 0 || kPadding != 0) {
+    // For HWCF, the n-padding is for F and k-padding is for C
+    newFilter =
+        getPaddedValue(rewriter, loc, newFilter, {0, 0, kPadding, nPadding});
+  }
+  if (mPadding != 0 || nPadding != 0) {
+    // For output, the m-padding is for W and k-padding is for F
+    newOuts =
+        getPaddedValue(rewriter, loc, newOuts, {0, 0, mPadding, nPadding});
+  }
+
+  auto paddedConv2dOp =
+      mlir::clone(rewriter, linalgOp, {newOuts.getType()},
+                  ArrayRef<Value>{newInput, newFilter, newOuts});
+  // extract slice.
+  auto zero = rewriter.getI64IntegerAttr(0);
+  auto one = rewriter.getI64IntegerAttr(1);
+  SmallVector<OpFoldResult> offsets(4, zero), strides(4, one), sizes;
+  auto resultType = linalgOp->getResult(0).getType().cast<RankedTensorType>();
+  auto resultShape = resultType.getShape();
+  sizes = {rewriter.getIndexAttr(resultShape[0]),
+           rewriter.getIndexAttr(resultShape[1]),
+           rewriter.getIndexAttr(resultShape[2]),
+           rewriter.getIndexAttr(resultShape[3])};
+  rewriter.replaceOpWithNewOp<tensor::ExtractSliceOp>(
+      linalgOp, paddedConv2dOp->getResults()[0], offsets, sizes, strides);
+}
+
+namespace {
 
 class PadToIntrinsicsPass : public PadToIntrinsicsBase<PadToIntrinsicsPass> {
 public:
@@ -186,10 +190,16 @@ public:
       auto [aType, bType, cType] = mma.getABCElementTypes();
       intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType);
     }
-    patterns.insert<PadConvOpFilter>(context, intrinsics);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
-      return signalPassFailure();
+
+    SmallVector<linalg::LinalgOp> targetConvs;
+    funcOp->walk([&](linalg::Conv2DNhwcHwcfOp convOp) {
+      targetConvs.push_back(cast<linalg::LinalgOp>(convOp.getOperation()));
+    });
+
+    IRRewriter rewriter(context);
+    for (auto convOp : llvm::make_early_inc_range(targetConvs)) {
+      rewriter.setInsertionPoint(convOp);
+      padConvOp(rewriter, convOp, intrinsics);
     }
   }
 };
