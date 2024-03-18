@@ -14,6 +14,7 @@
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/Linker/Linker.h"
 #include "llvm/Support/FileUtilities.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/Program.h"
 #include "llvm/Support/SourceMgr.h"
@@ -24,33 +25,16 @@
 
 namespace mlir::iree_compiler::IREE::HAL {
 
-//===========Link LLVM Module to ROCDL Start===================/
-// Inspiration of code from this section comes from XLA Kernel Gen Project
-// https://github.com/openxla/xla/blob/main/xla/service/gpu/llvm_gpu_backend/gpu_backend_lib.cc
-
-bool couldNeedDeviceBitcode(const llvm::Module &module) {
-  for (const llvm::Function &function : module.functions()) {
-    // The list of prefixes should be in sync with library functions used in
-    // target_util.cc.
-    if (!function.isIntrinsic() && function.isDeclaration() &&
-        (function.getName().starts_with("__ocml_") ||
-         function.getName().starts_with("__ockl_"))) {
-      return true;
-    }
-  }
-  return false;
-}
-
-std::unique_ptr<llvm::Module> loadIRModule(Location loc,
-                                           const std::string &filename,
-                                           llvm::LLVMContext *llvm_context) {
+static std::unique_ptr<llvm::Module>
+loadIRModule(Location loc, const std::string &filename,
+             llvm::LLVMContext *llvm_context) {
   llvm::SMDiagnostic diagnostic;
   std::unique_ptr<llvm::Module> module(
       llvm::parseIRFile(llvm::StringRef(filename.data(), filename.size()),
                         diagnostic, *llvm_context));
 
   if (!module) {
-    mlir::emitError(loc) << "error loading ROCDL LLVM module: "
+    mlir::emitError(loc) << "error loading HIP LLVM module: "
                          << diagnostic.getFilename().str() << ":"
                          << diagnostic.getLineNo() << ":"
                          << diagnostic.getColumnNo() << ": "
@@ -61,26 +45,27 @@ std::unique_ptr<llvm::Module> loadIRModule(Location loc,
   return module;
 }
 
-LogicalResult
-linkWithBitcodeVector(Location loc, llvm::Module *module,
-                      const std::vector<std::string> &bitcode_path_vector) {
+static LogicalResult linkWithBitcodeFiles(Location loc, llvm::Module *module,
+                                          ArrayRef<std::string> bitcodePaths) {
+  if (bitcodePaths.empty())
+    return success();
   llvm::Linker linker(*module);
-
-  for (auto &bitcode_path : bitcode_path_vector) {
-    if (!(llvm::sys::fs::exists(bitcode_path)))
+  for (auto &bitcodePath : bitcodePaths) {
+    if (!llvm::sys::fs::exists(bitcodePath)) {
       return mlir::emitError(loc)
              << "AMD bitcode module is required by this module but was "
                 "not found at "
-             << bitcode_path;
-    std::unique_ptr<llvm::Module> bitcode_module =
-        loadIRModule(loc, bitcode_path, &module->getContext());
-    if (!bitcode_module)
+             << bitcodePath;
+    }
+    std::unique_ptr<llvm::Module> bitcodeModule =
+        loadIRModule(loc, bitcodePath, &module->getContext());
+    if (!bitcodeModule)
       return failure();
     // Ignore the data layout of the module we're importing. This avoids a
     // warning from the linker.
-    bitcode_module->setDataLayout(module->getDataLayout());
+    bitcodeModule->setDataLayout(module->getDataLayout());
     if (linker.linkInModule(
-            std::move(bitcode_module), llvm::Linker::Flags::LinkOnlyNeeded,
+            std::move(bitcodeModule), llvm::Linker::Flags::LinkOnlyNeeded,
             [](llvm::Module &M, const llvm::StringSet<> &GVS) {
               llvm::internalizeModule(M, [&GVS](const llvm::GlobalValue &GV) {
                 return !GV.hasName() || (GVS.count(GV.getName()) == 0);
@@ -92,10 +77,10 @@ linkWithBitcodeVector(Location loc, llvm::Module *module,
   return success();
 }
 
-LogicalResult linkPathBitcodeFiles(Location loc, llvm::Linker &linker,
-                                   unsigned linkerFlags, StringRef path,
-                                   llvm::TargetMachine &targetMachine,
-                                   llvm::LLVMContext &context) {
+static LogicalResult linkBitcodeFile(Location loc, llvm::Linker &linker,
+                                     unsigned linkerFlags, StringRef path,
+                                     llvm::TargetMachine &targetMachine,
+                                     llvm::LLVMContext &context) {
   auto bitcodeBufferRef = llvm::MemoryBuffer::getFile(path);
   if (auto ec = bitcodeBufferRef.getError()) {
     return mlir::emitError(loc) << "failed reading user bitcode file `" << path
@@ -134,24 +119,9 @@ LogicalResult linkPathBitcodeFiles(Location loc, llvm::Linker &linker,
   return success();
 }
 
-static std::vector<std::string> getROCDLPaths(std::string targetChip,
-                                              std::string bitCodeDir) {
-  // AMDGPU bitcodes.
-  static const std::vector<std::string> rocdlFilenames({"ocml.bc", "ockl.bc"});
-
-  // Construct full path to ROCDL bitcode libraries.
-  std::vector<std::string> result;
-  std::string app = "/";
-  for (auto &filename : rocdlFilenames) {
-    result.push_back(bitCodeDir + app + filename);
-  }
-  return result;
-}
-
 static std::vector<std::string> getUkernelPaths(StringRef enabledUkernelsStr,
                                                 StringRef targetChip,
-                                                StringRef bitCodeDir) {
-  // AMD bitcodes.
+                                                StringRef bitcodePath) {
   std::vector<std::string> selectedUkernelNames;
   if (enabledUkernelsStr == "all") {
     const char *allUkernelNames[] = {"argmax"};
@@ -173,7 +143,7 @@ static std::vector<std::string> getUkernelPaths(StringRef enabledUkernelsStr,
   for (auto &kernelName : selectedUkernelNames) {
     std::string filename =
         "rocm_" + kernelName + "_ukernel_" + targetChip.str();
-    result.push_back(bitCodeDir.str() + app + filename + ".bc");
+    result.push_back(bitcodePath.str() + app + filename + ".bc");
   }
   return result;
 }
@@ -191,13 +161,13 @@ static void overridePlatformGlobal(llvm::Module *module, StringRef globalName,
       APInt(globalValue->getValueType()->getIntegerBitWidth(), newValue)));
 }
 
-static LogicalResult linkModuleWithGlobal(Location loc, llvm::Module *module,
-                                          std::string &targetChip) {
+LogicalResult setHIPGlobals(Location loc, llvm::Module *module,
+                            StringRef targetChip) {
   // Link target chip ISA version as global.
   const int kLenOfChipPrefix = 3;
-  std::string chipId = targetChip.substr(kLenOfChipPrefix);
+  auto chipId = targetChip.substr(kLenOfChipPrefix);
   // i.e gfx90a -> 9000 series.
-  int chipArch = stoi(chipId.substr(0, chipId.length() - 1)) * 100;
+  int chipArch = stoi(chipId.substr(0, chipId.size() - 1).str()) * 100;
   // Oldest GFX arch supported is gfx60x.
   if (chipArch < 6000)
     return failure();
@@ -207,8 +177,8 @@ static LogicalResult linkModuleWithGlobal(Location loc, llvm::Module *module,
   // Get chip code from suffix. i.e gfx1103 -> `3`.
   // gfx90a -> `a` == `10`.
   // gfx90c -> `c` == `12`.
-  std::string chipSuffix = chipId.substr(chipId.length() - 1);
-  uint32_t chipCode;
+  auto chipSuffix = chipId.substr(chipId.size() - 1);
+  uint32_t chipCode = 0;
   if (chipSuffix == "a") {
     chipCode = chipArch + 10;
   } else if (chipSuffix == "c") {
@@ -218,7 +188,7 @@ static LogicalResult linkModuleWithGlobal(Location loc, llvm::Module *module,
       return mlir::emitError(loc)
              << "error linking module with globals: unrecognized chip suffix '"
              << chipSuffix << "' for " << targetChip;
-    chipCode = chipArch + stoi(chipSuffix);
+    chipCode = chipArch + stoi(chipSuffix.str());
   }
   auto *int32Type = llvm::Type::getInt32Ty(module->getContext());
   overridePlatformGlobal(module, "__oclc_ISA_version", chipCode, int32Type);
@@ -235,30 +205,45 @@ static LogicalResult linkModuleWithGlobal(Location loc, llvm::Module *module,
     overridePlatformGlobal(module, globalParam.first, globalParam.second,
                            boolType);
   }
+
   return success();
 }
 
-// Links ROCm-Device-Libs into the given module if the module needs it.
-LogicalResult linkROCDLIfNecessary(Location loc, llvm::Module *module,
-                                   std::string targetChip,
-                                   std::string bitCodeDir) {
-  if (!couldNeedDeviceBitcode(*module))
-    return success();
-  if (!succeeded(HAL::linkWithBitcodeVector(
-          loc, module, getROCDLPaths(targetChip, bitCodeDir))))
-    return failure();
-  if (!succeeded(HAL::linkModuleWithGlobal(loc, module, targetChip)))
-    return failure();
-  return success();
+LogicalResult linkHIPBitcodeIfNeeded(Location loc, llvm::Module *module,
+                                     StringRef targetChip,
+                                     StringRef bitcodePath) {
+  bool usesOCML = false;
+  bool usesOCKL = false;
+  for (const llvm::Function &function : module->functions()) {
+    if (!function.isIntrinsic() && function.isDeclaration()) {
+      auto functionName = function.getName();
+      if (functionName.starts_with("__ocml_"))
+        usesOCML = true;
+      else if (functionName.starts_with("__ockl_"))
+        usesOCKL = true;
+    }
+  }
+
+  // Link externally-provided bitcode files when used.
+  SmallVector<std::string> bitcodePaths;
+  if (usesOCML) {
+    bitcodePaths.push_back(
+        (bitcodePath + llvm::sys::path::get_separator() + "ocml.bc").str());
+  }
+  if (usesOCKL) {
+    bitcodePaths.push_back(
+        (bitcodePath + llvm::sys::path::get_separator() + "ockl.bc").str());
+  }
+  return linkWithBitcodeFiles(loc, module, bitcodePaths);
 }
 
-// Links optimized Ukernel bitcodes into the given module if the module needs
-// it.
-LogicalResult linkUkernelBCFiles(Location loc, llvm::Module *module,
-                                 StringRef enabledUkernelsStr,
-                                 StringRef targetChip, StringRef bitCodeDir,
-                                 unsigned linkerFlags,
-                                 llvm::TargetMachine &targetMachine) {
+// Links optimized Ukernel bitcode into the given module if the module needs it.
+LogicalResult linkUkernelBitcodeFiles(Location loc, llvm::Module *module,
+                                      StringRef enabledUkernelsStr,
+                                      StringRef targetChip,
+                                      StringRef bitcodePath,
+                                      unsigned linkerFlags,
+                                      llvm::TargetMachine &targetMachine) {
   // Early exit if Ukernel not supported on target chip.
   if (!iree_compiler::hasUkernelSupportedRocmArch(targetChip)) {
     return mlir::emitError(loc)
@@ -266,20 +251,17 @@ LogicalResult linkUkernelBCFiles(Location loc, llvm::Module *module,
            << "' not supported on target chip: " << targetChip;
   }
   std::vector<std::string> ukernelPaths =
-      getUkernelPaths(enabledUkernelsStr, targetChip, bitCodeDir);
+      getUkernelPaths(enabledUkernelsStr, targetChip, bitcodePath);
   llvm::Linker linker(*module);
   for (auto &path : ukernelPaths) {
-    if (failed(linkPathBitcodeFiles(loc, linker, linkerFlags, StringRef(path),
-                                    targetMachine, module->getContext())))
+    if (failed(linkBitcodeFile(loc, linker, linkerFlags, StringRef(path),
+                               targetMachine, module->getContext())))
       return failure();
   }
 
   return success();
 }
 
-//===========Link LLVM Module to ROCDL End===================/
-
-//=====================Create HSACO Begin=============//
 // Link object file using lld lnker to generate code object
 // Inspiration from this section comes from LLVM-PROJECT-MLIR by
 // ROCmSoftwarePlatform
@@ -311,7 +293,6 @@ std::string createHsaco(Location loc, const std::string isa, StringRef name) {
   llvm::FileRemover cleanupHsaco(tempHsacoFilename);
 
   // Invoke lld. Expect a true return value from lld.
-  // Searching for LLD
   const SmallVector<std::string> &toolNames{"iree-lld", "lld"};
   std::string lldProgram = findTool(toolNames);
   if (lldProgram.empty()) {
@@ -328,7 +309,7 @@ std::string createHsaco(Location loc, const std::string isa, StringRef name) {
       tempHsacoFilename.str(),
   };
 
-  // Executing LLD
+  // Execute LLD.
   std::string errorMessage;
   int lldResult = llvm::sys::ExecuteAndWait(
       unescapeCommandLineComponent(lldProgram),
@@ -350,6 +331,5 @@ std::string createHsaco(Location loc, const std::string isa, StringRef name) {
                        hsacoFile->getBuffer().end());
   return strHSACO;
 }
-//==============Create HSACO End=============//
 
 } // namespace mlir::iree_compiler::IREE::HAL

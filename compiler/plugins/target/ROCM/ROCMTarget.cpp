@@ -69,16 +69,14 @@ public:
     static llvm::cl::OptionCategory category("ROCM HAL Target");
     binder.opt<std::string>("iree-rocm-target-chip", targetChip,
                             llvm::cl::cat(category),
-                            llvm::cl::desc("ROCm target Chip"));
-    binder.opt<bool>("iree-rocm-link-bc", linkBitcode, llvm::cl::cat(category),
-                     llvm::cl::desc("Whether to try Linking to AMD Bitcodes"));
+                            llvm::cl::desc("ROCm target chip."));
     binder.opt<std::string>("iree-rocm-bc-dir", bitcodeDirectory,
                             llvm::cl::cat(category),
-                            llvm::cl::desc("Directory of ROCM Bitcode"));
+                            llvm::cl::desc("Directory of ROCM Bitcode."));
     binder.opt<int>("iree-rocm-waves-per-eu", wavesPerEu,
                     llvm::cl::cat(category),
                     llvm::cl::desc("Optimization hint specifying minimum "
-                                   "number of waves per execution unit"));
+                                   "number of waves per execution unit."));
     binder.opt<std::string>(
         "iree-rocm-enable-ukernels", enableROCMUkernels,
         llvm::cl::cat(category),
@@ -206,11 +204,12 @@ public:
 
     addConfig("target_arch", b.getStringAttr(options.targetChip));
     addConfig("ukernels", b.getStringAttr(options.enableROCMUkernels));
+    if (options.wavesPerEu > 0)
+      addConfig("waves_per_eu", b.getI64IntegerAttr(options.wavesPerEu));
 
     ArrayAttr mmaAttrs = getROCMSupportedMmaAttrs(context, options.targetChip);
-    if (mmaAttrs) {
+    if (mmaAttrs)
       addConfig("mma_intrinsics", mmaAttrs);
-    }
 
     return b.getAttr<IREE::HAL::ExecutableTargetAttr>(
         b.getStringAttr("rocm"), b.getStringAttr("rocm-hsaco-fb"),
@@ -288,10 +287,11 @@ public:
   LogicalResult serializeExecutable(const SerializationOptions &serOptions,
                                     IREE::HAL::ExecutableVariantOp variantOp,
                                     OpBuilder &executableBuilder) override {
-    // Perform the translation in a separate context to avoid any
-    // multi-threading issues.
-    llvm::LLVMContext context;
-    const std::string &bitcodeDirectory = options.getBitcodeDirectory();
+    ModuleOp innerModuleOp = variantOp.getInnerModule();
+    auto targetAttr = variantOp.getTargetAttr();
+    StringRef targetArch = options.targetChip;
+    if (auto attr = getConfigStringAttr(targetAttr, "target_arch"))
+      targetArch = attr->getValue();
 
     // We name our files after the executable name so that they are easy to
     // track both during compilation (logs/artifacts/etc), as outputs (final
@@ -300,43 +300,25 @@ public:
     auto libraryName =
         variantOp->getParentOfType<IREE::HAL::ExecutableOp>().getName().str();
 
-    ModuleOp innerModuleOp = variantOp.getInnerModule();
-
-    auto llvmModule =
-        mlir::translateModuleToLLVMIR(innerModuleOp, context, libraryName);
-    if (!llvmModule) {
-      return variantOp.emitError() << "failed to translate the MLIR LLVM "
-                                      "dialect to the native llvm::Module";
-    }
-
     // Collect all the entry point names.
     SmallVector<IREE::HAL::ExecutableExportOp> exportOps;
     llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOpMap;
-    for (auto op : variantOp.getExportOps()) {
-      exportOps.push_back(op);
-      exportOpMap[op.getSymName()] = op;
-    }
     std::vector<std::array<int32_t, 3>> workgroupSizes;
     SmallVector<uint32_t> workgroupLocalMemories;
     int32_t subgroupSize = 64;
-    StringRef subTarget = options.targetChip;
-    StringRef GFX9("gfx9");
-    for (auto func : innerModuleOp.getOps<LLVM::LLVMFuncOp>()) {
-      int32_t flatWgSize = 1;
-      auto *llvmFunc = llvmModule->getFunction(func.getName());
-      if (llvmFunc->isDeclaration())
-        continue;
+    for (auto exportOp : variantOp.getExportOps()) {
+      exportOps.push_back(exportOp);
+      exportOpMap[exportOp.getSymName()] = exportOp;
+
       std::array<int32_t, 3> workgroupSize;
-      auto exportOp = exportOpMap[func.getName()];
       if (std::optional<ArrayAttr> workgroupSizeAttr =
               exportOp.getWorkgroupSize()) {
-        for (auto it : llvm::enumerate(workgroupSizeAttr.value())) {
+        for (auto it : llvm::enumerate(workgroupSizeAttr.value()))
           workgroupSize[it.index()] = it.value().cast<IntegerAttr>().getInt();
-          flatWgSize *= it.value().cast<IntegerAttr>().getInt();
-        }
       } else {
         workgroupSize = {1, 1, 1};
       }
+      workgroupSizes.push_back(workgroupSize);
 
       if (auto setSubgroupSize = getSubgroupSize(exportOp)) {
         if (subgroupSize != 32 && subgroupSize != 64) {
@@ -346,132 +328,206 @@ public:
         subgroupSize = *setSubgroupSize;
       }
 
-      int64_t wavesPerEu = options.wavesPerEu;
-      IREE::Codegen::TranslationInfoAttr translationInfo =
-          getTranslationInfo(exportOp);
-      if (auto translationConfig = translationInfo.getConfiguration()) {
-        if (auto attr = dyn_cast_or_null<IntegerAttr>(
-                translationConfig.get("amdgpu-waves-per-eu"))) {
-          wavesPerEu = attr.getValue().getSExtValue();
-        }
-      }
-
-      workgroupSizes.push_back(workgroupSize);
       uint32_t workgroupLocalMemory = 0;
       if (auto workgroupLocalMemoryAttr = exportOp.getWorkgroupLocalMemory()) {
         workgroupLocalMemory = workgroupLocalMemoryAttr->getSExtValue();
       }
       workgroupLocalMemories.push_back(workgroupLocalMemory);
-      // For GPU kernels,
-      // 1. Insert AMDGPU_KERNEL calling convention.
-      // 2. Insert amdgpu-flat-workgroup-size(1, 256) attribute.
-      // 3. Insert amdgpu-implicitarg-num-bytes=56 (which must be set on OpenCL
-      // and HIP kernels per Clang)
-      llvmFunc->setCallingConv(llvm::CallingConv::AMDGPU_KERNEL);
-      std::string wgSizeRange = std::string("1, ") + std::to_string(flatWgSize);
-      llvmFunc->addFnAttr("amdgpu-flat-work-group-size", wgSizeRange);
-      if (wavesPerEu > 0)
-        llvmFunc->addFnAttr("amdgpu-waves-per-eu", std::to_string(wavesPerEu));
-      if (subTarget.starts_with(GFX9))
-        addPreloadKernArgHint(llvmFunc);
     }
 
-    std::unique_ptr<llvm::TargetMachine> targetMachine;
-    {
-      llvm::Triple triple("amdgcn-amd-amdhsa");
-      std::string error;
-      const llvm::Target *target =
-          llvm::TargetRegistry::lookupTarget("", triple, error);
-      if (target == nullptr) {
-        return variantOp.emitError() << "cannot initialize target triple";
+    std::string targetHSACO;
+    if (variantOp.isExternal()) {
+      if (!variantOp.getObjects().has_value()) {
+        return variantOp.emitOpError()
+               << "no objects defined for external variant";
+      } else if (variantOp.getObjects()->getValue().size() != 1) {
+        // For now we assume there will be exactly one object file.
+        // In the future we will want to perform a linking step here and ideally
+        // support _also_ linking in the codegen results.
+        return variantOp.emitOpError() << "only one object reference is "
+                                          "supported for external variants";
       }
-      llvm::TargetOptions opt;
-      opt.AllowFPOpFusion = llvm::FPOpFusion::Fast;
-      opt.UnsafeFPMath = false;
-      opt.NoInfsFPMath = false;
-      opt.NoNaNsFPMath = true;
-      std::string features;
-      if (subTarget.starts_with(GFX9)) {
-        features = "+sramecc,-xnack";
+
+      // Read the HSACO from the object file.
+      auto objectAttr = llvm::cast<IREE::HAL::ExecutableObjectAttr>(
+          variantOp.getObjects()->getValue().front());
+      if (auto data = objectAttr.loadData()) {
+        targetHSACO = data.value();
       } else {
-        // GFX 10 or 11.
-        if (subgroupSize == 32)
-          features = "+wavefrontsize32";
-        if (subgroupSize == 64)
-          features = "+wavefrontsize64";
+        return variantOp.emitOpError()
+               << "object file could not be loaded: " << objectAttr;
+      }
+    } else {
+      // Perform the translation in a separate context to avoid any
+      // multi-threading issues.
+      llvm::LLVMContext context;
+
+      auto llvmModule =
+          mlir::translateModuleToLLVMIR(innerModuleOp, context, libraryName);
+      if (!llvmModule) {
+        return variantOp.emitError() << "failed to translate the MLIR LLVM "
+                                        "dialect to the native llvm::Module";
       }
 
-      targetMachine.reset(target->createTargetMachine(
-          triple.str(), options.targetChip, features, opt,
-          llvm::Reloc::Model::PIC_, std::nullopt,
-          llvm::CodeGenOptLevel::Aggressive));
+      for (auto func : innerModuleOp.getOps<LLVM::LLVMFuncOp>()) {
+        int32_t flatWgSize = 1;
+        auto *llvmFunc = llvmModule->getFunction(func.getName());
+        if (llvmFunc->isDeclaration())
+          continue;
+        auto exportOp = exportOpMap[func.getName()];
+        if (auto workgroupSizeAttr = exportOp.getWorkgroupSize()) {
+          for (auto it : llvm::enumerate(workgroupSizeAttr.value())) {
+            flatWgSize *= it.value().cast<IntegerAttr>().getInt();
+          }
+        }
 
-      if (targetMachine == nullptr) {
-        return variantOp.emitError() << "cannot initialize target machine";
+        // Try to get waves-per-eu from the export-specific translation info in
+        // cases where codegen decides to override the value.
+        // Otherwise, fallback to the default option.
+        int64_t wavesPerEu = 0;
+        IREE::Codegen::TranslationInfoAttr translationInfo =
+            getTranslationInfo(exportOp);
+        if (auto translationConfig = translationInfo.getConfiguration()) {
+          if (auto attr =
+                  translationConfig.getAs<IntegerAttr>("waves_per_eu")) {
+            wavesPerEu = attr.getValue().getSExtValue();
+          }
+        }
+        if (wavesPerEu == 0) {
+          if (auto attr = getConfigIntegerAttr(targetAttr, "waves_per_eu"))
+            wavesPerEu = attr->getValue().getSExtValue();
+        }
+
+        // For GPU kernels,
+        // 1. Insert AMDGPU_KERNEL calling convention.
+        // 2. Insert amdgpu-flat-workgroup-size(1, 256) attribute.
+        // 3. Insert amdgpu-implicitarg-num-bytes=56 (which must be set on
+        // OpenCL and HIP kernels per Clang)
+        llvmFunc->setCallingConv(llvm::CallingConv::AMDGPU_KERNEL);
+        std::string wgSizeRange =
+            std::string("1, ") + std::to_string(flatWgSize);
+        llvmFunc->addFnAttr("amdgpu-flat-work-group-size", wgSizeRange);
+        if (wavesPerEu > 0) {
+          llvmFunc->addFnAttr("amdgpu-waves-per-eu",
+                              std::to_string(wavesPerEu));
+        }
+        if (targetArch.starts_with("gfx9"))
+          addPreloadKernArgHint(llvmFunc);
       }
-    }
 
-    llvmModule->setDataLayout(targetMachine->createDataLayout());
+      std::unique_ptr<llvm::TargetMachine> targetMachine;
+      {
+        llvm::Triple triple("amdgcn-amd-amdhsa");
+        std::string error;
+        const llvm::Target *target =
+            llvm::TargetRegistry::lookupTarget("", triple, error);
+        if (target == nullptr) {
+          return variantOp.emitError() << "cannot initialize target triple";
+        }
+        llvm::TargetOptions opt;
+        opt.AllowFPOpFusion = llvm::FPOpFusion::Fast;
+        opt.UnsafeFPMath = false;
+        opt.NoInfsFPMath = false;
+        opt.NoNaNsFPMath = true;
+        std::string features;
+        if (targetArch.starts_with("gfx9")) {
+          features = "+sramecc,-xnack";
+        } else {
+          // GFX 10 or 11.
+          if (subgroupSize == 32)
+            features = "+wavefrontsize32";
+          if (subgroupSize == 64)
+            features = "+wavefrontsize64";
+        }
 
-    for (llvm::Function &f : llvmModule->functions())
-      f.addFnAttr(llvm::Attribute::AlwaysInline);
+        targetMachine.reset(target->createTargetMachine(
+            triple.str(), targetArch, features, opt, llvm::Reloc::Model::PIC_,
+            std::nullopt, llvm::CodeGenOptLevel::Aggressive));
 
-    // Link user modules and libdevice (if required).
-    // Note that linking order matters:
-    llvm::Linker linker(*llvmModule);
-    if (failed(linkCmdlineBitcodeFiles(
-            variantOp.getLoc(), linker, llvm::Linker::OverrideFromSrc,
-            *targetMachine, llvmModule->getContext()))) {
-      return failure();
-    }
+        if (targetMachine == nullptr) {
+          return variantOp.emitError() << "cannot initialize target machine";
+        }
+      }
 
-    if (!options.enableROCMUkernels.empty() &&
-        options.enableROCMUkernels != "none") {
-      auto enabledUkernelsStr = StringRef(options.enableROCMUkernels);
-      if (failed(linkUkernelBCFiles(
-              variantOp.getLoc(), llvmModule.get(), enabledUkernelsStr,
-              options.targetChip, bitcodeDirectory,
-              llvm::Linker::OverrideFromSrc, *targetMachine)))
+      llvmModule->setDataLayout(targetMachine->createDataLayout());
+
+      for (llvm::Function &f : llvmModule->functions())
+        f.addFnAttr(llvm::Attribute::AlwaysInline);
+
+      // Link user-provided modules.
+      llvm::Linker linker(*llvmModule);
+      if (failed(linkCmdlineBitcodeFiles(
+              variantOp.getLoc(), linker, llvm::Linker::OverrideFromSrc,
+              *targetMachine, llvmModule->getContext()))) {
         return failure();
-    }
-    // Link module to Device Library
-    if (options.linkBitcode) {
+      }
+
+      // Link module to any enabled ukernels.
+      const std::string &bitcodeDirectory = options.getBitcodeDirectory();
+      StringRef enabledUkernels;
+      if (auto attr = getConfigStringAttr(targetAttr, "ukernels"))
+        enabledUkernels = attr->getValue();
+      if (!enabledUkernels.empty() && enabledUkernels != "none") {
+        if (failed(linkUkernelBitcodeFiles(
+                variantOp.getLoc(), llvmModule.get(), enabledUkernels,
+                targetArch, bitcodeDirectory, llvm::Linker::OverrideFromSrc,
+                *targetMachine))) {
+          return failure();
+        }
+      }
+
+      // Link module to HIP device library.
       if (bitcodeDirectory.empty()) {
         return variantOp.emitError()
                << "cannot find ROCM bitcode files. Check your installation "
-                  "consistency and in the worst case, set --iree-rocm-bc-dir= "
-                  "to an explicit location on your system.";
+                  "consistency and in the worst case, set "
+                  "--iree-rocm-bc-dir= to a path on your system.";
       }
-      if (failed(linkROCDLIfNecessary(variantOp.getLoc(), llvmModule.get(),
-                                      options.targetChip, bitcodeDirectory)))
+      if (failed(linkHIPBitcodeIfNeeded(variantOp.getLoc(), llvmModule.get(),
+                                        targetArch, bitcodeDirectory))) {
         return failure();
-    }
-    if (!serOptions.dumpIntermediatesPath.empty()) {
-      dumpModuleToPath(serOptions.dumpIntermediatesPath,
-                       serOptions.dumpBaseName, variantOp.getName(),
-                       ".linked.ll", *llvmModule);
-    }
-    // Add Optimize module
-    optimizeModule(*llvmModule, *targetMachine);
-    // Store optimized ll.
-    if (!serOptions.dumpIntermediatesPath.empty()) {
-      dumpModuleToPath(serOptions.dumpIntermediatesPath,
-                       serOptions.dumpBaseName, variantOp.getName(),
-                       ".optimized.ll", *llvmModule);
-    }
-    // Serialize hsaco kernel into the binary that we will embed in the
-    // final FlatBuffer.
-    std::unique_ptr<llvm::Module> moduleCopy;
-    if (!serOptions.dumpIntermediatesPath.empty()) {
-      moduleCopy = llvm::CloneModule(*llvmModule);
-      if (!moduleCopy)
-        llvm::errs() << "Error: cloning LLVM IR failed\n";
-    }
-    std::string targetObj = translateModuleToObj(*llvmModule, *targetMachine);
-    std::string targetHSACO =
-        createHsaco(variantOp.getLoc(), targetObj, libraryName);
-    if (targetHSACO.empty()) {
-      return failure();
+      }
+
+      // Sets HIP platform globals based on the target architecture.
+      if (failed(setHIPGlobals(variantOp.getLoc(), llvmModule.get(),
+                               targetArch))) {
+        return failure();
+      }
+
+      if (!serOptions.dumpIntermediatesPath.empty()) {
+        dumpModuleToPath(serOptions.dumpIntermediatesPath,
+                         serOptions.dumpBaseName, variantOp.getName(),
+                         ".linked.ll", *llvmModule);
+      }
+
+      // Run LLVM optimization passes.
+      optimizeModule(*llvmModule, *targetMachine);
+      if (!serOptions.dumpIntermediatesPath.empty()) {
+        dumpModuleToPath(serOptions.dumpIntermediatesPath,
+                         serOptions.dumpBaseName, variantOp.getName(),
+                         ".optimized.ll", *llvmModule);
+      }
+
+      // Dump the assembly output.
+      if (!serOptions.dumpIntermediatesPath.empty()) {
+        auto moduleCopy = llvm::CloneModule(*llvmModule);
+        if (!moduleCopy) {
+          llvm::errs() << "Error: cloning LLVM IR failed\n";
+          return failure();
+        }
+        std::string targetISA =
+            translateModuleToISA(*moduleCopy.get(), *targetMachine);
+        dumpDataToPath(serOptions.dumpIntermediatesPath,
+                       serOptions.dumpBaseName, variantOp.getName(), ".rocmasm",
+                       targetISA);
+      }
+
+      // Serialize hsaco kernel into the binary that we will embed in the
+      // final FlatBuffer.
+      std::string targetObj = translateModuleToObj(*llvmModule, *targetMachine);
+      targetHSACO = createHsaco(variantOp.getLoc(), targetObj, libraryName);
+      if (targetHSACO.empty())
+        return failure();
     }
 
     if (!serOptions.dumpBinariesPath.empty()) {
@@ -597,13 +653,6 @@ public:
         variantOp.getLoc(), variantOp.getSymName(),
         variantOp.getTarget().getFormat(),
         builder.getBufferAttr(executableBuilder.getContext()));
-
-    if (!serOptions.dumpIntermediatesPath.empty()) {
-      std::string targetISA =
-          translateModuleToISA(*moduleCopy.get(), *targetMachine);
-      dumpDataToPath(serOptions.dumpIntermediatesPath, serOptions.dumpBaseName,
-                     variantOp.getName(), ".rocmasm", targetISA);
-    }
 
     return success();
   }
