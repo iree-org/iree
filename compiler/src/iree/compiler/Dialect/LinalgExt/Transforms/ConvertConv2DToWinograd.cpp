@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/WinogradConstants.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -25,6 +26,8 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
+#define DEBUG_TYPE "iree-linalg-ext-convert-conv2d-to-winograd"
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
 
@@ -154,7 +157,9 @@ namespace {
 template <typename ConvOp>
 class FoldWinogradFilterTransform final : public OpRewritePattern<ConvOp> {
 public:
-  using OpRewritePattern<ConvOp>::OpRewritePattern;
+  FoldWinogradFilterTransform(MLIRContext *context, SymbolTable symbolTable,
+                              PatternBenefit benefit = 1)
+      : OpRewritePattern<ConvOp>(context, benefit), symbolTable(symbolTable) {}
 
   LogicalResult matchAndRewrite(ConvOp convOp,
                                 PatternRewriter &rewriter) const override {
@@ -168,18 +173,18 @@ public:
     Value kernel = convOp.getInputs()[1];
     auto kernelType = kernel.getType().cast<ShapedType>();
     if (!kernelType) {
-      llvm::dbgs() << "kernelType\n";
+      LLVM_DEBUG(llvm::dbgs() << "kernelType\n");
       return failure();
     }
     ArrayRef<int64_t> kernelShape = kernelType.getShape();
     if (kernelShape.size() != 4) {
-      llvm::dbgs() << "kernelShape.size\n";
+      LLVM_DEBUG(llvm::dbgs() << "kernelShape.size\n");
       return failure();
     }
     const int64_t kh = isNchw ? kernelShape[2] : kernelShape[0];
     const int64_t kw = isNchw ? kernelShape[3] : kernelShape[1];
     if ((kh != 3) || (kw != 3)) {
-      llvm::dbgs() << "not 3\n";
+      LLVM_DEBUG(llvm::dbgs() << "not 3\n");
       return failure();
     }
     const int64_t kernelSize = kh;
@@ -187,8 +192,27 @@ public:
 
     DenseIntOrFPElementsAttr kernelAttr;
     if (!matchPattern(kernel, m_Constant(&kernelAttr))) {
-      llvm::dbgs() << "not constant\n";
-      return failure();
+      // Try to match against util.global ops if constant matcher fails.
+      auto producer = kernel.getDefiningOp();
+      if (!producer) {
+        return failure();
+      }
+      auto globalLoadProducer =
+          llvm::dyn_cast<IREE::Util::GlobalLoadOpInterface>(producer);
+      if (!globalLoadProducer) {
+        return failure();
+      }
+      Operation *globalOp =
+          symbolTable.lookup(globalLoadProducer.getGlobalName());
+      auto global = dyn_cast<IREE::Util::GlobalOpInterface>(globalOp);
+      if (!global) {
+        return failure();
+      }
+      auto globalInit = global.getGlobalInitialValue();
+      kernelAttr = dyn_cast_if_present<DenseIntOrFPElementsAttr>(globalInit);
+      if (!kernelAttr) {
+        return failure();
+      }
     }
 
     Operation *constOp = kernel.getDefiningOp();
@@ -218,6 +242,9 @@ public:
     rewriter.replaceOpWithNewOp<arith::ConstantOp>(constOp, *foldedKernelAttr);
     return success();
   }
+
+private:
+  SymbolTable symbolTable;
 };
 
 } // namespace
@@ -326,10 +353,12 @@ public:
     // Check that kernel has been constant folded (by validating rank = 3)
     Value kernel = convOp.getInputs()[1];
     auto kernelType = kernel.getType().cast<ShapedType>();
-    if (!kernelType) {
+    auto convResultType = dyn_cast<ShapedType>(convOp->getResult(0).getType());
+    if (!kernelType || !convResultType) {
       return failure();
     }
     Type elementType = kernelType.getElementType();
+    Type resultElementType = convResultType.getElementType();
     ArrayRef<int64_t> kernelShape = kernelType.getShape();
     if (kernelShape.size() != 3) {
       return failure();
@@ -340,8 +369,6 @@ public:
 
     // Create winograd input transform op
     Location loc = convOp.getLoc();
-    Value zero = rewriter.create<arith::ConstantOp>(
-        loc, rewriter.getZeroAttr(elementType));
     Value input = convOp.getInputs()[0];
     auto inputType = input.getType().cast<ShapedType>();
     if (!inputType) {
@@ -399,8 +426,11 @@ public:
       permute<IREE::LinalgExt::Permutation::NCHW_TO_NHWC>(outputShape);
     }
     bmmShape[2] = outputShape[3];
-    auto bmmOutputType = RankedTensorType::get(bmmShape, elementType);
-    emptyTensor = rewriter.create<tensor::EmptyOp>(loc, bmmShape, elementType);
+    Value zero = rewriter.create<arith::ConstantOp>(
+        loc, rewriter.getZeroAttr(resultElementType));
+    auto bmmOutputType = RankedTensorType::get(bmmShape, resultElementType);
+    emptyTensor =
+        rewriter.create<tensor::EmptyOp>(loc, bmmShape, resultElementType);
     auto fillOp = rewriter.create<linalg::FillOp>(loc, ValueRange{zero},
                                                   ValueRange{emptyTensor});
     auto bmmOp = rewriter.create<linalg::BatchMatmulOp>(
@@ -428,8 +458,8 @@ public:
     if (isNchw) {
       permute<IREE::LinalgExt::Permutation::NHWC_TO_NCHW>(paddedResultShape);
     }
-    emptyTensor =
-        rewriter.create<tensor::EmptyOp>(loc, paddedResultShape, elementType);
+    emptyTensor = rewriter.create<tensor::EmptyOp>(loc, paddedResultShape,
+                                                   resultElementType);
     auto winogradOutputOp =
         rewriter.create<IREE::LinalgExt::WinogradOutputTransformOp>(
             loc, emptyTensor.getType(), ValueRange{expandedBmmResult},
@@ -463,12 +493,14 @@ struct ConvertConv2DToWinogradPass
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(&getContext());
+    auto moduleOp = getOperation();
+    SymbolTable symbolTable(moduleOp);
     patterns.insert<FoldWinogradFilterTransform<linalg::Conv2DNchwFchwOp>,
-                    FoldWinogradFilterTransform<linalg::Conv2DNhwcHwcfOp>,
-                    ConvertConvToWinograd<linalg::Conv2DNhwcHwcfOp>,
+                    FoldWinogradFilterTransform<linalg::Conv2DNhwcHwcfOp>>(
+        context, symbolTable);
+    patterns.insert<ConvertConvToWinograd<linalg::Conv2DNhwcHwcfOp>,
                     ConvertConvToWinograd<linalg::Conv2DNchwFchwOp>>(context);
-    if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsAndFoldGreedily(moduleOp, std::move(patterns)))) {
       return signalPassFailure();
     }
   }
