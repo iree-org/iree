@@ -157,7 +157,8 @@ namespace {
 template <typename ConvOp>
 class FoldWinogradFilterTransform final : public OpRewritePattern<ConvOp> {
 public:
-  FoldWinogradFilterTransform(MLIRContext *context, SymbolTable symbolTable, PatternBenefit benefit = 1)
+  FoldWinogradFilterTransform(MLIRContext *context, SymbolTable symbolTable,
+                              PatternBenefit benefit = 1)
       : OpRewritePattern<ConvOp>(context, benefit), symbolTable(symbolTable) {}
 
   LogicalResult matchAndRewrite(ConvOp convOp,
@@ -196,11 +197,13 @@ public:
       if (!producer) {
         return failure();
       }
-      auto globalLoadProducer = llvm::dyn_cast<IREE::Util::GlobalLoadOpInterface>(producer);
+      auto globalLoadProducer =
+          llvm::dyn_cast<IREE::Util::GlobalLoadOpInterface>(producer);
       if (!globalLoadProducer) {
         return failure();
       }
-      Operation *globalOp = symbolTable.lookup(globalLoadProducer.getGlobalName());
+      Operation *globalOp =
+          symbolTable.lookup(globalLoadProducer.getGlobalName());
       auto global = dyn_cast<IREE::Util::GlobalOpInterface>(globalOp);
       if (!global) {
         return failure();
@@ -426,7 +429,8 @@ public:
     Value zero = rewriter.create<arith::ConstantOp>(
         loc, rewriter.getZeroAttr(resultElementType));
     auto bmmOutputType = RankedTensorType::get(bmmShape, resultElementType);
-    emptyTensor = rewriter.create<tensor::EmptyOp>(loc, bmmShape, resultElementType);
+    emptyTensor =
+        rewriter.create<tensor::EmptyOp>(loc, bmmShape, resultElementType);
     auto fillOp = rewriter.create<linalg::FillOp>(loc, ValueRange{zero},
                                                   ValueRange{emptyTensor});
     auto bmmOp = rewriter.create<linalg::BatchMatmulOp>(
@@ -454,8 +458,8 @@ public:
     if (isNchw) {
       permute<IREE::LinalgExt::Permutation::NHWC_TO_NCHW>(paddedResultShape);
     }
-    emptyTensor =
-        rewriter.create<tensor::EmptyOp>(loc, paddedResultShape, resultElementType);
+    emptyTensor = rewriter.create<tensor::EmptyOp>(loc, paddedResultShape,
+                                                   resultElementType);
     auto winogradOutputOp =
         rewriter.create<IREE::LinalgExt::WinogradOutputTransformOp>(
             loc, emptyTensor.getType(), ValueRange{expandedBmmResult},
@@ -492,11 +496,11 @@ struct ConvertConv2DToWinogradPass
     auto moduleOp = getOperation();
     SymbolTable symbolTable(moduleOp);
     patterns.insert<FoldWinogradFilterTransform<linalg::Conv2DNchwFchwOp>,
-                    FoldWinogradFilterTransform<linalg::Conv2DNchwFchwOp>>(context, symbolTable);
+                    FoldWinogradFilterTransform<linalg::Conv2DNchwFchwOp>>(
+        context, symbolTable);
     patterns.insert<ConvertConvToWinograd<linalg::Conv2DNhwcHwcfOp>,
                     ConvertConvToWinograd<linalg::Conv2DNchwFchwOp>>(context);
-    if (failed(applyPatternsAndFoldGreedily(moduleOp,
-                                            std::move(patterns)))) {
+    if (failed(applyPatternsAndFoldGreedily(moduleOp, std::move(patterns)))) {
       return signalPassFailure();
     }
   }
