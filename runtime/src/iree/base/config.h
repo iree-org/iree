@@ -95,6 +95,14 @@ typedef IREE_DEVICE_SIZE_T iree_device_size_t;
   (sizeof(iree_device_size_t) == 4 ? UINT32_MAX : UINT64_MAX)
 
 //===----------------------------------------------------------------------===//
+// Allocator configuration
+//===----------------------------------------------------------------------===//
+
+#if !defined(IREE_ALLOCATOR_DEFAULT)
+#define IREE_ALLOCATOR_DEFAULT iree_allocator_system
+#endif  // !IREE_ALLOCATOR_DEFAULT
+
+//===----------------------------------------------------------------------===//
 // iree_status_t configuration
 //===----------------------------------------------------------------------===//
 // Controls how much information an iree_status_t carries. When set to 0 all of

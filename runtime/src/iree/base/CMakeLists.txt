@@ -14,6 +14,7 @@ iree_cc_library(
   SRCS
     "allocator.c"
     "allocator.h"
+    "allocator_mimalloc.c"
     "assert.h"
     "bitfield.c"
     "bitfield.h"
@@ -33,6 +34,11 @@ iree_cc_library(
     "time.c"
     "wait_source.c"
     "wait_source.h"
+  COPTS
+    -I${IREE_SOURCE_DIR}/third_party/mimalloc_src
+    -I${IREE_SOURCE_DIR}/third_party/mimalloc_src/mimalloc/include
+  DEFINES
+    $<$<BOOL:IREE_ENABLE_MIMALLOC>:IREE_HAS_ALLOCATOR_MIMALLOC=1>
   DEPS
     ::core_headers
     iree::base::tracing::provider

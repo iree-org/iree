@@ -291,6 +291,38 @@ static inline iree_allocator_t iree_allocator_inline_arena(
 }
 
 //===----------------------------------------------------------------------===//
+// Optional allocators.
+//===----------------------------------------------------------------------===//
+
+#if IREE_HAS_ALLOCATOR_MIMALLOC
+
+// Default C allocator controller using malloc/free.
+IREE_API_EXPORT iree_status_t
+iree_allocator_mimalloc_ctl(void* self, iree_allocator_command_t command,
+                            const void* params, void** inout_ptr);
+
+// Allocates using the iree_allocator_malloc and iree_allocator_free methods.
+// These will usually be backed by malloc and free.
+static inline iree_allocator_t iree_allocator_mimalloc(void) {
+  iree_allocator_t v = {NULL, iree_allocator_mimalloc_ctl};
+  return v;
+}
+
+#endif  // IREE_HAS_ALLOCATOR_MIMALLOC
+
+//===----------------------------------------------------------------------===//
+// Default allocator.
+// While we make limited use of hard-coded allocators in library code, tools
+// bindings, and user code often just wants to defer to a default allocator
+// defined at build time. Such code should use iree_allocator_default()
+// as opposed to a specific allocator.
+//===----------------------------------------------------------------------===//
+
+static inline iree_allocator_t iree_allocator_default(void) {
+  return IREE_ALLOCATOR_DEFAULT();
+}
+
+//===----------------------------------------------------------------------===//
 // Aligned allocations via iree_allocator_t
 //===----------------------------------------------------------------------===//
 
