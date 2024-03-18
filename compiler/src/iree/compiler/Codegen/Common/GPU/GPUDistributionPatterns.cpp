@@ -162,6 +162,11 @@ struct DistributeElementwise final
       distributedOp->setAttr(fastmathAttrName, attr);
     }
 
+    StringRef predicateAttrName = rewriter.getStringAttr("predicate");
+    if (Attribute attr = op->getAttr(predicateAttrName)) {
+      distributedOp->setAttr(predicateAttrName, attr);
+    }
+
     DistributionPattern::replaceOpWithDistributedValues(
         rewriter, op, distributedOp->getResults());
     return success();
@@ -831,6 +836,55 @@ struct DistributeLayoutConflictResolutions final
   }
 };
 
+struct DistributeGather final : OpDistributionPattern<vector::GatherOp> {
+  using OpDistributionPattern::OpDistributionPattern;
+
+  LogicalResult matchAndRewrite(vector::GatherOp gatherOp,
+                                DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
+    VectorValue result = gatherOp.getResult();
+    VectorValue indexVec = gatherOp.getIndexVec();
+    VectorValue mask = gatherOp.getMask();
+    VectorValue passThru = gatherOp.getPassThru();
+
+    VectorLayoutInterface resultLayout = signature[result];
+    VectorLayoutInterface indicesLayout = signature[indexVec];
+    VectorLayoutInterface maskLayout = signature[mask];
+    VectorLayoutInterface passThruLayout = signature[passThru];
+
+    if (!resultLayout) {
+      return rewriter.notifyMatchFailure(gatherOp,
+                                         "result does not have layout");
+    }
+    if (!indicesLayout) {
+      return rewriter.notifyMatchFailure(gatherOp,
+                                         "indices does not have layout");
+    }
+    if (!maskLayout) {
+      return rewriter.notifyMatchFailure(gatherOp, "mask does not have layout");
+    }
+    if (!passThruLayout) {
+      return rewriter.notifyMatchFailure(gatherOp,
+                                         "passThru does not have layout");
+    }
+
+    SmallVector<int64_t> distributedShape = resultLayout.getDistributedShape();
+    Type elementType = result.getType().getElementType();
+    VectorType distributedType = VectorType::get(distributedShape, elementType);
+
+    // Simply distribute all operands and results.
+    VectorValue distributed = rewriter.create<vector::GatherOp>(
+        gatherOp.getLoc(), distributedType, gatherOp.getBase(),
+        gatherOp.getIndices(),
+        getDistributed(rewriter, indexVec, indicesLayout),
+        getDistributed(rewriter, mask, maskLayout),
+        getDistributed(rewriter, passThru, passThruLayout));
+
+    replaceOpWithDistributedValues(rewriter, gatherOp, distributed);
+    return success();
+  }
+};
+
 } // namespace
 
 void populateGPUReductionDistributionPatterns(RewritePatternSet &patterns,
@@ -842,6 +896,8 @@ void populateGPUDistributionPatterns(RewritePatternSet &patterns) {
   patterns.add<DistributeConstants, DistributeScfFor>(patterns.getContext());
   // Elementwise patterns.
   patterns.add<DistributeElementwise>(patterns.getContext());
+  // Gather patterns.
+  patterns.add<DistributeGather>(patterns.getContext());
 }
 
 void populateGPUDistributionLayoutAttrPatterns(Value laneId,
