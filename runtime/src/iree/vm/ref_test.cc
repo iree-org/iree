@@ -21,7 +21,7 @@ using InstancePtr =
 static InstancePtr MakeInstance() {
   iree_vm_instance_t* instance = NULL;
   IREE_CHECK_OK(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
-                                        iree_allocator_system(), &instance));
+                                        iree_allocator_default(), &instance));
   return InstancePtr(instance, iree_vm_instance_release);
 }
 

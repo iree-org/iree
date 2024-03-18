@@ -67,7 +67,7 @@ const iree_hal_test_resource_vtable_t iree_hal_test_resource_vtable = {
 struct ResourceSetTest : public ::testing::Test {
   // We could check the allocator to ensure all memory is freed if we wanted to
   // reduce the reliance on asan.
-  iree_allocator_t host_allocator = iree_allocator_system();
+  iree_allocator_t host_allocator = iree_allocator_default();
   iree_arena_block_pool_t block_pool;
 
   void SetUp() override {

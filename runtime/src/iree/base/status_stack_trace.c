@@ -341,7 +341,7 @@ iree_status_t iree_status_attach_stack_trace(iree_status_t status,
       sizeof(*payload) +
       sizeof(payload->addresses[0]) * IREE_STATUS_MAX_STACK_TRACE_FRAMES;
 
-  iree_allocator_t allocator = iree_allocator_system();
+  iree_allocator_t allocator = iree_allocator_default();
   iree_status_ignore(
       iree_allocator_malloc(allocator, total_size, (void**)&payload));
   if (IREE_UNLIKELY(!payload)) return status;

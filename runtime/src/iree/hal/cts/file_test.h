@@ -62,14 +62,14 @@ class file_test : public CtsTestBase {
                                  iree_device_size_t file_size, uint8_t pattern,
                                  iree_hal_file_t** out_file) {
     void* file_contents = NULL;
-    IREE_CHECK_OK(iree_allocator_malloc_aligned(iree_allocator_system(),
+    IREE_CHECK_OK(iree_allocator_malloc_aligned(iree_allocator_default(),
                                                 file_size, kMinimumAlignment, 0,
                                                 (void**)&file_contents));
     memset(file_contents, pattern, file_size);
 
     iree_io_file_handle_release_callback_t release_callback = {
         +[](void* user_data, iree_io_file_handle_primitive_t handle_primitive) {
-          iree_allocator_free_aligned(iree_allocator_system(), user_data);
+          iree_allocator_free_aligned(iree_allocator_default(), user_data);
         },
         file_contents,
     };
@@ -77,7 +77,7 @@ class file_test : public CtsTestBase {
     IREE_CHECK_OK(iree_io_file_handle_wrap_host_allocation(
         IREE_IO_FILE_ACCESS_READ | IREE_IO_FILE_ACCESS_WRITE,
         iree_make_byte_span(file_contents, file_size), release_callback,
-        iree_allocator_system(), &handle));
+        iree_allocator_default(), &handle));
     IREE_CHECK_OK(iree_hal_file_import(
         device_, IREE_HAL_QUEUE_AFFINITY_ANY, access, handle,
         IREE_HAL_EXTERNAL_FILE_FLAG_NONE, out_file));
@@ -98,10 +98,10 @@ TEST_P(file_test, ReadEntireFile) {
   IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 0ull, &semaphore));
   iree_hal_fence_t* wait_fence = NULL;
   IREE_ASSERT_OK(iree_hal_fence_create_at(
-      semaphore, 1ull, iree_allocator_system(), &wait_fence));
+      semaphore, 1ull, iree_allocator_default(), &wait_fence));
   iree_hal_fence_t* signal_fence = NULL;
   IREE_ASSERT_OK(iree_hal_fence_create_at(
-      semaphore, 2ull, iree_allocator_system(), &signal_fence));
+      semaphore, 2ull, iree_allocator_default(), &signal_fence));
 
   // NOTE: synchronously executing here so start with the wait signaled.
   // We should be able to make this async in the future.

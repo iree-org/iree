@@ -30,7 +30,7 @@ static StreamPtr CreateStream(iree_io_stream_mode_t mode,
                               size_t block_size = 1 * 1024) {
   iree_io_stream_t* stream = NULL;
   IREE_CHECK_OK(iree_io_vec_stream_create(mode, block_size,
-                                          iree_allocator_system(), &stream));
+                                          iree_allocator_default(), &stream));
   return StreamPtr(stream, iree_io_stream_release);
 }
 
@@ -40,7 +40,7 @@ static StreamPtr CreateStreamWithContents(iree_io_stream_mode_t mode,
                                           size_t block_size = 1 * 1024) {
   iree_io_stream_t* stream = NULL;
   IREE_CHECK_OK(iree_io_vec_stream_create(mode | IREE_IO_STREAM_MODE_WRITABLE,
-                                          block_size, iree_allocator_system(),
+                                          block_size, iree_allocator_default(),
                                           &stream));
   IREE_CHECK_OK(iree_io_stream_write(stream, sizeof(T) * N, elements));
   IREE_CHECK_OK(iree_io_stream_seek(stream, IREE_IO_STREAM_SEEK_SET, 0));

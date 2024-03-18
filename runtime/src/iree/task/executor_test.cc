@@ -27,7 +27,7 @@ TEST(ExecutorTest, Lifetime) {
     options.worker_local_memory_size = 64 * 1024;
     iree_task_executor_t* executor = NULL;
     IREE_ASSERT_OK(iree_task_executor_create(
-        options, &topology, iree_allocator_system(), &executor));
+        options, &topology, iree_allocator_default(), &executor));
     // -- idle --
     iree_task_executor_release(executor);
   }
@@ -47,7 +47,7 @@ TEST(ExecutorTest, LifetimeStress) {
     options.worker_local_memory_size = 64 * 1024;
     iree_task_executor_t* executor = NULL;
     IREE_ASSERT_OK(iree_task_executor_create(
-        options, &topology, iree_allocator_system(), &executor));
+        options, &topology, iree_allocator_default(), &executor));
     iree_task_scope_t scope;
     iree_task_scope_initialize(iree_make_cstring_view("scope"),
                                IREE_TASK_SCOPE_FLAG_NONE, &scope);
@@ -95,8 +95,8 @@ TEST(ExecutorTest, SubmissionStress) {
   iree_task_topology_t topology;
   iree_task_topology_initialize_from_group_count(/*group_count=*/4, &topology);
   iree_task_executor_t* executor = NULL;
-  IREE_ASSERT_OK(iree_task_executor_create(options, &topology,
-                                           iree_allocator_system(), &executor));
+  IREE_ASSERT_OK(iree_task_executor_create(
+      options, &topology, iree_allocator_default(), &executor));
   iree_task_scope_t scope;
   iree_task_scope_initialize(iree_make_cstring_view("scope"),
                              IREE_TASK_SCOPE_FLAG_NONE, &scope);

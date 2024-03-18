@@ -77,10 +77,10 @@ static iree_status_t RunFunction(benchmark::State& state,
                                  int result_count, int64_t batch_size = 1) {
   iree_vm_instance_t* instance = NULL;
   IREE_CHECK_OK(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
-                                        iree_allocator_system(), &instance));
+                                        iree_allocator_default(), &instance));
 
   iree_vm_module_t* import_module = NULL;
-  IREE_CHECK_OK(native_import_module_create(instance, iree_allocator_system(),
+  IREE_CHECK_OK(native_import_module_create(instance, iree_allocator_default(),
                                             &import_module));
 
   const auto* module_file_toc =
@@ -91,13 +91,13 @@ static iree_status_t RunFunction(benchmark::State& state,
       iree_const_byte_span_t{
           reinterpret_cast<const uint8_t*>(module_file_toc->data),
           static_cast<iree_host_size_t>(module_file_toc->size)},
-      iree_allocator_null(), iree_allocator_system(), &bytecode_module));
+      iree_allocator_null(), iree_allocator_default(), &bytecode_module));
 
   std::array<iree_vm_module_t*, 2> modules = {import_module, bytecode_module};
   iree_vm_context_t* context = NULL;
   IREE_CHECK_OK(iree_vm_context_create_with_modules(
       instance, IREE_VM_CONTEXT_FLAG_NONE, modules.size(), modules.data(),
-      iree_allocator_system(), &context));
+      iree_allocator_default(), &context));
 
   iree_vm_function_t function;
   IREE_CHECK_OK(
@@ -115,7 +115,7 @@ static iree_status_t RunFunction(benchmark::State& state,
 
   IREE_VM_INLINE_STACK_INITIALIZE(stack, IREE_VM_INVOCATION_FLAG_NONE,
                                   iree_vm_context_state_resolver(context),
-                                  iree_allocator_system());
+                                  iree_allocator_default());
   while (state.KeepRunningBatch(batch_size)) {
     for (iree_host_size_t i = 0; i < i32_args.size(); ++i) {
       reinterpret_cast<int32_t*>(call.arguments.data)[i] = i32_args[i];
@@ -136,7 +136,7 @@ static iree_status_t RunFunction(benchmark::State& state,
 static void BM_ModuleCreate(benchmark::State& state) {
   iree_vm_instance_t* instance = NULL;
   IREE_CHECK_OK(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
-                                        iree_allocator_system(), &instance));
+                                        iree_allocator_default(), &instance));
 
   while (state.KeepRunning()) {
     const auto* module_file_toc =
@@ -147,7 +147,7 @@ static void BM_ModuleCreate(benchmark::State& state) {
         iree_const_byte_span_t{
             reinterpret_cast<const uint8_t*>(module_file_toc->data),
             static_cast<iree_host_size_t>(module_file_toc->size)},
-        iree_allocator_null(), iree_allocator_system(), &module));
+        iree_allocator_null(), iree_allocator_default(), &module));
 
     // Just testing creation and verification here!
     benchmark::DoNotOptimize(module);
@@ -162,7 +162,7 @@ BENCHMARK(BM_ModuleCreate);
 static void BM_ModuleCreateState(benchmark::State& state) {
   iree_vm_instance_t* instance = NULL;
   IREE_CHECK_OK(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
-                                        iree_allocator_system(), &instance));
+                                        iree_allocator_default(), &instance));
 
   const auto* module_file_toc =
       iree_vm_bytecode_module_benchmark_module_create();
@@ -172,11 +172,11 @@ static void BM_ModuleCreateState(benchmark::State& state) {
       iree_const_byte_span_t{
           reinterpret_cast<const uint8_t*>(module_file_toc->data),
           static_cast<iree_host_size_t>(module_file_toc->size)},
-      iree_allocator_null(), iree_allocator_system(), &module));
+      iree_allocator_null(), iree_allocator_default(), &module));
 
   while (state.KeepRunning()) {
     iree_vm_module_state_t* module_state;
-    module->alloc_state(module->self, iree_allocator_system(), &module_state);
+    module->alloc_state(module->self, iree_allocator_default(), &module_state);
 
     // Really just testing malloc overhead, though it'll be module-dependent
     // and if we do anything heavyweight on state init it'll show here.
@@ -193,7 +193,7 @@ BENCHMARK(BM_ModuleCreateState);
 static void BM_FullModuleInit(benchmark::State& state) {
   iree_vm_instance_t* instance = NULL;
   IREE_CHECK_OK(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
-                                        iree_allocator_system(), &instance));
+                                        iree_allocator_default(), &instance));
 
   while (state.KeepRunning()) {
     const auto* module_file_toc =
@@ -204,10 +204,10 @@ static void BM_FullModuleInit(benchmark::State& state) {
         iree_const_byte_span_t{
             reinterpret_cast<const uint8_t*>(module_file_toc->data),
             static_cast<iree_host_size_t>(module_file_toc->size)},
-        iree_allocator_null(), iree_allocator_system(), &module));
+        iree_allocator_null(), iree_allocator_default(), &module));
 
     iree_vm_module_state_t* module_state;
-    module->alloc_state(module->self, iree_allocator_system(), &module_state);
+    module->alloc_state(module->self, iree_allocator_default(), &module_state);
 
     benchmark::DoNotOptimize(module_state);
 

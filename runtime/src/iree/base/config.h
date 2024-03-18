@@ -99,7 +99,7 @@ typedef IREE_DEVICE_SIZE_T iree_device_size_t;
 //===----------------------------------------------------------------------===//
 
 #if !defined(IREE_ALLOCATOR_DEFAULT)
-#define IREE_ALLOCATOR_DEFAULT iree_allocator_system
+#define IREE_ALLOCATOR_DEFAULT iree_allocator_mimalloc
 #endif  // !IREE_ALLOCATOR_DEFAULT
 
 //===----------------------------------------------------------------------===//

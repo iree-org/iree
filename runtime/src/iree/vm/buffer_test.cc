@@ -18,7 +18,7 @@ static iree_vm_instance_t* instance = NULL;
 struct VMBufferTest : public ::testing::Test {
   static void SetUpTestSuite() {
     IREE_CHECK_OK(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
-                                          iree_allocator_system(), &instance));
+                                          iree_allocator_default(), &instance));
   }
   static void TearDownTestSuite() { iree_vm_instance_release(instance); }
 };

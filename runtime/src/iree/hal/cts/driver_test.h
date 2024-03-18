@@ -29,7 +29,7 @@ class driver_test : public CtsTestBase {
     iree_hal_device_t* device = NULL;
     iree_status_t status = iree_hal_driver_create_device_by_path(
         driver_, name, path, /*param_count=*/0, /*params=*/NULL,
-        iree_allocator_system(), &device);
+        iree_allocator_default(), &device);
 
     // Creation via path is HAL driver specific. Allow unimplemented cases.
     if (iree_status_is_not_found(status)) {
@@ -50,7 +50,7 @@ TEST_P(driver_test, QueryAndCreateAvailableDevicesByID) {
   iree_host_size_t device_info_count = 0;
   iree_hal_device_info_t* device_infos = NULL;
   IREE_ASSERT_OK(iree_hal_driver_query_available_devices(
-      driver_, iree_allocator_system(), &device_info_count, &device_infos));
+      driver_, iree_allocator_default(), &device_info_count, &device_infos));
 
   std::cout << "Driver has " << device_info_count << " device(s)\n";
   for (iree_host_size_t i = 0; i < device_info_count; ++i) {
@@ -61,21 +61,21 @@ TEST_P(driver_test, QueryAndCreateAvailableDevicesByID) {
     iree_hal_device_t* device = NULL;
     IREE_ASSERT_OK(iree_hal_driver_create_device_by_id(
         driver_, device_infos[i].device_id, /*param_count=*/0, /*params=*/NULL,
-        iree_allocator_system(), &device));
+        iree_allocator_default(), &device));
     iree_string_view_t device_id = iree_hal_device_id(device);
     std::cout << "    Created device with id: '"
               << std::string(device_id.data, device_id.size) << "'\n";
     iree_hal_device_release(device);
   }
 
-  iree_allocator_free(iree_allocator_system(), device_infos);
+  iree_allocator_free(iree_allocator_default(), device_infos);
 }
 
 TEST_P(driver_test, QueryAndCreateAvailableDevicesByOrdinal) {
   iree_host_size_t device_info_count = 0;
   iree_hal_device_info_t* device_infos = NULL;
   IREE_ASSERT_OK(iree_hal_driver_query_available_devices(
-      driver_, iree_allocator_system(), &device_info_count, &device_infos));
+      driver_, iree_allocator_default(), &device_info_count, &device_infos));
 
   std::cout << "Driver has " << device_info_count << " device(s)\n";
   for (iree_host_size_t i = 0; i < device_info_count; ++i) {
@@ -85,22 +85,22 @@ TEST_P(driver_test, QueryAndCreateAvailableDevicesByOrdinal) {
               << "'\n";
     iree_hal_device_t* device = NULL;
     IREE_ASSERT_OK(iree_hal_driver_create_device_by_ordinal(
-        driver_, i, /*param_count=*/0, /*params=*/NULL, iree_allocator_system(),
-        &device));
+        driver_, i, /*param_count=*/0, /*params=*/NULL,
+        iree_allocator_default(), &device));
     iree_string_view_t device_id = iree_hal_device_id(device);
     std::cout << "    Created device with id: '"
               << std::string(device_id.data, device_id.size) << "'\n";
     iree_hal_device_release(device);
   }
 
-  iree_allocator_free(iree_allocator_system(), device_infos);
+  iree_allocator_free(iree_allocator_default(), device_infos);
 }
 
 TEST_P(driver_test, QueryAndCreateAvailableDevicesByPath) {
   iree_host_size_t device_info_count = 0;
   iree_hal_device_info_t* device_infos = NULL;
   IREE_ASSERT_OK(iree_hal_driver_query_available_devices(
-      driver_, iree_allocator_system(), &device_info_count, &device_infos));
+      driver_, iree_allocator_default(), &device_info_count, &device_infos));
 
   std::cout << "Driver has " << device_info_count << " device(s)\n";
   if (device_info_count == 0) GTEST_SKIP() << "No available devices";
@@ -116,7 +116,7 @@ TEST_P(driver_test, QueryAndCreateAvailableDevicesByPath) {
     CheckCreateDeviceViaPath(device_infos[i].name, IREE_SV(index));
   }
 
-  iree_allocator_free(iree_allocator_system(), device_infos);
+  iree_allocator_free(iree_allocator_default(), device_infos);
 }
 
 }  // namespace cts

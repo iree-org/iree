@@ -22,7 +22,7 @@ class LibmpiTest : public ::testing::Test {
  protected:
   static void SetUpTestSuite() {
     iree_status_t status =
-        iree_hal_mpi_library_load(iree_allocator_system(), &library, &symbols);
+        iree_hal_mpi_library_load(iree_allocator_default(), &library, &symbols);
 
     if (!iree_status_is_ok(status)) {
       iree_status_fprint(stderr, status);

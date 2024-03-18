@@ -28,13 +28,13 @@ class CheckTest : public ::testing::Test {
  protected:
   static void SetUpTestSuite() {
     IREE_ASSERT_OK(iree_vm_instance_create(
-        IREE_VM_TYPE_CAPACITY_DEFAULT, iree_allocator_system(), &instance_));
+        IREE_VM_TYPE_CAPACITY_DEFAULT, iree_allocator_default(), &instance_));
     IREE_ASSERT_OK(iree_hal_module_register_all_types(instance_));
 
     iree_hal_driver_t* hal_driver = nullptr;
     iree_status_t status = iree_hal_driver_registry_try_create(
         iree_hal_available_driver_registry(),
-        iree_make_cstring_view("local-task"), iree_allocator_system(),
+        iree_make_cstring_view("local-task"), iree_allocator_default(),
         &hal_driver);
     if (iree_status_is_not_found(status)) {
       fprintf(stderr, "Skipping test as 'local-task' driver was not found:\n");
@@ -43,13 +43,13 @@ class CheckTest : public ::testing::Test {
       return;
     }
     IREE_ASSERT_OK(iree_hal_driver_create_default_device(
-        hal_driver, iree_allocator_system(), &device_));
+        hal_driver, iree_allocator_default(), &device_));
     IREE_ASSERT_OK(iree_hal_module_create(
         instance_, /*device_count=*/1, &device_, IREE_HAL_MODULE_FLAG_NONE,
-        iree_allocator_system(), &hal_module_));
+        iree_allocator_default(), &hal_module_));
     iree_hal_driver_release(hal_driver);
 
-    IREE_ASSERT_OK(iree_check_module_create(instance_, iree_allocator_system(),
+    IREE_ASSERT_OK(iree_check_module_create(instance_, iree_allocator_default(),
                                             &check_module_))
         << "Native module failed to init";
   }
@@ -68,7 +68,7 @@ class CheckTest : public ::testing::Test {
     std::vector<iree_vm_module_t*> modules = {hal_module_, check_module_};
     IREE_ASSERT_OK(iree_vm_context_create_with_modules(
         instance_, IREE_VM_CONTEXT_FLAG_NONE, modules.size(), modules.data(),
-        iree_allocator_system(), &context_));
+        iree_allocator_default(), &context_));
     allocator_ = iree_hal_device_allocator(device_);
   }
 
@@ -178,14 +178,14 @@ class CheckTest : public ::testing::Test {
     // TODO(#2075): don't directly invoke native functions like this.
     return iree_vm_invoke(context_, function, IREE_VM_INVOCATION_FLAG_NONE,
                           /*policy=*/nullptr, inputs_.get(),
-                          /*outputs=*/nullptr, iree_allocator_system());
+                          /*outputs=*/nullptr, iree_allocator_default());
   }
 
   iree_status_t InvokeValue(const char* function_name,
                             std::vector<iree_vm_value_t> args) {
     IREE_RETURN_IF_ERROR(
         iree_vm_list_create(iree_vm_make_undefined_type_def(), args.size(),
-                            iree_allocator_system(), &inputs_));
+                            iree_allocator_default(), &inputs_));
     for (auto& arg : args) {
       IREE_RETURN_IF_ERROR(iree_vm_list_push_value(inputs_.get(), &arg));
     }
@@ -196,7 +196,7 @@ class CheckTest : public ::testing::Test {
                        std::vector<vm::ref<iree_hal_buffer_view_t>> args) {
     IREE_RETURN_IF_ERROR(
         iree_vm_list_create(iree_vm_make_undefined_type_def(), args.size(),
-                            iree_allocator_system(), &inputs_));
+                            iree_allocator_default(), &inputs_));
     iree_vm_ref_t device_ref = iree_hal_device_retain_ref(device_);
     IREE_RETURN_IF_ERROR(
         iree_vm_list_push_ref_move(inputs_.get(), &device_ref));

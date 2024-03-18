@@ -47,7 +47,7 @@ TEST(ThreadTest, Lifetime) {
   // Create the thread and immediately begin running it.
   iree_thread_t* thread = nullptr;
   IREE_ASSERT_OK(iree_thread_create(entry_fn, &entry_data, params,
-                                    iree_allocator_system(), &thread));
+                                    iree_allocator_default(), &thread));
   EXPECT_NE(0, iree_thread_id(thread));
 
   // Wait for the thread to finish.
@@ -88,7 +88,7 @@ TEST(ThreadTest, CreateSuspended) {
 
   iree_thread_t* thread = nullptr;
   IREE_ASSERT_OK(iree_thread_create(entry_fn, &entry_data, params,
-                                    iree_allocator_system(), &thread));
+                                    iree_allocator_default(), &thread));
   EXPECT_NE(0, iree_thread_id(thread));
 
   // NOTE: the thread will not be running and we should not expect a change in
@@ -136,7 +136,7 @@ TEST(ThreadTest, PriorityOverride) {
 
   iree_thread_t* thread = nullptr;
   IREE_ASSERT_OK(iree_thread_create(entry_fn, &entry_data, params,
-                                    iree_allocator_system(), &thread));
+                                    iree_allocator_default(), &thread));
   EXPECT_NE(0, iree_thread_id(thread));
 
   // Push a few overrides.
@@ -181,7 +181,7 @@ TEST(ThreadOverrideListTest, PriorityClass) {
         EXPECT_NE(current_priority_class, priority_class);
         current_priority_class = priority_class;
       },
-      current_priority_class, iree_allocator_system(), &list);
+      current_priority_class, iree_allocator_default(), &list);
 
   // (NORMAL) -> HIGH -> [ignored LOW] -> HIGHEST
   ASSERT_EQ(IREE_THREAD_PRIORITY_CLASS_NORMAL, current_priority_class);

@@ -25,7 +25,7 @@ namespace {
 TEST(DynamicSymbolsTest, CreateFromSystemLoader) {
   iree_hal_cuda_dynamic_symbols_t symbols;
   iree_status_t status = iree_hal_cuda_dynamic_symbols_initialize(
-      iree_allocator_system(), &symbols);
+      iree_allocator_default(), &symbols);
   if (!iree_status_is_ok(status)) {
     iree_status_fprint(stderr, status);
     iree_status_ignore(status);
@@ -53,7 +53,7 @@ TEST(DynamicSymbolsTest, CreateFromSystemLoader) {
 TEST(NCCLDynamicSymbolsTest, CreateFromSystemLoader) {
   iree_hal_cuda_dynamic_symbols_t cuda_symbols;
   iree_status_t status = iree_hal_cuda_dynamic_symbols_initialize(
-      iree_allocator_system(), &cuda_symbols);
+      iree_allocator_default(), &cuda_symbols);
   if (!iree_status_is_ok(status)) {
     iree_status_fprint(stderr, status);
     iree_status_ignore(status);
@@ -63,7 +63,7 @@ TEST(NCCLDynamicSymbolsTest, CreateFromSystemLoader) {
 
   iree_hal_cuda_nccl_dynamic_symbols_t nccl_symbols;
   status = iree_hal_cuda_nccl_dynamic_symbols_initialize(
-      iree_allocator_system(), &cuda_symbols, &nccl_symbols);
+      iree_allocator_default(), &cuda_symbols, &nccl_symbols);
   if (!iree_status_is_ok(status)) {
     iree_status_fprint(stderr, status);
     iree_status_ignore(status);

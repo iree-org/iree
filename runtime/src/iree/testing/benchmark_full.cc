@@ -100,7 +100,7 @@ static void iree_benchmark_run(const char* benchmark_name,
   iree_benchmark_state_t state;
   memset(&state, 0, sizeof(state));
   state.impl = &benchmark_state;
-  state.host_allocator = iree_allocator_system();
+  state.host_allocator = iree_allocator_default();
 
   iree_status_t status = benchmark_def->run(benchmark_def, &state);
   if (!iree_status_is_ok(status)) {

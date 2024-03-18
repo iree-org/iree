@@ -79,14 +79,14 @@ TEST_F(DynamicLibraryTest, LoadLibrarySuccess) {
   iree_dynamic_library_t* library = NULL;
   IREE_ASSERT_OK(iree_dynamic_library_load_from_file(
       library_temp_path_.c_str(), IREE_DYNAMIC_LIBRARY_FLAG_NONE,
-      iree_allocator_system(), &library));
+      iree_allocator_default(), &library));
   iree_dynamic_library_release(library);
 }
 
 TEST_F(DynamicLibraryTest, LoadLibraryFailure) {
   iree_dynamic_library_t* library = NULL;
   iree_status_t status = iree_dynamic_library_load_from_file(
-      kUnknownName, IREE_DYNAMIC_LIBRARY_FLAG_NONE, iree_allocator_system(),
+      kUnknownName, IREE_DYNAMIC_LIBRARY_FLAG_NONE, iree_allocator_default(),
       &library);
   IREE_EXPECT_STATUS_IS(IREE_STATUS_NOT_FOUND, status);
   iree_status_free(status);
@@ -97,10 +97,10 @@ TEST_F(DynamicLibraryTest, LoadLibraryTwice) {
   iree_dynamic_library_t* library2 = NULL;
   IREE_ASSERT_OK(iree_dynamic_library_load_from_file(
       library_temp_path_.c_str(), IREE_DYNAMIC_LIBRARY_FLAG_NONE,
-      iree_allocator_system(), &library1));
+      iree_allocator_default(), &library1));
   IREE_ASSERT_OK(iree_dynamic_library_load_from_file(
       library_temp_path_.c_str(), IREE_DYNAMIC_LIBRARY_FLAG_NONE,
-      iree_allocator_system(), &library2));
+      iree_allocator_default(), &library2));
   iree_dynamic_library_release(library1);
   iree_dynamic_library_release(library2);
 }
@@ -109,7 +109,7 @@ TEST_F(DynamicLibraryTest, GetSymbolSuccess) {
   iree_dynamic_library_t* library = NULL;
   IREE_ASSERT_OK(iree_dynamic_library_load_from_file(
       library_temp_path_.c_str(), IREE_DYNAMIC_LIBRARY_FLAG_NONE,
-      iree_allocator_system(), &library));
+      iree_allocator_default(), &library));
 
   int (*fn_ptr)(int);
   IREE_ASSERT_OK(iree_dynamic_library_lookup_symbol(library, "times_two",
@@ -124,7 +124,7 @@ TEST_F(DynamicLibraryTest, GetSymbolFailure) {
   iree_dynamic_library_t* library = NULL;
   IREE_ASSERT_OK(iree_dynamic_library_load_from_file(
       library_temp_path_.c_str(), IREE_DYNAMIC_LIBRARY_FLAG_NONE,
-      iree_allocator_system(), &library));
+      iree_allocator_default(), &library));
 
   int (*fn_ptr)(int);
   iree_status_t status =

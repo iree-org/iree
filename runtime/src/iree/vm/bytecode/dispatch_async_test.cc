@@ -30,19 +30,19 @@ class VMBytecodeDispatchAsyncTest : public ::testing::Test {
     IREE_TRACE_SCOPE();
     const iree_file_toc_t* file = async_bytecode_modules_c_create();
 
-    IREE_CHECK_OK(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
-                                          iree_allocator_system(), &instance_));
+    IREE_CHECK_OK(iree_vm_instance_create(
+        IREE_VM_TYPE_CAPACITY_DEFAULT, iree_allocator_default(), &instance_));
 
     IREE_CHECK_OK(iree_vm_bytecode_module_create(
         instance_,
         iree_const_byte_span_t{reinterpret_cast<const uint8_t*>(file->data),
                                static_cast<iree_host_size_t>(file->size)},
-        iree_allocator_null(), iree_allocator_system(), &bytecode_module_));
+        iree_allocator_null(), iree_allocator_default(), &bytecode_module_));
 
     std::vector<iree_vm_module_t*> modules = {bytecode_module_};
     IREE_CHECK_OK(iree_vm_context_create_with_modules(
         instance_, IREE_VM_CONTEXT_FLAG_NONE, modules.size(), modules.data(),
-        iree_allocator_system(), &context_));
+        iree_allocator_default(), &context_));
   }
 
   void TearDown() override {
@@ -68,7 +68,7 @@ TEST_F(VMBytecodeDispatchAsyncTest, YieldSequence) {
       IREE_SV("yield_sequence"), &function));
   IREE_VM_INLINE_STACK_INITIALIZE(stack, IREE_VM_CONTEXT_FLAG_NONE,
                                   iree_vm_context_state_resolver(context_),
-                                  iree_allocator_system());
+                                  iree_allocator_default());
 
   uint32_t arg_value = 97;
   uint32_t ret_value = 0;
@@ -114,7 +114,7 @@ TEST_F(VMBytecodeDispatchAsyncTest, YieldDivergent) {
       IREE_SV("yield_divergent"), &function));
   IREE_VM_INLINE_STACK_INITIALIZE(stack, IREE_VM_CONTEXT_FLAG_NONE,
                                   iree_vm_context_state_resolver(context_),
-                                  iree_allocator_system());
+                                  iree_allocator_default());
 
   // result = %arg0 ? %arg1 : %arg2
   struct {

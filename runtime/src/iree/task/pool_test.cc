@@ -21,7 +21,7 @@ typedef struct iree_test_task_t {
 TEST(PoolTest, Lifetime) {
   iree_task_pool_t pool;
   IREE_ASSERT_OK(iree_task_pool_initialize(
-      iree_allocator_system(), sizeof(iree_test_task_t), 32, &pool));
+      iree_allocator_default(), sizeof(iree_test_task_t), 32, &pool));
   iree_task_pool_deinitialize(&pool);
 }
 
@@ -29,7 +29,7 @@ TEST(PoolTest, AcquireRelease) {
   // Start with 2 preallocated tasks so we can test both acquiring existing and
   // growing to allocate new tasks.
   iree_task_pool_t pool;
-  IREE_ASSERT_OK(iree_task_pool_initialize(iree_allocator_system(),
+  IREE_ASSERT_OK(iree_task_pool_initialize(iree_allocator_default(),
                                            sizeof(iree_test_task_t), 2, &pool));
 
   // Acquire 4 tasks (so we test both the initial size and allocated tasks).
@@ -60,7 +60,7 @@ TEST(PoolTest, Trim) {
   // Start with 2 preallocated tasks so we can test both acquiring existing and
   // growing to allocate new tasks.
   iree_task_pool_t pool;
-  IREE_ASSERT_OK(iree_task_pool_initialize(iree_allocator_system(),
+  IREE_ASSERT_OK(iree_task_pool_initialize(iree_allocator_default(),
                                            sizeof(iree_test_task_t), 2, &pool));
 
   // Acquire and release some tasks.

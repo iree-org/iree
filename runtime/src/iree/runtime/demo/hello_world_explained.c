@@ -81,7 +81,7 @@ static int iree_runtime_demo_main(void) {
   iree_runtime_instance_options_use_all_available_drivers(&instance_options);
   iree_runtime_instance_t* instance = NULL;
   iree_status_t status = iree_runtime_instance_create(
-      &instance_options, iree_allocator_system(), &instance);
+      &instance_options, iree_allocator_default(), &instance);
 
   // Run the demo.
   // A real application would load its models (at startup, on-demand, etc) and

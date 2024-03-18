@@ -159,7 +159,7 @@ struct VMListTest : public ::testing::Test {
     // Note: VM instance creation registers list types, which is required before
     // using the list APIs.
     IREE_CHECK_OK(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
-                                          iree_allocator_system(), &instance));
+                                          iree_allocator_default(), &instance));
     RegisterRefTypes(instance);
   }
   static void TearDownTestSuite() { iree_vm_instance_release(instance); }
@@ -173,7 +173,7 @@ TEST_F(VMListTest, UsageI32) {
   iree_host_size_t initial_capacity = 123;
   iree_vm_list_t* list = nullptr;
   IREE_ASSERT_OK(iree_vm_list_create(element_type, initial_capacity,
-                                     iree_allocator_system(), &list));
+                                     iree_allocator_default(), &list));
 
   iree_vm_type_def_t queried_element_type = iree_vm_list_element_type(list);
   EXPECT_TRUE(iree_vm_type_def_is_value(queried_element_type));
@@ -207,7 +207,7 @@ TEST_F(VMListTest, UsageRef) {
   iree_host_size_t initial_capacity = 123;
   iree_vm_list_t* list = nullptr;
   IREE_ASSERT_OK(iree_vm_list_create(element_type, initial_capacity,
-                                     iree_allocator_system(), &list));
+                                     iree_allocator_default(), &list));
 
   iree_vm_type_def_t queried_element_type = iree_vm_list_element_type(list);
   EXPECT_TRUE(iree_vm_type_def_is_ref(queried_element_type));
@@ -242,7 +242,7 @@ TEST_F(VMListTest, UsageVariant) {
   iree_host_size_t initial_capacity = 123;
   iree_vm_list_t* list = nullptr;
   IREE_ASSERT_OK(iree_vm_list_create(element_type, initial_capacity,
-                                     iree_allocator_system(), &list));
+                                     iree_allocator_default(), &list));
 
   iree_vm_type_def_t queried_element_type = iree_vm_list_element_type(list);
   EXPECT_TRUE(iree_vm_type_def_is_variant(queried_element_type));
@@ -288,12 +288,12 @@ TEST_F(VMListTest, CloneValuesEmpty) {
   iree_host_size_t initial_capacity = 123;
   iree_vm_list_t* source_list = nullptr;
   IREE_ASSERT_OK(iree_vm_list_create(element_type, initial_capacity,
-                                     iree_allocator_system(), &source_list));
+                                     iree_allocator_default(), &source_list));
 
   // Clone list.
   iree_vm_list_t* target_list = nullptr;
   IREE_ASSERT_OK(
-      iree_vm_list_clone(source_list, iree_allocator_system(), &target_list));
+      iree_vm_list_clone(source_list, iree_allocator_default(), &target_list));
 
   // Verify the target list matches source parameters.
   iree_vm_type_def_t queried_element_type =
@@ -314,7 +314,7 @@ TEST_F(VMListTest, CloneValues) {
   iree_host_size_t initial_capacity = 123;
   iree_vm_list_t* source_list = nullptr;
   IREE_ASSERT_OK(iree_vm_list_create(element_type, initial_capacity,
-                                     iree_allocator_system(), &source_list));
+                                     iree_allocator_default(), &source_list));
   IREE_ASSERT_OK(iree_vm_list_resize(source_list, 5));
   EXPECT_EQ(5, iree_vm_list_size(source_list));
   for (iree_host_size_t i = 0; i < 5; ++i) {
@@ -325,7 +325,7 @@ TEST_F(VMListTest, CloneValues) {
   // Clone list.
   iree_vm_list_t* target_list = nullptr;
   IREE_ASSERT_OK(
-      iree_vm_list_clone(source_list, iree_allocator_system(), &target_list));
+      iree_vm_list_clone(source_list, iree_allocator_default(), &target_list));
 
   // Verify the contents match.
   EXPECT_EQ(iree_vm_list_size(target_list), iree_vm_list_size(source_list));
@@ -345,13 +345,13 @@ TEST_F(VMListTest, CloneValues) {
 TEST_F(VMListTest, CloneRefsEmpty) {
   iree_vm_type_def_t element_type = iree_vm_make_ref_type_def(test_a_type());
   iree_vm_list_t* source_list = nullptr;
-  IREE_ASSERT_OK(iree_vm_list_create(element_type, 8, iree_allocator_system(),
+  IREE_ASSERT_OK(iree_vm_list_create(element_type, 8, iree_allocator_default(),
                                      &source_list));
 
   // Clone list.
   iree_vm_list_t* target_list = nullptr;
   IREE_ASSERT_OK(
-      iree_vm_list_clone(source_list, iree_allocator_system(), &target_list));
+      iree_vm_list_clone(source_list, iree_allocator_default(), &target_list));
 
   // Verify the target list matches source parameters.
   iree_vm_type_def_t queried_element_type =
@@ -368,7 +368,7 @@ TEST_F(VMListTest, CloneRefsEmpty) {
 TEST_F(VMListTest, CloneRefs) {
   iree_vm_type_def_t element_type = iree_vm_make_ref_type_def(test_a_type());
   iree_vm_list_t* source_list = nullptr;
-  IREE_ASSERT_OK(iree_vm_list_create(element_type, 8, iree_allocator_system(),
+  IREE_ASSERT_OK(iree_vm_list_create(element_type, 8, iree_allocator_default(),
                                      &source_list));
   IREE_ASSERT_OK(iree_vm_list_resize(source_list, 5));
   EXPECT_EQ(5, iree_vm_list_size(source_list));
@@ -380,7 +380,7 @@ TEST_F(VMListTest, CloneRefs) {
   // Clone list.
   iree_vm_list_t* target_list = nullptr;
   IREE_ASSERT_OK(
-      iree_vm_list_clone(source_list, iree_allocator_system(), &target_list));
+      iree_vm_list_clone(source_list, iree_allocator_default(), &target_list));
 
   // Verify the contents match. Since they are refs we compare pointer equality
   // to ensure they were shallowly cloned.
@@ -405,13 +405,13 @@ TEST_F(VMListTest, CloneRefs) {
 TEST_F(VMListTest, CloneVariantsEmpty) {
   iree_vm_type_def_t element_type = iree_vm_make_undefined_type_def();
   iree_vm_list_t* source_list = nullptr;
-  IREE_ASSERT_OK(iree_vm_list_create(element_type, 10, iree_allocator_system(),
+  IREE_ASSERT_OK(iree_vm_list_create(element_type, 10, iree_allocator_default(),
                                      &source_list));
 
   // Clone list.
   iree_vm_list_t* target_list = nullptr;
   IREE_ASSERT_OK(
-      iree_vm_list_clone(source_list, iree_allocator_system(), &target_list));
+      iree_vm_list_clone(source_list, iree_allocator_default(), &target_list));
 
   // Verify the target list matches source parameters.
   iree_vm_type_def_t queried_element_type =
@@ -428,7 +428,7 @@ TEST_F(VMListTest, CloneVariantsEmpty) {
 TEST_F(VMListTest, CloneVariants) {
   iree_vm_type_def_t element_type = iree_vm_make_undefined_type_def();
   iree_vm_list_t* source_list = nullptr;
-  IREE_ASSERT_OK(iree_vm_list_create(element_type, 10, iree_allocator_system(),
+  IREE_ASSERT_OK(iree_vm_list_create(element_type, 10, iree_allocator_default(),
                                      &source_list));
   IREE_ASSERT_OK(iree_vm_list_resize(source_list, 10));
   EXPECT_EQ(10, iree_vm_list_size(source_list));
@@ -444,7 +444,7 @@ TEST_F(VMListTest, CloneVariants) {
   // Clone list.
   iree_vm_list_t* target_list = nullptr;
   IREE_ASSERT_OK(
-      iree_vm_list_clone(source_list, iree_allocator_system(), &target_list));
+      iree_vm_list_clone(source_list, iree_allocator_default(), &target_list));
 
   // Verify the contents match. Since they are refs we compare pointer equality
   // to ensure they were shallowly cloned.
@@ -478,7 +478,7 @@ TEST_F(VMListTest, Reserve) {
   iree_host_size_t initial_capacity = 0;
   iree_vm_list_t* list = nullptr;
   IREE_ASSERT_OK(iree_vm_list_create(element_type, initial_capacity,
-                                     iree_allocator_system(), &list));
+                                     iree_allocator_default(), &list));
   EXPECT_LE(initial_capacity, iree_vm_list_capacity(list));
   EXPECT_EQ(0, iree_vm_list_size(list));
 
@@ -506,7 +506,7 @@ TEST_F(VMListTest, ResizeI32) {
   iree_host_size_t initial_capacity = 4;
   iree_vm_list_t* list = nullptr;
   IREE_ASSERT_OK(iree_vm_list_create(element_type, initial_capacity,
-                                     iree_allocator_system(), &list));
+                                     iree_allocator_default(), &list));
   EXPECT_LE(initial_capacity, iree_vm_list_capacity(list));
   EXPECT_EQ(0, iree_vm_list_size(list));
 
@@ -556,7 +556,7 @@ TEST_F(VMListTest, ResizeRef) {
   iree_host_size_t initial_capacity = 4;
   iree_vm_list_t* list = nullptr;
   IREE_ASSERT_OK(iree_vm_list_create(element_type, initial_capacity,
-                                     iree_allocator_system(), &list));
+                                     iree_allocator_default(), &list));
   EXPECT_LE(initial_capacity, iree_vm_list_capacity(list));
   EXPECT_EQ(0, iree_vm_list_size(list));
 
@@ -606,7 +606,7 @@ TEST_F(VMListTest, ResizeVariant) {
   iree_host_size_t initial_capacity = 4;
   iree_vm_list_t* list = nullptr;
   IREE_ASSERT_OK(iree_vm_list_create(element_type, initial_capacity,
-                                     iree_allocator_system(), &list));
+                                     iree_allocator_default(), &list));
   EXPECT_LE(initial_capacity, iree_vm_list_capacity(list));
   EXPECT_EQ(0, iree_vm_list_size(list));
 
@@ -659,7 +659,7 @@ TEST_F(VMListTest, SwapStorageSelf) {
   iree_vm_type_def_t element_type = iree_vm_make_ref_type_def(test_a_type());
   iree_vm_list_t* list = nullptr;
   IREE_ASSERT_OK(iree_vm_list_create(element_type, /*initial_capacity=*/8,
-                                     iree_allocator_system(), &list));
+                                     iree_allocator_default(), &list));
   for (iree_host_size_t i = 0; i < 5; ++i) {
     iree_vm_ref_t ref_a = MakeRef<A>((float)i);
     IREE_ASSERT_OK(iree_vm_list_push_ref_move(list, &ref_a));
@@ -685,7 +685,7 @@ TEST_F(VMListTest, SwapStorage) {
   iree_vm_type_def_t element_type_a = iree_vm_make_ref_type_def(test_a_type());
   iree_vm_list_t* list_a = nullptr;
   IREE_ASSERT_OK(iree_vm_list_create(element_type_a, /*initial_capacity=*/8,
-                                     iree_allocator_system(), &list_a));
+                                     iree_allocator_default(), &list_a));
   iree_host_size_t list_a_size = 4;
   for (iree_host_size_t i = 0; i < list_a_size; ++i) {
     iree_vm_ref_t ref_a = MakeRef<A>((float)i);
@@ -695,7 +695,7 @@ TEST_F(VMListTest, SwapStorage) {
   iree_vm_type_def_t element_type_b = iree_vm_make_ref_type_def(test_b_type());
   iree_vm_list_t* list_b = nullptr;
   IREE_ASSERT_OK(iree_vm_list_create(element_type_b, /*initial_capacity=*/8,
-                                     iree_allocator_system(), &list_b));
+                                     iree_allocator_default(), &list_b));
   iree_host_size_t list_b_size = 3;
   for (iree_host_size_t i = 0; i < list_b_size; ++i) {
     iree_vm_ref_t ref_b = MakeRef<B>((float)i);
@@ -741,10 +741,10 @@ TEST_F(VMListTest, CopyOutOfRange) {
       iree_vm_make_value_type_def(IREE_VM_VALUE_TYPE_I32);
   iree_vm_list_t* src_list = nullptr;
   IREE_ASSERT_OK(iree_vm_list_create(element_type, /*initial_capacity=*/8,
-                                     iree_allocator_system(), &src_list));
+                                     iree_allocator_default(), &src_list));
   iree_vm_list_t* dst_list = nullptr;
   IREE_ASSERT_OK(iree_vm_list_create(element_type, /*initial_capacity=*/8,
-                                     iree_allocator_system(), &dst_list));
+                                     iree_allocator_default(), &dst_list));
 
   // Lists are both empty - everything should fail.
   IREE_ASSERT_OK(iree_vm_list_resize(src_list, 0));
@@ -814,7 +814,7 @@ TEST_F(VMListTest, CopyValues) {
   // src: [0, 1, 2, 3]
   iree_vm_list_t* src_list = nullptr;
   IREE_ASSERT_OK(iree_vm_list_create(element_type, /*initial_capacity=*/8,
-                                     iree_allocator_system(), &src_list));
+                                     iree_allocator_default(), &src_list));
   IREE_ASSERT_OK(iree_vm_list_resize(src_list, 4));
   for (iree_host_size_t i = 0; i < 4; ++i) {
     iree_vm_value_t value = iree_vm_value_make_i32(i);
@@ -824,7 +824,7 @@ TEST_F(VMListTest, CopyValues) {
   // dst: [4, 5, 6, 7]
   iree_vm_list_t* dst_list = nullptr;
   IREE_ASSERT_OK(iree_vm_list_create(element_type, /*initial_capacity=*/8,
-                                     iree_allocator_system(), &dst_list));
+                                     iree_allocator_default(), &dst_list));
   IREE_ASSERT_OK(iree_vm_list_resize(dst_list, 4));
   for (iree_host_size_t i = 0; i < 4; ++i) {
     iree_vm_value_t value = iree_vm_value_make_i32(4 + i);
@@ -872,7 +872,7 @@ TEST_F(VMListTest, CopyWrongValues) {
       iree_vm_make_value_type_def(IREE_VM_VALUE_TYPE_I32);
   iree_vm_list_t* src_list = nullptr;
   IREE_ASSERT_OK(iree_vm_list_create(src_element_type, /*initial_capacity=*/8,
-                                     iree_allocator_system(), &src_list));
+                                     iree_allocator_default(), &src_list));
   IREE_ASSERT_OK(iree_vm_list_resize(src_list, 4));
   for (iree_host_size_t i = 0; i < 4; ++i) {
     iree_vm_value_t value = iree_vm_value_make_i32(i);
@@ -884,7 +884,7 @@ TEST_F(VMListTest, CopyWrongValues) {
       iree_vm_make_value_type_def(IREE_VM_VALUE_TYPE_F32);
   iree_vm_list_t* dst_list = nullptr;
   IREE_ASSERT_OK(iree_vm_list_create(dst_element_type, /*initial_capacity=*/8,
-                                     iree_allocator_system(), &dst_list));
+                                     iree_allocator_default(), &dst_list));
   IREE_ASSERT_OK(iree_vm_list_resize(dst_list, 4));
   for (iree_host_size_t i = 0; i < 4; ++i) {
     iree_vm_value_t value = iree_vm_value_make_f32(4 + i);
@@ -906,7 +906,7 @@ TEST_F(VMListTest, CopyRefs) {
   // src: [0, 1, 2, 3]
   iree_vm_list_t* src_list = nullptr;
   IREE_ASSERT_OK(iree_vm_list_create(element_type, /*initial_capacity=*/8,
-                                     iree_allocator_system(), &src_list));
+                                     iree_allocator_default(), &src_list));
   iree_host_size_t src_list_size = 4;
   for (iree_host_size_t i = 0; i < src_list_size; ++i) {
     iree_vm_ref_t ref = MakeRef<B>(i);
@@ -916,7 +916,7 @@ TEST_F(VMListTest, CopyRefs) {
   // dst: [4, 5, 6, 7]
   iree_vm_list_t* dst_list = nullptr;
   IREE_ASSERT_OK(iree_vm_list_create(element_type, /*initial_capacity=*/8,
-                                     iree_allocator_system(), &dst_list));
+                                     iree_allocator_default(), &dst_list));
   iree_host_size_t dst_list_size = 4;
   for (iree_host_size_t i = 0; i < dst_list_size; ++i) {
     iree_vm_ref_t ref = MakeRef<B>(4 + i);
@@ -962,7 +962,7 @@ TEST_F(VMListTest, CopyWrongRefs) {
       iree_vm_make_ref_type_def(test_a_type());
   iree_vm_list_t* src_list = nullptr;
   IREE_ASSERT_OK(iree_vm_list_create(src_element_type, /*initial_capacity=*/8,
-                                     iree_allocator_system(), &src_list));
+                                     iree_allocator_default(), &src_list));
   iree_host_size_t src_list_size = 4;
   for (iree_host_size_t i = 0; i < src_list_size; ++i) {
     iree_vm_ref_t ref = MakeRef<A>(i);
@@ -974,7 +974,7 @@ TEST_F(VMListTest, CopyWrongRefs) {
       iree_vm_make_ref_type_def(test_b_type());
   iree_vm_list_t* dst_list = nullptr;
   IREE_ASSERT_OK(iree_vm_list_create(dst_element_type, /*initial_capacity=*/8,
-                                     iree_allocator_system(), &dst_list));
+                                     iree_allocator_default(), &dst_list));
   iree_host_size_t dst_list_size = 4;
   for (iree_host_size_t i = 0; i < dst_list_size; ++i) {
     iree_vm_ref_t ref = MakeRef<B>(4 + i);
@@ -1000,7 +1000,7 @@ TEST_F(VMListTest, CopyVariants) {
   iree_vm_list_t* src_list = nullptr;
   IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(),
                                      /*initial_capacity=*/8,
-                                     iree_allocator_system(), &src_list));
+                                     iree_allocator_default(), &src_list));
   IREE_ASSERT_OK(iree_vm_list_resize(src_list, 4));
   for (iree_host_size_t i = 0; i < 2; ++i) {
     iree_vm_value_t value = iree_vm_value_make_i32(i);
@@ -1015,7 +1015,7 @@ TEST_F(VMListTest, CopyVariants) {
   iree_vm_list_t* dst_list = nullptr;
   IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(),
                                      /*initial_capacity=*/8,
-                                     iree_allocator_system(), &dst_list));
+                                     iree_allocator_default(), &dst_list));
   IREE_ASSERT_OK(iree_vm_list_resize(dst_list, 4));
   for (iree_host_size_t i = 0; i < 2; ++i) {
     iree_vm_value_t value = iree_vm_value_make_i32(4 + i);
@@ -1064,7 +1064,7 @@ TEST_F(VMListTest, CopyFromVariants) {
   iree_vm_list_t* src_list = nullptr;
   IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(),
                                      /*initial_capacity=*/8,
-                                     iree_allocator_system(), &src_list));
+                                     iree_allocator_default(), &src_list));
   IREE_ASSERT_OK(iree_vm_list_resize(src_list, 4));
   for (iree_host_size_t i = 0; i < 2; ++i) {
     iree_vm_value_t value = iree_vm_value_make_i32(i);
@@ -1080,7 +1080,7 @@ TEST_F(VMListTest, CopyFromVariants) {
       iree_vm_make_value_type_def(IREE_VM_VALUE_TYPE_I32);
   iree_vm_list_t* dst_list = nullptr;
   IREE_ASSERT_OK(iree_vm_list_create(dst_element_type, /*initial_capacity=*/8,
-                                     iree_allocator_system(), &dst_list));
+                                     iree_allocator_default(), &dst_list));
   IREE_ASSERT_OK(iree_vm_list_resize(dst_list, 4));
   for (iree_host_size_t i = 0; i < 4; ++i) {
     iree_vm_value_t value = iree_vm_value_make_i32(4 + i);
@@ -1130,7 +1130,7 @@ TEST_F(VMListTest, CopyToVariants) {
       iree_vm_make_value_type_def(IREE_VM_VALUE_TYPE_I32);
   iree_vm_list_t* src_list = nullptr;
   IREE_ASSERT_OK(iree_vm_list_create(src_element_type, /*initial_capacity=*/8,
-                                     iree_allocator_system(), &src_list));
+                                     iree_allocator_default(), &src_list));
   IREE_ASSERT_OK(iree_vm_list_resize(src_list, 4));
   for (iree_host_size_t i = 0; i < 4; ++i) {
     iree_vm_value_t value = iree_vm_value_make_i32(i);
@@ -1141,7 +1141,7 @@ TEST_F(VMListTest, CopyToVariants) {
   iree_vm_list_t* dst_list = nullptr;
   IREE_ASSERT_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(),
                                      /*initial_capacity=*/8,
-                                     iree_allocator_system(), &dst_list));
+                                     iree_allocator_default(), &dst_list));
   IREE_ASSERT_OK(iree_vm_list_resize(dst_list, 4));
   for (iree_host_size_t i = 0; i < 2; ++i) {
     iree_vm_value_t value = iree_vm_value_make_i32(4 + i);
@@ -1196,7 +1196,7 @@ TEST_F(VMListTest, PushPopRef) {
   iree_host_size_t initial_capacity = 4;
   iree_vm_list_t* list = nullptr;
   IREE_ASSERT_OK(iree_vm_list_create(element_type, initial_capacity,
-                                     iree_allocator_system(), &list));
+                                     iree_allocator_default(), &list));
   EXPECT_LE(initial_capacity, iree_vm_list_capacity(list));
   EXPECT_EQ(0, iree_vm_list_size(list));
 

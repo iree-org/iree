@@ -12,7 +12,7 @@
 extern "C" int main(int argc, char** argv) {
   iree_vm_instance_t* instance = nullptr;
   iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
-                          iree_allocator_system(), &instance);
+                          iree_allocator_default(), &instance);
 
   const auto* module_file_toc =
       iree_vm_bytecode_module_size_benchmark_module_create();
@@ -22,12 +22,12 @@ extern "C" int main(int argc, char** argv) {
       iree_const_byte_span_t{
           reinterpret_cast<const uint8_t*>(module_file_toc->data),
           static_cast<iree_host_size_t>(module_file_toc->size)},
-      iree_allocator_null(), iree_allocator_system(), &module);
+      iree_allocator_null(), iree_allocator_default(), &module);
 
   iree_vm_context_t* context = nullptr;
   iree_vm_context_create_with_modules(instance, IREE_VM_CONTEXT_FLAG_NONE,
                                       /*module_count=*/1, &module,
-                                      iree_allocator_system(), &context);
+                                      iree_allocator_default(), &context);
 
   iree_vm_function_t function;
   iree_vm_module_lookup_function_by_name(
@@ -36,7 +36,7 @@ extern "C" int main(int argc, char** argv) {
 
   iree_vm_invoke(context, function, IREE_VM_INVOCATION_FLAG_NONE,
                  /*policy=*/nullptr, /*inputs=*/nullptr,
-                 /*outputs=*/nullptr, iree_allocator_system());
+                 /*outputs=*/nullptr, iree_allocator_default());
 
   iree_vm_module_release(module);
   iree_vm_context_release(context);

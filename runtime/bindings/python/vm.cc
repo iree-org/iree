@@ -139,7 +139,7 @@ VmInstance VmInstance::Create() {
 
   iree_vm_instance_t* instance = NULL;
   auto status = iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
-                                        iree_allocator_system(), &instance);
+                                        iree_allocator_default(), &instance);
   CheckApiStatus(status, "Error creating instance");
 
   // The python bindings assume the HAL is always available for use.
@@ -163,7 +163,7 @@ VmContext VmContext::Create(VmInstance* instance,
     // Simple create with open allowed modules.
     auto status =
         iree_vm_context_create(instance->raw_ptr(), IREE_VM_CONTEXT_FLAG_NONE,
-                               iree_allocator_system(), &context);
+                               iree_allocator_default(), &context);
     CheckApiStatus(status, "Error creating vm context");
   } else {
     // Closed set of modules.
@@ -174,7 +174,7 @@ VmContext VmContext::Create(VmInstance* instance,
     }
     auto status = iree_vm_context_create_with_modules(
         instance->raw_ptr(), IREE_VM_CONTEXT_FLAG_NONE, module_handles.size(),
-        module_handles.data(), iree_allocator_system(), &context);
+        module_handles.data(), iree_allocator_default(), &context);
     CheckApiStatus(status, "Error creating vm context with modules");
   }
 
@@ -200,7 +200,7 @@ void VmContext::Invoke(iree_vm_function_t f, VmVariantList& inputs,
     py::gil_scoped_release release;
     status = iree_vm_invoke(raw_ptr(), f, IREE_VM_INVOCATION_FLAG_NONE, nullptr,
                             inputs.raw_ptr(), outputs.raw_ptr(),
-                            iree_allocator_system());
+                            iree_allocator_default());
   }
   CheckApiStatus(status, "Error invoking function");
 }
@@ -220,7 +220,7 @@ VmModule VmModule::ResolveModuleDependency(VmInstance* instance,
       IREE_VM_MODULE_DEPENDENCY_FLAG_REQUIRED};
 
   auto status = iree_tooling_resolve_module_dependency(
-      instance->raw_ptr(), &dependency, iree_allocator_system(), &module);
+      instance->raw_ptr(), &dependency, iree_allocator_default(), &module);
 
   assert(module != nullptr);
 
@@ -355,7 +355,7 @@ VmModule VmModule::WrapBuffer(VmInstance* instance, py::object buffer_obj,
       instance->raw_ptr(),
       {static_cast<const uint8_t*>(buffer_info.view().buf),
        static_cast<iree_host_size_t>(buffer_info.view().len)},
-      deallocator, iree_allocator_system(), &module);
+      deallocator, iree_allocator_default(), &module);
   if (!iree_status_is_ok(status)) {
     delete state;
   }
@@ -856,7 +856,7 @@ void SetupVmBindings(nanobind::module_ m) {
             iree_vm_buffer_t* raw_buffer;
             CheckApiStatus(
                 iree_vm_buffer_create(access, length, alignment,
-                                      iree_allocator_system(), &raw_buffer),
+                                      iree_allocator_default(), &raw_buffer),
                 "Error creating buffer");
 
             new (self) VmBuffer();

@@ -175,7 +175,7 @@ typedef struct iree_vm_stack_t iree_vm_stack_t;
 //      stack,
 //      IREE_VM_INVOCATION_FLAG_NONE,
 //      iree_vm_context_state_resolver(context),
-//      iree_allocator_system());
+//      iree_allocator_default());
 //  ...
 //  iree_vm_stack_deinitialize(stack);
 #define IREE_VM_INLINE_STACK_INITIALIZE(stack, flags, state_resolver, \
@@ -229,7 +229,7 @@ IREE_API_EXPORT void iree_vm_stack_deinitialize(iree_vm_stack_t* stack);
 //
 // Example:
 //  iree_vm_stack_t* stack = NULL;
-//  iree_vm_stack_allocate(..., iree_allocator_system(), &stack);
+//  iree_vm_stack_allocate(..., iree_allocator_default(), &stack);
 //  ...
 //  iree_vm_stack_free(stack);
 IREE_API_EXPORT iree_status_t iree_vm_stack_allocate(

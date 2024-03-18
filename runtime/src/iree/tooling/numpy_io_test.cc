@@ -28,7 +28,7 @@ class NumpyIOTest : public ::testing::Test {
   virtual void SetUp() {
     iree_status_t status = iree_hal_create_device(
         iree_hal_available_driver_registry(), IREE_SV("local-sync"),
-        iree_allocator_system(), &device_);
+        iree_allocator_default(), &device_);
     if (iree_status_is_not_found(status)) {
       fprintf(stderr, "Skipping test as 'local-sync' driver was not found:\n");
       iree_status_fprint(stderr, status);
@@ -49,7 +49,7 @@ class NumpyIOTest : public ::testing::Test {
           IREE_IO_STREAM_MODE_READABLE | IREE_IO_STREAM_MODE_SEEKABLE,
           iree_make_byte_span((void*)file_toc[i].data, file_toc[i].size),
           iree_io_memory_stream_release_callback_null(),
-          iree_allocator_system(), &stream));
+          iree_allocator_default(), &stream));
       return StreamPtr(stream, iree_io_stream_release);
     }
     return StreamPtr{nullptr, iree_io_stream_release};
@@ -61,7 +61,7 @@ class NumpyIOTest : public ::testing::Test {
         IREE_IO_STREAM_MODE_READABLE | IREE_IO_STREAM_MODE_WRITABLE |
             IREE_IO_STREAM_MODE_SEEKABLE,
         // /*block_size=*/32 * 1024,
-        /*block_size=*/64, iree_allocator_system(), &stream));
+        /*block_size=*/64, iree_allocator_default(), &stream));
     return StreamPtr(stream, iree_io_stream_release);
   }
 

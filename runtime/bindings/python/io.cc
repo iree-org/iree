@@ -37,7 +37,7 @@ VmModule CreateIoParametersModule(VmInstance &instance, py::args providers) {
   }
   CheckApiStatus(iree_io_parameters_module_create(
                      instance.raw_ptr(), size, c_providers.data(),
-                     iree_allocator_system(), &module),
+                     iree_allocator_default(), &module),
                  "Error creating io_parameters module");
   return VmModule::StealFromRawPtr(module);
 }
@@ -72,7 +72,7 @@ FileHandle FileHandleWrapMemory(py::object host_buffer, bool readable,
               },
               (void *)outer_retained.get(),
           },
-          iree_allocator_system(), &created_handle),
+          iree_allocator_default(), &created_handle),
       "Could not wrap host memory into a file handle");
   outer_retained.release();
   return FileHandle::StealFromRawPtr(created_handle);
@@ -139,7 +139,7 @@ void ParameterIndexLoadFile(ParameterIndex &self, std::string &file_path,
   iree_file_contents_t *file_contents = nullptr;
   CheckApiStatus(
       iree_file_read_contents(file_path.c_str(), read_flags,
-                              iree_allocator_system(), &file_contents),
+                              iree_allocator_default(), &file_contents),
       "Error opening parameter file");
   iree_io_file_handle_release_callback_t release_callback = {
       +[](void *user_data, iree_io_file_handle_primitive_t handle_primitive) {
@@ -153,7 +153,7 @@ void ParameterIndexLoadFile(ParameterIndex &self, std::string &file_path,
   iree_io_file_handle_t *raw_file_handle = nullptr;
   iree_status_t status = iree_io_file_handle_wrap_host_allocation(
       IREE_IO_FILE_ACCESS_READ, file_contents->buffer, release_callback,
-      iree_allocator_system(), &raw_file_handle);
+      iree_allocator_default(), &raw_file_handle);
   if (!iree_status_is_ok(status)) {
     iree_file_contents_free(file_contents);
     CheckApiStatus(status, "Error accessing parameter memory");
@@ -185,7 +185,7 @@ void SetupIoBindings(py::module_ &m) {
            [](ParameterIndex *new_self) {
              iree_io_parameter_index_t *created;
              CheckApiStatus(iree_io_parameter_index_create(
-                                iree_allocator_system(), &created),
+                                iree_allocator_default(), &created),
                             "Could not create IO parameter index");
              new (new_self) ParameterIndex();
              *new_self = ParameterIndex::StealFromRawPtr(created);
@@ -264,7 +264,7 @@ void SetupIoBindings(py::module_ &m) {
                 iree_io_parameter_index_provider_create(
                     iree_make_string_view(scope.data(), scope.size()),
                     self.raw_ptr(), *max_concurrent_operations,
-                    iree_allocator_system(), &created),
+                    iree_allocator_default(), &created),
                 "Could not create parameter provider from index");
             return ParameterProvider::StealFromRawPtr(created);
           },
@@ -283,7 +283,7 @@ void SetupIoBindings(py::module_ &m) {
             } else {
               iree_io_parameter_index_t *created;
               CheckApiStatus(iree_io_parameter_index_create(
-                                 iree_allocator_system(), &created),
+                                 iree_allocator_default(), &created),
                              "Could not create IO parameter index");
               default_target_index = ParameterIndex::StealFromRawPtr(created);
               target_index = default_target_index.raw_ptr();
@@ -302,7 +302,7 @@ void SetupIoBindings(py::module_ &m) {
               iree_file_contents_t *file_contents = NULL;
               IREE_RETURN_IF_ERROR(iree_file_create_mapped(
                   params->path, archive_offset + archive_length, archive_offset,
-                  (iree_host_size_t)archive_length, iree_allocator_system(),
+                  (iree_host_size_t)archive_length, iree_allocator_default(),
                   &file_contents));
               iree_io_file_handle_release_callback_t release_callback;
               memset(&release_callback, 0, sizeof(release_callback));
@@ -315,7 +315,7 @@ void SetupIoBindings(py::module_ &m) {
               release_callback.user_data = file_contents;
               iree_status_t status = iree_io_file_handle_wrap_host_allocation(
                   IREE_IO_FILE_ACCESS_WRITE, file_contents->buffer,
-                  release_callback, iree_allocator_system(), out_file_handle);
+                  release_callback, iree_allocator_default(), out_file_handle);
               if (!iree_status_is_ok(status)) {
                 iree_file_contents_free(file_contents);
               }
@@ -329,7 +329,7 @@ void SetupIoBindings(py::module_ &m) {
                                    file_open_callback,
                                    &file_open_user_data,
                                },
-                               file_offset, iree_allocator_system()),
+                               file_offset, iree_allocator_default()),
                            "Error building parameter archive");
 
             // Return the target index.

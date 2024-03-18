@@ -285,7 +285,7 @@ void iree_uk_make_cpu_data_for_features(const char* cpu_features,
 }
 
 static void iree_uk_initialize_cpu_expensive(void) {
-  iree_cpu_initialize(iree_allocator_system());
+  iree_cpu_initialize(iree_allocator_default());
 }
 
 void iree_uk_initialize_cpu_once(void) {

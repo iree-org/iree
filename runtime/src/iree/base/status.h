@@ -526,7 +526,7 @@ IREE_API_EXPORT bool iree_status_format(iree_status_t status,
 // it) and must be non-NULL.
 //
 // Example:
-//  iree_allocator_t allocator = iree_allocator_system();
+//  iree_allocator_t allocator = iree_allocator_default();
 //  char* buffer = NULL;
 //  iree_host_size_t length = 0;
 //  if (iree_status_to_string(status, &allocator, &buffer, &length)) {

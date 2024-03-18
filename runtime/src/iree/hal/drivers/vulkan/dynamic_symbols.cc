@@ -160,7 +160,8 @@ iree_status_t DynamicSymbols::CreateFromSystemLoader(
   iree_dynamic_library_t* loader_library = NULL;
   iree_status_t status = iree_dynamic_library_load_from_files(
       IREE_ARRAYSIZE(kVulkanLoaderSearchNames), kVulkanLoaderSearchNames,
-      IREE_DYNAMIC_LIBRARY_FLAG_NONE, iree_allocator_system(), &loader_library);
+      IREE_DYNAMIC_LIBRARY_FLAG_NONE, iree_allocator_default(),
+      &loader_library);
   if (iree_status_is_not_found(status)) {
     iree_status_ignore(status);
     return iree_make_status(

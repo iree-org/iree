@@ -23,7 +23,7 @@ using ::testing::HasSubstr;
 struct StringBuilder {
   static StringBuilder MakeSystem() {
     iree_string_builder_t builder;
-    iree_string_builder_initialize(iree_allocator_system(), &builder);
+    iree_string_builder_initialize(iree_allocator_default(), &builder);
     return StringBuilder(builder);
   }
   static StringBuilder MakeEmpty() {
@@ -174,7 +174,7 @@ class BufferViewMatchersTest : public ::testing::Test {
   iree_hal_allocator_t* device_allocator_ = nullptr;
   virtual void SetUp() {
     IREE_CHECK_OK(iree_hal_allocator_create_heap(
-        IREE_SV("heap"), iree_allocator_system(), iree_allocator_system(),
+        IREE_SV("heap"), iree_allocator_default(), iree_allocator_default(),
         &device_allocator_));
   }
   virtual void TearDown() { iree_hal_allocator_release(device_allocator_); }
@@ -198,7 +198,7 @@ class BufferViewMatchersTest : public ::testing::Test {
     BufferView buffer_view;
     IREE_RETURN_IF_ERROR(iree_hal_buffer_view_create(
         buffer, shape.size(), shape.data(), element_type,
-        IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, iree_allocator_system(),
+        IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR, iree_allocator_default(),
         &buffer_view));
     return std::move(buffer_view);
   }

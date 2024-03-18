@@ -308,7 +308,7 @@ int main(int argc, char** argv) {
 
   iree_hal_executable_plugin_manager_t* plugin_manager = NULL;
   IREE_CHECK_OK(iree_hal_executable_plugin_manager_create_from_flags(
-      iree_allocator_system(), &plugin_manager));
+      iree_allocator_default(), &plugin_manager));
 
   // TODO(benvanik): override these with our own flags.
   iree_benchmark_def_t benchmark_def = {

@@ -578,7 +578,7 @@ iree_status_annotate(iree_status_t base_status, iree_string_view_t message) {
     return base_status;
   }
 
-  iree_allocator_t allocator = iree_allocator_system();
+  iree_allocator_t allocator = iree_allocator_default();
   iree_status_payload_message_t* payload = NULL;
   iree_status_ignore(
       iree_allocator_malloc(allocator, sizeof(*payload), (void**)&payload));
@@ -615,7 +615,7 @@ IREE_MUST_USE_RESULT static iree_status_t iree_status_annotate_vf(
   // Allocate storage with the additional room to store the formatted message.
   // This avoids additional allocations for the common case of a message coming
   // only from the original status error site.
-  iree_allocator_t allocator = iree_allocator_system();
+  iree_allocator_t allocator = iree_allocator_default();
   iree_status_payload_message_t* payload = NULL;
   iree_status_ignore(iree_allocator_malloc(
       allocator, sizeof(*payload) + message_size, (void**)&payload));
@@ -903,7 +903,7 @@ IREE_API_EXPORT bool iree_status_to_string(
 IREE_API_EXPORT void iree_status_fprint(FILE* file, iree_status_t status) {
   // TODO(benvanik): better support for colors/etc - possibly move to logging.
   // TODO(benvanik): do this without allocation by streaming the status.
-  iree_allocator_t allocator = iree_allocator_system();
+  iree_allocator_t allocator = iree_allocator_default();
   char* status_buffer = NULL;
   iree_host_size_t status_buffer_length = 0;
   if (iree_status_to_string(status, &allocator, &status_buffer,

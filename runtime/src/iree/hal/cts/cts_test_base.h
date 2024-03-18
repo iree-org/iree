@@ -57,7 +57,7 @@ class CtsTestBase : public ::testing::TestWithParam<std::string> {
 
     iree_hal_device_t* device = NULL;
     status = iree_hal_driver_create_default_device(
-        driver_, iree_allocator_system(), &device);
+        driver_, iree_allocator_default(), &device);
     if (iree_status_is_unavailable(status)) {
       iree_status_free(status);
       GTEST_SKIP() << "Skipping test as default device for '" << driver_name
@@ -146,7 +146,7 @@ class CtsTestBase : public ::testing::TestWithParam<std::string> {
     iree_status_t status = iree_hal_driver_registry_try_create(
         iree_hal_driver_registry_default(),
         iree_make_string_view(driver_name.data(), driver_name.size()),
-        iree_allocator_system(), &driver);
+        iree_allocator_default(), &driver);
     if (iree_status_is_unavailable(status)) {
       unavailable_driver_names.insert(driver_name);
     }

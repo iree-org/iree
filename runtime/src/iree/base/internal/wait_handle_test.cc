@@ -237,7 +237,7 @@ TEST(WaitSet, Lifetime) {
 
   iree_wait_set_t* wait_set = NULL;
   IREE_ASSERT_OK(
-      iree_wait_set_allocate(128, iree_allocator_system(), &wait_set));
+      iree_wait_set_allocate(128, iree_allocator_default(), &wait_set));
   IREE_ASSERT_OK(iree_wait_set_insert(wait_set, event));
   IREE_ASSERT_OK(iree_wait_set_insert(wait_set, event));
   iree_wait_set_erase(wait_set, event);
@@ -250,7 +250,7 @@ TEST(WaitSet, Lifetime) {
 TEST(WaitSet, UnreasonableCapacity) {
   iree_wait_set_t* wait_set = NULL;
   iree_status_t status = iree_wait_set_allocate(
-      1 * 1024 * 1024, iree_allocator_system(), &wait_set);
+      1 * 1024 * 1024, iree_allocator_default(), &wait_set);
   IREE_EXPECT_STATUS_IS(IREE_STATUS_INVALID_ARGUMENT, status);
   iree_status_free(status);
 }
@@ -262,7 +262,7 @@ TEST(WaitSet, Deduplication) {
   IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/true, &ev_dupe));
   iree_wait_set_t* wait_set = NULL;
   IREE_ASSERT_OK(
-      iree_wait_set_allocate(128, iree_allocator_system(), &wait_set));
+      iree_wait_set_allocate(128, iree_allocator_default(), &wait_set));
 
   // We want to test for duplication on ev_dupe here so ensure it's added.
   IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_unset));
@@ -310,7 +310,7 @@ TEST(WaitSet, Clear) {
   IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/true, &ev_dupe));
   iree_wait_set_t* wait_set = NULL;
   IREE_ASSERT_OK(
-      iree_wait_set_allocate(128, iree_allocator_system(), &wait_set));
+      iree_wait_set_allocate(128, iree_allocator_default(), &wait_set));
 
   // We want to test for duplication o n ev_dupe here.
   IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_unset));
@@ -349,7 +349,7 @@ TEST(WaitSet, WaitAllPolling) {
   IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/true, &ev_set_1));
   iree_wait_set_t* wait_set = NULL;
   IREE_ASSERT_OK(
-      iree_wait_set_allocate(128, iree_allocator_system(), &wait_set));
+      iree_wait_set_allocate(128, iree_allocator_default(), &wait_set));
 
   // Polls when empty should never block.
   iree_wait_set_clear(wait_set);
@@ -394,7 +394,7 @@ TEST(WaitSet, WaitAllTimeout) {
   IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/true, &ev_set_1));
   iree_wait_set_t* wait_set = NULL;
   IREE_ASSERT_OK(
-      iree_wait_set_allocate(128, iree_allocator_system(), &wait_set));
+      iree_wait_set_allocate(128, iree_allocator_default(), &wait_set));
 
   // Timeouts when empty should never block.
   iree_wait_set_clear(wait_set);
@@ -442,7 +442,7 @@ TEST(WaitSet, WaitAllBlocking) {
   IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/true, &ev_set_1));
   iree_wait_set_t* wait_set = NULL;
   IREE_ASSERT_OK(
-      iree_wait_set_allocate(128, iree_allocator_system(), &wait_set));
+      iree_wait_set_allocate(128, iree_allocator_default(), &wait_set));
 
   // Throw in some other set handles so that we are multi-waiting for just the
   // thread_to_main event to be set.
@@ -474,7 +474,7 @@ TEST(WaitSet, WaitAllDuplicates) {
   IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/true, &ev_set));
   iree_wait_set_t* wait_set = NULL;
   IREE_ASSERT_OK(
-      iree_wait_set_allocate(128, iree_allocator_system(), &wait_set));
+      iree_wait_set_allocate(128, iree_allocator_default(), &wait_set));
 
   IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_set));
   IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_set));
@@ -497,7 +497,7 @@ TEST(WaitSet, WaitAny) {
   IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/true, &ev_set));
   iree_wait_set_t* wait_set = NULL;
   IREE_ASSERT_OK(
-      iree_wait_set_allocate(128, iree_allocator_system(), &wait_set));
+      iree_wait_set_allocate(128, iree_allocator_default(), &wait_set));
 
   IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_unset));
   IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_set));
@@ -524,7 +524,7 @@ TEST(WaitSet, WaitAnyPolling) {
   IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/true, &ev_set_1));
   iree_wait_set_t* wait_set = NULL;
   IREE_ASSERT_OK(
-      iree_wait_set_allocate(128, iree_allocator_system(), &wait_set));
+      iree_wait_set_allocate(128, iree_allocator_default(), &wait_set));
 
   iree_wait_handle_t empty_handle;
   memset(&empty_handle, 0, sizeof(empty_handle));
@@ -591,7 +591,7 @@ TEST(WaitSet, WaitAnyTimeout) {
   IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/true, &ev_set_1));
   iree_wait_set_t* wait_set = NULL;
   IREE_ASSERT_OK(
-      iree_wait_set_allocate(128, iree_allocator_system(), &wait_set));
+      iree_wait_set_allocate(128, iree_allocator_default(), &wait_set));
 
   iree_wait_handle_t empty_handle;
   memset(&empty_handle, 0, sizeof(empty_handle));
@@ -656,7 +656,7 @@ TEST(WaitSet, WaitAnyBlocking) {
   IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/false, &ev_unset_1));
   iree_wait_set_t* wait_set = NULL;
   IREE_ASSERT_OK(
-      iree_wait_set_allocate(128, iree_allocator_system(), &wait_set));
+      iree_wait_set_allocate(128, iree_allocator_default(), &wait_set));
 
   // Throw in some unset handles so that we are multi-waiting for just the
   // thread_to_main event to be set.
@@ -696,7 +696,7 @@ TEST(WaitSet, WaitAnyErase) {
   IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/true, &ev_set));
   iree_wait_set_t* wait_set = NULL;
   IREE_ASSERT_OK(
-      iree_wait_set_allocate(128, iree_allocator_system(), &wait_set));
+      iree_wait_set_allocate(128, iree_allocator_default(), &wait_set));
 
   IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_unset_0));
   IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_set));
@@ -734,7 +734,7 @@ TEST(WaitSet, WaitAnyEraseTail) {
   IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/true, &ev_set));
   iree_wait_set_t* wait_set = NULL;
   IREE_ASSERT_OK(
-      iree_wait_set_allocate(128, iree_allocator_system(), &wait_set));
+      iree_wait_set_allocate(128, iree_allocator_default(), &wait_set));
 
   IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_unset));
   IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_set));
@@ -770,7 +770,7 @@ TEST(WaitSet, WaitAnyEraseSplit) {
   IREE_ASSERT_OK(iree_event_initialize(/*initial_state=*/true, &ev_set));
   iree_wait_set_t* wait_set = NULL;
   IREE_ASSERT_OK(
-      iree_wait_set_allocate(128, iree_allocator_system(), &wait_set));
+      iree_wait_set_allocate(128, iree_allocator_default(), &wait_set));
 
   IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_unset));
   IREE_ASSERT_OK(iree_wait_set_insert(wait_set, ev_set));

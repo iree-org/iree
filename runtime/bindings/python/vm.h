@@ -89,7 +89,7 @@ class VmVariantList : public ApiRefCounted<VmVariantList, iree_vm_list_t> {
     iree_vm_list_t* list;
     CheckApiStatus(
         iree_vm_list_create(iree_vm_make_undefined_type_def(), capacity,
-                            iree_allocator_system(), &list),
+                            iree_allocator_default(), &list),
         "Error allocating variant list");
     return VmVariantList::StealFromRawPtr(list);
   }
