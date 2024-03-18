@@ -899,7 +899,6 @@ static LogicalResult setWinogradOpConfig(mlir::FunctionOpInterface entryPoint,
   // workgroup size. The tile sizes below are placeholders and were obtained
   // by manual tuning on the AMD Navi2 GPU on a small set of convolution
   // sizes found in the StableDiffusion model.
-  llvm::dbgs() << "using normal KenelConfig\n";
   auto pipeline =
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUWinogradVectorize;
   std::array<int64_t, 3> workgroupSize = {64, 4, 4};
