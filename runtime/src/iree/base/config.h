@@ -99,7 +99,15 @@ typedef IREE_DEVICE_SIZE_T iree_device_size_t;
 //===----------------------------------------------------------------------===//
 
 #if !defined(IREE_ALLOCATOR_ENABLE_MIALLOC)
+#if defined(__riscv)
+// Our RV32 CI reports various compilation errors that lead us to believe
+// this is not supported on RISC-V. RV64 was not tested nor any dilligence
+// done. If you know things about this platform and support for mialloc,
+// feel free to better specify this clause.
+#define IREE_ALLOCATOR_ENABLE_MIALLOC 0
+#else
 #define IREE_ALLOCATOR_ENABLE_MIALLOC 1
+#endif
 #endif  // !IREE_ALLOCATOR_ENABLE_MIALLOC
 
 #if !defined(IREE_ALLOCATOR_DEFAULT)
