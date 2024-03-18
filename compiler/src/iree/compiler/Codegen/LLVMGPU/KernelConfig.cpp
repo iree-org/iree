@@ -448,12 +448,17 @@ setConvolutionVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   workgroupTileSizes[kDim] = schedule->kTileCount * schedule->kSize;
 
   // Tile all filter loop dimensions to 1.
+  SmallVector<int64_t> filterSizes;
   for (int64_t filterDim : convolutionDims->filterLoop) {
     workgroupTileSizes[filterDim] = 1;
+    filterSizes.push_back(bounds[filterDim]);
   }
 
+  bool useConvDistribute =
+      clGPUUseConvVectorDistributePipeline && !isAllOnesList(filterSizes);
+
   TileSizesListType tileSizes;
-  if (!clGPUUseConvVectorDistributePipeline) {
+  if (!useConvDistribute) {
     tileSizes.push_back(workgroupTileSizes);
   } else {
     SmallVector<int64_t> fstLevelTileSizes = workgroupTileSizes;
@@ -482,7 +487,7 @@ setConvolutionVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
 
   auto pipeline =
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorDistribute;
-  if (clGPUUseConvVectorDistributePipeline) {
+  if (useConvDistribute) {
     pipeline = IREE::Codegen::DispatchLoweringPassPipeline::
         LLVMGPUConvVectorDistribute;
   }
