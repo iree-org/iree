@@ -689,6 +689,27 @@ static void enforceLayoutToContractionOp(
   update(value, changed);
 }
 
+static void enforceLayoutToGatherOp(
+    vector::GatherOp gather, ArrayRef<DistributionLayout *> operandLattices,
+    ArrayRef<const DistributionLayout *> resultLattices,
+    std::function<void(DistributionLayout *, ChangeResult)> update) {
+  // Gather has only one vector result.
+  const DistributionLayout *result = resultLattices[0];
+
+  if (result->hasLayout()) {
+    // Note that the operand lattice is not updated. So using the operand
+    // lattice again can cause bugs.
+    for (auto [index, operandLattice] : llvm::enumerate(operandLattices)) {
+      ChangeResult changed = operandLattice->resolveWithPossibleConflict(
+          result, getOpOperand(gather, index));
+      update(operandLattice, changed);
+    }
+  } else {
+    // Enforce the same layout on all operands.
+    enforceSameLayoutForOperands(gather, operandLattices, update);
+  }
+}
+
 void enforcementTransferFunction(
     Operation *op, ArrayRef<DistributionLayout *> operandLattices,
     ArrayRef<const DistributionLayout *> resultLattices,
@@ -721,6 +742,11 @@ void enforcementTransferFunction(
   if (auto contraction = dyn_cast<vector::ContractionOp>(op)) {
     enforceLayoutToContractionOp(contraction, operandLattices, resultLattices,
                                  update);
+    return;
+  }
+
+  if (auto gather = dyn_cast<vector::GatherOp>(op)) {
+    enforceLayoutToGatherOp(gather, operandLattices, resultLattices, update);
     return;
   }
 }
