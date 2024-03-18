@@ -176,10 +176,10 @@ static void populateWarpAndThreadIndices(RewriterBase &rewriter, Value threadId,
   // Subgroup and thread (lane) indices normalized to the order in which
   // they are used by each dimension.
   warpIndices = llvm::to_vector(
-      llvm::map_range(vectorLayout.getSubgroupOrder(),
+      llvm::map_range(invertPermutationVector(vectorLayout.getSubgroupOrder()),
                       [&](int64_t i) { return filteredSubgroupIds[i]; }));
   threadIndices = llvm::to_vector(
-      llvm::map_range(vectorLayout.getThreadOrder(),
+      llvm::map_range(invertPermutationVector(vectorLayout.getThreadOrder()),
                       [&](int64_t i) { return filteredThreadIds[i]; }));
 }
 
@@ -249,6 +249,14 @@ struct DistributeTransferRead final
           readOp.getPermutationMapAttr(), readOp.getPadding(), readOp.getMask(),
           readOp.getInBoundsAttr());
       // Transpose to the element order.
+      //
+      // A = transfer_read
+      // B = transpose A
+      //
+      // P(A) = I
+      //
+      // P(A) * perm = P(B)
+      // perm = P(B)
       if (!isIdentityPermutation(vectorLayout.getElementOrder())) {
         slicedRead = rewriter.create<vector::TransposeOp>(
             slicedRead.getLoc(), slicedRead, vectorLayout.getElementOrder());
@@ -320,6 +328,14 @@ struct DistributeTransferWrite final
           writeOp.getLoc(), distributedVector,
           offsetArray.take_front(rank * 2));
       // Transpose to the native dimension order.
+      // B = transpose(A)
+      // transfer_write B
+      //
+      // P(B) = I
+      //
+      // P(A) * perm = P(B)
+      // P(A) * perm = I
+      // perm = P(A) ^ -1
       if (!isIdentityPermutation(vectorLayout.getElementOrder())) {
         slicedVector = rewriter.create<vector::TransposeOp>(
             slicedVector.getLoc(), slicedVector,
