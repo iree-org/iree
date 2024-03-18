@@ -209,7 +209,7 @@ public:
         return failure();
       }
       auto globalInit = global.getGlobalInitialValue();
-      kernelAttr = dyn_cast<DenseIntOrFPElementsAttr>(globalInit);
+      kernelAttr = dyn_cast_if_present<DenseIntOrFPElementsAttr>(globalInit);
       if (!kernelAttr) {
         return failure();
       }
@@ -496,7 +496,7 @@ struct ConvertConv2DToWinogradPass
     auto moduleOp = getOperation();
     SymbolTable symbolTable(moduleOp);
     patterns.insert<FoldWinogradFilterTransform<linalg::Conv2DNchwFchwOp>,
-                    FoldWinogradFilterTransform<linalg::Conv2DNchwFchwOp>>(
+                    FoldWinogradFilterTransform<linalg::Conv2DNhwcHwcfOp>>(
         context, symbolTable);
     patterns.insert<ConvertConvToWinograd<linalg::Conv2DNhwcHwcfOp>,
                     ConvertConvToWinograd<linalg::Conv2DNchwFchwOp>>(context);
