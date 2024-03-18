@@ -32,7 +32,7 @@ static Value getPaddedValue(RewriterBase &rewriter, Location loc,
       RankedTensorType::get(paddedShape, sourceType.getElementType());
   Value paddingValue = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getZeroAttr(sourceType.getElementType()));
-  SmallVector<OpFoldResult> low(4, rewriter.getIndexAttr(0));
+  SmallVector<OpFoldResult> low(padding.size(), rewriter.getIndexAttr(0));
   auto high = llvm::map_to_vector(padding, [&](int64_t v) -> OpFoldResult {
     return rewriter.getIndexAttr(v);
   });
@@ -161,6 +161,66 @@ static void padConvOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
       linalgOp, paddedConv2dOp->getResults()[0], offsets, sizes, strides);
 }
 
+static void padBatchGemmOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
+                           ArrayRef<GPUMatmulShapeType> intrinsics) {
+  if (!isa<linalg::BatchMatmulOp>(linalgOp)) {
+    return;
+  }
+
+  // Try to search for pad value.
+  SmallVector<int64_t, 4> bounds = linalgOp.getStaticLoopRanges();
+  int64_t mSize = bounds[1];
+  if (ShapedType::isDynamic(mSize)) {
+    return;
+  }
+  SmallVector<std::array<int64_t, 3>> mnkPaddingCandidates;
+  for (auto &intrinsic : intrinsics) {
+    std::optional<int64_t> mPadding, nPadding, kPadding;
+    auto getPadding = [](int64_t value, int64_t padTo) {
+      return ((value + padTo - 1) / padTo) * padTo - value;
+    };
+
+    if (mSize % intrinsic.mSize != 0) {
+      mPadding = getPadding(mSize, intrinsic.mSize);
+    }
+
+    if (!mPadding && !nPadding && !kPadding) {
+      // Some intrinsic matches. Nothing to do.
+      return;
+    }
+    mnkPaddingCandidates.push_back(
+        {mPadding.value_or(0), nPadding.value_or(0), kPadding.value_or(0)});
+  }
+  if (mnkPaddingCandidates.empty()) {
+    return;
+  }
+  std::array<int64_t, 3> mnkPadding = mnkPaddingCandidates.front();
+
+  Value newLhs = linalgOp.getDpsInputOperand(0)->get();
+  Value newRhs = linalgOp.getDpsInputOperand(1)->get();
+  Value newOuts = linalgOp.getDpsInitOperand(0)->get();
+
+  Location loc = linalgOp.getLoc();
+  int64_t mPadding = mnkPadding[0];
+  assert(mPadding != 0);
+  newLhs = getPaddedValue(rewriter, loc, newLhs, {0, mPadding, 0});
+  newOuts = getPaddedValue(rewriter, loc, newOuts, {0, mPadding, 0});
+  auto paddedMatmulOp = mlir::clone(rewriter, linalgOp, {newOuts.getType()},
+                                    ArrayRef<Value>{newLhs, newRhs, newOuts});
+
+  // extract slice.
+  auto zero = rewriter.getI64IntegerAttr(0);
+  auto one = rewriter.getI64IntegerAttr(1);
+  SmallVector<OpFoldResult> offsets(3, zero), strides(3, one), sizes;
+  auto resultType = linalgOp->getResult(0).getType().cast<RankedTensorType>();
+  auto resultShape = resultType.getShape();
+  sizes = {rewriter.getIndexAttr(resultShape[0]),
+           rewriter.getIndexAttr(resultShape[1]),
+           rewriter.getIndexAttr(resultShape[2])};
+  rewriter.replaceOpWithNewOp<tensor::ExtractSliceOp>(
+      linalgOp, paddedMatmulOp->getResults()[0], offsets, sizes, strides);
+}
+
 namespace {
 
 class PadToIntrinsicsPass : public PadToIntrinsicsBase<PadToIntrinsicsPass> {
@@ -191,15 +251,23 @@ public:
       intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType);
     }
 
-    SmallVector<linalg::LinalgOp> targetConvs;
-    funcOp->walk([&](linalg::Conv2DNhwcHwcfOp convOp) {
-      targetConvs.push_back(cast<linalg::LinalgOp>(convOp.getOperation()));
+    SmallVector<linalg::LinalgOp> targetOps;
+    funcOp->walk([&](linalg::LinalgOp linalgOp) {
+      if (isa<linalg::Conv2DNhwcHwcfOp, linalg::BatchMatmulOp>(
+              linalgOp.getOperation()))
+        targetOps.push_back(linalgOp);
     });
 
     IRRewriter rewriter(context);
-    for (auto convOp : llvm::make_early_inc_range(targetConvs)) {
-      rewriter.setInsertionPoint(convOp);
-      padConvOp(rewriter, convOp, intrinsics);
+    for (auto linalgOp : llvm::make_early_inc_range(targetOps)) {
+      rewriter.setInsertionPoint(linalgOp);
+      TypeSwitch<Operation *, void>(linalgOp.getOperation())
+          .Case<linalg::Conv2DNhwcHwcfOp>(
+              [&](auto convOp) { padConvOp(rewriter, linalgOp, intrinsics); })
+          .Case<linalg::BatchMatmulOp>([&](auto matmulOp) {
+            padBatchGemmOp(rewriter, linalgOp, intrinsics);
+          })
+          .Default([&](Operation *op) {});
     }
   }
 };
