@@ -49,6 +49,12 @@ llvm::cl::opt<bool> clGPUUseConvVectorDistributePipeline(
     llvm::cl::desc("enable the usage of the conv vector distribution pipeline"),
     llvm::cl::init(false));
 
+llvm::cl::opt<bool> clGPUReduceSkinnyMatmuls(
+    "iree-codegen-llvmgpu-reduce-skinny-matmuls",
+    llvm::cl::desc("Use vector reduction pipeline for skinny matmul. This may "
+                   "lead to precission loss."),
+    llvm::cl::init(false));
+
 llvm::cl::opt<bool> clGPUEnableTransformDialectJit(
     "iree-codegen-llvmgpu-enable-transform-dialect-jit",
     llvm::cl::desc("enable the usage of the transform dialect JIT"),
@@ -688,6 +694,18 @@ static LogicalResult setContractConfig(mlir::FunctionOpInterface entryPoint,
   }
   if (staticNonUnitParallelDimCount <= 1)
     return failure();
+
+  if (clGPUReduceSkinnyMatmuls) {
+    // Send 2xNxK matmuls to the vector reduction pipeline, similar to matvec.
+    // Note: Because of reassociation in the vector reduction pipeline, this may
+    // lead to precission loss.
+    if (llvm::all_equal({contractionDims->m.size(), contractionDims->n.size(),
+                         contractionDims->k.size(), size_t{1}}) &&
+        (bounds[contractionDims->m.front()] <= 2 ||
+         bounds[contractionDims->n.front()] <= 2)) {
+      return failure();
+    }
+  }
 
   // Don't consider operations that don't have a broadcast, those should go
   // through reductions.
