@@ -67,10 +67,10 @@ jobs:
       #   run: |
       #     source ${VENV_DIR}/bin/activate
       #     python -m pip install -r SHARK-TestSuite/iree_tests/requirements.txt
-      # - name: Run external TestSuite tests
-      #   env:
-      #     IREE_TEST_CONFIG_FILES: experimental/regression_suite/external_test_suite/onnx_gpu_rocm_rdna3.json
+      # - name: Run external tests - ONNX test suite
       #   run: |
       #     source ${VENV_DIR}/bin/activate
       #     export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/rocm/lib:/opt/rocm/hip/lib
-      #     pytest SHARK-TestSuite/iree_tests -n 4 -rpfE --timeout=30 --retries=2
+      #     pytest SHARK-TestSuite/iree_tests/onnx/ \
+      #         -n 4 -rpfE --timeout=30 --retries=2 --durations=20 \
+      #         --config-files=experimental/regression_suite/external_test_suite/onnx_gpu_rocm_rdna3.json
