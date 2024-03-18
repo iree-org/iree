@@ -25,7 +25,9 @@
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/Dialect/SPIRV/Linking/ModuleCombiner.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/DialectResourceBlobManager.h"
 #include "mlir/Target/SPIRV/Serialization.h"
 
 namespace mlir::iree_compiler::IREE::HAL {
@@ -222,6 +224,25 @@ public:
     FlatbufferBuilder builder;
     iree_hal_spirv_ExecutableDef_start_as_root(builder);
 
+    // Attach embedded source file contents.
+    SmallVector<iree_hal_spirv_SourceFileDef_ref_t> sourceFileRefs;
+    if (auto sourcesAttr = variantOp.getSourcesAttr()) {
+      for (auto sourceAttr : llvm::reverse(sourcesAttr.getValue())) {
+        if (auto resourceAttr = dyn_cast_if_present<DenseResourceElementsAttr>(
+                sourceAttr.getValue())) {
+          auto filenameRef = builder.createString(sourceAttr.getName());
+          auto contentRef = builder.streamUint8Vec([&](llvm::raw_ostream &os) {
+            auto blobData = resourceAttr.getRawHandle().getBlob()->getData();
+            os.write(blobData.data(), blobData.size());
+            return true;
+          });
+          sourceFileRefs.push_back(iree_hal_spirv_SourceFileDef_create(
+              builder, filenameRef, contentRef));
+        }
+      }
+      std::reverse(sourceFileRefs.begin(), sourceFileRefs.end());
+    }
+
     // The list of shader modules.
     SmallVector<iree_hal_spirv_ShaderModuleDef_ref_t> shaderModuleRefs;
 
@@ -236,10 +257,9 @@ public:
     subgroupSizes.resize(ordinalCount);
     shaderModuleIndices.resize(ordinalCount);
 
-    bool hasAnySubgroupSizes = false;
-
     // Iterate over all spirv.module ops and encode them into the FlatBuffer
     // data structure.
+    bool hasAnySubgroupSizes = false;
     for (spirv::ModuleOp spvModuleOp : spirvModuleOps) {
       // Currently the spirv.module op should only have one entry point. Get it.
       auto spirvEntryPoints = spvModuleOp.getOps<spirv::EntryPointOp>();
@@ -299,7 +319,37 @@ public:
           sourceLocationRefs[ordinal] = iree_hal_spirv_FileLineLocDef_create(
               builder, filenameRef, loc->getLine());
         }
-      };
+      }
+    }
+
+    // Optional compilation stage source files.
+    SmallVector<iree_hal_spirv_StageLocationsDef_ref_t> stageLocationsRefs;
+    if (options.debugLevel >= 3) {
+      for (auto exportOp : exportOps) {
+        SmallVector<iree_hal_spirv_StageLocationDef_ref_t> stageLocationRefs;
+        if (auto locsAttr = exportOp.getSourceLocsAttr()) {
+          for (auto locAttr : locsAttr.getValue()) {
+            if (auto loc =
+                    findFirstFileLoc(cast<LocationAttr>(locAttr.getValue()))) {
+              auto stageNameRef = builder.createString(locAttr.getName());
+              auto filenameRef = builder.createString(loc->getFilename());
+              stageLocationRefs.push_back(
+                  iree_hal_spirv_StageLocationDef_create(
+                      builder, stageNameRef,
+                      iree_hal_spirv_FileLineLocDef_create(builder, filenameRef,
+                                                           loc->getLine())));
+            }
+          }
+        }
+        if (!stageLocationRefs.empty()) {
+          // We only ever resize to the maximum -- so all previous data will
+          // be kept as-is.
+          stageLocationsRefs.resize(ordinalCount);
+          int64_t ordinal = exportOp.getOrdinalAttr().getInt();
+          stageLocationsRefs[ordinal] = iree_hal_spirv_StageLocationsDef_create(
+              builder, builder.createOffsetVecDestructive(stageLocationRefs));
+        }
+      }
     }
 
     // Add top-level executable fields following their order of definition.
@@ -323,6 +373,16 @@ public:
           builder.createOffsetVecDestructive(sourceLocationRefs);
       iree_hal_spirv_ExecutableDef_source_locations_add(builder,
                                                         sourceLocationsRef);
+    }
+    if (!stageLocationsRefs.empty()) {
+      auto stageLocationsRef =
+          builder.createOffsetVecDestructive(stageLocationsRefs);
+      iree_hal_spirv_ExecutableDef_stage_locations_add(builder,
+                                                       stageLocationsRef);
+    }
+    if (!sourceFileRefs.empty()) {
+      auto sourceFilesRef = builder.createOffsetVecDestructive(sourceFileRefs);
+      iree_hal_spirv_ExecutableDef_source_files_add(builder, sourceFilesRef);
     }
 
     iree_hal_spirv_ExecutableDef_end_as_root(builder);

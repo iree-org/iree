@@ -2,10 +2,12 @@
 
 Projects built by community members:
 
-* The [SHARK](https://github.com/nod-ai/SHARK) project from
-  [nod.ai](https://nod.ai/) uses a forked version of IREE
-  ([SHARK-Runtime](https://github.com/nod-ai/SHARK-Runtime)), offering
-  highly tuned performance on a large corpus of machine learning programs.
+* The [SHARK](https://github.com/nod-ai/SHARK) and
+  [SRT](https://github.com/nod-ai/SRT) projects offer highly tuned performance
+  and user interfaces for running a large corpus of machine learning programs.
+
+* The [SHARK-Turbine](https://github.com/nod-ai/SHARK-Turbine) project provides
+  tools for bridging between PyTorch and IREE.
 
 * The [IREE Bare-Metal Arm Sample](https://github.com/iml130/iree-bare-metal-arm)
   shows how to build IREE with the
@@ -20,13 +22,9 @@ Projects built by community members:
 Official repositories:
 
 * [iree-jax](https://github.com/iree-org/iree-jax) is home to
-  IREE's support for [JAX](https://github.com/google/jax) programs.
+  IREE's AOT support for [JAX](https://github.com/google/jax) programs.
 
-* [iree-torch](https://github.com/iree-org/iree-torch) contains
-  IREE's [PyTorch](https://pytorch.org/) frontend, leveraging the
-  [torch-mlir](https://github.com/llvm/torch-mlir) project.
-
-* [iree-samples](https://github.com/iree-org/iree-samples)
+* [iree-experimental](https://github.com/iree-org/iree-experimental)
   includes various samples and prototypes built with IREE.
 
 * [iree-llvm-sandbox](https://github.com/iree-org/iree-llvm-sandbox)

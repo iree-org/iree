@@ -43,6 +43,7 @@ iree_cc_library(
     MLIRArmSMEDialect
     MLIRArmSMEToLLVMIRTranslation
     MLIRBuiltinToLLVMIRTranslation
+    MLIRIR
     MLIRLLVMDialect
     MLIRLLVMToLLVMIRTranslation
     MLIRPDLDialect
@@ -57,6 +58,7 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::HAL::Target::LLVMLinkerUtils
     iree::compiler::Dialect::LinalgExt::IR
+    iree::compiler::Dialect::Util::IR
     iree::compiler::PluginAPI
     iree::compiler::Utils
     iree::compiler::plugins::target::LLVMCPU::Builtins

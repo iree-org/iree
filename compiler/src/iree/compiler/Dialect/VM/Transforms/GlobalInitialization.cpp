@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Dialect/Util/Analysis/Explorer.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
 #include "iree/compiler/Dialect/VM/Transforms/Passes.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -80,48 +81,28 @@ static void exportFuncIfNeeded(IREE::VM::ModuleOp moduleOp,
   moduleBuilder.create<IREE::VM::ExportOp>(funcOp.getLoc(), funcOp);
 }
 
-// TODO(benvanik): make this a generic pass.
-// Updates the mutability of globals based on whether they are stored outside of
-// initializers. A more sophisticated analysis is required as initializers can
-// call functions and this will miss that (but that's ok).
+// Updates the mutability of globals based on whether they are stored anywhere
+// in the program. The mutability here is not for program analysis but because
+// the runtime needs to allocate rwdata for the global instead of embedding it
+// as a rodata constant.
 static void fixupGlobalMutability(Operation *moduleOp,
                                   SymbolTable &symbolTable) {
+  Explorer explorer(moduleOp, TraversalAction::SHALLOW);
+  explorer.setOpInterfaceAction<mlir::FunctionOpInterface>(
+      TraversalAction::RECURSE);
+  explorer.initialize();
   SmallVector<Operation *> deadOps;
-  for (auto &op : moduleOp->getRegion(0).front()) {
-    auto globalOp = dyn_cast<IREE::Util::GlobalOpInterface>(op);
-    if (!globalOp)
-      continue;
-    if (!cast<SymbolOpInterface>(op).isPrivate()) {
-      // May be used outside the module; treat as used and mutable.
-      globalOp.setGlobalMutable(true);
-      continue;
-    }
-    auto uses = symbolTable.getSymbolUses(globalOp, moduleOp);
-    if (!uses.has_value()) {
+  explorer.forEachGlobal([&](const Explorer::GlobalInfo *globalInfo) {
+    if (globalInfo->uses.empty()) {
       // No uses - erase the global entirely.
-      deadOps.push_back(globalOp);
-      continue;
+      deadOps.push_back(globalInfo->op);
+    } else {
+      // If there are stores mark the global as mutable.
+      globalInfo->op.setGlobalMutable(!globalInfo->getStores().empty());
     }
-    bool maybeStored = false;
-    for (auto use : uses.value()) {
-      auto *user = use.getUser();
-      if (isa<IREE::Util::GlobalAddressOpInterface>(user)) {
-        // Can't analyze indirect variables; assume mutated.
-        maybeStored = true;
-        break;
-      } else if (isa<IREE::Util::GlobalStoreOpInterface>(user)) {
-        maybeStored = true;
-      }
-    }
-    // NOTE: we could erase globals never loaded if we know that computing
-    // their value has no side effects.
-    if (maybeStored) {
-      globalOp.setGlobalMutable(true);
-    }
-  }
-  for (auto *deadOp : deadOps) {
+  });
+  for (auto *deadOp : deadOps)
     deadOp->erase();
-  }
 }
 
 } // namespace

@@ -100,6 +100,17 @@ void iree_hal_executable_library_deinitialize_imports(
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
+void iree_hal_executable_library_publish_source_files(
+    const iree_hal_executable_library_v0_t* library) {
+  for (uint32_t i = 0; i < library->sources.count; ++i) {
+    const iree_hal_executable_source_file_v0_t* source_file =
+        &library->sources.files[i];
+    IREE_TRACE_PUBLISH_SOURCE_FILE(source_file->path, source_file->path_length,
+                                   source_file->content,
+                                   source_file->content_length);
+  }
+}
+
 iree_zone_id_t iree_hal_executable_library_call_zone_begin(
     iree_string_view_t executable_identifier,
     const iree_hal_executable_library_v0_t* library, iree_host_size_t ordinal) {
@@ -113,17 +124,34 @@ iree_zone_id_t iree_hal_executable_library_call_zone_begin(
 
   const char* source_file = NULL;
   size_t source_file_length = 0;
-  uint32_t source_line;
-  if (library->exports.src_locs != NULL) {
-    // We have source location data, so use it.
-    source_file = library->exports.src_locs[ordinal].path;
-    source_file_length = library->exports.src_locs[ordinal].path_length;
-    source_line = library->exports.src_locs[ordinal].line;
-  } else {
-    // No source location data, so make do with what we have.
-    source_file = executable_identifier.data;
-    source_file_length = executable_identifier.size;
-    source_line = ordinal;
+  uint32_t source_line = 0;
+  if (library->exports.stage_locations != NULL) {
+    for (uint32_t i = 0; i < library->exports.stage_locations->count; ++i) {
+      // TODO(benvanik): a way to select what location is chosen. For now we
+      // just pick the first one.
+      // const char* name = library->exports.stage_locations->names[i];
+      const iree_hal_executable_source_location_v0_t* location =
+          &library->exports.stage_locations->locations[i];
+      source_file = location->path;
+      source_file_length = location->path_length;
+      source_line = location->line;
+      break;
+    }
+  }
+  if (source_file == NULL) {
+    if (library->exports.source_locations != NULL) {
+      // We have source location data, so use it.
+      const iree_hal_executable_source_location_v0_t* location =
+          &library->exports.source_locations[ordinal];
+      source_file = location->path;
+      source_file_length = location->path_length;
+      source_line = location->line;
+    } else {
+      // No source location data, so make do with what we have.
+      source_file = executable_identifier.data;
+      source_file_length = executable_identifier.size;
+      source_line = ordinal;
+    }
   }
 
   IREE_TRACE_ZONE_BEGIN_EXTERNAL(z0, source_file, source_file_length,

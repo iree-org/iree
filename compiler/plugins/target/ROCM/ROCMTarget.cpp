@@ -19,6 +19,7 @@
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/PluginAPI/Client.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
+#include "iree/compiler/Utils/ModuleUtils.h"
 #include "iree/compiler/Utils/ToolUtils.h"
 #include "iree/schemas/rocm_executable_def_builder.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
@@ -37,6 +38,8 @@
 #include "llvm/Transforms/Utils/Cloning.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/DialectResourceBlobManager.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Target/LLVMIR/Dialect/Builtin/BuiltinToLLVMIRTranslation.h"
@@ -48,12 +51,19 @@ namespace mlir::iree_compiler::IREE::HAL {
 
 namespace {
 
-struct ROCMOptions {
+class ROCMOptions {
+public:
   std::string targetChip = "gfx908";
-  bool linkBitcode = false;
-  std::string bitcodeDirectory;
+  bool linkBitcode = true;
   int wavesPerEu = 0;
   std::string enableROCMUkernels = "none";
+
+  const std::string &getBitcodeDirectory() const {
+    if (bitcodeDirectory.empty()) {
+      return getDefaultBitcodeDirectory();
+    }
+    return bitcodeDirectory;
+  }
 
   void bindOptions(OptionsBinder &binder) {
     static llvm::cl::OptionCategory category("ROCM HAL Target");
@@ -77,6 +87,14 @@ struct ROCMOptions {
             "`default`, `none`, `all`, or a comma-separated list of "
             "specific unprefixed microkernels to enable, e.g. `mmt4d`."));
   }
+
+private:
+  static const std::string &getDefaultBitcodeDirectory() {
+    static std::string defaultValue =
+        mlir::iree_compiler::findPlatformLibDirectory("rocm");
+    return defaultValue;
+  }
+  std::string bitcodeDirectory;
 };
 } // namespace
 
@@ -273,6 +291,7 @@ public:
     // Perform the translation in a separate context to avoid any
     // multi-threading issues.
     llvm::LLVMContext context;
+    const std::string &bitcodeDirectory = options.getBitcodeDirectory();
 
     // We name our files after the executable name so that they are easy to
     // track both during compilation (logs/artifacts/etc), as outputs (final
@@ -291,9 +310,11 @@ public:
     }
 
     // Collect all the entry point names.
-    llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps;
+    SmallVector<IREE::HAL::ExecutableExportOp> exportOps;
+    llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOpMap;
     for (auto op : variantOp.getExportOps()) {
-      exportOps[op.getSymName()] = op;
+      exportOps.push_back(op);
+      exportOpMap[op.getSymName()] = op;
     }
     std::vector<std::array<int32_t, 3>> workgroupSizes;
     SmallVector<uint32_t> workgroupLocalMemories;
@@ -306,7 +327,7 @@ public:
       if (llvmFunc->isDeclaration())
         continue;
       std::array<int32_t, 3> workgroupSize;
-      auto exportOp = exportOps[func.getName()];
+      auto exportOp = exportOpMap[func.getName()];
       if (std::optional<ArrayAttr> workgroupSizeAttr =
               exportOp.getWorkgroupSize()) {
         for (auto it : llvm::enumerate(workgroupSizeAttr.value())) {
@@ -395,9 +416,6 @@ public:
     for (llvm::Function &f : llvmModule->functions())
       f.addFnAttr(llvm::Attribute::AlwaysInline);
 
-    iree_compiler::FlatbufferBuilder builder;
-    iree_hal_rocm_ExecutableDef_start_as_root(builder);
-
     // Link user modules and libdevice (if required).
     // Note that linking order matters:
     llvm::Linker linker(*llvmModule);
@@ -410,21 +428,23 @@ public:
     if (!options.enableROCMUkernels.empty() &&
         options.enableROCMUkernels != "none") {
       auto enabledUkernelsStr = StringRef(options.enableROCMUkernels);
-      linkUkernelBCFiles(llvmModule.get(), variantOp.getLoc(),
-                         enabledUkernelsStr, options.targetChip,
-                         options.bitcodeDirectory,
-                         llvm::Linker::OverrideFromSrc, *targetMachine);
+      if (failed(linkUkernelBCFiles(
+              variantOp.getLoc(), llvmModule.get(), enabledUkernelsStr,
+              options.targetChip, bitcodeDirectory,
+              llvm::Linker::OverrideFromSrc, *targetMachine)))
+        return failure();
     }
     // Link module to Device Library
     if (options.linkBitcode) {
-      if (options.bitcodeDirectory.empty()) {
+      if (bitcodeDirectory.empty()) {
         return variantOp.emitError()
                << "cannot find ROCM bitcode files. Check your installation "
                   "consistency and in the worst case, set --iree-rocm-bc-dir= "
                   "to an explicit location on your system.";
       }
-      linkROCDLIfNecessary(llvmModule.get(), options.targetChip,
-                           options.bitcodeDirectory);
+      if (failed(linkROCDLIfNecessary(variantOp.getLoc(), llvmModule.get(),
+                                      options.targetChip, bitcodeDirectory)))
+        return failure();
     }
     if (!serOptions.dumpIntermediatesPath.empty()) {
       dumpModuleToPath(serOptions.dumpIntermediatesPath,
@@ -459,15 +479,86 @@ public:
                      variantOp.getName(), ".hsaco", targetHSACO);
     }
 
+    iree_compiler::FlatbufferBuilder builder;
+    iree_hal_rocm_ExecutableDef_start_as_root(builder);
+
+    // Attach embedded source file contents.
+    SmallVector<iree_hal_rocm_SourceFileDef_ref_t> sourceFileRefs;
+    if (auto sourcesAttr = variantOp.getSourcesAttr()) {
+      for (auto sourceAttr : llvm::reverse(sourcesAttr.getValue())) {
+        if (auto resourceAttr = dyn_cast_if_present<DenseResourceElementsAttr>(
+                sourceAttr.getValue())) {
+          auto filenameRef = builder.createString(sourceAttr.getName());
+          auto contentRef = builder.streamUint8Vec([&](llvm::raw_ostream &os) {
+            auto blobData = resourceAttr.getRawHandle().getBlob()->getData();
+            os.write(blobData.data(), blobData.size());
+            return true;
+          });
+          sourceFileRefs.push_back(iree_hal_rocm_SourceFileDef_create(
+              builder, filenameRef, contentRef));
+        }
+      }
+      std::reverse(sourceFileRefs.begin(), sourceFileRefs.end());
+    }
+
+    SmallVector<StringRef> entryPointNames;
+    SmallVector<iree_hal_rocm_FileLineLocDef_ref_t> sourceLocationRefs;
+    entryPointNames.resize(exportOps.size());
+    for (auto exportOp : exportOps) {
+      auto ordinalAttr = exportOp.getOrdinalAttr();
+      if (!ordinalAttr) {
+        return mlir::emitError(exportOp.getLoc())
+               << "could not compile rocm binary: export op is missing ordinal";
+      }
+      int64_t ordinal = ordinalAttr.getInt();
+      entryPointNames[ordinal] = exportOp.getName();
+
+      // Optional source location information for debugging/profiling.
+      if (serOptions.debugLevel >= 1) {
+        // We only ever resize to the maximum -- so all previous data will
+        // be kept as-is.
+        sourceLocationRefs.resize(exportOps.size());
+        if (auto loc = findFirstFileLoc(exportOp.getLoc())) {
+          auto filenameRef = builder.createString(loc->getFilename());
+          sourceLocationRefs[ordinal] = iree_hal_rocm_FileLineLocDef_create(
+              builder, filenameRef, loc->getLine());
+        }
+      }
+    }
+
+    // Optional compilation stage source files.
+    SmallVector<iree_hal_rocm_StageLocationsDef_ref_t> stageLocationsRefs;
+    if (serOptions.debugLevel >= 3) {
+      for (auto exportOp : exportOps) {
+        SmallVector<iree_hal_rocm_StageLocationDef_ref_t> stageLocationRefs;
+        if (auto locsAttr = exportOp.getSourceLocsAttr()) {
+          for (auto locAttr : locsAttr.getValue()) {
+            if (auto loc =
+                    findFirstFileLoc(cast<LocationAttr>(locAttr.getValue()))) {
+              auto stageNameRef = builder.createString(locAttr.getName());
+              auto filenameRef = builder.createString(loc->getFilename());
+              stageLocationRefs.push_back(iree_hal_rocm_StageLocationDef_create(
+                  builder, stageNameRef,
+                  iree_hal_rocm_FileLineLocDef_create(builder, filenameRef,
+                                                      loc->getLine())));
+            }
+          }
+        }
+        if (!stageLocationRefs.empty()) {
+          // We only ever resize to the maximum -- so all previous data will
+          // be kept as-is.
+          stageLocationsRefs.resize(exportOps.size());
+          int64_t ordinal = exportOp.getOrdinalAttr().getInt();
+          stageLocationsRefs[ordinal] = iree_hal_rocm_StageLocationsDef_create(
+              builder, builder.createOffsetVecDestructive(stageLocationRefs));
+        }
+      }
+    }
+
     auto hsacoRef = flatbuffers_string_create(builder, targetHSACO.c_str(),
                                               targetHSACO.size());
 
-    auto entryPointNames = llvm::map_to_vector<8>(
-        variantOp.getBlock()
-            .getOps<iree_compiler::IREE::HAL::ExecutableExportOp>(),
-        [&](auto op) { return op.getName(); });
     auto entryPointsRef = builder.createStringVec(entryPointNames);
-
     iree_hal_rocm_BlockSizeDef_vec_start(builder);
     auto blockSizes = workgroupSizes.begin();
     for (int i = 0, e = entryPointNames.size(); i < e; ++i) {
@@ -483,6 +574,22 @@ public:
     iree_hal_rocm_ExecutableDef_shared_memory_sizes_add(
         builder, workgroupLocalMemoriesRef);
     iree_hal_rocm_ExecutableDef_hsaco_image_add(builder, hsacoRef);
+    if (!sourceLocationRefs.empty()) {
+      auto sourceLocationsRef =
+          builder.createOffsetVecDestructive(sourceLocationRefs);
+      iree_hal_rocm_ExecutableDef_source_locations_add(builder,
+                                                       sourceLocationsRef);
+    }
+    if (!stageLocationsRefs.empty()) {
+      auto stageLocationsRef =
+          builder.createOffsetVecDestructive(stageLocationsRefs);
+      iree_hal_rocm_ExecutableDef_stage_locations_add(builder,
+                                                      stageLocationsRef);
+    }
+    if (!sourceFileRefs.empty()) {
+      auto sourceFilesRef = builder.createOffsetVecDestructive(sourceFileRefs);
+      iree_hal_rocm_ExecutableDef_source_files_add(builder, sourceFilesRef);
+    }
     iree_hal_rocm_ExecutableDef_end_as_root(builder);
 
     // Add the binary data to the target executable.
@@ -510,19 +617,11 @@ struct ROCMSession
     : public PluginSession<ROCMSession, ROCMOptions,
                            PluginActivationPolicy::DefaultActivated> {
   void populateHALTargetDevices(IREE::HAL::TargetDeviceList &targets) {
-    if (options.bitcodeDirectory.empty()) {
-      options.bitcodeDirectory = findPlatformLibDirectory("rocm");
-    }
-
     // #hal.device.target<"rocm", ...
     targets.add("rocm",
                 [&]() { return std::make_shared<ROCMTargetDevice>(options); });
   }
   void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {
-    if (options.bitcodeDirectory.empty()) {
-      options.bitcodeDirectory = findPlatformLibDirectory("rocm");
-    }
-
     // #hal.executable.target<"rocm", ...
     targets.add("rocm", [&]() {
       LLVMInitializeAMDGPUTarget();

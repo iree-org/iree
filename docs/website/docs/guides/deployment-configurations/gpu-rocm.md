@@ -77,16 +77,15 @@ following commands to compile:
 iree-compile \
     --iree-hal-target-backends=rocm \
     --iree-rocm-target-chip=<...> \
-    --iree-rocm-link-bc=true \
-    --iree-rocm-bc-dir=<...> \
     mobilenet_iree_input.mlir -o mobilenet_rocm.vmfb
 ```
 
-Note ROCm Bitcode Dir (`iree-rocm-bc-dir`) path is required. If the system
-you are compiling IREE in has ROCm installed, then the default value of
-`/opt/rocm/amdgcn/bitcode` will usually suffice. If you intend on building
-ROCm compiler in a non-ROCm capable system, please set `iree-rocm-bc-dir`
-to the absolute path where you might have saved the amdgcn bitcode.
+Note that IREE comes with bundled bitcode files, which are used for linking
+certain intrinsics on AMD GPUs. These will be used automatically or if the
+`--iree-rocm-bc-dir` is empty. As additional support may be needed for
+different chips, users can use this flag to point to an explicit directory.
+For example, in ROCm installations on Linux, this is often found under
+`/opt/rocm/amdgcn/bitcode`.
 
 Note that a ROCm target chip (`iree-rocm-target-chip`) of the form
 `gfx<arch_number>` is needed to compile towards each GPU architecture. If
@@ -94,12 +93,14 @@ no architecture is specified then we will default to `gfx908`.
 
 Here is a table of commonly used architectures:
 
-| AMD GPU   | Target Chip |
-| --------- | ----------- |
-| AMD MI25  | `gfx900`    |
-| AMD MI50  | `gfx906`    |
-| AMD MI60  | `gfx906`    |
-| AMD MI100 | `gfx908`    |
+| AMD GPU    | Target Chip |
+| ---------- | ----------- |
+| AMD MI25   | `gfx900`    |
+| AMD MI50   | `gfx906`    |
+| AMD MI60   | `gfx906`    |
+| AMD MI100  | `gfx908`    |
+| AMD MI300A | `gfx940`    |
+| AMD MI300  | `gfx942`    |
 
 ### :octicons-terminal-16: Run a compiled program
 

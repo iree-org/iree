@@ -243,7 +243,17 @@ void buildHALConfigurationPassPipeline(OpPassManager &passManager,
   // benchmarks using the substituted executables.
   addExecutableSubstitutionPasses(passManager, clSubstituteExecutableSource,
                                   clSubstituteExecutableSourcesFrom);
+
+  // If debug information is requested capture the MLIR source text of each
+  // executable variant and associate it with the entry points. This allows us
+  // to preserve this information after translation and the original input IR
+  // has been erased.
+  if (targetOptions.debugLevel >= 3) {
+    passManager.addPass(
+        IREE::HAL::createCaptureExecutableSourcesPass({"0_source"}));
+  }
 }
+
 //===----------------------------------------------------------------------===//
 // --iree-hal-transformation-pipeline
 //===----------------------------------------------------------------------===//
@@ -297,6 +307,13 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
           {targetOptions.executableConfigurationsPath, "configured"}));
     }
 
+    // If debug information is requested capture the MLIR source text of each
+    // configured executable variant and associate it with the entry points.
+    if (targetOptions.debugLevel >= 3) {
+      passManager.addPass(
+          IREE::HAL::createCaptureExecutableSourcesPass({"1_configured"}));
+    }
+
     // Substitute hal.executables we've configured with those specified on the
     // command line. This developer feature allows for hand editing the
     // configured executable with different lowering parameters.
@@ -336,6 +353,15 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
 
   if (compileTo == PipelinePhase::ExecutableTargets)
     return;
+
+  // If debug information is requested capture the translated MLIR source text
+  // of each executable variant and associate it with the entry points. This
+  // allows us to compare the input IR with the translated IR before
+  // serialization (LLVM dialect, SPIR-V dialect, etc).
+  if (targetOptions.debugLevel >= 3) {
+    passManager.addPass(
+        IREE::HAL::createCaptureExecutableSourcesPass({"2_translated"}));
+  }
 
   // Substitute hal.executables we've translated with those specified on the
   // command line. This developer feature allows for splicing in hand-authored

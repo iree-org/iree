@@ -45,7 +45,7 @@ Build Tracy capture (`iree-tracy-capture`) | Base instructions below for [depend
 Build Tracy profiler (`iree-tracy-profiler`) | Base instructions below for [dependencies](#install-dependencies) and [build](#build-the-tracy-tools) | Same plus [`capstone-next` instructions](#do-you-need-capstone-next) for CPU disassembly to work
 Build the IREE compiler (`iree-compile`) for profiling your own modules  | [Nothing particular](#build-the-iree-compiler-iree-compile) | Same
 Build the IREE compiler (`iree-compile`) for profiling the compiler itself | [Also need](#build-the-iree-compiler-iree-compile) CMake setting: `IREE_ENABLE_COMPILER_TRACING` | Same
-Compile your IREE module (run `iree-compile`) | [Nothing particular](#compile-your-iree-module-run-iree-compile) | [Also need](#additional-steps-for-sampling) to pass `--iree-llvmcpu-link-embedded=false` (and also, for `llvm-cpu` backend, pass `--iree-llvmcpu-debug-symbols=true`, but that is currently default).
+Compile your IREE module (run `iree-compile`) | [Nothing particular](#compile-your-iree-module-run-iree-compile) | [Also need](#additional-steps-for-sampling) to pass `--iree-llvmcpu-link-embedded=false` and `--iree-hal-dump-executable-sources-to=...` (and also, for `llvm-cpu` backend, pass `--iree-llvmcpu-debug-symbols=true`, but that is currently default).
 Build IREE device binaries (`iree-run-module` etc) | [Base instructions below](#build-iree-device-binaries-with-tracy-instrumentation-clients) (CMake: set `IREE_ENABLE_RUNTIME_TRACING`) | [Also need](#additional-steps-for-sampling-1) debug information (Set `CMAKE_BUILD_TYPE` to `RelWithDebInfo`).
 Run IREE device binaries loading your modules | [Nothing particular](#running-the-profiled-program) (May need to set the environment variable `TRACY_NO_EXIT=1` for short-running benchmarks) | [Also need](#additional-steps-for-sampling-2) to set the environment variable `IREE_PRESERVE_DYLIB_TEMP_FILES` and adjust device security settings or run as root depending on OS.
 Run Tracy capture (`iree-tracy-capture`) to collect the trace | If device!=host (e.g. Android), [set up TCP port forwarding](#running-the-tracy-capture-cli-connecting-and-saving-profiles). | Same
@@ -179,8 +179,12 @@ particular here. Just run `iree-compile` as usual.
 
 ### Additional steps for Sampling
 
-In order for Sampling to work with your compiled modules, add this flag to your
-`iree-compile` command line: `--iree-llvmcpu-link-embedded=false`.
+In order for Sampling to work with your compiled modules, add these flags to
+your `iree-compile` command line:
+
+* `--iree-llvmcpu-link-embedded=false`.
+* `--iree-hal-dump-executable-sources-to=...` (enter a suitable path, e.g. some
+  subdirectory below `/tmp`).
 
 For the `llvm-cpu` target backend, sampling features also rely on debug
 information in the compiled module, enabled by

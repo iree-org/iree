@@ -39,7 +39,7 @@ Importing from other frameworks is planned - stay tuned!
 Check out the samples in IREE's
 [`samples/` directory](https://github.com/openxla/iree/tree/main/samples),
 as well as the
-[iree-samples repository](https://github.com/iree-org/iree-samples).
+[iree-experimental repository](https://github.com/iree-org/iree-experimental).
 
 ## :octicons-package-dependents-16: Export/Import
 
