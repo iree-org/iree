@@ -526,6 +526,55 @@ struct FusionOfTensorOpsPass
       }
     }
 
+    {
+      // Do one mroe step of moving collapse shapes down to unblock tile and
+      // fuse.
+      // TODO: For now just the specific case for SDXL, but generalize when
+      // possible.
+      linalg::ControlFusionFn pushCollapseDownControlFn =
+          [](OpOperand *fusedOperand) {
+            Operation *producer = fusedOperand->get().getDefiningOp();
+            Operation *consumer = fusedOperand->getOwner();
+
+            if (!isNonNullAndOutsideDispatch({producer, consumer})) {
+              return false;
+            }
+
+            auto collapseShapeOp = dyn_cast<tensor::CollapseShapeOp>(producer);
+            if (!collapseShapeOp)
+              return false;
+
+            auto collapseSource =
+                collapseShapeOp.getSrc().getDefiningOp<linalg::LinalgOp>();
+            if (!collapseSource) {
+              return false;
+            }
+            if (linalg::isaContractionOpInterface(collapseSource)) {
+              return true;
+            }
+            return false;
+          };
+      RewritePatternSet pushCollapseDown(context);
+      linalg::populateFoldReshapeOpsByExpansionPatterns(
+          pushCollapseDown, pushCollapseDownControlFn);
+      affine::AffineApplyOp::getCanonicalizationPatterns(pushCollapseDown,
+                                                         context);
+      linalg::GenericOp::getCanonicalizationPatterns(pushCollapseDown, context);
+      tensor::ExpandShapeOp::getCanonicalizationPatterns(pushCollapseDown,
+                                                         context);
+      tensor::CollapseShapeOp::getCanonicalizationPatterns(pushCollapseDown,
+                                                           context);
+      memref::populateResolveRankedShapedTypeResultDimsPatterns(
+          pushCollapseDown);
+
+      GreedyRewriteConfig rewriteConfig;
+      rewriteConfig.maxIterations = GreedyRewriteConfig::kNoLimit;
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(pushCollapseDown), rewriteConfig))) {
+        return signalPassFailure();
+      }
+    }
+
     // Run fusion of producer with consumer when producer has multiple uses.
     // For now run this sequence a fixed times (2 by default). Ideally we
     // would run it till no candidates exist.
