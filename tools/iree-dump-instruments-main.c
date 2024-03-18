@@ -283,7 +283,7 @@ int main(int argc, char** argv) {
   iree_file_contents_t* file_contents = NULL;
   iree_status_t status =
       iree_file_read_contents(argv[1], IREE_FILE_READ_FLAG_DEFAULT,
-                              iree_allocator_system(), &file_contents);
+                              iree_allocator_default(), &file_contents);
   if (iree_status_is_ok(status)) {
     status =
         iree_tooling_dump_instrument_file(file_contents->const_buffer, stdout);

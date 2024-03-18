@@ -551,7 +551,7 @@ IREE_FLAG(string, output, "metadata",
 int main(int argc, char** argv) {
   IREE_TRACE_APP_ENTER();
 
-  iree_allocator_t host_allocator = iree_allocator_system();
+  iree_allocator_t host_allocator = iree_allocator_default();
   int exit_code = EXIT_SUCCESS;
 
   // Parse command line flags.

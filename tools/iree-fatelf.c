@@ -99,7 +99,7 @@ static iree_status_t fatelf_parse(iree_const_byte_span_t file_data,
   // Allocate storage for the parsed header and records.
   iree_fatelf_header_t* header = NULL;
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(
-      iree_allocator_system(),
+      iree_allocator_default(),
       sizeof(iree_fatelf_header_t) +
           host_header.record_count * sizeof(iree_fatelf_record_t),
       (void**)&header));
@@ -194,9 +194,9 @@ static iree_status_t fatelf_join(int argc, char** argv) {
       (fatelf_entry_t*)iree_alloca(entry_count * sizeof(fatelf_entry_t));
   memset(entries, 0, entry_count * sizeof(*entries));
   for (iree_elf64_byte_t i = 0; i < entry_count; ++i) {
-    IREE_RETURN_IF_ERROR(
-        iree_file_read_contents(argv[i], IREE_FILE_READ_FLAG_DEFAULT,
-                                iree_allocator_system(), &entries[i].contents));
+    IREE_RETURN_IF_ERROR(iree_file_read_contents(
+        argv[i], IREE_FILE_READ_FLAG_DEFAULT, iree_allocator_default(),
+        &entries[i].contents));
     entries[i].elf_data = entries[i].contents->const_buffer;
   }
 
@@ -330,7 +330,7 @@ static iree_status_t fatelf_split(int argc, char** argv) {
   iree_file_contents_t* fatelf_contents = NULL;
   IREE_RETURN_IF_ERROR(
       iree_file_read_contents(argv[0], IREE_FILE_READ_FLAG_DEFAULT,
-                              iree_allocator_system(), &fatelf_contents));
+                              iree_allocator_default(), &fatelf_contents));
   iree_fatelf_header_t* header = NULL;
   IREE_RETURN_IF_ERROR(fatelf_parse(fatelf_contents->const_buffer, &header));
 
@@ -366,7 +366,7 @@ static iree_status_t fatelf_split(int argc, char** argv) {
 
   fprintf(stdout, "Wrote %d records to %.*s!\n", header->record_count,
           (int)dirname.size, dirname.data);
-  iree_allocator_free(iree_allocator_system(), header);
+  iree_allocator_free(iree_allocator_default(), header);
   iree_file_contents_free(fatelf_contents);
   return iree_ok_status();
 }
@@ -378,7 +378,7 @@ static iree_status_t fatelf_select(int argc, char** argv) {
   iree_file_contents_t* fatelf_contents = NULL;
   IREE_RETURN_IF_ERROR(
       iree_file_read_contents(argv[0], IREE_FILE_READ_FLAG_DEFAULT,
-                              iree_allocator_system(), &fatelf_contents));
+                              iree_allocator_default(), &fatelf_contents));
   iree_const_byte_span_t elf_data = iree_const_byte_span_empty();
   IREE_RETURN_IF_ERROR(
       iree_fatelf_select(fatelf_contents->const_buffer, &elf_data));
@@ -414,7 +414,7 @@ static iree_status_t fatelf_dump(int argc, char** argv) {
   iree_file_contents_t* fatelf_contents = NULL;
   IREE_RETURN_IF_ERROR(
       iree_file_read_contents(argv[0], IREE_FILE_READ_FLAG_DEFAULT,
-                              iree_allocator_system(), &fatelf_contents));
+                              iree_allocator_default(), &fatelf_contents));
   iree_fatelf_header_t* header = NULL;
   IREE_RETURN_IF_ERROR(fatelf_parse(fatelf_contents->const_buffer, &header));
 
@@ -449,7 +449,7 @@ static iree_status_t fatelf_dump(int argc, char** argv) {
     fprintf(stdout, "\n");
   }
 
-  iree_allocator_free(iree_allocator_system(), header);
+  iree_allocator_free(iree_allocator_default(), header);
   iree_file_contents_free(fatelf_contents);
   return iree_ok_status();
 }

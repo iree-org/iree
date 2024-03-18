@@ -158,7 +158,7 @@ extern "C" int main(int argc, char** argv) {
 
   IREE_TRACE_ZONE_BEGIN_NAMED(z0, "iree-check-module");
   int exit_code = 1;
-  iree_status_t status = Run(iree_allocator_system(), &exit_code);
+  iree_status_t status = Run(iree_allocator_default(), &exit_code);
   exit_code = iree_status_is_ok(status) ? exit_code : EXIT_FAILURE;
   IREE_TRACE_ZONE_END(z0);
 

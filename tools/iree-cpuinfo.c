@@ -10,7 +10,7 @@
 #include "iree/base/internal/cpu.h"
 
 int main(int argc, char *argv[]) {
-  iree_cpu_initialize(iree_allocator_system());
+  iree_cpu_initialize(iree_allocator_default());
   const uint64_t* cpu_data = iree_cpu_data_fields();
 
 #define IREE_CPU_FEATURE_BIT(arch, field_index, bit_pos, bit_name, llvm_name) \

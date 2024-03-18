@@ -333,7 +333,7 @@ StatusOr<int> CompileAndRunFile(iree_compiler_session_t* session,
   // Hosting libraries can route all runtime allocations to their own allocator
   // for statistics, isolation, or efficiency. Here we use the system
   // malloc/free.
-  iree_allocator_t host_allocator = iree_allocator_system();
+  iree_allocator_t host_allocator = iree_allocator_default();
 
   // The same VM instance should be shared across many contexts. Here we only
   // use this once but a library would want to retain this and the devices it

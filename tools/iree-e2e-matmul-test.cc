@@ -1267,7 +1267,7 @@ int main(int argc, char** argv) {
     return EXIT_FAILURE;
   }
 
-  iree_status_t status = load_and_run_e2e_tests(iree_allocator_system());
+  iree_status_t status = load_and_run_e2e_tests(iree_allocator_default());
   int exit_code = EXIT_SUCCESS;
   if (!iree_status_is_ok(status)) {
     iree_status_fprint(stderr, status);
