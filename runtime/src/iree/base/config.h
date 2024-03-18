@@ -95,26 +95,6 @@ typedef IREE_DEVICE_SIZE_T iree_device_size_t;
   (sizeof(iree_device_size_t) == 4 ? UINT32_MAX : UINT64_MAX)
 
 //===----------------------------------------------------------------------===//
-// Allocator configuration
-//===----------------------------------------------------------------------===//
-
-#if !defined(IREE_ALLOCATOR_ENABLE_MIALLOC)
-#if defined(__riscv)
-// Our RV32 CI reports various compilation errors that lead us to believe
-// this is not supported on RISC-V. RV64 was not tested nor any dilligence
-// done. If you know things about this platform and support for mialloc,
-// feel free to better specify this clause.
-#define IREE_ALLOCATOR_ENABLE_MIALLOC 0
-#else
-#define IREE_ALLOCATOR_ENABLE_MIALLOC 1
-#endif
-#endif  // !IREE_ALLOCATOR_ENABLE_MIALLOC
-
-#if !defined(IREE_ALLOCATOR_DEFAULT)
-#define IREE_ALLOCATOR_DEFAULT iree_allocator_system
-#endif  // !IREE_ALLOCATOR_DEFAULT
-
-//===----------------------------------------------------------------------===//
 // iree_status_t configuration
 //===----------------------------------------------------------------------===//
 // Controls how much information an iree_status_t carries. When set to 0 all of
@@ -204,6 +184,30 @@ typedef IREE_DEVICE_SIZE_T iree_device_size_t;
 #if !defined(IREE_TRACING_MODE)
 #define IREE_TRACING_MODE 0
 #endif  // !IREE_TRACING_MODE
+
+//===----------------------------------------------------------------------===//
+// Allocator configuration
+//===----------------------------------------------------------------------===//
+
+#if !defined(IREE_ALLOCATOR_ENABLE_MIALLOC)
+// Default disable MIALLOC in certain conditions:
+// * RISC-V: Our RV32 CI reports various compilation errors that lead us to 
+// believe this is not supported on RISC-V. RV64 was not tested nor any 
+// dilligence done. If you know things about this platform and support for 
+// mialloc, feel free to better specify this clause.
+// * Compiled without FILE_IO: Operating system file facilities are used to
+// interact with the system. FILE_IO is often disabled on bare-metal and gates
+// MIALLOC as well.
+#if defined(__riscv) || !IREE_FILE_IO_ENABLE
+#define IREE_ALLOCATOR_ENABLE_MIALLOC 0
+#else
+#define IREE_ALLOCATOR_ENABLE_MIALLOC 1
+#endif
+#endif  // !IREE_ALLOCATOR_ENABLE_MIALLOC
+
+#if !defined(IREE_ALLOCATOR_DEFAULT)
+#define IREE_ALLOCATOR_DEFAULT iree_allocator_system
+#endif  // !IREE_ALLOCATOR_DEFAULT
 
 //===----------------------------------------------------------------------===//
 // IREE HAL configuration
