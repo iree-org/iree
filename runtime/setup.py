@@ -72,6 +72,10 @@ else:
         "*** Tracy tools not enabled (enable with IREE_RUNTIME_BUILD_TRACY_TOOLS=ON)",
         file=sys.stderr,
     )
+# Default to LTO builds for our python releases.
+IREE_RUNTIME_OPTIMIZATION_PROFILE = os.getenv(
+    "IREE_RUNTIME_OPTIMIZATION_PROFILE", "lto"
+)
 
 
 def check_pip_version():
@@ -264,6 +268,7 @@ def build_configuration(cmake_build_dir, cmake_install_dir, extra_cmake_args=())
     cmake_args = [
         "-GNinja",
         "--log-level=VERBOSE",
+        f"-DIREE_RUNTIME_OPTIMIZATION_PROFILE={IREE_RUNTIME_OPTIMIZATION_PROFILE}",
         "-DIREE_BUILD_PYTHON_BINDINGS=ON",
         "-DIREE_BUILD_COMPILER=OFF",
         "-DIREE_BUILD_SAMPLES=OFF",
