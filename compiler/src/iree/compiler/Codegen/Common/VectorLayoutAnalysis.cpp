@@ -13,6 +13,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/Analysis/DataFlow/DeadCodeAnalysis.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Location.h"
@@ -614,7 +615,8 @@ static void enforceLayoutToTransposeOp(
   // Build a transposed layout.
   SmallVector<unsigned> permutation;
   ArrayRef<int64_t> perm = transpose.getPermutation();
-  VectorLayoutInterface permutedLayout = result->getLayout().permute(perm);
+  VectorLayoutInterface permutedLayout =
+      result->getLayout().permute(invertPermutationVector(perm));
 
   // Try to resolve with the transposed layout.
   ChangeResult changed = value->resolveWithPossibleConflict(

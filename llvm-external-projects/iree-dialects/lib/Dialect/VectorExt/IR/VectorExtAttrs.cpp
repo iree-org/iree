@@ -304,26 +304,27 @@ NestedLayoutAttr::project(ArrayRef<bool> droppedDims) const {
 
 VectorLayoutInterface
 NestedLayoutAttr::permute(ArrayRef<int64_t> permutation) const {
+  // The order fields are permuted by the inverse permutation to map the
+  // permuted sizes back to their original positions.
+  SmallVector<int64_t> invPerm = invertPermutationVector(permutation);
   SmallVector<int64_t> subgroupCount =
       applyPermutation(getSubgroupsPerWorkgroup(), permutation);
   SmallVector<int64_t> subgroupOrder =
-      applyPermutation(getSubgroupOrder(), permutation);
+      applyPermutation(getSubgroupOrder(), invPerm);
   SmallVector<int64_t> batchCount =
       applyPermutation(getBatchesPerSubgroup(), permutation);
-  SmallVector<int64_t> batchOrder =
-      applyPermutation(getBatchOrder(), permutation);
+  SmallVector<int64_t> batchOrder = applyPermutation(getBatchOrder(), invPerm);
   SmallVector<int64_t> outerCount =
       applyPermutation(getOutersPerBatch(), permutation);
-  SmallVector<int64_t> outerOrder =
-      applyPermutation(getOuterOrder(), permutation);
+  SmallVector<int64_t> outerOrder = applyPermutation(getOuterOrder(), invPerm);
   SmallVector<int64_t> threadCount =
       applyPermutation(getThreadsPerOuter(), permutation);
   SmallVector<int64_t> threadOrder =
-      applyPermutation(getThreadOrder(), permutation);
+      applyPermutation(getThreadOrder(), invPerm);
   SmallVector<int64_t> elementCount =
       applyPermutation(getElementsPerThread(), permutation);
   SmallVector<int64_t> elementOrder =
-      applyPermutation(getElementOrder(), permutation);
+      applyPermutation(getElementOrder(), invPerm);
 
   return NestedLayoutAttr::get(
       getContext(), subgroupCount, subgroupOrder, batchCount, batchOrder,
