@@ -88,6 +88,7 @@ static iree_status_t iree_allocator_system_alloc(
     } else if (command == IREE_ALLOCATOR_COMMAND_CALLOC) {
       IREE_TRACE_ZONE_BEGIN_NAMED(z0_named, "iree_allocator_system_calloc");
       z0 = z0_named;
+      IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, byte_length);
     } else {
       IREE_TRACE_ZONE_BEGIN_NAMED(z0_named, "iree_allocator_system_malloc");
       z0 = z0_named;

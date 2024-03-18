@@ -80,6 +80,7 @@ static iree_status_t iree_allocator_mimalloc_calloc(
   }
 
   IREE_TRACE_ZONE_BEGIN(z0);
+  IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, byte_length);
   void* new_ptr = mi_calloc(1, byte_length);
   iree_status_t status = iree_ok_status();
   if (new_ptr) {
