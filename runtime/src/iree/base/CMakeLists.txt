@@ -35,10 +35,10 @@ iree_cc_library(
     "wait_source.c"
     "wait_source.h"
   COPTS
+    # Just unconditionally include mimalloc impl on the include path.
+    # It won't be used if the feature is disabled.
     -I${IREE_SOURCE_DIR}/third_party/mimalloc_src
     -I${IREE_SOURCE_DIR}/third_party/mimalloc_src/mimalloc/include
-  DEFINES
-    $<$<BOOL:IREE_ENABLE_MIMALLOC>:IREE_HAS_ALLOCATOR_MIMALLOC=1>
   DEPS
     ::core_headers
     iree::base::tracing::provider

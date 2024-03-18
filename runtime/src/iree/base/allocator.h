@@ -294,7 +294,7 @@ static inline iree_allocator_t iree_allocator_inline_arena(
 // Optional allocators.
 //===----------------------------------------------------------------------===//
 
-#if IREE_HAS_ALLOCATOR_MIMALLOC
+#if IREE_ALLOCATOR_ENABLE_MIALLOC
 
 // Default C allocator controller using malloc/free.
 IREE_API_EXPORT iree_status_t
@@ -308,7 +308,7 @@ static inline iree_allocator_t iree_allocator_mimalloc(void) {
   return v;
 }
 
-#endif  // IREE_HAS_ALLOCATOR_MIMALLOC
+#endif  // IREE_ALLOCATOR_ENABLE_MIALLOC
 
 //===----------------------------------------------------------------------===//
 // Default allocator.

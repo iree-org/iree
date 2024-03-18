@@ -4,13 +4,17 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#if IREE_HAS_ALLOCATOR_MIMALLOC
+#include "iree/base/config.h"
+
+#if IREE_ALLOCATOR_ENABLE_MIALLOC
 
 #include "iree/base/allocator.h"
 #include "iree/base/assert.h"
 #include "iree/base/attributes.h"
 #include "iree/base/status.h"
 #include "iree/base/tracing.h"
+
+// Include the entire mimalloc impl statically.
 #include "mimalloc/src/static.c"
 
 static iree_status_t iree_allocator_mimalloc_malloc(
@@ -124,4 +128,4 @@ iree_allocator_mimalloc_ctl(void* self, iree_allocator_command_t command,
   }
 }
 
-#endif  // IREE_HAS_ALLOCATOR_MIMALLOC
+#endif  // IREE_ALLOCATOR_ENABLE_MIALLOC

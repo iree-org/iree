@@ -98,6 +98,10 @@ typedef IREE_DEVICE_SIZE_T iree_device_size_t;
 // Allocator configuration
 //===----------------------------------------------------------------------===//
 
+#if !defined(IREE_ALLOCATOR_ENABLE_MIALLOC)
+#define IREE_ALLOCATOR_ENABLE_MIALLOC 1
+#endif  // !IREE_ALLOCATOR_ENABLE_MIALLOC
+
 #if !defined(IREE_ALLOCATOR_DEFAULT)
 #define IREE_ALLOCATOR_DEFAULT iree_allocator_mimalloc
 #endif  // !IREE_ALLOCATOR_DEFAULT

@@ -53,7 +53,6 @@ option(IREE_ENABLE_COMPILER_TRACING "Enables instrumented compiler tracing." OFF
 option(IREE_ENABLE_RENDERDOC_PROFILING "Enables profiling HAL devices with the RenderDoc tool." OFF)
 option(IREE_ENABLE_THREADING "Builds IREE in with thread library support." ON)
 option(IREE_ENABLE_CLANG_TIDY "Builds IREE in with clang tidy enabled on IREE's libraries." OFF)
-option(IREE_ENABLE_MIMALLOC "Enables an allocator based on mimalloc." ON)
 
 set(IREE_TRACING_PROVIDER_DEFAULT "tracy" CACHE STRING "Default tracing implementation.")
 set(IREE_TRACING_PROVIDER ${IREE_TRACING_PROVIDER_DEFAULT} CACHE STRING "Chooses which built-in tracing implementation is used when tracing is enabled.")
