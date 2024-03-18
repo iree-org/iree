@@ -44,6 +44,10 @@ iree_runtime_cc_library(
         "wait_source.h",
     ],
     hdrs = ["api.h"],
+    defines = [
+        # Bazel build does not support mialloc.
+        "IREE_ALLOCATOR_ENABLE_MIALLOC=0",
+    ],
     deps = [
         ":core_headers",
         "//runtime/src/iree/base/tracing:provider",
