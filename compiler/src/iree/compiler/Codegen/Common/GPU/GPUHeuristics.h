@@ -49,6 +49,7 @@ struct GPUMMASchedule {
 std::optional<GPUMMASchedule>
 deduceMMASchedule(const GPUMatmulShapeType &problem,
                   ArrayRef<GPUMatmulShapeType> intrinsics,
-                  const GPUMMAHeuristicSeeds &seeds, bool canUpcastAcc = false);
+                  const GPUMMAHeuristicSeeds &seeds, int64_t sharedMemLimit,
+                  bool canUpcastAcc = false);
 
 } // namespace mlir::iree_compiler
