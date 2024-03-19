@@ -5,6 +5,6 @@ module @example {
 }
 
 // CHECK-LABEL: module @example
-//       CHECK:   func.func private @some_external_function(tensor<?xf32>) -> tensor<?xf32>
-//       CHECK:   func.func @some_function(%arg0: tensor<?xf32>) -> tensor<?xf32>
-//  CHECK-NEXT:     return %arg0 : tensor<?xf32>
+//       CHECK:   util.func private @some_external_function(%arg0: tensor<?xf32>) -> tensor<?xf32>
+//       CHECK:   util.func public @some_function(%arg0: tensor<?xf32>) -> tensor<?xf32>
+//  CHECK-NEXT:     util.return %arg0 : tensor<?xf32>

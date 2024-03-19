@@ -7,7 +7,6 @@
 #include <algorithm>
 #include <numeric>
 
-#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree/compiler/Codegen/Common/GPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
@@ -98,7 +97,7 @@ static LogicalResult tileCopyToWorkgroupMem(mlir::FunctionOpInterface funcOp,
           .setTileSizeComputationFunction(wgCopyTileSizeFn)
           .setDistributionOptions(copyInvocationDistributionOptions);
 
-  auto filter = IREE::LinalgExt::LinalgTransformationFilter(
+  auto filter = LinalgTransformationFilter(
       {StringAttr::get(funcOp.getContext(), getCopyToWorkgroupMemoryMarker())},
       StringAttr::get(funcOp.getContext(), getVectorizeMarker()));
   return distributeLinalgOpsWithFilter(funcOp, tilingOptions, filter);
@@ -178,7 +177,7 @@ static LogicalResult tileToUnroll(mlir::FunctionOpInterface funcOp,
                            .setTileSizeComputationFunction(wgCopyTileSizeFn);
 
   MLIRContext *context = funcOp.getContext();
-  auto filter = IREE::LinalgExt::LinalgTransformationFilter(
+  auto filter = LinalgTransformationFilter(
       {StringAttr::get(context, getCopyToWorkgroupMemoryMarker())},
       StringAttr::get(context, kCopyToDistribute));
   return distributeLinalgOpsWithFilter(funcOp, tilingOptions, filter);
@@ -259,7 +258,7 @@ static LogicalResult tileAndDistribute(mlir::FunctionOpInterface funcOp,
           .setTileSizeComputationFunction(wgCopyTileSizeFn)
           .setDistributionOptions(copyInvocationDistributionOptions);
 
-  auto filter = IREE::LinalgExt::LinalgTransformationFilter(
+  auto filter = LinalgTransformationFilter(
       {StringAttr::get(funcOp.getContext(), kCopyToDistribute)},
       StringAttr::get(funcOp.getContext(), kCopyDistributed));
   return distributeLinalgOpsWithFilter(funcOp, tilingOptions, filter);
@@ -271,7 +270,7 @@ static void
 vectorizeCopyToWorkgroupMemoryOps(mlir::FunctionOpInterface funcOp) {
   MLIRContext *context = funcOp.getContext();
   IRRewriter rewriter(context);
-  auto filter = IREE::LinalgExt::LinalgTransformationFilter(
+  auto filter = LinalgTransformationFilter(
       {StringAttr::get(context, getCopyToWorkgroupMemoryMarker()),
        StringAttr::get(context, kCopyDistributed)},
       std::nullopt);

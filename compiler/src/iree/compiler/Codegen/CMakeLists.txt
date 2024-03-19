@@ -18,7 +18,6 @@ iree_cc_library(
   SRCS
     "Passes.cpp"
   DEPS
-    IREELinalgExtPasses
     MLIRPass
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Common::CPU::CommonCPUPasses
@@ -29,6 +28,7 @@ iree_cc_library(
     iree::compiler::Codegen::SPIRV
     iree::compiler::Codegen::VMVX
     iree::compiler::Codegen::WGSL
+    iree::compiler::Dialect::LinalgExt::Transforms
   PUBLIC
 )
 

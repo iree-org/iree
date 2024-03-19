@@ -218,8 +218,8 @@ def iree_generated_e2e_matmul_test(
 
     tests = []
     for backend, driver in target_backends_and_drivers:
-        # CUDA backend/driver not supported by Bazel build.
-        if backend == "cuda" or driver == "cuda":
+        # CUDA/ROCm backend/driver not supported by Bazel build.
+        if backend == "cuda" or driver == "cuda" or backend == "rocm" or driver == "hip":
             continue
         suite_entry_name = "_".join([name, backend, driver])
         iree_single_backend_e2e_matmul_test(

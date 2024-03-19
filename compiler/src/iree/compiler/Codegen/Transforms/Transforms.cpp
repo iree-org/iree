@@ -764,10 +764,9 @@ void packAllocs(OpBuilder &builder, mlir::FunctionOpInterface funcOp,
   }
 }
 
-LogicalResult
-tileLinalgOpsWithFilter(mlir::FunctionOpInterface funcOp,
-                        scf::SCFTilingOptions options,
-                        IREE::LinalgExt::LinalgTransformationFilter filter) {
+LogicalResult tileLinalgOpsWithFilter(mlir::FunctionOpInterface funcOp,
+                                      scf::SCFTilingOptions options,
+                                      LinalgTransformationFilter filter) {
   IRRewriter rewriter(funcOp.getContext());
   SmallVector<Operation *> candidates;
   funcOp.walk([&](linalg::LinalgOp op) {
@@ -800,9 +799,10 @@ tileLinalgOpsWithFilter(mlir::FunctionOpInterface funcOp,
   return success();
 }
 
-LogicalResult distributeLinalgOpsWithFilter(
-    mlir::FunctionOpInterface funcOp, linalg::LinalgTilingOptions tilingOptions,
-    IREE::LinalgExt::LinalgTransformationFilter filter) {
+LogicalResult
+distributeLinalgOpsWithFilter(mlir::FunctionOpInterface funcOp,
+                              linalg::LinalgTilingOptions tilingOptions,
+                              LinalgTransformationFilter filter) {
   IRRewriter rewriter(funcOp.getContext());
   SmallVector<linalg::LinalgOp> candidates;
   funcOp.walk([&](linalg::LinalgOp op) {

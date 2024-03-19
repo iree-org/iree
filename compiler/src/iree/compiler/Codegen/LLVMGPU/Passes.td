@@ -13,6 +13,12 @@ include "mlir/Pass/PassBase.td"
 // LLVMGPU Passes (keep alphabetical)
 //------------------------------------------------------------------------------
 
+def AMDGPUPrepareForChainedMatmul :
+    InterfacePass<"iree-amdgpu-prepare-chained-matmul", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to swap operands and transpose accumulator and result";
+  let constructor = "mlir::iree_compiler::createAMDGPUPrepareForChainedMatmulPass()";
+}
+
 // TODO: Bring the argument in line with the names used elsewhere.
 def ConvertToNVVM :
     Pass<"iree-convert-to-nvvm", "ModuleOp"> {
@@ -43,8 +49,15 @@ def ExtractAddressComputationGPU: Pass<"extract-address-computation-gpu"> {
 
 def LLVMGPUCastAddressSpaceFunction :
     Pass<"iree-llvmgpu-cast-address-space-function", "ModuleOp"> {
-  let summary = "Pass to cast";
+  let summary = "Cast address space to generic in CallOp and FuncOp";
   let constructor = "mlir::iree_compiler::createLLVMGPUCastAddressSpaceFunction()";
+}
+
+def LLVMGPUCastTypeToFitMMA : InterfacePass<"iree-llvmgpu-cast-type-to-fit-mma",
+                                            "mlir::FunctionOpInterface"> {
+  let summary = "Perform type extension/truncation over vector.contract types "
+                "to target GPU MMA intrinsics";
+  let constructor = "mlir::iree_compiler::createLLVMGPUCastTypeToFitMMAPass()";
 }
 
 def LLVMGPULowerExecutableTarget :
@@ -57,6 +70,12 @@ def LLVMGPUPackSharedMemoryAlloc :
     InterfacePass<"iree-llvmgpu-pack-shared-memory-alloc", "mlir::FunctionOpInterface"> {
   let summary = "Pass pack shared memory allocation in order to reduce memory usage.";
   let constructor = "mlir::iree_compiler::createLLVMGPUPackSharedMemoryAlloc()";
+}
+
+def LLVMGPUPrefetchSharedMemory :
+    InterfacePass<"iree-llvmgpu-prefetch-shared-memory", "mlir::FunctionOpInterface"> {
+  let summary = "Rotate scf.for loops to prefetch shared memory with distance 1";
+  let constructor = "mlir::iree_compiler::createLLVMGPUPrefetchSharedMemoryPass()";
 }
 
 def LLVMGPUSelectLoweringStrategy :
@@ -87,6 +106,11 @@ def LLVMGPUVectorDistribute :
     InterfacePass<"iree-llvmgpu-vector-distribute", "mlir::FunctionOpInterface"> {
   let summary = "Pass to distribute vectorized functions.";
   let constructor = "mlir::iree_compiler::createLLVMGPUVectorDistribute()";
+  let options = [
+    Option<"testLayout", "test-layout", "bool", /*default=*/"false",
+           "Annotate vector ops with deduced layouts without real conversion "
+           "for testing purposes">
+  ];
 }
 
 def LLVMGPUVectorLowering :

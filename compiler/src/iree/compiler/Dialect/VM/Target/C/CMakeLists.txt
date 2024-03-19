@@ -25,27 +25,6 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
-    TranslateToCpp
-  HDRS
-    "CppEmitter.h"
-  SRCS
-    "TranslateToCpp.cpp"
-  DEPS
-    LLVMSupport
-    MLIRControlFlowDialect
-    MLIREmitCDialect
-    MLIRFuncDialect
-    MLIRFunctionInterfaces
-    MLIRIR
-    MLIRSCFDialect
-    MLIRSupport
-  DEFINES
-    "IREE_HAVE_C_OUTPUT_FORMAT"
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
     C
   HDRS
     "CModuleTarget.h"
@@ -55,11 +34,12 @@ iree_cc_library(
     "TranslationFlags.cpp"
     "TranslationRegistration.cpp"
   DEPS
-    ::TranslateToCpp
     LLVMSupport
+    MLIRControlFlowDialect
     MLIRIR
     MLIRPass
     MLIRSupport
+    MLIRTargetCpp
     MLIRTransforms
     MLIRTranslateLib
     iree::compiler::Dialect::Util::IR
@@ -68,6 +48,8 @@ iree_cc_library(
     iree::compiler::Dialect::VM::Conversion::VMToEmitC
     iree::compiler::Dialect::VM::IR
     iree::compiler::Dialect::VM::Transforms
+  DEFINES
+    "IREE_HAVE_C_OUTPUT_FORMAT"
   PUBLIC
 )
 

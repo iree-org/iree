@@ -6,7 +6,6 @@
 
 #include "FlowExtensions.h"
 
-#include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/ConvertRegionToWorkgroups.h"
 #include "iree/compiler/Dialect/Flow/Transforms/FormDispatchRegions.h"
@@ -49,7 +48,7 @@ static SmallVector<int64_t> getIndicesOfDynamicDims(ShapedType t) {
 /// For now, this only supports constant index ops and empty workload operands.
 /// Assumes the IREE::Flow::DispatchWorkgroupsOp is built with an empty region.
 static LogicalResult populateWorkgroupCountComputingRegion(
-    PatternRewriter &rewriter, scf::ForallOp forallOp,
+    RewriterBase &rewriter, scf::ForallOp forallOp,
     IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
   Location loc = forallOp.getLoc();
   OpBuilder::InsertionGuard g(rewriter);
@@ -80,7 +79,7 @@ static LogicalResult populateWorkgroupCountComputingRegion(
 /// Rewrite ParallelInsertSlice ops in `InParallelOp` as Flow
 /// DispatchTensorStoreOps.
 /// Ops are inserted just before the `block` terminator.
-static void rewriteParallelInsertSlices(PatternRewriter &rewriter,
+static void rewriteParallelInsertSlices(RewriterBase &rewriter,
                                         scf::ForallOp forallOp,
                                         scf::InParallelOp InParallelOp,
                                         Block &block,
@@ -120,8 +119,7 @@ static void rewriteParallelInsertSlices(PatternRewriter &rewriter,
 /// IREE::Flow::DispatchTensorLoadOps. Takes a list of all tensor and all
 /// tensorDynamicDims operands to the dispatchOp as well as a IRMapping from
 /// tensor operands to the corresponding Flow dispatch tensor bbArgs.
-static void rewriteExtractSlices(PatternRewriter &rewriter,
-                                 scf::ForallOp forallOp,
+static void rewriteExtractSlices(RewriterBase &rewriter, scf::ForallOp forallOp,
                                  IREE::Flow::DispatchWorkgroupsOp dispatchOp,
                                  ValueRange tensorOperands,
                                  ValueRange tensorDynamicDims,
@@ -247,7 +245,7 @@ static void cloneOpsIntoForallOp(RewriterBase &rewriter,
 // TODO: n-D ForallOp
 FailureOr<IREE::Flow::DispatchWorkgroupsOp>
 rewriteForeachThreadToFlowDispatchWorkgroups(scf::ForallOp forallOp,
-                                             PatternRewriter &rewriter) {
+                                             RewriterBase &rewriter) {
   // Step 0: Clone ops into the ForallOp.
   cloneOpsIntoForallOp(rewriter, forallOp);
 
@@ -467,7 +465,7 @@ DiagnosedSilenceableFailure
 IREE::transform_dialect::ForeachThreadToFlowDispatchWorkgroupsOp::applyToOne(
     transform::TransformRewriter &rewriter, scf::ForallOp target,
     transform::ApplyToEachResultList &results, transform::TransformState &) {
-  SimplePatternRewriter patternRewriter(target->getContext());
+  IRRewriter patternRewriter(target->getContext());
   FailureOr<IREE::Flow::DispatchWorkgroupsOp> result =
       rewriteForeachThreadToFlowDispatchWorkgroups(target, patternRewriter);
   if (failed(result))

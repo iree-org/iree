@@ -3,11 +3,11 @@
 func.func @matmul_256x256x256(%lhs: tensor<16x256xf16>,
                               %rhs: tensor<256x16xf16>,
                               %out: tensor<16x16xf32>) -> tensor<16x16xf32> {
-  %cst = arith.constant 0.000000e+00 : f16 
+  %cst = arith.constant 0.000000e+00 : f16
   %cst_0 = arith.constant dense<0.000000e+00> : vector<16x16xf32>
-  %c32 = arith.constant 32 : index 
-  %c256 = arith.constant 256 : index 
-  %c0 = arith.constant 0 : index 
+  %c32 = arith.constant 32 : index
+  %c256 = arith.constant 256 : index
+  %c0 = arith.constant 0 : index
   %8 = scf.for %arg0 = %c0 to %c256 step %c32 iter_args(%arg1 = %cst_0) -> (vector<16x16xf32>) {
     %10 = vector.transfer_read %lhs[%c0, %arg0], %cst {in_bounds = [true, true]} : tensor<16x256xf16>, vector<16x32xf16>
     %11 = vector.transfer_read %rhs[%arg0, %c0], %cst {in_bounds = [true, true]} : tensor<256x16xf16>, vector<32x16xf16>
@@ -23,6 +23,7 @@ func.func @matmul_256x256x256(%lhs: tensor<16x256xf16>,
 //         CHECK:    scf.for {{.*}} -> (vector<16x16xf32>) {
 //     CHECK-DAG:      %[[A:.*]] = vector.transfer_read %{{.*}} : tensor<16x256xf16>, vector<16x32xf16>
 //     CHECK-DAG:      %[[B:.*]] = vector.transfer_read %{{.*}} : tensor<256x16xf16>, vector<32x16xf16>
+//         CHECK:      gpu.barrier
 
 // LHS copy.
 //         CHECK:      %[[PA:.*]] = bufferization.alloc_tensor() {memory_space = #gpu.address_space<workgroup>} : tensor<16x32xf16, #gpu.address_space<workgroup>>

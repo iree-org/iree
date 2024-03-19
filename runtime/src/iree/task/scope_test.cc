@@ -17,7 +17,8 @@ namespace {
 
 TEST(ScopeTest, Lifetime) {
   iree_task_scope_t scope;
-  iree_task_scope_initialize(iree_make_cstring_view("scope_a"), &scope);
+  iree_task_scope_initialize(iree_make_cstring_view("scope_a"),
+                             IREE_TASK_SCOPE_FLAG_NONE, &scope);
   EXPECT_TRUE(iree_task_scope_is_idle(&scope));
   iree_task_scope_deinitialize(&scope);
 }
@@ -27,7 +28,7 @@ TEST(ScopeTest, Lifetime) {
 TEST(ScopeTest, LongNameTruncation) {
   iree_task_scope_t scope;
   iree_task_scope_initialize(iree_make_cstring_view("01234567890123456789"),
-                             &scope);
+                             IREE_TASK_SCOPE_FLAG_NONE, &scope);
   EXPECT_TRUE(iree_string_view_equal(iree_make_cstring_view("012345678901234"),
                                      iree_task_scope_name(&scope)));
   iree_task_scope_deinitialize(&scope);
@@ -35,7 +36,8 @@ TEST(ScopeTest, LongNameTruncation) {
 
 TEST(ScopeTest, AbortEmpty) {
   iree_task_scope_t scope;
-  iree_task_scope_initialize(iree_make_cstring_view("scope_a"), &scope);
+  iree_task_scope_initialize(iree_make_cstring_view("scope_a"),
+                             IREE_TASK_SCOPE_FLAG_NONE, &scope);
 
   // Current state is OK.
   EXPECT_TRUE(iree_task_scope_is_idle(&scope));
@@ -55,7 +57,8 @@ TEST(ScopeTest, AbortEmpty) {
 
 TEST(ScopeTest, FailEmpty) {
   iree_task_scope_t scope;
-  iree_task_scope_initialize(iree_make_cstring_view("scope_a"), &scope);
+  iree_task_scope_initialize(iree_make_cstring_view("scope_a"),
+                             IREE_TASK_SCOPE_FLAG_NONE, &scope);
 
   // Current state is OK.
   EXPECT_TRUE(iree_task_scope_is_idle(&scope));
@@ -80,7 +83,8 @@ TEST(ScopeTest, FailEmpty) {
 // calls are ignored.
 TEST(ScopeTest, FailAgain) {
   iree_task_scope_t scope;
-  iree_task_scope_initialize(iree_make_cstring_view("scope_a"), &scope);
+  iree_task_scope_initialize(iree_make_cstring_view("scope_a"),
+                             IREE_TASK_SCOPE_FLAG_NONE, &scope);
 
   // Current state is OK.
   EXPECT_TRUE(iree_task_scope_is_idle(&scope));
@@ -116,7 +120,8 @@ TEST(ScopeTest, FailAgain) {
 
 TEST(ScopeTest, WaitIdleWhenIdle) {
   iree_task_scope_t scope;
-  iree_task_scope_initialize(iree_make_cstring_view("scope_a"), &scope);
+  iree_task_scope_initialize(iree_make_cstring_view("scope_a"),
+                             IREE_TASK_SCOPE_FLAG_NONE, &scope);
 
   // Current state is OK and idle.
   EXPECT_TRUE(iree_task_scope_is_idle(&scope));
@@ -132,7 +137,8 @@ TEST(ScopeTest, WaitIdleWhenIdle) {
 
 TEST(ScopeTest, WaitIdleDeadlineExceeded) {
   iree_task_scope_t scope;
-  iree_task_scope_initialize(iree_make_cstring_view("scope_a"), &scope);
+  iree_task_scope_initialize(iree_make_cstring_view("scope_a"),
+                             IREE_TASK_SCOPE_FLAG_NONE, &scope);
 
   // Current state is OK and idle.
   EXPECT_TRUE(iree_task_scope_is_idle(&scope));
@@ -161,7 +167,8 @@ TEST(ScopeTest, WaitIdleDeadlineExceeded) {
 
 TEST(ScopeTest, WaitIdleSuccess) {
   iree_task_scope_t scope;
-  iree_task_scope_initialize(iree_make_cstring_view("scope_a"), &scope);
+  iree_task_scope_initialize(iree_make_cstring_view("scope_a"),
+                             IREE_TASK_SCOPE_FLAG_NONE, &scope);
 
   // Current state is OK and idle.
   EXPECT_TRUE(iree_task_scope_is_idle(&scope));
@@ -200,7 +207,8 @@ TEST(ScopeTest, WaitIdleSuccess) {
 
 TEST(ScopeTest, WaitIdleFailure) {
   iree_task_scope_t scope;
-  iree_task_scope_initialize(iree_make_cstring_view("scope_a"), &scope);
+  iree_task_scope_initialize(iree_make_cstring_view("scope_a"),
+                             IREE_TASK_SCOPE_FLAG_NONE, &scope);
 
   // Current state is OK and idle.
   EXPECT_TRUE(iree_task_scope_is_idle(&scope));

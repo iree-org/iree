@@ -115,6 +115,14 @@ public:
     });
     for (vector::ContractionOp contractOp : opsToPromote) {
       OpBuilder builder(contractOp);
+
+      // HACK: Until proper barrier placement is handled later we have to
+      // synchronize explicitly in this pass.
+
+      // Synchronize before the write to shared memory to avoid stepping over
+      // reads in the previous iteration of a loop.
+      builder.create<gpu::BarrierOp>(contractOp->getLoc());
+
       // Promote both of the input operands, excluding the accumulator.
       OpOperand &lhs = contractOp.getLhsMutable();
       FailureOr<Value> lhsRet =
@@ -130,8 +138,7 @@ public:
         return signalPassFailure();
       }
 
-      // HACK: Until proper barrier placement is handled later we have to
-      // synchronize here.
+      // Synchronize after the write to shared memory before we read from it.
       builder.create<gpu::BarrierOp>(contractOp->getLoc());
 
       Value lhsVec =

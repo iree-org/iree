@@ -252,13 +252,38 @@ static void iree_uk_pack_using_tile_func(const iree_uk_pack_params_t* params,
   }
 }
 
-IREE_UK_EXPORT int iree_uk_pack(const iree_uk_pack_params_t* params) {
+void iree_uk_pack_p(const iree_uk_pack_params_t* params) {
   iree_uk_pack_validate(params);
 
-  if (iree_uk_pack_early(params)) return 0;
+  if (iree_uk_pack_early(params)) return;
 
   // Select a target-specific tile_func and use that with generic outer loops.
   iree_uk_pack_tile_func_t tile_func = iree_uk_pack_select_tile_func(params);
   iree_uk_pack_using_tile_func(params, tile_func);
-  return 0;
+}
+
+IREE_UK_EXPORT void iree_uk_pack(
+    const void* in_buffer, iree_uk_index_t in_offset,
+    iree_uk_index_t in_stride0, void* out_buffer, iree_uk_index_t out_offset,
+    iree_uk_index_t out_stride0, iree_uk_index_t in_size0,
+    iree_uk_index_t in_size1, iree_uk_index_t out_size0,
+    iree_uk_index_t out_size1, iree_uk_index_t out_size2,
+    iree_uk_index_t out_size3, iree_uk_uint64_t padding_value,
+    iree_uk_uint32_t flags, const iree_uk_uint64_t* cpu_data) {
+  iree_uk_pack_params_t params = {.in_buffer = in_buffer,
+                                  .in_offset = in_offset,
+                                  .in_stride0 = in_stride0,
+                                  .out_buffer = out_buffer,
+                                  .out_offset = out_offset,
+                                  .out_stride0 = out_stride0,
+                                  .in_size0 = in_size0,
+                                  .in_size1 = in_size1,
+                                  .out_size0 = out_size0,
+                                  .out_size1 = out_size1,
+                                  .out_size2 = out_size2,
+                                  .out_size3 = out_size3,
+                                  .padding_value = padding_value,
+                                  .flags = flags,
+                                  .cpu_data = cpu_data};
+  iree_uk_pack_p(&params);
 }

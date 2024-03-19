@@ -26,10 +26,11 @@ py_binary(
 
 # LLVMCPU, non-data-tiling, no microkernels
 [iree_generated_e2e_matmul_test(
-    name = "e2e_matmul_nondt_%s_%s_%s" % (lhs_rhs_type, acc_type, size),
+    name = "e2e_matmul_cpu_nondt_%s_%s_%s" % (lhs_rhs_type, acc_type, size),
     compiler_flags = [
         "--iree-opt-data-tiling=false",
         "--iree-llvmcpu-enable-ukernels=none",
+        "--iree-llvmcpu-enable-scalable-vectorization",
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
@@ -64,15 +65,19 @@ py_binary(
 
 # LLVMCPU, non-data-tiling, no microkernels, ArmSME
 [iree_generated_e2e_matmul_test(
-    name = "e2e_matmul_arm_sme_nondt_%s_%s" % (dtype, size),
+    name = "e2e_matmul_cpu_arm_sme_nondt_%s_%s" % (dtype, size),
     compiler_flags = [
         "--iree-opt-data-tiling=false",
+        "--iree-llvmcpu-enable-scalable-vectorization",
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=%s" % dtype,
         "--acc_type=%s" % dtype,
         "--shapes=%s" % size,
+    ],
+    tags = [
+        "requires-arm-sme",
     ],
     target_backends_and_drivers = [
         ("llvm-cpu", "local-task"),
@@ -112,7 +117,7 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
 
 # LLVMCPU, data-tiling, data-tiling + ukernels.
 [iree_generated_e2e_matmul_test(
-    name = "e2e_matmul_dt%s_%s_%s_%s" % (
+    name = "e2e_matmul_cpu_dt%s_%s_%s_%s" % (
         ("_uk" if use_uk else ""),
         lhs_rhs_type,
         acc_type,
@@ -193,7 +198,7 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
 
 # VMVX, data-tiling + microkernels.
 [iree_generated_e2e_matmul_test(
-    name = "e2e_matmul_dt_uk_%s_small" % lhs_rhs_type,
+    name = "e2e_matmul_vmvx_dt_uk_%s_small" % lhs_rhs_type,
     compiler_flags = [
         "--iree-vmvx-enable-microkernels",
         "--iree-opt-data-tiling",
@@ -219,7 +224,7 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
 ###########################################################################
 
 iree_generated_e2e_matmul_test(
-    name = "e2e_matmul_direct_f32_gpu_large_LLVMGPUMatmulSimt",
+    name = "e2e_matmul_cuda_f32_large_simt",
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
         "--lhs_rhs_type=f32",
@@ -243,7 +248,7 @@ iree_generated_e2e_matmul_test(
 # Testing Ampere + TensorCore path.
 # WMMA TensorCore(F32): wmma.161616.f32.tf32
 iree_generated_e2e_matmul_test(
-    name = "e2e_matmul_direct_f32_gpu_large_LLVMGPUMatmulTensorCore",
+    name = "e2e_matmul_cuda_f32_large_tensorcore",
     compiler_flags = [
         "--iree-hal-cuda-llvm-target-arch=sm_80",
     ],
@@ -268,7 +273,7 @@ iree_generated_e2e_matmul_test(
 )
 
 iree_generated_e2e_matmul_test(
-    name = "e2e_matmul_direct_f32_gpu_large_unaligned",
+    name = "e2e_matmul_cuda_f32_large_unaligned",
     compiler_flags = [
         "--iree-hal-cuda-llvm-target-arch=sm_80",
     ],
@@ -292,7 +297,7 @@ iree_generated_e2e_matmul_test(
 )
 
 iree_generated_e2e_matmul_test(
-    name = "e2e_matmul_direct_f16_gpu_large_unaligned",
+    name = "e2e_matmul_cuda_f16_large_unaligned",
     compiler_flags = [
         "--iree-hal-cuda-llvm-target-arch=sm_80",
     ],
@@ -317,7 +322,7 @@ iree_generated_e2e_matmul_test(
 
 # MMA.SYNC TensorCore(F32): mma.sync.1688.f32.t32
 iree_generated_e2e_matmul_test(
-    name = "e2e_matmul_direct_f32_gpu_large_mma_sync_LLVMGPUMatmulTensorCoreMmaSync",
+    name = "e2e_matmul_cuda_f32_large_mma_sync",
     compiler_flags = [
         "--iree-hal-cuda-llvm-target-arch=sm_80",
     ],
@@ -343,7 +348,7 @@ iree_generated_e2e_matmul_test(
 
 # WMMA TensorCore(F16): wmma.161616.f16.f16
 iree_generated_e2e_matmul_test(
-    name = "e2e_matmul_direct_f16_gpu_large_LLVMGPUMatmulTensorCore",
+    name = "e2e_matmul_cuda_f16_large_tensorcore",
     compiler_flags = [
         "--iree-hal-cuda-llvm-target-arch=sm_80",
     ],
@@ -369,7 +374,7 @@ iree_generated_e2e_matmul_test(
 
 # MMA.SYNC TensorCore(F16): mma.sync.161616.f16.f16
 iree_generated_e2e_matmul_test(
-    name = "e2e_matmul_direct_f16_gpu_large_mma_sync_LLVMGPUMatmulTensorCoreMmaSync",
+    name = "e2e_matmul_cuda_f16_large_mma_sync",
     compiler_flags = [
         "--iree-hal-cuda-llvm-target-arch=sm_80",
     ],
@@ -394,7 +399,7 @@ iree_generated_e2e_matmul_test(
 )
 
 [iree_generated_e2e_matmul_test(
-    name = "e2e_matmul_direct_%s_large_split_k" % lhs_rhs_type,
+    name = "e2e_matmul_cuda_%s_large_splitk" % lhs_rhs_type,
     compiler_flags = [
         "--iree-flow-split-matmul-reduction=4",
     ],
@@ -423,12 +428,70 @@ iree_generated_e2e_matmul_test(
 
 ###########################################################################
 ##
+## ROCm backend
+##
+###########################################################################
+
+# Testing CDNA3 + matrix core path.
+iree_generated_e2e_matmul_test(
+    name = "e2e_matmul_rocm_f16_large_cdna3_mfma",
+    compiler_flags = [
+        "--iree-rocm-target-chip=gfx942",
+    ],
+    generator = ":generate_e2e_matmul_tests",
+    generator_args = [
+        "--lhs_rhs_type=f16",
+        "--acc_type=f32",
+        "--shapes=gpu_large_aligned",
+        "--compilation_info=LLVMGPUVectorDistribute",
+    ],
+    tags = [
+        "noasan",
+        "nomsan",
+        "notsan",
+        "noubsan",
+        "requires-gpu-cdna3",
+    ],
+    target_backends_and_drivers = [
+        ("rocm", "rocm"),
+    ],
+    test_runner = "//tools:iree-e2e-matmul-test",
+)
+
+iree_generated_e2e_matmul_test(
+    name = "e2e_matmul_rocm_f16_large_cdna3_mfma_tb",
+    compiler_flags = [
+        "--iree-rocm-target-chip=gfx942",
+    ],
+    generator = ":generate_e2e_matmul_tests",
+    generator_args = [
+        "--lhs_rhs_type=f16",
+        "--acc_type=f32",
+        "--transpose_rhs",
+        "--shapes=gpu_large_aligned",
+        "--compilation_info=LLVMGPUVectorDistribute",
+    ],
+    tags = [
+        "noasan",
+        "nomsan",
+        "notsan",
+        "noubsan",
+        "requires-gpu-cdna3",
+    ],
+    target_backends_and_drivers = [
+        ("rocm", "rocm"),
+    ],
+    test_runner = "//tools:iree-e2e-matmul-test",
+)
+
+###########################################################################
+##
 ## Vulkan backend
 ##
 ###########################################################################
 
 [iree_generated_e2e_matmul_test(
-    name = "e2e_matmul_direct_{0}_gpu_large_valhall".format(lhs_rhs_type),
+    name = "e2e_matmul_vulkan_{0}_large_valhall".format(lhs_rhs_type),
     compiler_flags = [
         "--iree-vulkan-target-triple=valhall-unknown-android31",
     ],
@@ -454,7 +517,7 @@ iree_generated_e2e_matmul_test(
 ]]
 
 [iree_generated_e2e_matmul_test(
-    name = "e2e_matmul_direct_{0}_gpu_large_ampere".format(lhs_rhs_type),
+    name = "e2e_matmul_vulkan_{0}_large_ampere".format(lhs_rhs_type),
     compiler_flags = [
         "--iree-vulkan-target-triple=ampere-unknown-linux",
     ],
@@ -479,7 +542,7 @@ iree_generated_e2e_matmul_test(
 ]]
 
 iree_generated_e2e_matmul_test(
-    name = "e2e_matmul_direct_f16_gpu_large_rdna3",
+    name = "e2e_matmul_vulkan_f16_large_rdna3",
     compiler_flags = [
         "--iree-vulkan-target-triple=rdna3-unknown-linux",
     ],

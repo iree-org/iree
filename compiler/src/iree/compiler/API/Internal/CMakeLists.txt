@@ -35,7 +35,6 @@ iree_cc_library(
     iree::compiler::PluginAPI::PluginManager
     iree::compiler::Tools::init_llvmir_translations
     iree::compiler::Tools::init_passes_and_dialects
-    iree::compiler::Tools::init_targets
     iree::compiler::Tools::version
     iree::compiler::Utils
     iree::compiler::bindings::c::headers
@@ -82,7 +81,6 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::Target
     iree::compiler::PluginAPI::PluginManager
     iree::compiler::Tools::init_passes_and_dialects
-    iree::compiler::Tools::init_targets
     iree::compiler::bindings::c::headers
   PUBLIC
 )

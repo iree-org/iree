@@ -21,16 +21,24 @@ static const char* kROCMLoaderSearchNames[] = {
 
 static iree_status_t iree_hal_rocm_dynamic_symbols_resolve_all(
     iree_hal_rocm_dynamic_symbols_t* syms) {
-#define RC_PFN_DECL(rocmSymbolName, ...)                              \
+#define IREE_HAL_ROCM_REQUIRED_PFN_DECL(rocmSymbolName, ...)          \
   {                                                                   \
     static const char* kName = #rocmSymbolName;                       \
     IREE_RETURN_IF_ERROR(iree_dynamic_library_lookup_symbol(          \
         syms->loader_library, kName, (void**)&syms->rocmSymbolName)); \
   }
-#define RC_PFN_STR_DECL(rocmSymbolName, ...) RC_PFN_DECL(rocmSymbolName, ...)
+#define IREE_HAL_ROCM_REQUIRED_PFN_STR_DECL(rocmSymbolName, ...) \
+  IREE_HAL_ROCM_REQUIRED_PFN_DECL(rocmSymbolName, ...)
+#define IREE_HAL_ROCM_OPTIONAL_PFN_DECL(rocmSymbolName, ...)          \
+  {                                                                   \
+    static const char* kName = #rocmSymbolName;                       \
+    IREE_IGNORE_ERROR(iree_dynamic_library_lookup_symbol(             \
+        syms->loader_library, kName, (void**)&syms->rocmSymbolName)); \
+  }
 #include "experimental/rocm/dynamic_symbol_tables.h"  // IWYU pragma: keep
-#undef RC_PFN_DECL
-#undef RC_PFN_STR_DECL
+#undef IREE_HAL_ROCM_REQUIRED_PFN_DECL
+#undef IREE_HAL_ROCM_REQUIRED_PFN_STR_DECL
+#undef IREE_HAL_ROCM_OPTIONAL_PFN_DECL
   return iree_ok_status();
 }
 

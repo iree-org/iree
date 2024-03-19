@@ -137,6 +137,10 @@ public:
   // plugins.
   void populateHALTargetBackends(IREE::HAL::TargetBackendList &list);
 
+  // Populates the given list of HAL target devices for all initialized
+  // plugins.
+  void populateHALTargetDevices(IREE::HAL::TargetDeviceList &list);
+
 private:
   PluginManagerOptions &options;
   // At construction, uninitialized plugin sessions are created for all

@@ -22,13 +22,16 @@ extern "C" {
 typedef struct iree_hal_rocm_dynamic_symbols_t {
   iree_dynamic_library_t* loader_library;
 
-#define RC_PFN_DECL(rocmSymbolName, ...) \
+#define IREE_HAL_ROCM_REQUIRED_PFN_DECL(rocmSymbolName, ...) \
   hipError_t (*rocmSymbolName)(__VA_ARGS__);
-#define RC_PFN_STR_DECL(rocmSymbolName, ...) \
+#define IREE_HAL_ROCM_REQUIRED_PFN_STR_DECL(rocmSymbolName, ...) \
   const char* (*rocmSymbolName)(__VA_ARGS__);
+#define IREE_HAL_ROCM_OPTIONAL_PFN_DECL(rocmSymbolName, ...) \
+  hipError_t (*rocmSymbolName)(__VA_ARGS__);
 #include "experimental/rocm/dynamic_symbol_tables.h"  // IWYU pragma: export
-#undef RC_PFN_DECL
-#undef RC_PFN_STR_DECL
+#undef IREE_HAL_ROCM_REQUIRED_PFN_DECL
+#undef IREE_HAL_ROCM_REQUIRED_PFN_STR_DECL
+#undef IREE_HAL_ROCM_OPTIONAL_PFN_DECL
 } iree_hal_rocm_dynamic_symbols_t;
 
 // Initializes |out_syms| in-place with dynamically loaded ROCM symbols.

@@ -54,7 +54,7 @@ def VerifyTargetEnvironmentPass :
   let options = [
     Option<
       "targetRegistry", "target-registry",
-      "llvm::cl::TargetBackendRegistryRef", "",
+      "llvm::cl::TargetRegistryRef", "",
       "Target backend registry containing the list of available backends."
     >,
   ];
@@ -64,18 +64,18 @@ def AssignTargetDevicesPass :
     Pass<"iree-hal-assign-target-devices", "mlir::ModuleOp"> {
   let summary = "Assigns the HAL devices the module will target to the given list of targets.";
   let description = [{
-    DO NOT SUBMIT
+    Assigns target HAL devices to the module based on the given list.
   }];
   let options = [
     Option<
       "targetRegistry", "target-registry",
-      "llvm::cl::TargetBackendRegistryRef", "",
+      "llvm::cl::TargetRegistryRef", "",
       "Target backend registry containing the list of available backends."
     >,
     ListOption<
-      "targets", "targets",
+      "targetBackends", "targetBackends",
       "std::string",
-      "List of devices to assign as targets."
+      "List of target backends to assign as device targets."
     >,
   ];
 }
@@ -206,12 +206,13 @@ def ConfigureExecutablesPass :
     Pass<"iree-hal-configure-executables", "IREE::HAL::ExecutableOp"> {
   let summary = "Configures hal.executable ops via a nested translation pipeline.";
   let description = [{
-    DO NOT SUBMIT
+    Runs a nested pipeline on each executable to attach target-specific
+    configuration information to variants.
   }];
   let options = [
     Option<
       "targetRegistry", "target-registry",
-      "llvm::cl::TargetBackendRegistryRef", "",
+      "llvm::cl::TargetRegistryRef", "",
       "Target backend registry containing the list of available backends."
     >,
   ];
@@ -221,12 +222,13 @@ def ConfigureTargetExecutableVariantsPass :
     Pass<"iree-hal-configure-target-executable-variants", "IREE::HAL::ExecutableVariantOp"> {
   let summary = "Configures hal.executable.variant ops for the specified target backend.";
   let description = [{
-    DO NOT SUBMIT
+    Attaches target-specific configuration information to a variant controlling
+    how code generation operates.
   }];
   let options = [
     Option<
       "targetRegistry", "target-registry",
-      "llvm::cl::TargetBackendRegistryRef", "",
+      "llvm::cl::TargetRegistryRef", "",
       "Target backend registry containing the list of available backends."
     >,
     Option<
@@ -241,12 +243,14 @@ def TranslateExecutablesPass :
     Pass<"iree-hal-translate-executables", "IREE::HAL::ExecutableOp"> {
   let summary = "Translates hal.executable ops via a nested translation pipeline.";
   let description = [{
-    DO NOT SUBMIT
+    Runs a nested pipeline on each executable to translate its variants from
+    their generic MLIR dialects (such as `linalg`) to their target-specific
+    dialects (`llvm`, `spirv`, etc).
   }];
   let options = [
     Option<
       "targetRegistry", "target-registry",
-      "llvm::cl::TargetBackendRegistryRef", "",
+      "llvm::cl::TargetRegistryRef", "",
       "Target backend registry containing the list of available backends."
     >,
   ];
@@ -256,12 +260,14 @@ def TranslateTargetExecutableVariantsPass :
     Pass<"iree-hal-translate-target-executable-variants", "IREE::HAL::ExecutableVariantOp"> {
   let summary = "Translates hal.executable.variant ops for the specified target backend.";
   let description = [{
-    DO NOT SUBMIT
+    Translates an executable variant for a specific target from its generic
+    MLIR dialects (such as `linalg`) to the target-specific dialects (`llvm`,
+    `spirv`, etc).
   }];
   let options = [
     Option<
       "targetRegistry", "target-registry",
-      "llvm::cl::TargetBackendRegistryRef", "",
+      "llvm::cl::TargetRegistryRef", "",
       "Target backend registry containing the list of available backends."
     >,
     Option<
@@ -272,19 +278,28 @@ def TranslateTargetExecutableVariantsPass :
   ];
 }
 
+def PruneExecutablesPass :
+    Pass<"iree-hal-prune-executables", "mlir::ModuleOp"> {
+  let summary = "Prunes executable variants and exports that are not referenced.";
+  let description = [{
+    Prunes executable variants and exports that are not referenced in the
+    module. This is intended to be run late in the pipeline where no new
+    dispatches will be inserted that may require the variants or exports that it
+    removes.
+  }];
+}
+
 def LinkExecutablesPass :
     Pass<"iree-hal-link-executables", "mlir::ModuleOp"> {
   let summary = "Links hal.executable ops into one or more hal.executable ops.";
   let description = [{
-    Calls into each target backend to have it link multiple `hal.executable` ops
-    together (if the backend desires).
-
-    DO NOT SUBMIT
+    Runs a nested pipeline to link multiple `hal.executable` ops together if the
+    target backend the executables are used with desires.
   }];
   let options = [
     Option<
       "targetRegistry", "target-registry",
-      "llvm::cl::TargetBackendRegistryRef", "",
+      "llvm::cl::TargetRegistryRef", "",
       "Target backend registry containing the list of available backends."
     >,
   ];
@@ -294,12 +309,15 @@ def LinkTargetExecutablesPass :
     Pass<"iree-hal-link-target-executables", "mlir::ModuleOp"> {
   let summary = "Links executables for the specified target backend.";
   let description = [{
-    DO NOT SUBMIT
+    Links together multiple `hal.executable` ops for the given target backend if
+    desired. Linking allows for intra-module deduplication and amortization of
+    startup time, code size, and runtime overheads that come from managing
+    multiple hundreds/thousands of executables.
   }];
   let options = [
     Option<
       "targetRegistry", "target-registry",
-      "llvm::cl::TargetBackendRegistryRef", "",
+      "llvm::cl::TargetRegistryRef", "",
       "Target backend registry containing the list of available backends."
     >,
     Option<
@@ -319,6 +337,7 @@ def ResolveExportOrdinalsPass :
     subsequent passes to collapse the executables into opaque blobs.
   }];
   let dependentDialects = [
+    "arith::ArithDialect",
     "IREE::HAL::HALDialect",
   ];
 }
@@ -327,12 +346,14 @@ def SerializeExecutablesPass :
     Pass<"iree-hal-serialize-executables", "IREE::HAL::ExecutableOp"> {
   let summary = "Converts hal.executable.variants to one or more hal.executable.binary ops.";
   let description = [{
-    DO NOT SUBMIT
+    Runs a nested pipeline on each executable to serialize its variants from
+    their low-level MLIR dialects (such as `llvm`, `spirv`, etc) to their
+    target-specific object format (static/shared libraries, SPIR-V, etc).
   }];
   let options = [
     Option<
       "targetRegistry", "target-registry",
-      "llvm::cl::TargetBackendRegistryRef", "",
+      "llvm::cl::TargetRegistryRef", "",
       "Target backend registry containing the list of available backends."
     >,
     Option<
@@ -357,12 +378,14 @@ def SerializeTargetExecutablesPass :
     Pass<"iree-hal-serialize-target-executables", "IREE::HAL::ExecutableOp"> {
   let summary = "Serializes executables for the specified target backend.";
   let description = [{
-    DO NOT SUBMIT
+    Serializes variants for the target backend from their low-level MLIR
+    dialects (such as `llvm`, `spirv`, etc) to their target-specific object
+    format (static/shared libraries, SPIR-V, etc).
   }];
   let options = [
     Option<
       "targetRegistry", "target-registry",
-      "llvm::cl::TargetBackendRegistryRef", "",
+      "llvm::cl::TargetRegistryRef", "",
       "Target backend registry containing the list of available backends."
     >,
     Option<
@@ -410,7 +433,6 @@ def MaterializeDispatchInstrumentationPass :
   ];
   let dependentDialects = [
     "mlir::arith::ArithDialect",
-    "mlir::func::FuncDialect",
     "IREE::HAL::HALDialect",
     "IREE::Stream::StreamDialect",
     "IREE::Util::UtilDialect",
@@ -427,7 +449,6 @@ def MaterializeResourceCachesPass :
   }];
   let dependentDialects = [
     "mlir::arith::ArithDialect",
-    "mlir::func::FuncDialect",
     "mlir::scf::SCFDialect",
     "IREE::HAL::HALDialect",
     "IREE::Util::UtilDialect",
@@ -451,6 +472,23 @@ def ElideRedundantCommandsPass :
 //===----------------------------------------------------------------------===//
 // Benchmarking and debugging utilities
 //===----------------------------------------------------------------------===//
+
+def CaptureExecutableSourcesPass :
+    Pass<"iree-hal-capture-executable-sources", "mlir::ModuleOp"> {
+  let summary = "Captures individual hal.executable.variant source listings and embeds them in the IR.";
+  let description = [{
+    Captures a source listing of each hal.executable.variant and attaches the
+    source to the variant embedded in the IR. Entry points are assigned
+    locations in the IR relative to the captured source.
+  }];
+  let options = [
+    Option<
+      "stage", "stage",
+      "std::string", "\"source\"",
+      "Name used to indicate what stage of compilation is captured."
+    >,
+  ];
+}
 
 def DumpExecutableSourcesPass :
     Pass<"iree-hal-dump-executable-sources", "mlir::ModuleOp"> {
@@ -511,7 +549,6 @@ def DumpExecutableBenchmarksPass :
   ];
   let dependentDialects = [
     "mlir::arith::ArithDialect",
-    "mlir::func::FuncDialect",
     "mlir::scf::SCFDialect",
     "IREE::HAL::HALDialect",
     "IREE::Util::UtilDialect",

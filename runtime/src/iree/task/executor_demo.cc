@@ -62,7 +62,8 @@ extern "C" int main(int argc, char* argv[]) {
 
   //
   iree_task_scope_t scope_a;
-  iree_task_scope_initialize(iree_make_cstring_view("a"), &scope_a);
+  iree_task_scope_initialize(iree_make_cstring_view("a"),
+                             IREE_TASK_SCOPE_FLAG_NONE, &scope_a);
 
   //
   iree_task_call_t call0;

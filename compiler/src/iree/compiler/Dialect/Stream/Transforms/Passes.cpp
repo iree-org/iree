@@ -136,7 +136,8 @@ void buildStreamAsyncPassPipeline(OpPassManager &passManager,
   // required for correct execution while copy elision is for performance only
   // (though it's critical enough that it is not optional).
   FunctionLikeNest(passManager)
-      .addPass(IREE::Stream::createMaterializeCopyOnWritePass);
+      .addPass(IREE::Stream::createMaterializeCopyOnWritePass)
+      .addPass(mlir::createCanonicalizerPass);
   passManager.addPass(IREE::Stream::createElideAsyncCopiesPass());
   FunctionLikeNest(passManager)
       .addPass(mlir::createCanonicalizerPass)

@@ -13,11 +13,35 @@
 
 #include "iree/compiler/Codegen/Common/GPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler {
+
+LogicalResult
+generalizeCandidates(MLIRContext *context,
+                     ArrayRef<linalg::LinalgOp> namedOpCandidates) {
+  IRRewriter rewriter(context);
+  for (auto linalgOp : namedOpCandidates) {
+    // Pass down lowering configuration. It can exist due to user set
+    // configuration from the input.
+    auto config = getLoweringConfig(linalgOp);
+    rewriter.setInsertionPoint(linalgOp);
+    FailureOr<linalg::GenericOp> generalizedOp =
+        linalg::generalizeNamedOp(rewriter, linalgOp);
+    if (failed(generalizedOp)) {
+      linalgOp->emitOpError("failed to generalize operation");
+      return failure();
+    }
+    if (config) {
+      setLoweringConfig(*generalizedOp, config);
+    }
+  }
+  return success();
+}
 
 namespace {
 struct GPUGeneralizeNamedOpsPass
@@ -36,15 +60,8 @@ void GPUGeneralizeNamedOpsPass::runOnOperation() {
       namedOpCandidates.push_back(linalgOp);
   });
 
-  IRRewriter rewriter(&getContext());
-  for (auto linalgOp : namedOpCandidates) {
-    rewriter.setInsertionPoint(linalgOp);
-    FailureOr<linalg::GenericOp> generalizedOp =
-        linalg::generalizeNamedOp(rewriter, linalgOp);
-    if (failed(generalizedOp)) {
-      linalgOp->emitOpError("failed to generalize operation");
-      return signalPassFailure();
-    }
+  if (failed(generalizeCandidates(&getContext(), namedOpCandidates))) {
+    return signalPassFailure();
   }
 }
 

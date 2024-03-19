@@ -38,9 +38,9 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Codegen/Interfaces:UKernelOpInterface",
         "//compiler/src/iree/compiler/Dialect/Flow/IR",
         "//compiler/src/iree/compiler/Dialect/HAL/IR",
+        "//compiler/src/iree/compiler/Dialect/LinalgExt/IR",
+        "//compiler/src/iree/compiler/Dialect/LinalgExt/Transforms",
         "//compiler/src/iree/compiler/Utils",
-        "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
-        "//llvm-external-projects/iree-dialects:IREELinalgExtPasses",
         "@llvm-project//llvm:Support",
         "@llvm-project//llvm:TargetParser",
         "@llvm-project//mlir:AffineDialect",
@@ -64,5 +64,21 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:VectorDialect",
         "@llvm-project//mlir:ViewLikeInterface",
+    ],
+)
+
+iree_compiler_cc_library(
+    name = "VectorOpUtils",
+    srcs = [
+        "VectorOpUtils.cpp",
+    ],
+    hdrs = [
+        "VectorOpUtils.h",
+    ],
+    deps = [
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:VectorDialect",
     ],
 )

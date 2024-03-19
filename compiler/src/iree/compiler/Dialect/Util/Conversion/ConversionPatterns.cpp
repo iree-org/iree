@@ -94,7 +94,79 @@ struct ConvertInitializerOp
   }
 };
 
-struct ConvertFuncOp : public OpConversionPattern<mlir::func::FuncOp> {
+struct ConvertFuncOp : public OpConversionPattern<IREE::Util::FuncOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::Util::FuncOp funcOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto &typeConverter = *getTypeConverter();
+
+    // Convert the input signature types.
+    // TODO(benvanik): dynamic shapes by passing in tensor dynamic dims.
+    auto originalType = funcOp.getFunctionType();
+    TypeConverter::SignatureConversion newSignature(
+        originalType.getNumInputs());
+    for (auto argType : llvm::enumerate(originalType.getInputs())) {
+      if (failed(typeConverter.convertSignatureArg(
+              argType.index(), argType.value(), newSignature))) {
+        return rewriter.notifyMatchFailure(funcOp,
+                                           "failed to convert arg type");
+      }
+    }
+    SmallVector<Type> newResultTypes;
+    if (failed(typeConverter.convertTypes(originalType.getResults(),
+                                          newResultTypes))) {
+      return rewriter.notifyMatchFailure(funcOp,
+                                         "failed to convert result type");
+    }
+
+    // Replace function.
+    auto newFuncOp = rewriter.cloneWithoutRegions(funcOp);
+    newFuncOp.getBlocks().clear();
+    rewriter.inlineRegionBefore(funcOp.getFunctionBody(),
+                                newFuncOp.getFunctionBody(), newFuncOp.end());
+    newFuncOp.setType(rewriter.getFunctionType(newSignature.getConvertedTypes(),
+                                               newResultTypes));
+    if (failed(rewriter.convertRegionTypes(&newFuncOp.getFunctionBody(),
+                                           typeConverter, &newSignature))) {
+      return rewriter.notifyMatchFailure(funcOp,
+                                         "failed to convert region types");
+    }
+    rewriter.eraseOp(funcOp);
+    return success();
+  }
+};
+
+struct ConvertCallOp : public OpConversionPattern<IREE::Util::CallOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::Util::CallOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    SmallVector<Type> resultTypes;
+    if (failed(getTypeConverter()->convertTypes(op.getResultTypes(),
+                                                resultTypes))) {
+      return rewriter.notifyMatchFailure(op, "unable to convert result types");
+    }
+    auto newOp = rewriter.replaceOpWithNewOp<IREE::Util::CallOp>(
+        op, resultTypes, op.getCallee(), adaptor.getOperands(),
+        adaptor.getTiedOperandsAttr());
+    newOp->setDialectAttrs(op->getDialectAttrs());
+    return success();
+  }
+};
+
+struct ConvertReturnOp : public OpConversionPattern<IREE::Util::ReturnOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::Util::ReturnOp returnOp, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<IREE::Util::ReturnOp>(returnOp,
+                                                      adaptor.getOperands());
+    return success();
+  }
+};
+
+struct ConvertFuncFuncOp : public OpConversionPattern<mlir::func::FuncOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult
   matchAndRewrite(mlir::func::FuncOp funcOp, OpAdaptor adaptor,
@@ -137,7 +209,7 @@ struct ConvertFuncOp : public OpConversionPattern<mlir::func::FuncOp> {
   }
 };
 
-struct ConvertCallOp : public OpConversionPattern<mlir::func::CallOp> {
+struct ConvertFuncCallOp : public OpConversionPattern<mlir::func::CallOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult
   matchAndRewrite(mlir::func::CallOp op, OpAdaptor adaptor,
@@ -153,7 +225,7 @@ struct ConvertCallOp : public OpConversionPattern<mlir::func::CallOp> {
   }
 };
 
-struct ConvertReturnOp : public OpConversionPattern<mlir::func::ReturnOp> {
+struct ConvertFuncReturnOp : public OpConversionPattern<mlir::func::ReturnOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult
   matchAndRewrite(mlir::func::ReturnOp returnOp, OpAdaptor adaptor,
@@ -259,28 +331,42 @@ void populateGenericStructuralConversionPatterns(
   // We need to rewrite certain types on operands/results so use the default
   // dynamic legality checker to force any ops using such types to run through
   // our patterns.
+
   conversionTarget.addDynamicallyLegalOp<IREE::Util::InitializerOp>(
       [&](IREE::Util::InitializerOp op) {
         return typeConverter.isLegal(&op.getBody());
       });
-  conversionTarget.addDynamicallyLegalOp<mlir::func::FuncOp>(
-      [&](mlir::func::FuncOp op) {
+  conversionTarget.addDynamicallyLegalOp<IREE::Util::FuncOp>(
+      [&](IREE::Util::FuncOp op) {
         return typeConverter.isSignatureLegal(op.getFunctionType()) &&
                typeConverter.isLegal(&op.getBody());
       });
+  addGenericLegalOp<IREE::Util::CallOp>(conversionTarget, typeConverter);
+  addGenericLegalOp<IREE::Util::ReturnOp>(conversionTarget, typeConverter);
+  patterns.insert<ConvertInitializerOp, ConvertFuncOp, ConvertCallOp,
+                  ConvertReturnOp>(typeConverter, context);
+
+  conversionTarget.addDynamicallyLegalOp<func::FuncOp>([&](func::FuncOp op) {
+    return typeConverter.isSignatureLegal(op.getFunctionType()) &&
+           typeConverter.isLegal(&op.getBody());
+  });
   addGenericLegalOp<func::CallOp>(conversionTarget, typeConverter);
   addGenericLegalOp<func::ReturnOp>(conversionTarget, typeConverter);
+  patterns.insert<ConvertFuncFuncOp, ConvertFuncCallOp, ConvertFuncReturnOp>(
+      typeConverter, context);
+
   addGenericLegalOp<cf::BranchOp>(conversionTarget, typeConverter);
   addGenericLegalOp<cf::CondBranchOp>(conversionTarget, typeConverter);
   addGenericLegalOp<cf::SwitchOp>(conversionTarget, typeConverter);
+  patterns.insert<ConvertBranchOp, ConvertCondBranchOp, ConvertSwitchOp>(
+      typeConverter, context);
+
   addGenericLegalOp<arith::SelectOp>(conversionTarget, typeConverter);
+  patterns.insert<ConvertSelectOp>(typeConverter, context);
+
   addGenericLegalOp<scf::IfOp>(conversionTarget, typeConverter);
   addGenericLegalOp<scf::YieldOp>(conversionTarget, typeConverter);
-  patterns
-      .insert<ConvertInitializerOp, ConvertFuncOp, ConvertCallOp,
-              ConvertReturnOp, ConvertBranchOp, ConvertCondBranchOp,
-              ConvertSwitchOp, ConvertSelectOp, ConvertIfOp, ConvertYieldOp>(
-          typeConverter, context);
+  patterns.insert<ConvertIfOp, ConvertYieldOp>(typeConverter, context);
 }
 
 } // namespace mlir::iree_compiler

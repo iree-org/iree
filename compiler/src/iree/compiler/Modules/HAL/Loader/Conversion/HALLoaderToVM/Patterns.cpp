@@ -82,12 +82,9 @@ struct ExecutableDispatchOpConversion
   matchAndRewrite(IREE::HAL::Loader::ExecutableDispatchOp dispatchOp,
                   OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto entryPoint = rewriter.create<IREE::VM::ConstI32Op>(
-        dispatchOp.getLoc(),
-        static_cast<int32_t>(adaptor.getEntryPoint().getZExtValue()));
     SmallVector<Value, 8> callOperands = {
         adaptor.getExecutable(),
-        entryPoint,
+        castToI32(adaptor.getEntryPoint(), rewriter),
         castToI32(adaptor.getWorkgroupX(), rewriter),
         castToI32(adaptor.getWorkgroupY(), rewriter),
         castToI32(adaptor.getWorkgroupZ(), rewriter),

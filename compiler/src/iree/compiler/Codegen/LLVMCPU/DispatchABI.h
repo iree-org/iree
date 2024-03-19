@@ -22,11 +22,11 @@
 
 namespace mlir::iree_compiler {
 
-// NOTE: HALDispatchABI and the associated conversion patterns should live under
-// iree/compiler/Dialect/HAL/Target/LLVMCPU/ instead of here as they have
-// nothing to do with linalg. If we need to use the patterns in this conversion
-// we can expose a populate*Patterns() function to access them without needing
-// them defined here.
+// NOTE: HALDispatchABI and the associated conversion patterns should maybe live
+// under compiler/plugins/target/LLVMCPU/ instead of here as they have nothing
+// to do with linalg. If we need to use the patterns in this conversion we can
+// expose a populate*Patterns() function to access them without needing them
+// defined here.
 
 //------------------------------------------------------------------------------
 // ExecutableLibraryDI

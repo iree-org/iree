@@ -173,7 +173,7 @@ hal.executable public @batch_matmul_16x128x256x512_div {
   ]>
 ]>
 hal.executable @generic_batch_matmul_32x8x512x64 {
-  hal.executable.variant @vulkan_spirv_fb target(<"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
     spirv.target_env = #spirv.target_env<
       #spirv.vce<v1.6,
       [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, CooperativeMatrixKHR],

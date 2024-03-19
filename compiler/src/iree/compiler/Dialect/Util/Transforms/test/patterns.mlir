@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: @foldBrArguments
 // CHECK-SAME: (%[[COND:.+]]: i1, %[[ARG1:.+]]: index)
-func.func @foldBrArguments(%cond: i1, %arg1: index) -> index {
+util.func @foldBrArguments(%cond: i1, %arg1: index) -> index {
   // CHECK: cf.cond_br %[[COND]]
   cf.cond_br %cond, ^bb1, ^bb2
 ^bb1:
@@ -19,15 +19,15 @@ func.func @foldBrArguments(%cond: i1, %arg1: index) -> index {
 ^bb3(%bb3_0: index, %bb3_1: index, %bb3_2: index, %bb3_3: index):
   // CHECK: %[[OP3:.+]] = "some.op3"(%[[BB3_ARG0]], %[[BB3_ARG1]], %[[BB3_ARG2]], %[[BB3_ARG1]])
   %2 = "some.op3"(%bb3_0, %bb3_1, %bb3_2, %bb3_3) : (index, index, index, index) -> index
-  // CHECK: return %[[OP3]]
-  return %2 : index
+  // CHECK: util.return %[[OP3]]
+  util.return %2 : index
 }
 
 // -----
 
 // CHECK-LABEL: @foldCondBrArguments
 // CHECK-SAME: (%[[COND:.+]]: i1, %[[ARG1:.+]]: index, %[[ARG2:.+]]: index)
-func.func @foldCondBrArguments(%cond: i1, %arg1: index, %arg2: index) -> index {
+util.func @foldCondBrArguments(%cond: i1, %arg1: index, %arg2: index) -> index {
   // CHECK: cf.cond_br %[[COND]], ^bb1, ^bb2
   cf.cond_br %cond, ^bb1(%arg1, %arg2, %arg2 : index, index, index),
                  ^bb2(%arg1, %arg1, %arg2 : index, index, index)
@@ -36,20 +36,20 @@ func.func @foldCondBrArguments(%cond: i1, %arg1: index, %arg2: index) -> index {
   // CHECK: %[[OP1:.+]] = "some.op1"(%[[ARG1]], %[[ARG2]], %[[ARG2]])
   %0 = "some.op1"(%bb1_0, %bb1_1, %bb1_2) : (index, index, index) -> index
   // CHECK: %[[OP1]]
-  return %0 : index
+  util.return %0 : index
   // CHECK: ^bb2:
 ^bb2(%bb2_0: index, %bb2_1: index, %bb2_2: index):
   // CHECK: %[[OP2:.+]] = "some.op2"(%[[ARG1]], %[[ARG1]], %[[ARG2]])
   %1 = "some.op2"(%bb2_0, %bb2_1, %bb2_2) : (index, index, index) -> index
-  // CHECK: return %[[OP2]]
-  return %1 : index
+  // CHECK: util.return %[[OP2]]
+  util.return %1 : index
 }
 
 // -----
 
 // CHECK-LABEL: @elideBranchOperands
 // CHECK-SAME: (%[[ARG0:.+]]: index, %[[ARG1:.+]]: index)
-func.func @elideBranchOperands(%arg0: index, %arg1: index) -> i32 {
+util.func @elideBranchOperands(%arg0: index, %arg1: index) -> i32 {
   // CHECK-DAG: %[[C5I32:.+]] = arith.constant 5 : i32
   // CHECK-DAG: %[[C1I32:.+]] = arith.constant 1 : i32
   // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
@@ -75,15 +75,15 @@ func.func @elideBranchOperands(%arg0: index, %arg1: index) -> i32 {
   cf.br ^loopHeader(%newValue, %newCounter, %bodyMax : i32, index, index)
   // CHECK: ^bb3:
 ^exit(%finalValue: i32):
-  // CHECK: return %[[BB1_ARG0]]
-  return %finalValue : i32
+  // CHECK: util.return %[[BB1_ARG0]]
+  util.return %finalValue : i32
 }
 
 // -----
 
 // CHECK-LABEL: @indexSwitchToIf
 // CHECK-SAME: (%[[CASE:.+]]: index)
-func.func @indexSwitchToIf(%case: index) -> (i32, i64) {
+util.func @indexSwitchToIf(%case: index) -> (i32, i64) {
   // CHECK-NOT: scf.index_switch
   // CHECK: %[[C1:.+]] = arith.constant 1 : index
   // CHECK: %[[IS_CASE_1:.+]] = arith.cmpi eq, %[[CASE]], %[[C1]]
@@ -106,15 +106,15 @@ func.func @indexSwitchToIf(%case: index) -> (i32, i64) {
     // CHECK-NEXT: scf.yield %[[DEFAULT_A]], %[[DEFAULT_B]]
     scf.yield %default_a, %default_b : i32, i64
   }
-  // CHECK: return %[[RESULTS]]#0, %[[RESULTS]]#1
-  return %results#0, %results#1 : i32, i64
+  // CHECK: util.return %[[RESULTS]]#0, %[[RESULTS]]#1
+  util.return %results#0, %results#1 : i32, i64
 }
 
 // -----
 
 // CHECK-LABEL: @indexSwitchToIfNoResult
 // CHECK-SAME: (%[[CASE:.+]]: index)
-func.func @indexSwitchToIfNoResult(%case: index) {
+util.func @indexSwitchToIfNoResult(%case: index) {
   // CHECK-NOT: scf.index_switch
   // CHECK: %[[C1:.+]] = arith.constant 1 : index
   // CHECK: %[[IS_CASE_1:.+]] = arith.cmpi eq, %[[CASE]], %[[C1]]
@@ -131,15 +131,15 @@ func.func @indexSwitchToIfNoResult(%case: index) {
     "some.op.default"() : () -> ()
     scf.yield
   }
-  // CHECK: return
-  return
+  // CHECK: util.return
+  util.return
 }
 
 // -----
 
 // CHECK-LABEL: @indexSwitchToIfNoDefault
 // CHECK-SAME: (%[[CASE:.+]]: index)
-func.func @indexSwitchToIfNoDefault(%case: index) {
+util.func @indexSwitchToIfNoDefault(%case: index) {
   // CHECK-NOT: scf.index_switch
   // CHECK: %[[C1:.+]] = arith.constant 1 : index
   // CHECK: %[[IS_CASE_1:.+]] = arith.cmpi eq, %[[CASE]], %[[C1]]
@@ -153,15 +153,15 @@ func.func @indexSwitchToIfNoDefault(%case: index) {
   // CHECK-NOT: } else {
   default {
   }
-  // CHECK: return
-  return
+  // CHECK: util.return
+  util.return
 }
 
 // -----
 
 // CHECK-LABEL: @mergeIndexSwitches
 // CHECK-SAME: (%[[CASE:.+]]: index)
-func.func @mergeIndexSwitches(%case: index) -> (i32, i32) {
+util.func @mergeIndexSwitches(%case: index) -> (i32, i32) {
   // CHECK: %[[RESULTS:.+]]:2 = scf.index_switch %[[CASE]] -> i32, i32
   %result0 = scf.index_switch %case -> i32
   // CHECK-NEXT: case 0 {
@@ -204,15 +204,15 @@ func.func @mergeIndexSwitches(%case: index) -> (i32, i32) {
     %default = "some.op1.default"(%result0) : (i32) -> i32
     scf.yield %default : i32
   }
-  // CHECK: return %[[RESULTS]]#0, %[[RESULTS]]#1
-  return %result0, %result1 : i32, i32
+  // CHECK: util.return %[[RESULTS]]#0, %[[RESULTS]]#1
+  util.return %result0, %result1 : i32, i32
 }
 
 // -----
 
 // CHECK-LABEL: @mergeIndexSwitchesNoResult
 // CHECK-SAME: (%[[CASE:.+]]: index)
-func.func @mergeIndexSwitchesNoResult(%case: index) {
+util.func @mergeIndexSwitchesNoResult(%case: index) {
   // CHECK: scf.index_switch %[[CASE]]
   scf.index_switch %case
   // CHECK-NEXT: case 0 {
@@ -253,14 +253,14 @@ func.func @mergeIndexSwitchesNoResult(%case: index) {
   default {
     "some.op1.default"() : () -> ()
   }
-  return
+  util.return
 }
 
 // -----
 
 // CHECK-LABEL: @mergeIndexSwitchesIntoEmptyDefault
 // CHECK-SAME: (%[[CASE:.+]]: index)
-func.func @mergeIndexSwitchesIntoEmptyDefault(%case: index) {
+util.func @mergeIndexSwitchesIntoEmptyDefault(%case: index) {
   // CHECK: scf.index_switch %[[CASE]]
   scf.index_switch %case
   // CHECK-NEXT: case 0 {
@@ -295,5 +295,5 @@ func.func @mergeIndexSwitchesIntoEmptyDefault(%case: index) {
   }
   default {
   }
-  return
+  util.return
 }

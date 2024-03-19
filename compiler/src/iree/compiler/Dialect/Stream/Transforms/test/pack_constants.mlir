@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(func.func(iree-stream-pack-constants))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module( util.func(iree-stream-pack-constants))' %s | FileCheck %s
 
 // This is a high level test of the structure emitted by the pass.
 // Subsequent tests focus on individual components.
@@ -14,7 +14,7 @@
 // CHECK-NEXT: ]>
 
 // CHECK-LABEL: @resourceConstants
-func.func @resourceConstants() -> (!stream.resource<constant>, !stream.resource<constant>, !stream.resource<constant>, !stream.timepoint) {
+util.func public @resourceConstants() -> (!stream.resource<constant>, !stream.resource<constant>, !stream.resource<constant>, !stream.timepoint) {
   %c4 = arith.constant 4 : index
   %c8 = arith.constant 8 : index
   %c48 = arith.constant 48 : index
@@ -48,8 +48,8 @@ func.func @resourceConstants() -> (!stream.resource<constant>, !stream.resource<
   // CHECK: %[[RES1:.+]] = stream.resource.subview %[[IF]]#1[%c64] : !stream.resource<constant>{%c192} -> !stream.resource<constant>{%c8}
   // CHECK: %[[RES2:.+]] = stream.resource.subview %[[IF]]#1[%c128] : !stream.resource<constant>{%c192} -> !stream.resource<constant>{%c48}
 
-  // CHECK: return %[[RES0]], %[[RES1]], %[[RES2]], %[[IF]]#0
-  return %0#0, %0#1, %0#2, %0#3 : !stream.resource<constant>, !stream.resource<constant>, !stream.resource<constant>, !stream.timepoint
+  // CHECK: util.return %[[RES0]], %[[RES1]], %[[RES2]], %[[IF]]#0
+  util.return %0#0, %0#1, %0#2, %0#3 : !stream.resource<constant>, !stream.resource<constant>, !stream.resource<constant>, !stream.timepoint
 }
 
 // -----
@@ -63,7 +63,7 @@ func.func @resourceConstants() -> (!stream.resource<constant>, !stream.resource<
 // CHECK: ]>
 
 // CHECK-LABEL: @resourceVariables
-func.func @resourceVariables() -> (!stream.resource<variable>, !stream.resource<variable>, !stream.timepoint) {
+util.func public @resourceVariables() -> (!stream.resource<variable>, !stream.resource<variable>, !stream.timepoint) {
   %c8 = arith.constant 8 : index
   %c1024 = arith.constant 1024 : index
 
@@ -80,8 +80,8 @@ func.func @resourceVariables() -> (!stream.resource<variable>, !stream.resource<
     !stream.resource<variable>{%c8} = dense<[101, 102]> : tensor<2xi32>
     => !stream.timepoint
 
-  // CHECK: return %[[RES0]], %[[RES1]], %[[READ_TIMEPOINT]]
-  return %0#0, %0#1, %0#2 : !stream.resource<variable>, !stream.resource<variable>, !stream.timepoint
+  // CHECK: util.return %[[RES0]], %[[RES1]], %[[READ_TIMEPOINT]]
+  util.return %0#0, %0#1, %0#2 : !stream.resource<variable>, !stream.resource<variable>, !stream.timepoint
 }
 
 // -----
@@ -108,7 +108,7 @@ func.func @resourceVariables() -> (!stream.resource<variable>, !stream.resource<
 // CHECK: ]>
 
 // CHECK-LABEL: @splitResourceConstants
-func.func @splitResourceConstants() -> (!stream.resource<constant>, !stream.resource<constant>, !stream.timepoint)
+util.func public @splitResourceConstants() -> (!stream.resource<constant>, !stream.resource<constant>, !stream.timepoint)
     attributes {stream.resources = #splitResourceConstantsConfig} {
   %c4 = arith.constant 4 : index
   %c8 = arith.constant 8 : index
@@ -134,6 +134,6 @@ func.func @splitResourceConstants() -> (!stream.resource<constant>, !stream.reso
     !stream.resource<constant>{%c8} = dense<[101, 102]> : tensor<2xi32>
     => !stream.timepoint
 
-  // CHECK: return %[[RES0]], %[[RES1]], %[[IF1]]#0
-  return %0#0, %0#1, %0#2 : !stream.resource<constant>, !stream.resource<constant>, !stream.timepoint
+  // CHECK: util.return %[[RES0]], %[[RES1]], %[[IF1]]#0
+  util.return %0#0, %0#1, %0#2 : !stream.resource<constant>, !stream.resource<constant>, !stream.timepoint
 }

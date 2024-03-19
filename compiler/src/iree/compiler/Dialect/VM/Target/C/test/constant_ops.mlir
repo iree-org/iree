@@ -8,12 +8,12 @@ vm.module @rodata_ops {
 
   // Check the generated state struct
   // CHECK-LABEL: struct rodata_ops_state_t {
-  // CHECK-NEXT: iree_allocator_t allocator;
-  // CHECK-NEXT: uint8_t rwdata[1];
-  // CHECK-NEXT: iree_vm_ref_t refs[1];
-  // CHECK-NEXT: iree_vm_buffer_t rodata_buffers[2];
-  // CHECK-NEXT: iree_vm_function_t imports[1];
-  // CHECK-NEXT: };
+  // CHECK-SAME: iree_allocator_t allocator;
+  // CHECK-SAME: uint8_t rwdata[1];
+  // CHECK-SAME: iree_vm_ref_t refs[1];
+  // CHECK-SAME: iree_vm_buffer_t rodata_buffers[2];
+  // CHECK-SAME: iree_vm_function_t imports[1];
+  // CHECK-SAME: };
 
   // We mark the rodata ops public in this test to explicitly prevent DCE from
   // deleting them.
@@ -46,7 +46,7 @@ vm.module @rodata_ops {
 // -----
 
 vm.module @constant_ops {
-  // CHECK-LABEL: constant_ops_neg_constant
+  // CHECK: constant_ops_neg_constant([[ARGS:[^)]*]]) {
   vm.func @neg_constant() -> i32 {
     // CHECK: int32_t [[CONST:[^ ]*]];
     // CHECK-NOT: [[CONST]] = 4294967292;

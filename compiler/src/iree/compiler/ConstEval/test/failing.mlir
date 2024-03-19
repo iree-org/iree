@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-consteval-jit-target-backend=vmvx --verify-diagnostics --iree-consteval-jit-debug --iree-consteval-jit-globals  %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-consteval-jit-target-device=vmvx --verify-diagnostics --iree-consteval-jit-debug --iree-consteval-jit-globals  %s | FileCheck %s
 // XFAIL: *
 
 // CHECK-LABEL: @eval_f64_scalar
@@ -6,9 +6,9 @@
 module @eval_i64_scalar {
   util.global private @offset : f64 = -2.0 : f64
   util.global private @hoisted : f64
-  func.func @main() -> f64 {
+  util.func public @main() -> f64 {
     %hoisted = util.global.load @hoisted : f64
-    return %hoisted : f64
+    util.return %hoisted : f64
   }
   util.initializer attributes {iree.compiler.consteval} {
     %cst = arith.constant 44.0 : f64

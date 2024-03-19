@@ -23,7 +23,6 @@ iree_cc_library(
   SRCS
     "VMVXTarget.cpp"
   DEPS
-    IREELinalgExtDialect
     LLVMSupport
     MLIRIR
     MLIRPass
@@ -31,6 +30,7 @@ iree_cc_library(
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::VMVX
     iree::compiler::Dialect::HAL::Target
+    iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::VM::Conversion
     iree::compiler::Dialect::VM::IR
     iree::compiler::Dialect::VM::Target::Bytecode

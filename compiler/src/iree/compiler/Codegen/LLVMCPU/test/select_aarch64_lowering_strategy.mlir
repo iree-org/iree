@@ -515,7 +515,7 @@ hal.executable private @mmt4d_384x384x512_4x1x4_dispatch_0 {
   }
 }
 
-//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[16, 16, 0, 0, 0, 0], [1, 1, 0, 4, 4, 0], [0, 0, 1, 0, 0, 1]{{\]}}
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[16, 16, 0, 0, 0, 0], [16, 16, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [1, 1, 0, 4, 4, 0], [0, 0, 1, 0, 0, 1], [0, 0, 0, 0, 0, 0]{{\]}}
 //       CHECK: func.func @mmt4d_384x384x512_4x1x4_dispatch_0()
 //       CHECK:   linalg.mmt4d
 //  CHECK-SAME:     lowering_config = #[[CONFIG]]

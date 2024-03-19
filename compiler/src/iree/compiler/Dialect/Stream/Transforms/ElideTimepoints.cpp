@@ -21,7 +21,6 @@
 #include "mlir/Analysis/Liveness.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Attributes.h"
@@ -870,7 +869,7 @@ static bool tryElideTimepointsInRegion(Region &region,
         })
         .Case<cf::BranchOp, cf::CondBranchOp>(
             [&](Operation *op) { elideTimepointOperands(op); })
-        .Case<func::ReturnOp, scf::YieldOp>(
+        .Case<IREE::Util::ReturnOp, scf::YieldOp>(
             [&](Operation *op) { elideTimepointOperands(op); });
   });
 

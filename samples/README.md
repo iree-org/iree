@@ -1,3 +1,4 @@
 # IREE Samples
 
-Also see the [iree-samples](https://github.com/iree-org/iree-samples) repository.
+Also see the [iree-experimental](https://github.com/iree-org/iree-experimental)
+repository.

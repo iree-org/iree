@@ -4,8 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
-#include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
@@ -13,6 +11,7 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -34,8 +33,7 @@ namespace mlir::iree_compiler {
 static void vectorizeLinalgOps(mlir::FunctionOpInterface funcOp) {
   MLIRContext *context = funcOp.getContext();
   IRRewriter rewriter(context);
-  IREE::LinalgExt::LinalgTransformationFilter f(
-      StringAttr::get(context, getVectorizeMarker()));
+  LinalgTransformationFilter f(StringAttr::get(context, getVectorizeMarker()));
 
   funcOp.walk([&](Operation *op) {
     if (failed(f.checkAndNotify(rewriter, op)) ||

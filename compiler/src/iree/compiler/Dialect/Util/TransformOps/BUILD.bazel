@@ -1,0 +1,68 @@
+# Copyright 2024 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library", "iree_gentbl_cc_library", "iree_td_library")
+load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_td_library(
+    name = "td_files",
+    srcs = enforce_glob(
+        [
+            "UtilTransformOps.td",
+        ],
+        include = ["*.td"],
+    ),
+    deps = [
+        "@llvm-project//mlir:OpBaseTdFiles",
+        "@llvm-project//mlir:TransformDialectTdFiles",
+    ],
+)
+
+iree_gentbl_cc_library(
+    name = "UtilTransformOpsGen",
+    tbl_outs = [
+        (
+            ["--gen-op-decls"],
+            "UtilTransformOps.h.inc",
+        ),
+        (
+            ["--gen-op-defs"],
+            "UtilTransformOps.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "UtilTransformOps.td",
+    deps = [":td_files"],
+)
+
+iree_compiler_cc_library(
+    name = "TransformOps",
+    srcs = [
+        "UtilTransformOps.cpp",
+        "UtilTransformOps.cpp.inc",
+    ],
+    hdrs = [
+        "UtilTransformOps.h",
+        "UtilTransformOps.h.inc",
+    ],
+    deps = [
+        ":UtilTransformOpsGen",
+        "//compiler/src/iree/compiler/Dialect/Util/IR",
+        "//compiler/src/iree/compiler/Utils",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:PDLDialect",
+        "@llvm-project//mlir:Support",
+        "@llvm-project//mlir:TransformDialect",
+        "@llvm-project//mlir:TransformUtils",
+    ],
+)

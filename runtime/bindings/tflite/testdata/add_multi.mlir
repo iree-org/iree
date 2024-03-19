@@ -1,11 +1,11 @@
 func.func @main(
-    %arg0: tensor<1x8x8x3xf32> {iree.identifier = "a"},
-    %arg1: tensor<1x8x8x3xf32> {iree.identifier = "b"},
-    %arg2: tensor<1x8x8x3xf32> {iree.identifier = "c"},
-    %arg3: tensor<1x8x8x3xf32> {iree.identifier = "d"}
+    %arg0: tensor<1x8x8x3xf32> {iree.abi.name = "a"},
+    %arg1: tensor<1x8x8x3xf32> {iree.abi.name = "b"},
+    %arg2: tensor<1x8x8x3xf32> {iree.abi.name = "c"},
+    %arg3: tensor<1x8x8x3xf32> {iree.abi.name = "d"}
   ) -> (
-    tensor<1x8x8x3xf32> {iree.identifier = "x"},
-    tensor<1x8x8x3xf32> {iree.identifier = "y"}
+    tensor<1x8x8x3xf32> {iree.abi.name = "x"},
+    tensor<1x8x8x3xf32> {iree.abi.name = "y"}
   ) {
   %0 = arith.addf %arg1, %arg2 : tensor<1x8x8x3xf32>
   %1 = arith.addf %arg0, %0 : tensor<1x8x8x3xf32>

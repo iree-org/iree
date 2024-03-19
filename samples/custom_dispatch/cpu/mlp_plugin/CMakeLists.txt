@@ -37,9 +37,7 @@ set_target_properties(iree_samples_custom_dispatch_cpu_mlp_plugin
 )
 
 add_dependencies(iree-sample-deps
-  iree_samples_custom_dispatch_cpu_mlp_plugin
-  iree_samples_custom_dispatch_cpu_system_plugin)
-
+  iree_samples_custom_dispatch_cpu_mlp_plugin)
 
 iree_lit_test_suite(
   NAME
@@ -51,6 +49,42 @@ iree_lit_test_suite(
     iree-compile
     iree-run-module
     iree_samples_custom_dispatch_cpu_mlp_plugin
+  DATA
+    "mlp_spec.mlir"
+  LABELS
+    "driver=local-sync"
+    "hostonly"
+)
+
+iree_lit_test_suite(
+  NAME
+    mlp_tosa_example
+  SRCS
+    "mlp_tosa.mlir"
+  TOOLS
+    FileCheck
+    iree-compile
+    iree-run-module
+    iree_samples_custom_dispatch_cpu_mlp_plugin
+  DATA
+    "mlp_tosa_spec.pdl.mlir"
+  LABELS
+    "driver=local-sync"
+    "hostonly"
+)
+
+iree_lit_test_suite(
+  NAME
+    mlp_torch_example
+  SRCS
+    "mlp_torch.mlir"
+  TOOLS
+    FileCheck
+    iree-compile
+    iree-run-module
+    iree_samples_custom_dispatch_cpu_mlp_plugin
+  DATA
+    "mlp_torch_spec.pdl.mlir"
   LABELS
     "driver=local-sync"
     "hostonly"

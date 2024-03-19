@@ -2,8 +2,8 @@
 
 mesh.mesh @mesh_2d(shape = 3x4)
 
-// CHECK-LABEL: func @all_gather_non_default_channel
-func.func @all_gather_non_default_channel(
+// CHECK-LABEL: util.func public @all_gather_non_default_channel
+ util.func public @all_gather_non_default_channel(
     // CHECK-SAME: %[[ARG:.*]]: tensor<3x4xi8>
     %arg0 : tensor<3x4xi8>) -> tensor<3x16xi8> {
   // CHECK-DAG: %[[CHANNEL:.*]] = util.global.load @_mesh_mesh_2d_axes_1 : !flow.channel
@@ -19,16 +19,16 @@ func.func @all_gather_non_default_channel(
   // CHECK-SAME: ins(%[[ALL_GATHER_RES]] : tensor<16x3xi8>) outs(%[[RES_INIT_VAL]] : tensor<3x16xi8>) permutation = [1, 0]
   %0 = mesh.all_gather %arg0 on @mesh_2d mesh_axes = [1] gather_axis = 1
     : tensor<3x4xi8> -> tensor<3x16xi8>
-  // CHECK: return %[[RES]] : tensor<3x16xi8>
-  return %0 : tensor<3x16xi8>
+  // CHECK: util.return %[[RES]] : tensor<3x16xi8>
+  util.return %0 : tensor<3x16xi8>
 }
 
 // -----
 
 mesh.mesh @mesh_1d(shape = 2)
 
-// CHECK-LABEL: func @all_reduce_sum_default_channel
-func.func @all_reduce_sum_default_channel(
+// CHECK-LABEL: util.func public @all_reduce_sum_default_channel
+ util.func public @all_reduce_sum_default_channel(
     // CHECK-SAME: %[[ARG:.*]]: tensor<1xi8>
     %arg0 : tensor<1xi8>) -> tensor<1xi8> {
   // CHECK: %[[CHANNEL:.*]] = flow.channel.default : !flow.channel
@@ -37,16 +37,16 @@ func.func @all_reduce_sum_default_channel(
   // CHECK-SAME: (tensor<1xi8>, tensor<1xi8>, !flow.channel) -> %[[INITIAL_VAL]] as tensor<1xi8>
   %0 = mesh.all_reduce %arg0 on @mesh_1d mesh_axes = [0]
     : tensor<1xi8> -> tensor<1xi8>
-  // CHECK: return %[[RES]] : tensor<1xi8>
-  return %0 : tensor<1xi8>
+  // CHECK: util.return %[[RES]] : tensor<1xi8>
+  util.return %0 : tensor<1xi8>
 }
 
 // -----
 
 mesh.mesh @mesh_2d(shape = 2x2)
 
-// CHECK-LABEL: func @all_reduce_min_non_default_channel
-func.func @all_reduce_min_non_default_channel(
+// CHECK-LABEL: util.func public @all_reduce_min_non_default_channel
+ util.func public @all_reduce_min_non_default_channel(
     // CHECK-SAME: %[[ARG:.*]]: tensor<1xi8>
     %arg0 : tensor<1xi8>) -> tensor<1xi8> {
   // CHECK-DAG: %[[CHANNEL:.*]] = util.global.load @_mesh_mesh_2d_axes_1_0 : !flow.channel
@@ -55,16 +55,16 @@ func.func @all_reduce_min_non_default_channel(
   // CHECK-SAME: (tensor<1xi8>, tensor<1xi8>, !flow.channel) -> %[[INITIAL_VAL]] as tensor<1xi8>
   %0 = mesh.all_reduce %arg0 on @mesh_2d mesh_axes = [1, 0] reduction = <min>
     : tensor<1xi8> -> tensor<1xi8>
-  // CHECK: return %[[RES]] : tensor<1xi8>
-  return %0 : tensor<1xi8>
+  // CHECK: util.return %[[RES]] : tensor<1xi8>
+  util.return %0 : tensor<1xi8>
 }
 
 // -----
 
 mesh.mesh @mesh_1d(shape = 2)
 
-// CHECK-LABEL: func @all_reduce_f32
-func.func @all_reduce_f32(
+// CHECK-LABEL: util.func public @all_reduce_f32
+ util.func public @all_reduce_f32(
     // CHECK-SAME: %[[ARG:.*]]: tensor<1xf32>
     %arg0 : tensor<1xf32>) -> tensor<1xf32> {
   // CHECK-DAG: %[[CHANNEL:.*]] = flow.channel.default : !flow.channel
@@ -73,29 +73,29 @@ func.func @all_reduce_f32(
   // CHECK-SAME: (tensor<1xf32>, tensor<1xf32>, !flow.channel) -> %[[INITIAL_VAL]] as tensor<1xf32>
   %0 = mesh.all_reduce %arg0 on @mesh_1d mesh_axes = [0]
     : tensor<1xf32> -> tensor<1xf32>
-  // CHECK: return %[[RES]] : tensor<1xf32>
-  return %0 : tensor<1xf32>
+  // CHECK: util.return %[[RES]] : tensor<1xf32>
+  util.return %0 : tensor<1xf32>
 }
 
 // -----
 
 mesh.mesh @mesh_1d(shape = 2)
 
-// CHECK-LABEL: func @process_linear_index
-func.func @process_linear_index() -> index {
+// CHECK-LABEL: util.func public @process_linear_index
+ util.func public @process_linear_index() -> index {
   // CHECK: %[[CHANNEL:.*]] = flow.channel.default : !flow.channel
   // CHECK: %[[RES:.*]] = flow.channel.rank %[[CHANNEL]] : index
   %0 = mesh.process_linear_index on @mesh_1d : index
-  // CHECK: return %[[RES]] : index
-  return %0 : index
+  // CHECK: util.return %[[RES]] : index
+  util.return %0 : index
 }
 
 // -----
 
 mesh.mesh @mesh_3d(shape = 2x3x4)
 
-// CHECK-LABEL: func @all_to_all_non_default_channel
-func.func @all_to_all_non_default_channel(
+// CHECK-LABEL: util.func public @all_to_all_non_default_channel
+ util.func public @all_to_all_non_default_channel(
     // CHECK-SAME: %[[ARG:.*]]: tensor<1x12x3x4x5xf32>
     %arg0 : tensor<1x12x3x4x5xf32>) -> tensor<1x2x3x24x5xf32> {
   // CHECK: %[[CHANNEL:.*]] = util.global.load @_mesh_mesh_3d_axes_1_0 : !flow.channel
@@ -113,16 +113,16 @@ func.func @all_to_all_non_default_channel(
   // CHECK-SAME-LITERAL: [[0], [1], [2], [3, 4], [5]] : tensor<1x2x3x6x4x5xf32> into tensor<1x2x3x24x5xf32>
   %0 = mesh.all_to_all %arg0 on @mesh_3d mesh_axes = [1, 0] split_axis = 1 concat_axis = 3
     : tensor<1x12x3x4x5xf32> -> tensor<1x2x3x24x5xf32>
-  // CHECK: return %[[COLLAPSED_SPLIT_COUNT_INTO_CONCAT_AXIS]] : tensor<1x2x3x24x5xf32>
-  return %0 : tensor<1x2x3x24x5xf32>
+  // CHECK: util.return %[[COLLAPSED_SPLIT_COUNT_INTO_CONCAT_AXIS]] : tensor<1x2x3x24x5xf32>
+  util.return %0 : tensor<1x2x3x24x5xf32>
 }
 
 // -----
 
 mesh.mesh @mesh_2d(shape = 2x2)
 
-// CHECK-LABEL: func @reduce_scatter_non_default_channel
-func.func @reduce_scatter_non_default_channel(
+// CHECK-LABEL: util.func public @reduce_scatter_non_default_channel
+ util.func public @reduce_scatter_non_default_channel(
     // CHECK-SAME: %[[ARG:.*]]: tensor<3x2xi8>
     %arg0 : tensor<3x2xi8>) -> tensor<3x1xi8> {
   // CHECK-DAG: %[[CHANNEL:.*]] = util.global.load @_mesh_mesh_2d_axes_0 : !flow.channel
@@ -138,6 +138,6 @@ func.func @reduce_scatter_non_default_channel(
   // CHECK-SAME: ins(%[[REDUCE_SCATTER_RES]] : tensor<1x3xi8>) outs(%[[RES_INIT_VAL]] : tensor<3x1xi8>) permutation = [1, 0]
   %0 = mesh.reduce_scatter %arg0 on @mesh_2d mesh_axes = [0] scatter_axis = 1
     : tensor<3x2xi8> -> tensor<3x1xi8>
-  // CHECK: return %[[RES]] : tensor<3x1xi8>
-  return %0 : tensor<3x1xi8>
+  // CHECK: util.return %[[RES]] : tensor<3x1xi8>
+  util.return %0 : tensor<3x1xi8>
 }

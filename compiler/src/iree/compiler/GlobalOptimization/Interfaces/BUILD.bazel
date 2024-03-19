@@ -29,23 +29,15 @@ iree_compiler_cc_library(
 iree_compiler_cc_library(
     name = "HoistableInterfaces",
     srcs = [
-        "HoistableOpInterface.cpp",
         "HoistableTypeInterface.cpp",
     ],
     hdrs = [
-        "HoistableOpInterface.h",
         "HoistableTypeInterface.h",
     ],
     deps = [
         "//compiler/src/iree/compiler/Dialect/Flow/IR",
-        "//compiler/src/iree/compiler/Dialect/Flow/IR:FlowOpsGen",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
-        "//llvm-external-projects/iree-dialects:IREELinalgExtDialect",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
-        "@llvm-project//mlir:LinalgDialect",
-        "@llvm-project//mlir:LinalgOpsIncGen",
-        "@llvm-project//mlir:LinalgStructuredOpsIncGen",
-        "@llvm-project//mlir:TensorDialect",
     ],
 )

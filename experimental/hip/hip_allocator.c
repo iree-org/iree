@@ -245,19 +245,22 @@ iree_hal_hip_allocator_query_buffer_compatibility(
     }
   }
 
-  // If concurrent managed access is not supported then make device-local +
-  // host-visible allocations fall back to host-local + device-visible
-  // page-locked memory. This will be significantly slower for the device to
-  // access but the compiler only uses this type for readback staging buffers
-  // and it's better to function than function fast.
-  if (!allocator->supports_concurrent_managed_access &&
-      iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL |
+  if (iree_all_bits_set(params->type, IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL |
                                           IREE_HAL_MEMORY_TYPE_HOST_VISIBLE)) {
+    // Device local and host visible in general is much more slower than device
+    // only for discrete GPUs. So mark as so accordingly.
     compatibility |= IREE_HAL_BUFFER_COMPATIBILITY_LOW_PERFORMANCE;
-    params->type &= ~(IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL |
-                      IREE_HAL_MEMORY_TYPE_HOST_VISIBLE);
-    params->type |=
-        IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
+    // If concurrent managed access is not supported then make device-local +
+    // host-visible allocations fall back to host-local + device-visible
+    // page-locked memory. This will be significantly slower for the device to
+    // access but the compiler only uses this type for readback staging buffers
+    // and it's better to function than function fast.
+    if (!allocator->supports_concurrent_managed_access) {
+      params->type &= ~(IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL |
+                        IREE_HAL_MEMORY_TYPE_HOST_VISIBLE);
+      params->type |=
+          IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
+    }
   }
 
   // We are now optimal.

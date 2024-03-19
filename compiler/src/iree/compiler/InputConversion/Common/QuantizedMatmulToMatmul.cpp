@@ -28,38 +28,51 @@ bool isConstantZero(Value val) {
   return constIntOp && constIntOp.value() == 0;
 }
 
-// Pattern lowering quantized_matmul to matmul.
-// Always succeeds.
-//
+// Pattern lowering quantized_matmul to matmul and quantized_batch_matmul to
+// batch_matmul op.
 // This is implementing the math explained in Section 2.3 of
 // https://arxiv.org/abs/1712.05877.
 struct QuantizedMatmulToMatmul
-    : public OpRewritePattern<linalg::QuantizedMatmulOp> {
-  using OpRewritePattern<linalg::QuantizedMatmulOp>::OpRewritePattern;
+    : public OpInterfaceRewritePattern<linalg::LinalgOp> {
+  using OpInterfaceRewritePattern<linalg::LinalgOp>::OpInterfaceRewritePattern;
 
-  LogicalResult matchAndRewrite(linalg::QuantizedMatmulOp quantizedMatmulOp,
+  LogicalResult matchAndRewrite(linalg::LinalgOp op,
                                 PatternRewriter &rewriter) const override {
-    Location loc = quantizedMatmulOp.getLoc();
+    // Fails when the operation is neither quantized_matmul or
+    // quantized_batch_matmul.
+    if (!isa<linalg::QuantizedMatmulOp, linalg::QuantizedBatchMatmulOp>(op)) {
+      return failure();
+    }
+
+    Location loc = op.getLoc();
+    SmallVector<Value> inputs = op.getDpsInputs();
+    bool batch = isa<linalg::QuantizedBatchMatmulOp>(op) ? true : false;
     ImplicitLocOpBuilder builder(loc, rewriter);
-    ValueRange inputs = quantizedMatmulOp.getInputs();
     assert(inputs.size() == 4);
     Value lhs = inputs[0];
     Value rhs = inputs[1];
     Value lhsZp = inputs[2];
     Value rhsZp = inputs[3];
-    ValueRange outputs = quantizedMatmulOp.getOutputs();
+    auto lhsTy = dyn_cast<ShapedType>(lhs.getType());
+    unsigned lhsRank = lhsTy.getRank();
+    Value acc = op.getDpsInits()[0];
     // Compute the matmul part.
-    Value acc = outputs[0];
-    Value matmul =
-        builder.create<linalg::MatmulOp>(ValueRange{lhs, rhs}, ValueRange{acc})
-            .getResult(0);
+    Value matmul = batch ? builder
+                               .create<linalg::BatchMatmulOp>(
+                                   ValueRange{lhs, rhs}, ValueRange{acc})
+                               .getResult(0)
+                         : builder
+                               .create<linalg::MatmulOp>(ValueRange{lhs, rhs},
+                                                         ValueRange{acc})
+                               .getResult(0);
     bool lhsZpIsConstantZero = isConstantZero(lhsZp);
     bool rhsZpIsConstantZero = isConstantZero(rhsZp);
     if (lhsZpIsConstantZero && rhsZpIsConstantZero) {
       // Easy case: both zero points are constant zeros, so the quantized_matmul
       // was just a matmul all along.
-      rewriter.replaceOp(quantizedMatmulOp, matmul);
+      rewriter.replaceOp(op, matmul);
       return success();
+      // return matmul;
     }
     // Create the result. No need to zero-fill it as we will overwrite it.
     ShapedType accType = llvm::cast<ShapedType>(acc.getType());
@@ -67,12 +80,17 @@ struct QuantizedMatmulToMatmul
         tensor::getMixedSizes(builder, loc, acc), accType.getElementType());
     // Create the indexing maps for the generic.
     MLIRContext *context = rewriter.getContext();
-    AffineExpr m, n;
-    bindDims(context, m, n);
-    AffineMap mapToNone = AffineMap::get(2, 0, context);
-    AffineMap mapToRowDim = AffineMap::get(2, 0, m, context);
-    AffineMap mapToColumnDim = AffineMap::get(2, 0, n, context);
-    AffineMap mapIdentity = AffineMap::get(2, 0, {m, n}, context);
+    AffineExpr b, m, n;
+    batch ? bindDims(context, b, m, n) : bindDims(context, m, n);
+    AffineMap mapToNone = AffineMap::get(lhsRank, 0, context);
+    AffineMap mapToRowDim = batch ? AffineMap::get(lhsRank, 0, {b, m}, context)
+                                  : AffineMap::get(lhsRank, 0, m, context);
+    AffineMap mapToColumnDim = batch
+                                   ? AffineMap::get(lhsRank, 0, {b, n}, context)
+                                   : AffineMap::get(lhsRank, 0, n, context);
+    AffineMap mapIdentity = batch
+                                ? AffineMap::get(lhsRank, 0, {b, m, n}, context)
+                                : AffineMap::get(lhsRank, 0, {m, n}, context);
     SmallVector<AffineMap> indexingMaps;
     SmallVector<Value> ins;
     auto addInput = [&](Value val, AffineMap map) -> int {
@@ -88,34 +106,38 @@ struct QuantizedMatmulToMatmul
     int indexOfLhsZpTimesRhsZpTimesKSizeInput = 0;
     Type accElTy = accType.getElementType();
     if (!rhsZpIsConstantZero) {
-      Value lhsSums = sumReduceDimensionSubset(builder, lhs, accElTy,
-                                               /*is_reduction=*/{false, true});
+      SmallVector<bool> colRedIterator(lhsRank, false);
+      colRedIterator.back() = true;
+      Value lhsSums =
+          sumReduceDimensionSubset(builder, lhs, accElTy, colRedIterator);
       indexOfLhsSumsInput = addInput(lhsSums, mapToRowDim);
       indexOfRhsZpInput = addInput(rhsZp, mapToNone);
     }
     if (!lhsZpIsConstantZero) {
-      Value rhsSums = sumReduceDimensionSubset(builder, rhs, accElTy,
-                                               /*is_reduction=*/{true, false});
+      SmallVector<bool> rowRedIterator(lhsRank, false);
+      rowRedIterator[static_cast<int>(batch)] = true;
+      Value rhsSums =
+          sumReduceDimensionSubset(builder, rhs, accElTy, rowRedIterator);
       indexOfRhsSumsInput = addInput(rhsSums, mapToColumnDim);
       indexOfLhsZpInput = addInput(lhsZp, mapToNone);
     }
     if (!lhsZpIsConstantZero && !rhsZpIsConstantZero) {
       Value lhsZpTimesRhsZp = builder.create<arith::MulIOp>(lhsZp, rhsZp);
+
       Value kSize = rewriter.create<arith::IndexCastOp>(
-          loc, accElTy, builder.create<tensor::DimOp>(lhs, 1));
+          loc, accElTy, builder.create<tensor::DimOp>(lhs, batch ? 2 : 1));
       Value lhsZpTimesRhsZpTimesKSize =
           builder.create<arith::MulIOp>(lhsZpTimesRhsZp, kSize);
       indexOfLhsZpTimesRhsZpTimesKSizeInput =
           addInput(lhsZpTimesRhsZpTimesKSize, mapToNone);
     }
-    // Add the indexing map for the initResult 'output' even though it's unused.
+    // Add the indexing map for the initResult 'output' even though it's unused
     indexingMaps.push_back(mapIdentity);
     // Create the generic putting all the terms together.
-    SmallVector<utils::IteratorType> iterators{utils::IteratorType::parallel,
-                                               utils::IteratorType::parallel};
+    SmallVector<utils::IteratorType> iterators(lhsRank,
+                                               utils::IteratorType::parallel);
     rewriter.replaceOpWithNewOp<linalg::GenericOp>(
-        quantizedMatmulOp, acc.getType(), ins, ValueRange{initResult},
-        indexingMaps, iterators,
+        op, acc.getType(), ins, ValueRange{initResult}, indexingMaps, iterators,
         [=](OpBuilder &b, Location loc, ValueRange args) {
           Value matmulEl = args[indexOfMatmulInput];
           Value lhsSumsEl = args[indexOfLhsSumsInput];
@@ -146,6 +168,7 @@ struct QuantizedMatmulToMatmul
           }
           b.create<linalg::YieldOp>(loc, result);
         });
+
     return success();
   }
 };

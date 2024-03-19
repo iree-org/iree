@@ -47,13 +47,16 @@ iree_cc_library(
     "GPUVectorDistribution.h"
     "Passes.h"
   SRCS
+    "AMDGPUDistributeContract.cpp"
     "GPUCheckResourceUsage.cpp"
+    "GPUCreateFastSlowPath.cpp"
     "GPUDistribute.cpp"
     "GPUDistributeSharedMemoryCopy.cpp"
     "GPUDistributionPatterns.cpp"
     "GPUGeneralizeNamedOps.cpp"
     "GPULowerToUKernels.cpp"
     "GPUMultiBuffering.cpp"
+    "GPUNestedLayoutDistributionPatterns.cpp"
     "GPUPatterns.cpp"
     "GPUPipelining.cpp"
     "GPUReduceBankConflicts.cpp"
@@ -70,14 +73,15 @@ iree_cc_library(
   DEPS
     ::PassHeaders
     ::PassesIncGen
-    IREELinalgExtDialect
-    IREELinalgExtTransforms
     IREEVectorExtDialect
     LLVMSupport
+    MLIRAMDGPUDialect
     MLIRAffineDialect
     MLIRAffineTransforms
     MLIRAffineUtils
+    MLIRAnalysis
     MLIRArithDialect
+    MLIRArithUtils
     MLIRBufferizationDialect
     MLIRDestinationStyleOpInterface
     MLIRFuncDialect
@@ -101,15 +105,32 @@ iree_cc_library(
     MLIRSideEffectInterfaces
     MLIRSupport
     MLIRTensorDialect
+    MLIRTensorTransforms
     MLIRTransforms
     MLIRVectorDialect
     MLIRVectorToSCF
     MLIRVectorTransforms
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
+    iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
+    iree::compiler::Codegen::Utils::VectorOpUtils
     iree::compiler::Dialect::HAL::IR
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
+    GPUHeuristics
+  HDRS
+    "GPUHeuristics.h"
+  SRCS
+    "GPUHeuristics.cpp"
+  DEPS
+    LLVMSupport
+    MLIRIR
+    MLIRSupport
   PUBLIC
 )
 

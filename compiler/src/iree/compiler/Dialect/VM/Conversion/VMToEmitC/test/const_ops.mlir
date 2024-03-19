@@ -2,7 +2,7 @@
 
 
 vm.module @my_module {
-  // CHECK-LABEL: @my_module_const_i32_zero
+  // CHECK-LABEL: emitc.func private @my_module_const_i32_zero
   vm.func @const_i32_zero() -> i32 {
     // CHECK: %[[ZERO:.+]] = "emitc.constant"() <{value = 0 : i32}> : () -> i32
     %zero = vm.const.i32.zero
@@ -13,7 +13,7 @@ vm.module @my_module {
 // -----
 
 vm.module @my_module {
-  // CHECK-LABEL: @my_module_const_i32
+  // CHECK-LABEL: emitc.func private @my_module_const_i32
   vm.func @const_i32() {
     // CHECK-NEXT: %0 = "emitc.constant"() <{value = 0 : i32}> : () -> i32
     %0 = vm.const.i32 0
@@ -28,7 +28,7 @@ vm.module @my_module {
 // -----
 
 vm.module @my_module {
-  // CHECK-LABEL: @my_module_const_ref_zero
+  // CHECK-LABEL: emitc.func private @my_module_const_ref_zero
   vm.func @const_ref_zero() {
     // CHECK: %[[REF:.+]] = "emitc.variable"() <{value = #emitc.opaque<"">}> : () -> !emitc.opaque<"iree_vm_ref_t">
     // CHECK-NEXT: %[[REFPTR:.+]] = emitc.apply "&"(%[[REF]]) : (!emitc.opaque<"iree_vm_ref_t">) -> !emitc.ptr<!emitc.opaque<"iree_vm_ref_t">>

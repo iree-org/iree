@@ -98,7 +98,7 @@ static void iree_uk_test_unpack_for_shape_params(
                              (params.out_offset * iree_uk_type_size(out_type));
 
   iree_unpack_reference(&reference_params);
-  iree_uk_unpack(&actual_params);
+  iree_uk_unpack_p(&actual_params);
 
   if (!iree_uk_2d_buffers_equal(actual_out_buffer, reference_out_buffer,
                                 out_type, params.out_size0, params.out_size1,

@@ -95,7 +95,7 @@ util.func private @basicExtern(%arg0: tensor<?xf32>) -> (tensor<?xf32>, i32)
 util.func @basicCall(%arg0: tensor<?xf32>) -> (tensor<?xf32>, i32) {
   // CHECK: %[[CALL:.+]]:2 = util.call @basicExtern(%[[ARG0]]) : (tensor<?xf32>) -> (tensor<?xf32>, i32)
   %call:2 = util.call @basicExtern(%arg0) : (tensor<?xf32>) -> (tensor<?xf32>, i32)
-  // CHECK: return %[[CALL]]#0, %[[CALL]]#1
+  // CHECK: util.return %[[CALL]]#0, %[[CALL]]#1
   util.return %call#0, %call#1 : tensor<?xf32>, i32
 }
 
@@ -109,7 +109,7 @@ util.func private @inplaceExtern(%arg0: tensor<?xf32>) -> %arg0
 util.func @inplaceCall(%arg0: tensor<?xf32>) -> tensor<?xf32> {
   // CHECK: %[[CALL:.+]] = util.call @inplaceExtern(%[[ARG0]]) : (tensor<?xf32>) -> %[[ARG0]]
   %call = util.call @inplaceExtern(%arg0) : (tensor<?xf32>) -> %arg0
-  // CHECK: return %[[CALL]]
+  // CHECK: util.return %[[CALL]]
   util.return %call : tensor<?xf32>
 }
 
@@ -123,6 +123,6 @@ util.func private @inplaceTypeChangeExtern(%arg0: tensor<?x4xf32>) -> %arg0 as t
 util.func public @inplaceTypeChangeCall(%arg0: tensor<?x4xf32>) -> tensor<4x?xi32> {
   // CHECK: %[[CALL:.+]] = util.call @inplaceTypeChangeExtern(%[[ARG0]]) : (tensor<?x4xf32>) -> %[[ARG0]] as tensor<4x?xi32>
   %call = util.call @inplaceTypeChangeExtern(%arg0) : (tensor<?x4xf32>) -> %arg0 as tensor<4x?xi32>
-  // CHECK: return %[[CALL]]
+  // CHECK: util.return %[[CALL]]
   util.return %call : tensor<4x?xi32>
 }

@@ -84,7 +84,7 @@ class BenchmarkTest(unittest.TestCase):
             inputs=[arg0, arg1],
         )
 
-        self.assertEquals(len(benchmark_results), 1)
+        self.assertEqual(len(benchmark_results), 1)
         benchmark_time = float(benchmark_results[0].time.split(" ")[0])
         self.assertGreater(benchmark_time, 0)
 
@@ -100,7 +100,7 @@ class BenchmarkTest(unittest.TestCase):
             device=iree.compiler.core.DEFAULT_TESTING_DRIVER,
             inputs=[arg1],
         )
-        self.assertEquals(len(benchmark_results_1), 1)
+        self.assertEqual(len(benchmark_results_1), 1)
 
         benchmark_results_2 = benchmark_module(
             vm_module,
@@ -108,7 +108,7 @@ class BenchmarkTest(unittest.TestCase):
             device=iree.compiler.core.DEFAULT_TESTING_DRIVER,
             inputs=[arg2],
         )
-        self.assertEquals(len(benchmark_results_2), 1)
+        self.assertEqual(len(benchmark_results_2), 1)
 
     def testBenchmarkModuleTimeout(self):
         ctx = iree.runtime.SystemContext()

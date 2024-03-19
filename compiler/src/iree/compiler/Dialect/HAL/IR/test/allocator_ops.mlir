@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: @allocator_allocate
 //  CHECK-SAME: (%[[ALLOCATOR:.+]]: !hal.allocator)
-func.func @allocator_allocate(%allocator: !hal.allocator) {
+util.func public @allocator_allocate(%allocator: !hal.allocator) {
   // CHECK-DAG: %[[AFFINITY:.+]] = arith.constant -1
   %affinity = arith.constant -1 : i64
   // CHECK-DAG: %[[SIZE:.+]] = arith.constant 123
@@ -13,14 +13,14 @@ func.func @allocator_allocate(%allocator: !hal.allocator) {
   // CHECK-SAME:   : !hal.buffer{%[[SIZE]]}
   %ref = hal.allocator.allocate<%allocator : !hal.allocator>
       affinity(%affinity) type(HostLocal) usage(Transfer) : !hal.buffer{%size}
-  return
+  util.return
 }
 
 // -----
 
 // CHECK-LABEL: @allocator_import
 //  CHECK-SAME: %[[ALLOCATOR:.+]]: !hal.allocator
-func.func @allocator_import(%allocator: !hal.allocator, %arg1: !util.buffer) {
+util.func public @allocator_import(%allocator: !hal.allocator, %arg1: !util.buffer) {
   // CHECK-DAG: %[[OFFSET:.+]] = arith.constant 100
   %offset = arith.constant 100 : index
   // CHECK-DAG: %[[LENGTH:.+]] = arith.constant 200
@@ -36,5 +36,5 @@ func.func @allocator_import(%allocator: !hal.allocator, %arg1: !util.buffer) {
   %ok, %ref = hal.allocator.import<%allocator : !hal.allocator>
       source(%arg1 : !util.buffer)[%offset, %length]
       affinity(%affinity) type(DeviceLocal) usage(Transfer) : i1, !hal.buffer
-  return
+  util.return
 }

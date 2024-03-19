@@ -10,10 +10,15 @@
 #include <stddef.h>
 
 #include "iree/base/api.h"
+#include "iree/base/internal/flags.h"
 #include "iree/hal/drivers/local_task/task_driver.h"
 #include "iree/hal/local/loaders/registration/init.h"
 #include "iree/hal/local/plugins/registration/init.h"
 #include "iree/task/api.h"
+
+IREE_FLAG(
+    bool, task_abort_on_failure, false,
+    "Aborts the program on the first failure within a task system queue.");
 
 static iree_status_t iree_hal_local_task_driver_factory_enumerate(
     void* self, iree_host_size_t* out_driver_info_count,
@@ -41,6 +46,9 @@ static iree_status_t iree_hal_local_task_driver_factory_try_create(
 
   iree_hal_task_device_params_t default_params;
   iree_hal_task_device_params_initialize(&default_params);
+  if (FLAG_task_abort_on_failure) {
+    default_params.queue_scope_flags |= IREE_TASK_SCOPE_FLAG_ABORT_ON_FAILURE;
+  }
 
   // Create executors for each topology specified by flags.
   // Stack allocated storage today but we can query for the total count and

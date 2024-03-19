@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: @parameterLoad
 // CHECK-SAME: (%[[DEVICE:.+]]: !hal.device, %[[WAIT:.+]]: !hal.fence, %[[SIGNAL:.+]]: !hal.fence)
-func.func @parameterLoad(%device: !hal.device, %wait: !hal.fence, %signal: !hal.fence) {
+util.func public @parameterLoad(%device: !hal.device, %wait: !hal.fence, %signal: !hal.fence) {
   // CHECK-DAG: %[[AFFINITY:.+]] = arith.constant -1
   %affinity = arith.constant -1 : i64
   // CHECK-DAG: %[[OFFSET:.+]] = arith.constant 0
@@ -24,5 +24,5 @@ func.func @parameterLoad(%device: !hal.device, %wait: !hal.fence, %signal: !hal.
       usage("TransferSource|TransferTarget|Transfer|DispatchStorageRead|DispatchStorageWrite|DispatchStorage|SharingImmutable") {
         "scope"::"w0"[%offset] : !hal.buffer{%length}
       }
-  return
+  util.return
 }

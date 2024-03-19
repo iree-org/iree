@@ -69,8 +69,8 @@ Args:
   signal_semaphores: Semaphores/Fence to signal.
 )";
 
-static const char kHalFenceWait[] =
-    R"(Waits until the fence is signalled or errored.
+static const char kHalWait[] =
+    R"(Waits until the semaphore or fence is signalled or errored.
 
 Three wait cases are supported:
   * timeout: Relative nanoseconds to wait.
@@ -104,6 +104,19 @@ static std::string ToHexString(const uint8_t* data, size_t length) {
 }
 static std::string ToHexString(uint32_t value) {
   return ToHexString((const uint8_t*)&value, sizeof(value));
+}
+
+iree_timeout_t NormalizeTimeout(std::optional<iree_duration_t> timeout,
+                                std::optional<iree_time_t> deadline) {
+  if (!timeout && !deadline) {
+    return iree_infinite_timeout();
+  } else if (timeout && deadline) {
+    throw std::invalid_argument("timeout and deadline cannot both be set");
+  } else if (timeout) {
+    return iree_make_timeout_ns(*timeout);
+  } else {
+    return iree_timeout_t{IREE_TIMEOUT_ABSOLUTE, *deadline};
+  }
 }
 
 }  // namespace
@@ -1119,6 +1132,15 @@ void SetupHalBindings(nanobind::module_ m) {
       .def("__repr__", &HalBufferView::Repr);
 
   py::class_<HalSemaphore>(m, "HalSemaphore")
+      .def(
+          "fail",
+          [](HalSemaphore& self, std::string& message) {
+            // TODO: Take some category enum and use that is available.
+            iree_status_t status =
+                iree_make_status(IREE_STATUS_UNKNOWN, "%s", message.c_str());
+            iree_hal_semaphore_fail(self.raw_ptr(), status);
+          },
+          py::arg("message"))
       .def("query",
            [](HalSemaphore& self) {
              uint64_t out_value;
@@ -1127,10 +1149,52 @@ void SetupHalBindings(nanobind::module_ m) {
                  "querying semaphore");
              return out_value;
            })
-      .def("signal", [](HalSemaphore& self, uint64_t new_value) {
-        CheckApiStatus(iree_hal_semaphore_signal(self.raw_ptr(), new_value),
-                       "signaling semaphore");
-      });
+      .def("signal",
+           [](HalSemaphore& self, uint64_t new_value) {
+             CheckApiStatus(
+                 iree_hal_semaphore_signal(self.raw_ptr(), new_value),
+                 "signaling semaphore");
+           })
+      .def(
+          "wait",
+          [](HalSemaphore& self, uint64_t payload,
+             std::optional<iree_duration_t> timeout,
+             std::optional<iree_time_t> deadline) -> bool {
+            iree_timeout_t t = NormalizeTimeout(timeout, deadline);
+            iree_status_t status;
+            uint64_t unused_value;
+            {
+              py::gil_scoped_release release;
+              status = iree_hal_semaphore_wait(self.raw_ptr(), payload, t);
+            }
+            if (iree_status_is_deadline_exceeded(status)) {
+              // Time out.
+              return false;
+            } else if (iree_status_is_aborted(status)) {
+              // Synchronous failure.
+              iree_status_ignore(status);
+              status = iree_hal_semaphore_query(self.raw_ptr(), &unused_value);
+              if (iree_status_is_ok(status)) {
+                status = iree_make_status(
+                    IREE_STATUS_FAILED_PRECONDITION,
+                    "expected synchronous status failure missing");
+              }
+              CheckApiStatus(status, "synchronous semaphore failure");
+            } else {
+              // General failure check.
+              CheckApiStatus(status, "waiting for semaphore");
+            }
+
+            // Asynchronous failure.
+            status = iree_hal_semaphore_query(self.raw_ptr(), &unused_value);
+            if (iree_status_is_deferred(status)) {
+              return false;
+            }
+            CheckApiStatus(status, "asynchronous semaphore failure");
+            return true;
+          },
+          py::arg("payload"), py::arg("timeout") = py::none(),
+          py::arg("deadline") = py::none(), kHalWait);
 
   auto hal_fence = py::class_<HalFence>(m, "HalFence");
   VmRef::BindRefProtocol(hal_fence, iree_hal_fence_type,
@@ -1214,17 +1278,7 @@ void SetupHalBindings(nanobind::module_ m) {
           "wait",
           [](HalFence& self, std::optional<iree_duration_t> timeout,
              std::optional<iree_time_t> deadline) -> bool {
-            iree_timeout_t t;
-            if (!timeout && !deadline) {
-              t = iree_infinite_timeout();
-            } else if (timeout && deadline) {
-              throw std::invalid_argument(
-                  "timeout and deadline cannot both be set");
-            } else if (timeout) {
-              t = iree_make_timeout_ns(*timeout);
-            } else {
-              t = iree_timeout_t{IREE_TIMEOUT_ABSOLUTE, *deadline};
-            }
+            iree_timeout_t t = NormalizeTimeout(timeout, deadline);
             iree_status_t status;
             {
               py::gil_scoped_release release;
@@ -1257,7 +1311,7 @@ void SetupHalBindings(nanobind::module_ m) {
             return true;
           },
           py::arg("timeout") = py::none(), py::arg("deadline") = py::none(),
-          kHalFenceWait);
+          kHalWait);
 
   py::class_<HalMappedMemory>(m, "MappedMemory")
       .def(

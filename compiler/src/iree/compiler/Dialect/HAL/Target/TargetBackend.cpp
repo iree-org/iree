@@ -35,8 +35,8 @@ void TargetOptions::bindOptions(OptionsBinder &binder) {
 
   binder.opt<int>(
       "iree-hal-executable-debug-level", debugLevel,
-      llvm::cl::desc("Debug level for executable translation (0-3)"),
-      llvm::cl::init(2), llvm::cl::cat(halTargetOptionsCategory));
+      llvm::cl::desc("Debug level for executable translation (0-3)."),
+      llvm::cl::cat(halTargetOptionsCategory));
 
   binder.opt<std::string>(
       "iree-hal-dump-executable-files-to", executableFilesPath,
@@ -89,6 +89,35 @@ void TargetOptions::bindOptions(OptionsBinder &binder) {
       llvm::cl::desc(
           "Path to write translated and serialized executable binaries into."),
       llvm::cl::cat(halTargetOptionsCategory));
+}
+
+SmallVector<std::string>
+gatherExecutableTargetNames(IREE::HAL::ExecutableOp executableOp) {
+  SmallVector<std::string> targetNames;
+  llvm::SmallDenseSet<StringRef> targets;
+  executableOp.walk([&](IREE::HAL::ExecutableVariantOp variantOp) {
+    auto targetName = variantOp.getTarget().getBackend().getValue();
+    if (targets.insert(targetName).second) {
+      targetNames.push_back(targetName.str());
+    }
+  });
+  llvm::stable_sort(targetNames);
+  return targetNames;
+}
+
+SmallVector<std::string> gatherExecutableTargetNames(mlir::ModuleOp moduleOp) {
+  SmallVector<std::string> targetNames;
+  llvm::stable_sort(targetNames);
+  llvm::SmallDenseSet<StringRef> targets;
+  moduleOp.walk([&](IREE::HAL::ExecutableOp executableOp) {
+    executableOp.walk([&](IREE::HAL::ExecutableVariantOp variantOp) {
+      auto targetName = variantOp.getTarget().getBackend().getValue();
+      if (targets.insert(targetName).second) {
+        targetNames.push_back(targetName.str());
+      }
+    });
+  });
+  return targetNames;
 }
 
 void dumpDataToPath(StringRef path, StringRef baseName, StringRef suffix,

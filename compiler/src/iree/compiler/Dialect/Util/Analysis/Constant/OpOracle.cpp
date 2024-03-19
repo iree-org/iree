@@ -53,8 +53,7 @@ bool isLegalConstExprType(Type t) {
     // support, but for now the consteval JIT has interop limitations. Lift
     // this restriction when the JIT interops for all types.
     auto bitWidth = t.getIntOrFloatBitWidth();
-    return bitWidth == 1 || bitWidth == 8 || bitWidth == 16 || bitWidth == 32 ||
-           bitWidth == 64;
+    return llvm::isPowerOf2_64(bitWidth) && bitWidth != 2 && bitWidth <= 64;
   }
 
   if (llvm::isa<IndexType>(t)) {

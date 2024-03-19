@@ -44,7 +44,8 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &pm,
 void addSPIRVSubgroupReducePassPipeline(OpPassManager &pm);
 
 /// Pass pipeline to lower IREE HAL executables via transform dialect schedules.
-void addSPIRVTransformDialectPassPipeline(OpPassManager &pm);
+void addSPIRVTransformDialectPassPipeline(OpPassManager &pm,
+                                          StringRef entryPoint);
 
 /// Pass pipeline to lower winograd ops. This pipeline follows the
 /// SPIRVBaseVectorize pipeline with the following exception:
@@ -84,13 +85,6 @@ createSPIRVAnnotateWinogradLoopsPass();
 /// Breaks down large vectors not natively supported by SPIR-V.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createSPIRVBreakDownLargeVectorPass();
-
-// Uses `tensor.pad` ops as anchors to create separate fast and slow paths
-// inside the kernel. The fast path is for inner tiles where we don't need
-// padding, while the slow path is for boundary tiles where we do need
-// padding.
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createSPIRVCreateFastSlowPathPass();
 
 /// Pass to distribute tiled loop nests to invocations.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>

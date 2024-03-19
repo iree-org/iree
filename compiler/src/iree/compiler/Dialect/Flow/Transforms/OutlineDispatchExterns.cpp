@@ -43,9 +43,6 @@ convertDispatchExternToDispatchOp(IREE::HAL::DispatchExternOp dispatchExternOp,
       dispatchExternOp.getArguments(), dispatchExternOp.getArgumentDims(),
       dispatchExternOp.getResultDims(), dispatchExternOp.getTiedOperandsAttr());
   dispatchOp->setDialectAttrs(dispatchExternOp->getDialectAttrs());
-  if (auto bindingsAttr = dispatchExternOp.getBindingsAttr()) {
-    dispatchOp->setAttr("hal.interface.bindings", bindingsAttr);
-  }
 
   // Replace uses of the existing results with the new results.
   for (int i = 0; i < dispatchExternOp.getNumResults(); ++i) {
@@ -110,6 +107,9 @@ outlineDispatchExternOp(std::string name,
         dispatchExternOp.getSubgroupSizeAttr(),
         dispatchExternOp.getWorkgroupLocalMemoryAttr());
     exportOp->setDialectAttrs(dispatchExternOp->getDialectAttrs());
+    if (auto bindingsAttr = dispatchExternOp.getBindingsAttr()) {
+      exportOp->setAttr("hal.interface.bindings", bindingsAttr);
+    }
     if (!dispatchExternOp.getWorkgroupCount().empty()) {
       IRMapping mapper;
       dispatchExternOp.getWorkgroupCount().cloneInto(

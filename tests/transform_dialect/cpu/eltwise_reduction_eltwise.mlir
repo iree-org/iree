@@ -43,19 +43,17 @@ func.func @reduce(%arg : !in_tensor_t) -> (!out_tensor_t) {
   return %8 : !out_tensor_t
 }
 
-
-// RUN: iree-opt %s --iree-hal-target-backends=llvm-cpu \
-// RUN:     --iree-abi-transformation-pipeline \
-// RUN:     --iree-flow-transformation-pipeline \
-// RUN:     --iree-stream-transformation-pipeline \
-// RUN:     --iree-hal-configuration-pipeline | \
-// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-materialize-user-configs, iree-llvmcpu-select-lowering-strategy, iree-llvmcpu-lower-executable-target)))' \
+// RUN: iree-compile %s --iree-hal-target-backends=llvm-cpu \
+// RUN:     --iree-opt-data-tiling=false \
+// RUN:     --compile-to=executable-configurations | \
+// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-materialize-user-configs,iree-llvmcpu-select-lowering-strategy,iree-llvmcpu-lower-executable-target)))' \
 // RUN:     --iree-llvmcpu-enable-transform-dialect-jit | \
 // RUN: FileCheck %s
 
 // RUN: iree-compile %s --iree-hal-target-backends=llvm-cpu  \
+// RUN:     --iree-opt-data-tiling=false \
 // RUN:     --iree-llvmcpu-enable-transform-dialect-jit | \
-// RUN: iree-run-module --module=- --function=reduce --device=local-task --input="32x256xf32=1" |\
+// RUN: iree-run-module --module=- --function=reduce --device=local-task --input="32x256xf32=1" | \
 // RUN: FileCheck %s --check-prefix=EXEC
 
 //      CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index

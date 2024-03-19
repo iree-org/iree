@@ -13,7 +13,6 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -42,16 +41,12 @@ struct MaterializeResourceCachesPass
     // likely it's already been run. We could fix the pass to better support
     // partial materialization but there's no use cases for that today.
     auto executableOps = llvm::to_vector<8>(moduleOp.getOps<ExecutableOp>());
-    SmallVector<IREE::HAL::DescriptorSetLayoutLookupOp>
-        descriptorSetLayoutLookupOps;
     SmallVector<IREE::HAL::PipelineLayoutLookupOp> pipelineLayoutLookupOps;
     SmallVector<IREE::HAL::ExecutableLookupOp> executableLookupOps;
     for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
       for (auto &block : funcOp.getFunctionBody()) {
         block.walk([&](Operation *op) {
-          if (auto lookupOp = dyn_cast<DescriptorSetLayoutLookupOp>(op)) {
-            descriptorSetLayoutLookupOps.push_back(lookupOp);
-          } else if (auto lookupOp = dyn_cast<PipelineLayoutLookupOp>(op)) {
+          if (auto lookupOp = dyn_cast<PipelineLayoutLookupOp>(op)) {
             pipelineLayoutLookupOps.push_back(lookupOp);
           } else if (auto lookupOp = dyn_cast<ExecutableLookupOp>(op)) {
             executableLookupOps.push_back(lookupOp);
@@ -59,8 +54,7 @@ struct MaterializeResourceCachesPass
         });
       }
     }
-    if (descriptorSetLayoutLookupOps.empty() &&
-        pipelineLayoutLookupOps.empty() && executableLookupOps.empty()) {
+    if (pipelineLayoutLookupOps.empty() && executableLookupOps.empty()) {
       return;
     }
 
@@ -86,9 +80,6 @@ struct MaterializeResourceCachesPass
 
     // Generate cached resource singletons and replace lookup ops with direct
     // loads from variables.
-    for (auto lookupOp : descriptorSetLayoutLookupOps) {
-      replaceDescriptorSetLayoutLookupOp(lookupOp);
-    }
     for (auto lookupOp : pipelineLayoutLookupOps) {
       replacePipelineLayoutLookupOp(lookupOp);
     }
@@ -288,16 +279,16 @@ private:
     auto funcName = (StringRef("__constant_block_") +
                      std::to_string(nextUniqueConstantBlockId++))
                         .str();
-    auto funcOp = moduleBuilder.create<func::FuncOp>(blockOp.getLoc(), funcName,
-                                                     blockOp.getFunctionType());
+    auto funcOp = moduleBuilder.create<IREE::Util::FuncOp>(
+        blockOp.getLoc(), funcName, blockOp.getFunctionType());
     funcOp.setPrivate();
     funcOp.getRegion().takeBody(blockOp.getRegion());
 
     // Replace the hal.return with a func.return.
     for (auto returnOp :
          llvm::make_early_inc_range(funcOp.getOps<IREE::HAL::ReturnOp>())) {
-      OpBuilder(returnOp).create<func::ReturnOp>(returnOp.getLoc(),
-                                                 returnOp.getOperands());
+      OpBuilder(returnOp).create<IREE::Util::ReturnOp>(returnOp.getLoc(),
+                                                       returnOp.getOperands());
       returnOp.erase();
     }
 
@@ -306,22 +297,11 @@ private:
     if (funcOp.getNumArguments() > 0) {
       callOperands.push_back(device);
     }
-    auto callOp = callerBuilder.create<func::CallOp>(blockOp.getLoc(), funcOp,
-                                                     callOperands);
+    auto callOp = callerBuilder.create<IREE::Util::CallOp>(
+        blockOp.getLoc(), funcOp, callOperands);
 
     return llvm::map_to_vector(callOp.getResults(),
                                [](OpResult result) -> Value { return result; });
-  }
-
-  void
-  replaceDescriptorSetLayoutLookupOp(DescriptorSetLayoutLookupOp &lookupOp) {
-    OpBuilder builder(lookupOp);
-    auto globalOp = defineDescriptorSetLayoutOp(
-        lookupOp.getLoc(), lookupOp.getBindings(), lookupOp.getFlags());
-    auto loadedValue = globalOp.createLoadOp(lookupOp.getLoc(), builder)
-                           .getLoadedGlobalValue();
-    lookupOp.replaceAllUsesWith(loadedValue);
-    lookupOp.erase();
   }
 
   void replacePipelineLayoutLookupOp(PipelineLayoutLookupOp &lookupOp) {

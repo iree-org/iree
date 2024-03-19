@@ -39,8 +39,8 @@ func.func @conv() {
     dimension_numbers = #stablehlo.conv<raw input_batch_dimension = 0, input_feature_dimension = 3, input_spatial_dimensions = [1, 2], kernel_input_feature_dimension = 2, kernel_output_feature_dimension = 3, kernel_spatial_dimensions = [0, 1], output_batch_dimension = 0, output_feature_dimension = 3, output_spatial_dimensions = [1, 2]>,
     feature_group_count = 1 : i64,
     padding = dense<1> : tensor<2x2xi64>,
-    rhs_dilation = dense<1> : tensor<2xi64>,
-    window_strides = dense<1> : tensor<2xi64>
+    rhs_dilation = array<i64: 1, 1>,
+    window_strides = array<i64: 1, 1>
   } : (tensor<36x7x7x512xf32>, tensor<3x3x512x512xf32>) -> tensor<36x7x7x512xf32>
   %1 = "stablehlo.convolution"(%input, %filter) {
     compilation_info = #conv_compilation1,
@@ -48,8 +48,8 @@ func.func @conv() {
     dimension_numbers = #stablehlo.conv<raw input_batch_dimension = 0, input_feature_dimension = 3, input_spatial_dimensions = [1, 2], kernel_input_feature_dimension = 2, kernel_output_feature_dimension = 3, kernel_spatial_dimensions = [0, 1], output_batch_dimension = 0, output_feature_dimension = 3, output_spatial_dimensions = [1, 2]>,
     feature_group_count = 1 : i64,
     padding = dense<1> : tensor<2x2xi64>,
-    rhs_dilation = dense<1> : tensor<2xi64>,
-    window_strides = dense<1> : tensor<2xi64>
+    rhs_dilation = array<i64: 1, 1>,
+    window_strides = array<i64: 1, 1>
   } : (tensor<36x7x7x512xf32>, tensor<3x3x512x512xf32>) -> tensor<36x7x7x512xf32>
   check.expect_almost_eq(%0, %1) : tensor<36x7x7x512xf32>
   return

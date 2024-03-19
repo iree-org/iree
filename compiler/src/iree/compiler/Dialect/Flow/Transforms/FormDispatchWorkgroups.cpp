@@ -38,15 +38,15 @@ namespace mlir::iree_compiler::IREE::Flow {
 
 /// Traverses DispatchRegionOp in the function and rewrites them as
 /// DispatchWorkgroupsOp
-static FailureOr<SmallVector<Flow::DispatchWorkgroupsOp>>
+static FailureOr<SmallVector<IREE::Flow::DispatchWorkgroupsOp>>
 createDispatchWorkgroups(mlir::TensorDimTrackingRewriter &rewriter,
                          mlir::FunctionOpInterface funcOp,
                          DominanceInfo const &dominanceInfo) {
-  SmallVector<Flow::DispatchRegionOp> regionOps;
+  SmallVector<IREE::Flow::DispatchRegionOp> regionOps;
   funcOp.walk([&](Flow::DispatchRegionOp op) { regionOps.push_back(op); });
 
   // Clone additional producers and rewrite to DispatchWorkgroupsOp.
-  SmallVector<Flow::DispatchWorkgroupsOp> result;
+  SmallVector<IREE::Flow::DispatchWorkgroupsOp> result;
   for (auto regionOp : regionOps) {
     auto maybeWorkgroupOp =
         rewriteFlowDispatchRegionToFlowDispatchWorkgroups(regionOp, rewriter);
@@ -60,13 +60,13 @@ createDispatchWorkgroups(mlir::TensorDimTrackingRewriter &rewriter,
 /// Return `true` if the given op is contained in DispatchWorkgroupsOp or in a
 /// DispatchRegionOp.
 static bool isInDispatchRegion(Operation *op) {
-  return op->getParentOfType<Flow::DispatchWorkgroupsOp>() ||
-         op->getParentOfType<Flow::DispatchRegionOp>();
+  return op->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>() ||
+         op->getParentOfType<IREE::Flow::DispatchRegionOp>();
 }
 
 /// Wrap a single op in a DispatchWorkgroupsOp. When generateWorkloadRegion is
 /// true, `workload_count` region is generated for dispatch.region
-static FailureOr<Flow::DispatchWorkgroupsOp>
+static FailureOr<IREE::Flow::DispatchWorkgroupsOp>
 wrapInWorkgroupsOp(mlir::TensorDimTrackingRewriter &rewriter, Operation *op) {
   // Simplify tensor::DimOps.
   SmallVector<tensor::DimOp> dimOps = rewriter.getTensorDimOps();
@@ -75,23 +75,24 @@ wrapInWorkgroupsOp(mlir::TensorDimTrackingRewriter &rewriter, Operation *op) {
     return failure();
 
   // Wrap operation.
-  auto regionOp = Flow::wrapOpInDispatchRegion(rewriter, op);
+  auto regionOp = IREE::Flow::wrapOpInDispatchRegion(rewriter, op);
   if (failed(regionOp))
     return failure();
   if (failed(cloneProducersToRegion(rewriter, *regionOp)))
     return failure();
-  auto workgroupsOp = Flow::rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
-      *regionOp, rewriter);
+  auto workgroupsOp =
+      IREE::Flow::rewriteFlowDispatchRegionToFlowDispatchWorkgroups(*regionOp,
+                                                                    rewriter);
   if (failed(workgroupsOp))
     return failure();
   return *workgroupsOp;
 }
 
 /// Wrap all given ops in a DispatchWorkgroupsOp.
-static FailureOr<SmallVector<Flow::DispatchWorkgroupsOp>>
+static FailureOr<SmallVector<IREE::Flow::DispatchWorkgroupsOp>>
 wrapInWorkgroupsOp(mlir::TensorDimTrackingRewriter &rewriter,
                    SmallVector<Operation *> rootOps) {
-  SmallVector<Flow::DispatchWorkgroupsOp> result;
+  SmallVector<IREE::Flow::DispatchWorkgroupsOp> result;
   for (Operation *rootOp : rootOps) {
     auto workgroupsOp = wrapInWorkgroupsOp(rewriter, rootOp);
     if (failed(workgroupsOp))
@@ -104,7 +105,7 @@ wrapInWorkgroupsOp(mlir::TensorDimTrackingRewriter &rewriter,
 /// Wrap all ops of the given types that are direct children of the given op
 /// in DispatchWorkgroupsOps.
 template <typename... OpTys>
-static FailureOr<SmallVector<Flow::DispatchWorkgroupsOp>>
+static FailureOr<SmallVector<IREE::Flow::DispatchWorkgroupsOp>>
 wrapInWorkgroupsOp(mlir::TensorDimTrackingRewriter &rewriter, Operation *op) {
   // Find ops of type OpTys.
   SmallVector<Operation *> rootOps;
@@ -120,10 +121,9 @@ wrapInWorkgroupsOp(mlir::TensorDimTrackingRewriter &rewriter, Operation *op) {
 
 /// Rewrite top-level InsertSliceOps to FlowUpdateOps or wrap them in a
 /// dispatch region.
-LogicalResult
-convertInsertSliceOps(mlir::TensorDimTrackingRewriter &rewriter,
-                      mlir::FunctionOpInterface funcOp,
-                      SmallVector<Flow::DispatchWorkgroupsOp> &workgroupsOps) {
+LogicalResult convertInsertSliceOps(
+    mlir::TensorDimTrackingRewriter &rewriter, mlir::FunctionOpInterface funcOp,
+    SmallVector<IREE::Flow::DispatchWorkgroupsOp> &workgroupsOps) {
   // Find eligible InsertSliceOps.
   SmallVector<tensor::InsertSliceOp> insertSliceOps;
   funcOp.walk([&](tensor::InsertSliceOp op) {
@@ -140,7 +140,7 @@ convertInsertSliceOps(mlir::TensorDimTrackingRewriter &rewriter,
   }
 
   // Create a DispatchWorkgroupsOp for every remaining InsertSliceOp.
-  FailureOr<SmallVector<Flow::DispatchWorkgroupsOp>> newWorkgroupsOps =
+  FailureOr<SmallVector<IREE::Flow::DispatchWorkgroupsOp>> newWorkgroupsOps =
       wrapInWorkgroupsOp(rewriter, remainingInsertSliceOps);
   if (failed(newWorkgroupsOps))
     return failure();
@@ -151,10 +151,9 @@ convertInsertSliceOps(mlir::TensorDimTrackingRewriter &rewriter,
 
 /// Rewrite top-level ExtractSliceOps to FlowSliceOps or wrap them in a
 /// dispatch region.
-LogicalResult
-convertExtractSliceOps(mlir::TensorDimTrackingRewriter &rewriter,
-                       mlir::FunctionOpInterface funcOp,
-                       SmallVector<Flow::DispatchWorkgroupsOp> &workgroupsOps) {
+LogicalResult convertExtractSliceOps(
+    mlir::TensorDimTrackingRewriter &rewriter, mlir::FunctionOpInterface funcOp,
+    SmallVector<IREE::Flow::DispatchWorkgroupsOp> &workgroupsOps) {
   // Find eligible ExtractSliceOps.
   SmallVector<tensor::ExtractSliceOp> extractSliceOps;
   funcOp.walk([&](tensor::ExtractSliceOp op) {
@@ -171,7 +170,7 @@ convertExtractSliceOps(mlir::TensorDimTrackingRewriter &rewriter,
   }
 
   // Create a DispatchWorkgroupsOp for every remaining ExtractSliceOp.
-  FailureOr<SmallVector<Flow::DispatchWorkgroupsOp>> newWorkgroupsOps =
+  FailureOr<SmallVector<IREE::Flow::DispatchWorkgroupsOp>> newWorkgroupsOps =
       wrapInWorkgroupsOp(rewriter, remainingExtractSliceOps);
   if (failed(newWorkgroupsOps))
     return failure();
@@ -190,9 +189,8 @@ convertExtractSliceOps(mlir::TensorDimTrackingRewriter &rewriter,
 /// - To correlate back to the captured workload,
 /// `flow.dispatch.workload.ordinal`
 ///   to map the captured operand to the position in the workload list.
-static void
-createDefaultWorkgroupCountRegion(RewriterBase &rewriter,
-                                  Flow::DispatchWorkgroupsOp workgroupsOp) {
+static void createDefaultWorkgroupCountRegion(
+    RewriterBase &rewriter, IREE::Flow::DispatchWorkgroupsOp workgroupsOp) {
   Region &workgroupCountBody = workgroupsOp.getWorkgroupCount();
   if (!workgroupCountBody.empty()) {
     // Preserve pre-existing workgroup count region.
@@ -220,9 +218,9 @@ createDefaultWorkgroupCountRegion(RewriterBase &rewriter,
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPointToStart(block);
   auto defaultCountOp =
-      rewriter.create<Flow::DispatchWorkgroupCountFromSliceOp>(
+      rewriter.create<IREE::Flow::DispatchWorkgroupCountFromSliceOp>(
           loc, block->getArguments());
-  rewriter.create<Flow::ReturnOp>(loc, defaultCountOp.getResults());
+  rewriter.create<IREE::Flow::ReturnOp>(loc, defaultCountOp.getResults());
 
   // Update the `workgroupsOp` region.
   rewriter.modifyOpInPlace(workgroupsOp, [&]() {
@@ -241,7 +239,7 @@ createDefaultWorkgroupCountRegion(RewriterBase &rewriter,
       if (!llvm::isa<IndexType>(operand.getType()))
         continue;
       BlockArgument arg = workgroupsOp.getInputBlockArgument(index);
-      auto ordinalOp = rewriter.create<Flow::DispatchWorkloadOrdinalOp>(
+      auto ordinalOp = rewriter.create<IREE::Flow::DispatchWorkloadOrdinalOp>(
           loc, arg, rewriter.getIndexAttr(ordinalNumber++));
       rewriter.replaceAllUsesExcept(arg, ordinalOp, ordinalOp);
     }
@@ -278,7 +276,8 @@ void FormDispatchWorkgroupsPass::runOnOperation() {
       createDispatchWorkgroups(rewriter, funcOp, dominanceInfo);
   if (failed(maybeWorkgroupsOps))
     return signalPassFailure();
-  SmallVector<Flow::DispatchWorkgroupsOp> workgroupsOps = *maybeWorkgroupsOps;
+  SmallVector<IREE::Flow::DispatchWorkgroupsOp> workgroupsOps =
+      *maybeWorkgroupsOps;
 
   LLVM_DEBUG({
     llvm::dbgs() << "\n--- After forming of dispatch workgroups ---\n";
@@ -309,8 +308,8 @@ void FormDispatchWorkgroupsPass::runOnOperation() {
   // A few extra canonicalizations/lowerings.
   {
     RewritePatternSet convertToFlowPatterns(context);
-    Flow::populateTensorToFlowConversionPatterns(context,
-                                                 convertToFlowPatterns);
+    IREE::Flow::populateTensorToFlowConversionPatterns(context,
+                                                       convertToFlowPatterns);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(
         convertToFlowPatterns);
     IREE::Flow::TensorReshapeOp::getCanonicalizationPatterns(
@@ -326,7 +325,7 @@ void FormDispatchWorkgroupsPass::runOnOperation() {
     // Finally fold `tensor.insert_slice/extract_slice` operations with
     // `flow.dispatch.tensor.load/store`.
     RewritePatternSet foldExtractInsertSliceOps(context);
-    Flow::populateTensorSliceOpWithDispatchTensorOpFoldingPatterns(
+    IREE::Flow::populateTensorSliceOpWithDispatchTensorOpFoldingPatterns(
         foldExtractInsertSliceOps, context);
     if (failed(applyPatternsAndFoldGreedily(
             funcOp, std::move(foldExtractInsertSliceOps)))) {
@@ -340,7 +339,8 @@ void FormDispatchWorkgroupsPass::runOnOperation() {
   // arguments.
   {
     RewritePatternSet patterns(context);
-    Flow::DispatchWorkgroupsOp::getCanonicalizationPatterns(patterns, context);
+    IREE::Flow::DispatchWorkgroupsOp::getCanonicalizationPatterns(patterns,
+                                                                  context);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       funcOp.emitOpError(
           "failed in flow.dispatch.workgroups op canonicalization");

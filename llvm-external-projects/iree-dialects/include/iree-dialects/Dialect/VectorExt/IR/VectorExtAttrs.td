@@ -77,7 +77,7 @@ def LayoutAttr : IREEVectorExt_Attr<"Layout",
   let genVerifyDecl = 0;
   let extraClassDeclaration = [{
     // Get the shape for a given layout dimension.
-    std::optional<int64_t> getShape(const LayoutDimension &dim);
+    std::optional<int64_t> getShape(const LayoutDimension &dim) const;
     std::optional<int64_t> getBatchDim(int64_t dim);
     // Get the lane dimension shape for a provided simd tensor dim.
     std::optional<int64_t> getLaneDim(int64_t dim);
@@ -96,6 +96,12 @@ def LayoutAttr : IREEVectorExt_Attr<"Layout",
     // which is that for lane k, the shuffle op returns the
     // value from lane k ^ offset.
     uint64_t getShuffleOffset(int64_t reductionDim);
+
+    // Determines whether the other layout has a lane
+    // dimension that the current layout does not have OR whether
+    // the shape of the two layouts for a common lane dimension
+    // is not the same.
+    bool hasLaneConflictWith(const LayoutAttr &other);
   }];
 }
 
@@ -130,7 +136,7 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
     1. Subgroups per Workgroup
 
     This level of tiling is also known as "subgroup/warp distribution". It
-    represents how subgroups are distributed in a workgroup. 
+    represents how subgroups are distributed in a workgroup.
 
     The subgroups are placed contiguously with their shape and ordering
     determined by:
@@ -148,7 +154,7 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
     The total number of subgroups used (computed by multiplying each dim in
     subgroups_per_workgroup) should be a multiple of number of subgroups in the
     harware. If the total number of subgroups used exceeds the number of
-    subgroups of the hardware, then the subgroup used (say x) is 
+    subgroups of the hardware, then the subgroup used (say x) is
     x mod num_subgroups:
 
     num_subgroups = 4
@@ -183,7 +189,7 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
 
     0 1 2 3 4
     5 6 7 8 9
-    --------- --> Thread Layout of shape 2x5 duplicated 2 times, to get a layout of shape 4x5 
+    --------- --> Thread Layout of shape 2x5 duplicated 2 times, to get a layout of shape 4x5
     0 1 2 3 4     outers_per_batch=[2, 1]
     5 6 7 8 9     threads_per_outer=[2, 5]
 
@@ -213,7 +219,7 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
 
     {
       [0 2]|[0 2]      0,1,2,3 --> thread ids
-      [1 3]|[1 3]      
+      [1 3]|[1 3]
       ------------     [x z]   --> a single outer tile
       [0 2]|[0 2]      [y w]
       [1 3]|[1 3]
@@ -273,11 +279,17 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
     ArrayRefParameter<"int64_t", "thread_order">:$threadOrder,
 
     ArrayRefParameter<"int64_t", "elements_per_thread">:$elementsPerThread,
-    ArrayRefParameter<"int64_t", "element_order">:$elementOrder
+    ArrayRefParameter<"int64_t", "element_order">:$elementOrder,
+
+    ArrayRefParameter<"int64_t", "subgroup_basis">:$subgroupBasis,
+    ArrayRefParameter<"bool", "subgroup_active_ids">:$subgroupActiveIds,
+
+    ArrayRefParameter<"int64_t", "thread_basis">:$threadBasis,
+    ArrayRefParameter<"bool", "thread_active_ids">:$threadActiveIds
   );
 
-  // TODO: add custom parser/printer and builder to elide default value array
-  // refs.
+  // By default, identity orderings are elided when parsing/printing.
+  // TODO: Improve custom parsing/printing for sizes/basis elements.
   let assemblyFormat = [{
     `<` `subgroups_per_workgroup` `=` `[` $subgroupsPerWorkgroup `]` `,`
         `batches_per_subgroup`    `=` `[` $batchesPerSubgroup `]` `,`
@@ -285,12 +297,21 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
         `threads_per_outer`       `=` `[` $threadsPerOuter `]` `,`
         `elements_per_thread`     `=` `[` $elementsPerThread `]` `,`
 
-        `subgroup_order`          `=` `[` $subgroupOrder `]` `,`
-        `batch_order`             `=` `[` $batchOrder `]` `,`
-        `outer_order`             `=` `[` $outerOrder `]` `,`
-        `thread_order`            `=` `[` $threadOrder `]` `,`
-        `element_order`           `=` `[` $elementOrder `]` 
+        custom<Permutation>("\"subgroup_order\"", ref($subgroupsPerWorkgroup), "true", $subgroupOrder) ``
+        custom<Permutation>("\"batch_order\"", ref($batchesPerSubgroup), "true", $batchOrder) ``
+        custom<Permutation>("\"outer_order\"", ref($outersPerBatch), "true", $outerOrder) ``
+        custom<Permutation>("\"thread_order\"", ref($threadsPerOuter), "true", $threadOrder) ``
+        custom<Permutation>("\"element_order\"", ref($elementsPerThread), "true", $elementOrder) ``
+
+        custom<Basis>("\"subgroup_basis\"", "\"subgroup_active_ids\"", "true", $subgroupBasis, $subgroupActiveIds) ``
+        custom<Basis>("\"thread_basis\"", "\"thread_active_ids\"", "false", $threadBasis, $threadActiveIds) ``
     `>`
+  }];
+
+  let extraClassDeclaration = [{
+    // Returns the subgroup/lane ids delinearized from a single linearized
+    // thread ID.
+    SmallVector<Value> computeThreadIds(Value threadId, RewriterBase &rewriter) const;
   }];
 
   let genVerifyDecl = 1;

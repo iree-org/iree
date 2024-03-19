@@ -34,7 +34,7 @@ typedef struct iree_benchmark_state_t {
   iree_allocator_t host_allocator;
 } iree_benchmark_state_t;
 
-// Returns a range argument with the given ordial.
+// Returns a range argument with the given ordinal.
 int64_t iree_benchmark_get_range(iree_benchmark_state_t* state,
                                  iree_host_size_t ordinal);
 

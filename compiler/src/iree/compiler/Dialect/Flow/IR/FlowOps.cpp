@@ -1400,8 +1400,10 @@ void DispatchOp::build(OpBuilder &builder, OperationState &state,
   state.addOperands(resultDims);
   state.addAttributes(attributes);
   state.attributes.erase(IREE::Util::TiedOpInterface::getStorageAttrName());
-  state.addAttribute(IREE::Util::TiedOpInterface::getStorageAttrName(),
-                     tiedOperands);
+  if (tiedOperands) {
+    state.addAttribute(IREE::Util::TiedOpInterface::getStorageAttrName(),
+                       tiedOperands);
+  }
   state.attributes.erase(getOperandSegmentSizeAttr());
   state.addAttribute(getOperandSegmentSizeAttr(),
                      builder.getDenseI32ArrayAttr({
@@ -1510,8 +1512,10 @@ void FuncOp::build(OpBuilder &builder, OperationState &state, StringRef name,
   state.addAttribute("function_type", TypeAttr::get(type));
   state.attributes.append(attrs.begin(), attrs.end());
   state.attributes.erase(IREE::Util::TiedOpInterface::getStorageAttrName());
-  state.addAttribute(IREE::Util::TiedOpInterface::getStorageAttrName(),
-                     tiedOperands);
+  if (tiedOperands) {
+    state.addAttribute(IREE::Util::TiedOpInterface::getStorageAttrName(),
+                       tiedOperands);
+  }
   state.addRegion();
   if (!argAttrs.empty() || !resAttrs.empty()) {
     assert(type.getNumInputs() == argAttrs.size());
@@ -1538,8 +1542,10 @@ void CallOp::build(OpBuilder &builder, OperationState &state,
   state.addOperands(resultDims);
   state.addAttributes(attributes);
   state.attributes.erase(IREE::Util::TiedOpInterface::getStorageAttrName());
-  state.addAttribute(IREE::Util::TiedOpInterface::getStorageAttrName(),
-                     tiedOperands);
+  if (tiedOperands) {
+    state.addAttribute(IREE::Util::TiedOpInterface::getStorageAttrName(),
+                       tiedOperands);
+  }
   state.attributes.erase(getOperandSegmentSizeAttr());
   state.addAttribute(getOperandSegmentSizeAttr(),
                      builder.getDenseI32ArrayAttr({

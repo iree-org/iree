@@ -19,6 +19,9 @@ namespace mlir::iree_compiler::Preprocessing {
 /// using im2col tranformation.
 std::unique_ptr<Pass> createConvertConv2DToImg2ColPass();
 
+/// A pass to convert convolutions to channels last and propagate.
+std::unique_ptr<Pass> createConvertConvToChannelsLastPass();
+
 /// Moves the body of the entire function into a single dispatch.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createMakeSingleDispatchForFunctionPass();

@@ -9,7 +9,6 @@
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Modules/IO/Parameters/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
 #include "mlir/Transforms/Passes.h"
@@ -17,7 +16,7 @@
 namespace mlir::iree_compiler::GlobalOptimization {
 
 using FunctionLikeNest =
-    MultiOpNest<func::FuncOp, IREE::Util::InitializerOp, IREE::Util::FuncOp>;
+    MultiOpNest<IREE::Util::InitializerOp, IREE::Util::FuncOp>;
 
 static llvm::cl::opt<bool> clEnableQuantizedMatmulReassociation(
     "iree-global-opt-enable-quantized-matmul-reassociation",
@@ -145,9 +144,15 @@ void buildGlobalOptimizationPassPipeline(
     mainPassManager.addPass(createCSEPass());
     mainPassManager.addPass(createSimplifyPackUnpackPass());
   }
-  // Generalize transposes and any other remaining named linalg ops that can now
-  // be represented as generics.
+  // Generalize transposes and any other remaining named linalg ops that can
+  // now be represented as generics.
   FunctionLikeNest(mainPassManager).addPass(createGeneralizeLinalgNamedOpsPass);
+
+  // Hoist loop invariants (e.g. from scf loops) with zero-trip-check.
+  FunctionLikeNest(mainPassManager)
+      .addPass(createGlobalLoopInvariantCodeMotionPass)
+      .addPass(mlir::createCanonicalizerPass)
+      .addPass(mlir::createCSEPass);
 
   OpPassManager pipeline(ModuleOp::getOperationName());
   FunctionLikeNest(pipeline)

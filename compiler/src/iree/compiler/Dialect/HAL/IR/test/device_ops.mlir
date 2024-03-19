@@ -2,26 +2,26 @@
 
 // CHECK-LABEL: @device_allocator
 // CHECK-SAME: (%[[DEVICE:.+]]: !hal.device)
-func.func @device_allocator(%device: !hal.device) -> !hal.allocator {
+util.func public @device_allocator(%device: !hal.device) -> !hal.allocator {
   // CHECK: %allocator = hal.device.allocator<%[[DEVICE]] : !hal.device> : !hal.allocator
   %allocator = hal.device.allocator<%device : !hal.device> : !hal.allocator
-  return %allocator : !hal.allocator
+  util.return %allocator : !hal.allocator
 }
 
 // -----
 
 // CHECK-LABEL: @device_query
 // CHECK-SAME: (%[[DEVICE:.+]]: !hal.device)
-func.func @device_query(%device : !hal.device) -> (i1, i32) {
+util.func public @device_query(%device : !hal.device) -> (i1, i32) {
   // CHECK: = hal.device.query<%[[DEVICE]] : !hal.device> key("sys" :: "foo") : i1, i32
   %ok, %value = hal.device.query<%device : !hal.device> key("sys" :: "foo") : i1, i32
-  return %ok, %value : i1, i32
+  util.return %ok, %value : i1, i32
 }
 
 // -----
 
 // CHECK-LABEL: @device_queue_alloca
-func.func @device_queue_alloca(
+util.func public @device_queue_alloca(
     // CHECK-SAME: (%[[DEVICE:.+]]: !hal.device, %[[AFFINITY:.+]]: i64,
     %device: !hal.device, %affinity: i64,
     // CHECK-SAME:  %[[WAIT_FENCE:.+]]: !hal.fence, %[[SIGNAL_FENCE:.+]]: !hal.fence,
@@ -41,13 +41,13 @@ func.func @device_queue_alloca(
       type(DeviceLocal) usage(Transfer)
       // CHECK-SAME: : !hal.buffer{%[[SIZE]]}
       : !hal.buffer{%size}
-  return %buffer : !hal.buffer
+  util.return %buffer : !hal.buffer
 }
 
 // -----
 
 // CHECK-LABEL: @device_queue_dealloca
-func.func @device_queue_dealloca(
+util.func public @device_queue_dealloca(
     // CHECK-SAME: (%[[DEVICE:.+]]: !hal.device, %[[AFFINITY:.+]]: i64,
     %device: !hal.device, %affinity: i64,
     // CHECK-SAME:  %[[WAIT_FENCE:.+]]: !hal.fence, %[[SIGNAL_FENCE:.+]]: !hal.fence,
@@ -62,13 +62,13 @@ func.func @device_queue_dealloca(
       wait(%wait_fence) signal(%signal_fence)
       // CHECK-SAME: buffer(%[[BUFFER]] : !hal.buffer)
       buffer(%buffer : !hal.buffer)
-  return
+  util.return
 }
 
 // -----
 
 // CHECK-LABEL: @device_queue_read
-func.func @device_queue_read(
+util.func public @device_queue_read(
     // CHECK-SAME: (%[[DEVICE:.+]]: !hal.device, %[[AFFINITY:.+]]: i64,
     %device: !hal.device, %affinity: i64,
     // CHECK-SAME:  %[[WAIT_FENCE:.+]]: !hal.fence, %[[SIGNAL_FENCE:.+]]: !hal.fence,
@@ -97,13 +97,13 @@ func.func @device_queue_read(
       length(%length)
       // CHECK-SAME: flags(0)
       flags(0)
-  return
+  util.return
 }
 
 // -----
 
 // CHECK-LABEL: @device_queue_write
-func.func @device_queue_write(
+util.func public @device_queue_write(
     // CHECK-SAME: (%[[DEVICE:.+]]: !hal.device, %[[AFFINITY:.+]]: i64,
     %device: !hal.device, %affinity: i64,
     // CHECK-SAME:  %[[WAIT_FENCE:.+]]: !hal.fence, %[[SIGNAL_FENCE:.+]]: !hal.fence,
@@ -132,13 +132,13 @@ func.func @device_queue_write(
       length(%length)
       // CHECK-SAME: flags(0)
       flags(0)
-  return
+  util.return
 }
 
 // -----
 
 // CHECK-LABEL: @device_queue_execute
-func.func @device_queue_execute(
+util.func public @device_queue_execute(
     // CHECK-SAME: (%[[DEVICE:.+]]: !hal.device, %[[AFFINITY:.+]]: i64,
     %device: !hal.device, %affinity: i64,
     // CHECK-SAME:  %[[WAIT_FENCE:.+]]: !hal.fence, %[[SIGNAL_FENCE:.+]]: !hal.fence,
@@ -153,18 +153,18 @@ func.func @device_queue_execute(
       wait(%wait_fence) signal(%signal_fence)
       // CHECK-SAME: commands([%[[CMD0]], %[[CMD1]]])
       commands([%cmd0, %cmd1])
-  return
+  util.return
 }
 
 // -----
 
 // CHECK-LABEL: @device_queue_flush
-func.func @device_queue_flush(
+util.func public @device_queue_flush(
     // CHECK-SAME: (%[[DEVICE:.+]]: !hal.device, %[[AFFINITY:.+]]: i64)
     %device: !hal.device, %affinity: i64) {
   // CHECK: hal.device.queue.flush<%[[DEVICE]] : !hal.device>
   hal.device.queue.flush<%device : !hal.device>
       // CHECK-SAME: affinity(%[[AFFINITY]])
       affinity(%affinity)
-  return
+  util.return
 }

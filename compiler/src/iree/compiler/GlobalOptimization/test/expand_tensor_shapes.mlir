@@ -8,7 +8,7 @@
 util.global private mutable @loadedGlobal : tensor<4x?x?x2xf32>
 
 // CHECK-LABEL: @globalLoad
-func.func @globalLoad() {
+util.func private @globalLoad() {
   // CHECK-NEXT: %[[TENSOR:.+]] = util.global.load @loadedGlobal : tensor<4x?x?x2xf32>
   // CHECK-NEXT: %[[D1:.+]] = util.global.load @loadedGlobal__d1 : index
   // CHECK-NEXT: %[[D2:.+]] = util.global.load @loadedGlobal__d2 : index
@@ -16,7 +16,7 @@ func.func @globalLoad() {
   %0 = util.global.load @loadedGlobal : tensor<4x?x?x2xf32>
   // CHECK-NEXT: util.optimization_barrier %[[TIED]]
   util.optimization_barrier %0 : tensor<4x?x?x2xf32>
-  return
+  util.return
 }
 
 // -----
@@ -30,13 +30,13 @@ util.global private mutable @storedGlobal : tensor<4x?x?x2xf32>
 
 // CHECK-LABEL: @globalStore
 // CHECK-SAME: (%[[ARG0:.+]]: tensor<4x?x?x2xf32>, %[[D1:.+]]: index, %[[D2:.+]]: index)
-func.func @globalStore(%arg0: tensor<4x?x?x2xf32>) {
+util.func private @globalStore(%arg0: tensor<4x?x?x2xf32>) {
   // CHECK-NEXT: %[[TIED:.+]] = flow.tensor.tie_shape %[[ARG0]] : tensor<4x?x?x2xf32>{%[[D1]], %[[D2]]}
   // CHECK-NEXT: util.global.store %[[ARG0]], @storedGlobal : tensor<4x?x?x2xf32>
   // CHECK-NEXT: util.global.store %[[D1]], @storedGlobal__d1 : index
   // CHECK-NEXT: util.global.store %[[D2]], @storedGlobal__d2 : index
   util.global.store %arg0, @storedGlobal : tensor<4x?x?x2xf32>
-  return
+  util.return
 }
 
 // -----
@@ -46,7 +46,7 @@ func.func @globalStore(%arg0: tensor<4x?x?x2xf32>) {
 // CHECK-LABEL: @funcArgs
 // CHECK-SAME: (%[[ARG0:.+]]: tensor<4x?x?x2xf32>, %[[ARG0_D1:.+]]: index, %[[ARG0_D2:.+]]: index,
 // CHECK-SAME:  %[[ARG1:.+]]: tensor<?xi32>, %[[ARG1_D0:.+]]: index)
-func.func @funcArgs(%arg0: tensor<4x?x?x2xf32>, %arg1: tensor<?xi32>) {
+util.func private @funcArgs(%arg0: tensor<4x?x?x2xf32>, %arg1: tensor<?xi32>) {
   // CHECK-NEXT: %[[TIED_ARG0:.+]] = flow.tensor.tie_shape %[[ARG0]] : tensor<4x?x?x2xf32>{%[[ARG0_D1]], %[[ARG0_D2]]}
   // CHECK-NEXT: %[[TIED_ARG1:.+]] = flow.tensor.tie_shape %[[ARG1]] : tensor<?xi32>{%[[ARG1_D0]]}
 
@@ -55,7 +55,7 @@ func.func @funcArgs(%arg0: tensor<4x?x?x2xf32>, %arg1: tensor<?xi32>) {
   // CHECK-NEXT: util.optimization_barrier %[[TIED_ARG1]]
   util.optimization_barrier %arg1 : tensor<?xi32>
 
-  return
+  util.return
 }
 
 // -----
@@ -65,14 +65,14 @@ func.func @funcArgs(%arg0: tensor<4x?x?x2xf32>, %arg1: tensor<?xi32>) {
 // CHECK-LABEL: @funcResults
 // CHECK-SAME: (%[[ARG0:.+]]: tensor<4x?x?x2xf32>, %[[ARG0_D1:.+]]: index, %[[ARG0_D2:.+]]: index,
 // CHECK-SAME:  %[[ARG1:.+]]: tensor<?xi32>, %[[ARG1_D0:.+]]: index)
-func.func @funcResults(%arg0: tensor<4x?x?x2xf32>, %arg1: tensor<?xi32>) -> (tensor<4x?x?x2xf32>, tensor<?xi32>) {
+util.func private @funcResults(%arg0: tensor<4x?x?x2xf32>, %arg1: tensor<?xi32>) -> (tensor<4x?x?x2xf32>, tensor<?xi32>) {
   // CHECK-NEXT: %[[TIED_ARG0:.+]] = flow.tensor.tie_shape %[[ARG0]] : tensor<4x?x?x2xf32>{%[[ARG0_D1]], %[[ARG0_D2]]}
   // CHECK-NEXT: %[[TIED_ARG1:.+]] = flow.tensor.tie_shape %[[ARG1]] : tensor<?xi32>{%[[ARG1_D0]]}
 
-  // NOTE: we return %arg0/%arg1 instead of the tied ones - this helps the ties
+  // NOTE: we util.return %arg0/%arg1 instead of the tied ones - this helps the ties
   // get dropped early when they aren't needed.
-  // CHECK-NEXT: return %[[ARG0]], %[[ARG0_D1]], %[[ARG0_D2]], %[[ARG1]], %[[ARG1_D0]]
-  return %arg0, %arg1 : tensor<4x?x?x2xf32>, tensor<?xi32>
+  // CHECK-NEXT: util.return %[[ARG0]], %[[ARG0_D1]], %[[ARG0_D2]], %[[ARG1]], %[[ARG1_D0]]
+  util.return %arg0, %arg1 : tensor<4x?x?x2xf32>, tensor<?xi32>
 }
 
 // -----
@@ -82,13 +82,13 @@ func.func @funcResults(%arg0: tensor<4x?x?x2xf32>, %arg1: tensor<?xi32>) -> (ten
 // CHECK-LABEL: @caller
 // CHECK-SAME: (%[[ARG0:.+]]: tensor<4x?x?x2xf32>, %[[ARG0_D1:.+]]: index, %[[ARG0_D2:.+]]: index,
 // CHECK-SAME:  %[[ARG1:.+]]: tensor<?xi32>, %[[ARG1_D0:.+]]: index)
-func.func @caller(%arg0: tensor<4x?x?x2xf32>, %arg1: tensor<?xi32>) {
+util.func private @caller(%arg0: tensor<4x?x?x2xf32>, %arg1: tensor<?xi32>) {
   // CHECK-NEXT: %[[TIED_ARG0:.+]] = flow.tensor.tie_shape %[[ARG0]] : tensor<4x?x?x2xf32>{%[[ARG0_D1]], %[[ARG0_D2]]}
   // CHECK-NEXT: %[[TIED_ARG1:.+]] = flow.tensor.tie_shape %[[ARG1]] : tensor<?xi32>{%[[ARG1_D0]]}
 
-  // CHECK: %[[RET:.+]]:5 = call @callee(%[[ARG0]], %[[ARG0_D1]], %[[ARG0_D2]], %[[ARG1]], %[[ARG1_D0]])
+  // CHECK: %[[RET:.+]]:5 = util.call @callee(%[[ARG0]], %[[ARG0_D1]], %[[ARG0_D2]], %[[ARG1]], %[[ARG1_D0]])
   // CHECK-SAME: (tensor<4x?x?x2xf32>, index, index, tensor<?xi32>, index) -> (tensor<4x?x?x2xf32>, index, index, tensor<?xi32>, index)
-  %0:2 = call @callee(%arg0, %arg1) : (tensor<4x?x?x2xf32>, tensor<?xi32>) -> (tensor<4x?x?x2xf32>, tensor<?xi32>)
+  %0:2 = util.call @callee(%arg0, %arg1) : (tensor<4x?x?x2xf32>, tensor<?xi32>) -> (tensor<4x?x?x2xf32>, tensor<?xi32>)
 
   // CHECK-NEXT: %[[TIED_RET0:.+]] = flow.tensor.tie_shape %[[RET]]#0 : tensor<4x?x?x2xf32>{%[[RET]]#1, %[[RET]]#2}
   // CHECK-NEXT: %[[TIED_RET1:.+]] = flow.tensor.tie_shape %[[RET]]#3 : tensor<?xi32>{%[[RET]]#4}
@@ -98,10 +98,55 @@ func.func @caller(%arg0: tensor<4x?x?x2xf32>, %arg1: tensor<?xi32>) {
   // CHECK-NEXT: util.optimization_barrier %[[TIED_RET1]]
   util.optimization_barrier %0#1 : tensor<?xi32>
 
-  return
+  util.return
 }
 
-func.func private @callee(%arg0: tensor<4x?x?x2xf32>, %arg1: tensor<?xi32>) -> (tensor<4x?x?x2xf32>, tensor<?xi32>)
+util.func private @callee(%arg0: tensor<4x?x?x2xf32>, %arg1: tensor<?xi32>) -> (tensor<4x?x?x2xf32>, tensor<?xi32>) {
+  util.return %arg0, %arg1 : tensor<4x?x?x2xf32>, tensor<?xi32>
+}
+
+// -----
+
+// Tests that tied operands are updated when we expand functions/calls.
+
+// CHECK-LABEL: @tiedCaller
+// CHECK-SAME: (%[[ARG0:.+]]: tensor<4x?x?x2xf32>, %[[ARG0_D1:.+]]: index, %[[ARG0_D2:.+]]: index,
+// CHECK-SAME:  %[[ARG1:.+]]: tensor<?xi32>, %[[ARG1_D0:.+]]: index)
+util.func private @tiedCaller(%arg0: tensor<4x?x?x2xf32>, %arg1: tensor<?xi32>) {
+  // CHECK-NEXT: %[[TIED_ARG0:.+]] = flow.tensor.tie_shape %[[ARG0]] : tensor<4x?x?x2xf32>{%[[ARG0_D1]], %[[ARG0_D2]]}
+  // CHECK-NEXT: %[[TIED_ARG1:.+]] = flow.tensor.tie_shape %[[ARG1]] : tensor<?xi32>{%[[ARG1_D0]]}
+
+  // CHECK: %[[RET:.+]]:5 = util.call @tiedCallee(%[[ARG0]], %[[ARG0_D1]], %[[ARG0_D2]], %[[ARG1]], %[[ARG1_D0]])
+  // CHECK-SAME: (tensor<4x?x?x2xf32>, index, index, tensor<?xi32>, index) -> (tensor<4x?x?x2xf32>, index, index, %[[ARG1]], index)
+  %0:2 = util.call @tiedCallee(%arg0, %arg1) : (tensor<4x?x?x2xf32>, tensor<?xi32>) -> (tensor<4x?x?x2xf32>, %arg1)
+
+  // CHECK-NEXT: %[[TIED_RET0:.+]] = flow.tensor.tie_shape %[[RET]]#0 : tensor<4x?x?x2xf32>{%[[RET]]#1, %[[RET]]#2}
+  // CHECK-NEXT: %[[TIED_RET1:.+]] = flow.tensor.tie_shape %[[RET]]#3 : tensor<?xi32>{%[[RET]]#4}
+
+  // CHECK-NEXT: util.optimization_barrier %[[TIED_RET0]]
+  util.optimization_barrier %0#0 : tensor<4x?x?x2xf32>
+  // CHECK-NEXT: util.optimization_barrier %[[TIED_RET1]]
+  util.optimization_barrier %0#1 : tensor<?xi32>
+
+  util.return
+}
+
+// CHECK-LABEL: util.func private @tiedCallee
+// CHECK-SAME: (%[[CALLEE_ARG0:.+]]: tensor<4x?x?x2xf32>, %[[CALLEE_ARG0_D1:.+]]: index, %[[CALLEE_ARG0_D2:.+]]: index,
+// CHECK-SAME:  %[[CALLEE_ARG1:.+]]: tensor<?xi32>, %[[CALLEE_ARG1_D0:.+]]: index)
+// CHECK-SAME: -> (tensor<4x?x?x2xf32>, index, index, %[[CALLEE_ARG1]], index)
+util.func private @tiedCallee(%arg0: tensor<4x?x?x2xf32>, %arg1: tensor<?xi32>) -> (tensor<4x?x?x2xf32>, %arg1) {
+  // CHECK-NEXT: %[[CALLEE_TIED_ARG0:.+]] = flow.tensor.tie_shape %[[CALLEE_ARG0]] : tensor<4x?x?x2xf32>{%[[CALLEE_ARG0_D1]], %[[CALLEE_ARG0_D2]]}
+  // CHECK-NEXT: %[[CALLEE_TIED_ARG1:.+]] = flow.tensor.tie_shape %[[CALLEE_ARG1]] : tensor<?xi32>{%[[CALLEE_ARG1_D0]]}
+
+  // CHECK-NEXT: util.optimization_barrier %[[CALLEE_TIED_ARG0]]
+  util.optimization_barrier %arg0 : tensor<4x?x?x2xf32>
+  // CHECK-NEXT: util.optimization_barrier %[[CALLEE_TIED_ARG1]]
+  util.optimization_barrier %arg1 : tensor<?xi32>
+
+  // CHECK-NEXT: util.return %[[CALLEE_ARG0]], %[[CALLEE_ARG0_D1]], %[[CALLEE_ARG0_D2]], %[[CALLEE_ARG1]], %[[CALLEE_ARG1_D0]]
+  util.return %arg0, %arg1 : tensor<4x?x?x2xf32>, tensor<?xi32>
+}
 
 // -----
 
@@ -110,7 +155,7 @@ func.func private @callee(%arg0: tensor<4x?x?x2xf32>, %arg1: tensor<?xi32>) -> (
 // CHECK-LABEL: @br
 // CHECK-SAME: (%[[ARG0:.+]]: tensor<4x?x?x2xf32>, %[[ARG0_D1:.+]]: index, %[[ARG0_D2:.+]]: index,
 // CHECK-SAME:  %[[ARG1:.+]]: tensor<?xi32>, %[[ARG1_D0:.+]]: index)
-func.func @br(%arg0: tensor<4x?x?x2xf32>, %arg1: tensor<?xi32>) {
+util.func private @br(%arg0: tensor<4x?x?x2xf32>, %arg1: tensor<?xi32>) {
   // CHECK-NEXT: %[[TIED_ARG0:.+]] = flow.tensor.tie_shape %[[ARG0]] : tensor<4x?x?x2xf32>{%[[ARG0_D1]], %[[ARG0_D2]]}
   // CHECK-NEXT: %[[TIED_ARG1:.+]] = flow.tensor.tie_shape %[[ARG1]] : tensor<?xi32>{%[[ARG1_D0]]}
 
@@ -128,7 +173,7 @@ func.func @br(%arg0: tensor<4x?x?x2xf32>, %arg1: tensor<?xi32>) {
   // CHECK-NEXT: util.optimization_barrier %[[TIED_BB1_ARG1]]
   util.optimization_barrier %bb1_arg1 : tensor<?xi32>
 
-  return
+  util.return
 }
 
 // -----
@@ -138,7 +183,7 @@ func.func @br(%arg0: tensor<4x?x?x2xf32>, %arg1: tensor<?xi32>) {
 // CHECK-LABEL: @select
 // CHECK-SAME: (%[[COND:.+]]: i1,
 // CHECK-SAME:  %[[ARG0:.+]]: tensor<4x?x?x2xf32>, %[[ARG0_D1:.+]]: index, %[[ARG0_D2:.+]]: index, %[[ARG1:.+]]: tensor<4x?x?x2xf32>, %[[ARG1_D1:.+]]: index, %[[ARG1_D2:.+]]: index)
-func.func @select(%cond: i1, %arg0: tensor<4x?x?x2xf32>, %arg1: tensor<4x?x?x2xf32>) {
+util.func private @select(%cond: i1, %arg0: tensor<4x?x?x2xf32>, %arg1: tensor<4x?x?x2xf32>) {
   // CHECK-NEXT: %[[TIED_ARG0:.+]] = flow.tensor.tie_shape %[[ARG0]] : tensor<4x?x?x2xf32>{%[[ARG0_D1]], %[[ARG0_D2]]}
   // CHECK-NEXT: %[[TIED_ARG1:.+]] = flow.tensor.tie_shape %[[ARG1]] : tensor<4x?x?x2xf32>{%[[ARG1_D1]], %[[ARG1_D2]]}
 
@@ -151,14 +196,14 @@ func.func @select(%cond: i1, %arg0: tensor<4x?x?x2xf32>, %arg1: tensor<4x?x?x2xf
   // CHECK-NEXT: util.optimization_barrier %[[SEL_TIED]]
   util.optimization_barrier %0 : tensor<4x?x?x2xf32>
 
-  return
+  util.return
 }
 
 // -----
 
 // CHECK-LABEL: @scf_while
 // CHECK-SAME: %[[ARG0:.+]]: tensor<?xf32>, %[[ARG1:.+]]: index, %[[ARG2:.+]]: i32
-func.func @scf_while(%arg0 : tensor<?xf32>, %arg1 : i32) {
+util.func private @scf_while(%arg0 : tensor<?xf32>, %arg1 : i32) {
   %zero = arith.constant 0 : i32
   %one = arith.constant 1 : i32
   // CHECK:  %[[TIE:.+]] = flow.tensor.tie_shape %[[ARG0]] : tensor<?xf32>{%[[ARG1]]}
@@ -188,14 +233,14 @@ func.func @scf_while(%arg0 : tensor<?xf32>, %arg1 : i32) {
   // CHECK:  %[[TIE:.+]] = flow.tensor.tie_shape %[[WHILE]]#1 : tensor<?xf32>{%[[WHILE]]#2}
   // CHECK:  %[[BARRIER:.+]] = util.optimization_barrier %[[TIE]]
   util.optimization_barrier %0#1 : tensor<?xf32>
-  return
+  util.return
 }
 
 // -----
 
-// CHECK-LABEL: func.func @scf_if
+// CHECK-LABEL: @scf_if
 // CHECK-SAME: %[[ARG0:.+]]: tensor<?xf32>, %[[ARG1:.+]]: index, %[[ARG2:.+]]: i1
-func.func @scf_if(%arg0 : tensor<?xf32>, %arg1 : i1) {
+util.func private @scf_if(%arg0 : tensor<?xf32>, %arg1 : i1) {
   // CHECK:   %[[TIE:.+]] = flow.tensor.tie_shape %[[ARG0]] : tensor<?xf32>{%[[ARG1]]}
   // CHECK:   %[[IF:.+]]:2 = scf.if %[[ARG2]] -> (tensor<?xf32>, index) {
   %0 = scf.if %arg1 -> tensor<?xf32> {
@@ -213,5 +258,5 @@ func.func @scf_if(%arg0 : tensor<?xf32>, %arg1 : i1) {
   // CHECK:   %[[TIE:.+]] = flow.tensor.tie_shape %[[IF]]#0 : tensor<?xf32>{%[[IF]]#1}
   // CHECK:   %[[BARRIER:.+]] = util.optimization_barrier %[[TIE]] : tensor<?xf32>
   util.optimization_barrier %0 : tensor<?xf32>
-  return
+  util.return
 }

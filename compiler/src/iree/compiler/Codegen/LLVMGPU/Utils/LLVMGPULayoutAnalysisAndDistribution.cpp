@@ -1267,7 +1267,9 @@ static void collectOperations(Operation *rootOp,
 static bool isMatmulTransposeB(vector::ContractionOp contractOp) {
   // Set up the parallel/reduction structure in right form.
   using MapList = ArrayRef<ArrayRef<AffineExpr>>;
-  auto infer = [](MapList m) { return AffineMap::inferFromExprList(m); };
+  auto infer = [&](MapList m) {
+    return AffineMap::inferFromExprList(m, contractOp.getContext());
+  };
   AffineExpr m, n, k;
   bindDims(contractOp.getContext(), m, n, k);
   auto iteratorTypes = contractOp.getIteratorTypes().getValue();

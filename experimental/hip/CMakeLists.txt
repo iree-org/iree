@@ -52,6 +52,8 @@ iree_cc_library(
     "stream_command_buffer.h"
     "timepoint_pool.c"
     "timepoint_pool.h"
+    "tracing.c"
+    "tracing.h"
   INCLUDES
     "${HIP_API_HEADERS_ROOT}"
   DEPS
@@ -64,6 +66,7 @@ iree_cc_library(
     iree::base::internal::event_pool
     iree::base::internal::synchronization
     iree::base::internal::threading
+    iree::base::internal::wait_handle
     iree::base::internal::flatcc::parsing
     iree::hal
     iree::hal::utils::collective_batch
@@ -73,8 +76,6 @@ iree_cc_library(
     iree::hal::utils::resource_set
     iree::hal::utils::semaphore_base
     iree::schemas::rocm_executable_def_c_fbs
-  COPTS
-    "-D__HIP_PLATFORM_HCC__=1"
   PUBLIC
 )
 
@@ -92,8 +93,6 @@ iree_cc_library(
     "status_util.c"
   INCLUDES
     "${HIP_API_HEADERS_ROOT}"
-  COPTS
-    "-D__HIP_PLATFORM_HCC__=1"
   DEPS
     iree::base
     iree::base::core_headers
@@ -113,6 +112,4 @@ iree_cc_test(
     iree::testing::gtest_main
   LABELS
     "driver=hip"
-  COPTS
-    "-D__HIP_PLATFORM_HCC__=1"
 )

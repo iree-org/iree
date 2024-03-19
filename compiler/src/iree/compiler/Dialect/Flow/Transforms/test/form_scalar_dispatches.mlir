@@ -1,7 +1,7 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-flow-form-scalar-dispatches))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-flow-form-scalar-dispatches))" --split-input-file %s | FileCheck %s
 
 #map = affine_map<() -> ()>
-func.func @simpleDAG(
+util.func public @simpleDAG(
     %arg0 : tensor<f32>, %arg1 : tensor<f32>, %arg2 : tensor<f32>, %arg3 : tensor<f32>)
     -> (tensor<f32>, tensor<f32>) {
   %0 = tensor.empty() : tensor<f32>
@@ -23,9 +23,9 @@ func.func @simpleDAG(
       %6 = arith.subf %b1, %b0 : f32
       linalg.yield %6 : f32
     } -> tensor<f32>
-  return %1, %5 : tensor<f32>, tensor<f32>
+  util.return %1, %5 : tensor<f32>, tensor<f32>
 }
-// CHECK-LABEL: func @simpleDAG(
+// CHECK-LABEL: util.func public @simpleDAG(
 //  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<f32>
 //  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<f32>
 //  CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<f32>
@@ -41,12 +41,12 @@ func.func @simpleDAG(
 //       CHECK:     count() -> (index, index, index)
 //  CHECK-NEXT:       %[[C1:.+]] = arith.constant 1 : index
 //  CHECK-NEXT:       flow.return %[[C1]], %[[C1]], %[[C1]]
-//       CHECK:   return %[[RESULT]]#1, %[[RESULT]]#0
+//       CHECK:   util.return %[[RESULT]]#1, %[[RESULT]]#0
 
 // -----
 
 #map = affine_map<() -> ()>
-func.func @simpleHorizontal(
+util.func public @simpleHorizontal(
     %arg0 : tensor<f32>, %arg1 : tensor<f32>, %arg2 : tensor<f32>, %arg3 : tensor<f32>)
     -> (tensor<f32>, tensor<f32>) {
   %0 = tensor.empty() : tensor<f32>
@@ -68,9 +68,9 @@ func.func @simpleHorizontal(
       %6 = arith.addf %b0, %b0 : f32
       linalg.yield %6 : f32
     } -> tensor<f32>
-  return %3, %5 : tensor<f32>, tensor<f32>
+  util.return %3, %5 : tensor<f32>, tensor<f32>
 }
-// CHECK-LABEL: func @simpleHorizontal
+// CHECK-LABEL: util.func public @simpleHorizontal
 //  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<f32>
 //  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<f32>
 //  CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<f32>
@@ -86,7 +86,7 @@ func.func @simpleHorizontal(
 //       CHECK:     count() -> (index, index, index)
 //  CHECK-NEXT:       %[[C1:.+]] = arith.constant 1 : index
 //  CHECK-NEXT:       flow.return %[[C1]], %[[C1]], %[[C1]]
-//       CHECK:   return %[[RESULT]]#1, %[[RESULT]]#0
+//       CHECK:   util.return %[[RESULT]]#1, %[[RESULT]]#0
 
 // -----
 
@@ -94,7 +94,7 @@ func.func @simpleHorizontal(
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
 #map2 = affine_map<(d0, d1) -> (d0)>
 #map3 = affine_map<(d0) -> (d0)>
-func.func @interleaving(
+util.func public @interleaving(
       %arg0 : tensor<1x1xf32>, %arg1 : tensor<1xf32>, %arg2 : tensor<f32>, %arg3 : tensor<f32>)
       -> (tensor<f32>, tensor<1xf32>) {
     %cst = arith.constant 0.0 : f32
@@ -128,9 +128,9 @@ func.func @interleaving(
         %10 = arith.divf %b1, %b0 : f32
         linalg.yield %10 : f32
       } -> tensor<f32>
-    return %9, %7 : tensor<f32>, tensor<1xf32>
+    util.return %9, %7 : tensor<f32>, tensor<1xf32>
 }
-// CHECK-LABEL: func @interleaving(
+// CHECK-LABEL: util.func public @interleaving(
 //  CHECK-SAME:     %[[ARG0:.+]]: tensor<1x1xf32>,
 //  CHECK-SAME:     %[[ARG1:.+]]: tensor<1xf32>,
 //  CHECK-SAME:     %[[ARG2:.+]]: tensor<f32>,
@@ -156,4 +156,4 @@ func.func @interleaving(
 //  CHECK-SAME:         ins(%[[DISPATCH0]]#0, %[[ARG3]] :
 //  CHECK-SAME:         outs(%[[EMPTY1]] :
 //       CHECK:    flow.return %[[GENERIC3]], %[[GENERIC2]]
-//       CHECK:  return %[[DISPATCH1]]#0, %[[DISPATCH1]]#1
+//       CHECK:  util.return %[[DISPATCH1]]#0, %[[DISPATCH1]]#1

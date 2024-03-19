@@ -1,19 +1,19 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(func.func(iree-stream-materialize-copy-on-write))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module( util.func(iree-stream-materialize-copy-on-write))' %s | FileCheck %s
 
 // Tests that block arguments (including function arguments) are always cloned.
 // Until a whole-program analysis runs we don't know their semantics.
 
 // CHECK-LABEL: @blockArgsNeedCopies
 //  CHECK-SAME: (%[[SRC:.+]]: !stream.resource<*>, %[[SIZE:.+]]: index)
-func.func @blockArgsNeedCopies(%src: !stream.resource<*>, %size: index) -> !stream.resource<*> {
+util.func public @blockArgsNeedCopies(%src: !stream.resource<*>, %size: index) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   %c123_i32 = arith.constant 123 : i32
   // CHECK: %[[CLONE:.+]] = stream.async.clone %[[SRC]] : !stream.resource<*>{%[[SIZE]]} -> !stream.resource<*>{%[[SIZE]]}
   // CHECK: %[[FILL:.+]] = stream.async.fill %c123_i32, %[[CLONE]]{{.+}} -> %[[CLONE]]
   %0 = stream.async.fill %c123_i32, %src[%c0 to %c128 for %c128] : i32 -> %src as !stream.resource<*>{%size}
-  // CHECK: return %[[FILL]]
-  return %0 : !stream.resource<*>
+  // CHECK: util.return %[[FILL]]
+  util.return %0 : !stream.resource<*>
 }
 
 // -----
@@ -22,7 +22,7 @@ func.func @blockArgsNeedCopies(%src: !stream.resource<*>, %size: index) -> !stre
 
 // CHECK-LABEL: @singleUseTiedOperand
 //  CHECK-SAME: (%[[SIZE:.+]]: index)
-func.func @singleUseTiedOperand(%size: index) -> !stream.resource<*> {
+util.func public @singleUseTiedOperand(%size: index) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   %c256 = arith.constant 256 : index
@@ -37,7 +37,7 @@ func.func @singleUseTiedOperand(%size: index) -> !stream.resource<*> {
   // CHECK-NOT: stream.async.clone
   // CHECK: stream.async.fill
   %2 = stream.async.fill %c789_i32, %1[%c128 to %c256 for %c128] : i32 -> %0 as !stream.resource<*>{%size}
-  return %2 : !stream.resource<*>
+  util.return %2 : !stream.resource<*>
 }
 
 // -----
@@ -46,7 +46,7 @@ func.func @singleUseTiedOperand(%size: index) -> !stream.resource<*> {
 // user.
 
 // CHECK-LABEL: @multipleUsesOneUser
-func.func private @multipleUsesOneUser(%size: index) -> !stream.resource<*> {
+util.func private @multipleUsesOneUser(%size: index) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   %c256 = arith.constant 256 : index
@@ -56,7 +56,7 @@ func.func private @multipleUsesOneUser(%size: index) -> !stream.resource<*> {
   // CHECK-NOT: stream.async.clone
   // CHECK: stream.async.dispatch
   %1 = stream.async.dispatch @ex::@dispatch(%0[%c0 to %c128 for %c128], %0[%c128 to %c256 for %c128]) : (!stream.resource<*>{%size}, !stream.resource<*>{%size}) -> %0{%size}
-  return %1 : !stream.resource<*>
+  util.return %1 : !stream.resource<*>
 }
 
 // -----
@@ -66,7 +66,7 @@ func.func private @multipleUsesOneUser(%size: index) -> !stream.resource<*> {
 
 // CHECK-LABEL: @oneCopyPerOperation
 //  CHECK-SAME: (%[[SRC:.+]]: !stream.resource<*>, %[[SIZE:.+]]: index)
-func.func @oneCopyPerOperation(%src: !stream.resource<*>, %size: index) -> !stream.resource<*> {
+util.func public @oneCopyPerOperation(%src: !stream.resource<*>, %size: index) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   %c256 = arith.constant 128 : index
@@ -74,8 +74,8 @@ func.func @oneCopyPerOperation(%src: !stream.resource<*>, %size: index) -> !stre
   // CHECK-NOT: stream.async.clone
   // CHECK: %[[RESULT:.+]] = stream.async.dispatch @ex::@dispatch(%[[CLONE]]{{.*}}, %[[CLONE]]{{.*}}) {{.*}} -> %[[CLONE]]{%[[SIZE]]}
   %0 = stream.async.dispatch @ex::@dispatch(%src[%c0 to %c128 for %c128], %src[%c128 to %c256 for %c128]) : (!stream.resource<*>{%size}, !stream.resource<*>{%size}) -> %src{%size}
-  // CHECK: return %[[RESULT]]
-  return %0 : !stream.resource<*>
+  // CHECK: util.return %[[RESULT]]
+  util.return %0 : !stream.resource<*>
 }
 
 // -----
@@ -86,7 +86,7 @@ func.func @oneCopyPerOperation(%src: !stream.resource<*>, %size: index) -> !stre
 
 // CHECK-LABEL: @multiUseTiedOperand
 //  CHECK-SAME: (%[[SIZE:.+]]: index)
-func.func @multiUseTiedOperand(%size: index) -> (!stream.resource<*>, !stream.resource<*>) {
+util.func public @multiUseTiedOperand(%size: index) -> (!stream.resource<*>, !stream.resource<*>) {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   %c256 = arith.constant 256 : index
@@ -101,7 +101,7 @@ func.func @multiUseTiedOperand(%size: index) -> (!stream.resource<*>, !stream.re
   // CHECK: %[[CLONE1:.+]] = stream.async.clone %[[SPLAT]]
   // CHECK: %[[FILL1:.+]] = stream.async.fill %c789_i32, %[[CLONE1]]
   %2 = stream.async.fill %c789_i32, %0[%c128 to %c256 for %c128] : i32 -> %0 as !stream.resource<*>{%size}
-  return %1, %2 : !stream.resource<*>, !stream.resource<*>
+  util.return %1, %2 : !stream.resource<*>, !stream.resource<*>
 }
 
 // -----
@@ -112,7 +112,7 @@ func.func @multiUseTiedOperand(%size: index) -> (!stream.resource<*>, !stream.re
 
 // CHECK-LABEL: @tiedCollectivesTODO
 //  CHECK-SAME: (%[[CHANNEL:.+]]: !stream.channel, %[[SEND_RECV:.+]]: !stream.resource<*>, %[[SEND_SIZE:.+]]: index, %[[RECV_SIZE:.+]]: index, %[[COUNT:.+]]: index)
-func.func private @tiedCollectivesTODO(%channel: !stream.channel, %send_recv: !stream.resource<*>, %send_size: index, %recv_size: index, %count: index) -> !stream.resource<*> {
+util.func private @tiedCollectivesTODO(%channel: !stream.channel, %send_recv: !stream.resource<*>, %send_size: index, %recv_size: index, %count: index) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
   // CHECK: %[[RECV_CLONE:.+]] = stream.async.clone on(#hal.affinity.queue<[0]>) %[[SEND_RECV]]
   // CHECK: %[[ALL_GATHER:.+]] = stream.async.collective<all_gather : f32>[%[[COUNT]]]
@@ -123,8 +123,8 @@ func.func private @tiedCollectivesTODO(%channel: !stream.channel, %send_recv: !s
       %send_recv[%c0 to %recv_size for %recv_size] :
       // CHECK-SAME: !stream.resource<*>{%[[SEND_SIZE]]} -> %[[RECV_CLONE]] as !stream.resource<*>{%[[RECV_SIZE]]}
       !stream.resource<*>{%send_size} -> %recv as !stream.resource<*>{%recv_size}
-  // CHECK: return %[[ALL_GATHER]]
-  return %0 : !stream.resource<*>
+  // CHECK: util.return %[[ALL_GATHER]]
+  util.return %0 : !stream.resource<*>
 }
 
 // -----
@@ -134,7 +134,7 @@ func.func private @tiedCollectivesTODO(%channel: !stream.channel, %send_recv: !s
 // original contents for use by @dispatch1.
 
 // CHECK-LABEL: @tiedDispatches
-func.func private @tiedDispatches() {
+util.func private @tiedDispatches() {
   %c0_i32 = arith.constant 0 : i32
   %c1_i32 = arith.constant 1 : i32
   %c0 = arith.constant 0 : index
@@ -156,7 +156,7 @@ func.func private @tiedDispatches() {
   // CHECK-SAME: (!stream.resource<*>{%c40}, !stream.resource<*>{%c40}) -> %[[DISPATCH0]]{%c40}
   %dispatch1 = stream.async.dispatch @ex::@dispatch1[%c1, %c1, %c1](%dispatch0[%c0 to %c40 for %c40], %splat0[%c0 to %c40 for %c40]) : (!stream.resource<*>{%c40}, !stream.resource<*>{%c40}) -> %dispatch0{%c40}
 
-  return
+  util.return
 }
 
 // -----
@@ -165,7 +165,7 @@ func.func private @tiedDispatches() {
 // take care of them later.
 
 // CHECK-LABEL: @blockArgMove
-func.func @blockArgMove(%cond: i1, %size: index) -> (!stream.resource<*>, !stream.resource<*>) {
+util.func public @blockArgMove(%cond: i1, %size: index) -> (!stream.resource<*>, !stream.resource<*>) {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   %c123_i32 = arith.constant 123 : i32
@@ -185,5 +185,5 @@ func.func @blockArgMove(%cond: i1, %size: index) -> (!stream.resource<*>, !strea
   cf.cond_br %cond, ^bb1(%fill0, %bb1_1_new : !stream.resource<*>, !stream.resource<*>),
                  ^bb2(%fill0, %bb1_1_new : !stream.resource<*>, !stream.resource<*>)
 ^bb2(%bb2_0: !stream.resource<*>, %bb2_1: !stream.resource<*>):
-  return %bb2_0, %bb2_1 : !stream.resource<*>, !stream.resource<*>
+  util.return %bb2_0, %bb2_1 : !stream.resource<*>, !stream.resource<*>
 }

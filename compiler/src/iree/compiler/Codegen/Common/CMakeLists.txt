@@ -117,8 +117,6 @@ iree_cc_library(
   DEPS
     ::PassHeaders
     ::PassesIncGen
-    IREELinalgExtDialect
-    IREELinalgExtTransforms
     IREEVectorExtDialect
     LLVMSupport
     MLIRAffineAnalysis
@@ -173,6 +171,8 @@ iree_cc_library(
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::LinalgExt::IR
+    iree::compiler::Dialect::LinalgExt::Transforms
     iree::compiler::Dialect::Util::IR
     iree::compiler::Utils
   PUBLIC
@@ -190,8 +190,6 @@ iree_cc_library(
     ::PassHeaders
     ::PassesIncGen
     IREEDialectsTransforms
-    IREELinalgExtDialect
-    IREELinalgExtTransformOps
     IREELinalgTransformDialect
     IREEVectorExtDialect
     LLVMSupport
@@ -238,11 +236,14 @@ iree_cc_library(
     MLIRVectorTransforms
     iree::compiler::Codegen::Common::TransformExtensions::CommonExtensions
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
+    iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
     iree::compiler::Codegen::LLVMCPU::TransformExtensions::LLVMCPUExtensions
     iree::compiler::Codegen::LLVMGPU::TransformExtensions::LLVMGPUExtensions
     iree::compiler::Codegen::TransformStrategies::Common::TransformStrategies
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Flow::TransformExtensions::FlowExtensions
+    iree::compiler::Dialect::LinalgExt::IR
+    iree::compiler::Dialect::LinalgExt::TransformExtensions::LinalgExtExtensions
     iree::compiler::Utils
   PUBLIC
 )

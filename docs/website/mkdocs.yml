@@ -157,6 +157,7 @@ nav:
               - HAL/Inline: "reference/mlir-dialects/HALInline.md"
               - HAL/Loader: "reference/mlir-dialects/HALLoader.md"
               - IO/Parameters: "reference/mlir-dialects/IOParameters.md"
+              - LinalgExt: "reference/mlir-dialects/LinalgExt.md"
               - Stream: "reference/mlir-dialects/Stream.md"
               - Util: "reference/mlir-dialects/Util.md"
               - VM: "reference/mlir-dialects/VM.md"
@@ -164,7 +165,6 @@ nav:
           # Dialects from llvm-external-projects/iree-dialects/
           - "Public dialects":
               - IREEInput: "reference/mlir-dialects/IREEInput.md"
-              - IREELinalgExt: "reference/mlir-dialects/IREELinalgExt.md"
               - IREEVectorExt: "reference/mlir-dialects/IREEVectorExt.md"
       - "Other topics":
           - Glossary: "reference/glossary.md"

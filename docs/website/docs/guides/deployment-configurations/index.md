@@ -41,11 +41,11 @@ When compiling programs, a list of target backends must be specified via
 | -------------- | ----------- | ---------------------- |
 | `llvm-cpu` | Code generation for CPU-like devices supported by LLVM | `local-sync`, `local-task` |
 | `vmvx` | Portable interpreter powered by a microkernel library | `local-sync`, `local-task` |
-| `vulkan` or<br>`vulkan-spirv` | Portable GPU support via SPIR-V for Vulkan | `vulkan` |
+| `vulkan-spirv` | Portable GPU support via SPIR-V for Vulkan | `vulkan` |
 | `cuda` | NVIDIA GPU support via PTX for CUDA | `cuda` |
-| `metal` or<br>`metal-spirv` | GPU support on Apple platforms via MSL for Metal | `metal` |
+| `metal-spirv` | GPU support on Apple platforms via MSL for Metal | `metal` |
 | `rocm` | **Experimental** <br> AMD GPU support via HSACO for ROCm | `rocm` |
-| `webgpu-wgsl` | **Experimental** <br> GPU support on the Web via WGSL for WebGPU | `webgpu` |
+| `webgpu-spirv` | **Experimental** <br> GPU support on the Web via WGSL for WebGPU | `webgpu` |
 
 !!! tip "Tip - listing available backends"
     The list of compiler target backends can be queried:

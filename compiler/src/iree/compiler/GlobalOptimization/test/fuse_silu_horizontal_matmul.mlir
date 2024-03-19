@@ -1,40 +1,38 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-global-opt-fuse-silu-horizontal-matmul,canonicalize))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-global-opt-fuse-silu-horizontal-matmul,canonicalize))" %s | FileCheck %s
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
-module {
-  func.func @silu_horizontal_matmul_fusion(%arg0: index, %arg1: tensor<?x5120xf16>, %arg2: tensor<13824x5120xf16>, %arg3: tensor<13824x5120xf16>) -> tensor<?x13824xf16> {
-    %cst = arith.constant 1.000000e+00 : f16
-    %cst_0 = arith.constant 0.000000e+00 : f16
-    %0 = tensor.empty(%arg0) : tensor<?x13824xf16>
-    %1 = linalg.fill ins(%cst : f16) outs(%0 : tensor<?x13824xf16>) -> tensor<?x13824xf16>
-    %2 = linalg.matmul_transpose_b ins(%arg1, %arg2 : tensor<?x5120xf16>, tensor<13824x5120xf16>) outs(%1 : tensor<?x13824xf16>) -> tensor<?x13824xf16>
-    %3 = tensor.empty(%arg0) : tensor<?x13824xf16>
-    %4 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%2 : tensor<?x13824xf16>) outs(%3 : tensor<?x13824xf16>) {
-    ^bb0(%in: f16, %out: f16):
-      %10 = arith.negf %in : f16
-      %11 = math.exp %10 : f16
-      %12 = arith.addf %11, %cst_0 : f16
-      %13 = arith.divf %cst_0, %12 : f16
-      linalg.yield %13 : f16
-    } -> tensor<?x13824xf16>
-    %5 = tensor.empty(%arg0) : tensor<?x13824xf16>
-    %6 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel", "parallel"]} ins(%4, %2 : tensor<?x13824xf16>, tensor<?x13824xf16>) outs(%5 : tensor<?x13824xf16>) {
-    ^bb0(%in: f16, %in_1: f16, %out: f16):
-      %10 = arith.mulf %in, %in_1 : f16
-      linalg.yield %10 : f16
-    } -> tensor<?x13824xf16>
-    %7 = linalg.matmul_transpose_b ins(%arg1, %arg3 : tensor<?x5120xf16>, tensor<13824x5120xf16>) outs(%1 : tensor<?x13824xf16>) -> tensor<?x13824xf16>
-    %8 = tensor.empty(%arg0) : tensor<?x13824xf16>
-    %9 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel", "parallel"]} ins(%6, %7 : tensor<?x13824xf16>, tensor<?x13824xf16>) outs(%8 : tensor<?x13824xf16>) {
-    ^bb0(%in: f16, %in_1: f16, %out: f16):
-      %10 = arith.mulf %in, %in_1 : f16
-      linalg.yield %10 : f16
-    } -> tensor<?x13824xf16>
-    return %9 : tensor<?x13824xf16>
-  }
+util.func public @silu_horizontal_matmul_fusion(%arg0: index, %arg1: tensor<?x5120xf16>, %arg2: tensor<13824x5120xf16>, %arg3: tensor<13824x5120xf16>) -> tensor<?x13824xf16> {
+  %cst = arith.constant 1.000000e+00 : f16
+  %cst_0 = arith.constant 0.000000e+00 : f16
+  %0 = tensor.empty(%arg0) : tensor<?x13824xf16>
+  %1 = linalg.fill ins(%cst : f16) outs(%0 : tensor<?x13824xf16>) -> tensor<?x13824xf16>
+  %2 = linalg.matmul_transpose_b ins(%arg1, %arg2 : tensor<?x5120xf16>, tensor<13824x5120xf16>) outs(%1 : tensor<?x13824xf16>) -> tensor<?x13824xf16>
+  %3 = tensor.empty(%arg0) : tensor<?x13824xf16>
+  %4 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%2 : tensor<?x13824xf16>) outs(%3 : tensor<?x13824xf16>) {
+  ^bb0(%in: f16, %out: f16):
+    %10 = arith.negf %in : f16
+    %11 = math.exp %10 : f16
+    %12 = arith.addf %11, %cst_0 : f16
+    %13 = arith.divf %cst_0, %12 : f16
+    linalg.yield %13 : f16
+  } -> tensor<?x13824xf16>
+  %5 = tensor.empty(%arg0) : tensor<?x13824xf16>
+  %6 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel", "parallel"]} ins(%4, %2 : tensor<?x13824xf16>, tensor<?x13824xf16>) outs(%5 : tensor<?x13824xf16>) {
+  ^bb0(%in: f16, %in_1: f16, %out: f16):
+    %10 = arith.mulf %in, %in_1 : f16
+    linalg.yield %10 : f16
+  } -> tensor<?x13824xf16>
+  %7 = linalg.matmul_transpose_b ins(%arg1, %arg3 : tensor<?x5120xf16>, tensor<13824x5120xf16>) outs(%1 : tensor<?x13824xf16>) -> tensor<?x13824xf16>
+  %8 = tensor.empty(%arg0) : tensor<?x13824xf16>
+  %9 = linalg.generic {indexing_maps = [#map, #map, #map], iterator_types = ["parallel", "parallel"]} ins(%6, %7 : tensor<?x13824xf16>, tensor<?x13824xf16>) outs(%8 : tensor<?x13824xf16>) {
+  ^bb0(%in: f16, %in_1: f16, %out: f16):
+    %10 = arith.mulf %in, %in_1 : f16
+    linalg.yield %10 : f16
+  } -> tensor<?x13824xf16>
+  util.return %9 : tensor<?x13824xf16>
 }
 //   CHECK-DAG: #[[MAP:[a-zA-Z0-9]+]] = affine_map<(d0, d1) -> (d0, d1)>
-//       CHECK: func.func @silu_horizontal_matmul_fusion(
+//       CHECK: util.func public @silu_horizontal_matmul_fusion(
 //  CHECK-SAME:   %[[IN0:.+]]: index,
 //  CHECK-SAME:   %[[IN1:.+]]: tensor<?x5120xf16>,
 //  CHECK-SAME:   %[[IN2:.+]]: tensor<13824x5120xf16>,
@@ -70,4 +68,4 @@ module {
 //       CHECK:   } -> tensor<?x13824xf16>
 //       CHECK:   flow.return %[[OUTPUT]] : tensor<?x13824xf16>
 //       CHECK: }
-//       CHECK: return %[[DISPATCH]] : tensor<?x13824xf16>
+//       CHECK: util.return %[[DISPATCH]] : tensor<?x13824xf16>

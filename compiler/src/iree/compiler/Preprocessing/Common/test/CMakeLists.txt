@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "conv2d_to_img2col.mlir"
+    "conv_to_channels_last.mlir"
     "make_single_dispatch_for_function.mlir"
     "pad_linalg_ops.mlir"
     "preprocessing_match_ops.mlir"

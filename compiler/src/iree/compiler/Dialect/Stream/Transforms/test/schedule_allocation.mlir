@@ -8,7 +8,7 @@
 // CHECK-SAME: (%[[OPERAND_TIMEPOINT:.+]]: !stream.timepoint,
 // CHECK-SAME:  %[[OPERAND:.+]]: !stream.resource<transient>,
 // CHECK-SAME   %[[SIZE:.+]]: index)
-func.func @extractConstants(%timepoint: !stream.timepoint, %operand: !stream.resource<transient>, %size: index) {
+util.func public @extractConstants(%timepoint: !stream.timepoint, %operand: !stream.resource<transient>, %size: index) {
   %c0 = arith.constant 0 : index
   %c8 = arith.constant 8 : index
   %c16 = arith.constant 16 : index
@@ -52,7 +52,7 @@ func.func @extractConstants(%timepoint: !stream.timepoint, %operand: !stream.res
   util.optimization_barrier %results#2 : !stream.resource<variable>
   // CHECK: util.optimization_barrier %[[OPERAND]]
   util.optimization_barrier %results#3 : !stream.resource<transient>
-  return
+  util.return
 }
 
 // -----
@@ -61,7 +61,7 @@ func.func @extractConstants(%timepoint: !stream.timepoint, %operand: !stream.res
 
 // CHECK-LABEL: @explicitAllocs
 // CHECK-SAME: (%[[SIZE:.+]]: index)
-func.func @explicitAllocs(%size: index) {
+util.func public @explicitAllocs(%size: index) {
   // CHECK: %[[ALLOC:.+]] = stream.resource.alloc : !stream.resource<external>{%[[SIZE]]}
   %alloc = stream.resource.alloc : !stream.resource<external>{%size}
   // CHECK: util.optimization_barrier %[[ALLOC]]
@@ -72,7 +72,7 @@ func.func @explicitAllocs(%size: index) {
   %empty = stream.resource.alloc : !stream.resource<transient>{%c0}
   // CHECK: util.optimization_barrier %[[EMPTY]]
   util.optimization_barrier %empty : !stream.resource<transient>
-  return
+  util.return
 }
 
 // -----
@@ -82,7 +82,7 @@ func.func @explicitAllocs(%size: index) {
 
 // CHECK-LABEL: @passthroughOperands
 // CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index)
-func.func @passthroughOperands(%operand: !stream.resource<transient>, %size: index) {
+util.func public @passthroughOperands(%operand: !stream.resource<transient>, %size: index) {
   // CHECK: = stream.cmd.execute with(%[[OPERAND]] as %[[CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]})
   %result, %result_timepoint = stream.async.execute with(%operand as %capture: !stream.resource<transient>{%size}) -> (%operand as !stream.resource<transient>{%size}) {
     stream.yield %capture : !stream.resource<transient>{%size}
@@ -90,14 +90,14 @@ func.func @passthroughOperands(%operand: !stream.resource<transient>, %size: ind
   } => !stream.timepoint
   // CHECK: util.optimization_barrier %[[OPERAND]]
   util.optimization_barrier %result : !stream.resource<transient>
-  return
+  util.return
 }
 
 // -----
 
 // CHECK-LABEL: @capturedOperands
 // CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index)
-func.func @capturedOperands(%operand: !stream.resource<transient>, %size: index) {
+util.func public @capturedOperands(%operand: !stream.resource<transient>, %size: index) {
   // CHECK: stream.cmd.execute
   // CHECK-SAME: => with(%[[OPERAND]] as %[[CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]}
   %result_timepoint = stream.async.execute with(%operand as %capture: !stream.resource<transient>{%size}) {
@@ -105,7 +105,7 @@ func.func @capturedOperands(%operand: !stream.resource<transient>, %size: index)
     %0 = stream.async.clone %capture : !stream.resource<transient>{%size} -> !stream.resource<transient>{%size}
     stream.yield
   } => !stream.timepoint
-  return
+  util.return
 }
 
 // -----
@@ -114,7 +114,7 @@ func.func @capturedOperands(%operand: !stream.resource<transient>, %size: index)
 
 // CHECK-LABEL: @tiedOperands
 // CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index)
-func.func @tiedOperands(%operand: !stream.resource<transient>, %size: index) {
+util.func public @tiedOperands(%operand: !stream.resource<transient>, %size: index) {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   %c255_i32 = arith.constant 255 : i32
@@ -126,7 +126,7 @@ func.func @tiedOperands(%operand: !stream.resource<transient>, %size: index) {
   } => !stream.timepoint
   // CHECK: util.optimization_barrier %[[OPERAND]]
   util.optimization_barrier %result : !stream.resource<transient>
-  return
+  util.return
 }
 
 // -----
@@ -136,7 +136,7 @@ func.func @tiedOperands(%operand: !stream.resource<transient>, %size: index) {
 // CHECK-LABEL: @tiedOperandSubviews
 // CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<external>,
 // CHECK-SAME:  %[[SIZE:.+]]: index, %[[OFFSET0:.+]]: index, %[[OFFSET1:.+]]: index, %[[OFFSET2:.+]]: index, %[[LENGTH0:.+]]: index, %[[LENGTH1:.+]]: index, %[[LENGTH2:.+]]: index)
-func.func @tiedOperandSubviews(%operand: !stream.resource<external>, %size: index, %offset0: index, %offset1: index, %offset2: index, %length0: index, %length1: index, %length2: index) {
+util.func public @tiedOperandSubviews(%operand: !stream.resource<external>, %size: index, %offset0: index, %offset1: index, %offset2: index, %length0: index, %length1: index, %length2: index) {
   %c0 = arith.constant 0 : index
   // CHECK: %[[SUBVIEW_OFFSET:.+]] = arith.addi %[[OFFSET0]], %[[OFFSET1]]
   // CHECK: %[[SUBVIEW:.+]] = stream.resource.subview %[[OPERAND]][%[[SUBVIEW_OFFSET]]] {{.*}} -> !stream.resource<external>{%[[LENGTH1]]}
@@ -156,7 +156,7 @@ func.func @tiedOperandSubviews(%operand: !stream.resource<external>, %size: inde
   } => !stream.timepoint
   // CHECK: util.optimization_barrier %[[SUBVIEW]]
   util.optimization_barrier %result1 : !stream.resource<external>
-  return
+  util.return
 }
 
 // -----
@@ -166,7 +166,7 @@ func.func @tiedOperandSubviews(%operand: !stream.resource<external>, %size: inde
 // CHECK-LABEL: @aliasPropagation
 // CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<external>,
 // CHECK-SAME:  %[[SIZE:.+]]: index, %[[OFFSET:.+]]: index, %[[LENGTH:.+]]: index)
-func.func @aliasPropagation(%operand: !stream.resource<external>, %size: index, %offset: index, %length: index) {
+util.func public @aliasPropagation(%operand: !stream.resource<external>, %size: index, %offset: index, %length: index) {
   %c0 = arith.constant 0 : index
   // CHECK: stream.cmd.execute with(%[[OPERAND]] as %[[CAPTURE:.+]]: !stream.resource<external>{%[[SIZE]]})
   %result, %result_timepoint = stream.async.execute with(%operand as %capture: !stream.resource<external>{%size}) -> (%operand as !stream.resource<external>{%size}) {
@@ -178,7 +178,7 @@ func.func @aliasPropagation(%operand: !stream.resource<external>, %size: index, 
   } => !stream.timepoint
   // CHECK: util.optimization_barrier %[[OPERAND]]
   util.optimization_barrier %result : !stream.resource<external>
-  return
+  util.return
 }
 
 // -----
@@ -188,7 +188,7 @@ func.func @aliasPropagation(%operand: !stream.resource<external>, %size: index, 
 
 // CHECK-LABEL: @producedResults
 // CHECK-SAME: (%[[SIZE0:.+]]: index, %[[SIZE1:.+]]: index)
-func.func @producedResults(%size0: index, %size1: index) {
+util.func public @producedResults(%size0: index, %size1: index) {
   %c254_i32 = arith.constant 254 : i32
   %c255_i32 = arith.constant 255 : i32
   //      CHECK: %[[PACK:.+]]:3 = stream.resource.pack slices({
@@ -214,7 +214,7 @@ func.func @producedResults(%size0: index, %size1: index) {
   util.optimization_barrier %results#0 : !stream.resource<transient>
   // CHECK: util.optimization_barrier %[[SUBALLOCA1]]
   util.optimization_barrier %results#1 : !stream.resource<transient>
-  return
+  util.return
 }
 
 // -----
@@ -225,7 +225,7 @@ func.func @producedResults(%size0: index, %size1: index) {
 
 // CHECK-LABEL: @locals
 // CHECK-SAME: (%[[SIZE0:.+]]: index, %[[SIZE1:.+]]: index, %[[AWAIT_TIMEPOINT:.+]]: !stream.timepoint)
-func.func @locals(%size0: index, %size1: index, %await_timepoint: !stream.timepoint) -> !stream.timepoint {
+util.func public @locals(%size0: index, %size1: index, %await_timepoint: !stream.timepoint) -> !stream.timepoint {
   %c254_i32 = arith.constant 254 : i32
   %c255_i32 = arith.constant 255 : i32
   //      CHECK: %[[SLICES:.+]]:3 = stream.resource.pack on(#hal.affinity.queue<[0]>) slices({
@@ -245,8 +245,8 @@ func.func @locals(%size0: index, %size1: index, %await_timepoint: !stream.timepo
   } => !stream.timepoint
   // CHECK: %[[DEALLOCA_TIMEPOINT:.+]] = stream.resource.dealloca on(#hal.affinity.queue<[0]>) await(%[[EXEC_TIMEPOINT]]) => %[[ALLOCA]] : !stream.resource<transient>{%[[SLICES]]#0} => !stream.timepoint
   // CHECK: %[[JOIN:.+]] = stream.timepoint.join max(%[[DEALLOCA_TIMEPOINT]], %[[EXEC_TIMEPOINT]]) => !stream.timepoint
-  // CHECK: return %[[JOIN]]
-  return %result_timepoint : !stream.timepoint
+  // CHECK: util.return %[[JOIN]]
+  util.return %result_timepoint : !stream.timepoint
 }
 
 // -----
@@ -257,7 +257,7 @@ func.func @locals(%size0: index, %size1: index, %await_timepoint: !stream.timepo
 
 // CHECK-LABEL: @concurrentRegions
 // CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index)
-func.func @concurrentRegions(%operand: !stream.resource<transient>, %size: index) {
+util.func public @concurrentRegions(%operand: !stream.resource<transient>, %size: index) {
   %c0 = arith.constant 0 : index
   %c128 = arith.constant 128 : index
   %c254_i32 = arith.constant 254 : i32
@@ -281,14 +281,14 @@ func.func @concurrentRegions(%operand: !stream.resource<transient>, %size: index
   util.optimization_barrier %results#0 : !stream.resource<transient>
   // CHECK: util.optimization_barrier %[[ALLOCA]]
   util.optimization_barrier %results#1 : !stream.resource<transient>
-  return
+  util.return
 }
 
 // -----
 
 // CHECK-LABEL: @applyAsyncSplatOp
 // CHECK-SAME: (%[[SIZE:.+]]: index)
-func.func @applyAsyncSplatOp(%size: index) {
+util.func public @applyAsyncSplatOp(%size: index) {
   %c255_i32 = arith.constant 255 : i32
   // CHECK: %[[ALLOCA:.+]], %[[ALLOCA_TIMEPOINT:.+]] = stream.resource.alloca uninitialized : !stream.resource<transient>{%[[SIZE]]}
   // CHECK: stream.cmd.execute await(%[[ALLOCA_TIMEPOINT]])
@@ -300,14 +300,14 @@ func.func @applyAsyncSplatOp(%size: index) {
   } => !stream.timepoint
   // CHECK: util.optimization_barrier %[[ALLOCA]]
   util.optimization_barrier %result : !stream.resource<transient>
-  return
+  util.return
 }
 
 // -----
 
 // CHECK-LABEL: @applyAsyncCloneOp
 // CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index)
-func.func @applyAsyncCloneOp(%operand: !stream.resource<transient>, %size: index) {
+util.func public @applyAsyncCloneOp(%operand: !stream.resource<transient>, %size: index) {
   // CHECK: %[[ALLOCA:.+]], %[[ALLOCA_TIMEPOINT:.+]] = stream.resource.alloca uninitialized : !stream.resource<transient>{%[[SIZE]]}
   // CHECK: stream.cmd.execute await(%[[ALLOCA_TIMEPOINT]])
   // CHECK-SAME: with(%[[OPERAND]] as %[[OPERAND_CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]},
@@ -320,7 +320,7 @@ func.func @applyAsyncCloneOp(%operand: !stream.resource<transient>, %size: index
   } => !stream.timepoint
   // CHECK: util.optimization_barrier %[[ALLOCA]]
   util.optimization_barrier %result : !stream.resource<transient>
-  return
+  util.return
 }
 
 // -----
@@ -330,7 +330,7 @@ func.func @applyAsyncCloneOp(%operand: !stream.resource<transient>, %size: index
 
 // CHECK-LABEL: @applyAsyncSliceOp
 // CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index)
-func.func @applyAsyncSliceOp(%operand: !stream.resource<transient>, %size: index) {
+util.func public @applyAsyncSliceOp(%operand: !stream.resource<transient>, %size: index) {
   %c16 = arith.constant 16 : index
   %c128 = arith.constant 128 : index
   %c144 = arith.constant 144 : index
@@ -346,14 +346,14 @@ func.func @applyAsyncSliceOp(%operand: !stream.resource<transient>, %size: index
   } => !stream.timepoint
   // CHECK: util.optimization_barrier %[[ALLOCA]]
   util.optimization_barrier %result : !stream.resource<transient>
-  return
+  util.return
 }
 
 // -----
 
 // CHECK-LABEL: @applyAsyncFillOp
 // CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index)
-func.func @applyAsyncFillOp(%operand: !stream.resource<transient>, %size: index) {
+util.func public @applyAsyncFillOp(%operand: !stream.resource<transient>, %size: index) {
   %c16 = arith.constant 16 : index
   %c128 = arith.constant 128 : index
   %c144 = arith.constant 144 : index
@@ -366,7 +366,7 @@ func.func @applyAsyncFillOp(%operand: !stream.resource<transient>, %size: index)
   } => !stream.timepoint
   // CHECK: util.optimization_barrier %[[OPERAND]]
   util.optimization_barrier %result : !stream.resource<transient>
-  return
+  util.return
 }
 
 // -----
@@ -378,7 +378,7 @@ func.func @applyAsyncFillOp(%operand: !stream.resource<transient>, %size: index)
 // CHECK-SAME: (%[[UPDATE:.+]]: !stream.resource<external>,
 // CHECK-SAME:  %[[OPERAND:.+]]: !stream.resource<transient>,
 // CHECK-SAME:  %[[SIZE:.+]]: index)
-func.func @applyAsyncUpdateOp(%update: !stream.resource<external>, %operand: !stream.resource<transient>, %size: index) {
+util.func public @applyAsyncUpdateOp(%update: !stream.resource<external>, %operand: !stream.resource<transient>, %size: index) {
   %c16 = arith.constant 16 : index
   %c128 = arith.constant 128 : index
   %c144 = arith.constant 144 : index
@@ -393,7 +393,7 @@ func.func @applyAsyncUpdateOp(%update: !stream.resource<external>, %operand: !st
   } => !stream.timepoint
   // CHECK: util.optimization_barrier %[[OPERAND]]
   util.optimization_barrier %result : !stream.resource<transient>
-  return
+  util.return
 }
 
 // -----
@@ -402,7 +402,7 @@ func.func @applyAsyncUpdateOp(%update: !stream.resource<external>, %operand: !st
 // CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<external>,
 // CHECK-SAME:  %[[TARGET:.+]]: !stream.resource<transient>,
 // CHECK-SAME:  %[[SIZE:.+]]: index)
-func.func @applyAsyncCopyOp(%source: !stream.resource<external>, %target: !stream.resource<transient>, %size: index) {
+util.func public @applyAsyncCopyOp(%source: !stream.resource<external>, %target: !stream.resource<transient>, %size: index) {
   %c16 = arith.constant 16 : index
   %c128 = arith.constant 128 : index
   %c144 = arith.constant 144 : index
@@ -417,7 +417,7 @@ func.func @applyAsyncCopyOp(%source: !stream.resource<external>, %target: !strea
   } => !stream.timepoint
   // CHECK: util.optimization_barrier %[[TARGET]]
   util.optimization_barrier %result : !stream.resource<transient>
-  return
+  util.return
 }
 
 // -----
@@ -430,7 +430,7 @@ func.func @applyAsyncCopyOp(%source: !stream.resource<external>, %target: !strea
 // CHECK-SAME: (%[[SOURCE:.+]]: !stream.resource<external>,
 // CHECK-SAME:  %[[TARGET:.+]]: !stream.resource<transient>,
 // CHECK-SAME:  %[[SIZE:.+]]: index)
-func.func @applyConcurrentAsyncCopyOp(%source: !stream.resource<external>, %target: !stream.resource<transient>, %size: index) {
+util.func public @applyConcurrentAsyncCopyOp(%source: !stream.resource<external>, %target: !stream.resource<transient>, %size: index) {
   %c0 = arith.constant 0 : index
   %c16 = arith.constant 16 : index
   %c128 = arith.constant 128 : index
@@ -453,7 +453,7 @@ func.func @applyConcurrentAsyncCopyOp(%source: !stream.resource<external>, %targ
   } => !stream.timepoint
   // CHECK: util.optimization_barrier %[[TARGET]]
   util.optimization_barrier %result : !stream.resource<transient>
-  return
+  util.return
 }
 
 // -----
@@ -465,7 +465,7 @@ func.func @applyConcurrentAsyncCopyOp(%source: !stream.resource<external>, %targ
 // CHECK-SAME:  %[[SEND:.+]]: !stream.resource<external>, %[[SEND_SIZE:[a-z0-9]+]]: index,
 // CHECK-SAME:  %[[RECV:.+]]: !stream.resource<transient>, %[[RECV_SIZE:[a-z0-9]+]]: index,
 // CHECK-SAME:  %[[COUNT:[a-z0-9]+]]: index)
-func.func @applyAsyncCollectiveOpOutOfPlace(%channel: !stream.channel, %send: !stream.resource<external>, %send_size: index, %recv: !stream.resource<transient>, %recv_size: index, %count: index) {
+util.func public @applyAsyncCollectiveOpOutOfPlace(%channel: !stream.channel, %send: !stream.resource<external>, %send_size: index, %recv: !stream.resource<transient>, %recv_size: index, %count: index) {
   %c0 = arith.constant 0 : index
   // CHECK: stream.cmd.execute
   // CHECK-SAME: with(%[[SEND]] as %[[SEND_CAPTURE:.+]]: !stream.resource<external>{%[[SEND_SIZE]]},
@@ -482,7 +482,7 @@ func.func @applyAsyncCollectiveOpOutOfPlace(%channel: !stream.channel, %send: !s
   } => !stream.timepoint
   // CHECK: util.optimization_barrier %[[RECV]]
   util.optimization_barrier %result : !stream.resource<transient>
-  return
+  util.return
 }
 
 // -----
@@ -491,7 +491,7 @@ func.func @applyAsyncCollectiveOpOutOfPlace(%channel: !stream.channel, %send: !s
 
 // CHECK-LABEL: @applyAsyncTransferOp
 // CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index)
-func.func @applyAsyncTransferOp(%operand: !stream.resource<transient>, %size: index) {
+util.func public @applyAsyncTransferOp(%operand: !stream.resource<transient>, %size: index) {
   // CHECK: %[[ALLOCA:.+]], %[[ALLOCA_TIMEPOINT:.+]] = stream.resource.alloca uninitialized : !stream.resource<transient>{%[[SIZE]]}
   // CHECK: stream.cmd.execute await(%[[ALLOCA_TIMEPOINT]])
   // CHECK-SAME: with(%[[OPERAND]] as %[[OPERAND_CAPTURE:.+]]: !stream.resource<transient>{%[[SIZE]]},
@@ -504,14 +504,14 @@ func.func @applyAsyncTransferOp(%operand: !stream.resource<transient>, %size: in
   } => !stream.timepoint
   // CHECK: util.optimization_barrier %[[ALLOCA]]
   util.optimization_barrier %result : !stream.resource<transient>
-  return
+  util.return
 }
 
 // -----
 
 // CHECK-LABEL: @applyAsyncDispatchOp
 // CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index, %[[OFFSET:.+]]: index, %[[END:.+]]: index, %[[LENGTH:.+]]: index)
-func.func @applyAsyncDispatchOp(%operand: !stream.resource<transient>, %size: index, %offset: index, %end: index, %length: index) {
+util.func public @applyAsyncDispatchOp(%operand: !stream.resource<transient>, %size: index, %offset: index, %end: index, %length: index) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c4 = arith.constant 4 : index
@@ -533,7 +533,7 @@ func.func @applyAsyncDispatchOp(%operand: !stream.resource<transient>, %size: in
   util.optimization_barrier %results#0 : !stream.resource<transient>
   // CHECK: util.optimization_barrier %[[ALLOCA]]
   util.optimization_barrier %results#1 : !stream.resource<transient>
-  return
+  util.return
 }
 
 // -----
@@ -543,7 +543,7 @@ func.func @applyAsyncDispatchOp(%operand: !stream.resource<transient>, %size: in
 
 // CHECK-LABEL: @applyAsyncDispatchUnusedOp
 // CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index, %[[OFFSET:.+]]: index, %[[END:.+]]: index, %[[LENGTH:.+]]: index)
-func.func @applyAsyncDispatchUnusedOp(%operand: !stream.resource<transient>, %size: index, %offset: index, %end: index, %length: index) {
+util.func public @applyAsyncDispatchUnusedOp(%operand: !stream.resource<transient>, %size: index, %offset: index, %end: index, %length: index) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c4 = arith.constant 4 : index
@@ -572,7 +572,7 @@ func.func @applyAsyncDispatchUnusedOp(%operand: !stream.resource<transient>, %si
   util.optimization_barrier %result_timepoint : !stream.timepoint
   // CHECK: util.optimization_barrier %[[OPERAND]]
   util.optimization_barrier %result : !stream.resource<transient>
-  return
+  util.return
 }
 
 // -----
@@ -582,7 +582,7 @@ stream.async.func private @asyncExtern(%arg0: !stream.resource<transient>, %arg1
 
 // CHECK-LABEL: @applyAsyncCallOp
 // CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<transient>, %[[SIZE:.+]]: index, %[[OFFSET:.+]]: index, %[[END:.+]]: index, %[[LENGTH:.+]]: index)
-func.func @applyAsyncCallOp(%operand: !stream.resource<transient>, %size: index, %offset: index, %end: index, %length: index) {
+util.func public @applyAsyncCallOp(%operand: !stream.resource<transient>, %size: index, %offset: index, %end: index, %length: index) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c4 = arith.constant 4 : index
@@ -602,7 +602,7 @@ func.func @applyAsyncCallOp(%operand: !stream.resource<transient>, %size: index,
   util.optimization_barrier %results#0 : !stream.resource<transient>
   // CHECK: util.optimization_barrier %[[ALLOCA]]
   util.optimization_barrier %results#1 : !stream.resource<transient>
-  return
+  util.return
 }
 
 // -----
@@ -612,15 +612,15 @@ func.func @applyAsyncCallOp(%operand: !stream.resource<transient>, %size: index,
 // CHECK-LABEL: @asyncLoadStore
 // CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<staging>,
 // CHECK-SAME:  %[[SIZE:.+]]: index)
-func.func @asyncLoadStore(%operand: !stream.resource<staging>, %size: index) -> f32 {
+util.func public @asyncLoadStore(%operand: !stream.resource<staging>, %size: index) -> f32 {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 5.4 : f32
   // CHECK: stream.resource.store %cst, %[[OPERAND]][%c0] : f32 -> !stream.resource<staging>{%[[SIZE]]}
   %0 = stream.async.store %cst, %operand[%c0] : f32 -> %operand as !stream.resource<staging>{%size}
   // CHECK: %[[RESULT:.+]] = stream.resource.load %[[OPERAND]][%c0] : !stream.resource<staging>{%[[SIZE]]} -> f32
   %1 = stream.async.load %0[%c0] : !stream.resource<staging>{%size} -> f32
-  // CHECK: return %[[RESULT]]
-  return %1 : f32
+  // CHECK: util.return %[[RESULT]]
+  util.return %1 : f32
 }
 
 // -----
@@ -630,7 +630,7 @@ func.func @asyncLoadStore(%operand: !stream.resource<staging>, %size: index) -> 
 // CHECK-LABEL: @scfFor
 // CHECK-SAME: (%[[OPERAND:.+]]: !stream.resource<staging>,
 // CHECK-SAME:  %[[SIZE:.+]]: index)
-func.func @scfFor(%operand: !stream.resource<staging>, %size: index) -> f32 {
+util.func public @scfFor(%operand: !stream.resource<staging>, %size: index) -> f32 {
   %c0 = arith.constant 0 : index
   %c2 = arith.constant 2 : index
   %c4 = arith.constant 4 : index
@@ -650,6 +650,6 @@ func.func @scfFor(%operand: !stream.resource<staging>, %size: index) -> f32 {
     scf.yield %2 : f32
   }
 
-  // CHECK: return %[[FOR]]
-  return %sum : f32
+  // CHECK: util.return %[[FOR]]
+  util.return %sum : f32
 }

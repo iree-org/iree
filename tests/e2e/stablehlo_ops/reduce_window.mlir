@@ -8,8 +8,8 @@ func.func @reduce_window_nonoverlapping_1x4x6x1xf32() {
   ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):   // no predecessors
     %3 = "stablehlo.add"(%arg0, %arg1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
     "stablehlo.return"(%3) : (tensor<f32>) -> ()
-  }) {window_dimensions = dense<[1, 2, 3, 1]> : tensor<4xi64>,
-      window_strides = dense<[1, 2, 3, 1]> : tensor<4xi64>} : (tensor<1x4x6x1xf32>, tensor<f32>) -> tensor<1x2x2x1xf32>
+  }) {window_dimensions = array<i64: 1, 2, 3, 1>,
+      window_strides = array<i64: 1, 2, 3, 1>} : (tensor<1x4x6x1xf32>, tensor<f32>) -> tensor<1x2x2x1xf32>
   check.expect_eq_const(%res, dense<[[[[30.0], [48.0]],[[102.0], [120.0]]]]> : tensor<1x2x2x1xf32>) : tensor<1x2x2x1xf32>
   return
 }
@@ -24,8 +24,8 @@ func.func @reduce_window_overlapping_4x6xf32() {
   ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):   // no predecessors
     %3 = "stablehlo.add"(%arg0, %arg1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
     "stablehlo.return"(%3) : (tensor<f32>) -> ()
-  }) {window_dimensions = dense<[1, 2, 3, 1]> : tensor<4xi64>,
-      window_strides = dense<[1, 1, 1, 1]> : tensor<4xi64>} : (tensor<1x4x6x1xf32>, tensor<f32>) -> tensor<1x3x4x1xf32>
+  }) {window_dimensions = array<i64: 1, 2, 3, 1>,
+      window_strides = array<i64: 1, 1, 1, 1>} : (tensor<1x4x6x1xf32>, tensor<f32>) -> tensor<1x3x4x1xf32>
   check.expect_eq_const(%res, dense<[[
       [[ 30.0], [ 36.0], [ 42.0], [ 48.0]],
       [[ 66.0], [ 72.0], [ 78.0], [ 84.0]],
@@ -43,8 +43,8 @@ func.func @reduce_window_max_4x6xf32() {
   ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):   // no predecessors
     %3 = "stablehlo.maximum"(%arg0, %arg1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
     "stablehlo.return"(%3) : (tensor<f32>) -> ()
-  }) {window_dimensions = dense<[1, 2, 3, 1]> : tensor<4xi64>,
-      window_strides = dense<[1, 2, 3, 1]> : tensor<4xi64>} : (tensor<1x4x6x1xf32>, tensor<f32>) -> tensor<1x2x2x1xf32>
+  }) {window_dimensions = array<i64: 1, 2, 3, 1>,
+      window_strides = array<i64: 1, 2, 3, 1>} : (tensor<1x4x6x1xf32>, tensor<f32>) -> tensor<1x2x2x1xf32>
   check.expect_almost_eq_const(%res, dense<[[[[9.0], [12.0]], [[21.0], [24.0]]]]> : tensor<1x2x2x1xf32>) : tensor<1x2x2x1xf32>
   return
 }
@@ -59,8 +59,8 @@ func.func @reduce_window_min_4x6xf32() {
   ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):   // no predecessors
     %3 = "stablehlo.minimum"(%arg0, %arg1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
     "stablehlo.return"(%3) : (tensor<f32>) -> ()
-  }) {window_dimensions = dense<[1, 2, 3, 1]> : tensor<4xi64>,
-      window_strides = dense<[1, 2, 3, 1]> : tensor<4xi64>} : (tensor<1x4x6x1xf32>, tensor<f32>) -> tensor<1x2x2x1xf32>
+  }) {window_dimensions = array<i64: 1, 2, 3, 1>,
+      window_strides = array<i64: 1, 2, 3, 1>} : (tensor<1x4x6x1xf32>, tensor<f32>) -> tensor<1x2x2x1xf32>
   check.expect_almost_eq_const(%res, dense<[[[[1.0], [4.0]], [[13.0], [14.0]]]]> : tensor<1x2x2x1xf32>) : tensor<1x2x2x1xf32>
   return
 }
@@ -75,8 +75,8 @@ func.func @reduce_window_max_with_padding_4x6xf32() {
   ^bb0(%arg0: tensor<f32>, %arg1: tensor<f32>):   // no predecessors
     %3 = "stablehlo.maximum"(%arg0, %arg1) : (tensor<f32>, tensor<f32>) -> tensor<f32>
     "stablehlo.return"(%3) : (tensor<f32>) -> ()
-  }) {window_dimensions = dense<[1, 2, 3, 1]> : tensor<4xi64>,
-      window_strides = dense<[1, 2, 3, 1]> : tensor<4xi64>,
+  }) {window_dimensions = array<i64: 1, 2, 3, 1>,
+      window_strides = array<i64: 1, 2, 3, 1>,
       padding = dense<[[0, 0], [1, 1], [0, 0], [0, 0]]> : tensor<4x2xi64>} : (tensor<1x4x6x1xf32>, tensor<f32>) -> tensor<1x3x2x1xf32>
   check.expect_almost_eq_const(%res, dense<[[[[3.0], [6.0]], [[15.0], [18.0]], [[21.0], [24.0]]]]> : tensor<1x3x2x1xf32>) : tensor<1x3x2x1xf32>
   return
@@ -90,8 +90,8 @@ func.func @cumsum_f32() {
     %4 = stablehlo.add %arg1, %arg2 : tensor<f32>
     "stablehlo.return"(%4) : (tensor<f32>) -> ()
   }) {padding = dense<[[1, 0], [0, 0], [0, 0]]> : tensor<3x2xi64>,
-      window_dimensions = dense<[2, 1, 1]> : tensor<3xi64>,
-      window_strides = dense<1> : tensor<3xi64>
+      window_dimensions = array<i64: 2, 1, 1>,
+      window_strides = array<i64: 1, 1, 1>
   } : (tensor<2x2x2xf32>, tensor<f32>) -> tensor<2x2x2xf32>
   check.expect_almost_eq_const(%res, dense<[[[1.0, 1.0], [1.0, 1.0]], [[2.0, 2.0], [2.0, 2.0]]]> : tensor<2x2x2xf32>) : tensor<2x2x2xf32>
   return

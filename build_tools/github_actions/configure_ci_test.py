@@ -145,12 +145,14 @@ class ConfigureCITest(unittest.TestCase):
         trailers = {}
         all_jobs = {"job1", "job2", "job3"}
         is_pr = True
+        is_llvm_integrate_pr = False
         modified_paths = ["runtime/file"]
         jobs = configure_ci.get_enabled_jobs(
             trailers,
             all_jobs,
             modified_paths=modified_paths,
             is_pr=is_pr,
+            is_llvm_integrate_pr=is_llvm_integrate_pr,
         )
         self.assertCountEqual(jobs, all_jobs)
 
@@ -160,12 +162,14 @@ class ConfigureCITest(unittest.TestCase):
         postsubmit_job = next(iter(configure_ci.DEFAULT_POSTSUBMIT_ONLY_JOBS))
         all_jobs = default_jobs | {postsubmit_job}
         is_pr = False
+        is_llvm_integrate_pr = False
         modified_paths = ["runtime/file"]
         jobs = configure_ci.get_enabled_jobs(
             trailers,
             all_jobs,
             modified_paths=modified_paths,
             is_pr=is_pr,
+            is_llvm_integrate_pr=is_llvm_integrate_pr,
         )
         self.assertCountEqual(jobs, all_jobs)
 
@@ -175,14 +179,33 @@ class ConfigureCITest(unittest.TestCase):
         postsubmit_job = next(iter(configure_ci.DEFAULT_POSTSUBMIT_ONLY_JOBS))
         all_jobs = default_jobs | {postsubmit_job}
         is_pr = True
+        is_llvm_integrate_pr = False
         modified_paths = ["runtime/file"]
         jobs = configure_ci.get_enabled_jobs(
             trailers,
             all_jobs,
             modified_paths=modified_paths,
             is_pr=is_pr,
+            is_llvm_integrate_pr=is_llvm_integrate_pr,
         )
         self.assertCountEqual(jobs, default_jobs)
+
+    def test_get_enabled_jobs_llvm_integrate(self):
+        trailers = {}
+        default_jobs = {"job1", "job2", "job3"}
+        postsubmit_job = next(iter(configure_ci.DEFAULT_POSTSUBMIT_ONLY_JOBS))
+        all_jobs = default_jobs | {postsubmit_job}
+        is_pr = True
+        is_llvm_integrate_pr = True
+        modified_paths = ["runtime/file"]
+        jobs = configure_ci.get_enabled_jobs(
+            trailers,
+            all_jobs,
+            modified_paths=modified_paths,
+            is_pr=is_pr,
+            is_llvm_integrate_pr=is_llvm_integrate_pr,
+        )
+        self.assertCountEqual(jobs, all_jobs)
 
     def test_get_enabled_jobs_no_modifies(self):
         trailers = {}
@@ -190,12 +213,14 @@ class ConfigureCITest(unittest.TestCase):
         postsubmit_job = next(iter(configure_ci.DEFAULT_POSTSUBMIT_ONLY_JOBS))
         all_jobs = default_jobs | {postsubmit_job}
         is_pr = True
+        is_llvm_integrate_pr = False
         modified_paths = ["experimental/file"]
         jobs = configure_ci.get_enabled_jobs(
             trailers,
             all_jobs,
             modified_paths=modified_paths,
             is_pr=is_pr,
+            is_llvm_integrate_pr=is_llvm_integrate_pr,
         )
         self.assertCountEqual(jobs, {})
 
@@ -205,12 +230,14 @@ class ConfigureCITest(unittest.TestCase):
         postsubmit_job = next(iter(configure_ci.DEFAULT_POSTSUBMIT_ONLY_JOBS))
         all_jobs = default_jobs | {postsubmit_job}
         is_pr = True
+        is_llvm_integrate_pr = False
         modified_paths = ["runtime/file"]
         jobs = configure_ci.get_enabled_jobs(
             trailers,
             all_jobs,
             modified_paths=modified_paths,
             is_pr=is_pr,
+            is_llvm_integrate_pr=is_llvm_integrate_pr,
         )
         self.assertCountEqual(jobs, {"job3"})
 
@@ -220,12 +247,14 @@ class ConfigureCITest(unittest.TestCase):
         postsubmit_job = next(iter(configure_ci.DEFAULT_POSTSUBMIT_ONLY_JOBS))
         all_jobs = default_jobs | {postsubmit_job}
         is_pr = True
+        is_llvm_integrate_pr = False
         modified_paths = ["runtime/file"]
         jobs = configure_ci.get_enabled_jobs(
             trailers,
             all_jobs,
             modified_paths=modified_paths,
             is_pr=is_pr,
+            is_llvm_integrate_pr=is_llvm_integrate_pr,
         )
         self.assertCountEqual(jobs, {})
 
@@ -235,12 +264,14 @@ class ConfigureCITest(unittest.TestCase):
         default_jobs = {"job1", "job2", "job3"}
         all_jobs = default_jobs | {postsubmit_job}
         is_pr = True
+        is_llvm_integrate_pr = False
         modified_paths = ["runtime/file"]
         jobs = configure_ci.get_enabled_jobs(
             trailers,
             all_jobs,
             modified_paths=modified_paths,
             is_pr=is_pr,
+            is_llvm_integrate_pr=is_llvm_integrate_pr,
         )
         self.assertCountEqual(jobs, all_jobs)
 
@@ -250,12 +281,14 @@ class ConfigureCITest(unittest.TestCase):
         default_jobs = {"job1", "job2", "job3"}
         all_jobs = default_jobs | {postsubmit_job}
         is_pr = True
+        is_llvm_integrate_pr = False
         modified_paths = ["runtime/file"]
         jobs = configure_ci.get_enabled_jobs(
             trailers,
             all_jobs,
             modified_paths=modified_paths,
             is_pr=is_pr,
+            is_llvm_integrate_pr=is_llvm_integrate_pr,
         )
         self.assertCountEqual(jobs, {postsubmit_job})
 
@@ -263,12 +296,14 @@ class ConfigureCITest(unittest.TestCase):
         trailers = {}
         all_jobs = {"job1"}
         is_pr = True
+        is_llvm_integrate_pr = False
         modified_paths = ["runtime/src/iree/hal/drivers/metal/file"]
         jobs = configure_ci.get_enabled_jobs(
             trailers,
             all_jobs,
             modified_paths=modified_paths,
             is_pr=is_pr,
+            is_llvm_integrate_pr=is_llvm_integrate_pr,
         )
         expected_jobs = {"job1", "build_test_all_macos_arm64"}
         self.assertCountEqual(jobs, expected_jobs)
@@ -277,12 +312,14 @@ class ConfigureCITest(unittest.TestCase):
         trailers = {}
         all_jobs = {"job1"}
         is_pr = True
+        is_llvm_integrate_pr = False
         modified_paths = ["runtime/src/iree/base/internal/threading_win32.c"]
         jobs = configure_ci.get_enabled_jobs(
             trailers,
             all_jobs,
             modified_paths=modified_paths,
             is_pr=is_pr,
+            is_llvm_integrate_pr=is_llvm_integrate_pr,
         )
         expected_jobs = {"job1", "build_test_all_windows"}
         self.assertCountEqual(jobs, expected_jobs)
@@ -292,12 +329,14 @@ class ConfigureCITest(unittest.TestCase):
         trailers = {}
         all_jobs = {"job1"}
         is_pr = True
+        is_llvm_integrate_pr = False
         modified_paths = ["docs/windows.md"]
         jobs = configure_ci.get_enabled_jobs(
             trailers,
             all_jobs,
             modified_paths=modified_paths,
             is_pr=is_pr,
+            is_llvm_integrate_pr=is_llvm_integrate_pr,
         )
         expected_jobs = {}
         self.assertCountEqual(jobs, expected_jobs)

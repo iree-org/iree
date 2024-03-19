@@ -321,3 +321,39 @@ hal.executable private @multirow  {
 //       CHECK:     vector.transfer_write {{.*}} : vector<4xf16>, memref<1x32000xf16, #hal.descriptor_type<storage_buffer>>
 //       CHECK:   }
 //  CHECK-NEXT:   return
+
+// -----
+
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+hal.executable private @simple_nd_write  {
+  hal.executable.variant @cuda target(#executable_target_cuda_nvptx_fb) {
+    hal.executable.export @simple_nd_write layout(#pipeline_layout) attributes {
+      workgroup_size = [32 : index, 1 : index, 1 : index]
+    }
+    builtin.module {
+    func.func @simple_nd_write() {
+      %c0 = arith.constant 0 : index
+      %cst_0 = arith.constant 0.000000e+00 : f32
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<4x1024xf32>
+      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : memref<4x1024xf32>
+      %6 = vector.transfer_read %0[%c0, %c0], %cst_0 {in_bounds = [true, true]} : memref<4x1024xf32>, vector<4x1024xf32>
+      vector.transfer_write %6, %1[%c0, %c0] {in_bounds = [true, true]} : vector<4x1024xf32>, memref<4x1024xf32>
+      return
+    }
+    }
+  }
+}
+
+// CHECK: #[[$MAP:.+]] = affine_map<()[s0] -> (s0 * 128)>
+
+// CHECK-LABEL: func @simple_nd_write(
+//       CHECK:   %[[RD:.+]] = vector.transfer_read {{.*}} vector<1x128xf32>
+//       CHECK:   %[[IDS:.+]]:2 = affine.delinearize_index %{{.*}} into (%c4, %c8) : index, index
+//       CHECK:   %[[INNER_ID:.+]] = affine.apply #[[$MAP]]()[%[[IDS]]#1]
+//       CHECK:   vector.transfer_write %[[RD]], %{{.*}}[%[[IDS]]#0, %[[INNER_ID]]] {{.*}} : vector<1x128xf32>

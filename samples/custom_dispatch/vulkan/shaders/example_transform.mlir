@@ -17,7 +17,7 @@
 // HACK: Currently this must match EXACTLY with the executable target for the
 // custom kernel. For things to be truly portable, we need to be able to compare
 // executable configurations.
-#spirv_target = #hal.executable.target<"vulkan", "vulkan-spirv-fb", {
+#spirv_target = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
   spirv.target_env = #spirv.target_env<
     #spirv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformArithmetic, GroupNonUniformBallot],
                      [SPV_KHR_storage_buffer_storage_class, SPV_KHR_variable_pointers]>,
@@ -31,11 +31,7 @@
 // hence we only support vulkan here. It is possible to hand author a custom
 // kernel that supports multiple targets by specifying an object per-target, but
 // that requires authoring the kernel for multiple targets.
-#vulkan_target = #hal.device.target<"vulkan", {
-  executable_targets = [#spirv_target],
-  // HACK: Vulkan target currently uses the legacy synchronous execution model.
-  legacy_sync
-}>
+#vulkan_target = #hal.device.target<"vulkan", [#spirv_target]>
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (d0)>

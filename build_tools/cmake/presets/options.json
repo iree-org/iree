@@ -1,149 +1,149 @@
 {
-    "version": 4,
-    "cmakeMinimumRequired": {
-      "major": 3,
-      "minor": 23,
-      "patch": 0
-    },
-    "include": [
-        "new.json"
-    ],
-    "configurePresets": [
-        {
-            "name": "minimal",
-            "displayName": "Minimal config",
-            "description": "Project configured with minimal features enabled",
-            "cacheVariables": {
-                "IREE_DEFAULT_CPU_LLVM_TARGETS": {
-                    "type": "STRING",
-                    "value": "host"
-                },
-                "IREE_BUILD_SAMPLES": {
-                    "type": "BOOL",
-                    "value": "OFF"
-                },
-                "IREE_BUILD_PYTHON_BINDINGS": {
-                    "type": "BOOL",
-                    "value": "OFF"
-                },
-                "IREE_BUILD_BINDINGS_TFLITE": {
-                    "type": "BOOL",
-                    "value": "OFF"
-                },
-                "IREE_EXTERNAL_HAL_DRIVERS": {
-                    "type": "STRING",
-                    "value": ""
-                },
-                "IREE_HAL_DRIVER_DEFAULTS": {
-                    "type": "BOOL",
-                    "value": "OFF"
-                },
-                "IREE_HAL_DRIVER_CUDA": {
-                    "type": "BOOL",
-                    "value": "OFF"
-                },
-                "IREE_HAL_DRIVER_LOCAL_SYNC": {
-                    "type": "BOOL",
-                    "value": "OFF"
-                },
-                "IREE_HAL_DRIVER_VULKAN": {
-                    "type": "BOOL",
-                    "value": "OFF"
-                },
-                "IREE_HAL_DRIVER_METAL": {
-                    "type": "BOOL",
-                    "value": "OFF"
-                },
-                "IREE_TARGET_BACKEND_DEFAULTS": {
-                    "type": "BOOL",
-                    "value": "OFF"
-                },
-                "IREE_TARGET_BACKEND_LLVM_CPU": {
-                    "type": "BOOL",
-                    "value": "OFF"
-                },
-                "IREE_TARGET_BACKEND_LLVM_CPU_WASM": {
-                    "type": "BOOL",
-                    "value": "OFF"
-                },
-                "IREE_TARGET_BACKEND_ROCM": {
-                    "type": "BOOL",
-                    "value": "OFF"
-                },
-                "IREE_TARGET_BACKEND_METAL_SPIRV": {
-                    "type": "BOOL",
-                    "value": "OFF"
-                },
-                "IREE_TARGET_BACKEND_VULKAN_SPIRV": {
-                    "type": "BOOL",
-                    "value": "OFF"
-                },
-                "IREE_TARGET_BACKEND_CUDA": {
-                    "type": "BOOL",
-                    "value": "OFF"
-                },
-                "IREE_TARGET_BACKEND_WEBGPU": {
-                    "type": "BOOL",
-                    "value": "OFF"
-                },
-                "IREE_INPUT_STABLEHLO": {
-                    "type": "BOOL",
-                    "value": "OFF"
-                },
-                "IREE_INPUT_TORCH": {
-                    "type": "BOOL",
-                    "value": "OFF"
-                },
-                "IREE_INPUT_TOSA": {
-                    "type": "BOOL",
-                    "value": "OFF"
-                },
-                "IREE_OUTPUT_FORMAT_C": {
-                    "type": "BOOL",
-                    "value": "OFF"
-                }
-            }
+  "version": 4,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 23,
+    "patch": 0
+  },
+  "include": [
+    "new.json"
+  ],
+  "configurePresets": [
+    {
+      "name": "minimal",
+      "displayName": "Minimal config",
+      "description": "Project configured with minimal features enabled",
+      "cacheVariables": {
+        "IREE_DEFAULT_CPU_LLVM_TARGETS": {
+          "type": "STRING",
+          "value": "host"
         },
-        {
-            "name": "python-bindings",
-            "displayName": "Python Development",
-            "cacheVariables": {
-                "IREE_BUILD_PYTHON_BINDINGS": {
-                    "type": "BOOL",
-                    "value": "OFF"
-                },
-                "Python3_FIND_VIRTUALENV": {
-                    "type": "STRING",
-                    "value": "ONLY"
-                }
-            }
+        "IREE_BUILD_SAMPLES": {
+          "type": "BOOL",
+          "value": "OFF"
         },
-        {
-            "name": "new-linux-minimal",
-            "displayName": "(START HERE) Set Up New Minimal Dev Config",
-            "description": "Project configured with minimal features enabled",
-            "inherits": [
-                "new-linux-dev",
-                "minimal"
-            ]
+        "IREE_BUILD_PYTHON_BINDINGS": {
+          "type": "BOOL",
+          "value": "OFF"
         },
-        {
-            "name": "new-macos-minimal",
-            "displayName": "(START HERE) Set Up New Minimal Dev Config",
-            "description": "Project configured with minimal features enabled",
-            "inherits": [
-                "new-macos-dev",
-                "minimal"
-            ]
+        "IREE_BUILD_BINDINGS_TFLITE": {
+          "type": "BOOL",
+          "value": "OFF"
         },
-        {
-            "name": "new-windows-minimal",
-            "displayName": "(START HERE) Set Up New Minimal Dev Config",
-            "description": "Project configured with minimal features enabled",
-            "inherits": [
-                "new-windows-dev",
-                "minimal"
-            ]
+        "IREE_EXTERNAL_HAL_DRIVERS": {
+          "type": "STRING",
+          "value": ""
+        },
+        "IREE_HAL_DRIVER_DEFAULTS": {
+          "type": "BOOL",
+          "value": "OFF"
+        },
+        "IREE_HAL_DRIVER_CUDA": {
+          "type": "BOOL",
+          "value": "OFF"
+        },
+        "IREE_HAL_DRIVER_LOCAL_SYNC": {
+          "type": "BOOL",
+          "value": "OFF"
+        },
+        "IREE_HAL_DRIVER_VULKAN": {
+          "type": "BOOL",
+          "value": "OFF"
+        },
+        "IREE_HAL_DRIVER_METAL": {
+          "type": "BOOL",
+          "value": "OFF"
+        },
+        "IREE_TARGET_BACKEND_DEFAULTS": {
+          "type": "BOOL",
+          "value": "OFF"
+        },
+        "IREE_TARGET_BACKEND_LLVM_CPU": {
+          "type": "BOOL",
+          "value": "OFF"
+        },
+        "IREE_TARGET_BACKEND_LLVM_CPU_WASM": {
+          "type": "BOOL",
+          "value": "OFF"
+        },
+        "IREE_TARGET_BACKEND_ROCM": {
+          "type": "BOOL",
+          "value": "OFF"
+        },
+        "IREE_TARGET_BACKEND_METAL_SPIRV": {
+          "type": "BOOL",
+          "value": "OFF"
+        },
+        "IREE_TARGET_BACKEND_VULKAN_SPIRV": {
+          "type": "BOOL",
+          "value": "OFF"
+        },
+        "IREE_TARGET_BACKEND_CUDA": {
+          "type": "BOOL",
+          "value": "OFF"
+        },
+        "IREE_TARGET_BACKEND_WEBGPU_SPIRV": {
+          "type": "BOOL",
+          "value": "OFF"
+        },
+        "IREE_INPUT_STABLEHLO": {
+          "type": "BOOL",
+          "value": "OFF"
+        },
+        "IREE_INPUT_TORCH": {
+          "type": "BOOL",
+          "value": "OFF"
+        },
+        "IREE_INPUT_TOSA": {
+          "type": "BOOL",
+          "value": "OFF"
+        },
+        "IREE_OUTPUT_FORMAT_C": {
+          "type": "BOOL",
+          "value": "OFF"
         }
-    ]
+      }
+    },
+    {
+      "name": "python-bindings",
+      "displayName": "Python Development",
+      "cacheVariables": {
+        "IREE_BUILD_PYTHON_BINDINGS": {
+          "type": "BOOL",
+          "value": "OFF"
+        },
+        "Python3_FIND_VIRTUALENV": {
+          "type": "STRING",
+          "value": "ONLY"
+        }
+      }
+    },
+    {
+      "name": "new-linux-minimal",
+      "displayName": "(START HERE) Set Up New Minimal Dev Config",
+      "description": "Project configured with minimal features enabled",
+      "inherits": [
+        "new-linux-dev",
+        "minimal"
+      ]
+    },
+    {
+      "name": "new-macos-minimal",
+      "displayName": "(START HERE) Set Up New Minimal Dev Config",
+      "description": "Project configured with minimal features enabled",
+      "inherits": [
+        "new-macos-dev",
+        "minimal"
+      ]
+    },
+    {
+      "name": "new-windows-minimal",
+      "displayName": "(START HERE) Set Up New Minimal Dev Config",
+      "description": "Project configured with minimal features enabled",
+      "inherits": [
+        "new-windows-dev",
+        "minimal"
+      ]
+    }
+  ]
 }

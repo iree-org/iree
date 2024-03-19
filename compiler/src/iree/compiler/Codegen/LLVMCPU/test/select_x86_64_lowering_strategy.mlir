@@ -2233,7 +2233,7 @@ hal.executable private @batch_mmt4d {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 10, 80, 0, 0, 0, 0], [1, 1, 1, 0, 8, 4, 0], [0, 0, 0, 1, 0, 0, 1]{{\]}}>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 10, 80, 0, 0, 0, 0], [1, 10, 80, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0], [1, 1, 1, 0, 8, 4, 0], [0, 0, 0, 1, 0, 0, 1], [0, 0, 0, 0, 0, 0, 0]{{\]}}>
 //      CHECK: func.func @batch_mmt4d()
 //      CHECK:   linalg.batch_mmt4d
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
@@ -2269,7 +2269,7 @@ hal.executable private @mmt4d_with_large_reduction {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1, 0, 0, 0, 0], [1, 1, 0, 16, 16, 0], [0, 0, 1, 0, 0, 1]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1, 0, 0, 0, 0], [1, 1, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [1, 1, 0, 16, 16, 0], [0, 0, 1, 0, 0, 1], [0, 0, 0, 0, 0, 0]]>
 //      CHECK: func.func @mmt4d_with_large_reduction()
 //      CHECK:   linalg.mmt4d
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
@@ -2318,3 +2318,45 @@ hal.executable private @pad_only {
 //      CHECK:   tensor.pad {{.+}} {
 //      CHECK:     tensor.yield
 // CHECK-NEXT:   } {lowering_config = #[[CONFIG]]}
+
+// -----
+
+hal.executable private @attention {
+  hal.executable.variant public @embedded_elf_x86_64 target(<"llvm-cpu", "embedded-elf-x86_64", {
+      cpu = "generic", cpu_features = "",
+      data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+      native_vector_size = 64 : index, target_triple = "x86_64-none-elf"}>) {
+  hal.executable.export public @attention ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer, ReadOnly>, <3, storage_buffer>]>]>) attributes {hal.interface.bindings = [#hal.interface.binding<0, 0>, #hal.interface.binding<0, 1>, #hal.interface.binding<0, 2>, #hal.interface.binding<0, 3>]} {
+  ^bb0(%arg0: !hal.device):
+    %x, %y, %z = flow.dispatch.workgroup_count_from_slice
+    hal.return %x, %y, %z : index, index, index
+  }
+  builtin.module {
+    func.func @attention() {
+      %c0 = arith.constant 0 : index
+      %scale = arith.constant 0.125 : f16
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<20x4096x64xf16>>
+      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<20x4096x64xf16>>
+      %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<20x4096x64xf16>>
+      %3 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<20x4096x64xf16>>
+      %4 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [20, 4096, 64], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<20x4096x64xf16>> -> tensor<20x4096x64xf16>
+      %5 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [20, 4096, 64], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<20x4096x64xf16>> -> tensor<20x4096x64xf16>
+      %6 = flow.dispatch.tensor.load %2, offsets = [0, 0, 0], sizes = [20, 4096, 64], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<20x4096x64xf16>> -> tensor<20x4096x64xf16>
+      %7 = tensor.empty() : tensor<20x4096x64xf16>
+      %8 = iree_linalg_ext.attention
+        ins(%4, %5, %6, %scale : tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, tensor<20x4096x64xf16>, f16)
+        outs(%7 : tensor<20x4096x64xf16>) -> tensor<20x4096x64xf16>
+      flow.dispatch.tensor.store %8, %3, offsets = [0, 0, 0], sizes = [20, 4096, 64], strides = [1, 1, 1] : tensor<20x4096x64xf16> -> !flow.dispatch.tensor<writeonly:tensor<20x4096x64xf16>>
+      return
+    }
+  }
+}
+}
+
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[20, 64], [1, 1]]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPULinalgExtTileAndVectorize>
+//      CHECK: hal.executable.export public @attention
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//     CHECK: func.func @attention()
+//     CHECK:   iree_linalg_ext.attention
+// CHECK-SAME:    {lowering_config = #[[CONFIG]]}

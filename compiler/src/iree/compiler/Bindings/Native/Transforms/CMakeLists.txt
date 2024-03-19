@@ -22,7 +22,6 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRAffineUtils
-    MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR
     MLIRPass

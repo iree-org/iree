@@ -19,6 +19,12 @@ def GPUCheckResourceUsage :
   let constructor = "mlir::iree_compiler::createGPUCheckResourceUsagePass()";
 }
 
+def GPUCreateFastSlowPath :
+    InterfacePass<"iree-codegen-gpu-create-fast-slow-path", "mlir::FunctionOpInterface"> {
+  let summary = "Create separate fast and slow paths to handle padding";
+  let constructor = "mlir::iree_compiler::createGPUCreateFastSlowPathPass()";
+}
+
 def GPUDistribute :
     InterfacePass<"iree-codegen-gpu-distribute", "mlir::FunctionOpInterface"> {
   let summary = "Pass to distribute scf.forall ops.";

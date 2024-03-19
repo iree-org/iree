@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: @file_from_memory
 // CHECK-SAME: (%[[DEVICE:.+]]: !hal.device, %[[BUFFER:.+]]: !util.buffer)
-func.func @file_from_memory(%device: !hal.device, %buffer: !util.buffer) -> !hal.file {
+util.func public @file_from_memory(%device: !hal.device, %buffer: !util.buffer) -> !hal.file {
   // CHECK-DAG: %[[AFFINITY:.+]] = arith.constant -1
   %affinity = arith.constant -1 : i64
   // CHECK-DAG: %[[OFFSET:.+]] = arith.constant 100
@@ -24,5 +24,5 @@ func.func @file_from_memory(%device: !hal.device, %buffer: !util.buffer) -> !hal
       access(Read)
       buffer(%buffer : !util.buffer)[%offset for %length]
       flags(%flags) : !hal.file
-  return %file : !hal.file
+  util.return %file : !hal.file
 }

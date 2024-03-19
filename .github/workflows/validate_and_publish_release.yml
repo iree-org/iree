@@ -59,6 +59,9 @@ jobs:
           TRACY_NO_INVARIANT_CHECK=1 IREE_PY_RUNTIME=tracy \
             python -m iree.runtime._package_test
       # Binaries from the tarball
+      - name: Run iree-benchmark-executable
+        id: run_iree_benchmark_executable
+        run: ./bin/iree-benchmark-executable --help
       - name: Run iree-benchmark-module
         id: run_iree_benchmark_module
         run: ./bin/iree-benchmark-module --help
@@ -90,6 +93,9 @@ jobs:
       - name: Py iree-run-module
         id: py_iree-run-module
         run: iree-run-module --help
+      - name: Py iree-benchmark-executable
+        id: py_iree_benchmark_executable
+        run: iree-benchmark-executable --help
       - name: Py iree-benchmark-module
         id: py_iree_benchmark_module
         run: iree-benchmark-module --help

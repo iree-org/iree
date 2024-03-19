@@ -14,6 +14,8 @@ on:
       - main
       # Experimental branches can also get packages and tests automatically.
       - exppkg-*
+      # Short term feature branches:
+      - sdxl
 
 concurrency:
   # A PR number if a pull request and otherwise the commit hash. This cancels

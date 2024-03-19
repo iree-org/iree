@@ -269,13 +269,11 @@ public:
         auto vecType = llvm::dyn_cast<VectorType>(val.getType());
         if (!vecType)
           return AffineMap::get(val.getContext());
-        // Create a map (d0, d1) -> (d1) to distribute along the inner
-        // dimension. Once we support n-d distribution we can add more
-        // complex cases.
+        // Create an identity dim map of rank |vecRank|. This greedily divides
+        // threads along the outermost vector dimensions to the innermost ones.
         int64_t vecRank = vecType.getRank();
         OpBuilder builder(val.getContext());
-        return AffineMap::get(vecRank, 0,
-                              builder.getAffineDimExpr(vecRank - 1));
+        return builder.getMultiDimIdentityMap(vecRank);
       };
 
       RewritePatternSet patterns(ctx);

@@ -30,13 +30,16 @@ typedef struct iree_hal_hip_dynamic_symbols_t {
   iree_dynamic_library_t* dylib;
 
   // Concrete HIP symbols defined by including the `dynamic_symbol_tables.h`.
-#define IREE_HIP_PFN_DECL(hipSymbolName, ...) \
+#define IREE_HAL_HIP_REQUIRED_PFN_DECL(hipSymbolName, ...) \
   hipError_t (*hipSymbolName)(__VA_ARGS__);
-#define IREE_HIP_PFN_STR_DECL(hipSymbolName, ...) \
+#define IREE_HAL_HIP_REQUIRED_PFN_STR_DECL(hipSymbolName, ...) \
   const char* (*hipSymbolName)(__VA_ARGS__);
+#define IREE_HAL_HIP_OPTIONAL_PFN_DECL(hipSymbolName, ...) \
+  hipError_t (*hipSymbolName)(__VA_ARGS__);
 #include "experimental/hip/dynamic_symbol_tables.h"  // IWYU pragma: export
-#undef IREE_HIP_PFN_DECL
-#undef IREE_HIP_PFN_STR_DECL
+#undef IREE_HAL_HIP_REQUIRED_PFN_DECL
+#undef IREE_HAL_HIP_REQUIRED_PFN_STR_DECL
+#undef IREE_HAL_HIP_OPTIONAL_PFN_DECL
 } iree_hal_hip_dynamic_symbols_t;
 
 // Initializes |out_syms| in-place with dynamically loaded HIP symbols.

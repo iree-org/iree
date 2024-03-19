@@ -17,6 +17,7 @@ iree_cc_library(
     "Passes.h"
   SRCS
     "AssignTargetDevices.cpp"
+    "CaptureExecutableSources.cpp"
     "ConfigureExecutables.cpp"
     "ConvertToHAL.cpp"
     "DumpExecutableBenchmarks.cpp"
@@ -31,6 +32,7 @@ iree_cc_library(
     "Passes.cpp"
     "Passes.h.inc"
     "PreprocessExecutables.cpp"
+    "PruneExecutables.cpp"
     "RepeatDispatches.cpp"
     "ResolveExportOrdinals.cpp"
     "SerializeExecutables.cpp"

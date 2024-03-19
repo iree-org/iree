@@ -7,7 +7,7 @@
   ]>
 ]>
 hal.executable private @subgroup_reduce {
-  hal.executable.variant @vulkan_spirv_fb target(<"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader, GroupNonUniformShuffle], []>, ARM:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 512,
@@ -105,7 +105,7 @@ hal.executable private @subgroup_reduce {
   ]>
 ]>
 hal.executable private @subgroup_reduce {
-  hal.executable.variant @vulkan_spirv_fb target(<"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 512,

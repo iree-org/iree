@@ -1,6 +1,6 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-flow-form-dispatch-workgroups))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-flow-form-dispatch-workgroups))" --split-input-file %s | FileCheck %s
 
-func.func @existing_count_region(%arg0 : index, %arg1 : index) -> tensor<?x?xf32> {
+util.func public @existing_count_region(%arg0 : index, %arg1 : index) -> tensor<?x?xf32> {
   %c1 = arith.constant 1 : index
   %0 = flow.dispatch.region[%arg0, %arg1] -> (tensor<?x?xf32>{%arg0, %arg1}) {
     %1 = tensor.empty(%arg0, %arg1) : tensor<?x?xf32>
@@ -8,16 +8,16 @@ func.func @existing_count_region(%arg0 : index, %arg1 : index) -> tensor<?x?xf32
   } count(%arg2 : index, %arg3 : index) -> (index, index, index) {
     flow.return %arg2, %arg3, %c1 : index, index, index
   }
-  return %0 : tensor<?x?xf32>
+  util.return %0 : tensor<?x?xf32>
 }
-// CHECK-LABEL: func @existing_count_region(
+// CHECK-LABEL: util.func public @existing_count_region(
 //       CHECK:   count(%[[ARG2:[a-zA-Z0-9]+]]: index, %[[ARG3:[a-zA-Z0-9]+]]: index)
 //       CHECK:     %[[C1:.+]] = arith.constant 1 : index
 //       CHECK:     flow.return %[[ARG2]], %[[ARG3]], %[[C1]]
 
 // -----
 
-func.func @simple_test_with_cfg(%arg0: i1) -> (tensor<10x20xf32>) {
+util.func public @simple_test_with_cfg(%arg0: i1) -> (tensor<10x20xf32>) {
   %cst = arith.constant dense<1.000000e+00> : tensor<10x20xf32>
   %0 = flow.dispatch.region -> (tensor<10x20xf32>) {
     %cst_0 = arith.constant dense<1.000000e+00> : tensor<10x20xf32>
@@ -28,9 +28,9 @@ func.func @simple_test_with_cfg(%arg0: i1) -> (tensor<10x20xf32>) {
   ^bb2:  // pred: ^bb0
     flow.return %cst_0 : tensor<10x20xf32>
   }
-  return %0 : tensor<10x20xf32>
+  util.return %0 : tensor<10x20xf32>
 }
-// CHECK-LABEL: func @simple_test_with_cfg
+// CHECK-LABEL: util.func public @simple_test_with_cfg
 //  CHECK-SAME:     %[[ARG0:.+]]: i1
 //       CHECK:   %[[RESULT:.+]] = flow.dispatch.workgroups(%[[ARG0]])
 //  CHECK-NEXT:       %[[ARG1:.+]]: i1, %[[ARG2:.+]]: !flow.dispatch.tensor
@@ -42,4 +42,4 @@ func.func @simple_test_with_cfg(%arg0: i1) -> (tensor<10x20xf32>) {
 //       CHECK:     ^[[BB2:.+]]:
 //       CHECK:       flow.dispatch.tensor.store %[[CST]], %[[ARG2]]
 //       CHECK:       flow.return
-//       CHECK:   return %[[RESULT]]
+//       CHECK:   util.return %[[RESULT]]

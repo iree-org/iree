@@ -17,7 +17,6 @@
 #include "llvm/ADT/BreadthFirstIterator.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -59,7 +58,8 @@ static bool isDynamicTensor(Type type) {
 // dynamic dims as globals as duplicates will get added and we'll need to rely
 // on global fusion to get rid of them. Note that this only expands globals and
 // does not yet update use sites - we just need the ops to reference.
-static ExpandedGlobalMap expandGlobalTensorDims(Operation *rootOp) {
+static ExpandedGlobalMap expandGlobalTensorDims(Operation *rootOp,
+                                                SymbolTable &symbolTable) {
   ExpandedGlobalMap expandedGlobals;
 
   // Gather all of the dynamically-shaped tensor globals in the root.
@@ -72,7 +72,6 @@ static ExpandedGlobalMap expandGlobalTensorDims(Operation *rootOp) {
   }
 
   // Expand each global by adding one global per dynamic dim beside it.
-  SymbolTable symbolTable(rootOp);
   auto indexType = IndexType::get(rootOp->getContext());
   for (auto &it : expandedGlobals) {
     auto &global = it.second;
@@ -108,19 +107,23 @@ static bool usesDynamicTensors(Operation *op) {
          llvm::any_of(op->getResultTypes(), isDynamicTensor);
 }
 
+static void expandType(Type type, SmallVectorImpl<Type> &newTypes) {
+  newTypes.push_back(type);
+  if (auto tensorType = llvm::dyn_cast<RankedTensorType>(type)) {
+    newTypes.append(tensorType.getNumDynamicDims(),
+                    IndexType::get(type.getContext()));
+  }
+}
+
 // Expands tensors in the given |types| list to (tensor, dynamic dims...).
 // This could be changed to some iterator magic to avoid the alloc.
 static SmallVector<Type> expandTypes(TypeRange types) {
   if (types.empty())
     return {};
-  auto indexType = IndexType::get(types.front().getContext());
   SmallVector<Type> newTypes;
   newTypes.reserve(types.size() * 2);
   for (auto type : types) {
-    newTypes.push_back(type);
-    if (auto tensorType = llvm::dyn_cast<RankedTensorType>(type)) {
-      newTypes.append(tensorType.getNumDynamicDims(), indexType);
-    }
+    expandType(type, newTypes);
   }
   return newTypes;
 }
@@ -163,6 +166,20 @@ static ExpandedValue consumeExpandedValue(Location loc, Value value,
   return expandedValue;
 }
 
+static void expandOperand(Location loc, Value operand,
+                          SmallVectorImpl<Value> &newOperands,
+                          TensorDimMap &tensorDimMap, IndexSet &indexSet,
+                          OpBuilder &builder) {
+  if (isDynamicTensor(operand.getType())) {
+    auto expandedValue =
+        consumeExpandedValue(loc, operand, tensorDimMap, indexSet, builder);
+    newOperands.push_back(expandedValue.tensor);
+    newOperands.append(expandedValue.dynamicDims);
+  } else {
+    newOperands.push_back(operand);
+  }
+}
+
 // Expands tensor in |operands| into (tensor, dynamic dims...) tuples.
 static SmallVector<Value> expandOperands(Location loc, ValueRange operands,
                                          TensorDimMap &tensorDimMap,
@@ -171,25 +188,20 @@ static SmallVector<Value> expandOperands(Location loc, ValueRange operands,
   SmallVector<Value> result;
   result.reserve(operands.size() * 2);
   for (auto operand : operands) {
-    if (isDynamicTensor(operand.getType())) {
-      auto expandedValue =
-          consumeExpandedValue(loc, operand, tensorDimMap, indexSet, builder);
-      result.push_back(expandedValue.tensor);
-      result.append(expandedValue.dynamicDims);
-    } else {
-      result.push_back(operand);
-    }
+    expandOperand(loc, operand, result, tensorDimMap, indexSet, builder);
   }
   return result;
 }
 
-static void expandTensorDims(Operation *op, ExpandedGlobalMap &globalMap,
-                             IndexSet &indexSet, TensorDimMap &tensorDimMap);
+static void expandTensorDims(Operation *op, SymbolTable &symbolTable,
+                             ExpandedGlobalMap &globalMap, IndexSet &indexSet,
+                             TensorDimMap &tensorDimMap);
 
 // Recursively expands tensors into (tensor, dynamic dims...) tuples within the
 // given |region|. All branches, ops, and nested regions will be processed.
-static void expandRegion(Region &region, ExpandedGlobalMap &globalMap,
-                         IndexSet &indexSet, TensorDimMap tensorDimMap) {
+static void expandRegion(Region &region, SymbolTable &symbolTable,
+                         ExpandedGlobalMap &globalMap, IndexSet &indexSet,
+                         TensorDimMap tensorDimMap) {
   if (region.empty())
     return;
 
@@ -232,14 +244,14 @@ static void expandRegion(Region &region, ExpandedGlobalMap &globalMap,
   if (region.hasOneBlock()) {
     for (auto &op :
          llvm::make_early_inc_range(region.front().getOperations())) {
-      expandTensorDims(&op, globalMap, indexSet, tensorDimMap);
+      expandTensorDims(&op, symbolTable, globalMap, indexSet, tensorDimMap);
     }
   } else {
     DominanceInfo domInfo(region.getParentOp());
     for (auto *blockInfo : llvm::breadth_first(domInfo.getRootNode(&region))) {
       auto *block = blockInfo->getBlock();
       for (auto &op : llvm::make_early_inc_range(block->getOperations())) {
-        expandTensorDims(&op, globalMap, indexSet, tensorDimMap);
+        expandTensorDims(&op, symbolTable, globalMap, indexSet, tensorDimMap);
       }
     }
   }
@@ -337,30 +349,36 @@ static void expandGlobalStoreOp(IREE::Util::GlobalStoreOpInterface op,
 }
 
 static void expandInitializerOp(IREE::Util::InitializerOp op,
+                                SymbolTable &symbolTable,
                                 ExpandedGlobalMap &globalMap,
                                 IndexSet &indexSet,
                                 TensorDimMap &tensorDimMap) {
-  expandRegion(op.getRegion(), globalMap, indexSet, tensorDimMap);
+  expandRegion(op.getRegion(), symbolTable, globalMap, indexSet, tensorDimMap);
 }
 
 // Inserts dimension associate reshapes on tensor arguments.
 // Requires that the ExpandCallOp/ExpandReturnOp patterns handle passing dims.
 //
 // Example:
-//  func.func @foo(%0: tensor<?xf32>)
+//  util.func @foo(%0: tensor<?xf32>)
 //  ->
-//  func.func @foo(%0: tensor<?xf32>, %d: index) {
+//  util.func @foo(%0: tensor<?xf32>, %d: index) {
 //    %1 = flow.tensor.tie_shape %0 : tensor<?xf32>{%d}
-static void expandFuncOp(mlir::func::FuncOp op, ExpandedGlobalMap &globalMap,
-                         IndexSet &indexSet, TensorDimMap &tensorDimMap) {
-  auto oldType = op.getFunctionType();
-  auto inputTypes = expandTypes(oldType.getInputs());
-  auto resultTypes = expandTypes(oldType.getResults());
-  auto newType = FunctionType::get(op.getContext(), inputTypes, resultTypes);
-  if (newType != oldType) {
-    op.setType(newType);
+static void expandFuncOp(IREE::Util::FuncOp op, SymbolTable &symbolTable,
+                         ExpandedGlobalMap &globalMap, IndexSet &indexSet,
+                         TensorDimMap &tensorDimMap) {
+  // Ignore public/external function signatures but still convert regions.
+  bool canModifyEntryBlock = !IREE::Util::isPublicOrExternal(op);
+  if (canModifyEntryBlock) {
+    op.expandSignature(
+        [&](unsigned i, Type type, SmallVectorImpl<Type> &newTypes) {
+          expandType(type, newTypes);
+        },
+        [&](unsigned i, Type type, SmallVectorImpl<Type> &newTypes) {
+          expandType(type, newTypes);
+        });
   }
-  expandRegion(op.getRegion(), globalMap, indexSet, tensorDimMap);
+  expandRegion(op.getRegion(), symbolTable, globalMap, indexSet, tensorDimMap);
 }
 
 // Splits tensor operands and results into (tensor, dynamic dims...).
@@ -368,22 +386,31 @@ static void expandFuncOp(mlir::func::FuncOp op, ExpandedGlobalMap &globalMap,
 //
 // Example:
 //  %a = flow.tensor.tie_shape %0 : tensor<?xf32>{%d}
-//  %r = call @foo(%a)
+//  %r = util.call @foo(%a)
 //  ->
-//  %r, %rd = call @foo(%a, %ad)
+//  %r, %rd = util.call @foo(%a, %ad)
 //  %2 = flow.tensor.tie_shape %r : tensor<?xf32>{%rd}
-static void expandCallOp(mlir::func::CallOp op, IndexSet &indexSet,
-                         TensorDimMap &tensorDimMap) {
+static void expandCallOp(IREE::Util::CallOp op, SymbolTable &symbolTable,
+                         IndexSet &indexSet, TensorDimMap &tensorDimMap) {
   if (!usesDynamicTensors(op))
+    return;
+
+  // Ignore calls to public/external functions.
+  auto calleeOp = symbolTable.lookup<CallableOpInterface>(op.getCallee());
+  if (IREE::Util::isPublicOrExternal(calleeOp))
     return;
 
   // Build the new call op with expanded operands and results.
   OpBuilder builder(op);
-  auto operands = expandOperands(op.getLoc(), op.getOperands(), tensorDimMap,
-                                 indexSet, builder);
-  auto resultTypes = expandTypes(op.getResultTypes());
-  auto newOp = builder.create<mlir::func::CallOp>(op.getLoc(), op.getCallee(),
-                                                  resultTypes, operands);
+  auto newOp = op.cloneAndExpand(
+      [&](unsigned i, Value operand, SmallVectorImpl<Value> &newOperands) {
+        expandOperand(op.getLoc(), operand, newOperands, tensorDimMap, indexSet,
+                      builder);
+      },
+      [&](unsigned i, Type type, SmallVectorImpl<Type> &newTypes) {
+        expandType(type, newTypes);
+      },
+      builder);
 
   retieResults(op, newOp, tensorDimMap);
   op.erase();
@@ -394,17 +421,19 @@ static void expandCallOp(mlir::func::CallOp op, IndexSet &indexSet,
 //
 // Example:
 //  %1 = flow.tensor.tie_shape %0 : tensor<?xf32>{%d}
-//  return %1
+//  util.return %1
 //  ->
-//  return %0, %d
-static void expandReturnOp(mlir::func::ReturnOp op, IndexSet &indexSet,
+//  util.return %0, %d
+static void expandReturnOp(IREE::Util::ReturnOp op, IndexSet &indexSet,
                            TensorDimMap &tensorDimMap) {
   if (!usesDynamicTensors(op))
+    return;
+  if (IREE::Util::isPublicOrExternal(op->getParentOfType<IREE::Util::FuncOp>()))
     return;
   OpBuilder builder(op);
   auto operands = expandOperands(op.getLoc(), op.getOperands(), tensorDimMap,
                                  indexSet, builder);
-  builder.create<mlir::func::ReturnOp>(op.getLoc(), operands);
+  builder.create<IREE::Util::ReturnOp>(op.getLoc(), operands);
   op.erase();
 }
 
@@ -484,8 +513,9 @@ static void expandSelectOp(mlir::arith::SelectOp op, IndexSet &indexSet,
   op.erase();
 }
 
-static void expandWhileOp(mlir::scf::WhileOp op, ExpandedGlobalMap &globalMap,
-                          IndexSet &indexSet, TensorDimMap &tensorDimMap) {
+static void expandWhileOp(mlir::scf::WhileOp op, SymbolTable &symbolTable,
+                          ExpandedGlobalMap &globalMap, IndexSet &indexSet,
+                          TensorDimMap &tensorDimMap) {
   OpBuilder builder(op);
   auto operands = expandOperands(op.getLoc(), op.getOperands(), tensorDimMap,
                                  indexSet, builder);
@@ -498,14 +528,17 @@ static void expandWhileOp(mlir::scf::WhileOp op, ExpandedGlobalMap &globalMap,
   newOp.getBefore().takeBody(op.getBefore());
   newOp.getAfter().takeBody(op.getAfter());
 
-  expandRegion(newOp.getBefore(), globalMap, indexSet, tensorDimMap);
-  expandRegion(newOp.getAfter(), globalMap, indexSet, tensorDimMap);
+  expandRegion(newOp.getBefore(), symbolTable, globalMap, indexSet,
+               tensorDimMap);
+  expandRegion(newOp.getAfter(), symbolTable, globalMap, indexSet,
+               tensorDimMap);
   retieResults(op, newOp, tensorDimMap);
   op.erase();
 }
 
-static void expandIfOp(mlir::scf::IfOp op, ExpandedGlobalMap &globalMap,
-                       IndexSet &indexSet, TensorDimMap &tensorDimMap) {
+static void expandIfOp(mlir::scf::IfOp op, SymbolTable &symbolTable,
+                       ExpandedGlobalMap &globalMap, IndexSet &indexSet,
+                       TensorDimMap &tensorDimMap) {
   OpBuilder builder(op);
   auto resultTypes = expandTypes(op.getResultTypes());
 
@@ -513,11 +546,12 @@ static void expandIfOp(mlir::scf::IfOp op, ExpandedGlobalMap &globalMap,
       op.getLoc(), resultTypes, op.getOperand(), op.elseBlock() != nullptr);
 
   newOp.getBodyRegion().takeBody(op.getBodyRegion());
-  expandRegion(newOp.getBodyRegion(), globalMap, indexSet, tensorDimMap);
-
+  expandRegion(newOp.getBodyRegion(), symbolTable, globalMap, indexSet,
+               tensorDimMap);
   if (newOp.elseBlock()) {
     newOp.getElseRegion().takeBody(op.getElseRegion());
-    expandRegion(newOp.getElseRegion(), globalMap, indexSet, tensorDimMap);
+    expandRegion(newOp.getElseRegion(), symbolTable, globalMap, indexSet,
+                 tensorDimMap);
   }
 
   retieResults(op, newOp, tensorDimMap);
@@ -544,19 +578,21 @@ static void expandScfConditionOp(mlir::scf::ConditionOp op, IndexSet &indexSet,
 }
 
 // Recursively expands tensors into (tensor, dynamic dims...) in |op|.
-static void expandTensorDims(Operation *op, ExpandedGlobalMap &globalMap,
-                             IndexSet &indexSet, TensorDimMap &tensorDimMap) {
+static void expandTensorDims(Operation *op, SymbolTable &symbolTable,
+                             ExpandedGlobalMap &globalMap, IndexSet &indexSet,
+                             TensorDimMap &tensorDimMap) {
   if (auto loadOp = dyn_cast<IREE::Util::GlobalLoadOpInterface>(op)) {
     expandGlobalLoadOp(loadOp, globalMap, indexSet, tensorDimMap);
   } else if (auto storeOp = dyn_cast<IREE::Util::GlobalStoreOpInterface>(op)) {
     expandGlobalStoreOp(storeOp, globalMap, indexSet, tensorDimMap);
   } else if (auto initializerOp = dyn_cast<IREE::Util::InitializerOp>(op)) {
-    expandInitializerOp(initializerOp, globalMap, indexSet, tensorDimMap);
-  } else if (auto funcOp = dyn_cast<mlir::func::FuncOp>(op)) {
-    expandFuncOp(funcOp, globalMap, indexSet, tensorDimMap);
-  } else if (auto callOp = dyn_cast<mlir::func::CallOp>(op)) {
-    expandCallOp(callOp, indexSet, tensorDimMap);
-  } else if (auto returnOp = dyn_cast<mlir::func::ReturnOp>(op)) {
+    expandInitializerOp(initializerOp, symbolTable, globalMap, indexSet,
+                        tensorDimMap);
+  } else if (auto funcOp = dyn_cast<IREE::Util::FuncOp>(op)) {
+    expandFuncOp(funcOp, symbolTable, globalMap, indexSet, tensorDimMap);
+  } else if (auto callOp = dyn_cast<IREE::Util::CallOp>(op)) {
+    expandCallOp(callOp, symbolTable, indexSet, tensorDimMap);
+  } else if (auto returnOp = dyn_cast<IREE::Util::ReturnOp>(op)) {
     expandReturnOp(returnOp, indexSet, tensorDimMap);
   } else if (auto branchOp = dyn_cast<mlir::cf::BranchOp>(op)) {
     expandBranchOp(branchOp, indexSet, tensorDimMap);
@@ -565,9 +601,9 @@ static void expandTensorDims(Operation *op, ExpandedGlobalMap &globalMap,
   } else if (auto selectOp = dyn_cast<mlir::arith::SelectOp>(op)) {
     expandSelectOp(selectOp, indexSet, tensorDimMap);
   } else if (auto whileOp = dyn_cast<mlir::scf::WhileOp>(op)) {
-    expandWhileOp(whileOp, globalMap, indexSet, tensorDimMap);
+    expandWhileOp(whileOp, symbolTable, globalMap, indexSet, tensorDimMap);
   } else if (auto ifOp = dyn_cast<mlir::scf::IfOp>(op)) {
-    expandIfOp(ifOp, globalMap, indexSet, tensorDimMap);
+    expandIfOp(ifOp, symbolTable, globalMap, indexSet, tensorDimMap);
   } else if (auto yieldOp = dyn_cast<mlir::scf::YieldOp>(op)) {
     expandScfYieldOp(yieldOp, indexSet, tensorDimMap);
   } else if (auto conditionOp = dyn_cast<mlir::scf::ConditionOp>(op)) {
@@ -593,7 +629,6 @@ public:
   ExpandTensorShapesPass() = default;
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<mlir::func::FuncDialect>();
     registry.insert<mlir::arith::ArithDialect>();
     registry.insert<IREE::Flow::FlowDialect>();
     registry.insert<IREE::Util::UtilDialect>();
@@ -601,9 +636,10 @@ public:
 
   void runOnOperation() override {
     auto rootOp = getOperation();
+    SymbolTable symbolTable(rootOp);
 
     // Expand all util.global ops holding tensor into tensor + dynamic dims.
-    auto globalMap = expandGlobalTensorDims(rootOp);
+    auto globalMap = expandGlobalTensorDims(rootOp, symbolTable);
 
     // Walk the entire IR tree and expand the globals.
     // We could do this via pattern application but that gets much trickier to
@@ -618,7 +654,8 @@ public:
                             ? OpBuilder(callableOp)
                             : OpBuilder::atBlockBegin(&region->front()));
       TensorDimMap tensorDimMap;
-      expandTensorDims(callableOp, globalMap, indexSet, tensorDimMap);
+      expandTensorDims(callableOp, symbolTable, globalMap, indexSet,
+                       tensorDimMap);
     }
   }
 };

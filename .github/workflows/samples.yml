@@ -32,7 +32,7 @@ jobs:
       - name: "Testing Colab Notebooks"
         run: |
           ./build_tools/github_actions/docker_run.sh  \
-            gcr.io/iree-oss/samples@sha256:86840f79a2d2c1896aaa4da9b2a3b33d822ba5bb24c8a5686cea9d6d07cddad3 \
+            gcr.io/iree-oss/samples@sha256:0cb4a27f8fce2e6c9a425b93ecd97bf3c5c3a8ec56929ab7ef005f51d4b1e054 \
             ./samples/colab/test_notebooks.py
 
   samples:
@@ -43,7 +43,7 @@ jobs:
       - name: "Testing Samples"
         run: |
           ./build_tools/github_actions/docker_run.sh  \
-            gcr.io/iree-oss/samples@sha256:86840f79a2d2c1896aaa4da9b2a3b33d822ba5bb24c8a5686cea9d6d07cddad3 \
+            gcr.io/iree-oss/samples@sha256:0cb4a27f8fce2e6c9a425b93ecd97bf3c5c3a8ec56929ab7ef005f51d4b1e054 \
             ./build_tools/testing/test_samples.sh
 
   # FIXME: unify this with host build from ci.yml. This is complicated by
@@ -62,8 +62,8 @@ jobs:
       - name: "Building host tools"
         run: |
           ./build_tools/github_actions/docker_run.sh  \
-            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:61e9aae211007dbad95e1f429e9e5121fd5968c204791038424979c21146cf75" \
-            gcr.io/iree-oss/base@sha256:61e9aae211007dbad95e1f429e9e5121fd5968c204791038424979c21146cf75 \
+            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446" \
+            gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
             ./build_tools/cmake/build_host_tools.sh "${HOST_BUILD_DIR}"
       - name: "Testing Experimental Web Samples"
         env:
@@ -72,5 +72,5 @@ jobs:
           ./build_tools/github_actions/docker_run.sh  \
             --env "IREE_HOST_BUILD_DIR=${HOST_BUILD_DIR}" \
             --env "IREE_EMPSCRIPTEN_BUILD_DIR=${IREE_EMPSCRIPTEN_BUILD_DIR}" \
-            gcr.io/iree-oss/emscripten@sha256:fe9bcd0851243c7b04d577d9e8a663860720484ec932bb53d4c56aec7f7b6d64 \
+            gcr.io/iree-oss/emscripten@sha256:2dd4c52f1bb499ab365aad0111fe5538b685d88af38636b409b0cf6a576ab214 \
             ./experimental/web/build_and_test_samples.sh

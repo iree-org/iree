@@ -138,7 +138,10 @@ DEFAULT_POSTSUBMIT_ONLY_JOBS = frozenset(
 # The file paths should be specified using Unix shell-style wildcards.
 PRESUBMIT_TOUCH_ONLY_JOBS = [
     ("build_test_all_macos_arm64", ["runtime/src/iree/hal/drivers/metal/*"]),
-    ("build_test_all_windows", ["*win32*", "*windows*", "*msvc*"]),
+    (
+        "build_test_all_windows",
+        ["*win32*", "*windows*", "*msvc*", "runtime/src/iree/builtins/ukernel/*"],
+    ),
 ]
 
 # Default presets enabled in CI.
@@ -403,6 +406,7 @@ def get_enabled_jobs(
     all_jobs: Set[str],
     *,
     is_pr: bool,
+    is_llvm_integrate_pr: bool,
     modified_paths: Optional[Iterable[str]],
 ) -> Set[str]:
     """Returns the CI jobs to run.
@@ -411,6 +415,7 @@ def get_enabled_jobs(
       trailers: trailers from PR description.
       all_jobs: all known supported jobs.
       is_pr: whether this is for pull requests or not.
+      is_llvm_integrate_pr:  whether this is for an LLVM integrate PR or not.
       modified_paths: the paths of the files changed. These paths are
         relative to the repo root directory.
 
@@ -419,8 +424,13 @@ def get_enabled_jobs(
     """
     if not is_pr:
         print(
-            "Running all jobs because run was not triggered by a pull request"
-            " event.",
+            "Running all jobs because run was not triggered by a pull request event.",
+            file=sys.stderr,
+        )
+        return all_jobs
+    if is_llvm_integrate_pr:
+        print(
+            "Running all jobs because run was triggered by an LLVM integrate pull request event.",
             file=sys.stderr,
         )
         return all_jobs
@@ -578,6 +588,7 @@ def main():
             all_jobs,
             modified_paths=get_modified_paths(base_ref),
             is_pr=is_pr,
+            is_llvm_integrate_pr=is_llvm_integrate_pr,
         )
     except ValueError as e:
         print(e)

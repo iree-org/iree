@@ -12,8 +12,12 @@
 #include "iree/compiler/Pipelines/Options.h"
 #include "iree/compiler/PluginAPI/Client.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Pass/PassOptions.h"
 
 namespace mlir::iree_compiler::Preprocessing {
+
+/// Placeholder struct for preprocessing pass pipeline options.
+struct TransformOptions : public PassPipelineOptions<TransformOptions> {};
 
 /// Adds a set of passes to the given pass manager that run preprocessing
 /// passes specified in textual pass-pipeline format using

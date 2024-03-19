@@ -10,7 +10,7 @@
 util.global private mutable @constantGlobal : !stream.resource<constant>
 
 // CHECK-LABEL: @globalLoad
-func.func @globalLoad() {
+util.func private @globalLoad() {
   // CHECK-NEXT: %[[TIMEPOINT:.+]] = util.global.load @constantGlobal__timepoint : !stream.timepoint
   // CHECK-NEXT: %[[UNREADY:.+]] = util.global.load @constantGlobal : !stream.resource<constant>
   // CHECK-NEXT: %[[SIZE:.+]] = stream.resource.size %[[UNREADY]]
@@ -18,7 +18,7 @@ func.func @globalLoad() {
   %0 = util.global.load @constantGlobal : !stream.resource<constant>
   // CHECK-NEXT: util.optimization_barrier %[[VALUE]]
   util.optimization_barrier %0 : !stream.resource<constant>
-  return
+  util.return
 }
 
 // -----
@@ -34,12 +34,12 @@ func.func @globalLoad() {
 util.global private mutable @mutableGlobal : !stream.resource<variable>
 
 // CHECK-LABEL: @globalStore
-// CHECK-SAME: (%[[TIMEPOINT:.+]]: !stream.timepoint, %[[UNREADY:.+]]: !stream.resource<variable>)
-func.func private @globalStore(%arg0: !stream.resource<variable>) {
+// CHECK-SAME: (%[[UNREADY:.+]]: !stream.resource<variable>, %[[TIMEPOINT:.+]]: !stream.timepoint)
+util.func private @globalStore(%arg0: !stream.resource<variable>) {
   //      CHECK: util.global.store %[[TIMEPOINT]], @mutableGlobal__timepoint : !stream.timepoint
   // CHECK-NEXT: util.global.store %[[UNREADY]], @mutableGlobal : !stream.resource<variable>
   util.global.store %arg0, @mutableGlobal : !stream.resource<variable>
-  return
+  util.return
 }
 
 // -----
@@ -50,9 +50,9 @@ func.func private @globalStore(%arg0: !stream.resource<variable>) {
 // This rotates waits from callers into callees.
 
 // CHECK-LABEL: @funcArgs
-// CHECK-SAME: (%[[TIMEPOINT0:.+]]: !stream.timepoint, %[[UNREADY0:.+]]: !stream.resource<external>,
-// CHECK-SAME:  %[[TIMEPOINT1:.+]]: !stream.timepoint, %[[UNREADY1:.+]]: !stream.resource<transient>)
-func.func private @funcArgs(%arg0: !stream.resource<external>, %arg1: !stream.resource<transient>) {
+// CHECK-SAME: (%[[UNREADY0:.+]]: !stream.resource<external>, %[[TIMEPOINT0:.+]]: !stream.timepoint,
+// CHECK-SAME:  %[[UNREADY1:.+]]: !stream.resource<transient>, %[[TIMEPOINT1:.+]]: !stream.timepoint)
+util.func private @funcArgs(%arg0: !stream.resource<external>, %arg1: !stream.resource<transient>) {
   // CHECK-NEXT: %[[SIZE0:.+]] = stream.resource.size %[[UNREADY0]] : !stream.resource<external>
   // CHECK-NEXT: %[[READY0:.+]] = stream.timepoint.await %[[TIMEPOINT0]] => %[[UNREADY0]] : !stream.resource<external>{%[[SIZE0]]}
   // CHECK-NEXT: %[[SIZE1:.+]] = stream.resource.size %[[UNREADY1]] : !stream.resource<transient>
@@ -62,7 +62,8 @@ func.func private @funcArgs(%arg0: !stream.resource<external>, %arg1: !stream.re
   util.optimization_barrier %arg0 : !stream.resource<external>
   // CHECK-NEXT: util.optimization_barrier %[[READY1]]
   util.optimization_barrier %arg1 : !stream.resource<transient>
-  return
+
+  util.return
 }
 
 // -----
@@ -73,15 +74,15 @@ func.func private @funcArgs(%arg0: !stream.resource<external>, %arg1: !stream.re
 // This rotates waits from callees into callers.
 
 // CHECK-LABEL: @funcResults
-// CHECK-SAME: (%[[TIMEPOINT0:.+]]: !stream.timepoint, %[[UNREADY0:.+]]: !stream.resource<external>,
-// CHECK-SAME:  %[[TIMEPOINT1:.+]]: !stream.timepoint, %[[UNREADY1:.+]]: !stream.resource<transient>)
-func.func private @funcResults(%arg0: !stream.resource<external>, %arg1: !stream.resource<transient>) -> (!stream.resource<external>, !stream.resource<transient>) {
+// CHECK-SAME: (%[[UNREADY0:.+]]: !stream.resource<external>, %[[TIMEPOINT0:.+]]: !stream.timepoint,
+// CHECK-SAME:  %[[UNREADY1:.+]]: !stream.resource<transient>, %[[TIMEPOINT1:.+]]: !stream.timepoint)
+util.func private @funcResults(%arg0: !stream.resource<external>, %arg1: !stream.resource<transient>) -> (!stream.resource<external>, !stream.resource<transient>) {
   // NOTE: there will be extra stuff here from the arg insertion. Since the
   // return should consume the await that was inserted we expect to directly use
   // the function arguments.
 
-  // CHECK: return %[[TIMEPOINT0]], %[[UNREADY0]], %[[TIMEPOINT1]], %[[UNREADY1]]
-  return %arg0, %arg1 : !stream.resource<external>, !stream.resource<transient>
+  // CHECK: util.return %[[UNREADY0]], %[[TIMEPOINT0]], %[[UNREADY1]], %[[TIMEPOINT1]]
+  util.return %arg0, %arg1 : !stream.resource<external>, !stream.resource<transient>
 }
 
 // -----
@@ -94,31 +95,31 @@ func.func private @funcResults(%arg0: !stream.resource<external>, %arg1: !stream
 // callees to callers.
 
 // CHECK-LABEL: @caller
-// CHECK-SAME: (%[[TIMEPOINT0:.+]]: !stream.timepoint, %[[UNREADY0:.+]]: !stream.resource<external>,
-// CHECK-SAME:  %[[TIMEPOINT1:.+]]: !stream.timepoint, %[[UNREADY1:.+]]: !stream.resource<transient>)
-func.func private @caller(%arg0: !stream.resource<external>, %arg1: !stream.resource<transient>) {
+// CHECK-SAME: (%[[UNREADY0:.+]]: !stream.resource<external>, %[[TIMEPOINT0:.+]]: !stream.timepoint,
+// CHECK-SAME:  %[[UNREADY1:.+]]: !stream.resource<transient>, %[[TIMEPOINT1:.+]]: !stream.timepoint)
+util.func private @caller(%arg0: !stream.resource<external>, %arg1: !stream.resource<transient>) {
   // NOTE: there will be extra stuff here from the arg insertion. The call
   // consumes the unready resources and we expect the args to be passed
   // directly.
 
-  // CHECK: %[[RET:.+]]:4 = call @callee(%[[TIMEPOINT0]], %[[UNREADY0]], %[[TIMEPOINT1]], %[[UNREADY1]])
-  // CHECK-SAME: : (!stream.timepoint, !stream.resource<external>, !stream.timepoint, !stream.resource<transient>) -> (!stream.timepoint, !stream.resource<external>, !stream.timepoint, !stream.resource<transient>)
-  %0:2 = call @callee(%arg0, %arg1) : (!stream.resource<external>, !stream.resource<transient>) -> (!stream.resource<external>, !stream.resource<transient>)
-  // CHECK-NEXT: %[[RET_SIZE0:.+]] = stream.resource.size %[[RET]]#1 : !stream.resource<external>
-  // CHECK-NEXT: %[[RET_READY0:.+]] = stream.timepoint.await %[[RET]]#0 => %[[RET]]#1 : !stream.resource<external>{%[[RET_SIZE0]]}
-  // CHECK-NEXT: %[[RET_SIZE1:.+]] = stream.resource.size %[[RET]]#3 : !stream.resource<transient>
-  // CHECK-NEXT: %[[RET_READY1:.+]] = stream.timepoint.await %[[RET]]#2 => %[[RET]]#3 : !stream.resource<transient>{%[[RET_SIZE1]]}
+  // CHECK: %[[RET:.+]]:4 = util.call @callee(%[[UNREADY0]], %[[TIMEPOINT0]], %[[UNREADY1]], %[[TIMEPOINT1]])
+  // CHECK-SAME: : (!stream.resource<external>, !stream.timepoint, !stream.resource<transient>, !stream.timepoint) -> (!stream.resource<external>, !stream.timepoint, !stream.resource<transient>, !stream.timepoint)
+  %0:2 = util.call @callee(%arg0, %arg1) : (!stream.resource<external>, !stream.resource<transient>) -> (!stream.resource<external>, !stream.resource<transient>)
+  // CHECK-NEXT: %[[RET_SIZE0:.+]] = stream.resource.size %[[RET]]#0 : !stream.resource<external>
+  // CHECK-NEXT: %[[RET_READY0:.+]] = stream.timepoint.await %[[RET]]#1 => %[[RET]]#0 : !stream.resource<external>{%[[RET_SIZE0]]}
+  // CHECK-NEXT: %[[RET_SIZE1:.+]] = stream.resource.size %[[RET]]#2 : !stream.resource<transient>
+  // CHECK-NEXT: %[[RET_READY1:.+]] = stream.timepoint.await %[[RET]]#3 => %[[RET]]#2 : !stream.resource<transient>{%[[RET_SIZE1]]}
 
   // CHECK-NEXT: util.optimization_barrier %[[RET_READY0]] : !stream.resource<external>
   util.optimization_barrier %0#0 : !stream.resource<external>
   // CHECK-NEXT: util.optimization_barrier %[[RET_READY1]] : !stream.resource<transient>
   util.optimization_barrier %0#1 : !stream.resource<transient>
 
-  return
+  util.return
 }
 
-func.func private @callee(%arg0: !stream.resource<external>, %arg1: !stream.resource<transient>) -> (!stream.resource<external>, !stream.resource<transient>) {
-  return %arg0, %arg1 : !stream.resource<external>, !stream.resource<transient>
+util.func private @callee(%arg0: !stream.resource<external>, %arg1: !stream.resource<transient>) -> (!stream.resource<external>, !stream.resource<transient>) {
+  util.return %arg0, %arg1 : !stream.resource<external>, !stream.resource<transient>
 }
 
 // -----
@@ -129,18 +130,18 @@ func.func private @callee(%arg0: !stream.resource<external>, %arg1: !stream.reso
 // This rotates waits on branch operands into successors.
 
 // CHECK-LABEL: @br
-// CHECK-SAME: (%[[TIMEPOINT0:.+]]: !stream.timepoint, %[[UNREADY0:.+]]: !stream.resource<external>,
-// CHECK-SAME:  %[[TIMEPOINT1:.+]]: !stream.timepoint, %[[UNREADY1:.+]]: !stream.resource<transient>)
-func.func private @br(%arg0: !stream.resource<external>, %arg1: !stream.resource<transient>) {
+// CHECK-SAME: (%[[UNREADY0:.+]]: !stream.resource<external>, %[[TIMEPOINT0:.+]]: !stream.timepoint,
+// CHECK-SAME:  %[[UNREADY1:.+]]: !stream.resource<transient>, %[[TIMEPOINT1:.+]]: !stream.timepoint)
+util.func private @br(%arg0: !stream.resource<external>, %arg1: !stream.resource<transient>) {
   // NOTE: there will be extra stuff here from the arg insertion. The branch
   // consumes the unready resources and we expect the args to be passed directly
   // to the cf.br.
 
-  // CHECK: cf.br ^bb1(%[[TIMEPOINT0]], %[[UNREADY0]], %[[TIMEPOINT1]], %[[UNREADY1]]
+  // CHECK: cf.br ^bb1(%[[UNREADY0]], %[[TIMEPOINT0]], %[[UNREADY1]], %[[TIMEPOINT1]]
   cf.br ^bb1(%arg0, %arg1 : !stream.resource<external>, !stream.resource<transient>)
 
-// CHECK-NEXT: ^bb1(%[[BB1_TIMEPOINT0:.+]]: !stream.timepoint, %[[BB1_UNREADY0:.+]]: !stream.resource<external>,
-// CHECK-SAME:      %[[BB1_TIMEPOINT1:.+]]: !stream.timepoint, %[[BB1_UNREADY1:.+]]: !stream.resource<transient>):
+// CHECK-NEXT: ^bb1(%[[BB1_UNREADY0:.+]]: !stream.resource<external>, %[[BB1_TIMEPOINT0:.+]]: !stream.timepoint,
+// CHECK-SAME:      %[[BB1_UNREADY1:.+]]: !stream.resource<transient>, %[[BB1_TIMEPOINT1:.+]]: !stream.timepoint):
 ^bb1(%bb1_arg0: !stream.resource<external>, %bb1_arg1: !stream.resource<transient>):
   // CHECK-NEXT: %[[SIZE0:.+]] = stream.resource.size %[[BB1_UNREADY0]] : !stream.resource<external>
   // CHECK-NEXT: %[[READY0:.+]] = stream.timepoint.await %[[BB1_TIMEPOINT0]] => %[[BB1_UNREADY0]] : !stream.resource<external>{%8}
@@ -151,7 +152,7 @@ func.func private @br(%arg0: !stream.resource<external>, %arg1: !stream.resource
   util.optimization_barrier %bb1_arg0 : !stream.resource<external>
   // CHECK-NEXT: util.optimization_barrier %[[READY1]]
   util.optimization_barrier %bb1_arg1 : !stream.resource<transient>
-  return
+  util.return
 }
 
 // -----
@@ -159,21 +160,21 @@ func.func private @br(%arg0: !stream.resource<external>, %arg1: !stream.resource
 // Tests switch terminator expansion similar to a branch test above.
 
 // CHECK-LABEL: @switch
-// CHECK-SAME: (%[[TIMEPOINT0:.+]]: !stream.timepoint, %[[UNREADY0:.+]]: !stream.resource<external>,
-// CHECK-SAME:  %[[TIMEPOINT1:.+]]: !stream.timepoint, %[[UNREADY1:.+]]: !stream.resource<transient>)
-func.func private @switch(%arg0: !stream.resource<external>, %arg1: !stream.resource<transient>) {
+// CHECK-SAME: (%[[UNREADY0:.+]]: !stream.resource<external>, %[[TIMEPOINT0:.+]]: !stream.timepoint,
+// CHECK-SAME:  %[[UNREADY1:.+]]: !stream.resource<transient>, %[[TIMEPOINT1:.+]]: !stream.timepoint)
+util.func private @switch(%arg0: !stream.resource<external>, %arg1: !stream.resource<transient>) {
   %flag = arith.constant 1 : i32
 
   // CHECK:      cf.switch
-  // CHECK-NEXT: default: ^bb1(%[[TIMEPOINT0]], %[[UNREADY0]], %[[TIMEPOINT1]], %[[UNREADY1]]
-  // CHECK-NEXT: 0: ^bb1(%[[TIMEPOINT0]], %[[UNREADY0]], %[[TIMEPOINT1]], %[[UNREADY1]]
+  // CHECK-NEXT: default: ^bb1(%[[UNREADY0]], %[[TIMEPOINT0]], %[[UNREADY1]], %[[TIMEPOINT1]]
+  // CHECK-NEXT: 0: ^bb1(%[[UNREADY0]], %[[TIMEPOINT0]], %[[UNREADY1]], %[[TIMEPOINT1]]
   cf.switch %flag : i32, [
     default: ^bb1(%arg0, %arg1 : !stream.resource<external>, !stream.resource<transient>),
     0: ^bb1(%arg0, %arg1 : !stream.resource<external>, !stream.resource<transient>)
   ]
 
-// CHECK: ^bb1(%[[BB1_TIMEPOINT0:.+]]: !stream.timepoint, %[[BB1_UNREADY0:.+]]: !stream.resource<external>,
-// CHECK-SAME:      %[[BB1_TIMEPOINT1:.+]]: !stream.timepoint, %[[BB1_UNREADY1:.+]]: !stream.resource<transient>):
+//      CHECK: ^bb1(%[[BB1_UNREADY0:.+]]: !stream.resource<external>, %[[BB1_TIMEPOINT0:.+]]: !stream.timepoint,
+// CHECK-SAME:      %[[BB1_UNREADY1:.+]]: !stream.resource<transient>, %[[BB1_TIMEPOINT1:.+]]: !stream.timepoint):
 ^bb1(%bb1_arg0: !stream.resource<external>, %bb1_arg1: !stream.resource<transient>):
   // CHECK-NEXT: %[[SIZE0:.+]] = stream.resource.size %[[BB1_UNREADY0]] : !stream.resource<external>
   // CHECK-NEXT: %[[READY0:.+]] = stream.timepoint.await %[[BB1_TIMEPOINT0]] => %[[BB1_UNREADY0]] : !stream.resource<external>{%8}
@@ -184,7 +185,7 @@ func.func private @switch(%arg0: !stream.resource<external>, %arg1: !stream.reso
   util.optimization_barrier %bb1_arg0 : !stream.resource<external>
   // CHECK-NEXT: util.optimization_barrier %[[READY1]]
   util.optimization_barrier %bb1_arg1 : !stream.resource<transient>
-  return
+  util.return
 }
 
 // -----
@@ -196,9 +197,9 @@ func.func private @switch(%arg0: !stream.resource<external>, %arg1: !stream.reso
 // This rotates waits on producers to waits on consumers.
 
 // CHECK-LABEL: @asyncExecuteConsume
-// CHECK-SAME: (%[[TIMEPOINT0:.+]]: !stream.timepoint, %[[UNREADY0:.+]]: !stream.resource<external>,
-// CHECK-SAME:  %[[TIMEPOINT1:.+]]: !stream.timepoint, %[[UNREADY1:.+]]: !stream.resource<transient>)
-func.func private @asyncExecuteConsume(%arg0: !stream.resource<external>, %arg1: !stream.resource<transient>) {
+// CHECK-SAME: (%[[UNREADY0:.+]]: !stream.resource<external>, %[[TIMEPOINT0:.+]]: !stream.timepoint,
+// CHECK-SAME:  %[[UNREADY1:.+]]: !stream.resource<transient>, %[[TIMEPOINT1:.+]]: !stream.timepoint)
+util.func private @asyncExecuteConsume(%arg0: !stream.resource<external>, %arg1: !stream.resource<transient>) {
   // NOTE: there will be extra stuff here from the arg insertion. The execution
   // region consumes the unready resources and we expect the args to be captured
   // directly.
@@ -219,5 +220,6 @@ func.func private @asyncExecuteConsume(%arg0: !stream.resource<external>, %arg1:
   %ready_results:2 = stream.timepoint.await %results_timepoint => %results#0, %results#1 : !stream.resource<external>{%arg0_size}, !stream.resource<transient>{%arg1_size}
   util.optimization_barrier %ready_results#0 : !stream.resource<external>
   util.optimization_barrier %ready_results#1 : !stream.resource<transient>
-  return
+
+  util.return
 }

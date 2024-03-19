@@ -71,6 +71,16 @@ typedef struct iree_hal_hip_device_params_t {
   // Specifies how command buffers are recorded and executed.
   iree_hal_hip_command_buffer_mode_t command_buffer_mode;
 
+  // Enables tracing of command buffers when IREE tracing is enabled.
+  // May take advantage of additional extensions for more accurate timing or
+  // hardware-specific performance counters.
+  //
+  // NOTE: tracing has a non-trivial overhead and will skew the timing of
+  // submissions and introduce false barriers between dispatches. Use this to
+  // identify slow dispatches and refine from there; be wary of whole-program
+  // tracing with this enabled.
+  bool stream_tracing;
+
   // Whether to use async allocations even if reported as available by the
   // device. Defaults to true when the device supports it.
   bool async_allocations;

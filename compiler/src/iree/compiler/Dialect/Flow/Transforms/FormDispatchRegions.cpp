@@ -6,13 +6,13 @@
 
 #include "iree/compiler/Dialect/Flow/Transforms/FormDispatchRegions.h"
 
-#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/ConvertRegionToWorkgroups.h"
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
@@ -58,8 +58,8 @@ SmallVector<tensor::DimOp> TensorDimTrackingRewriter::getTensorDimOps() {
     result.push_back(cast<tensor::DimOp>(op));
   return result;
 }
-void TensorDimTrackingRewriter::notifyOperationRemoved(Operation *op) {
-  IRRewriter::Listener::notifyOperationRemoved(op);
+void TensorDimTrackingRewriter::notifyOperationErased(Operation *op) {
+  IRRewriter::Listener::notifyOperationErased(op);
   if (isa<tensor::DimOp>(op))
     dimOps.erase(op);
 }
@@ -99,8 +99,8 @@ LogicalResult simplifyDimOps(RewriterBase &rewriter,
 
     // Try to simplify dynamic dims.
     SmallVector<Value> dynamicDims;
-    if (failed(Flow::reifyDynamicResultDims(rewriter, dimOp.getSource(),
-                                            dynamicDims)))
+    if (failed(IREE::Flow::reifyDynamicResultDims(rewriter, dimOp.getSource(),
+                                                  dynamicDims)))
       return failure();
     unsigned ctr = 0;
     for (int64_t i = 0; i < *dimOp.getConstantIndex(); ++i)
@@ -216,6 +216,10 @@ static bool hasFusableUnpackProducer(linalg::LinalgOp linalgOp) {
 /// formation.
 static bool isRootOp(Operation *op) {
   if (op->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>()) {
+    return false;
+  }
+  // Dequantization-like ops get cloned into dispatches later.
+  if (isDequantizationLikeOp(op)) {
     return false;
   }
   // Any Linalg named op or generic op with reduction iterator types is a root
@@ -821,7 +825,7 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
 // Dispatch region formation
 //===----------------------------------------------------------------------===//
 
-/// Create Flow::DispatchGroupsOps based on a fusion heuristic.
+/// Create IREE::Flow::DispatchGroupsOps based on a fusion heuristic.
 static LogicalResult
 createFusionGroups(TensorDimTrackingRewriter &rewriter,
                    mlir::FunctionOpInterface funcOp,
@@ -856,19 +860,20 @@ createFusionGroups(TensorDimTrackingRewriter &rewriter,
 
   // Step 2. Create a DispatchRegionOp for every fusion group.
   OpBuilder::InsertionGuard g(rewriter);
-  SmallVector<Flow::DispatchRegionOp> regionOps;
+  SmallVector<IREE::Flow::DispatchRegionOp> regionOps;
   for (const auto &it : llvm::enumerate(roots)) {
     // Simplify tensor::DimOps.
     {
       SmallVector<tensor::DimOp> dimOps = rewriter.getTensorDimOps();
-      if (failed(iree_compiler::IREE::Flow::simplifyDimOps(rewriter, dimOps))) {
+      if (failed(IREE::Flow::simplifyDimOps(rewriter, dimOps))) {
         return failure();
       }
     }
 
     // Create fusion group.
-    Flow::DispatchRegionOp regionOp;
-    auto maybeRegionOp = Flow::wrapOpInDispatchRegion(rewriter, it.value());
+    IREE::Flow::DispatchRegionOp regionOp;
+    auto maybeRegionOp =
+        IREE::Flow::wrapOpInDispatchRegion(rewriter, it.value());
     if (failed(maybeRegionOp))
       return failure();
     regionOp = *maybeRegionOp;
@@ -884,8 +889,7 @@ createFusionGroups(TensorDimTrackingRewriter &rewriter,
       // Simplify tensor::DimOps.
       {
         SmallVector<tensor::DimOp> dimOps = rewriter.getTensorDimOps();
-        if (failed(
-                iree_compiler::IREE::Flow::simplifyDimOps(rewriter, dimOps))) {
+        if (failed(IREE::Flow::simplifyDimOps(rewriter, dimOps))) {
           return failure();
         }
       }
@@ -899,7 +903,7 @@ createFusionGroups(TensorDimTrackingRewriter &rewriter,
     // Simplify tensor::DimOps.
     {
       SmallVector<tensor::DimOp> dimOps = rewriter.getTensorDimOps();
-      if (failed(iree_compiler::IREE::Flow::simplifyDimOps(rewriter, dimOps))) {
+      if (failed(IREE::Flow::simplifyDimOps(rewriter, dimOps))) {
         return failure();
       }
     }

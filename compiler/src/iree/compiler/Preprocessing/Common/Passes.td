@@ -9,12 +9,33 @@
 
 include "mlir/Pass/PassBase.td"
 
+def ApplyPDLPatterns : Pass<"iree-preprocessing-apply-pdl-patterns", "ModuleOp"> {
+  let summary = "Parse an input file containing PDL patterns and apply them as patterns";
+  let options = [
+    Option<"patternsFile", "patterns-file", "std::string",
+      /*default=*/"", "File path to file containing PDL patterns to use.">,
+  ];
+}
+
 def ConvertConv2DToImg2Col :
     Pass<"iree-preprocessing-convert-conv2d-to-img2col", ""> {
   let summary = "Convert linalg convolution ops to matmul img2col based implementation";
   let constructor = "mlir::iree_compiler::Preprocessing::createConvertConv2DToImg2ColPass()";
   let dependentDialects = [
     "mlir::linalg::LinalgDialect",
+  ];
+}
+
+def ConvertConvToChannelsLast :
+    Pass<"iree-preprocessing-convert-conv-to-channels-last", ""> {
+  let summary = "Convert linalg convolutions to channels last.";
+  let constructor =
+      "mlir::iree_compiler::Preprocessing::createConvertConvToChannelsLastPass()";
+  let options = [
+    Option<"tileSize", "tile-size", "int",
+           /*default=*/"0",
+           "Tiling factor for the channel dimension of NCHW-like convolutions. "
+           "Defaults to fully transposing all channel-like dimensions">,
   ];
 }
 

@@ -15,7 +15,6 @@
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -672,6 +671,12 @@ struct CmdDispatchOpPattern
     auto loc = dispatchOp.getLoc();
     auto commandBuffer = mapping->lookupCommandBufferFor(dispatchOp);
 
+    // TODO(multi-device): reusable command buffers done at the stream level may
+    // make this difficult. For now we assume each stream region being lowered
+    // has a singular affinity that may itself reference multiple devices in the
+    // future but currently uniquely identifies a device.
+    auto affinityAttr = IREE::Stream::AffinityAttr::lookup(dispatchOp);
+
     // Get the device handle we're executing against in this execution region.
     // Note that this is a dynamic value: we have to treat the device as unknown
     // here.
@@ -715,14 +720,19 @@ struct CmdDispatchOpPattern
       auto caseBuilder = OpBuilder::atBlockBegin(&caseBlock);
 
       // Record push constants and buffer bindings.
-      recordParameters(loc, device, commandBuffer, dispatchOp, adaptor,
-                       exportOp.getLayout(), caseBuilder);
+      recordParameters(loc, affinityAttr, device, commandBuffer, exportOp,
+                       dispatchOp, adaptor, caseBuilder);
 
       // Dispatch with a target-specific workgroup count.
       auto caseWorkgroupCount = exportOp.calculateWorkgroupCount(
           loc, device, adaptor.getWorkload(), caseBuilder);
-      caseBuilder.create<IREE::HAL::CommandBufferDispatchSymbolOp>(
-          loc, commandBuffer, entryPointAttr, caseWorkgroupCount[0],
+      Value executable = caseBuilder.create<IREE::HAL::ExecutableLookupOp>(
+          loc, caseBuilder.getType<IREE::HAL::ExecutableType>(), device,
+          entryPointAttr.getRootReference().getValue());
+      Value ordinal = caseBuilder.create<IREE::HAL::ExecutableExportOrdinalOp>(
+          loc, caseBuilder.getIndexType(), entryPointAttr);
+      caseBuilder.create<IREE::HAL::CommandBufferDispatchOp>(
+          loc, commandBuffer, executable, ordinal, caseWorkgroupCount[0],
           caseWorkgroupCount[1], caseWorkgroupCount[2]);
 
       caseBuilder.create<scf::YieldOp>(loc);
@@ -737,11 +747,12 @@ struct CmdDispatchOpPattern
     return success();
   }
 
-  void recordParameters(Location loc, Value device, Value commandBuffer,
+  void recordParameters(Location loc, IREE::Stream::AffinityAttr affinityAttr,
+                        Value device, Value commandBuffer,
+                        IREE::HAL::ExecutableExportOp exportOp,
                         IREE::Stream::CmdDispatchOp dispatchOp,
-                        OpAdaptor adaptor,
-                        IREE::HAL::PipelineLayoutAttr layoutAttr,
-                        OpBuilder &builder) const {
+                        OpAdaptor adaptor, OpBuilder &builder) const {
+    auto layoutAttr = exportOp.getLayout();
     auto pipelineLayout =
         builder
             .create<IREE::HAL::PipelineLayoutLookupOp>(
@@ -766,12 +777,6 @@ struct CmdDispatchOpPattern
           builder.getIndexAttr(pushConstantBase), pushConstants);
     }
 
-    // TODO(benvanik): typed accessors for bindings.
-    auto bindingAttrs = llvm::dyn_cast_if_present<ArrayAttr>(
-        dispatchOp->getAttr("hal.interface.bindings"));
-    assert(bindingAttrs &&
-           "interface materialization must annotate dispatch sites");
-
     // Push descriptor bindings.
     int64_t currentSet = -1;
     SmallVector<IREE::HAL::DescriptorSetBindingValue> bindings;
@@ -780,9 +785,9 @@ struct CmdDispatchOpPattern
           loc, commandBuffer, pipelineLayout, currentSet, bindings);
       bindings.clear();
     };
-    for (unsigned i = 0; i < adaptor.getResources().size(); ++i) {
-      auto bindingAttr =
-          llvm::cast<IREE::HAL::InterfaceBindingAttr>(bindingAttrs[i]);
+    auto bindingAttrs = IREE::HAL::getInterfaceBindingAttrs(
+        exportOp, dispatchOp.getResources().size());
+    for (auto [i, bindingAttr] : llvm::enumerate(bindingAttrs)) {
       int64_t set = bindingAttr.getSet();
       if (currentSet != -1 && currentSet != set)
         flushSet();
@@ -818,13 +823,14 @@ struct CmdFuncOpPattern
                                                 newResultTypes))) {
       return rewriter.notifyMatchFailure(funcOp, "failed to convert types");
     }
-    auto newOp = rewriter.replaceOpWithNewOp<func::FuncOp>(
-        funcOp, funcOp.getName(),
+    auto newOp = rewriter.replaceOpWithNewOp<IREE::Util::FuncOp>(
+        funcOp, funcOp.getNameAttr(),
         rewriter.getFunctionType(newArgTypes, newResultTypes),
-        funcOp.getSymVisibilityAttr(),
+        /*tied_operands=*/ArrayAttr{}, funcOp.getSymVisibilityAttr(),
         rewriter.getArrayAttr(
             ArrayRef<Attribute>(newArgAttrs.data(), newArgAttrs.size())),
-        funcOp.getAllResultAttrs());
+        funcOp.getAllResultAttrs(),
+        /*inlining_policy=*/IREE::Util::InliningPolicyAttrInterface{});
     newOp->setDialectAttrs(funcOp->getDialectAttrs());
     return success();
   }
@@ -867,8 +873,9 @@ struct CmdCallOpPattern
       llvm::append_range(resultTypes, convertedTypes);
     }
 
-    rewriter.replaceOpWithNewOp<func::CallOp>(callOp, callOp.getCalleeAttr(),
-                                              resultTypes, operands);
+    rewriter.replaceOpWithNewOp<IREE::Util::CallOp>(
+        callOp, resultTypes, callOp.getCallee(), operands,
+        /*tied_operands=*/ArrayAttr{});
     return success();
   }
 };

@@ -9,7 +9,7 @@
   ]>
 ]>
 hal.executable private @complex_executable {
-  hal.executable.variant @vulkan_spirv_fb target(<"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader, GroupNonUniformShuffle], []>, Unknown:IntegratedGPU, #spirv.resource_limits<
         max_compute_shared_memory_size = 32768,
         max_compute_workgroup_invocations = 512,
@@ -18,7 +18,7 @@ hal.executable private @complex_executable {
     }>) {
     hal.executable.export public @complex_view_as_real ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_slice 
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {

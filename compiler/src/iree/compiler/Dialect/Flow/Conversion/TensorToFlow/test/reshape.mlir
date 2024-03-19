@@ -1,6 +1,6 @@
 // RUN: iree-opt --iree-flow-convert-to-flow --split-input-file %s | FileCheck %s
 
-func.func @turn_fill_into_splat(%arg0: tensor<?x?xf32>, %arg1: tensor<f32>, %arg2: index, %arg3: index, %arg4: index, %arg5: index) -> tensor<?x?xf32> {
+ util.func public @turn_fill_into_splat(%arg0: tensor<?x?xf32>, %arg1: tensor<f32>, %arg2: index, %arg3: index, %arg4: index, %arg5: index) -> tensor<?x?xf32> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %0 = tensor.extract %arg1[] : tensor<f32>
@@ -11,11 +11,11 @@ func.func @turn_fill_into_splat(%arg0: tensor<?x?xf32>, %arg1: tensor<f32>, %arg
   %5 = tensor.empty(%3, %4) : tensor<?x?xf32>
   %6 = linalg.fill ins(%0 : f32) outs(%5 : tensor<?x?xf32>) -> tensor<?x?xf32>
   %7 = flow.tensor.update %arg0, %6[%arg2, %arg3] : tensor<?x?xf32>{%1, %2} -> %6 as tensor<?x?xf32>{%3, %4}
-  return %7 : tensor<?x?xf32>
+  util.return %7 : tensor<?x?xf32>
 }
 
 //       CHECK: #[[MAP:.+]] = affine_map<(d0)[s0, s1] -> (d0 + s0 + s1)>
-//       CHECK: func.func @turn_fill_into_splat
+//       CHECK:  util.func public @turn_fill_into_splat
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
 //  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9]+]]: tensor<f32>
 //  CHECK-SAME:   %[[ARG2:[a-zA-Z0-9]+]]: index
@@ -34,17 +34,17 @@ func.func @turn_fill_into_splat(%arg0: tensor<?x?xf32>, %arg1: tensor<f32>, %arg
 
 // -----
 
-func.func @static_tensor_reshape(%arg0: tensor<2x4xf32>, %arg1: tensor<2xindex>) -> tensor<1x8xf32> {
+ util.func public @static_tensor_reshape(%arg0: tensor<2x4xf32>, %arg1: tensor<2xindex>) -> tensor<1x8xf32> {
   // CHECK-DAG: %[[RESULT:.*]] = flow.tensor.reshape %arg0 : tensor<2x4xf32> -> tensor<1x8xf32>
-  // CHECK: return %[[RESULT]]
+  // CHECK: util.return %[[RESULT]]
   %0 = tensor.reshape %arg0(%arg1)
              : (tensor<2x4xf32>, tensor<2xindex>) -> tensor<1x8xf32>
-  return %0 : tensor<1x8xf32> }
+  util.return %0 : tensor<1x8xf32> }
 
 // -----
 
-  func.func @dynamic_tensor_reshape(%arg0: tensor<2x4xf32>, %arg1: tensor<2xindex>) -> tensor<?x?xf32> {
-  //      CHECK: func.func @dynamic_tensor_reshape
+   util.func public @dynamic_tensor_reshape(%arg0: tensor<2x4xf32>, %arg1: tensor<2xindex>) -> tensor<?x?xf32> {
+  //      CHECK:  util.func public @dynamic_tensor_reshape
   // CHECK-SAME:     %[[ARG0:.+]]: tensor<2x4xf32>
   // CHECK-SAME:     %[[ARG1:.+]]: tensor<2xindex>
   // CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
@@ -52,29 +52,29 @@ func.func @static_tensor_reshape(%arg0: tensor<2x4xf32>, %arg1: tensor<2xindex>)
   // CHECK-DAG: %[[VAL:.+]] = flow.tensor.load %[[ARG1]][%[[C0]]] : tensor<2xindex>
   // CHECK-DAG: %[[VAL1:.+]] = flow.tensor.load %[[ARG1]][%[[C1]]] : tensor<2xindex>
   // CHECK-DAG: %[[RESULT:.*]] = flow.tensor.reshape %[[ARG0]] : tensor<2x4xf32> -> tensor<?x?xf32>{%[[VAL]], %[[VAL1]]}
-  // CHECK: return %[[RESULT]]
+  // CHECK: util.return %[[RESULT]]
   %0 = tensor.reshape %arg0(%arg1)
              : (tensor<2x4xf32>, tensor<2xindex>) -> tensor<?x?xf32>
-  return %0 : tensor<?x?xf32> }
+  util.return %0 : tensor<?x?xf32> }
 
   // -----
 
-  func.func @mix_dynamic_and_static_tensor_reshape(%arg0: tensor<2x4xf32>, %arg1: tensor<2xindex>) -> tensor<1x?xf32> {
-  //      CHECK: func.func @mix_dynamic_and_static_tensor_reshape
+   util.func public @mix_dynamic_and_static_tensor_reshape(%arg0: tensor<2x4xf32>, %arg1: tensor<2xindex>) -> tensor<1x?xf32> {
+  //      CHECK:  util.func public @mix_dynamic_and_static_tensor_reshape
   // CHECK-SAME:     %[[ARG0:.+]]: tensor<2x4xf32>
   // CHECK-SAME:     %[[ARG1:.+]]: tensor<2xindex>
   // CHECK-DAG: %[[C1:.*]] = arith.constant 1 : index
   // CHECK-DAG: %[[VAL:.+]] = flow.tensor.load %[[ARG1]][%[[C1]]] : tensor<2xindex>
   // CHECK-DAG: %[[RESULT:.*]] = flow.tensor.reshape %[[ARG0]] : tensor<2x4xf32> -> tensor<1x?xf32>{%[[VAL]]}
-  // CHECK: return %[[RESULT]]
+  // CHECK: util.return %[[RESULT]]
   %0 = tensor.reshape %arg0(%arg1)
              : (tensor<2x4xf32>, tensor<2xindex>) -> tensor<1x?xf32>
-  return %0 : tensor<1x?xf32> }
+  util.return %0 : tensor<1x?xf32> }
 
   // -----
 
-  func.func @dynamic_input_and_output_tensor_reshape(%arg0: tensor<?x4xf32>, %arg1: tensor<2xindex>) -> tensor<1x?xf32> {
-  //      CHECK: func.func @dynamic_input_and_output_tensor_reshape
+   util.func public @dynamic_input_and_output_tensor_reshape(%arg0: tensor<?x4xf32>, %arg1: tensor<2xindex>) -> tensor<1x?xf32> {
+  //      CHECK:  util.func public @dynamic_input_and_output_tensor_reshape
   // CHECK-SAME:     %[[ARG0:.+]]: tensor<?x4xf32>
   // CHECK-SAME:     %[[ARG1:.+]]: tensor<2xindex>
   // CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
@@ -82,18 +82,18 @@ func.func @static_tensor_reshape(%arg0: tensor<2x4xf32>, %arg1: tensor<2xindex>)
   // CHECK-DAG: %[[D0:.*]] = tensor.dim %[[ARG0]], %[[C0]] : tensor<?x4xf32>
   // CHECK-DAG: %[[VAL:.+]] = flow.tensor.load %[[ARG1]][%[[C1]]] : tensor<2xindex>
   // CHECK-DAG: %[[RESULT:.*]] = flow.tensor.reshape %[[ARG0]] : tensor<?x4xf32>{%[[D0]]} -> tensor<1x?xf32>{%[[VAL]]}
-  // CHECK: return %[[RESULT]]
+  // CHECK: util.return %[[RESULT]]
   %0 = tensor.reshape %arg0(%arg1)
              : (tensor<?x4xf32>, tensor<2xindex>) -> tensor<1x?xf32>
-  return %0 : tensor<1x?xf32> }
+  util.return %0 : tensor<1x?xf32> }
 
   // -----
-  func.func @from_elements_test_reshape(%arg0: tensor<?x4xf32>, %arg1: index, %arg2: index) -> tensor<?x1xf32> {
+   util.func public @from_elements_test_reshape(%arg0: tensor<?x4xf32>, %arg1: index, %arg2: index) -> tensor<?x1xf32> {
   // CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
   // CHECK-DAG: %[[D1:.*]] = tensor.dim %arg0, %[[C0:.*]] : tensor<?x4xf32>
   // CHECK-DAG: %[[RESULT:.*]] = flow.tensor.reshape %arg0 : tensor<?x4xf32>{%[[D1]]} -> tensor<?x1xf32>{%arg1}
-  // CHECK: return %[[RESULT]]
+  // CHECK: util.return %[[RESULT]]
   %0 = tensor.from_elements %arg1, %arg2 : tensor<2xindex>
   %1 = tensor.reshape %arg0(%0)
              : (tensor<?x4xf32>, tensor<2xindex>) -> tensor<?x1xf32>
-  return %1 : tensor<?x1xf32> }
+  util.return %1 : tensor<?x1xf32> }

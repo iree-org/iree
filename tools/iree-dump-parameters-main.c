@@ -110,6 +110,7 @@ static iree_status_t iree_tooling_extract_parameters(
 //===----------------------------------------------------------------------===//
 
 int main(int argc, char** argv) {
+  IREE_TRACE_APP_ENTER();
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_allocator_t host_allocator = iree_allocator_system();
@@ -126,6 +127,7 @@ int main(int argc, char** argv) {
             "Use one or more --parameters=file.ext flags to specify parameter "
             "files.\n");
     IREE_TRACE_ZONE_END(z0);
+    IREE_TRACE_APP_EXIT(exit_code);
     return EXIT_FAILURE;
   }
 
@@ -164,5 +166,6 @@ int main(int argc, char** argv) {
   fflush(stderr);
 
   IREE_TRACE_ZONE_END(z0);
+  IREE_TRACE_APP_EXIT(exit_code);
   return exit_code;
 }

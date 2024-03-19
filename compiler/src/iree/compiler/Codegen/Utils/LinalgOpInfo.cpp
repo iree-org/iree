@@ -73,7 +73,8 @@ LinalgOpInfo::LinalgOpInfo(linalg::LinalgOp linalgOp,
 //   * Consider transpose + reductions.
 //   * Consider input and output transposes.
 static SmallVector<OpOperand *>
-computeTransposeInfo(LinalgOp linalgOp, TransposeMapFilter transposeMapFilter) {
+computeTransposeInfo(LinalgOp linalgOp,
+                     LinalgOpInfo::TransposeMapFilter transposeMapFilter) {
   SmallVector<OpOperand *> transposeOperands;
 
   // Reductions are not supported.
@@ -122,6 +123,28 @@ void LinalgOpInfo::computeInfo(LinalgOp linalgOp) {
   transposeOperands = computeTransposeInfo(linalgOp, transposeMapFilter);
   reductionTrait = computeReductionInfo(linalgOp);
   dynamicTrait = computeDynamicInfo(linalgOp);
+}
+
+bool isMatmulOrBatchMatmul(linalg::LinalgOp linalgOp) {
+  // (Batch) matmul should be a reduction op with 2/3 parallel dimensions.
+  if (!linalg::isaContractionOpInterface(linalgOp) ||
+      !llvm::is_contained({2u, 3u}, linalgOp.getNumParallelLoops()))
+    return false;
+
+  // Also exclude the case of matvec, which has only one non-unit parallel dim.
+  // They should go down different pipelines.
+  int nonUnitParallelDimCount = 0;
+  SmallVector<int64_t, 4> bounds = linalgOp.getStaticLoopRanges();
+  FailureOr<mlir::linalg::ContractionDimensions> contractionDims =
+      mlir::linalg::inferContractionDims(linalgOp);
+  assert(succeeded(contractionDims) && "Could not infer contraction dims");
+  for (auto mDim : contractionDims->m) {
+    nonUnitParallelDimCount += bounds[mDim] != 1;
+  }
+  for (auto nDim : contractionDims->n) {
+    nonUnitParallelDimCount += bounds[nDim] != 1;
+  }
+  return nonUnitParallelDimCount > 1;
 }
 
 } // namespace mlir::iree_compiler

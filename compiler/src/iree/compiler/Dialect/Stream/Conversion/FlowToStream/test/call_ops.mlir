@@ -8,14 +8,14 @@ flow.func private @basicExtern(%arg0: tensor<?xf32>, %arg1: index) -> tensor<?xf
 
 // CHECK-LABEL: @basicCall
 // CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<*>, %[[SIZE0:.+]]: index, %[[DIM0:.+]]: index)
-func.func @basicCall(%arg0: tensor<?xf32>, %dim0: index) -> tensor<?xf32> {
+util.func public @basicCall(%arg0: tensor<?xf32>, %dim0: index) -> tensor<?xf32> {
   %c0 = arith.constant 0 : index
   // CHECK: %[[RESULT_SIZE:.+]] = stream.tensor.sizeof tensor<?xf32>{%[[DIM0]]}
   // CHECK: %[[CALL:.+]] = stream.async.call @basicExtern
   // CHECK-SAME: (%[[ARG0]][%c0 to %[[SIZE0]] for %[[SIZE0]]], %[[DIM0]]) : (!stream.resource<*>{%[[SIZE0]]}, index) -> !stream.resource<*>{%[[RESULT_SIZE]]}
   %call = flow.call @basicExtern(%arg0, %dim0) : (tensor<?xf32>{%dim0}, index) -> tensor<?xf32>{%dim0}
-  // CHECK: return %[[CALL]], %[[RESULT_SIZE]]
-  return %call : tensor<?xf32>
+  // CHECK: util.return %[[CALL]], %[[RESULT_SIZE]]
+  util.return %call : tensor<?xf32>
 }
 
 // -----
@@ -28,12 +28,12 @@ flow.func private @inplaceExtern(%arg0: tensor<?xf32>, %arg1: index) -> tensor<?
 
 // CHECK-LABEL: @inplaceCall
 // CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<*>, %[[SIZE0:.+]]: index, %[[DIM0:.+]]: index)
-func.func @inplaceCall(%arg0: tensor<?xf32>, %dim0: index) -> tensor<?xf32> {
+util.func public @inplaceCall(%arg0: tensor<?xf32>, %dim0: index) -> tensor<?xf32> {
   %c0 = arith.constant 0 : index
   // CHECK: %[[CALL:.+]] = stream.async.call @inplaceExtern(%[[ARG0]][%c0 to %[[SIZE0]] for %[[SIZE0]]], %[[DIM0]]) : (!stream.resource<*>{%[[SIZE0]]}, index) -> %[[ARG0]]{%[[SIZE0]]}
   %call = flow.call @inplaceExtern(%arg0, %dim0) : (tensor<?xf32>{%dim0}, index) -> %arg0{%dim0}
-  // CHECK: return %[[CALL]], %[[SIZE0]]
-  return %call : tensor<?xf32>
+  // CHECK: util.return %[[CALL]], %[[SIZE0]]
+  util.return %call : tensor<?xf32>
 }
 
 // -----
@@ -46,10 +46,10 @@ flow.func private @inplaceTypeChangeExtern(%arg0: tensor<?x4xf32>, %arg1: index)
 
 // CHECK-LABEL: @inplaceTypeChangeCall
 // CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<*>, %[[SIZE0:.+]]: index, %[[DIM0:.+]]: index)
-func.func @inplaceTypeChangeCall(%arg0: tensor<?x4xf32>, %dim0: index) -> tensor<4x?xi32> {
+util.func public @inplaceTypeChangeCall(%arg0: tensor<?x4xf32>, %dim0: index) -> tensor<4x?xi32> {
   %c0 = arith.constant 0 : index
   // CHECK: %[[CALL:.+]] = stream.async.call @inplaceTypeChangeExtern(%[[ARG0]][%c0 to %[[SIZE0]] for %[[SIZE0]]], %[[DIM0]]) : (!stream.resource<*>{%[[SIZE0]]}, index) -> %[[ARG0]]{%[[SIZE0]]}
   %call = flow.call @inplaceTypeChangeExtern(%arg0, %dim0) : (tensor<?x4xf32>{%dim0}, index) -> %arg0 as tensor<4x?xi32>{%dim0}
-  // CHECK: return %[[CALL]], %[[SIZE0]]
-  return %call : tensor<4x?xi32>
+  // CHECK: util.return %[[CALL]], %[[SIZE0]]
+  util.return %call : tensor<4x?xi32>
 }

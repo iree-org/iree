@@ -76,7 +76,7 @@ hal.executable @ex_with_condition {
     hal.executable.condition(%device: !hal.device) -> i1 {
       // CHECK-NEXT: %[[OK:.+]], %[[VALUE:.+]] = hal.device.query<%[[DEVICE]]
       %ok, %value = hal.device.query<%device : !hal.device> key("some" :: "value") : i1, i32
-      // CHECK-NEXT: return %[[OK]]
+      // CHECK-NEXT: hal.return %[[OK]]
       hal.return %ok : i1
     }
 
@@ -144,7 +144,7 @@ hal.executable @ex_with_constants {
 // CHECK-SAME: %[[DEVICE:.+]]: !hal.device,
 // CHECK-SAME: %[[LAYOUT0:.+]]: !hal.pipeline_layout,
 // CHECK-SAME: %[[LAYOUT1:.+]]: !hal.pipeline_layout
-func.func @executable_create(%device: !hal.device,
+util.func public @executable_create(%device: !hal.device,
                         %layout0: !hal.pipeline_layout,
                         %layout1: !hal.pipeline_layout) {
   //      CHECK: = hal.executable.create
@@ -154,7 +154,7 @@ func.func @executable_create(%device: !hal.device,
   %0 = hal.executable.create device(%device : !hal.device)
                              target(@exe::@binary1)
                             layouts([%layout0, %layout1]) : !hal.executable
-  return
+  util.return
 }
 
 // -----
@@ -163,7 +163,7 @@ func.func @executable_create(%device: !hal.device,
 // CHECK-SAME: %[[DEVICE:.+]]: !hal.device,
 // CHECK-SAME: %[[LAYOUT0:.+]]: !hal.descriptor_set_layout,
 // CHECK-SAME: %[[LAYOUT1:.+]]: !hal.descriptor_set_layout
-func.func @pipeline_layout_create(%device: !hal.device,
+util.func public @pipeline_layout_create(%device: !hal.device,
                                %layout0: !hal.descriptor_set_layout,
                                %layout1: !hal.descriptor_set_layout) {
   // CHECK: hal.pipeline_layout.create
@@ -173,7 +173,7 @@ func.func @pipeline_layout_create(%device: !hal.device,
   %0 = hal.pipeline_layout.create device(%device : !hal.device)
                             push_constants(1)
                                    layouts([%layout0, %layout1]) : !hal.pipeline_layout
-  return
+  util.return
 }
 
 // -----
@@ -197,7 +197,7 @@ hal.executable @unresolved_workload_ex {
 // CHECK-LABEL: @unresolved_workload
 // CHECK-SAME: (%[[DEVICE:.+]]: !hal.device,
 // CHECK-SAME:  %[[WORKLOAD_0:.+]]: index, %[[WORKLOAD_1:.+]]: index)
-func.func @unresolved_workload(%device: !hal.device,
+util.func public @unresolved_workload(%device: !hal.device,
                                %workload_0: index, %workload_1: index) -> (index, index, index) {
   // CHECK: %[[WORKGROUP_X:.+]], %[[WORKGROUP_Y:.+]], %[[WORKGROUP_Z:.+]] =
   // CHECK-SAME:   hal.executable.calculate_workgroups
@@ -208,6 +208,6 @@ func.func @unresolved_workload(%device: !hal.device,
       device(%device : !hal.device)
       target(@unresolved_workload_ex::@backend::@entry0)
       workload([%workload_0, %workload_1]) : index, index, index
-  // CHECK: return %[[WORKGROUP_X]], %[[WORKGROUP_Y]], %[[WORKGROUP_Z]]
-  return %workgroups#0, %workgroups#1, %workgroups#2 : index, index, index
+  // CHECK: util.return %[[WORKGROUP_X]], %[[WORKGROUP_Y]], %[[WORKGROUP_Z]]
+  util.return %workgroups#0, %workgroups#1, %workgroups#2 : index, index, index
 }

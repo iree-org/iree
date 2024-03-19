@@ -8,8 +8,8 @@
 stream.executable private @specializeEx {
   stream.executable.export public @dispatch
   builtin.module  {
-    // CHECK: func.func @dispatch(%[[BINDING:.+]]: !stream.binding, %[[A:.+]]: i32, %[[SITE:.+]]: index)
-    func.func @dispatch(%binding: !stream.binding, %a: i32, %b: index, %c: i1, %d: i1) {
+    // CHECK:  util.func public @dispatch(%[[BINDING:.+]]: !stream.binding, %[[A:.+]]: i32, %[[SITE:.+]]: index)
+     util.func public @dispatch(%binding: !stream.binding, %a: i32, %b: index, %c: i1, %d: i1) {
       // CHECK-NEXT: %[[LUT_I32:.+]] = arith.constant dense<[
       // CHECK-SAME:   [20],
       // CHECK-SAME:   [40]
@@ -35,12 +35,12 @@ stream.executable private @specializeEx {
       util.optimization_barrier %c : i1
       // CHECK-NEXT: util.optimization_barrier %[[D]] : i1
       util.optimization_barrier %d : i1
-      return
+      util.return
     }
   }
 }
-// CHECK: func.func @specialize(%[[A:.+]]: i32)
-func.func @specialize(%a: i32) {
+// CHECK:  util.func public @specialize(%[[A:.+]]: i32)
+util.func public @specialize(%a: i32) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c20 = arith.constant 20 : index
@@ -58,5 +58,5 @@ func.func @specialize(%a: i32) {
       rw %capture[%c0 for %c20] : !stream.resource<transient>{%c20}
     }
   } => !stream.timepoint
-  return
+  util.return
 }

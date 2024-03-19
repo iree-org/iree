@@ -59,6 +59,7 @@ iree_cc_library(
     iree::base::internal::flatcc::parsing
     iree::base::internal::synchronization
     iree::base::internal::threading
+    iree::base::internal::wait_handle
     iree::hal
     iree::hal::utils::collective_batch
     iree::hal::utils::deferred_command_buffer

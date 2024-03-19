@@ -65,7 +65,7 @@ this_dir="$(cd $(dirname $0) && pwd)"
 script_name="$(basename $0)"
 repo_root=$(cd "${this_dir}" && find_git_dir_parent)
 manylinux_docker_image="${manylinux_docker_image:-$(uname -m | awk '{print ($1 == "aarch64") ? "quay.io/pypa/manylinux_2_28_aarch64" : "ghcr.io/nod-ai/manylinux_x86_64:main" }')}"
-python_versions="${override_python_versions:-cp39-cp39 cp310-cp310 cp311-cp311}"
+python_versions="${override_python_versions:-cp39-cp39 cp310-cp310 cp311-cp311 cp312-cp312}"
 output_dir="${output_dir:-${this_dir}/wheelhouse}"
 packages="${packages:-iree-runtime iree-compiler}"
 package_suffix="${package_suffix:-}"

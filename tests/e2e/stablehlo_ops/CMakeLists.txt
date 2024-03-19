@@ -373,7 +373,6 @@ iree_check_single_backend_test_suite(
     "cuda"
   COMPILER_FLAGS
     "--iree-stream-emulate-memset"
-    "--iree-hal-cuda-enable-legacy-sync=false"
   INPUT_TYPE
     "stablehlo"
   RUNNER_ARGS
@@ -455,8 +454,6 @@ iree_check_single_backend_test_suite(
     "cuda"
   DRIVER
     "cuda"
-  COMPILER_FLAGS
-    "--iree-hal-cuda-enable-legacy-sync=false"
   INPUT_TYPE
     "stablehlo"
   RUNNER_ARGS
@@ -535,7 +532,7 @@ iree_check_single_backend_test_suite(
     "transpose.mlir"
     # "while.mlir"  # TODO(#12509): WebGPU SPIR-V broken
   TARGET_BACKEND
-    "webgpu"
+    "webgpu-spirv"
   # Only test compilation for now, the WebGPU driver is not stable/tested yet.
   # DRIVER
   #   "webgpu"

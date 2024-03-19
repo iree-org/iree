@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: @command_buffer_create
 //  CHECK-SAME: (%[[DEVICE:.+]]: !hal.device)
-func.func @command_buffer_create(%device: !hal.device) {
+util.func public @command_buffer_create(%device: !hal.device) {
   //      CHECK: %cmd = hal.command_buffer.create
   // CHECK-SAME:   device(%[[DEVICE]] : !hal.device)
   // CHECK-SAME:   mode(OneShot)
@@ -10,34 +10,34 @@ func.func @command_buffer_create(%device: !hal.device) {
   %cmd = hal.command_buffer.create device(%device : !hal.device)
                                      mode(OneShot)
                                categories("Transfer|Dispatch") : !hal.command_buffer
-  return
+  util.return
 }
 
 // -----
 
 // CHECK-LABEL: @command_buffer_finalize
 //  CHECK-SAME: (%[[CMD:.+]]: !hal.command_buffer)
-func.func @command_buffer_finalize(%cmd: !hal.command_buffer) {
+util.func public @command_buffer_finalize(%cmd: !hal.command_buffer) {
   // CHECK: hal.command_buffer.finalize<%[[CMD]] : !hal.command_buffer>
   hal.command_buffer.finalize<%cmd : !hal.command_buffer>
-  return
+  util.return
 }
 
 // -----
 
 // CHECK-LABEL: @command_buffer_device
 //  CHECK-SAME: (%[[CMD:.+]]: !hal.command_buffer)
-func.func @command_buffer_device(%cmd: !hal.command_buffer) {
+util.func public @command_buffer_device(%cmd: !hal.command_buffer) {
   // CHECK: %0 = hal.command_buffer.device<%[[CMD]] : !hal.command_buffer> : !hal.device
   %0 = hal.command_buffer.device<%cmd : !hal.command_buffer> : !hal.device
-  return
+  util.return
 }
 
 // -----
 
 // CHECK-LABEL: @command_buffer_execution_barrier
 //  CHECK-SAME: (%[[CMD:.+]]: !hal.command_buffer)
-func.func @command_buffer_execution_barrier(%cmd: !hal.command_buffer) {
+util.func public @command_buffer_execution_barrier(%cmd: !hal.command_buffer) {
   //      CHECK: hal.command_buffer.execution_barrier<%[[CMD]] : !hal.command_buffer>
   // CHECK-SAME:   source(CommandIssue)
   // CHECK-SAME:   target(CommandProcess)
@@ -46,7 +46,7 @@ func.func @command_buffer_execution_barrier(%cmd: !hal.command_buffer) {
       source(CommandIssue)
       target(CommandProcess)
       flags(None)
-  return
+  util.return
 }
 
 // -----
@@ -56,7 +56,7 @@ func.func @command_buffer_execution_barrier(%cmd: !hal.command_buffer) {
 //  CHECK-SAME: %[[BUFFER:.+]]: !hal.buffer,
 //  CHECK-SAME: %[[OFFSET:.+]]: index, %[[LENGTH:.+]]: index,
 //  CHECK-SAME: %[[PATTERN:.+]]: i32)
-func.func @command_buffer_fill_buffer(
+util.func public @command_buffer_fill_buffer(
     %cmd: !hal.command_buffer,
     %buffer: !hal.buffer,
     %offset: index,
@@ -68,7 +68,7 @@ func.func @command_buffer_fill_buffer(
   hal.command_buffer.fill_buffer<%cmd : !hal.command_buffer>
       target(%buffer : !hal.buffer)[%offset, %length]
       pattern(%pattern : i32)
-  return
+  util.return
 }
 
 // -----
@@ -78,7 +78,7 @@ func.func @command_buffer_fill_buffer(
 //  CHECK-SAME: %[[BUFFER:.+]]: !hal.buffer,
 //  CHECK-SAME: %[[SRC_OFFSET:.+]]: index, %[[DST_OFFSET:.+]]: index,
 //  CHECK-SAME: %[[LENGTH:.+]]: index)
-func.func @command_buffer_copy_buffer(
+util.func public @command_buffer_copy_buffer(
     %cmd: !hal.command_buffer,
     %buffer: !hal.buffer,
     %src_offset: index,
@@ -93,7 +93,7 @@ func.func @command_buffer_copy_buffer(
       source(%buffer : !hal.buffer)[%src_offset]
       target(%buffer : !hal.buffer)[%dst_offset]
       length(%length)
-  return
+  util.return
 }
 
 // -----
@@ -104,7 +104,7 @@ func.func @command_buffer_copy_buffer(
 //  CHECK-SAME:  %[[PARAM:.+]]: i32,
 //  CHECK-SAME:  %[[SEND_BUFFER:.+]]: !hal.buffer, %[[RECV_BUFFER:.+]]: !hal.buffer,
 //  CHECK-SAME:  %[[COUNT:.+]]: index)
-func.func @command_buffer_collective(
+util.func public @command_buffer_collective(
     %cmd: !hal.command_buffer,
     %channel: !hal.channel,
     %param: i32,
@@ -154,7 +154,7 @@ func.func @command_buffer_collective(
       recv(%recv_buffer : !hal.buffer)[%c20, %c128]
       count(%count)
 
-  return
+  util.return
 }
 
 // -----
@@ -164,7 +164,7 @@ func.func @command_buffer_collective(
 //  CHECK-SAME: %[[LAYOUT:.+]]: !hal.pipeline_layout,
 //  CHECK-SAME: %[[BUFFER:.+]]: !hal.buffer,
 //  CHECK-SAME: %[[SLOT:.+]]: index
-func.func @command_buffer_push_descriptor_set(
+util.func public @command_buffer_push_descriptor_set(
     %cmd: !hal.command_buffer,
     %layout: !hal.pipeline_layout,
     %buffer: !hal.buffer,
@@ -185,7 +185,7 @@ func.func @command_buffer_push_descriptor_set(
         // CHECK-NEXT: %c1 = (%[[SLOT]] : index)[%c4, %c4096]
         %c1 = (%slot : index)[%c4, %c4096]
       ])
-  return
+  util.return
 }
 
 // -----
@@ -203,19 +203,19 @@ hal.executable @ex {
 
 // CHECK-LABEL: @command_buffer_dispatch
 //  CHECK-SAME: (%[[CMD:.+]]: !hal.command_buffer,
-//  CHECK-SAME: %[[X:.+]]: index, %[[Y:.+]]: index, %[[Z:.+]]: index)
-func.func @command_buffer_dispatch(
+//  CHECK-SAME:  %[[EXECUTABLE:.+]]: !hal.executable, %[[ORDINAL:[a-z0-9]+]]: index,
+//  CHECK-SAME:  %[[X:[a-z0-9]+]]: index, %[[Y:[a-z0-9]+]]: index, %[[Z:[a-z0-9]+]]: index)
+util.func public @command_buffer_dispatch(
     %cmd: !hal.command_buffer,
-    %x: index,
-    %y: index,
-    %z: index) {
-  //      CHECK: hal.command_buffer.dispatch.symbol<%[[CMD]] : !hal.command_buffer>
-  // CHECK-SAME:   target(@ex::@backend::@entry0)
+    %executable: !hal.executable, %ordinal: index,
+    %x: index, %y: index, %z: index) {
+  //      CHECK: hal.command_buffer.dispatch<%[[CMD]] : !hal.command_buffer>
+  // CHECK-SAME:   target(%[[EXECUTABLE]] : !hal.executable)[%[[ORDINAL]]
   // CHECK-SAME:   workgroups([%[[X]], %[[Y]], %[[Z]]])
-  hal.command_buffer.dispatch.symbol<%cmd : !hal.command_buffer>
-      target(@ex::@backend::@entry0)
+  hal.command_buffer.dispatch<%cmd : !hal.command_buffer>
+      target(%executable: !hal.executable)[%ordinal]
       workgroups([%x, %y, %z])
-  return
+  util.return
 }
 
 // -----
@@ -233,17 +233,17 @@ hal.executable @ex {
 
 // CHECK-LABEL: @command_buffer_dispatch_indirect
 //  CHECK-SAME: (%[[CMD:.+]]: !hal.command_buffer,
-//  CHECK-SAME:  %[[BUFFER:.+]]: !hal.buffer,
-//  CHECK-SAME:  %[[OFFSET:.+]]: index)
-func.func @command_buffer_dispatch_indirect(
+//  CHECK-SAME:  %[[EXECUTABLE:.+]]: !hal.executable, %[[ORDINAL:.+]]: index,
+//  CHECK-SAME:  %[[BUFFER:.+]]: !hal.buffer, %[[OFFSET:.+]]: index)
+util.func public @command_buffer_dispatch_indirect(
     %cmd: !hal.command_buffer,
-    %buffer: !hal.buffer,
-    %offset: index) {
-  //      CHECK: hal.command_buffer.dispatch.indirect.symbol<%[[CMD]] : !hal.command_buffer>
-  // CHECK-SAME:   target(@ex::@backend::@entry0)
+    %executable: !hal.executable, %ordinal: index,
+    %buffer: !hal.buffer, %offset: index) {
+  //      CHECK: hal.command_buffer.dispatch.indirect<%[[CMD]] : !hal.command_buffer>
+  // CHECK-SAME:   target(%[[EXECUTABLE]] : !hal.executable)[%[[ORDINAL]]
   // CHECK-SAME:   workgroups(%[[BUFFER]] : !hal.buffer)[%[[OFFSET]]]
-  hal.command_buffer.dispatch.indirect.symbol<%cmd : !hal.command_buffer>
-      target(@ex::@backend::@entry0)
+  hal.command_buffer.dispatch.indirect<%cmd : !hal.command_buffer>
+      target(%executable: !hal.executable)[%ordinal]
       workgroups(%buffer : !hal.buffer)[%offset]
-  return
+  util.return
 }

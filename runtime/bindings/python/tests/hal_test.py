@@ -210,6 +210,52 @@ class DeviceHalTest(unittest.TestCase):
         sem1.signal(2)
         self.assertEqual(sem1.query(), 2)
 
+    def testSemaphoreSignal(self):
+        sem = self.device.create_semaphore(0)
+        self.assertFalse(sem.wait(1, deadline=0))
+        sem.signal(1)
+        self.assertTrue(sem.wait(1, deadline=0))
+
+    def testSynchronousSemaphoreFailed(self):
+        sem = self.device.create_semaphore(0)
+        sem.fail("TEST FAILURE")
+        with self.assertRaisesRegex(
+            RuntimeError, "^synchronous semaphore failure.*TEST FAILURE"
+        ):
+            sem.wait(1, deadline=0)
+
+    def testAsynchronousSemaphoreFailed(self):
+        sem = self.device.create_semaphore(0)
+        exceptions = []
+
+        def run():
+            print("SIGNALLING ASYNC FAILURE")
+            time.sleep(0.2)
+            sem.fail("TEST FAILURE")
+            print("SIGNALLED")
+
+        def wait():
+            print("WAITING")
+            try:
+                sem.wait(1)
+            except RuntimeError as e:
+                exceptions.append(e)
+
+        runner = threading.Thread(target=run)
+        waiter = threading.Thread(target=wait)
+        waiter.start()
+        runner.start()
+        waiter.join()
+        runner.join()
+        self.assertTrue(exceptions)
+        print(exceptions)
+        # Note: It is impossible to 100% guarantee that this sequences such as to
+        # report an asynchronous vs synchronous failure, although we tip the odds in
+        # this favor with the sleep in the signalling thread. Therefore, we do not
+        # check the "asynchronous" vs "synchronous" message prefix to avoid flaky
+        # test races.
+        self.assertIn("TEST FAILURE", str(exceptions[0]))
+
     def testTrivialQueueAlloc(self):
         sem = self.device.create_semaphore(0)
         buf = self.device.queue_alloca(

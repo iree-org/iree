@@ -200,8 +200,9 @@ print(iree_results)
 ## :octicons-code-16: Samples
 
 * The
-[tflitehub folder](https://github.com/iree-org/iree-samples/tree/main/tflitehub)
-in the [iree-samples repository](https://github.com/iree-org/iree-samples)
+[tflitehub folder](https://github.com/iree-org/iree-experimental/tree/main/tflitehub)
+in the
+[iree-experimental repository](https://github.com/iree-org/iree-experimental)
 contains test scripts to compile, run, and compare various TensorFlow Lite
 models sourced from [TensorFlow Hub](https://tfhub.dev/).
 

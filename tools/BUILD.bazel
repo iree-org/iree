@@ -25,6 +25,22 @@ package(
 exports_files(["lit.cfg.py"])
 
 iree_runtime_cc_binary(
+    name = "iree-benchmark-executable",
+    srcs = ["iree-benchmark-executable-main.c"],
+    deps = [
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:file_io",
+        "//runtime/src/iree/base/internal:flags",
+        "//runtime/src/iree/hal",
+        "//runtime/src/iree/modules/hal:types",
+        "//runtime/src/iree/testing:benchmark",
+        "//runtime/src/iree/tooling:device_util",
+        "//runtime/src/iree/tooling:function_io",
+        "//runtime/src/iree/vm",
+    ],
+)
+
+iree_runtime_cc_binary(
     name = "iree-benchmark-module",
     srcs = ["iree-benchmark-module-main.cc"],
     deps = [

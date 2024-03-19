@@ -8,7 +8,7 @@
 
 #include <memory>
 
-#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
+#include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "llvm/Support/ToolOutputFile.h"
@@ -80,6 +80,11 @@ static llvm::cl::opt<bool>
                          llvm::cl::desc("Fuse multi-use ops."),
                          llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clEnableElementWiseFuseMultiReduction(
+    "iree-flow-element-wise-fuse-multi-reduction",
+    llvm::cl::desc("Enable element-wise fusion of multi-reduction loop ops."),
+    llvm::cl::init(true));
+
 static llvm::cl::opt<bool> clDispatchGenerateWorkloadRegion(
     "iree-flow-dispatch-generate-workload-region",
     llvm::cl::desc("Generate the workload region."), llvm::cl::init(true));
@@ -121,6 +126,11 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
   // Start of Flow pipeline, verify input legality.
   passManager.addPass(IREE::Flow::createVerifyInputLegalityPass());
 
+  // Inject tensor tracing early as we need to have the tracers in the IR
+  // prior to dispatch region formation where we may lose access to them.
+  FunctionLikeNest(passManager)
+      .addPass(IREE::Flow::createInjectTensorTracingPass);
+
   // Transform pad operations into linalg.fill + tensor.insert_slice.
   // This is a WAR for not having native pad handling.
   if (!clEnablePadHandling && !clEnableFusePaddingIntoLinalgProducerOps) {
@@ -135,9 +145,12 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass)
       // Elementwise fusion.
-      .addPass(
-          []() { return createFusionOfTensorOpsPass(clEnableFuseMultiUse); })
-      .addPredicatedPass(clDetensoring, mlir::createLinalgDetensorizePass)
+      .addPass([]() {
+        return createFusionOfTensorOpsPass(
+            clEnableFuseMultiUse, clEnableElementWiseFuseMultiReduction);
+      })
+      .addPredicatedPass(clDetensoring,
+                         [&]() { return mlir::createLinalgDetensorizePass(); })
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass)
       .addPredicatedPass(clCollapseReductionDims, createCollapseDimsPass)
@@ -262,6 +275,9 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       // match later stages.
       .addPredicatedPass(clTraceDispatchTensors,
                          IREE::Flow::createInjectDispatchTracingPass)
+      // Inject tensor tracing late for any attributes that were added by the
+      // passes above after we've formed dispatch regions.
+      .addPass(IREE::Flow::createInjectTensorTracingPass)
       // Cleanup the IR after we are done.
       .addPass(IREE::Flow::createCleanupTensorShapesPass)
       .addPass(mlir::createCanonicalizerPass)

@@ -109,6 +109,11 @@ module attributes { transform.with_named_sequence } {
     %warp = transform.iree.vector.to_warp_execute_on_lane_0 %if_op { warp_size = 32 } : (!transform.any_op) -> !transform.any_op
     transform.iree.vector.warp_distribute %end_func : (!transform.any_op) -> ()
 
+    // Annotate the exported function as already translated.
+    %exports = transform.structured.match ops{["hal.executable.export"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
+    %none = transform.param.constant #iree_codegen.translation_info<None> -> !transform.any_param
+    transform.annotate %exports "translation_info" = %none : !transform.any_op, !transform.any_param
+
     transform.yield
   }
 } // module

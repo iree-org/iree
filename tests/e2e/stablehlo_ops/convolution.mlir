@@ -22,8 +22,8 @@ func.func @conv2d_nopadding() {
           output_spatial_dimensions = [1, 2]
         >,
         feature_group_count = 1 : i64,
-        rhs_dilation = dense<1> : tensor<2xi64>,
-        window_strides = dense<1> : tensor<2xi64>} : (tensor<1x4x4x2xf32>, tensor<3x2x2x1xf32>) -> tensor<1x2x3x1xf32>
+        rhs_dilation = array<i64: 1, 1>,
+        window_strides = array<i64: 1, 1>} : (tensor<1x4x4x2xf32>, tensor<3x2x2x1xf32>) -> tensor<1x2x3x1xf32>
   check.expect_almost_eq_const(%res, dense<[[
       [[1310.0],[1466.0],[1622.0]],
       [[2090.0],[2246.0],[2402.0]]
@@ -60,8 +60,8 @@ func.func @conv2d_nopadding_batch_feature() {
           output_spatial_dimensions = [1, 2]
         >,
         feature_group_count = 1 : i64,
-        rhs_dilation = dense<1> : tensor<2xi64>,
-        window_strides = dense<1> : tensor<2xi64>} : (tensor<2x4x4x1xf32>, tensor<3x2x2x1xf32>) -> tensor<1x2x3x1xf32>
+        rhs_dilation = array<i64: 1, 1>,
+        window_strides = array<i64: 1, 1>} : (tensor<2x4x4x1xf32>, tensor<3x2x2x1xf32>) -> tensor<1x2x3x1xf32>
   check.expect_almost_eq_const(%res, dense<[[
       [[1310.0],[1466.0],[1622.0]],
       [[2090.0],[2246.0],[2402.0]]
@@ -93,8 +93,8 @@ func.func @conv2d_reorder_input_spatial() {
           output_spatial_dimensions = [1, 2]
         >,
         feature_group_count = 1 : i64,
-        rhs_dilation = dense<1> : tensor<2xi64>,
-        window_strides = dense<1> : tensor<2xi64>} : (tensor<1x4x4x2xf32>, tensor<3x2x2x1xf32>) -> tensor<1x2x3x1xf32>
+        rhs_dilation = array<i64: 1, 1>,
+        window_strides = array<i64: 1, 1>} : (tensor<1x4x4x2xf32>, tensor<3x2x2x1xf32>) -> tensor<1x2x3x1xf32>
   check.expect_almost_eq_const(%res, dense<[[
       [[1310.0],[1466.0],[1622.0]],
       [[2090.0],[2246.0],[2402.0]]
@@ -126,8 +126,8 @@ func.func @conv2d_reorder_kernel() {
           output_spatial_dimensions = [1, 2]
         >,
         feature_group_count = 1 : i64,
-        rhs_dilation = dense<1> : tensor<2xi64>,
-        window_strides = dense<1> : tensor<2xi64>} : (tensor<1x4x4x2xf32>, tensor<1x3x2x2xf32>) -> tensor<1x2x3x1xf32>
+        rhs_dilation = array<i64: 1, 1>,
+        window_strides = array<i64: 1, 1>} : (tensor<1x4x4x2xf32>, tensor<1x3x2x2xf32>) -> tensor<1x2x3x1xf32>
   check.expect_almost_eq_const(%res, dense<[[
       [[1310.0],[1466.0],[1622.0]],
       [[2090.0],[2246.0],[2402.0]]
@@ -159,8 +159,8 @@ func.func @conv2d_reorder_output() {
           output_spatial_dimensions = [3, 1]
         >,
         feature_group_count = 1 : i64,
-        rhs_dilation = dense<1> : tensor<2xi64>,
-        window_strides = dense<1> : tensor<2xi64>} : (tensor<1x4x4x2xf32>, tensor<3x2x2x1xf32>) -> tensor<1x3x1x2xf32>
+        rhs_dilation = array<i64: 1, 1>,
+        window_strides = array<i64: 1, 1>} : (tensor<1x4x4x2xf32>, tensor<3x2x2x1xf32>) -> tensor<1x3x1x2xf32>
   check.expect_almost_eq_const(%res, dense<[[
       [[1310.0, 2090.0]],
       [[1466.0, 2246.0]],
@@ -194,8 +194,8 @@ func.func @conv2d_1452x3221_same() {
         >,
        feature_group_count = 1 : i64,
        padding = dense<[[1, 1], [0, 1]]> : tensor<2x2xi64>,
-       rhs_dilation = dense<1> : tensor<2xi64>,
-       window_strides = dense<1> : tensor<2xi64>} :
+       rhs_dilation = array<i64: 1, 1>,
+       window_strides = array<i64: 1, 1>} :
        (tensor<1x4x5x2xf32>, tensor<3x2x2x1xf32>) -> tensor<1x4x5x1xf32>
   check.expect_almost_eq_const(%res,  dense<[[
     [[ 600.0], [ 736.0], [ 872.0], [1008.0], [ 476.0]],
@@ -233,8 +233,8 @@ func.func @conv2d_2451x2311_same() {
         >,
        feature_group_count = 1 : i64,
        padding = dense<[[0, 1], [1, 1]]> : tensor<2x2xi64>,
-       rhs_dilation = dense<1> : tensor<2xi64>,
-       window_strides = dense<1> : tensor<2xi64>} :
+       rhs_dilation = array<i64: 1, 1>,
+       window_strides = array<i64: 1, 1>} :
        (tensor<2x4x5x1xf32>, tensor<2x3x1x1xf32>) -> tensor<2x4x5x1xf32>
   check.expect_almost_eq_const(%res, dense<[
     [[[ 80.0], [121.0], [142.0], [163.0], [100.0]],
@@ -323,8 +323,8 @@ func.func @conv2d_no_padding2() {
           output_spatial_dimensions = [1, 2]
         >,
        feature_group_count = 1 : i64,
-       rhs_dilation = dense<1> : tensor<2xi64>,
-       window_strides = dense<1> : tensor<2xi64>} :
+       rhs_dilation = array<i64: 1, 1>,
+       window_strides = array<i64: 1, 1>} :
        (tensor<2x4x5x3xf32>, tensor<2x3x3x6xf32>) -> tensor<2x3x3x6xf32>
   check.expect_almost_eq_const(%res, dense<[
       [[[16065.0,  16290.0,  16515.0,  16740.0,  16965.0,  17190.0],
@@ -394,8 +394,8 @@ func.func @conv2d_1452x2223_dilated_valid() {
         >,
     feature_group_count = 1 : i64,
     padding = dense<0> : tensor<2x2xi64>,
-    rhs_dilation = dense<[2, 1]> : tensor<2xi64>,
-    window_strides = dense<1> : tensor<2xi64>
+    rhs_dilation = array<i64: 2, 1>,
+    window_strides = array<i64: 1, 1>
   } : (tensor<1x4x5x2xf32>, tensor<2x2x2x3xf32>) -> tensor<1x2x4x3xf32>
   check.expect_almost_eq_const(%res, dense<
     [[[[-0.45181108, -0.37253797, -1.1074474 ],
@@ -427,8 +427,8 @@ func.func @depthwise_conv_non_1_channel_multiplier() {
         >,
     feature_group_count = 2 : i64,
     padding = dense<0> : tensor<2x2xi64>,
-    rhs_dilation = dense<1> : tensor<2xi64>,
-    window_strides = dense<1> : tensor<2xi64>} : (tensor<2x4x5x2xf32>, tensor<2x2x1x6xf32>) -> tensor<2x3x4x6xf32>
+    rhs_dilation = array<i64: 1, 1>,
+    window_strides = array<i64: 1, 1>} : (tensor<2x4x5x2xf32>, tensor<2x2x1x6xf32>) -> tensor<2x3x4x6xf32>
   check.expect_almost_eq_const(%res, dense<4.0> : tensor<2x3x4x6xf32>) : tensor<2x3x4x6xf32>
   return
 }

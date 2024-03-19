@@ -7,7 +7,7 @@
 
 // CHECK-LABEL: @file_constant
 //  CHECK-SAME: (%[[BUFFER:.+]]: !util.buffer) -> !util.buffer
-func.func @file_constant(%buffer: !util.buffer) -> !stream.file {
+util.func public @file_constant(%buffer: !util.buffer) -> !stream.file {
   %c0 = arith.constant 0 : index
   %c100 = arith.constant 100 : index
   %c200 = arith.constant 200 : index
@@ -15,28 +15,28 @@ func.func @file_constant(%buffer: !util.buffer) -> !stream.file {
   // CHECK: %[[SPAN:.+]] = util.buffer.subspan %[[BUFFER]][%c100] : !util.buffer{%c300} -> !util.buffer{%c200}
   %file = stream.file.constant %buffer[%c100 for %c200] : !util.buffer{%c300} -> !stream.file
   // CHECK: return %[[SPAN]]
-  return %file : !stream.file
+  util.return %file : !stream.file
 }
 
 // -----
 
 // CHECK-LABEL: @file_read
 //  CHECK-SAME: (%[[WAIT:.+]]: i64, %[[FILE:.+]]: !util.buffer, %[[RESOURCE:.+]]: !util.buffer)
-func.func @file_read(%wait: !stream.timepoint, %file: !stream.file, %resource: !stream.resource<variable>) -> !stream.timepoint {
+util.func public @file_read(%wait: !stream.timepoint, %file: !stream.file, %resource: !stream.resource<variable>) -> !stream.timepoint {
   %c0 = arith.constant 0 : index
   %offset = arith.constant 100 : i64
   %c1088 = arith.constant 1088 : index
   // CHECK: %[[SIGNAL:.+]] = arith.constant 0 : i64
   %signal = stream.file.read await(%wait) => %file[%offset], %resource[%c0], %c1088 : !stream.file -> !stream.resource<variable>{%c1088} => !stream.timepoint
   // CHECK: return %[[SIGNAL]]
-  return %signal : !stream.timepoint
+  util.return %signal : !stream.timepoint
 }
 
 // -----
 
 // CHECK-LABEL: @file_write
 //  CHECK-SAME: (%[[WAIT:.+]]: i64, %[[FILE:.+]]: !util.buffer, %[[RESOURCE:.+]]: !util.buffer)
-func.func @file_write(%wait: !stream.timepoint, %file: !stream.file, %resource: !stream.resource<variable>) -> !stream.timepoint {
+util.func public @file_write(%wait: !stream.timepoint, %file: !stream.file, %resource: !stream.resource<variable>) -> !stream.timepoint {
   %c0 = arith.constant 0 : index
   %offset = arith.constant 100 : i64
   %c1088 = arith.constant 1088 : index
@@ -45,14 +45,14 @@ func.func @file_write(%wait: !stream.timepoint, %file: !stream.file, %resource: 
   // CHECK: %[[SIGNAL:.+]] = arith.constant 0 : i64
   %signal = stream.file.write await(%wait) => %resource[%c0], %file[%offset], %c1088 : !stream.resource<variable>{%c1088} -> !stream.file => !stream.timepoint
   // CHECK: return %[[SIGNAL]]
-  return %signal : !stream.timepoint
+  util.return %signal : !stream.timepoint
 }
 
 // -----
 
 // CHECK-LABEL: @variable_read
 //  CHECK-SAME: (%[[WAIT:.+]]: i64) -> (!util.buffer, i64)
-func.func @variable_read(%wait: !stream.timepoint) -> (!stream.resource<variable>, !stream.timepoint) {
+util.func public @variable_read(%wait: !stream.timepoint) -> (!stream.resource<variable>, !stream.timepoint) {
   %c0 = arith.constant 0 : index
   %c16 = arith.constant 16 : index
   %c32 = arith.constant 32 : index
@@ -69,5 +69,5 @@ func.func @variable_read(%wait: !stream.timepoint) -> (!stream.resource<variable
   // CHECK: %[[SIGNAL:.+]] = arith.constant 0 : i64
   %signal = stream.file.read await(%wait) => %file[%c100], %resource[%c32], %c32 : !stream.file -> !stream.resource<variable>{%c64} => !stream.timepoint
   // CHECK: return %[[STORAGE]], %[[SIGNAL]]
-  return %resource, %signal : !stream.resource<variable>, !stream.timepoint
+  util.return %resource, %signal : !stream.resource<variable>, !stream.timepoint
 }

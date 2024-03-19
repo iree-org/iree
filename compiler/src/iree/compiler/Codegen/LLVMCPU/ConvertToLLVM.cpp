@@ -966,7 +966,9 @@ void ConvertToLLVMPass::runOnOperation() {
   {
     RewritePatternSet patterns(&getContext());
     vector::populateVectorToVectorCanonicalizationPatterns(patterns);
+    vector::populateBubbleVectorBitCastOpPatterns(patterns);
     vector::populateVectorBroadcastLoweringPatterns(patterns);
+    vector::populateVectorInterleaveLoweringPatterns(patterns);
     // TODO: doubtful that the "default" does what one want here, it is likely
     // better to use outerproduct.
     vector::populateVectorContractLoweringPatterns(

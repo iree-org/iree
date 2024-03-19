@@ -29,10 +29,9 @@ def OpGroupExecutableOps : OpDocGroup {
 
 let opDocGroup = OpGroupExecutableOps in {
 
-def HALLoader_ExecutableQuerySupportOp :
-    HALLoader_PureOp<"executable.query_support", [
-      DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-    ]> {
+def HALLoader_ExecutableQuerySupportOp : HALLoader_PureOp<"executable.query_support", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
   let summary = "queries whether an executable format is supported";
   let description = [{
     Returns true if the given format is supported by the device loader. This
@@ -54,10 +53,9 @@ def HALLoader_ExecutableQuerySupportOp :
   }];
 }
 
-def HALLoader_ExecutableLoadOp :
-    HALLoader_PureOp<"executable.load", [
-      DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-    ]> {
+def HALLoader_ExecutableLoadOp : HALLoader_PureOp<"executable.load", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
   let summary = "dynamically loads an executable";
   let description = [{
     Creates, loads, and dynamically links an executable.
@@ -84,11 +82,10 @@ def HALLoader_ExecutableLoadOp :
   }];
 }
 
-def HALLoader_ExecutableLookupOp :
-    HALLoader_PureOp<"executable.lookup", [
-      DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
-      DeclareOpInterfaceMethods<SymbolUserOpInterface>,
-    ]> {
+def HALLoader_ExecutableLookupOp : HALLoader_PureOp<"executable.lookup", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+  DeclareOpInterfaceMethods<SymbolUserOpInterface>,
+]> {
   let summary = [{executable cache lookup pseudo-op}];
   let description = [{
     Used during conversion to provide a placeholder for a globally cached and
@@ -109,50 +106,33 @@ def HALLoader_ExecutableLookupOp :
   }];
 }
 
-def HALLoader_ExecutableDispatchSymbolOp :
-    HALLoader_Op<"executable.dispatch.symbol", [
-      AttrSizedOperandSegments,
-      DeclareOpInterfaceMethods<SymbolUserOpInterface>,
-    ]> {
-  let summary = [{inline executable dispatch operation}];
+def HALLoader_ExecutableExportOrdinalOp : HALLoader_PureOp<"executable.export.ordinal", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+  DeclareOpInterfaceMethods<SymbolUserOpInterface>,
+]> {
+  let summary = [{executable export ordinal lookup pseudo-op}];
   let description = [{
-    Dispatches execution to an executable entry point with the given parameters.
-    The entry point is a symbolic reference to an exported entry point.
+    Resolves an executable export ordinal to a value once ordinals have been
+    assigned.
   }];
 
   let arguments = (ins
-    HAL_Executable:$executable,
-    SymbolRefAttr:$entry_point,
-    HAL_Dim:$workgroup_x,
-    HAL_Dim:$workgroup_y,
-    HAL_Dim:$workgroup_z,
-    Variadic<I32>:$push_constants,
-    Variadic<Util_BufferType>:$binding_buffers,
-    Variadic<HAL_DeviceSize>:$binding_offsets,
-    Variadic<HAL_DeviceSize>:$binding_lengths
+    SymbolRefAttr:$entry_point
+  );
+  let results = (outs
+    Index:$result
   );
 
   let assemblyFormat = [{
-    `executable` `(` $executable `:` type($executable) `)`
     `target` `(` $entry_point `)`
-    `workgroups` `(` `[`
-        $workgroup_x `,`
-        $workgroup_y `,`
-        $workgroup_z
-    `]` `)`
-    (`constants` `(` `[` $push_constants^ `]` `)`)?
-    `bindings` `(` `[`
-    custom<DispatchBindings>($binding_buffers,
-                             type($binding_buffers),
-                             $binding_offsets,
-                             $binding_lengths)
-    `]` `)`
+    `:` type($result)
     attr-dict-with-keyword
   }];
 }
 
-def HALLoader_ExecutableDispatchOp :
-    HALLoader_Op<"executable.dispatch", [AttrSizedOperandSegments]> {
+def HALLoader_ExecutableDispatchOp : HALLoader_Op<"executable.dispatch", [
+  AttrSizedOperandSegments,
+]> {
   let summary = [{inline executable dispatch operation}];
   let description = [{
     Dispatches execution to an executable entry point with the given parameters.
@@ -160,7 +140,7 @@ def HALLoader_ExecutableDispatchOp :
 
   let arguments = (ins
     HAL_Executable:$executable,
-    HAL_OrdinalAttr:$entry_point,
+    HAL_Ordinal:$entry_point,
     HAL_Dim:$workgroup_x,
     HAL_Dim:$workgroup_y,
     HAL_Dim:$workgroup_z,

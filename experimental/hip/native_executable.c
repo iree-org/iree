@@ -174,6 +174,9 @@ iree_status_t iree_hal_hip_native_executable_create(
           (char*)((char*)executable + sizeof(*executable) +
                   entry_point_count * sizeof(executable->entry_points[0])));
 
+  iree_hal_resource_initialize(&iree_hal_hip_native_executable_vtable,
+                               &executable->resource);
+
   // Load the HSACO image - this will fail if the device cannot handle the
   // contents. We could check this prior to creating
   hipModule_t module = NULL;
@@ -181,6 +184,11 @@ iree_status_t iree_hal_hip_native_executable_create(
   iree_status_t status = IREE_HIP_RESULT_TO_STATUS(
       symbols, hipModuleLoadDataEx(&module, hsaco_image, 0, NULL, NULL),
       "hipModuleLoadDataEx");
+  if (!iree_status_is_ok(status)) {
+    status = iree_status_annotate(
+        status,
+        IREE_SV("mismatched target chip? missing/wrong bitcode directory?"));
+  }
 
   // Query max optin shared memory per block - we'll use it to compare with
   // kernel usages.
@@ -195,8 +203,6 @@ iree_status_t iree_hal_hip_native_executable_create(
   }
 
   if (iree_status_is_ok(status)) {
-    iree_hal_resource_initialize(&iree_hal_hip_native_executable_vtable,
-                                 &executable->resource);
     executable->host_allocator = host_allocator;
     executable->symbols = symbols;
     executable->hip_module = module;
@@ -219,11 +225,11 @@ iree_status_t iree_hal_hip_native_executable_create(
       }
 
       if (shared_memory_sizes_vec[i] > max_shared_memory) {
-        status =
-            iree_make_status(IREE_STATUS_OUT_OF_RANGE,
-                             "requested shared memory size of %u bytes "
-                             "larger than allowed size of %u bytes",
-                             shared_memory_sizes_vec[i], max_shared_memory);
+        status = iree_make_status(
+            IREE_STATUS_INVALID_ARGUMENT,
+            "function '%s' requested shared memory size of %u bytes larger "
+            "than allowed size of %u bytes",
+            entry_name, shared_memory_sizes_vec[i], max_shared_memory);
       } else {
         status = IREE_HIP_RESULT_TO_STATUS(
             symbols,
@@ -258,13 +264,13 @@ iree_status_t iree_hal_hip_native_executable_create(
       IREE_TRACE({
         if (iree_hal_rocm_ExecutableDef_source_locations_is_present(
                 executable_def)) {
-          iree_hal_hip_FileLineLocDef_vec_t source_locs_vec =
+          iree_hal_rocm_FileLineLocDef_vec_t source_locs_vec =
               iree_hal_rocm_ExecutableDef_source_locations_get(executable_def);
-          iree_hal_hip_FileLineLocDef_table_t source_loc =
-              iree_hal_hip_FileLineLocDef_vec_at(source_locs_vec, i);
+          iree_hal_rocm_FileLineLocDef_table_t source_loc =
+              iree_hal_rocm_FileLineLocDef_vec_at(source_locs_vec, i);
           flatbuffers_string_t filename =
-              iree_hal_hip_FileLineLocDef_filename_get(source_loc);
-          uint32_t line = iree_hal_hip_FileLineLocDef_line_get(source_loc);
+              iree_hal_rocm_FileLineLocDef_filename_get(source_loc);
+          uint32_t line = iree_hal_rocm_FileLineLocDef_line_get(source_loc);
           kernel_info->source_filename =
               iree_make_string_view(filename, flatbuffers_string_len(filename));
           kernel_info->source_line = line;

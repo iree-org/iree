@@ -421,6 +421,7 @@ static iree_status_t iree_hal_task_queue_retire_cmd_allocate(
 //===----------------------------------------------------------------------===//
 
 void iree_hal_task_queue_initialize(iree_string_view_t identifier,
+                                    iree_task_scope_flags_t scope_flags,
                                     iree_task_executor_t* executor,
                                     iree_arena_block_pool_t* block_pool,
                                     iree_hal_task_queue_t* out_queue) {
@@ -433,7 +434,7 @@ void iree_hal_task_queue_initialize(iree_string_view_t identifier,
   iree_task_executor_retain(out_queue->executor);
   out_queue->block_pool = block_pool;
 
-  iree_task_scope_initialize(identifier, &out_queue->scope);
+  iree_task_scope_initialize(identifier, scope_flags, &out_queue->scope);
 
   iree_hal_task_queue_state_initialize(&out_queue->state);
 

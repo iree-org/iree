@@ -36,18 +36,16 @@ declare -a label_exclude_args=(
   "^driver=vulkan$"
   "^driver=metal$"
   "^driver=cuda$"
+  "^driver=rocm$"
+  "^driver=hip$"
   "^vulkan_uses_vk_khr_shader_float16_int8$"
   "^requires-filesystem$"
   "^requires-dtz$"
   "^noriscv$"
 )
 
-# Excluding mobilebert, fp16, and lowering_config regression
-# tests for now.
 # TODO(#10462): Investigate the lowering_config test issue.
 declare -a test_exclude_args=(
-  "bert"
-  "fp16"
   "regression_llvm-cpu_lowering_config"
 )
 
@@ -87,19 +85,6 @@ if [[ "${RISCV_PLATFORM}-${RISCV_ARCH}" == "linux-riscv_32" ]]; then
     "stablehlo.*llvm-cpu.*pow"
   )
 fi
-
-test_exclude_args+=(
-  # TODO(#12703): Enable the tests.
-  "iree/tests/e2e/matmul/e2e_matmul_mmt4d_i8_intrinsics_small_llvm-cpu_local-task"
-  "iree/tests/e2e/matmul/e2e_matmul_mmt4d_i8_small_llvm-cpu_local-task"
-  "iree/tests/e2e/tensor_ops/check_llvm-cpu_local-task_pack.mlir"
-  "iree/tests/e2e/tensor_ops/check_llvm-cpu_local-task_pack_dynamic_inner_tiles.mlir"
-  # TODO(#13421): Enable the tests
-  "iree/tests/e2e/stablehlo_ops/check_llvm-cpu_local-task_dot.mlir"
-  "iree/tests/e2e/matmul/e2e_matmul_direct_i8_small_llvm-cpu_local-task"
-  "iree/tests/e2e/matmul/e2e_matmul_direct_f32_small_llvm-cpu_local-task"
-  "iree/tests/e2e/regression/check_regression_llvm-cpu_strided_slice.mlir"
-)
 
 tests_label_exclude_regex="($(IFS="|" ; echo "${label_exclude_args[*]}"))"
 tests_exclude_regex="($(IFS="|" ; echo "${test_exclude_args[*]}"))"

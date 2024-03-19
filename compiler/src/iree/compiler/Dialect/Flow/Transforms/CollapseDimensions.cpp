@@ -420,12 +420,12 @@ static bool collapseDimensions(IRRewriter &rewriter,
   OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(genericOp.value());
 
-  FailureOr<SmallVector<Value>> maybeReplacements =
+  FailureOr<linalg::CollapseResult> maybeReplacements =
       mlir::linalg::collapseOpIterationDims(genericOp.value(), collapseIndices,
                                             rewriter);
   if (failed(maybeReplacements))
     return false;
-  rewriter.replaceOp(genericOp.value(), maybeReplacements.value());
+  rewriter.replaceOp(genericOp.value(), maybeReplacements->results);
   return true;
 }
 

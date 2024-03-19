@@ -230,6 +230,8 @@ function(iree_cc_library)
       PRIVATE
         ${IREE_DEFAULT_COPTS}
         ${_RULE_COPTS}
+      INTERFACE
+        ${IREE_INTERFACE_COPTS}
     )
     target_link_options(${_NAME}
       PRIVATE

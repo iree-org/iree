@@ -139,6 +139,16 @@ function(iree_native_test)
         ${_TEST_ARGS}
     )
     iree_configure_test(${_TEST_NAME})
+  elseif(IREE_ARCH STREQUAL "arm_64" AND "requires-arm-sme" IN_LIST _RULE_LABELS)
+    add_test(
+      NAME
+        ${_TEST_NAME}
+      COMMAND
+        "${IREE_ROOT_DIR}/build_tools/cmake/run_arm_sme_test.sh"
+        "$<TARGET_FILE:${_SRC_TARGET}>"
+        ${_TEST_ARGS}
+    )
+    iree_configure_test(${_TEST_NAME})
   else()
     add_test(
       NAME

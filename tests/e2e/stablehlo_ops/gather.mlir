@@ -13,7 +13,7 @@ func.func @foo() {
       offset_dims = [0, 1],
       start_index_map = [0],
     >,
-    slice_sizes = dense<[1, 1, 5]> : tensor<3xi64>
+    slice_sizes = array<i64: 1, 1, 5>
   } : (tensor<5x1x5xi32>, tensor<i64>) -> tensor<1x5xi32>
   check.expect_eq_const(%res, dense<[[11, 12, 13, 14, 15]]> : tensor<1x5xi32>) : tensor<1x5xi32>
   return
@@ -34,7 +34,7 @@ func.func @via_torch_index_select() {
       offset_dims = [0, 1],
       start_index_map = [0],
     >,
-    slice_sizes = dense<[1, 1, 5]> : tensor<3xi64>
+    slice_sizes = array<i64: 1, 1, 5>
   } : (tensor<5x1x5xi32>, tensor<i64>) -> tensor<1x5xi32>
   check.expect_eq_const(%res, dense<[[11, 12, 13, 14, 15]]> : tensor<1x5xi32>) : tensor<1x5xi32>
   return
@@ -64,7 +64,7 @@ func.func @general_but_just_index_select() {
       start_index_map = [0, 1]
     >,
     indices_are_sorted = false,
-    slice_sizes = dense<[1, 1, 8]> : tensor<3xi64>
+    slice_sizes = array<i64: 1, 1, 8>
   } : (tensor<1x4x8xi32>, tensor<1x8x2xi32>) -> tensor<1x8x8xi32>
   check.expect_eq_const(%result, dense<[[
          [ 8,  9, 10, 11, 12, 13, 14, 15],
@@ -97,7 +97,7 @@ func.func @small_slices() {
       start_index_map = [0, 1]
     >,
     indices_are_sorted = false,
-    slice_sizes = dense<[1, 1, 3]> : tensor<3xi64>
+    slice_sizes = array<i64: 1, 1, 3>
   } : (tensor<1x4x8xi32>, tensor<1x4x2xi32>) -> tensor<1x4x3xi32>
   check.expect_eq_const(%result, dense<[[
         [ 8,  9, 10],
@@ -126,7 +126,7 @@ func.func @nonstandard_offset_dims() {
       start_index_map = [0, 1]
     >,
     indices_are_sorted = false,
-    slice_sizes = dense<[1, 2, 3]> : tensor<3xi64>
+    slice_sizes = array<i64: 1, 2, 3>
   } : (tensor<1x4x8xi32>, tensor<1x4x2xi32>) -> tensor<1x2x3x4xi32>
   check.expect_eq_const(%result, dense<[[
       [[ 8, 16, 16,  0],
@@ -157,7 +157,7 @@ func.func @reordered_start_index() {
       start_index_map = [3, 2, 0, 1]
     >,
     indices_are_sorted = false,
-    slice_sizes = dense<[1, 2, 1, 3]> : tensor<4xi64>
+    slice_sizes = array<i64: 1, 2, 1, 3>
   } : (tensor<1x3x2x4xi32>, tensor<2x4xi32>) -> tensor<2x2x3xi32>
 
   check.expect_eq_const(%result, dense<[

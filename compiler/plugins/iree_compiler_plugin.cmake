@@ -20,6 +20,10 @@ if(IREE_TARGET_BACKEND_CUDA)
   add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/target/CUDA target/CUDA)
 endif()
 
+if(IREE_TARGET_BACKEND_LLVM_CPU)
+  add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/target/LLVMCPU target/LLVMCPU)
+endif()
+
 if(IREE_TARGET_BACKEND_METAL_SPIRV)
   add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/target/MetalSPIRV target/MetalSPIRV)
 endif()
@@ -32,6 +36,10 @@ if(IREE_TARGET_BACKEND_VMVX)
   add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/target/VMVX target/VMVX)
 endif()
 
-if(IREE_TARGET_BACKEND_WEBGPU)
-  add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/target/WebGPU target/WebGPU)
+if(IREE_TARGET_BACKEND_VULKAN_SPIRV)
+  add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/target/VulkanSPIRV target/VulkanSPIRV)
+endif()
+
+if(IREE_TARGET_BACKEND_WEBGPU_SPIRV)
+  add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/target/WebGPUSPIRV target/WebGPUSPIRV)
 endif()

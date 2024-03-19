@@ -28,7 +28,6 @@ endif()
 iree_lit_test_suite(
     name = "lit",
     srcs = [
-        "mma.mlir",
         # TODO(#15892): reductions have flakes and need to be triaged.
         # "reduction.mlir",
         # "reduction_eltwise.mlir",

@@ -2,7 +2,7 @@
 
 #map0 = affine_map<(d0, d1) -> ()>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
-func.func @linalg_generic_traversal(%arg0 : tensor<5x6xf32>) -> (tensor<5x6xf32>, tensor<5x6xf32>, tensor<5x6xf32>) {
+util.func @linalg_generic_traversal(%arg0 : tensor<5x6xf32>) -> (tensor<5x6xf32>, tensor<5x6xf32>, tensor<5x6xf32>) {
   %cst_min = arith.constant dense<-1.270000e+02> : tensor<f32>
   %cst_max = arith.constant dense<1.270000e+02> : tensor<f32>
   %init = tensor.empty() : tensor<5x6xf32>
@@ -38,5 +38,5 @@ func.func @linalg_generic_traversal(%arg0 : tensor<5x6xf32>) -> (tensor<5x6xf32>
   %max_range = "iree_unregistered.test_fprange"(%max) : (tensor<5x6xf32>) -> tensor<5x6xf32>
   // CHECK: fp-range: [-inf, inf, TRUNC]
   %floor_range = "iree_unregistered.test_fprange"(%floor) : (tensor<5x6xf32>) -> tensor<5x6xf32>
-  return %result_range, %max_range, %floor_range : tensor<5x6xf32>, tensor<5x6xf32>, tensor<5x6xf32>
+  util.return %result_range, %max_range, %floor_range : tensor<5x6xf32>, tensor<5x6xf32>, tensor<5x6xf32>
 }

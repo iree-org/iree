@@ -72,20 +72,20 @@ jobs:
           ./build_tools/github_actions/docker_run.sh \
             --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
             --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
-            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:61e9aae211007dbad95e1f429e9e5121fd5968c204791038424979c21146cf75" \
-            gcr.io/iree-oss/base@sha256:61e9aae211007dbad95e1f429e9e5121fd5968c204791038424979c21146cf75 \
+            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446" \
+            gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
             ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
       # TODO(scotttodd): trim build/tests to exclude integration tests (tests/ folder, check tests)
       #                  that coverage should move to a test_cpu job (matrix with test_gpu?)
       - name: "Testing IREE"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/base@sha256:61e9aae211007dbad95e1f429e9e5121fd5968c204791038424979c21146cf75 \
+            gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
             ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
       - name: "Testing iree-dialects"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/base@sha256:61e9aae211007dbad95e1f429e9e5121fd5968c204791038424979c21146cf75 \
+            gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
             ./build_tools/cmake/test_iree_dialects.sh "${BUILD_DIR}"
 
       # TODO(#16203): If this (or iree-dist) is small enough, just use GitHub

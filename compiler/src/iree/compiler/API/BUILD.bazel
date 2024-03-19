@@ -41,6 +41,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:CAPILinalg",
         "@llvm-project//mlir:CAPIPDL",
         "@llvm-project//mlir:CAPITransformDialect",
+        "@llvm-project//mlir:CAPITransformDialectTransforms",
     ],
 )
 

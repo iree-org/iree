@@ -278,4 +278,17 @@ operator<<(AsmPrinter &printer,
 #include "iree/compiler/Dialect/HAL/IR/HALAttrs.h.inc" // IWYU pragma: keep
 // clang-format on
 
+//===----------------------------------------------------------------------===//
+// Utilities
+//===----------------------------------------------------------------------===//
+
+namespace mlir::iree_compiler::IREE::HAL {
+
+// Returns the assigned bindings via the `hal.interface.bindings` attribute
+// on the operation or default bindings in set 0 with bindings [0, count).
+SmallVector<IREE::HAL::InterfaceBindingAttr>
+getInterfaceBindingAttrs(Operation *op, size_t resourceCount);
+
+} // namespace mlir::iree_compiler::IREE::HAL
+
 #endif // IREE_COMPILER_DIALECT_HAL_IR_HALTYPES_H_

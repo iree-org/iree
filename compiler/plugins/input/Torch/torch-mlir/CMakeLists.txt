@@ -176,7 +176,7 @@ iree_cc_library(
     ::TorchConversionDialectTransformsGen
     ::TorchDialectIR
     ::ConversionPassesGen
-    torch-mlir-dialects::TMTensorDialectIR
+    iree::compiler::plugins::input::Torch::torch-mlir-dialects::TMTensorDialectIR
     MLIRArithDialect
     MLIRFuncDialect
     MLIRIR

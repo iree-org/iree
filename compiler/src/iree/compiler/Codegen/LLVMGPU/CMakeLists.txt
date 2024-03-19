@@ -72,14 +72,17 @@ iree_cc_library(
     "ROCDLKernelConfig.h"
     "ROCDLPasses.h"
   SRCS
+    "AMDGPUChainedMatmulPass.cpp"
     "ConvertToLLVM.cpp"
     "ConvertToNVVM.cpp"
     "ConvertToROCDL.cpp"
     "ExtractAddressComputationGPUPass.cpp"
     "KernelConfig.cpp"
     "LLVMGPUCastAddressSpaceFunction.cpp"
+    "LLVMGPUCastTypeToFitMMA.cpp"
     "LLVMGPULowerExecutableTarget.cpp"
     "LLVMGPUPackSharedMemoryAlloc.cpp"
+    "LLVMGPUPrefetching.cpp"
     "LLVMGPUSelectLoweringStrategy.cpp"
     "LLVMGPUTensorCoreVectorization.cpp"
     "LLVMGPUTensorPad.cpp"
@@ -97,9 +100,6 @@ iree_cc_library(
     ::PassesIncGen
     ::ROCDLPassHeaders
     ::ROCDLPassesIncGen
-    IREELinalgExtDialect
-    IREELinalgExtPasses
-    IREELinalgExtTransforms
     IREELinalgTransformDialect
     IREELinalgTransformDialectPasses
     IREEVectorExtDialect
@@ -110,6 +110,7 @@ iree_cc_library(
     MLIRAMDGPUUtils
     MLIRAffineDialect
     MLIRAffineToStandard
+    MLIRAffineTransforms
     MLIRAnalysis
     MLIRArithDialect
     MLIRArithToAMDGPU
@@ -165,6 +166,7 @@ iree_cc_library(
     MLIRVectorTransforms
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Common::GPU::CommonGPUPasses
+    iree::compiler::Codegen::Common::GPU::GPUHeuristics
     iree::compiler::Codegen::Common::TransformDialectInterpreterPass
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
@@ -174,8 +176,11 @@ iree_cc_library(
     iree::compiler::Codegen::TransformStrategies::GPU
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
+    iree::compiler::Codegen::Utils::VectorOpUtils
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::LinalgExt::IR
+    iree::compiler::Dialect::LinalgExt::Transforms
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
   PUBLIC

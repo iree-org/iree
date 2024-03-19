@@ -1,6 +1,6 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-flow-form-dispatch-regions{fuse-pad-with-consumers}))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-flow-form-dispatch-regions{fuse-pad-with-consumers}))" --split-input-file %s | FileCheck %s
 
-func.func @fuse_with_consumer(%arg0 : tensor<?x?x?x?xf32>, %arg1 : index,
+util.func public @fuse_with_consumer(%arg0 : tensor<?x?x?x?xf32>, %arg1 : index,
     %arg2 : index, %arg3 : index, %arg4 : index,
     %arg5 : tensor<?x?x?x?xf32>, %arg6 : tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32> {
   %cst = arith.constant 42.0 : f32
@@ -10,9 +10,9 @@ func.func @fuse_with_consumer(%arg0 : tensor<?x?x?x?xf32>, %arg1 : index,
   } : tensor<?x?x?x?xf32> to tensor<?x?x?x?xf32>
   %1 = linalg.conv_2d_nhwc_hwcf ins(%0, %arg5 : tensor<?x?x?x?xf32>, tensor<?x?x?x?xf32>)
       outs(%arg6 : tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32>
-  return %1 : tensor<?x?x?x?xf32>
+  util.return %1 : tensor<?x?x?x?xf32>
 }
-// CHECK-LABEL: func @fuse_with_consumer
+// CHECK-LABEL: util.func public @fuse_with_consumer
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?x?x?xf32>
 //  CHECK-SAME:   %[[ARG5:[a-zA-Z0-9]+]]: tensor<?x?x?x?xf32>
 //  CHECK-SAME:   %[[ARG6:[a-zA-Z0-9]+]]: tensor<?x?x?x?xf32>
@@ -22,4 +22,4 @@ func.func @fuse_with_consumer(%arg0 : tensor<?x?x?x?xf32>, %arg1 : index,
 //  CHECK-SAME:         ins(%[[PADDED]], %[[ARG5]] :
 //  CHECK-SAME:         outs(%[[ARG6]] :
 //       CHECK:     flow.return %[[CONV]]
-//       CHECK:   return %[[RETURN]]
+//       CHECK:   util.return %[[RETURN]]

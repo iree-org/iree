@@ -57,6 +57,7 @@ static iree_hal_task_device_t* iree_hal_task_device_cast(
 void iree_hal_task_device_params_initialize(
     iree_hal_task_device_params_t* out_params) {
   out_params->arena_block_size = 32 * 1024;
+  out_params->queue_scope_flags = IREE_TASK_SCOPE_FLAG_NONE;
 }
 
 static iree_status_t iree_hal_task_device_check_params(
@@ -131,9 +132,9 @@ iree_status_t iree_hal_task_device_create(
     device->queue_count = queue_count;
     for (iree_host_size_t i = 0; i < device->queue_count; ++i) {
       // TODO(benvanik): add a number to each queue ID.
-      iree_hal_task_queue_initialize(device->identifier, queue_executors[i],
-                                     &device->small_block_pool,
-                                     &device->queues[i]);
+      iree_hal_task_queue_initialize(
+          device->identifier, params->queue_scope_flags, queue_executors[i],
+          &device->small_block_pool, &device->queues[i]);
     }
   }
 
@@ -226,6 +227,12 @@ static iree_status_t iree_hal_task_device_query_i64(
   iree_hal_task_device_t* device = iree_hal_task_device_cast(base_device);
   *out_value = 0;
 
+  if (iree_string_view_equal(category, IREE_SV("hal.device.id"))) {
+    *out_value =
+        iree_string_view_match_pattern(device->identifier, key) ? 1 : 0;
+    return iree_ok_status();
+  }
+
   if (iree_string_view_equal(category, IREE_SV("hal.executable.format"))) {
     *out_value =
         iree_hal_query_any_executable_loader_support(
@@ -233,7 +240,9 @@ static iree_status_t iree_hal_task_device_query_i64(
             ? 1
             : 0;
     return iree_ok_status();
-  } else if (iree_string_view_equal(category, IREE_SV("hal.device"))) {
+  }
+
+  if (iree_string_view_equal(category, IREE_SV("hal.device"))) {
     if (iree_string_view_equal(key, IREE_SV("concurrency"))) {
       *out_value = (int64_t)device->queue_count;
       return iree_ok_status();

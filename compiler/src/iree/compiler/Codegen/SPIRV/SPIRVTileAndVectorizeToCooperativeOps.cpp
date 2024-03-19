@@ -13,7 +13,6 @@
 
 #include <algorithm>
 
-#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
@@ -164,7 +163,7 @@ static LogicalResult tileToSubgroup(mlir::FunctionOpInterface funcOp,
                            .setTileSizeComputationFunction(setTileSizesFn)
                            .setDistributionOptions(distributionOptions);
 
-  IREE::LinalgExt::LinalgTransformationFilter filter(
+  LinalgTransformationFilter filter(
       {StringAttr::get(context, getWorkgroupKTiledMarker()),
        StringAttr::get(context, getWorkgroupMemoryMarker())},
       StringAttr::get(context, getVectorizeMarker()));

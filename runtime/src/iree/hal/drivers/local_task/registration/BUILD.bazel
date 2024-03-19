@@ -21,6 +21,7 @@ iree_runtime_cc_library(
     ],
     deps = [
         "//runtime/src/iree/base",
+        "//runtime/src/iree/base/internal:flags",
         "//runtime/src/iree/hal",
         "//runtime/src/iree/hal/drivers/local_task:task_driver",
         "//runtime/src/iree/hal/local/loaders/registration",

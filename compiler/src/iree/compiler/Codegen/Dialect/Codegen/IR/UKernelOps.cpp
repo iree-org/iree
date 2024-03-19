@@ -246,20 +246,24 @@ struct UKernelOpsBufferizationInterface
       bufferOpOperands.push_back(operand);
     }
 
-    // Ignore all result types that are tensor types.
-    SmallVector<Type> resultTypes;
-    for (auto resultType : op->getResultTypes()) {
+    SmallVector<Type> nonTensorResultTypes;
+    SmallVector<Value> nonTensorResultValues;
+    for (OpResult result : op->getResults()) {
+      Type resultType = result.getType();
       if (llvm::isa<RankedTensorType>(resultType))
         continue;
-      resultTypes.push_back(resultType);
+      nonTensorResultTypes.push_back(resultType);
+      nonTensorResultValues.push_back(result);
     }
 
-    auto bufferOp = rewriter.create<OpTy>(op->getLoc(), resultTypes,
+    auto bufferOp = rewriter.create<OpTy>(op->getLoc(), nonTensorResultTypes,
                                           bufferOpOperands, op->getAttrs());
-    ValueRange dpsInits =
+    SmallVector<Value> bufferizedResults =
         cast<DestinationStyleOpInterface>(bufferOp.getOperation())
             .getDpsInits();
-    bufferization::replaceOpWithBufferizedValues(rewriter, op, dpsInits);
+    bufferizedResults.append(nonTensorResultValues);
+    bufferization::replaceOpWithBufferizedValues(rewriter, op,
+                                                 bufferizedResults);
     return success();
   }
 };

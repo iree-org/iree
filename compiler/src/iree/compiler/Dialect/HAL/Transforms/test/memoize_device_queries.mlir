@@ -18,8 +18,8 @@
 
 // CHECK: util.global private @_device_query_2
 
-// CHECK-LABEL: func.func @device_matchers
-func.func @device_matchers(%device : !hal.device) -> (i1, i1, i1, i1, i1, i1) {
+// CHECK-LABEL: util.func public @device_matchers
+util.func public @device_matchers(%device : !hal.device) -> (i1, i1, i1, i1, i1, i1) {
   // Same queries (same variables):
   // CHECK-NEXT: = util.global.load @_device_query_0_ok : i1
   // CHECK-NEXT: = util.global.load @_device_query_0 : i1
@@ -34,5 +34,5 @@ func.func @device_matchers(%device : !hal.device) -> (i1, i1, i1, i1, i1, i1) {
   // CHECK-NEXT: = util.global.load @_device_query_2 : i1
   %id1_b_ok, %id1_b = hal.device.query<%device : !hal.device> key("hal.device.id" :: "id1") : i1, i1 = true
 
-  return %id0_a_ok, %id0_a, %id0_b_ok, %id0_b, %id1_a, %id1_b : i1, i1, i1, i1, i1, i1
+  util.return %id0_a_ok, %id0_a, %id0_b_ok, %id0_b, %id1_a, %id1_b : i1, i1, i1, i1, i1, i1
 }

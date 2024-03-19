@@ -36,18 +36,6 @@ CMAKE_ARGS=(
 
   # Enable TSan in all C/C++ targets, including IREE runtime, compiler, tests.
   "-DIREE_ENABLE_TSAN=ON"
-
-  # Enable TSan in iree_bytecode_module's. Otherwise, our TSan-enabled IREE
-  # runtime won't be able to call into these modules.
-  "-DIREE_BYTECODE_MODULE_ENABLE_TSAN=ON"
-
-  # Link iree_bytecode_module's with system linker, not embedded-ELF linker.
-  # Necessary with TSan.
-  "-DIREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER=ON"
-
-  # Don't build samples: they assume embedded-ELF so don't work with
-  # IREE_BYTECODE_MODULE_FORCE_LLVM_SYSTEM_LINKER=ON.
-  "-DIREE_BUILD_SAMPLES=OFF"
 )
 
 "${CMAKE_BIN}" -B "${BUILD_DIR}" "${CMAKE_ARGS[@]?}"

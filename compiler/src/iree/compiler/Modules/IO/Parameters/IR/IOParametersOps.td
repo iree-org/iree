@@ -7,7 +7,7 @@
 #ifndef IREE_DIALECT_MODULES_IO_PARAMETERS_OPS
 #define IREE_DIALECT_MODULES_IO_PARAMETERS_OPS
 
-include "iree/compiler/Dialect/HAL/IR/HALBase.td"
+include "iree/compiler/Dialect/HAL/IR/HALAttrs.td"
 include "iree/compiler/Dialect/Util/IR/UtilAttrs.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 include "iree/compiler/Modules/IO/Parameters/IR/IOParametersBase.td"

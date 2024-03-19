@@ -563,14 +563,16 @@ def TestGpuVectorDistribution :
     number.
 
     The distribution is done for a single warp using gpu.thread x as the lane
-    ID.
+    ID. The optional experimental attribute enabled experimental distribution
+    patterns.
 
     #### Return modes
 
     This transform does not consume the target handle and always return success.
     }];
 
-    let arguments = (ins TransformHandleTypeInterface:$target);
+    let arguments = (ins TransformHandleTypeInterface:$target,
+                         DefaultValuedOptionalAttr<BoolAttr, "false">:$experimental);
     let results = (outs);
 
     let assemblyFormat = [{ $target attr-dict `:` type($target)}];

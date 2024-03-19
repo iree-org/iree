@@ -60,6 +60,20 @@
 
 // -----
 
+// CHECK-LABEL: "device.targets"
+"device.targets"() {
+  // CHECK-SAME: target_0 = #hal.device.target<"a">
+  target_0 = #hal.device.target<"a">,
+  // CHECK-SAME: target_1 = #hal.device.target<"b", {config}>,
+  target_1 = #hal.device.target<"b", {config}>,
+  // CHECK-SAME: target_2 = #hal.device.target<"c", {config}, [#hal.executable.target<"llvm-cpu", "f">]>,
+  target_2 = #hal.device.target<"c", {config}, [#hal.executable.target<"llvm-cpu", "f">]>,
+  // CHECK-SAME: target_3 = #hal.device.target<"d", [#hal.executable.target<"llvm-cpu", "f">]>
+  target_3 = #hal.device.target<"d", [#hal.executable.target<"llvm-cpu", "f">]>
+} : () -> ()
+
+// -----
+
 "affinity.queue"() {
   // CHECK: any = #hal.affinity.queue<*>
   any = #hal.affinity.queue<*>,

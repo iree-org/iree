@@ -50,6 +50,7 @@ iree_cc_library(
     "FuseDequantizationMatmul.cpp"
     "FuseSiluHorizontalMatmul.cpp"
     "GeneralizeLinalgNamedOps.cpp"
+    "GlobalLoopInvariantCodeMotion.cpp"
     "InferNumericNarrowing.cpp"
     "MaterializeHomogeneousEncodings.cpp"
     "OptimizeNumerics.cpp"
@@ -64,16 +65,12 @@ iree_cc_library(
     ::PassHeaders
     ::PassesIncGen
     IREEDialectsTransforms
-    IREELinalgExtDialect
-    IREELinalgExtTransforms
-    IREELinalgExtUtils
     IREELinalgTransformDialect
     LLVMSupport
     MLIRAffineDialect
     MLIRArithDialect
     MLIRArithUtils
     MLIRControlFlowDialect
-    MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR
     MLIRLinalgDialect
@@ -84,6 +81,7 @@ iree_cc_library(
     MLIRMemRefTransforms
     MLIRPass
     MLIRSCFDialect
+    MLIRSCFTransforms
     MLIRSupport
     MLIRTensorDialect
     MLIRTensorTransforms
@@ -97,6 +95,9 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::Transforms
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
+    iree::compiler::Dialect::LinalgExt::IR
+    iree::compiler::Dialect::LinalgExt::Transforms
+    iree::compiler::Dialect::LinalgExt::Utils
     iree::compiler::Dialect::Util::Analysis
     iree::compiler::Dialect::Util::Analysis::Attributes
     iree::compiler::Dialect::Util::Analysis::DFX

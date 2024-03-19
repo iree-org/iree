@@ -16,7 +16,6 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
@@ -54,7 +53,8 @@ using ExpandedGlobalMap = DenseMap<StringRef, ExpandedGlobal>;
 // already exist offset globals as duplicates will get added and we'll need to
 // rely on global fusion to get rid of them. Note that this only expands globals
 // and does not yet update use sites - we just need the ops to reference.
-static ExpandedGlobalMap expandResourceGlobals(Operation *rootOp) {
+static ExpandedGlobalMap expandResourceGlobals(Operation *rootOp,
+                                               SymbolTable &symbolTable) {
   ExpandedGlobalMap expandedGlobals;
 
   // Gather all of the resource globals in the root.
@@ -67,7 +67,6 @@ static ExpandedGlobalMap expandResourceGlobals(Operation *rootOp) {
   }
 
   // Expand each global by adding the offset right next to it.
-  SymbolTable symbolTable(rootOp);
   auto indexType = IndexType::get(rootOp->getContext());
   for (auto &it : expandedGlobals) {
     auto &global = it.second;
@@ -112,21 +111,25 @@ static bool usesResources(Operation *op) {
          llvm::any_of(op->getResultTypes(), isResourceType);
 }
 
+static void expandType(Type type, SmallVectorImpl<Type> &newTypes) {
+  newTypes.push_back(type);
+  if (isResourceType(type)) {
+    auto indexType = IndexType::get(type.getContext());
+    newTypes.push_back(indexType); // resource size
+    newTypes.push_back(indexType); // subrange offset
+    newTypes.push_back(indexType); // subrange length
+  }
+}
+
 // Expands resources in the given |types| list to (resource, size, offset, len).
 // This could be changed to some iterator magic to avoid the alloc.
 static SmallVector<Type> expandTypes(TypeRange types) {
   if (types.empty())
     return {};
-  auto indexType = IndexType::get(types.front().getContext());
   SmallVector<Type> newTypes;
   newTypes.reserve(types.size() * 2);
   for (auto type : types) {
-    newTypes.push_back(type);
-    if (isResourceType(type)) {
-      newTypes.push_back(indexType); // resource size
-      newTypes.push_back(indexType); // subrange offset
-      newTypes.push_back(indexType); // subrange length
-    }
+    expandType(type, newTypes);
   }
   return newTypes;
 }
@@ -178,6 +181,22 @@ static Subrange consumeSubrange(Location loc, Value value,
   }
 }
 
+static void expandOperand(Location loc, Value operand,
+                          SmallVectorImpl<Value> &newOperands,
+                          SubrangeMap &subrangeMap, IndexSet &indexSet,
+                          OpBuilder &builder) {
+  if (isResourceType(operand.getType())) {
+    auto subrange =
+        consumeSubrange(loc, operand, subrangeMap, indexSet, builder);
+    newOperands.push_back(subrange.resource);
+    newOperands.push_back(subrange.resourceSize);
+    newOperands.push_back(subrange.subrangeOffset);
+    newOperands.push_back(subrange.subrangeLength);
+  } else {
+    newOperands.push_back(operand);
+  }
+}
+
 // Expands resources in |operands| into (resource, size, offset, length) tuples.
 static SmallVector<Value> expandOperands(Location loc, ValueRange operands,
                                          SubrangeMap &subrangeMap,
@@ -186,29 +205,21 @@ static SmallVector<Value> expandOperands(Location loc, ValueRange operands,
   SmallVector<Value> result;
   result.reserve(operands.size() * 2);
   for (auto operand : operands) {
-    if (isResourceType(operand.getType())) {
-      auto subrange =
-          consumeSubrange(loc, operand, subrangeMap, indexSet, builder);
-      result.push_back(subrange.resource);
-      result.push_back(subrange.resourceSize);
-      result.push_back(subrange.subrangeOffset);
-      result.push_back(subrange.subrangeLength);
-    } else {
-      result.push_back(operand);
-    }
+    expandOperand(loc, operand, result, subrangeMap, indexSet, builder);
   }
   return result;
 }
 
-static void expandSubranges(Operation *op, ExpandedGlobalMap &globalMap,
-                            IndexSet &indexSet, SubrangeMap &subrangeMap);
+static void expandSubranges(Operation *op, SymbolTable &symbolTable,
+                            ExpandedGlobalMap &globalMap, IndexSet &indexSet,
+                            SubrangeMap &subrangeMap);
 
 // Recursively expands resources into (resource, size, offset, length) tuples
 // within the given |region|. All branches, ops, and nested regions will be
 // processed.
 static void expandRegion(Region &region, bool canModifyEntryBlock,
-                         ExpandedGlobalMap &globalMap, IndexSet &indexSet,
-                         SubrangeMap subrangeMap) {
+                         SymbolTable &symbolTable, ExpandedGlobalMap &globalMap,
+                         IndexSet &indexSet, SubrangeMap subrangeMap) {
   if (region.empty())
     return;
 
@@ -255,14 +266,14 @@ static void expandRegion(Region &region, bool canModifyEntryBlock,
   if (region.hasOneBlock()) {
     for (auto &op :
          llvm::make_early_inc_range(region.front().getOperations())) {
-      expandSubranges(&op, globalMap, indexSet, subrangeMap);
+      expandSubranges(&op, symbolTable, globalMap, indexSet, subrangeMap);
     }
   } else {
     DominanceInfo domInfo(region.getParentOp());
     for (auto *blockInfo : llvm::breadth_first(domInfo.getRootNode(&region))) {
       auto *block = blockInfo->getBlock();
       for (auto &op : llvm::make_early_inc_range(block->getOperations())) {
-        expandSubranges(&op, globalMap, indexSet, subrangeMap);
+        expandSubranges(&op, symbolTable, globalMap, indexSet, subrangeMap);
       }
     }
   }
@@ -270,10 +281,12 @@ static void expandRegion(Region &region, bool canModifyEntryBlock,
 
 // Recursively expands all regions on the op.
 static void expandRegions(Operation *op, bool canModifyEntryBlock,
+                          SymbolTable &symbolTable,
                           ExpandedGlobalMap &globalMap, IndexSet &indexSet,
                           SubrangeMap subrangeMap) {
   for (auto &region : op->getRegions()) {
-    expandRegion(region, canModifyEntryBlock, globalMap, indexSet, subrangeMap);
+    expandRegion(region, canModifyEntryBlock, symbolTable, globalMap, indexSet,
+                 subrangeMap);
   }
 }
 
@@ -385,23 +398,11 @@ static void expandGlobalStoreOp(IREE::Util::GlobalStoreOpInterface op,
 }
 
 static void expandInitializerOp(IREE::Util::InitializerOp op,
+                                SymbolTable &symbolTable,
                                 ExpandedGlobalMap &globalMap,
                                 IndexSet &indexSet, SubrangeMap &subrangeMap) {
-  expandRegion(op.getRegion(), /*canModifyEntryBlock=*/false, globalMap,
-               indexSet, subrangeMap);
-}
-
-// Returns true if |op| is either public and visible to external modules or
-// external and resolved later on. We can't modify their signatures.
-static bool isPublicOrExternal(CallableOpInterface callableOp) {
-  if (auto symbolOp = dyn_cast<SymbolOpInterface>(callableOp.getOperation())) {
-    if (symbolOp.isPublic())
-      return true;
-  }
-  auto *region = callableOp.getCallableRegion();
-  if (!region || region->empty())
-    return true;
-  return false;
+  expandRegion(op.getRegion(), /*canModifyEntryBlock=*/false, symbolTable,
+               globalMap, indexSet, subrangeMap);
 }
 
 // Inserts subranges on resource arguments.
@@ -412,25 +413,26 @@ static bool isPublicOrExternal(CallableOpInterface callableOp) {
 // sites don't need a wait.
 //
 // Example:
-//  func.func @foo(%0: !stream.resource)
+//  util.func @foo(%0: !stream.resource)
 //  ->
-//  func.func @foo(%0: !stream.resource, %sz: index, %o: index, %l: index) {
+//  util.func @foo(%0: !stream.resource, %sz: index, %o: index, %l: index) {
 //    %1 = stream.resource.subview %0[%o] : {%sz} -> {%l}
-static void expandFuncOp(mlir::func::FuncOp op, ExpandedGlobalMap &globalMap,
-                         IndexSet &indexSet, SubrangeMap &subrangeMap) {
+static void expandFuncOp(IREE::Util::FuncOp op, SymbolTable &symbolTable,
+                         ExpandedGlobalMap &globalMap, IndexSet &indexSet,
+                         SubrangeMap &subrangeMap) {
   // Ignore public/external function signatures but still convert regions.
-  bool canModifyEntryBlock = !isPublicOrExternal(op);
+  bool canModifyEntryBlock = !IREE::Util::isPublicOrExternal(op);
   if (canModifyEntryBlock) {
-    auto oldType = op.getFunctionType();
-    auto inputTypes = expandTypes(oldType.getInputs());
-    auto resultTypes = expandTypes(oldType.getResults());
-    auto newType = FunctionType::get(op.getContext(), inputTypes, resultTypes);
-    if (newType != oldType) {
-      op.setType(newType);
-    }
+    op.expandSignature(
+        [&](unsigned i, Type type, SmallVectorImpl<Type> &newTypes) {
+          expandType(type, newTypes);
+        },
+        [&](unsigned i, Type type, SmallVectorImpl<Type> &newTypes) {
+          expandType(type, newTypes);
+        });
   }
-  expandRegion(op.getRegion(), canModifyEntryBlock, globalMap, indexSet,
-               subrangeMap);
+  expandRegion(op.getRegion(), canModifyEntryBlock, symbolTable, globalMap,
+               indexSet, subrangeMap);
 }
 
 // Splits resource operands and results into (resource, resourceSize,
@@ -443,28 +445,31 @@ static void expandFuncOp(mlir::func::FuncOp op, ExpandedGlobalMap &globalMap,
 //
 // Example:
 //  %1 = stream.resource.subview %0[%o] : {%sz} -> {%l}
-//  %r = call @foo(%1)
+//  %r = util.call @foo(%1)
 //  ->
-//  %r, %rsz, %ro, %rl = call @foo(%0, %sz, %o, %l)
+//  %r, %rsz, %ro, %rl = util.call @foo(%0, %sz, %o, %l)
 //  %2 = stream.resource.subview %r[%ro] : {%rsz} -> {%rl}
-static void expandCallOp(mlir::func::CallOp op, IndexSet &indexSet,
-                         SubrangeMap &subrangeMap) {
+static void expandCallOp(IREE::Util::CallOp op, SymbolTable &symbolTable,
+                         IndexSet &indexSet, SubrangeMap &subrangeMap) {
   if (!usesResources(op))
     return;
 
   // Ignore calls to public/external functions.
-  auto calleeOp = SymbolTable::lookupNearestSymbolFrom<CallableOpInterface>(
-      op, op.getCalleeAttr());
-  if (isPublicOrExternal(calleeOp))
+  auto calleeOp = symbolTable.lookup<CallableOpInterface>(op.getCallee());
+  if (IREE::Util::isPublicOrExternal(calleeOp))
     return;
 
   // Build the new call op with expanded operands and results.
   OpBuilder builder(op);
-  auto operands = expandOperands(op.getLoc(), op.getOperands(), subrangeMap,
-                                 indexSet, builder);
-  auto resultTypes = expandTypes(op.getResultTypes());
-  auto newOp = builder.create<mlir::func::CallOp>(op.getLoc(), op.getCallee(),
-                                                  resultTypes, operands);
+  auto newOp = op.cloneAndExpand(
+      [&](unsigned i, Value operand, SmallVectorImpl<Value> &newOperands) {
+        expandOperand(op.getLoc(), operand, newOperands, subrangeMap, indexSet,
+                      builder);
+      },
+      [&](unsigned i, Type type, SmallVectorImpl<Type> &newTypes) {
+        expandType(type, newTypes);
+      },
+      builder);
 
   // Insert subranges on results that we are sinking across the call edge.
   // The hope is that by moving the subranges here we can fold with uses inside
@@ -499,19 +504,19 @@ static void expandCallOp(mlir::func::CallOp op, IndexSet &indexSet,
 //
 // Example:
 //  %1 = stream.resource.subview %0[%o] : {%sz} -> {%l}
-//  return %1
+//  util.return %1
 //  ->
-//  return %0, %sz, %o, %l
-static void expandReturnOp(mlir::func::ReturnOp op, IndexSet &indexSet,
+//  util.return %0, %sz, %o, %l
+static void expandReturnOp(IREE::Util::ReturnOp op, IndexSet &indexSet,
                            SubrangeMap &subrangeMap) {
   if (!usesResources(op))
     return;
-  if (isPublicOrExternal(op->getParentOfType<mlir::func::FuncOp>()))
+  if (IREE::Util::isPublicOrExternal(op->getParentOfType<IREE::Util::FuncOp>()))
     return;
   OpBuilder builder(op);
   auto operands = expandOperands(op.getLoc(), op.getOperands(), subrangeMap,
                                  indexSet, builder);
-  builder.create<mlir::func::ReturnOp>(op.getLoc(), operands);
+  builder.create<IREE::Util::ReturnOp>(op.getLoc(), operands);
   op.erase();
 }
 
@@ -573,8 +578,9 @@ static void expandSwitchOp(mlir::cf::SwitchOp op, IndexSet &indexSet,
 
 // Recursively expands resources into (resource, size, offset, length) in |op|.
 // TODO(benvanik): make this a type switch.
-static void expandSubranges(Operation *op, ExpandedGlobalMap &globalMap,
-                            IndexSet &indexSet, SubrangeMap &subrangeMap) {
+static void expandSubranges(Operation *op, SymbolTable &symbolTable,
+                            ExpandedGlobalMap &globalMap, IndexSet &indexSet,
+                            SubrangeMap &subrangeMap) {
   if (auto subrangeOp = dyn_cast<IREE::Util::SubrangeOpInterface>(op)) {
     return updateSubrangeOp(subrangeOp, indexSet, subrangeMap);
   }
@@ -584,12 +590,13 @@ static void expandSubranges(Operation *op, ExpandedGlobalMap &globalMap,
   } else if (auto storeOp = dyn_cast<IREE::Util::GlobalStoreOpInterface>(op)) {
     return expandGlobalStoreOp(storeOp, globalMap, indexSet, subrangeMap);
   } else if (auto initializerOp = dyn_cast<IREE::Util::InitializerOp>(op)) {
-    return expandInitializerOp(initializerOp, globalMap, indexSet, subrangeMap);
-  } else if (auto funcOp = dyn_cast<mlir::func::FuncOp>(op)) {
-    return expandFuncOp(funcOp, globalMap, indexSet, subrangeMap);
-  } else if (auto callOp = dyn_cast<mlir::func::CallOp>(op)) {
-    return expandCallOp(callOp, indexSet, subrangeMap);
-  } else if (auto returnOp = dyn_cast<mlir::func::ReturnOp>(op)) {
+    return expandInitializerOp(initializerOp, symbolTable, globalMap, indexSet,
+                               subrangeMap);
+  } else if (auto funcOp = dyn_cast<IREE::Util::FuncOp>(op)) {
+    return expandFuncOp(funcOp, symbolTable, globalMap, indexSet, subrangeMap);
+  } else if (auto callOp = dyn_cast<IREE::Util::CallOp>(op)) {
+    return expandCallOp(callOp, symbolTable, indexSet, subrangeMap);
+  } else if (auto returnOp = dyn_cast<IREE::Util::ReturnOp>(op)) {
     return expandReturnOp(returnOp, indexSet, subrangeMap);
   } else if (auto branchOp = dyn_cast<mlir::cf::BranchOp>(op)) {
     return expandBranchOp(branchOp, indexSet, subrangeMap);
@@ -604,14 +611,14 @@ static void expandSubranges(Operation *op, ExpandedGlobalMap &globalMap,
   // We could add an interface to ops we want to do this to, though, to at least
   // allow dialects to plug in. For now we just need SCF so this is hardcoded.
   if (auto ifOp = dyn_cast<mlir::scf::IfOp>(op)) {
-    return expandRegions(ifOp, /*canModifyEntryBlock=*/false, globalMap,
-                         indexSet, subrangeMap);
+    return expandRegions(ifOp, /*canModifyEntryBlock=*/false, symbolTable,
+                         globalMap, indexSet, subrangeMap);
   } else if (auto forOp = dyn_cast<mlir::scf::ForOp>(op)) {
-    return expandRegions(forOp, /*canModifyEntryBlock=*/false, globalMap,
-                         indexSet, subrangeMap);
+    return expandRegions(forOp, /*canModifyEntryBlock=*/false, symbolTable,
+                         globalMap, indexSet, subrangeMap);
   } else if (auto whileOp = dyn_cast<mlir::scf::WhileOp>(op)) {
-    return expandRegions(whileOp, /*canModifyEntryBlock=*/false, globalMap,
-                         indexSet, subrangeMap);
+    return expandRegions(whileOp, /*canModifyEntryBlock=*/false, symbolTable,
+                         globalMap, indexSet, subrangeMap);
   }
   // TODO(benvanik): also handle scf.yield: today we don't propagate across
   // return values.
@@ -634,16 +641,16 @@ class PropagateSubrangesPass
 public:
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<mlir::arith::ArithDialect>();
-    registry.insert<mlir::func::FuncDialect>();
     registry.insert<mlir::scf::SCFDialect>();
     registry.insert<IREE::Util::UtilDialect>();
   }
 
   void runOnOperation() override {
     auto rootOp = getOperation();
+    SymbolTable symbolTable(rootOp);
 
     // Expand all util.global ops holding resources into resource and subrange.
-    auto globalMap = expandResourceGlobals(rootOp);
+    auto globalMap = expandResourceGlobals(rootOp, symbolTable);
 
     // Walk the entire IR tree and expand the globals.
     // We could do this via pattern application but that gets much trickier to
@@ -658,7 +665,8 @@ public:
       IndexSet indexSet(callableOp.getLoc(),
                         OpBuilder::atBlockBegin(&region->front()));
       SubrangeMap subrangeMap;
-      expandSubranges(callableOp, globalMap, indexSet, subrangeMap);
+      expandSubranges(callableOp, symbolTable, globalMap, indexSet,
+                      subrangeMap);
     }
   }
 };

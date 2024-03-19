@@ -18,7 +18,6 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "multiple_target_env_conversion.mlir"
     "target_env_conversion.mlir"
   TOOLS
     FileCheck

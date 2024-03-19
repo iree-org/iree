@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: @FoldBufferViewCreateSubspan
 // CHECK-SAME: (%[[BASE_BUFFER:.+]]: !hal.buffer, %[[SUBSPAN_OFFSET:.+]]: index, %[[SUBSPAN_LENGTH:.+]]: index)
-func.func @FoldBufferViewCreateSubspan(%base_buffer: !hal.buffer, %subspan_offset: index, %subspan_length: index) -> !hal.buffer_view {
+util.func public @FoldBufferViewCreateSubspan(%base_buffer: !hal.buffer, %subspan_offset: index, %subspan_length: index) -> !hal.buffer_view {
   %subspan = hal.buffer.subspan<%base_buffer : !hal.buffer>[%subspan_offset, %subspan_length] : !hal.buffer
   // CHECK-DAG: %[[VIEW_OFFSET:.+]] = arith.constant 512
   %view_offset = arith.constant 512 : index
@@ -18,5 +18,5 @@ func.func @FoldBufferViewCreateSubspan(%base_buffer: !hal.buffer, %subspan_offse
                                  shape([%dim0])
                                  type(%type)
                                  encoding(%encoding) : !hal.buffer_view
-  return %view : !hal.buffer_view
+  util.return %view : !hal.buffer_view
 }

@@ -327,12 +327,16 @@ ParseResult parseOperandTypeList(OpAsmParser &parser,
                                  SmallVectorImpl<Type> &operandTypes) {
   if (failed(parser.parseLParen()))
     return failure();
-  while (!succeeded(parser.parseOptionalRParen())) {
+  if (succeeded(parser.parseOptionalRParen()))
+    return success(); // empty
+  do {
     Type type;
     if (failed(parser.parseType(type)))
       return failure();
     operandTypes.push_back(type);
-  }
+  } while (succeeded(parser.parseOptionalComma()));
+  if (failed(parser.parseRParen()))
+    return failure();
   return success();
 }
 
@@ -1262,8 +1266,9 @@ FuncOp FuncOp::create(Location location, StringRef name, FunctionType type,
   OpBuilder builder(location->getContext());
   OperationState state(location, getOperationName());
   FuncOp::build(builder, state, name, type,
-                builder.getIndexArrayAttr(tiedOperands), attrs, argAttrs,
-                resAttrs);
+                tiedOperands.empty() ? ArrayAttr{}
+                                     : builder.getIndexArrayAttr(tiedOperands),
+                attrs, argAttrs, resAttrs);
   return cast<FuncOp>(Operation::create(state));
 }
 
@@ -1275,12 +1280,14 @@ void FuncOp::build(OpBuilder &builder, OperationState &state, StringRef name,
   state.addAttribute(SymbolTable::getSymbolAttrName(),
                      builder.getStringAttr(name));
   state.addAttribute(SymbolTable::getVisibilityAttrName(),
-                     builder.getStringAttr("private"));
+                     builder.getStringAttr("public"));
   state.addAttribute("function_type", TypeAttr::get(type));
   state.attributes.append(attrs.begin(), attrs.end());
   state.attributes.erase(IREE::Util::TiedOpInterface::getStorageAttrName());
-  state.addAttribute(IREE::Util::TiedOpInterface::getStorageAttrName(),
-                     tiedOperands);
+  if (tiedOperands) {
+    state.addAttribute(IREE::Util::TiedOpInterface::getStorageAttrName(),
+                       tiedOperands);
+  }
   state.addRegion();
   if (!argAttrs.empty() || !resAttrs.empty()) {
     assert(type.getNumInputs() == argAttrs.size());
@@ -1417,12 +1424,96 @@ void FuncOp::print(OpAsmPrinter &p) {
   }
 }
 
+bool IREE::Util::FuncOp::hasAnyTiedOperands() {
+  auto tiedOperandsAttr = getTiedOperandsAttr();
+  if (!tiedOperandsAttr)
+    return false;
+  return llvm::any_of(
+      tiedOperandsAttr.getAsRange<IntegerAttr>(), [](IntegerAttr attr) {
+        return attr.getInt() != IREE::Util::TiedOpInterface::kUntiedIndex;
+      });
+}
+
+void IREE::Util::FuncOp::expandSignature(
+    std::function<void(unsigned, Type, SmallVectorImpl<Type> &)> expandArgument,
+    std::function<void(unsigned, Type, SmallVectorImpl<Type> &)> expandResult) {
+  auto oldType = getFunctionType();
+
+  SmallVector<DictionaryAttr> oldArgumentAttrs;
+  getAllArgAttrs(oldArgumentAttrs);
+  SmallVector<DictionaryAttr> oldResultAttrs;
+  getAllResultAttrs(oldResultAttrs);
+
+  SmallVector<int64_t> adjustedTiedOperands;
+  IREE::Util::detail::getAllTiedOperands(getOperation(), adjustedTiedOperands);
+
+  SmallVector<Type> newArgumentTypes;
+  SmallVector<DictionaryAttr> newArgumentAttrs;
+  for (auto [oldIndex, argType] : llvm::enumerate(oldType.getInputs())) {
+    size_t newIndex = newArgumentTypes.size();
+    expandArgument(oldIndex, argType, newArgumentTypes);
+    size_t expandedCount = newArgumentTypes.size() - newIndex;
+    for (size_t i = 0; i < adjustedTiedOperands.size(); ++i) {
+      if (adjustedTiedOperands[i] == oldIndex)
+        adjustedTiedOperands[i] = newIndex;
+    }
+    newArgumentAttrs.push_back(oldArgumentAttrs[oldIndex]);
+    newArgumentAttrs.append(expandedCount - 1,
+                            DictionaryAttr::get(getContext()));
+  }
+
+  SmallVector<Type> newResultTypes;
+  SmallVector<int64_t> newTiedOperands;
+  SmallVector<DictionaryAttr> newResultAttrs;
+  for (auto [oldIndex, resultType] : llvm::enumerate(oldType.getResults())) {
+    size_t newIndex = newResultTypes.size();
+    expandResult(oldIndex, resultType, newResultTypes);
+    size_t expandedCount = newResultTypes.size() - newIndex;
+    newTiedOperands.push_back(adjustedTiedOperands[oldIndex]);
+    newTiedOperands.append(expandedCount - 1,
+                           IREE::Util::TiedOpInterface::kUntiedIndex);
+    newResultAttrs.push_back(oldResultAttrs[oldIndex]);
+    newResultAttrs.append(expandedCount - 1, DictionaryAttr::get(getContext()));
+  }
+
+  auto newType =
+      FunctionType::get(getContext(), newArgumentTypes, newResultTypes);
+  if (newType != oldType) {
+    setFunctionType(newType);
+    setTiedOperandsAttr(ArrayAttr::get(
+        getContext(),
+        llvm::map_to_vector<8>(newTiedOperands, [&](int64_t v) -> Attribute {
+          return IntegerAttr::get(IndexType::get(getContext()), v);
+        })));
+    setAllArgAttrs(newArgumentAttrs);
+    setAllResultAttrs(newResultAttrs);
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // util.call
 //===----------------------------------------------------------------------===//
 
 FunctionType CallOp::getCalleeType() {
   return FunctionType::get(getContext(), getOperandTypes(), getResultTypes());
+}
+
+static bool areTiedOperandsEqual(ArrayAttr a, ArrayAttr b) {
+  auto hasAnyTied = [](ArrayAttr tiedOperandsAttr) {
+    if (!tiedOperandsAttr)
+      return false;
+    return llvm::any_of(
+        tiedOperandsAttr.getAsRange<IntegerAttr>(), [](IntegerAttr attr) {
+          return attr.getInt() != IREE::Util::TiedOpInterface::kUntiedIndex;
+        });
+  };
+  bool hasAnyTiedA = hasAnyTied(a);
+  bool hasAnyTiedB = hasAnyTied(b);
+  if (hasAnyTiedA != hasAnyTiedB)
+    return false;
+  if (!a || !b)
+    return true;
+  return a == b;
 }
 
 LogicalResult CallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
@@ -1444,14 +1535,48 @@ LogicalResult CallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
   }
 
   // Ensure tied operands are consistent.
-  auto expectedTiedOperands = getTiedOperandsAttr();
+  auto callerTiedOperands = getTiedOperandsAttr();
   auto calleeTiedOperands = calleeOp.getTiedOperandsAttr();
-  if (calleeTiedOperands != expectedTiedOperands) {
-    return emitOpError("function tied operands mismatch; expected ")
-           << expectedTiedOperands << " but callee is " << calleeTiedOperands;
+  if (!areTiedOperandsEqual(calleeTiedOperands, callerTiedOperands)) {
+    return emitOpError("function tied operands mismatch; have ")
+           << callerTiedOperands << " but callee is " << calleeTiedOperands;
   }
 
   return success();
+}
+
+IREE::Util::CallOp IREE::Util::CallOp::cloneAndExpand(
+    std::function<void(unsigned, Value, SmallVectorImpl<Value> &)>
+        expandOperand,
+    std::function<void(unsigned, Type, SmallVectorImpl<Type> &)> expandResult,
+    OpBuilder &builder) {
+  SmallVector<int64_t> adjustedTiedOperands;
+  IREE::Util::detail::getAllTiedOperands(getOperation(), adjustedTiedOperands);
+
+  SmallVector<Value> newOperands;
+  for (auto [oldIndex, operand] : llvm::enumerate(getOperands())) {
+    size_t newIndex = newOperands.size();
+    expandOperand(oldIndex, operand, newOperands);
+    for (size_t i = 0; i < adjustedTiedOperands.size(); ++i) {
+      if (adjustedTiedOperands[i] == oldIndex)
+        adjustedTiedOperands[i] = newIndex;
+    }
+  }
+
+  SmallVector<Type> newResultTypes;
+  SmallVector<int64_t> newTiedOperands;
+  for (auto [oldIndex, resultType] : llvm::enumerate(getResultTypes())) {
+    size_t newIndex = newResultTypes.size();
+    expandResult(oldIndex, resultType, newResultTypes);
+    size_t expandedCount = newResultTypes.size() - newIndex;
+    newTiedOperands.push_back(adjustedTiedOperands[oldIndex]);
+    newTiedOperands.append(expandedCount - 1,
+                           IREE::Util::TiedOpInterface::kUntiedIndex);
+  }
+
+  return builder.create<IREE::Util::CallOp>(
+      getLoc(), newResultTypes, getCallee(), newOperands,
+      builder.getIndexArrayAttr(newTiedOperands));
 }
 
 //===----------------------------------------------------------------------===//

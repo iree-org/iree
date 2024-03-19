@@ -1,8 +1,8 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(func.func(iree-util-strip-debug-ops))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(util.func(iree-util-strip-debug-ops))' %s | FileCheck %s
 
 // CHECK-LABEL: @stripAssert
-func.func @stripAssert(%cond: i1) {
+util.func @stripAssert(%cond: i1) {
   // CHECK-NOT: cf.assert
   cf.assert %cond, "hello!"
-  return
+  util.return
 }

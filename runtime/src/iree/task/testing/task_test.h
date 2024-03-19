@@ -31,7 +31,8 @@ class TaskTest : public ::testing::Test {
         options, &topology, iree_allocator_system(), &executor_));
     iree_task_topology_deinitialize(&topology);
 
-    iree_task_scope_initialize(iree_make_cstring_view("scope"), &scope_);
+    iree_task_scope_initialize(iree_make_cstring_view("scope"),
+                               IREE_TASK_SCOPE_FLAG_NONE, &scope_);
   }
 
   virtual void TearDown() {

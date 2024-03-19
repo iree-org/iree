@@ -62,66 +62,6 @@ struct LowerUnPackPattern : public OpRewritePattern<tensor::UnPackOp> {
   }
 };
 
-/// Folding trailing unit dims away from transpose op if they are not
-/// transposed.
-/// TODO(hanchung): Remove the workaround after we materialize encoding to do 1D
-/// data tiling instead of 2D with unit dimension for AVX512 targets. This is a
-/// workaround for 1D data tiling which is represented in 2D with an unit
-/// dimension form.
-struct FoldTrailingUnitTranspose
-    : public OpRewritePattern<linalg::TransposeOp> {
-  using OpRewritePattern<linalg::TransposeOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(linalg::TransposeOp op,
-                                PatternRewriter &rewriter) const override {
-    auto inputTy = llvm::cast<ShapedType>(op.getInput().getType());
-    int numDropDims = 0;
-    ArrayRef<int64_t> perm = op.getPermutation();
-    for (int idx = inputTy.getRank() - 1; idx >= 0; idx--) {
-      if (idx != perm[idx] || inputTy.getDimSize(idx) != 1)
-        break;
-      numDropDims++;
-    }
-    if (numDropDims == 0)
-      return failure();
-
-    // Dropping all dims. Elide now to avoid corner cases.
-    if (numDropDims == inputTy.getRank()) {
-      rewriter.replaceOp(op, op.getInput());
-      return success();
-    }
-
-    Location loc = op.getLoc();
-    SmallVector<OpFoldResult> srcMixedSizes =
-        tensor::getMixedSizes(rewriter, loc, op.getInput());
-    SmallVector<OpFoldResult> mixedStride(inputTy.getRank(),
-                                          rewriter.getIndexAttr(1));
-    SmallVector<OpFoldResult> mixedOffsets(inputTy.getRank(),
-                                           rewriter.getIndexAttr(0));
-    auto src = rewriter.create<tensor::ExtractSliceOp>(
-        loc,
-        RankedTensorType::get(inputTy.getShape().drop_back(numDropDims),
-                              inputTy.getElementType()),
-        op.getInput(), mixedOffsets, srcMixedSizes, mixedStride);
-
-    SmallVector<OpFoldResult> destMixedSizes =
-        tensor::getMixedSizes(rewriter, loc, op.getInit());
-    auto initTy = llvm::cast<ShapedType>(op.getInit().getType());
-    destMixedSizes.resize(initTy.getRank() - numDropDims);
-    auto dest = rewriter.create<tensor::EmptyOp>(loc, destMixedSizes,
-                                                 initTy.getElementType());
-    auto transp = rewriter.create<linalg::TransposeOp>(
-        loc, src, dest, perm.drop_back(numDropDims));
-    destMixedSizes.resize(initTy.getRank(), rewriter.getIndexAttr(1));
-    auto insertSliceOp = rewriter.create<tensor::InsertSliceOp>(
-        loc, transp.getResult()[0], op.getInit(), mixedOffsets, destMixedSizes,
-        mixedStride);
-    rewriter.replaceOp(op, insertSliceOp.getResult());
-
-    return success();
-  }
-};
-
 struct DecomposePackUnPackOpsPass
     : public DecomposePackUnPackOpsBase<DecomposePackUnPackOpsPass> {
   DecomposePackUnPackOpsPass(bool tileOuterToOne) {
@@ -255,15 +195,6 @@ void DecomposePackUnPackOpsPass::runOnOperation() {
     RewritePatternSet patterns(ctx);
     patterns.add<linalg::GeneralizeOuterUnitDimsPackOpPattern,
                  linalg::GeneralizeOuterUnitDimsUnPackOpPattern>(ctx);
-    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-      return signalPassFailure();
-    }
-  }
-
-  // Fold trailing unit dims away for linalg.transpose ops.
-  {
-    RewritePatternSet patterns(ctx);
-    patterns.add<FoldTrailingUnitTranspose>(ctx);
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }

@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/builtins/ukernel/exported_bits.h"
 #include "iree/compiler/Codegen/Common/CPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/CPU/Passes.h"
@@ -13,6 +12,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -119,11 +119,6 @@ getFnNameAndDefAttrs(const char *ukernelName, RewriterBase &rewriter,
         rewriter.getArrayAttr({rewriter.getStringAttr("processor_data")}));
     result.defAttrs.emplace_back(rewriter.getStringAttr("hal.import.bitcode"),
                                  rewriter.getBoolAttr(true));
-    result.defAttrs.emplace_back(
-        rewriter.getStringAttr("hal.import.cconv"),
-        IREE::HAL::CallingConventionAttr::get(
-            rewriter.getContext(),
-            IREE::HAL::CallingConvention::ParameterStruct));
   }
   return result;
 }
@@ -227,6 +222,11 @@ matchDAGForUKernel(RewriterBase &rewriter, linalg::Mmt4DOp op,
     flags |= IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS;
   }
 
+  // TODO(#15784): drop the fallback flag, instead create a iree_uk_mmt4d_info
+  // ukernel op to query whether the ukernel has fast code for this case, and
+  // preserve the original `linalg.mmt4d` as a fallback in the `else` branch.
+  flags |= IREE_UK_FLAG_MMT4D_ALLOW_GENERIC_FALLBACK_TILE_FUNCTION;
+
   Location loc = op.getLoc();
   Value m = rewriter.create<tensor::DimOp>(loc, lhs, 0);
   Value n = rewriter.create<tensor::DimOp>(loc, rhs, 0);
@@ -244,8 +244,15 @@ matchDAGForUKernel(RewriterBase &rewriter, linalg::Mmt4DOp op,
   Value flagsVal = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getI32IntegerAttr(flags));
   auto fn = getFnNameAndDefAttrs(ukernelName, rewriter, targetAttr);
+  SmallVector<Type> returnTypes{outType};
+  if (!isVMVXBackend(targetAttr)) {
+    // Hack to avoid issues with void-returning functions in llvm-cpu.
+    // Note that the first return value, of tensor type, disappears in
+    // bufferization.
+    returnTypes.push_back(rewriter.getI32Type());
+  }
   auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
-      loc, outType, fn.name, ValueRange{lhs, rhs}, out,
+      loc, returnTypes, fn.name, ValueRange{lhs, rhs}, out,
       ValueRange{m, n, k, m0, n0, k0, flagsVal},
       /*fn_def_attrs=*/rewriter.getDictionaryAttr(fn.defAttrs),
       /*strided_outer_dims=*/rewriter.getIndexAttr(1));
@@ -573,7 +580,9 @@ struct LowerToUKernelPattern : OpRewritePattern<OpType> {
       return rewriter.notifyMatchFailure(
           op, "failed to find microkernel op to replace with");
     }
-    rewriter.replaceOp(op, ukernelOp.value()->getResults());
+    SmallVector<Value> results = ukernelOp.value()->getResults();
+    results.truncate(op->getNumResults());
+    rewriter.replaceOp(op, results);
     return success();
   }
 

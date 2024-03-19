@@ -6,8 +6,6 @@
 
 #include "CommonExtensions.h"
 
-#include "iree-dialects/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree-dialects/Dialect/LinalgTransform/SimplePatternRewriter.h"
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "iree-dialects/Transforms/TransformMatchers.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
@@ -23,6 +21,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
@@ -939,10 +938,12 @@ void transform_dialect::TestVectorLayoutAnalysisOp::getEffects(
 
 class TestVectorLayoutOptions : public VectorLayoutOptions {
 public:
-  TestVectorLayoutOptions(Operation *root) : VectorLayoutOptions(root) {}
+  TestVectorLayoutOptions(Operation *root)
+      : VectorLayoutOptions(root, /*fullConversion=*/false) {}
 
-  void setAnchorOps(VectorLayoutAnalysis &analysis) override {
+  LogicalResult setAnchorOps(VectorLayoutAnalysis &analysis) override {
     setAnchorOpsFromAttributes(analysis, root);
+    return success();
   }
 };
 
@@ -966,7 +967,13 @@ transform_dialect::TestGpuVectorDistribution::applyToOne(
   populateGPUDistributionPatterns(patterns);
   populateGPUDistributionLayoutAttrPatterns(laneId, patterns);
   populateGPUReductionDistributionPatterns(patterns);
-  distributeVectorOps(target, patterns, options);
+  populateGPUDistributeNestedLayoutAttrPatterns(laneId, patterns);
+  populateGPUDistributeNestedLayoutContractAMDGPUPatterns(patterns);
+  if (getExperimental())
+    populateGPULayoutResolutionDistributionPatterns(patterns);
+  if (failed(distributeVectorOps(target, patterns, options))) {
+    return emitDefaultDefiniteFailure(target);
+  }
   return DiagnosedSilenceableFailure::success();
 }
 

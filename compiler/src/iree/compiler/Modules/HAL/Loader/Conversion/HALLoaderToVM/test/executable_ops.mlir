@@ -3,13 +3,13 @@
 
 // CHECK-LABEL: @executableLoad
 // CHECK-SAME: (%[[EXECUTABLE_DATA:.+]]: !vm.buffer)
-func.func @executableLoad(%executable_data: !util.buffer) -> !hal.executable {
+util.func public @executableLoad(%executable_data: !util.buffer) -> !hal.executable {
   // CHECK-DAG: %[[CONSTANTS:.+]] = vm.const.ref.zero : !vm.buffer
   // CHECK-DAG: %[[FORMAT_STR:.+]] = vm.rodata.inline {{.+}} : !vm.buffer = "executable_format"
   // CHECK: %[[EXECUTABLE:.+]] = vm.call @hal_loader.executable.load(%[[FORMAT_STR]], %[[EXECUTABLE_DATA]], %[[CONSTANTS]])
   %executable = hal_loader.executable.load format("executable_format") data(%executable_data) : !hal.executable
   // CHECK: return %[[EXECUTABLE]]
-  return %executable : !hal.executable
+  util.return %executable : !hal.executable
 }
 
 // -----
@@ -17,7 +17,9 @@ func.func @executableLoad(%executable_data: !util.buffer) -> !hal.executable {
 // CHECK-LABEL: @executableDispatch
 // CHECK-SAME: (%[[EXECUTABLE:.+]]: !vm.ref<!hal.executable>,
 // CHECK-SAME:  %[[BUFFER0:.+]]: !vm.buffer, %[[BUFFER1:.+]]: !vm.buffer)
-func.func @executableDispatch(%executable: !hal.executable, %buffer0: !util.buffer, %buffer1: !util.buffer) {
+util.func public @executableDispatch(%executable: !hal.executable, %buffer0: !util.buffer, %buffer1: !util.buffer) {
+  // CHECK-DAG: %[[ORDINAL:.+]] = vm.const.i32 16
+  %ordinal = arith.constant 16 : index
   // CHECK-DAG: %[[COUNT_X:.+]] = vm.const.i32 1000
   %count_x = arith.constant 1000 : index
   // CHECK-DAG: %[[COUNT_Y:.+]] = vm.const.i32 1001
@@ -38,8 +40,8 @@ func.func @executableDispatch(%executable: !hal.executable, %buffer0: !util.buff
   %length1 = arith.constant 256 : index
   // CHECK: vm.call.variadic @hal_loader.executable.dispatch
   hal_loader.executable.dispatch
-    // CHECK-SAME: %[[EXECUTABLE]], %c16
-    executable(%executable : !hal.executable)[16]
+    // CHECK-SAME: %[[EXECUTABLE]], %[[ORDINAL]]
+    executable(%executable : !hal.executable)[%ordinal]
     // CHECK-SAME: %[[COUNT_X]], %[[COUNT_Y]], %[[COUNT_Z]]
     workgroups([%count_x, %count_y, %count_z])
     // CHECK-SAME: [%[[CONSTANT0]], %[[CONSTANT1]]]
@@ -50,5 +52,5 @@ func.func @executableDispatch(%executable: !hal.executable, %buffer0: !util.buff
       // CHECK-SAME: (%[[BUFFER1]], %[[OFFSET1]], %[[LENGTH1]])
       (%buffer1 : !util.buffer)[%offset1, %length1]
     ])
-  return
+  util.return
 }

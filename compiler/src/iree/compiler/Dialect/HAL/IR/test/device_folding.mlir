@@ -2,7 +2,7 @@
 
 // CHECK-LABEL: @ImmediatelyResolveDeviceQueueBarrier
 // CHECK-SAME: (%[[DEVICE:.+]]: !hal.device, %[[SIGNAL_FENCE:.+]]: !hal.fence)
-func.func @ImmediatelyResolveDeviceQueueBarrier(%device: !hal.device, %signal_fence: !hal.fence) {
+util.func public @ImmediatelyResolveDeviceQueueBarrier(%device: !hal.device, %signal_fence: !hal.fence) {
   %c-1_i64 = arith.constant -1 : i64
   // CHECK-NOT: util.null
   %wait_fence = util.null : !hal.fence
@@ -12,27 +12,27 @@ func.func @ImmediatelyResolveDeviceQueueBarrier(%device: !hal.device, %signal_fe
       affinity(%c-1_i64)
       wait(%wait_fence)
       signal(%signal_fence)
-  return
+  util.return
 }
 
 // -----
 
 // CHECK-LABEL: @HoistDeviceQueueBarrierChain
 // CHECK-SAME: (%[[DEVICE:.+]]: !hal.device, %[[SIGNAL_FENCE:.+]]: !hal.fence)
-func.func @HoistDeviceQueueBarrierChain(%device: !hal.device, %signal_fence: !hal.fence) {
+util.func public @HoistDeviceQueueBarrierChain(%device: !hal.device, %signal_fence: !hal.fence) {
   %c-1_i64 = arith.constant -1 : i64
   // CHECK-NOT: hal.fence.create
   %temp_fence = hal.fence.create device(%device : !hal.device) flags("None") : !hal.fence
-  // CHECK: call @external_async_fn(%[[SIGNAL_FENCE]])
-  call @external_async_fn(%temp_fence) : (!hal.fence) -> ()
+  // CHECK: util.call @external_async_fn(%[[SIGNAL_FENCE]])
+  util.call @external_async_fn(%temp_fence) : (!hal.fence) -> ()
   // CHECK-NOT: hal.device.queue.execute
   hal.device.queue.execute<%device : !hal.device>
       affinity(%c-1_i64)
       wait(%temp_fence)
       signal(%signal_fence)
-  return
+  util.return
 }
-func.func private @external_async_fn(!hal.fence)
+util.func private @external_async_fn(!hal.fence)
 
 // -----
 
@@ -41,7 +41,7 @@ func.func private @external_async_fn(!hal.fence)
 
 // CHECK-LABEL: @HoistDeviceQueueBarrierChainOutOfOrder
 // CHECK-SAME: (%[[DEVICE:.+]]: !hal.device, %[[CMD:.+]]: !hal.command_buffer, %[[WAIT_FENCE:.+]]: !hal.fence)
-func.func @HoistDeviceQueueBarrierChainOutOfOrder(%device: !hal.device, %cmd: !hal.command_buffer, %wait_fence: !hal.fence) -> !hal.fence {
+util.func public @HoistDeviceQueueBarrierChainOutOfOrder(%device: !hal.device, %cmd: !hal.command_buffer, %wait_fence: !hal.fence) -> !hal.fence {
   %c-1_i64 = arith.constant -1 : i64
   // CHECK: %[[FENCE1:.+]] = hal.fence.create {{.+}} {test.fence1}
   %fence0 = hal.fence.create device(%device : !hal.device) flags("None") : !hal.fence attributes {test.fence0}
@@ -58,8 +58,8 @@ func.func @HoistDeviceQueueBarrierChainOutOfOrder(%device: !hal.device, %cmd: !h
       affinity(%c-1_i64)
       wait(%fence0)
       signal(%fence1)
-  // CHECK: return %[[FENCE1]]
-  return %fence1 : !hal.fence
+  // CHECK: util.return %[[FENCE1]]
+  util.return %fence1 : !hal.fence
 }
 
 // -----
@@ -69,7 +69,7 @@ func.func @HoistDeviceQueueBarrierChainOutOfOrder(%device: !hal.device, %cmd: !h
 // CHECK-SAME:  %[[CMD:.+]]: !hal.command_buffer,
 // CHECK-SAME:  %[[WAIT_FENCE:.+]]: !hal.fence,
 // CHECK-SAME:  %[[SIGNAL_FENCE:.+]]: !hal.fence)
-func.func @ElideDeviceQueueBarrierOp(
+util.func public @ElideDeviceQueueBarrierOp(
     %device: !hal.device,
     %cmd: !hal.command_buffer,
     %wait_fence: !hal.fence,
@@ -112,6 +112,6 @@ func.func @ElideDeviceQueueBarrierOp(
       wait(%fence1)
       signal(%signal_fence)
 
-  // CHECK-NEXT: return
-  return
+  // CHECK-NEXT: util.return
+  util.return
 }

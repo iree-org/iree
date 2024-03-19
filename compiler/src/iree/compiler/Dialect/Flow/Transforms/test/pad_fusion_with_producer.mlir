@@ -1,6 +1,6 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-flow-form-dispatch-regions{fuse-pad-with-producers}))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-flow-form-dispatch-regions{fuse-pad-with-producers}))" --split-input-file %s | FileCheck %s
 
-func.func @fuse_pad_with_producer(%arg0 : tensor<?x?x?x?xf32>,
+util.func public @fuse_pad_with_producer(%arg0 : tensor<?x?x?x?xf32>,
     %arg1 : tensor<?x?x?x?xf32>, %arg2 : tensor<?x?x?x?xf32>,
     %arg3 : tensor<?xf32>, %arg4 : index, %arg5 : index, %arg6 : index,
     %arg7 : index) -> tensor<?x?x?x?xf32> {
@@ -33,9 +33,9 @@ func.func @fuse_pad_with_producer(%arg0 : tensor<?x?x?x?xf32>,
   ^bb0(%b0 : index, %b1 : index, %b2 : index, %b3 : index) :
     tensor.yield %cst : f32
   } : tensor<?x?x?x?xf32> to tensor<?x?x?x?xf32>
-  return %4 : tensor<?x?x?x?xf32>
+  util.return %4 : tensor<?x?x?x?xf32>
 }
-// CHECK-LABEL: func @fuse_pad_with_producer(
+// CHECK-LABEL: util.func public @fuse_pad_with_producer(
 //  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?x?x?xf32>
 //  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?x?x?xf32>
 //  CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<?x?x?x?xf32>
@@ -48,4 +48,4 @@ func.func @fuse_pad_with_producer(%arg0 : tensor<?x?x?x?xf32>,
 //  CHECK-SAME:         ins(%[[CONV]], %[[ARG3]]
 //       CHECK:     %[[PADDED:.+]] = tensor.pad %[[GENERIC]]
 //       CHECK:     flow.return %[[PADDED]]
-//       CHEKC:   return %[[RETURN]]
+//       CHEKC:   util.return %[[RETURN]]

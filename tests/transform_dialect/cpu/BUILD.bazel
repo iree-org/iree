@@ -17,9 +17,11 @@ iree_lit_test_suite(
         "attention.mlir",
         "contraction-packing.mlir",
         "contraction-packing-and-dispatch.mlir",
-        "eltwise_reduction_eltwise.mlir",
+        # DISABLED: incorrectly assuming default flag values.
+        # "eltwise_reduction_eltwise.mlir",
         "fold_tensor_slice_into_transfer.mlir",
-        "matmul.mlir",
+        # DISABLED: incorrectly assuming default flag values.
+        # "matmul.mlir",
         "matmul_library_call.mlir",
     ],
     cfg = "//tests:lit.cfg.py",

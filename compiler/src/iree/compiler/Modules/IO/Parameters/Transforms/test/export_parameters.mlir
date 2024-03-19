@@ -9,7 +9,7 @@ module @parameter_example {
   util.global private @array_global_0 = dense<[[11.0, 12.0]]> : tensor<1x2xf32>
   util.global private @dense_global_1 = dense<"0x0000E040000000410000104100002041"> : tensor<2x2xf32>
   util.global private @dense_global_2 = dense<"0x0000803F000000400000404000008040"> : tensor<2x2xf32>
-  func.func @parameter_example(%arg0: tensor<1x2xf32>) -> tensor<1x2xf32> {
+  util.func public @parameter_example(%arg0: tensor<1x2xf32>) -> tensor<1x2xf32> {
     %cst = arith.constant 0.000000e+00 : f32
     %3 = util.global.load @array_global_0 : tensor<1x2xf32>
     %4 = util.global.load @dense_global_1 : tensor<2x2xf32>
@@ -21,6 +21,6 @@ module @parameter_example {
     %10 = linalg.add ins(%8, %5 : tensor<1x2xf32>, tensor<1x2xf32>) outs(%empty : tensor<1x2xf32>) -> tensor<1x2xf32>
     %12 = linalg.matmul ins(%10, %4 : tensor<1x2xf32>, tensor<2x2xf32>) outs(%fill : tensor<1x2xf32>) -> tensor<1x2xf32>
     %14 = linalg.add ins(%12, %3 : tensor<1x2xf32>, tensor<1x2xf32>) outs(%empty : tensor<1x2xf32>) -> tensor<1x2xf32>
-    return %14 : tensor<1x2xf32>
+    util.return %14 : tensor<1x2xf32>
   }
 }

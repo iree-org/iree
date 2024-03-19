@@ -18,7 +18,6 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
@@ -46,9 +45,9 @@ static const int kUnassigned = -1;
 // callees for example.
 struct FuncAnalysis {
   // Function under analysis.
-  func::FuncOp funcOp;
+  IREE::Util::FuncOp funcOp;
   // All call sites across the whole program.
-  SmallVector<func::CallOp> callOps;
+  SmallVector<IREE::Util::CallOp> callOps;
 
   // Whether this function may be accessed indirectly or used externally.
   // This generally disables optimizations.
@@ -131,19 +130,26 @@ struct FuncAnalysis {
 };
 
 // Note that the analysis results may be incomplete.
-static FuncAnalysis analyzeFuncOp(func::FuncOp funcOp, Explorer &explorer) {
+static FuncAnalysis analyzeFuncOp(IREE::Util::FuncOp funcOp,
+                                  Explorer &explorer) {
   // Gather callers from across the program.
   FuncAnalysis analysis;
   analysis.funcOp = funcOp;
   analysis.isIncomplete = funcOp.isPublic() || funcOp.isExternal();
   if (explorer.walkIncomingCalls(funcOp, [&](mlir::CallOpInterface callOp) {
-        if (auto funcCallOp = dyn_cast<func::CallOp>((Operation *)callOp)) {
+        if (auto funcCallOp =
+                dyn_cast<IREE::Util::CallOp>((Operation *)callOp)) {
           analysis.callOps.push_back(funcCallOp);
         } else {
           analysis.isIncomplete = true;
         }
         return WalkResult::advance();
       }) == TraversalResult::INCOMPLETE) {
+    analysis.isIncomplete = true;
+  }
+
+  // TODO(benvanik): support functions with tied operands.
+  if (funcOp.hasAnyTiedOperands()) {
     analysis.isIncomplete = true;
   }
 
@@ -168,7 +174,7 @@ static FuncAnalysis analyzeFuncOp(func::FuncOp funcOp, Explorer &explorer) {
 
   // Walk all return sites in the function.
   SmallVector<Value> seenResultValues(resultCount);
-  funcOp.walk([&](func::ReturnOp returnOp) {
+  funcOp.walk([&](IREE::Util::ReturnOp returnOp) {
     for (auto [i, value] : llvm::enumerate(returnOp.getOperands())) {
       // Check to see if the value returned is a constant and stash.
       // We'll only use this value if all return sites are uniform.
@@ -227,17 +233,25 @@ static FuncAnalysis analyzeFuncOp(func::FuncOp funcOp, Explorer &explorer) {
       // We'll only use this value if all call sites are uniform.
       Attribute constantValue;
       if (matchPattern(value, m_Constant(&constantValue))) {
-        analysis.callerUniformArgValues[i] = {
-            value.getLoc(),
-            value.getType(),
-            constantValue,
-        };
+        if (!seenArgAttrs[i]) {
+          // First call site with a constant: stash so we can inline it if it's
+          // uniform.
+          seenArgAttrs[i] = constantValue;
+          analysis.callerUniformArgValues[i] = {
+              value.getLoc(),
+              value.getType(),
+              constantValue,
+          };
+        } else if (seenArgAttrs[i] != constantValue) {
+          // Value constant has changed from prior calls: mark non-uniform.
+          analysis.callerUniformArgs.reset(i);
+        }
       } else {
         // Check to see if the value is the same as previously seen.
         // This will ensure that across calling functions we set non-uniform
         // _unless_ it's a constant value.
         if (!seenArgValues[i]) {
-          // First call site: take the value directly.
+          // First call site with a value: take the value directly.
           seenArgValues[i] = value;
         } else if (seenArgValues[i] != value) {
           // Value has changed and is not constant: mark non-uniform.
@@ -245,13 +259,8 @@ static FuncAnalysis analyzeFuncOp(func::FuncOp funcOp, Explorer &explorer) {
         }
       }
 
-      // Check to see if the constant value is the same as previously seen.
-      // NOTE: unlike callee results we only check constant values.
-      if (!seenArgAttrs[i]) {
-        // First call site: take the value directly.
-        seenArgAttrs[i] = constantValue;
-      } else if (seenArgAttrs[i] != constantValue) {
-        // Value has changed: mark non-uniform.
+      // Mark non-uniform if we've seen both constant and non-constant values.
+      if (seenArgValues[i] && seenArgAttrs[i]) {
         analysis.callerUniformArgs.reset(i);
       }
 
@@ -329,7 +338,7 @@ static FuncAnalysis analyzeFuncOp(func::FuncOp funcOp, Explorer &explorer) {
     auto arg = funcOp.getArgument(argIndex);
     bool onlyReturnUsers = true;
     for (auto user : arg.getUsers()) {
-      if (!isa<func::ReturnOp>(user)) {
+      if (!isa<IREE::Util::ReturnOp>(user)) {
         onlyReturnUsers = false;
         break;
       }
@@ -397,7 +406,8 @@ static void replaceValueWithConstant(Value value, LocAttr constantValue,
 }
 
 // Returns true if any changes were made.
-static bool applyFuncChanges(FuncAnalysis &analysis, func::FuncOp funcOp) {
+static bool applyFuncChanges(FuncAnalysis &analysis,
+                             IREE::Util::FuncOp funcOp) {
   // Build the new set of function arguments and inline uniform constants.
   auto builder = OpBuilder::atBlockBegin(&funcOp.getBlocks().front());
   auto oldArgTypes = llvm::to_vector(funcOp.getArgumentTypes());
@@ -461,7 +471,7 @@ static bool applyFuncChanges(FuncAnalysis &analysis, func::FuncOp funcOp) {
     return false;
 
   // Erase dead results from all return sites.
-  funcOp.walk([&](func::ReturnOp returnOp) {
+  funcOp.walk([&](IREE::Util::ReturnOp returnOp) {
     for (int i = deadResults.size() - 1; i >= 0; --i) {
       if (deadResults.test(i))
         returnOp.getOperandsMutable().erase(i);
@@ -478,7 +488,8 @@ static bool applyFuncChanges(FuncAnalysis &analysis, func::FuncOp funcOp) {
 }
 
 // Returns true if any changes were made.
-static bool applyCallChanges(FuncAnalysis &analysis, func::CallOp callOp) {
+static bool applyCallChanges(FuncAnalysis &analysis,
+                             IREE::Util::CallOp callOp) {
   // Build the new set of call operands.
   SmallVector<Value> oldOperands = callOp.getOperands();
   SmallVector<Value> newOperands;
@@ -548,8 +559,10 @@ static bool applyCallChanges(FuncAnalysis &analysis, func::CallOp callOp) {
     return false;
 
   // Fully replace call op because we may have changed result count.
-  auto newCallOp = OpBuilder(callOp).create<func::CallOp>(
-      callOp.getLoc(), callOp.getCalleeAttr(), newResultTypes, newOperands);
+  // TODO(benvanik): update tied operands.
+  auto newCallOp = OpBuilder(callOp).create<IREE::Util::CallOp>(
+      callOp.getLoc(), newResultTypes, callOp.getCalleeAttr(), newOperands,
+      /*tied_operands=*/ArrayAttr{});
   newCallOp->setDialectAttrs(callOp->getDialectAttrs());
 
   // Remap live old results -> new results.
@@ -586,7 +599,7 @@ public:
     // across the whole program we can't perform any mutations during this
     // analysis.
     std::vector<FuncAnalysis> analysisResults;
-    for (auto funcOp : moduleOp.getOps<func::FuncOp>()) {
+    for (auto funcOp : moduleOp.getOps<IREE::Util::FuncOp>()) {
       analysisResults.push_back(analyzeFuncOp(funcOp, explorer));
     }
 

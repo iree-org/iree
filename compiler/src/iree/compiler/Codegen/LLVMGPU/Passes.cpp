@@ -4,14 +4,13 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
+#include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 
 #include <cstdint>
 
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
-#include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/ROCDLPasses.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -19,17 +18,17 @@
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/ComplexToStandard/ComplexToStandard.h"
-#include "mlir/Conversion/GPUToNVVM/GPUToNVVMPass.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
+#include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/Func/Transforms/Passes.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
 #include "mlir/Dialect/MemRef/Transforms/Passes.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/Pass/PassManager.h"
@@ -47,23 +46,64 @@ static llvm::cl::opt<unsigned>
     logSwizzleTile("iree-codegen-log-swizzle-tile",
                    llvm::cl::desc("log swizzle tile value"), llvm::cl::init(0));
 
+llvm::cl::opt<int64_t> clLLVMGPUSharedMemoryLimit(
+    "iree-llvmgpu-shared-memory-limit",
+    llvm::cl::desc("specify the maximum amount of shared memory allowed to be "
+                   "allocated for the given target"),
+    llvm::cl::init(163 * 1024));
+
+llvm::cl::opt<bool> clLLVMGPUEnablePrefetch(
+    "iree-llvmgpu-enable-prefetch",
+    llvm::cl::desc("Enable prefetch in the vector distribute pipeline"),
+    llvm::cl::init(false));
+
 //===----------------------------------------------------------------------===//
 // Bufferization Configuration
 //===----------------------------------------------------------------------===//
 
+static bool hasThreadMapping(scf::ForallOp forall) {
+  if (!forall.getMapping().has_value()) {
+    return false;
+  }
+  return llvm::any_of(forall.getMapping().value(), [](Attribute attr) {
+    return isa<gpu::GPUThreadMappingAttr>(attr);
+  });
+}
+
+// All pipelines that use this allocation function distribute scf.forall ops
+// after bufferizing. This means that to differentiate between an allocation in
+// function memory and workgroup memory, we need to look for a parent
+// scf.forall op with a thread mapping. If not present, we allocate workgroup
+// memory. Pipelines that choose to distribute in a different order will have
+// to use a different allocation function.
 static FailureOr<Value> gpuAllocationFn(OpBuilder &builder, Location loc,
                                         MemRefType memRefType,
                                         ValueRange dynamicSizes,
                                         unsigned alignment) {
-  auto workgroupSpace = gpu::AddressSpaceAttr::get(
-      builder.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
+  Block *insertionBlock = builder.getInsertionBlock();
+  Operation *parent = insertionBlock->getParentOp();
+  scf::ForallOp enclosingForall = dyn_cast<scf::ForallOp>(parent);
+  if (!enclosingForall) {
+    enclosingForall = parent->getParentOfType<scf::ForallOp>();
+  }
+  gpu::AddressSpaceAttr addressSpace;
+  if (enclosingForall && hasThreadMapping(enclosingForall)) {
+    addressSpace = gpu::AddressSpaceAttr::get(
+        builder.getContext(), gpu::GPUDialect::getPrivateAddressSpace());
+  } else {
+    addressSpace = gpu::AddressSpaceAttr::get(
+        builder.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
+  }
   MemRefType allocType =
       MemRefType::get(memRefType.getShape(), memRefType.getElementType(),
-                      AffineMap(), workgroupSpace);
+                      AffineMap(), addressSpace);
   return builder.create<memref::AllocOp>(loc, allocType, dynamicSizes)
       .getResult();
 }
 
+// Barriers are only needed when copying to/from workgroup memory. The only
+// other kind of memory that can be allocated is function memory, which is local
+// to a thread.
 static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
                                Value to) {
   bool needsBarrier = false;
@@ -106,8 +146,9 @@ tileAndDistributeToWorkgroup(OpPassManager &pm,
   nestedModulePM.addNestedPass<func::FuncOp>(
       createConvertToDestinationPassingStylePass(
           useWARForCooperativeMatrixCodegen));
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      IREE::LinalgExt::createTileAndDecomposeAttentionPass());
+  // TODO(#16421): Disable decomposition due to failure in bufferization.
+  // nestedModulePM.addNestedPass<func::FuncOp>(
+  //     IREE::LinalgExt::createTileAndDecomposeAttentionPass());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 }
@@ -126,7 +167,6 @@ static void addGPUVectorizationPasses(OpPassManager &pm) {
   options.vectorizeGatherAccesses = true;
   options.enableCleanup = false;
   options.foldCastIntoContract = true;
-  options.maxVectorSize = 4096;
   pm.addNestedPass<func::FuncOp>(createGenericVectorizationPass(options));
   pm.addNestedPass<func::FuncOp>(createOptimizeTensorInsertExtractSlicesPass());
   pm.addNestedPass<func::FuncOp>(createCanonicalizerPass());
@@ -489,6 +529,20 @@ void addGPUVectorDistributePassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(
       createGPUTensorTileToSerialLoops());
 
+  // Generalize all named ops so that we can fold away unit extent dims. By this
+  // point, all tiling is finished so the tiling configurations on those ops can
+  // be safely dropped. This additionally allows vectorization of convolution to
+  // `vector.contract` as filter dimensions are expected to be tiled to 1 by
+  // this point.
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLinalgGeneralizeNamedOpsPass());
+  LinalgFoldUnitExtentDimsPassOptions options;
+  options.useRankReducingSlices = true;
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      mlir::createLinalgFoldUnitExtentDimsPass(options));
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
+
   nestedModulePM.addNestedPass<func::FuncOp>(
       createOptimizeTensorInsertExtractSlicesPass());
 
@@ -506,12 +560,20 @@ void addGPUVectorDistributePassPipeline(OpPassManager &pm) {
       createHoistStaticallyBoundAllocationsPass());
 
   // Vector SIMD -> Vector SIMT
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createLLVMGPUCastTypeToFitMMAPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUVectorDistribute());
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
   nestedModulePM.addNestedPass<func::FuncOp>(
       createGPUReduceSharedMemoryBankConflicts());
+
+  if (clLLVMGPUEnablePrefetch) {
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLLVMGPUPrefetchSharedMemoryPass());
+  }
+
   nestedModulePM.addNestedPass<func::FuncOp>(
       memref::createFoldMemRefAliasOpsPass());
   nestedModulePM.addPass(createCSEPass());
@@ -538,7 +600,6 @@ void addGPUWarpReductionPassPipeline(OpPassManager &pm) {
     options.vectorizeGatherAccesses = true;
     options.enableCleanup = false;
     options.generateContract = false;
-    options.maxVectorSize = 16384;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createGenericVectorizationPass(options));
     nestedModulePM.addNestedPass<func::FuncOp>(
@@ -634,6 +695,29 @@ void addGPUDefaultPassPipeline(OpPassManager &pm, bool enableMicrokernels) {
       createRemoveSingleIterationLoopPass());
 }
 
+void addGPUBaseLoweringPassPipeline(OpPassManager &pm) {
+  auto &nestedModulePM = pm.nest<ModuleOp>();
+
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createConvertToDestinationPassingStylePass(
+          /*useWARForCooperativeMatrixCodegen=*/false));
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
+
+  addBufferizePasses(nestedModulePM);
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
+
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      IREE::LinalgExt::createLinalgExtToLoopsPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createMemrefCopyToLinalgPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(createConvertLinalgToLoopsPass());
+  nestedModulePM.addNestedPass<func::FuncOp>(
+      createRemoveSingleIterationLoopPass());
+  nestedModulePM.addPass(createCanonicalizerPass());
+  nestedModulePM.addPass(createCSEPass());
+}
+
 // Add passes to make the address computation more explicit and optimize them.
 //
 // The idea here is to be less dependent on what the LLVM backend is able to do,
@@ -693,8 +777,9 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool forROCDL) {
 
   // Run checks on shared memory usage.
   // TODO: query this from the target.
-  auto getSharedMemoryLimit = [](mlir::FunctionOpInterface) {
-    return 163 * 1024;
+  int64_t limit = clLLVMGPUSharedMemoryLimit;
+  auto getSharedMemoryLimit = [limit](mlir::FunctionOpInterface) {
+    return limit;
   };
   auto getIndexBitwidth = [](mlir::FunctionOpInterface) { return 64; };
   pm.addPass(
@@ -719,6 +804,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool forROCDL) {
   pm.addPass(memref::createFoldMemRefAliasOpsPass());
   pm.addPass(memref::createExpandStridedMetadataPass());
   pm.addPass(createEmulateNarrowTypePass());
+  pm.addPass(affine::createAffineExpandIndexOpsPass());
   pm.addPass(createLowerAffinePass());
   pm.addPass(createCanonicalizerPass());
   pm.addPass(createCSEPass());
@@ -740,9 +826,10 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool forROCDL) {
 extern llvm::cl::opt<std::string> clGPUCodegenTransformDialectDebugPayloadTag;
 extern llvm::cl::opt<std::string> clGPUCodegenTransformDialectDebugTransformTag;
 
-void addGPUTransformDialectPasses(OpPassManager &passManager) {
+void addGPUTransformDialectPasses(OpPassManager &passManager,
+                                  StringRef entryPoint) {
   passManager.addPass(
-      mlir::iree_compiler::createTransformDialectInterpreterPass());
+      mlir::iree_compiler::createTransformDialectInterpreterPass(entryPoint));
 
   // Dropping the schedule is needed:
   //   1. if we want to embed the transform in the module: we should drop the
@@ -756,9 +843,9 @@ void addGPUTransformDialectPasses(OpPassManager &passManager) {
 //===----------------------------------------------------------------------===//
 
 void buildLLVMGPUCodegenConfigurationPassPipeline(OpPassManager &pm) {
-  addCommonTargetExecutablePreprocessingPasses(pm);
   auto &nestedModulePM = pm.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUGeneralizeNamedOpsPass());
+  addCommonTargetExecutablePreprocessingPasses(pm);
   pm.addPass(createLLVMGPUSelectLoweringStrategyPass());
 }
 
@@ -786,9 +873,9 @@ void buildLLVMGPUCodegenPassPipeline(OpPassManager &pm, bool useROCM) {
 //===----------------------------------------------------------------------===//
 
 void buildROCDLCodegenConfigurationPassPipeline(OpPassManager &pm) {
-  addCommonTargetExecutablePreprocessingPasses(pm);
   auto &nestedModulePM = pm.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUGeneralizeNamedOpsPass());
+  addCommonTargetExecutablePreprocessingPasses(pm);
   pm.addPass(createROCDLSelectLoweringStrategyPass());
 }
 
@@ -865,6 +952,11 @@ void registerCodegenROCDLPasses() {
       [](OpPassManager &passManager) {
         buildROCDLCodegenPassPipeline(passManager);
       });
+
+  static PassPipelineRegistration<> LLVMGPUBufferizePipeline(
+      "iree-codegen-llvmgpu-bufferization-pipeline",
+      "Runs pass pipeline to bufferize for llvmgpu backends",
+      [](OpPassManager &passManager) { addBufferizePasses(passManager); });
 }
 
 } // namespace mlir::iree_compiler

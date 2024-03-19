@@ -65,6 +65,7 @@ createFoldUnitExtentDimsPass();
 // Creates a pass to fuse Linalg operations on tensors.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createFusionOfTensorOpsPass(bool fuseMultiUse = false,
+                            bool fuseMultiReduction = true,
                             unsigned multiUseFusionIteration = 2);
 
 // Create a pass to initialize all empty tensors after dispatch formation to
@@ -164,6 +165,10 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createAnnotateDispatchesPass();
 // Injects tracing markers for dispatch operation tensor inputs and outputs.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createInjectDispatchTracingPass();
+
+// Injects tensor tracing on ops annotated with `iree.tensor.trace`.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createInjectTensorTracingPass();
 
 // Crops the program and inserts trace markers at the specified symbols.
 std::unique_ptr<OperationPass<mlir::ModuleOp>>

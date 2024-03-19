@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "mlir/Support/LLVM.h"
+#include "llvm/ADT/StringRef.h"
 #include <memory>
 
 namespace mlir {

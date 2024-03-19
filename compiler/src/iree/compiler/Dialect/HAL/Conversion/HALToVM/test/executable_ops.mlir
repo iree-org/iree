@@ -14,7 +14,7 @@ hal.executable @exe {
 }
 
 // CHECK-LABEL: @executableCreate
-func.func @executableCreate(
+util.func public @executableCreate(
     // CHECK-SAME: %[[DEV:.+]]: !vm.ref<!hal.device>
     %device: !hal.device,
     // CHECK-SAME: %[[LAYOUT0:.+]]: !vm.ref<!hal.pipeline_layout>,
@@ -40,7 +40,7 @@ func.func @executableCreate(
   %1 = hal.executable.create device(%device : !hal.device) target(@exe::@binary2) layouts([%layout1, %layout0]) : !hal.executable
 
   // CHECK: vm.return %[[EXE1]], %[[EXE2]]
-  return %0, %1 : !hal.executable, !hal.executable
+  util.return %0, %1 : !hal.executable, !hal.executable
 }
 
 // -----
@@ -61,7 +61,7 @@ hal.executable @exe2 {
 }
 
 // CHECK-LABEL: @multipleExecutables
-func.func @multipleExecutables(
+util.func public @multipleExecutables(
     %device: !hal.device,
     %layout0: !hal.pipeline_layout,
     %layout1: !hal.pipeline_layout
@@ -72,7 +72,7 @@ func.func @multipleExecutables(
   // CHECK-DAG: %[[FORMAT2:.+]] = vm.rodata.inline "_utf8_format_
   // CHECK-DAG: %[[BINARY2:.+]] = vm.const.ref.rodata @exe2_binary2 : !vm.buffer
   %1 = hal.executable.create device(%device : !hal.device) target(@exe2::@binary2) layouts([%layout1, %layout0]) : !hal.executable
-  return %0, %1 : !hal.executable, !hal.executable
+  util.return %0, %1 : !hal.executable, !hal.executable
 }
 
 // -----
@@ -86,7 +86,7 @@ hal.executable @exe {
 }
 
 // CHECK-LABEL: @executableConstants
-func.func @executableConstants(
+util.func public @executableConstants(
     // CHECK-SAME: %[[DEV:.+]]: !vm.ref<!hal.device>
     %device: !hal.device,
     // CHECK-SAME: %[[LAYOUT:.+]]: !vm.ref<!hal.pipeline_layout>
@@ -117,5 +117,5 @@ func.func @executableConstants(
       constants([%constant0, %c0, %constant1]) : !hal.executable
 
   // CHECK: vm.return %[[EXE]]
-  return %0 : !hal.executable
+  util.return %0 : !hal.executable
 }

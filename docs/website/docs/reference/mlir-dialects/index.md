@@ -24,6 +24,7 @@ Dialect                     | Description
 [HAL/Inline](./HALInline.md) | Inline HAL interop runtime module dialect
 [HAL/Loader](./HALLoader.md) | HAL inline executable loader runtime module dialect
 [IO/Parameters](./IOParameters.md) | External parameter resource management APIs
+[LinalgExt](./LinalgExt.md) | Extensions to the Linalg dialect for specific operations
 [Stream](./Stream.md)       | Model execution partitioning and scheduling
 [Util](./Util.md)           | Types and ops common across IREE subdialects
 [VM](./VM.md)               | Represents operations against an abstract virtual machine
@@ -40,7 +41,6 @@ mechanism.
 Dialect                             | Description
 ------------------------------------| -----------
 [IREEInput](./IREEInput.md)         | Structural ops legal as input to IREE's compiler
-[IREELinalgExt](./IREELinalgExt.md) | Extensions to the Linalg dialect for specific operations
 [IREEVectorExt](./IREEVectorExt.md) | Extensions to the Vector dialect for specific operations
 
 [^1]: Hardware Abstraction Layer

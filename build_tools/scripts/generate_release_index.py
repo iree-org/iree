@@ -44,7 +44,8 @@ class ReleaseFetcher:
         url = f"https://api.github.com/repos/{self._repo}/releases"
         page = 1
 
-        while True:
+        # GitHub limits API responses to the first 1000 results.
+        while page * self._per_page < 1000:
             response = self._session.get(
                 url,
                 params={

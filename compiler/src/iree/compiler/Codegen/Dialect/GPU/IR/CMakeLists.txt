@@ -41,6 +41,7 @@ iree_cc_library(
     MLIRVectorDialect
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Utils
+    iree::compiler::Codegen::Utils::VectorOpUtils
   PUBLIC
 )
 

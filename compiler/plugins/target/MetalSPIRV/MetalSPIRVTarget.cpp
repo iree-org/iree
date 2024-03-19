@@ -4,9 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "./MSLToMetalLib.h"
-#include "./MetalTargetPlatform.h"
-#include "./SPIRVToMSL.h"
+#include "compiler/plugins/target/MetalSPIRV/MSLToMetalLib.h"
+#include "compiler/plugins/target/MetalSPIRV/MetalTargetPlatform.h"
+#include "compiler/plugins/target/MetalSPIRV/SPIRVToMSL.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
@@ -105,30 +105,68 @@ static spirv::TargetEnvAttr getMetalTargetEnv(MLIRContext *context) {
       spirv::DeviceType::IntegratedGPU, spirv::TargetEnvAttr::kUnknownDeviceID);
 }
 
+// TODO: MetalOptions for choosing the Metal version.
+class MetalTargetDevice : public TargetDevice {
+public:
+  MetalTargetDevice(const MetalSPIRVOptions &options) : options(options) {}
+
+  IREE::HAL::DeviceTargetAttr
+  getDefaultDeviceTarget(MLIRContext *context,
+                         const TargetRegistry &targetRegistry) const override {
+    Builder b(context);
+    SmallVector<NamedAttribute> configItems;
+
+    auto configAttr = b.getDictionaryAttr(configItems);
+
+    // If we had multiple target environments we would generate one target attr
+    // per environment, with each setting its own environment attribute.
+    SmallVector<IREE::HAL::ExecutableTargetAttr> executableTargetAttrs;
+    targetRegistry.getTargetBackend("metal-spirv")
+        ->getDefaultExecutableTargets(context, "metal", configAttr,
+                                      executableTargetAttrs);
+
+    return IREE::HAL::DeviceTargetAttr::get(context, b.getStringAttr("metal"),
+                                            configAttr, executableTargetAttrs);
+  }
+
+private:
+  const MetalSPIRVOptions &options;
+};
+
 class MetalSPIRVTargetBackend : public TargetBackend {
 public:
   MetalSPIRVTargetBackend(const MetalSPIRVOptions &options)
       : options(options) {}
 
-  // NOTE: we could vary this based on the options such as 'metal-v2'.
-  std::string name() const override { return "metal"; }
+  std::string getLegacyDefaultDeviceID() const override { return "metal"; }
+
+  void getDefaultExecutableTargets(
+      MLIRContext *context, StringRef deviceID, DictionaryAttr deviceConfigAttr,
+      SmallVectorImpl<IREE::HAL::ExecutableTargetAttr> &executableTargetAttrs)
+      const override {
+    executableTargetAttrs.push_back(
+        getExecutableTarget(context, getMetalTargetEnv(context)));
+  }
+
+  IREE::HAL::ExecutableTargetAttr
+  getExecutableTarget(MLIRContext *context,
+                      spirv::TargetEnvAttr targetEnv) const {
+    Builder b(context);
+    SmallVector<NamedAttribute> configItems;
+    auto addConfig = [&](StringRef name, Attribute value) {
+      configItems.emplace_back(b.getStringAttr(name), value);
+    };
+
+    addConfig(spirv::getTargetEnvAttrName(), targetEnv);
+
+    return b.getAttr<IREE::HAL::ExecutableTargetAttr>(
+        b.getStringAttr("metal-spirv"), b.getStringAttr("metal-msl-fb"),
+        b.getDictionaryAttr(configItems));
+  }
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<gpu::GPUDialect, IREE::Codegen::IREECodegenDialect,
                     IREE::Flow::FlowDialect, spirv::SPIRVDialect>();
-  }
-
-  IREE::HAL::DeviceTargetAttr
-  getDefaultDeviceTarget(MLIRContext *context) const override {
-    Builder b(context);
-    SmallVector<NamedAttribute> configItems;
-
-    configItems.emplace_back(b.getStringAttr("executable_targets"),
-                             getExecutableTargets(context));
-
-    auto configAttr = b.getDictionaryAttr(configItems);
-    return IREE::HAL::DeviceTargetAttr::get(
-        context, b.getStringAttr(deviceID()), configAttr);
   }
 
   void buildConfigurationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
@@ -282,48 +320,29 @@ public:
   }
 
 private:
-  ArrayAttr getExecutableTargets(MLIRContext *context) const {
-    SmallVector<Attribute> targetAttrs;
-    // If we had multiple target environments we would generate one target attr
-    // per environment, with each setting its own environment attribute.
-    targetAttrs.push_back(
-        getExecutableTarget(context, getMetalTargetEnv(context)));
-    return ArrayAttr::get(context, targetAttrs);
-  }
-
-  IREE::HAL::ExecutableTargetAttr
-  getExecutableTarget(MLIRContext *context,
-                      spirv::TargetEnvAttr targetEnv) const {
-    Builder b(context);
-    SmallVector<NamedAttribute> configItems;
-
-    configItems.emplace_back(b.getStringAttr(spirv::getTargetEnvAttrName()),
-                             targetEnv);
-
-    auto configAttr = b.getDictionaryAttr(configItems);
-    return IREE::HAL::ExecutableTargetAttr::get(
-        context, b.getStringAttr("metal"), b.getStringAttr("metal-msl-fb"),
-        configAttr);
-  }
-
   const MetalSPIRVOptions &options;
 };
 
 struct MetalSPIRVSession
     : public PluginSession<MetalSPIRVSession, MetalSPIRVOptions,
                            PluginActivationPolicy::DefaultActivated> {
-  void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {
-    auto backendFactory = [=]() {
-      return std::make_shared<MetalSPIRVTargetBackend>(options);
-    };
+  void populateHALTargetDevices(IREE::HAL::TargetDeviceList &targets) {
     // #hal.device.target<"metal", ...
-    targets.add("metal", backendFactory);
+    targets.add("metal",
+                [=]() { return std::make_shared<MetalTargetDevice>(options); });
+  }
+  void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {
     // #hal.executable.target<"metal-spirv", ...
-    targets.add("metal-spirv", backendFactory);
+    targets.add("metal-spirv", [=]() {
+      return std::make_shared<MetalSPIRVTargetBackend>(options);
+    });
   }
 };
 
 } // namespace mlir::iree_compiler::IREE::HAL
+
+IREE_DEFINE_COMPILER_OPTION_FLAGS(
+    mlir::iree_compiler::IREE::HAL::MetalSPIRVOptions);
 
 extern "C" bool iree_register_compiler_plugin_hal_target_metal_spirv(
     mlir::iree_compiler::PluginRegistrar *registrar) {
@@ -331,6 +350,3 @@ extern "C" bool iree_register_compiler_plugin_hal_target_metal_spirv(
       "hal_target_metal_spirv");
   return true;
 }
-
-IREE_DEFINE_COMPILER_OPTION_FLAGS(
-    mlir::iree_compiler::IREE::HAL::MetalSPIRVOptions);

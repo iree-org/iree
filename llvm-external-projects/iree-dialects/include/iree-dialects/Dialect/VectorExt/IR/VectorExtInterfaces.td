@@ -33,7 +33,7 @@ def VectorLayoutInterface : AttrInterface<"VectorLayoutInterface"> {
       /*description=*/"Projects the given layout.",
       /*retTy=*/"VectorLayoutInterface",
       /*methodName=*/"project",
-      /*args=*/(ins "::llvm::ArrayRef<bool>":$projectedDims)
+      /*args=*/(ins "::llvm::ArrayRef<bool>":$droppedDims)
     >,
     InterfaceMethod<
       /*description=*/"Get the distributed shape for the given vector type.",

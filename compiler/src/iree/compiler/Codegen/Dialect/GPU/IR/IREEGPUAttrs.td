@@ -13,13 +13,15 @@ include "mlir/IR/OpBase.td"
 include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/EnumAttr.td"
 
-def IREEGPU_MmaArrayAttr : TypedArrayAttrBase<IREEGPU_MmaAttr,
-    "Descriptor array of a list of supported mma operations">;
+//===----------------------------------------------------------------------===//
+// Base MMA Vector Layout Attributes
+//===----------------------------------------------------------------------===//
 
 class IREEGPU_MmaVectorLayoutAttr<string attrname, string mmaintrinsic> :
     AttrDef<IREEGPU_Dialect, attrname, [
-  DeclareAttrInterfaceMethods<IREEGPU_MmaAttr,[
+  DeclareAttrInterfaceMethods<IREEGPU_MmaAttr, [
     "getABCElementTypes",
+    "getABCVectorTypes",
     "getContractionLayout",
     "getMNKShape",
   ]>
@@ -48,7 +50,7 @@ class IREEGPU_MmaVectorLayoutAttr<string attrname, string mmaintrinsic> :
 
   }];
 
-    
+
   let parameters = (ins
     mmaintrinsic:$intrinsic,
     "int64_t":$mSize,
@@ -59,7 +61,7 @@ class IREEGPU_MmaVectorLayoutAttr<string attrname, string mmaintrinsic> :
     "::mlir::Type":$cType
   );
 
-  let extraClassDeclaration = [{
+  string baseExtraClassDeclaration = [{
     ::std::tuple<Type, Type, Type> getABCElementTypes() {
       return ::std::make_tuple(getAType(), getBType(), getCType());
     }
@@ -90,12 +92,12 @@ def IREEGPU_MFMAIntrinsic : IREEGPU_I32MmaEnumAttr<"MFMAIntrinsic",
     "Descriptor for different MFMA operations", [
       F16_16x16x16_F32,
       F16_32x32x8_F32,
-    ]>; 
+    ]>;
 
 def IREEGPU_MFMAIntrinsicAttr
   : IREEGPU_MmaEnumAttr<IREEGPU_MFMAIntrinsic, "mfma_intrinsic">;
 
-def IREEGPU_MFMA : IREEGPU_MmaVectorLayoutAttr<"MFMA", "MFMAIntrinsicAttr"> {
+def IREEGPU_MFMAAttr : IREEGPU_MmaVectorLayoutAttr<"MFMA", "MFMAIntrinsicAttr"> {
   let mnemonic = "mfma_layout";
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
 
@@ -116,6 +118,72 @@ def IREEGPU_MFMA : IREEGPU_MmaVectorLayoutAttr<"MFMA", "MFMAIntrinsicAttr"> {
   let builders = [
     AttrBuilder<(ins "MFMAIntrinsic":$intrinsic)>
   ];
+
+  let extraClassDeclaration = !strconcat(baseExtraClassDeclaration, [{
+    int64_t getBlockSize() const;
+
+    // Partial nested layout for an MMA intrinsic's matrix input/output inside
+    // a single subgroup.
+    //
+    // Note that this is just a container used by the following methods; it can
+    // contain both the shape and the order.
+    struct SingleSubgroupLayout {
+      SmallVector<int64_t, 2> outer;
+      SmallVector<int64_t, 2> thread;
+      SmallVector<int64_t, 2> element;
+    };
+
+    // Returns the A/B/C matrix's partial nested layout shape inside a single
+    // subgroup. Shape at each outer/thread/element level is a 2-D value,
+    // following canonical matmul order--(M, K) for A, (K, N) for B, and
+    // (M, N) for C.
+    SingleSubgroupLayout getASingleSubgroupLayoutCount() const;
+    SingleSubgroupLayout getBSingleSubgroupLayoutCount() const;
+    SingleSubgroupLayout getCSingleSubgroupLayoutCount() const;
+
+    // Returns the A/B/C matrix's partial nested layout order inside a single
+    // subgroup. Order at each outer/thread/element level is a 2-value
+    // permuation vector, following canonical matmul order--(M, K) for A,
+    // (K, N) for B, and (M, N) for C.
+    SingleSubgroupLayout getASingleSubgroupLayoutOrder() const;
+    SingleSubgroupLayout getBSingleSubgroupLayoutOrder() const;
+    SingleSubgroupLayout getCSingleSubgroupLayoutOrder() const;
+  }]);
 }
+
+//===----------------------------------------------------------------------===//
+// MMA schedule Attributes
+//===----------------------------------------------------------------------===//
+
+def IREEGPU_MmaScheduleAttr : AttrDef<IREEGPU_Dialect, "MMASchedule"> {
+  let mnemonic = "mma_schedule";
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+
+  string description = [{
+    A schedule of MMA intrinsic instruction and various levels of tile sizes
+    to solve a specific contraction problem.
+  }];
+
+
+  let parameters = (ins
+    "::mlir::iree_compiler::IREE::GPU::MmaAttr":$intrinsic,
+    "int64_t":$subgroup_m_count,
+    "int64_t":$subgroup_n_count,
+    "int64_t":$subgroup_m_tile_count,
+    "int64_t":$subgroup_n_tile_count,
+    "int64_t":$subgroup_k_tile_count
+  );
+
+  let assemblyFormat = "`<` struct(params) `>`";
+
+  let extraClassDeclaration = [{
+    // Returns the A/B/C matrix concrete layout targeting |contractOp|.
+    ::std::optional<::std::tuple<VectorExt::VectorLayoutInterface,
+                                 VectorExt::VectorLayoutInterface,
+                                 VectorExt::VectorLayoutInterface>>
+      getContractionLayout(::mlir::vector::ContractionOp contractOp) const;
+  }];
+}
+
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_GPU_IREEGPUATTRS

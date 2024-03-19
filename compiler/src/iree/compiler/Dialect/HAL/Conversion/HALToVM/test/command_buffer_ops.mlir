@@ -1,34 +1,34 @@
 // RUN: iree-opt --split-input-file --iree-convert-hal-to-vm --canonicalize --iree-vm-target-index-bits=32 %s | FileCheck %s
 
 // CHECK-LABEL: @command_buffer_create
-func.func @command_buffer_create(%arg0: !hal.device) {
+util.func public @command_buffer_create(%arg0: !hal.device) {
   // CHECK: %ref = vm.call @hal.command_buffer.create(%arg0, %c1, %c3, %zero) : (!vm.ref<!hal.device>, i32, i32, i32) -> !vm.ref<!hal.command_buffer>
   %cmd = hal.command_buffer.create device(%arg0 : !hal.device) mode("OneShot") categories("Transfer|Dispatch") : !hal.command_buffer
-  return
+  util.return
 }
 
 // -----
 
 // CHECK-LABEL: @command_buffer_create_bindings
-func.func @command_buffer_create_bindings(%arg0: !hal.device, %arg1: index) {
+util.func public @command_buffer_create_bindings(%arg0: !hal.device, %arg1: index) {
   // CHECK: %ref = vm.call @hal.command_buffer.create(%arg0, %c1, %c3, %arg1) : (!vm.ref<!hal.device>, i32, i32, i32) -> !vm.ref<!hal.command_buffer>
   %cmd = hal.command_buffer.create device(%arg0 : !hal.device) mode("OneShot") categories("Transfer|Dispatch") bindings(%arg1) : !hal.command_buffer
-  return
+  util.return
 }
 
 // -----
 
 // CHECK-LABEL: @command_buffer_finalize
-func.func @command_buffer_finalize(%arg0: !hal.command_buffer) {
+util.func public @command_buffer_finalize(%arg0: !hal.command_buffer) {
   // CHECK: vm.call @hal.command_buffer.finalize(%arg0) : (!vm.ref<!hal.command_buffer>) -> ()
   hal.command_buffer.finalize<%arg0 : !hal.command_buffer>
-  return
+  util.return
 }
 
 // -----
 
 // CHECK-LABEL: @command_buffer_execution_barrier
-func.func @command_buffer_execution_barrier(
+util.func public @command_buffer_execution_barrier(
   %arg0: !hal.command_buffer,
   %arg1: !hal.buffer
 ) {
@@ -37,13 +37,13 @@ func.func @command_buffer_execution_barrier(
       source("CommandIssue")
       target("CommandProcess")
       flags("None")
-  return
+  util.return
 }
 
 // -----
 
 // CHECK-LABEL: @command_buffer_fill_buffer_i8
-func.func @command_buffer_fill_buffer_i8(
+util.func public @command_buffer_fill_buffer_i8(
   %arg0: !hal.command_buffer,
   %arg1: !hal.buffer,
   %arg2: i8
@@ -56,13 +56,13 @@ func.func @command_buffer_fill_buffer_i8(
   hal.command_buffer.fill_buffer<%arg0 : !hal.command_buffer>
       target(%arg1 : !hal.buffer)[%c100, %c200]
       pattern(%arg2 : i8)
-  return
+  util.return
 }
 
 // -----
 
 // CHECK-LABEL: @command_buffer_fill_buffer_i16
-func.func @command_buffer_fill_buffer_i16(
+util.func public @command_buffer_fill_buffer_i16(
   %arg0: !hal.command_buffer,
   %arg1: !hal.buffer,
   %arg2: i16
@@ -75,13 +75,13 @@ func.func @command_buffer_fill_buffer_i16(
   hal.command_buffer.fill_buffer<%arg0 : !hal.command_buffer>
       target(%arg1 : !hal.buffer)[%c100, %c200]
       pattern(%arg2 : i16)
-  return
+  util.return
 }
 
 // -----
 
 // CHECK-LABEL: @command_buffer_fill_buffer_i32
-func.func @command_buffer_fill_buffer_i32(
+util.func public @command_buffer_fill_buffer_i32(
   %arg0: !hal.command_buffer,
   %arg1: !hal.buffer,
   %arg2: i32
@@ -93,13 +93,13 @@ func.func @command_buffer_fill_buffer_i32(
   hal.command_buffer.fill_buffer<%arg0 : !hal.command_buffer>
       target(%arg1 : !hal.buffer)[%c100, %c200]
       pattern(%arg2 : i32)
-  return
+  util.return
 }
 
 // -----
 
 // CHECK-LABEL: @command_buffer_copy_buffer
-func.func @command_buffer_copy_buffer(
+util.func public @command_buffer_copy_buffer(
   %arg0: !hal.command_buffer,
   %arg1: !hal.buffer
 ) {
@@ -111,7 +111,7 @@ func.func @command_buffer_copy_buffer(
       source(%arg1 : !hal.buffer)[%c100]
       target(%arg1 : !hal.buffer)[%c200]
       length(%c300)
-  return
+  util.return
 }
 
 // -----
@@ -122,7 +122,7 @@ func.func @command_buffer_copy_buffer(
 //  CHECK-SAME:  %[[PARAM:.+]]: i32,
 //  CHECK-SAME:  %[[SEND_BUFFER:.+]]: !vm.ref<!hal.buffer>, %[[RECV_BUFFER:.+]]: !vm.ref<!hal.buffer>,
 //  CHECK-SAME:  %[[COUNT:.+]]: i32)
-func.func @command_buffer_collective_all_reduce_sum(
+util.func public @command_buffer_collective_all_reduce_sum(
     %cmd: !hal.command_buffer,
     %channel: !hal.channel,
     %param: i32,
@@ -146,7 +146,7 @@ func.func @command_buffer_collective_all_reduce_sum(
       send(%send_buffer : !hal.buffer)[%c10, %c128]
       recv(%recv_buffer : !hal.buffer)[%c20, %c256]
       count(%count)
-  return
+  util.return
 }
 
 // -----
@@ -157,7 +157,7 @@ func.func @command_buffer_collective_all_reduce_sum(
 //  CHECK-SAME:  %[[PARAM:.+]]: i32,
 //  CHECK-SAME:  %[[SEND_BUFFER:.+]]: !vm.ref<!hal.buffer>,
 //  CHECK-SAME:  %[[COUNT:.+]]: i32)
-func.func @command_buffer_collective_send(
+util.func public @command_buffer_collective_send(
     %cmd: !hal.command_buffer,
     %channel: !hal.channel,
     %param: i32,
@@ -179,7 +179,7 @@ func.func @command_buffer_collective_send(
       param(%param : i32)
       send(%send_buffer : !hal.buffer)[%c10, %c128]
       count(%count)
-  return
+  util.return
 }
 
 // -----
@@ -189,7 +189,7 @@ func.func @command_buffer_collective_send(
 //  CHECK-SAME: %[[LAYOUT:.+]]: !vm.ref<!hal.pipeline_layout>,
 //  CHECK-SAME: %[[BUFFER:.+]]: !vm.ref<!hal.buffer>,
 //  CHECK-SAME: %[[SLOT:.+]]: i32
-func.func @command_buffer_push_descriptor_set(
+util.func public @command_buffer_push_descriptor_set(
     %cmd: !hal.command_buffer,
     %layout: !hal.pipeline_layout,
     %buffer: !hal.buffer,
@@ -214,38 +214,42 @@ func.func @command_buffer_push_descriptor_set(
         %c0 = (%buffer : !hal.buffer)[%c4096, %c8000],
         %c1 = (%slot : index)[%c4, %c4096]
       ])
-  return
+  util.return
 }
 
 // -----
 
 // CHECK-LABEL: @command_buffer_dispatch
-func.func @command_buffer_dispatch(
+util.func public @command_buffer_dispatch(
   %arg0: !hal.command_buffer,
   %arg1: !hal.executable
 ) {
+  // CHECK: %[[ORDINAL:.+]] = vm.const.i32 123
+  %ordinal = arith.constant 123 : index
   %c100 = arith.constant 100 : index
   %c200 = arith.constant 200 : index
   %c300 = arith.constant 300 : index
-  // CHECK: vm.call @hal.command_buffer.dispatch(%arg0, %arg1, %zero, %c100, %c200, %c300) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
+  // CHECK: vm.call @hal.command_buffer.dispatch(%arg0, %arg1, %[[ORDINAL]], %c100, %c200, %c300) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, i32, i32, i32) -> ()
   hal.command_buffer.dispatch<%arg0 : !hal.command_buffer>
-      target(%arg1 : !hal.executable)[0]
+      target(%arg1 : !hal.executable)[%ordinal]
       workgroups([%c100, %c200, %c300])
-  return
+  util.return
 }
 
 // -----
 
 // CHECK-LABEL: @command_buffer_dispatch_indirect
-func.func @command_buffer_dispatch_indirect(
+util.func public @command_buffer_dispatch_indirect(
   %arg0: !hal.command_buffer,
   %arg1: !hal.executable,
   %arg2: !hal.buffer
 ) {
+  // CHECK: %[[ORDINAL:.+]] = vm.const.i32 123
+  %ordinal = arith.constant 123 : index
   %c100 = arith.constant 100 : index
-  // CHECK: vm.call @hal.command_buffer.dispatch.indirect(%arg0, %arg1, %zero, %arg2, %c100) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, !vm.ref<!hal.buffer>, i64) -> ()
+  // CHECK: vm.call @hal.command_buffer.dispatch.indirect(%arg0, %arg1, %[[ORDINAL]], %arg2, %c100) : (!vm.ref<!hal.command_buffer>, !vm.ref<!hal.executable>, i32, !vm.ref<!hal.buffer>, i64) -> ()
   hal.command_buffer.dispatch.indirect<%arg0 : !hal.command_buffer>
-      target(%arg1 : !hal.executable)[0]
+      target(%arg1 : !hal.executable)[%ordinal]
       workgroups(%arg2 : !hal.buffer)[%c100]
-  return
+  util.return
 }

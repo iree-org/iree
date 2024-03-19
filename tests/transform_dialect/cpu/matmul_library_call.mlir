@@ -14,8 +14,7 @@ module {
 
 // RUN: iree-compile %s --iree-hal-target-backends=llvm-cpu \
 // RUN:   --iree-opt-data-tiling=false \
-// RUN:   --iree-codegen-use-transform-dialect-strategy=custom_matmul \
-// RUN:   --iree-codegen-transform-dialect-library=%p/transform_library.mlir \
+// RUN:   --iree-codegen-transform-dialect-library=%p/transform_library.mlir@custom_matmul \
 // RUN:   --compile-to=executable-targets | \
 // RUN: FileCheck %s --check-prefixes=CODEGEN-DEFAULT
 
@@ -26,8 +25,7 @@ module {
 
 // RUN: iree-compile %s --iree-hal-target-backends=llvm-cpu \
 // RUN:   --iree-opt-data-tiling=false \
-// RUN:   --iree-codegen-transform-dialect-library=%p/transform_library.mlir \
-// RUN:   --iree-codegen-use-transform-dialect-strategy=custom_matmul | \
+// RUN:   --iree-codegen-transform-dialect-library=%p/transform_library.mlir@custom_matmul | \
 // RUN: iree-run-module --module=- --function=matmul_static \
 // RUN:   --input="3x5xf32=1" \
 // RUN:   --input="5x3xf32=2" \

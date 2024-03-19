@@ -12,6 +12,7 @@ add_mlir_library(IREEVectorExtDialect
 
   LINK_LIBS PUBLIC
   MLIRIR
+  MLIRAffineDialect
 )
 
 iree_dialects_target_includes(IREEVectorExtDialect)

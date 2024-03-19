@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-stream-schedule-concurrency))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module( util.func(iree-stream-schedule-concurrency))" %s | FileCheck %s
 
 // Tests that when favor=min-peak-memory we assume ops are in an order that
 // reduces live memory ranges and only optimistically put them in concurrency
@@ -6,7 +6,7 @@
 
 // CHECK-LABEL: @partitioningForMinPeakMemory
 // CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<external>, %[[ARG1:.+]]: !stream.resource<external>)
-func.func @partitioningForMinPeakMemory(%arg0: !stream.resource<external>, %arg1: !stream.resource<external>) -> !stream.resource<external>
+util.func public @partitioningForMinPeakMemory(%arg0: !stream.resource<external>, %arg1: !stream.resource<external>) -> !stream.resource<external>
     attributes {stream.partitioning = #stream.partitioning_config<"min-peak-memory">} {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
@@ -45,7 +45,7 @@ func.func @partitioningForMinPeakMemory(%arg0: !stream.resource<external>, %arg1
     stream.yield %5 : !stream.resource<external>{%c20}
   } => !stream.timepoint
   %0 = stream.timepoint.await %result_timepoint => %results : !stream.resource<external>{%c20}
-  return %0 : !stream.resource<external>
+  util.return %0 : !stream.resource<external>
 }
 
 // -----
@@ -55,7 +55,7 @@ func.func @partitioningForMinPeakMemory(%arg0: !stream.resource<external>, %arg1
 
 // CHECK-LABEL: @partitioningForMaxConcurrency
 // CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<external>, %[[ARG1:.+]]: !stream.resource<external>)
-func.func @partitioningForMaxConcurrency(%arg0: !stream.resource<external>, %arg1: !stream.resource<external>) -> !stream.resource<external>
+util.func public @partitioningForMaxConcurrency(%arg0: !stream.resource<external>, %arg1: !stream.resource<external>) -> !stream.resource<external>
     attributes {stream.partitioning = #stream.partitioning_config<"max-concurrency">} {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
@@ -98,7 +98,7 @@ func.func @partitioningForMaxConcurrency(%arg0: !stream.resource<external>, %arg
     stream.yield %5 : !stream.resource<external>{%c20}
   } => !stream.timepoint
   %0 = stream.timepoint.await %result_timepoint => %results : !stream.resource<external>{%c20}
-  return %0 : !stream.resource<external>
+  util.return %0 : !stream.resource<external>
 }
 
 // -----
@@ -109,7 +109,7 @@ func.func @partitioningForMaxConcurrency(%arg0: !stream.resource<external>, %arg
 
 // CHECK-LABEL: @keepTiedOpsSeparate
 // CHECK-SAME: (%[[ARG0:.+]]: !stream.resource<external>)
-func.func @keepTiedOpsSeparate(%arg0: !stream.resource<external>) -> (!stream.resource<external>, !stream.resource<external>) {
+util.func public @keepTiedOpsSeparate(%arg0: !stream.resource<external>) -> (!stream.resource<external>, !stream.resource<external>) {
   %c0 = arith.constant 0 : index
   %c4 = arith.constant 4 : index
   // CHECK: stream.async.execute
@@ -123,7 +123,7 @@ func.func @keepTiedOpsSeparate(%arg0: !stream.resource<external>) -> (!stream.re
     // CHECK-NEXT: stream.yield
     stream.yield %1, %2 : !stream.resource<external>{%c4}, !stream.resource<external>{%c4}
   } => !stream.timepoint
-  return %results#0, %results#1 : !stream.resource<external>, !stream.resource<external>
+  util.return %results#0, %results#1 : !stream.resource<external>, !stream.resource<external>
 }
 
 // -----
@@ -138,7 +138,7 @@ func.func @keepTiedOpsSeparate(%arg0: !stream.resource<external>) -> (!stream.re
 // CHECK-SAME:  %[[SEND0:.+]]: !stream.resource<external>, %[[SEND0_SIZE:[a-z0-9]+]]: index,
 // CHECK-SAME:  %[[SEND1:.+]]: !stream.resource<transient>, %[[SEND1_SIZE:[a-z0-9]+]]: index,
 // CHECK-SAME:  %[[RECV_SIZE:[a-z0-9]+]]: index, %[[COUNT:[a-z0-9]+]]: index)
-func.func @groupCollectiveOps(%channel: !stream.channel, %send0: !stream.resource<external>, %send0_size: index, %send1: !stream.resource<transient>, %send1_size: index, %recv_size: index, %count: index) {
+util.func public @groupCollectiveOps(%channel: !stream.channel, %send0: !stream.resource<external>, %send0_size: index, %send1: !stream.resource<transient>, %send1_size: index, %recv_size: index, %count: index) {
   %c0 = arith.constant 0 : index
   // CHECK: stream.async.execute
   %result:2, %result_timepoint = stream.async.execute
@@ -184,5 +184,5 @@ func.func @groupCollectiveOps(%channel: !stream.channel, %send0: !stream.resourc
   } => !stream.timepoint
   util.optimization_barrier %result#0 : !stream.resource<transient>
   util.optimization_barrier %result#1 : !stream.resource<transient>
-  return
+  util.return
 }

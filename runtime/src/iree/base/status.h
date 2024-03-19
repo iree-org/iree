@@ -398,6 +398,9 @@ typedef struct iree_status_handle_t* iree_status_t;
 #define IREE_CHECK_OK(expr)                                                    \
   IREE_STATUS_IMPL_CHECK_OK_(IREE_STATUS_IMPL_CONCAT_(__status_, __COUNTER__), \
                              (expr))
+//===----------------------------------------------------------------------===//
+// Status code utilities
+//===----------------------------------------------------------------------===//
 
 // Returns the canonical status code for the given errno value.
 // https://en.cppreference.com/w/cpp/error/errno_macros
@@ -415,6 +418,10 @@ iree_status_code_from_win32_error(uint32_t error);
 // IREE_STATUS_UNAVAILABLE = "UNAVAILABLE". Do not rely on string-matching the
 // result as the exact text may change.
 IREE_API_EXPORT const char* iree_status_code_string(iree_status_code_t code);
+
+//===----------------------------------------------------------------------===//
+// Status management
+//===----------------------------------------------------------------------===//
 
 // Allocates a new status instance for a failing error |code|.
 // |file| and |line| should be populated with __FILE__ and __LINE__ at the call
@@ -493,6 +500,10 @@ IREE_API_EXPORT IREE_MUST_USE_RESULT iree_status_t IREE_PRINTF_ATTRIBUTE(2, 3)
 #define iree_status_annotate(base_status, ...) (base_status)
 #define iree_status_annotate_f(base_status, ...) (base_status)
 #endif  // has IREE_STATUS_FEATURE_ANNOTATIONS
+
+//===----------------------------------------------------------------------===//
+// Status string conversion and printing
+//===----------------------------------------------------------------------===//
 
 // Formats the status as a multi-line string containing all associated payloads.
 // Note that this may contain PII such as file paths and must only be used for

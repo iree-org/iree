@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_CONSTEVAL_PASSDETAIL_H_
 #define IREE_COMPILER_CONSTEVAL_PASSDETAIL_H_
 
+#include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/Pass.h"
 

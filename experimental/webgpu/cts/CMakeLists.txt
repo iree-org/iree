@@ -12,7 +12,7 @@ iree_hal_cts_test_suite(
   DRIVER_REGISTRATION_FN
     "iree_hal_webgpu_driver_module_register"
   COMPILER_TARGET_BACKEND
-    "webgpu"
+    "webgpu-spirv"
   EXECUTABLE_FORMAT
     "\"webgpu-wgsl-fb\""
   DEPS

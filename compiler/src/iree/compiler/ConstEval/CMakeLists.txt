@@ -51,6 +51,7 @@ iree_cc_library(
     MLIRFunctionInterfaces
     MLIRIR
     MLIRPass
+    iree::compiler::Dialect::HAL::Target
     iree::compiler::Pipelines
     iree::compiler::Utils
   PUBLIC

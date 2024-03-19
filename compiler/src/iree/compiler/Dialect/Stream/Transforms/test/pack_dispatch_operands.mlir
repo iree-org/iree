@@ -3,17 +3,17 @@
 stream.executable private @ex0 {
   stream.executable.export public @device_i1
   builtin.module {
-    // CHECK-LABEL: func.func @device_i1
+    // CHECK-LABEL:  util.func public @device_i1
     // CHECK-SAME: (%arg0: i32, %arg1: !stream.binding)
-    func.func @device_i1(%arg0: i1 {stream.values = [true, false]}, %arg1: !stream.binding) {
+     util.func public @device_i1(%arg0: i1 {stream.values = [true, false]}, %arg1: !stream.binding) {
       // CHECK-NEXT: %[[DEV_I1:.+]] = arith.trunci %arg0 {stream.values = [true, false]} : i32 to i1
       // CHECK-NEXT: util.optimization_barrier %[[DEV_I1]]
       util.optimization_barrier %arg0 : i1
-      return
+      util.return
     }
   }
 }
-func.func @host_i1(%arg0: i1) -> !stream.timepoint {
+util.func public @host_i1(%arg0: i1) -> !stream.timepoint {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c128 = arith.constant 128 : index
@@ -25,7 +25,7 @@ func.func @host_i1(%arg0: i1) -> !stream.timepoint {
       wo %arg1[%c0 for %c128] : !stream.resource<external>{%c128}
     }
   } => !stream.timepoint
-  return %1 : !stream.timepoint
+  util.return %1 : !stream.timepoint
 }
 
 // -----
@@ -33,18 +33,18 @@ func.func @host_i1(%arg0: i1) -> !stream.timepoint {
 stream.executable private @ex1 {
   stream.executable.export public @device_bf16
   builtin.module {
-    // CHECK-LABEL: func.func @device_bf16
+    // CHECK-LABEL:  util.func public @device_bf16
     // CHECK-SAME: (%arg0: i32, %arg1: !stream.binding)
-    func.func @device_bf16(%arg0: bf16, %arg1: !stream.binding) {
+     util.func public @device_bf16(%arg0: bf16, %arg1: !stream.binding) {
       // CHECK-NEXT: %[[DEV_I16:.+]] = arith.trunci %arg0 : i32 to i16
       // CHECK-NEXT: %[[DEV_BF16:.+]] = arith.bitcast %[[DEV_I16]] : i16 to bf16
       // CHECK-NEXT: util.optimization_barrier %[[DEV_BF16]]
       util.optimization_barrier %arg0 : bf16
-      return
+      util.return
     }
   }
 }
-func.func @host_bf16(%arg0: bf16) -> !stream.timepoint {
+util.func public @host_bf16(%arg0: bf16) -> !stream.timepoint {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c128 = arith.constant 128 : index
@@ -57,7 +57,7 @@ func.func @host_bf16(%arg0: bf16) -> !stream.timepoint {
       wo %arg1[%c0 for %c128] : !stream.resource<external>{%c128}
     }
   } => !stream.timepoint
-  return %1 : !stream.timepoint
+  util.return %1 : !stream.timepoint
 }
 
 // -----
@@ -66,20 +66,20 @@ stream.executable private @ex2 {
   // CHECK-LABEL: @device_i64
   stream.executable.export public @device_i64
   builtin.module {
-    // CHECK-LABEL: func.func @device_i64
+    // CHECK-LABEL:  util.func public @device_i64
     // CHECK-SAME: (%[[DEV_LO32:.+]]: i32, %[[DEV_HI32:.+]]: i32, %arg2: !stream.binding)
-    func.func @device_i64(%arg0: i64 {stream.values = [-1 : i64, 0x0000000200000003 : i64]}, %arg1: !stream.binding) {
+     util.func public @device_i64(%arg0: i64 {stream.values = [-1 : i64, 0x0000000200000003 : i64]}, %arg1: !stream.binding) {
       // CHECK-DAG: %[[DEV_LO64:.+]] = arith.extui %[[DEV_LO32]] : i32 to i64
       // CHECK-DAG: %[[DEV_HI64:.+]] = arith.extui %[[DEV_HI32]] : i32 to i64
       // CHECK-DAG: %[[DEV_HISHL:.+]] = arith.shli %[[DEV_HI64]], %c32
       // CHECK-DAG: %[[DEV_I64:.+]] = arith.ori %[[DEV_LO64]], %[[DEV_HISHL]] {stream.values = [-1, 8589934595]}
       // CHECK-NEXT: util.optimization_barrier %[[DEV_I64]]
       util.optimization_barrier %arg0 : i64
-      return
+      util.return
     }
   }
 }
-func.func @host_i64(%arg0: i64) -> !stream.timepoint {
+util.func public @host_i64(%arg0: i64) -> !stream.timepoint {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c128 = arith.constant 128 : index
@@ -93,7 +93,7 @@ func.func @host_i64(%arg0: i64) -> !stream.timepoint {
       wo %arg1[%c0 for %c128] : !stream.resource<external>{%c128}
     }
   } => !stream.timepoint
-  return %1 : !stream.timepoint
+  util.return %1 : !stream.timepoint
 }
 
 // -----
@@ -109,9 +109,9 @@ func.func @host_i64(%arg0: i64) -> !stream.timepoint {
 stream.executable private @ex3 attributes {stream.resources = #resourceIndex32} {
   stream.executable.export public @device_index_32
   builtin.module {
-    // CHECK-LABEL: func.func @device_index_32
+    // CHECK-LABEL:  util.func public @device_index_32
     // CHECK-SAME: (%[[DEV_I32:.+]]: i32, %{{.+}}: !stream.binding)
-    func.func @device_index_32(%arg0: index {stream.alignment = 16 : index, stream.values = [0 : index, 1234 : index]}, %arg1: !stream.binding) {
+     util.func public @device_index_32(%arg0: index {stream.alignment = 16 : index, stream.values = [0 : index, 1234 : index]}, %arg1: !stream.binding) {
       // 32-bit device size fits in a push constant:
       // CHECK: %[[DEV_INDEX:.+]] = arith.index_castui %[[DEV_I32]] {
       // CHECK-SAME:   stream.alignment = 16 : index
@@ -119,11 +119,11 @@ stream.executable private @ex3 attributes {stream.resources = #resourceIndex32} 
       // CHECK-SAME: } : i32 to index
       // CHECK: util.optimization_barrier %[[DEV_INDEX]]
       util.optimization_barrier %arg0 : index
-      return
+      util.return
     }
   }
 }
-func.func @host_index_32(%arg0: index) -> !stream.timepoint {
+util.func public @host_index_32(%arg0: index) -> !stream.timepoint {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c128 = arith.constant 128 : index
@@ -138,7 +138,7 @@ func.func @host_index_32(%arg0: index) -> !stream.timepoint {
       wo %arg1[%c0 for %c128] : !stream.resource<external>{%c128}
     }
   } => !stream.timepoint
-  return %1 : !stream.timepoint
+  util.return %1 : !stream.timepoint
 }
 
 // -----
@@ -154,9 +154,9 @@ func.func @host_index_32(%arg0: index) -> !stream.timepoint {
 stream.executable private @ex4 attributes {stream.resources = #resourceIndex64} {
   stream.executable.export public @device_index_64
   builtin.module {
-    // CHECK-LABEL: func.func @device_index_64
+    // CHECK-LABEL:  util.func public @device_index_64
     // CHECK-SAME: (%[[DEV_LO32:.+]]: i32, %[[DEV_HI32:.+]]: i32, %{{.+}}: !stream.binding)
-    func.func @device_index_64(%arg0: index {stream.alignment = 16 : index, stream.values = [0 : index, 1234 : index]}, %arg1: !stream.binding) {
+     util.func public @device_index_64(%arg0: index {stream.alignment = 16 : index, stream.values = [0 : index, 1234 : index]}, %arg1: !stream.binding) {
       // 64-bit device size requires joining after it was split into lo/hi:
       // CHECK-DAG: %[[DEV_LO64:.+]] = arith.extui %[[DEV_LO32]] : i32 to i64
       // CHECK-DAG: %[[DEV_HI64:.+]] = arith.extui %[[DEV_HI32]] : i32 to i64
@@ -168,11 +168,11 @@ stream.executable private @ex4 attributes {stream.resources = #resourceIndex64} 
       // CHECK-SAME: } : i64 to index
       // CHECK: util.optimization_barrier %[[DEV_INDEX]]
       util.optimization_barrier %arg0 : index
-      return
+      util.return
     }
   }
 }
-func.func @host_index_64(%arg0: index) -> !stream.timepoint {
+util.func public @host_index_64(%arg0: index) -> !stream.timepoint {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c128 = arith.constant 128 : index
@@ -190,7 +190,7 @@ func.func @host_index_64(%arg0: index) -> !stream.timepoint {
       wo %arg1[%c0 for %c128] : !stream.resource<external>{%c128}
     }
   } => !stream.timepoint
-  return %1 : !stream.timepoint
+  util.return %1 : !stream.timepoint
 }
 
 // -----
@@ -199,19 +199,19 @@ stream.executable private @ex5 {
   // CHECK-LABEL: @device_complex_f32
   stream.executable.export public @device_complex_f32
   builtin.module {
-    // CHECK-LABEL: func.func @device_complex_f32
+    // CHECK-LABEL:  util.func public @device_complex_f32
     // CHECK-SAME: (%[[DEV_REAL_I32:.+]]: i32, %[[DEV_IMAG_I32:.+]]: i32, %arg2: !stream.binding)
-    func.func @device_complex_f32(%arg0: complex<f32>, %arg1: !stream.binding) {
+     util.func public @device_complex_f32(%arg0: complex<f32>, %arg1: !stream.binding) {
       // CHECK-DAG: %[[DEV_REAL_F32:.+]] = arith.bitcast %[[DEV_REAL_I32]] : i32 to f32
       // CHECK-DAG: %[[DEV_IMAG_F32:.+]] = arith.bitcast %[[DEV_IMAG_I32]] : i32 to f32
       // CHECK-DAG: %[[DEV_COMPLEX:.+]] = complex.create %[[DEV_REAL_F32]], %[[DEV_IMAG_F32]]
       // CHECK-NEXT: util.optimization_barrier %[[DEV_COMPLEX]]
       util.optimization_barrier %arg0 : complex<f32>
-      return
+      util.return
     }
   }
 }
-func.func @host_complex_f32(%arg0: complex<f32>) -> !stream.timepoint {
+util.func public @host_complex_f32(%arg0: complex<f32>) -> !stream.timepoint {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c128 = arith.constant 128 : index
@@ -226,7 +226,7 @@ func.func @host_complex_f32(%arg0: complex<f32>) -> !stream.timepoint {
       wo %arg1[%c0 for %c128] : !stream.resource<external>{%c128}
     }
   } => !stream.timepoint
-  return %1 : !stream.timepoint
+  util.return %1 : !stream.timepoint
 }
 
 // -----
@@ -235,19 +235,19 @@ stream.executable private @ex6 {
   // CHECK-LABEL: @device_complex_f64_bitcast
   stream.executable.export public @device_complex_f64_bitcast
   builtin.module {
-    // CHECK-LABEL: func.func @device_complex_f64
+    // CHECK-LABEL:  util.func public @device_complex_f64
     // CHECK-SAME: (%{{.*}}: i32, %{{.*}}: i32, %{{.*}}: i32, %{{.*}}: i32, %arg4: !stream.binding)
-    func.func @device_complex_f64_bitcast(%arg0: complex<f64>, %arg1: !stream.binding) {
+     util.func public @device_complex_f64_bitcast(%arg0: complex<f64>, %arg1: !stream.binding) {
       // CHECK-COUNT-2: arith.bitcast {{.*}} : i64 to f64
       // CHECK: %[[DEV_COMPLEX:.+]] = complex.create
       // CHECK-NEXT: util.optimization_barrier %[[DEV_COMPLEX]]
       util.optimization_barrier %arg0 : complex<f64>
-      return
+      util.return
     }
   }
 }
-// CHECK-LABEL: func.func @host_complex_bitcast
-func.func @host_complex_bitcast(%arg0: complex<f64>) -> !stream.timepoint {
+// CHECK-LABEL:  util.func public @host_complex_bitcast
+util.func public @host_complex_bitcast(%arg0: complex<f64>) -> !stream.timepoint {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c128 = arith.constant 128 : index
@@ -269,5 +269,5 @@ func.func @host_complex_bitcast(%arg0: complex<f64>) -> !stream.timepoint {
       wo %arg1[%c0 for %c128] : !stream.resource<external>{%c128}
     }
   } => !stream.timepoint
-  return %2 : !stream.timepoint
+  util.return %2 : !stream.timepoint
 }

@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-top-level-scf-to-cfg))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-top-level-scf-to-cfg))" %s | FileCheck %s
 
 // CHECK-LABEL: @generic_nested_for
 // While not super recommended, we do have cases of SCF constructs embedded
@@ -6,7 +6,7 @@
 // The normal --convert-scf-to-std pass will produce an illegal linalg op
 // (multiple basic blocks). The --iree-top-level-scf-to-cfg should not touch it.
 #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-func.func @generic_nested_for(%arg0: tensor<?x?x?x?xi32>, %arg1: tensor<?x?x?x?xi32>, %out0: tensor<?x?x?x?xi32>) -> tensor<?x?x?x?xi32> {
+util.func public @generic_nested_for(%arg0: tensor<?x?x?x?xi32>, %arg1: tensor<?x?x?x?xi32>, %out0: tensor<?x?x?x?xi32>) -> tensor<?x?x?x?xi32> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c6 = arith.constant 6 : index
@@ -41,5 +41,5 @@ func.func @generic_nested_for(%arg0: tensor<?x?x?x?xi32>, %arg1: tensor<?x?x?x?x
     linalg.yield %27 : i32
   } -> tensor<?x?x?x?xi32>
 
-  return %0 : tensor<?x?x?x?xi32>
+  util.return %0 : tensor<?x?x?x?xi32>
 }

@@ -24,7 +24,7 @@ public:
   SmallVector<tensor::DimOp> getTensorDimOps();
 
 protected:
-  void notifyOperationRemoved(Operation *op) override;
+  void notifyOperationErased(Operation *op) override;
   void notifyOperationInserted(Operation *op, InsertPoint previous) override;
 
 private:

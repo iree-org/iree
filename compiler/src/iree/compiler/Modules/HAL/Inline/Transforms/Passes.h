@@ -33,7 +33,7 @@ namespace mlir::iree_compiler::IREE::HAL::Inline {
 //   buildHALInlineTransformPassPipeline & run
 //   <serialize VM module>
 void buildHALInlineStaticTransformPassPipeline(
-    OpPassManager &passManager, const TargetBackendRegistry &targetRegistry,
+    OpPassManager &passManager, const TargetRegistry &targetRegistry,
     const TargetOptions &targetOptions);
 
 //===----------------------------------------------------------------------===//

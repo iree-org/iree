@@ -1,7 +1,7 @@
 // RUN: iree-opt --allow-unregistered-dialect --split-input-file %s | iree-opt --allow-unregistered-dialect --split-input-file | FileCheck %s
 
 // CHECK-LABEL: @complexWorkgroupsUsage
-func.func @complexWorkgroupsUsage(
+util.func public @complexWorkgroupsUsage(
     // CHECK-SAME: %[[ARG0:.+]]: tensor<?x4xf32>
     %arg0 : tensor<?x4xf32>,
     // CHECK-SAME: %[[ARG1:.+]]: index
@@ -56,14 +56,14 @@ func.func @complexWorkgroupsUsage(
     // CHECK-NEXT: flow.return
     flow.return
   }
-  // CHECK: return %[[OUTER_RET0]] : tensor<4x?xf32>
-  return %0 : tensor<4x?xf32>
+  // CHECK: util.return %[[OUTER_RET0]] : tensor<4x?xf32>
+  util.return %0 : tensor<4x?xf32>
 }
 
 // -----
 
 // CHECK-LABEL: @inplaceDispatch
-func.func @inplaceDispatch(
+util.func public @inplaceDispatch(
     // CHECK-SAME: %[[ARG0:.+]]: tensor<?x4xf32>
     %arg0: tensor<?x4xf32>,
     // CHECK-SAME: %[[ARG1:.+]]: index
@@ -88,15 +88,15 @@ func.func @inplaceDispatch(
     // CHECK-NEXT: flow.return
     flow.return
   }
-  // CHECK: return %[[OUTER_RET0]] : tensor<?x4xf32>
-  return %0 : tensor<?x4xf32>
+  // CHECK: util.return %[[OUTER_RET0]] : tensor<?x4xf32>
+  util.return %0 : tensor<?x4xf32>
 }
 
 // -----
 
 // CHECK-LABEL: @dispatchWithCountRegion
 // CHECK-SAME: (%[[ARG0:.+]]: tensor<4xi32>)
-func.func @dispatchWithCountRegion(%arg0: tensor<4xi32>) -> tensor<4xi32> {
+util.func public @dispatchWithCountRegion(%arg0: tensor<4xi32>) -> tensor<4xi32> {
   // CHECK-DAG: %[[WORKGROUP_COUNT_X:.+]] = arith.constant 100
   %x = arith.constant 100 : index
   // CHECK-DAG: %[[WORKGROUP_COUNT_Y:.+]] = arith.constant 50
@@ -117,6 +117,6 @@ func.func @dispatchWithCountRegion(%arg0: tensor<4xi32>) -> tensor<4xi32> {
     // CHECK-NEXT: flow.return %[[X_CAPTURE]], %[[Y_CAPTURE]], %[[Z]]
     flow.return %x_capture, %y_capture, %z : index, index, index
   }
-  // CHECK: return %[[OUTER_RET0]] : tensor<4xi32>
-  return %0 : tensor<4xi32>
+  // CHECK: util.return %[[OUTER_RET0]] : tensor<4xi32>
+  util.return %0 : tensor<4xi32>
 }

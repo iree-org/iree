@@ -34,7 +34,7 @@ RUN apt-get update \
     lsb-release
 
 # Install the latest supported compiler tools
-ARG LLVM_VERSION=17
+ARG LLVM_VERSION=19
 ENV CC /usr/bin/clang-${LLVM_VERSION}
 ENV CXX /usr/bin/clang++-${LLVM_VERSION}
 

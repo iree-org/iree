@@ -6,7 +6,6 @@
 
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 
-#include "iree-dialects/Dialect/LinalgExt/Passes/Passes.h"
 #include "iree-dialects/Transforms/TransformMatchers.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/AsyncToLLVM/AsyncToLLVM.h"
@@ -57,6 +56,7 @@ using namespace mlir;
 /// (`pdlValues[1]`).
 /// TODO: PDL needs user-defined "questions".
 static LogicalResult nestedInFunc(PatternRewriter &rewriter,
+                                  PDLResultList &pdlResults,
                                   ArrayRef<PDLValue> pdlValues) {
   assert(pdlValues.size() == 2 && "expected 2 PDL values");
   Operation *operation = pdlValues[0].cast<Operation *>();
@@ -168,6 +168,7 @@ static LogicalResult isEquivalentToOpImpl(PatternRewriter &rewriter,
 ///           then the bodies would be equivalent (really isomorphic).
 ///   3. other cases TBD (e.g. vector.generic when available).
 static LogicalResult isEquivalentToOp(PatternRewriter &rewriter,
+                                      PDLResultList &pdlResults,
                                       ArrayRef<PDLValue> pdlValues) {
   assert(pdlValues.size() == 2 && "expected 2 PDL values");
   Operation *operation = pdlValues[0].cast<Operation *>();
@@ -208,6 +209,7 @@ static LogicalResult isEquivalentToOp(PatternRewriter &rewriter,
 /// Note: 0 is the convention to express "do not tile", it is considered to
 /// divide everything.
 static LogicalResult isDimMultipleOf(PatternRewriter &rewriter,
+                                     PDLResultList &pdlResults,
                                      ArrayRef<PDLValue> pdlValues) {
   assert(pdlValues.size() == 2 && "expected 2 PDL values");
   ValueRange operands = pdlValues[0].cast<ValueRange>();
@@ -251,6 +253,7 @@ static LogicalResult isDimMultipleOf(PatternRewriter &rewriter,
 /// Succeed if `value`[`operand_number`] is a ranked type whose `dim` is
 /// dynamic.
 static LogicalResult isDimStatic(PatternRewriter &rewriter,
+                                 PDLResultList &pdlResults,
                                  ArrayRef<PDLValue> pdlValues) {
   assert(pdlValues.size() == 2 && "expected 2 PDL values");
   ValueRange operands = pdlValues[0].cast<ValueRange>();
@@ -285,6 +288,7 @@ static LogicalResult isDimStatic(PatternRewriter &rewriter,
 /// Succeed if `value`[`operand_number`] is a ranked type whose `dim` is
 /// dynamic.
 static LogicalResult isDimDynamic(PatternRewriter &rewriter,
+                                  PDLResultList &pdlResults,
                                   ArrayRef<PDLValue> pdlValues) {
   assert(pdlValues.size() == 2 && "expected 2 PDL values");
   ValueRange operands = pdlValues[0].cast<ValueRange>();

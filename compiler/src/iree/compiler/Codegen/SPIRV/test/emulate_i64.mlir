@@ -47,7 +47,7 @@ hal.executable private @buffer_types {
 // -----
 
 hal.executable private @emulate_1d_vector {
-  hal.executable.variant public @vulkan_spirv_fb target(<"vulkan", "vulkan-spirv-fb", {
+  hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
       spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, #spirv.resource_limits<>>}>) {
     hal.executable.export public @emulate_1d_vector ordinal(0)
       layout(#hal.pipeline.layout<push_constants = 0,

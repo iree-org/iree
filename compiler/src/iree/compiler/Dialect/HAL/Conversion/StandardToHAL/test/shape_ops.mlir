@@ -2,11 +2,11 @@
 
 // CHECK-LABEL: @tensorDim
 // CHECK-SAME: (%[[ARG0:.+]]: !hal.buffer_view)
-func.func @tensorDim(%arg0: tensor<4x?xf32>) -> index {
+util.func public @tensorDim(%arg0: tensor<4x?xf32>) -> index {
   %c1 = arith.constant 1 : index
   // CHECK: %[[DIM:.+]] = hal.buffer_view.dim<%[[ARG0]] : !hal.buffer_view>[1] : index
   %dim = tensor.dim %arg0, %c1 : tensor<4x?xf32>
-  return %dim : index
+  util.return %dim : index
 }
 
 // -----
@@ -16,10 +16,10 @@ func.func @tensorDim(%arg0: tensor<4x?xf32>) -> index {
 
 // CHECK: @tensorRank
 // CHECK-SAME: (%[[ARG0:.+]]: !hal.buffer_view)
-func.func @tensorRank(%arg0: tensor<4x?xf32>) -> index {
+util.func public @tensorRank(%arg0: tensor<4x?xf32>) -> index {
   // CHECK-NOT: hal.buffer_view.rank
   // CHECK: %[[RANK:.+]] = arith.constant 2
   %rank = tensor.rank %arg0 : tensor<4x?xf32>
-  // CHECK: return %[[RANK]]
-  return %rank : index
+  // CHECK: util.return %[[RANK]]
+  util.return %rank : index
 }

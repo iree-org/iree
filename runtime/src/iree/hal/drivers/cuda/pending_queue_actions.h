@@ -54,6 +54,9 @@ typedef void(IREE_API_PTR* iree_hal_cuda_pending_action_cleanup_callback_t)(
 
 // Enqueues the given list of |command_buffers| that waits on
 // |wait_semaphore_list| and signals |signal_semaphore_lsit|.
+//
+// |cleanup_callback|, if not NULL, will run after the action completes but
+// before releasing all retained resources.
 iree_status_t iree_hal_cuda_pending_queue_actions_enqueue_execution(
     iree_hal_device_t* device, CUstream dispatch_stream,
     CUstream callback_stream, iree_hal_cuda_pending_queue_actions_t* actions,

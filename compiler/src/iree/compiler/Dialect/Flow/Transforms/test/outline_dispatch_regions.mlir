@@ -11,9 +11,9 @@
 // CHECK-NEXT:   return
 // CHECK-NEXT: }
 
-// CHECK-LABEL: func.func @staticShapeDispatch(
+// CHECK-LABEL: util.func public @staticShapeDispatch(
 // CHECK-SAME: %[[ARG0:.+]]: tensor<8x4xf32>)
-func.func @staticShapeDispatch(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
+util.func public @staticShapeDispatch(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
   // CHECK-DAG: %[[X:.+]] = arith.constant 100
   %x = arith.constant 100 : index
   // CHECK-DAG: %[[Y:.+]] = arith.constant 50
@@ -29,8 +29,8 @@ func.func @staticShapeDispatch(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
     flow.dispatch.tensor.store %ret_value, %ret,  offsets=[0, 0], sizes=[4, 8], strides=[1, 1] : tensor<4x8xf32> -> !flow.dispatch.tensor<writeonly:tensor<4x8xf32>>
     flow.return
   }
-  // CHECK-NEXT: return %[[RET]]
-  return %0 : tensor<4x8xf32>
+  // CHECK-NEXT: util.return %[[RET]]
+  util.return %0 : tensor<4x8xf32>
 }
 
 // -----
@@ -43,9 +43,9 @@ func.func @staticShapeDispatch(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
 // CHECK-NEXT:   flow.executable.export public @dispatchFnMuli_dispatch_1
 //      CHECK: func.func @dispatchFnMuli_dispatch_1(
 
-// CHECK-LABEL: func.func @dispatchFnMuli(
+// CHECK-LABEL: util.func public @dispatchFnMuli(
 // CHECK-SAME: %[[ARG0:.+]]: tensor<8x4xf32>)
-func.func @dispatchFnMuli(%arg0 : tensor<8x4xf32>) -> tensor<8x4xf32> {
+util.func public @dispatchFnMuli(%arg0 : tensor<8x4xf32>) -> tensor<8x4xf32> {
   // CHECK-DAG: %[[X:.+]] = arith.constant 100
   %x = arith.constant 100 : index
   // CHECK-DAG: %[[Y:.+]] = arith.constant 50
@@ -72,16 +72,16 @@ func.func @dispatchFnMuli(%arg0 : tensor<8x4xf32>) -> tensor<8x4xf32> {
     flow.dispatch.tensor.store %ret_value, %ret, offsets=[0, 0], sizes=[8, 4], strides=[1, 1] : tensor<8x4xf32> -> !flow.dispatch.tensor<writeonly:tensor<8x4xf32>>
     flow.return
   }
-  // CHECK-NEXT: return %[[RET1]]
-  return %1 : tensor<8x4xf32>
+  // CHECK-NEXT: util.return %[[RET1]]
+  util.return %1 : tensor<8x4xf32>
 }
 
 // -----
 
 // CHECK: flow.executable private @dispatchFn1_dispatch_0
 
-// CHECK-LABEL: func.func @dispatchFn1
-func.func @dispatchFn1(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
+// CHECK-LABEL: util.func public @dispatchFn1
+util.func public @dispatchFn1(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
   %x = arith.constant 100 : index
   %y = arith.constant 50 : index
   // CHECK: flow.dispatch @dispatchFn1_dispatch_0::@dispatchFn1_dispatch_0
@@ -93,13 +93,13 @@ func.func @dispatchFn1(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
   ) {
     flow.return
   }
-  return %0 : tensor<4x8xf32>
+  util.return %0 : tensor<4x8xf32>
 }
 
 // CHECK: flow.executable private @dispatchFn2_dispatch_0
 
-// CHECK-LABEL: func.func @dispatchFn2
-func.func @dispatchFn2(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
+// CHECK-LABEL: util.func public @dispatchFn2
+util.func public @dispatchFn2(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
   %x = arith.constant 100 : index
   %y = arith.constant 50 : index
   // CHECK: flow.dispatch @dispatchFn2_dispatch_0::@dispatchFn2_dispatch_0
@@ -111,7 +111,7 @@ func.func @dispatchFn2(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
   ) {
     flow.return
   }
-  return %0 : tensor<4x8xf32>
+  util.return %0 : tensor<4x8xf32>
 }
 
 // -----
@@ -130,9 +130,9 @@ func.func @dispatchFn2(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
 // CHECK:   return
 // CHECK-NEXT: }
 
-// CHECK-LABEL: func.func @dynamicShapeDispatch(
+// CHECK-LABEL: util.func public @dynamicShapeDispatch(
 // CHECK-SAME: %[[ARG0:.+]]: tensor<7x?x24x?xf32>
-func.func @dynamicShapeDispatch(%arg0 : tensor<7x?x24x?xf32>) -> tensor<?x?x1024xf32> {
+util.func public @dynamicShapeDispatch(%arg0 : tensor<7x?x24x?xf32>) -> tensor<?x?x1024xf32> {
   %c1 = arith.constant 1 : index
   %c3 = arith.constant 3 : index
   // CHECK-DAG: %[[DIM1:.+]] = tensor.dim %[[ARG0]], %c1
@@ -157,14 +157,14 @@ func.func @dynamicShapeDispatch(%arg0 : tensor<7x?x24x?xf32>) -> tensor<?x?x1024
     flow.dispatch.tensor.store %ret_tile, %ret, offsets=[0, 0, 0], sizes=[%dim3_capture, %dim1_capture, 1024], strides=[1, 1, 1] : tensor<?x?x1024xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x?x1024xf32>>{%dim3_capture, %dim1_capture}
     flow.return
   }
-  // CHECK-NEXT: return %[[RET0]]
-  return %ret0 : tensor<?x?x1024xf32>
+  // CHECK-NEXT: util.return %[[RET0]]
+  util.return %ret0 : tensor<?x?x1024xf32>
 }
 
 // -----
 
-// CHECK-LABEL: func.func @dispatchWithCountRegion
-func.func @dispatchWithCountRegion(%arg0: tensor<4xi32>) -> tensor<4xi32> {
+// CHECK-LABEL: util.func public @dispatchWithCountRegion
+util.func public @dispatchWithCountRegion(%arg0: tensor<4xi32>) -> tensor<4xi32> {
   %x = arith.constant 100 : index
   %y = arith.constant 50 : index
   %0 = flow.dispatch.workgroups[%x, %y](%arg0) : (tensor<4xi32>) -> %arg0 =
@@ -174,5 +174,5 @@ func.func @dispatchWithCountRegion(%arg0: tensor<4xi32>) -> tensor<4xi32> {
     %z = arith.constant 1 : index
     flow.return %x_capture, %y_capture, %z : index, index, index
   }
-  return %0 : tensor<4xi32>
+  util.return %0 : tensor<4xi32>
 }

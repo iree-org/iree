@@ -33,7 +33,6 @@ def ExportParametersPass :
 def GenerateSplatParameterArchivePass :
     Pass<"iree-io-generate-splat-parameter-archive", "mlir::ModuleOp"> {
   let summary = "Generates a .irpa file with splat entries for all parameters";
-  let dependentDialects = [];
   let options = [
     Option<"archivePath", "archive-path", "std::string",
            /*default=*/"",

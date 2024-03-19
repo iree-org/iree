@@ -39,7 +39,7 @@ declare -a CMAKE_ARGS=(
 
   # Enable the WebGPU compiler build. All deps get fetched as needed, but some
   # of the deps are too large to enable by default for all developers.
-  "-DIREE_TARGET_BACKEND_WEBGPU=ON"
+  "-DIREE_TARGET_BACKEND_WEBGPU_SPIRV=ON"
 )
 
 "${CMAKE_BIN}" "${CMAKE_ARGS[@]}"

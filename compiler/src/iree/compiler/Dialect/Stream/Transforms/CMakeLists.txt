@@ -42,7 +42,6 @@ iree_cc_library(
     "VerifyLowerings.cpp"
   DEPS
     ::PassesIncGen
-    IREELinalgExtDialect
     LLVMSupport
     MLIRAffineDialect
     MLIRAnalysis
@@ -64,6 +63,7 @@ iree_cc_library(
     MLIRVectorDialect
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
+    iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::Stream::Analysis
     iree::compiler::Dialect::Stream::Builtins
     iree::compiler::Dialect::Stream::Conversion

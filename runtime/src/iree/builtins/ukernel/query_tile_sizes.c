@@ -62,7 +62,7 @@ static void iree_uk_query_tile_sizes_2d_matmul(
   }
 }
 
-IREE_UK_EXPORT int iree_uk_query_tile_sizes_2d(
+IREE_UK_EXPORT void iree_uk_query_tile_sizes_2d(
     const iree_uk_query_tile_sizes_2d_params_t* params,
     iree_uk_query_tile_sizes_2d_out_params_t* out_params) {
   iree_uk_query_tile_sizes_2d_validate(params);
@@ -72,5 +72,4 @@ IREE_UK_EXPORT int iree_uk_query_tile_sizes_2d(
   } else {
     // Shouldn't happen, validated earlier.
   }
-  return 0;
 }

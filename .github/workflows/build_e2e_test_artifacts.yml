@@ -107,18 +107,19 @@ jobs:
           BUILD_E2E_TEST_ARTIFACTS_DIR: build-e2e-test-artifacts
           IREE_SHARD_COUNT: ${{ inputs.shard-count }}
         run: |
+          echo "e2e-test-artifacts-dir=${BUILD_E2E_TEST_ARTIFACTS_DIR}/e2e_test_artifacts" >> "${GITHUB_OUTPUT}"
+          echo "e2e-test-artifacts-build-log=${BUILD_E2E_TEST_ARTIFACTS_DIR}/.ninja_log" >> "${GITHUB_OUTPUT}"
           build_tools/github_actions/docker_run.sh \
             --env "IREE_HOST_BIN_DIR=${INSTALL_DIR}/bin" \
             --env "IREE_BENCHMARK_PRESETS=${IREE_BENCHMARK_PRESETS}" \
             --env "IREE_BUILD_DEFAULT_BENCHMARK_SUITES=${IREE_BUILD_DEFAULT_BENCHMARK_SUITES}" \
             --env "IREE_SHARD_COUNT=${IREE_SHARD_COUNT}" \
-            gcr.io/iree-oss/base@sha256:61e9aae211007dbad95e1f429e9e5121fd5968c204791038424979c21146cf75 \
+            gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
             build_tools/cmake/build_e2e_test_artifacts.sh \
             "${BUILD_E2E_TEST_ARTIFACTS_DIR}"
-          echo "e2e-test-artifacts-dir=${BUILD_E2E_TEST_ARTIFACTS_DIR}/e2e_test_artifacts" >> "${GITHUB_OUTPUT}"
-          echo "e2e-test-artifacts-build-log=${BUILD_E2E_TEST_ARTIFACTS_DIR}/.ninja_log" >> "${GITHUB_OUTPUT}"
       - name: "Uploading e2e test artifacts"
         id: upload
+        if: ${{ !cancelled() }}
         env:
           E2E_TEST_ARTIFACTS_DIR: ${{ steps.build.outputs.e2e-test-artifacts-dir }}
           E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR: ${{ env.GCS_DIR }}/e2e-test-artifacts
@@ -129,12 +130,13 @@ jobs:
           # from GCS and they won't change. We can upload links instead of files
           # to save space.
           # Uploads all artifacts except for the `*.tflite`, which are the
-          # source models we imported into MLIR.
+          # source models we imported into MLIR, and empty directories (GCS
+          # doesn't accept them).
           # Not archiving the directory to allow fetching each file as needed
           # separately. `find` depth is limited at 1 to exclude the directory
           # itself and list all files and subdirectories at the first level. Let
           # gcloud cli handle the recursive file traversal.
-          find "${E2E_TEST_ARTIFACTS_DIR}" -mindepth 1 -maxdepth 1 ! -name "*.tflite" \
+          find "${E2E_TEST_ARTIFACTS_DIR}" -mindepth 1 -maxdepth 1 ! -name "*.tflite" ! -empty \
             | gcloud storage cp --read-paths-from-stdin -r \
               "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}"
           gcloud storage cp "${E2E_TEST_ARTIFACTS_BUILD_LOG}" \

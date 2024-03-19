@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree-dialects/Dialect/LinalgExt/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/SPIRV/PassDetail.h"
@@ -148,8 +147,7 @@ static LogicalResult tileAndDistributeToThreads(linalg::LinalgOp consumerOp,
 static LogicalResult
 tileReduction(mlir::FunctionOpInterface funcOp,
               const scf::SCFTileSizeComputationFunction &computeFn) {
-  auto filter =
-      IREE::LinalgExt::LinalgTransformationFilter().setMatchByDefault();
+  auto filter = LinalgTransformationFilter().setMatchByDefault();
   auto options =
       scf::SCFTilingOptions().setTileSizeComputationFunction(computeFn);
   auto result = tileLinalgOpsWithFilter(funcOp, options, filter);

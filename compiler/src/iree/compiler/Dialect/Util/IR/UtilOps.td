@@ -634,6 +634,22 @@ def Util_FuncOp : Util_Op<"func", [
 
     ArrayRef<Type> getArgumentTypes() { return getFunctionType().getInputs(); }
     ArrayRef<Type> getResultTypes() { return getFunctionType().getResults(); }
+
+    // Returns true if any operand is tied to a result.
+    bool hasAnyTiedOperands();
+
+    // Updates the function signature to potentially expand each argument and
+    // result. Only the signature and the metadata on the function (tied
+    // operands, argument/result attrs, etc) are updated and the body region
+    // remains unchanged.
+    //
+    // Any type that may be tied must remain in the same relative order (expand
+    // by appending types after the base type).
+    //
+    // If |newSignature| is provided
+    void expandSignature(
+        std::function<void(unsigned, Type, SmallVectorImpl<Type> &)> expandArgument,
+        std::function<void(unsigned, Type, SmallVectorImpl<Type> &)> expandResult);
   }];
 
   let hasCustomAssemblyFormat = 1;
@@ -671,6 +687,19 @@ def Util_CallOp : Util_Op<"call", [
     Variadic<AnyType>:$results
   );
 
+  let builders = [
+    OpBuilder<(ins
+      CArg<"FunctionOpInterface">:$callee,
+      CArg<"ValueRange">:$operands,
+      CArg<"ArrayAttr", "{}">:$tied_operands,
+      CArg<"ArrayRef<NamedAttribute>", "{}">:$attrs
+    ), [{
+      build($_builder, $_state, callee.getResultTypes(), callee.getName(),
+            operands, tied_operands);
+      $_state.addAttributes(attrs);
+    }]>,
+  ];
+
   let assemblyFormat = [{
     $callee `(` $operands `)`
     attr-dict `:`
@@ -696,6 +725,15 @@ def Util_CallOp : Util_Op<"call", [
     void setCalleeFromCallable(CallInterfaceCallable callee) {
       (*this)->setAttr("callee", callee.get<SymbolRefAttr>());
     }
+
+    // Clones the call and potentially expands each operand and result.
+    // Callers can then replace result uses using the returned op.
+    // Any type that may be tied must remain in the same relative order (expand
+    // by appending types after the base type).
+    IREE::Util::CallOp cloneAndExpand(
+        std::function<void(unsigned, Value, SmallVectorImpl<Value> &)> expandOperand,
+        std::function<void(unsigned, Type, SmallVectorImpl<Type> &)> expandResult,
+        OpBuilder &builder);
   }];
 }
 

@@ -1213,9 +1213,6 @@ FailureOr<LLVM::LLVMFunctionType> HALDispatchABI::getABIFunctionType(
     allArgTypes.append(extraFieldsTypes.begin(), extraFieldsTypes.end());
     return LLVM::LLVMFunctionType::get(resultType, allArgTypes);
   }
-  case IREE::HAL::CallingConvention::ParameterStruct:
-    return LLVM::LLVMFunctionType::get(LLVM::LLVMVoidType::get(context),
-                                       LLVM::LLVMPointerType::get(context));
   default:
     llvm_unreachable("unhandled calling convention");
     return failure();
@@ -1288,23 +1285,6 @@ FailureOr<SmallVector<Value>> HALDispatchABI::materializeABI(
                                [](OpResult v) -> Value { return v; });
   }
 
-  if (cConv == IREE::HAL::CallingConvention::ParameterStruct) {
-    auto [structType, paramsStructPtr] = packIntoParameterStruct(
-        forOp, resultTypes, args, extraFieldVals, rewriter);
-    rewriter.create<LLVM::CallOp>(loc, TypeRange{}, paramsStructPtr,
-                                  forOp->getAttrs());
-    SmallVector<Value> results;
-    if (!resultTypes.empty()) {
-      results.reserve(resultTypes.size());
-      Value structVal =
-          rewriter.create<LLVM::LoadOp>(loc, structType, paramsStructPtr);
-      for (int64_t i = 0, e = resultTypes.size(); i < e; ++i) {
-        results.push_back(
-            rewriter.create<LLVM::ExtractValueOp>(loc, structVal, i));
-      }
-    }
-    return results;
-  }
   return forOp->emitOpError("unhandled calling convention");
 }
 

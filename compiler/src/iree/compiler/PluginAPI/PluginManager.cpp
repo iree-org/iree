@@ -200,4 +200,11 @@ void PluginManagerSession::populateHALTargetBackends(
   }
 }
 
+void PluginManagerSession::populateHALTargetDevices(
+    IREE::HAL::TargetDeviceList &list) {
+  for (auto *s : initializedSessions) {
+    s->populateHALTargetDevices(list);
+  }
+}
+
 } // namespace mlir::iree_compiler

@@ -20,11 +20,6 @@ struct LLVMCPUAssignImportOrdinalsPass
   void runOnOperation() override {
     auto variantOp = getOperation();
 
-    // Ignore non-LLVMCPU variants.
-    // TODO(benvanik): a way to nest this in the pipeline via dynamic passes.
-    if (variantOp.getTarget().getBackend().getValue() != "llvm-cpu")
-      return;
-
     auto *context = variantOp.getContext();
     auto unitAttr = UnitAttr::get(context);
     auto importKeyAttr = StringAttr::get(context, "hal.executable.import.key");

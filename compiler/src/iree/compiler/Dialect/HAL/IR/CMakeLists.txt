@@ -31,13 +31,14 @@ iree_cc_library(
     "HALTypeInterfaces.cpp.inc"
     "HALTypeInterfaces.h.inc"
   SRCS
+    "HALAttrs.cpp"
     "HALOpFolders.cpp"
     "HALOps.cpp"
     "HALTypes.cpp"
   DEPS
+    ::HALAttrsGen
     ::HALInterfacesGen
     ::HALOpsGen
-    ::HALTypesGen
     LLVMSupport
     MLIRArithDialect
     MLIRControlFlowDialect
@@ -85,6 +86,18 @@ iree_cc_library(
 
 iree_tablegen_library(
   NAME
+    HALAttrsGen
+  TD_FILE
+    "HALAttrs.td"
+  OUTS
+    --gen-attrdef-decls --attrdefs-dialect=hal HALAttrs.h.inc
+    --gen-attrdef-defs --attrdefs-dialect=hal HALAttrs.cpp.inc
+    --gen-enum-decls HALEnums.h.inc
+    --gen-enum-defs HALEnums.cpp.inc
+)
+
+iree_tablegen_library(
+  NAME
     HALInterfacesGen
   TD_FILE
     "HALInterfaces.td"
@@ -105,18 +118,6 @@ iree_tablegen_library(
   OUTS
     --gen-op-decls HALOps.h.inc
     --gen-op-defs HALOps.cpp.inc
-)
-
-iree_tablegen_library(
-  NAME
-    HALTypesGen
-  TD_FILE
-    "HALBase.td"
-  OUTS
-    --gen-attrdef-decls --attrdefs-dialect=hal HALAttrs.h.inc
-    --gen-attrdef-defs --attrdefs-dialect=hal HALAttrs.cpp.inc
-    --gen-enum-decls HALEnums.h.inc
-    --gen-enum-defs HALEnums.cpp.inc
 )
 
 iree_tablegen_doc(

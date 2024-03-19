@@ -34,6 +34,11 @@ void iree_hal_executable_library_deinitialize_imports(
     iree_allocator_t host_allocator);
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+
+// Publishes all source files in the library to the tracing provider, if any.
+void iree_hal_executable_library_publish_source_files(
+    const iree_hal_executable_library_v0_t* library);
+
 iree_zone_id_t iree_hal_executable_library_call_zone_begin(
     iree_string_view_t executable_identifier,
     const iree_hal_executable_library_v0_t* library, iree_host_size_t ordinal);
@@ -41,11 +46,17 @@ iree_zone_id_t iree_hal_executable_library_call_zone_begin(
     zone_id, executable_identifier, library, ordinal)                   \
   iree_zone_id_t zone_id = iree_hal_executable_library_call_zone_begin( \
       executable_identifier, library, ordinal)
+
 #else
+
+static inline void iree_hal_executable_library_publish_source_files(
+    const iree_hal_executable_library_v0_t* library) {}
+
 #define IREE_HAL_EXECUTABLE_LIBRARY_CALL_TRACE_ZONE_BEGIN( \
     zone_id, executable_identifier, library, ordinal)      \
   iree_zone_id_t zone_id = 0;                              \
   (void)zone_id;
+
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 
 #endif  // IREE_HAL_LOCAL_EXECUTABLE_LIBRARY_UTIL_H_

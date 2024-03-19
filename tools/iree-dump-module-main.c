@@ -549,6 +549,8 @@ IREE_FLAG(string, output, "metadata",
           "  'flatbuffer-json': module flatbuffer in JSON format.\n");
 
 int main(int argc, char** argv) {
+  IREE_TRACE_APP_ENTER();
+
   iree_allocator_t host_allocator = iree_allocator_system();
   int exit_code = EXIT_SUCCESS;
 
@@ -560,6 +562,7 @@ int main(int argc, char** argv) {
 
   if (argc < 2) {
     fprintf(stderr, "Syntax: iree-dump-module [--output=...] module.vmfb\n");
+    IREE_TRACE_APP_EXIT(EXIT_FAILURE);
     return EXIT_FAILURE;
   }
 
@@ -610,5 +613,6 @@ int main(int argc, char** argv) {
     exit_code = EXIT_FAILURE;
   }
   fflush(stderr);
+  IREE_TRACE_APP_EXIT(exit_code);
   return exit_code;
 }

@@ -5,9 +5,17 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
+
+#include <cassert>
+
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/raw_ostream.h"
 #include "mlir/Analysis/DataFlow/DeadCodeAnalysis.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/Location.h"
 
 #define DEBUG_TYPE "iree-vector-layout-analysis"
 
@@ -91,7 +99,20 @@ private:
   /// should only be used when you know there will be no layout conflicts.
   /// Otherwise, the resolve-like functions should be used.
   void setInnerLayout(const VectorLayoutInterface &layout) {
-    assert(!layout || layout.isValidLayout(getValue().getType().getShape()));
+    if (layout && !layout.isValidLayout(getValue().getType().getShape())) {
+      Location loc = getValue().getLoc();
+      emitError(loc)
+          << "Attempting to assign an invalid or incompatible layout: "
+          << layout;
+      emitRemark(loc) << "To value: " << getValue();
+      std::string buf;
+      llvm::raw_string_ostream os(buf);
+      llvm::interleaveComma(getValue().getType().getShape(), os);
+      emitRemark(loc) << "Of shape: [" << os.str() << "]";
+      // TODO(https://github.com/openxla/iree/issues/16119): We shouldn't crash
+      // here.
+      llvm::report_fatal_error("Invalid layout assignment");
+    }
     vectorLayout = layout;
   }
 

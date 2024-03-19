@@ -38,9 +38,9 @@ if (( IREE_USE_CCACHE == 1 )); then
 fi
 
 # Copy into a new directory before making edits, so CMake only runs when needed.
-BUILD_DOCS_ORIGINAL_DIR="${BUILD_DIR}/doc/Dialects/"
+BUILD_DOCS_ORIGINAL_DIR="${BUILD_DIR}/doc/Dialects"
 BUILD_DOCS_DIALECTS_ORIGINAL_DIR="${BUILD_DIR}/llvm-external-projects/mlir-iree-dialects/docs/Dialects"
-BUILD_DOCS_PROCESSED_DIR="${BUILD_DIR}/doc/Dialects_for_website/"
+BUILD_DOCS_PROCESSED_DIR="${BUILD_DIR}/doc/Dialects_for_website"
 mkdir -p "${BUILD_DOCS_PROCESSED_DIR}"
 cp -r "${BUILD_DOCS_ORIGINAL_DIR}/." "${BUILD_DOCS_PROCESSED_DIR}"
 cp -r "${BUILD_DOCS_DIALECTS_ORIGINAL_DIR}/." "${BUILD_DOCS_PROCESSED_DIR}"
@@ -56,7 +56,6 @@ done
 
 # Rename iree-dialect files.
 mv "${BUILD_DOCS_PROCESSED_DIR}/InputOps.md" "${BUILD_DOCS_PROCESSED_DIR}/IREEInput.md"
-mv "${BUILD_DOCS_PROCESSED_DIR}/LinalgExtOps.md" "${BUILD_DOCS_PROCESSED_DIR}/IREELinalgExt.md"
 mv "${BUILD_DOCS_PROCESSED_DIR}/VectorExtOps.md" "${BUILD_DOCS_PROCESSED_DIR}/IREEVectorExt.md"
 # mv "${BUILD_DOCS_PROCESSED_DIR}/StructuredTransformOpsExt.md" "${BUILD_DOCS_PROCESSED_DIR}/IREEStructuredTransformExt.md"
 
