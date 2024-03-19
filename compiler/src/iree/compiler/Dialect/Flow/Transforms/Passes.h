@@ -57,6 +57,10 @@ std::unique_ptr<Pass> createConvertRegionToWorkgroupsPass();
 std::unique_ptr<Pass>
 createTensorPadToTensorInsertSlicePass(bool skipSingleLinalgOpUses = false);
 
+/// Fuses winograd ops with pad and extract_slice.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createFuseWinogradPaddingPass();
+
 // Create a pass that imports upstream patterns to fold unit extent dims
 // but with IREE control.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>

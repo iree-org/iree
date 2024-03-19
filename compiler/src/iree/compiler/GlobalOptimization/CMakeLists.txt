@@ -50,7 +50,6 @@ iree_cc_library(
     "FuseDequantizationMatmul.cpp"
     "FuseHorizontalContractions.cpp"
     "FuseSiluHorizontalMatmul.cpp"
-    "FuseWinogradPadding.cpp"
     "GeneralizeLinalgNamedOps.cpp"
     "GlobalLoopInvariantCodeMotion.cpp"
     "InferNumericNarrowing.cpp"

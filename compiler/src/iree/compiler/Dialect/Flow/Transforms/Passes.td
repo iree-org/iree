@@ -267,6 +267,12 @@ def TensorPadToTensorInsertSlice :
   ];
 }
 
+def FuseWinogradPadding:
+    InterfacePass<"iree-flow-fuse-winograd-padding", "mlir::FunctionOpInterface"> {
+  let summary = "Fuses winograd transform ops with pad and extract_slice ops";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createFuseWinogradPaddingPass()";
+}
+
 def TopLevelSCFToCFG :
     InterfacePass<"iree-top-level-scf-to-cfg", "mlir::FunctionOpInterface"> {
   let summary = "Converts non-nested SCF constructs to CFG (not traversing into opaque operations).";
