@@ -115,6 +115,23 @@ module @example attributes {hal.device.targets = [#rocm_target]} {
       hal.return %x, %c1, %c1 : index, index, index
     }
 
+    hal.executable.export public @packed_parameters ordinal(2)
+        layout(#hal.pipeline.layout<push_constants = 4, sets = [
+          <0, bindings = [
+              <0, storage_buffer>
+          ]>
+        ]>) attributes {
+      workgroup_size = [64 : index, 1 : index, 1 : index],
+      // Override how parameters are packed by mapping the constants and buffers
+      // from the IREE HAL ABI to a flat parameter buffer.
+      rocm.parameter_mapping = "c4:0:20,c4:4:16,c4:8:4,c4:12:0,b8:0:0:8"
+    } {
+    ^bb0(%device: !hal.device, %workload: index):
+      %x = affine.apply affine_map<()[s0] -> (s0 ceildiv 64)>()[%workload]
+      %c1 = arith.constant 1 : index
+      hal.return %x, %c1, %c1 : index, index, index
+    }
+
   }  // hal.executable.source
 
   // Function demonstrating a few hand-authored dispatches mixed with codegen.
@@ -146,8 +163,16 @@ module @example attributes {hal.device.targets = [#rocm_target]} {
     // Dispatch an in-place `rhs *= lhs` kernel.
     %2 = flow.dispatch @executable::@simple_mul_inplace[%dim](%dim_i32, %0, %1) : (i32, tensor<?xf32>{%dim}, tensor<?xf32>{%dim}) -> %1{%dim}
 
-    // CHECK: 8xf32=96 96 96 96 96 96 96 96
-    return %2 : tensor<?xf32>
+    // Dispatch an in-place `value += %arg0 + %arg1 * %arg2` but with a
+    // parameter mapping that reorders the buffer and primitive parameters in
+    // an arbitrary way.
+    %c1 = arith.constant 1 : i32
+    %c2 = arith.constant 2 : i32
+    %c3 = arith.constant 3 : i32
+    %3 = flow.dispatch @executable::@packed_parameters[%dim](%dim_i32, %c1, %c2, %c3, %2) : (i32, i32, i32, i32, tensor<?xf32>{%dim}) -> %2{%dim}
+
+    // CHECK: 8xf32=103 103 103 103 103 103 103 103
+    return %3 : tensor<?xf32>
   }
 
 }  // module

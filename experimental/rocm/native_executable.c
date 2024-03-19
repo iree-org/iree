@@ -18,6 +18,10 @@
 #include "iree/schemas/rocm_executable_def_reader.h"
 #include "iree/schemas/rocm_executable_def_verifier.h"
 
+static_assert(sizeof(iree_hal_rocm_parameter_mapping_op_t) ==
+                  sizeof(iree_hal_rocm_ParameterMappingOp_t),
+              "struct size mismatch");
+
 typedef struct iree_hal_rocm_entry_point_t {
   iree_hal_rocm_kernel_params_t kernel_params;
   iree_string_view_t name;
@@ -44,6 +48,74 @@ static iree_hal_rocm_native_executable_t* iree_hal_rocm_native_executable_cast(
   return (iree_hal_rocm_native_executable_t*)base_value;
 }
 
+static iree_status_t iree_hal_rocm_validate_parameter_mapping(
+    iree_hal_rocm_ParameterMappingDef_table_t mapping_def) {
+  uint16_t total_length =
+      iree_hal_rocm_ParameterMappingDef_total_length_get(mapping_def);
+  // We could pull this limit from a device attribute, probably.
+  if (total_length >= IREE_HAL_ROCM_MAX_PARAMETER_BUFFER_SIZE) {
+    return iree_make_status(
+        IREE_STATUS_RESOURCE_EXHAUSTED,
+        "parameter buffer size is limited to 4KB; requested %u", total_length);
+  }
+  iree_hal_rocm_ParameterMappingOp_vec_t ops =
+      iree_hal_rocm_ParameterMappingDef_ops_get(mapping_def);
+  size_t op_count = ops ? iree_hal_rocm_ParameterMappingOp_vec_len(ops) : 0;
+  size_t push_constant_capacity =
+      IREE_HAL_ROCM_MAX_PUSH_CONSTANT_COUNT * sizeof(uint32_t);
+  for (size_t i = 0; i < op_count; ++i) {
+    const iree_hal_rocm_ParameterMappingOp_t* op =
+        iree_hal_rocm_ParameterMappingOp_vec_at(ops, i);
+    switch (op->type) {
+      case IREE_HAL_ROCM_PARAMETER_MAPPING_TYPE_CONSTANT:
+        switch (op->size) {
+          case 1:
+          case 2:
+          case 4:
+          case 8:
+            break;
+          default:
+            return iree_make_status(
+                IREE_STATUS_INVALID_ARGUMENT,
+                "only 1, 2, 4, and 8-byte parameters are supported (got %u)",
+                op->size);
+        }
+        if (op->source + op->size > push_constant_capacity) {
+          return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                  "source constant offset out of bounds");
+        }
+        break;
+      case IREE_HAL_ROCM_PARAMETER_MAPPING_TYPE_BUFFER:
+        // Only 64-bit supported right now.
+        if (op->size != sizeof(hipDeviceptr_t)) {
+          return iree_make_status(
+              IREE_STATUS_INVALID_ARGUMENT,
+              "buffer parameters must match hipDeviceptr_t");
+        }
+        uint8_t set = (uint8_t)(op->source >> 8);
+        uint8_t binding = (uint8_t)(op->source & 0xFF);
+        if (set >= IREE_HAL_ROCM_MAX_DESCRIPTOR_SET_COUNT) {
+          return iree_make_status(
+              IREE_STATUS_INVALID_ARGUMENT,
+              "descriptor set ordinal out of bounds (%u >= %u)", set,
+              IREE_HAL_ROCM_MAX_DESCRIPTOR_SET_COUNT);
+        }
+        if (binding >= IREE_HAL_ROCM_MAX_DESCRIPTOR_SET_BINDING_COUNT) {
+          return iree_make_status(
+              IREE_STATUS_INVALID_ARGUMENT,
+              "descriptor binding ordinal out of bounds (%u >= %u)", binding,
+              IREE_HAL_ROCM_MAX_DESCRIPTOR_SET_BINDING_COUNT);
+        }
+        break;
+    }
+    if (op->target + op->size > total_length) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "target parameter out of range");
+    }
+  }
+  return iree_ok_status();
+}
+
 iree_status_t iree_hal_rocm_native_executable_create(
     iree_hal_rocm_context_wrapper_t* context,
     const iree_hal_executable_params_t* executable_params,
@@ -66,6 +138,8 @@ iree_status_t iree_hal_rocm_native_executable_create(
       iree_hal_rocm_ExecutableDef_hsaco_image_get(executable_def);
   flatbuffers_string_vec_t entry_points_vec =
       iree_hal_rocm_ExecutableDef_entry_points_get(executable_def);
+  iree_hal_rocm_ParameterMappingDef_vec_t mappings_vec =
+      iree_hal_rocm_ExecutableDef_mappings_get(executable_def);
   iree_hal_rocm_BlockSizeDef_vec_t block_sizes_vec =
       iree_hal_rocm_ExecutableDef_block_sizes_get(executable_def);
   flatbuffers_uint32_vec_t shared_memory_sizes =
@@ -138,6 +212,7 @@ iree_status_t iree_hal_rocm_native_executable_create(
                   shared_memory_sizes[i]),
               "hipFuncSetAttribute");
         }
+        if (!iree_status_is_ok(status)) break;
         // Package required parameters for kernel launches for each entry point.
         iree_hal_rocm_entry_point_t* entry_point_info =
             &executable->entry_points[i];
@@ -150,6 +225,30 @@ iree_status_t iree_hal_rocm_native_executable_create(
         params->block_size[1] = block_sizes_vec[i].y;
         params->block_size[2] = block_sizes_vec[i].z;
         params->shared_memory_size = shared_memory_sizes[i];
+
+        // Optional parameter repacking mapping.
+        // We alias the data directly from the flatbuffer here.
+        if (mappings_vec &&
+            i < iree_hal_rocm_ParameterMappingDef_vec_len(mappings_vec)) {
+          iree_hal_rocm_ParameterMappingDef_table_t mapping_def =
+              iree_hal_rocm_ParameterMappingDef_vec_at(mappings_vec, i);
+          if (mapping_def) {
+            status = iree_hal_rocm_validate_parameter_mapping(mapping_def);
+            if (!iree_status_is_ok(status)) break;
+            params->parameter_size =
+                iree_hal_rocm_ParameterMappingDef_total_length_get(mapping_def);
+            iree_hal_rocm_ParameterMappingOp_vec_t ops =
+                iree_hal_rocm_ParameterMappingDef_ops_get(mapping_def);
+            params->mapping_count =
+                (uint32_t)iree_hal_rocm_ParameterMappingOp_vec_len(ops);
+            params->mappings =
+                params->mapping_count
+                    ? (const iree_hal_rocm_parameter_mapping_op_t*)
+                          iree_hal_rocm_ParameterMappingOp_vec_at(ops, 0)
+                    : NULL;
+          }
+        }
+
         entry_point_info->name = iree_make_string_view(
             entry_name, flatbuffers_string_len(entry_name));
       }

@@ -148,6 +148,111 @@ static void addPreloadKernArgHint(llvm::Function *F) {
   }
 }
 
+static FailureOr<iree_hal_rocm_ParameterMappingOp_t>
+serializeParameterMappingConstantOp(StringRef sizeString,
+                                    StringRef sourceString,
+                                    StringRef targetString) {
+  iree_hal_rocm_ParameterMappingOp_t op;
+  op.type = iree_hal_rocm_ParameterMappingType_CONSTANT;
+  if (!llvm::to_integer<uint8_t>(sizeString, op.size)) {
+    llvm::errs() << "invalid op size string: '" << sizeString << "'\n";
+    return failure();
+  }
+  if (!llvm::to_integer<uint16_t>(sourceString, op.source)) {
+    llvm::errs() << "invalid op source string: '" << sourceString << "'\n";
+    return failure();
+  }
+  if (!llvm::to_integer<uint16_t>(targetString, op.target)) {
+    llvm::errs() << "invalid op target string: '" << targetString << "'\n";
+    return failure();
+  }
+  return op;
+}
+
+static FailureOr<iree_hal_rocm_ParameterMappingOp_t>
+serializeParameterMappingBufferOp(StringRef sizeString, StringRef setString,
+                                  StringRef bindingString,
+                                  StringRef targetString) {
+  iree_hal_rocm_ParameterMappingOp_t op;
+  op.type = iree_hal_rocm_ParameterMappingType_BUFFER;
+  if (!llvm::to_integer<uint8_t>(sizeString, op.size)) {
+    llvm::errs() << "invalid op size string: '" << sizeString << "'\n";
+    return failure();
+  }
+  uint8_t set = 0;
+  if (!llvm::to_integer<uint8_t>(setString, set)) {
+    llvm::errs() << "invalid op set string: '" << setString << "'\n";
+    return failure();
+  }
+  uint8_t binding = 0;
+  if (!llvm::to_integer<uint8_t>(bindingString, binding)) {
+    llvm::errs() << "invalid op binding string: '" << bindingString << "'\n";
+    return failure();
+  }
+  op.source = (uint16_t(set) << 8) | binding;
+  if (!llvm::to_integer<uint16_t>(targetString, op.target)) {
+    llvm::errs() << "invalid op target string: '" << targetString << "'\n";
+    return failure();
+  }
+  return op;
+}
+
+static FailureOr<iree_hal_rocm_ParameterMappingDef_ref_t>
+serializeParameterMapping(FlatbufferBuilder &builder, StringRef mappingString) {
+  size_t totalLength = 0;
+  SmallVector<iree_hal_rocm_ParameterMappingOp_t> ops;
+  for (auto opString : llvm::split(mappingString, ',')) {
+    SmallVector<StringRef> fragments;
+    llvm::SplitString(opString, fragments, ":");
+    if (opString.starts_with("c")) {
+      if (fragments.size() != 3) {
+        llvm::errs() << "invalid constant op string, needs 3 components: '"
+                     << opString << "'\n";
+        return failure();
+      }
+      auto opOr = serializeParameterMappingConstantOp(
+          fragments[0].substr(1), fragments[1], fragments[2]);
+      if (failed(opOr))
+        return failure();
+      ops.push_back(*opOr);
+      totalLength = std::max(totalLength, size_t(opOr->target + opOr->size));
+    } else if (opString.starts_with("b")) {
+      if (fragments.size() != 4) {
+        llvm::errs() << "invalid buffer op string, needs 4 components: '"
+                     << opString << "'\n";
+        return failure();
+      }
+      auto opOr = serializeParameterMappingBufferOp(
+          fragments[0].substr(1), fragments[1], fragments[2], fragments[3]);
+      if (failed(opOr))
+        return failure();
+      ops.push_back(*opOr);
+      totalLength = std::max(totalLength, size_t(opOr->target + opOr->size));
+    } else {
+      llvm::errs() << "invalid op type: '" << opString << "'\n";
+      return failure();
+    }
+  }
+  iree_hal_rocm_ParameterMappingOp_vec_ref_t opsRef =
+      iree_hal_rocm_ParameterMappingOp_vec_create(builder, ops.data(),
+                                                  ops.size());
+  return iree_hal_rocm_ParameterMappingDef_create(builder, totalLength, opsRef);
+}
+
+static FailureOr<iree_hal_rocm_ParameterMappingDef_vec_ref_t>
+serializeParameterMappings(FlatbufferBuilder &builder,
+                           ArrayRef<StringRef> mappingStrings) {
+  SmallVector<iree_hal_rocm_ParameterMappingDef_ref_t> mappingRefs;
+  mappingRefs.reserve(mappingStrings.size());
+  for (auto mappingString : mappingStrings) {
+    auto mappingRefOr = serializeParameterMapping(builder, mappingString);
+    if (failed(mappingRefOr))
+      return failure();
+    mappingRefs.push_back(*mappingRefOr);
+  }
+  return builder.createOffsetVecDestructive(mappingRefs);
+}
+
 class ROCMTargetDevice final : public TargetDevice {
 public:
   ROCMTargetDevice(const ROCMOptions &options) : options(options) {}
@@ -558,8 +663,11 @@ public:
     }
 
     SmallVector<StringRef> entryPointNames;
+    SmallVector<StringRef> mappingStrings;
+    bool hasAnyMappings = false;
     SmallVector<iree_hal_rocm_FileLineLocDef_ref_t> sourceLocationRefs;
     entryPointNames.resize(exportOps.size());
+    mappingStrings.resize(exportOps.size());
     for (auto exportOp : exportOps) {
       auto ordinalAttr = exportOp.getOrdinalAttr();
       if (!ordinalAttr) {
@@ -568,6 +676,13 @@ public:
       }
       int64_t ordinal = ordinalAttr.getInt();
       entryPointNames[ordinal] = exportOp.getName();
+
+      if (auto mappingAttr =
+              exportOp->getAttrOfType<StringAttr>("rocm.parameter_mapping")) {
+        if (!mappingAttr.empty())
+          hasAnyMappings = true;
+        mappingStrings[ordinal] = mappingAttr.getValue();
+      }
 
       // Optional source location information for debugging/profiling.
       if (serOptions.debugLevel >= 1) {
@@ -614,6 +729,13 @@ public:
     auto hsacoRef = flatbuffers_string_create(builder, targetHSACO.c_str(),
                                               targetHSACO.size());
 
+    iree_hal_rocm_ParameterMappingDef_vec_ref_t mappingsRef = 0;
+    if (hasAnyMappings) {
+      auto mappingsRefOr = serializeParameterMappings(builder, mappingStrings);
+      if (failed(mappingsRefOr))
+        return failure();
+      mappingsRef = *mappingsRefOr;
+    }
     auto entryPointsRef = builder.createStringVec(entryPointNames);
     iree_hal_rocm_BlockSizeDef_vec_start(builder);
     auto blockSizes = workgroupSizes.begin();
@@ -626,6 +748,8 @@ public:
         builder.createInt32Vec(workgroupLocalMemories);
     auto blockSizesRef = iree_hal_rocm_BlockSizeDef_vec_end(builder);
     iree_hal_rocm_ExecutableDef_entry_points_add(builder, entryPointsRef);
+    if (mappingsRef)
+      iree_hal_rocm_ExecutableDef_mappings_add(builder, mappingsRef);
     iree_hal_rocm_ExecutableDef_block_sizes_add(builder, blockSizesRef);
     iree_hal_rocm_ExecutableDef_shared_memory_sizes_add(
         builder, workgroupLocalMemoriesRef);
