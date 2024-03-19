@@ -314,7 +314,6 @@ struct ImportParametersPass
     if (scopePaths.empty())
       return;
 
-    MLIRContext *context = &getContext();
     ModuleOp moduleOp = getOperation();
     Explorer explorer(moduleOp, TraversalAction::SHALLOW);
     explorer.setOpInterfaceAction<mlir::FunctionOpInterface>(
