@@ -26,6 +26,18 @@ X86_64_BENCHMARK_CONFIG = [
     common_definitions.CpuBenchmarkConfig(
         model=tflite_models.MOBILENET_V3SMALL, threads=[0, 1]
     ),
+    common_definitions.CpuBenchmarkConfig(
+        model=matmul.MATMUL_1x256x2048_I8xI4_MLIR, threads=[0, 1]
+    ),
+    common_definitions.CpuBenchmarkConfig(
+        model=matmul.MATMUL_256x256x2048_I8xI4_MLIR, threads=[0, 1]
+    ),
+    common_definitions.CpuBenchmarkConfig(
+        model=matmul.MATMUL_1x256x2048_I8xI8_MLIR, threads=[0, 1]
+    ),
+    common_definitions.CpuBenchmarkConfig(
+        model=matmul.MATMUL_256x256x2048_I8xI8_MLIR, threads=[0, 1]
+    ),
     # Small models.
     common_definitions.CpuBenchmarkConfig(
         model=tflite_models.DEEPLABV3_FP32, threads=[1, 8]
