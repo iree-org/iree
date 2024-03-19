@@ -57,7 +57,7 @@ llvm::cl::opt<int64_t> clLLVMGPUSharedMemoryLimit(
     "iree-llvmgpu-shared-memory-limit",
     llvm::cl::desc("specify the maximum amount of shared memory allowed to be "
                    "allocated for the given target"),
-    llvm::cl::init(163 * 1024));
+    llvm::cl::init(65536));
 
 llvm::cl::opt<bool> clLLVMGPUEnablePrefetch(
     "iree-llvmgpu-enable-prefetch",
