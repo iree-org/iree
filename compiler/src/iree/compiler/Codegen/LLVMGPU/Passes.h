@@ -100,6 +100,9 @@ createLLVMGPULowerExecutableTargetPass();
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMGPUPackSharedMemoryAlloc();
 
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createLLVMGPUPrefetchSharedMemoryPass();
+
 enum class GPUTensorCoreType {
   WMMA = 0,
   MMA_SYNC = 1,

@@ -685,6 +685,39 @@ def PackSharedMemoryAllocOp :  Op<Transform_Dialect, "iree.pack_shared_memory_al
   }];
 }
 
+def PrefetchSharedMemoryCopiesOp : Op<
+    Transform_Dialect, "iree.prefetch_shared_memory_copies", [
+      FunctionalStyleTransformOpTrait,
+      MemoryEffectsOpInterface,
+      TransformEachOpTrait,
+      TransformOpInterface,
+      ReportTrackingListenerFailuresOpTrait]> {
+  let description = [{
+    #### Return modes
+    This transform consumes the scf.for handle and produces a result handle
+    which points to a) the new scf.for loop generated (success case) or b) the
+    existing scf.for loop (failure case).
+  }];
+
+  let arguments = (ins TransformHandleTypeInterface:$for_op);
+  let results = (outs TransformHandleTypeInterface:$result);
+
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let assemblyFormat = [{
+    $for_op
+    attr-dict
+    `:` functional-type(operands, results)}];
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::transform::TransformRewriter &rewriter,
+        ::mlir::scf::ForOp forOp,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
 def AMDGPUDistributeVectorsOp :
   Op<Transform_Dialect, "iree.amdgpu_distribute_vectors",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
@@ -750,12 +783,16 @@ def SetContractionLayoutAttributes :
      DeclareOpInterfaceMethods<TransformOpInterface>]> {
   let description = [{
     Infers and sets the layout of the target contraction op based on the given
-    MFMA attribute.
+    MFMA attribute. The optional read_layout_indices attribute determines whether
+    to apply a modified version of the MFMA layout to the operands of
+    the contracts that enables loading a greater number of elements from LDS.
+    If empty, the read layout is not applied to any operand. 0 specifies
+    LHS and 1 RHS.
   }];
 
   let arguments = (ins TransformHandleTypeInterface:$target,
-                       TransformParamTypeInterface:$mma_type);
-
+                       TransformParamTypeInterface:$mma_type,
+                       DefaultValuedOptionalAttr<DenseI64ArrayAttr, "{}">:$read_layout_indices);
   let assemblyFormat = "$target `,` $mma_type attr-dict `:` type($target) `,` type($mma_type)";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 }

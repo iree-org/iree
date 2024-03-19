@@ -11,7 +11,6 @@
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
-#include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/ROCDLPasses.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -19,14 +18,12 @@
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/ComplexToStandard/ComplexToStandard.h"
-#include "mlir/Conversion/GPUToNVVM/GPUToNVVMPass.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
 #include "mlir/Dialect/Affine/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/Func/Transforms/Passes.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/Linalg/Passes.h"
@@ -54,6 +51,11 @@ llvm::cl::opt<int64_t> clLLVMGPUSharedMemoryLimit(
     llvm::cl::desc("specify the maximum amount of shared memory allowed to be "
                    "allocated for the given target"),
     llvm::cl::init(163 * 1024));
+
+llvm::cl::opt<bool> clLLVMGPUEnablePrefetch(
+    "iree-llvmgpu-enable-prefetch",
+    llvm::cl::desc("Enable prefetch in the vector distribute pipeline"),
+    llvm::cl::init(false));
 
 //===----------------------------------------------------------------------===//
 // Bufferization Configuration
@@ -566,6 +568,12 @@ void addGPUVectorDistributePassPipeline(OpPassManager &pm) {
 
   nestedModulePM.addNestedPass<func::FuncOp>(
       createGPUReduceSharedMemoryBankConflicts());
+
+  if (clLLVMGPUEnablePrefetch) {
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLLVMGPUPrefetchSharedMemoryPass());
+  }
+
   nestedModulePM.addNestedPass<func::FuncOp>(
       memref::createFoldMemRefAliasOpsPass());
   nestedModulePM.addPass(createCSEPass());
@@ -835,9 +843,9 @@ void addGPUTransformDialectPasses(OpPassManager &passManager,
 //===----------------------------------------------------------------------===//
 
 void buildLLVMGPUCodegenConfigurationPassPipeline(OpPassManager &pm) {
-  addCommonTargetExecutablePreprocessingPasses(pm);
   auto &nestedModulePM = pm.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUGeneralizeNamedOpsPass());
+  addCommonTargetExecutablePreprocessingPasses(pm);
   pm.addPass(createLLVMGPUSelectLoweringStrategyPass());
 }
 
@@ -865,9 +873,9 @@ void buildLLVMGPUCodegenPassPipeline(OpPassManager &pm, bool useROCM) {
 //===----------------------------------------------------------------------===//
 
 void buildROCDLCodegenConfigurationPassPipeline(OpPassManager &pm) {
-  addCommonTargetExecutablePreprocessingPasses(pm);
   auto &nestedModulePM = pm.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUGeneralizeNamedOpsPass());
+  addCommonTargetExecutablePreprocessingPasses(pm);
   pm.addPass(createROCDLSelectLoweringStrategyPass());
 }
 

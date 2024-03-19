@@ -473,6 +473,23 @@ def ElideRedundantCommandsPass :
 // Benchmarking and debugging utilities
 //===----------------------------------------------------------------------===//
 
+def CaptureExecutableSourcesPass :
+    Pass<"iree-hal-capture-executable-sources", "mlir::ModuleOp"> {
+  let summary = "Captures individual hal.executable.variant source listings and embeds them in the IR.";
+  let description = [{
+    Captures a source listing of each hal.executable.variant and attaches the
+    source to the variant embedded in the IR. Entry points are assigned
+    locations in the IR relative to the captured source.
+  }];
+  let options = [
+    Option<
+      "stage", "stage",
+      "std::string", "\"source\"",
+      "Name used to indicate what stage of compilation is captured."
+    >,
+  ];
+}
+
 def DumpExecutableSourcesPass :
     Pass<"iree-hal-dump-executable-sources", "mlir::ModuleOp"> {
   let summary = "Dumps individual hal.executable source listings to the provided path.";

@@ -176,7 +176,7 @@ table FusedLocDef {
   locations:[int32];
 }
 
-// mlir/IR/BuiltinLocationAttributes.td : FusedLoc
+// mlir/IR/BuiltinLocationAttributes.td : NameLoc
 table NameLocDef {
   name:string;
   child_location:int32;

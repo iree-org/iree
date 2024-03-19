@@ -72,6 +72,12 @@ def LLVMGPUPackSharedMemoryAlloc :
   let constructor = "mlir::iree_compiler::createLLVMGPUPackSharedMemoryAlloc()";
 }
 
+def LLVMGPUPrefetchSharedMemory :
+    InterfacePass<"iree-llvmgpu-prefetch-shared-memory", "mlir::FunctionOpInterface"> {
+  let summary = "Rotate scf.for loops to prefetch shared memory with distance 1";
+  let constructor = "mlir::iree_compiler::createLLVMGPUPrefetchSharedMemoryPass()";
+}
+
 def LLVMGPUSelectLoweringStrategy :
     Pass<"iree-llvmgpu-select-lowering-strategy", "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
   let summary = "Select a IREE::HAL::DispatchLoweringPassPipeline for lowering the target variant";

@@ -9,14 +9,9 @@ if(NOT IREE_ROCM_TEST_TARGET_CHIP MATCHES "^gfx")
 endif()
 
 unset(IREE_HIP_TEST_COMPILER_FLAGS)
-if(IREE_ROCM_TEST_LINK_BITCODE)
-  list(APPEND IREE_HIP_TEST_COMPILER_FLAGS "--iree-rocm-link-bc=true")
-else()
-  list(APPEND IREE_HIP_TEST_COMPILER_FLAGS "--iree-rocm-link-bc=false")
-endif()
 list(APPEND IREE_HIP_TEST_COMPILER_FLAGS
   "--iree-rocm-target-chip=${IREE_ROCM_TEST_TARGET_CHIP}"
-  "--iree-rocm-bc-dir=${IREE_ROCM_TEST_BITCODE_DIR}")
+)
 
 iree_hal_cts_test_suite(
   DRIVER_NAME

@@ -102,6 +102,11 @@ static iree_status_t iree_hal_static_executable_create(
                                                 executable->library.v0);
   }
 
+  // Publish the executable sources with the tracing infrastructure.
+  if (iree_status_is_ok(status)) {
+    iree_hal_executable_library_publish_source_files(executable->library.v0);
+  }
+
   if (iree_status_is_ok(status)) {
     *out_executable = (iree_hal_executable_t*)executable;
   } else {

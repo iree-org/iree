@@ -153,8 +153,9 @@ print("Results:", results)
 
 Check out the samples in IREE's
 [samples/colab/ directory](https://github.com/openxla/iree/tree/main/samples/colab)
-and the [iree-samples repository](https://github.com/iree-org/iree-samples) for
-examples using the Python APIs.
+and the
+[iree-experimental repository](https://github.com/iree-org/iree-experimental)
+for examples using the Python APIs.
 
 ### :material-console: Console scripts
 

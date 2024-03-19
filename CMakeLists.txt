@@ -123,6 +123,11 @@ option(IREE_COMPILER_BUILD_SHARED_LIBS "Enables BUILD_SHARED_LIBS CMake mode for
 # CI coverage is established.
 option(BUILD_SHARED_LIBS "Instructs CMake to build libraries as shared if possible" OFF)
 
+# Control of LTO settings for the runtime build.
+set(IREE_RUNTIME_OPTIMIZATION_PROFILE "" CACHE STRING 
+    "Build optimization profile to apply. One of '', 'lto', 'size'.")
+set(IREE_LTO_MODE "full" CACHE STRING "LTO type, 'thin' or 'full'. Only consulted on clang-like compilers.")
+
 #-------------------------------------------------------------------------------
 # IREE command-line tooling configuration
 #-------------------------------------------------------------------------------

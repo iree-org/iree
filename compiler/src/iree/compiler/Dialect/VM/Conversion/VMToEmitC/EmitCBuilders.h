@@ -81,9 +81,6 @@ enum BinaryOperator {
 Value unaryOperator(OpBuilder builder, Location location, UnaryOperator op,
                     Value operand, Type resultType);
 
-Value binaryOperator(OpBuilder builder, Location location, BinaryOperator op,
-                     Value lhs, Value rhs, Type resultType);
-
 Value allocateVariable(OpBuilder builder, Location location, Type type,
                        Attribute initializer);
 
