@@ -78,6 +78,10 @@ createFuseHorizontalContractionsPass();
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createFuseSiluHorizontalMatmulPass();
 
+/// Fuses winograd ops with pad and extract_slice.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createFuseWinogradPaddingPass();
+
 /// Generalizes some named Linalg ops into `linalg.generic` operations since the
 /// compiler can handle that better.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>

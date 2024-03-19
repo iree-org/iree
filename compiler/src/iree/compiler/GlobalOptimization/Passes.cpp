@@ -121,6 +121,7 @@ void buildGlobalOptimizationPassPipeline(
       .addPass(IREE::Flow::createFoldUnitExtentDimsPass)
       .addPredicatedPass(clEnableFuseSiluHorizontalMatmul,
                          createFuseSiluHorizontalMatmulPass)
+      .addPass(createFuseWinogradPaddingPass)
       .addPredicatedPass(clEnableDemoteContractionInputsToBF16,
                          createDemoteContractionInputsToBF16Pass)
       .addPass([&]() {
