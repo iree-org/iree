@@ -17,6 +17,36 @@ struct BlockSizeDef {
   z:uint32;
 }
 
+enum ParameterMappingType:uint8 {
+  CONSTANT = 0,
+  BUFFER = 1,
+}
+
+// Specifies the source and target of a parameter mapping operation.
+struct ParameterMappingOp {
+  // Type of the mapping.
+  type:ParameterMappingType;
+  // Size of the parameter (constant value or pointer width) in bytes.
+  size:uint8;
+  // For buffers: uint8 set, uint8 binding.
+  // For push constants: source byte offset in the push constant data.
+  source:uint16;
+  // Target byte offset in the parameter buffer.
+  target:uint16;
+}
+
+// Describes a parameter packing specification.
+table ParameterMappingDef {
+  // Total size of the target parameter buffer in bytes.
+  total_length:uint16;
+  // Mappings from a parameter source of a specific type to a target byte offset
+  // in the parameter buffer. Multiple mappings may source from the same
+  // parameter but it is expected that each target is only set once. Ideally
+  // mappings should be sorted by target offset but need not be and may be
+  // sparse.
+  ops:[ParameterMappingOp];
+}
+
 // A struct for a source code location that consists of a file name and
 // a line number within that file.
 table FileLineLocDef {
@@ -45,6 +75,10 @@ table ExecutableDef {
   // A map of entry point ordinals to string names as used in the shader
   // library.
   entry_points:[string];
+
+  // Optional list of mappings per entry point. If either the list or an
+  // individual mapping is omitted the default behavior is used.
+  mappings:[ParameterMappingDef];
 
   // Block sizes for each entry point.
   // This list has the same size as the entry_points list.

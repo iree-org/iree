@@ -72,3 +72,26 @@ extern "C" __global__ void simple_mul_inplace(
     binding1[tid] *= binding0[tid];
   }
 }
+
+// `value += %arg0 + %arg1 * %arg2`
+//
+// Custom explicit ABI:
+//  +0  arg2
+//  +4  arg1
+//  +8  binding0
+// +16  arg0
+// +20  dim
+//
+// Matching parameter mapping specification:
+//   rocm.parameter_mapping = "c4:0:20,c4:4:16,c4:8:4,c4:12:0,b8:0:0:8"
+//
+// From the source:
+//   (dim, arg0, arg1, arg2, binding0)
+extern "C" __global__ void packed_parameters(int arg2, int arg1,
+                                             float* __restrict__ binding0,
+                                             int arg0, int dim) {
+  int tid = blockDim.x * blockIdx.x + threadIdx.x;
+  if (tid < dim) {
+    binding0[tid] += arg0 + arg1 * arg2;
+  }
+}

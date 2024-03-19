@@ -17,10 +17,16 @@
 #include "experimental/rocm/status_util.h"
 #include "iree/base/api.h"
 
+#define IREE_HAL_ROCM_MAX_BINDING_COUNT     \
+  (IREE_HAL_ROCM_MAX_DESCRIPTOR_SET_COUNT * \
+   IREE_HAL_ROCM_MAX_DESCRIPTOR_SET_BINDING_COUNT)
+
+// Kernel arguments contains binding and push constants.
+#define IREE_HAL_ROCM_MAX_KERNEL_ARG 128
+
 // Command buffer implementation that directly maps to rocm direct.
 // This records the commands on the calling thread without additional threading
 // indirection.
-
 typedef struct {
   iree_hal_command_buffer_t base;
   iree_hal_rocm_context_wrapper_t* context;
@@ -33,13 +39,12 @@ typedef struct {
   iree_arena_allocator_t arena;
 
   // Keep track of the current set of kernel arguments.
-  int32_t push_constant[IREE_HAL_ROCM_MAX_PUSH_CONSTANT_COUNT];
+  int32_t push_constants[IREE_HAL_ROCM_MAX_PUSH_CONSTANT_COUNT];
+  hipDeviceptr_t bindings[IREE_HAL_ROCM_MAX_DESCRIPTOR_SET_COUNT]
+                         [IREE_HAL_ROCM_MAX_DESCRIPTOR_SET_BINDING_COUNT];
+  uint8_t parameter_buffer[IREE_HAL_ROCM_MAX_PARAMETER_BUFFER_SIZE];
   void* current_descriptor[];
 } iree_hal_rocm_direct_command_buffer_t;
-
-#define IREE_HAL_ROCM_MAX_BINDING_COUNT 64
-// Kernel arguments contains binding and push constants.
-#define IREE_HAL_ROCM_MAX_KERNEL_ARG 128
 
 static const iree_hal_command_buffer_vtable_t
     iree_hal_rocm_direct_command_buffer_vtable;
@@ -346,7 +351,7 @@ static iree_status_t iree_hal_rocm_direct_command_buffer_push_constants(
       iree_hal_rocm_direct_command_buffer_cast(base_command_buffer);
   iree_host_size_t constant_base_index = offset / sizeof(int32_t);
   for (iree_host_size_t i = 0; i < values_length / sizeof(int32_t); i++) {
-    command_buffer->push_constant[i + constant_base_index] =
+    command_buffer->push_constants[i + constant_base_index] =
         ((uint32_t*)values)[i];
   }
   return iree_ok_status();
@@ -400,9 +405,82 @@ static iree_status_t iree_hal_rocm_direct_command_buffer_push_descriptor_set(
                                iree_hal_buffer_byte_offset(binding.buffer) +
                                binding.offset)
             : 0;
+    command_buffer->bindings[set][binding.binding] = device_ptr;
     *((hipDeviceptr_t*)command_buffer->current_descriptor[i + base_binding]) =
         device_ptr;
   }
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_rocm_direct_command_buffer_dispatch_with_layout(
+    iree_hal_rocm_direct_command_buffer_t* command_buffer,
+    const iree_hal_rocm_kernel_params_t* kernel_params, uint32_t workgroup_x,
+    uint32_t workgroup_y, uint32_t workgroup_z) {
+  // Patch the push constants in the kernel arguments.
+  iree_host_size_t num_constants =
+      iree_hal_rocm_pipeline_layout_num_constants(kernel_params->layout);
+  iree_host_size_t constant_base_index =
+      iree_hal_rocm_push_constant_index(kernel_params->layout);
+  // Patch the push constants in the kernel arguments.
+  for (iree_host_size_t i = 0; i < num_constants; i++) {
+    *((uint32_t*)command_buffer->current_descriptor[i + constant_base_index]) =
+        command_buffer->push_constants[i];
+  }
+
+  ROCM_RETURN_IF_ERROR(
+      command_buffer->context->syms,
+      hipModuleLaunchKernel(
+          kernel_params->function, workgroup_x, workgroup_y, workgroup_z,
+          kernel_params->block_size[0], kernel_params->block_size[1],
+          kernel_params->block_size[2], kernel_params->shared_memory_size, 0,
+          command_buffer->current_descriptor, NULL),
+      "hipModuleLaunchKernel");
+
+  return iree_ok_status();
+}
+
+static iree_status_t
+iree_hal_rocm_direct_command_buffer_dispatch_with_parameter_buffer(
+    iree_hal_rocm_direct_command_buffer_t* command_buffer,
+    const iree_hal_rocm_kernel_params_t* kernel_params, uint32_t workgroup_x,
+    uint32_t workgroup_y, uint32_t workgroup_z) {
+  for (uint32_t i = 0; i < kernel_params->mapping_count; ++i) {
+    const iree_hal_rocm_parameter_mapping_op_t* op =
+        &kernel_params->mappings[i];
+    switch (op->type) {
+      case IREE_HAL_ROCM_PARAMETER_MAPPING_TYPE_CONSTANT: {
+        memcpy(command_buffer->parameter_buffer + op->target,
+               (const uint8_t*)command_buffer->push_constants + op->source,
+               op->size);
+        break;
+      }
+      case IREE_HAL_ROCM_PARAMETER_MAPPING_TYPE_BUFFER: {
+        uint8_t set = (uint8_t)(op->source >> 8);
+        uint8_t binding = (uint8_t)(op->source & 0xFF);
+        memcpy(command_buffer->parameter_buffer + op->target,
+               &command_buffer->bindings[set][binding], op->size);
+        break;
+      }
+    }
+  }
+
+  void* extra[] = {
+      HIP_LAUNCH_PARAM_BUFFER_POINTER,
+      command_buffer->parameter_buffer,
+      HIP_LAUNCH_PARAM_BUFFER_SIZE,
+      (void*)(uintptr_t)kernel_params->parameter_size,
+      HIP_LAUNCH_PARAM_END,
+  };
+
+  ROCM_RETURN_IF_ERROR(
+      command_buffer->context->syms,
+      hipModuleLaunchKernel(kernel_params->function, workgroup_x, workgroup_y,
+                            workgroup_z, kernel_params->block_size[0],
+                            kernel_params->block_size[1],
+                            kernel_params->block_size[2],
+                            kernel_params->shared_memory_size, 0, NULL, extra),
+      "hipModuleLaunchKernel");
+
   return iree_ok_status();
 }
 
@@ -431,30 +509,17 @@ static iree_status_t iree_hal_rocm_direct_command_buffer_dispatch(
         /*name=*/NULL, 0);
   });
 
-  // Patch the push constants in the kernel arguments.
-  iree_host_size_t num_constants =
-      iree_hal_rocm_pipeline_layout_num_constants(kernel_params.layout);
-  iree_host_size_t constant_base_index =
-      iree_hal_rocm_push_constant_index(kernel_params.layout);
-  // Patch the push constants in the kernel arguments.
-  for (iree_host_size_t i = 0; i < num_constants; i++) {
-    *((uint32_t*)command_buffer->current_descriptor[i + constant_base_index]) =
-        command_buffer->push_constant[i];
-  }
-
-  // TODO(raikonenfnu): Currently using NULL stream, need to figure out way to
-  // access proper stream from command buffer
-  ROCM_RETURN_IF_ERROR(
-      command_buffer->context->syms,
-      hipModuleLaunchKernel(
-          kernel_params.function, workgroup_x, workgroup_y, workgroup_z,
-          kernel_params.block_size[0], kernel_params.block_size[1],
-          kernel_params.block_size[2], kernel_params.shared_memory_size, 0,
-          command_buffer->current_descriptor, NULL),
-      "hipModuleLaunchKernel");
+  iree_status_t status =
+      kernel_params.mappings
+          ? iree_hal_rocm_direct_command_buffer_dispatch_with_parameter_buffer(
+                command_buffer, &kernel_params, workgroup_x, workgroup_y,
+                workgroup_z)
+          : iree_hal_rocm_direct_command_buffer_dispatch_with_layout(
+                command_buffer, &kernel_params, workgroup_x, workgroup_y,
+                workgroup_z);
 
   IREE_ROCM_TRACE_ZONE_END(command_buffer->tracing_context, 0);
-  return iree_ok_status();
+  return status;
 }
 
 static iree_status_t iree_hal_rocm_direct_command_buffer_dispatch_indirect(

@@ -17,6 +17,15 @@ extern "C" {
 
 #define IREE_HAL_ROCM_MAX_PUSH_CONSTANT_COUNT 64
 
+// The max number of bindings per descriptor set allowed in the HIP HAL
+// implementation.
+#define IREE_HAL_ROCM_MAX_DESCRIPTOR_SET_BINDING_COUNT 16
+
+// The max number of descriptor sets allowed in the HIP HAL implementation.
+#define IREE_HAL_ROCM_MAX_DESCRIPTOR_SET_COUNT 4
+
+#define IREE_HAL_ROCM_MAX_PARAMETER_BUFFER_SIZE 4096
+
 //===----------------------------------------------------------------------===//
 // iree_hal_rocm_descriptor_set_layout_t
 //===----------------------------------------------------------------------===//
