@@ -171,11 +171,12 @@ iree_uk_mmt4d_tile_s8s4s32_1x8x16_arm_64_i8mm(
 }
 
 IREE_UK_ATTRIBUTE_ALWAYS_INLINE static inline void
-iree_uk_mmt4d_tile_s8s4s32_2x8x16_to_8x8x16_arm_64_i8mm(
+iree_uk_mmt4d_tile_s8s4s32_2x8x16_to_4x8x16_arm_64_i8mm(
     void* IREE_UK_RESTRICT out_tile, const void* IREE_UK_RESTRICT lhs_panel,
     const void* IREE_UK_RESTRICT rhs_panel,
     const iree_uk_mmt4d_params_t* params, int M0) {
-  IREE_UK_ASSERT(M0 >= 2 && M0 <= 8 && iree_uk_is_po2_u32(M0));
+  // We support M0 up to 4 in order to fit within the register budget.
+  IREE_UK_ASSERT(M0 >= 2 && M0 <= 4 && iree_uk_is_po2_u32(M0));
   IREE_UK_ASSERT(!(params->K0 % 16));
   const iree_uk_int8_t* IREE_UK_RESTRICT lhs_ptr = lhs_panel;
   const iree_uk_int8_t* IREE_UK_RESTRICT rhs_ptr = rhs_panel;
@@ -184,7 +185,7 @@ iree_uk_mmt4d_tile_s8s4s32_2x8x16_to_8x8x16_arm_64_i8mm(
   const int8x16_t vmask = vmovq_n_s8(0xF0);
   const int mtiles = M0 / 2;
 
-  int32x4_t acc[4][4];
+  int32x4_t acc[2][4];
   IREE_UK_UNROLL for (int i = 0; i < mtiles; i++) {
     IREE_UK_UNROLL for (int j = 0; j < 4; j++) {
       // We start with zero accumulators and add the value of *out_ptr later.
@@ -202,7 +203,7 @@ iree_uk_mmt4d_tile_s8s4s32_2x8x16_to_8x8x16_arm_64_i8mm(
     }
     rhs_ptr += 64;
 
-    int8x16_t lhs[2][4];
+    int8x16_t lhs[2][2];
     if (M0 == 2) {
       int8x8x2_t lhs_uzp[2];
       IREE_UK_UNROLL for (int i = 0; i < 2; i++) {
@@ -210,15 +211,16 @@ iree_uk_mmt4d_tile_s8s4s32_2x8x16_to_8x8x16_arm_64_i8mm(
       }
       lhs[0][0] = vcombine_s8(lhs_uzp[0].val[0], lhs_uzp[1].val[0]);
       lhs[1][0] = vcombine_s8(lhs_uzp[0].val[1], lhs_uzp[1].val[1]);
+      lhs_ptr += 32;
     } else {
-      IREE_UK_UNROLL for (int i = 0; i < mtiles; i++) {
+      IREE_UK_UNROLL for (int i = 0; i < 2; i++) {
         int8x8x2_t lhs_0 = vld2_s8(lhs_ptr + 16 * 2 * i);
         int8x8x2_t lhs_1 = vld2_s8(lhs_ptr + 16 * (2 * i + 1));
         lhs[0][i] = vcombine_s8(lhs_0.val[0], lhs_1.val[0]);
         lhs[1][i] = vcombine_s8(lhs_0.val[1], lhs_1.val[1]);
       }
+      lhs_ptr += 64;
     }
-    lhs_ptr += 32 * mtiles;
 
     IREE_UK_UNROLL for (int i = 0; i < mtiles; i++) {
       IREE_UK_UNROLL for (int j = 0; j < 4; j++) {
@@ -255,11 +257,8 @@ iree_uk_mmt4d_tile_s8s4s32_2x8x16_to_8x8x16_arm_64_i8mm(
 }
 
 IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
-    iree_uk_mmt4d_tile_s8s4s32_2x8x16_to_8x8x16_arm_64_i8mm,
+    iree_uk_mmt4d_tile_s8s4s32_2x8x16_to_4x8x16_arm_64_i8mm,
     iree_uk_mmt4d_tile_s8s4s32_2x8x16_arm_64_i8mm, 2)
 IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
-    iree_uk_mmt4d_tile_s8s4s32_2x8x16_to_8x8x16_arm_64_i8mm,
+    iree_uk_mmt4d_tile_s8s4s32_2x8x16_to_4x8x16_arm_64_i8mm,
     iree_uk_mmt4d_tile_s8s4s32_4x8x16_arm_64_i8mm, 4)
-IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(
-    iree_uk_mmt4d_tile_s8s4s32_2x8x16_to_8x8x16_arm_64_i8mm,
-    iree_uk_mmt4d_tile_s8s4s32_8x8x16_arm_64_i8mm, 8)
