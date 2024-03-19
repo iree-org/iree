@@ -4,10 +4,6 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-if(NOT IREE_ROCM_TEST_TARGET_CHIP MATCHES "^gfx")
-  return()
-endif()
-
 unset(COMPILER_FLAGS)
 list(APPEND COMPILER_FLAGS
   "--iree-rocm-target-chip=${IREE_ROCM_TARGET_CHIP}")

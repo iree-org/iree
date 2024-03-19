@@ -507,11 +507,11 @@ iree_check_single_backend_test_suite(
     "--iree-input-type=tosa"
 )
 
-if(IREE_ROCM_TEST_TARGET_CHIP MATCHES "^gfx")
+if(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx")
 
 unset(IREE_HIP_TEST_COMPILER_FLAGS)
 list(APPEND IREE_HIP_TEST_COMPILER_FLAGS
-  "--iree-rocm-target-chip=${IREE_ROCM_TEST_TARGET_CHIP}"
+  "--iree-rocm-target-chip=${IREE_HIP_TEST_TARGET_CHIP}"
 )
 
 iree_check_single_backend_test_suite(
@@ -640,4 +640,4 @@ iree_check_single_backend_test_suite(
     "requires-gpu-amd"
 )
 
-endif(IREE_ROCM_TEST_TARGET_CHIP MATCHES "^gfx")
+endif(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx")

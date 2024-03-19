@@ -224,17 +224,13 @@ endif()
 # against.
 #-------------------------------------------------------------------------------
 
-set(IREE_ROCM_TEST_TARGET_CHIP \"\" CACHE STRING
-  "Target chip for ROCm tests that need to compile device code. \
+set(IREE_HIP_TEST_TARGET_CHIP \"\" CACHE STRING
+  "Target chip for HIP tests that need to compile device code. \
    Defaults to \"\" to disable tests.")
-set(IREE_ROCM_TEST_LINK_BITCODE_DEFAULT ON)
-set(IREE_ROCM_TEST_LINK_BITCODE ${IREE_ROCM_TEST_LINK_BITCODE_DEFAULT} CACHE BOOL
-  "Whether to link to device bitcode for tests that need to compile device code. \
-   Defaults to ${IREE_ROCM_TEST_LINK_BITCODE_DEFAULT}.")
-set(IREE_ROCM_TEST_BITCODE_DIR_DEFAULT "/opt/rocm/amdgcn/bitcode")
-set(IREE_ROCM_TEST_BITCODE_DIR "${IREE_ROCM_TEST_BITCODE_DIR_DEFAULT}" CACHE STRING
-  "Directory of ROCm device bitcode for tests that need to compile device code. \
-   Defaults to \"${IREE_ROCM_TEST_BITCODE_DIR_DEFAULT}\".")
+set(IREE_HIP_TEST_BITCODE_DIR_DEFAULT "/opt/HIP/amdgcn/bitcode")
+set(IREE_HIP_TEST_BITCODE_DIR "${IREE_HIP_TEST_BITCODE_DIR_DEFAULT}" CACHE STRING
+  "Directory of HIP device bitcode for tests that need to compile device code. \
+   Defaults to \"${IREE_HIP_TEST_BITCODE_DIR_DEFAULT}\".")
 
 #-------------------------------------------------------------------------------
 # Runtime HAL Driver Options
