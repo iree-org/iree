@@ -1,9 +1,8 @@
 {
   "config_name": "gpu_rocm_rdna3",
-  "iree_compile_flags" : [
+  "iree_compile_flags": [
     "--iree-hal-target-backends=rocm",
-    "--iree-rocm-target-chip=gfx1100",
-    "--iree-rocm-link-bc=true"
+    "--iree-rocm-target-chip=gfx1100"
   ],
   "iree_run_module_flags": [
     "--device=rocm"
@@ -784,7 +783,6 @@
     "test_unsqueeze_unsorted_axes",
     "test_upsample_nearest",
     "test_wrap_pad",
-
     // These pass on CPU but fail on ROCm.
   ],
   "expected_run_failures": [
@@ -904,7 +902,6 @@
     "test_shape_start_1_end_negative_1",
     "test_shape_start_negative_1",
     "test_where_long_example",
-
     // These pass on CPU but fail on ROCm.
     "test_gather_negative_indices",
     "test_reduce_l1_default_axes_keepdims_example_expanded",
