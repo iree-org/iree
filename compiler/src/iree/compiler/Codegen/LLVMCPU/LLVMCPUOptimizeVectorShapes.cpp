@@ -68,21 +68,36 @@ void LLVMCPUOptimizeVectorShapesPass::runOnOperation() {
     vector::populateDropUnitDimWithShapeCastPatterns(patterns);
     vector::InsertOp::getCanonicalizationPatterns(patterns, ctx);
     vector::ExtractOp::getCanonicalizationPatterns(patterns, ctx);
-    (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns))))
+      return signalPassFailure();
   }
 
   unsigned targetVectorBitwidth = getNativeVectorSizeInBytes(funcOp) * 8;
   if (targetVectorBitwidth == 0)
     return;
 
-  // Collapse dimensions from transfer ops that are contiguous in memory.
-  // TODO: Extend flattening patterns so that we can provide a target vector
-  // length to make a more targeted flattening decisions.
-  RewritePatternSet patterns(ctx);
-  vector::populateFlattenVectorTransferPatterns(patterns, targetVectorBitwidth);
-  memref::CollapseShapeOp::getCanonicalizationPatterns(patterns, ctx);
-  memref::SubViewOp::getCanonicalizationPatterns(patterns, ctx);
-  (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+  // Collapse dimensions from simple operations and transfer ops that are
+  // contiguous in memoryif main vector dimension of those ops is lower than the
+  // target vector length.
+  {
+    RewritePatternSet patterns(ctx);
+    TypeConverter typeConverter;
+    ConversionTarget target(*ctx);
+    vector::populateVectorLinearizeTypeConversionsAndLegality(
+        typeConverter, patterns, target, targetVectorBitwidth);
+    if (failed(applyPartialConversion(getOperation(), target,
+                                      std::move(patterns))))
+      return signalPassFailure();
+  }
+  {
+    RewritePatternSet patterns(ctx);
+    vector::populateFlattenVectorTransferPatterns(patterns,
+                                                  targetVectorBitwidth);
+    memref::CollapseShapeOp::getCanonicalizationPatterns(patterns, ctx);
+    memref::SubViewOp::getCanonicalizationPatterns(patterns, ctx);
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns))))
+      return signalPassFailure();
+  }
 }
 } // namespace
 
