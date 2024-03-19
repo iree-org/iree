@@ -14,6 +14,7 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -25,10 +26,23 @@
 #include "mlir/IR/Visitors.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Support/MathExtras.h"
+#include "llvm/Support/CommandLine.h"
 
 #define DEBUG_TYPE "iree-codegen-llvmgpu-prefetch-shared-memory-copy"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 #define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
+
+llvm::cl::opt<bool> clLLVMGPUEnablePrefetchingIGLP0(
+    "iree-llvmgpu-prefetching-use-iglp-0",
+    llvm::cl::desc(
+        "Interleave DS and MFMA instructions for small GEMM kernels."),
+    llvm::cl::init(false));
+
+llvm::cl::opt<bool> clLLVMGPUEnablePrefetchingIGLP1(
+    "iree-llvmgpu-prefetching-use-iglp-1",
+    llvm::cl::desc(
+        "Interleave DS and MFMA instructions for single wave GEMM kernels."),
+    llvm::cl::init(false));
 
 namespace mlir::iree_compiler {
 
@@ -185,6 +199,19 @@ public:
   void createKernel(RewriterBase &rewriter, scf::ForOp newForOp) {
     rewriter.setInsertionPoint(newForOp.getBody(), newForOp.getBody()->begin());
     Location loc = forOp.getLoc();
+
+    if (clLLVMGPUEnablePrefetchingIGLP0) {
+      // Set iglp opt 0 if flag enabled.
+      StringAttr intrinsic = rewriter.getStringAttr("llvm.amdgcn.iglp.opt");
+      Value iglpOpt = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI32Type(), 0);
+      rewriter.create<LLVM::CallIntrinsicOp>(loc, TypeRange(), intrinsic, ValueRange(iglpOpt));
+    } else if (clLLVMGPUEnablePrefetchingIGLP1) {
+      // Set iglp opt 1 if flag enabled.
+      StringAttr intrinsic = rewriter.getStringAttr("llvm.amdgcn.iglp.opt");
+      Value iglpOpt = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI32Type(), 1);
+      rewriter.create<LLVM::CallIntrinsicOp>(loc, TypeRange(), intrinsic, ValueRange(iglpOpt));
+    }
+    
     Value indVar = newForOp.getInductionVar();
     Value increment = rewriter.create<arith::ConstantIndexOp>(loc, step);
     Value iPlusOne = rewriter.create<arith::AddIOp>(loc, indVar, increment);
