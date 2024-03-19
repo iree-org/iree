@@ -364,6 +364,9 @@ cmake_dependent_option(IREE_TARGET_BACKEND_VULKAN_SPIRV "Enables the 'vulkan-spi
 # Default target backends that are not yet fully supported but are being brought up.
 cmake_dependent_option(IREE_TARGET_BACKEND_ROCM "Enables the 'rocm' compiler target backend" ${IREE_TARGET_BACKEND_DEFAULTS} ${IREE_BUILD_COMPILER} OFF)
 
+set(IREE_ROCM_PATH_DEFAULT "/opt/rocm")
+set(IREE_ROCM_PATH "${IREE_ROCM_PATH_DEFAULT}" CACHE STRING "Path to ROCm installation.")
+
 # Supported default target backends that are only available on certain
 # platforms.
 set(IREE_TARGET_BACKEND_CUDA_DEFAULT ${IREE_TARGET_BACKEND_DEFAULTS})

@@ -10,9 +10,6 @@ endif()
 # Check if HIP is installed on system.
 # HIP is required to compile ukernels.
 # TODO: We can do better than this and ensure that headers are always available.
-if (NOT IREE_ROCM_PATH)
-  set(IREE_ROCM_PATH "/opt/rocm")
-endif()
 set (IREE_ROCM_VERSION "${IREE_ROCM_PATH}/.info/version")
 if (NOT EXISTS ${IREE_ROCM_VERSION})
   message(STATUS
@@ -57,6 +54,7 @@ function(iree_rocm_bitcode_library)
     # Suppress warnings about missing path to rocm lib,
     # and benign warning about ROCM version.
     "-nogpulib"
+    "--rocm-path=${IREE_ROCM_PATH}"
     "-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH"
     # Avoid error caused by clang bundling.
     "--offload-device-only"
