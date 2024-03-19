@@ -909,8 +909,11 @@ LogicalResult setCooperativeMatrixConfig(
   GPUMMAHeuristicSeeds seeds{numSubgroupsPerWorkgroup, numMNTilesPerSubgroup,
                              numKTilesPerSubgroup};
 
+  int64_t sharedMemoryLimit =
+      targetEnv.getResourceLimits().getMaxComputeSharedMemorySize();
+
   std::optional<GPUMMASchedule> schedule =
-      deduceMMASchedule(problem, intrinsics, seeds);
+      deduceMMASchedule(problem, intrinsics, seeds, sharedMemoryLimit);
   if (!schedule)
     return failure();
 
