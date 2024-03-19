@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
+#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -80,8 +81,7 @@ static SmallVector<linalg::ProcInfo> getIds(OpBuilder &b, Location loc,
           affine::makeComposedAffineApply(b, loc, d0 % numThreadsDim, {dimId});
     info.procId = dimId;
     info.nprocs = b.create<arith::ConstantIndexOp>(loc, numThreadsDim);
-    info.distributionMethod =
-        linalg::DistributionMethod::CyclicNumProcsGeNumIters;
+    info.distributionMethod = linalg::DistributionMethod::Cyclic;
     infos.push_back(info);
     id = affine::makeComposedAffineApply(b, loc, d0.floorDiv(numThreadsDim),
                                          {id});
@@ -115,7 +115,9 @@ namespace {
 struct LLVMGPUDistributeSharedMemcpyV2Pass
     : public LLVMGPUDistributeSharedMemcpyV2Base<
           LLVMGPUDistributeSharedMemcpyV2Pass> {
-  void getDependentDialects(DialectRegistry &registry) const override {}
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<amdgpu::AMDGPUDialect>();
+  }
   void runOnOperation() override {
     auto funcOp = getOperation();
     FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
@@ -166,7 +168,7 @@ struct LLVMGPUDistributeSharedMemcpyV2Pass
 
       auto tilingOptions =
           linalg::LinalgTilingOptions()
-              .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
+              .setLoopType(linalg::LinalgTilingLoopType::Loops)
               .setTileSizeComputationFunction(wgCopyTileSizeFn)
               .setDistributionOptions(copyInvocationDistributionOptions);
       FailureOr<linalg::TiledLinalgOp> res =
@@ -174,6 +176,12 @@ struct LLVMGPUDistributeSharedMemcpyV2Pass
       if (failed(res)) {
         continue;
       }
+      // auto forLoops = llvm::map_to_vector(
+      //     res->loops, [](Operation *loop) { return cast<scf::ForOp>(loop); });
+      // if (failed(coalesceLoops(rewriter, forLoops))) {
+      //   op->emitOpError("failed to coalesce loops");
+      //   return signalPassFailure();
+      // }
       if (res->tensorResults.empty()) {
         rewriter.eraseOp(op);
       } else {
