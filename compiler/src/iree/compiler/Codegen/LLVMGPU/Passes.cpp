@@ -64,6 +64,12 @@ llvm::cl::opt<bool> clLLVMGPUEnablePrefetch(
     llvm::cl::desc("Enable prefetch in the vector distribute pipeline"),
     llvm::cl::init(false));
 
+llvm::cl::opt<bool> clLLVMGPUEnablePromoteFilter(
+    "iree-llvmgpu-promote-filter",
+    llvm::cl::desc(
+        "Promotes the filter in the convolution distribute pipeline"),
+    llvm::cl::init(false));
+
 static llvm::cl::opt<bool> clWinogradUseForall(
     "iree-codegen-winograd-use-forall",
     llvm::cl::desc("use forall for LLVMGPU winograd distribution"),
@@ -701,6 +707,11 @@ void addGPUConvVectorDistributePassPipeline(OpPassManager &pm) {
 
   // Linalg -> Vector
   addGPUVectorizationPasses(nestedModulePM);
+
+  if (clLLVMGPUEnablePromoteFilter) {
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createGPUVectorAlloc(/*promoteLhs=*/false));
+  }
 
   // Tensor -> Memref
   addVectorBufferizePasses(nestedModulePM);

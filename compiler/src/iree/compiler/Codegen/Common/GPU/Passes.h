@@ -130,7 +130,7 @@ createGPUTileReductionPass();
 // Creates a pass to create allocations for some vector values to use GPU
 // shared memory.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createGPUVectorAlloc();
+createGPUVectorAlloc(bool promoteLhs = true);
 
 // Distributes vector ops to all threads/warps in a GPU workgroup.
 // `getWarpSize` is for deciding the warp size to use; it takes the

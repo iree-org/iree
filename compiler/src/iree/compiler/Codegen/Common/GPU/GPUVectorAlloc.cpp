@@ -100,6 +100,12 @@ namespace {
 
 struct GPUVectorAllocPass : public GPUVectorAllocBase<GPUVectorAllocPass> {
 public:
+  GPUVectorAllocPass(bool optionPromoteLhs = true) {
+    promoteLhs = optionPromoteLhs;
+  }
+  GPUVectorAllocPass(const GPUVectorAllocPass &pass) {
+    promoteLhs = pass.promoteLhs;
+  }
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<bufferization::BufferizationDialect>();
     registry.insert<gpu::GPUDialect>();
@@ -125,10 +131,14 @@ public:
 
       // Promote both of the input operands, excluding the accumulator.
       OpOperand &lhs = contractOp.getLhsMutable();
-      FailureOr<Value> lhsRet =
-          allocateTensorForVector(builder, contractOp->getLoc(), lhs.get());
-      if (failed(lhsRet)) {
-        return signalPassFailure();
+      Value lhsVal;
+      if (promoteLhs) {
+        FailureOr<Value> lhsRet =
+            allocateTensorForVector(builder, contractOp->getLoc(), lhs.get());
+        if (failed(lhsRet)) {
+          return signalPassFailure();
+        }
+        lhsVal = *lhsRet;
       }
 
       OpOperand &rhs = contractOp.getRhsMutable();
@@ -141,11 +151,13 @@ public:
       // Synchronize after the write to shared memory before we read from it.
       builder.create<gpu::BarrierOp>(contractOp->getLoc());
 
-      Value lhsVec =
-          readVectorFromTensor(builder, contractOp.getLhsType(), *lhsRet);
+      if (promoteLhs) {
+        Value lhsVec =
+            readVectorFromTensor(builder, contractOp.getLhsType(), lhsVal);
+        lhs.set(lhsVec);
+      }
       Value rhsVec =
           readVectorFromTensor(builder, contractOp.getRhsType(), *rhsRet);
-      lhs.set(lhsVec);
       rhs.set(rhsVec);
     }
   }
@@ -153,8 +165,8 @@ public:
 } // namespace
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createGPUVectorAlloc() {
-  return std::make_unique<GPUVectorAllocPass>();
+createGPUVectorAlloc(bool promoteLhs) {
+  return std::make_unique<GPUVectorAllocPass>(promoteLhs);
 }
 
 } // namespace mlir::iree_compiler

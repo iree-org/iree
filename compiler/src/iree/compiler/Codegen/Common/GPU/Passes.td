@@ -118,6 +118,11 @@ def GPUVectorAlloc :
   let summary = "Pass to create allocations for contraction inputs to copy "
                 "to GPU shared memory";
   let constructor = "mlir::iree_compiler::createGPUVectorAlloc()";
+  let options = [
+    Option<"promoteLhs", "promoteLhs", "bool",
+            /*default=*/"true",
+           "Promote the left hand side of contractions">,
+  ];
 }
 
 def VectorReductionToGPU :

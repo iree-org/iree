@@ -7,12 +7,15 @@
 #include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
+#include "llvm/ADT/STLExtras.h"
+#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -45,12 +48,29 @@ static int getBaseVectorSize(linalg::GenericOp genericOp) {
   return vectorSize;
 }
 
+int64_t clampToNearestPowerOf2(int64_t x) {
+  for (int s = 1, e = 32; s <= e; s = s << 1) {
+    x |= x >> s;
+  }
+  return x ^ (x >> 1);
+}
+
 /// Return the shape of copy op that can be vectorized to a
 /// transfer_read/transfer_write of size `targetVectorSize`.
-static SmallVector<int64_t> getNativeDstShape(linalg::GenericOp copyOp) {
+static SmallVector<int64_t> getNativeDstShape(linalg::GenericOp copyOp,
+                                              int64_t flatWorkgroupSize) {
   int targetVectorSize = getBaseVectorSize(copyOp);
+  int64_t powersOf2 = 1;
+  SmallVector<int64_t> loopRanges = copyOp.getStaticLoopRanges();
+  for (int64_t dim : loopRanges) {
+    powersOf2 *= clampToNearestPowerOf2(dim);
+  }
+  while (targetVectorSize > 1 &&
+         flatWorkgroupSize * targetVectorSize > powersOf2) {
+    targetVectorSize = targetVectorSize >> 1;
+  }
   SmallVector<int64_t> dstShape;
-  for (int64_t dim : copyOp.getStaticLoopRanges()) {
+  for (int64_t dim : loopRanges) {
     // Skip tiling of dimension of size 1 to simplify distribution.
     dstShape.push_back(dim == 1 ? 0 : 1);
   }
@@ -61,27 +81,40 @@ static SmallVector<int64_t> getNativeDstShape(linalg::GenericOp copyOp) {
 /// Break up the flat id onto the static loop ranges.
 static SmallVector<linalg::ProcInfo> getIds(OpBuilder &b, Location loc,
                                             ArrayRef<Range> parallelLoopRanges,
-                                            Value flatThreadId) {
+                                            Value flatThreadId,
+                                            int64_t flatWorkgroupSize) {
   SmallVector<linalg::ProcInfo> infos;
   Value id = flatThreadId;
   AffineExpr d0 = b.getAffineDimExpr(0);
+  int64_t residualThreads = flatWorkgroupSize;
   for (Range r : llvm::reverse(parallelLoopRanges)) {
     linalg::ProcInfo info;
     auto offset = r.offset.dyn_cast<Attribute>();
     auto stride = r.stride.dyn_cast<Attribute>();
     auto size = r.size.dyn_cast<Attribute>();
     assert(offset && stride && size);
-    int64_t numThreadsDim = (llvm::cast<IntegerAttr>(size).getInt() -
-                             llvm::cast<IntegerAttr>(offset).getInt()) /
-                            llvm::cast<IntegerAttr>(stride).getInt();
+    int64_t sizeInt = llvm::cast<IntegerAttr>(size).getInt();
+    int64_t offsetInt = llvm::cast<IntegerAttr>(offset).getInt();
+    int64_t strideInt = llvm::cast<IntegerAttr>(stride).getInt();
+    int64_t rawNumThreadsDim = (sizeInt - offsetInt) / strideInt;
+
+    int64_t pow2Size = clampToNearestPowerOf2(rawNumThreadsDim);
+    int64_t numThreadsDim;
+    if (residualThreads > pow2Size) {
+      numThreadsDim = pow2Size;
+      residualThreads /= pow2Size;
+    } else {
+      numThreadsDim = residualThreads;
+      residualThreads = 1;
+    }
+
     Value dimId = id;
     if (infos.size() != parallelLoopRanges.size() - 1)
       dimId =
           affine::makeComposedAffineApply(b, loc, d0 % numThreadsDim, {dimId});
     info.procId = dimId;
     info.nprocs = b.create<arith::ConstantIndexOp>(loc, numThreadsDim);
-    info.distributionMethod =
-        linalg::DistributionMethod::CyclicNumProcsGeNumIters;
+    info.distributionMethod = linalg::DistributionMethod::Cyclic;
     infos.push_back(info);
     id = affine::makeComposedAffineApply(b, loc, d0.floorDiv(numThreadsDim),
                                          {id});
@@ -115,7 +148,9 @@ namespace {
 struct LLVMGPUDistributeSharedMemcpyV2Pass
     : public LLVMGPUDistributeSharedMemcpyV2Base<
           LLVMGPUDistributeSharedMemcpyV2Pass> {
-  void getDependentDialects(DialectRegistry &registry) const override {}
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<amdgpu::AMDGPUDialect>();
+  }
   void runOnOperation() override {
     auto funcOp = getOperation();
     FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
@@ -137,17 +172,21 @@ struct LLVMGPUDistributeSharedMemcpyV2Pass
       return;
     }
 
+    int64_t flatWorkgroupSize =
+        workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
+
     IRRewriter rewriter(ctx);
     for (auto op : candidates) {
       rewriter.setInsertionPoint(op);
 
       linalg::TileSizeComputationFunction wgCopyTileSizeFn =
-          [](OpBuilder &builder, Operation *operation) {
+          [flatWorkgroupSize](OpBuilder &builder, Operation *operation) {
             SmallVector<Value> tileSizesVal;
             auto copyOp = dyn_cast<linalg::GenericOp>(operation);
             if (!copyOp)
               return tileSizesVal;
-            SmallVector<int64_t> staticSize = getNativeDstShape(copyOp);
+            SmallVector<int64_t> staticSize =
+                getNativeDstShape(copyOp, flatWorkgroupSize);
             for (int64_t dim : staticSize) {
               tileSizesVal.push_back(builder.create<arith::ConstantIndexOp>(
                   operation->getLoc(), dim));
@@ -156,17 +195,17 @@ struct LLVMGPUDistributeSharedMemcpyV2Pass
           };
 
       Value flatId = createFlatId(funcOp, workgroupSize);
-      auto getCopyThreadProcInfoFn =
-          [flatId](OpBuilder &builder, Location loc,
-                   ArrayRef<Range> parallelLoopRanges) {
-            return getIds(builder, loc, parallelLoopRanges, flatId);
-          };
+      auto getCopyThreadProcInfoFn = [&](OpBuilder &builder, Location loc,
+                                         ArrayRef<Range> parallelLoopRanges) {
+        return getIds(builder, loc, parallelLoopRanges, flatId,
+                      flatWorkgroupSize);
+      };
       linalg::LinalgLoopDistributionOptions copyInvocationDistributionOptions;
       copyInvocationDistributionOptions.procInfo = getCopyThreadProcInfoFn;
 
       auto tilingOptions =
           linalg::LinalgTilingOptions()
-              .setLoopType(linalg::LinalgTilingLoopType::ParallelLoops)
+              .setLoopType(linalg::LinalgTilingLoopType::Loops)
               .setTileSizeComputationFunction(wgCopyTileSizeFn)
               .setDistributionOptions(copyInvocationDistributionOptions);
       FailureOr<linalg::TiledLinalgOp> res =
@@ -174,6 +213,12 @@ struct LLVMGPUDistributeSharedMemcpyV2Pass
       if (failed(res)) {
         continue;
       }
+      // auto forLoops = llvm::map_to_vector(
+      //     res->loops, [](Operation *loop) { return cast<scf::ForOp>(loop); });
+      // if (failed(coalesceLoops(rewriter, forLoops))) {
+      //   op->emitOpError("failed to coalesce loops");
+      //   return signalPassFailure();
+      // }
       if (res->tensorResults.empty()) {
         rewriter.eraseOp(op);
       } else {
