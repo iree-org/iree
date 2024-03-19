@@ -13,6 +13,10 @@
 #include "experimental/rocm/status_util.h"
 #include "iree/base/api.h"
 
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING
+static const char* IREE_HAL_ROCM_ALLOCATOR_ID = "ROCm";
+#endif  // IREE_TRACING_FEATURE_ALLOCATION_TRACKING
+
 typedef struct iree_hal_rocm_allocator_t {
   iree_hal_resource_t resource;
   iree_hal_device_t* base_device;
@@ -298,6 +302,9 @@ static iree_status_t iree_hal_rocm_allocator_allocate_buffer(
   }
 
   if (iree_status_is_ok(status)) {
+    IREE_TRACE_ALLOC_NAMED(IREE_HAL_ROCM_ALLOCATOR_ID,
+                           (void*)iree_hal_rocm_buffer_device_pointer(buffer),
+                           allocation_size);
     IREE_STATISTICS(iree_hal_allocator_statistics_record_alloc(
         &allocator->statistics, compat_params.type, allocation_size));
     *out_buffer = buffer;
@@ -323,6 +330,9 @@ static void iree_hal_rocm_allocator_deallocate_buffer(
                             iree_hal_rocm_buffer_device_pointer(base_buffer),
                             iree_hal_rocm_buffer_host_pointer(base_buffer));
 
+  IREE_TRACE_FREE_NAMED(
+      IREE_HAL_ROCM_ALLOCATOR_ID,
+      (void*)iree_hal_rocm_buffer_device_pointer(base_buffer));
   IREE_STATISTICS(iree_hal_allocator_statistics_record_free(
       &allocator->statistics, memory_type,
       iree_hal_buffer_allocation_size(base_buffer)));

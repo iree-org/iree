@@ -5,7 +5,7 @@ requires = [
     "cmake",
     "nanobind>=1.4.0",
     "ninja",
-    "numpy",
+    "numpy>=2.0.0b1",
     "packaging",
     "PyYAML",
 ]
