@@ -30,11 +30,23 @@ std::optional<GPUMMASchedule>
 fitScheduleInSharedMemory(ArrayRef<GPUMatmulShapeType> intrinsics,
                           GPUMMASchedule schedule, int64_t sharedMemLimit) {
   int64_t lhsBitwidth =
-      intrinsics[schedule.index].aType.getIntOrFloatBitWidth();
+      intrinsics[schedule.index].aType.getIntOrFloatBitWidth() / 8;
   int64_t rhsBitwidth =
-      intrinsics[schedule.index].bType.getIntOrFloatBitWidth();
+      intrinsics[schedule.index].bType.getIntOrFloatBitWidth() / 8;
   while (sharedMemoryUsed(schedule, lhsBitwidth, rhsBitwidth) >
          sharedMemLimit) {
+
+    LLVM_DEBUG({
+      llvm::errs() << "Shrinking schedule\n";
+      llvm::errs() << "mSize: " << schedule.mSize << "\n";
+      llvm::errs() << "nSize: " << schedule.nSize << "\n";
+      llvm::errs() << "kSize: " << schedule.kSize << "\n";
+      llvm::errs() << "mTileCount: " << schedule.mTileCount << "\n";
+      llvm::errs() << "nTileCount: " << schedule.nTileCount << "\n";
+      llvm::errs() << "kTileCount: " << schedule.kTileCount << "\n";
+      llvm::errs() << "mWarpCount: " << schedule.mWarpCount << "\n";
+      llvm::errs() << "nWarpCount: " << schedule.nWarpCount << "\n";
+    });
     // Attempt to shrink the schedule along one of the dimensions.
     if (schedule.mTileCount % 2 == 0) {
       schedule.mTileCount /= 2;
