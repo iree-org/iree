@@ -1,4 +1,4 @@
-// Copyright 2023 The IREE Authors
+// Copyright 2024 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -106,7 +106,7 @@ loadParameterIndex(ModuleOp moduleOp, StringRef path,
         iree_io_parse_safetensors_index(fileHandle->get(), parameterIndex),
         "parsing safetensors file");
   } else {
-    llvm::errs() << "unsupported archive file format: " << path << "\n";
+    llvm::errs() << "unsupported archive file format: '" << path << "'\n";
     return failure();
   }
 }
@@ -171,7 +171,7 @@ loadParameterArchives(ModuleOp moduleOp, ArrayRef<std::string> scopePaths) {
 }
 
 // Today only shaped types of elements where we know we can directly access the
-// data as stored in teh file.
+// data as stored in the file.
 static bool isTypeSupported(Type type) {
   auto shapedType = dyn_cast<ShapedType>(type);
   if (!shapedType)
@@ -226,7 +226,8 @@ importParameterFromSplat(StringRef fullName, ShapedType globalType,
       assert(false && "integer width not supported");
       return failure();
     }
-    return IntegerAttr::get(globalType, APInt(integerType.getWidth(), value));
+    return TypedAttr(
+        IntegerAttr::get(globalType, APInt(integerType.getWidth(), value)));
   } else if (auto floatType = dyn_cast<FloatType>(elementType)) {
     uint64_t value = 0;
     switch (floatType.getWidth()) {
@@ -246,9 +247,9 @@ importParameterFromSplat(StringRef fullName, ShapedType globalType,
       assert(false && "integer width not supported");
       return failure();
     }
-    return FloatAttr::get(globalType,
-                          APFloat(floatType.getFloatSemantics(),
-                                  APInt(integerType.getWidth(), value)));
+    return TypedAttr(FloatAttr::get(
+        globalType, APFloat(floatType.getFloatSemantics(),
+                            APInt(integerType.getWidth(), value))));
   }
   if (!valueAttr) {
     llvm::errs() << "unsupported splat type: " << elementType << "\n";
