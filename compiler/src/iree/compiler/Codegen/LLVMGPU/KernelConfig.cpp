@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/LLVMGPU/KernelConfig.h"
 
 #include <cstdint>
+#include <functional>
 #include <numeric>
 #include <optional>
 
@@ -568,13 +569,16 @@ setMatmulVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   int64_t nSize = 1;
   for (auto dim : contractionDims->n)
     nSize *= bounds[dim];
+  int64_t batchSize = 1;
+  for (auto dim : contractionDims->batch)
+    batchSize *= bounds[dim];
 
   GPUMMAHeuristicSeeds seeds;
 
   // Note that the following heuristic seeds are just placeholder values.
   // We need to clean it up and make it adjusting to different targets.
   // See https://github.com/openxla/iree/issues/16341 for details.
-  if (mSize * nSize <= clGPUMatmulCThreshold) {
+  if (mSize * nSize * batchSize <= clGPUMatmulCThreshold) {
     // For matmuls with small M*N size, we want to distribute M*N onto more
     // workgroups to fill the GPU. Use a smaller bestMNTileCountPerSubgroup
     // and a larger bestKTileCountPerSubgroup.
