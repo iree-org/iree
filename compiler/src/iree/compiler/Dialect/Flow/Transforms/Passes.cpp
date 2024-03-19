@@ -140,6 +140,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
 
   FunctionLikeNest(passManager)
       // Preprocess the input to a form more amenable for fusion
+      .addPass(createFuseWinogradPaddingPass)
       .addPass(createInterchangeGenericOpsPass)
       .addPass(memref::createResolveShapedTypeResultDimsPass)
       .addPass(mlir::createCanonicalizerPass)

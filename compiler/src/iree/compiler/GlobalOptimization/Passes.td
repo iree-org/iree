@@ -77,12 +77,6 @@ def FuseSiluHorizontalMatmul:
   let constructor = "mlir::iree_compiler::GlobalOptimization::createFuseSiluHorizontalMatmulPass()";
 }
 
-def FuseWinogradPadding:
-    InterfacePass<"iree-global-opt-fuse-winograd-padding", "mlir::FunctionOpInterface"> {
-  let summary = "Fuses winograd transform ops with pad and extract_slice ops";
-  let constructor = "mlir::iree_compiler::GlobalOptimization::createFuseWinogradPaddingPass()";
-}
-
 def GeneralizeLinalgNamedOps :
     InterfacePass<"iree-global-opt-generalize-linalg-named-ops", "mlir::FunctionOpInterface"> {
   let summary = "Convert some Linalg named ops into linalg.generics";

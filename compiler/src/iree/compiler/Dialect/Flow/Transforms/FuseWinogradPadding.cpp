@@ -5,10 +5,10 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
+#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree/compiler/GlobalOptimization/PassDetail.h"
-#include "iree/compiler/GlobalOptimization/Passes.h"
 #include "iree/compiler/GlobalOptimization/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -25,9 +25,7 @@
 #define DEBUG_TYPE "iree-global-opt-fuse-winograd-padding"
 #define DBGS() (llvm::dbgs() << '[' << DEBUG_TYPE << "] ")
 
-namespace mlir {
-namespace iree_compiler {
-namespace GlobalOptimization {
+namespace mlir::iree_compiler::IREE::Flow {
 
 namespace {
 
@@ -51,13 +49,13 @@ public:
     if (!collapseShape->hasOneUse()) {
       return failure();
     }
-    auto pad = dyn_cast<tensor::PadOp>(
+    auto insertSlice = dyn_cast<tensor::InsertSliceOp>(
         *collapseShape->getResult(0).getUsers().begin());
-    if (!pad) {
+    if (!insertSlice) {
       return failure();
     }
 
-    SmallVector<Operation *> opsToFuse = {inputOp, collapseShape, pad};
+    SmallVector<Operation *> opsToFuse = {inputOp, collapseShape, insertSlice};
 
     // Fail if matmul is already in a dispatch.
     for (Operation *op : opsToFuse) {
@@ -66,7 +64,8 @@ public:
       }
     }
 
-    auto result = wrapConsecutiveOpsInDispatchRegion(rewriter, opsToFuse);
+    auto result = GlobalOptimization::wrapConsecutiveOpsInDispatchRegion(
+        rewriter, opsToFuse);
     if (failed(result)) {
       return failure();
     }
@@ -104,7 +103,8 @@ public:
       }
     }
 
-    auto result = wrapConsecutiveOpsInDispatchRegion(rewriter, opsToFuse);
+    auto result = GlobalOptimization::wrapConsecutiveOpsInDispatchRegion(
+        rewriter, opsToFuse);
     if (failed(result)) {
       return failure();
     }
@@ -129,7 +129,7 @@ void FuseWinogradPaddingPass::runOnOperation() {
   MLIRContext *context = &getContext();
 
   RewritePatternSet patterns(context);
-  // patterns.insert<FuseWinogradInputWithPadPattern>(context);
+  patterns.insert<FuseWinogradInputWithPadPattern>(context);
   patterns.insert<FuseWinogradOutputWithExtractSlicePattern>(context);
   if (failed(
           applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
@@ -142,6 +142,4 @@ createFuseWinogradPaddingPass() {
   return std::make_unique<FuseWinogradPaddingPass>();
 }
 
-} // namespace GlobalOptimization
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::Flow
