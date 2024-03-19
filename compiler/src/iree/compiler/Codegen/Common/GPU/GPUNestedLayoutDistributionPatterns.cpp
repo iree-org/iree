@@ -345,18 +345,6 @@ struct DistributeBroadcast final : OpDistributionPattern<vector::BroadcastOp> {
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
 
-    VectorValue srcVector = dyn_cast<VectorValue>(broadcastOp.getSource());
-    if (!srcVector) {
-      // TODO: Add support for scalar broadcasting.
-      return rewriter.notifyMatchFailure(
-          broadcastOp, "unimplemented: scalar broadcast distribution");
-    }
-    auto sourceLayout = dyn_cast<NestedLayoutAttr>(signature[srcVector]);
-    if (!sourceLayout) {
-      return rewriter.notifyMatchFailure(broadcastOp,
-                                         "non-nested source vector layout");
-    }
-
     VectorValue dstVector = broadcastOp.getVector();
     auto vectorLayout = dyn_cast<NestedLayoutAttr>(signature[dstVector]);
     if (!vectorLayout) {
@@ -368,6 +356,22 @@ struct DistributeBroadcast final : OpDistributionPattern<vector::BroadcastOp> {
     Type elementType =
         llvm::cast<ShapedType>(dstVector.getType()).getElementType();
     auto vectorType = VectorType::get(distShape, elementType);
+
+    VectorValue srcVector = dyn_cast<VectorValue>(broadcastOp.getSource());
+    if (!srcVector) {
+      auto broadcast = rewriter.create<vector::BroadcastOp>(
+          broadcastOp.getLoc(), vectorType, broadcastOp.getSource());
+      replaceOpWithDistributedValues(rewriter, broadcastOp,
+                                     broadcast.getResult());
+      return success();
+    }
+
+    auto sourceLayout = dyn_cast<NestedLayoutAttr>(signature[srcVector]);
+    if (!sourceLayout) {
+      return rewriter.notifyMatchFailure(broadcastOp,
+                                         "non-nested source vector layout");
+    }
+
     Location loc = broadcastOp.getLoc();
     Value accumulator = rewriter.create<arith::ConstantOp>(
         loc, vectorType, rewriter.getZeroAttr(vectorType));
