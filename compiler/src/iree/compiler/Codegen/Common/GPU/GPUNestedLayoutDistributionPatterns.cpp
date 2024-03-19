@@ -360,8 +360,7 @@ struct DistributeBroadcast final : OpDistributionPattern<vector::BroadcastOp> {
     VectorValue srcVector = dyn_cast<VectorValue>(broadcastOp.getSource());
     if (!srcVector) {
       auto broadcast = rewriter.create<vector::BroadcastOp>(
-          broadcastOp.getLoc(), broadcastOp, vectorType,
-          broadcastOp.getSource());
+          broadcastOp.getLoc(), vectorType, broadcastOp.getSource());
       replaceOpWithDistributedValues(rewriter, broadcastOp,
                                      broadcast.getResult());
       return success();
