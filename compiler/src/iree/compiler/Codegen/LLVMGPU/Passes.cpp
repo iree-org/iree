@@ -931,6 +931,8 @@ void addGPUImplicitGEMMPassPipeline(OpPassManager &pm) {
         createLLVMGPUNormalizeContractMapsPass());
     nestedModulePM.addNestedPass<func::FuncOp>(
         createLLVMGPUCastTypeToFitMMAPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLLVMGPUPromoteDenseCstToTensorPass());
     nestedModulePM.addNestedPass<func::FuncOp>(createLLVMGPUVectorDistribute());
     nestedModulePM.addPass(createCanonicalizerPass());
     nestedModulePM.addPass(createCSEPass());

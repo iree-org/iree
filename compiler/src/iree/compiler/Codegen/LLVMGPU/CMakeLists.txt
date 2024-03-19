@@ -88,6 +88,7 @@ iree_cc_library(
     "LLVMGPUPadIGemm.cpp"
     "LLVMGPUPrefetching.cpp"
     "LLVMGPUPromoteConvImgAndTileFilter.cpp"
+    "LLVMGPUPromoteDenseCstToTensor.cpp"
     "LLVMGPURewritePadInDestinationPassingStyle.cpp"
     "LLVMGPUSelectLoweringStrategy.cpp"
     "LLVMGPUTensorCoreVectorization.cpp"
