@@ -291,17 +291,6 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
         "maxWorkgroupParallelDims set to more than allowed MaxParallelDims");
   }
 
-  // Try to cleanup reshapes
-  {
-    RewritePatternSet patterns(context);
-    populateReshapeToInterfaceTensorPatterns(patterns);
-    if (failed(
-            applyPatternsAndFoldGreedily(innerModule, std::move(patterns)))) {
-      innerModule->emitOpError("failed to fold reshapes with stores/loads");
-      return signalPassFailure();
-    }
-  }
-
   for (auto funcOp : innerModule.getOps<mlir::FunctionOpInterface>()) {
     auto exportOp = entryPoints.lookup(funcOp.getName());
     if (!exportOp)
