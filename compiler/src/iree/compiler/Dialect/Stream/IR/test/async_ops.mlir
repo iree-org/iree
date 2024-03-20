@@ -261,6 +261,28 @@ util.func private @asyncCall(%arg0: !stream.resource<*>, %arg1: index) -> !strea
 }
 
 // -----
+// Verifies that calling a function with a broader lifetime is allowed if the
+// callee has an unknown lifetime.
+stream.async.func private @asyncExtern(%arg0: !stream.resource<*>, %arg1: index) -> %arg0
+
+// CHECK-LABEL: @asyncExternNarrowLifetimeCall
+util.func private @asyncExternNarrowLifetimeCall(%arg0: !stream.resource<external>, %arg1: index) -> !stream.resource<external> {
+  %c0 = arith.constant 0 : index
+  %call = stream.async.call @asyncExtern(%arg0[%c0 to %arg1 for %arg1], %arg1) : (!stream.resource<external>{%arg1}, index) -> %arg0{%arg1}
+  util.return %call : !stream.resource<external>
+}
+
+// -----
+stream.async.func private @asyncExtern(%arg0: !stream.resource<transient>, %arg1: index) -> %arg0
+
+util.func private @asyncExternNarrowLifetimeCall(%arg0: !stream.resource<external>, %arg1: index) -> !stream.resource<external> {
+  %c0 = arith.constant 0 : index
+  // expected-error @+1 {{function argument type mismatch; expected '!stream.resource<external>' but callee provides '!stream.resource<transient>'}}
+  %call = stream.async.call @asyncExtern(%arg0[%c0 to %arg1 for %arg1], %arg1) : (!stream.resource<external>{%arg1}, index) -> %arg0{%arg1}
+  util.return %call : !stream.resource<external>
+}
+
+// -----
 
 // CHECK-LABEL: @asyncExecute
 util.func private @asyncExecute(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.timepoint) -> (!stream.resource<*>, !stream.timepoint) {
