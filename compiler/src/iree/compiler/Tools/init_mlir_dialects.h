@@ -12,6 +12,7 @@
 #ifndef IREE_COMPILER_TOOLS_INIT_MLIR_DIALECTS_H_
 #define IREE_COMPILER_TOOLS_INIT_MLIR_DIALECTS_H_
 
+#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/TransformOps/AffineTransformOps.h"
 #include "mlir/Dialect/ArmNeon/ArmNeonDialect.h"
@@ -60,6 +61,7 @@ namespace mlir {
 inline void registerMlirDialects(DialectRegistry &registry) {
   // clang-format off
   registry.insert<affine::AffineDialect,
+                  amdgpu::AMDGPUDialect,
                   bufferization::BufferizationDialect,
                   cf::ControlFlowDialect,
                   complex::ComplexDialect,
