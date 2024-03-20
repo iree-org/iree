@@ -365,6 +365,7 @@ setConvolutionVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
 
   // TODO: Relax this condition to strictly alignment requirements.
   if (convolutionDims->outputChannel.size() < 1 ||
+      convolutionDims->outputChannel.size() > 2 ||
       convolutionDims->inputChannel.size() < 1 ||
       convolutionDims->filterLoop.size() < 1 ||
       convolutionDims->outputImage.size() < 1 ||
@@ -399,8 +400,18 @@ setConvolutionVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   Type rhsElemType = getElementTypeOrSelf(rhs);
   Type initElemType = getElementTypeOrSelf(init);
 
-  GPUMatmulShapeType problem{bounds[mDim], bounds[nDim], bounds[kDim],
-                             lhsElemType,  rhsElemType,  initElemType};
+  int64_t mSize;
+  if (convolutionDims->outputImage.size() == 2) {
+    mSize = 1;
+    for (auto dim : convolutionDims->outputImage) {
+      mSize *= bounds[dim];
+    }
+  } else {
+    mSize = bounds[mDim];
+  }
+
+  GPUMatmulShapeType problem{mSize,       bounds[nDim], bounds[kDim],
+                             lhsElemType, rhsElemType,  initElemType};
 
   auto mmaAttrs = llvm::to_vector(mmaKinds->getAsRange<IREE::GPU::MmaAttr>());
   SmallVector<GPUMatmulShapeType> intrinsics;
@@ -441,8 +452,43 @@ setConvolutionVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
     workgroupTileSizes[batch] = 1;
   }
   // Tile all output image dimensions with unit size except the last one.
-  for (int64_t oi : llvm::drop_end(convolutionDims->outputImage)) {
-    workgroupTileSizes[oi] = 1;
+  if (convolutionDims->outputImage.size() == 2) {
+    int64_t hDim = convolutionDims->outputImage[0];
+    int64_t wDim = convolutionDims->outputImage[1];
+    int64_t hSize = bounds[hDim];
+    int64_t wSize = bounds[wDim];
+
+    int64_t residualElements = schedule->mWarpCount * schedule->mTileCount;
+    int64_t hCount = 1;
+    int64_t wCount = schedule->mSize;
+
+    if (wSize % wCount != 0) {
+      return failure();
+    }
+
+    while (residualElements > 1) {
+      int64_t hGcd = std::gcd(residualElements, hSize / hCount);
+      int64_t wGcd = std::gcd(residualElements, wSize / wCount);
+      if (hGcd == 1 && wGcd == 1) {
+        return failure();
+      }
+      if ((wCount > hCount && hGcd != 1) || wGcd == 1) {
+        hCount *= hGcd;
+        residualElements /= hGcd;
+      } else {
+        wCount *= wGcd;
+        residualElements /= wGcd;
+      }
+    }
+
+    workgroupTileSizes[hDim] = hCount;
+    workgroupTileSizes[wDim] = wCount;
+  } else {
+    for (int64_t oi : llvm::drop_end(convolutionDims->outputImage)) {
+      workgroupTileSizes[oi] = 1;
+    }
+    workgroupTileSizes[mDim] =
+        schedule->mWarpCount * schedule->mTileCount * schedule->mSize;
   }
   for (int64_t oc : llvm::drop_end(convolutionDims->outputChannel)) {
     workgroupTileSizes[oc] = 1;
@@ -451,8 +497,6 @@ setConvolutionVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
     workgroupTileSizes[ic] = 1;
   }
   // Compute the M/N dimension tile size by multiply subgroup information.
-  workgroupTileSizes[mDim] =
-      schedule->mWarpCount * schedule->mTileCount * schedule->mSize;
   workgroupTileSizes[nDim] =
       schedule->nWarpCount * schedule->nTileCount * schedule->nSize;
 
