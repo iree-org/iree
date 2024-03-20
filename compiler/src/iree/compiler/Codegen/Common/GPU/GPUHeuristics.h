@@ -50,6 +50,6 @@ std::optional<GPUMMASchedule>
 deduceMMASchedule(const GPUMatmulShapeType &problem,
                   ArrayRef<GPUMatmulShapeType> intrinsics,
                   const GPUMMAHeuristicSeeds &seeds, int64_t sharedMemLimit,
-                  bool canUpcastAcc = false);
+                  bool canUpcastAcc = false, bool mustBeAligned = true);
 
 } // namespace mlir::iree_compiler

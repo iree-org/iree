@@ -78,7 +78,7 @@ std::optional<GPUMMASchedule>
 deduceMMASchedule(const GPUMatmulShapeType &problem,
                   ArrayRef<GPUMatmulShapeType> intrinsics,
                   const GPUMMAHeuristicSeeds &seeds, int64_t sharedMemLimit,
-                  bool canUpcastAcc) {
+                  bool canUpcastAcc, bool mustBeAligned) {
   for (auto [index, intrinsic] : llvm::enumerate(intrinsics)) {
     if (problem.aType != intrinsic.aType || problem.bType != intrinsic.bType) {
       continue; // Cannot use this intrinsic for mismatched types
@@ -93,9 +93,9 @@ deduceMMASchedule(const GPUMatmulShapeType &problem,
       }
     }
 
-    if (problem.mSize % intrinsic.mSize != 0 ||
-        problem.nSize % intrinsic.nSize != 0 ||
-        problem.kSize % intrinsic.kSize != 0) {
+    if (mustBeAligned && (problem.mSize % intrinsic.mSize != 0 ||
+                          problem.nSize % intrinsic.nSize != 0 ||
+                          problem.kSize % intrinsic.kSize != 0)) {
       continue; // Cannot use this intrinsic for misaligned cases
     }
 

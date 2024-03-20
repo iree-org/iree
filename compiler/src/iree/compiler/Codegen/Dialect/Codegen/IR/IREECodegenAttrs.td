@@ -54,8 +54,10 @@ def LLVMGPU_ImplicitGEMM
     : I32EnumAttrCase<"LLVMGPUImplicitGEMM", 111>;
 def LLVMGPU_ConvVectorDistribute
     : I32EnumAttrCase<"LLVMGPUConvVectorDistribute", 112>;
+def LLVMGPU_MatmulVectorDistribute
+    : I32EnumAttrCase<"LLVMGPUMatmulVectorDistribute", 113>;
 def LLVMGPU_WinogradVectorize
-    : I32EnumAttrCase<"LLVMGPUWinogradVectorize", 113>;
+    : I32EnumAttrCase<"LLVMGPUWinogradVectorize", 114>;
 
 def SPIRV_BaseLowering
     : I32EnumAttrCase<"SPIRVBaseLowering", 200>;
@@ -97,7 +99,7 @@ def DispatchLoweringPassPipelineEnum : I32EnumAttr<
     LLVMGPU_TransposeSharedMem, LLVMGPU_WarpReduction, LLVMGPU_PackUnPack,
     LLVMGPU_MatmulTensorCoreMmaSync, LLVMGPU_VectorDistribute,
     LLVMGPU_ImplicitGEMM, LLVMGPU_ConvVectorDistribute,
-    LLVMGPU_WinogradVectorize,
+    LLVMGPU_MatmulVectorDistribute, LLVMGPU_WinogradVectorize,
 
     // SPIR-V CodeGen pipelines
     SPIRV_BaseLowering, SPIRV_BaseDistribute, SPIRV_BaseVectorize,

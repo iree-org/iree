@@ -89,6 +89,12 @@ def LLVMGPUPrefetchSharedMemory :
   let constructor = "mlir::iree_compiler::createLLVMGPUPrefetchSharedMemoryPass()";
 }
 
+def LLVMGPUPromoteMatmulToFitMMA :
+    InterfacePass<"iree-llvmgpu-promote-matmul-to-fit-mma", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to promote contraction ops to fit mma shapes";
+  let constructor = "mlir::iree_compiler::createLLVMGPUPromoteMatmulToFitMMAPass()";
+}
+
 def LLVMGPUPromoteConvImgAndTileFilter :
     InterfacePass<"iree-llvmgpu-promote-conv-img-and-tile-filter", "mlir::FunctionOpInterface"> {
   let summary = "Pass promote convolution image operand and tile filter with tilingLevel=1.";
