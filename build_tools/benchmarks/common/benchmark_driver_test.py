@@ -38,7 +38,6 @@ class FakeBenchmarkDriver(BenchmarkDriver):
         self,
         benchmark_case: BenchmarkCase,
         benchmark_results_filename: Optional[pathlib.Path],
-        capture_filename: Optional[pathlib.Path],
     ) -> None:
         if self.raise_exception_on_case == benchmark_case:
             raise Exception("fake exception")
@@ -56,8 +55,6 @@ class FakeBenchmarkDriver(BenchmarkDriver):
             benchmark_results_filename.write_text(
                 json.dumps(fake_benchmark_metrics.to_json_object())
             )
-        if capture_filename:
-            capture_filename.write_text("{}")
 
 
 class BenchmarkDriverTest(unittest.TestCase):
@@ -75,9 +72,7 @@ class BenchmarkDriverTest(unittest.TestCase):
         self.benchmark_results_dir = (
             self.tmp_dir / benchmark_config.BENCHMARK_RESULTS_REL_PATH
         )
-        self.captures_dir = self.tmp_dir / benchmark_config.CAPTURES_REL_PATH
         self.benchmark_results_dir.mkdir()
-        self.captures_dir.mkdir()
 
         self.config = benchmark_config.BenchmarkConfig(
             tmp_dir=self.tmp_dir,
@@ -86,13 +81,7 @@ class BenchmarkDriverTest(unittest.TestCase):
             ),
             benchmark_results_dir=self.benchmark_results_dir,
             git_commit_hash="abcd",
-            normal_benchmark_tool_dir=self.tmp_dir,
-            trace_capture_config=benchmark_config.TraceCaptureConfig(
-                traced_benchmark_tool_dir=self.tmp_dir,
-                trace_capture_tool=self.tmp_dir / "capture_tool",
-                capture_tarball=self.tmp_dir / "captures.tar",
-                capture_tmp_dir=self.captures_dir,
-            ),
+            benchmark_tool_dir=self.tmp_dir,
             use_compatible_filter=True,
         )
 
@@ -251,13 +240,6 @@ class BenchmarkDriverTest(unittest.TestCase):
                 self.benchmark_results_dir / f"{self.case2.run_config}.json",
             ],
         )
-        self.assertEqual(
-            driver.get_capture_filenames(),
-            [
-                self.captures_dir / f"{self.case1.run_config}.tracy",
-                self.captures_dir / f"{self.case2.run_config}.tracy",
-            ],
-        )
         self.assertEqual(driver.get_benchmark_errors(), [])
 
     def test_run_disable_compatible_filter(self):
@@ -269,17 +251,6 @@ class BenchmarkDriverTest(unittest.TestCase):
         driver.run()
 
         self.assertEqual(len(driver.get_benchmark_results().benchmarks), 3)
-
-    def test_run_with_no_capture(self):
-        self.config.trace_capture_config = None
-        driver = FakeBenchmarkDriver(
-            self.device_info, self.config, self.benchmark_suite
-        )
-
-        driver.run()
-
-        self.assertEqual(len(driver.get_benchmark_result_filenames()), 2)
-        self.assertEqual(driver.get_capture_filenames(), [])
 
     def test_run_with_exception_and_keep_going(self):
         self.config.keep_going = True
@@ -295,13 +266,11 @@ class BenchmarkDriverTest(unittest.TestCase):
         self.assertEqual(len(driver.get_benchmark_errors()), 1)
         self.assertEqual(len(driver.get_benchmark_result_filenames()), 1)
 
-    def test_run_with_previous_benchmarks_and_captures(self):
+    def test_run_with_previous_benchmarks(self):
         benchmark_filename = (
             self.benchmark_results_dir / f"{self.case1.run_config}.json"
         )
         benchmark_filename.touch()
-        capture_filename = self.captures_dir / f"{self.case1.run_config}.tracy"
-        capture_filename.touch()
         config = dataclasses.replace(self.config, continue_from_previous=True)
         driver = FakeBenchmarkDriver(
             device_info=self.device_info,
@@ -313,7 +282,6 @@ class BenchmarkDriverTest(unittest.TestCase):
 
         self.assertEqual(len(driver.run_benchmark_cases), 1)
         self.assertEqual(len(driver.get_benchmark_result_filenames()), 2)
-        self.assertEqual(len(driver.get_capture_filenames()), 2)
 
 
 if __name__ == "__main__":

@@ -175,7 +175,7 @@ jobs:
         env:
           IREE_EXECUTION_BENCHMARK_CONFIG: ${{ steps.download-assets.outputs.benchmark-config }}
           IREE_DOCKER_WRAPPER: ./build_tools/github_actions/docker_run.sh
-          IREE_NORMAL_BENCHMARK_TOOLS_DIR: ${{ steps.unpack-tools.outputs.normal-benchmark-tools-dir }}
+          IREE_BENCHMARK_TOOLS_DIR: ${{ steps.unpack-tools.outputs.normal-benchmark-tools-dir }}
           IREE_TRACED_BENCHMARK_TOOLS_DIR: ${{ steps.unpack-tools.outputs.traced-benchmark-tools-dir }}
           IREE_TRACY_CAPTURE_TOOL: ${{ steps.unpack-tools.outputs.tracy-capture-tool }}
           IREE_TARGET_DEVICE_NAME: ${{ env.DEVICE_NAME }}

@@ -110,7 +110,7 @@ Run benchmarks (currently only support running on a Linux host):
 
 ```sh
 build_tools/benchmarks/run_benchmarks_on_linux.py \
-  --normal_benchmark_tool_dir="${IREE_BUILD_DIR?}/tools" \
+  --benchmark_tool_dir="${IREE_BUILD_DIR?}/tools" \
   --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR?}" \
   --execution_benchmark_config="${E2E_TEST_ARTIFACTS_DIR?}/exec_config.json" \
   --target_device_name="<target_device_name, e.g. c2-standard-60>" \
@@ -140,7 +140,7 @@ Filters can be used to select the benchmarks:
 
 ```sh
 build_tools/benchmarks/run_benchmarks_on_linux.py \
-  --normal_benchmark_tool_dir="${IREE_BUILD_DIR?}/tools" \
+  --benchmark_tool_dir="${IREE_BUILD_DIR?}/tools" \
   --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR?}" \
   --execution_benchmark_config="${E2E_TEST_ARTIFACTS_DIR?}/exec_config.json" \
   --target_device_name="c2-standard-60" \

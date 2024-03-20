@@ -7,26 +7,17 @@
 """Runs all matched benchmark suites on an Android device.
 
 This script probes the Android phone via `adb` and uses the device information
-to filter and run suitable benchmarks and optionally captures Tracy traces on
-the Android phone.
+to filter and run suitable benchmarks on the Android device.
 
 It expects that `adb` is installed, and there is iree tools cross-compiled
-towards Android. If to capture traces, another set of tracing-enabled iree
-tools and the Tracy `capture` tool should be cross-compiled towards Android.
+towards Android.
 
-Example usages:
+Example usage:
 
-  # Without trace generation
   python3 run_benchmarks.py \
-    --normal_benchmark_tool_dir=/path/to/normal/android/target/tools/dir \
+    --benchmark_tool_dir=/path/to/normal/android/target/tools/dir \
     /path/to/host/build/dir
 
-  # With trace generation
-  python3 run_benchmarks.py \
-    --normal_benchmark_tool_dir=/path/to/normal/android/target/tools/dir \
-    --traced_benchmark_tool_dir=/path/to/tracy/android/target/tools/dir \
-    --trace_capture_tool=/path/to/host/build/tracy/capture \
-    /path/to/host/build/dir
 """
 
 import sys
@@ -73,7 +64,6 @@ from e2e_test_framework.definitions import iree_definitions
 ANDROID_TMPDIR = pathlib.PurePosixPath("/data/local/tmp/iree-benchmarks")
 ADB_SERVER_ADDR = ("localhost", 5037)
 ANDROID_NORMAL_TOOL_DIR = ANDROID_TMPDIR / "normal-tools"
-ANDROID_TRACED_TOOL_DIR = ANDROID_TMPDIR / "traced-tools"
 ANDROID_TRACY_PORT = 8086
 
 
@@ -279,7 +269,6 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
         self,
         benchmark_case: BenchmarkCase,
         benchmark_results_filename: Optional[pathlib.Path],
-        capture_filename: Optional[pathlib.Path],
     ) -> None:
         module_rel_dir = iree_artifacts.get_module_dir_path(
             benchmark_case.run_config.module_generation_config
@@ -314,11 +303,11 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
         run_args.append(f"--module={module_device_path}")
 
         if benchmark_results_filename is not None:
-            if self.config.normal_benchmark_tool_dir is None:
-                raise ValueError("normal_benchmark_tool_dir can't be None.")
+            if self.config.benchmark_tool_dir is None:
+                raise ValueError("benchmark_tool_dir can't be None.")
             if expected_outputs_dir:
                 self.__run_verify(
-                    host_tool_dir=self.config.normal_benchmark_tool_dir,
+                    host_tool_dir=self.config.benchmark_tool_dir,
                     run_args=run_args,
                     expected_outputs_dir=expected_outputs_dir,
                     verify_params=benchmark_case.verify_params,
@@ -326,24 +315,10 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
                 )
 
             self.__run_benchmark(
-                host_tool_dir=self.config.normal_benchmark_tool_dir,
+                host_tool_dir=self.config.benchmark_tool_dir,
                 benchmark_case=benchmark_case,
                 run_args=run_args,
                 results_filename=benchmark_results_filename,
-                taskset=taskset,
-            )
-
-        if capture_filename is not None:
-            capture_config = self.config.trace_capture_config
-            if capture_config is None:
-                raise ValueError("Trace capture config can't be None.")
-
-            self.__run_capture(
-                host_tool_dir=capture_config.traced_benchmark_tool_dir,
-                trace_capture_tool=capture_config.trace_capture_tool,
-                benchmark_case=benchmark_case,
-                run_args=run_args,
-                capture_filename=capture_filename,
                 taskset=taskset,
             )
 
@@ -394,52 +369,6 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
         if self.verbose:
             print(benchmark_metrics)
         results_filename.write_text(json.dumps(benchmark_metrics.to_json_object()))
-
-    def __run_capture(
-        self,
-        host_tool_dir: pathlib.Path,
-        trace_capture_tool: pathlib.Path,
-        benchmark_case: BenchmarkCase,
-        run_args: Sequence[str],
-        capture_filename: pathlib.Path,
-        taskset: str,
-    ):
-        tool_name = benchmark_case.benchmark_tool_name
-        device_tool = self.__check_and_push_file(
-            host_tool_dir / tool_name, ANDROID_TRACED_TOOL_DIR
-        )
-        run_cmd = [
-            "TRACY_NO_EXIT=1",
-            f"IREE_PRESERVE_DYLIB_TEMP_FILES={ANDROID_TMPDIR}",
-            "taskset",
-            taskset,
-            device_tool,
-        ]
-        run_cmd += run_args
-        if tool_name == "iree-benchmark-module":
-            run_cmd += get_iree_benchmark_module_arguments(
-                driver_info=benchmark_case.driver_info,
-                benchmark_min_time=self.config.benchmark_min_time,
-                dump_results=False,
-                capture_mode=True,
-            )
-
-        # Just launch the traced benchmark tool with TRACY_NO_EXIT=1 without
-        # waiting for the adb command to complete as that won't happen.
-        process = adb_start_cmd(run_cmd, verbose=self.verbose)
-
-        wait_for_iree_benchmark_module_start(process, self.verbose)
-
-        # Now it's okay to collect the trace via the capture tool. This will
-        # send the signal to let the previously waiting benchmark tool to
-        # complete.
-        capture_cmd = [trace_capture_tool, "-f", "-o", capture_filename]
-        # If verbose, just let the subprocess print its output. The subprocess
-        # may need to detect if the output is a TTY to decide whether to log
-        # verbose progress info and use ANSI colors, so it's better to use
-        # stdout redirection than to capture the output in a string.
-        stdout_redirect = None if self.verbose else subprocess.DEVNULL
-        execute_cmd(capture_cmd, verbose=self.verbose, stdout=stdout_redirect)
 
     def __deduce_taskset_from_run_config(
         self, run_config: iree_definitions.E2EModelRunConfig
@@ -585,10 +514,6 @@ def main(args):
         # Also clear temporary directory on the host device.
         atexit.register(shutil.rmtree, args.tmp_dir)
 
-    trace_capture_config = benchmark_config.trace_capture_config
-    if trace_capture_config:
-        add_port_forwarding(port=ANDROID_TRACY_PORT, verbose=args.verbose)
-
     benchmark_driver.run()
 
     benchmark_results = benchmark_driver.get_benchmark_results()
@@ -599,12 +524,6 @@ def main(args):
     if args.verbose:
         print(benchmark_results.commit)
         print(benchmark_results.benchmarks)
-
-    if trace_capture_config:
-        # Put all captures in a tarball and remove the original files.
-        with tarfile.open(trace_capture_config.capture_tarball, "w:gz") as tar:
-            for capture_filename in benchmark_driver.get_capture_filenames():
-                tar.add(capture_filename)
 
     benchmark_errors = benchmark_driver.get_benchmark_errors()
     if benchmark_errors:

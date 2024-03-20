@@ -36,7 +36,6 @@ class BenchmarkDriver(object):
         self.benchmark_grace_time = benchmark_grace_time
         self.verbose = verbose
         self.finished_benchmarks: List[Tuple[BenchmarkInfo, pathlib.Path]] = []
-        self.finished_captures: List[pathlib.Path] = []
         self.benchmark_errors = []
         self._seen_benchmark_names: Set[str] = set()
 
@@ -44,7 +43,6 @@ class BenchmarkDriver(object):
         self,
         benchmark_case: BenchmarkCase,
         benchmark_results_filename: Optional[pathlib.Path],
-        capture_filename: Optional[pathlib.Path],
     ) -> None:
         """Runs the benchmark case and serializes the results.
 
@@ -52,8 +50,6 @@ class BenchmarkDriver(object):
           benchmark_case: the benchmark_case.
           benchmark_results_filename: the path to store the serialized
             BenchmarkMetrics. Benchmarking is required if set.
-          capture_filename: the path to store captured trace. Trace capturing is
-            required if set.
 
         Raises:
           Exception during benchmarking.
@@ -66,14 +62,10 @@ class BenchmarkDriver(object):
         It performs the following steps:
           1. Enumerate and filter benchmark cases.
           2. Call 'run_benchmark_case' for each benchmark case.
-          3. Collect the benchmark results and captures.
+          3. Collect the benchmark results.
         """
 
         self.config.benchmark_results_dir.mkdir(parents=True, exist_ok=True)
-        if self.config.trace_capture_config is not None:
-            self.config.trace_capture_config.capture_tmp_dir.mkdir(
-                parents=True, exist_ok=True
-            )
 
         cpu_target_arch = self.device_info.get_cpu_arch()
         gpu_target_arch = self.device_info.get_gpu_arch()
@@ -128,7 +120,7 @@ class BenchmarkDriver(object):
                 )
             self._seen_benchmark_names.add(benchmark_name)
 
-            results_path, capture_path = self.__get_output_paths(benchmark_name)
+            results_path = self.__get_output_paths(benchmark_name)
             # If we continue from the previous results, check and skip if the result
             # files exist.
             if self.config.continue_from_previous:
@@ -136,24 +128,18 @@ class BenchmarkDriver(object):
                     self.finished_benchmarks.append((benchmark_info, results_path))
                     results_path = None
 
-                if capture_path is not None and capture_path.exists():
-                    self.finished_captures.append(capture_path)
-                    capture_path = None
-
-            # Skip if no need to benchmark and capture.
-            if results_path is None and capture_path is None:
+            # Skip if no need to benchmark.
+            if results_path is None:
                 continue
 
             print(f"--> Benchmark started: {benchmark_name} <--")
 
             try:
-                self.run_benchmark_case(benchmark_case, results_path, capture_path)
+                self.run_benchmark_case(benchmark_case, results_path)
             except Exception as e:
                 # Delete unfinished results if they exist.
                 if results_path is not None:
                     results_path.unlink(missing_ok=True)
-                if capture_path is not None:
-                    capture_path.unlink(missing_ok=True)
 
                 if not self.config.keep_going:
                     raise e
@@ -169,8 +155,6 @@ class BenchmarkDriver(object):
 
             if results_path:
                 self.finished_benchmarks.append((benchmark_info, results_path))
-            if capture_path:
-                self.finished_captures.append(capture_path)
 
     def get_benchmark_results(self) -> BenchmarkResults:
         """Returns the finished benchmark results."""
@@ -197,33 +181,21 @@ class BenchmarkDriver(object):
         """Returns the json file paths of finished benchmarks."""
         return [path for info, path in self.finished_benchmarks]
 
-    def get_capture_filenames(self) -> Sequence[pathlib.Path]:
-        """Returns the tracy file paths of finished captures."""
-        return self.finished_captures
-
     def get_benchmark_errors(self):
         """Returns the exceptions captured during benchmarking."""
         return self.benchmark_errors
 
     def __get_output_paths(self, benchmark_name: str):
-        """Get output paths for the results and capture. The path of results/capture
-        is None if the benchmark/capture doesn't need to be run.
+        """Get output path for the results. The path is None if the benchmark doesn't need to be run.
         """
 
         benchmark_results_filename = None
-        if self.config.normal_benchmark_tool_dir:
+        if self.config.benchmark_tool_dir:
             benchmark_results_filename = (
                 self.config.benchmark_results_dir / f"{benchmark_name}.json"
             )
 
-        capture_filename = None
-        if self.config.trace_capture_config:
-            capture_filename = (
-                self.config.trace_capture_config.capture_tmp_dir
-                / f"{benchmark_name}.tracy"
-            )
-
-        return (benchmark_results_filename, capture_filename)
+        return benchmark_results_filename
 
     def __get_benchmark_info_from_case(
         self, benchmark_case: BenchmarkCase
@@ -248,12 +220,7 @@ class BenchmarkDriver(object):
     def __get_available_drivers_and_loaders(
         self,
     ) -> Tuple[Sequence[str], Sequence[str]]:
-        any_tool_dir = (
-            self.config.normal_benchmark_tool_dir
-            if self.config.normal_benchmark_tool_dir
-            else self.config.trace_capture_config.traced_benchmark_tool_dir
-        )
-        config_txt_file_path = any_tool_dir / "build_config.txt"
+        config_txt_file_path = self.config.benchmark_tool_dir / "build_config.txt"
         config_txt_file_lines = config_txt_file_path.read_text().splitlines()
 
         available_drivers = []

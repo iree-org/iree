@@ -179,7 +179,6 @@ def get_iree_benchmark_module_arguments(
     driver_info: DriverInfo,
     benchmark_min_time: Optional[float] = None,
     dump_results: bool = True,
-    capture_mode: bool = False,
 ):
     """Returns the common arguments to run iree-benchmark-module."""
 
@@ -187,10 +186,6 @@ def get_iree_benchmark_module_arguments(
         # VMVX is very unoptimized for now and can take a long time to run.
         # Decrease the repetition for it until it's reasonably fast.
         repetitions = 3
-    elif capture_mode:
-        # Capture mode is slower and we just need enough repetition to collect
-        # trace after the warmup phase.
-        repetitions = 4
     else:
         repetitions = 10
 
