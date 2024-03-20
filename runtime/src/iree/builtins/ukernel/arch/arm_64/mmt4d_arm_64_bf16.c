@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/builtins/ukernel/arch/arm_64/common_arm_64.h"
-#include "iree/builtins/ukernel/arch/arm_64/mmt4d_arm_64_internal.h"
+#include "iree/builtins/ukernel/mmt4d_internal.h"
 
 static inline float32x4_t iree_uk_neon_zip1_f32_as_s64(float32x4_t a,
                                                        float32x4_t b) {

@@ -23,7 +23,6 @@ iree_bitcode_library(
     "${PROJECT_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
     "common_x86_64.h"
     "common_x86_64_entry_point.h"
-    "mmt4d_x86_64_internal.h"
   SRCS
     "mmt4d_x86_64_entry_point.c"
 )
@@ -38,7 +37,6 @@ iree_bitcode_library(
     "${PROJECT_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
     "common_x86_64.h"
     "common_x86_64_entry_point.h"
-    "mmt4d_x86_64_internal.h"
   SRCS
     "mmt4d_x86_64_avx2_fma.c"
   COPTS
@@ -58,7 +56,6 @@ iree_bitcode_library(
     "${PROJECT_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
     "common_x86_64.h"
     "common_x86_64_entry_point.h"
-    "mmt4d_x86_64_internal.h"
   SRCS
     "mmt4d_x86_64_avx512_base.c"
   COPTS
@@ -83,7 +80,6 @@ iree_bitcode_library(
     "${PROJECT_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
     "common_x86_64.h"
     "common_x86_64_entry_point.h"
-    "mmt4d_x86_64_internal.h"
   SRCS
     "mmt4d_x86_64_avx512_vnni.c"
   COPTS
@@ -109,7 +105,6 @@ iree_bitcode_library(
     "${PROJECT_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
     "common_x86_64.h"
     "common_x86_64_entry_point.h"
-    "mmt4d_x86_64_internal.h"
   SRCS
     "mmt4d_x86_64_avx512_bf16.c"
   COPTS

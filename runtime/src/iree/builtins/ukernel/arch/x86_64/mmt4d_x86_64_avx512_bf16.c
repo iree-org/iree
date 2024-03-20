@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/builtins/ukernel/arch/x86_64/common_x86_64.h"
-#include "iree/builtins/ukernel/arch/x86_64/mmt4d_x86_64_internal.h"
+#include "iree/builtins/ukernel/mmt4d_internal.h"
 
 #if defined(IREE_UK_COMPILER_CLANG) && !defined(IREE_UK_COMPILER_MSVC)
 // This inline-asm function is a work-around for:

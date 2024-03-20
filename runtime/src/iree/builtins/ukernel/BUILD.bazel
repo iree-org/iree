@@ -16,12 +16,16 @@ package(
 
 iree_runtime_cc_library(
     name = "exported_bits",
-    hdrs = ["exported_bits.h"],
+    hdrs = [
+        "exported_bits.h",
+        "exported_tiles.inl",
+    ],
 )
 
 internal_headers = [
     "common.h",
     "exported_bits.h",
+    "exported_tiles.inl",
     "mmt4d.h",
     "mmt4d_internal.h",
     "pack.h",

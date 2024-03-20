@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/builtins/ukernel/arch/arm_64/common_arm_64.h"
-#include "iree/builtins/ukernel/arch/arm_64/mmt4d_arm_64_internal.h"
+#include "iree/builtins/ukernel/mmt4d_internal.h"
 
 IREE_UK_ATTRIBUTE_ALWAYS_INLINE static inline void
 iree_uk_mmt4d_tile_f16f16f16_1x8x1_to_8x8x1_arm_64_fullfp16(

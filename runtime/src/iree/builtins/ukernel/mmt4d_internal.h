@@ -127,6 +127,12 @@ typedef void (*iree_uk_mmt4d_tile_func_t)(
             const void* IREE_UK_RESTRICT rhs_panel, \
             const iree_uk_mmt4d_params_t* params);
 
+#define IREE_UK_MMT4D_TILE(ARCH, LHS, RHS, OUT, M0, N0, K0, SUFFIX) \
+  IREE_UK_MMT4D_TILE_FUNC_DECL(                                     \
+      iree_uk_mmt4d_tile_##LHS##RHS##OUT##_##M0##x##N0##x##K0##_##ARCH##SUFFIX)
+
+#include "iree/builtins/ukernel/exported_tiles.inl"
+
 #define IREE_UK_MMT4D_TILE_FUNC_IMPL_FOR_M0(GENERIC_FUNC, FUNC, M0) \
   void FUNC(void* IREE_UK_RESTRICT out_tile,                        \
             const void* IREE_UK_RESTRICT lhs_panel,                 \

@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/builtins/ukernel/arch/x86_64/common_x86_64_entry_point.h"
-#include "iree/builtins/ukernel/arch/x86_64/mmt4d_x86_64_internal.h"
+#include "iree/builtins/ukernel/mmt4d_internal.h"
 
 static iree_uk_mmt4d_tile_func_t
 iree_uk_mmt4d_select_tile_func_x86_64_f32f32f32_M0x16x1(

@@ -15,6 +15,7 @@ iree_cc_library(
     exported_bits
   HDRS
     "exported_bits.h"
+    "exported_tiles.inl"
   DEPS
 
   PUBLIC
@@ -25,6 +26,7 @@ add_custom_command(OUTPUT internal_headers_filegroup.stamp
   DEPENDS
     "common.h"
     "exported_bits.h"
+    "exported_tiles.inl"
     "mmt4d.h"
     "mmt4d_internal.h"
     "pack.h"
@@ -45,6 +47,7 @@ iree_cc_library(
   HDRS
     "common.h"
     "exported_bits.h"
+    "exported_tiles.inl"
     "mmt4d.h"
     "mmt4d_internal.h"
     "pack.h"
@@ -64,6 +67,7 @@ iree_cc_library(
   HDRS
     "common.h"
     "exported_bits.h"
+    "exported_tiles.inl"
     "mmt4d.h"
     "mmt4d_internal.h"
     "pack.h"
@@ -87,6 +91,7 @@ iree_cc_library(
   SRCS
     "common.h"
     "exported_bits.h"
+    "exported_tiles.inl"
     "mmt4d.c"
     "mmt4d.h"
     "mmt4d_internal.h"
