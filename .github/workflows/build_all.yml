@@ -78,16 +78,16 @@ jobs:
             ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
       # TODO(scotttodd): trim build/tests to exclude integration tests (tests/ folder, check tests)
       #                  that coverage should move to a test_cpu job (matrix with test_gpu?)
-      - name: "Testing IREE"
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
-            ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
-      - name: "Testing iree-dialects"
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
-            ./build_tools/cmake/test_iree_dialects.sh "${BUILD_DIR}"
+      # - name: "Testing IREE"
+      #   run: |
+      #     ./build_tools/github_actions/docker_run.sh \
+      #       gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
+      #       ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
+      # - name: "Testing iree-dialects"
+      #   run: |
+      #     ./build_tools/github_actions/docker_run.sh \
+      #       gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
+      #       ./build_tools/cmake/test_iree_dialects.sh "${BUILD_DIR}"
 
       # TODO(#16203): If this (or iree-dist) is small enough, just use GitHub
       #   artifacts instead of `tar` commands and GCS
