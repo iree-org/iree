@@ -215,22 +215,16 @@ else()
 endif()
 
 #-------------------------------------------------------------------------------
-# ROCm Default Target Configuration.
+# HIP Default Target Configuration.
 #
-# ROCm does not have a stable instruction set like NVIDIA PTX; it requires
-# binaries specific to a target chip. In IREE, we can have various tests that
-# generates and runs the final deployable code. So for such tests we need to
-# make sure we give it the proper target chip and device bitcode path to link
-# against.
+# HIP does not have a stable instruction set like NVIDIA PTX; it requires
+# binaries specific to a target chip. We have tests that generate and run
+# deployable code which need to specify the proper target chip.
 #-------------------------------------------------------------------------------
 
 set(IREE_HIP_TEST_TARGET_CHIP \"\" CACHE STRING
   "Target chip for HIP tests that need to compile device code. \
    Defaults to \"\" to disable tests.")
-set(IREE_HIP_TEST_BITCODE_DIR_DEFAULT "/opt/HIP/amdgcn/bitcode")
-set(IREE_HIP_TEST_BITCODE_DIR "${IREE_HIP_TEST_BITCODE_DIR_DEFAULT}" CACHE STRING
-  "Directory of HIP device bitcode for tests that need to compile device code. \
-   Defaults to \"${IREE_HIP_TEST_BITCODE_DIR_DEFAULT}\".")
 
 #-------------------------------------------------------------------------------
 # Runtime HAL Driver Options
