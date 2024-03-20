@@ -45,6 +45,13 @@ struct TransformOptions : public PassPipelineOptions<TransformOptions> {
   };
 };
 
+static llvm::cl::opt<bool> clDumpUnconfiguredBenchmarks{
+    "iree-hal-dump-benchmarks-before-configuration",
+    llvm::cl::desc("Dump executable benchmarks before the dispatch "
+                   "configuration pipeline."),
+    llvm::cl::init(false),
+};
+
 static llvm::cl::opt<unsigned> clBenchmarkDispatchRepeatCount{
     "iree-hal-benchmark-dispatch-repeat-count",
     llvm::cl::desc(
@@ -292,6 +299,18 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
   //----------------------------------------------------------------------------
 
   if (compileFrom < PipelinePhase::ExecutableConfigurations) {
+
+    // Dump standalone hal.executable benchmark modules.
+    // Today this only works for executables that have static dispatch
+    // parameters and is only useful for basic microbenchmarking. We do this
+    // after configuration to make it easy to tweak configurations directly
+    // from the benchmark.
+    if (clDumpUnconfiguredBenchmarks &&
+        !targetOptions.executableBenchmarksPath.empty()) {
+      passManager.addPass(IREE::HAL::createDumpExecutableBenchmarksPass(
+          {targetOptions.executableBenchmarksPath}));
+    }
+
     // Select a translation strategy for each hal.executable.variant and
     // generate the IR to condition on support for the variant. In the future,
     // this or neighboring passes can expand/contract variants based on the
@@ -321,12 +340,10 @@ void buildHALTransformPassPipeline(OpPassManager &passManager,
                                     clSubstituteExecutableConfiguration,
                                     clSubstituteExecutableConfigurationsFrom);
 
-    // Dump standalone hal.executable benchmark modules.
-    // Today this only works for executables that have static dispatch
-    // parameters and is only useful for basic microbenchmarking. We do this
-    // after configuration to make it easy to tweak configurations directly
-    // from the benchmark.
-    if (!targetOptions.executableBenchmarksPath.empty()) {
+    // Dump standalone hal.executable benchmark modules after configuration if
+    // requested.
+    if (!clDumpUnconfiguredBenchmarks &&
+        !targetOptions.executableBenchmarksPath.empty()) {
       passManager.addPass(IREE::HAL::createDumpExecutableBenchmarksPass(
           {targetOptions.executableBenchmarksPath}));
     }
