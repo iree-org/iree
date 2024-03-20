@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <cstdint>
+#include <numeric>
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
@@ -184,6 +185,124 @@ static void populateWarpAndThreadIndices(RewriterBase &rewriter, Value threadId,
 }
 
 namespace {
+
+struct DistributeDenseConstant final
+    : OpDistributionPattern<arith::ConstantOp> {
+  using OpDistributionPattern::OpDistributionPattern;
+
+  DistributeDenseConstant(MLIRContext *context, Value threadId)
+      : OpDistributionPattern(context), threadId(threadId) {}
+
+  LogicalResult matchAndRewrite(arith::ConstantOp constantOp,
+                                DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
+
+    auto attr = dyn_cast<DenseElementsAttr>(constantOp.getValue());
+    if (!attr) {
+      return failure();
+    }
+
+    VectorValue vector = dyn_cast<VectorValue>(constantOp.getResult());
+    if (!vector) {
+      return failure();
+    }
+
+    NestedLayoutAttr resultLayout =
+        dyn_cast<NestedLayoutAttr>(signature[vector]);
+
+    // Replace all direct conflict uses with distributed constant.
+    SmallVector<LayoutConflictResolutionOp> conflicts;
+    for (Operation *op : constantOp->getUsers()) {
+      auto conflict = dyn_cast<IREE::VectorExt::LayoutConflictResolutionOp>(op);
+      if (!conflict) {
+        continue;
+      }
+      conflicts.push_back(conflict);
+    }
+
+    // Clone the arith.constant so it can be used for conflicts.
+    arith::ConstantOp clonedConstant =
+        llvm::cast<arith::ConstantOp>(rewriter.clone(*constantOp));
+    VectorValue clonedVector =
+        llvm::cast<VectorValue>(clonedConstant.getResult());
+
+    for (LayoutConflictResolutionOp conflict : conflicts) {
+      NestedLayoutAttr layout =
+          dyn_cast<NestedLayoutAttr>(conflict.getDesiredLayout());
+      if (!layout) {
+        continue;
+      }
+
+      rewriter.setInsertionPoint(conflict);
+      VectorValue distributed =
+          distributeConstantToLayout(rewriter, clonedVector, layout);
+      replaceOpWithDistributedValues(rewriter, conflict, distributed);
+    }
+
+    // Replace the original user distributed values.
+    rewriter.setInsertionPoint(constantOp);
+    VectorValue distributed =
+        distributeConstantToLayout(rewriter, clonedVector, resultLayout);
+    replaceOpWithDistributedValues(rewriter, constantOp, distributed);
+
+    return success();
+  }
+
+  VectorValue distributeConstantToLayout(RewriterBase &rewriter,
+                                         VectorValue base,
+                                         NestedLayoutAttr layout) const {
+    int64_t rank = layout.getBatchOrder().size();
+
+    SmallVector<int64_t> distShape = layout.getDistributedShape();
+    SmallVector<int64_t> reshapedConstant = distShape;
+
+    // TODO: I'm not 100% sure if the permutations here are correct.
+    SmallVector<int64_t> subgroupShape = applyPermutation(
+        layout.getSubgroupsPerWorkgroup(), layout.getSubgroupOrder());
+    SmallVector<int64_t> threadShape =
+        applyPermutation(layout.getThreadsPerOuter(), layout.getThreadOrder());
+
+    reshapedConstant.insert(reshapedConstant.begin() + rank,
+                            threadShape.begin(), threadShape.end());
+    reshapedConstant.insert(reshapedConstant.begin(), subgroupShape.begin(),
+                            subgroupShape.end());
+
+    VectorType reshapedType =
+        VectorType::get(reshapedConstant, base.getType().getElementType());
+
+    // Shape cast the base vector to the reshapedConstant shape.
+    VectorValue reshaped =
+        rewriter.create<vector::ShapeCastOp>(base.getLoc(), reshapedType, base);
+    // Transpose the reshaped vector such that it looks like: [subgroup, thread,
+    // ...].
+    SmallVector<int64_t> permutation(reshapedConstant.size());
+    std::iota(permutation.begin(), permutation.end(), 0);
+    for (int i = 0; i < rank; ++i) {
+      // Transpose the batch with the thread.
+      std::swap(permutation[i + rank], permutation[i + rank * 2]);
+    }
+    VectorValue transposed = rewriter.create<vector::TransposeOp>(
+        base.getLoc(), reshaped, permutation);
+
+    SmallVector<int64_t> tileShape = getElementVectorTileShape(layout);
+    SmallVector<int64_t> loopOrder = getLoopOrder(layout);
+
+    SmallVector<Value> warpIndices, threadIndices;
+    populateWarpAndThreadIndices(rewriter, threadId, layout, warpIndices,
+                                 threadIndices);
+
+    SmallVector<Value> indices;
+    indices.append(warpIndices.begin(), warpIndices.end());
+    indices.append(threadIndices.begin(), threadIndices.end());
+
+    Value out = rewriter.create<vector::ExtractOp>(
+        base.getLoc(), transposed, indices,
+        SmallVector<int64_t>(indices.size(), ShapedType::kDynamic));
+    return llvm::cast<VectorValue>(out);
+  }
+
+  Value threadId;
+};
 
 /// Pattern to distribute `vector.transfer_read` ops with nested layouts.
 struct DistributeTransferRead final
@@ -451,9 +570,8 @@ struct DistributeBroadcast final : OpDistributionPattern<vector::BroadcastOp> {
 
 void populateGPUDistributeNestedLayoutAttrPatterns(
     Value threadId, RewritePatternSet &patterns) {
-  patterns.add<DistributeTransferRead, DistributeTransferWrite>(
-      patterns.getContext(), threadId);
+  patterns.add<DistributeTransferRead, DistributeTransferWrite,
+               DistributeDenseConstant>(patterns.getContext(), threadId);
   patterns.add<DistributeBroadcast>(patterns.getContext());
 }
-
 }; // namespace mlir::iree_compiler
