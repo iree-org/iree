@@ -32,6 +32,9 @@ util.func public @pack_elementwise_fusion(%arg0 : tensor<?xf32>,
 // CHECK-LABEL: util.func public @pack_elementwise_fusion(
 //  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?xf32>
 //  CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?xf32>
+//       CHECK:   tensor.dim
+//       CHECK:   tensor.dim
+//  CHECK-NOT:    tensor.dim
 //       CHECK:   %[[RETURN:.+]] = flow.dispatch.region
 //       CHECK:     %[[GENERIC:.+]] = linalg.generic
 //  CHECK-SAME:         iterator_types = ["parallel", "parallel"]
