@@ -434,7 +434,9 @@ void iree_tracing_gpu_zone_notify(uint8_t context_id, uint16_t query_id,
 
 #endif  // IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
 
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING
 void* iree_tracing_obscure_ptr(void* ptr) { return ptr; }
+#endif  // IREE_TRACING_FEATURE_ALLOCATION_TRACKING
 
 #endif  // IREE_TRACING_FEATURES
 
