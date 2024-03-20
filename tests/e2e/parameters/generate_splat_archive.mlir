@@ -21,7 +21,7 @@ module @parameter_example {
 
 // RUN: iree-compile %s \
 // RUN:   --iree-hal-target-backends=vmvx \
-// RUN:   --iree-opt-splat-parameter-archive-export-file=%t.irpa | \
+// RUN:   --iree-opt-splat-parameter-file=%t.irpa | \
 // RUN: iree-run-module --device=local-task --module=- \
 // RUN:   --input=1x2xi32=1 \
 // RUN:   --parameters=model=%t.irpa \

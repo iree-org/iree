@@ -21,9 +21,9 @@ module @parameter_example {
 
 // RUN: iree-compile %s \
 // RUN:   --iree-hal-target-backends=vmvx \
-// RUN:   --iree-opt-parameter-archive-export-file=%t.irpa \
-// RUN:   --iree-opt-parameter-archive-export-scope=compile \
-// RUN:   --iree-opt-minimum-parameter-export-size=0 | \
+// RUN:   --iree-opt-export-parameter-file=%t.irpa \
+// RUN:   --iree-opt-export-parameter-scope=compile \
+// RUN:   --iree-opt-export-parameter-minimum-size=0 | \
 // RUN: iree-run-module --device=local-task --module=- \
 // RUN:   --input=1x2xf32=1.0 \
 // RUN:   --parameters=compile=%t.irpa \
