@@ -23,50 +23,28 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-struct NormalizeContractionMaps : OpRewritePattern<vector::ContractionOp> {
-  NormalizeContractionMaps(MLIRContext *context, IREE::GPU::MmaAttr intrinsic,
-                           PatternBenefit benefit = 1)
-      : OpRewritePattern(context, benefit), intrinsic(intrinsic) {}
+static void normalizeContractionMaps(RewriterBase &rewriter,
+                                     vector::ContractionOp contractOp) {
+  SmallVector<int64_t> perm = {1, 0};
+  MLIRContext *context = rewriter.getContext();
+  AffineExpr m, n, k;
+  bindDims(context, m, n, k);
 
-  LogicalResult matchAndRewrite(vector::ContractionOp contractOp,
-                                PatternRewriter &rewriter) const override {
-    VectorContractOpInfo opInfo(contractOp);
-    if (opInfo.getOpKind() != VectorContractOpInfo::OpKind::KM_NK_MN) {
-      return rewriter.notifyMatchFailure(contractOp,
-                                         "already normalized contract kind");
-    }
+  using MapList = ArrayRef<ArrayRef<AffineExpr>>;
+  SmallVector<AffineMap> indexingMaps =
+      AffineMap::inferFromExprList(MapList{{m, k}, {k, n}, {m, n}}, context);
 
-    auto srcCType = dyn_cast<VectorType>(contractOp.getAccType());
-    if (!srcCType) {
-      return rewriter.notifyMatchFailure(contractOp, "unhandled scalar case");
-    }
+  Location loc = contractOp.getLoc();
+  auto transposeAcc =
+      rewriter.create<vector::TransposeOp>(loc, contractOp.getAcc(), perm);
+  auto newContractOp = rewriter.create<vector::ContractionOp>(
+      loc, contractOp.getRhs(), contractOp.getLhs(), transposeAcc,
+      rewriter.getAffineMapArrayAttr(indexingMaps),
+      contractOp.getIteratorTypes());
 
-    SmallVector<int64_t> perm = {1, 0};
-
-    MLIRContext *context = rewriter.getContext();
-    AffineExpr m, n, k;
-    bindDims(context, m, n, k);
-
-    using MapList = ArrayRef<ArrayRef<AffineExpr>>;
-    SmallVector<AffineMap> indexingMaps =
-        AffineMap::inferFromExprList(MapList{{m, k}, {k, n}, {m, n}}, context);
-
-    Location loc = contractOp.getLoc();
-    auto transposeAcc =
-        rewriter.create<vector::TransposeOp>(loc, contractOp.getAcc(), perm);
-    auto newContractOp = rewriter.create<vector::ContractionOp>(
-        loc, contractOp.getRhs(), contractOp.getLhs(), transposeAcc,
-        rewriter.getAffineMapArrayAttr(indexingMaps),
-        contractOp.getIteratorTypes());
-
-    rewriter.replaceOpWithNewOp<vector::TransposeOp>(contractOp, newContractOp,
-                                                     perm);
-    return success();
-  }
-
-private:
-  IREE::GPU::MmaAttr intrinsic;
-};
+  rewriter.replaceOpWithNewOp<vector::TransposeOp>(contractOp, newContractOp,
+                                                   perm);
+}
 
 struct LLVMGPUNormalizeContractMapsPass
     : public LLVMGPUNormalizeContractMapsBase<
@@ -94,13 +72,32 @@ public:
       return signalPassFailure();
     }
 
-    MLIRContext *context = &getContext();
-    RewritePatternSet patterns(context);
-    patterns.add<NormalizeContractionMaps>(context,
-                                           scheduleAttr.getIntrinsic());
+    SmallVector<vector::ContractionOp> targetOps;
+    func->walk([&](vector::ContractionOp contractOp) {
+      VectorContractOpInfo opInfo(contractOp);
+      if (opInfo.getOpKind() == VectorContractOpInfo::OpKind::KM_NK_MN &&
+          dyn_cast<VectorType>(contractOp.getAccType())) {
+        targetOps.push_back(contractOp);
+      }
+    });
 
-    if (failed(applyPatternsAndFoldGreedily(func, std::move(patterns)))) {
-      return signalPassFailure();
+    MLIRContext *context = &getContext();
+    IRRewriter rewriter(context);
+    for (auto contractOp : llvm::make_early_inc_range(targetOps)) {
+      rewriter.setInsertionPoint(contractOp);
+      normalizeContractionMaps(rewriter, contractOp);
+    }
+
+    // We at least did one flip, and would require to flip the schedule to match
+    // new contract op.
+    if (!targetOps.empty()) {
+      auto newScheduleAttr = IREE::GPU::MMAScheduleAttr::get(
+          context, scheduleAttr.getIntrinsic(),
+          scheduleAttr.getSubgroupNCount(), scheduleAttr.getSubgroupMCount(),
+          scheduleAttr.getSubgroupNTileCount(),
+          scheduleAttr.getSubgroupMTileCount(),
+          scheduleAttr.getSubgroupKTileCount());
+      func->setAttr(scheduleAttrName, newScheduleAttr);
     }
   }
 };
