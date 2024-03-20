@@ -257,11 +257,140 @@ static gpu::GPUThreadMappingAttr getThreadMapping(MLIRContext *context,
       context, gpu::symbolizeMappingId(mappingIdInt).value());
 }
 
+static FailureOr<scf::ForallOp> tileWithForall(
+    RewriterBase &rewriter, Location loc, OpOperand &input, Value output,
+    Value boundValue, int64_t numImageDims, int64_t workgroupSize,
+    scf::LoopNest &loopNest, Value &iterArg, SmallVector<Value> &ivs,
+    std::optional<scf::ForallOp> &peeledForall, SmallVector<Value> &peeledIvs) {
+  SmallVector<Value> lbs, ubs, steps;
+  computeLoopParams(lbs, ubs, steps, boundValue, numImageDims, loc, rewriter);
+
+  SmallVector<int64_t> forallInds, forInds;
+  SmallVector<Value> forallUbs, forUbs;
+  computeForallAndForUpperBounds(rewriter, loc, ubs, workgroupSize, forallUbs,
+                                 forUbs, forallInds, forInds);
+
+  SmallVector<int64_t> constUbs;
+  for (auto ub : ubs) {
+    auto constUb = getConstantIntValue(ub);
+    if (!constUb.has_value()) {
+      return failure();
+    }
+    if (constUb.value() != 1) {
+      constUbs.push_back(constUb.value());
+    }
+  }
+  int64_t iterationSpace = 1;
+  for (auto ub : constUbs) {
+    llvm::dbgs() << "const ub: " << ub << "\n";
+    iterationSpace *= ub;
+  }
+  int forallBounds = std::min<int64_t>(iterationSpace, workgroupSize);
+  int forBounds = floorDiv(iterationSpace, workgroupSize);
+  Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+  Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
+
+  if (forBounds > 1) {
+    Value ub = rewriter.create<arith::ConstantIndexOp>(loc, forBounds);
+    rewriter.setInsertionPoint(input.getOwner());
+    loopNest = scf::buildLoopNest(
+        rewriter, loc, zero, ub, one, ValueRange({output}),
+        [&](OpBuilder &nestedBuilder, Location loc, ValueRange outputIvs,
+            ValueRange iterArgs) -> scf::ValueVector { return {iterArgs[0]}; });
+  }
+
+  SmallVector<Attribute> idDims;
+  idDims.push_back(getThreadMapping(rewriter.getContext(), 0));
+  ArrayAttr mapping = rewriter.getArrayAttr(idDims);
+  Location forallLoc =
+      loopNest.loops.empty() ? loc : loopNest.loops.back()->getLoc();
+  Value forallOut = loopNest.loops.empty()
+                        ? output
+                        : loopNest.loops.back().getRegionIterArg(0);
+  if (!loopNest.loops.empty()) {
+    rewriter.setInsertionPointToStart(loopNest.loops.back().getBody());
+  } else {
+    rewriter.setInsertionPoint(input.getOwner());
+  }
+  Value forallUb = rewriter.create<arith::ConstantIndexOp>(loc, forallBounds);
+  scf::ForallOp forallOp = rewriter.create<scf::ForallOp>(
+      forallLoc, getAsOpFoldResult((forallUb)), forallOut, mapping);
+  iterArg = forallOp.getRegionOutArgs()[0];
+  rewriter.setInsertionPointToStart(forallOp.getBody());
+  Value linearIv = forallOp.getInductionVar(0);
+  if (!loopNest.loops.empty()) {
+    AffineExpr s0, s1;
+    bindSymbols(rewriter.getContext(), s0, s1);
+    auto fb = rewriter.getAffineConstantExpr(forBounds);
+    AffineMap map = AffineMap::get(0, 2, {s0 * fb + s1}, rewriter.getContext());
+    linearIv = rewriter.createOrFold<affine::AffineApplyOp>(
+        forallOp->getLoc(), map,
+        ValueRange{forallOp.getInductionVar(0),
+                   loopNest.loops.back().getInductionVar()});
+  }
+
+  auto linearExpr = rewriter.getAffineDimExpr(0);
+  auto strides = computeStrides(constUbs);
+  llvm::dbgs() << "Strides: " << strides << "\n";
+  SmallVector<AffineExpr> ivExprs = delinearize(linearExpr, strides);
+  int64_t exprInd = 0;
+  for (auto ub : ubs) {
+    if (getConstantIntValue(ub).value() == 1) {
+      ivs.push_back(zero);
+      continue;
+    }
+    auto expr = ivExprs[exprInd++];
+    llvm::dbgs() << "expr: " << expr << "\n";
+    OpFoldResult ofr = affine::makeComposedFoldedAffineApply(
+        rewriter, loc, AffineMap::get(/*numDims=*/1, /*numSymbols=*/0, expr),
+        getAsOpFoldResult(linearIv));
+    ivs.push_back(getValueOrCreateConstantIndexOp(rewriter, loc, ofr));
+  }
+
+  // Peel additional iterations into another forall loop
+  int64_t numPeeled = iterationSpace - forallBounds * forBounds;
+  if (numPeeled) {
+    rewriter.setInsertionPoint(input.getOwner());
+    Value forallUb = rewriter.create<arith::ConstantIndexOp>(loc, numPeeled);
+    auto out = loopNest.loops.empty() ? forallOp.getResults()
+                                      : loopNest.loops.back().getResults();
+    peeledForall = rewriter.create<scf::ForallOp>(
+        forallLoc, getAsOpFoldResult((forallUb)), out, mapping);
+
+    rewriter.setInsertionPointToStart(peeledForall->getBody());
+    AffineExpr s0;
+    bindSymbols(rewriter.getContext(), s0);
+    auto offset = rewriter.getAffineConstantExpr(forallBounds * forBounds);
+    AffineMap map = AffineMap::get(0, 1, {s0 + offset}, rewriter.getContext());
+    linearIv = rewriter.createOrFold<affine::AffineApplyOp>(
+        peeledForall->getLoc(), map,
+        ValueRange{peeledForall->getInductionVar(0)});
+
+    exprInd = 0;
+    for (auto ub : ubs) {
+      if (getConstantIntValue(ub).value() == 1) {
+        peeledIvs.push_back(zero);
+        continue;
+      }
+      auto expr = ivExprs[exprInd++];
+      llvm::dbgs() << "expr: " << expr << "\n";
+      OpFoldResult ofr = affine::makeComposedFoldedAffineApply(
+          rewriter, loc, AffineMap::get(/*numDims=*/1, /*numSymbols=*/0, expr),
+          getAsOpFoldResult(linearIv));
+      peeledIvs.push_back(getValueOrCreateConstantIndexOp(rewriter, loc, ofr));
+    }
+  }
+
+  return forallOp;
+}
+
 /// Tile iree_linalg_ext.winograd.input_transform op.
 /// TODO: Adopt getTiledImplementation with this.
 static LogicalResult tileWinogradInputTransformOpWithForall(
     WinogradInputTransformOp inputOp, RewriterBase &rewriter,
-    WinogradInputTransformOp &tiledWinogradInputTransformOp) {
+    WinogradInputTransformOp &tiledWinogradInputTransformOp,
+    std::optional<WinogradInputTransformOp>
+        &peeledTiledWinogradInputTransformOp) {
   Location loc = inputOp.getLoc();
   auto funcOp = inputOp->getParentOfType<mlir::FunctionOpInterface>();
   if (!funcOp) {
@@ -283,6 +412,7 @@ static LogicalResult tileWinogradInputTransformOpWithForall(
   }
 
   Value input = inputOp.input();
+  OpOperand &inputOperand = inputOp->getOpOperand(0);
   Value output = inputOp.output();
   auto outputType = output.getType().cast<ShapedType>();
   auto inputType = input.getType().cast<ShapedType>();
@@ -300,149 +430,106 @@ static LogicalResult tileWinogradInputTransformOpWithForall(
 
   rewriter.setInsertionPointToStart(&funcOp.getFunctionBody().front());
 
-  SmallVector<Value> lbs, ubs, steps;
-  computeLoopParams(lbs, ubs, steps, output, numImageDims, loc, rewriter);
-  // Construct loops
-  SmallVector<int64_t> forallInds, forInds;
-  SmallVector<Value> forallUbs, forUbs;
-  computeForallAndForUpperBounds(rewriter, loc, ubs, workgroupSize, forallUbs,
-                                 forUbs, forallInds, forInds);
-  SmallVector<Attribute> idDims;
-  for (int i = 0; i < forallUbs.size(); i++) {
-    idDims.push_back(getThreadMapping(rewriter.getContext(), i));
-  }
-  std::reverse(idDims.begin(), idDims.end());
-  ArrayAttr mapping = rewriter.getArrayAttr(idDims);
+  SmallVector<Value> ivs, peeledIvs, iterArgs;
   scf::LoopNest loopNest;
-  auto loopNestSelect = [&](SmallVector<Value> vals) {
-    return llvm::map_to_vector(forInds, [&](auto ind) { return vals[ind]; });
-  };
-  if (!forInds.empty()) {
-    rewriter.setInsertionPoint(inputOp);
-    loopNest = scf::buildLoopNest(
-        rewriter, loc, loopNestSelect(lbs), forUbs, loopNestSelect(steps),
-        ValueRange({output}),
-        [&](OpBuilder &nestedBuilder, Location loc, ValueRange outputIvs,
-            ValueRange iterArgs) -> scf::ValueVector { return {iterArgs[0]}; });
+  Value itArg;
+  std::optional<scf::ForallOp> peeledForall;
+  FailureOr<scf::ForallOp> maybeForallOp = tileWithForall(
+      rewriter, loc, inputOperand, output, output, numImageDims, workgroupSize,
+      loopNest, itArg, ivs, peeledForall, peeledIvs);
+  if (failed(maybeForallOp)) {
+    return failure();
+  }
+  SmallVector<scf::ForallOp> forallOps;
+  SmallVector<SmallVector<Value>> ivLists;
+  forallOps.push_back(maybeForallOp.value());
+  ivLists.push_back(ivs);
+  iterArgs.push_back(itArg);
+  if (peeledForall.has_value()) {
+    forallOps.push_back(peeledForall.value());
+    ivLists.push_back(peeledIvs);
+    iterArgs.push_back(peeledForall->getRegionOutArgs()[0]);
   }
 
-  Location forallLoc =
-      loopNest.loops.empty() ? loc : loopNest.loops.back()->getLoc();
-  Value forallOut = loopNest.loops.empty()
-                        ? output
-                        : loopNest.loops.back().getRegionIterArg(0);
-  if (!loopNest.loops.empty()) {
-    rewriter.setInsertionPointToStart(loopNest.loops.back().getBody());
-  } else {
-    rewriter.setInsertionPoint(inputOp);
-  }
-  scf::ForallOp forallOp = rewriter.create<scf::ForallOp>(
-      forallLoc, getAsOpFoldResult((forallUbs)), forallOut, mapping);
-  Value iterArg = forallOp.getRegionOutArgs()[0];
-  SmallVector<Value> forAllIvs = forallOp.getInductionVars();
-  int64_t forIdx = 0, forallIdx = 0;
-  SmallVector<Value> ivs;
-  SetVector<int64_t> forIndsSet(forInds.begin(), forInds.end());
-  SetVector<int64_t> forallIndsSet(forallInds.begin(), forallInds.end());
-  for (int64_t idx = 0; idx < ubs.size() - 1; ++idx) {
-    if (forIndsSet.contains(idx)) {
-      ivs.push_back(loopNest.loops[forIdx++].getInductionVar());
+  for (auto [forallOp, inductionVars, iterArg] :
+       llvm::zip_equal(forallOps, ivLists, iterArgs)) {
+    // Extract input slice
+    auto one = rewriter.getIndexAttr(1);
+    auto zero = rewriter.getIndexAttr(0);
+    auto inputTileSizeAttr = rewriter.getIndexAttr(inputTileSize);
+    SmallVector<OpFoldResult> strides(inputOp.getInputOperandRank(), one);
+    SmallVector<OpFoldResult> sizes(inputOp.getInputOperandRank(), one);
+    SmallVector<OpFoldResult> offsets(inputOp.getInputOperandRank(), zero);
+
+    rewriter.setInsertionPoint(forallOp.getBody()->getTerminator());
+    for (int i = 0; i < inputShape.size(); i++) {
+      if (!imageDimsSet.contains(i)) {
+        offsets[i] = inductionVars[i];
+      } else {
+        AffineExpr dim0;
+        auto it = rewriter.getAffineConstantExpr(inputTileSize);
+        auto ot = rewriter.getAffineConstantExpr(outputTileSize);
+        auto delta = rewriter.getAffineConstantExpr(inputShape[i]);
+        bindDims(rewriter.getContext(), dim0);
+        AffineMap scaleMap =
+            AffineMap::get(1, 0, {dim0 * ot}, rewriter.getContext());
+        offsets[i] = rewriter.createOrFold<affine::AffineApplyOp>(
+            loc, scaleMap, ValueRange{inductionVars[i]});
+        AffineMap minMap =
+            AffineMap::get(1, 0, {-dim0 + delta, it}, rewriter.getContext());
+        sizes[i] = rewriter.createOrFold<affine::AffineMinOp>(
+            loc, minMap,
+            ValueRange{
+                getValueOrCreateConstantIndexOp(rewriter, loc, offsets[i])});
+      }
+    }
+    rewriter.setInsertionPoint(forallOp.getBody()->getTerminator());
+    auto tensorType = RankedTensorType::get(
+        SmallVector<int64_t>(numImageDims, ShapedType::kDynamic), elementType);
+    if (isNchw) {
+      permute<Permutation::NHWC_TO_NCHW>(offsets);
+      permute<Permutation::NHWC_TO_NCHW>(sizes);
+    }
+    Value dynamicSlice = rewriter.create<tensor::ExtractSliceOp>(
+        loc, tensorType, input, offsets, sizes, strides);
+
+    // Extract output slice
+    auto stridesOutputSlice =
+        SmallVector<OpFoldResult>(inputOp.getOutputOperandRank(), one);
+    auto offsetsOutputSlice = SmallVector<OpFoldResult>(numImageDims, zero);
+    offsetsOutputSlice.append(inductionVars.begin(), inductionVars.end());
+    auto sizesOutputSlice =
+        SmallVector<OpFoldResult>(inputOp.getOutputOperandRank(), one);
+    sizesOutputSlice[0] = sizesOutputSlice[1] = inputTileSizeAttr;
+    tensorType = RankedTensorType::get(inputTileSquare, elementType);
+    Value outputSlice = rewriter.create<tensor::EmptyOp>(
+        loc, tensorType.getShape(), elementType);
+
+    IntegerAttr outputTileSizeI64Attr =
+        rewriter.getI64IntegerAttr(inputOp.getOutputTileSize());
+    IntegerAttr kernelSizeI64Attr =
+        rewriter.getI64IntegerAttr(inputOp.getKernelSize());
+    DenseI64ArrayAttr imageDimensionsDenseI64ArrayAttr =
+        rewriter.getDenseI64ArrayAttr(inputOp.imageDimensions());
+    auto tiledOp = rewriter.create<WinogradInputTransformOp>(
+        loc, tensorType, dynamicSlice, outputSlice, outputTileSizeI64Attr,
+        kernelSizeI64Attr, imageDimensionsDenseI64ArrayAttr);
+    if (forallOp == forallOps.front()) {
+      tiledWinogradInputTransformOp = tiledOp;
     } else {
-      ivs.push_back(forAllIvs[forallIdx++]);
+      peeledTiledWinogradInputTransformOp = tiledOp;
     }
+
+    // Insert results into output slice
+    rewriter.setInsertionPointToEnd(forallOp.getTerminator().getBody());
+    rewriter.create<tensor::ParallelInsertSliceOp>(
+        loc, tiledOp.getResult()[0], iterArg, offsetsOutputSlice,
+        sizesOutputSlice, stridesOutputSlice);
   }
-  if (forallUbs.size() + forUbs.size() > ubs.size()) {
-    rewriter.setInsertionPointToStart(forallOp.getBody());
-    AffineExpr s0, s1, s2;
-    bindSymbols(rewriter.getContext(), s0, s1, s2);
-    AffineMap map = AffineMap::get(0, 3, {s0 * s1 + s2}, rewriter.getContext());
-    Value iv = rewriter.createOrFold<affine::AffineApplyOp>(
-        forallOp->getLoc(), map,
-        ValueRange{forAllIvs[forallIdx++], forUbs.back(),
-                   loopNest.loops[forIdx++].getInductionVar()});
-    ivs.push_back(iv);
-  } else if (forIndsSet.contains(ubs.size() - 1)) {
-    ivs.push_back(loopNest.loops[forIdx++].getInductionVar());
-  } else {
-    ivs.push_back(forAllIvs[forallIdx++]);
-  }
-
-  // Extract input slice
-  auto one = rewriter.getIndexAttr(1);
-  auto zero = rewriter.getIndexAttr(0);
-  auto inputTileSizeAttr = rewriter.getIndexAttr(inputTileSize);
-  SmallVector<OpFoldResult> strides(inputOp.getInputOperandRank(), one);
-  SmallVector<OpFoldResult> sizes(inputOp.getInputOperandRank(), one);
-  SmallVector<OpFoldResult> offsets(inputOp.getInputOperandRank(), zero);
-  forIdx = 0;
-
-  rewriter.setInsertionPointToStart(forallOp.getBody());
-  for (int i = 0; i < inputShape.size(); i++) {
-    OpBuilder::InsertionGuard g(rewriter);
-    if (!forallIndsSet.contains(i)) {
-      rewriter.setInsertionPoint(
-          loopNest.loops[forIdx++].getBody()->getTerminator());
-    }
-    if (!imageDimsSet.contains(i)) {
-      offsets[i] = ivs[i];
-    } else {
-      AffineExpr dim0;
-      auto it = rewriter.getAffineConstantExpr(inputTileSize);
-      auto ot = rewriter.getAffineConstantExpr(outputTileSize);
-      auto delta = rewriter.getAffineConstantExpr(inputShape[i]);
-      bindDims(rewriter.getContext(), dim0);
-      AffineMap scaleMap =
-          AffineMap::get(1, 0, {dim0 * ot}, rewriter.getContext());
-      offsets[i] = rewriter.createOrFold<affine::AffineApplyOp>(
-          loc, scaleMap, ValueRange{ivs[i]});
-      AffineMap minMap =
-          AffineMap::get(1, 0, {-dim0 + delta, it}, rewriter.getContext());
-      sizes[i] = rewriter.createOrFold<affine::AffineMinOp>(
-          loc, minMap,
-          ValueRange{
-              getValueOrCreateConstantIndexOp(rewriter, loc, offsets[i])});
-    }
-  }
-  rewriter.setInsertionPoint(forallOp.getBody()->getTerminator());
-  auto tensorType = RankedTensorType::get(
-      SmallVector<int64_t>(numImageDims, ShapedType::kDynamic), elementType);
-  if (isNchw) {
-    permute<Permutation::NHWC_TO_NCHW>(offsets);
-    permute<Permutation::NHWC_TO_NCHW>(sizes);
-  }
-  Value dynamicSlice = rewriter.create<tensor::ExtractSliceOp>(
-      loc, tensorType, input, offsets, sizes, strides);
-
-  // Extract output slice
-  auto stridesOutputSlice =
-      SmallVector<OpFoldResult>(inputOp.getOutputOperandRank(), one);
-  auto offsetsOutputSlice = SmallVector<OpFoldResult>(numImageDims, zero);
-  offsetsOutputSlice.append(ivs.begin(), ivs.end());
-  auto sizesOutputSlice =
-      SmallVector<OpFoldResult>(inputOp.getOutputOperandRank(), one);
-  sizesOutputSlice[0] = sizesOutputSlice[1] = inputTileSizeAttr;
-  tensorType = RankedTensorType::get(inputTileSquare, elementType);
-  Value outputSlice =
-      rewriter.create<tensor::EmptyOp>(loc, tensorType.getShape(), elementType);
-
-  IntegerAttr outputTileSizeI64Attr =
-      rewriter.getI64IntegerAttr(inputOp.getOutputTileSize());
-  IntegerAttr kernelSizeI64Attr =
-      rewriter.getI64IntegerAttr(inputOp.getKernelSize());
-  DenseI64ArrayAttr imageDimensionsDenseI64ArrayAttr =
-      rewriter.getDenseI64ArrayAttr(inputOp.imageDimensions());
-  tiledWinogradInputTransformOp = rewriter.create<WinogradInputTransformOp>(
-      loc, tensorType, dynamicSlice, outputSlice, outputTileSizeI64Attr,
-      kernelSizeI64Attr, imageDimensionsDenseI64ArrayAttr);
-
-  // Insert results into output slice
-  rewriter.setInsertionPointToEnd(forallOp.getTerminator().getBody());
-  rewriter.create<tensor::ParallelInsertSliceOp>(
-      loc, tiledWinogradInputTransformOp.getResult()[0], iterArg,
-      offsetsOutputSlice, sizesOutputSlice, stridesOutputSlice);
 
   if (loopNest.loops.empty()) {
-    inputOp.getResults()[0].replaceAllUsesWith(forallOp.getResults()[0]);
+    inputOp.getResults()[0].replaceAllUsesWith(
+        forallOps.back().getResults()[0]);
     return success();
   }
 
@@ -451,10 +538,17 @@ static LogicalResult tileWinogradInputTransformOpWithForall(
           loopNest.loops.back().getBody()->getTerminator())) {
     OpBuilder::InsertionGuard yieldGuard(rewriter);
     rewriter.setInsertionPoint(yieldOp);
-    rewriter.replaceOpWithNewOp<scf::YieldOp>(yieldOp, forallOp.getResult(0));
+    rewriter.replaceOpWithNewOp<scf::YieldOp>(yieldOp,
+                                              forallOps.front().getResult(0));
   }
-  inputOp.getResults()[0].replaceAllUsesWith(loopNest.results[0]);
 
+  if (forallOps.size() > 1) {
+    inputOp.getResults()[0].replaceAllUsesWith(
+        forallOps.back().getResults()[0]);
+    return success();
+  }
+
+  inputOp.getResults()[0].replaceAllUsesWith(loopNest.results[0]);
   return success();
 }
 
@@ -580,9 +674,11 @@ tileAndDecomposeWinogradInputTransformOp(WinogradInputTransformOp inputOp,
                                          RewriterBase &rewriter, bool onlyTile,
                                          bool useForall) {
   WinogradInputTransformOp tiledWinogradInputTransformOp;
+  std::optional<WinogradInputTransformOp> peeledTiledWinogradInputTransformOp;
   if (useForall) {
     if (failed(tileWinogradInputTransformOpWithForall(
-            inputOp, rewriter, tiledWinogradInputTransformOp))) {
+            inputOp, rewriter, tiledWinogradInputTransformOp,
+            peeledTiledWinogradInputTransformOp))) {
       return failure();
     }
   } else if (failed(tileWinogradInputTransformOp(
@@ -591,6 +687,11 @@ tileAndDecomposeWinogradInputTransformOp(WinogradInputTransformOp inputOp,
   }
   if (onlyTile) {
     return success();
+  }
+  if (peeledTiledWinogradInputTransformOp.has_value() &&
+      failed(decomposeTiledWinogradInputTransformOp(
+          peeledTiledWinogradInputTransformOp.value(), rewriter))) {
+    return failure();
   }
   return decomposeTiledWinogradInputTransformOp(tiledWinogradInputTransformOp,
                                                 rewriter);
@@ -718,134 +819,6 @@ static LogicalResult tileWinogradOutputTransformOp(
   return success();
 }
 
-static FailureOr<scf::ForallOp>
-tileWithForall(RewriterBase &rewriter, Location loc, OpOperand &input,
-               Value output, int64_t numImageDims, int64_t workgroupSize,
-               scf::LoopNest &loopNest, Value &iterArg, SmallVector<Value> &ivs,
-               std::optional<scf::ForallOp> &peeledForall,
-               SmallVector<Value> &peeledIvs) {
-  SmallVector<Value> lbs, ubs, steps;
-  computeLoopParams(lbs, ubs, steps, input.get(), numImageDims, loc, rewriter);
-
-  SmallVector<int64_t> forallInds, forInds;
-  SmallVector<Value> forallUbs, forUbs;
-  computeForallAndForUpperBounds(rewriter, loc, ubs, workgroupSize, forallUbs,
-                                 forUbs, forallInds, forInds);
-
-  SmallVector<int64_t> constUbs;
-  for (auto ub : ubs) {
-    auto constUb = getConstantIntValue(ub);
-    if (!constUb.has_value()) {
-      return failure();
-    }
-    if (constUb.value() != 1) {
-      constUbs.push_back(constUb.value());
-    }
-  }
-  int64_t iterationSpace = 1;
-  for (auto ub : constUbs) {
-    llvm::dbgs() << "const ub: " << ub << "\n";
-    iterationSpace *= ub;
-  }
-  int forallBounds = std::min<int64_t>(iterationSpace, workgroupSize);
-  int forBounds = floorDiv(iterationSpace, workgroupSize);
-  Value zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-  Value one = rewriter.create<arith::ConstantIndexOp>(loc, 1);
-
-  if (forBounds > 1) {
-    Value ub = rewriter.create<arith::ConstantIndexOp>(loc, forBounds);
-    rewriter.setInsertionPoint(input.getOwner());
-    loopNest = scf::buildLoopNest(
-        rewriter, loc, zero, ub, one, ValueRange({output}),
-        [&](OpBuilder &nestedBuilder, Location loc, ValueRange outputIvs,
-            ValueRange iterArgs) -> scf::ValueVector { return {iterArgs[0]}; });
-  }
-
-  SmallVector<Attribute> idDims;
-  idDims.push_back(getThreadMapping(rewriter.getContext(), 0));
-  ArrayAttr mapping = rewriter.getArrayAttr(idDims);
-  Location forallLoc =
-      loopNest.loops.empty() ? loc : loopNest.loops.back()->getLoc();
-  Value forallOut = loopNest.loops.empty()
-                        ? output
-                        : loopNest.loops.back().getRegionIterArg(0);
-  if (!loopNest.loops.empty()) {
-    rewriter.setInsertionPointToStart(loopNest.loops.back().getBody());
-  } else {
-    rewriter.setInsertionPoint(input.getOwner());
-  }
-  Value forallUb = rewriter.create<arith::ConstantIndexOp>(loc, forallBounds);
-  scf::ForallOp forallOp = rewriter.create<scf::ForallOp>(
-      forallLoc, getAsOpFoldResult((forallUb)), forallOut, mapping);
-  iterArg = forallOp.getRegionOutArgs()[0];
-  rewriter.setInsertionPointToStart(forallOp.getBody());
-  Value linearIv = forallOp.getInductionVar(0);
-  if (!loopNest.loops.empty()) {
-    AffineExpr s0, s1;
-    bindSymbols(rewriter.getContext(), s0, s1);
-    auto fb = rewriter.getAffineConstantExpr(forBounds);
-    AffineMap map = AffineMap::get(0, 2, {s0 * fb + s1}, rewriter.getContext());
-    linearIv = rewriter.createOrFold<affine::AffineApplyOp>(
-        forallOp->getLoc(), map,
-        ValueRange{forallOp.getInductionVar(0),
-                   loopNest.loops.back().getInductionVar()});
-  }
-
-  auto linearExpr = rewriter.getAffineDimExpr(0);
-  auto strides = computeStrides(constUbs);
-  llvm::dbgs() << "Strides: " << strides << "\n";
-  SmallVector<AffineExpr> ivExprs = delinearize(linearExpr, strides);
-  int64_t exprInd = 0;
-  for (auto ub : ubs) {
-    if (getConstantIntValue(ub).value() == 1) {
-      ivs.push_back(zero);
-      continue;
-    }
-    auto expr = ivExprs[exprInd++];
-    llvm::dbgs() << "expr: " << expr << "\n";
-    OpFoldResult ofr = affine::makeComposedFoldedAffineApply(
-        rewriter, loc, AffineMap::get(/*numDims=*/1, /*numSymbols=*/0, expr),
-        getAsOpFoldResult(linearIv));
-    ivs.push_back(getValueOrCreateConstantIndexOp(rewriter, loc, ofr));
-  }
-
-  // Peel additional iterations into another forall loop
-  int64_t numPeeled = iterationSpace - forallBounds * forBounds;
-  if (numPeeled) {
-    rewriter.setInsertionPoint(input.getOwner());
-    Value forallUb = rewriter.create<arith::ConstantIndexOp>(loc, numPeeled);
-    auto out = loopNest.loops.empty() ? forallOp.getResults()
-                                      : loopNest.loops.back().getResults();
-    peeledForall = rewriter.create<scf::ForallOp>(
-        forallLoc, getAsOpFoldResult((forallUb)), out, mapping);
-
-    rewriter.setInsertionPointToStart(peeledForall->getBody());
-    AffineExpr s0;
-    bindSymbols(rewriter.getContext(), s0);
-    auto offset = rewriter.getAffineConstantExpr(forallBounds * forBounds);
-    AffineMap map = AffineMap::get(0, 1, {s0 + offset}, rewriter.getContext());
-    linearIv = rewriter.createOrFold<affine::AffineApplyOp>(
-        peeledForall->getLoc(), map,
-        ValueRange{peeledForall->getInductionVar(0)});
-
-    exprInd = 0;
-    for (auto ub : ubs) {
-      if (getConstantIntValue(ub).value() == 1) {
-        peeledIvs.push_back(zero);
-        continue;
-      }
-      auto expr = ivExprs[exprInd++];
-      llvm::dbgs() << "expr: " << expr << "\n";
-      OpFoldResult ofr = affine::makeComposedFoldedAffineApply(
-          rewriter, loc, AffineMap::get(/*numDims=*/1, /*numSymbols=*/0, expr),
-          getAsOpFoldResult(linearIv));
-      peeledIvs.push_back(getValueOrCreateConstantIndexOp(rewriter, loc, ofr));
-    }
-  }
-
-  return forallOp;
-}
-
 /// Tile iree_linalg_ext.winograd.output_transform op.
 /// TODO: Adopt getTiledImplementation with this.
 static LogicalResult tileWinogradOutputTransformOpWithForall(
@@ -893,7 +866,7 @@ static LogicalResult tileWinogradOutputTransformOpWithForall(
   Value itArg;
   std::optional<scf::ForallOp> peeledForall;
   FailureOr<scf::ForallOp> maybeForallOp = tileWithForall(
-      rewriter, loc, inputOperand, output, numImageDims, workgroupSize,
+      rewriter, loc, inputOperand, output, input, numImageDims, workgroupSize,
       loopNest, itArg, ivs, peeledForall, peeledIvs);
   if (failed(maybeForallOp)) {
     return failure();
