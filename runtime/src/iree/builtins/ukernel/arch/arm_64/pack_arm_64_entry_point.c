@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/builtins/ukernel/arch/arm_64/common_arm_64_entry_point.h"
+#include "iree/builtins/ukernel/arch/arm_64/common_arm_64.h"
 #include "iree/builtins/ukernel/arch/arm_64/pack_arm_64_internal.h"
 
 iree_uk_pack_tile_func_t iree_uk_pack_select_tile_func_arch(

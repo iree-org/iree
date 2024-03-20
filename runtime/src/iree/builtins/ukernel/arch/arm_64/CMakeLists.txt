@@ -22,8 +22,8 @@ iree_bitcode_library(
     "${PROJECT_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
     "${PROJECT_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
     "common_arm_64.h"
-    "common_arm_64_entry_point.h"
     "mmt4d_arm_64_internal.h"
+    "mmt4d_arm_64_tiles.inl"
   SRCS
     "mmt4d_arm_64_entry_point.c"
 )
@@ -37,8 +37,8 @@ iree_bitcode_library(
     "${PROJECT_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
     "${PROJECT_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
     "common_arm_64.h"
-    "common_arm_64_entry_point.h"
     "mmt4d_arm_64_internal.h"
+    "mmt4d_arm_64_tiles.inl"
   SRCS
     "mmt4d_arm_64_base.c"
 )
@@ -52,8 +52,8 @@ iree_bitcode_library(
     "${PROJECT_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
     "${PROJECT_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
     "common_arm_64.h"
-    "common_arm_64_entry_point.h"
     "mmt4d_arm_64_internal.h"
+    "mmt4d_arm_64_tiles.inl"
   SRCS
     "mmt4d_arm_64_fullfp16.c"
   COPTS
@@ -69,8 +69,8 @@ iree_bitcode_library(
     "${PROJECT_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
     "${PROJECT_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
     "common_arm_64.h"
-    "common_arm_64_entry_point.h"
     "mmt4d_arm_64_internal.h"
+    "mmt4d_arm_64_tiles.inl"
   SRCS
     "mmt4d_arm_64_fp16fml.c"
   COPTS
@@ -86,8 +86,8 @@ iree_bitcode_library(
     "${PROJECT_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
     "${PROJECT_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
     "common_arm_64.h"
-    "common_arm_64_entry_point.h"
     "mmt4d_arm_64_internal.h"
+    "mmt4d_arm_64_tiles.inl"
   SRCS
     "mmt4d_arm_64_bf16.c"
   COPTS
@@ -103,8 +103,8 @@ iree_bitcode_library(
     "${PROJECT_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
     "${PROJECT_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
     "common_arm_64.h"
-    "common_arm_64_entry_point.h"
     "mmt4d_arm_64_internal.h"
+    "mmt4d_arm_64_tiles.inl"
   SRCS
     "mmt4d_arm_64_dotprod.c"
   COPTS
@@ -120,8 +120,8 @@ iree_bitcode_library(
     "${PROJECT_BINARY_DIR}/runtime/src/iree/builtins/ukernel/internal_headers_filegroup.stamp"
     "${PROJECT_BINARY_DIR}/runtime/src/iree/schemas/cpu_data_headers_filegroup.stamp"
     "common_arm_64.h"
-    "common_arm_64_entry_point.h"
     "mmt4d_arm_64_internal.h"
+    "mmt4d_arm_64_tiles.inl"
   SRCS
     "mmt4d_arm_64_i8mm.c"
   COPTS

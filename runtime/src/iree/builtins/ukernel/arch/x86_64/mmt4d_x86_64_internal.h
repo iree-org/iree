@@ -1,4 +1,4 @@
-// Copyright 2023 The IREE Authors
+// Copyright 2024 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -9,117 +9,12 @@
 
 #include "iree/builtins/ukernel/mmt4d_internal.h"
 
-IREE_UK_MMT4D_TILE_FUNC_DECL(iree_uk_mmt4d_tile_s8s8s32_1x8x2_x86_64_avx2_fma)
-IREE_UK_MMT4D_TILE_FUNC_DECL(iree_uk_mmt4d_tile_s8s8s32_2x8x2_x86_64_avx2_fma)
-IREE_UK_MMT4D_TILE_FUNC_DECL(iree_uk_mmt4d_tile_s8s8s32_4x8x2_x86_64_avx2_fma)
-IREE_UK_MMT4D_TILE_FUNC_DECL(iree_uk_mmt4d_tile_s8s8s32_8x8x2_x86_64_avx2_fma)
-IREE_UK_MMT4D_TILE_FUNC_DECL(iree_uk_mmt4d_tile_s16s16s32_1x8x2_x86_64_avx2_fma)
-IREE_UK_MMT4D_TILE_FUNC_DECL(iree_uk_mmt4d_tile_s16s16s32_2x8x2_x86_64_avx2_fma)
-IREE_UK_MMT4D_TILE_FUNC_DECL(iree_uk_mmt4d_tile_s16s16s32_4x8x2_x86_64_avx2_fma)
-IREE_UK_MMT4D_TILE_FUNC_DECL(iree_uk_mmt4d_tile_s16s16s32_8x8x2_x86_64_avx2_fma)
-IREE_UK_MMT4D_TILE_FUNC_DECL(iree_uk_mmt4d_tile_f32f32f32_1x8x1_x86_64_avx2_fma)
-IREE_UK_MMT4D_TILE_FUNC_DECL(iree_uk_mmt4d_tile_f32f32f32_2x8x1_x86_64_avx2_fma)
-IREE_UK_MMT4D_TILE_FUNC_DECL(iree_uk_mmt4d_tile_f32f32f32_4x8x1_x86_64_avx2_fma)
-IREE_UK_MMT4D_TILE_FUNC_DECL(iree_uk_mmt4d_tile_f32f32f32_8x8x1_x86_64_avx2_fma)
-IREE_UK_MMT4D_TILE_FUNC_DECL(iree_uk_mmt4d_tile_f16f16f32_1x8x1_x86_64_avx2_fma)
-IREE_UK_MMT4D_TILE_FUNC_DECL(iree_uk_mmt4d_tile_f16f16f32_2x8x1_x86_64_avx2_fma)
-IREE_UK_MMT4D_TILE_FUNC_DECL(iree_uk_mmt4d_tile_f16f16f32_4x8x1_x86_64_avx2_fma)
-IREE_UK_MMT4D_TILE_FUNC_DECL(iree_uk_mmt4d_tile_f16f16f32_8x8x1_x86_64_avx2_fma)
-IREE_UK_MMT4D_TILE_FUNC_DECL(iree_uk_mmt4d_tile_f16f16f16_1x8x1_x86_64_avx2_fma)
-IREE_UK_MMT4D_TILE_FUNC_DECL(iree_uk_mmt4d_tile_f16f16f16_2x8x1_x86_64_avx2_fma)
-IREE_UK_MMT4D_TILE_FUNC_DECL(iree_uk_mmt4d_tile_f16f16f16_4x8x1_x86_64_avx2_fma)
-IREE_UK_MMT4D_TILE_FUNC_DECL(iree_uk_mmt4d_tile_f16f16f16_8x8x1_x86_64_avx2_fma)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_f32f32f32_1x16x1_x86_64_avx512_base)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_f32f32f32_2x16x1_x86_64_avx512_base)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_f32f32f32_4x16x1_x86_64_avx512_base)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_f32f32f32_8x16x1_x86_64_avx512_base)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_f32f32f32_16x16x1_x86_64_avx512_base)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_f16f16f32_1x16x1_x86_64_avx512_base)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_f16f16f32_2x16x1_x86_64_avx512_base)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_f16f16f32_4x16x1_x86_64_avx512_base)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_f16f16f32_8x16x1_x86_64_avx512_base)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_f16f16f32_16x16x1_x86_64_avx512_base)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_bf16bf16f32_1x16x2_x86_64_avx512_bf16)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_bf16bf16f32_2x16x2_x86_64_avx512_bf16)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_bf16bf16f32_4x16x2_x86_64_avx512_bf16)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_bf16bf16f32_8x16x2_x86_64_avx512_bf16)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_bf16bf16f32_16x16x2_x86_64_avx512_bf16)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_f16f16f16_1x16x1_x86_64_avx512_base)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_f16f16f16_2x16x1_x86_64_avx512_base)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_f16f16f16_4x16x1_x86_64_avx512_base)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_f16f16f16_8x16x1_x86_64_avx512_base)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_f16f16f16_16x16x1_x86_64_avx512_base)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_bf16bf16bf16_1x16x2_x86_64_avx512_bf16)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_bf16bf16bf16_2x16x2_x86_64_avx512_bf16)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_bf16bf16bf16_4x16x2_x86_64_avx512_bf16)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_bf16bf16bf16_8x16x2_x86_64_avx512_bf16)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_bf16bf16bf16_16x16x2_x86_64_avx512_bf16)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_s8s8s32_1x16x2_x86_64_avx512_base)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_s8s8s32_2x16x2_x86_64_avx512_base)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_s8s8s32_4x16x2_x86_64_avx512_base)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_s8s8s32_8x16x2_x86_64_avx512_base)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_s8s8s32_16x16x2_x86_64_avx512_base)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_s8s8s32_1x16x2_x86_64_avx512_vnni)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_s8s8s32_2x16x2_x86_64_avx512_vnni)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_s8s8s32_4x16x2_x86_64_avx512_vnni)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_s8s8s32_8x16x2_x86_64_avx512_vnni)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_s8s8s32_16x16x2_x86_64_avx512_vnni)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_s16s16s32_1x16x2_x86_64_avx512_base)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_s16s16s32_2x16x2_x86_64_avx512_base)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_s16s16s32_4x16x2_x86_64_avx512_base)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_s16s16s32_8x16x2_x86_64_avx512_base)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_s16s16s32_16x16x2_x86_64_avx512_base)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_s16s16s32_1x16x2_x86_64_avx512_vnni)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_s16s16s32_2x16x2_x86_64_avx512_vnni)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_s16s16s32_4x16x2_x86_64_avx512_vnni)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_s16s16s32_8x16x2_x86_64_avx512_vnni)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_s16s16s32_16x16x2_x86_64_avx512_vnni)
-IREE_UK_MMT4D_TILE_FUNC_DECL(
-    iree_uk_mmt4d_tile_s16u4s32_1x32x8_x86_64_avx512_vnni)
+#define IREE_UK_MMT4D_TILE(ARCH, LHS, RHS, OUT, M0, N0, K0, SUFFIX) \
+  IREE_UK_MMT4D_TILE_FUNC_DECL(                                     \
+      iree_uk_mmt4d_tile_##LHS##RHS##OUT##_##M0##x##N0##x##K0##_##ARCH##SUFFIX)
 
-#endif  // foIREE_BUILTINS_UKERNEL_ARCH_X86_64_MMT4D_X86_64_INTERNAL_H_
+#include "iree/builtins/ukernel/arch/x86_64/mmt4d_x86_64_tiles.inl"
+
+#undef IREE_UK_MMT4D_TILE
+
+#endif  // IREE_BUILTINS_UKERNEL_ARCH_X86_64_MMT4D_X86_64_INTERNAL_H_
