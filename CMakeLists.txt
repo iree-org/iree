@@ -222,9 +222,9 @@ endif()
 # deployable code which need to specify the proper target chip.
 #-------------------------------------------------------------------------------
 
-set(IREE_HIP_TEST_TARGET_CHIP \"\" CACHE STRING
+set(IREE_HIP_TEST_TARGET_CHIP "" CACHE STRING
   "Target chip for HIP tests that need to compile device code. \
-   Defaults to \"\" to disable tests.")
+   Defaults to empty string to disable tests.")
 
 #-------------------------------------------------------------------------------
 # Runtime HAL Driver Options
