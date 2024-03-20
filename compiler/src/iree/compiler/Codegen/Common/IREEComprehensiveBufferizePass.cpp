@@ -162,6 +162,30 @@ void EliminateEmptyTensorsPass::runOnOperation() {
   ModuleOp moduleOp = getOperation();
   MLIRContext *context = &getContext();
 
+  IRRewriter rewriter(moduleOp->getContext());
+  SmallVector<tensor::EmptyOp> emptyOps;
+  moduleOp->walk([&](Operation *op) {
+    if (auto empty = dyn_cast<tensor::EmptyOp>(op)) {
+      emptyOps.push_back(empty);
+    }
+  });
+  for (auto emptyOp : emptyOps) {
+    if (emptyOp->hasOneUse()) {
+      continue;
+    }
+    auto mixedSizes = emptyOp.getMixedSizes();
+    auto elementType = emptyOp.getType().getElementType();
+    for (auto &use : emptyOp->getUses()) {
+      OpBuilder::InsertionGuard g(rewriter);
+      Location loc = use.getOwner()->getLoc();
+      rewriter.setInsertionPoint(use.getOwner());
+      auto newEmpty =
+          rewriter.create<tensor::EmptyOp>(loc, mixedSizes, elementType);
+      rewriter.modifyOpInPlace(use.getOwner(),
+                               [&]() { use.set(newEmpty.getResult()); });
+    }
+  }
+
   // Run the convert to destination style patterns.
   {
     RewritePatternSet patterns(context);
@@ -173,7 +197,6 @@ void EliminateEmptyTensorsPass::runOnOperation() {
     }
   }
 
-  IRRewriter rewriter(moduleOp->getContext());
   auto bufferizationOptions = getBufferizationOptions();
   OneShotAnalysisState state(moduleOp, bufferizationOptions);
   // Analyze IR.
