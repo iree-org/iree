@@ -262,7 +262,7 @@ if(NOT IREE_CUDA_AVAILABLE OR CMAKE_CROSSCOMPILING)
 endif()
 
 # HIP support is enabled by default if not cross compiling. Note: a HIP-compatible
-# GPU with drivers is still # required to actually run HIP workloads.
+# GPU with drivers is still required to actually run HIP workloads.
 set(IREE_HAL_DRIVER_HIP_DEFAULT ${IREE_HAL_DRIVER_DEFAULTS})
 if(CMAKE_CROSSCOMPILING)
   set(IREE_HAL_DRIVER_HIP_DEFAULT OFF)
