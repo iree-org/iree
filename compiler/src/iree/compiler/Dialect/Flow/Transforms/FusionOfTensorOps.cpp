@@ -479,17 +479,40 @@ struct FusionOfTensorOpsPass
             }
 
             // Do not fuse if consumer is a contraction/matmul like op.
-            if (auto linalgConsumerOp = dyn_cast<linalg::LinalgOp>(consumer)) {
-              if (linalg::isaContractionOpInterface(linalgConsumerOp))
-                return false;
+            auto consumerLinalgOp = dyn_cast<linalg::LinalgOp>(consumer);
+            if (!consumerLinalgOp ||
+                consumerLinalgOp.getNumLoops() !=
+                    consumerLinalgOp.getNumParallelLoops()) {
+              return false;
             }
 
             auto reshapeOp = dyn_cast<tensor::ExpandShapeOp>(producer);
             if (!reshapeOp)
               return true;
 
-            return reshapeOp.getSrc().getDefiningOp<linalg::LinalgOp>() !=
-                   nullptr;
+            // Dont propagate tensor.expand_shape down past dequantization ops.
+            if (isDequantizationLikeOp(consumer)) {
+              return false;
+            }
+
+            auto reshapeSrcOp = reshapeOp.getSrc().getDefiningOp();
+            if (!reshapeSrcOp) {
+              return false;
+            }
+
+            if (isa<linalg::LinalgOp>(reshapeSrcOp)) {
+              return true;
+            }
+
+            // This part is a total hack to account for some artifact
+            // introduceed by reshape propagation in transpose propagateion.
+            auto reshapeSrcSrcOp =
+                dyn_cast<tensor::CollapseShapeOp>(reshapeSrcOp);
+            if (reshapeSrcSrcOp &&
+                reshapeSrcSrcOp.getSrc().getDefiningOp<linalg::LinalgOp>()) {
+              return true;
+            }
+            return false;
           };
 
       RewritePatternSet collapsingReshapePatterns(&getContext());
@@ -540,6 +563,18 @@ struct FusionOfTensorOpsPass
               return false;
             }
 
+            auto consumerLinalgOp = dyn_cast<linalg::LinalgOp>(consumer);
+            if (!consumerLinalgOp ||
+                consumerLinalgOp.getNumLoops() !=
+                    consumerLinalgOp.getNumParallelLoops()) {
+              return false;
+            }
+
+            // Dont propagate tensor.expand_shape down past dequantization ops.
+            if (isDequantizationLikeOp(consumer)) {
+              return false;
+            }
+
             auto collapseShapeOp = dyn_cast<tensor::CollapseShapeOp>(producer);
             if (!collapseShapeOp)
               return false;
@@ -549,10 +584,7 @@ struct FusionOfTensorOpsPass
             if (!collapseSource) {
               return false;
             }
-            if (linalg::isaContractionOpInterface(collapseSource)) {
-              return true;
-            }
-            return false;
+            return true;
           };
       RewritePatternSet pushCollapseDown(context);
       linalg::populateFoldReshapeOpsByExpansionPatterns(
@@ -575,6 +607,57 @@ struct FusionOfTensorOpsPass
       }
       LLVM_DEBUG({
         llvm::dbgs() << "\n--- After third fixed point ---\n";
+        funcOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+        llvm::dbgs() << "\n\n";
+      });
+    }
+
+    {
+      // TOTAL HACK: We do this again. Indication that the "propagate-down"
+      // patterns need to run repeatedly till there is no change.
+      linalg::ControlFusionFn fuseByCollapsingControlFn =
+          [](OpOperand *fusedOperand) {
+            Operation *producer = fusedOperand->get().getDefiningOp();
+            Operation *consumer = fusedOperand->getOwner();
+            if (!isNonNullAndOutsideDispatch({producer, consumer})) {
+              return false;
+            }
+
+            // Do not fuse if consumer is a contraction/matmul like op.
+            if (auto linalgConsumerOp = dyn_cast<linalg::LinalgOp>(consumer)) {
+              if (linalg::isaContractionOpInterface(linalgConsumerOp))
+                return false;
+            }
+
+            auto reshapeOp = dyn_cast<tensor::ExpandShapeOp>(producer);
+            if (!reshapeOp)
+              return true;
+
+            // For now just do matmul op.
+            auto reshapeSrcOp =
+                reshapeOp.getSrc().getDefiningOp<linalg::LinalgOp>();
+            return reshapeSrcOp &&
+                   linalg::isaContractionOpInterface(reshapeSrcOp);
+          };
+
+      RewritePatternSet collapsingReshapePatterns(&getContext());
+      linalg::populateFoldReshapeOpsByCollapsingPatterns(
+          collapsingReshapePatterns, fuseByCollapsingControlFn);
+      tensor::CollapseShapeOp::getCanonicalizationPatterns(
+          collapsingReshapePatterns, context);
+      tensor::ExpandShapeOp::getCanonicalizationPatterns(
+          collapsingReshapePatterns, context);
+      tensor::populateFoldTensorEmptyPatterns(collapsingReshapePatterns);
+      memref::populateResolveRankedShapedTypeResultDimsPatterns(
+          collapsingReshapePatterns);
+      if (failed(applyPatternsAndFoldGreedily(
+              funcOp, std::move(collapsingReshapePatterns)))) {
+        funcOp->emitError("failed to apply collapsing reshape patterns");
+        return signalPassFailure();
+      }
+
+      LLVM_DEBUG({
+        llvm::dbgs() << "\n--- After second fixed point ---\n";
         funcOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
         llvm::dbgs() << "\n\n";
       });
