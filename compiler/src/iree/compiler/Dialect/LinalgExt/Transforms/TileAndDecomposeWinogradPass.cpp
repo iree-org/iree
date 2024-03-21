@@ -12,7 +12,6 @@
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/WinogradConstants.h"
 #include "llvm/ADT/DenseSet.h"
-#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Sequence.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/ADT/bit.h"
@@ -32,27 +31,13 @@
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OpDefinition.h"
-#include "mlir/IR/PatternMatch.h"
-#include "mlir/IR/Value.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
-#include "mlir/Support/MathExtras.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
 namespace {
-
-template <typename T>
-static llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
-                                     const llvm::SmallVectorImpl<T> &vector) {
-  for (T element : vector) {
-    os << element << " ";
-  }
-
-  return os;
-}
 
 static void computeLoopParams(SmallVectorImpl<Value> &lbs,
                               SmallVectorImpl<Value> &ubs,
@@ -282,7 +267,6 @@ static FailureOr<scf::ForallOp> tileWithForall(
   }
   int64_t iterationSpace = 1;
   for (auto ub : constUbs) {
-    llvm::dbgs() << "const ub: " << ub << "\n";
     iterationSpace *= ub;
   }
   int forallBounds = std::min<int64_t>(iterationSpace, workgroupSize);
@@ -331,7 +315,6 @@ static FailureOr<scf::ForallOp> tileWithForall(
 
   auto linearExpr = rewriter.getAffineDimExpr(0);
   auto strides = computeStrides(constUbs);
-  llvm::dbgs() << "Strides: " << strides << "\n";
   SmallVector<AffineExpr> ivExprs = delinearize(linearExpr, strides);
   int64_t exprInd = 0;
   for (auto ub : ubs) {
@@ -340,7 +323,6 @@ static FailureOr<scf::ForallOp> tileWithForall(
       continue;
     }
     auto expr = ivExprs[exprInd++];
-    llvm::dbgs() << "expr: " << expr << "\n";
     OpFoldResult ofr = affine::makeComposedFoldedAffineApply(
         rewriter, loc, AffineMap::get(/*numDims=*/1, /*numSymbols=*/0, expr),
         getAsOpFoldResult(linearIv));
@@ -373,7 +355,6 @@ static FailureOr<scf::ForallOp> tileWithForall(
         continue;
       }
       auto expr = ivExprs[exprInd++];
-      llvm::dbgs() << "expr: " << expr << "\n";
       OpFoldResult ofr = affine::makeComposedFoldedAffineApply(
           rewriter, loc, AffineMap::get(/*numDims=*/1, /*numSymbols=*/0, expr),
           getAsOpFoldResult(linearIv));
