@@ -43,6 +43,8 @@ using LayoutAttr = mlir::iree_compiler::IREE::VectorExt::LayoutAttr;
 
 namespace mlir::iree_compiler {
 
+using VectorValue = TypedValue<VectorType>;
+
 namespace {
 
 // Vector layout option setter aimed at contractions. Currently this only sets
