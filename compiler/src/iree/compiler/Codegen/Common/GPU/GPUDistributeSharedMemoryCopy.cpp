@@ -48,7 +48,7 @@ static const llvm::StringRef kCopyToDistribute = "copy_to_distribute";
 static const llvm::StringRef kCopyDistributed = "copy_distributed";
 
 // For optimal performance we always want to copy 128 bits
-static constexpr int copyVectorNumBits = 128;
+static constexpr int copyVectorNumBits = 256;
 
 /// Tiles copy to shared memory mapping. Copy to shared memory are not part of
 /// the launch config but needs to be distributed on the workgroup picked by the
