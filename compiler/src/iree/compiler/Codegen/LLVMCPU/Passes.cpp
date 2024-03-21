@@ -697,6 +697,12 @@ static void addLowerToLLVMPasses(OpPassManager &passManager,
   }
 
   if (enableAArch64SME) {
+    // Decompose large (2D-scalable) vector types to (multiple) SME tiles
+    // + some ArmSME specific vector dialect rewrites.
+    passManager.addPass(mlir::arm_sme::createVectorLegalizationPass());
+    passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    passManager.addNestedPass<func::FuncOp>(createCSEPass());
+
     // (Arith, Vector) -> ArmSME
     passManager.addNestedPass<func::FuncOp>(
         mlir::createArithToArmSMEConversionPass());
