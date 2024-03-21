@@ -172,17 +172,17 @@ static LogicalResult doMultiUseFusion(Operation *rootOp,
                                       RewriterBase &rewriter) {
   assert(rootOp && "root op cant be null");
 
-  LLVM_DEBUG({
-    llvm::dbgs() << "Fusion root : \n";
-    rootOp->print(llvm::dbgs());
-    llvm::dbgs() << "\nFused with :";
+  // LLVM_DEBUG({
+  //   llvm::dbgs() << "Fusion root : \n";
+  //   rootOp->print(llvm::dbgs());
+  //   llvm::dbgs() << "\nFused with :";
 
-    for (auto producer : fusableOps) {
-      llvm::dbgs() << "\t";
-      producer->print(llvm::dbgs());
-      llvm::dbgs() << "\n";
-    }
-  });
+  //   for (auto producer : fusableOps) {
+  //     llvm::dbgs() << "\t";
+  //     producer->print(llvm::dbgs());
+  //     llvm::dbgs() << "\n";
+  //   }
+  // });
 
   SmallVector<Operation *> fusedOpsVec = llvm::to_vector(fusableOps);
   mlir::computeTopologicalSorting(fusedOpsVec);
@@ -573,6 +573,11 @@ struct FusionOfTensorOpsPass
               funcOp, std::move(pushCollapseDown), rewriteConfig))) {
         return signalPassFailure();
       }
+      LLVM_DEBUG({
+        llvm::dbgs() << "\n--- After third fixed point ---\n";
+        funcOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
+        llvm::dbgs() << "\n\n";
+      });
     }
 
     // Run fusion of producer with consumer when producer has multiple uses.
