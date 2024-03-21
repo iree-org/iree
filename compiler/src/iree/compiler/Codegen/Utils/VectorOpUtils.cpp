@@ -19,7 +19,11 @@ VectorContractOpInfo::getOperandMNIndex() const {
     return std::make_pair(0, 1);
   case OpKind::MK_NK_MN:
     return std::make_pair(0, 0);
+  case OpKind::KM_KN_MN:
+    return std::make_pair(0, 0);
   case OpKind::KM_NK_MN:
+    return std::make_pair(1, 0);
+  case OpKind::KM_NK_NM:
     return std::make_pair(1, 0);
   case OpKind::UNKNOWN:
     break;
@@ -39,7 +43,11 @@ VectorContractOpInfo::getOperandKIndex() const {
     return std::make_pair(1, 0);
   case OpKind::MK_NK_MN:
     return std::make_pair(1, 1);
+  case OpKind::KM_KN_MN:
+    return std::make_pair(1, 1);
   case OpKind::KM_NK_MN:
+    return std::make_pair(0, 1);
+  case OpKind::KM_NK_NM:
     return std::make_pair(0, 1);
   case OpKind::UNKNOWN:
     break;
@@ -58,8 +66,11 @@ VectorContractOpInfo::getResultMNIndex() const {
   switch (opKind) {
   case OpKind::MK_KN_MN:
   case OpKind::MK_NK_MN:
+  case OpKind::KM_KN_MN:
   case OpKind::KM_NK_MN:
     return std::make_pair(0, 1);
+  case OpKind::KM_NK_NM:
+    return std::make_pair(1, 0);
   default:
     break;
   }
@@ -104,8 +115,14 @@ VectorContractOpInfo::inferOpKind(MLIRContext *ctx,
         return OpKind::MK_NK_MN;
       }
       return OpKind::MK_KN_MN;
-    } else if (rhsN < rhsKDim) {
+    } else if (rhsN > rhsKDim) {
+      return OpKind::KM_KN_MN;
+    } else {
       return OpKind::KM_NK_MN;
+    }
+  } else {
+    if (lhsM > lhsKDim && rhsN < rhsKDim) {
+      return OpKind::KM_NK_NM;
     }
   }
   return OpKind::UNKNOWN;
