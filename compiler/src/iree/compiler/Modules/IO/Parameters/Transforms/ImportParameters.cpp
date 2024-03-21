@@ -24,9 +24,7 @@
 
 #include "iree/base/api.h"
 #include "iree/io/file_handle.h"
-#include "iree/io/formats/gguf/gguf_parser.h"
-#include "iree/io/formats/irpa/irpa_parser.h"
-#include "iree/io/formats/safetensors/safetensors_parser.h"
+#include "iree/io/formats/parser_registry.h"
 
 namespace mlir::iree_compiler::IREE::IO::Parameters {
 
@@ -89,25 +87,11 @@ loadParameterIndex(ModuleOp moduleOp, StringRef path,
     return failure();
 
   // Parse the archive as a particular format.
-  // TODO(benvanik): centralize this type selection logic in iree/io/.
-  StringRef format = llvm::sys::path::extension(path);
-  if (format == ".gguf") {
-    return handleRuntimeError(
-        moduleOp, iree_io_parse_gguf_index(fileHandle->get(), parameterIndex),
-        "parsing gguf file");
-  } else if (format == ".irpa") {
-    return handleRuntimeError(
-        moduleOp, iree_io_parse_irpa_index(fileHandle->get(), parameterIndex),
-        "parsing irpa file");
-  } else if (format == ".safetensors") {
-    return handleRuntimeError(
-        moduleOp,
-        iree_io_parse_safetensors_index(fileHandle->get(), parameterIndex),
-        "parsing safetensors file");
-  } else {
-    llvm::errs() << "unsupported archive file format: '" << path << "'\n";
-    return failure();
-  }
+  return handleRuntimeError(
+      moduleOp,
+      iree_io_parse_file_index(iree_make_string_view(path.data(), path.size()),
+                               fileHandle->get(), parameterIndex),
+      "parsing parameter archive");
 }
 
 class ParameterIndices {
