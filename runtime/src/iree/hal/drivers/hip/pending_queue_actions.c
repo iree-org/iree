@@ -594,6 +594,10 @@ static iree_status_t iree_hal_hip_pending_queue_actions_issue_execution(
   }
 
   // Then launch all command buffers to the dispatch stream.
+  IREE_TRACE_ZONE_BEGIN(dispatch_command_buffers);
+  IREE_TRACE_ZONE_APPEND_TEXT(dispatch_command_buffers,
+                              " dispatch_command_buffers",
+                              strlen(" dispatch_command_buffers"));
   for (iree_host_size_t i = 0; i < action->payload.command_buffers.count; ++i) {
     iree_hal_command_buffer_t* command_buffer =
         action->payload.command_buffers.ptr[i];
@@ -627,6 +631,7 @@ static iree_status_t iree_hal_hip_pending_queue_actions_issue_execution(
                   iree_hal_buffer_binding_table_empty()));
     }
   }
+  IREE_TRACE_ZONE_END(dispatch_command_buffers);
 
   // Last record hipEvent_t signals in the dispatch stream.
   for (iree_host_size_t i = 0; i < action->signal_semaphore_list.count; ++i) {
