@@ -44,6 +44,29 @@ def IREEVectorExt_LayoutConflictResolutionOp : IREEVectorExt_PureOp<"layout_conf
   let hasVerifier = 1;
 }
 
+def IREEVectorExt_LayoutReshapeOp : IREEVectorExt_PureOp<"layout_reshape"> {
+  let summary = "Layout Reshape operator";
+  let description = [{
+    The layout reshape operator takes a vector and a desired layout and
+    transforms the vector to one with the desired layout.
+
+    The reshape is different from a conflict in the sense that a reshape 
+    is reshaping the data held by a single thread. The thread layout must
+    be same for a reshape to be valid.
+  }];
+  let arguments = (ins
+    AnyVector:$input,
+    VectorLayoutInterface:$sourceLayout,
+    VectorLayoutInterface:$desiredLayout
+  );
+  let results = (outs
+    AnyVector:$output
+  );
+  let extraClassDeclaration = [{}];
+  let assemblyFormat = "$input attr-dict `:` type($input) `->` type($output)";
+  let hasVerifier = 1;
+}
+
 def IREEVectorExt_ToSIMDOp : IREEVectorExt_PureOp<"to_simd",
     [SameOperandsAndResultElementType, Pure]> {
   let summary = "SIMT to SIMD conversion operation";

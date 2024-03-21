@@ -463,6 +463,73 @@ struct DistributeBroadcast final : OpDistributionPattern<vector::BroadcastOp> {
   }
 };
 
+struct DistributeLayoutReshape final
+    : OpDistributionPattern<IREE::VectorExt::LayoutReshapeOp> {
+  using OpDistributionPattern::OpDistributionPattern;
+
+  LogicalResult
+  matchAndRewrite(IREE::VectorExt::LayoutReshapeOp layoutReshapeOp,
+                  DistributionSignature &signature,
+                  PatternRewriter &rewriter) const override {
+    // TODO: Verify that this layout shape cast is actually valid.
+
+    VectorValue srcVector = layoutReshapeOp.getInput();
+    VectorValue dstVector = layoutReshapeOp.getOutput();
+    Type elementType =
+        llvm::cast<ShapedType>(dstVector.getType()).getElementType();
+    Location loc = layoutReshapeOp.getLoc();
+
+    NestedLayoutAttr srcLayout =
+        dyn_cast<NestedLayoutAttr>(signature[srcVector]);
+    if (!srcLayout) {
+      return rewriter.notifyMatchFailure(
+          layoutReshapeOp, "non-nested operand layout for reshape");
+    }
+
+    NestedLayoutAttr dstLayout =
+        dyn_cast<NestedLayoutAttr>(signature[dstVector]);
+    if (!dstLayout) {
+      return rewriter.notifyMatchFailure(
+          layoutReshapeOp, "non-nested result layout for reshape");
+    }
+
+    SmallVector<int64_t> srcShape = srcLayout.getDistributedShape();
+    SmallVector<int64_t> dstShape = dstLayout.getDistributedShape();
+
+    SmallVector<int64_t> loopOrder = getLoopOrder(srcLayout);
+    assert(loopOrder == getLoopOrder(dstLayout) &&
+           "Loop order should be same for a reshape");
+
+    SmallVector<int64_t> minElementTile;
+    for (auto [srcElement, dstElement] :
+         llvm::zip_equal(getElementVectorTileShape(srcLayout),
+                         getElementVectorTileShape(dstLayout))) {
+      minElementTile.push_back(std::min(srcElement, dstElement));
+    }
+
+    auto resultType = VectorType::get(dstShape, elementType);
+    Value accumulator = rewriter.create<arith::ConstantOp>(
+        loc, resultType, rewriter.getZeroAttr(resultType));
+
+    SmallVector<int64_t> strides(dstShape.size(), 1);
+
+    VectorValue distSrc = getDistributed(rewriter, srcVector, srcLayout);
+
+    for (auto [srcOffset, dstOffset] : llvm::zip_equal(
+             StaticTileOffsetRange(srcShape, minElementTile, loopOrder),
+             StaticTileOffsetRange(dstShape, minElementTile, loopOrder))) {
+      // Extract from source.
+      VectorValue extracted = rewriter.create<vector::ExtractStridedSliceOp>(
+          loc, distSrc, srcOffset, minElementTile, strides);
+      accumulator = rewriter.create<vector::InsertStridedSliceOp>(
+          loc, extracted, accumulator, dstOffset, strides);
+    }
+
+    replaceOpWithDistributedValues(rewriter, layoutReshapeOp, accumulator);
+    return success();
+  }
+};
+
 } // namespace
 
 void populateGPUDistributeNestedLayoutAttrPatterns(
@@ -470,6 +537,7 @@ void populateGPUDistributeNestedLayoutAttrPatterns(
   patterns.add<DistributeTransferRead, DistributeTransferWrite>(
       patterns.getContext(), threadId);
   patterns.add<DistributeBroadcast>(patterns.getContext());
+  patterns.add<DistributeLayoutReshape>(patterns.getContext());
 }
 
 }; // namespace mlir::iree_compiler
