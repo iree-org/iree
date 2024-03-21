@@ -387,9 +387,9 @@ setConvolutionVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   int64_t nDim = convolutionDims->outputChannel.back();
   // TODO: Support NCHW convolutions. This is just a matmul_transpose_a, however
   // the distribution patterns currently do not support that variant.
-  if (mDim > nDim) {
-    return failure();
-  }
+  // if (mDim > nDim) {
+  //   return failure();
+  // }
   int64_t kDim = convolutionDims->inputChannel.back();
 
   Value lhs = op.getDpsInputOperand(0)->get();
