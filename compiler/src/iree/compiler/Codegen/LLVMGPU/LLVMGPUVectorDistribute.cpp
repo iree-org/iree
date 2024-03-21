@@ -77,6 +77,10 @@ public:
                 setTransferReadAnchor(context, analysis, transfer);
                 return success();
               })
+              .Case([&](vector::TransferWriteOp transfer) {
+                setTransferWriteAnchor(context, analysis, transfer);
+                return success();
+              })
               .Default([](Operation *) { return success(); });
       return failed(setResult) ? WalkResult::interrupt()
                                : WalkResult::advance();
@@ -132,100 +136,36 @@ private:
     return success();
   }
 
-  // Sets a layout anchor for reads from global memory.
-  // The layout this generates is approximately the following:
-  //
-  // #layout = #iree_vector_ext.nested_layout<
-  //    subgroups_per_workgroup = [1, ..., 1]
-  //    batches_per_subgroup =    [<remaining undistributed elements>]
-  //    outers_per_batch =        [1, ..., 1]
-  //    threads_per_outer =       [<greedy from innermost memref dim>]
-  //    elements_per_thread =     [1, ..., 128/element_bitwidth, ..., 1]
-  //            innermost_memref_dimension ^^^^^^
-  //
-  // (All orders are the same)
-  //    *_order = [<broadcasted_dims>, <transfer_permutation>]>
-  //
-  // So for the following transfer_read with 64 threads:
-  //  vector.transfer_read ... : memref<16x256xf16>, vector<16x32xf16>
-  //
-  // We use the following layout:
-  // #layout = #iree_vector_ext.nested_layout<
-  //    subgroups_per_workgroup = [1, 1]
-  //    batches_per_subgroup =    [1, 1]
-  //    outers_per_batch =        [1, 1]
-  //    threads_per_outer =       [16, 4]
-  //    elements_per_thread =     [1, 8]
-  //
-  //    *_order = [0, 1]>
-  void setTransferReadAnchor(MLIRContext *context,
-                             VectorLayoutAnalysis &analysis,
-                             vector::TransferReadOp transfer) {
-
-    // Get the forward slice of the transfer to approximate whether it will take
-    // the layout of a contraction instead. Transfer_read ops used directly by a
-    // contraction (i.e. without a copy to shared memory in between) should take
-    // the layout of the contraction op. This is common for cases where the
-    // initial values of the accumulator in a linalg.matmul is read from memory
-    // instead of just being a zerofill.
-    ForwardSliceOptions forwardOptions;
-    forwardOptions.filter = [&](Operation *op) -> bool {
-      return llvm::any_of(op->getResultTypes(),
-                          [](Type t) { return isa<VectorType>(t); });
-    };
-    BackwardSliceOptions backwardOptions;
-    backwardOptions.filter = [&](Operation *op) -> bool {
-      return llvm::any_of(op->getOperandTypes(),
-                          [](Type t) { return isa<VectorType>(t); });
-    };
-    SetVector<Operation *> slice =
-        getSlice(transfer, backwardOptions, forwardOptions);
-
-    if (llvm::any_of(slice, [](Operation *op) {
-          return llvm::isa<vector::ContractionOp>(op);
-        })) {
-      return;
-    }
-
-    // TODO: Support masking.
-    if (transfer.getMask()) {
-      return;
-    }
-    // Shared memory loads are expected to take the layout of the contraction.
-    auto sourceMemRefType =
-        dyn_cast<MemRefType>(transfer.getSource().getType());
-    if (!sourceMemRefType || hasSharedMemoryAddressSpace(sourceMemRefType)) {
-      return;
-    }
-
-    int64_t bitWidth = IREE::Util::getTypeBitWidth(
-        getElementTypeOrSelf(transfer.getVectorType()));
+  VectorLayoutInterface getMemoryTransferLayout(MLIRContext *context,
+                                                VectorValue vector,
+                                                AffineMap transferMap) {
+    VectorType vectorType = vector.getType();
+    int64_t bitWidth =
+        IREE::Util::getTypeBitWidth(getElementTypeOrSelf(vectorType));
     if (!llvm::isPowerOf2_64(bitWidth) || bitWidth > 128) {
-      return;
+      return nullptr;
     }
     int64_t numElementsPerThread = 128 / bitWidth;
-    int64_t flatNumElements =
-        ShapedType::getNumElements(transfer.getVectorType().getShape());
+    int64_t flatNumElements = ShapedType::getNumElements(vectorType.getShape());
     int64_t flatNumThreads = ShapedType::getNumElements(workgroupSize);
     if (flatNumElements % flatNumThreads != 0) {
-      return;
+      return nullptr;
     }
     numElementsPerThread =
         std::min(numElementsPerThread, flatNumElements / flatNumThreads);
 
-    AffineMap transferMap = transfer.getPermutationMap();
     if (transferMap.getNumDims() == 0) {
-      return;
+      return nullptr;
     }
 
     // Select the innermost dim of the memref as the contiguous dim to load
     // from.
-    int64_t transferRank = transfer.getVectorType().getRank();
+    int64_t transferRank = vectorType.getRank();
     std::optional<unsigned> maybeDim = transferMap.getResultPosition(
         getAffineDimExpr(transferMap.getNumDims() - 1, context));
     int64_t distXDim = maybeDim ? *maybeDim : transferRank - 1;
 
-    ArrayRef<int64_t> vectorShape = transfer.getVectorType().getShape();
+    ArrayRef<int64_t> vectorShape = vectorType.getShape();
 
     // Limit the maximum inner vector read width to the innermost contiguous
     // dimension. We could try to be clever and extend this to adjacent
@@ -308,7 +248,122 @@ private:
         threadCounts, order, elementSizes, order, subgroupBasis,
         SmallVector<bool>(subgroupBasis.size(), true), threadBasis,
         SmallVector<bool>(threadBasis.size(), true));
-    analysis.setAnchor(transfer.getResult(), layout);
+    return layout;
+  }
+
+  // Sets a layout anchor for reads from global memory.
+  // The layout this generates is approximately the following:
+  //
+  // #layout = #iree_vector_ext.nested_layout<
+  //    subgroups_per_workgroup = [1, ..., 1]
+  //    batches_per_subgroup =    [<remaining undistributed elements>]
+  //    outers_per_batch =        [1, ..., 1]
+  //    threads_per_outer =       [<greedy from innermost memref dim>]
+  //    elements_per_thread =     [1, ..., 128/element_bitwidth, ..., 1]
+  //            innermost_memref_dimension ^^^^^^
+  //
+  // (All orders are the same)
+  //    *_order = [<broadcasted_dims>, <transfer_permutation>]>
+  //
+  // So for the following transfer_read with 64 threads:
+  //  vector.transfer_read ... : memref<16x256xf16>, vector<16x32xf16>
+  //
+  // We use the following layout:
+  // #layout = #iree_vector_ext.nested_layout<
+  //    subgroups_per_workgroup = [1, 1]
+  //    batches_per_subgroup =    [1, 1]
+  //    outers_per_batch =        [1, 1]
+  //    threads_per_outer =       [16, 4]
+  //    elements_per_thread =     [1, 8]
+  //
+  //    *_order = [0, 1]>
+  void setTransferReadAnchor(MLIRContext *context,
+                             VectorLayoutAnalysis &analysis,
+                             vector::TransferReadOp transfer) {
+
+    // Get the forward slice of the transfer to approximate whether it will take
+    // the layout of a contraction instead. Transfer_read ops used directly by a
+    // contraction (i.e. without a copy to shared memory in between) should take
+    // the layout of the contraction op. This is common for cases where the
+    // initial values of the accumulator in a linalg.matmul is read from memory
+    // instead of just being a zerofill.
+    ForwardSliceOptions forwardOptions;
+    forwardOptions.filter = [&](Operation *op) -> bool {
+      return llvm::any_of(op->getResultTypes(),
+                          [](Type t) { return isa<VectorType>(t); });
+    };
+    BackwardSliceOptions backwardOptions;
+    backwardOptions.filter = [&](Operation *op) -> bool {
+      return llvm::any_of(op->getOperandTypes(),
+                          [](Type t) { return isa<VectorType>(t); });
+    };
+    SetVector<Operation *> slice =
+        getSlice(transfer, backwardOptions, forwardOptions);
+
+    if (llvm::any_of(slice, [](Operation *op) {
+          return llvm::isa<vector::ContractionOp>(op);
+        })) {
+      return;
+    }
+
+    // TODO: Support masking.
+    if (transfer.getMask()) {
+      return;
+    }
+    // Shared memory loads are expected to take the layout of the contraction.
+    auto sourceMemRefType =
+        dyn_cast<MemRefType>(transfer.getSource().getType());
+    if (!sourceMemRefType || hasSharedMemoryAddressSpace(sourceMemRefType)) {
+      return;
+    }
+
+    VectorLayoutInterface layout = getMemoryTransferLayout(
+        context, transfer.getVector(), transfer.getPermutationMap());
+
+    analysis.setAnchor(transfer.getVector(), layout);
+
+    if (printLayout) {
+      llvm::outs() << "transfer '" << transfer << "' vector layout: " << layout
+                   << "\n";
+    }
+  }
+
+  void setTransferWriteAnchor(MLIRContext *context,
+                              VectorLayoutAnalysis &analysis,
+                              vector::TransferWriteOp transfer) {
+
+    // Get the backward slice of the transfer to approximate whether it will
+    // take the layout of a contraction or transfer_read instead.
+    ForwardSliceOptions forwardOptions;
+    forwardOptions.filter = [&](Operation *op) -> bool {
+      return llvm::any_of(op->getResultTypes(),
+                          [](Type t) { return isa<VectorType>(t); });
+    };
+    BackwardSliceOptions backwardOptions;
+    backwardOptions.filter = [&](Operation *op) -> bool {
+      return llvm::any_of(op->getOperandTypes(),
+                          [](Type t) { return isa<VectorType>(t); });
+    };
+    SetVector<Operation *> slice =
+        getSlice(transfer, backwardOptions, forwardOptions);
+
+    if (llvm::any_of(slice, [](Operation *op) {
+          return llvm::isa<vector::ContractionOp>(op) ||
+                 llvm::isa<vector::TransferReadOp>(op);
+        })) {
+      return;
+    }
+
+    // TODO: Support masking.
+    if (transfer.getMask()) {
+      return;
+    }
+
+    VectorLayoutInterface layout = getMemoryTransferLayout(
+        context, transfer.getVector(), transfer.getPermutationMap());
+
+    analysis.setAnchor(transfer.getVector(), layout);
+
     if (printLayout) {
       llvm::outs() << "transfer '" << transfer << "' vector layout: " << layout
                    << "\n";
