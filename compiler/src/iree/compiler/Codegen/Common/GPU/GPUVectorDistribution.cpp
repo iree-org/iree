@@ -166,16 +166,22 @@ debugPrintUniqueOperationNames(SmallVectorImpl<Operation *> &worklist) {
 }
 
 /// A rewriter for the pattern rewriting driver.
-struct VectorDistributionRewriter : PatternRewriter {
-  VectorDistributionRewriter(MLIRContext *ctx) : PatternRewriter(ctx) {}
+struct VectorDistributionRewriter : PatternRewriter, RewriterBase::Listener {
+  VectorDistributionRewriter(MLIRContext *ctx, DenseSet<Operation *> &deadOps)
+      : PatternRewriter(ctx, this), Listener(), deadOps(deadOps) {}
+
+  void notifyOperationErased(Operation *op) { deadOps.insert(op); }
+
+  DenseSet<Operation *> &deadOps;
 };
 
 static void applyVectorDistribution(Operation *root,
                                     const FrozenRewritePatternSet &patterns) {
 
   SmallVector<Operation *> worklist;
+  DenseSet<Operation *> deadOps;
 
-  VectorDistributionRewriter rewriter(root->getContext());
+  VectorDistributionRewriter rewriter(root->getContext(), deadOps);
   PatternApplicator applicator(patterns);
   applicator.applyDefaultCostModel();
 
@@ -193,6 +199,10 @@ static void applyVectorDistribution(Operation *root,
   // operation. It always runs on an existing operation. This ensures that no
   // invalidated state of the analysis is ever used.
   for (Operation *op : worklist) {
+    if (deadOps.contains(op)) {
+      continue;
+    }
+
     LLVM_DEBUG(llvm::dbgs() << "Distributing: ");
     LLVM_DEBUG(op->print(llvm::dbgs(), OpPrintingFlags().skipRegions()));
     LLVM_DEBUG(llvm::dbgs() << "\n");

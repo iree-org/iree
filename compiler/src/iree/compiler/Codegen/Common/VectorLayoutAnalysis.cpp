@@ -408,6 +408,7 @@ static void propagateLayoutToElementwiseOp(
     Operation *op, ArrayRef<const DistributionLayout *> operandLattices,
     ArrayRef<DistributionLayout *> resultLattices,
     std::function<void(DistributionLayout *, ChangeResult)> update) {
+
   // All operands and results must agree on the same layout.
 
   // We do not support multiple results yet.
@@ -537,6 +538,12 @@ void propagationTransferFunction(
     Operation *op, ArrayRef<const DistributionLayout *> operandLattices,
     ArrayRef<DistributionLayout *> resultLattices,
     std::function<void(DistributionLayout *, ChangeResult)> update) {
+
+  // Do not propagate layout from constant operations as constant operations
+  // can be duplicated and do not have an actual layout.
+  if (isa<arith::ConstantOp>(op)) {
+    return;
+  }
 
   // Propagate layout to elementwise operations.
   if (OpTrait::hasElementwiseMappableTraits(op)) {
