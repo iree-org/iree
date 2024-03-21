@@ -22,8 +22,6 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Support/FileUtilities.h"
 
-#include "iree/base/api.h"
-#include "iree/io/file_handle.h"
 #include "iree/io/formats/parser_registry.h"
 
 namespace mlir::iree_compiler::IREE::IO::Parameters {
@@ -32,11 +30,6 @@ namespace mlir::iree_compiler::IREE::IO::Parameters {
 #include "iree/compiler/Modules/IO/Parameters/Transforms/Passes.h.inc"
 
 namespace {
-
-using FileHandle =
-    std::unique_ptr<iree_io_file_handle_t, void (*)(iree_io_file_handle_t *)>;
-using ParameterIndex = std::unique_ptr<iree_io_parameter_index_t,
-                                       void (*)(iree_io_parameter_index_t *)>;
 
 static FailureOr<FileHandle> openArchiveFile(ModuleOp moduleOp,
                                              StringRef archivePath) {
@@ -129,15 +122,6 @@ private:
   SmallVector<ParameterIndex> indices;
   DenseMap<StringRef, iree_io_parameter_index_t *> indicesByScope;
 };
-
-using ScopePath = std::pair<StringRef, StringRef>;
-static ScopePath splitScopePath(StringRef scopePath) {
-  size_t i = scopePath.find_first_of('=');
-  if (i == StringRef::npos)
-    return ScopePath("", scopePath);
-  else
-    return ScopePath(scopePath.substr(0, i), scopePath.substr(i + 1));
-}
 
 // Allocates one parameter index per scope (possibly an empty string) and
 // merges in parameters from the referenced files.

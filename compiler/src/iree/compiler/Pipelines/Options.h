@@ -130,12 +130,11 @@ struct GlobalOptimizationOptions {
   // Maximum size of parameters to import or 0 to disable automatic import.
   int64_t parameterImportMaximumSize = 0;
 
-  // File path to create a parameter archive out of global initial values.
-  std::string parameterExportFile = "";
-  // Optional scope to use for the created parameter archive.
-  std::string parameterExportScope = "";
+  // File path to an archive to export parameters to with an optional
+  // `scope=` prefix.
+  std::string parameterExportPath;
   // Minimum size of constants to export as parameters.
-  int64_t parameterExportMinimumSize = 256;
+  int64_t parameterExportMinimumSize = 0;
 
   // File path to create a splat parameter archive out of all parameters in the
   // module.

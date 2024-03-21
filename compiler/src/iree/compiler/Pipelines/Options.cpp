@@ -189,18 +189,10 @@ void GlobalOptimizationOptions::bindOptions(OptionsBinder &binder) {
                       llvm::cl::desc("Maximum size of parameters to import."),
                       llvm::cl::cat(category));
 
-  // TODO(benvanik): make this a list of scope=path like the runtime tools. Then
-  // we can export different scopes to different files.
   binder.opt<std::string>(
-      "iree-opt-export-parameter-file", parameterExportFile,
-      llvm::cl::desc(
-          "File path to create a parameter archive using any inline global "
-          "constants."),
-      llvm::cl::cat(category));
-  binder.opt<std::string>(
-      "iree-opt-export-parameter-scope", parameterExportScope,
-      llvm::cl::desc("Scope for parameters in the archive created in "
-                     "`iree-opt-export-parameter-archive-export-file`."),
+      "iree-opt-export-parameters", parameterExportPath,
+      llvm::cl::desc("File path to an archive to export parameters to with an "
+                     "optional `scope=` prefix."),
       llvm::cl::cat(category));
   binder.opt<int64_t>(
       "iree-opt-export-parameter-minimum-size", parameterExportMinimumSize,

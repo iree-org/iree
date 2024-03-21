@@ -40,8 +40,7 @@ iree_cc_library(
     iree::io::formats::irpa
     iree::io::formats::parser_registry
     iree::io::parameter_index
-    iree::io::scope_map
-    iree::tooling::parameter_util
+    iree::io::stream
   PUBLIC
 )
 

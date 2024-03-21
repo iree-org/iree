@@ -11,21 +11,19 @@ include "mlir/Pass/PassBase.td"
 
 def ExportParametersPass :
     Pass<"iree-io-export-parameters", "mlir::ModuleOp"> {
-  let summary = "Moves all inline constants of a minimum size and constant "
-                "initialized globals values to a parameter archive.";
+  let summary = "Exports all global constants to an archive file when "
+                "they are larger than the specified minimum size.";
   let dependentDialects = [
     "IREE::Stream::StreamDialect",
     "IREE::Util::UtilDialect",
   ];
   let options = [
-    Option<"parameterScope", "scope", "std::string",
+    Option<"scopePath", "path", "std::string",
            /*default=*/"",
-           "Optional scope to use for the exported parameters.">,
-    Option<"archivePath", "archive-path", "std::string",
-           /*default=*/"",
-           "Path to write the parameter archive to.">,
+           "File path to an archive to export from with an optional "
+           "`scope=` prefix.">,
     Option<"minimumSize", "minimum-size", "int64_t",
-           /*default=*/"256",
+           /*default=*/"0",
            "Minimum size of a serialized global to export.">,
   ];
 }
@@ -34,7 +32,7 @@ def GenerateSplatParameterArchivePass :
     Pass<"iree-io-generate-splat-parameter-archive", "mlir::ModuleOp"> {
   let summary = "Generates a .irpa file with splat entries for all parameters.";
   let options = [
-    Option<"archivePath", "archive-path", "std::string",
+    Option<"filePath", "file", "std::string",
            /*default=*/"",
            "Path to write the parameter archive to.">,
   ];

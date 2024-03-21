@@ -712,7 +712,6 @@ static bool iree_status_format_message(iree_status_t status,
       } else {
         buffer[buffer_length] = ';';
         buffer[buffer_length + 1] = ' ';
-        buffer[buffer_length + 2] = '\0';
       }
     }
     buffer_length += 2;  // '; '
@@ -772,12 +771,13 @@ IREE_API_EXPORT bool iree_status_format(iree_status_t status,
 
   iree_host_size_t message_buffer_length = 0;
   bool ret = iree_status_format_message(
-      status, buffer_capacity, buffer ? buffer + prefix_buffer_length : NULL,
-      &message_buffer_length, /*has_prefix=*/true);
+      status, buffer ? buffer_capacity - prefix_buffer_length : 0,
+      buffer ? buffer + prefix_buffer_length : NULL, &message_buffer_length,
+      /*has_prefix=*/true);
   if (!ret) {
     return false;
   }
-  *out_buffer_length = message_buffer_length + prefix_buffer_length;
+  *out_buffer_length = prefix_buffer_length + message_buffer_length;
   return true;
 }
 

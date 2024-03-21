@@ -24,6 +24,12 @@ IREE_API_EXPORT void iree_io_parameter_archive_builder_deinitialize(
   memset(builder, 0, sizeof(*builder));
 }
 
+IREE_API_EXPORT bool iree_io_parameter_archive_builder_is_empty(
+    const iree_io_parameter_archive_builder_t* builder) {
+  IREE_ASSERT_ARGUMENT(builder);
+  return iree_io_parameter_index_count(builder->index) == 0;
+}
+
 static iree_io_physical_size_t
 iree_io_parameter_archive_builder_storage_alignment(
     const iree_io_parameter_archive_builder_t* builder) {

@@ -245,12 +245,10 @@ void buildGlobalOptimizationPassPipeline(
   // constants that aren't exported and skip it for larger parameters, but this
   // is a sensible place for the common case of wanting const-eval in the final
   // artifact + archive.
-  if (!transformOptions.options.parameterExportFile.empty()) {
+  if (!transformOptions.options.parameterExportPath.empty()) {
     IREE::IO::Parameters::ExportParametersPassOptions exportParametersOptions;
-    exportParametersOptions.archivePath =
-        transformOptions.options.parameterExportFile;
-    exportParametersOptions.parameterScope =
-        transformOptions.options.parameterExportScope;
+    exportParametersOptions.scopePath =
+        transformOptions.options.parameterExportPath;
     exportParametersOptions.minimumSize =
         transformOptions.options.parameterExportMinimumSize;
     mainPassManager.addPass(IREE::IO::Parameters::createExportParametersPass(
@@ -260,7 +258,7 @@ void buildGlobalOptimizationPassPipeline(
   if (!transformOptions.options.parameterSplatExportFile.empty()) {
     IREE::IO::Parameters::GenerateSplatParameterArchivePassOptions
         generateSplatOptions;
-    generateSplatOptions.archivePath =
+    generateSplatOptions.filePath =
         transformOptions.options.parameterSplatExportFile;
     mainPassManager.addPass(
         IREE::IO::Parameters::createGenerateSplatParameterArchivePass(

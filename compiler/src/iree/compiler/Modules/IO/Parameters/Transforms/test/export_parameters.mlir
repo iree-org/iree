@@ -1,26 +1,42 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(iree-io-export-parameters{archive-path="%t.irpa" scope=opt minimum-size=0})" %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(iree-io-export-parameters{path="opt=%t.irpa" minimum-size=0})" %s | FileCheck %s
+// RUN: iree-dump-parameters --parameters=%t.irpa | FileCheck %s --check-prefix=DUMP
 
-// CHECK-LABEL: module @parameter_example
-module @parameter_example {
-// CHECK-DAG: util.global private @array_global_0 = #stream.parameter.named<"opt"::"array_global_0"> : tensor<1x2xf32>
-// CHECK-DAG: util.global private @dense_global_1 = #stream.parameter.named<"opt"::"dense_global_1"> : tensor<2x2xf32>
-// CHECK-DAG: util.global private @constant_hoisted = #stream.parameter.named<"opt"::"constant_hoisted"> : tensor<1x2xf32>
-// CHECK-DAG: util.global private @dense_global_2 = #stream.parameter.named<"opt"::"dense_global_2"> : tensor<2x2xf32>
-  util.global private @array_global_0 = dense<[[11.0, 12.0]]> : tensor<1x2xf32>
-  util.global private @dense_global_1 = dense<"0x0000E040000000410000104100002041"> : tensor<2x2xf32>
-  util.global private @dense_global_2 = dense<"0x0000803F000000400000404000008040"> : tensor<2x2xf32>
-  util.func public @parameter_example(%arg0: tensor<1x2xf32>) -> tensor<1x2xf32> {
-    %cst = arith.constant 0.000000e+00 : f32
-    %3 = util.global.load @array_global_0 : tensor<1x2xf32>
-    %4 = util.global.load @dense_global_1 : tensor<2x2xf32>
-    %5 = arith.constant dense<"0x0000A0400000C040"> : tensor<1x2xf32>
-    %6 = util.global.load @dense_global_2 : tensor<2x2xf32>
-    %empty = tensor.empty() : tensor<1x2xf32>
-    %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<1x2xf32>) -> tensor<1x2xf32>
-    %8 = linalg.matmul ins(%arg0, %6 : tensor<1x2xf32>, tensor<2x2xf32>) outs(%fill : tensor<1x2xf32>) -> tensor<1x2xf32>
-    %10 = linalg.add ins(%8, %5 : tensor<1x2xf32>, tensor<1x2xf32>) outs(%empty : tensor<1x2xf32>) -> tensor<1x2xf32>
-    %12 = linalg.matmul ins(%10, %4 : tensor<1x2xf32>, tensor<2x2xf32>) outs(%fill : tensor<1x2xf32>) -> tensor<1x2xf32>
-    %14 = linalg.add ins(%12, %3 : tensor<1x2xf32>, tensor<1x2xf32>) outs(%empty : tensor<1x2xf32>) -> tensor<1x2xf32>
-    util.return %14 : tensor<1x2xf32>
-  }
-}
+//      CHECK: util.global private @constant_scalar_i1 = #stream.parameter.named<"opt"::"constant_scalar_i1"> : tensor<i1>
+//       DUMP: - | - | 1 | `constant_scalar_i1`
+util.global private @constant_scalar_i1 = dense<true> : tensor<i1>
+
+// CHECK-NEXT: util.global private @constant_dense_2xi1 = #stream.parameter.named<"opt"::"constant_dense_2xi1"> : tensor<2xi1>
+//  DUMP-NEXT: {{[0-9]+}} | {{[0-9]+}} | 2 | `constant_dense_2xi1`
+util.global private @constant_dense_2xi1 = dense<[true, false]> : tensor<2xi1>
+
+// CHECK-NEXT: util.global private @constant_dense_3xi4 = #stream.parameter.named<"opt"::"constant_dense_3xi4"> : tensor<3xi4>
+//  DUMP-NEXT: {{[0-9]+}} | {{[0-9]+}} | 2 | `constant_dense_3xi4`
+util.global private @constant_dense_3xi4 = dense<[4, 5, 6]> : tensor<3xi4>
+
+// CHECK-NEXT: util.global private @constant_dense_2xi8 = #stream.parameter.named<"opt"::"constant_dense_2xi8"> : tensor<2xi8>
+//  DUMP-NEXT: {{[0-9]+}} | {{[0-9]+}} | 2 | `constant_dense_2xi8`
+util.global private @constant_dense_2xi8 = dense<[4, 5]> : tensor<2xi8>
+
+// CHECK-NEXT: util.global private @constant_dense_2xf32 = #stream.parameter.named<"opt"::"constant_dense_2xf32"> : tensor<2xf32>
+//  DUMP-NEXT: {{[0-9]+}} | {{[0-9]+}} | 8 | `constant_dense_2xf32`
+util.global private @constant_dense_2xf32 = dense<[11.0, 12.0]> : tensor<2xf32>
+
+// CHECK-NEXT: util.global private @constant_splat_2xf32 = #stream.parameter.named<"opt"::"constant_splat_2xf32"> : tensor<2xf32>
+//  DUMP-NEXT: - | - | 8 | `constant_splat_2xf32`
+util.global private @constant_splat_2xf32 = dense<11.0> : tensor<2xf32>
+
+// CHECK-NEXT: util.global private mutable @mutable_scalar_i1 = #stream.parameter.named<"opt"::"mutable_scalar_i1"> : tensor<i1>
+//  DUMP-NEXT: {{[0-9]+}} | {{[0-9]+}} | 1 | `mutable_scalar_i1`
+util.global private mutable @mutable_scalar_i1 = dense<true> : tensor<i1>
+
+// CHECK-NEXT: util.global private mutable @mutable_dense_3xi4 = #stream.parameter.named<"opt"::"mutable_dense_3xi4"> : tensor<3xi4>
+//  DUMP-NEXT: {{[0-9]+}} | {{[0-9]+}} | 2 | `mutable_dense_3xi4`
+util.global private mutable @mutable_dense_3xi4 = dense<[4, 5, 6]> : tensor<3xi4>
+
+// CHECK-NEXT: util.global private mutable @mutable_dense_2xf32 = #stream.parameter.named<"opt"::"mutable_dense_2xf32"> : tensor<2xf32>
+//  DUMP-NEXT: {{[0-9]+}} | {{[0-9]+}} | 8 | `mutable_dense_2xf32`
+util.global private mutable @mutable_dense_2xf32 = dense<[11.0, 12.0]> : tensor<2xf32>
+
+// CHECK-NEXT: util.global private mutable @mutable_splat_2xf32 = #stream.parameter.named<"opt"::"mutable_splat_2xf32"> : tensor<2xf32>
+//  DUMP-NEXT: {{[0-9]+}} | {{[0-9]+}} | 8 | `mutable_splat_2xf32`
+util.global private mutable @mutable_splat_2xf32 = dense<11.0> : tensor<2xf32>
