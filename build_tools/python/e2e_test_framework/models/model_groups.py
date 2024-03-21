@@ -19,24 +19,25 @@ from e2e_test_framework.models import (
 # A list of models with thread configurations.
 # Note `0` represents sync execution.
 X86_64_BENCHMARK_CONFIG = [
+    # Microbenchmarks.
+    common_definitions.CpuBenchmarkConfig(
+        model=matmul.MATMUL_1x256x2048_I8xI4_MLIR, threads=[0]
+    ),
+    common_definitions.CpuBenchmarkConfig(
+        model=matmul.MATMUL_256x256x2048_I8xI4_MLIR, threads=[0]
+    ),
+    common_definitions.CpuBenchmarkConfig(
+        model=matmul.MATMUL_1x256x2048_I8xI8_MLIR, threads=[0]
+    ),
+    common_definitions.CpuBenchmarkConfig(
+        model=matmul.MATMUL_256x256x2048_I8xI8_MLIR, threads=[0]
+    ),
     # Tiny models.
     common_definitions.CpuBenchmarkConfig(
         model=tflite_models.PERSON_DETECT_INT8, threads=[0, 1]
     ),
     common_definitions.CpuBenchmarkConfig(
         model=tflite_models.MOBILENET_V3SMALL, threads=[0, 1]
-    ),
-    common_definitions.CpuBenchmarkConfig(
-        model=matmul.MATMUL_1x256x2048_I8xI4_MLIR, threads=[0, 1]
-    ),
-    common_definitions.CpuBenchmarkConfig(
-        model=matmul.MATMUL_256x256x2048_I8xI4_MLIR, threads=[0, 1]
-    ),
-    common_definitions.CpuBenchmarkConfig(
-        model=matmul.MATMUL_1x256x2048_I8xI8_MLIR, threads=[0, 1]
-    ),
-    common_definitions.CpuBenchmarkConfig(
-        model=matmul.MATMUL_256x256x2048_I8xI8_MLIR, threads=[0, 1]
     ),
     # Small models.
     common_definitions.CpuBenchmarkConfig(
