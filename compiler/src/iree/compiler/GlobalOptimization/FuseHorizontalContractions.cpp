@@ -256,7 +256,8 @@ void FuseHorizontalContractionsPass::runOnOperation() {
     }
 
     Block *block = generic->getBlock();
-    Operation *user = *generic->user_begin();
+    // Get the collapse shape user.
+    Operation *user = *generic->user_begin()->getResult(0).user_begin();
 
     SmallVector<linalg::GenericOp> fusionGroup;
     fusionGroup.push_back(generic);
