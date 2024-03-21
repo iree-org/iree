@@ -82,6 +82,20 @@ std::optional<int64_t> getConstantIndex(Value value) {
   return val.getSExtValue();
 }
 
+static void setPriority(Location loc, OpBuilder &builder, int priority) {
+  auto asmDialectAttr =
+      LLVM::AsmDialectAttr::get(builder.getContext(), LLVM::AsmDialect::AD_ATT);
+  std::string str = "s_setprio " + std::to_string(priority);
+  const char *asmStr = str.c_str();
+  const char *constraints = "";
+  builder.create<LLVM::InlineAsmOp>(
+      loc,
+      /*resultTypes=*/TypeRange(), /*operands=*/ValueRange(),
+      /*asm_string=*/asmStr, constraints, /*has_side_effects=*/true,
+      /*is_align_stack=*/false, /*asm_dialect=*/asmDialectAttr,
+      /*operand_attrs=*/ArrayAttr());
+}
+
 class LoopPrefetcher {
 public:
   /// Creates an instance that plans the given scf.for |op| to be ready for
@@ -131,6 +145,9 @@ public:
       emitRead(mapping[0], rewriter, zero);
       // Write(0)
       emitWrite(mapping[0], rewriter, zero);
+      // Read (1)
+      iterArgs = emitRead(mapping[1], rewriter, one);
+      emitBarrier(loc, rewriter);
       return {iterArgs, writeArgs};
     }
 
@@ -159,7 +176,7 @@ public:
                               SmallVector<Value> &newIterArgs,
                               SmallVector<Value> &writeArgs) {
     Location loc = forOp.getLoc();
-    int64_t newUpperBound = singleStage ? (ub - step) : (ub - 2 * step);
+    int64_t newUpperBound = (ub - 2 * step);
     auto newUb = rewriter.create<arith::ConstantIndexOp>(loc, newUpperBound);
 
     // Keep original iter args and then add some for what's being loaded to
@@ -211,7 +228,7 @@ public:
       Value iglpOpt = rewriter.create<LLVM::ConstantOp>(loc, rewriter.getI32Type(), 1);
       rewriter.create<LLVM::CallIntrinsicOp>(loc, TypeRange(), intrinsic, ValueRange(iglpOpt));
     }
-    
+
     Value indVar = newForOp.getInductionVar();
     Value increment = rewriter.create<arith::ConstantIndexOp>(loc, step);
     Value iPlusOne = rewriter.create<arith::AddIOp>(loc, indVar, increment);
@@ -222,16 +239,29 @@ public:
       for (auto [idx, arg] : llvm::enumerate(forOp.getRegionIterArgs())) {
         mapping[i].map(arg, newForOp.getRegionIterArgs()[idx]);
       }
+      if (i == 1) {
+        // Map write vectors to iter args of new for loop.
+        int index = forOp.getRegionIterArgs().size();
+        for (Operation *op : writeStage) {
+          if (auto writeOp = dyn_cast<vector::TransferWriteOp>(op)) {
+            mapping[i].map(writeOp.getVector(),
+                           newForOp.getRegionIterArgs()[index++]);
+          }
+        }
+      }
     }
 
     SmallVector<Value> readRegisters, moreRegisters;
     if (singleStage) {
-      emitRead(mapping[1], rewriter, iPlusOne);
-      emitBarrier(loc, rewriter);
       emitCompute(mapping[0], rewriter, indVar);
       emitBarrier(loc, rewriter);
+      setPriority(loc, rewriter, 1);
       emitWrite(mapping[1], rewriter, iPlusOne);
-      updateYield(mapping[0], readRegisters, rewriter);
+      readRegisters = emitRead(mapping[2], rewriter, iPlusTwo);
+      setPriority(loc, rewriter, 0);
+      emitBarrier(loc, rewriter);
+      updateYieldWithMultipleMappings(mapping[2], mapping[0], readRegisters,
+                                      rewriter);
       return;
     }
 
@@ -266,8 +296,24 @@ public:
       mapping[0].map(forOp.getRegionIterArg(i), newForOp.getResult(i));
     }
 
+    // Map write inputs to results of newForLoop.
+    int index = forOp->getNumResults();
+    for (Operation *op : writeStage) {
+      if (auto writeOp = dyn_cast<vector::TransferWriteOp>(op)) {
+        mapping[0].map(writeOp.getVector(), newForOp.getResult(index++));
+      }
+    }
+
     if (singleStage) {
+      SmallVector<Value> computeResults;
+      // Compute(N-2)
+      computeResults = emitCompute(mapping[0], rewriter, nMinusTwo);
+      mapping[0].map(forOp.getRegionIterArg(0), computeResults[0]);
       emitBarrier(loc, rewriter);
+      // Write(N-1)
+      emitWrite(mapping[0], rewriter, nMinusOne);
+      emitBarrier(loc, rewriter);
+      // Compute(N-1)
       return emitCompute(mapping[0], rewriter, nMinusOne);
     }
 
@@ -346,7 +392,9 @@ private:
 
     for (Operation &op : forOp.getBody()->getOperations()) {
       if (auto read = dyn_cast<vector::TransferReadOp>(op)) {
-        getValueDependencies(read, readDependencies);
+        MemRefType type = dyn_cast<MemRefType>(read.getSource().getType());
+        if (!gpu::GPUDialect::hasWorkgroupMemoryAddressSpace(type))
+          getValueDependencies(read, readDependencies);
       } else if (auto write = dyn_cast<vector::TransferWriteOp>(op)) {
         getValueDependencies(write, writeDependencies,
                              /*noTransferReads=*/true);
@@ -380,6 +428,26 @@ private:
                << op);
           return failure();
         }
+      }
+    }
+
+    // Modify yield op to take all read results as operands
+    SmallVector<Value> readResults;
+    for (Operation *op : readStage) {
+      if (auto readOp = dyn_cast<vector::TransferReadOp>(op)) {
+        readResults.push_back(readOp.getResult());
+      }
+    }
+    IRRewriter rewriter(forOp.getContext());
+    for (auto [idx, op] : llvm::enumerate(computeStage)) {
+      if (auto yieldOp = dyn_cast<scf::YieldOp>(op)) {
+        SmallVector<Value> newOperands = yieldOp->getOperands();
+        llvm::append_range(newOperands, readResults);
+        rewriter.setInsertionPoint(yieldOp);
+        Operation *newYield =
+            rewriter.create<scf::YieldOp>(op->getLoc(), newOperands);
+        computeStage[idx] = newYield;
+        break;
       }
     }
 
@@ -516,6 +584,25 @@ private:
     }
   }
 
+  void updateYieldWithMultipleMappings(IRMapping &mapping0, IRMapping &mapping1,
+                                       SmallVector<Value> &readValues,
+                                       RewriterBase &rewriter) {
+    for (Operation *op : computeStage) {
+      if (auto yield = dyn_cast<scf::YieldOp>(op)) {
+        cloneAndUpdateOperands(rewriter, yield, [&](OpOperand *newOperand) {
+          if (mapping0.contains(newOperand->get())) {
+            newOperand->set(mapping0.lookup(newOperand->get()));
+          }
+          if (mapping1.contains(newOperand->get())) {
+            newOperand->set(mapping1.lookup(newOperand->get()));
+          }
+        });
+
+        break;
+      }
+    }
+  }
+
   void updateYield(IRMapping &mapping, SmallVector<Value> &readValues,
                    RewriterBase &rewriter) {
     for (Operation *op : computeStage) {
@@ -565,6 +652,8 @@ FailureOr<scf::ForOp> prefetchSharedMemoryCopy(RewriterBase &rewriter,
 
   SmallVector<Value> results =
       prefetcher.emitEpilogue(rewriter, newForOp, writeArgs);
+  for (int i = results.size() - 1; i >= forOp->getNumResults(); --i)
+    results.pop_back();
   rewriter.replaceOp(forOp, results);
   return newForOp;
 }
