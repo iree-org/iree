@@ -45,11 +45,6 @@ llvm::cl::opt<bool> clGPUEnableVectorDistribution(
     llvm::cl::desc("enable the usage of the vector distribution pipeline"),
     llvm::cl::init(false));
 
-llvm::cl::opt<bool> clGPUUsePadToModelMemcpy(
-    "iree-codegen-llvmgpu-use-pad-to-model-memcpy",
-    llvm::cl::desc("enable the usage of the vector distribution pipeline"),
-    llvm::cl::init(false));
-
 llvm::cl::opt<bool> clGPUUseConvVectorDistributePipeline(
     "iree-codegen-llvmgpu-use-conv-vector-distribute-pipeline",
     llvm::cl::desc("enable the usage of the conv vector distribution pipeline"),
@@ -658,12 +653,11 @@ setMatmulVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
                                  /*canUpcastAcc=*/true);
   }
 
-  // Only batch_matmul is supported in the LLVMGPUMatmulVectorDistribute
+  // Only batch_matmul is supported in the LLVMGPUPadAndVectorDistribute
   // pipeline.
-  if (!schedule && clGPUUsePadToModelMemcpy &&
-      !contractionDims->batch.empty()) {
+  if (!schedule && !contractionDims->batch.empty()) {
     pipeline = IREE::Codegen::DispatchLoweringPassPipeline::
-        LLVMGPUMatmulVectorDistribute;
+        LLVMGPUPadAndVectorDistribute;
     bool mustBeAligned = false;
     schedule = deduceMMASchedule(problem, intrinsics, seeds, sharedMemoryLimit,
                                  /*canUpcastAcc=*/false, mustBeAligned);
