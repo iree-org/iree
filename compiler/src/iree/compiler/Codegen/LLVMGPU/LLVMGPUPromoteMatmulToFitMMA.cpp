@@ -200,6 +200,26 @@ public:
         op.getSourceMutable().assign(extractSliceOp.getResult());
         rewriter.finalizeOpModification(op);
       }
+
+      RewritePatternSet patterns(ctx);
+      tensor::PadOp::getCanonicalizationPatterns(patterns, ctx);
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+        return signalPassFailure();
+      }
+
+      // Rely on GPUVectorAlloc to model aligned cases.
+      funcOp.walk([&](tensor::PadOp padOp) {
+        if (!padOp.getNofoldAttr()) {
+          return;
+        }
+        if (!llvm::all_of(padOp.getMixedLowPad(), isZeroIndex) ||
+            !llvm::all_of(padOp.getMixedHighPad(), isZeroIndex)) {
+          return;
+        }
+        rewriter.startOpModification(padOp);
+        padOp.setNofold(false);
+        rewriter.finalizeOpModification(padOp);
+      });
     }
   }
 };

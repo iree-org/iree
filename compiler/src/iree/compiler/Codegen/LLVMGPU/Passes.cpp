@@ -641,7 +641,10 @@ void addGPUVectorDistributePassPipeline(OpPassManager &pm,
   addGPUVectorizationPasses(nestedModulePM);
 
   // Allocate tensors for copies to shared memory.
-  if (!usePadToModelSharedMemcpy) {
+  if (usePadToModelSharedMemcpy) {
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createGPUVectorAlloc(/*promoteLHS=*/false));
+  } else {
     nestedModulePM.addNestedPass<func::FuncOp>(createGPUVectorAlloc());
   }
 
