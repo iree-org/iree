@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <optional>
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/PassDetail.h"
@@ -15,6 +16,7 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
@@ -271,6 +273,27 @@ createExpand(Value tensor, Location loc, PatternRewriter &rewriter,
                                                 reassociations);
 }
 
+static std::optional<linalg::GenericOp> getGenericDemotionUser(Operation *op) {
+  if (!op->hasOneUse()) {
+    return std::nullopt;
+  }
+  SmallVector<Operation *> users(op->getUsers());
+  auto genericOp = dyn_cast<linalg::GenericOp>(users[0]);
+  if (!genericOp || !linalg::isElementwise(genericOp)) {
+    return std::nullopt;
+  }
+  auto yieldOp = cast<linalg::YieldOp>(genericOp.getBody()->getTerminator());
+  auto castOp = yieldOp->getOperand(0).getDefiningOp<arith::TruncFOp>();
+  if (!castOp) {
+    return std::nullopt;
+  }
+  Value castIn = castOp->getOperand(0);
+  if (!castIn.isa<BlockArgument>()) {
+    return std::nullopt;
+  }
+  return genericOp;
+}
+
 namespace {
 
 /// Convert conv2d to a sequence of ops that implement the
@@ -438,6 +461,35 @@ public:
         ValueRange({fillOp.result()}));
     Value bmmResult = bmmOp.getResult(0);
 
+    // Add demotion after batch_matmul
+    Value result = convOp.getResult(0);
+    std::optional<linalg::GenericOp> demotionOp =
+        getGenericDemotionUser(convOp);
+    if (demotionOp.has_value()) {
+      auto demotedType = demotionOp->getResultTypes()[0];
+      auto demotedElementType =
+          cast<RankedTensorType>(demotedType).getElementType();
+      auto newDemotionOutType = bmmOutputType.clone(demotedElementType);
+      auto bmmMixedSizes = tensor::getMixedSizes(rewriter, loc, bmmResult);
+      Value init = rewriter.create<tensor::EmptyOp>(loc, bmmMixedSizes,
+                                                    demotedElementType);
+      SmallVector<AffineMap> maps(
+          2, AffineMap::getMultiDimIdentityMap(newDemotionOutType.getRank(),
+                                               rewriter.getContext()));
+      SmallVector<utils::IteratorType> iteratorTypes(
+          newDemotionOutType.getRank(), utils::IteratorType::parallel);
+      auto newDemotionOp = rewriter.create<linalg::GenericOp>(
+          loc, newDemotionOutType, bmmResult, init, maps, iteratorTypes,
+          nullptr, linalg::getPrunedAttributeList(demotionOp.value()));
+      rewriter.inlineRegionBefore(demotionOp.value().getRegion(),
+                                  newDemotionOp.getRegion(),
+                                  newDemotionOp.getRegion().begin());
+      bmmResult = newDemotionOp->getResult(0);
+      resultElementType = demotedElementType;
+      outputType = outputType.clone(demotedElementType);
+      result = demotionOp->getResult(0);
+    }
+
     // Add expand shape
     SmallVector<int64_t> expandedShape = {resultShape[0], resultShape[1],
                                           resultShape[2], resultShape[3],
@@ -478,7 +530,6 @@ public:
     auto winogradOutput = rewriter.create<tensor::ExtractSliceOp>(
         loc, outputType, paddedOutput, offsets, sizes, strides);
 
-    Value result = convOp.getResult(0);
     result.replaceAllUsesWith(winogradOutput);
     return success();
   }
