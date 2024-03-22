@@ -451,7 +451,8 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
       }
     }
 
-    rewriter.replaceUsesWithinBlock(target, clonedTarget->getResults(), &body);
+    rewriter.replaceOpUsesWithinBlock(target, clonedTarget->getResults(),
+                                      &body);
   }
 
   FailureOr<IREE::Flow::DispatchRegionOp> newRegionOp =
