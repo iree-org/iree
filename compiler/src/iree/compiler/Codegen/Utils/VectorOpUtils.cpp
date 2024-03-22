@@ -89,15 +89,15 @@ VectorContractOpInfo::inferOpKind(MLIRContext *ctx,
     return OpKind::UNKNOWN;
   }
 
-  if (!contractionDims.batch.empty() &&
-      (contractionDims.batch.size() > 1 || contractionDims.batch[0] != 0)) {
-    return OpKind::UNKNOWN;
-  }
-
-  if (*maps[0].getResultPosition(getAffineDimExpr(0, ctx)) != 0 ||
-      *maps[1].getResultPosition(getAffineDimExpr(0, ctx)) != 0 ||
-      *maps[2].getResultPosition(getAffineDimExpr(0, ctx)) != 0) {
-    return OpKind::UNKNOWN;
+  if (!contractionDims.batch.empty()) {
+    if (contractionDims.batch.size() > 1 || contractionDims.batch[0] != 0) {
+      return OpKind::UNKNOWN;
+    }
+    if (*maps[0].getResultPosition(getAffineDimExpr(0, ctx)) != 0 ||
+        *maps[1].getResultPosition(getAffineDimExpr(0, ctx)) != 0 ||
+        *maps[2].getResultPosition(getAffineDimExpr(0, ctx)) != 0) {
+      return OpKind::UNKNOWN;
+    }
   }
 
   int64_t innerM = contractionDims.m.back();

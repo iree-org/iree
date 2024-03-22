@@ -561,8 +561,10 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
     llvm::errs() << "Getting mma layouts for:\n" << contractOp << "\n";
     llvm::errs() << "For schedule: " << *this << "\n";
   });
-  if (opInfo.getOpKind() == VectorContractOpInfo::OpKind::UNKNOWN)
+  if (opInfo.getOpKind() == VectorContractOpInfo::OpKind::UNKNOWN) {
+    LLVM_DEBUG({ llvm::errs() << "Unknown contraction kind\n"; });
     return std::nullopt;
+  }
 
   auto [aM, bN] = *opInfo.getOperandMNIndex();
   auto [aK, bK] = *opInfo.getOperandKIndex();
@@ -579,6 +581,7 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
 
   int64_t batchCount = opInfo.getBatchCount();
   if (batchCount == 1 && bounds[0] != 1) {
+    LLVM_DEBUG({ llvm::errs() << "non-unit batch dimension\n"; });
     return std::nullopt;
   }
 
