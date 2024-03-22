@@ -37,7 +37,6 @@ struct LLVMGPUPromoteDenseCstToTensorPass
 
     IRRewriter rewriter(ctx);
     for (auto constantOp : candidates) {
-      constantOp.dump();
       rewriter.setInsertionPoint(constantOp);
       auto attr = dyn_cast<DenseElementsAttr>(constantOp.getValue());
       auto attrType = dyn_cast<ShapedType>(attr.getType());
