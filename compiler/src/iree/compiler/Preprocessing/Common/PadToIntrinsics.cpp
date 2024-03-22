@@ -264,9 +264,9 @@ public:
       TypeSwitch<Operation *, void>(linalgOp.getOperation())
           .Case<linalg::Conv2DNhwcHwcfOp>(
               [&](auto convOp) { padConvOp(rewriter, linalgOp, intrinsics); })
-          .Case<linalg::BatchMatmulOp>([&](auto matmulOp) {
-            padBatchGemmOp(rewriter, linalgOp, intrinsics);
-          })
+          //.Case<linalg::BatchMatmulOp>([&](auto matmulOp) {
+            //padBatchGemmOp(rewriter, linalgOp, intrinsics);
+          //})
           .Default([&](Operation *op) {});
     }
   }

@@ -52,7 +52,8 @@ void addGPUTransposePassPipeline(OpPassManager &pm);
 void addGPUVectorizationPassPipeline(OpPassManager &pm);
 
 /// Lowering based on vector distribution patterns.
-void addGPUVectorDistributePassPipeline(OpPassManager &pm);
+void addGPUVectorDistributePassPipeline(OpPassManager &pm,
+                                        bool usePadToModelSharedMemcpy);
 void addGPUConvVectorDistributePassPipeline(OpPassManager &pm);
 
 /// Lowering reductions to warp reductions.
@@ -121,6 +122,9 @@ enum class GPUTensorCoreType {
   MMA_SYNC = 1,
 };
 
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createLLVMGPUFoldExtractSliceIntoXferWritePass();
+
 /// Convert Linalg ops to Vector and prepare converstion to GPU MMA ops.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMGPUTensorCoreVectorizationPass(
@@ -186,6 +190,12 @@ verifyGPUMatmulPipeline(Operation *op,
 /// on operators like Flash Attention.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createAMDGPUPrepareForChainedMatmulPass();
+
+/// Pass to pad operations on tensors in top-down order.
+enum class LLVMGPUMatmulPadOption { ParallelDims, ReductionDims };
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createLLVMGPUPromoteMatmulToFitMMAPass(
+    LLVMGPUMatmulPadOption option = LLVMGPUMatmulPadOption::ParallelDims);
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMGPUPromoteConvImgAndTileFilterPass();

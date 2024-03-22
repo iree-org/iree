@@ -60,6 +60,12 @@ def LLVMGPUCastTypeToFitMMA : InterfacePass<"iree-llvmgpu-cast-type-to-fit-mma",
   let constructor = "mlir::iree_compiler::createLLVMGPUCastTypeToFitMMAPass()";
 }
 
+def LLVMGPUFoldExtractSliceIntoXferWrite :
+    InterfacePass<"iree-llvmgpu-fold-extract-slice-into-xfer-write", "mlir::FunctionOpInterface"> {
+  let summary = "Perform a pass that folds extract_slice(xfer_write) into a single xfer_write";
+  let constructor = "mlir::iree_compiler::createLLVMGPUFoldExtractSliceIntoXferWritePass()";
+}
+
 def LLVMGPUIm2Col : InterfacePass<"iree-llvmgpu-im2col", "mlir::FunctionOpInterface"> {
   let summary = "Perform Im2Col conversion for convolution operations";
   let constructor = "mlir::iree_compiler::createLLVMGPUIm2ColPass()";
@@ -87,6 +93,12 @@ def LLVMGPUPrefetchSharedMemory :
     InterfacePass<"iree-llvmgpu-prefetch-shared-memory", "mlir::FunctionOpInterface"> {
   let summary = "Rotate scf.for loops to prefetch shared memory with distance 1";
   let constructor = "mlir::iree_compiler::createLLVMGPUPrefetchSharedMemoryPass()";
+}
+
+def LLVMGPUPromoteMatmulToFitMMA :
+    InterfacePass<"iree-llvmgpu-promote-matmul-to-fit-mma", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to promote contraction ops to fit mma shapes";
+  let constructor = "mlir::iree_compiler::createLLVMGPUPromoteMatmulToFitMMAPass()";
 }
 
 def LLVMGPUPromoteConvImgAndTileFilter :

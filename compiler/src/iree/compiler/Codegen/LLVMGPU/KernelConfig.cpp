@@ -643,12 +643,30 @@ setMatmulVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   int64_t sharedMemoryLimit = targetInfo.sharedMemoryLimit;
 
   // First try to find a schedule with an exactly matching intrinsic.
+  auto pipeline =
+      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorDistribute;
   std::optional<GPUMMASchedule> schedule =
       deduceMMASchedule(problem, intrinsics, seeds, sharedMemoryLimit);
   if (!schedule) {
     // Then try again by allowing upcasting accumulator.
     schedule = deduceMMASchedule(problem, intrinsics, seeds, sharedMemoryLimit,
                                  /*canUpcastAcc=*/true);
+  }
+
+  // Only batch_matmul is supported in the LLVMGPUPadAndVectorDistribute
+  // pipeline.
+  if (!schedule && !contractionDims->batch.empty()) {
+    pipeline = IREE::Codegen::DispatchLoweringPassPipeline::
+        LLVMGPUPadAndVectorDistribute;
+    bool mustBeAligned = false;
+    schedule = deduceMMASchedule(problem, intrinsics, seeds, sharedMemoryLimit,
+                                 /*canUpcastAcc=*/false, mustBeAligned);
+    if (!schedule) {
+      // Then try again by allowing upcasting accumulator.
+      schedule =
+          deduceMMASchedule(problem, intrinsics, seeds, sharedMemoryLimit,
+                            /*canUpcastAcc=*/true, mustBeAligned);
+    }
   }
   if (!schedule) {
     return failure();
@@ -700,10 +718,9 @@ setMatmulVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
       scheduleAttr);
   auto configDict = DictionaryAttr::get(context, attrs);
 
-  return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, op, tileSizes,
-      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorDistribute,
-      workgroupSize, subgroupSize, configDict);
+  return setOpConfigAndEntryPointFnTranslation(entryPoint, op, tileSizes,
+                                               pipeline, workgroupSize,
+                                               subgroupSize, configDict);
 }
 
 static LogicalResult
