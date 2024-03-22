@@ -6,7 +6,7 @@
 
 #include "iree/hal/drivers/hip/tracing.h"
 
-#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
 
 #include "iree/hal/drivers/hip/dynamic_symbols.h"
 #include "iree/hal/drivers/hip/status_util.h"
@@ -293,4 +293,4 @@ void iree_hal_hip_tracing_context_free(
 void iree_hal_hip_tracing_context_collect(
     iree_hal_hip_tracing_context_t* context) {}
 
-#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
