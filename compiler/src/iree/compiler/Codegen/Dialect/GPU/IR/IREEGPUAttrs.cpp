@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Utils/VectorOpUtils.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -576,6 +577,11 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
   SmallVector<int64_t> bounds;
   contractOp.getIterationBounds(bounds);
 
+  int64_t batchCount = opInfo.getBatchCount();
+  if (batchCount == 1 && bounds[0] != 1) {
+    return std::nullopt;
+  }
+
   // Get the concrete nested layout for each matrix. Note that the struct
   // MFMAAttr::SingleSubgroupLayout contains the partial layout for the
   // canonical (M, K) x (K, N) -> (M, N) matmul form; while the specific
@@ -620,6 +626,9 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
   }
 
   SmallVector<int64_t> subgroupBasis;
+  if (batchCount == 1) {
+    subgroupBasis.push_back(1);
+  }
   auto mDimVec = opInfo.getMDims();
   llvm::SmallDenseSet<int64_t> mDims(mDimVec.begin(), mDimVec.end());
   auto nDimVec = opInfo.getNDims();
@@ -663,11 +672,28 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
   auto [m, n] = opInfo.getResultFullMNIndex();
   int64_t cRank = opInfo.getCRank();
 
+  LLVM_DEBUG({
+    llvm::errs() << "Subgroup M Basis: ";
+    llvm::interleaveComma(subgroupMBasis, llvm::errs());
+    llvm::errs() << "\n";
+    llvm::errs() << "Subgroup N Basis: ";
+    llvm::interleaveComma(subgroupNBasis, llvm::errs());
+    llvm::errs() << "\n";
+    llvm::errs() << "Batch M Sizes: ";
+    llvm::interleaveComma(batchMSizes, llvm::errs());
+    llvm::errs() << "\n";
+    llvm::errs() << "Batch N Sizes: ";
+    llvm::interleaveComma(batchNSizes, llvm::errs());
+    llvm::errs() << "\n";
+  });
+
+  // Right now this is assuming at most one batch dim which is outer most and
+  // unit.
   SmallVector<int64_t> cMDims = opInfo.outMDims;
   SmallVector<int64_t> cNDims = opInfo.outNDims;
   SmallVector<int64_t> cBatchSizes(cRank, 1);
   SmallVector<int64_t> cSubgroupSizes(cRank, 1);
-  SmallVector<int64_t> cOverallOrder(cRank, 0);
+  SmallVector<int64_t> cOverallOrder = getIdentityPerm(cRank);
   for (auto [i, dim] : llvm::enumerate(cMDims)) {
     cBatchSizes[dim] = batchMSizes[i];
     cSubgroupSizes[dim] = subgroupMBasis[i];
@@ -708,13 +734,14 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
   SmallVector<int64_t> aMDims = opInfo.lhsMDims;
   SmallVector<int64_t> aBatchSizes(aRank, 1);
   SmallVector<int64_t> aSubgroupSizes(aRank, 1);
-  SmallVector<int64_t> aSubgroupOrder(aRank, 0);
-  SmallVector<int64_t> aBatchOrder(aRank, 0);
+  SmallVector<int64_t> aSubgroupOrder = getIdentityPerm(aRank);
+  SmallVector<int64_t> aBatchOrder = getIdentityPerm(aRank);
   for (auto [i, dim] : llvm::enumerate(aMDims)) {
     aBatchSizes[dim] = batchMSizes[i];
     aSubgroupSizes[dim] = subgroupMBasis[i];
-    aSubgroupOrder[dim] = i;
-    aBatchOrder[dim] = i >= afk ? i + 1 : i;
+    int64_t j = i + batchCount;
+    aSubgroupOrder[dim] = j;
+    aBatchOrder[dim] = j >= afk ? j + 1 : j;
   }
   aSubgroupOrder[afk] = aRank - 1;
   aBatchOrder[afk] = afk;
@@ -723,6 +750,9 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
   SmallVector<bool> aActiveSubgroups(subgroupBasis.size(), false);
   for (auto mDim : mDims) {
     aActiveSubgroups[mDim] = true;
+  }
+  if (batchCount == 1) {
+    aActiveSubgroups[0] = true;
   }
   aActiveSubgroups.back() = true;
 
@@ -746,13 +776,14 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
   SmallVector<int64_t> bNDims = opInfo.rhsNDims;
   SmallVector<int64_t> bBatchSizes(bRank, 1);
   SmallVector<int64_t> bSubgroupSizes(bRank, 1);
-  SmallVector<int64_t> bSubgroupOrder(bRank, 0);
-  SmallVector<int64_t> bBatchOrder(bRank, 0);
+  SmallVector<int64_t> bSubgroupOrder = getIdentityPerm(bRank);
+  SmallVector<int64_t> bBatchOrder = getIdentityPerm(bRank);
   for (auto [i, dim] : llvm::enumerate(bNDims)) {
     bBatchSizes[dim] = batchNSizes[i];
     bSubgroupSizes[dim] = subgroupNBasis[i];
-    bSubgroupOrder[dim] = i;
-    bBatchOrder[dim] = i >= bfk ? i + 1 : i;
+    int64_t j = i + batchCount;
+    bSubgroupOrder[dim] = j;
+    bBatchOrder[dim] = j >= bfk ? j + 1 : j;
   }
   bSubgroupOrder[bfk] = bRank - 1;
   bBatchOrder[bfk] = bfk;
@@ -761,6 +792,9 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
   SmallVector<bool> bActiveSubgroups(subgroupBasis.size(), false);
   for (auto nDim : nDims) {
     bActiveSubgroups[nDim] = true;
+  }
+  if (batchCount == 1) {
+    bActiveSubgroups[0] = true;
   }
   bActiveSubgroups.back() = true;
 

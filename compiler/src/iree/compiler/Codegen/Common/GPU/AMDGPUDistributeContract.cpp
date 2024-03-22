@@ -210,6 +210,11 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
       rhsOffsets[rhsN] = resultOffsets[resultN];
     }
 
+    if (opDetail.getBatchCount() == 1) {
+      rhsOffsets[0] = resultOffsets[0];
+      lhsOffsets[0] = resultOffsets[0];
+    }
+
     auto [lhsK, rhsK] = opDetail.getOperandFullKIndex();
     lhsOffsets[lhsK] = kOffset;
     rhsOffsets[rhsK] = kOffset;
