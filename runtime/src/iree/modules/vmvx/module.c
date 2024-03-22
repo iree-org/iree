@@ -577,9 +577,11 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_mmt4d, mmt4d, v) {
                            /*stride1=*/1,
                            /*size0=*/M,
                            /*size1=*/N * out_tile_size);
-  iree_uk_mmt4d(lhs, 0 /*offsets already accounted for*/, lhs_stride0, rhs, 0,
-                rhs_stride0, out, 0, out_stride0, M, N, K, M0, N0, K0,
-                args->flags, (const iree_uk_uint64_t*)iree_cpu_data_fields());
+  iree_uk_mmt4d(
+      lhs, 0 /*offsets already accounted for*/, lhs_stride0, rhs, 0,
+      rhs_stride0, out, 0, out_stride0, M, N, K, M0, N0, K0,
+      args->flags | IREE_UK_FLAG_MMT4D_ALLOW_GENERIC_FALLBACK_TILE_FUNCTION,
+      (const iree_uk_uint64_t*)iree_cpu_data_fields());
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }

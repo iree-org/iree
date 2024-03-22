@@ -17,3 +17,11 @@ iree_cc_library(
     ${IREE_UK_ARCH_DEPS}
   PUBLIC
 )
+
+iree_cc_library(
+  NAME
+    exported_mmt4d_tiles
+  DEPS
+    ${IREE_UK_ARCH_EXPORTED_MMT4D_TILES_DEPS}
+  PUBLIC
+)

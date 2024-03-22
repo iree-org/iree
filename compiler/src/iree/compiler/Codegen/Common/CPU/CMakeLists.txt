@@ -74,6 +74,7 @@ iree_cc_library(
     MLIRVectorDialect
     MLIRVectorToSCF
     MLIRVectorTransforms
+    iree::builtins::ukernel::arch::exported_mmt4d_tiles
     iree::builtins::ukernel::exported_bits
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect

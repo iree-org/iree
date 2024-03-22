@@ -29,6 +29,19 @@ func.func @mmt4d_f32f32f32(%arg0 : tensor<?x?x16x1xf32>, %arg1 : tensor<?x?x16x1
 
 // -----
 
+func.func @mmt4d_f32f32f32_missing_cpu_feature(%arg0 : tensor<?x?x16x1xf32>, %arg1 : tensor<?x?x16x1xf32>,
+    %arg2 : tensor<?x?x16x16xf32>) -> tensor<?x?x16x16xf32> attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {ukernels = "all", target_triple="x86_64-xyz-xyz", cpu_features="+avx,+avx2,+fma"}>
+} {
+  %0 = linalg.mmt4d ins(%arg0, %arg1 : tensor<?x?x16x1xf32>, tensor<?x?x16x1xf32>)
+      outs(%arg2 : tensor<?x?x16x16xf32>) -> tensor<?x?x16x16xf32>
+  return %0 : tensor<?x?x16x16xf32>
+}
+// CHECK-LABEL: func @mmt4d_f32f32f32_missing_cpu_feature(
+//      CHECK:   linalg.mmt4d
+
+// -----
+
 func.func @mmt4d_f32f32f32_with_none_ukernel_enabled(%arg0 : tensor<?x?x16x1xf32>, %arg1 : tensor<?x?x16x1xf32>,
     %arg2 : tensor<?x?x16x16xf32>) -> tensor<?x?x16x16xf32> attributes {
   hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {ukernels = "none", target_triple="x86_64-xyz-xyz", cpu_features="+avx512f"}>
@@ -209,8 +222,8 @@ func.func @mmt4d_f16f16f16(%arg0 : tensor<?x?x16x1xf16>, %arg1 : tensor<?x?x16x1
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?x16x1xf16>
 // CHECK-SAME:     %[[ARG1:[a-zA-Z0-9]+]]: tensor<?x?x16x1xf16>
 // CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<?x?x16x16xf16>
-//  CHECK-DAG:   %[[FLAGS:.+]] = arith.constant 1796 : i32
-//  NOSKIPROUND-DAG:   %[[FLAGS:.+]] = arith.constant 769 : i32
+//  CHECK-DAG:   %[[FLAGS:.+]] = arith.constant 1284 : i32
+//  NOSKIPROUND-DAG:   %[[FLAGS:.+]] = arith.constant 257 : i32
 //  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //  CHECK-DAG:   %[[C1_i32:.+]] = arith.constant 1 : i32

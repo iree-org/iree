@@ -10,6 +10,16 @@
 
 iree_add_all_subdirs()
 
+iree_cc_library(
+  NAME
+    mmt4d_x86_64_tiles
+  HDRS
+    "mmt4d_x86_64_tiles.inl"
+  DEPS
+
+  PUBLIC
+)
+
 iree_compiler_targeting_iree_arch(_IREE_UKERNEL_BITCODE_BUILD_X86_64 "x86_64")
 if(_IREE_UKERNEL_BITCODE_BUILD_X86_64)
 
@@ -143,9 +153,14 @@ endif()  # _IREE_UKERNEL_BITCODE_BUILD_X86_64
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
 
+list(APPEND IREE_UK_ARCH_EXPORTED_MMT4D_TILES_DEPS
+     "iree::builtins::ukernel::arch::x86_64::mmt4d_x86_64_tiles" PARENT_SCOPE)
+
 if (NOT (IREE_ARCH STREQUAL "x86_64"))
   return()
 endif()
+
+set(IREE_UK_ARCH_DEPS "iree::builtins::ukernel::arch::x86_64" PARENT_SCOPE)
 
 # Target CPUs supporting AVX2+FMA3. That includes Intel Haswell (2013) and newer
 # and AMD Excavator (2015) and newer. There is no current plan to look after
@@ -405,5 +420,3 @@ iree_cc_library(
     ${IREE_UK_X86_64_DEPS}
   PUBLIC
 )
-
-set(IREE_UK_ARCH_DEPS "iree::builtins::ukernel::arch::x86_64" PARENT_SCOPE)

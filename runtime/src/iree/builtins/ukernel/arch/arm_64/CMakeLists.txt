@@ -10,6 +10,16 @@
 
 iree_add_all_subdirs()
 
+iree_cc_library(
+  NAME
+    mmt4d_arm_64_tiles
+  HDRS
+    "mmt4d_arm_64_tiles.inl"
+  DEPS
+
+  PUBLIC
+)
+
 iree_compiler_targeting_iree_arch(_IREE_UKERNEL_BITCODE_BUILD_ARM_64 "arm_64")
 if(_IREE_UKERNEL_BITCODE_BUILD_ARM_64)
 
@@ -148,9 +158,14 @@ endif()  # _IREE_UKERNEL_BITCODE_BUILD_ARM_64
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
 
+list(APPEND IREE_UK_ARCH_EXPORTED_MMT4D_TILES_DEPS
+     "iree::builtins::ukernel::arch::arm_64::mmt4d_arm_64_tiles" PARENT_SCOPE)
+
 if (NOT (IREE_ARCH STREQUAL "arm_64"))
   return()
 endif()
+
+set(IREE_UK_ARCH_DEPS "iree::builtins::ukernel::arch::arm_64" PARENT_SCOPE)
 
 iree_select_compiler_opts(IREE_UK_COPTS_ARM_64_FULLFP16
   CLANG_OR_GCC
@@ -285,5 +300,3 @@ iree_cc_library(
     ${IREE_UK_ARM_64_DEPS}
   PUBLIC
 )
-
-set(IREE_UK_ARCH_DEPS "iree::builtins::ukernel::arch::arm_64" PARENT_SCOPE)

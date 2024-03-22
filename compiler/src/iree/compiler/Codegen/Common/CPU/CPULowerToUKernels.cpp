@@ -13,6 +13,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -22,7 +23,6 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Matchers.h"
-#include "mlir/IR/TypeRange.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler {
@@ -152,6 +152,88 @@ static Type getElementTypeForUKernel(Value input) {
   return castOpSrcType;
 }
 
+static std::string ukernelTypeName(Type t) {
+  const char *category;
+  if (t.isSignlessInteger()) {
+    category = "s";
+  } else if (t.isUnsignedInteger()) {
+    category = "u";
+  } else if (t.isF16() || t.isF32()) {
+    category = "f";
+  } else if (t.isBF16()) {
+    category = "bf";
+  } else {
+    return "";
+  }
+  return llvm::formatv("{0}{1}", category, t.getIntOrFloatBitWidth());
+}
+
+static bool canUseTile(IREE::HAL::ExecutableTargetAttr targetAttr,
+                       StringRef arch, StringRef suffix) {
+  if (arch != getIreeArchNameForTargetTriple(*getTargetTriple(targetAttr))) {
+    return false;
+  }
+  if (suffix.empty()) {
+    return true;
+  }
+  if (arch == "x86_64") {
+    if (suffix == "_avx2_fma2") {
+      return hasFeature(targetAttr, "+avx2");
+    }
+    if (suffix == "_avx512_base") {
+      return hasFeature(targetAttr, "+avx512f");
+    }
+    if (suffix == "_avx512_bf16") {
+      return hasFeature(targetAttr, "+avx512bf16");
+    }
+    if (suffix == "_avx512_vnni") {
+      return hasFeature(targetAttr, "+avx512vnni");
+    }
+  } else if (arch == "arm_64") {
+    if (suffix == "_fp16fml") {
+      return hasFeature(targetAttr, "+fp16fml");
+    }
+    if (suffix == "_fullfp16") {
+      return hasFeature(targetAttr, "+fullfp16");
+    }
+    if (suffix == "_bf16") {
+      return hasFeature(targetAttr, "+bf16");
+    }
+    if (suffix == "_dotprod") {
+      return hasFeature(targetAttr, "+dotprod");
+    }
+    if (suffix == "_i8mm") {
+      return hasFeature(targetAttr, "+i8mm");
+    }
+  }
+  return false;
+}
+
+static bool isMmt4dUkernelFast(IREE::HAL::ExecutableTargetAttr targetAttr,
+                               StringRef elemTypeTripleName, int m0, int n0,
+                               int k0) {
+  if (isVMVXBackend(targetAttr)) {
+    return true;
+  }
+  auto triple = getTargetTriple(targetAttr);
+  if (!triple) {
+    return false;
+  }
+  std::string archName = getIreeArchNameForTargetTriple(*triple);
+
+#define IREE_UK_MMT4D_TILE(ARCH, LHS, RHS, OUT, M0, N0, K0, SUFFIX)            \
+  if (elemTypeTripleName == (#LHS #RHS #OUT) && m0 == M0 && n0 == N0 &&        \
+      k0 == K0 && canUseTile(targetAttr, #ARCH, #SUFFIX)) {                    \
+    return true;                                                               \
+  }
+
+#include "iree/builtins/ukernel/arch/exported_mmt4d_tiles.inl"
+
+#undef IREE_UK_MMT4D_TILE
+
+  return false;
+}
+
 /// Matches an (linalg.fill -> )? linalg.mmt4d operation sequence and converts
 /// it into a iree_codegen.ukernel.mmt4d operation, that is later lowered
 /// into a call to the microkernel.
@@ -170,44 +252,51 @@ matchDAGForUKernel(RewriterBase &rewriter, linalg::Mmt4DOp op,
   Type lhsElemType = getElementTypeForUKernel(op.getDpsInputOperand(0)->get());
   Type rhsElemType = getElementTypeForUKernel(op.getDpsInputOperand(1)->get());
   Type outElemType = outType.getElementType();
+  std::string lhsElemTypeName = ukernelTypeName(lhsElemType);
+  std::string rhsElemTypeName = ukernelTypeName(rhsElemType);
+  std::string outElemTypeName = ukernelTypeName(outElemType);
+  if (lhsElemTypeName.empty() || rhsElemTypeName.empty() ||
+      outElemTypeName.empty()) {
+    return failure();
+  }
+  std::string elemTypeTripleName =
+      lhsElemTypeName + rhsElemTypeName + outElemTypeName;
+
   uint32_t flags = 0;
-  if (lhsElemType.isSignlessInteger(8) && rhsElemType.isSignlessInteger(8) &&
-      outElemType.isSignlessInteger(32)) {
+  if (elemTypeTripleName == "s8s8s32") {
     flags = IREE_UK_FLAG_MMT4D_TYPE_S8S8S32;
-  } else if (lhsElemType.isSignlessInteger(8) &&
-             rhsElemType.isSignlessInteger(4) &&
-             outElemType.isSignlessInteger(32)) {
+  } else if (elemTypeTripleName == "s8s4s32") {
     flags = IREE_UK_FLAG_MMT4D_TYPE_S8S4S32;
-  } else if (lhsElemType.isSignlessInteger(16) &&
-             rhsElemType.isSignlessInteger(16) &&
-             outElemType.isSignlessInteger(32)) {
+  } else if (elemTypeTripleName == "s16s16s32") {
     flags = IREE_UK_FLAG_MMT4D_TYPE_S16S16S32;
-  } else if (lhsElemType.isSignlessInteger(16) &&
-             rhsElemType.isUnsignedInteger(4) &&
-             outElemType.isSignlessInteger(32)) {
+  } else if (elemTypeTripleName == "s16u4s32") {
     flags = IREE_UK_FLAG_MMT4D_TYPE_S16U4S32;
-  } else if (lhsElemType.isSignlessInteger(16) &&
-             rhsElemType.isSignlessInteger(8) &&
-             outElemType.isSignlessInteger(32)) {
+  } else if (elemTypeTripleName == "s16s8s32") {
     flags = IREE_UK_FLAG_MMT4D_TYPE_S16S8S32;
-  } else if (lhsElemType.isF32() && rhsElemType.isF32() &&
-             outElemType.isF32()) {
+  } else if (elemTypeTripleName == "f32f32f32") {
     flags = IREE_UK_FLAG_MMT4D_TYPE_F32F32F32;
-  } else if (lhsElemType.isF16() && rhsElemType.isF16() &&
-             outElemType.isF32()) {
+  } else if (elemTypeTripleName == "f16f16f32") {
     flags = IREE_UK_FLAG_MMT4D_TYPE_F16F16F32;
-  } else if (lhsElemType.isF16() && rhsElemType.isF16() &&
-             outElemType.isF16()) {
+  } else if (elemTypeTripleName == "f16f16f16") {
     flags = IREE_UK_FLAG_MMT4D_TYPE_F16F16F16;
-  } else if (lhsElemType.isBF16() && rhsElemType.isBF16() &&
-             outElemType.isF32()) {
+  } else if (elemTypeTripleName == "bf16bf16f32") {
     flags = IREE_UK_FLAG_MMT4D_TYPE_BF16BF16F32;
-  } else if (lhsElemType.isBF16() && rhsElemType.isBF16() &&
-             outElemType.isBF16()) {
+  } else if (elemTypeTripleName == "bf16bf16bf16") {
     flags = IREE_UK_FLAG_MMT4D_TYPE_BF16BF16BF16;
   } else {
     return rewriter.notifyMatchFailure(
         op, "unsupported combination of element types");
+  }
+
+  auto lhsShape = lhs.getType().cast<ShapedType>().getShape();
+  auto rhsShape = rhs.getType().cast<ShapedType>().getShape();
+  int m0int = lhsShape[2];
+  int n0int = rhsShape[2];
+  int k0int = rhsShape[3];
+
+  if (!isMmt4dUkernelFast(targetAttr, elemTypeTripleName, m0int, n0int,
+                          k0int)) {
+    return failure();
   }
 
   // Check if the accumulator is zero-filled.
@@ -226,16 +315,10 @@ matchDAGForUKernel(RewriterBase &rewriter, linalg::Mmt4DOp op,
     flags |= IREE_UK_FLAG_MMT4D_SKIP_INTERMEDIATE_ROUNDINGS;
   }
 
-  // TODO(#15784): drop the fallback flag, instead create a iree_uk_mmt4d_info
-  // ukernel op to query whether the ukernel has fast code for this case, and
-  // preserve the original `linalg.mmt4d` as a fallback in the `else` branch.
-  flags |= IREE_UK_FLAG_MMT4D_ALLOW_GENERIC_FALLBACK_TILE_FUNCTION;
-
   Location loc = op.getLoc();
   Value m = rewriter.create<tensor::DimOp>(loc, lhs, 0);
   Value n = rewriter.create<tensor::DimOp>(loc, rhs, 0);
   Value k = rewriter.create<tensor::DimOp>(loc, rhs, 1);
-
   auto getDimAsI32 = [](RewriterBase &rewriter, Location loc, Value value,
                         int dim) -> Value {
     return rewriter.create<arith::IndexCastOp>(

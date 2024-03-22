@@ -4,13 +4,18 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content")
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_library")
 load("//build_tools/bazel:iree_bitcode_library.bzl", "iree_bitcode_library", "iree_link_bitcode")
 
 package(
     default_visibility = ["//visibility:public"],
     features = ["layering_check"],
     licenses = ["notice"],  # Apache 2.0
+)
+
+iree_runtime_cc_library(
+    name = "mmt4d_arm_64_tiles",
+    hdrs = ["mmt4d_arm_64_tiles.inl"],
 )
 
 #===------------------------------------------------------------------------===#

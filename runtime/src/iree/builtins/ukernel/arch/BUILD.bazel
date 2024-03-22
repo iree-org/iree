@@ -20,3 +20,12 @@ iree_runtime_cc_library(
         "//runtime/src/iree/builtins/ukernel:fallback",
     ],
 )
+
+iree_runtime_cc_library(
+    name = "exported_mmt4d_tiles",
+    hdrs = ["exported_mmt4d_tiles.inl"],
+    deps = [
+        "//runtime/src/iree/builtins/ukernel/arch/arm_64:mmt4d_arm_64_tiles",
+        "//runtime/src/iree/builtins/ukernel/arch/x86_64:mmt4d_x86_64_tiles",
+    ],
+)
