@@ -1743,6 +1743,10 @@ setConvolutionIGemmConfig(mlir::FunctionOpInterface entryPoint,
     return failure();
   }
 
+  if (!linalg::isaConvolutionOpInterface(op)) {
+    return failure();
+  }
+
   // This pipeline needs to know the subgroup size for distributing to virtual
   // lane IDs.
   if (targetInfo.supportedSubgroupSizes.empty()) {

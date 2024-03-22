@@ -403,6 +403,25 @@ public:
   void runOnOperation() override {
     auto func = getOperation();
 
+    {
+      SmallVector<vector::TransferReadOp> transfers;
+      func->walk([&](vector::TransferReadOp transfer) {
+        transfers.push_back(transfer);
+      });
+
+      IRRewriter rewriter(func->getContext());
+      for (auto transfer : transfers) {
+        if (transfer->hasOneUse() || transfer->use_empty()) {
+          continue;
+        }
+        rewriter.setInsertionPoint(transfer);
+        for (auto &use : transfer->getUses()) {
+          auto newTransfer = rewriter.clone(*transfer);
+          use.assign(newTransfer->getResult(0));
+        }
+      }
+    }
+
     std::array<int64_t, 3> workgroupSize;
     if (func->hasAttr("workgroup_size")) {
       auto tmpSizes =
