@@ -974,7 +974,7 @@ static LogicalResult setWinogradOpConfig(mlir::FunctionOpInterface entryPoint,
   // sizes found in the StableDiffusion model.
   auto pipeline =
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUWinogradVectorize;
-  std::array<int64_t, 3> workgroupSize = {64, 4, 4};
+  std::array<int64_t, 3> workgroupSize = {1024, 1, 1};
   TileSizesListType tileSizes = {{1, 32}};
   return setOpConfigAndEntryPointFnTranslation(entryPoint, op, tileSizes,
                                                pipeline, workgroupSize);

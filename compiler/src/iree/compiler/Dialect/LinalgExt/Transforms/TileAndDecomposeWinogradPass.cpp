@@ -236,7 +236,7 @@ static void computeForallAndForUpperBounds(OpBuilder &builder, Location loc,
 static gpu::GPUThreadMappingAttr getThreadMapping(MLIRContext *context,
                                                   int64_t dim) {
   auto mappingIdInt =
-      std::min<int64_t>(dim + static_cast<uint64_t>(gpu::MappingId::LinearDim0),
+      std::min<int64_t>(dim + static_cast<uint64_t>(gpu::MappingId::DimX),
                         gpu::getMaxEnumValForMappingId());
   return mlir::gpu::GPUThreadMappingAttr::get(
       context, gpu::symbolizeMappingId(mappingIdInt).value());
@@ -249,11 +249,6 @@ static FailureOr<scf::ForallOp> tileWithForall(
     std::optional<scf::ForallOp> &peeledForall, SmallVector<Value> &peeledIvs) {
   SmallVector<Value> lbs, ubs, steps;
   computeLoopParams(lbs, ubs, steps, boundValue, numImageDims, loc, rewriter);
-
-  SmallVector<int64_t> forallInds, forInds;
-  SmallVector<Value> forallUbs, forUbs;
-  computeForallAndForUpperBounds(rewriter, loc, ubs, workgroupSize, forallUbs,
-                                 forUbs, forallInds, forInds);
 
   SmallVector<int64_t> constUbs;
   for (auto ub : ubs) {
