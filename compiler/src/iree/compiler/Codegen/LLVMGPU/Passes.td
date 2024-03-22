@@ -129,6 +129,12 @@ def LLVMGPUPadIGemm :
   let constructor = "mlir::iree_compiler::createLLVMGPUPadIGemmPass()";
 }
 
+def LLVMGPUPromoteDenseCstToTensor :
+    InterfacePass<"iree-llvmgpu-promote-dense-cse-to-tensor", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to make constants in tensor types.";
+  let constructor = "mlir::iree_compiler::createLLVMGPUPromoteDenseCstToTensorPass()";
+}
+
 def LLVMGPURewritePadInDestinationPassingStyle :
     InterfacePass<"iree-llvmgpu-rewrite-pad-in-dps", "mlir::FunctionOpInterface"> {
   let summary = "Pass to rewrite tensor.pad in destination passing style.";

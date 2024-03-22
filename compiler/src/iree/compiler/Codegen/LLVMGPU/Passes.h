@@ -193,6 +193,9 @@ createLLVMGPUPromoteConvImgAndTileFilterPass();
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMGPUDistributeSharedMemcpyV2Pass();
 
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createLLVMGPUPromoteDenseCstToTensorPass();
+
 //----------------------------------------------------------------------------//
 // Register LLVMGPU Passes
 //----------------------------------------------------------------------------//

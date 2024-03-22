@@ -920,6 +920,8 @@ void addGPUImplicitGEMMPassPipeline(OpPassManager &pm) {
     addGPUVectorizationPasses(nestedModulePM);
 
     // Tensor -> Memref
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLLVMGPUPromoteDenseCstToTensorPass());
     addVectorBufferizePasses(nestedModulePM);
     nestedModulePM.addPass(createCanonicalizerPass());
     nestedModulePM.addPass(createCSEPass());
