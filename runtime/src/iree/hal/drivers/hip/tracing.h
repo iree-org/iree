@@ -62,7 +62,7 @@ void iree_hal_hip_tracing_context_free(iree_hal_hip_tracing_context_t* context);
 void iree_hal_hip_tracing_context_collect(
     iree_hal_hip_tracing_context_t* context);
 
-#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
 
 // Begins a normal zone derived on the calling |src_loc|.
 // Must be perfectly nested and paired with a corresponding zone end.
@@ -111,7 +111,7 @@ void iree_hal_hip_tracing_zone_end_impl(iree_hal_hip_tracing_context_t* context,
     function_name_length, name, name_length)
 #define IREE_HIP_TRACE_ZONE_END(context, stream)
 
-#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
 
 #ifdef __cplusplus
 }  // extern "C"
