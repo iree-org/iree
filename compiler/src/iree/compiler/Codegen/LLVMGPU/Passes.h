@@ -122,6 +122,9 @@ enum class GPUTensorCoreType {
   MMA_SYNC = 1,
 };
 
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createLLVMGPUFoldExtractSliceIntoXferWritePass();
+
 /// Convert Linalg ops to Vector and prepare converstion to GPU MMA ops.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMGPUTensorCoreVectorizationPass(

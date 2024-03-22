@@ -81,6 +81,7 @@ iree_cc_library(
     "LLVMGPUCastAddressSpaceFunction.cpp"
     "LLVMGPUCastTypeToFitMMA.cpp"
     "LLVMGPUDistributeSharedMemcpyV2.cpp"
+    "LLVMGPUFoldExtractSliceIntoXferWrite.cpp"
     "LLVMGPUIm2ColPass.cpp"
     "LLVMGPULowerExecutableTarget.cpp"
     "LLVMGPUNormalizeContractMaps.cpp"

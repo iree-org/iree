@@ -639,6 +639,10 @@ void addGPUVectorDistributePassPipeline(OpPassManager &pm,
 
   // Linalg -> Vector
   addGPUVectorizationPasses(nestedModulePM);
+  if (usePadToModelSharedMemcpy) {
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLLVMGPUFoldExtractSliceIntoXferWritePass());
+  }
 
   // Allocate tensors for copies to shared memory.
   nestedModulePM.addNestedPass<func::FuncOp>(createGPUVectorAlloc());
