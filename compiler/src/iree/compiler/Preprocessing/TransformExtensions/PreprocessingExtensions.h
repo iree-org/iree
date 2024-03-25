@@ -13,7 +13,6 @@
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
 #include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.h"
 
-
 namespace mlir {
 class DialectRegistry;
 } // namespace mlir

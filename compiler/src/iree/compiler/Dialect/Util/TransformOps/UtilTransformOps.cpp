@@ -14,7 +14,6 @@
 #include "mlir/IR/Dominance.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-
 namespace mlir::iree_compiler::IREE::Util {
 
 //===----------------------------------------------------------------------===//

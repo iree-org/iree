@@ -15,7 +15,6 @@
 #include "mlir/IR/ImplicitLocOpBuilder.h"
 #include "mlir/IR/OpDefinition.h"
 
-
 namespace mlir {
 namespace linalg {
 class LinalgOp;
