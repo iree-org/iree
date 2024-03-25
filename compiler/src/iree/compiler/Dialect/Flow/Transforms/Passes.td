@@ -15,10 +15,10 @@ def AnnotateDispatches :
   let constructor = "mlir::iree_compiler::IREE::Flow::createAnnotateDispatchesPass()";
 }
 
-def CaptureDispatchDynamicDims :
-    Pass<"iree-flow-capture-dispatch-dynamic-dims", ""> {
-  let summary = "Captures dynamic shape dimensions required by dispatch operands/results.";
-  let constructor = "mlir::iree_compiler::IREE::Flow::createCaptureDispatchDynamicDimsPass()";
+def CaptureDynamicDims :
+    Pass<"iree-flow-capture-dynamic-dims", ""> {
+  let summary = "Captures dynamic shape dimensions required by dispatch operands/results and control flow operations.";
+  let constructor = "mlir::iree_compiler::IREE::Flow::createCaptureDynamicDimsPass()";
 }
 
 def CleanupTensorShapes :
