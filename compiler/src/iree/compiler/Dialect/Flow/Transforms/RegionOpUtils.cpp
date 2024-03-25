@@ -223,8 +223,10 @@ static bool hasDynamicShape(Type t) {
 }
 
 /// Reify the dynamic dimensions of the given value.
-LogicalResult reifyDynamicResultDims(OpBuilder &b, Value value,
-                                     SmallVector<Value> &dynamicDims) {
+static LogicalResult
+reifyDynamicResultDimsImpl(OpBuilder &b, Value value,
+                           SmallVectorImpl<Value> &dynamicDims,
+                           bool createTensorDimOps) {
   OpBuilder::InsertionGuard guard(b);
 
   // Case 1: No dynamic result dims.
@@ -246,6 +248,9 @@ LogicalResult reifyDynamicResultDims(OpBuilder &b, Value value,
 
   // Case 2: Value is a block argument.
   if (auto bbArg = llvm::dyn_cast<BlockArgument>(value)) {
+    if (!createTensorDimOps)
+      return failure();
+
     b.setInsertionPointToStart(bbArg.getOwner());
     emitTensorDimOps();
     return success();
@@ -261,7 +266,8 @@ LogicalResult reifyDynamicResultDims(OpBuilder &b, Value value,
   if (tiedOp) {
     Value tiedOperand = tiedOp.getTiedResultOperand(value);
     if (tiedOperand && tiedOperand.getType() == value.getType())
-      return reifyDynamicResultDims(b, tiedOperand, dynamicDims);
+      return reifyDynamicResultDimsImpl(b, tiedOperand, dynamicDims,
+                                        createTensorDimOps);
   }
 
   // Case 4: Query ShapeAwareOpInterface.
@@ -285,10 +291,27 @@ LogicalResult reifyDynamicResultDims(OpBuilder &b, Value value,
     return success();
   }
 
+  if (!createTensorDimOps)
+    return failure();
+
   // None of the above. Insert tensor.dim ops.
   b.setInsertionPointAfter(op);
   emitTensorDimOps();
   return success();
+}
+
+/// Reify the dynamic dimensions of the given value.
+LogicalResult reifyDynamicResultDims(OpBuilder &b, Value value,
+                                     SmallVectorImpl<Value> &dynamicDims) {
+  return reifyDynamicResultDimsImpl(b, value, dynamicDims,
+                                    /*createTensorDimOps=*/true);
+}
+
+LogicalResult
+getOptimizedDynamicResultDims(OpBuilder &b, Value value,
+                              SmallVectorImpl<Value> &dynamicDims) {
+  return reifyDynamicResultDimsImpl(b, value, dynamicDims,
+                                    /*createTensorDimOps=*/false);
 }
 
 // Append a result to the given DispatchRegionOp. The newly created
@@ -451,7 +474,8 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
       }
     }
 
-    rewriter.replaceUsesWithinBlock(target, clonedTarget->getResults(), &body);
+    rewriter.replaceOpUsesWithinBlock(target, clonedTarget->getResults(),
+                                      &body);
   }
 
   FailureOr<IREE::Flow::DispatchRegionOp> newRegionOp =

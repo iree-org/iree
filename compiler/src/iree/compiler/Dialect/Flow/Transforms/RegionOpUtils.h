@@ -31,9 +31,17 @@ bool isNonNullAndOutsideDispatch(ArrayRef<Operation *> operations);
 SmallVector<Range> getLoopRanges(Operation *op, Location loc,
                                  OpBuilder &builder);
 
-/// Reify the dynamic dimensions of the given value.
+/// Reify the dynamic dimensions of the given value, inserting at the back of
+/// 'dynamicDims'.
 LogicalResult reifyDynamicResultDims(OpBuilder &b, Value value,
-                                     SmallVector<Value> &dynamicDims);
+                                     SmallVectorImpl<Value> &dynamicDims);
+
+/// Attemps to create optimized expressions for computing every dynamic
+/// dimension of 'value'. If successful, 'dynamicDims' contains a value for each
+/// dynamic dimension of 'value'. Returns failure otherwise.
+LogicalResult
+getOptimizedDynamicResultDims(OpBuilder &b, Value value,
+                              SmallVectorImpl<Value> &dynamicDims);
 
 /// Append a result to the given DispatchRegionOp. The newly created
 /// DispatchRegionOp is returned.

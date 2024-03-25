@@ -99,14 +99,14 @@ LogicalResult simplifyDimOps(RewriterBase &rewriter,
 
     // Try to simplify dynamic dims.
     SmallVector<Value> dynamicDims;
-    if (failed(IREE::Flow::reifyDynamicResultDims(rewriter, dimOp.getSource(),
-                                                  dynamicDims)))
-      return failure();
-    unsigned ctr = 0;
-    for (int64_t i = 0; i < *dimOp.getConstantIndex(); ++i)
-      if (tensorType.isDynamicDim(i))
-        ++ctr;
-    rewriter.replaceOp(dimOp, dynamicDims[ctr]);
+    if (succeeded(IREE::Flow::getOptimizedDynamicResultDims(
+            rewriter, dimOp.getSource(), dynamicDims))) {
+      unsigned ctr = 0;
+      for (int64_t i = 0; i < *dimOp.getConstantIndex(); ++i)
+        if (tensorType.isDynamicDim(i))
+          ++ctr;
+      rewriter.replaceOp(dimOp, dynamicDims[ctr]);
+    }
   }
 
   return success();

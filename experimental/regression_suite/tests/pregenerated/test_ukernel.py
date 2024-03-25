@@ -43,7 +43,6 @@ def argmax_ukernel_gfx90a_rocm_vmfb(argmax_ukernel_source):
         + [
             "--iree-hal-target-backends=rocm",
             "--iree-rocm-target-chip=gfx90a",
-            "--iree-rocm-link-bc=true",
             "--iree-rocm-enable-ukernels=argmax",
         ],
     )
@@ -58,7 +57,6 @@ def argmax_ukernel_gfx940_rocm_vmfb(argmax_ukernel_source):
         + [
             "--iree-hal-target-backends=rocm",
             "--iree-rocm-target-chip=gfx940",
-            "--iree-rocm-link-bc=true",
             "--iree-rocm-enable-ukernels=argmax",
         ],
     )

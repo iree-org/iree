@@ -107,3 +107,43 @@ MATMUL_123x2561x2561_FP32_MLIR = common_definitions.Model(
     entry_function="matmul_123x2561x2561_f32t_f32t_f32t_tile_config_default",
     input_types=["123x2561xf32", "2561x2561xf32", "123x2561xf32"],
 )
+
+MATMUL_1x256x2048_I8xI4_MLIR = common_definitions.Model(
+    id=unique_ids.MICRO_MATMUL_1x256x2048_I8xI4_MLIR,
+    name="matmul_1x256x2048_i8_i4_i32_tile_config_default",
+    tags=["i8i4", "ubench", "matmul"],
+    source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
+    source_url="https://storage.googleapis.com/iree-model-artifacts/linalg/jax_derived_0.4.25_1710887127/matmul_1x256x2048_i8_i4_i32_tile_config_default.mlirbc",
+    entry_function="main",
+    input_types=["1x256xi8"],
+)
+
+MATMUL_256x256x2048_I8xI4_MLIR = common_definitions.Model(
+    id=unique_ids.MICRO_MATMUL_256x256x2048_I8xI4_MLIR,
+    name="matmul_256x256x2048_i8_i4_i32_tile_config_default",
+    tags=["i8i4", "ubench", "matmul"],
+    source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
+    source_url="https://storage.googleapis.com/iree-model-artifacts/linalg/jax_derived_0.4.25_1710887127/matmul_256x256x2048_i8_i4_i32_tile_config_default.mlirbc",
+    entry_function="main",
+    input_types=["256x256xi8"],
+)
+
+MATMUL_1x256x2048_I8xI8_MLIR = common_definitions.Model(
+    id=unique_ids.MICRO_MATMUL_1x256x2048_I8xI8_MLIR,
+    name="matmul_1x256x2048_i8_i8_i32_tile_config_default",
+    tags=["i8i8", "ubench", "matmul"],
+    source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
+    source_url="https://storage.googleapis.com/iree-model-artifacts/linalg/jax_derived_0.4.25_1710887127/matmul_1x256x2048_i8_i8_i32_tile_config_default.mlirbc",
+    entry_function="main",
+    input_types=["1x256xi8"],
+)
+
+MATMUL_256x256x2048_I8xI8_MLIR = common_definitions.Model(
+    id=unique_ids.MICRO_MATMUL_256x256x2048_I8xI8_MLIR,
+    name="matmul_256x256x2048_i8_i8_i32_tile_config_default",
+    tags=["i8i8", "ubench", "matmul"],
+    source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
+    source_url="https://storage.googleapis.com/iree-model-artifacts/linalg/jax_derived_0.4.25_1710887127/matmul_256x256x2048_i8_i8_i32_tile_config_default.mlirbc",
+    entry_function="main",
+    input_types=["256x256xi8"],
+)
