@@ -59,6 +59,7 @@ iree_cc_library(
     MLIRTensorTransformOps
     MLIRTensorTransforms
     MLIRTransformDialect
+    MLIRTransformDialectInterfaces
     MLIRTransforms
     MLIRVectorDialect
     MLIRVectorToGPU
