@@ -246,7 +246,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {target_arch = "gf
 //  CHECK-SAME:   translation_info = #[[$TRANSLATION]]
 //  CHECK-SAME:   workgroup_size = [64 : index, 1 : index, 1 : index]
 //       CHECK: func.func @skinny_mmt()
-//       CHECK:   linalg.generic
+//       CHECK:   linalg.matmul_transpose_b
 //  CHECK-SAME:     lowering_config = #[[$CONFIG]]
 
 // -----
