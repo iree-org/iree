@@ -647,8 +647,13 @@ static LogicalResult setContractConfig(mlir::FunctionOpInterface entryPoint,
   if (llvm::all_equal({contractionDims->m.size(), contractionDims->n.size(),
                        contractionDims->k.size(), size_t{1}}) &&
       contractionDims->batch.empty()) {
-    if (bounds[contractionDims->m.front()] <= 4 ||
-        bounds[contractionDims->n.front()] <= 4) {
+    int64_t mSize = bounds[contractionDims->m.front()];
+    int64_t nSize = bounds[contractionDims->n.front()];
+    int64_t preferredSubgroupSize = targetInfo.supportedSubgroupSizes.front();
+    if ((mSize <= 4 &&
+         (nSize > preferredSubgroupSize || ShapedType::isDynamic(nSize))) ||
+        (nSize <= 4 &&
+         (mSize > preferredSubgroupSize || ShapedType::isDynamic(mSize)))) {
       return failure();
     }
   }

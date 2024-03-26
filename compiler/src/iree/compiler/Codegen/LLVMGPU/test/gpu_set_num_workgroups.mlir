@@ -1,5 +1,6 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-codegen-llvmgpu-configuration-pipeline)))" \
-// RUN: --iree-codegen-llvmgpu-enable-transform-dialect-jit=false %s | FileCheck %s
+// RUN:   --iree-codegen-llvmgpu-enable-transform-dialect-jit=false %s | FileCheck %s
+
 // Transform dialect attributes are tested separately.
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
