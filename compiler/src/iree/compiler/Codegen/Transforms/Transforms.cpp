@@ -20,7 +20,6 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Transforms/Transforms.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Vector/IR/ScalableValueBoundsConstraintSet.h"
 #include "mlir/Interfaces/ValueBoundsOpInterface.h"
@@ -125,6 +124,8 @@ std::optional<Value> hoistOneStaticallyBoundAllocation(
   }
 
   Value vscale = nullptr;
+  // Use the given vscale range (if provided); otherwise look at the target
+  // information.
   if (!vscaleRange.has_value()) {
     auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
     vscaleRange = getDefaultVscaleRange(targetAttr);
@@ -166,8 +167,11 @@ std::optional<Value> hoistOneStaticallyBoundAllocation(
 
   /// For the dynamic but bounded case, insert an allocation of the shape of the
   /// bounds, and a subview of the required size to be used as a replacement.
-  SmallVector<int64_t> allocShape;
-  SmallVector<Value> scalableSizes;
+
+  // Dynamic sizes in the `allocaShape` have a corresponding scalable size in
+  // `scalableSizes`.
+  SmallVector<int64_t> allocShape;  // The shape of the alloca e.g `16x3x?`.
+  SmallVector<Value> scalableSizes; // Scalable sizes (e.g. 4 x vscale).
   SmallVector<OpFoldResult> subviewSizes;
   allocShape.reserve(allocLikeType.getRank());
   scalableSizes.reserve(allocLikeType.getRank());

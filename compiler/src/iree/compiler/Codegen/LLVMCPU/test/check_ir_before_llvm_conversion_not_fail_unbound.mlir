@@ -34,10 +34,10 @@ module {
 
 module {
   func.func @scalable_alloca() {
-    %c4 = arith.constant 4 : index
+    %c16384 = arith.constant 16384 : index
     %vscale = vector.vscale
-    %c4_vscale = arith.muli %vscale, %c4 : index
-    %0 = memref.alloca(%c4_vscale) : memref<?x16xf32>
+    %c16384_vscale = arith.muli %vscale, %c16384 : index
+    %0 = memref.alloca(%c16384_vscale) : memref<?xf32>
     return
   }
 }

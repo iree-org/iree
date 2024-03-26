@@ -312,6 +312,8 @@ def HoistStaticallyBoundAllocations :
     InterfacePass<"iree-hoist-statically-bound-allocations", "mlir::FunctionOpInterface"> {
   let summary = "Hoist statically bound alloca ops to the entry block of functions";
   let constructor = "mlir::iree_compiler::createHoistStaticallyBoundAllocationsPass()";
+  // Note: These options only exist to help with testing, real world uses should look at the target.
+  // There also should be no observable change if the input IR is not scalable.
   let options = [
     Option<"vscaleMin", "vscale-min", "unsigned",
             /*default=*/"0",
