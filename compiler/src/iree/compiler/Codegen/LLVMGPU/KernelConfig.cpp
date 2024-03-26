@@ -640,6 +640,19 @@ static LogicalResult setContractConfig(mlir::FunctionOpInterface entryPoint,
     return failure();
   }
 
+  // Send very skinny, {2-4}xNxK and Mx{2-4}xK, matmuls to the vector reduction
+  // pipeline, similar to matvec. Note: Because of reassociation in the vector
+  // reduction pipeline, this may lead to precission loss. If this ever becomes
+  // an issue, we can hide this behind a flag.
+  if (llvm::all_equal({contractionDims->m.size(), contractionDims->n.size(),
+                       contractionDims->k.size(), size_t{1}}) &&
+      contractionDims->batch.empty()) {
+    if (bounds[contractionDims->m.front()] <= 4 ||
+        bounds[contractionDims->n.front()] <= 4) {
+      return failure();
+    }
+  }
+
   // TODO: Properly rematerialize leading elementwise with shared memory
   // promotion.
   if (hasFusedLeadingOp(op)) {
