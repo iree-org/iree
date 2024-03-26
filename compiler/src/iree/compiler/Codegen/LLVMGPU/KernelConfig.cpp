@@ -69,6 +69,9 @@ namespace {
 constexpr StringLiteral kCudaTarget = "cuda";
 constexpr StringLiteral kRocmTarget = "rocm";
 
+// Threshold used to determine whether a matmul dimension is 'very skinny'.
+constexpr int64_t kVerySkinnyDimThreshold = 4;
+
 /// Structure to represent target features.
 struct TargetInfo {
   // TODO: add finer grain control for other tensorcore types.
@@ -650,9 +653,9 @@ static LogicalResult setContractConfig(mlir::FunctionOpInterface entryPoint,
     int64_t mSize = bounds[contractionDims->m.front()];
     int64_t nSize = bounds[contractionDims->n.front()];
     int64_t preferredSubgroupSize = targetInfo.supportedSubgroupSizes.front();
-    if ((mSize <= 4 &&
+    if ((mSize <= kVerySkinnyDimThreshold &&
          (nSize > preferredSubgroupSize || ShapedType::isDynamic(nSize))) ||
-        (nSize <= 4 &&
+        (nSize <= kVerySkinnyDimThreshold &&
          (mSize > preferredSubgroupSize || ShapedType::isDynamic(mSize)))) {
       return failure();
     }
