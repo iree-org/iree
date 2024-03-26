@@ -237,7 +237,7 @@ static iree_status_t iree_hal_hip_driver_dump_device_info(
   // Report path to the runtime library.
   iree_string_builder_t path_builder;
   iree_string_builder_initialize(builder->allocator, &path_builder);
-  iree_status_t status = iree_hal_hip_dynamic_symbols_get_path(
+  iree_status_t status = iree_hal_hip_dynamic_symbols_append_path_to_builder(
       &driver->hip_symbols, &path_builder);
   if (iree_status_is_ok(status)) {
     status = iree_string_builder_append_format(

@@ -337,7 +337,6 @@ iree_status_t iree_dynamic_library_get_symbol_path(
   if (dladdr((void*)symbol, &dl_info) == 0) {
     return iree_make_status(IREE_STATUS_NOT_FOUND);
   }
-  iree_string_builder_reset(out_path);
   return iree_string_builder_append_cstring(out_path, dl_info.dli_fname);
 }
 

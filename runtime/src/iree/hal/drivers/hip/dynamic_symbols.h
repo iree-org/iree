@@ -73,7 +73,7 @@ void iree_hal_hip_dynamic_symbols_deinitialize(
 // symbols. If not loaded from a shared library, the exact behavior is
 // implementation dependent (i.e. it may return a failure status or it may
 // return a path to an executable, etc).
-iree_status_t iree_hal_hip_dynamic_symbols_get_path(
+iree_status_t iree_hal_hip_dynamic_symbols_append_path_to_builder(
     iree_hal_hip_dynamic_symbols_t* syms, iree_string_builder_t* out_path);
 
 #ifdef __cplusplus

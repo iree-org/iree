@@ -83,13 +83,13 @@ static iree_status_t iree_hal_hip_driver_parse_flags(
   }
 
   // bool and int flags
-  IREE_RETURN_IF_ERROR(iree_string_pair_builder_add_int(
+  IREE_RETURN_IF_ERROR(iree_string_pair_builder_add_int32(
       builder, key_hip_use_streams, FLAG_hip_use_streams));
-  IREE_RETURN_IF_ERROR(iree_string_pair_builder_add_int(
+  IREE_RETURN_IF_ERROR(iree_string_pair_builder_add_int32(
       builder, key_hip_async_allocations, FLAG_hip_async_allocations));
-  IREE_RETURN_IF_ERROR(iree_string_pair_builder_add_int(
+  IREE_RETURN_IF_ERROR(iree_string_pair_builder_add_int32(
       builder, key_hip_tracing, FLAG_hip_tracing));
-  IREE_RETURN_IF_ERROR(iree_string_pair_builder_add_int(
+  IREE_RETURN_IF_ERROR(iree_string_pair_builder_add_int32(
       builder, key_hip_default_index, FLAG_hip_default_index));
 
   // If there were no flag-based dylib paths, consult the environment
@@ -102,7 +102,7 @@ static iree_status_t iree_hal_hip_driver_parse_flags(
       iree_string_view_t dylib_path_env =
           iree_make_cstring_view(raw_dylib_path_env);
       IREE_RETURN_IF_ERROR(
-          iree_string_pair_builder_alloc_string(builder, &dylib_path_env));
+          iree_string_pair_builder_emplace_string(builder, &dylib_path_env));
       while (true) {
         iree_string_view_t first, rest;
         intptr_t index =
@@ -228,7 +228,8 @@ static iree_status_t iree_hal_hip_driver_factory_try_create(
   if (iree_status_is_ok(status)) {
     status = iree_hal_hip_driver_populate_options(
         host_allocator, &driver_options, &device_params,
-        flag_option_builder.pairs_size, flag_option_builder.pairs);
+        iree_string_pair_builder_size(&flag_option_builder),
+        iree_string_pair_builder_pairs(&flag_option_builder));
   }
 
   if (iree_status_is_ok(status)) {

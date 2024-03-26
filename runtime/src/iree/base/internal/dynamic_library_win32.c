@@ -328,21 +328,24 @@ iree_status_t iree_dynamic_library_get_symbol_path(
     return iree_make_status(IREE_STATUS_NOT_FOUND);
   }
 
-  iree_string_builder_reset(out_path);
-  IREE_RETURN_IF_ERROR(iree_string_builder_reserve(out_path, 64));
+  char* path_buffer = NULL;
+  iree_host_size_t path_capacity = 0;
+  iree_host_size_t path_size = 0;
+  IREE_RETURN_IF_ERROR(iree_string_builder_reserve_for_append(
+      out_path, 64, &path_buffer, &path_capacity));
   while (1) {
-    out_path->size =
-        GetModuleFileNameA(hm, out_path->buffer, out_path->capacity);
-    if (out_path->size == 0) {
+    path_size = GetModuleFileNameA(hm, path_buffer, path_capacity);
+    if (path_size == 0) {
       return iree_make_status(IREE_STATUS_NOT_FOUND);
     }
-    if (out_path->size == out_path->capacity) {
-      IREE_RETURN_IF_ERROR(
-          iree_string_builder_reserve(out_path, out_path->capacity + MAX_PATH));
+    if (path_size == path_capacity) {
+      IREE_RETURN_IF_ERROR(iree_string_builder_reserve_for_append(
+          out_path, path_capacity + MAX_PATH, &path_buffer, &path_capacity));
       continue;
     }
     break;
   }
+  iree_string_builder_commit_append(out_path, path_size);
   return iree_ok_status();
 }
 

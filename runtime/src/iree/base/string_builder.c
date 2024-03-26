@@ -104,6 +104,24 @@ IREE_API_EXPORT iree_status_t iree_string_builder_reserve(
   return iree_ok_status();
 }
 
+IREE_API_EXPORT iree_status_t iree_string_builder_reserve_for_append(
+    iree_string_builder_t* builder,
+    iree_host_size_t minimum_additional_capacity, char** out_buffer,
+    iree_host_size_t* out_capacity) {
+  iree_host_size_t new_capacity =
+      builder->size + minimum_additional_capacity + /*NUL=*/1;
+  IREE_RETURN_IF_ERROR(iree_string_builder_reserve(builder, new_capacity));
+  *out_buffer = builder->buffer + builder->size;
+  *out_capacity = builder->capacity - builder->size - /*NUL=*/1;
+  return iree_ok_status();
+}
+
+IREE_API_EXPORT void iree_string_builder_commit_append(
+    iree_string_builder_t* builder, iree_host_size_t append_size) {
+  builder->size += append_size;
+  builder->buffer[builder->size] = 0;
+}
+
 IREE_API_EXPORT void iree_string_builder_reset(iree_string_builder_t* builder) {
   builder->size = 0;
 }
@@ -187,7 +205,6 @@ IREE_API_EXPORT iree_status_t IREE_PRINTF_ATTRIBUTE(2, 3)
 
 IREE_API_EXPORT void iree_string_pair_builder_initialize(
     iree_allocator_t allocator, iree_string_pair_builder_t* out_builder) {
-  //
   memset(out_builder, 0, sizeof(*out_builder));
   out_builder->allocator = allocator;
 }
@@ -205,7 +222,7 @@ IREE_API_EXPORT iree_status_t iree_string_pair_builder_add(
     iree_string_pair_builder_t* builder, iree_string_pair_t pair) {
   if (builder->pairs_size == builder->pairs_capacity) {
     // Resize.
-    builder->pairs_capacity = builder->pairs_capacity * 2 + 8;
+    builder->pairs_capacity = iree_max(8, builder->pairs_capacity * 2);
     IREE_RETURN_IF_ERROR(iree_allocator_realloc(
         builder->allocator, builder->pairs_capacity * sizeof(builder->pairs[0]),
         (void**)&builder->pairs));
@@ -214,29 +231,30 @@ IREE_API_EXPORT iree_status_t iree_string_pair_builder_add(
   return iree_ok_status();
 }
 
-IREE_API_EXPORT iree_status_t iree_string_pair_builder_add_int(
-    iree_string_pair_builder_t* builder, iree_string_view_t key, int value) {
+IREE_API_EXPORT iree_status_t
+iree_string_pair_builder_add_int32(iree_string_pair_builder_t* builder,
+                                   iree_string_view_t key, int32_t value) {
   char temp[32];
-  snprintf(temp, sizeof temp, "%d", value);
+  snprintf(temp, sizeof(temp), "%d", value);
   iree_string_view_t value_string = iree_make_cstring_view(temp);
   IREE_RETURN_IF_ERROR(
-      iree_string_pair_builder_alloc_string(builder, &value_string));
+      iree_string_pair_builder_emplace_string(builder, &value_string));
   return iree_string_pair_builder_add(builder,
                                       iree_make_string_pair(key, value_string));
 }
 
-IREE_API_EXPORT iree_status_t iree_string_pair_builder_alloc_string(
+IREE_API_EXPORT iree_status_t iree_string_pair_builder_emplace_string(
     iree_string_pair_builder_t* builder, iree_string_view_t* inout_string) {
   if (builder->temp_strings_size == builder->temp_strings_capacity) {
     // Resize.
-    builder->temp_strings_capacity = builder->temp_strings_capacity * 2 + 8;
+    builder->temp_strings_capacity = iree_max(8, builder->pairs_capacity * 2);
     IREE_RETURN_IF_ERROR(iree_allocator_realloc(
         builder->allocator,
         builder->temp_strings_capacity * sizeof(builder->temp_strings[0]),
         (void**)&builder->temp_strings));
   }
 
-  char* alloced;
+  char* alloced = NULL;
   IREE_RETURN_IF_ERROR(iree_allocator_malloc(
       builder->allocator, inout_string->size + 1, (void**)&alloced));
   memcpy(alloced, inout_string->data, inout_string->size);
