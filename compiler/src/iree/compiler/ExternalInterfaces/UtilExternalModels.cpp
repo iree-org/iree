@@ -319,6 +319,9 @@ void registerUtilExternalModels(DialectRegistry &registry) {
         LinalgOpTiedOpInterface<LinalgExt::TopkOp>>(*context);
     LinalgExt::WinogradInputTransformOp::attachInterface<
         LinalgOpTiedOpInterface<LinalgExt::WinogradInputTransformOp>>(*context);
+    LinalgExt::WinogradFilterTransformOp::attachInterface<
+        LinalgOpTiedOpInterface<LinalgExt::WinogradFilterTransformOp>>(
+        *context);
     LinalgExt::WinogradOutputTransformOp::attachInterface<
         LinalgOpTiedOpInterface<LinalgExt::WinogradOutputTransformOp>>(
         *context);

@@ -65,6 +65,7 @@ enum class Permutation {
   NHWC_TO_NCHW,
   TTNHWC_TO_TTNCHW,
   TTNCHW_TO_TTNHWC,
+  TTFC_TO_TTCF,
 };
 
 // Permutes the elements of a SmallVector depending on the permutation specified
@@ -82,6 +83,9 @@ static void permute(SmallVectorImpl<T> &vector) {
     break;
   case Permutation::TTNHWC_TO_TTNCHW:
     std::rotate(vector.rbegin(), vector.rbegin() + 1, vector.rend() - 3);
+    break;
+  case Permutation::TTFC_TO_TTCF:
+    std::rotate(vector.rbegin(), vector.rbegin() + 1, vector.rend() - 2);
     break;
   default:
     break;

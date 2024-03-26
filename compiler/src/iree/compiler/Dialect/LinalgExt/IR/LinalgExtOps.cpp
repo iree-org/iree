@@ -2281,6 +2281,181 @@ LogicalResult WinogradInputTransformOp::reifyResultShapes(
 }
 
 //===----------------------------------------------------------------------===//
+// WinogradFilterTransformOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult WinogradFilterTransformOp::verify() {
+  Operation *op = getOperation();
+  if (getNumDpsInputs() != 1) {
+    return op->emitOpError("expected one input operand");
+  }
+  if (getNumDpsInits() != 1) {
+    return op->emitOpError("expected one output operand");
+  }
+  auto inputType = input().getType().cast<ShapedType>();
+  auto outputType = output().getType().cast<ShapedType>();
+  if (outputType.getElementType() != inputType.getElementType()) {
+    return op->emitOpError(
+        "expected input/output element types to be identical");
+  }
+  unsigned inputRank = inputType.getRank();
+  unsigned outputRank = outputType.getRank();
+
+  if (inputRank != 2 && inputRank != 4) {
+    return op->emitOpError("expected input operand to have rank either 2 or 4");
+  }
+
+  if (inputRank == 2) {
+    if (outputRank != 2) {
+      return op->emitOpError(
+          "expected output operand to have rank 2 if input is of rank 2");
+    }
+    return success();
+  }
+
+  if (getOutputOperandRank() != getInputOperandRank()) {
+    return op->emitOpError("expected output rank to be equal to input rank");
+  }
+  const SmallVector<int64_t> kernelDims = kernelDimensions();
+  const size_t numKernelDims = kernelDims.size();
+  llvm::SmallSetVector<int64_t, 2> kernelDimsSet(kernelDims.begin(),
+                                                 kernelDims.end());
+  if (kernelDims.size() != 2) {
+    return op->emitOpError("expected only 2 kernel dimensions");
+  }
+  if (!isHwcf() && !isFchw()) {
+    return op->emitOpError(
+        "expect kernel dimensions to be either [0, 1] or [2, 3]");
+  }
+  const int64_t kernelSize = getKernelSize();
+  ArrayRef<int64_t> inputShape = inputType.getShape();
+  for (auto kernelDim : kernelDims) {
+    if (inputShape[kernelDim] != kernelSize) {
+      return op->emitOpError(
+          "expect all kernel dimensions to have the same size");
+    }
+  }
+  const int64_t inputTileSize = getInputTileSize();
+  SmallVector<int64_t> expectedOutputShape(numKernelDims, inputTileSize);
+  for (int i = 0; i < inputShape.size(); i++) {
+    if (!kernelDimsSet.contains(i)) {
+      expectedOutputShape.push_back(inputShape[i]);
+    }
+  }
+  if (isFchw()) {
+    permute<Permutation::TTFC_TO_TTCF>(expectedOutputShape);
+  }
+  ArrayRef<int64_t> outputShape = outputType.getShape();
+  if (failed(verifyCompatibleShape(expectedOutputShape, outputShape))) {
+    return op->emitOpError("incompatible output shape");
+  }
+  return success();
+}
+
+SmallVector<Range>
+WinogradFilterTransformOp::getIterationDomain(OpBuilder &builder) {
+  Location loc = getLoc();
+  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
+  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
+  Value source = input();
+  SmallVector<int64_t> kernelDims = kernelDimensions();
+  llvm::SmallSetVector<int64_t, 2> kernelDimsSet(kernelDims.begin(),
+                                                 kernelDims.end());
+  SmallVector<Range> loopBounds(kernelDims.size());
+  int count = 0;
+  for (auto dim : llvm::seq<int64_t>(0, getInputOperandRank())) {
+    if (!kernelDimsSet.contains(dim)) {
+      loopBounds[count].offset = zero;
+      loopBounds[count].size = getDimValue(builder, loc, source, dim);
+      loopBounds[count].stride = one;
+      count++;
+    }
+  }
+  return loopBounds;
+}
+
+SmallVector<utils::IteratorType>
+WinogradFilterTransformOp::getLoopIteratorTypes() {
+  SmallVector<utils::IteratorType> iteratorTypes(getIterationDomainRank(),
+                                                 utils::IteratorType::parallel);
+  return iteratorTypes;
+}
+
+FailureOr<TilingResult> WinogradFilterTransformOp::getTiledImplementation(
+    OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes) {
+  Location loc = getLoc();
+  auto one = builder.getIndexAttr(1);
+  auto zero = builder.getIndexAttr(0);
+  const int cDim = channelDim();
+  const int fDim = filterDim();
+
+  assert(offsets.size() == 2);
+  SmallVector<OpFoldResult> inputOffsets(getInputOperandRank(), zero);
+  SmallVector<OpFoldResult> outputOffsets(getOutputOperandRank(), zero);
+  outputOffsets[2] = inputOffsets[cDim] = offsets[0];
+  outputOffsets[3] = inputOffsets[fDim] = offsets[1];
+
+  SmallVector<OpFoldResult> inputStrides(getInputOperandRank(), one);
+  SmallVector<OpFoldResult> outputStrides(getOutputOperandRank(), one);
+
+  assert(sizes.size() == 2);
+  auto inputShape = input().getType().cast<ShapedType>().getShape();
+  auto outputShape = output().getType().cast<ShapedType>().getShape();
+  SmallVector<OpFoldResult> inputSizes =
+      getAsOpFoldResult(builder.getIndexArrayAttr(inputShape));
+  SmallVector<OpFoldResult> outputSizes =
+      getAsOpFoldResult(builder.getIndexArrayAttr(outputShape));
+  outputSizes[2] = inputSizes[cDim] = sizes[0];
+  outputSizes[3] = inputSizes[fDim] = sizes[1];
+
+  SmallVector<Value> tiledOperands;
+  tiledOperands.emplace_back(
+      getSlice(builder, loc, input(), inputOffsets, inputSizes, inputStrides));
+  tiledOperands.emplace_back(getSlice(builder, loc, output(), outputOffsets,
+                                      outputSizes, outputStrides));
+
+  SmallVector<Type, 4> resultTypes;
+  if (hasPureTensorSemantics()) {
+    resultTypes.push_back(tiledOperands[1].getType());
+  }
+
+  Operation *tiledOp =
+      mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
+
+  return TilingResult{{tiledOp}, SmallVector<Value>(tiledOp->getResults())};
+}
+
+LogicalResult WinogradFilterTransformOp::getResultTilePosition(
+    OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
+    SmallVector<OpFoldResult> &resultSizes) {
+  if (resultNumber == 0) {
+    auto resultShape = output().getType().cast<ShapedType>().getShape();
+    resultSizes = getAsOpFoldResult(builder.getIndexArrayAttr(resultShape));
+    resultOffsets = SmallVector<OpFoldResult>(getOutputOperandRank(),
+                                              builder.getIndexAttr(0));
+    resultOffsets[2] = offsets[0];
+    resultOffsets[3] = offsets[1];
+    resultSizes[2] = sizes[0];
+    resultSizes[3] = sizes[1];
+    return success();
+  }
+  return failure();
+}
+
+LogicalResult WinogradFilterTransformOp::fold(FoldAdaptor,
+                                              SmallVectorImpl<OpFoldResult> &) {
+  return memref::foldMemRefCast(*this);
+}
+
+LogicalResult WinogradFilterTransformOp::reifyResultShapes(
+    OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  return cast<LinalgExtOp>(getOperation())
+      .reifyResultShapes(b, reifiedReturnShapes);
+}
+
+//===----------------------------------------------------------------------===//
 // WinogradOutputTransformOp
 //===----------------------------------------------------------------------===//
 
@@ -2709,6 +2884,7 @@ DEFINE_OP_GET_EFFECTS(TopkOp)
 DEFINE_OP_GET_EFFECTS(PackOp)
 DEFINE_OP_GET_EFFECTS(UnPackOp)
 DEFINE_OP_GET_EFFECTS(WinogradInputTransformOp)
+DEFINE_OP_GET_EFFECTS(WinogradFilterTransformOp)
 DEFINE_OP_GET_EFFECTS(WinogradOutputTransformOp)
 DEFINE_OP_GET_EFFECTS(AttentionOp)
 
