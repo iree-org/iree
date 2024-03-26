@@ -395,7 +395,7 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
 
   if (pipelineOpt.enableAArch64SSVE) {
     nestedModulePM.addNestedPass<func::FuncOp>(
-        createLLVMCPUUnsupportedScalabilityToLoopsPass());
+        createLLVMCPU2DScalableTo1DScalablePass());
   }
 
   if (pipelineOpt.enablePeeling) {
