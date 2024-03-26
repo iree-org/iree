@@ -79,7 +79,7 @@ jobs:
           source ${VENV_DIR}/bin/activate
           pytest SHARK-TestSuite/iree_tests/onnx/ \
               -n auto -rpfE --timeout=30 --retries=2 --durations=20 \
-              --config-files=experimental/regression_suite/external_test_suite/onnx_cpu_llvm_sync.json
+              --config-files=build_tools/pkgci/external_test_suite/onnx_cpu_llvm_sync.json
       # TODO(scotttodd): add a local cache for these large files to a persistent runner
       - name: Download remote files for real weight model tests
         run: |
@@ -90,4 +90,4 @@ jobs:
           source ${VENV_DIR}/bin/activate
           pytest SHARK-TestSuite/iree_tests/pytorch/ -k real_weights \
                -rpfE --timeout=600 --durations=0 \
-              --config-files=experimental/regression_suite/external_test_suite/pytorch_cpu_llvm_task.json
+              --config-files=build_tools/pkgci/external_test_suite/pytorch_cpu_llvm_task.json
