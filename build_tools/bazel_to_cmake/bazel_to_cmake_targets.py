@@ -58,6 +58,7 @@ class TargetConverter:
                 ],
                 # MLIR
                 "@llvm-project//mlir:AllPassesAndDialects": ["MLIRAllDialects"],
+                "@llvm-project//mlir:BufferizationInterfaces": [""],
                 "@llvm-project//mlir:CommonFolders": [""],
                 "@llvm-project//mlir:ConversionPasses": [""],
                 "@llvm-project//mlir:DialectUtils": [""],
