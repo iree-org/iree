@@ -233,11 +233,12 @@ steps to profile `iree-compile` and visualize the results as a flame graph.
    ```shell
    cmake <Your-CMAKE-Flags> \
       -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-      -DCMAKE_CXX_FLAGS="-fno-omit-frame-pointers" \
-      -DCMAKE_C_FLAGS="-fno-omit-frame-pointers"
+      -DCMAKE_CXX_FLAGS="-fno-omit-frame-pointer" \
+      -DCMAKE_C_FLAGS="-fno-omit-frame-pointer"
    ```
 
-2. Set perf event scope/access to the appropriate level with [`perf_event_paranoid`](https://www.kernel.org/doc/html/v5.7/admin-guide/perf-security.html#perf-events-perf-unprivileged-users).
+2. Set perf event scope/access to the appropriate level with
+   [`perf_event_paranoid`](https://www.kernel.org/doc/html/v5.7/admin-guide/perf-security.html#perf-events-perf-unprivileged-users).
 
    ```shell
    echo 0 | sudo tee /proc/sys/kernel/perf_event_paranoid
