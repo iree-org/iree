@@ -103,52 +103,6 @@ static unsigned mapDimToRoleIndex(int64_t dimPos, EncodingAttr encoding) {
   return idx.value();
 }
 
-std::optional<SmallVector<int64_t>>
-getPermutationToCanonicalMatmulShape(EncodingAttr encoding) {
-  FailureOr<linalg::ContractionDimensions> cDims =
-      getEncodingContractionDims(encoding);
-  if (failed(cDims)) {
-    return std::nullopt;
-  }
-  // Only support at most 1 Batch, M, N, K dimensions for now
-  if (cDims->m.size() > 1 || cDims->n.size() > 1 || cDims->k.size() > 1 ||
-      cDims->batch.size() > 1) {
-    return std::nullopt;
-  }
-  SmallVector<int64_t> perm;
-  EncodingRole role = encoding.getRole().getValue();
-  // Add batch dim
-  if (!cDims->batch.empty()) {
-    perm.push_back(mapDimToRoleIndex(cDims->batch[0], encoding));
-  }
-  // Add M dim
-  if (role != EncodingRole::RHS && cDims->m.size() == 1) {
-    perm.push_back(mapDimToRoleIndex(cDims->m[0], encoding));
-  }
-  // Add K dim
-  if (role != EncodingRole::RESULT) {
-    perm.push_back(mapDimToRoleIndex(cDims->k[0], encoding));
-  }
-  // Add N dim
-  if (role != EncodingRole::LHS && cDims->n.size() == 1) {
-    perm.push_back(mapDimToRoleIndex(cDims->n[0], encoding));
-  }
-  return perm;
-}
-
-RankedTensorType getCanonicalMatmulTypeWithEncoding(RankedTensorType type) {
-  auto encoding = getEncodingAttr(type);
-  if (!encoding) {
-    return type;
-  }
-  auto perm = getPermutationToCanonicalMatmulShape(encoding);
-  if (!perm) {
-    return type;
-  }
-  return RankedTensorType::get(applyPermutation(type.getShape(), perm.value()),
-                               type.getElementType(), encoding);
-}
-
 RankedTensorType getOriginalTypeWithEncoding(RankedTensorType type) {
   auto encoding = getEncodingAttr(type);
   if (!encoding) {
