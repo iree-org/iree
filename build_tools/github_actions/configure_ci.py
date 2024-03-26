@@ -95,7 +95,6 @@ ALL_KEY = "all"
 SKIP_PATH_PATTERNS = [
     "docs/*",
     "third_party/mkdocs-material/*",
-    "experimental/*",
     # These configure the runners themselves and don't affect presubmit.
     "build_tools/github_actions/runner/*",
     ".github/ISSUE_TEMPLATE/*",
