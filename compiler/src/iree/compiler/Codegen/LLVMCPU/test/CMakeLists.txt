@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "2d-scalable-to-1d-scalable.mlir"
     "aarch64_dotprod_vector_lowering.mlir"
     "aarch64_vector_lowering.mlir"
     "apply_scale_lowering.mlir"
@@ -53,7 +54,6 @@ iree_lit_test_suite(
     "tile_and_fuse.mlir"
     "transform_dialect_bufferize.mlir"
     "unfused_fma.mlir"
-    "unsupported_scalability_to_loops.mlir"
     "vector_contract_to_arm_asm.mlir"
     "vector_contract_to_arm_intrinsics.mlir"
     "vector_lowering.mlir"
