@@ -214,7 +214,7 @@ class ConfigureCITest(unittest.TestCase):
         all_jobs = default_jobs | {postsubmit_job}
         is_pr = True
         is_llvm_integrate_pr = False
-        modified_paths = ["experimental/file"]
+        modified_paths = ["docs/file"]
         jobs = configure_ci.get_enabled_jobs(
             trailers,
             all_jobs,
