@@ -65,7 +65,8 @@ static bool iree_hal_hip_try_load_dylib(const char* file_path,
   iree_host_size_t length = 0;
   if (iree_status_to_string(status, &allocator, &buffer, &length)) {
     iree_status_ignore(iree_string_builder_append_format(
-        error_builder, "\n  Tried: %s\n    %.*s", file_path, length, buffer));
+        error_builder, "\n  Tried: %s\n    %.*s", file_path, (int)length,
+        buffer));
     iree_allocator_free(allocator, buffer);
   }
 
@@ -151,10 +152,6 @@ iree_status_t iree_hal_hip_dynamic_symbols_initialize(
     } else {
       iree_string_view_t error_detail =
           iree_string_builder_view(&error_builder);
-      fprintf(stderr, "BUILDER: %.*s\n",
-              iree_string_builder_size(&error_builder),
-              iree_string_builder_buffer(&error_builder));
-      fprintf(stderr, "BUILDER: %.*s\n", error_detail.size, error_detail.data);
       status = iree_make_status(
           IREE_STATUS_UNAVAILABLE,
           "HIP runtime library 'amdhip64.dll'/'libamdhip64.so' not available: "
