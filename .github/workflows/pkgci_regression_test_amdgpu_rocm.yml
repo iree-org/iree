@@ -73,4 +73,4 @@ jobs:
       #     export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/rocm/lib:/opt/rocm/hip/lib
       #     pytest SHARK-TestSuite/iree_tests/onnx/ \
       #         -n 4 -rpfE --timeout=30 --retries=2 --durations=20 \
-      #         --config-files=experimental/regression_suite/external_test_suite/onnx_gpu_rocm_rdna3.json
+      #         --config-files=build_tools/pkgci/external_test_suite/onnx_gpu_rocm_rdna3.json
