@@ -59,7 +59,7 @@ iree_runtime_cc_library(
     name = "ukernel",
     srcs = [
         "mmt4d.c",
-        "mmt4d_tile.c",
+        "mmt4d_tile_generic.c",
         "pack.c",
         "pack_tile.c",
         "query_tile_sizes.c",
@@ -112,7 +112,7 @@ bitcode_specific_archs = [
     name = "ukernel_bitcode_generic_%s" % arch,
     srcs = [
         "mmt4d.c",
-        "mmt4d_tile.c",
+        "mmt4d_tile_generic.c",
     ] + ([] if arch in bitcode_specific_archs else ["fallback.c"]),
     arch = arch,
     internal_hdrs = [

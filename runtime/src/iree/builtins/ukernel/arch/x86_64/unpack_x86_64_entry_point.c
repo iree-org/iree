@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/builtins/ukernel/arch/x86_64/common_x86_64_entry_point.h"
+#include "iree/builtins/ukernel/arch/x86_64/common_x86_64.h"
 #include "iree/builtins/ukernel/arch/x86_64/unpack_x86_64_internal.h"
 
 IREE_UK_UNPACK_TILE_FUNC_DECL(
@@ -21,13 +21,13 @@ iree_uk_unpack_tile_func_t iree_uk_unpack_select_tile_func_arch(
   if (esize != 4 || transpose) return 0;
   if (params->in_size2 == 8 && params->in_size3 == 8) {
 #if defined(IREE_UK_BUILD_X86_64_AVX2_FMA)
-    if (iree_uk_cpu_supports_avx2_fma(params->cpu_data)) {
+    if (iree_uk_cpu_x86_64_avx2_fma(params->cpu_data)) {
       return iree_uk_unpack_tile_8x8_x32_x86_64_avx2_fma_direct;
     }
 #endif
   } else if (params->in_size2 == 16 && params->in_size3 == 16) {
 #if defined(IREE_UK_BUILD_X86_64_AVX512_BASE)
-    if (iree_uk_cpu_supports_avx512_base(params->cpu_data)) {
+    if (iree_uk_cpu_x86_64_avx512_base(params->cpu_data)) {
       return iree_uk_unpack_tile_16x16_x32_x86_64_avx512_base_direct;
     }
 #endif
