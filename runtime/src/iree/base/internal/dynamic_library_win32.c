@@ -320,7 +320,7 @@ iree_status_t iree_dynamic_library_lookup_symbol(
 }
 
 iree_status_t iree_dynamic_library_get_symbol_path(
-    void* symbol, iree_string_builder_t* out_path) {
+    void* symbol, iree_string_builder_t* builder) {
   HMODULE hm = NULL;
   if (GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
                             GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
@@ -332,20 +332,21 @@ iree_status_t iree_dynamic_library_get_symbol_path(
   iree_host_size_t path_capacity = 0;
   iree_host_size_t path_size = 0;
   IREE_RETURN_IF_ERROR(iree_string_builder_reserve_for_append(
-      out_path, 64, &path_buffer, &path_capacity));
+      builder, 64, &path_buffer, &path_capacity));
   while (1) {
     path_size = GetModuleFileNameA(hm, path_buffer, path_capacity);
     if (path_size == 0) {
       return iree_make_status(IREE_STATUS_NOT_FOUND);
     }
-    if (path_size == path_capacity) {
+    if (path_size == path_capacity ||
+        GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
       IREE_RETURN_IF_ERROR(iree_string_builder_reserve_for_append(
-          out_path, path_capacity + MAX_PATH, &path_buffer, &path_capacity));
+          builder, path_capacity + MAX_PATH, &path_buffer, &path_capacity));
       continue;
     }
     break;
   }
-  iree_string_builder_commit_append(out_path, path_size);
+  iree_string_builder_commit_append(builder, path_size);
   return iree_ok_status();
 }
 

@@ -248,10 +248,12 @@ IREE_API_EXPORT iree_status_t iree_string_pair_builder_emplace_string(
   if (builder->temp_strings_size == builder->temp_strings_capacity) {
     // Resize.
     builder->temp_strings_capacity = iree_max(8, builder->pairs_capacity * 2);
+    char** realloced = builder->temp_strings;
     IREE_RETURN_IF_ERROR(iree_allocator_realloc(
         builder->allocator,
         builder->temp_strings_capacity * sizeof(builder->temp_strings[0]),
-        (void**)&builder->temp_strings));
+        (void**)&realloced));
+    builder->temp_strings = realloced;
   }
 
   char* alloced = NULL;

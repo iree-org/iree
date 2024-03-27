@@ -332,12 +332,12 @@ iree_status_t iree_dynamic_library_attach_symbols_from_memory(
 }
 
 iree_status_t iree_dynamic_library_get_symbol_path(
-    void* symbol, iree_string_builder_t* out_path) {
+    void* symbol, iree_string_builder_t* builder) {
   Dl_info dl_info;
   if (dladdr((void*)symbol, &dl_info) == 0) {
     return iree_make_status(IREE_STATUS_NOT_FOUND);
   }
-  return iree_string_builder_append_cstring(out_path, dl_info.dli_fname);
+  return iree_string_builder_append_cstring(builder, dl_info.dli_fname);
 }
 
 #endif  // IREE_PLATFORM_*
