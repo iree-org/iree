@@ -826,6 +826,8 @@
     "test_shape_start_negative_1",
     "test_size",
     "test_size_example",
+    "test_split_zero_size_splits_opset13",
+    "test_split_zero_size_splits_opset18",
     "test_sub_uint8",
     "test_tril",
     "test_tril_neg",
