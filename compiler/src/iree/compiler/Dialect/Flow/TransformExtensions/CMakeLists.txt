@@ -39,6 +39,7 @@ iree_cc_library(
     MLIRSCFDialect
     MLIRTensorDialect
     MLIRTransformDialect
+    MLIRTransformDialectInterfaces
     MLIRTransformUtils
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Flow::Transforms

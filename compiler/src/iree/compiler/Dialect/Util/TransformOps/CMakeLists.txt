@@ -36,6 +36,7 @@ iree_cc_library(
     MLIRPDLDialect
     MLIRSupport
     MLIRTransformDialect
+    MLIRTransformDialectInterfaces
     MLIRTransformUtils
     iree::compiler::Dialect::Util::IR
     iree::compiler::Utils

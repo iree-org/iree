@@ -8,7 +8,7 @@
 
 #include "iree/compiler/Utils/EquivalenceUtils.h"
 #include "llvm/Support/Debug.h"
-#include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
+#include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/IRMapping.h"

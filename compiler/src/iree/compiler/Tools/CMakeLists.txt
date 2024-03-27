@@ -82,6 +82,7 @@ iree_cc_library(
     MLIRBufferizationDialect
     MLIRComplexDialect
     MLIRControlFlowDialect
+    MLIRControlFlowTransforms
     MLIRFuncInlinerExtension
     MLIRGPUDialect
     MLIRGPUToSPIRV
