@@ -35,6 +35,7 @@ iree_cc_library(
     MLIRNVGPUDialect
     MLIRSCFDialect
     MLIRSCFTransforms
+    MLIRSideEffectInterfaces
     MLIRSupport
     MLIRVectorDialect
     iree::compiler::Codegen::Common

@@ -46,6 +46,7 @@ iree_cc_library(
     MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR
+    MLIRInliningUtils
     MLIRSideEffectInterfaces
     MLIRSupport
     MLIRTransformUtils
