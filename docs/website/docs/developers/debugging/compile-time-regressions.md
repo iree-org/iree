@@ -236,14 +236,12 @@ steps to profile `iree-compile` and visualize the results as a flame graph.
       -DCMAKE_CXX_FLAGS="-fno-omit-frame-pointer" \
       -DCMAKE_C_FLAGS="-fno-omit-frame-pointer"
    ```
-
 2. Set perf event scope/access to the appropriate level with
    [`perf_event_paranoid`](https://www.kernel.org/doc/html/v5.7/admin-guide/perf-security.html#perf-events-perf-unprivileged-users).
 
    ```shell
    echo 0 | sudo tee /proc/sys/kernel/perf_event_paranoid
    ```
-
 3. Run `iree-compile` under the `perf` profiler and collect profile data. This
    requires `sudo`.
 
@@ -251,7 +249,6 @@ steps to profile `iree-compile` and visualize the results as a flame graph.
    sudo perf record -F 999 -g -- tools/iree-compile <Your-Compile-Arguments>
    sudo chown "$USER:$USER" perf.data
    ```
-
 4. Use `pprof` to process `perf.data` from the previous step and start a local
    http server with the visualized profile. See the
    [`pprof`'s README](https://github.com/google/pprof) for installation
