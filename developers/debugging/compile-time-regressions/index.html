@@ -3597,38 +3597,40 @@ sure to set both <code>-DIREE_ENABLE_COMPILER_TRACING=ON</code> and
 <p>These linux tools allow for fine-grained profiling. Below we present a list of
 steps to profile <code>iree-compile</code> and visualize the results as a flame graph.</p>
 <ol>
-<li>Compile IREE tools with debug information (line tables at minimum) and frame
+<li>
+<p>Compile IREE tools with debug information (line tables at minimum) and frame
    pointers. You can do that by selecting the <code>RelWithDebInfo</code> build type and
-   adding <code>-fno-omit-frame-pointers</code> to your compiler flags:</li>
-</ol>
+   adding <code>-fno-omit-frame-pointers</code> to your compiler flags:</p>
 <div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>&lt;Your-CMAKE-Flags&gt;<span class="w"> </span><span class="se">\</span>
 <span class="w">   </span>-DCMAKE_BUILD_TYPE<span class="o">=</span>RelWithDebInfo<span class="w"> </span><span class="se">\</span>
 <span class="w">   </span>-DCMAKE_CXX_FLAGS<span class="o">=</span><span class="s2">&quot;-fno-omit-frame-pointer&quot;</span><span class="w"> </span><span class="se">\</span>
 <span class="w">   </span>-DCMAKE_C_FLAGS<span class="o">=</span><span class="s2">&quot;-fno-omit-frame-pointer&quot;</span>
 </code></pre></div>
-<ol>
-<li>Set perf event scope/access to the appropriate level with
-   <a href="https://www.kernel.org/doc/html/v5.7/admin-guide/perf-security.html#perf-events-perf-unprivileged-users"><code>perf_event_paranoid</code></a>.</li>
-</ol>
+</li>
+<li>
+<p>Set perf event scope/access to the appropriate level with
+   <a href="https://www.kernel.org/doc/html/v5.7/admin-guide/perf-security.html#perf-events-perf-unprivileged-users"><code>perf_event_paranoid</code></a>.</p>
 <div class="highlight"><pre><span></span><code><span class="nb">echo</span><span class="w"> </span><span class="m">0</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>sudo<span class="w"> </span>tee<span class="w"> </span>/proc/sys/kernel/perf_event_paranoid
 </code></pre></div>
-<ol>
-<li>Run <code>iree-compile</code> under the <code>perf</code> profiler and collect profile data. This
-   requires <code>sudo</code>.</li>
-</ol>
+</li>
+<li>
+<p>Run <code>iree-compile</code> under the <code>perf</code> profiler and collect profile data. This
+   requires <code>sudo</code>.</p>
 <div class="highlight"><pre><span></span><code>sudo<span class="w"> </span>perf<span class="w"> </span>record<span class="w"> </span>-F<span class="w"> </span><span class="m">999</span><span class="w"> </span>-g<span class="w"> </span>--<span class="w"> </span>tools/iree-compile<span class="w"> </span>&lt;Your-Compile-Arguments&gt;
 sudo<span class="w"> </span>chown<span class="w"> </span><span class="s2">&quot;</span><span class="nv">$USER</span><span class="s2">:</span><span class="nv">$USER</span><span class="s2">&quot;</span><span class="w"> </span>perf.data
 </code></pre></div>
-<ol>
-<li>Use <code>pprof</code> to process <code>perf.data</code> from the previous step and start a local
+</li>
+<li>
+<p>Use <code>pprof</code> to process <code>perf.data</code> from the previous step and start a local
    http server with the visualized profile. See the
    <a href="https://github.com/google/pprof"><code>pprof</code>'s README</a> for installation
    instructions and make sure to build
    <a href="https://github.com/google/perf_data_converter"><code>perf_data_converter</code></a> and
-   add it to your <code>PATH</code>.</li>
-</ol>
+   add it to your <code>PATH</code>.</p>
 <div class="highlight"><pre><span></span><code>pprof<span class="w"> </span>-http<span class="w"> </span><span class="s1">&#39;:&#39;</span><span class="w"> </span>perf.data
 </code></pre></div>
+</li>
+</ol>
 <h2 id="stepping-through-compiler-ir">Stepping through compiler IR<a class="headerlink" href="#stepping-through-compiler-ir" title="Permanent link">link</a></h2>
 <p>Debugging an MLIR-based compiler like IREE usually involves reading IR at some
 point. For compile time regressions, it helps to snapshot the IR at a few key
