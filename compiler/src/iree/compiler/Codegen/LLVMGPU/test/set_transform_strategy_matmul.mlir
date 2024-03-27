@@ -1,4 +1,5 @@
-// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-select-lowering-strategy)))" --iree-codegen-llvmgpu-enable-transform-dialect-aligned-matmul | FileCheck %s
+// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-select-lowering-strategy)))" \
+// RUN:   --iree-codegen-llvmgpu-enable-transform-dialect-aligned-matmul | FileCheck %s
 
 // Check that setting the command line options affect the transform
 // strategy as expected.
@@ -36,8 +37,8 @@
 // RUN: -td-matmul-strategy-pipeline-depth=3 \
 // RUN: | FileCheck --check-prefix=WITH_OPTIONS_3 %s
 
-// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-select-lowering-strategy)))" --iree-codegen-llvmgpu-enable-transform-dialect-small-matmul \
-// RUN: | FileCheck --check-prefix=SMALL %s
+// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-select-lowering-strategy)))" \
+// RUN:   --iree-codegen-llvmgpu-enable-transform-dialect-small-matmul | FileCheck --check-prefix=SMALL %s
 
 hal.executable @matmul_1 {
 hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>) {
@@ -462,11 +463,11 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 }
 }
 
-// CHECK:       iree_codegen.translation_info<LLVMGPUMatmulSimt, {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
+// CHECK:       iree_codegen.translation_info<LLVMGPUVectorize>
 // CHECK-LABEL: func @matmul_5_small
 
 // This matmul is considered "too small"/"degenerate" for a tensor core strategy,
-// just fallback to the simt strategy.
+// just fallback to the vectorized strategy.
 
 // WITH_OPTIONS_2-LABEL: func @matmul_5_small
 

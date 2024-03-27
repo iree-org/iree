@@ -58,11 +58,13 @@ class TargetConverter:
                 ],
                 # MLIR
                 "@llvm-project//mlir:AllPassesAndDialects": ["MLIRAllDialects"],
+                "@llvm-project//mlir:BufferizationInterfaces": [""],
                 "@llvm-project//mlir:CommonFolders": [""],
                 "@llvm-project//mlir:ConversionPasses": [""],
                 "@llvm-project//mlir:DialectUtils": [""],
                 "@llvm-project//mlir:GPUDialect": ["MLIRGPUDialect"],
                 "@llvm-project//mlir:GPUTransforms": ["MLIRGPUTransforms"],
+                "@llvm-project//mlir:InliningUtils": [""],
                 "@llvm-project//mlir:LinalgOpsIncGen": ["MLIRLinalgOpsIncGenLib"],
                 "@llvm-project//mlir:LinalgStructuredOpsIncGen": [
                     "MLIRLinalgStructuredOpsIncGenLib"

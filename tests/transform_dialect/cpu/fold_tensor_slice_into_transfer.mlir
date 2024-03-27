@@ -101,10 +101,11 @@ func.func @insert_slice_of_transfer_write_rank_extending(%t1 : tensor<?x?x12xf32
 }
 
 module attributes { transform.with_named_sequence } {
-  transform.named_sequence @__transform_main(%func_op: !transform.op<"func.func"> {transform.readonly}) {
-    transform.apply_patterns to %func_op {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    transform.apply_patterns to %top_level_func {
       transform.apply_patterns.iree.fold_tensor_slice_into_transfer
-    } : !transform.op<"func.func">
+    } : !transform.any_op
     transform.yield
   }
-} // module
+}

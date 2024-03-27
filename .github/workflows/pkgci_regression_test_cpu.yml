@@ -20,12 +20,7 @@ on:
 jobs:
   linux_x86_64:
     name: Linux (x86_64)
-    runs-on:
-      - self-hosted # must come first
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
-      - environment=prod
-      - cpu
-      - os-family=Linux
+    runs-on: ubuntu-20.04-64core
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       IREERS_ARTIFACT_DIR: ${{ github.workspace }}/artifacts
@@ -58,10 +53,6 @@ jobs:
             experimental/regression_suite
 
       # Out of tree tests
-      - name: Install git lfs
-        run: |
-          sudo apt-get install git-lfs
-          git lfs install
       - name: Check out external TestSuite repository
         uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
         with:
