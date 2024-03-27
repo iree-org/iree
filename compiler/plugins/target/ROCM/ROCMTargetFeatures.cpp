@@ -23,12 +23,16 @@ static ArrayAttr getMfmaArrayAttr(MLIRContext *context,
 ArrayAttr getROCMSupportedMmaAttrs(MLIRContext *context, StringRef targetArch) {
   if (targetArch == "gfx940" || targetArch == "gfx942") { // MI300A/X
     return getMfmaArrayAttr(context,
-                            {IREE::GPU::MFMAIntrinsic::F16_16x16x16_F32,
-                             IREE::GPU::MFMAIntrinsic::F16_32x32x8_F32});
+                            {IREE::GPU::MFMAIntrinsic::MFMA_F16_16x16x16_F32,
+                             IREE::GPU::MFMAIntrinsic::MFMA_F16_32x32x8_F32});
   } else if (targetArch == "gfx90a") { // MI210
     return getMfmaArrayAttr(context,
-                            {IREE::GPU::MFMAIntrinsic::F16_16x16x16_F32,
-                             IREE::GPU::MFMAIntrinsic::F16_32x32x8_F32});
+                            {IREE::GPU::MFMAIntrinsic::MFMA_F16_16x16x16_F32,
+                             IREE::GPU::MFMAIntrinsic::MFMA_F16_32x32x8_F32});
+  } else if (targetArch == "gfx1100") { // RDNA3
+    return getMfmaArrayAttr(context,
+                            {IREE::GPU::MFMAIntrinsic::WMMA_F16_16x16x16_F16,
+                             IREE::GPU::MFMAIntrinsic::WMMA_F16_16x16x16_F16});
   }
   return ArrayAttr();
 }
