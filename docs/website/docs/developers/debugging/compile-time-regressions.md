@@ -230,27 +230,27 @@ steps to profile `iree-compile` and visualize the results as a flame graph.
    pointers. You can do that by selecting the `RelWithDebInfo` build type and
    adding `-fno-omit-frame-pointers` to your compiler flags:
 
-   ```shell
-   cmake <Your-CMAKE-Flags> \
-      -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-      -DCMAKE_CXX_FLAGS="-fno-omit-frame-pointer" \
-      -DCMAKE_C_FLAGS="-fno-omit-frame-pointer"
-   ```
+     ```shell
+     cmake <Your-CMAKE-Flags> \
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+        -DCMAKE_CXX_FLAGS="-fno-omit-frame-pointer" \
+        -DCMAKE_C_FLAGS="-fno-omit-frame-pointer"
+     ```
 
 2. Set perf event scope/access to the appropriate level with
    [`perf_event_paranoid`](https://www.kernel.org/doc/html/v5.7/admin-guide/perf-security.html#perf-events-perf-unprivileged-users).
 
-   ```shell
-   echo 0 | sudo tee /proc/sys/kernel/perf_event_paranoid
-   ```
+     ```shell
+     echo 0 | sudo tee /proc/sys/kernel/perf_event_paranoid
+     ```
 
 3. Run `iree-compile` under the `perf` profiler and collect profile data. This
    requires `sudo`.
 
-   ```shell
-   sudo perf record -F 999 -g -- tools/iree-compile <Your-Compile-Arguments>
-   sudo chown "$USER:$USER" perf.data
-   ```
+     ```shell
+     sudo perf record -F 999 -g -- tools/iree-compile <Your-Compile-Arguments>
+     sudo chown "$USER:$USER" perf.data
+     ```
 
 4. Use `pprof` to process `perf.data` from the previous step and start a local
    http server with the visualized profile. See the
@@ -259,9 +259,9 @@ steps to profile `iree-compile` and visualize the results as a flame graph.
    [`perf_data_converter`](https://github.com/google/perf_data_converter) and
    add it to your `PATH`.
 
-   ```shell
-   pprof -http ':' perf.data
-   ```
+     ```shell
+     pprof -http ':' perf.data
+     ```
 
 ## Stepping through compiler IR
 
