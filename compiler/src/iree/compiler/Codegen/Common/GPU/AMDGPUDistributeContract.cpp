@@ -69,6 +69,11 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
     MFMAParameters mfmaParams;
     std::tie(mfmaParams.m, mfmaParams.n, mfmaParams.k) = mfmaAttr.getMNKShape();
     mfmaParams.blocks = mfmaAttr.getBlockSize();
+    StringRef computeType = mfmaAttr.getComputeType();
+    if (computeType.empty()) {
+      return rewriter.notifyMatchFailure(
+          contractOp, "Cannot determine intrinsic compute type.");
+    }
 
     // Infer the contract kind so that we know know to correlate M/N/K dims.
     VectorContractOpInfo opDetail(contractOp);
@@ -162,8 +167,9 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
             rewriter.create<vector::ExtractOp>(loc, lhs, lhsBatchOffsets);
         Value rhsSlice =
             rewriter.create<vector::ExtractOp>(loc, rhs, rhsBatchOffsets);
-        accSlice = computeMMA(rewriter, loc, mfmaParams, lhsSlice, rhsSlice,
-                              accSlice, aVectorType, bVectorType, cVectorType);
+        accSlice =
+            computeMMA(rewriter, loc, mfmaParams, lhsSlice, rhsSlice, accSlice,
+                       aVectorType, bVectorType, cVectorType, computeType);
       }
       finalTile = rewriter.create<vector::InsertOp>(loc, accSlice, finalTile,
                                                     resultBatchOffsets);
@@ -222,15 +228,20 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
   // |intrinsic|.
   Value computeMMA(OpBuilder &builder, Location loc,
                    const MFMAParameters &mfmaParams, Value a, Value b, Value c,
-                   VectorType aType, VectorType bType, VectorType cType) const {
+                   VectorType aType, VectorType bType, VectorType cType,
+                   StringRef computeType) const {
     Value aCast = builder.create<vector::ShapeCastOp>(a.getLoc(), aType, a);
     Value bCast = builder.create<vector::ShapeCastOp>(b.getLoc(), bType, b);
     Value cCast = builder.create<vector::ShapeCastOp>(c.getLoc(), cType, c);
-
-    Value mfmaOp = builder.create<amdgpu::MFMAOp>(
-        loc, cType, mfmaParams.m, mfmaParams.n, mfmaParams.k, mfmaParams.blocks,
-        aCast, bCast, cCast);
-    return builder.create<vector::ShapeCastOp>(c.getLoc(), c.getType(), mfmaOp);
+    Value mmaOp;
+    if (computeType == "MFMA") {
+      mmaOp = builder.create<amdgpu::MFMAOp>(
+          loc, cType, mfmaParams.m, mfmaParams.n, mfmaParams.k,
+          mfmaParams.blocks, aCast, bCast, cCast);
+    } else if (computeType == "WMMA") {
+      mmaOp = builder.create<amdgpu::WMMAOp>(loc, cType, aCast, bCast, cCast);
+    }
+    return builder.create<vector::ShapeCastOp>(c.getLoc(), c.getType(), mmaOp);
   }
 };
 

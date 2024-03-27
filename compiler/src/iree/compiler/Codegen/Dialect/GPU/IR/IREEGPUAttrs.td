@@ -125,6 +125,7 @@ def IREEGPU_MFMAAttr : IREEGPU_MmaVectorLayoutAttr<"MFMA", "MFMAIntrinsicAttr"> 
 
   let extraClassDeclaration = !strconcat(baseExtraClassDeclaration, [{
     int64_t getBlockSize() const;
+    StringRef getComputeType() const;
 
     // Partial nested layout for an MMA intrinsic's matrix input/output inside
     // a single subgroup.

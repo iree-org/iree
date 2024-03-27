@@ -269,6 +269,25 @@ static ConcreteMmaLayout getConcreteMFMALayout(MLIRContext *context,
     return ConcreteMmaLayout{opaqueLayout, aMLayout, aKLayout, bKLayout,
                              bNLayout,     cMLayout, cNLayout};
   }
+  case MFMAIntrinsic::WMMA_F16_16x16x16_F16:
+  case MFMAIntrinsic::WMMA_F16_16x16x16_F32: {
+    // #outer = #iree_vector_ext.per_dim_layout<[LANEX], [16]>
+    // #inner = #iree_vector_ext.per_dim_layout<[LANEY, VECTORX], [4, 4]>
+    // #layout_a = #iree_vector_ext.layout<#outer, #inner>
+    // #layout_b = #iree_vector_ext.layout<#inner, #outer>
+    // #layout_c = #iree_vector_ext.layout<#inner, #outer>
+
+    auto outer = PerDimLayoutAttr::get(context, {laneX}, {16});
+    auto inner = PerDimLayoutAttr::get(context, {laneY, vectorX}, {1, 16});
+    auto aMLayout = outer;
+    auto aKLayout = inner;
+    auto bKLayout = inner;
+    auto bNLayout = outer;
+    auto cMLayout = inner;
+    auto cNLayout = outer;
+    return ConcreteMmaLayout{opaqueLayout, aMLayout, aKLayout, bKLayout,
+                             bNLayout,     cMLayout, cNLayout};
+  }
   default: {
     break;
   }
@@ -335,7 +354,7 @@ MFMAAttr::getABCVectorTypes() const {
   case MFMAIntrinsic::WMMA_F16_16x16x16_F32: {
     auto aType = VectorType::get({16}, getAType());
     auto bType = VectorType::get({16}, getBType());
-    auto cType = VectorType::get({16}, getCType());
+    auto cType = VectorType::get({8}, getCType());
     return std::make_tuple(aType, bType, cType);
   }
   }
@@ -353,18 +372,30 @@ MFMAAttr::getContractionLayout(vector::ContractionOp contract) const {
 
 int64_t MFMAAttr::getBlockSize() const {
   switch (getIntrinsic().getValue()) {
-  case MFMAIntrinsic::MFMA_F16_16x16x16_F32: {
+  case MFMAIntrinsic::MFMA_F16_16x16x16_F32:
+  case MFMAIntrinsic::MFMA_F16_32x32x8_F32:
+  case MFMAIntrinsic::WMMA_F16_16x16x16_F16:
+  case MFMAIntrinsic::WMMA_F16_16x16x16_F32: {
     return 1;
-  }
-  case MFMAIntrinsic::MFMA_F16_32x32x8_F32: {
-    return 1;
-  }
-  default: {
-    break;
   }
   }
   // This should not happen but just to make GCC happy.
   return 0;
+}
+
+StringRef MFMAAttr::getComputeType() const {
+  switch (getIntrinsic().getValue()) {
+  case MFMAIntrinsic::MFMA_F16_16x16x16_F32:
+  case MFMAIntrinsic::MFMA_F16_32x32x8_F32: {
+    return "MFMA";
+  }
+  case MFMAIntrinsic::WMMA_F16_16x16x16_F16:
+  case MFMAIntrinsic::WMMA_F16_16x16x16_F32: {
+    return "WMMA";
+  }
+  }
+  // This should not happen but just to make GCC happy.
+  return "";
 }
 
 MFMAAttr::SingleSubgroupLayout MFMAAttr::getASingleSubgroupLayoutCount() const {
@@ -374,6 +405,10 @@ MFMAAttr::SingleSubgroupLayout MFMAAttr::getASingleSubgroupLayoutCount() const {
   }
   case MFMAIntrinsic::MFMA_F16_32x32x8_F32: {
     return {/*outer=*/{1, 1}, /*thread=*/{32, 2}, /*element=*/{1, 4}};
+  }
+  case MFMAIntrinsic::WMMA_F16_16x16x16_F16:
+  case MFMAIntrinsic::WMMA_F16_16x16x16_F32: {
+    return {/*outer=*/{1, 1}, /*thread=*/{16, 1}, /*element=*/{1, 16}};
   }
   default: {
     break;
@@ -390,6 +425,10 @@ MFMAAttr::SingleSubgroupLayout MFMAAttr::getBSingleSubgroupLayoutCount() const {
   case MFMAIntrinsic::MFMA_F16_32x32x8_F32: {
     return {/*outer=*/{1, 1}, /*thread=*/{2, 32}, /*element=*/{4, 1}};
   }
+  case MFMAIntrinsic::WMMA_F16_16x16x16_F16:
+  case MFMAIntrinsic::WMMA_F16_16x16x16_F32: {
+    return {/*outer=*/{1, 1}, /*thread=*/{1, 16}, /*element=*/{16, 1}};
+  }
   default: {
     break;
   }
@@ -405,8 +444,9 @@ MFMAAttr::SingleSubgroupLayout MFMAAttr::getCSingleSubgroupLayoutCount() const {
   case MFMAIntrinsic::MFMA_F16_32x32x8_F32: {
     return {/*outer=*/{4, 1}, /*thread=*/{2, 32}, /*element=*/{4, 1}};
   }
-  default: {
-    break;
+  case MFMAIntrinsic::WMMA_F16_16x16x16_F16:
+  case MFMAIntrinsic::WMMA_F16_16x16x16_F32: {
+    return {/*outer=*/{1, 1}, /*thread=*/{2, 16}, /*element=*/{8, 1}};
   }
   }
   return {};
@@ -415,11 +455,10 @@ MFMAAttr::SingleSubgroupLayout MFMAAttr::getCSingleSubgroupLayoutCount() const {
 MFMAAttr::SingleSubgroupLayout MFMAAttr::getASingleSubgroupLayoutOrder() const {
   switch (getIntrinsic().getValue()) {
   case MFMAIntrinsic::MFMA_F16_16x16x16_F32:
-  case MFMAIntrinsic::MFMA_F16_32x32x8_F32: {
+  case MFMAIntrinsic::MFMA_F16_32x32x8_F32:
+  case MFMAIntrinsic::WMMA_F16_16x16x16_F16:
+  case MFMAIntrinsic::WMMA_F16_16x16x16_F32: {
     return {/*outer=*/{0, 1}, /*thread=*/{1, 0}, /*element=*/{0, 1}};
-  }
-  default: {
-    break;
   }
   }
   return {};
@@ -428,11 +467,10 @@ MFMAAttr::SingleSubgroupLayout MFMAAttr::getASingleSubgroupLayoutOrder() const {
 MFMAAttr::SingleSubgroupLayout MFMAAttr::getBSingleSubgroupLayoutOrder() const {
   switch (getIntrinsic().getValue()) {
   case MFMAIntrinsic::MFMA_F16_16x16x16_F32:
-  case MFMAIntrinsic::MFMA_F16_32x32x8_F32: {
+  case MFMAIntrinsic::MFMA_F16_32x32x8_F32:
+  case MFMAIntrinsic::WMMA_F16_16x16x16_F16:
+  case MFMAIntrinsic::WMMA_F16_16x16x16_F32: {
     return {/*outer=*/{0, 1}, /*thread=*/{0, 1}, /*element=*/{1, 0}};
-  }
-  default: {
-    break;
   }
   }
   return {};
@@ -441,11 +479,10 @@ MFMAAttr::SingleSubgroupLayout MFMAAttr::getBSingleSubgroupLayoutOrder() const {
 MFMAAttr::SingleSubgroupLayout MFMAAttr::getCSingleSubgroupLayoutOrder() const {
   switch (getIntrinsic().getValue()) {
   case MFMAIntrinsic::MFMA_F16_16x16x16_F32:
-  case MFMAIntrinsic::MFMA_F16_32x32x8_F32: {
+  case MFMAIntrinsic::MFMA_F16_32x32x8_F32:
+  case MFMAIntrinsic::WMMA_F16_16x16x16_F16:
+  case MFMAIntrinsic::WMMA_F16_16x16x16_F32: {
     return {/*outer=*/{0, 1}, /*thread=*/{0, 1}, /*element=*/{1, 0}};
-  }
-  default: {
-    break;
   }
   }
   return {};
