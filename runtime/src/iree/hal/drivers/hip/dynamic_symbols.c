@@ -155,7 +155,7 @@ iree_status_t iree_hal_hip_dynamic_symbols_initialize(
       status = iree_make_status(
           IREE_STATUS_UNAVAILABLE,
           "HIP runtime library 'amdhip64.dll'/'libamdhip64.so' not available: "
-          "please ensure installed and in dynamic library search path:%*.s",
+          "please ensure installed and in dynamic library search path:%.*s",
           (int)error_detail.size, error_detail.data);
     }
   }
