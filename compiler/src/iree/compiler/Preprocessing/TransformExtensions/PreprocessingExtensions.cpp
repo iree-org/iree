@@ -164,7 +164,7 @@ IREE::transform_dialect::MatchCastCompatibleDagFromRootOp::matchOperation(
     DiagnosedSilenceableFailure diag =
         compareCastCompatibleOperations(*this, targetOp, payloadOp);
     if (!diag.succeeded()) {
-      diag.attachNote() << "While processing operation " << *payloadOp;
+      diag.attachNote(payloadOp->getLoc()) << "While processing operation";
       return diag;
     }
 
@@ -218,8 +218,7 @@ IREE::transform_dialect::MatchCastCompatibleDagFromRootOp::matchOperation(
     DiagnosedSilenceableFailure diag =
         compareOperationRegions(*this, cache, *mapping, targetOp, payloadOp);
     if (!diag.succeeded()) {
-      diag.attachNote() << "While processing region of operation "
-                        << *payloadOp;
+      diag.attachNote(payloadOp->getLoc()) << "While processing region";
       return diag;
     }
     for (auto [targetOpResult, payloadOpResult] :

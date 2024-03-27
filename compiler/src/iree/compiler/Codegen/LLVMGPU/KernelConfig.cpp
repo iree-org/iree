@@ -69,6 +69,9 @@ namespace {
 constexpr StringLiteral kCudaTarget = "cuda";
 constexpr StringLiteral kRocmTarget = "rocm";
 
+// Threshold used to determine whether a matmul dimension is 'very skinny'.
+constexpr int64_t kVerySkinnyDimThreshold = 4;
+
 /// Structure to represent target features.
 struct TargetInfo {
   // TODO: add finer grain control for other tensorcore types.
@@ -638,6 +641,24 @@ static LogicalResult setContractConfig(mlir::FunctionOpInterface entryPoint,
   if (llvm::any_of(op.getIndexingMapsArray(),
                    [](AffineMap m) { return m.isPermutation(); })) {
     return failure();
+  }
+
+  // Send very skinny, {2-4}xNxK and Mx{2-4}xK, matmuls to the vector reduction
+  // pipeline, similar to matvec. Note: Because of reassociation in the vector
+  // reduction pipeline, this may lead to precission loss. If this ever becomes
+  // an issue, we can hide this behind a flag.
+  if (llvm::all_equal({contractionDims->m.size(), contractionDims->n.size(),
+                       contractionDims->k.size(), size_t{1}}) &&
+      contractionDims->batch.empty()) {
+    int64_t mSize = bounds[contractionDims->m.front()];
+    int64_t nSize = bounds[contractionDims->n.front()];
+    int64_t preferredSubgroupSize = targetInfo.supportedSubgroupSizes.front();
+    if ((mSize <= kVerySkinnyDimThreshold &&
+         (nSize > preferredSubgroupSize || ShapedType::isDynamic(nSize))) ||
+        (nSize <= kVerySkinnyDimThreshold &&
+         (mSize > preferredSubgroupSize || ShapedType::isDynamic(mSize)))) {
+      return failure();
+    }
   }
 
   // TODO: Properly rematerialize leading elementwise with shared memory
