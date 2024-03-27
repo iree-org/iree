@@ -50,7 +50,6 @@ iree_cc_library(
     MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR
-    MLIRInliningUtils
     MLIRParser
     MLIRSupport
     MLIRTransformUtils

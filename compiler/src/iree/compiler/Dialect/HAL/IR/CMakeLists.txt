@@ -73,7 +73,6 @@ iree_cc_library(
     MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR
-    MLIRInliningUtils
     MLIRMemRefDialect
     MLIRParser
     MLIRSCFDialect

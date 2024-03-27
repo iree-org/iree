@@ -46,7 +46,6 @@ iree_cc_library(
     MLIRFunctionInterfaces
     MLIRIR
     MLIRInferTypeOpInterface
-    MLIRInliningUtils
     MLIRMemRefDialect
     MLIRParser
     MLIRSideEffectInterfaces
