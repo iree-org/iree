@@ -409,7 +409,7 @@ SmallVector<int64_t> MFMAAttr::getADataDuplicate() const {
     return {2, 1};
   }
   }
-  // This should not happen but just to make GCC happy.
+  // Defaults to no data duplication.
   return {1, 1};
 }
 
@@ -424,7 +424,7 @@ SmallVector<int64_t> MFMAAttr::getBDataDuplicate() const {
     return {1, 2};
   }
   }
-  // This should not happen but just to make GCC happy.
+  // Defaults to no data duplication.
   return {1, 1};
 }
 
@@ -437,7 +437,7 @@ SmallVector<int64_t> MFMAAttr::getCDataDuplicate() const {
     break;
   }
   }
-  // This should not happen but just to make GCC happy.
+  // Defaults to no data duplication.
   return {1, 1};
 }
 
