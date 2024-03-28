@@ -74,8 +74,7 @@ public:
                 return setContractionAnchor(context, analysis, contract);
               })
               .Case([&](vector::TransferReadOp transfer) {
-                setTransferReadAnchor(context, analysis, transfer);
-                return success();
+                return setTransferReadAnchor(context, analysis, transfer);
               })
               .Default([](Operation *) { return success(); });
       return failed(setResult) ? WalkResult::interrupt()
@@ -104,10 +103,18 @@ private:
     }
 
     auto [aLayout, bLayout, cLayout] = *layouts;
-    analysis.setAnchor(contract.getLhs(), aLayout);
-    analysis.setAnchor(contract.getRhs(), bLayout);
-    analysis.setAnchor(contract.getAcc(), cLayout);
-    analysis.setAnchor(contract.getResult(), cLayout);
+    if (analysis.setAnchor(contract.getLhs(), aLayout).failed()) {
+      return failure();
+    }
+    if (analysis.setAnchor(contract.getRhs(), bLayout).failed()) {
+      return failure();
+    }
+    if (analysis.setAnchor(contract.getAcc(), cLayout).failed()) {
+      return failure();
+    }
+    if (analysis.setAnchor(contract.getResult(), cLayout).failed()) {
+      return failure();
+    }
     contract->setAttr("iree.amdgpu.mfma", schedule.getIntrinsic());
     if (printLayout) {
       llvm::outs() << "contract A vector layout: " << aLayout << "\n";
@@ -158,9 +165,9 @@ private:
   //    elements_per_thread =     [1, 8]
   //
   //    *_order = [0, 1]>
-  void setTransferReadAnchor(MLIRContext *context,
-                             VectorLayoutAnalysis &analysis,
-                             vector::TransferReadOp transfer) {
+  LogicalResult setTransferReadAnchor(MLIRContext *context,
+                                      VectorLayoutAnalysis &analysis,
+                                      vector::TransferReadOp transfer) {
 
     // Get the forward slice of the transfer to approximate whether it will take
     // the layout of a contraction instead. Transfer_read ops used directly by a
@@ -184,38 +191,38 @@ private:
     if (llvm::any_of(slice, [](Operation *op) {
           return llvm::isa<vector::ContractionOp>(op);
         })) {
-      return;
+      return success();
     }
 
     // TODO: Support masking.
     if (transfer.getMask()) {
-      return;
+      return success();
     }
     // Shared memory loads are expected to take the layout of the contraction.
     auto sourceMemRefType =
         dyn_cast<MemRefType>(transfer.getSource().getType());
     if (!sourceMemRefType || hasSharedMemoryAddressSpace(sourceMemRefType)) {
-      return;
+      return success();
     }
 
     int64_t bitWidth = IREE::Util::getTypeBitWidth(
         getElementTypeOrSelf(transfer.getVectorType()));
     if (!llvm::isPowerOf2_64(bitWidth) || bitWidth > 128) {
-      return;
+      return success();
     }
     int64_t numElementsPerThread = 128 / bitWidth;
     int64_t flatNumElements =
         ShapedType::getNumElements(transfer.getVectorType().getShape());
     int64_t flatNumThreads = ShapedType::getNumElements(workgroupSize);
     if (flatNumElements % flatNumThreads != 0) {
-      return;
+      return success();
     }
     numElementsPerThread =
         std::min(numElementsPerThread, flatNumElements / flatNumThreads);
 
     AffineMap transferMap = transfer.getPermutationMap();
     if (transferMap.getNumDims() == 0) {
-      return;
+      return success();
     }
 
     // Select the innermost dim of the memref as the contiguous dim to load
@@ -308,11 +315,14 @@ private:
         threadCounts, order, elementSizes, order, subgroupBasis,
         SmallVector<bool>(subgroupBasis.size(), true), threadBasis,
         SmallVector<bool>(threadBasis.size(), true));
-    analysis.setAnchor(transfer.getResult(), layout);
+    if (analysis.setAnchor(transfer.getResult(), layout).failed()) {
+      return failure();
+    }
     if (printLayout) {
       llvm::outs() << "transfer '" << transfer << "' vector layout: " << layout
                    << "\n";
     }
+    return success();
   }
 
   SmallVector<int64_t, 3> workgroupSize;

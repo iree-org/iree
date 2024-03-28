@@ -100,20 +100,7 @@ private:
   /// should only be used when you know there will be no layout conflicts.
   /// Otherwise, the resolve-like functions should be used.
   void setInnerLayout(const VectorLayoutInterface &layout) {
-    if (layout && !layout.isValidLayout(getValue().getType().getShape())) {
-      Location loc = getValue().getLoc();
-      emitError(loc)
-          << "Attempting to assign an invalid or incompatible layout: "
-          << layout;
-      emitRemark(loc) << "To value: " << getValue();
-      std::string buf;
-      llvm::raw_string_ostream os(buf);
-      llvm::interleaveComma(getValue().getType().getShape(), os);
-      emitRemark(loc) << "Of shape: [" << os.str() << "]";
-      // TODO(https://github.com/openxla/iree/issues/16119): We shouldn't crash
-      // here.
-      llvm::report_fatal_error("Invalid layout assignment");
-    }
+    assert(layout && layout.isValidLayout(getValue()).succeeded());
     vectorLayout = layout;
   }
 
@@ -987,6 +974,20 @@ DistributionLayout *EnforceLayout::getLatticeElement(Value val) {
 ///        VectorLayoutAnalysis
 /// ==========================================================================
 
+LogicalResult VectorLayoutAnalysis::setAnchor(Value val, Attribute layout) {
+  VectorLayoutInterface layoutInterface =
+      dyn_cast<VectorLayoutInterface>(layout);
+  assert(layoutInterface &&
+         "expected layout to implement VectorLayoutInterface");
+  auto typedVal = dyn_cast<TypedValue<VectorType>>(val);
+  assert(typedVal && "expected value to be a vector type");
+  if (layoutInterface.isValidLayout(typedVal).failed()) {
+    return failure();
+  }
+  anchors[typedVal] = cast<VectorLayoutInterface>(layout);
+  return success();
+}
+
 LogicalResult VectorLayoutAnalysis::run() {
   // The order of loading matters here, because propagateLayout does anchoring
   // initialization which needs the lattice to know both enforcement and
@@ -1045,9 +1046,9 @@ void VectorLayoutAnalysis::dump() {
 
 namespace mlir::iree_compiler {
 
-void setAnchorOpsFromAttributes(VectorLayoutAnalysis &analysis,
-                                Operation *root) {
-  root->walk([&](Operation *op) {
+LogicalResult setAnchorOpsFromAttributes(VectorLayoutAnalysis &analysis,
+                                         Operation *root) {
+  WalkResult result = root->walk([&](Operation *op) {
     for (NamedAttribute attr : op->getAttrs()) {
       StringRef name = attr.getName().strref();
       if (name.contains("__vector_layout_test_anchor_operand_")) {
@@ -1056,17 +1057,29 @@ void setAnchorOpsFromAttributes(VectorLayoutAnalysis &analysis,
             .getAsInteger(/*Radix=*/10, operandNum);
         assert(operandNum < op->getNumOperands() &&
                "operand number out of range");
-        analysis.setAnchor(op->getOperand(operandNum), attr.getValue());
+        if (analysis.setAnchor(op->getOperand(operandNum), attr.getValue())
+                .failed()) {
+          return WalkResult::interrupt();
+        }
       }
       if (name.contains("__vector_layout_test_anchor_result_")) {
         int resultNum;
         name.substr(name.find_last_of("_") + 1)
             .getAsInteger(/*Radix=*/10, resultNum);
         assert(resultNum < op->getNumResults() && "result number out of range");
-        analysis.setAnchor(op->getResult(resultNum), attr.getValue());
+        if (analysis.setAnchor(op->getResult(resultNum), attr.getValue())
+                .failed()) {
+          return WalkResult::interrupt();
+        }
       }
     }
+    return WalkResult::advance();
   });
+
+  if (result.wasInterrupted()) {
+    return failure();
+  }
+  return success();
 }
 
 } // namespace mlir::iree_compiler

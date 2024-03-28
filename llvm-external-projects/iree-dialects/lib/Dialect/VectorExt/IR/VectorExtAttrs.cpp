@@ -23,6 +23,8 @@ using namespace mlir;
 
 namespace mlir::iree_compiler::IREE::VectorExt {
 
+using VectorValue = TypedValue<VectorType>;
+
 bool PerDimLayoutAttr::contains(const LayoutDimension &dim) {
   for (LayoutDimensionAttr label : getLabels()) {
     if (label.getValue() == dim)
@@ -50,18 +52,30 @@ std::optional<int64_t> LayoutAttr::getShape(const LayoutDimension &dim) const {
 
 // Get the SIMT Vector shape in the order specified by dims. If no dims are
 // specified, then return an empty vector.
-bool LayoutAttr::isValidLayout(ArrayRef<int64_t> shape) const {
-  for (auto perDimLayout : llvm::enumerate(getLayouts())) {
-    ArrayRef<int64_t> layoutShape = perDimLayout.value().getShapes();
-    int64_t computedShape =
+LogicalResult LayoutAttr::isValidLayout(VectorValue vector) const {
+  ArrayRef<int64_t> shape = vector.getType().getShape();
+  for (auto [idx, layout] : llvm::enumerate(getLayouts())) {
+    ArrayRef<int64_t> layoutShape = layout.getShapes();
+    int64_t expectedShape =
         std::reduce(layoutShape.begin(), layoutShape.end(),
                     static_cast<int64_t>(1), std::multiplies<int64_t>());
-    int64_t expectedShape = shape[perDimLayout.index()];
-    if (computedShape != expectedShape) {
-      return false;
+    if (expectedShape != shape[idx]) {
+      std::string shapeStr;
+      llvm::raw_string_ostream shapeOs(shapeStr);
+      llvm::interleaveComma(shape, shapeOs);
+      std::string layoutStr;
+      llvm::raw_string_ostream layoutOs(layoutStr);
+      printStripped(layoutOs);
+      return emitError(vector.getLoc(),
+                       "Vector shape: [" + shapeStr +
+                           "] does not match the layout (" + layoutStr +
+                           ") at dim " + std::to_string(idx) +
+                           ". Dimension expected by layout: " +
+                           std::to_string(expectedShape) +
+                           " actual: " + std::to_string(shape[idx]));
     }
   }
-  return true;
+  return success();
 }
 
 // Project out the layout for the specified dimensions
@@ -364,7 +378,8 @@ SmallVector<int64_t> NestedLayoutAttr::getDistributedShape() const {
   return shape;
 }
 
-bool NestedLayoutAttr::isValidLayout(ArrayRef<int64_t> shape) const {
+LogicalResult NestedLayoutAttr::isValidLayout(VectorValue vector) const {
+  ArrayRef<int64_t> shape = vector.getType().getShape();
   // Multiply all shapes in the layout.
   for (int i = 0, e = shape.size(); i < e; ++i) {
     int64_t expectedShape = getSubgroupsPerWorkgroup()[i] *
@@ -372,10 +387,22 @@ bool NestedLayoutAttr::isValidLayout(ArrayRef<int64_t> shape) const {
                             getOutersPerBatch()[i] * getThreadsPerOuter()[i] *
                             getElementsPerThread()[i];
     if (expectedShape != shape[i]) {
-      return false;
+      std::string shapeStr;
+      llvm::raw_string_ostream shapeOs(shapeStr);
+      llvm::interleaveComma(shape, shapeOs);
+      std::string layoutStr;
+      llvm::raw_string_ostream layoutOs(layoutStr);
+      printStripped(layoutOs);
+      return emitError(vector.getLoc(),
+                       "Vector shape: [" + shapeStr +
+                           "] does not match the layout (" + layoutStr +
+                           ") at dim " + std::to_string(i) +
+                           ". Dimension expected by layout: " +
+                           std::to_string(expectedShape) +
+                           " actual: " + std::to_string(shape[i]));
     }
   }
-  return true;
+  return success();
 }
 
 // TODO: These things should ideally go into the parser when we have a custom
