@@ -917,7 +917,9 @@ transform_dialect::TestVectorLayoutAnalysisOp::applyToOne(
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   VectorLayoutAnalysis analysis(target);
-  setAnchorOpsFromAttributes(analysis, target);
+  if (setAnchorOpsFromAttributes(analysis, target).failed()) {
+    return emitDefaultSilenceableFailure(target);
+  }
   if (failed(analysis.run())) {
     target.emitError("layout analysis failed");
     return emitDefaultSilenceableFailure(target);
@@ -942,8 +944,7 @@ public:
       : VectorLayoutOptions(root, /*fullConversion=*/false) {}
 
   LogicalResult setAnchorOps(VectorLayoutAnalysis &analysis) override {
-    setAnchorOpsFromAttributes(analysis, root);
-    return success();
+    return setAnchorOpsFromAttributes(analysis, root);
   }
 };
 

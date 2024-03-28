@@ -1526,8 +1526,7 @@ public:
       : VectorLayoutOptions(root, fullConversion) {}
 
   LogicalResult setAnchorOps(VectorLayoutAnalysis &analysis) override {
-    setAnchorOpsFromAttributes(analysis, root);
-    return success();
+    return setAnchorOpsFromAttributes(analysis, root);
   }
 };
 
