@@ -162,7 +162,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 
 // -----
 
-// CHECK:      #[[$TILE_SIZES:.+]] = #iree_codegen.lowering_config<tile_sizes =  {{\[}}[32, 128, 32]{{\]}}
+// CHECK:      #[[$TILE_SIZES:.+]] = #iree_codegen.lowering_config<tile_sizes =  {{\[}}[64, 128, 64]{{\]}}
 // CHECK:      #iree_codegen.translation_info<LLVMGPUVectorDistribute
 // CHECK-SAME: mma_schedule = #iree_gpu.mma_schedule
 // CHECK-SAME:   intrinsic = #iree_gpu.mfma_layout<F16_16x16x16_F32>

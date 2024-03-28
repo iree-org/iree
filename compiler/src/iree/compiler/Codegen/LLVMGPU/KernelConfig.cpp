@@ -100,19 +100,29 @@ constexpr unsigned softwarePipelineDepthSimt = 0;
 
 /// Return the best combination of tile size and wg size. It will then used to
 /// pick the best size aligned with the shape dimension.
-static void getMatmulConfig(SmallVectorImpl<TileWorkgroupSizePair> &tileSizes) {
+static SmallVector<TileWorkgroupSizePair>
+getMatmulConfig(const TargetInfo &targetInfo) {
+  SmallVector<TileWorkgroupSizePair> tileSizes;
   // Pick tile size so that M*K and K*N dividible by wgSize * \*vecSize=*\4.
   // This way workgroup memory copy don't need to be masked. Once we support
   // masked load we can get performance out of more configuration.
-  tileSizes.push_back(TileWorkgroupSizePair({{32, 128, 32}, {32, 8, 1}, 1}));
-  tileSizes.push_back(TileWorkgroupSizePair({{128, 64, 8}, {16, 8, 1}, 1}));
-  tileSizes.push_back(TileWorkgroupSizePair({{16, 256, 32}, {64, 2, 1}, 1}));
-  tileSizes.push_back(TileWorkgroupSizePair({{8, 32, 32}, {8, 8, 1}, 1}));
 
-  tileSizes.push_back(TileWorkgroupSizePair({{32, 128, 4}, {32, 8, 1}, 1}));
-  tileSizes.push_back(TileWorkgroupSizePair({{8, 128, 4}, {32, 1, 1}, 1}));
-  tileSizes.push_back(TileWorkgroupSizePair({{16, 64, 4}, {16, 2, 1}, 1}));
-  tileSizes.push_back(TileWorkgroupSizePair({{1, 128, 8}, {32, 1, 1}, 1}));
+  // Make use of the full subgroup when possible.
+  if (targetInfo.supportedSubgroupSizes.front() == 64) {
+    tileSizes.push_back(TileWorkgroupSizePair({{64, 128, 64}, {64, 16, 1}, 1}));
+  }
+
+  llvm::append_values(tileSizes,
+                      TileWorkgroupSizePair({{32, 128, 32}, {32, 8, 1}, 1}),
+                      TileWorkgroupSizePair({{128, 64, 8}, {16, 8, 1}, 1}),
+                      TileWorkgroupSizePair({{16, 256, 32}, {64, 2, 1}, 1}),
+                      TileWorkgroupSizePair({{8, 32, 32}, {8, 8, 1}, 1}),
+
+                      TileWorkgroupSizePair({{32, 128, 4}, {32, 8, 1}, 1}),
+                      TileWorkgroupSizePair({{8, 128, 4}, {32, 1, 1}, 1}),
+                      TileWorkgroupSizePair({{16, 64, 4}, {16, 2, 1}, 1}),
+                      TileWorkgroupSizePair({{1, 128, 8}, {32, 1, 1}, 1}));
+  return tileSizes;
 }
 
 /// Return the best combination of tile size and wg size when using tensorcore
@@ -782,10 +792,10 @@ static LogicalResult setContractConfig(mlir::FunctionOpInterface entryPoint,
           softwarePipelineDepthSimt,
           IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt);
     }
-    // simt matmul case
-    SmallVector<TileWorkgroupSizePair> tileSizeConfig;
-    // Query the best configuration.
-    getMatmulConfig(tileSizeConfig);
+
+    // SIMT matmul case. Query the best configuration.
+    SmallVector<TileWorkgroupSizePair> tileSizeConfig =
+        getMatmulConfig(targetInfo);
     // Pick the best configuration where the original shape is aligned on the
     // tile size.
     for (TileWorkgroupSizePair &config : tileSizeConfig) {
@@ -801,9 +811,8 @@ static LogicalResult setContractConfig(mlir::FunctionOpInterface entryPoint,
   }
   // If we haven't found any config, use the best tile size hoping that
   // the workgroup specialization handles the main tile path efficiently.
-  SmallVector<TileWorkgroupSizePair> tileSizeConfig;
-  // Query the best configuration.
-  getMatmulConfig(tileSizeConfig);
+  SmallVector<TileWorkgroupSizePair> tileSizeConfig =
+      getMatmulConfig(targetInfo);
   constexpr size_t configIndex = 0;
   const TileWorkgroupSizePair &config = tileSizeConfig[configIndex];
   const int64_t tileX = config.tileSize[0];
