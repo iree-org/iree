@@ -30,7 +30,7 @@ iree_cc_library(
     "RegionOpUtils.h"
   SRCS
     "AnnotateDispatches.cpp"
-    "CaptureDispatchDynamicDims.cpp"
+    "CaptureDynamicDims.cpp"
     "CleanupTensorShapes.cpp"
     "CloneProducersIntoDispatchRegions.cpp"
     "CollapseDimensions.cpp"
