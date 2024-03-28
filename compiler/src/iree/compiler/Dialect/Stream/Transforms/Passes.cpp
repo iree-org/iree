@@ -95,6 +95,11 @@ void buildStreamTensorPassPipeline(OpPassManager &passManager,
   // TODO(benvanik): compute affinities for executables.
   // TODO(benvanik): annotate all dispatches with preferred executable affinity.
   // TODO(benvanik): DFA to specify all value affinities and pin dispatches.
+
+  // Verify that all ops that may require affinities have them assigned or
+  // available (on a parent scope, etc). This allows subsequent passes to trust
+  // that an affinity lookup will always return a valid affinity.
+  passManager.addPass(IREE::Stream::createVerifyAffinitiesPass());
 }
 
 //===----------------------------------------------------------------------===//
