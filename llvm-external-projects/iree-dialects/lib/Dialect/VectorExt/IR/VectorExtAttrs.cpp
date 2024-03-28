@@ -315,11 +315,11 @@ NestedLayoutAttr::project(ArrayRef<bool> droppedDims) const {
   composeMasks(subgroupMask, droppedDims);
   composeMasks(threadMask, droppedDims);
 
-  return NestedLayoutAttr::get(getContext(), subgroupCount, subgroupOrder,
-                               batchCount, batchOrder, outerCount, outerOrder,
-                               threadCount, threadOrder, elementCount,
-                               elementOrder, getSubgroupBasis(), subgroupMask,
-                               getThreadBasis(), threadMask);
+  return NestedLayoutAttr::get(
+      getContext(), subgroupCount, subgroupOrder, batchCount, batchOrder,
+      outerCount, outerOrder, threadCount, threadOrder, elementCount,
+      elementOrder, getSubgroupBasis(), subgroupMask, getThreadBasis(),
+      threadMask, getDataDuplicate());
 }
 
 VectorLayoutInterface
@@ -371,7 +371,7 @@ NestedLayoutAttr::permute(ArrayRef<int64_t> permutation) const {
       getContext(), subgroupCount, subgroupOrder, batchCount, batchOrder,
       outerCount, outerOrder, threadCount, threadOrder, elementCount,
       elementOrder, getSubgroupBasis(), getSubgroupActiveIds(),
-      getThreadBasis(), getThreadActiveIds());
+      getThreadBasis(), getThreadActiveIds(), getDataDuplicate());
 }
 
 /// We distribute to:
@@ -427,7 +427,8 @@ LogicalResult NestedLayoutAttr::verify(
     ArrayRef<int64_t> threadsPerOuter, ArrayRef<int64_t> threadOrder,
     ArrayRef<int64_t> elementsPerThread, ArrayRef<int64_t> elementOrder,
     ArrayRef<int64_t> subgroupBasis, ArrayRef<bool> subgroupActiveIds,
-    ArrayRef<int64_t> threadBasis, ArrayRef<bool> threadActiveIds) {
+    ArrayRef<int64_t> threadBasis, ArrayRef<bool> threadActiveIds,
+    ArrayRef<int64_t> dataDuplicate) {
 
   size_t rank = subgroupsPerWorkgroup.size();
   auto checkTile = [&](ArrayRef<int64_t> tileShape, ArrayRef<int64_t> order) {
@@ -487,8 +488,12 @@ NestedLayoutAttr::computeThreadIds(Value threadId,
   // thread_basis = [7, 9]
   //
   // subgroup_id(Y, X), thread_id(Y, X) = affine.delinearize_index(3, 5, 7, 9)
+  SmallVector<int64_t> duplicatedThreadBasis(getThreadBasis());
+  for (auto [idx, duplicateFactor] : llvm::enumerate(getDataDuplicate())) {
+    duplicatedThreadBasis[idx] *= duplicateFactor;
+  }
   auto basisSizes =
-      llvm::concat<const int64_t>(getSubgroupBasis(), getThreadBasis());
+      llvm::concat<const int64_t>(getSubgroupBasis(), duplicatedThreadBasis);
 
   SmallVector<OpFoldResult> basisIndexAttr;
   for (int64_t basisIndex : basisSizes) {

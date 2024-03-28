@@ -398,6 +398,49 @@ StringRef MFMAAttr::getComputeType() const {
   return "";
 }
 
+SmallVector<int64_t> MFMAAttr::getADataDuplicate() const {
+  switch (getIntrinsic().getValue()) {
+  case MFMAIntrinsic::MFMA_F16_16x16x16_F32:
+  case MFMAIntrinsic::MFMA_F16_32x32x8_F32: {
+    break;
+  }
+  case MFMAIntrinsic::WMMA_F16_16x16x16_F16:
+  case MFMAIntrinsic::WMMA_F16_16x16x16_F32: {
+    return {2, 1};
+  }
+  }
+  // This should not happen but just to make GCC happy.
+  return {1, 1};
+}
+
+SmallVector<int64_t> MFMAAttr::getBDataDuplicate() const {
+  switch (getIntrinsic().getValue()) {
+  case MFMAIntrinsic::MFMA_F16_16x16x16_F32:
+  case MFMAIntrinsic::MFMA_F16_32x32x8_F32: {
+    break;
+  }
+  case MFMAIntrinsic::WMMA_F16_16x16x16_F16:
+  case MFMAIntrinsic::WMMA_F16_16x16x16_F32: {
+    return {1, 2};
+  }
+  }
+  // This should not happen but just to make GCC happy.
+  return {1, 1};
+}
+
+SmallVector<int64_t> MFMAAttr::getCDataDuplicate() const {
+  switch (getIntrinsic().getValue()) {
+  case MFMAIntrinsic::MFMA_F16_16x16x16_F32:
+  case MFMAIntrinsic::MFMA_F16_32x32x8_F32:
+  case MFMAIntrinsic::WMMA_F16_16x16x16_F16:
+  case MFMAIntrinsic::WMMA_F16_16x16x16_F32: {
+    break;
+  }
+  }
+  // This should not happen but just to make GCC happy.
+  return {1, 1};
+}
+
 MFMAAttr::SingleSubgroupLayout MFMAAttr::getASingleSubgroupLayoutCount() const {
   switch (getIntrinsic().getValue()) {
   case MFMAIntrinsic::MFMA_F16_16x16x16_F32: {
@@ -409,9 +452,6 @@ MFMAAttr::SingleSubgroupLayout MFMAAttr::getASingleSubgroupLayoutCount() const {
   case MFMAIntrinsic::WMMA_F16_16x16x16_F16:
   case MFMAIntrinsic::WMMA_F16_16x16x16_F32: {
     return {/*outer=*/{1, 1}, /*thread=*/{16, 1}, /*element=*/{1, 16}};
-  }
-  default: {
-    break;
   }
   }
   return {};
@@ -429,9 +469,6 @@ MFMAAttr::SingleSubgroupLayout MFMAAttr::getBSingleSubgroupLayoutCount() const {
   case MFMAIntrinsic::WMMA_F16_16x16x16_F32: {
     return {/*outer=*/{1, 1}, /*thread=*/{1, 16}, /*element=*/{16, 1}};
   }
-  default: {
-    break;
-  }
   }
   return {};
 }
@@ -446,7 +483,6 @@ MFMAAttr::SingleSubgroupLayout MFMAAttr::getCSingleSubgroupLayoutCount() const {
   }
   case MFMAIntrinsic::WMMA_F16_16x16x16_F16:
   case MFMAIntrinsic::WMMA_F16_16x16x16_F32: {
-    // return {/*outer=*/{1, 1}, /*thread=*/{8, 2}, /*element=*/{1, 8}};
     return {/*outer=*/{8, 1}, /*thread=*/{2, 16}, /*element=*/{1, 1}};
   }
   }
@@ -501,7 +537,7 @@ NestedLayoutAttr permuteAndCreateNestedLayout(
     SmallVector<int64_t, 2> outerOrder, SmallVector<int64_t, 2> threadCount,
     SmallVector<int64_t, 2> threadOrder, SmallVector<int64_t, 2> elementCount,
     SmallVector<int64_t, 2> elementOrder, ArrayRef<int64_t> subgroupBasis,
-    ArrayRef<int64_t> threadBasis) {
+    ArrayRef<int64_t> threadBasis, SmallVector<int64_t, 2> dataDuplicate) {
   if (!isIdentityPermutation(permute)) {
     applyPermutationToVector(subgroupCount, permute);
     applyPermutationToVector(subgroupOrder, permute);
@@ -513,13 +549,14 @@ NestedLayoutAttr permuteAndCreateNestedLayout(
     applyPermutationToVector(threadOrder, permute);
     applyPermutationToVector(elementCount, permute);
     applyPermutationToVector(elementOrder, permute);
+    applyPermutationToVector(dataDuplicate, permute);
   }
 
   return NestedLayoutAttr::get(
       context, subgroupCount, subgroupOrder, batchCount, batchOrder, outerCount,
       outerOrder, threadCount, threadOrder, elementCount, elementOrder,
       subgroupBasis, SmallVector<bool>(subgroupBasis.size(), true), threadBasis,
-      SmallVector<bool>(threadBasis.size(), true));
+      SmallVector<bool>(threadBasis.size(), true), dataDuplicate);
 }
 
 std::optional<std::tuple<VectorExt::VectorLayoutInterface,
@@ -579,6 +616,7 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
 
   SmallVector<int64_t, 2> cThreadBasis = cCounts.thread;
   applyPermutationToVector(cThreadBasis, cOrders.thread);
+  SmallVector<int64_t, 2> cDataDuplicate = mfmaAttr.getCDataDuplicate();
 
   auto cLayout = permuteAndCreateNestedLayout(
       context, cPermute,
@@ -589,13 +627,14 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
       /*outerOrder=*/cOrders.outer, /*threadCount=*/cCounts.thread,
       /*threadOrder=*/cOrders.thread,
       /*elementCount=*/cCounts.element, /*elementOrder=*/cOrders.element,
-      subgroupBasis, cThreadBasis);
+      subgroupBasis, cThreadBasis, cDataDuplicate);
 
   // A matrix layout
   MFMAAttr::SingleSubgroupLayout aCounts =
       mfmaAttr.getASingleSubgroupLayoutCount();
   MFMAAttr::SingleSubgroupLayout aOrders =
       mfmaAttr.getASingleSubgroupLayoutOrder();
+  SmallVector<int64_t, 2> aDataDuplicate = mfmaAttr.getADataDuplicate();
 
   SmallVector<int64_t, 2> aThreadBasis = aCounts.thread;
   applyPermutationToVector(aThreadBasis, aOrders.thread);
@@ -609,13 +648,14 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
       /*outerOrder=*/aOrders.outer, /*threadCount=*/aCounts.thread,
       /*threadOrder=*/aOrders.thread,
       /*elementCount=*/aCounts.element, /*elementOrder=*/aOrders.element,
-      subgroupBasis, aThreadBasis);
+      subgroupBasis, aThreadBasis, aDataDuplicate);
 
   // B matrix layout
   MFMAAttr::SingleSubgroupLayout bCounts =
       mfmaAttr.getBSingleSubgroupLayoutCount();
   MFMAAttr::SingleSubgroupLayout bOrders =
       mfmaAttr.getBSingleSubgroupLayoutOrder();
+  SmallVector<int64_t, 2> bDataDuplicate = mfmaAttr.getBDataDuplicate();
 
   SmallVector<int64_t, 2> bThreadBasis = bCounts.thread;
   applyPermutationToVector(bThreadBasis, bOrders.thread);
@@ -629,7 +669,7 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
       /*outerOrder=*/bOrders.outer, /*threadCount=*/bCounts.thread,
       /*threadOrder=*/bOrders.thread,
       /*elementCount=*/bCounts.element, /*elementOrder=*/bOrders.element,
-      subgroupBasis, bThreadBasis);
+      subgroupBasis, bThreadBasis, bDataDuplicate);
 
   return std::make_tuple(aLayout, bLayout, cLayout);
 }
