@@ -54,6 +54,12 @@ std::optional<int64_t> LayoutAttr::getShape(const LayoutDimension &dim) const {
 // specified, then return an empty vector.
 LogicalResult LayoutAttr::isValidLayout(VectorValue vector) const {
   ArrayRef<int64_t> shape = vector.getType().getShape();
+  if (shape.size() != getLayouts().size()) {
+    return emitError(vector.getLoc(),
+                     "Rank of vector (" + std::to_string(shape.size()) +
+                         ") does not match rank of layout (" +
+                         std::to_string(getLayouts().size()) + ").");
+  }
   for (auto [idx, layout] : llvm::enumerate(getLayouts())) {
     ArrayRef<int64_t> layoutShape = layout.getShapes();
     int64_t expectedShape =
@@ -380,6 +386,12 @@ SmallVector<int64_t> NestedLayoutAttr::getDistributedShape() const {
 
 LogicalResult NestedLayoutAttr::isValidLayout(VectorValue vector) const {
   ArrayRef<int64_t> shape = vector.getType().getShape();
+  if (shape.size() != getBatchOrder().size()) {
+    return emitError(vector.getLoc(),
+                     "Rank of vector (" + std::to_string(shape.size()) +
+                         ") does not match rank of layout (" +
+                         std::to_string(getBatchOrder().size()) + ").");
+  }
   // Multiply all shapes in the layout.
   for (int i = 0, e = shape.size(); i < e; ++i) {
     int64_t expectedShape = getSubgroupsPerWorkgroup()[i] *
