@@ -321,8 +321,7 @@ private:
         context, subgroupCounts, order, batchSizes, order, outerSizes, order,
         threadCounts, order, elementSizes, order, subgroupBasis,
         SmallVector<bool>(subgroupBasis.size(), true), threadBasis,
-        SmallVector<bool>(threadBasis.size(), true),
-        SmallVector<int64_t>(threadBasis.size(), 1));
+        SmallVector<bool>(threadBasis.size(), true));
     if (analysis.setAnchor(transfer.getResult(), layout).failed()) {
       return failure();
     }
