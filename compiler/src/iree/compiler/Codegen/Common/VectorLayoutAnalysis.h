@@ -141,7 +141,7 @@ private:
 };
 
 LogicalResult setAnchorOpsFromAttributes(VectorLayoutAnalysis &analysis,
-                                Operation *root);
+                                         Operation *root);
 
 }; // namespace iree_compiler
 }; // namespace mlir
