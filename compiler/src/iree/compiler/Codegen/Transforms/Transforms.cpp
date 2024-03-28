@@ -130,29 +130,26 @@ std::optional<Value> hoistOneStaticallyBoundAllocation(
     auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
     vscaleRange = getDefaultVscaleRange(targetAttr);
   }
-  auto computeAllocationBound = [&](Value value, Value &scalableBound,
-                                    int64_t &constantBound) -> LogicalResult {
-    scalableBound = nullptr;
+
+  auto computeAllocationBound = [&](Value value) -> FailureOr<OpFoldResult> {
     if (vscaleRange.has_value()) {
       // Scalability supported: Allocations could be scalable.
-      auto ub = vector::ScalableValueBoundsConstraintSet::computeScalableBound(
-          value, std::nullopt, vscaleRange->min, vscaleRange->max,
-          presburger::BoundType::UB);
+      FailureOr<vector::ConstantOrScalableBound> ub =
+          vector::ScalableValueBoundsConstraintSet::computeScalableBound(
+              value, std::nullopt, vscaleRange->min, vscaleRange->max,
+              presburger::BoundType::UB);
       if (failed(ub))
         return failure();
 
       if (ub->map.isSingleConstant()) {
-        constantBound = ub->map.getSingleConstantResult();
-        return success();
+        auto constantBound = ub->map.getSingleConstantResult();
+        return OpFoldResult(builder.getIndexAttr(constantBound));
       }
 
       if (!vscale)
         vscale = builder.create<vector::VectorScaleOp>(loc);
-      auto bound = affine::materializeComputedBound(
+      return affine::materializeComputedBound(
           builder, loc, ub->map, {std::make_pair(vscale, std::nullopt)});
-
-      scalableBound = getValueOrCreateConstantIndexOp(builder, loc, bound);
-      return success();
     }
     // Non-scalable target: Assume everything is fixed-size.
     auto ub = ValueBoundsConstraintSet::computeConstantBound(
@@ -161,20 +158,15 @@ std::optional<Value> hoistOneStaticallyBoundAllocation(
     if (failed(ub))
       return failure();
 
-    constantBound = *ub;
-    return success();
+    return OpFoldResult(builder.getIndexAttr(*ub));
   };
 
   /// For the dynamic but bounded case, insert an allocation of the shape of the
   /// bounds, and a subview of the required size to be used as a replacement.
 
-  // Dynamic sizes in the `allocaShape` have a corresponding scalable size in
-  // `scalableSizes`.
-  SmallVector<int64_t> allocShape;  // The shape of the alloca e.g `16x3x?`.
-  SmallVector<Value> scalableSizes; // Scalable sizes (e.g. 4 x vscale).
+  SmallVector<OpFoldResult> allocSizes;
   SmallVector<OpFoldResult> subviewSizes;
-  allocShape.reserve(allocLikeType.getRank());
-  scalableSizes.reserve(allocLikeType.getRank());
+  allocSizes.reserve(allocLikeType.getRank());
   subviewSizes.reserve(allocLikeType.getRank());
 
   Value allocation;
@@ -185,33 +177,22 @@ std::optional<Value> hoistOneStaticallyBoundAllocation(
     int index = 0;
     for (auto dimSize : allocLikeType.getShape()) {
       if (!ShapedType::isDynamic(dimSize)) {
-        allocShape.push_back(dimSize);
-        subviewSizes.push_back(builder.getIndexAttr(dimSize));
+        auto dimSizeAttr = builder.getIndexAttr(dimSize);
+        allocSizes.push_back(dimSizeAttr);
+        subviewSizes.push_back(dimSizeAttr);
         continue;
       }
 
       Value dynamicSize = dynamicSizes[index++];
-      Value scalableBound = nullptr;
-      int64_t constantBound = 0;
-      if (failed(computeAllocationBound(dynamicSize, scalableBound,
-                                        constantBound))) {
+      auto ub = computeAllocationBound(dynamicSize);
+      if (failed(ub))
         return std::nullopt;
-      }
 
-      if (scalableBound) {
-        // Scalable size.
-        allocShape.push_back(ShapedType::kDynamic);
-        scalableSizes.push_back(scalableBound);
-      } else {
-        // Static size.
-        allocShape.push_back(constantBound);
-      }
-
+      allocSizes.push_back(*ub);
       subviewSizes.push_back(dynamicSize);
     }
-    auto allocationType = allocLikeType.clone(allocShape);
-    allocation = builder.create<AllocLikeOpType>(loc, allocationType,
-                                                 scalableSizes, alignmentAttr);
+    allocation = builder.create<AllocLikeOpType>(
+        loc, allocSizes, allocLikeType.getElementType(), alignmentAttr);
   }
 
   SmallVector<OpFoldResult> offsets(allocLikeType.getRank(),

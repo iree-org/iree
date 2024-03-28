@@ -64,9 +64,8 @@ checkStackAllocationSize(mlir::FunctionOpInterface funcOp) {
       auto ub = vector::ScalableValueBoundsConstraintSet::computeScalableBound(
           operand, /*dim=*/std::nullopt,
           /*vscaleMin=*/1, /*vscaleMax=*/1, presburger::BoundType::UB);
-      FailureOr<vector::ConstantOrScalableBound::BoundSize> size;
-      if (succeeded(ub) && succeeded(size = ub->getSize())) {
-        allocaSize *= size->baseSize;
+      if (succeeded(ub)) {
+        allocaSize *= ub->getSize()->baseSize;
         continue;
       }
       return allocaOp.emitOpError("expected no unbounded stack allocations");
