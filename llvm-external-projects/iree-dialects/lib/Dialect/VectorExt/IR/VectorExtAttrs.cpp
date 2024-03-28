@@ -304,26 +304,48 @@ NestedLayoutAttr::project(ArrayRef<bool> droppedDims) const {
 
 VectorLayoutInterface
 NestedLayoutAttr::permute(ArrayRef<int64_t> permutation) const {
+  // The order fields are permuted by the inverse permutation to map the
+  // permuted sizes back to their original positions.
+  //
+  // Shape = S
+  // Distributed Shape = DS
+  // Ordering = P
+  //
+  // S(A) * P(A) = DS(A)
+  //
+  // AT = transpose(A)
+  //
+  // Given:
+  // DS(A) = DS(AT) -- 1
+  // S(AT) = S(A) * perm -- 2
+  //
+  // :=
+  //
+  // Using 1
+  // S(A) * P(A) = S(AT) * P(AT)
+  // Using 2
+  // S(A) * P(A) =  S(A) * perm * P(AT)
+  // P(A) = perm * P(AT)
+  // P(AT) = perm^-1 * P(A)
+  SmallVector<int64_t> invPerm = invertPermutationVector(permutation);
   SmallVector<int64_t> subgroupCount =
       applyPermutation(getSubgroupsPerWorkgroup(), permutation);
   SmallVector<int64_t> subgroupOrder =
-      applyPermutation(getSubgroupOrder(), permutation);
+      applyPermutation(invPerm, getSubgroupOrder());
   SmallVector<int64_t> batchCount =
       applyPermutation(getBatchesPerSubgroup(), permutation);
-  SmallVector<int64_t> batchOrder =
-      applyPermutation(getBatchOrder(), permutation);
+  SmallVector<int64_t> batchOrder = applyPermutation(invPerm, getBatchOrder());
   SmallVector<int64_t> outerCount =
       applyPermutation(getOutersPerBatch(), permutation);
-  SmallVector<int64_t> outerOrder =
-      applyPermutation(getOuterOrder(), permutation);
+  SmallVector<int64_t> outerOrder = applyPermutation(invPerm, getOuterOrder());
   SmallVector<int64_t> threadCount =
       applyPermutation(getThreadsPerOuter(), permutation);
   SmallVector<int64_t> threadOrder =
-      applyPermutation(getThreadOrder(), permutation);
+      applyPermutation(invPerm, getThreadOrder());
   SmallVector<int64_t> elementCount =
       applyPermutation(getElementsPerThread(), permutation);
   SmallVector<int64_t> elementOrder =
-      applyPermutation(getElementOrder(), permutation);
+      applyPermutation(invPerm, getElementOrder());
 
   return NestedLayoutAttr::get(
       getContext(), subgroupCount, subgroupOrder, batchCount, batchOrder,
