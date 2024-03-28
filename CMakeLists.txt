@@ -67,6 +67,12 @@ if(CMAKE_SYSTEM_NAME MATCHES "Darwin|Emscripten|Windows|WindowsStore")
 endif()
 option(IREE_ENABLE_CPUINFO "Enables runtime use of cpuinfo for processor topology detection." ${IREE_ENABLE_CPUINFO_DEFAULT})
 
+if(IREE_ENABLE_COMPILER_TRACING AND NOT IREE_ENABLE_RUNTIME_TRACING)
+  message(SEND_ERROR
+      "IREE_ENABLE_COMPILER_TRACING currently requires "
+      "-DIREE_ENABLE_RUNTIME_TRACING=ON")
+endif()
+
 option(IREE_BUILD_COMPILER "Builds the IREE compiler." ON)
 option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
 option(IREE_BUILD_DOCS "Builds IREE documentation files." OFF)
@@ -124,7 +130,7 @@ option(IREE_COMPILER_BUILD_SHARED_LIBS "Enables BUILD_SHARED_LIBS CMake mode for
 option(BUILD_SHARED_LIBS "Instructs CMake to build libraries as shared if possible" OFF)
 
 # Control of LTO settings for the runtime build.
-set(IREE_RUNTIME_OPTIMIZATION_PROFILE "" CACHE STRING 
+set(IREE_RUNTIME_OPTIMIZATION_PROFILE "" CACHE STRING
     "Build optimization profile to apply. One of '', 'lto', 'size'.")
 set(IREE_LTO_MODE "full" CACHE STRING "LTO type, 'thin' or 'full'. Only consulted on clang-like compilers.")
 
