@@ -194,10 +194,6 @@ private:
       return success();
     }
 
-    // TODO: Support masking.
-    if (transfer.getMask()) {
-      return success();
-    }
     // Shared memory loads are expected to take the layout of the contraction.
     auto sourceMemRefType =
         dyn_cast<MemRefType>(transfer.getSource().getType());
@@ -205,24 +201,39 @@ private:
       return success();
     }
 
+    // TODO: Support masking.
+    if (transfer.getMask()) {
+      transfer->emitOpError(
+          "Anchoring on transfer_read with masks is not yet implemented.");
+      return failure();
+    }
+
     int64_t bitWidth = IREE::Util::getTypeBitWidth(
         getElementTypeOrSelf(transfer.getVectorType()));
     if (!llvm::isPowerOf2_64(bitWidth) || bitWidth > 128) {
-      return success();
+      transfer->emitOpError(
+          "Anchoring on transfer_read with element type of bitwidth " +
+          std::to_string(bitWidth) + " is not yet implemented");
+      return failure();
     }
     int64_t numElementsPerThread = 128 / bitWidth;
     int64_t flatNumElements =
         ShapedType::getNumElements(transfer.getVectorType().getShape());
     int64_t flatNumThreads = ShapedType::getNumElements(workgroupSize);
     if (flatNumElements % flatNumThreads != 0) {
-      return success();
+      transfer->emitOpError(
+          "Anchoring on transfer_read with unsupported number of elements (not "
+          "divisible by workgroup size)");
+      return failure();
     }
     numElementsPerThread =
         std::min(numElementsPerThread, flatNumElements / flatNumThreads);
 
     AffineMap transferMap = transfer.getPermutationMap();
     if (transferMap.getNumDims() == 0) {
-      return success();
+      transfer->emitOpError("Anchoring on transfer_read with zero-rank "
+                            "permutation map is not supported.");
+      return failure();
     }
 
     // Select the innermost dim of the memref as the contiguous dim to load
