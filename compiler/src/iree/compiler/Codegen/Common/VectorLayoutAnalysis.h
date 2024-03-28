@@ -98,10 +98,9 @@ class VectorLayoutAnalysis {
 public:
   VectorLayoutAnalysis(Operation *root) : root(root) {}
 
-  /// Fix the layout for a specific value. The layout must implement
-  /// VectorLayoutInterface. Returns failure if the layout set is invalid for
-  /// the value.
-  LogicalResult setAnchor(Value val, Attribute layout);
+  /// Fix the layout for a specific value. Returns failure if the layout set is
+  /// invalid for the value.
+  LogicalResult setAnchor(Value val, VectorLayoutInterface layout);
 
   /// Run the analysis. The analysis expects that the user has set some anchor
   /// points and is trying to infer the layout of other values.

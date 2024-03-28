@@ -974,14 +974,11 @@ DistributionLayout *EnforceLayout::getLatticeElement(Value val) {
 ///        VectorLayoutAnalysis
 /// ==========================================================================
 
-LogicalResult VectorLayoutAnalysis::setAnchor(Value val, Attribute layout) {
-  VectorLayoutInterface layoutInterface =
-      dyn_cast<VectorLayoutInterface>(layout);
-  assert(layoutInterface &&
-         "expected layout to implement VectorLayoutInterface");
+LogicalResult VectorLayoutAnalysis::setAnchor(Value val,
+                                              VectorLayoutInterface layout) {
   auto typedVal = dyn_cast<TypedValue<VectorType>>(val);
   assert(typedVal && "expected value to be a vector type");
-  if (layoutInterface.isValidLayout(typedVal).failed()) {
+  if (layout.isValidLayout(typedVal).failed()) {
     return failure();
   }
   anchors[typedVal] = cast<VectorLayoutInterface>(layout);
@@ -1055,10 +1052,15 @@ LogicalResult setAnchorOpsFromAttributes(VectorLayoutAnalysis &analysis,
         int operandNum;
         name.substr(name.find_last_of("_") + 1)
             .getAsInteger(/*Radix=*/10, operandNum);
-        assert(operandNum < op->getNumOperands() &&
-               "operand number out of range");
-        if (analysis.setAnchor(op->getOperand(operandNum), attr.getValue())
-                .failed()) {
+        if (operandNum >= op->getNumOperands()) {
+          op->emitError("Operand number for anchor is out of range");
+          return WalkResult::interrupt();
+        }
+        auto layout = dyn_cast<VectorLayoutInterface>(attr.getValue());
+        if (!layout) {
+          op->emitError("Anchor should implement VectorLayoutInteface");
+        }
+        if (analysis.setAnchor(op->getOperand(operandNum), layout).failed()) {
           return WalkResult::interrupt();
         }
       }
@@ -1066,9 +1068,15 @@ LogicalResult setAnchorOpsFromAttributes(VectorLayoutAnalysis &analysis,
         int resultNum;
         name.substr(name.find_last_of("_") + 1)
             .getAsInteger(/*Radix=*/10, resultNum);
-        assert(resultNum < op->getNumResults() && "result number out of range");
-        if (analysis.setAnchor(op->getResult(resultNum), attr.getValue())
-                .failed()) {
+        if (resultNum >= op->getNumResults()) {
+          op->emitError("Result number for anchor is out of range");
+          return WalkResult::interrupt();
+        }
+        auto layout = dyn_cast<VectorLayoutInterface>(attr.getValue());
+        if (!layout) {
+          op->emitError("Anchor should implement VectorLayoutInteface");
+        }
+        if (analysis.setAnchor(op->getResult(resultNum), layout).failed()) {
           return WalkResult::interrupt();
         }
       }
