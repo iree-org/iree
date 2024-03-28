@@ -19,7 +19,6 @@ using VectorValue = TypedValue<VectorType>;
 
 // Validate that the desired layout has the same shape as the input.
 LogicalResult LayoutConflictResolutionOp::verify() {
-  Operation *op = getOperation();
   ArrayRef<int64_t> inputShape =
       cast<VectorType>(getInput().getType()).getShape();
   if (getSourceLayout().isValidLayout(getInput()).failed()) {
