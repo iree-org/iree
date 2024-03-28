@@ -207,3 +207,64 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 
 // CHECK-LABEL: hal.executable public @matmul_1024x1024x1024
 // CHECK: linalg.matmul {{.*}}lowering_config = #[[$TILE_SIZES]]
+
+// -----
+
+// CHECK:      #[[$TILE_SIZES:.+]] = #iree_codegen.lowering_config<tile_sizes =  {{\[}}[1, 1, 1, 32, 32, 1, 1, 1, 32]{{\]}}
+// CHECK:      #iree_codegen.translation_info<LLVMGPUVectorDistribute
+// CHECK-SAME: mma_schedule = #iree_gpu.mma_schedule
+// CHECK-SAME:   intrinsic = #iree_gpu.mfma_layout<F16_16x16x16_F32>
+// CHECK-SAME:   subgroup_m_count = 2, subgroup_n_count = 2,
+// CHECK-SAME:   subgroup_m_tile_count = 1, subgroup_n_tile_count = 1, subgroup_k_tile_count = 2
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+hal.executable @conv_nchwc {
+hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
+      target_arch = "gfx940",
+      mma_intrinsics = [#iree_gpu.mfma_layout<F16_16x16x16_F32>,
+                        #iree_gpu.mfma_layout<F16_32x32x8_F32>]
+  }>) {
+  hal.executable.export @conv_nchwc layout(#pipeline_layout) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @conv_nchwc() {
+        %cst = arith.constant 0.000000e+00 : f32
+        %c0 = arith.constant 0 : index
+        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2x20x34x34x64xf16>>
+        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<8x20x3x3x160x64xf16>>
+        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<2x8x32x32x160xf16>>
+        %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0, 0], sizes = [2, 20, 34, 34, 64], strides = [1, 1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<2x20x34x34x64xf16>> -> tensor<2x20x34x34x64xf16>      %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, 0, 0, 0], sizes = [8, 20, 3, 3, 160, 64], strides = [1, 1, 1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<8x20x3x3x160x64xf16>> -> tensor<8x20x3x3x160x64xf16>
+        %5 = tensor.empty() : tensor<2x8x32x32x160xf32>
+        %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<2x8x32x32x160xf32>) -> tensor<2x8x32x32x160xf32>
+        %7 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d5, d2 + d6, d3 + d7, d8)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d1, d5, d6, d7, d4, d8)>, affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d1, d2, d3, d4)>], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction", "reduction"]} ins(%3, %4 : tensor<2x20x34x34x64xf16>, tensor<8x20x3x3x160x64xf16>) outs(%6 : tensor<2x8x32x32x160xf32>) attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 1, 1, 32, 0, 1, 1, 1, 0]]>} {
+        ^bb0(%in: f16, %in_0: f16, %out: f32):
+          %10 = arith.extf %in : f16 to f32
+          %11 = arith.extf %in_0 : f16 to f32
+          %12 = arith.mulf %10, %11 : f32
+          %13 = arith.addf %out, %12 : f32
+          linalg.yield %13 : f32
+        } -> tensor<2x8x32x32x160xf32>
+        %8 = tensor.empty() : tensor<2x8x32x32x160xf16>
+        %9 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]} ins(%7 : tensor<2x8x32x32x160xf32>) outs(%8 : tensor<2x8x32x32x160xf16>) {
+        ^bb0(%in: f32, %out: f16):
+          %10 = arith.truncf %in : f32 to f16
+          linalg.yield %10 : f16
+        } -> tensor<2x8x32x32x160xf16>
+        flow.dispatch.tensor.store %9, %2, offsets = [0, 0, 0, 0, 0], sizes = [2, 8, 32, 32, 160], strides = [1, 1, 1, 1, 1] : tensor<2x8x32x32x160xf16> -> !flow.dispatch.tensor<writeonly:tensor<2x8x32x32x160xf16>>
+        return
+      }
+
+    }
+  }
+}
+
+// CHECK-LABEL: hal.executable public @conv_nchwc
+// CHECK: linalg.generic {{.*}}lowering_config = #[[$TILE_SIZES]]
