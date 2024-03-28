@@ -60,6 +60,12 @@ set(IREE_TRACING_PROVIDER_H "" CACHE STRING "Header file for custom tracing prov
 set(IREE_TRACING_MODE_DEFAULT "2" CACHE STRING "Default tracing feature/verbosity mode. See iree/base/tracing.h for more.")
 set(IREE_TRACING_MODE ${IREE_TRACING_MODE_DEFAULT} CACHE STRING "Tracing feature/verbosity mode. See iree/base/tracing.h for more.")
 
+if(IREE_ENABLE_COMPILER_TRACING AND NOT IREE_ENABLE_RUNTIME_TRACING)
+  message(SEND_ERROR
+      "IREE_ENABLE_COMPILER_TRACING currently requires "
+      "-DIREE_ENABLE_RUNTIME_TRACING=ON")
+endif()
+
 # TODO(#8469): remove the dependency on cpuinfo entirely.
 set(IREE_ENABLE_CPUINFO_DEFAULT ON)
 if(CMAKE_SYSTEM_NAME MATCHES "Darwin|Emscripten|Windows|WindowsStore")
@@ -124,7 +130,7 @@ option(IREE_COMPILER_BUILD_SHARED_LIBS "Enables BUILD_SHARED_LIBS CMake mode for
 option(BUILD_SHARED_LIBS "Instructs CMake to build libraries as shared if possible" OFF)
 
 # Control of LTO settings for the runtime build.
-set(IREE_RUNTIME_OPTIMIZATION_PROFILE "" CACHE STRING 
+set(IREE_RUNTIME_OPTIMIZATION_PROFILE "" CACHE STRING
     "Build optimization profile to apply. One of '', 'lto', 'size'.")
 set(IREE_LTO_MODE "full" CACHE STRING "LTO type, 'thin' or 'full'. Only consulted on clang-like compilers.")
 
