@@ -283,7 +283,7 @@ static ConcreteMmaLayout getConcreteMFMALayout(MLIRContext *context,
     auto aKLayout = inner;
     auto bKLayout = inner;
     auto bNLayout = outer;
-    auto cMLayout = inner;
+    auto cMLayout = PerDimLayoutAttr::get(context, {laneY, vectorX}, {8, 2});
     auto cNLayout = outer;
     return ConcreteMmaLayout{opaqueLayout, aMLayout, aKLayout, bKLayout,
                              bNLayout,     cMLayout, cNLayout};
@@ -446,7 +446,8 @@ MFMAAttr::SingleSubgroupLayout MFMAAttr::getCSingleSubgroupLayoutCount() const {
   }
   case MFMAIntrinsic::WMMA_F16_16x16x16_F16:
   case MFMAIntrinsic::WMMA_F16_16x16x16_F32: {
-    return {/*outer=*/{1, 1}, /*thread=*/{2, 16}, /*element=*/{8, 1}};
+    // return {/*outer=*/{1, 1}, /*thread=*/{8, 2}, /*element=*/{1, 8}};
+    return {/*outer=*/{8, 1}, /*thread=*/{2, 16}, /*element=*/{1, 1}};
   }
   }
   return {};
