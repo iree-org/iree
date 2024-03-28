@@ -486,6 +486,11 @@ def VerifyInputPass :
   let summary = "Verifies that input dialects are supported by the streams dialect.";
 }
 
+def VerifyAffinitiesPass :
+    Pass<"iree-stream-verify-affinities", "mlir::ModuleOp"> {
+  let summary = "Verifies that all operations have affinities assigned (directly or indirectly).";
+}
+
 def VerifyLoweringToTensorsPass :
     Pass<"iree-stream-verify-lowering-to-tensors", "mlir::ModuleOp"> {
   let summary = "Verifies that input dialects are converted to stream.tensor.* ops.";
