@@ -51,8 +51,8 @@ Next you will need to get an IREE runtime that includes the ROCm HAL driver.
 
 Please make sure you have followed the
 [Getting started](../../building-from-source/getting-started.md) page to build
-IREE from source, then enable the experimental ROCm HAL driver with the
-`IREE_EXTERNAL_HAL_DRIVERS=rocm` option.
+IREE from source, then enable the HIP HAL driver with the
+`IREE_HAL_DRIVER_HIP` option.
 
 ## Compile and run a program model
 
@@ -108,7 +108,7 @@ Run the following command:
 
 ``` shell hl_lines="2"
 iree-run-module \
-    --device=rocm \
+    --device=hip \
     --module=mobilenet_rocm.vmfb \
     --function=predict \
     --input="1x224x224x3xf32=0"
