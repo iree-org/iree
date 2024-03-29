@@ -5,8 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <cassert>
-#include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/GPU/PassDetail.h"
+#include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/STLExtras.h"
@@ -34,12 +34,10 @@ namespace mlir::iree_compiler {
 /// }
 // TODO: Make this a callback and the core functionality in the pass a utility
 // function.
-static std::pair<Value, Value> makeSwizzledId(Location loc, OpBuilder b,
-                                              Value workgroupIdX,
-                                              Value workgroupIdY,
-                                              Value workgroupCountX,
-                                              Value workgroupCountY,
-                                              unsigned swizzleTile) {
+static std::pair<Value, Value>
+makeSwizzledId(Location loc, OpBuilder b, Value workgroupIdX,
+               Value workgroupIdY, Value workgroupCountX, Value workgroupCountY,
+               unsigned swizzleTile) {
   Value zero = b.create<arith::ConstantIndexOp>(loc, 0);
   Value tile = b.create<arith::ConstantIndexOp>(loc, swizzleTile);
   Value yModTile = b.create<arith::RemUIOp>(loc, workgroupIdY, tile);

@@ -50,7 +50,7 @@ namespace mlir::iree_compiler {
 constexpr int64_t kDefaultSubgroupSize = 32;
 
 static llvm::cl::opt<unsigned> clReorderWorkgroupLogSwizzleTile(
-    "iree-codegen-reorder-workgrpu-log-swizzle-tile",
+    "iree-codegen-reorder-workgroups-log-swizzle-tile",
     llvm::cl::desc("Reorder workgroup using strategy: log swizzle tile value. "
                    "Setting this to a non-zero value enables swizzling."),
     llvm::cl::init(0));

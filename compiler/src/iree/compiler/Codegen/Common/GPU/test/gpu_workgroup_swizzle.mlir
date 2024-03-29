@@ -51,38 +51,3 @@ func.func @matmul() {
 //          CHECK: %[[S12:.*]] = arith.andi %[[S10]], %[[S11]] : i1
 //          CHECK: %[[S13:.*]] = arith.select %[[S12]], %[[WORKGROUPIDX]], %[[S6]] : index
 //          CHECK: %[[S14:.*]] = arith.select %[[S12]], %[[WORKGROUPIDY]], %[[S7]] : index
-
-
-// -----
-
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>
-  ]>
-]>
-
-hal.executable @mmt {
-hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {target_arch = "gfx940"}>) {
-    hal.executable.export @mmt layout(#pipeline_layout)
-    builtin.module {
-      func.func @mmt() {
-        %c0 = arith.constant 0 : index
-        %cst = arith.constant 0.000000e+00 : f16
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<64x4096xf16>>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<32000x4096xf16>>
-        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<64x32000xf16>>
-        %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [64, 4096], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<64x4096xf16>> -> tensor<64x4096xf16>
-        %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [32000, 4096], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<32000x4096xf16>> -> tensor<32000x4096xf16>
-        %5 = tensor.empty() : tensor<64x32000xf16>
-        %6 = linalg.fill ins(%cst : f16) outs(%5 : tensor<64x32000xf16>) -> tensor<64x32000xf16>
-        %7 = linalg.matmul_transpose_b ins(%3, %4 : tensor<64x4096xf16>, tensor<32000x4096xf16>)
-                                       outs(%6 : tensor<64x32000xf16>) -> tensor<64x32000xf16>
-        flow.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [64, 32000], strides = [1, 1] : tensor<64x32000xf16> -> !flow.dispatch.tensor<writeonly:tensor<64x32000xf16>>
-        return
-      }
-    }
-  }
-}
-
