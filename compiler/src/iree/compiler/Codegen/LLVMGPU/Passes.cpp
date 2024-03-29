@@ -132,6 +132,28 @@ static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
   return success();
 }
 
+// Returns success when workgroup reordering is supported for `funcOp`.
+// On ROCm, we require workgroup counts to be static.
+static LogicalResult canReorderWorkgroups(FunctionOpInterface funcOp) {
+  auto variantOp = getExecutableVariantOp(funcOp);
+  if (failed(variantOp))
+    return failure();
+
+  IREE::HAL::ExecutableTargetAttr target = variantOp->getTarget();
+  if (target.getBackend() != "rocm")
+    return success();
+
+  // Workgroup reordering on ROCm currently requires all workgrup counts to be
+  // static.
+  SmallVector<int64_t> workgroupCounts = getStaticNumWorkgroups(funcOp);
+  if (workgroupCounts.empty())
+    return failure();
+
+  // This is further restricted to 2D+ grids as we reorder along the X and Y
+  // workgroup IDs.
+  return success(workgroupCounts.size() >= 2);
+}
+
 //===----------------------------------------------------------------------===//
 // Common Pass Recipes
 //===----------------------------------------------------------------------===//
@@ -258,8 +280,8 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
 
   nestedModulePM.addNestedPass<func::FuncOp>(
       createGPUReduceSharedMemoryBankConflicts());
-  // nestedModulePM.addNestedPass<func::FuncOp>(
-  //    createWorkGroupSwizzle(logSwizzleTile));
+  nestedModulePM.addNestedPass<func::FuncOp>(createReorderWorkgroups(
+      clReorderWorkgroupLogSwizzleTile, canReorderWorkgroups));
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
@@ -306,8 +328,8 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
 
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
-  // nestedModulePM.addNestedPass<func::FuncOp>(
-  //    createWorkGroupSwizzle(logSwizzleTile));
+  nestedModulePM.addNestedPass<func::FuncOp>(createReorderWorkgroups(
+      clReorderWorkgroupLogSwizzleTile, canReorderWorkgroups));
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
@@ -374,8 +396,8 @@ void addGPUMatmulTensorCoreMmaSyncPassPipeline(OpPassManager &pm,
 
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
-  // nestedModulePM.addNestedPass<func::FuncOp>(
-  //    createWorkGroupSwizzle(logSwizzleTile));
+  nestedModulePM.addNestedPass<func::FuncOp>(createReorderWorkgroups(
+      clReorderWorkgroupLogSwizzleTile, canReorderWorkgroups));
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
@@ -526,26 +548,6 @@ static void addVectorBufferizePasses(OpPassManager &passManager) {
   addIREEComprehensiveBufferizePasses(passManager, allocationFn, memcpyFn);
   passManager.addPass(createCanonicalizerPass());
   passManager.addPass(createCSEPass());
-}
-
-static LogicalResult canReorderWorkgroups(FunctionOpInterface funcOp) {
-  auto variantOp = getExecutableVariantOp(funcOp);
-  if (failed(variantOp))
-    return failure();
-
-  IREE::HAL::ExecutableTargetAttr target = variantOp->getTarget();
-  if (target.getBackend() != "rocm")
-    return success();
-
-  // Workgroup reordering on ROCm currently requires all workgrup counts to be
-  // static.
-  SmallVector<int64_t> workgroupCounts = getStaticNumWorkgroups(funcOp);
-  if (workgroupCounts.empty())
-    return failure();
-
-  // This is further restricted to 2D+ grids as we reorder along the X and Y
-  // workgroup IDs.
-  return success(workgroupCounts.size() >= 2);
 }
 
 void addGPUVectorDistributePassPipeline(OpPassManager &pm) {
