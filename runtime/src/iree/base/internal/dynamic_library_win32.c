@@ -319,7 +319,7 @@ iree_status_t iree_dynamic_library_lookup_symbol(
   return iree_ok_status();
 }
 
-iree_status_t iree_dynamic_library_get_symbol_path(
+iree_status_t iree_dynamic_library_append_symbol_path_to_builder(
     void* symbol, iree_string_builder_t* builder) {
   HMODULE hm = NULL;
   if (GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |

@@ -77,7 +77,7 @@ iree_status_t iree_dynamic_library_attach_symbols_from_memory(
 // library in which |for_symbol| is located. For symbols not in a dynamic
 // library, the behavior is implementation dependent (i.e. it may return
 // a failure status or it may return a path to an executable, etc).
-iree_status_t iree_dynamic_library_get_symbol_path(
+iree_status_t iree_dynamic_library_append_symbol_path_to_builder(
     void* for_symbol, iree_string_builder_t* builder);
 
 #ifdef __cplusplus

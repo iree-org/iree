@@ -331,7 +331,7 @@ iree_status_t iree_dynamic_library_attach_symbols_from_memory(
   return iree_ok_status();
 }
 
-iree_status_t iree_dynamic_library_get_symbol_path(
+iree_status_t iree_dynamic_library_append_symbol_path_to_builder(
     void* symbol, iree_string_builder_t* builder) {
   Dl_info dl_info;
   if (dladdr((void*)symbol, &dl_info) == 0) {
