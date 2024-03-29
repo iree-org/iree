@@ -14,9 +14,12 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/ROCDLPasses.h"
+#include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/ComplexToStandard/ComplexToStandard.h"
@@ -46,18 +49,19 @@ namespace mlir::iree_compiler {
 
 constexpr int64_t kDefaultSubgroupSize = 32;
 
-llvm::cl::opt<unsigned> clLogSwizzleTile(
-    "iree-codegen-log-swizzle-tile",
-    llvm::cl::desc("Reorder workgroup using strategy: log swizzle tile value"),
+static llvm::cl::opt<unsigned> clReorderWorkgroupLogSwizzleTile(
+    "iree-codegen-reorder-workgrpu-log-swizzle-tile",
+    llvm::cl::desc("Reorder workgroup using strategy: log swizzle tile value. "
+                   "Setting this to a non-zero value enables swizzling."),
     llvm::cl::init(0));
 
-llvm::cl::opt<int64_t> clLLVMGPUSharedMemoryLimit(
+static llvm::cl::opt<int64_t> clLLVMGPUSharedMemoryLimit(
     "iree-llvmgpu-shared-memory-limit",
     llvm::cl::desc("specify the maximum amount of shared memory allowed to be "
                    "allocated for the given target"),
     llvm::cl::init(163 * 1024));
 
-llvm::cl::opt<bool> clLLVMGPUEnablePrefetch(
+static llvm::cl::opt<bool> clLLVMGPUEnablePrefetch(
     "iree-llvmgpu-enable-prefetch",
     llvm::cl::desc("Enable prefetch in the vector distribute pipeline"),
     llvm::cl::init(false));
@@ -524,23 +528,31 @@ static void addVectorBufferizePasses(OpPassManager &passManager) {
   passManager.addPass(createCSEPass());
 }
 
+static LogicalResult canReorderWorkgroups(FunctionOpInterface funcOp) {
+  auto variantOp = getExecutableVariantOp(funcOp);
+  if (failed(variantOp))
+    return failure();
+
+  IREE::HAL::ExecutableTargetAttr target = variantOp->getTarget();
+  if (target.getBackend() != "rocm")
+    return success();
+
+  // Workgroup reordering on ROCm currently requires all workgrup counts to be
+  // static.
+  SmallVector<int64_t> workgroupCounts = getStaticNumWorkgroups(funcOp);
+  if (workgroupCounts.empty())
+    return failure();
+
+  // This is further restricted to 2D+ grids as we reorder along the X and Y
+  // workgroup IDs.
+  return success(workgroupCounts.size() >= 2);
+}
+
 void addGPUVectorDistributePassPipeline(OpPassManager &pm) {
   tileAndDistributeToWorkgroup(pm);
   auto &nestedModulePM = pm.nest<ModuleOp>();
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createReorderWorkgroups(clLogSwizzleTile, [](FunctionOpInterface funcOp) {
-        auto entryPoint = getEntryPoint(funcOp);
-        if (failed(entryPoint))
-          return failure();
-        IREE::Codegen::TranslationInfoAttr transInfo =
-            getTranslationInfo(*entryPoint);
-        if (!transInfo)
-          return failure();
-        DictionaryAttr config = transInfo.getConfiguration();
-        if (config.contains("mma_schedule"))
-          return success();
-        return failure();
-      }));
+  nestedModulePM.addNestedPass<func::FuncOp>(createReorderWorkgroups(
+      clReorderWorkgroupLogSwizzleTile, canReorderWorkgroups));
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 

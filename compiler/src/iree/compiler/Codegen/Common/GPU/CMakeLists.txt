@@ -68,7 +68,7 @@ iree_cc_library(
     "GPUVectorDistribution.cpp"
     "Passes.cpp"
     "VectorReductionToGPU.cpp"
-    "WorkGroupSwizzle.cpp"
+    "WorkgroupReordering.cpp"
     "WorkgroupSpecializationPass.cpp"
   DEPS
     ::PassHeaders

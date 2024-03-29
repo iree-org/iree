@@ -51,9 +51,10 @@ pipelineSharedMemoryCopy(RewriterBase &rewriter, scf::ForOp forOp,
 LogicalResult tileReductionToSerialLoops(mlir::FunctionOpInterface funcOp,
                                          bool fuseInputProducer = false);
 
+/// Swizzles the workgroup order in `funcOp` according to the `swizzleLogTile`
+/// size. `swizzleLogTile` of 0 disables any swizzling.
 LogicalResult swizzleWorkgroupsInFunc(mlir::FunctionOpInterface funcOp,
-                                      unsigned swizzleLogTile,
-                                      ArrayRef<int64_t> workgroupCount);
+                                      unsigned swizzleLogTile);
 
 // Lowers workgroup memory copies to distributed transfer_read/transfer_write
 // ops. Expects the memory copy to be marked with copy_to_workgroup_memory

@@ -8,20 +8,22 @@
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/GPU/PassDetail.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/Location.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 
 #define DEBUG_TYPE "iree-codegen-reorder-workgroups"
 
 namespace mlir::iree_compiler {
 
-/// This function implements the following swizzling logic
+/// Implements the following swizzling logic:
 /// void getTiledId2(unsigned x, unsigned y, unsigned* tiledx,
-///                 unsigned* tiledy) {
+///                  unsigned* tiledy) {
 ///  unsigned t_tiledx = (x + (y % tile) * grid_size_x) / tile;
 ///  unsigned t_tiledy = (y / tile) * tile +
 ///      (x + (y % tile) * grid_size_x) % tile;
@@ -35,16 +37,14 @@ namespace mlir::iree_compiler {
 static std::pair<Value, Value> makeSwizzledId(Location loc, OpBuilder b,
                                               Value workgroupIdX,
                                               Value workgroupIdY,
-                                              ArrayRef<int64_t> workgroupCount,
+                                              Value workgroupCountX,
+                                              Value workgroupCountY,
                                               unsigned swizzleTile) {
-  Value gridSizeX = b.create<arith::ConstantIndexOp>(loc, workgroupCount[0]);
-  Value gridSizeY = b.create<arith::ConstantIndexOp>(loc, workgroupCount[1]);
-
   Value zero = b.create<arith::ConstantIndexOp>(loc, 0);
   Value tile = b.create<arith::ConstantIndexOp>(loc, swizzleTile);
   Value yModTile = b.create<arith::RemUIOp>(loc, workgroupIdY, tile);
   Value yDivTile = b.create<arith::DivUIOp>(loc, workgroupIdY, tile);
-  Value swizzleParam = b.create<arith::MulIOp>(loc, yModTile, gridSizeX);
+  Value swizzleParam = b.create<arith::MulIOp>(loc, yModTile, workgroupCountX);
   Value swizzleParam2 =
       b.create<arith::AddIOp>(loc, workgroupIdX, swizzleParam);
   Value swizzleParam3 = b.create<arith::RemUIOp>(loc, swizzleParam2, tile);
@@ -53,35 +53,48 @@ static std::pair<Value, Value> makeSwizzledId(Location loc, OpBuilder b,
       b.create<arith::DivUIOp>(loc, swizzleParam2, tile);
   Value unboundedSwizzledIdY =
       b.create<arith::AddIOp>(loc, swizzleParam3, swizzleParam4);
-  Value gyModTile = b.create<arith::RemUIOp>(loc, gridSizeY, tile);
+  Value gyModTile = b.create<arith::RemUIOp>(loc, workgroupCountY, tile);
   Value gyAddTile = b.create<arith::AddIOp>(loc, swizzleParam4, tile);
   Value condition1 =
       b.create<arith::CmpIOp>(loc, arith::CmpIPredicate::ne, gyModTile, zero);
   Value condition2 = b.create<arith::CmpIOp>(loc, arith::CmpIPredicate::ugt,
-                                             gyAddTile, gridSizeY);
+                                             gyAddTile, workgroupCountY);
   Value condition3 = b.create<arith::AndIOp>(loc, condition1, condition2);
   Value swizzledIdX = b.create<arith::SelectOp>(loc, condition3, workgroupIdX,
                                                 unboundedSwizzledIdX);
   Value swizzledIdY = b.create<arith::SelectOp>(loc, condition3, workgroupIdY,
                                                 unboundedSwizzledIdY);
   return {swizzledIdX, swizzledIdY};
-
-  /*
-  Value zero = b.create<arith::ConstantIndexOp>(loc, 0);
-  Value one = b.create<arith::ConstantIndexOp>(loc, 1);
-  Value two = b.create<arith::ConstantIndexOp>(loc, 2);
-  Value last = b.create<arith::SubIOp>(loc, gridSizeX, one);
-  Value reversedX = b.create<arith::SubIOp>(loc, last, workgroupIdX);
-  Value yMod2 = b.create<arith::RemSIOp>(loc, workgroupIdY, two);
-  Value isYEven = b.create<arith::CmpIOp>(loc, arith::CmpIPredicate::eq, yMod2, zero);
-  Value newX = b.create<arith::SelectOp>(loc, isYEven, workgroupIdX, reversedX);
-  SwizzledIdX = newX;
-  SwizzledIdY = workgroupIdY; */
 }
 
-LogicalResult swizzleWorkgroupsInFunc(mlir::FunctionOpInterface funcOp,
-                                      unsigned swizzleLogTile, ArrayRef<int64_t> workgroupCount) {
-  assert(workgroupCount.size() == 3 && "Expected a 3D grid");
+/// Returns the workgroup counts along the X and Y dimensions. These will be
+/// constants when static in the corresponding `hal.executable.export` op.
+static std::pair<Value, Value>
+getWorkgroupCountsXY(OpBuilder &builder, FunctionOpInterface funcOp) {
+  Location loc = funcOp.getLoc();
+  SmallVector<int64_t> workgroupCounts = getStaticNumWorkgroups(funcOp);
+  // Check if we can rely on a static grid.
+  if (workgroupCounts.size() >= 2) {
+    LLVM_DEBUG(llvm::dbgs()
+               << "Using static workgroup counts: X = " << workgroupCounts[0]
+               << ", Y = " << workgroupCounts[1] << "\n");
+    Value workgroupCountX =
+        builder.create<arith::ConstantIndexOp>(loc, workgroupCounts[0]);
+    Value workgroupCountY =
+        builder.create<arith::ConstantIndexOp>(loc, workgroupCounts[1]);
+    return {workgroupCountX, workgroupCountY};
+  }
+
+  LLVM_DEBUG(llvm::dbgs() << "Using dynamic workgroup counts\n");
+  Value dynamicCountX =
+      builder.create<IREE::HAL::InterfaceWorkgroupCountOp>(loc, 0);
+  Value dynamicCountY =
+      builder.create<IREE::HAL::InterfaceWorkgroupCountOp>(loc, 1);
+  return {dynamicCountX, dynamicCountY};
+}
+
+LogicalResult swizzleWorkgroupsInFunc(FunctionOpInterface funcOp,
+                                      unsigned swizzleLogTile) {
   if (swizzleLogTile == 0)
     return success();
 
@@ -116,8 +129,10 @@ LogicalResult swizzleWorkgroupsInFunc(mlir::FunctionOpInterface funcOp,
       builder.create<IREE::HAL::InterfaceWorkgroupIDOp>(funcOp.getLoc(), 0);
   Value workgroupIdY =
       builder.create<IREE::HAL::InterfaceWorkgroupIDOp>(funcOp.getLoc(), 1);
-  auto [newX, newY] = makeSwizzledId(funcOp.getLoc(), builder, workgroupIdX,
-                                     workgroupIdY, workgroupCount, swizzleTile);
+  auto [workgroupCntX, workgroupCntY] = getWorkgroupCountsXY(builder, funcOp);
+  auto [newX, newY] =
+      makeSwizzledId(funcOp.getLoc(), builder, workgroupIdX, workgroupIdY,
+                     workgroupCntX, workgroupCntY, swizzleTile);
   oldXId.replaceAllUsesWith(newX);
   oldYId.replaceAllUsesWith(newY);
   oldXId->erase();
@@ -151,23 +166,13 @@ struct ReorderWorkgroupsPass final
     if (filterFn && failed(filterFn(funcOp)))
       return;
 
-    SmallVector<int64_t> workgroupCount = getStaticNumWorkgroups(funcOp);
-    if (workgroupCount.size() != 3) {
-      LLVM_DEBUG(llvm::dbgs() << "Reorder Workgroups: failed to find static "
-                                 "workgroup counts. Bailing out.");
-      return;
-    }
-
     LLVM_DEBUG({
-      llvm::dbgs() << "--- Before reorder workgroups with workgroup counts: [";
-      llvm::interleaveComma(workgroupCount, llvm::dbgs());
-      llvm::dbgs() << "] ---\n";
+      llvm::dbgs() << "--- Before reorder workgroups with workgroup counts ---";
       funcOp.print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
       llvm::dbgs() << "\n\n";
     });
 
-    if (failed(
-            swizzleWorkgroupsInFunc(funcOp, swizzleLogTile, workgroupCount))) {
+    if (failed(swizzleWorkgroupsInFunc(funcOp, swizzleLogTile))) {
       LLVM_DEBUG(llvm::dbgs() << "Failed to reorder workgroups\n");
       return;
     }
