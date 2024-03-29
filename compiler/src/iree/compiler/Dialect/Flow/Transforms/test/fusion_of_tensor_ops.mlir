@@ -659,3 +659,35 @@ util.func public @no_fuse_multi_use_dequant_with_producer(%arg0: tensor<12x128x1
 //       CHECK:   %[[GENERIC3:.+]] = linalg.generic
 //       CHECK:     math.rsqrt
 //  CHECK-NEXT:     arith.addf
+
+// -----
+
+// Check for fix for https://github.com/openxla/iree/issues/16835. The reshape
+// should not be propagated to block fusion.
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d1)>
+util.func public @fix_issue_16835(%arg0: tensor<49x6x16x16xf32>, %arg1: tensor<96xf32>) -> tensor<28x28x96xf32> {
+  %cst = arith.constant 3.000000e+00 : f32
+  %cst_0 = arith.constant 6.000000e+00 : f32
+  %cst_1 = arith.constant 0.000000e+00 : f32
+  %cst_2 = arith.constant 0.166666672 : f32
+  %0 = tensor.empty() : tensor<784x96xf32>
+  %1 = tensor.empty() : tensor<784x96xf32>
+  %unpack = tensor.unpack %arg0 outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %0 : tensor<49x6x16x16xf32> -> tensor<784x96xf32>
+  %2 = linalg.generic {indexing_maps = [#map, #map1, #map], iterator_types = ["parallel", "parallel"]} ins(%unpack, %arg1 : tensor<784x96xf32>, tensor<96xf32>) outs(%1 : tensor<784x96xf32>) {
+  ^bb0(%in: f32, %in_3: f32, %out: f32):
+    %3 = arith.addf %in, %in_3 : f32
+    %4 = arith.addf %3, %cst : f32
+    %5 = arith.minimumf %4, %cst_0 : f32
+    %6 = arith.maximumf %5, %cst_1 : f32
+    %7 = arith.mulf %3, %6 : f32
+    %8 = arith.mulf %7, %cst_2 : f32
+    linalg.yield %8 : f32
+  } -> tensor<784x96xf32>
+  %expanded = tensor.expand_shape %2 [[0, 1], [2]] : tensor<784x96xf32> into tensor<28x28x96xf32>
+  util.return %expanded : tensor<28x28x96xf32>
+}
+// CHECK-LABEL: util.func public @fix_issue_16835
+//       CHECK:   tensor.unpack
+//       CHECK:   linalg.generic
+//       CHECK:   tensor.expand_shape
