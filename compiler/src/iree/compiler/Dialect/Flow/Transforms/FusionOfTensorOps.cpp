@@ -488,8 +488,8 @@ struct FusionOfTensorOpsPass
             if (!reshapeOp)
               return true;
 
-            return reshapeOp.getSrc().getDefiningOp<linalg::LinalgOp>() !=
-                   nullptr;
+            return isa<linalg::LinalgOp, tensor::UnPackOp>(
+                reshapeOp.getSrc().getDefiningOp());
           };
 
       RewritePatternSet collapsingReshapePatterns(&getContext());
