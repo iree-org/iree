@@ -65,9 +65,9 @@ static bool hasThreadMapping(scf::ForallOp forall) {
   if (!forall.getMapping().has_value()) {
     return false;
   }
-  return llvm::any_of(forall.getMapping().value(), [](Attribute attr) {
-    return isa<gpu::GPUThreadMappingAttr>(attr);
-  });
+  return llvm::any_of(*forall.getMapping(),
+                      llvm::IsaPred<gpu::GPUThreadMappingAttr>);
+  ;
 }
 
 // All pipelines that use this allocation function distribute scf.forall ops

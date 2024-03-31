@@ -365,12 +365,9 @@ static LogicalResult analyseScfForOp(scf::ForOp forOp,
 /// - all `tensor.extract_slice` operations dominate the `tensor.insert_slice`
 /// op.
 static void hasDestructiveUpdatePattern(Value source, BufferizationPlan &plan) {
-  auto isUpdateOp = [](Operation *op) {
-    return isa<tensor::InsertSliceOp, vector::TransferWriteOp>(op);
-  };
-  auto isReadOp = [](Operation *op) {
-    return isa<tensor::ExtractSliceOp, vector::TransferReadOp>(op);
-  };
+  auto isUpdateOp =
+      llvm::IsaPred<tensor::InsertSliceOp, vector::TransferWriteOp>;
+  auto isReadOp = llvm::IsaPred<tensor::ExtractSliceOp, vector::TransferReadOp>;
   auto getDest = [](Operation *op) -> Value {
     if (auto insertSliceOp = dyn_cast<tensor::InsertSliceOp>(op)) {
       return insertSliceOp.getDest();
@@ -583,13 +580,11 @@ LogicalResult createTensorEquivalenceClasses(mlir::FunctionOpInterface funcOp,
               bufferization::AllocTensorOp>(
             [&](Operation *op) { return success(); })
         .Default([&](Operation *op) -> LogicalResult {
-          if (llvm::any_of(op->getOperands(),
-                           [](Value v) {
-                             return llvm::isa<RankedTensorType>(v.getType());
-                           }) ||
-              llvm::any_of(op->getResultTypes(), [](Type t) {
-                return llvm::isa<RankedTensorType>(t);
-              })) {
+          if (llvm::any_of(
+                  op->getOperands(),
+                  [](Value v) { return isa<RankedTensorType>(v.getType()); }) ||
+              llvm::any_of(op->getResultTypes(),
+                           llvm::IsaPred<RankedTensorType>)) {
             return op->emitOpError("unhandled tensor operation");
           }
           return success();
@@ -609,7 +604,7 @@ LogicalResult createTensorEquivalenceClasses(mlir::FunctionOpInterface funcOp,
       return;
     }
     if (auto vectorWriteOp = dyn_cast<vector::TransferWriteOp>(updateOp)) {
-      if (llvm::isa<RankedTensorType>(vectorWriteOp.getSource().getType())) {
+      if (isa<RankedTensorType>(vectorWriteOp.getSource().getType())) {
         hasDestructiveUpdatePattern(vectorWriteOp.getSource(), plan);
       }
     }

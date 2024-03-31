@@ -116,18 +116,17 @@ static Value buildTensorExportOp(Location loc, Value sourceValue,
 // the stream ops that capture encodings and shapes.
 static bool doesOperationNeedWrapping(Operation *op) {
   return llvm::any_of(op->getOperands(),
-                      [&](Value operand) {
+                      [](Value operand) {
                         if (!llvm::isa<TensorType>(operand.getType()))
                           return false;
                         return !isa_and_nonnull<TensorExportOp>(
                             operand.getDefiningOp());
                       }) ||
-         llvm::any_of(op->getResults(), [&](Value result) {
-           if (!llvm::isa<TensorType>(result.getType()))
+         llvm::any_of(op->getResults(), [](Value result) {
+           if (!isa<TensorType>(result.getType()))
              return false;
-           return !llvm::all_of(result.getUsers(), [&](Operation *user) {
-             return isa<TensorImportOp>(user);
-           });
+           return !llvm::all_of(result.getUsers(),
+                                llvm::IsaPred<TensorImportOp>);
          });
 }
 
@@ -148,12 +147,11 @@ struct GenericResourcePattern : public ConversionPattern {
     rewriter.setInsertionPoint(op);
     for (auto [oldOperand, newOperand] :
          llvm::zip_equal(op->getOperands(), operands)) {
-      if (!llvm::isa<IREE::Stream::ResourceType>(newOperand.getType()) &&
-          !llvm::isa<TensorType>(newOperand.getType())) {
+      if (!isa<IREE::Stream::ResourceType, TensorType>(newOperand.getType())) {
         newOperands.push_back(newOperand);
         continue;
       }
-      auto tensorType = llvm::dyn_cast<TensorType>(oldOperand.getType());
+      auto tensorType = dyn_cast<TensorType>(oldOperand.getType());
       assert(tensorType && "must have a tensor type to map to a resource");
 
       auto dynamicDims = IREE::Util::buildDynamicDimsForValue(
@@ -166,7 +164,7 @@ struct GenericResourcePattern : public ConversionPattern {
     // Import into resources from tensor results produced by the op.
     rewriter.setInsertionPointAfter(op);
     for (auto result : op->getResults()) {
-      auto tensorType = llvm::dyn_cast<TensorType>(result.getType());
+      auto tensorType = dyn_cast<TensorType>(result.getType());
       if (!tensorType)
         continue;
 

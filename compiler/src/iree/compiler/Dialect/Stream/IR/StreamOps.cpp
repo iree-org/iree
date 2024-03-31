@@ -3011,16 +3011,12 @@ CmdDispatchOp::makeOperandToArgMap(mlir::FunctionOpInterface funcOp) {
 // static
 SmallVector<unsigned>
 CmdDispatchOp::makeResourceToArgMap(mlir::FunctionOpInterface funcOp) {
-  unsigned operandCount =
-      llvm::count_if(funcOp.getArgumentTypes(), [](Type type) {
-        return llvm::isa<IREE::Stream::BindingType>(type);
-      });
+  unsigned operandCount = llvm::count_if(
+      funcOp.getArgumentTypes(), llvm::IsaPred<IREE::Stream::BindingType>);
   SmallVector<unsigned> map(operandCount);
-  unsigned operandIdx = 0;
-  for (auto it : llvm::enumerate(funcOp.getArgumentTypes())) {
-    unsigned argIdx = it.index();
-    auto argType = it.value();
-    if (llvm::isa<IREE::Stream::BindingType>(argType)) {
+  size_t operandIdx = 0;
+  for (auto [argIdx, argType] : llvm::enumerate(funcOp.getArgumentTypes())) {
+    if (isa<IREE::Stream::BindingType>(argType)) {
       map[operandIdx++] = argIdx;
     }
   }
