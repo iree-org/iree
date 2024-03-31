@@ -115,9 +115,8 @@ static bool usesResources(Operation *op) {
 static void expandType(Type type, SmallVectorImpl<Type> &newTypes) {
   newTypes.push_back(type);
   if (isResourceType(type)) {
-    auto indexType = IndexType::get(type.getContext());
     // resource size, subrance offset, subrange length
-    llvm::append_values(newTypes, indexType, indexType, indexType);
+    newTypes.append(3, IndexType::get(type.getContext()));
   }
 }
 
