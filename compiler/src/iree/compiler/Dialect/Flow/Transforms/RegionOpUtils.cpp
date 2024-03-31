@@ -23,8 +23,10 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
+#include "mlir/IR/Block.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dominance.h"
+#include "mlir/IR/Value.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/RegionUtils.h"
 #include "mlir/Transforms/TopologicalSortUtils.h"
@@ -172,8 +174,7 @@ static bool checkShapeIsDataDependant(Operation *op) {
       // needs to have a single region with a single block. This seems
       // unnecessary for IREEs use case. For now avoid this assert by bailing if
       // any operands are block arguments.
-      if (llvm::any_of(op->getOperands(),
-                       [](Value v) { return llvm::isa<BlockArgument>(v); })) {
+      if (llvm::any_of(op->getOperands(), llvm::IsaPred<BlockArgument>)) {
         auto parentOp = op->getParentOp();
         if (parentOp->getNumRegions() != 1 ||
             parentOp->getRegion(0).getBlocks().size() != 1) {
@@ -186,8 +187,7 @@ static bool checkShapeIsDataDependant(Operation *op) {
     for (Value initOperand : linalgOp.getDpsInits()) {
       mlir::getBackwardSlice(initOperand, &slice, options);
     }
-    return llvm::any_of(
-        slice, [](Operation *op) { return isa<tensor::ExtractOp>(op); });
+    return llvm::any_of(slice, llvm::IsaPred<tensor::ExtractOp>);
   }
   return false;
 }

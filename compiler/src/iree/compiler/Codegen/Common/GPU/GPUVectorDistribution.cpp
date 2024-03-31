@@ -212,14 +212,11 @@ static bool canDistribute(Operation *op, VectorLayoutAnalysis &analysis) {
   llvm::append_range(values, op->getResults());
 
   // First check if any of them are vector values.
-  if (llvm::none_of(values, [](Value value) -> bool {
-        return isa<VectorValue>(value);
-      })) {
+  if (llvm::none_of(values, llvm::IsaPred<VectorValue>))
     return false;
-  }
 
   // Check if all operands and results of this operation have a layout.
-  return llvm::all_of(values, [&](Value value) -> bool {
+  return llvm::all_of(values, [&analysis](Value value) {
     auto vectorValue = dyn_cast<VectorValue>(value);
     return !vectorValue || analysis.getLayout<Attribute>(vectorValue);
   });

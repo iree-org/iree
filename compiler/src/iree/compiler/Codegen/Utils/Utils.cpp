@@ -16,6 +16,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
@@ -271,24 +272,9 @@ bool isReadOnly(Value v) {
 /// Returns the first of `exprs` which is of the type `T`.
 template <typename T>
 static AffineExpr getAffineExprOfType(ArrayRef<AffineExpr> exprs) {
-  for (auto expr : exprs) {
-    if (isa<T>(expr))
-      return expr;
-  }
+  if (auto it = llvm::find_if(exprs, llvm::IsaPred<T>); it != exprs.end())
+    return *it;
   return nullptr;
-}
-
-/// Returns true if the `expr` is on of the types in {`T1`, `T2`, `T3...`}.
-template <typename T>
-static bool isaAffineExprOfType(AffineExpr expr) {
-  return isa<T>(expr);
-}
-template <typename T1, typename T2, typename... T3>
-static bool isaAffineExprOfType(AffineExpr expr) {
-  if (isa<T1>(expr)) {
-    return true;
-  }
-  return isaAffineExprOfType<T2, T3...>(expr);
 }
 
 /// Returns a Value that represents the value for symbol or dim expr for the map
@@ -387,7 +373,7 @@ public:
     // The other expression must be the undistributed `lb`.
     AffineExpr lbExpr =
         (offsetExpr == expr.getLHS() ? expr.getRHS() : expr.getLHS());
-    if (isaAffineExprOfType<AffineDimExpr, AffineSymbolExpr>(lbExpr)) {
+    if (isa<AffineDimExpr, AffineSymbolExpr>(lbExpr)) {
       Value v = getValueForDimOrSymbol(applyOp, lbExpr);
       if (!v) {
         return failure();
@@ -541,7 +527,7 @@ public:
 private:
   LogicalResult processSentinel(AffineExpr e,
                                 SmallVectorImpl<AffineExpr> &sentinels) {
-    if (isaAffineExprOfType<AffineDimExpr, AffineSymbolExpr>(e)) {
+    if (isa<AffineDimExpr, AffineSymbolExpr>(e)) {
       sentinels.push_back(e);
       return success();
     } else if (auto constExpr = dyn_cast<AffineConstantExpr>(e)) {
@@ -1172,9 +1158,7 @@ bool hasFusedLeadingOp(linalg::LinalgOp rootOp) {
     backwardSlice.set_union(tmpBackwardSlice);
   }
 
-  return llvm::any_of(backwardSlice, [](Operation *op) {
-    return llvm::isa<linalg::LinalgOp>(op);
-  });
+  return llvm::any_of(backwardSlice, llvm::IsaPred<linalg::LinalgOp>);
 }
 
 } // namespace mlir::iree_compiler

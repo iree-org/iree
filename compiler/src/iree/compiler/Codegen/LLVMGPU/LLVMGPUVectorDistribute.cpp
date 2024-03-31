@@ -177,20 +177,16 @@ private:
     // instead of just being a zerofill.
     ForwardSliceOptions forwardOptions;
     forwardOptions.filter = [&](Operation *op) -> bool {
-      return llvm::any_of(op->getResultTypes(),
-                          [](Type t) { return isa<VectorType>(t); });
+      return llvm::any_of(op->getResultTypes(), llvm::IsaPred<VectorType>);
     };
     BackwardSliceOptions backwardOptions;
     backwardOptions.filter = [&](Operation *op) -> bool {
-      return llvm::any_of(op->getOperandTypes(),
-                          [](Type t) { return isa<VectorType>(t); });
+      return llvm::any_of(op->getOperandTypes(), llvm::IsaPred<VectorType>);
     };
     SetVector<Operation *> slice =
         getSlice(transfer, backwardOptions, forwardOptions);
 
-    if (llvm::any_of(slice, [](Operation *op) {
-          return llvm::isa<vector::ContractionOp>(op);
-        })) {
+    if (llvm::any_of(slice, llvm::IsaPred<vector::ContractionOp>)) {
       return success();
     }
 
