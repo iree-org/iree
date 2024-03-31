@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/schemas/cpu_data.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/BinaryFormat/Dwarf.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -359,9 +360,7 @@ HALDispatchABI::getEnvironmentType(MLIRContext *context,
   // iree_hal_executable_import_thunk_v0_t import_thunk;
   // const iree_hal_executable_import_v0_t* import_funcs;
   // const void** import_contexts;
-  fieldTypes.push_back(LLVM::LLVMPointerType::get(context));
-  fieldTypes.push_back(LLVM::LLVMPointerType::get(context));
-  fieldTypes.push_back(LLVM::LLVMPointerType::get(context));
+  fieldTypes.append(3, opaquePtrType);
 
   // iree_hal_processor_v0_t processor;
   fieldTypes.push_back(processorType);
@@ -393,9 +392,7 @@ HALDispatchABI::getDispatchStateType(MLIRContext *context,
   // uint32_t workgroup_size_x;
   // uint32_t workgroup_size_y;
   // uint16_t workgroup_size_z;
-  fieldTypes.push_back(uint32Type);
-  fieldTypes.push_back(uint32Type);
-  fieldTypes.push_back(uint16Type);
+  llvm::append_values(fieldTypes, uint32Type, uint32Type, uint16Type);
 
   // uint16_t push_constant_count;
   fieldTypes.push_back(uint16Type);
@@ -403,9 +400,7 @@ HALDispatchABI::getDispatchStateType(MLIRContext *context,
   // uint32_t workgroup_count_x;
   // uint32_t workgroup_count_y;
   // uint16_t workgroup_count_z;
-  fieldTypes.push_back(uint32Type);
-  fieldTypes.push_back(uint32Type);
-  fieldTypes.push_back(uint16Type);
+  llvm::append_values(fieldTypes, uint32Type, uint32Type, uint16Type);
 
   // uint8_t max_concurrency;
   fieldTypes.push_back(uint8Type);
@@ -416,9 +411,7 @@ HALDispatchABI::getDispatchStateType(MLIRContext *context,
   // const uint32_t * push_constants;
   // void *const * binding_ptrs;
   // const size_t * binding_lengths;
-  fieldTypes.push_back(opaquePtrType);
-  fieldTypes.push_back(opaquePtrType);
-  fieldTypes.push_back(opaquePtrType);
+  fieldTypes.append(3, opaquePtrType);
 
   LogicalResult bodySet = structType.setBody(fieldTypes, /*isPacked=*/false);
   assert(succeeded(bodySet) &&

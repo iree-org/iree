@@ -148,10 +148,11 @@ getTensorCoreConfig(SmallVectorImpl<TileWorkgroupSizePair> &tileSizes,
       tileSizes.push_back(
           TileWorkgroupSizePair({{128, 256, 16}, {128, 2, 1}, 4}));
     }
-    tileSizes.push_back(TileWorkgroupSizePair({{32, 32, 16}, {64, 2, 1}, 4}));
-    tileSizes.push_back(TileWorkgroupSizePair({{16, 32, 16}, {64, 1, 1}, 4}));
-    tileSizes.push_back(TileWorkgroupSizePair({{32, 16, 16}, {32, 2, 1}, 4}));
-    tileSizes.push_back(TileWorkgroupSizePair({{16, 16, 16}, {32, 1, 1}, 4}));
+    llvm::append_values(tileSizes,
+                        TileWorkgroupSizePair({{32, 32, 16}, {64, 2, 1}, 4}),
+                        TileWorkgroupSizePair({{16, 32, 16}, {64, 1, 1}, 4}),
+                        TileWorkgroupSizePair({{32, 16, 16}, {32, 2, 1}, 4}),
+                        TileWorkgroupSizePair({{16, 16, 16}, {32, 1, 1}, 4}));
   }
 }
 

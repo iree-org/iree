@@ -73,12 +73,11 @@ struct ConcretizePadResultShape final : public OpRewritePattern<tensor::PadOp> {
     bindSymbols(context, sym0, sym1, sym2);
     auto addMap = AffineMap::get(0, 3, {sym0 + sym1 + sym2}, context);
 
-    SmallVector<Value, 3> valueSizes;
     for (int dimIndex = 0; dimIndex < rank; ++dimIndex) {
-      valueSizes.clear();
-      valueSizes.push_back(getAsIndexValue(lowPad[dimIndex], rewriter, loc));
-      valueSizes.push_back(getAsIndexValue(source[dimIndex], rewriter, loc));
-      valueSizes.push_back(getAsIndexValue(highPad[dimIndex], rewriter, loc));
+      SmallVector<Value, 3> valueSizes = {
+          getAsIndexValue(lowPad[dimIndex], rewriter, loc),
+          getAsIndexValue(source[dimIndex], rewriter, loc),
+          getAsIndexValue(highPad[dimIndex], rewriter, loc)};
 
       // The pad op's result shape is low padding + source size + high padding.
       // Try to see if we can get a constant number by composing and

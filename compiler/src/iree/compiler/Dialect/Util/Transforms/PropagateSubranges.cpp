@@ -13,6 +13,7 @@
 #include "iree/compiler/Dialect/Util/Transforms/Patterns.h"
 #include "iree/compiler/Utils/IndexSet.h"
 #include "llvm/ADT/BreadthFirstIterator.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
@@ -115,9 +116,8 @@ static void expandType(Type type, SmallVectorImpl<Type> &newTypes) {
   newTypes.push_back(type);
   if (isResourceType(type)) {
     auto indexType = IndexType::get(type.getContext());
-    newTypes.push_back(indexType); // resource size
-    newTypes.push_back(indexType); // subrange offset
-    newTypes.push_back(indexType); // subrange length
+    // resource size, subrance offset, subrange length
+    llvm::append_values(newTypes, indexType, indexType, indexType);
   }
 }
 
@@ -188,10 +188,8 @@ static void expandOperand(Location loc, Value operand,
   if (isResourceType(operand.getType())) {
     auto subrange =
         consumeSubrange(loc, operand, subrangeMap, indexSet, builder);
-    newOperands.push_back(subrange.resource);
-    newOperands.push_back(subrange.resourceSize);
-    newOperands.push_back(subrange.subrangeOffset);
-    newOperands.push_back(subrange.subrangeLength);
+    llvm::append_values(newOperands, subrange.resource, subrange.resourceSize,
+                        subrange.subrangeOffset, subrange.subrangeLength);
   } else {
     newOperands.push_back(operand);
   }

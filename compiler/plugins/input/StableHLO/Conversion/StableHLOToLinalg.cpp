@@ -2156,11 +2156,9 @@ struct SelectAndScatterNoOverlapConverter final
     auto scatterInputMap =
         AffineMap::get(broadcastShape.size(), /*symbolCount=*/0, broadcastExprs,
                        b.getContext());
-    SmallVector<AffineMap> scatterIndexingMaps;
-    scatterIndexingMaps.push_back(scatterInputMap);
-    scatterIndexingMaps.push_back(scatterInputMap);
-    scatterIndexingMaps.push_back(
-        b.getMultiDimIdentityMap(broadcastShape.size()));
+    SmallVector<AffineMap> scatterIndexingMaps = {
+        scatterInputMap, scatterInputMap,
+        b.getMultiDimIdentityMap(broadcastShape.size())};
 
     auto scatterGeneric = b.create<linalg::GenericOp>(
         /*resultTensors=*/ArrayRef<Type>{scatterFill.getType()},
