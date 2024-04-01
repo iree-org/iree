@@ -15,6 +15,7 @@
 #include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -488,7 +489,8 @@ struct FusionOfTensorOpsPass
             if (!reshapeOp)
               return true;
 
-            return isa<linalg::LinalgOp, tensor::UnPackOp>(
+            return isa<linalg::LinalgOp, tensor::UnPackOp,
+                       LinalgExt::UnsetEncodingOp>(
                 reshapeOp.getSrc().getDefiningOp());
           };
 
