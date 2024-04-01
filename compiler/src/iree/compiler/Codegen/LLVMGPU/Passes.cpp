@@ -20,6 +20,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
+#include "llvm/Support/CommandLine.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/ComplexToStandard/ComplexToStandard.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
@@ -48,11 +49,21 @@ namespace mlir::iree_compiler {
 
 constexpr int64_t kDefaultSubgroupSize = 32;
 
-static llvm::cl::opt<unsigned> clReorderWorkgroupLogSwizzleTile(
+static llvm::cl::opt<ReorderWorkgrupsStrategy> clReorderWorkgroupsStrategy(
+    "iree-codegen-reorder-workgroups-strategy",
+    llvm::cl::desc("Reorder workgroup IDs using the selected strategy"),
+    llvm::cl::values(clEnumValN(ReorderWorkgrupsStrategy::None, "none",
+                                "No workgroup reordering"),
+                     clEnumValN(ReorderWorkgrupsStrategy::Swizzle, "swizzle",
+                                "Swizzle"),
+                     clEnumValN(ReorderWorkgrupsStrategy::Transpose,
+                                "transpose", "Transpose")),
+    llvm::cl::init(ReorderWorkgrupsStrategy::None));
+
+static llvm::cl::opt<unsigned> clReorderWorkgroupsLogSwizzleTile(
     "iree-codegen-reorder-workgroups-log-swizzle-tile",
-    llvm::cl::desc("Reorder workgroup using strategy: log swizzle tile value. "
-                   "Setting this to a non-zero value enables swizzling."),
-    llvm::cl::init(0));
+    llvm::cl::desc("Reorder workgroups: log tile size to use"),
+    llvm::cl::init(3));
 
 static llvm::cl::opt<int64_t> clLLVMGPUSharedMemoryLimit(
     "iree-llvmgpu-shared-memory-limit",
@@ -280,7 +291,8 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
   nestedModulePM.addNestedPass<func::FuncOp>(
       createGPUReduceSharedMemoryBankConflicts());
   nestedModulePM.addNestedPass<func::FuncOp>(createReorderWorkgroups(
-      clReorderWorkgroupLogSwizzleTile, canReorderWorkgroups));
+      clReorderWorkgroupsStrategy, clReorderWorkgroupsLogSwizzleTile,
+      canReorderWorkgroups));
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
@@ -328,7 +340,8 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createReorderWorkgroups(
-      clReorderWorkgroupLogSwizzleTile, canReorderWorkgroups));
+      clReorderWorkgroupsStrategy, clReorderWorkgroupsLogSwizzleTile,
+      canReorderWorkgroups));
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
@@ -396,7 +409,8 @@ void addGPUMatmulTensorCoreMmaSyncPassPipeline(OpPassManager &pm,
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createReorderWorkgroups(
-      clReorderWorkgroupLogSwizzleTile, canReorderWorkgroups));
+      clReorderWorkgroupsStrategy, clReorderWorkgroupsLogSwizzleTile,
+      canReorderWorkgroups));
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
@@ -553,7 +567,8 @@ void addGPUVectorDistributePassPipeline(OpPassManager &pm) {
   tileAndDistributeToWorkgroup(pm);
   auto &nestedModulePM = pm.nest<ModuleOp>();
   nestedModulePM.addNestedPass<func::FuncOp>(createReorderWorkgroups(
-      clReorderWorkgroupLogSwizzleTile, canReorderWorkgroups));
+      clReorderWorkgroupsStrategy, clReorderWorkgroupsLogSwizzleTile,
+      canReorderWorkgroups));
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 

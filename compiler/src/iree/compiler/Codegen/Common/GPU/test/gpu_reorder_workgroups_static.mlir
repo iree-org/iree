@@ -1,19 +1,37 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-codegen-reorder-workgroups{logTile=3})))))" \
-// RUN:   %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-codegen-reorder-workgroups{strategy=swizzle logTile=3})))))" \
+// RUN:   %s | FileCheck --check-prefix=SWIZZLE %s
+
+// RUN: iree-opt --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-codegen-reorder-workgroups{strategy=transpose})))))" \
+// RUN:   %s | FileCheck --check-prefix=TRANSPOSE %s
 
 // Make sure we use static workgroup counts instead of introducting
 // `hal.interface.workgroup.count` ops. These are currently not supported on ROCm.
 
-// CHECK-LABEL: hal.executable private @main_dispatch_0 {
-// CHECK-LABEL: func.func @main_dispatch_0_matmul_transpose_b_32000x32000x4096_f16
-// CHECK-DAG:               %[[WG_X:.+]] = hal.interface.workgroup.id[0] : index
-// CHECK-DAG:               %[[WG_Y:.+]] = hal.interface.workgroup.id[1] : index
-// CHECK-NOT:               hal.interface.workgroup.count
-// CHECK-DAG:               %[[SEL_X:.+]] = arith.select %{{.+}}, %[[WG_X]]
-// CHECK-DAG:               %[[SEL_Y:.+]] = arith.select %{{.+}}, %[[WG_Y]]
-// CHECK-DAG:               affine.apply #{{.+}}()[%[[SEL_X]]]
-// CHECK-DAG:               affine.apply #{{.+}}()[%[[SEL_Y]]]
-// CHECK:                   return
+// SWIZZLE-LABEL: hal.executable private @main_dispatch_0 {
+// SWIZZLE-LABEL: func.func @main_dispatch_0_matmul_transpose_b_32000x32000x4096_f16
+// SWIZZLE-DAG:               %[[WG_X:.+]] = hal.interface.workgroup.id[0] : index
+// SWIZZLE-DAG:               %[[WG_Y:.+]] = hal.interface.workgroup.id[1] : index
+// SWIZZLE-NOT:               hal.interface.workgroup.count
+// SWIZZLE-DAG:               %[[SEL_X:.+]] = arith.select %{{.+}}, %[[WG_X]]
+// SWIZZLE-DAG:               %[[SEL_Y:.+]] = arith.select %{{.+}}, %[[WG_Y]]
+// SWIZZLE-DAG:               affine.apply #{{.+}}()[%[[SEL_X]]]
+// SWIZZLE-DAG:               affine.apply #{{.+}}()[%[[SEL_Y]]]
+// SWIZZLE:                   return
+
+// TRANSPOSE-LABEL: hal.executable private @main_dispatch_0 {
+// TRANSPOSE-LABEL: func.func @main_dispatch_0_matmul_transpose_b_32000x32000x4096_f16
+// TRANSPOSE-DAG:               %[[WG_X:.+]] = hal.interface.workgroup.id[0] : index
+// TRANSPOSE-DAG:               %[[WG_Y:.+]] = hal.interface.workgroup.id[1] : index
+// TRANSPOSE-NOT:               hal.interface.workgroup.count
+// TRANSPOSE-DAG:               %[[C250:.+]] = arith.constant 250 : index
+// TRANSPOSE-DAG:               %[[C500:.+]] = arith.constant 500 : index
+// TRANSPOSE:                   %[[MUL:.+]] = arith.muli %[[WG_Y]], %[[C250]] : index
+// TRANSPOSE:                   %[[ADD:.+]] = arith.addi %[[MUL]], %[[WG_X]] : index
+// TRANSPOSE:                   %[[DIV:.+]] = arith.divui %[[ADD]], %[[C500]] : index
+// TRANSPOSE:                   %[[REM:.+]] = arith.remui %[[ADD]], %[[C500]] : index
+// TRANSPOSE-DAG:               affine.apply #{{.+}}()[%[[DIV]]]
+// TRANSPOSE-DAG:               affine.apply #{{.+}}()[%[[REM]]]
+// TRANSPOSE:                   return
 
 hal.executable private @main_dispatch_0 {
 hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb", {mma_intrinsics = [#iree_gpu.mfma_layout<F16_16x16x16_F32>, #iree_gpu.mfma_layout<F16_32x32x8_F32>], target_arch = "gfx940", ukernels = "none"}>) {
