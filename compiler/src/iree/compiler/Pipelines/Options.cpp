@@ -226,6 +226,11 @@ void PreprocessingOptions::bindOptions(OptionsBinder &binder) {
       llvm::cl::desc(
           "File name of a transform dialect spec to use for preprocessing"),
       llvm::cl::cat(category));
+  binder.opt<std::string>(
+      "iree-preprocessing-pdl-spec-filename", preprocessingPDLSpecFilename,
+      llvm::cl::desc(
+          "File name of a transform dialect spec to use for preprocessing"),
+      llvm::cl::cat(category));
 }
 
 } // namespace mlir::iree_compiler
