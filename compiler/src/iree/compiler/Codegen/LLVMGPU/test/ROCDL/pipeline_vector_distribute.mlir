@@ -14,8 +14,8 @@
 hal.executable @matmul_256x256x256_f16_f32 {
 hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
       target_arch = "gfx940",
-      mma_intrinsics = [#iree_gpu.mfma_layout<MFMA_F16_16x16x16_F32>,
-                        #iree_gpu.mfma_layout<MFMA_F16_32x32x8_F32>]
+      mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+                        #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>]
   }>) {
   hal.executable.export @matmul_256x256x256_f16_f32 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
@@ -44,7 +44,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 // Basic pipeline test to make sure it generates the instructions we expect.
 
 //       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute
-//  CHECK-SAME:   mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mfma_layout<MFMA_F16_16x16x16_F32>,
+//  CHECK-SAME:   mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
 //  CHECK-SAME:     subgroup_m_count = 2, subgroup_n_count = 2, subgroup_m_tile_count = 2, subgroup_n_tile_count = 2, subgroup_k_tile_count = 8>
 
 // CHECK-LABEL: hal.executable.export public @matmul_256x256x256_f16_f32
@@ -71,8 +71,8 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 hal.executable @matmul_256x256x256_f16_f16 {
 hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
       target_arch = "gfx940",
-      mma_intrinsics = [#iree_gpu.mfma_layout<MFMA_F16_16x16x16_F32>,
-                        #iree_gpu.mfma_layout<MFMA_F16_32x32x8_F32>]
+      mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+                        #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>]
   }>) {
   hal.executable.export @matmul_256x256x256_f16_f16 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
@@ -99,7 +99,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 }
 
 //       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute
-//  CHECK-SAME:   mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mfma_layout<MFMA_F16_16x16x16_F32>,
+//  CHECK-SAME:   mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
 //  CHECK-SAME:     subgroup_m_count = 2, subgroup_n_count = 2, subgroup_m_tile_count = 2, subgroup_n_tile_count = 2, subgroup_k_tile_count = 8>
 
 // CHECK-LABEL: hal.executable.export public @matmul_256x256x256_f16_f16
@@ -126,8 +126,8 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 hal.executable @expanded_matmul_transpose_b_executable {
 hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
       target_arch = "gfx940",
-      mma_intrinsics = [#iree_gpu.mfma_layout<MFMA_F16_16x16x16_F32>,
-                        #iree_gpu.mfma_layout<MFMA_F16_32x32x8_F32>]
+      mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+                        #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>]
   }>) {
   hal.executable.export @expanded_matmul_transpose_b layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device):
@@ -198,8 +198,8 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 hal.executable @conv_nhwc_dispatch_0 {
 hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
       target_arch = "gfx940",
-      mma_intrinsics = [#iree_gpu.mfma_layout<MFMA_F16_16x16x16_F32>,
-                        #iree_gpu.mfma_layout<MFMA_F16_32x32x8_F32>]
+      mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+                        #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>]
   }>) {
   hal.executable.export @conv_nhwc layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device):
@@ -241,7 +241,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 // -----
 
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {
-  mma_intrinsics = [#iree_gpu.mfma_layout<MFMA_F16_16x16x16_F32>, #iree_gpu.mfma_layout<MFMA_F16_32x32x8_F32>],
+  mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>],
   target_arch = "gfx942",
   ukernels = "none"
 }>
@@ -303,7 +303,7 @@ hal.executable public @main_dispatch_expanded_matmul {
 
 
 //       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute
-//  CHECK-SAME:   mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mfma_layout<MFMA_F16_16x16x16_F32>,
+//  CHECK-SAME:   mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
 //  CHECK-SAME:     subgroup_m_count = 2, subgroup_n_count = 2, subgroup_m_tile_count = 2, subgroup_n_tile_count = 2, subgroup_k_tile_count = 8>
 
 // CHECK-LABEL: hal.executable.export public @generic_2x1024x20x64x1280_f16
@@ -333,7 +333,7 @@ hal.executable public @main_dispatch_expanded_matmul {
 hal.executable @matmul_256x256x256_f16_f32 {
 hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
       target_arch = "gfx1100",
-      mma_intrinsics = [#iree_gpu.mfma_layout<WMMA_F16_16x16x16_F32>]
+      mma_intrinsics = [#iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>]
   }>) {
   hal.executable.export @matmul_256x256x256_f16_f32 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
@@ -360,7 +360,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 }
 
 //       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute
-//  CHECK-SAME:   mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mfma_layout<WMMA_F16_16x16x16_F32>,
+//  CHECK-SAME:   mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>,
 //  CHECK-SAME:     subgroup_m_count = 2, subgroup_n_count = 2, subgroup_m_tile_count = 2, subgroup_n_tile_count = 2, subgroup_k_tile_count = 8>
 
 // CHECK-LABEL: hal.executable.export public @matmul_256x256x256_f16_f32

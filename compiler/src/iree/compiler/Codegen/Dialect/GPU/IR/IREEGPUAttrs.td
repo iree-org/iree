@@ -82,7 +82,7 @@ class IREEGPU_MmaEnumAttr<EnumAttrInfo enumInfo, string name = "">
   : EnumAttr<IREEGPU_Dialect, enumInfo, name>;
 
 //===----------------------------------------------------------------------===//
-// MFMA Attributes
+// MMA Attributes
 //===----------------------------------------------------------------------===//
 
 def MFMA_F16_16x16x16_F32 : I32EnumAttrCase<"MFMA_F16_16x16x16_F32", 0>;
@@ -90,7 +90,7 @@ def MFMA_F16_32x32x8_F32 : I32EnumAttrCase<"MFMA_F16_32x32x8_F32", 1>;
 def WMMA_F16_16x16x16_F16 : I32EnumAttrCase<"WMMA_F16_16x16x16_F16", 2>;
 def WMMA_F16_16x16x16_F32 : I32EnumAttrCase<"WMMA_F16_16x16x16_F32", 3>;
 
-def IREEGPU_MFMAIntrinsic : IREEGPU_I32MmaEnumAttr<"MFMAIntrinsic",
+def IREEGPU_MMAIntrinsic : IREEGPU_I32MmaEnumAttr<"MMAIntrinsic",
     "Descriptor for different MFMA operations", [
       MFMA_F16_16x16x16_F32,
       MFMA_F16_32x32x8_F32,
@@ -98,16 +98,16 @@ def IREEGPU_MFMAIntrinsic : IREEGPU_I32MmaEnumAttr<"MFMAIntrinsic",
       WMMA_F16_16x16x16_F32
     ]>;
 
-def IREEGPU_MFMAIntrinsicAttr
-  : IREEGPU_MmaEnumAttr<IREEGPU_MFMAIntrinsic, "mfma_intrinsic">;
+def IREEGPU_MMAIntrinsicAttr
+  : IREEGPU_MmaEnumAttr<IREEGPU_MMAIntrinsic, "mma_intrinsic">;
 
-def IREEGPU_MFMAAttr : IREEGPU_MmaVectorLayoutAttr<"MFMA", "MFMAIntrinsicAttr"> {
-  let mnemonic = "mfma_layout";
+def IREEGPU_MMAAttr : IREEGPU_MmaVectorLayoutAttr<"MMA", "MMAIntrinsicAttr"> {
+  let mnemonic = "mma_layout";
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
 
   let description = !strconcat(baseDescription, [{
-    This mma variant describes configurations for MFMA ops. The |intrinsic|
-    field specifies which particular MFMA intrinsic this refers to, with each
+    This mma variant describes configurations for MMA ops. The |intrinsic|
+    field specifies which particular MMA intrinsic this refers to, with each
     intrinsic implicating a specific MNK shape and operand types. The intrinsic
     enum name describes these fields as
 
@@ -120,7 +120,7 @@ def IREEGPU_MFMAAttr : IREEGPU_MmaVectorLayoutAttr<"MFMA", "MFMAIntrinsicAttr"> 
 
   let skipDefaultBuilders = 1;
   let builders = [
-    AttrBuilder<(ins "MFMAIntrinsic":$intrinsic)>
+    AttrBuilder<(ins "MMAIntrinsic":$intrinsic)>
   ];
 
   let extraClassDeclaration = !strconcat(baseExtraClassDeclaration, [{

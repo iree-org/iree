@@ -95,7 +95,7 @@ class MMASchedule:
     def __str__(self):
         return (
             "mma_schedule = #iree_gpu.mma_schedule<"
-            + f"intrinsic = #iree_gpu.mfma_layout<{self.intrinsic}>, "
+            + f"intrinsic = #iree_gpu.mma_layout<{self.intrinsic}>, "
             + f"subgroup_m_count = {self.m_count}, "
             + f"subgroup_n_count = {self.n_count}, "
             + f"subgroup_m_tile_count = {self.m_tile_count}, "

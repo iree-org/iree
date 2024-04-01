@@ -12,10 +12,10 @@
 namespace mlir::iree_compiler::IREE::HAL {
 
 static ArrayAttr getMfmaArrayAttr(MLIRContext *context,
-                                  ArrayRef<IREE::GPU::MFMAIntrinsic> types) {
-  SmallVector<Attribute> attrs(types.size(), IREE::GPU::MFMAAttr());
+                                  ArrayRef<IREE::GPU::MMAIntrinsic> types) {
+  SmallVector<Attribute> attrs(types.size(), IREE::GPU::MMAAttr());
   for (auto [idx, type] : llvm::enumerate(types)) {
-    attrs[idx] = IREE::GPU::MFMAAttr::get(context, type);
+    attrs[idx] = IREE::GPU::MMAAttr::get(context, type);
   }
   return ArrayAttr::get(context, attrs);
 }
@@ -23,16 +23,16 @@ static ArrayAttr getMfmaArrayAttr(MLIRContext *context,
 ArrayAttr getROCMSupportedMmaAttrs(MLIRContext *context, StringRef targetArch) {
   if (targetArch == "gfx940" || targetArch == "gfx942") { // MI300A/X
     return getMfmaArrayAttr(context,
-                            {IREE::GPU::MFMAIntrinsic::MFMA_F16_16x16x16_F32,
-                             IREE::GPU::MFMAIntrinsic::MFMA_F16_32x32x8_F32});
+                            {IREE::GPU::MMAIntrinsic::MFMA_F16_16x16x16_F32,
+                             IREE::GPU::MMAIntrinsic::MFMA_F16_32x32x8_F32});
   } else if (targetArch == "gfx90a") { // MI210
     return getMfmaArrayAttr(context,
-                            {IREE::GPU::MFMAIntrinsic::MFMA_F16_16x16x16_F32,
-                             IREE::GPU::MFMAIntrinsic::MFMA_F16_32x32x8_F32});
+                            {IREE::GPU::MMAIntrinsic::MFMA_F16_16x16x16_F32,
+                             IREE::GPU::MMAIntrinsic::MFMA_F16_32x32x8_F32});
   } else if (targetArch == "gfx1100") { // RDNA3
     return getMfmaArrayAttr(context,
-                            {IREE::GPU::MFMAIntrinsic::WMMA_F16_16x16x16_F16,
-                             IREE::GPU::MFMAIntrinsic::WMMA_F16_16x16x16_F16});
+                            {IREE::GPU::MMAIntrinsic::WMMA_F16_16x16x16_F16,
+                             IREE::GPU::MMAIntrinsic::WMMA_F16_16x16x16_F16});
   }
   return ArrayAttr();
 }

@@ -4,7 +4,7 @@ func.func @mfma_matmul_256x256x256(%lhs: memref<16x256xf16, strided<[256, 1], of
                               %rhs: memref<256x16xf16, strided<[256, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>,
                               %out: memref<16x16xf32, strided<[256, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>)
   attributes {
-    mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mfma_layout<MFMA_F16_16x16x16_F32>,
+    mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
                      subgroup_m_count = 1, subgroup_n_count = 1, subgroup_m_tile_count = 1, subgroup_n_tile_count = 1, subgroup_k_tile_count = 2>,
     workgroup_size = [64, 1, 1]} {
   %alloc = memref.alloc() : memref<32x16xf16, #gpu.address_space<workgroup>>
@@ -58,7 +58,7 @@ func.func @mfma_matmul_256x256x256(%lhs: memref<16x256xf16, strided<[256, 1], of
                               %rhs: memref<16x256xf16, strided<[256, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>,
                               %out: memref<16x16xf32, strided<[256, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>)
   attributes {
-    mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mfma_layout<MFMA_F16_16x16x16_F32>,
+    mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
                      subgroup_m_count = 1, subgroup_n_count = 1, subgroup_m_tile_count = 1, subgroup_n_tile_count = 1, subgroup_k_tile_count = 2>,
     workgroup_size = [64, 1, 1]} {
   %alloc = memref.alloc() : memref<32x16xf16, #gpu.address_space<workgroup>>
@@ -124,7 +124,7 @@ func.func @wmma_matmul_256x256x256(%lhs: memref<16x256xf16, strided<[256, 1], of
                               %rhs: memref<256x16xf16, strided<[256, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>,
                               %out: memref<16x16xf32, strided<[256, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>)
   attributes {
-    mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mfma_layout<WMMA_F16_16x16x16_F32>,
+    mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>,
                      subgroup_m_count = 1, subgroup_n_count = 1, subgroup_m_tile_count = 1, subgroup_n_tile_count = 1, subgroup_k_tile_count = 2>,
     workgroup_size = [32, 1, 1]} {
   %alloc = memref.alloc() : memref<32x16xf16, #gpu.address_space<workgroup>>
@@ -182,7 +182,7 @@ func.func @wmma_matmul_256x256x256(%lhs: memref<16x256xf16, strided<[256, 1], of
                               %rhs: memref<16x256xf16, strided<[256, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>,
                               %out: memref<16x16xf32, strided<[256, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>)
   attributes {
-    mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mfma_layout<WMMA_F16_16x16x16_F32>,
+    mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>,
                      subgroup_m_count = 1, subgroup_n_count = 1, subgroup_m_tile_count = 1, subgroup_n_tile_count = 1, subgroup_k_tile_count = 2>,
     workgroup_size = [32, 1, 1]} {
   %alloc = memref.alloc() : memref<32x16xf16, #gpu.address_space<workgroup>>

@@ -8,7 +8,7 @@
 // CHECK:      #[[$TILE_SIZES:.+]] = #iree_codegen.lowering_config<tile_sizes =  {{\[}}[1, 1, 64, 64, 128]{{\]}}
 // CHECK:      #iree_codegen.translation_info<LLVMGPUVectorDistribute
 // CHECK-SAME: mma_schedule = #iree_gpu.mma_schedule
-// CHECK-SAME:   intrinsic = #iree_gpu.mfma_layout<MFMA_F16_16x16x16_F32>
+// CHECK-SAME:   intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
 // CHECK-SAME:   subgroup_m_count = 1, subgroup_n_count = 4,
 // CHECK-SAME:   subgroup_m_tile_count = 4, subgroup_n_tile_count = 1, subgroup_k_tile_count = 8
 
@@ -21,8 +21,8 @@
 hal.executable @expanded_matmul_transpose_b_executable {
 hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
       target_arch = "gfx940",
-      mma_intrinsics = [#iree_gpu.mfma_layout<MFMA_F16_16x16x16_F32>,
-                        #iree_gpu.mfma_layout<MFMA_F16_32x32x8_F32>]
+      mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+                        #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>]
   }>) {
   hal.executable.export @expanded_matmul_transpose_b layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device):
@@ -76,7 +76,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 // CHECK:      #[[$TILE_SIZES:.+]] = #iree_codegen.lowering_config<tile_sizes =  {{\[}}[1, 1, 64, 128, 1, 1, 32]{{\]}}
 // CHECK:      #iree_codegen.translation_info<LLVMGPUVectorDistribute
 // CHECK-SAME: mma_schedule = #iree_gpu.mma_schedule
-// CHECK-SAME:   intrinsic = #iree_gpu.mfma_layout<MFMA_F16_16x16x16_F32>
+// CHECK-SAME:   intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
 // CHECK-SAME:   subgroup_m_count = 2, subgroup_n_count = 2,
 // CHECK-SAME:   subgroup_m_tile_count = 2, subgroup_n_tile_count = 4, subgroup_k_tile_count = 2
 
@@ -89,8 +89,8 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 hal.executable @conv_nhwc {
 hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
       target_arch = "gfx940",
-      mma_intrinsics = [#iree_gpu.mfma_layout<MFMA_F16_16x16x16_F32>,
-                        #iree_gpu.mfma_layout<MFMA_F16_32x32x8_F32>]
+      mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+                        #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>]
   }>) {
   hal.executable.export @conv_nhwc layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
@@ -165,7 +165,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 // CHECK:      #[[$TILE_SIZES:.+]] = #iree_codegen.lowering_config<tile_sizes =  {{\[}}[64, 128, 64]{{\]}}
 // CHECK:      #iree_codegen.translation_info<LLVMGPUVectorDistribute
 // CHECK-SAME: mma_schedule = #iree_gpu.mma_schedule
-// CHECK-SAME:   intrinsic = #iree_gpu.mfma_layout<MFMA_F16_16x16x16_F32>
+// CHECK-SAME:   intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
 // CHECK-SAME:   subgroup_m_count = 2, subgroup_n_count = 2,
 // CHECK-SAME:   subgroup_m_tile_count = 2, subgroup_n_tile_count = 4, subgroup_k_tile_count = 4
 
@@ -178,8 +178,8 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 hal.executable @mfma_matmul_1024x1024x1024 {
 hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
       target_arch = "gfx940",
-      mma_intrinsics = [#iree_gpu.mfma_layout<MFMA_F16_16x16x16_F32>,
-                        #iree_gpu.mfma_layout<MFMA_F16_32x32x8_F32>]
+      mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+                        #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>]
   }>) {
   hal.executable.export @mfma_matmul_1024x1024x1024 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
@@ -213,7 +213,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 // CHECK:      #[[$TILE_SIZES:.+]] = #iree_codegen.lowering_config<tile_sizes =  {{\[}}[1, 1, 1, 32, 32, 1, 1, 1, 32]{{\]}}
 // CHECK:      #iree_codegen.translation_info<LLVMGPUVectorDistribute
 // CHECK-SAME: mma_schedule = #iree_gpu.mma_schedule
-// CHECK-SAME:   intrinsic = #iree_gpu.mfma_layout<MFMA_F16_16x16x16_F32>
+// CHECK-SAME:   intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
 // CHECK-SAME:   subgroup_m_count = 2, subgroup_n_count = 2,
 // CHECK-SAME:   subgroup_m_tile_count = 1, subgroup_n_tile_count = 1, subgroup_k_tile_count = 2
 
@@ -226,8 +226,8 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 hal.executable @conv_nchwc {
 hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
       target_arch = "gfx940",
-      mma_intrinsics = [#iree_gpu.mfma_layout<MFMA_F16_16x16x16_F32>,
-                        #iree_gpu.mfma_layout<MFMA_F16_32x32x8_F32>]
+      mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+                        #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>]
   }>) {
   hal.executable.export @conv_nchwc layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
@@ -274,7 +274,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 // CHECK:      #[[$TILE_SIZES:.+]] = #iree_codegen.lowering_config<tile_sizes =  {{\[}}[64, 128, 64]{{\]}}
 // CHECK:      #iree_codegen.translation_info<LLVMGPUVectorDistribute
 // CHECK-SAME: mma_schedule = #iree_gpu.mma_schedule
-// CHECK-SAME:   intrinsic = #iree_gpu.mfma_layout<WMMA_F16_16x16x16_F32>
+// CHECK-SAME:   intrinsic = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>
 // CHECK-SAME:   subgroup_m_count = 2, subgroup_n_count = 2,
 // CHECK-SAME:   subgroup_m_tile_count = 2, subgroup_n_tile_count = 4, subgroup_k_tile_count = 4
 
@@ -287,7 +287,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 hal.executable @wmma_matmul_1024x1024x1024 {
 hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
       target_arch = "gfx1100",
-      mma_intrinsics = [#iree_gpu.mfma_layout<WMMA_F16_16x16x16_F32>]
+      mma_intrinsics = [#iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>]
   }>) {
   hal.executable.export @wmma_matmul_1024x1024x1024 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):

@@ -57,19 +57,19 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
 
     // We assume there is an decision made before regarding which mfma intrinsic
     // to use and it is attached as an attribute to this contract op.
-    auto mfmaAttr =
-        contractOp->getAttrOfType<IREE::GPU::MFMAAttr>("iree.amdgpu.mfma");
-    if (!mfmaAttr) {
+    auto mmaAttr =
+        contractOp->getAttrOfType<IREE::GPU::MMAAttr>("iree.amdgpu.mma");
+    if (!mmaAttr) {
       return rewriter.notifyMatchFailure(
-          contractOp, "missing iree.amdgpu.mfma intrinsic attribute");
+          contractOp, "missing iree.amdgpu.mma intrinsic attribute");
     }
     // Get the storage vector types that each thread is in charge of.
-    auto [aVectorType, bVectorType, cVectorType] = mfmaAttr.getABCVectorTypes();
+    auto [aVectorType, bVectorType, cVectorType] = mmaAttr.getABCVectorTypes();
     // Get parameters for the amdgpu.mfma operation.
-    MFMAParameters mfmaParams;
-    std::tie(mfmaParams.m, mfmaParams.n, mfmaParams.k) = mfmaAttr.getMNKShape();
-    mfmaParams.blocks = mfmaAttr.getBlockSize();
-    StringRef computeType = mfmaAttr.getComputeType();
+    MMAParameters mmaParams;
+    std::tie(mmaParams.m, mmaParams.n, mmaParams.k) = mmaAttr.getMNKShape();
+    mmaParams.blocks = mmaAttr.getBlockSize();
+    StringRef computeType = mmaAttr.getComputeType();
     if (computeType.empty()) {
       return rewriter.notifyMatchFailure(
           contractOp, "Cannot determine intrinsic compute type.");
@@ -168,7 +168,7 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
         Value rhsSlice =
             rewriter.create<vector::ExtractOp>(loc, rhs, rhsBatchOffsets);
         accSlice =
-            computeMMA(rewriter, loc, mfmaParams, lhsSlice, rhsSlice, accSlice,
+            computeMMA(rewriter, loc, mmaParams, lhsSlice, rhsSlice, accSlice,
                        aVectorType, bVectorType, cVectorType, computeType);
       }
       finalTile = rewriter.create<vector::InsertOp>(loc, accSlice, finalTile,
@@ -217,7 +217,7 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
     applyPermutationToVector(rhsOffsets, rhsLayout.getBatchOrder());
   }
 
-  struct MFMAParameters {
+  struct MMAParameters {
     uint32_t m = 0;
     uint32_t n = 0;
     uint32_t k = 0;
@@ -227,7 +227,7 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
   // Generates amdgpu.mfma operation on the given inputs for the given MFMA
   // |intrinsic|.
   Value computeMMA(OpBuilder &builder, Location loc,
-                   const MFMAParameters &mfmaParams, Value a, Value b, Value c,
+                   const MMAParameters &mmaParams, Value a, Value b, Value c,
                    VectorType aType, VectorType bType, VectorType cType,
                    StringRef computeType) const {
     Value aCast = builder.create<vector::ShapeCastOp>(a.getLoc(), aType, a);
@@ -236,8 +236,8 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
     Value mmaOp;
     if (computeType == "MFMA") {
       mmaOp = builder.create<amdgpu::MFMAOp>(
-          loc, cType, mfmaParams.m, mfmaParams.n, mfmaParams.k,
-          mfmaParams.blocks, aCast, bCast, cCast);
+          loc, cType, mmaParams.m, mmaParams.n, mmaParams.k, mmaParams.blocks,
+          aCast, bCast, cCast);
     } else if (computeType == "WMMA") {
       mmaOp = builder.create<amdgpu::WMMAOp>(loc, cType, aCast, bCast, cCast);
     }
