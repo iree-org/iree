@@ -1,4 +1,4 @@
-#layout = #iree_gpu.mfma_layout<F16_16x16x16_F32>
+#layout = #iree_gpu.mfma_layout<MFMA_F16_16x16x16_F32>
 
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.consumed}) {

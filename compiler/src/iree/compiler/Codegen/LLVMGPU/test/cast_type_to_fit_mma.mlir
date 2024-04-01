@@ -2,7 +2,7 @@
 
 func.func @matmul_96x64x16_mm(%lhs: vector<96x16xf16>, %rhs: vector<16x64xf16>, %init: vector<96x64xf16>) -> vector<96x64xf16> attributes {
     mma_schedule = #iree_gpu.mma_schedule<
-      intrinsic = #iree_gpu.mfma_layout<F16_32x32x8_F32>,
+      intrinsic = #iree_gpu.mfma_layout<MFMA_F16_32x32x8_F32>,
       subgroup_m_count = 1, subgroup_n_count = 1, subgroup_m_tile_count = 3, subgroup_n_tile_count = 2, subgroup_k_tile_count = 2>,
     workgroup_size = [64, 1, 1]} {
     %0 = vector.contract {
@@ -26,7 +26,7 @@ func.func @matmul_96x64x16_mm(%lhs: vector<96x16xf16>, %rhs: vector<16x64xf16>, 
 
 func.func @matmul_96x64x16_mmt(%lhs: vector<96x16xf16>, %rhs: vector<64x16xf16>, %init: vector<96x64xf16>) -> vector<96x64xf16> attributes {
     mma_schedule = #iree_gpu.mma_schedule<
-      intrinsic = #iree_gpu.mfma_layout<F16_32x32x8_F32>,
+      intrinsic = #iree_gpu.mfma_layout<MFMA_F16_32x32x8_F32>,
       subgroup_m_count = 1, subgroup_n_count = 1, subgroup_m_tile_count = 3, subgroup_n_tile_count = 2, subgroup_k_tile_count = 2>,
     workgroup_size = [64, 1, 1]} {
     %0 = vector.contract {
@@ -47,7 +47,7 @@ func.func @matmul_96x64x16_mmt(%lhs: vector<96x16xf16>, %rhs: vector<64x16xf16>,
 
 func.func @matmul_96x64x16_mm_cannot_divide(%lhs: vector<95x16xf16>, %rhs: vector<16x64xf16>, %init: vector<95x64xf16>) -> vector<95x64xf16> attributes {
     mma_schedule = #iree_gpu.mma_schedule<
-      intrinsic = #iree_gpu.mfma_layout<F16_32x32x8_F32>,
+      intrinsic = #iree_gpu.mfma_layout<MFMA_F16_32x32x8_F32>,
       subgroup_m_count = 1, subgroup_n_count = 1, subgroup_m_tile_count = 3, subgroup_n_tile_count = 2, subgroup_k_tile_count = 2>,
     workgroup_size = [64, 1, 1]} {
     %0 = vector.contract {
@@ -67,7 +67,7 @@ func.func @matmul_96x64x16_mm_cannot_divide(%lhs: vector<95x16xf16>, %rhs: vecto
 
 func.func @matmul_96x64x16_mm_cannot_downcast(%lhs: vector<96x16xf16>, %rhs: vector<16x64xf16>, %init: vector<96x64xf64>) -> vector<96x64xf64> attributes {
     mma_schedule = #iree_gpu.mma_schedule<
-      intrinsic = #iree_gpu.mfma_layout<F16_32x32x8_F32>,
+      intrinsic = #iree_gpu.mfma_layout<MFMA_F16_32x32x8_F32>,
       subgroup_m_count = 1, subgroup_n_count = 1, subgroup_m_tile_count = 3, subgroup_n_tile_count = 2, subgroup_k_tile_count = 2>,
     workgroup_size = [64, 1, 1]} {
     %0 = vector.contract {
