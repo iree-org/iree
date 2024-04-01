@@ -824,10 +824,10 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool forROCDL) {
   addLowerAndOptimizeAddressComputationPasses(pm);
 
   // Run checks on shared memory usage.
-  // TODO: query this from the target.
   auto getSharedMemoryLimit = [](mlir::FunctionOpInterface entryPoint) {
     return getTargetSharedMemoryLimit(entryPoint);
   };
+  // TODO: query this from the target.
   auto getIndexBitwidth = [](mlir::FunctionOpInterface) { return 64; };
   pm.addPass(
       createGPUCheckResourceUsagePass(getSharedMemoryLimit, getIndexBitwidth));
