@@ -11,10 +11,14 @@
 #include "iree-dialects/Dialect/LinalgTransform/Passes.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/ROCDLPasses.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/ComplexToStandard/ComplexToStandard.h"
@@ -31,9 +35,11 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassOptions.h"
 #include "mlir/Pass/PassRegistry.h"
+#include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/Passes.h"
 
 #define DEBUG_TYPE "iree-llvm-gpu-lowering-pass-pipeline"
@@ -42,17 +48,19 @@ namespace mlir::iree_compiler {
 
 constexpr int64_t kDefaultSubgroupSize = 32;
 
-static llvm::cl::opt<unsigned>
-    logSwizzleTile("iree-codegen-log-swizzle-tile",
-                   llvm::cl::desc("log swizzle tile value"), llvm::cl::init(0));
+static llvm::cl::opt<unsigned> clReorderWorkgroupLogSwizzleTile(
+    "iree-codegen-reorder-workgroups-log-swizzle-tile",
+    llvm::cl::desc("Reorder workgroup using strategy: log swizzle tile value. "
+                   "Setting this to a non-zero value enables swizzling."),
+    llvm::cl::init(0));
 
-llvm::cl::opt<int64_t> clLLVMGPUSharedMemoryLimit(
+static llvm::cl::opt<int64_t> clLLVMGPUSharedMemoryLimit(
     "iree-llvmgpu-shared-memory-limit",
     llvm::cl::desc("specify the maximum amount of shared memory allowed to be "
                    "allocated for the given target"),
     llvm::cl::init(163 * 1024));
 
-llvm::cl::opt<bool> clLLVMGPUEnablePrefetch(
+static llvm::cl::opt<bool> clLLVMGPUEnablePrefetch(
     "iree-llvmgpu-enable-prefetch",
     llvm::cl::desc("Enable prefetch in the vector distribute pipeline"),
     llvm::cl::init(false));
@@ -121,6 +129,28 @@ static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
     builder.create<gpu::BarrierOp>(loc);
   }
   return success();
+}
+
+// Returns success when workgroup reordering is supported for `funcOp`.
+// On ROCm, we require workgroup counts to be static.
+static LogicalResult canReorderWorkgroups(FunctionOpInterface funcOp) {
+  auto variantOp = getExecutableVariantOp(funcOp);
+  if (failed(variantOp))
+    return failure();
+
+  IREE::HAL::ExecutableTargetAttr target = variantOp->getTarget();
+  if (target.getBackend() != "rocm")
+    return success();
+
+  // Workgroup reordering on ROCm currently requires all workgrup counts to be
+  // static.
+  SmallVector<int64_t> workgroupCounts = getStaticNumWorkgroups(funcOp);
+  if (workgroupCounts.empty())
+    return failure();
+
+  // This is further restricted to 2D+ grids as we reorder along the X and Y
+  // workgroup IDs.
+  return success(workgroupCounts.size() >= 2);
 }
 
 //===----------------------------------------------------------------------===//
@@ -249,8 +279,8 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &pm) {
 
   nestedModulePM.addNestedPass<func::FuncOp>(
       createGPUReduceSharedMemoryBankConflicts());
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createWorkGroupSwizzle(logSwizzleTile));
+  nestedModulePM.addNestedPass<func::FuncOp>(createReorderWorkgroups(
+      clReorderWorkgroupLogSwizzleTile, canReorderWorkgroups));
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
@@ -297,8 +327,8 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &pm,
 
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createWorkGroupSwizzle(logSwizzleTile));
+  nestedModulePM.addNestedPass<func::FuncOp>(createReorderWorkgroups(
+      clReorderWorkgroupLogSwizzleTile, canReorderWorkgroups));
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
@@ -365,8 +395,8 @@ void addGPUMatmulTensorCoreMmaSyncPassPipeline(OpPassManager &pm,
 
   nestedModulePM.addNestedPass<func::FuncOp>(
       createRemoveSingleIterationLoopPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createWorkGroupSwizzle(logSwizzleTile));
+  nestedModulePM.addNestedPass<func::FuncOp>(createReorderWorkgroups(
+      clReorderWorkgroupLogSwizzleTile, canReorderWorkgroups));
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 
@@ -522,6 +552,8 @@ static void addVectorBufferizePasses(OpPassManager &passManager) {
 void addGPUVectorDistributePassPipeline(OpPassManager &pm) {
   tileAndDistributeToWorkgroup(pm);
   auto &nestedModulePM = pm.nest<ModuleOp>();
+  nestedModulePM.addNestedPass<func::FuncOp>(createReorderWorkgroups(
+      clReorderWorkgroupLogSwizzleTile, canReorderWorkgroups));
   nestedModulePM.addPass(createCanonicalizerPass());
   nestedModulePM.addPass(createCSEPass());
 

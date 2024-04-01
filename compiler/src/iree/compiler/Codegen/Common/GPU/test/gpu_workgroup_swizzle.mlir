@@ -1,4 +1,5 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-workgroup-swizzle{logTile=3}))" %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-reorder-workgroups{logTile=3}))" \
+// RUN:   --split-input-file %s | FileCheck %s
 
 func.func @matmul() {
   %c0 = arith.constant 0 : index
@@ -50,6 +51,3 @@ func.func @matmul() {
 //          CHECK: %[[S12:.*]] = arith.andi %[[S10]], %[[S11]] : i1
 //          CHECK: %[[S13:.*]] = arith.select %[[S12]], %[[WORKGROUPIDX]], %[[S6]] : index
 //          CHECK: %[[S14:.*]] = arith.select %[[S12]], %[[WORKGROUPIDY]], %[[S7]] : index
-
-
-
