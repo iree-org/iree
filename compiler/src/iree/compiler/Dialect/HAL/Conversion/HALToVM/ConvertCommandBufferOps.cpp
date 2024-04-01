@@ -8,6 +8,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Dialect/VM/Conversion/ImportUtils.h"
 #include "iree/compiler/Dialect/VM/IR/VMOps.h"
+#include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Transforms/DialectConversion.h"
 
@@ -171,7 +172,7 @@ public:
     // %recv_offset : i64,
     // %recv_length : i64,
     // %element_count : i64
-    SmallVector<Value, 8> callOperands;
+    SmallVector<Value> callOperands;
     callOperands.push_back(adaptor.getCommandBuffer());
     callOperands.push_back(adaptor.getChannel());
     callOperands.push_back(rewriter.create<IREE::VM::ConstI32Op>(

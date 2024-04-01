@@ -279,10 +279,10 @@ Value mlir::iree_compiler::buildPad(
   SmallVector<Attribute> transposeAttrs;
   for (auto &transp : transposePaddings)
     transposeAttrs.push_back(b.getI64ArrayAttr(transp));
-  SmallVector<Type> resultTypes;
-  resultTypes.push_back(opH.getType());
-  resultTypes.push_back(transform::AnyOpType::get(b.getContext()));
-  resultTypes.push_back(transform::AnyOpType::get(b.getContext()));
+
+  Type resultTypes[] = {opH.getType(),
+                        transform::AnyOpType::get(b.getContext()),
+                        transform::AnyOpType::get(b.getContext())};
   return b
       .create<transform::PadOp>(resultTypes, opH, b.getArrayAttr(paddingValues),
                                 b.getI64ArrayAttr(paddingDimensions),
