@@ -178,8 +178,8 @@ timepoint. We need to keep track of all CPU wait timepoints in the timeline.
 After a new signaled value, go through the timeline and notify all those waiting
 on earlier values.
 
-If there are GPU waits, given that there are no way we can signal a `hipEvent_t` on
-CPU, one way to handle this is to cache and defer the submission batches by
+If there are GPU waits, given that there are no way we can signal a `hipEvent_t`
+on CPU, one way to handle this is to cache and defer the submission batches by
 ourselves until CPU signals past the desired value. To support this, we would
 need to implement a deferred/pending actions queue.
 
@@ -194,9 +194,10 @@ unblock CPU waits.
 After advancing the timeline from the CPU side with `hipLaunchHostFunc()`,
 we can release more workload from the deferred/pending actions queue to the GPU.
 Though, per the documentation of `hipLaunchHostFunc()`, "the host function must
-not make any HIP API calls." So we cannot do that directly inside `hipLaunchHostFunc()`;
-we need to notify another separate thread to call HIP APIs to push more work to the GPU.
-So the deferred/pending action queue should have an associcated thread.
+not make any HIP API calls." So we cannot do that directly inside
+`hipLaunchHostFunc()`; we need to notify another separate thread to call HIP
+APIs to push more work to the GPU. So the deferred/pending action queue should
+have an associcated thread.
 
 For GPU waits, we can also leverage the same logic--using CPU signaling to
 unblock deferred GPU queue actions. Though this is performant, given that
