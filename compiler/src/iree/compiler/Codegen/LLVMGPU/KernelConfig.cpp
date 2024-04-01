@@ -388,7 +388,8 @@ setConvolutionVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   GPUMatmulShapeType problem{bounds[mDim], bounds[nDim], bounds[kDim],
                              lhsElemType,  rhsElemType,  initElemType};
 
-  auto mmaAttrs = llvm::to_vector(mmaKinds->getAsRange<IREE::GPU::MmaAttr>());
+  auto mmaAttrs =
+      llvm::to_vector(mmaKinds->getAsRange<IREE::GPU::MmaInterfaceAttr>());
   SmallVector<GPUMatmulShapeType> intrinsics;
   intrinsics.reserve(mmaKinds->size());
   for (auto mma : mmaAttrs) {
@@ -520,7 +521,8 @@ setMatmulVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   GPUMatmulShapeType problem{bounds[mDim], bounds[nDim], bounds[kDim],
                              lhsElemType,  rhsElemType,  initElemType};
 
-  auto mmaAttrs = llvm::to_vector(mmaKinds->getAsRange<IREE::GPU::MmaAttr>());
+  auto mmaAttrs =
+      llvm::to_vector(mmaKinds->getAsRange<IREE::GPU::MmaInterfaceAttr>());
   SmallVector<GPUMatmulShapeType> intrinsics;
   intrinsics.reserve(mmaKinds->size());
   for (auto mma : mmaAttrs) {

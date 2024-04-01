@@ -10,7 +10,7 @@
 include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.td"
 include "mlir/IR/EnumAttr.td"
 
-def IREEGPU_MmaAttr : AttrInterface<"MmaAttr"> {
+def IREEGPU_MmaInterfaceAttr : AttrInterface<"MmaInterfaceAttr"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
 
   let description = [{

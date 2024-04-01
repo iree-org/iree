@@ -24,7 +24,8 @@ namespace mlir::iree_compiler {
 namespace {
 
 struct UpcastContractOutput : OpRewritePattern<vector::ContractionOp> {
-  UpcastContractOutput(MLIRContext *context, IREE::GPU::MmaAttr intrinsic,
+  UpcastContractOutput(MLIRContext *context,
+                       IREE::GPU::MmaInterfaceAttr intrinsic,
                        PatternBenefit benefit = 1)
       : OpRewritePattern(context, benefit), intrinsic(intrinsic) {}
 
@@ -82,7 +83,7 @@ struct UpcastContractOutput : OpRewritePattern<vector::ContractionOp> {
   }
 
 private:
-  IREE::GPU::MmaAttr intrinsic;
+  IREE::GPU::MmaInterfaceAttr intrinsic;
 };
 
 struct LLVMGPUCastTypeToFitMMAPass

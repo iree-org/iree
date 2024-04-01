@@ -19,7 +19,7 @@ include "mlir/IR/EnumAttr.td"
 
 class IREEGPU_MmaVectorLayoutAttr<string attrname, string mmaintrinsic> :
     AttrDef<IREEGPU_Dialect, attrname, [
-  DeclareAttrInterfaceMethods<IREEGPU_MmaAttr, [
+  DeclareAttrInterfaceMethods<IREEGPU_MmaInterfaceAttr, [
     "getABCElementTypes",
     "getABCVectorTypes",
     "getContractionLayout",
@@ -174,7 +174,7 @@ def IREEGPU_MmaScheduleAttr : AttrDef<IREEGPU_Dialect, "MMASchedule"> {
 
 
   let parameters = (ins
-    "::mlir::iree_compiler::IREE::GPU::MmaAttr":$intrinsic,
+    "::mlir::iree_compiler::IREE::GPU::MmaInterfaceAttr":$intrinsic,
     "int64_t":$subgroup_m_count,
     "int64_t":$subgroup_n_count,
     "int64_t":$subgroup_m_tile_count,
