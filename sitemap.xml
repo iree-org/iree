@@ -141,6 +141,11 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://iree.dev/developers/design-docs/hip-hal-driver/</loc>
+         <lastmod>2024-04-01</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://iree.dev/developers/design-docs/invocation-execution-model/</loc>
          <lastmod>2024-04-01</lastmod>
          <changefreq>daily</changefreq>

@@ -8,13 +8,13 @@
       
       
       
-        <link rel="canonical" href="https://iree.dev/developers/building/cmake-options/">
+        <link rel="canonical" href="https://iree.dev/developers/design-docs/hip-hal-driver/">
       
       
-        <link rel="prev" href="../emscripten/">
+        <link rel="prev" href="../cuda-hal-driver/">
       
       
-        <link rel="next" href="../cmake-with-ccache/">
+        <link rel="next" href="../metal-hal-driver/">
       
       
       <link rel="icon" href="../../../assets/images/ghost.svg">
@@ -22,7 +22,7 @@
     
     
       
-        <title>CMake options - IREE</title>
+        <title>HIP HAL driver - IREE</title>
       
     
     
@@ -81,7 +81,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#cmake-options" class="md-skip">
+        <a href="#hip-hal-driver" class="md-skip">
           Skip to content
         </a>
       
@@ -116,7 +116,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              CMake options
+              HIP HAL driver
             
           </span>
         </div>
@@ -344,6 +344,8 @@
         <div class="md-main__inner md-grid">
           
             
+              
+                
               
               <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
                 <div class="md-sidebar__scrollwrap">
@@ -2038,8 +2040,6 @@
                 
   
   
-    
-  
   
     
     
@@ -2056,13 +2056,15 @@
     
       
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
       
         
         
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_3" checked>
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_3" >
         
           <label class="md-nav__link" for="__nav_5_3" id="__nav_5_3_label" tabindex="0">
             
@@ -2075,7 +2077,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_5_3">
             <span class="md-nav__icon md-icon"></span>
             Building
@@ -2088,7 +2090,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../bazel/" class="md-nav__link">
+      <a href="../../building/bazel/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M15 2.75a.75.75 0 0 1-.75.75h-4a.75.75 0 0 1 0-1.5h4a.75.75 0 0 1 .75.75Zm-8.5.75v1.25a.75.75 0 0 0 1.5 0v-4a.75.75 0 0 0-1.5 0V2H1.75a.75.75 0 0 0 0 1.5H6.5Zm1.25 5.25a.75.75 0 0 0 0-1.5h-6a.75.75 0 0 0 0 1.5h6ZM15 8a.75.75 0 0 1-.75.75H11.5V10a.75.75 0 1 1-1.5 0V6a.75.75 0 0 1 1.5 0v1.25h2.75A.75.75 0 0 1 15 8Zm-9 5.25v-2a.75.75 0 0 0-1.5 0v1.25H1.75a.75.75 0 0 0 0 1.5H4.5v1.25a.75.75 0 0 0 1.5 0v-2Zm9 0a.75.75 0 0 1-.75.75h-6a.75.75 0 0 1 0-1.5h6a.75.75 0 0 1 .75.75Z"/></svg>
@@ -2110,7 +2112,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../emscripten/" class="md-nav__link">
+      <a href="../../building/emscripten/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.745 0v.129a2.752 2.752 0 1 1-5.504 0V0H0v24h24V0h-9.255zm-3.291 21.431-1.169-5.783h-.02l-1.264 5.783H7.39l-1.824-8.497h1.59l1.088 5.783h.02l1.311-5.783h1.487l1.177 5.854h.02l1.242-5.854h1.561l-2.027 8.497h-1.581zm8.755 0-.542-1.891h-2.861l-.417 1.891h-1.59l2.056-8.497h2.509l2.5 8.497h-1.655zm-2.397-6.403-.694 3.118h2.159l-.796-3.118h-.669z"/></svg>
@@ -2130,31 +2132,9 @@
                 
   
   
-    
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M11.769.066.067 23.206l12.76-10.843zm11.438 23.868L7.471 17.587 0 23.934zm.793-.198L12.298.463l1.719 19.24zM12.893 12.959l-5.025 4.298 5.62 2.248z"/></svg>
-  
-  <span class="md-ellipsis">
-    CMake options
-  </span>
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../building/cmake-options/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M11.769.066.067 23.206l12.76-10.843zm11.438 23.868L7.471 17.587 0 23.934zm.793-.198L12.298.463l1.719 19.24zM12.893 12.959l-5.025 4.298 5.62 2.248z"/></svg>
@@ -2165,227 +2145,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#frequently-used-cmake-options" class="md-nav__link">
-    Frequently-used CMake options
-  </a>
-  
-    <nav class="md-nav" aria-label="Frequently-used CMake options">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#cmake_build_type" class="md-nav__link">
-    CMAKE_BUILD_TYPE
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#cmake_lang_compiler" class="md-nav__link">
-    CMAKE_&lt;LANG&gt;_COMPILER
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#iree-specific-cmake-options" class="md-nav__link">
-    IREE-specific CMake options
-  </a>
-  
-    <nav class="md-nav" aria-label="IREE-specific CMake options">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#iree_enable_runtime_tracing" class="md-nav__link">
-    IREE_ENABLE_RUNTIME_TRACING
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_enable_compiler_tracing" class="md-nav__link">
-    IREE_ENABLE_COMPILER_TRACING
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_build_compiler" class="md-nav__link">
-    IREE_BUILD_COMPILER
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_build_tests" class="md-nav__link">
-    IREE_BUILD_TESTS
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_build_docs" class="md-nav__link">
-    IREE_BUILD_DOCS
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_build_samples" class="md-nav__link">
-    IREE_BUILD_SAMPLES
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_build_python_bindings" class="md-nav__link">
-    IREE_BUILD_PYTHON_BINDINGS
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_build_bindings_tflite" class="md-nav__link">
-    IREE_BUILD_BINDINGS_TFLITE
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_build_bindings_tflite_java" class="md-nav__link">
-    IREE_BUILD_BINDINGS_TFLITE_JAVA
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_build_experimental_remoting" class="md-nav__link">
-    IREE_BUILD_EXPERIMENTAL_REMOTING
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_hal_driver_defaults" class="md-nav__link">
-    IREE_HAL_DRIVER_DEFAULTS
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_hal_driver_" class="md-nav__link">
-    IREE_HAL_DRIVER_*
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_target_backend_defaults" class="md-nav__link">
-    IREE_TARGET_BACKEND_DEFAULTS
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_target_backend_" class="md-nav__link">
-    IREE_TARGET_BACKEND_*
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_input_" class="md-nav__link">
-    IREE_INPUT_*
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_output_format_c" class="md-nav__link">
-    IREE_OUTPUT_FORMAT_C
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_dev_mode" class="md-nav__link">
-    IREE_DEV_MODE
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_enable_lld" class="md-nav__link">
-    IREE_ENABLE_LLD
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_enable_asan" class="md-nav__link">
-    IREE_ENABLE_ASAN
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_enable_msan" class="md-nav__link">
-    IREE_ENABLE_MSAN
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_enable_tsan" class="md-nav__link">
-    IREE_ENABLE_TSAN
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_enable_ubsan" class="md-nav__link">
-    IREE_ENABLE_UBSAN
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#cross-compilation" class="md-nav__link">
-    Cross-compilation
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -2397,7 +2156,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../cmake-with-ccache/" class="md-nav__link">
+      <a href="../../building/cmake-with-ccache/" class="md-nav__link">
         
   
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M11.769.066.067 23.206l12.76-10.843zm11.438 23.868L7.471 17.587 0 23.934zm.793-.198L12.298.463l1.719 19.24zM12.893 12.959l-5.025 4.298 5.62 2.248z"/></svg>
@@ -2809,6 +2568,8 @@
                 
   
   
+    
+  
   
     
     
@@ -2829,15 +2590,13 @@
     
       
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
         
         
-          
-        
-        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_6" checked>
         
           <label class="md-nav__link" for="__nav_5_6" id="__nav_5_6_label" tabindex="0">
             
@@ -2850,7 +2609,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_6_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_6_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_5_6">
             <span class="md-nav__icon md-icon"></span>
             Design docs
@@ -2863,7 +2622,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../design-docs/design-roadmap/" class="md-nav__link">
+      <a href="../design-roadmap/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2883,7 +2642,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../design-docs/function-abi/" class="md-nav__link">
+      <a href="../function-abi/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2903,7 +2662,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../design-docs/invocation-execution-model/" class="md-nav__link">
+      <a href="../invocation-execution-model/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2923,7 +2682,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../design-docs/cuda-hal-driver/" class="md-nav__link">
+      <a href="../cuda-hal-driver/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -2941,9 +2700,29 @@
                 
   
   
+    
   
-    <li class="md-nav__item">
-      <a href="../../design-docs/hip-hal-driver/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  <span class="md-ellipsis">
+    HIP HAL driver
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   <span class="md-ellipsis">
@@ -2952,6 +2731,168 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overall-design-choices" class="md-nav__link">
+    Overall design choices
+  </a>
+  
+    <nav class="md-nav" aria-label="Overall design choices">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#hip-driver-vs-runtime-api" class="md-nav__link">
+    HIP driver vs runtime API
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#gpu-objects" class="md-nav__link">
+    GPU Objects
+  </a>
+  
+    <nav class="md-nav" aria-label="GPU Objects">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#driver" class="md-nav__link">
+    Driver
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#device" class="md-nav__link">
+    Device
+  </a>
+  
+    <nav class="md-nav" aria-label="Device">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#async-allocation" class="md-nav__link">
+    Async allocation
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#command-buffer" class="md-nav__link">
+    Command buffer
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#allocator" class="md-nav__link">
+    Allocator
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#buffer" class="md-nav__link">
+    Buffer
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#executable" class="md-nav__link">
+    Executable
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#synchronization" class="md-nav__link">
+    Synchronization
+  </a>
+  
+    <nav class="md-nav" aria-label="Synchronization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#event" class="md-nav__link">
+    Event
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#semaphore" class="md-nav__link">
+    Semaphore
+  </a>
+  
+    <nav class="md-nav" aria-label="Semaphore">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#hipevent_t-capabilities" class="md-nav__link">
+    hipEvent_t capabilities
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#signal-to-wait-analysis" class="md-nav__link">
+    Signal to wait analysis
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#data-structures" class="md-nav__link">
+    Data structures
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -2963,7 +2904,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../design-docs/metal-hal-driver/" class="md-nav__link">
+      <a href="../metal-hal-driver/" class="md-nav__link">
         
   
   <span class="md-ellipsis">
@@ -3429,6 +3370,8 @@
             
             
               
+                
+              
               <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
                 <div class="md-sidebar__scrollwrap">
                   <div class="md-sidebar__inner">
@@ -3448,23 +3391,16 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#frequently-used-cmake-options" class="md-nav__link">
-    Frequently-used CMake options
+  <a href="#overall-design-choices" class="md-nav__link">
+    Overall design choices
   </a>
   
-    <nav class="md-nav" aria-label="Frequently-used CMake options">
+    <nav class="md-nav" aria-label="Overall design choices">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#cmake_build_type" class="md-nav__link">
-    CMAKE_BUILD_TYPE
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#cmake_lang_compiler" class="md-nav__link">
-    CMAKE_&lt;LANG&gt;_COMPILER
+  <a href="#hip-driver-vs-runtime-api" class="md-nav__link">
+    HIP driver vs runtime API
   </a>
   
 </li>
@@ -3475,163 +3411,64 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#iree-specific-cmake-options" class="md-nav__link">
-    IREE-specific CMake options
+  <a href="#gpu-objects" class="md-nav__link">
+    GPU Objects
   </a>
   
-    <nav class="md-nav" aria-label="IREE-specific CMake options">
+    <nav class="md-nav" aria-label="GPU Objects">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#iree_enable_runtime_tracing" class="md-nav__link">
-    IREE_ENABLE_RUNTIME_TRACING
+  <a href="#driver" class="md-nav__link">
+    Driver
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#iree_enable_compiler_tracing" class="md-nav__link">
-    IREE_ENABLE_COMPILER_TRACING
+  <a href="#device" class="md-nav__link">
+    Device
+  </a>
+  
+    <nav class="md-nav" aria-label="Device">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#async-allocation" class="md-nav__link">
+    Async allocation
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#command-buffer" class="md-nav__link">
+    Command buffer
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#iree_build_compiler" class="md-nav__link">
-    IREE_BUILD_COMPILER
+  <a href="#allocator" class="md-nav__link">
+    Allocator
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#iree_build_tests" class="md-nav__link">
-    IREE_BUILD_TESTS
+  <a href="#buffer" class="md-nav__link">
+    Buffer
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#iree_build_docs" class="md-nav__link">
-    IREE_BUILD_DOCS
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_build_samples" class="md-nav__link">
-    IREE_BUILD_SAMPLES
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_build_python_bindings" class="md-nav__link">
-    IREE_BUILD_PYTHON_BINDINGS
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_build_bindings_tflite" class="md-nav__link">
-    IREE_BUILD_BINDINGS_TFLITE
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_build_bindings_tflite_java" class="md-nav__link">
-    IREE_BUILD_BINDINGS_TFLITE_JAVA
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_build_experimental_remoting" class="md-nav__link">
-    IREE_BUILD_EXPERIMENTAL_REMOTING
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_hal_driver_defaults" class="md-nav__link">
-    IREE_HAL_DRIVER_DEFAULTS
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_hal_driver_" class="md-nav__link">
-    IREE_HAL_DRIVER_*
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_target_backend_defaults" class="md-nav__link">
-    IREE_TARGET_BACKEND_DEFAULTS
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_target_backend_" class="md-nav__link">
-    IREE_TARGET_BACKEND_*
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_input_" class="md-nav__link">
-    IREE_INPUT_*
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_output_format_c" class="md-nav__link">
-    IREE_OUTPUT_FORMAT_C
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_dev_mode" class="md-nav__link">
-    IREE_DEV_MODE
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_enable_lld" class="md-nav__link">
-    IREE_ENABLE_LLD
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_enable_asan" class="md-nav__link">
-    IREE_ENABLE_ASAN
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_enable_msan" class="md-nav__link">
-    IREE_ENABLE_MSAN
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_enable_tsan" class="md-nav__link">
-    IREE_ENABLE_TSAN
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#iree_enable_ubsan" class="md-nav__link">
-    IREE_ENABLE_UBSAN
+  <a href="#executable" class="md-nav__link">
+    Executable
   </a>
   
 </li>
@@ -3642,9 +3479,56 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#cross-compilation" class="md-nav__link">
-    Cross-compilation
+  <a href="#synchronization" class="md-nav__link">
+    Synchronization
   </a>
+  
+    <nav class="md-nav" aria-label="Synchronization">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#event" class="md-nav__link">
+    Event
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#semaphore" class="md-nav__link">
+    Semaphore
+  </a>
+  
+    <nav class="md-nav" aria-label="Semaphore">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#hipevent_t-capabilities" class="md-nav__link">
+    hipEvent_t capabilities
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#signal-to-wait-analysis" class="md-nav__link">
+    Signal to wait analysis
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#data-structures" class="md-nav__link">
+    Data structures
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -3661,9 +3545,28 @@
               <article class="md-content__inner md-typeset">
                 
                   
+  
+  
+
+<nav class="md-tags" hidden>
+  
+    
+    
+    
+      <a href="../../../community/tags/#gpu" class="md-tag">GPU</a>
+    
+  
+    
+    
+    
+      <a href="../../../community/tags/#hip" class="md-tag">HIP</a>
+    
+  
+</nav>
+
 
   
-    <a href="https://github.com/openxla/iree/blob/main/docs/website/docs/developers/building/cmake-options.md" title="Edit this page" class="md-content__button md-icon">
+    <a href="https://github.com/openxla/iree/blob/main/docs/website/docs/developers/design-docs/hip-hal-driver.md" title="Edit this page" class="md-content__button md-icon">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 18c.56 0 1 .44 1 1s-.44 1-1 1-1-.44-1-1 .44-1 1-1m0-3c-2.73 0-5.06 1.66-6 4 .94 2.34 3.27 4 6 4s5.06-1.66 6-4c-.94-2.34-3.27-4-6-4m0 6.5a2.5 2.5 0 0 1-2.5-2.5 2.5 2.5 0 0 1 2.5-2.5 2.5 2.5 0 0 1 2.5 2.5 2.5 2.5 0 0 1-2.5 2.5M9.27 20H6V4h7v5h5v4.07c.7.08 1.36.25 2 .49V8l-6-6H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h4.5a8.15 8.15 0 0 1-1.23-2Z"/></svg>
     </a>
@@ -3671,151 +3574,211 @@
   
 
 
-<h1 id="cmake-options">CMake options<a class="headerlink" href="#cmake-options" title="Permanent link">link</a></h1>
-<h2 id="frequently-used-cmake-options">Frequently-used CMake options<a class="headerlink" href="#frequently-used-cmake-options" title="Permanent link">link</a></h2>
-<h3 id="cmake_build_type"><code>CMAKE_BUILD_TYPE</code><a class="headerlink" href="#cmake_build_type" title="Permanent link">link</a></h3>
+<h1 id="hip-hal-driver">HIP HAL driver<a class="headerlink" href="#hip-hal-driver" title="Permanent link">link</a></h1>
+<p>This document lists technical details regarding the HIP implemenation of
+IREE's Hardware Abstraction Layer, called a HIP HAL driver.</p>
+<p>IREE provides a <a href="https://github.com/openxla/iree/tree/main/runtime/src/iree/hal">Hardware Abstraction Layer (HAL)</a> as a common
+interface to different compute accelerators. IREE HAL's design draws inspiration
+from modern GPU architecture and APIs; so implementing a HAL driver using HIP
+is mostly straightforward; though there are places we need emulation given no
+direct mapping concepts or mechanisms. HIP HAL driver draws inspiration from the
+CUDA HAL driver and the code structure is based off of that implementation.</p>
+<h2 id="overall-design-choices">Overall design choices<a class="headerlink" href="#overall-design-choices" title="Permanent link">link</a></h2>
+<h3 id="hip-driver-vs-runtime-api">HIP driver vs runtime API<a class="headerlink" href="#hip-driver-vs-runtime-api" title="Permanent link">link</a></h3>
+<p>IREE HAL's design draws inspiration from modern GPU APIs--it provides explicit
+control of low-level GPU objects. The compiler is expected to plan the object
+lifetime and schedule workload and synchronization in an optimized way; IREE
+HAL implementation and the underlying GPU driver stack is expected to be a thin
+layer without much smarts and magic.</p>
+<p>Unlike CUDA, HIP doesn't provide two separate API's with the same functionality
+in the name of driver and runtime. Instead it extends the HIP API with Modules
+and Ctx control API's that the CUDA driver API's exclusively offer.At runtime
+the HIP HAL driver will load the <code>libamdhip64.so</code>/<code>amdhip64.dll</code> library dynamically.</p>
+<h2 id="gpu-objects">GPU Objects<a class="headerlink" href="#gpu-objects" title="Permanent link">link</a></h2>
+<h3 id="driver">Driver<a class="headerlink" href="#driver" title="Permanent link">link</a></h3>
+<p>There is no direct HIP construct that map to the IREE HAL <code>iree_hal_driver_t</code>
+abstraction. We use it to hold the dynamic symbols loaded for all devices,
+and device enumeration and creation.</p>
+<h3 id="device">Device<a class="headerlink" href="#device" title="Permanent link">link</a></h3>
+<p><code>iree_hal_hip_device_t</code> implements <a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/device.h"><code>iree_hal_device_t</code></a> to provide
+the interface to HIP GPU device by wrapping a <code>hipDevice_t</code>.
+For each device, right now we create two <code>hipStream_t</code>s--one for issuing commands
+for memory allocation and kernel lauches as instructed by the program; the other
+for issue host callback functions after dispatched command buffers completes.
+See synchronization section regarding the details.</p>
+<h4 id="async-allocation">Async allocation<a class="headerlink" href="#async-allocation" title="Permanent link">link</a></h4>
+<p>The HIP HAL drivers supports async allocation
+(<code>iree_hal_device_queue_alloca()</code> and <code>iree_hal_device_queue_dealloca()</code>)
+via HIP stream ordered memory allocation.</p>
+<p>The <code>async_allocations</code> in the <code>iree_hal_hip_device_params_t</code> struct allows
+to enable this feature.</p>
+<h3 id="command-buffer">Command buffer<a class="headerlink" href="#command-buffer" title="Permanent link">link</a></h3>
+<p><a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/command_buffer.h"><code>iree_hal_command_buffer_t</code></a> is a recording of commands to
+issue to the GPU; when the command buffer is submitted to the device it's then
+actually executed on the GPU asynchronously.</p>
+<p>Two implementations of <code>iree_hal_command_buffer_t</code> exist in the HIP HAL
+driver--one backed by <code>hipGraph_t</code> and the other backed by <code>hipStream_t</code>.</p>
+<p><code>hipGraph_t</code> conceptually matches <code>iree_hal_command_buffer_t</code> better given it's
+a recording of commands to issue to the GPU. Also using the <code>hipGraph_t</code> API allows
+to easily encode fine grain dependencies between dispatch without having to
+create multiple streams. Therefore, the <code>hipGraph_t</code>-backed implementation is a
+more natural one.
+Though note that <code>hipGraph_t</code> API is meant to be used for recording once and
+replaying multiple times and there may be a performance penalty to using
+<code>hipGraph_t</code> API for one-shot command buffer.</p>
+<p>The <code>hipStream_t</code>-backed implementation just issues commands directly to a
+<code>hipStream_t</code> when recording. Commands issued to <code>hipStream_t</code> can be immediately
+sent to the GPU for execution; there is no recording and replaying separation.
+In order to match the recording semantics of <code>iree_hal_command_buffer_t</code>, to
+use the <code>hipStream_t</code>-backed command buffer, we need to first record the command
+buffer into an in-memory
+<a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/utils/deferred_command_buffer.h"><code>iree_hal_deferred_command_buffer_t</code></a>, and then
+when applying the command buffer, we create a new <code>hipStream_t</code>-backed
+implementation.</p>
+<p>The <code>command_buffer_mode</code> in the <code>iree_hal_hips_device_params_t</code> struct allows
+to select which implementation to use.</p>
+<h3 id="allocator">Allocator<a class="headerlink" href="#allocator" title="Permanent link">link</a></h3>
+<p>The allocator will forward allocation requests to <code>hipHostMalloc()</code> for host
+local memory, <code>hipMalloc()</code> for device local and host invisible memory, and
+<code>hipMallocManaged()</code> for device local and host visible memory.</p>
+<h3 id="buffer">Buffer<a class="headerlink" href="#buffer" title="Permanent link">link</a></h3>
+<p>HIP buffers are represented either as a host pointer or a device pointer of
+type <code>hipDeviceptr_t</code>.</p>
+<h3 id="executable">Executable<a class="headerlink" href="#executable" title="Permanent link">link</a></h3>
+<p><a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/executable.h"><code>iree_hal_executable_t</code></a> maps naturally to <code>hipModule_t</code>.</p>
+<p>The compiler generates a FlatBuffer containing a HSACO image as well as a
+list of entry point functions and their associated metadata (names,
+workgroup size, dynamic shared memory size, etc.). At runtime, the HIP HAL
+driver loads the HSACO image and creates <code>hipFunction_t</code>s out of it for various
+entry points.</p>
+<h2 id="synchronization">Synchronization<a class="headerlink" href="#synchronization" title="Permanent link">link</a></h2>
+<h3 id="event">Event<a class="headerlink" href="#event" title="Permanent link">link</a></h3>
+<p><a href="https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/event.h"><code>iree_hal_event_t</code></a> right now is not used in the compiler so it's
+not yet implemented in the HIP HAL driver.</p>
+<h3 id="semaphore">Semaphore<a class="headerlink" href="#semaphore" title="Permanent link">link</a></h3>
+<p>The IREE HAL uses semaphores to synchronize work between host CPU threads and
+device GPU streams. It's a unified primitive that covers all directions--host
+to host, host to device, device to host, and device to device, and allows
+flexible signal and wait ordering--signal before wait, or wait before signal.
+There is no limit on the number of waits of the same value too.</p>
+<p>The core state of a HAL semaphore consists of a monotonically increasing 64-bit
+integer value, which forms a timeline--signaling the semaphore to a larger
+value advances the timeline and unblocks work waiting on some earlier values.
+The semantics closely mirrors
+<a href="https://www.khronos.org/blog/vulkan-timeline-semaphores">Vulkan timeline semaphore</a>.</p>
+<p>In HIP, there is no direct equivalent primitives providing all the capabilities
+needed by the HAL semaphore abstraction. Therefore, to implement the support,
+we need to leverage multiple native CPU or HIP primitives under the hood.</p>
+<h4 id="hipevent_t-capabilities"><code>hipEvent_t</code> capabilities<a class="headerlink" href="#hipevent_t-capabilities" title="Permanent link">link</a></h4>
+<p>The main synchronization mechanism is HIP event--<code>hipEvent_t</code>.
+As a functionality and integration baseline, we use <code>hipEvent_t</code> to implement the
+IREE HAL semaphore abstraction.</p>
+<p><code>hipEvent_t</code> natively supports the following capabilities:</p>
 <ul>
-<li>type: STRING</li>
+<li>State: binary; either unsignaled or signaled. There can exist multiple
+  waits (e.g., via <code>hipEventSynchronize()</code> or <code>hipGraphAddEventWaitNode()</code>) for
+  the same <code>hipEvent_t</code> signal (e.g., via <code>hipEventRecord()</code> or
+  <code>hipGraphAddEventRecordNode()</code>).</li>
+<li>Ordering: must be signal before wait. Waiting before signal would mean
+  waiting an empty set of work, or previously recorded work.</li>
+<li>Direction: device to device, device to host.</li>
 </ul>
-<p>Sets the build type. Possible values are <code>Release</code>, <code>Debug</code>,
-<code>RelWithDebInfo</code> and <code>MinSizeRel</code>. If unset, build type is set to <code>Release</code>.</p>
-<h3 id="cmake_lang_compiler"><code>CMAKE_&lt;LANG&gt;_COMPILER</code><a class="headerlink" href="#cmake_lang_compiler" title="Permanent link">link</a></h3>
+<p>We need to fill the remaining capability gaps. Before going into details,
+the overall approach would be to:</p>
 <ul>
-<li>type: STRING</li>
+<li>State: we need a 64-bit integer value timeline. Given the binary state of
+  a <code>hipEvent_t</code>, each <code>hipEvent_t</code> would just be a "timepoint" on the timeline.</li>
+<li>Ordering: we need to defer releasing the workload to the GPU until the
+  semaphore waits are reached on the host, or we can have some device
+  <code>hipEvent_t</code> to wait on.</li>
+<li>Direction: host to host and host to device is missing; we can support that
+  with host synchronization mechanisms.</li>
 </ul>
-<p>This is the command that will be used as the <code>&lt;LANG&gt;</code> compiler, which are <code>C</code>
-and <code>CXX</code> in IREE. These variables are set to compile IREE with <code>clang</code> or
-rather <code>clang++</code>. Once set, these variables can not be changed.</p>
-<h2 id="iree-specific-cmake-options">IREE-specific CMake options<a class="headerlink" href="#iree-specific-cmake-options" title="Permanent link">link</a></h2>
-<p>This gives a brief explanation of IREE specific CMake options and variables.</p>
-<h3 id="iree_enable_runtime_tracing"><code>IREE_ENABLE_RUNTIME_TRACING</code><a class="headerlink" href="#iree_enable_runtime_tracing" title="Permanent link">link</a></h3>
+<h4 id="signal-to-wait-analysis">Signal to wait analysis<a class="headerlink" href="#signal-to-wait-analysis" title="Permanent link">link</a></h4>
+<p>Concretely, for a given HAL semaphore, looking at the four directions:</p>
+<h5 id="cpu-signal">CPU signal<a class="headerlink" href="#cpu-signal" title="Permanent link">link</a></h5>
+<p>A CPU thread signals the semaphore timeline to a new value.</p>
+<p>If there are CPU waits, it is purely on the CPU side. We just need to use common
+CPU notification mechanisms. In IREE we have <code>iree_event_t</code> wrapping various
+low-level OS primitives for it. So we can just use that to represent a wait
+timepoint. We need to keep track of all CPU wait timepoints in the timeline.
+After a new signaled value, go through the timeline and notify all those waiting
+on earlier values.</p>
+<p>If there are GPU waits, given that there are no way we can signal a <code>hipEvent_t</code>
+on CPU, one way to handle this is to cache and defer the submission batches by
+ourselves until CPU signals past the desired value. To support this, we would
+need to implement a deferred/pending actions queue.</p>
+<h5 id="gpu-signal">GPU signal<a class="headerlink" href="#gpu-signal" title="Permanent link">link</a></h5>
+<p>GPU signals can only be through a <code>hipEvent_t</code> object, which has a binary state.
+We need to advance the timeline too. One way is to use <code>hipLaunchHostFunc()</code>
+to advance from the CPU side with <code>iree_hal_semaphore_list_signal()</code>.
+This additionally would mean we can reuse the logic form CPU signaling to
+unblock CPU waits.</p>
+<p>After advancing the timeline from the CPU side with <code>hipLaunchHostFunc()</code>,
+we can release more workload from the deferred/pending actions queue to the GPU.
+Though, per the documentation of <code>hipLaunchHostFunc()</code>, "the host function must
+not make any HIP API calls." So we cannot do that directly inside
+<code>hipLaunchHostFunc()</code>; we need to notify another separate thread to call HIP
+APIs to push more work to the GPU. So the deferred/pending action queue should
+have an associcated thread.</p>
+<p>For GPU waits, we can also leverage the same logic--using CPU signaling to
+unblock deferred GPU queue actions. Though this is performant, given that
+the CPU is involved for GPU internal synchronization. We want to use <code>hipEvent_t</code>
+instead:</p>
 <ul>
-<li>type: BOOL</li>
+<li>We keep track of all GPU signals in the timeline. Once we see a GPU wait
+  request, try to scan the timeline to find a GPU signal that advances the
+  timeline past the desired value, and use that for waiting instead. (This
+  actually applies to CPU waits too, and it's an optimization over pure
+  CPU side <code>iree_event_t</code> polling.)</li>
+<li>We may not see GPU signal before seeing GPU wait requests, then we can also
+  keep track of all GPU waits in the timeline. Later once see either a CPU
+  signal or GPU signal advancing past the waited value, we can handle them
+  accordingly--submitting immediately or associating the <code>hipEvent_t</code>.
+  This would also guarantee the requirement of <code>hipEvent_t</code>--recording should
+  happen before waiting.</li>
+<li>We can use the same <code>hipEvent_t</code> to unblock multiple GPU waits. That's allowed,
+  though it would mean we need to be careful regarding <code>hipEvent_t</code> lifetime
+  management. Here we can use reference counting to see how many timepoints
+  are using it and automatically return to a pool once done.</li>
 </ul>
-<p>Enables instrumented runtime tracing. Defaults to <code>OFF</code>.</p>
-<h3 id="iree_enable_compiler_tracing"><code>IREE_ENABLE_COMPILER_TRACING</code><a class="headerlink" href="#iree_enable_compiler_tracing" title="Permanent link">link</a></h3>
+<p>Another problem is that per the <code>hipLaunchHostFunc()</code> doc, "the function will
+be called after currently enqueued work and will block work added after it."
+We don't want the blocking behavior involving host. So we can use a dedicated
+<code>hipStream_t</code> for launching the host function, waiting on the <code>hipEvent_t</code> from the
+original stream too. We can also handle resource deallocation together there.</p>
+<h4 id="data-structures">Data structures<a class="headerlink" href="#data-structures" title="Permanent link">link</a></h4>
+<p>To summarize, we need the following data structures to implement HAL semaphore:</p>
 <ul>
-<li>type: BOOL</li>
+<li><code>iree_event_t</code>: CPU notification mechanism wrapping low-level OS primitives.
+  Used by host wait timepoints.</li>
+<li><code>iree_event_pool_t</code>: a pool for CPU <code>iree_event_t</code> objects to recycle.</li>
+<li><code>iree_hal_hip_event_t</code>: GPU notification mechanism wrapping a <code>hipEvent_t</code> and
+  a reference count. Used by device signal and wait timepoints. Associates with
+  a <code>iree_hal_hip_event_pool_t</code> pool--returns to the pool directly on once
+  reference count goes to 0.</li>
+<li><code>iree_hal_hip_event_pool_t</code>: a pool for GPU <code>iree_hal_hip_event_t</code> objects
+  to recycle.</li>
+<li><code>iree_hal_hip_timepoint_t</code>: an object that wraps a CPU <code>iree_event_t</code> or
+  GPU <code>iree_hal_hip_event_t</code> to represent wait/signal of a timepoint on a
+  timeline.</li>
+<li><code>iree_hal_hip_timepoint_pool_t</code>: a pool for <code>iree_hal_hip_timepoint_t</code>
+  objects to recycle. This pool builds upon the CPU and GPU event pool--it
+  acquires CPU/GPU event objects there.</li>
+<li><code>iree_hal_hip_timeline_semaphore_t</code>: contains a list of CPU wait and GPU
+  wait/signal timepoints.</li>
+<li><code>iree_hal_hip_queue_action_t</code>: a pending queue action (kernel launch or
+  stream-ordered allocation).</li>
+<li><code>iree_hal_hip_pending_queue_actions_t</code>: a data structure to manage pending
+  queue actions. It provides APIs to enqueue actions, and advance the queue on
+  demand--queue actions are released to the GPU when all their wait semaphores
+  are signaled past the desired value, or we can have a <code>hipEvent_t</code> object already
+  recorded to some <code>hipStream_t</code> to wait on.</li>
 </ul>
-<p>Enables instrumented compiler tracing. This requires that
-<code>IREE_ENABLE_RUNTIME_TRACING</code> also be set. Defaults to <code>OFF</code>.</p>
-<h3 id="iree_build_compiler"><code>IREE_BUILD_COMPILER</code><a class="headerlink" href="#iree_build_compiler" title="Permanent link">link</a></h3>
-<ul>
-<li>type: BOOL</li>
-</ul>
-<p>Builds the IREE compiler. Defaults to <code>ON</code>.</p>
-<h3 id="iree_build_tests"><code>IREE_BUILD_TESTS</code><a class="headerlink" href="#iree_build_tests" title="Permanent link">link</a></h3>
-<ul>
-<li>type: BOOL</li>
-</ul>
-<p>Builds IREE unit tests. Defaults to <code>ON</code>.</p>
-<h3 id="iree_build_docs"><code>IREE_BUILD_DOCS</code><a class="headerlink" href="#iree_build_docs" title="Permanent link">link</a></h3>
-<ul>
-<li>type: BOOL</li>
-</ul>
-<p>Builds IREE documentation files. Defaults to <code>OFF</code>.</p>
-<h3 id="iree_build_samples"><code>IREE_BUILD_SAMPLES</code><a class="headerlink" href="#iree_build_samples" title="Permanent link">link</a></h3>
-<ul>
-<li>type: BOOL</li>
-</ul>
-<p>Builds IREE sample projects. Defaults to <code>ON</code>.</p>
-<h3 id="iree_build_python_bindings"><code>IREE_BUILD_PYTHON_BINDINGS</code><a class="headerlink" href="#iree_build_python_bindings" title="Permanent link">link</a></h3>
-<ul>
-<li>type: BOOL</li>
-</ul>
-<p>Builds the IREE python bindings. Defaults to <code>OFF</code>.</p>
-<h3 id="iree_build_bindings_tflite"><code>IREE_BUILD_BINDINGS_TFLITE</code><a class="headerlink" href="#iree_build_bindings_tflite" title="Permanent link">link</a></h3>
-<ul>
-<li>type: BOOL</li>
-</ul>
-<p>Builds the IREE TFLite C API compatibility shim. Defaults to <code>ON</code>.</p>
-<h3 id="iree_build_bindings_tflite_java"><code>IREE_BUILD_BINDINGS_TFLITE_JAVA</code><a class="headerlink" href="#iree_build_bindings_tflite_java" title="Permanent link">link</a></h3>
-<ul>
-<li>type: BOOL</li>
-</ul>
-<p>Builds the IREE TFLite Java bindings with the C API compatibility shim.
-Defaults to <code>ON</code>.</p>
-<h3 id="iree_build_experimental_remoting"><code>IREE_BUILD_EXPERIMENTAL_REMOTING</code><a class="headerlink" href="#iree_build_experimental_remoting" title="Permanent link">link</a></h3>
-<ul>
-<li>type: BOOL</li>
-</ul>
-<p>Builds experimental remoting component. Defaults to <code>OFF</code>.</p>
-<h3 id="iree_hal_driver_defaults"><code>IREE_HAL_DRIVER_DEFAULTS</code><a class="headerlink" href="#iree_hal_driver_defaults" title="Permanent link">link</a></h3>
-<ul>
-<li>type: BOOL</li>
-</ul>
-<p>Default setting for each <code>IREE_HAL_DRIVER_*</code> option.</p>
-<h3 id="iree_hal_driver_"><code>IREE_HAL_DRIVER_*</code><a class="headerlink" href="#iree_hal_driver_" title="Permanent link">link</a></h3>
-<ul>
-<li>type: BOOL</li>
-</ul>
-<p>Individual options enabling the build for each runtime HAL driver.</p>
-<h3 id="iree_target_backend_defaults"><code>IREE_TARGET_BACKEND_DEFAULTS</code><a class="headerlink" href="#iree_target_backend_defaults" title="Permanent link">link</a></h3>
-<ul>
-<li>type: BOOL</li>
-</ul>
-<p>Default setting for each <code>IREE_TARGET_BACKEND_*</code> option.</p>
-<h3 id="iree_target_backend_"><code>IREE_TARGET_BACKEND_*</code><a class="headerlink" href="#iree_target_backend_" title="Permanent link">link</a></h3>
-<ul>
-<li>type: BOOL</li>
-</ul>
-<p>Individual options enabling the build for each compiler target backend.</p>
-<h3 id="iree_input_"><code>IREE_INPUT_*</code><a class="headerlink" href="#iree_input_" title="Permanent link">link</a></h3>
-<ul>
-<li>type: BOOL</li>
-</ul>
-<p>Individual options enabling each set of input dialects.</p>
-<h3 id="iree_output_format_c"><code>IREE_OUTPUT_FORMAT_C</code><a class="headerlink" href="#iree_output_format_c" title="Permanent link">link</a></h3>
-<ul>
-<li>type: BOOL</li>
-</ul>
-<p>Enables the vm-c compiler output format, using MLIR EmitC. Defaults to <code>ON</code>.</p>
-<h3 id="iree_dev_mode"><code>IREE_DEV_MODE</code><a class="headerlink" href="#iree_dev_mode" title="Permanent link">link</a></h3>
-<ul>
-<li>type: BOOL</li>
-</ul>
-<p>Configure settings to optimize for IREE development (as opposed to CI or
-release). Defaults to <code>OFF</code>. For example, this will downgrade some compiler
-diagnostics from errors to warnings.</p>
-<h3 id="iree_enable_lld"><code>IREE_ENABLE_LLD</code><a class="headerlink" href="#iree_enable_lld" title="Permanent link">link</a></h3>
-<ul>
-<li>type: BOOL</li>
-</ul>
-<p>Use lld when linking. Defaults to <code>OFF</code>. This option is equivalent to
-<code>-DIREE_USE_LINKER=lld</code>. The option <code>IREE_ENABLE_LLD</code> and <code>IREE_USE_LINKER</code> can
-not be set at the same time.</p>
-<h3 id="iree_enable_asan"><code>IREE_ENABLE_ASAN</code><a class="headerlink" href="#iree_enable_asan" title="Permanent link">link</a></h3>
-<ul>
-<li>type: BOOL</li>
-</ul>
-<p>Enable <a href="https://clang.llvm.org/docs/AddressSanitizer.html">address sanitizer</a> if
-the current build type is Debug and the compiler supports it.</p>
-<h3 id="iree_enable_msan"><code>IREE_ENABLE_MSAN</code><a class="headerlink" href="#iree_enable_msan" title="Permanent link">link</a></h3>
-<ul>
-<li>type: BOOL</li>
-</ul>
-<p>Enable <a href="https://clang.llvm.org/docs/MemorySanitizer.html">memory sanitizer</a> if
-the current build type is Debug and the compiler supports it.</p>
-<h3 id="iree_enable_tsan"><code>IREE_ENABLE_TSAN</code><a class="headerlink" href="#iree_enable_tsan" title="Permanent link">link</a></h3>
-<ul>
-<li>type: BOOL</li>
-</ul>
-<p>Enable <a href="https://clang.llvm.org/docs/ThreadSanitizer.html">thread sanitizer</a> if
-the current build type is Debug and the compiler supports it.</p>
-<h3 id="iree_enable_ubsan"><code>IREE_ENABLE_UBSAN</code><a class="headerlink" href="#iree_enable_ubsan" title="Permanent link">link</a></h3>
-<ul>
-<li>type: BOOL</li>
-</ul>
-<p>Enable <a href="https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html">undefiend behavior sanitizer</a>
-if the current build type is Debug and the compiler supports it.</p>
-<h2 id="cross-compilation">Cross-compilation<a class="headerlink" href="#cross-compilation" title="Permanent link">link</a></h2>
-<p>When cross compiling (using a toolchain file like
-<a href="https://android.googlesource.com/platform/ndk/+/main/build/cmake/android.toolchain.cmake"><code>android.toolchain.cmake</code></a>),
-first build and install IREE's tools for your host configuration, then use the
-<code>IREE_HOST_BIN_DIR</code> CMake option to point the cross compiled build at the
-host tools.</p>
 
 
+
+  
 
 
 
