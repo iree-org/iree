@@ -16,5 +16,5 @@ int64_t getTargetSharedMemoryLimit(FunctionOpInterface entryPoint);
 
 LogicalResult initGPULaunchConfig(ModuleOp moduleOp);
 
-}  // namespace mlir::iree_compiler
-#endif  // IREE_COMPILER_CODEGEN_LLVMGPU_KERNELCONFIG_H_
+} // namespace mlir::iree_compiler
+#endif // IREE_COMPILER_CODEGEN_LLVMGPU_KERNELCONFIG_H_
