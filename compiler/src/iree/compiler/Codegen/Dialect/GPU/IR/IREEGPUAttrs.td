@@ -87,14 +87,12 @@ class IREEGPU_MmaEnumAttr<EnumAttrInfo enumInfo, string name = "">
 
 def MFMA_F16_16x16x16_F32 : I32EnumAttrCase<"MFMA_F16_16x16x16_F32", 0>;
 def MFMA_F16_32x32x8_F32 : I32EnumAttrCase<"MFMA_F16_32x32x8_F32", 1>;
-def WMMA_F16_16x16x16_F16 : I32EnumAttrCase<"WMMA_F16_16x16x16_F16", 2>;
-def WMMA_F16_16x16x16_F32 : I32EnumAttrCase<"WMMA_F16_16x16x16_F32", 3>;
+def WMMA_F16_16x16x16_F32 : I32EnumAttrCase<"WMMA_F16_16x16x16_F32", 2>;
 
 def IREEGPU_MMAIntrinsic : IREEGPU_I32MmaEnumAttr<"MMAIntrinsic",
     "Descriptor for different MFMA operations", [
       MFMA_F16_16x16x16_F32,
       MFMA_F16_32x32x8_F32,
-      WMMA_F16_16x16x16_F16,
       WMMA_F16_16x16x16_F32
     ]>;
 
