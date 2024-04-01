@@ -251,26 +251,26 @@ def get_rocm_test_compilation_infos(compilation_info_id: CompilationInfoId):
     assert compilation_info_id == CompilationInfoId.LLVMGPUVectorDistribute
 
     schedules = [
-        MMASchedule("F16_16x16x16_F32", 1, 1, 1, 1, 1),
-        MMASchedule("F16_16x16x16_F32", 1, 1, 1, 1, 2),
-        MMASchedule("F16_16x16x16_F32", 1, 1, 1, 2, 1),
-        MMASchedule("F16_16x16x16_F32", 1, 1, 2, 1, 1),
-        MMASchedule("F16_16x16x16_F32", 2, 2, 1, 1, 1),
-        MMASchedule("F16_16x16x16_F32", 2, 4, 2, 1, 2),
-        MMASchedule("F16_16x16x16_F32", 4, 2, 4, 2, 2),
-        MMASchedule("F16_32x32x8_F32", 1, 1, 1, 2, 2),
-        MMASchedule("F16_32x32x8_F32", 2, 2, 1, 1, 1),
-        MMASchedule("F16_32x32x8_F32", 1, 4, 2, 1, 2),
-        MMASchedule("F16_32x32x8_F32", 4, 2, 1, 2, 4),
+        MMASchedule("MFMA_F16_16x16x16_F32", 1, 1, 1, 1, 1),
+        MMASchedule("MFMA_F16_16x16x16_F32", 1, 1, 1, 1, 2),
+        MMASchedule("MFMA_F16_16x16x16_F32", 1, 1, 1, 2, 1),
+        MMASchedule("MFMA_F16_16x16x16_F32", 1, 1, 2, 1, 1),
+        MMASchedule("MFMA_F16_16x16x16_F32", 2, 2, 1, 1, 1),
+        MMASchedule("MFMA_F16_16x16x16_F32", 2, 4, 2, 1, 2),
+        MMASchedule("MFMA_F16_16x16x16_F32", 4, 2, 4, 2, 2),
+        MMASchedule("MFMA_F16_32x32x8_F32", 1, 1, 1, 2, 2),
+        MMASchedule("MFMA_F16_32x32x8_F32", 2, 2, 1, 1, 1),
+        MMASchedule("MFMA_F16_32x32x8_F32", 1, 4, 2, 1, 2),
+        MMASchedule("MFMA_F16_32x32x8_F32", 4, 2, 1, 2, 4),
     ]
 
     infos = []
     for schedule in schedules:
-        if schedule.intrinsic == "F16_16x16x16_F32":
+        if schedule.intrinsic == "MFMA_F16_16x16x16_F32":
             wg_tile_m = schedule.m_count * schedule.m_tile_count * 16
             wg_tile_n = schedule.n_count * schedule.n_tile_count * 16
             wg_tile_k = schedule.k_tile_count * 16
-        elif schedule.intrinsic == "F16_32x32x8_F32":
+        elif schedule.intrinsic == "MFMA_F16_32x32x8_F32":
             wg_tile_m = schedule.m_count * schedule.m_tile_count * 32
             wg_tile_n = schedule.n_count * schedule.n_tile_count * 32
             wg_tile_k = schedule.k_tile_count * 8
