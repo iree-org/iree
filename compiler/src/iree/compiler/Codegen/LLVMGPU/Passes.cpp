@@ -12,6 +12,7 @@
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/LLVMGPU/KernelConfig.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/ROCDLPasses.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -49,6 +50,7 @@ namespace mlir::iree_compiler {
 
 constexpr int64_t kDefaultSubgroupSize = 32;
 
+<<<<<<< HEAD
 static llvm::cl::opt<ReorderWorkgrupsStrategy> clReorderWorkgroupsStrategy(
     "iree-codegen-reorder-workgroups-strategy",
     llvm::cl::desc("Reorder workgroup IDs using the selected strategy"),
@@ -59,6 +61,11 @@ static llvm::cl::opt<ReorderWorkgrupsStrategy> clReorderWorkgroupsStrategy(
                      clEnumValN(ReorderWorkgrupsStrategy::Transpose,
                                 "transpose", "Transpose")),
     llvm::cl::init(ReorderWorkgrupsStrategy::None));
+=======
+static llvm::cl::opt<unsigned>
+    logSwizzleTile("iree-codegen-log-swizzle-tile",
+                   llvm::cl::desc("log swizzle tile value"), llvm::cl::init(0));
+>>>>>>> f0ce3eea5f (address comments and add shared memory limit)
 
 static llvm::cl::opt<unsigned> clReorderWorkgroupsLogSwizzleTile(
     "iree-codegen-reorder-workgroups-log-swizzle-tile",
@@ -824,9 +831,8 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool forROCDL) {
 
   // Run checks on shared memory usage.
   // TODO: query this from the target.
-  int64_t limit = clLLVMGPUSharedMemoryLimit;
-  auto getSharedMemoryLimit = [limit](mlir::FunctionOpInterface) {
-    return limit;
+  auto getSharedMemoryLimit = [](mlir::FunctionOpInterface entryPoint) {
+    return getTargetSharedMemoryLimit(entryPoint);
   };
   auto getIndexBitwidth = [](mlir::FunctionOpInterface) { return 64; };
   pm.addPass(

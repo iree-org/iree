@@ -46,16 +46,16 @@ llvm::cl::opt<bool> clGPUEnableTransformDialectJit(
     llvm::cl::init(true));
 
 /// Flag to force using WMMA tensorcore operations.
-llvm::cl::opt<bool>
-    clGPUUseWMMA("iree-codegen-llvmgpu-use-wmma",
-                 llvm::cl::desc("force use of wmma operations for tensorcore"),
-                 llvm::cl::init(false));
+llvm::cl::opt<bool> clGPUUseWMMA(
+    "iree-codegen-llvmgpu-use-wmma",
+    llvm::cl::desc("force use of wmma operations for tensorcore"),
+    llvm::cl::init(false));
 
 /// Flag used to toggle using mma.sync vs wmma when targetting tensorcore.
-llvm::cl::opt<bool>
-    clGPUUseMMASync("iree-codegen-llvmgpu-use-mma-sync",
-                    llvm::cl::desc("force use mma sync instead of wmma ops"),
-                    llvm::cl::init(false));
+llvm::cl::opt<bool> clGPUUseMMASync(
+    "iree-codegen-llvmgpu-use-mma-sync",
+    llvm::cl::desc("force use mma sync instead of wmma ops"),
+    llvm::cl::init(false));
 
 llvm::cl::opt<int> clGPUMatmulCThreshold(
     "iree-codegen-llvmgpu-matmul-c-matrix-threshold",
@@ -93,7 +93,7 @@ struct TileWorkgroupSizePair {
 // Simt codegen does not do software pipelining.
 constexpr unsigned softwarePipelineDepthSimt = 0;
 
-} // namespace
+}  // namespace
 
 //====---------------------------------------------------------------------===//
 // Matmul Configuration Helpers
@@ -128,9 +128,9 @@ getMatmulConfig(const TargetInfo &targetInfo) {
 
 /// Return the best combination of tile size and wg size when using tensorcore
 /// operations.
-static void
-getTensorCoreConfig(SmallVectorImpl<TileWorkgroupSizePair> &tileSizes,
-                    Type elementType, int64_t M, int64_t N, int64_t K) {
+static void getTensorCoreConfig(
+    SmallVectorImpl<TileWorkgroupSizePair> &tileSizes, Type elementType,
+    int64_t M, int64_t N, int64_t K) {
   // Based on early analysis we found that 128x256x32_3 gives acceptable
   // performance across many of the large matrix sizes for f16 and fp32. This
   // needs to be refined into a better startegy based on empircal data but this
@@ -200,8 +200,7 @@ static TargetInfo getCudaTargetInfo(mlir::FunctionOpInterface entryPoint) {
   info.sharedMemoryLimit = 163 * 1024;
   StringRef targetName = getTargetArch(entryPoint);
   // If no target name is set assume all the features are off.
-  if (targetName == "")
-    return info;
+  if (targetName == "") return info;
   if (!StringRef(targetName).starts_with("sm_")) {
     entryPoint.emitError("unknown target name ") << targetName;
     return info;
@@ -225,8 +224,7 @@ static TargetInfo getRocmTargetInfo(mlir::FunctionOpInterface entryPoint) {
   StringRef targetName = getTargetArch(entryPoint);
   info.sharedMemoryLimit = 65536;
   // If no target name is set assume all the features are off.
-  if (targetName.empty())
-    return info;
+  if (targetName.empty()) return info;
 
   if (!targetName.starts_with("gfx")) {
     entryPoint.emitError("unknown target name ") << targetName;
@@ -248,10 +246,8 @@ static TargetInfo getRocmTargetInfo(mlir::FunctionOpInterface entryPoint) {
 
 static TargetInfo getTargetInfo(mlir::FunctionOpInterface entryPoint) {
   // TODO: fill out target info for other vendors.
-  if (isCudaTarget(entryPoint))
-    return getCudaTargetInfo(entryPoint);
-  if (isRocmTarget(entryPoint))
-    return getRocmTargetInfo(entryPoint);
+  if (isCudaTarget(entryPoint)) return getCudaTargetInfo(entryPoint);
+  if (isRocmTarget(entryPoint)) return getRocmTargetInfo(entryPoint);
   return {};
 }
 
@@ -260,8 +256,7 @@ static bool supportsTensorCore(mlir::FunctionOpInterface entryPoint,
                                const TargetInfo &targetInfo) {
   // Limit tensor core pipeline to matmul as not all combinations of transpose
   // are supported upstream.
-  if (!targetInfo.hasTF32TensorCore)
-    return false;
+  if (!targetInfo.hasTF32TensorCore) return false;
   if (!(isa<linalg::MatmulOp>(op) || isa<linalg::BatchMatmulOp>(op))) {
     assert(linalg::isaContractionOpInterface(op));
     // If this is not a named op matmul check some properties to make sure that
@@ -270,27 +265,22 @@ static bool supportsTensorCore(mlir::FunctionOpInterface entryPoint,
     // should be a reduce.
     Region &body = op->getRegion(0);
     Region::OpIterator it = body.op_begin();
-    if (it == body.op_end() || !isa<arith::MulFOp>(*(it++)))
-      return false;
-    if (it == body.op_end() || !isa<arith::AddFOp>(*(it++)))
-      return false;
-    if (it == body.op_end() || !isa<linalg::YieldOp>(*(it++)))
-      return false;
+    if (it == body.op_end() || !isa<arith::MulFOp>(*(it++))) return false;
+    if (it == body.op_end() || !isa<arith::AddFOp>(*(it++))) return false;
+    if (it == body.op_end() || !isa<linalg::YieldOp>(*(it++))) return false;
     AffineMap outputMap = op.getMatchingIndexingMap(op.getDpsInitOperand(0));
-    if (outputMap.getNumResults() != outputMap.getNumDims() - 1)
-      return false;
+    if (outputMap.getNumResults() != outputMap.getNumDims() - 1) return false;
     OpBuilder b(op);
     for (unsigned i = 0, e = outputMap.getNumResults(); i < e - 1; i++) {
-      if (outputMap.getResult(i) != b.getAffineDimExpr(i))
-        return false;
+      if (outputMap.getResult(i) != b.getAffineDimExpr(i)) return false;
     }
   }
   return true;
 }
 
 /// Decides which tensorcore operations to use.
-static IREE::Codegen::DispatchLoweringPassPipeline
-getTensorCorePipeline(Type elementType) {
+static IREE::Codegen::DispatchLoweringPassPipeline getTensorCorePipeline(
+    Type elementType) {
   // Currently mma.sync is on by default for fp16 only.
   IREE::Codegen::DispatchLoweringPassPipeline codegenPipeline =
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulTensorCore;
@@ -318,10 +308,9 @@ getTensorCorePipeline(Type elementType) {
 // Vector Distribution Contraction/Convolution Pipeline Configuration
 //====---------------------------------------------------------------------===//
 
-static LogicalResult
-setConvolutionVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
-                                       linalg::LinalgOp op,
-                                       const TargetInfo &targetInfo) {
+static LogicalResult setConvolutionVectorDistributionConfig(
+    mlir::FunctionOpInterface entryPoint, linalg::LinalgOp op,
+    const TargetInfo &targetInfo) {
   FailureOr<ArrayAttr> mmaKinds = getSupportedMmaTypes(entryPoint);
   if (failed(mmaKinds)) {
     return failure();
@@ -415,14 +404,14 @@ setConvolutionVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   int64_t sharedMemoryLimit = targetInfo.sharedMemoryLimit;
 
   // First try to find a schedule with an exactly matching intrinsic.
-  std::optional<GPUMMASchedule> schedule =
+  FailureOr<GPUMMASchedule> schedule =
       deduceMMASchedule(problem, intrinsics, seeds, sharedMemoryLimit);
-  if (!schedule) {
+  if (failed(schedule)) {
     // Then try again by allowing upcasting accumulator.
     schedule = deduceMMASchedule(problem, intrinsics, seeds, sharedMemoryLimit,
                                  /*canUpcastAcc=*/true);
   }
-  if (!schedule) {
+  if (failed(schedule)) {
     return failure();
   }
 
@@ -480,10 +469,9 @@ setConvolutionVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
       workgroupSize, targetSubgroupSize, configDict);
 }
 
-static LogicalResult
-setMatmulVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
-                                  linalg::LinalgOp op,
-                                  const TargetInfo &targetInfo) {
+static LogicalResult setMatmulVectorDistributionConfig(
+    mlir::FunctionOpInterface entryPoint, linalg::LinalgOp op,
+    const TargetInfo &targetInfo) {
   FailureOr<ArrayAttr> mmaKinds = getSupportedMmaTypes(entryPoint);
   if (failed(mmaKinds)) {
     return failure();
@@ -628,10 +616,9 @@ setMatmulVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
       workgroupSize, targetSubgroupSize, configDict);
 }
 
-static LogicalResult
-setVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
-                            linalg::LinalgOp linalgOp,
-                            const TargetInfo &targetInfo) {
+static LogicalResult setVectorDistributionConfig(
+    mlir::FunctionOpInterface entryPoint, linalg::LinalgOp linalgOp,
+    const TargetInfo &targetInfo) {
   if (linalg::isaContractionOpInterface(linalgOp)) {
     return setMatmulVectorDistributionConfig(entryPoint, linalgOp, targetInfo);
   }
@@ -669,8 +656,7 @@ static LogicalResult setContractConfig(mlir::FunctionOpInterface entryPoint,
     staticNonUnitParallelDimCount +=
         bounds[nDim] != 1 && !ShapedType::isDynamic(bounds[nDim]);
   }
-  if (staticNonUnitParallelDimCount <= 1)
-    return failure();
+  if (staticNonUnitParallelDimCount <= 1) return failure();
 
   // Don't consider operations that don't have a broadcast, those should go
   // through reductions.
@@ -728,10 +714,9 @@ static LogicalResult setContractConfig(mlir::FunctionOpInterface entryPoint,
         }
 
         tileSizes.emplace_back(
-            std::move(workgroupTileSizes)); // Workgroup level.
+            std::move(workgroupTileSizes));  // Workgroup level.
         std::optional<int64_t> subgroupSize = std::nullopt;
-        if (!subgroupSizes.empty())
-          subgroupSize = subgroupSizes.front();
+        if (!subgroupSizes.empty()) subgroupSize = subgroupSizes.front();
 
         return setOpConfigAndEntryPointFnTranslation(
             entryPoint, op, tileSizes, pipeline, workgroupSize, subgroupSize,
@@ -838,8 +823,7 @@ static LogicalResult setContractConfig(mlir::FunctionOpInterface entryPoint,
   int64_t tileK = config.tileSize[2];
   // Since specialization doesn't work for K loop and peeling is not enabled yet
   // we pick a tileK size that is aligned on the K size.
-  if (ShapedType::isDynamic(sizeK))
-    tileK = 1;
+  if (ShapedType::isDynamic(sizeK)) tileK = 1;
   while (sizeK % tileK != 0) {
     tileK >>= 1;
   }
@@ -927,7 +911,7 @@ static LogicalResult setSortConfig(mlir::FunctionOpInterface entryPoint,
       break;
     }
   }
-  tileSizes.emplace_back(std::move(workgroupTileSizes)); // Workgroup level
+  tileSizes.emplace_back(std::move(workgroupTileSizes));  // Workgroup level
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, tileSizes,
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDistribute,
@@ -938,9 +922,8 @@ static LogicalResult setSortConfig(mlir::FunctionOpInterface entryPoint,
 // Pack/Unpack Pipeline Configuration
 //====---------------------------------------------------------------------===//
 
-static SmallVector<int64_t>
-getDefaultWorkgroupTileSizesForPackUnPack(TilingInterface op,
-                                          int64_t defaultSize) {
+static SmallVector<int64_t> getDefaultWorkgroupTileSizesForPackUnPack(
+    TilingInterface op, int64_t defaultSize) {
   unsigned numLoops = op.getLoopIteratorTypes().size();
   auto partitionedLoops = cast<PartitionableLoopsInterface>(op.getOperation())
                               .getPartitionableLoops(kNumMaxParallelDims);
@@ -969,8 +952,7 @@ static LogicalResult setPackConfig(mlir::FunctionOpInterface entryPoint,
   SmallVector<int64_t> innerTiles = packOp.getStaticTiles();
   ArrayRef<int64_t> dimPos = packOp.getInnerDimsPos();
   for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
-    if (tileSizes[pos] == 0 || ShapedType::isDynamic(size))
-      continue;
+    if (tileSizes[pos] == 0 || ShapedType::isDynamic(size)) continue;
     tileSizes[pos] = tileSizes[pos] / size;
     tileSizes[pos] = std::max<int64_t>(tileSizes[pos], 1);
   }
@@ -1038,7 +1020,7 @@ static LogicalResult setRootDefaultConfig(mlir::FunctionOpInterface entryPoint,
              shape.back() % (workgroupSize[0] * vectorSize) != 0) {
         vectorSize /= 2;
       }
-      if (vectorSize == 1) // assume there is fastpath + slowpath
+      if (vectorSize == 1)  // assume there is fastpath + slowpath
         vectorSize = 4;
       int64_t problemSize = std::accumulate(
           shape.begin(), shape.end(), 1,
@@ -1056,8 +1038,7 @@ static LogicalResult setRootDefaultConfig(mlir::FunctionOpInterface entryPoint,
         int64_t id = 0;
         for (int64_t dim : llvm::reverse(shape)) {
           // Unit loops are already skipped.
-          if (dim == 1)
-            continue;
+          if (dim == 1) continue;
           if (dim < flatWG) {
             skipInnerTiling++;
             workgroupSize[id] = dim;
@@ -1067,8 +1048,7 @@ static LogicalResult setRootDefaultConfig(mlir::FunctionOpInterface entryPoint,
           }
           flatWG = flatWG / dim;
           id++;
-          if (flatWG <= 1 || id >= workgroupSize.size())
-            break;
+          if (flatWG <= 1 || id >= workgroupSize.size()) break;
         }
         break;
       }
@@ -1100,8 +1080,7 @@ static LogicalResult setRootDefaultConfig(mlir::FunctionOpInterface entryPoint,
         workgroupTileSizes[depth - 1] = 0;
         skipInnerTiling--;
         id++;
-        if (id >= workgroupSize.size())
-          break;
+        if (id >= workgroupSize.size()) break;
         continue;
       }
       workgroupTileSizes[depth - 1] = workgroupSize[id] * vectorSize;
@@ -1114,7 +1093,7 @@ static LogicalResult setRootDefaultConfig(mlir::FunctionOpInterface entryPoint,
     // is the most inner dimension.
     workgroupTileSizes.append(linalgOp.getNumReductionLoops(), 4);
   }
-  tileSizes.emplace_back(std::move(workgroupTileSizes)); // Workgroup level
+  tileSizes.emplace_back(std::move(workgroupTileSizes));  // Workgroup level
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, tileSizes, passPipeline, workgroupSize,
       targetInfo.supportedSubgroupSizes.front());
@@ -1125,9 +1104,9 @@ static LogicalResult setRootDefaultConfig(mlir::FunctionOpInterface entryPoint,
 //====---------------------------------------------------------------------===//
 
 /// Set configuration for transform dialect based strategies.
-static LogicalResult
-setTransformDialectConfig(mlir::FunctionOpInterface entryPoint, Operation *op,
-                          const TargetInfo &targetInfo) {
+static LogicalResult setTransformDialectConfig(
+    mlir::FunctionOpInterface entryPoint, Operation *op,
+    const TargetInfo &targetInfo) {
   if (!clGPUEnableTransformDialectJit) {
     return failure();
   }
@@ -1173,32 +1152,26 @@ setTransformDialectConfig(mlir::FunctionOpInterface entryPoint, Operation *op,
 }
 
 static bool isMatvecLike(linalg::LinalgOp linalgOp) {
-  if (linalgOp.getNumParallelLoops() != 2)
-    return false;
+  if (linalgOp.getNumParallelLoops() != 2) return false;
 
-  if (linalgOp.getNumReductionLoops() != 1)
-    return false;
+  if (linalgOp.getNumReductionLoops() != 1) return false;
 
   // TODO: Allow for matvec with fused dequantization.
   FailureOr<linalg::ContractionDimensions> dims =
       linalg::inferContractionDims(linalgOp);
-  if (failed(dims))
-    return false;
+  if (failed(dims)) return false;
 
   // TODO: Support batch matvec.
-  if (!dims->batch.empty())
-    return false;
+  if (!dims->batch.empty()) return false;
 
   for (ArrayRef indices : {dims->m, dims->n, dims->k}) {
-    if (!llvm::hasSingleElement(indices))
-      return false;
+    if (!llvm::hasSingleElement(indices)) return false;
   }
 
   // Check if the first parallel dimension has bound 1, indicating we found a
   // vector shape.
   SmallVector<int64_t, 4> bounds = linalgOp.getStaticLoopRanges();
-  if (bounds[dims->m.front()] != 1)
-    return false;
+  if (bounds[dims->m.front()] != 1) return false;
 
   return true;
 }
@@ -1208,11 +1181,10 @@ static bool isMatvecLike(linalg::LinalgOp linalgOp) {
 //====---------------------------------------------------------------------===//
 
 /// Set the configuration for reductions that can be mapped to warp reductions.
-static LogicalResult
-setWarpReductionConfig(mlir::FunctionOpInterface entryPoint,
-                       linalg::LinalgOp op, const TargetInfo &targetInfo) {
-  if (!targetInfo.hasWarpShuffle)
-    return failure();
+static LogicalResult setWarpReductionConfig(
+    mlir::FunctionOpInterface entryPoint, linalg::LinalgOp op,
+    const TargetInfo &targetInfo) {
+  if (!targetInfo.hasWarpShuffle) return failure();
 
   SmallVector<unsigned> parallelDims;
   SmallVector<unsigned> reductionDims;
@@ -1222,8 +1194,7 @@ setWarpReductionConfig(mlir::FunctionOpInterface entryPoint,
   SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
   int64_t numParallelDims = op.getNumParallelLoops();
 
-  if (reductionDims.empty())
-    return failure();
+  if (reductionDims.empty()) return failure();
 
   // Make sure reduction dimensions are static and innermost ones.
   int64_t numDynamicReductionDims = 0;
@@ -1241,8 +1212,7 @@ setWarpReductionConfig(mlir::FunctionOpInterface entryPoint,
     return failure();
   }
 
-  if (op.getRegionOutputArgs().size() != 1)
-    return failure();
+  if (op.getRegionOutputArgs().size() != 1) return failure();
 
   // Only support projected permutation, this could be extended to projected
   // permutated with broadcast.
@@ -1257,16 +1227,14 @@ setWarpReductionConfig(mlir::FunctionOpInterface entryPoint,
     SmallVector<Operation *> combinerOps;
     if (matchReduction(op.getRegionOutputArgs(), index, combinerOps) &&
         combinerOps.size() == 1) {
-      if (foundSingleReductionOutput)
-        return failure();
+      if (foundSingleReductionOutput) return failure();
       foundSingleReductionOutput = true;
       continue;
     }
     if (!op.getMatchingIndexingMap(&initOpOperand).isIdentity())
       return failure();
   }
-  if (!foundSingleReductionOutput)
-    return failure();
+  if (!foundSingleReductionOutput) return failure();
 
   // Tile all the parallel dimension to 1.
   SmallVector<unsigned> partitionedLoops =
@@ -1282,8 +1250,8 @@ setWarpReductionConfig(mlir::FunctionOpInterface entryPoint,
     int64_t preferredSubgroupSize = targetInfo.supportedSubgroupSizes.front();
     reductionTileSizes[reductionDims[0]] = preferredSubgroupSize;
     TileSizesListType tileSizes;
-    tileSizes.emplace_back(std::move(workgroupTileSizes)); // Workgroup level
-    tileSizes.emplace_back(std::move(reductionTileSizes)); // Reduction level
+    tileSizes.emplace_back(std::move(workgroupTileSizes));  // Workgroup level
+    tileSizes.emplace_back(std::move(reductionTileSizes));  // Reduction level
     std::array<int64_t, 3> workgroupSize = {preferredSubgroupSize, 1, 1};
     if (failed(setOpConfigAndEntryPointFnTranslation(
             entryPoint, op, tileSizes,
@@ -1295,8 +1263,7 @@ setWarpReductionConfig(mlir::FunctionOpInterface entryPoint,
   }
 
   int64_t reductionSize = 1;
-  for (int64_t dim : reductionDims)
-    reductionSize *= bounds[dim];
+  for (int64_t dim : reductionDims) reductionSize *= bounds[dim];
 
   auto selectedSubgroupSizeIt = llvm::find_if(
       targetInfo.supportedSubgroupSizes, [reductionSize](int64_t subgroupSize) {
@@ -1309,17 +1276,14 @@ setWarpReductionConfig(mlir::FunctionOpInterface entryPoint,
   const Type elementType =
       llvm::cast<ShapedType>(op.getDpsInitOperand(0)->get().getType())
           .getElementType();
-  if (!elementType.isIntOrFloat())
-    return failure();
+  if (!elementType.isIntOrFloat()) return failure();
   unsigned bitWidth = elementType.getIntOrFloatBitWidth();
   // Reduction distribution only supports 8/16/32 bit types now.
-  if (bitWidth != 32 && bitWidth != 16 && bitWidth != 8)
-    return failure();
+  if (bitWidth != 32 && bitWidth != 16 && bitWidth != 8) return failure();
 
   const unsigned largestLoadSizeInBits = 128;
   unsigned vectorSize = largestLoadSizeInBits / bitWidth;
-  while ((reductionSize / vectorSize) % subgroupSize != 0)
-    vectorSize /= 2;
+  while ((reductionSize / vectorSize) % subgroupSize != 0) vectorSize /= 2;
 
   // Deduce the workgroup size we should use for reduction. Currently a
   // workgroup processes all elements in reduction dimensions. Need to make sure
@@ -1367,8 +1331,7 @@ setWarpReductionConfig(mlir::FunctionOpInterface entryPoint,
   // First, do warp reductions along multiple subgroups.
   // Second, reduce results from multiple subgroups using single warp reduce.
   // The final warp reduce requires subgroup count <= subgroup size to work.
-  if ((groupSize / subgroupSize) > subgroupSize)
-    return failure();
+  if ((groupSize / subgroupSize) > subgroupSize) return failure();
 
   // With just one subgroup per workgroup, make each subgroup do more work and
   // process a few reductions (rows) along the last parallel dimension.
@@ -1396,18 +1359,16 @@ setWarpReductionConfig(mlir::FunctionOpInterface entryPoint,
   for (int i = reductionDims.size() - 1; i >= 0; --i) {
     int64_t dim = reductionDims[i];
     int64_t bound = bounds[dim];
-    if (i == reductionDims.size() - 1)
-      bound /= vectorSize;
+    if (i == reductionDims.size() - 1) bound /= vectorSize;
     APInt size = llvm::APIntOps::GreatestCommonDivisor(
         {64, uint64_t(remainingGroupSize)}, {64, uint64_t(bound)});
     reductionTileSizes[dim] = size.getSExtValue();
-    if (i == reductionDims.size() - 1)
-      reductionTileSizes[dim] *= vectorSize;
+    if (i == reductionDims.size() - 1) reductionTileSizes[dim] *= vectorSize;
     remainingGroupSize /= size.getSExtValue();
   }
   TileSizesListType tileSizes;
-  tileSizes.emplace_back(std::move(workgroupTileSizes)); // Workgroup level
-  tileSizes.emplace_back(std::move(reductionTileSizes)); // Reduction level
+  tileSizes.emplace_back(std::move(workgroupTileSizes));  // Workgroup level
+  tileSizes.emplace_back(std::move(reductionTileSizes));  // Reduction level
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, tileSizes,
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUWarpReduction,
@@ -1486,10 +1447,9 @@ static LogicalResult setTransposeConfig(mlir::FunctionOpInterface entryPoint,
 /// Set the configuration for argmax that can be mapped to argmax uKernel.
 /// Distribute all parallel dim across different workgroups, and only use single
 /// subgroup per workgroup.
-static LogicalResult
-setArgmaxUkernelConfig(mlir::FunctionOpInterface entryPoint,
-                       linalg::GenericOp op, const TargetInfo &targetInfo) {
-
+static LogicalResult setArgmaxUkernelConfig(
+    mlir::FunctionOpInterface entryPoint, linalg::GenericOp op,
+    const TargetInfo &targetInfo) {
   // Checks if UKernels are enabled.
   if (auto variantOp =
           entryPoint->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
@@ -1501,19 +1461,16 @@ setArgmaxUkernelConfig(mlir::FunctionOpInterface entryPoint,
     }
   }
 
-  if (!targetInfo.hasWarpShuffle)
-    return failure();
+  if (!targetInfo.hasWarpShuffle) return failure();
 
-  if (failed(isArgmaxOp(op)))
-    return failure();
+  if (failed(isArgmaxOp(op))) return failure();
   SmallVector<unsigned> parallelDims;
   SmallVector<unsigned> reductionDims;
   op.getParallelDims(parallelDims);
   op.getReductionDims(reductionDims);
 
   // Currently Argmax UKernel only support 1 reduction dim.
-  if (reductionDims.size() != 1)
-    return failure();
+  if (reductionDims.size() != 1) return failure();
 
   // Make sure reduction dimensions are static and innermost ones.
   SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
@@ -1548,8 +1505,8 @@ setArgmaxUkernelConfig(mlir::FunctionOpInterface entryPoint,
   int64_t preferredSubgroupSize = targetInfo.supportedSubgroupSizes.front();
   reductionTileSizes[reductionDims[0]] = preferredSubgroupSize;
   TileSizesListType tileSizes;
-  tileSizes.emplace_back(std::move(workgroupTileSizes)); // Workgroup level
-  tileSizes.emplace_back(std::move(reductionTileSizes)); // Reduction level
+  tileSizes.emplace_back(std::move(workgroupTileSizes));  // Workgroup level
+  tileSizes.emplace_back(std::move(reductionTileSizes));  // Reduction level
   std::array<int64_t, 3> workgroupSize = {preferredSubgroupSize, 1, 1};
   if (failed(setOpConfigAndEntryPointFnTranslation(
           entryPoint, op, tileSizes,
@@ -1561,9 +1518,9 @@ setArgmaxUkernelConfig(mlir::FunctionOpInterface entryPoint,
 }
 
 /// Make UKernels take the LLVMGPUDefault lowering pipeline.
-static LogicalResult
-setUKernelConfig(mlir::FunctionOpInterface entryPoint,
-                 IREE::Codegen::UKernelOpInterface ukernelOp) {
+static LogicalResult setUKernelConfig(
+    mlir::FunctionOpInterface entryPoint,
+    IREE::Codegen::UKernelOpInterface ukernelOp) {
   auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
       entryPoint->getContext(),
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDefault);
@@ -1591,8 +1548,7 @@ static bool distributeToOneDim(const int64_t inputDim,
       // Handle 4 elements per thread for the innermost dimension. We need
       // this for vectorized load.
       chosenTileSize = 4;
-      if (inputDim % (dim * chosenTileSize) != 0)
-        continue;
+      if (inputDim % (dim * chosenTileSize) != 0) continue;
     } else {
       for (int64_t t = residualTilingFactor; t >= 1; t >>= 1)
         if (inputDim % (dim * t) == 0) {
@@ -1674,7 +1630,7 @@ static LogicalResult setConvolutionConfig(linalg::LinalgOp linalgOp,
   int64_t residualThreads = subgroupSize;
   int64_t residualTilingFactor = bestTilingFactor;
 
-  SmallVector<int64_t, 3> workgroupSize(3, 1); // (X, Y, Z)
+  SmallVector<int64_t, 3> workgroupSize(3, 1);  // (X, Y, Z)
   SmallVector<int64_t> workgroupTileSizes(4, 1);
 
   if (isNCHW) {
@@ -1801,11 +1757,14 @@ static void propagateLoweringConfig(Operation *rootOperation,
   if (IREE::Codegen::LoweringConfigAttr config =
           getLoweringConfig(rootOperation)) {
     for (auto op : computeOps) {
-      if (op == rootOperation)
-        continue;
+      if (op == rootOperation) continue;
       setLoweringConfig(op, config);
     }
   }
+}
+
+int64_t getTargetSharedMemoryLimit(FunctionOpInterface entryPoint) {
+  return getTargetInfo(entryPoint).sharedMemoryLimit;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1818,8 +1777,7 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
 
   for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
     auto exportOp = exportOps.lookup(funcOp.getName());
-    if (!exportOp)
-      continue;
+    if (!exportOp) continue;
 
     if (!getTranslationInfo(funcOp)) {
       // If no translation info set, first check whether we already have
@@ -1895,12 +1853,11 @@ LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
       continue;
     }
 
-    if (failed(setRootConfig(funcOp, rootOperation)))
-      continue;
+    if (failed(setRootConfig(funcOp, rootOperation))) continue;
 
     propagateLoweringConfig(rootOperation, computeOps);
   }
   return success();
 }
 
-} // namespace mlir::iree_compiler
+}  // namespace mlir::iree_compiler
