@@ -1,5 +1,5 @@
 // RUN: iree-opt --split-input-file \ 
-// RUN: --iree-codegen-llvmgpu-use-vector-distribution '--pass-pipeline=builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-select-lowering-strategy, iree-llvmgpu-lower-executable-target, canonicalize)))'
+// RUN: --iree-codegen-llvmgpu-use-vector-distribution '--pass-pipeline=builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-select-lowering-strategy, iree-llvmgpu-lower-executable-target, canonicalize)))' %s | FileCheck %s
 
 hal.executable @fit_shared_memory_schedule {
 hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb", {mma_intrinsics = [#iree_gpu.mfma_layout<F16_16x16x16_F32>, #iree_gpu.mfma_layout<F16_32x32x8_F32>], target_arch = "gfx942", ukernels = "none"}>) {
@@ -27,3 +27,5 @@ hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb", {m
     }
   }
 }}
+
+// CHECK-LABEL: .executable.export public @fit_shared_memory_schedule
