@@ -48,16 +48,16 @@ fitScheduleInSharedMemory(ArrayRef<GPUMatmulShapeType> intrinsics,
       llvm::errs() << "nWarpCount: " << schedule.nWarpCount << "\n";
     });
     // Attempt to shrink the schedule along one of the dimensions.
-    if (schedule.mTileCount > 1) {
-      schedule.mTileCount--;
+    if (schedule.mTileCount % 2 == 0) {
+      schedule.mTileCount /= 2;
       continue;
     }
-    if (schedule.nTileCount > 1) {
-      schedule.nTileCount--;
+    if (schedule.nTileCount % 2 == 0) {
+      schedule.nTileCount /= 2;
       continue;
     }
-    if (schedule.kTileCount > 1) {
-      schedule.kTileCount--;
+    if (schedule.kTileCount % 2 == 0) {
+      schedule.kTileCount /= 2;
       continue;
     }
     if (schedule.mWarpCount % 2 == 0) {
