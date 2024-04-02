@@ -76,7 +76,15 @@ def IREEGPU_MmaInterfaceAttr : AttrInterface<"MmaInterfaceAttr"> {
       /*defaultImplementation=*/[{
         return failure();
       }]
-    >
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the expected subgroup size of the MMA operation/intrinsic.
+      }],
+      /*retTy=*/"int64_t",
+      /*methodName=*/"getSubgroupSize",
+      /*args=*/(ins)
+    >,
   ];
 }
 

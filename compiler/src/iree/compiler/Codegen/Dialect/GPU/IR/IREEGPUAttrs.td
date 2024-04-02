@@ -24,6 +24,7 @@ class IREEGPU_MmaVectorLayoutAttr<string attrname, string mmaintrinsic> :
     "getABCVectorTypes",
     "getContractionLayout",
     "getMNKShape",
+    "getSubgroupSize",
   ]>
 ]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
@@ -90,10 +91,20 @@ def MFMA_F16_32x32x8_F32 : I32EnumAttrCase<"MFMA_F16_32x32x8_F32", 1>;
 def WMMA_F16_16x16x16_F32 : I32EnumAttrCase<"WMMA_F16_16x16x16_F32", 2>;
 
 def IREEGPU_MMAIntrinsic : IREEGPU_I32MmaEnumAttr<"MMAIntrinsic",
-    "Descriptor for different MFMA operations", [
+    "Descriptor for different MMA intrinsics", [
       MFMA_F16_16x16x16_F32,
       MFMA_F16_32x32x8_F32,
       WMMA_F16_16x16x16_F32
+    ]>;
+
+def INVALID_COMPUTE_TYPE : I32EnumAttrCase<"INVALID", 0>;
+def MFMA_COMPUTE_TYPE : I32EnumAttrCase<"MFMA", 1>;
+def WMMA_COMPUTE_TYPE : I32EnumAttrCase<"WMMA", 2>;
+def IREEGPU_MMAComputeType : IREEGPU_I32MmaEnumAttr<"MMAComputeType",
+    "Descriptor for different types of MMA operations", [
+      INVALID_COMPUTE_TYPE,
+      MFMA_COMPUTE_TYPE,
+      WMMA_COMPUTE_TYPE
     ]>;
 
 def IREEGPU_MMAIntrinsicAttr
@@ -123,7 +134,7 @@ def IREEGPU_MMAAttr : IREEGPU_MmaVectorLayoutAttr<"MMA", "MMAIntrinsicAttr"> {
 
   let extraClassDeclaration = !strconcat(baseExtraClassDeclaration, [{
     int64_t getBlockSize() const;
-    StringRef getComputeType() const;
+    MMAComputeType getComputeType() const;
     SmallVector<int64_t> getADataDuplicate() const;
     SmallVector<int64_t> getBDataDuplicate() const;
     SmallVector<int64_t> getCDataDuplicate() const;

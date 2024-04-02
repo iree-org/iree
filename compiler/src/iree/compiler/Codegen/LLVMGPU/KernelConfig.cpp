@@ -329,7 +329,7 @@ setConvolutionVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   if (targetInfo.supportedSubgroupSizes.empty()) {
     return failure();
   }
-  const int64_t subgroupSize = targetInfo.supportedSubgroupSizes.front();
+  const int64_t targetSubgroupSize = targetInfo.supportedSubgroupSizes.front();
 
   SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
   FailureOr<mlir::linalg::ConvolutionDimensions> convolutionDims =
@@ -395,6 +395,8 @@ setConvolutionVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   for (auto mma : mmaAttrs) {
     auto [mSize, nSize, kSize] = mma.getMNKShape();
     auto [aType, bType, cType] = mma.getABCElementTypes();
+    if (mma.getSubgroupSize() != targetSubgroupSize)
+      continue;
     intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType);
   }
 
@@ -417,8 +419,8 @@ setConvolutionVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
     return failure();
   }
 
-  std::array<int64_t, 3> workgroupSize{schedule->nWarpCount * subgroupSize,
-                                       schedule->mWarpCount, 1};
+  std::array<int64_t, 3> workgroupSize{
+      schedule->nWarpCount * targetSubgroupSize, schedule->mWarpCount, 1};
 
   SmallVector<int64_t> workgroupTileSizes(op.getNumLoops(), 0);
   // Tile all batch dimensions with unit size.
@@ -468,7 +470,7 @@ setConvolutionVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, tileSizes,
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorDistribute,
-      workgroupSize, subgroupSize, configDict);
+      workgroupSize, targetSubgroupSize, configDict);
 }
 
 static LogicalResult
@@ -485,7 +487,7 @@ setMatmulVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   if (targetInfo.supportedSubgroupSizes.empty()) {
     return failure();
   }
-  const int64_t subgroupSize = targetInfo.supportedSubgroupSizes.front();
+  const int64_t targetSubgroupSize = targetInfo.supportedSubgroupSizes.front();
 
   SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
   FailureOr<mlir::linalg::ContractionDimensions> contractionDims =
@@ -528,6 +530,8 @@ setMatmulVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   for (auto mma : mmaAttrs) {
     auto [mSize, nSize, kSize] = mma.getMNKShape();
     auto [aType, bType, cType] = mma.getABCElementTypes();
+    if (mma.getSubgroupSize() != targetSubgroupSize)
+      continue;
     intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType);
   }
 
@@ -561,8 +565,8 @@ setMatmulVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
     return failure();
   }
 
-  std::array<int64_t, 3> workgroupSize{schedule->nWarpCount * subgroupSize,
-                                       schedule->mWarpCount, 1};
+  std::array<int64_t, 3> workgroupSize{
+      schedule->nWarpCount * targetSubgroupSize, schedule->mWarpCount, 1};
 
   SmallVector<int64_t> workgroupTileSizes(op.getNumLoops(), 0);
   // Tile all batch dimensions with unit size.
@@ -610,7 +614,7 @@ setMatmulVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, tileSizes,
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorDistribute,
-      workgroupSize, subgroupSize, configDict);
+      workgroupSize, targetSubgroupSize, configDict);
 }
 
 static LogicalResult

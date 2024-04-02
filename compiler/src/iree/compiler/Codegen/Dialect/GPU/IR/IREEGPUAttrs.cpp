@@ -327,6 +327,8 @@ MMAAttr MMAAttr::get(MLIRContext *context, MMAIntrinsic type) {
                    layout.cType);
 }
 
+// NOTE: For layout specifications of the WMMA intrinsics
+//       below we are assuming subgroupsize of 32.
 std::tuple<VectorType, VectorType, VectorType>
 MMAAttr::getABCVectorTypes() const {
   // Check https://github.com/ROCm/amd_matrix_instruction_calculator for
@@ -377,18 +379,32 @@ int64_t MMAAttr::getBlockSize() const {
   return 0;
 }
 
-StringRef MMAAttr::getComputeType() const {
+int64_t MMAAttr::getSubgroupSize() const {
   switch (getIntrinsic().getValue()) {
   case MMAIntrinsic::MFMA_F16_16x16x16_F32:
   case MMAIntrinsic::MFMA_F16_32x32x8_F32: {
-    return "MFMA";
+    return 64;
   }
   case MMAIntrinsic::WMMA_F16_16x16x16_F32: {
-    return "WMMA";
+    return 32;
   }
   }
   // This should not happen but just to make GCC happy.
-  return "";
+  return 0;
+}
+
+MMAComputeType MMAAttr::getComputeType() const {
+  switch (getIntrinsic().getValue()) {
+  case MMAIntrinsic::MFMA_F16_16x16x16_F32:
+  case MMAIntrinsic::MFMA_F16_32x32x8_F32: {
+    return MMAComputeType::MFMA;
+  }
+  case MMAIntrinsic::WMMA_F16_16x16x16_F32: {
+    return MMAComputeType::WMMA;
+  }
+  }
+  // This should not happen but just to make GCC happy.
+  return MMAComputeType::INVALID;
 }
 
 SmallVector<int64_t> MMAAttr::getADataDuplicate() const {
@@ -420,14 +436,7 @@ SmallVector<int64_t> MMAAttr::getBDataDuplicate() const {
 }
 
 SmallVector<int64_t> MMAAttr::getCDataDuplicate() const {
-  switch (getIntrinsic().getValue()) {
-  case MMAIntrinsic::MFMA_F16_16x16x16_F32:
-  case MMAIntrinsic::MFMA_F16_32x32x8_F32:
-  case MMAIntrinsic::WMMA_F16_16x16x16_F32: {
-    break;
-  }
-  }
-  // Defaults to no data duplication.
+  // Currently no C-layout need data duplication yet.
   return {1, 1};
 }
 

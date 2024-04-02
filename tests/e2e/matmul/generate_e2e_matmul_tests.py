@@ -249,7 +249,7 @@ def get_all_spirv_tile_workgroup_size_pairs(t_tile_k):
 
 def get_rocm_test_compilation_infos(compilation_info_id: CompilationInfoId):
     assert compilation_info_id == CompilationInfoId.LLVMGPUVectorDistribute
-
+    # TODO: Add test for WMMA layout.
     schedules = [
         MMASchedule("MFMA_F16_16x16x16_F32", 1, 1, 1, 1, 1),
         MMASchedule("MFMA_F16_16x16x16_F32", 1, 1, 1, 1, 2),
