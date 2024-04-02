@@ -113,6 +113,12 @@ public:
   /// and reduction dimensions.
   SizesAndScalableFlags getVectorTileSizes();
 
+  /// Returns a new `LoweringConfigAttr`, with the tile sizes of vector
+  /// dimensions, set to `sizes`, and the corresponding scalability set to
+  /// `scalableFlags`.
+  IREE::Codegen::LoweringConfigAttr
+  withNewVectorSizes(ArrayRef<int64_t> sizes, ArrayRef<bool> scalableFlags);
+
   /// Returns a list with the tiling levels that can be fused for this
   /// configuration.
   SmallVector<int64_t> getFusableLevels();
