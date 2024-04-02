@@ -27,6 +27,7 @@ iree_lit_test_suite(
         include = ["*.mlir"],
         exclude = [
             "external_function_spec.mlir",
+            "pdl_patterns.mlir",
         ],
     ),
     cfg = "//compiler:lit.cfg.py",
