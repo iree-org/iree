@@ -120,7 +120,7 @@ TilingConfig::withNewVectorSizes(ArrayRef<int64_t> newSizes,
       if (tilingLevelHasSize(parallelInnerLevel, dimPos))
         return parallelInnerLevel;
     }
-    assert(false && "no vector size found for `dimPos`");
+    llvm_unreachable("no vector size found for `dimPos`");
   };
 
   // Make a map from tiling levels to vector dims at that level.
