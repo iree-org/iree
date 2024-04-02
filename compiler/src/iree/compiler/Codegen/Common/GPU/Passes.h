@@ -145,9 +145,12 @@ createConvertVectorReductionToGPUPass(
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createWorkgroupSpecializationPass();
 
+enum class ReorderWorkgrupsStrategy { None, Swizzle, Transpose };
+
 /// Reorders workgroup IDs.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createReorderWorkgroups(
+    ReorderWorkgrupsStrategy strategy = ReorderWorkgrupsStrategy::None,
     unsigned swizzleLogTile = 0,
     std::function<LogicalResult(mlir::FunctionOpInterface)> filterFn = nullptr);
 
