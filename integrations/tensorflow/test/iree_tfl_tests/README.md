@@ -11,7 +11,7 @@ east_text_detector   | PASS ✓
 gpt2                 | PASS ✓
 llvmcpu_mobilebert_tf2_quant | PASS ✓
 llvmcpu_mobilenet_v1 | PASS ✓
-llvmcpu_mobilenet_v3-large_uint8 | FAIL ✗
+llvmcpu_mobilenet_v3-large_uint8 | PASS ✓
 llvmcpu_posenet_i8   | FAIL ✗
 llvmcpu_resnet_50_int8 | PASS ✓
 mnasnet              | PASS ✓
