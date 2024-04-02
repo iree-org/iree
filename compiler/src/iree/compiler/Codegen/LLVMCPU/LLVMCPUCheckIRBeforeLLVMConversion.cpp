@@ -18,6 +18,12 @@ static llvm::cl::opt<int> clMaxAllocationSizeInBytes(
     llvm::cl::desc("maximum allowed stack allocation size in bytes"),
     llvm::cl::init(32768));
 
+static llvm::cl::opt<unsigned> clAssumedVscaleValue(
+    "iree-llvmcpu-stack-allocation-assumed-vscale",
+    llvm::cl::desc(
+        "assumed value of vscale when checking (scalable) stack allocations"),
+    llvm::cl::init(1));
+
 namespace {
 struct LLVMCPUCheckIRBeforeLLVMConversionPass
     : LLVMCPUCheckIRBeforeLLVMConversionBase<
@@ -45,6 +51,7 @@ checkStackAllocationSize(mlir::FunctionOpInterface funcOp) {
   }
 
   int cumSize = 0;
+  const unsigned assumedVscale = clAssumedVscaleValue;
   for (auto allocaOp : allocaOps) {
     if (allocaOp->getBlock() != &funcOp.getFunctionBody().front()) {
       return allocaOp->emitOpError(
@@ -59,11 +66,15 @@ checkStackAllocationSize(mlir::FunctionOpInterface funcOp) {
       allocaSize *= dimSize;
     }
     for (auto operand : allocaOp.getDynamicSizes()) {
-      // Assume vscale is 1 for determining if the alloca is within the stack
-      // limit. This should always resolve to a constant bound.
+      // Assume vscale is `clAssumedVscaleValue` for determining if the alloca
+      // is within the stack limit. This should always resolve to a constant
+      // bound. Note: This may be an underestimate if the runtime larger than
+      // `clAssumedVscaleValue`, but should still catch unreasonable allocatons
+      // (which will have large static factors).
       auto ub = vector::ScalableValueBoundsConstraintSet::computeScalableBound(
           operand, /*dim=*/std::nullopt,
-          /*vscaleMin=*/1, /*vscaleMax=*/1, presburger::BoundType::UB);
+          /*vscaleMin=*/assumedVscale,
+          /*vscaleMax=*/assumedVscale, presburger::BoundType::UB);
       if (succeeded(ub)) {
         allocaSize *= ub->getSize()->baseSize;
         continue;
