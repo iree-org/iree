@@ -191,8 +191,18 @@ std::optional<Value> hoistOneStaticallyBoundAllocation(
       allocSizes.push_back(*ub);
       subviewSizes.push_back(dynamicSize);
     }
-    allocation = builder.create<AllocLikeOpType>(
-        loc, allocSizes, allocLikeType.getElementType(), alignmentAttr);
+
+    // FIXME: The `AllocLikeOp::build()` method for OpFoldResult drops the
+    // layout, so we have to resolve the static/dynamic values here.
+    SmallVector<int64_t> staticShape;
+    SmallVector<Value> dynamicSizes;
+    staticShape.reserve(allocLikeType.getRank());
+    dynamicSizes.reserve(allocLikeType.getRank());
+    dispatchIndexOpFoldResults(allocSizes, dynamicSizes, staticShape);
+    auto allocationType = allocLikeType.clone(staticShape);
+
+    allocation = builder.create<AllocLikeOpType>(loc, allocationType,
+                                                 dynamicSizes, alignmentAttr);
   }
 
   SmallVector<OpFoldResult> offsets(allocLikeType.getRank(),
