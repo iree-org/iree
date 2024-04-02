@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-2d-scalable-to-1d-scalable{assume-arm-sme=true}))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-2d-scalable-to-1d-scalable{assume-arm-sme=true},cse))" --split-input-file %s | FileCheck %s
 
 #compute_config = #iree_codegen.lowering_config<tile_sizes = [[0, 0], [[4], [4]], [0, 0], [0, 0]]>
 #matmul_config = #iree_codegen.lowering_config<tile_sizes = [[0, 0, 0], [[4], [4], 0], [0, 0, 1], [0, 0, 0]]>
@@ -64,16 +64,22 @@ func.func @scalable_2d_matmul_and_generic(%arg0: tensor<32400x32xf32>, %arg1: te
 // CHECK: #[[MATMUL_CONFIG:.*]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 0, 0], {{\[}}[4], [4], 0], [0, 0, 1], [0, 0, 0]]>
 // CHECK: #[[GENERIC_CONFIG:.*]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 0], [4, [4]], [0, 0], [0, 0]]>
 //
-//      CHECK: func.func @scalable_2d_matmul_and_generic
+//      CHECK: func.func @scalable_2d_matmul_and_generi
+//      CHECK:   %[[C4:.*]] = arith.constant 4 : index
+//      CHECK:   %[[VSCALE:.*]] = vector.vscale
+//      CHECK:   %[[C4_VSCALE:.*]] = arith.muli %[[VSCALE]], %[[C4]] : index
 //      CHECK:   scf.for
+// CHECK-SAME:    step %[[C4_VSCALE]]
 // CHECK-SAME:   {
 //      CHECK:     scf.for
+// CHECK-SAME:      step %[[C4_VSCALE]]
 // CHECK-SAME:     {
 //      CHECK:       linalg.fill
 // CHECK-SAME:         lowering_config = #[[FILL_CONFIG]]
 //      CHECK:       linalg.matmul
 // CHECK-SAME:         lowering_config = #[[MATMUL_CONFIG]]
 //      CHECK:       scf.for
+// CHECK-SAME:        step %[[C4]]
 // CHECK-SAME:       {
 //      CHECK:         linalg.generic
 // CHECK-SAME:           lowering_config = #[[GENERIC_CONFIG]]
