@@ -4,7 +4,7 @@ icon: material/chart-line
 
 # Profiling with Tracy
 
-## Overview
+## :octicons-book-16: Overview
 
 [Tracy](https://github.com/wolfpld/tracy) is a hybrid instrumentation and
 sampling profiler that IREE uses for performance analysis.
@@ -46,7 +46,7 @@ graph LR
   tracyserver --> storage["Storage"]
 ```
 
-### The Tracy manual
+### :octicons-file-16: The Tracy manual
 
 !!! info "The Tracy manual"
 
@@ -56,7 +56,7 @@ graph LR
     [Download tracy.pdf :octicons-download-16:](https://github.com/wolfpld/tracy/releases/latest/download/tracy.pdf){ .md-button .md-button--primary }
     [View tracy.pdf in browser :material-magnify:](https://docs.google.com/viewer?url=https://github.com/wolfpld/tracy/releases/latest/download/tracy.pdf){ .md-button .md-button--primary }
 
-## Capturing a trace
+## :octicons-telescope-16: Capturing a trace
 
 You will need three things to capture a trace:
 
@@ -75,7 +75,7 @@ be built from source by using either the upstream CMake build or IREE's
 1. Build `iree-run-module` (or other tools like `iree-benchmark-module`) with
     tracing support:
 
-    ```bash
+    ```shell
     cmake -G Ninja -B ../iree-build/ -S . \
         -DCMAKE_BUILD_TYPE=RelWithDebInfo \
         -DIREE_ENABLE_RUNTIME_TRACING=ON
@@ -87,7 +87,7 @@ be built from source by using either the upstream CMake build or IREE's
         The `iree-runtime` Python package includes prebuilt instrumented tools.
         Set the `IREE_PY_RUNTIME=tracy` environment variable to use them:
 
-        ```bash
+        ```shell
         python -m pip install iree-runtime
         IREE_PY_RUNTIME=tracy iree-run-module ...
         ```
@@ -101,9 +101,9 @@ be built from source by using either the upstream CMake build or IREE's
 
 2. Compile a program to profile:
 
-    ```bash
-    iree-compile {program_input.mlir} \
-      --iree-hal-target-backends=llvm-cpu \
+    ```shell
+    iree-compile program_input.mlir \
+      --iree-hal-target-backends={target} \
       --iree-hal-executable-debug-level=3 \
       -o program.vmfb
     ```
@@ -115,9 +115,9 @@ be built from source by using either the upstream CMake build or IREE's
         Set the `TRACY_NO_EXIT=1` environment variable to keep short-running
         programs from exiting before connecting.
 
-    ```bash
+    ```shell
     iree-run-module \
-      --module={program.vmfb} \
+      --module=program.vmfb \
       --device=local-task \
       --entry_function={entry} \
       --parameters={parameters} \
@@ -164,10 +164,22 @@ be built from source by using either the upstream CMake build or IREE's
 
 #### Changing `IREE_TRACING_MODE`
 
-* Set IREE's `IREE_TRACING_MODE` value (defined in
-    [iree/base/tracing.h](https://github.com/openxla/iree/blob/main/runtime/src/iree/base/tracing.h))
-    to adjust which tracing features, such as allocation tracking and
-    callstacks, are enabled.
+Set IREE's `IREE_TRACING_MODE` value (defined in
+[iree/base/tracing.h](https://github.com/openxla/iree/blob/main/runtime/src/iree/base/tracing.h))
+to adjust which tracing features, such as allocation tracking and
+callstacks, are enabled.
+
+For example, to track memory allocations with callstacks:
+
+```shell
+cmake -G Ninja -B ../iree-build/ -S . \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    -DIREE_ENABLE_RUNTIME_TRACING=ON \
+    -DIREE_TRACING_MODE=4
+cmake --build ../iree-build/ --target iree-run-module
+```
+
+[![Tracy memory callstacks](https://github.com/openxla/iree/assets/4010439/c0732eec-3fc5-476b-8e6a-fa8c8631eaac)](https://github.com/openxla/iree/assets/4010439/c0732eec-3fc5-476b-8e6a-fa8c8631eaac)
 
 #### Options for the `llvm-cpu` backend
 
@@ -182,7 +194,22 @@ be built from source by using either the upstream CMake build or IREE's
 
 * Ensure that `--iree-llvmcpu-debug-symbols=true` is set (it is by default).
 
-### Remote capture (e.g. SSH, Android)
+Putting those flags together in an example:
+
+```shell
+iree-compile program_input.mlir \
+  --iree-hal-target-backends=llvm-cpu \
+  --iree-hal-executable-debug-level=3 \
+  --iree-llvmcpu-link-embedded=false \
+  --iree-llvmcpu-debug-symbols=true \
+  -o program_full_info.vmfb
+
+TRACY_NO_EXIT=1 IREE_PRESERVE_DYLIB_TEMP_FILES=1 iree-run-module \
+  --module=program_full_info.vmfb \
+  ...
+```
+
+### :octicons-server-16: Remote capture (e.g. SSH, Android)
 
 Tracy's client/server connection uses TCP port 8086 by default. If the
 Tracy-instrumented program is running on a separate machine, this port needs to
@@ -203,7 +230,7 @@ Tracing `iree-compile` is much like tracing the runtime tools, except that
 both of these options need to be set with CMake:
 `-DIREE_ENABLE_RUNTIME_TRACING=ON -DIREE_ENABLE_COMPILER_TRACING=ON`.
 
-## Touring the Tracy profiler UI
+## :octicons-graph-16: Touring the Tracy profiler UI
 
 The initial view should look like this:
 
@@ -269,7 +296,7 @@ source view pointing to the `.mlir` file.
 <!-- TODO: discuss memory profiling -->
 <!-- TODO: discuss comparing trace files -->
 
-## Troubleshooting
+## :octicons-question-16: Troubleshooting
 
 ### "RESOURCE_EXHAUSTED; failed to open file" issue
 
@@ -291,7 +318,7 @@ sudo sh -c "ulimit -n <bigNum> && <myTracyInstrumentedProgram>"
 
 ---
 
-## Appendix
+## :octicons-log-16: Appendix
 
 ### Building Tracy from source
 
