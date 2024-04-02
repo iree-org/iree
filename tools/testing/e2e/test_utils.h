@@ -1,5 +1,5 @@
-#ifndef IREE_TOOLS_TESTING_E2E_UTILS_H
-#define IREE_TOOLS_TESTING_E2E_UTILS_H
+#ifndef IREE_TOOLS_TESTING_E2E_TEST_UTILS_H
+#define IREE_TOOLS_TESTING_E2E_TEST_UTILS_H
 #include <stdio.h>
 
 #include "iree/base/api.h"
@@ -15,7 +15,7 @@ IREE_FLAG(
 IREE_FLAG(
     int32_t, max_elements_to_check, 10000,
     "Maximum number of tensor elements to check for the given test. For larger "
-    "matrices, only every n-th element will be checked for some n chosed to "
+    "buffers, only every n-th element will be checked for some n chosed to "
     "stay just under that threshold and to avoid being a divisor of the inner "
     "dimension size to avoid special patterns. As the check uses a slow "
     "reference implementation, this is a trade-off between test latency and "
@@ -150,4 +150,4 @@ iree_status_t load_and_run_e2e_tests(
     iree_allocator_t host_allocator,
     iree_status_t (*test_module_create)(iree_vm_instance_t*, iree_allocator_t,
                                         iree_vm_module_t**));
-#endif  // IREE_TOOLS_TESTING_E2E_UTILS
+#endif  // IREE_TOOLS_TESTING_E2E_TEST_UTILS
