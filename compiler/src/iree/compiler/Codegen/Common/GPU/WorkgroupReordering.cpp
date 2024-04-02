@@ -65,7 +65,7 @@ makeSwizzledIds(Location loc, OpBuilder b, Value workgroupIdX,
 }
 
 /// Transpose IDs, i.e., changes the traversal order from left -> right then
-/// top -> bottom to top -> down then left -> right.
+/// top -> bottom to top -> bottom then left -> right.
 static std::pair<Value, Value> makeTransposedIds(Location loc, OpBuilder b,
                                                  Value workgroupIdX,
                                                  Value workgroupIdY,
@@ -143,22 +143,22 @@ static LogicalResult reorderWorkgroupsInFunc(FunctionOpInterface funcOp,
   Value workgroupIdY =
       builder.create<IREE::HAL::InterfaceWorkgroupIDOp>(funcOp.getLoc(), 1);
   auto [workgroupCntX, workgroupCntY] = getWorkgroupCountsXY(builder, funcOp);
-  Value newX;
-  Value newY;
+  Value newWorkgroupIdX;
+  Value newWorkgroupIdY;
   if (strategy == ReorderWorkgrupsStrategy::Swizzle) {
-    std::tie(newX, newY) =
+    std::tie(newWorkgroupIdX, newWorkgroupIdY) =
         makeSwizzledIds(funcOp.getLoc(), builder, workgroupIdX, workgroupIdY,
                         workgroupCntX, workgroupCntY, swizzleTile);
   } else {
     assert(strategy == ReorderWorkgrupsStrategy::Transpose &&
            "Unhandled strategy");
-    std::tie(newX, newY) =
+    std::tie(newWorkgroupIdX, newWorkgroupIdY) =
         makeTransposedIds(funcOp.getLoc(), builder, workgroupIdX, workgroupIdY,
                           workgroupCntX, workgroupCntY);
   }
 
-  oldXId.replaceAllUsesWith(newX);
-  oldYId.replaceAllUsesWith(newY);
+  oldXId.replaceAllUsesWith(newWorkgroupIdX);
+  oldYId.replaceAllUsesWith(newWorkgroupIdY);
   oldXId->erase();
   oldYId->erase();
   return success();
