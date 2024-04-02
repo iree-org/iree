@@ -399,6 +399,8 @@ setConvolutionVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
       continue;
     intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType);
   }
+  if (intrinsics.empty())
+    return failure();
 
   // Note that the following heuristic seeds are just placeholder values.
   // We need to clean it up and make it adjusting to different targets.
@@ -534,6 +536,8 @@ setMatmulVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
       continue;
     intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType);
   }
+  if (intrinsics.empty())
+    return failure();
 
   GPUMMAHeuristicSeeds seeds;
 
