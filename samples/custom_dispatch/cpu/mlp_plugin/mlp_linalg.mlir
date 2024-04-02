@@ -1,4 +1,12 @@
-// RUN: iree-compile --iree-preprocessing-pdl-spec-filename=%p/linalg_pdl.mlir %s --compile-to=preprocessing | FileCheck %s
+// RUN: iree-compile --iree-preprocessing-pdl-spec-filename=%p/mlp_linalg_spec.pdl.mlir %s --compile-to=preprocessing | FileCheck %s
+
+// RUN: iree-compile --iree-preprocessing-pdl-spec-filename=%p/mlp_linalg_spec.pdl.mlir %s | \
+// RUN: iree-run-module --device=local-sync \
+// RUN:     --executable_plugin=$IREE_BINARY_DIR/samples/custom_dispatch/cpu/mlp_plugin/mlp_plugin$IREE_DYLIB_EXT \
+// RUN:     --module=- \
+// RUN:     --function=mlp_invocation \
+// RUN:     --input="2x4xf32=[[2.0, 2.0, 2.0, 2.0], [-2.0, -2.0, -2.0, -2.0]]" \
+// RUN:     --input="4x8xf32=[[3.0, -3.0, 3.0, -3.0], [3.0, -3.0, 3.0, -3.0], [3.0, -3.0, 3.0, -3.0], [3.0, -3.0, 3.0, -3.0], [3.0, -3.0, 3.0, -3.0], [3.0, -3.0, 3.0, -3.0], [3.0, -3.0, 3.0, -3.0], [3.0, -3.0, 3.0, -3.0]]" | FileCheck %s --check-prefix=OUTPUT
 
 // CHECK-LABEL:   stream.executable private @mlp_external_executable
 //       CHECK:   stream.executable.export public @mlp_external_entry_point
@@ -65,7 +73,6 @@
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 module @example attributes {hal.device.targets = [#cpu_target]} {
-
   func.func @mlp_invocation(%lhs: tensor<?x?xf32>,
                             %rhs: tensor<?x?xf32>) -> (tensor<?x?xf32>) {
     %c0 = arith.constant 0 : index
@@ -96,3 +103,7 @@ module @example attributes {hal.device.targets = [#cpu_target]} {
     return %neg : tensor<?x?xf32>
   }
 }  // module
+
+  // OUTPUT-LABEL: EXEC @mlp_invocation
+  //       OUTPUT: [Plugin]: M = 2, N = 8, K = 4
+  //       OUTPUT: 2x8xf32=[-24 -0 -24 -0 -24 -0 -24 -0][-0 -24 -0 -24 -0 -24 -0 -24]
