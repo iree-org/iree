@@ -115,8 +115,10 @@ public:
     registry.insert<gpu::GPUDialect>();
   }
 
-  LogicalResult initializeOptions(StringRef options) override {
-    if (failed(Pass::initializeOptions(options)))
+  LogicalResult initializeOptions(
+      StringRef options,
+      function_ref<LogicalResult(const Twine &)> errorHandler) override {
+    if (failed(Pass::initializeOptions(options, errorHandler)))
       return failure();
     // Consider pass option too
     promoteCMatrix |= this->promoteC;
