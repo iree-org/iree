@@ -125,7 +125,7 @@ function run_in_docker() {
     cache_dir="$(cd ${cache_dir} && pwd)"
     echo "Caching build artifacts to ${cache_dir}"
     export CCACHE_DIR="${cache_dir}/ccache"
-    export CCACHE_MAXSIZE="2G"
+    export CCACHE_MAXSIZE="3G"
     export CMAKE_C_COMPILER_LAUNCHER=ccache
     export CMAKE_CXX_COMPILER_LAUNCHER=ccache
     # Configure pip cache dir.
