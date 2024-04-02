@@ -33,6 +33,7 @@ iree_lit_test_suite(
     cfg = "//compiler:lit.cfg.py",
     data = [
         "external_function_spec.mlir",
+        "pdl_patterns.mlir",
     ],
     tools = [
         "//tools:iree-opt",

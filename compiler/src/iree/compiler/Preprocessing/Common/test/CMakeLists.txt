@@ -26,6 +26,7 @@ iree_lit_test_suite(
     iree-opt
   DATA
     external_function_spec.mlir
+    pdl_patterns.mlir
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
