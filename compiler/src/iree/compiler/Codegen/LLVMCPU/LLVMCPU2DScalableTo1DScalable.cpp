@@ -11,7 +11,6 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Pass/Pass.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler {
 
@@ -93,49 +92,39 @@ static bool opKnownToSupport2DScalableVectorizationWithArmSME(Operation *op) {
 // Note: It would be easy to parameterize this rewrite to convert N-D scalable
 // operations to M-D scalable ones (where M < N). However this is currently not
 // needed.
-struct DropUnsupportedScalableDimsFromTilingInterfaceOps
-    : public OpInterfaceRewritePattern<TilingInterface> {
-  DropUnsupportedScalableDimsFromTilingInterfaceOps(MLIRContext *context,
-                                                    bool assumeArmSME)
-      : OpInterfaceRewritePattern(context), assumeArmSME(assumeArmSME) {}
+static LogicalResult
+dropScalabilityFromUnsupportedOperations(mlir::FunctionOpInterface funcOp,
+                                         bool assumeArmSME = false) {
+  // Note: Which operations should have scalability dropped is specific to
+  // ArmSME. The rest of this rewrite could be generic (though currently
+  // there's no other targets that support > 1D scalability).
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
+  bool isArmSME = assumeArmSME || hasSMEFeature(targetAttr);
 
-  LogicalResult matchAndRewrite(TilingInterface op,
-                                PatternRewriter &rewriter) const override {
-    // Note: Which operations should have scalability dropped is specific to
-    // ArmSME. The rest of this rewrite could be generic (though currently
-    // there's no other targets that support > 1D scalability).
-    auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
-    bool isArmSME = assumeArmSME || hasSMEFeature(targetAttr);
-    if (!isArmSME || opKnownToSupport2DScalableVectorizationWithArmSME(op))
-      return failure();
+  if (!isArmSME)
+    return success();
 
-    auto loweringConfigAttr = getLoweringConfig(op);
+  SmallVector<TilingInterface> computeOps;
+  funcOp.walk([&](TilingInterface op) {
+    if (!opKnownToSupport2DScalableVectorizationWithArmSME(op))
+      computeOps.push_back(op);
+  });
+
+  for (TilingInterface tilingOp : computeOps) {
+    auto loweringConfigAttr = getLoweringConfig(tilingOp);
     if (!loweringConfigAttr)
-      return failure();
+      continue;
 
-    auto tileSizes = loweringConfigAttr.getTileSizeVals();
-    auto scalableFlags = loweringConfigAttr.getScalableTileFlagVals();
-
-    // 1. Drop scalable dimensions from leading tiling levels first (and leading
-    // dimensions within tiling levels). This works out as dropping scalability
-    // from leading dimensions of the vector type.
-    int64_t firstTilingLevelWithScalableDims = -1;
-    int64_t numScalableDims = 0;
-    for (auto [level, levelScalableFlags] : llvm::enumerate(scalableFlags)) {
-      numScalableDims += llvm::count(levelScalableFlags, true);
-      if (numScalableDims > 0 && firstTilingLevelWithScalableDims == -1)
-        firstTilingLevelWithScalableDims = level;
-    }
+    TilingConfig tilingConfig(loweringConfigAttr);
+    auto [vectorSizes, scalableFlags] = tilingConfig.getVectorTileSizes();
+    auto numScalableDims = llvm::count(scalableFlags, true);
 
     if (numScalableDims <= 1)
-      return failure();
-
-    auto levelTileSizes = tileSizes[firstTilingLevelWithScalableDims];
-    auto levelScalableFlags = scalableFlags[firstTilingLevelWithScalableDims];
+      continue;
 
     SmallVector<int64_t> loopTileSizes;
     SmallVector<bool> newScalableFlags;
-    for (auto [flag, size] : llvm::zip(levelScalableFlags, levelTileSizes)) {
+    for (auto [flag, size] : llvm::zip_equal(scalableFlags, vectorSizes)) {
       if (flag && numScalableDims >= 2) {
         --numScalableDims;
         loopTileSizes.push_back(size);
@@ -146,41 +135,34 @@ struct DropUnsupportedScalableDimsFromTilingInterfaceOps
       }
     }
 
+    IRRewriter rewriter(tilingOp->getContext());
+    rewriter.setInsertionPoint(tilingOp);
+
     // 2. Re-tile the operation with some scalability dropped. This introduces
     // loops for previously scalable vector/tile sizes.
     scf::SCFTilingOptions options{};
-    setSCFTileSizes(options, op, loopTileSizes, {});
-    auto tilingResult =
-        scf::tileUsingSCF(rewriter, cast<TilingInterface>(op), options);
+    setSCFTileSizes(options, tilingOp, loopTileSizes, {});
+    auto tilingResult = scf::tileUsingSCF(rewriter, tilingOp, options);
     if (failed(tilingResult))
       return failure();
 
     // 3. Update the lowering config of the new tiled operations.
-    scalableFlags[firstTilingLevelWithScalableDims] = newScalableFlags;
-    auto newLoweringConfig = IREE::Codegen::LoweringConfigAttr::get(
-        getContext(), tileSizes, scalableFlags);
+    auto newLoweringConfig =
+        tilingConfig.withNewVectorSizes(vectorSizes, newScalableFlags);
     for (auto *newOp : tilingResult->tiledOps) {
       if (isa<TilingInterface>(newOp))
         setLoweringConfig(newOp, newLoweringConfig);
     }
 
-    rewriter.replaceOp(op, tilingResult->replacements);
-    return success();
-  };
-
-private:
-  bool assumeArmSME{false};
-};
+    rewriter.replaceOp(tilingOp, tilingResult->replacements);
+  }
+  return success();
+}
 
 void LLVMCPU2DScalableTo1DScalablePass::runOnOperation() {
-  RewritePatternSet patterns(&getContext());
-  patterns.add<DropUnsupportedScalableDimsFromTilingInterfaceOps>(
-      patterns.getContext(), assumeArmSME);
-
-  if (mlir::failed(mlir::applyPatternsAndFoldGreedily(getOperation(),
-                                                      std::move(patterns)))) {
+  if (failed(dropScalabilityFromUnsupportedOperations(getOperation(),
+                                                      assumeArmSME)))
     signalPassFailure();
-  }
 }
 
 } // namespace
