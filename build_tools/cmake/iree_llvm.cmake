@@ -139,6 +139,14 @@ macro(iree_llvm_set_bundled_cmake_options)
   set(LLVM_ENABLE_IDE ON CACHE BOOL "")
   set(LLVM_ENABLE_BINDINGS OFF CACHE BOOL "")
 
+  # Force LLVM to avoid dependencies, which we don't ever really want in our
+  # limited builds.
+  set(LLVM_ENABLE_LIBEDIT OFF CACHE BOOL "Default disable")
+  set(LLVM_ENABLE_LIBXML2 OFF CACHE BOOL "Default disable")
+  set(LLVM_ENABLE_TERMINFO OFF CACHE BOOL "Default disable")
+  set(LLVM_ENABLE_ZLIB OFF CACHE BOOL "Default disable")
+  set(LLVM_ENABLE_ZSTD OFF CACHE BOOL "Default disable")
+
   # LLVM defaults to building all targets. We always enable targets that we need
   # as we need them, so default to none. The user can override this as needed,
   # which is fine.
