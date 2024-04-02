@@ -14,7 +14,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_cpu_arm_sme_nondt_f32_small
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -40,7 +40,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_cpu_arm_sme_nondt_f32_large
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -66,7 +66,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_cpu_dt_i8_i32_small
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -95,7 +95,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_cpu_dt_i8_i32_large
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -125,7 +125,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_cpu_dt_f32_f32_small
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -153,7 +153,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_cpu_dt_f32_f32_large
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -182,7 +182,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_cpu_dt_f16_f16_small
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -212,7 +212,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_cpu_dt_f16_f16_large
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -244,7 +244,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_cpu_dt_f16_f32_small
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -274,7 +274,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_cpu_dt_f16_f32_large
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -306,7 +306,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_cpu_dt_bf16_bf16_small
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -337,7 +337,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_cpu_dt_bf16_bf16_large
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -370,7 +370,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_cpu_dt_bf16_f32_small
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -401,7 +401,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_cpu_dt_bf16_f32_large
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -434,7 +434,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_cpu_dt_uk_i8_i32_small
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -463,7 +463,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_cpu_dt_uk_i8_i32_large
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -493,7 +493,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_cpu_dt_uk_f32_f32_small
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -521,7 +521,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_cpu_dt_uk_f32_f32_large
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -550,7 +550,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_cpu_dt_uk_f16_f16_small
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -580,7 +580,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_cpu_dt_uk_f16_f16_large
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -612,7 +612,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_cpu_dt_uk_f16_f32_small
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -642,7 +642,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_cpu_dt_uk_f16_f32_large
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -674,7 +674,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_cpu_dt_uk_bf16_bf16_small
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -705,7 +705,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_cpu_dt_uk_bf16_bf16_large
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -738,7 +738,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_cpu_dt_uk_bf16_f32_small
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -769,7 +769,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_cpu_dt_uk_bf16_f32_large
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -802,7 +802,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_vmvx_dt_uk_i8_small
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -823,7 +823,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_vmvx_dt_uk_f32_small
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -844,7 +844,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_cuda_f32_large_simt
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -869,7 +869,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_cuda_f32_large_tensorcore
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -896,7 +896,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_cuda_f32_large_unaligned
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -922,7 +922,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_cuda_f16_large_unaligned
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -948,7 +948,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_cuda_f32_large_mma_sync
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -975,7 +975,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_cuda_f16_large_tensorcore
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -1002,7 +1002,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_cuda_f16_large_mma_sync
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -1029,7 +1029,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_cuda_f32_large_splitk
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -1056,7 +1056,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_rocm_f16_large_cdna3_mfma
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -1084,7 +1084,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_rocm_f16_large_cdna3_mfma_tb
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -1113,7 +1113,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_vulkan_i8_large_valhall
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -1137,7 +1137,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_vulkan_f16_large_valhall
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -1161,7 +1161,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_vulkan_f32_large_valhall
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -1185,7 +1185,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_vulkan_i8_large_ampere
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -1209,7 +1209,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_vulkan_f16_large_ampere
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -1233,7 +1233,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_vulkan_f32_large_ampere
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS
@@ -1257,7 +1257,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_vulkan_f16_large_rdna3
   TEST_TYPE
-    matmuls
+    matmul
   GENERATOR
     "generate_e2e_matmul_tests.py"
   GENERATOR_ARGS

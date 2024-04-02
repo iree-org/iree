@@ -14,7 +14,7 @@ package(
 
 iree_runtime_cc_library(
     name = "e2e_test_util",
-    srcs = ["test_utils.cc"],
+    srcs = ["test_utils.c"],
     hdrs = ["test_utils.h"],
     deps = [
         "//runtime/src/iree/base",

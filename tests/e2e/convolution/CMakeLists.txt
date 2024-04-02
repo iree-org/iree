@@ -14,7 +14,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_conv2d_cpu_f32_f32_f32_small
   TEST_TYPE
-    conv2ds
+    conv2d
   GENERATOR
     "generate_e2e_conv2d_tests.py"
   GENERATOR_ARGS
@@ -28,10 +28,9 @@ iree_generated_e2e_runner_test(
     "llvm-cpu"
   DRIVERS
     "local-task"
-  COMPILER_FLAGS
-
   LABELS
-
+    "hostonly"
+    "local"
   TARGET_CPU_FEATURES_VARIANTS
     "default"
 )
@@ -40,7 +39,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_conv2d_cpu_f32_f32_f32_medium
   TEST_TYPE
-    conv2ds
+    conv2d
   GENERATOR
     "generate_e2e_conv2d_tests.py"
   GENERATOR_ARGS
@@ -54,10 +53,9 @@ iree_generated_e2e_runner_test(
     "llvm-cpu"
   DRIVERS
     "local-task"
-  COMPILER_FLAGS
-
   LABELS
-
+    "hostonly"
+    "local"
   TARGET_CPU_FEATURES_VARIANTS
     "default"
 )
@@ -66,7 +64,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_conv2d_cpu_f32_f32_f32_large
   TEST_TYPE
-    conv2ds
+    conv2d
   GENERATOR
     "generate_e2e_conv2d_tests.py"
   GENERATOR_ARGS
@@ -80,10 +78,9 @@ iree_generated_e2e_runner_test(
     "llvm-cpu"
   DRIVERS
     "local-task"
-  COMPILER_FLAGS
-
   LABELS
-
+    "hostonly"
+    "local"
   TARGET_CPU_FEATURES_VARIANTS
     "default"
 )
@@ -92,7 +89,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_conv2d_cpu_f16_f16_f16_small
   TEST_TYPE
-    conv2ds
+    conv2d
   GENERATOR
     "generate_e2e_conv2d_tests.py"
   GENERATOR_ARGS
@@ -106,10 +103,9 @@ iree_generated_e2e_runner_test(
     "llvm-cpu"
   DRIVERS
     "local-task"
-  COMPILER_FLAGS
-
   LABELS
-
+    "hostonly"
+    "local"
   TARGET_CPU_FEATURES_VARIANTS
     "default"
 )
@@ -118,7 +114,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_conv2d_cpu_f16_f16_f16_medium
   TEST_TYPE
-    conv2ds
+    conv2d
   GENERATOR
     "generate_e2e_conv2d_tests.py"
   GENERATOR_ARGS
@@ -132,10 +128,9 @@ iree_generated_e2e_runner_test(
     "llvm-cpu"
   DRIVERS
     "local-task"
-  COMPILER_FLAGS
-
   LABELS
-
+    "hostonly"
+    "local"
   TARGET_CPU_FEATURES_VARIANTS
     "default"
 )
@@ -144,7 +139,7 @@ iree_generated_e2e_runner_test(
   NAME
     e2e_conv2d_cpu_f16_f16_f16_large
   TEST_TYPE
-    conv2ds
+    conv2d
   GENERATOR
     "generate_e2e_conv2d_tests.py"
   GENERATOR_ARGS
@@ -158,10 +153,9 @@ iree_generated_e2e_runner_test(
     "llvm-cpu"
   DRIVERS
     "local-task"
-  COMPILER_FLAGS
-
   LABELS
-
+    "hostonly"
+    "local"
   TARGET_CPU_FEATURES_VARIANTS
     "default"
 )

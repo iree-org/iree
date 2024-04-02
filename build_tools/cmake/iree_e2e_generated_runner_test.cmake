@@ -13,9 +13,10 @@ include(CMakeParseArguments)
 #
 # Parameters:
 #   NAME: Name of the target
+#   TEST_TYPE: Type of test (Currently, matmul and conv2d are supported).
 #   VARIANT_NAME: Variant name to suffix NAME with.
-#       Will reuse the same test/calls vmfb files.
-#   TESTS_SRC: mlir source file with tests to be compiled to an IREE module.
+#       Will reuse the same TEST_TYPE/calls vmfb files.
+#   TESTS_SRC: mlir source file with TEST_TYPE to be compiled to an IREE module.
 #   TESTS_VMFB: specifies the path to use for the generated IREE module.
 #   CALLS_SRC: mlir source file with calls to be compiled to an IREE module.
 #   CALLS_VMFB: specifies the path to use for the generated IREE module.
@@ -133,11 +134,11 @@ endfunction()
 #
 # Parameters:
 #   NAME: Name of the target
-#   TEST_TYPE: Name of the test
+#   TEST_TYPE: Type of test (Currently, matmul and conv are supported).
 #   GENERATOR: Program (at the moment, must be Python3) to run to generate the
 #       source file (and possibly a trace file and module path). It will be
 #       invoked with the following standard flags, in addition to GENERATOR_ARGS:
-#         --output_${TEST_TYPE}s_mlir=${CMAKE_CURRENT_BINARY_DIR}/name_${TEST_TYPE}s.mlir
+#         --output_${TEST_TYPE}_mlir=${CMAKE_CURRENT_BINARY_DIR}/name_${TEST_TYPE}.mlir
 #         --output_calls_mlir=${CMAKE_CURRENT_BINARY_DIR}/name_calls.mlir
 #       and if TARGET_CPU_FEATURES is not empty:
 #         --requirements=${TARGET_CPU_FEATURES}
@@ -387,10 +388,11 @@ endfunction()
 # One test is generated per source and backend/driver pair.
 # Parameters:
 #   NAME: Name of the target
+#   TEST_TYPE: Type of test (Currently, matmul and conv are supported).
 #   GENERATOR: Program (at the moment, must be Python3) to run to generate the
 #       source file (and possibly a trace file and module path). It will be
 #       invoked with the following standard flags, in addition to GENERATOR_ARGS:
-#         --output_${TEST_TYPE}s_mlir=${CMAKE_CURRENT_BINARY_DIR}/name_${TEST_TYPE}s.mlir
+#         --output_${TEST_TYPE}_mlir=${CMAKE_CURRENT_BINARY_DIR}/name_${TEST_TYPE}.mlir
 #         --output_calls_mlir=${CMAKE_CURRENT_BINARY_DIR}/name_calls.mlir
 #   GENERATOR_ARGS: additional args to pass to the generator program.
 #   TARGET_BACKENDS: backends to compile the module for. These form pairs with

@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <assert.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,15 +18,17 @@
 #include "iree/tooling/device_util.h"
 #include "iree/vm/api.h"
 #include "iree/vm/native_module_cc.h"
-#include "test_utils.h"
+#include "tools/testing/e2e/test_utils.h"
 
 //===----------------------------------------------------------------------===//
 // Reference conv2d (NCHW-FCHW)
 //===----------------------------------------------------------------------===//
 
-int convert_to_1d_index(iree_hal_dim_t channels, iree_hal_dim_t height,
-                        iree_hal_dim_t width, iree_hal_dim_t n,
-                        iree_hal_dim_t c, iree_hal_dim_t h, iree_hal_dim_t w) {
+// Conversion from 4D indices in row major order to 1D index.
+static int convert_to_1d_index(iree_hal_dim_t channels, iree_hal_dim_t height,
+                               iree_hal_dim_t width, iree_hal_dim_t n,
+                               iree_hal_dim_t c, iree_hal_dim_t h,
+                               iree_hal_dim_t w) {
   return n * (channels * height * width) + c * (height * width) + h * width + w;
 }
 
@@ -159,11 +160,13 @@ static iree_status_t reference_conv2d(
     for (iree_hal_dim_t oc = 0; oc < f_size; ++oc) {
       for (iree_hal_dim_t oh = 0; oh < oh_size; ++oh) {
         for (iree_hal_dim_t ow = 0; ow < ow_size; ++ow) {
-          IREE_RETURN_IF_ERROR(reference_conv2d_element(
-              n_size, c_size, h_size, w_size, f_size, kh_size, kw_size, sh_size,
-              sw_size, dh_size, dw_size, oh_size, ow_size, input_type,
-              kernel_type, acc_type, input_contents.data, kernel_contents.data,
-              acc_contents.data, result_contents.data, n, oc, oh, ow));
+          IREE_RETURN_AND_END_ZONE_IF_ERROR(
+              z0, reference_conv2d_element(
+                      n_size, c_size, h_size, w_size, f_size, kh_size, kw_size,
+                      sh_size, sw_size, dh_size, dw_size, oh_size, ow_size,
+                      input_type, kernel_type, acc_type, input_contents.data,
+                      kernel_contents.data, acc_contents.data,
+                      result_contents.data, n, oc, oh, ow));
         }
       }
     }
@@ -360,11 +363,14 @@ static iree_status_t check_conv2d_results_impl(FILE* file,
           count = 0;
           iree_hal_dim_t idx =
               convert_to_1d_index(results->f, oh_size, ow_size, n, oc, oh, ow);
-          iree_e2e_test_value_t actual_value = read_buffer_element(
-              idx, results->result_type, results->actual_contents.data);
-          iree_e2e_test_value_t expected_value = read_buffer_element(
-              idx, results->result_type, results->expected_contents.data);
-          if (!result_elements_agree(actual_value, expected_value)) {
+          iree_test_utils_e2e_value_t actual_value =
+              iree_test_utils_read_buffer_element(
+                  idx, results->result_type, results->actual_contents.data);
+          iree_test_utils_e2e_value_t expected_value =
+              iree_test_utils_read_buffer_element(
+                  idx, results->result_type, results->expected_contents.data);
+          if (!iree_test_utils_result_elements_agree(actual_value,
+                                                     expected_value)) {
             fprintf(
                 file,
                 "\n\nerror: the actual and expected result tensors disagree "
@@ -390,7 +396,7 @@ static iree_status_t check_conv2d_results_impl(FILE* file,
 static iree_status_t check_conv2d_results(FILE* file,
                                           const conv2d_results_t* results) {
   IREE_TRACE_ZONE_BEGIN(z0);
-  // TODO: Increase the check every to x to reduce the number of comparisons.
+  // TODO: Increase the check every param to reduce the number of comparisons.
   int check_every = 1;
   iree_status_t status = check_conv2d_results_impl(file, results, check_every);
   if (!iree_status_is_ok(status) && check_every > 1) {
@@ -413,9 +419,7 @@ static iree_status_t check_conv2d_results(FILE* file,
 // TBD so this file is written in C besides this module so that we can swap it
 // back to being pure C in the future.
 
-namespace {
-
-using namespace iree;
+namespace iree {
 
 class Conv2dTestModuleState final {
  public:
@@ -460,7 +464,8 @@ class Conv2dTestModuleState final {
           // max].
           int32_t min = 0;
           int32_t max = 0;
-          get_min_max_for_element_type(callback_state.element_type, &min, &max);
+          iree_test_utils_get_min_max_for_element_type(
+              callback_state.element_type, &min, &max);
           uint32_t range = (max - min + 1);
           iree_host_size_t element_byte_count =
               iree_hal_element_dense_byte_count(callback_state.element_type);
@@ -468,8 +473,11 @@ class Conv2dTestModuleState final {
           uint32_t state = callback_state.seed;
           for (uint8_t* data = span.data; data < data_end;
                data += element_byte_count) {
-            int32_t value = (int32_t)pseudorandom_range(&state, range) + min;
-            write_element(callback_state.element_type, value, data);
+            int32_t value =
+                (int32_t)iree_test_utils_pseudorandom_range(&state, range) +
+                min;
+            iree_test_utils_write_element(callback_state.element_type, value,
+                                          data);
           }
           return iree_ok_status();
         },
@@ -516,17 +524,17 @@ struct Conv2dTestModule final : public vm::NativeModule<Conv2dTestModuleState> {
   }
 };
 
-}  // namespace
+}  // namespace iree
 
 static iree_status_t conv2d_test_module_create(iree_vm_instance_t* instance,
                                                iree_allocator_t host_allocator,
                                                iree_vm_module_t** out_module) {
   IREE_ASSERT_ARGUMENT(out_module);
   *out_module = NULL;
-  auto module = std::make_unique<Conv2dTestModule>(
+  auto module = std::make_unique<iree::Conv2dTestModule>(
       "conv2d_test", /*version=*/0, instance, host_allocator,
-      iree::span<const vm::NativeFunction<Conv2dTestModuleState>>(
-          kConv2dTestModuleFunctions));
+      iree::span<const iree::vm::NativeFunction<iree::Conv2dTestModuleState>>(
+          iree::kConv2dTestModuleFunctions));
   *out_module = module.release()->interface();
   return iree_ok_status();
 }
@@ -541,8 +549,8 @@ int main(int argc, char** argv) {
     return EXIT_FAILURE;
   }
 
-  iree_status_t status = load_and_run_e2e_tests(iree_allocator_system(),
-                                                conv2d_test_module_create);
+  iree_status_t status = iree_test_utils_load_and_run_e2e_tests(
+      iree_allocator_system(), conv2d_test_module_create);
   int exit_code = EXIT_SUCCESS;
   if (!iree_status_is_ok(status)) {
     iree_status_fprint(stderr, status);

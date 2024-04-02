@@ -862,7 +862,7 @@ class BuildFileFunctions(object):
         test_type,
         generator,
         generator_args=None,
-        test_runner="",
+        test_runner=None,
         target_backends_and_drivers=None,
         compiler_flags=None,
         runner_args=None,
@@ -891,9 +891,6 @@ class BuildFileFunctions(object):
         generator_args_block = self._convert_string_list_block(
             "GENERATOR_ARGS", generator_args
         )
-        # Use the fully qualified target name
-        target_name_prefix = "iree_tools_testing_e2e_"
-        test_runner = f"{target_name_prefix}{test_runner.split(':')[-1]}"
         test_runner_block = self._convert_target_block("TEST_RUNNER", test_runner)
         target_backends_block = self._convert_string_list_block(
             "TARGET_BACKENDS", target_backends

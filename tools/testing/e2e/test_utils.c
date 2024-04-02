@@ -1,6 +1,11 @@
-#include "test_utils.h"
+// Copyright 2024 The IREE Authors
+//
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <assert.h>
+#include "tools/testing/e2e/test_utils.h"
+
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,12 +21,11 @@
 #include "iree/tooling/context_util.h"
 #include "iree/tooling/device_util.h"
 #include "iree/vm/api.h"
-#include "iree/vm/native_module_cc.h"
 
-const char* emoji(bool good) { return good ? "🦄" : "🐞"; }
+const char* iree_test_utils_emoji(bool good) { return good ? "🦄" : "🐞"; }
 
-int calculate_check_every(iree_hal_dim_t tot_elements,
-                          iree_hal_dim_t no_div_of) {
+int iree_test_utils_calculate_check_every(iree_hal_dim_t tot_elements,
+                                          iree_hal_dim_t no_div_of) {
   int check_every = 1;
   if (FLAG_max_elements_to_check) {
     check_every = ((tot_elements) + FLAG_max_elements_to_check - 1) /
@@ -33,101 +37,99 @@ int calculate_check_every(iree_hal_dim_t tot_elements,
   return check_every;
 }
 
-inline iree_e2e_test_value_t iree_e2e_test_value_make_none() {
-  iree_e2e_test_value_t result;
-  result.type = IREE_E2E_TEST_VALUE_TYPE_NONE;
+iree_test_utils_e2e_value_t iree_test_utils_value_make_none() {
+  iree_test_utils_e2e_value_t result;
+  result.type = IREE_TEST_UTILS_VALUE_TYPE_NONE;
   return result;
 }
 
-inline iree_e2e_test_value_t iree_e2e_test_value_make_i8(int8_t value) {
-  iree_e2e_test_value_t result;
-  result.type = IREE_E2E_TEST_VALUE_TYPE_I8;
+iree_test_utils_e2e_value_t iree_test_utils_value_make_i8(int8_t value) {
+  iree_test_utils_e2e_value_t result;
+  result.type = IREE_TEST_UTILS_VALUE_TYPE_I8;
   result.i8 = value;
   return result;
 }
 
-inline iree_e2e_test_value_t iree_e2e_test_value_make_i16(int16_t value) {
-  iree_e2e_test_value_t result;
-  result.type = IREE_E2E_TEST_VALUE_TYPE_I16;
+iree_test_utils_e2e_value_t iree_test_utils_value_make_i16(int16_t value) {
+  iree_test_utils_e2e_value_t result;
+  result.type = IREE_TEST_UTILS_VALUE_TYPE_I16;
   result.i16 = value;
   return result;
 }
 
-inline iree_e2e_test_value_t iree_e2e_test_value_make_i32(int32_t value) {
-  iree_e2e_test_value_t result;
-  result.type = IREE_E2E_TEST_VALUE_TYPE_I32;
+iree_test_utils_e2e_value_t iree_test_utils_value_make_i32(int32_t value) {
+  iree_test_utils_e2e_value_t result;
+  result.type = IREE_TEST_UTILS_VALUE_TYPE_I32;
   result.i32 = value;
   return result;
 }
 
-inline iree_e2e_test_value_t iree_e2e_test_value_make_f16(uint16_t value) {
-  iree_e2e_test_value_t result;
-  result.type = IREE_E2E_TEST_VALUE_TYPE_F16;
+iree_test_utils_e2e_value_t iree_test_utils_value_make_f16(uint16_t value) {
+  iree_test_utils_e2e_value_t result;
+  result.type = IREE_TEST_UTILS_VALUE_TYPE_F16;
   result.f16_u16 = value;
   return result;
 }
 
-inline iree_e2e_test_value_t iree_e2e_test_value_make_bf16(uint16_t value) {
-  iree_e2e_test_value_t result;
-  result.type = IREE_E2E_TEST_VALUE_TYPE_BF16;
+iree_test_utils_e2e_value_t iree_test_utils_value_make_bf16(uint16_t value) {
+  iree_test_utils_e2e_value_t result;
+  result.type = IREE_TEST_UTILS_VALUE_TYPE_BF16;
   result.bf16_u16 = value;
   return result;
 }
 
-inline iree_e2e_test_value_t iree_e2e_test_value_make_f32(float value) {
-  iree_e2e_test_value_t result;
-  result.type = IREE_E2E_TEST_VALUE_TYPE_F32;
+iree_test_utils_e2e_value_t iree_test_utils_value_make_f32(float value) {
+  iree_test_utils_e2e_value_t result;
+  result.type = IREE_TEST_UTILS_VALUE_TYPE_F32;
   result.f32 = value;
   return result;
 }
 
-// Reads an element from a buffer given index.
-iree_e2e_test_value_t read_buffer_element(iree_hal_dim_t index,
-                                          iree_hal_element_type_t result_type,
-                                          const void* data) {
+iree_test_utils_e2e_value_t iree_test_utils_read_buffer_element(
+    iree_hal_dim_t index, iree_hal_element_type_t result_type,
+    const void* data) {
   if (iree_hal_element_type_is_integer(result_type, 8)) {
-    return iree_e2e_test_value_make_i8(((int8_t*)data)[index]);
+    return iree_test_utils_value_make_i8(((int8_t*)data)[index]);
   } else if (iree_hal_element_type_is_integer(result_type, 16)) {
-    return iree_e2e_test_value_make_i16(((int16_t*)data)[index]);
+    return iree_test_utils_value_make_i16(((int16_t*)data)[index]);
   } else if (iree_hal_element_type_is_integer(result_type, 32)) {
-    return iree_e2e_test_value_make_i32(((int32_t*)data)[index]);
+    return iree_test_utils_value_make_i32(((int32_t*)data)[index]);
   } else if (result_type == IREE_HAL_ELEMENT_TYPE_FLOAT_16) {
-    return iree_e2e_test_value_make_f16(((uint16_t*)data)[index]);
+    return iree_test_utils_value_make_f16(((uint16_t*)data)[index]);
   } else if (result_type == IREE_HAL_ELEMENT_TYPE_BFLOAT_16) {
-    return iree_e2e_test_value_make_bf16(((uint16_t*)data)[index]);
+    return iree_test_utils_value_make_bf16(((uint16_t*)data)[index]);
   } else if (result_type == IREE_HAL_ELEMENT_TYPE_FLOAT_32) {
-    return iree_e2e_test_value_make_f32(((float*)data)[index]);
+    return iree_test_utils_value_make_f32(((float*)data)[index]);
   }
   iree_status_abort(iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                      "unhandled matmul result type"));
-  return iree_e2e_test_value_make_none();
+  return iree_test_utils_value_make_none();
 }
 
-// Prints a iree_e2e_test_value_t to a string buffer. Returns the number of
-// characters written. Like snprintf.
-int snprintf_value(char* buf, size_t bufsize, iree_e2e_test_value_t value,
-                   precision_t precision) {
+int iree_test_utils_snprintf_value(char* buf, size_t bufsize,
+                                   iree_test_utils_e2e_value_t value,
+                                   precision_t precision) {
   switch (value.type) {
-    case IREE_E2E_TEST_VALUE_TYPE_I8:
+    case IREE_TEST_UTILS_VALUE_TYPE_I8:
       return snprintf(buf, bufsize, "%" PRIi8, value.i8);
-    case IREE_E2E_TEST_VALUE_TYPE_I16:
+    case IREE_TEST_UTILS_VALUE_TYPE_I16:
       return snprintf(buf, bufsize, "%" PRIi16, value.i16);
-    case IREE_E2E_TEST_VALUE_TYPE_I32:
+    case IREE_TEST_UTILS_VALUE_TYPE_I32:
       return snprintf(buf, bufsize, "%" PRIi32, value.i32);
-    case IREE_E2E_TEST_VALUE_TYPE_I64:
+    case IREE_TEST_UTILS_VALUE_TYPE_I64:
       return snprintf(buf, bufsize, "%" PRIi64, value.i64);
-    case IREE_E2E_TEST_VALUE_TYPE_F16:
+    case IREE_TEST_UTILS_VALUE_TYPE_F16:
       return snprintf(buf, bufsize,
                       precision == PRECISION_HIGH ? "%.5g" : "%.4g",
                       iree_math_f16_to_f32(value.f16_u16));
-    case IREE_E2E_TEST_VALUE_TYPE_BF16:
+    case IREE_TEST_UTILS_VALUE_TYPE_BF16:
       return snprintf(buf, bufsize,
                       precision == PRECISION_HIGH ? "%.5g" : "%.4g",
                       iree_math_bf16_to_f32(value.bf16_u16));
-    case IREE_E2E_TEST_VALUE_TYPE_F32:
+    case IREE_TEST_UTILS_VALUE_TYPE_F32:
       return snprintf(buf, bufsize,
                       precision == PRECISION_HIGH ? "%.8g" : "%.4g", value.f32);
-    case IREE_E2E_TEST_VALUE_TYPE_F64:
+    case IREE_TEST_UTILS_VALUE_TYPE_F64:
       return snprintf(buf, bufsize,
                       precision == PRECISION_HIGH ? "%.16g" : "%.4g",
                       value.f64);
@@ -138,9 +140,8 @@ int snprintf_value(char* buf, size_t bufsize, iree_e2e_test_value_t value,
   }
 }
 
-// Returns true if |expected| and |actual| agree to tolerable accuracy.
-bool result_elements_agree(iree_e2e_test_value_t expected,
-                           iree_e2e_test_value_t actual) {
+bool iree_test_utils_result_elements_agree(iree_test_utils_e2e_value_t expected,
+                                           iree_test_utils_e2e_value_t actual) {
   if (expected.type != actual.type) {
     iree_status_abort(
         iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "mismatched types"));
@@ -156,25 +157,25 @@ bool result_elements_agree(iree_e2e_test_value_t expected,
   }
 
   switch (expected.type) {
-    case IREE_E2E_TEST_VALUE_TYPE_I32:
+    case IREE_TEST_UTILS_VALUE_TYPE_I32:
       return actual.i32 == expected.i32;
     // Since we fill buffers with small integers for floating point GEMMs
     // functional testing, we can test for bit-exactness on the actual and
     // expected values. Inexact results are only permitted when the
     // `require_exact_results` flag is set to `false`.
-    case IREE_E2E_TEST_VALUE_TYPE_F16:
+    case IREE_TEST_UTILS_VALUE_TYPE_F16:
       if (actual.f16_u16 == expected.f16_u16) return true;
       if (FLAG_require_exact_results) return false;
       return fabsf(iree_math_f16_to_f32(actual.f16_u16) -
                    iree_math_f16_to_f32(expected.f16_u16)) <
              FLAG_acceptable_fp_delta;
-    case IREE_E2E_TEST_VALUE_TYPE_BF16:
+    case IREE_TEST_UTILS_VALUE_TYPE_BF16:
       if (actual.bf16_u16 == expected.bf16_u16) return true;
       if (FLAG_require_exact_results) return false;
       return fabsf(iree_math_bf16_to_f32(actual.bf16_u16) -
                    iree_math_bf16_to_f32(expected.bf16_u16)) <
              FLAG_acceptable_fp_delta;
-    case IREE_E2E_TEST_VALUE_TYPE_F32:
+    case IREE_TEST_UTILS_VALUE_TYPE_F32:
       if (actual.f32 == expected.f32) return true;
       if (FLAG_require_exact_results) return false;
       return fabsf(actual.f32 - expected.f32) < FLAG_acceptable_fp_delta;
@@ -189,10 +190,8 @@ bool result_elements_agree(iree_e2e_test_value_t expected,
 // RNG utilities
 //===----------------------------------------------------------------------===//
 
-// Writes an element of the given |element_type| with the given integral |value|
-// to |dst|.
-void write_element(iree_hal_element_type_t element_type, int32_t value,
-                   void* dst) {
+void iree_test_utils_write_element(iree_hal_element_type_t element_type,
+                                   int32_t value, void* dst) {
 #define WRITE_ELEMENT_CASE(ETYPE, CTYPE) \
   case IREE_HAL_ELEMENT_TYPE_##ETYPE:    \
     *(CTYPE*)dst = (CTYPE)value;         \
@@ -229,21 +228,17 @@ void write_element(iree_hal_element_type_t element_type, int32_t value,
 #undef WRITE_ELEMENT_CASE
 }
 
-// Simple deterministic pseudorandom generator.
-// This function is same as C++'s std::minstd_rand.
-uint32_t pseudorandom_uint32(uint32_t* state) {
+uint32_t iree_test_utils_pseudorandom_uint32(uint32_t* state) {
   *state = (*state * IREE_PRNG_MULTIPLIER) % IREE_PRNG_MODULUS;
   return *state;
 }
 
-// Returns a random uint32_t in the range [0, range).
-uint32_t pseudorandom_range(uint32_t* state, uint32_t range) {
-  return pseudorandom_uint32(state) % range;
+uint32_t iree_test_utils_pseudorandom_range(uint32_t* state, uint32_t range) {
+  return iree_test_utils_pseudorandom_uint32(state) % range;
 }
 
-// Get minimum and maximum for integer-valued uniform distribution.
-void get_min_max_for_element_type(iree_hal_element_type_t element_type,
-                                  int32_t* min, int32_t* max) {
+void iree_test_utils_get_min_max_for_element_type(
+    iree_hal_element_type_t element_type, int32_t* min, int32_t* max) {
   switch (element_type) {
     case IREE_HAL_ELEMENT_TYPE_INT_8:
     case IREE_HAL_ELEMENT_TYPE_SINT_8:
@@ -298,11 +293,8 @@ void get_min_max_for_element_type(iree_hal_element_type_t element_type,
 // Test runner
 //===----------------------------------------------------------------------===//
 
-// Returns true if the |function| is a supported callable test function.
-// We only support functions that are publicly exported, not an internal
-// compiler/runtime function (__ prefixed), and take/return no args/results.
-iree_status_t check_test_function(iree_vm_function_t function,
-                                  bool* out_is_valid) {
+iree_status_t iree_test_utils_check_test_function(iree_vm_function_t function,
+                                                  bool* out_is_valid) {
   *out_is_valid = true;
 
   iree_string_view_t function_name = iree_vm_function_name(&function);
@@ -326,11 +318,9 @@ iree_status_t check_test_function(iree_vm_function_t function,
   return iree_ok_status();
 }
 
-// Synchronous runs a test |function|.
-// If the test fails then the failure status is returned to the caller.
-iree_status_t run_test_function(iree_vm_context_t* context,
-                                iree_vm_function_t function,
-                                iree_allocator_t host_allocator) {
+iree_status_t iree_test_utils_run_test_function(
+    iree_vm_context_t* context, iree_vm_function_t function,
+    iree_allocator_t host_allocator) {
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_string_view_t function_name = iree_vm_function_name(&function);
   IREE_TRACE_ZONE_APPEND_TEXT(z0, function_name.data, function_name.size);
@@ -348,10 +338,9 @@ iree_status_t run_test_function(iree_vm_context_t* context,
   return status;
 }
 
-// Runs all test functions in |test_module|.
-iree_status_t run_all_test_functions(iree_vm_context_t* context,
-                                     iree_vm_module_t* test_module,
-                                     iree_allocator_t host_allocator) {
+iree_status_t iree_test_utils_run_all_test_functions(
+    iree_vm_context_t* context, iree_vm_module_t* test_module,
+    iree_allocator_t host_allocator) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   // Walk all functions and find the ones we can run (no args, non-internal).
@@ -365,12 +354,13 @@ iree_status_t run_all_test_functions(iree_vm_context_t* context,
         z0, iree_vm_module_lookup_function_by_ordinal(
                 test_module, IREE_VM_FUNCTION_LINKAGE_EXPORT, i, &function));
     bool is_valid = false;
-    IREE_RETURN_AND_END_ZONE_IF_ERROR(z0,
-                                      check_test_function(function, &is_valid));
+    IREE_RETURN_AND_END_ZONE_IF_ERROR(
+        z0, iree_test_utils_check_test_function(function, &is_valid));
     if (is_valid) {
       // Try to run the function and fail on mismatch.
       IREE_RETURN_AND_END_ZONE_IF_ERROR(
-          z0, run_test_function(context, function, host_allocator));
+          z0,
+          iree_test_utils_run_test_function(context, function, host_allocator));
     }
   }
 
@@ -378,9 +368,8 @@ iree_status_t run_all_test_functions(iree_vm_context_t* context,
   return iree_ok_status();
 }
 
-// Returns OK if there are declared requirements on |module| and they are all
-// met and otherwise UNAVAILABLE indicating that the module should not be run.
-iree_status_t check_module_requirements(iree_vm_module_t* module) {
+iree_status_t iree_test_utils_check_module_requirements(
+    iree_vm_module_t* module) {
   iree_string_view_t target_features =
       iree_vm_module_lookup_attr_by_name(module, IREE_SV("target_features"));
   while (!iree_string_view_is_empty(target_features)) {
@@ -403,7 +392,7 @@ iree_status_t check_module_requirements(iree_vm_module_t* module) {
   return iree_ok_status();
 }
 
-iree_status_t load_and_run_e2e_tests(
+iree_status_t iree_test_utils_load_and_run_e2e_tests(
     iree_allocator_t host_allocator,
     iree_status_t (*test_module_create)(iree_vm_instance_t*, iree_allocator_t,
                                         iree_vm_module_t**)) {
@@ -447,7 +436,7 @@ iree_status_t load_and_run_e2e_tests(
 
   // Ensure the test module is possible to run.
   if (iree_status_is_ok(status)) {
-    status = check_module_requirements(test_module);
+    status = iree_test_utils_check_module_requirements(test_module);
   }
   iree_tooling_module_list_reset(&module_list);
 
@@ -458,7 +447,8 @@ iree_status_t load_and_run_e2e_tests(
 
   // Run all of the tests in the test module.
   if (iree_status_is_ok(status)) {
-    status = run_all_test_functions(context, test_module, host_allocator);
+    status = iree_test_utils_run_all_test_functions(context, test_module,
+                                                    host_allocator);
   }
 
   // End profiling (if enabled).

@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-"""Macros for defining tests that use the iree-e2e-{test_type}-test runner."""
+"""Macros for defining tests that use the iree-e2e-${test_type}-test runner."""
 
 load("//build_tools/bazel:iree_bytecode_module.bzl", "iree_bytecode_module")
 load("//build_tools/bazel:native_binary.bzl", "native_test")
@@ -109,18 +109,18 @@ def iree_single_backend_e2e_runner_test(
         target_cpu_features = None,
         timeout = None,
         **kwargs):
-    """Generates an iree_e2e_test using a custom python generator script.
+    """Generates an iree_e2e_runner_test using a custom python generator script.
 
     The generator script produces .mlir sources which are compiled and passed to
-    iree_e2e_test.
+    iree_e2e_runner_test.
 
     Args:
         name: Name of the target
-        test_type: Name of the test (e.g., matmuls, conv2ds).
+        test_type: Name of the test (e.g., matmul, conv2d).
         generator: Target to run to generate the source MLIR files.
             It will be invoked with the following standard flags, in addition
             to generator_args:
-            --output_{$test_type}_mlir=(current binary dir)/name_{$test_type}.mlir
+            --output_${test_type}_mlir=(current binary dir)/name_${test_type}.mlir
             --output_calls_mlir=(current binary dir)/name_calls.mlir
         generator_args: additional args to pass to the generator program.
         target_backend: target backend to compile for.
@@ -188,15 +188,15 @@ def iree_generated_e2e_runner_test(
         timeout = None,
         target_cpu_features_variants = [],
         **kwargs):
-    """Generates a suite of iree_e2e_test on multiple backends/drivers.
+    """Generates a suite of iree_e2e_runner_test on multiple backends/drivers.
 
     Args:
         name: Name of the target
-        test_type: Name of the test (e.g., matmuls, conv2ds).
+        test_type: Name of the test (e.g., matmul, conv2d).
         generator: Target to run to generate the source MLIR files.
             It will be invoked with the following standard flags, in addition
             to generator_args:
-            --output_{test_type}_mlir=(current binary dir)/name_{test_type}.mlir
+            --output_${test_type}_mlir=(current binary dir)/name_${test_type}.mlir
             --output_calls_mlir=(current binary dir)/name_calls.mlir
         generator_args: additional args to pass to the generator program.
         target_backends_and_drivers: backend/driver pairs to compile and run

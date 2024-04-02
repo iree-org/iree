@@ -4,8 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <assert.h>
-#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -21,7 +19,7 @@
 #include "iree/tooling/device_util.h"
 #include "iree/vm/api.h"
 #include "iree/vm/native_module_cc.h"
-#include "test_utils.h"
+#include "tools/testing/e2e/test_utils.h"
 
 //===----------------------------------------------------------------------===//
 // Reference matmul
@@ -212,10 +210,11 @@ static iree_status_t reference_matmul(
     for (iree_hal_dim_t n = 0; n < n_size; ++n) {
       if (++count < compute_every) continue;
       count = 0;
-      IREE_RETURN_IF_ERROR(reference_matmul_element(
-          m_size, k_size, n_size, lhs_type, rhs_type, acc_type, transpose_rhs,
-          lhs_contents.data, rhs_contents.data, acc_contents.data,
-          result_contents.data, m, n));
+      IREE_RETURN_AND_END_ZONE_IF_ERROR(
+          z0, reference_matmul_element(
+                  m_size, k_size, n_size, lhs_type, rhs_type, acc_type,
+                  transpose_rhs, lhs_contents.data, rhs_contents.data,
+                  acc_contents.data, result_contents.data, m, n));
     }
   }
 
@@ -373,11 +372,12 @@ static int get_max_elem_width(precision_t precision, iree_hal_dim_t rows,
   for (int row = row_start; row < row_end; row++) {
     for (int col = col_start; col < col_end; col++) {
       iree_hal_dim_t idx = col + row * cols;
-      iree_e2e_test_value_t elem =
-          read_buffer_element(idx, element_type, matrix);
+      iree_test_utils_e2e_value_t elem =
+          iree_test_utils_read_buffer_element(idx, element_type, matrix);
       // NOTE: iree_max is a macro and may evaluate its args twice.
       char buf[64];
-      int this_elem_width = snprintf_value(buf, sizeof(buf), elem, precision);
+      int this_elem_width =
+          iree_test_utils_snprintf_value(buf, sizeof(buf), elem, precision);
       max_elem_width = iree_max(max_elem_width, this_elem_width);
     }
   }
@@ -429,16 +429,18 @@ static void print_matrix(FILE* file, const char* label, precision_t precision,
   for (int row = row_start; row < row_end; row++) {
     for (int col = col_start; col < col_end; col++) {
       iree_hal_dim_t idx = col + row * cols;
-      iree_e2e_test_value_t element =
-          read_buffer_element(idx, element_type, matrix);
+      iree_test_utils_e2e_value_t element =
+          iree_test_utils_read_buffer_element(idx, element_type, matrix);
       bool disagree = false;
       if (other_matrix) {
-        iree_e2e_test_value_t other_element =
-            read_buffer_element(idx, element_type, other_matrix);
-        disagree = !result_elements_agree(element, other_element);
+        iree_test_utils_e2e_value_t other_element =
+            iree_test_utils_read_buffer_element(idx, element_type,
+                                                other_matrix);
+        disagree =
+            !iree_test_utils_result_elements_agree(element, other_element);
       }
       char buf[64];
-      snprintf_value(buf, sizeof(buf), element, precision);
+      iree_test_utils_snprintf_value(buf, sizeof(buf), element, precision);
       fprintf(file, "%*s", max_elem_width, buf);
       // See comment on |highlight| function parameter for why 2 spaces.
       // A 3rd space is added unconditionally to make it clear that a highlight
@@ -451,12 +453,11 @@ static void print_matrix(FILE* file, const char* label, precision_t precision,
 
 // Helper for check_matmul_results: handler for the failure case.
 // If |file| is not NULL, detailed logging is written to it.
-static iree_status_t check_matmul_failure(FILE* file,
-                                          const matmul_results_t* results,
-                                          iree_e2e_test_value_t actual_value,
-                                          iree_e2e_test_value_t expected_value,
-                                          iree_hal_dim_t row,
-                                          iree_hal_dim_t col, int check_every) {
+static iree_status_t check_matmul_failure(
+    FILE* file, const matmul_results_t* results,
+    iree_test_utils_e2e_value_t actual_value,
+    iree_test_utils_e2e_value_t expected_value, iree_hal_dim_t row,
+    iree_hal_dim_t col, int check_every) {
   if (!file || check_every > 1) {
     // No logging of errors with check_every>1 as most of the reference matrix
     // elements have not been computed. The caller is expected to retry with
@@ -472,10 +473,10 @@ static iree_status_t check_matmul_failure(FILE* file,
           row, col);
   char actual_value_buf[32];
   char expected_value_buf[32];
-  snprintf_value(actual_value_buf, sizeof(actual_value_buf), actual_value,
-                 PRECISION_HIGH);
-  snprintf_value(expected_value_buf, sizeof(expected_value_buf), expected_value,
-                 PRECISION_HIGH);
+  iree_test_utils_snprintf_value(actual_value_buf, sizeof(actual_value_buf),
+                                 actual_value, PRECISION_HIGH);
+  iree_test_utils_snprintf_value(expected_value_buf, sizeof(expected_value_buf),
+                                 expected_value, PRECISION_HIGH);
   fprintf(file, "actual value: %s\n", actual_value_buf);
   fprintf(file, "expected value: %s\n", expected_value_buf);
 
@@ -519,12 +520,12 @@ static iree_status_t check_matmul_failure(FILE* file,
   print_matrix(file, "expected result", PRECISION_LOW, results->m, m_start,
                m_end, results->n, n_start, n_end, results->result_type,
                results->expected_contents.data, results->actual_contents.data,
-               emoji(true));
+               iree_test_utils_emoji(true));
   fprintf(file, "\n");
   print_matrix(file, "actual result", PRECISION_LOW, results->m, m_start, m_end,
                results->n, n_start, n_end, results->result_type,
                results->actual_contents.data, results->expected_contents.data,
-               emoji(false));
+               iree_test_utils_emoji(false));
   fprintf(file, "\n");
 
   IREE_TRACE_ZONE_END(z0);
@@ -552,11 +553,14 @@ static iree_status_t check_matmul_results_impl(FILE* file,
       if (++count < check_every) continue;
       count = 0;
       iree_hal_dim_t idx = m * results->n + n;
-      iree_e2e_test_value_t actual_value = read_buffer_element(
-          idx, results->result_type, results->actual_contents.data);
-      iree_e2e_test_value_t expected_value = read_buffer_element(
-          idx, results->result_type, results->expected_contents.data);
-      if (!result_elements_agree(actual_value, expected_value)) {
+      iree_test_utils_e2e_value_t actual_value =
+          iree_test_utils_read_buffer_element(idx, results->result_type,
+                                              results->actual_contents.data);
+      iree_test_utils_e2e_value_t expected_value =
+          iree_test_utils_read_buffer_element(idx, results->result_type,
+                                              results->expected_contents.data);
+      if (!iree_test_utils_result_elements_agree(actual_value,
+                                                 expected_value)) {
         iree_status_t status = check_matmul_failure(
             file, results, actual_value, expected_value, m, n, check_every);
         IREE_TRACE_ZONE_END(z0);
@@ -575,7 +579,8 @@ static iree_status_t check_matmul_results_impl(FILE* file,
 static iree_status_t check_matmul_results(FILE* file,
                                           const matmul_results_t* results) {
   IREE_TRACE_ZONE_BEGIN(z0);
-  int check_every = calculate_check_every(results->m * results->n, results->n);
+  int check_every = iree_test_utils_calculate_check_every(
+      results->m * results->n, results->n);
   iree_status_t status = check_matmul_results_impl(file, results, check_every);
   if (!iree_status_is_ok(status) && check_every > 1) {
     // If we got a failure with check_every>1, that didn't log a useful
@@ -597,9 +602,7 @@ static iree_status_t check_matmul_results(FILE* file,
 // so this file is written in C besides this module so that we can swap it back
 // to being pure C in the future.
 
-namespace {
-
-using namespace iree;
+namespace iree {
 
 class MatmulTestModuleState final {
  public:
@@ -640,7 +643,8 @@ class MatmulTestModuleState final {
           // Generate "uniform" integer-valued numbers in the range [min, max].
           int32_t min = 0;
           int32_t max = 0;
-          get_min_max_for_element_type(callback_state.element_type, &min, &max);
+          iree_test_utils_get_min_max_for_element_type(
+              callback_state.element_type, &min, &max);
           uint32_t range = (max - min + 1);
           iree_host_size_t element_byte_count =
               iree_hal_element_dense_byte_count(callback_state.element_type);
@@ -648,8 +652,11 @@ class MatmulTestModuleState final {
           uint32_t state = callback_state.seed;
           for (uint8_t* data = span.data; data < data_end;
                data += element_byte_count) {
-            int32_t value = (int32_t)pseudorandom_range(&state, range) + min;
-            write_element(callback_state.element_type, value, data);
+            int32_t value =
+                (int32_t)iree_test_utils_pseudorandom_range(&state, range) +
+                min;
+            iree_test_utils_write_element(callback_state.element_type, value,
+                                          data);
           }
           return iree_ok_status();
         },
@@ -693,17 +700,17 @@ struct MatmulTestModule final : public vm::NativeModule<MatmulTestModuleState> {
   }
 };
 
-}  // namespace
+}  // namespace iree
 
-iree_status_t matmul_test_module_create(iree_vm_instance_t* instance,
-                                        iree_allocator_t host_allocator,
-                                        iree_vm_module_t** out_module) {
+static iree_status_t matmul_test_module_create(iree_vm_instance_t* instance,
+                                               iree_allocator_t host_allocator,
+                                               iree_vm_module_t** out_module) {
   IREE_ASSERT_ARGUMENT(out_module);
   *out_module = NULL;
-  auto module = std::make_unique<MatmulTestModule>(
+  auto module = std::make_unique<iree::MatmulTestModule>(
       "matmul_test", /*version=*/0, instance, host_allocator,
-      iree::span<const vm::NativeFunction<MatmulTestModuleState>>(
-          kMatmulTestModuleFunctions));
+      iree::span<const iree::vm::NativeFunction<iree::MatmulTestModuleState>>(
+          iree::kMatmulTestModuleFunctions));
   *out_module = module.release()->interface();
   return iree_ok_status();
 }
@@ -718,8 +725,8 @@ int main(int argc, char** argv) {
     return EXIT_FAILURE;
   }
 
-  iree_status_t status = load_and_run_e2e_tests(iree_allocator_system(),
-                                                matmul_test_module_create);
+  iree_status_t status = iree_test_utils_load_and_run_e2e_tests(
+      iree_allocator_system(), matmul_test_module_create);
   int exit_code = EXIT_SUCCESS;
   if (!iree_status_is_ok(status)) {
     iree_status_fprint(stderr, status);

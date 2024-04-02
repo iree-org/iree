@@ -50,7 +50,7 @@ py_binary(
                                    # Widening matmuls fail to lower for SVE.
                                    (["arm_64:sve:+sve"] if lhs_rhs_type == acc_type else []),
     test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
-    test_type = "matmuls",
+    test_type = "matmul",
 ) for (lhs_rhs_type, acc_type) in [
     # ("i8", "i32"),  # TODO(#15800): enable once compile time is reasonable
     # ("f32", "f32"),  # TODO(#15800): enable once compile time is reasonable
@@ -85,7 +85,7 @@ py_binary(
     ],
     target_cpu_features_variants = ["arm_64:sme:+sve,+sme"],
     test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
-    test_type = "matmuls",
+    test_type = "matmul",
 ) for dtype in [
     "f32",
     # "f64" (also supported for ArmSME, but not by the test generator)
@@ -175,7 +175,7 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
                                        "arm_64:bf16:+bf16",
                                    ] if lhs_rhs_type == "bf16" and acc_type == "f32" else []),
     test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
-    test_type = "matmuls",
+    test_type = "matmul",
 ) for use_uk in [
     False,
     True,
@@ -215,7 +215,7 @@ X86_64_AVX512_BF16 = X86_64_AVX512 + [
         ("vmvx", "local-task"),
     ],
     test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
-    test_type = "matmuls",
+    test_type = "matmul",
 ) for lhs_rhs_type in [
     "i8",
     "f32",
@@ -247,7 +247,7 @@ iree_generated_e2e_runner_test(
         ("cuda", "cuda"),
     ],
     test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
-    test_type = "matmuls",
+    test_type = "matmul",
 )
 
 # Testing Ampere + TensorCore path.
@@ -275,7 +275,7 @@ iree_generated_e2e_runner_test(
         ("cuda", "cuda"),
     ],
     test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
-    test_type = "matmuls",
+    test_type = "matmul",
 )
 
 iree_generated_e2e_runner_test(
@@ -300,7 +300,7 @@ iree_generated_e2e_runner_test(
         ("cuda", "cuda"),
     ],
     test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
-    test_type = "matmuls",
+    test_type = "matmul",
 )
 
 iree_generated_e2e_runner_test(
@@ -325,7 +325,7 @@ iree_generated_e2e_runner_test(
         ("cuda", "cuda"),
     ],
     test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
-    test_type = "matmuls",
+    test_type = "matmul",
 )
 
 # MMA.SYNC TensorCore(F32): mma.sync.1688.f32.t32
@@ -352,7 +352,7 @@ iree_generated_e2e_runner_test(
         ("cuda", "cuda"),
     ],
     test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
-    test_type = "matmuls",
+    test_type = "matmul",
 )
 
 # WMMA TensorCore(F16): wmma.161616.f16.f16
@@ -379,7 +379,7 @@ iree_generated_e2e_runner_test(
         ("cuda", "cuda"),
     ],
     test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
-    test_type = "matmuls",
+    test_type = "matmul",
 )
 
 # MMA.SYNC TensorCore(F16): mma.sync.161616.f16.f16
@@ -406,7 +406,7 @@ iree_generated_e2e_runner_test(
         ("cuda", "cuda"),
     ],
     test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
-    test_type = "matmuls",
+    test_type = "matmul",
 )
 
 [iree_generated_e2e_runner_test(
@@ -433,7 +433,7 @@ iree_generated_e2e_runner_test(
         ("cuda", "cuda"),
     ],
     test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
-    test_type = "matmuls",
+    test_type = "matmul",
 ) for lhs_rhs_type in [
     "f32",
 ]]
@@ -468,7 +468,7 @@ iree_generated_e2e_runner_test(
         ("rocm", "rocm"),
     ],
     test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
-    test_type = "matmuls",
+    test_type = "matmul",
 )
 
 iree_generated_e2e_runner_test(
@@ -495,7 +495,7 @@ iree_generated_e2e_runner_test(
         ("rocm", "rocm"),
     ],
     test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
-    test_type = "matmuls",
+    test_type = "matmul",
 )
 
 ###########################################################################
@@ -524,7 +524,7 @@ iree_generated_e2e_runner_test(
         ("vulkan-spirv", "vulkan"),
     ],
     test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
-    test_type = "matmuls",
+    test_type = "matmul",
 ) for lhs_rhs_type in [
     "i8",
     "f16",
@@ -550,7 +550,7 @@ iree_generated_e2e_runner_test(
         ("vulkan-spirv", "vulkan"),
     ],
     test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
-    test_type = "matmuls",
+    test_type = "matmul",
 ) for lhs_rhs_type in [
     "i8",
     "f16",
@@ -580,5 +580,5 @@ iree_generated_e2e_runner_test(
         ("vulkan-spirv", "vulkan"),
     ],
     test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
-    test_type = "matmuls",
+    test_type = "matmul",
 )

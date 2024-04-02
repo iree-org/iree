@@ -752,7 +752,7 @@ def generate(
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Generator of e2e matmul tests")
     parser.add_argument(
-        "--output_matmuls_mlir",
+        "--output_matmul_mlir",
         type=str,
         help="Path of output .mlir file containing the generated matmuls",
         required=True,
@@ -875,7 +875,7 @@ def main(args):
         lhs_rhs_type, acc_type, shapes_id, args.transpose_rhs, compilation_info_id
     )
 
-    write_code_file(functions, args.output_matmuls_mlir)
+    write_code_file(functions, args.output_matmul_mlir)
     write_calls_file(
         functions,
         calls,

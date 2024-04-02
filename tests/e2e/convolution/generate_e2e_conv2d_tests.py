@@ -40,6 +40,7 @@ class ShapesId(enum.Enum):
 
 
 # Enumerates ways to construct MLIR tensor types.
+# TODO: Enable dynamic dimensions once the tests start passing.
 @enum.unique
 class Dynamicity(enum.Enum):
     DYNAMIC = "dynamic"  # Use '?' everywhere. Example: tensor<?x?xf32>.
@@ -93,7 +94,7 @@ class TestShape:
     accumulate: bool
 
 
-# The attributes needed for the convolution operation.
+# Attributes for the linalg.conv2d operation.
 @dataclasses.dataclass
 class ConvAttrs:
     STRIDE: typing.Tuple[int, int] = (1, 1)
@@ -109,9 +110,6 @@ def get_test_shapes(shapes_id: ShapesId):
     #    same for all shapes, while execution latency grows linearly with
     #    n*f*ow*oh*kh*kw.
 
-    # 2. Some shapes are commented out: they used to be tested but have been
-    #    disabled to improve the trade-off between test coverage and build
-    #    latency.
     if shapes_id == ShapesId.SMALL:
         return [
             TestShape(n=1, c=1, h=1, w=1, kh=1, kw=1, f=1, accumulate=True),
@@ -194,7 +192,7 @@ class TestInputTensorShapes:
     f: DimSize
 
 
-# Helper for generate_function. Generates TestInputMatricesShapes, i.e.
+# Helper for generate_function. Generates TestInputTensorShapes, i.e.
 # converts from the runtime shape dimensions in TestShape and given dynamicity to
 # the set of shapes to be used in a test function's input tensors.
 def generate_shapes(shape: TestShape, dynamicity: Dynamicity):
@@ -217,7 +215,9 @@ def generate_shapes(shape: TestShape, dynamicity: Dynamicity):
     return shapes
 
 
-def out_shape_calc(i_shape: int, k_shape: int, dilation_val: int, stride_val: int):
+# Helper to calculate the output shape based on the input shape, kernel shape,
+# dilation and stride.
+def calc_out_shape(i_shape: int, k_shape: int, dilation_val: int, stride_val: int):
     x = (k_shape - 1) * (dilation_val - 1)
     x = i_shape - k_shape - x
     return math.floor(x / stride_val) + 1
@@ -249,9 +249,9 @@ def get_tensor_shape(
     stride = conv_attr.STRIDE
 
     # Calculate output height.
-    oh = out_shape_calc(input_height, kernel_height, dilation[0], stride[0])
+    oh = calc_out_shape(input_height, kernel_height, dilation[0], stride[0])
     # Calculate output width.
-    ow = out_shape_calc(input_width, kernel_width, dilation[1], stride[1])
+    ow = calc_out_shape(input_width, kernel_width, dilation[1], stride[1])
 
     input_tensor_shape, kernel_tensor_shape, output_tensor_shape = [], [], []
 
@@ -549,7 +549,7 @@ def generate(
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Generator of e2e conv2d tests")
     parser.add_argument(
-        "--output_conv2ds_mlir",
+        "--output_conv2d_mlir",
         type=str,
         help="Path of output .mlir file containing the generated conv2d functions",
         required=True,
@@ -564,7 +564,7 @@ def parse_arguments():
         "--input_type",
         type=str,
         choices=["f32", "f16"],
-        help="Numeric type of input matrices",
+        help="Numeric type of input tensors",
         required=True,
     )
     parser.add_argument(
@@ -579,7 +579,7 @@ def parse_arguments():
         "--kernel_type",
         type=str,
         choices=["f32", "f16"],
-        help="Numeric type of input matrices",
+        help="Numeric type of input tensors",
         required=True,
     )
     parser.add_argument(
@@ -594,7 +594,7 @@ def parse_arguments():
         "--acc_type",
         type=str,
         choices=["f32", "f16"],
-        help="Numeric type of input matrices",
+        help="Numeric type of input tensors",
         default="",
         required=False,
     )
@@ -616,7 +616,7 @@ def parse_arguments():
         "--stride",
         type=str,
         default="1,1",
-        help="The dilation factor for the convolution operation. Comma-separated. As in 1,1",
+        help="The stride factor for the convolution operation. Comma-separated. As in 1,1",
         required=False,
     )
     parser.add_argument(
@@ -694,7 +694,7 @@ def main(args):
         shapes_id,
     )
 
-    write_code_file(functions, args.output_conv2ds_mlir)
+    write_code_file(functions, args.output_conv2d_mlir)
     write_calls_file(
         functions,
         calls,
