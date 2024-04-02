@@ -74,7 +74,8 @@ static iree_status_t iree_hal_hip_driver_create_internal(
   driver->default_device_index = options->default_device_index;
 
   iree_status_t status = iree_hal_hip_dynamic_symbols_initialize(
-      host_allocator, &driver->hip_symbols);
+      host_allocator, options->hip_lib_search_path_count,
+      options->hip_lib_search_paths, &driver->hip_symbols);
 
   memcpy(&driver->device_params, device_params, sizeof(driver->device_params));
 
@@ -232,6 +233,20 @@ static iree_status_t iree_hal_hip_driver_dump_device_info(
     iree_hal_driver_t* base_driver, iree_hal_device_id_t device_id,
     iree_string_builder_t* builder) {
   iree_hal_hip_driver_t* driver = iree_hal_hip_driver_cast(base_driver);
+
+  // Report path to the runtime library.
+  iree_string_builder_t path_builder;
+  iree_string_builder_initialize(builder->allocator, &path_builder);
+  iree_status_t status = iree_hal_hip_dynamic_symbols_append_path_to_builder(
+      &driver->hip_symbols, &path_builder);
+  if (iree_status_is_ok(status)) {
+    status = iree_string_builder_append_format(
+        builder, "\n- amdhip64_dylib_path: %s", path_builder.buffer);
+    iree_string_builder_deinitialize(&path_builder);
+    IREE_RETURN_IF_ERROR(status);
+  }
+
+  // Report driver properties.
   if (!driver->hip_symbols.hipGetDevicePropertiesR0600) {
     // ROCm 6.0 release changes the hipDeviceProp_t struct and would need to use
     // the matching hipGetDevicePropertiesR0600() API to query it. This symbol

@@ -102,6 +102,20 @@ typedef struct iree_hal_hip_driver_options_t {
   // The index of the default HIP device to use within the list of available
   // devices.
   int default_device_index;
+
+  // List of paths to guide searching for the dynamic libamdhip64.so (or
+  // amdhip64.dll), which contains the backing HIP runtime library. If this
+  // is present, it overrides any other mechanism for finding the HIP runtime
+  // library. Default search heuristics are used (i.e. ask the system to find an
+  // appropriately named library) if there are zero entries.
+  // Each entry can be:
+  //
+  // * Directory in which to find a platform specific runtime library
+  //   name.
+  // * Specific fully qualified path to a file that will be loaded with no
+  //   further interpretation if the entry starts with "file:".
+  iree_string_view_t* hip_lib_search_paths;
+  iree_host_size_t hip_lib_search_path_count;
 } iree_hal_hip_driver_options_t;
 
 // Initializes the given |out_options| with default driver creation options.

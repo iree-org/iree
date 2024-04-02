@@ -319,6 +319,37 @@ iree_status_t iree_dynamic_library_lookup_symbol(
   return iree_ok_status();
 }
 
+iree_status_t iree_dynamic_library_append_symbol_path_to_builder(
+    void* symbol, iree_string_builder_t* builder) {
+  HMODULE hm = NULL;
+  if (GetModuleHandleEx(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+                            GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                        (LPCSTR)symbol, &hm) == 0) {
+    return iree_make_status(IREE_STATUS_NOT_FOUND);
+  }
+
+  char* path_buffer = NULL;
+  iree_host_size_t path_capacity = 0;
+  iree_host_size_t path_size = 0;
+  IREE_RETURN_IF_ERROR(iree_string_builder_reserve_for_append(
+      builder, 64, &path_buffer, &path_capacity));
+  while (1) {
+    path_size = GetModuleFileNameA(hm, path_buffer, path_capacity);
+    if (path_size == 0) {
+      return iree_make_status(IREE_STATUS_NOT_FOUND);
+    }
+    if (path_size == path_capacity ||
+        GetLastError() == ERROR_INSUFFICIENT_BUFFER) {
+      IREE_RETURN_IF_ERROR(iree_string_builder_reserve_for_append(
+          builder, path_capacity + MAX_PATH, &path_buffer, &path_capacity));
+      continue;
+    }
+    break;
+  }
+  iree_string_builder_commit_append(builder, path_size);
+  return iree_ok_status();
+}
+
 #if defined(IREE_HAVE_DYNAMIC_LIBRARY_PDB_SUPPORT)
 
 typedef struct {
