@@ -179,7 +179,7 @@ public:
     if (variantOp.isExternal())
       return;
 
-    buildSPIRVCodegenPassPipeline(passManager, /*enableFastMath=*/false);
+    buildSPIRVCodegenPassPipeline(passManager);
   }
 
   void buildLinkingPassPipeline(OpPassManager &passManager) override {

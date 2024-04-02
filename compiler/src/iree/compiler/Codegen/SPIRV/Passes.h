@@ -61,7 +61,7 @@ void buildSPIRVCodegenConfigurationPassPipeline(OpPassManager &pm);
 /// Populates passes needed to lower linalg/arith/math ops to SPIR-V ops via
 /// the structured ops path. The pass manager `pm` here operate on the module
 /// within the IREE::HAL::ExecutableOp.
-void buildSPIRVCodegenPassPipeline(OpPassManager &pm, bool enableFastMath);
+void buildSPIRVCodegenPassPipeline(OpPassManager &pm);
 
 /// Populates passes needed to link HAL executables across SPIRV targets.
 void buildSPIRVLinkingPassPipeline(OpPassManager &passManager);
@@ -76,7 +76,7 @@ void buildSPIRVLinkingPassPipeline(OpPassManager &passManager);
 /// GPU processor ID ops into SPIR-V global variables, loop/standard ops into
 /// corresponding SPIR-V ops.
 std::unique_ptr<OperationPass<ModuleOp>>
-createConvertToSPIRVPass(bool enableFastMath = false, unsigned indexWidth = 32);
+createConvertToSPIRVPass(unsigned indexWidth = 32);
 
 /// Annotates the innermost Winograd loops with the spirv distribute attribute.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
