@@ -187,7 +187,7 @@ public:
     if (variantOp.isExternal())
       return;
 
-    buildSPIRVCodegenPassPipeline(passManager, /*enableFastMath=*/false);
+    buildSPIRVCodegenPassPipeline(passManager);
   }
 
   LogicalResult serializeExecutable(const SerializationOptions &serOptions,
