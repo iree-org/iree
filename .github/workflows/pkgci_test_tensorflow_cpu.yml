@@ -43,7 +43,10 @@ jobs:
         run: |
           ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
-            --fetch-gh-workflow=${{ inputs.artifact_run_id }}
+            --fetch-gh-workflow=${{ inputs.artifact_run_id }} \
+            --compiler-variant=asserts \
+            --runtime-variant=asserts
+
       - name: Run tests
         run: |
           source ${VENV_DIR}/bin/activate
