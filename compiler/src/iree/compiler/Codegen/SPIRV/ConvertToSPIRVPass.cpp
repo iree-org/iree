@@ -486,8 +486,10 @@ public:
   explicit ConvertToSPIRVPass(bool enableFastMath, unsigned indexBits)
       : enableFastMath(enableFastMath), indexBits(indexBits) {}
 
-  LogicalResult initializeOptions(StringRef options) override {
-    if (failed(Pass::initializeOptions(options)))
+  LogicalResult initializeOptions(
+      StringRef options,
+      function_ref<LogicalResult(const Twine &)> errorHandler) override {
+    if (failed(Pass::initializeOptions(options, errorHandler)))
       return failure();
     // Use pass option if present.
     enableFastMath |= enableFastMathOption;
@@ -631,7 +633,6 @@ void ConvertToSPIRVPass::runOnOperation() {
   }
 
   SPIRVConversionOptions options = {};
-  options.enableFastMathMode = this->enableFastMath;
   options.use64bitIndex = use64bitIndex;
 
   SPIRVTypeConverter typeConverter(targetAttr, options);
