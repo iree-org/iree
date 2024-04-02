@@ -19,11 +19,12 @@ include "mlir/IR/EnumAttr.td"
 
 class IREEGPU_MmaVectorLayoutAttr<string attrname, string mmaintrinsic> :
     AttrDef<IREEGPU_Dialect, attrname, [
-  DeclareAttrInterfaceMethods<IREEGPU_MmaAttr, [
+  DeclareAttrInterfaceMethods<IREEGPU_MmaInterfaceAttr, [
     "getABCElementTypes",
     "getABCVectorTypes",
     "getContractionLayout",
     "getMNKShape",
+    "getSubgroupSize",
   ]>
 ]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
@@ -82,28 +83,40 @@ class IREEGPU_MmaEnumAttr<EnumAttrInfo enumInfo, string name = "">
   : EnumAttr<IREEGPU_Dialect, enumInfo, name>;
 
 //===----------------------------------------------------------------------===//
-// MFMA Attributes
+// MMA Attributes
 //===----------------------------------------------------------------------===//
 
-def F16_16x16x16_F32 : I32EnumAttrCase<"F16_16x16x16_F32", 0>;
-def F16_32x32x8_F32 : I32EnumAttrCase<"F16_32x32x8_F32", 1>;
+def MFMA_F16_16x16x16_F32 : I32EnumAttrCase<"MFMA_F16_16x16x16_F32", 0>;
+def MFMA_F16_32x32x8_F32 : I32EnumAttrCase<"MFMA_F16_32x32x8_F32", 1>;
+def WMMA_F16_16x16x16_F32 : I32EnumAttrCase<"WMMA_F16_16x16x16_F32", 2>;
 
-def IREEGPU_MFMAIntrinsic : IREEGPU_I32MmaEnumAttr<"MFMAIntrinsic",
-    "Descriptor for different MFMA operations", [
-      F16_16x16x16_F32,
-      F16_32x32x8_F32,
+def IREEGPU_MMAIntrinsic : IREEGPU_I32MmaEnumAttr<"MMAIntrinsic",
+    "Descriptor for different MMA intrinsics", [
+      MFMA_F16_16x16x16_F32,
+      MFMA_F16_32x32x8_F32,
+      WMMA_F16_16x16x16_F32
     ]>;
 
-def IREEGPU_MFMAIntrinsicAttr
-  : IREEGPU_MmaEnumAttr<IREEGPU_MFMAIntrinsic, "mfma_intrinsic">;
+def INVALID_COMPUTE_TYPE : I32EnumAttrCase<"INVALID", 0>;
+def MFMA_COMPUTE_TYPE : I32EnumAttrCase<"MFMA", 1>;
+def WMMA_COMPUTE_TYPE : I32EnumAttrCase<"WMMA", 2>;
+def IREEGPU_MMAComputeType : IREEGPU_I32MmaEnumAttr<"MMAComputeType",
+    "Descriptor for different types of MMA operations", [
+      INVALID_COMPUTE_TYPE,
+      MFMA_COMPUTE_TYPE,
+      WMMA_COMPUTE_TYPE
+    ]>;
 
-def IREEGPU_MFMAAttr : IREEGPU_MmaVectorLayoutAttr<"MFMA", "MFMAIntrinsicAttr"> {
-  let mnemonic = "mfma_layout";
+def IREEGPU_MMAIntrinsicAttr
+  : IREEGPU_MmaEnumAttr<IREEGPU_MMAIntrinsic, "mma_intrinsic">;
+
+def IREEGPU_MMAAttr : IREEGPU_MmaVectorLayoutAttr<"MMA", "MMAIntrinsicAttr"> {
+  let mnemonic = "mma_layout";
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
 
   let description = !strconcat(baseDescription, [{
-    This mma variant describes configurations for MFMA ops. The |intrinsic|
-    field specifies which particular MFMA intrinsic this refers to, with each
+    This mma variant describes configurations for MMA ops. The |intrinsic|
+    field specifies which particular MMA intrinsic this refers to, with each
     intrinsic implicating a specific MNK shape and operand types. The intrinsic
     enum name describes these fields as
 
@@ -116,11 +129,15 @@ def IREEGPU_MFMAAttr : IREEGPU_MmaVectorLayoutAttr<"MFMA", "MFMAIntrinsicAttr"> 
 
   let skipDefaultBuilders = 1;
   let builders = [
-    AttrBuilder<(ins "MFMAIntrinsic":$intrinsic)>
+    AttrBuilder<(ins "MMAIntrinsic":$intrinsic)>
   ];
 
   let extraClassDeclaration = !strconcat(baseExtraClassDeclaration, [{
     int64_t getBlockSize() const;
+    MMAComputeType getComputeType() const;
+    SmallVector<int64_t> getADataDuplicate() const;
+    SmallVector<int64_t> getBDataDuplicate() const;
+    SmallVector<int64_t> getCDataDuplicate() const;
 
     // Partial nested layout for an MMA intrinsic's matrix input/output inside
     // a single subgroup.
@@ -166,7 +183,7 @@ def IREEGPU_MmaScheduleAttr : AttrDef<IREEGPU_Dialect, "MMASchedule"> {
 
 
   let parameters = (ins
-    "::mlir::iree_compiler::IREE::GPU::MmaAttr":$intrinsic,
+    "::mlir::iree_compiler::IREE::GPU::MmaInterfaceAttr":$intrinsic,
     "int64_t":$subgroup_m_count,
     "int64_t":$subgroup_n_count,
     "int64_t":$subgroup_m_tile_count,

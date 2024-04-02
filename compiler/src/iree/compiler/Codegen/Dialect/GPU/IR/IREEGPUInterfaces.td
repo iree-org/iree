@@ -10,7 +10,7 @@
 include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.td"
 include "mlir/IR/EnumAttr.td"
 
-def IREEGPU_MmaAttr : AttrInterface<"MmaAttr"> {
+def IREEGPU_MmaInterfaceAttr : AttrInterface<"MmaInterfaceAttr"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
 
   let description = [{
@@ -76,7 +76,15 @@ def IREEGPU_MmaAttr : AttrInterface<"MmaAttr"> {
       /*defaultImplementation=*/[{
         return failure();
       }]
-    >
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns the expected subgroup size of the MMA operation/intrinsic.
+      }],
+      /*retTy=*/"int64_t",
+      /*methodName=*/"getSubgroupSize",
+      /*args=*/(ins)
+    >,
   ];
 }
 

@@ -53,7 +53,7 @@ func.func @contract_to_mfma_32x32x8_mm(%a : vector<32x8xf16>, %b : vector<8x32xf
     indexing_maps = [#map1, #map2, #map3],
     iterator_types = ["parallel", "parallel", "reduction"],
     kind = #vector.kind<add>,
-    iree.amdgpu.mfma = #iree_gpu.mfma_layout<F16_32x32x8_F32>,
+    iree.amdgpu.mma = #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>,
     "__vector_layout_test_anchor_operand_0" = #layout_a,
     "__vector_layout_test_anchor_operand_1" = #layout_b,
     "__vector_layout_test_anchor_operand_2" = #layout_c,
@@ -133,7 +133,7 @@ func.func @contract_to_mfma_16x16x16_mm(%a : vector<16x16xf16>, %b : vector<16x1
     indexing_maps = [#map1, #map2, #map3],
     iterator_types = ["parallel", "parallel", "reduction"],
     kind = #vector.kind<add>,
-    iree.amdgpu.mfma = #iree_gpu.mfma_layout<F16_16x16x16_F32>,
+    iree.amdgpu.mma = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
     "__vector_layout_test_anchor_operand_0" = #layout_a,
     "__vector_layout_test_anchor_operand_1" = #layout_b,
     "__vector_layout_test_anchor_operand_2" = #layout_b,
@@ -225,7 +225,7 @@ func.func @contract_to_mfma_32x32x8_mm_mnbatch(%a : vector<64x8xf16>, %b : vecto
     indexing_maps = [#map1, #map2, #map3],
     iterator_types = ["parallel", "parallel", "reduction"],
     kind = #vector.kind<add>,
-    iree.amdgpu.mfma = #iree_gpu.mfma_layout<F16_32x32x8_F32>,
+    iree.amdgpu.mma = #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>,
     "__vector_layout_test_anchor_operand_0" = #layout_a,
     "__vector_layout_test_anchor_operand_1" = #layout_b,
     "__vector_layout_test_anchor_operand_2" = #layout_c,
@@ -318,7 +318,7 @@ func.func @contract_to_mfma_32x32x8_mm_kbatch(%a : vector<32x16xf16>, %b : vecto
     indexing_maps = [#map1, #map2, #map3],
     iterator_types = ["parallel", "parallel", "reduction"],
     kind = #vector.kind<add>,
-    iree.amdgpu.mfma = #iree_gpu.mfma_layout<F16_32x32x8_F32>,
+    iree.amdgpu.mma = #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>,
     "__vector_layout_test_anchor_operand_0" = #layout_a,
     "__vector_layout_test_anchor_operand_1" = #layout_b,
     "__vector_layout_test_anchor_operand_2" = #layout_c,
@@ -409,7 +409,7 @@ func.func @contract_to_mfma_32x32x8_mm_mnbatch_order(%a : vector<64x8xf16>, %b :
     indexing_maps = [#map1, #map2, #map3],
     iterator_types = ["parallel", "parallel", "reduction"],
     kind = #vector.kind<add>,
-    iree.amdgpu.mfma = #iree_gpu.mfma_layout<F16_32x32x8_F32>,
+    iree.amdgpu.mma = #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>,
     "__vector_layout_test_anchor_operand_0" = #layout_a,
     "__vector_layout_test_anchor_operand_1" = #layout_b,
     "__vector_layout_test_anchor_operand_2" = #layout_c,
@@ -504,7 +504,7 @@ func.func @contract_to_mfma_32x32x8_mmt(%a : vector<32x8xf16>, %b : vector<64x8x
     indexing_maps = [#map1, #map2, #map3],
     iterator_types = ["parallel", "parallel", "reduction"],
     kind = #vector.kind<add>,
-    iree.amdgpu.mfma = #iree_gpu.mfma_layout<F16_32x32x8_F32>,
+    iree.amdgpu.mma = #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>,
     "__vector_layout_test_anchor_operand_0" = #layout_a,
     "__vector_layout_test_anchor_operand_1" = #layout_b,
     "__vector_layout_test_anchor_operand_2" = #layout_c,
@@ -531,4 +531,95 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK:   amdgpu.mfma
 // CHECK:   %[[INS1:.+]] = vector.insert %17, %[[INS0]] [0, 1] : vector<4x1x1x4xf32> into vector<1x2x4x1x1x4xf32>
 // CHECK:   iree_vector_ext.to_simd %[[INS1]] : vector<1x2x4x1x1x4xf32> -> vector<32x64xf32>
+
+// -----
+
+// RDNA3 V_WMMA_F32_16X16X16_F32
+
+#map1 = affine_map<(m, n, k) -> (m, k)>
+#map2 = affine_map<(m, n, k) -> (k, n)>
+#map3 = affine_map<(m, n, k) -> (m, n)>
+
+// A: shape = 16x16, layout = layoutA
+#layout_a = #iree_vector_ext.nested_layout<
+  subgroups_per_workgroup = [1, 1],
+  batches_per_subgroup    = [1, 1],
+  outers_per_batch        = [1, 1],
+  threads_per_outer       = [16, 1],
+  elements_per_thread     = [1, 16],
+
+  thread_order            = [1, 0],
+
+  subgroup_basis          = [1, 1],
+  thread_basis            = [1, 32]
+>
+
+// B: shape = 16x16, layout = layoutB
+#layout_b = #iree_vector_ext.nested_layout<
+  subgroups_per_workgroup = [1, 1],
+  batches_per_subgroup    = [1, 1],
+  outers_per_batch        = [1, 1],
+  threads_per_outer       = [1, 16],
+  elements_per_thread     = [16, 1],
+
+  element_order           = [1, 0],
+
+  subgroup_basis          = [1, 1],
+  thread_basis            = [1, 32]
+>
+
+// C: shape = 16x16, layout = layoutC
+#layout_c = #iree_vector_ext.nested_layout<
+  subgroups_per_workgroup = [1, 1],
+  batches_per_subgroup    = [1, 1],
+  outers_per_batch        = [8, 1],
+  threads_per_outer       = [2, 16],
+  elements_per_thread     = [1, 1],
+
+  element_order = [1, 0],
+
+  subgroup_basis          = [1, 1],
+  thread_basis            = [2, 16]
+>
+
+func.func @contract_to_wmma_16x16x16_mm(%a : vector<16x16xf16>, %b : vector<16x16xf16>, %c : vector<16x16xf32>) -> vector<16x16xf32> {
+  %output = vector.contract {
+    indexing_maps = [#map1, #map2, #map3],
+    iterator_types = ["parallel", "parallel", "reduction"],
+    kind = #vector.kind<add>,
+    iree.amdgpu.mma = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>,
+    "__vector_layout_test_anchor_operand_0" = #layout_a,
+    "__vector_layout_test_anchor_operand_1" = #layout_b,
+    "__vector_layout_test_anchor_operand_2" = #layout_c,
+    "__vector_layout_test_anchor_result_0" = #layout_c
+  } %a, %b, %c : vector<16x16xf16>, vector<16x16xf16> into vector<16x16xf32>
+  return %output : vector<16x16xf32>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+
+// CHECK-LABEL: func.func @contract_to_wmma_16x16x16_mm
+//  CHECK-SAME: (%[[A:.+]]: vector<16x16xf16>, %[[B:.+]]: vector<16x16xf16>, %[[C:.+]]: vector<16x16xf32>)
+//       CHECK:   %[[INIT:.+]] = arith.constant dense<0.000000e+00> : vector<1x1x8x1x1x1xf32>
+//       CHECK:   %[[C_SIMT:.+]] = iree_vector_ext.to_simt %[[C]] : vector<16x16xf32> -> vector<1x1x8x1x1x1xf32>
+//       CHECK:   %[[A_SIMT:.+]] = iree_vector_ext.to_simt %[[A]] : vector<16x16xf16> -> vector<1x1x1x1x1x16xf16>
+//       CHECK:   %[[B_SIMT:.+]] = iree_vector_ext.to_simt %[[B]] : vector<16x16xf16> -> vector<1x1x1x1x1x16xf16>
+//       CHECK:   %[[C_VEC:.+]] = vector.extract %[[C_SIMT]][0, 0] : vector<8x1x1x1xf32> from vector<1x1x8x1x1x1xf32>
+//       CHECK:   %[[A_VEC:.+]] = vector.extract %[[A_SIMT]][0, 0] : vector<1x1x1x16xf16> from vector<1x1x1x1x1x16xf16>
+//       CHECK:   %[[B_VEC:.+]] = vector.extract %[[B_SIMT]][0, 0] : vector<1x1x1x16xf16> from vector<1x1x1x1x1x16xf16>
+//       CHECK:   %[[A_CAST:.+]] = vector.shape_cast %[[A_VEC]] : vector<1x1x1x16xf16> to vector<16xf16>
+//       CHECK:   %[[B_CAST:.+]] = vector.shape_cast %[[B_VEC]] : vector<1x1x1x16xf16> to vector<16xf16>
+//       CHECK:   %[[C_CAST:.+]] = vector.shape_cast %[[C_VEC]] : vector<8x1x1x1xf32> to vector<8xf32>
+//       CHECK:   %[[WMMA:.+]] = amdgpu.wmma %[[A_CAST]] * %[[B_CAST]] + %[[C_CAST]]
+//       CHECK:   %[[R_CAST:.+]] = vector.shape_cast %[[WMMA]] : vector<8xf32> to vector<8x1x1x1xf32>
+//       CHECK:   %[[INSERT:.+]] = vector.insert %[[R_CAST]], %[[INIT]] [0, 0] : vector<8x1x1x1xf32> into vector<1x1x8x1x1x1xf32>
+//       CHECK:   %[[R_SIMD:.+]] = iree_vector_ext.to_simd %[[INSERT]] : vector<1x1x8x1x1x1xf32> -> vector<16x16xf32>
+//       CHECK:   return {{.*}} %[[R_SIMD]]
 
