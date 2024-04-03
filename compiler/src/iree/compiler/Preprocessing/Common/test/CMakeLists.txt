@@ -18,6 +18,7 @@ iree_lit_test_suite(
     "conv_to_channels_last.mlir"
     "make_single_dispatch_for_function.mlir"
     "pad_linalg_ops.mlir"
+    "pdl_example.mlir"
     "preprocessing_match_ops.mlir"
     "transform_symbol_importing.mlir"
   TOOLS
@@ -25,6 +26,7 @@ iree_lit_test_suite(
     iree-opt
   DATA
     external_function_spec.mlir
+    pdl_patterns.mlir
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
