@@ -17,10 +17,10 @@ namespace mlir::iree_compiler {
 namespace {
 
 /// Currently, IREE requires `lowering_config`s to be propagated to all compute
-/// ops within a dispatch region. This can be problematic for SME, as it does
-/// not make sense to use 2D-scalability for all ops within a dispatch region.
-/// The Arm SME target only supports 2D scalable outer products, so if it's not
-/// an outer product, we can only scalably vectorize in one dimension.
+/// ops within a dispatch region. This can be problematic for SME which only
+/// supports 2D scalable outer product operations -- if an operation cannot be
+/// lowered to an outer product, we can only scalably vectorize it in one
+/// dimension.
 ///
 /// The solution here is this pass (`2d-scalable-to-1d-scalable`) that runs just
 /// before vectorization, that drops unsupported scalable tile/vector sizes,
@@ -140,15 +140,15 @@ dropScalabilityFromUnsupportedOperations(mlir::FunctionOpInterface funcOp,
 
     // 2. Re-tile the operation with some scalability dropped. This introduces
     // loops for previously scalable vector/tile sizes.
-    scf::SCFTilingOptions options{};
-    setSCFTileSizes(options, tilingOp, loopTileSizes, {});
+    scf::SCFTilingOptions options;
+    setSCFTileSizes(options, tilingOp, loopTileSizes, /*tileScalableFlags=*/{});
     auto tilingResult = scf::tileUsingSCF(rewriter, tilingOp, options);
     if (failed(tilingResult))
       return failure();
 
     // 3. Update the lowering config of the new tiled operations.
-    auto newLoweringConfig =
-        tilingConfig.withNewVectorSizes(vectorSizes, newScalableFlags);
+    auto newLoweringConfig = tilingConfig.getLoweringConfigWithNewVectorSizes(
+        vectorSizes, newScalableFlags);
     for (auto *newOp : tilingResult->tiledOps) {
       if (isa<TilingInterface>(newOp))
         setLoweringConfig(newOp, newLoweringConfig);
