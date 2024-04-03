@@ -1,12 +1,12 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(iree-preprocessing-apply-pdl-patterns{patterns-file=%p/tosa.pdl.mlir})" %s | FileCheck %s
 
-// CHECK-LABEL:   stream.executable private @mlp_external_executable
-//       CHECK:   stream.executable.export public @mlp_external_entry_point
+// CHECK-LABEL:   stream.executable private @mlp_external_f32_f32_f32_i32_i32_i32_executable
+//       CHECK:   stream.executable.export public @mlp_external_f32_f32_f32_i32_i32_i32_entry_point
 //       CHECK:   builtin.module
-//       CHECK:     func.func private @mlp_external
+//       CHECK:     func.func private @mlp_external_f32_f32_f32_i32_i32_i32
 //  CHECK-SAME:         (memref<f32>, index, memref<f32>, index, memref<f32>, index, i32, i32, i32)
 //  CHECK-SAME:         attributes {llvm.bareptr = [true]}
-//       CHECK:     func.func @mlp_external_entry_point
+//       CHECK:     func.func @mlp_external_f32_f32_f32_i32_i32_i32_entry_point
 //  CHECK-SAME:         %[[ARG0:[a-zA-Z0-9]+]]: !stream.binding
 //  CHECK-SAME:         %[[ARG1:[a-zA-Z0-9]+]]: !stream.binding
 //  CHECK-SAME:         %[[ARG2:[a-zA-Z0-9]+]]: !stream.binding
@@ -14,17 +14,17 @@
 //  CHECK-SAME:         %[[ARG4:[a-zA-Z0-9]+]]: i32
 //  CHECK-SAME:         %[[ARG5:[a-zA-Z0-9]+]]: i32
 //       CHECK:       %[[C0:.+]] = arith.constant 0 : index
-//       CHECK:       %[[STREAM0:.+]] = stream.binding.subspan %[[ARG0]][%[[C0]]] : !stream.binding -> memref<1x2x4xf32>
-//  CHECK-NEXT:       %[[STREAM0_BASE:[a-zA-Z0-9_]+]],
-//  CHECK-SAME:             = memref.extract_strided_metadata %[[STREAM0]]
-//       CHECK:       %[[STREAM1:.+]] = stream.binding.subspan %[[ARG1]][%[[C0]]] : !stream.binding -> memref<1x4x8xf32>
-//  CHECK-NEXT:       %[[STREAM1_BASE:[a-zA-Z0-9_]+]],
-//  CHECK-SAME:             = memref.extract_strided_metadata %[[STREAM1]]
-//       CHECK:       %[[STREAM2:.+]] = stream.binding.subspan %[[ARG2]][%[[C0]]] : !stream.binding -> memref<1x2x8xf32>
-//  CHECK-NEXT:       %[[STREAM2_BASE:[a-zA-Z0-9_]+]],
-//  CHECK-SAME:             = memref.extract_strided_metadata %[[STREAM2]]
+//       CHECK:       %[[STREAM0:.+]] = stream.binding.subspan %[[ARG0]][%[[C0]]] : !stream.binding -> memref<1x2x4xf32, strided<[8, 4, 1], offset: ?>>
+//  CHECK-NEXT:       %[[STREAM0_BASE:[a-zA-Z0-9_]+]], %[[OFFSET0:[a-zA-Z0-9_]+]],
+//  CHECK-SAME:             = iree_codegen.extract_strided_metadata %[[STREAM0]]
+//       CHECK:       %[[STREAM1:.+]] = stream.binding.subspan %[[ARG1]][%[[C0]]] : !stream.binding -> memref<1x4x8xf32, strided<[32, 8, 1], offset: ?>>
+//  CHECK-NEXT:       %[[STREAM1_BASE:[a-zA-Z0-9_]+]], %[[OFFSET1:[a-zA-Z0-9_]+]],
+//  CHECK-SAME:             = iree_codegen.extract_strided_metadata %[[STREAM1]]
+//       CHECK:       %[[STREAM2:.+]] = stream.binding.subspan %[[ARG2]][%[[C0]]] : !stream.binding -> memref<1x2x8xf32, strided<[16, 8, 1], offset: ?>>
+//  CHECK-NEXT:       %[[STREAM2_BASE:[a-zA-Z0-9_]+]], %[[OFFSET2:[a-zA-Z0-9_]+]],
+//  CHECK-SAME:             = iree_codegen.extract_strided_metadata %[[STREAM2]]
 //       CHECK:       call @mlp_external
-//  CHECK-SAME:           %[[STREAM0_BASE]], %[[C0]], %[[STREAM1_BASE]], %[[C0]], %[[STREAM2_BASE]], %[[C0]], %[[ARG3]], %[[ARG4]], %[[ARG5]]
+//  CHECK-SAME:           %[[STREAM0_BASE]], %[[OFFSET0]], %[[STREAM1_BASE]], %[[OFFSET1]], %[[STREAM2_BASE]], %[[OFFSET2]], %[[ARG3]], %[[ARG4]], %[[ARG5]]
 
 //       CHECK:     func.func @mlp_invocation
 //  CHECK-SAME:         (%[[ARG0:.+]]: tensor<2x4xf32>, %[[ARG1:.+]]: tensor<4x8xf32>)
@@ -34,7 +34,7 @@
 //   CHECK-DAG:       %[[LHS:.+]] = tosa.reshape %[[ARG0]]
 //   CHECK-DAG:       %[[RHS:.+]] = tosa.reshape %[[ARG1]]
 //       CHECK:       %[[RESULT:.+]] = flow.dispatch
-//  CHECK-SAME:           @mlp_external_executable::@mlp_external_entry_point
+//  CHECK-SAME:           @mlp_external_f32_f32_f32_i32_i32_i32_executable::@mlp_external_f32_f32_f32_i32_i32_i32_entry_point
 //  CHECK-SAME:           (%[[LHS]], %[[RHS]], %[[C2]], %[[C8]], %[[C4]])
 //       CHECK:       tosa.negate %[[RESULT]]
 

@@ -16,6 +16,7 @@ def ApplyPDLPatternsPass : Pass<"iree-preprocessing-apply-pdl-patterns", "Module
       /*default=*/"", "File path to file containing PDL patterns to use.">,
   ];
   let dependentDialects = [
+    "iree_compiler::IREE::Codegen::IREECodegenDialect",
     "iree_compiler::IREE::Flow::FlowDialect",
     "iree_compiler::IREE::Stream::StreamDialect",
     "iree_compiler::IREE::Util::UtilDialect",

@@ -145,7 +145,8 @@ static iree_hal_executable_plugin_status_t mlp_plugin_resolve(
     bool is_optional =
         iree_hal_executable_plugin_import_is_optional(symbol_name);
     if (is_optional) ++symbol_name;
-    if (iree_hal_executable_plugin_strcmp(symbol_name, "mlp_external") == 0) {
+    if (iree_hal_executable_plugin_strcmp(
+            symbol_name, "mlp_external_f32_f32_f32_i32_i32_i32") == 0) {
       params->out_fn_ptrs[i] = mlp_external;
       params->out_fn_contexts[i] =
           plugin;  // passing plugin to each import call

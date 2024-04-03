@@ -6,6 +6,8 @@
 
 #include "iree/compiler/Preprocessing/Common/Passes.h"
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
@@ -36,9 +38,31 @@ namespace mlir::iree_compiler::Preprocessing {
 
 } // namespace mlir::iree_compiler::Preprocessing
 
+/// Get strides for row-major oredering of a tensor with the given `shape`.
+static SmallVector<int64_t> getStridesFromShape(ArrayRef<int64_t> shape) {
+  if (shape.empty()) {
+    return {};
+  }
+  SmallVector<int64_t> strides(shape.size(), ShapedType::kDynamic);
+  strides.back() = 1;
+  for (int i = strides.size() - 1; i > 0; --i) {
+    if (ShapedType::isDynamic(shape[i])) {
+      break;
+    }
+    strides[i - 1] = strides[i] * shape[i];
+  }
+  return strides;
+}
+
 // Get the `memref` type for a `tensor` type.
-static MemRefType getMemRefTypeFor(RankedTensorType tensorType) {
-  return MemRefType::get(tensorType.getShape(), tensorType.getElementType());
+static MemRefType getMemRefTypeFor(MLIRContext *context,
+                                   RankedTensorType tensorType) {
+  SmallVector<int64_t> strides = getStridesFromShape(tensorType.getShape());
+  MemRefLayoutAttrInterface layoutAttr =
+      StridedLayoutAttr::get(context,
+                             /*offset=*/ShapedType::kDynamic, strides);
+  return MemRefType::get(tensorType.getShape(), tensorType.getElementType(),
+                         layoutAttr);
 }
 
 // Generates the external function call type that corresponds to the
@@ -51,7 +75,7 @@ static FunctionType getExternalFunctionCallType(MLIRContext *context,
   SmallVector<Type> externalCallArgTypes;
   // Conversion from tensor types to call arg types.
   auto convertTensorTypeToCallArgTypes = [&](RankedTensorType tensorType) {
-    auto memRefType = getMemRefTypeFor(tensorType);
+    auto memRefType = getMemRefTypeFor(context, tensorType);
     externalCallArgTypes.push_back(
         MemRefType::get(ArrayRef<int64_t>{}, memRefType.getElementType()));
     externalCallArgTypes.push_back(IndexType::get(context));
@@ -84,11 +108,11 @@ std::pair<Value, Value>
 getBasePtrAndOffsetForTensor(PatternRewriter &rewriter, Location loc,
                              RankedTensorType tensorType, Value value,
                              Value bindingOffset, ValueRange dynamicDims) {
-  auto memrefType = getMemRefTypeFor(tensorType);
+  auto memrefType = getMemRefTypeFor(rewriter.getContext(), tensorType);
   Value memrefVal = rewriter.create<IREE::Stream::BindingSubspanOp>(
       loc, memrefType, value, bindingOffset, dynamicDims);
   auto extractMetadataOp =
-      rewriter.create<memref::ExtractStridedMetadataOp>(loc, memrefVal);
+      rewriter.create<IREE::Codegen::ExtractStridedMetadataOp>(loc, memrefVal);
   return std::make_pair<Value, Value>(extractMetadataOp.getResult(0),
                                       extractMetadataOp.getResult(1));
 }
@@ -335,6 +359,39 @@ static LogicalResult checkTensorElementType(PatternRewriter &rewriter,
   return success(tensorType && tensorType.getElementType() == elementType);
 }
 
+static std::string operandTypeToString(Type operandType) {
+  std::string outputString;
+  llvm::raw_string_ostream sstream(outputString);
+  if (auto shapedType = dyn_cast<ShapedType>(operandType)) {
+    shapedType.getElementType().print(sstream);
+  } else {
+    operandType.print(sstream);
+  }
+  return outputString;
+}
+
+static std::string makeUniqueFuncName(std::string externalFnName,
+                                      SmallVector<Type> inputTypes,
+                                      SmallVector<Type> resultTypes,
+                                      SmallVector<Type> otherOperandTypes) {
+  SmallVector<std::string> datatypeTokens;
+  for (Type inputType : inputTypes) {
+    datatypeTokens.push_back(operandTypeToString(inputType));
+  }
+  for (Type resultType : resultTypes) {
+    datatypeTokens.push_back(operandTypeToString(resultType));
+  }
+  for (Type otherOperandType : otherOperandTypes) {
+    datatypeTokens.push_back(operandTypeToString(otherOperandType));
+  }
+  std::string outputString;
+  llvm::raw_string_ostream sstream(outputString);
+  llvm::interleave(
+      datatypeTokens, [&](std::string token) { sstream << token; },
+      [&] { sstream << "_"; });
+  return externalFnName + "_" + outputString;
+}
+
 // Rewrite function to rewrite a matched DAG into a flow.dispatch. Conceptually,
 // the matched DAG at the tensor level gets replaced by a function
 //
@@ -389,6 +446,11 @@ static LogicalResult rewriteAsFlowDispatch(
                                        "unhandled operand/result types");
   }
   StringAttr externalFnNameAttr = dyn_cast<StringAttr>(externalFnName);
+
+  std::string uniqueExternalFnName =
+      makeUniqueFuncName(externalFnNameAttr.getValue().str(), inputTypes,
+                         resultTypes, otherOperandTypes);
+  externalFnNameAttr = rewriter.getStringAttr(uniqueExternalFnName);
   if (!externalFnNameAttr) {
     return rewriter.notifyMatchFailure(
         rootOp, "expected string attribute for external fn name");
@@ -402,10 +464,25 @@ static LogicalResult rewriteAsFlowDispatch(
         rootOp, "failed to get dynamic result dimensions");
   }
 
-  SymbolRefAttr entryPointFnRef =
-      createStreamExecutableOp(rewriter, rootOp, externalFnNameAttr.getValue(),
-                               inputTypes, resultTypes, otherOperandTypes);
+  // Parent of the rootOp is the funcOp containing it and we want the moduleOp
+  // that contains the funcOp. Then we can look at the symbol table to make sure
+  // the function we are creating doesnt already exist.
+  auto moduleOp = rootOp->getParentOp()->getParentOp();
 
+  SymbolTable symbolTableModule(moduleOp);
+
+  std::string executableOpName = uniqueExternalFnName + "_executable";
+  std::string entryPointName = uniqueExternalFnName + "_entry_point";
+  SymbolRefAttr entryPointFnRef;
+  if (auto symbol = symbolTableModule.lookup(executableOpName)) {
+    entryPointFnRef = SymbolRefAttr::get(
+        SymbolTable::getSymbolName(symbol),
+        SymbolRefAttr::get(rewriter.getStringAttr(entryPointName)));
+  } else {
+    entryPointFnRef = createStreamExecutableOp(
+        rewriter, rootOp, externalFnNameAttr.getValue(), inputTypes,
+        resultTypes, otherOperandTypes);
+  }
   SmallVector<Value> operands = llvm::to_vector(inputOperands);
   operands.append(otherOperands.begin(), otherOperands.end());
   IREE::Flow::DispatchOp dispatchOp =

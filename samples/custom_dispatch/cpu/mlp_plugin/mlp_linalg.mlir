@@ -9,13 +9,13 @@
 // RUN:     --input="4x8xf32=[[3.0, -3.0, 3.0, -3.0], [3.0, -3.0, 3.0, -3.0], [3.0, -3.0, 3.0, -3.0], [3.0, -3.0, 3.0, -3.0], [3.0, -3.0, 3.0, -3.0], [3.0, -3.0, 3.0, -3.0], [3.0, -3.0, 3.0, -3.0], [3.0, -3.0, 3.0, -3.0]]" | \
 // RUN:   FileCheck %s --check-prefix=OUTPUT
 
-// CHECK-LABEL:   stream.executable private @mlp_external_executable
-//       CHECK:   stream.executable.export public @mlp_external_entry_point
+// CHECK-LABEL:   stream.executable private @mlp_external_f32_f32_f32_i32_i32_i32_executable
+//       CHECK:   stream.executable.export public @mlp_external_f32_f32_f32_i32_i32_i32_entry_point
 //       CHECK:   builtin.module
-//       CHECK:     func.func private @mlp_external
+//       CHECK:     func.func private @mlp_external_f32_f32_f32_i32_i32_i32
 //  CHECK-SAME:         (memref<f32>, index, memref<f32>, index, memref<f32>, index, i32, i32, i32)
 //  CHECK-SAME:         attributes {llvm.bareptr = [true]}
-//       CHECK:     func.func @mlp_external_entry_point
+//       CHECK:     func.func @mlp_external_f32_f32_f32_i32_i32_i32_entry_point
 //  CHECK-SAME:         %[[ARG0:[a-zA-Z0-9]+]]: !stream.binding
 //  CHECK-SAME:         %[[ARG1:[a-zA-Z0-9]+]]: !stream.binding
 //  CHECK-SAME:         %[[ARG2:[a-zA-Z0-9]+]]: !stream.binding
@@ -29,17 +29,17 @@
 //  CHECK-SAME:         %[[ARG10:[a-zA-Z0-9]+]]: index
 //  CHECK-SAME:         %[[ARG11:[a-zA-Z0-9]+]]: index
 //       CHECK:       %[[C0:.+]] = arith.constant 0 : index
-//       CHECK:       %[[STREAM0:.+]] = stream.binding.subspan %[[ARG0]][%[[C0]]] : !stream.binding -> memref<?x?xf32>{%[[ARG6]], %[[ARG7]]}
-//  CHECK-NEXT:       %[[STREAM0_BASE:[a-zA-Z0-9_]+]],
-//  CHECK-SAME:             = memref.extract_strided_metadata %[[STREAM0]]
-//       CHECK:       %[[STREAM1:.+]] = stream.binding.subspan %[[ARG1]][%[[C0]]] : !stream.binding -> memref<?x?xf32>{%[[ARG8]], %[[ARG9]]}
-//  CHECK-NEXT:       %[[STREAM1_BASE:[a-zA-Z0-9_]+]],
-//  CHECK-SAME:             = memref.extract_strided_metadata %[[STREAM1]]
-//       CHECK:       %[[STREAM2:.+]] = stream.binding.subspan %[[ARG2]][%[[C0]]] : !stream.binding -> memref<?x?xf32>{%[[ARG10]], %[[ARG11]]}
-//  CHECK-NEXT:       %[[STREAM2_BASE:[a-zA-Z0-9_]+]],
-//  CHECK-SAME:             = memref.extract_strided_metadata %[[STREAM2]]
+//       CHECK:       %[[STREAM0:.+]] = stream.binding.subspan %[[ARG0]][%[[C0]]] : !stream.binding -> memref<?x?xf32, strided<[?, 1], offset: ?>>{%[[ARG6]], %[[ARG7]]}
+//  CHECK-NEXT:       %[[STREAM0_BASE:[a-zA-Z0-9_]+]], %[[OFFSET0:[a-zA-Z0-9_]+]],
+//  CHECK-SAME:             = iree_codegen.extract_strided_metadata %[[STREAM0]]
+//       CHECK:       %[[STREAM1:.+]] = stream.binding.subspan %[[ARG1]][%[[C0]]] : !stream.binding -> memref<?x?xf32, strided<[?, 1], offset: ?>>{%[[ARG8]], %[[ARG9]]}
+//  CHECK-NEXT:       %[[STREAM1_BASE:[a-zA-Z0-9_]+]], %[[OFFSET1:[a-zA-Z0-9_]+]],
+//  CHECK-SAME:             = iree_codegen.extract_strided_metadata %[[STREAM1]]
+//       CHECK:       %[[STREAM2:.+]] = stream.binding.subspan %[[ARG2]][%[[C0]]] : !stream.binding -> memref<?x?xf32, strided<[?, 1], offset: ?>>{%[[ARG10]], %[[ARG11]]}
+//  CHECK-NEXT:       %[[STREAM2_BASE:[a-zA-Z0-9_]+]], %[[OFFSET2:[a-zA-Z0-9_]+]],
+//  CHECK-SAME:             = iree_codegen.extract_strided_metadata %[[STREAM2]]
 //       CHECK:       call @mlp_external
-//  CHECK-SAME:           %[[STREAM0_BASE]], %[[C0]], %[[STREAM1_BASE]], %[[C0]], %[[STREAM2_BASE]], %[[C0]], %[[ARG3]], %[[ARG4]], %[[ARG5]]
+//  CHECK-SAME:           %[[STREAM0_BASE]], %[[OFFSET0]], %[[STREAM1_BASE]], %[[OFFSET1]], %[[STREAM2_BASE]], %[[OFFSET2]], %[[ARG3]], %[[ARG4]], %[[ARG5]]
 
 //       CHECK:     util.func public @mlp_invocation
 //  CHECK-SAME:         (%[[ARG0:[a-zA-Z0-9]+]]: !hal.buffer_view, %[[ARG1:[a-zA-Z0-9]+]]: !hal.buffer_view)
@@ -53,7 +53,7 @@
 //   CHECK-DAG:       %[[N_I32:.+]] = arith.index_cast %[[NDIM1]] : index to i32
 //   CHECK-DAG:       %[[K_I32:.+]] = arith.index_cast %[[MDIM1]] : index to i32
 //       CHECK:       %[[RESULT:.+]] = flow.dispatch
-//  CHECK-SAME:           @mlp_external_executable::@mlp_external_entry_point
+//  CHECK-SAME:           @mlp_external_f32_f32_f32_i32_i32_i32_executable::@mlp_external_f32_f32_f32_i32_i32_i32_entry_point
 //  CHECK-SAME:           (%[[LHS]], %[[RHS]], %[[M_I32]], %[[N_I32]], %[[K_I32]], %[[MDIM0]], %[[MDIM1]], %[[NDIM0]], %[[NDIM1]], %[[MDIM0]], %[[NDIM1]])
 //       CHECK:       linalg.generic
 //  CHECK-SAME:           ins(%[[RESULT]] :
