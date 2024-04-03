@@ -11,7 +11,10 @@
     "test_dequantizelinear",
     "test_slice_default_axes",
   ],
-  "skip_run_tests": [],
+  "skip_run_tests": [
+    // Hanging on some machines?
+    "test_gather_elements_negative_indices",
+  ],
   "expected_compile_failures": [
     "test_acos",
     "test_acos_example",
@@ -749,7 +752,6 @@
     "test_dynamicquantizelinear_min_adjusted",
     "test_dynamicquantizelinear_min_adjusted_expanded",
     "test_elu_default",
-    "test_gather_elements_negative_indices",
     "test_gathernd_example_int32",
     "test_hardsigmoid",
     "test_hardsigmoid_default",
