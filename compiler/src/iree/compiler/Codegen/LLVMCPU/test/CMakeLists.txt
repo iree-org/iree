@@ -14,7 +14,6 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "2d-scalable-to-1d-scalable.mlir"
     "aarch64_dotprod_vector_lowering.mlir"
     "aarch64_vector_lowering.mlir"
     "apply_scale_lowering.mlir"
