@@ -237,12 +237,6 @@ adb forward tcp:8086 tcp:8086
 You can also pass `-p <port>` to the capture tool to override the default port
 to connect to, or use the Tracy GUI which scans other ports too.
 
-### Tracing `iree-compile`
-
-Tracing `iree-compile` is much like tracing the runtime tools, except that
-both of these options need to be set with CMake:
-`-DIREE_ENABLE_RUNTIME_TRACING=ON -DIREE_ENABLE_COMPILER_TRACING=ON`.
-
 ## :octicons-graph-16: Touring the Tracy profiler UI
 
 The initial view should look like this:
@@ -306,8 +300,51 @@ the Ghost zone saw into the IREE compiled module that that calls into, with the
 source view pointing to the `.mlir` file.
 
 <!-- TODO: more on using statistics -->
-<!-- TODO: discuss memory profiling -->
 <!-- TODO: discuss comparing trace files -->
+
+## Tracing `iree-compile`
+
+Tracing `iree-compile` is much like tracing the runtime tools, except that
+_both_ of these options need to be set with CMake:
+`-DIREE_ENABLE_RUNTIME_TRACING=ON -DIREE_ENABLE_COMPILER_TRACING=ON`:
+
+```shell hl_lines="3-4"
+cmake -G Ninja -B ../iree-build/ -S . \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    -DIREE_ENABLE_RUNTIME_TRACING=ON \
+    -DIREE_ENABLE_COMPILER_TRACING=ON
+cmake --build ../iree-build/ --target iree-compile
+```
+
+The steps for collecting traces are the same: run the instrumented program and
+connect using the Tracy profiler UI or capture tool.
+
+[![Tracing iree-compile](https://github.com/openxla/iree/assets/4010439/bf5c0502-6b1b-4caa-bdd9-132281245421)](https://github.com/openxla/iree/assets/4010439/bf5c0502-6b1b-4caa-bdd9-132281245421)
+
+* MLIR passes are instrumented using
+  [Pass Instrumentation](https://mlir.llvm.org/docs/PassManagement/#pass-instrumentation),
+  (see
+  [`TracingUtils.h`](https://github.com/openxla/iree/blob/main/compiler/src/iree/compiler/Utils/TracingUtils.h))
+* Zones are annotated with op breadcrumbs indicating which root op was processed
+* Each compilation phase (e.g. Flow, Stream, HAL) is tagged as a "frame", so
+  you can jump between them, limit statistics to them, and see how much time
+  each took
+
+??? caution "Caution - Tracy sampling with `iree-compile`"
+
+    When tracing the compiler, the LLVM/MLIR code can easily generate millions
+    of trace events. Traces captured with sampling can thus take hours to
+    collect, require 40GB+ of RAM to view, and take 1GB+ on disk to store.
+
+    ![image](https://github.com/openxla/iree/assets/4010439/39c42225-0309-4067-91cf-e6ac1c0aae0e)
+
+    However, sampling is especially useful in diagnosing long compile times,
+    since only the MLIR passes are instrumentated, unlike in IREE's runtime
+    where most functions are covered.
+
+For more tips on profiling the compiler, see the
+[Compile time regression debugging](../debugging/compile-time-regressions.md)
+page.
 
 ## :octicons-question-16: Troubleshooting
 
