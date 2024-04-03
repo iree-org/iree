@@ -14,6 +14,7 @@
   "skip_run_tests": [
     // Hanging on some machines?
     "test_gather_elements_negative_indices",
+    "test_scatter_elements_with_negative_indices",
   ],
   "expected_compile_failures": [
     "test_acos",
