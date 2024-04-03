@@ -20,20 +20,17 @@ iree_lit_test_suite(
             "conv_to_channels_last.mlir",
             "make_single_dispatch_for_function.mlir",
             "pad_linalg_ops.mlir",
-            "pdl_example.mlir",
             "preprocessing_match_ops.mlir",
             "transform_symbol_importing.mlir",
         ],
         include = ["*.mlir"],
         exclude = [
             "external_function_spec.mlir",
-            "pdl_patterns.mlir",
         ],
     ),
     cfg = "//compiler:lit.cfg.py",
     data = [
         "external_function_spec.mlir",
-        "pdl_patterns.mlir",
     ],
     tools = [
         "//tools:iree-opt",
