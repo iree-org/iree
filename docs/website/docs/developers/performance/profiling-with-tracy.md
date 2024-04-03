@@ -82,8 +82,8 @@ be built from source by using either the upstream CMake build or IREE's
     cmake --build ../iree-build/ --target iree-run-module
     ```
 
-    1.  Sampling needs debug info from `CMAKE_BUILD_TYPE` set to either
-        `RelWithDebInfo` or `Debug`
+    1. Sampling needs debug info from `CMAKE_BUILD_TYPE` set to either
+       `RelWithDebInfo` or `Debug`
 
     For more information about building from source, follow the
     [Getting started](../../building-from-source/getting-started.md) page.
@@ -114,11 +114,11 @@ be built from source by using either the upstream CMake build or IREE's
       -o program.vmfb
     ```
 
-    1.  The `--iree-hal-executable-debug-level=3` flag embeds source information
-        about each executable into the `.vmfb` file for the runtime to pass to
-        Tracy. Without this flag, source locations are included on a best-effort
-        basis, typically coming from either the input .mlir file or an input
-        Python file.
+    1. The `--iree-hal-executable-debug-level=3` flag embeds source information
+       about each executable into the `.vmfb` file for the runtime to pass to
+       Tracy. Without this flag, source locations are included on a best-effort
+       basis, typically coming from either the input .mlir file or an input
+       Python file.
 
 3. Run the program using the instrumented `iree-run-module`
 
@@ -138,9 +138,9 @@ be built from source by using either the upstream CMake build or IREE's
       ...
     ```
 
-    1.  Some platforms require elevated permissions (sudo / administrator)
-        to collect sampling data. Refer to the
-        [Tracy PDF manual](#the-tracy-manual) for full details.
+    1. Some platforms require elevated permissions (sudo / administrator)
+       to collect sampling data. Refer to the
+       [Tracy PDF manual](#the-tracy-manual) for full details.
 
 4. While the program is running, connect using the Tracy profiler UI or capture
     tool:
@@ -305,7 +305,7 @@ source view pointing to the `.mlir` file.
 ## Tracing `iree-compile`
 
 Tracing `iree-compile` is much like tracing the runtime tools, except that
-_both_ of these options need to be set with CMake:
+*both* of these options need to be set with CMake:
 `-DIREE_ENABLE_RUNTIME_TRACING=ON -DIREE_ENABLE_COMPILER_TRACING=ON`:
 
 ```shell hl_lines="3-4"
