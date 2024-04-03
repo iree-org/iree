@@ -397,11 +397,6 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
     nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUPeelPass());
   }
 
-  if (pipelineOpt.enableAArch64SSVE) {
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createLLVMCPU2DScalableTo1DScalablePass());
-  }
-
   {
     nestedModulePM.addNestedPass<func::FuncOp>(createVectorizePadPass());
     nestedModulePM.addNestedPass<func::FuncOp>(
