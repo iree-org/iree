@@ -118,40 +118,31 @@ void getExtensions(const TargetTriple &triple,
   switch (triple.getArch()) {
   case TargetTripleArch::Apple_M1: {
     // Example: https://vulkan.gpuinfo.org/displayreport.php?id=14673
-    const Extension list[] = {
-        Extension::VK_KHR_16bit_storage,
-        Extension::VK_KHR_8bit_storage,
-        Extension::VK_KHR_shader_float16_int8,
-        Extension::VK_KHR_storage_buffer_storage_class,
-        Extension::VK_KHR_buffer_device_address,
-        Extension::VK_KHR_variable_pointers,
-    };
-    return append_range(extensions, list);
+    return append_values(extensions, Extension::VK_KHR_16bit_storage,
+                         Extension::VK_KHR_8bit_storage,
+                         Extension::VK_KHR_shader_float16_int8,
+                         Extension::VK_KHR_storage_buffer_storage_class,
+                         Extension::VK_KHR_buffer_device_address,
+                         Extension::VK_KHR_variable_pointers);
   }
   case TargetTripleArch::ARM_Valhall: {
     // Example: https://vulkan.gpuinfo.org/displayreport.php?id=10312
-    const Extension list[] = {
-        Extension::VK_KHR_16bit_storage,
-        Extension::VK_KHR_8bit_storage,
-        Extension::VK_KHR_shader_float16_int8,
-        Extension::VK_KHR_shader_integer_dot_product,
-        Extension::VK_KHR_spirv_1_4,
-        Extension::VK_KHR_storage_buffer_storage_class,
-        Extension::VK_KHR_variable_pointers,
-    };
-    return append_range(extensions, list);
+    return append_values(extensions, Extension::VK_KHR_16bit_storage,
+                         Extension::VK_KHR_8bit_storage,
+                         Extension::VK_KHR_shader_float16_int8,
+                         Extension::VK_KHR_shader_integer_dot_product,
+                         Extension::VK_KHR_spirv_1_4,
+                         Extension::VK_KHR_storage_buffer_storage_class,
+                         Extension::VK_KHR_variable_pointers);
   }
   case TargetTripleArch::QC_Adreno: {
     // Example: https://vulkan.gpuinfo.org/displayreport.php?id=10983 (11)
     // Example: https://vulkan.gpuinfo.org/displayreport.php?id=16312 (12)
-    const Extension list[] = {
-        Extension::VK_KHR_16bit_storage,
-        Extension::VK_KHR_shader_float16_int8,
-        Extension::VK_KHR_spirv_1_4,
-        Extension::VK_KHR_storage_buffer_storage_class,
-        Extension::VK_KHR_variable_pointers,
-    };
-    append_range(extensions, list);
+    append_values(extensions, Extension::VK_KHR_16bit_storage,
+                  Extension::VK_KHR_shader_float16_int8,
+                  Extension::VK_KHR_spirv_1_4,
+                  Extension::VK_KHR_storage_buffer_storage_class,
+                  Extension::VK_KHR_variable_pointers);
     if (triple.getOS() == TargetTripleOS::Android31) {
       extensions.push_back(Extension::VK_KHR_8bit_storage);
     }
@@ -179,18 +170,15 @@ void getExtensions(const TargetTriple &triple,
     return append_range(extensions, list);
   }
 
-  // Desktop GPUs typically support all extensions we care.
-  const Extension desktop[] = {Extension::VK_KHR_16bit_storage,
-                               Extension::VK_KHR_8bit_storage,
-                               Extension::VK_KHR_shader_float16_int8,
-                               Extension::VK_KHR_shader_integer_dot_product,
-                               Extension::VK_KHR_spirv_1_4,
-                               Extension::VK_KHR_storage_buffer_storage_class,
-                               Extension::VK_KHR_buffer_device_address,
-                               Extension::VK_KHR_variable_pointers,
-                               Extension::VK_EXT_subgroup_size_control};
-
-  llvm::append_range(extensions, desktop);
+  llvm::append_values(
+      extensions, // Desktop GPUs typically support all extensions we care.
+      Extension::VK_KHR_16bit_storage, Extension::VK_KHR_8bit_storage,
+      Extension::VK_KHR_shader_float16_int8,
+      Extension::VK_KHR_shader_integer_dot_product, Extension::VK_KHR_spirv_1_4,
+      Extension::VK_KHR_storage_buffer_storage_class,
+      Extension::VK_KHR_buffer_device_address,
+      Extension::VK_KHR_variable_pointers,
+      Extension::VK_EXT_subgroup_size_control);
   if (getVendor(triple) == spirv::Vendor::NVIDIA ||
       triple.getArch() == TargetTripleArch::AMD_RDNAv3) {
     extensions.push_back(Extension::VK_KHR_cooperative_matrix);

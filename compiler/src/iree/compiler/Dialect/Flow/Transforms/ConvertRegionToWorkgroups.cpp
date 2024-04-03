@@ -51,9 +51,9 @@ findFirstTiedValueOutsideOfRegionOp(IREE::Flow::DispatchRegionOp regionOp,
                                     Value value) {
   // Check if `v` is defined outside of `regionOp`.
   auto isOutside = [&](Value v) {
-    if (llvm::isa<OpResult>(v))
+    if (isa<OpResult>(v))
       return !regionOp->isAncestor(v.getDefiningOp());
-    assert(v.isa<BlockArgument>() && "expected bbArg");
+    assert(isa<BlockArgument>(v) && "expected bbArg");
     // DispatchRegionOp does not have block arguments.
     return true;
   };
@@ -167,9 +167,9 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
     rewriter.inlineRegionBefore(regionOp.getWorkgroupCount(),
                                 workgroupsOp.getWorkgroupCount(),
                                 workgroupsOp.getWorkgroupCount().begin());
-    mlir::makeRegionIsolatedFromAbove(
-        rewriter, workgroupsOp.getWorkgroupCount(),
-        [](Operation *op) { return isa<arith::ConstantOp>(op); });
+    mlir::makeRegionIsolatedFromAbove(rewriter,
+                                      workgroupsOp.getWorkgroupCount(),
+                                      llvm::IsaPred<arith::ConstantOp>);
   }
 
   IRMapping bvm;

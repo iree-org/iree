@@ -16,6 +16,7 @@ iree_lit_test_suite(
   SRCS
     "annotate_dispatches.mlir"
     "capture_dispatch_dynamic_dims.mlir"
+    "capture_scf_for_dynamic_dims.mlir"
     "cleanup_tensor_shapes.mlir"
     "clone_producers_into_dispatch_regions.mlir"
     "collapse_dimensions.mlir"

@@ -41,7 +41,7 @@
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
-#include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
+#include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
@@ -917,7 +917,9 @@ transform_dialect::TestVectorLayoutAnalysisOp::applyToOne(
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   VectorLayoutAnalysis analysis(target);
-  setAnchorOpsFromAttributes(analysis, target);
+  if (setAnchorOpsFromAttributes(analysis, target).failed()) {
+    return emitDefaultSilenceableFailure(target);
+  }
   if (failed(analysis.run())) {
     target.emitError("layout analysis failed");
     return emitDefaultSilenceableFailure(target);
@@ -942,8 +944,7 @@ public:
       : VectorLayoutOptions(root, /*fullConversion=*/false) {}
 
   LogicalResult setAnchorOps(VectorLayoutAnalysis &analysis) override {
-    setAnchorOpsFromAttributes(analysis, root);
-    return success();
+    return setAnchorOpsFromAttributes(analysis, root);
   }
 };
 

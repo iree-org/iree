@@ -551,9 +551,18 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
     }
   }
 
-  nestedModulePM.addNestedPass<func::FuncOp>(createGenericVectorizationPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createOptimizeTensorInsertExtractSlicesPass());
+  {
+    GenericVectorizationPassOptions options;
+    options.enableVectorMasking = pipelineOpt.enableVectorMasking;
+    options.vectorizePadding = true;
+    options.vectorizeGatherAccesses = true;
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createGenericVectorizationPass(options));
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createOptimizeTensorInsertExtractSlicesPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+  }
 
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
@@ -697,6 +706,12 @@ static void addLowerToLLVMPasses(OpPassManager &passManager,
   }
 
   if (enableAArch64SME) {
+    // Decompose large (2D-scalable) vector types to (multiple) SME tiles
+    // + some ArmSME specific vector dialect rewrites.
+    passManager.addPass(mlir::arm_sme::createVectorLegalizationPass());
+    passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    passManager.addNestedPass<func::FuncOp>(createCSEPass());
+
     // (Arith, Vector) -> ArmSME
     passManager.addNestedPass<func::FuncOp>(
         mlir::createArithToArmSMEConversionPass());

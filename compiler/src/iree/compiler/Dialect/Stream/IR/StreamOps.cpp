@@ -2250,8 +2250,10 @@ void AsyncFuncOp::build(OpBuilder &builder, OperationState &state,
   state.addAttribute(SymbolTable::getVisibilityAttrName(),
                      builder.getStringAttr("private"));
   state.addAttribute("function_type", TypeAttr::get(type));
-  state.addAttribute(IREE::Util::TiedOpInterface::getStorageAttrName(),
-                     tiedOperands);
+  if (tiedOperands) {
+    state.addAttribute(IREE::Util::TiedOpInterface::getStorageAttrName(),
+                       tiedOperands);
+  }
   state.addRegion();
   if (!argAttrs.empty() || !resAttrs.empty()) {
     assert(type.getNumInputs() == argAttrs.size());
@@ -2330,22 +2332,22 @@ AsyncCallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
   }
 
   // NOTE: we allow the func to have broader lifetimes (`*`) than the calls.
-  auto expectedType = getCalleeType();
+  auto callType = getCalleeType();
   auto calleeType = calleeOp.getFunctionType();
-  if (calleeType.getNumInputs() != expectedType.getNumInputs() ||
-      calleeType.getNumResults() != expectedType.getNumResults()) {
+  if (calleeType.getNumInputs() != callType.getNumInputs() ||
+      calleeType.getNumResults() != callType.getNumResults()) {
     return emitOpError("function type mismatch; expected ")
-           << expectedType << " but callee is " << calleeType;
+           << callType << " but callee is " << calleeType;
   }
-  auto typesCompatible = [](Type actual, Type expected) {
-    if (actual == expected)
+  // auto typesCompatible = [](Type actual, Type expected) {
+  auto typesCompatible = [](Type callee, Type call) {
+    if (callee == call)
       return true;
-    auto calleeResource = llvm::dyn_cast<IREE::Stream::ResourceType>(actual);
-    auto expectedResource =
-        llvm::dyn_cast<IREE::Stream::ResourceType>(expected);
-    if (calleeResource && expectedResource) {
-      if (expectedResource.getLifetime() == IREE::Stream::Lifetime::Unknown) {
-        // Allow anything to match with an unknown lifetime.
+    auto calleeResource = llvm::dyn_cast<IREE::Stream::ResourceType>(callee);
+    auto callResource = llvm::dyn_cast<IREE::Stream::ResourceType>(call);
+    if (calleeResource && callResource) {
+      if (calleeResource.getLifetime() == IREE::Stream::Lifetime::Unknown) {
+        // Allow anything to match with an unknown lifetime on the async.func.
         return true;
       }
       // Lifetime is specified on the func and the call doesn't match.
@@ -2354,14 +2356,14 @@ AsyncCallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
     return false;
   };
   for (auto [calleeArg, expectedArg] :
-       llvm::zip_equal(calleeType.getInputs(), expectedType.getInputs())) {
+       llvm::zip_equal(calleeType.getInputs(), callType.getInputs())) {
     if (!typesCompatible(calleeArg, expectedArg)) {
       return emitOpError("function argument type mismatch; expected ")
              << expectedArg << " but callee provides " << calleeArg;
     }
   }
   for (auto [calleeResult, expectedResult] :
-       llvm::zip_equal(calleeType.getResults(), expectedType.getResults())) {
+       llvm::zip_equal(calleeType.getResults(), callType.getResults())) {
     if (!typesCompatible(calleeResult, expectedResult)) {
       return emitOpError("function result type mismatch; expected ")
              << expectedResult << " but callee provides " << calleeResult;
@@ -3009,16 +3011,12 @@ CmdDispatchOp::makeOperandToArgMap(mlir::FunctionOpInterface funcOp) {
 // static
 SmallVector<unsigned>
 CmdDispatchOp::makeResourceToArgMap(mlir::FunctionOpInterface funcOp) {
-  unsigned operandCount =
-      llvm::count_if(funcOp.getArgumentTypes(), [](Type type) {
-        return llvm::isa<IREE::Stream::BindingType>(type);
-      });
+  unsigned operandCount = llvm::count_if(
+      funcOp.getArgumentTypes(), llvm::IsaPred<IREE::Stream::BindingType>);
   SmallVector<unsigned> map(operandCount);
-  unsigned operandIdx = 0;
-  for (auto it : llvm::enumerate(funcOp.getArgumentTypes())) {
-    unsigned argIdx = it.index();
-    auto argType = it.value();
-    if (llvm::isa<IREE::Stream::BindingType>(argType)) {
+  size_t operandIdx = 0;
+  for (auto [argIdx, argType] : llvm::enumerate(funcOp.getArgumentTypes())) {
+    if (isa<IREE::Stream::BindingType>(argType)) {
       map[operandIdx++] = argIdx;
     }
   }

@@ -34,11 +34,13 @@ iree_cc_library(
     IREEDialectsTransforms
     IREELinalgTransformDialect
     MLIRArithDialect
+    MLIRBytecodeOpInterface
     MLIRIR
     MLIRPDLDialect
     MLIRSCFDialect
     MLIRTensorDialect
     MLIRTransformDialect
+    MLIRTransformDialectInterfaces
     MLIRTransformUtils
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Flow::Transforms

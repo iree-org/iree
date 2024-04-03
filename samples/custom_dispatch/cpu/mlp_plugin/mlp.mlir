@@ -4,7 +4,8 @@
 // RUN:     --module=- \
 // RUN:     --function=mlp_invocation \
 // RUN:     --input="2x2xf32=[[2.0, 2.0], [-2.0, -2.0]]" \
-// RUN:     --input="2x2xf32=[[3.0, -3.0], [3.0, -3.0]]"
+// RUN:     --input="2x2xf32=[[3.0, -3.0], [3.0, -3.0]]" | \
+// RUN: FileCheck %s
 
 // The implementation of MLP is matched using a transform dialect script and is forwarded to a system plugin.
 
@@ -27,7 +28,7 @@ module @example attributes {hal.device.targets = [#cpu_target]} {
 
   // CHECK-LABEL: EXEC @mlp_invocation
   //       CHECK: [Plugin]: M = 2, N = 2, K = 2
-  //       CHECK: 2x2xf32=[-12 0][0 -12]
+  //       CHECK: 2x2xf32=[-12 -0][-0 -12]
   func.func @mlp_invocation(%lhs: tensor<?x?xf32>,
                             %rhs: tensor<?x?xf32>) -> (tensor<?x?xf32>) {
     %c0 = arith.constant 0 : index

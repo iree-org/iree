@@ -25,6 +25,7 @@ iree_cc_library(
     "WorkItem.cpp"
   DEPS
     LLVMSupport
+    MLIRBytecodeWriter
     MLIRIR
     MLIRPass
     MLIRSupport

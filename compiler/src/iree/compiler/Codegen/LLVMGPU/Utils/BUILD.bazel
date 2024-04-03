@@ -45,6 +45,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:NVGPUDialect",
         "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:SCFTransforms",
+        "@llvm-project//mlir:SideEffectInterfaces",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:VectorDialect",
     ],

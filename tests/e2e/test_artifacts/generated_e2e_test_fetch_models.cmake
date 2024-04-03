@@ -1,4 +1,32 @@
 iree_fetch_artifact(
+  NAME "model-matmul_1x256x2048_i8_i4_i32_tile_config_default"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/linalg/jax_derived_0.4.25_1710887127/matmul_1x256x2048_i8_i4_i32_tile_config_default.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_matmul_1x256x2048_i8_i4_i32_tile_config_default.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME "model-matmul_256x256x2048_i8_i4_i32_tile_config_default"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/linalg/jax_derived_0.4.25_1710887127/matmul_256x256x2048_i8_i4_i32_tile_config_default.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_matmul_256x256x2048_i8_i4_i32_tile_config_default.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME "model-matmul_1x256x2048_i8_i8_i32_tile_config_default"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/linalg/jax_derived_0.4.25_1710887127/matmul_1x256x2048_i8_i8_i32_tile_config_default.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_matmul_1x256x2048_i8_i8_i32_tile_config_default.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME "model-matmul_256x256x2048_i8_i8_i32_tile_config_default"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/linalg/jax_derived_0.4.25_1710887127/matmul_256x256x2048_i8_i8_i32_tile_config_default.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_matmul_256x256x2048_i8_i8_i32_tile_config_default.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
   NAME "model-PersonDetect_int8"
   SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/person_detect.tflite"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_PersonDetect_int8.tflite"

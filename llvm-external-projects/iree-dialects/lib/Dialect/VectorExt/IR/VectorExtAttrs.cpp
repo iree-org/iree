@@ -23,6 +23,8 @@ using namespace mlir;
 
 namespace mlir::iree_compiler::IREE::VectorExt {
 
+using VectorValue = TypedValue<VectorType>;
+
 bool PerDimLayoutAttr::contains(const LayoutDimension &dim) {
   for (LayoutDimensionAttr label : getLabels()) {
     if (label.getValue() == dim)
@@ -50,18 +52,36 @@ std::optional<int64_t> LayoutAttr::getShape(const LayoutDimension &dim) const {
 
 // Get the SIMT Vector shape in the order specified by dims. If no dims are
 // specified, then return an empty vector.
-bool LayoutAttr::isValidLayout(ArrayRef<int64_t> shape) const {
-  for (auto perDimLayout : llvm::enumerate(getLayouts())) {
-    ArrayRef<int64_t> layoutShape = perDimLayout.value().getShapes();
-    int64_t computedShape =
+LogicalResult LayoutAttr::isValidLayout(VectorValue vector) const {
+  ArrayRef<int64_t> shape = vector.getType().getShape();
+  if (shape.size() != getLayouts().size()) {
+    return emitError(vector.getLoc(),
+                     "Rank of vector (" + std::to_string(shape.size()) +
+                         ") does not match rank of layout (" +
+                         std::to_string(getLayouts().size()) + ").");
+  }
+  for (auto [idx, layout] : llvm::enumerate(getLayouts())) {
+    ArrayRef<int64_t> layoutShape = layout.getShapes();
+    int64_t expectedShape =
         std::reduce(layoutShape.begin(), layoutShape.end(),
                     static_cast<int64_t>(1), std::multiplies<int64_t>());
-    int64_t expectedShape = shape[perDimLayout.index()];
-    if (computedShape != expectedShape) {
-      return false;
+    if (expectedShape != shape[idx]) {
+      std::string shapeStr;
+      llvm::raw_string_ostream shapeOs(shapeStr);
+      llvm::interleaveComma(shape, shapeOs);
+      std::string layoutStr;
+      llvm::raw_string_ostream layoutOs(layoutStr);
+      printStripped(layoutOs);
+      return emitError(vector.getLoc(),
+                       "Vector shape: [" + shapeStr +
+                           "] does not match the layout (" + layoutStr +
+                           ") at dim " + std::to_string(idx) +
+                           ". Dimension expected by layout: " +
+                           std::to_string(expectedShape) +
+                           " actual: " + std::to_string(shape[idx]));
     }
   }
-  return true;
+  return success();
 }
 
 // Project out the layout for the specified dimensions
@@ -304,26 +324,48 @@ NestedLayoutAttr::project(ArrayRef<bool> droppedDims) const {
 
 VectorLayoutInterface
 NestedLayoutAttr::permute(ArrayRef<int64_t> permutation) const {
+  // The order fields are permuted by the inverse permutation to map the
+  // permuted sizes back to their original positions.
+  //
+  // Shape = S
+  // Distributed Shape = DS
+  // Ordering = P
+  //
+  // S(A) * P(A) = DS(A)
+  //
+  // AT = transpose(A)
+  //
+  // Given:
+  // DS(A) = DS(AT) -- 1
+  // S(AT) = S(A) * perm -- 2
+  //
+  // :=
+  //
+  // Using 1
+  // S(A) * P(A) = S(AT) * P(AT)
+  // Using 2
+  // S(A) * P(A) =  S(A) * perm * P(AT)
+  // P(A) = perm * P(AT)
+  // P(AT) = perm^-1 * P(A)
+  SmallVector<int64_t> invPerm = invertPermutationVector(permutation);
   SmallVector<int64_t> subgroupCount =
       applyPermutation(getSubgroupsPerWorkgroup(), permutation);
   SmallVector<int64_t> subgroupOrder =
-      applyPermutation(getSubgroupOrder(), permutation);
+      applyPermutation(invPerm, getSubgroupOrder());
   SmallVector<int64_t> batchCount =
       applyPermutation(getBatchesPerSubgroup(), permutation);
-  SmallVector<int64_t> batchOrder =
-      applyPermutation(getBatchOrder(), permutation);
+  SmallVector<int64_t> batchOrder = applyPermutation(invPerm, getBatchOrder());
   SmallVector<int64_t> outerCount =
       applyPermutation(getOutersPerBatch(), permutation);
-  SmallVector<int64_t> outerOrder =
-      applyPermutation(getOuterOrder(), permutation);
+  SmallVector<int64_t> outerOrder = applyPermutation(invPerm, getOuterOrder());
   SmallVector<int64_t> threadCount =
       applyPermutation(getThreadsPerOuter(), permutation);
   SmallVector<int64_t> threadOrder =
-      applyPermutation(getThreadOrder(), permutation);
+      applyPermutation(invPerm, getThreadOrder());
   SmallVector<int64_t> elementCount =
       applyPermutation(getElementsPerThread(), permutation);
   SmallVector<int64_t> elementOrder =
-      applyPermutation(getElementOrder(), permutation);
+      applyPermutation(invPerm, getElementOrder());
 
   return NestedLayoutAttr::get(
       getContext(), subgroupCount, subgroupOrder, batchCount, batchOrder,
@@ -342,7 +384,14 @@ SmallVector<int64_t> NestedLayoutAttr::getDistributedShape() const {
   return shape;
 }
 
-bool NestedLayoutAttr::isValidLayout(ArrayRef<int64_t> shape) const {
+LogicalResult NestedLayoutAttr::isValidLayout(VectorValue vector) const {
+  ArrayRef<int64_t> shape = vector.getType().getShape();
+  if (shape.size() != getBatchOrder().size()) {
+    return emitError(vector.getLoc(),
+                     "Rank of vector (" + std::to_string(shape.size()) +
+                         ") does not match rank of layout (" +
+                         std::to_string(getBatchOrder().size()) + ").");
+  }
   // Multiply all shapes in the layout.
   for (int i = 0, e = shape.size(); i < e; ++i) {
     int64_t expectedShape = getSubgroupsPerWorkgroup()[i] *
@@ -350,10 +399,22 @@ bool NestedLayoutAttr::isValidLayout(ArrayRef<int64_t> shape) const {
                             getOutersPerBatch()[i] * getThreadsPerOuter()[i] *
                             getElementsPerThread()[i];
     if (expectedShape != shape[i]) {
-      return false;
+      std::string shapeStr;
+      llvm::raw_string_ostream shapeOs(shapeStr);
+      llvm::interleaveComma(shape, shapeOs);
+      std::string layoutStr;
+      llvm::raw_string_ostream layoutOs(layoutStr);
+      printStripped(layoutOs);
+      return emitError(vector.getLoc(),
+                       "Vector shape: [" + shapeStr +
+                           "] does not match the layout (" + layoutStr +
+                           ") at dim " + std::to_string(i) +
+                           ". Dimension expected by layout: " +
+                           std::to_string(expectedShape) +
+                           " actual: " + std::to_string(shape[i]));
     }
   }
-  return true;
+  return success();
 }
 
 // TODO: These things should ideally go into the parser when we have a custom

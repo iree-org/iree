@@ -31,7 +31,7 @@ iree_compiler_cc_library(
     name = "Transforms",
     srcs = [
         "AnnotateDispatches.cpp",
-        "CaptureDispatchDynamicDims.cpp",
+        "CaptureDynamicDims.cpp",
         "CleanupTensorShapes.cpp",
         "CloneProducersIntoDispatchRegions.cpp",
         "CollapseDimensions.cpp",

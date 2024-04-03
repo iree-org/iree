@@ -128,14 +128,16 @@ def WorkgroupSpecialization :
   let constructor = "mlir::iree_compiler::createWorkgroupSpecializationPass()";
 }
 
-def WorkGroupSwizzle :
-    InterfacePass<"iree-workgroup-swizzle", "mlir::FunctionOpInterface"> {
-  let summary = "swizzle the workgroup ids for better cache reuse";
-  let constructor = "mlir::iree_compiler::createWorkGroupSwizzle()";
+def ReorderWorkgroups :
+    InterfacePass<"iree-codegen-reorder-workgroups", "mlir::FunctionOpInterface"> {
+  let summary = "Reorder workgroup ids for better cache reuse";
+  let constructor = "mlir::iree_compiler::createReorderWorkgroups()";
   let options = [
+    Option<"strategy", "strategy", "std::string", /*default=*/"",
+           "Workgroup reordering strategy, one of: '' (none),  'transpose', 'swizzle'">,
     Option<"logTile", "logTile", "unsigned",
             /*default=*/"0",
-           "pass the tile value for unit testing">,
+           "The log2 of the tile size used for swizzling. (0: disabled, non-0: swizzling enabled)">,
   ];
 }
 

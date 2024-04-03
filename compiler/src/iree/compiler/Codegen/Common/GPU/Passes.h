@@ -51,6 +51,8 @@ pipelineSharedMemoryCopy(RewriterBase &rewriter, scf::ForOp forOp,
 LogicalResult tileReductionToSerialLoops(mlir::FunctionOpInterface funcOp,
                                          bool fuseInputProducer = false);
 
+/// Swizzles the workgroup order in `funcOp` according to the `swizzleLogTile`
+/// size. `swizzleLogTile` of 0 disables any swizzling.
 LogicalResult swizzleWorkgroupsInFunc(mlir::FunctionOpInterface funcOp,
                                       unsigned swizzleLogTile);
 
@@ -143,9 +145,14 @@ createConvertVectorReductionToGPUPass(
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createWorkgroupSpecializationPass();
 
-/// Converts vector ops to gpu dialect.
+enum class ReorderWorkgrupsStrategy { None, Swizzle, Transpose };
+
+/// Reorders workgroup IDs.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createWorkGroupSwizzle(unsigned swizzleLogTile = 0);
+createReorderWorkgroups(
+    ReorderWorkgrupsStrategy strategy = ReorderWorkgrupsStrategy::None,
+    unsigned swizzleLogTile = 0,
+    std::function<LogicalResult(mlir::FunctionOpInterface)> filterFn = nullptr);
 
 // This pass generalizes named Linalg ops that are better off as generics.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>

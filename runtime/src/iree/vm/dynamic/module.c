@@ -119,6 +119,9 @@ static iree_status_t IREE_API_PTR iree_vm_dynamic_module_get_function_attr(
     void* self, iree_vm_function_linkage_t linkage, iree_host_size_t ordinal,
     iree_host_size_t index, iree_string_pair_t* out_attr) {
   iree_vm_dynamic_module_t* module = (iree_vm_dynamic_module_t*)self;
+  if (!module->user_module->get_function_attr) {
+    return iree_make_status(IREE_STATUS_NOT_FOUND);
+  }
   return iree_status_freeze(module->user_module->get_function_attr(
       module->user_module->self, linkage, ordinal, index, out_attr));
 }

@@ -770,9 +770,8 @@ LogicalResult setMatmulOpConfig(spirv::ResourceLimitsAttr limits,
 
   workgroupTileSizes.resize(lastParallelDim + 1);
   threadTileSizes.resize(lastParallelDim + 1);
-  tileSizes.push_back(workgroupTileSizes);
-  tileSizes.push_back(threadTileSizes);
-  tileSizes.push_back(reductionTileSizes);
+  llvm::append_values(tileSizes, workgroupTileSizes, threadTileSizes,
+                      reductionTileSizes);
   return setOpConfigAndEntryPointFnTranslation(
       op->getParentOfType<mlir::FunctionOpInterface>(), op, tileSizes,
       CodeGenPipeline::SPIRVBaseVectorize, workgroupSize);
@@ -954,12 +953,8 @@ LogicalResult setCooperativeMatrixConfig(
   reductionTileSizes.append(kIndex, 0);
   reductionTileSizes.push_back(schedule->kTileCount * schedule->kSize);
 
-  TileSizesListType tileSizes;
-  tileSizes.reserve(3);
-  tileSizes.push_back(workgroupTileSizes);
-  tileSizes.push_back(subgroupTileSizes);
-  tileSizes.push_back(reductionTileSizes);
-  tileSizes.push_back(vectorSizes);
+  TileSizesListType tileSizes = {workgroupTileSizes, subgroupTileSizes,
+                                 reductionTileSizes, vectorSizes};
 
   // Don't do multibuffering if the inner reduction loop is folded out.
   auto pipelineDepth = softwarePipelineDepth;

@@ -21,6 +21,7 @@
 #include "mlir/IR/BuiltinDialect.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/IRMapping.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -3964,7 +3965,6 @@ class ContainerAllocOpConversion : public EmitCConversionPattern<OpTy> {
   getOperands(IREE::VM::ListAllocOp op, Adaptor adaptor,
               ConversionPatternRewriter &rewriter, Type elementType,
               Value containerPtr, Value allocator) const {
-    SmallVector<Value> result;
 
     auto moduleOp = op.getOperation()->getParentOfType<IREE::VM::ModuleOp>();
     auto parentFuncOp =
@@ -3980,12 +3980,8 @@ class ContainerAllocOpConversion : public EmitCConversionPattern<OpTy> {
     }
 
     Value capacity = adaptor.getOperands()[0];
-
-    result.push_back(elementTypePtr.value());
-    result.push_back(capacity);
-    result.push_back(allocator);
-    result.push_back(containerPtr);
-
+    SmallVector<Value> result = {elementTypePtr.value(), capacity, allocator,
+                                 containerPtr};
     return result;
   }
 
@@ -3995,9 +3991,6 @@ class ContainerAllocOpConversion : public EmitCConversionPattern<OpTy> {
               Value containerPtr, Value allocator) const {
     auto ctx = op.getContext();
     auto loc = op.getLoc();
-
-    SmallVector<Value> result;
-
     Value access =
         rewriter
             .create<emitc::ConstantOp>(
@@ -4012,12 +4005,8 @@ class ContainerAllocOpConversion : public EmitCConversionPattern<OpTy> {
     Value length = adaptor.getOperands()[0];
     Value alignment = adaptor.getOperands()[1];
 
-    result.push_back(access);
-    result.push_back(length);
-    result.push_back(alignment);
-    result.push_back(allocator);
-    result.push_back(containerPtr);
-
+    SmallVector<Value> result = {access, length, alignment, allocator,
+                                 containerPtr};
     return result;
   }
 
@@ -4027,8 +4016,6 @@ class ContainerAllocOpConversion : public EmitCConversionPattern<OpTy> {
               Value containerPtr, Value allocator) const {
     auto ctx = op.getContext();
     auto loc = op.getLoc();
-
-    SmallVector<Value> result;
 
     Value access =
         rewriter
@@ -4061,14 +4048,8 @@ class ContainerAllocOpConversion : public EmitCConversionPattern<OpTy> {
     Value length = adaptor.getOperands()[2];
     Value alignment = adaptor.getOperands()[3];
 
-    result.push_back(access);
-    result.push_back(source);
-    result.push_back(offset);
-    result.push_back(length);
-    result.push_back(alignment);
-    result.push_back(allocator);
-    result.push_back(containerPtr);
-
+    SmallVector<Value> result = {access,    source,    offset,      length,
+                                 alignment, allocator, containerPtr};
     return result;
   }
 };

@@ -38,6 +38,7 @@ iree_cc_library(
     MLIRAffineDialect
     MLIRArithDialect
     MLIRBufferizationDialect
+    MLIRBytecodeOpInterface
     MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRGPUDialect
@@ -54,6 +55,8 @@ iree_cc_library(
     MLIRSideEffectInterfaces
     MLIRTensorTransformOps
     MLIRTransformDialect
+    MLIRTransformDialectInterfaces
+    MLIRTransformUtils
     MLIRTransforms
     MLIRVectorDialect
     MLIRVectorToGPU

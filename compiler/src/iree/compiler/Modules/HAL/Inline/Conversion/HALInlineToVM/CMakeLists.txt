@@ -23,6 +23,7 @@ iree_cc_library(
     MLIRFunctionInterfaces
     MLIRIR
     MLIRPass
+    MLIRTransformUtils
     MLIRTransforms
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::VM::Conversion

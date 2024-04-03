@@ -76,6 +76,7 @@ iree_cc_library(
     MLIRSparseTensorDialect
     MLIRSupport
     MLIRTensorDialect
+    MLIRTransformUtils
     MLIRTransforms
     StablehloOps
   PUBLIC

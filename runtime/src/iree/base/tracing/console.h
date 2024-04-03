@@ -126,7 +126,11 @@ void iree_tracing_memory_free(const char* name, size_t name_length, void* ptr);
 #define IREE_TRACE_SET_THREAD_NAME(name) iree_tracing_set_thread_name(name)
 
 #define IREE_TRACE_PUBLISH_SOURCE_FILE(filename, filename_length, content, \
-                                       content_length)
+                                       content_length)                     \
+  (void)filename;                                                          \
+  (void)filename_length;                                                   \
+  (void)content;                                                           \
+  (void)content_length;
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_FIBERS
 // TODO(benvanik): console tracing fiber markers.

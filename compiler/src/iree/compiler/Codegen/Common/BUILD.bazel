@@ -40,6 +40,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
     ],
 )
@@ -159,6 +160,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:ArithTransforms",
         "@llvm-project//mlir:ArithUtils",
         "@llvm-project//mlir:BufferizationDialect",
+        "@llvm-project//mlir:BufferizationInterfaces",
         "@llvm-project//mlir:BufferizationTransforms",
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:FuncDialect",
@@ -189,6 +191,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:TensorUtils",
         "@llvm-project//mlir:TilingInterface",
         "@llvm-project//mlir:TransformDialect",
+        "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
         "@llvm-project//mlir:ValueBoundsOpInterface",
         "@llvm-project//mlir:VectorDialect",
@@ -258,6 +261,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:SCFTransforms",
         "@llvm-project//mlir:TensorTransforms",
         "@llvm-project//mlir:Transforms",
+        "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:VectorTransforms",
         # Other Stuff
         "//compiler/src/iree/compiler/Utils",

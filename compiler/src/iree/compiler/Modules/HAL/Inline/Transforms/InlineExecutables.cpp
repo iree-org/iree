@@ -357,7 +357,7 @@ public:
     }
     Value device = builder.create<IREE::Util::NullOp>(
         loc, builder.getType<IREE::HAL::DeviceType>());
-    auto workgroupCount =
+    std::array<Value, 3> workgroupCount =
         exportOp.calculateWorkgroupCount(loc, device, workload, builder);
 
     // For now we don't handle local memory.
@@ -385,13 +385,9 @@ public:
     }
 
     int workgroupXYZOffset = workgroupArgs.size();
-    workgroupArgs.push_back(nullptr);           // workgroup_x, set below
-    workgroupArgs.push_back(nullptr);           // workgroup_y, set below
-    workgroupArgs.push_back(nullptr);           // workgroup_z, set below
-    workgroupArgs.append(3, indexSet.get(1));   // workgroup_size_xyz
-    workgroupArgs.push_back(workgroupCount[0]); // workgroup_count_x
-    workgroupArgs.push_back(workgroupCount[1]); // workgroup_count_y
-    workgroupArgs.push_back(workgroupCount[2]); // workgroup_count_z
+    workgroupArgs.append(3, nullptr);         // workgroup_xyz, set below
+    workgroupArgs.append(3, indexSet.get(1)); // workgroup_size_xyz
+    llvm::append_range(workgroupArgs, workgroupCount); // workgroup_count_xyz
 
     // Z -> Y -> Z loop nest.
     builder.create<scf::ForOp>(

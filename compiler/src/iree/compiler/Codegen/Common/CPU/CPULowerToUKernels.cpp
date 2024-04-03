@@ -65,8 +65,10 @@ public:
 
   void runOnOperation() override;
 
-  LogicalResult initializeOptions(StringRef options) override {
-    if (failed(Pass::initializeOptions(options))) {
+  LogicalResult initializeOptions(
+      StringRef options,
+      function_ref<LogicalResult(const Twine &)> errorHandler) override {
+    if (failed(Pass::initializeOptions(options, errorHandler))) {
       return failure();
     }
     // This option defaults to `true` both in Passes.td and in C++ code.
@@ -174,6 +176,10 @@ matchDAGForUKernel(RewriterBase &rewriter, linalg::Mmt4DOp op,
   if (lhsElemType.isSignlessInteger(8) && rhsElemType.isSignlessInteger(8) &&
       outElemType.isSignlessInteger(32)) {
     flags = IREE_UK_FLAG_MMT4D_TYPE_S8S8S32;
+  } else if (lhsElemType.isSignlessInteger(8) &&
+             rhsElemType.isSignlessInteger(4) &&
+             outElemType.isSignlessInteger(32)) {
+    flags = IREE_UK_FLAG_MMT4D_TYPE_S8S4S32;
   } else if (lhsElemType.isSignlessInteger(16) &&
              rhsElemType.isSignlessInteger(16) &&
              outElemType.isSignlessInteger(32)) {

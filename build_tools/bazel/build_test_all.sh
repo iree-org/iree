@@ -13,6 +13,7 @@
 #
 # GPU / hardware-dependent tests can be enabled by setting any of these to 0:
 #   * IREE_CUDA_DISABLE
+#   * IREE_HIP_DISABLE
 #   * IREE_METAL_DISABLE
 #   * IREE_VULKAN_DISABLE
 #   * IREE_NVIDIA_GPU_TESTS_DISABLE
@@ -40,6 +41,9 @@ fi
 if ! [[ -v IREE_CUDA_DISABLE ]]; then
   IREE_CUDA_DISABLE=1
 fi
+if ! [[ -v IREE_HIP_DISABLE ]]; then
+  IREE_HIP_DISABLE=1
+fi
 if ! [[ -v IREE_METAL_DISABLE ]]; then
   IREE_METAL_DISABLE=1
 fi
@@ -56,6 +60,7 @@ fi
 declare -a test_env_args=(
   --test_env="LD_PRELOAD=libvulkan.so.1"
   --test_env=IREE_CUDA_DISABLE="${IREE_CUDA_DISABLE}"
+  --test_env=IREE_HIP_DISABLE="${IREE_HIP_DISABLE}"
   --test_env=IREE_METAL_DISABLE="${IREE_METAL_DISABLE}"
   --test_env=IREE_VULKAN_DISABLE="${IREE_VULKAN_DISABLE}"
   --test_env=IREE_NVIDIA_GPU_TESTS_DISABLE="${IREE_NVIDIA_GPU_TESTS_DISABLE}"
@@ -75,6 +80,9 @@ declare -a default_test_tag_filters=("-nodocker")
 
 if (( IREE_CUDA_DISABLE == 1 )); then
   default_test_tag_filters+=("-driver=cuda")
+fi
+if (( IREE_HIP_DISABLE == 1 )); then
+  default_test_tag_filters+=("-driver=hip")
 fi
 if (( IREE_METAL_DISABLE == 1 )); then
   default_test_tag_filters+=("-driver=metal")

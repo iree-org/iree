@@ -331,7 +331,7 @@ transposeConvLikeLinalgOp(PatternRewriter &rewriter, linalg::LinalgOp convOp,
   Location loc = convOp.getLoc();
 
   linalg::ConvolutionDimensions convDims;
-  auto errString = getMatchConvolutionMessage(
+  StringRef errString = getMatchConvolutionMessage(
       linalg::detail::isConvolutionInterfaceImpl(convOp, &convDims));
   if (!errString.empty()) {
     return failure();
@@ -342,6 +342,10 @@ transposeConvLikeLinalgOp(PatternRewriter &rewriter, linalg::LinalgOp convOp,
   }
 
   if (convDims.outputChannel.size() > 1) {
+    return failure();
+  }
+
+  if (convDims.filterLoop.empty()) {
     return failure();
   }
 
@@ -648,8 +652,10 @@ public:
     registry.insert<linalg::LinalgDialect>();
     registry.insert<tensor::TensorDialect>();
   }
-  LogicalResult initializeOptions(StringRef options) override {
-    if (failed(Pass::initializeOptions(options))) {
+  LogicalResult initializeOptions(
+      StringRef options,
+      function_ref<LogicalResult(const Twine &)> errorHandler) override {
+    if (failed(Pass::initializeOptions(options, errorHandler))) {
       return failure();
     }
     tilingFactor = tileSize;

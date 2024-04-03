@@ -99,14 +99,14 @@ LogicalResult simplifyDimOps(RewriterBase &rewriter,
 
     // Try to simplify dynamic dims.
     SmallVector<Value> dynamicDims;
-    if (failed(IREE::Flow::reifyDynamicResultDims(rewriter, dimOp.getSource(),
-                                                  dynamicDims)))
-      return failure();
-    unsigned ctr = 0;
-    for (int64_t i = 0; i < *dimOp.getConstantIndex(); ++i)
-      if (tensorType.isDynamicDim(i))
-        ++ctr;
-    rewriter.replaceOp(dimOp, dynamicDims[ctr]);
+    if (succeeded(IREE::Flow::getOptimizedDynamicResultDims(
+            rewriter, dimOp.getSource(), dynamicDims))) {
+      unsigned ctr = 0;
+      for (int64_t i = 0; i < *dimOp.getConstantIndex(); ++i)
+        if (tensorType.isDynamicDim(i))
+          ++ctr;
+      rewriter.replaceOp(dimOp, dynamicDims[ctr]);
+    }
   }
 
   return success();
@@ -276,9 +276,8 @@ static bool isUnpackLikeOpViaExtractSliceOps(Operation *op) {
 // TODO(ravishankarm): Maybe make `set_encoding` have pad semantics that can be
 // explicitly broken down if needed.
 static bool isPadUsedInSetEncoding(tensor::PadOp padOp) {
-  return llvm::any_of(padOp->getUsers(), [](Operation *user) {
-    return isa<IREE::LinalgExt::SetEncodingOp>(user);
-  });
+  return llvm::any_of(padOp->getUsers(),
+                      llvm::IsaPred<IREE::LinalgExt::SetEncodingOp>);
 }
 
 //===----------------------------------------------------------------------===//

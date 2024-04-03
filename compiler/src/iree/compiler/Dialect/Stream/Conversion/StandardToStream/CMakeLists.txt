@@ -30,6 +30,7 @@ iree_cc_library(
     MLIRSCFDialect
     MLIRShapeDialect
     MLIRTensorDialect
+    MLIRTransformUtils
     MLIRTransforms
     iree::compiler::Dialect::Stream::Conversion
     iree::compiler::Dialect::Stream::IR

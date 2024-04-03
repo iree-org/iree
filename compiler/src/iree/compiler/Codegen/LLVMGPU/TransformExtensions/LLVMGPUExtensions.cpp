@@ -17,6 +17,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
@@ -28,7 +29,7 @@
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
 #include "mlir/Dialect/NVGPU/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
+#include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
@@ -452,16 +453,14 @@ struct WarpOpLoad : public OpRewritePattern<vector::WarpExecuteOnLane0Op> {
   using OpRewritePattern<vector::WarpExecuteOnLane0Op>::OpRewritePattern;
   LogicalResult matchAndRewrite(vector::WarpExecuteOnLane0Op warpOp,
                                 PatternRewriter &rewriter) const override {
-    OpOperand *operand = getWarpResult(
-        warpOp, [](Operation *op) { return isa<memref::LoadOp>(op); });
+    OpOperand *operand = getWarpResult(warpOp, llvm::IsaPred<memref::LoadOp>);
     if (!operand)
       return failure();
     auto load = operand->get().getDefiningOp<memref::LoadOp>();
     unsigned operandIndex = operand->getOperandNumber();
     Value distributedVal = warpOp.getResult(operandIndex);
 
-    SmallVector<Value> indices(load.getIndices().begin(),
-                               load.getIndices().end());
+    auto indices = llvm::to_vector_of<Value>(load.getIndices());
     if (!indices.empty())
       return failure();
 
@@ -1526,8 +1525,7 @@ public:
       : VectorLayoutOptions(root, fullConversion) {}
 
   LogicalResult setAnchorOps(VectorLayoutAnalysis &analysis) override {
-    setAnchorOpsFromAttributes(analysis, root);
-    return success();
+    return setAnchorOpsFromAttributes(analysis, root);
   }
 };
 
@@ -1671,7 +1669,7 @@ transform_dialect::SetContractionLayoutAttributes::apply(
     return emitDefiniteFailure()
            << "invalid more than one attribute for contraction annotation";
   }
-  auto mmaType = llvm::dyn_cast<IREE::GPU::MmaAttr>(typeList.front());
+  auto mmaType = llvm::dyn_cast<IREE::GPU::MmaInterfaceAttr>(typeList.front());
   if (!mmaType) {
     return emitDefiniteFailure()
            << "invalid non-mma attribute for contraction annotation "

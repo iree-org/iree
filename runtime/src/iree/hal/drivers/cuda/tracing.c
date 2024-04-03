@@ -6,7 +6,7 @@
 
 #include "iree/hal/drivers/cuda/tracing.h"
 
-#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
 
 #include "iree/hal/drivers/cuda/cuda_dynamic_symbols.h"
 #include "iree/hal/drivers/cuda/cuda_status_util.h"

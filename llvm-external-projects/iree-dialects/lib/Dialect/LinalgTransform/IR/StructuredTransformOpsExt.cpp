@@ -31,7 +31,7 @@
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
-#include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
+#include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.h"
 #include "mlir/Dialect/Transform/PDLExtension/PDLExtensionOps.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/PassManager.h"

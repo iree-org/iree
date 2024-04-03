@@ -56,6 +56,7 @@ iree_cc_library(
     MLIRPass
     MLIRSCFDialect
     MLIRSupport
+    MLIRTransformUtils
     MLIRTransforms
     MLIRVectorDialect
     iree::compiler::Dialect::Util::Analysis

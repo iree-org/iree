@@ -18,10 +18,11 @@ def VectorLayoutInterface : AttrInterface<"VectorLayoutInterface"> {
 
   let methods = [
     InterfaceMethod<
-      /*description=*/"Check if this is a valid layout for the given shape.",
-      /*retTy=*/"bool",
+      /*description=*/"Check if this layout is valid for the given vector type."
+                       "On failure, emits diagnostics to explain the failure.",
+      /*retTy=*/"LogicalResult",
       /*methodName=*/"isValidLayout",
-      /*args=*/(ins "::llvm::ArrayRef<int64_t>":$shape)
+      /*args=*/(ins "::mlir::TypedValue<::mlir::VectorType>":$vector)
     >,
     InterfaceMethod<
       /*description=*/"Permutes the given layout.",

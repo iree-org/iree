@@ -90,7 +90,7 @@ iree_cc_library(
     "mmt4d.c"
     "mmt4d.h"
     "mmt4d_internal.h"
-    "mmt4d_tile.c"
+    "mmt4d_tile_generic.c"
     "pack.c"
     "pack.h"
     "pack_internal.h"
@@ -121,7 +121,7 @@ iree_bitcode_library(
     "internal_headers_filegroup.stamp"
   SRCS
     "mmt4d.c"
-    "mmt4d_tile.c"
+    "mmt4d_tile_generic.c"
 )
 
 iree_bitcode_library(
@@ -134,7 +134,7 @@ iree_bitcode_library(
     "internal_headers_filegroup.stamp"
   SRCS
     "mmt4d.c"
-    "mmt4d_tile.c"
+    "mmt4d_tile_generic.c"
 )
 
 iree_bitcode_library(
@@ -148,7 +148,7 @@ iree_bitcode_library(
   SRCS
     "fallback.c"
     "mmt4d.c"
-    "mmt4d_tile.c"
+    "mmt4d_tile_generic.c"
 )
 
 iree_bitcode_library(
@@ -162,7 +162,7 @@ iree_bitcode_library(
   SRCS
     "fallback.c"
     "mmt4d.c"
-    "mmt4d_tile.c"
+    "mmt4d_tile_generic.c"
 )
 
 iree_bitcode_library(
@@ -176,7 +176,7 @@ iree_bitcode_library(
   SRCS
     "fallback.c"
     "mmt4d.c"
-    "mmt4d_tile.c"
+    "mmt4d_tile_generic.c"
 )
 
 iree_link_bitcode(

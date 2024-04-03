@@ -109,11 +109,9 @@ struct InlineConstGlobalInitializer : public OpRewritePattern<InitializerOp> {
 
   bool isGlobalStoreOp(Operation *op) const {
     // TODO(benvanik): trait/interface to make this more generic?
-    return isa<IREE::VM::GlobalStoreI32Op>(op) ||
-           isa<IREE::VM::GlobalStoreI64Op>(op) ||
-           isa<IREE::VM::GlobalStoreF32Op>(op) ||
-           isa<IREE::VM::GlobalStoreF64Op>(op) ||
-           isa<IREE::VM::GlobalStoreRefOp>(op);
+    return isa<IREE::VM::GlobalStoreI32Op, IREE::VM::GlobalStoreI64Op,
+               IREE::VM::GlobalStoreF32Op, IREE::VM::GlobalStoreF64Op,
+               IREE::VM::GlobalStoreRefOp>(op);
   }
 };
 

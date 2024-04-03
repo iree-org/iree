@@ -198,7 +198,7 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
             clDispatchGenerateWorkloadRegion);
       })
       ////////////////////////////////////////////////////////////////////////
-      .addPass(createCaptureDispatchDynamicDimsPass)
+      .addPass(createCaptureDynamicDimsPass)
       .addPass(mlir::createCanonicalizerPass)
       .addPass(createCSEPass)
 

@@ -25,7 +25,7 @@ def HAL_Dialect : Dialect {
     chopped out.
 
     The type set is limited to those that can be represented in the IREE HAL
-    design: buffers and views, synchronization primitives like semaphores, and
+    design: buffers and views, synchronization primitives like semaphores,
     and command buffers. The intent is that if a device could implement the HAL
     interface the sequencer ops could run on that device, such as being able to
     run on a GPU via indirect command buffers.

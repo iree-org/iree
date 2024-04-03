@@ -31,7 +31,9 @@ public:
   FixedPointIteratorPass(OpPassManager pipeline);
 
 private:
-  LogicalResult initializeOptions(StringRef options) override;
+  LogicalResult initializeOptions(
+      StringRef options,
+      function_ref<LogicalResult(const Twine &)> errorHandler) override;
   void getDependentDialects(DialectRegistry &registry) const override;
   void runOnOperation() override;
 
@@ -52,8 +54,10 @@ FixedPointIteratorPass::FixedPointIteratorPass(OpPassManager pipeline)
   ss.flush();
 }
 
-LogicalResult FixedPointIteratorPass::initializeOptions(StringRef options) {
-  if (failed(Pass::initializeOptions(options)))
+LogicalResult FixedPointIteratorPass::initializeOptions(
+    StringRef options,
+    function_ref<LogicalResult(const Twine &)> errorHandler) {
+  if (failed(Pass::initializeOptions(options, errorHandler)))
     return failure();
   if (pipeline)
     return success();

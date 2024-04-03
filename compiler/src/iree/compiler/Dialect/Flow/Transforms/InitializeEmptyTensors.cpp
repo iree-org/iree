@@ -32,10 +32,8 @@ static FailureOr<TypedAttr> getZero(OpBuilder &builder, Location loc,
 /// `flow.tensor.*` op.
 static bool shouldBeConvertedToFlowTensorOp(tensor::EmptyOp emptyTensorOp) {
   return !(llvm::all_of(emptyTensorOp->getUsers(),
-                        [](Operation *user) -> bool {
-                          return isa<linalg::LinalgOp, LinalgExt::LinalgExtOp,
-                                     tensor::PackOp, tensor::UnPackOp>(user);
-                        }) ||
+                        llvm::IsaPred<linalg::LinalgOp, LinalgExt::LinalgExtOp,
+                                      tensor::PackOp, tensor::UnPackOp>) ||
            emptyTensorOp->getParentOfType<Flow::DispatchWorkgroupsOp>());
 }
 

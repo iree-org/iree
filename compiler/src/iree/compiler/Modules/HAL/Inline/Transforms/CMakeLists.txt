@@ -36,6 +36,7 @@ iree_cc_library(
     MLIRSCFDialect
     MLIRSCFToControlFlow
     MLIRSupport
+    MLIRTransformUtils
     MLIRTransforms
     iree::compiler::Dialect::HAL::Conversion
     iree::compiler::Dialect::HAL::Conversion::StandardToHAL

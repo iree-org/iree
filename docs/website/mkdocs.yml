@@ -202,6 +202,7 @@ nav:
           - "developers/design-docs/function-abi.md"
           - "developers/design-docs/invocation-execution-model.md"
           - "developers/design-docs/cuda-hal-driver.md"
+          - "developers/design-docs/hip-hal-driver.md"
           - "developers/design-docs/metal-hal-driver.md"
       - "Other topics":
           - "developers/usage-best-practices.md"
