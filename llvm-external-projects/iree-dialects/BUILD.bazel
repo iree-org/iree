@@ -268,6 +268,7 @@ cc_library(
         "@llvm-project//mlir:SCFTransforms",
         "@llvm-project//mlir:TensorTransformOps",
         "@llvm-project//mlir:Transforms",
+        "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:VectorToSCF",
 
         # Utils
