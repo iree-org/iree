@@ -64,9 +64,10 @@ jobs:
         run: |
           source ${VENV_DIR}/bin/activate
           python -m pip install -r SHARK-TestSuite/iree_tests/requirements.txt
+      # -n 4 -rpfE --timeout=30 --retries=2 --durations=20 \
       - name: Run external tests - ONNX test suite
         run: |
           source ${VENV_DIR}/bin/activate
           pytest SHARK-TestSuite/iree_tests/onnx/ \
-              -n 4 -rpfE --timeout=30 --retries=2 --durations=20 \
+              -rpfE --durations=20 \
               --config-files=build_tools/pkgci/external_test_suite/onnx_gpu_cuda.json
