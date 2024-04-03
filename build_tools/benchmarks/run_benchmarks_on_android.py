@@ -315,6 +315,7 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
                 param_path = adb_fetch_and_push_file(
                     source=benchmark_definition.ResourceLocation.build_url(url),
                     dest=android_case_dir / filename,
+                    verbose=self.verbose,
                 )
                 param_arg = f"{scope}={param_path}" if scope else param_path
                 external_params.append(param_arg)
