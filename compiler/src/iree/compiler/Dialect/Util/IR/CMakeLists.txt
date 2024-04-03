@@ -61,6 +61,7 @@ iree_cc_library(
     MLIRSideEffectInterfaces
     MLIRSupport
     MLIRTensorDialect
+    MLIRTransformUtils
     MLIRTransforms
     MLIRViewLikeInterface
   PUBLIC

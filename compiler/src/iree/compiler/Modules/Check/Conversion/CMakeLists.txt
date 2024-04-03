@@ -19,6 +19,7 @@ iree_cc_library(
     "ConversionPatterns.cpp"
   DEPS
     MLIRPass
+    MLIRTransformUtils
     MLIRTransforms
     iree::compiler::Dialect::HAL::Conversion
     iree::compiler::Dialect::HAL::IR

@@ -157,6 +157,7 @@ iree_cc_library(
     MLIRSupport
     MLIRTensorDialect
     MLIRTransformDialect
+    MLIRTransformUtils
     MLIRTransforms
     MLIRValueBoundsOpInterface
     MLIRVectorDialect

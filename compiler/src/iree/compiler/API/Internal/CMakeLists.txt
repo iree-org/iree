@@ -92,6 +92,7 @@ iree_cc_library(
     "IREEReduceToolEntryPoint.cpp"
   DEPS
     LLVMSupport
+    MLIRBytecodeWriter
     MLIRIR
     MLIRParser
     MLIRPass
