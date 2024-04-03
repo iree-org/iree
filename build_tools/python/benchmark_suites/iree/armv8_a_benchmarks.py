@@ -11,7 +11,7 @@ from benchmark_suites.iree import benchmark_presets, module_execution_configs, u
 from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework.device_specs import device_collections
-from e2e_test_framework.models import tflite_models, tf_models, matmul
+from e2e_test_framework.models import matmul, tflite_models, tf_models, torch_models
 
 
 class Android_ARMv8_A_Benchmarks(object):
@@ -24,6 +24,7 @@ class Android_ARMv8_A_Benchmarks(object):
         tf_models.GPT2_117M_1x1_FP32_TF,
         tflite_models.MOBILEBERT_INT8,
         tflite_models.VIT_INT8_TFL,
+        torch_models.GEMMA7B_TORCH,
     ]
 
     MATMULS = [

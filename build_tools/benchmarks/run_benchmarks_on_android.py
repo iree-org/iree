@@ -45,6 +45,7 @@ import subprocess
 import tarfile
 import time
 from typing import Any, Optional, Sequence, Tuple
+import urllib.parse
 
 from common import benchmark_suite as benchmark_suite_module
 from common.benchmark_config import BenchmarkConfig
@@ -305,12 +306,26 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
                 url=benchmark_case.expected_output_uri,
                 device_dir=android_case_dir / "expected_outputs_npy",
             )
+        external_params = []
+        if benchmark_case.external_param_urls:
+            for param_url in benchmark_case.external_param_urls:
+                scope, url = param_url.split("=", maxsplit=1)
+                url_path = urllib.parse.urlparse(url).path
+                filename = pathlib.PurePath(url_path).name
+                param_path = adb_fetch_and_push_file(
+                    source=benchmark_definition.ResourceLocation.build_url(url),
+                    dest=android_case_dir / filename,
+                )
+                param_arg = f"{scope}={param_path}" if scope else param_path
+                external_params.append(param_arg)
 
         run_config = benchmark_case.run_config
         # TODO(#15452): Change to `--task_topology_cpu_ids` once we figure out
         # the right mapping.
         taskset = self.__deduce_taskset_from_run_config(run_config)
-        run_args = run_config.materialize_run_flags(inputs_dir=inputs_dir)
+        run_args = run_config.materialize_run_flags(
+            inputs_dir=inputs_dir, external_params=external_params
+        )
         run_args.append(f"--module={module_device_path}")
 
         if benchmark_results_filename is not None:
