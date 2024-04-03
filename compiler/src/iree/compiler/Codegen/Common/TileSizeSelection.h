@@ -111,7 +111,7 @@ public:
 
   /// Returns the tiling level that contains the vector dim at `dimPos` (which
   /// is an index into the result of `getVectorTileSizes()`).
-  unsigned getTilingLevelForVectorDimPosition(unsigned dimPos);
+  std::optional<unsigned> getTilingLevelForVectorDimPosition(unsigned dimPos);
 
   /// Returns the tile sizes of all the vector dimensions, including parallel
   /// and reduction dimensions.

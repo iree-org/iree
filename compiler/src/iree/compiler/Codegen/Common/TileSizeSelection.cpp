@@ -54,7 +54,8 @@ TilingConfig::TilingConfig(IREE::Codegen::LoweringConfigAttr lc)
 
 /// Returns the tiling level that contains the vector dim at `dimPos` (which is
 /// an index into the result of `getVectorTileSizes()`).
-unsigned TilingConfig::getTilingLevelForVectorDimPosition(unsigned dimPos) {
+std::optional<unsigned>
+TilingConfig::getTilingLevelForVectorDimPosition(unsigned dimPos) {
   constexpr std::array vectorTilingLevels{VectorCommonParallelTiles,
                                           VectorReductionTiles,
                                           VectorInnerParallelTiles};
@@ -71,8 +72,7 @@ unsigned TilingConfig::getTilingLevelForVectorDimPosition(unsigned dimPos) {
       foundLevel = tilingLevelIndex;
     }
   }
-  assert(foundLevel.has_value() && "no vector size found for `dimPos`");
-  return *foundLevel;
+  return foundLevel;
 }
 
 /// Returns the tile size (size + scalability pair) at `index`. The
@@ -92,10 +92,12 @@ SizesAndScalableFlags TilingConfig::getVectorTileSizes() {
   SmallVector<bool> scalableFlags(numDims, false);
   auto tilingLevels = loweringConfig.getTilingLevels();
   for (int dimPos = 0; dimPos < numDims; ++dimPos) {
-    unsigned dimTilingLevel = getTilingLevelForVectorDimPosition(dimPos);
+    auto dimTilingLevel = getTilingLevelForVectorDimPosition(dimPos);
+    if (!dimTilingLevel.has_value())
+      continue; // The size for this dim is zero in all vector tiling levels.
     std::tie(vectorSizes[dimPos], scalableFlags[dimPos]) = getTileSizeAtIndex(
-        tilingLevels[dimTilingLevel].getSizes(),
-        tilingLevels[dimTilingLevel].getScalableFlags(), dimPos);
+        tilingLevels[*dimTilingLevel].getSizes(),
+        tilingLevels[*dimTilingLevel].getScalableFlags(), dimPos);
   }
   return std::make_pair(vectorSizes, scalableFlags);
 }
@@ -117,7 +119,11 @@ TilingConfig::getLoweringConfigWithNewVectorSizes(
   std::array<SmallVector<unsigned, 4>, MaxNumTileLevels> tilingLevelToDimsMap;
   for (unsigned dimPos = 0; dimPos < numDims; ++dimPos) {
     auto tilingLevelIndex = getTilingLevelForVectorDimPosition(dimPos);
-    tilingLevelToDimsMap[tilingLevelIndex].push_back(dimPos);
+    assert((tilingLevelIndex.has_value() || sizes[dimPos] == 0) &&
+           "attempting to set vector size for dim with underspecified tiling "
+           "level (zero is the only valid tile size)");
+    if (tilingLevelIndex.has_value())
+      tilingLevelToDimsMap[*tilingLevelIndex].push_back(dimPos);
   }
 
   MLIRContext *context = loweringConfig.getContext();
