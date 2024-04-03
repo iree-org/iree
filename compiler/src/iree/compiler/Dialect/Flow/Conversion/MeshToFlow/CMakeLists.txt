@@ -30,6 +30,7 @@ iree_cc_library(
     MLIRPass
     MLIRSupport
     MLIRTensorDialect
+    MLIRTransformUtils
     MLIRTransforms
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Util::IR

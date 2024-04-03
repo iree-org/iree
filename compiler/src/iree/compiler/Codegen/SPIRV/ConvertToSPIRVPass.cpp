@@ -483,14 +483,13 @@ public:
     registry.insert<spirv::SPIRVDialect>();
   }
 
-  explicit ConvertToSPIRVPass(bool enableFastMath, unsigned indexBits)
-      : enableFastMath(enableFastMath), indexBits(indexBits) {}
+  explicit ConvertToSPIRVPass(unsigned indexBits) : indexBits(indexBits) {}
 
-  LogicalResult initializeOptions(StringRef options) override {
-    if (failed(Pass::initializeOptions(options)))
+  LogicalResult initializeOptions(
+      StringRef options,
+      function_ref<LogicalResult(const Twine &)> errorHandler) override {
+    if (failed(Pass::initializeOptions(options, errorHandler)))
       return failure();
-    // Use pass option if present.
-    enableFastMath |= enableFastMathOption;
     indexBits = indexBitsOption;
     return success();
   }
@@ -498,9 +497,6 @@ public:
   void runOnOperation() override;
 
 private:
-  // Enable fast math when doing type conversion by assuming no NaN or infinite
-  // values.
-  bool enableFastMath;
   // Use 64 bits for index widths.
   unsigned indexBits;
 };
@@ -631,7 +627,6 @@ void ConvertToSPIRVPass::runOnOperation() {
   }
 
   SPIRVConversionOptions options = {};
-  options.enableFastMathMode = this->enableFastMath;
   options.use64bitIndex = use64bitIndex;
 
   SPIRVTypeConverter typeConverter(targetAttr, options);
@@ -746,8 +741,8 @@ void ConvertToSPIRVPass::runOnOperation() {
 //===----------------------------------------------------------------------===//
 
 std::unique_ptr<OperationPass<ModuleOp>>
-createConvertToSPIRVPass(bool enableFastMath, unsigned indexBits) {
-  return std::make_unique<ConvertToSPIRVPass>(enableFastMath, indexBits);
+createConvertToSPIRVPass(unsigned indexBits) {
+  return std::make_unique<ConvertToSPIRVPass>(indexBits);
 }
 
 } // namespace mlir::iree_compiler

@@ -134,8 +134,10 @@ struct OptimizeVectorTransferPass
     LDBG("after erasing unused allocs and stores\n" << funcOp);
   }
 
-  LogicalResult initializeOptions(StringRef options) override {
-    if (failed(Pass::initializeOptions(options))) {
+  LogicalResult initializeOptions(
+      StringRef options,
+      function_ref<LogicalResult(const Twine &)> errorHandler) override {
+    if (failed(Pass::initializeOptions(options, errorHandler))) {
       return failure();
     }
     // `flatten` may have been set to `true` in the constructor already.
