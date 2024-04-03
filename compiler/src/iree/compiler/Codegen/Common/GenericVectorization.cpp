@@ -26,15 +26,26 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-static std::optional<SmallVector<int64_t>> inferVectorSizesFromIR(Value val);
-
-/// Tries to infer the vector sizes from an IR using ValueBounds analysis.
-/// Returns failure if vector sizes can't be inferred.
-static std::optional<SmallVector<int64_t>>
-inferVectorSizesFromIR(linalg::LinalgOp linalgOp) {
-  LLVM_DEBUG(VEC_DBGS() << "Inferring vector sizes for:\n" << linalgOp << "\n");
-
+struct VectorizationTileSizes {
+  SmallVector<int64_t> destShape;
   SmallVector<int64_t> vectorSizes;
+};
+
+/// Returns a VectorizationTileSizes which contains the inferred bounded result
+/// shape and vector input sizes. This is useful to infer the sizes from a
+/// chain.
+static std::optional<VectorizationTileSizes> inferSizesFromIR(Value val);
+
+/// Tries to infer the vector sizes from an IR using ValueBounds analysis. If
+/// `opResult` is provided, it stores the bounded result shapes to destShape.
+/// Returns std::nullopt if vector sizes can't be inferred.
+static std::optional<VectorizationTileSizes>
+inferSizesFromIR(linalg::LinalgOp linalgOp, std::optional<OpResult> opResult) {
+  LLVM_DEBUG(VEC_DBGS() << "Inferring sizes for:\n"
+                        << linalgOp << " with OpResult.resultNumber="
+                        << opResult->getResultNumber() << "\n");
+
+  VectorizationTileSizes result;
   unsigned numDims = linalgOp.getNumLoops();
 
   for (int dim = 0; dim < numDims; ++dim) {
@@ -53,8 +64,8 @@ inferVectorSizesFromIR(linalg::LinalgOp linalgOp) {
     int64_t dimSize = llvm::cast<ShapedType>(firstOperand.getType())
                           .getShape()[firstOperandDim];
     if (!ShapedType::isDynamic(dimSize)) {
-      vectorSizes.push_back(dimSize);
-      LLVM_DEBUG(VEC_DBGS() << "Inferred vector size '" << dimSize
+      result.vectorSizes.push_back(dimSize);
+      LLVM_DEBUG(VEC_DBGS() << "Inferred iteration size '" << dimSize
                             << "' for dimension '" << dim << "'\n");
       continue;
     }
@@ -78,17 +89,25 @@ inferVectorSizesFromIR(linalg::LinalgOp linalgOp) {
     }
 
     dimSize = maybeDimBound.value();
-    vectorSizes.push_back(dimSize);
-    LLVM_DEBUG(VEC_DBGS() << "Inferred vector size '" << dimSize
+    result.vectorSizes.push_back(dimSize);
+    LLVM_DEBUG(VEC_DBGS() << "Inferred iteration size '" << dimSize
                           << "' for dimension '" << dim << "'\n");
   }
 
-  return vectorSizes;
+  if (opResult) {
+    result.destShape = linalgOp.getIndexingMapMatchingResult(opResult.value())
+                           .compose(result.vectorSizes);
+  }
+
+  return result;
 }
 
-static std::optional<SmallVector<int64_t>>
-inferVectorSizesFromIR(tensor::PackOp op) {
-  LLVM_DEBUG(VEC_DBGS() << "Inferring vector sizes for:\n" << op << "\n");
+/// Returns the result sizes and vector input sizes of the tensor.pack op. The
+/// inferred bounding size is returned if it is dynamic shape. Returns
+/// std::nullopt if the shape inference failed.
+static std::optional<VectorizationTileSizes>
+inferSizesFromIR(tensor::PackOp op) {
+  LLVM_DEBUG(VEC_DBGS() << "Inferring dest sizes for:\n" << op << "\n");
 
   if (llvm::any_of(op.getInnerTiles(), [](OpFoldResult v) {
         return !getConstantIntValue(v).has_value();
@@ -97,44 +116,50 @@ inferVectorSizesFromIR(tensor::PackOp op) {
     return std::nullopt;
   }
 
-  SmallVector<int64_t> vectorSizes;
-  auto inferred = inferVectorSizesFromIR(op.getSource());
+  VectorizationTileSizes result;
+  std::optional<VectorizationTileSizes> inferred =
+      inferSizesFromIR(op.getSource());
   if (!inferred) {
     return std::nullopt;
   }
-  vectorSizes = inferred.value();
+  result.vectorSizes = inferred.value().destShape;
 
   for (auto [dimPos, tileSize] :
        llvm::zip_equal(op.getInnerDimsPos(), op.getStaticInnerTiles())) {
-    if (vectorSizes[dimPos] % tileSize != 0) {
+    if (result.vectorSizes[dimPos] % tileSize != 0) {
       return std::nullopt;
     }
-    vectorSizes[dimPos] /= tileSize;
+    result.vectorSizes[dimPos] /= tileSize;
   }
   auto outerDimsPerm = op.getOuterDimsPerm();
   if (!outerDimsPerm.empty()) {
-    applyPermutationToVector(vectorSizes, outerDimsPerm);
+    applyPermutationToVector(result.vectorSizes, outerDimsPerm);
   }
 
   LLVM_DEBUG({
     VEC_DBGS() << "After adjustment with inner tiles and "
                   "outer_dims_perm:\n";
-    for (auto [idx, val] : llvm::enumerate(vectorSizes)) {
+    for (auto [idx, val] : llvm::enumerate(result.vectorSizes)) {
       llvm::dbgs() << "Dim #" << idx << ": " << val << "\n";
     }
   });
+  result.destShape = result.vectorSizes;
 
-  return vectorSizes;
+  return result;
 }
 
-static std::optional<SmallVector<int64_t>> inferVectorSizesFromIR(Value val) {
-  std::optional<SmallVector<int64_t>> result;
+/// See the documentation in the above function declaration.
+static std::optional<VectorizationTileSizes> inferSizesFromIR(Value val) {
+  std::optional<VectorizationTileSizes> result;
   TypeSwitch<Operation *, void>(val.getDefiningOp())
-      .Case<linalg::LinalgOp, tensor::PackOp>(
-          [&](auto op) { result = inferVectorSizesFromIR(op); })
+      .Case<linalg::LinalgOp>(
+          [&](auto op) { result = inferSizesFromIR(op, cast<OpResult>(val)); })
+      .Case<tensor::PackOp>([&](auto op) { result = inferSizesFromIR(op); })
       .Case<tensor::ExtractSliceOp>([&](tensor::ExtractSliceOp op) {
-        LLVM_DEBUG(VEC_DBGS() << "Inferring vector sizes for:\n" << op << "\n");
-        SmallVector<int64_t> vectorSizes;
+        // tensor::ExtractSliceOp is not vectorizable, so only `destShape` has
+        // the values.
+        result = VectorizationTileSizes();
+        LLVM_DEBUG(VEC_DBGS() << "Inferring sizes for:\n" << op << "\n");
         int64_t destRank = op.getResult().getType().getRank();
         for (int dim = 0; dim < destRank; ++dim) {
           LLVM_DEBUG(VEC_DBGS() << "Dim #" << dim << ": ");
@@ -144,12 +169,12 @@ static std::optional<SmallVector<int64_t>> inferVectorSizesFromIR(Value val) {
                   /*stopCondition=*/nullptr, /*closedUB=*/true);
           if (failed(maybeDimBound)) {
             LLVM_DEBUG(llvm::dbgs() << "failed\n");
+            result = std::nullopt;
             return;
           }
           LLVM_DEBUG(llvm::dbgs() << maybeDimBound.value() << "\n");
-          vectorSizes.push_back(maybeDimBound.value());
+          result->destShape.push_back(maybeDimBound.value());
         }
-        result = vectorSizes;
       })
       .Default([&](Operation *) {});
   return result;
@@ -173,7 +198,17 @@ getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
   std::optional<SmallVector<int64_t>> vectorSizes;
   TypeSwitch<Operation *, void>(op)
       .Case<linalg::LinalgOp>([&](linalg::LinalgOp linalgOp) {
-        vectorSizes = inferVectorSizesFromIR(linalgOp);
+        std::optional<VectorizationTileSizes> result =
+            inferSizesFromIR(linalgOp, /*opResult=*/std::nullopt);
+        if (result) {
+          vectorSizes = result->vectorSizes;
+        }
+      })
+      .Case<tensor::PackOp>([&](tensor::PackOp packOp) {
+        std::optional<VectorizationTileSizes> result = inferSizesFromIR(packOp);
+        if (result) {
+          vectorSizes = result->vectorSizes;
+        }
       })
       .Case<tensor::PadOp>([&](tensor::PadOp padOp) {
         auto ty = padOp.getResultType();
@@ -182,9 +217,6 @@ getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
         if (!ty.hasStaticShape())
           return;
         vectorSizes = SmallVector<int64_t>(ty.getShape());
-      })
-      .Case<tensor::PackOp>([&](tensor::PackOp packOp) {
-        vectorSizes = inferVectorSizesFromIR(packOp);
       })
       .Default([&](Operation *) {});
   if (vectorSizes) {
