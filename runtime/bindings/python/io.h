@@ -46,7 +46,10 @@ struct ApiPtrAdapter<iree_io_parameter_index_t> {
   }
 };
 
-class FileHandle : public ApiRefCounted<FileHandle, iree_io_file_handle_t> {};
+class FileHandle : public ApiRefCounted<FileHandle, iree_io_file_handle_t> {
+ public:
+  int HandleBufferProtocol(Py_buffer *view, int flags);
+};
 
 class ParameterProvider
     : public ApiRefCounted<ParameterProvider, iree_io_parameter_provider_t> {};

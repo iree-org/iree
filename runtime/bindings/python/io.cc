@@ -164,12 +164,50 @@ void ParameterIndexLoadFile(ParameterIndex &self, std::string &file_path,
   ParameterIndexParseFileHandle(self, file_handle, *format);
 }
 
+// Wraps an index and an entry, extending lifetime of the index.
+struct ParameterIndexEntryWrapper {
+  ParameterIndexEntryWrapper(ParameterIndex index) : index(std::move(index)) {}
+
+  ParameterIndex index;
+  const iree_io_parameter_index_entry_t *entry = nullptr;
+};
+
 }  // namespace
+
+int FileHandle::HandleBufferProtocol(Py_buffer *view, int flags) {
+  auto primitive = iree_io_file_handle_primitive(raw_ptr());
+  if (primitive.type != IREE_IO_FILE_HANDLE_TYPE_HOST_ALLOCATION) {
+    PyErr_SetString(PyExc_ValueError,
+                    "FileHandle is not based on a host allocation and "
+                    "cannot be mapped");
+    return -1;
+  }
+  if (view == NULL) {
+    PyErr_SetString(PyExc_ValueError, "NULL view in getbuffer");
+    return -1;
+  }
+
+  view->buf = primitive.value.host_allocation.data;
+  view->len = primitive.value.host_allocation.data_length;
+  bool is_writable =
+      iree_io_file_handle_access(raw_ptr()) & IREE_IO_FILE_ACCESS_WRITE;
+  view->readonly = !is_writable;
+  view->itemsize = 1;
+  view->format = (char *)"B";  // Byte
+  view->ndim = 1;
+  view->shape = nullptr;
+  view->strides = nullptr;
+  view->suboffsets = nullptr;
+  view->internal = nullptr;
+  return 0;
+}
 
 void SetupIoBindings(py::module_ &m) {
   m.def("create_io_parameters_module", &CreateIoParametersModule);
 
-  py::class_<FileHandle>(m, "FileHandle")
+  auto file_handle = py::class_<FileHandle>(m, "FileHandle");
+  BindBufferProtocol<FileHandle>(file_handle);
+  file_handle
       .def_static(
           "wrap_memory",
           [](py::object host_buffer, bool readable, bool writable) {
@@ -178,8 +216,142 @@ void SetupIoBindings(py::module_ &m) {
                                         writable, unused_len);
           },
           py::arg("host_buffer"), py::arg("readable") = true,
-          py::arg("writable") = false);
+          py::arg("writable") = false)
+      .def_prop_ro(
+          "is_host_allocation",
+          [](FileHandle &self) {
+            auto primitive = iree_io_file_handle_primitive(self.raw_ptr());
+            return primitive.type == IREE_IO_FILE_HANDLE_TYPE_HOST_ALLOCATION;
+          })
+      .def_prop_ro(
+          "host_allocation",
+          [](py::handle self) {
+            return py::steal<py::object>(PyMemoryView_FromObject(self.ptr()));
+          })
+      .def("__repr__", [](py::handle self_object) {
+        if (py::cast<py::bool_>(self_object.attr("is_host_allocation"))) {
+          return py::str("FileHandle<host_allocation({})>")
+              .format(self_object.attr("host_allocation"));
+        } else {
+          return py::str("<FileHandle unknown>");
+        }
+      });
+  // FileHandle buffer protocol implementation via low level API.
+  {
+    static PyBufferProcs buffer_procs = {
+        // It is not legal to raise exceptions from these callbacks.
+        +[](PyObject *raw_self, Py_buffer *view, int flags) -> int {
+          // Cast must succeed due to invariants.
+          auto self = py::cast<FileHandle *>(py::handle(raw_self));
+          auto primitive = iree_io_file_handle_primitive(self->raw_ptr());
+          if (primitive.type != IREE_IO_FILE_HANDLE_TYPE_HOST_ALLOCATION) {
+            PyErr_SetString(PyExc_ValueError,
+                            "FileHandle is not based on a host allocation and "
+                            "cannot be mapped");
+            return -1;
+          }
+          if (view == NULL) {
+            PyErr_SetString(PyExc_ValueError, "NULL view in getbuffer");
+            return -1;
+          }
+
+          Py_INCREF(raw_self);
+          view->obj = raw_self;
+          view->buf = primitive.value.host_allocation.data;
+          view->len = primitive.value.host_allocation.data_length;
+          bool is_writable = iree_io_file_handle_access(self->raw_ptr()) &
+                             IREE_IO_FILE_ACCESS_WRITE;
+          view->readonly = !is_writable;
+          view->itemsize = 1;
+          view->format = (char *)"B";  // Byte
+          view->ndim = 1;
+          view->shape = nullptr;
+          view->strides = nullptr;
+          view->suboffsets = nullptr;
+          view->internal = nullptr;
+          return 0;
+        },
+        +[](PyObject *self_obj, Py_buffer *view) -> void {
+
+        },
+    };
+    auto heap_type = reinterpret_cast<PyHeapTypeObject *>(file_handle.ptr());
+    assert(heap_type->ht_type.tp_flags & Py_TPFLAGS_HEAPTYPE &&
+           "must be heap type");
+    heap_type->as_buffer = buffer_procs;
+  }
+
   py::class_<ParameterProvider>(m, "ParameterProvider");
+  py::class_<ParameterIndexEntryWrapper>(m, "ParameterIndexEntry")
+      .def_prop_ro("key",
+                   [](ParameterIndexEntryWrapper &self) {
+                     return py::str(self.entry->key.data, self.entry->key.size);
+                   })
+      .def_prop_ro(
+          "length",
+          [](ParameterIndexEntryWrapper &self) { return self.entry->length; })
+      .def_prop_ro("metadata",
+                   [](ParameterIndexEntryWrapper &self) {
+                     return py::bytes((const char *)self.entry->metadata.data,
+                                      self.entry->metadata.data_length);
+                   })
+      .def_prop_ro("is_file",
+                   [](ParameterIndexEntryWrapper &self) {
+                     return self.entry->type ==
+                            IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_FILE;
+                   })
+      .def_prop_ro("is_splat",
+                   [](ParameterIndexEntryWrapper &self) {
+                     return self.entry->type ==
+                            IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_SPLAT;
+                   })
+      .def_prop_ro(
+          "file_storage",
+          [](ParameterIndexEntryWrapper &self) {
+            if (self.entry->type !=
+                IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_FILE) {
+              throw std::invalid_argument("Entry is not file storage based");
+            }
+            return py::make_tuple(
+                FileHandle::BorrowFromRawPtr(self.entry->storage.file.handle),
+                self.entry->storage.file.offset);
+          })
+      .def_prop_ro("file_view",
+                   [](py::handle self_object) {
+                     auto file_storage = self_object.attr("file_storage");
+                     py::handle file_handle = file_storage[0];
+                     auto offset = py::cast<iree_host_size_t>(file_storage[1]);
+                     auto length =
+                         py::cast<iree_host_size_t>(self_object.attr("length"));
+                     py::object memview = file_handle.attr("host_allocation");
+                     py::slice slice(offset, offset + length);
+                     return memview.attr("__getitem__")(slice);
+                   })
+      .def_prop_ro("splat_pattern",
+                   [](ParameterIndexEntryWrapper &self) {
+                     if (self.entry->type !=
+                         IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_SPLAT) {
+                       throw std::invalid_argument("Entry is not splat");
+                     }
+                     return py::bytes(
+                         (const char *)self.entry->storage.splat.pattern,
+                         self.entry->storage.splat.pattern_length);
+                   })
+      .def("__repr__", [](py::handle &self_object) {
+        if (py::cast<py::bool_>(self_object.attr("is_splat"))) {
+          return py::str("<ParameterIndexEntry '{}' splat {}:{}>")
+              .format(self_object.attr("key"),
+                      self_object.attr("splat_pattern"),
+                      self_object.attr("length"));
+        } else if (py::cast<py::bool_>(self_object.attr("is_file"))) {
+          py::object file_storage = self_object.attr("file_storage");
+          return py::str("<ParameterIndexEntry '{}' {}:{}:{}")
+              .format(self_object.attr("key"), file_storage[0], file_storage[1],
+                      self_object.attr("length"));
+        } else {
+          return py::str("<ParameterIndexEntry unknown>");
+        }
+      });
   py::class_<ParameterIndex>(m, "ParameterIndex")
       .def("__init__",
            [](ParameterIndex *new_self) {
@@ -193,6 +365,44 @@ void SetupIoBindings(py::module_ &m) {
       .def("__len__",
            [](ParameterIndex &self) {
              return iree_io_parameter_index_count(self.raw_ptr());
+           })
+      .def(
+          "__getitem__",
+          [](ParameterIndex &self, iree_host_size_t i) {
+            ParameterIndexEntryWrapper entry_wrapper(self);
+            CheckApiStatus(iree_io_parameter_index_get(self.raw_ptr(), i,
+                                                       &entry_wrapper.entry),
+                           "Could not enumerate parameter index");
+            return entry_wrapper;
+          },
+          py::arg("i"))
+      .def("items",
+           [](ParameterIndex &self) {
+             py::list items;
+             for (iree_host_size_t i = 0;
+                  i < iree_io_parameter_index_count(self.raw_ptr()); ++i) {
+               ParameterIndexEntryWrapper entry_wrapper(self);
+               CheckApiStatus(iree_io_parameter_index_get(self.raw_ptr(), i,
+                                                          &entry_wrapper.entry),
+                              "Could not enumerate parameter index");
+               py::str key(entry_wrapper.entry->key.data,
+                           entry_wrapper.entry->key.size);
+               py::object value = py::cast(std::move(entry_wrapper));
+               items.append(py::make_tuple(key, value));
+             }
+             return items;
+           })
+      .def("__repr__",
+           [](ParameterIndex &self) {
+             iree_string_builder_t b;
+             iree_string_builder_initialize(iree_allocator_system(), &b);
+             iree_status_t status = iree_io_parameter_index_dump(
+                 iree_string_view_empty(), self.raw_ptr(), &b);
+             iree_string_view_t sv = iree_string_builder_view(&b);
+             py::str result = py::str(sv.data, sv.size);
+             iree_string_builder_deinitialize(&b);
+             CheckApiStatus(status, "Failed to dump parameter index");
+             return result;
            })
       .def(
           "reserve",
