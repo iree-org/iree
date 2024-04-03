@@ -96,13 +96,14 @@ FailureOr<GPUMMASchedule> fitScheduleInSharedMemory(
   return schedule;
 }
 
-FailureOr<GPUMMASchedule> deduceMMASchedule(
-    const GPUMatmulShapeType &problem, ArrayRef<GPUMatmulShapeType> intrinsics,
-    const GPUMMAHeuristicSeeds &seeds, int64_t sharedMemLimitInBytes,
-    bool canUpcastAcc) {
+FailureOr<GPUMMASchedule>
+deduceMMASchedule(const GPUMatmulShapeType &problem,
+                  ArrayRef<GPUMatmulShapeType> intrinsics,
+                  const GPUMMAHeuristicSeeds &seeds,
+                  int64_t sharedMemLimitInBytes, bool canUpcastAcc) {
   for (auto [index, intrinsic] : llvm::enumerate(intrinsics)) {
     if (problem.aType != intrinsic.aType || problem.bType != intrinsic.bType) {
-      continue;  // Cannot use this intrinsic for mismatched types
+      continue; // Cannot use this intrinsic for mismatched types
     }
     if (problem.cType != intrinsic.cType) {
       auto isFpCase =
@@ -110,14 +111,14 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
       auto isUpcast = problem.cType.getIntOrFloatBitWidth() <
                       intrinsic.cType.getIntOrFloatBitWidth();
       if (!(canUpcastAcc && isFpCase && isUpcast)) {
-        continue;  // Cannot use this intrinsic if not upcasting
+        continue; // Cannot use this intrinsic if not upcasting
       }
     }
 
     if (problem.mSize % intrinsic.mSize != 0 ||
         problem.nSize % intrinsic.nSize != 0 ||
         problem.kSize % intrinsic.kSize != 0) {
-      continue;  // Cannot use this intrinsic for misaligned cases
+      continue; // Cannot use this intrinsic for misaligned cases
     }
 
     int64_t mTotalTileCount = problem.mSize / intrinsic.mSize;
@@ -201,4 +202,4 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
   return failure();
 }
 
-}  // namespace mlir::iree_compiler
+} // namespace mlir::iree_compiler
