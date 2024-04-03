@@ -180,7 +180,7 @@ static std::optional<VectorizationTileSizes> inferSizesFromIR(Value val) {
   return result;
 }
 
-// Renurn the vector sizes from the local lowering config or try to infer them
+// Returns the vector sizes from the local lowering config or try to infer them
 // from the tensor shapes and tiled loops in the IR.
 static std::optional<SizesAndScalableFlags>
 getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
