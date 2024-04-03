@@ -75,14 +75,20 @@ be built from source by using either the upstream CMake build or IREE's
 1. Build `iree-run-module` (or other tools like `iree-benchmark-module`) with
     tracing support:
 
-    ```shell
+    ```shell hl_lines="2-3"
     cmake -G Ninja -B ../iree-build/ -S . \
-        -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo \ # (1)!
         -DIREE_ENABLE_RUNTIME_TRACING=ON
     cmake --build ../iree-build/ --target iree-run-module
     ```
 
-    ??? tip - "Tip - Instrumented Python bindings"
+    1.  Sampling needs debug info from `CMAKE_BUILD_TYPE` set to either
+        `RelWithDebInfo` or `Debug`
+
+    For more information about building from source, follow the
+    [Getting started](../../building-from-source/getting-started.md) page.
+
+    ??? tip - "Tip - Instrumented Python packages"
 
         The `iree-runtime` Python package includes prebuilt instrumented tools.
         Set the `IREE_PY_RUNTIME=tracy` environment variable to use them:
@@ -101,12 +107,18 @@ be built from source by using either the upstream CMake build or IREE's
 
 2. Compile a program to profile:
 
-    ```shell
+    ```shell hl_lines="3"
     iree-compile program_input.mlir \
       --iree-hal-target-backends={target} \
-      --iree-hal-executable-debug-level=3 \
+      --iree-hal-executable-debug-level=3 \ # (1)!
       -o program.vmfb
     ```
+
+    1.  The `--iree-hal-executable-debug-level=3` flag embeds source information
+        about each executable into the `.vmfb` file for the runtime to pass to
+        Tracy. Without this flag, source locations are included on a best-effort
+        basis, typically coming from either the input .mlir file or an input
+        Python file.
 
 3. Run the program using the instrumented `iree-run-module`
 
@@ -115,16 +127,20 @@ be built from source by using either the upstream CMake build or IREE's
         Set the `TRACY_NO_EXIT=1` environment variable to keep short-running
         programs from exiting before connecting.
 
-    ```shell
-    iree-run-module \
+    ```shell hl_lines="1"
+    sudo iree-run-module \ # (1)!
       --module=program.vmfb \
-      --device=local-task \
+      --device={device} \
       --entry_function={entry} \
       --parameters={parameters} \
       --input={arg0} \
       --input={arg1} \
       ...
     ```
+
+    1.  Some platforms require elevated permissions (sudo / administrator)
+        to collect sampling data. Refer to the
+        [Tracy PDF manual](#the-tracy-manual) for full details.
 
 4. While the program is running, connect using the Tracy profiler UI or capture
     tool:
@@ -152,26 +168,16 @@ be built from source by using either the upstream CMake build or IREE's
 
 ### Including more information in traces
 
-* Debug information is needed for sampling data. Build with `CMAKE_BUILD_TYPE`
-    set to either `RelWithDebInfo` or `Debug`.
-* Some platforms require elevated permissions (root / sudo / administrator) to
-    collect sampling data. Refer to the Tracy manual for full details.
-* All backends can compile using the `--iree-hal-executable-debug-level=3`
-    flag on `iree-compile`. This embeds source information about each executable
-    into the `.vmfb` file for the runtime to pass to Tracy. Without this flag,
-    source locations are included on a best-effort basis, typically coming from
-    either the input .mlir file or an input Python file.
-
 #### Changing `IREE_TRACING_MODE`
 
 Set IREE's `IREE_TRACING_MODE` value (defined in
 [iree/base/tracing.h](https://github.com/openxla/iree/blob/main/runtime/src/iree/base/tracing.h))
-to adjust which tracing features, such as allocation tracking and
-callstacks, are enabled.
+to adjust which tracing features are enabled. Each feature adds tracing overhead
+and increases the size of trace files, so adjust this setting with care.
 
 For example, to track memory allocations with callstacks:
 
-```shell
+```shell hl_lines="3-4"
 cmake -G Ninja -B ../iree-build/ -S . \
     -DCMAKE_BUILD_TYPE=RelWithDebInfo \
     -DIREE_ENABLE_RUNTIME_TRACING=ON \
@@ -179,9 +185,15 @@ cmake -G Ninja -B ../iree-build/ -S . \
 cmake --build ../iree-build/ --target iree-run-module
 ```
 
+The Memory window in the Tracy profiler should then show callstacks for each
+allocation:
+
 [![Tracy memory callstacks](https://github.com/openxla/iree/assets/4010439/c0732eec-3fc5-476b-8e6a-fa8c8631eaac)](https://github.com/openxla/iree/assets/4010439/c0732eec-3fc5-476b-8e6a-fa8c8631eaac)
 
 #### Options for the `llvm-cpu` backend
+
+When using the `llvm-cpu` backend (`--iree-hal-target-backends=llvm-cpu` with
+`--device=local-task` or `--device=local-sync`), these options are available:
 
 * The `--iree-llvmcpu-link-embedded=false` flag uses the "system" linker
     (.so/.dylib/.dll) instead of the generic
@@ -194,9 +206,9 @@ cmake --build ../iree-build/ --target iree-run-module
 
 * Ensure that `--iree-llvmcpu-debug-symbols=true` is set (it is by default).
 
-Putting those flags together in an example:
+Putting those flags and environment variables together in an example:
 
-```shell
+```shell hl_lines="2-5 8"
 iree-compile program_input.mlir \
   --iree-hal-target-backends=llvm-cpu \
   --iree-hal-executable-debug-level=3 \
@@ -204,7 +216,8 @@ iree-compile program_input.mlir \
   --iree-llvmcpu-debug-symbols=true \
   -o program_full_info.vmfb
 
-TRACY_NO_EXIT=1 IREE_PRESERVE_DYLIB_TEMP_FILES=1 iree-run-module \
+TRACY_NO_EXIT=1 IREE_PRESERVE_DYLIB_TEMP_FILES=1 sudo iree-run-module \
+  --device=local-task \
   --module=program_full_info.vmfb \
   ...
 ```
@@ -215,7 +228,7 @@ Tracy's client/server connection uses TCP port 8086 by default. If the
 Tracy-instrumented program is running on a separate machine, this port needs to
 be forwarded.
 
-In particular, when benchmarking on Android, this is needed:
+In particular, when profiling on Android, this is needed:
 
 ```shell
 adb forward tcp:8086 tcp:8086
