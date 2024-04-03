@@ -9,12 +9,12 @@ authors:
 contact:
   - family-names: Vanik
     given-names: Ben
-    email: benvanik@google.com
-    affiliation: Google
+    email: ben.vanik@gmail.com
+    affiliation: Advanced Micro Devices, Inc.
   - family-names: Laurenzo
     given-names: Stella
-    email: laurenzo@google.com
-    affiliation: Google
+    email: stellaraccident@gmail.com
+    affiliation: Advanced Micro Devices, Inc.
 license: "Apache-2.0 WITH LLVM-exception"
 url: "https://iree.dev/"
 repository-code: "https://github.com/openxla/iree"
