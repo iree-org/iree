@@ -109,6 +109,10 @@ public:
     return getVectorSizesForLevel(getVectorInnerParallelLevel());
   }
 
+  /// Returns the tiling level that contains the vector dim at `dimPos` (which
+  /// is an index into the result of `getVectorTileSizes()`).
+  unsigned getTilingLevelForVectorDimPosition(unsigned dimPos);
+
   /// Returns the tile sizes of all the vector dimensions, including parallel
   /// and reduction dimensions.
   SizesAndScalableFlags getVectorTileSizes();
@@ -117,7 +121,8 @@ public:
   /// dimensions, set to `sizes`, and the corresponding scalability set to
   /// `scalableFlags`.
   IREE::Codegen::LoweringConfigAttr
-  withNewVectorSizes(ArrayRef<int64_t> sizes, ArrayRef<bool> scalableFlags);
+  getLoweringConfigWithNewVectorSizes(ArrayRef<int64_t> sizes,
+                                      ArrayRef<bool> scalableFlags);
 
   /// Returns a list with the tiling levels that can be fused for this
   /// configuration.
