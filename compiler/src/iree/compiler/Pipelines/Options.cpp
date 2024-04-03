@@ -220,8 +220,10 @@ void PreprocessingOptions::bindOptions(OptionsBinder &binder) {
       llvm::cl::desc("Textual description of the pass pipeline to run before "
                      "running normal IREE compilation pipelines"),
       llvm::cl::cat(category));
-  // Two ways of doing custom transformations at the pre-processing step are
-  // supported.
+  // Following ways of doing custom transformations at the pre-processing step
+  // are supported.
+
+  // 0. Through a preprocessing pass pipeline.
   // 1. Through a Transform dialect spec file.
   // 2. Through a PDL spec file.
   // A user may simultaneously use both. The order is transform dialect
