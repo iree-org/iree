@@ -90,9 +90,9 @@ void buildPreprocessingPassPipeline(
         preprocessingOptions.preprocessingPDLSpecFilename;
     passManager.addPass(
         Preprocessing::createApplyPDLPatterns(applyPDLPatternsOptions));
+    passManager.addPass(createCanonicalizerPass());
+    passManager.addPass(createCSEPass());
   }
-  passManager.addPass(createCanonicalizerPass());
-  passManager.addPass(createCSEPass());
 }
 
 static void
