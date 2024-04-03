@@ -20,38 +20,36 @@ using llvm::APIntOps::GreatestCommonDivisor;
 
 namespace mlir::iree_compiler {
 
-int64_t sharedMemoryUsed(const GPUMMASchedule &schedule, int64_t lhsBitwidth,
-                         int64_t rhsBitwidth) {
+static int64_t calculateSharedMemoryUsedInBytes(const GPUMMASchedule &schedule,
+                                                int64_t lhsBitwidth,
+                                                int64_t rhsBitwidth) {
   int64_t tileM = schedule.mSize * schedule.mTileCount * schedule.mWarpCount;
   int64_t tileN = schedule.nSize * schedule.nTileCount * schedule.nWarpCount;
   int64_t tileK = schedule.kSize * schedule.kTileCount;
-  return tileM * tileK * lhsBitwidth + tileN * tileK * rhsBitwidth;
+  return (tileM * tileK * lhsBitwidth + tileN * tileK * rhsBitwidth) / 8;
 }
 
 bool isValidSchedule(const GPUMatmulShapeType &problem,
                      const GPUMMASchedule &schedule) {
-  return problem.mSize %
-                 (schedule.mSize * schedule.mTileCount * schedule.mWarpCount) ==
-             0 &&
-         problem.nSize %
-                 (schedule.nSize * schedule.nTileCount * schedule.nWarpCount) ==
-             0 &&
-         problem.kSize % (schedule.kSize * schedule.kTileCount) == 0;
+  bool isValidM = problem.mSize %
+                  (schedule.mSize * schedule.mTileCount * schedule.mWarpCount);
+  bool isValidN = problem.nSize %
+                  (schedule.nSize * schedule.nTileCount * schedule.nWarpCount);
+  bool isValidK = problem.kSize % (schedule.kSize * schedule.kTileCount) == 0;
+  return isValidN && isValidM && isValidK;
 }
 
-FailureOr<GPUMMASchedule>
-fitScheduleInSharedMemory(const GPUMatmulShapeType &problem,
-                          ArrayRef<GPUMatmulShapeType> intrinsics,
-                          GPUMMASchedule schedule, int64_t sharedMemLimit) {
+FailureOr<GPUMMASchedule> fitScheduleInSharedMemory(
+    const GPUMatmulShapeType &problem, ArrayRef<GPUMatmulShapeType> intrinsics,
+    GPUMMASchedule schedule, int64_t sharedMemLimitInBytes) {
   int64_t lhsBitwidth =
-      intrinsics[schedule.index].aType.getIntOrFloatBitWidth() / 8;
+      intrinsics[schedule.index].aType.getIntOrFloatBitWidth();
   int64_t rhsBitwidth =
-      intrinsics[schedule.index].bType.getIntOrFloatBitWidth() / 8;
+      intrinsics[schedule.index].bType.getIntOrFloatBitWidth();
 
   while (!isValidSchedule(problem, schedule) ||
-         sharedMemoryUsed(schedule, lhsBitwidth, rhsBitwidth) >
-             sharedMemLimit) {
-
+         calculateSharedMemoryUsedInBytes(schedule, lhsBitwidth, rhsBitwidth) >
+             sharedMemLimitInBytes) {
     LLVM_DEBUG({
       llvm::dbgs() << "Shrinking schedule\n";
       llvm::dbgs() << "mSize: " << schedule.mSize << "\n";
@@ -64,30 +62,31 @@ fitScheduleInSharedMemory(const GPUMatmulShapeType &problem,
       llvm::dbgs() << "nWarpCount: " << schedule.nWarpCount << "\n";
     });
 
-    auto decrementIfPossible = [](int64_t &c) {
+    auto decrementIfPossible = [](int64_t &c) -> LogicalResult {
       if (c <= 1) {
-        return false;
+        return failure();
       }
       --c;
-      return true;
+      return success();
     };
 
     // Attempt to shrink the schedule along one of the dimensions.
-    // TODO: Is it worth trying to decrease only the tile count with the maximum
-    // size?
-    if (decrementIfPossible(schedule.mTileCount)) {
+    // TODO: A better solution should probably factor problem.mSize /
+    // (mWarpCount * mTileCount * mSize) and then pop off the smallest factors
+    // one at a time, preferably trying to keep the tile "generally square."
+    if (decrementIfPossible(schedule.mTileCount).succeeded()) {
       continue;
     }
-    if (decrementIfPossible(schedule.nTileCount)) {
+    if (decrementIfPossible(schedule.nTileCount).succeeded()) {
       continue;
     }
-    if (decrementIfPossible(schedule.kTileCount)) {
+    if (decrementIfPossible(schedule.kTileCount).succeeded()) {
       continue;
     }
-    if (decrementIfPossible(schedule.mWarpCount)) {
+    if (decrementIfPossible(schedule.mWarpCount).succeeded()) {
       continue;
     }
-    if (decrementIfPossible(schedule.nWarpCount)) {
+    if (decrementIfPossible(schedule.nWarpCount).succeeded()) {
       continue;
     }
 
@@ -97,14 +96,13 @@ fitScheduleInSharedMemory(const GPUMatmulShapeType &problem,
   return schedule;
 }
 
-FailureOr<GPUMMASchedule>
-deduceMMASchedule(const GPUMatmulShapeType &problem,
-                  ArrayRef<GPUMatmulShapeType> intrinsics,
-                  const GPUMMAHeuristicSeeds &seeds, int64_t sharedMemLimit,
-                  bool canUpcastAcc) {
+FailureOr<GPUMMASchedule> deduceMMASchedule(
+    const GPUMatmulShapeType &problem, ArrayRef<GPUMatmulShapeType> intrinsics,
+    const GPUMMAHeuristicSeeds &seeds, int64_t sharedMemLimitInBytes,
+    bool canUpcastAcc) {
   for (auto [index, intrinsic] : llvm::enumerate(intrinsics)) {
     if (problem.aType != intrinsic.aType || problem.bType != intrinsic.bType) {
-      continue; // Cannot use this intrinsic for mismatched types
+      continue;  // Cannot use this intrinsic for mismatched types
     }
     if (problem.cType != intrinsic.cType) {
       auto isFpCase =
@@ -112,14 +110,14 @@ deduceMMASchedule(const GPUMatmulShapeType &problem,
       auto isUpcast = problem.cType.getIntOrFloatBitWidth() <
                       intrinsic.cType.getIntOrFloatBitWidth();
       if (!(canUpcastAcc && isFpCase && isUpcast)) {
-        continue; // Cannot use this intrinsic if not upcasting
+        continue;  // Cannot use this intrinsic if not upcasting
       }
     }
 
     if (problem.mSize % intrinsic.mSize != 0 ||
         problem.nSize % intrinsic.nSize != 0 ||
         problem.kSize % intrinsic.kSize != 0) {
-      continue; // Cannot use this intrinsic for misaligned cases
+      continue;  // Cannot use this intrinsic for misaligned cases
     }
 
     int64_t mTotalTileCount = problem.mSize / intrinsic.mSize;
@@ -198,9 +196,9 @@ deduceMMASchedule(const GPUMatmulShapeType &problem,
         GPUMMASchedule{index, intrinsic.mSize, intrinsic.nSize, intrinsic.kSize,
                        mWarpCount, nWarpCount, mTileCount, nTileCount,
                        kTileCount},
-        sharedMemLimit);
+        sharedMemLimitInBytes);
   }
   return failure();
 }
 
-} // namespace mlir::iree_compiler
+}  // namespace mlir::iree_compiler
