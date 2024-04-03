@@ -196,8 +196,6 @@ std::optional<Value> hoistOneStaticallyBoundAllocation(
     // layout, so we have to resolve the static/dynamic values here.
     SmallVector<int64_t> staticShape;
     SmallVector<Value> dynamicSizes;
-    staticShape.reserve(allocLikeType.getRank());
-    dynamicSizes.reserve(allocLikeType.getRank());
     dispatchIndexOpFoldResults(allocSizes, dynamicSizes, staticShape);
     auto allocationType = allocLikeType.clone(staticShape);
 
