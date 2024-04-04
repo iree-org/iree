@@ -135,6 +135,7 @@ void populateVectorContractCustomKernelsPatterns(
 //----------------------------------------------------------------------------//
 
 struct LLVMCPUPipelineOptions {
+  bool useConfiguredVectorSizes = true;
   bool enablePeeling = false;
   bool enableVectorMasking = false;
   bool enableAArch64SSVE = false;

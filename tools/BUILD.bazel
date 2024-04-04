@@ -218,24 +218,6 @@ iree_runtime_cc_binary(
     ],
 )
 
-iree_runtime_cc_binary(
-    name = "iree-e2e-matmul-test",
-    srcs = ["iree-e2e-matmul-test.cc"],
-    deps = [
-        "//runtime/src/iree/base",
-        "//runtime/src/iree/base/internal",
-        "//runtime/src/iree/base/internal:cpu",
-        "//runtime/src/iree/base/internal:flags",
-        "//runtime/src/iree/base/internal:path",
-        "//runtime/src/iree/hal",
-        "//runtime/src/iree/modules/hal",
-        "//runtime/src/iree/tooling:context_util",
-        "//runtime/src/iree/tooling:device_util",
-        "//runtime/src/iree/vm",
-        "//runtime/src/iree/vm:cc",
-    ],
-)
-
 iree_compiler_cc_binary(
     name = "iree-tblgen",
     srcs = [

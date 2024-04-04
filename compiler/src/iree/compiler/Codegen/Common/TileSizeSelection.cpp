@@ -87,6 +87,10 @@ static std::pair<int64_t, bool> getTileSizeAtIndex(ArrayRef<int64_t> sizes,
 /// Returns the tile sizes of all the vector dimensions, including parallel
 /// and reduction dimensions.
 SizesAndScalableFlags TilingConfig::getVectorTileSizes() {
+  if (getNumTilingLevels() == 2) {
+    return getVectorCommonParallelSizes();
+  }
+
   unsigned numDims = getNumDimensions();
   SmallVector<int64_t> vectorSizes(numDims, 0);
   SmallVector<bool> scalableFlags(numDims, false);

@@ -220,8 +220,8 @@ class TargetConverter:
         if m:
             return ["iree::" + self._convert_to_cmake_path(m.group(1))]
 
-        # Map //tools/(.*) -> \1
-        m = re.match(f"^{iree_core_repo}//tools[/|:](.+)", target)
+        # Map //tools:(.*) -> \1
+        m = re.match(f"^{iree_core_repo}//tools[|:](.+)", target)
         if m:
             return [self._convert_to_cmake_path(m.group(1))]
 
