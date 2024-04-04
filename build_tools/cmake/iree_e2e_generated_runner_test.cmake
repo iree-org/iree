@@ -6,17 +6,18 @@
 
 include(CMakeParseArguments)
 
-# iree_e2e_matmul_test()
+# iree_e2e_runner_test()
 #
 # Creates a test using a specified test runner program for the specified
-# matmul test files.
+# test files.
 #
 # Parameters:
 #   NAME: Name of the target
+#   TEST_TYPE: Type of test (Currently, matmul and conv2d are supported).
 #   VARIANT_NAME: Variant name to suffix NAME with.
-#       Will reuse the same matmul/calls vmfb files.
-#   MATMULS_SRC: mlir source file with matmuls to be compiled to an IREE module.
-#   MATMULS_VMFB: specifies the path to use for the generated IREE module.
+#       Will reuse the same TEST_TYPE/calls vmfb files.
+#   TESTS_SRC: mlir source file with TEST_TYPE to be compiled to an IREE module.
+#   TESTS_VMFB: specifies the path to use for the generated IREE module.
 #   CALLS_SRC: mlir source file with calls to be compiled to an IREE module.
 #   CALLS_VMFB: specifies the path to use for the generated IREE module.
 #   TARGET_BACKEND: target backend to compile for.
@@ -33,7 +34,7 @@ include(CMakeParseArguments)
 #   TEST_DEFINED: Whether to define a test target.
 #   TEST_DISABLED: The test target will be skipped and its status will be
 #       'Not Run'.
-function(iree_e2e_matmul_test)
+function(iree_e2e_runner_test)
   if(NOT IREE_BUILD_TESTS)
     return()
   endif()
@@ -46,7 +47,7 @@ function(iree_e2e_matmul_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;VARIANT_NAME;MATMULS_SRC;MATMULS_VMFB;CALLS_SRC;CALLS_VMFB;TRACE;TARGET_BACKEND;DRIVER;TEST_RUNNER;TEST_DEFINED;TEST_DISABLED"
+    "NAME;TEST_TYPE;VARIANT_NAME;TESTS_SRC;TESTS_VMFB;CALLS_SRC;CALLS_VMFB;TRACE;TARGET_BACKEND;DRIVER;TEST_RUNNER;TEST_DEFINED;TEST_DISABLED"
     "COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES"
     ${ARGN}
   )
@@ -66,14 +67,14 @@ function(iree_e2e_matmul_test)
     list(APPEND _BASE_COMPILER_FLAGS "--iree-llvmcpu-target-cpu-features=${_RULE_TARGET_CPU_FEATURES}")
   endif()
 
-  if(NOT TARGET "${_NAME}_matmuls_module")
+  if(NOT TARGET "${_NAME}_${_RULE_TEST_TYPE}_module")
     iree_bytecode_module(
       NAME
-        "${_RULE_NAME}_matmuls_module"
+        "${_RULE_NAME}_${_RULE_TEST_TYPE}_module"
       MODULE_FILE_NAME
-        "${_RULE_MATMULS_VMFB}"
+        "${_RULE_TESTS_VMFB}"
       SRC
-        "${_RULE_MATMULS_SRC}"
+        "${_RULE_TESTS_SRC}"
       FLAGS
         "${_BASE_COMPILER_FLAGS}"
         "${_RULE_COMPILER_FLAGS}"
@@ -99,7 +100,7 @@ function(iree_e2e_matmul_test)
   add_custom_target("${_NAME}${_RULE_VARIANT_NAME}" ALL)
   add_dependencies(
     "${_NAME}${_RULE_VARIANT_NAME}"
-    "${_NAME}_matmuls_module"
+    "${_NAME}_${_RULE_TEST_TYPE}_module"
     "${_NAME}_calls_module"
     "${_RULE_TEST_RUNNER}"
   )
@@ -115,10 +116,10 @@ function(iree_e2e_matmul_test)
       SRC
         "${_RULE_TEST_RUNNER}"
       DATA
-        ${_MATMULS_VMFB}
+        ${_TESTS_VMFB}
         ${_CALLS_VMFB}
       ARGS
-        "--module={{${_MATMULS_VMFB}}}"
+        "--module={{${_TESTS_VMFB}}}"
         "--module={{${_CALLS_VMFB}}}"
         ${_RULE_RUNNER_ARGS}
       LABELS
@@ -129,14 +130,15 @@ function(iree_e2e_matmul_test)
   endif()
 endfunction()
 
-# iree_single_backend_e2e_matmul_test()
+# iree_single_backend_e2e_runner_test()
 #
 # Parameters:
 #   NAME: Name of the target
+#   TEST_TYPE: Type of test (Currently, matmul and conv are supported).
 #   GENERATOR: Program (at the moment, must be Python3) to run to generate the
 #       source file (and possibly a trace file and module path). It will be
 #       invoked with the following standard flags, in addition to GENERATOR_ARGS:
-#         --output_matmuls_mlir=${CMAKE_CURRENT_BINARY_DIR}/name_matmuls.mlir
+#         --output_${TEST_TYPE}_mlir=${CMAKE_CURRENT_BINARY_DIR}/name_${TEST_TYPE}.mlir
 #         --output_calls_mlir=${CMAKE_CURRENT_BINARY_DIR}/name_calls.mlir
 #       and if TARGET_CPU_FEATURES is not empty:
 #         --requirements=${TARGET_CPU_FEATURES}
@@ -152,7 +154,7 @@ endfunction()
 #   TEST_RUNNER: trace-runner program to run.
 #   TARGET_CPU_FEATURES: If specified, a string passed as argument to
 #       --iree-llvmcpu-target-cpu-features.
-function(iree_single_backend_e2e_matmul_test)
+function(iree_single_backend_e2e_runner_test)
   if(NOT IREE_BUILD_TESTS)
     return()
   endif()
@@ -165,7 +167,7 @@ function(iree_single_backend_e2e_matmul_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;GENERATOR;TARGET_BACKEND;DRIVER;TEST_RUNNER"
+    "NAME;TEST_TYPE;GENERATOR;TARGET_BACKEND;DRIVER;TEST_RUNNER"
     "GENERATOR_ARGS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES"
     ${ARGN}
   )
@@ -242,12 +244,12 @@ function(iree_single_backend_e2e_matmul_test)
   iree_package_name(_PACKAGE_NAME)
   set(_NAME "${_PACKAGE_NAME}_${_RULE_NAME}")
 
-  set(_MATMULS_SRC "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_NAME}_matmuls.mlir")
+  set(_TESTS_SRC "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_NAME}_${_RULE_TEST_TYPE}.mlir")
   set(_CALLS_SRC "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_NAME}_calls.mlir")
-  set(_MATMULS_VMFB "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_NAME}_matmuls.vmfb")
+  set(_TESTS_VMFB "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_NAME}_${_RULE_TEST_TYPE}.vmfb")
   set(_CALLS_VMFB "${CMAKE_CURRENT_BINARY_DIR}/${_RULE_NAME}_calls.vmfb")
 
-  list(APPEND _GENERATOR_STANDARD_FLAGS "--output_matmuls_mlir=${_MATMULS_SRC}")
+  list(APPEND _GENERATOR_STANDARD_FLAGS "--output_${_RULE_TEST_TYPE}_mlir=${_TESTS_SRC}")
   list(APPEND _GENERATOR_STANDARD_FLAGS "--output_calls_mlir=${_CALLS_SRC}")
   if(_RULE_TARGET_CPU_FEATURES)
     list(APPEND _GENERATOR_STANDARD_FLAGS "--requirements=${_RULE_TARGET_CPU_FEATURES}")
@@ -264,7 +266,7 @@ function(iree_single_backend_e2e_matmul_test)
       ${_GENERATOR_STANDARD_FLAGS}
       ${_RULE_GENERATOR_ARGS}
     OUTPUT
-      ${_MATMULS_SRC}
+      ${_TESTS_SRC}
       ${_CALLS_SRC}
     DEPENDS
       ${_RULE_GENERATOR}
@@ -273,7 +275,7 @@ function(iree_single_backend_e2e_matmul_test)
   add_custom_target(
     "${_NAME}_generated_files"
     DEPENDS
-      ${_MATMULS_SRC}
+      ${_TESTS_SRC}
       ${_CALLS_SRC}
   )
 
@@ -288,11 +290,12 @@ function(iree_single_backend_e2e_matmul_test)
 
   # Define the regular test suite, unless the config is llvm-cpu + TSan.
   if(NOT _RULE_TARGET_BACKEND STREQUAL "llvm-cpu" OR NOT IREE_ENABLE_TSAN)
-    iree_e2e_matmul_test(
+    iree_e2e_runner_test(
       NAME ${_RULE_NAME}
+      TEST_TYPE ${_RULE_TEST_TYPE}
       VARIANT_NAME ""
-      MATMULS_SRC ${_MATMULS_SRC}
-      MATMULS_VMFB ${_MATMULS_VMFB}
+      TESTS_SRC ${_TESTS_SRC}
+      TESTS_VMFB ${_TESTS_VMFB}
       CALLS_SRC ${_CALLS_SRC}
       CALLS_VMFB ${_CALLS_VMFB}
       TEST_RUNNER ${_RULE_TEST_RUNNER}
@@ -306,7 +309,7 @@ function(iree_single_backend_e2e_matmul_test)
       TEST_DISABLED ${_TEST_DISABLED}
     )
     # Note we are relying on the fact that the target created by
-    # iree_e2e_matmul_test is _NAME, even though we passed _RULE_NAME to it,
+    # iree_e2e_runner_test is _NAME, even though we passed _RULE_NAME to it,
     # i.e. we are relying on the prefixing to be identical.
     add_dependencies("${_NAME}" "${_NAME}_generated_files")
   endif()
@@ -321,11 +324,12 @@ function(iree_single_backend_e2e_matmul_test)
       set(_ASAN_COMPILER_FLAGS ${_RULE_COMPILER_FLAGS})
       list(APPEND _ASAN_COMPILER_FLAGS "--iree-llvmcpu-link-embedded=false")
       list(APPEND _ASAN_COMPILER_FLAGS "--iree-llvmcpu-sanitize=address")
-      iree_e2e_matmul_test(
+      iree_e2e_runner_test(
         NAME ${_RULE_NAME}
+        TEST_TYPE ${_RULE_TEST_TYPE}
         VARIANT_NAME "_asan"
-        MATMULS_SRC ${_MATMULS_SRC}
-        MATMULS_VMFB ${_MATMULS_VMFB}
+        TESTS_SRC ${_TESTS_SRC}
+        TESTS_VMFB ${_TESTS_VMFB}
         CALLS_SRC ${_CALLS_SRC}
         CALLS_VMFB ${_CALLS_VMFB}
         TEST_RUNNER ${_RULE_TEST_RUNNER}
@@ -339,7 +343,7 @@ function(iree_single_backend_e2e_matmul_test)
         TEST_DISABLED ${_TEST_DISABLED}
       )
       # Note we are relying on the fact that the target created by
-      # iree_e2e_matmul_test is _NAME, even though we passed _RULE_NAME to it,
+      # iree_e2e_runner_test is _NAME, even though we passed _RULE_NAME to it,
       # i.e. we are relying on the prefixing to be identical.
       add_dependencies("${_NAME}_asan" "${_NAME}_generated_files")
     endif()
@@ -348,11 +352,11 @@ function(iree_single_backend_e2e_matmul_test)
       set(_TSAN_COMPILER_FLAGS ${_RULE_COMPILER_FLAGS})
       list(APPEND _TSAN_COMPILER_FLAGS "--iree-llvmcpu-link-embedded=false")
       list(APPEND _TSAN_COMPILER_FLAGS "--iree-llvmcpu-sanitize=thread")
-      iree_e2e_matmul_test(
+      iree_e2e_runner_test(
         NAME ${_RULE_NAME}
         VARIANT_NAME "_tsan"
-        MATMULS_SRC ${_MATMULS_SRC}
-        MATMULS_VMFB ${_MATMULS_VMFB}
+        TESTS_SRC ${_TESTS_SRC}
+        TESTS_VMFB ${_TESTS_VMFB}
         CALLS_SRC ${_CALLS_SRC}
         CALLS_VMFB ${_CALLS_VMFB}
         TEST_RUNNER ${_RULE_TEST_RUNNER}
@@ -366,7 +370,7 @@ function(iree_single_backend_e2e_matmul_test)
         TEST_DISABLED ${_TEST_DISABLED}
       )
       # Note we are relying on the fact that the target created by
-      # iree_e2e_matmul_test is _NAME, even though we passed _RULE_NAME to it,
+      # iree_e2e_runner_test is _NAME, even though we passed _RULE_NAME to it,
       # i.e. we are relying on the prefixing to be identical.
       add_dependencies("${_NAME}_tsan" "${_NAME}_generated_files")
     endif()
@@ -374,9 +378,9 @@ function(iree_single_backend_e2e_matmul_test)
 endfunction()
 
 
-# iree_generated_e2e_matmul_test()
+# iree_generated_e2e_runner_test()
 #
-# Creates a set of iree_single_backend_e2e_matmul_test's differing
+# Creates a set of iree_single_backend_e2e_runner_test's differing
 # by target backend and driver.
 #
 # Mirrors the bzl rule of the same name.
@@ -384,10 +388,11 @@ endfunction()
 # One test is generated per source and backend/driver pair.
 # Parameters:
 #   NAME: Name of the target
+#   TEST_TYPE: Type of test (Currently, matmul and conv are supported).
 #   GENERATOR: Program (at the moment, must be Python3) to run to generate the
 #       source file (and possibly a trace file and module path). It will be
 #       invoked with the following standard flags, in addition to GENERATOR_ARGS:
-#         --output_matmuls_mlir=${CMAKE_CURRENT_BINARY_DIR}/name_matmuls.mlir
+#         --output_${TEST_TYPE}_mlir=${CMAKE_CURRENT_BINARY_DIR}/name_${TEST_TYPE}.mlir
 #         --output_calls_mlir=${CMAKE_CURRENT_BINARY_DIR}/name_calls.mlir
 #   GENERATOR_ARGS: additional args to pass to the generator program.
 #   TARGET_BACKENDS: backends to compile the module for. These form pairs with
@@ -413,7 +418,7 @@ endfunction()
 #       and cpu_features is a comma-separated list of LLVM target attributes
 #       to enable. Example:
 #         x86_64:avx2_fma:+avx,+avx2,+fma
-function(iree_generated_e2e_matmul_test)
+function(iree_generated_e2e_runner_test)
   if(NOT IREE_BUILD_TESTS)
     return()
   endif()
@@ -421,7 +426,7 @@ function(iree_generated_e2e_matmul_test)
   cmake_parse_arguments(
     _RULE
     ""
-    "NAME;GENERATOR;TEST_RUNNER"
+    "NAME;TEST_TYPE;GENERATOR;TEST_RUNNER"
     "TARGET_BACKENDS;DRIVERS;GENERATOR_ARGS;COMPILER_FLAGS;RUNNER_ARGS;LABELS;TARGET_CPU_FEATURES_VARIANTS"
     ${ARGN}
   )
@@ -436,6 +441,7 @@ function(iree_generated_e2e_matmul_test)
   else()
     set(_TARGET_CPU_FEATURES_VARIANTS "default")
   endif()
+
 
   if(NOT DEFINED _RULE_TARGET_BACKENDS AND NOT DEFINED _RULE_DRIVERS)
     set(_RULE_TARGET_BACKENDS "vmvx" "vulkan-spirv" "llvm-cpu")
@@ -467,9 +473,11 @@ function(iree_generated_e2e_matmul_test)
         set(_TARGET_CPU_FEATURES_SUFFIX "_${_TARGET_CPU_FEATURES_NAME}")
         list(APPEND _LABELS "cpu_features=${_TARGET_CPU_FEATURES_NAME}")
       endif()
-      iree_single_backend_e2e_matmul_test(
+      iree_single_backend_e2e_runner_test(
         NAME
           "${_RULE_NAME}_${_TARGET_BACKEND}_${_DRIVER}${_TARGET_CPU_FEATURES_SUFFIX}"
+        TEST_TYPE
+          ${_RULE_TEST_TYPE}
         GENERATOR
           ${_RULE_GENERATOR}
         GENERATOR_ARGS
