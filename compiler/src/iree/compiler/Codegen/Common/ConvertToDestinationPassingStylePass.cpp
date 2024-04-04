@@ -92,12 +92,16 @@ getTensorLoadOpForTensorStoreOp(OpBuilder &b,
 template <typename TensorReshapeOpTy>
 static Value getReverseOfReshapeOp(OpBuilder &b, TensorReshapeOpTy reshapeOp,
                                    Value resultBuffer) {
-  using ReverseReshapeOpTy = typename std::conditional<
-      std::is_same<TensorReshapeOpTy, tensor::CollapseShapeOp>::value,
-      tensor::ExpandShapeOp, tensor::CollapseShapeOp>::type;
-  return b.create<ReverseReshapeOpTy>(reshapeOp.getLoc(),
-                                      reshapeOp.getSrcType(), resultBuffer,
-                                      reshapeOp.getReassociation());
+  if constexpr (std::is_same<TensorReshapeOpTy,
+                             tensor::CollapseShapeOp>::value) {
+    return b.create<tensor::ExpandShapeOp>(
+        reshapeOp.getLoc(), reshapeOp.getSrcType(), resultBuffer,
+        reshapeOp.getReassociationIndices(),
+        tensor::getMixedSizes(b, reshapeOp.getLoc(), reshapeOp.getSrc()));
+  }
+  return b.create<tensor::CollapseShapeOp>(reshapeOp.getLoc(),
+                                           reshapeOp.getSrcType(), resultBuffer,
+                                           reshapeOp.getReassociation());
 }
 
 /// Gets the reverse of a `tensor.cast` op to get a memref type that
