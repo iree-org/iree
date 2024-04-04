@@ -37,7 +37,7 @@ struct DumpModulePass : public DumpModuleBase<DumpModulePass> {
     if (llvm::sys::path::extension(path) == ".mlirbc") {
       BytecodeWriterConfig config;
       if (failed(writeBytecodeToFile(getOperation(), file->os(), config))) {
-        llvm::errs() << "failed to serialize module to " << path << "\n";
+        llvm::errs() << "failed to serialize module to '" << path << "'\n";
         return signalPassFailure();
       }
     } else {
