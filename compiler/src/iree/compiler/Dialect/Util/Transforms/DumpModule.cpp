@@ -29,7 +29,7 @@ struct DumpModulePass : public DumpModuleBase<DumpModulePass> {
     std::string error;
     auto file = mlir::openOutputFile(path, &error);
     if (!file) {
-      llvm::errs() << "while dumping to " << path << ": " << error << "\n";
+      llvm::errs() << "while dumping to '" << path << "': " << error << "\n";
       return signalPassFailure();
     }
 
