@@ -28,6 +28,7 @@ VER_0 {
     ireeCompilerInvocationRunPassPipeline;
     ireeCompilerInvocationSetCompileFromPhase;
     ireeCompilerInvocationSetCompileToPhase;
+    ireeCompilerInvocationSetDumpCompilationPhasesTo;
     ireeCompilerInvocationSetCrashHandler;
     ireeCompilerInvocationSetVerifyIR;
     ireeCompilerOutputDestroy;

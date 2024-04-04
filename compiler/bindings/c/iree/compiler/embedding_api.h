@@ -239,6 +239,11 @@ IREE_EMBED_EXPORTED void
 ireeCompilerInvocationSetCompileToPhase(iree_compiler_invocation_t *inv,
                                         const char *phase);
 
+// Dumps IR snapshots at the end of each compilation phase to the given
+// directory. The file names will be inferred from the source or module name.
+IREE_EMBED_EXPORTED void ireeCompilerInvocationSetDumpCompilationPhasesTo(
+    iree_compiler_invocation_t *inv, const char *path);
+
 // Enables/disables verification of IR after each pass. Defaults to enabled.
 IREE_EMBED_EXPORTED void
 ireeCompilerInvocationSetVerifyIR(iree_compiler_invocation_t *inv, bool enable);

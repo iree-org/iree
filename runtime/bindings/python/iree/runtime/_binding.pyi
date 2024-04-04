@@ -56,6 +56,14 @@ class FileHandle:
     def wrap_memory(
         host_buffer: Any, readable: bool = True, writable: bool = False
     ) -> FileHandle: ...
+    def host_allocation(self) -> memoryview:
+        """Access the raw view of the allocated host memory.
+
+        Requires is_host_allocation.
+        """
+        ...
+    @property
+    def is_host_allocation(self) -> bool: ...
 
 class HalAllocator:
     def allocate_buffer(
@@ -308,9 +316,40 @@ class MemoryType(int):
     def __and__(self, other: MemoryType) -> int: ...
     def __or__(self, other: MemoryType) -> int: ...
 
+class ParameterIndexEntry:
+    @property
+    def key(self) -> str: ...
+    @property
+    def length(self) -> int: ...
+    @property
+    def metadata(self) -> bytes: ...
+    @property
+    def is_file(self) -> bool: ...
+    @property
+    def is_splat(self) -> bool: ...
+    @property
+    def file_storage(self) -> Tuple[FileHandle, int]:
+        """Accesses the underlying storage (if is_file).
+
+        Only valid if is_file. Returns the backing FileHandle and offset.
+        """
+        ...
+    @property
+    def file_view(self) -> memoryview:
+        """Accesses a memoryview of the file contents.
+
+        Only valid if is_file and the file has host accessible storage.
+        """
+        ...
+    @property
+    def splat_pattern(self) -> bytes:
+        """Accesses the splat pattern (if is_splat)."""
+        ...
+
 class ParameterIndex:
     def __init__() -> None: ...
     def __len__(self) -> int: ...
+    def __getitem__(self, i) -> ParameterIndexEntry: ...
     def reserve(self, new_capacity: int) -> None: ...
     def add_splat(
         self,
@@ -357,6 +396,13 @@ class ParameterIndex:
     def create_provider(
         self, *, scope: str = "", max_concurrent_operations: Optional[int] = None
     ) -> ParameterProvider: ...
+    def items(self) -> List[Tuple[str, ParameterIndexEntry]]:
+        """Accesses the items as a tuple(str, entry).
+
+        Note that the index may contain duplicates, so loading into a dict
+        is up to the user, as only they can know if this is legal.
+        """
+        ...
 
 class ParameterProvider: ...
 

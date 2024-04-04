@@ -23,6 +23,8 @@ namespace mlir::iree_compiler::IREE::Util {
 std::unique_ptr<OperationPass<void>> createApplyPatternsPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createCombineInitializersPass();
 std::unique_ptr<OperationPass<void>> createDropCompilerHintsPass();
+std::unique_ptr<OperationPass<mlir::ModuleOp>>
+createDumpModulePass(std::string path = "");
 std::unique_ptr<OperationPass<void>>
 createFixedPointIteratorPass(OpPassManager pipeline);
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createFoldGlobalsPass();
@@ -36,7 +38,6 @@ createStripAndSplatConstantsPass();
 std::unique_ptr<OperationPass<void>> createStripDebugOpsPass();
 
 // Expression hoisting.
-
 struct ExprHoistingOptions {
   using RegisterDialectsFn = std::function<void(DialectRegistry &)>;
 

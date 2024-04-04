@@ -49,6 +49,7 @@
 #include "iree/compiler/Tools/init_llvmir_translations.h"
 #include "iree/compiler/Tools/init_passes.h"
 #include "iree/compiler/Tools/version.h"
+#include "iree/compiler/Utils/ModuleUtils.h"
 #include "iree/compiler/Utils/TracingUtils.h"
 #include "iree/compiler/embedding_api.h"
 #include "iree/compiler/mlir_interop.h"
@@ -56,6 +57,7 @@
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ManagedStatic.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/SMLoc.h"
 #include "llvm/Support/Signals.h"
@@ -677,6 +679,8 @@ struct Invocation {
   bool runPipeline(enum iree_compiler_pipeline_t pipeline);
   bool getCompilationPhase(IREEVMPipelinePhase &compileFrom,
                            IREEVMPipelinePhase &compileTo);
+  void dumpCompilationPhase(IREEVMPipelinePhase phase,
+                            OpPassManager &passManager);
   bool runTextualPassPipeline(const char *textPassPipeline);
   Error *outputIR(Output &output);
   Error *outputIRBytecode(Output &output, int bytecodeVersion);
@@ -700,6 +704,7 @@ struct Invocation {
   // Run options.
   std::string compileToPhaseName{"end"};
   std::string compileFromPhaseName{"start"};
+  std::string dumpCompilationPhasesTo;
   bool enableVerifier = true;
 
   // Diagnostic options.
@@ -720,6 +725,13 @@ Invocation::Invocation(Session &session) : session(session) {
       [&targetRegistry](OpPassManager &pm) {
         pm.addPass(ConstEval::createJitGlobalsPass({&targetRegistry}));
       };
+
+  // Dump compilation phase results if the option is set.
+  pipelineHooks.afterPhase = [this](IREEVMPipelinePhase phase,
+                                    OpPassManager &passManager) {
+    dumpCompilationPhase(phase, passManager);
+  };
+
   // The PluginSession implements PipelineExtensions and delegates it to
   // activated plugins.
   pipelineHooks.pipelineExtensions = &session.pluginSession;
@@ -891,6 +903,30 @@ bool Invocation::getCompilationPhase(IREEVMPipelinePhase &compileFrom,
   return true;
 }
 
+void Invocation::dumpCompilationPhase(IREEVMPipelinePhase phase,
+                                      OpPassManager &passManager) {
+  if (!parsedModule || dumpCompilationPhasesTo.empty())
+    return;
+
+  std::string phaseName;
+  enumerateIREEVMPipelinePhases(
+      [&](IREEVMPipelinePhase enumeratedPhase, StringRef name, StringRef desc) {
+        if (enumeratedPhase == phase)
+          phaseName = name;
+      });
+
+  std::string fileName =
+      guessModuleName(cast<ModuleOp>(parsedModule), "module") + "." +
+      std::to_string(static_cast<int>(phase)) + "." + phaseName + ".mlir";
+
+  SmallVector<char> path;
+  path.append(dumpCompilationPhasesTo.begin(), dumpCompilationPhasesTo.end());
+  llvm::sys::path::append(path, fileName);
+
+  passManager.addPass(
+      IREE::Util::createDumpModulePass(std::string(path.begin(), path.end())));
+}
+
 bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
   auto passManager = createPassManager();
   switch (pipeline) {
@@ -936,7 +972,8 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
       return false;
     }
     IREE::HAL::buildHALTransformPassPipeline(
-        *passManager, session.targetRegistry, session.halTargetOptions);
+        *passManager, session.targetRegistry, session.halTargetOptions,
+        pipelineHooks);
     break;
   }
   case IREE_COMPILER_PIPELINE_PRECOMPILE: {
@@ -945,7 +982,6 @@ bool Invocation::runPipeline(enum iree_compiler_pipeline_t pipeline) {
     if (!getCompilationPhase(compileFrom, compileTo)) {
       return false;
     }
-
     buildIREEPrecompileTransformPassPipeline(
         session.targetRegistry, session.bindingOptions, session.inputOptions,
         session.preprocessingOptions, session.highLevelOptimizationOptions,
@@ -1379,6 +1415,11 @@ void ireeCompilerInvocationSetCompileFromPhase(iree_compiler_invocation_t *inv,
 void ireeCompilerInvocationSetCompileToPhase(iree_compiler_invocation_t *inv,
                                              const char *phase) {
   unwrap(inv)->compileToPhaseName = std::string(phase);
+}
+
+void ireeCompilerInvocationSetDumpCompilationPhasesTo(
+    iree_compiler_invocation_t *inv, const char *path) {
+  unwrap(inv)->dumpCompilationPhasesTo = std::string(path);
 }
 
 void ireeCompilerInvocationSetVerifyIR(iree_compiler_invocation_t *inv,

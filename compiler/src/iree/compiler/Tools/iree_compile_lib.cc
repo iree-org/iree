@@ -134,6 +134,11 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
         compileToPhases.push_back(name.str());
       });
 
+  llvm::cl::opt<std::string> dumpCompilationPhasesTo(
+      "dump-compilation-phases-to",
+      llvm::cl::desc("Dumps IR at the end of each compilation phase to the "
+                     "given directory."));
+
   llvm::cl::opt<bool> emitMLIRBytecode(
       "emit-mlir-bytecode",
       llvm::cl::desc(
@@ -237,6 +242,8 @@ int mlir::iree_compiler::runIreecMain(int argc, char **argv) {
         compileFromPhases[static_cast<int>(compileFrom.getValue())].c_str());
     ireeCompilerInvocationSetCompileToPhase(
         r.inv, compileToPhases[static_cast<int>(compileTo.getValue())].c_str());
+    ireeCompilerInvocationSetDumpCompilationPhasesTo(
+        r.inv, dumpCompilationPhasesTo.c_str());
     ireeCompilerInvocationSetVerifyIR(r.inv, verifyIR);
     if (!ireeCompilerInvocationParseSource(r.inv, source))
       return false;

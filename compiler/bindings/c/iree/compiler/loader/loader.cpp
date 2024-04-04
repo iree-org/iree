@@ -258,6 +258,11 @@ void ireeCompilerInvocationSetCompileToPhase(iree_compiler_invocation_t *run,
   __ireeCompilerInvocationSetCompileToPhase(run, phase);
 }
 
+void ireeCompilerInvocationSetDumpCompilationPhasesTo(
+    iree_compiler_invocation_t *inv, const char *path) {
+  __ireeCompilerInvocationSetDumpCompilationPhasesTo(inv, path);
+}
+
 void ireeCompilerInvocationSetVerifyIR(iree_compiler_invocation_t *run,
                                        bool enable) {
   __ireeCompilerInvocationSetVerifyIR(run, enable);
