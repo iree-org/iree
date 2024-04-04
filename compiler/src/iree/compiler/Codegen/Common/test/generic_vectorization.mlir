@@ -366,3 +366,37 @@ func.func @generic_unpack_infer_vector_size(%arg0: tensor<?x?x16x16xf32>, %arg1:
 // CHECK-MASK:           %[[GENERIC_SRC:.+]] = vector.transfer_read %[[UNPACK_WRITE]]{{.+}}, %[[GENERIC_MASK]]
 // CHECK-MASK:           %[[EXP:.+]] = math.exp %[[GENERIC_SRC]]
 // CHECK-MASK:           vector.transfer_write %[[EXP]]{{.+}}, %[[GENERIC_MASK]]
+
+// -----
+
+func.func @static_pack(%arg0: tensor<32x8x16xf32>, %arg1: tensor<4x1x32x16x2xf32>) -> tensor<4x1x32x16x2xf32> {
+  %pack = tensor.pack %arg0 outer_dims_perm = [1, 2, 0] inner_dims_pos = [2, 1] inner_tiles = [16, 2] into %arg1 : tensor<32x8x16xf32> -> tensor<4x1x32x16x2xf32>
+  return %pack : tensor<4x1x32x16x2xf32>
+}
+// CHECK-LABEL: func.func @static_pack
+// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[CST:.+]] = arith.constant 0.000000e+00 : f32
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK:         %[[READ:.+]] = vector.transfer_read %[[SRC]]{{.+}} : tensor<32x8x16xf32>, vector<32x8x16xf32>
+// CHECK:         %[[SHAPE_CAST:.+]] = vector.shape_cast %[[READ]] : vector<32x8x16xf32> to vector<32x4x2x1x16xf32>
+// CHECK:         %[[TRANSP:.+]] = vector.transpose %[[SHAPE_CAST]], [1, 3, 0, 4, 2]
+// CHECK-DAG:     %[[EMPTY:.+]] = tensor.empty() : tensor<4x1x32x16x2xf32>
+// CHECK:         %[[WRITE:.+]] = vector.transfer_write %[[TRANSP]], %[[EMPTY]]
+// CHECK:         return %[[WRITE]]
+
+// -----
+
+func.func @static_unpack(%arg0: tensor<4x1x32x16x2xf32>, %arg1: tensor<32x8x16xf32>) -> tensor<32x8x16xf32> {
+  %unpack = tensor.unpack %arg0 outer_dims_perm = [1, 2, 0] inner_dims_pos = [2, 1] inner_tiles = [16, 2] into %arg1 : tensor<4x1x32x16x2xf32> -> tensor<32x8x16xf32>
+  return %unpack : tensor<32x8x16xf32>
+}
+// CHECK-LABEL: func.func @static_unpack
+// CHECK-SAME:    %[[SRC:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[CST:.+]] = arith.constant 0.000000e+00 : f32
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK:         %[[READ:.+]] = vector.transfer_read %[[SRC]]{{.+}} : tensor<4x1x32x16x2xf32>, vector<4x1x32x16x2xf32>
+// CHECK:         %[[TRANSP:.+]] = vector.transpose %[[READ]], [2, 0, 4, 1, 3]
+// CHECK:         %[[SHAPE_CAST:.+]] = vector.shape_cast %[[TRANSP]] : vector<32x4x2x1x16xf32> to vector<32x8x16xf32>
+// CHECK-DAG:     %[[EMPTY:.+]] = tensor.empty() : tensor<32x8x16xf32>
+// CHECK:         %[[WRITE:.+]] = vector.transfer_write %[[SHAPE_CAST]], %[[EMPTY]]
+// CHECK:         return %[[WRITE]]

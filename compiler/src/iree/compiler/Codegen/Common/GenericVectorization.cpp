@@ -194,6 +194,18 @@ inferSizesFromIR(tensor::UnPackOp op) {
 
 /// See the documentation in the above function declaration.
 static std::optional<VectorizationTileSizes> inferSizesFromIR(Value val) {
+  auto type = dyn_cast<RankedTensorType>(val.getType());
+  if (!type) {
+    return std::nullopt;
+  }
+  if (type.hasStaticShape()) {
+    SmallVector<int64_t> shape(type.getShape());
+    return VectorizationTileSizes{shape, shape};
+  }
+  if (!val.getDefiningOp()) {
+    return std::nullopt;
+  }
+
   std::optional<VectorizationTileSizes> result;
   TypeSwitch<Operation *, void>(val.getDefiningOp())
       .Case<linalg::LinalgOp>(
@@ -315,13 +327,10 @@ void GenericVectorizationPass::runOnOperation() {
   IRRewriter rewriter(context);
   SmallVector<Operation *> candidates;
   funcOp.walk([&](Operation *op) {
-    if (isa<linalg::LinalgOp>(op)) {
+    if (isa<linalg::LinalgOp, tensor::PackOp, tensor::UnPackOp>(op)) {
       candidates.push_back(op);
     } else if (vectorizePadding && enableVectorMasking &&
                isa<tensor::PadOp>(op)) {
-      candidates.push_back(op);
-    } else if (enableVectorMasking &&
-               isa<tensor::PackOp, tensor::UnPackOp>(op)) {
       candidates.push_back(op);
     }
   });
@@ -339,6 +348,35 @@ void GenericVectorizationPass::runOnOperation() {
         auto [sizes, scalableDims] = *vectorSizesAndScalableDims;
         vectorSizes.append(sizes.begin(), sizes.end());
         scalableVecDims.append(scalableDims.begin(), scalableDims.end());
+      }
+    } else if (isa<tensor::PackOp, tensor::UnPackOp>(op)) {
+      // TODO(#16948): Support vectorization for static cases without passing
+      // input_vector_sizes.
+      bool isStatic = true;
+      for (auto type : op->getOperandTypes()) {
+        auto rankedType = dyn_cast<RankedTensorType>(type);
+        if (!rankedType || !rankedType.hasStaticShape()) {
+          isStatic = false;
+          break;
+        }
+      }
+      if (!isStatic) {
+        continue;
+      }
+      std::optional<SizesAndScalableFlags> vectorSizesAndScalableDims =
+          getVectorSizes(op, useConfiguredVectorSizes);
+      if (vectorSizesAndScalableDims) {
+        auto [sizes, scalableDims] = *vectorSizesAndScalableDims;
+        vectorSizes.append(sizes.begin(), sizes.end());
+        scalableVecDims.append(scalableDims.begin(), scalableDims.end());
+      }
+      if (auto unpackOp = dyn_cast<tensor::UnPackOp>(op)) {
+        if (vectorSizes != unpackOp.getDestType().getShape())
+          continue;
+      }
+      if (auto packOp = dyn_cast<tensor::PackOp>(op)) {
+        if (packOp.getPaddingValue())
+          continue;
       }
     }
 
