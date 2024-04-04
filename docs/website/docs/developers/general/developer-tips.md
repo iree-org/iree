@@ -381,6 +381,38 @@ Flag | Files dumped
 
 <!-- TODO(scotttodd): Link to a playground Colab notebook that dumps files? -->
 
+### Executable benchmarks
+
+The _benchmark_ files produced by `--iree-hal-dump-executable-benchmarks-to`
+can be compiled in isolation and passed to `iree-benchmark-module`, where they
+exercise the full IREE runtime for a single executable:
+
+```console hl_lines="3 14-15"
+$ iree-compile simple_abs.mlir \
+  --iree-hal-target-backends=llvm-cpu \
+  --iree-hal-dump-executable-benchmarks-to=/tmp/iree/simple_abs/ \
+  -o /dev/null
+
+$ ls /tmp/iree/simple_abs/
+
+module_abs_dispatch_0_embedded_elf_x86_64_benchmark.mlir
+
+$ iree-compile \
+  /tmp/iree/simple_abs/module_abs_dispatch_0_embedded_elf_x86_64_benchmark.mlir \
+  -o /tmp/iree/simple_abs/module_abs_dispatch_0_benchmark.vmfb
+
+$ iree-benchmark-module \
+  /tmp/iree/simple_abs/module_abs_dispatch_0_benchmark.vmfb
+```
+
+The _binary_ files produced by `--iree-hal-dump-executable-binaries-to`
+can be passed to `iree-benchmark-executable` where they are benchmarked
+directly, without using the IREE VM, HAL APIs, task system, etc. Note that this
+interface is much lower level.
+
+<!-- TODO: example? -->
+<!-- TODO: link to more docs in developer-overview.md? -->
+
 ## Compiling phase by phase
 
 IREE compiles programs through a series of broad phases:
