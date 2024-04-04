@@ -236,50 +236,6 @@ void SetupIoBindings(py::module_ &m) {
           return py::str("<FileHandle unknown>");
         }
       });
-  // FileHandle buffer protocol implementation via low level API.
-  {
-    static PyBufferProcs buffer_procs = {
-        // It is not legal to raise exceptions from these callbacks.
-        +[](PyObject *raw_self, Py_buffer *view, int flags) -> int {
-          // Cast must succeed due to invariants.
-          auto self = py::cast<FileHandle *>(py::handle(raw_self));
-          auto primitive = iree_io_file_handle_primitive(self->raw_ptr());
-          if (primitive.type != IREE_IO_FILE_HANDLE_TYPE_HOST_ALLOCATION) {
-            PyErr_SetString(PyExc_ValueError,
-                            "FileHandle is not based on a host allocation and "
-                            "cannot be mapped");
-            return -1;
-          }
-          if (view == NULL) {
-            PyErr_SetString(PyExc_ValueError, "NULL view in getbuffer");
-            return -1;
-          }
-
-          Py_INCREF(raw_self);
-          view->obj = raw_self;
-          view->buf = primitive.value.host_allocation.data;
-          view->len = primitive.value.host_allocation.data_length;
-          bool is_writable = iree_io_file_handle_access(self->raw_ptr()) &
-                             IREE_IO_FILE_ACCESS_WRITE;
-          view->readonly = !is_writable;
-          view->itemsize = 1;
-          view->format = (char *)"B";  // Byte
-          view->ndim = 1;
-          view->shape = nullptr;
-          view->strides = nullptr;
-          view->suboffsets = nullptr;
-          view->internal = nullptr;
-          return 0;
-        },
-        +[](PyObject *self_obj, Py_buffer *view) -> void {
-
-        },
-    };
-    auto heap_type = reinterpret_cast<PyHeapTypeObject *>(file_handle.ptr());
-    assert(heap_type->ht_type.tp_flags & Py_TPFLAGS_HEAPTYPE &&
-           "must be heap type");
-    heap_type->as_buffer = buffer_procs;
-  }
 
   py::class_<ParameterProvider>(m, "ParameterProvider");
   py::class_<ParameterIndexEntryWrapper>(m, "ParameterIndexEntry")
