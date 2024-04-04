@@ -39,6 +39,17 @@ def DropCompilerHints : Pass<"iree-util-drop-compiler-hints", ""> {
   }];
 }
 
+def DumpModule : Pass<"iree-util-dump-module", "mlir::ModuleOp"> {
+  let summary = "Dumps the module IR to the given file path.";
+  let description = [{
+    Dumps the module IR to the given file path in either textual (.mlir) or
+    binary (.mlirbc) format. Source locations remain unchanged.
+  }];
+  let constructor = [{
+    mlir::iree_compiler::IREE::Util::createDumpModulePass()
+  }];
+}
+
 def FixedPointIterator : Pass<"iree-util-fixed-point-iterator", ""> {
   let summary = "Iterates a sub-pipeline to a fixed point.";
   let constructor = [{
