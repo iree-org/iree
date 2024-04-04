@@ -55,6 +55,18 @@ jobs:
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'regression_test_amdgpu_rocm')
     uses: ./.github/workflows/pkgci_regression_test_amdgpu_rocm.yml
 
+  regression_test_nvidiagpu_vulkan:
+    name: Regression Test NVIDIAGPU-Vulkan
+    needs: [setup, build_packages]
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'regression_test_nvidiagpu_vulkan')
+    uses: ./.github/workflows/pkgci_regression_test_nvidiagpu_vulkan.yml
+
+  regression_test_nvidiagpu_cuda:
+    name: Regression Test NVIDIAGPU-CUDA
+    needs: [setup, build_packages]
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'regression_test_nvidiagpu_cuda')
+    uses: ./.github/workflows/pkgci_regression_test_nvidiagpu_cuda.yml
+
   test_tensorflow_cpu:
     name: Test TensorFlow CPU
     needs: [setup, build_packages]
