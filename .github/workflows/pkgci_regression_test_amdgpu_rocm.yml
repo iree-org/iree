@@ -58,7 +58,7 @@ jobs:
         uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
         with:
           repository: nod-ai/SHARK-TestSuite
-          ref: e67779cee2a3878c2ba9ede50f2121cf21c1e99c
+          ref: 65cdac8e1dfab53892337009a9704162e1cf8bfb
           path: SHARK-TestSuite
           submodules: false
       - name: Installing external TestSuite Python requirements
