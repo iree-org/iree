@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 import array
+import gc
 import logging
 import numpy as np
 from pathlib import Path
@@ -32,23 +33,14 @@ class ParameterApiTest(unittest.TestCase):
             self.assertGreater(file_path.stat().st_size, 0)
 
     def testArchiveFileRoundtrip(self):
-        with tempfile.TemporaryDirectory() as td:
-            file_path = Path(td) / "archive.irpa"
-            orig_array = np.asarray([[1], [2], [3]], dtype=np.int64)
-            rt.save_archive_file(
-                {
-                    "weight": rt.SplatValue(np.int8(2), [30, 20]),
-                    "bias": rt.SplatValue(array.array("b", [32]), 30),
-                    "array": orig_array,
-                },
-                file_path,
-            )
-            self.assertTrue(file_path.exists())
-            self.assertGreater(file_path.stat().st_size, 0)
+        orig_array = np.asarray([[1], [2], [3]], dtype=np.int64)
 
+        def verify_archive(file_path: Path):
             # Load and verify.
             index = rt.ParameterIndex()
-            index.load(str(file_path))
+            # For this test, disable mmap to make temp file management on
+            # windows a bit better.
+            index.load(str(file_path), mmap=False)
             self.assertEqual(len(index), 3)
 
             # Note that the happy path of most properties are verified via
@@ -82,6 +74,23 @@ class ParameterApiTest(unittest.TestCase):
             self.assertEqual(len(array_view), 24)
             array_back = np.asarray(array_view).view(np.int64).reshape(orig_array.shape)
             np.testing.assert_array_equal(array_back, orig_array)
+
+        with tempfile.TemporaryDirectory() as td:
+            file_path = Path(td) / "archive.irpa"
+            rt.save_archive_file(
+                {
+                    "weight": rt.SplatValue(np.int8(2), [30, 20]),
+                    "bias": rt.SplatValue(array.array("b", [32]), 30),
+                    "array": orig_array,
+                },
+                file_path,
+            )
+            self.assertTrue(file_path.exists())
+            self.assertGreater(file_path.stat().st_size, 0)
+            # Open / verify in its own scope and collect prior to tearing
+            # down the temp dir.
+            verify_archive(file_path)
+            gc.collect()
 
     def testFileHandleWrap(self):
         fh = rt.FileHandle.wrap_memory(b"foobar")
