@@ -17,6 +17,7 @@ from . import _binding
 from ._binding import (
     FileHandle,
     ParameterIndex,
+    ParameterIndexEntry,
     ParameterProvider,
     create_io_parameters_module,
 )
