@@ -99,9 +99,6 @@ X86_64_BENCHMARK_CONFIG = [
     common_definitions.CpuBenchmarkConfig(
         model=torch_models.FALCON7B_INT4_1X100XI64_GPTQ_TORCH, threads=[30]
     ),
-    common_definitions.CpuBenchmarkConfig(
-        model=torch_models.GEMMA7B_TORCH, threads=[30]
-    ),
 ]
 
 X86_64_BENCHMARK_CONFIG_LARGE = [

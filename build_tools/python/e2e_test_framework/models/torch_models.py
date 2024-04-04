@@ -136,16 +136,3 @@ FALCON7B_INT4_1X100XI64_GPTQ_TORCH = common_definitions.Model(
     entry_function="forward",
     input_types=["1x100xi64"],
 )
-
-GEMMA7B_TORCH = common_definitions.Model(
-    id=unique_ids.MODEL_GEMMA7B_1X1XI64_TORCH,
-    name="Gemma7bPT",
-    tags=["transformer"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_TORCH_MLIR,
-    source_url="https://storage.googleapis.com/shark_tank/dan/Gemma/gemma_7b.mlir",
-    entry_function="run_forward",
-    input_types=["1x1xi64"],
-    external_param_urls=[
-        "model=https://storage.googleapis.com/shark_tank/dan/Gemma/gf32.safetensors"
-    ],
-)

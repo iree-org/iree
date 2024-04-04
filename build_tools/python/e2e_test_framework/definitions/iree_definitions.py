@@ -162,7 +162,6 @@ class MLIRDialectType(Enum):
     NONE = "none"
     TOSA = "tosa"
     STABLEHLO = "stablehlo"
-    TORCH = "torch"
 
 
 @serialization.serializable(type_key="iree_import_configs")
@@ -207,18 +206,10 @@ DEFAULT_STABLEHLO_MLIR_IMPORT_CONFIG = ImportConfig(
     dialect_type=MLIRDialectType.STABLEHLO,
 )
 
-DEFAULT_TORCH_MLIR_IMPORT_CONFIG = ImportConfig(
-    id=unique_ids.IREE_MODEL_IMPORT_TORCH_MLIR_DEFAULT,
-    name="torch",
-    tool=ImportTool.NONE,
-    dialect_type=MLIRDialectType.TORCH,
-)
-
 MODEL_SOURCE_TO_DEFAULT_IMPORT_CONFIG_MAP = {
     common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR: DEFAULT_LINALG_MLIR_IMPORT_CONFIG,
     common_definitions.ModelSourceType.EXPORTED_TFLITE: DEFAULT_TFLITE_IMPORT_CONFIG,
     common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR: DEFAULT_STABLEHLO_MLIR_IMPORT_CONFIG,
-    common_definitions.ModelSourceType.EXPORTED_TORCH_MLIR: DEFAULT_TORCH_MLIR_IMPORT_CONFIG,
 }
 
 

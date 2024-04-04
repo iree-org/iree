@@ -174,13 +174,6 @@ iree_fetch_artifact(
 )
 
 iree_fetch_artifact(
-  NAME "model-Gemma7bPT"
-  SOURCE_URL "https://storage.googleapis.com/shark_tank/dan/Gemma/gemma_7b.mlir"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Gemma7bPT.mlir"
-  UNPACK
-)
-
-iree_fetch_artifact(
   NAME "model-BERT_LARGE_JAX_384XI32_BATCH1"
   SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.25_1709787220/BERT_LARGE_FP32_JAX_384XI32_BATCH1/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BERT_LARGE_JAX_384XI32_BATCH1.mlirbc"

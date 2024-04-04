@@ -107,8 +107,6 @@ class ModelSourceType(Enum):
     EXPORTED_STABLEHLO_MLIR = "exported_stablehlo_mlir"
     # Exported TFLite model file.
     EXPORTED_TFLITE = "exported_tflite"
-    # Exported Torch model file.
-    EXPORTED_TORCH_MLIR = "exported_torch_mlir"
 
 
 @serialization.serializable
