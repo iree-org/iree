@@ -18,15 +18,12 @@ export IREE_BYOLLVM_INSTALL_DIR="${IREE_BYOLLVM_BUILD_DIR}/install"
 
 python3 --version
 
-# Honor the venv setup instructions like we do in setup_build.sh, but we can't
-# just use that because this is independent/uses different env vars/etc.
-if [[ ! -z "${IREE_BUILD_SETUP_PYTHON_VENV:-}" ]]; then
-  # We've been instructed to set up a venv.
-  echo "Setting up venv at $IREE_BUILD_SETUP_PYTHON_VENV"
-  python3 -m venv "$IREE_BUILD_SETUP_PYTHON_VENV"
-  source "$IREE_BUILD_SETUP_PYTHON_VENV/bin/activate"
-  python -m pip install -r runtime/bindings/python/iree/runtime/build_requirements.txt
-fi
+# We've been instructed to set up a venv.
+VENV_DIR="$IREE_BYOLLVM_BUILD_DIR/.venv"
+echo "Setting up venv at $VENV_DIR"
+python3 -m venv "$VENV_DIR"
+source "$VENV_DIR/bin/activate"
+python -m pip install -r runtime/bindings/python/iree/runtime/build_requirements.txt
 
 # Note: by using the `build_llvm` action here, we are exercising byo_llvm.sh's
 # ability to build LLVM... from our own third_party/llvm-project. That's not
