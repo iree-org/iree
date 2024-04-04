@@ -468,9 +468,51 @@ $ iree-compile simple_exp_abi.mlir \
 
 or explicitly resume from an intermediate phase with `--compile-from=<phase name>`:
 
-```console
+```console hl_lines="3"
 $ iree-compile simple_exp_abi.mlir \
   --iree-hal-target-backends=llvm-cpu \
   --compile-from=abi \
   -o simple_exp_cpu.vmfb
 ```
+
+### Dumping compilation phases
+
+The `--dump-compilation-phases-to` flag can be used to dump program IR after
+each phase, much like `--compile-to` but without exiting early:
+
+```console hl_lines="3"
+$ iree-compile simple_abs.mlir \
+  --iree-hal-target-backends=llvm-cpu \
+  --dump-compilation-phases-to=/tmp/iree/simple_abs
+  -o /tmp/iree/simple_abs/simple_abs_cpu.vmfb
+
+$ ls /tmp/iree/simple_abs -1v
+
+simple_abs.1.input.mlir
+simple_abs.2.abi.mlir
+simple_abs.3.preprocessing.mlir
+simple_abs.4.global-optimization.mlir
+simple_abs.5.flow.mlir
+simple_abs.6.stream.mlir
+simple_abs.7.executable-sources.mlir
+simple_abs.8.executable-configurations.mlir
+simple_abs.9.executable-targets.mlir
+simple_abs.10.hal.mlir
+simple_abs.11.vm.mlir
+```
+
+As with `--compile-to`, these files can be used together with `--compile-from`:
+
+```console
+$ iree-compile simple_abs.2.abi.mlir \
+  --iree-hal-target-backends=llvm-cpu \
+  --compile-from=abi \
+  -o simple_exp_cpu.vmfb
+```
+
+All together, these passes can be used to, for example:
+
+* speed up triage ("at which phase do we go wrong")
+* allow for faster development iteration (snapshot all phases at some baseline,
+  modify the compiler source, then resume from just before where those changes
+  impact a pipeline)
