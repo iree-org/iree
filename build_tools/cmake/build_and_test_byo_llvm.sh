@@ -16,6 +16,18 @@ source build_tools/cmake/setup_ccache.sh
 export IREE_BYOLLVM_BUILD_DIR="${1:-build-byo-llvm}"
 export IREE_BYOLLVM_INSTALL_DIR="${IREE_BYOLLVM_BUILD_DIR}/install"
 
+python3 --version
+
+# Honor the venv setup instructions like we do in setup_build.sh, but we can't
+# just use that because this is independent/uses different env vars/etc.
+if [[ ! -z "${IREE_BUILD_SETUP_PYTHON_VENV:-}" ]]; then
+  # We've been instructed to set up a venv.
+  echo "Setting up venv at $IREE_BUILD_SETUP_PYTHON_VENV"
+  python3 -m venv "$IREE_BUILD_SETUP_PYTHON_VENV"
+  source "$IREE_BUILD_SETUP_PYTHON_VENV/bin/activate"
+  python -m pip install -r runtime/bindings/python/iree/runtime/build_requirements.txt
+fi
+
 # Note: by using the `build_llvm` action here, we are exercising byo_llvm.sh's
 # ability to build LLVM... from our own third_party/llvm-project. That's not
 # the most intuitive interpretation of "bring your own LLVM", since as far as
