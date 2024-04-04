@@ -19,12 +19,12 @@ import requests
 import shutil
 import subprocess
 import tarfile
-import urllib.parse
 
 from common import benchmark_suite as benchmark_suite_module
 from common.benchmark_driver import BenchmarkDriver
 from common.benchmark_suite import BenchmarkCase, BenchmarkSuite
 from common.benchmark_config import BenchmarkConfig
+from common import benchmark_definition
 from common.benchmark_definition import (
     execute_cmd,
     execute_cmd_and_get_output,
@@ -83,9 +83,9 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
         external_params = []
         if benchmark_case.external_param_urls:
             for param_url in benchmark_case.external_param_urls:
-                scope, url = param_url.split("=", maxsplit=1)
-                url_path = urllib.parse.urlparse(url).path
-                filename = pathlib.PurePath(url_path).name
+                scope, url, filename = benchmark_definition.parse_external_param_url(
+                    param_url
+                )
                 param_path = self.__fetch_file(uri=url, dest=case_tmp_dir / filename)
                 param_arg = f"{scope}={param_path}" if scope else param_path
                 external_params.append(param_arg)

@@ -45,7 +45,6 @@ import subprocess
 import tarfile
 import time
 from typing import Any, Optional, Sequence, Tuple
-import urllib.parse
 
 from common import benchmark_suite as benchmark_suite_module
 from common.benchmark_config import BenchmarkConfig
@@ -309,9 +308,9 @@ class AndroidBenchmarkDriver(BenchmarkDriver):
         external_params = []
         if benchmark_case.external_param_urls:
             for param_url in benchmark_case.external_param_urls:
-                scope, url = param_url.split("=", maxsplit=1)
-                url_path = urllib.parse.urlparse(url).path
-                filename = pathlib.PurePath(url_path).name
+                scope, url, filename = benchmark_definition.parse_external_param_url(
+                    param_url
+                )
                 param_path = adb_fetch_and_push_file(
                     source=benchmark_definition.ResourceLocation.build_url(url),
                     dest=android_case_dir / filename,
