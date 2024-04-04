@@ -80,7 +80,7 @@ struct TargetInfo {
   bool hasMmaSync = false;
   // These are listed in the order of preference, not necessarily monotonically.
   SmallVector<int64_t, 2> supportedSubgroupSizes = {32};
-  int64_t sharedMemoryLimit = 65536;
+  int64_t sharedMemoryLimitInBytes = 65536;
 };
 
 struct TileWorkgroupSizePair {
@@ -197,7 +197,7 @@ static TargetInfo getCudaTargetInfo(mlir::FunctionOpInterface entryPoint) {
   // All the cuda target are assumed to have warp support.
   info.hasWarpShuffle = true;
   info.supportedSubgroupSizes = {32};
-  info.sharedMemoryLimit = 163 * 1024;
+  info.sharedMemoryLimitInBytes = 163 * 1024;
   StringRef targetName = getTargetArch(entryPoint);
   // If no target name is set assume all the features are off.
   if (targetName == "")
@@ -223,7 +223,7 @@ static TargetInfo getCudaTargetInfo(mlir::FunctionOpInterface entryPoint) {
 static TargetInfo getRocmTargetInfo(mlir::FunctionOpInterface entryPoint) {
   TargetInfo info;
   StringRef targetName = getTargetArch(entryPoint);
-  info.sharedMemoryLimit = 65536;
+  info.sharedMemoryLimitInBytes = 65536;
   // If no target name is set assume all the features are off.
   if (targetName.empty())
     return info;
@@ -412,15 +412,16 @@ setConvolutionVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
                              /*bestMNTileCountPerSubgroup=*/8,
                              /*bestKTileCountPerSubgroup=*/2};
 
-  int64_t sharedMemoryLimit = targetInfo.sharedMemoryLimit;
+  int64_t sharedMemoryLimitInBytes = targetInfo.sharedMemoryLimitInBytes;
 
   // First try to find a schedule with an exactly matching intrinsic.
   FailureOr<GPUMMASchedule> schedule =
-      deduceMMASchedule(problem, intrinsics, seeds, sharedMemoryLimit);
+      deduceMMASchedule(problem, intrinsics, seeds, sharedMemoryLimitInBytes);
   if (failed(schedule)) {
     // Then try again by allowing upcasting accumulator.
-    schedule = deduceMMASchedule(problem, intrinsics, seeds, sharedMemoryLimit,
-                                 /*canUpcastAcc=*/true);
+    schedule =
+        deduceMMASchedule(problem, intrinsics, seeds, sharedMemoryLimitInBytes,
+                          /*canUpcastAcc=*/true);
   }
   if (failed(schedule)) {
     return failure();
@@ -562,15 +563,16 @@ setMatmulVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
              /*bestKTileCountPerSubgroup=*/4};
   }
 
-  int64_t sharedMemoryLimit = targetInfo.sharedMemoryLimit;
+  int64_t sharedMemoryLimitInBytes = targetInfo.sharedMemoryLimitInBytes;
 
   // First try to find a schedule with an exactly matching intrinsic.
   std::optional<GPUMMASchedule> schedule =
-      deduceMMASchedule(problem, intrinsics, seeds, sharedMemoryLimit);
+      deduceMMASchedule(problem, intrinsics, seeds, sharedMemoryLimitInBytes);
   if (!schedule) {
     // Then try again by allowing upcasting accumulator.
-    schedule = deduceMMASchedule(problem, intrinsics, seeds, sharedMemoryLimit,
-                                 /*canUpcastAcc=*/true);
+    schedule =
+        deduceMMASchedule(problem, intrinsics, seeds, sharedMemoryLimitInBytes,
+                          /*canUpcastAcc=*/true);
   }
   if (!schedule) {
     return failure();
@@ -1807,8 +1809,8 @@ static void propagateLoweringConfig(Operation *rootOperation,
   }
 }
 
-int64_t getTargetSharedMemoryLimit(FunctionOpInterface entryPoint) {
-  return getTargetInfo(entryPoint).sharedMemoryLimit;
+int64_t getTargetSharedMemoryLimitInBytes(FunctionOpInterface entryPoint) {
+  return getTargetInfo(entryPoint).sharedMemoryLimitInBytes;
 }
 
 //===----------------------------------------------------------------------===//

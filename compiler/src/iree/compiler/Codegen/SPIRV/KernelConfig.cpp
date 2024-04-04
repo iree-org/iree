@@ -909,11 +909,11 @@ LogicalResult setCooperativeMatrixConfig(
   GPUMMAHeuristicSeeds seeds{numSubgroupsPerWorkgroup, numMNTilesPerSubgroup,
                              numKTilesPerSubgroup};
 
-  int64_t sharedMemoryLimit =
+  int64_t sharedMemoryLimitInBytes =
       targetEnv.getResourceLimits().getMaxComputeSharedMemorySize();
 
   FailureOr<GPUMMASchedule> schedule =
-      deduceMMASchedule(problem, intrinsics, seeds, sharedMemoryLimit);
+      deduceMMASchedule(problem, intrinsics, seeds, sharedMemoryLimitInBytes);
   if (failed(schedule))
     return failure();
 

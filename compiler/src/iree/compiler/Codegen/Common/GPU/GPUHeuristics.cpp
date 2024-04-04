@@ -74,19 +74,19 @@ FailureOr<GPUMMASchedule> fitScheduleInSharedMemory(
     // TODO: A better solution should probably factor problem.mSize /
     // (mWarpCount * mTileCount * mSize) and then pop off the smallest factors
     // one at a time, preferably trying to keep the tile "generally square."
-    if (decrementIfPossible(schedule.mTileCount).succeeded()) {
+    if (succeeded(decrementIfPossible(schedule.mTileCount))) {
       continue;
     }
-    if (decrementIfPossible(schedule.nTileCount).succeeded()) {
+    if (succeeded(decrementIfPossible(schedule.nTileCount))) {
       continue;
     }
-    if (decrementIfPossible(schedule.kTileCount).succeeded()) {
+    if (succeeded(decrementIfPossible(schedule.kTileCount))) {
       continue;
     }
-    if (decrementIfPossible(schedule.mWarpCount).succeeded()) {
+    if (succeeded(decrementIfPossible(schedule.mWarpCount))) {
       continue;
     }
-    if (decrementIfPossible(schedule.nWarpCount).succeeded()) {
+    if (succeeded(decrementIfPossible(schedule.nWarpCount))) {
       continue;
     }
 
