@@ -16,7 +16,7 @@ CMAKE_BIN="${CMAKE_BIN:-$(which cmake)}"
 ninja --version
 python3 --version
 
-if [[ ! -z "$IREE_BUILD_SETUP_PYTHON_VENV" ]]; then
+if [[ ! -z "${IREE_BUILD_SETUP_PYTHON_VENV:-}" ]]; then
   # We've been instructed to set up a venv.
   echo "Setting up venv at $IREE_BUILD_SETUP_PYTHON_VENV"
   python3 -m venv "$IREE_BUILD_SETUP_PYTHON_VENV"
