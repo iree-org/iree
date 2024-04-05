@@ -1,4 +1,7 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-hoist-statically-bound-allocations))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-hoist-statically-bound-allocations{vscale-min=1 vscale-max=16}))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-hoist-statically-bound-allocations{vscale-max=0}))" %s | FileCheck %s --check-prefix=CHECK-UNBOUNDED-VSCALE
+
+// Note: Scalable allocations are not hoisted if vscale is unbounded.
 
 func.func @non_entry_bb_allocas() {
   cf.br ^bb1
@@ -11,6 +14,29 @@ func.func @non_entry_bb_allocas() {
 //  CHECK-NEXT:   cf.br ^bb1
 //  CHECK-NEXT:   ^bb1:
 //  CHECK-NEXT:   return
+
+// -----
+
+func.func @non_entry_bb_scalable_allocas() attributes { vscale_range = #llvm.vscale_range<minRange = 1, maxRange = 16>   } {
+  cf.br ^bb1
+ ^bb1() :
+  %vscale = vector.vscale
+  %c4 = arith.constant 4 : index
+  %c4_vscale = arith.muli %vscale, %c4 : index
+  %0 = memref.alloca(%c4_vscale) : memref<?xi32>
+  return
+}
+// CHECK: #[[$SCALABLE_BOUND_MAP_0:.*]] = affine_map<()[s0] -> (s0 * 4)>
+// CHECK-LABEL: func @non_entry_bb_scalable_allocas()
+//  CHECK-NEXT:   %[[VSCALE:.+]] = vector.vscale
+//  CHECK-NEXT:   %[[C4_VSCALE:.+]] = affine.apply #[[$SCALABLE_BOUND_MAP_0]]()[%[[VSCALE]]]
+//  CHECK-NEXT:   %[[ALLOCA:.+]] = memref.alloca(%[[C4_VSCALE]]) : memref<?xi32>
+//  CHECK-NEXT:   cf.br ^bb1
+//  CHECK-NEXT:   ^bb1:
+
+// CHECK-UNBOUNDED-VSCALE-LABEL: func @non_entry_bb_scalable_allocas()
+// CHECK-UNBOUNDED-VSCALE: ^bb1:
+// CHECK-UNBOUNDED-VSCALE:   memref.alloca
 
 // -----
 
@@ -58,6 +84,38 @@ func.func @nested_op_alloca_linalg_use(%arg0 : index) {
 //       CHECK:     %[[CAST:.+]] = memref.cast %[[SUBVIEW]]
 //       CHECK:     linalg.fill
 //  CHECK-SAME:         outs(%[[CAST]] :
+
+// -----
+
+#map = affine_map<(d0)[s0] -> (d0, s0 * 32)>
+func.func @nested_op_scalable_alloca_linalg_use(%arg0 : index) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c42 = arith.constant 42 : i32
+  %vscale = vector.vscale
+  scf.for %iv = %c0 to %arg0 step %c1 {
+    %0 = affine.min #map(%iv)[%vscale]
+    %1 = memref.alloca(%0) : memref<?xi32>
+    linalg.fill ins(%c42 : i32) outs(%1 : memref<?xi32>)
+    scf.yield
+  }
+  return
+}
+// CHECK: #[[$SCALABLE_BOUND_MAP_1:.*]] = affine_map<()[s0] -> (s0 * 32)>
+// CHECK-LABEL: func @nested_op_scalable_alloca_linalg_use(
+//  CHECK-NEXT:   %[[VSCALE:.+]] = vector.vscale
+//  CHECK-NEXT:   %[[C32_VSCALE:.+]] = affine.apply #[[$SCALABLE_BOUND_MAP_1]]()[%[[VSCALE]]]
+//  CHECK-NEXT:   %[[ALLOCA:.+]] = memref.alloca(%[[C32_VSCALE]]) : memref<?xi32>
+//       CHECK:   scf.for
+//       CHECK:     %[[SIZE:.+]] = affine.min
+//       CHECK:     %[[SUBVIEW:.+]] = memref.subview %[[ALLOCA]][0] [%[[SIZE]]] [1]
+//       CHECK:     %[[CAST:.+]] = memref.cast %[[SUBVIEW]]
+//       CHECK:     linalg.fill
+//  CHECK-SAME:         outs(%[[CAST]] :
+
+// CHECK-UNBOUNDED-VSCALE-LABEL: func @nested_op_scalable_alloca_linalg_use(
+//       CHECK-UNBOUNDED-VSCALE: scf.for
+//       CHECK-UNBOUNDED-VSCALE:   memref.alloca
 
 // -----
 
@@ -157,3 +215,39 @@ func.func @nested_op_alloc_linalg_use(%arg0 : index) {
 //       CHECK:     linalg.fill
 //  CHECK-SAME:         outs(%[[CAST]] :
 //       CHECK:   memref.dealloc %[[ALLOC:.+]] : memref<16xi32>
+
+// -----
+
+#map = affine_map<(d0)[s0] -> (d0, s0 * 32)>
+func.func @nested_op_scalable_alloc_linalg_use(%arg0 : index) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c42 = arith.constant 42 : i32
+  %vscale = vector.vscale
+  scf.for %iv = %c0 to %arg0 step %c1 {
+    %0 = affine.min #map(%iv)[%vscale]
+    %1 = memref.alloc(%0) : memref<?xi32>
+    linalg.fill ins(%c42 : i32) outs(%1 : memref<?xi32>)
+    memref.dealloc %1 : memref<?xi32>
+    scf.yield
+  }
+  return
+}
+// CHECK: #[[$SCALABLE_BOUND_MAP_2:.*]] = affine_map<()[s0] -> (s0 * 32)>
+// CHECK-LABEL: func @nested_op_scalable_alloc_linalg_use(
+//  CHECK-NEXT:   %[[VSCALE:.+]] = vector.vscale
+//  CHECK-NEXT:   %[[C32_VSCALE:.+]] = affine.apply #[[$SCALABLE_BOUND_MAP_2]]()[%[[VSCALE]]]
+//  CHECK-NEXT:   %[[ALLOC:.+]] = memref.alloc(%[[C32_VSCALE]]) : memref<?xi32>
+//       CHECK:   scf.for
+//  CHECK-SAME:           {
+//       CHECK:     %[[SIZE:.+]] = affine.min
+//       CHECK:     %[[SUBVIEW:.+]] = memref.subview %[[ALLOC]][0] [%[[SIZE]]] [1]
+//       CHECK:     %[[CAST:.+]] = memref.cast %[[SUBVIEW]]
+//       CHECK:     linalg.fill
+//  CHECK-SAME:         outs(%[[CAST]] :
+//       CHECK:   }
+//       CHECK:   memref.dealloc %[[ALLOC:.+]] : memref<?xi32>
+
+// CHECK-UNBOUNDED-VSCALE-LABEL: func @nested_op_scalable_alloc_linalg_use(
+//       CHECK-UNBOUNDED-VSCALE: scf.for
+//       CHECK-UNBOUNDED-VSCALE:   memref.alloc

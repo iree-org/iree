@@ -139,6 +139,19 @@ def LLVMCPUTileAndFuse :
   ];
 }
 
+// Note: This pass is currently only required when targeting Arm SME (which is
+// the only target that currently has some concept of 2D scalability).
+def LLVMCPU2DScalableTo1DScalable :
+    InterfacePass<"iree-llvmcpu-2d-scalable-to-1d-scalable", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to replace unsupported scalable dimensions with loops.";
+  let constructor =
+      "mlir::iree_compiler::createLLVMCPU2DScalableTo1DScalablePass()";
+  let options = [
+    Option<"assumeArmSME", "assume-arm-sme", "bool", /*default=*/"false",
+      "Assume the current target is ArmSME (used for testing)">
+  ];
+}
+
 def LLVMCPUUnfuseFMAOps :
     InterfacePass<"iree-llvmcpu-unfuse-fma-pass", "mlir::FunctionOpInterface"> {
   let summary = "Convert llvm.fma into unfused mulf and addf ops";

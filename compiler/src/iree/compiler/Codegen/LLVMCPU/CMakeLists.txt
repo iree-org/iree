@@ -53,6 +53,7 @@ iree_cc_library(
     "DispatchABI.cpp"
     "ExpandF16OpToF32Pass.cpp"
     "KernelDispatch.cpp"
+    "LLVMCPU2DScalableTo1DScalable.cpp"
     "LLVMCPUAssignConstantOrdinals.cpp"
     "LLVMCPUAssignImportOrdinals.cpp"
     "LLVMCPUCheckIRBeforeLLVMConversion.cpp"

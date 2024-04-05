@@ -131,6 +131,24 @@ py::dict GetFunctionReflectionDict(iree_vm_function_t& f) {
 }  // namespace
 
 //------------------------------------------------------------------------------
+// VmBuffer
+//------------------------------------------------------------------------------
+
+int VmBuffer::HandleBufferProtocol(Py_buffer* view, int flags) {
+  view->buf = raw_ptr()->data.data;
+  view->len = raw_ptr()->data.data_length;
+  view->readonly = !(raw_ptr()->access & IREE_VM_BUFFER_ACCESS_MUTABLE);
+  view->itemsize = 1;
+  view->format = (char*)"B";  // Byte
+  view->ndim = 1;
+  view->shape = nullptr;
+  view->strides = nullptr;
+  view->suboffsets = nullptr;
+  view->internal = nullptr;
+  return 0;
+}
+
+//------------------------------------------------------------------------------
 // VmInstance
 //------------------------------------------------------------------------------
 
@@ -807,43 +825,7 @@ void SetupVmBindings(nanobind::module_ m) {
   VmRef::BindRefProtocol(vm_buffer, iree_vm_buffer_type,
                          iree_vm_buffer_retain_ref, iree_vm_buffer_deref,
                          iree_vm_buffer_isa);
-  // Implement the buffer protocol with low-level API.
-  {
-    static PyBufferProcs buffer_procs = {
-        // It is not legal to raise exceptions from these callbacks.
-        +[](PyObject* raw_self, Py_buffer* view, int flags) -> int {
-          // Cast must succeed due to invariants.
-          auto self = py::cast<VmBuffer*>(py::handle(raw_self));
-          if (view == NULL) {
-            PyErr_SetString(PyExc_ValueError, "NULL view in getbuffer");
-            return -1;
-          }
-
-          Py_INCREF(raw_self);
-          view->obj = raw_self;
-          view->buf = self->raw_ptr()->data.data;
-          view->len = self->raw_ptr()->data.data_length;
-          view->readonly =
-              !(self->raw_ptr()->access & IREE_VM_BUFFER_ACCESS_MUTABLE);
-          view->itemsize = 1;
-          view->format = (char*)"B";  // Byte
-          view->ndim = 1;
-          view->shape = nullptr;
-          view->strides = nullptr;
-          view->suboffsets = nullptr;
-          view->internal = nullptr;
-          return 0;
-        },
-        +[](PyObject* self_obj, Py_buffer* view) -> void {
-
-        },
-    };
-    auto heap_type = reinterpret_cast<PyHeapTypeObject*>(vm_buffer.ptr());
-    assert(heap_type->ht_type.tp_flags & Py_TPFLAGS_HEAPTYPE &&
-           "must be heap type");
-    heap_type->as_buffer = buffer_procs;
-  }
-
+  BindBufferProtocol<VmBuffer>(vm_buffer);
   vm_buffer
       .def(
           "__init__",

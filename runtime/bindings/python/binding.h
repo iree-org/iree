@@ -128,6 +128,39 @@ inline py::object create_empty_tuple() {
   return py::steal(py::handle(PyTuple_New(0)));
 }
 
+// For a bound class, binds the buffer protocol. This will result in a call
+// to on the CppType:
+//   HandleBufferProtocol(Py_buffer *view, int flags)
+// This is a low level callback and must not raise any exceptions. If
+// error conditions are warranted the usual PyErr_SetString approach must be
+// used (and -1 returned). Return 0 on success.
+template <typename CppType>
+void BindBufferProtocol(py::handle clazz) {
+  PyBufferProcs buffer_procs;
+  memset(&buffer_procs, 0, sizeof(buffer_procs));
+  buffer_procs.bf_getbuffer =
+      // It is not legal to raise exceptions from these callbacks.
+      +[](PyObject* raw_self, Py_buffer* view, int flags) -> int {
+    if (view == NULL) {
+      PyErr_SetString(PyExc_ValueError, "NULL view in getbuffer");
+      return -1;
+    }
+
+    // Cast must succeed due to invariants.
+    auto self = py::cast<CppType*>(py::handle(raw_self));
+
+    Py_INCREF(raw_self);
+    view->obj = raw_self;
+    return self->HandleBufferProtocol(view, flags);
+  };
+  buffer_procs.bf_releasebuffer =
+      +[](PyObject* raw_self, Py_buffer* view) -> void {};
+  auto heap_type = reinterpret_cast<PyHeapTypeObject*>(clazz.ptr());
+  assert(heap_type->ht_type.tp_flags & Py_TPFLAGS_HEAPTYPE &&
+         "must be heap type");
+  heap_type->as_buffer = buffer_procs;
+}
+
 }  // namespace python
 }  // namespace iree
 

@@ -52,44 +52,114 @@ TilingConfig::TilingConfig(IREE::Codegen::LoweringConfigAttr lc)
   }
 };
 
+/// Returns the tiling level that contains the vector dim at `dimPos` (which is
+/// an index into the result of `getVectorTileSizes()`).
+std::optional<unsigned>
+TilingConfig::getTilingLevelForVectorDimPosition(unsigned dimPos) {
+  constexpr std::array vectorTilingLevels{VectorCommonParallelTiles,
+                                          VectorReductionTiles,
+                                          VectorInnerParallelTiles};
+  ArrayRef<TilingLevel> possibleLevels = vectorTilingLevels;
+  if (!hasVectorInnerParallelLevel())
+    possibleLevels = possibleLevels.drop_back();
+  std::optional<unsigned> foundLevel;
+  auto tilingLevels = loweringConfig.getTilingLevels();
+  for (TilingLevel level : possibleLevels) {
+    auto tilingLevelIndex = getActualLevel(level);
+    if (tilingLevels[tilingLevelIndex].getSizes()[dimPos] != 0) {
+      assert(!foundLevel.has_value() &&
+             "expected at most one tile size to be non-zero");
+      foundLevel = tilingLevelIndex;
+    }
+  }
+  return foundLevel;
+}
+
+/// Returns the tile size (size + scalability pair) at `index`. The
+/// `scalableFlags` can be empty.
+static std::pair<int64_t, bool> getTileSizeAtIndex(ArrayRef<int64_t> sizes,
+                                                   ArrayRef<bool> scalableFlags,
+                                                   unsigned index) {
+  return std::make_pair(sizes[index],
+                        index < scalableFlags.size() && scalableFlags[index]);
+}
+
 /// Returns the tile sizes of all the vector dimensions, including parallel
 /// and reduction dimensions.
 SizesAndScalableFlags TilingConfig::getVectorTileSizes() {
+  if (getNumTilingLevels() == 2) {
+    return getVectorCommonParallelSizes();
+  }
+
   unsigned numDims = getNumDimensions();
   SmallVector<int64_t> vectorSizes(numDims, 0);
   SmallVector<bool> scalableFlags(numDims, false);
-  auto [parallelCommonSizes, parallelCommonScalableFlags] =
-      getVectorCommonParallelSizes();
-  auto [reductionSizes, reductionScalableFlags] = getVectorReductionSizes();
-  SizesAndScalableFlags parallelInnerTiles;
-  if (hasVectorInnerParallelLevel()) {
-    parallelInnerTiles = getVectorInnerParallelSizes();
+  auto tilingLevels = loweringConfig.getTilingLevels();
+  for (int dimPos = 0; dimPos < numDims; ++dimPos) {
+    auto dimTilingLevel = getTilingLevelForVectorDimPosition(dimPos);
+    if (!dimTilingLevel.has_value())
+      continue; // The size for this dim is zero in all vector tiling levels.
+    std::tie(vectorSizes[dimPos], scalableFlags[dimPos]) = getTileSizeAtIndex(
+        tilingLevels[*dimTilingLevel].getSizes(),
+        tilingLevels[*dimTilingLevel].getScalableFlags(), dimPos);
   }
-
-  for (int i = 0; i < numDims; ++i) {
-    SmallVector<bool> dimSizes;
-    dimSizes.push_back(!!parallelCommonSizes[i] ||
-                       parallelCommonScalableFlags[i]);
-    dimSizes.push_back(!!reductionSizes[i] || reductionScalableFlags[i]);
-    if (hasVectorInnerParallelLevel())
-      dimSizes.push_back(!!parallelInnerTiles.first[i] ||
-                         parallelInnerTiles.second[i]);
-
-    unsigned nonZeroCnt = llvm::count(dimSizes, true);
-    assert(nonZeroCnt <= 1 && "expected one tile size at most to be non-zero");
-    (void)nonZeroCnt;
-
-    vectorSizes[i] = parallelCommonSizes[i] ^ reductionSizes[i];
-    if (hasVectorInnerParallelLevel())
-      vectorSizes[i] ^= parallelInnerTiles.first[i];
-
-    scalableFlags[i] =
-        parallelCommonScalableFlags[i] || reductionScalableFlags[i];
-    if (hasVectorInnerParallelLevel())
-      scalableFlags[i] |= parallelInnerTiles.second[i];
-  }
-
   return std::make_pair(vectorSizes, scalableFlags);
+}
+
+/// Returns a new `LoweringConfigAttr`, with the tile sizes of vector
+/// dimensions, set to `sizes`, and the corresponding scalability set to
+/// `scalableFlags`.
+IREE::Codegen::LoweringConfigAttr
+TilingConfig::getLoweringConfigWithNewVectorSizes(
+    ArrayRef<int64_t> sizes, ArrayRef<bool> scalableFlags) {
+  unsigned numDims = getNumDimensions();
+  assert(sizes.size() == numDims &&
+         "expected `sizes` to match number of dimensions");
+  assert((scalableFlags.empty() || scalableFlags.size() == numDims) &&
+         "expected `scalableFlags` to match "
+         "number of dimensions (or be empty)");
+
+  // Make a map from tiling levels to vector dims at that level.
+  std::array<SmallVector<unsigned, 4>, MaxNumTileLevels> tilingLevelToDimsMap;
+  for (unsigned dimPos = 0; dimPos < numDims; ++dimPos) {
+    auto tilingLevelIndex = getTilingLevelForVectorDimPosition(dimPos);
+    assert((tilingLevelIndex.has_value() || sizes[dimPos] == 0) &&
+           "attempting to set vector size for dim with underspecified tiling "
+           "level (zero is the only valid tile size)");
+    if (tilingLevelIndex.has_value())
+      tilingLevelToDimsMap[*tilingLevelIndex].push_back(dimPos);
+  }
+
+  MLIRContext *context = loweringConfig.getContext();
+  auto tilingLevels = loweringConfig.getTilingLevels();
+  SmallVector<IREE::Codegen::LoweringConfigTilingLevelAttr> newTilingLevelsList(
+      tilingLevels.begin(), tilingLevels.end());
+
+  // For each vector tiling level:
+  for (auto [tilingLevelIndex, tilingLevelDims] :
+       llvm::enumerate(tilingLevelToDimsMap)) {
+    if (tilingLevelDims.empty())
+      continue;
+    auto level = tilingLevels[tilingLevelIndex];
+    SmallVector<int64_t> newSizes(level.getSizes());
+    SmallVector<bool> newScalableFlags(level.getScalableFlags());
+    newScalableFlags.resize(numDims);
+    // 1. Update all the vector sizes within that tiling level.
+    for (unsigned dimPos : tilingLevelDims) {
+      std::tie(newSizes[dimPos], newScalableFlags[dimPos]) =
+          getTileSizeAtIndex(sizes, scalableFlags, dimPos);
+    }
+    // 2. Then create a new tiling level attribute for that level.
+    auto newLevel = IREE::Codegen::LoweringConfigTilingLevelAttr::get(
+        context, newSizes, level.getInterchange(), newScalableFlags);
+    newTilingLevelsList[tilingLevelIndex] = newLevel;
+  }
+
+  // Create a new `lowering_config` attribute.
+  auto newTilingLevels = IREE::Codegen::LoweringConfigTilingLevelsAttr::get(
+      context, newTilingLevelsList);
+  return IREE::Codegen::LoweringConfigAttr::get(
+      context, newTilingLevels, loweringConfig.getNativeVectorSize());
 }
 
 /// Returns a list with the tiling levels that can be fused for this
