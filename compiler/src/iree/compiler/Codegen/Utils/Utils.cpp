@@ -722,7 +722,7 @@ linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
     auto numParallelDims = parallelLoopRanges.size();
 
     SmallVector<linalg::ProcInfo, 3> procInfo(numParallelDims);
-    Value splitDim;
+    std::optional<OpFoldResult> splitDim;
     for (size_t dim = 0; dim < numParallelDims; ++dim) {
       if (numParallelDims > maxWorkgroupParallelDims &&
           dim >= maxWorkgroupParallelDims - 1) {
@@ -730,26 +730,27 @@ linalg::LinalgLoopDistributionOptions getIREELinalgLoopDistributionOptions(
           splitDim = buildHALWorkgroupInfoOp<IREE::HAL::InterfaceWorkgroupIDOp>(
               builder, maxWorkgroupParallelDims - 1);
         }
-        Value size = getValueOrCreateConstantIndexOp(
-            builder, loc, parallelLoopRanges[numParallelDims - dim - 1].size);
-        Value offset = getValueOrCreateConstantIndexOp(
-            builder, loc, parallelLoopRanges[numParallelDims - dim - 1].offset);
+        OpFoldResult size = parallelLoopRanges[numParallelDims - dim - 1].size;
+        OpFoldResult offset =
+            parallelLoopRanges[numParallelDims - dim - 1].offset;
         AffineExpr d0, d1;
         int64_t tileSize = nonZeroTileSizes[numParallelDims - dim - 1];
         bindSymbols(builder.getContext(), d0, d1);
-        Value numTiles = affine::makeComposedAffineApply(
+        OpFoldResult numTiles = affine::makeComposedFoldedAffineApply(
             builder, loc, (d0 - d1).ceilDiv(tileSize), {size, offset});
-        Value dimValue;
+        OpFoldResult dimValue;
         if (dim == numParallelDims - 1)
-          dimValue = splitDim;
+          dimValue = splitDim.value();
         else {
-          dimValue = affine::makeComposedAffineApply(builder, loc, (d0 % d1),
-                                                     {splitDim, numTiles});
-          splitDim = affine::makeComposedAffineApply(
-              builder, loc, (d0).floorDiv(d1), {splitDim, numTiles});
+          dimValue = affine::makeComposedFoldedAffineApply(
+              builder, loc, (d0 % d1), {splitDim.value(), numTiles});
+          splitDim = affine::makeComposedFoldedAffineApply(
+              builder, loc, (d0).floorDiv(d1), {splitDim.value(), numTiles});
         }
-        procInfo[numParallelDims - dim - 1] = {dimValue, numTiles,
-                                               distributionMethod};
+        procInfo[numParallelDims - dim - 1] = {
+            getValueOrCreateConstantIndexOp(builder, loc, dimValue),
+            getValueOrCreateConstantIndexOp(builder, loc, numTiles),
+            distributionMethod};
         continue;
       }
       procInfo[numParallelDims - dim - 1] = {

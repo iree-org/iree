@@ -788,10 +788,9 @@ hal.executable private @static_3d_fft_stage3 {
 //      CHECK: func.func @static_3d_fft_stage3()
 //      CHECK:   scf.for %[[IV0:.+]] =
 //      CHECK:     scf.for %[[IV1:.+]] =
-//      CHECK:       scf.for %[[IV2:.+]] =
-//  CHECK-DAG:         %[[SUBVIEW1:.+]] = memref.subview %{{.+}}[%[[IV0]], %[[IV1]], %[[IV2]]]
+//  CHECK-DAG:         %[[SUBVIEW1:.+]] = memref.subview %{{.+}}[0, %[[IV0]], %[[IV1]]]
 //  CHECK-DAG:         %[[CAST1:.+]] = memref.cast %[[SUBVIEW1]]
-//  CHECK-DAG:         %[[SUBVIEW2:.+]] = memref.subview %{{.+}}[%[[IV0]], %[[IV1]], %[[IV2]]]
+//  CHECK-DAG:         %[[SUBVIEW2:.+]] = memref.subview %{{.+}}[0, %[[IV0]], %[[IV1]]]
 //  CHECK-DAG:         %[[CAST2:.+]] = memref.cast %[[SUBVIEW2]]
 //      CHECK:         iree_linalg_ext.fft
 // CHECK-SAME:             outs(%[[CAST1]], %[[CAST2]] :
@@ -1090,7 +1089,6 @@ hal.executable private @generic_static {
     }
   }
 }
-//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 16)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 32)>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable private @generic_static
@@ -1101,21 +1099,17 @@ hal.executable private @generic_static {
 //      CHECK:   hal.return %[[C3]], %[[C1]], %[[C1]] : index, index, index
 //      CHECK: func.func @generic_static()
 //      CHECK:   scf.for %[[IV0:.+]] =
-//      CHECK:     scf.for %[[IV1:.+]] =
-//      CHECK:       %[[RESULT:.+]] = linalg.generic
-//      CHECK:       flow.dispatch.tensor.store %[[RESULT]], %{{.+}}, offsets = [%[[IV0]], %[[IV1]]]
+//      CHECK:     %[[RESULT:.+]] = linalg.generic
+//      CHECK:     flow.dispatch.tensor.store %[[RESULT]], %{{.+}}, offsets = [0, %[[IV0]]]
 
-//  NO-LOOP-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 16)>
 //  NO-LOOP-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 32)>
 //      NO-LOOP: func.func @generic_static()
 //  NO-LOOP-DAG:   %[[IDX:.+]] = hal.interface.workgroup.id[0] : index
-//  NO-LOOP-DAG:   %[[IDY:.+]] = hal.interface.workgroup.id[1] : index
 //  NO-LOOP-DAG:   %[[OFFX:.+]] = affine.apply #[[MAP1]]()[%[[IDX]]]
-//  NO-LOOP-DAG:   %[[OFFY:.+]] = affine.apply #[[MAP0]]()[%[[IDY]]]
 //  NO-LOOP-NOT:   scf.for
 //      NO-LOOP:   %[[RESULT:.+]] = linalg.generic
 //      NO-LOOP:   -> tensor<16x32xf32>
-//      NO-LOOP:   flow.dispatch.tensor.store %[[RESULT]], %{{.+}}, offsets = [%[[OFFY]], %[[OFFX]]]
+//      NO-LOOP:   flow.dispatch.tensor.store %[[RESULT]], %{{.+}}, offsets = [0, %[[OFFX]]]
 
 // -----
 
@@ -1220,7 +1214,6 @@ hal.executable private @restrict_num_workgroups {
     }
   }
 }
-//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 * 7)>
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 64)>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDefault>
 //      CHECK: hal.executable private @restrict_num_workgroups
@@ -1229,7 +1222,7 @@ hal.executable private @restrict_num_workgroups {
 //  CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //  CHECK-DAG:   %[[C7:.+]] = arith.constant 7 : index
 //  CHECK-DAG:   %[[C9:.+]] = arith.constant 9 : index
-//      CHECK:   hal.return %[[C9]], %[[C1]], %[[C7]] : index, index, index
+//      CHECK:   hal.return %[[C9]], %[[C7]], %[[C1]] : index, index, index
 
 // -----
 
@@ -1354,7 +1347,7 @@ hal.executable private @gemm_unit_N {
     }
   }
 }
-//  CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0] -> (s0 ceildiv 64)>
+//  CHECK-DAG: #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * 64)>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //      CHECK: hal.executable private @gemm_unit_N
 //      CHECK: hal.executable.export public @gemm_unit_N
@@ -2276,10 +2269,9 @@ hal.executable private @dynamic_unpack_fusion {
 }
 // CHECK-LABEL: func.func @dynamic_unpack_fusion
 // CHECK:         scf.for
-// CHECK:           scf.for
-// CHECK:             tensor.unpack
-// CHECK:             tensor.extract_slice
-// CHECK:             linalg.generic
+// CHECK:           tensor.unpack
+// CHECK:           tensor.extract_slice
+// CHECK:           linalg.generic
 
 // -----
 
@@ -2537,3 +2529,74 @@ module {
 // CHECK:         %[[RHS:.+]] = flow.dispatch.tensor.load %[[RHS_BINDING]], offsets = [0, %workgroup_id_x]
 // CHECK:         %[[MATMUL:.+]] = linalg.matmul {{.*}} ins(%[[LHS]], %[[RHS]]
 // CHECK-DAG:     flow.dispatch.tensor.store %[[MATMUL]], %[[OUT_BINDING]]
+
+// -----
+
+// Check that the distribution avoids distributing unit-trip count loops.
+
+hal.executable private @avoid_unit_range_distribute {
+  hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb", {mma_intrinsics = [#iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>], target_arch = "gfx1100", ukernels = "none"}>) {
+    hal.executable.export public @avoid_unit_range_distribute ordinal(0) layout(#hal.pipeline.layout<push_constants = 6, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) attributes {hal.interface.bindings = [#hal.interface.binding<0, 0>, #hal.interface.binding<0, 1>], subgroup_size = 32 : index, translation_info = #iree_codegen.translation_info<LLVMGPUVectorDistribute>, workgroup_size = [32 : index, 1 : index, 1 : index]} {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice %arg1, %arg2
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @avoid_unit_range_distribute() {
+        %c0 = arith.constant 0 : index
+        %c32_i64 = arith.constant 32 : i64
+        %cst = arith.constant 0.000000e+00 : f16
+        %0 = hal.interface.constant.load[0] : i32
+        %1 = hal.interface.constant.load[1] : i32
+        %2 = hal.interface.constant.load[2] : i32
+        %3 = hal.interface.constant.load[3] : i32
+        %4 = hal.interface.constant.load[4] : i32
+        %5 = hal.interface.constant.load[5] : i32
+        %6 = arith.extui %0 : i32 to i64
+        %7 = arith.extui %1 : i32 to i64
+        %8 = arith.shli %7, %c32_i64 : i64
+        %9 = arith.ori %6, %8 : i64
+        %10 = arith.index_castui %9 : i64 to index
+        %11 = arith.extui %2 : i32 to i64
+        %12 = arith.extui %3 : i32 to i64
+        %13 = arith.shli %12, %c32_i64 : i64
+        %14 = arith.ori %11, %13 : i64
+        %15 = arith.index_castui %14 : i64 to index
+        %16 = arith.extui %4 : i32 to i64
+        %17 = arith.extui %5 : i32 to i64
+        %18 = arith.shli %17, %c32_i64 : i64
+        %19 = arith.ori %16, %18 : i64
+        %20 = arith.index_castui %19 : i64 to index
+        %21 = flow.dispatch.workload.ordinal %15, 0 : index
+        %22 = flow.dispatch.workload.ordinal %20, 1 : index
+        %23 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<32x?x?x16x16xf16>>{%21, %22}
+        %24 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%10) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<32x?x8x16x16xf16>>{%22}
+        %25 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<32x?x16x8x16xf16>>{%22}
+        %26 = flow.dispatch.tensor.load %23, offsets = [0, 0, 0, 0, 0], sizes = [32, %21, %22, 16, 16], strides = [1, 1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<32x?x?x16x16xf16>>{%21, %22} -> tensor<32x?x?x16x16xf16>
+        %27 = flow.dispatch.tensor.load %24, offsets = [0, 0, 0, 0, 0], sizes = [32, %22, 8, 16, 16], strides = [1, 1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<32x?x8x16x16xf16>>{%22} -> tensor<32x?x8x16x16xf16>
+        %28 = tensor.empty(%22) : tensor<32x?x16x8x16xf16>
+        %29 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 1, 16, 1, 16, 1, 16]]>} ins(%cst : f16) outs(%28 : tensor<32x?x16x8x16xf16>) -> tensor<32x?x16x8x16xf16>
+        %30 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d5, d2, d6)>, affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d5, d3, d6, d4)>, affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3, d4)>], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "reduction", "reduction"]} ins(%26, %27 : tensor<32x?x?x16x16xf16>, tensor<32x?x8x16x16xf16>) outs(%29 : tensor<32x?x16x8x16xf16>) attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 1, 16, 1, 16, 1, 16]]>} {
+        ^bb0(%in: f16, %in_0: f16, %out: f16):
+          %31 = arith.mulf %in, %in_0 : f16
+          %32 = arith.addf %out, %31 : f16
+          linalg.yield %32 : f16
+        } -> tensor<32x?x16x8x16xf16>
+        flow.dispatch.tensor.store %30, %25, offsets = [0, 0, 0, 0, 0], sizes = [32, %22, 16, 8, 16], strides = [1, 1, 1, 1, 1] : tensor<32x?x16x8x16xf16> -> !flow.dispatch.tensor<writeonly:tensor<32x?x16x8x16xf16>>{%22}
+        return
+      }
+    }
+  }
+}
+// CHECK-LABEL: func.func @avoid_unit_range_distribute()
+//   CHECK-DAG:   %[[WGID_X:.+]] = hal.interface.workgroup.id[0]
+//   CHECK-DAG:   %[[WGCOUNT_X:.+]] = hal.interface.workgroup.count[0]
+//   CHECK-DAG:   %[[WGID_Y:.+]] = hal.interface.workgroup.id[1]
+//   CHECK-DAG:   %[[WGCOUNT_Y:.+]] = hal.interface.workgroup.count[1]
+//   CHECK-DAG:   %[[WGID_Z:.+]] = hal.interface.workgroup.id[2]
+//   CHECK-DAG:   %[[WGCOUNT_Z:.+]] = hal.interface.workgroup.count[2]
+//       CHECK:   scf.for %{{.+}} = %[[WGID_Z]] to %{{.+}} step %[[WGCOUNT_Z]]
+//       CHECK:     scf.for %{{.+}} = %[[WGID_Y]] to %{{.+}} step %[[WGCOUNT_Y]]
+//       CHECK:       scf.for %{{.+}} = %[[WGID_X]] to %{{.+}} step %[[WGCOUNT_X]]
+//       CHECK:         tensor.empty() : tensor<1x1x16x1x16xf16>
+
