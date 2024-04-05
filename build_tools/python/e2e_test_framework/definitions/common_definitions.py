@@ -208,6 +208,9 @@ class Model(object):
     # Parameters for iree-run-module to control the tolerance.
     # For example: --expected_f32_threshold=0.0001
     verify_params: List[str] = dataclasses.field(default_factory=list)
+    # Model parameter files (/docs/website/docs/guides/parameters.md).
+    # Format: `scope=parameter file url` (scoped) or `=parameter file url` (unscoped)
+    external_param_urls: List[str] = dataclasses.field(default_factory=list)
 
     def __str__(self):
         return self.name

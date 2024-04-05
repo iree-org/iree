@@ -9,10 +9,7 @@ See https://iree.dev/developers/performance/benchmark-suites/ for how to build
 the benchmark suite.
 """
 
-import pathlib
 import re
-import urllib.parse
-import urllib.request
 
 import dataclasses
 from dataclasses import dataclass
@@ -51,6 +48,7 @@ class BenchmarkCase:
     input_uri: Optional[str] = None
     expected_output_uri: Optional[str] = None
     verify_params: List[str] = dataclasses.field(default_factory=list)
+    external_param_urls: List[str] = dataclasses.field(default_factory=list)
 
 
 # A map from execution config to driver info. This is temporary during migration
@@ -217,6 +215,7 @@ class BenchmarkSuite(object):
                 input_uri=model.input_url,
                 expected_output_uri=model.expected_output_url,
                 verify_params=model.verify_params,
+                external_param_urls=model.external_param_urls,
                 run_config=run_config,
             )
             benchmark_cases.append(benchmark_case)
