@@ -19,6 +19,10 @@ def _float_constant(val: float) -> array.array:
     return array.array("f", [val])
 
 
+def index_entry_as_array(entry, like_array):
+    return np.asarray(entry.file_view).view(like_array.dtype).reshape(like_array.shape)
+
+
 class ParameterApiTest(unittest.TestCase):
     def testCreateArchiveFile(self):
         splat_index = rt.ParameterIndex()
@@ -109,6 +113,40 @@ class ParameterApiTest(unittest.TestCase):
             splat_index.add_splat(
                 "weight", array.array("f", [1.0, 2.0, 3.0, 4.0, 5.0]), 30 * 20 * 4
             )
+
+    def testGguf(self):
+        index = rt.ParameterIndex()
+        index.load(
+            str(
+                Path(__file__).resolve().parent
+                / "testdata"
+                / "parameter_weight_bias_1.gguf"
+            )
+        )
+        expected_weight = np.zeros([30, 20], dtype=np.float32) + 2.0
+        expected_bias = np.zeros([30], dtype=np.float32) + 1.0
+        entries = dict(index.items())
+        weight = index_entry_as_array(entries["weight"], expected_weight)
+        bias = index_entry_as_array(entries["bias"], expected_bias)
+        np.testing.assert_array_equal(weight, expected_weight)
+        np.testing.assert_array_equal(bias, expected_bias)
+
+    def testSafetensors(self):
+        index = rt.ParameterIndex()
+        index.load(
+            str(
+                Path(__file__).resolve().parent
+                / "testdata"
+                / "parameter_weight_bias_1.safetensors"
+            )
+        )
+        expected_weight = np.zeros([30, 20], dtype=np.float32) + 2.0
+        expected_bias = np.zeros([30], dtype=np.float32) + 1.0
+        entries = dict(index.items())
+        weight = index_entry_as_array(entries["weight"], expected_weight)
+        bias = index_entry_as_array(entries["bias"], expected_bias)
+        np.testing.assert_array_equal(weight, expected_weight)
+        np.testing.assert_array_equal(bias, expected_bias)
 
 
 if __name__ == "__main__":
