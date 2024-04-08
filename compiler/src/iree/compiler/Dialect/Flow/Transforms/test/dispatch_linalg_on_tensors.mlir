@@ -1259,7 +1259,10 @@ util.func public @dont_fuse_reshape(%lhs : tensor<?xf32>, %rhs1 : tensor<4x?xf32
   %cst = arith.constant 0.0 : f32
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
-  %0 = tensor.expand_shape %lhs [[0, 1]] : tensor<?xf32> into tensor<?x4xf32>
+  %dim = tensor.dim %lhs, %c0 : tensor<?xf32>
+  %c4 = arith.constant 4 : index
+  %dyn = arith.divui %dim, %c4 : index
+  %0 = tensor.expand_shape %lhs [[0, 1]] output_shape [%dyn, 4] : tensor<?xf32> into tensor<?x4xf32>
   %m = tensor.dim %0, %c0 : tensor<?x4xf32>
   %n1 = tensor.dim %rhs1, %c1 : tensor<4x?xf32>
   %init1 = tensor.empty(%m, %n1) : tensor<?x?xf32>

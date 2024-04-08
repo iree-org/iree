@@ -227,18 +227,26 @@ util.func public @propagate_to_bmm_transpose_batch(%transposed_lhs: tensor<16x2x
 
 // -----
 
-util.func public @sink_through_expand_shape(%arg0 : tensor<?x?x?xf32>) -> tensor<32x?x16x?x?xf32> {
-  %c0 = arith.constant 0 : index
-  %c1 = arith.constant 1 : index
+util.func public @sink_through_expand_shape(%arg0: tensor<?x?x?xf32>) -> tensor<32x?x16x?x?xf32> {
+  %c4 = arith.constant 4 : index
+  %c3 = arith.constant 3 : index
+  %c32 = arith.constant 32 : index
+  %c16 = arith.constant 16 : index
   %c2 = arith.constant 2 : index
-  %d0 = tensor.dim %arg0, %c0 : tensor<?x?x?xf32>
-  %d1 = tensor.dim %arg0, %c1 : tensor<?x?x?xf32>
-  %d2 = tensor.dim %arg0, %c2 : tensor<?x?x?xf32>
-  %empty = tensor.empty(%d0, %d1, %d2): tensor<?x?x?xf32>
-  %transposed = linalg.transpose ins(%arg0 : tensor<?x?x?xf32>)
-      outs(%empty : tensor<?x?x?xf32>) permutation = [1, 0, 2]
-  %expanded = tensor.expand_shape %transposed [[0, 1], [2, 3], [4]] : tensor<?x?x?xf32> into tensor<32x?x16x?x?xf32>
-  util.return %expanded : tensor<32x?x16x?x?xf32>
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+  %dim = tensor.dim %arg0, %c0 : tensor<?x?x?xf32>
+  %dim_0 = tensor.dim %arg0, %c1 : tensor<?x?x?xf32>
+  %dim_1 = tensor.dim %arg0, %c2 : tensor<?x?x?xf32>
+  %0 = arith.divui %dim, %c16 : index
+  %1 = arith.divui %dim_0, %c32 : index
+  %expanded = tensor.expand_shape %arg0 [[0, 1], [2, 3], [4]] output_shape [16, %0, 32, %1, %dim_1] : tensor<?x?x?xf32> into tensor<16x?x32x?x?xf32>
+  %dim_2 = tensor.dim %expanded, %c1 : tensor<16x?x32x?x?xf32>
+  %dim_3 = tensor.dim %expanded, %c3 : tensor<16x?x32x?x?xf32>
+  %dim_4 = tensor.dim %expanded, %c4 : tensor<16x?x32x?x?xf32>
+  %2 = tensor.empty(%dim_3, %dim_2, %dim_4) : tensor<32x?x16x?x?xf32>
+  %transposed = linalg.transpose ins(%expanded : tensor<16x?x32x?x?xf32>) outs(%2 : tensor<32x?x16x?x?xf32>) permutation = [2, 3, 0, 1, 4]
+  util.return %transposed : tensor<32x?x16x?x?xf32>
 }
 // SINK-LABEL: util.func public @sink_through_expand_shape
 //       SINK:   %[[EXP:.+]] = tensor.expand_shape {{.*}} {{\[\[}}0, 1], [2, 3], [4]]
@@ -254,7 +262,7 @@ util.func public @sink_non_involution_through_expand_shape(%arg0 : tensor<2x3x4x
   %empty = tensor.empty(): tensor<3x4x2xf32>
   %transposed = linalg.transpose ins(%arg0 : tensor<2x3x4xf32>)
       outs(%empty : tensor<3x4x2xf32>) permutation = [1, 2, 0]
-  %expanded = tensor.expand_shape %transposed [[0, 1], [2], [3]] : tensor<3x4x2xf32> into tensor<1x3x4x2xf32>
+  %expanded = tensor.expand_shape %transposed [[0, 1], [2], [3]] output_shape [1, 3, 4, 2] : tensor<3x4x2xf32> into tensor<1x3x4x2xf32>
   util.return %expanded : tensor<1x3x4x2xf32>
 }
 // SINK-LABEL: util.func public @sink_non_involution_through_expand_shape

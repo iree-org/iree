@@ -611,7 +611,7 @@ module {
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<12xi32>>
     %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:tensor<3x4xi32>>
     %2 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [12], strides = [1] : !flow.dispatch.tensor<readonly:tensor<12xi32>> -> tensor<12xi32>
-    %3 = tensor.expand_shape %2 [[0, 1]] : tensor<12xi32> into tensor<3x4xi32>
+    %3 = tensor.expand_shape %2 [[0, 1]] output_shape [3, 4] : tensor<12xi32> into tensor<3x4xi32>
     flow.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [3, 4], strides = [1, 1] : tensor<3x4xi32> -> !flow.dispatch.tensor<writeonly:tensor<3x4xi32>>
     return
   }
@@ -631,7 +631,7 @@ module {
     %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:tensor<3x4xi32>>
     %2 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [3, 4], strides = [1, 1] : !flow.dispatch.tensor<writeonly:tensor<3x4xi32>> -> tensor<3x4xi32>
     %3 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [12], strides = [1] : !flow.dispatch.tensor<readonly:tensor<12xi32>> -> tensor<12xi32>
-    %4 = tensor.expand_shape %3 [[0, 1]] : tensor<12xi32> into tensor<3x4xi32>
+    %4 = tensor.expand_shape %3 [[0, 1]] output_shape [3, 4] : tensor<12xi32> into tensor<3x4xi32>
     %5 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%4 : tensor<3x4xi32>) outs(%2 : tensor<3x4xi32>) {
     ^bb0(%arg0: i32, %arg1: i32):
       %6 = arith.addi %arg0, %arg0 : i32
@@ -659,7 +659,7 @@ module {
     %2 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [3, 4], strides = [1, 1] : !flow.dispatch.tensor<writeonly:tensor<3x4xi32>> -> tensor<3x4xi32>
     %3 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:tensor<3x4xi32>>
     %4 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [12], strides = [1] : !flow.dispatch.tensor<readonly:tensor<12xi32>> -> tensor<12xi32>
-    %5 = tensor.expand_shape %4 [[0, 1]] : tensor<12xi32> into tensor<3x4xi32>
+    %5 = tensor.expand_shape %4 [[0, 1]] output_shape [3, 4] : tensor<12xi32> into tensor<3x4xi32>
     %6 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%5 : tensor<3x4xi32>) outs(%2 : tensor<3x4xi32>) {
     ^bb0(%arg0: i32, %arg1: i32):
       %7 = arith.addi %arg0, %arg0 : i32
@@ -688,7 +688,7 @@ module {
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<3x4xi32>>
     %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:tensor<12xi32>>
     %2 = flow.dispatch.tensor.load %1, offsets = [0], sizes = [12], strides = [1] : !flow.dispatch.tensor<writeonly:tensor<12xi32>> -> tensor<12xi32>
-    %3 = tensor.expand_shape %2 [[0, 1]] : tensor<12xi32> into tensor<3x4xi32>
+    %3 = tensor.expand_shape %2 [[0, 1]] output_shape [3, 4] : tensor<12xi32> into tensor<3x4xi32>
     %4 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [3, 4], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<3x4xi32>> -> tensor<3x4xi32>
     %5 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%4 : tensor<3x4xi32>) outs(%3 : tensor<3x4xi32>) {
     ^bb0(%arg0: i32, %arg1: i32):
