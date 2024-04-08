@@ -25,14 +25,13 @@ graph LR
 
 ## :octicons-list-unordered-16: Supported frameworks
 
-See end-to-end examples of how to use each framework with IREE:
+See guides on how to use each framework with IREE:
 
-* [:simple-python: JAX](./jax.md)
 * [:simple-pytorch: PyTorch](./pytorch.md)
+* [:simple-onnx: ONNX](./onnx.md)
+* [:simple-python: JAX](./jax.md)
 * [:simple-tensorflow: TensorFlow](./tensorflow.md) and
   [:simple-tensorflow: TensorFlow Lite](./tflite.md)
-
-Importing from other frameworks is planned - stay tuned!
 
 ## :octicons-code-16: Samples
 
@@ -52,7 +51,8 @@ This export/import process is specific to each frontend and typically involves a
 number of stages:
 
 1. Capture/trace/freeze the ML model into a graph
-2. Write that graph to an interchange format (e.g. SavedModel, TorchScript)
+2. Write that graph to an interchange format (e.g. SavedModel, TorchScript,
+   ONNX)
 3. Load the saved program into an import tool and convert to MLIR
 4. Legalize the graph's operations so only IREE-compatible operations remain
 5. Write the imported MLIR to a file

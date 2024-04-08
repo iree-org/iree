@@ -29,7 +29,7 @@ IREE supports importing from a variety of ML frameworks:
 - [x] PyTorch
 - [x] TensorFlow
 - [x] TensorFlow Lite
-- [ ] ONNX (experimental)
+- [x] ONNX
 
 The IREE compiler tools run on :fontawesome-brands-linux: Linux,
 :fontawesome-brands-windows: Windows, and :fontawesome-brands-apple: macOS
