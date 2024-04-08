@@ -78,7 +78,9 @@ SSH, as well as sharing of saved traces across machines.
 The primary source of Tracy documentation, including how to build the profiler
 UI and CLI capture tool, is a PDF manual:
 
+<!-- markdownlint-disable-next-line -->
 [Download tracy.pdf :octicons-download-16:](https://github.com/wolfpld/tracy/releases/latest/download/tracy.pdf){ .md-button .md-button--primary }
+<!-- markdownlint-disable-next-line -->
 [View tracy.pdf in browser :material-magnify:](https://docs.google.com/viewer?url=https://github.com/wolfpld/tracy/releases/latest/download/tracy.pdf){ .md-button .md-button--primary }
 
 ## :octicons-telescope-16: Capturing a trace
