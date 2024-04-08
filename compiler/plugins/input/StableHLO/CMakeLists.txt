@@ -32,6 +32,7 @@ iree_cc_library(
     MLIRPass
     MLIRTransforms
     StablehloOps
+    StablehloPasses
     iree::compiler::PluginAPI
     iree::compiler::plugins::input::StableHLO::Conversion
   PUBLIC

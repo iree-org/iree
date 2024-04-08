@@ -11,6 +11,8 @@
 #include "mlir/Pass/PassManager.h"
 #include "stablehlo/dialect/ChloOps.h"
 #include "stablehlo/dialect/StablehloOps.h"
+#include "stablehlo/dialect/VhloOps.h"
+#include "stablehlo/transforms/Passes.h"
 
 namespace mlir::iree_compiler::stablehlo {
 
@@ -91,6 +93,7 @@ struct StableHLOSession
   void onRegisterDialects(DialectRegistry &registry) override {
     registry.insert<mlir::chlo::ChloDialect>();
     registry.insert<mlir::stablehlo::StablehloDialect>();
+    registry.insert<mlir::vhlo::VhloDialect>();
   }
 
   bool extendCustomInputConversionPassPipeline(
@@ -107,6 +110,10 @@ struct StableHLOSession
       buildStableHLOXLAInputConversionPassPipeline(passManager,
                                                    stableHloOptions);
       return true;
+    } else if (typeMnemonic == "vhlo") {
+      ::mlir::stablehlo::createStablehloDeserializePipeline(passManager);
+      buildStableHLOInputConversionPassPipeline(passManager, stableHloOptions);
+      return true;
     }
 
     return false;
@@ -115,6 +122,7 @@ struct StableHLOSession
   void populateCustomInputConversionTypes(StringSet<> &typeMnemonics) override {
     typeMnemonics.insert("stablehlo");
     typeMnemonics.insert("stablehlo_xla");
+    typeMnemonics.insert("vhlo");
   }
 
   void populateDetectedCustomInputConversionTypes(

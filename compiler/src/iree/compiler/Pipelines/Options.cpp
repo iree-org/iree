@@ -46,6 +46,7 @@ void InputDialectOptions::bindOptions(OptionsBinder &binder) {
 #ifdef IREE_COMPILER_PLUGIN_HAVE_STATIC_INPUT_STABLEHLO
           "  =stablehlo     - Legalize from StableHLO ops.\n"
           "  =stablehlo_xla - Legalize from StableHLO ops (with XLA cleanup preprocessing).\n"
+          "  =vhlo          - Legalize from VHLO ops (VHLO is translated to StableHLO).\n"
 #endif // IREE_COMPILER_PLUGIN_HAVE_STATIC_INPUT_STABLEHLO
 #ifdef IREE_COMPILER_PLUGIN_HAVE_STATIC_INPUT_TOSA
           "  =tosa          - Legalize from TOSA ops.\n"
