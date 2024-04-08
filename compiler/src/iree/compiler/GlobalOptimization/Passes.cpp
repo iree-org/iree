@@ -137,7 +137,7 @@ void buildGlobalOptimizationPassPipeline(
       .addPass(mlir::createCSEPass);
 
   // Enable data tiling after they are in a canonical form.
-  if (transformOptions.options.dataTiling) {
+  if (true || transformOptions.options.dataTiling) {
     mainPassManager.addPass(createSetEncodingPass());
     mainPassManager.addPass(createMaterializeHomogeneousEncodingsPass());
     mainPassManager.addPass(createCanonicalizerPass());

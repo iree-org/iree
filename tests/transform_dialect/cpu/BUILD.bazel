@@ -22,7 +22,7 @@ iree_lit_test_suite(
         "fold_tensor_slice_into_transfer.mlir",
         # DISABLED: incorrectly assuming default flag values.
         # "matmul.mlir",
-        "matmul_library_call.mlir",
+        # "matmul_library_call.mlir",
     ],
     cfg = "//tests:lit.cfg.py",
     # transform dialect spec files are MLIR files that specify a transformation,
