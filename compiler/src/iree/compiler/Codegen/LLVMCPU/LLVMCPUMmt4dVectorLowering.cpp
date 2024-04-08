@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
@@ -29,8 +30,11 @@ namespace mlir::iree_compiler {
 namespace {
 struct LLVMCPUMmt4dVectorLoweringPass
     : public LLVMCPUMmt4dVectorLoweringBase<LLVMCPUMmt4dVectorLoweringPass> {
+  LLVMCPUMmt4dVectorLoweringPass(bool enableVectorContractCustomKernels) {
+    this->enableVectorContractCustomKernels = enableVectorContractCustomKernels;
+  }
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<vector::VectorDialect>();
+    registry.insert<vector::VectorDialect, LLVM::LLVMDialect>();
   }
   void runOnOperation() override;
 };
@@ -89,7 +93,7 @@ void LLVMCPUMmt4dVectorLoweringPass::runOnOperation() {
     }
   }
 
-  {
+  if (enableVectorContractCustomKernels) {
     // Special-case vector.contract codegen paths. This needs to happen
     // just before the generic vector ops lowerings.
     RewritePatternSet patterns(context);
@@ -102,8 +106,9 @@ void LLVMCPUMmt4dVectorLoweringPass::runOnOperation() {
 }
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPUMmt4dVectorLoweringPass() {
-  return std::make_unique<LLVMCPUMmt4dVectorLoweringPass>();
+createLLVMCPUMmt4dVectorLoweringPass(bool enableVectorContractCustomKernels) {
+  return std::make_unique<LLVMCPUMmt4dVectorLoweringPass>(
+      enableVectorContractCustomKernels);
 }
 
 } // namespace mlir::iree_compiler

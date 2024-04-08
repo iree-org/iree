@@ -92,8 +92,10 @@ struct TensorPadToTensorInsertSlicePass
                     mlir::math::MathDialect, mlir::arith::ArithDialect>();
   }
 
-  LogicalResult initializeOptions(StringRef options) override {
-    if (failed(Pass::initializeOptions(options))) {
+  LogicalResult initializeOptions(
+      StringRef options,
+      function_ref<LogicalResult(const Twine &)> errorHandler) override {
+    if (failed(Pass::initializeOptions(options, errorHandler))) {
       return failure();
     }
     // `skipSingleLinalgOpUses` may have been set to `true` in the constructor

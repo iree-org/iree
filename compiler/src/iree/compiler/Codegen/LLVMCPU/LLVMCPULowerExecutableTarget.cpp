@@ -130,6 +130,9 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   ModuleOp moduleOp = variantOp.getInnerModule();
   LLVMCPUPipelineOptions pipelineOpts;
   auto target = variantOp.getTarget();
+  if (isX86(target)) {
+    pipelineOpts.useConfiguredVectorSizes = false;
+  }
   pipelineOpts.lowerToAVX2 = hasAVX2Feature(target);
   pipelineOpts.enableVectorMasking =
       isX86(target) || isRISCV(target) ||

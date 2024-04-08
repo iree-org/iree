@@ -49,7 +49,8 @@ createLLVMCPULowerExecutableTargetPass();
 std::unique_ptr<Pass> createExpandF16OpToF32Pass();
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPUMmt4dVectorLoweringPass();
+createLLVMCPUMmt4dVectorLoweringPass(
+    bool enableVectorContractCustomKernels = true);
 
 /// Pass to perform peeling on non-distributed loops.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
@@ -66,6 +67,9 @@ createLLVMCPUSynchronizeSymbolVisibilityPass();
 /// Pass to tile and fuse TilingInterface ops with given tilingLevel.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUTileAndFusePass(int64_t tilingLevel = -1);
+
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createLLVMCPU2DScalableTo1DScalablePass();
 
 /// Pass to tile TilingInterface ops with given tilingLevel.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
@@ -132,6 +136,7 @@ void populateVectorContractCustomKernelsPatterns(
 //----------------------------------------------------------------------------//
 
 struct LLVMCPUPipelineOptions {
+  bool useConfiguredVectorSizes = true;
   bool enablePeeling = false;
   bool enableVectorMasking = false;
   bool enableAArch64SSVE = false;

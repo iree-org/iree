@@ -27,6 +27,7 @@ EXPORTS
   ireeCompilerInvocationRunPassPipeline
   ireeCompilerInvocationSetCompileFromPhase
   ireeCompilerInvocationSetCompileToPhase
+  ireeCompilerInvocationSetDumpCompilationPhasesTo
   ireeCompilerInvocationSetCrashHandler
   ireeCompilerInvocationSetVerifyIR
   ireeCompilerOutputDestroy

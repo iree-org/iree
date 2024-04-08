@@ -36,12 +36,21 @@ enum class PipelinePhase {
   End,
 };
 
+// Hooks for injecting behavior into the HAL pipeline.
+struct PipelineHooks {
+  // Called immediately before a compilation phase.
+  std::function<void(PipelinePhase phase, OpPassManager &)> beforePhase;
+  // Called immediately after a compilation phase.
+  std::function<void(PipelinePhase phase, OpPassManager &)> afterPhase;
+};
+
 // Adds a set of passes to the given pass manager that run the head of the HAL
 // pipeline to assign devices, materialize interfaces, and translate
 // executables. The host portion of the program is annotated but not modified.
 void buildHALConfigurationPassPipeline(OpPassManager &passManager,
                                        const TargetRegistry &targetRegistry,
-                                       const TargetOptions &targetOptions);
+                                       const TargetOptions &targetOptions,
+                                       PipelineHooks hooks = {});
 
 // Adds a set of passes to the given pass manager that run the required HAL
 // transforms in the canonical order.
@@ -55,7 +64,7 @@ void buildHALConfigurationPassPipeline(OpPassManager &passManager,
 //   <run conversion from HAL to vm/etc>
 void buildHALTransformPassPipeline(
     OpPassManager &passManager, const TargetRegistry &targetRegistry,
-    const TargetOptions &targetOptions,
+    const TargetOptions &targetOptions, PipelineHooks hooks = {},
     PipelinePhase compileFrom = PipelinePhase::Start,
     PipelinePhase compileTo = PipelinePhase::End);
 

@@ -1669,7 +1669,7 @@ transform_dialect::SetContractionLayoutAttributes::apply(
     return emitDefiniteFailure()
            << "invalid more than one attribute for contraction annotation";
   }
-  auto mmaType = llvm::dyn_cast<IREE::GPU::MmaAttr>(typeList.front());
+  auto mmaType = llvm::dyn_cast<IREE::GPU::MmaInterfaceAttr>(typeList.front());
   if (!mmaType) {
     return emitDefiniteFailure()
            << "invalid non-mma attribute for contraction annotation "

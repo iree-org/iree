@@ -27,6 +27,7 @@ iree_cc_library(
     MLIRPass
     MLIRSCFDialect
     MLIRSupport
+    MLIRTransformUtils
     MLIRTransforms
     iree::compiler::Dialect::Util::IR
   PUBLIC

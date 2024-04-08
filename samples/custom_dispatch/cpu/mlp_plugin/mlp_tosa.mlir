@@ -5,7 +5,8 @@
 // RUN:     --module=- \
 // RUN:     --function=mlp_invocation \
 // RUN:     --input="2x4xf32=[[2.0, 2.0, 2.0, 2.0], [-2.0, -2.0, -2.0, -2.0]]" \
-// RUN:     --input="4x8xf32=[[3.0, -3.0, 3.0, -3.0], [3.0, -3.0, 3.0, -3.0], [3.0, -3.0, 3.0, -3.0], [3.0, -3.0, 3.0, -3.0], [3.0, -3.0, 3.0, -3.0], [3.0, -3.0, 3.0, -3.0], [3.0, -3.0, 3.0, -3.0], [3.0, -3.0, 3.0, -3.0]]"
+// RUN:     --input="4x8xf32=[[3.0, -3.0, 3.0, -3.0], [3.0, -3.0, 3.0, -3.0], [3.0, -3.0, 3.0, -3.0], [3.0, -3.0, 3.0, -3.0], [3.0, -3.0, 3.0, -3.0], [3.0, -3.0, 3.0, -3.0], [3.0, -3.0, 3.0, -3.0], [3.0, -3.0, 3.0, -3.0]]" | \
+// RUN: FileCheck %s
 
 // Rewrite function to rewrite a matched DAG into a flow.dispatch. Conceptually,
 // the matched DAG at the tensor level gets replaced by a function
@@ -44,15 +45,15 @@
 
 module @example attributes {hal.device.targets = [#cpu_target]} {
   func.func @mlp_invocation(%lhs: tensor<2x4xf32>, %rhs : tensor<4x8xf32>) -> tensor<2x8xf32> {
-    %lhs_3D = tosa.reshape %lhs {new_shape = array<i64 : 1, 2, 2>} : (tensor<2x4xf32>) -> tensor<1x2x4xf32>
-    %rhs_3D = tosa.reshape %rhs {new_shape = array<i64 : 1, 2, 2>} : (tensor<4x8xf32>) -> tensor<1x4x8xf32>
+    %lhs_3D = tosa.reshape %lhs {new_shape = array<i64 : 1, 2, 4>} : (tensor<2x4xf32>) -> tensor<1x2x4xf32>
+    %rhs_3D = tosa.reshape %rhs {new_shape = array<i64 : 1, 4, 8>} : (tensor<4x8xf32>) -> tensor<1x4x8xf32>
     %0 = tosa.matmul %lhs_3D, %rhs_3D : (tensor<1x2x4xf32>, tensor<1x4x8xf32>) -> tensor<1x2x8xf32>
     %1 = tosa.clamp %0 {
         min_int = 0 : i64, max_int = 9223372036854775807 : i64,
         min_fp = 0.0 : f32, max_fp = 3.4028235e+38 : f32}
         : (tensor<1x2x8xf32>) -> tensor<1x2x8xf32>
     %2 = tosa.negate %1 : (tensor<1x2x8xf32>) -> tensor<1x2x8xf32>
-    %3 = tosa.reshape %2 {new_shape = array<i64 : 2, 2>}  : (tensor<1x2x8xf32>) -> tensor<2x8xf32>
+    %3 = tosa.reshape %2 {new_shape = array<i64 : 2, 8>}  : (tensor<1x2x8xf32>) -> tensor<2x8xf32>
     return %3 : tensor<2x8xf32>
   }
 }

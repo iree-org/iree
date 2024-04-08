@@ -25,7 +25,8 @@ namespace {
 TEST(DynamicSymbolsTest, CreateFromSystemLoader) {
   iree_hal_hip_dynamic_symbols_t symbols;
   iree_status_t status = iree_hal_hip_dynamic_symbols_initialize(
-      iree_allocator_system(), &symbols);
+      iree_allocator_system(), /*hip_lib_search_path_count=*/0,
+      /*hip_lib_search_paths=*/NULL, &symbols);
   if (!iree_status_is_ok(status)) {
     iree_status_fprint(stderr, status);
     iree_status_ignore(status);
@@ -42,6 +43,22 @@ TEST(DynamicSymbolsTest, CreateFromSystemLoader) {
   }
 
   iree_hal_hip_dynamic_symbols_deinitialize(&symbols);
+}
+
+static const iree_string_view_t non_existing_search_paths[] = {
+    iree_make_cstring_view("/path/that/does/not/exist"),
+    iree_make_cstring_view("file:nowhere/libamdhip64.so"),
+    iree_make_cstring_view("filename_that_does_not_exist.dll"),
+};
+
+TEST(DynamicSymbolsTest, SearchPathsFail) {
+  iree_hal_hip_dynamic_symbols_t symbols;
+  iree_status_t status = iree_hal_hip_dynamic_symbols_initialize(
+      iree_allocator_system(),
+      /*hip_lib_search_path_count=*/IREE_ARRAYSIZE(non_existing_search_paths),
+      non_existing_search_paths, &symbols);
+
+  ASSERT_TRUE(iree_status_is_unavailable(status));
 }
 
 }  // namespace

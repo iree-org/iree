@@ -34,6 +34,7 @@ iree_cc_library(
     MLIRLinalgDialect
     MLIRPass
     MLIRTensorDialect
+    MLIRTransformUtils
     MLIRTransforms
     iree::compiler::Dialect::LinalgExt::IR
   PUBLIC
@@ -67,6 +68,7 @@ iree_cc_library(
     MLIRTosaToMLProgram
     MLIRTosaToSCF
     MLIRTosaToTensor
+    MLIRTransformUtils
     MLIRTransforms
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::InputConversion::Common

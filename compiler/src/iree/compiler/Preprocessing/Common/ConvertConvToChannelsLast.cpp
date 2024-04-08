@@ -652,8 +652,10 @@ public:
     registry.insert<linalg::LinalgDialect>();
     registry.insert<tensor::TensorDialect>();
   }
-  LogicalResult initializeOptions(StringRef options) override {
-    if (failed(Pass::initializeOptions(options))) {
+  LogicalResult initializeOptions(
+      StringRef options,
+      function_ref<LogicalResult(const Twine &)> errorHandler) override {
+    if (failed(Pass::initializeOptions(options, errorHandler))) {
       return failure();
     }
     tilingFactor = tileSize;

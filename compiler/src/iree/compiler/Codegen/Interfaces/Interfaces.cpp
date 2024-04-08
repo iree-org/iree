@@ -35,6 +35,7 @@
 #include "mlir/Dialect/Tensor/TransformOps/TensorTransformOps.h"
 #include "mlir/Dialect/Tensor/Transforms/SubsetInsertionOpInterfaceImpl.h"
 #include "mlir/Dialect/Transform/LoopExtension/LoopExtension.h"
+#include "mlir/Dialect/Vector/IR/ValueBoundsOpInterfaceImpl.h"
 #include "mlir/Dialect/Vector/TransformOps/VectorTransformOps.h"
 #include "mlir/Dialect/Vector/Transforms/SubsetOpInterfaceImpl.h"
 
@@ -72,6 +73,7 @@ void registerCodegenInterfaces(DialectRegistry &registry) {
   transform::registerLoopExtension(registry);
   vector::registerSubsetOpInterfaceExternalModels(registry);
   vector::registerTransformDialectExtension(registry);
+  vector::registerValueBoundsOpInterfaceExternalModels(registry);
 }
 
 } // namespace mlir::iree_compiler

@@ -81,6 +81,11 @@ def LLVMCPULowerExecutableTarget :
 def LLVMCPUMmt4dVectorLowering
     : InterfacePass<"iree-llvmcpu-mmt4d-vector-lowering", "mlir::FunctionOpInterface"> {
   let summary = "Apply vector lowering logic to vector ops";
+  let options = [
+    Option<"enableVectorContractCustomKernels", "vector-contract-custom-kernels", "bool",
+      /*default=*/"true",
+      "Flag to enable or disable vector contract custom kernels.">,
+  ];
   let constructor =
       "mlir::iree_compiler::createLLVMCPUMmt4dVectorLoweringPass()";
 }
@@ -136,6 +141,19 @@ def LLVMCPUTileAndFuse :
   let options = [
     Option<"tilingLevel", "tiling-level", "int64_t", /*default=*/"-1",
       "Use default tiling level used to retrieve the configuration from lowering_config">
+  ];
+}
+
+// Note: This pass is currently only required when targeting Arm SME (which is
+// the only target that currently has some concept of 2D scalability).
+def LLVMCPU2DScalableTo1DScalable :
+    InterfacePass<"iree-llvmcpu-2d-scalable-to-1d-scalable", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to replace unsupported scalable dimensions with loops.";
+  let constructor =
+      "mlir::iree_compiler::createLLVMCPU2DScalableTo1DScalablePass()";
+  let options = [
+    Option<"assumeArmSME", "assume-arm-sme", "bool", /*default=*/"false",
+      "Assume the current target is ArmSME (used for testing)">
   ];
 }
 

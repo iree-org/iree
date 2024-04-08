@@ -19,6 +19,7 @@ iree_cc_library(
     "Patterns.cpp"
   DEPS
     MLIRIR
+    MLIRTransformUtils
     MLIRTransforms
     iree::compiler::Dialect::HAL::IR
   PUBLIC

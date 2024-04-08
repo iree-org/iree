@@ -87,6 +87,12 @@ static llvm::cl::opt<bool> clUseSoftmaxInterFusion(
     llvm::cl::desc("Enables inter-pass fusion for the DecomposeSoftmax pass."),
     llvm::cl::init(true));
 
+static llvm::cl::opt<bool> clEnableVectorContractCustomKernels(
+    "iree-llvmcpu-enable-vector-contract-custom-kernels",
+    llvm::cl::desc("Enables vector contract custom kernels for "
+                   "LLVMCPUMmt4dVectorLowering pass."),
+    llvm::cl::init(true));
+
 static void addTileAndDistributePasses(OpPassManager &pm) {
   pm.addPass(createTileAndDistributeToWorkgroupsPass());
   auto &nestedModulePM = pm.nest<ModuleOp>();
@@ -326,6 +332,7 @@ void addCPUBufferOpsTileAndVectorizePipeline(
   nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUPeelPass());
   {
     GenericVectorizationPassOptions options;
+    options.useConfiguredVectorSizes = pipelineOpt.useConfiguredVectorSizes;
     options.enableVectorMasking = pipelineOpt.enableVectorMasking;
     options.vectorizeGatherAccesses = true;
     nestedModulePM.addNestedPass<func::FuncOp>(
@@ -397,6 +404,11 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
     nestedModulePM.addNestedPass<func::FuncOp>(createLLVMCPUPeelPass());
   }
 
+  if (pipelineOpt.enableAArch64SSVE) {
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createLLVMCPU2DScalableTo1DScalablePass());
+  }
+
   {
     nestedModulePM.addNestedPass<func::FuncOp>(createVectorizePadPass());
     nestedModulePM.addNestedPass<func::FuncOp>(
@@ -405,6 +417,7 @@ void addMultiTilingExpertPassPipeline(OpPassManager &passManager,
     nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
 
     GenericVectorizationPassOptions options;
+    options.useConfiguredVectorSizes = pipelineOpt.useConfiguredVectorSizes;
     options.enableVectorMasking = pipelineOpt.enableVectorMasking;
     options.vectorizePadding = true;
     options.vectorizeGatherAccesses = true;
@@ -469,6 +482,7 @@ void addConvTileAndDecomposeExpertPassPipeline(
   {
     nestedModulePM.addNestedPass<func::FuncOp>(createVectorizePadPass());
     GenericVectorizationPassOptions options;
+    options.useConfiguredVectorSizes = pipelineOpt.useConfiguredVectorSizes;
     options.enableVectorMasking = pipelineOpt.enableVectorMasking;
     options.vectorizePadding = true;
     options.vectorizeGatherAccesses = true;
@@ -551,9 +565,18 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
     }
   }
 
-  nestedModulePM.addNestedPass<func::FuncOp>(createGenericVectorizationPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createOptimizeTensorInsertExtractSlicesPass());
+  {
+    GenericVectorizationPassOptions options;
+    options.enableVectorMasking = pipelineOpt.enableVectorMasking;
+    options.vectorizePadding = true;
+    options.vectorizeGatherAccesses = true;
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createGenericVectorizationPass(options));
+    nestedModulePM.addNestedPass<func::FuncOp>(
+        createOptimizeTensorInsertExtractSlicesPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
+    nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
+  }
 
   nestedModulePM.addNestedPass<func::FuncOp>(createCanonicalizerPass());
   nestedModulePM.addNestedPass<func::FuncOp>(createCSEPass());
@@ -562,7 +585,8 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
 
   // Vector lowering of Mmt4d.
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMCPUMmt4dVectorLoweringPass());
+      createLLVMCPUMmt4dVectorLoweringPass(
+          clEnableVectorContractCustomKernels));
 
   // Generic vector lowering.
   LLVMCPUVectorLoweringPassOptions options;
@@ -583,6 +607,7 @@ void addCPUDataTilingPipeline(OpPassManager &passManager,
 
   {
     GenericVectorizationPassOptions options;
+    options.useConfiguredVectorSizes = pipelineOpt.useConfiguredVectorSizes;
     options.vectorizePadding = true;
     options.enableVectorMasking = pipelineOpt.enableVectorMasking;
     nestedModulePM.addNestedPass<func::FuncOp>(
@@ -616,6 +641,7 @@ void addCPULinalgExtTileAndVectorizePipeline(
 
   {
     GenericVectorizationPassOptions options;
+    options.useConfiguredVectorSizes = pipelineOpt.useConfiguredVectorSizes;
     options.enableVectorMasking = pipelineOpt.enableVectorMasking;
     nestedModulePM.addNestedPass<func::FuncOp>(
         createGenericVectorizationPass(options));

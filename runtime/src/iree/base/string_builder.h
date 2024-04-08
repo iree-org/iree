@@ -106,6 +106,33 @@ IREE_API_EXPORT IREE_MUST_USE_RESULT char* iree_string_builder_take_storage(
 IREE_API_EXPORT iree_status_t iree_string_builder_reserve(
     iree_string_builder_t* builder, iree_host_size_t minimum_capacity);
 
+// Reserves storage for at least |minimum_additional_capacity| beyond the
+// current size. Return a pointer in |out_buffer| that can have up to
+// |out_capacity| characters written to it. Generally, any contents added
+// in this way should be committed upon success via
+// |iree_string_builder_commit_append|.
+// Always reserves one extra char than requested for a NUL, to be added by
+// a subsequent call to |iree_string_builder_commit_append|.
+// This function is not recommended for general use (prefer
+// |iree_string_builder_append_inline|) but is provided to ease interop with OS
+// functions that return strings/capacities in loops until given a big enough
+// buffer.
+IREE_API_EXPORT iree_status_t iree_string_builder_reserve_for_append(
+    iree_string_builder_t* builder,
+    iree_host_size_t minimum_additional_capacity, char** out_buffer,
+    iree_host_size_t* out_capacity);
+
+// Resizes the string builder after direct modification of the backing buffer
+// has been performed (i.e. via |iree_string_builder_reserve_for_append| or
+// equivalent). It is illegal to resize the builder to a size greater than has
+// been reserved.
+// This function is not recommended for general use (prefer
+// |iree_string_builder_append_inline|) but is provided to ease interop with OS
+// functions that return strings/capacities in loops until given a big enough
+// buffer.
+IREE_API_EXPORT void iree_string_builder_commit_append(
+    iree_string_builder_t* builder, iree_host_size_t append_size);
+
 // Resets the string builder length to 0 without releasing storage.
 IREE_API_EXPORT void iree_string_builder_reset(iree_string_builder_t* builder);
 
@@ -130,6 +157,59 @@ IREE_API_EXPORT iree_status_t iree_string_builder_append_cstring(
 IREE_API_EXPORT IREE_PRINTF_ATTRIBUTE(2, 3) iree_status_t
     iree_string_builder_append_format(iree_string_builder_t* builder,
                                       const char* format, ...);
+
+// Lightweight builder for lists of iree_string_pair_t.
+// Includes a side pool for keeping dynamically allocated strings, since it is
+// common to need to create backed, temporary strings when constructing lists
+// of views.
+typedef struct iree_string_pair_builder_t {
+  // Allocator used for buffer storage.
+  iree_allocator_t allocator;
+
+  // Pairs being assembled.
+  iree_string_pair_t* pairs;
+  iree_host_size_t pairs_size;
+  iree_host_size_t pairs_capacity;
+
+  char** temp_strings;
+  iree_host_size_t temp_strings_size;
+  iree_host_size_t temp_strings_capacity;
+} iree_string_pair_builder_t;
+
+// Initializes a string pair builder in |out_builder| with the given
+// |allocator|.
+IREE_API_EXPORT void iree_string_pair_builder_initialize(
+    iree_allocator_t allocator, iree_string_pair_builder_t* out_builder);
+
+// Deinitializes |builder| and releases allocated storage.
+IREE_API_EXPORT void iree_string_pair_builder_deinitialize(
+    iree_string_pair_builder_t* builder);
+
+// Gets the array of pairs under construction, which is guaranteed to be
+// valid until the builder is modified. This will be NULL if empty.
+static inline iree_string_pair_t* iree_string_pair_builder_pairs(
+    iree_string_pair_builder_t* builder) {
+  return builder->pairs;
+}
+
+// Gets the size of the pairs under construction.
+static inline iree_host_size_t iree_string_pair_builder_size(
+    iree_string_pair_builder_t* builder) {
+  return builder->pairs_size;
+}
+
+// Adds a string pair to |builder|.
+IREE_API_EXPORT iree_status_t iree_string_pair_builder_add(
+    iree_string_pair_builder_t* builder, iree_string_pair_t pair);
+
+// Adds a string/int pair to |builder|.
+IREE_API_EXPORT iree_status_t iree_string_pair_builder_add_int32(
+    iree_string_pair_builder_t* builder, iree_string_view_t key, int32_t value);
+
+// Adds a string to the list of temporary allocated strings, updating the
+// |inout_string| to be the allocated version.
+IREE_API_EXPORT iree_status_t iree_string_pair_builder_emplace_string(
+    iree_string_pair_builder_t* builder, iree_string_view_t* inout_string);
 
 #ifdef __cplusplus
 }  // extern "C"

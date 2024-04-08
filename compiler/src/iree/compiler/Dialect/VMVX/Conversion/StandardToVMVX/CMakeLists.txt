@@ -27,6 +27,7 @@ iree_cc_library(
     MLIRMemRefDialect
     MLIRPass
     MLIRSupport
+    MLIRTransformUtils
     MLIRTransforms
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::VMVX::IR
