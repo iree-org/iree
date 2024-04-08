@@ -135,15 +135,12 @@ hal.executable private @conv_1d {
 //       CHECK: %[[BDIMX:.+]] = gpu.block_dim x
 //       CHECK: %[[TIDY:.+]] = gpu.thread_id y
 //       CHECK: %[[BDIMY:.+]] = gpu.block_dim y
-//       CHECK: %[[TIDZ:.+]] = gpu.thread_id z
-//       CHECK: %[[BDIMZ:.+]] = gpu.block_dim z
-//       CHECK: scf.for %[[IV_Z:.+]] = %[[TIDZ]] to %{{.*}} step %[[BDIMZ]]
-//       CHECK:   scf.for %[[IV_Y:.+]] = %[[TIDY]] to %{{.*}} step %[[BDIMY]]
-//       CHECK:     scf.for %[[IV_X:.+]] = %[[TIDX]] to %{{.*}} step %[[BDIMX]]
-//       CHECK:       %[[ARG0SV2:.+]] = memref.subview %[[ARG0SV1]][%[[IV_Z]], %[[IV_Y]], 0] [1, 3, 1]
-//       CHECK:       %[[ARG1SV2:.+]] = memref.subview %[[ARG1SV1]][0, 0, %[[IV_X]]] [3, 1, 1]
-//       CHECK:       %[[RETSV2:.+]] = memref.subview %[[RETSV1]][%[[IV_Z]], %[[IV_Y]], %[[IV_X]]] [1, 1, 1]
-//       CHECK:       linalg.conv_1d_nwc_wcf
+//       CHECK: scf.for %[[IV_Y:.+]] = %[[TIDY]] to %{{.*}} step %[[BDIMY]]
+//       CHECK:   scf.for %[[IV_X:.+]] = %[[TIDX]] to %{{.*}} step %[[BDIMX]]
+//       CHECK:     %[[ARG0SV2:.+]] = memref.subview %[[ARG0SV1]][0, %[[IV_Y]], 0] [1, 3, 1]
+//       CHECK:     %[[ARG1SV2:.+]] = memref.subview %[[ARG1SV1]][0, 0, %[[IV_X]]] [3, 1, 1]
+//       CHECK:     %[[RETSV2:.+]] = memref.subview %[[RETSV1]][0, %[[IV_Y]], %[[IV_X]]] [1, 1, 1]
+//       CHECK:     linalg.conv_1d_nwc_wcf
 //  CHECK-SAME:         ins(%[[ARG0SV2]], %[[ARG1SV2]]
 //  CHECK-SAME:         outs(%[[RETSV2]]
 
