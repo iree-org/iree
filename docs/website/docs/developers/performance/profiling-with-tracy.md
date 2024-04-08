@@ -11,16 +11,40 @@ sampling profiler that IREE uses for performance analysis.
 
 [![Tracy overview](https://github.com/openxla/iree/assets/4010439/3df4f682-9215-4f55-b7b0-5fe2dce860b0)](https://github.com/openxla/iree/assets/4010439/3df4f682-9215-4f55-b7b0-5fe2dce860b0)
 
+### :material-eyedropper: Instrumentation and sampling
+
 * *Instrumentation* is generic code built into the program being profiled,
     recording zone start and end timestamps where a developer requests them:
 
     [![Tracy instrumentation](https://github.com/openxla/iree/assets/4010439/70706e6d-d253-4ca3-85bf-165f23d24635)](https://github.com/openxla/iree/assets/4010439/70706e6d-d253-4ca3-85bf-165f23d24635)
+
+    Most of IREE's runtime code is instrumented using the macros defined in
+    [iree/base/tracing.h](https://github.com/openxla/iree/blob/main/runtime/src/iree/base/tracing.h):
+
+    ```c
+    void iree_sample_function() {
+      IREE_TRACE_ZONE_BEGIN(z0);
+      // All code here will be included in the zone for `iree_sample_function`.
+      IREE_TRACE_ZONE_END(z0);
+    }
+    ```
 
 * *Sampling* collects program state and information about the machine using
     platform-specific APIs at a regular sampling frequency. Sampled data
     includes callstacks, hardware counters, and more:
 
     [![Tracy sampling](https://github.com/openxla/iree/assets/4010439/d637a692-8bfa-42c4-bd0d-75ea3dce2e69)](https://github.com/openxla/iree/assets/4010439/d637a692-8bfa-42c4-bd0d-75ea3dce2e69)
+
+    While recording instrumentation data requires no special setup, recording
+    sampling data will need some configuration depending on your operating
+    system. Refer to the "Automated data collection" section in the
+    [Tracy PDF manual](#the-tracy-manual) for full details. Generally, sampling
+    needs:
+
+    * Debug information from `-DCMAKE_BUILD_TYPE=RelWithDebInfo` or `Debug`
+    * Privilege elevation from `sudo` on Unix or adminstrator on Windows
+
+### :material-connection: Remote or embedded telemetry
 
 Tracy uses a client-server model with communication over a TCP socket:
 
@@ -46,15 +70,16 @@ graph LR
   tracyserver --> storage["Storage"]
 ```
 
+This allows for [remote capture](#remote-capture-eg-ssh-android), such as over
+SSH, as well as sharing of saved traces across machines.
+
 ### :octicons-file-16: The Tracy manual
 
-!!! info "The Tracy manual"
+The primary source of Tracy documentation, including how to build the profiler
+UI and CLI capture tool, is a PDF manual:
 
-    The primary source of Tracy documentation, including how to build the
-    capture tool and profiler UI, is a PDF manual:
-
-    [Download tracy.pdf :octicons-download-16:](https://github.com/wolfpld/tracy/releases/latest/download/tracy.pdf){ .md-button .md-button--primary }
-    [View tracy.pdf in browser :material-magnify:](https://docs.google.com/viewer?url=https://github.com/wolfpld/tracy/releases/latest/download/tracy.pdf){ .md-button .md-button--primary }
+[Download tracy.pdf :octicons-download-16:](https://github.com/wolfpld/tracy/releases/latest/download/tracy.pdf){ .md-button .md-button--primary }
+[View tracy.pdf in browser :material-magnify:](https://docs.google.com/viewer?url=https://github.com/wolfpld/tracy/releases/latest/download/tracy.pdf){ .md-button .md-button--primary }
 
 ## :octicons-telescope-16: Capturing a trace
 
