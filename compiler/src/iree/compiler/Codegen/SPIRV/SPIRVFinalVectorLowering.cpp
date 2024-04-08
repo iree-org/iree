@@ -96,7 +96,7 @@ public:
       vector::ExtractOp::getCanonicalizationPatterns(patterns, context);
       vector::TransferReadOp::getCanonicalizationPatterns(patterns, context);
       vector::TransferWriteOp::getCanonicalizationPatterns(patterns, context);
-      populateVectorTransferTensorSliceTransforms(patterns);
+      tensor::populateFoldTensorSubsetIntoVectorTransferPatterns(patterns);
       vector::ReductionOp::getCanonicalizationPatterns(patterns, context);
       scf::IfOp::getCanonicalizationPatterns(patterns, context);
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {

@@ -245,7 +245,7 @@ void transform_dialect::ApplyFoldReshapeIntoTensorHalInterfacePatternsOp::
 
 void transform_dialect::ApplyFoldTensorSliceIntoTransferPatternsOp::
     populatePatterns(RewritePatternSet &patterns) {
-  populateVectorTransferTensorSliceTransforms(patterns);
+  tensor::populateFoldTensorSubsetIntoVectorTransferPatterns(patterns);
 }
 
 void transform_dialect::ApplyPrepareVectorToMMAPatternsOp::populatePatterns(

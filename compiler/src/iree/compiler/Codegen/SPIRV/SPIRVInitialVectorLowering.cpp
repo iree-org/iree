@@ -363,7 +363,7 @@ public:
       RewritePatternSet patterns(context);
       vector::TransferReadOp::getCanonicalizationPatterns(patterns, context);
       vector::TransferWriteOp::getCanonicalizationPatterns(patterns, context);
-      populateVectorTransferTensorSliceTransforms(patterns);
+      tensor::populateFoldTensorSubsetIntoVectorTransferPatterns(patterns);
 
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
@@ -488,7 +488,7 @@ public:
 
       vector::TransferReadOp::getCanonicalizationPatterns(patterns, context);
       vector::TransferWriteOp::getCanonicalizationPatterns(patterns, context);
-      populateVectorTransferTensorSliceTransforms(patterns);
+      tensor::populateFoldTensorSubsetIntoVectorTransferPatterns(patterns);
 
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();

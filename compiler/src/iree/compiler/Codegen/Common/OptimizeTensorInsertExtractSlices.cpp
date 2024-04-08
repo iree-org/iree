@@ -50,7 +50,7 @@ void OptimizeTensorInsertExtractSlicesPass::runOnOperation() {
   LDBG("after hoisting redundant transfers on tensors\n" << funcOp);
 
   RewritePatternSet patterns(context);
-  populateVectorTransferTensorSliceTransforms(patterns);
+  tensor::populateFoldTensorSubsetIntoVectorTransferPatterns(patterns);
   if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
     return signalPassFailure();
   }
