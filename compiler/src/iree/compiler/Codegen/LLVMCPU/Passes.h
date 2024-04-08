@@ -49,7 +49,8 @@ createLLVMCPULowerExecutableTargetPass();
 std::unique_ptr<Pass> createExpandF16OpToF32Pass();
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPUMmt4dVectorLoweringPass();
+createLLVMCPUMmt4dVectorLoweringPass(
+    bool enableVectorContractCustomKernels = true);
 
 /// Pass to perform peeling on non-distributed loops.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>

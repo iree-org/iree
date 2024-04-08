@@ -87,6 +87,12 @@ static llvm::cl::opt<bool> clUseSoftmaxInterFusion(
     llvm::cl::desc("Enables inter-pass fusion for the DecomposeSoftmax pass."),
     llvm::cl::init(true));
 
+static llvm::cl::opt<bool> clEnableVectorContractCustomKernels(
+    "iree-llvmcpu-enable-vector-contract-custom-kernels",
+    llvm::cl::desc("Enables vector contract custom kernels for "
+                   "LLVMCPUMmt4dVectorLowering pass."),
+    llvm::cl::init(true));
+
 static void addTileAndDistributePasses(OpPassManager &pm) {
   pm.addPass(createTileAndDistributeToWorkgroupsPass());
   auto &nestedModulePM = pm.nest<ModuleOp>();
@@ -579,7 +585,8 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &passManager,
 
   // Vector lowering of Mmt4d.
   nestedModulePM.addNestedPass<func::FuncOp>(
-      createLLVMCPUMmt4dVectorLoweringPass());
+      createLLVMCPUMmt4dVectorLoweringPass(
+          clEnableVectorContractCustomKernels));
 
   // Generic vector lowering.
   LLVMCPUVectorLoweringPassOptions options;
