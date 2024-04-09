@@ -38,6 +38,7 @@ Members of our developer community have authored bindings using other languages:
 Language | Compiler API? | Runtime API? | Published packages?
 -------- | ------------ | ----------- | ------------------
 [JavaScript](#javascript) | :grey_question: Experimental | :grey_question: Experimental | :x: Unsupported
+[Java](#java) | :x: Unsupported | :grey_question: Experimental | :x: Unsupported
 [Julia](#julia) | :grey_question: Experimental | :grey_question: Experimental | :x: Unsupported
 [Rust](#rust) | :x: Unsupported | :grey_question: Experimental | :grey_question: Experimental
 
@@ -45,6 +46,12 @@ Language | Compiler API? | Runtime API? | Published packages?
 
 * JavaScript bindings for WebAssembly and WebGPU are under development in IREE's
 [`experimental/web/`](https://github.com/openxla/iree/tree/main/experimental/web)
+directory.
+
+### :fontawesome-brands-java: Java
+
+* Java TFLite bindings were developed at one point in IREE's
+[`runtime/bindings/tflite/java`](https://github.com/openxla/iree/tree/main/runtime/bindings/tflite/java)
 directory.
 
 ### :simple-julia: Julia
