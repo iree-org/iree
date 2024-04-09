@@ -159,7 +159,17 @@ enumerateMatmulTileArm64(TypeRange elementTypes, ExecutableTargetAttr target) {
 
   if (!hasUkernel(target)) {
     if (lhs.isSignlessInteger(8) && rhs.isSignlessInteger(8) &&
-        (out.isSignlessInteger(32) || out.isF32())) {
+        (out.isSignlessInteger(32))) {
+      if (hasFeature(target, "+i8mm") && hasFeature(target, "+neon")) {
+        return {
+            TileMxNxK{8, 8, 8}, // Aim to use SMMLA.
+            TileMxNxK{4, 8, 8}, // Truncation of the above.
+            TileMxNxK{2, 8, 8}, // Truncation of the above.
+            TileMxNxK{1, 8, 8}, // Truncation of the above.
+        };
+      }
+
+      // Default.
       return {
           TileMxNxK{8, 8, 1}, // Aim to use SMLAL.
           TileMxNxK{4, 8, 1}, // Truncation of the above.
@@ -168,7 +178,16 @@ enumerateMatmulTileArm64(TypeRange elementTypes, ExecutableTargetAttr target) {
       };
     }
     if (lhs.isSignlessInteger(8) && rhs.isSignlessInteger(4) &&
-        (out.isSignlessInteger(32) || out.isF32())) {
+        (out.isSignlessInteger(32))) {
+      if (hasFeature(target, "+i8mm") && hasFeature(target, "+neon")) {
+        return {
+            TileMxNxK{4, 8, 32},
+            TileMxNxK{2, 8, 32},
+            TileMxNxK{1, 8, 32},
+        };
+      }
+
+      // Default.
       return {
           TileMxNxK{4, 16, 1}, // Aim to use SMLAL.
           TileMxNxK{2, 32, 1}, // Truncation of the above.
