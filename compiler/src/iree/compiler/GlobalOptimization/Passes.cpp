@@ -36,8 +36,8 @@ static llvm::cl::opt<bool> clEnableTransposePropagation(
     llvm::cl::init(false));
 
 // TODO(hanchung): Remove the flag. We don't want to do early materialization by
-// default. Because it won't work for heterogeneous computing. This is the right
-// layer for handling such information.
+// default. Because it won't work for heterogeneous computing. This is not the
+// right layer for handling such information.
 static llvm::cl::opt<bool> clEnableEarlyMaterialization(
     "iree-global-opt-enable-early-materialization",
     llvm::cl::desc(
