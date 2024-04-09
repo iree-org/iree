@@ -22,7 +22,6 @@ Language | Compiler API? | Runtime API? | Published packages?
 -------- | ------------ | ----------- | ------------------
 [C/C++](#cc) | :white_check_mark: Supported | :white_check_mark: Supported | :x: Unsupported
 [Python](#python) | :white_check_mark: Supported | :white_check_mark: Supported | :white_check_mark: Supported
-[JavaScript](#javascript) | :grey_question: Experimental | :grey_question: Experimental | :x: Unsupported
 
 ### C/C++
 
@@ -32,20 +31,21 @@ See the [C API](./c-api.md) reference page.
 
 See the [Python](./python.md) reference page.
 
-### :simple-javascript: JavaScript
-
-* JavaScript bindings for WebAssembly and WebGPU are under development in IREE's
-[`experimental/web/`](https://github.com/openxla/iree/tree/main/experimental/web)
-directory.
-
-## Unofficial API bindings
+## Unofficial and experimental API bindings
 
 Members of our developer community have authored bindings using other languages:
 
 Language | Compiler API? | Runtime API? | Published packages?
 -------- | ------------ | ----------- | ------------------
+[JavaScript](#javascript) | :grey_question: Experimental | :grey_question: Experimental | :x: Unsupported
 [Julia](#julia) | :grey_question: Experimental | :grey_question: Experimental | :x: Unsupported
 [Rust](#rust) | :x: Unsupported | :grey_question: Experimental | :grey_question: Experimental
+
+### :simple-javascript: JavaScript
+
+* JavaScript bindings for WebAssembly and WebGPU are under development in IREE's
+[`experimental/web/`](https://github.com/openxla/iree/tree/main/experimental/web)
+directory.
 
 ### :simple-julia: Julia
 
