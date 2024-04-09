@@ -3589,19 +3589,13 @@ instrumentation. Once the compiler finishes running, this prints a report like</
 <p>This is easy data to collect, especially remotely over SSH, but it might not
 paint a complete picture and requires waiting for compilation to finish.</p>
 <h3 id="using-tracy">Using Tracy<a class="headerlink" href="#using-tracy" title="Permanent link">link</a></h3>
-<!-- TODO(scotttodd): update link -->
-
 <p>See our documentation on
-<a href="../../performance/profiling-with-tracy/">profiling with Tracy</a>. For compile
-time regressions, pay particular attention to the different compilation phases
-(Flow/Stream/HAL), how many times <code>TranslateExecutablesPass</code> runs, and if there
-are outlier passes that take significantly longer to run than others.</p>
-<div class="admonition tip -">
-<p class="admonition-title">CMake Flags</p>
-<p>Currently, compiler tracing requires the runtime tracing to be enabled. Make
-sure to set both <code>-DIREE_ENABLE_COMPILER_TRACING=ON</code> and
-<code>-DIREE_ENABLE_RUNTIME_TRACING=ON</code>.</p>
-</div>
+<a href="../../performance/profiling-with-tracy/">profiling with Tracy</a>, in particular
+the section on
+<a href="../../performance/profiling-with-tracy/#tracing-iree-compile">tracing <code>iree-compile</code></a>.
+For compile time regressions, pay particular attention to the compilation
+phases (Flow/Stream/HAL), how many times <code>TranslateExecutablesPass</code> runs, and
+if there are outlier passes that take significantly longer to run than others.</p>
 <p>Here are some previous analyses for inspiration:</p>
 <ul>
 <li><a href="https://github.com/openxla/iree/issues/12033">https://github.com/openxla/iree/issues/12033</a></li>
