@@ -18,6 +18,7 @@
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetOptions.h"
 #include "llvm/TargetParser/Host.h"
+#include "llvm/TargetParser/RISCVTargetParser.h"
 #include "llvm/TargetParser/SubtargetFeature.h"
 #include "llvm/TargetParser/Triple.h"
 #include "llvm/TargetParser/X86TargetParser.h"
@@ -67,20 +68,26 @@ bool resolveCPUAndCPUFeatures(llvm::StringRef inCpu,
     outCpuFeatures = targetCpuFeatures.getString();
   }
 
-  // If CPU is non-host and non-generic then we need to populate the
-  // corresponding features.
   if (outCpu.empty() || inCpu == "host" || inCpu == "generic" ||
       inCpu.starts_with("generic-")) {
     return true;
   }
-  if (triple.isX86()) {
-    llvm::SubtargetFeatures targetCpuFeatures(outCpuFeatures);
-    llvm::SmallVector<llvm::StringRef> cpuFeatureList;
-    llvm::X86::getFeaturesForCPU(outCpu, cpuFeatureList);
-    for (auto &feature : cpuFeatureList) {
+  // If CPU is non-host and non-generic then we need to populate the
+  // corresponding features.
+  llvm::SubtargetFeatures targetCpuFeatures(outCpuFeatures);
+  auto addCpuFeatures = [&](const auto &getFeaturesForCPU,
+                            auto &cpuFeatureList) {
+    getFeaturesForCPU(outCpu, cpuFeatureList, false);
+    for (const auto &feature : cpuFeatureList) {
       targetCpuFeatures.AddFeature(feature);
     }
-    outCpuFeatures = targetCpuFeatures.getString();
+  };
+  if (triple.isX86()) {
+    llvm::SmallVector<llvm::StringRef> cpuFeatureList;
+    addCpuFeatures(llvm::X86::getFeaturesForCPU, cpuFeatureList);
+  } else if (triple.isRISCV64()) {
+    llvm::SmallVector<std::string> cpuFeatureList;
+    addCpuFeatures(llvm::RISCV::getFeaturesForCPU, cpuFeatureList);
   } else {
     llvm::errs()
         << "error: Resolution of target CPU to target CPU features is not "
@@ -90,6 +97,7 @@ bool resolveCPUAndCPUFeatures(llvm::StringRef inCpu,
            "on this architecture, or implement that.\n";
     return false;
   }
+  outCpuFeatures = targetCpuFeatures.getString();
   return true;
 }
 

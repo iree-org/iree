@@ -39,24 +39,23 @@ hal.executable private @pad_only {
 //       CHECK:   %[[OUTPUT:.+]] = hal.interface.binding.subspan {{.+}} : memref<1x114x114x64xf32
 //       CHECK:   scf.for
 //       CHECK:     scf.for
-//       CHECK:       scf.for
-//       CHECK:         scf.if
-//       CHECK:           %[[OUTPUT_SUBVIEW_IF:.+]] = memref.subview %[[OUTPUT]]
-//       CHECK:           linalg.generic
-//  CHECK-SAME:               outs(%[[OUTPUT_SUBVIEW_IF]]
-//       CHECK:         else
-//       CHECK:           %[[INPUT_SUBVIEW:.+]] = memref.subview %[[INPUT]]
-//       CHECK:           %[[OUTPUT_SUBVIEW:.+]] = memref.subview %[[OUTPUT]]
+//       CHECK:       scf.if
+//       CHECK:         %[[OUTPUT_SUBVIEW_IF:.+]] = memref.subview %[[OUTPUT]]
+//       CHECK:         linalg.generic
+//  CHECK-SAME:             outs(%[[OUTPUT_SUBVIEW_IF]]
+//       CHECK:       else
+//       CHECK:         %[[INPUT_SUBVIEW:.+]] = memref.subview %[[INPUT]]
+//       CHECK:         %[[OUTPUT_SUBVIEW:.+]] = memref.subview %[[OUTPUT]]
+//       CHECK:         scf.for
 //       CHECK:           scf.for
 //       CHECK:             scf.for
-//       CHECK:               scf.for
-//       CHECK:                 %[[OUTPUT_SLICE:.+]] = memref.subview %[[OUTPUT_SUBVIEW]]
-//       CHECK:                 %[[RESULT_VEC:.+]] = scf.if %{{.+}} -> (vector<4xf32>) {
-//       CHECK:                   %[[VEC_LOAD:.+]] = vector.load %[[INPUT_SUBVIEW]]
-//       CHECK:                   scf.yield %[[VEC_LOAD]]
-//       CHECK:                 }
-//       CHECK:                 %[[DROP_UNIT_OUTPUT_SLICE:.+]] = memref.subview %[[OUTPUT_SLICE]]
-//       CHECK:                 vector.store %[[RESULT_VEC]], %[[DROP_UNIT_OUTPUT_SLICE]]
+//       CHECK:               %[[OUTPUT_SLICE:.+]] = memref.subview %[[OUTPUT_SUBVIEW]]
+//       CHECK:               %[[RESULT_VEC:.+]] = scf.if %{{.+}} -> (vector<4xf32>) {
+//       CHECK:                 %[[VEC_LOAD:.+]] = vector.load %[[INPUT_SUBVIEW]]
+//       CHECK:                 scf.yield %[[VEC_LOAD]]
+//       CHECK:               }
+//       CHECK:               %[[DROP_UNIT_OUTPUT_SLICE:.+]] = memref.subview %[[OUTPUT_SLICE]]
+//       CHECK:               vector.store %[[RESULT_VEC]], %[[DROP_UNIT_OUTPUT_SLICE]]
 
 // -----
 

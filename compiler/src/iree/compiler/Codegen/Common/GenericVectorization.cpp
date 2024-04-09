@@ -148,6 +148,53 @@ inferSizesFromIR(tensor::PackOp op) {
   return result;
 }
 
+/// Returns the result sizes and vector input sizes of the tensor.unpack op. The
+/// inferred bounding size is returned if it is dynamic shape. Returns
+/// std::nullopt if the shape inference failed.
+static std::optional<VectorizationTileSizes>
+inferSizesFromIR(tensor::UnPackOp op) {
+  LLVM_DEBUG(VEC_DBGS() << "Inferring dest sizes for:\n" << op << "\n");
+
+  if (llvm::any_of(op.getInnerTiles(), [](OpFoldResult v) {
+        return !getConstantIntValue(v).has_value();
+      })) {
+    LLVM_DEBUG(
+        VEC_DBGS()
+        << "failed on inference because inner_tiles are not all constant");
+    return std::nullopt;
+  }
+
+  VectorizationTileSizes result;
+  std::optional<VectorizationTileSizes> inferred =
+      inferSizesFromIR(op.getSource());
+  if (!inferred) {
+    return std::nullopt;
+  }
+  result.vectorSizes = inferred.value().destShape;
+
+  result.vectorSizes.resize(op.getDestType().getRank());
+  auto outerDimsPerm = op.getOuterDimsPerm();
+  if (!outerDimsPerm.empty()) {
+    applyPermutationToVector(result.vectorSizes,
+                             invertPermutationVector(outerDimsPerm));
+  }
+  for (auto [dimPos, tileSize] :
+       llvm::zip_equal(op.getInnerDimsPos(), op.getStaticInnerTiles())) {
+    result.vectorSizes[dimPos] *= tileSize;
+  }
+
+  LLVM_DEBUG({
+    VEC_DBGS() << "After adjustment with inner tiles and "
+                  "outer_dims_perm:\n";
+    for (auto [idx, val] : llvm::enumerate(result.vectorSizes)) {
+      llvm::dbgs() << "Dim #" << idx << ": " << val << "\n";
+    }
+  });
+  result.destShape = result.vectorSizes;
+
+  return result;
+}
+
 /// See the documentation in the above function declaration.
 static std::optional<VectorizationTileSizes> inferSizesFromIR(Value val) {
   std::optional<VectorizationTileSizes> result;
@@ -204,8 +251,8 @@ getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
           vectorSizes = result->vectorSizes;
         }
       })
-      .Case<tensor::PackOp>([&](tensor::PackOp packOp) {
-        std::optional<VectorizationTileSizes> result = inferSizesFromIR(packOp);
+      .Case<tensor::PackOp, tensor::UnPackOp>([&](auto op) {
+        std::optional<VectorizationTileSizes> result = inferSizesFromIR(op);
         if (result) {
           vectorSizes = result->vectorSizes;
         }
@@ -219,6 +266,7 @@ getVectorSizes(Operation *op, bool useConfiguredVectorSizes) {
         vectorSizes = SmallVector<int64_t>(ty.getShape());
       })
       .Default([&](Operation *) {});
+
   if (vectorSizes) {
     // This can't identify scalable flags, so pad them with `false`.
     return std::make_pair(vectorSizes.value(),
@@ -275,7 +323,8 @@ void GenericVectorizationPass::runOnOperation() {
     } else if (vectorizePadding && enableVectorMasking &&
                isa<tensor::PadOp>(op)) {
       candidates.push_back(op);
-    } else if (enableVectorMasking && isa<tensor::PackOp>(op)) {
+    } else if (enableVectorMasking &&
+               isa<tensor::PackOp, tensor::UnPackOp>(op)) {
       candidates.push_back(op);
     }
   });

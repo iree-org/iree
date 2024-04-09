@@ -29,12 +29,6 @@
 
 namespace mlir::iree_compiler {
 
-/// Method to check if a value is zero
-static bool isZero(Value val) {
-  OpFoldResult ofr = getAsOpFoldResult(val);
-  return isConstantIntValue(ofr, 0);
-}
-
 /// Helper method to adjust the interchange vector to match the iteration
 /// domain.
 static SmallVector<int64_t>
@@ -56,17 +50,17 @@ fillInterchangeVector(ArrayRef<unsigned> interchangeVector,
 /// for a distributed loop. Replace the iteration domain to
 /// - lb_partitioned = lb + procId * step
 /// - step_partitioned = step * nprocs
-static std::tuple<Value, Value> getDistributeLBAndStep(OpBuilder &b,
-                                                       Location loc, Value lb,
-                                                       Value step, Value procId,
-                                                       Value nprocs) {
+static std::tuple<OpFoldResult, OpFoldResult>
+getDistributeLBAndStep(OpBuilder &b, Location loc, OpFoldResult lb,
+                       OpFoldResult step, OpFoldResult procId,
+                       OpFoldResult nprocs) {
   AffineExpr s0, s1, s2;
   bindSymbols(b.getContext(), s0, s1, s2);
   auto offsetMap = AffineMap::get(0, 3, {s0 + s1 * s2});
   auto stepMap = AffineMap::get(0, 2, {s0 * s1});
-  Value distributeLB = affine::makeComposedAffineApply(
+  OpFoldResult distributeLB = affine::makeComposedFoldedAffineApply(
       b, loc, offsetMap, ArrayRef<OpFoldResult>{lb, procId, step});
-  Value distributeStep = affine::makeComposedAffineApply(
+  OpFoldResult distributeStep = affine::makeComposedFoldedAffineApply(
       b, loc, stepMap, ArrayRef<OpFoldResult>{step, nprocs});
   return {distributeLB, distributeStep};
 }
@@ -81,17 +75,6 @@ static std::tuple<Value, Value> getDistributeLBAndStep(OpBuilder &b,
 /// distribution and also use `flow.dispatch.tensor.load/store` instead of
 /// `tensor.extract_slice/insert_slice`.
 
-namespace {
-// Till `scf.for` can take an `OpFoldResult` for lb, ub and step, use of `Range`
-// with `OpFoldResult` causes lots of `OpFoldResult` -> `Value` conversion.
-// This struct is a mirror of `Range` with `Value` type fields.
-struct RangeVal {
-  Value offset;
-  Value size;
-  Value stride;
-};
-} // namespace
-
 /// Generate an empty loop nest that represents the tiled loop nest shell.
 /// - `loopRanges` specifies the lb, ub and step of the untiled iteration space.
 /// - `tileSizeVals` is the tile sizes to use. Zero represent untiled loops.
@@ -99,8 +82,8 @@ struct RangeVal {
 /// the
 ///   tile processed within the inner most loop.
 static SmallVector<scf::ForOp> generateTileLoopNest(
-    OpBuilder &builder, Location loc, ArrayRef<RangeVal> loopRanges,
-    ArrayRef<Value> tileSizeVals,
+    OpBuilder &builder, Location loc, ArrayRef<Range> loopRanges,
+    ArrayRef<OpFoldResult> tileSizeVals,
     ArrayRef<linalg::DistributionMethod> distributionMethod,
     ArrayRef<linalg::ProcInfo> procInfo, SmallVector<OpFoldResult> &offsets,
     SmallVector<OpFoldResult> &sizes, SmallVector<Value> &workgroupCount) {
@@ -122,10 +105,10 @@ static SmallVector<scf::ForOp> generateTileLoopNest(
   bindDims(builder.getContext(), d0);
   bindSymbols(builder.getContext(), s0, s1, s2);
   AffineMap minMap = AffineMap::get(1, 2, {s0, s1 - d0}, builder.getContext());
-  auto createBoundedTileSize = [&](Value iv, Value tileSize,
-                                   Value size) -> OpFoldResult {
-    if (isConstantIntValue(getAsOpFoldResult(tileSize), 1)) {
-      return builder.getIndexAttr(1);
+  auto createBoundedTileSize = [&](OpFoldResult iv, OpFoldResult tileSize,
+                                   OpFoldResult size) -> OpFoldResult {
+    if (isConstantIntValue(tileSize, 1)) {
+      return tileSize;
     }
     return affine::makeComposedFoldedAffineMin(
         builder, loc, minMap, ArrayRef<OpFoldResult>{iv, tileSize, size});
@@ -138,14 +121,14 @@ static SmallVector<scf::ForOp> generateTileLoopNest(
     // Capturing structured bindings in lambdas is a c++20 feature, so we have
     // to declare a local variable for it.
     int index = idx;
-    Value lb = loopRange.offset;
-    Value ub = loopRange.size;
-    Value step = tileSizeVals[index];
+    OpFoldResult lb = loopRange.offset;
+    OpFoldResult ub = loopRange.size;
+    OpFoldResult step = tileSizeVals[index];
     // No loops if tile size is zero. Set offset and size to the loop
     // offset and size.
-    if (matchPattern(tileSizeVals[index], m_Zero())) {
-      offsets[index] = getAsOpFoldResult(lb);
-      sizes[index] = getAsOpFoldResult(ub);
+    if (isConstantIntValue(tileSizeVals[index], 0)) {
+      offsets[index] = lb;
+      sizes[index] = ub;
       continue;
     }
 
@@ -155,9 +138,7 @@ static SmallVector<scf::ForOp> generateTileLoopNest(
           builder, loc,
           affine::makeComposedFoldedAffineApply(
               builder, loc, numIterationsMap,
-              {getAsOpFoldResult(loopRange.offset),
-               getAsOpFoldResult(loopRange.size),
-               getAsOpFoldResult(tileSizeVals[index])}));
+              {loopRange.offset, loopRange.size, tileSizeVals[index]}));
       workgroupCount.push_back(numWorkgroups);
       std::tie(lb, step) = getDistributeLBAndStep(builder, loc, lb, step,
                                                   procInfo[procDim].procId,
@@ -166,13 +147,16 @@ static SmallVector<scf::ForOp> generateTileLoopNest(
     }
 
     if (method == linalg::DistributionMethod::CyclicNumProcsEqNumIters) {
-      offsets[index] = getAsOpFoldResult(lb);
+      offsets[index] = lb;
       sizes[index] = createBoundedTileSize(lb, tileSizeVals[index], ub);
       continue;
     }
 
+    Value lbVal = getValueOrCreateConstantIndexOp(builder, loc, lb);
+    Value ubVal = getValueOrCreateConstantIndexOp(builder, loc, ub);
+    Value stepVal = getValueOrCreateConstantIndexOp(builder, loc, step);
     auto loop = builder.create<scf::ForOp>(
-        loc, lb, ub, step, ValueRange{},
+        loc, lbVal, ubVal, stepVal, ValueRange{},
         [&](OpBuilder &bodyBuilder, Location bodyLoc, Value iv,
             ValueRange /*iterArgs*/) {
           sizes[index] = createBoundedTileSize(iv, tileSizeVals[index], ub);
@@ -270,34 +254,25 @@ tileDispatchUsingSCFFopOp(RewriterBase &rewriter, TilingInterface op,
   }
 
   // 1. Get the range of the loops that are represented by the operation.
-  SmallVector<Range> iterationDomainOfr = op.getIterationDomain(rewriter);
+  SmallVector<Range> iterationDomain = op.getIterationDomain(rewriter);
   Location loc = op.getLoc();
-  size_t numLoops = iterationDomainOfr.size();
+  size_t numLoops = iterationDomain.size();
   if (numLoops == 0) {
     return IREETilingResult();
   }
-  auto iterationDomain = llvm::map_to_vector(iterationDomainOfr, [&](Range r) {
-    return RangeVal{getValueOrCreateConstantIndexOp(rewriter, loc, r.offset),
-                    getValueOrCreateConstantIndexOp(rewriter, loc, r.size),
-                    getValueOrCreateConstantIndexOp(rewriter, loc, r.stride)};
-  });
 
   // 2. Materialize the tile sizes. Enforce the convention that "tiling by zero"
   // skips tiling a particular dimension. This convention is significantly
   // simpler to handle instead of adjusting affine maps to account for missing
   // dimensions.
-  SmallVector<Value> tileSizeVector =
-      options.tileSizeComputationFunction(rewriter, op);
-  if (tileSizeVector.size() < numLoops) {
-    auto zero = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
-    tileSizeVector.append(numLoops - tileSizeVector.size(), zero);
-  }
-  tileSizeVector.resize(numLoops);
+  SmallVector<OpFoldResult> tileSizes =
+      getAsOpFoldResult(options.tileSizeComputationFunction(rewriter, op));
+  tileSizes.resize(numLoops, rewriter.getIndexAttr(0));
 
   IREETilingResult tilingResult;
   tilingResult.tiledLoops.resize(numLoops, false);
-  for (auto [index, tileSize] : llvm::enumerate(tileSizeVector)) {
-    if (!isZero(tileSize)) {
+  for (auto [index, tileSize] : llvm::enumerate(tileSizes)) {
+    if (!isConstantIntValue(tileSize, 0)) {
       tilingResult.tiledLoops.set(index);
     }
   }
@@ -324,7 +299,7 @@ tileDispatchUsingSCFFopOp(RewriterBase &rewriter, TilingInterface op,
       }
 
       applyPermutationToVector(iterationDomain, interchangeVector);
-      applyPermutationToVector(tileSizeVector, interchangeVector);
+      applyPermutationToVector(tileSizes, interchangeVector);
     }
 
     // If there is distribution specified, adjust the loop ranges. Note that
@@ -339,12 +314,26 @@ tileDispatchUsingSCFFopOp(RewriterBase &rewriter, TilingInterface op,
       // The parallel loops that are tiled are partitionable loops.
       SmallVector<Range> parallelLoopRanges;
       SmallVector<unsigned> partitionedLoopIds;
+
+      AffineExpr s0, s1, s2, s3; // lb, ub, step, tileSize
+      bindSymbols(rewriter.getContext(), s0, s1, s2, s3);
+      AffineExpr numTilesExprs = (s1 - s0).ceilDiv(s2 * s3);
       for (auto [index, iteratorType] : llvm::enumerate(iteratorTypes)) {
-        if (iteratorType == utils::IteratorType::parallel &&
-            !isZero(tileSizeVector[index])) {
-          parallelLoopRanges.push_back(iterationDomainOfr[index]);
-          partitionedLoopIds.push_back(index);
+        if (iteratorType != utils::IteratorType::parallel ||
+            isConstantIntValue(tileSizes[index], 0)) {
+          continue;
         }
+
+        OpFoldResult numTiles = affine::makeComposedFoldedAffineApply(
+            rewriter, loc, numTilesExprs,
+            {iterationDomain[index].offset, iterationDomain[index].size,
+             iterationDomain[index].stride, tileSizes[index]});
+        if (isConstantIntValue(numTiles, 1)) {
+          continue;
+        }
+
+        parallelLoopRanges.push_back(iterationDomain[index]);
+        partitionedLoopIds.push_back(index);
       }
 
       // Query the callback to get the {procId, nprocs} to use.
@@ -360,7 +349,7 @@ tileDispatchUsingSCFFopOp(RewriterBase &rewriter, TilingInterface op,
     // loops for now do not return any values even if the original operation has
     // results.
     tilingResult.loops = generateTileLoopNest(
-        rewriter, loc, iterationDomain, tileSizeVector, distributionMethods,
+        rewriter, loc, iterationDomain, tileSizes, distributionMethods,
         procInfo, offsets, sizes, workgroupCount);
 
     if (!interchangeVector.empty()) {
