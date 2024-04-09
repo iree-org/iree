@@ -79,9 +79,7 @@ The primary source of Tracy documentation, including how to build the profiler
 UI and CLI capture tool, is a PDF manual:
 
 <!-- markdownlint-disable-next-line -->
-[Download tracy.pdf :octicons-download-16:](https://github.com/wolfpld/tracy/releases/latest/download/tracy.pdf){ .md-button .md-button--primary }
-<!-- markdownlint-disable-next-line -->
-[View tracy.pdf in browser :material-magnify:](https://docs.google.com/viewer?url=https://github.com/wolfpld/tracy/releases/latest/download/tracy.pdf){ .md-button .md-button--primary }
+[Download tracy.pdf :octicons-download-16:](https://github.com/wolfpld/tracy/releases/latest/download/tracy.pdf){ .md-button .md-button--primary } [View tracy.pdf in browser :material-magnify:](https://docs.google.com/viewer?url=https://github.com/wolfpld/tracy/releases/latest/download/tracy.pdf){ .md-button .md-button--primary }
 
 ## :octicons-telescope-16: Capturing a trace
 
@@ -102,15 +100,14 @@ be built from source by using either the upstream CMake build or IREE's
 1. Build `iree-run-module` (or other tools like `iree-benchmark-module`) with
     tracing support:
 
-    ```shell hl_lines="2-3"
+    ```shell hl_lines="4-5"
+    # Sampling needs debug info from the `RelWithDebInfo` or `Debug` build type.
+
     cmake -G Ninja -B ../iree-build/ -S . \
-        -DCMAKE_BUILD_TYPE=RelWithDebInfo \ # (1)!
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo \
         -DIREE_ENABLE_RUNTIME_TRACING=ON
     cmake --build ../iree-build/ --target iree-run-module
     ```
-
-    1. Sampling needs debug info from `CMAKE_BUILD_TYPE` set to either
-       `RelWithDebInfo` or `Debug`
 
     For more information about building from source, follow the
     [Getting started](../../building-from-source/getting-started.md) page.
@@ -134,28 +131,30 @@ be built from source by using either the upstream CMake build or IREE's
 
 2. Compile a program to profile:
 
-    ```shell hl_lines="3"
+    ```shell hl_lines="8"
+    # The --iree-hal-executable-debug-level=3 flag embeds source information
+    # about each executable into the .vmfb file for the runtime to pass to
+    # Tracy. Without this flag, source locations are included on a best-effort
+    # basis, typically coming from the input .mlir or .py file.
+
     iree-compile program_input.mlir \
       --iree-hal-target-backends={target} \
-      --iree-hal-executable-debug-level=3 \ # (1)!
+      --iree-hal-executable-debug-level=3 \
       -o program.vmfb
     ```
 
-    1. The `--iree-hal-executable-debug-level=3` flag embeds source information
-       about each executable into the `.vmfb` file for the runtime to pass to
-       Tracy. Without this flag, source locations are included on a best-effort
-       basis, typically coming from either the input .mlir file or an input
-       Python file.
+3. Run the program using the instrumented `iree-run-module`:
 
-3. Run the program using the instrumented `iree-run-module`
+    ```shell hl_lines="9"
+    # Set the TRACY_NO_EXIT environment variable to keep short-running programs
+    # from exiting before connecting.
+    #
+    # Some platforms need elevated permissions (root / sudo / administrator)
+    # to collect sampling data using kernel facilities. If you only want to
+    # collect instrumentation data or your platform does not require it, you
+    # can run with more limited permissions.
 
-    !!! tip inline end "Tip - `TRACY_NO_EXIT`"
-
-        Set the `TRACY_NO_EXIT=1` environment variable to keep short-running
-        programs from exiting before connecting.
-
-    ```shell hl_lines="1"
-    sudo iree-run-module \ # (1)!
+    TRACY_NO_EXIT=1 sudo iree-run-module \
       --module=program.vmfb \
       --device={device} \
       --entry_function={entry} \
@@ -164,10 +163,6 @@ be built from source by using either the upstream CMake build or IREE's
       --input={arg1} \
       ...
     ```
-
-    1. Some platforms require elevated permissions (sudo / administrator)
-       to collect sampling data. Refer to the
-       [Tracy PDF manual](#the-tracy-manual) for full details.
 
 4. While the program is running, connect using the Tracy profiler UI or capture
     tool:
