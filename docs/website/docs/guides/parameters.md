@@ -81,18 +81,19 @@ graph BT
 
 ### :iree-ghost: IRPA
 
-The IREE Parameter Archive (IRPA)
-[file format](https://github.com/openxla/iree/blob/main/runtime/src/iree/schemas/parameter_archive.h)
-is IREE's own format optimized for deployment.
+The IREE Parameter Archive (IRPA) file format
+([`iree/schemas/parameter_archive.h`](https://github.com/openxla/iree/blob/main/runtime/src/iree/schemas/parameter_archive.h))
+is IREE's own format optimized for deployment. Formats like [GGUF](#gguf) and
+[safetensors](#safetensors) can be
+[converted to IRPA](#converting-to-the-irpa-format).
 
-For testing and benchmarking workflows, IRPA files may include a mix of real
-data and splatted values.
-
-!!! todo "TODO: fill in details"
-
-    * explain properties / tradeoffs (conversion is lossy - just buffers with
-      no types/shapes)
-    * add usage samples
+* Data is always aligned in IRPA files for efficient loading
+* IRPA files contain minimal metadata and are fully hermetic. Buffers are
+  stored as opaque byte range blobs, _not_ as tensors with explicit types and
+  shapes
+* For testing and benchmarking workflows, IRPA files may include a mix of real
+  data and splatted values (repeating patterns with no storage requirements on
+  disk)
 
 ### GGUF
 
@@ -101,20 +102,43 @@ is used by the [GGML project](https://github.com/ggerganov/ggml) and other
 projects in that ecosystem like
 [llama.cpp](https://github.com/ggerganov/llama.cpp).
 
-!!! todo "TODO: fill in details"
-
-    * explain properties / tradeoffs (mmap compatible, self describing)
-    * add usage samples
+* GGUF files are non-hermetic - using them requires knowledge about the settings
+  used to compile GGML in order to interpret the contents of each file
+  (particularly for various quantization formats)
+* GGUF files _are_ aligned, so they should have matching performance with IRPA
+  files
 
 ### :hugging: Safetensors
 
 The [safetensors format](https://huggingface.co/docs/safetensors/index) is used
 by the Hugging Face community.
 
-!!! todo "TODO: fill in details"
+* Safetensors files are _not_ naturally aligned to support efficient loading, so
+  using them across runtime devices comes with (possibly severe) performance
+  penalties
 
-    * explain properties / tradeoffs (not aligned? no mmap?)
-    * add usage samples
+### :octicons-stack-16: Extensibility and other formats
+
+The core IREE tools are written in C and aim to be simple and pragmatic, with
+minimal dependencies. Other formats could be converted into supported file
+types:
+
+* PyTorch `.pt` and `.pth` files (serialized state dictionaries produced with
+  [`torch.save`](https://pytorch.org/docs/stable/generated/torch.save.html))
+* ONNX `.onnx` protobufs (see the [ONNX guide](./ml-frameworks/onnx.md))
+* TensorFlow checkpoint (`.ckpt`, `.h5`) files or SavedModel /
+  [`model.keras`](https://www.tensorflow.org/tutorials/keras/save_and_load)
+  archives (see the [TensorFlow guide](./ml-frameworks/tensorflow.md))
+
+In-tree formats for file-backed parameters are defined in the
+[`iree/io/formats/`](https://github.com/openxla/iree/tree/main/runtime/src/iree/io/formats)
+folder. Additional formats could be defined out-of-tree to make use of external
+libraries as needed.
+
+Parameter loading from memory (or a cache, or some other location) is possible
+by adding new providers implementing
+[`iree_io_parameter_provider_t`](https://github.com/openxla/iree/blob/main/runtime/src/iree/io/parameter_provider.h).
+The default parameter index provider operates on files on local disk.
 
 ## :material-hammer-wrench: Working with parameter files
 
@@ -290,7 +314,9 @@ For concrete examples, see these test files:
 
 #### :simple-python: From Python
 
-!!! TODO "TODO: `create_io_parameters_module()` sample code"
+See the
+[`runtime/bindings/python/tests/io_runtime_test.py`](https://github.com/openxla/iree/blob/main/runtime/bindings/python/tests/io_runtime_test.py)
+file for usage examples.
 
 #### :octicons-code-16: Using the C API
 
