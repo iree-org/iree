@@ -292,7 +292,7 @@ hal.executable private @vectorize_fill_conv2d_generic {
 //   CHECK-NOT:    linalg.fill
 //       CHECK:    vector.fma
 //   CHECK-NOT:    linalg.generic
-//       CHECK:    arith.cmpf olt, %{{.+}}, %{{.+}} : vector<4x4xf32>
+//       CHECK:    arith.cmpf olt, %{{.+}}, %{{.+}} : vector<16xf32>
 
 // -----
 
