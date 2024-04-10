@@ -80,7 +80,7 @@ def GPUPipelining : InterfacePass<"iree-codegen-gpu-pipelining", "mlir::Function
 
 def GPUReduceBankConflicts :
     InterfacePass<"iree-codegen-gpu-reduce-bank-conflicts", "mlir::FunctionOpInterface"> {
-  let summary = "Pass to try to reduce the number of bank conflicts.";
+  let summary = "Pass to try to reduce the number of bank conflicts by padding memref.alloc ops.";
   let constructor = "mlir::iree_compiler::createGPUReduceSharedMemoryBankConflicts()";
 }
 

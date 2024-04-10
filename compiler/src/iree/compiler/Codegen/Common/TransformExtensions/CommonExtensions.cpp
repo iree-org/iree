@@ -886,6 +886,28 @@ void transform_dialect::WorkgroupSwizzleOp::getEffects(
 }
 
 //===----------------------------------------------------------------------===//
+// ReduceSharedMemoryBankConclitsOp
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+transform_dialect::ReduceSharedMemoryBankConflictsOp::applyToOne(
+    transform::TransformRewriter &rewriter, mlir::FunctionOpInterface target,
+    transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  if (failed(reduceSharedMemoryBankConflicts(target, getPaddingSizeBits()))) {
+    return emitDefaultDefiniteFailure(target)
+           << "failed to reduce shared memory bank conflicts";
+  }
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::ReduceSharedMemoryBankConflictsOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::modifiesPayload(effects);
+}
+
+//===----------------------------------------------------------------------===//
 // TestVectorLayoutAnalysisOp
 //===----------------------------------------------------------------------===//
 

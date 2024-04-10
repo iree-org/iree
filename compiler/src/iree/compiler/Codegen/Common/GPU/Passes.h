@@ -56,6 +56,15 @@ LogicalResult tileReductionToSerialLoops(mlir::FunctionOpInterface funcOp,
 LogicalResult swizzleWorkgroupsInFunc(mlir::FunctionOpInterface funcOp,
                                       unsigned swizzleLogTile);
 
+/// Adds padding to `memref.alloc` ops to reduce shared memory bank conflicts.
+/// The `paddingSizeBits` argument should be picked based on the target
+/// architecture, striking balance between minimizing bank conflicts and keeping
+/// the data aligned. Smaller values (close to the bank bitwidth) achieve the
+/// former, while larger (~= widest load size) the latter. We want to
+/// **misalign** the rows, but not too much.
+LogicalResult reduceSharedMemoryBankConflicts(mlir::FunctionOpInterface funcOp,
+                                              unsigned paddingSizeBits);
+
 // Lowers workgroup memory copies to distributed transfer_read/transfer_write
 // ops. Expects the memory copy to be marked with copy_to_workgroup_memory
 // marker.
@@ -107,7 +116,7 @@ createGPUPipeliningPass(bool epiloguePeeling = true, unsigned depth = 1,
 /// Apply transformation to reduce the number of bank conflicts when accessing
 /// shared memory by padding fastest moving dimension with the specified size.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createGPUReduceSharedMemoryBankConflicts(int64_t paddingSizeBits = 128);
+createGPUReduceSharedMemoryBankConflicts(int64_t paddingSizeBits = 64);
 
 // Creates a pass to create allocations for some tensor values to use GPU
 // shared memory.

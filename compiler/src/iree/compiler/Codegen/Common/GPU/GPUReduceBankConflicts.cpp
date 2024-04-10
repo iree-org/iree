@@ -13,8 +13,8 @@
 
 namespace mlir::iree_compiler {
 
-/// Pad out the inner dimension of the allocOp in order reduce the chances to
-/// have bank conflicts when reading 2D shapes within shared memory.
+/// Pad out the inner dimension of the `memref.alloc` op in order reduce the
+/// chances to have bank conflicts when reading 2D shapes within shared memory.
 static void padAlloc(MLIRContext *context, memref::AllocOp allocOp,
                      int64_t paddingSizeBits) {
   auto allocOpShape = allocOp.getType().getShape();
@@ -26,7 +26,8 @@ static void padAlloc(MLIRContext *context, memref::AllocOp allocOp,
   Type elType = allocOp.getType().getElementType();
   unsigned bitwidth =
       mlir::DataLayout::closest(allocOp).getTypeSizeInBits(elType);
-  // Pad with 128bits==16bytes so that accesses are still aligned on 16bytes.
+  // Pad with the specified amount. This should be >= bank size and <= widest
+  // load size.
   int64_t paddingSize = paddingSizeBits / bitwidth;
   SmallVector<int64_t> shape = llvm::to_vector(allocOp.getType().getShape());
   shape.back() = shape.back() + paddingSize;
@@ -45,6 +46,23 @@ static void padAlloc(MLIRContext *context, memref::AllocOp allocOp,
   rewriter.eraseOp(allocOp);
 }
 
+LogicalResult reduceSharedMemoryBankConflicts(mlir::FunctionOpInterface funcOp,
+                                              unsigned paddingSize) {
+  SmallVector<memref::AllocOp> sharedMemAllocs;
+  // Collect all the alloc operations.
+  funcOp.walk([&](memref::AllocOp allocOp) {
+    if (hasSharedMemoryAddressSpace(allocOp.getType()) &&
+        allocOp.getType().hasStaticShape()) {
+      sharedMemAllocs.push_back(allocOp);
+    }
+  });
+  for (memref::AllocOp alloc : sharedMemAllocs)
+    padAlloc(funcOp->getContext(), alloc, paddingSize);
+
+  // In the current form this always succeeds.
+  return success();
+}
+
 namespace {
 
 /// Pass to reduce the number of bank conflicts when accessing shared memory in
@@ -53,8 +71,8 @@ namespace {
 /// usage. In order to get better memory access patterns we should do shared
 /// memory swizzling which requires more complex transformations. This pass can
 /// be removed once the better solution is implemented.
-struct GPUReduceBankConflictsPass
-    : public GPUReduceBankConflictsBase<GPUReduceBankConflictsPass> {
+struct GPUReduceBankConflictsPass final
+    : GPUReduceBankConflictsBase<GPUReduceBankConflictsPass> {
 private:
   int64_t paddingSizeBits;
 
@@ -64,17 +82,7 @@ public:
 
   void runOnOperation() override {
     auto funcOp = getOperation();
-    MLIRContext *context = &getContext();
-    SmallVector<memref::AllocOp> sharedMemAllocs;
-    // Collect all the alloc operations.
-    funcOp.walk([&](memref::AllocOp allocOp) {
-      if (hasSharedMemoryAddressSpace(allocOp.getType()) &&
-          allocOp.getType().hasStaticShape()) {
-        sharedMemAllocs.push_back(allocOp);
-      }
-    });
-    for (memref::AllocOp alloc : sharedMemAllocs)
-      padAlloc(context, alloc, paddingSizeBits);
+    (void)reduceSharedMemoryBankConflicts(funcOp, paddingSizeBits);
   }
 };
 
