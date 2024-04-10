@@ -503,7 +503,7 @@ HALDispatchABI::buildScopeAttr(mlir::ModuleOp moduleOp,
       LLVM::DIFileAttr::get(context, llvm::sys::path::filename(inputFilePath),
                             llvm::sys::path::parent_path(inputFilePath));
   auto compileUnitAttr = LLVM::DICompileUnitAttr::get(
-      context, DistinctAttr::create(UnitAttr::get(context)),
+      DistinctAttr::create(UnitAttr::get(context)),
       llvm::dwarf::DW_LANG_C17, fileAttr, builder.getStringAttr("IREE"),
       /*isOptimized=*/true, LLVM::DIEmissionKind::Full);
 
