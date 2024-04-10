@@ -116,7 +116,7 @@ createGPUPipeliningPass(bool epiloguePeeling = true, unsigned depth = 1,
 /// Apply transformation to reduce the number of bank conflicts when accessing
 /// shared memory by padding fastest moving dimension with the specified size.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createGPUReduceSharedMemoryBankConflicts(int64_t paddingSizeBits = 64);
+createGPUReduceSharedMemoryBankConflicts(int64_t paddingSizeBits = 128);
 
 // Creates a pass to create allocations for some tensor values to use GPU
 // shared memory.

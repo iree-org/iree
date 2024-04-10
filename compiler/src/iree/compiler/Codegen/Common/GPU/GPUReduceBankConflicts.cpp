@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 
 namespace mlir::iree_compiler {
 
@@ -73,17 +74,22 @@ namespace {
 /// be removed once the better solution is implemented.
 struct GPUReduceBankConflictsPass final
     : GPUReduceBankConflictsBase<GPUReduceBankConflictsPass> {
-private:
-  int64_t paddingSizeBits;
-
-public:
   GPUReduceBankConflictsPass(int64_t paddingSizeBits)
       : paddingSizeBits(paddingSizeBits) {}
+  void initOptions() {
+    if (GPUReduceBankConflictsBase::paddingBits.hasValue())
+      paddingSizeBits = GPUReduceBankConflictsBase::paddingBits;
+  }
 
   void runOnOperation() override {
-    auto funcOp = getOperation();
-    (void)reduceSharedMemoryBankConflicts(funcOp, paddingSizeBits);
+    initOptions();
+    FunctionOpInterface funcOp = getOperation();
+    if (failed(reduceSharedMemoryBankConflicts(funcOp, paddingSizeBits)))
+      signalPassFailure();
   }
+
+private:
+  int64_t paddingSizeBits;
 };
 
 } // namespace
