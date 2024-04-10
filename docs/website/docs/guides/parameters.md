@@ -125,7 +125,6 @@ types:
 
 * PyTorch `.pt` and `.pth` files (serialized state dictionaries produced with
   [`torch.save`](https://pytorch.org/docs/stable/generated/torch.save.html))
-* ONNX `.onnx` protobufs (see the [ONNX guide](./ml-frameworks/onnx.md))
 * TensorFlow checkpoint (`.ckpt`, `.h5`) files or SavedModel /
   [`model.keras`](https://www.tensorflow.org/tutorials/keras/save_and_load)
   archives (see the [TensorFlow guide](./ml-frameworks/tensorflow.md))
