@@ -8,9 +8,11 @@
 
 #if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
 
-#include "experimental/rocm/status_util.h"
-
 #include <dlfcn.h>
+#include <pthread.h>
+#include <unistd.h>
+
+#include "experimental/rocm/status_util.h"
 
 // Total number of events per tracing context. This translates to the maximum
 // number of outstanding timestamp queries before collection is required.
@@ -18,13 +20,13 @@
 #define IREE_HAL_ROCM_TRACING_DEFAULT_QUERY_CAPACITY (16 * 1024 - 256)
 
 typedef void (*SmuDumpCallback)(uint64_t, const char*, const char*, double);
-typedef bool (*SmuDumpInitFunc) (SmuDumpCallback callback);
-typedef void (*SmuDumpEndFunc) (void);
-typedef void (*SmuDumpOnceFunc) (void);
-typedef void (*RegDumpOnceFunc) (void);
-typedef void (*SviDumpOnceFunc) (void);
-typedef uint32_t (*RegGetTraceRate) (void);
-typedef uint32_t (*SmuGetTraceRate) (void);
+typedef bool (*SmuDumpInitFunc)(SmuDumpCallback callback);
+typedef void (*SmuDumpEndFunc)(void);
+typedef void (*SmuDumpOnceFunc)(void);
+typedef void (*RegDumpOnceFunc)(void);
+typedef void (*SviDumpOnceFunc)(void);
+typedef uint32_t (*RegGetTraceRate)(void);
+typedef uint32_t (*SmuGetTraceRate)(void);
 
 #define SMUTRACE_DLL "libsmutrace.so"
 
@@ -50,7 +52,8 @@ struct iree_hal_rocm_tracing_context_t {
 
   // Event pool reused to capture tracing timestamps.
   hipEvent_t event_pool[IREE_HAL_ROCM_TRACING_DEFAULT_QUERY_CAPACITY];
-  
+
+  void* smutrace_handle;
   SmuDumpInitFunc f_smuDumpInit;
   SmuDumpEndFunc f_smuDumpEnd;
   SmuDumpOnceFunc f_smuDumpOnce;
@@ -59,13 +62,42 @@ struct iree_hal_rocm_tracing_context_t {
   RegGetTraceRate f_regGetTraceRate;
   SmuGetTraceRate f_smuGetTraceRate;
   bool smutrace_enabled;
+  pthread_t var_dump_thread;
+  int64_t m_reg_period;
 };
 
+static uint64_t clocktime_ns() {
+  struct timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  return ((uint64_t)ts.tv_sec * 1000000000) + ts.tv_nsec;
+}
 
-void iree_smutrace_callback(uint64_t did, const char* type ,const char* name, double value)
-{
-    IREE_TRACE_SET_PLOT_TYPE(name, IREE_TRACING_PLOT_TYPE_NUMBER, true, true, 0xFF0000FF);
-    IREE_TRACE_PLOT_VALUE_F64(name, value);
+static void* dump_smu_variables_thread(void* ctx) {
+  iree_hal_rocm_tracing_context_t* context =
+      (iree_hal_rocm_tracing_context_t*)ctx;
+
+  int64_t startTime = clocktime_ns() / 1000;
+
+  if (context != NULL) {
+    while (context->smutrace_enabled == true) {
+      context->f_regDumpOnce();
+
+      int64_t endTime = clocktime_ns() / 1000;
+      int64_t sleepTime = startTime + context->m_reg_period - endTime;
+      sleepTime = (sleepTime > 0) ? sleepTime : 0;
+      usleep(sleepTime);
+      startTime = clocktime_ns() / 1000;
+    }
+  }
+
+  pthread_exit(NULL);
+}
+
+static void iree_smutrace_callback(uint64_t did, const char* type,
+                                   const char* name, double value) {
+  IREE_TRACE_SET_PLOT_TYPE(name, IREE_TRACING_PLOT_TYPE_NUMBER, true, true,
+                           0xFF0000FF);
+  IREE_TRACE_PLOT_VALUE_F64(name, value);
 }
 
 static iree_status_t iree_hal_rocm_tracing_context_initial_calibration(
@@ -158,20 +190,39 @@ iree_status_t iree_hal_rocm_tracing_context_allocate(
   }
 
   context->smutrace_enabled = false;
-  void (*dl) = dlopen(SMUTRACE_DLL, RTLD_LAZY);
-  if (dl) {
-    context->f_smuDumpInit = (SmuDumpInitFunc) dlsym(dl, "smuDumpInit");
-    context->f_smuDumpEnd = (SmuDumpEndFunc) dlsym(dl, "smuDumpEnd");
-    context->f_smuDumpOnce = (SmuDumpOnceFunc) dlsym(dl, "smuDumpOnce");
-    context->f_regDumpOnce = (RegDumpOnceFunc) dlsym(dl, "regDumpOnce");
-    context->f_sviDumpOnce = (SviDumpOnceFunc) dlsym(dl, "sviDumpOnce");
-    context->f_smuGetTraceRate = (SmuGetTraceRate) dlsym(dl, "getSmuVariablesCaptureRate");
-    context->f_regGetTraceRate = (RegGetTraceRate) dlsym(dl, "getRegisterExpressionCaptureRate");
-    context->smutrace_enabled = (context->f_smuDumpInit && context->f_smuDumpEnd && context->f_smuDumpOnce &&
-                        context->f_smuGetTraceRate && context->f_regGetTraceRate && context->f_regDumpOnce  && context->f_sviDumpOnce  &&
-                        context->f_smuDumpInit(iree_smutrace_callback));
+  context->smutrace_handle = dlopen(SMUTRACE_DLL, RTLD_LAZY);
+  if (context->smutrace_handle) {
+    context->f_smuDumpInit =
+        (SmuDumpInitFunc)dlsym(context->smutrace_handle, "smuDumpInit");
+    context->f_smuDumpEnd =
+        (SmuDumpEndFunc)dlsym(context->smutrace_handle, "smuDumpEnd");
+    context->f_smuDumpOnce =
+        (SmuDumpOnceFunc)dlsym(context->smutrace_handle, "smuDumpOnce");
+    context->f_regDumpOnce =
+        (RegDumpOnceFunc)dlsym(context->smutrace_handle, "regDumpOnce");
+    context->f_sviDumpOnce =
+        (SviDumpOnceFunc)dlsym(context->smutrace_handle, "sviDumpOnce");
+    context->f_smuGetTraceRate = (SmuGetTraceRate)dlsym(
+        context->smutrace_handle, "getSmuVariablesCaptureRate");
+    context->f_regGetTraceRate = (RegGetTraceRate)dlsym(
+        context->smutrace_handle, "getRegisterExpressionCaptureRate");
+    context->smutrace_enabled =
+        (context->f_smuDumpInit && context->f_smuDumpEnd &&
+         context->f_smuDumpOnce && context->f_smuGetTraceRate &&
+         context->f_regGetTraceRate && context->f_regDumpOnce &&
+         context->f_sviDumpOnce &&
+         context->f_smuDumpInit(iree_smutrace_callback));
   } else {
     fprintf(stderr, "Warning: " SMUTRACE_DLL " could not be loaded!\n");
+  }
+
+  if (context->smutrace_enabled) {
+    context->m_reg_period = context->f_regGetTraceRate();
+    int ret = pthread_create(&context->var_dump_thread, NULL,
+                             dump_smu_variables_thread, context);
+    if (ret != 0) {
+      fprintf(stderr, "Warning: failed to create variables dump thread\n");
+    }
   }
 
   if (iree_status_is_ok(status)) {
@@ -210,7 +261,10 @@ void iree_hal_rocm_tracing_context_free(
   iree_allocator_free(host_allocator, context);
 
   if (context->smutrace_enabled) {
+    context->smutrace_enabled = false;
+    pthread_join(context->var_dump_thread, NULL);
     context->f_smuDumpEnd();
+    dlclose(context->smutrace_handle);
   }
 
   IREE_TRACE_ZONE_END(z0);
