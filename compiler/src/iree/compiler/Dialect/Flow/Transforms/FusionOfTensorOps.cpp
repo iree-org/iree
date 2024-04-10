@@ -489,8 +489,8 @@ struct FusionOfTensorOpsPass
             if (!reshapeOp)
               return true;
 
-            return isa<linalg::LinalgOp, tensor::UnPackOp,
-                       LinalgExt::UnsetEncodingOp>(
+            return llvm::isa_and_nonnull<linalg::LinalgOp, tensor::UnPackOp,
+                                         LinalgExt::UnsetEncodingOp>(
                 reshapeOp.getSrc().getDefiningOp());
           };
 
