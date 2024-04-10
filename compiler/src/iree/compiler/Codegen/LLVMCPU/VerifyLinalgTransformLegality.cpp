@@ -21,9 +21,9 @@ struct VerifyLinalgTransformLegalityPass
 } // namespace
 
 void VerifyLinalgTransformLegalityPass::runOnOperation() {
-  auto moduleOp = getOperation();
+  auto funcOp = getOperation();
   // For now only check that there are no Linalg transform markers.
-  auto walkResult = moduleOp.walk([](linalg::LinalgOp op) -> WalkResult {
+  auto walkResult = funcOp.walk([](linalg::LinalgOp op) -> WalkResult {
     if (op->hasAttr(LinalgTransforms::kLinalgTransformMarker)) {
       return op.emitError("expected no Linalg transform markers");
     }
@@ -34,7 +34,7 @@ void VerifyLinalgTransformLegalityPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<OperationPass<ModuleOp>>
+std::unique_ptr<InterfacePass<FunctionOpInterface>>
 createVerifyLinalgTransformLegalityPass() {
   return std::make_unique<VerifyLinalgTransformLegalityPass>();
 }

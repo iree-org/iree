@@ -20,8 +20,7 @@ def VMVXAssignConstantOrdinals :
 }
 
 def VMVXSelectLoweringStrategy :
-    Pass<"iree-vmvx-select-lowering-strategy",
-         "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
+    Pass<"iree-vmvx-select-lowering-strategy", "ModuleOp"> {
   let summary =
       "Select a IREE::HAL::DispatchLoweringPassPipeline for lowering the variant";
   let constructor =
@@ -35,8 +34,7 @@ def VMVXLinkExecutables :
 }
 
 def VMVXLowerExecutableTarget :
-    Pass<"iree-vmvx-lower-executable-target",
-         "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
+    InterfacePass<"iree-vmvx-lower-executable-target", "mlir::FunctionOpInterface"> {
   let summary =
       "Lower executable target using an IREE::HAL::DispatchLoweringPassPipeline";
   let constructor =

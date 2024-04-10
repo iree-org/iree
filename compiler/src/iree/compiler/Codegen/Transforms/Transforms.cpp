@@ -438,9 +438,9 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
 LogicalResult lowerWorkgroupCountFromSliceOp(
     RewriterBase &rewriter, mlir::FunctionOpInterface entryPointFn,
     ArrayRef<OpFoldResult> workgroupCount, int maxWorkgroupParallelDims) {
-  FailureOr<IREE::HAL::ExecutableExportOp> exportOp =
+  std::optional<IREE::HAL::ExecutableExportOp> exportOp =
       getEntryPoint(entryPointFn);
-  if (failed(exportOp)) {
+  if (!exportOp) {
     return entryPointFn.emitOpError(
         "expected function to be entry point function");
   }

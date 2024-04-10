@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-codegen-gpu-check-resource-usage %s --verify-diagnostics -split-input-file | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-check-resource-usage))" %s --verify-diagnostics -split-input-file | FileCheck %s
 
 module {
   // expected-error @+1 {{uses 274432 bytes of shared memory; exceeded the limit of 65536 bytes}}

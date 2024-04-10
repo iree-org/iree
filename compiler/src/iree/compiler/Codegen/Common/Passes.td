@@ -26,7 +26,7 @@ def BubbleUpOrdinalOps : Pass<"iree-codegen-bubble-up-ordinal-ops", ""> {
 }
 
 def BufferizeCopyOnlyDispatches :
-  Pass<"iree-codegen-bufferize-copy-only-dispatches", "ModuleOp"> {
+  InterfacePass<"iree-codegen-bufferize-copy-only-dispatches", "mlir::FunctionOpInterface"> {
   let summary =
       "Bufferize dispatches that copy to/from interfaces to convert to a linalg.copy op";
   let constructor = "mlir::iree_compiler::createBufferizeCopyOnlyDispatchesPass()";
@@ -47,13 +47,13 @@ def ConcretizePadResultShape :
   let constructor = "mlir::iree_compiler::createConcretizePadResultShapePass()";
 }
 
-def ConvertBf16ArithToF32 : Pass<"iree-convert-bf16-arith-to-f32", "ModuleOp"> {
+def ConvertBf16ArithToF32 : Pass<"iree-convert-bf16-arith-to-f32", ""> {
   let summary = "Convert bf16 arithmetic operations to f32";
   let constructor = "mlir::iree_compiler::createConvertBf16ArithToF32Pass()";
 }
 
 def ConvertBf16ToUInt16Buffers :
-    Pass<"iree-convert-bf16-to-uint16-buffers", "ModuleOp"> {
+    Pass<"iree-convert-bf16-to-uint16-buffers", ""> {
   let summary = "Convert bf16 buffers to uint16 equivalents";
   let constructor = "mlir::iree_compiler::createConvertBf16ToUInt16BuffersPass()";
 }
@@ -170,6 +170,15 @@ def DecomposeSoftmax :
   ];
 }
 
+def ReconcileTranslationInfo
+    : Pass<"iree-codegen-reconcile-translation-info", "IREE::HAL::ExecutableVariantOp"> {
+  let summary =
+      "Reconcile information (like workgroup_size, subgroup_size) across "
+      "`TranslationInfo` set on each function in the dispatch and merge them"
+      "and set them at the appropriate places in the surrounding HAL ops";
+  let constructor = "mlir::iree_compiler::createReconcileTranslationInfoPass()";
+}
+
 def ReplaceSlowMinMaxOps
     : InterfacePass<"iree-codegen-replace-slow-min-max-ops", "mlir::FunctionOpInterface"> {
   let summary =
@@ -179,13 +188,13 @@ def ReplaceSlowMinMaxOps
 }
 
 def EliminateEmptyTensors :
-    Pass<"iree-eliminate-empty-tensors", "ModuleOp"> {
+    InterfacePass<"iree-eliminate-empty-tensors", "mlir::FunctionOpInterface"> {
   let summary = "Eliminate tensor.empty ops to avoid buffer allocations";
   let constructor = "mlir::iree_compiler::createEliminateEmptyTensorsPass()";
 }
 
 def EmulateNarrowType :
-    Pass<"iree-codegen-emulate-narrow-type", "ModuleOp"> {
+    Pass<"iree-codegen-emulate-narrow-type", ""> {
   let summary = "Emulate narrow integer operations using wide integer operations";
   let constructor = "mlir::iree_compiler::createEmulateNarrowTypePass()";
 }
@@ -234,8 +243,7 @@ def ExtractAddressComputation: Pass<"extract-address-computation"> {
   ];
 }
 
-def FlattenMemRefSubspan :
-  Pass<"iree-codegen-flatten-memref-subspan", "ModuleOp"> {
+def FlattenMemRefSubspan : Pass<"iree-codegen-flatten-memref-subspan", "ModuleOp"> {
   let summary =
       "Flatten n-D MemRef subspan ops to 1-D ones and fold byte offsets";
   let constructor = "mlir::iree_compiler::createFlattenMemRefSubspanPass()";
@@ -328,7 +336,7 @@ def HoistStaticallyBoundAllocations :
 }
 
 def IREEComprehensiveBufferize :
-    Pass<"iree-codegen-iree-comprehensive-bufferize", "ModuleOp"> {
+    InterfacePass<"iree-codegen-iree-comprehensive-bufferize", "mlir::FunctionOpInterface"> {
   let summary = "Convert from to Linalg ops on tensors to buffers";
   let constructor = "mlir::iree_compiler::createIREEComprehensiveBufferizePass()";
   let options = [
@@ -357,6 +365,12 @@ def InstrumentMemoryAccesses :
   let constructor = "mlir::iree_compiler::createInstrumentMemoryAccessesPass()";
 }
 
+def LowerExecutableUsingTransformDialect :
+    Pass<"iree-codegen-lower-executable-using-transform-dialect", "ModuleOp"> {
+  let summary = "Lower executables using the transform dialect recipe provided in the module.";
+  let constructor = "mlir::iree_compiler::createLowerExecutableUsingTransformDialectPass()";
+}
+
 def LowerUKernelOpsToCalls :
     Pass<"iree-codegen-lower-ukernel-ops-to-calls", "ModuleOp"> {
   let summary = "Lower micro-kernel wrapper ops into function calls";
@@ -370,7 +384,7 @@ def MaterializeEncodingIntoNop :
 }
 
 def MaterializeUserConfigs :
-    Pass<"iree-codegen-materialize-user-configs", "IREE::HAL::ExecutableVariantOp"> {
+    InterfacePass<"iree-codegen-materialize-user-configs", "mlir::FunctionOpInterface"> {
   let summary = "Sets the lowering configs and translation info from user configs";
   let constructor = "mlir::iree_compiler::createMaterializeUserConfigsPass()";
   let dependentDialects = [
@@ -465,7 +479,7 @@ def TestPartitionableLoopsInterface :
 }
 
 def TileAndDistributeToWorkgroups :
-    Pass<"iree-codegen-tile-and-distribute-to-workgroups", "IREE::HAL::ExecutableVariantOp"> {
+    InterfacePass<"iree-codegen-tile-and-distribute-to-workgroups", "mlir::FunctionOpInterface"> {
   let summary = "Tile and distribute operations to workgroups";
   let constructor = "mlir::iree_compiler::createTileAndDistributeToWorkgroupsPass()";
   let options = [

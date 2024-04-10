@@ -1,5 +1,5 @@
-// RUN: iree-opt --split-input-file --iree-spirv-vectorize-load-store --canonicalize -cse --mlir-print-local-scope %s | FileCheck %s
-// RUN: iree-opt --split-input-file --iree-spirv-vectorize-load-store --cse --mlir-print-local-scope %s | FileCheck %s --check-prefix=BASE
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-spirv-vectorize-load-store, canonicalize, cse))" --mlir-print-local-scope %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-spirv-vectorize-load-store, cse))" --mlir-print-local-scope %s | FileCheck %s --check-prefix=BASE
 
 func.func @alloc_transfer_read_write_vector4_vector8(%arg0: memref<4096x4096xf32>, %x: index, %y: index) {
   %cst = arith.constant 0.000000e+00 : f32

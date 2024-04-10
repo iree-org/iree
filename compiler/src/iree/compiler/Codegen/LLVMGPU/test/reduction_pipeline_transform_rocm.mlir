@@ -1,5 +1,5 @@
 // RUN: iree-opt --split-input-file \
-// RUN:  --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-select-lowering-strategy, iree-llvmgpu-lower-executable-target)))" \
+// RUN:  --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-llvmgpu-select-lowering-strategy, func.func(iree-llvmgpu-lower-executable-target)))))" \
 // RUN:  %s | FileCheck %s
 
 hal.executable @group_reduction_1d {
@@ -30,12 +30,9 @@ hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb", {t
 }
 }
 
-// CHECK:       #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUWarpReduction>
-// CHECK-LABEL: hal.executable.export public @group_reduction_1d
-// CHECK-SAME:    subgroup_size = 32
-// CHECK-SAME:    translation_info = #[[$TRANSLATION]]
-// CHECK-SAME:    workgroup_size = [32 : index, 1 : index, 1 : index]
-//CHECK-LABEL:      func.func @group_reduction_1d
+//         CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUWarpReduction workgroup_size = [32, 1, 1] subgroup_size = 32>
+//         CHECK: func.func @group_reduction_1d()
+//    CHECK-SAME:    translation_info = #[[$TRANSLATION]]
 // CHECK-COUNT-5:     gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
 
 // -----
@@ -70,12 +67,8 @@ hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb", {t
 
 // On CDNA, we prefer wave64 with subgroup size of 64.
 
-// CHECK:       #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUWarpReduction>
-// CHECK-LABEL: hal.executable.export public @group_reduction_1d
-// CHECK-SAME:    subgroup_size = 64
-// CHECK-SAME:    translation_info = #[[$TRANSLATION]]
-// CHECK-SAME:    workgroup_size = [64 : index, 1 : index, 1 : index]
-//CHECK-LABEL:      func.func @group_reduction_1d
+//        CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 64>
+//        CHECK: func.func @group_reduction_1d
 // CHECK-COUNT-5:     gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}} arith.addf
 
 // -----
@@ -124,13 +117,9 @@ hal.executable private @i4_dequant_matvec {
   }
 }
 
-// CHECK:       #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUWarpReduction>
-// CHECK-LABEL: hal.executable.export public @i4_dequant_matvec
-// CHECK-SAME:    subgroup_size = 32
-// CHECK-SAME:    translation_info = #[[$TRANSLATION]]
-// CHECK-SAME:    workgroup_size = [64 : index, 1 : index, 1 : index]
-//
-//   CHECK-LABEL: func.func @i4_dequant_matvec()
+//        CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 32>
+//        CHECK: func.func @i4_dequant_matvec()
+//   CHECK-SAME:    translation_info = #[[$TRANSLATION]]
 //         CHECK:   %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<1x8xf16>
 //         CHECK:   %[[FOR:.+]] = scf.for %{{.+}} = %c0 to %c32 step %c4 iter_args(%[[ARG:.+]] = %[[CST]]) -> (vector<1x8xf16>)
 //         CHECK:     %[[READ0:.+]] = vector.transfer_read {{.+}} : memref<4096x32x128xi4, #hal.descriptor_type<storage_buffer>>, vector<1x8xi4>
@@ -196,12 +185,9 @@ hal.executable private @i4_dequant_matvec {
   }
 }
 
-// CHECK:       #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUWarpReduction>
-// CHECK-LABEL: hal.executable.export public @i4_dequant_matvec
-// CHECK-SAME:    subgroup_size = 64
-// CHECK-SAME:    translation_info = #[[$TRANSLATION]]
-// CHECK-SAME:    workgroup_size = [64 : index, 1 : index, 1 : index]
-// CHECK-LABEL:     func.func @i4_dequant_matvec()
+//      CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 64>
+//      CHECK: func.func @i4_dequant_matvec()
+// CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 
 // -----
 
@@ -241,13 +227,9 @@ hal.executable private @matvec_fp16 {
 // write 8 results at the end.
 // TODO(kuhar): We should reduce the number of `gpu.shuffles` performed.
 
-// CHECK:       #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUWarpReduction>
-// CHECK-LABEL: hal.executable.export public @matvec_fp16
-// CHECK-SAME:    subgroup_size = 64
-// CHECK-SAME:    translation_info = #[[$TRANSLATION]]
-// CHECK-SAME:    workgroup_size = [64 : index, 1 : index, 1 : index]
-//
-//    CHECK-LABEL: func.func @matvec_fp16()
+//          CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 64>
+//          CHECK: func.func @matvec_fp16()
+//     CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //      CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //      CHECK-DAG:   %[[C512:.+]] = arith.constant 512 : index
 //      CHECK-DAG:   %[[C4096:.+]] = arith.constant 4096 : index
@@ -299,13 +281,9 @@ hal.executable private @matvec_fp16 {
 // Multi-row matvec with wave32.
 // TODO(kuhar): We should reduce the number of `gpu.shuffles` performed.
 
-// CHECK:       #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUWarpReduction>
-// CHECK-LABEL: hal.executable.export public @matvec_fp16
-// CHECK-SAME:    subgroup_size = 32
-// CHECK-SAME:    translation_info = #[[$TRANSLATION]]
-// CHECK-SAME:    workgroup_size = [64 : index, 1 : index, 1 : index]
-//
-//    CHECK-LABEL: func.func @matvec_fp16()
+//          CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 32>
+//          CHECK: func.func @matvec_fp16()
+//     CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //      CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //      CHECK-DAG:   %[[C512:.+]] = arith.constant 512 : index
 //      CHECK-DAG:   %[[C4096:.+]] = arith.constant 4096 : index

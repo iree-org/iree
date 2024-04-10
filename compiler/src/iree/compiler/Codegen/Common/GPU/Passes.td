@@ -14,7 +14,7 @@ include "mlir/Pass/PassBase.td"
 //===---------------------------------------------------------------------===//
 
 def GPUCheckResourceUsage :
-    Pass<"iree-codegen-gpu-check-resource-usage", "ModuleOp"> {
+    InterfacePass<"iree-codegen-gpu-check-resource-usage", "mlir::FunctionOpInterface"> {
   let summary = "Checks GPU specific resource usage constraints like shared memory limits";
   let constructor = "mlir::iree_compiler::createGPUCheckResourceUsagePass()";
 }

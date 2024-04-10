@@ -9,10 +9,11 @@
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 
 namespace mlir::iree_compiler {
 
-LogicalResult initCPULaunchConfig(ModuleOp moduleOp);
+LogicalResult initCPULaunchConfig(FunctionOpInterface funcOp);
 
 } // namespace mlir::iree_compiler
 

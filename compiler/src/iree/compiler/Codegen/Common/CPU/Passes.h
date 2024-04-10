@@ -46,7 +46,7 @@ createCPUMaterializeUpperBoundTileSizePass(
     ArrayRef<IREE::HAL::ExecutableTargetAttr> targetAttrs = {});
 
 /// Adds CPU bufferization passes to the pipeline.
-void addCPUBufferizePasses(OpPassManager &passManager);
+void addCPUBufferizePasses(OpPassManager &funcPassManager);
 
 /// Pass to lower a sequence of operations to a iree_codegen.ukernel.*
 /// operation.

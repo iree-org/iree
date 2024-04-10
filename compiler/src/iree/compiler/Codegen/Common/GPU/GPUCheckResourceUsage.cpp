@@ -104,21 +104,20 @@ static LogicalResult checkGPUAllocationSize(
 }
 
 void GPUCheckResourceUsagePass::runOnOperation() {
-  auto moduleOp = getOperation();
-  for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
-    unsigned limit = this->getSharedMemoryLimit
-                         ? this->getSharedMemoryLimit(funcOp)
-                         : 64 * 1024;
-    if (failed(checkGPUAllocationSize(funcOp, limit,
-                                      this->getIndexBitwidth
-                                          ? this->getIndexBitwidth
-                                          : getDatalayoutIndexBitwidth))) {
-      return signalPassFailure();
-    }
+  auto funcOp = getOperation();
+  unsigned limit = this->getSharedMemoryLimit
+                       ? this->getSharedMemoryLimit(funcOp)
+                       : 64 * 1024;
+  if (failed(checkGPUAllocationSize(funcOp, limit,
+                                    this->getIndexBitwidth
+                                        ? this->getIndexBitwidth
+                                        : getDatalayoutIndexBitwidth))) {
+    return signalPassFailure();
   }
 }
 
-std::unique_ptr<OperationPass<ModuleOp>> createGPUCheckResourceUsagePass(
+std::unique_ptr<InterfacePass<FunctionOpInterface>>
+createGPUCheckResourceUsagePass(
     std::function<unsigned(mlir::FunctionOpInterface)> getSharedMemoryLimit,
     std::function<unsigned(mlir::FunctionOpInterface)> getIndexBitwidth) {
   return std::make_unique<GPUCheckResourceUsagePass>(getSharedMemoryLimit,

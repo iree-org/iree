@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/VMVX/PassDetail.h"
@@ -11,12 +12,15 @@
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
+
+#define DEBUG_TYPE "iree-vmvx-lower-executable-target"
 
 using mlir::iree_compiler::IREE::Codegen::LoweringConfigAttr;
 
@@ -47,40 +51,45 @@ public:
 } // namespace
 
 void VMVXLowerExecutableTargetPass::runOnOperation() {
-  IREE::HAL::ExecutableVariantOp variantOp = getOperation();
+  auto funcOp = getOperation();
 
-  std::optional<IREE::Codegen::TranslationInfoAttr> translationInfo =
-      getIdenticalTranslationInfo(variantOp);
-  if (!translationInfo) {
-    variantOp.emitOpError(
-        "unhandled compilation of entry point functions with different "
-        "translation info");
+  auto translationInfo = getTranslationInfo(funcOp);
+  if (!translationInfo)
+    return;
+
+  std::optional<OpPassManager> maybePipeline =
+      getFunctionOpInterfacePassManager(funcOp);
+  if (!maybePipeline) {
+    funcOp.emitOpError(
+        "unhandled function-like container during executable lowering");
+    return signalPassFailure();
+  }
+  OpPassManager &pipeline = maybePipeline.value();
+
+  auto target = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
+  bool enableUKernels = target && hasUkernel(target);
+  switch (translationInfo.getDispatchLoweringPassPipeline()) {
+  // No pipleline specified, nothing to do.
+  case IREE::Codegen::DispatchLoweringPassPipeline::None:
+    return;
+  case IREE::Codegen::DispatchLoweringPassPipeline::VMVXDefault:
+    addVMVXDefaultPassPipeline(pipeline, enableUKernels);
+    break;
+  default:
+    funcOp.emitOpError("Unsupported pipeline on VMVX target.");
     return signalPassFailure();
   }
 
-  OpPassManager pipeline(IREE::HAL::ExecutableVariantOp::getOperationName());
-  if (translationInfo.has_value()) {
-    auto target = variantOp.getTarget();
-    bool enableUKernels = hasUkernel(target);
-    switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
-    // No pipleline specified, nothing to do.
-    case IREE::Codegen::DispatchLoweringPassPipeline::None:
-      return;
-    case IREE::Codegen::DispatchLoweringPassPipeline::VMVXDefault:
-      addVMVXDefaultPassPipeline(pipeline, enableUKernels);
-      break;
-    default:
-      variantOp.emitOpError("Unsupported pipeline on VMVX target.");
-      return signalPassFailure();
-    }
-  }
-
-  if (failed(runPipeline(pipeline, variantOp))) {
+  LLVM_DEBUG({
+    llvm::dbgs() << "Using Pass pipeline : ";
+    pipeline.dump();
+  });
+  if (failed(runPipeline(pipeline, funcOp))) {
     return signalPassFailure();
   }
 }
 
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
+std::unique_ptr<InterfacePass<FunctionOpInterface>>
 createVMVXLowerExecutableTargetPass() {
   return std::make_unique<VMVXLowerExecutableTargetPass>();
 }

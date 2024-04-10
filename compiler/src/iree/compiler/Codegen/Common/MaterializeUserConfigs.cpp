@@ -73,11 +73,8 @@ struct MaterializeUserConfigsPass
   }
 
   void runOnOperation() override {
-    IREE::HAL::ExecutableVariantOp variantOp = getOperation();
-    ModuleOp moduleOp = variantOp.getInnerModule();
-    llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
-        getAllEntryPoints(moduleOp);
-    MLIRContext *context = moduleOp.getContext();
+    auto funcOp = getOperation();
+    MLIRContext *context = funcOp.getContext();
 
     // Parse the file path and kernel config strategy from flags. There are
     // two possible usage flows for transform dialect libraries.
@@ -92,9 +89,8 @@ struct MaterializeUserConfigsPass
     llvm::SplitString(llvm::StringRef(clCodegenTransformDialectLibraryFileName),
                       parts, "@");
     if (parts.size() > 2) {
-      variantOp.emitError()
-          << "Invalid transform library path and sequence name "
-          << clCodegenTransformDialectLibraryFileName;
+      funcOp.emitError() << "Invalid transform library path and sequence name "
+                         << clCodegenTransformDialectLibraryFileName;
       return signalPassFailure();
     }
     bool hasTransformLibrary = !parts.empty();
@@ -102,7 +98,7 @@ struct MaterializeUserConfigsPass
     std::string libraryFileName;
     if (hasTransformLibrary) {
       if (parts[0].empty()) {
-        variantOp.emitError() << "Cannot specify an empty library path";
+        funcOp.emitError() << "Cannot specify an empty library path";
         return signalPassFailure();
       }
       libraryFileName = parts[0];
@@ -112,7 +108,7 @@ struct MaterializeUserConfigsPass
     // Check if the user specified a custom entry point name.
     if (parts.size() == 2) {
       if (parts[1].empty()) {
-        variantOp.emitError() << "Cannot specify an empty sequence name";
+        funcOp.emitError() << "Cannot specify an empty sequence name";
         return signalPassFailure();
       }
       entrySequenceName = parts[1];
@@ -120,7 +116,7 @@ struct MaterializeUserConfigsPass
       entrySequenceName = "__kernel_config";
     }
 
-    LDBG("MaterializeUserConfigsPass on variant: " << variantOp);
+    LDBG("MaterializeUserConfigsPass on function: " << funcOp);
     std::optional<ModuleOp> transformLibrary = std::nullopt;
     if (hasTransformLibrary) {
       auto dialect =
@@ -128,88 +124,60 @@ struct MaterializeUserConfigsPass
       auto maybeTransformLibrary =
           dialect->getOrLoadTransformLibraryModule(libraryFileName);
       if (failed(maybeTransformLibrary)) {
-        variantOp.emitError()
-            << "failed to load transform library module: " << libraryFileName;
+        funcOp.emitError() << "failed to load transform library module: "
+                           << libraryFileName;
         return signalPassFailure();
       }
       transformLibrary = *maybeTransformLibrary;
       LDBG("--found transform library @" << libraryFileName);
 
       auto runResult = runTransformConfigurationStrategy(
-          variantOp, entrySequenceName, *transformLibrary);
+          funcOp, entrySequenceName, *transformLibrary);
       if (runResult == StrategyRunResult::NotFound) {
-        variantOp.emitError() << "transform kernel config strategy `"
-                              << entrySequenceName << " not found";
+        funcOp.emitError() << "transform kernel config strategy `"
+                           << entrySequenceName << " not found";
         return signalPassFailure();
       } else if (runResult == StrategyRunResult::Failed) {
-        variantOp.emitError() << "transform kernel config strategy `"
-                              << entrySequenceName << "` failed to apply";
+        funcOp.emitError() << "transform kernel config strategy `"
+                           << entrySequenceName << "` failed to apply";
         return signalPassFailure();
       }
     }
 
-    LDBG("--start iterating over: "
-         << std::distance(moduleOp.getOps<mlir::FunctionOpInterface>().begin(),
-                          moduleOp.getOps<mlir::FunctionOpInterface>().end())
-         << " functions");
-    std::optional<IREE::Codegen::TranslationInfoAttr> translationInfo;
-    for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
-      auto exportOp = exportOps.lookup(funcOp.getName());
-      if (!exportOp) {
-        continue;
-      }
-
-      /// Nothing to do if the export already has a config.
-      if (getTranslationInfo(exportOp)) {
-        continue;
-      }
-
-      /// First, apply all user configs.
-      auto res = funcOp.walk([&](Operation *op) {
-        if (auto compilationInfo = getCompilationInfo(op)) {
-          if (failed(setUserConfig(funcOp, op, compilationInfo))) {
-            return WalkResult::interrupt();
-          }
-        }
-        return WalkResult::advance();
-      });
-
-      if (res.wasInterrupted()) {
-        moduleOp.emitOpError("error in setting user configuration");
-        return signalPassFailure();
-      }
-    }
-
-    LDBG("--guaranteed unique translationInfo: " << translationInfo);
-    /// We only need to resolve symbols for transform dialect based strategies.
-    if (!translationInfo ||
-        translationInfo.value().getDispatchLoweringPassPipeline() !=
-            IREE::Codegen::DispatchLoweringPassPipeline::
-                TransformDialectCodegen) {
+    /// Nothing to do if the export already has a config.
+    IREE::Codegen::TranslationInfoAttr translationInfo =
+        getTranslationInfo(funcOp);
+    if (translationInfo) {
       return;
     }
 
-    // From now on, we know we have a transform dialect strategy. We now need to
-    // ensure it can resolve and apply in a subsequent interpreter pass or else
-    // we need to fall back to codegen.
-    bool failedToResolve = false;
-    auto g = llvm::make_scope_exit([&]() {
-      if (!failedToResolve)
-        return;
-
-      exportOps = getAllEntryPoints(variantOp.getInnerModule());
-      for (auto &it : exportOps) {
-        auto exportOp = it.second;
-        if (getTranslationInfo(exportOp) == translationInfo) {
-          exportOp->removeAttr(kTranslationInfoAttrName);
+    /// First, apply all user configs.
+    auto res = funcOp.walk([&](Operation *op) {
+      if (auto compilationInfo = getCompilationInfo(op)) {
+        if (failed(setUserConfig(funcOp, op, compilationInfo))) {
+          return WalkResult::interrupt();
         }
       }
+      return WalkResult::advance();
     });
 
+    if (res.wasInterrupted()) {
+      funcOp.emitOpError("error in setting user configuration");
+      return signalPassFailure();
+    }
+
+    translationInfo = getTranslationInfo(funcOp);
+    LDBG("--guaranteed unique translationInfo: " << translationInfo);
+    /// We only need to resolve symbols for transform dialect based strategies.
+    if (!translationInfo || translationInfo.getDispatchLoweringPassPipeline() !=
+                                IREE::Codegen::DispatchLoweringPassPipeline::
+                                    TransformDialectCodegen) {
+      return;
+    }
+
     std::optional<SymbolRefAttr> strategyName =
-        translationInfo.value().getCodegenSpec();
+        translationInfo.getCodegenSpec();
     if (!strategyName || *strategyName == SymbolRefAttr()) {
-      failedToResolve = true;
       return;
     }
 
@@ -217,10 +185,9 @@ struct MaterializeUserConfigsPass
     /// transform library.
     StringRef entryPoint = strategyName->getLeafReference();
     if (!transformLibrary || !(*transformLibrary) ||
-        !transform::detail::findTransformEntryPoint(
-            variantOp, *transformLibrary, entryPoint)) {
-      moduleOp.emitOpError("failed to find transform strategy symbol");
-      failedToResolve = true;
+        !transform::detail::findTransformEntryPoint(funcOp, *transformLibrary,
+                                                    entryPoint)) {
+      funcOp.emitOpError("failed to find transform strategy symbol");
     }
   }
 
@@ -231,7 +198,7 @@ private:
 
 } // namespace
 
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
+std::unique_ptr<InterfacePass<FunctionOpInterface>>
 createMaterializeUserConfigsPass() {
   return std::make_unique<MaterializeUserConfigsPass>();
 }

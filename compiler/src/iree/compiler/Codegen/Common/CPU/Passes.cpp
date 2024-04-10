@@ -44,10 +44,10 @@ static LogicalResult cpuCopyFn(OpBuilder &builder, Location loc, Value from,
   return success();
 }
 
-void addCPUBufferizePasses(OpPassManager &passManager) {
+void addCPUBufferizePasses(OpPassManager &funcPassManager) {
   BufferizationOptions::AllocationFn allocationFn = cpuAllocationFn;
   BufferizationOptions::MemCpyFn memcpyFn = cpuCopyFn;
-  addIREEComprehensiveBufferizePasses(passManager, allocationFn, memcpyFn);
+  addIREEComprehensiveBufferizePasses(funcPassManager, allocationFn, memcpyFn);
 }
 
 //===---------------------------------------------------------------------===//
