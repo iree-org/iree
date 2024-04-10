@@ -2034,12 +2034,45 @@
     Dumping executable files
   </a>
   
+    <nav class="md-nav" aria-label="Dumping executable files">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#module-level-executable-benchmarks" class="md-nav__link">
+    Module level executable benchmarks
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#low-level-executable-binary-benchmarks" class="md-nav__link">
+    Low level executable binary benchmarks
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
   <a href="#compiling-phase-by-phase" class="md-nav__link">
     Compiling phase by phase
   </a>
+  
+    <nav class="md-nav" aria-label="Compiling phase by phase">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dumping-compilation-phases" class="md-nav__link">
+    Dumping compilation phases
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -3293,12 +3326,45 @@
     Dumping executable files
   </a>
   
+    <nav class="md-nav" aria-label="Dumping executable files">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#module-level-executable-benchmarks" class="md-nav__link">
+    Module level executable benchmarks
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#low-level-executable-binary-benchmarks" class="md-nav__link">
+    Low level executable binary benchmarks
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
   <a href="#compiling-phase-by-phase" class="md-nav__link">
     Compiling phase by phase
   </a>
+  
+    <nav class="md-nav" aria-label="Compiling phase by phase">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#dumping-compilation-phases" class="md-nav__link">
+    Dumping compilation phases
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -3709,6 +3775,47 @@ can be disassembled using
 </div>
 <!-- TODO(scotttodd): Link to a playground Colab notebook that dumps files? -->
 
+<h3 id="module-level-executable-benchmarks">Module level executable benchmarks<a class="headerlink" href="#module-level-executable-benchmarks" title="Permanent link">link</a></h3>
+<p>The <em>benchmark</em> files produced by <code>--iree-hal-dump-executable-benchmarks-to</code>
+can be compiled in isolation and passed to <code>iree-benchmark-module</code>, where they
+exercise the full IREE runtime for a single executable:</p>
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>simple_abs.mlir<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-target-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
+<span class="hll"><span class="w">  </span>--iree-hal-dump-executable-benchmarks-to<span class="o">=</span>/tmp/iree/simple_abs/<span class="w"> </span><span class="se">\</span>
+</span><span class="w">  </span>-o<span class="w"> </span>/dev/null
+
+<span class="hll"><span class="gp">$ </span>iree-compile<span class="w"> </span><span class="se">\</span>
+</span><span class="hll"><span class="w">  </span>/tmp/iree/simple_abs/module_abs_dispatch_0_embedded_elf_x86_64_benchmark.mlir<span class="w"> </span><span class="se">\</span>
+</span><span class="hll"><span class="w">  </span>-o<span class="w"> </span>/tmp/iree/simple_abs/module_abs_dispatch_0_benchmark.vmfb
+</span><span class="hll">
+</span><span class="hll"><span class="gp">$ </span>iree-benchmark-module<span class="w"> </span><span class="se">\</span>
+</span><span class="hll"><span class="w">  </span>/tmp/iree/simple_abs/module_abs_dispatch_0_benchmark.vmfb
+</span></code></pre></div>
+<h3 id="low-level-executable-binary-benchmarks">Low level executable binary benchmarks<a class="headerlink" href="#low-level-executable-binary-benchmarks" title="Permanent link">link</a></h3>
+<p>The <em>binary</em> files produced by <code>--iree-hal-dump-executable-binaries-to</code>
+can be passed to <code>iree-benchmark-executable</code> where they are benchmarked
+directly, without using the IREE VM, HAL APIs, task system, etc. Note that this
+interface is much lower level and you must specify all push constants / binding
+parameters manually:</p>
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-target-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
+<span class="hll"><span class="w">  </span>--iree-hal-dump-executable-binaries-to<span class="o">=</span>/tmp/iree/simple_abs/<span class="w"> </span><span class="se">\</span>
+</span><span class="w">  </span>-o<span class="w"> </span>/dev/null
+
+<span class="hll"><span class="gp">$ </span>iree-benchmark-executable<span class="w"> </span><span class="se">\</span>
+</span><span class="hll"><span class="w">  </span>--device<span class="o">=</span>local-sync<span class="w"> </span><span class="se">\</span>
+</span><span class="hll"><span class="w">  </span>--executable_format<span class="o">=</span>embedded-elf-x86_64<span class="w"> </span><span class="se">\</span>
+</span><span class="hll"><span class="w">  </span>--executable_file<span class="o">=</span>/tmp/iree/simple_abs/module_abs_dispatch_0_embedded_elf_x86_64.so<span class="w"> </span><span class="se">\</span>
+</span><span class="hll"><span class="w">  </span>--entry_point<span class="o">=</span><span class="m">0</span><span class="w"> </span><span class="se">\</span>
+</span><span class="hll"><span class="w">  </span>--binding<span class="o">=</span><span class="nv">f32</span><span class="o">=</span>-2.5<span class="w"> </span><span class="se">\</span>
+</span><span class="hll"><span class="w">  </span>--binding<span class="o">=</span><span class="nv">f32</span><span class="o">=</span><span class="m">0</span><span class="w"> </span><span class="se">\</span>
+</span><span class="hll"><span class="w">  </span>--workgroup_count<span class="o">=</span><span class="m">1</span>,1,1
+</span></code></pre></div>
+<p>See the comments in
+<a href="https://github.com/openxla/iree/blob/main/tools/iree-benchmark-executable-main.c"><code>tools/iree-benchmark-executable-main.c</code></a>
+and the test file at
+<a href="https://github.com/openxla/iree/blob/main/tools/test/iree-benchmark-executable.mlir"><code>tools/test/iree-benchmark-executable.mlir</code></a>
+for more information and examples.</p>
 <h2 id="compiling-phase-by-phase">Compiling phase by phase<a class="headerlink" href="#compiling-phase-by-phase" title="Permanent link">link</a></h2>
 <p>IREE compiles programs through a series of broad phases:</p>
 <pre class="mermaid"><code>graph LR
@@ -3819,9 +3926,44 @@ then resume compilation and continue through the pipeline:</p>
 <p>or explicitly resume from an intermediate phase with <code>--compile-from=&lt;phase name&gt;</code>:</p>
 <div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>simple_exp_abi.mlir<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--iree-hal-target-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
+<span class="hll"><span class="w">  </span>--compile-from<span class="o">=</span>abi<span class="w"> </span><span class="se">\</span>
+</span><span class="w">  </span>-o<span class="w"> </span>simple_exp_cpu.vmfb
+</code></pre></div>
+<h3 id="dumping-compilation-phases">Dumping compilation phases<a class="headerlink" href="#dumping-compilation-phases" title="Permanent link">link</a></h3>
+<p>The <code>--dump-compilation-phases-to</code> flag can be used to dump program IR after
+each phase, much like <code>--compile-to</code> but without exiting early:</p>
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>simple_abs.mlir<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-target-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
+<span class="hll"><span class="w">  </span>--dump-compilation-phases-to<span class="o">=</span>/tmp/iree/simple_abs
+</span><span class="go">  -o /tmp/iree/simple_abs/simple_abs_cpu.vmfb</span>
+
+<span class="gp">$ </span>ls<span class="w"> </span>/tmp/iree/simple_abs<span class="w"> </span>-1v
+
+<span class="go">simple_abs.1.input.mlir</span>
+<span class="go">simple_abs.2.abi.mlir</span>
+<span class="go">simple_abs.3.preprocessing.mlir</span>
+<span class="go">simple_abs.4.global-optimization.mlir</span>
+<span class="go">simple_abs.5.flow.mlir</span>
+<span class="go">simple_abs.6.stream.mlir</span>
+<span class="go">simple_abs.7.executable-sources.mlir</span>
+<span class="go">simple_abs.8.executable-configurations.mlir</span>
+<span class="go">simple_abs.9.executable-targets.mlir</span>
+<span class="go">simple_abs.10.hal.mlir</span>
+<span class="go">simple_abs.11.vm.mlir</span>
+</code></pre></div>
+<p>As with <code>--compile-to</code>, these files can be used together with <code>--compile-from</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>simple_abs.2.abi.mlir<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-target-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--compile-from<span class="o">=</span>abi<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>-o<span class="w"> </span>simple_exp_cpu.vmfb
 </code></pre></div>
+<p>All together, these passes can be used to, for example:</p>
+<ul>
+<li>speed up triage ("at which phase do we go wrong")</li>
+<li>allow for faster development iteration (snapshot all phases at some baseline,
+  modify the compiler source, then resume from just before where those changes
+  impact a pipeline)</li>
+</ul>
 
 
 
