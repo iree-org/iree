@@ -53,7 +53,7 @@ jobs:
             -rA -s -m "plat_rdna3_rocm and presubmit" \
             experimental/regression_suite
 
-      # Disabled while flaky. Might be replaced with HIP tests instead?
+      # Disabled while flaky / unreliable (runners crashing?)
 
       # # Out of tree tests
       # - name: Checking out external TestSuite repository

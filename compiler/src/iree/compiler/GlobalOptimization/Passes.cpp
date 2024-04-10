@@ -35,6 +35,16 @@ static llvm::cl::opt<bool> clEnableTransposePropagation(
         "Enables propagation of transpose ops to improve fusion chances."),
     llvm::cl::init(false));
 
+// TODO(hanchung): Remove the flag. We don't want to do early materialization by
+// default. Because it won't work for heterogeneous computing. This is not the
+// right layer for handling such information.
+static llvm::cl::opt<bool> clEnableEarlyMaterialization(
+    "iree-global-opt-enable-early-materialization",
+    llvm::cl::desc(
+        "Enables early materialization on encodings. Note, this flag should be "
+        "false eventually. This does not work for heterogeneous computing."),
+    llvm::cl::init(true));
+
 static llvm::cl::opt<bool> clEnableDemoteContractionInputsToBF16(
     "iree-global-opt-enable-demote-contraction-inputs-to-bf16",
     llvm::cl::desc(
@@ -138,8 +148,12 @@ void buildGlobalOptimizationPassPipeline(
 
   // Enable data tiling after they are in a canonical form.
   if (transformOptions.options.dataTiling) {
+    // TODO(hanchung): Make data-tiling passes be FunctionOpInterface pass, so
+    // we can use `FunctionLikNest` here.
     mainPassManager.addPass(createSetEncodingPass());
-    mainPassManager.addPass(createMaterializeHomogeneousEncodingsPass());
+    if (clEnableEarlyMaterialization) {
+      mainPassManager.addPass(createMaterializeHomogeneousEncodingsPass());
+    }
     mainPassManager.addPass(createCanonicalizerPass());
     mainPassManager.addPass(createCSEPass());
     mainPassManager.addPass(createSimplifyPackUnpackPass());

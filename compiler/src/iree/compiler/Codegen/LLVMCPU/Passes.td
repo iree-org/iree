@@ -81,6 +81,11 @@ def LLVMCPULowerExecutableTarget :
 def LLVMCPUMmt4dVectorLowering
     : InterfacePass<"iree-llvmcpu-mmt4d-vector-lowering", "mlir::FunctionOpInterface"> {
   let summary = "Apply vector lowering logic to vector ops";
+  let options = [
+    Option<"enableVectorContractCustomKernels", "vector-contract-custom-kernels", "bool",
+      /*default=*/"true",
+      "Flag to enable or disable vector contract custom kernels.">,
+  ];
   let constructor =
       "mlir::iree_compiler::createLLVMCPUMmt4dVectorLoweringPass()";
 }

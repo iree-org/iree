@@ -38,11 +38,9 @@ hal.executable private @static_3d_sort  {
 //       CHECK: %[[WG_OUTPUT:.+]] = memref.subview %[[ARG0]]
 //       CHECK: %[[TID_X:.+]] = gpu.thread_id x
 //       CHECK: %[[DIM_X:.+]] = gpu.block_dim x
-//       CHECK: %[[TID_Y:.+]] = gpu.thread_id y
-//       CHECK: %[[DIM_Y:.+]] = gpu.block_dim y
-//       CHECK: scf.for %[[IV_Y:.+]] = %[[TID_Y]] to %{{.+}} step %[[DIM_Y]]
-//       CHECK:   scf.for %[[IV_X:.+]] = %[[TID_X]] to %{{.+}} step %[[DIM_X]]
-//       CHECK:     %[[DEST:.+]] = memref.subview %[[WG_OUTPUT]][%[[IV_Y]], 0, %[[IV_X]]]
-//       CHECK:     iree_linalg_ext.sort
+//       CHECK: scf.for %[[IV_X:.+]] = %[[TID_X]] to %{{.+}} step %[[DIM_X]]
+//       CHECK:   %[[DEST:.+]] = memref.subview %[[WG_OUTPUT]][0, 0, %[[IV_X]]]
+//       CHECK:   %[[CAST:.+]] = memref.cast %[[DEST]]
+//       CHECK:   iree_linalg_ext.sort
 //  CHECK-SAME:       dimension(1)
-//  CHECK-SAME:       outs(%[[DEST]]
+//  CHECK-SAME:       outs(%[[CAST]]

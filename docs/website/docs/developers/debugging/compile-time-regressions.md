@@ -188,19 +188,13 @@ paint a complete picture and requires waiting for compilation to finish.
 
 ### Using Tracy
 
-<!-- TODO(scotttodd): update link -->
-
 See our documentation on
-[profiling with Tracy](../performance/profiling-with-tracy.md). For compile
-time regressions, pay particular attention to the different compilation phases
-(Flow/Stream/HAL), how many times `TranslateExecutablesPass` runs, and if there
-are outlier passes that take significantly longer to run than others.
-
-!!! tip - "CMake Flags"
-
-    Currently, compiler tracing requires the runtime tracing to be enabled. Make
-    sure to set both `-DIREE_ENABLE_COMPILER_TRACING=ON` and
-    `-DIREE_ENABLE_RUNTIME_TRACING=ON`.
+[profiling with Tracy](../performance/profiling-with-tracy.md), in particular
+the section on
+[tracing `iree-compile`](../performance/profiling-with-tracy.md#tracing-iree-compile).
+For compile time regressions, pay particular attention to the compilation
+phases (Flow/Stream/HAL), how many times `TranslateExecutablesPass` runs, and
+if there are outlier passes that take significantly longer to run than others.
 
 Here are some previous analyses for inspiration:
 

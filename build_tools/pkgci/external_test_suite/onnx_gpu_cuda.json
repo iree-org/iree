@@ -809,7 +809,6 @@
     "test_qlinearmatmul_3D_uint8_float32",
     "test_quantizelinear",
     "test_range_int32_type_negative_delta",
-    "test_scatter_elements_with_negative_indices",
     "test_selu_default",
     "test_shape",
     "test_shape_clip_end",
