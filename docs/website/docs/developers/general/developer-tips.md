@@ -381,21 +381,17 @@ Flag | Files dumped
 
 <!-- TODO(scotttodd): Link to a playground Colab notebook that dumps files? -->
 
-### Executable benchmarks
+### Module level executable benchmarks
 
 The _benchmark_ files produced by `--iree-hal-dump-executable-benchmarks-to`
 can be compiled in isolation and passed to `iree-benchmark-module`, where they
 exercise the full IREE runtime for a single executable:
 
-```console hl_lines="3 14-15"
+```console hl_lines="3 6-11"
 $ iree-compile simple_abs.mlir \
   --iree-hal-target-backends=llvm-cpu \
   --iree-hal-dump-executable-benchmarks-to=/tmp/iree/simple_abs/ \
   -o /dev/null
-
-$ ls /tmp/iree/simple_abs/
-
-module_abs_dispatch_0_embedded_elf_x86_64_benchmark.mlir
 
 $ iree-compile \
   /tmp/iree/simple_abs/module_abs_dispatch_0_embedded_elf_x86_64_benchmark.mlir \
@@ -405,13 +401,35 @@ $ iree-benchmark-module \
   /tmp/iree/simple_abs/module_abs_dispatch_0_benchmark.vmfb
 ```
 
+### Low level executable binary benchmarks
+
 The _binary_ files produced by `--iree-hal-dump-executable-binaries-to`
 can be passed to `iree-benchmark-executable` where they are benchmarked
 directly, without using the IREE VM, HAL APIs, task system, etc. Note that this
-interface is much lower level.
+interface is much lower level and you must specify all push constants / binding
+parameters manually:
 
-<!-- TODO: example? -->
-<!-- TODO: link to more docs in developer-overview.md? -->
+```console hl_lines="3 6-13"
+$ iree-compile \
+  --iree-hal-target-backends=llvm-cpu \
+  --iree-hal-dump-executable-binaries-to=/tmp/iree/simple_abs/ \
+  -o /dev/null
+
+$ iree-benchmark-executable \
+  --device=local-sync \
+  --executable_format=embedded-elf-x86_64 \
+  --executable_file=/tmp/iree/simple_abs/module_abs_dispatch_0_embedded_elf_x86_64.so \
+  --entry_point=0 \
+  --binding=f32=-2.5 \
+  --binding=f32=0 \
+  --workgroup_count=1,1,1
+```
+
+See the comments in
+[`tools/iree-benchmark-executable-main.c`](https://github.com/openxla/iree/blob/main/tools/iree-benchmark-executable-main.c)
+and the test file at
+[`tools/test/iree-benchmark-executable.mlir`](https://github.com/openxla/iree/blob/main/tools/test/iree-benchmark-executable.mlir)
+for more information and examples.
 
 ## Compiling phase by phase
 
