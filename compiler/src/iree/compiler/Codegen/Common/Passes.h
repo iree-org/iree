@@ -317,6 +317,12 @@ void populateLinalgToVectorVectorizeConvPatterns(MLIRContext *context,
 void populateVectorizePadPatterns(RewritePatternSet &patterns,
                                   PatternBenefit baseBenefit = 1);
 
+/// Collect patterns to fold tensor.extract_slice -> vector.transfer_read and
+/// vector.transfer_write -> tensor.insert_slice op chains into vector tranfer
+/// read and write ops.
+void populateVectorTransferTensorSliceTransforms(RewritePatternSet &patterns,
+                                                 PatternBenefit benefit = 1);
+
 /// Method to register all passes.
 void registerCodegenCommonPasses();
 

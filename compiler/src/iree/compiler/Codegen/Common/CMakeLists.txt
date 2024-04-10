@@ -85,6 +85,7 @@ iree_cc_library(
     "FlattenMemRefSubspanPass.cpp"
     "FoldAffineMinInDistributedLoops.cpp"
     "FoldTensorExtractOpPass.cpp"
+    "FoldTensorSubsetIntoVectorTransferOps.cpp"
     "ForOpCanonicalizationPass.cpp"
     "FuseTensorPadWithConsumer.cpp"
     "GenericVectorization.cpp"
