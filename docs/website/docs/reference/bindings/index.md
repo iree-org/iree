@@ -22,7 +22,6 @@ Language | Compiler API? | Runtime API? | Published packages?
 -------- | ------------ | ----------- | ------------------
 [C/C++](#cc) | :white_check_mark: Supported | :white_check_mark: Supported | :x: Unsupported
 [Python](#python) | :white_check_mark: Supported | :white_check_mark: Supported | :white_check_mark: Supported
-[JavaScript](#javascript) | :grey_question: Experimental | :grey_question: Experimental | :x: Unsupported
 
 ### C/C++
 
@@ -32,20 +31,28 @@ See the [C API](./c-api.md) reference page.
 
 See the [Python](./python.md) reference page.
 
+## Unofficial and experimental API bindings
+
+Members of our developer community have authored bindings using other languages:
+
+Language | Compiler API? | Runtime API? | Published packages?
+-------- | ------------ | ----------- | ------------------
+[JavaScript](#javascript) | :grey_question: Experimental | :grey_question: Experimental | :x: Unsupported
+[Java](#java) | :x: Unsupported | :grey_question: Experimental | :x: Unsupported
+[Julia](#julia) | :grey_question: Experimental | :grey_question: Experimental | :x: Unsupported
+[Rust](#rust) | :x: Unsupported | :grey_question: Experimental | :grey_question: Experimental
+
 ### :simple-javascript: JavaScript
 
 * JavaScript bindings for WebAssembly and WebGPU are under development in IREE's
 [`experimental/web/`](https://github.com/openxla/iree/tree/main/experimental/web)
 directory.
 
-## Unofficial API bindings
+### :fontawesome-brands-java: Java
 
-Members of our developer community have authored bindings using other languages:
-
-Language | Compiler API? | Runtime API? | Published packages?
--------- | ------------ | ----------- | ------------------
-[Julia](#julia) | :grey_question: Experimental | :grey_question: Experimental | :x: Unsupported
-[Rust](#rust) | :x: Unsupported | :grey_question: Experimental | :grey_question: Experimental
+* Java TFLite bindings were developed at one point in IREE's
+[`runtime/bindings/tflite/java`](https://github.com/openxla/iree/tree/main/runtime/bindings/tflite/java)
+directory.
 
 ### :simple-julia: Julia
 
