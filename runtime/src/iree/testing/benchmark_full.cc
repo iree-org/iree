@@ -178,9 +178,9 @@ void iree_benchmark_initialize(int* argc, char** argv) {
 "===----------------------------------------------------------------------===\n"
 "\n"
 "Tracing is enabled and will skew your results!\n"
-"The timings involved here can an order of magnitude off due to the tracing\n"
-"time sampling, recording, and instrumentation overhead. Disable tracing with\n"
-"IREE_ENABLE_RUNTIME_TRACING=OFF and rebuild.\n"
+"The timings involved here can be an order of magnitude off due to the\n"
+"tracing time sampling, recording, and instrumentation overhead.\n"
+"Disable tracing with IREE_ENABLE_RUNTIME_TRACING=OFF and rebuild.\n"
 "\x1b[0m"
 "\n"
   );
