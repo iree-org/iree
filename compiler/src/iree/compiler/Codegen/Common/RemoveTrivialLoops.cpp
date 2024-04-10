@@ -45,21 +45,20 @@ getWorkgroupRange(Value processorValue, SmallVectorImpl<Value> & /*dims*/,
                   SmallVectorImpl<Value> & /*symbols*/,
                   ArrayRef<int64_t> workgroupCount,
                   ArrayRef<int64_t> workgroupSize) {
-  if (workgroupSize.empty()) {
-    return std::nullopt;
-  }
-  if (auto idOp = processorValue.getDefiningOp<gpu::ThreadIdOp>()) {
-    unsigned index = dimToIndex(idOp.getDimension());
-    OpBuilder b(processorValue.getContext());
-    AffineExpr zero = b.getAffineConstantExpr(0);
-    AffineExpr ubExpr = b.getAffineConstantExpr(workgroupSize[index]);
-    return std::make_pair(zero, ubExpr - 1);
-  }
-  if (auto dimOp = processorValue.getDefiningOp<gpu::BlockDimOp>()) {
-    OpBuilder builder(processorValue.getContext());
-    unsigned index = dimToIndex(dimOp.getDimension());
-    AffineExpr bound = builder.getAffineConstantExpr(workgroupSize[index]);
-    return std::make_pair(bound, bound);
+  if (!workgroupSize.empty()) {
+    if (auto idOp = processorValue.getDefiningOp<gpu::ThreadIdOp>()) {
+      unsigned index = dimToIndex(idOp.getDimension());
+      OpBuilder b(processorValue.getContext());
+      AffineExpr zero = b.getAffineConstantExpr(0);
+      AffineExpr ubExpr = b.getAffineConstantExpr(workgroupSize[index]);
+      return std::make_pair(zero, ubExpr - 1);
+    }
+    if (auto dimOp = processorValue.getDefiningOp<gpu::BlockDimOp>()) {
+      OpBuilder builder(processorValue.getContext());
+      unsigned index = dimToIndex(dimOp.getDimension());
+      AffineExpr bound = builder.getAffineConstantExpr(workgroupSize[index]);
+      return std::make_pair(bound, bound);
+    }
   }
 
   if (workgroupCount.empty())
