@@ -5,7 +5,7 @@
     "--iree-rocm-target-chip=gfx1100"
   ],
   "iree_run_module_flags": [
-    "--device=rocm"
+    "--device=hip"
   ],
   "skip_compile_tests": [
     // TODO(#16666): Fix these tests hanging at runtime (miscompiles?)
