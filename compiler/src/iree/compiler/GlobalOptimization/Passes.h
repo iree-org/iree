@@ -114,7 +114,7 @@ std::unique_ptr<Pass> createSimplifyPackUnpackPass();
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createGlobalLoopInvariantCodeMotionPass();
 
-/// TODO
+/// Propagate pack/unpack ops across other ops to improve fusion.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createDataLayoutPropagationPass();
 

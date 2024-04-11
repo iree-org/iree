@@ -24,6 +24,7 @@ struct DataLayoutPropagationPass
 
     RewritePatternSet patterns(context);
     linalg::populateDataLayoutPropagationPatterns(patterns, [](Operation *op) {
+      // Currently only bubble up/push down pack/unpack through collapse/expand shape ops.
       return isa<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(op);
     });
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
