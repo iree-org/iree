@@ -94,7 +94,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   }
 
   LLVMCPUPipelineOptions pipelineOpts;
-    if (isX86(target) || isRISCV(target)) {
+  if (isX86(target) || isRISCV(target)) {
     pipelineOpts.useConfiguredVectorSizes = false;
   }
   pipelineOpts.lowerToAVX2 = hasAVX2Feature(target);

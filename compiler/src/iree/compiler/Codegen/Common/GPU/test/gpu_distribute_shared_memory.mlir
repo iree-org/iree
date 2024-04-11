@@ -95,7 +95,7 @@ module {
 
   func.func @unaligned_shared_memory_copy(
     %global : memref<56x32xf32, strided<[128, 1], offset: ?>>, %shared : memref<56x32xf32, 3>)
-	attributes {hal.executable.target = #executable_target, translation_info = #translation_info} {
+        attributes {hal.executable.target = #executable_target, translation_info = #translation_info} {
     linalg.generic {
       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
       iterator_types = ["parallel", "parallel"]
