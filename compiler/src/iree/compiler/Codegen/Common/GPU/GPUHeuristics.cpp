@@ -31,11 +31,11 @@ static int64_t calculateSharedMemoryUsedInBytes(const GPUMMASchedule &schedule,
 
 bool isValidSchedule(const GPUMatmulShapeType &problem,
                      const GPUMMASchedule &schedule) {
-  bool isValidM = problem.mSize %
-                  (schedule.mSize * schedule.mTileCount * schedule.mWarpCount);
-  bool isValidN = problem.nSize %
-                  (schedule.nSize * schedule.nTileCount * schedule.nWarpCount);
-  bool isValidK = problem.kSize % (schedule.kSize * schedule.kTileCount) == 0;
+  bool isValidM = (problem.mSize % (schedule.mSize * schedule.mTileCount *
+                                    schedule.mWarpCount)) == 0;
+  bool isValidN = (problem.nSize % (schedule.nSize * schedule.nTileCount *
+                                    schedule.nWarpCount)) == 0;
+  bool isValidK = (problem.kSize % (schedule.kSize * schedule.kTileCount)) == 0;
   return isValidN && isValidM && isValidK;
 }
 

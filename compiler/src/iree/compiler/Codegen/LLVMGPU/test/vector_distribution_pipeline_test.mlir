@@ -1,11 +1,14 @@
-// RUN: iree-opt --split-input-file \ 
-// RUN: --iree-codegen-llvmgpu-use-vector-distribution '--pass-pipeline=builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-select-lowering-strategy, iree-llvmgpu-lower-executable-target, canonicalize)))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-codegen-llvmgpu-use-vector-distribution \
+// RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-select-lowering-strategy, iree-llvmgpu-lower-executable-target, canonicalize)))' \
+// RUN:   %s | FileCheck %s
 
 hal.executable @fit_shared_memory_schedule {
-hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb", {mma_intrinsics = [#iree_gpu.mfma_layout<F16_16x16x16_F32>, #iree_gpu.mfma_layout<F16_32x32x8_F32>], target_arch = "gfx942", ukernels = "none"}>) {
+hal.executable.variant public @rocm_hsaco_fb
+  target(<"rocm", "rocm-hsaco-fb", {mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>],
+                                    target_arch = "gfx942", ukernels = "none"}>) {
   hal.executable.export public @fit_shared_memory_schedule ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) attributes {hal.interface.bindings = [#hal.interface.binding<0, 0>, #hal.interface.binding<0, 1>, #hal.interface.binding<0, 2>]} {
   ^bb0(%arg0: !hal.device):
-    %x, %y, %z = flow.dispatch.workgroup_count_from_slice 
+    %x, %y, %z = flow.dispatch.workgroup_count_from_slice
     hal.return %x, %y, %z : index, index, index
   }
   builtin.module {
