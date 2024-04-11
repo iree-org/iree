@@ -5,6 +5,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/GPU/GPUHeuristics.h"
+
+#include <cstdint>
+
 #include "llvm/ADT/APInt.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
@@ -17,10 +20,87 @@ using llvm::APIntOps::GreatestCommonDivisor;
 
 namespace mlir::iree_compiler {
 
-std::optional<GPUMMASchedule>
+static int64_t calculateSharedMemoryUsedInBytes(const GPUMMASchedule &schedule,
+                                                int64_t lhsBitwidth,
+                                                int64_t rhsBitwidth) {
+  int64_t tileM = schedule.mSize * schedule.mTileCount * schedule.mWarpCount;
+  int64_t tileN = schedule.nSize * schedule.nTileCount * schedule.nWarpCount;
+  int64_t tileK = schedule.kSize * schedule.kTileCount;
+  return (tileM * tileK * lhsBitwidth + tileN * tileK * rhsBitwidth) / 8;
+}
+
+bool isValidSchedule(const GPUMatmulShapeType &problem,
+                     const GPUMMASchedule &schedule) {
+  bool isValidM = (problem.mSize % (schedule.mSize * schedule.mTileCount *
+                                    schedule.mWarpCount)) == 0;
+  bool isValidN = (problem.nSize % (schedule.nSize * schedule.nTileCount *
+                                    schedule.nWarpCount)) == 0;
+  bool isValidK = (problem.kSize % (schedule.kSize * schedule.kTileCount)) == 0;
+  return isValidN && isValidM && isValidK;
+}
+
+FailureOr<GPUMMASchedule> fitScheduleInSharedMemory(
+    const GPUMatmulShapeType &problem, ArrayRef<GPUMatmulShapeType> intrinsics,
+    GPUMMASchedule schedule, int64_t sharedMemLimitInBytes) {
+  int64_t lhsBitwidth =
+      intrinsics[schedule.index].aType.getIntOrFloatBitWidth();
+  int64_t rhsBitwidth =
+      intrinsics[schedule.index].bType.getIntOrFloatBitWidth();
+
+  while (!isValidSchedule(problem, schedule) ||
+         calculateSharedMemoryUsedInBytes(schedule, lhsBitwidth, rhsBitwidth) >
+             sharedMemLimitInBytes) {
+    LLVM_DEBUG({
+      llvm::dbgs() << "Shrinking schedule\n";
+      llvm::dbgs() << "mSize: " << schedule.mSize << "\n";
+      llvm::dbgs() << "nSize: " << schedule.nSize << "\n";
+      llvm::dbgs() << "kSize: " << schedule.kSize << "\n";
+      llvm::dbgs() << "mTileCount: " << schedule.mTileCount << "\n";
+      llvm::dbgs() << "nTileCount: " << schedule.nTileCount << "\n";
+      llvm::dbgs() << "kTileCount: " << schedule.kTileCount << "\n";
+      llvm::dbgs() << "mWarpCount: " << schedule.mWarpCount << "\n";
+      llvm::dbgs() << "nWarpCount: " << schedule.nWarpCount << "\n";
+    });
+
+    auto decrementIfPossible = [](int64_t &c) -> LogicalResult {
+      if (c <= 1) {
+        return failure();
+      }
+      --c;
+      return success();
+    };
+
+    // Attempt to shrink the schedule along one of the dimensions.
+    // TODO: A better solution should probably factor problem.mSize /
+    // (mWarpCount * mTileCount * mSize) and then pop off the smallest factors
+    // one at a time, preferably trying to keep the tile "generally square."
+    if (succeeded(decrementIfPossible(schedule.mTileCount))) {
+      continue;
+    }
+    if (succeeded(decrementIfPossible(schedule.nTileCount))) {
+      continue;
+    }
+    if (succeeded(decrementIfPossible(schedule.kTileCount))) {
+      continue;
+    }
+    if (succeeded(decrementIfPossible(schedule.mWarpCount))) {
+      continue;
+    }
+    if (succeeded(decrementIfPossible(schedule.nWarpCount))) {
+      continue;
+    }
+
+    // If no dimension can be shrunk, give up.
+    return failure();
+  }
+  return schedule;
+}
+
+FailureOr<GPUMMASchedule>
 deduceMMASchedule(const GPUMatmulShapeType &problem,
                   ArrayRef<GPUMatmulShapeType> intrinsics,
-                  const GPUMMAHeuristicSeeds &seeds, bool canUpcastAcc) {
+                  const GPUMMAHeuristicSeeds &seeds,
+                  int64_t sharedMemLimitInBytes, bool canUpcastAcc) {
   for (auto [index, intrinsic] : llvm::enumerate(intrinsics)) {
     if (problem.aType != intrinsic.aType || problem.bType != intrinsic.bType) {
       continue; // Cannot use this intrinsic for mismatched types
@@ -112,11 +192,14 @@ deduceMMASchedule(const GPUMatmulShapeType &problem,
       llvm::dbgs() << "  subgroup tile count (M, N, K) = (" << mTileCount
                    << ", " << nTileCount << ", " << kTileCount << ")\n";
     });
-    return GPUMMASchedule{index,           intrinsic.mSize, intrinsic.nSize,
-                          intrinsic.kSize, mWarpCount,      nWarpCount,
-                          mTileCount,      nTileCount,      kTileCount};
+    return fitScheduleInSharedMemory(
+        problem, intrinsics,
+        GPUMMASchedule{index, intrinsic.mSize, intrinsic.nSize, intrinsic.kSize,
+                       mWarpCount, nWarpCount, mTileCount, nTileCount,
+                       kTileCount},
+        sharedMemLimitInBytes);
   }
-  return std::nullopt;
+  return failure();
 }
 
 } // namespace mlir::iree_compiler

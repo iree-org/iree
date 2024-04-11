@@ -909,9 +909,12 @@ LogicalResult setCooperativeMatrixConfig(
   GPUMMAHeuristicSeeds seeds{numSubgroupsPerWorkgroup, numMNTilesPerSubgroup,
                              numKTilesPerSubgroup};
 
-  std::optional<GPUMMASchedule> schedule =
-      deduceMMASchedule(problem, intrinsics, seeds);
-  if (!schedule)
+  int64_t sharedMemoryLimitInBytes =
+      targetEnv.getResourceLimits().getMaxComputeSharedMemorySize();
+
+  FailureOr<GPUMMASchedule> schedule =
+      deduceMMASchedule(problem, intrinsics, seeds, sharedMemoryLimitInBytes);
+  if (failed(schedule))
     return failure();
 
   auto pipeline = CodeGenPipeline::SPIRVCooperativeMatrixVectorize;

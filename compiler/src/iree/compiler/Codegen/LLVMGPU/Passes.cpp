@@ -12,6 +12,7 @@
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/LLVMGPU/KernelConfig.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/ROCDLPasses.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -823,14 +824,13 @@ static void addLowerToLLVMGPUPasses(OpPassManager &pm, bool forROCDL) {
   addLowerAndOptimizeAddressComputationPasses(pm);
 
   // Run checks on shared memory usage.
-  // TODO: query this from the target.
-  int64_t limit = clLLVMGPUSharedMemoryLimit;
-  auto getSharedMemoryLimit = [limit](mlir::FunctionOpInterface) {
-    return limit;
+  auto getSharedMemoryLimitInBytes = [](mlir::FunctionOpInterface entryPoint) {
+    return getTargetSharedMemoryLimitInBytes(entryPoint);
   };
+  // TODO: query this from the target.
   auto getIndexBitwidth = [](mlir::FunctionOpInterface) { return 64; };
-  pm.addPass(
-      createGPUCheckResourceUsagePass(getSharedMemoryLimit, getIndexBitwidth));
+  pm.addPass(createGPUCheckResourceUsagePass(getSharedMemoryLimitInBytes,
+                                             getIndexBitwidth));
 
   // SCF -> CF
   pm.addNestedPass<func::FuncOp>(createConvertSCFToCFPass());
