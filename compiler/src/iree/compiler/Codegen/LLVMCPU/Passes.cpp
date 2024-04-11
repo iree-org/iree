@@ -615,18 +615,6 @@ void addCPUDefaultPassPipeline(OpPassManager &funcPassManager) {
   addCPUBufferizePasses(funcPassManager);
 }
 
-void addTransformDialectPasses(OpPassManager &funcPassManager,
-                               StringRef entryPoint) {
-  // Give control to the transform dialect.
-  funcPassManager.addPass(
-      mlir::iree_compiler::createTransformDialectInterpreterPass(entryPoint));
-  // Dropping the schedule is needed:
-  //   1. if we want to embed the transform in the module: we should drop the
-  //      schedule once applied.
-  //   2. if transform.do_not_dce_operands ops are introduced.
-  funcPassManager.addPass(createDropSchedulePass());
-}
-
 static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
                                  bool enableAArch64SME) {
   // TODO: Remove the following pass and plumb support for #hal.descriptor_type
@@ -756,18 +744,13 @@ void buildLLVMCPUCodegenConfigurationPassPipeline(
 
 void buildLLVMCPUCodegenPassPipeline(OpPassManager &variantPassManager,
                                      bool enableAArch64SME) {
-  // Run pass pipelines to lower to scalar/vector code at `FunctionOpInterface`
-  // granularity.
-  {
-    FunctionLikeNest(variantPassManager.nest<ModuleOp>())
-        .addPass(createLLVMCPULowerExecutableTargetPass);
-  }
+  OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
+  modulePassManager.addPass(createLowerExecutableUsingTransformDialectPass());
+  FunctionLikeNest(modulePassManager)
+      .addPass(createLLVMCPULowerExecutableTargetPass);
 
   // Run conversion to LLVM at `ModuleOp` granularity.
-  {
-    OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
-    addLowerToLLVMPasses(modulePassManager, enableAArch64SME);
-  }
+  addLowerToLLVMPasses(modulePassManager, enableAArch64SME);
   LLVM_DEBUG({
     llvm::dbgs() << "Using LLVMCPU pass pipeline:\n";
     variantPassManager.printAsTextualPipeline(llvm::dbgs());

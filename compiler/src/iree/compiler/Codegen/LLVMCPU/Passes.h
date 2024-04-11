@@ -182,10 +182,6 @@ void addMultiTilingExpertPassPipeline(OpPassManager &funcPassManager,
 void addTensorToVectorsPassPipeline(OpPassManager &funcPassManager,
                                     bool lowerToVectors = true);
 
-/// Transform dialect-based common.
-void addTransformDialectPasses(OpPassManager &funcPassManager,
-                               StringRef entryPoint);
-
 // Populates the passes needed to do tiling, decomposing, and vectorizing the
 // convolution ops.
 LogicalResult verifyConvTileAndDecomposeExpertConfig(
