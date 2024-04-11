@@ -130,7 +130,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   ModuleOp moduleOp = variantOp.getInnerModule();
   LLVMCPUPipelineOptions pipelineOpts;
   auto target = variantOp.getTarget();
-  if (isX86(target)) {
+  if (isX86(target) || isRISCV(target)) {
     pipelineOpts.useConfiguredVectorSizes = false;
   }
   pipelineOpts.lowerToAVX2 = hasAVX2Feature(target);
