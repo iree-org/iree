@@ -30,7 +30,7 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/Passes.h"
 
-#define DEBUG_TYPE "iree-llvm-cpu-lowering-pass-pipeline"
+#define DEBUG_TYPE "iree-llvmcpu-pass-pipelines"
 
 namespace mlir::iree_compiler {
 
@@ -628,12 +628,10 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
   FunctionLikeNest(modulePassManager)
       // LinalgExt -> SCF
       .addPass(IREE::LinalgExt::createLinalgExtToLoopsPass)
-
       // Linalg -> SCF
       .addPass(createMemrefCopyToLinalgPass)
       .addPredicatedPass(clCheckLinalgVectorization,
                          createLLVMCPUEmitVectorizationRemarksPass)
-
       .addPass(createConvertLinalgToLoopsPass)
       .addPass(createConvertBf16ArithToF32Pass)
       .addPass(createConvertBf16ToUInt16BuffersPass)
@@ -645,15 +643,11 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
 
   FunctionLikeNest(modulePassManager)
       .addPass(createFoldTensorExtractOpPass)
-
       // Handle complex operation conversion.
       .addPass(createConvertComplexToStandardPass)
-
       // math dialect elementry functions -> polynomial form.
       .addPass(createPolynomialApproximationPass)
-
       .addPass(createHoistStaticallyBoundAllocationsPass)
-
       // Use `arith.minf/maxf` instead of `arith.minimumf/maximumf`.
       .addPredicatedPass(clUseFastMinMaxOps, createReplaceSlowMinMaxOpsPass);
 
@@ -679,18 +673,15 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
       // must conclude before this point.
       .addPass(createIREEExpandStridedMetadataPass)
       .addPass(createCleanupBufferAllocViewPass)
-
       // Checking stack allocation before converting to CF dialect is easier.
       .addPass([&]() {
         return createLLVMCPUCheckIRBeforeLLVMConversionPass(
             clFailOnOutOfBoundsStackAllocation);
       })
-
       // SCF -> CF
       .addPass(createConvertSCFToCFPass)
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass)
-
       // (HAL, IREE, Linalg, CF) -> LLVM
       .addPass(arith::createArithExpandOpsPass)
       .addPass(memref::createExpandOpsPass)

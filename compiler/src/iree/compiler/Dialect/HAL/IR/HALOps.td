@@ -2097,12 +2097,12 @@ def HAL_ExecutableExportOp : HAL_Op<"executable.export", [
         Location loc, Value device, ValueRange workload, OpBuilder &builder);
 
     // Helper function to return the subgroup size.
-    std::optional<size_t> getSubgroupSizeAsSizeT() {
-      std::optional<APInt> subgroupSizeSizeT = getSubgroupSize();
-      if (!subgroupSizeSizeT) {
+    std::optional<uint64_t> getSubgroupSizeAsUInt() {
+      std::optional<APInt> subgroupSizeUInt = getSubgroupSize();
+      if (!subgroupSizeUInt) {
         return std::nullopt;
       }
-      return subgroupSizeSizeT->getZExtValue();
+      return subgroupSizeUInt->getZExtValue();
     }
   }];
 }

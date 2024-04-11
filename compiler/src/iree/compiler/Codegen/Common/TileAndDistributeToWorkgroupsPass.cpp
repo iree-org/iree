@@ -284,7 +284,7 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
 
   auto funcOp = getOperation();
 
-  // TODO(MaheshRavishankar): THe logic of lowering workgroup count
+  // TODO(MaheshRavishankar): The logic of lowering workgroup count
   // needs to be moved out of this pass. Once this is moved to
   // use scf.forall, this logic can be moved to the scf.forall
   // resolution phase.

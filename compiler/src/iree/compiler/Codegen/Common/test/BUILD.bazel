@@ -53,6 +53,7 @@ iree_lit_test_suite(
             "materialize_user_configs.mlir",
             "pad_dynamic_alloc.mlir",
             "polynomial_approximation.mlir",
+            "reconcile_translation_info.mlir",
             "reductions.mlir",
             "rematerialize_parallel_ops.mlir",
             "remove_dead_allocs.mlir",

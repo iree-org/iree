@@ -320,7 +320,7 @@ public:
       }
       workgroupSizes.push_back(workgroupSize);
 
-      if (auto setSubgroupSize = exportOp.getSubgroupSizeAsSizeT()) {
+      if (auto setSubgroupSize = exportOp.getSubgroupSizeAsUInt()) {
         if (setSubgroupSize.value() != 32 && setSubgroupSize.value() != 64) {
           return variantOp.emitError()
                  << "invalid subgroup size " << setSubgroupSize.value();

@@ -86,6 +86,7 @@ void ReconcileTranslationInfoPass::runOnOperation() {
   }
   auto exportOp = *exportOps.begin();
   MLIRContext *context = &getContext();
+  Builder builder(&getContext());
 
   SmallVector<IREE::Codegen::TranslationInfoAttr> translationInfos;
   innerModuleOp->walk([&](FunctionOpInterface funcOp) {
@@ -122,12 +123,8 @@ void ReconcileTranslationInfoPass::runOnOperation() {
   for (auto [index, size] : llvm::enumerate(reconciledWorkgroupSize.value())) {
     workgroupSize[index] = size;
   }
-  auto workgroupSizeArrayAttr =
-      llvm::map_to_vector(workgroupSize, [&](int64_t value) -> Attribute {
-        return IntegerAttr::get(IndexType::get(context), value);
-      });
-  exportOp.setWorkgroupSizeAttr(
-      ArrayAttr::get(context, workgroupSizeArrayAttr));
+  auto workgroupSizeArrayAttr = builder.getIndexArrayAttr(workgroupSize);
+  exportOp.setWorkgroupSizeAttr(workgroupSizeArrayAttr);
 
   // Reconcile subgroup sizes.
   FailureOr<int64_t> reconciledSubgroupSize =
@@ -137,8 +134,8 @@ void ReconcileTranslationInfoPass::runOnOperation() {
     return signalPassFailure();
   }
   if (reconciledSubgroupSize.value() != int64_t()) {
-    exportOp.setSubgroupSizeAttr(IntegerAttr::get(
-        IndexType::get(context), reconciledSubgroupSize.value()));
+    exportOp.setSubgroupSizeAttr(
+        builder.getIndexAttr(reconciledSubgroupSize.value()));
   }
 
   // Erase all the lowering configs and translation infos.
