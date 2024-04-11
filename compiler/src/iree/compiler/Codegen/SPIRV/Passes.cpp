@@ -121,7 +121,7 @@ static void addTileAndDistributeToWorkgroupsPasses(
 }
 
 /// Adds passes to lower vector ops to meet SPIR-V requirements.
-static void addSPIRVVectorLoweringPasses(OpPassManager &funcPassManager) {
+void addSPIRVVectorLoweringPasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createSPIRVInitialVectorLoweringPass());
   funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
   funcPassManager.addPass(createSPIRVFinalVectorLoweringPass());
@@ -273,18 +273,6 @@ static void addSPIRVLoweringPasses(OpPassManager &modulePassManager) {
   spirvModulePassManager.addPass(spirv::createSPIRVRewriteInsertsPass());
   spirvModulePassManager.addPass(spirv::createSPIRVCanonicalizeGLPass());
   spirvModulePassManager.addPass(spirv::createSPIRVUpdateVCEPass());
-}
-
-void addSPIRVTransformDialectPasses(OpPassManager &funcPassManager,
-                                    StringRef entryPoint) {
-  funcPassManager.addPass(
-      mlir::iree_compiler::createTransformDialectInterpreterPass(entryPoint));
-
-  // Dropping the schedule is needed:
-  //   1. if we want to embed the transform in the module: we should drop the
-  //      schedule once applied.
-  //   2. if transform.do_not_dce_operands ops are introduced.
-  funcPassManager.addPass(createDropSchedulePass());
 }
 
 //===----------------------------------------------------------------------===//
@@ -617,16 +605,6 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createCSEPass());
 }
 
-void addSPIRVTransformDialectPassPipeline(OpPassManager &funcPassManager,
-                                          StringRef entryPoint) {
-  addSPIRVTransformDialectPasses(funcPassManager, entryPoint);
-
-  // Run GenericVectorization pass additionally to convert vectors into forms
-  // needed for SPIR-V.
-  funcPassManager.addPass(createGenericVectorizationPass());
-  addSPIRVVectorLoweringPasses(funcPassManager);
-}
-
 //===----------------------------------------------------------------------===//
 // Entry Point
 //===----------------------------------------------------------------------===//
@@ -647,12 +625,20 @@ void buildSPIRVCodegenConfigurationPassPipeline(
 }
 
 void buildSPIRVCodegenPassPipeline(OpPassManager &variantPassManager) {
-  OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
-  FunctionLikeNest funcPassManager(modulePassManager);
-  funcPassManager.addPass(createSPIRVLowerExecutableTargetPass);
-  addMemRefLoweringPasses(modulePassManager);
+  {
+    OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
+    modulePassManager.addPass(
+        createSPIRVLowerExecutableUsingTransformDialectPass());
+    FunctionLikeNest(modulePassManager)
+        .addPass(createSPIRVLowerExecutableTargetPass);
+    addMemRefLoweringPasses(modulePassManager);
+  }
   variantPassManager.addPass(createReconcileTranslationInfoPass());
-  addSPIRVLoweringPasses(variantPassManager.nest<ModuleOp>());
+
+  {
+    OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
+    addSPIRVLoweringPasses(modulePassManager);
+  }
 
   LLVM_DEBUG({
     llvm::dbgs() << "Using SPIR-V pass pipeline:\n";

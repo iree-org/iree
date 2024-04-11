@@ -77,6 +77,13 @@ def SPIRVLowerExecutableTarget :
       "mlir::iree_compiler::createSPIRVLowerExecutableTargetPass()";
 }
 
+def SPIRVLowerExecutableUsingTransformDialect :
+    Pass<"iree-spirv-lower-executable-using-transform-dialect", "ModuleOp"> {
+  let summary = "Lower the executable target to SPIR-V using transform dialect"
+                " followed by some passes to do SPIR-V specific vectorization";
+  let constructor = "mlir::iree_compiler::createSPIRVLowerExecutableUsingTransformDialectPass()";
+}
+
 def SPIRVMapMemRefStorageClass :
     InterfacePass<"iree-spirv-map-memref-storage-class", "mlir::FunctionOpInterface"> {
   let summary = "Map MemRef memory spaces to SPIR-V storage classes";

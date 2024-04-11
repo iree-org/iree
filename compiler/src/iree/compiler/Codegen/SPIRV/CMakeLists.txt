@@ -64,6 +64,7 @@ iree_cc_library(
     "SPIRVInitialVectorLowering.cpp"
     "SPIRVLinkExecutables.cpp"
     "SPIRVLowerExecutableTargetPass.cpp"
+    "SPIRVLowerExecutableUsingTransformDialect.cpp"
     "SPIRVMapMemRefStorageClass.cpp"
     "SPIRVMaterializeExecutableConditions.cpp"
     "SPIRVSelectLoweringStrategy.cpp"

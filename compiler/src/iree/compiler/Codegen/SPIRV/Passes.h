@@ -31,6 +31,9 @@ void addSPIRVBaseDistributePassPipeline(OpPassManager &funcPassManager);
 
 void addSPIRVBaseVectorizePassPipeline(OpPassManager &funcPassManager);
 
+/// Adds passes to lower vector ops to meet SPIR-V requirements.
+void addSPIRVVectorLoweringPasses(OpPassManager &funcPassManager);
+
 void addSPIRVCooperativeMatrixVectorizePassPipeline(
     OpPassManager &funcPassManager, unsigned pipelineDepth,
     unsigned storeStage);
@@ -42,10 +45,6 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &funcPassManager,
 /// Pass pipeline to lower IREE HAL executables by tiling and distributing
 /// reduction to workgroups and then subgroups.
 void addSPIRVSubgroupReducePassPipeline(OpPassManager &funcPassManager);
-
-/// Pass pipeline to lower IREE HAL executables via transform dialect schedules.
-void addSPIRVTransformDialectPassPipeline(OpPassManager &funcPassManager,
-                                          StringRef entryPoint);
 
 /// Pass pipeline to lower winograd ops. This pipeline follows the
 /// SPIRVBaseVectorize pipeline with the following exception:
@@ -78,7 +77,8 @@ void buildSPIRVLinkingPassPipeline(OpPassManager &modulePassManager);
 std::unique_ptr<OperationPass<ModuleOp>>
 createConvertToSPIRVPass(unsigned indexWidth = 32);
 
-/// Annotates the innermost Winograd loops with the spirv distribute attribute.
+/// Annotates the innermost Winograd loops with the spirv distribute
+/// attribute.
 std::unique_ptr<InterfacePass<FunctionOpInterface>>
 createSPIRVAnnotateWinogradLoopsPass();
 
@@ -125,12 +125,18 @@ createSPIRVSelectLoweringStrategyPass();
 std::unique_ptr<InterfacePass<FunctionOpInterface>>
 createSPIRVLowerExecutableTargetPass();
 
+/// Pass to lower executables using Transform dialect on the SPIR-V backend.
+/// This shouldnt be a separate pass, but it is since there are some
+/// extra spir-v passes that need to be run as well.
+std::unique_ptr<OperationPass<ModuleOp>>
+createSPIRVLowerExecutableUsingTransformDialectPass();
+
 /// Pass to map MemRef memory spaces to SPIR-V storage classes.
 std::unique_ptr<InterfacePass<FunctionOpInterface>>
 createSPIRVMapMemRefStorageClassPass();
 
-/// Pass to materialize SPIR-V target requirements of hal.exectuable.variant ops
-/// into hal.executable.condition regions.
+/// Pass to materialize SPIR-V target requirements of hal.exectuable.variant
+/// ops into hal.executable.condition regions.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
 createSPIRVMaterializeExecutableConditionsPass();
 
