@@ -561,7 +561,7 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(
-			  createGPUReduceSharedMemoryBankConflicts(/*paddingSizeBits=*/64));
+      createGPUReduceSharedMemoryBankConflicts(/*paddingSizeBits=*/64));
 
   funcPassManager.addPass(createGPUReduceSharedMemoryBankConflicts());
   if (clLLVMGPUEnablePrefetch) {
@@ -756,8 +756,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
   funcPassManager
       .addPass([&]() {
         // TODO: query this from the target.
-        int64_t limit = clLLVMGPUSharedMemoryLimit;
-        auto getSharedMemoryLimit = [limit](mlir::FunctionOpInterface) {
+        auto getSharedMemoryLimit = [](mlir::FunctionOpInterface entryPoint) {
           return getTargetSharedMemoryLimitInBytes(entryPoint);
         };
         auto getIndexBitwidth = [](mlir::FunctionOpInterface) { return 64; };

@@ -14,10 +14,9 @@ namespace mlir::iree_compiler {
 std::optional<OpPassManager>
 getFunctionOpInterfacePassManager(FunctionOpInterface interfaceOp) {
   return TypeSwitch<Operation *, OpPassManager>(interfaceOp.getOperation())
-      .Case<func::FuncOp, IREE::Util::FuncOp>([&](auto funcOp) {
-        return OpPassManager(funcOp.getOperationName());
-      });
-  return std::nullopt;
+      .Case<func::FuncOp, IREE::Util::FuncOp>(
+          [&](auto funcOp) { return OpPassManager(funcOp.getOperationName()); })
+      .Default<Operation *>([&](Operation *op) { return std::nullopt; });
 }
 
 } // namespace mlir::iree_compiler
