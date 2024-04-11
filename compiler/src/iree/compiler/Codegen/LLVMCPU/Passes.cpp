@@ -734,6 +734,11 @@ void buildLLVMCPUCodegenConfigurationPassPipelineImpl(
       .addPass(createEraseHALDescriptorTypeFromMemRefPass);
 
   modulePassManager.addPass(createLLVMCPUSelectLoweringStrategyPass());
+  LLVM_DEBUG({
+    llvm::dbgs() << "LLVMCPU codegen configuration pass pipeline:\n";
+    modulePassManager.printAsTextualPipeline(llvm::dbgs());
+    llvm::dbgs() << "\n";
+  });
 }
 
 void buildLLVMCPUCodegenConfigurationPassPipeline(
@@ -752,7 +757,7 @@ void buildLLVMCPUCodegenPassPipeline(OpPassManager &variantPassManager,
   // Run conversion to LLVM at `ModuleOp` granularity.
   addLowerToLLVMPasses(modulePassManager, enableAArch64SME);
   LLVM_DEBUG({
-    llvm::dbgs() << "Using LLVMCPU pass pipeline:\n";
+    llvm::dbgs() << "LLVMCPU codegen pass pipeline:\n";
     variantPassManager.printAsTextualPipeline(llvm::dbgs());
     llvm::dbgs() << "\n";
   });
