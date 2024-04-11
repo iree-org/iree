@@ -17,7 +17,7 @@ namespace mlir::iree_compiler {
 /// Pad out the inner dimension of the `memref.alloc` op in order reduce the
 /// chances to have bank conflicts when reading 2D shapes within shared memory.
 static void padAlloc(MLIRContext *context, memref::AllocOp allocOp,
-                     int64_t paddingSizeBits) {
+                     unsigned paddingSizeBits) {
   auto allocOpShape = allocOp.getType().getShape();
   if (allocOpShape.empty())
     return;
@@ -89,7 +89,7 @@ struct GPUReduceBankConflictsPass final
   }
 
 private:
-  int64_t paddingSizeBits;
+  unsigned paddingSizeBits;
 };
 
 } // namespace
