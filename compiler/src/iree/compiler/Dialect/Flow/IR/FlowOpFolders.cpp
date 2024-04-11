@@ -787,40 +787,6 @@ OpFoldResult TensorConstantOp::fold(FoldAdaptor operands) {
   return {};
 }
 
-namespace {
-
-struct ExpandDynamicShapeConstant : public OpRewritePattern<TensorConstantOp> {
-  using OpRewritePattern<TensorConstantOp>::OpRewritePattern;
-  LogicalResult matchAndRewrite(TensorConstantOp op,
-                                PatternRewriter &rewriter) const override {
-    auto constantOp =
-        rewriter.create<arith::ConstantOp>(op.getLoc(), op.getValue());
-    auto dynamicType = op.getType();
-    auto staticType = llvm::cast<ShapedType>(constantOp.getType());
-    SmallVector<Value> dynamicDims;
-    for (int64_t i = 0; i < dynamicType.getNumDynamicDims(); ++i) {
-      auto dimValue = rewriter
-                          .create<arith::ConstantIndexOp>(
-                              op.getLoc(), staticType.getDimSize(i))
-                          .getResult();
-      dynamicDims.push_back(
-          rewriter
-              .create<IREE::Util::OptimizationBarrierOp>(op.getLoc(), dimValue)
-              .getResult(0));
-    }
-    rewriter.replaceOpWithNewOp<IREE::Flow::TensorReshapeOp>(
-        op, dynamicType, constantOp.getResult(), dynamicDims);
-    return success();
-  }
-};
-
-} // namespace
-
-void TensorConstantOp::getCanonicalizationPatterns(RewritePatternSet &results,
-                                                   MLIRContext *context) {
-  results.insert<ExpandDynamicShapeConstant>(context);
-}
-
 //===----------------------------------------------------------------------===//
 // flow.tensor.tie_shape
 //===----------------------------------------------------------------------===//
@@ -986,6 +952,7 @@ struct ResolveShapedDim : public OpRewritePattern<tensor::DimOp> {
     }
     auto idx = op.getConstantIndex().value();
 
+    // Fold static dims from the type.
     auto shapedType = llvm::cast<ShapedType>(op.getSource().getType());
     if (!shapedType.isDynamicDim(idx)) {
       rewriter.replaceOpWithNewOp<arith::ConstantIndexOp>(
@@ -993,19 +960,40 @@ struct ResolveShapedDim : public OpRewritePattern<tensor::DimOp> {
       return success();
     }
 
+    // Find dims captured on shape-aware ops.
     auto dynamicDims = IREE::Util::findDynamicDims(
         op.getSource(), op->getBlock(), Block::iterator(op.getOperation()));
-    if (!dynamicDims.has_value()) {
-      return rewriter.notifyMatchFailure(op, "no dynamic dims found/usable");
+    if (dynamicDims.has_value()) {
+      unsigned dimOffset = 0;
+      for (unsigned i = 0; i < idx; ++i) {
+        if (shapedType.isDynamicDim(i))
+          ++dimOffset;
+      }
+      rewriter.replaceOp(op, dynamicDims.value()[dimOffset]);
+      return success();
     }
-    unsigned dimOffset = 0;
-    for (unsigned i = 0; i < idx; ++i) {
-      if (shapedType.isDynamicDim(i))
-        ++dimOffset;
-    }
-    rewriter.replaceOp(op, dynamicDims.value()[dimOffset]);
 
-    return success();
+    // Special handling of flow.tensor.constant which may be acting as a
+    // dynamically shaped value that we want to remove the tensor.dim of but
+    // still treat the shape as dynamic. We do this by inserting an optimization
+    // barrier between the constant and the consumers. Note that this use case
+    // is very specific and generally only applicable to tests/benchmarks.
+    if (auto constantOp = dyn_cast_if_present<IREE::Flow::TensorConstantOp>(
+            op.getShapedValue().getDefiningOp())) {
+      auto valueType = dyn_cast<ShapedType>(constantOp.getValue().getType());
+      if (valueType && valueType != constantOp.getType()) {
+        // Constant op is acting as a cast. If the dimension being queried was
+        // static it would have been resolved above so we know it's dynamic
+        // here.
+        Value staticValue = rewriter.create<arith::ConstantIndexOp>(
+            op.getLoc(), valueType.getDimSize(idx));
+        rewriter.replaceOpWithNewOp<IREE::Util::OptimizationBarrierOp>(
+            op, staticValue);
+        return success();
+      }
+    }
+
+    return rewriter.notifyMatchFailure(op, "no dynamic dims found/usable");
   }
 };
 
@@ -1031,8 +1019,6 @@ void TensorBitCastOp::getCanonicalizationPatterns(RewritePatternSet &results,
       context);
   results.insert<ReplaceOpIfTensorOperandEmpty<TensorBitCastOp, 0, 0>>(context);
   results.insert<FlattenTensorCastLikeChain<TensorBitCastOp>>(context);
-  results.insert<ResolveShapedRank>(context);
-  results.insert<ResolveShapedDim>(context);
 }
 
 //===----------------------------------------------------------------------===//

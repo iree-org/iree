@@ -16,21 +16,19 @@ util.func public @expandStaticShapeConstant() -> (tensor<2x4xi32>, index, index)
 
 // -----
 
-// CHECK-LABEL: @expandDynamicShapeConstant
-util.func public @expandDynamicShapeConstant() -> (tensor<?x?xi32>, index, index) {
+// CHECK-LABEL: @tensorDimOfDynamicConstant
+util.func public @tensorDimOfDynamicConstant() -> (index, index) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
-  // CHECK-DAG: %[[CST:.+]] = arith.constant dense<2> : tensor<2x4xi32>
+  // CHECK-NOT: flow.tensor.constant
+  %0 = flow.tensor.constant dense<2> : tensor<2x4xi32> -> tensor<2x?xi32>
   // CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
+  %d0 = tensor.dim %0, %c0 : tensor<2x?xi32>
   // CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
-  // CHECK-DAG: %[[D0:.+]] = util.optimization_barrier %[[C2]] : index
-  // CHECK-DAG: %[[D1:.+]] = util.optimization_barrier %[[C4]] : index
-  // CHECK: %[[T:.+]] = flow.tensor.reshape %[[CST]] : tensor<2x4xi32> -> tensor<?x?xi32>{%[[D0]], %[[D1]]}
-  %0 = flow.tensor.constant dense<2> : tensor<2x4xi32> -> tensor<?x?xi32>
-  %d0 = tensor.dim %0, %c0 : tensor<?x?xi32>
-  %d1 = tensor.dim %0, %c1 : tensor<?x?xi32>
-  // CHECK: util.return %[[T]], %[[D0]], %[[D1]]
-  util.return %0, %d0, %d1 : tensor<?x?xi32>, index, index
+  // CHECK-DAG: %[[C4_DYNAMIC:.+]] = util.optimization_barrier %[[C4]]
+  %d1 = tensor.dim %0, %c1 : tensor<2x?xi32>
+  // CHECK: util.return %[[C2]], %[[C4_DYNAMIC]]
+  util.return %d0, %d1 : index, index
 }
 
 // -----
