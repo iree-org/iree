@@ -5775,20 +5775,21 @@ lowering.</p>
 </table>
 <h4 id="flowtensorconstant-flowtensorconstantop"><code>flow.tensor.constant</code> (Flow::TensorConstantOp)<a class="headerlink" href="#flowtensorconstant-flowtensorconstantop" title="Permanent link">link</a></h4>
 <p><em>Tensor constant that can have dynamic dimensions</em></p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `flow.tensor.constant` $value attr-dict `-&gt;` type($result)
+<p>Allows specifying a tensor constant of IREE-specific types/attributes or
+where the return value can erase shape information.</p>
+<div class="highlight"><pre><span></span><code>%cst = flow.tensor.constant #something_tensor_like : tensor&lt;2x2xf32&gt;
+%res = math.absf %cst : tensor&lt;2x2xf32&gt;
 </code></pre></div>
-<p>Allows specifying a constant where the return value can erase shape
-information. This operation is declared as having side effects and has no
-folder, so will not be optimized away by the compiler. The underlying shape
-information should be hidden from the compiler and resolved at runtime.</p>
-<div class="highlight"><pre><span></span><code>%c = flow.tensor.constant tensor&lt;2x2xf32&gt; -&gt; tensor&lt;?x?xf32&gt;
-%res = math.absf %c : tensor&lt;?x?xf32&gt;
+<div class="highlight"><pre><span></span><code>%cst = flow.tensor.constant dense&lt;4.0&gt; : tensor&lt;2x2xf32&gt; -&gt; tensor&lt;?x2xf32&gt;
+%res = math.absf %cst : tensor&lt;?x2xf32&gt;
 </code></pre></div>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_18">Attributes:<a class="headerlink" href="#attributes_18" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
-<tr><td><code>value</code></td><td>::mlir::ElementsAttr</td><td>constant vector/tensor attribute</td></tr>
+<tr><td><code>value</code></td><td>::mlir::TypedAttr</td><td>TypedAttr instance</td></tr>
 </table>
 
 <h5 id="results_24">Results:<a class="headerlink" href="#results_24" title="Permanent link">link</a></h5>
