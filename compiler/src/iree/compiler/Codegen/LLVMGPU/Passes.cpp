@@ -819,9 +819,12 @@ void addGPUTransformDialectPasses(OpPassManager &funcPassManager,
 
 static void buildLLVMGPUCodegenConfigurationPassPipelineImpl(
     OpPassManager &modulePassManager) {
-  FunctionLikeNest funcPassManager(modulePassManager);
-  funcPassManager.addPass(createGPUGeneralizeNamedOpsPass);
-  addCommonTargetExecutablePreprocessingPasses(funcPassManager);
+  {
+    FunctionLikeNest funcPassManager(modulePassManager);
+    funcPassManager.addPass(createGPUGeneralizeNamedOpsPass);
+    addCommonTargetExecutablePreprocessingPasses(funcPassManager);
+  }
+  modulePassManager.addPass(createMaterializeUserConfigsPass());
 
   modulePassManager.addPass(createLLVMGPUSelectLoweringStrategyPass());
 }
@@ -861,9 +864,12 @@ void buildLLVMGPUCodegenPassPipeline(OpPassManager &variantPassManager,
 
 static void buildROCDLCodegenConfigurationPassPipelineImpl(
     OpPassManager &modulePassManager) {
-  FunctionLikeNest funcPassManager(modulePassManager);
-  funcPassManager.addPass(createGPUGeneralizeNamedOpsPass);
-  addCommonTargetExecutablePreprocessingPasses(funcPassManager);
+  {
+    FunctionLikeNest funcPassManager(modulePassManager);
+    funcPassManager.addPass(createGPUGeneralizeNamedOpsPass);
+    addCommonTargetExecutablePreprocessingPasses(funcPassManager);
+  }
+  modulePassManager.addPass(createMaterializeUserConfigsPass());
 
   modulePassManager.addPass(createROCDLSelectLoweringStrategyPass());
 }

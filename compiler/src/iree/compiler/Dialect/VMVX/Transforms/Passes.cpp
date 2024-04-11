@@ -34,12 +34,15 @@ namespace mlir::iree_compiler::IREE::VMVX {
 
 static void
 buildVMVXConfigurationPassPipelineImpl(OpPassManager &modulePassManager) {
-  FunctionLikeNest funcPassManager(modulePassManager);
-  // ---------------------------------------------------------------------------
-  // Tensor-level optimization, kernel dispatch and lower to buffers.
-  // ---------------------------------------------------------------------------
-  addCommonTargetExecutablePreprocessingPasses(funcPassManager);
-  funcPassManager
+  {
+    FunctionLikeNest funcPassManager(modulePassManager);
+    // ---------------------------------------------------------------------------
+    // Tensor-level optimization, kernel dispatch and lower to buffers.
+    // ---------------------------------------------------------------------------
+    addCommonTargetExecutablePreprocessingPasses(funcPassManager);
+  }
+  modulePassManager.addPass(createMaterializeUserConfigsPass());
+  FunctionLikeNest(modulePassManager)
       .addPass([&]() { return createCPUMaterializeEncodingPass(); })
       // TODO: Remove the following pass the plumb support for
       // #hal.descriptor_type memory space through the stack.

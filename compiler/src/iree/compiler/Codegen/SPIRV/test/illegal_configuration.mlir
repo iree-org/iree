@@ -1,5 +1,5 @@
 // RUN: iree-opt \
-// RUN:   --pass-pipeline='builtin.module(func.func(iree-codegen-materialize-user-configs), iree-spirv-select-lowering-strategy-pass)' \
+// RUN:   --pass-pipeline='builtin.module(iree-codegen-materialize-user-configs, iree-spirv-select-lowering-strategy-pass)' \
 // RUN:   --verify-diagnostics --split-input-file %s
 
 #config = #iree_codegen.lowering_config<tile_sizes = []>

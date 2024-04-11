@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline='builtin.module(func.func(iree-codegen-materialize-user-configs))' --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-codegen-materialize-user-configs)' --split-input-file %s | FileCheck %s
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0], [32, 32, 0], [0, 0, 32], [0, 0, 0]]>
 #executable_target_system_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "system-elf-x86_64", {target_triple = "x86_64-xyz-xyz"}>

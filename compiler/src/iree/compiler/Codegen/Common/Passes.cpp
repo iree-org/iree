@@ -18,8 +18,7 @@ void addCommonTargetExecutablePreprocessingPasses(
       .addPass(createBufferizeCopyOnlyDispatchesPass)
       .addPass([&]() {
         return createDecomposeSoftmaxPass(useDecomposeSoftmaxFusion);
-      })
-      .addPass(createMaterializeUserConfigsPass);
+      });
 }
 
 //===---------------------------------------------------------------------===//

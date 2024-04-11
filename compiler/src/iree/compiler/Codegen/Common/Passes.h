@@ -225,8 +225,7 @@ std::unique_ptr<InterfacePass<FunctionOpInterface>>
 createMemrefCopyToLinalgPass();
 
 /// Extracts lowering configs and translation info from user configs.
-std::unique_ptr<InterfacePass<FunctionOpInterface>>
-createMaterializeUserConfigsPass();
+std::unique_ptr<OperationPass<ModuleOp>> createMaterializeUserConfigsPass();
 
 /// Pass to optimize vector transfer_read and transfer_write.
 std::unique_ptr<InterfacePass<FunctionOpInterface>>

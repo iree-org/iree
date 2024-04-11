@@ -383,8 +383,7 @@ def MaterializeEncodingIntoNop :
   let constructor = "mlir::iree_compiler::createMaterializeEncodingIntoNopPass()";
 }
 
-def MaterializeUserConfigs :
-    InterfacePass<"iree-codegen-materialize-user-configs", "mlir::FunctionOpInterface"> {
+def MaterializeUserConfigs : Pass<"iree-codegen-materialize-user-configs", "ModuleOp"> {
   let summary = "Sets the lowering configs and translation info from user configs";
   let constructor = "mlir::iree_compiler::createMaterializeUserConfigsPass()";
   let dependentDialects = [

@@ -611,9 +611,12 @@ void addSPIRVSubgroupReducePassPipeline(OpPassManager &funcPassManager) {
 
 static void buildSPIRVCodegenConfigurationPassPipelineImpl(
     OpPassManager &modulePassManager) {
-  FunctionLikeNest funcPassManager(modulePassManager);
-  funcPassManager.addPass(createGPUGeneralizeNamedOpsPass);
-  addCommonTargetExecutablePreprocessingPasses(funcPassManager);
+  {
+    FunctionLikeNest funcPassManager(modulePassManager);
+    funcPassManager.addPass(createGPUGeneralizeNamedOpsPass);
+    addCommonTargetExecutablePreprocessingPasses(funcPassManager);
+  }
+  modulePassManager.addPass(createMaterializeUserConfigsPass());
 
   modulePassManager.addPass(createSPIRVSelectLoweringStrategyPass());
 }
