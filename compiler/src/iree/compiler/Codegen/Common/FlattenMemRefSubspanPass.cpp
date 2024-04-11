@@ -353,6 +353,15 @@ static Value linearizeIndices(Value sourceValue, ValueRange indices,
   SmallVector<int64_t> strides;
   int64_t offset;
   if (succeeded(getStridesAndOffset(sourceType, strides, offset))) {
+    // For unit dimensions, strides don't matter since the index value can only
+    // be 0. Rewriting strides a 1 prevents unnecessarily failing the flattening
+    // when the stride has a dynamic value.
+    SmallVector<int64_t> shape(sourceType.getShape());
+    for (int i = 0; i < rank; ++i) {
+      if (shape[i] == 1) {
+        strides[i] = 1;
+      }
+    }
     // The memref itself might have an offset, but we should not account for it
     // when computing the linearization. The original memref might be
     // `memref<?x?xf32, strided<[?, ?], offset: ?>`

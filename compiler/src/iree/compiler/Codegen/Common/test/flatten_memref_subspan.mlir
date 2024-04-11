@@ -19,6 +19,24 @@ func.func @load_subspan_with_offset(%offset : index, %i0: index, %i1: index, %i2
 
 // -----
 
+func.func @load_subspan_with_stride_on_outer_unit_dim_and_inner_dynamic_dim(%offset : index, %i0: index, %i1: index, %i2: index, %i3: index, %dim : index) -> f32 {
+  %subspan = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%offset) :  memref<1x?x1x4xf32, strided<[?, 4, 4, 1], offset: ?>>{%dim}
+  %val = memref.load %subspan[%i0, %i1, %i2, %i3] : memref<1x?x1x4xf32, strided<[?, 4, 4, 1], offset: ?>>
+  return %val: f32
+}
+//  CHECK-DAG: #[[$MAP0:.+]] = affine_map<()[s0, s1] -> (s0 * 4 + s1 floordiv 4)>
+//  CHECK-DAG: #[[$MAP1:.+]] = affine_map<()[s0, s1, s2, s3, s4] -> (s1 + s2 * 4 + s3 + s4 + s0 floordiv 4)>
+//CHECK-LABEL: func.func @load_subspan_with_stride_on_outer_unit_dim_and_inner_dynamic_dim
+// CHECK-SAME: (%[[OFFSET:.+]]: index, %[[I0:.+]]: index, %[[I1:.+]]: index, %[[I2:.+]]: index, %[[I3:.+]]: index, %[[DIM:.+]]: index)
+//  CHECK-DAG:   %[[ZERO:.+]] = arith.constant 0 : index
+//  CHECK-DAG:   %[[SIZE:.+]] = affine.apply #[[$MAP0]]()[%[[DIM]], %[[OFFSET]]]
+//      CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%[[ZERO]]) : memref<?xf32>{%[[SIZE]]}
+//      CHECK:   %[[INDEX:.+]] = affine.apply #[[$MAP1]]()[%[[OFFSET]], %[[I0]], %[[I1]], %[[I2]], %[[I3]]]
+//      CHECK:   %[[LOAD:.+]] = memref.load %[[SUBSPAN]][%[[INDEX]]]
+//      CHECK:   return %[[LOAD]]
+
+// -----
+
 func.func @store_subspan_with_offset(%value: f32, %offset : index, %i0: index, %i1: index, %i2: index) {
   %subspan = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%offset) : memref<2x3x4xf32, strided<[12, 4, 1], offset: ?>>
   memref.store %value, %subspan[%i0, %i1, %i2] : memref<2x3x4xf32, strided<[12, 4, 1], offset: ?>>
@@ -375,7 +393,7 @@ func.func @expand_shape2(%offset : index, %i0: index, %i1: index) -> f32 {
 }
 
 //  CHECK-DAG: #[[$MAP0:.+]] = affine_map<()[s0] -> (s0 floordiv 4 + 128)>
-//  CHECK-DAG: #[[$MAP1:.+]] = affine_map<()[s0, s1, s2] -> (s1 * 128 + s2 + s0 floordiv 4)>
+//  CHECK-DAG: #[[$MAP1:.+]] = affine_map<()[s0, s1, s2] -> (s1 + s2 + s0 floordiv 4)>
 //CHECK-LABEL: func.func @expand_shape2
 // CHECK-SAME: (%[[OFFSET:.+]]: index, %[[I0:.+]]: index, %[[I1:.+]]: index)
 //  CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
