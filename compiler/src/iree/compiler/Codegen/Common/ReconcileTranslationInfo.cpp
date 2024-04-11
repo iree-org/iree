@@ -110,11 +110,11 @@ void ReconcileTranslationInfoPass::runOnOperation() {
   FailureOr<SmallVector<int64_t>> reconciledWorkgroupSize =
       reconcileWorkgroupSize(translationInfos);
   if (failed(reconciledWorkgroupSize)) {
-    variantOp.emitOpError("failed to reconcile workgroup sizes");
+    exportOp.emitOpError("failed to reconcile workgroup sizes");
     return signalPassFailure();
   }
   if (reconciledWorkgroupSize->size() > 3) {
-    variantOp.emitOpError(
+    exportOp.emitOpError(
         "reconciled workgroup size is greater than 3 (illegal)");
     return signalPassFailure();
   }
@@ -133,7 +133,7 @@ void ReconcileTranslationInfoPass::runOnOperation() {
   FailureOr<int64_t> reconciledSubgroupSize =
       reconcileSubgroupSize(translationInfos);
   if (failed(reconciledSubgroupSize)) {
-    variantOp.emitOpError("failed to reconcile subgroup size");
+    exportOp.emitOpError("failed to reconcile subgroup size");
     return signalPassFailure();
   }
   if (reconciledSubgroupSize.value() != int64_t()) {
