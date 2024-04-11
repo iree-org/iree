@@ -27,7 +27,7 @@ IREE_FLAG_LIST(
 IREE_FLAG(bool, hip_use_streams, true,
           "Use HIP streams (instead of graphs) for executing command buffers.");
 
-IREE_FLAG(bool, hip_allow_inline_execution, true,
+IREE_FLAG(bool, hip_allow_inline_execution, false,
           "Allow command buffers to execute inline against HIP streams when \n"
           "possible.");
 
@@ -160,7 +160,7 @@ static iree_status_t iree_hal_hip_driver_populate_options(
       if (!iree_string_view_atoi_int32(value, &ivalue)) {
         return iree_make_status(
             IREE_STATUS_FAILED_PRECONDITION,
-            "Option 'hip_allowkey_hip_allow_inline_execution' expected to be "
+            "Option 'hip_allow_inline_execution' expected to be "
             "int. Got: '%.*s'",
             (int)value.size, value.data);
       }
