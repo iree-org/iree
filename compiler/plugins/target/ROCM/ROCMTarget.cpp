@@ -138,13 +138,17 @@ static std::string translateModuleToISA(llvm::Module &module,
 // Adds argument hints to preload kernel arguments to SGPRs.
 // TODO: Query max number of user SGPRs from target machine.
 static void addPreloadKernArgHint(llvm::Function *F) {
-  static constexpr size_t maxSGPRs = 16;
-  for (size_t i = 0, e = std::min(F->arg_size(), maxSGPRs); i != e; ++i) {
-    llvm::Argument *Arg = F->getArg(i);
+  static constexpr unsigned preloadLimit = 8;
+  unsigned numPreloaded = 0;
+  for (llvm::Argument &arg : F->args()) {
     // Check for incompatible attributes.
-    if (Arg->hasByRefAttr() || Arg->hasNestAttr())
+    if (arg.hasByRefAttr() || arg.hasNestAttr())
+      continue;
+
+    arg.addAttr(llvm::Attribute::InReg);
+    ++numPreloaded;
+    if (numPreloaded >= preloadLimit)
       break;
-    Arg->addAttr(llvm::Attribute::InReg);
   }
 }
 
