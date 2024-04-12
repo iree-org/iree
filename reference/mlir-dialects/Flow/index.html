@@ -1719,6 +1719,13 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#flowtensordynamic_constant-flowtensordynamicconstantop" class="md-nav__link">
+    flow.tensor.dynamic_constant (Flow::TensorDynamicConstantOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#flowtensorempty-flowtensoremptyop" class="md-nav__link">
     flow.tensor.empty (Flow::TensorEmptyOp)
   </a>
@@ -1792,7 +1799,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_20" class="md-nav__link">
+  <a href="#attributes_21" class="md-nav__link">
     Attributes
   </a>
   
@@ -1802,6 +1809,13 @@
           <li class="md-nav__item">
   <a href="#dummyattr" class="md-nav__link">
     DummyAttr
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#namedparameterattr" class="md-nav__link">
+    NamedParameterAttr
   </a>
   
 </li>
@@ -3995,6 +4009,13 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#flowtensordynamic_constant-flowtensordynamicconstantop" class="md-nav__link">
+    flow.tensor.dynamic_constant (Flow::TensorDynamicConstantOp)
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#flowtensorempty-flowtensoremptyop" class="md-nav__link">
     flow.tensor.empty (Flow::TensorEmptyOp)
   </a>
@@ -4068,7 +4089,7 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#attributes_20" class="md-nav__link">
+  <a href="#attributes_21" class="md-nav__link">
     Attributes
   </a>
   
@@ -4078,6 +4099,13 @@
           <li class="md-nav__item">
   <a href="#dummyattr" class="md-nav__link">
     DummyAttr
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#namedparameterattr" class="md-nav__link">
+    NamedParameterAttr
   </a>
   
 </li>
@@ -4257,6 +4285,7 @@ workload size, shapes of inputs and outputs, etc.</p>
 <li><a href="#flowtensorbitcast-flowtensorbitcastop">flow.tensor.bitcast (Flow::TensorBitCastOp)</a></li>
 <li><a href="#flowtensorclone-flowtensorcloneop">flow.tensor.clone (Flow::TensorCloneOp)</a></li>
 <li><a href="#flowtensorconstant-flowtensorconstantop">flow.tensor.constant (Flow::TensorConstantOp)</a></li>
+<li><a href="#flowtensordynamic_constant-flowtensordynamicconstantop">flow.tensor.dynamic_constant (Flow::TensorDynamicConstantOp)</a></li>
 <li><a href="#flowtensorempty-flowtensoremptyop">flow.tensor.empty (Flow::TensorEmptyOp)</a></li>
 <li><a href="#flowtensorload-flowtensorloadop">flow.tensor.load (Flow::TensorLoadOp)</a></li>
 <li><a href="#flowtensorreshape-flowtensorreshapeop">flow.tensor.reshape (Flow::TensorReshapeOp)</a></li>
@@ -4270,8 +4299,9 @@ workload size, shapes of inputs and outputs, etc.</p>
 </li>
 </ul>
 </li>
-<li><a href="#attributes_20">Attributes</a><ul>
+<li><a href="#attributes_21">Attributes</a><ul>
 <li><a href="#dummyattr">DummyAttr</a></li>
+<li><a href="#namedparameterattr">NamedParameterAttr</a></li>
 </ul>
 </li>
 <li><a href="#type-constraints">Type constraints</a><ul>
@@ -5775,16 +5805,15 @@ lowering.</p>
 </table>
 <h4 id="flowtensorconstant-flowtensorconstantop"><code>flow.tensor.constant</code> (Flow::TensorConstantOp)<a class="headerlink" href="#flowtensorconstant-flowtensorconstantop" title="Permanent link">link</a></h4>
 <p><em>Tensor constant that can have dynamic dimensions</em></p>
-<p>Allows specifying a tensor constant of IREE-specific types/attributes or
-where the return value can erase shape information.</p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `flow.tensor.constant` attr-dict $value
+</code></pre></div>
+<p>Allows specifying a tensor constant of IREE-specific types/attributes.</p>
 <div class="highlight"><pre><span></span><code>%cst = flow.tensor.constant #something_tensor_like : tensor&lt;2x2xf32&gt;
 %res = math.absf %cst : tensor&lt;2x2xf32&gt;
 </code></pre></div>
-<div class="highlight"><pre><span></span><code>%cst = flow.tensor.constant dense&lt;4.0&gt; : tensor&lt;2x2xf32&gt; -&gt; tensor&lt;?x2xf32&gt;
-%res = math.absf %cst : tensor&lt;?x2xf32&gt;
-</code></pre></div>
-<p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
-<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
+<p>Traits: <code>AlwaysSpeculatableImplTrait</code>, <code>ConstantLike</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_18">Attributes:<a class="headerlink" href="#attributes_18" title="Permanent link">link</a></h5>
 <table>
@@ -5793,6 +5822,40 @@ where the return value can erase shape information.</p>
 </table>
 
 <h5 id="results_24">Results:<a class="headerlink" href="#results_24" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Result</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;"><code>result</code></td>
+<td>tensor of any type values</td>
+</tr>
+</tbody>
+</table>
+<h4 id="flowtensordynamic_constant-flowtensordynamicconstantop"><code>flow.tensor.dynamic_constant</code> (Flow::TensorDynamicConstantOp)<a class="headerlink" href="#flowtensordynamic_constant-flowtensordynamicconstantop" title="Permanent link">link</a></h4>
+<p><em>Tensor constant that can have dynamic dimensions</em></p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>operation ::= `flow.tensor.dynamic_constant` attr-dict $value `-&gt;` type($result)
+</code></pre></div>
+<p>Allows specifying a tensor constant of IREE-specific types/attributes with
+a dynamic shape that approximates a value as passed from the user. This
+disables many optimizations and should only be used when testing or
+benchmarking and wanting to ensure that dynamic dimension behavior is
+preserved.</p>
+<div class="highlight"><pre><span></span><code>%cst = flow.tensor.dynamic_constant #something_tensor_like : tensor&lt;2x2xf32&gt; -&gt; tensor&lt;?x2xf32&gt;
+%res = math.absf %cst : tensor&lt;?x2xf32&gt;
+</code></pre></div>
+<h5 id="attributes_19">Attributes:<a class="headerlink" href="#attributes_19" title="Permanent link">link</a></h5>
+<table>
+<tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
+<tr><td><code>value</code></td><td>::mlir::TypedAttr</td><td>TypedAttr instance</td></tr>
+</table>
+
+<h5 id="results_25">Results:<a class="headerlink" href="#results_25" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5833,7 +5896,7 @@ any ranges of the tensor that are later read.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_25">Results:<a class="headerlink" href="#results_25" title="Permanent link">link</a></h5>
+<h5 id="results_26">Results:<a class="headerlink" href="#results_26" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5882,7 +5945,7 @@ any ranges of the tensor that are later read.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_26">Results:<a class="headerlink" href="#results_26" title="Permanent link">link</a></h5>
+<h5 id="results_27">Results:<a class="headerlink" href="#results_27" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5932,7 +5995,7 @@ any ranges of the tensor that are later read.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_27">Results:<a class="headerlink" href="#results_27" title="Permanent link">link</a></h5>
+<h5 id="results_28">Results:<a class="headerlink" href="#results_28" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -5990,7 +6053,7 @@ any ranges of the tensor that are later read.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_28">Results:<a class="headerlink" href="#results_28" title="Permanent link">link</a></h5>
+<h5 id="results_29">Results:<a class="headerlink" href="#results_29" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6034,7 +6097,7 @@ any ranges of the tensor that are later read.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_29">Results:<a class="headerlink" href="#results_29" title="Permanent link">link</a></h5>
+<h5 id="results_30">Results:<a class="headerlink" href="#results_30" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6087,7 +6150,7 @@ any ranges of the tensor that are later read.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_30">Results:<a class="headerlink" href="#results_30" title="Permanent link">link</a></h5>
+<h5 id="results_31">Results:<a class="headerlink" href="#results_31" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6133,7 +6196,7 @@ calculations and is removed during lowering.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_31">Results:<a class="headerlink" href="#results_31" title="Permanent link">link</a></h5>
+<h5 id="results_32">Results:<a class="headerlink" href="#results_32" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6160,7 +6223,7 @@ tensors. The key is arbitrary and can be used for identifying the set of
 values being traced.</p>
 <p>Traits: <code>AttrSizedOperandSegments</code></p>
 <p>Interfaces: <code>ShapeAwareOpInterface</code></p>
-<h5 id="attributes_19">Attributes:<a class="headerlink" href="#attributes_19" title="Permanent link">link</a></h5>
+<h5 id="attributes_20">Attributes:<a class="headerlink" href="#attributes_20" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
 <tr><td><code>key</code></td><td>::mlir::StringAttr</td><td>string attribute</td></tr>
@@ -6229,7 +6292,7 @@ given offset indices.</p>
 </tr>
 </tbody>
 </table>
-<h5 id="results_32">Results:<a class="headerlink" href="#results_32" title="Permanent link">link</a></h5>
+<h5 id="results_33">Results:<a class="headerlink" href="#results_33" title="Permanent link">link</a></h5>
 <table>
 <thead>
 <tr>
@@ -6244,9 +6307,54 @@ given offset indices.</p>
 </tr>
 </tbody>
 </table>
-<h2 id="attributes_20">Attributes<a class="headerlink" href="#attributes_20" title="Permanent link">link</a></h2>
+<h2 id="attributes_21">Attributes<a class="headerlink" href="#attributes_21" title="Permanent link">link</a></h2>
 <h3 id="dummyattr">DummyAttr<a class="headerlink" href="#dummyattr" title="Permanent link">link</a></h3>
 <p>Syntax: <code>#flow.dummy</code></p>
+<h3 id="namedparameterattr">NamedParameterAttr<a class="headerlink" href="#namedparameterattr" title="Permanent link">link</a></h3>
+<p>named parameter referenced an optional scope and key</p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>#flow.parameter.named&lt;
+  ::mlir::Type,   # type
+  StringAttr,   # scope
+  StringAttr,   # key
+  DictionaryAttr   # config
+&gt;
+</code></pre></div>
+<p>Species an externally-defined parameter that can be referenced by an
+optional scope defining a set of parameters and a key uniquely identifying
+the parameter within its scope.</p>
+<h5 id="parameters">Parameters:<a class="headerlink" href="#parameters" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Parameter</th>
+<th style="text-align: center;">C++ type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">type</td>
+<td style="text-align: center;"><code>::mlir::Type</code></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center;">scope</td>
+<td style="text-align: center;"><code>StringAttr</code></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center;">key</td>
+<td style="text-align: center;"><code>StringAttr</code></td>
+<td></td>
+</tr>
+<tr>
+<td style="text-align: center;">config</td>
+<td style="text-align: center;"><code>DictionaryAttr</code></td>
+<td></td>
+</tr>
+</tbody>
+</table>
 <h2 id="type-constraints">Type constraints<a class="headerlink" href="#type-constraints" title="Permanent link">link</a></h2>
 <h3 id="dispatchtensor">dispatch.tensor<a class="headerlink" href="#dispatchtensor" title="Permanent link">link</a></h3>
 <p>A placeholder for a dispatch region input/output operand. This can be used
