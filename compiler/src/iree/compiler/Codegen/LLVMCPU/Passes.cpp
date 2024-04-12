@@ -652,8 +652,8 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
       .addPredicatedPass(clUseFastMinMaxOps, createReplaceSlowMinMaxOpsPass);
 
   if (enableAArch64SME) {
+    modulePassManager.addPass(mlir::arm_sme::createVectorLegalizationPass());
     FunctionLikeNest(modulePassManager)
-        .addPass(mlir::arm_sme::createVectorLegalizationPass)
         .addPass(createCanonicalizerPass)
         .addPass(createCSEPass)
         .addPass(mlir::createArithToArmSMEConversionPass)

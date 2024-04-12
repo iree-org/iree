@@ -122,6 +122,7 @@ iree_cc_library(
   DEPS
     ::PassHeaders
     ::PassesIncGen
+    IREELinalgTransformDialect
     IREEVectorExtDialect
     LLVMSupport
     MLIRAffineAnalysis
