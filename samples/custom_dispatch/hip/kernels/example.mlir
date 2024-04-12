@@ -1,7 +1,7 @@
 // RUN: iree-compile %s \
 // RUN:     --iree-hal-executable-object-search-path=$IREE_BINARY_DIR | \
 // RUN: iree-run-module \
-// RUN:     --device=rocm \
+// RUN:     --device=hip \
 // RUN:     --module=- \
 // RUN:     --function=mixed_invocation \
 // RUN:     --input=8xf32=2 \
@@ -119,7 +119,7 @@ module @example attributes {hal.device.targets = [#rocm_target]} {
 
   // Function demonstrating a few hand-authored dispatches mixed with codegen.
   // Invoke with:
-  //  --device=rocm
+  //  --device=hip
   //  --function=mixed_invocation
   //  --input=8xf32=2
   //  --input=8xf32=4

@@ -36,7 +36,6 @@ declare -a label_exclude_args=(
   "^driver=vulkan$"
   "^driver=metal$"
   "^driver=cuda$"
-  "^driver=rocm$"
   "^driver=hip$"
   "^vulkan_uses_vk_khr_shader_float16_int8$"
   "^requires-filesystem$"

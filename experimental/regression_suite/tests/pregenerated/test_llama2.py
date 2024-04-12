@@ -223,7 +223,7 @@ def test_step_a100_vulkan_stripped(llama2_7b_f16qi4_a100_vulkan_vmfb):
 def test_step_rdna3_rocm_stripped(llama2_7b_f16qi4_stripped_rdna3_rocm_vmfb):
     iree_benchmark_module(
         llama2_7b_f16qi4_stripped_rdna3_rocm_vmfb,
-        device="rocm",
+        device="hip",
         function="first_vicuna_forward",
         args=[
             "--input=1x1xi64",
@@ -231,7 +231,7 @@ def test_step_rdna3_rocm_stripped(llama2_7b_f16qi4_stripped_rdna3_rocm_vmfb):
     )
     iree_benchmark_module(
         llama2_7b_f16qi4_stripped_rdna3_rocm_vmfb,
-        device="rocm",
+        device="hip",
         function="second_vicuna_forward",
         args=[
             "--input=1x1xi64",
