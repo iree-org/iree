@@ -41,25 +41,51 @@ public:
   LogicalResult
   matchAndRewrite(IREE::Flow::TensorConstantOp constantOp, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
+    // Capture the tensor constant strongly typed with constant lifetime.
+    Type constantType = IREE::Stream::ResourceType::get(
+        getContext(), IREE::Stream::Lifetime::Constant);
+    auto affinityAttr = IREE::Stream::AffinityAttr::lookup(constantOp);
+    auto newOp = rewriter.create<IREE::Stream::TensorConstantOp>(
+        constantOp.getLoc(), constantType, constantOp.getValue(),
+        TypeAttr::get(constantOp.getType()), ValueRange{}, affinityAttr);
+
+    // Transfer to unknown lifetime.
+    Type unknownType = IREE::Stream::ResourceType::get(getContext());
+    auto constantSize = rewriter.createOrFold<IREE::Stream::ResourceSizeOp>(
+        constantOp.getLoc(), rewriter.getIndexType(), newOp.getResult());
+    rewriter.replaceOpWithNewOp<IREE::Stream::AsyncTransferOp>(
+        constantOp, unknownType, newOp.getResult(), constantSize, constantSize,
+        /*source_affinity=*/affinityAttr,
+        /*result_affinity=*/affinityAttr);
+    return success();
+  }
+};
+
+struct ConvertTensorDynamicConstantOp
+    : public OpConversionPattern<IREE::Flow::TensorDynamicConstantOp> {
+public:
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::Flow::TensorDynamicConstantOp constantOp,
+                  OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
     auto attrType = dyn_cast<RankedTensorType>(constantOp.getValue().getType());
     if (!attrType)
       return failure();
     auto resultType = constantOp.getType();
 
     // If the op is acting as a dynamic value then preserve that behavior by
-    // calculation the shape through optimization barriers.
+    // calculating the shape through optimization barriers.
     SmallVector<Value> dynamicDims;
-    if (!resultType.hasStaticShape()) {
-      for (unsigned i = 0; i < resultType.getRank(); ++i) {
-        if (resultType.isDynamicDim(i)) {
-          Value staticDim = rewriter.create<arith::ConstantIndexOp>(
-              constantOp.getLoc(), attrType.getDimSize(i));
-          Value dynamicDim = rewriter
-                                 .create<IREE::Util::OptimizationBarrierOp>(
-                                     constantOp.getLoc(), staticDim)
-                                 .getResult(0);
-          dynamicDims.push_back(dynamicDim);
-        }
+    for (unsigned i = 0; i < resultType.getRank(); ++i) {
+      if (resultType.isDynamicDim(i)) {
+        Value staticDim = rewriter.create<arith::ConstantIndexOp>(
+            constantOp.getLoc(), attrType.getDimSize(i));
+        Value dynamicDim = rewriter
+                               .create<IREE::Util::OptimizationBarrierOp>(
+                                   constantOp.getLoc(), staticDim)
+                               .getResult(0);
+        dynamicDims.push_back(dynamicDim);
       }
     }
 
@@ -937,7 +963,7 @@ void populateFlowToStreamConversionPatterns(MLIRContext *context,
                                             TypeConverter &typeConverter,
                                             RewritePatternSet &patterns) {
   patterns
-      .insert<ConvertTensorConstantOp,
+      .insert<ConvertTensorConstantOp, ConvertTensorDynamicConstantOp,
               ConvertTensorCastLikeOp<IREE::Flow::TensorReshapeOp>,
               ConvertTensorCastLikeOp<IREE::Flow::TensorBitCastOp>,
               ConvertTensorAllocaOp, ConvertTensorEmptyOp, ConvertTensorSplatOp,

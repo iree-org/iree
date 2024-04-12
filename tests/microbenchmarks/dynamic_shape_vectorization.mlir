@@ -14,9 +14,9 @@ func.func @dynamic_matmul() -> tensor<?x?xf32> {
   %dim1 = util.unfoldable_constant 513 : index
   %dim2 = util.unfoldable_constant 385 : index
 
-  %A = flow.tensor.constant dense<1.0> : tensor<513x257xf32> -> tensor<?x?xf32>
-  %B = flow.tensor.constant dense<2.0> : tensor<257x385xf32> -> tensor<?x?xf32>
-  %C = flow.tensor.constant dense<0.0> : tensor<513x385xf32> -> tensor<?x?xf32>
+  %A = flow.tensor.dynamic_constant dense<1.0> : tensor<513x257xf32> -> tensor<?x?xf32>
+  %B = flow.tensor.dynamic_constant dense<2.0> : tensor<257x385xf32> -> tensor<?x?xf32>
+  %C = flow.tensor.dynamic_constant dense<0.0> : tensor<513x385xf32> -> tensor<?x?xf32>
 
   %gemm = linalg.matmul
       ins(%A, %B : tensor<?x?xf32>, tensor<?x?xf32>)
@@ -26,9 +26,9 @@ func.func @dynamic_matmul() -> tensor<?x?xf32> {
 
 func.func @dynamic_elw() -> tensor<?x?xf32> {
   %c0 = arith.constant 0.000000e+00 : f32
-  %A = flow.tensor.constant dense<1.0> : tensor<513x1025xf32> -> tensor<?x?xf32>
-  %B = flow.tensor.constant dense<2.0> : tensor<513x1025xf32> -> tensor<?x?xf32>
-  %C = flow.tensor.constant dense<0.0> : tensor<513x1025xf32> -> tensor<?x?xf32>
+  %A = flow.tensor.dynamic_constant dense<1.0> : tensor<513x1025xf32> -> tensor<?x?xf32>
+  %B = flow.tensor.dynamic_constant dense<2.0> : tensor<513x1025xf32> -> tensor<?x?xf32>
+  %C = flow.tensor.dynamic_constant dense<0.0> : tensor<513x1025xf32> -> tensor<?x?xf32>
 
   %gen = linalg.generic {
       indexing_maps = [

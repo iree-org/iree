@@ -12,6 +12,18 @@ util.func public @tensorConstantStatic() -> tensor<4x2xi32> {
 
 // -----
 
+// CHECK-LABEL: @tensorConstantParameter
+util.func public @tensorConstantParameter() -> tensor<4x2xi32> {
+  // CHECK-DAG: %[[CST:.+]] = stream.tensor.constant : tensor<4x2xi32> in !stream.resource<constant> = #stream.parameter.named<"scope"::"key"> : tensor<4x2xi32>
+  // CHECK-DAG: %[[SIZE:.+]] = stream.resource.size %[[CST]] : !stream.resource<constant>
+  // CHECK-DAG: %[[TRANSFER:.+]] = stream.async.transfer %[[CST]] : !stream.resource<constant>{%[[SIZE]]} -> !stream.resource<*>{%[[SIZE]]}
+  %cst = flow.tensor.constant #stream.parameter.named<"scope"::"key"> : tensor<4x2xi32>
+  // CHECK: util.return %[[TRANSFER]], %[[SIZE]]
+  util.return %cst : tensor<4x2xi32>
+}
+
+// -----
+
 // CHECK-LABEL: @tensorConstantDynamic
 util.func public @tensorConstantDynamic() -> tensor<?x?xi32> {
   // CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
@@ -21,21 +33,9 @@ util.func public @tensorConstantDynamic() -> tensor<?x?xi32> {
   // CHECK-DAG: %[[CST:.+]] = stream.tensor.constant : tensor<?x?xi32>{%[[D0]], %[[D1]]} in !stream.resource<constant> = dense<2> : tensor<2x4xi32>
   // CHECK-DAG: %[[SIZE:.+]] = stream.resource.size %[[CST]] : !stream.resource<constant>
   // CHECK-DAG: %[[TRANSFER:.+]] = stream.async.transfer %[[CST]] : !stream.resource<constant>{%[[SIZE]]} -> !stream.resource<*>{%[[SIZE]]}
-  %cst = flow.tensor.constant dense<2> : tensor<2x4xi32> -> tensor<?x?xi32>
+  %cst = flow.tensor.dynamic_constant dense<2> : tensor<2x4xi32> -> tensor<?x?xi32>
   // CHECK: util.return %[[TRANSFER]], %[[SIZE]]
   util.return %cst : tensor<?x?xi32>
-}
-
-// -----
-
-// CHECK-LABEL: @tensorConstantParameter
-util.func public @tensorConstantParameter() -> tensor<4x2xi32> {
-  // CHECK-DAG: %[[CST:.+]] = stream.tensor.constant : tensor<4x2xi32> in !stream.resource<constant> = #stream.parameter.named<"scope"::"key"> : tensor<4x2xi32>
-  // CHECK-DAG: %[[SIZE:.+]] = stream.resource.size %[[CST]] : !stream.resource<constant>
-  // CHECK-DAG: %[[TRANSFER:.+]] = stream.async.transfer %[[CST]] : !stream.resource<constant>{%[[SIZE]]} -> !stream.resource<*>{%[[SIZE]]}
-  %cst = flow.tensor.constant #stream.parameter.named<"scope"::"key"> : tensor<4x2xi32>
-  // CHECK: util.return %[[TRANSFER]], %[[SIZE]]
-  util.return %cst : tensor<4x2xi32>
 }
 
 // -----
