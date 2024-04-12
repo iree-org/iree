@@ -2095,6 +2095,15 @@ def HAL_ExecutableExportOp : HAL_Op<"executable.export", [
     // Calculates an XYZ workgroup size based on the given |workload|.
     std::array<Value, 3> calculateWorkgroupSize(
         Location loc, Value device, ValueRange workload, OpBuilder &builder);
+
+    // Helper function to return the subgroup size.
+    std::optional<uint64_t> getSubgroupSizeAsUInt() {
+      std::optional<APInt> subgroupSizeUInt = getSubgroupSize();
+      if (!subgroupSizeUInt) {
+        return std::nullopt;
+      }
+      return subgroupSizeUInt->getZExtValue();
+    }
   }];
 }
 

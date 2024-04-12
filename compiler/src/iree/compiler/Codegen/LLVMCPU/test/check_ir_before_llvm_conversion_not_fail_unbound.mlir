@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-llvmcpu-check-ir-before-llvm-conversion=fail-on-out-of-bounds=false %s --verify-diagnostics -split-input-file
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-check-ir-before-llvm-conversion{fail-on-out-of-bounds=false}))" %s --verify-diagnostics -split-input-file
 
 module {
   func.func @dynamic_allocas(%arg0: index) {

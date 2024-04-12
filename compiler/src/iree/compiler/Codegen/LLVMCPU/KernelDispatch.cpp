@@ -2583,33 +2583,27 @@ setTranslationInfoAndRootConfig(mlir::FunctionOpInterface entryPointFn,
   return success();
 }
 
-LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
-  llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
-      getAllEntryPoints(moduleOp);
-  for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
-    auto exportOp = exportOps.lookup(funcOp.getName());
-    if (!exportOp)
-      continue;
-    if (getTranslationInfo(exportOp))
-      continue;
+LogicalResult initCPULaunchConfig(FunctionOpInterface funcOp) {
+  if (getTranslationInfo(funcOp)) {
+    return success();
+  }
 
-    // For now pick the default for functions with control flow, cause
-    // the currently built pipelines dont work so well with control flow.
-    if (funcOp.empty() || !llvm::hasSingleElement(funcOp.getFunctionBody())) {
-      return lowerUsingDefaultPipeline(funcOp);
-    }
+  // For now pick the default for functions with control flow, cause
+  // the currently built pipelines dont work so well with control flow.
+  if (funcOp.empty() || !llvm::hasSingleElement(funcOp.getFunctionBody())) {
+    return lowerUsingDefaultPipeline(funcOp);
+  }
 
-    SmallVector<Operation *> computeOps = getComputeOps(funcOp);
-    if (failed(setTranslationInfoAndRootConfig(funcOp, computeOps))) {
-      return failure();
-    }
+  SmallVector<Operation *> computeOps = getComputeOps(funcOp);
+  if (failed(setTranslationInfoAndRootConfig(funcOp, computeOps))) {
+    return failure();
   }
 
   // The root configuration setting introduces `tensor.dim` operations.
   // Resolve those away.
-  RewritePatternSet patterns(moduleOp.getContext());
+  RewritePatternSet patterns(funcOp.getContext());
   memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
-  return applyPatternsAndFoldGreedily(moduleOp, std::move(patterns));
+  return applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
 }
 
 } // namespace mlir::iree_compiler

@@ -16,7 +16,7 @@ namespace mlir::iree_compiler {
 // the lowering configuration.
 int64_t getTargetSharedMemoryLimitInBytes(FunctionOpInterface entryPoint);
 
-LogicalResult initGPULaunchConfig(ModuleOp moduleOp);
+LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp);
 
 } // namespace mlir::iree_compiler
 #endif // IREE_COMPILER_CODEGEN_LLVMGPU_KERNELCONFIG_H_

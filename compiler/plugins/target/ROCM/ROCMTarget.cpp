@@ -305,7 +305,7 @@ public:
     llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOpMap;
     std::vector<std::array<int32_t, 3>> workgroupSizes;
     SmallVector<uint32_t> workgroupLocalMemories;
-    int32_t subgroupSize = 64;
+    uint32_t subgroupSize = 64;
     for (auto exportOp : variantOp.getExportOps()) {
       exportOps.push_back(exportOp);
       exportOpMap[exportOp.getSymName()] = exportOp;
@@ -320,12 +320,12 @@ public:
       }
       workgroupSizes.push_back(workgroupSize);
 
-      if (auto setSubgroupSize = getSubgroupSize(exportOp)) {
-        if (subgroupSize != 32 && subgroupSize != 64) {
+      if (auto setSubgroupSize = exportOp.getSubgroupSizeAsUInt()) {
+        if (setSubgroupSize.value() != 32 && setSubgroupSize.value() != 64) {
           return variantOp.emitError()
-                 << "invalid subgroup size " << subgroupSize;
+                 << "invalid subgroup size " << setSubgroupSize.value();
         }
-        subgroupSize = *setSubgroupSize;
+        subgroupSize = setSubgroupSize.value();
       }
 
       uint32_t workgroupLocalMemory = 0;
@@ -385,13 +385,8 @@ public:
         // cases where codegen decides to override the value.
         // Otherwise, fallback to the default option.
         int64_t wavesPerEu = 0;
-        IREE::Codegen::TranslationInfoAttr translationInfo =
-            getTranslationInfo(exportOp);
-        if (auto translationConfig = translationInfo.getConfiguration()) {
-          if (auto attr =
-                  translationConfig.getAs<IntegerAttr>("waves_per_eu")) {
-            wavesPerEu = attr.getValue().getSExtValue();
-          }
+        if (auto attr = func->getAttrOfType<IntegerAttr>("waves_per_eu")) {
+          wavesPerEu = attr.getValue().getSExtValue();
         }
         if (wavesPerEu == 0) {
           if (auto attr = getConfigIntegerAttr(targetAttr, "waves_per_eu"))

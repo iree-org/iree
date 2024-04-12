@@ -1,44 +1,27 @@
 // RUN: iree-opt --split-input-file \
-// RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-codegen-decompose-softmax)), iree-spirv-select-lowering-strategy-pass, iree-spirv-lower-executable-target-pass)))' \
+// RUN:   --pass-pipeline='builtin.module(func.func(iree-codegen-decompose-softmax), iree-spirv-select-lowering-strategy-pass, func.func(iree-spirv-lower-executable-target-pass))' \
 // RUN:   %s | FileCheck %s
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-  spirv.target_env = #spirv.target_env<#spirv.vce<v1.3,
-    [Shader, GroupNonUniform, GroupNonUniformShuffle], [SPV_KHR_storage_buffer_storage_class]>, Unknown:Unknown,
-    #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64], subgroup_size = 32, cooperative_matrix_properties_khr = []>>}>
-
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>
-
-hal.executable @warp_reduction_dispatch {
-  hal.executable.variant public @vulkan_spirv_fb target(#executable_target_vulkan_spirv_fb) {
-    hal.executable.export public @warp_reduction_dispatch ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
-      hal.return %x, %y, %z : index, index, index
-    }
-    builtin.module {
-      func.func @warp_reduction_dispatch() {
-        %c0 = arith.constant 0 : index
-        %c10240 = arith.constant 10240 : index
-        %cst = arith.constant 1.000000e+00 : f32
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<512x10240xf32>>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:tensor<512xf32>>
-        %5 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [512, 10240], strides = [1, 1]
-            : !flow.dispatch.tensor<readonly:tensor<512x10240xf32>> -> tensor<512x10240xf32>
-        %8 = tensor.empty() : tensor<512xf32>
-        %9 = linalg.fill ins(%cst : f32) outs(%8 : tensor<512xf32>) -> tensor<512xf32>
-        %10 = linalg.generic {
-            indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0)>], iterator_types = ["parallel", "reduction"]}
-            ins(%5 : tensor<512x10240xf32>) outs(%9 : tensor<512xf32>) {
-          ^bb0(%arg1: f32, %arg2: f32):  // no predecessors
-            %11 = arith.addf %arg1, %arg2 : f32
-            linalg.yield %11 : f32
-          } -> tensor<512xf32>
-        flow.dispatch.tensor.store %10, %1, offsets = [0], sizes = [512], strides = [1]
-            : tensor<512xf32> -> !flow.dispatch.tensor<writeonly:tensor<512xf32>>
-        return
-      }
-    }
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformShuffle], [SPV_KHR_storage_buffer_storage_class]>, #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64], cooperative_matrix_properties_khr = []>>}>
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d0)>
+module {
+  func.func @warp_reduction_dispatch() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+    %c0 = arith.constant 0 : index
+    %c10240 = arith.constant 10240 : index
+    %cst = arith.constant 1.000000e+00 : f32
+    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<512x10240xf32>>
+    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:tensor<512xf32>>
+    %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [512, 10240], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<512x10240xf32>> -> tensor<512x10240xf32>
+    %3 = tensor.empty() : tensor<512xf32>
+    %4 = linalg.fill ins(%cst : f32) outs(%3 : tensor<512xf32>) -> tensor<512xf32>
+    %5 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "reduction"]} ins(%2 : tensor<512x10240xf32>) outs(%4 : tensor<512xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      %6 = arith.addf %in, %out : f32
+      linalg.yield %6 : f32
+    } -> tensor<512xf32>
+    flow.dispatch.tensor.store %5, %1, offsets = [0], sizes = [512], strides = [1] : tensor<512xf32> -> !flow.dispatch.tensor<writeonly:tensor<512xf32>>
+    return
   }
 }
 
@@ -98,50 +81,31 @@ hal.executable @warp_reduction_dispatch {
 
 // -----
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-  spirv.target_env = #spirv.target_env<#spirv.vce<v1.3,
-    [Shader, GroupNonUniform, GroupNonUniformShuffle], [SPV_KHR_storage_buffer_storage_class]>, Unknown:Unknown,
-    #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64], subgroup_size = 32>>}>
-
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>
-
-hal.executable @warp_reduction_dispatch {
-  hal.executable.variant public @vulkan_spirv_fb target(#executable_target_vulkan_spirv_fb) {
-    hal.executable.export public @warp_reduction_dispatch ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
-      hal.return %x, %y, %z : index, index, index
-    }
-    builtin.module {
-      func.func @warp_reduction_dispatch() {
-        %c0 = arith.constant 0 : index
-        %cst = arith.constant 0.000000e+00 : f16
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<10x9216x9216xf16>>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<10x9216x9216xf16>>
-        %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [10, 9216, 9216], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<10x9216x9216xf16>> -> tensor<10x9216x9216xf16>
-        %3 = tensor.empty() : tensor<10x9216x9216xf16>
-        %4 = tensor.empty() : tensor<10x9216xf16>
-        %5 = linalg.fill ins(%cst : f16) outs(%4 : tensor<10x9216xf16>) -> tensor<10x9216xf16>
-        %6 = linalg.generic {
-            indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
-            iterator_types = ["parallel", "parallel", "reduction"]}
-        ins(%2 : tensor<10x9216x9216xf16>) outs(%5 : tensor<10x9216xf16>) {
-        ^bb0(%in: f16, %out: f16):
-          %8 = arith.addf %in, %out : f16
-          linalg.yield %8 : f16
-        } -> tensor<10x9216xf16>
-        %7 = linalg.generic {
-            indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
-            iterator_types = ["parallel", "parallel", "parallel"]}
-        ins(%2, %6 : tensor<10x9216x9216xf16>, tensor<10x9216xf16>) outs(%3 : tensor<10x9216x9216xf16>) {
-        ^bb0(%in: f16, %in_0: f16, %out: f16):
-          %8 = arith.divf %in, %in_0 : f16
-          linalg.yield %8 : f16
-        } -> tensor<10x9216x9216xf16>
-        flow.dispatch.tensor.store %7, %1, offsets = [0, 0, 0], sizes = [10, 9216, 9216], strides = [1, 1, 1] : tensor<10x9216x9216xf16> -> !flow.dispatch.tensor<writeonly:tensor<10x9216x9216xf16>>
-        return
-      }
-    }
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformShuffle], [SPV_KHR_storage_buffer_storage_class]>, #spirv.resource_limits<max_compute_workgroup_size = [128, 128, 64]>>}>
+#map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
+module {
+  func.func @warp_reduction_dispatch() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+    %c0 = arith.constant 0 : index
+    %cst = arith.constant 0.000000e+00 : f16
+    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<10x9216x9216xf16>>
+    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<10x9216x9216xf16>>
+    %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [10, 9216, 9216], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<10x9216x9216xf16>> -> tensor<10x9216x9216xf16>
+    %3 = tensor.empty() : tensor<10x9216x9216xf16>
+    %4 = tensor.empty() : tensor<10x9216xf16>
+    %5 = linalg.fill ins(%cst : f16) outs(%4 : tensor<10x9216xf16>) -> tensor<10x9216xf16>
+    %6 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "parallel", "reduction"]} ins(%2 : tensor<10x9216x9216xf16>) outs(%5 : tensor<10x9216xf16>) {
+    ^bb0(%in: f16, %out: f16):
+      %8 = arith.addf %in, %out : f16
+      linalg.yield %8 : f16
+    } -> tensor<10x9216xf16>
+    %7 = linalg.generic {indexing_maps = [#map, #map1, #map], iterator_types = ["parallel", "parallel", "parallel"]} ins(%2, %6 : tensor<10x9216x9216xf16>, tensor<10x9216xf16>) outs(%3 : tensor<10x9216x9216xf16>) {
+    ^bb0(%in: f16, %in_0: f16, %out: f16):
+      %8 = arith.divf %in, %in_0 : f16
+      linalg.yield %8 : f16
+    } -> tensor<10x9216x9216xf16>
+    flow.dispatch.tensor.store %7, %1, offsets = [0, 0, 0], sizes = [10, 9216, 9216], strides = [1, 1, 1] : tensor<10x9216x9216xf16> -> !flow.dispatch.tensor<writeonly:tensor<10x9216x9216xf16>>
+    return
   }
 }
 
@@ -191,39 +155,21 @@ hal.executable @warp_reduction_dispatch {
 
 // -----
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-  spirv.target_env = #spirv.target_env<#spirv.vce<v1.3,
-    [Shader, GroupNonUniform, GroupNonUniformShuffle], []>, Unknown:Unknown, #spirv.resource_limits<
-      max_compute_shared_memory_size = 49152,
-      max_compute_workgroup_invocations = 1024,
-      max_compute_workgroup_size = [1024, 1024, 64],
-      subgroup_size = 32>>}>
-
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>
-
-hal.executable @softmax {
-hal.executable.variant public @vulkan_spirv_fb target(#executable_target_vulkan_spirv_fb) {
-  hal.executable.export public @softmax ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
-      hal.return %x, %y, %z : index, index, index
-    }
-  builtin.module {
-    func.func @softmax() {
-      %c0 = arith.constant 0 : index
-      %cst = arith.constant -3.40282347E+38 : f32
-      %cst_0 = arith.constant 0.000000e+00 : f32
-      %cst_1 = arith.constant 1.000000e+00 : f32
-      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<12x128x40960xf32>>
-      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<12x128x40960xf32>>
-      %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [12, 128, 40960], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<12x128x40960xf32>> -> tensor<12x128x40960xf32>
-      %3 = tensor.empty() : tensor<12x128x40960xf32>
-      %4 = linalg.softmax dimension(2) ins(%2 : tensor<12x128x40960xf32>) outs(%3 : tensor<12x128x40960xf32>) -> tensor<12x128x40960xf32>
-      flow.dispatch.tensor.store %4, %1, offsets = [0, 0, 0], sizes = [12, 128, 40960], strides = [1, 1, 1] : tensor<12x128x40960xf32> -> !flow.dispatch.tensor<writeonly:tensor<12x128x40960xf32>>
-      return
-    }
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.3, [Shader, GroupNonUniform, GroupNonUniformShuffle], []>, #spirv.resource_limits<max_compute_shared_memory_size = 49152, max_compute_workgroup_invocations = 1024, max_compute_workgroup_size = [1024, 1024, 64]>>}>
+module {
+  func.func @softmax() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+    %c0 = arith.constant 0 : index
+    %cst = arith.constant -3.40282347E+38 : f32
+    %cst_0 = arith.constant 0.000000e+00 : f32
+    %cst_1 = arith.constant 1.000000e+00 : f32
+    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<12x128x40960xf32>>
+    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<12x128x40960xf32>>
+    %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [12, 128, 40960], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<12x128x40960xf32>> -> tensor<12x128x40960xf32>
+    %3 = tensor.empty() : tensor<12x128x40960xf32>
+    %4 = linalg.softmax dimension(2) ins(%2 : tensor<12x128x40960xf32>) outs(%3 : tensor<12x128x40960xf32>) -> tensor<12x128x40960xf32>
+    flow.dispatch.tensor.store %4, %1, offsets = [0, 0, 0], sizes = [12, 128, 40960], strides = [1, 1, 1] : tensor<12x128x40960xf32> -> !flow.dispatch.tensor<writeonly:tensor<12x128x40960xf32>>
+    return
   }
-}
 }
 
 //   CHECK-LABEL:  func.func @softmax
@@ -307,49 +253,25 @@ hal.executable.variant public @vulkan_spirv_fb target(#executable_target_vulkan_
 
 // -----
 
-#pipeline_layout = #hal.pipeline.layout<push_constants = 2, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer, ReadOnly>,
-    #hal.descriptor_set.binding<1, storage_buffer>
-  ]>
-]>
-
-hal.executable private @dynamic_softmax {
-  hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {
-      spirv.target_env = #spirv.target_env<#spirv.vce<v1.6,
-        [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, GroupNonUniformShuffle],
-        [SPV_KHR_16bit_storage]>, api=Vulkan, Unknown:DiscreteGPU, #spirv.resource_limits<
-          max_compute_shared_memory_size = 65536,
-          max_compute_workgroup_invocations = 1024,
-          max_compute_workgroup_size = [1024, 1024, 1024],
-          subgroup_size = 64>>
-    }>) {
-    hal.executable.export public @dynamic_softmax ordinal(0) layout(#pipeline_layout) {
-    ^bb0(%arg0: !hal.device, %arg1: index):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_slice %arg1
-      hal.return %x, %y, %z : index, index, index
-    }
-    builtin.module {
-      func.func @dynamic_softmax() {
-        %c32_i64 = arith.constant 32 : i64
-        %c0 = arith.constant 0 : index
-        %0 = hal.interface.constant.load[0] : i32
-        %1 = hal.interface.constant.load[1] : i32
-        %2 = arith.extui %0 : i32 to i64
-        %3 = arith.extui %1 : i32 to i64
-        %4 = arith.shli %3, %c32_i64 : i64
-        %5 = arith.ori %2, %4 : i64
-        %6 = arith.index_castui %5 : i64 to index
-        %7 = flow.dispatch.workload.ordinal %6, 0 : index
-        %8 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<32x?xf16>>{%7}
-        %9 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<32x?xf16>>{%7}
-        %10 = flow.dispatch.tensor.load %8, offsets = [0, 0], sizes = [32, %7], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<32x?xf16>>{%7} -> tensor<32x?xf16>
-        %11 = tensor.empty(%7) : tensor<32x?xf16>
-        %12 = linalg.softmax dimension(1) ins(%10 : tensor<32x?xf16>) outs(%11 : tensor<32x?xf16>) -> tensor<32x?xf16>
-        flow.dispatch.tensor.store %12, %9, offsets = [0, 0], sizes = [32, %7], strides = [1, 1] : tensor<32x?xf16> -> !flow.dispatch.tensor<writeonly:tensor<32x?xf16>>{%7}
-        return
-      }
-    }
+#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.6, [Shader, Float16, StorageBuffer16BitAccess, StorageUniform16, GroupNonUniformShuffle], [SPV_KHR_16bit_storage]>, api=Vulkan, #spirv.resource_limits<max_compute_shared_memory_size = 65536, max_compute_workgroup_invocations = 1024, max_compute_workgroup_size = [1024, 1024, 1024], subgroup_size = 64>>}>
+module {
+  func.func @dynamic_softmax() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+    %c32_i64 = arith.constant 32 : i64
+    %c0 = arith.constant 0 : index
+    %0 = hal.interface.constant.load[0] : i32
+    %1 = hal.interface.constant.load[1] : i32
+    %2 = arith.extui %0 : i32 to i64
+    %3 = arith.extui %1 : i32 to i64
+    %4 = arith.shli %3, %c32_i64 : i64
+    %5 = arith.ori %2, %4 : i64
+    %6 = arith.index_castui %5 : i64 to index
+    %8 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<32x?xf16>>{%6}
+    %9 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<32x?xf16>>{%6}
+    %10 = flow.dispatch.tensor.load %8, offsets = [0, 0], sizes = [32, %6], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<32x?xf16>>{%6} -> tensor<32x?xf16>
+    %11 = tensor.empty(%6) : tensor<32x?xf16>
+    %12 = linalg.softmax dimension(1) ins(%10 : tensor<32x?xf16>) outs(%11 : tensor<32x?xf16>) -> tensor<32x?xf16>
+    flow.dispatch.tensor.store %12, %9, offsets = [0, 0], sizes = [32, %6], strides = [1, 1] : tensor<32x?xf16> -> !flow.dispatch.tensor<writeonly:tensor<32x?xf16>>{%6}
+    return
   }
 }
 

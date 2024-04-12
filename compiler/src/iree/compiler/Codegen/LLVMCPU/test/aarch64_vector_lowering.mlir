@@ -1,6 +1,6 @@
-// RUN: iree-opt %s --pass-pipeline="builtin.module(func.func(iree-llvmcpu-mmt4d-vector-lowering),iree-codegen-llvmcpu-vector-lowering-pipeline)" --split-input-file | FileCheck %s
-// RUN: iree-opt %s --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-llvmcpu-mmt4d-vector-lowering{vector-contract-custom-kernels=false})))))" --split-input-file | FileCheck %s -check-prefix=CHECK-KERNEL-OFF
-// RUN: iree-opt %s --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-llvmcpu-mmt4d-vector-lowering{vector-contract-custom-kernels=true})))))" --split-input-file | FileCheck %s -check-prefix=CHECK-KERNEL-ON
+// RUN: iree-opt %s --pass-pipeline="builtin.module(func.func(iree-llvmcpu-mmt4d-vector-lowering, iree-codegen-llvmcpu-vector-lowering-pipeline))" --split-input-file | FileCheck %s
+// RUN: iree-opt %s --pass-pipeline="builtin.module(func.func(iree-llvmcpu-mmt4d-vector-lowering{vector-contract-custom-kernels=false}))" --split-input-file | FileCheck %s -check-prefix=CHECK-KERNEL-OFF
+// RUN: iree-opt %s --pass-pipeline="builtin.module(func.func(iree-llvmcpu-mmt4d-vector-lowering{vector-contract-custom-kernels=true}))" --split-input-file | FileCheck %s -check-prefix=CHECK-KERNEL-ON
 
 #map0 = affine_map<()[s0] -> (s0 * 64)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
@@ -179,43 +179,31 @@ module {
 // CHECK-KERNEL-OFF-LABEL: @simpul_mul_mixed_mini_no_custom_kernel
 // CHECK-KERNEL-OFF-NOT: llvm.inline_asm asm_dialect
 
-hal.executable private @simpul_mul_mixed_mini_dispatch {
-  hal.executable.variant public @embedded_elf_arm_64 target(<"llvm-cpu", "embedded-elf-arm_64", {cpu = "generic", cpu_features = "+neon,+i8mm,+reserve-x18", data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : i64, target_triple = "aarch64-unknown-unknown-eabi-elf", ukernels = "none"}>) {
-  hal.executable.export public @simpul_mul_mixed_mini_no_custom_kernel ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) attributes {hal.interface.bindings = [#hal.interface.binding<0, 0>, #hal.interface.binding<0, 1>], translation_info = #iree_codegen.translation_info<Mmt4dTilingExpert>} {
-  ^bb0(%arg0: !hal.device):
-    %c1 = arith.constant 1 : index
-    hal.return %c1, %c1, %c1 : index, index, index
+#executable_target = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu = "generic", cpu_features = "+neon,+i8mm,+reserve-x18", data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : i64, target_triple = "aarch64-unknown-unknown-eabi-elf", ukernels = "none"}>
+#translation_info = #iree_codegen.translation_info<Mmt4dTilingExpert>
+module {
+  func.func @simpul_mul_mixed_mini_no_custom_kernel(%5 : vector<1x1x8x1xi8>, %6 : vector<1x1x8x1xi8> , %arg3 : vector<1x1x8x8xi32> ) -> vector<1x1x8x8xi32>
+  attributes { hal.executable.target = #executable_target, translation_info = #translation_info}  {
+    %7 = arith.extsi %5 : vector<1x1x8x1xi8> to vector<1x1x8x1xi32>
+    %8 = arith.extsi %6 : vector<1x1x8x1xi8> to vector<1x1x8x1xi32>
+    %9 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d2, d3, d5)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d2, d4, d5)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d4)>], iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"], kind = #vector.kind<add>} %7, %8, %arg3 : vector<1x1x8x1xi32>, vector<1x1x8x1xi32> into vector<1x1x8x8xi32>
+    return %9 : vector<1x1x8x8xi32>
   }
-  builtin.module {
-    func.func @simpul_mul_mixed_mini_no_custom_kernel(%5 : vector<1x1x8x1xi8>, %6 : vector<1x1x8x1xi8> , %arg3 : vector<1x1x8x8xi32> )  -> vector<1x1x8x8xi32> {
-            %7 = arith.extsi %5 : vector<1x1x8x1xi8> to vector<1x1x8x1xi32>
-            %8 = arith.extsi %6 : vector<1x1x8x1xi8> to vector<1x1x8x1xi32>
-            %9 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d2, d3, d5)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d2, d4, d5)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d4)>], iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"], kind = #vector.kind<add>} %7, %8, %arg3 : vector<1x1x8x1xi32>, vector<1x1x8x1xi32> into vector<1x1x8x8xi32>
-            return %9 : vector<1x1x8x8xi32>
-        }
-      }
-    }
-  }
+}
 
 // -----
 
 // CHECK-KERNEL-ON-LABEL: @simpul_mul_mixed_mini_custom_kernel
 // CHECK-KERNEL-ON-DAG: llvm.inline_asm asm_dialect
 
-hal.executable private @simpul_mul_mixed_mini_dispatch {
-  hal.executable.variant public @embedded_elf_arm_64 target(<"llvm-cpu", "embedded-elf-arm_64", {cpu = "generic", cpu_features = "+neon,+i8mm,+reserve-x18", data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : i64, target_triple = "aarch64-unknown-unknown-eabi-elf", ukernels = "none"}>) {
-  hal.executable.export public @simpul_mul_mixed_mini_custom_kernel ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) attributes {hal.interface.bindings = [#hal.interface.binding<0, 0>, #hal.interface.binding<0, 1>], translation_info = #iree_codegen.translation_info<Mmt4dTilingExpert>} {
-  ^bb0(%arg0: !hal.device):
-    %c1 = arith.constant 1 : index
-    hal.return %c1, %c1, %c1 : index, index, index
+#executable_target = #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64", {cpu = "generic", cpu_features = "+neon,+i8mm,+reserve-x18", data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : i64, target_triple = "aarch64-unknown-unknown-eabi-elf", ukernels = "none"}>
+#translation_info = #iree_codegen.translation_info<Mmt4dTilingExpert>
+module {
+  func.func @simpul_mul_mixed_mini_custom_kernel(%5 : vector<1x1x8x1xi8>, %6 : vector<1x1x8x1xi8> , %arg3 : vector<1x1x8x8xi32> )  -> vector<1x1x8x8xi32>
+  attributes { hal.executable.target = #executable_target, translation_info = #translation_info} {
+    %7 = arith.extsi %5 : vector<1x1x8x1xi8> to vector<1x1x8x1xi32>
+    %8 = arith.extsi %6 : vector<1x1x8x1xi8> to vector<1x1x8x1xi32>
+    %9 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d2, d3, d5)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d2, d4, d5)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d4)>], iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"], kind = #vector.kind<add>} %7, %8, %arg3 : vector<1x1x8x1xi32>, vector<1x1x8x1xi32> into vector<1x1x8x8xi32>
+    return %9 : vector<1x1x8x8xi32>
   }
-  builtin.module {
-    func.func @simpul_mul_mixed_mini_custom_kernel(%5 : vector<1x1x8x1xi8>, %6 : vector<1x1x8x1xi8> , %arg3 : vector<1x1x8x8xi32> )  -> vector<1x1x8x8xi32> {
-            %7 = arith.extsi %5 : vector<1x1x8x1xi8> to vector<1x1x8x1xi32>
-            %8 = arith.extsi %6 : vector<1x1x8x1xi8> to vector<1x1x8x1xi32>
-            %9 = vector.contract {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d2, d3, d5)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d1, d2, d4, d5)>, affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d3, d4)>], iterator_types = ["parallel", "parallel", "reduction", "parallel", "parallel", "reduction"], kind = #vector.kind<add>} %7, %8, %arg3 : vector<1x1x8x1xi32>, vector<1x1x8x1xi32> into vector<1x1x8x8xi32>
-            return %9 : vector<1x1x8x8xi32>
-        }
-      }
-    }
-  }
+}

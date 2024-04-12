@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/GPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -225,9 +226,14 @@ public:
 
     debugPrint(funcOp, "after step #1: preprocessing reduction ops");
 
-    auto workgroupSize = llvm::map_to_vector(
-        getEntryPoint(funcOp)->getWorkgroupSize().value(),
-        [&](Attribute attr) { return llvm::cast<IntegerAttr>(attr).getInt(); });
+    std::optional<SmallVector<int64_t>> maybeWorkgroupSize =
+        getWorkgroupSize(funcOp);
+    if (!maybeWorkgroupSize) {
+      funcOp->emitOpError(
+          "expected workgroup size to be set as part of `translation_info`");
+      return signalPassFailure();
+    }
+    SmallVector<int64_t> &workgroupSize = maybeWorkgroupSize.value();
     assert(workgroupSize[1] == 1 && workgroupSize[2] == 1);
     // 2. Create the warp op and move the function body into it.
     const int groupSize = workgroupSize[0];

@@ -118,7 +118,7 @@ class CompilationInfo:
 
     # Prints the workgroup size
     def workgroup_size_str(self):
-        return "[" + ", ".join(map(str, self.workgroup_size)) + "]"
+        return "workgroup_size = [" + ", ".join(map(str, self.workgroup_size)) + "]"
 
 
 # Returns the list of TestShape's to use for the collection of shapes
@@ -537,10 +537,9 @@ def generate_function(
             f"#compilation{generate_function.compilation_index} = "
             "#iree_codegen.compilation_info<\n"
             f"  lowering_config = <tile_sizes = {compilation_info.tile_sizes}>,\n"
-            f"  translation_info = <{compiler_pipeline},\n"
+            f"  translation_info = <{compiler_pipeline} {compilation_info.workgroup_size_str()},\n"
             f"  {{ pipeline_depth = {compilation_info.software_pipeline_depth}, "
-            f"  store_stage = 1{mma_schedule} }}>,\n"
-            f"  workgroup_size = {compilation_info.workgroup_size_str()}>\n"
+            f"  store_stage = 1{mma_schedule} }}>>\n"
         )
         compilation_info_attr = (
             f"{{compilation_info = #compilation{generate_function.compilation_index}}} "

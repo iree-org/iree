@@ -362,8 +362,8 @@ Value mlir::iree_compiler::buildBufferize(ImplicitLocOpBuilder &b,
         b.create<IREE::transform_dialect::
                      ApplyFoldTensorSliceIntoTransferPatternsOp>(loc);
       });
-  b.create<IREEEliminateEmptyTensorsOp>(variantH);
-  variantH = b.create<IREEBufferizeOp>(variantH, targetGpu);
+  b.create<IREEEliminateEmptyTensorsOp>(funcH);
+  variantH = b.create<IREEBufferizeOp>(funcH, targetGpu);
   return variantH;
 }
 

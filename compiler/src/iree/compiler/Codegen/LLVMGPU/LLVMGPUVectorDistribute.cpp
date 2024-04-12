@@ -362,7 +362,17 @@ public:
         workgroupSize[i] = llvm::cast<IntegerAttr>(size).getInt();
       }
     } else {
-      workgroupSize = getWorkgroupSize(func);
+      std::optional<SmallVector<int64_t>> maybeWorkgroupSize =
+          getWorkgroupSize(func);
+      if (!maybeWorkgroupSize) {
+        return;
+      }
+      for (auto [index, value] : llvm::enumerate(maybeWorkgroupSize.value())) {
+        workgroupSize[index] = value;
+      }
+      for (auto index : llvm::seq<size_t>(maybeWorkgroupSize->size(), 3)) {
+        workgroupSize[index] = 1;
+      }
     }
 
     llvm::StringLiteral scheduleAttrName =

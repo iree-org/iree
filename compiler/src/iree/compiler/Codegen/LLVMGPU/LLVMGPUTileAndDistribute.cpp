@@ -214,8 +214,6 @@ public:
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     auto funcOp = getOperation();
-    if (!isEntryPoint(funcOp))
-      return;
 
     // Promote C matrix and propagate the potential  fill producer into the temp
     // allocation. This needs to be done before reduction tiling.
@@ -241,10 +239,15 @@ public:
       funcOp.dump();
     });
 
-    auto workgroupSize = llvm::map_to_vector(
-        getEntryPoint(funcOp)->getWorkgroupSize().value(),
-        [&](Attribute attr) { return llvm::cast<IntegerAttr>(attr).getInt(); });
+    std::optional<SmallVector<int64_t>> maybeWorkgroupSize =
+        getWorkgroupSize(funcOp);
+    if (!maybeWorkgroupSize) {
+      funcOp.emitOpError("expected workgroup size to be set on the lowering "
+                         "config for the function");
+      return signalPassFailure();
+    }
 
+    SmallVector<int64_t> workgroupSize = maybeWorkgroupSize.value();
     int64_t flatWorkgroupSize =
         workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
     // Only promote to workgroup size if there are multiple warps.

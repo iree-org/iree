@@ -136,6 +136,8 @@ def IREECodegen_TranslationInfoAttr :
   let assemblyFormat = [{
     `<` `` $passPipeline
     (`codegen_spec` `=` $codegenSpec^)?
+    (`workgroup_size` `=` `[` $workgroupSize^ `]`)?
+    (`subgroup_size` `=` $subgroupSize^)?
     (`,` $configuration^)? `>`
   }];
 
@@ -144,12 +146,20 @@ def IREECodegen_TranslationInfoAttr :
         "Name of the pipeline to be invoked on the translation unit.">:$passPipeline,
     OptionalParameter<"SymbolRefAttr",
         "The symbol pointing to the transform dialect codegen spec to be used">:$codegenSpec,
+    OptionalArrayRefParameter<"int64_t", "The workgroup size to use">:$workgroupSize,
+    OptionalParameter<"int64_t", "The subgroup size to use">:$subgroupSize,
     OptionalParameter<"DictionaryAttr",
         "Pipeline specific configuration">:$configuration
   );
   let builders = [
     AttrBuilder<(ins "DispatchLoweringPassPipeline":$passPipeline,
         CArg<"SymbolRefAttr", "{}">:$codegenSpec,
+        CArg<"ArrayRef<int64_t>", "{}">:$workgroupSize,
+        CArg<"std::optional<int64_t>", "std::nullopt">:$subgroupSize,
+        CArg<"DictionaryAttr", "{}">:$configuration)>,
+    AttrBuilder<(ins "DispatchLoweringPassPipeline":$passPipeline,
+        "ArrayRef<int64_t>":$workgroupSize,
+        CArg<"std::optional<int64_t>", "std::nullopt">:$subgroupSize,
         CArg<"DictionaryAttr", "{}">:$configuration)>
   ];
   let extraClassDeclaration = [{
@@ -266,23 +276,13 @@ def IREECodegen_CompilationInfoAttr :
   }];
   let parameters = (ins
     AttrParameter<"LoweringConfigAttr", "">:$loweringConfig,
-    AttrParameter<"TranslationInfoAttr", "">:$translationInfo,
-    OptionalArrayRefParameter<"int64_t", "The workgroup size to use during translation.">:$workgroupSize,
-    OptionalParameter<"std::optional<int64_t>",
-        "The subgroup size to use during translation.">:$subgroupSize
+    AttrParameter<"TranslationInfoAttr", "">:$translationInfo
   );
 
   let assemblyFormat = [{
-    `<` `lowering_config` `=` $loweringConfig `,` `translation_info` `=` $translationInfo
-    (`,` `workgroup_size` `=` `[` $workgroupSize^ `]`)?
-    (`,` `subgroup_size` `=` $subgroupSize^)? `>`
+    `<` `lowering_config` `=` $loweringConfig `,` `translation_info` `=` $translationInfo `>`
   }];
 
-  let extraClassDeclaration = [{
-    SmallVector<int64_t> getWorkgroupSizeVals() {
-      return SmallVector<int64_t>(getWorkgroupSize());
-    }
-  }];
   let genVerifyDecl = 1;
 }
 

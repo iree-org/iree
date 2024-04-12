@@ -1,31 +1,23 @@
-// RUN: iree-opt %s --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-transform-dialect-interpreter)))' \
+// RUN: iree-opt %s --pass-pipeline='builtin.module(iree-transform-dialect-interpreter)' \
 // RUN:   --iree-codegen-transform-dialect-library=%p/attention_transform_spec.mlir| \
 // RUN: FileCheck --check-prefix=CHECK %s
 
-hal.executable @_attention_dispatch_0 {
-  hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}>) {
-    hal.executable.export public @_attention_dispatch_0 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer, ReadOnly>, <3, storage_buffer>]>]>) {
-    ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
-      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
-      hal.return %x, %y, %z : index, index, index
-    }
-    builtin.module {
-      func.func @_attention_dispatch_0() {
-        %c0 = arith.constant 0 : index
-        %scale = arith.constant 0.125 : f16
-        %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<192x1024x64xf16>>
-        %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<192x1024x64xf16>>
-        %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<192x1024x64xf16>>
-        %3 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<192x1024x64xf16>>
-        %4 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [192, 1024, 64], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<192x1024x64xf16>> -> tensor<192x1024x64xf16>
-        %5 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [192, 1024, 64], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<192x1024x64xf16>> -> tensor<192x1024x64xf16>
-        %6 = flow.dispatch.tensor.load %2, offsets = [0, 0, 0], sizes = [192, 1024, 64], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<192x1024x64xf16>> -> tensor<192x1024x64xf16>
-        %7 = tensor.empty() : tensor<192x1024x64xf16>
-        %8 = iree_linalg_ext.attention ins(%4, %5, %6, %scale : tensor<192x1024x64xf16>, tensor<192x1024x64xf16>, tensor<192x1024x64xf16>, f16) outs(%7 : tensor<192x1024x64xf16>) -> tensor<192x1024x64xf16>
-        flow.dispatch.tensor.store %8, %3, offsets = [0, 0, 0], sizes = [192, 1024, 64], strides = [1, 1, 1] : tensor<192x1024x64xf16> -> !flow.dispatch.tensor<writeonly:tensor<192x1024x64xf16>>
-        return
-      }
-    }
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}>
+module {
+  func.func @_attention_dispatch_0() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
+    %c0 = arith.constant 0 : index
+    %cst = arith.constant 1.250000e-01 : f16
+    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<192x1024x64xf16>>
+    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<192x1024x64xf16>>
+    %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<192x1024x64xf16>>
+    %3 = hal.interface.binding.subspan set(0) binding(3) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<192x1024x64xf16>>
+    %4 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [192, 1024, 64], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<192x1024x64xf16>> -> tensor<192x1024x64xf16>
+    %5 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [192, 1024, 64], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<192x1024x64xf16>> -> tensor<192x1024x64xf16>
+    %6 = flow.dispatch.tensor.load %2, offsets = [0, 0, 0], sizes = [192, 1024, 64], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<192x1024x64xf16>> -> tensor<192x1024x64xf16>
+    %7 = tensor.empty() : tensor<192x1024x64xf16>
+    %8 = iree_linalg_ext.attention ins(%4, %5, %6, %cst : tensor<192x1024x64xf16>, tensor<192x1024x64xf16>, tensor<192x1024x64xf16>, f16) outs(%7 : tensor<192x1024x64xf16>) -> tensor<192x1024x64xf16>
+    flow.dispatch.tensor.store %8, %3, offsets = [0, 0, 0], sizes = [192, 1024, 64], strides = [1, 1, 1] : tensor<192x1024x64xf16> -> !flow.dispatch.tensor<writeonly:tensor<192x1024x64xf16>>
+    return
   }
 }
 
@@ -37,7 +29,9 @@ hal.executable @_attention_dispatch_0 {
 // CHECK-DAG:  #[[MAP5:.+]] = affine_map<(d0, d1, d2) -> (d1, d2)>
 // CHECK-DAG:  #[[MAP6:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
 // CHECK-DAG:  #[[MAP7:.+]] = affine_map<(d0, d1) -> (d1, d0)>
-// CHECK:      func.func @_attention_dispatch_0() {
+// CHECK-DAG:  #[[TRANSLATION:.+]] = #iree_codegen.translation_info<None workgroup_size = [4, 8, 4] subgroup_size = 32>
+// CHECK:      func.func @_attention_dispatch_0()
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
 // CHECK-DAG:    %[[CST:.+]] = arith.constant dense<0.000000e+00> : vector<32x64xf32>
 // CHECK-DAG:    %[[CST_0:.+]] = arith.constant dense<-1.000000e+30> : vector<32xf32>
 // CHECK-DAG:    %[[CST_1:.+]] = arith.constant dense<0.000000e+00> : vector<32xf32>
