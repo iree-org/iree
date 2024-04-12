@@ -1,5 +1,3 @@
-// XFAILED due to failure with https://github.com/openxla/iree/pull/16665 (Issues: https://github.com/openxla/iree/issues/17039)
-// XFAIL: * 
 func.func @matmul(%lhs : tensor<16x16xf16>, %rhs : tensor<16x8xf16>) -> tensor<16x8xf16> {
   %c0 = arith.constant 0.0 : f16
   %0 = tensor.empty() : tensor<16x8xf16>

@@ -64,10 +64,6 @@ module attributes { transform.with_named_sequence } {
     // ===========================================================================
     %func_11 = transform.iree.layout_analysis_and_distribution %memref_func : (!transform.any_op) -> (!transform.any_op)
 
-    // Annotate the exported function as already translated.
-    %none = transform.param.constant #iree_codegen.translation_info<None> -> !transform.any_param
-    transform.annotate %func_11 "translation_info" = %none : !transform.any_op, !transform.any_param
-
     transform.yield
   }
 } // module

@@ -1,5 +1,3 @@
-// XFAILED due to failure with https://github.com/openxla/iree/pull/16665 (Issues: https://github.com/openxla/iree/issues/17039)
-// XFAIL: * 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (d0)>
 func.func @matmul_reduction(%lhs : tensor<16x16xf16>, %rhs : tensor<16x16xf16>) -> tensor<16x16xf16> {
@@ -11,8 +9,7 @@ func.func @matmul_reduction(%lhs : tensor<16x16xf16>, %rhs : tensor<16x16xf16>) 
   %1 = linalg.fill ins(%c0 : f16) outs(%0 : tensor<16x16xf16>) -> tensor<16x16xf16>
   %2 = linalg.matmul_transpose_b ins(%lhs, %rhs : tensor<16x16xf16>, tensor<16x16xf16>)
       outs(%1 : tensor<16x16xf16>) -> tensor<16x16xf16>
-  %6 = linalg.generic {indexing_maps// XFAILED due to failure with https://github.com/openxla/iree/pull/16665 (Issues: https://github.com/openxla/iree/issues/17039)
-// XFAIL: * 
+  %6 = linalg.generic {indexing_maps
  = [#map, #map1], iterator_types = ["parallel", "reduction"]}
         ins(%2 : tensor<16x16xf16>) outs(%init : tensor<16xf16>) {
         ^bb0(%in: f16, %out: f16):
