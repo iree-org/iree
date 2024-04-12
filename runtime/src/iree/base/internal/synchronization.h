@@ -53,7 +53,13 @@
 #if defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_EMSCRIPTEN) || \
     defined(IREE_PLATFORM_LINUX) || defined(IREE_PLATFORM_WINDOWS)
 #define IREE_PLATFORM_HAS_FUTEX 1
+#else  // IREE_PLATFORM_*
+#define IREE_PLATFORM_HAS_FUTEX 0
 #endif  // IREE_PLATFORM_*
+
+#if !defined(IREE_RUNTIME_USE_FUTEX)
+#define IREE_RUNTIME_USE_FUTEX IREE_PLATFORM_HAS_FUTEX
+#endif  // IREE_RUNTIME_USE_FUTEX
 
 #if defined(IREE_PLATFORM_APPLE)
 #include <os/lock.h>
@@ -278,7 +284,7 @@ typedef struct iree_slim_mutex_t IREE_THREAD_ANNOTATION_ATTRIBUTE(
   os_unfair_lock value;
 #elif defined(IREE_PLATFORM_WINDOWS) && defined(IREE_MUTEX_USE_WIN32_SRW)
   SRWLOCK value;
-#elif defined(IREE_PLATFORM_HAS_FUTEX)
+#elif IREE_RUNTIME_USE_FUTEX
   iree_atomic_int32_t value;
 #else
   iree_mutex_t impl;  // fallback
@@ -348,7 +354,7 @@ typedef struct iree_notification_t {
 #if IREE_SYNCHRONIZATION_DISABLE_UNSAFE
   // Nothing required. Unused field to make compilers happy.
   int reserved;
-#elif !defined(IREE_PLATFORM_HAS_FUTEX)
+#elif !IREE_RUNTIME_USE_FUTEX
   // No futex on darwin/when using TSAN, so use mutex/condvar instead.
   pthread_mutex_t mutex;
   pthread_cond_t cond;
@@ -362,7 +368,7 @@ typedef struct iree_notification_t {
 #if IREE_SYNCHRONIZATION_DISABLE_UNSAFE
 #define IREE_NOTIFICATION_INIT \
   { IREE_ATOMIC_VAR_INIT(0) }
-#elif !defined(IREE_PLATFORM_HAS_FUTEX)
+#elif !IREE_RUNTIME_USE_FUTEX
 #define IREE_NOTIFICATION_INIT \
   { PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER, 0, 0 }
 #else

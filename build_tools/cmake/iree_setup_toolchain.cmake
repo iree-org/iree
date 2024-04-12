@@ -170,8 +170,18 @@ macro(iree_setup_toolchain)
     string(APPEND CMAKE_C_FLAGS " -fsanitize=memory")
   endif()
   if(IREE_ENABLE_TSAN)
-    string(APPEND CMAKE_CXX_FLAGS " -fsanitize=thread")
-    string(APPEND CMAKE_C_FLAGS " -fsanitize=thread")
+    iree_append_to_lists(
+      "-g -fno-omit-frame-pointer -fsanitize=thread"
+      CMAKE_CXX_FLAGS
+      CMAKE_C_FLAGS)
+    iree_append_to_lists(
+      "-fsanitize=thread"
+      CMAKE_SHARED_LINKER_FLAGS
+      CMAKE_EXE_LINKER_FLAGS
+      # We don't append to CMAKE_STATIC_LINKER_FLAGS, because object files are
+      # linked as an object library with llvm-ar and it does not have option
+      # -fsanitize=thread
+    )
   endif()
   if(IREE_ENABLE_UBSAN)
     string(APPEND CMAKE_CXX_FLAGS " -fsanitize=undefined")

@@ -23,6 +23,7 @@ iree_cc_library(
     "atomics_disabled.h"
     "atomics_gcc.h"
     "atomics_msvc.h"
+    "tsan.h"
   DEPS
     iree::base::core_headers
   PUBLIC
