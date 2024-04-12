@@ -27,6 +27,10 @@ IREE_FLAG_LIST(
 IREE_FLAG(bool, hip_use_streams, true,
           "Use HIP streams (instead of graphs) for executing command buffers.");
 
+IREE_FLAG(bool, hip_allow_inline_execution, false,
+          "Allow command buffers to execute inline against HIP streams when \n"
+          "possible.");
+
 IREE_FLAG(
     bool, hip_async_allocations, true,
     "Enables HIP asynchronous stream-ordered allocations when supported.");
@@ -63,6 +67,8 @@ static const iree_string_view_t key_hip_dylib_path =
     iree_string_view_literal("hip_dylib_path");
 static const iree_string_view_t key_hip_use_streams =
     iree_string_view_literal("hip_use_streams");
+static const iree_string_view_t key_hip_allow_inline_execution =
+    iree_string_view_literal("hip_allow_inline_execution");
 static const iree_string_view_t key_hip_async_allocations =
     iree_string_view_literal("hip_async_allocations");
 static const iree_string_view_t key_hip_tracing =
@@ -85,6 +91,9 @@ static iree_status_t iree_hal_hip_driver_parse_flags(
   // bool and int flags
   IREE_RETURN_IF_ERROR(iree_string_pair_builder_add_int32(
       builder, key_hip_use_streams, FLAG_hip_use_streams));
+  IREE_RETURN_IF_ERROR(iree_string_pair_builder_add_int32(
+      builder, key_hip_allow_inline_execution,
+      FLAG_hip_allow_inline_execution));
   IREE_RETURN_IF_ERROR(iree_string_pair_builder_add_int32(
       builder, key_hip_async_allocations, FLAG_hip_async_allocations));
   IREE_RETURN_IF_ERROR(iree_string_pair_builder_add_int32(
@@ -146,6 +155,17 @@ static iree_status_t iree_hal_hip_driver_populate_options(
       if (ivalue) {
         device_params->command_buffer_mode =
             IREE_HAL_HIP_COMMAND_BUFFER_MODE_STREAM;
+      }
+    } else if (iree_string_view_equal(key, key_hip_allow_inline_execution)) {
+      if (!iree_string_view_atoi_int32(value, &ivalue)) {
+        return iree_make_status(
+            IREE_STATUS_FAILED_PRECONDITION,
+            "Option 'hip_allow_inline_execution' expected to be "
+            "int. Got: '%.*s'",
+            (int)value.size, value.data);
+      }
+      if (ivalue) {
+        device_params->allow_inline_execution = ivalue ? true : false;
       }
     } else if (iree_string_view_equal(key, key_hip_async_allocations)) {
       if (!iree_string_view_atoi_int32(value, &ivalue)) {
