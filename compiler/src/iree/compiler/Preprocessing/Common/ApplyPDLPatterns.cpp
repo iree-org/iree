@@ -210,6 +210,40 @@ createEntryPointFn(PatternRewriter &rewriter, Operation *rootOp,
   return entryPointFn;
 }
 
+static std::string operandTypeToString(Type operandType) {
+  std::string outputString;
+  llvm::raw_string_ostream sstream(outputString);
+  if (auto shapedType = dyn_cast<ShapedType>(operandType)) {
+    shapedType.getElementType().print(sstream);
+  } else {
+    operandType.print(sstream);
+  }
+  return outputString;
+}
+
+// Make a unique function name based on the base name and input/output types.
+static std::string makeUniqueFuncName(std::string externalFnName,
+                                      SmallVector<Type> inputTypes,
+                                      SmallVector<Type> resultTypes,
+                                      SmallVector<Type> otherOperandTypes) {
+  SmallVector<std::string> datatypeTokens;
+  for (Type inputType : inputTypes) {
+    datatypeTokens.push_back(operandTypeToString(inputType));
+  }
+  for (Type resultType : resultTypes) {
+    datatypeTokens.push_back(operandTypeToString(resultType));
+  }
+  for (Type otherOperandType : otherOperandTypes) {
+    datatypeTokens.push_back(operandTypeToString(otherOperandType));
+  }
+  std::string outputString;
+  llvm::raw_string_ostream sstream(outputString);
+  llvm::interleave(
+      datatypeTokens, [&](std::string token) { sstream << token; },
+      [&] { sstream << "_"; });
+  return externalFnName + "_" + outputString;
+}
+
 // Generate the `hal.executable` that calls into the external function.
 // Return the nested symbol reference to the entry point function generated.
 static SymbolRefAttr
@@ -225,7 +259,10 @@ createStreamExecutableOp(PatternRewriter &rewriter, Operation *rootOp,
 
   // Create the hal.executable to marshal calling the external function.
   Location loc = rootOp->getLoc();
-  std::string executableOpName = externalFnName.str() + "_executable";
+
+  std::string uniqueExternalFnName = makeUniqueFuncName(
+      externalFnName.str(), inputTypes, resultTypes, otherOperandTypes);
+  std::string executableOpName = uniqueExternalFnName + "_executable";
   auto executableOp =
       rewriter.create<IREE::Stream::ExecutableOp>(loc, executableOpName);
   executableOp.setPrivate();
@@ -241,8 +278,8 @@ createStreamExecutableOp(PatternRewriter &rewriter, Operation *rootOp,
   MLIRContext *context = rewriter.getContext();
   FunctionType externalFnCallType = getExternalFunctionCallType(
       context, loc, inputTypes, resultTypes, otherOperandTypes);
-  func::FuncOp externalFnCall =
-      rewriter.create<func::FuncOp>(loc, externalFnName, externalFnCallType);
+  func::FuncOp externalFnCall = rewriter.create<func::FuncOp>(
+      loc, uniqueExternalFnName, externalFnCallType);
   externalFnCall.setPrivate();
   externalFnCall->setAttr("llvm.bareptr", rewriter.getBoolArrayAttr(true));
 
@@ -359,39 +396,6 @@ static LogicalResult checkTensorElementType(PatternRewriter &rewriter,
   return success(tensorType && tensorType.getElementType() == elementType);
 }
 
-static std::string operandTypeToString(Type operandType) {
-  std::string outputString;
-  llvm::raw_string_ostream sstream(outputString);
-  if (auto shapedType = dyn_cast<ShapedType>(operandType)) {
-    shapedType.getElementType().print(sstream);
-  } else {
-    operandType.print(sstream);
-  }
-  return outputString;
-}
-
-static std::string makeUniqueFuncName(std::string externalFnName,
-                                      SmallVector<Type> inputTypes,
-                                      SmallVector<Type> resultTypes,
-                                      SmallVector<Type> otherOperandTypes) {
-  SmallVector<std::string> datatypeTokens;
-  for (Type inputType : inputTypes) {
-    datatypeTokens.push_back(operandTypeToString(inputType));
-  }
-  for (Type resultType : resultTypes) {
-    datatypeTokens.push_back(operandTypeToString(resultType));
-  }
-  for (Type otherOperandType : otherOperandTypes) {
-    datatypeTokens.push_back(operandTypeToString(otherOperandType));
-  }
-  std::string outputString;
-  llvm::raw_string_ostream sstream(outputString);
-  llvm::interleave(
-      datatypeTokens, [&](std::string token) { sstream << token; },
-      [&] { sstream << "_"; });
-  return externalFnName + "_" + outputString;
-}
-
 // Rewrite function to rewrite a matched DAG into a flow.dispatch. Conceptually,
 // the matched DAG at the tensor level gets replaced by a function
 //
@@ -450,7 +454,6 @@ static LogicalResult rewriteAsFlowDispatch(
   std::string uniqueExternalFnName =
       makeUniqueFuncName(externalFnNameAttr.getValue().str(), inputTypes,
                          resultTypes, otherOperandTypes);
-  externalFnNameAttr = rewriter.getStringAttr(uniqueExternalFnName);
   if (!externalFnNameAttr) {
     return rewriter.notifyMatchFailure(
         rootOp, "expected string attribute for external fn name");
@@ -472,7 +475,8 @@ static LogicalResult rewriteAsFlowDispatch(
   SymbolTable symbolTableModule(moduleOp);
 
   std::string executableOpName = uniqueExternalFnName + "_executable";
-  std::string entryPointName = uniqueExternalFnName + "_entry_point";
+  std::string entryPointName =
+      externalFnNameAttr.getValue().str() + "_entry_point";
   SymbolRefAttr entryPointFnRef;
   if (auto symbol = symbolTableModule.lookup(executableOpName)) {
     entryPointFnRef = SymbolRefAttr::get(

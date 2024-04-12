@@ -1,12 +1,12 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(iree-preprocessing-apply-pdl-patterns{patterns-file=%p/torch.pdl.mlir}, cse)" %s | FileCheck %s
 
 // CHECK-LABEL:   stream.executable private @mlp_external_f32_f32_f32_i32_i32_i32_executable
-//       CHECK:   stream.executable.export public @mlp_external_f32_f32_f32_i32_i32_i32_entry_point
+//       CHECK:   stream.executable.export public @mlp_external_entry_point
 //       CHECK:   builtin.module
 //       CHECK:     func.func private @mlp_external_f32_f32_f32_i32_i32_i32
 //  CHECK-SAME:         (memref<f32>, index, memref<f32>, index, memref<f32>, index, i32, i32, i32)
 //  CHECK-SAME:         attributes {llvm.bareptr = [true]}
-//       CHECK:     func.func @mlp_external_f32_f32_f32_i32_i32_i32_entry_point
+//       CHECK:     func.func @mlp_external_entry_point
 //  CHECK-SAME:         %[[ARG0:[a-zA-Z0-9]+]]: !stream.binding
 //  CHECK-SAME:         %[[ARG1:[a-zA-Z0-9]+]]: !stream.binding
 //  CHECK-SAME:         %[[ARG2:[a-zA-Z0-9]+]]: !stream.binding
@@ -29,7 +29,7 @@
 //       CHECK:       %[[STREAM2:.+]] = stream.binding.subspan %[[ARG2]][%[[C0]]] : !stream.binding -> memref<?x?xf32, strided<[?, 1], offset: ?>>{%[[ARG10]], %[[ARG11]]}
 //  CHECK-NEXT:       %[[STREAM2_BASE:[a-zA-Z0-9_]+]], %[[OFFSET2:[a-zA-Z0-9_]+]],
 //  CHECK-SAME:             = iree_codegen.extract_strided_metadata %[[STREAM2]]
-//       CHECK:       call @mlp_external
+//       CHECK:       call @mlp_external_f32_f32_f32_i32_i32_i32
 //  CHECK-SAME:           %[[STREAM0_BASE]], %[[OFFSET0]], %[[STREAM1_BASE]], %[[OFFSET1]], %[[STREAM2_BASE]], %[[OFFSET2]], %[[ARG3]], %[[ARG4]], %[[ARG5]]
 
 //       CHECK:     func.func @mlp_invocation
@@ -44,7 +44,7 @@
 //       CHECK:       %[[K_I32:.+]] = arith.index_cast %[[K]] : index to i32
 //       CHECK:       %[[K_0:.+]] = tensor.dim %[[RHS]], %[[C0]]
 //       CHECK:       %[[RESULT:.+]] = flow.dispatch
-//  CHECK-SAME:           @mlp_external_f32_f32_f32_i32_i32_i32_executable::@mlp_external_f32_f32_f32_i32_i32_i32_entry_point
+//  CHECK-SAME:           @mlp_external_f32_f32_f32_i32_i32_i32_executable::@mlp_external_entry_point
 //  CHECK-SAME:           (%[[LHS]], %[[RHS]], %[[M_I32]], %[[N_I32]], %[[K_I32]], %[[M]], %[[K]], %[[K_0]], %[[N]], %[[M]], %[[N]])
 //       CHECK:       linalg.generic
 //  CHECK-SAME:           ins(%[[RESULT]] :
