@@ -40,21 +40,6 @@ func.func @reduce_add(%arg0: tensor<5x4xi32>, %arg1: tensor<i32>) -> tensor<5xi3
 
 // -----
 
-// CHECK-LABEL: @reduce_add_unranked
-// CHECK-PRIMITIVE-LABEL: @reduce_add_unranked
-func.func @reduce_add_unranked(%arg0: tensor<*xi32>, %arg1: tensor<i32>) -> tensor<*xi32> {
-  %0 = "stablehlo.reduce"(%arg0, %arg1) ({
-  ^bb0(%arg3: tensor<i32>, %arg4 : tensor<i32>):
-    %1 = stablehlo.add %arg3, %arg4 : tensor<i32>
-    "stablehlo.return"(%1) : (tensor<i32>) -> ()
-  }) {dimensions = array<i64: 1>, someattr} : (tensor<*xi32>, tensor<i32>) -> tensor<*xi32>
-  func.return %0 : tensor<*xi32>
-}
-// CHECK: stablehlo.reduce
-// CHECK-PRIMITIVE: stablehlo.reduce
-
-// -----
-
 // CHECK-DAG: #[[MAP0:.*]] = affine_map<(d0, d1) -> (d1, d0)>
 // CHECK-DAG: #[[MAP1:.*]] = affine_map<(d0, d1) -> (d0)>
 // CHECK:     @reduce_dim0
