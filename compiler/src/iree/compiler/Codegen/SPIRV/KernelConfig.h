@@ -20,6 +20,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 
 namespace mlir::iree_compiler {
 
@@ -115,7 +116,7 @@ getMatmulBMNKIndex(linalg::LinalgOp op, int *lastParallelDim = nullptr);
 /// Attaches the `translation_info` attribute to entry points in `moduleOp` and
 /// `lowering_config` attributes to all root ops in `moduleOp`'s region.
 /// These attributes are used to drive the CodeGen pipeline.
-LogicalResult initSPIRVLaunchConfig(ModuleOp moduleOp);
+LogicalResult initSPIRVLaunchConfig(FunctionOpInterface funcOp);
 
 } // namespace mlir::iree_compiler
 

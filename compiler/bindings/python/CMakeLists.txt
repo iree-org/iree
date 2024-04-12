@@ -177,6 +177,7 @@ set(_SOURCE_COMPONENTS
   MLIRPythonSources.Core
 
   # Core dialects (constrained to IREE input dialects).
+  MLIRPythonSources.Dialects.amdgpu
   MLIRPythonSources.Dialects.arith
   MLIRPythonSources.Dialects.builtin
   MLIRPythonSources.Dialects.cf

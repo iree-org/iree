@@ -46,7 +46,7 @@ def LLVMCPUAssignImportOrdinals :
 }
 
 def LLVMCPUCheckIRBeforeLLVMConversion :
-    Pass<"iree-llvmcpu-check-ir-before-llvm-conversion", "ModuleOp"> {
+    InterfacePass<"iree-llvmcpu-check-ir-before-llvm-conversion", "mlir::FunctionOpInterface"> {
   let summary = "Checks CPU backend specific IR constraints (like no allocas)";
   let constructor = "mlir::iree_compiler::createLLVMCPUCheckIRBeforeLLVMConversionPass()";
   let options = [
@@ -70,8 +70,7 @@ def LLVMCPULinkExecutables :
 }
 
 def LLVMCPULowerExecutableTarget :
-    Pass<"iree-llvmcpu-lower-executable-target",
-         "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
+    InterfacePass<"iree-llvmcpu-lower-executable-target", "mlir::FunctionOpInterface"> {
   let summary =
       "Lower executable target using an IREE::HAL::DispatchLoweringPassPipeline";
   let constructor =
@@ -98,8 +97,7 @@ def LLVMCPUPeel :
 }
 
 def LLVMCPUSelectLoweringStrategy :
-    Pass<"iree-llvmcpu-select-lowering-strategy",
-         "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
+    Pass<"iree-llvmcpu-select-lowering-strategy", "ModuleOp"> {
   let summary =
       "Select a IREE::HAL::DispatchLoweringPassPipeline for lowering the variant";
   let constructor =
@@ -221,7 +219,7 @@ def VectorContractCustomKernels :
 }
 
 def VerifyLinalgTransformLegality :
-    Pass<"iree-llvmcpu-verify-linalg-transform-legality", "ModuleOp"> {
+    InterfacePass<"iree-llvmcpu-verify-linalg-transform-legality", "mlir::FunctionOpInterface"> {
   let summary = "Verify that only supported IR constructs are passed to the compiler.";
   let constructor = "mlir::iree_compiler::createVerifyLinalgTransformLegalityPass()";
 }

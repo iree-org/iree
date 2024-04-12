@@ -1594,6 +1594,41 @@ LogicalResult CallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
 }
 
 //===----------------------------------------------------------------------===//
+// flow.tensor.constant
+//===----------------------------------------------------------------------===//
+
+ParseResult TensorConstantOp::parse(OpAsmParser &parser,
+                                    OperationState &result) {
+  if (parser.parseOptionalAttrDict(result.attributes))
+    return failure();
+  TypedAttr valueAttr;
+  if (failed(parser.parseAttribute(valueAttr)))
+    return failure();
+  result.addAttribute("value", valueAttr);
+  if (succeeded(parser.parseOptionalArrow())) {
+    Type resultType;
+    if (failed(parser.parseType(resultType)))
+      return failure();
+    result.addTypes(resultType);
+  } else {
+    result.addTypes(valueAttr.getType());
+  }
+  return success();
+}
+
+void TensorConstantOp::print(OpAsmPrinter &p) {
+  p << " ";
+  p.printOptionalAttrDict((*this)->getAttrs(), {"value"});
+  p.printAttribute(getValue());
+  auto attrType = getValue().getType();
+  auto resultType = getType();
+  if (attrType != resultType) {
+    p << " -> ";
+    p.printType(resultType);
+  }
+}
+
+//===----------------------------------------------------------------------===//
 // flow.tensor.tie_shape
 //===----------------------------------------------------------------------===//
 

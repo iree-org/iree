@@ -1,5 +1,5 @@
 // RUN: iree-opt --split-input-file --iree-codegen-llvmgpu-use-vector-distribution --iree-llvmgpu-enable-prefetch=true \
-// RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-select-lowering-strategy, iree-llvmgpu-lower-executable-target)))" %s | FileCheck %s
+// RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-llvmgpu-select-lowering-strategy, func.func(iree-llvmgpu-lower-executable-target)))))" %s | FileCheck %s
 
 // TODO: This test is still using the legacy LLVMGPU kernel config. This needs
 // to be migrated to the rocdl heuristics, but for now is just physically
@@ -43,16 +43,12 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 
 // Basic pipeline test to make sure it generates the instructions we expect.
 
-//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute
+//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [128, 2, 1] subgroup_size = 64
 //  CHECK-SAME:   mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
 //  CHECK-SAME:     subgroup_m_count = 2, subgroup_n_count = 2, subgroup_m_tile_count = 2, subgroup_n_tile_count = 2, subgroup_k_tile_count = 8>
 
-// CHECK-LABEL: hal.executable.export public @matmul_256x256x256_f16_f32
-//  CHECK-SAME:    subgroup_size = 64
-//  CHECK-SAME:    translation_info = #[[$TRANSLATION]]
-//  CHECK-SAME:    workgroup_size = [128 : index, 2 : index, 1 : index]
-
-//    CHECK-LABEL: func.func @matmul_256x256x256_f16_f32
+//    CHECK-LABEL: func.func @matmul_256x256x256_f16_f32()
+//     CHECK-SAME:    translation_info = #[[$TRANSLATION]]
 //          CHECK:   scf.for {{.*}} = %c0 to %c256 step %c128 iter_args({{.*}}) -> (vector<2x2x1x1x1x4xf32>)
 // Each subgroup handles 2 * 2 tiles, and for each tile we accumulate 8 times
 // along the K dimension. So in total 32 mfma ops.
@@ -98,16 +94,12 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 }
 }
 
-//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute
+//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [128, 2, 1] subgroup_size = 64
 //  CHECK-SAME:   mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
 //  CHECK-SAME:     subgroup_m_count = 2, subgroup_n_count = 2, subgroup_m_tile_count = 2, subgroup_n_tile_count = 2, subgroup_k_tile_count = 8>
 
-// CHECK-LABEL: hal.executable.export public @matmul_256x256x256_f16_f16
-//  CHECK-SAME:    subgroup_size = 64
-//  CHECK-SAME:    translation_info = #[[$TRANSLATION]]
-//  CHECK-SAME:    workgroup_size = [128 : index, 2 : index, 1 : index]
-
-//    CHECK-LABEL: func.func @matmul_256x256x256_f16_f16
+//    CHECK-LABEL: func.func @matmul_256x256x256_f16_f16()
+//     CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //          CHECK:   scf.for {{.*}} = %c0 to %c256 step %c128 iter_args(%[[ARG:.+]] = {{.*}}) -> (vector<2x2x1x1x1x4xf16>)
 //          CHECK:     arith.extf %[[ARG]] : vector<2x2x1x1x1x4xf16> to vector<2x2x1x1x1x4xf32>
 // CHECK-COUNT-32:     amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
@@ -173,10 +165,9 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
   }
 }
 
-// CHECK-LABEL: hal.executable.export public @expanded_matmul_transpose_b
-//  CHECK-SAME:    workgroup_size = [256 : index, 1 : index, 1 : index]
-
-//    CHECK-LABEL: func @expanded_matmul_transpose_b
+//          CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [256, 1, 1] subgroup_size = 64
+//          CHECK: func @expanded_matmul_transpose_b
+//     CHECK-SAME:     translation_info = #[[TRANSLATION]]
 // This has more than 2 iteartions. So we have prefetching enabled for this case. Due to
 // prefetching, we have one iteration peeled of so upper bound is 2048 - 128 = 1920.
 //          CHECK:   scf.for {{.*}} = %c0 to %c1920 step %c128 iter_args(%[[ARG:.+]] = {{.*}}) -> (vector<4x1x1x1x1x4xf16>)
@@ -302,14 +293,9 @@ hal.executable public @main_dispatch_expanded_matmul {
 }
 
 
-//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute
+//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [128, 2, 1] subgroup_size = 64
 //  CHECK-SAME:   mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
 //  CHECK-SAME:     subgroup_m_count = 2, subgroup_n_count = 2, subgroup_m_tile_count = 2, subgroup_n_tile_count = 2, subgroup_k_tile_count = 8>
-
-// CHECK-LABEL: hal.executable.export public @generic_2x1024x20x64x1280_f16
-//  CHECK-SAME:    subgroup_size = 64
-//  CHECK-SAME:    translation_info = #[[$TRANSLATION]]
-//  CHECK-SAME:    workgroup_size = [128 : index, 2 : index, 1 : index]
 
 //    CHECK-LABEL: func.func @generic_2x1024x20x64x1280_f16
 // This has more than 2 iteartions. So we have prefetching enabled for this case. Due to
@@ -359,16 +345,13 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 }
 }
 
-//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute
+//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [64, 2, 1] subgroup_size = 32
 //  CHECK-SAME:   mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>,
 //  CHECK-SAME:     subgroup_m_count = 2, subgroup_n_count = 2, subgroup_m_tile_count = 2, subgroup_n_tile_count = 2, subgroup_k_tile_count = 8>
 
-// CHECK-LABEL: hal.executable.export public @matmul_256x256x256_f16_f32
-//  CHECK-SAME:    subgroup_size = 32
-//  CHECK-SAME:    translation_info = #[[$TRANSLATION]]
-//  CHECK-SAME:    workgroup_size = [64 : index, 2 : index, 1 : index]
 
 //    CHECK-LABEL: func.func @matmul_256x256x256_f16_f32
+//     CHECK-SAME:    translation_info = #[[$TRANSLATION]]
 //          CHECK:   scf.for {{.*}} = %c0 to %c256 step %c128 iter_args({{.*}}) -> (vector<2x2x8x1x1x1xf32>)
 // Each subgroup handles 2 * 2 tiles, and for each tile we accumulate 8 times
 // along the K dimension. So in total 32 wmma ops.

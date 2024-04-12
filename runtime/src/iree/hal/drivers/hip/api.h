@@ -87,6 +87,11 @@ typedef struct iree_hal_hip_device_params_t {
 
   // Parameters for each hipMemPool_t used for queue-ordered allocations.
   iree_hal_hip_memory_pooling_params_t memory_pools;
+
+  // Allow executing command buffers against HIP streams as they are recorded.
+  // Only command buffers produced by the compiler that have the
+  // IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION bit set will use this.
+  bool allow_inline_execution;
 } iree_hal_hip_device_params_t;
 
 // Initializes |out_params| to default values.

@@ -1034,22 +1034,20 @@ private:
 void SPIRVVectorizeLoadStorePass::runOnOperation() {
   // Uses the signature conversion methodology of the dialect conversion
   // framework to implement the conversion.
-  ModuleOp module = getOperation();
+  auto funcOp = getOperation();
   MLIRContext *context = &getContext();
 
   // Prior pass should have unrolled and broken down vectors with rank > 1.
-  for (auto func : module.getOps<mlir::FunctionOpInterface>()) {
-    auto result = func.walk([](VectorTransferOpInterface transferOp) {
-      if (cast<VectorType>(transferOp.getVectorType()).getRank() > 1) {
-        transferOp.emitOpError(
-            "with rank > 1 should be broken down by prior passes");
-        return WalkResult::interrupt();
-      }
-      return WalkResult::advance();
-    });
-    if (result.wasInterrupted()) {
-      signalPassFailure();
+  auto result = funcOp.walk([](VectorTransferOpInterface transferOp) {
+    if (cast<VectorType>(transferOp.getVectorType()).getRank() > 1) {
+      transferOp.emitOpError(
+          "with rank > 1 should be broken down by prior passes");
+      return WalkResult::interrupt();
     }
+    return WalkResult::advance();
+  });
+  if (result.wasInterrupted()) {
+    signalPassFailure();
   }
 
   memrefUsageAnalysis = &getAnalysis<MemRefUsageAnalysis>();
@@ -1089,25 +1087,24 @@ void SPIRVVectorizeLoadStorePass::runOnOperation() {
       [&](auto op) { return !memrefUsageAnalysis->shouldConvertTransfer(op); });
   target.markUnknownOpDynamicallyLegal([&](Operation *op) { return true; });
 
-  if (failed(applyPartialConversion(module, target,
+  if (failed(applyPartialConversion(funcOp, target,
                                     std::move(conversionPatterns)))) {
     return signalPassFailure();
   }
 
-  for (auto func : module.getOps<mlir::FunctionOpInterface>()) {
-    RewritePatternSet rewritingPatterns(context);
-    rewritingPatterns.add<ScalarizeVectorTransferRead, ScalarizeVectorLoad,
-                          ScalarizeVectorTransferWrite>(context);
-    rewritingPatterns.add<ReifyExtractOfCreateMask>(context);
+  RewritePatternSet rewritingPatterns(context);
+  rewritingPatterns.add<ScalarizeVectorTransferRead, ScalarizeVectorLoad,
+                        ScalarizeVectorTransferWrite>(context);
+  rewritingPatterns.add<ReifyExtractOfCreateMask>(context);
 
-    if (failed(
-            applyPatternsAndFoldGreedily(func, std::move(rewritingPatterns)))) {
-      return signalPassFailure();
-    }
+  if (failed(
+          applyPatternsAndFoldGreedily(funcOp, std::move(rewritingPatterns)))) {
+    return signalPassFailure();
   }
 }
 
-std::unique_ptr<OperationPass<ModuleOp>> createSPIRVVectorizeLoadStore() {
+std::unique_ptr<InterfacePass<FunctionOpInterface>>
+createSPIRVVectorizeLoadStore() {
   return std::make_unique<SPIRVVectorizeLoadStorePass>();
 }
 

@@ -332,13 +332,14 @@ public:
   }
   void runOnOperation() override {
     auto funcOp = getOperation();
-    if (!isEntryPoint(funcOp))
-      return;
 
-    auto workgroupSize = llvm::map_to_vector(
-        getEntryPoint(funcOp)->getWorkgroupSize().value(),
-        [&](Attribute attr) { return llvm::cast<IntegerAttr>(attr).getInt(); });
-    if (failed(tileParallelDims(funcOp, workgroupSize, distributeToWarp))) {
+    std::optional<SmallVector<int64_t>> workgroupSize =
+        getWorkgroupSize(funcOp);
+    if (!workgroupSize) {
+      return;
+    }
+    if (failed(tileParallelDims(funcOp, workgroupSize.value(),
+                                distributeToWarp))) {
       return signalPassFailure();
     }
 

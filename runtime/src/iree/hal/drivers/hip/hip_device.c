@@ -107,6 +107,7 @@ IREE_API_EXPORT void iree_hal_hip_device_params_initialize(
   out_params->command_buffer_mode = IREE_HAL_HIP_COMMAND_BUFFER_MODE_GRAPH;
   out_params->stream_tracing = false;
   out_params->async_allocations = true;
+  out_params->allow_inline_execution = false;
 }
 
 static iree_status_t iree_hal_hip_device_check_params(
@@ -440,7 +441,18 @@ static iree_status_t iree_hal_hip_device_create_command_buffer(
     iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
     iree_hal_command_buffer_t** out_command_buffer) {
   iree_hal_hip_device_t* device = iree_hal_hip_device_cast(base_device);
-
+  if (device->params.allow_inline_execution &&
+      iree_all_bits_set(mode,
+                        IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION)) {
+    // The caller has indicated the command buffer can be executed as it is
+    // recorded, implying that the command buffer cannot be reused and doesn't
+    // need to be persisted. This lets us lower the execution delay as we can
+    // directly route commands to a HIP stream and let it eagerly flush.
+    return iree_hal_hip_stream_command_buffer_create(
+        base_device, device->hip_symbols, device->tracing_context, mode,
+        command_categories, binding_capacity, device->hip_dispatch_stream,
+        &device->block_pool, device->host_allocator, out_command_buffer);
+  }
   switch (device->params.command_buffer_mode) {
     case IREE_HAL_HIP_COMMAND_BUFFER_MODE_GRAPH:
       return iree_hal_hip_graph_command_buffer_create(

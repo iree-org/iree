@@ -4,12 +4,14 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/ROCDLPassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/ROCDLPasses.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -35,19 +37,24 @@ public:
   }
 
   void runOnOperation() override {
-    IREE::HAL::ExecutableVariantOp variantOp = getOperation();
+    auto funcOp = getOperation();
 
-    std::optional<IREE::Codegen::TranslationInfoAttr> translationInfo =
-        getIdenticalTranslationInfo(variantOp);
+    IREE::Codegen::TranslationInfoAttr translationInfo =
+        getTranslationInfo(funcOp);
     if (!translationInfo) {
-      variantOp.emitError(
-          "unsupported entry point functions with different translation info");
-      return signalPassFailure();
+      return;
     }
 
-    OpPassManager pipeline(variantOp.getOperationName());
+    std::optional<OpPassManager> maybePipeline =
+        getFunctionOpInterfacePassManager(funcOp);
+    if (!maybePipeline) {
+      funcOp.emitOpError(
+          "unhandled function-like container during executable lowering");
+      return signalPassFailure();
+    }
+    OpPassManager &pipeline = maybePipeline.value();
 
-    switch (translationInfo.value().getDispatchLoweringPassPipeline()) {
+    switch (translationInfo.getDispatchLoweringPassPipeline()) {
     case CodeGenPipeline::LLVMGPUBaseLowering:
       addGPUBaseLoweringPassPipeline(pipeline);
       break;
@@ -58,18 +65,18 @@ public:
     case IREE::Codegen::DispatchLoweringPassPipeline::None:
       return;
     default:
-      variantOp.emitOpError("unsupported pipeline on ROCDL target");
+      funcOp.emitOpError("unsupported pipeline on ROCDL target");
       return signalPassFailure();
     }
 
-    if (failed(runPipeline(pipeline, variantOp))) {
+    if (failed(runPipeline(pipeline, funcOp))) {
       return signalPassFailure();
     }
   }
 };
 } // namespace
 
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
+std::unique_ptr<InterfacePass<FunctionOpInterface>>
 createROCDLLowerExecutableTargetPass() {
   return std::make_unique<ROCDLLowerExecutableTargetPass>();
 }

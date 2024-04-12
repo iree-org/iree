@@ -17,7 +17,6 @@
 #include "iree/compiler/Codegen/LLVMGPU/TransformExtensions/LLVMGPUExtensions.h"
 #include "iree/compiler/Dialect/Flow/TransformExtensions/FlowExtensions.h"
 #include "iree/compiler/Dialect/LinalgExt/TransformExtensions/LinalgExtExtensionsOps.h"
-#include "mlir/Dialect/AMDGPU/TransformOps/AMDGPUTransformOps.h"
 #include "mlir/Dialect/Affine/IR/ValueBoundsOpInterfaceImpl.h"
 #include "mlir/Dialect/Affine/TransformOps/AffineTransformOps.h"
 #include "mlir/Dialect/Arith/IR/ValueBoundsOpInterfaceImpl.h"
@@ -57,7 +56,6 @@ void registerCodegenInterfaces(DialectRegistry &registry) {
   linalg::registerTilingInterfaceExternalModels(registry);
   affine::registerTransformDialectExtension(registry);
   affine::registerValueBoundsOpInterfaceExternalModels(registry);
-  amdgpu::registerTransformDialectExtension(registry);
   arith::registerValueBoundsOpInterfaceExternalModels(registry);
   bufferization::registerTransformDialectExtension(registry);
   gpu::registerTransformDialectExtension(registry);

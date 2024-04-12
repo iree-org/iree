@@ -72,16 +72,19 @@ constexpr char coopMatShapeAttrName[] = "iree.spirv.coopmatrix.shape";
 void setSPIRVCooperativeMatrixInfo(mlir::FunctionOpInterface funcOp,
                                    linalg::LinalgOp rootOp,
                                    ArrayRef<int64_t> shape) {
-  auto moduleOp = funcOp->getParentOfType<ModuleOp>();
-  auto exportOp = getAllEntryPoints(moduleOp).lookup(funcOp.getName());
+  auto exportOp = getEntryPoint(funcOp);
+  if (!exportOp) {
+    return;
+  }
 
   Builder b(funcOp.getContext());
-  exportOp->setAttr(coopMatShapeAttrName, b.getDenseI64ArrayAttr(shape));
+  exportOp.value()->setAttr(coopMatShapeAttrName,
+                            b.getDenseI64ArrayAttr(shape));
   auto inputType = cast<ShapedType>(rootOp.getDpsInputs().front().getType());
   auto outputType = cast<ShapedType>(rootOp.getDpsInits().front().getType());
   auto elementTypes = b.getTypeArrayAttr(
       {inputType.getElementType(), outputType.getElementType()});
-  exportOp->setAttr(coopMatTypeAttrName, elementTypes);
+  exportOp.value()->setAttr(coopMatTypeAttrName, elementTypes);
 }
 
 /// Returns the chosen cooperative matrix shape for CodeGen from the
@@ -89,9 +92,9 @@ void setSPIRVCooperativeMatrixInfo(mlir::FunctionOpInterface funcOp,
 /// ArrayRef if cannot query.
 ArrayRef<int64_t>
 getSPIRVCooperativeMatrixShape(mlir::FunctionOpInterface funcOp) {
-  auto moduleOp = funcOp->getParentOfType<ModuleOp>();
-  auto exportOp = getAllEntryPoints(moduleOp).lookup(funcOp.getName());
-  auto attr = exportOp->getAttrOfType<DenseI64ArrayAttr>(coopMatShapeAttrName);
+  auto exportOp = getEntryPoint(funcOp);
+  auto attr =
+      exportOp.value()->getAttrOfType<DenseI64ArrayAttr>(coopMatShapeAttrName);
   if (!attr)
     return {};
   return attr.asArrayRef();

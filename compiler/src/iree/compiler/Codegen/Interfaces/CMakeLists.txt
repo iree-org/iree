@@ -24,7 +24,6 @@ iree_cc_library(
     ::UKernelOpInterface
     IREELinalgTransformDialect
     MLIRAMDGPUDialect
-    MLIRAMDGPUTransformOps
     MLIRAffineDialect
     MLIRAffineTransformOps
     MLIRArithValueBoundsOpInterfaceImpl

@@ -21,6 +21,7 @@
 #include "iree/hal/drivers/hip/graph_command_buffer.h"
 #include "iree/hal/drivers/hip/hip_device.h"
 #include "iree/hal/drivers/hip/status_util.h"
+#include "iree/hal/drivers/hip/stream_command_buffer.h"
 #include "iree/hal/utils/deferred_command_buffer.h"
 #include "iree/hal/utils/resource_set.h"
 
@@ -596,7 +597,12 @@ static iree_status_t iree_hal_hip_pending_queue_actions_issue_execution(
   for (iree_host_size_t i = 0; i < action->payload.command_buffers.count; ++i) {
     iree_hal_command_buffer_t* command_buffer =
         action->payload.command_buffers.ptr[i];
-    if (iree_hal_hip_graph_command_buffer_isa(command_buffer)) {
+    if (iree_hal_hip_stream_command_buffer_isa(command_buffer)) {
+      // Nothing to do for an inline command buffer; all the work has already
+      // been submitted. When we support semaphores we'll still need to signal
+      // their completion but do not have to worry about any waits: if there
+      // were waits we wouldn't have been able to execute inline!
+    } else if (iree_hal_hip_graph_command_buffer_isa(command_buffer)) {
       hipGraphExec_t exec = iree_hal_hip_graph_command_buffer_handle(
           action->payload.command_buffers.ptr[i]);
       IREE_HIP_RETURN_AND_END_ZONE_IF_ERROR(

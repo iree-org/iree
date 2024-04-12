@@ -7,11 +7,11 @@
 #ifndef IREE_COMPILER_CODEGEN_LLVMGPU_ROCDLKERNELCONFIG_H_
 #define IREE_COMPILER_CODEGEN_LLVMGPU_ROCDLKERNELCONFIG_H_
 
-#include "mlir/IR/BuiltinOps.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 
 namespace mlir::iree_compiler {
 
-LogicalResult initROCDLLaunchConfig(ModuleOp moduleOp);
+LogicalResult initROCDLLaunchConfig(FunctionOpInterface funcOp);
 
 } // namespace mlir::iree_compiler
 

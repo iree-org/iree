@@ -313,8 +313,7 @@ struct ConvertBf16ArithToF32Pass
 
 } // namespace
 
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createConvertBf16ArithToF32Pass() {
+std::unique_ptr<OperationPass<>> createConvertBf16ArithToF32Pass() {
   return std::make_unique<ConvertBf16ArithToF32Pass>();
 }
 

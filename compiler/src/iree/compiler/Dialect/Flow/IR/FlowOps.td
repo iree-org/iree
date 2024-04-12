@@ -11,6 +11,7 @@ include "iree/compiler/Dialect/Flow/IR/FlowBase.td"
 include "iree/compiler/Dialect/Flow/IR/FlowInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 include "mlir/Interfaces/FunctionInterfaces.td"
+include "mlir/IR/BuiltinAttributeInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/CallInterfaces.td"
@@ -1039,28 +1040,26 @@ def OpGroupTensorOps : OpDocGroup {
 
 let opDocGroup = OpGroupTensorOps in {
 
-// TODO(benvanik): make this behave like std.constant if not dynamic.
-def FLOW_TensorConstantOp : FLOW_Op<"tensor.constant"> {
+def FLOW_TensorConstantOp : FLOW_PureOp<"tensor.constant"> {
   let summary = [{tensor constant that can have dynamic dimensions}];
   let description = [{
-    Allows specifying a constant where the return value can erase shape
-    information. This operation is declared as having side effects and has no
-    folder, so will not be optimized away by the compiler. The underlying shape
-    information should be hidden from the compiler and resolved at runtime.
+    Allows specifying a tensor constant of IREE-specific types/attributes or
+    where the return value can erase shape information.
 
     ```mlir
-    %c = flow.tensor.constant tensor<2x2xf32> -> tensor<?x?xf32>
-    %res = math.absf %c : tensor<?x?xf32>
+    %cst = flow.tensor.constant #something_tensor_like : tensor<2x2xf32>
+    %res = math.absf %cst : tensor<2x2xf32>
+    ```
+
+    ```mlir
+    %cst = flow.tensor.constant dense<4.0> : tensor<2x2xf32> -> tensor<?x2xf32>
+    %res = math.absf %cst : tensor<?x2xf32>
     ```
   }];
-  let arguments = (ins ElementsAttr:$value);
+  let arguments = (ins TypedAttrInterface:$value);
   let results = (outs AnyTensor:$result);
-  let assemblyFormat = [{
-    $value attr-dict `->` type($result)
-  }];
 
   let hasFolder = 1;
-  let hasCanonicalizer = 1;
 }
 
 def FLOW_TensorTieShapeOp : FLOW_PureOp<"tensor.tie_shape", [
