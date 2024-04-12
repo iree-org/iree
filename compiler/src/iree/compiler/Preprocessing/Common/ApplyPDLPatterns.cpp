@@ -278,8 +278,8 @@ createStreamExecutableOp(PatternRewriter &rewriter, Operation *rootOp,
   MLIRContext *context = rewriter.getContext();
   FunctionType externalFnCallType = getExternalFunctionCallType(
       context, loc, inputTypes, resultTypes, otherOperandTypes);
-  func::FuncOp externalFnCall = rewriter.create<func::FuncOp>(
-      loc, uniqueExternalFnName, externalFnCallType);
+  func::FuncOp externalFnCall =
+      rewriter.create<func::FuncOp>(loc, externalFnName, externalFnCallType);
   externalFnCall.setPrivate();
   externalFnCall->setAttr("llvm.bareptr", rewriter.getBoolArrayAttr(true));
 

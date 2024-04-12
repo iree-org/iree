@@ -3,7 +3,7 @@
 // CHECK-LABEL:   stream.executable private @mlp_external_f32_f32_f32_i32_i32_i32_executable
 //       CHECK:   stream.executable.export public @mlp_external_entry_point
 //       CHECK:   builtin.module
-//       CHECK:     func.func private @mlp_external_f32_f32_f32_i32_i32_i32
+//       CHECK:     func.func private @mlp_external
 //  CHECK-SAME:         (memref<f32>, index, memref<f32>, index, memref<f32>, index, i32, i32, i32)
 //  CHECK-SAME:         attributes {llvm.bareptr = [true]}
 //       CHECK:     func.func @mlp_external_entry_point
@@ -23,7 +23,7 @@
 //       CHECK:       %[[STREAM2:.+]] = stream.binding.subspan %[[ARG2]][%[[C0]]] : !stream.binding -> memref<1x2x8xf32, strided<[16, 8, 1], offset: ?>>
 //  CHECK-NEXT:       %[[STREAM2_BASE:[a-zA-Z0-9_]+]], %[[OFFSET2:[a-zA-Z0-9_]+]],
 //  CHECK-SAME:             = iree_codegen.extract_strided_metadata %[[STREAM2]]
-//       CHECK:       call @mlp_external_f32_f32_f32_i32_i32_i32
+//       CHECK:       call @mlp_external
 //  CHECK-SAME:           %[[STREAM0_BASE]], %[[OFFSET0]], %[[STREAM1_BASE]], %[[OFFSET1]], %[[STREAM2_BASE]], %[[OFFSET2]], %[[ARG3]], %[[ARG4]], %[[ARG5]]
 
 //       CHECK:     func.func @mlp_invocation

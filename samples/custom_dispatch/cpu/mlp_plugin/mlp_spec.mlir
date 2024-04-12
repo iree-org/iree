@@ -11,7 +11,7 @@ module attributes {transform.with_named_sequence} {
       hal.return %c1, %c1, %c1 : index, index, index
     }
     builtin.module {
-      func.func private @mlp_external_f32_f32_f32_i32_i32_i32(%lhs : memref<f32>, %lhs_offset : index, %rhs : memref<f32>, %rhs_offset : index, %result : memref<f32>, %result_offset : index, %m : i32, %n : i32, %k : i32) attributes {llvm.bareptr}
+      func.func private @mlp_external(%lhs : memref<f32>, %lhs_offset : index, %rhs : memref<f32>, %rhs_offset : index, %result : memref<f32>, %result_offset : index, %m : i32, %n : i32, %k : i32) attributes {llvm.bareptr}
       func.func @mlp(%arg0: !stream.binding, %arg1: !stream.binding, %arg2: !stream.binding, %arg3: i32, %arg4: i32, %arg5 : i32) {
         %c0 = arith.constant 0 : index
         %m = arith.index_cast %arg3 : i32 to index
@@ -23,7 +23,7 @@ module attributes {transform.with_named_sequence} {
         %p0, %o0, %s00, %s01, %t00, %t01 = memref.extract_strided_metadata %lhs : memref<?x?xf32> -> memref<f32>, index, index, index, index, index
         %p1, %o1, %s10, %s11, %t10, %t11 = memref.extract_strided_metadata %rhs : memref<?x?xf32> -> memref<f32>, index, index, index, index, index
         %p2, %o2, %s20, %s21, %t20, %t21 = memref.extract_strided_metadata %result : memref<?x?xf32> -> memref<f32>, index, index, index, index, index
-        func.call @mlp_external_f32_f32_f32_i32_i32_i32(%p0, %o0, %p1, %o1, %p2, %o2, %arg3, %arg4, %arg5) : (memref<f32>, index, memref<f32>, index, memref<f32>, index, i32, i32, i32) -> ()
+        func.call @mlp_external(%p0, %o0, %p1, %o1, %p2, %o2, %arg3, %arg4, %arg5) : (memref<f32>, index, memref<f32>, index, memref<f32>, index, i32, i32, i32) -> ()
         return
       }
     }
