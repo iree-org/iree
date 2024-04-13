@@ -268,3 +268,24 @@ util.func public @dequant_like_extf_reduction(%arg0: tensor<11008x32x128xf16>) -
 //  CHECK-SAME:       iterator_types = ["parallel", "reduction", "reduction"]
 //       CHECK:   flow.return %[[GEN]] :
 //       CHECK:   util.return %[[DISP]]
+
+// -----
+
+#map1 = affine_map<(d0) -> (d0)>
+util.func public @clone_elementwise_op_empty() -> tensor<1280xf32> {
+   %0 = flow.tensor.constant #flow.parameter.named<"model"::"unet.time_embedding.linear_2.bias"> : tensor<1280xf16>
+   %1 = tensor.empty() : tensor<1280xf32>
+   %2 = linalg.generic {indexing_maps = [#map1, #map1], iterator_types = ["parallel"]} ins(%0 : tensor<1280xf16>) outs(%1 : tensor<1280xf32>) {
+   ^bb0(%in: f16, %out: f32):
+     %3 = arith.extf %in : f16 to f32
+     linalg.yield %3 : f32
+   } -> tensor<1280xf32>
+   util.return %2 : tensor<1280xf32>
+}
+//      CHECK: util.func public @clone_elementwise_op_empty()
+//      CHECK:   %[[RETURN:.+]] = flow.dispatch.region
+//      CHECK:     %[[EMPTY:.+]] = tensor.empty()
+//      CHECK:     %[[GENERIC:.+]] = linalg.generic
+// CHECK-SAME:         outs(%[[EMPTY]] :
+//      CHECK:     flow.return %[[GENERIC]]
+//      CHECK:   util.return %[[RETURN]]

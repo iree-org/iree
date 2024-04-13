@@ -41,6 +41,13 @@ struct CloneProducersIntoDispatchRegionPass
         return signalPassFailure();
       }
     });
+
+    // Rerun the cloning again to move still clonable operations into
+    // dispatches.
+    funcOp->walk([&](DispatchRegionOp regionOp) {
+      if (failed(cloneProducersToRegion(rewriter, regionOp)))
+        return signalPassFailure();
+    });
   }
 };
 
