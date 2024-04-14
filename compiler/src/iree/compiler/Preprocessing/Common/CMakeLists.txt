@@ -32,7 +32,6 @@ iree_cc_library(
     "InterpreterPass.cpp"
     "MakeSingleDispatchForFunction.cpp"
     "PadLinalgOps.cpp"
-    "PassDetail.h"
     "Passes.cpp"
   DEPS
     ::PassesIncGen
