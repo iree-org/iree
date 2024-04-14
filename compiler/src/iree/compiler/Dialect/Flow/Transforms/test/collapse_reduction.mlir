@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file -iree-flow-collapse-dims %s | FileCheck %s
+// RUN: iree-opt --split-input-file -iree-flow-collapse-reduction-dimensions %s | FileCheck %s
 
 util.func public @multi_reduce_dim(%arg0: tensor<2x32x10x4096xf32>) -> tensor<2x32x1x1xf32> {
   %cst = arith.constant -0.000000e+00 : f32

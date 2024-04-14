@@ -7,7 +7,6 @@
 #include <utility>
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
@@ -27,6 +26,10 @@
 #define DEBUG_TYPE "iree-dispatch"
 
 namespace mlir::iree_compiler::IREE::Flow {
+
+#define GEN_PASS_DEF_ANNOTATEDISPATCHESPASS
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
+
 namespace {
 
 static int64_t costOfDomain(ArrayRef<int64_t> domain) {
@@ -358,10 +361,9 @@ static std::string summarizeDispatchRegion(Region &region) {
 
 } // namespace
 
-class AnnotateDispatchesPass
-    : public AnnotateDispatchesBase<AnnotateDispatchesPass> {
-public:
-  AnnotateDispatchesPass() = default;
+struct AnnotateDispatchesPass
+    : public IREE::Flow::impl::AnnotateDispatchesPassBase<
+          AnnotateDispatchesPass> {
 
   void runOnOperation() override {
     DenseMap<Attribute, SymbolRefAttr> entryPointRefReplacements;
@@ -416,9 +418,5 @@ public:
     }
   }
 };
-
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createAnnotateDispatchesPass() {
-  return std::make_unique<AnnotateDispatchesPass>();
-}
 
 } // namespace mlir::iree_compiler::IREE::Flow

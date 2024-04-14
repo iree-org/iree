@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -13,6 +12,9 @@
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler::IREE::Flow {
+
+#define GEN_PASS_DEF_CAPTUREDYNAMICDIMSPASS
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
 
 namespace {
 
@@ -252,12 +254,9 @@ static void captureDims(scf::ForOp forOp) {
   forOp->erase();
 }
 
-class CaptureDynamicDimsPass
-    : public CaptureDynamicDimsBase<CaptureDynamicDimsPass> {
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Flow::FlowDialect>();
-  }
-
+struct CaptureDynamicDimsPass
+    : public IREE::Flow::impl::CaptureDynamicDimsPassBase<
+          CaptureDynamicDimsPass> {
   void runOnOperation() override {
     getOperation()->walk([&](scf::ForOp forOp) { captureDims(forOp); });
     getOperation()->walk([&](IREE::Flow::DispatchWorkgroupsOp dispatchOp) {
@@ -267,9 +266,5 @@ class CaptureDynamicDimsPass
 };
 
 } // namespace
-
-std::unique_ptr<Pass> createCaptureDynamicDimsPass() {
-  return std::make_unique<CaptureDynamicDimsPass>();
-}
 
 } // namespace mlir::iree_compiler::IREE::Flow

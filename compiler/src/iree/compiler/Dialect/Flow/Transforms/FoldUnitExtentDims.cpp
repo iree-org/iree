@@ -11,7 +11,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -24,15 +23,13 @@
 
 namespace mlir::iree_compiler::IREE::Flow {
 
+#define GEN_PASS_DEF_FOLDUNITEXTENTDIMSPASS
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
+
 namespace {
 struct FoldUnitExtentDimsPass
-    : public FoldUnitExtentDimsBase<FoldUnitExtentDimsPass> {
-
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<affine::AffineDialect, arith::ArithDialect,
-                    linalg::LinalgDialect, tensor::TensorDialect>();
-  }
-
+    : public IREE::Flow::impl::FoldUnitExtentDimsPassBase<
+          FoldUnitExtentDimsPass> {
   void runOnOperation() override;
 };
 } // namespace
@@ -56,11 +53,6 @@ void FoldUnitExtentDimsPass::runOnOperation() {
                                           std::move(foldUnitDimsPatterns)))) {
     return signalPassFailure();
   }
-}
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createFoldUnitExtentDimsPass() {
-  return std::make_unique<FoldUnitExtentDimsPass>();
 }
 
 } // namespace mlir::iree_compiler::IREE::Flow

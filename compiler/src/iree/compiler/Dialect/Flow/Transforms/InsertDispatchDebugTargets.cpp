@@ -7,7 +7,6 @@
 #include <utility>
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -21,6 +20,10 @@
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler::IREE::Flow {
+
+#define GEN_PASS_DEF_INSERTDEBUGTARGETATORDINALPASS
+#define GEN_PASS_DEF_INSERTDEBUGTARGETATSYMBOLPASS
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
 
 // Filters out non-tensor values for tracing.
 static SmallVector<Value> filterNonTensorValues(ValueRange &&range) {
@@ -123,20 +126,14 @@ static LogicalResult replaceReturnWithOpResults(mlir::ModuleOp moduleOp,
   return success();
 }
 
+namespace {
+
 // Insert break/tracing by ordinal for the specified function.
 struct InsertDebugTargetAtOrdinalPass
-    : public InsertDebugTargetAtOrdinalBase<InsertDebugTargetAtOrdinalPass> {
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Flow::FlowDialect, IREE::HAL::HALDialect>();
-  }
-  InsertDebugTargetAtOrdinalPass(std::string breakStr, std::string traceStr) {
-    this->breakDebugTarget = breakStr;
-    this->traceDebugTarget = traceStr;
-  };
-  InsertDebugTargetAtOrdinalPass(const InsertDebugTargetAtOrdinalPass &pass)
-      : InsertDebugTargetAtOrdinalPass(pass.breakDebugTarget,
-                                       pass.traceDebugTarget) {}
-
+    : public IREE::Flow::impl::InsertDebugTargetAtOrdinalPassBase<
+          InsertDebugTargetAtOrdinalPass> {
+  using IREE::Flow::impl::InsertDebugTargetAtOrdinalPassBase<
+      InsertDebugTargetAtOrdinalPass>::InsertDebugTargetAtOrdinalPassBase;
   void runOnOperation() override {
     auto [breakFname, breakOrdinal] =
         getOrdinalFromDebugTarget(breakDebugTarget);
@@ -205,19 +202,10 @@ struct InsertDebugTargetAtOrdinalPass
 // Break/trace by symbol, after outlining dispatch regions and
 // deduplication.
 struct InsertDebugTargetAtSymbolPass
-    : public InsertDebugTargetAtSymbolBase<InsertDebugTargetAtSymbolPass> {
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Flow::FlowDialect, IREE::HAL::HALDialect,
-                    IREE::Util::UtilDialect>();
-  }
-  InsertDebugTargetAtSymbolPass(std::string breakStr, std::string traceStr) {
-    this->breakDebugTarget = breakStr;
-    this->traceDebugTarget = traceStr;
-  };
-  InsertDebugTargetAtSymbolPass(const InsertDebugTargetAtSymbolPass &pass)
-      : InsertDebugTargetAtSymbolPass(pass.breakDebugTarget,
-                                      pass.traceDebugTarget) {}
-
+    : public IREE::Flow::impl::InsertDebugTargetAtSymbolPassBase<
+          InsertDebugTargetAtSymbolPass> {
+  using IREE::Flow::impl::InsertDebugTargetAtSymbolPassBase<
+      InsertDebugTargetAtSymbolPass>::InsertDebugTargetAtSymbolPassBase;
   void runOnOperation() override {
     bool foundBreakFunc = true;
     bool foundTraceFunc = true;
@@ -275,18 +263,6 @@ struct InsertDebugTargetAtSymbolPass
   }
 };
 
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createInsertDebugTargetAtOrdinalPass(std::string breakDebugTarget,
-                                     std::string traceDebugTarget) {
-  return std::make_unique<InsertDebugTargetAtOrdinalPass>(breakDebugTarget,
-                                                          traceDebugTarget);
-}
-
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createInsertDebugTargetAtSymbolPass(std::string breakDebugTarget,
-                                    std::string traceDebugTarget) {
-  return std::make_unique<InsertDebugTargetAtSymbolPass>(breakDebugTarget,
-                                                         traceDebugTarget);
-}
+} // namespace
 
 } // namespace mlir::iree_compiler::IREE::Flow

@@ -7,7 +7,6 @@
 #include <utility>
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -21,6 +20,10 @@
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler::IREE::Flow {
+
+#define GEN_PASS_DEF_OUTLINEDISPATCHEXTERNSPASS
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
+
 namespace {
 
 //===----------------------------------------------------------------------===//
@@ -129,15 +132,9 @@ outlineDispatchExternOp(std::string name,
 
 } // namespace
 
-class OutlineDispatchExternsPass
-    : public OutlineDispatchExternsBase<OutlineDispatchExternsPass> {
-public:
-  OutlineDispatchExternsPass() = default;
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Flow::FlowDialect>();
-    registry.insert<IREE::HAL::HALDialect>();
-  }
-
+struct OutlineDispatchExternsPass
+    : public IREE::Flow::impl::OutlineDispatchExternsPassBase<
+          OutlineDispatchExternsPass> {
   void runOnOperation() override {
     for (auto funcOp : getOperation().getOps<mlir::FunctionOpInterface>()) {
       // Outline all of the dispatch externs ops in this function.
@@ -162,10 +159,5 @@ public:
     }
   }
 };
-
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createOutlineDispatchExternsPass() {
-  return std::make_unique<OutlineDispatchExternsPass>();
-}
 
 } // namespace mlir::iree_compiler::IREE::Flow
