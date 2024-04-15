@@ -11,7 +11,6 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
-#include "iree/compiler/Preprocessing/Common/PassDetail.h"
 #include "iree/compiler/Preprocessing/Common/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
@@ -27,6 +26,10 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler::Preprocessing {
+
+#define GEN_PASS_DEF_PADTOINTRINSICS
+#include "iree/compiler/Preprocessing/Common/Passes.h.inc" // IWYU pragma: export
+
 namespace {
 
 static Value getPaddedValue(RewriterBase &rewriter, Location loc,
@@ -215,8 +218,9 @@ static void padBatchGemmOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
   assert(mPadding != 0);
   newLhs = getPaddedValue(rewriter, loc, newLhs, {0, mPadding, 0});
   newOuts = getPaddedValue(rewriter, loc, newOuts, {0, mPadding, 0});
-  auto paddedMatmulOp = mlir::clone(rewriter, linalgOp, {newOuts.getType()},
-                                    ArrayRef<Value>{newLhs, newRhs, newOuts});
+  linalg::LinalgOp paddedMatmulOp =
+      mlir::clone(rewriter, linalgOp, {newOuts.getType()},
+                  ArrayRef<Value>{newLhs, newRhs, newOuts});
 
   // Extract slice.
   IntegerAttr zero = rewriter.getI64IntegerAttr(0);
@@ -232,14 +236,15 @@ static void padBatchGemmOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
       linalgOp, paddedMatmulOp->getResults()[0], offsets, sizes, strides);
 }
 
-struct PadToIntrinsicsPass final : PadToIntrinsicsBase<PadToIntrinsicsPass> {
+struct PadToIntrinsicsPass final
+    : impl::PadToIntrinsicsBase<PadToIntrinsicsPass> {
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
-    auto funcOp = getOperation();
+    Operation *rootOp = getOperation();
     ArrayAttr mmaKinds = nullptr;
     for (IREE::HAL::ExecutableTargetAttr targetAttr :
-         IREE::HAL::DeviceTargetAttr::lookupExecutableTargets(funcOp)) {
+         IREE::HAL::DeviceTargetAttr::lookupExecutableTargets(rootOp)) {
       FailureOr<ArrayAttr> candidateMmaKinds =
           getSupportedMmaTypes(targetAttr.getConfiguration());
       if (succeeded(candidateMmaKinds)) {
@@ -258,7 +263,7 @@ struct PadToIntrinsicsPass final : PadToIntrinsicsBase<PadToIntrinsicsPass> {
         });
 
     SmallVector<linalg::LinalgOp> targetOps;
-    funcOp->walk([&](linalg::LinalgOp linalgOp) {
+    rootOp->walk([&](linalg::LinalgOp linalgOp) {
       if (isa<linalg::Conv2DNhwcHwcfOp, linalg::BatchMatmulOp>(
               linalgOp.getOperation()))
         targetOps.push_back(linalgOp);
@@ -280,9 +285,5 @@ struct PadToIntrinsicsPass final : PadToIntrinsicsBase<PadToIntrinsicsPass> {
 };
 
 } // namespace
-
-std::unique_ptr<Pass> createPadToIntrinsicsPass() {
-  return std::make_unique<PadToIntrinsicsPass>();
-}
 
 } // namespace mlir::iree_compiler::Preprocessing
