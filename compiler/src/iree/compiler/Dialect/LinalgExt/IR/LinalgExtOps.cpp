@@ -2797,6 +2797,27 @@ EncodingAttr EncodingAttr::get(MLIRContext *ctx, EncodingRole role,
              b.getAffineMapArrayAttr(maps));
 }
 
+AffineMap EncodingAttr::getMapForRole() {
+  EncodingRole role = getRole().getValue();
+  switch (role) {
+  case EncodingRole::LHS:
+    return getUserIndexingMaps()[0].cast<AffineMapAttr>().getAffineMap();
+  case EncodingRole::RHS:
+    return getUserIndexingMaps()[1].cast<AffineMapAttr>().getAffineMap();
+  case EncodingRole::RESULT:
+    return getUserIndexingMaps()[2].cast<AffineMapAttr>().getAffineMap();
+  default:
+    return AffineMap();
+  }
+}
+
+unsigned EncodingAttr::mapDimToRoleIndex(int64_t dimPos) {
+  AffineMap map = getMapForRole();
+  auto idx = map.getResultPosition(getAffineDimExpr(dimPos, getContext()));
+  assert(idx.has_value());
+  return idx.value();
+}
+
 // clang-format off
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.cpp.inc" // IWYU pragma: keep

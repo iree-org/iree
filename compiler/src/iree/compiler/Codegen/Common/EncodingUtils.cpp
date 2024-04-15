@@ -70,28 +70,6 @@ MaterializeEncodingConversionTarget::MaterializeEncodingConversionTarget(
   });
 }
 
-static AffineMap getMapForRole(EncodingAttr encoding) {
-  EncodingRole role = encoding.getRole().getValue();
-  if (role == EncodingRole::LHS)
-    return cast<AffineMapAttr>(encoding.getUserIndexingMaps()[0])
-        .getAffineMap();
-  else if (role == EncodingRole::RHS)
-    return cast<AffineMapAttr>(encoding.getUserIndexingMaps()[1])
-        .getAffineMap();
-  else
-    return cast<AffineMapAttr>(encoding.getUserIndexingMaps()[2])
-        .getAffineMap();
-}
-
-// Given the dim position of the encoding `user_indexing_maps`, return the
-/// matching index of the given encoding's tensor
-static unsigned mapDimToRoleIndex(int64_t dimPos, EncodingAttr encoding) {
-  AffineMap map = getMapForRole(encoding);
-  auto idx = map.getResultPosition(getAffineDimExpr(dimPos, map.getContext()));
-  assert(idx.has_value());
-  return idx.value();
-}
-
 RankedTensorType getOriginalTypeWithEncoding(RankedTensorType type) {
   auto encoding = getEncodingAttr(type);
   if (!encoding) {
@@ -125,27 +103,27 @@ MaterializeEncodingInfo getEncodingInfoForMatmul(EncodingAttr encoding,
          "Expected at most one M, N, K, and Batch dimension");
   if (!cDims->batch.empty()) {
     encodingInfo.outerDimsPerm.push_back(
-        mapDimToRoleIndex(cDims->batch[0], encoding));
+        encoding.mapDimToRoleIndex(cDims->batch[0]));
   }
   if (role != EncodingRole::RHS && !cDims->m.empty()) {
     encodingInfo.outerDimsPerm.push_back(
-        mapDimToRoleIndex(cDims->m[0], encoding));
+        encoding.mapDimToRoleIndex(cDims->m[0]));
     encodingInfo.innerDimsPos.push_back(
-        mapDimToRoleIndex(cDims->m[0], encoding));
+        encoding.mapDimToRoleIndex(cDims->m[0]));
     encodingInfo.innerTileSizes.push_back(tileMxNxK.M);
   }
   if (role != EncodingRole::LHS && !cDims->n.empty()) {
     encodingInfo.outerDimsPerm.push_back(
-        mapDimToRoleIndex(cDims->n[0], encoding));
+        encoding.mapDimToRoleIndex(cDims->n[0]));
     encodingInfo.innerDimsPos.push_back(
-        mapDimToRoleIndex(cDims->n[0], encoding));
+        encoding.mapDimToRoleIndex(cDims->n[0]));
     encodingInfo.innerTileSizes.push_back(tileMxNxK.N);
   }
   if (role != EncodingRole::RESULT) {
     encodingInfo.outerDimsPerm.push_back(
-        mapDimToRoleIndex(cDims->k[0], encoding));
+        encoding.mapDimToRoleIndex(cDims->k[0]));
     encodingInfo.innerDimsPos.push_back(
-        mapDimToRoleIndex(cDims->k[0], encoding));
+        encoding.mapDimToRoleIndex(cDims->k[0]));
     encodingInfo.innerTileSizes.push_back(tileMxNxK.K);
   }
   return encodingInfo;
