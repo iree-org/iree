@@ -226,16 +226,13 @@ static iree_status_t iree_hal_hip_semaphore_acquire_timepoint_host_wait(
   return iree_ok_status();
 }
 
-// Acquires an iree_hal_hip_event_t object to wait on the host for the
-// timeline to reach at least the given |min_value| on the device.
-// Returns true and writes to |out_event| if we can find such an event;
-// returns false otherwise.
-// The caller should release the |out_event| once done.
-static bool iree_hal_hip_semaphore_acquire_event_host_wait(
-    iree_hal_hip_semaphore_t* semaphore, uint64_t min_value,
+bool iree_hal_hip_semaphore_acquire_event_host_wait(
+    iree_hal_semaphore_t* base_semaphore, uint64_t min_value,
     iree_hal_hip_event_t** out_event) {
   *out_event = NULL;
   IREE_TRACE_ZONE_BEGIN(z0);
+  iree_hal_hip_semaphore_t* semaphore =
+      iree_hal_hip_semaphore_cast(base_semaphore);
 
   // Scan through the timepoint list and try to find a device event signal to
   // wait on. We need to lock with the timepoint list mutex here.
@@ -290,7 +287,7 @@ static iree_status_t iree_hal_hip_semaphore_wait(
   // should happen outside of the lock given that acquiring has its own internal
   // locks. This is faster than waiting on a host timepoint.
   iree_hal_hip_event_t* wait_event = NULL;
-  if (iree_hal_hip_semaphore_acquire_event_host_wait(semaphore, value,
+  if (iree_hal_hip_semaphore_acquire_event_host_wait(&semaphore->base, value,
                                                      &wait_event)) {
     IREE_HIP_RETURN_AND_END_ZONE_IF_ERROR(
         z0, semaphore->symbols,
@@ -518,8 +515,8 @@ iree_status_t iree_hal_hip_event_semaphore_acquire_timepoint_device_wait(
       &wait_timepoint->base);
 
   iree_hal_hip_event_t* wait_event = NULL;
-  if (iree_hal_hip_semaphore_acquire_event_host_wait(semaphore, min_value,
-                                                     &wait_event)) {
+  if (iree_hal_hip_semaphore_acquire_event_host_wait(&semaphore->base,
+                                                     min_value, &wait_event)) {
     // We've found an existing signal timepoint to wait on; we don't need a
     // standalone wait timepoint anymore. Decrease its refcount before
     // overwriting it to return it back to the pool and retain the existing one.

@@ -419,7 +419,7 @@ TEST_P(semaphore_submission_test,
   // complete.
   IREE_ASSERT_OK(iree_hal_semaphore_signal(host_wait_semaphore, 1ull));
 
-  // Now wait on both to complete.
+  // Now wait on any to complete.
   iree_hal_semaphore_t* main_semaphore_ptrs[] = {host_signal_semaphore,
                                                  device_signal_semaphore};
   uint64_t main_payload_values[] = {1ull, 1ull};
