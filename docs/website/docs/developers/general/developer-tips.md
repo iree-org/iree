@@ -533,7 +533,7 @@ each phase, much like `--compile-to` but without exiting early:
 ```console hl_lines="3"
 $ iree-compile simple_abs.mlir \
   --iree-hal-target-backends=llvm-cpu \
-  --dump-compilation-phases-to=/tmp/iree/simple_abs
+  --dump-compilation-phases-to=/tmp/iree/simple_abs \
   -o /tmp/iree/simple_abs/simple_abs_cpu.vmfb
 
 $ ls /tmp/iree/simple_abs -1v
