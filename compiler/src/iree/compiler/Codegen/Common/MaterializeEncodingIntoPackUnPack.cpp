@@ -220,7 +220,13 @@ static FailureOr<tensor::PackOp> lowerSetEncodingOpToPackOp(
   if (!encoding) {
     return failure();
   }
-  std::optional<Value> paddingValue = getPaddingValue(source);
+  std::optional<Value> paddingValue;
+  if (encoding.getRoundDimsTo().empty()) {
+    paddingValue = getPaddingValue(source);
+  } else {
+    paddingValue = rewriter.create<arith::ConstantOp>(
+        loc, rewriter.getZeroAttr(resultType.getElementType()));
+  }
   SmallVector<OpFoldResult> sourceDims =
       tensor::getMixedSizes(rewriter, loc, source);
   SmallVector<OpFoldResult> resultDims = tensor::PackOp::getResultShape(

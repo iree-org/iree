@@ -26,6 +26,8 @@
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+#define DEBUG_TYPE "cpu-materialize-encoding"
+
 namespace mlir::iree_compiler {
 
 using namespace IREE::LinalgExt;
@@ -305,13 +307,23 @@ enumerateMatmulTileX86_64(TypeRange elementTypes, ExecutableTargetAttr target) {
   return {};
 }
 
-static TileMxNxK chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
-                                  int64_t matmulNarrowM,
-                                  int64_t matmulNarrowN) {
+/// Returns the best TileMxNxK from `enumeratedTiles` pool. If the
+/// `hostDefinedUpperBound` is not empty, the chosen tile sizes can not be
+/// greater than the values.
+/// TODO(#16933): Remove `hostDefinedUpperBound` once we can propagate such
+/// information to host. For now, they are defined by host.
+static TileMxNxK
+chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles, int64_t matmulNarrowM,
+                 int64_t matmulNarrowN,
+                 ArrayRef<int64_t> hostDefinedUpperBound = {}) {
+  assert((hostDefinedUpperBound.empty() || hostDefinedUpperBound.size() == 3) &&
+         "expected hostDefinedUpperBound is empty or has upper bound for {M, "
+         "N, K}");
   // Handle narrow-N by transposing to reduce to narrow-M. Note: the
   // enumeratedTiles currently only enumerate narrow-M cases.
   if (matmulNarrowN && (!matmulNarrowM || matmulNarrowN < matmulNarrowM)) {
-    TileMxNxK tile = chooseMatmulTile(enumeratedTiles, matmulNarrowN, 0);
+    TileMxNxK tile = chooseMatmulTile(enumeratedTiles, matmulNarrowN, 0,
+                                      hostDefinedUpperBound);
     std::swap(tile.M, tile.N);
     return tile;
   }
@@ -342,7 +354,18 @@ static TileMxNxK chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
   SmallVector<RatedTileMxNxK> ratedTiles;
   ratedTiles.reserve(enumeratedTiles.size());
   int64_t bestPaddingPenalty = INT64_MAX;
+  int64_t mUB = INT64_MAX;
+  int64_t nUB = INT64_MAX;
+  int64_t kUB = INT64_MAX;
+  if (!hostDefinedUpperBound.empty()) {
+    mUB = hostDefinedUpperBound[0];
+    nUB = hostDefinedUpperBound[1];
+    kUB = hostDefinedUpperBound[2];
+  }
   for (auto tile : enumeratedTiles) {
+    if (tile.M > mUB || tile.N > nUB || tile.K > kUB) {
+      continue;
+    }
     RatedTileMxNxK ratedTile(tile);
     ratedTile.paddingPenalty = 0;
     // If we are choosing a tile for a narrow-M case, we want to minimize
@@ -468,7 +491,9 @@ materializeEncodingForTarget(RankedTensorType tensorType,
   // Choose a final matmul TileMxNxK from the above-enumarated tile shapes,
   // taking narrow dimensions into account.
   TileMxNxK chosenTileMxNxK =
-      chooseMatmulTile(enumeratedTileMxNxK, matmulNarrowM, matmulNarrowN);
+      chooseMatmulTile(enumeratedTileMxNxK, matmulNarrowM, matmulNarrowN,
+                       encoding.getRoundDimsTo());
+
   // Map the matmul TileMxNxK to an actual tile shape for the tensor at hand,
   // based on its role in the matmul.
   auto rank = tensorType.getRank();
