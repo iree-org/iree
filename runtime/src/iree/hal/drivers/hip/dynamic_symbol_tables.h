@@ -42,6 +42,9 @@ IREE_HAL_HIP_REQUIRED_PFN_STR_DECL(hipGetErrorName, hipError_t)
 IREE_HAL_HIP_REQUIRED_PFN_STR_DECL(hipGetErrorString, hipError_t)
 IREE_HAL_HIP_REQUIRED_PFN_DECL(hipGraphAddEmptyNode, hipGraphNode_t *,
                                hipGraph_t, const hipGraphNode_t *, size_t)
+IREE_HAL_HIP_REQUIRED_PFN_DECL(hipGraphAddEventRecordNode, hipGraphNode_t *,
+                               hipGraph_t, const hipGraphNode_t *, size_t,
+                               hipEvent_t)
 IREE_HAL_HIP_REQUIRED_PFN_DECL(hipGraphAddKernelNode, hipGraphNode_t *,
                                hipGraph_t, const hipGraphNode_t *, size_t,
                                const hipKernelNodeParams *)

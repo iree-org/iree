@@ -221,7 +221,7 @@ void iree_hal_hip_tracing_context_collect(
   IREE_TRACE_ZONE_END(z0);
 }
 
-static uint16_t iree_hal_hip_tracing_context_insert_query(
+static uint16_t iree_hal_hip_stream_tracing_context_insert_query(
     iree_hal_hip_tracing_context_t* context, hipStream_t stream) {
   // Allocate an event from the pool for use by the query.
   uint32_t query_id = context->query_head;
@@ -241,38 +241,88 @@ static uint16_t iree_hal_hip_tracing_context_insert_query(
   return query_id;
 }
 
+static uint16_t iree_hal_hip_graph_tracing_context_insert_query(
+    iree_hal_hip_tracing_context_t* context, hipGraphNode_t* out_node,
+    hipGraph_t graph, hipGraphNode_t* dependency_nodes,
+    size_t dependency_nodes_count) {
+  // Allocate an event from the pool for use by the query.
+  uint32_t query_id = context->query_head;
+  context->query_head = (context->query_head + 1) % context->query_capacity;
+
+  // TODO: check to see if the read and write heads of the ringbuffer have
+  // overlapped. If they have we could try to collect but it's not guaranteed
+  // that collection will complete (e.g. we may be reserving events for use in
+  // graphs that haven't yet been launched).
+  //
+  // For now we just allow the overlap and tracing results will be inconsistent.
+  IREE_ASSERT_NE(context->query_head, context->query_tail);
+
+  hipEvent_t event = context->event_pool[query_id];
+  iree_status_t status = IREE_HIP_RESULT_TO_STATUS(
+      context->symbols,
+      hipGraphAddEventRecordNode(out_node, graph, dependency_nodes,
+                                 dependency_nodes_count, event));
+  IREE_ASSERT(iree_status_is_ok(status));
+
+  return query_id;
+}
+
 // TODO: optimize this implementation to reduce the number of events required:
 // today we insert 2 events per zone (one for begin and one for end) but in
 // many cases we could reduce this by inserting events only between zones and
 // using the differences between them.
 
-void iree_hal_hip_tracing_zone_begin_impl(
+void iree_hal_hip_stream_tracing_zone_begin_impl(
     iree_hal_hip_tracing_context_t* context, hipStream_t stream,
     const iree_tracing_location_t* src_loc) {
-  if (!context) return;
+  IREE_ASSERT_ARGUMENT(context);
   uint16_t query_id =
-      iree_hal_hip_tracing_context_insert_query(context, stream);
+      iree_hal_hip_stream_tracing_context_insert_query(context, stream);
   iree_tracing_gpu_zone_begin(context->id, query_id, src_loc);
 }
 
-void iree_hal_hip_tracing_zone_begin_external_impl(
+void iree_hal_hip_stream_tracing_zone_begin_external_impl(
     iree_hal_hip_tracing_context_t* context, hipStream_t stream,
     const char* file_name, size_t file_name_length, uint32_t line,
     const char* function_name, size_t function_name_length, const char* name,
     size_t name_length) {
-  if (!context) return;
+  IREE_ASSERT_ARGUMENT(context);
   uint16_t query_id =
-      iree_hal_hip_tracing_context_insert_query(context, stream);
+      iree_hal_hip_stream_tracing_context_insert_query(context, stream);
   iree_tracing_gpu_zone_begin_external(context->id, query_id, file_name,
                                        file_name_length, line, function_name,
                                        function_name_length, name, name_length);
 }
 
-void iree_hal_hip_tracing_zone_end_impl(iree_hal_hip_tracing_context_t* context,
-                                        hipStream_t stream) {
+void iree_hal_hip_graph_tracing_zone_begin_external_impl(
+    iree_hal_hip_tracing_context_t* context, hipGraphNode_t* out_node,
+    hipGraph_t graph, hipGraphNode_t* dependency_nodes,
+    size_t dependency_nodes_count, const char* file_name,
+    size_t file_name_length, uint32_t line, const char* function_name,
+    size_t function_name_length, const char* name, size_t name_length) {
+  if (!context) return;
+  uint16_t query_id = iree_hal_hip_graph_tracing_context_insert_query(
+      context, out_node, graph, dependency_nodes, dependency_nodes_count);
+  iree_tracing_gpu_zone_begin_external(context->id, query_id, file_name,
+                                       file_name_length, line, function_name,
+                                       function_name_length, name, name_length);
+}
+
+void iree_hal_hip_stream_tracing_zone_end_impl(
+    iree_hal_hip_tracing_context_t* context, hipStream_t stream) {
   if (!context) return;
   uint16_t query_id =
-      iree_hal_hip_tracing_context_insert_query(context, stream);
+      iree_hal_hip_stream_tracing_context_insert_query(context, stream);
+  iree_tracing_gpu_zone_end(context->id, query_id);
+}
+
+void iree_hal_hip_graph_tracing_zone_end_impl(
+    iree_hal_hip_tracing_context_t* context, hipGraphNode_t* out_node,
+    hipGraph_t graph, hipGraphNode_t* dependency_nodes,
+    size_t dependency_nodes_count) {
+  if (!context) return;
+  uint16_t query_id = iree_hal_hip_graph_tracing_context_insert_query(
+      context, out_node, graph, dependency_nodes, dependency_nodes_count);
   iree_tracing_gpu_zone_end(context->id, query_id);
 }
 
