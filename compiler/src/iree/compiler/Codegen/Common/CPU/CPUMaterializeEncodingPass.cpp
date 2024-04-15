@@ -27,6 +27,8 @@
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+#define DEBUG_TYPE "cpu-materialize-encoding"
+
 namespace mlir::iree_compiler {
 
 using namespace IREE::LinalgExt;
@@ -470,6 +472,26 @@ materializeEncodingForTarget(RankedTensorType tensorType,
   // taking narrow dimensions into account.
   TileMxNxK chosenTileMxNxK =
       chooseMatmulTile(enumeratedTileMxNxK, matmulNarrowM, matmulNarrowN);
+
+  if (!encoding.getRoundDimsTo().empty()) {
+    SmallVector<int64_t> tileSizes = {chosenTileMxNxK.M, chosenTileMxNxK.N,
+                                      chosenTileMxNxK.K};
+    for (auto [tileSize, roundDimTo] :
+         llvm::zip_equal(tileSizes, encoding.getRoundDimsTo())) {
+      if (ShapedType::isDynamic(tileSize))
+        continue;
+      if (tileSize > roundDimTo) {
+        LLVM_DEBUG(
+            llvm::dbgs() << "failed, because some of selected tile sizes (";
+            llvm::interleaveComma(tileSizes, llvm::dbgs());
+            llvm::dbgs() << ") are greater than roundDimsTo in the encoding(";
+            llvm::interleaveComma(encoding.getRoundDimsTo(), llvm::dbgs());
+            llvm::dbgs() << ")\n";);
+        return failure();
+      }
+    }
+  }
+
   // Map the matmul TileMxNxK to an actual tile shape for the tensor at hand,
   // based on its role in the matmul.
   auto rank = tensorType.getRank();
