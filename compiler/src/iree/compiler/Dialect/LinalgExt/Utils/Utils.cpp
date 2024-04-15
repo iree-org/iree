@@ -8,6 +8,7 @@
 
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Builders.h"
@@ -90,6 +91,20 @@ SmallVector<int64_t> asShapeWithAnyValueAsDynamic(ArrayRef<OpFoldResult> ofrs) {
     }
   }
   return result;
+}
+
+EncodingAttr getEncodingAttr(RankedTensorType type) {
+  return dyn_cast_or_null<EncodingAttr>(type.getEncoding());
+}
+
+FailureOr<linalg::ContractionDimensions>
+getEncodingContractionDims(EncodingAttr encoding) {
+  auto indexingMapsAttr = encoding.getUserIndexingMaps();
+  SmallVector<AffineMap> indexingMaps = llvm::map_to_vector(
+      indexingMapsAttr.getValue(), [](Attribute m) -> AffineMap {
+        return cast<AffineMapAttr>(m).getAffineMap();
+      });
+  return linalg::inferContractionDims(indexingMaps);
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt

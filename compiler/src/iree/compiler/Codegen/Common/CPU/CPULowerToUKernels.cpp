@@ -13,6 +13,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -478,7 +479,7 @@ getFlagForUserAndOperandTypes(IREE::LinalgExt::EncodingAttr encoding,
                               ArrayRef<Attribute> operandTypes) {
   // There are currently no batch_mmt4d ukernels, so check for no batch
   // dimension.
-  auto cDims = getEncodingContractionDims(encoding);
+  auto cDims = IREE::LinalgExt::getEncodingContractionDims(encoding);
   if (failed(cDims) || !cDims->batch.empty() || operandTypes.size() != 3) {
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_NONE;
   }
