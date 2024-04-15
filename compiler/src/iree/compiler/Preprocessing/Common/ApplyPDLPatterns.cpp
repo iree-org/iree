@@ -31,7 +31,7 @@ using namespace mlir::iree_compiler;
 
 namespace mlir::iree_compiler::Preprocessing {
 
-#define GEN_PASS_DEF_APPLYPDLPATTERNS
+#define GEN_PASS_DEF_APPLYPDLPATTERNSPASS
 #include "iree/compiler/Preprocessing/Common/Passes.h.inc" // IWYU pragma: export
 
 } // namespace mlir::iree_compiler::Preprocessing
@@ -451,19 +451,11 @@ populatePDLModuleFromFileName(MLIRContext *context, RewritePatternSet &patterns,
 namespace {
 
 class ApplyPDLPatternsPass
-    : public iree_compiler::Preprocessing::impl::ApplyPDLPatternsBase<
+    : public iree_compiler::Preprocessing::impl::ApplyPDLPatternsPassBase<
           ApplyPDLPatternsPass> {
-
 public:
-  using Base::Base;
-
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<arith::ArithDialect, iree_compiler::IREE::Flow::FlowDialect,
-                    iree_compiler::IREE::Stream::StreamDialect,
-                    iree_compiler::IREE::Util::UtilDialect,
-                    memref::MemRefDialect, pdl::PDLDialect,
-                    pdl_interp::PDLInterpDialect, tensor::TensorDialect>();
-  }
+  using iree_compiler::Preprocessing::impl::ApplyPDLPatternsPassBase<
+      ApplyPDLPatternsPass>::ApplyPDLPatternsPassBase;
 
   LogicalResult initialize(MLIRContext *context) override {
     if (patternsFile.empty()) {

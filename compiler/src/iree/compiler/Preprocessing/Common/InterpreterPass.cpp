@@ -21,7 +21,8 @@ class InterpreterPass
     : public iree_compiler::Preprocessing::impl::InterpreterPassBase<
           InterpreterPass> {
 public:
-  using Base::Base;
+  using iree_compiler::Preprocessing::impl::InterpreterPassBase<
+      InterpreterPass>::InterpreterPassBase;
 
   void runOnOperation() override {
     MLIRContext *context = &getContext();
