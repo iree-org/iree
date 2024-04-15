@@ -11,7 +11,7 @@
 
 // Fasilitates compilation with thread sanitizer support.
 
-#ifdef IREE_SANITIZER_THREAD
+#if defined(IREE_SANITIZER_THREAD)
 
 #ifdef __cplusplus
 extern "C" {

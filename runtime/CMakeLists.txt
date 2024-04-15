@@ -31,14 +31,6 @@ iree_include_cmake_plugin_dirs(
     "iree_runtime_plugin.cmake"
 )
 
-if(NOT IREE_RUNTIME_USE_FUTEX STREQUAL "AUTO")
-  if (IREE_RUNTIME_USE_FUTEX)
-    add_compile_definitions(IREE_RUNTIME_USE_FUTEX=1)
-  else()
-    add_compile_definitions(IREE_RUNTIME_USE_FUTEX=0)
-  endif()
-endif()
-
 add_subdirectory(src)
 
 if(IREE_BUILD_PYTHON_BINDINGS)

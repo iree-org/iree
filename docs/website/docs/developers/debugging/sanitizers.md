@@ -208,15 +208,8 @@ LD_LIBRARY_PATH="$LIBSTDCXX_INSTALL_DIR/lib" \
 To enable TSan:
 
 ```shell
-cmake \
-  -DIREE_ENABLE_TSAN=ON \
-  -DIREE_RUNTIME_USE_FUTEX=OFF \
-  ...
+cmake -DIREE_ENABLE_TSAN=ON ...
 ```
-
-We disable futexes as they are not supported by TSan and we don't have
-TSan instrumentation to let TSan know what is going on.
-This will disable the IREE slim mutex and use POSIX instead.
 
 Several `_tsan` tests like
 `iree/tests/e2e/stablehlo_ops/check_llvm-cpu_local-task_tsan_abs.mlir` are

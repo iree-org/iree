@@ -97,7 +97,7 @@ static inline void iree_processor_yield(void) {
 // Cross-platform futex mappings (where supported)
 //==============================================================================
 
-#if IREE_RUNTIME_USE_FUTEX
+#if defined(IREE_RUNTIME_USE_FUTEX)
 
 // Waits in the OS for the value at the specified |address| to change.
 // If the contents of |address| do not match |expected_value| the wait will
@@ -419,7 +419,7 @@ void iree_slim_mutex_unlock(iree_slim_mutex_t* mutex)
   iree_mutex_impl_unlock(mutex);
 }
 
-#elif IREE_RUNTIME_USE_FUTEX
+#elif defined(IREE_RUNTIME_USE_FUTEX)
 
 // This implementation is a combo of several sources:
 //
@@ -619,7 +619,7 @@ bool iree_notification_commit_wait(iree_notification_t* notification,
 
 void iree_notification_cancel_wait(iree_notification_t* notification) {}
 
-#elif !IREE_RUNTIME_USE_FUTEX
+#elif !defined(IREE_RUNTIME_USE_FUTEX)
 
 // Emulation of a lock-free futex-backed notification using pthreads.
 // This is a normal cond-var-like usage with support for our prepare/cancel API

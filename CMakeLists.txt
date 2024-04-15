@@ -52,8 +52,6 @@ option(IREE_ENABLE_RUNTIME_TRACING "Enables instrumented runtime tracing." OFF)
 option(IREE_ENABLE_COMPILER_TRACING "Enables instrumented compiler tracing." OFF)
 option(IREE_ENABLE_RENDERDOC_PROFILING "Enables profiling HAL devices with the RenderDoc tool." OFF)
 option(IREE_ENABLE_THREADING "Builds IREE in with thread library support." ON)
-set(IREE_RUNTIME_USE_FUTEX "AUTO" CACHE STRING
-  "Force IREE to use futexes. Use standard CMake ON/OFF values. The default is \"AUTO\", which lets IREE decide whether to use them.")
 option(IREE_ENABLE_CLANG_TIDY "Builds IREE in with clang tidy enabled on IREE's libraries." OFF)
 
 set(IREE_TRACING_PROVIDER_DEFAULT "tracy" CACHE STRING "Default tracing implementation.")
