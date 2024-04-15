@@ -16,6 +16,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -30,6 +31,7 @@ namespace mlir::iree_compiler {
 
 using namespace IREE::LinalgExt;
 using IREE::HAL::ExecutableTargetAttr;
+using IREE::LinalgExt::getEncodingAttr;
 
 //===---------------------------------------------------------------------===//
 // Utility methods
@@ -350,7 +352,7 @@ lowerContractionOpWithEncoding(RewriterBase &rewriter,
 
     Type newResultType = newResult.getType();
 
-    auto cDims = getEncodingContractionDims(lhsEncoding);
+    auto cDims = IREE::LinalgExt::getEncodingContractionDims(lhsEncoding);
     if (cDims->batch.empty()) {
       result = rewriter.create<linalg::Mmt4DOp>(
           linalgOp.getLoc(), newResultType, ValueRange{newLhs, newRhs},

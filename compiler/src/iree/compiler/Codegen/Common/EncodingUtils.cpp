@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
@@ -13,6 +14,8 @@ namespace mlir::iree_compiler {
 
 using IREE::LinalgExt::EncodingAttr;
 using IREE::LinalgExt::EncodingRole;
+using IREE::LinalgExt::getEncodingAttr;
+using IREE::LinalgExt::getEncodingContractionDims;
 
 /// For a given tensor type with an encoding, return the materialized
 /// type to use for it. If no encoding is set, then return the tensor type
@@ -67,10 +70,6 @@ MaterializeEncodingConversionTarget::MaterializeEncodingConversionTarget(
   });
 }
 
-EncodingAttr getEncodingAttr(RankedTensorType type) {
-  return type.getEncoding().dyn_cast_or_null<EncodingAttr>();
-}
-
 static AffineMap getMapForRole(EncodingAttr encoding) {
   EncodingRole role = encoding.getRole().getValue();
   if (role == EncodingRole::LHS)
@@ -84,17 +83,7 @@ static AffineMap getMapForRole(EncodingAttr encoding) {
         .getAffineMap();
 }
 
-FailureOr<linalg::ContractionDimensions>
-getEncodingContractionDims(EncodingAttr encoding) {
-  auto indexingMapsAttr = encoding.getUserIndexingMaps();
-  SmallVector<AffineMap> indexingMaps = llvm::map_to_vector(
-      indexingMapsAttr.getValue(), [](Attribute m) -> AffineMap {
-        return cast<AffineMapAttr>(m).getAffineMap();
-      });
-  return linalg::inferContractionDims(indexingMaps);
-}
-
-/// Given the dim position of the encoding `user_indexing_maps`, return the
+// Given the dim position of the encoding `user_indexing_maps`, return the
 /// matching index of the given encoding's tensor
 static unsigned mapDimToRoleIndex(int64_t dimPos, EncodingAttr encoding) {
   AffineMap map = getMapForRole(encoding);
