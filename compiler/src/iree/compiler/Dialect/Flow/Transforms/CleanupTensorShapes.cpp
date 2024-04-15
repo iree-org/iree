@@ -5,16 +5,19 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 
 namespace mlir::iree_compiler::IREE::Flow {
 
+#define GEN_PASS_DEF_CLEANUPTENSORSHAPESPASS
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
+
 namespace {
 
-class CleanupTensorShapesPass
-    : public CleanupTensorShapesBase<CleanupTensorShapesPass> {
+struct CleanupTensorShapesPass
+    : public IREE::Flow::impl::CleanupTensorShapesPassBase<
+          CleanupTensorShapesPass> {
   void runOnOperation() override {
     // Walk ops and ensure we no longer have any tensor shape queries.
     // If we come across any shape witness ops we can erase those.
@@ -37,9 +40,5 @@ class CleanupTensorShapesPass
 };
 
 } // namespace
-
-std::unique_ptr<Pass> createCleanupTensorShapesPass() {
-  return std::make_unique<CleanupTensorShapesPass>();
-}
 
 } // namespace mlir::iree_compiler::IREE::Flow

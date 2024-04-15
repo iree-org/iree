@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
-#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "llvm/Support/CommandLine.h"
@@ -17,61 +16,55 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
-#include "mlir/Dialect/Transform/Transforms/TransformInterpreterPassBase.h"
+#include "mlir/Dialect/Transform/Transforms/TransformInterpreterUtils.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Support/LLVM.h"
 
 namespace mlir::iree_compiler::IREE::Flow {
 
+#define GEN_PASS_DEF_DISPATCHWITHTRANSFORMDIALECTPASS
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
+
 /// Pass declaration.
 /// Interpreter pass that applies transform dialect ops for dispatch region
 /// formation. This needs to be its own pass because the registration mechanism
 /// and ops available are different than for other interpreters.
-class DispatchWithTransformDialect
-    : public mlir::transform::TransformInterpreterPassBase<
-          DispatchWithTransformDialect, DispatchWithTransformDialectBase> {
-  void getDependentDialects(DialectRegistry &registry) const override {
-    // clang-format off
-    registry.insert<mlir::iree_compiler::IREE::LinalgExt::IREELinalgExtDialect,
-                    IREE::Flow::FlowDialect,
-                    affine::AffineDialect,
-                    arith::ArithDialect,
-                    linalg::LinalgDialect,
-                    pdl::PDLDialect,
-                    pdl_interp::PDLInterpDialect,
-                    scf::SCFDialect,
-                    tensor::TensorDialect,
-                    transform::TransformDialect
-    >();
-    // clang-format on
-  }
-
+namespace {
+class DispatchWithTransformDialectPass
+    : public IREE::Flow::impl::DispatchWithTransformDialectPassBase<
+          DispatchWithTransformDialectPass> {
 public:
-  DispatchWithTransformDialect(StringRef transformFileName,
-                               StringRef debugPayloadRootTag = StringRef(),
-                               StringRef debugTransformRootTag = StringRef()) {
-    this->transformFileName = transformFileName.str();
-    this->debugPayloadRootTag = debugPayloadRootTag.str();
-    this->debugTransformRootTag = debugTransformRootTag.str();
-  }
-  DispatchWithTransformDialect(const DispatchWithTransformDialect &pass)
-      : TransformInterpreterPassBase(pass) {
-    this->transformFileName = pass.transformFileName;
-    this->debugPayloadRootTag = pass.debugPayloadRootTag;
-    this->debugTransformRootTag = pass.debugTransformRootTag;
+  using IREE::Flow::impl::DispatchWithTransformDialectPassBase<
+      DispatchWithTransformDialectPass>::DispatchWithTransformDialectPassBase;
+  void runOnOperation() override {
+    MLIRContext *context = &getContext();
+    // Load the module from the spec path. The module will be unloaded once the
+    // pass finishes.
+    OwningOpRef<ModuleOp> transformModule;
+    if (failed(transform::detail::assembleTransformLibraryFromPaths(
+            context, transformSpecPath, transformModule)))
+      return signalPassFailure();
+    Operation *payloadRoot = getOperation();
+    Operation *transformEntryPoint = transform::detail::findTransformEntryPoint(
+        getOperation(), *transformModule, "__transform_main");
+    if (!transformEntryPoint) {
+      getOperation()->emitError() << "could not find transform entry point "
+                                     "__transform_main in transform module";
+      return signalPassFailure();
+    }
+
+    if (failed(transform::applyTransformNamedSequence(
+            payloadRoot, transformEntryPoint, *transformModule,
+            options.enableExpensiveChecks(!disableExpensiveChecks)))) {
+      return signalPassFailure();
+    }
   }
 
 private:
-  Statistic numDispatches{this, "number of dispatches",
-                          "Number of Flow dispatches created"};
+  /// Transform interpreter options.
+  transform::TransformOptions options;
 };
 
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createDispatchWithTransformDialect(StringRef transformFileName,
-                                   StringRef debugPayloadRootTag,
-                                   StringRef debugTransformRootTag) {
-  return std::make_unique<DispatchWithTransformDialect>(
-      transformFileName, debugPayloadRootTag, debugTransformRootTag);
-}
+} // namespace
 
 } // namespace mlir::iree_compiler::IREE::Flow

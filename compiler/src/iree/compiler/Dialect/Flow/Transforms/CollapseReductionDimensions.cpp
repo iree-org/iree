@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -13,6 +12,9 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler::IREE::Flow {
+
+#define GEN_PASS_DEF_COLLAPSEREDUCTIONDIMENSIONSPASS
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
 
 namespace {
 
@@ -66,11 +68,9 @@ collapseDimensions(linalg::LinalgOp linalgOp) {
   return collapseIndices;
 }
 
-struct CollapseDimsPass : public CollapseDimsBase<CollapseDimsPass> {
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg::LinalgDialect>();
-  }
-
+struct CollapseReductionDimensionsPass
+    : public IREE::Flow::impl::CollapseReductionDimensionsPassBase<
+          CollapseReductionDimensionsPass> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     linalg::populateCollapseDimensions(patterns, collapseDimensions);
@@ -82,9 +82,5 @@ struct CollapseDimsPass : public CollapseDimsBase<CollapseDimsPass> {
 };
 
 } // namespace
-
-std::unique_ptr<Pass> createCollapseDimsPass() {
-  return std::make_unique<CollapseDimsPass>();
-}
 
 } // namespace mlir::iree_compiler::IREE::Flow

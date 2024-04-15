@@ -36,7 +36,7 @@ public:
         getOperation(), *transformModule, "__transform_main");
     if (!transformEntryPoint) {
       getOperation()->emitError() << "could not find transform entry point "
-                                     "__preprocessing_main in transform module";
+                                     "__transform_main in transform module";
       return signalPassFailure();
     }
 

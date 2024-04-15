@@ -11,7 +11,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -19,6 +18,9 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler::IREE::Flow {
+
+#define GEN_PASS_DEF_INTERCHANGEGENERICOPSPASS
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
 
 namespace {
 
@@ -52,11 +54,8 @@ struct GenericOpInterchangePattern
 };
 
 struct InterchangeGenericOpsPass
-    : public InterchangeGenericOpsBase<InterchangeGenericOpsPass> {
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg::LinalgDialect>();
-  }
-
+    : public IREE::Flow::impl::InterchangeGenericOpsPassBase<
+          InterchangeGenericOpsPass> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
     patterns.add<GenericOpInterchangePattern>(&getContext());
@@ -68,9 +67,5 @@ struct InterchangeGenericOpsPass
 };
 
 } // namespace
-
-std::unique_ptr<Pass> createInterchangeGenericOpsPass() {
-  return std::make_unique<InterchangeGenericOpsPass>();
-}
 
 } // namespace mlir::iree_compiler::IREE::Flow

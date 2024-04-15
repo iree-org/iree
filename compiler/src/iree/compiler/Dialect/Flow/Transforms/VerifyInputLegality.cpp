@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Utils/ConversionUtils.h"
 #include "mlir/Dialect/Tosa/IR/TosaOps.h"
@@ -14,9 +13,14 @@
 
 namespace mlir::iree_compiler::IREE::Flow {
 
+#define GEN_PASS_DEF_VERIFYINPUTLEGALITYPASS
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
+
 namespace {
-class VerifyInputLegalityPass
-    : public VerifyInputLegalityBase<VerifyInputLegalityPass> {
+
+struct VerifyInputLegalityPass
+    : public IREE::Flow::impl::VerifyInputLegalityPassBase<
+          VerifyInputLegalityPass> {
   void runOnOperation() override {
     ConversionTarget target(getContext());
     target.markUnknownOpDynamicallyLegal([](Operation *) { return true; });
@@ -35,9 +39,5 @@ class VerifyInputLegalityPass
   }
 };
 } // namespace
-
-std::unique_ptr<Pass> createVerifyInputLegalityPass() {
-  return std::make_unique<VerifyInputLegalityPass>();
-}
 
 } // namespace mlir::iree_compiler::IREE::Flow

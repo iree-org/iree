@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "llvm/Support/Debug.h"
@@ -20,19 +19,15 @@
 
 namespace mlir::iree_compiler::IREE::Flow {
 
+#define GEN_PASS_DEF_FORMSCALARDISPATCHESPASS
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
+
 namespace {
 
 /// Pass declaration.
 struct FormScalarDispatchesPass
-    : public FormScalarDispatchesBase<FormScalarDispatchesPass> {
-  using FormScalarDispatchesBase<
-      FormScalarDispatchesPass>::FormScalarDispatchesBase;
-
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<affine::AffineDialect, IREE::Flow::FlowDialect,
-                    linalg::LinalgDialect, tensor::TensorDialect>();
-  }
-
+    : public IREE::Flow::impl::FormScalarDispatchesPassBase<
+          FormScalarDispatchesPass> {
   void runOnOperation() override;
 };
 } // namespace
@@ -267,11 +262,6 @@ void FormScalarDispatchesPass::runOnOperation() {
     rewriter.create<Flow::ReturnOp>(dispatchRegionOp.value()->getLoc(),
                                     ValueRange{one, one, one});
   }
-}
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createFormScalarDispatchesPass() {
-  return std::make_unique<FormScalarDispatchesPass>();
 }
 
 } // namespace mlir::iree_compiler::IREE::Flow
