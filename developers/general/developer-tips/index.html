@@ -3934,8 +3934,8 @@ then resume compilation and continue through the pipeline:</p>
 each phase, much like <code>--compile-to</code> but without exiting early:</p>
 <div class="highlight"><pre><span></span><code><span class="gp">$ </span>iree-compile<span class="w"> </span>simple_abs.mlir<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--iree-hal-target-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
-<span class="hll"><span class="w">  </span>--dump-compilation-phases-to<span class="o">=</span>/tmp/iree/simple_abs
-</span><span class="go">  -o /tmp/iree/simple_abs/simple_abs_cpu.vmfb</span>
+<span class="hll"><span class="w">  </span>--dump-compilation-phases-to<span class="o">=</span>/tmp/iree/simple_abs<span class="w"> </span><span class="se">\</span>
+</span><span class="w">  </span>-o<span class="w"> </span>/tmp/iree/simple_abs/simple_abs_cpu.vmfb
 
 <span class="gp">$ </span>ls<span class="w"> </span>/tmp/iree/simple_abs<span class="w"> </span>-1v
 
