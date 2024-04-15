@@ -168,27 +168,45 @@ void buildGlobalOptimizationPassPipeline(
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass);
 
-  OpPassManager pipeline(ModuleOp::getOperationName());
-  FunctionLikeNest(pipeline)
-      // Simplify util.global accesses early on; this can help with dispatch
-      // region formation as redundant store-loads are removed.
+  // Simplify util.global accesses early on; this can help with dispatch
+  // region formation as redundant store-loads are removed.
+  FunctionLikeNest(mainPassManager)
       .addPass(IREE::Util::createSimplifyGlobalAccessesPass);
 
   // Module level cleanup and canonicalization of util.global (and other
   // util ops).
-  pipeline.addPass(IREE::Util::createApplyPatternsPass());
-  pipeline.addPass(IREE::Util::createFoldGlobalsPass());
-  pipeline.addPass(IREE::Util::createIPOPass());
-  pipeline.addPass(createCanonicalizerPass());
-  pipeline.addPass(createCSEPass());
+  mainPassManager.addPass(IREE::Util::createApplyPatternsPass());
+  mainPassManager.addPass(IREE::Util::createFoldGlobalsPass());
+  mainPassManager.addPass(IREE::Util::createIPOPass());
+  mainPassManager.addPass(createCanonicalizerPass());
+  mainPassManager.addPass(createCSEPass());
 
   if (transformOptions.options.constExprHoisting) {
-    buildGlobalOptExprHoistingPassPipeline(pipeline, transformOptions);
+    buildGlobalOptExprHoistingPassPipeline(mainPassManager, transformOptions);
   }
 
   if (transformOptions.buildConstEvalPassPipeline) {
-    transformOptions.buildConstEvalPassPipeline(pipeline);
+    transformOptions.buildConstEvalPassPipeline(mainPassManager);
   }
+
+  if (transformOptions.options.numericPrecisionReduction) {
+    mainPassManager.addPass(createInferNumericNarrowingPass());
+    mainPassManager.addPass(createOptimizeNumericsPass());
+    mainPassManager.addPass(createCleanupNumericNarrowingPass());
+  }
+
+  FunctionLikeNest(mainPassManager)
+      .addPass(mlir::createCanonicalizerPass)
+      .addPass(mlir::createCSEPass);
+
+  FunctionLikeNest(mainPassManager)
+      // After running const-eval to a fixed point and folding unit extent dims,
+      // try any new raising opportunities.
+      .addPass(createRaiseSpecialOps)
+      // Strip std.assert & co after we perform optimizations; prior to this we
+      // may use the assertions to derive information during analysis.
+      .addPredicatedPass(transformOptions.options.stripAssertions,
+                         IREE::Util::createStripDebugOpsPass);
 
   // Export after const-eval. If the user wants to keep the input constants
   // as is in the final parameter archive, they will probably want to disable
@@ -205,7 +223,7 @@ void buildGlobalOptimizationPassPipeline(
         transformOptions.options.parameterExportScope;
     exportParametersOptions.minimumSize =
         transformOptions.options.minimumParameterExportSize;
-    pipeline.addPass(IREE::IO::Parameters::createExportParametersPass(
+    mainPassManager.addPass(IREE::IO::Parameters::createExportParametersPass(
         exportParametersOptions));
   }
 
@@ -214,33 +232,10 @@ void buildGlobalOptimizationPassPipeline(
         generateSplatOptions;
     generateSplatOptions.archivePath =
         transformOptions.options.splatParameterArchiveExportPath;
-    pipeline.addPass(
+    mainPassManager.addPass(
         IREE::IO::Parameters::createGenerateSplatParameterArchivePass(
             generateSplatOptions));
   }
-
-  if (transformOptions.options.numericPrecisionReduction) {
-    pipeline.addPass(createInferNumericNarrowingPass());
-    pipeline.addPass(createOptimizeNumericsPass());
-    pipeline.addPass(createCleanupNumericNarrowingPass());
-  }
-
-  FunctionLikeNest(pipeline)
-      .addPass(mlir::createCanonicalizerPass)
-      .addPass(mlir::createCSEPass);
-
-  // Add the whole fixed point iterator.
-  mainPassManager.addPass(
-      IREE::Util::createFixedPointIteratorPass(std::move(pipeline)));
-
-  FunctionLikeNest(mainPassManager)
-      // After running const-eval to a fixed point and folding unit extent dims,
-      // try any new raising opportunities.
-      .addPass(createRaiseSpecialOps)
-      // Strip std.assert & co after we perform optimizations; prior to this we
-      // may use the assertions to derive information during analysis.
-      .addPredicatedPass(transformOptions.options.stripAssertions,
-                         IREE::Util::createStripDebugOpsPass);
 }
 
 namespace {
