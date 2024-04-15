@@ -182,6 +182,39 @@ void Explorer::forEachGlobal(std::function<void(const GlobalInfo *)> fn) {
   }
 }
 
+void Explorer::forEachInitializer(
+    std::function<void(IREE::Util::InitializerOpInterface)> fn) {
+  for (auto &region : rootOp->getRegions()) {
+    for (auto initializerOp :
+         region.getOps<IREE::Util::InitializerOpInterface>()) {
+      fn(initializerOp);
+    }
+  }
+}
+
+void Explorer::forEachFunction(std::function<void(FunctionOpInterface)> fn) {
+  for (auto &scc : llvm::make_range(llvm::scc_begin(&callGraph),
+                                    llvm::scc_end(&callGraph))) {
+    for (auto *node : scc) {
+      if (node->isExternal())
+        continue;
+      auto parentOp =
+          node->getCallableRegion()->getParentOfType<FunctionOpInterface>();
+      if (parentOp && parentOp->getParentOp() == rootOp)
+        fn(parentOp);
+    }
+  }
+}
+
+void Explorer::forEachFunctionLikeOp(
+    std::function<void(FunctionOpInterface)> fn) {
+  forEachInitializer([=](IREE::Util::InitializerOpInterface op) {
+    if (auto funcOp = dyn_cast<FunctionOpInterface>(op.getOperation()))
+      fn(funcOp);
+  });
+  forEachFunction(fn);
+}
+
 bool Explorer::mayValuesAlias(Value a, Value b) {
   if (a == b)
     return true;

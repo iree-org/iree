@@ -47,11 +47,12 @@ iree_cc_library(
     ::Runtime
     LLVMSupport
     MLIRArithDialect
-    MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR
     MLIRPass
     iree::compiler::Dialect::HAL::Target
+    iree::compiler::Dialect::Util::Analysis::Constant
+    iree::compiler::Dialect::Util::IR
     iree::compiler::Pipelines
     iree::compiler::Utils
   PUBLIC
