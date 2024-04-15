@@ -56,6 +56,8 @@
 #endif  // IREE_PLATFORM_*
 
 #if defined(IREE_PLATFORM_HAS_FUTEX) && !defined(IREE_SANITIZER_THREAD)
+// TODO: If we have TSan instrumentation for futexes we can enabled them when
+// compiling with TSan.
 #define IREE_RUNTIME_USE_FUTEX 1
 #endif  // IREE_PLATFORM_HAS_FUTEX
 

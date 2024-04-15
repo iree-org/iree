@@ -9,7 +9,7 @@
 #include <string.h>
 
 #include "iree/base/api.h"
-#include "iree/base/internal/tsan.h"
+#include "iree/base/internal/debugging.h"
 #include "iree/hal/allocator.h"
 #include "iree/hal/buffer.h"
 #include "iree/hal/buffer_heap_impl.h"
