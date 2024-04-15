@@ -2894,7 +2894,8 @@ EncodingAttr EncodingAttr::get(MLIRContext *ctx, EncodingRole role,
                                ArrayRef<Type> elemTypes, Type origType,
                                std::optional<int64_t> matmulNarrowM,
                                std::optional<int64_t> matmulNarrowN,
-                               ArrayRef<AffineMap> maps) {
+                               ArrayRef<AffineMap> maps,
+                               ArrayRef<int64_t> roundDimsTo) {
   Builder b(ctx);
   auto optionalToAttr = [&](std::optional<int64_t> x) {
     return x ? b.getIndexAttr(*x) : IntegerAttr();
@@ -2903,7 +2904,7 @@ EncodingAttr EncodingAttr::get(MLIRContext *ctx, EncodingRole role,
   auto origTypeAttr = origType ? TypeAttr::get(origType) : TypeAttr();
   return get(ctx, roleAttr, b.getTypeArrayAttr(elemTypes), origTypeAttr,
              optionalToAttr(matmulNarrowM), optionalToAttr(matmulNarrowN),
-             b.getAffineMapArrayAttr(maps));
+             b.getAffineMapArrayAttr(maps), roundDimsTo);
 }
 
 AffineMap EncodingAttr::getMapForRole() {

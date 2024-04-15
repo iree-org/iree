@@ -93,7 +93,9 @@ def EncodingAttr :
     // TODO(#15466): generalize matmul_narrow_{M,N} into a list?
     OptionalParameter<"IntegerAttr", "optional M narrow dimension size (only for contraction op user_indexing_maps)">:$matmul_narrow_M,
     OptionalParameter<"IntegerAttr", "optional N narrow dimension size (only for contraction op user_indexing_maps)">:$matmul_narrow_N,
-    OptionalParameter<"ArrayAttr", "Indexing maps of the operation using this tensor">:$user_indexing_maps
+    OptionalParameter<"ArrayAttr", "Indexing maps of the operation using this tensor">:$user_indexing_maps,
+    // TODO(hanchung): The round_dims_to parameter can be revisited. We explicitly map them to M,N,K dimension for now.
+    OptionalArrayRefParameter<"int64_t", "Values for padding M,N,K dimensions">:$round_dims_to
   );
 
   let builders = [
@@ -101,7 +103,8 @@ def EncodingAttr :
         "ArrayRef<Type>":$elemTypes, "Type":$origType,
         CArg<"std::optional<int64_t>", "{}">:$matmulNarrowM,
         CArg<"std::optional<int64_t>", "{}">:$matmulNarrowN,
-        CArg<"ArrayRef<AffineMap>", "{}">:$maps)>
+        CArg<"ArrayRef<AffineMap>", "{}">:$maps,
+        CArg<"ArrayRef<int64_t>", "{}">:$roundDimsTo)>
   ];
 
   let extraClassDeclaration = [{
