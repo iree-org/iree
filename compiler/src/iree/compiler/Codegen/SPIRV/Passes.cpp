@@ -348,11 +348,16 @@ void addSPIRVWinogradVectorizePassPipeline(OpPassManager &funcPassManager) {
   addTileAndDistributeToWorkgroupsPasses(
       funcPassManager, /*useFuseTensorPadWithConsumerPass=*/true);
 
-  funcPassManager.addPass(
-      IREE::LinalgExt::createTileAndDecomposeWinogradTransformPass());
   funcPassManager.addPass(createFoldAffineMinInDistributedLoopsPass());
   funcPassManager.addPass(memref::createResolveShapedTypeResultDimsPass());
 
+  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createCSEPass());
+
+  funcPassManager.addPass(createGPUCreateFastSlowPathPass());
+  funcPassManager.addPass(createSPIRVTilePass());
+  funcPassManager.addPass(
+      IREE::LinalgExt::createDecomposeWinogradTransformPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 

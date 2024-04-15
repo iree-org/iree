@@ -1497,6 +1497,48 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
       entryPointFn, fftOp, tileSizes, DispatchLoweringPassPipeline::CPUDefault);
 }
 
+/// Sets the lowering configuration for dispatch region for
+/// linalg_ext.winograd.input_transform root op.
+static LogicalResult
+setRootConfig(mlir::FunctionOpInterface entryPointFn,
+              IREE::LinalgExt::WinogradInputTransformOp inputOp) {
+  assert(!getLoweringConfig(inputOp) && "expected lowering_config is not set");
+  auto outShape = inputOp.getOutputOperandType().getShape();
+  SmallVector<int64_t> distTileSizes(outShape.begin() + 2, outShape.end());
+  distTileSizes = llvm::map_to_vector(distTileSizes, [](int64_t size) {
+    return std::min<int64_t>(size, clDefaultDistTileSize);
+  });
+  distTileSizes[1] = distTileSizes[2] = 0;
+  TileSizesListType tileSizes;
+  tileSizes.push_back(distTileSizes);
+  SmallVector<int64_t> vecTileSizes(4, 1);
+  tileSizes.push_back(vecTileSizes);
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, inputOp, tileSizes,
+      DispatchLoweringPassPipeline::CPULinalgExtTileAndVectorize);
+}
+
+/// Sets the lowering configuration for dispatch region for
+/// linalg_ext.winograd.input_transform root op.
+static LogicalResult
+setRootConfig(mlir::FunctionOpInterface entryPointFn,
+              IREE::LinalgExt::WinogradOutputTransformOp outputOp) {
+  assert(!getLoweringConfig(outputOp) && "expected lowering_config is not set");
+  auto inShape = outputOp.getInputOperandType().getShape();
+  SmallVector<int64_t> distTileSizes(inShape.begin() + 2, inShape.end());
+  distTileSizes = llvm::map_to_vector(distTileSizes, [](int64_t size) {
+    return std::min<int64_t>(size, clDefaultDistTileSize);
+  });
+  distTileSizes[1] = distTileSizes[2] = 0;
+  TileSizesListType tileSizes;
+  tileSizes.push_back(distTileSizes);
+  SmallVector<int64_t> vecTileSizes(4, 1);
+  tileSizes.push_back(vecTileSizes);
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, outputOp, tileSizes,
+      DispatchLoweringPassPipeline::CPULinalgExtTileAndVectorize);
+}
+
 static void setX86VectorTileSizes(linalg::GenericOp genericOp,
                                   unsigned numLoops,
                                   ArrayRef<int64_t> distTileSizes,
@@ -2060,7 +2102,9 @@ setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
                                targetMLTransInfo);
         })
         .Case<IREE::LinalgExt::AttentionOp, IREE::LinalgExt::FftOp,
-              tensor::PackOp, tensor::PadOp, tensor::UnPackOp, linalg::Mmt4DOp,
+              IREE::LinalgExt::WinogradInputTransformOp,
+              IREE::LinalgExt::WinogradOutputTransformOp, tensor::PackOp,
+              tensor::PadOp, tensor::UnPackOp, linalg::Mmt4DOp,
               linalg::BatchMmt4DOp>(
             [&](auto op) { return setRootConfig(entryPointFn, op); })
         .Case<linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNchwFchwOp,
