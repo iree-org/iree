@@ -28,6 +28,7 @@
 
 namespace mlir::iree_compiler::Preprocessing {
 namespace {
+
 static Value getPaddedValue(RewriterBase &rewriter, Location loc,
                             Value padSource, ArrayRef<int64_t> padding) {
   auto sourceType = cast<RankedTensorType>(padSource.getType());
@@ -51,7 +52,6 @@ static Value getPaddedValue(RewriterBase &rewriter, Location loc,
 
 static void padConvOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
                       ArrayRef<GPUMatmulShapeType> intrinsics) {
-  // Operation *op = linalgOp.getOperation();
   if (!isa<linalg::ConvolutionOpInterface>(*linalgOp)) {
     return;
   }
@@ -265,7 +265,7 @@ struct PadToIntrinsicsPass final : PadToIntrinsicsBase<PadToIntrinsicsPass> {
     });
 
     IRRewriter rewriter(context);
-    for (auto linalgOp : llvm::make_early_inc_range(targetOps)) {
+    for (linalg::LinalgOp linalgOp : llvm::make_early_inc_range(targetOps)) {
       rewriter.setInsertionPoint(linalgOp);
       TypeSwitch<Operation *, void>(linalgOp.getOperation())
           .Case<linalg::Conv2DNhwcHwcfOp>([&](linalg::Conv2DNhwcHwcfOp convOp) {
