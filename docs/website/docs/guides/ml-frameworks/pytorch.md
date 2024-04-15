@@ -16,7 +16,7 @@ icon: simple/pytorch
     with us.
 
     Stay tuned and join the discussion in our
-    [Discord server](https://discord.gg/26P4xW4)'s `#pytorch` channel.
+    [Discord server](https://discord.gg/wEWh6Z9nMU)'s `#pytorch` channel.
 
 ## :octicons-book-16: Overview
 
