@@ -17,7 +17,7 @@ iree_runtime_cc_library(
     name = "utils",
     hdrs = ["semaphore.h"],
     deps = [
-               "//runtime/src/iree/base",
-               "//runtime/src/iree/hal",
-           ]
+        "//runtime/src/iree/base",
+        "//runtime/src/iree/hal",
+    ],
 )
