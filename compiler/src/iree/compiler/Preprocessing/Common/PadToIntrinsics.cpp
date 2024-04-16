@@ -104,7 +104,7 @@ static void padConvOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
   for (const GPUMatmulShapeType &intrinsic : intrinsics) {
     std::optional<int64_t> mPadding, nPadding, kPadding;
     auto getPadding = [](int64_t value, int64_t padTo) {
-      return ((value + padTo - 1) / padTo) * padTo - value;
+      return llvm::divideCeil(value, padTo) * padTo - value;
     };
 
     if (mSize % intrinsic.mSize != 0) {
@@ -175,68 +175,6 @@ static void padConvOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
   rewriter.replaceOp(linalgOp, extracted);
 }
 
-static void padBatchGemmOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
-                           ArrayRef<GPUMatmulShapeType> intrinsics) {
-  if (!isa<linalg::BatchMatmulOp>(linalgOp)) {
-    return;
-  }
-
-  // Try to search for pad value.
-  SmallVector<int64_t, 4> bounds = linalgOp.getStaticLoopRanges();
-  int64_t mSize = bounds[1];
-  if (ShapedType::isDynamic(mSize)) {
-    return;
-  }
-  SmallVector<std::array<int64_t, 3>> mnkPaddingCandidates;
-  for (const GPUMatmulShapeType &intrinsic : intrinsics) {
-    std::optional<int64_t> mPadding, nPadding, kPadding;
-    auto getPadding = [](int64_t value, int64_t padTo) {
-      return ((value + padTo - 1) / padTo) * padTo - value;
-    };
-
-    if (mSize % intrinsic.mSize != 0) {
-      mPadding = getPadding(mSize, intrinsic.mSize);
-    }
-
-    if (!mPadding && !nPadding && !kPadding) {
-      // Some intrinsic matches. Nothing to do.
-      return;
-    }
-    mnkPaddingCandidates.push_back(
-        {mPadding.value_or(0), nPadding.value_or(0), kPadding.value_or(0)});
-  }
-  if (mnkPaddingCandidates.empty()) {
-    return;
-  }
-  std::array<int64_t, 3> mnkPadding = mnkPaddingCandidates.front();
-
-  Value newLhs = linalgOp.getDpsInputOperand(0)->get();
-  Value newRhs = linalgOp.getDpsInputOperand(1)->get();
-  Value newOuts = linalgOp.getDpsInitOperand(0)->get();
-
-  Location loc = linalgOp.getLoc();
-  int64_t mPadding = mnkPadding[0];
-  assert(mPadding != 0);
-  newLhs = getPaddedValue(rewriter, loc, newLhs, {0, mPadding, 0});
-  newOuts = getPaddedValue(rewriter, loc, newOuts, {0, mPadding, 0});
-  linalg::LinalgOp paddedMatmulOp =
-      mlir::clone(rewriter, linalgOp, {newOuts.getType()},
-                  ArrayRef<Value>{newLhs, newRhs, newOuts});
-
-  // Extract slice.
-  IntegerAttr zero = rewriter.getI64IntegerAttr(0);
-  IntegerAttr one = rewriter.getI64IntegerAttr(1);
-  SmallVector<OpFoldResult> offsets(3, zero);
-  SmallVector<OpFoldResult> strides(3, one);
-  auto resultType = linalgOp->getResult(0).getType().cast<RankedTensorType>();
-  auto resultShape = resultType.getShape();
-  SmallVector<OpFoldResult> sizes = {rewriter.getIndexAttr(resultShape[0]),
-                                     rewriter.getIndexAttr(resultShape[1]),
-                                     rewriter.getIndexAttr(resultShape[2])};
-  rewriter.replaceOpWithNewOp<tensor::ExtractSliceOp>(
-      linalgOp, paddedMatmulOp->getResults()[0], offsets, sizes, strides);
-}
-
 struct PadToIntrinsicsPass final
     : impl::PadToIntrinsicsBase<PadToIntrinsicsPass> {
   void runOnOperation() override {
@@ -271,16 +209,11 @@ struct PadToIntrinsicsPass final
     });
 
     IRRewriter rewriter(context);
-    for (linalg::LinalgOp linalgOp : llvm::make_early_inc_range(targetOps)) {
-      rewriter.setInsertionPoint(linalgOp);
-      TypeSwitch<Operation *, void>(linalgOp.getOperation())
-          .Case<linalg::Conv2DNhwcHwcfOp>([&](linalg::Conv2DNhwcHwcfOp convOp) {
-            padConvOp(rewriter, linalgOp, intrinsics);
-          })
-          .Case<linalg::BatchMatmulOp>([&](linalg::BatchMatmulOp matmulOp) {
-            // padBatchGemmOp(rewriter, linalgOp, intrinsics);
-          })
-          .Default([&](Operation *op) {});
+    for (Operation *linalgOp : llvm::make_early_inc_range(targetOps)) {
+      if (auto convOp = dyn_cast<linalg::Conv2DNhwcHwcfOp>(linalgOp)) {
+        rewriter.setInsertionPoint(convOp);
+        padConvOp(rewriter, convOp, intrinsics);
+      }
     }
   }
 };
