@@ -12,7 +12,6 @@
 #include "stablehlo/dialect/ChloOps.h"
 #include "stablehlo/dialect/StablehloOps.h"
 #include "stablehlo/dialect/VhloOps.h"
-#include "stablehlo/transforms/Passes.h"
 
 namespace mlir::iree_compiler::stablehlo {
 
@@ -109,10 +108,6 @@ struct StableHLOSession
     } else if (typeMnemonic == "stablehlo_xla") {
       buildStableHLOXLAInputConversionPassPipeline(passManager,
                                                    stableHloOptions);
-      return true;
-    } else if (typeMnemonic == "vhlo") {
-      ::mlir::stablehlo::createStablehloDeserializePipeline(passManager);
-      buildStableHLOInputConversionPassPipeline(passManager, stableHloOptions);
       return true;
     }
 

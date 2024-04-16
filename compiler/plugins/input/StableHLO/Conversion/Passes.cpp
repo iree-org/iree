@@ -19,6 +19,8 @@
 #include "mlir/Pass/PassOptions.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
+#include "stablehlo/dialect/VhloOps.h"
+#include "stablehlo/transforms/Passes.h"
 
 namespace mlir::iree_compiler::stablehlo {
 namespace {
@@ -40,6 +42,11 @@ void registerStableHLOConversionPassPipeline() {
 // Prepare HLO for use as an input to the Flow dialect.
 void buildStableHLOInputConversionPassPipelineImpl(
     OpPassManager &passManager, const StableHloOptions &options, bool detuple) {
+  // if the input is VHLO, then it is automatically converted to Stablehlo
+  // otherwise, this pass is considered a NOP.
+  // Note: Having StableHLO and VHLO in the same function is considered
+  // undefined behavior.
+  ::mlir::stablehlo::createStablehloDeserializePipeline(passManager);
   passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());
   passManager.addNestedPass<func::FuncOp>(createStableHLOCanonicalize());
   passManager.addNestedPass<func::FuncOp>(mlir::createCSEPass());

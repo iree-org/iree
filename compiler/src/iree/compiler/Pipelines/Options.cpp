@@ -44,9 +44,8 @@ void InputDialectOptions::bindOptions(OptionsBinder &binder) {
 // messages, so we err on the side of being helpful and populating plugin
 // options here, even though it is a layering violation.
 #ifdef IREE_COMPILER_PLUGIN_HAVE_STATIC_INPUT_STABLEHLO
-          "  =stablehlo     - Legalize from StableHLO ops.\n"
-          "  =stablehlo_xla - Legalize from StableHLO ops (with XLA cleanup preprocessing).\n"
-          "  =vhlo          - Legalize from VHLO ops (VHLO is translated to StableHLO).\n"
+          "  =stablehlo     - Legalize from StableHLO ops (Do VHLO to StableHLO conversion ap priori, if necessary).\n"
+          "  =stablehlo_xla - Legalize from StableHLO ops (with XLA cleanup preprocessing and VHLO to StableHLO conversion, if necessary).\n"
 #endif // IREE_COMPILER_PLUGIN_HAVE_STATIC_INPUT_STABLEHLO
 #ifdef IREE_COMPILER_PLUGIN_HAVE_STATIC_INPUT_TOSA
           "  =tosa          - Legalize from TOSA ops.\n"
