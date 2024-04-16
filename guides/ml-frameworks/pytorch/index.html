@@ -720,6 +720,14 @@
     PyTorch
   </span>
   
+    
+  
+  
+    <span class="md-status md-status--new" title="Recently updated">
+    </span>
+  
+
+  
 
           <span class="md-nav__icon md-icon"></span>
         </label>
@@ -732,6 +740,14 @@
   <span class="md-ellipsis">
     PyTorch
   </span>
+  
+    
+  
+  
+    <span class="md-status md-status--new" title="Recently updated">
+    </span>
+  
+
   
 
       </a>
@@ -851,26 +867,6 @@
         
       </ul>
     </nav>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#alternate-workflows" class="md-nav__link">
-    Alternate workflows
-  </a>
-  
-    <nav class="md-nav" aria-label="Alternate workflows">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#native-on-device-training" class="md-nav__link">
-    Native / on-device training
-  </a>
   
 </li>
         
@@ -3486,26 +3482,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#alternate-workflows" class="md-nav__link">
-    Alternate workflows
-  </a>
-  
-    <nav class="md-nav" aria-label="Alternate workflows">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#native-on-device-training" class="md-nav__link">
-    Native / on-device training
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -3559,7 +3535,8 @@ with us.</p>
 <a href="https://discord.gg/wEWh6Z9nMU">Discord server</a>'s <code>#pytorch</code> channel.</p>
 </div>
 <h2 id="overview"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.743 3.743 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Zm7.251 10.324.004-5.073-.002-2.253A2.25 2.25 0 0 0 5.003 2.5H1.5v9h3.757a3.75 3.75 0 0 1 1.994.574ZM8.755 4.75l-.004 7.322a3.752 3.752 0 0 1 1.992-.572H14.5v-9h-3.495a2.25 2.25 0 0 0-2.25 2.25Z"/></svg></span> Overview<a class="headerlink" href="#overview" title="Permanent link">link</a></h2>
-<p><a href="https://github.com/nod-ai/SHARK-Turbine">SHARK-Turbine</a> offers a tight
+<p><a href="https://pypi.org/project/iree-turbine/">iree-turbine</a> (rebrand pending from
+<a href="https://github.com/nod-ai/SHARK-Turbine">SHARK-Turbine</a>) offers a tight
 integration between compatible versions of IREE,
 <a href="https://github.com/llvm/torch-mlir">torch-mlir</a>, and
 <a href="https://pytorch.org/">PyTorch</a>.</p>
@@ -3573,14 +3550,14 @@ integration between compatible versions of IREE,
   accTitle: PyTorch integration overview
   accDescr {
     PyTorch programs can be optimized within a Python session with
-    SHARK-Turbine's just-in-time tools.
+    iree-turbine's just-in-time tools.
     PyTorch programs can be exported out of Python to native binaries using
-    SHARK-Turbine's ahead-of-time export toolkit.
+    iree-turbine's ahead-of-time export toolkit.
   }
 
   subgraph Python
     pytorch(PyTorch)
-    subgraph turbine [SHARK-Turbine]
+    subgraph turbine [iree-turbine]
       jit("Eager execution (JIT)")
       aot("Export toolkit (AOT)")
     end
@@ -3596,8 +3573,12 @@ integration between compatible versions of IREE,
 
   aot -.-&gt; binary</code></pre>
 <h2 id="prerequisites"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M2.75 14A1.75 1.75 0 0 1 1 12.25v-2.5a.75.75 0 0 1 1.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 0 0 .25-.25v-2.5a.75.75 0 0 1 1.5 0v2.5A1.75 1.75 0 0 1 13.25 14Z"/><path d="M7.25 7.689V2a.75.75 0 0 1 1.5 0v5.689l1.97-1.969a.749.749 0 1 1 1.06 1.06l-3.25 3.25a.749.749 0 0 1-1.06 0L4.22 6.78a.749.749 0 1 1 1.06-1.06l1.97 1.969Z"/></svg></span> Prerequisites<a class="headerlink" href="#prerequisites" title="Permanent link">link</a></h2>
-<p>Install Turbine and its requirements:</p>
-<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>shark-turbine
+<p>Install a recent version of PyTorch (<code>2.3.0+</code>, prerelease as of April 2024):</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--pre<span class="w"> </span>--index-url<span class="w"> </span>https://download.pytorch.org/whl/test/cpu<span class="w"> </span><span class="nv">torch</span><span class="o">==</span><span class="m">2</span>.3.0
+</code></pre></div>
+<p>Install iree-turbine:</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>iree-turbine
 </code></pre></div>
 <h2 id="just-in-time-jit-execution"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M9.533.753V.752c.217 2.385 1.463 3.626 2.653 4.81C13.37 6.74 14.498 7.863 14.498 10c0 3.5-3 6-6.5 6S1.5 13.512 1.5 10c0-1.298.536-2.56 1.425-3.286.376-.308.862 0 1.035.454C4.46 8.487 5.581 8.419 6 8c.282-.282.341-.811-.003-1.5C4.34 3.187 7.035.75 8.77.146c.39-.137.726.194.763.607ZM7.998 14.5c2.832 0 5-1.98 5-4.5 0-1.463-.68-2.19-1.879-3.383l-.036-.037c-1.013-1.008-2.3-2.29-2.834-4.434-.322.256-.63.579-.864.953-.432.696-.621 1.58-.046 2.73.473.947.67 2.284-.278 3.232-.61.61-1.545.84-2.403.633a2.79 2.79 0 0 1-1.436-.874A3.198 3.198 0 0 0 3 10c0 2.53 2.164 4.5 4.998 4.5Z"/></svg></span> Just-in-time (JIT) execution<a class="headerlink" href="#just-in-time-jit-execution" title="Permanent link">link</a></h2>
 <p>Just-in-time integration allows for Python code using TorchDynamo to optimize
@@ -3619,7 +3600,7 @@ PyTorch models/functions using IREE, all within an interactive Python session.</
     subgraph compile ["torch.compile()"]
       direction LR
       dynamo{{TorchDynamo}}
-      turbine{{SHARK-Turbine}}
+      turbine{{iree-turbine}}
       iree{{IREE}}
       dynamo --&gt; turbine --&gt; iree
     end
@@ -3627,10 +3608,12 @@ PyTorch models/functions using IREE, all within an interactive Python session.</
     output([Optimized module])
     input --&gt; compile --&gt; output
   end</code></pre>
-<p>For deployment outside of Python, see the ahead-of-time sections below.</p>
+<p>For deployment outside of Python, see the
+<a href="#ahead-of-time-aot-export">ahead-of-time sections below</a>.</p>
 <h3 id="quickstart"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M14.064 0h.186C15.216 0 16 .784 16 1.75v.186a8.752 8.752 0 0 1-2.564 6.186l-.458.459c-.314.314-.641.616-.979.904v3.207c0 .608-.315 1.172-.833 1.49l-2.774 1.707a.749.749 0 0 1-1.11-.418l-.954-3.102a1.214 1.214 0 0 1-.145-.125L3.754 9.816a1.218 1.218 0 0 1-.124-.145L.528 8.717a.749.749 0 0 1-.418-1.11l1.71-2.774A1.748 1.748 0 0 1 3.31 4h3.204c.288-.338.59-.665.904-.979l.459-.458A8.749 8.749 0 0 1 14.064 0ZM8.938 3.623h-.002l-.458.458c-.76.76-1.437 1.598-2.02 2.5l-1.5 2.317 2.143 2.143 2.317-1.5c.902-.583 1.74-1.26 2.499-2.02l.459-.458a7.25 7.25 0 0 0 2.123-5.127V1.75a.25.25 0 0 0-.25-.25h-.186a7.249 7.249 0 0 0-5.125 2.123ZM3.56 14.56c-.732.732-2.334 1.045-3.005 1.148a.234.234 0 0 1-.201-.064.234.234 0 0 1-.064-.201c.103-.671.416-2.273 1.15-3.003a1.502 1.502 0 1 1 2.12 2.12Zm6.94-3.935c-.088.06-.177.118-.266.175l-2.35 1.521.548 1.783 1.949-1.2a.25.25 0 0 0 .119-.213ZM3.678 8.116 5.2 5.766c.058-.09.117-.178.176-.266H3.309a.25.25 0 0 0-.213.119l-1.2 1.95ZM12 5a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z"/></svg></span> Quickstart<a class="headerlink" href="#quickstart" title="Permanent link">link</a></h3>
 <p>Turbine integrates into PyTorch as a
-<a href="https://pytorch.org/docs/2.0/dynamo/custom-backends.html">custom backend</a> for
+<a href="https://pytorch.org/docs/stable/torch.compiler_custom_backends.html">custom backend</a>
+for
 <a href="https://pytorch.org/docs/stable/generated/torch.compile.html"><code>torch.compile</code></a>.</p>
 <p>Behind the scenes, PyTorch captures the structure of the input model into a
 computation graph and feeds that graph through to the selected backend compiler.</p>
@@ -3674,7 +3657,7 @@ computation graph and feeds that graph through to the selected backend compiler.
 </tr>
 <tr>
 <td>Simple MLP eager</td>
-<td><a href="https://github.com/nod-ai/SHARK-Turbine/blob/main/examples/eager_mlp/mlp_eager_simple.py"><code>examples/eager_mlp/mlp_eager_simple.py</code></a></td>
+<td><a href="https://github.com/nod-ai/SHARK-Turbine/blob/main/core/examples/eager_mlp/mlp_eager_simple.py"><code>core/examples/eager_mlp/mlp_eager_simple.py</code></a></td>
 </tr>
 </tbody>
 </table>
@@ -3753,7 +3736,7 @@ Python and then export deployment-ready artifacts that can be used in IREE's
 </tr>
 <tr>
 <td>Simple MLP export</td>
-<td><a href="https://github.com/nod-ai/SHARK-Turbine/blob/main/examples/aot_mlp/mlp_export_simple.py"><code>examples/aot_mlp/mlp_export_simple.py</code></a></td>
+<td><a href="https://github.com/nod-ai/SHARK-Turbine/blob/main/core/examples/aot_mlp/mlp_export_simple.py"><code>core/examples/aot_mlp/mlp_export_simple.py</code></a></td>
 </tr>
 </tbody>
 </table>
@@ -3782,7 +3765,7 @@ access to more features.</p>
 
   export -. "compile()" .-&gt; binary</code></pre>
 <p>Advanced export workflows can use the
-<a href="https://github.com/nod-ai/SHARK-Turbine/blob/main/python/shark_turbine/aot/compiled_module.py"><code>aot.CompiledModule</code></a>
+<a href="https://github.com/nod-ai/SHARK-Turbine/blob/main/core/shark_turbine/aot/compiled_module.py"><code>aot.CompiledModule</code></a>
 class to define and constrain the structure of a program prior to compiling it.</p>
 <!-- TODO(scotttodd): API reference pages for aot.CompiledModule etc.?
                       https://github.com/nod-ai/SHARK-Turbine/issues/106
@@ -3870,8 +3853,7 @@ their values independently at runtime.</p>
 <ul>
 <li>
 <p>Individual globals can be exported using <code>aot.export_global()</code>:</p>
-<div class="highlight"><pre><span></span><code><span class="n">state_example</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
-<span class="n">update_example</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">tensor</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><span class="n">state_example</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">zeros</span><span class="p">([</span><span class="mi">1</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">int32</span><span class="p">)</span>
 
 <span class="k">class</span> <span class="nc">SampleModule</span><span class="p">(</span><span class="n">aot</span><span class="o">.</span><span class="n">CompiledModule</span><span class="p">):</span>
   <span class="n">value</span> <span class="o">=</span> <span class="n">aot</span><span class="o">.</span><span class="n">export_global</span><span class="p">(</span><span class="n">state_example</span><span class="p">,</span> <span class="n">mutable</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
@@ -3879,7 +3861,7 @@ their values independently at runtime.</p>
   <span class="k">def</span> <span class="nf">get_value</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
     <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">value</span>
 
-  <span class="k">def</span> <span class="nf">update_value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new_value</span><span class="o">=</span><span class="n">aot</span><span class="o">.</span><span class="n">abstractify</span><span class="p">(</span><span class="n">update_example</span><span class="p">)):</span>
+  <span class="k">def</span> <span class="nf">update_value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">new_value</span><span class="o">=</span><span class="n">aot</span><span class="o">.</span><span class="n">abstractify</span><span class="p">(</span><span class="n">value</span><span class="p">)):</span>
     <span class="bp">self</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="n">new_value</span>
 </code></pre></div>
 </li>
@@ -3934,51 +3916,15 @@ their values independently at runtime.</p>
 </tr>
 <tr>
 <td>AOT unit tests</td>
-<td><a href="https://github.com/nod-ai/SHARK-Turbine/tree/main/tests/aot"><code>tests/aot/</code></a></td>
+<td><a href="https://github.com/nod-ai/SHARK-Turbine/tree/main/core/tests/aot"><code>core/tests/aot/</code></a></td>
 </tr>
 <tr>
 <td>Dynamic MLP export</td>
-<td><a href="https://github.com/nod-ai/SHARK-Turbine/blob/main/examples/aot_mlp/mlp_export_dynamic.py"><code>examples/aot_mlp/mlp_export_dynamic.py</code></a></td>
+<td><a href="https://github.com/nod-ai/SHARK-Turbine/blob/main/core/examples/aot_mlp/mlp_export_dynamic.py"><code>core/examples/aot_mlp/mlp_export_dynamic.py</code></a></td>
 </tr>
 <tr>
 <td>stateless llama2</td>
-<td><a href="https://github.com/nod-ai/SHARK-Turbine/blob/main/python/turbine_models/custom_models/stateless_llama.py"><code>python/turbine_models/custom_models/stateless_llama.py</code></a></td>
-</tr>
-</tbody>
-</table>
-<h2 id="alternate-workflows">Alternate workflows<a class="headerlink" href="#alternate-workflows" title="Permanent link">link</a></h2>
-<div class="admonition caution">
-<p class="admonition-title">Caution - These are due for migration to SHARK-Turbine.</p>
-</div>
-<table>
-<thead>
-<tr>
-<th>Code samples</th>
-<th></th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>(Deprecated) Inference on BERT</td>
-<td><a href="https://colab.research.google.com/github/iree-org/iree-torch/blob/main/examples/bert.ipynb"><img alt="Open in Colab" src="https://colab.research.google.com/assets/colab-badge.svg" /></a></td>
-</tr>
-</tbody>
-</table>
-<h3 id="native-on-device-training">Native / on-device training<a class="headerlink" href="#native-on-device-training" title="Permanent link">link</a></h3>
-<p>A small (~100-250KB), self-contained binary can be built for deploying to
-resource-constrained environments without a Python interpreter.</p>
-<table>
-<thead>
-<tr>
-<th>Example scripts</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><a href="https://github.com/iree-org/iree-torch/blob/main/examples/regression.py">Basic Inference and Training Example</a></td>
-</tr>
-<tr>
-<td><a href="https://github.com/iree-org/iree-torch/tree/main/examples/native_training">Native On-device Training Example</a></td>
+<td><a href="https://github.com/nod-ai/SHARK-Turbine/blob/main/models/turbine_models/custom_models/stateless_llama.py"><code>models/turbine_models/custom_models/stateless_llama.py</code></a></td>
 </tr>
 </tbody>
 </table>
