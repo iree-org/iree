@@ -912,7 +912,7 @@ bool hasUkernelSupportedGpuArch(IREE::HAL::ExecutableTargetAttr targetAttr) {
 //===----------------------------------------------------------------------===//
 
 static constexpr char mmaTypeListName[] = "mma_intrinsics";
-static FailureOr<ArrayAttr> getSupportedMmaTypes(DictionaryAttr config) {
+FailureOr<ArrayAttr> getSupportedMmaTypes(DictionaryAttr config) {
   if (!config) {
     return failure();
   }
