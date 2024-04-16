@@ -9,7 +9,6 @@
 #include <string.h>
 
 #include "iree/base/api.h"
-#include "iree/base/internal/debugging.h"
 #include "iree/hal/allocator.h"
 #include "iree/hal/buffer.h"
 #include "iree/hal/buffer_heap_impl.h"
@@ -286,31 +285,12 @@ static iree_status_t iree_hal_heap_buffer_invalidate_range(
     iree_hal_buffer_t* base_buffer, iree_device_size_t local_byte_offset,
     iree_device_size_t local_byte_length) {
   iree_atomic_thread_fence(iree_memory_order_acquire);
-
-  // Manual annotation for TSan.
-  // We can't determine what atomics are involved here.
-  // We use the buffer address as a best effort.
-  // This is probably not useful since TSan can't associate it with the
-  // actual atomics that will be affected.
-  // At least we would have a happens-before relation on the buffer address.
-  iree_hal_heap_buffer_t* buffer = (iree_hal_heap_buffer_t*)base_buffer;
-  IREE_TSAN_ACQUIRE(buffer->data.data);
-
   return iree_ok_status();
 }
 
 static iree_status_t iree_hal_heap_buffer_flush_range(
     iree_hal_buffer_t* base_buffer, iree_device_size_t local_byte_offset,
     iree_device_size_t local_byte_length) {
-  iree_hal_heap_buffer_t* buffer = (iree_hal_heap_buffer_t*)base_buffer;
-  // Manual annotation for TSan.
-  // We can't determine what atomics are involved here.
-  // We use the buffer address as a best effort.
-  // This is probably not useful since TSan can't associate it with the
-  // actual atomics that will be affected.
-  // At least we would have a happens-before relation on the buffer address.
-  IREE_TSAN_RELEASE(buffer->data.data);
-
   iree_atomic_thread_fence(iree_memory_order_release);
   return iree_ok_status();
 }

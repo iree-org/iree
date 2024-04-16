@@ -31,7 +31,6 @@ iree_runtime_cc_library(
         "atomics_disabled.h",
         "atomics_gcc.h",
         "atomics_msvc.h",
-        "tsan.h",
     ],
     hdrs = [
         "atomics.h",
