@@ -96,6 +96,14 @@ def EncodingAttr :
     OptionalParameter<"ArrayAttr", "Indexing maps of the operation using this tensor">:$user_indexing_maps
   );
 
+  let builders = [
+    AttrBuilder<(ins "EncodingRole":$role,
+        "ArrayRef<Type>":$elemTypes, "Type":$origType,
+        CArg<"std::optional<int64_t>", "{}">:$matmulNarrowM,
+        CArg<"std::optional<int64_t>", "{}">:$matmulNarrowN,
+        CArg<"ArrayRef<AffineMap>", "{}">:$maps)>
+  ];
+
   let genVerifyDecl = 0;
 }
 
