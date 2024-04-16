@@ -7,7 +7,6 @@
 #ifndef IREE_COMPILER_DIALECT_LINALGEXT_UTILS_UTILS_H_
 #define IREE_COMPILER_DIALECT_LINALGEXT_UTILS_UTILS_H_
 
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -16,6 +15,12 @@
 #include "mlir/IR/PatternMatch.h"
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
+// TODO(hanchung): The forward declaration is aimed to avoid circular
+// dependency. It is surprising that Utils can not depend on LinalgExt, which
+// does not follow the code structure in upstream. This is likely because of
+// legacy issues. We should clean below methods up and move some of them to
+// compiler/Utils/.
+class EncodingAttr;
 
 /// Returns a `memref.dim` or `tensor.dim` operation to get the shape of `v` at
 /// `dim`.
