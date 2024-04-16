@@ -8,6 +8,7 @@
 
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/IR/PatternMatch.h"
@@ -204,11 +205,99 @@ public:
   }
 };
 
+/// Fold tensor.extract_slice into vector.transfer_write if
+///   1. The tensor.extract_slice op has only one use.
+///   2. All the offests of the tensor.extract_slice op are zeros.
+///   3. The vector.transfer_write op does not have masks.
+///   4. The vector.transfer_write op writes to a tensor.empty op.
+///
+/// E.g.:
+///
+/// ```
+/// %0 = vector.transfer_write %v, %t[%a, %b, %c]
+///   {in_bounds = [true, true, true]}
+///   : vector<1x64x128xf16>, tensor<1x64x128xf16>
+/// %extracted_slice = tensor.extract_slice %0[0, 0, 0] [1, %3, 128] [1, 1, 1]
+///   : tensor<1x64x128xf16> to tensor<1x?x128xf16>
+/// ```
+/// is rewritten to:
+/// ```
+/// %1 = vector.transfer_write %v, %t2[%a, %b, %c]
+///   {in_bounds = [true, false, true]}
+///   : vector<4x5xf32>, tensor<?x?xf32>
+/// ```
+class FoldExtractSliceIntoXferWrite final
+    : public OpRewritePattern<tensor::ExtractSliceOp> {
+public:
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::ExtractSliceOp extractSliceOp,
+                                PatternRewriter &rewriter) const override {
+    if (extractSliceOp.getDroppedDims().any()) {
+      return failure();
+    }
+
+    auto result = dyn_cast<OpResult>(extractSliceOp.getSource());
+    if (!result) {
+      return failure();
+    }
+    if (!result.hasOneUse()) {
+      return failure();
+    }
+    if (!llvm::all_of(extractSliceOp.getMixedOffsets(), isZeroIndex)) {
+      return failure();
+    }
+
+    auto xferOp =
+        extractSliceOp.getSource().getDefiningOp<vector::TransferWriteOp>();
+    if (!xferOp) {
+      return failure();
+    }
+    if (!xferOp.getSource().getDefiningOp<tensor::EmptyOp>()) {
+      return failure();
+    }
+    if (xferOp.getMask()) {
+      return failure();
+    }
+    if (!xferOp.getInBounds()) {
+      return failure();
+    }
+
+    Location loc = extractSliceOp.getLoc();
+    SmallVector<OpFoldResult> mixedSizes = extractSliceOp.getMixedSizes();
+    auto init = rewriter.create<tensor::EmptyOp>(
+        loc, mixedSizes, extractSliceOp.getType().getElementType());
+
+    SmallVector<bool> inBounds;
+    inBounds.resize(mixedSizes.size());
+    for (auto [idx, vecSize, destSize] :
+         llvm::zip_equal(llvm::seq<int64_t>(0, inBounds.size()),
+                         xferOp.getVectorType().getShape(), mixedSizes)) {
+      auto maybeCst = getConstantIntValue(destSize);
+      if (!maybeCst) {
+        inBounds[idx] = false;
+        continue;
+      }
+      if (*maybeCst >= vecSize) {
+        inBounds[idx] = false;
+      } else {
+        inBounds[idx] = true;
+      }
+    }
+
+    rewriter.replaceOpWithNewOp<vector::TransferWriteOp>(
+        extractSliceOp, xferOp.getVector(), init, xferOp.getIndices(),
+        xferOp.getPermutationMap(), inBounds);
+
+    return success();
+  }
+};
+
 } // namespace
 
 void mlir::iree_compiler::populateVectorTransferTensorSliceTransforms(
     RewritePatternSet &patterns, PatternBenefit benefit) {
-  patterns
-      .add<FoldExtractSliceIntoTransferRead, FoldInsertSliceIntoTransferWrite>(
-          patterns.getContext(), benefit);
+  patterns.add<FoldExtractSliceIntoTransferRead,
+               FoldInsertSliceIntoTransferWrite, FoldExtractSliceIntoXferWrite>(
+      patterns.getContext(), benefit);
 }
