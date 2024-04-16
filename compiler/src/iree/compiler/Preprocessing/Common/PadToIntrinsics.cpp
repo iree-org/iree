@@ -198,19 +198,15 @@ struct PadToIntrinsicsPass final
           return GPUMatmulShapeType{mSize, nSize, kSize, aType, bType, cType};
         });
 
-    SmallVector<linalg::LinalgOp> targetOps;
-    rootOp->walk([&](linalg::LinalgOp linalgOp) {
-      if (isa<linalg::Conv2DNhwcHwcfOp, linalg::BatchMatmulOp>(
-              linalgOp.getOperation()))
-        targetOps.push_back(linalgOp);
-    });
+    SmallVector<linalg::Conv2DNhwcHwcfOp> targetOps;
+    rootOp->walk(
+        [&](linalg::Conv2DNhwcHwcfOp convOp) { targetOps.push_back(convOp); });
 
     IRRewriter rewriter(context);
-    for (Operation *linalgOp : llvm::make_early_inc_range(targetOps)) {
-      if (auto convOp = dyn_cast<linalg::Conv2DNhwcHwcfOp>(linalgOp)) {
-        rewriter.setInsertionPoint(convOp);
-        padConvOp(rewriter, convOp, intrinsics);
-      }
+    for (linalg::Conv2DNhwcHwcfOp convOp :
+         llvm::make_early_inc_range(targetOps)) {
+      rewriter.setInsertionPoint(convOp);
+      padConvOp(rewriter, convOp, intrinsics);
     }
   }
 };
