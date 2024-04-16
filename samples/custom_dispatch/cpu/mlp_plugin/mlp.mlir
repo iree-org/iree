@@ -27,7 +27,7 @@
 module @example attributes {hal.device.targets = [#cpu_target]} {
 
   // CHECK-LABEL: EXEC @mlp_invocation
-  //       CHECK: [Plugin]: M = 2, N = 2, K = 2
+  //       CHECK: [Plugin]: M = 2, N = 2, K = 2, doRelu = 1
   //       CHECK: 2x2xf32=[-12 -0][-0 -12]
   func.func @mlp_invocation(%lhs: tensor<?x?xf32>,
                             %rhs: tensor<?x?xf32>) -> (tensor<?x?xf32>) {
