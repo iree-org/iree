@@ -14,8 +14,6 @@
 #include "mlir/Dialect/MLProgram/IR/MLProgram.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 
-using namespace mlir::iree_compiler::IREE;
-
 namespace mlir::iree_compiler {
 
 namespace {
@@ -25,7 +23,7 @@ namespace {
 //===----------------------------------------------------------------------===//
 
 struct GlobalOpInterfaceExternalModel
-    : public Util::GlobalOpInterface::ExternalModel<
+    : public IREE::Util::GlobalOpInterface::ExternalModel<
           GlobalOpInterfaceExternalModel, ml_program::GlobalOp> {
   Attribute getGlobalInitialValue(Operation *op) const {
     return cast<ml_program::GlobalOp>(op).getValueAttr();
@@ -94,8 +92,8 @@ struct GlobalOpInterfaceExternalModel
 struct GenericNumericCastExternalModel {
   template <typename OpTy>
   struct ExternalModel
-      : public Util::NumericCastOpInterface::ExternalModel<ExternalModel<OpTy>,
-                                                           OpTy> {};
+      : public IREE::Util::NumericCastOpInterface::ExternalModel<
+            ExternalModel<OpTy>, OpTy> {};
 
   template <typename OpTy>
   static void add(MLIRContext *context) {
@@ -114,8 +112,8 @@ struct GenericNumericCastExternalModel {
 //===----------------------------------------------------------------------===//
 
 struct InsertSliceOpTiedOpInterface
-    : public Util::TiedOpInterface::ExternalModel<InsertSliceOpTiedOpInterface,
-                                                  tensor::InsertSliceOp> {
+    : public IREE::Util::TiedOpInterface::ExternalModel<
+          InsertSliceOpTiedOpInterface, tensor::InsertSliceOp> {
   Value getTiedResult(Operation *op, unsigned resultIndex) const {
     auto insertSliceOp = cast<tensor::InsertSliceOp>(op);
     return IREE::Util::TiedOpInterface::findTiedBaseValue(
@@ -134,8 +132,8 @@ struct InsertSliceOpTiedOpInterface
 
 template <typename OpTy>
 struct LinalgOpTiedOpInterface
-    : public Util::TiedOpInterface::ExternalModel<LinalgOpTiedOpInterface<OpTy>,
-                                                  OpTy> {
+    : public IREE::Util::TiedOpInterface::ExternalModel<
+          LinalgOpTiedOpInterface<OpTy>, OpTy> {
   Value getTiedResult(Operation *op, unsigned resultIndex) const {
     auto linalgOp = cast<OpTy>(op);
     return IREE::Util::TiedOpInterface::findTiedBaseValue(
