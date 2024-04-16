@@ -290,8 +290,8 @@ void buildLLVMCPUVectorLoweringPipeline(
     OpPassManager &funcPassManager,
     const LLVMCPUVectorLoweringPassOptions &options) {
   funcPassManager.addPass(createLLVMCPUDropVectorUnitDimsPass());
-  funcPassManager.addPass(
-      createLLVMCPUVirtualVectorLoweringPass(options.splitVectorTransfersTo));
+  funcPassManager.addPass(createLLVMCPUVirtualVectorLoweringPass(
+      options.splitVectorTransfersTo, options.enableArmNeon));
 
   // Make sure we remove redundant vector ops (e.g., vector tranposes) before we
   // lower them and can't be optimized away anymore.
@@ -340,6 +340,7 @@ void addCPUBufferOpsTileAndVectorizePipeline(
     LLVMCPUVectorLoweringPassOptions options;
     options.lowerVectorTransposeToAVX2 = pipelineOpt.lowerToAVX2;
     options.splitVectorTransfersTo = "linalg-copy";
+    options.enableArmNeon = pipelineOpt.enableAArch64Neon;
     buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
   }
 
@@ -416,6 +417,7 @@ void addMultiTilingExpertPassPipeline(OpPassManager &funcPassManager,
     LLVMCPUVectorLoweringPassOptions options;
     options.lowerVectorTransposeToAVX2 = pipelineOpt.lowerToAVX2;
     options.splitVectorTransfersTo = "linalg-copy";
+    options.enableArmNeon = pipelineOpt.enableAArch64Neon;
     buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
   }
 
@@ -473,6 +475,7 @@ void addConvTileAndDecomposeExpertPassPipeline(
     LLVMCPUVectorLoweringPassOptions options;
     options.lowerVectorTransposeToAVX2 = pipelineOpt.lowerToAVX2;
     options.splitVectorTransfersTo = "shuffle";
+    options.enableArmNeon = pipelineOpt.enableAArch64Neon;
     buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
   }
 
@@ -548,6 +551,7 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &funcPassManager,
   LLVMCPUVectorLoweringPassOptions options;
   options.lowerVectorTransposeToAVX2 = pipelineOpt.lowerToAVX2;
   options.splitVectorTransfersTo = "linalg-copy";
+  options.enableArmNeon = pipelineOpt.enableAArch64Neon;
   buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
 }
 
@@ -576,6 +580,7 @@ void addCPUDataTilingPipeline(OpPassManager &funcPassManager,
     LLVMCPUVectorLoweringPassOptions options;
     options.lowerVectorTransposeToAVX2 = pipelineOpt.lowerToAVX2;
     options.splitVectorTransfersTo = "linalg-copy";
+    options.enableArmNeon = pipelineOpt.enableAArch64Neon;
     buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
   }
 }
@@ -606,6 +611,7 @@ void addCPULinalgExtTileAndVectorizePipeline(
     LLVMCPUVectorLoweringPassOptions options;
     options.lowerVectorTransposeToAVX2 = pipelineOpt.lowerToAVX2;
     options.splitVectorTransfersTo = "linalg-copy";
+    options.enableArmNeon = pipelineOpt.enableAArch64Neon;
     buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
   }
 }

@@ -39,6 +39,9 @@ bool hasAnySVEFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
 /// Returns true if the 'targetAttr' contains '+sme' in its cpu features.
 bool hasSMEFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
 
+/// Returns true if the 'targetAttr' contains '+neon' in its cpu features.
+bool hasNeonFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_LLVMCPU_UTILS_H_

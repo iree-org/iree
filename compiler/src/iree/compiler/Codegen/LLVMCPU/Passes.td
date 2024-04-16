@@ -180,6 +180,9 @@ def LLVMCPUVirtualVectorLowering :
           "\tlinalg-copy: use linalg.fill + linalg.generic for the slow path\n"
           "\tvector-transfers: use extra small unmasked vector.transfers for"
           " the slow path\n}]>,
+    Option<"enableArmNeon", "enable-arm-neon", "bool",
+      /*default=*/ "false",
+      "Enables arm neon lowering patterns">,
   ];
   let constructor =
       "mlir::iree_compiler::createLLVMCPUVirtualVectorLoweringPass()";

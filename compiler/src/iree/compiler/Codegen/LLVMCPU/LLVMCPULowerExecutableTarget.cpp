@@ -104,6 +104,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   pipelineOpts.enableUkernels = hasUkernel(target);
   pipelineOpts.enableAArch64SSVE =
       isAArch64(target) && hasAnySVEFeature(target) && hasSMEFeature(target);
+  pipelineOpts.enableAArch64Neon = isAArch64(target) && hasNeonFeature(target);
 
   IREE::Codegen::TranslationInfoAttr translationInfo =
       getTranslationInfo(funcOp);

@@ -54,4 +54,8 @@ bool hasSMEFeature(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return hasFeature(targetAttr, "+sme");
 }
 
+bool hasNeonFeature(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  return hasFeature(targetAttr, "+neon");
+}
+
 } // namespace mlir::iree_compiler
