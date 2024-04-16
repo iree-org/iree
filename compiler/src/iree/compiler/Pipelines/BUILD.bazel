@@ -53,7 +53,7 @@ iree_compiler_cc_library(
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Pass",
-        "@stablehlo//:stablehlo_passes",
         "@llvm-project//mlir:Support",
+        "@stablehlo//:stablehlo_passes",
     ],
 )
