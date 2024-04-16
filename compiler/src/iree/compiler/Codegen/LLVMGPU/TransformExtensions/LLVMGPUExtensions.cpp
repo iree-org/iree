@@ -1489,7 +1489,7 @@ transform_dialect::AMDGPUDistributeVectorsOp::applyToOne(
 
 void transform_dialect::AMDGPUDistributeVectorsOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
+  transform::consumesHandle(getTarget(), effects);
   transform::modifiesPayload(effects);
 }
 
