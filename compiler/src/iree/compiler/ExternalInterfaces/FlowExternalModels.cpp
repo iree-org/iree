@@ -14,8 +14,8 @@ namespace mlir::iree_compiler {
 namespace {
 
 struct DispatchTensorLoadOpInterface
-    : public ValueBoundsOpInterface::ExternalModel<DispatchTensorLoadOpInterface,
-                                                   Flow::DispatchTensorLoadOp> {
+    : public ValueBoundsOpInterface::ExternalModel<
+          DispatchTensorLoadOpInterface, Flow::DispatchTensorLoadOp> {
   void populateBoundsForShapedValueDim(Operation *op, Value value, int64_t dim,
                                        ValueBoundsConstraintSet &cstr) const {
     auto loadOp = cast<Flow::DispatchTensorLoadOp>(op);
