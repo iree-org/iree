@@ -29,6 +29,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/IR/Value.h"
+#include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Support/MathExtras.h"
@@ -140,6 +141,28 @@ getScaledSizeAndOffset(OpBuilder &builder, Location loc, OpFoldResult size,
   auto imageSize = affine::makeComposedFoldedAffineMin(
       builder, loc, sizeMap, {dimSizeValue, imageOffset, size});
   return std::make_pair(imageSize, imageOffset);
+}
+
+/// If the input has a fully static shape, return the static sizes. Otherwise,
+/// attempt to reify the shape of the input from its defining op. Input dims
+/// are store into `reifiedInputDims`.
+static LogicalResult
+getStaticOrReifiedInputDims(OpBuilder &builder, Location loc, Value input,
+                            ReifiedRankedShapedTypeDims &reifiedInputDims) {
+  SmallVector<OpFoldResult> inputSizes;
+  auto definingReifyOp =
+      input.getDefiningOp<ReifyRankedShapedTypeOpInterface>();
+  if (!definingReifyOp) {
+    auto inputShapedType = input.getType().cast<ShapedType>();
+    if (!inputShapedType.hasStaticShape()) {
+      return failure();
+    }
+    reifiedInputDims.push_back(getAsOpFoldResult(
+        builder.getIndexArrayAttr(inputShapedType.getShape())));
+    return success();
+  } else {
+    return definingReifyOp.reifyResultShapes(builder, reifiedInputDims);
+  }
 }
 
 //===----------------------------------------------------------------------===//
@@ -2241,28 +2264,16 @@ WinogradInputTransformOp::getTiledImplementation(OpBuilder &builder,
 
   SmallVector<OpFoldResult> inputStrides(getInputOperandRank(), one);
   SmallVector<OpFoldResult> outputStrides(getOutputOperandRank(), one);
-  ReifiedRankedShapedTypeDims reifiedResultShapes;
+  ReifiedRankedShapedTypeDims reifiedResultShapes, reifiedInputShapes;
   if (failed(reifyResultShapes(builder, reifiedResultShapes))) {
     return failure();
   }
   SmallVector<OpFoldResult> outputSizes = reifiedResultShapes[0];
-  SmallVector<OpFoldResult> inputSizes;
-  auto definingReifyOp =
-      input().getDefiningOp<ReifyRankedShapedTypeOpInterface>();
-  if (!definingReifyOp) {
-    auto inputShapedType = input().getType().cast<ShapedType>();
-    if (!inputShapedType.hasStaticShape()) {
-      return failure();
-    }
-    inputSizes = getAsOpFoldResult(
-        builder.getIndexArrayAttr(inputShapedType.getShape()));
-  } else {
-    ReifiedRankedShapedTypeDims inputReifyShapes;
-    if (failed(definingReifyOp.reifyResultShapes(builder, inputReifyShapes))) {
-      return failure();
-    }
-    inputSizes = inputReifyShapes[0];
+  if (failed(getStaticOrReifiedInputDims(builder, loc, input(),
+                                         reifiedInputShapes))) {
+    return failure();
   }
+  SmallVector<OpFoldResult> inputSizes = reifiedInputShapes[0];
 
   assert(sizes.size() == 4);
   outputSizes[2] = inputSizes[0] = sizes[0];
@@ -2327,6 +2338,180 @@ LogicalResult WinogradInputTransformOp::fold(FoldAdaptor,
 }
 
 LogicalResult WinogradInputTransformOp::reifyResultShapes(
+    OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  return cast<LinalgExtOp>(getOperation())
+      .reifyResultShapes(b, reifiedReturnShapes);
+}
+
+//===----------------------------------------------------------------------===//
+// WinogradFilterTransformOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult WinogradFilterTransformOp::verify() {
+  Operation *op = getOperation();
+  if (getNumDpsInputs() != 1) {
+    return op->emitOpError("expected one input operand");
+  }
+  if (getNumDpsInits() != 1) {
+    return op->emitOpError("expected one output operand");
+  }
+  auto inputType = input().getType().cast<ShapedType>();
+  auto outputType = output().getType().cast<ShapedType>();
+  if (outputType.getElementType() != inputType.getElementType()) {
+    return op->emitOpError(
+        "expected input/output element types to be identical");
+  }
+  unsigned inputRank = inputType.getRank();
+  unsigned outputRank = outputType.getRank();
+
+  if (inputRank != 2 && inputRank != 4) {
+    return op->emitOpError("expected input operand to have rank either 2 or 4");
+  }
+
+  if (inputRank == 2) {
+    if (outputRank != 2) {
+      return op->emitOpError(
+          "expected output operand to have rank 2 if input is of rank 2");
+    }
+    return success();
+  }
+
+  if (getOutputOperandRank() != getInputOperandRank()) {
+    return op->emitOpError("expected output rank to be equal to input rank");
+  }
+  const SmallVector<int64_t> kernelDims = kernelDimensions();
+  const size_t numKernelDims = kernelDims.size();
+  llvm::SmallSetVector<int64_t, 2> kernelDimsSet(kernelDims.begin(),
+                                                 kernelDims.end());
+  if (kernelDims.size() != 2) {
+    return op->emitOpError("expected only 2 kernel dimensions");
+  }
+  if (!isHwcf() && !isFchw()) {
+    return op->emitOpError(
+        "expect kernel dimensions to be either [0, 1] or [2, 3]");
+  }
+  const int64_t kernelSize = getKernelSize();
+  ArrayRef<int64_t> inputShape = inputType.getShape();
+  for (auto kernelDim : kernelDims) {
+    if (inputShape[kernelDim] != kernelSize) {
+      return op->emitOpError(
+          "expect all kernel dimensions to have the same size");
+    }
+  }
+  const int64_t inputTileSize = getInputTileSize();
+  SmallVector<int64_t> expectedOutputShape(numKernelDims, inputTileSize);
+  for (int i = 0; i < inputShape.size(); i++) {
+    if (!kernelDimsSet.contains(i)) {
+      expectedOutputShape.push_back(inputShape[i]);
+    }
+  }
+  if (isFchw()) {
+    permute<Permutation::TTFC_TO_TTCF>(expectedOutputShape);
+  }
+  ArrayRef<int64_t> outputShape = outputType.getShape();
+  if (failed(verifyCompatibleShape(expectedOutputShape, outputShape))) {
+    return op->emitOpError("incompatible output shape");
+  }
+  return success();
+}
+
+SmallVector<Range>
+WinogradFilterTransformOp::getIterationDomain(OpBuilder &builder) {
+  Location loc = getLoc();
+  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
+  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
+  Value source = output();
+  SmallVector<int64_t> kernelDims = kernelDimensions();
+  llvm::SmallSetVector<int64_t, 2> kernelDimsSet(kernelDims.begin(),
+                                                 kernelDims.end());
+  auto outRank = getOutputOperandRank();
+  SmallVector<Range> loopBounds(outRank - kernelDims.size());
+  int count = 0;
+  for (auto dim : llvm::seq<int64_t>(kernelDims.size(), outRank)) {
+    loopBounds[count].offset = zero;
+    loopBounds[count].size = getDimValue(builder, loc, source, dim);
+    loopBounds[count].stride = one;
+    count++;
+  }
+  return loopBounds;
+}
+
+SmallVector<utils::IteratorType>
+WinogradFilterTransformOp::getLoopIteratorTypes() {
+  SmallVector<utils::IteratorType> iteratorTypes(getIterationDomainRank(),
+                                                 utils::IteratorType::parallel);
+  return iteratorTypes;
+}
+
+FailureOr<TilingResult> WinogradFilterTransformOp::getTiledImplementation(
+    OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes) {
+  Location loc = getLoc();
+  auto one = builder.getIndexAttr(1);
+  auto zero = builder.getIndexAttr(0);
+  const int cDim = channelDim();
+  const int fDim = filterDim();
+
+  assert(offsets.size() == 2);
+  SmallVector<OpFoldResult> inputOffsets(getInputOperandRank(), zero);
+  SmallVector<OpFoldResult> outputOffsets(getOutputOperandRank(), zero);
+  outputOffsets[2] = inputOffsets[cDim] = offsets[0];
+  outputOffsets[3] = inputOffsets[fDim] = offsets[1];
+
+  SmallVector<OpFoldResult> inputStrides(getInputOperandRank(), one);
+  SmallVector<OpFoldResult> outputStrides(getOutputOperandRank(), one);
+
+  assert(sizes.size() == 2);
+  auto inputShape = input().getType().cast<ShapedType>().getShape();
+  auto outputShape = output().getType().cast<ShapedType>().getShape();
+  SmallVector<OpFoldResult> inputSizes =
+      getAsOpFoldResult(builder.getIndexArrayAttr(inputShape));
+  SmallVector<OpFoldResult> outputSizes =
+      getAsOpFoldResult(builder.getIndexArrayAttr(outputShape));
+  outputSizes[2] = inputSizes[cDim] = sizes[0];
+  outputSizes[3] = inputSizes[fDim] = sizes[1];
+
+  SmallVector<Value> tiledOperands;
+  tiledOperands.emplace_back(
+      getSlice(builder, loc, input(), inputOffsets, inputSizes, inputStrides));
+  tiledOperands.emplace_back(getSlice(builder, loc, output(), outputOffsets,
+                                      outputSizes, outputStrides));
+
+  SmallVector<Type, 4> resultTypes;
+  if (hasPureTensorSemantics()) {
+    resultTypes.push_back(tiledOperands[1].getType());
+  }
+
+  Operation *tiledOp =
+      mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
+
+  return TilingResult{{tiledOp}, SmallVector<Value>(tiledOp->getResults())};
+}
+
+LogicalResult WinogradFilterTransformOp::getResultTilePosition(
+    OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
+    SmallVector<OpFoldResult> &resultSizes) {
+  if (resultNumber == 0) {
+    auto resultShape = output().getType().cast<ShapedType>().getShape();
+    resultSizes = getAsOpFoldResult(builder.getIndexArrayAttr(resultShape));
+    resultOffsets = SmallVector<OpFoldResult>(getOutputOperandRank(),
+                                              builder.getIndexAttr(0));
+    resultOffsets[2] = offsets[0];
+    resultOffsets[3] = offsets[1];
+    resultSizes[2] = sizes[0];
+    resultSizes[3] = sizes[1];
+    return success();
+  }
+  return failure();
+}
+
+LogicalResult WinogradFilterTransformOp::fold(FoldAdaptor,
+                                              SmallVectorImpl<OpFoldResult> &) {
+  return memref::foldMemRefCast(*this);
+}
+
+LogicalResult WinogradFilterTransformOp::reifyResultShapes(
     OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
   return cast<LinalgExtOp>(getOperation())
       .reifyResultShapes(b, reifiedReturnShapes);
@@ -2452,28 +2637,16 @@ FailureOr<TilingResult> WinogradOutputTransformOp::getTiledImplementation(
   SmallVector<OpFoldResult> inputStrides(getInputOperandRank(), one);
   SmallVector<OpFoldResult> outputStrides(getOutputOperandRank(), one);
 
-  SmallVector<SmallVector<OpFoldResult>> reifiedResultShapes;
+  ReifiedRankedShapedTypeDims reifiedResultShapes, reifiedInputShapes;
   if (failed(reifyResultShapes(builder, reifiedResultShapes))) {
     return failure();
   }
   SmallVector<OpFoldResult> outputSizes = reifiedResultShapes[0];
-  SmallVector<OpFoldResult> inputSizes;
-  auto definingReifyOp =
-      input().getDefiningOp<ReifyRankedShapedTypeOpInterface>();
-  if (!definingReifyOp) {
-    auto inputShapedType = input().getType().cast<ShapedType>();
-    if (!inputShapedType.hasStaticShape()) {
-      return failure();
-    }
-    inputSizes = getAsOpFoldResult(
-        builder.getIndexArrayAttr(inputShapedType.getShape()));
-  } else {
-    ReifiedRankedShapedTypeDims inputReifyShapes;
-    if (failed(definingReifyOp.reifyResultShapes(builder, inputReifyShapes))) {
-      return failure();
-    }
-    inputSizes = inputReifyShapes[0];
+  if (failed(getStaticOrReifiedInputDims(builder, loc, input(),
+                                         reifiedInputShapes))) {
+    return failure();
   }
+  SmallVector<OpFoldResult> inputSizes = reifiedInputShapes[0];
 
   inputSizes[2] = outputSizes[0] = sizes[0];
   inputSizes[5] = outputSizes[cDim] = sizes[3];
@@ -2818,6 +2991,7 @@ DEFINE_OP_GET_EFFECTS(TopkOp)
 DEFINE_OP_GET_EFFECTS(PackOp)
 DEFINE_OP_GET_EFFECTS(UnPackOp)
 DEFINE_OP_GET_EFFECTS(WinogradInputTransformOp)
+DEFINE_OP_GET_EFFECTS(WinogradFilterTransformOp)
 DEFINE_OP_GET_EFFECTS(WinogradOutputTransformOp)
 DEFINE_OP_GET_EFFECTS(AttentionOp)
 

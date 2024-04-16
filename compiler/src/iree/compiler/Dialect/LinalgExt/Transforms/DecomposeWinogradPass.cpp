@@ -82,6 +82,69 @@ struct FoldWinogradOpUnitDims : public OpRewritePattern<TransformOp> {
   }
 };
 
+/// Pattern to decompose the tiled WinogradFilterTransformOp.
+struct DecomposeWinogradFilterTransform
+    : public OpRewritePattern<WinogradFilterTransformOp> {
+  using OpRewritePattern<WinogradFilterTransformOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(WinogradFilterTransformOp transformOp,
+                                PatternRewriter &rewriter) const override {
+    Location loc = transformOp.getLoc();
+    auto funcOp = transformOp->getParentOfType<mlir::FunctionOpInterface>();
+    if (!funcOp) {
+      return rewriter.notifyMatchFailure(transformOp,
+                                         "Could not find parent function");
+    }
+    rewriter.setInsertionPointToStart(&funcOp.getFunctionBody().front());
+
+    Value inputSlice = transformOp.input();
+    Value outputSlice = transformOp.output();
+    if (transformOp.getInputOperandRank() != 2 ||
+        transformOp.getOutputOperandRank() != 2) {
+      return rewriter.notifyMatchFailure(transformOp, "Winograd op not tiled");
+    }
+    const int64_t inputTileSize = transformOp.getInputTileSize();
+    const int64_t kernelSize = transformOp.getKernelSize();
+    ArrayRef<int64_t> kernelDims = transformOp.getKernelDimensions();
+    llvm::SmallSetVector<int64_t, 2> kernelDimsSet(kernelDims.begin(),
+                                                   kernelDims.end());
+    Type elementType = transformOp.getOutputOperandType().getElementType();
+    Value zeroF32 = rewriter.create<arith::ConstantOp>(
+        loc, rewriter.getZeroAttr(elementType));
+    const float *GT{nullptr};
+    const float *G{nullptr};
+    GT = IREE::LinalgExt::Winograd::GT_6x6_3x3;
+    G = IREE::LinalgExt::Winograd::G_6x6_3x3;
+    Value GTV = IREE::LinalgExt::createValueFrom2DConstant(
+        GT, kernelSize, inputTileSize, loc, rewriter);
+    Value GV = IREE::LinalgExt::createValueFrom2DConstant(
+        G, inputTileSize, kernelSize, loc, rewriter);
+
+    // Create computation
+    OpBuilder::InsertionGuard afterTransformOp(rewriter);
+    rewriter.setInsertionPointAfter(transformOp);
+
+    // Create matmul(input, GT)
+    SmallVector<int64_t> initShape(kernelDims.size(), inputTileSize);
+    initShape[0] = kernelSize;
+    auto tensorType = cast<ShapedType>(outputSlice.getType()).clone(initShape);
+    Value init = rewriter.create<tensor::EmptyOp>(loc, initShape, elementType);
+    linalg::FillOp fillOp = rewriter.create<linalg::FillOp>(
+        loc, ValueRange{zeroF32}, ValueRange{init});
+    linalg::MatmulOp matmulOp = rewriter.create<linalg::MatmulOp>(
+        loc, tensorType, ValueRange{inputSlice, GTV}, fillOp.result());
+
+    // Create matmul(G, matmul(input, GT))
+    fillOp = rewriter.create<linalg::FillOp>(loc, ValueRange{zeroF32},
+                                             ValueRange{outputSlice});
+    matmulOp = rewriter.create<linalg::MatmulOp>(
+        loc, outputSlice.getType(), ValueRange{GV, matmulOp.getResult(0)},
+        fillOp.result());
+    transformOp.getResult()[0].replaceAllUsesWith(matmulOp.getResult(0));
+    return success();
+  }
+};
+
 /// Pattern to decompose the tiled WinogradInputTransformOp.
 /// The input should be just a single tile of the input image of size `i x i`,
 /// where `i` is the input tile size and `i = m + r - 1`. `m` is the filter
@@ -293,11 +356,13 @@ struct DecomposeWinogradTransformPass
 void DecomposeWinogradTransformPass::runOnOperation() {
   MLIRContext *context = &getContext();
   RewritePatternSet patterns(context);
+  patterns.add<FoldWinogradOpUnitDims<WinogradFilterTransformOp>>(context);
   patterns.add<FoldWinogradOpUnitDims<WinogradInputTransformOp>>(context);
   patterns.add<FoldWinogradOpUnitDims<WinogradOutputTransformOp>>(context);
   tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
   tensor::InsertSliceOp::getCanonicalizationPatterns(patterns, context);
   tensor::ExtractSliceOp::getCanonicalizationPatterns(patterns, context);
+  patterns.add<DecomposeWinogradFilterTransform>(context);
   patterns.add<DecomposeWinogradInputTransform>(context);
   patterns.add<DecomposeWinogradOutputTransform>(context);
   if (failed(

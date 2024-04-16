@@ -1157,6 +1157,117 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
   }];
 }
 
+def IREELinalgExt_WinogradFilterTransformOp : IREELinalgExt_Op<"winograd.filter_transform",
+    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+     DeclareOpInterfaceMethods<TilingInterface,
+      ["getIterationDomain",
+       "getLoopIteratorTypes",
+       "getResultTilePosition",
+       "getTiledImplementation"]>]> {
+  let summary = "Winograd Filter Transform operator";
+  let description = [{
+    Filter transform op.
+  }];
+
+  let arguments = (ins Variadic<AnyShaped>:$inputs,
+                       Variadic<AnyShaped>:$outputs,
+                       I64Attr:$output_tile_size,
+                       I64Attr:$kernel_size,
+                       DenseI64ArrayAttr:$kernel_dimensions
+  );
+
+  let builders = [
+    OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$outputs,
+      CArg<"int64_t", "8">:$output_tile_size, CArg<"int64_t", "3">:$kernel_size,
+      CArg<"ArrayRef<int64_t>", "{0, 1}">:$kernel_dimensions)>
+  ];
+
+  let results = (outs Variadic<AnyRankedTensor>:$result);
+  let hasFolder = 1;
+  let assemblyFormat = [{
+    attr-dict
+    `output_tile_size` `(` $output_tile_size `)`
+    `kernel_size` `(` $kernel_size `)`
+    `kernel_dimensions` `(` $kernel_dimensions `)`
+    `ins` `(` $inputs `:` type($inputs) `)`
+    `outs` `(` $outputs `:` type($outputs) `)`
+    (`->` type($result)^)?
+  }];
+
+  let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
+    Value input() {
+      return getDpsInputOperand(0)->get();
+    }
+    Value output() {
+      return getDpsInitOperand(0)->get();
+    }
+    ShapedType getInputOperandType() {
+      return input().getType().cast<ShapedType>();
+    }
+    ShapedType getOutputOperandType() {
+      return output().getType().cast<ShapedType>();
+    }
+    Value getOriginalOperand() {
+      return input();
+    }
+    Value getTransformedOperand() {
+      return output();
+    }
+    ShapedType getOriginalOperandType() {
+      return getInputOperandType();
+    }
+    ShapedType getTransformedOperandType() {
+      return getOutputOperandType();
+    }
+    int64_t getInputOperandRank() {
+      return getInputOperandType().getRank();
+    }
+    int64_t getOutputOperandRank() {
+      return getOutputOperandType().getRank();
+    }
+    SmallVector<int64_t> kernelDimensions() {
+      return llvm::to_vector(getKernelDimensions());
+    }
+    int64_t getInputTileSize() {
+      return getOutputTileSize() + getKernelSize() - 1;
+    }
+    SmallVector<int64_t> hwDimensions() {
+      return llvm::to_vector(getKernelDimensions());
+    }
+    std::array<int64_t, 2> hwcfKernelDimensions() {
+      return {0, 1};
+    }
+    std::array<int64_t, 2> fchwKernelDimensions() {
+      return {2, 3};
+    }
+    bool isHwcf() {
+      std::array<int64_t, 2> hwcfKernelDims = hwcfKernelDimensions();
+      SmallVector<int64_t> kernelDims = kernelDimensions();
+      return kernelDims == ArrayRef<int64_t>(hwcfKernelDims);
+    }
+    bool isFchw() {
+      std::array<int64_t, 2> fchwKernelDims = fchwKernelDimensions();
+      SmallVector<int64_t> kernelDims = kernelDimensions();
+      return kernelDims == ArrayRef<int64_t>(fchwKernelDims);
+    }
+    int channelDim() {
+      return isHwcf() ? 2 : 1;
+    }
+    int filterDim() {
+      return isHwcf() ? 3 : 0;
+    }
+    int64_t getIterationDomainRank() {
+      SmallVector<int64_t> kernelDims = kernelDimensions();
+      return getInputOperandRank() - kernelDims.size();
+    }
+    // Method to implement for specifying output range for
+    // DestinationStyleOpInterface
+    MutableOperandRange getDpsInitsMutable() {
+      return getOutputsMutable();
+    }
+  }];
+}
+
 def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_transform",
     [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
      DeclareOpInterfaceMethods<TilingInterface,

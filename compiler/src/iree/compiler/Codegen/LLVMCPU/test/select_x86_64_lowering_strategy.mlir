@@ -1592,6 +1592,31 @@ module {
       data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
       native_vector_size = 64 : index, target_triple = "x86_64-none-elf"}>
 module {
+    func.func @winograd_filter_transform() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
+    %c0 = arith.constant 0 : index
+    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<3x3x64x128xf32>>
+    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<8x8x64x128xf32>>
+    %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [3, 3, 64, 128], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<3x3x64x128xf32>> -> tensor<3x3x64x128xf32>
+    %3 = tensor.empty() : tensor<8x8x64x128xf32>
+    %4 = iree_linalg_ext.winograd.filter_transform output_tile_size(6) kernel_size(3) kernel_dimensions([0, 1]) ins(%2 : tensor<3x3x64x128xf32>) outs(%3 : tensor<8x8x64x128xf32>) -> tensor<8x8x64x128xf32>
+    flow.dispatch.tensor.store %4, %1, offsets = [0, 0, 0, 0], sizes = [8, 8, 64, 128], strides = [1, 1, 1, 1] : tensor<8x8x64x128xf32> -> !flow.dispatch.tensor<writeonly:tensor<8x8x64x128xf32>>
+    return
+  }
+}
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[32, 64], [1, 1]]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPULinalgExtTileAndVectorize>
+//      CHECK: func.func @winograd_filter_transform()
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//      CHECK:   iree_linalg_ext.winograd.filter_transform
+// CHECK-SAME:     {lowering_config = #[[CONFIG]]}
+
+// -----
+
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {
+      cpu = "generic", cpu_features = "",
+      data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
+      native_vector_size = 64 : index, target_triple = "x86_64-none-elf"}>
+module {
   func.func @attention() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
     %c0 = arith.constant 0 : index
     %scale = arith.constant 0.125 : f16
