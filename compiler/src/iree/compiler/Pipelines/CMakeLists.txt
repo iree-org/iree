@@ -54,6 +54,7 @@ iree_cc_library(
     iree::compiler::Modules::HAL::Loader::Transforms
     iree::compiler::Preprocessing::Passes
     iree::compiler::Utils
+    StablehloPasses
   PUBLIC
 )
 
