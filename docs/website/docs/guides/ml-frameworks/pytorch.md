@@ -5,11 +5,13 @@ tags:
   - Python
   - PyTorch
 icon: simple/pytorch
+status: new
 ---
 
 # PyTorch + IREE = :octicons-heart-16:
 
 !!! caution "Caution - under development"
+
     We are still validating and fixing specific models. Between bug fixes in
     flight and releases running behind, we don't expect that you will be able
     to do a lot of advanced things without using nightly releases or working
@@ -20,7 +22,8 @@ icon: simple/pytorch
 
 ## :octicons-book-16: Overview
 
-[SHARK-Turbine](https://github.com/nod-ai/SHARK-Turbine) offers a tight
+[iree-turbine](https://pypi.org/project/iree-turbine/) (rebrand pending from
+[SHARK-Turbine](https://github.com/nod-ai/SHARK-Turbine)) offers a tight
 integration between compatible versions of IREE,
 [torch-mlir](https://github.com/llvm/torch-mlir), and
 [PyTorch](https://pytorch.org/).
@@ -36,14 +39,14 @@ graph LR
   accTitle: PyTorch integration overview
   accDescr {
     PyTorch programs can be optimized within a Python session with
-    SHARK-Turbine's just-in-time tools.
+    iree-turbine's just-in-time tools.
     PyTorch programs can be exported out of Python to native binaries using
-    SHARK-Turbine's ahead-of-time export toolkit.
+    iree-turbine's ahead-of-time export toolkit.
   }
 
   subgraph Python
     pytorch(PyTorch)
-    subgraph turbine [SHARK-Turbine]
+    subgraph turbine [iree-turbine]
       jit("Eager execution (JIT)")
       aot("Export toolkit (AOT)")
     end
@@ -62,10 +65,17 @@ graph LR
 
 ## :octicons-download-16: Prerequisites
 
-Install Turbine and its requirements:
+Install a recent version of PyTorch (`2.3.0+`, prerelease as of April 2024):
 
 ``` shell
-python -m pip install shark-turbine
+python -m pip install \
+  --pre --index-url https://download.pytorch.org/whl/test/cpu torch==2.3.0
+```
+
+Install iree-turbine:
+
+``` shell
+python -m pip install iree-turbine
 ```
 
 ## :octicons-flame-16: Just-in-time (JIT) execution
@@ -91,7 +101,7 @@ graph TD
     subgraph compile ["torch.compile()"]
       direction LR
       dynamo{{TorchDynamo}}
-      turbine{{SHARK-Turbine}}
+      turbine{{iree-turbine}}
       iree{{IREE}}
       dynamo --> turbine --> iree
     end
@@ -101,12 +111,14 @@ graph TD
   end
 ```
 
-For deployment outside of Python, see the ahead-of-time sections below.
+For deployment outside of Python, see the
+[ahead-of-time sections below](#ahead-of-time-aot-export).
 
 ### :octicons-rocket-16: Quickstart
 
 Turbine integrates into PyTorch as a
-[custom backend](https://pytorch.org/docs/2.0/dynamo/custom-backends.html) for
+[custom backend](https://pytorch.org/docs/stable/torch.compiler_custom_backends.html)
+for
 [`torch.compile`](https://pytorch.org/docs/stable/generated/torch.compile.html).
 
 Behind the scenes, PyTorch captures the structure of the input model into a
@@ -143,7 +155,7 @@ turbine_output = opt_linear_module(args)
 | Code samples |  |
 | -- | -- |
 JIT compilation notebook | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/colab/pytorch_jit.ipynb)
-Simple MLP eager | [`examples/eager_mlp/mlp_eager_simple.py`](https://github.com/nod-ai/SHARK-Turbine/blob/main/examples/eager_mlp/mlp_eager_simple.py)
+Simple MLP eager | [`core/examples/eager_mlp/mlp_eager_simple.py`](https://github.com/nod-ai/SHARK-Turbine/blob/main/core/examples/eager_mlp/mlp_eager_simple.py)
 
 ## :octicons-package-dependents-16: Ahead-of-time (AOT) export
 
@@ -219,7 +231,7 @@ print(result.to_host())
 | Code samples |  |
 | -- | -- |
 Simple AOT export notebook | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/colab/pytorch_aot_simple.ipynb)
-Simple MLP export | [`examples/aot_mlp/mlp_export_simple.py`](https://github.com/nod-ai/SHARK-Turbine/blob/main/examples/aot_mlp/mlp_export_simple.py)
+Simple MLP export | [`core/examples/aot_mlp/mlp_export_simple.py`](https://github.com/nod-ai/SHARK-Turbine/blob/main/core/examples/aot_mlp/mlp_export_simple.py)
 
 ### :octicons-tools-16: Advanced API
 
@@ -251,7 +263,7 @@ graph LR
 ```
 
 Advanced export workflows can use the
-[`aot.CompiledModule`](https://github.com/nod-ai/SHARK-Turbine/blob/main/python/shark_turbine/aot/compiled_module.py)
+[`aot.CompiledModule`](https://github.com/nod-ai/SHARK-Turbine/blob/main/core/shark_turbine/aot/compiled_module.py)
 class to define and constrain the structure of a program prior to compiling it.
 
 <!-- TODO(scotttodd): API reference pages for aot.CompiledModule etc.?
@@ -349,8 +361,7 @@ their values independently at runtime.
 * Individual globals can be exported using `aot.export_global()`:
 
     ```python
-    state_example = torch.tensor(0, dtype=torch.int32)
-    update_example = torch.tensor(0, dtype=torch.int32)
+    state_example = torch.zeros([1], dtype=torch.int32)
 
     class SampleModule(aot.CompiledModule):
       value = aot.export_global(state_example, mutable=True)
@@ -358,7 +369,7 @@ their values independently at runtime.
       def get_value(self):
         return self.value
 
-      def update_value(self, new_value=aot.abstractify(update_example)):
+      def update_value(self, new_value=aot.abstractify(value)):
         self.value = new_value
     ```
 
@@ -400,24 +411,6 @@ their values independently at runtime.
 | -- | -- |
 Advanced AOT export notebook | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/colab/pytorch_aot_advanced.ipynb)
 PyTorch dynamic shapes notebook | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/dynamic_shapes/pytorch_dynamic_shapes.ipynb)
-AOT unit tests | [`tests/aot/`](https://github.com/nod-ai/SHARK-Turbine/tree/main/tests/aot)
-Dynamic MLP export | [`examples/aot_mlp/mlp_export_dynamic.py`](https://github.com/nod-ai/SHARK-Turbine/blob/main/examples/aot_mlp/mlp_export_dynamic.py)
-stateless llama2 | [`python/turbine_models/custom_models/stateless_llama.py`](https://github.com/nod-ai/SHARK-Turbine/blob/main/python/turbine_models/custom_models/stateless_llama.py)
-
-## Alternate workflows
-
-!!! caution "Caution - These are due for migration to SHARK-Turbine."
-
-| Code samples |  |
-| -- | -- |
-(Deprecated) Inference on BERT | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iree-org/iree-torch/blob/main/examples/bert.ipynb)
-
-### Native / on-device training
-
-A small (~100-250KB), self-contained binary can be built for deploying to
-resource-constrained environments without a Python interpreter.
-
-| Example scripts |
-| -- |
-| [Basic Inference and Training Example](https://github.com/iree-org/iree-torch/blob/main/examples/regression.py) |
-| [Native On-device Training Example](https://github.com/iree-org/iree-torch/tree/main/examples/native_training) |
+AOT unit tests | [`core/tests/aot/`](https://github.com/nod-ai/SHARK-Turbine/tree/main/core/tests/aot)
+Dynamic MLP export | [`core/examples/aot_mlp/mlp_export_dynamic.py`](https://github.com/nod-ai/SHARK-Turbine/blob/main/core/examples/aot_mlp/mlp_export_dynamic.py)
+stateless llama2 | [`models/turbine_models/custom_models/stateless_llama.py`](https://github.com/nod-ai/SHARK-Turbine/blob/main/models/turbine_models/custom_models/stateless_llama.py)
