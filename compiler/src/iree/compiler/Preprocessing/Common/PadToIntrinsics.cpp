@@ -170,8 +170,9 @@ static void padConvOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
                                      rewriter.getIndexAttr(resultShape[1]),
                                      rewriter.getIndexAttr(resultShape[2]),
                                      rewriter.getIndexAttr(resultShape[3])};
-  rewriter.replaceOpWithNewOp<tensor::ExtractSliceOp>(
-      linalgOp, paddedConv2dOp->getResults()[0], offsets, sizes, strides);
+  Value extracted = rewriter.createOrFold<tensor::ExtractSliceOp>(
+      loc, paddedConv2dOp->getResults()[0], offsets, sizes, strides);
+  rewriter.replaceOp(linalgOp, extracted);
 }
 
 static void padBatchGemmOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
@@ -277,7 +278,7 @@ struct PadToIntrinsicsPass final
             padConvOp(rewriter, linalgOp, intrinsics);
           })
           .Case<linalg::BatchMatmulOp>([&](linalg::BatchMatmulOp matmulOp) {
-            padBatchGemmOp(rewriter, linalgOp, intrinsics);
+            // padBatchGemmOp(rewriter, linalgOp, intrinsics);
           })
           .Default([&](Operation *op) {});
     }
