@@ -1,4 +1,3 @@
-
 // RUN: iree-opt %s --pass-pipeline="builtin.module(func.func(iree-preprocessing-pad-to-intrinsics))" \
 // RUN:   | FileCheck %s
 
