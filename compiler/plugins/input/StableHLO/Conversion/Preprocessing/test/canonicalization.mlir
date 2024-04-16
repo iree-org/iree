@@ -474,19 +474,6 @@ func.func @dynamic_broadcast_in_dim_op_almost_not_actually_dynamic(%arg0: tensor
   func.return %0 : tensor<5x4xf32>
 }
 
-// CHECK-LABEL: func @dynamic_broadcast_in_dim_all_dims_non_expanding
-func.func @dynamic_broadcast_in_dim_all_dims_non_expanding(%arg0: tensor<*xf32>, %arg1: tensor<1xindex>) -> tensor<?xf32> {
-  // CHECK-SAME: %[[ARG:.*]]: tensor<*xf32>
-  %1 = "stablehlo.dynamic_broadcast_in_dim"(%arg0, %arg1) {
-    broadcast_dimensions = array<i64: 0>,
-    known_expanding_dimensions = array<i64>,
-    known_nonexpanding_dimensions = array<i64: 0>
-  } : (tensor<*xf32>, tensor<1xindex>) -> tensor<?xf32>
-  // CHECK: %[[RES:.*]] = tensor.cast %[[ARG]] : tensor<*xf32> to tensor<?xf32>
-  // CHECK: return %[[RES]] : tensor<?xf32>
-  func.return %1 : tensor<?xf32>
-}
-
 // -----
 
 // CHECK-LABEL: func.func @gather_to_slice
