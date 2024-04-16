@@ -130,21 +130,7 @@ IREE_ATTRIBUTE_ALWAYS_INLINE static inline void iree_debug_break(void) {
   ((void)(addr), (void)(size))
 #endif  // IREE_SANITIZER_ADDRESS
 
-#if defined(IREE_SANITIZER_THREAD)
-
-#include <sanitizer/tsan_interface.h>
-
-#define IREE_TSAN_ACQUIRE(addr) __tsan_acquire(addr)
-#define IREE_TSAN_RELEASE(addr) __tsan_release(addr)
-
-#else  // IREE_SANITIZER_THREAD
-
-#define IREE_TSAN_ACQUIRE(addr) (void)((addr))
-#define IREE_TSAN_RELEASE(addr) (void)((addr))
-
-#endif  // IREE_SANITIZER_THREAD
-
-#ifdef IREE_COMPILER_GCC_COMPAT
+#if defined(IREE_COMPILER_GCC_COMPAT) && defined(IREE_SANITIZER_THREAD)
 
 #define IREE_DISABLE_COMPILER_TSAN_ERRORS()           \
   _Pragma("GCC diagnostic push")                      \
@@ -152,12 +138,12 @@ IREE_ATTRIBUTE_ALWAYS_INLINE static inline void iree_debug_break(void) {
           _Pragma("GCC diagnostic ignored \"-Wtsan\"")
 #define IREE_RESTORE_COMPILER_TSAN_ERRORS() _Pragma("GCC diagnostic pop")
 
-#else  // IREE_COMPILER_GCC_COMPAT
+#else  // IREE_COMPILER_GCC_COMPAT ...
 
 #define IREE_DISABLE_COMPILER_TSAN_ERRORS()
 #define IREE_RESTORE_COMPILER_TSAN_ERRORS()
 
-#endif  // IREE_COMPILER_GCC_COMPAT
+#endif  // IREE_COMPILER_GCC_COMPAT ...
 
 #ifdef __cplusplus
 }  // extern "C"
