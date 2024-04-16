@@ -14,9 +14,11 @@ iree_cc_library(
   NAME
     ExternalModels
   HDRS
+    "FlowExternalModels.h"
     "Interfaces.h"
     "UtilExternalModels.h"
   SRCS
+    "FlowExternalModels.cpp"
     "Interfaces.cpp"
     "UtilExternalModels.cpp"
   DEPS
@@ -27,6 +29,7 @@ iree_cc_library(
     MLIRLinalgStructuredOpsIncGenLib
     MLIRMLProgramDialect
     MLIRTensorDialect
+    iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::Util::IR
   PUBLIC

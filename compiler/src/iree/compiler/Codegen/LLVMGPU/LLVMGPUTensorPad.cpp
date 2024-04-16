@@ -11,6 +11,8 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Interfaces/ValueBoundsOpInterface.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -42,75 +44,6 @@ getPaddedShapeFromTensorLoad(IREE::Flow::DispatchTensorLoadOp tensorLoad,
     }
   }
   return paddedShape;
-}
-
-static FailureOr<SmallVector<Value>>
-rewriteAsPaddedOp(IRRewriter &rewriter, linalg::LinalgOp linalgOp,
-                  linalg::LinalgOp &paddedOp) {
-  Location loc = linalgOp.getLoc();
-
-  IRRewriter::InsertionGuard g(rewriter);
-  // Set IP after op because we also take the dims of the original output.
-  rewriter.setInsertionPointAfter(linalgOp);
-
-  // Pad each input operand in shared memory up to the targets bounding box
-  // size. In this case, this corresponds with the maximum tile size from
-  // distributing to workgroups.
-  SmallVector<Value> paddedOperands;
-  paddedOperands.reserve(linalgOp.getNumDpsInputs() +
-                         linalgOp.getNumDpsInits());
-  for (OpOperand &opOperand : linalgOp->getOpOperands()) {
-    auto tensorLoad =
-        opOperand.get().getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
-    if (!tensorLoad) {
-      return rewriter.notifyMatchFailure(linalgOp, "does not have tensor load");
-    }
-    FailureOr<SmallVector<int64_t>> maybePaddedShape =
-        getPaddedShapeFromTensorLoad(tensorLoad, linalgOp.getShape(&opOperand));
-    if (failed(maybePaddedShape))
-      return failure();
-    auto paddedShape = *maybePaddedShape;
-
-    Value paddingValue = rewriter.create<arith::ConstantOp>(
-        loc, rewriter.getZeroAttr(getElementTypeOrSelf(tensorLoad)));
-    auto paddedTensorType =
-        RankedTensorType::get(paddedShape, getElementTypeOrSelf(tensorLoad));
-    Value paddedValue = linalg::makeComposedPadHighOp(
-        rewriter, loc, paddedTensorType, tensorLoad, paddingValue,
-        /*nofold=*/false);
-    paddedOperands.push_back(paddedValue);
-  }
-
-  // Clone linalgOp to paddedOp with padded input/output shapes.
-  auto resultTensorTypes = ValueRange(paddedOperands)
-                               .take_back(linalgOp.getNumDpsInits())
-                               .getTypes();
-  paddedOp = mlir::clone(rewriter, linalgOp, resultTensorTypes, paddedOperands);
-
-  // Slice out the original shape from the padded result to pass on to
-  // consumers. The original linalg op is used to provide the dims for the reify
-  // result shapes.
-  SmallVector<SmallVector<OpFoldResult>> reifiedResultShapes;
-  if (failed(cast<ReifyRankedShapedTypeOpInterface>(linalgOp.getOperation())
-                 .reifyResultShapes(rewriter, reifiedResultShapes))) {
-    return failure();
-  }
-
-  SmallVector<Value> paddedSubviewResults;
-  paddedSubviewResults.reserve(paddedOp->getNumResults());
-  for (const auto &[resultNumber, paddedResult] :
-       llvm::enumerate(paddedOp->getResults())) {
-    int64_t rank =
-        llvm::cast<RankedTensorType>(paddedResult.getType()).getRank();
-    SmallVector<OpFoldResult> offsets(rank, rewriter.getIndexAttr(0));
-    SmallVector<OpFoldResult> sizes;
-    for (OpFoldResult v : reifiedResultShapes[resultNumber])
-      sizes.push_back(v);
-    SmallVector<OpFoldResult> strides(rank, rewriter.getIndexAttr(1));
-    paddedSubviewResults.push_back(rewriter.create<tensor::ExtractSliceOp>(
-        loc, paddedResult, offsets, sizes, strides));
-  }
-  return paddedSubviewResults;
 }
 
 static FailureOr<Value> rewriteAsPaddedOp(IRRewriter &rewriter,
@@ -195,15 +128,28 @@ struct LLVMGPUTensorPadPass
         return;
       }
 
-      linalg::LinalgOp paddedOp;
-      FailureOr<SmallVector<Value>> newResults =
-          rewriteAsPaddedOp(rewriter, linalgOp, paddedOp);
-      if (failed(newResults)) {
-        return;
+      SmallVector<int64_t> paddingDims =
+          llvm::to_vector(llvm::seq<int64_t>(0, linalgOp.getNumLoops()));
+      SmallVector<Attribute> paddingValueAttributes;
+      for (auto &operand : linalgOp->getOpOperands()) {
+        auto elemType = getElementTypeOrSelf(operand.get().getType());
+        paddingValueAttributes.push_back(rewriter.getZeroAttr(elemType));
       }
 
-      // Replace the original operation to pad.
-      rewriter.replaceOp(linalgOp, *newResults);
+      auto options =
+          linalg::LinalgPaddingOptions()
+              .setPaddingDimensions(paddingDims)
+              .setPaddingValues(paddingValueAttributes)
+              .setCopyBackOp(linalg::LinalgPaddingOptions::CopyBackOp::None);
+      linalg::LinalgOp paddedOp;
+      SmallVector<Value> newResults;
+      SmallVector<tensor::PadOp> padOps;
+      if (failed(linalg::rewriteAsPaddedOp(rewriter, linalgOp, options,
+                                           paddedOp, newResults, padOps))) {
+        funcOp.emitWarning("failed to pad ops");
+        return;
+      }
+      rewriter.replaceOp(linalgOp, newResults);
     });
 
     funcOp.walk([&](tensor::UnPackOp unpackOp) {

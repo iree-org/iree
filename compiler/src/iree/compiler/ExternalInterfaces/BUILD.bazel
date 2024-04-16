@@ -15,14 +15,17 @@ package(
 iree_compiler_cc_library(
     name = "ExternalModels",
     srcs = [
+        "FlowExternalModels.cpp",
         "Interfaces.cpp",
         "UtilExternalModels.cpp",
     ],
     hdrs = [
+        "FlowExternalModels.h",
         "Interfaces.h",
         "UtilExternalModels.h",
     ],
     deps = [
+        "//compiler/src/iree/compiler/Dialect/Flow/IR",
         "//compiler/src/iree/compiler/Dialect/LinalgExt/IR",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
         "@llvm-project//mlir:ArithDialect",
