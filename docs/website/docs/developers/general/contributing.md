@@ -8,7 +8,7 @@ We'd love to accept your patches and contributions to this project.
 
 !!! note "Note - coordinating efforts"
 
-    Please [file issues](https://github.com/openxla/iree/issues/new/choose) or
+    Please [file issues](https://github.com/iree-org/iree/issues/new/choose) or
     reach out on any of our other
     [communication channels](../../index.md#communication-channels) before doing
     substantial work; this will ensure that others don't duplicate the work and
@@ -55,7 +55,7 @@ they are applied consistently across the project.
     run automatically in your editor of choice.
 
     The script at
-    [`build_tools/scripts/lint.sh`](https://github.com/openxla/iree/blob/main/build_tools/scripts/lint.sh)
+    [`build_tools/scripts/lint.sh`](https://github.com/iree-org/iree/blob/main/build_tools/scripts/lint.sh)
     can also be used to run the full suite of lint checks.
 
 ### :octicons-code-review-16: Code reviews
@@ -145,7 +145,7 @@ join any of the teams on <https://github.com/orgs/openxla/teams>.
 
 If you would like additional recognition for your contributions, you may add
 yourself or your organization to the
-[AUTHORS file](https://github.com/openxla/iree/blob/main/AUTHORS) that keeps
+[AUTHORS file](https://github.com/iree-org/iree/blob/main/AUTHORS) that keeps
 track of those who have made significant contributions to the project.
 
 * Please add the entity who owns the copyright for your contribution.
@@ -181,7 +181,7 @@ IREE supports building from source with both Bazel and CMake.
 
 IREE uses [GitHub Actions](https://docs.github.com/en/actions) for CI. The
 primary CI is configured in the
-[ci.yml workflow file](https://github.com/openxla/iree/blob/main/.github/workflows/ci.yml).
+[ci.yml workflow file](https://github.com/iree-org/iree/blob/main/.github/workflows/ci.yml).
 
 #### Self-hosted runners
 
@@ -190,7 +190,7 @@ In addition to the default runners GitHub provides, IREE uses
 to run many of its workflow jobs. These enable access to additional compute and
 custom configurations such as accelerators. Configuration scripting is checked
 in to this repository (see the
-[README for that directory](https://github.com/openxla/iree/blob/main/build_tools/github_actions/runner/README.md)).
+[README for that directory](https://github.com/iree-org/iree/blob/main/build_tools/github_actions/runner/README.md)).
 
 #### Custom managed runners
 
@@ -202,7 +202,7 @@ for some platforms.
 
 The setup step of the CI determines which CI jobs to run. This is controlled by
 the
-[configure_ci.py](https://github.com/openxla/iree/blob/main/build_tools/github_actions/configure_ci.py)
+[configure_ci.py](https://github.com/iree-org/iree/blob/main/build_tools/github_actions/configure_ci.py)
 script. It will generally run a pre-determined set of jobs on presubmit with
 some jobs kept as post-submit only. If changes are only to a certain set of
 excluded files that we know don't affect CI (e.g. Markdown files), then it will
@@ -379,7 +379,7 @@ different branch on your public fork and create the PR from there.
     [git-sudo](https://gist.github.com/GMNGeoffrey/42dd9a9792390094a43bdb69659320c0).
 
 3. Use a script like
-    [git_update.sh](https://github.com/openxla/iree/blob/main/build_tools/scripts/git/git_update.sh)
+    [git_update.sh](https://github.com/iree-org/iree/blob/main/build_tools/scripts/git/git_update.sh)
     to easily synchronize `main` with `upstream`. Submodules make this is a
     little trickier than it should be. You can also turn this into a git command
     by adding it to your path as `git-update`.

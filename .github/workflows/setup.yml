@@ -73,7 +73,7 @@ jobs:
         # possible to update the trailers, labels on the pull request and re-run
         # the workflow to make them take effect.
         # This is majorly for triggering benchmarks without pushing new commits.
-        # See https://github.com/openxla/iree/issues/10042#issuecomment-1449250094
+        # See https://github.com/iree-org/iree/issues/10042#issuecomment-1449250094
         # for more details.
         id: fetch-pr
         if: github.event_name == 'pull_request'

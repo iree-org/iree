@@ -171,14 +171,14 @@ The default build does _not_ include:
 * Experimental components
 
 These can be changed via the `IREE_` CMake options listed in the root
-[`CMakeLists.txt`](https://github.com/openxla/iree/blob/main/CMakeLists.txt).
+[`CMakeLists.txt`](https://github.com/iree-org/iree/blob/main/CMakeLists.txt).
 
 ### Extensions and integrations
 
 When using IREE within other projects, you can register compiler plugins and
 runtime HAL drivers. You can also bring your own copy of LLVM and some other
 tools. See the root
-[`CMakeLists.txt`](https://github.com/openxla/iree/blob/main/CMakeLists.txt)
+[`CMakeLists.txt`](https://github.com/iree-org/iree/blob/main/CMakeLists.txt)
 for details.
 
 ## :octicons-code-16: Tests and samples
@@ -220,7 +220,7 @@ cmake --build ../iree-build --target iree-run-tests
 ```
 
 To run only certain tests, we have a
-[helper script](https://github.com/openxla/iree/blob/main/build_tools/cmake/ctest_all.sh)
+[helper script](https://github.com/iree-org/iree/blob/main/build_tools/cmake/ctest_all.sh)
 that converts environment variables into ctest filters:
 
 ``` shell

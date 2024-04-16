@@ -118,5 +118,5 @@ to use TFLite programs with IREE.
 IREE also has bindings for the
 [TFLite C API](https://github.com/tensorflow/tensorflow/tree/master/tensorflow/lite/c),
 see the
-[`runtime/bindings/tflite/`](https://github.com/openxla/iree/tree/main/runtime/bindings/tflite)
+[`runtime/bindings/tflite/`](https://github.com/iree-org/iree/tree/main/runtime/bindings/tflite)
 directory for details.

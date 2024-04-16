@@ -9,17 +9,17 @@ icon: material/chart-line
 [Tracy](https://github.com/wolfpld/tracy) is a hybrid instrumentation and
 sampling profiler that IREE uses for performance analysis.
 
-[![Tracy overview](https://github.com/openxla/iree/assets/4010439/3df4f682-9215-4f55-b7b0-5fe2dce860b0)](https://github.com/openxla/iree/assets/4010439/3df4f682-9215-4f55-b7b0-5fe2dce860b0)
+[![Tracy overview](https://github.com/iree-org/iree/assets/4010439/3df4f682-9215-4f55-b7b0-5fe2dce860b0)](https://github.com/iree-org/iree/assets/4010439/3df4f682-9215-4f55-b7b0-5fe2dce860b0)
 
 ### :material-eyedropper: Instrumentation and sampling
 
 * *Instrumentation* is generic code built into the program being profiled,
     recording zone start and end timestamps where a developer requests them:
 
-    [![Tracy instrumentation](https://github.com/openxla/iree/assets/4010439/70706e6d-d253-4ca3-85bf-165f23d24635)](https://github.com/openxla/iree/assets/4010439/70706e6d-d253-4ca3-85bf-165f23d24635)
+    [![Tracy instrumentation](https://github.com/iree-org/iree/assets/4010439/70706e6d-d253-4ca3-85bf-165f23d24635)](https://github.com/iree-org/iree/assets/4010439/70706e6d-d253-4ca3-85bf-165f23d24635)
 
     Most of IREE's runtime code is instrumented using the macros defined in
-    [iree/base/tracing.h](https://github.com/openxla/iree/blob/main/runtime/src/iree/base/tracing.h):
+    [iree/base/tracing.h](https://github.com/iree-org/iree/blob/main/runtime/src/iree/base/tracing.h):
 
     ```c
     void iree_sample_function() {
@@ -33,7 +33,7 @@ sampling profiler that IREE uses for performance analysis.
     platform-specific APIs at a regular sampling frequency. Sampled data
     includes callstacks, hardware counters, and more:
 
-    [![Tracy sampling](https://github.com/openxla/iree/assets/4010439/d637a692-8bfa-42c4-bd0d-75ea3dce2e69)](https://github.com/openxla/iree/assets/4010439/d637a692-8bfa-42c4-bd0d-75ea3dce2e69)
+    [![Tracy sampling](https://github.com/iree-org/iree/assets/4010439/d637a692-8bfa-42c4-bd0d-75ea3dce2e69)](https://github.com/iree-org/iree/assets/4010439/d637a692-8bfa-42c4-bd0d-75ea3dce2e69)
 
     While recording instrumentation data requires no special setup, recording
     sampling data will need some configuration depending on your operating
@@ -193,7 +193,7 @@ be built from source by using either the upstream CMake build or IREE's
 #### Changing `IREE_TRACING_MODE`
 
 Set IREE's `IREE_TRACING_MODE` value (defined in
-[iree/base/tracing.h](https://github.com/openxla/iree/blob/main/runtime/src/iree/base/tracing.h))
+[iree/base/tracing.h](https://github.com/iree-org/iree/blob/main/runtime/src/iree/base/tracing.h))
 to adjust which tracing features are enabled. Each feature adds tracing overhead
 and increases the size of trace files, so adjust this setting with care.
 
@@ -210,7 +210,7 @@ cmake --build ../iree-build/ --target iree-run-module
 The Memory window in the Tracy profiler should then show callstacks for each
 allocation:
 
-[![Tracy memory callstacks](https://github.com/openxla/iree/assets/4010439/c0732eec-3fc5-476b-8e6a-fa8c8631eaac)](https://github.com/openxla/iree/assets/4010439/c0732eec-3fc5-476b-8e6a-fa8c8631eaac)
+[![Tracy memory callstacks](https://github.com/iree-org/iree/assets/4010439/c0732eec-3fc5-476b-8e6a-fa8c8631eaac)](https://github.com/iree-org/iree/assets/4010439/c0732eec-3fc5-476b-8e6a-fa8c8631eaac)
 
 #### Options for the `llvm-cpu` backend
 
@@ -221,7 +221,7 @@ When using the `llvm-cpu` backend (`--iree-hal-target-backends=llvm-cpu` with
     (.so/.dylib/.dll) instead of the generic
     "embedded" ELF linker, allowing Tracy to look more deeply at generated code:
 
-    [![System linking source](https://github.com/openxla/iree/assets/4010439/29b72647-f242-41d9-8a6c-10b48dc155fa)](https://github.com/openxla/iree/assets/4010439/29b72647-f242-41d9-8a6c-10b48dc155fa)
+    [![System linking source](https://github.com/iree-org/iree/assets/4010439/29b72647-f242-41d9-8a6c-10b48dc155fa)](https://github.com/iree-org/iree/assets/4010439/29b72647-f242-41d9-8a6c-10b48dc155fa)
 
 * The `IREE_PRESERVE_DYLIB_TEMP_FILES` environment variable can be used on
     Posix platforms to ensure that Tracy can view IREE's generated native code.
@@ -341,12 +341,12 @@ cmake --build ../iree-build/ --target iree-compile
 The steps for collecting traces are the same: run the instrumented program and
 connect using the Tracy profiler UI or capture tool.
 
-[![Tracing iree-compile](https://github.com/openxla/iree/assets/4010439/bf5c0502-6b1b-4caa-bdd9-132281245421)](https://github.com/openxla/iree/assets/4010439/bf5c0502-6b1b-4caa-bdd9-132281245421)
+[![Tracing iree-compile](https://github.com/iree-org/iree/assets/4010439/bf5c0502-6b1b-4caa-bdd9-132281245421)](https://github.com/iree-org/iree/assets/4010439/bf5c0502-6b1b-4caa-bdd9-132281245421)
 
 * MLIR passes are instrumented using
   [Pass Instrumentation](https://mlir.llvm.org/docs/PassManagement/#pass-instrumentation),
   (see
-  [`TracingUtils.h`](https://github.com/openxla/iree/blob/main/compiler/src/iree/compiler/Utils/TracingUtils.h))
+  [`TracingUtils.h`](https://github.com/iree-org/iree/blob/main/compiler/src/iree/compiler/Utils/TracingUtils.h))
 * Zones are annotated with op breadcrumbs indicating which root op was processed
 * Each compilation phase (e.g. Flow, Stream, HAL) is tagged as a "frame", so
   you can jump between them, limit statistics to them, and see how much time
@@ -358,7 +358,7 @@ connect using the Tracy profiler UI or capture tool.
     of trace events. Traces captured with sampling can thus take hours to
     collect, require 40GB+ of RAM to view, and take 1GB+ on disk to store.
 
-    ![image](https://github.com/openxla/iree/assets/4010439/39c42225-0309-4067-91cf-e6ac1c0aae0e)
+    ![image](https://github.com/iree-org/iree/assets/4010439/39c42225-0309-4067-91cf-e6ac1c0aae0e)
 
     However, sampling is especially useful in diagnosing long compile times,
     since only the MLIR passes are instrumentated, unlike in IREE's runtime

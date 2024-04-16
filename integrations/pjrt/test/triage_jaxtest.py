@@ -323,102 +323,54 @@ def check_dot_shape(errortxt, _, __):
 
 
 KnownChecks = {
-    "https://github.com/openxla/iree/issues/14255 (detensoring)":
-        check_from_tensor,
-    "https://github.com/openxla/iree/issues/????? (unknown)":
-        check_jax_unimplemented,
-    "https://github.com/openxla/iree/issues/13726 (collective)":
-        check_collective,
-    "https://github.com/openxla/iree/issues/12410 (custom call)":
-        check_custom_call,
-    "https://github.com/openxla/iree/issues/11018 (triangle)":
-        check_triangular_solve,
-    "https://github.com/openxla/iree/issues/12263 (fft)":
-        check_fft,
-    "https://github.com/openxla/iree/issues/14072 (complex convolution)":
-        check_complex_convolution,
-    "https://github.com/openxla/iree/issues/10816 (cholesky)":
-        check_cholesky,
-    "https://github.com/openxla/iree/issues/11761 (rng bit gen i8)":
-        check_rng_bit_i8,
-    "https://github.com/openxla/iree/issues/????? (eigen decomp)":
-        check_eigen_decomposition,
-    "https://github.com/openxla/iree/issues/13579 (scatter ui)":
-        check_scatter_ui,
-    "https://github.com/openxla/iree/issues/13725 (cross repl)":
-        check_cross_replica,
-    "https://github.com/openxla/iree/issues/13493 (dot i1)":
-        check_dot_i1,
-    "https://github.com/openxla/iree/issues/13522 (roundeven)":
-        check_roundeven,
-    "https://github.com/openxla/iree/issues/13577 (max/min f16)":
-        check_min_max_f16,
-    "https://github.com/openxla/iree/issues/13523 (scatter)":
-        check_scatter,
-    "https://github.com/openxla/iree/issues/13580 (scatter crash)":
-        check_scatter_crash,
-    "https://github.com/openxla/iree/issues/14079 (shape_cast)":
-        check_shape_cast,
-    "https://github.com/openxla/iree/issues/????? (optimized prgrm)":
-        check_optimized_program,
-    "https://github.com/openxla/iree/issues/????? (donation)":
-        check_donation,
-    "https://github.com/openxla/iree/issues/????? (python callback)":
-        check_python_callback,
-    "https://github.com/openxla/iree/issues/????? (subspan)":
-        check_subspan,
-    "https://github.com/openxla/iree/issues/14098 (unsigned topk)":
-        check_unsigned_topk,
-    "https://github.com/openxla/iree/issues/????? (bounds indexing)":
-        check_bounds_indexing,
-    "https://github.com/openxla/iree/issues/????? (nan correctness)":
-        check_nan_correctness,
-    "https://github.com/openxla/iree/issues/????? (pointer mismatch)":
-        check_pointer_mismatch,
-    "https://github.com/openxla/iree/issues/10841 (select and scatter)":
-        check_select_and_scatter,
-    "https://github.com/openxla/iree/issues/????? (degenerate scatter)":
-        check_degenerate_scatter,
-    "https://github.com/openxla/iree/issues/????? (cost analysis)":
-        check_cost_analysis,
-    "https://github.com/openxla/iree/issues/????? (invalid option)":
-        check_invalid_option,
-    "https://github.com/openxla/iree/issues/????? (inf mismatch)":
-        check_inf_mismatch,
-    "https://github.com/openxla/iree/issues/????? (shape assertion)":
-        check_shape_assertion,
-    "https://github.com/openxla/iree/issues/????? (vector contract)":
-        check_vector_contract,
-    "https://github.com/openxla/iree/issues/????? (subbyte indexed)":
-        check_subbyte_read,
-    "https://github.com/openxla/iree/issues/????? (buffer usage)":
-        check_buffer_usage,
-    "https://github.com/openxla/iree/issues/????? (subbyte singleton)":
-        check_subbyte_singleton,
-    "https://github.com/openxla/iree/issues/????? (max arg)":
-        check_max_arg,
-    "https://github.com/openxla/iree/issues/????? (double support)":
-        check_double_support,
-    "https://github.com/openxla/iree/issues/????? (zero extent)":
-        check_stablehlo_degenerate,
-    "https://github.com/openxla/iree/issues/????? (all reduce)":
-        check_stablehlo_allreduce,
-    "https://github.com/openxla/iree/issues/????? (stablehlo dot_general)":
-        check_dot_shape,
-    "(unknown backend)":
-        check_unknown_backend,
-    "(semaphore)":
-        check_semaphore_overload,
-    "Aborted (possible timeout)":
-        check_aborted,
-    "Runtime Crash":
-        check_runtime_crash,
-    "Compilation Failure":
-        check_compilation,
-    "Numerical Failures":
-        check_numerical,
-    "Untriaged":
-        lambda _, __, ___: True,
+    "https://github.com/iree-org/iree/issues/14255 (detensoring)": check_from_tensor,
+    "https://github.com/iree-org/iree/issues/????? (unknown)": check_jax_unimplemented,
+    "https://github.com/iree-org/iree/issues/13726 (collective)": check_collective,
+    "https://github.com/iree-org/iree/issues/12410 (custom call)": check_custom_call,
+    "https://github.com/iree-org/iree/issues/11018 (triangle)": check_triangular_solve,
+    "https://github.com/iree-org/iree/issues/12263 (fft)": check_fft,
+    "https://github.com/iree-org/iree/issues/14072 (complex convolution)": check_complex_convolution,
+    "https://github.com/iree-org/iree/issues/10816 (cholesky)": check_cholesky,
+    "https://github.com/iree-org/iree/issues/11761 (rng bit gen i8)": check_rng_bit_i8,
+    "https://github.com/iree-org/iree/issues/????? (eigen decomp)": check_eigen_decomposition,
+    "https://github.com/iree-org/iree/issues/13579 (scatter ui)": check_scatter_ui,
+    "https://github.com/iree-org/iree/issues/13725 (cross repl)": check_cross_replica,
+    "https://github.com/iree-org/iree/issues/13493 (dot i1)": check_dot_i1,
+    "https://github.com/iree-org/iree/issues/13522 (roundeven)": check_roundeven,
+    "https://github.com/iree-org/iree/issues/13577 (max/min f16)": check_min_max_f16,
+    "https://github.com/iree-org/iree/issues/13523 (scatter)": check_scatter,
+    "https://github.com/iree-org/iree/issues/13580 (scatter crash)": check_scatter_crash,
+    "https://github.com/iree-org/iree/issues/14079 (shape_cast)": check_shape_cast,
+    "https://github.com/iree-org/iree/issues/????? (optimized prgrm)": check_optimized_program,
+    "https://github.com/iree-org/iree/issues/????? (donation)": check_donation,
+    "https://github.com/iree-org/iree/issues/????? (python callback)": check_python_callback,
+    "https://github.com/iree-org/iree/issues/????? (subspan)": check_subspan,
+    "https://github.com/iree-org/iree/issues/14098 (unsigned topk)": check_unsigned_topk,
+    "https://github.com/iree-org/iree/issues/????? (bounds indexing)": check_bounds_indexing,
+    "https://github.com/iree-org/iree/issues/????? (nan correctness)": check_nan_correctness,
+    "https://github.com/iree-org/iree/issues/????? (pointer mismatch)": check_pointer_mismatch,
+    "https://github.com/iree-org/iree/issues/10841 (select and scatter)": check_select_and_scatter,
+    "https://github.com/iree-org/iree/issues/????? (degenerate scatter)": check_degenerate_scatter,
+    "https://github.com/iree-org/iree/issues/????? (cost analysis)": check_cost_analysis,
+    "https://github.com/iree-org/iree/issues/????? (invalid option)": check_invalid_option,
+    "https://github.com/iree-org/iree/issues/????? (inf mismatch)": check_inf_mismatch,
+    "https://github.com/iree-org/iree/issues/????? (shape assertion)": check_shape_assertion,
+    "https://github.com/iree-org/iree/issues/????? (vector contract)": check_vector_contract,
+    "https://github.com/iree-org/iree/issues/????? (subbyte indexed)": check_subbyte_read,
+    "https://github.com/iree-org/iree/issues/????? (buffer usage)": check_buffer_usage,
+    "https://github.com/iree-org/iree/issues/????? (subbyte singleton)": check_subbyte_singleton,
+    "https://github.com/iree-org/iree/issues/????? (max arg)": check_max_arg,
+    "https://github.com/iree-org/iree/issues/????? (double support)": check_double_support,
+    "https://github.com/iree-org/iree/issues/????? (zero extent)": check_stablehlo_degenerate,
+    "https://github.com/iree-org/iree/issues/????? (all reduce)": check_stablehlo_allreduce,
+    "https://github.com/iree-org/iree/issues/????? (stablehlo dot_general)": check_dot_shape,
+    "(unknown backend)": check_unknown_backend,
+    "(semaphore)": check_semaphore_overload,
+    "Aborted (possible timeout)": check_aborted,
+    "Runtime Crash": check_runtime_crash,
+    "Compilation Failure": check_compilation,
+    "Numerical Failures": check_numerical,
+    "Untriaged": lambda _, __, ___: True,
 }
 
 

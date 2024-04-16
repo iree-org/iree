@@ -10,7 +10,7 @@
 The following environment variables are required:
 - GITHUB_REPOSITORY: GitHub org and repository, e.g. openxla/iree.
 - GITHUB_WORKFLOW_REF: GitHub workflow ref, e.g.
-    openxla/iree/.github/workflows/ci.yml@refs/pull/1/merge.
+    iree-org/iree/.github/workflows/ci.yml@refs/pull/1/merge.
 - GITHUB_EVENT_NAME: GitHub event name, e.g. pull_request.
 - GITHUB_OUTPUT: path to write workflow output variables.
 - GITHUB_STEP_SUMMARY: path to write workflow summary output.
@@ -165,7 +165,7 @@ PR_DESCRIPTION_TEMPLATE = string.Template("${title}\n\n${body}")
 # third_party/llvm-project submodule. This should only include PRs
 # intended to be merged and should exclude test/draft PRs as well as
 # PRs that include temporary patches to the submodule during review.
-# See also: https://github.com/openxla/iree/issues/12268
+# See also: https://github.com/iree-org/iree/issues/12268
 LLVM_INTEGRATE_TITLE_PATTERN = re.compile("^integrate.+llvm", re.IGNORECASE)
 LLVM_INTEGRATE_BRANCH_PATTERN = re.compile(
     "bump-llvm|llvm-bump|integrate-llvm", re.IGNORECASE
