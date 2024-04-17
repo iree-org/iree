@@ -22,7 +22,6 @@ iree_cc_library(
     LLVMSupport
     MLIRArithDialect
     MLIRIR
-    MLIRLinalgDialect
     MLIRMemRefDialect
     MLIRSupport
     MLIRTensorDialect

@@ -7,7 +7,6 @@
 #ifndef IREE_COMPILER_DIALECT_LINALGEXT_UTILS_UTILS_H_
 #define IREE_COMPILER_DIALECT_LINALGEXT_UTILS_UTILS_H_
 
-#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
