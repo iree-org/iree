@@ -6,7 +6,7 @@
 
 #include "iree/compiler/ConstEval/Runtime.h"
 
-#include "iree/base/status_cc.h"
+#include "iree/base/api.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
 #include "iree/hal/drivers/local_task/registration/driver_module.h"
@@ -144,16 +144,17 @@ FunctionCall::FunctionCall(CompiledBinary &binary, iree_host_size_t argCapacity,
     : binary(binary), argCapacity(argCapacity), resultCapacity(resultCapacity) {
 }
 
-LogicalResult FunctionCall::initialize() {
-  if (!iree_status_is_ok(iree_vm_list_create(iree_vm_make_undefined_type_def(),
-                                             argCapacity,
-                                             iree_allocator_system(), &inputs)))
-    return failure();
-  if (!iree_status_is_ok(
-          iree_vm_list_create(iree_vm_make_undefined_type_def(), resultCapacity,
-                              iree_allocator_system(), &outputs)))
-    return failure();
-  return success();
+LogicalResult FunctionCall::initialize(Location loc) {
+  iree_status_t status = iree_ok_status();
+  if (iree_status_is_ok(status)) {
+    status = iree_vm_list_create(iree_vm_make_undefined_type_def(), argCapacity,
+                                 iree_allocator_system(), &inputs);
+  }
+  if (iree_status_is_ok(status)) {
+    iree_vm_list_create(iree_vm_make_undefined_type_def(), resultCapacity,
+                        iree_allocator_system(), &outputs);
+  }
+  return handleRuntimeError(loc, status);
 }
 
 FailureOr<iree::vm::ref<iree_hal_buffer_t>>
@@ -502,16 +503,20 @@ InMemoryCompiledBinary::translateFromModule(mlir::ModuleOp moduleOp) {
 }
 
 Runtime::Runtime() {
-  if (iree_status_is_ok(initStatus))
+  if (iree_status_is_ok(initStatus)) {
     initStatus =
         iree_hal_driver_registry_allocate(iree_allocator_system(), &registry);
-  if (iree_status_is_ok(initStatus))
+  }
+  if (iree_status_is_ok(initStatus)) {
     initStatus = iree_hal_local_task_driver_module_register(registry);
-  if (iree_status_is_ok(initStatus))
+  }
+  if (iree_status_is_ok(initStatus)) {
     initStatus = iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
                                          iree_allocator_system(), &instance);
-  if (iree_status_is_ok(initStatus))
+  }
+  if (iree_status_is_ok(initStatus)) {
     initStatus = iree_hal_module_register_all_types(instance.get());
+  }
 }
 
 Runtime::~Runtime() {

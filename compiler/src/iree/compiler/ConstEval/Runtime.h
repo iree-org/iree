@@ -55,7 +55,7 @@ public:
   FunctionCall(CompiledBinary &binary, iree_host_size_t argCapacity,
                iree_host_size_t resultCapacity);
 
-  LogicalResult initialize();
+  LogicalResult initialize(Location loc);
   LogicalResult addArgument(Location loc, Attribute attr);
   LogicalResult invoke(Location loc, StringRef name);
   LogicalResult getResultAsAttr(Location loc, size_t index, Type mlirType,
