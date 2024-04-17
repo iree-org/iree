@@ -2818,6 +2818,24 @@ unsigned EncodingAttr::mapDimToRoleIndex(int64_t dimPos) {
   return idx.value();
 }
 
+//===---------------------------------------------------------------------===//
+// LinalgExt Dialect Helpers
+//===---------------------------------------------------------------------===//
+
+EncodingAttr mlir::iree_compiler::IREE::LinalgExt::getEncodingAttr(RankedTensorType type) {
+  return dyn_cast_or_null<EncodingAttr>(type.getEncoding());
+}
+
+FailureOr<linalg::ContractionDimensions>
+mlir::iree_compiler::IREE::LinalgExt::getEncodingContractionDims(EncodingAttr encoding) {
+  auto indexingMapsAttr = encoding.getUserIndexingMaps();
+  SmallVector<AffineMap> indexingMaps = llvm::map_to_vector(
+      indexingMapsAttr.getValue(), [](Attribute m) -> AffineMap {
+        return cast<AffineMapAttr>(m).getAffineMap();
+      });
+  return linalg::inferContractionDims(indexingMaps);
+}
+
 // clang-format off
 #define GET_OP_CLASSES
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.cpp.inc" // IWYU pragma: keep

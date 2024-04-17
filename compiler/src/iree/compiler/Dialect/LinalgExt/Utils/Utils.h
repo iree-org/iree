@@ -15,12 +15,6 @@
 #include "mlir/IR/PatternMatch.h"
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
-// TODO(hanchung): The forward declaration is aimed to avoid circular
-// dependency. It is surprising that Utils can not depend on LinalgExt, which
-// does not follow the code structure in upstream. This is likely because of
-// legacy issues. We should clean below methods up and move some of them to
-// compiler/Utils/.
-class EncodingAttr;
 
 /// Returns a `memref.dim` or `tensor.dim` operation to get the shape of `v` at
 /// `dim`.
@@ -94,18 +88,6 @@ static void permute(SmallVectorImpl<T> &vector) {
     break;
   }
 }
-
-//===---------------------------------------------------------------------===//
-// Utility methods about Encoding.
-//===---------------------------------------------------------------------===//
-
-/// Returns the encoding attribute from the type if there is an encoding.
-/// Otherwise, returns null.
-EncodingAttr getEncodingAttr(RankedTensorType type);
-
-/// Returns the ContractionDimensions for the encoding user_indexing_maps.
-FailureOr<linalg::ContractionDimensions>
-getEncodingContractionDims(EncodingAttr encoding);
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt
 #endif // IREE_COMPILER_DIALECT_LINALGEXT_UTILS_UTILS_H_
