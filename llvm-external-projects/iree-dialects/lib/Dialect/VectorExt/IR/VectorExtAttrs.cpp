@@ -102,14 +102,13 @@ VectorLayoutInterface LayoutAttr::project(ArrayRef<bool> droppedDims) const {
 // Permute the layout according to the provided permutation
 // vector. The dimensionality of the layout remains the same.
 VectorLayoutInterface LayoutAttr::permute(ArrayRef<int64_t> permutation) const {
-  int64_t rank = getRank();
-  assert(permutation.size() == rank &&
+  assert(permutation.size() == getRank() &&
          "permutation size must match layout rank");
 
   ArrayRef<PerDimLayoutAttr> layouts = getLayouts();
   SmallVector<PerDimLayoutAttr> newLayouts;
   for (unsigned index : permutation) {
-    assert(index >= 0 && index < rank);
+    assert(index >= 0 && index < getRank());
     newLayouts.push_back(layouts[index]);
   }
   return LayoutAttr::get(getContext(), newLayouts);
