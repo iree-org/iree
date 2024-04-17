@@ -86,6 +86,9 @@ class TargetConverter:
                 "@stablehlo//:broadcast_utils": [
                     "StablehloBroadcastUtils",
                 ],
+                "@stablehlo//:stablehlo_passes": [
+                    "StablehloPasses",
+                ],
                 # NCCL
                 "@nccl//:headers": [
                     "nccl::headers",
