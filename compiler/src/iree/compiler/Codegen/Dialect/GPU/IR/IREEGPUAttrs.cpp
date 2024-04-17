@@ -523,9 +523,18 @@ MMAAttr::SingleSubgroupLayout MMAAttr::getCSingleSubgroupLayoutOrder() const {
 // MMA Schedule Attributes
 //===----------------------------------------------------------------------===//
 
+/// Gets a unit vector of the given rank, but fills in the given dimensions
+/// from the 2 element array |counts|. |dim0| is the position in the returned
+/// vector to put the first element of |counts|, and |dim1| is the position to
+/// put the second element. For example,
+///
+/// rank = 3, counts = [5, 7], dim0 = 2, dim1 = 1
+/// returns [1, 5, 7]
 SmallVector<int64_t> getUnitOfRankWithDims(int64_t rank,
                                            ArrayRef<int64_t> counts,
                                            int64_t dim0, int64_t dim1) {
+  assert(counts.size() == 2 &&
+         "Unexpected non-rank 2 single subgroup dimension counts");
   SmallVector<int64_t> res(rank, 1);
   res[dim0] = counts[0];
   res[dim1] = counts[1];
@@ -536,9 +545,25 @@ SmallVector<int64_t> getIdentityPerm(int64_t rank) {
   return llvm::to_vector(llvm::seq(static_cast<int64_t>(0), rank));
 }
 
+/// Constructs an identity permutation with the given rank, except it applies
+/// the given rank-2 |perm| to the two dimensions |dim0| and |dim1|, and then
+/// swaps the positions of dim0 and dim1 in the final permutation. For example,
+///
+/// rank = 3, perm = [1, 0], dim0 = 1, dim1 = 2
+/// returns [0, 1, 2]
+///
+/// This is essentially just applying two rank-2 permutations to two particular
+/// dimensions. First it applies |perm|, which corresponds to a permutation
+/// needed by the underlying intrinsic, then it does another permutation based
+/// on the order of actual dimensions for the MMA fragment. For example, for the
+/// B matrix, dim0 = K and dim1 = N, so for the element order of an MFMA
+/// 16x16x16, perm would be `[1, 0]`, however if the actual contraction is a
+/// matmul_transpose_b, then the element order needs to be [0, 1].
 SmallVector<int64_t> getIdentityPermWithSwap(int64_t rank,
                                              ArrayRef<int64_t> perm,
                                              int64_t dim0, int64_t dim1) {
+  assert(perm.size() == 2 &&
+         "Unexpected non-rank 2 single subgroup dimension order");
   SmallVector<int64_t> res = getIdentityPerm(rank);
   if (perm[0] > perm[1]) {
     std::swap(dim0, dim1);
@@ -550,18 +575,42 @@ SmallVector<int64_t> getIdentityPermWithSwap(int64_t rank,
   return res;
 }
 
+/// Constructs the nested layout given the layout for a single subgroup and the
+/// subgroup/batch counts and orders, as well as the dimensions along which to
+/// distribute the intrinsic's layout.
+///
+/// |outerDim| and |innerDim| refer to which dimensions are the outermost and
+/// innermost for a canonical MK_KN_MN matrix multiply, for a particular
+/// fragment. For example, for the B matrix of an MK_NK_MN matrix multiply,
+/// we would have:
+///   outerDim = 1 for the K dim
+///   innerDim = 0 for the N dim
+///
+/// For something like MK_NKN_MN with multiple N dims, it would typically be:
+///   outerDim = 1 for K
+///   innerDim = 2 for the second N dim
+///
+/// Importantly these two dimensions always refer to the actual dimension
+/// positions in the undistributed vector. For each fragment, this means:
+///   A: [outerDim, innerDim] = [innerMostMDim, innerMostKDim]
+///   B: [outerDim, innerDim] = [innerMostKDim, innerMostNDim]
+///   C: [outerDim, innerDim] = [innerMostMDim, innerMostNDim]
+///
+/// And here inner most is referential to the iteration order, not the order
+/// they appear per fragment (because there is no relationship between the
+/// dimension order of M in A and in C, for example).
 NestedLayoutAttr permuteAndCreateNestedLayout(
-    MLIRContext *context, int64_t rank, int64_t dim0, int64_t dim1,
-    ArrayRef<int64_t> permute, SmallVector<int64_t> subgroupCount,
-    SmallVector<int64_t> subgroupOrder, SmallVector<int64_t> batchCount,
-    SmallVector<int64_t> batchOrder, MMAAttr::SingleSubgroupLayout counts,
-    MMAAttr::SingleSubgroupLayout orders, ArrayRef<int64_t> dataDuplicate,
-    ArrayRef<int64_t> subgroupBasis, ArrayRef<bool> subgroupActiveIds) {
+    MLIRContext *context, int64_t rank, int64_t outerDim, int64_t innerDim,
+    SmallVector<int64_t> subgroupCount, SmallVector<int64_t> subgroupOrder,
+    SmallVector<int64_t> batchCount, SmallVector<int64_t> batchOrder,
+    MMAAttr::SingleSubgroupLayout counts, MMAAttr::SingleSubgroupLayout orders,
+    ArrayRef<int64_t> dataDuplicate, ArrayRef<int64_t> subgroupBasis,
+    ArrayRef<bool> subgroupActiveIds) {
 
   LLVM_DEBUG({
     llvm::errs() << "Given:";
-    llvm::errs() << "\n    dim0 = " << dim0;
-    llvm::errs() << "\n    dim1 = " << dim1;
+    llvm::errs() << "\n    outerDim = " << outerDim;
+    llvm::errs() << "\n    innerDim = " << innerDim;
     llvm::errs() << "\n    subgroupCount: ";
     llvm::interleaveComma(subgroupCount, llvm::errs());
     llvm::errs() << "\n    subgroupOrder: ";
@@ -590,24 +639,24 @@ NestedLayoutAttr permuteAndCreateNestedLayout(
   });
 
   SmallVector<int64_t> outerOrder =
-      getIdentityPermWithSwap(rank, orders.outer, dim0, dim1);
+      getIdentityPermWithSwap(rank, orders.outer, outerDim, innerDim);
   SmallVector<int64_t> threadOrder =
-      getIdentityPermWithSwap(rank, orders.thread, dim0, dim1);
+      getIdentityPermWithSwap(rank, orders.thread, outerDim, innerDim);
   SmallVector<int64_t> elementOrder =
-      getIdentityPermWithSwap(rank, orders.element, dim0, dim1);
+      getIdentityPermWithSwap(rank, orders.element, outerDim, innerDim);
 
   SmallVector<int64_t> threadBasis =
-      getUnitOfRankWithDims(rank, counts.thread, dim0, dim1);
-  threadBasis[dim0] *= dataDuplicate[0];
-  threadBasis[dim1] *= dataDuplicate[1];
+      getUnitOfRankWithDims(rank, counts.thread, outerDim, innerDim);
+  threadBasis[outerDim] *= dataDuplicate[0];
+  threadBasis[innerDim] *= dataDuplicate[1];
   applyPermutationToVector(threadBasis, threadOrder);
 
   SmallVector<int64_t> outerCount =
-      getUnitOfRankWithDims(rank, counts.outer, dim0, dim1);
+      getUnitOfRankWithDims(rank, counts.outer, outerDim, innerDim);
   SmallVector<int64_t> threadCount =
-      getUnitOfRankWithDims(rank, counts.thread, dim0, dim1);
+      getUnitOfRankWithDims(rank, counts.thread, outerDim, innerDim);
   SmallVector<int64_t> elementCount =
-      getUnitOfRankWithDims(rank, counts.element, dim0, dim1);
+      getUnitOfRankWithDims(rank, counts.element, outerDim, innerDim);
 
   LLVM_DEBUG({
     llvm::errs() << "\nNew layout attr:";
@@ -659,23 +708,6 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
   });
   if (opInfo.getOpKind() == VectorContractOpInfo::OpKind::UNKNOWN)
     return std::nullopt;
-
-  // Get the indices of the M, N, and K dimensions for the particular
-  // contraction type. This is from the perspective of the inner most contract
-  // handled by a single intrinsic. For example, MN_NK_MN contractions will
-  // always return
-  //
-  // aM, bN = 0, 1
-  // aK, bK = 1, 0
-  // cM, cN = 0, 1
-  //
-  // Regardless of how many dimensions are in the original contraction.
-  auto [aM, bN] = *opInfo.getOperandMNIndex();
-  auto [aK, bK] = *opInfo.getOperandKIndex();
-  auto [cM, cN] = *opInfo.getResultMNIndex();
-  SmallVector<int64_t, 2> aPermute = {aM, aK};
-  SmallVector<int64_t, 2> bPermute = {bK, bN};
-  SmallVector<int64_t, 2> cPermute = {cM, cN};
 
   auto mmaAttr = llvm::cast<MMAAttr>(getIntrinsic());
   MLIRContext *context = getContext();
@@ -783,7 +815,7 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
   MMAAttr::SingleSubgroupLayout cOrders =
       mmaAttr.getCSingleSubgroupLayoutOrder();
 
-  auto [m, n] = opInfo.getResultFullMNIndex();
+  auto [m, n] = opInfo.getResultMNIndex();
   int64_t cRank = opInfo.getCRank();
 
   // Get the M and N dims w.r.t. the dimensions of the C matrix. cMDims and
@@ -812,7 +844,7 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
   cActiveSubgroups.back() = false;
 
   auto cLayout = permuteAndCreateNestedLayout(
-      context, cRank, m, n, cPermute,
+      context, cRank, m, n,
       /*subgroupCount=*/cSubgroupSizes,
       /*subgroupOrder=*/cOverallOrder,
       /*batchCount=*/cBatchSizes,
@@ -827,8 +859,8 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
   MMAAttr::SingleSubgroupLayout aOrders =
       mmaAttr.getASingleSubgroupLayoutOrder();
 
-  auto [afm, bfn] = opInfo.getOperandFullMNIndex();
-  auto [afk, bfk] = opInfo.getOperandFullKIndex();
+  auto [afm, bfn] = opInfo.getOperandMNIndex();
+  auto [afk, bfk] = opInfo.getOperandKIndex();
 
   int64_t aRank = opInfo.getARank();
 
@@ -854,7 +886,7 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
   aActiveSubgroups.back() = true;
 
   auto aLayout = permuteAndCreateNestedLayout(
-      context, aRank, afm, afk, aPermute,
+      context, aRank, afm, afk,
       /*subgroupCount=*/aSubgroupSizes,
       /*subgroupOrder=*/aSubgroupOrder,
       /*batchCount=*/aBatchSizes,
@@ -893,7 +925,7 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
   bActiveSubgroups.back() = true;
 
   auto bLayout = permuteAndCreateNestedLayout(
-      context, bRank, bfk, bfn, bPermute,
+      context, bRank, bfk, bfn,
       /*subgroupCount=*/bSubgroupSizes,
       /*subgroupOrder=*/bSubgroupOrder,
       /*batchCount=*/bBatchSizes,

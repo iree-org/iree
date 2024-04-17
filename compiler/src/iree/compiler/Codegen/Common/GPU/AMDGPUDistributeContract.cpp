@@ -183,7 +183,7 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
   std::optional<int64_t> getKBatchSize(const VectorContractOpInfo &opDetail,
                                        NestedLayoutAttr lhsLayout,
                                        NestedLayoutAttr rhsLayout) const {
-    auto [lhsK, rhsK] = opDetail.getOperandFullKIndex();
+    auto [lhsK, rhsK] = opDetail.getOperandKIndex();
     int64_t lhsKBatch = lhsLayout.getBatchesPerSubgroup()[lhsK];
     int64_t rhsKBatch = rhsLayout.getBatchesPerSubgroup()[rhsK];
 
@@ -214,7 +214,7 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
       rhsOffsets[rhsN] = resultOffsets[resultN];
     }
 
-    auto [lhsK, rhsK] = opDetail.getOperandFullKIndex();
+    auto [lhsK, rhsK] = opDetail.getOperandKIndex();
     lhsOffsets[lhsK] = kOffset;
     rhsOffsets[rhsK] = kOffset;
 

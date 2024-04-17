@@ -23,16 +23,13 @@ public:
   OpKind getOpKind() const { return opKind; }
 
   // Returns the (LHS M, RHS N) dimension index pair.
-  std::optional<std::pair<int, int>> getOperandMNIndex() const;
-  std::pair<int, int> getOperandFullMNIndex() const;
+  std::pair<int, int> getOperandMNIndex() const;
 
   // Returns the (LHS K, RHS K) dimension index pair.
-  std::optional<std::pair<int, int>> getOperandKIndex() const;
-  std::pair<int, int> getOperandFullKIndex() const;
+  std::pair<int, int> getOperandKIndex() const;
 
   // Returns the result (M, N) dimension index pair.
-  std::optional<std::pair<int, int>> getResultMNIndex() const;
-  std::pair<int, int> getResultFullMNIndex() const;
+  std::pair<int, int> getResultMNIndex() const;
 
   SmallVector<unsigned, 2> getMDims() const { return contractionDims.m; }
 

@@ -12,57 +12,17 @@
 
 namespace mlir::iree_compiler {
 
-std::optional<std::pair<int, int>>
-VectorContractOpInfo::getOperandMNIndex() const {
-  switch (opKind) {
-  case OpKind::MK_KN_MN:
-    return std::make_pair(0, 1);
-  case OpKind::MK_NK_MN:
-    return std::make_pair(0, 0);
-  case OpKind::UNKNOWN:
-    break;
-  }
-  return std::nullopt;
-}
-
-std::pair<int, int> VectorContractOpInfo::getOperandFullMNIndex() const {
+std::pair<int, int> VectorContractOpInfo::getOperandMNIndex() const {
   return std::make_pair(lhsMDims.back(), rhsNDims.back());
 }
 
 // Returns the (LHS K, RHS K) dimension index pair.
-std::optional<std::pair<int, int>>
-VectorContractOpInfo::getOperandKIndex() const {
-  switch (opKind) {
-  case OpKind::MK_KN_MN:
-    return std::make_pair(1, 0);
-  case OpKind::MK_NK_MN:
-    return std::make_pair(1, 1);
-  case OpKind::UNKNOWN:
-    break;
-  }
-  return std::nullopt;
-}
-
-// Returns the (LHS K, RHS K) dimension index pair.
-std::pair<int, int> VectorContractOpInfo::getOperandFullKIndex() const {
+std::pair<int, int> VectorContractOpInfo::getOperandKIndex() const {
   return std::make_pair(lhsKDim, rhsKDim);
 }
 
 // Returns the result (M, N) dimension index pair.
-std::optional<std::pair<int, int>>
-VectorContractOpInfo::getResultMNIndex() const {
-  switch (opKind) {
-  case OpKind::MK_KN_MN:
-  case OpKind::MK_NK_MN:
-    return std::make_pair(0, 1);
-  default:
-    break;
-  }
-  return std::nullopt;
-}
-
-// Returns the result (M, N) dimension index pair.
-std::pair<int, int> VectorContractOpInfo::getResultFullMNIndex() const {
+std::pair<int, int> VectorContractOpInfo::getResultMNIndex() const {
   return std::make_pair(outMDims.back(), outNDims.back());
 }
 
