@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-consteval-jit-globals --iree-consteval-jit-debug %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-consteval-jit-globals --iree-consteval-jit-debug --verify-diagnostics %s | FileCheck %s
 
 module @no_uninitialized {
   util.global private @hoisted : tensor<5x6xf32> = dense<4.0> : tensor<5x6xf32>
@@ -134,6 +134,22 @@ module @eval_i1_tensor {
     %cst = arith.constant dense<[0, 1, 0, 1, 1, 0]> : tensor<6xi8>
     %casted = arith.trunci %cst : tensor<6xi8> to tensor<6xi1>
     util.global.store %casted, @hoisted : tensor<6xi1>
+    util.return
+  }
+}
+
+// -----
+// CHECK-LABEL: @eval_i4_tensor
+module @eval_i4_tensor {
+  util.global private @hoisted : tensor<5x6xi4>
+  util.func public @main() -> tensor<5x6xi4> {
+    %hoisted = util.global.load @hoisted : tensor<5x6xi4>
+    util.return %hoisted : tensor<5x6xi4>
+  }
+  // expected-warning @+1 {{unsupported type for current jit configuration}}
+  util.initializer attributes {iree.compiler.consteval} {
+    %cst = arith.constant dense<3> : tensor<5x6xi4>
+    util.global.store %cst, @hoisted : tensor<5x6xi4>
     util.return
   }
 }
