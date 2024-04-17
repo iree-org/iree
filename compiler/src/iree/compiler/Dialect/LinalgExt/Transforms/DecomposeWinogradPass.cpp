@@ -83,6 +83,35 @@ struct FoldWinogradOpUnitDims : public OpRewritePattern<TransformOp> {
 };
 
 /// Pattern to decompose the tiled WinogradInputTransformOp.
+/// The input should be just a single tile of the input image of size `i x i`,
+/// where `i` is the input tile size and `i = m + r - 1`. `m` is the filter
+/// size, and `r` is the output tile size. This tile might not be a full tile.
+///
+/// The tile of the input transform decomposes into two matrix multiplications:
+/// `matmul(transpose(B), matmul(tile(x), B))`
+/// The matrix `B` is a precomputed constant.
+///
+/// The result of the decomposition will look like the following:
+/// ```
+/// %tf = iree_linalg_ext.winograd.input_transform
+///     output_tile_size(6) kernel_size(3) image_dimensions([1, 2])
+///     ins(%in_tile : tensor<?x?xf32>)
+///     outs(%out_tile : tensor<8x8xf32>) -> tensor<8x8xf32>
+/// ```
+/// Decomposes to
+/// ```
+/// %B = arith.constant dense<[...]>
+/// %BT = arith.constant dense<[...]>
+/// %scratch = linalg.fill ins(%zero) outs(%empty) -> tensor<8x8xf32>
+/// %padded = tensor.insert_slice %in_tile into %scratch
+///     : tensor<?x?xf16> into tensor<8x8xf16>
+/// %init_0 = linalg.fill ins(%zero) outs(%out_tile) -> tensor<8x8xf32>
+/// %mm_0 = linalg.matmul ins(%padded, %B : tensor<8x8xf16>, tensor<8x8xf32>)
+///     outs(%init_0 : tensor<8x8xf32>) -> tensor<8x8xf32>
+/// %init_1 = linalg.fill ins(%zero) outs(%out_tile) -> tensor<8x8xf32>
+/// %mm_1 = linalg.matmul ins(%BT, %mm_0 : tensor<8x8xf16>, tensor<8x8xf32>)
+///     outs(%init_1 : tensor<8x8xf32>) -> tensor<8x8xf32>
+/// ````
 struct DecomposeWinogradInputTransform
     : public OpRewritePattern<WinogradInputTransformOp> {
   using OpRewritePattern<WinogradInputTransformOp>::OpRewritePattern;
@@ -90,13 +119,6 @@ struct DecomposeWinogradInputTransform
   LogicalResult matchAndRewrite(WinogradInputTransformOp transformOp,
                                 PatternRewriter &rewriter) const override {
     Location loc = transformOp.getLoc();
-    auto funcOp = transformOp->getParentOfType<mlir::FunctionOpInterface>();
-    if (!funcOp) {
-      return rewriter.notifyMatchFailure(transformOp,
-                                         "Could not find parent function");
-    }
-    rewriter.setInsertionPointToStart(&funcOp.getFunctionBody().front());
-
     Value dynamicSlice = transformOp.input();
     Value outputSlice = transformOp.output();
     if (transformOp.getInputOperandRank() != 2 ||
@@ -140,8 +162,6 @@ struct DecomposeWinogradInputTransform
         sizes.push_back(mixedSizes[i]);
       }
     }
-    OpBuilder::InsertionGuard afterTransformOp(rewriter);
-    rewriter.setInsertionPointAfter(transformOp);
     linalg::FillOp fillOp = rewriter.create<linalg::FillOp>(
         loc, ValueRange{zeroF32}, ValueRange{scratch});
     Value inputSlice = rewriter.create<tensor::InsertSliceOp>(
@@ -171,6 +191,32 @@ struct DecomposeWinogradInputTransform
 };
 
 /// Pattern to decompose the tiled WinogradOutputTransformOp.
+/// The input should be just a single tile of the winograd output image of size
+/// `i x i`, where `i` is the input tile size and `i = m + r - 1`. `m` is the
+/// filter size, and `r` is the output tile size.
+///
+/// The tile of the input transform decomposes into two matrix multiplications:
+/// `matmul(transpose(A), matmul(x, A))`
+/// The matrix `A` is a precomputed constant.
+///
+/// The result of the decomposition will look like the following:
+/// ```
+/// %tf = iree_linalg_ext.winograd.output_transform
+///     output_tile_size(6) kernel_size(3) image_dimensions([1, 2])
+///     ins(%in_tile : tensor<8x8xf32>)
+///     outs(%out_tile : tensor<6x6xf32>) -> tensor<6x6xf32>
+/// ```
+/// Decomposes to
+/// ```
+/// %A = arith.constant dense<[...]>
+/// %AT = arith.constant dense<[...]>
+/// %init_0 = linalg.fill ins(%zero) outs(%empty) -> tensor<8x6xf32>
+/// %mm_0 = linalg.matmul ins(%in_tile, %A : tensor<8x8xf16>, tensor<8x6xf32>)
+///     outs(%init_0 : tensor<8x8xf32>) -> tensor<8x8xf32>
+/// %init_1 = linalg.fill ins(%zero) outs(%out_tile) -> tensor<6x6xf32>
+/// %mm_1 = linalg.matmul ins(%AT, %mm_0 : tensor<6x8xf16>, tensor<8x6xf32>)
+///     outs(%init_1 : tensor<6x6xf32>) -> tensor<6x6xf32>
+/// ````
 struct DecomposeWinogradOutputTransform
     : public OpRewritePattern<WinogradOutputTransformOp> {
   using OpRewritePattern<WinogradOutputTransformOp>::OpRewritePattern;
@@ -178,12 +224,6 @@ struct DecomposeWinogradOutputTransform
   LogicalResult matchAndRewrite(WinogradOutputTransformOp transformOp,
                                 PatternRewriter &rewriter) const override {
     Location loc = transformOp.getLoc();
-    auto funcOp = transformOp->getParentOfType<mlir::FunctionOpInterface>();
-    if (!funcOp) {
-      return rewriter.notifyMatchFailure(transformOp,
-                                         "Could not find parent function");
-    }
-    rewriter.setInsertionPointToStart(&funcOp.getFunctionBody().front());
     Value inputSlice = transformOp.input();
     Value outputSlice = transformOp.output();
     if (transformOp.getInputOperandRank() != 2 ||
@@ -211,8 +251,6 @@ struct DecomposeWinogradOutputTransform
     Value scratch =
         rewriter.create<tensor::EmptyOp>(loc, scratchShape, elementType);
     // Create computation
-    OpBuilder::InsertionGuard afterTransformOp(rewriter);
-    rewriter.setInsertionPointAfter(transformOp);
     Value result, AMatrix, BMatrix;
     linalg::MatmulOp matmulOp;
     linalg::FillOp fillOp;

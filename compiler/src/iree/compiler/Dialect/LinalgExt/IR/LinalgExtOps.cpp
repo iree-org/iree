@@ -138,11 +138,8 @@ getScaledSizeAndOffset(OpBuilder &builder, Location loc, OpFoldResult size,
       builder, loc, {dim0 * scale}, offset);
   auto dimSizeValue = getValueOrCreateConstantIndexOp(builder, loc, dimSize);
   AffineMap sizeMap = AffineMap::get(3, 0, {dim0 - dim1, dim2 * scale}, ctx);
-  Value imageSize = builder.createOrFold<affine::AffineMinOp>(
-      loc, sizeMap,
-      ValueRange{dimSizeValue,
-                 getValueOrCreateConstantIndexOp(builder, loc, imageOffset),
-                 getValueOrCreateConstantIndexOp(builder, loc, size)});
+  auto imageSize = affine::makeComposedFoldedAffineMin(
+      builder, loc, sizeMap, {dimSizeValue, imageOffset, size});
   return std::make_pair(imageSize, imageOffset);
 }
 
