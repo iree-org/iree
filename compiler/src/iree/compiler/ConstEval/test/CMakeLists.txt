@@ -17,6 +17,7 @@ iree_lit_test_suite(
     "compile_regressions.mlir"
     "failing.mlir"
     "jit_globals.mlir"
+    "jit_globals_vmvx.mlir"
     "scalar_values.mlir"
   TOOLS
     FileCheck

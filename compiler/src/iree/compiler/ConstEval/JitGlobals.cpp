@@ -422,6 +422,8 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
 
       FunctionCall call(binary, jitFunction.argumentBindings.size(),
                         jitFunction.resultBindings.size());
+      if (failed(call.initialize()))
+        return failure();
 
       // Convert arguments.
       for (ArgumentBinding &arg : jitFunction.argumentBindings) {

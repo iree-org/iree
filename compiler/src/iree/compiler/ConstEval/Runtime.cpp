@@ -6,6 +6,7 @@
 
 #include "iree/compiler/ConstEval/Runtime.h"
 
+#include "iree/base/status_cc.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
 #include "iree/hal/drivers/local_task/registration/driver_module.h"
@@ -22,17 +23,8 @@ namespace {
 LogicalResult handleRuntimeError(Location loc, iree_status_t status) {
   if (iree_status_is_ok(status))
     return success();
-  std::string message;
-  message.resize(512);
-  iree_host_size_t buffer_length;
-  if (!iree_status_format(status, message.size(), &message[0],
-                          &buffer_length)) {
-    message.resize(buffer_length + 1);
-    iree_status_format(status, message.size(), &message[0], &buffer_length);
-  }
-  message.resize(buffer_length);
-  iree_status_ignore(status);
-  return emitError(loc) << "runtime error in consteval: " << message;
+  return emitError(loc) << "runtime error in consteval: "
+                        << iree::Status::ToString(status);
 }
 
 LogicalResult convertToElementType(Location loc, Type baseType,
@@ -149,13 +141,19 @@ void CompiledBinary::deinitialize() {
 
 FunctionCall::FunctionCall(CompiledBinary &binary, iree_host_size_t argCapacity,
                            iree_host_size_t resultCapacity)
-    : binary(binary) {
-  IREE_CHECK_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(),
-                                    argCapacity, iree_allocator_system(),
-                                    &inputs));
-  IREE_CHECK_OK(iree_vm_list_create(iree_vm_make_undefined_type_def(),
-                                    resultCapacity, iree_allocator_system(),
-                                    &outputs));
+    : binary(binary), argCapacity(argCapacity), resultCapacity(resultCapacity) {
+}
+
+LogicalResult FunctionCall::initialize() {
+  if (!iree_status_is_ok(iree_vm_list_create(iree_vm_make_undefined_type_def(),
+                                             argCapacity,
+                                             iree_allocator_system(), &inputs)))
+    return failure();
+  if (!iree_status_is_ok(
+          iree_vm_list_create(iree_vm_make_undefined_type_def(), resultCapacity,
+                              iree_allocator_system(), &outputs)))
+    return failure();
+  return success();
 }
 
 FailureOr<iree::vm::ref<iree_hal_buffer_t>>
@@ -404,9 +402,13 @@ TypedAttr CompiledBinary::convertVariantToAttribute(Location loc,
       // mapping is not available. Today with the CPU backends it's always
       // possible but would not work with accelerators.
       iree_hal_buffer_mapping_t mapping;
-      IREE_CHECK_OK(iree_hal_buffer_map_range(
-          buffer, IREE_HAL_MAPPING_MODE_SCOPED, IREE_HAL_MEMORY_ACCESS_READ,
-          /*byte_offset=*/0, length, &mapping));
+      if (failed(handleRuntimeError(
+              loc, iree_hal_buffer_map_range(
+                       buffer, IREE_HAL_MAPPING_MODE_SCOPED,
+                       IREE_HAL_MEMORY_ACCESS_READ,
+                       /*byte_offset=*/0, length, &mapping)))) {
+        return {};
+      }
       MutableArrayRef<char> rawBufferArray(
           reinterpret_cast<char *>(mapping.contents.data),
           mapping.contents.data_length);
@@ -427,37 +429,61 @@ TypedAttr CompiledBinary::convertVariantToAttribute(Location loc,
   return {};
 }
 
-void CompiledBinary::initialize(void *data, size_t length) {
+LogicalResult CompiledBinary::initialize(Location loc, void *data,
+                                         size_t length) {
   Runtime &runtime = Runtime::getInstance();
+  if (failed(handleRuntimeError(loc, runtime.initStatus))) {
+    return failure();
+  }
 
   // Create driver and device.
   iree_hal_driver_t *driver = nullptr;
-  IREE_CHECK_OK(iree_hal_driver_registry_try_create(
-      runtime.registry, iree_make_cstring_view("local-task"),
-      iree_allocator_system(), &driver));
-  IREE_CHECK_OK(iree_hal_driver_create_default_device(
-      driver, iree_allocator_system(), &device));
+  if (failed(handleRuntimeError(loc, iree_hal_driver_registry_try_create(
+                                         runtime.registry,
+                                         iree_make_cstring_view("local-task"),
+                                         iree_allocator_system(), &driver)))) {
+    return failure();
+  }
+  if (failed(handleRuntimeError(
+          loc, iree_hal_driver_create_default_device(
+                   driver, iree_allocator_system(), &device)))) {
+    return failure();
+  }
   iree_hal_driver_release(driver);
 
   // Create hal module.
   iree_hal_device_t *device_ptr = device.get();
-  IREE_CHECK_OK(iree_hal_module_create(
-      runtime.instance.get(), /*device_count=*/1, &device_ptr,
-      IREE_HAL_MODULE_FLAG_NONE, iree_allocator_system(), &hal_module));
+  if (failed(handleRuntimeError(
+          loc,
+          iree_hal_module_create(runtime.instance.get(), /*device_count=*/1,
+                                 &device_ptr, IREE_HAL_MODULE_FLAG_NONE,
+                                 iree_allocator_system(), &hal_module)))) {
+    return failure();
+  }
 
   // Bytecode module.
-  IREE_CHECK_OK(iree_vm_bytecode_module_create(
-      runtime.instance.get(), iree_make_const_byte_span(data, length),
-      iree_allocator_null(), iree_allocator_system(), &main_module));
+  if (failed(handleRuntimeError(
+          loc,
+          iree_vm_bytecode_module_create(
+              runtime.instance.get(), iree_make_const_byte_span(data, length),
+              iree_allocator_null(), iree_allocator_system(), &main_module)))) {
+    return failure();
+  }
 
   // Context.
   std::array<iree_vm_module_t *, 2> modules = {
       hal_module.get(),
       main_module.get(),
   };
-  IREE_CHECK_OK(iree_vm_context_create_with_modules(
-      runtime.instance.get(), IREE_VM_CONTEXT_FLAG_NONE, modules.size(),
-      modules.data(), iree_allocator_system(), &context));
+  if (failed(handleRuntimeError(loc, iree_vm_context_create_with_modules(
+                                         runtime.instance.get(),
+                                         IREE_VM_CONTEXT_FLAG_NONE,
+                                         modules.size(), modules.data(),
+                                         iree_allocator_system(), &context)))) {
+    return failure();
+  }
+
+  return success();
 }
 
 InMemoryCompiledBinary::~InMemoryCompiledBinary() { deinitialize(); }
@@ -472,17 +498,20 @@ InMemoryCompiledBinary::translateFromModule(mlir::ModuleOp moduleOp) {
     return failure();
   }
   os.flush();
-  initialize(&binary[0], binary.length());
-  return success();
+  return initialize(moduleOp.getLoc(), &binary[0], binary.length());
 }
 
 Runtime::Runtime() {
-  IREE_CHECK_OK(
-      iree_hal_driver_registry_allocate(iree_allocator_system(), &registry));
-  IREE_CHECK_OK(iree_hal_local_task_driver_module_register(registry));
-  IREE_CHECK_OK(iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
-                                        iree_allocator_system(), &instance));
-  IREE_CHECK_OK(iree_hal_module_register_all_types(instance.get()));
+  if (iree_status_is_ok(initStatus))
+    initStatus =
+        iree_hal_driver_registry_allocate(iree_allocator_system(), &registry);
+  if (iree_status_is_ok(initStatus))
+    initStatus = iree_hal_local_task_driver_module_register(registry);
+  if (iree_status_is_ok(initStatus))
+    initStatus = iree_vm_instance_create(IREE_VM_TYPE_CAPACITY_DEFAULT,
+                                         iree_allocator_system(), &instance);
+  if (iree_status_is_ok(initStatus))
+    initStatus = iree_hal_module_register_all_types(instance.get());
 }
 
 Runtime::~Runtime() {
