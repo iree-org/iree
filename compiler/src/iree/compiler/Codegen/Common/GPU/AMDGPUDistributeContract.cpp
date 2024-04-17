@@ -97,10 +97,8 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
     LLVM_DEBUG(llvm::dbgs() << "init tile: " << finalTile << "\n");
 
     // Offsets into the LHS/RHS batches.
-    SmallVector<int64_t, 2> lhsBatchOffsets(
-        lhsLayout.getBatchesPerSubgroup().size(), 0);
-    SmallVector<int64_t, 2> rhsBatchOffsets(
-        rhsLayout.getBatchesPerSubgroup().size(), 0);
+    SmallVector<int64_t, 2> lhsBatchOffsets(lhsLayout.getRank(), 0);
+    SmallVector<int64_t, 2> rhsBatchOffsets(rhsLayout.getRank(), 0);
 
     // Offsets into the result batches.
     ArrayRef<int64_t> resultBatches = resultLayout.getBatchesPerSubgroup();
