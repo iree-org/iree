@@ -79,7 +79,7 @@ static SmallVector<Value> getTransferIndicesFromNestedLayout(
       return constExpr.getValue() == 0;
     return false;
   };
-  int64_t rank = vectorLayout.getBatchOrder().size();
+  int64_t rank = vectorLayout.getRank();
   // Permute the batch and outer vector offsets to match the order of
   // the vector dimensions using the inverse of the batch/offset order.
   SmallVector<int64_t> batchOffsets =
@@ -113,7 +113,7 @@ static SmallVector<Value> getTransferIndicesFromNestedLayout(
 }
 
 static SmallVector<int64_t> getLoopOrder(NestedLayoutAttr vectorLayout) {
-  int64_t rank = vectorLayout.getBatchOrder().size();
+  int64_t rank = vectorLayout.getRank();
   // Let the unroll order first unroll the batch dimensions, then the
   // outer vector dimensions. We unroll in the order specified by the
   // layout.
@@ -137,7 +137,7 @@ static SmallVector<int64_t> getLoopOrder(NestedLayoutAttr vectorLayout) {
 
 static SmallVector<int64_t>
 getElementVectorTileShape(NestedLayoutAttr vectorLayout) {
-  int64_t rank = vectorLayout.getBatchOrder().size();
+  int64_t rank = vectorLayout.getRank();
   SmallVector<int64_t> tileShape = vectorLayout.getDistributedShape();
   // We tile to a vector with BATCH, OUTER, and ELEMENT dimensions. So to access
   // the subvector only containing elements, we need indices in all BATCH and
@@ -154,7 +154,7 @@ static void populateWarpAndThreadIndices(RewriterBase &rewriter, Value threadId,
                                          NestedLayoutAttr vectorLayout,
                                          SmallVector<Value> &warpIndices,
                                          SmallVector<Value> &threadIndices) {
-  int64_t subgroupRank = vectorLayout.getSubgroupBasis().size();
+  int64_t subgroupRank = vectorLayout.getRank();
   // The delinearized thread IDs are returned from outer most to inner most,
   // i.e. before applying the layout described dimensions ordering.
   SmallVector<Value> threadIds =
@@ -217,7 +217,7 @@ struct DistributeTransferRead final
     SmallVector<int64_t> distShape = vectorLayout.getDistributedShape();
     SmallVector<int64_t> tileShape = getElementVectorTileShape(vectorLayout);
     SmallVector<int64_t> loopOrder = getLoopOrder(vectorLayout);
-    int64_t rank = vectorLayout.getBatchOrder().size();
+    int64_t rank = vectorLayout.getRank();
 
     Type elementType = readOp.getSource().getType().getElementType();
     auto vectorType = VectorType::get(distShape, elementType);
@@ -304,7 +304,7 @@ struct DistributeTransferWrite final
     SmallVector<int64_t> distShape = vectorLayout.getDistributedShape();
     SmallVector<int64_t> tileShape = getElementVectorTileShape(vectorLayout);
     SmallVector<int64_t> loopOrder = getLoopOrder(vectorLayout);
-    int64_t rank = vectorLayout.getBatchOrder().size();
+    int64_t rank = vectorLayout.getRank();
 
     SmallVector<Value> warpIndices, threadIndices;
     populateWarpAndThreadIndices(rewriter, threadId, vectorLayout, warpIndices,
@@ -388,8 +388,8 @@ struct DistributeBroadcast final : OpDistributionPattern<vector::BroadcastOp> {
     Value accumulator = rewriter.create<arith::ConstantOp>(
         loc, vectorType, rewriter.getZeroAttr(vectorType));
 
-    int64_t rank = vectorLayout.getBatchOrder().size();
-    int64_t sourceRank = sourceLayout.getBatchOrder().size();
+    int64_t rank = vectorLayout.getRank();
+    int64_t sourceRank = sourceLayout.getRank();
     // We unroll along both the batch and outer dimensions for a similar reason
     // to the transfer ops. `vector.broadcast` can only broadcast along outer
     // dims, so mixing broadcasted and un-broadcasted element/outer dims can't
