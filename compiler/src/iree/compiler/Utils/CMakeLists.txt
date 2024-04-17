@@ -57,6 +57,7 @@ iree_cc_library(
     iree::base::internal::flatcc::building
     iree::base::internal::flatcc::debugging
     iree::base::internal::flatcc::parsing
+    iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::Util::IR
   PUBLIC
 )

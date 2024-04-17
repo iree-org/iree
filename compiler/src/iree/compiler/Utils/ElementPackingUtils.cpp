@@ -6,7 +6,7 @@
 
 #include "iree/compiler/Utils/ElementPackingUtils.h"
 
-#include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/MathExtras.h"
