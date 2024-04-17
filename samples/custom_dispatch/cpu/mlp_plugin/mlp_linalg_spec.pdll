@@ -5,30 +5,37 @@
 
 
 // Native rewrite "rewriteAsFlowDispatch"
-Rewrite rewriteAsFlowDispatch(op : Op, fname : Attr,  inputs : ValueRange, repl_vals : ValueRange, repl_dims : ValueRange, other : ValueRange) -> Op;
+Rewrite rewriteAsFlowDispatch(op : Op,  inputs : ValueRange, repl_vals : ValueRange, repl_dims : ValueRange, other : ValueRange) -> Op;
 
 
 Pattern mlp with benefit(1) {
-  let root = op<linalg.matmul> (lhs : Value, rhs : Value, fill : Value, valueRange : ValueRange); 
+  let LhsTy : Type;
+  let RhsTy : Type;
+  let MatMulTy : Type;
+  let zeroVal = op<arith.constant> { value = attr<"0.0 : f32"> };
+  let fillOp = op<linalg.fill> (zeroVal.0, empty : Value) -> (MatMulTy);
+  let matMulOp = op<linalg.matmul> (lhs : Value<LhsTy>, rhs : Value<RhsTy>, fillOp.0) -> (MatMulTy);
 
-  rewrite root with {
-    let constZero = op<arith.constant> { value = attr<"0 : i32"> };
-    let constOne = op<arith.constant> { value = attr<"1 : i32"> };
-    let m = op<tensor.dim>(lhs, constZero);
-    let n = op<tensor.dim>(rhs, constOne);
-    let k = op<tensor.dim>(lhs, constOne);
-    let m_cast = op<arith.index_cast>(m);
-    let n_cast = op<arith.index_cast>(n);
-    let k_cast = op<arith.index_cast>(k);
+  rewrite matMulOp with {
+    let IntTy = type<"i32">;
+    let IndexType = type<"index">;
+    let BoolTy = type<"i1">;
+    let constZero = op<arith.constant> { value = attr<"0 : i32"> } -> (BoolTy);
+    let constOne = op<arith.constant> { value = attr<"1 : i32"> } -> (BoolTy);
+    let m = op<tensor.dim>(lhs, constZero) -> (IndexType);
+    let n = op<tensor.dim>(rhs, constOne)  -> (IndexType);
+    let k = op<tensor.dim>(lhs, constOne) -> (IndexType);
+    let m_cast = op<arith.index_cast>(m)  -> (IntTy);
+    let n_cast = op<arith.index_cast>(n) -> (IntTy);
+    let k_cast = op<arith.index_cast>(k) -> (IntTy);
 
 
 
-    let doRelu = op<arith.constant> { value = attr<"false"> };
+    let doRelu = op<arith.constant> { value = attr<"0 : i1"> };
     let inputs = (lhs, rhs);
-    let repl_vals = (root.0 );
+    let repl_vals = (matMulOp.0 );
     let repl_dims = (m.0, n.0);
     let other = (m_cast.0, n_cast.0, k_cast.0, doRelu.0);
-    let fname = attr<"mlp_external">;
-    rewriteAsFlowDispatch(root, fname, inputs, repl_vals, repl_dims, other);
+    rewriteAsFlowDispatch(matMulOp, inputs, repl_vals, repl_dims, other);
   };
 }
