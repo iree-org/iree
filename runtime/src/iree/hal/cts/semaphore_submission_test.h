@@ -456,7 +456,7 @@ TEST_P(semaphore_submission_test, IntermediateSemaphoreBetweenDeviceBatches) {
   // The signaling relationship is
   // command_buffer1 -> semaphore1 -> command_buffer2 -> semaphore2
 
-  // Create second command_buffer1.
+  // Create first command buffer.
   iree_hal_command_buffer_t* command_buffer1 = NULL;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
@@ -465,7 +465,7 @@ TEST_P(semaphore_submission_test, IntermediateSemaphoreBetweenDeviceBatches) {
   IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer1));
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer1));
 
-  // Create second command_buffer2.
+  // Create second command buffer.
   iree_hal_command_buffer_t* command_buffer2 = NULL;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
