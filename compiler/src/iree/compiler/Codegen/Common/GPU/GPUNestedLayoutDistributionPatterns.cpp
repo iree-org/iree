@@ -154,7 +154,7 @@ static void populateWarpAndThreadIndices(RewriterBase &rewriter, Value threadId,
                                          NestedLayoutAttr vectorLayout,
                                          SmallVector<Value> &warpIndices,
                                          SmallVector<Value> &threadIndices) {
-  int64_t subgroupRank = vectorLayout.getRank();
+  int64_t subgroupRank = vectorLayout.getSubgroupBasis().size();
   // The delinearized thread IDs are returned from outer most to inner most,
   // i.e. before applying the layout described dimensions ordering.
   SmallVector<Value> threadIds =
