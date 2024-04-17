@@ -14,8 +14,12 @@ package(
 iree_compiler_cc_test(
     name = "utils",
     testonly = True,
-    srcs = ["UtilsTest.cpp"],
+    srcs = [
+      "TileSizeSelectionTest.cpp",
+      "UtilsTest.cpp"
+    ],
     deps = [
+        "//compiler/src/iree/compiler/Codegen/",
         "//compiler/src/iree/compiler/Utils",
         "@com_google_googletest//:gtest",
     ],

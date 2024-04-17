@@ -14,11 +14,13 @@ iree_cc_test(
   NAME
     utils
   SRCS
+    "TileSizeSelectionTest.cpp"
     "UtilsTest.cpp"
   DEPS
     gmock
     gtest
     iree::compiler::Utils
+    iree::compiler::Codegen::Common
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
