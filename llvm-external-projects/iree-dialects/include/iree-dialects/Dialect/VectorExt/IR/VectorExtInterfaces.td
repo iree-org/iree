@@ -41,6 +41,12 @@ def VectorLayoutInterface : AttrInterface<"VectorLayoutInterface"> {
       /*retTy=*/"SmallVector<int64_t>",
       /*methodName=*/"getDistributedShape",
       /*args=*/(ins)
+    >,
+    InterfaceMethod<
+      /*description=*/"Get the rank of the undistributed vector for this layout.",
+      /*retTy=*/"int64_t",
+      /*methodName=*/"getRank",
+      /*args=*/(ins)
     >
   ];
 }
