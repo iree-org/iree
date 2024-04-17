@@ -86,7 +86,7 @@ createLLVMCPUUnfuseFMAOpsPass();
 struct LLVMCPUVectorLoweringPassOptions {
   std::string splitVectorTransfersTo = "";
   bool lowerVectorTransposeToAVX2 = false;
-  bool enableArmNeon = false;
+  bool enableArmI8mm = false;
 };
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
@@ -94,7 +94,7 @@ createLLVMCPUDropVectorUnitDimsPass();
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUVirtualVectorLoweringPass(std::string splitVectorTransfersTo = "",
-                                       bool enableArmNeon = false);
+                                       bool enableArmI8mm = false);
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUVectorTransferLoweringPass();
@@ -143,6 +143,7 @@ struct LLVMCPUPipelineOptions {
   bool enableVectorMasking = false;
   bool enableAArch64SSVE = false;
   bool enableAArch64Neon = false;
+  bool enableAArch64I8mm = false;
   bool enableUkernels = false;
   bool lowerToAVX2 = false;
 };

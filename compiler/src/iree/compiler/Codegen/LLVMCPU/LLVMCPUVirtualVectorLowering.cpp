@@ -24,9 +24,9 @@ class LLVMCPUVirtualVectorLoweringPass
 public:
   using LLVMCPUVirtualVectorLoweringBase::LLVMCPUVirtualVectorLoweringBase;
   LLVMCPUVirtualVectorLoweringPass(std::string splitVectorTransfersTo,
-                                   bool enableArmNeon) {
+                                   bool enableArmI8mm) {
     this->splitVectorTransfersTo = splitVectorTransfersTo;
-    this->enableArmNeon = enableArmNeon;
+    this->enableArmI8mm = enableArmI8mm;
   }
 
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -58,7 +58,7 @@ void LLVMCPUVirtualVectorLoweringPass::runOnOperation() {
           .setVectorTransferSplit(vectorTransferSplit);
 
   RewritePatternSet patterns(ctx);
-  if (enableArmNeon) {
+  if (enableArmI8mm) {
     arm_neon::populateLowerContractionToSMMLAPatternPatterns(patterns);
   }
   vector::populateVectorToVectorCanonicalizationPatterns(patterns);
@@ -82,9 +82,9 @@ void LLVMCPUVirtualVectorLoweringPass::runOnOperation() {
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUVirtualVectorLoweringPass(std::string splitVectorTransfersTo,
-                                       bool enableArmNeon) {
+                                       bool enableArmI8mm) {
   return std::make_unique<LLVMCPUVirtualVectorLoweringPass>(
-      splitVectorTransfersTo, enableArmNeon);
+      splitVectorTransfersTo, enableArmI8mm);
 }
 
 } // namespace mlir::iree_compiler
