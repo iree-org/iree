@@ -1,0 +1,8 @@
+#include "mlir/Dialect/Linalg/IR/LinalgOps.td"
+#include "mlir/Dialect/Arith/IR/ArithOps.td"
+#include "mlir/Dialect/Func/IR/FuncOps.td"
+
+Pattern mlp with benefit(1) {
+  let root = op<func.call> (operands : Value); 
+  replace root with op<arith.constant>{ value = attr<"true">};
+}

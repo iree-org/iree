@@ -108,4 +108,45 @@ iree_lit_test_suite(
     "hostonly"
 )
 
+
+# Add test for pdll -> pdl then run the test
+
+# Convert mlp_linalg_spec.pdll to mlp_linalg_spec.pdl.mlir but place in ./gen (for now)
+add_custom_command(
+  OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/mlp_linalg_generated.pdl.mlir"
+  COMMAND mlir-pdll 
+    "${CMAKE_CURRENT_SOURCE_DIR}/mlp_linalg_spec.pdll" 
+    -I /home/ianwood/iree/third_party/llvm-project/mlir/include/
+    -x=mlir 
+    --debug
+    -o "${CMAKE_CURRENT_SOURCE_DIR}/mlp_linalg_generated.pdl.mlir"
+  DEPENDS
+    mlir-pdll
+    "${CMAKE_CURRENT_SOURCE_DIR}/mlp_linalg_spec.pdll"
+  VERBATIM
+)
+
+add_custom_target(
+    gen_pdl_files ALL 
+    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/mlp_linalg_generated.pdl.mlir"
+)
+
+
+iree_lit_test_suite(
+  NAME
+    mlp_pdll_linalg_example
+  SRCS
+    "mlp_linalg_pdll.mlir"
+  TOOLS
+    FileCheck
+    iree-compile
+    iree-run-module
+    iree_samples_custom_dispatch_cpu_mlp_plugin
+  DATA
+    "gen/mlp_linalg_spec.pdl.mlir"
+  LABELS
+    "driver=local-sync"
+    "hostonly"
+)
+
 endif(IREE_HAL_EXECUTABLE_PLUGIN_SYSTEM_LIBRARY)
