@@ -129,19 +129,19 @@ static bool isSmallerThan(ArrayRef<int64_t> sourceShape,
 /// `dimSize`.
 static std::pair<OpFoldResult, OpFoldResult>
 getScaledSizeAndOffset(OpBuilder &builder, Location loc, OpFoldResult size,
-                       OpFoldResult offset, int64_t dimSize, int64_t scale) {
-  AffineExpr dim0, dim1;
+                       OpFoldResult offset, OpFoldResult dimSize,
+                       int64_t scale) {
+  AffineExpr dim0, dim1, dim2;
   auto ctx = builder.getContext();
-  bindDims(ctx, dim0, dim1);
+  bindDims(ctx, dim0, dim1, dim2);
   AffineMap offsetMap = AffineMap::get(1, 0, {dim0 * scale}, ctx);
   Value imageOffset = builder.createOrFold<affine::AffineApplyOp>(
       loc, offsetMap, getValueOrCreateConstantIndexOp(builder, loc, offset));
-  auto dimSizeExpr = builder.getAffineConstantExpr(dimSize);
-  AffineMap sizeMap =
-      AffineMap::get(2, 0, {dimSizeExpr - dim0, dim1 * scale}, ctx);
+  auto dimSizeValue = getValueOrCreateConstantIndexOp(builder, loc, dimSize);
+  AffineMap sizeMap = AffineMap::get(3, 0, {dim0 - dim1, dim2 * scale}, ctx);
   Value imageSize = builder.createOrFold<affine::AffineMinOp>(
       loc, sizeMap,
-      ValueRange{imageOffset,
+      ValueRange{dimSizeValue, imageOffset,
                  getValueOrCreateConstantIndexOp(builder, loc, size)});
   return std::make_pair(imageSize, imageOffset);
 }
@@ -2245,12 +2245,28 @@ WinogradInputTransformOp::getTiledImplementation(OpBuilder &builder,
 
   SmallVector<OpFoldResult> inputStrides(getInputOperandRank(), one);
   SmallVector<OpFoldResult> outputStrides(getOutputOperandRank(), one);
-  auto inputShape = input().getType().cast<ShapedType>().getShape();
-  auto outputShape = output().getType().cast<ShapedType>().getShape();
-  SmallVector<OpFoldResult> inputSizes =
-      getAsOpFoldResult(builder.getIndexArrayAttr(inputShape));
-  SmallVector<OpFoldResult> outputSizes =
-      getAsOpFoldResult(builder.getIndexArrayAttr(outputShape));
+  ReifiedRankedShapedTypeDims reifiedResultShapes;
+  if (failed(reifyResultShapes(builder, reifiedResultShapes))) {
+    return failure();
+  }
+  SmallVector<OpFoldResult> outputSizes = reifiedResultShapes[0];
+  SmallVector<OpFoldResult> inputSizes;
+  auto definingReifyOp =
+      input().getDefiningOp<ReifyRankedShapedTypeOpInterface>();
+  if (!definingReifyOp) {
+    auto inputShapedType = input().getType().cast<ShapedType>();
+    if (!inputShapedType.hasStaticShape()) {
+      return failure();
+    }
+    inputSizes = getAsOpFoldResult(
+        builder.getIndexArrayAttr(inputShapedType.getShape()));
+  } else {
+    ReifiedRankedShapedTypeDims inputReifyShapes;
+    if (failed(definingReifyOp.reifyResultShapes(builder, inputReifyShapes))) {
+      return failure();
+    }
+    inputSizes = inputReifyShapes[0];
+  }
 
   assert(sizes.size() == 4);
   outputSizes[2] = inputSizes[0] = sizes[0];
@@ -2259,9 +2275,9 @@ WinogradInputTransformOp::getTiledImplementation(OpBuilder &builder,
   outputSizes[5] = inputSizes[cDim] = sizes[3];
 
   auto hSizeAndOffset = getScaledSizeAndOffset(
-      builder, loc, sizes[1], offsets[1], inputShape[hDim], getInputTileSize());
+      builder, loc, sizes[1], offsets[1], inputSizes[hDim], getInputTileSize());
   auto wSizeAndOffset = getScaledSizeAndOffset(
-      builder, loc, sizes[2], offsets[2], inputShape[wDim], getInputTileSize());
+      builder, loc, sizes[2], offsets[2], inputSizes[wDim], getInputTileSize());
 
   inputSizes[hDim] = hSizeAndOffset.first;
   inputSizes[wDim] = wSizeAndOffset.first;
@@ -2438,12 +2454,29 @@ FailureOr<TilingResult> WinogradOutputTransformOp::getTiledImplementation(
   SmallVector<OpFoldResult> inputStrides(getInputOperandRank(), one);
   SmallVector<OpFoldResult> outputStrides(getOutputOperandRank(), one);
 
-  auto inputShape = input().getType().cast<ShapedType>().getShape();
-  auto outputShape = output().getType().cast<ShapedType>().getShape();
-  SmallVector<OpFoldResult> inputSizes =
-      getAsOpFoldResult(builder.getIndexArrayAttr(inputShape));
-  SmallVector<OpFoldResult> outputSizes =
-      getAsOpFoldResult(builder.getIndexArrayAttr(outputShape));
+  SmallVector<SmallVector<OpFoldResult>> reifiedResultShapes;
+  if (failed(reifyResultShapes(builder, reifiedResultShapes))) {
+    return failure();
+  }
+  SmallVector<OpFoldResult> outputSizes = reifiedResultShapes[0];
+  SmallVector<OpFoldResult> inputSizes;
+  auto definingReifyOp =
+      input().getDefiningOp<ReifyRankedShapedTypeOpInterface>();
+  if (!definingReifyOp) {
+    auto inputShapedType = input().getType().cast<ShapedType>();
+    if (!inputShapedType.hasStaticShape()) {
+      return failure();
+    }
+    inputSizes = getAsOpFoldResult(
+        builder.getIndexArrayAttr(inputShapedType.getShape()));
+  } else {
+    ReifiedRankedShapedTypeDims inputReifyShapes;
+    if (failed(definingReifyOp.reifyResultShapes(builder, inputReifyShapes))) {
+      return failure();
+    }
+    inputSizes = inputReifyShapes[0];
+  }
+
   inputSizes[2] = outputSizes[0] = sizes[0];
   inputSizes[5] = outputSizes[cDim] = sizes[3];
 
@@ -2455,10 +2488,10 @@ FailureOr<TilingResult> WinogradOutputTransformOp::getTiledImplementation(
 
   auto hSizeAndOffset =
       getScaledSizeAndOffset(builder, loc, sizes[1], offsets[1],
-                             outputShape[hDim], getInputTileSize());
+                             outputSizes[hDim], getInputTileSize());
   auto wSizeAndOffset =
       getScaledSizeAndOffset(builder, loc, sizes[2], offsets[2],
-                             outputShape[wDim], getInputTileSize());
+                             outputSizes[wDim], getInputTileSize());
 
   outputSizes[hDim] = hSizeAndOffset.first;
   outputSizes[wDim] = wSizeAndOffset.first;
@@ -2499,12 +2532,16 @@ LogicalResult WinogradOutputTransformOp::getResultTilePosition(
     resultOffsets[cDim] = offsets[3];
     resultSizes[0] = sizes[0];
     resultSizes[cDim] = sizes[3];
-    auto hSizeAndOffset =
-        getScaledSizeAndOffset(builder, loc, sizes[1], offsets[1],
-                               resultShape[hDim], getInputTileSize());
-    auto wSizeAndOffset =
-        getScaledSizeAndOffset(builder, loc, sizes[2], offsets[2],
-                               resultShape[wDim], getInputTileSize());
+    SmallVector<SmallVector<OpFoldResult>> reifiedResultShapes;
+    if (failed(reifyResultShapes(builder, reifiedResultShapes))) {
+      return failure();
+    }
+    auto hSizeAndOffset = getScaledSizeAndOffset(
+        builder, loc, sizes[1], offsets[1], reifiedResultShapes[0][hDim],
+        getInputTileSize());
+    auto wSizeAndOffset = getScaledSizeAndOffset(
+        builder, loc, sizes[2], offsets[2], reifiedResultShapes[0][wDim],
+        getInputTileSize());
 
     resultSizes[hDim] = hSizeAndOffset.first;
     resultSizes[wDim] = wSizeAndOffset.first;

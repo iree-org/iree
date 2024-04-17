@@ -1503,15 +1503,15 @@ static LogicalResult
 setRootConfig(mlir::FunctionOpInterface entryPointFn,
               IREE::LinalgExt::WinogradInputTransformOp inputOp) {
   assert(!getLoweringConfig(inputOp) && "expected lowering_config is not set");
-  auto outShape = inputOp.getOutputOperandType().getShape();
-  SmallVector<int64_t> distTileSizes(outShape.begin() + 2, outShape.end());
-  distTileSizes = llvm::map_to_vector(distTileSizes, [](int64_t size) {
-    return std::min<int64_t>(size, clDefaultDistTileSize);
-  });
-  distTileSizes[1] = distTileSizes[2] = 0;
+  auto iterationRank = inputOp.getIterationDomainRank();
+  SmallVector<int64_t> vecSizeHints(iterationRank, 1);
+  DistributionHeuristicConfig distConfig;
+  distConfig.vectorSizeHints = vecSizeHints;
+  SmallVector<int64_t> distTileSizes =
+      getDefaultDistributedLevelTileSizes(inputOp, distConfig);
   TileSizesListType tileSizes;
   tileSizes.push_back(distTileSizes);
-  SmallVector<int64_t> vecTileSizes(4, 1);
+  SmallVector<int64_t> vecTileSizes(iterationRank, 1);
   tileSizes.push_back(vecTileSizes);
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, inputOp, tileSizes,
@@ -1524,15 +1524,15 @@ static LogicalResult
 setRootConfig(mlir::FunctionOpInterface entryPointFn,
               IREE::LinalgExt::WinogradOutputTransformOp outputOp) {
   assert(!getLoweringConfig(outputOp) && "expected lowering_config is not set");
-  auto inShape = outputOp.getInputOperandType().getShape();
-  SmallVector<int64_t> distTileSizes(inShape.begin() + 2, inShape.end());
-  distTileSizes = llvm::map_to_vector(distTileSizes, [](int64_t size) {
-    return std::min<int64_t>(size, clDefaultDistTileSize);
-  });
-  distTileSizes[1] = distTileSizes[2] = 0;
+  auto iterationRank = outputOp.getIterationDomainRank();
+  SmallVector<int64_t> vecSizeHints(iterationRank, 1);
+  DistributionHeuristicConfig distConfig;
+  distConfig.vectorSizeHints = vecSizeHints;
+  SmallVector<int64_t> distTileSizes =
+      getDefaultDistributedLevelTileSizes(outputOp, distConfig);
   TileSizesListType tileSizes;
   tileSizes.push_back(distTileSizes);
-  SmallVector<int64_t> vecTileSizes(4, 1);
+  SmallVector<int64_t> vecTileSizes(iterationRank, 1);
   tileSizes.push_back(vecTileSizes);
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, outputOp, tileSizes,
