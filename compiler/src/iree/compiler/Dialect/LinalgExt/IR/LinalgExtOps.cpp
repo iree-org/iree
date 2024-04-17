@@ -33,9 +33,7 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Support/MathExtras.h"
 
-using namespace mlir;
-using namespace mlir::iree_compiler::IREE::LinalgExt;
-namespace IREE = mlir::iree_compiler::IREE;
+namespace mlir::iree_compiler::IREE::LinalgExt {
 
 //===----------------------------------------------------------------------===//
 // Utils.
@@ -1743,11 +1741,11 @@ LogicalResult PackOp::verify() {
 }
 
 SmallVector<OpFoldResult> PackOp::getMixedTiles() {
-  return ::getMixedTiles(*this);
+  return LinalgExt::getMixedTiles(*this);
 }
 
 SmallVector<int64_t> PackOp::getStaticTiles() {
-  return ::getStaticTiles(*this);
+  return LinalgExt::getStaticTiles(*this);
 }
 
 // Helper for PackOp::{getResultShape,getPackedType}. Returns the shape of the
@@ -1841,11 +1839,11 @@ ShapedType PackOp::getPackedType(ShapedType sourceType,
 }
 
 DenseMap<int64_t, OpFoldResult> PackOp::getDimAndTileMapping() {
-  return ::getDimAndTileMapping(*this);
+  return LinalgExt::getDimAndTileMapping(*this);
 }
 
 SmallVector<Range> PackOp::getIterationDomain(OpBuilder &builder) {
-  return ::getIterationDomain(*this, builder);
+  return LinalgExt::getIterationDomain(*this, builder);
 }
 
 /// Generate the body of the innermost loop of the scalar implementation
@@ -2011,15 +2009,15 @@ void UnPackOp::build(OpBuilder &builder, OperationState &state, Value source,
 }
 
 SmallVector<OpFoldResult> UnPackOp::getMixedTiles() {
-  return ::getMixedTiles(*this);
+  return LinalgExt::getMixedTiles(*this);
 }
 
 SmallVector<int64_t> UnPackOp::getStaticTiles() {
-  return ::getStaticTiles(*this);
+  return LinalgExt::getStaticTiles(*this);
 }
 
 DenseMap<int64_t, OpFoldResult> UnPackOp::getDimAndTileMapping() {
-  return ::getDimAndTileMapping(*this);
+  return LinalgExt::getDimAndTileMapping(*this);
 }
 
 LogicalResult UnPackOp::generateScalarImplementation(OpBuilder &builder,
@@ -2089,7 +2087,7 @@ UnPackOp::reifyResultShapes(OpBuilder &builder,
 }
 
 SmallVector<Range> UnPackOp::getIterationDomain(OpBuilder &builder) {
-  return ::getIterationDomain(*this, builder);
+  return LinalgExt::getIterationDomain(*this, builder);
 }
 
 LogicalResult UnPackOp::verify() {
@@ -2835,6 +2833,8 @@ getEncodingContractionDims(EncodingAttr encoding) {
       });
   return linalg::inferContractionDims(indexingMaps);
 }
+
+} // namespace mlir::iree_compiler::IREE::LinalgExt
 
 // clang-format off
 #define GET_OP_CLASSES
