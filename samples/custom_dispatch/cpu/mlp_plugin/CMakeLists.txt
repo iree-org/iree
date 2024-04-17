@@ -131,6 +131,14 @@ add_custom_target(
     DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/mlp_linalg_generated.pdl.mlir"
 )
 
+  # Append the includes used for this file to the pdll_compilation_commands
+  # file.
+  file(APPEND ${CMAKE_BINARY_DIR}/pdll_compile_commands.yml
+      "--- !FileInfo:\n"
+      "  filepath: \"${CMAKE_CURRENT_SOURCE_DIR}/mlp_linalg_spec.pdll\"\n"
+      "  includes: \"/home/ianwood/iree/third_party/llvm-project/mlir/include/\"\n"
+  )
+
 
 iree_lit_test_suite(
   NAME

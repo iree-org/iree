@@ -1,8 +1,34 @@
 #include "mlir/Dialect/Linalg/IR/LinalgOps.td"
 #include "mlir/Dialect/Arith/IR/ArithOps.td"
 #include "mlir/Dialect/Func/IR/FuncOps.td"
+#include "mlir/Dialect/Tensor/IR/TensorOps.td"
+
+
+// Native rewrite "rewriteAsFlowDispatch"
+Rewrite rewriteAsFlowDispatch(op : Op, fname : Attr,  inputs : ValueRange, repl_vals : ValueRange, repl_dims : ValueRange, other : ValueRange) -> Op;
+
 
 Pattern mlp with benefit(1) {
-  let root = op<func.call> (operands : Value); 
-  replace root with op<arith.constant>{ value = attr<"true">};
+  let root = op<linalg.matmul> (lhs : Value, rhs : Value, fill : Value, valueRange : ValueRange); 
+
+  rewrite root with {
+    let constZero = op<arith.constant> { value = attr<"0 : i32"> };
+    let constOne = op<arith.constant> { value = attr<"1 : i32"> };
+    let m = op<tensor.dim>(lhs, constZero);
+    let n = op<tensor.dim>(rhs, constOne);
+    let k = op<tensor.dim>(lhs, constOne);
+    let m_cast = op<arith.index_cast>(m);
+    let n_cast = op<arith.index_cast>(n);
+    let k_cast = op<arith.index_cast>(k);
+
+
+
+    let doRelu = op<arith.constant> { value = attr<"false"> };
+    let inputs = (lhs, rhs);
+    let repl_vals = (root.0 );
+    let repl_dims = (m.0, n.0);
+    let other = (m_cast.0, n_cast.0, k_cast.0, doRelu.0);
+    let fname = attr<"mlp_external">;
+    rewriteAsFlowDispatch(root, fname, inputs, repl_vals, repl_dims, other);
+  };
 }
