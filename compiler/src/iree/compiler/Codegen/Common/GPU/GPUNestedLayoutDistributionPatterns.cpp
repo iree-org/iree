@@ -79,7 +79,7 @@ static SmallVector<Value> getTransferIndicesFromNestedLayout(
       return constExpr.getValue() == 0;
     return false;
   };
-  int64_t rank = vectorLayout.getBatchOrder().size();
+  int64_t rank = vectorLayout.getRank();
   // Permute the batch and outer vector offsets to match the order of
   // the vector dimensions using the inverse of the batch/offset order.
   SmallVector<int64_t> batchOffsets =
@@ -113,7 +113,7 @@ static SmallVector<Value> getTransferIndicesFromNestedLayout(
 }
 
 static SmallVector<int64_t> getLoopOrder(NestedLayoutAttr vectorLayout) {
-  int64_t rank = vectorLayout.getBatchOrder().size();
+  int64_t rank = vectorLayout.getRank();
   // Let the unroll order first unroll the batch dimensions, then the
   // outer vector dimensions. We unroll in the order specified by the
   // layout.
@@ -137,7 +137,7 @@ static SmallVector<int64_t> getLoopOrder(NestedLayoutAttr vectorLayout) {
 
 static SmallVector<int64_t>
 getElementVectorTileShape(NestedLayoutAttr vectorLayout) {
-  int64_t rank = vectorLayout.getBatchOrder().size();
+  int64_t rank = vectorLayout.getRank();
   SmallVector<int64_t> tileShape = vectorLayout.getDistributedShape();
   // We tile to a vector with BATCH, OUTER, and ELEMENT dimensions. So to access
   // the subvector only containing elements, we need indices in all BATCH and
@@ -154,20 +154,33 @@ static void populateWarpAndThreadIndices(RewriterBase &rewriter, Value threadId,
                                          NestedLayoutAttr vectorLayout,
                                          SmallVector<Value> &warpIndices,
                                          SmallVector<Value> &threadIndices) {
-  int64_t rank = vectorLayout.getBatchOrder().size();
+  int64_t subgroupRank = vectorLayout.getSubgroupBasis().size();
   // The delinearized thread IDs are returned from outer most to inner most,
   // i.e. before applying the layout described dimensions ordering.
   SmallVector<Value> threadIds =
       vectorLayout.computeThreadIds(threadId, rewriter);
 
+  SmallVector<Value> filteredSubgroupIds;
+  for (auto [id, active] :
+       llvm::zip(threadIds, vectorLayout.getSubgroupActiveIds())) {
+    if (active)
+      filteredSubgroupIds.push_back(id);
+  }
+  SmallVector<Value> filteredThreadIds;
+  for (auto [id, active] : llvm::zip(llvm::drop_begin(threadIds, subgroupRank),
+                                     vectorLayout.getThreadActiveIds())) {
+    if (active)
+      filteredThreadIds.push_back(id);
+  }
+
   // Subgroup and thread (lane) indices normalized to the order in which
   // they are used by each dimension.
-  warpIndices =
-      llvm::to_vector(llvm::map_range(vectorLayout.getSubgroupOrder(),
-                                      [&](int64_t i) { return threadIds[i]; }));
+  warpIndices = llvm::to_vector(
+      llvm::map_range(invertPermutationVector(vectorLayout.getSubgroupOrder()),
+                      [&](int64_t i) { return filteredSubgroupIds[i]; }));
   threadIndices = llvm::to_vector(
-      llvm::map_range(vectorLayout.getThreadOrder(),
-                      [&](int64_t i) { return threadIds[i + rank]; }));
+      llvm::map_range(invertPermutationVector(vectorLayout.getThreadOrder()),
+                      [&](int64_t i) { return filteredThreadIds[i]; }));
 }
 
 namespace {
@@ -204,7 +217,7 @@ struct DistributeTransferRead final
     SmallVector<int64_t> distShape = vectorLayout.getDistributedShape();
     SmallVector<int64_t> tileShape = getElementVectorTileShape(vectorLayout);
     SmallVector<int64_t> loopOrder = getLoopOrder(vectorLayout);
-    int64_t rank = vectorLayout.getBatchOrder().size();
+    int64_t rank = vectorLayout.getRank();
 
     Type elementType = readOp.getSource().getType().getElementType();
     auto vectorType = VectorType::get(distShape, elementType);
@@ -236,6 +249,14 @@ struct DistributeTransferRead final
           readOp.getPermutationMapAttr(), readOp.getPadding(), readOp.getMask(),
           readOp.getInBoundsAttr());
       // Transpose to the element order.
+      //
+      // A = transfer_read
+      // B = transpose A
+      //
+      // P(A) = I
+      //
+      // P(A) * perm = P(B)
+      // perm = P(B)
       if (!isIdentityPermutation(vectorLayout.getElementOrder())) {
         slicedRead = rewriter.create<vector::TransposeOp>(
             slicedRead.getLoc(), slicedRead, vectorLayout.getElementOrder());
@@ -283,7 +304,7 @@ struct DistributeTransferWrite final
     SmallVector<int64_t> distShape = vectorLayout.getDistributedShape();
     SmallVector<int64_t> tileShape = getElementVectorTileShape(vectorLayout);
     SmallVector<int64_t> loopOrder = getLoopOrder(vectorLayout);
-    int64_t rank = vectorLayout.getBatchOrder().size();
+    int64_t rank = vectorLayout.getRank();
 
     SmallVector<Value> warpIndices, threadIndices;
     populateWarpAndThreadIndices(rewriter, threadId, vectorLayout, warpIndices,
@@ -307,6 +328,14 @@ struct DistributeTransferWrite final
           writeOp.getLoc(), distributedVector,
           offsetArray.take_front(rank * 2));
       // Transpose to the native dimension order.
+      // B = transpose(A)
+      // transfer_write B
+      //
+      // P(B) = I
+      //
+      // P(A) * perm = P(B)
+      // P(A) * perm = I
+      // perm = P(A) ^ -1
       if (!isIdentityPermutation(vectorLayout.getElementOrder())) {
         slicedVector = rewriter.create<vector::TransposeOp>(
             slicedVector.getLoc(), slicedVector,
@@ -359,8 +388,8 @@ struct DistributeBroadcast final : OpDistributionPattern<vector::BroadcastOp> {
     Value accumulator = rewriter.create<arith::ConstantOp>(
         loc, vectorType, rewriter.getZeroAttr(vectorType));
 
-    int64_t rank = vectorLayout.getBatchOrder().size();
-    int64_t sourceRank = sourceLayout.getBatchOrder().size();
+    int64_t rank = vectorLayout.getRank();
+    int64_t sourceRank = sourceLayout.getRank();
     // We unroll along both the batch and outer dimensions for a similar reason
     // to the transfer ops. `vector.broadcast` can only broadcast along outer
     // dims, so mixing broadcasted and un-broadcasted element/outer dims can't

@@ -59,6 +59,7 @@ fi
 export IREE_VULKAN_DISABLE=1
 export IREE_METAL_DISABLE=1
 export IREE_CUDA_DISABLE=1
+export IREE_HIP_DISABLE=1
 
 # Honor the "notsan" label on tests.
 export IREE_EXTRA_COMMA_SEPARATED_CTEST_LABELS_TO_EXCLUDE=notsan

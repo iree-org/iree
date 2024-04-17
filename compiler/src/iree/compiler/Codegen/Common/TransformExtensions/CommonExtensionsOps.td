@@ -9,8 +9,8 @@
 
 include "mlir/Dialect/Transform/IR/TransformAttrs.td"
 include "mlir/Dialect/Transform/IR/TransformDialect.td"
-include "mlir/Dialect/Transform/IR/TransformInterfaces.td"
 include "mlir/Dialect/Transform/IR/TransformTypes.td"
+include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Dialect/SCF/IR/DeviceMappingInterface.td"
 include "mlir/IR/EnumAttr.td"
@@ -496,6 +496,42 @@ def WorkgroupSwizzleOp :  Op<Transform_Dialect, "iree.workgroup_swizzle",
   let arguments = (
       ins TransformHandleTypeInterface:$target,
           I64Attr:$log_tile
+  );
+  let results = (outs);
+
+  let assemblyFormat = "$target attr-dict `:` functional-type(operands, results)";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::transform::TransformRewriter &rewriter,
+        ::mlir::FunctionOpInterface funcOp,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
+def ReduceSharedMemoryBankConflictsOp :  Op<Transform_Dialect, "iree.reduce_shared_memory_bank_conflicts",
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     TransformEachOpTrait,
+     TransformOpInterface,
+     ReportTrackingListenerFailuresOpTrait]> {
+  let summary = "Add padding to 'memref.alloc' ops reduce shared memory bank conflicts";
+  let description = [{
+    The `paddingSizeBits` argument should be picked based on the target
+    architecture, striking balance between minimizing bank conflicts and keeping
+    the data aligned. Smaller values (close to the bank bitwidth) achieve the
+    former, while larger (~= widest load size) the latter. We want to **misalign**
+    the rows, but not too much. For gfx942, 64 is a good default.
+
+    #### Return modes
+
+    This transform does not consume the target handle and always return success.
+  }];
+
+  let arguments = (
+      ins TransformHandleTypeInterface:$target,
+          DefaultValuedOptionalAttr<I64Attr, "64">:$padding_size_bits
   );
   let results = (outs);
 

@@ -83,32 +83,6 @@ getSubgroupIdsAndCounts(mlir::OpBuilder &builder, mlir::Location loc,
   return procInfo;
 }
 
-std::array<int64_t, 3> getWorkgroupSize(mlir::FunctionOpInterface funcOp) {
-  std::array<int64_t, 3> workgroupSize;
-  FailureOr<IREE::HAL::ExecutableExportOp> exportOp =
-      mlir::iree_compiler::getEntryPoint(funcOp);
-  std::optional<mlir::ArrayAttr> workgroupSizeAttr =
-      exportOp->getWorkgroupSize();
-  assert(workgroupSizeAttr.has_value());
-  for (auto [index, attr] : llvm::enumerate(workgroupSizeAttr.value())) {
-    workgroupSize[index] =
-        llvm::cast<mlir::IntegerAttr>(attr).getValue().getZExtValue();
-  }
-  return workgroupSize;
-}
-
-std::optional<int64_t> getSubgroupSize(mlir::FunctionOpInterface funcOp) {
-  FailureOr<IREE::HAL::ExecutableExportOp> exportOp =
-      mlir::iree_compiler::getEntryPoint(funcOp);
-  if (failed(exportOp)) {
-    return std::nullopt;
-  }
-  if (IntegerAttr attr = exportOp->getSubgroupSizeAttr()) {
-    return attr.getValue().getSExtValue();
-  }
-  return std::nullopt;
-}
-
 //===----------------------------------------------------------------------===//
 // GPU vectorization
 //===----------------------------------------------------------------------===//
@@ -938,7 +912,7 @@ bool hasUkernelSupportedGpuArch(IREE::HAL::ExecutableTargetAttr targetAttr) {
 //===----------------------------------------------------------------------===//
 
 static constexpr char mmaTypeListName[] = "mma_intrinsics";
-static FailureOr<ArrayAttr> getSupportedMmaTypes(DictionaryAttr config) {
+FailureOr<ArrayAttr> getSupportedMmaTypes(DictionaryAttr config) {
   if (!config) {
     return failure();
   }

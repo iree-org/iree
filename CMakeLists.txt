@@ -60,6 +60,12 @@ set(IREE_TRACING_PROVIDER_H "" CACHE STRING "Header file for custom tracing prov
 set(IREE_TRACING_MODE_DEFAULT "2" CACHE STRING "Default tracing feature/verbosity mode. See iree/base/tracing.h for more.")
 set(IREE_TRACING_MODE ${IREE_TRACING_MODE_DEFAULT} CACHE STRING "Tracing feature/verbosity mode. See iree/base/tracing.h for more.")
 
+if(IREE_ENABLE_COMPILER_TRACING AND NOT IREE_ENABLE_RUNTIME_TRACING)
+  message(SEND_ERROR
+      "IREE_ENABLE_COMPILER_TRACING currently requires "
+      "-DIREE_ENABLE_RUNTIME_TRACING=ON")
+endif()
+
 # TODO(#8469): remove the dependency on cpuinfo entirely.
 set(IREE_ENABLE_CPUINFO_DEFAULT ON)
 if(CMAKE_SYSTEM_NAME MATCHES "Darwin|Emscripten|Windows|WindowsStore")
@@ -122,6 +128,11 @@ option(IREE_COMPILER_BUILD_SHARED_LIBS "Enables BUILD_SHARED_LIBS CMake mode for
 # This option is considered experimental and should not be relied on until
 # CI coverage is established.
 option(BUILD_SHARED_LIBS "Instructs CMake to build libraries as shared if possible" OFF)
+
+# Control of LTO settings for the runtime build.
+set(IREE_RUNTIME_OPTIMIZATION_PROFILE "" CACHE STRING
+    "Build optimization profile to apply. One of '', 'lto', 'size'.")
+set(IREE_LTO_MODE "full" CACHE STRING "LTO type, 'thin' or 'full'. Only consulted on clang-like compilers.")
 
 #-------------------------------------------------------------------------------
 # IREE command-line tooling configuration
@@ -210,6 +221,18 @@ else()
 endif()
 
 #-------------------------------------------------------------------------------
+# HIP Default Target Configuration.
+#
+# HIP does not have a stable instruction set like NVIDIA PTX; it requires
+# binaries specific to a target chip. We have tests that generate and run
+# deployable code which need to specify the proper target chip.
+#-------------------------------------------------------------------------------
+
+set(IREE_HIP_TEST_TARGET_CHIP "" CACHE STRING
+  "Target chip for HIP tests that need to compile device code. \
+   Defaults to empty string to disable tests.")
+
+#-------------------------------------------------------------------------------
 # Runtime HAL Driver Options
 # By default, all runtime drivers supported by the current platform which do
 # not require external deps are enabled by default. This can be changed with:
@@ -244,6 +267,13 @@ if(NOT IREE_CUDA_AVAILABLE OR CMAKE_CROSSCOMPILING)
   set(IREE_HAL_DRIVER_CUDA_DEFAULT OFF)
 endif()
 
+# HIP support is enabled by default if not cross compiling. Note: a HIP-compatible
+# GPU with drivers is still required to actually run HIP workloads.
+set(IREE_HAL_DRIVER_HIP_DEFAULT ${IREE_HAL_DRIVER_DEFAULTS})
+if(CMAKE_CROSSCOMPILING)
+  set(IREE_HAL_DRIVER_HIP_DEFAULT OFF)
+endif()
+
 # Vulkan support is enabled by default if the platform might support Vulkan.
 # Apple platforms support Metal instead of Vulkan, though MoltenVK may work.
 set(IREE_HAL_DRIVER_VULKAN_DEFAULT ${IREE_HAL_DRIVER_DEFAULTS})
@@ -259,6 +289,7 @@ if(NOT APPLE OR NOT ${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm64")
 endif()
 
 option(IREE_HAL_DRIVER_CUDA "Enables the 'cuda' runtime HAL driver" ${IREE_HAL_DRIVER_CUDA_DEFAULT})
+option(IREE_HAL_DRIVER_HIP "Enables the 'hip' runtime HAL driver" ${IREE_HAL_DRIVER_HIP_DEFAULT})
 option(IREE_HAL_DRIVER_LOCAL_SYNC "Enables the 'local-sync' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
 option(IREE_HAL_DRIVER_LOCAL_TASK "Enables the 'local-task' runtime HAL driver" ${IREE_HAL_DRIVER_DEFAULTS})
 option(IREE_HAL_DRIVER_VULKAN "Enables the 'vulkan' runtime HAL driver" ${IREE_HAL_DRIVER_VULKAN_DEFAULT})
@@ -306,6 +337,9 @@ endif()
 message(STATUS "IREE HAL drivers:")
 if(IREE_HAL_DRIVER_CUDA)
   message(STATUS "  - cuda")
+endif()
+if(IREE_HAL_DRIVER_HIP)
+  message(STATUS "  - hip")
 endif()
 if(IREE_HAL_DRIVER_LOCAL_SYNC)
   message(STATUS "  - local-sync")
@@ -530,7 +564,7 @@ include(iree_lit_test)
 include(iree_llvm)
 include(iree_add_all_subdirs)
 include(iree_check_test)
-include(iree_e2e_matmul_test)
+include(iree_e2e_generated_runner_test)
 include(iree_native_test)
 include(iree_cc_binary_benchmark)
 include(iree_benchmark_suite)
@@ -560,22 +594,6 @@ iree_register_external_hal_driver(
     iree::experimental::rocm::registration
   REGISTER_FN
     iree_hal_rocm_driver_module_register
-)
-
-#-------------------------------------------------------------------------------
-# Experimental HIP HAL driver
-# Enable with: -DIREE_EXTERNAL_HAL_DRIVERS=hip
-#-------------------------------------------------------------------------------
-
-iree_register_external_hal_driver(
-  NAME
-    hip
-  SOURCE_DIR
-    "${CMAKE_CURRENT_SOURCE_DIR}/experimental/hip"
-  DRIVER_TARGET
-    iree::experimental::hip::registration
-  REGISTER_FN
-    iree_hal_hip_driver_module_register
 )
 
 #-------------------------------------------------------------------------------

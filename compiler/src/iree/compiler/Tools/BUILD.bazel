@@ -92,6 +92,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:ComplexDialect",
         "@llvm-project//mlir:ControlFlowDialect",
+        "@llvm-project//mlir:ControlFlowTransforms",
         "@llvm-project//mlir:ConversionPasses",
         "@llvm-project//mlir:EmitCDialect",
         "@llvm-project//mlir:FuncDialect",
@@ -162,20 +163,6 @@ config_setting(
     flag_values = {
         "@iree_cuda//:enabled": "True",
     },
-)
-
-iree_compiler_cc_library(
-    name = "init_targets",
-    srcs = ["init_targets.cc"],
-    hdrs = ["init_targets.h"],
-    local_defines = [
-        "IREE_HAVE_LLVM_CPU_TARGET",
-        "IREE_HAVE_VULKANSPIRV_TARGET",
-    ],
-    deps = [
-        "//compiler/src/iree/compiler/Dialect/HAL/Target/LLVMCPU",
-        "//compiler/src/iree/compiler/Dialect/HAL/Target/VulkanSPIRV",
-    ],
 )
 
 iree_compiler_cc_library(

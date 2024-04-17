@@ -8,11 +8,12 @@
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
-#include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/IR/Attributes.h"
@@ -371,19 +372,27 @@ struct DistributeReductions final
   DistributeReductions(MLIRContext *context, int64_t maxBitsPerShuffle)
       : OpDistributionPattern(context), maxBitsPerShuffle(maxBitsPerShuffle) {}
 
+  static constexpr int64_t kDefaultSubgroupSize = 32;
+
   // Do parallel reduction using butterfly shuffles.
   Value doThreadGlobalReduction(Value result, uint64_t shuffleOffset,
                                 int64_t laneSize,
                                 vector::CombiningKind combiningKind,
                                 int64_t entriesPerVector, Value mEmpty,
                                 OpBuilder &rewriter, Location loc) const {
-    uint32_t size = maxBitsPerShuffle;
+    auto funcOp = result.getDefiningOp()->getParentOfType<func::FuncOp>();
+    std::optional<int64_t> maybeSubgroupSize = getSubgroupSize(funcOp);
+    if (!maybeSubgroupSize)
+      funcOp->emitWarning("No subgroup size specified, using default value = " +
+                          Twine(kDefaultSubgroupSize));
+    int64_t subgroupSize = maybeSubgroupSize.value_or(kDefaultSubgroupSize);
+
     Value mask;
     assert(llvm::isPowerOf2_64(laneSize));
     for (uint64_t i = shuffleOffset; i < shuffleOffset * laneSize; i <<= 1) {
       Value packed = packVectorToSupportedWidth(loc, rewriter, result);
-      auto shuffleOp = rewriter.create<gpu::ShuffleOp>(loc, packed, i, size,
-                                                       gpu::ShuffleMode::XOR);
+      auto shuffleOp = rewriter.create<gpu::ShuffleOp>(
+          loc, packed, i, subgroupSize, gpu::ShuffleMode::XOR);
       Value unpacked =
           unpackToVector(loc, rewriter, shuffleOp.getShuffleResult(),
                          result.getType().cast<VectorType>());

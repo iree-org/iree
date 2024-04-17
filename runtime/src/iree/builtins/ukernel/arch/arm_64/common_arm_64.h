@@ -10,6 +10,47 @@
 #include <arm_neon.h>
 
 #include "iree/builtins/ukernel/common.h"
+#include "iree/schemas/cpu_data.h"
+
+#if defined(IREE_DEVICE_STANDALONE)
+// Standalone builds (e.g. bitcode) use our own Clang, supporting everything.
+#define IREE_UK_BUILD_ARM_64_FULLFP16
+#define IREE_UK_BUILD_ARM_64_FP16FML
+#define IREE_UK_BUILD_ARM_64_BF16
+#define IREE_UK_BUILD_ARM_64_DOTPROD
+#define IREE_UK_BUILD_ARM_64_I8MM
+#else
+// Compiling with the system toolchain. Include the configured header.
+#include "iree/builtins/ukernel/arch/arm_64/config_arm_64.h"
+#endif
+
+static inline bool iree_uk_cpu_arm_64(const iree_uk_uint64_t* cpu_data) {
+  (void)cpu_data;
+  return true;
+}
+
+static inline bool iree_uk_cpu_arm_64_fullfp16(
+    const iree_uk_uint64_t* cpu_data) {
+  return iree_uk_all_bits_set(cpu_data[0], IREE_CPU_DATA0_ARM_64_FULLFP16);
+}
+
+static inline bool iree_uk_cpu_arm_64_fp16fml(
+    const iree_uk_uint64_t* cpu_data) {
+  return iree_uk_all_bits_set(cpu_data[0], IREE_CPU_DATA0_ARM_64_FP16FML);
+}
+
+static inline bool iree_uk_cpu_arm_64_bf16(const iree_uk_uint64_t* cpu_data) {
+  return iree_uk_all_bits_set(cpu_data[0], IREE_CPU_DATA0_ARM_64_BF16);
+}
+
+static inline bool iree_uk_cpu_arm_64_dotprod(
+    const iree_uk_uint64_t* cpu_data) {
+  return iree_uk_all_bits_set(cpu_data[0], IREE_CPU_DATA0_ARM_64_DOTPROD);
+}
+
+static inline bool iree_uk_cpu_arm_64_i8mm(const iree_uk_uint64_t* cpu_data) {
+  return iree_uk_all_bits_set(cpu_data[0], IREE_CPU_DATA0_ARM_64_I8MM);
+}
 
 static inline int8x16x2_t iree_uk_neon_load_8x4xi8_strided(
     const iree_uk_int8_t* src, iree_uk_index_t stride) {

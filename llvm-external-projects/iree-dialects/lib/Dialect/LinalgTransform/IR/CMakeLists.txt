@@ -14,6 +14,7 @@ add_mlir_library(IREELinalgTransformDialect
   MLIRPDLDialect
   MLIRRewrite
   MLIRTransformDialect
+  MLIRTransformDialectInterfaces
   MLIRTransformPDLExtension
 
   # Transforms

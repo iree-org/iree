@@ -68,6 +68,11 @@ LogicalResult verifySPIRVMatmulPromoteVectorizePassPipeline(
       limits.getMaxComputeWorkgroupSize().getAsValueRange<IntegerAttr>(),
       [](const APInt &dim) { return dim.getSExtValue(); });
 
+  if (workgroupSize.size() < 3) {
+    return funcOp->emitOpError("expected workgroup size to have three "
+                               "dimensions for SPIR-V pipelines");
+  }
+
   // Verify each dimension of workgroupSize should be power of two.
   if (!llvm::isPowerOf2_64(workgroupSize[0]) ||
       !llvm::isPowerOf2_64(workgroupSize[1]) ||

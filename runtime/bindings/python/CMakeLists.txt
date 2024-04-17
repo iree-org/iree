@@ -244,6 +244,13 @@ iree_py_test(
 
 iree_py_test(
   NAME
+    io_test
+  SRCS
+    "tests/io_test.py"
+)
+
+iree_py_test(
+  NAME
     system_setup_test
   SRCS
     "tests/system_setup_test.py"
@@ -261,9 +268,9 @@ if(IREE_BUILD_BUNDLED_LLVM)
 
   iree_py_test(
     NAME
-      io_test
+      io_runtime_test
     SRCS
-      "tests/io_test.py"
+      "tests/io_runtime_test.py"
   )
 
   iree_py_test(

@@ -96,6 +96,23 @@ def EncodingAttr :
     OptionalParameter<"ArrayAttr", "Indexing maps of the operation using this tensor">:$user_indexing_maps
   );
 
+  let builders = [
+    AttrBuilder<(ins "EncodingRole":$role,
+        "ArrayRef<Type>":$elemTypes, "Type":$origType,
+        CArg<"std::optional<int64_t>", "{}">:$matmulNarrowM,
+        CArg<"std::optional<int64_t>", "{}">:$matmulNarrowN,
+        CArg<"ArrayRef<AffineMap>", "{}">:$maps)>
+  ];
+
+  let extraClassDeclaration = [{
+    /// Returns the indexing map used by the role in the encoding.
+    AffineMap getMapForRole();
+
+    /// Given the dim position of the encoding `user_indexing_maps`, returns the
+    /// matching index of the given encoding's tensor.
+    unsigned mapDimToRoleIndex(int64_t dimPos);
+  }];
+
   let genVerifyDecl = 0;
 }
 

@@ -124,6 +124,7 @@ function(iree_cc_binary)
   target_compile_options(${_NAME}
     PRIVATE
       ${IREE_DEFAULT_COPTS}
+      ${IREE_INTERFACE_COPTS}
       ${_RULE_COPTS}
   )
   target_link_options(${_NAME}
@@ -198,12 +199,12 @@ function(iree_cc_binary)
       if (NOT _lib_dir)
         set(_lib_dir "lib")
       endif()
-      set(_install_rpath "${_origin_prefix}:${_origin_prefix}/../${_lib_dir}")
+      set(_install_rpath "${_origin_prefix}" "${_origin_prefix}/../${_lib_dir}")
       if(_lib_dir)
         cmake_path(IS_ABSOLUTE _lib_dir _is_abs_libdir)
         if(_is_abs_libdir)
           # Use the libdir verbatim.
-          set(_install_rpath "${_origin_prefix}:${_lib_dir}")
+          set(_install_rpath "${_origin_prefix}" "${_lib_dir}")
         endif()
       endif()
       set_target_properties(${_NAME} PROPERTIES

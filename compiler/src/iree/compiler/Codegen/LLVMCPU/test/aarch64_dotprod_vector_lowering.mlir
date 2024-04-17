@@ -1,22 +1,11 @@
-// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-llvmcpu-mmt4d-vector-lowering,iree-codegen-optimize-vector-transfer{flatten=true})))))' --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline='builtin.module(func.func(iree-llvmcpu-mmt4d-vector-lowering,iree-codegen-optimize-vector-transfer{flatten=true}))' %s | FileCheck %s
 
-// -----
-
-#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
-  #hal.descriptor_set.layout<0, bindings = [
-    #hal.descriptor_set.binding<0, storage_buffer>,
-    #hal.descriptor_set.binding<1, storage_buffer>,
-    #hal.descriptor_set.binding<2, storage_buffer>,
-    #hal.descriptor_set.binding<3, storage_buffer>
-  ]>
-]>
-
-hal.executable private @foo {
-hal.executable.variant @system_elf_arm_64 target(<"llvm-cpu", "system-elf-arm_64", {cpu_features = "+dotprod", data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android29"}>) {
-hal.executable.export @foo layout(#pipeline_layout)
-builtin.module attributes {llvm.data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", llvm.target_triple = "aarch64-none-linux-android29"} {
-
-func.func @mmt4d_kernel_dispatch() {
+#target = #hal.executable.target<"llvm-cpu", "system-elf-arm_64", {
+    cpu_features = "+dotprod",
+    data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128",
+    native_vector_size = 16 : index,
+    target_triple = "aarch64-none-linux-android29"}>
+func.func @mmt4d_kernel_dispatch() attributes {hal.executable.target = #target} {
   %c0_i8 = arith.constant 0 : i8
   %cst = arith.constant dense<0> : vector<1x1x8x8xi32>
   %c2 = arith.constant 2 : index
@@ -58,10 +47,6 @@ func.func @mmt4d_kernel_dispatch() {
     }
   }
   return
-}
-
-}
-}
 }
 
 // CHECK-LABEL:  @mmt4d_kernel_dispatch(

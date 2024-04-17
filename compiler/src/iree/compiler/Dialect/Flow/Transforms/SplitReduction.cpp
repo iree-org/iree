@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -19,6 +18,9 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler::IREE::Flow {
+
+#define GEN_PASS_DEF_SPLITREDUCTIONPASS
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
 
 // TODO(thomasraoux): Move to attributes.
 static llvm::cl::opt<int64_t>
@@ -49,11 +51,8 @@ static LogicalResult splitReductionOnMatmul(
 }
 
 namespace {
-struct SplitReductionPass : public SplitReductionBase<SplitReductionPass> {
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg::LinalgDialect>();
-  }
-
+struct SplitReductionPass
+    : public IREE::Flow::impl::SplitReductionPassBase<SplitReductionPass> {
   void runOnOperation() override {
     if (splitReductionRatio.getValue() <= 1 &&
         topkSplitReductionRatio.empty()) {
@@ -97,9 +96,5 @@ struct SplitReductionPass : public SplitReductionBase<SplitReductionPass> {
 };
 
 } // namespace
-
-std::unique_ptr<Pass> createSplitReductionPass() {
-  return std::make_unique<SplitReductionPass>();
-}
 
 } // namespace mlir::iree_compiler::IREE::Flow

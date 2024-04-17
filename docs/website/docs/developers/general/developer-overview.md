@@ -24,7 +24,7 @@ developers.
 * [/tools/](https://github.com/openxla/iree/blob/main/tools/):
   Developer tools (`iree-compile`, `iree-run-module`, etc.)
 * [/samples/](https://github.com/openxla/iree/blob/main/samples/): Also see the
-  separate <https://github.com/iree-org/iree-samples> repository
+  separate <https://github.com/iree-org/iree-experimental> repository
 
 ## IREE compiler code layout
 

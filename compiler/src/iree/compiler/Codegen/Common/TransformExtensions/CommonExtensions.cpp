@@ -41,7 +41,7 @@
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
-#include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
+#include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
@@ -393,8 +393,7 @@ transform_dialect::ShareForallOperandsOp::applyToOne(
 //===---------------------------------------------------------------------===//
 
 LogicalResult rewriteForallToWorkgroup(RewriterBase &rewriter,
-                                       scf::ForallOp forallOp,
-                                       IREE::HAL::ExecutableExportOp exportOp) {
+                                       scf::ForallOp forallOp) {
   // Step 0. Target-specific verifications. There is no good place to anchor
   // those right now: the ForallOp is target-independent and the
   // transform op does not apply to individual ForallOp.
@@ -496,23 +495,6 @@ DiagnosedSilenceableFailure transform_dialect::ForallToWorkgroupOp::applyToOne(
     transform::TransformRewriter &rewriter, mlir::FunctionOpInterface target,
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  if (!isa<HAL::ExecutableOp, HAL::ExecutableVariantOp>(state.getTopLevel())) {
-    return mlir::emitDefiniteFailure(
-        state.getTopLevel(),
-        "requires HAL::ExecutableOp or HAL::ExecutableVariantOp toplevel "
-        "to attach the workgroup size information to a nested "
-        "ExecutableExportOp");
-  }
-
-  IREE::HAL::ExecutableExportOp exportOp;
-  state.getTopLevel()->walk([&](IREE::HAL::ExecutableExportOp op) {
-    if (op.getSymName() == target.getName())
-      exportOp = op;
-  });
-  if (!exportOp) {
-    return mlir::emitSilenceableFailure(
-        target, "no IREE::HAL::ExecutableExportOp found");
-  }
 
   scf::ForallOp topLevelForallOp;
   auto walkResult = target->walk([&](scf::ForallOp forallOp) {
@@ -530,7 +512,7 @@ DiagnosedSilenceableFailure transform_dialect::ForallToWorkgroupOp::applyToOne(
   }
 
   rewriter.setInsertionPoint(topLevelForallOp);
-  if (failed(rewriteForallToWorkgroup(rewriter, topLevelForallOp, exportOp)))
+  if (failed(rewriteForallToWorkgroup(rewriter, topLevelForallOp)))
     return mlir::emitDefiniteFailure(target, "rewriteForallToWorkgroup failed");
 
   return DiagnosedSilenceableFailure::success();
@@ -760,19 +742,7 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
     transform::TransformRewriter &rewriter,
     transform::TransformResults &results, transform::TransformState &state) {
   auto payload = state.getPayloadOps(getTarget());
-  if (!llvm::hasSingleElement(payload) ||
-      !isa<ModuleOp, HAL::ExecutableOp, HAL::ExecutableVariantOp>(
-          *payload.begin())) {
-    return mlir::emitDefiniteFailure(
-        state.getTopLevel(), "requires exactly a single HAL::ExecutableOp or "
-                             "HAL::ExecutableVariantOp target op.");
-  }
 
-  //===-------------------------------------------------------------------===//
-  // DO NOT JUST CALL `addIREEComprehensiveBufferizePasses` as this results in
-  // a lot of registration issues due to nested pass pipeline mess.
-  // Instead, take what we need from it.
-  //===-------------------------------------------------------------------===//
   // Bufferize the dispatch.
   using mlir::bufferization::BufferizationOptions;
   BufferizationOptions::AllocationFn allocationFn =
@@ -793,15 +763,10 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
     config.listener = &listener;
     // Manually gather list of ops because the other GreedyPatternRewriteDriver
     // overloads only accepts ops that are isolated from above.
-    SmallVector<Operation *> ops;
-    state.getTopLevel()->walk([&](Operation *nestedOp) {
-      if (state.getTopLevel() != nestedOp)
-        ops.push_back(nestedOp);
-    });
     LogicalResult result =
-        applyOpPatternsAndFold(ops, std::move(patterns), config);
+        applyOpPatternsAndFold(target, std::move(patterns), config);
     if (failed(result)) {
-      return mlir::emitDefiniteFailure(state.getTopLevel(),
+      return mlir::emitDefiniteFailure(target,
                                        "greedy pattern application failed");
     }
     if (listener.failed())
@@ -814,9 +779,18 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
   options.memCpyFn = memCpyFn;
   options.testAnalysisOnly = getTestAnalysisOnly();
   options.printConflicts = getPrintConflicts();
-  if (failed(runIREEOneShotBufferize(state.getTopLevel(), options)))
-    return mlir::emitDefiniteFailure(state.getTopLevel(),
-                                     "bufferization failed");
+
+  if (getTargetGpu()) {
+    options.defaultMemorySpaceFn =
+        [&](TensorType t) -> std::optional<Attribute> {
+      Attribute addressSpaceAttr = gpu::AddressSpaceAttr::get(
+          t.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
+      return addressSpaceAttr;
+    };
+  }
+  if (failed(runIREEOneShotBufferize(target, options))) {
+    return mlir::emitDefiniteFailure(target, "bufferization failed");
+  }
 
   // Early exit if test_analysis_only is set.
   if (getTestAnalysisOnly()) {
@@ -827,21 +801,12 @@ DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
   //   3. Post-bufferization passes are fine.
   PassManager pm(getContext());
   addIREEPostBufferizationPasses(pm);
-  WalkResult res = state.getTopLevel()->walk([&](ModuleOp moduleOp) {
-    if (failed(pm.run(moduleOp))) {
-      getOperation()->emitError()
-          << "failed to post-bufferization passes on module:\n"
-          << *(moduleOp.getOperation()) << "\nunder top-level:\n"
-          << *state.getTopLevel();
-      return WalkResult::interrupt();
-    }
-    return WalkResult::advance();
-  });
-  if (res.wasInterrupted())
+  if (failed(pm.run(target))) {
     return mlir::emitDefiniteFailure(target)
            << "post-bufferization passes failed";
+  }
 
-  results.set(getOperation()->getOpResult(0), {*payload.begin()});
+  results.set(getOperation()->getOpResult(0), {target});
   return listener.checkAndResetError();
 }
 
@@ -886,6 +851,28 @@ void transform_dialect::WorkgroupSwizzleOp::getEffects(
 }
 
 //===----------------------------------------------------------------------===//
+// ReduceSharedMemoryBankConclitsOp
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+transform_dialect::ReduceSharedMemoryBankConflictsOp::applyToOne(
+    transform::TransformRewriter &rewriter, mlir::FunctionOpInterface target,
+    transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  if (failed(reduceSharedMemoryBankConflicts(target, getPaddingSizeBits()))) {
+    return emitDefaultDefiniteFailure(target)
+           << "failed to reduce shared memory bank conflicts";
+  }
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::ReduceSharedMemoryBankConflictsOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::modifiesPayload(effects);
+}
+
+//===----------------------------------------------------------------------===//
 // TestVectorLayoutAnalysisOp
 //===----------------------------------------------------------------------===//
 
@@ -917,7 +904,9 @@ transform_dialect::TestVectorLayoutAnalysisOp::applyToOne(
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
   VectorLayoutAnalysis analysis(target);
-  setAnchorOpsFromAttributes(analysis, target);
+  if (setAnchorOpsFromAttributes(analysis, target).failed()) {
+    return emitDefaultSilenceableFailure(target);
+  }
   if (failed(analysis.run())) {
     target.emitError("layout analysis failed");
     return emitDefaultSilenceableFailure(target);
@@ -942,8 +931,7 @@ public:
       : VectorLayoutOptions(root, /*fullConversion=*/false) {}
 
   LogicalResult setAnchorOps(VectorLayoutAnalysis &analysis) override {
-    setAnchorOpsFromAttributes(analysis, root);
-    return success();
+    return setAnchorOpsFromAttributes(analysis, root);
   }
 };
 

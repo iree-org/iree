@@ -4,13 +4,15 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Utils/EquivalenceUtils.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler::IREE::Flow {
+
+#define GEN_PASS_DEF_DEDUPLICATEEXECUTABLESPASS
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
 
 namespace {
 
@@ -144,10 +146,8 @@ static int deduplicateObjects(Operation *scopeOp,
 } // namespace
 
 class DeduplicateExecutablesPass
-    : public DeduplicateExecutablesBase<DeduplicateExecutablesPass> {
-public:
-  explicit DeduplicateExecutablesPass() {}
-  DeduplicateExecutablesPass(const DeduplicateExecutablesPass &pass) {}
+    : public IREE::Flow::impl::DeduplicateExecutablesPassBase<
+          DeduplicateExecutablesPass> {
 
   void runOnOperation() override {
     auto moduleOp = getOperation();
@@ -158,32 +158,28 @@ public:
     }
     if (allObjects.empty())
       return;
-    totalObjects = allObjects.size();
-    objectsDeduplicated = deduplicateObjects(moduleOp, allObjects);
-    remainingObjects = totalObjects - objectsDeduplicated;
+    (void)deduplicateObjects(moduleOp, allObjects);
+    // totalObjects = allObjects.size();
+    // objectsDeduplicated = deduplicateObjects(moduleOp, allObjects);
+    // remainingObjects = totalObjects - objectsDeduplicated;
   }
 
 private:
-  Statistic totalObjects{
-      this,
-      "total object(s)",
-      "Number of object ops before deduplication",
-  };
-  Statistic objectsDeduplicated{
-      this,
-      "duplicate object(s)",
-      "Number of object ops removed as duplicates",
-  };
-  Statistic remainingObjects{
-      this,
-      "unique object(s)",
-      "Number of object ops remaining after deduplication",
-  };
+  // Statistic totalObjects{
+  //     this,
+  //     "total object(s)",
+  //     "Number of object ops before deduplication",
+  // };
+  // Statistic objectsDeduplicated{
+  //     this,
+  //     "duplicate object(s)",
+  //     "Number of object ops removed as duplicates",
+  // };
+  // Statistic remainingObjects{
+  //     this,
+  //     "unique object(s)",
+  //     "Number of object ops remaining after deduplication",
+  // };
 };
-
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createDeduplicateExecutablesPass() {
-  return std::make_unique<DeduplicateExecutablesPass>();
-}
 
 } // namespace mlir::iree_compiler::IREE::Flow

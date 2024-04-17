@@ -26,9 +26,9 @@ extern "C" {
 // each stream gets an ID allocated once and passed to all tracing macros.
 //
 // Usage:
-//   IREE_CUDA_TRACE_ZONE_BEGIN(queue->tracing_context, stream);
+//   IREE_CUDA_STREAM_TRACE_ZONE_BEGIN(queue->tracing_context, stream);
 //   cuLaunchKernel(..., stream);
-//   IREE_CUDA_TRACE_ZONE_END(queue->tracing_context, stream);
+//   IREE_CUDA_STREAM_TRACE_ZONE_END(queue->tracing_context, stream);
 //   ...
 //   iree_hal_cuda_tracing_context_collect(queue->tracing_context);
 //
@@ -37,8 +37,7 @@ extern "C" {
 //
 // TODO(benvanik): expose CUevent reservation separate from recording. For
 // graphs we will need to insert the events but in order to reuse the graphs
-// we'll need to reserve and patch new events each graph launch. For now we
-// don't instrument graphs.
+// we'll need to reserve and patch new events each graph launch.
 //
 // Thread-compatible: external synchronization is required if using from
 // multiple threads (same as with CUstream itself).
@@ -63,54 +62,80 @@ void iree_hal_cuda_tracing_context_free(
 void iree_hal_cuda_tracing_context_collect(
     iree_hal_cuda_tracing_context_t* context);
 
-#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
 
 // Begins a normal zone derived on the calling |src_loc|.
 // Must be perfectly nested and paired with a corresponding zone end.
-void iree_hal_cuda_tracing_zone_begin_impl(
+void iree_hal_cuda_stream_tracing_zone_begin_impl(
     iree_hal_cuda_tracing_context_t* context, CUstream stream,
     const iree_tracing_location_t* src_loc);
 
 // Begins an external zone using the given source information.
 // The provided strings will be copied into the tracy buffer.
-void iree_hal_cuda_tracing_zone_begin_external_impl(
+void iree_hal_cuda_stream_tracing_zone_begin_external_impl(
     iree_hal_cuda_tracing_context_t* context, CUstream stream,
     const char* file_name, size_t file_name_length, uint32_t line,
     const char* function_name, size_t function_name_length, const char* name,
     size_t name_length);
 
-void iree_hal_cuda_tracing_zone_end_impl(
+void iree_hal_cuda_graph_tracing_zone_begin_external_impl(
+    iree_hal_cuda_tracing_context_t* context, CUgraphNode* out_node,
+    CUgraph graph, CUgraphNode* dependency_nodes, size_t dependency_nodes_count,
+    const char* file_name, size_t file_name_length, uint32_t line,
+    const char* function_name, size_t function_name_length, const char* name,
+    size_t name_length);
+
+void iree_hal_cuda_stream_tracing_zone_end_impl(
     iree_hal_cuda_tracing_context_t* context, CUstream stream);
+void iree_hal_cuda_graph_tracing_zone_end_impl(
+    iree_hal_cuda_tracing_context_t* context, CUgraphNode* out_node,
+    CUgraph graph, CUgraphNode* dependency_nodes,
+    size_t dependency_nodes_count);
 
 // Begins a new zone with the parent function name.
-#define IREE_CUDA_TRACE_ZONE_BEGIN(context, stream)                           \
-  static const iree_tracing_location_t TracyConcat(                           \
-      __tracy_source_location, __LINE__) = {name_literal, __FUNCTION__,       \
-                                            __FILE__, (uint32_t)__LINE__, 0}; \
-  iree_hal_cuda_tracing_zone_begin_impl(                                      \
+#define IREE_CUDA_STREAM_TRACE_ZONE_BEGIN(context, stream)                \
+  static const iree_tracing_location_t TracyConcat(                       \
+      __tracy_source_location, __LINE__) = {NULL, __FUNCTION__, __FILE__, \
+                                            (uint32_t)__LINE__, 0};       \
+  iree_hal_cuda_stream_tracing_zone_begin_impl(                           \
       context, stream, &TracyConcat(__tracy_source_location, __LINE__));
 
 // Begins an externally defined zone with a dynamic source location.
 // The |file_name|, |function_name|, and optional |name| strings will be copied
 // into the trace buffer and do not need to persist.
-#define IREE_CUDA_TRACE_ZONE_BEGIN_EXTERNAL(                             \
+#define IREE_CUDA_STREAM_TRACE_ZONE_BEGIN_EXTERNAL(                      \
     context, stream, file_name, file_name_length, line, function_name,   \
     function_name_length, name, name_length)                             \
-  iree_hal_cuda_tracing_zone_begin_external_impl(                        \
+  iree_hal_cuda_stream_tracing_zone_begin_external_impl(                 \
       context, stream, file_name, file_name_length, line, function_name, \
       function_name_length, name, name_length)
+#define IREE_CUDA_GRAPH_TRACE_ZONE_BEGIN_EXTERNAL(                            \
+    context, out_node, graph, dpendency_nodes, dpendency_nodes_count,         \
+    file_name, file_name_length, line, function_name, function_name_length,   \
+    name, name_length)                                                        \
+  iree_hal_cuda_graph_tracing_zone_begin_external_impl(                       \
+      context, out_node, graph, dpendency_nodes, dpendency_nodes_count,       \
+      file_name, file_name_length, line, function_name, function_name_length, \
+      name, name_length)
 
-// Ends the current zone. Must be passed the |zone_id| from the _BEGIN.
-#define IREE_CUDA_TRACE_ZONE_END(context, stream) \
-  iree_hal_cuda_tracing_zone_end_impl(context, stream)
+#define IREE_CUDA_STREAM_TRACE_ZONE_END(context, stream) \
+  iree_hal_cuda_stream_tracing_zone_end_impl(context, stream)
+#define IREE_CUDA_GRAPH_TRACE_ZONE_END(                                 \
+    context, out_node, graph, dependency_nodes, dependency_nodes_count) \
+  iree_hal_cuda_graph_tracing_zone_end_impl(                            \
+      context, out_node, graph, dependency_nodes, dependency_nodes_count)
 
 #else
 
-#define IREE_CUDA_TRACE_ZONE_BEGIN(context, stream)
-#define IREE_CUDA_TRACE_ZONE_BEGIN_EXTERNAL(                           \
+#define IREE_CUDA_STREAM_TRACE_ZONE_BEGIN(context, stream)
+#define IREE_CUDA_STREAM_TRACE_ZONE_BEGIN_EXTERNAL(                    \
     context, stream, file_name, file_name_length, line, function_name, \
     function_name_length, name, name_length)
-#define IREE_CUDA_TRACE_ZONE_END(context, stream)
+#define IREE_CUDA_GRAPH_TRACE_ZONE_BEGIN_EXTERNAL(                          \
+    context, out_node, graph, dpendency_nodes, dpendency_nodes_count,       \
+    file_name, file_name_length, line, function_name, function_name_length, \
+    name, name_length)
+#define IREE_CUDA_STREAM_TRACE_ZONE_END(context, stream)
 
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION
 

@@ -46,7 +46,7 @@ def LLVMCPUAssignImportOrdinals :
 }
 
 def LLVMCPUCheckIRBeforeLLVMConversion :
-    Pass<"iree-llvmcpu-check-ir-before-llvm-conversion", "ModuleOp"> {
+    InterfacePass<"iree-llvmcpu-check-ir-before-llvm-conversion", "mlir::FunctionOpInterface"> {
   let summary = "Checks CPU backend specific IR constraints (like no allocas)";
   let constructor = "mlir::iree_compiler::createLLVMCPUCheckIRBeforeLLVMConversionPass()";
   let options = [
@@ -70,8 +70,7 @@ def LLVMCPULinkExecutables :
 }
 
 def LLVMCPULowerExecutableTarget :
-    Pass<"iree-llvmcpu-lower-executable-target",
-         "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
+    InterfacePass<"iree-llvmcpu-lower-executable-target", "mlir::FunctionOpInterface"> {
   let summary =
       "Lower executable target using an IREE::HAL::DispatchLoweringPassPipeline";
   let constructor =
@@ -81,6 +80,11 @@ def LLVMCPULowerExecutableTarget :
 def LLVMCPUMmt4dVectorLowering
     : InterfacePass<"iree-llvmcpu-mmt4d-vector-lowering", "mlir::FunctionOpInterface"> {
   let summary = "Apply vector lowering logic to vector ops";
+  let options = [
+    Option<"enableVectorContractCustomKernels", "vector-contract-custom-kernels", "bool",
+      /*default=*/"true",
+      "Flag to enable or disable vector contract custom kernels.">,
+  ];
   let constructor =
       "mlir::iree_compiler::createLLVMCPUMmt4dVectorLoweringPass()";
 }
@@ -93,8 +97,7 @@ def LLVMCPUPeel :
 }
 
 def LLVMCPUSelectLoweringStrategy :
-    Pass<"iree-llvmcpu-select-lowering-strategy",
-         "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
+    Pass<"iree-llvmcpu-select-lowering-strategy", "ModuleOp"> {
   let summary =
       "Select a IREE::HAL::DispatchLoweringPassPipeline for lowering the variant";
   let constructor =
@@ -136,6 +139,19 @@ def LLVMCPUTileAndFuse :
   let options = [
     Option<"tilingLevel", "tiling-level", "int64_t", /*default=*/"-1",
       "Use default tiling level used to retrieve the configuration from lowering_config">
+  ];
+}
+
+// Note: This pass is currently only required when targeting Arm SME (which is
+// the only target that currently has some concept of 2D scalability).
+def LLVMCPU2DScalableTo1DScalable :
+    InterfacePass<"iree-llvmcpu-2d-scalable-to-1d-scalable", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to replace unsupported scalable dimensions with loops.";
+  let constructor =
+      "mlir::iree_compiler::createLLVMCPU2DScalableTo1DScalablePass()";
+  let options = [
+    Option<"assumeArmSME", "assume-arm-sme", "bool", /*default=*/"false",
+      "Assume the current target is ArmSME (used for testing)">
   ];
 }
 
@@ -202,7 +218,7 @@ def VectorContractCustomKernels :
 }
 
 def VerifyLinalgTransformLegality :
-    Pass<"iree-llvmcpu-verify-linalg-transform-legality", "ModuleOp"> {
+    InterfacePass<"iree-llvmcpu-verify-linalg-transform-legality", "mlir::FunctionOpInterface"> {
   let summary = "Verify that only supported IR constructs are passed to the compiler.";
   let constructor = "mlir::iree_compiler::createVerifyLinalgTransformLegalityPass()";
 }

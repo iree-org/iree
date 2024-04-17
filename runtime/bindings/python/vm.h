@@ -76,7 +76,10 @@ struct ApiPtrAdapter<iree_vm_ref_t> {
 // VmBuffer
 //------------------------------------------------------------------------------
 
-class VmBuffer : public ApiRefCounted<VmBuffer, iree_vm_buffer_t> {};
+class VmBuffer : public ApiRefCounted<VmBuffer, iree_vm_buffer_t> {
+ public:
+  int HandleBufferProtocol(Py_buffer* view, int flags);
+};
 
 //------------------------------------------------------------------------------
 // VmVariantList

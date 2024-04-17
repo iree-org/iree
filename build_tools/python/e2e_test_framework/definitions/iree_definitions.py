@@ -348,7 +348,10 @@ class E2EModelRunConfig(object):
         return self.name
 
     def materialize_run_flags(
-        self, gpu_id: str = "0", inputs_dir: Optional[pathlib.PurePath] = None
+        self,
+        gpu_id: str = "0",
+        inputs_dir: Optional[pathlib.PurePath] = None,
+        external_params: Sequence[str] = (),
     ) -> List[str]:
         """Materialize flags with dependent values.
 
@@ -369,6 +372,8 @@ class E2EModelRunConfig(object):
             flags += [f"--input=@{npy}" for npy in input_npys]
         else:
             flags += [f"--input={input_type}=0" for input_type in model.input_types]
+
+        flags += [f"--parameters={param}" for param in external_params]
 
         return flags
 

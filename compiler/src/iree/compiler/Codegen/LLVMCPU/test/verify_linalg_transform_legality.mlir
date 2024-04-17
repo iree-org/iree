@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-llvmcpu-verify-linalg-transform-legality %s --verify-diagnostics -split-input-file
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-verify-linalg-transform-legality))" %s --verify-diagnostics -split-input-file
 
 func.func @matmul_123x456xf32_times_456x789xf32_into_123x789xf32_dispatch_0() {
   %cst = arith.constant 0.000000e+00 : f32

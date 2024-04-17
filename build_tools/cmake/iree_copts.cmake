@@ -189,7 +189,9 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     # Explicitly enable some additional warnings.
     # Some of these aren't on by default, or under -Wall, or are subsets of
     # warnings turned off above.
-    "-Wc++20-extensions"  # Enable until we use C++20 across all compilers
+    #
+    # TODO(#16946): reenable -Wc++20-extensions.
+    # "-Wc++20-extensions"  # Enable until we use C++20 across all compilers
     "-Wctad-maybe-unsupported"
     "-Wfloat-overflow-conversion"
     "-Wfloat-zero-conversion"
@@ -415,48 +417,109 @@ if(EMSCRIPTEN AND IREE_EXTERNAL_WEBGPU_HAL_DRIVER_FOUND)
 endif()
 
 #-------------------------------------------------------------------------------
-# Size-optimized build flags
+# Flag sets used different optimization profiles.
 #-------------------------------------------------------------------------------
 
-# TODO(#898): add a dedicated size-constrained configuration.
-if(IREE_SIZE_OPTIMIZED)
-  iree_select_compiler_opts(IREE_SIZE_OPTIMIZED_DEFAULT_COPTS
-    MSVC_OR_CLANG_CL
-      "/GS-"
-      "/GL"
-      "/Gw"
-      "/Gy"
-      "/DNDEBUG"
-      "/Os"
-      "/Oy"
-      "/Zi"
-      "/c"
+iree_select_compiler_opts(IREE_LTO_COPTS
+  CLANG
+    "-flto=${IREE_LTO_MODE}"
+  GCC
+    "-flto"
+    "-fuse-linker-plugin"
+  MSVC_OR_CLANG_CL
+    "/GL"
+)
+
+iree_select_compiler_opts(IREE_LTO_LINKOPTS
+  CLANG
+    "-flto=${IREE_LTO_MODE}"
+  GCC
+    "-flto"
+  MSVC_OR_CLANG_CL
+    "-LTCG"
+)
+
+iree_select_compiler_opts(IREE_SIZE_OPTIMIZED_DEFAULT_COPTS
+  MSVC_OR_CLANG_CL
+    "/GS-"
+    "/Gw"
+    "/Gy"
+    "/DNDEBUG"
+    "/Os"
+    "/Oy"
+    "/Zi"
+    "/c"
+)
+iree_select_compiler_opts(IREE_SIZE_OPTIMIZED_DEFAULT_LINKOPTS
+  MSVC_OR_CLANG_CL
+    "-DEBUG:FULL"
+    "-opt:ref,icf"
+)
+
+# Function which enables various optimization options for a sub-tree by
+# modifying the IREE_DEFAULT_COPTS and IREE_DEFAULT_LINKOPTS that targets
+# created after this point use.
+#
+# Available profiles:
+#   "lto": Applies options to enable link time code generation.
+#   "size": Applies a variety of options to minimize the size of the runtime,
+#     generally at the expense of features but not performance. This implies
+#     LTO.
+#
+# Parameters:
+# PROFILE_NAME: Name of a supported profile or falsey for none.
+# SIZE_INTERFACE_COPTS: Additional IREE_INTERFACE_COPTS to add for the
+#   "size" profile.
+function(iree_enable_optimization_options)
+  cmake_parse_arguments(
+    _RULE
+    ""
+    "PROFILE_NAME"
+    "SIZE_INTERFACE_COPTS"
+    ${ARGN}
   )
-  iree_select_compiler_opts(IREE_SIZE_OPTIMIZED_DEFAULT_LINKOPTS
-    MSVC_OR_CLANG_CL
-      "-DEBUG:FULL"
-      "-LTCG"
-      "-opt:ref,icf"
+
+  if(NOT _RULE_PROFILE_NAME)
+    # Do nothing.
+    return()
+  endif()
+
+  set(_ADDL_COPTS)
+  set(_ADDL_INTERFACE_COPTS)
+  set(_ADDL_LINKOPTS)
+
+  if(_RULE_PROFILE_NAME STREQUAL "lto")
+    set(_ADDL_COPTS ${IREE_LTO_COPTS})
+    set(_ADDL_LINKOPTS ${IREE_LTO_LINKOPTS})
+  elseif(_RULE_PROFILE_NAME STREQUAL "size")
+    # Size optimized assumes LTO.
+    # Size optimized often also elides logging and various status reporting,
+    # which can result in unused-but-set-variable style warnings. Disable those.
+    iree_select_compiler_opts(_ADDL_COPTS
+      ALL
+        ${IREE_LTO_COPTS}
+        ${IREE_SIZE_OPTIMIZED_DEFAULT_COPTS}
+      CLANG_OR_GCC
+        -Wno-unused-but-set-variable
+    )
+    set(_ADDL_INTERFACE_COPTS "${_RULE_SIZE_INTERFACE_COPTS}")
+    set(_ADDL_LINKOPTS 
+      ${IREE_LTO_LINKOPTS}
+      ${IREE_SIZE_OPTIMIZED_DEFAULT_LINKOPTS}
+    )
+  else()
+    message(FATAL_ERROR "Unrecognized size optimization profile name '${_RULE_PROFILE_NAME}'. Expected one of 'lto', 'size'")
+  endif()
+
+  message(STATUS "Enabled optimization profile '${_RULE_PROFILE_NAME}' for targets under ${CMAKE_CURRENT_SOURCE_DIR}: \n"
+    "      COPTS: ${_ADDL_COPTS}\n"
+    "      INTERFACE COPTS: ${_ADDL_INTERFACE_COPTS}\n"
+    "      LINKOPTS: ${_ADDL_LINKOPTS}"
   )
-  # TODO(#898): make this only impact the runtime (IREE_RUNTIME_DEFAULT_...).
-  # These flags come from iree/base/config.h:
-  set(IREE_DEFAULT_COPTS
-      "${IREE_DEFAULT_COPTS}"
-      "${IREE_SIZE_OPTIMIZED_DEFAULT_COPTS}"
-      "-DIREE_STATUS_MODE=0"
-      "-DIREE_STATISTICS_ENABLE=0"
-      "-DIREE_HAL_MODULE_STRING_UTIL_ENABLE=0"
-      "-DIREE_HAL_COMMAND_BUFFER_VALIDATION_ENABLE=0"
-      "-DIREE_VM_BACKTRACE_ENABLE=0"
-      "-DIREE_VM_BYTECODE_VERIFICATION_ENABLE=0"
-      "-DIREE_VM_EXT_F32_ENABLE=0"
-      "-DIREE_VM_EXT_F64_ENABLE=0"
-  )
-  set(IREE_DEFAULT_LINKOPTS
-      "${IREE_DEFAULT_LINKOPTS}"
-      "${IREE_SIZE_OPTIMIZED_DEFAULT_LINKOPTS}"
-  )
-endif()
+  set(IREE_DEFAULT_COPTS "${IREE_DEFAULT_COPTS};${_ADDL_COPTS}" PARENT_SCOPE)
+  set(IREE_INTERFACE_COPTS "${IREE_INTERFACE_COPTS};${_ADDL_INTERFACE_COPTS}" PARENT_SCOPE)
+  set(IREE_DEFAULT_LINKOPTS "${IREE_DEFAULT_LINKOPTS};${_ADDL_LINKOPTS}" PARENT_SCOPE)
+endfunction()
 
 #-------------------------------------------------------------------------------
 # Compiler: Clang/LLVM

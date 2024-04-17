@@ -40,6 +40,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:LinalgTransforms",
         "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
     ],
 )
@@ -64,6 +65,7 @@ iree_compiler_cc_library(
         "SPIRVInitialVectorLowering.cpp",
         "SPIRVLinkExecutables.cpp",
         "SPIRVLowerExecutableTargetPass.cpp",
+        "SPIRVLowerExecutableUsingTransformDialect.cpp",
         "SPIRVMapMemRefStorageClass.cpp",
         "SPIRVMaterializeExecutableConditions.cpp",
         "SPIRVSelectLoweringStrategy.cpp",
@@ -151,6 +153,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:TosaDialect",
         "@llvm-project//mlir:TosaToArith",
         "@llvm-project//mlir:TransformDialect",
+        "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
         "@llvm-project//mlir:VectorDialect",
         "@llvm-project//mlir:VectorInterfaces",

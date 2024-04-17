@@ -1,0 +1,45 @@
+# Copyright 2019 The IREE Authors
+#
+# Licensed under the Apache License v2.0 with LLVM Exceptions.
+# See https://llvm.org/LICENSE.txt for license information.
+# SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+load("//build_tools/bazel:build_defs.oss.bzl", "iree_compiler_cc_library", "iree_compiler_register_plugin")
+
+package(
+    default_visibility = ["//visibility:public"],
+    features = ["layering_check"],
+    licenses = ["notice"],  # Apache 2.0
+)
+
+iree_compiler_register_plugin(
+    plugin_id = "hal_target_vulkan_spirv",
+    target = ":VulkanSPIRV",
+)
+
+iree_compiler_cc_library(
+    name = "VulkanSPIRV",
+    srcs = [
+        "VulkanSPIRVTarget.cpp",
+    ],
+    deps = [
+        "//compiler/src/iree/compiler/Codegen/Common",
+        "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR:IREECodegenDialect",
+        "//compiler/src/iree/compiler/Codegen/SPIRV",
+        "//compiler/src/iree/compiler/Codegen/Utils",
+        "//compiler/src/iree/compiler/Dialect/HAL/Target",
+        "//compiler/src/iree/compiler/Dialect/Vulkan/IR",
+        "//compiler/src/iree/compiler/Dialect/Vulkan/Utils",
+        "//compiler/src/iree/compiler/PluginAPI",
+        "//compiler/src/iree/compiler/Utils",
+        "//runtime/src/iree/schemas:spirv_executable_def_c_fbs",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:AsmParser",
+        "@llvm-project//mlir:GPUDialect",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:SPIRVDialect",
+        "@llvm-project//mlir:SPIRVModuleCombiner",
+        "@llvm-project//mlir:SPIRVSerialization",
+        "@llvm-project//mlir:Support",
+    ],
+)

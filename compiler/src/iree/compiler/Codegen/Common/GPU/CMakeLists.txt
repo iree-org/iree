@@ -32,6 +32,7 @@ iree_cc_library(
     MLIRMemRefDialect
     MLIRNVGPUDialect
     MLIRPass
+    MLIRTransformUtils
     MLIRTransforms
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Dialect::HAL::IR
@@ -68,7 +69,7 @@ iree_cc_library(
     "GPUVectorDistribution.cpp"
     "Passes.cpp"
     "VectorReductionToGPU.cpp"
-    "WorkGroupSwizzle.cpp"
+    "WorkgroupReordering.cpp"
     "WorkgroupSpecializationPass.cpp"
   DEPS
     ::PassHeaders
@@ -106,6 +107,7 @@ iree_cc_library(
     MLIRSupport
     MLIRTensorDialect
     MLIRTensorTransforms
+    MLIRTransformUtils
     MLIRTransforms
     MLIRVectorDialect
     MLIRVectorToSCF

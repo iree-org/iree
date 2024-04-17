@@ -3,21 +3,22 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-if (NOT IREE_TARGET_BACKEND_ROCM)
+if(NOT IREE_TARGET_BACKEND_ROCM)
   return()
 endif()
 
 # Check if HIP is installed on system.
 # HIP is required to compile ukernels.
-if (NOT IREE_ROCM_PATH)
+# TODO: We can do better than this and ensure that headers are always available.
+if(NOT IREE_ROCM_PATH)
   set(IREE_ROCM_PATH "/opt/rocm")
 endif()
-set (IREE_ROCM_VERSION "${IREE_ROCM_PATH}/.info/version")
-if (NOT EXISTS ${IREE_ROCM_VERSION})
+set(IREE_ROCM_VERSION "${IREE_ROCM_PATH}/include/hip/hip_version.h")
+if(NOT EXISTS ${IREE_ROCM_VERSION})
   message(STATUS
           "hip runtime cannot be found in ${IREE_ROCM_PATH}.
           Please try setting IREE_ROCM_PATH to rocm directory.
-          Ukernel will not be compiled.")
+          Ukernels will not be compiled.")
   return()
 endif()
 
@@ -26,8 +27,8 @@ iree_add_all_subdirs()
 
 set(_platform_lib_reldir "iree_platform_libs/rocm")
 set(_device_bc_path "${IREE_COMPILER_DYLIB_DIR}/iree_platform_libs/rocm")
-set (_amd_ukernel_libs)
-set (_amd_ukernel_targets)
+set(_amd_ukernel_libs)
+set(_amd_ukernel_targets)
 function(iree_rocm_bitcode_library)
   cmake_parse_arguments(
     _RULE
@@ -44,9 +45,9 @@ function(iree_rocm_bitcode_library)
   endif()
 
   set(_ROCM_ARCH "${_RULE_ROCM_ARCH}")
-  set (OPT_FLAG "-O0")
-  if (_ROCM_ARCH MATCHES "GFX9")
-    set (OPT_FLAG "-O3")
+  set(OPT_FLAG "-O0")
+  if(_ROCM_ARCH MATCHES "GFX9")
+    set(OPT_FLAG "-O3")
   endif()
   set(_COPTS
     "-x" "hip"

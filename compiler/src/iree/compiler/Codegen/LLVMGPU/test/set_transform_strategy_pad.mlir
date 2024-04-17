@@ -1,12 +1,12 @@
 // RUN: iree-opt %s --split-input-file \
-// RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-select-lowering-strategy)))" \
+// RUN:   --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" \
 // RUN:   --iree-codegen-llvmgpu-enable-transform-dialect-pad-strategy \
 // RUN: | FileCheck %s
 
 // Check that setting the command line options affect the transform
 // strategy as expected.
 // RUN: iree-opt %s --split-input-file \
-// RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-select-lowering-strategy)))" \
+// RUN:   --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" \
 // RUN:   --iree-codegen-llvmgpu-enable-transform-dialect-pad-strategy \
 // RUN:   --td-pad-strategy-blk-sizes=16,32,1 \
 // RUN:   --td-pad-strategy-num-threads=8,4,1 \
@@ -14,33 +14,23 @@
 // RUN:   --td-pad-strategy-use-async-copies=false \
 // RUN: | FileCheck --check-prefix=WITH_OPTIONS %s
 
-hal.executable @pad {
-hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>) {
-  hal.executable.export public @pad ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
-  ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
-    %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
-    hal.return %x, %y, %z : index, index, index
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
+module {
+  func.func @pad() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
+    %c0 = arith.constant 0 : index
+    %c56 = arith.constant 56 : index
+    %cst = arith.constant 0.000000e+00 : f32
+    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<123x456xf32>>
+    %1 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<128x512xf32>>
+    %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [123, 456], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<123x456xf32>> -> tensor<123x456xf32>
+    %cst_0 = arith.constant 0.000000e+00 : f32
+    %padded = tensor.pad %2 low[%c0, 0] high[5, %c56] {
+    ^bb0(%arg0: index, %arg1: index):
+      tensor.yield %cst_0 : f32
+    } : tensor<123x456xf32> to tensor<128x512xf32>
+    flow.dispatch.tensor.store %padded, %1, offsets = [0, 0], sizes = [128, 512], strides = [1, 1] : tensor<128x512xf32> -> !flow.dispatch.tensor<writeonly:tensor<128x512xf32>>
+    return
   }
-  builtin.module {
-    func.func @pad() {
-      %c0 = arith.constant 0 : index
-      %c56 = arith.constant 56 : index
-      %cst = arith.constant 0.000000e+00 : f32
-      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<123x456xf32>>
-      %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<128x512xf32>>
-      %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [123, 456], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<123x456xf32>> -> tensor<123x456xf32>
-
-      %pad = arith.constant 0.0 : f32
-      %padded = tensor.pad %3 low[%c0, 0] high[5, %c56] {
-        ^bb0(%arg1: index, %arg2: index):
-          tensor.yield %pad : f32
-      } : tensor<123x456xf32> to tensor<128x512xf32>
-
-      flow.dispatch.tensor.store %padded, %2, offsets = [0, 0], sizes = [128, 512], strides = [1, 1] : tensor<128x512xf32> -> !flow.dispatch.tensor<writeonly:tensor<128x512xf32>>
-      return
-    }
-  }
-}
 }
 
 // CHECK-LABEL: func @pad
@@ -103,32 +93,22 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 
 // -----
 
-hal.executable @pad_low {
-hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>) {
-  hal.executable.export public @pad_low ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
-  ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
-    %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
-    hal.return %x, %y, %z : index, index, index
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
+module {
+  func.func @pad_low() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
+    %c0 = arith.constant 0 : index
+    %cst = arith.constant 0.000000e+00 : f32
+    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<123x456xf32>>
+    %1 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<128x512xf32>>
+    %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [123, 456], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<123x456xf32>> -> tensor<123x456xf32>
+    %cst_0 = arith.constant 0.000000e+00 : f32
+    %padded = tensor.pad %2 low[5, 0] high[0, 56] {
+    ^bb0(%arg0: index, %arg1: index):
+      tensor.yield %cst_0 : f32
+    } : tensor<123x456xf32> to tensor<128x512xf32>
+    flow.dispatch.tensor.store %padded, %1, offsets = [0, 0], sizes = [128, 512], strides = [1, 1] : tensor<128x512xf32> -> !flow.dispatch.tensor<writeonly:tensor<128x512xf32>>
+    return
   }
-  builtin.module {
-    func.func @pad_low() {
-      %c0 = arith.constant 0 : index
-      %cst = arith.constant 0.000000e+00 : f32
-      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<123x456xf32>>
-      %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<128x512xf32>>
-      %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [123, 456], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<123x456xf32>> -> tensor<123x456xf32>
-
-      %pad = arith.constant 0.0 : f32
-      %padded = tensor.pad %3 low[5, 0] high[0, 56] {
-        ^bb0(%arg1: index, %arg2: index):
-          tensor.yield %pad : f32
-      } : tensor<123x456xf32> to tensor<128x512xf32>
-
-      flow.dispatch.tensor.store %padded, %2, offsets = [0, 0], sizes = [128, 512], strides = [1, 1] : tensor<128x512xf32> -> !flow.dispatch.tensor<writeonly:tensor<128x512xf32>>
-      return
-    }
-  }
-}
 }
 
 // The strategy doesn't apply for low padding.
@@ -139,33 +119,23 @@ hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {t
 
 // -----
 
-hal.executable @pad_local {
-hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>) {
-  hal.executable.export public @pad_local ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
-  ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
-    %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
-    hal.return %x, %y, %z : index, index, index
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
+module {
+  func.func @pad_local() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
+    %c0 = arith.constant 0 : index
+    %cst = arith.constant 0.000000e+00 : f32
+    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<123x456xf32>>
+    %1 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<128x512xf32>>
+    %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [123, 456], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<123x456xf32>> -> tensor<123x456xf32>
+    %padded = tensor.pad %2 low[0, 0] high[5, 56] {
+    ^bb0(%arg0: index, %arg1: index):
+      %3 = arith.index_cast %arg0 : index to i64
+      %4 = arith.uitofp %3 : i64 to f32
+      tensor.yield %4 : f32
+    } : tensor<123x456xf32> to tensor<128x512xf32>
+    flow.dispatch.tensor.store %padded, %1, offsets = [0, 0], sizes = [128, 512], strides = [1, 1] : tensor<128x512xf32> -> !flow.dispatch.tensor<writeonly:tensor<128x512xf32>>
+    return
   }
-  builtin.module {
-    func.func @pad_local() {
-      %c0 = arith.constant 0 : index
-      %cst = arith.constant 0.000000e+00 : f32
-      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<123x456xf32>>
-      %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<128x512xf32>>
-      %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [123, 456], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<123x456xf32>> -> tensor<123x456xf32>
-
-      %padded = tensor.pad %3 low[0, 0] high[5, 56] {
-        ^bb0(%arg1: index, %arg2: index):
-          %5 = arith.index_cast %arg1 : index to i64
-          %pad = arith.uitofp %5 : i64 to f32
-          tensor.yield %pad : f32
-      } : tensor<123x456xf32> to tensor<128x512xf32>
-
-      flow.dispatch.tensor.store %padded, %2, offsets = [0, 0], sizes = [128, 512], strides = [1, 1] : tensor<128x512xf32> -> !flow.dispatch.tensor<writeonly:tensor<128x512xf32>>
-      return
-    }
-  }
-}
 }
 
 // The strategy doesn't apply for local pad values.

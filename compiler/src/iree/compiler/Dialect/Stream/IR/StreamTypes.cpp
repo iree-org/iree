@@ -80,6 +80,39 @@ static llvm::cl::opt<IREE::Stream::MemoryModel> clResourceMemoryModel(
     llvm::cl::init(IREE::Stream::MemoryModel::Unified));
 
 //===----------------------------------------------------------------------===//
+// Utilities
+//===----------------------------------------------------------------------===//
+
+void AsyncAccessRange::print(llvm::raw_ostream &os, AsmState &asmState) {
+  os << stringifyResourceAccessBitfield(access) << " ";
+  resource.printAsOperand(os, asmState);
+  os << "[";
+  start.printAsOperand(os, asmState);
+  os << " to ";
+  end.printAsOperand(os, asmState);
+  os << " for ";
+  length.printAsOperand(os, asmState);
+  os << "]";
+}
+
+// static
+bool AsyncAccessRange::mayOverlap(const AsyncAccessRange &lhs,
+                                  const AsyncAccessRange &rhs) {
+  // Different resources do not overlap for this purpose. They may still alias
+  // at various points but that's beyond the analysis we can do here.
+  if (lhs.resource != rhs.resource)
+    return false;
+
+  // Check for adjacent but not overlapping.
+  if (lhs.end == rhs.start || lhs.start == rhs.end) {
+    return false;
+  }
+
+  // _May_ overlap. More analysis required.
+  return true;
+}
+
+//===----------------------------------------------------------------------===//
 // custom<ParameterReference>($scope, $key)
 //===----------------------------------------------------------------------===//
 

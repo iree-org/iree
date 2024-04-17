@@ -35,6 +35,7 @@ extern void ireeCompilerInvocationPipeline();
 extern void ireeCompilerInvocationRunPassPipeline();
 extern void ireeCompilerInvocationSetCompileFromPhase();
 extern void ireeCompilerInvocationSetCompileToPhase();
+extern void ireeCompilerInvocationSetDumpCompilationPhasesTo();
 extern void ireeCompilerInvocationSetCrashHandler();
 extern void ireeCompilerInvocationSetVerifyIR();
 extern void ireeCompilerOutputDestroy();
@@ -728,6 +729,7 @@ uintptr_t __iree_compiler_hidden_force_extern() {
   x += (uintptr_t)&ireeCompilerInvocationRunPassPipeline;
   x += (uintptr_t)&ireeCompilerInvocationSetCompileFromPhase;
   x += (uintptr_t)&ireeCompilerInvocationSetCompileToPhase;
+  x += (uintptr_t)&ireeCompilerInvocationSetDumpCompilationPhasesTo;
   x += (uintptr_t)&ireeCompilerInvocationSetCrashHandler;
   x += (uintptr_t)&ireeCompilerInvocationSetVerifyIR;
   x += (uintptr_t)&ireeCompilerOutputDestroy;

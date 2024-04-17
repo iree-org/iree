@@ -29,6 +29,7 @@ iree_cc_library(
   DEPS
     ::PassesIncGen
     MLIRPass
+    MLIRTransformUtils
     MLIRTransforms
   PUBLIC
 )
@@ -69,6 +70,7 @@ iree_cc_library(
     MLIRSupport
     MLIRTensorDialect
     MLIRTosaToArith
+    MLIRTransformUtils
     MLIRTransforms
     MLIRVectorDialect
     MLIRVectorToSCF

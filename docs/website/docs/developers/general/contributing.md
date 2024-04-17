@@ -72,6 +72,14 @@ information on using pull requests.
   working for a certain situation, please ask as we bias towards pragmatism for
   cases that require it.
 
+### :material-test-tube: Testing policy
+
+With few exceptions, features should be accompanied by automated tests.
+
+We use a mix of in-tree and out-of-tree unit and integration tests. For more
+information about the types of tests used across the project, refer to the
+[testing guide](./testing-guide.md).
+
 ### :material-check-all: GitHub Actions workflows
 
 We use [GitHub Actions](https://docs.github.com/en/actions) to automatically
@@ -294,7 +302,7 @@ runs.
 * Also run GPU tests on NVIDIA A100 runners (opt-in due to low availability):
 
     ``` text
-    ci-extra: test_a100
+    ci-extra: test_nvidia_a100
     ```
 
 * Skip all CI builds and tests, e.g. for comment-only changes:

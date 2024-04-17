@@ -107,6 +107,11 @@ typedef struct ___tracy_source_location_data iree_tracing_location_t;
 void iree_tracing_tracy_initialize();
 void iree_tracing_tracy_deinitialize();
 
+void iree_tracing_publish_source_file(const void* filename,
+                                      size_t filename_length,
+                                      const void* content,
+                                      size_t content_length);
+
 IREE_MUST_USE_RESULT iree_zone_id_t
 iree_tracing_zone_begin_impl(const iree_tracing_location_t* src_loc,
                              const char* name, size_t name_length);
@@ -172,7 +177,9 @@ void iree_tracing_gpu_zone_notify(uint8_t context_id, uint16_t query_id,
 
 #endif  // IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
 
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_ALLOCATION_TRACKING
 void* iree_tracing_obscure_ptr(void* ptr);
+#endif  // IREE_TRACING_FEATURE_ALLOCATION_TRACKING
 
 #endif  // IREE_TRACING_FEATURES
 
@@ -201,6 +208,11 @@ void* iree_tracing_obscure_ptr(void* ptr);
 #define IREE_TRACE_FIBER_ENTER(fiber)
 #define IREE_TRACE_FIBER_LEAVE()
 #endif  // IREE_TRACING_FEATURE_FIBERS
+
+#define IREE_TRACE_PUBLISH_SOURCE_FILE(filename, filename_length, content, \
+                                       content_length)                     \
+  iree_tracing_publish_source_file(filename, filename_length, content,     \
+                                   content_length)
 
 #define IREE_TRACE_ZONE_BEGIN(zone_id) \
   IREE_TRACE_ZONE_BEGIN_NAMED(zone_id, NULL)

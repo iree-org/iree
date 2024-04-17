@@ -22,9 +22,10 @@ module attributes { transform.with_named_sequence } {
     %attention4 = transform.structured.match ops{["iree_linalg_ext.attention"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     %acc_fill, %max_fill, %sum_fill, %inner_loop, %final_scaling, %blocked_attention = transform.iree.tile_attention %attention4 :
       (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
-    %fill_op, %first_matmul, %reduce_max, %partial_softmax, %scale_factor, %update, %reduce_sum, %scale_acc, %second_matmul
+    %scale_q, %fill_op, %first_matmul, %reduce_max, %partial_softmax, %scale_factor, %update, %reduce_sum, %scale_acc, %second_matmul
         = transform.iree.decompose_tiled_attention %blocked_attention :
-      (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
+      (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op,
+                              !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
 
     // Vectorize function
     // ==========================================
@@ -41,22 +42,21 @@ module attributes { transform.with_named_sequence } {
       transform.apply_patterns.scf.for_loop_canonicalization
       transform.apply_patterns.canonicalization
     } : !transform.any_op
-    transform.iree.apply_licm %variant_op : !transform.any_op
-    transform.apply_cse to %variant_op : !transform.any_op
+    transform.iree.apply_licm %func_3 : !transform.any_op
+    transform.apply_cse to %func_3 : !transform.any_op
 
     // Bufferization
     // ==========================================
-    transform.iree.eliminate_empty_tensors %variant_op : (!transform.any_op) -> ()
+    transform.iree.eliminate_empty_tensors %func_3 : (!transform.any_op) -> ()
     transform.apply_patterns to %func_3 {
       transform.apply_patterns.linalg.erase_unnecessary_inputs
     } : !transform.any_op
-    %variant_op_3 = transform.iree.bufferize %variant_op : (!transform.any_op) -> (!transform.any_op)
+    %func_4 = transform.iree.bufferize %func_3 : (!transform.any_op) -> (!transform.any_op)
 
     // Step 6. Post-bufferization vector distribution
     // ===========================================================================
-    %func_7 = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
-    transform.iree.forall_to_workgroup %func_7 : (!transform.any_op) -> ()
-    %func_8 = transform.structured.hoist_redundant_vector_transfers %func_7
+    transform.iree.forall_to_workgroup %func_4 : (!transform.any_op) -> ()
+    %func_8 = transform.structured.hoist_redundant_vector_transfers %func_4
     : (!transform.any_op) -> !transform.any_op
     transform.apply_patterns to %func_8 {
       transform.apply_patterns.canonicalization
@@ -65,9 +65,8 @@ module attributes { transform.with_named_sequence } {
     transform.memref.erase_dead_alloc_and_stores %func_8 : (!transform.any_op) -> ()
 
     // Annotate the exported function as already translated.
-    %exports = transform.structured.match ops{["hal.executable.export"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
     %none = transform.param.constant #iree_codegen.translation_info<None> -> !transform.any_param
-    transform.annotate %exports "translation_info" = %none : !transform.any_op, !transform.any_param
+    transform.annotate %func_8 "translation_info" = %none : !transform.any_op, !transform.any_param
     transform.yield
   } // codegen
 

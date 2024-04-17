@@ -29,6 +29,7 @@ iree_cc_library(
   DEPS
     ::PassesIncGen
     MLIRPass
+    MLIRTransformUtils
     MLIRTransforms
   PUBLIC
 )
@@ -42,6 +43,7 @@ iree_cc_library(
   SRCS
     "CleanupNumericNarrowing.cpp"
     "Convert1X1FilterConv2DToMatmul.cpp"
+    "DataLayoutPropagation.cpp"
     "DecomposeConcat.cpp"
     "DemoteContractionInputsToBF16.cpp"
     "DetachElementwiseFromNamedOps.cpp"
@@ -86,6 +88,7 @@ iree_cc_library(
     MLIRTensorDialect
     MLIRTensorTransforms
     MLIRTensorUtils
+    MLIRTransformUtils
     MLIRTransforms
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Common::CPU::CommonCPUPasses

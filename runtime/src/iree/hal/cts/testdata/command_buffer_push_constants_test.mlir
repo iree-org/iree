@@ -7,7 +7,7 @@
 ]>
 
 hal.executable.source public @executable {
-  hal.executable.export public @write_push_constants layout(#pipeline_layout) attributes {workgroup_size = [1 : index, 1 : index, 1 : index]} {
+  hal.executable.export public @write_push_constants ordinal(0) layout(#pipeline_layout) attributes {workgroup_size = [1 : index, 1 : index, 1 : index]} {
   ^bb0(%arg0: !hal.device):
     %c1 = arith.constant 1 : index
     hal.return %c1, %c1, %c1 : index, index, index

@@ -985,6 +985,10 @@ static iree_status_t iree_hal_vulkan_get_device_properties(
     VkCooperativeMatrixPropertiesKHR* properties =
         (VkCooperativeMatrixPropertiesKHR*)iree_alloca(
             count * sizeof(VkCooperativeMatrixPropertiesKHR));
+    memset(properties, 0, count * sizeof(VkCooperativeMatrixPropertiesKHR));
+    for (uint32_t i = 0; i < count; ++i) {
+      properties[i].sType = VK_STRUCTURE_TYPE_COOPERATIVE_MATRIX_PROPERTIES_KHR;
+    }
     IREE_RETURN_IF_ERROR(VK_RESULT_TO_STATUS(
         instance_syms->vkGetPhysicalDeviceCooperativeMatrixPropertiesKHR(
             physical_device, &count, properties)));

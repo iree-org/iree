@@ -80,6 +80,7 @@ case "${BUILD_PRESET}" in
       -DIREE_ENABLE_ASSERTIONS=OFF
       -DIREE_BUILD_SAMPLES=OFF
       -DIREE_BUILD_TESTS=OFF
+      -DRISCV_LINKER_FLAGS_EXE="-static"
     )
     ;;
   benchmark-with-tracing)
@@ -88,6 +89,7 @@ case "${BUILD_PRESET}" in
       -DIREE_BUILD_SAMPLES=OFF
       -DIREE_BUILD_TESTS=OFF
       -DIREE_ENABLE_RUNTIME_TRACING=ON
+      -DRISCV_LINKER_FLAGS_EXE="-static"
     )
     ;;
   benchmark-suite-test)

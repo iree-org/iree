@@ -61,7 +61,7 @@ extra:
       link: https://github.com/openxla/iree
       name: IREE on GitHub
     - icon: fontawesome/brands/discord
-      link: https://discord.gg/26P4xW4
+      link: https://discord.gg/wEWh6Z9nMU
       name: IREE Discord Server
     - icon: fontawesome/solid/users
       link: https://groups.google.com/forum/#!forum/iree-discuss
@@ -202,6 +202,7 @@ nav:
           - "developers/design-docs/function-abi.md"
           - "developers/design-docs/invocation-execution-model.md"
           - "developers/design-docs/cuda-hal-driver.md"
+          - "developers/design-docs/hip-hal-driver.md"
           - "developers/design-docs/metal-hal-driver.md"
       - "Other topics":
           - "developers/usage-best-practices.md"

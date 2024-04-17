@@ -19,8 +19,10 @@
 #include "iree/hal/drivers/cuda/cuda_device.h"
 #include "iree/hal/drivers/cuda/cuda_dynamic_symbols.h"
 #include "iree/hal/drivers/cuda/cuda_status_util.h"
+#include "iree/hal/drivers/cuda/event_pool.h"
 #include "iree/hal/drivers/cuda/event_semaphore.h"
 #include "iree/hal/drivers/cuda/graph_command_buffer.h"
+#include "iree/hal/drivers/utils/semaphore.h"
 #include "iree/hal/utils/deferred_command_buffer.h"
 #include "iree/hal/utils/resource_set.h"
 
@@ -94,7 +96,7 @@ typedef struct iree_hal_cuda_queue_action_t {
   iree_hal_semaphore_list_t signal_semaphore_list;
 
   // Scratch fields for analyzing whether actions are ready to issue.
-  CUevent events[IREE_HAL_CUDA_MAX_WAIT_EVENT_COUNT];
+  iree_hal_cuda_event_t* events[IREE_HAL_CUDA_MAX_WAIT_EVENT_COUNT];
   iree_host_size_t event_count;
   // Whether the current action is still not ready for releasing to the GPU.
   bool is_pending;
@@ -588,12 +590,17 @@ static iree_status_t iree_hal_cuda_pending_queue_actions_issue_execution(
   for (iree_host_size_t i = 0; i < action->event_count; ++i) {
     IREE_CUDA_RETURN_AND_END_ZONE_IF_ERROR(
         z0, symbols,
-        cuStreamWaitEvent(action->dispatch_cu_stream, action->events[i],
+        cuStreamWaitEvent(action->dispatch_cu_stream,
+                          iree_hal_cuda_event_handle(action->events[i]),
                           CU_EVENT_WAIT_DEFAULT),
         "cuStreamWaitEvent");
   }
 
   // Then launch all command buffers to the dispatch stream.
+  IREE_TRACE_ZONE_BEGIN(dispatch_command_buffers);
+  IREE_TRACE_ZONE_APPEND_TEXT(dispatch_command_buffers,
+                              " dispatch_command_buffers",
+                              strlen(" dispatch_command_buffers"));
   for (iree_host_size_t i = 0; i < action->payload.command_buffers.count; ++i) {
     iree_hal_command_buffer_t* command_buffer =
         action->payload.command_buffers.ptr[i];
@@ -622,6 +629,7 @@ static iree_status_t iree_hal_cuda_pending_queue_actions_issue_execution(
                   iree_hal_buffer_binding_table_empty()));
     }
   }
+  IREE_TRACE_ZONE_END(dispatch_command_buffers);
 
   // Last record CUevent signals in the dispatch stream.
   for (iree_host_size_t i = 0; i < action->signal_semaphore_list.count; ++i) {
@@ -661,6 +669,14 @@ static iree_status_t iree_hal_cuda_pending_queue_actions_issue_execution(
   return iree_ok_status();
 }
 
+static void iree_hal_cuda_queue_action_clear_events(
+    iree_hal_cuda_queue_action_t* action) {
+  for (iree_host_size_t i = 0; i < action->event_count; ++i) {
+    iree_hal_cuda_event_release(action->events[i]);
+  }
+  action->event_count = 0;
+}
+
 // Performs the given cleanup |action| on the CPU.
 static iree_status_t iree_hal_cuda_pending_queue_actions_issue_cleanup(
     iree_hal_cuda_queue_action_t* action) {
@@ -689,6 +705,8 @@ static iree_status_t iree_hal_cuda_pending_queue_actions_issue_cleanup(
   // action counter.
   --actions->working_area.pending_action_count;
 
+  iree_hal_cuda_queue_action_clear_events(action);
+
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
 }
@@ -715,7 +733,6 @@ iree_status_t iree_hal_cuda_pending_queue_actions_issue(
     iree_hal_cuda_queue_action_t* next_action = action->next;
     action->next = NULL;
 
-    iree_host_size_t semaphore_count = action->wait_semaphore_list.count;
     iree_hal_semaphore_t** semaphores = action->wait_semaphore_list.semaphores;
     uint64_t* values = action->wait_semaphore_list.payload_values;
 
@@ -726,22 +743,32 @@ iree_status_t iree_hal_cuda_pending_queue_actions_issue(
     // wait semaphores to make sure that they are either already ready or we can
     // wait on a device event.
     if (action->state == IREE_HAL_cuda_QUEUE_ACTION_STATE_ALIVE) {
-      for (iree_host_size_t i = 0; i < semaphore_count; ++i) {
+      for (iree_host_size_t i = 0; i < action->wait_semaphore_list.count; ++i) {
         // If this semaphore has already signaled past the desired value, we can
         // just ignore it.
         uint64_t value = 0;
         status = iree_hal_semaphore_query(semaphores[i], &value);
         if (IREE_UNLIKELY(!iree_status_is_ok(status))) break;
-        if (value >= values[i]) continue;
+        if (value >= values[i]) {
+          // No need to wait on this timepoint as it has already occurred and
+          // we can remove it from the wait list.
+          iree_hal_semaphore_list_remove_element(&action->wait_semaphore_list,
+                                                 i);
+          --i;
+          continue;
+        }
 
-        // Try to acquire a CUevent from a device wait timepoint. If so, we can
-        // use that CUevent to wait on the device. Otherwise, this action is
-        // still not ready.
-        CUevent event = NULL;
-        status = iree_hal_cuda_event_semaphore_acquire_timepoint_device_wait(
-            semaphores[i], values[i], &event);
-        if (IREE_UNLIKELY(!iree_status_is_ok(status))) break;
-        if (!event) {
+        // Try to acquire a CUDA event from an existing device signal timepoint.
+        // If so, we can use that event to wait on the device.
+        // Otherwise, this action is still not ready for execution.
+        // Before issuing recording on a stream, an event represents an empty
+        // set of work so waiting on it will just return success.
+        // Here we must guarantee the CUDA event is indeed recorded, which means
+        // it's associated with some already present device signal timepoint on
+        // the semaphore timeline.
+        iree_hal_cuda_event_t* wait_event = NULL;
+        if (!iree_hal_cuda_semaphore_acquire_event_host_wait(
+                semaphores[i], values[i], &wait_event)) {
           // Clear the scratch fields.
           action->event_count = 0;
           action->is_pending = true;
@@ -749,11 +776,18 @@ iree_status_t iree_hal_cuda_pending_queue_actions_issue(
         }
         if (IREE_UNLIKELY(action->event_count >=
                           IREE_HAL_CUDA_MAX_WAIT_EVENT_COUNT)) {
-          status = iree_make_status(IREE_STATUS_RESOURCE_EXHAUSTED,
-                                    "exceeded max wait CUevent limit");
+          status = iree_make_status(
+              IREE_STATUS_RESOURCE_EXHAUSTED,
+              "exceeded maximum queue action wait event limit");
+          iree_hal_cuda_event_release(wait_event);
           break;
         }
-        action->events[action->event_count++] = event;
+        action->events[action->event_count++] = wait_event;
+
+        // Remove the wait timepoint as we have a corresponding event that we
+        // will wait on.
+        iree_hal_semaphore_list_remove_element(&action->wait_semaphore_list, i);
+        --i;
       }
     }
 

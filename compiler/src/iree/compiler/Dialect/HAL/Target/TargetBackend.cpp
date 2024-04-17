@@ -35,8 +35,8 @@ void TargetOptions::bindOptions(OptionsBinder &binder) {
 
   binder.opt<int>(
       "iree-hal-executable-debug-level", debugLevel,
-      llvm::cl::desc("Debug level for executable translation (0-3)"),
-      llvm::cl::init(2), llvm::cl::cat(halTargetOptionsCategory));
+      llvm::cl::desc("Debug level for executable translation (0-3)."),
+      llvm::cl::cat(halTargetOptionsCategory));
 
   binder.opt<std::string>(
       "iree-hal-dump-executable-files-to", executableFilesPath,

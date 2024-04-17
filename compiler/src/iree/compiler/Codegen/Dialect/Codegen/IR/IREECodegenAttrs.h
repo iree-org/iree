@@ -39,49 +39,16 @@ namespace mlir::iree_compiler {
 // `hal.executable.export`
 //===----------------------------------------------------------------------===//
 
-/// Gets the translate executable info attribute value associated with
-/// `exportOp`. It expects that the attribute is stored using the identifier
-/// `translation_info`.
+/// Returns the translation info for the `funcOp`. Returns `nullptr` on failure.
 IREE::Codegen::TranslationInfoAttr
-getTranslationInfo(IREE::HAL::ExecutableExportOp exportOp);
-/// Returns the translation info for the `funcOp` (by looking at the entry
-/// point). Returns `nullptr` on failure.
-inline IREE::Codegen::TranslationInfoAttr
-getTranslationInfo(mlir::FunctionOpInterface funcOp) {
-  FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
-  if (failed(exportOp))
-    return nullptr;
-  return getTranslationInfo(*exportOp);
-}
-
-/// Returns the identical TranslationInfoAttr. Returns nullptr if entry point
-/// functions have different TranslationInfoAttr.
-/// There might be multiple entry points in the module. Currently, all of them
-/// need to have the same translation info.
-/// TODO(ravishankarm): This is strange that this is not enforced
-/// structurally, but something to address later on. The main issue is how
-/// to invoke separate dynamic pass pipelines on  entry point functions,
-/// when the passes might have module level changes. For now this
-/// restriction is fine.
-std::optional<IREE::Codegen::TranslationInfoAttr>
-getIdenticalTranslationInfo(IREE::HAL::ExecutableVariantOp variantOp);
-
-// TODO(ravishankarm, benvanik): Eventually all the information needed for the
-// lowering will be consolidated into a single attribute with richer
-// information.
+getTranslationInfo(mlir::FunctionOpInterface funcOp);
 
 /// Returns the workgroup size specified on the `exportOp`.
-SmallVector<int64_t> getWorkgroupSize(IREE::HAL::ExecutableExportOp exportOp);
+std::optional<SmallVector<int64_t>>
+getWorkgroupSize(mlir::FunctionOpInterface funcOp);
 
 /// Returns the subgroup size specified on the `exportOp`.
-std::optional<int64_t> getSubgroupSize(IREE::HAL::ExecutableExportOp exportOp);
-
-/// Sets and overwrites the dispatch workgroup/subgroup size for the given entry
-/// point function. Returns failure if the given entry point is not exported via
-/// hal.executable.export.
-LogicalResult setDispatchConfig(mlir::FunctionOpInterface entryPoint,
-                                ArrayRef<int64_t> workgroupSize,
-                                std::optional<int64_t> subgroupSize);
+std::optional<int64_t> getSubgroupSize(mlir::FunctionOpInterface funcOp);
 
 /// Sets and overwites the translate executable info for the given entry point.
 /// Returns failure if the given entry point is not exported via
@@ -89,6 +56,9 @@ LogicalResult setDispatchConfig(mlir::FunctionOpInterface entryPoint,
 LogicalResult
 setTranslationInfo(mlir::FunctionOpInterface entryPoint,
                    IREE::Codegen::TranslationInfoAttr translationInfo);
+
+/// Erases any translation info set on an operation.
+void eraseTranslationInfo(mlir::FunctionOpInterface funcOp);
 
 //===----------------------------------------------------------------------===//
 // Helpers for getting/setting `iree_codegen.lowering_config` attribute on root
@@ -144,10 +114,9 @@ inline LogicalResult setOpConfigAndEntryPointFnTranslation(
   auto config = IREE::Codegen::LoweringConfigAttr::get(context, tileSizes,
                                                        scalableTileFlags);
   setLoweringConfig(op, config);
-  if (failed(setDispatchConfig(entryPointFn, workgroupSize, subgroupSize)))
-    return failure();
   auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-      entryPointFn.getContext(), passPipeline, SymbolRefAttr(), pipelineConfig);
+      entryPointFn.getContext(), passPipeline, SymbolRefAttr(), workgroupSize,
+      subgroupSize, pipelineConfig);
   return setTranslationInfo(entryPointFn, translationInfo);
 }
 
@@ -164,6 +133,9 @@ inline LogicalResult setOpConfigAndEntryPointFnTranslation(
                                                passPipeline, workgroupSize,
                                                subgroupSize, pipelineConfig);
 }
+
+/// Function to erase lowering configs that are set on an operation.
+void eraseLoweringConfig(Operation *op);
 
 //===----------------------------------------------------------------------===//
 // Helpers for getting/setting `iree_codegen.compilation_info` attribute on root

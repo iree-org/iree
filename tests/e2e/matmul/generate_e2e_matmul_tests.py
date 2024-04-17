@@ -95,7 +95,7 @@ class MMASchedule:
     def __str__(self):
         return (
             "mma_schedule = #iree_gpu.mma_schedule<"
-            + f"intrinsic = #iree_gpu.mfma_layout<{self.intrinsic}>, "
+            + f"intrinsic = #iree_gpu.mma_layout<{self.intrinsic}>, "
             + f"subgroup_m_count = {self.m_count}, "
             + f"subgroup_n_count = {self.n_count}, "
             + f"subgroup_m_tile_count = {self.m_tile_count}, "
@@ -118,7 +118,7 @@ class CompilationInfo:
 
     # Prints the workgroup size
     def workgroup_size_str(self):
-        return "[" + ", ".join(map(str, self.workgroup_size)) + "]"
+        return "workgroup_size = [" + ", ".join(map(str, self.workgroup_size)) + "]"
 
 
 # Returns the list of TestShape's to use for the collection of shapes
@@ -249,28 +249,28 @@ def get_all_spirv_tile_workgroup_size_pairs(t_tile_k):
 
 def get_rocm_test_compilation_infos(compilation_info_id: CompilationInfoId):
     assert compilation_info_id == CompilationInfoId.LLVMGPUVectorDistribute
-
+    # TODO: Add test for WMMA layout.
     schedules = [
-        MMASchedule("F16_16x16x16_F32", 1, 1, 1, 1, 1),
-        MMASchedule("F16_16x16x16_F32", 1, 1, 1, 1, 2),
-        MMASchedule("F16_16x16x16_F32", 1, 1, 1, 2, 1),
-        MMASchedule("F16_16x16x16_F32", 1, 1, 2, 1, 1),
-        MMASchedule("F16_16x16x16_F32", 2, 2, 1, 1, 1),
-        MMASchedule("F16_16x16x16_F32", 2, 4, 2, 1, 2),
-        MMASchedule("F16_16x16x16_F32", 4, 2, 4, 2, 2),
-        MMASchedule("F16_32x32x8_F32", 1, 1, 1, 2, 2),
-        MMASchedule("F16_32x32x8_F32", 2, 2, 1, 1, 1),
-        MMASchedule("F16_32x32x8_F32", 1, 4, 2, 1, 2),
-        MMASchedule("F16_32x32x8_F32", 4, 2, 1, 2, 4),
+        MMASchedule("MFMA_F16_16x16x16_F32", 1, 1, 1, 1, 1),
+        MMASchedule("MFMA_F16_16x16x16_F32", 1, 1, 1, 1, 2),
+        MMASchedule("MFMA_F16_16x16x16_F32", 1, 1, 1, 2, 1),
+        MMASchedule("MFMA_F16_16x16x16_F32", 1, 1, 2, 1, 1),
+        MMASchedule("MFMA_F16_16x16x16_F32", 2, 2, 1, 1, 1),
+        MMASchedule("MFMA_F16_16x16x16_F32", 2, 4, 2, 1, 2),
+        MMASchedule("MFMA_F16_16x16x16_F32", 4, 2, 4, 2, 2),
+        MMASchedule("MFMA_F16_32x32x8_F32", 1, 1, 1, 2, 2),
+        MMASchedule("MFMA_F16_32x32x8_F32", 2, 2, 1, 1, 1),
+        MMASchedule("MFMA_F16_32x32x8_F32", 1, 4, 2, 1, 2),
+        MMASchedule("MFMA_F16_32x32x8_F32", 4, 2, 1, 2, 4),
     ]
 
     infos = []
     for schedule in schedules:
-        if schedule.intrinsic == "F16_16x16x16_F32":
+        if schedule.intrinsic == "MFMA_F16_16x16x16_F32":
             wg_tile_m = schedule.m_count * schedule.m_tile_count * 16
             wg_tile_n = schedule.n_count * schedule.n_tile_count * 16
             wg_tile_k = schedule.k_tile_count * 16
-        elif schedule.intrinsic == "F16_32x32x8_F32":
+        elif schedule.intrinsic == "MFMA_F16_32x32x8_F32":
             wg_tile_m = schedule.m_count * schedule.m_tile_count * 32
             wg_tile_n = schedule.n_count * schedule.n_tile_count * 32
             wg_tile_k = schedule.k_tile_count * 8
@@ -537,10 +537,9 @@ def generate_function(
             f"#compilation{generate_function.compilation_index} = "
             "#iree_codegen.compilation_info<\n"
             f"  lowering_config = <tile_sizes = {compilation_info.tile_sizes}>,\n"
-            f"  translation_info = <{compiler_pipeline},\n"
+            f"  translation_info = <{compiler_pipeline} {compilation_info.workgroup_size_str()},\n"
             f"  {{ pipeline_depth = {compilation_info.software_pipeline_depth}, "
-            f"  store_stage = 1{mma_schedule} }}>,\n"
-            f"  workgroup_size = {compilation_info.workgroup_size_str()}>\n"
+            f"  store_stage = 1{mma_schedule} }}>>\n"
         )
         compilation_info_attr = (
             f"{{compilation_info = #compilation{generate_function.compilation_index}}} "
@@ -752,7 +751,7 @@ def generate(
 def parse_arguments():
     parser = argparse.ArgumentParser(description="Generator of e2e matmul tests")
     parser.add_argument(
-        "--output_matmuls_mlir",
+        "--output_matmul_mlir",
         type=str,
         help="Path of output .mlir file containing the generated matmuls",
         required=True,
@@ -875,7 +874,7 @@ def main(args):
         lhs_rhs_type, acc_type, shapes_id, args.transpose_rhs, compilation_info_id
     )
 
-    write_code_file(functions, args.output_matmuls_mlir)
+    write_code_file(functions, args.output_matmul_mlir)
     write_calls_file(
         functions,
         calls,

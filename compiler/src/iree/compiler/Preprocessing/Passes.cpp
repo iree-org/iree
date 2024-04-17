@@ -83,6 +83,16 @@ void buildPreprocessingPassPipeline(
     passManager.addPass(
         Preprocessing::createInterpreterPass(interpreterOptions));
   }
+
+  if (!preprocessingOptions.preprocessingPDLSpecFilename.empty()) {
+    Preprocessing::ApplyPDLPatternsPassOptions applyPDLPatternsOptions;
+    applyPDLPatternsOptions.patternsFile =
+        preprocessingOptions.preprocessingPDLSpecFilename;
+    passManager.addPass(
+        Preprocessing::createApplyPDLPatternsPass(applyPDLPatternsOptions));
+    passManager.addPass(createCanonicalizerPass());
+    passManager.addPass(createCSEPass());
+  }
 }
 
 static void

@@ -125,7 +125,7 @@ module attributes {
 // CODEGEN-PRINTER:     IR printer: Setting matmul strategy to custom_transform_strategy
 // CODEGEN-PRINTER:       translation_info = #iree_codegen.translation_info<TransformDialectCodegen codegen_spec = @custom_transform_strategy>
 // CODEGEN-PRINTER:     IR printer: Setting reduce strategy to base vectorize top-level
-// CODEGEN-PRINTER:       translation_info = #iree_codegen.translation_info<SPIRVBaseVectorize>, workgroup_size = [16 : index, 1 : index, 1 : index]
+// CODEGEN-PRINTER:       translation_info = #iree_codegen.translation_info<SPIRVBaseVectorize workgroup_size = [16, 1, 1]>
 
 /// Then test with threading to make sure it runs
 // RUN: iree-compile %s --iree-hal-target-backends=vulkan \
@@ -135,9 +135,6 @@ module attributes {
 // RUN:   --mlir-disable-threading | \
 // RUN: FileCheck %s --check-prefixes=CODEGEN
 
-// CODEGEN: Ran custom_transform_strategy
 // CODEGEN: spirv.func @example_module_dispatch_0_generic_80_f32
-// CODEGEN: hal.executable private @example_module_dispatch_1
-// CODEGEN:   #iree_codegen.translation_info<TransformDialectCodegen codegen_spec = @custom_transform_strategy>
-// CODEGEN:     spirv.func @example_module_dispatch_1_matmul_16x16x5_f32
+// CODEGEN: spirv.func @example_module_dispatch_1_matmul_16x16x5_f32
 // CODEGEN: spirv.func @example_module_dispatch_2_generic_16x16_f32

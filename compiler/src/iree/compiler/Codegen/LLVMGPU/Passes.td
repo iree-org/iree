@@ -61,7 +61,7 @@ def LLVMGPUCastTypeToFitMMA : InterfacePass<"iree-llvmgpu-cast-type-to-fit-mma",
 }
 
 def LLVMGPULowerExecutableTarget :
-    Pass<"iree-llvmgpu-lower-executable-target", "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
+    InterfacePass<"iree-llvmgpu-lower-executable-target", "mlir::FunctionOpInterface"> {
   let summary = "Perform lowering of executable target using one of the IREE::HAL::DispatchLoweringPassPipeline";
   let constructor = "mlir::iree_compiler::createLLVMGPULowerExecutableTargetPass()";
 }
@@ -72,8 +72,14 @@ def LLVMGPUPackSharedMemoryAlloc :
   let constructor = "mlir::iree_compiler::createLLVMGPUPackSharedMemoryAlloc()";
 }
 
+def LLVMGPUPrefetchSharedMemory :
+    InterfacePass<"iree-llvmgpu-prefetch-shared-memory", "mlir::FunctionOpInterface"> {
+  let summary = "Rotate scf.for loops to prefetch shared memory with distance 1";
+  let constructor = "mlir::iree_compiler::createLLVMGPUPrefetchSharedMemoryPass()";
+}
+
 def LLVMGPUSelectLoweringStrategy :
-    Pass<"iree-llvmgpu-select-lowering-strategy", "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
+    Pass<"iree-llvmgpu-select-lowering-strategy", "ModuleOp"> {
   let summary = "Select a IREE::HAL::DispatchLoweringPassPipeline for lowering the target variant";
   let constructor = "mlir::iree_compiler::createLLVMGPUSelectLoweringStrategyPass()";
 }

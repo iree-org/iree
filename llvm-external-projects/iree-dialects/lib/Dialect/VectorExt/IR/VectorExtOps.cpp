@@ -11,29 +11,21 @@
 using namespace mlir;
 using namespace mlir::iree_compiler::IREE::VectorExt;
 
+using VectorValue = TypedValue<VectorType>;
+
 //===----------------------------------------------------------------------===//
 // LayoutConflictResolutionOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult validateLayout(Operation *op, StringRef label,
-                             VectorLayoutInterface layout,
-                             ArrayRef<int64_t> inputShape) {
-  if (!layout.isValidLayout(inputShape)) {
-    return op->emitError(
-        "The " + label +
-        " layout shape cannot be distributed over the given vector shape.");
-  }
-  return success();
-}
-
 // Validate that the desired layout has the same shape as the input.
 LogicalResult LayoutConflictResolutionOp::verify() {
-  Operation *op = getOperation();
-  ArrayRef<int64_t> inputShape =
-      cast<VectorType>(getInput().getType()).getShape();
-  if (succeeded(validateLayout(op, "source", getSourceLayout(), inputShape)))
-    return validateLayout(op, "desired", getDesiredLayout(), inputShape);
-  return failure();
+  if (getSourceLayout().isValidLayout(getInput()).failed()) {
+    return failure();
+  }
+  if (getDesiredLayout().isValidLayout(getOutput()).failed()) {
+    return failure();
+  }
+  return success();
 }
 
 // to_simd -> to_simt

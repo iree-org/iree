@@ -24,7 +24,7 @@ func.func @default() -> (i32, tensor<f32>, tensor<?x4xi32>) {
   %1 = arith.constant dense<4.0> : tensor<f32>
   // OUTPUT-DEFAULT: result[2]: hal.buffer_view
   // OUTPUT-DEFAULT-NEXT: 2x4xi32=[0 1 2 3][4 5 6 7]
-  %2 = flow.tensor.constant dense<[[0,1,2,3],[4,5,6,7]]> : tensor<2x4xi32> -> tensor<?x4xi32>
+  %2 = flow.tensor.dynamic_constant dense<[[0,1,2,3],[4,5,6,7]]> : tensor<2x4xi32> -> tensor<?x4xi32>
   return %0, %1, %2 : i32, tensor<f32>, tensor<?x4xi32>
 }
 
@@ -48,7 +48,7 @@ func.func @numpy() -> (i32, tensor<f32>, tensor<?x4xi32>) {
   %1 = arith.constant dense<4.0> : tensor<f32>
   // OUTPUT-NUMPY-NEXT{LITERAL}: [[0 1 2 3]
   // OUTPUT-NUMPY-NEXT{LITERAL}:  [4 5 6 7]]
-  %2 = flow.tensor.constant dense<[[0,1,2,3],[4,5,6,7]]> : tensor<2x4xi32> -> tensor<?x4xi32>
+  %2 = flow.tensor.dynamic_constant dense<[[0,1,2,3],[4,5,6,7]]> : tensor<2x4xi32> -> tensor<?x4xi32>
   return %0, %1, %2 : i32, tensor<f32>, tensor<?x4xi32>
 }
 
@@ -90,7 +90,7 @@ func.func @numpy() -> (i32, tensor<f32>, tensor<?x4xi32>) {
 
 func.func @write_binary() -> (tensor<f32>, tensor<?x4xi32>) {
   %0 = arith.constant dense<4.0> : tensor<f32>
-  %1 = flow.tensor.constant dense<[[0,1,2,3],[4,5,6,7]]> : tensor<2x4xi32> -> tensor<?x4xi32>
+  %1 = flow.tensor.dynamic_constant dense<[[0,1,2,3],[4,5,6,7]]> : tensor<2x4xi32> -> tensor<?x4xi32>
   return %0, %1 : tensor<f32>, tensor<?x4xi32>
 }
 func.func @echo_binary(%arg0: tensor<f32>, %arg1: tensor<?x4xi32>) -> (tensor<f32>, tensor<?x4xi32>) {

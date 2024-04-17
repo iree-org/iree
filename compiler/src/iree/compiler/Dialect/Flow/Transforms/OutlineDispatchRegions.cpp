@@ -7,7 +7,6 @@
 #include <utility>
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "llvm/Support/Debug.h"
@@ -20,6 +19,10 @@
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler::IREE::Flow {
+
+#define GEN_PASS_DEF_OUTLINEDISPATCHREGIONSPASS
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
+
 namespace {
 
 //===----------------------------------------------------------------------===//
@@ -151,16 +154,9 @@ static LogicalResult outlineDispatchWorkgroupsOp(
                                                executableOp, exportOp);
 }
 
-} // namespace
-
-class OutlineDispatchRegionsPass
-    : public OutlineDispatchRegionsBase<OutlineDispatchRegionsPass> {
-public:
-  OutlineDispatchRegionsPass() = default;
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<func::FuncDialect, IREE::Flow::FlowDialect>();
-  }
-
+struct OutlineDispatchRegionsPass
+    : public IREE::Flow::impl::OutlineDispatchRegionsPassBase<
+          OutlineDispatchRegionsPass> {
   void runOnOperation() override {
     // Convert each dispatch region into a flow.executable + dispatch op.
     int initializerCount = 0;
@@ -206,9 +202,6 @@ public:
   }
 };
 
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createOutlineDispatchRegionsPass() {
-  return std::make_unique<OutlineDispatchRegionsPass>();
-}
+} // namespace
 
 } // namespace mlir::iree_compiler::IREE::Flow

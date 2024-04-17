@@ -37,6 +37,7 @@ iree_compiler_cc_library(
     deps = [
         ":PassesIncGen",
         "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
     ],
 )
@@ -46,6 +47,7 @@ iree_compiler_cc_library(
     srcs = [
         "CleanupNumericNarrowing.cpp",
         "Convert1X1FilterConv2DToMatmul.cpp",
+        "DataLayoutPropagation.cpp",
         "DecomposeConcat.cpp",
         "DemoteContractionInputsToBF16.cpp",
         "DetachElementwiseFromNamedOps.cpp",
@@ -115,6 +117,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:TensorTransforms",
         "@llvm-project//mlir:TensorUtils",
+        "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
     ],
 )

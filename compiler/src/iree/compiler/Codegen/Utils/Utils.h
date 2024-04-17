@@ -33,17 +33,9 @@ static constexpr unsigned kNumMaxParallelDims = 3;
 /// Returns true if the given `func` is a kernel dispatch entry point.
 bool isEntryPoint(mlir::FunctionOpInterface func);
 
-/// Returns a map from function symbol name to corresponding entry point op.
-llvm::StringMap<IREE::HAL::ExecutableExportOp>
-getAllEntryPoints(ModuleOp module);
-
 /// Returns the entry point op for the `funcOp`. Returns `nullptr` on failure.
-FailureOr<IREE::HAL::ExecutableExportOp>
+std::optional<IREE::HAL::ExecutableExportOp>
 getEntryPoint(mlir::FunctionOpInterface funcOp);
-
-/// Returns the ExecutableVariableOp enclosing `op`. Returns `nullptr` on
-/// failure.
-FailureOr<IREE::HAL::ExecutableVariantOp> getExecutableVariantOp(Operation *op);
 
 /// Returns the StringAttr with the name `stringAttr` in the `targetAttr`, if
 /// found.
@@ -236,6 +228,14 @@ void sinkOpsInCFG(const SmallVector<Operation *> &allocs,
 // Check if there is a fused linalg op present in the backward slice of any of
 // the inputs.
 bool hasFusedLeadingOp(linalg::LinalgOp rootOp);
+
+struct VscaleRange {
+  unsigned min;
+  unsigned max;
+};
+
+std::optional<VscaleRange>
+getDefaultVscaleRange(IREE::HAL::ExecutableTargetAttr targetAttr);
 
 } // namespace mlir::iree_compiler
 

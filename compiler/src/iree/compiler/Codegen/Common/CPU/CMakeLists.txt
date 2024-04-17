@@ -70,6 +70,7 @@ iree_cc_library(
     MLIRSupport
     MLIRTensorDialect
     MLIRTensorTransforms
+    MLIRTransformUtils
     MLIRTransforms
     MLIRVectorDialect
     MLIRVectorToSCF
@@ -82,7 +83,6 @@ iree_cc_library(
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::LinalgExt::IR
-    iree::compiler::Dialect::LinalgExt::Utils
   PUBLIC
 )
 

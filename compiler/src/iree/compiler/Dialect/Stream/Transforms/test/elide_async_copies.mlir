@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-stream-elide-async-copies %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-stream-elide-async-copies --cse %s | FileCheck %s
 
 // Tests that a normal clone-on-multiple-uses pattern has the last clone elided.
 // This is what the --iree-stream-materialize-copy-on-write pass generates and
@@ -119,4 +119,141 @@ util.func private @blockArgMove(%cond: i1, %size: index) -> (!stream.resource<*>
                  ^bb2(%fill0, %bb1_1_new : !stream.resource<*>, !stream.resource<*>)
 ^bb2(%bb2_0: !stream.resource<*>, %bb2_1: !stream.resource<*>):
   util.return %bb2_0, %bb2_1 : !stream.resource<*>, !stream.resource<*>
+}
+
+// -----
+
+// Tests that slices aren't elided when there are ops our folding doesn't (yet)
+// support.
+
+// CHECK-LABEL: @slice_unsupported_fold
+util.func private @slice_unsupported_fold(%producer: !stream.resource<*>) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c100 = arith.constant 100 : index
+  %c200 = arith.constant 200 : index
+  %c300 = arith.constant 300 : index
+  %c123_i32 = arith.constant 123 : i32
+  // CHECK: stream.async.slice
+  %slice = stream.async.slice %producer[%c100 to %c200] : !stream.resource<*>{%c300} -> !stream.resource<*>{%c100}
+  // CHECK: stream.async.fill
+  %consumer = stream.async.fill %c123_i32, %slice[%c0 to %c100 for %c100] : i32 -> !stream.resource<*>{%c100}
+  util.return %consumer : !stream.resource<*>
+}
+
+// -----
+
+// Tests that slices of tied values don't get folded as our analysis doesn't
+// (yet) walk up the use-def chain.
+
+// CHECK-LABEL: @slice_unsupported_tied
+util.func private @slice_unsupported_tied(%input: !stream.resource<*>) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c100 = arith.constant 100 : index
+  %c200 = arith.constant 200 : index
+  %c300 = arith.constant 300 : index
+  %producer_storage = stream.async.alloca : !stream.resource<*>{%c100}
+  // CHECK: stream.async.copy
+  %producer = stream.async.copy %input[%c0 to %c300], %producer_storage[%c0 to %c300], %c300 : !stream.resource<*>{%c300} -> %producer_storage as !stream.resource<*>{%c300}
+  // CHECK: stream.async.slice
+  %slice = stream.async.slice %producer[%c100 to %c200] : !stream.resource<*>{%c300} -> !stream.resource<*>{%c100}
+  %consumer_storage = stream.async.alloca : !stream.resource<*>{%c100}
+  // CHECK: stream.async.copy
+  %consumer = stream.async.copy %slice[%c0 to %c100], %consumer_storage[%c0 to %c100], %c300 : !stream.resource<*>{%c100} -> %consumer_storage as !stream.resource<*>{%c100}
+  util.return %consumer : !stream.resource<*>
+}
+
+// -----
+
+// Tests that sliced ranges that overlap other used ranges don't fold if there
+// are writes as the copy is required for correctness.
+
+// CHECK-LABEL: @slice_overlap_preventing
+util.func private @slice_overlap_preventing(%producer: !stream.resource<*>) -> (!stream.resource<*>, !stream.resource<*>) {
+  %c0 = arith.constant 0 : index
+  %c100 = arith.constant 100 : index
+  %c200 = arith.constant 200 : index
+  %c300 = arith.constant 300 : index
+  %c123_i32 = arith.constant 123 : i32
+  // CHECK: stream.async.slice
+  %slice = stream.async.slice %producer[%c100 to %c200] : !stream.resource<*>{%c300} -> !stream.resource<*>{%c100}
+  %consumer_storage = stream.async.alloca : !stream.resource<*>{%c100}
+  // CHECK: stream.async.copy
+  %consumer = stream.async.copy %slice[%c0 to %c100], %consumer_storage[%c0 to %c100], %c300 : !stream.resource<*>{%c100} -> %consumer_storage as !stream.resource<*>{%c100}
+  // This fill overlaps the sliced range and should block the fold.
+  // CHECK: stream.async.fill
+  %fill = stream.async.fill %c123_i32, %producer[%c0 to %c200 for %c200] : i32 -> !stream.resource<*>{%c300}
+  util.return %consumer, %fill : !stream.resource<*>, !stream.resource<*>
+}
+
+// -----
+
+// Tests that sliced ranges that don't overlap other used ranges fold.
+
+// CHECK-LABEL: @slice_overlap_exclusive
+// CHECK-SAME: (%[[PRODUCER:.+]]: !stream.resource<*>)
+util.func private @slice_overlap_exclusive(%producer: !stream.resource<*>) -> (!stream.resource<*>, !stream.resource<*>) {
+  %c0 = arith.constant 0 : index
+  %c100 = arith.constant 100 : index
+  %c200 = arith.constant 200 : index
+  %c300 = arith.constant 300 : index
+  %c123_i32 = arith.constant 123 : i32
+  // CHECK-NOT: stream.async.slice
+  %slice = stream.async.slice %producer[%c100 to %c200] : !stream.resource<*>{%c300} -> !stream.resource<*>{%c100}
+  %consumer_storage = stream.async.alloca : !stream.resource<*>{%c100}
+  // CHECK: stream.async.copy %[[PRODUCER]][%c100 to %c200]
+  %consumer = stream.async.copy %slice[%c0 to %c100], %consumer_storage[%c0 to %c100], %c300 : !stream.resource<*>{%c100} -> %consumer_storage as !stream.resource<*>{%c100}
+  // CHECK: stream.async.fill
+  %fill = stream.async.fill %c123_i32, %producer[%c200 to %c300 for %c100] : i32 -> !stream.resource<*>{%c300}
+  util.return %consumer, %fill : !stream.resource<*>, !stream.resource<*>
+}
+
+// -----
+
+// Tests that sliced ranges that overlap but just for reads.
+
+// CHECK-LABEL: @slice_overlap_readonly
+// CHECK-SAME: (%[[PRODUCER:.+]]: !stream.resource<*>)
+util.func private @slice_overlap_readonly(%producer: !stream.resource<*>) -> (!stream.resource<*>, !stream.resource<*>) {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c100 = arith.constant 100 : index
+  %c101 = arith.constant 101 : index
+  %c200 = arith.constant 200 : index
+  %c300 = arith.constant 300 : index
+  // CHECK-NOT: stream.async.slice
+  %slice = stream.async.slice %producer[%c100 to %c200] : !stream.resource<*>{%c300} -> !stream.resource<*>{%c100}
+  %consumer_storage_0 = stream.async.alloca : !stream.resource<*>{%c100}
+  // CHECK: stream.async.copy %[[PRODUCER]][%c100 to %c200]
+  %consumer_0 = stream.async.copy %slice[%c0 to %c100], %consumer_storage_0[%c0 to %c100], %c300 : !stream.resource<*>{%c100} -> %consumer_storage as !stream.resource<*>{%c100}
+  %consumer_storage_1 = stream.async.alloca : !stream.resource<*>{%c100}
+  // CHECK: stream.async.copy %[[PRODUCER]][%c101 to %c201]
+  %consumer_1 = stream.async.copy %slice[%c1 to %c101], %consumer_storage_1[%c0 to %c100], %c300 : !stream.resource<*>{%c100} -> %consumer_storage as !stream.resource<*>{%c100}
+  util.return %consumer_0, %consumer_1 : !stream.resource<*>, !stream.resource<*>
+}
+
+// -----
+
+stream.executable private @ex {
+  stream.executable.export public @dispatch workgroups() -> (index, index, index) {
+    %c1 = arith.constant 1 : index
+    stream.return %c1, %c1, %c1 : index, index, index
+  }
+}
+
+// CHECK-LABEL: @slice_dispatch_fold
+// CHECK-SAME: (%[[PRODUCER:.+]]: !stream.resource<*>)
+util.func private @slice_dispatch_fold(%producer: !stream.resource<*>) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c10 = arith.constant 10 : index
+  %c20 = arith.constant 20 : index
+  %c30 = arith.constant 30 : index
+  %c100 = arith.constant 100 : index
+  %c200 = arith.constant 200 : index
+  %c300 = arith.constant 300 : index
+  %c123_i32 = arith.constant 123 : i32
+  // CHECK-NOT: stream.async.slice
+  %slice = stream.async.slice %producer[%c100 to %c200] : !stream.resource<*>{%c300} -> !stream.resource<*>{%c100}
+  // CHECK: stream.async.dispatch @ex::@dispatch(%c123_i32, %[[PRODUCER]][%c110 to %c130 for %c20]) : (i32, !stream.resource<*>{%c300}) -> !stream.resource<*>{%c100}
+  %consumer = stream.async.dispatch @ex::@dispatch(%c123_i32, %slice[%c10 to %c30 for %c20]) : (i32, !stream.resource<*>{%c100}) -> !stream.resource<*>{%c100}
+  util.return %consumer : !stream.resource<*>
 }

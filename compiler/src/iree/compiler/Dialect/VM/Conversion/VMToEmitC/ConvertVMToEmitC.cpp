@@ -21,6 +21,7 @@
 #include "mlir/IR/BuiltinDialect.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/IRMapping.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -2093,9 +2094,13 @@ private:
         /*memberName=*/"module",
         /*operand=*/import);
 
-    auto conditionI1 = emitc_builders::unaryOperator(
-        builder, location, emitc_builders::UnaryOperator::LOGICAL_NOT,
-        importModule, boolType);
+    auto conditionI1 = builder
+                           .create<emitc::LogicalNotOp>(
+                               /*location=*/location,
+                               /*type=*/boolType,
+                               /*args=*/
+                               /*operands=*/importModule)
+                           .getResult();
 
     // Start by splitting the block into two. The part before will contain the
     // condition, and the part after will contain the continuation point.
@@ -2271,9 +2276,12 @@ private:
       Value size =
           emitc_builders::sizeOf(builder, loc, TypeAttr::get(valueType));
 
-      result = emitc_builders::binaryOperator(
-          builder, loc, emitc_builders::BinaryOperator::ADDITION, result, size,
-          hostSizeType);
+      result = builder
+                   .create<emitc::AddOp>(
+                       /*location=*/loc,
+                       /*type=*/hostSizeType,
+                       /*operands=*/ArrayRef<Value>{result, size})
+                   .getResult();
     }
 
     return {result};
@@ -2287,13 +2295,8 @@ private:
     auto ctx = builder.getContext();
 
     // iree_vm_function_call_t call;
-    auto call = builder
-                    .create<emitc::VariableOp>(
-                        /*location=*/loc,
-                        /*resultType=*/
-                        emitc::OpaqueType::get(ctx, "iree_vm_function_call_t"),
-                        /*value=*/emitc::OpaqueAttr::get(ctx, ""))
-                    .getResult();
+    auto call = emitc_builders::allocateVariable(
+        builder, loc, emitc::OpaqueType::get(ctx, "iree_vm_function_call_t"));
 
     // importValue = *import;
     auto importValue = emitc_builders::contentsOf(builder, loc, import);
@@ -2432,9 +2435,13 @@ private:
         Type valueType = typeConverter.convertTypeAsNonPointer(argType);
         Value size =
             emitc_builders::sizeOf(builder, loc, TypeAttr::get(valueType));
-        uint8Ptr = emitc_builders::binaryOperator(
-            builder, loc, emitc_builders::BinaryOperator::ADDITION, uint8Ptr,
-            size, bytePtrType);
+
+        uint8Ptr = builder
+                       .create<emitc::AddOp>(
+                           /*location=*/loc,
+                           /*type=*/bytePtrType,
+                           /*operands=*/ArrayRef<Value>{uint8Ptr, size})
+                       .getResult();
       }
     }
     return success();
@@ -2502,9 +2509,12 @@ private:
         Type valueType = llvm::cast<emitc::PointerType>(argType).getPointee();
         Value size =
             emitc_builders::sizeOf(builder, loc, TypeAttr::get(valueType));
-        uint8Ptr = emitc_builders::binaryOperator(
-            builder, loc, emitc_builders::BinaryOperator::ADDITION, uint8Ptr,
-            size, bytePtrType);
+        uint8Ptr = builder
+                       .create<emitc::AddOp>(
+                           /*location=*/loc,
+                           /*type=*/bytePtrType,
+                           /*operands=*/ArrayRef<Value>{uint8Ptr, size})
+                       .getResult();
       }
     }
     return success();
@@ -2819,12 +2829,10 @@ class CallOpConversion : public EmitCConversionPattern<OpTy> {
 
     Value operandRef = this->getModuleAnalysis().lookupRef(operand);
 
-    auto refOp = builder.create<emitc::VariableOp>(
-        /*location=*/loc,
-        /*resultType=*/emitc::OpaqueType::get(ctx, "iree_vm_ref_t"),
-        /*value=*/emitc::OpaqueAttr::get(ctx, ""));
+    Value ref = emitc_builders::allocateVariable(
+        builder, loc, emitc::OpaqueType::get(ctx, "iree_vm_ref_t"));
 
-    Value refPtr = emitc_builders::addressOf(builder, loc, refOp.getResult());
+    Value refPtr = emitc_builders::addressOf(builder, loc, ref);
 
     if (failed(clearStruct(builder, refPtr))) {
       return failure();
@@ -3359,12 +3367,20 @@ private:
         /*operand=*/import);
 
     Type boolType = rewriter.getIntegerType(1);
-    auto conditionI1 = emitc_builders::unaryOperator(
-        rewriter, loc, emitc_builders::UnaryOperator::LOGICAL_NOT, importModule,
-        boolType);
-    auto invConditionI1 = emitc_builders::unaryOperator(
-        rewriter, loc, emitc_builders::UnaryOperator::LOGICAL_NOT, conditionI1,
-        boolType);
+    auto conditionI1 = rewriter
+                           .create<emitc::LogicalNotOp>(
+                               /*location=*/loc,
+                               /*type=*/boolType,
+                               /*args=*/
+                               /*operands=*/importModule)
+                           .getResult();
+    auto invConditionI1 = rewriter
+                              .create<emitc::LogicalNotOp>(
+                                  /*location=*/loc,
+                                  /*type=*/boolType,
+                                  /*args=*/
+                                  /*operands=*/conditionI1)
+                              .getResult();
 
     auto i32Type = rewriter.getIntegerType(32);
     auto conditionI32 = rewriter.create<emitc::CastOp>(
@@ -3949,7 +3965,6 @@ class ContainerAllocOpConversion : public EmitCConversionPattern<OpTy> {
   getOperands(IREE::VM::ListAllocOp op, Adaptor adaptor,
               ConversionPatternRewriter &rewriter, Type elementType,
               Value containerPtr, Value allocator) const {
-    SmallVector<Value> result;
 
     auto moduleOp = op.getOperation()->getParentOfType<IREE::VM::ModuleOp>();
     auto parentFuncOp =
@@ -3965,12 +3980,8 @@ class ContainerAllocOpConversion : public EmitCConversionPattern<OpTy> {
     }
 
     Value capacity = adaptor.getOperands()[0];
-
-    result.push_back(elementTypePtr.value());
-    result.push_back(capacity);
-    result.push_back(allocator);
-    result.push_back(containerPtr);
-
+    SmallVector<Value> result = {elementTypePtr.value(), capacity, allocator,
+                                 containerPtr};
     return result;
   }
 
@@ -3980,9 +3991,6 @@ class ContainerAllocOpConversion : public EmitCConversionPattern<OpTy> {
               Value containerPtr, Value allocator) const {
     auto ctx = op.getContext();
     auto loc = op.getLoc();
-
-    SmallVector<Value> result;
-
     Value access =
         rewriter
             .create<emitc::ConstantOp>(
@@ -3997,12 +4005,8 @@ class ContainerAllocOpConversion : public EmitCConversionPattern<OpTy> {
     Value length = adaptor.getOperands()[0];
     Value alignment = adaptor.getOperands()[1];
 
-    result.push_back(access);
-    result.push_back(length);
-    result.push_back(alignment);
-    result.push_back(allocator);
-    result.push_back(containerPtr);
-
+    SmallVector<Value> result = {access, length, alignment, allocator,
+                                 containerPtr};
     return result;
   }
 
@@ -4012,8 +4016,6 @@ class ContainerAllocOpConversion : public EmitCConversionPattern<OpTy> {
               Value containerPtr, Value allocator) const {
     auto ctx = op.getContext();
     auto loc = op.getLoc();
-
-    SmallVector<Value> result;
 
     Value access =
         rewriter
@@ -4046,14 +4048,8 @@ class ContainerAllocOpConversion : public EmitCConversionPattern<OpTy> {
     Value length = adaptor.getOperands()[2];
     Value alignment = adaptor.getOperands()[3];
 
-    result.push_back(access);
-    result.push_back(source);
-    result.push_back(offset);
-    result.push_back(length);
-    result.push_back(alignment);
-    result.push_back(allocator);
-    result.push_back(containerPtr);
-
+    SmallVector<Value> result = {access,    source,    offset,      length,
+                                 alignment, allocator, containerPtr};
     return result;
   }
 };
@@ -4208,9 +4204,14 @@ class ListGetRefOpConversion
               .getResult();
 
       // ref->type != IREE_VM_REF_TYPE_NULL
-      auto refTypeIsNotNull = emitc_builders::binaryOperator(
-          rewriter, loc, emitc_builders::BinaryOperator::NOT_EQUAL_TO, refType,
-          refTypeNull, rewriter.getI1Type());
+      auto refTypeIsNotNull = rewriter
+                                  .create<emitc::CmpOp>(
+                                      /*location=*/loc,
+                                      /*type=*/rewriter.getI1Type(),
+                                      /*predicate*/ emitc::CmpPredicate::ne,
+                                      /*lhs*/ refType,
+                                      /*rhs*/ refTypeNull)
+                                  .getResult();
 
       // (iree_vm_type_def_is_value(type_def)
       auto typedefIsValue =
@@ -4237,17 +4238,30 @@ class ListGetRefOpConversion
               .getResult(0);
 
       // ref->type != iree_vm_type_def_as_ref(type_def)
-      auto refTypesDontMatch = emitc_builders::binaryOperator(
-          rewriter, loc, emitc_builders::BinaryOperator::NOT_EQUAL_TO, refType,
-          typedefAsRef, rewriter.getI1Type());
+      auto refTypesDontMatch = rewriter
+                                   .create<emitc::CmpOp>(
+                                       /*location=*/loc,
+                                       /*type=*/rewriter.getI1Type(),
+                                       /*predicate*/ emitc::CmpPredicate::ne,
+                                       /*lhs*/ refType,
+                                       /*rhs*/ typedefAsRef)
+                                   .getResult();
 
-      auto invalidRefType = emitc_builders::binaryOperator(
-          rewriter, loc, emitc_builders::BinaryOperator::LOGICAL_OR,
-          typedefIsValue, refTypesDontMatch, rewriter.getI1Type());
+      auto invalidRefType = rewriter
+                                .create<emitc::LogicalOrOp>(
+                                    /*location=*/loc,
+                                    /*type=*/rewriter.getI1Type(),
+                                    /*lhs*/ typedefIsValue,
+                                    /*rhs*/ refTypesDontMatch)
+                                .getResult();
 
-      invalidType = emitc_builders::binaryOperator(
-          rewriter, loc, emitc_builders::BinaryOperator::LOGICAL_AND,
-          refTypeIsNotNull, invalidRefType, rewriter.getI1Type());
+      invalidType = rewriter
+                        .create<emitc::LogicalAndOp>(
+                            /*location=*/loc,
+                            /*type=*/rewriter.getI1Type(),
+                            /*lhs*/ refTypeIsNotNull,
+                            /*rhs*/ invalidRefType)
+                        .getResult();
     }
 
     // Start by splitting the block into two. The part before will contain

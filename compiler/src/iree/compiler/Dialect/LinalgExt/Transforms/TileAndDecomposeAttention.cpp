@@ -8,16 +8,12 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
-#include "llvm/ADT/DenseSet.h"
-#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
-#include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/Pass/Pass.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir {
 namespace iree_compiler {
@@ -437,10 +433,12 @@ IREE::LinalgExt::AttentionOp tileAttention(IREE::LinalgExt::AttentionOp attnOp,
   Value querySlice = extractSlice(query, queryShape, {}, sequenceTileLength,
                                   headDimension, elementType, loc, rewriter);
 
+  Value scale = attnOp.getScale();
+
   auto tiledAttentionOp = rewriter.create<IREE::LinalgExt::AttentionOp>(
       attnOp.getLoc(),
       SmallVector<Type>{accumulatorF32.getType(), sum.getType(), max.getType()},
-      SmallVector<Value>{querySlice, keySlice, valueSlice},
+      SmallVector<Value>{querySlice, keySlice, valueSlice, scale},
       SmallVector<Value>{iterArgResult, iterArgMax, iterArgSum});
 
   if (attnOp.getTransposeV())
@@ -478,6 +476,34 @@ IREE::LinalgExt::AttentionOp tileAttention(IREE::LinalgExt::AttentionOp attnOp,
   return tiledAttentionOp;
 }
 
+Value scaleQuery(Value querySlice, Value scale, RewriterBase &rewriter) {
+  ShapedType queryType = cast<ShapedType>(querySlice.getType());
+  Location loc = querySlice.getLoc();
+
+  // Create a fill op for scale.
+  SmallVector<OpFoldResult> queryDims =
+      tensor::getMixedSizes(rewriter, loc, querySlice);
+  Value empty = rewriter.create<tensor::EmptyOp>(loc, queryDims,
+                                                 queryType.getElementType());
+  auto fillOp = rewriter.create<linalg::FillOp>(loc, ValueRange{scale}, empty)
+                    .getResult(0);
+
+  // Create a generic op to multiply the query by the scale.
+  SmallVector<utils::IteratorType> iteratorTypes(2,
+                                                 utils::IteratorType::parallel);
+  auto identityMap =
+      AffineMap::getMultiDimIdentityMap(2, rewriter.getContext());
+  SmallVector<AffineMap> indexingMaps(2, identityMap);
+  auto scaleOp = rewriter.create<linalg::GenericOp>(
+      loc, TypeRange{fillOp.getType()}, ValueRange{querySlice},
+      ValueRange{fillOp}, indexingMaps, iteratorTypes,
+      [&](OpBuilder &b, Location loc, ValueRange args) {
+        Value result = b.create<arith::MulFOp>(loc, args[0], args[1]);
+        b.create<linalg::YieldOp>(loc, result);
+      });
+  return scaleOp.getResult(0);
+}
+
 /// Decompose tiled iree_linalg_ext.attention op.
 /// TODO: Adopt decomposeOperation with this.
 void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
@@ -492,9 +518,6 @@ void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
   Value max = *tiledAttnOp.getMax();
   Value sum = *tiledAttnOp.getSum();
 
-  assert(max && "expected max statistic operand to be present");
-  assert(sum && "expected sum statistic operand to be present");
-
   OpBuilder::InsertionGuard withinScfLoop(rewriter);
   rewriter.setInsertionPointAfter(tiledAttnOp);
   SmallVector<OpFoldResult> queryDimValues =
@@ -505,6 +528,24 @@ void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
       tileSize ? rewriter.getIndexAttr(tileSize.value()) : sequenceTileLength;
 
   Type elementType = tiledAttnOp.getQueryType().getElementType();
+
+  // Since we use exp2 for attention instead of the original exp, we have to
+  // multiply the scale by log2(e). We use exp2 instead of exp as most GPUs
+  // have better support for exp2.
+  Value scale = tiledAttnOp.getScale();
+  Value log2e = rewriter.create<arith::ConstantOp>(
+      loc, rewriter.getFloatAttr(elementType, M_LOG2E));
+  scale = rewriter.create<arith::MulFOp>(loc, scale, log2e);
+
+  // In the original algorithm, the scaling is done after the softmax:
+  //        softmax(Q @ K.T * scale) @ V
+  //
+  // But, it is mathematically equivalent to do it on Q first and then multiply
+  // it by K.T. This just allows us to do the scaling once, instead of each
+  // iteration of the loop.
+  querySlice = scaleQuery(querySlice, scale, rewriter);
+  ops.push_back(querySlice.getDefiningOp());
+
   auto [result, newMax, newSum] = createAttentionBody(
       keySlice, valueSlice, querySlice, tiledResult, max, sum,
       sequenceTileLength, keyValueTileLength, headDimension, elementType, ops,

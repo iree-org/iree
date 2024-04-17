@@ -12,7 +12,6 @@
 #include "iree/compiler/PluginAPI/PluginManager.h"
 #include "iree/compiler/Tools/init_dialects.h"
 #include "iree/compiler/Tools/init_passes.h"
-#include "iree/compiler/Tools/init_targets.h"
 #include "iree/compiler/tool_entry_points_api.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/Process.h"
@@ -146,7 +145,6 @@ int ireeOptRunMain(int argc, char **argv) {
   mlir::DialectRegistry registry;
   mlir::iree_compiler::registerAllDialects(registry);
   mlir::iree_compiler::registerAllPasses();
-  mlir::iree_compiler::registerHALTargetBackends();
 
   // Register the pass to drop embedded transform dialect IR.
   // TODO: this should be upstreamed.

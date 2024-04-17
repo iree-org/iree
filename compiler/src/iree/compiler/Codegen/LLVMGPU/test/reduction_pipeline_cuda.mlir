@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-codegen-decompose-softmax)), iree-llvmgpu-select-lowering-strategy, iree-llvmgpu-lower-executable-target)))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-codegen-decompose-softmax), iree-llvmgpu-select-lowering-strategy, iree-codegen-lower-executable-using-transform-dialect, func.func(iree-llvmgpu-lower-executable-target)))))" %s | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -39,11 +39,10 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 }
 }
 
-//         CHECK:  #[[$MAP:.+]] = affine_map<()[s0] -> (s0 * 4)>
-//   CHECK-LABEL: hal.executable.export public @warp_reduction_dispatch
-//    CHECK-SAME:    subgroup_size = 32
-//    CHECK-SAME:    workgroup_size = [256 : index, 1 : index, 1 : index]
-//   CHECK-LABEL:  func.func @warp_reduction_dispatch
+//         CHECK: #[[$MAP:.+]] = affine_map<()[s0] -> (s0 * 4)>
+//         CHECK: #[[TRANSLATION_INFO:.+]] = #iree_codegen.translation_info<None workgroup_size = [256, 1, 1] subgroup_size = 32>
+//         CHECK:  func.func @warp_reduction_dispatch()
+//    CHECK-SAME:      translation_info = #[[TRANSLATION_INFO]]
 //     CHECK-DAG:    %[[C0I:.+]] = arith.constant 0 : i32
 //     CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
 //     CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : i32
@@ -154,10 +153,9 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 }
 }
 
-//   CHECK-LABEL: hal.executable.export public @warp_reduction_broadcast_dispatch
-//    CHECK-SAME:    subgroup_size = 32
-//    CHECK-SAME:    workgroup_size = [512 : index, 1 : index, 1 : index]
-//   CHECK-LABEL:  func.func @warp_reduction_broadcast_dispatch
+//         CHECK: #[[TRANSLATION_INFO:.+]] = #iree_codegen.translation_info<None workgroup_size = [512, 1, 1] subgroup_size = 32>
+//         CHECK:  func.func @warp_reduction_broadcast_dispatch()
+//    CHECK-SAME:      translation_info = #[[TRANSLATION_INFO]]
 //         CHECK:    scf.for {{.*}} -> (vector<1xf32>) {
 //         CHECK:      vector.transfer_read {{.*}} : memref<512x10240xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
 //         CHECK:      vector.reduction <add>, {{.*}} : vector<4xf32> into f32
@@ -229,10 +227,9 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
 }
 }
 
-//   CHECK-LABEL: hal.executable.export public @softmax
-//    CHECK-SAME:    subgroup_size = 32
-//    CHECK-SAME:    workgroup_size = [1024 : index, 1 : index, 1 : index]
-//   CHECK-LABEL:  func.func @softmax
+//         CHECK: #[[TRANSLATION_INFO:.+]] = #iree_codegen.translation_info<LLVMGPUWarpReduction workgroup_size = [1024, 1, 1] subgroup_size = 32>
+//         CHECK:  func.func @softmax()
+//    CHECK-SAME:      translation_info = #[[TRANSLATION_INFO]]
 //         CHECK:    scf.for {{.*}} -> (vector<4xf32>) {
 //         CHECK:      vector.transfer_read {{.*}} : memref<12x128x40960xf32, #hal.descriptor_type<storage_buffer>>, vector<4xf32>
 //         CHECK:      arith.maximumf {{.*}} : vector<4xf32>

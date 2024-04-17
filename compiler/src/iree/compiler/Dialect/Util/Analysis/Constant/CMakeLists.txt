@@ -25,6 +25,7 @@ iree_cc_library(
     MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR
+    MLIRSideEffectInterfaces
     MLIRSupport
     iree::compiler::Dialect::Util::Analysis
     iree::compiler::Dialect::Util::IR

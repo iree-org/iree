@@ -117,22 +117,13 @@ setConfigForKernel(mlir::FunctionOpInterface entryPointFn) {
   return success();
 }
 
-LogicalResult initVMVXLaunchConfig(ModuleOp moduleOp) {
-  llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
-      getAllEntryPoints(moduleOp);
-  for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
-    auto exportOp = exportOps.lookup(funcOp.getName());
-    if (!exportOp) {
-      continue;
-    }
+LogicalResult initVMVXLaunchConfig(FunctionOpInterface funcOp) {
+  if (getTranslationInfo(funcOp)) {
+    return success();
+  }
 
-    if (getTranslationInfo(exportOp)) {
-      continue;
-    }
-
-    if (failed(setConfigForKernel(funcOp))) {
-      return failure();
-    }
+  if (failed(setConfigForKernel(funcOp))) {
+    return failure();
   }
 
   return success();

@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-llvmcpu-check-ir-before-llvm-conversion=fail-on-out-of-bounds=false %s --verify-diagnostics -split-input-file
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-llvmcpu-check-ir-before-llvm-conversion{fail-on-out-of-bounds=false}))" %s --verify-diagnostics -split-input-file
 
 module {
   func.func @dynamic_allocas(%arg0: index) {
@@ -29,3 +29,16 @@ module {
   }
 }
 // CHECK-LABEL: func @mix_static_and_unbound_dynamic_allocas(
+
+// -----
+
+module {
+  func.func @scalable_alloca() {
+    %c16384 = arith.constant 16384 : index
+    %vscale = vector.vscale
+    %c16384_vscale = arith.muli %vscale, %c16384 : index
+    %0 = memref.alloca(%c16384_vscale) : memref<?xf32>
+    return
+  }
+}
+// CHECK-LABEL: func @scalable_alloca(

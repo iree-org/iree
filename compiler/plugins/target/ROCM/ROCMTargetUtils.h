@@ -13,15 +13,22 @@
 
 namespace mlir::iree_compiler::IREE::HAL {
 
-// Links LLVM module to ROC Device Library Bit Code
-void linkROCDLIfNecessary(llvm::Module *module, std::string targetChip,
-                          std::string bitCodeDir);
+// Sets HIP platform globals based on the target architecture.
+LogicalResult setHIPGlobals(Location loc, llvm::Module *module,
+                            StringRef targetChip);
+
+// Links HIP device bitcode if the module uses any symbols from it.
+LogicalResult linkHIPBitcodeIfNeeded(Location loc, llvm::Module *module,
+                                     StringRef targetChip,
+                                     StringRef bitcodePath);
 
 // Links optimized Ukernel module.
-void linkUkernelBCFiles(llvm::Module *module, Location loc,
-                        StringRef enabledUkernelsStr, StringRef targetChip,
-                        StringRef bitCodeDir, unsigned linkerFlags,
-                        llvm::TargetMachine &targetMachine);
+LogicalResult linkUkernelBitcodeFiles(Location loc, llvm::Module *module,
+                                      StringRef enabledUkernelsStr,
+                                      StringRef targetChip,
+                                      StringRef bitcodePath,
+                                      unsigned linkerFlags,
+                                      llvm::TargetMachine &targetMachine);
 // Compiles ISAToHsaco Code
 std::string createHsaco(Location loc, const std::string isa, StringRef name);
 

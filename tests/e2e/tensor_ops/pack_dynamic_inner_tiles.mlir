@@ -19,7 +19,7 @@ func.func private @generate_2D_source(%height : index, %width : index) -> tensor
 }
 
 func.func @fully_dynamic_pack_simple() {
-  %iree_input = flow.tensor.constant dense<[
+  %iree_input = flow.tensor.dynamic_constant dense<[
     [0, 1, 2, 3],
     [4, 5, 6, 7],
     [8, 9, 10, 11],

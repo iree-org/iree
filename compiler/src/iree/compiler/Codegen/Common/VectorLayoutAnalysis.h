@@ -98,16 +98,9 @@ class VectorLayoutAnalysis {
 public:
   VectorLayoutAnalysis(Operation *root) : root(root) {}
 
-  /// Fix the layout for a specific value. The layout must implement
-  /// VectorLayoutInterface.
-  template <typename T>
-  void setAnchor(Value val, T layout) {
-    assert(isa<VectorLayoutInterface>(layout) &&
-           "expected layout to implement VectorLayoutInterface");
-    auto typedVal = dyn_cast<TypedValue<VectorType>>(val);
-    assert(typedVal && "expected value to be a vector type");
-    anchors[typedVal] = cast<VectorLayoutInterface>(layout);
-  }
+  /// Fix the layout for a specific value. Returns failure if the layout set is
+  /// invalid for the value.
+  LogicalResult setAnchor(Value val, VectorLayoutInterface layout);
 
   /// Run the analysis. The analysis expects that the user has set some anchor
   /// points and is trying to infer the layout of other values.
@@ -146,8 +139,8 @@ private:
   DataFlowSolver solver;
 };
 
-void setAnchorOpsFromAttributes(VectorLayoutAnalysis &analysis,
-                                Operation *root);
+LogicalResult setAnchorOpsFromAttributes(VectorLayoutAnalysis &analysis,
+                                         Operation *root);
 
 }; // namespace iree_compiler
 }; // namespace mlir

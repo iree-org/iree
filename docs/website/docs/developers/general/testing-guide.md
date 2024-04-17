@@ -400,3 +400,84 @@ our `CMakeLists.txt` file by
 There are other test targets that generate tests based on template configuraton
 and platform detection, such as `iree_static_linker_test`. Those targets are
 not supported by Bazel rules at this point.
+
+## External test suite
+
+An out-of-tree test suite is under development at
+[nod-ai/SHARK-TestSuite](https://github.com/nod-ai/SHARK-TestSuite/tree/main/iree_tests)
+for large collections of generated tests and machine learning models that are
+too large to fit into the main git repository.
+
+Testing these programs follows several stages:
+
+```mermaid
+graph LR
+  Import -. "\n(offline)" .-> Compile
+  Compile --> Run
+```
+
+This particular test suite treats importing (e.g. from ONNX, PyTorch, or
+TensorFlow) as an offline step and contains test cases organized into folders
+of programs, inputs, and expected outputs:
+
+```text title="Sample test case directory"
+test_case_name/
+  model.mlir
+  input_0.npy
+  output_0.npy
+  test_data_flags.txt
+```
+
+```text title="Sample test_data_flags.txt"
+--input=@input_0.npy
+--expected_output=@output_0.npy
+```
+
+* Many model, input, and output files are too large to store directly in Git,
+so the external test suite also uses [Git LFS](https://git-lfs.com/) and cloud
+storage.
+
+Each test case can be run using a sequence of commands like:
+
+```bash
+iree-compile model.mlir {flags} -o model.vmfb
+iree-run-module --module=model.vmfb --flagfile=test_data_flags.txt
+```
+
+To run slices of the test suite, a [pytest](https://docs.pytest.org/en/stable/)
+runner is included that can be configured using JSON files. The JSON files
+tested in the IREE repo itself are stored in
+[`build_tools/pkgci/external_test_suite/`](https://github.com/openxla/iree/tree/main/build_tools/pkgci/external_test_suite).
+
+For example, here is part of a config file for running ONNX tests on CPU:
+
+```json title="build_tools/pkgci/external_test_suite/onnx_cpu_llvm_sync.json" linenums="1"
+--8<-- "build_tools/pkgci/external_test_suite/onnx_cpu_llvm_sync.json::20"
+```
+
+### Adding new test cases
+
+To add new test cases to the external test suite:
+
+1. Import the programs you want to test into MLIR. This can be done manually or
+   using automation. Prefer to automate, or at least document, the process so
+   test cases can be regenerated later.
+2. Construct sets of inputs and expected outputs (as .npy or .bin files). These
+   can be manually authored or imported by running the program through a
+   reference backend.
+3. Group the program, inputs, and outputs together using a flagfile.
+
+To start running new test cases:
+
+1. Bump the commit of the test suite that is used in IREE's
+   [`.github/workflows/` files](https://github.com/openxla/iree/tree/main/.github/workflows)
+2. Add new pytest invocations and/or config files that run the new tests
+
+### Usage from other projects
+
+The external test suite only needs `iree-compile` and `iree-run-module` to run,
+so it is well suited for use in downstream projects that implement plugins for
+IREE. The
+[`conftest.py`](https://github.com/nod-ai/SHARK-TestSuite/blob/main/iree_tests/conftest.py)
+file can also be forked (or bypassed entirely) to further customize the test
+runner behavior.

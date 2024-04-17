@@ -8,7 +8,7 @@
 #define IREE_COMPILER_DIALECT_UTIL_TRANSFORMOPS_UTILTRANSFORMOPS_H_
 
 #include "mlir/Bytecode/BytecodeOpInterface.h"
-#include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
+#include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.h"
 #include "mlir/IR/OpImplementation.h"
 
 #define GET_OP_CLASSES

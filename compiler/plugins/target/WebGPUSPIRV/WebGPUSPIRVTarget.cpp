@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "./SPIRVToWGSL.h"
+#include "compiler/plugins/target/WebGPUSPIRV/SPIRVToWGSL.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/WGSL/Passes.h"
@@ -145,22 +145,15 @@ public:
     passManager.nest<ModuleOp>().nest<func::FuncOp>().addPass(
         createWGSLReplacePushConstantsPass());
 
-    // From WGSL spec, "Floating Point Evaluation"
-    // (https://www.w3.org/TR/WGSL/#floating-point-evaluation):
-    // - Implementations may assume that NaNs and infinities are not present at
-    //   runtime.
-    //   - In such an implementation, when an evaluation would produce an
-    //     infinity or a NaN, an undefined value of the target type is produced
-    //     instead.
-    // So WebGPU effectively assumes fast math mode. We also don't have reliable
-    // ways to check whether a floating point number is NaN or infinity.
-    // Therefore, just let the SPIR-V CodeGen to avoid generating guards w.r.t.
-    // NaN and infinity.
-    buildSPIRVCodegenPassPipeline(passManager, /*enableFastMath=*/true);
+    buildSPIRVCodegenPassPipeline(passManager);
 
-    // WGSL does not support extended multiplication:
-    // https://github.com/gpuweb/gpuweb/issues/1565. Make sure to lower it to
-    // regular multiplication before we convert SPIR-V to WGSL.
+    // Prepare SPIR-V for WebGPU by expanding or removing unsupported ops.
+    // For example,
+    //   * WGSL does not support extended multiplication:
+    //     https://github.com/gpuweb/gpuweb/issues/1565, so we lower to
+    //     regular multiplication
+    //   * WGSL does not support NaN or infinities:
+    //     https://www.w3.org/TR/WGSL/#floating-point-evaluation
     passManager.nest<ModuleOp>().nest<spirv::ModuleOp>().addPass(
         spirv::createSPIRVWebGPUPreparePass());
   }

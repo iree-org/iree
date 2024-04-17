@@ -42,6 +42,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:NVGPUDialect",
         "@llvm-project//mlir:Pass",
+        "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
     ],
 )
@@ -70,7 +71,7 @@ iree_compiler_cc_library(
         "GPUVectorDistribution.cpp",
         "Passes.cpp",
         "VectorReductionToGPU.cpp",
-        "WorkGroupSwizzle.cpp",
+        "WorkgroupReordering.cpp",
         "WorkgroupSpecializationPass.cpp",
     ],
     hdrs = [
@@ -122,6 +123,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:TensorTransforms",
+        "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
         "@llvm-project//mlir:VectorDialect",
         "@llvm-project//mlir:VectorToSCF",

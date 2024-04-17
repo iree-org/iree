@@ -162,8 +162,7 @@ createImportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
     // TODO(benvanik): always pass in a signal fence? could be useful if we
     // want to allow for async work using fences that's not device-related.
     const bool haveTensorResults =
-        llvm::any_of(oldImportType.getResults(),
-                     [](Type type) { return llvm::isa<TensorType>(type); });
+        llvm::any_of(oldImportType.getResults(), llvm::IsaPred<TensorType>);
     if (!haveTensorResults && !hasSideEffects) {
       // No tensors returned from import - pass in an immediate signal.
       signalFence = entryBuilder.create<IREE::Util::NullOp>(

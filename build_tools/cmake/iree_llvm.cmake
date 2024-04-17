@@ -36,7 +36,13 @@ macro(iree_llvm_configure_bundled)
 
   message(STATUS "Configuring third_party/llvm-project")
   list(APPEND CMAKE_MESSAGE_INDENT "  ")
-  add_subdirectory("third_party/llvm-project/llvm" "llvm-project" EXCLUDE_FROM_ALL)
+  set(_BUNDLED_LLVM_CMAKE_SOURCE_SUBDIR "third_party/llvm-project/llvm")
+  add_subdirectory("${_BUNDLED_LLVM_CMAKE_SOURCE_SUBDIR}" "llvm-project" EXCLUDE_FROM_ALL)
+  get_directory_property(LLVM_VERSION_MAJOR DIRECTORY "${_BUNDLED_LLVM_CMAKE_SOURCE_SUBDIR}" LLVM_VERSION_MAJOR)
+  if (NOT LLVM_VERSION_MAJOR)
+    message(SEND_ERROR "Failed to read LLVM_VERSION_MAJOR property on LLVM directory. Should have been set since https://github.com/llvm/llvm-project/pull/83346.")
+  endif()
+
   list(POP_BACK CMAKE_MESSAGE_INDENT)
 
   # Reset CMAKE_BUILD_TYPE to its previous setting.
@@ -58,7 +64,7 @@ macro(iree_llvm_configure_bundled)
   list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
 
   set(LLVM_INCLUDE_DIRS
-    ${IREE_SOURCE_DIR}/third_party/llvm-project/llvm/include
+    ${IREE_SOURCE_DIR}/${_BUNDLED_LLVM_CMAKE_SOURCE_SUBDIR}/include
     ${IREE_BINARY_DIR}/llvm-project/include
   )
   set(MLIR_INCLUDE_DIRS
@@ -72,12 +78,12 @@ macro(iree_llvm_configure_bundled)
 
   set(LLVM_BINARY_DIR "${IREE_BINARY_DIR}/llvm-project")
   set(LLVM_TOOLS_BINARY_DIR "${LLVM_BINARY_DIR}/bin")
-  set(LLVM_EXTERNAL_LIT "${IREE_SOURCE_DIR}/third_party/llvm-project/llvm/utils/lit/lit.py")
+  set(LLVM_EXTERNAL_LIT "${IREE_SOURCE_DIR}/${_BUNDLED_LLVM_CMAKE_SOURCE_SUBDIR}/utils/lit/lit.py")
 
   set(IREE_LLVM_LINK_BINARY "$<TARGET_FILE:${IREE_LLVM_LINK_TARGET}>")
   set(IREE_LLD_BINARY "$<TARGET_FILE:${IREE_LLD_TARGET}>")
   set(IREE_CLANG_BINARY "$<TARGET_FILE:${IREE_CLANG_TARGET}>")
-  set(IREE_CLANG_BUILTIN_HEADERS_PATH "${LLVM_BINARY_DIR}/lib/clang/${CLANG_EXECUTABLE_VERSION}/include/")
+  set(IREE_CLANG_BUILTIN_HEADERS_PATH "${LLVM_BINARY_DIR}/lib/clang/${LLVM_VERSION_MAJOR}/include/")
 endmacro()
 
 macro(iree_llvm_configure_installed)
@@ -132,6 +138,14 @@ macro(iree_llvm_set_bundled_cmake_options)
   set(LLVM_APPEND_VC_REV OFF CACHE BOOL "")
   set(LLVM_ENABLE_IDE ON CACHE BOOL "")
   set(LLVM_ENABLE_BINDINGS OFF CACHE BOOL "")
+
+  # Force LLVM to avoid dependencies, which we don't ever really want in our
+  # limited builds.
+  set(LLVM_ENABLE_LIBEDIT OFF CACHE BOOL "Default disable")
+  set(LLVM_ENABLE_LIBXML2 OFF CACHE BOOL "Default disable")
+  set(LLVM_ENABLE_TERMINFO OFF CACHE BOOL "Default disable")
+  set(LLVM_ENABLE_ZLIB OFF CACHE BOOL "Default disable")
+  set(LLVM_ENABLE_ZSTD OFF CACHE BOOL "Default disable")
 
   # LLVM defaults to building all targets. We always enable targets that we need
   # as we need them, so default to none. The user can override this as needed,

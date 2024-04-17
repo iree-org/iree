@@ -1,5 +1,5 @@
-// RUN: iree-opt --split-input-file --iree-codegen-llvmgpu-use-vector-distribution \
-// RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-select-lowering-strategy, iree-llvmgpu-lower-executable-target)))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-codegen-llvmgpu-use-vector-distribution --iree-llvmgpu-enable-prefetch=true \
+// RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-llvmgpu-select-lowering-strategy, func.func(iree-llvmgpu-lower-executable-target)))))" %s | FileCheck %s
 
 // TODO: This test is still using the legacy LLVMGPU kernel config. This needs
 // to be migrated to the rocdl heuristics, but for now is just physically
@@ -14,8 +14,8 @@
 hal.executable @matmul_256x256x256_f16_f32 {
 hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
       target_arch = "gfx940",
-      mma_intrinsics = [#iree_gpu.mfma_layout<F16_16x16x16_F32>,
-                        #iree_gpu.mfma_layout<F16_32x32x8_F32>]
+      mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+                        #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>]
   }>) {
   hal.executable.export @matmul_256x256x256_f16_f32 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
@@ -43,16 +43,12 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 
 // Basic pipeline test to make sure it generates the instructions we expect.
 
-//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute
-//  CHECK-SAME:   mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mfma_layout<F16_16x16x16_F32>,
+//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [128, 2, 1] subgroup_size = 64
+//  CHECK-SAME:   mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
 //  CHECK-SAME:     subgroup_m_count = 2, subgroup_n_count = 2, subgroup_m_tile_count = 2, subgroup_n_tile_count = 2, subgroup_k_tile_count = 8>
 
-// CHECK-LABEL: hal.executable.export public @matmul_256x256x256_f16_f32
-//  CHECK-SAME:    subgroup_size = 64
-//  CHECK-SAME:    translation_info = #[[$TRANSLATION]]
-//  CHECK-SAME:    workgroup_size = [128 : index, 2 : index, 1 : index]
-
-//    CHECK-LABEL: func.func @matmul_256x256x256_f16_f32
+//    CHECK-LABEL: func.func @matmul_256x256x256_f16_f32()
+//     CHECK-SAME:    translation_info = #[[$TRANSLATION]]
 //          CHECK:   scf.for {{.*}} = %c0 to %c256 step %c128 iter_args({{.*}}) -> (vector<2x2x1x1x1x4xf32>)
 // Each subgroup handles 2 * 2 tiles, and for each tile we accumulate 8 times
 // along the K dimension. So in total 32 mfma ops.
@@ -71,8 +67,8 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 hal.executable @matmul_256x256x256_f16_f16 {
 hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
       target_arch = "gfx940",
-      mma_intrinsics = [#iree_gpu.mfma_layout<F16_16x16x16_F32>,
-                        #iree_gpu.mfma_layout<F16_32x32x8_F32>]
+      mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+                        #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>]
   }>) {
   hal.executable.export @matmul_256x256x256_f16_f16 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
@@ -98,16 +94,12 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 }
 }
 
-//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute
-//  CHECK-SAME:   mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mfma_layout<F16_16x16x16_F32>,
+//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [128, 2, 1] subgroup_size = 64
+//  CHECK-SAME:   mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
 //  CHECK-SAME:     subgroup_m_count = 2, subgroup_n_count = 2, subgroup_m_tile_count = 2, subgroup_n_tile_count = 2, subgroup_k_tile_count = 8>
 
-// CHECK-LABEL: hal.executable.export public @matmul_256x256x256_f16_f16
-//  CHECK-SAME:    subgroup_size = 64
-//  CHECK-SAME:    translation_info = #[[$TRANSLATION]]
-//  CHECK-SAME:    workgroup_size = [128 : index, 2 : index, 1 : index]
-
-//    CHECK-LABEL: func.func @matmul_256x256x256_f16_f16
+//    CHECK-LABEL: func.func @matmul_256x256x256_f16_f16()
+//     CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //          CHECK:   scf.for {{.*}} = %c0 to %c256 step %c128 iter_args(%[[ARG:.+]] = {{.*}}) -> (vector<2x2x1x1x1x4xf16>)
 //          CHECK:     arith.extf %[[ARG]] : vector<2x2x1x1x1x4xf16> to vector<2x2x1x1x1x4xf32>
 // CHECK-COUNT-32:     amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
@@ -126,8 +118,8 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 hal.executable @expanded_matmul_transpose_b_executable {
 hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
       target_arch = "gfx940",
-      mma_intrinsics = [#iree_gpu.mfma_layout<F16_16x16x16_F32>,
-                        #iree_gpu.mfma_layout<F16_32x32x8_F32>]
+      mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+                        #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>]
   }>) {
   hal.executable.export @expanded_matmul_transpose_b layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device):
@@ -173,15 +165,17 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
   }
 }
 
-// CHECK-LABEL: hal.executable.export public @expanded_matmul_transpose_b
-//  CHECK-SAME:    workgroup_size = [256 : index, 1 : index, 1 : index]
-
-//    CHECK-LABEL: func @expanded_matmul_transpose_b
-//          CHECK:   scf.for {{.*}} = %c0 to %c2048 step %c128 iter_args(%[[ARG:.+]] = {{.*}}) -> (vector<4x1x1x1x1x4xf16>)
+//          CHECK: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [256, 1, 1] subgroup_size = 64
+//          CHECK: func @expanded_matmul_transpose_b
+//     CHECK-SAME:     translation_info = #[[TRANSLATION]]
+// This has more than 2 iteartions. So we have prefetching enabled for this case. Due to
+// prefetching, we have one iteration peeled of so upper bound is 2048 - 128 = 1920.
+//          CHECK:   scf.for {{.*}} = %c0 to %c1920 step %c128 iter_args(%[[ARG:.+]] = {{.*}}) -> (vector<4x1x1x1x1x4xf16>)
 //          CHECK:     arith.extf %[[ARG]] : vector<4x1x1x1x1x4xf16> to vector<4x1x1x1x1x4xf32>
 // CHECK-COUNT-32:     amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
 //          CHECK:     %[[TRUNC:.+]] = arith.truncf %{{.*}} : vector<4x1x1x1x1x4xf32> to vector<4x1x1x1x1x4xf16>
 //          CHECK:     scf.yield %[[TRUNC]] : vector<4x1x1x1x1x4xf16>
+// CHECK-COUNT-32:   amdgpu.mfma
 //  CHECK-COUNT-4:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<4x1xf16>, memref<2x10x64x64xf16, #hal.descriptor_type<storage_buffer>>
 
 // -----
@@ -195,8 +189,8 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 hal.executable @conv_nhwc_dispatch_0 {
 hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
       target_arch = "gfx940",
-      mma_intrinsics = [#iree_gpu.mfma_layout<F16_16x16x16_F32>,
-                        #iree_gpu.mfma_layout<F16_32x32x8_F32>]
+      mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+                        #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>]
   }>) {
   hal.executable.export @conv_nhwc layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device):
@@ -225,14 +219,20 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 //    CHECK-LABEL: func.func @conv_nhwc
 //          CHECK:   scf.for {{.*}} = %c0 to %c3
 //          CHECK:     scf.for {{.*}} = %c0 to %c3
-//          CHECK:       scf.for {{.*}} = %c0 to %c768 step %c32 iter_args(%[[ARG:.+]] = {{.*}}) -> (vector<2x4x1x1x1x4xf32>)
+// This has more than 2 iteartions. So we have prefetching enabled for this case. Due to
+// prefetching, we have one iteration peeled of so upper bound is 768 - 32 = 736.
+//          CHECK:       scf.for {{.*}} = %c0 to %c736 step %c32 iter_args(%[[ARG:.+]] = {{.*}}) -> (vector<2x4x1x1x1x4xf32>)
 // CHECK-COUNT-16:         amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
+//          CHECK:         scf.yield
+// CHECK-COUNT-16:       amdgpu.mfma
+//          CHECK:     scf.yield
+//          CHECK:   scf.yield
 //  CHECK-COUNT-8:   vector.transfer_write {{.+}} : vector<4x1xf32>, memref<2x256x512x256xf32, #hal.descriptor_type<storage_buffer>>
 
 // -----
 
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {
-  mma_intrinsics = [#iree_gpu.mfma_layout<F16_16x16x16_F32>, #iree_gpu.mfma_layout<F16_32x32x8_F32>],
+  mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>],
   target_arch = "gfx942",
   ukernels = "none"
 }>
@@ -293,20 +293,71 @@ hal.executable public @main_dispatch_expanded_matmul {
 }
 
 
-//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute
-//  CHECK-SAME:   mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mfma_layout<F16_16x16x16_F32>,
+//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [128, 2, 1] subgroup_size = 64
+//  CHECK-SAME:   mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
 //  CHECK-SAME:     subgroup_m_count = 2, subgroup_n_count = 2, subgroup_m_tile_count = 2, subgroup_n_tile_count = 2, subgroup_k_tile_count = 8>
 
-// CHECK-LABEL: hal.executable.export public @generic_2x1024x20x64x1280_f16
-//  CHECK-SAME:    subgroup_size = 64
-//  CHECK-SAME:    translation_info = #[[$TRANSLATION]]
-//  CHECK-SAME:    workgroup_size = [128 : index, 2 : index, 1 : index]
-
 //    CHECK-LABEL: func.func @generic_2x1024x20x64x1280_f16
-//      CHECK-NOT:   vector.transfer_read
-//          CHECK:   scf.for {{.*}} = %c0 to %c1280 step %c128 iter_args({{.*}}) -> (vector<2x2x1x1x1x4xf16>)
+// This has more than 2 iteartions. So we have prefetching enabled for this case. Due to
+// prefetching, we have one iteration peeled of so upper bound is 1280 - 128 = 1152.
+//          CHECK:   scf.for {{.*}} = %c0 to %c1152 step %c128 iter_args({{.*}}) -> (vector<2x2x1x1x1x4xf16>)
 // Each subgroup handles 2 * 2 tiles, and for each tile we accumulate 8 times
 // along the K dimension. So in total 32 mfma ops.
 // CHECK-COUNT-32:     amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
 //          CHECK:     scf.yield %{{.+}} : vector<2x2x1x1x1x4xf16>
+// CHECK-COUNT-32:   amdgpu.mfma
 //  CHECK-COUNT-4:   vector.transfer_write {{.+}} : vector<4x1xf16>
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+hal.executable @matmul_256x256x256_f16_f32 {
+hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
+      target_arch = "gfx1100",
+      mma_intrinsics = [#iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>]
+  }>) {
+  hal.executable.export @matmul_256x256x256_f16_f32 layout(#pipeline_layout) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
+      hal.return %x, %y, %z : index, index, index
+    }
+  builtin.module {
+    func.func @matmul_256x256x256_f16_f32() {
+      %cst = arith.constant 0.000000e+00 : f32
+      %c0 = arith.constant 0 : index
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<256x256xf16>>
+      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<256x256xf16>>
+      %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<256x256xf32>>
+      %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [256, 256], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<256x256xf16>> -> tensor<256x256xf16>
+      %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [256, 256], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<256x256xf16>> -> tensor<256x256xf16>
+      %5 = tensor.empty() : tensor<256x256xf32>
+      %6 = linalg.fill ins(%cst : f32) outs(%5 : tensor<256x256xf32>) -> tensor<256x256xf32>
+      %7 = linalg.matmul ins(%3, %4 : tensor<256x256xf16>, tensor<256x256xf16>) outs(%6 : tensor<256x256xf32>) -> tensor<256x256xf32>
+      flow.dispatch.tensor.store %7, %2, offsets = [0, 0], sizes = [256, 256], strides = [1, 1] : tensor<256x256xf32> -> !flow.dispatch.tensor<writeonly:tensor<256x256xf32>>
+      return
+    }
+  }
+}
+}
+
+//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [64, 2, 1] subgroup_size = 32
+//  CHECK-SAME:   mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>,
+//  CHECK-SAME:     subgroup_m_count = 2, subgroup_n_count = 2, subgroup_m_tile_count = 2, subgroup_n_tile_count = 2, subgroup_k_tile_count = 8>
+
+
+//    CHECK-LABEL: func.func @matmul_256x256x256_f16_f32
+//     CHECK-SAME:    translation_info = #[[$TRANSLATION]]
+//          CHECK:   scf.for {{.*}} = %c0 to %c256 step %c128 iter_args({{.*}}) -> (vector<2x2x8x1x1x1xf32>)
+// Each subgroup handles 2 * 2 tiles, and for each tile we accumulate 8 times
+// along the K dimension. So in total 32 wmma ops.
+// CHECK-COUNT-32:     amdgpu.wmma {{.*}} : vector<16xf16>, vector<16xf16>, vector<8xf32>
+//          CHECK:     scf.yield %{{.+}} : vector<2x2x8x1x1x1xf32>
+//  Since each subgroup handles 2 * 2 tiles, and for each tile, each lane holds 4 values.
+//  we will have 32 writes. We cannot do contiguous writes since the outputs columns has interleaved
+//  thread ids.
+//  CHECK-COUNT-32:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<1x1xf32>, memref<256x256xf32, #hal.descriptor_type<storage_buffer>>

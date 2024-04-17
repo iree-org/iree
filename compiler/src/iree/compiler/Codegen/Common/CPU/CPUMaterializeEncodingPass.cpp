@@ -133,6 +133,30 @@ enumerateMatmulTileArm64(TypeRange elementTypes, ExecutableTargetAttr target) {
     }
   }
 
+  if (hasUkernel(target) && lhs.isSignlessInteger(8) &&
+      rhs.isSignlessInteger(4) && out.isSignlessInteger(32)) {
+    if (hasFeature(target, "+i8mm")) {
+      return {
+          TileMxNxK{4, 8, 16},
+          TileMxNxK{2, 8, 16},
+          TileMxNxK{1, 8, 16},
+      };
+    }
+    if (hasFeature(target, "+dotprod")) {
+      return {
+          TileMxNxK{8, 8, 8},
+          TileMxNxK{4, 8, 8},
+          TileMxNxK{2, 8, 8},
+          TileMxNxK{1, 8, 8},
+      };
+    }
+    return {
+        TileMxNxK{4, 16, 2},
+        TileMxNxK{2, 16, 2},
+        TileMxNxK{1, 16, 2},
+    };
+  }
+
   if (!hasUkernel(target)) {
     if (lhs.isSignlessInteger(8) && rhs.isSignlessInteger(8) &&
         (out.isSignlessInteger(32) || out.isF32())) {

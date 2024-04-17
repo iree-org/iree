@@ -8,7 +8,6 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -18,6 +17,9 @@
 #include "mlir/Transforms/RegionUtils.h"
 
 namespace mlir::iree_compiler::IREE::Flow {
+
+#define GEN_PASS_DEF_CONVERTREGIONTOWORKGROUPSPASS
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
 
 namespace {
 
@@ -51,9 +53,9 @@ findFirstTiedValueOutsideOfRegionOp(IREE::Flow::DispatchRegionOp regionOp,
                                     Value value) {
   // Check if `v` is defined outside of `regionOp`.
   auto isOutside = [&](Value v) {
-    if (llvm::isa<OpResult>(v))
+    if (isa<OpResult>(v))
       return !regionOp->isAncestor(v.getDefiningOp());
-    assert(v.isa<BlockArgument>() && "expected bbArg");
+    assert(isa<BlockArgument>(v) && "expected bbArg");
     // DispatchRegionOp does not have block arguments.
     return true;
   };
@@ -167,9 +169,9 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
     rewriter.inlineRegionBefore(regionOp.getWorkgroupCount(),
                                 workgroupsOp.getWorkgroupCount(),
                                 workgroupsOp.getWorkgroupCount().begin());
-    mlir::makeRegionIsolatedFromAbove(
-        rewriter, workgroupsOp.getWorkgroupCount(),
-        [](Operation *op) { return isa<arith::ConstantOp>(op); });
+    mlir::makeRegionIsolatedFromAbove(rewriter,
+                                      workgroupsOp.getWorkgroupCount(),
+                                      llvm::IsaPred<arith::ConstantOp>);
   }
 
   IRMapping bvm;
@@ -256,11 +258,8 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
 
 namespace {
 struct ConvertRegionToWorkgroupsPass
-    : public ConvertRegionToWorkgroupsBase<ConvertRegionToWorkgroupsPass> {
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Flow::FlowDialect, tensor::TensorDialect>();
-  }
-
+    : public IREE::Flow::impl::ConvertRegionToWorkgroupsPassBase<
+          ConvertRegionToWorkgroupsPass> {
   void runOnOperation() override {
     SmallVector<IREE::Flow::DispatchRegionOp> ops;
     getOperation()->walk(
@@ -278,9 +277,5 @@ struct ConvertRegionToWorkgroupsPass
 };
 
 } // namespace
-
-std::unique_ptr<Pass> createConvertRegionToWorkgroupsPass() {
-  return std::make_unique<ConvertRegionToWorkgroupsPass>();
-}
 
 } // namespace mlir::iree_compiler::IREE::Flow

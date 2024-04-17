@@ -125,7 +125,7 @@ ExecutableLibraryDI::getConstOf(LLVM::DITypeAttr typeAttr) {
   return LLVM::DIDerivedTypeAttr::get(
       builder.getContext(), llvm::dwarf::DW_TAG_const_type,
       /*name=*/nullptr, typeAttr, /*sizeInBits=*/0, /*alignInBits=*/0,
-      /*offsetInBits=*/0);
+      /*offsetInBits=*/0, /*extraData=*/nullptr);
 }
 
 LLVM::DIDerivedTypeAttr
@@ -134,13 +134,14 @@ ExecutableLibraryDI::getPtrOf(LLVM::DITypeAttr typeAttr) {
       builder.getContext(), llvm::dwarf::DW_TAG_pointer_type,
       /*name=*/nullptr, typeAttr, /*sizeInBits=*/ptrBitwidth,
       /*alignInBits=*/0,
-      /*offsetInBits=*/0);
+      /*offsetInBits=*/0,
+      /*extraData=*/nullptr);
 }
 
 LLVM::DICompositeTypeAttr
 ExecutableLibraryDI::getArrayOf(LLVM::DITypeAttr typeAttr, int64_t count) {
   return LLVM::DICompositeTypeAttr::get(
-      builder.getContext(), llvm::dwarf::DW_TAG_array_type,
+      builder.getContext(), llvm::dwarf::DW_TAG_array_type, /*recId=*/{},
       /*name=*/builder.getStringAttr(""), fileAttr,
       /*line=*/227, fileAttr,
       /*baseType=*/typeAttr, LLVM::DIFlags::Zero,
@@ -159,7 +160,7 @@ ExecutableLibraryDI::getTypedefOf(StringRef name, LLVM::DITypeAttr typeAttr) {
   return LLVM::DIDerivedTypeAttr::get(
       builder.getContext(), llvm::dwarf::DW_TAG_typedef,
       builder.getStringAttr(name), typeAttr, /*sizeInBits=*/0,
-      /*alignInBits=*/0, /*offsetInBits=*/0);
+      /*alignInBits=*/0, /*offsetInBits=*/0, /*extraData=*/nullptr);
 }
 
 LLVM::DIDerivedTypeAttr
@@ -172,7 +173,7 @@ ExecutableLibraryDI::getMemberOf(StringRef name, LLVM::DITypeAttr typeAttr,
       builder.getContext(), llvm::dwarf::DW_TAG_member,
       builder.getStringAttr(name), typeAttr,
       /*sizeInBits=*/memberSizeInBits, /*alignInBits=*/0,
-      /*offsetInBits=*/memberOffsetInBits);
+      /*offsetInBits=*/memberOffsetInBits, /*extraData=*/nullptr);
 }
 
 LLVM::DITypeAttr ExecutableLibraryDI::getBasicType(Type type) {
@@ -214,7 +215,7 @@ LLVM::DITypeAttr ExecutableLibraryDI::getBasicType(Type type) {
 LLVM::DICompositeTypeAttr ExecutableLibraryDI::getProcessorV0T() {
   unsigned offsetInBits = 0;
   return LLVM::DICompositeTypeAttr::get(
-      builder.getContext(), llvm::dwarf::DW_TAG_structure_type,
+      builder.getContext(), llvm::dwarf::DW_TAG_structure_type, /*recId=*/{},
       builder.getStringAttr("iree_hal_processor_v0_t"), fileAttr,
       /*line=*/227, fileAttr,
       /*baseType=*/nullptr, LLVM::DIFlags::Zero, /*sizeInBits=*/512,
@@ -230,6 +231,7 @@ LLVM::DIDerivedTypeAttr ExecutableLibraryDI::getEnvironmentV0T() {
       "iree_hal_executable_environment_v0_t",
       LLVM::DICompositeTypeAttr::get(
           builder.getContext(), llvm::dwarf::DW_TAG_structure_type,
+          /*recId=*/{},
           builder.getStringAttr("iree_hal_executable_environment_v0_t"),
           fileAttr,
           /*line=*/246, fileAttr,
@@ -255,6 +257,7 @@ LLVM::DIDerivedTypeAttr ExecutableLibraryDI::getDispatchStateV0T() {
       "iree_hal_executable_dispatch_state_v0_t",
       LLVM::DICompositeTypeAttr::get(
           builder.getContext(), llvm::dwarf::DW_TAG_structure_type,
+          /*recId=*/{},
           builder.getStringAttr("iree_hal_executable_dispatch_state_v0_t"),
           fileAttr, /*line=*/275, fileAttr,
           /*baseType=*/nullptr, LLVM::DIFlags::Zero, /*sizeInBits=*/384,
@@ -288,6 +291,7 @@ LLVM::DIDerivedTypeAttr ExecutableLibraryDI::getWorkgroupStateV0T() {
       "iree_hal_executable_workgroup_state_v0_t",
       LLVM::DICompositeTypeAttr::get(
           builder.getContext(), llvm::dwarf::DW_TAG_structure_type,
+          /*recId=*/{},
           builder.getStringAttr("iree_hal_executable_workgroup_state_v0_t"),
           fileAttr, /*line=*/321, fileAttr,
           /*baseType=*/nullptr, LLVM::DIFlags::Zero, /*sizeInBits=*/256,
@@ -499,8 +503,8 @@ HALDispatchABI::buildScopeAttr(mlir::ModuleOp moduleOp,
       LLVM::DIFileAttr::get(context, llvm::sys::path::filename(inputFilePath),
                             llvm::sys::path::parent_path(inputFilePath));
   auto compileUnitAttr = LLVM::DICompileUnitAttr::get(
-      context, DistinctAttr::create(UnitAttr::get(context)),
-      llvm::dwarf::DW_LANG_C17, fileAttr, builder.getStringAttr("IREE"),
+      DistinctAttr::create(UnitAttr::get(context)), llvm::dwarf::DW_LANG_C17,
+      fileAttr, builder.getStringAttr("IREE"),
       /*isOptimized=*/true, LLVM::DIEmissionKind::Full);
 
   auto int32TypeAttr =

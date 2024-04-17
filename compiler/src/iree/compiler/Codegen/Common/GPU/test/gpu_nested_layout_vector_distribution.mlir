@@ -363,6 +363,46 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // -----
 
+#layout = #iree_vector_ext.nested_layout<
+  subgroups_per_workgroup = [2],
+  batches_per_subgroup    = [1],
+  outers_per_batch        = [1],
+  threads_per_outer       = [16],
+  elements_per_thread     = [4],
+
+  subgroup_basis          = [2, 2],
+  subgroup_active_ids     = [false, true],
+  thread_basis            = [4, 16],
+  thread_active_ids       = [false, true]
+>
+
+// CHECK-DAG: #[[$MAP:.+]] = affine_map<()[s0, s1] -> (s0 * 64 + s1 * 4)>
+
+// CHECK-LABEL: @distribute_transfer_read_broadcast
+func.func @distribute_transfer_read_broadcast(%arg0: memref<32x128xf16>) -> vector<128xf16> {
+  %c0 = arith.constant 0 : index
+  %cst = arith.constant 0.0 : f16
+  %root = vector.transfer_read %arg0[%c0, %c0], %cst
+          {in_bounds = [true],
+           "__vector_layout_test_anchor_result_0" = #layout}
+                  : memref<32x128xf16>, vector<128xf16>
+  func.return %root : vector<128xf16>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK: %[[IDS:.+]]:4 = affine.delinearize_index %{{.*}} into (%c2, %c2, %c4, %c16) : index, index, index, index
+// CHECK: %[[LANEY:.+]] = affine.apply #[[$MAP]]()[%[[IDS]]#1, %[[IDS]]#3]
+// CHECK: %[[RD:.+]] = vector.transfer_read %{{.*}}[%c0, %[[LANEY:.+]]], {{.*}} : memref<32x128xf16>, vector<4xf16>
+
+// -----
+
 #layout_row_major = #iree_vector_ext.nested_layout<
   subgroups_per_workgroup = [1, 1],
   batches_per_subgroup    = [2, 2],
@@ -879,3 +919,86 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK: math.sqrt %{{.*}} : vector<2x4x2x1x2x2xf16>
 // CHECK: iree_vector_ext.to_simd %{{.*}} : vector<2x4x2x1x2x2xf16> -> vector<256x64xf16>
 // CHECK: return {{.*}}#[[$LAYOUT]]
+
+// -----
+
+#layout = #iree_vector_ext.nested_layout<
+  subgroups_per_workgroup = [2, 1, 1],
+  batches_per_subgroup = [1, 2, 4],
+  outers_per_batch = [1, 1, 1],
+  threads_per_outer = [4, 8, 2],
+  elements_per_thread = [4, 1, 2],
+
+  subgroup_basis = [2, 1, 1],
+  thread_basis   = [4, 8, 2]
+>
+
+func.func @transpose_3d(%arr: memref<32x32x32xf16>) -> () {
+  %c0 = arith.constant 0 : index
+  %cst_0 = arith.constant 0.0 : f16
+  %cst0_1 = arith.constant dense<0.0> : vector<16xf16>
+  %root = vector.transfer_read %arr[%c0, %c0, %c0], %cst_0 {
+    in_bounds = [true, true, true],
+    "__vector_layout_test_anchor_result_0" = #layout
+  } : memref<32x32x32xf16>, vector<32x16x16xf16>
+  %t = vector.transpose %root, [1, 2, 0] : vector<32x16x16xf16> to vector<16x16x32xf16>
+  vector.transfer_write %t, %arr[%c0, %c0, %c0] {in_bounds = [true, true, true]} : vector<16x16x32xf16>, memref<32x32x32xf16>
+  func.return
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK: #[[$MAP:.+]] = affine_map<()[s0, s1] -> (s0 * 16 + s1 * 4)>
+// CHECK: #[[$MAP1:.+]] = affine_map<()[s0] -> (s0 * 2)>
+// CHECK: #[[$MAP2:.+]] = affine_map<()[s0] -> (s0 * 2 + 4)>
+// CHECK: #[[$MAP3:.+]] = affine_map<()[s0] -> (s0 * 2 + 8)>
+// CHECK: #[[$MAP4:.+]] = affine_map<()[s0] -> (s0 * 2 + 12)>
+// CHECK: #[[$MAP5:.+]] = affine_map<()[s0] -> (s0 + 8)>
+
+// CHECK-LABEL: func @transpose_3d
+// CHECK:         %[[IDS:.+]]:6 = affine.delinearize_index %{{.*}} into (%c2, %c1, %c1, %c4, %c8, %c2)
+
+// CHECK:         %[[DIM0_ID:.+]] = affine.apply #[[$MAP]]()[%[[IDS]]#0, %[[IDS]]#3]
+// CHECK:         %[[DIM2_ID0:.+]] = affine.apply #[[$MAP1]]()[%[[IDS]]#5]
+// CHECK:         %[[RD0:.+]] = vector.transfer_read %arg0[%[[DIM0_ID]], %[[IDS]]#4, %[[DIM2_ID0]]], {{.*}} : memref<32x32x32xf16>, vector<4x1x2xf16>
+// CHECK:         %[[DIM2_ID1:.+]] = affine.apply #[[$MAP2]]()[%[[IDS]]#5]
+// CHECK:         %[[RD1:.+]] = vector.transfer_read %arg0[%[[DIM0_ID]], %[[IDS]]#4, %[[DIM2_ID1]]]
+// CHECK:         %[[DIM2_ID2:.+]] = affine.apply #[[$MAP3]]()[%[[IDS]]#5]
+// CHECK:         %[[RD2:.+]] = vector.transfer_read %arg0[%[[DIM0_ID]], %[[IDS]]#4, %[[DIM2_ID2]]]
+// CHECK:         %[[DIM2_ID3:.+]] = affine.apply #[[$MAP4]]()[%[[IDS]]#5]
+// CHECK:         %[[RD3:.+]] = vector.transfer_read %arg0[%[[DIM0_ID]], %[[IDS]]#4, %[[DIM2_ID3]]]
+// CHECK:         %[[DIM2_ID4:.+]] = affine.apply #[[$MAP5]]()[%[[IDS]]#4]
+// CHECK:         %[[RD4:.+]] = vector.transfer_read %arg0[%[[DIM0_ID]], %[[DIM2_ID4]], %[[DIM2_ID0]]]
+// CHECK:         %[[RD5:.+]] = vector.transfer_read %arg0[%[[DIM0_ID]], %[[DIM2_ID4]], %[[DIM2_ID1]]]
+// CHECK:         %[[RD6:.+]] = vector.transfer_read %arg0[%[[DIM0_ID]], %[[DIM2_ID4]], %[[DIM2_ID2]]]
+// CHECK:         %[[RD7:.+]] = vector.transfer_read %arg0[%[[DIM0_ID]], %[[DIM2_ID4]], %[[DIM2_ID3]]]
+
+// CHECK:         %[[T0:.+]] = vector.transpose %[[RD0]], [1, 2, 0] : vector<4x1x2xf16> to vector<1x2x4xf16>
+// CHECK:         vector.transfer_write %[[T0]], %arg0[%[[IDS]]#4, %[[DIM2_ID0]], %[[DIM0_ID]]] {{.*}} : vector<1x2x4xf16>, memref<32x32x32xf16>
+
+// CHECK:         %[[T1:.+]] = vector.transpose %[[RD4]], [1, 2, 0] : vector<4x1x2xf16> to vector<1x2x4xf16>
+// CHECK:         vector.transfer_write %[[T1]], %arg0[%[[DIM2_ID4]], %[[DIM2_ID0]], %[[DIM0_ID]]]
+
+// CHECK:         %[[T2:.+]] = vector.transpose %[[RD1]], [1, 2, 0] : vector<4x1x2xf16> to vector<1x2x4xf16>
+// CHECK:         vector.transfer_write %[[T2]], %arg0[%[[IDS]]#4, %[[DIM2_ID1]], %[[DIM0_ID]]]
+
+// CHECK:         %[[T3:.+]] = vector.transpose %[[RD5]], [1, 2, 0] : vector<4x1x2xf16> to vector<1x2x4xf16>
+// CHECK:         vector.transfer_write %[[T3]], %arg0[%[[DIM2_ID4]], %[[DIM2_ID1]], %[[DIM0_ID]]]
+
+// CHECK:         %[[T4:.+]] = vector.transpose %[[RD2]], [1, 2, 0] : vector<4x1x2xf16> to vector<1x2x4xf16>
+// CHECK:         vector.transfer_write %[[T4]], %arg0[%[[IDS]]#4, %[[DIM2_ID2]], %[[DIM0_ID]]]
+
+// CHECK:         %[[T5:.+]] = vector.transpose %[[RD6]], [1, 2, 0] : vector<4x1x2xf16> to vector<1x2x4xf16>
+// CHECK:         vector.transfer_write %[[T5]], %arg0[%[[DIM2_ID4]], %[[DIM2_ID2]], %[[DIM0_ID]]]
+
+// CHECK:         %[[T6:.+]] = vector.transpose %[[RD3]], [1, 2, 0] : vector<4x1x2xf16> to vector<1x2x4xf16>
+// CHECK:         vector.transfer_write %[[T6]], %arg0[%[[IDS]]#4, %[[DIM2_ID3]], %[[DIM0_ID]]]
+
+// CHECK:         %[[T7:.+]] = vector.transpose %[[RD7]], [1, 2, 0] : vector<4x1x2xf16> to vector<1x2x4xf16>
+// CHECK:         vector.transfer_write %[[T7]], %arg0[%[[DIM2_ID4]], %[[DIM2_ID3]], %[[DIM0_ID]]]

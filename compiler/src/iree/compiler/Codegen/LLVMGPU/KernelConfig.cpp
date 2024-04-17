@@ -69,6 +69,9 @@ namespace {
 constexpr StringLiteral kCudaTarget = "cuda";
 constexpr StringLiteral kRocmTarget = "rocm";
 
+// Threshold used to determine whether a matmul dimension is 'very skinny'.
+constexpr int64_t kVerySkinnyDimThreshold = 4;
+
 /// Structure to represent target features.
 struct TargetInfo {
   // TODO: add finer grain control for other tensorcore types.
@@ -77,6 +80,7 @@ struct TargetInfo {
   bool hasMmaSync = false;
   // These are listed in the order of preference, not necessarily monotonically.
   SmallVector<int64_t, 2> supportedSubgroupSizes = {32};
+  int64_t sharedMemoryLimitInBytes = 65536;
 };
 
 struct TileWorkgroupSizePair {
@@ -97,19 +101,29 @@ constexpr unsigned softwarePipelineDepthSimt = 0;
 
 /// Return the best combination of tile size and wg size. It will then used to
 /// pick the best size aligned with the shape dimension.
-static void getMatmulConfig(SmallVectorImpl<TileWorkgroupSizePair> &tileSizes) {
+static SmallVector<TileWorkgroupSizePair>
+getMatmulConfig(const TargetInfo &targetInfo) {
+  SmallVector<TileWorkgroupSizePair> tileSizes;
   // Pick tile size so that M*K and K*N dividible by wgSize * \*vecSize=*\4.
   // This way workgroup memory copy don't need to be masked. Once we support
   // masked load we can get performance out of more configuration.
-  tileSizes.push_back(TileWorkgroupSizePair({{32, 128, 32}, {32, 8, 1}, 1}));
-  tileSizes.push_back(TileWorkgroupSizePair({{128, 64, 8}, {16, 8, 1}, 1}));
-  tileSizes.push_back(TileWorkgroupSizePair({{16, 256, 32}, {64, 2, 1}, 1}));
-  tileSizes.push_back(TileWorkgroupSizePair({{8, 32, 32}, {8, 8, 1}, 1}));
 
-  tileSizes.push_back(TileWorkgroupSizePair({{32, 128, 4}, {32, 8, 1}, 1}));
-  tileSizes.push_back(TileWorkgroupSizePair({{8, 128, 4}, {32, 1, 1}, 1}));
-  tileSizes.push_back(TileWorkgroupSizePair({{16, 64, 4}, {16, 2, 1}, 1}));
-  tileSizes.push_back(TileWorkgroupSizePair({{1, 128, 8}, {32, 1, 1}, 1}));
+  // Make use of the full subgroup when possible.
+  if (targetInfo.supportedSubgroupSizes.front() == 64) {
+    tileSizes.push_back(TileWorkgroupSizePair({{64, 128, 64}, {64, 16, 1}, 1}));
+  }
+
+  llvm::append_values(tileSizes,
+                      TileWorkgroupSizePair({{32, 128, 32}, {32, 8, 1}, 1}),
+                      TileWorkgroupSizePair({{128, 64, 8}, {16, 8, 1}, 1}),
+                      TileWorkgroupSizePair({{16, 256, 32}, {64, 2, 1}, 1}),
+                      TileWorkgroupSizePair({{8, 32, 32}, {8, 8, 1}, 1}),
+
+                      TileWorkgroupSizePair({{32, 128, 4}, {32, 8, 1}, 1}),
+                      TileWorkgroupSizePair({{8, 128, 4}, {32, 1, 1}, 1}),
+                      TileWorkgroupSizePair({{16, 64, 4}, {16, 2, 1}, 1}),
+                      TileWorkgroupSizePair({{1, 128, 8}, {32, 1, 1}, 1}));
+  return tileSizes;
 }
 
 /// Return the best combination of tile size and wg size when using tensorcore
@@ -135,17 +149,17 @@ getTensorCoreConfig(SmallVectorImpl<TileWorkgroupSizePair> &tileSizes,
       tileSizes.push_back(
           TileWorkgroupSizePair({{128, 256, 16}, {128, 2, 1}, 4}));
     }
-    tileSizes.push_back(TileWorkgroupSizePair({{32, 32, 16}, {64, 2, 1}, 4}));
-    tileSizes.push_back(TileWorkgroupSizePair({{16, 32, 16}, {64, 1, 1}, 4}));
-    tileSizes.push_back(TileWorkgroupSizePair({{32, 16, 16}, {32, 2, 1}, 4}));
-    tileSizes.push_back(TileWorkgroupSizePair({{16, 16, 16}, {32, 1, 1}, 4}));
+    llvm::append_values(tileSizes,
+                        TileWorkgroupSizePair({{32, 32, 16}, {64, 2, 1}, 4}),
+                        TileWorkgroupSizePair({{16, 32, 16}, {64, 1, 1}, 4}),
+                        TileWorkgroupSizePair({{32, 16, 16}, {32, 2, 1}, 4}),
+                        TileWorkgroupSizePair({{16, 16, 16}, {32, 1, 1}, 4}));
   }
 }
 
+// Get the target arch associated with the immediate parent.
 static StringRef getTargetArch(mlir::FunctionOpInterface entryPoint) {
-  if (auto variantOp =
-          entryPoint->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
-    IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.getTarget();
+  if (auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPoint)) {
     if (auto config = targetAttr.getConfiguration()) {
       if (auto attr = config.getAs<StringAttr>("target_arch")) {
         return attr.getValue();
@@ -156,9 +170,7 @@ static StringRef getTargetArch(mlir::FunctionOpInterface entryPoint) {
 }
 
 bool isCudaTarget(mlir::FunctionOpInterface entryPoint) {
-  if (auto variantOp =
-          entryPoint->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
-    IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.getTarget();
+  if (auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPoint)) {
     if (auto backend = targetAttr.getBackend()) {
       return backend.getValue().str() == kCudaTarget;
     }
@@ -167,9 +179,7 @@ bool isCudaTarget(mlir::FunctionOpInterface entryPoint) {
 }
 
 bool isRocmTarget(mlir::FunctionOpInterface entryPoint) {
-  if (auto variantOp =
-          entryPoint->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
-    IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.getTarget();
+  if (auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPoint)) {
     if (auto backend = targetAttr.getBackend()) {
       return backend.getValue().str() == kRocmTarget;
     }
@@ -182,6 +192,7 @@ static TargetInfo getCudaTargetInfo(mlir::FunctionOpInterface entryPoint) {
   // All the cuda target are assumed to have warp support.
   info.hasWarpShuffle = true;
   info.supportedSubgroupSizes = {32};
+  info.sharedMemoryLimitInBytes = 163 * 1024;
   StringRef targetName = getTargetArch(entryPoint);
   // If no target name is set assume all the features are off.
   if (targetName == "")
@@ -207,6 +218,7 @@ static TargetInfo getCudaTargetInfo(mlir::FunctionOpInterface entryPoint) {
 static TargetInfo getRocmTargetInfo(mlir::FunctionOpInterface entryPoint) {
   TargetInfo info;
   StringRef targetName = getTargetArch(entryPoint);
+  info.sharedMemoryLimitInBytes = 65536;
   // If no target name is set assume all the features are off.
   if (targetName.empty())
     return info;
@@ -315,12 +327,14 @@ setConvolutionVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   if (targetInfo.supportedSubgroupSizes.empty()) {
     return failure();
   }
-  const int64_t subgroupSize = targetInfo.supportedSubgroupSizes.front();
+  const int64_t targetSubgroupSize = targetInfo.supportedSubgroupSizes.front();
 
   SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
   FailureOr<mlir::linalg::ConvolutionDimensions> convolutionDims =
       mlir::linalg::inferConvolutionDims(op);
-  assert(succeeded(convolutionDims) && "Could not infer contraction dims");
+  if (failed(convolutionDims)) {
+    return failure();
+  }
 
   // This strategy turns non-strided/dilated convolution problems into matmul
   // problems by tiling certain dimensions to 1:
@@ -334,8 +348,8 @@ setConvolutionVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   //  - The input channel dimension, corresponding to the K dimension.
 
   // TODO: Relax this condition to strictly alignment requirements.
-  if (convolutionDims->outputChannel.size() != 1 ||
-      convolutionDims->inputChannel.size() != 1 ||
+  if (convolutionDims->outputChannel.size() < 1 ||
+      convolutionDims->inputChannel.size() < 1 ||
       convolutionDims->filterLoop.size() < 1 ||
       convolutionDims->outputImage.size() < 1 ||
       convolutionDims->depth.size() != 0) {
@@ -353,13 +367,13 @@ setConvolutionVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   }
 
   int64_t mDim = convolutionDims->outputImage.back();
-  int64_t nDim = convolutionDims->outputChannel.front();
+  int64_t nDim = convolutionDims->outputChannel.back();
   // TODO: Support NCHW convolutions. This is just a matmul_transpose_a, however
   // the distribution patterns currently do not support that variant.
   if (mDim > nDim) {
     return failure();
   }
-  int64_t kDim = convolutionDims->inputChannel.front();
+  int64_t kDim = convolutionDims->inputChannel.back();
 
   Value lhs = op.getDpsInputOperand(0)->get();
   Value rhs = op.getDpsInputOperand(1)->get();
@@ -372,14 +386,19 @@ setConvolutionVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   GPUMatmulShapeType problem{bounds[mDim], bounds[nDim], bounds[kDim],
                              lhsElemType,  rhsElemType,  initElemType};
 
-  auto mmaAttrs = llvm::to_vector(mmaKinds->getAsRange<IREE::GPU::MmaAttr>());
+  auto mmaAttrs =
+      llvm::to_vector(mmaKinds->getAsRange<IREE::GPU::MmaInterfaceAttr>());
   SmallVector<GPUMatmulShapeType> intrinsics;
   intrinsics.reserve(mmaKinds->size());
   for (auto mma : mmaAttrs) {
     auto [mSize, nSize, kSize] = mma.getMNKShape();
     auto [aType, bType, cType] = mma.getABCElementTypes();
+    if (mma.getSubgroupSize() != targetSubgroupSize)
+      continue;
     intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType);
   }
+  if (intrinsics.empty())
+    return failure();
 
   // Note that the following heuristic seeds are just placeholder values.
   // We need to clean it up and make it adjusting to different targets.
@@ -388,20 +407,23 @@ setConvolutionVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
                              /*bestMNTileCountPerSubgroup=*/8,
                              /*bestKTileCountPerSubgroup=*/2};
 
+  int64_t sharedMemoryLimitInBytes = targetInfo.sharedMemoryLimitInBytes;
+
   // First try to find a schedule with an exactly matching intrinsic.
-  std::optional<GPUMMASchedule> schedule =
-      deduceMMASchedule(problem, intrinsics, seeds);
-  if (!schedule) {
+  FailureOr<GPUMMASchedule> schedule =
+      deduceMMASchedule(problem, intrinsics, seeds, sharedMemoryLimitInBytes);
+  if (failed(schedule)) {
     // Then try again by allowing upcasting accumulator.
     schedule =
-        deduceMMASchedule(problem, intrinsics, seeds, /*canUpcastAcc=*/true);
+        deduceMMASchedule(problem, intrinsics, seeds, sharedMemoryLimitInBytes,
+                          /*canUpcastAcc=*/true);
   }
-  if (!schedule) {
+  if (failed(schedule)) {
     return failure();
   }
 
-  std::array<int64_t, 3> workgroupSize{schedule->nWarpCount * subgroupSize,
-                                       schedule->mWarpCount, 1};
+  std::array<int64_t, 3> workgroupSize{
+      schedule->nWarpCount * targetSubgroupSize, schedule->mWarpCount, 1};
 
   SmallVector<int64_t> workgroupTileSizes(op.getNumLoops(), 0);
   // Tile all batch dimensions with unit size.
@@ -411,6 +433,12 @@ setConvolutionVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   // Tile all output image dimensions with unit size except the last one.
   for (int64_t oi : llvm::drop_end(convolutionDims->outputImage)) {
     workgroupTileSizes[oi] = 1;
+  }
+  for (int64_t oc : llvm::drop_end(convolutionDims->outputChannel)) {
+    workgroupTileSizes[oc] = 1;
+  }
+  for (int64_t ic : llvm::drop_end(convolutionDims->inputChannel)) {
+    workgroupTileSizes[ic] = 1;
   }
   // Compute the M/N dimension tile size by multiply subgroup information.
   workgroupTileSizes[mDim] =
@@ -445,7 +473,7 @@ setConvolutionVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, tileSizes,
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorDistribute,
-      workgroupSize, subgroupSize, configDict);
+      workgroupSize, targetSubgroupSize, configDict);
 }
 
 static LogicalResult
@@ -462,7 +490,7 @@ setMatmulVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   if (targetInfo.supportedSubgroupSizes.empty()) {
     return failure();
   }
-  const int64_t subgroupSize = targetInfo.supportedSubgroupSizes.front();
+  const int64_t targetSubgroupSize = targetInfo.supportedSubgroupSizes.front();
 
   SmallVector<int64_t, 4> bounds = op.getStaticLoopRanges();
   FailureOr<mlir::linalg::ContractionDimensions> contractionDims =
@@ -498,14 +526,19 @@ setMatmulVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   GPUMatmulShapeType problem{bounds[mDim], bounds[nDim], bounds[kDim],
                              lhsElemType,  rhsElemType,  initElemType};
 
-  auto mmaAttrs = llvm::to_vector(mmaKinds->getAsRange<IREE::GPU::MmaAttr>());
+  auto mmaAttrs =
+      llvm::to_vector(mmaKinds->getAsRange<IREE::GPU::MmaInterfaceAttr>());
   SmallVector<GPUMatmulShapeType> intrinsics;
   intrinsics.reserve(mmaKinds->size());
   for (auto mma : mmaAttrs) {
     auto [mSize, nSize, kSize] = mma.getMNKShape();
     auto [aType, bType, cType] = mma.getABCElementTypes();
+    if (mma.getSubgroupSize() != targetSubgroupSize)
+      continue;
     intrinsics.emplace_back(mSize, nSize, kSize, aType, bType, cType);
   }
+  if (intrinsics.empty())
+    return failure();
 
   GPUMMAHeuristicSeeds seeds;
 
@@ -525,20 +558,23 @@ setMatmulVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
              /*bestKTileCountPerSubgroup=*/4};
   }
 
+  int64_t sharedMemoryLimitInBytes = targetInfo.sharedMemoryLimitInBytes;
+
   // First try to find a schedule with an exactly matching intrinsic.
   std::optional<GPUMMASchedule> schedule =
-      deduceMMASchedule(problem, intrinsics, seeds);
+      deduceMMASchedule(problem, intrinsics, seeds, sharedMemoryLimitInBytes);
   if (!schedule) {
     // Then try again by allowing upcasting accumulator.
     schedule =
-        deduceMMASchedule(problem, intrinsics, seeds, /*canUpcastAcc=*/true);
+        deduceMMASchedule(problem, intrinsics, seeds, sharedMemoryLimitInBytes,
+                          /*canUpcastAcc=*/true);
   }
   if (!schedule) {
     return failure();
   }
 
-  std::array<int64_t, 3> workgroupSize{schedule->nWarpCount * subgroupSize,
-                                       schedule->mWarpCount, 1};
+  std::array<int64_t, 3> workgroupSize{
+      schedule->nWarpCount * targetSubgroupSize, schedule->mWarpCount, 1};
 
   SmallVector<int64_t> workgroupTileSizes(op.getNumLoops(), 0);
   // Tile all batch dimensions with unit size.
@@ -586,7 +622,7 @@ setMatmulVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, tileSizes,
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorDistribute,
-      workgroupSize, subgroupSize, configDict);
+      workgroupSize, targetSubgroupSize, configDict);
 }
 
 static LogicalResult
@@ -596,7 +632,7 @@ setVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   if (linalg::isaContractionOpInterface(linalgOp)) {
     return setMatmulVectorDistributionConfig(entryPoint, linalgOp, targetInfo);
   }
-  if (isa<linalg::ConvolutionOpInterface>(*linalgOp)) {
+  if (linalg::isaConvolutionOpInterface(linalgOp)) {
     return setConvolutionVectorDistributionConfig(entryPoint, linalgOp,
                                                   targetInfo);
   }
@@ -638,6 +674,24 @@ static LogicalResult setContractConfig(mlir::FunctionOpInterface entryPoint,
   if (llvm::any_of(op.getIndexingMapsArray(),
                    [](AffineMap m) { return m.isPermutation(); })) {
     return failure();
+  }
+
+  // Send very skinny, {2-4}xNxK and Mx{2-4}xK, matmuls to the vector reduction
+  // pipeline, similar to matvec. Note: Because of reassociation in the vector
+  // reduction pipeline, this may lead to precission loss. If this ever becomes
+  // an issue, we can hide this behind a flag.
+  if (llvm::all_equal({contractionDims->m.size(), contractionDims->n.size(),
+                       contractionDims->k.size(), size_t{1}}) &&
+      contractionDims->batch.empty()) {
+    int64_t mSize = bounds[contractionDims->m.front()];
+    int64_t nSize = bounds[contractionDims->n.front()];
+    int64_t preferredSubgroupSize = targetInfo.supportedSubgroupSizes.front();
+    if ((mSize <= kVerySkinnyDimThreshold &&
+         (nSize > preferredSubgroupSize || ShapedType::isDynamic(nSize))) ||
+        (nSize <= kVerySkinnyDimThreshold &&
+         (mSize > preferredSubgroupSize || ShapedType::isDynamic(mSize)))) {
+      return failure();
+    }
   }
 
   // TODO: Properly rematerialize leading elementwise with shared memory
@@ -753,10 +807,10 @@ static LogicalResult setContractConfig(mlir::FunctionOpInterface entryPoint,
           softwarePipelineDepthSimt,
           IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt);
     }
-    // simt matmul case
-    SmallVector<TileWorkgroupSizePair> tileSizeConfig;
-    // Query the best configuration.
-    getMatmulConfig(tileSizeConfig);
+
+    // SIMT matmul case. Query the best configuration.
+    SmallVector<TileWorkgroupSizePair> tileSizeConfig =
+        getMatmulConfig(targetInfo);
     // Pick the best configuration where the original shape is aligned on the
     // tile size.
     for (TileWorkgroupSizePair &config : tileSizeConfig) {
@@ -772,9 +826,8 @@ static LogicalResult setContractConfig(mlir::FunctionOpInterface entryPoint,
   }
   // If we haven't found any config, use the best tile size hoping that
   // the workgroup specialization handles the main tile path efficiently.
-  SmallVector<TileWorkgroupSizePair> tileSizeConfig;
-  // Query the best configuration.
-  getMatmulConfig(tileSizeConfig);
+  SmallVector<TileWorkgroupSizePair> tileSizeConfig =
+      getMatmulConfig(targetInfo);
   constexpr size_t configIndex = 0;
   const TileWorkgroupSizePair &config = tileSizeConfig[configIndex];
   const int64_t tileX = config.tileSize[0];
@@ -1433,11 +1486,8 @@ static LogicalResult setTransposeConfig(mlir::FunctionOpInterface entryPoint,
 static LogicalResult
 setArgmaxUkernelConfig(mlir::FunctionOpInterface entryPoint,
                        linalg::GenericOp op, const TargetInfo &targetInfo) {
-
   // Checks if UKernels are enabled.
-  if (auto variantOp =
-          entryPoint->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
-    auto target = variantOp.getTarget();
+  if (auto target = IREE::HAL::ExecutableTargetAttr::lookup(entryPoint)) {
     const char ukernelName[] = "argmax";
     if (!hasUkernel(target, ukernelName) ||
         !hasUkernelSupportedGpuArch(target)) {
@@ -1752,98 +1802,92 @@ static void propagateLoweringConfig(Operation *rootOperation,
   }
 }
 
+int64_t getTargetSharedMemoryLimitInBytes(FunctionOpInterface entryPoint) {
+  return getTargetInfo(entryPoint).sharedMemoryLimitInBytes;
+}
+
 //===----------------------------------------------------------------------===//
 // Entry Point
 //===----------------------------------------------------------------------===//
+LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
 
-LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
-  llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
-      getAllEntryPoints(moduleOp);
-
-  for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
-    auto exportOp = exportOps.lookup(funcOp.getName());
-    if (!exportOp)
-      continue;
-
-    if (!getTranslationInfo(funcOp)) {
-      // If no translation info set, first check whether we already have
-      // workgroup count set--it's a "contract" to indicate that we should
-      // bypass all tiling and distribution to go down just the most basic
-      // lowering flow.
-      if (Block *body = exportOp.getWorkgroupCountBody()) {
-        auto retOp = cast<IREE::HAL::ReturnOp>(body->getTerminator());
-        // For scalar dispatch cases--using just one thread of one workgroup.
-        auto isOne = [](Value value) { return matchPattern(value, m_One()); };
-        if (llvm::all_of(retOp.getOperands(), isOne)) {
-          std::array<int64_t, 3> workgroupSize = {1, 1, 1};
-          if (failed(setDispatchConfig(funcOp, workgroupSize, std::nullopt)))
-            return failure();
-          auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-              funcOp.getContext(),
-              IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUBaseLowering);
-          if (failed(setTranslationInfo(funcOp, translationInfo))) {
-            return failure();
-          }
-          continue;
+  auto exportOp = getEntryPoint(funcOp);
+  if (!getTranslationInfo(funcOp) && exportOp) {
+    // If no translation info set, first check whether we already have
+    // workgroup count set--it's a "contract" to indicate that we should
+    // bypass all tiling and distribution to go down just the most basic
+    // lowering flow.
+    if (Block *body = exportOp->getWorkgroupCountBody()) {
+      auto retOp = cast<IREE::HAL::ReturnOp>(body->getTerminator());
+      // For scalar dispatch cases--using just one thread of one workgroup.
+      auto isOne = [](Value value) { return matchPattern(value, m_One()); };
+      if (llvm::all_of(retOp.getOperands(), isOne)) {
+        SmallVector<int64_t, 3> workgroupSize = {1, 1, 1};
+        auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+            funcOp.getContext(),
+            IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUBaseLowering,
+            workgroupSize);
+        if (failed(setTranslationInfo(funcOp, translationInfo))) {
+          return failure();
         }
+        return success();
       }
     }
+  }
 
-    SmallVector<Operation *> computeOps = getComputeOps(funcOp);
-    if (getTranslationInfo(exportOp)) {
-      // Currently LLVMGPU requires propagation of user lowering configs.
-      for (auto op : computeOps) {
-        if (getLoweringConfig(op)) {
-          propagateLoweringConfig(op, computeOps);
-          break;
-        }
+  SmallVector<Operation *> computeOps = getComputeOps(funcOp);
+  if (getTranslationInfo(funcOp)) {
+    // Currently LLVMGPU requires propagation of user lowering configs.
+    for (auto op : computeOps) {
+      if (getLoweringConfig(op)) {
+        propagateLoweringConfig(op, computeOps);
+        break;
       }
-      continue;
     }
+    return success();
+  }
 
-    Operation *rootOperation = nullptr;
+  Operation *rootOperation = nullptr;
 
-    // Find the root operation. linalg.generic and linalg.fill are not root
-    // operations if there are other compute operations present.
-    for (Operation *op : llvm::reverse(computeOps)) {
-      if (!isa<linalg::GenericOp, linalg::FillOp>(op)) {
+  // Find the root operation. linalg.generic and linalg.fill are not root
+  // operations if there are other compute operations present.
+  for (Operation *op : llvm::reverse(computeOps)) {
+    if (!isa<linalg::GenericOp, linalg::FillOp>(op)) {
+      rootOperation = op;
+      break;
+    }
+    if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
+      // linalg.generic with `reduction` iterator types are roots as well.
+      if (genericOp.getNumLoops() != genericOp.getNumParallelLoops()) {
         rootOperation = op;
         break;
       }
-      if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
-        // linalg.generic with `reduction` iterator types are roots as well.
-        if (genericOp.getNumLoops() != genericOp.getNumParallelLoops()) {
-          rootOperation = op;
-          break;
-        }
-      }
     }
-
-    if (!rootOperation) {
-      for (Operation *op : llvm::reverse(computeOps)) {
-        if (isa<linalg::GenericOp, linalg::FillOp>(op)) {
-          rootOperation = op;
-          break;
-        }
-      }
-    }
-
-    if (!rootOperation) {
-      // No root operation found, set it to none.
-      auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-          funcOp.getContext(),
-          IREE::Codegen::DispatchLoweringPassPipeline::None);
-      if (failed(setTranslationInfo(funcOp, translationInfo))) {
-        return failure();
-      }
-      continue;
-    }
-
-    if (failed(setRootConfig(funcOp, rootOperation)))
-      continue;
-
-    propagateLoweringConfig(rootOperation, computeOps);
   }
+
+  if (!rootOperation) {
+    for (Operation *op : llvm::reverse(computeOps)) {
+      if (isa<linalg::GenericOp, linalg::FillOp>(op)) {
+        rootOperation = op;
+        break;
+      }
+    }
+  }
+
+  if (!rootOperation) {
+    // No root operation found, set it to none.
+    auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+        funcOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::None);
+    if (failed(setTranslationInfo(funcOp, translationInfo))) {
+      return failure();
+    }
+    return success();
+  }
+
+  if (failed(setRootConfig(funcOp, rootOperation)))
+    return funcOp.emitOpError("failed to set root config");
+
+  propagateLoweringConfig(rootOperation, computeOps);
   return success();
 }
 

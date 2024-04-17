@@ -12,8 +12,8 @@ include "iree/compiler/Dialect/HAL/IR/HALBase.td"
 include "iree/compiler/Dialect/HAL/IR/HALInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilAttrs.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
-include "mlir/IR/BuiltinAttributeInterfaces.td"
 include "mlir/Interfaces/FunctionInterfaces.td"
+include "mlir/IR/BuiltinAttributeInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/CallInterfaces.td"
@@ -2054,7 +2054,8 @@ def HAL_ExecutableExportOp : HAL_Op<"executable.export", [
     HAL_PipelineLayoutAttr:$layout,
     OptionalAttr<HAL_WorkgroupSizeAttr>:$workgroup_size,
     OptionalAttr<HAL_SubgroupSizeAttr>:$subgroup_size,
-    OptionalAttr<IndexAttr>:$workgroup_local_memory
+    OptionalAttr<IndexAttr>:$workgroup_local_memory,
+    OptionalAttr<DictionaryAttr>:$source_locs
   );
 
   let regions = (region AnyRegion:$workgroup_count);
@@ -2069,7 +2070,8 @@ def HAL_ExecutableExportOp : HAL_Op<"executable.export", [
       "::mlir::IntegerAttr":$workgroup_local_memory
     ), [{
       build($_builder, $_state, nullptr, sym_name, ordinal, layout,
-            workgroup_size, subgroup_size, workgroup_local_memory);
+            workgroup_size, subgroup_size, workgroup_local_memory,
+            DictionaryAttr{});
     }]>,
   ];
 
@@ -2093,6 +2095,15 @@ def HAL_ExecutableExportOp : HAL_Op<"executable.export", [
     // Calculates an XYZ workgroup size based on the given |workload|.
     std::array<Value, 3> calculateWorkgroupSize(
         Location loc, Value device, ValueRange workload, OpBuilder &builder);
+
+    // Helper function to return the subgroup size.
+    std::optional<uint64_t> getSubgroupSizeAsUInt() {
+      std::optional<APInt> subgroupSizeUInt = getSubgroupSize();
+      if (!subgroupSizeUInt) {
+        return std::nullopt;
+      }
+      return subgroupSizeUInt->getZExtValue();
+    }
   }];
 }
 
@@ -2119,7 +2130,8 @@ def HAL_ExecutableVariantOp : HAL_Op<"executable.variant", [
     OptionalAttr<StrAttr>:$sym_visibility,
     SymbolNameAttr:$sym_name,
     HAL_ExecutableTargetAttr:$target,
-    OptionalAttr<HAL_ExecutableObjectArrayAttr>:$objects
+    OptionalAttr<HAL_ExecutableObjectArrayAttr>:$objects,
+    OptionalAttr<DictionaryAttr>:$sources
   );
 
   let regions = (region
@@ -2131,6 +2143,7 @@ def HAL_ExecutableVariantOp : HAL_Op<"executable.variant", [
     $sym_name
     `target` `(` $target `)`
     (`objects` `(` $objects^ `)` )?
+    (`sources` `(` $sources^ `)` )?
     attr-dict-with-keyword
     $body
   }];

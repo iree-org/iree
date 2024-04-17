@@ -32,6 +32,9 @@ on:
         description: GCS path to the uploaded install archive.
         value: ${{ jobs.build_all.outputs.install-dir-gcs-artifact }}
 
+permissions:
+  contents: read
+
 env:
   # This duplicates the variable from ci.yml. The variable needs to be in env
   # instead of the outputs of setup because it contains the run attempt and we
@@ -73,6 +76,7 @@ jobs:
             --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
             --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
             --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446" \
+            --env "IREE_BUILD_SETUP_PYTHON_VENV=${BUILD_DIR}/.venv" \
             gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
             ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
       # TODO(scotttodd): trim build/tests to exclude integration tests (tests/ folder, check tests)

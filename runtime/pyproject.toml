@@ -3,9 +3,9 @@ requires = [
     "setuptools>=42",
     "wheel",
     "cmake",
-    "nanobind>=1.4.0",
+    "nanobind>=1.9.2",
     "ninja",
-    "numpy",
+    "numpy>=2.0.0b1",
     "packaging",
     "PyYAML",
 ]

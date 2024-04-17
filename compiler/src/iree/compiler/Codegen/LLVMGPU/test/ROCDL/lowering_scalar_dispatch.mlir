@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-rocdl-select-lowering-strategy, iree-rocdl-lower-executable-target)))' -mlir-print-local-scope %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-rocdl-select-lowering-strategy, func.func(iree-rocdl-lower-executable-target)))))' -mlir-print-local-scope %s | FileCheck %s
 
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {target_arch = "gfx90a", ukernels = "none"}>
 
@@ -30,11 +30,8 @@ hal.executable @scalar_dispatch {
   }
 }
 
-// CHECK-LABEL: hal.executable.export public @scalar_dispatch
-//  CHECK-SAME: translation_info = #iree_codegen.translation_info<LLVMGPUBaseLowering>
-//  CHECK-SAME: workgroup_size = [1 : index, 1 : index, 1 : index]
-
-//       CHECK: func.func @scalar_dispatch()
+// CHECK-LABEL: func.func @scalar_dispatch()
+//  CHECK-SAME: translation_info = #iree_codegen.translation_info<LLVMGPUBaseLowering workgroup_size = [1, 1, 1]>
 //       CHECK:   %[[SPAN0:.+]] = hal.interface.binding.subspan set(0) binding(0)
 //       CHECK:   %[[SPAN1:.+]] = hal.interface.binding.subspan set(0) binding(1)
 //       CHECK:   memref.load %[[SPAN0]][] : memref<i64, #hal.descriptor_type<storage_buffer>>

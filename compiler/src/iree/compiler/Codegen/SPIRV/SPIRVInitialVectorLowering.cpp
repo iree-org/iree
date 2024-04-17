@@ -347,7 +347,11 @@ public:
     for (vector::ContractionOp op : contractOps) {
       OpBuilder builder(op);
       IRRewriter rewriter(builder);
-      (void)vector::castAwayContractionLeadingOneDim(op, rewriter);
+      auto result = vector::castAwayContractionLeadingOneDim(
+          op, /*maskingOp=*/nullptr, rewriter);
+      if (succeeded(result)) {
+        rewriter.replaceOp(op, *result);
+      }
     }
 
     debugPrint(funcOp, "after trimming contract leading unit dims");

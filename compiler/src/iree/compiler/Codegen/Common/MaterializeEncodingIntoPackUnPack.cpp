@@ -30,6 +30,7 @@ namespace mlir::iree_compiler {
 
 using namespace IREE::LinalgExt;
 using IREE::HAL::ExecutableTargetAttr;
+using IREE::LinalgExt::getEncodingAttr;
 
 //===---------------------------------------------------------------------===//
 // Utility methods
@@ -350,7 +351,7 @@ lowerContractionOpWithEncoding(RewriterBase &rewriter,
 
     Type newResultType = newResult.getType();
 
-    auto cDims = getEncodingContractionDims(lhsEncoding);
+    auto cDims = IREE::LinalgExt::getEncodingContractionDims(lhsEncoding);
     if (cDims->batch.empty()) {
       result = rewriter.create<linalg::Mmt4DOp>(
           linalgOp.getLoc(), newResultType, ValueRange{newLhs, newRhs},

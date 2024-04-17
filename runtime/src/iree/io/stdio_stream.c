@@ -180,7 +180,8 @@ IREE_API_EXPORT iree_status_t iree_io_stdio_stream_open(
   } else {
     if (stream) {
       iree_io_stream_release(stream);
-    } else {
+    }
+    if (handle) {
       fclose(handle);
     }
   }
