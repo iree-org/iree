@@ -19,7 +19,6 @@
 #include "mlir/Pass/PassOptions.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
-#include "stablehlo/dialect/VhloOps.h"
 #include "stablehlo/transforms/Passes.h"
 
 namespace mlir::iree_compiler::stablehlo {
