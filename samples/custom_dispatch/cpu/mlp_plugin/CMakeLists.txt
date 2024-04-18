@@ -18,6 +18,8 @@ endif()
 
 # system-library plugin mechanism using the system dynamic library loader.
 if(IREE_HAL_EXECUTABLE_PLUGIN_SYSTEM_LIBRARY)
+
+set(TORCH_MLIR_ROOT_DIR "${IREE_SOURCE_DIR}/third_party/torch-mlir")
   
 add_library(iree_samples_custom_dispatch_cpu_mlp_plugin SHARED
   mlp_plugin.c
@@ -107,37 +109,12 @@ iree_lit_test_suite(
     "driver=local-sync"
     "hostonly"
 )
-
-# Use `mlir-pdll` to build mlp_linglg_from_pdll.pdl.mlir from mpl_linalg_spec.pdll 
-add_custom_command(
-  OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/mlp_linalg_from_pdll.pdl.mlir"
-  COMMAND mlir-pdll 
-    "${CMAKE_CURRENT_SOURCE_DIR}/mlp_linalg_spec.pdll" 
-    -I "${PROJECT_SOURCE_DIR}/third_party/llvm-project/mlir/include"
-    -x=mlir 
-   #-debug
-    -o "${CMAKE_CURRENT_SOURCE_DIR}/mlp_linalg_from_pdll.pdl.mlir"
-  DEPENDS
-    mlir-pdll
-    "${CMAKE_CURRENT_SOURCE_DIR}/mlp_linalg_spec.pdll"
-  VERBATIM
-)
-
-add_custom_target(
-  iree_samples_custom_dispatch_cpu_mlir_plugin_build_pdll ALL
-  DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/mlp_linalg_from_pdll.pdl.mlir"
-)
-
-add_dependencies(
-  iree_samples_custom_dispatch_cpu_mlp_plugin 
-  iree_samples_custom_dispatch_cpu_mlir_plugin_build_pdll
-)
-
+set(MLP_PDLL_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR};${MLIR_INCLUDE_DIRS};${TORCH_MLIR_ROOT_DIR}/include")
 # Append the includes used for this file to the pdll_compilation_commands
 file(APPEND ${CMAKE_BINARY_DIR}/pdll_compile_commands.yml
   "--- !FileInfo:\n"
   "  filepath: \"${CMAKE_CURRENT_SOURCE_DIR}/mlp_linalg_spec.pdll\"\n"
-  "  includes: \"/home/ianwood/iree/third_party/llvm-project/mlir/include/\"\n"
+  "  includes: \"${TORCH_MLIR_ROOT_DIR}/include;${CMAKE_CURRENT_SOURCE_DIR};${MLIR_INCLUDE_DIRS}\"\n"
 )
 
 iree_lit_test_suite(
@@ -151,7 +128,40 @@ iree_lit_test_suite(
     iree-run-module
     iree_samples_custom_dispatch_cpu_mlp_plugin
   DATA
-    "mlp_linalg_from_pdll.pdl.mlir"
+    "mlp_linalg_spec.pdll"
+  LABELS
+    "driver=local-sync"
+    "hostonly"
+)
+
+iree_lit_test_suite(
+  NAME
+    mlp_pdll_torch_example
+  SRCS
+    "mlp_torch_pdll.mlir"
+  TOOLS
+    FileCheck
+    iree-compile
+    iree-run-module
+    iree_samples_custom_dispatch_cpu_mlp_plugin
+  DATA
+    "mlp_linalg_spec.pdll"
+  LABELS
+    "driver=local-sync"
+    "hostonly"
+)
+iree_lit_test_suite(
+  NAME
+    mlp_pdll_tosa_example
+  SRCS
+    "mlp_tosa_pdll.mlir"
+  TOOLS
+    FileCheck
+    iree-compile
+    iree-run-module
+    iree_samples_custom_dispatch_cpu_mlp_plugin
+  DATA
+    "mlp_linalg_spec.pdll"
   LABELS
     "driver=local-sync"
     "hostonly"
