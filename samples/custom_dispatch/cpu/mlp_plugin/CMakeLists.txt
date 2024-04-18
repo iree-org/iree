@@ -108,18 +108,15 @@ iree_lit_test_suite(
     "hostonly"
 )
 
-
-# Add test for pdll -> pdl then run the test
-
-# Convert mlp_linalg_spec.pdll to mlp_linalg_spec.pdl.mlir but place in ./gen (for now)
+# Use `mlir-pdll` to build mlp_linglg_from_pdll.pdl.mlir from mpl_linalg_spec.pdll 
 add_custom_command(
-  OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/mlp_linalg_generated.pdl.mlir"
+  OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/mlp_linalg_from_pdll.pdl.mlir"
   COMMAND mlir-pdll 
     "${CMAKE_CURRENT_SOURCE_DIR}/mlp_linalg_spec.pdll" 
-    -I /home/ianwood/iree/third_party/llvm-project/mlir/include/
+    -I "${PROJECT_SOURCE_DIR}/third_party/llvm-project/mlir/include"
     -x=mlir 
    #-debug
-    -o "${CMAKE_CURRENT_SOURCE_DIR}/mlp_linalg_generated.pdl.mlir"
+    -o "${CMAKE_CURRENT_SOURCE_DIR}/mlp_linalg_from_pdll.pdl.mlir"
   DEPENDS
     mlir-pdll
     "${CMAKE_CURRENT_SOURCE_DIR}/mlp_linalg_spec.pdll"
@@ -127,17 +124,21 @@ add_custom_command(
 )
 
 add_custom_target(
-    gen_pdl_files ALL 
-    DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/mlp_linalg_generated.pdl.mlir"
+  iree_samples_custom_dispatch_cpu_mlir_plugin_build_pdll ALL
+  DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/mlp_linalg_from_pdll.pdl.mlir"
 )
 
-  # Append the includes used for this file to the pdll_compilation_commands
-  # file.
-  file(APPEND ${CMAKE_BINARY_DIR}/pdll_compile_commands.yml
-      "--- !FileInfo:\n"
-      "  filepath: \"${CMAKE_CURRENT_SOURCE_DIR}/mlp_linalg_spec.pdll\"\n"
-      "  includes: \"/home/ianwood/iree/third_party/llvm-project/mlir/include/\"\n"
-  )
+add_dependencies(
+  iree_samples_custom_dispatch_cpu_mlp_plugin 
+  iree_samples_custom_dispatch_cpu_mlir_plugin_build_pdll
+)
+
+# Append the includes used for this file to the pdll_compilation_commands
+file(APPEND ${CMAKE_BINARY_DIR}/pdll_compile_commands.yml
+  "--- !FileInfo:\n"
+  "  filepath: \"${CMAKE_CURRENT_SOURCE_DIR}/mlp_linalg_spec.pdll\"\n"
+  "  includes: \"/home/ianwood/iree/third_party/llvm-project/mlir/include/\"\n"
+)
 
 iree_lit_test_suite(
   NAME
@@ -150,7 +151,7 @@ iree_lit_test_suite(
     iree-run-module
     iree_samples_custom_dispatch_cpu_mlp_plugin
   DATA
-    "mlp_linalg_generated.pdl.mlir"
+    "mlp_linalg_from_pdll.pdl.mlir"
   LABELS
     "driver=local-sync"
     "hostonly"

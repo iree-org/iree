@@ -1,0 +1,2 @@
+# Ignore the pdl file generated from pdll
+mlp_linalg_from_pdll.pdl.mlir

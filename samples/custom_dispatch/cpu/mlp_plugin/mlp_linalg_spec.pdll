@@ -5,27 +5,37 @@
 
 
 // Native rewrite "rewriteAsFlowDispatch"
-Rewrite rewriteAsFlowDispatch(op : Op, fn_name : Attr,  inputs : ValueRange, repl_vals : ValueRange, repl_dims : ValueRange, other : ValueRange) -> Op;
+Rewrite rewriteAsFlowDispatch(
+        op : Op, fn_name : Attr, 
+        inputs : ValueRange, 
+        repl_vals : ValueRange, 
+        repl_dims : ValueRange, 
+        other : ValueRange);
 
 
 
 Pattern mlp with benefit(1) {
-  let LhsTy : Type;
-  let RhsTy : Type;
-  let MatMulTy : Type;
-  let zeroVal = op<arith.constant> { value = attr<"0.0 : f32"> };
+  // Types
+  let LhsTy = type<"tensor<?x?xf32>">;
+  let RhsTy = type<"tensor<?x?xf32>">;
+  let MatMulTy = type<"tensor<?x?xf32>">;
+  let IntTy = type<"i32">;
+  let IndexTy = type<"index">;
+  let BoolTy = type<"i1">;
+  let FloatTy = type<"f32">;
+
+  // Opt to match against
+  let zeroVal = op<arith.constant> { value = attr<"0.000000e+00 : f32"> } -> (FloatTy);
   let fillOp = op<linalg.fill> (zeroVal.0, empty : Value) -> (MatMulTy);
-  let matMulOp = op<linalg.matmul> (lhs : Value<LhsTy>, rhs : Value<RhsTy>, fillOp.0) -> (MatMulTy);
+  let matMulOp = op<linalg.matmul> 
+                (lhs : Value<LhsTy>, rhs : Value<RhsTy>, fillOp.0) -> (MatMulTy);
 
   rewrite matMulOp with {
-    let IntTy = type<"i32">;
-    let IndexType = type<"index">;
-    let BoolTy = type<"i1">;
-    let constZero = op<arith.constant> { value = attr<"0 : i32"> } -> (BoolTy);
-    let constOne = op<arith.constant> { value = attr<"1 : i32"> } -> (BoolTy);
-    let m = op<tensor.dim>(lhs, constZero) -> (IndexType);
-    let n = op<tensor.dim>(rhs, constOne)  -> (IndexType);
-    let k = op<tensor.dim>(lhs, constOne) -> (IndexType);
+    let zeroOp = op<arith.constant> { value = attr<"0 : index"> } -> (IndexTy);
+    let oneOp = op<arith.constant> { value = attr<"1 : index"> } -> (IndexTy);
+    let m = op<tensor.dim>(lhs, zeroOp) -> (IndexTy);
+    let n = op<tensor.dim>(rhs, oneOp)  -> (IndexTy);
+    let k = op<tensor.dim>(lhs, oneOp); 
     let m_cast = op<arith.index_cast>(m)  -> (IntTy);
     let n_cast = op<arith.index_cast>(n) -> (IntTy);
     let k_cast = op<arith.index_cast>(k) -> (IntTy);

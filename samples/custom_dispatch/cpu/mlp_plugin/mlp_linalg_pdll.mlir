@@ -1,6 +1,6 @@
-// RUN: iree-compile --iree-preprocessing-pdl-spec-filename=%p/mlp_linalg_generated.pdl.mlir %s --compile-to=preprocessing | FileCheck %s
+// RUN: iree-compile --iree-preprocessing-pdl-spec-filename=%p/mlp_linalg_from_pdll.pdl.mlir %s --compile-to=preprocessing | FileCheck %s
 
-// RUN: iree-compile --iree-preprocessing-pdl-spec-filename=%p/mlp_linalg_generated.pdl.mlir %s | \
+// RUN: iree-compile --iree-preprocessing-pdl-spec-filename=%p/mlp_linalg_from_pdll.pdl.mlir %s | \
 // RUN:   iree-run-module --device=local-sync \
 // RUN:     --executable_plugin=$IREE_BINARY_DIR/samples/custom_dispatch/cpu/mlp_plugin/mlp_plugin$IREE_DYLIB_EXT \
 // RUN:     --module=- \
