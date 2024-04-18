@@ -231,6 +231,7 @@ print(result.to_host())
 | Code samples |  |
 | -- | -- |
 Simple AOT export notebook | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/colab/pytorch_aot_simple.ipynb)
+Import [Whisper](https://huggingface.co/openai/whisper-small) from [:hugging: Hugging Face](https://huggingface.co/) notebook | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/colab/pytorch_huggingface_whisper.ipynb)
 Simple MLP export | [`core/examples/aot_mlp/mlp_export_simple.py`](https://github.com/nod-ai/SHARK-Turbine/blob/main/core/examples/aot_mlp/mlp_export_simple.py)
 
 ### :octicons-tools-16: Advanced API
