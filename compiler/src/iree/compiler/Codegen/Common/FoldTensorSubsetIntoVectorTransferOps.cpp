@@ -262,9 +262,6 @@ public:
     if (xferOp.getMask()) {
       return failure();
     }
-    if (!xferOp.getInBounds()) {
-      return failure();
-    }
 
     Location loc = extractSliceOp.getLoc();
     SmallVector<OpFoldResult> mixedSizes = extractSliceOp.getMixedSizes();

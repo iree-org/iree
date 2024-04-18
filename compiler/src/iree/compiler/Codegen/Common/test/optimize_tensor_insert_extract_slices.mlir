@@ -1,5 +1,24 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-optimize-tensor-insert-extract-slices))" --split-input-file %s | FileCheck %s
 
+func.func @fold_extract_slice_consumer_into_xfer_write(%arg0: vector<1x64x128xf16>, %arg1: index) -> tensor<1x?x128xf16> {
+  %c0 = arith.constant 0 : index
+  %0 = tensor.empty() : tensor<1x64x128xf16>
+  %1 = vector.transfer_write %arg0, %0[%c0, %c0, %c0] {in_bounds = [true, true, true]} : vector<1x64x128xf16>, tensor<1x64x128xf16>
+  %extracted_slice = tensor.extract_slice %1[0, 0, 0] [1, %arg1, 128] [1, 1, 1] : tensor<1x64x128xf16> to tensor<1x?x128xf16>
+  return %extracted_slice : tensor<1x?x128xf16>
+}
+// CHECK-LABEL: func.func @fold_extract_slice_consumer_into_xfer_write
+// CHECK-SAME:    %[[VEC:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[SZ:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK:         %[[INIT:.+]] = tensor.empty(%[[SZ]]) : tensor<1x?x128xf16>
+// CHECK:         %[[WRITE:.+]] = vector.transfer_write %[[VEC]], %[[INIT]]
+// CHECK-SAME:      [%[[C0]], %[[C0]], %[[C0]]] {in_bounds = [true, false, true]}
+// CHECK-SAME:      : vector<1x64x128xf16>, tensor<1x?x128xf16>
+// CHECK:         return %[[WRITE]]
+
+// -----
+
 #map = affine_map<()[s0] -> (s0 * 64)>
 #map1 = affine_map<()[s0] -> (s0 * 128)>
 #map2 = affine_map<()[s0] -> (s0 * -64 + 968, 64)>
