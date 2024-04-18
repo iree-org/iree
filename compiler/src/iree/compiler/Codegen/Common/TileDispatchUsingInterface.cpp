@@ -105,9 +105,22 @@ static SmallVector<scf::ForOp> generateTileLoopNest(
   bindDims(builder.getContext(), d0);
   bindSymbols(builder.getContext(), s0, s1, s2);
   AffineMap minMap = AffineMap::get(1, 2, {s0, s1 - d0}, builder.getContext());
+  AffineExpr modExpr = s0 % s1;
   auto createBoundedTileSize = [&](OpFoldResult iv, OpFoldResult tileSize,
+                                   OpFoldResult offset,
                                    OpFoldResult size) -> OpFoldResult {
     if (isConstantIntValue(tileSize, 1)) {
+      return tileSize;
+    }
+    // lb/iv = offset + procId * tileSize
+    // min (tileSize, size - iv)
+    // min (tileSize, size - offset - procId * tileSize)
+    // min (tileSize, size - procId * tileSize)
+    // => if size % tileSize == 0. The expression above evaluates to tileSize
+    // (excluding zero).
+    OpFoldResult tileDivisible = affine::makeComposedFoldedAffineApply(
+        builder, loc, modExpr, {size, tileSize});
+    if (isConstantIntValue(tileDivisible, 0) && isConstantIntValue(offset, 0)) {
       return tileSize;
     }
     return affine::makeComposedFoldedAffineMin(
@@ -122,6 +135,7 @@ static SmallVector<scf::ForOp> generateTileLoopNest(
     // to declare a local variable for it.
     int index = idx;
     OpFoldResult lb = loopRange.offset;
+    OpFoldResult offset = loopRange.offset;
     OpFoldResult ub = loopRange.size;
     OpFoldResult step = tileSizeVals[index];
     // No loops if tile size is zero. Set offset and size to the loop
@@ -148,20 +162,21 @@ static SmallVector<scf::ForOp> generateTileLoopNest(
 
     if (method == linalg::DistributionMethod::CyclicNumProcsEqNumIters) {
       offsets[index] = lb;
-      sizes[index] = createBoundedTileSize(lb, tileSizeVals[index], ub);
+      sizes[index] = createBoundedTileSize(lb, tileSizeVals[index], offset, ub);
       continue;
     }
 
     Value lbVal = getValueOrCreateConstantIndexOp(builder, loc, lb);
     Value ubVal = getValueOrCreateConstantIndexOp(builder, loc, ub);
     Value stepVal = getValueOrCreateConstantIndexOp(builder, loc, step);
-    auto loop = builder.create<scf::ForOp>(
-        loc, lbVal, ubVal, stepVal, ValueRange{},
-        [&](OpBuilder &bodyBuilder, Location bodyLoc, Value iv,
-            ValueRange /*iterArgs*/) {
-          sizes[index] = createBoundedTileSize(iv, tileSizeVals[index], ub);
-          builder.create<scf::YieldOp>(loc);
-        });
+    auto loop =
+        builder.create<scf::ForOp>(loc, lbVal, ubVal, stepVal, ValueRange{},
+                                   [&](OpBuilder &bodyBuilder, Location bodyLoc,
+                                       Value iv, ValueRange /*iterArgs*/) {
+                                     sizes[index] = createBoundedTileSize(
+                                         iv, tileSizeVals[index], offset, ub);
+                                     builder.create<scf::YieldOp>(loc);
+                                   });
     offsets[index] = loop.getInductionVar();
     loops.push_back(loop);
     builder.setInsertionPoint(loop.getBody()->getTerminator());

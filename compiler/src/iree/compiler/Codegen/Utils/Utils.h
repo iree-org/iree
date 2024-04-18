@@ -98,6 +98,10 @@ bool isReadOnly(Value v);
 /// constant. Return an empty vector otherwise.
 SmallVector<int64_t> getStaticNumWorkgroups(mlir::FunctionOpInterface funcOp);
 
+// Similar to getStaticNumWorkgroups but will return sizes even if it has
+// dynamic dim.
+SmallVector<int64_t> getMixedNumWorkgroups(mlir::FunctionOpInterface funcOp);
+
 //===----------------------------------------------------------------------===//
 // Utility functions to set configurations
 //===----------------------------------------------------------------------===//
