@@ -45,11 +45,11 @@ pdl.pattern @mlp : benefit(1) {
   // %result = func.call @mlp_external(%lhs : tensor<...xf32>,
   //     %rhs : tensor<..xf32>, %M : i32, %N : i32, %K : i32) -> tensor<..xf32>
   // ```
-  %lhs = pdl.operand
-  %rhs = pdl.operand
-  %empty = pdl.operand
   %lhs_type = pdl.type : tensor<?x?xf32>
   %rhs_type = pdl.type : tensor<?x?xf32>
+  %lhs = pdl.operand : %lhs_type
+  %rhs = pdl.operand : %rhs_type
+  %empty = pdl.operand
   %matmul_type = pdl.type : tensor<?x?xf32>
 
   %zero_val_f32 = pdl.attribute = 0.000000e+00 : f32
