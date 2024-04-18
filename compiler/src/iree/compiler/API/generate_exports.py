@@ -58,6 +58,7 @@ MLIR_C_HEADER_FILES = [
     "Pass.h",
     "Support.h",
     "Transforms.h",
+    "Dialect/GPU.h",
     "Dialect/Linalg.h",
     "Dialect/Transform.h",
     "Dialect/Transform/Interpreter.h",
@@ -70,6 +71,7 @@ IREE_DIALECTS_HEADER_FILES = [
 
 EXPLICIT_EXPORTS = [
     # MLIR registration functions that are part of generated code.
+    "mlirRegisterGPUPasses",
     "mlirRegisterLinalgPasses",
     "mlirGetDialectHandle__iree_input__",
     "mlirGetDialectHandle__transform__",
