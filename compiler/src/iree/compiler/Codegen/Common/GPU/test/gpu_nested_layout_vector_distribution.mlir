@@ -1002,3 +1002,86 @@ builtin.module attributes { transform.with_named_sequence } {
 
 // CHECK:         %[[T7:.+]] = vector.transpose %[[RD7]], [1, 2, 0] : vector<4x1x2xf16> to vector<1x2x4xf16>
 // CHECK:         vector.transfer_write %[[T7]], %arg0[%[[DIM2_ID4]], %[[DIM2_ID3]], %[[DIM0_ID]]]
+
+// -----
+
+#nested = #iree_vector_ext.nested_layout<
+  subgroups_per_workgroup = [1, 1], 
+  batches_per_subgroup = [2, 2], 
+  outers_per_batch = [1, 1], 
+  threads_per_outer = [16, 4], 
+  elements_per_thread = [1, 4], 
+  subgroup_order = [1, 0], 
+  batch_order = [1, 0], 
+  outer_order = [1, 0], 
+  thread_order = [1, 0], 
+  subgroup_basis = [1, 1], 
+  thread_basis = [4, 16]
+>
+
+func.func @mfma_16x16x16_out_reduced_dim1(%arg0: vector<32x32xf32>, %arg1: vector<32xf32>) -> vector<32xf32> {
+  %0 = vector.multi_reduction <maximumf>, %arg0, %arg1 
+  {
+    __vector_layout_test_anchor_operand_0 = #nested
+  } [1] : vector<32x32xf32> to vector<32xf32>
+  return %0 : vector<32xf32>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func @mfma_16x16x16_out_reduced_dim1
+// CHECK-DAG: %[[C16:.*]] = arith.constant 16 : i32
+// CHECK-DAG: %[[C32:.*]] = arith.constant 32 : i32
+// CHECK-DAG: %[[C64:.*]] = arith.constant 64 : i32
+// Local reduction
+// CHECK: vector.multi_reduction <maximumf>, %{{.*}}, %{{.*}} [0, 2, 5]
+// Global reduction
+// CHECK: gpu.shuffle  xor %{{.*}}, %[[C16]], %[[C64]] : f32
+// CHECK: gpu.shuffle  xor %{{.*}}, %[[C32]], %[[C64]] : f32
+// CHECK: gpu.shuffle  xor %{{.*}}, %[[C16]], %[[C64]] : f32
+// CHECK: gpu.shuffle  xor %{{.*}}, %[[C32]], %[[C64]] : f32
+
+// -----
+
+#nested = #iree_vector_ext.nested_layout<
+  subgroups_per_workgroup = [1, 1],
+  batches_per_subgroup    = [1, 4],
+  outers_per_batch        = [1, 1],
+  threads_per_outer       = [32, 2],
+  elements_per_thread     = [1, 4],
+
+  thread_order            = [1, 0],
+
+  subgroup_basis          = [1, 1],
+  thread_basis            = [2, 32]
+>
+
+func.func @mfma_32x32x8_out_reduced_dim1(%arg0: vector<32x32xf32>, %arg1: vector<32xf32>) -> vector<32xf32> {
+  %0 = vector.multi_reduction <maximumf>, %arg0, %arg1 
+  {
+    __vector_layout_test_anchor_operand_0 = #nested
+  } [1] : vector<32x32xf32> to vector<32xf32>
+  return %0 : vector<32xf32>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func @mfma_32x32x8_out_reduced_dim1
+// CHECK-DAG: %[[C32:.*]] = arith.constant 32 : i32
+// CHECK-DAG: %[[C64:.*]] = arith.constant 64 : i32
+// Local reduction
+// CHECK: vector.multi_reduction <maximumf>, %{{.*}}, %{{.*}} [1, 3, 5]
+// Global reduction
+// CHECK: gpu.shuffle  xor %{{.*}}, %[[C32]], %[[C64]] : f32

@@ -473,9 +473,8 @@ static int64_t getShuffleOffset(NestedLayoutAttr layout, int64_t dim) {
     }
   }
   // Apply permutation on the active thread strides.
-  applyPermutationToVector(activeThreadStrides, layout.getThreadOrder());
-
   // TODO: Do we need to do inversion or not?
+  applyPermutationToVector(activeThreadStrides, layout.getThreadOrder());
   return activeThreadStrides[dim];
 }
 
@@ -516,7 +515,7 @@ struct DistributeMultiReduction final
     VectorValue disSrc =
         getDistributed(rewriter, srcVector, signature[srcVector]);
     VectorValue disAcc =
-        getDistributed(rewriter, srcVector, signature[accVector]);
+        getDistributed(rewriter, accVector, signature[accVector]);
 
     Location loc = multiReduceOp.getLoc();
 
