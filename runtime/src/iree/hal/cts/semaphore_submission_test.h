@@ -25,9 +25,8 @@ class semaphore_submission_test : public CtsTestBase {};
 
 TEST_P(semaphore_submission_test, SubmitWithNoCommandBuffers) {
   // No waits, one signal which we immediately wait on after submit.
-  iree_hal_semaphore_t* signal_semaphore = NULL;
-  IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 0ull, &signal_semaphore));
-  uint64_t signal_payload_values[] = {1ull};
+  iree_hal_semaphore_t* signal_semaphore = CreateSemaphore();
+  uint64_t signal_payload_values[] = { 1 };
   iree_hal_semaphore_list_t signal_semaphores = {
       1,
       &signal_semaphore,
@@ -39,25 +38,17 @@ TEST_P(semaphore_submission_test, SubmitWithNoCommandBuffers) {
                                                iree_hal_semaphore_list_empty(),
                                                signal_semaphores, 0, NULL));
   IREE_ASSERT_OK(
-      iree_hal_semaphore_wait(signal_semaphore, 1ull, iree_infinite_timeout()));
+      iree_hal_semaphore_wait(signal_semaphore, 1, iree_infinite_timeout()));
 
   iree_hal_semaphore_release(signal_semaphore);
 }
 
 TEST_P(semaphore_submission_test, SubmitAndSignal) {
-  iree_hal_command_buffer_t* command_buffer = NULL;
-  IREE_ASSERT_OK(iree_hal_command_buffer_create(
-      device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
-      IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
-      /*binding_capacity=*/0, &command_buffer));
-
-  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
-  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+  iree_hal_command_buffer_t* command_buffer = CreateEmptyCommandBuffer();
 
   // No waits, one signal which we immediately wait on after submit.
-  iree_hal_semaphore_t* signal_semaphore = NULL;
-  IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 0ull, &signal_semaphore));
-  uint64_t signal_payload_values[] = {1ull};
+  iree_hal_semaphore_t* signal_semaphore = CreateSemaphore();
+  uint64_t signal_payload_values[] = {1};
   iree_hal_semaphore_list_t signal_semaphores = {
       1,
       &signal_semaphore,
@@ -69,7 +60,7 @@ TEST_P(semaphore_submission_test, SubmitAndSignal) {
       /*queue_affinity=*/0, iree_hal_semaphore_list_empty(), signal_semaphores,
       1, &command_buffer));
   IREE_ASSERT_OK(
-      iree_hal_semaphore_wait(signal_semaphore, 1ull, iree_infinite_timeout()));
+      iree_hal_semaphore_wait(signal_semaphore, 1, iree_infinite_timeout()));
 
   iree_hal_command_buffer_release(command_buffer);
   iree_hal_semaphore_release(signal_semaphore);
@@ -77,26 +68,19 @@ TEST_P(semaphore_submission_test, SubmitAndSignal) {
 
 TEST_P(semaphore_submission_test, SubmitWithWait) {
   // Empty command buffer.
-  iree_hal_command_buffer_t* command_buffer = NULL;
-  IREE_ASSERT_OK(iree_hal_command_buffer_create(
-      device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
-      IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
-      /*binding_capacity=*/0, &command_buffer));
-  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
-  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+  iree_hal_command_buffer_t* command_buffer = CreateEmptyCommandBuffer();
 
   // One wait and one signal semaphore.
-  iree_hal_semaphore_t* wait_semaphore = NULL;
-  IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 0ull, &wait_semaphore));
-  uint64_t wait_payload_values[] = {1ull};
+  iree_hal_semaphore_t* wait_semaphore = CreateSemaphore();
+  uint64_t wait_payload_values[] = {1};
   iree_hal_semaphore_list_t wait_semaphores = {
       1,
       &wait_semaphore,
       wait_payload_values,
   };
   iree_hal_semaphore_t* signal_semaphore = NULL;
-  IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 100ull, &signal_semaphore));
-  uint64_t signal_payload_values[] = {101ull};
+  IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 100, &signal_semaphore));
+  uint64_t signal_payload_values[] = {101};
   iree_hal_semaphore_list_t signal_semaphores = {
       1,
       &signal_semaphore,
@@ -109,13 +93,11 @@ TEST_P(semaphore_submission_test, SubmitWithWait) {
                                     signal_semaphores, 1, &command_buffer));
 
   // Work shouldn't start until the wait semaphore reaches its payload value.
-  uint64_t value;
-  IREE_ASSERT_OK(iree_hal_semaphore_query(signal_semaphore, &value));
-  EXPECT_EQ(100ull, value);
+  CheckSemaphoreValue(signal_semaphore, 100);
 
   // Signal the wait semaphore, work should begin and complete.
-  IREE_ASSERT_OK(iree_hal_semaphore_signal(wait_semaphore, 1ull));
-  IREE_ASSERT_OK(iree_hal_semaphore_wait(signal_semaphore, 101ull,
+  IREE_ASSERT_OK(iree_hal_semaphore_signal(wait_semaphore, 1));
+  IREE_ASSERT_OK(iree_hal_semaphore_wait(signal_semaphore, 101,
                                          iree_infinite_timeout()));
 
   iree_hal_command_buffer_release(command_buffer);
@@ -124,35 +106,24 @@ TEST_P(semaphore_submission_test, SubmitWithWait) {
 }
 
 TEST_P(semaphore_submission_test, SubmitWithMultipleSemaphores) {
-  iree_hal_command_buffer_t* command_buffer = NULL;
-  IREE_ASSERT_OK(iree_hal_command_buffer_create(
-      device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
-      IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
-      /*binding_capacity=*/0, &command_buffer));
+  iree_hal_command_buffer_t* command_buffer = CreateEmptyCommandBuffer();
 
-  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
-  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
-
-  iree_hal_semaphore_t* wait_semaphore_1 = NULL;
-  iree_hal_semaphore_t* wait_semaphore_2 = NULL;
-  IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 0ull, &wait_semaphore_1));
-  IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 0ull, &wait_semaphore_2));
+  iree_hal_semaphore_t* wait_semaphore_1 = CreateSemaphore();
+  iree_hal_semaphore_t* wait_semaphore_2 = CreateSemaphore();
   iree_hal_semaphore_t* wait_semaphore_ptrs[] = {wait_semaphore_1,
                                                  wait_semaphore_2};
-  uint64_t wait_payload_values[] = {1ull, 1ull};
+  uint64_t wait_payload_values[] = {1, 1};
   iree_hal_semaphore_list_t wait_semaphores = {
       IREE_ARRAYSIZE(wait_semaphore_ptrs),
       wait_semaphore_ptrs,
       wait_payload_values,
   };
 
-  iree_hal_semaphore_t* signal_semaphore_1 = NULL;
-  iree_hal_semaphore_t* signal_semaphore_2 = NULL;
-  IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 0ull, &signal_semaphore_1));
-  IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 0ull, &signal_semaphore_2));
+  iree_hal_semaphore_t* signal_semaphore_1 = CreateSemaphore();
+  iree_hal_semaphore_t* signal_semaphore_2 = CreateSemaphore();
   iree_hal_semaphore_t* signal_semaphore_ptrs[] = {signal_semaphore_1,
                                                    signal_semaphore_2};
-  uint64_t signal_payload_values[] = {1ull, 1ull};
+  uint64_t signal_payload_values[] = {1, 1};
   iree_hal_semaphore_list_t signal_semaphores = {
       IREE_ARRAYSIZE(signal_semaphore_ptrs),
       signal_semaphore_ptrs,
@@ -165,15 +136,12 @@ TEST_P(semaphore_submission_test, SubmitWithMultipleSemaphores) {
                                     signal_semaphores, 1, &command_buffer));
 
   // Work shouldn't start until all wait semaphores reach their payload values.
-  uint64_t value;
-  IREE_ASSERT_OK(iree_hal_semaphore_query(signal_semaphore_1, &value));
-  EXPECT_EQ(0ull, value);
-  IREE_ASSERT_OK(iree_hal_semaphore_query(signal_semaphore_2, &value));
-  EXPECT_EQ(0ull, value);
+  CheckSemaphoreValue(signal_semaphore_1, 0);
+  CheckSemaphoreValue(signal_semaphore_2, 0);
 
   // Signal the wait semaphores, work should begin and complete.
-  IREE_ASSERT_OK(iree_hal_semaphore_signal(wait_semaphore_1, 1ull));
-  IREE_ASSERT_OK(iree_hal_semaphore_signal(wait_semaphore_2, 1ull));
+  IREE_ASSERT_OK(iree_hal_semaphore_signal(wait_semaphore_1, 1));
+  IREE_ASSERT_OK(iree_hal_semaphore_signal(wait_semaphore_2, 1));
 
   IREE_ASSERT_OK(
       iree_hal_semaphore_list_wait(signal_semaphores, iree_infinite_timeout()));
@@ -187,38 +155,23 @@ TEST_P(semaphore_submission_test, SubmitWithMultipleSemaphores) {
 
 // Tests we can wait on both host and device semaphore to singal.
 TEST_P(semaphore_submission_test, WaitAllHostAndDeviceSemaphores) {
-  iree_hal_command_buffer_t* command_buffer = NULL;
-  IREE_ASSERT_OK(iree_hal_command_buffer_create(
-      device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
-      IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
-      /*binding_capacity=*/0, &command_buffer));
-
-  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
-  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+  iree_hal_command_buffer_t* command_buffer = CreateEmptyCommandBuffer();
 
   // Create two semaphores, one for the host thread to wait on, and one for the
   // device to wait on.
-  iree_hal_semaphore_t* host_wait_semaphore = NULL;
-  iree_hal_semaphore_t* device_wait_semaphore = NULL;
-  IREE_ASSERT_OK(
-      iree_hal_semaphore_create(device_, 0ull, &host_wait_semaphore));
-  IREE_ASSERT_OK(
-      iree_hal_semaphore_create(device_, 0ull, &device_wait_semaphore));
+  iree_hal_semaphore_t* host_wait_semaphore = CreateSemaphore();
+  iree_hal_semaphore_t* device_wait_semaphore = CreateSemaphore();
 
   // Create two semaphores, one for the host thread to signal, and one for the
   // device to signal.
-  iree_hal_semaphore_t* host_signal_semaphore = NULL;
-  iree_hal_semaphore_t* device_signal_semaphore = NULL;
-  IREE_ASSERT_OK(
-      iree_hal_semaphore_create(device_, 0ull, &host_signal_semaphore));
-  IREE_ASSERT_OK(
-      iree_hal_semaphore_create(device_, 0ull, &device_signal_semaphore));
+  iree_hal_semaphore_t* host_signal_semaphore = CreateSemaphore();
+  iree_hal_semaphore_t* device_signal_semaphore = CreateSemaphore();
 
   // Prepare device wait and signal semaphore lists.
-  uint64_t device_wait_payload_values[] = {1ull};
+  uint64_t device_wait_payload_values[] = {1};
   iree_hal_semaphore_list_t device_wait_semaphores = {
       /*count=*/1, &device_wait_semaphore, device_wait_payload_values};
-  uint64_t device_signal_payload_values[] = {1ull};
+  uint64_t device_signal_payload_values[] = {1};
   iree_hal_semaphore_list_t device_signal_semaphores = {
       /*count=*/1, &device_signal_semaphore, device_signal_payload_values};
 
@@ -230,27 +183,24 @@ TEST_P(semaphore_submission_test, WaitAllHostAndDeviceSemaphores) {
   // Start another thread and have it wait.
   std::thread thread([&]() {
     IREE_ASSERT_OK(
-        iree_hal_semaphore_wait(host_wait_semaphore, 1ull,
+        iree_hal_semaphore_wait(host_wait_semaphore, 1,
                                 iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
-    IREE_ASSERT_OK(iree_hal_semaphore_signal(host_signal_semaphore, 1ull));
+    IREE_ASSERT_OK(iree_hal_semaphore_signal(host_signal_semaphore, 1));
   });
 
   // Work shouldn't start until all wait semaphores reach their payload values.
-  uint64_t value;
-  IREE_ASSERT_OK(iree_hal_semaphore_query(host_signal_semaphore, &value));
-  EXPECT_EQ(0ull, value);
-  IREE_ASSERT_OK(iree_hal_semaphore_query(device_signal_semaphore, &value));
-  EXPECT_EQ(0ull, value);
+  CheckSemaphoreValue(host_signal_semaphore, 0);
+  CheckSemaphoreValue(device_signal_semaphore, 0);
 
   // Signal the wait semaphores for both host thread and device, work should
   // begin and complete.
-  IREE_ASSERT_OK(iree_hal_semaphore_signal(host_wait_semaphore, 1ull));
-  IREE_ASSERT_OK(iree_hal_semaphore_signal(device_wait_semaphore, 1ull));
+  IREE_ASSERT_OK(iree_hal_semaphore_signal(host_wait_semaphore, 1));
+  IREE_ASSERT_OK(iree_hal_semaphore_signal(device_wait_semaphore, 1));
 
   // Now wait on both to complete.
   iree_hal_semaphore_t* main_semaphore_ptrs[] = {host_signal_semaphore,
                                                  device_signal_semaphore};
-  uint64_t main_payload_values[] = {1ull, 1ull};
+  uint64_t main_payload_values[] = {1, 1};
   iree_hal_semaphore_list_t main_wait_semaphores = {
       IREE_ARRAYSIZE(main_semaphore_ptrs), main_semaphore_ptrs,
       main_payload_values};
@@ -270,38 +220,23 @@ TEST_P(semaphore_submission_test, WaitAllHostAndDeviceSemaphores) {
 // and device signals.
 TEST_P(semaphore_submission_test,
        WaitAnyHostAndDeviceSemaphoresAndDeviceSignals) {
-  iree_hal_command_buffer_t* command_buffer = NULL;
-  IREE_ASSERT_OK(iree_hal_command_buffer_create(
-      device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
-      IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
-      /*binding_capacity=*/0, &command_buffer));
-
-  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
-  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+  iree_hal_command_buffer_t* command_buffer = CreateEmptyCommandBuffer();
 
   // Create two semaphores, one for the host thread to wait on, and one for the
   // device to wait on.
-  iree_hal_semaphore_t* host_wait_semaphore = NULL;
-  iree_hal_semaphore_t* device_wait_semaphore = NULL;
-  IREE_ASSERT_OK(
-      iree_hal_semaphore_create(device_, 0ull, &host_wait_semaphore));
-  IREE_ASSERT_OK(
-      iree_hal_semaphore_create(device_, 0ull, &device_wait_semaphore));
+  iree_hal_semaphore_t* host_wait_semaphore = CreateSemaphore();
+  iree_hal_semaphore_t* device_wait_semaphore = CreateSemaphore();
 
   // Create two semaphores, one for the host thread to signal, and one for the
   // device to signal.
-  iree_hal_semaphore_t* host_signal_semaphore = NULL;
-  iree_hal_semaphore_t* device_signal_semaphore = NULL;
-  IREE_ASSERT_OK(
-      iree_hal_semaphore_create(device_, 0ull, &host_signal_semaphore));
-  IREE_ASSERT_OK(
-      iree_hal_semaphore_create(device_, 0ull, &device_signal_semaphore));
+  iree_hal_semaphore_t* host_signal_semaphore = CreateSemaphore();
+  iree_hal_semaphore_t* device_signal_semaphore = CreateSemaphore();
 
   // Prepare device wait and signal semaphore lists.
-  uint64_t device_wait_payload_values[] = {1ull};
+  uint64_t device_wait_payload_values[] = {1};
   iree_hal_semaphore_list_t device_wait_semaphores = {
       /*count=*/1, &device_wait_semaphore, device_wait_payload_values};
-  uint64_t device_signal_payload_values[] = {1ull};
+  uint64_t device_signal_payload_values[] = {1};
   iree_hal_semaphore_list_t device_signal_semaphores = {
       /*count=*/1, &device_signal_semaphore, device_signal_payload_values};
 
@@ -313,25 +248,22 @@ TEST_P(semaphore_submission_test,
   // Start another thread and have it wait.
   std::thread thread([&]() {
     IREE_ASSERT_OK(
-        iree_hal_semaphore_wait(host_wait_semaphore, 1ull,
+        iree_hal_semaphore_wait(host_wait_semaphore, 1,
                                 iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
-    IREE_ASSERT_OK(iree_hal_semaphore_signal(host_signal_semaphore, 1ull));
+    IREE_ASSERT_OK(iree_hal_semaphore_signal(host_signal_semaphore, 1));
   });
 
   // Work shouldn't start until all wait semaphores reach their payload values.
-  uint64_t value;
-  IREE_ASSERT_OK(iree_hal_semaphore_query(host_signal_semaphore, &value));
-  EXPECT_EQ(0ull, value);
-  IREE_ASSERT_OK(iree_hal_semaphore_query(device_signal_semaphore, &value));
-  EXPECT_EQ(0ull, value);
+  CheckSemaphoreValue(host_signal_semaphore, 0);
+  CheckSemaphoreValue(device_signal_semaphore, 0);
 
   // Signal the wait semaphores for the device, work should begin and complete.
-  IREE_ASSERT_OK(iree_hal_semaphore_signal(device_wait_semaphore, 1ull));
+  IREE_ASSERT_OK(iree_hal_semaphore_signal(device_wait_semaphore, 1));
 
   // Now wait on any to complete.
   iree_hal_semaphore_t* main_semaphore_ptrs[] = {host_signal_semaphore,
                                                  device_signal_semaphore};
-  uint64_t main_payload_values[] = {1ull, 1ull};
+  uint64_t main_payload_values[] = {1, 1};
   iree_hal_semaphore_list_t main_wait_semaphores = {
       IREE_ARRAYSIZE(main_semaphore_ptrs), main_semaphore_ptrs,
       main_payload_values};
@@ -340,13 +272,11 @@ TEST_P(semaphore_submission_test,
       iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
 
   // Check that the device has signaled but the host thread hasn't.
-  IREE_ASSERT_OK(iree_hal_semaphore_query(host_signal_semaphore, &value));
-  EXPECT_EQ(0ull, value);
-  IREE_ASSERT_OK(iree_hal_semaphore_query(device_signal_semaphore, &value));
-  EXPECT_EQ(1ull, value);
+  CheckSemaphoreValue(host_signal_semaphore, 0);
+  CheckSemaphoreValue(device_signal_semaphore, 1);
 
   // Now let the host thread to complete.
-  IREE_ASSERT_OK(iree_hal_semaphore_signal(host_wait_semaphore, 1ull));
+  IREE_ASSERT_OK(iree_hal_semaphore_signal(host_wait_semaphore, 1));
   thread.join();
 
   iree_hal_command_buffer_release(command_buffer);
@@ -360,38 +290,23 @@ TEST_P(semaphore_submission_test,
 // and host signals.
 TEST_P(semaphore_submission_test,
        WaitAnyHostAndDeviceSemaphoresAndHostSignals) {
-  iree_hal_command_buffer_t* command_buffer = NULL;
-  IREE_ASSERT_OK(iree_hal_command_buffer_create(
-      device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
-      IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
-      /*binding_capacity=*/0, &command_buffer));
-
-  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
-  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
+  iree_hal_command_buffer_t* command_buffer = CreateEmptyCommandBuffer();
 
   // Create two semaphores, one for the host thread to wait on, and one for the
   // device to wait on.
-  iree_hal_semaphore_t* host_wait_semaphore = NULL;
-  iree_hal_semaphore_t* device_wait_semaphore = NULL;
-  IREE_ASSERT_OK(
-      iree_hal_semaphore_create(device_, 0ull, &host_wait_semaphore));
-  IREE_ASSERT_OK(
-      iree_hal_semaphore_create(device_, 0ull, &device_wait_semaphore));
+  iree_hal_semaphore_t* host_wait_semaphore = CreateSemaphore();
+  iree_hal_semaphore_t* device_wait_semaphore = CreateSemaphore();
 
   // Create two semaphores, one for the host thread to signal, and one for the
   // device to signal.
-  iree_hal_semaphore_t* host_signal_semaphore = NULL;
-  iree_hal_semaphore_t* device_signal_semaphore = NULL;
-  IREE_ASSERT_OK(
-      iree_hal_semaphore_create(device_, 0ull, &host_signal_semaphore));
-  IREE_ASSERT_OK(
-      iree_hal_semaphore_create(device_, 0ull, &device_signal_semaphore));
+  iree_hal_semaphore_t* host_signal_semaphore = CreateSemaphore();
+  iree_hal_semaphore_t* device_signal_semaphore = CreateSemaphore();
 
   // Prepare device wait and signal semaphore lists.
-  uint64_t device_wait_payload_values[] = {1ull};
+  uint64_t device_wait_payload_values[] = {1};
   iree_hal_semaphore_list_t device_wait_semaphores = {
       /*count=*/1, &device_wait_semaphore, device_wait_payload_values};
-  uint64_t device_signal_payload_values[] = {1ull};
+  uint64_t device_signal_payload_values[] = {1};
   iree_hal_semaphore_list_t device_signal_semaphores = {
       /*count=*/1, &device_signal_semaphore, device_signal_payload_values};
 
@@ -403,26 +318,23 @@ TEST_P(semaphore_submission_test,
   // Start another thread and have it wait.
   std::thread thread([&]() {
     IREE_ASSERT_OK(
-        iree_hal_semaphore_wait(host_wait_semaphore, 1ull,
+        iree_hal_semaphore_wait(host_wait_semaphore, 1,
                                 iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
-    IREE_ASSERT_OK(iree_hal_semaphore_signal(host_signal_semaphore, 1ull));
+    IREE_ASSERT_OK(iree_hal_semaphore_signal(host_signal_semaphore, 1));
   });
 
   // Work shouldn't start until all wait semaphores reach their payload values.
-  uint64_t value;
-  IREE_ASSERT_OK(iree_hal_semaphore_query(host_signal_semaphore, &value));
-  EXPECT_EQ(0ull, value);
-  IREE_ASSERT_OK(iree_hal_semaphore_query(device_signal_semaphore, &value));
-  EXPECT_EQ(0ull, value);
+  CheckSemaphoreValue(host_signal_semaphore, 0);
+  CheckSemaphoreValue(device_signal_semaphore, 0);
 
   // Signal the wait semaphores for the host thread, work should begin and
   // complete.
-  IREE_ASSERT_OK(iree_hal_semaphore_signal(host_wait_semaphore, 1ull));
+  IREE_ASSERT_OK(iree_hal_semaphore_signal(host_wait_semaphore, 1));
 
   // Now wait on any to complete.
   iree_hal_semaphore_t* main_semaphore_ptrs[] = {host_signal_semaphore,
                                                  device_signal_semaphore};
-  uint64_t main_payload_values[] = {1ull, 1ull};
+  uint64_t main_payload_values[] = {1, 1};
   iree_hal_semaphore_list_t main_wait_semaphores = {
       IREE_ARRAYSIZE(main_semaphore_ptrs), main_semaphore_ptrs,
       main_payload_values};
@@ -432,15 +344,13 @@ TEST_P(semaphore_submission_test,
   thread.join();
 
   // Check that the host thread has signaled but the device hasn't.
-  IREE_ASSERT_OK(iree_hal_semaphore_query(host_signal_semaphore, &value));
-  EXPECT_EQ(1ull, value);
-  IREE_ASSERT_OK(iree_hal_semaphore_query(device_signal_semaphore, &value));
-  EXPECT_EQ(0ull, value);
+  CheckSemaphoreValue(host_signal_semaphore, 1);
+  CheckSemaphoreValue(device_signal_semaphore, 0);
 
   // Signal and wait for the device to complete too.
-  IREE_ASSERT_OK(iree_hal_semaphore_signal(device_wait_semaphore, 1ull));
+  IREE_ASSERT_OK(iree_hal_semaphore_signal(device_wait_semaphore, 1));
   IREE_ASSERT_OK(
-      iree_hal_semaphore_wait(device_signal_semaphore, 1ull,
+      iree_hal_semaphore_wait(device_signal_semaphore, 1,
                               iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
 
   iree_hal_command_buffer_release(command_buffer);
@@ -456,38 +366,20 @@ TEST_P(semaphore_submission_test, IntermediateSemaphoreBetweenDeviceBatches) {
   // The signaling relationship is
   // command_buffer1 -> semaphore1 -> command_buffer2 -> semaphore2
 
-  // Create first command buffer.
-  iree_hal_command_buffer_t* command_buffer1 = NULL;
-  IREE_ASSERT_OK(iree_hal_command_buffer_create(
-      device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
-      IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
-      /*binding_capacity=*/0, &command_buffer1));
-  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer1));
-  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer1));
-
-  // Create second command buffer.
-  iree_hal_command_buffer_t* command_buffer2 = NULL;
-  IREE_ASSERT_OK(iree_hal_command_buffer_create(
-      device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
-      IREE_HAL_COMMAND_CATEGORY_DISPATCH, IREE_HAL_QUEUE_AFFINITY_ANY,
-      /*binding_capacity=*/0, &command_buffer2));
-  IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer2));
-  IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer2));
+  iree_hal_command_buffer_t* command_buffer1 = CreateEmptyCommandBuffer();
+  iree_hal_command_buffer_t* command_buffer2 = CreateEmptyCommandBuffer();
 
   // Semaphore to signal when command_buffer1 is done and to wait to
   // start executing command_buffer2.
-  iree_hal_semaphore_t* semaphore1 = NULL;
-  IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 0, &semaphore1));
-  uint64_t semaphore1_value = 1;
+  iree_hal_semaphore_t* semaphore1 = CreateSemaphore();
+  uint64_t semaphore_signal_value = 1;
   iree_hal_semaphore_list_t semaphore1_list = {/*count=*/1, &semaphore1,
-                                               &semaphore1_value};
+                                               &semaphore_signal_value};
 
   // Semaphore to signal when all work (command_buffer2) is done.
-  iree_hal_semaphore_t* semaphore2 = NULL;
-  IREE_ASSERT_OK(iree_hal_semaphore_create(device_, 0, &semaphore2));
-  uint64_t semaphore2_value = 1;
+  iree_hal_semaphore_t* semaphore2 = CreateSemaphore();
   iree_hal_semaphore_list_t semaphore2_list = {/*count=*/1, &semaphore2,
-                                               &semaphore2_value};
+                                               &semaphore_signal_value};
 
   // Dispatch the second command buffer.
   IREE_ASSERT_OK(iree_hal_device_queue_execute(
@@ -497,16 +389,8 @@ TEST_P(semaphore_submission_test, IntermediateSemaphoreBetweenDeviceBatches) {
 
   // Make sure that the intermediate and second semaphores have not advanced
   // since only command_buffer2 is queued.
-  uint64_t semaphore2_value_after_queueing_command_buffer2;
-  IREE_ASSERT_OK(iree_hal_semaphore_query(
-      semaphore2, &semaphore2_value_after_queueing_command_buffer2));
-  EXPECT_EQ(static_cast<uint64_t>(0),
-            semaphore2_value_after_queueing_command_buffer2);
-  uint64_t semaphore1_value_after_queueing_command_buffer2;
-  IREE_ASSERT_OK(iree_hal_semaphore_query(
-      semaphore1, &semaphore1_value_after_queueing_command_buffer2));
-  EXPECT_EQ(static_cast<uint64_t>(0),
-            semaphore1_value_after_queueing_command_buffer2);
+  CheckSemaphoreValue(semaphore1, 0);
+  CheckSemaphoreValue(semaphore2, 0);
 
   // Submit the first command buffer.
   iree_hal_semaphore_list_t command_buffer1_wait_semaphore_list = {
@@ -518,25 +402,15 @@ TEST_P(semaphore_submission_test, IntermediateSemaphoreBetweenDeviceBatches) {
 
   // Wait on the intermediate semaphore and check its value.
   IREE_ASSERT_OK(
-      iree_hal_semaphore_wait(semaphore1, semaphore1_value,
+      iree_hal_semaphore_wait(semaphore1, semaphore_signal_value,
                               iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
-  uint64_t semaphore1_value_after_command_buffer1_has_done_executing;
-  IREE_ASSERT_OK(iree_hal_semaphore_query(
-      semaphore1, &semaphore1_value_after_command_buffer1_has_done_executing));
-  uint64_t expected_semaphore1_value = semaphore1_value;
-  EXPECT_EQ(semaphore1_value,
-            semaphore1_value_after_command_buffer1_has_done_executing);
+  CheckSemaphoreValue(semaphore1, semaphore_signal_value);
 
   // Wait on the second semaphore and check its value.
   IREE_ASSERT_OK(
-      iree_hal_semaphore_wait(semaphore2, semaphore2_value,
+      iree_hal_semaphore_wait(semaphore2, semaphore_signal_value,
                               iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
-  uint64_t semaphore2_value_after_command_buffer2_has_done_executing;
-  IREE_ASSERT_OK(iree_hal_semaphore_query(
-      semaphore2, &semaphore2_value_after_command_buffer2_has_done_executing));
-  uint64_t expected_semaphore2_value = semaphore2_value;
-  EXPECT_EQ(expected_semaphore2_value,
-            semaphore2_value_after_command_buffer2_has_done_executing);
+  CheckSemaphoreValue(semaphore2, semaphore_signal_value);
 
   iree_hal_command_buffer_release(command_buffer1);
   iree_hal_command_buffer_release(command_buffer2);
@@ -555,6 +429,8 @@ TEST_P(semaphore_submission_test, TwoBatchesWaitingOn1FormerBatchAmongst2) {
   //      command_buffer21         command_buffer22
   //             ↓                        ↓
   //        semaphore21              semaphore22
+
+  printf("TwoBatchesWaitingOn1FormerBatchAmongst2 started.");
 
   iree_hal_command_buffer_t* command_buffer11 = CreateEmptyCommandBuffer();
   iree_hal_command_buffer_t* command_buffer12 = CreateEmptyCommandBuffer();
