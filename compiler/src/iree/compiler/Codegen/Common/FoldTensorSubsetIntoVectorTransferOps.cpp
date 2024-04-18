@@ -206,7 +206,7 @@ public:
 };
 
 /// Fold tensor.extract_slice into vector.transfer_write if
-///   1. The tensor.extract_slice op has only one use.
+///   1. The vector.transfer_write op has only one use.
 ///   2. All the offests of the tensor.extract_slice op are zeros.
 ///   3. The vector.transfer_write op does not have masks.
 ///   4. The vector.transfer_write op writes to a tensor.empty op.
@@ -226,7 +226,7 @@ public:
 ///   {in_bounds = [true, false, true]}
 ///   : vector<4x5xf32>, tensor<?x?xf32>
 /// ```
-class FoldExtractSliceIntoXferWrite final
+class FoldExtractSliceIntoTransferWrite final
     : public OpRewritePattern<tensor::ExtractSliceOp> {
 public:
   using OpRewritePattern::OpRewritePattern;
@@ -234,27 +234,30 @@ public:
   LogicalResult matchAndRewrite(tensor::ExtractSliceOp extractSliceOp,
                                 PatternRewriter &rewriter) const override {
     if (extractSliceOp.getDroppedDims().any()) {
-      return failure();
-    }
-
-    auto result = dyn_cast<OpResult>(extractSliceOp.getSource());
-    if (!result) {
-      return failure();
-    }
-    if (!result.hasOneUse()) {
-      return failure();
+      return rewriter.notifyMatchFailure(
+          extractSliceOp,
+          "expect it is not a rank-reduced tensor.extract_slice op");
     }
     if (!llvm::all_of(extractSliceOp.getMixedOffsets(), isZeroIndex)) {
-      return failure();
+      return rewriter.notifyMatchFailure(extractSliceOp,
+                                         "expect all the offsets are zeros");
     }
 
     auto xferOp =
         extractSliceOp.getSource().getDefiningOp<vector::TransferWriteOp>();
     if (!xferOp) {
-      return failure();
+      return rewriter.notifyMatchFailure(
+          extractSliceOp, "expect the source is from transfer.vector_write op");
+    }
+    if (!xferOp->hasOneUse()) {
+      return rewriter.notifyMatchFailure(
+          extractSliceOp,
+          "expect the transfer.vector_write op has only one use");
     }
     if (!xferOp.getSource().getDefiningOp<tensor::EmptyOp>()) {
-      return failure();
+      return rewriter.notifyMatchFailure(
+          extractSliceOp, "expect the transfer.vector_write op to write into a "
+                          "tensor.empty op");
     }
     if (xferOp.getMask()) {
       return failure();
@@ -297,7 +300,7 @@ public:
 
 void mlir::iree_compiler::populateVectorTransferTensorSliceTransforms(
     RewritePatternSet &patterns, PatternBenefit benefit) {
-  patterns.add<FoldExtractSliceIntoTransferRead,
-               FoldInsertSliceIntoTransferWrite, FoldExtractSliceIntoXferWrite>(
-      patterns.getContext(), benefit);
+  patterns
+      .add<FoldExtractSliceIntoTransferRead, FoldInsertSliceIntoTransferWrite,
+           FoldExtractSliceIntoTransferWrite>(patterns.getContext(), benefit);
 }
