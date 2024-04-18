@@ -219,10 +219,6 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
 
     lhsOffsets[lhsK] = kOffset;
     rhsOffsets[rhsK] = kOffset;
-
-    // Now apply permutation on LHS/RHS according to their batch order.
-    lhsOffsets = applyPermutationMap(lhsMap, ArrayRef(lhsOffsets));
-    rhsOffsets = applyPermutationMap(rhsMap, ArrayRef(rhsOffsets));
   }
 
   struct AMDMMAParameters {
