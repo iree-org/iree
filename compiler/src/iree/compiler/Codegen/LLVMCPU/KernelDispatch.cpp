@@ -1963,8 +1963,23 @@ static LogicalResult setConvRootConfig(mlir::FunctionOpInterface entryPointFn,
   int64_t numTilingDims = parallelTileSizes.size();
   tileSizes.emplace_back(numTilingDims, 0);
 
+  // Set "scalable" flags
+  ScalableTileFlagsListType scalableTileFlags;
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
+  if (isAArch64(targetAttr) && clEnableScalableVectorization) {
+    // Level 1: Distribution
+    scalableTileFlags.emplace_back(numTilingDims, false);
+    // Level 2: Parallel
+    scalableTileFlags.emplace_back(
+        SmallVector<bool>{false, false, false, true, false, false});
+    // Level 3: Reduction
+    scalableTileFlags.emplace_back(numTilingDims, false);
+    // Level 4: Inner parallel
+    scalableTileFlags.emplace_back(numTilingDims, false);
+  }
+
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, convOp, tileSizes,
+      entryPointFn, convOp, tileSizes, scalableTileFlags,
       DispatchLoweringPassPipeline::CPUConvTileAndDecomposeExpert);
 }
 
