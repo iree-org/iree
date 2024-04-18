@@ -602,10 +602,9 @@ SmallVector<int64_t> getIdentityPermWithSwap(int64_t rank,
 NestedLayoutAttr permuteAndCreateNestedLayout(
     MLIRContext *context, int64_t rank, int64_t outerDim, int64_t innerDim,
     SmallVector<int64_t> subgroupCount, SmallVector<int64_t> subgroupOrder,
-    SmallVector<int64_t> batchCount, SmallVector<int64_t> batchOrder,
-    MMAAttr::SingleSubgroupLayout counts, MMAAttr::SingleSubgroupLayout orders,
-    ArrayRef<int64_t> dataDuplicate, ArrayRef<int64_t> subgroupBasis,
-    ArrayRef<bool> subgroupActiveIds) {
+    SmallVector<int64_t> batchCount, MMAAttr::SingleSubgroupLayout counts,
+    MMAAttr::SingleSubgroupLayout orders, ArrayRef<int64_t> dataDuplicate,
+    ArrayRef<int64_t> subgroupBasis, ArrayRef<bool> subgroupActiveIds) {
 
   LLVM_DEBUG({
     llvm::errs() << "Given:";
@@ -617,12 +616,8 @@ NestedLayoutAttr permuteAndCreateNestedLayout(
     llvm::interleaveComma(subgroupOrder, llvm::errs());
     llvm::errs() << "\n    batchCount: ";
     llvm::interleaveComma(batchCount, llvm::errs());
-    llvm::errs() << "\n    batchOrder: ";
-    llvm::interleaveComma(batchOrder, llvm::errs());
     llvm::errs() << "\n    counts.outer: ";
     llvm::interleaveComma(counts.outer, llvm::errs());
-    llvm::errs() << "\n    orders.outer: ";
-    llvm::interleaveComma(orders.outer, llvm::errs());
     llvm::errs() << "\n    counts.thread: ";
     llvm::interleaveComma(counts.thread, llvm::errs());
     llvm::errs() << "\n    orders.thread: ";
@@ -630,20 +625,14 @@ NestedLayoutAttr permuteAndCreateNestedLayout(
     llvm::errs() << "\n    counts.element: ";
     llvm::interleaveComma(counts.element, llvm::errs());
     llvm::errs() << "\n    orders.element: ";
-    llvm::interleaveComma(orders.element, llvm::errs());
-    llvm::errs() << "\n    subgroupBasis: ";
     llvm::interleaveComma(subgroupBasis, llvm::errs());
     llvm::errs() << "\n    subgroupActiveIds: ";
     llvm::interleaveComma(subgroupActiveIds, llvm::errs());
     llvm::errs() << "\n";
   });
 
-  SmallVector<int64_t> outerOrder =
-      getIdentityPermWithSwap(rank, orders.outer, outerDim, innerDim);
   SmallVector<int64_t> threadOrder =
       getIdentityPermWithSwap(rank, orders.thread, outerDim, innerDim);
-  SmallVector<int64_t> elementOrder =
-      getIdentityPermWithSwap(rank, orders.element, outerDim, innerDim);
 
   SmallVector<int64_t> threadBasis =
       getUnitOfRankWithDims(rank, counts.thread, outerDim, innerDim);
@@ -666,21 +655,15 @@ NestedLayoutAttr permuteAndCreateNestedLayout(
     llvm::interleaveComma(subgroupOrder, llvm::errs());
     llvm::errs() << "\n    batchCount: ";
     llvm::interleaveComma(batchCount, llvm::errs());
-    llvm::errs() << "\n    batchOrder: ";
-    llvm::interleaveComma(batchOrder, llvm::errs());
     llvm::errs() << "\n    outerCount: ";
     llvm::interleaveComma(outerCount, llvm::errs());
     llvm::errs() << "\n    outerOrder: ";
-    llvm::interleaveComma(outerOrder, llvm::errs());
-    llvm::errs() << "\n    threadCount: ";
     llvm::interleaveComma(threadCount, llvm::errs());
     llvm::errs() << "\n    threadOrder: ";
     llvm::interleaveComma(threadOrder, llvm::errs());
     llvm::errs() << "\n    elementCount: ";
     llvm::interleaveComma(elementCount, llvm::errs());
     llvm::errs() << "\n    elementOrder: ";
-    llvm::interleaveComma(elementOrder, llvm::errs());
-    llvm::errs() << "\n    subgroupBasis: ";
     llvm::interleaveComma(subgroupBasis, llvm::errs());
     llvm::errs() << "\n    subgroupActiveIds: ";
     llvm::interleaveComma(subgroupActiveIds, llvm::errs());
@@ -690,10 +673,9 @@ NestedLayoutAttr permuteAndCreateNestedLayout(
   });
 
   auto layoutAttr = NestedLayoutAttr::get(
-      context, subgroupCount, subgroupOrder, batchCount, batchOrder, outerCount,
-      outerOrder, threadCount, threadOrder, elementCount, elementOrder,
-      subgroupBasis, subgroupActiveIds, threadBasis,
-      SmallVector<bool>(threadBasis.size(), true));
+      context, subgroupCount, subgroupOrder, batchCount, outerCount,
+      threadCount, threadOrder, elementCount, subgroupBasis, subgroupActiveIds,
+      threadBasis, SmallVector<bool>(threadBasis.size(), true));
   return layoutAttr;
 }
 
@@ -847,8 +829,7 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
       context, cRank, m, n,
       /*subgroupCount=*/cSubgroupSizes,
       /*subgroupOrder=*/cOverallOrder,
-      /*batchCount=*/cBatchSizes,
-      /*batchOrder=*/cOverallOrder, cCounts, cOrders,
+      /*batchCount=*/cBatchSizes, cCounts, cOrders,
       /*dataDuplicate=*/mmaAttr.getCDataDuplicate(), subgroupBasis,
       cActiveSubgroups);
   LLVM_DEBUG({ llvm::errs() << "C layout: " << cLayout << "\n"; });
@@ -868,15 +849,12 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
   SmallVector<int64_t> aBatchSizes(aRank, 1);
   SmallVector<int64_t> aSubgroupSizes(aRank, 1);
   SmallVector<int64_t> aSubgroupOrder(aRank, 0);
-  SmallVector<int64_t> aBatchOrder(aRank, 0);
   for (auto [i, dim] : llvm::enumerate(aMDims)) {
     aBatchSizes[dim] = batchMSizes[i];
     aSubgroupSizes[dim] = subgroupMBasis[i];
     aSubgroupOrder[dim] = i;
-    aBatchOrder[dim] = i >= afk ? i + 1 : i;
   }
   aSubgroupOrder[afk] = aRank - 1;
-  aBatchOrder[afk] = afk;
   aBatchSizes[afk] = getSubgroupKTileCount();
 
   SmallVector<bool> aActiveSubgroups(subgroupBasis.size(), false);
@@ -889,8 +867,7 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
       context, aRank, afm, afk,
       /*subgroupCount=*/aSubgroupSizes,
       /*subgroupOrder=*/aSubgroupOrder,
-      /*batchCount=*/aBatchSizes,
-      /*batchOrder=*/getIdentityPerm(aRank), aCounts, aOrders,
+      /*batchCount=*/aBatchSizes, aCounts, aOrders,
       /*dataDuplicate=*/mmaAttr.getADataDuplicate(), subgroupBasis,
       aActiveSubgroups);
   LLVM_DEBUG({ llvm::errs() << "A layout: " << aLayout << "\n"; });
@@ -907,15 +884,12 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
   SmallVector<int64_t> bBatchSizes(bRank, 1);
   SmallVector<int64_t> bSubgroupSizes(bRank, 1);
   SmallVector<int64_t> bSubgroupOrder(bRank, 0);
-  SmallVector<int64_t> bBatchOrder(bRank, 0);
   for (auto [i, dim] : llvm::enumerate(bNDims)) {
     bBatchSizes[dim] = batchNSizes[i];
     bSubgroupSizes[dim] = subgroupNBasis[i];
     bSubgroupOrder[dim] = i;
-    bBatchOrder[dim] = i >= bfk ? i + 1 : i;
   }
   bSubgroupOrder[bfk] = bRank - 1;
-  bBatchOrder[bfk] = bfk;
   bBatchSizes[bfk] = getSubgroupKTileCount();
 
   SmallVector<bool> bActiveSubgroups(subgroupBasis.size(), false);
@@ -928,8 +902,7 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
       context, bRank, bfk, bfn,
       /*subgroupCount=*/bSubgroupSizes,
       /*subgroupOrder=*/bSubgroupOrder,
-      /*batchCount=*/bBatchSizes,
-      /*batchOrder=*/bBatchOrder, bCounts, bOrders,
+      /*batchCount=*/bBatchSizes, bCounts, bOrders,
       /*dataDuplicate=*/mmaAttr.getBDataDuplicate(), subgroupBasis,
       bActiveSubgroups);
   LLVM_DEBUG({ llvm::errs() << "B layout: " << bLayout << "\n"; });
