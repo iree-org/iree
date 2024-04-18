@@ -68,9 +68,10 @@ def SPIRV_WinogradVectorize
 
 def VMVX_Default : I32EnumAttrCase<"VMVXDefault", 300>;
 
-
 def Linalg_TransformDialectCodegen
     : I32EnumAttrCase<"TransformDialectCodegen", 1000>;
+def Custom
+    : I32EnumAttrCase<"Custom", 1001>;
 
 def None : I32EnumAttrCase<"None", 0xffff>;
 
@@ -99,7 +100,13 @@ def DispatchLoweringPassPipelineEnum : I32EnumAttr<
     VMVX_Default,
 
     // Transform dialect based codegen
-    Linalg_TransformDialectCodegen, None
+    Linalg_TransformDialectCodegen,
+
+    // For out of tree pass-pipelines
+    Custom,
+
+    // None to specify no in-built pipelines to use.
+    None
   ]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
   // Don't generate a C++ class! We want to use the AttrDef
