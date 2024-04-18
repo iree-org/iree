@@ -15,7 +15,7 @@ func.func @f32_to_i4_1d() {
   %exti8 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]}
     ins(%blocker : tensor<8xi4>) outs(%init1 : tensor<8xi8>) {
   ^bb0(%in: i4, %out: i8):
-    %2 = arith.extsi %in : i4 to i8
+    %2 = arith.extui %in : i4 to i8
     linalg.yield %2 : i8
   } -> tensor<8xi8>
 
@@ -40,7 +40,7 @@ func.func @f32_to_i2_1d() {
   %exti8 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>], iterator_types = ["parallel"]}
     ins(%blocker : tensor<8xi2>) outs(%init1 : tensor<8xi8>) {
   ^bb0(%in: i2, %out: i8):
-    %2 = arith.extsi %in : i2 to i8
+    %2 = arith.extui %in : i2 to i8
     linalg.yield %2 : i8
   } -> tensor<8xi8>
 
