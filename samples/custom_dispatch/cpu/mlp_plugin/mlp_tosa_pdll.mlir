@@ -1,4 +1,4 @@
-// RUN: mlir-pdll %p/mlp_all_specs.pdll -x=mlir -I/home/ianwood/iree/third_party/torch-mlir/include -I/home/ianwood/iree/samples/custom_dispatch/cpu/mlp_plugin -I/home/ianwood/iree/third_party/llvm-project/mlir/include -I/home/ianwood/iree-build/llvm-project/tools/mlir/include > %t && \ 
+// RUN: mlir-pdll %p/mlp_all_specs.pdll -x=mlir -I%S/../../../..//third_party/torch-mlir/include -I%S/../../../..//samples/custom_dispatch/cpu/mlp_plugin -I%S/../../../..//third_party/llvm-project/mlir/include -I%S/../../../../-build/llvm-project/tools/mlir/include > %t && \ 
 // RUN: iree-opt --pass-pipeline="builtin.module(iree-preprocessing-apply-pdl-patterns{patterns-file=%t})" %s | \
 // RUN: iree-compile - | \
 // RUN: iree-run-module --device=local-sync \
