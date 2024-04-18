@@ -130,14 +130,15 @@ static bool isSmallerThan(ArrayRef<int64_t> sourceShape,
 static std::pair<OpFoldResult, OpFoldResult>
 getScaledSizeAndOffset(OpBuilder &builder, Location loc, OpFoldResult size,
                        OpFoldResult offset, OpFoldResult dimSize,
-                       int64_t scale) {
+                       int64_t offsetScale, int64_t sizeScale) {
   AffineExpr dim0, dim1, dim2;
   auto ctx = builder.getContext();
   bindDims(ctx, dim0, dim1, dim2);
   auto imageOffset = affine::makeComposedFoldedAffineApply(
-      builder, loc, {dim0 * scale}, offset);
+      builder, loc, {dim0 * offsetScale}, offset);
   auto dimSizeValue = getValueOrCreateConstantIndexOp(builder, loc, dimSize);
-  AffineMap sizeMap = AffineMap::get(3, 0, {dim0 - dim1, dim2 * scale}, ctx);
+  AffineMap sizeMap =
+      AffineMap::get(3, 0, {dim0 - dim1, dim2 * sizeScale}, ctx);
   auto imageSize = affine::makeComposedFoldedAffineMin(
       builder, loc, sizeMap, {dimSizeValue, imageOffset, size});
   return std::make_pair(imageSize, imageOffset);
@@ -2272,9 +2273,11 @@ WinogradInputTransformOp::getTiledImplementation(OpBuilder &builder,
   outputSizes[5] = inputSizes[cDim] = sizes[3];
 
   auto hSizeAndOffset = getScaledSizeAndOffset(
-      builder, loc, sizes[1], offsets[1], inputSizes[hDim], getInputTileSize());
+      builder, loc, sizes[1], offsets[1], inputSizes[hDim], getOutputTileSize(),
+      getInputTileSize());
   auto wSizeAndOffset = getScaledSizeAndOffset(
-      builder, loc, sizes[2], offsets[2], inputSizes[wDim], getInputTileSize());
+      builder, loc, sizes[2], offsets[2], inputSizes[wDim], getOutputTileSize(),
+      getInputTileSize());
 
   inputSizes[hDim] = hSizeAndOffset.first;
   inputSizes[wDim] = wSizeAndOffset.first;
@@ -2483,12 +2486,12 @@ FailureOr<TilingResult> WinogradOutputTransformOp::getTiledImplementation(
   inputSizes[4] = sizes[2];
   inputSizes[5] = outputSizes[cDim] = sizes[3];
 
-  auto hSizeAndOffset =
-      getScaledSizeAndOffset(builder, loc, sizes[1], offsets[1],
-                             outputSizes[hDim], getInputTileSize());
-  auto wSizeAndOffset =
-      getScaledSizeAndOffset(builder, loc, sizes[2], offsets[2],
-                             outputSizes[wDim], getInputTileSize());
+  auto hSizeAndOffset = getScaledSizeAndOffset(
+      builder, loc, sizes[1], offsets[1], outputSizes[hDim],
+      getOutputTileSize(), getOutputTileSize());
+  auto wSizeAndOffset = getScaledSizeAndOffset(
+      builder, loc, sizes[2], offsets[2], outputSizes[wDim],
+      getOutputTileSize(), getOutputTileSize());
 
   outputSizes[hDim] = hSizeAndOffset.first;
   outputSizes[wDim] = wSizeAndOffset.first;
@@ -2535,10 +2538,10 @@ LogicalResult WinogradOutputTransformOp::getResultTilePosition(
     }
     auto hSizeAndOffset = getScaledSizeAndOffset(
         builder, loc, sizes[1], offsets[1], reifiedResultShapes[0][hDim],
-        getInputTileSize());
+        getOutputTileSize(), getOutputTileSize());
     auto wSizeAndOffset = getScaledSizeAndOffset(
         builder, loc, sizes[2], offsets[2], reifiedResultShapes[0][wDim],
-        getInputTileSize());
+        getOutputTileSize(), getOutputTileSize());
 
     resultSizes[hDim] = hSizeAndOffset.first;
     resultSizes[wDim] = wSizeAndOffset.first;
