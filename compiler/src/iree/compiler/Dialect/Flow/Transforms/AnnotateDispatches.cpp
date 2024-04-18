@@ -4,23 +4,19 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <utility>
-
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Utils/StringUtils.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/StructuredOpsUtils.h"
+#include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
-#include "mlir/IR/IRMapping.h"
-#include "mlir/IR/SymbolTable.h"
 #include "mlir/Pass/Pass.h"
 
 #define DEBUG_TYPE "iree-dispatch"
@@ -161,6 +157,43 @@ static std::string getOpNameWithoutDialectName(Operation *op) {
   return opName.str();
 }
 
+static bool isMatvecLike(linalg::LinalgOp linalgOp) {
+  if (!linalg::isaContractionOpInterface(linalgOp))
+    return false;
+
+  FailureOr<linalg::ContractionDimensions> dims =
+      linalg::inferContractionDims(linalgOp);
+  if (failed(dims))
+    return false;
+
+  // One of the input should have all the parallel dimensions with size one.
+  SmallVector<int64_t, 4> bounds = linalgOp.getStaticLoopRanges();
+  SmallVector<AffineMap> maps = linalgOp.getIndexingMapsArray();
+  SmallVector<utils::IteratorType> iterators = linalgOp.getIteratorTypesArray();
+
+  auto areAllParallelDimsUnitSize = [&](AffineMap map) {
+    for (AffineExpr result : map.getResults()) {
+      // We have checked before that the affine map is projected permutation.
+      unsigned pos = cast<AffineDimExpr>(result).getPosition();
+      // For a parallel dim, the bounds can be non-one if it's batch dim.
+      if (iterators[pos] == utils::IteratorType::parallel && bounds[pos] != 1 &&
+          !llvm::is_contained(dims->batch, pos))
+        return false;
+    }
+    return true;
+  };
+
+  return areAllParallelDimsUnitSize(maps[0]) ||
+         areAllParallelDimsUnitSize(maps[1]);
+}
+
+static bool isMatmulLike(linalg::LinalgOp linalgOp) {
+  // Matmul should have at least 1 reduction and 2 parallel dimensions.
+  return linalg::isaContractionOpInterface(linalgOp) &&
+         linalgOp.getNumReductionLoops() >= 1 &&
+         linalgOp.getNumParallelLoops() >= 2;
+}
+
 static std::string summarizeLinalgOp(linalg::LinalgOp op) {
   std::string prefix;
 
@@ -182,7 +215,8 @@ static std::string summarizeLinalgOp(linalg::LinalgOp op) {
     }
   }
 
-  // Categorize linalg.generic ops better.
+  // Categorize linalg.generic ops better. The following checks more specific
+  // cases before more general ones.
   if (prefix.empty() && isa<linalg::GenericOp>(op)) {
     if (llvm::all_of(op.getIndexingMapsArray(),
                      [](AffineMap m) { return m.isIdentity(); })) {
@@ -191,6 +225,10 @@ static std::string summarizeLinalgOp(linalg::LinalgOp op) {
                             [](AffineMap m) { return m.isMinorIdentity(); })) {
       // We have checked that this is not pure elementwise in the above.
       prefix = "broadcast";
+    } else if (isMatvecLike(op)) {
+      prefix = "matvec_like";
+    } else if (isMatmulLike(op)) {
+      prefix = "matmul_like";
     } else if (linalg::isaContractionOpInterface(op)) {
       prefix = "contract";
     } else if (linalg::isaConvolutionOpInterface(op)) {
