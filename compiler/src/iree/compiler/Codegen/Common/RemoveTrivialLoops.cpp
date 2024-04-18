@@ -61,7 +61,8 @@ getWorkgroupRange(Value processorValue, SmallVectorImpl<Value> & /*dims*/,
     }
   }
 
-  if (llvm::any_of(workgroupCount, ShapedType::isDynamic))
+  if (workgroupCount.empty() ||
+      llvm::any_of(workgroupCount, ShapedType::isDynamic))
     return std::nullopt;
 
   if (auto idOp =
