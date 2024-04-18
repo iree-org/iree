@@ -5,7 +5,8 @@
 
 
 // Native rewrite "rewriteAsFlowDispatch"
-Rewrite rewriteAsFlowDispatch(op : Op,  inputs : ValueRange, repl_vals : ValueRange, repl_dims : ValueRange, other : ValueRange) -> Op;
+Rewrite rewriteAsFlowDispatch(op : Op, fn_name : Attr,  inputs : ValueRange, repl_vals : ValueRange, repl_dims : ValueRange, other : ValueRange) -> Op;
+
 
 
 Pattern mlp with benefit(1) {
@@ -36,6 +37,9 @@ Pattern mlp with benefit(1) {
     let repl_vals = (matMulOp.0 );
     let repl_dims = (m.0, n.0);
     let other = (m_cast.0, n_cast.0, k_cast.0, doRelu.0);
-    rewriteAsFlowDispatch(matMulOp, inputs, repl_vals, repl_dims, other);
+
+    // oof, figuring out i needed to escape the string took too long :( 
+    let fn_name = attr<"\"mlp_external\"">;
+    rewriteAsFlowDispatch(matMulOp, fn_name, inputs, repl_vals, repl_dims, other);
   };
 }

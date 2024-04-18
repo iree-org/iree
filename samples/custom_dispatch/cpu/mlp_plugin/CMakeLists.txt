@@ -118,7 +118,7 @@ add_custom_command(
     "${CMAKE_CURRENT_SOURCE_DIR}/mlp_linalg_spec.pdll" 
     -I /home/ianwood/iree/third_party/llvm-project/mlir/include/
     -x=mlir 
-    --debug
+   #-debug
     -o "${CMAKE_CURRENT_SOURCE_DIR}/mlp_linalg_generated.pdl.mlir"
   DEPENDS
     mlir-pdll
@@ -139,7 +139,6 @@ add_custom_target(
       "  includes: \"/home/ianwood/iree/third_party/llvm-project/mlir/include/\"\n"
   )
 
-
 iree_lit_test_suite(
   NAME
     mlp_pdll_linalg_example
@@ -151,10 +150,9 @@ iree_lit_test_suite(
     iree-run-module
     iree_samples_custom_dispatch_cpu_mlp_plugin
   DATA
-    "gen/mlp_linalg_spec.pdl.mlir"
+    "mlp_linalg_generated.pdl.mlir"
   LABELS
     "driver=local-sync"
     "hostonly"
 )
-
 endif(IREE_HAL_EXECUTABLE_PLUGIN_SYSTEM_LIBRARY)
