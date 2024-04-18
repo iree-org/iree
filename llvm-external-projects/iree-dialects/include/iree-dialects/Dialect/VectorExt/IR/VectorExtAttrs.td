@@ -270,16 +270,13 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
     ArrayRefParameter<"int64_t", "subgroup_order">:$subgroupOrder,
 
     ArrayRefParameter<"int64_t", "batches_per_subgroup">:$batchesPerSubgroup,
-    ArrayRefParameter<"int64_t", "batch_order">:$batchOrder,
 
     ArrayRefParameter<"int64_t", "outers_per_batch">:$outersPerBatch,
-    ArrayRefParameter<"int64_t", "outer_order">:$outerOrder,
 
     ArrayRefParameter<"int64_t", "threads_per_outer">:$threadsPerOuter,
     ArrayRefParameter<"int64_t", "thread_order">:$threadOrder,
 
     ArrayRefParameter<"int64_t", "elements_per_thread">:$elementsPerThread,
-    ArrayRefParameter<"int64_t", "element_order">:$elementOrder,
 
     ArrayRefParameter<"int64_t", "subgroup_basis">:$subgroupBasis,
     ArrayRefParameter<"bool", "subgroup_active_ids">:$subgroupActiveIds,
@@ -298,10 +295,7 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
         `elements_per_thread`     `=` `[` $elementsPerThread `]` `,`
 
         custom<Permutation>("\"subgroup_order\"", ref($subgroupsPerWorkgroup), "true", $subgroupOrder) ``
-        custom<Permutation>("\"batch_order\"", ref($batchesPerSubgroup), "true", $batchOrder) ``
-        custom<Permutation>("\"outer_order\"", ref($outersPerBatch), "true", $outerOrder) ``
         custom<Permutation>("\"thread_order\"", ref($threadsPerOuter), "true", $threadOrder) ``
-        custom<Permutation>("\"element_order\"", ref($elementsPerThread), "true", $elementOrder) ``
 
         custom<Basis>("\"subgroup_basis\"", "\"subgroup_active_ids\"", "true", $subgroupBasis, $subgroupActiveIds) ``
         custom<Basis>("\"thread_basis\"", "\"thread_active_ids\"", "false", $threadBasis, $threadActiveIds) ``
