@@ -202,3 +202,34 @@ module {
 
 // CHECK-LABEL: func.func @wmma_matmul_1024x1024x1024()
 // CHECK: linalg.matmul {{.*}}lowering_config = #[[$TILE_SIZES]]
+
+// -----
+
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>], target_arch = "gfx940"}>
+module {
+  func.func @matmul_dynamic_dim() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
+          %c0 = arith.constant 0 : index
+          %c32_i64 = arith.constant 32 : i64
+          %cst = arith.constant 0.000000e+00 : f32
+          %0 = hal.interface.constant.load[0] : i32
+          %1 = hal.interface.constant.load[1] : i32
+          %2 = arith.extui %0 : i32 to i64
+          %3 = arith.extui %1 : i32 to i64
+          %4 = arith.shli %3, %c32_i64 : i64
+          %5 = arith.ori %2, %4 : i64
+          %6 = arith.index_castui %5 : i64 to index
+          %7 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<256x256xf16>>
+          %8 = flow.dispatch.workload.ordinal %6, 0 : index
+          %9 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?x256xf16>>{%8}
+          %10 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<?x256xf32>>{%8}
+          %11 = flow.dispatch.tensor.load %9, offsets = [0, 0], sizes = [%8, 256], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x256xf16>>{%8} -> tensor<?x256xf16>
+          %12 = flow.dispatch.tensor.load %7, offsets = [0, 0], sizes = [256, 256], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<256x256xf16>> -> tensor<256x256xf16>
+          %13 = tensor.empty(%8) : tensor<?x256xf32>
+          %14 = linalg.fill ins(%cst : f32) outs(%13 : tensor<?x256xf32>) -> tensor<?x256xf32>
+          %15 = linalg.matmul ins(%11, %12 : tensor<?x256xf16>, tensor<256x256xf16>) outs(%14 : tensor<?x256xf32>) -> tensor<?x256xf32>
+          flow.dispatch.tensor.store %15, %10, offsets = [0, 0], sizes = [%8, 256], strides = [1, 1] : tensor<?x256xf32> -> !flow.dispatch.tensor<writeonly:tensor<?x256xf32>>{%8}
+          return
+  }
+}
+// Check that we have unhandled dynamic dimension.
+//       CHECK-NOT: iree_codegen.translation_info<LLVMGPUVectorDistribute
