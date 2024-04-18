@@ -188,9 +188,9 @@ static bool isMatvecLike(linalg::LinalgOp linalgOp) {
 }
 
 static bool isMatmulLike(linalg::LinalgOp linalgOp) {
-  // Matmul should have at least 1 reduction and 2 parallel dimensions.
+  // Matmul should have at least 1 reduction, which is checked by the interface,
+  // and 2 parallel dimensions.
   return linalg::isaContractionOpInterface(linalgOp) &&
-         linalgOp.getNumReductionLoops() >= 1 &&
          linalgOp.getNumParallelLoops() >= 2;
 }
 
