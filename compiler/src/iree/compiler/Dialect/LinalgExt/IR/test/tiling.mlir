@@ -844,8 +844,8 @@ module attributes { transform.with_named_sequence } {
     transform.yield
   }
 }
-// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0) -> (d0 * 8)>
-// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0) -> (d0 * -8 + 10, 8)>
+// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0) -> (d0 * 6)>
+// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0) -> (d0 * -6 + 10, 8)>
 // CHECK:      func.func @winograd_input_transform(%[[ARG0:[a-zA-Z0-9_]+]]: tensor<1x10x10x1280xf32>) ->
 // CHECK-SAME:   tensor<8x8x1x2x2x1280xf32> {
 // CHECK-DAG:    %[[C2:.+]] = arith.constant 2 : index
@@ -898,8 +898,8 @@ module attributes { transform.with_named_sequence } {
     transform.yield
   }
 }
-// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0) -> (d0 * 8)>
-// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0) -> (d0 * -8 + 10, 8)>
+// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0) -> (d0 * 6)>
+// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0) -> (d0 * -6 + 10, 8)>
 // CHECK:      func.func @winograd_input_transform_memref(%[[ARG0:[a-zA-Z0-9_]+]]: memref<1x10x10x1280xf32>,
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: memref<8x8x1x2x2x1280xf32>) {
 // CHECK-DAG:    %[[C2:.+]] = arith.constant 2 : index
@@ -950,8 +950,8 @@ module attributes { transform.with_named_sequence } {
 }
 // CHECK-DAG:  #[[MAP:.+]] = affine_map<()[s0] -> (s0 * -8 + 34, 16)>
 // CHECK-DAG:  #[[MAP1:.+]] = affine_map<()[s0] -> (s0 * -8 + 34, 24)>
-// CHECK-DAG:  #[[MAP3:.+]] = affine_map<(d0) -> (d0 * 8)>
-// CHECK-DAG:  #[[MAP4:.+]] = affine_map<(d0)[s0] -> (d0 * -8 + s0, 8)>
+// CHECK-DAG:  #[[MAP3:.+]] = affine_map<(d0) -> (d0 * 6)>
+// CHECK-DAG:  #[[MAP4:.+]] = affine_map<(d0)[s0] -> (d0 * -6 + s0, 8)>
 // CHECK:      func.func @winograd_input_transform_dynamic(%[[ARG0:[a-zA-Z0-9_]+]]: tensor<2x34x34x128xf32>
 // CHECK-SAME:   %[[I0:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:   %[[I1:[a-zA-Z0-9_]+]]: index
@@ -1017,8 +1017,8 @@ module attributes { transform.with_named_sequence } {
     transform.yield
   }
 }
-// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0) -> (d0 * 8)>
-// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0) -> (d0 * -8 + 12, 8)>
+// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0) -> (d0 * 6)>
+// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0) -> (d0 * -6 + 12, 6)>
 // CHECK:      func.func @winograd_output_transform(%[[ARG0:[a-zA-Z0-9_]+]]: tensor<8x8x1x2x2x32xf32>) ->
 // CHECK-SAME:   tensor<1x12x12x32xf32> {
 // CHECK-DAG:    %[[C2:.+]] = arith.constant 2 : index
@@ -1071,8 +1071,8 @@ module attributes { transform.with_named_sequence } {
     transform.yield
   }
 }
-// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0) -> (d0 * 8)>
-// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0) -> (d0 * -8 + 12, 8)>
+// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0) -> (d0 * 6)>
+// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0) -> (d0 * -6 + 12, 6)>
 // CHECK:      func.func @winograd_output_transform_memref(%[[ARG0:[a-zA-Z0-9_]+]]: memref<8x8x1x2x2x32xf32>,
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: memref<1x12x12x32xf32>) {
 // CHECK-DAG:    %[[C2:.+]] = arith.constant 2 : index
@@ -1115,9 +1115,9 @@ module attributes { transform.with_named_sequence } {
     transform.yield
   }
 }
-// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0) -> (d0 * 8)>
-// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1) -> (8, d0 - d1 * 8)>
-// CHECK-DAG:  #[[MAP2:.+]] = affine_map<(d0)[s0] -> (d0 * -8 + s0, 8)>
+// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0) -> (d0 * 6)>
+// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0, d1) -> (6, d0 - d1 * 6)>
+// CHECK-DAG:  #[[MAP2:.+]] = affine_map<(d0)[s0] -> (d0 * -6 + s0, 6)>
 // CHECK:      func.func @winograd_output_transform_dynamic(%[[ARG0:[a-zA-Z0-9_]+]]: tensor<8x8x?x?x?x?xf32>
 // CHECK-SAME:   %[[I0:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:   %[[I1:[a-zA-Z0-9_]+]]: index
@@ -1188,8 +1188,8 @@ module attributes { transform.with_named_sequence } {
     transform.yield
   }
 }
-// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0) -> (d0 * 8)>
-// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0) -> (d0 * -8 + 10, 8)>
+// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0) -> (d0 * 6)>
+// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0) -> (d0 * -6 + 10, 8)>
 // CHECK:      func.func @winograd_input_transform_nchw(%[[ARG0:[a-zA-Z0-9_]+]]: tensor<1x1280x10x10xf32>) ->
 // CHECK-SAME:   tensor<8x8x1x2x2x1280xf32> {
 // CHECK-DAG:    %[[C2:.+]] = arith.constant 2 : index
@@ -1243,8 +1243,8 @@ module attributes { transform.with_named_sequence } {
     transform.yield
   }
 }
-// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0) -> (d0 * 8)>
-// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0) -> (d0 * -8 + 12, 8)>
+// CHECK-DAG:  #[[MAP:.+]] = affine_map<(d0) -> (d0 * 6)>
+// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0) -> (d0 * -6 + 12, 6)>
 // CHECK:      func.func @winograd_output_transform_nchw(%[[ARG0:[a-zA-Z0-9_]+]]: tensor<8x8x1x2x2x32xf32>) ->
 // CHECK-SAME:   tensor<1x32x12x12xf32> {
 // CHECK-DAG:    %[[C2:.+]] = arith.constant 2 : index
