@@ -413,14 +413,14 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
   });
 
   {
-    SmallVector<int64_t> mixedNumWorkgroup = getMixedNumWorkgroups(funcOp);
+    SmallVector<int64_t> staticNumWorkgroup = getStaticNumWorkgroups(funcOp);
     // Apply linalg tiling optimization patterns, which includes folding
     // casting ops into tiled operations.
     RewritePatternSet patterns(context);
     linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
     tensor::populateFoldTensorEmptyPatterns(patterns);
     populateFoldAffineMinInDistributedLoopsPatterns(patterns,
-                                                    mixedNumWorkgroup);
+                                                    staticNumWorkgroup);
     context->getOrLoadDialect<tensor::TensorDialect>()
         ->getCanonicalizationPatterns(patterns);
     context->getOrLoadDialect<IREE::LinalgExt::IREELinalgExtDialect>()

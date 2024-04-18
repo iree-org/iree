@@ -1105,32 +1105,6 @@ SmallVector<int64_t> getStaticNumWorkgroups(mlir::FunctionOpInterface funcOp) {
     if (auto indexOp = dyn_cast_or_null<arith::ConstantIndexOp>(defOp)) {
       result.push_back(indexOp.value());
     } else {
-      return SmallVector<int64_t>();
-    }
-  }
-
-  return result;
-}
-
-/// Infer the number of workgroups from exportOp.
-SmallVector<int64_t> getMixedNumWorkgroups(mlir::FunctionOpInterface funcOp) {
-  SmallVector<int64_t> result;
-  std::optional<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
-  if (!exportOp)
-    return result;
-
-  Block *body = exportOp->getWorkgroupCountBody();
-  if (!body)
-    return result;
-
-  auto returnOp = cast<IREE::HAL::ReturnOp>(body->getTerminator());
-  assert(returnOp.getNumOperands() == 3);
-
-  for (unsigned i = 0; i < 3; ++i) {
-    Operation *defOp = returnOp.getOperand(i).getDefiningOp();
-    if (auto indexOp = dyn_cast_or_null<arith::ConstantIndexOp>(defOp)) {
-      result.push_back(indexOp.value());
-    } else {
       result.push_back(ShapedType::kDynamic);
     }
   }

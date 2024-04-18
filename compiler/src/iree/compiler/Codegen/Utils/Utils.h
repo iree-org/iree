@@ -95,12 +95,8 @@ bool isRISCV32(IREE::HAL::ExecutableTargetAttr targetAttr);
 bool isReadOnly(Value v);
 
 /// Return the static number of workgroup dispatched if it is known and
-/// constant. Return an empty vector otherwise.
+/// constant.
 SmallVector<int64_t> getStaticNumWorkgroups(mlir::FunctionOpInterface funcOp);
-
-// Similar to getStaticNumWorkgroups but will return sizes even if it has
-// dynamic dim.
-SmallVector<int64_t> getMixedNumWorkgroups(mlir::FunctionOpInterface funcOp);
 
 //===----------------------------------------------------------------------===//
 // Utility functions to set configurations
