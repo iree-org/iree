@@ -41,6 +41,9 @@ set_target_properties(iree_samples_custom_dispatch_cpu_mlp_plugin
 add_dependencies(iree-sample-deps
   iree_samples_custom_dispatch_cpu_mlp_plugin)
 
+add_dependencies(iree_samples_custom_dispatch_cpu_mlp_plugin
+  mlir-pdll)
+
 iree_lit_test_suite(
   NAME
     mlp_example
@@ -109,11 +112,11 @@ iree_lit_test_suite(
     "driver=local-sync"
     "hostonly"
 )
-set(MLP_PDLL_INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR};${MLIR_INCLUDE_DIRS};${TORCH_MLIR_ROOT_DIR}/include")
+
 # Append the includes used for this file to the pdll_compilation_commands
 file(APPEND ${CMAKE_BINARY_DIR}/pdll_compile_commands.yml
   "--- !FileInfo:\n"
-  "  filepath: \"${CMAKE_CURRENT_SOURCE_DIR}/mlp_linalg_spec.pdll\"\n"
+  "  filepath: \"${CMAKE_CURRENT_SOURCE_DIR}/mlp_all_specs.pdll\"\n"
   "  includes: \"${TORCH_MLIR_ROOT_DIR}/include;${CMAKE_CURRENT_SOURCE_DIR};${MLIR_INCLUDE_DIRS}\"\n"
 )
 
@@ -126,9 +129,10 @@ iree_lit_test_suite(
     FileCheck
     iree-compile
     iree-run-module
+    mlir-pdll
     iree_samples_custom_dispatch_cpu_mlp_plugin
   DATA
-    "mlp_linalg_spec.pdll"
+    "mlp_all_specs.pdll"
   LABELS
     "driver=local-sync"
     "hostonly"
@@ -143,9 +147,10 @@ iree_lit_test_suite(
     FileCheck
     iree-compile
     iree-run-module
+    mlir-pdll
     iree_samples_custom_dispatch_cpu_mlp_plugin
   DATA
-    "mlp_linalg_spec.pdll"
+    "mlp_all_specs.pdll"
   LABELS
     "driver=local-sync"
     "hostonly"
@@ -159,11 +164,14 @@ iree_lit_test_suite(
     FileCheck
     iree-compile
     iree-run-module
+    mlir-pdll
     iree_samples_custom_dispatch_cpu_mlp_plugin
   DATA
-    "mlp_linalg_spec.pdll"
+    "mlp_all_specs.pdll"
   LABELS
     "driver=local-sync"
     "hostonly"
+  DEPENDS 
+    mlir-pdll
 )
 endif(IREE_HAL_EXECUTABLE_PLUGIN_SYSTEM_LIBRARY)
