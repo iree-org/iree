@@ -274,7 +274,62 @@ flow.executable private @ex {
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 
 flow.executable private @ex {
-  // CHECK: flow.executable.export public @dispatch_contract_16x32x8_f32
+  // CHECK: flow.executable.export public @dispatch_matvec_like_1x32x8_f32
+  flow.executable.export public @dispatch
+  builtin.module {
+    func.func @dispatch(%arg0: !flow.dispatch.tensor<readwrite:tensor<1x32xf32>>) {
+      %0 = tensor.empty() : tensor<1x8xf32>
+      %1 = tensor.empty() : tensor<8x32xf32>
+      %init = flow.dispatch.tensor.load %arg0, offsets = [0, 0], sizes = [16, 32], strides = [1, 1] : !flow.dispatch.tensor<readwrite:tensor<1x32xf32>> -> tensor<1x32xf32>
+      %2 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction"]}
+              ins(%0, %1 : tensor<1x8xf32>, tensor<8x32xf32>) outs(%init : tensor<1x32xf32>) {
+      ^bb0(%in: f32, %in_0: f32, %out: f32):
+        %3 = arith.mulf %in, %in_0 : f32
+        %4 = arith.addf %out, %3 : f32
+        linalg.yield %4 : f32
+      } -> tensor<1x32xf32>
+      flow.dispatch.tensor.store %2, %arg0, offsets = [0, 0], sizes = [1, 32], strides = [1, 1] : tensor<1x32xf32> -> !flow.dispatch.tensor<readwrite:tensor<1x32xf32>>
+      return
+    }
+  }
+}
+
+// -----
+
+#map =  affine_map<(d0, d1, d2, d3) -> (d1, d0, d3)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
+#map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+
+// Batch matvec-like generic
+flow.executable private @ex {
+  // CHECK: flow.executable.export public @dispatch_matvec_like_32x1x512x64_f32
+  flow.executable.export public @dispatch
+  builtin.module {
+    func.func @dispatch(%arg0: !flow.dispatch.tensor<readwrite:tensor<32x1x512xf32>>) {
+      %0 = tensor.empty() : tensor<1x32x64xf32>
+      %1 = tensor.empty() : tensor<32x64x512xf32>
+      %init = flow.dispatch.tensor.load %arg0, offsets = [0, 0, 0], sizes = [32, 1, 512], strides = [1, 1, 1] : !flow.dispatch.tensor<readwrite:tensor<32x1x512xf32>> -> tensor<32x1x512xf32>
+      %2 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "reduction"]}
+              ins(%0, %1 : tensor<1x32x64xf32>, tensor<32x64x512xf32>) outs(%init : tensor<32x1x512xf32>) {
+      ^bb0(%in: f32, %in_0: f32, %out: f32):
+        %8 = arith.mulf %in, %in_0 : f32
+        %9 = arith.addf %out, %8 : f32
+        linalg.yield %9 : f32
+      } -> tensor<32x1x512xf32>
+      flow.dispatch.tensor.store %2, %arg0, offsets = [0, 0, 0], sizes = [32, 1, 512], strides = [1, 1, 1] : tensor<32x1x512xf32> -> !flow.dispatch.tensor<readwrite:tensor<32x1x512xf32>>
+      return
+    }
+  }
+}
+
+// -----
+
+#map = affine_map<(d0, d1, d2) -> (d0, d2)>
+#map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
+#map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
+
+flow.executable private @ex {
+  // CHECK: flow.executable.export public @dispatch_matmul_like_16x32x8_f32
   flow.executable.export public @dispatch
   builtin.module {
     func.func @dispatch(%arg0: !flow.dispatch.tensor<readwrite:tensor<16x32xf32>>) {
@@ -289,6 +344,91 @@ flow.executable private @ex {
         linalg.yield %4 : f32
       } -> tensor<16x32xf32>
       flow.dispatch.tensor.store %2, %arg0, offsets = [0, 0], sizes = [16, 32], strides = [1, 1] : tensor<16x32xf32> -> !flow.dispatch.tensor<readwrite:tensor<16x32xf32>>
+      return
+    }
+  }
+}
+
+// -----
+
+#map =  affine_map<(d0, d1, d2, d3) -> (d1, d0, d3)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
+#map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+
+// batch matmul-like generic
+flow.executable private @ex {
+  // CHECK: flow.executable.export public @dispatch_matmul_like_32x8x512x64_f32
+  flow.executable.export public @dispatch
+  builtin.module {
+    func.func @dispatch(%arg0: !flow.dispatch.tensor<readwrite:tensor<32x8x512xf32>>) {
+      %0 = tensor.empty() : tensor<8x32x64xf32>
+      %1 = tensor.empty() : tensor<32x64x512xf32>
+      %init = flow.dispatch.tensor.load %arg0, offsets = [0, 0, 0], sizes = [32, 8, 512], strides = [1, 1, 1] : !flow.dispatch.tensor<readwrite:tensor<32x8x512xf32>> -> tensor<32x8x512xf32>
+      %2 = linalg.generic {indexing_maps = [#map, #map1, #map2], iterator_types = ["parallel", "parallel", "parallel", "reduction"]}
+              ins(%0, %1 : tensor<8x32x64xf32>, tensor<32x64x512xf32>) outs(%init : tensor<32x8x512xf32>) {
+      ^bb0(%in: f32, %in_0: f32, %out: f32):
+        %8 = arith.mulf %in, %in_0 : f32
+        %9 = arith.addf %out, %8 : f32
+        linalg.yield %9 : f32
+      } -> tensor<32x8x512xf32>
+      flow.dispatch.tensor.store %2, %arg0, offsets = [0, 0, 0], sizes = [32, 8, 512], strides = [1, 1, 1] : tensor<32x8x512xf32> -> !flow.dispatch.tensor<readwrite:tensor<32x8x512xf32>>
+      return
+    }
+  }
+}
+
+// -----
+
+#map0 = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>
+#map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
+
+// Multi-reduction matmul-like generic
+flow.executable private @ex {
+  // CHECK: flow.executable.export public @dispatch_matmul_like_512x11008x32x128_f32
+  flow.executable.export public @dispatch
+  builtin.module {
+    func.func @dispatch(%arg0: !flow.dispatch.tensor<readwrite:tensor<512x11008xf32>>) {
+      %0 = tensor.empty() : tensor<512x32x128xf32>
+      %1 = tensor.empty() : tensor<11008x32x128xf32>
+      %init = flow.dispatch.tensor.load %arg0, offsets = [0, 0], sizes = [512, 11008], strides = [1, 1] : !flow.dispatch.tensor<readwrite:tensor<512x11008xf32>> -> tensor<512x11008xf32>
+      %2 = linalg.generic {indexing_maps = [#map0, #map1, #map2], iterator_types = ["parallel", "parallel", "reduction", "reduction"]}
+              ins(%0, %1 : tensor<512x32x128xf32>, tensor<11008x32x128xf32>) outs(%init : tensor<512x11008xf32>) {
+      ^bb0(%in: f32, %in_0: f32, %out: f32):
+        %24 = arith.mulf %in, %in_0 : f32
+        %25 = arith.addf %24, %out : f32
+        linalg.yield %25 : f32
+      } -> tensor<512x11008xf32>
+      flow.dispatch.tensor.store %2, %arg0, offsets = [0, 0], sizes = [512, 11008], strides = [1, 1] : tensor<512x11008xf32> -> !flow.dispatch.tensor<readwrite:tensor<512x11008xf32>>
+      return
+    }
+  }
+}
+
+// -----
+
+#map0 = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>
+#map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
+
+// Multi-parallel matmul-like generic
+flow.executable private @ex {
+  // CHECK: flow.executable.export public @dispatch_matmul_like_2x128x128x320x960_f16
+  flow.executable.export public @dispatch
+  builtin.module {
+    func.func @dispatch(%arg0: !flow.dispatch.tensor<readwrite:tensor<2x128x128x320xf16>>) {
+      %0 = tensor.empty() : tensor<320x960xf16>
+      %1 = tensor.empty() : tensor<960x2x128x128xf16>
+      %init = flow.dispatch.tensor.load %arg0, offsets = [0, 0, 0, 0], sizes = [2, 128, 128, 320], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readwrite:tensor<2x128x128x320xf16>> -> tensor<2x128x128x320xf16>
+      %2 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d3, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d4, d0, d1, d2)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>],
+                                            iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]}
+              ins(%0, %1 : tensor<320x960xf16>, tensor<960x2x128x128xf16>) outs(%init : tensor<2x128x128x320xf16>) {
+      ^bb0(%in: f16, %in_0: f16, %out: f16):
+        %8 = arith.mulf %in_0, %in : f16
+        %9 = arith.addf %out, %8 : f16
+        linalg.yield %9 : f16
+      } -> tensor<2x128x128x320xf16>
+      flow.dispatch.tensor.store %2, %arg0, offsets = [0, 0, 0, 0], sizes = [2, 128, 128, 320], strides = [1, 1, 1, 1] : tensor<2x128x128x320xf16> -> !flow.dispatch.tensor<readwrite:tensor<2x128x128x320xf16>>
       return
     }
   }
