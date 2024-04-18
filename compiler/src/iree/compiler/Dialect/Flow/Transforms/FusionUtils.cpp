@@ -56,10 +56,14 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
   if (!producerOp->hasOneUse())
     return false;
 
-  // Do no fuse dequantization-like operations with consumers as we want to keep
-  // the smallest bitwidths at the dispatch boundaries, unless the consumer
-  // dequantization op only has one use, in which case elementwise op fusion
-  // is fine.
+  // Do no fuse dequantization-like operations with producers. The
+  // dequantization ops are cloned into all their use dispatches. So fusing
+  // producer with consumer here would then result in producer also getting
+  // cloned into many dispatches which is against the thumb rule of fusion to
+  // not introduce additional computation (except for dequant ops). If the
+  // consumer has only one use, then this fusion is fine since cloning wont
+  // result in redundant computation of the producer. (Also note that the
+  // producer is always an elementwise operation).
   if (isDequantizationLikeOp(consumerOp) && !consumerOp->hasOneUse()) {
     return false;
   }
