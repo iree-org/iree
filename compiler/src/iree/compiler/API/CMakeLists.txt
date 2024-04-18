@@ -16,9 +16,9 @@ iree_cc_library(
   DEPS
     IREEDialectsCAPI
     MLIRCAPIDebug
+    MLIRCAPIGPU
     MLIRCAPIIR
     MLIRCAPIInterfaces
-    MLIRCAPIGPU
     MLIRCAPILinalg
     MLIRCAPIPDL
     MLIRCAPITransformDialect
