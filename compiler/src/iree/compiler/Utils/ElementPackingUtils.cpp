@@ -68,7 +68,7 @@ Value calculateStorageElementCountInBytes(Location loc,
   SmallVector<Value> paddedDynamicDims(dynamicDims.begin(), dynamicDims.end());
   auto encoding = IREE::LinalgExt::getEncodingAttr(shapedType);
   if (encoding && !encoding.getRoundDimsTo().empty()) {
-    auto roundDimsTo = encoding.getRoundDimsTo();
+    auto roundDimsTo = encoding.getRoundDimsToArray();
     FailureOr<linalg::ContractionDimensions> cDims =
         IREE::LinalgExt::getEncodingContractionDims(encoding);
     auto indexingMap = encoding.getMapForRole();

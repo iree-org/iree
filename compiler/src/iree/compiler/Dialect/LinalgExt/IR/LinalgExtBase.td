@@ -95,7 +95,7 @@ def EncodingAttr :
     OptionalParameter<"IntegerAttr", "optional N narrow dimension size (only for contraction op user_indexing_maps)">:$matmul_narrow_N,
     OptionalParameter<"ArrayAttr", "Indexing maps of the operation using this tensor">:$user_indexing_maps,
     // TODO(hanchung): The round_dims_to parameter can be revisited. We explicitly map them to M,N,K dimension for now.
-    OptionalArrayRefParameter<"int64_t", "Values for padding M,N,K dimensions">:$round_dims_to
+    OptionalParameter<"DenseArrayAttr", "Values for padding M,N,K dimensions">:$round_dims_to
   );
 
   let builders = [
@@ -114,6 +114,9 @@ def EncodingAttr :
     /// Given the dim position of the encoding `user_indexing_maps`, returns the
     /// matching index of the given encoding's tensor.
     unsigned mapDimToRoleIndex(int64_t dimPos);
+
+    /// Returns an integer array with values in `round_dims_to`.
+    ArrayRef<int64_t> getRoundDimsToArray();
   }];
 
   let genVerifyDecl = 0;

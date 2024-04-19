@@ -2902,9 +2902,12 @@ EncodingAttr EncodingAttr::get(MLIRContext *ctx, EncodingRole role,
   };
   auto roleAttr = EncodingRoleAttr::get(ctx, role);
   auto origTypeAttr = origType ? TypeAttr::get(origType) : TypeAttr();
+  auto roundDimsToAttr = roundDimsTo.empty()
+                             ? DenseI64ArrayAttr()
+                             : b.getDenseI64ArrayAttr(roundDimsTo);
   return get(ctx, roleAttr, b.getTypeArrayAttr(elemTypes), origTypeAttr,
              optionalToAttr(matmulNarrowM), optionalToAttr(matmulNarrowN),
-             b.getAffineMapArrayAttr(maps), roundDimsTo);
+             b.getAffineMapArrayAttr(maps), roundDimsToAttr);
 }
 
 AffineMap EncodingAttr::getMapForRole() {
@@ -2926,6 +2929,14 @@ unsigned EncodingAttr::mapDimToRoleIndex(int64_t dimPos) {
   auto idx = map.getResultPosition(getAffineDimExpr(dimPos, getContext()));
   assert(idx.has_value());
   return idx.value();
+}
+
+ArrayRef<int64_t> EncodingAttr::getRoundDimsToArray() {
+  auto roundDimsTo = getRoundDimsTo();
+  if (!roundDimsTo) {
+    return {};
+  }
+  return roundDimsTo.cast<DenseI64ArrayAttr>().asArrayRef();
 }
 
 //===---------------------------------------------------------------------===//

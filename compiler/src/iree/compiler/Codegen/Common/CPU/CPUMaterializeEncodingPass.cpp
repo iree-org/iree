@@ -492,7 +492,7 @@ materializeEncodingForTarget(RankedTensorType tensorType,
   // taking narrow dimensions into account.
   TileMxNxK chosenTileMxNxK =
       chooseMatmulTile(enumeratedTileMxNxK, matmulNarrowM, matmulNarrowN,
-                       encoding.getRoundDimsTo());
+                       encoding.getRoundDimsToArray());
 
   // Map the matmul TileMxNxK to an actual tile shape for the tensor at hand,
   // based on its role in the matmul.
