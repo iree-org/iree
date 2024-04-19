@@ -1,6 +1,64 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-linalg-ext-decompose-winograd),cse)" --split-input-file %s | FileCheck %s
 
 module {
+  func.func @winograd_filter_transform(%arg0: tensor<3x3x64x128xf32>, %arg1: tensor<8x8x64x128xf32>) -> tensor<8x8x64x128xf32> {
+    %extracted_slice = tensor.extract_slice %arg0[0, 0, 0, 0] [3, 3, 1, 1] [1, 1, 1, 1] : tensor<3x3x64x128xf32> to tensor<3x3x1x1xf32>
+    %extracted_slice_0 = tensor.extract_slice %arg1[0, 0, 0, 0] [8, 8, 1, 1] [1, 1, 1, 1] : tensor<8x8x64x128xf32> to tensor<8x8x1x1xf32>
+    %14 = iree_linalg_ext.winograd.filter_transform output_tile_size(6) kernel_size(3) kernel_dimensions([0, 1]) ins(%extracted_slice : tensor<3x3x1x1xf32>) outs(%extracted_slice_0 : tensor<8x8x1x1xf32>) -> tensor<8x8x1x1xf32>
+    %inserted_slice = tensor.insert_slice %14 into %arg1[0, 0, 0, 0] [8, 8, 1, 1] [1, 1, 1, 1] : tensor<8x8x1x1xf32> into tensor<8x8x64x128xf32>
+    return %inserted_slice : tensor<8x8x64x128xf32>
+  }
+}
+// CHECK:      func.func @winograd_filter_transform(
+// CHECK-SAME:   %[[ARG0:.+]]: tensor<3x3x64x128xf32>
+// CHECK-SAME:   %[[ARG1:.+]]: tensor<8x8x64x128xf32>
+// CHECK-DAG:    %[[ZERO:.+]] = arith.constant 0.000000e+00 : f32
+// CHECK-DAG:    %[[GT:.+]] = arith.constant dense<{{\[\[}}1.000000e+00, -0.222222224,{{.*}} : tensor<3x8xf32>
+// CHECK-DAG:    %[[G:.+]] = arith.constant dense<{{\[\[}}1.000000e+00, 0.000000e+00,{{.*}} : tensor<8x3xf32>
+// CHECK-DAG:    %[[EMPTY:.+]] = tensor.empty() : tensor<3x8xf32>
+// CHECK-DAG:    %[[INPUT_TILE:.+]] = tensor.extract_slice %[[ARG0]]
+// CHECK-DAG:    %[[OUTPUT_TILE:.+]] = tensor.extract_slice %[[ARG1]]
+// CHECK:        %[[FILL_0:.+]] = linalg.fill ins(%[[ZERO]] : f32) outs(%[[EMPTY]] : tensor<3x8xf32>) -> tensor<3x8xf32>
+// CHECK:        %[[MATMUL_0:.+]] = linalg.matmul ins(%[[INPUT_TILE]], %[[GT]]
+// CHECK-SAME:     outs(%[[FILL_0]]
+// CHECK:        %[[FILL_1:.+]] = linalg.fill ins(%[[ZERO]] : f32) outs(%[[OUTPUT_TILE]] : tensor<8x8xf32>) -> tensor<8x8xf32>
+// CHECK:        %[[MATMUL_1:.+]] = linalg.matmul ins(%[[G]], %[[MATMUL_0]]
+// CHECK-SAME:     outs(%[[FILL_1]]
+// CHECK:        %[[INSERTED_SLICE_1:.+]] = tensor.insert_slice %[[MATMUL_1]] into %[[ARG1]]
+// CHECK:        return %[[INSERTED_SLICE_1]] : tensor<8x8x64x128xf32>
+
+// -----
+
+module {
+  func.func @winograd_filter_transform_fchw(%arg0: tensor<64x128x3x3xf32>, %arg1: tensor<8x8x64x128xf32>) -> tensor<8x8x64x128xf32> {
+    %extracted_slice = tensor.extract_slice %arg0[0, 0, 0, 0] [1, 1, 3, 3] [1, 1, 1, 1] : tensor<64x128x3x3xf32> to tensor<1x1x3x3xf32>
+    %extracted_slice_0 = tensor.extract_slice %arg1[0, 0, 0, 0] [8, 8, 1, 1] [1, 1, 1, 1] : tensor<8x8x64x128xf32> to tensor<8x8x1x1xf32>
+    %14 = iree_linalg_ext.winograd.filter_transform output_tile_size(6) kernel_size(3) kernel_dimensions([2, 3]) ins(%extracted_slice : tensor<1x1x3x3xf32>) outs(%extracted_slice_0 : tensor<8x8x1x1xf32>) -> tensor<8x8x1x1xf32>
+    %inserted_slice = tensor.insert_slice %14 into %arg1[0, 0, 0, 0] [8, 8, 1, 1] [1, 1, 1, 1] : tensor<8x8x1x1xf32> into tensor<8x8x64x128xf32>
+    return %inserted_slice : tensor<8x8x64x128xf32>
+  }
+}
+// CHECK:      func.func @winograd_filter_transform_fchw(
+// CHECK-SAME:   %[[ARG0:.+]]: tensor<64x128x3x3xf32>
+// CHECK-SAME:   %[[ARG1:.+]]: tensor<8x8x64x128xf32>
+// CHECK-DAG:    %[[ZERO:.+]] = arith.constant 0.000000e+00 : f32
+// CHECK-DAG:    %[[GT:.+]] = arith.constant dense<{{\[\[}}1.000000e+00, -0.222222224,{{.*}} : tensor<3x8xf32>
+// CHECK-DAG:    %[[G:.+]] = arith.constant dense<{{\[\[}}1.000000e+00, 0.000000e+00,{{.*}} : tensor<8x3xf32>
+// CHECK-DAG:    %[[EMPTY:.+]] = tensor.empty() : tensor<3x8xf32>
+// CHECK-DAG:    %[[INPUT_TILE:.+]] = tensor.extract_slice %[[ARG0]]
+// CHECK-DAG:    %[[OUTPUT_TILE:.+]] = tensor.extract_slice %[[ARG1]]
+// CHECK:        %[[FILL_0:.+]] = linalg.fill ins(%[[ZERO]] : f32) outs(%[[EMPTY]] : tensor<3x8xf32>) -> tensor<3x8xf32>
+// CHECK:        %[[MATMUL_0:.+]] = linalg.matmul ins(%[[INPUT_TILE]], %[[GT]]
+// CHECK-SAME:     outs(%[[FILL_0]]
+// CHECK:        %[[FILL_1:.+]] = linalg.fill ins(%[[ZERO]] : f32) outs(%[[OUTPUT_TILE]] : tensor<8x8xf32>) -> tensor<8x8xf32>
+// CHECK:        %[[MATMUL_1:.+]] = linalg.matmul ins(%[[G]], %[[MATMUL_0]]
+// CHECK-SAME:     outs(%[[FILL_1]]
+// CHECK:        %[[INSERTED_SLICE_1:.+]] = tensor.insert_slice %[[MATMUL_1]] into %[[ARG1]]
+// CHECK:        return %[[INSERTED_SLICE_1]] : tensor<8x8x64x128xf32>
+
+// -----
+
+module {
   func.func @winograd_input_transform(%arg0: tensor<2x130x130x64xf16>, %arg1: tensor<8x8x2x22x22x64xf16>,
                                       %s0 : index, %s1 : index,
                                       %i0 : index, %i1 : index, %i2 : index, %i3 : index, %i4 : index, %i5 : index) -> tensor<8x8x2x22x22x64xf16> {
