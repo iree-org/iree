@@ -35,7 +35,6 @@ iree_cc_library(
     MLIRIR
     MLIRPass
     MLIRSupport
-    StablehloPasses
     iree::compiler::Bindings::Native::Transforms
     iree::compiler::Bindings::TFLite::Transforms
     iree::compiler::Dialect::Flow::Transforms

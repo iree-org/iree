@@ -41,7 +41,7 @@ void registerStableHLOConversionPassPipeline() {
 // Prepare HLO for use as an input to the Flow dialect.
 void buildStableHLOInputConversionPassPipelineImpl(
     OpPassManager &passManager, const StableHloOptions &options, bool detuple) {
-  // if the input is VHLO, then it is automatically converted to Stablehlo
+  // If the input is VHLO, then it is automatically converted to Stablehlo
   // otherwise, this pass is considered a NOP.
   // Note: Having StableHLO and VHLO in the same function is considered
   // undefined behavior.

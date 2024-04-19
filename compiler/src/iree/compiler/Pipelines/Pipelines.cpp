@@ -19,7 +19,6 @@
 #include "iree/compiler/Modules/HAL/Loader/Transforms/Passes.h"
 #include "iree/compiler/Preprocessing/Passes.h"
 #include "iree/compiler/Utils/TracingUtils.h"
-#include "stablehlo/transforms/Passes.h"
 
 namespace mlir::iree_compiler {
 
@@ -108,8 +107,6 @@ void buildIREEPrecompileTransformPassPipeline(
     case InputDialectOptions::Type::none:
       break;
     case InputDialectOptions::Type::auto_detect:
-      // The VHLO -> StableHLO passes will be a Nop if there is no VHLO present.
-      ::mlir::stablehlo::createStablehloDeserializePipeline(passManager);
       // Run the auto pipeline that chooses from plugins using module contents.
       passManager.addPass(
           createAutoInputConversionPipelinePass(hooks.pipelineExtensions));

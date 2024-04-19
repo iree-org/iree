@@ -130,6 +130,7 @@ iree_cc_library(
     MLIRShapeOpsTransforms
     MLIRShapeToStandard
     MLIRTransforms
+    StablehloPasses
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms

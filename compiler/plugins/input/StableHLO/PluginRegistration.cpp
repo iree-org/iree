@@ -102,7 +102,10 @@ struct StableHLOSession
     stableHloOptions.demoteF64ToF32 = options.demoteF64ToF32;
     stableHloOptions.promoteBF16ToF32 = options.promoteBF16ToF32;
 
-    if (typeMnemonic == "stablehlo") {
+    // VHLO is converted to StableHLO. The conversion function is called
+    // automatically, and if the input is fully stablehlo the function
+    // acts as Nop.
+    if (typeMnemonic == "stablehlo" || typeMnemonic == "vhlo") {
       buildStableHLOInputConversionPassPipeline(passManager, stableHloOptions);
       return true;
     } else if (typeMnemonic == "stablehlo_xla") {
@@ -126,6 +129,7 @@ struct StableHLOSession
     auto *ctx = module.getContext();
     const Dialect *chloDialect = ctx->getLoadedDialect("chlo");
     const Dialect *stablehloDialect = ctx->getLoadedDialect("stablehlo");
+    const Dialect *vhloDialect = ctx->getLoadedDialect("vhlo");
 
     // stablehlo ops _with tuples_    --> only "stablehlo_xla" type
     // stablehlo ops _without tuples_ --> only "stablehlo" type
@@ -135,7 +139,7 @@ struct StableHLOSession
     bool hasTuples = false;
     module.walk([&](Operation *op) {
       Dialect *d = op->getDialect();
-      if (d == chloDialect || d == stablehloDialect) {
+      if (d == chloDialect || d == stablehloDialect || d == vhloDialect) {
         hasStableHLO = true;
         if (checkOpForTuples(op)) {
           hasTuples = true;
