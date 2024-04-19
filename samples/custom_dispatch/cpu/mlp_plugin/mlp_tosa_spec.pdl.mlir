@@ -74,6 +74,7 @@ pdl.pattern @mlp : benefit(1) {
     %one_val = pdl.attribute = 1 : index
     %two_val = pdl.attribute = 2 : index
     %index_type = pdl.type : index
+    %bool_type = pdl.type : i1
     %one_op = pdl.operation "arith.constant" {"value" = %one_val} -> (%index_type : !pdl.type)
     %one = pdl.result 0 of %one_op
     %two_op = pdl.operation "arith.constant" {"value" = %two_val} -> (%index_type : !pdl.type)
@@ -92,11 +93,15 @@ pdl.pattern @mlp : benefit(1) {
     %k_i32_op = pdl.operation "arith.index_cast"(%k : !pdl.value) -> (%i32_type : !pdl.type)
     %k_i32 = pdl.result 0 of %k_i32_op
 
+    %true_val = pdl.attribute = 1 : i1
+    %do_relu_op = pdl.operation "arith.constant" {"value" = %true_val} -> (%bool_type : !pdl.type)
+    %do_relu = pdl.result 0 of %do_relu_op
+
     %replaced_values_dims = pdl.range : !pdl.range<value>
     %input_values = pdl.range %lhs, %rhs : !pdl.value, !pdl.value
     %replaced_value = pdl.result 0 of %relu
     %replaced_values = pdl.range %replaced_value : !pdl.value
-    %other_operands = pdl.range %m_i32, %n_i32, %k_i32 : !pdl.value, !pdl.value, !pdl.value
+    %other_operands = pdl.range %m_i32, %n_i32, %k_i32, %do_relu : !pdl.value, !pdl.value, !pdl.value, !pdl.value
 
     // The `rewriteAsFlowDispatch` is a rewrite function that allows
     // converting the matched dag into a call to the external function call

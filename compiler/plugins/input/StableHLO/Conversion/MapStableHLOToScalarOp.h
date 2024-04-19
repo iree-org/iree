@@ -1276,7 +1276,9 @@ struct StableHloOpToStdScalarOp {
     static_assert(!std::is_same<StableHloOpTy, stablehlo::ConvertOp>::value);
     return mapOpOfType<StableHloOpTy>(
         op.getLoc(), resultTypes, argTypes,
-        typename StableHloOpTy::Adaptor(args, op->getAttrDictionary()), b);
+        typename StableHloOpTy::Adaptor(args, op->getAttrDictionary(),
+                                        op.getProperties()),
+        b);
   }
   // Overload for stablehlo::ConvertOp.
   static Value mapOpWithArgTypes(stablehlo::ConvertOp op,

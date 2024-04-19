@@ -25,13 +25,13 @@ struct GatherIsTorchIndexSelectPattern final
 
   LogicalResult matchAndRewrite(mlir::stablehlo::GatherOp gather,
                                 PatternRewriter &rewriter) const override {
-    TypedValue<TensorType> startIndices = gather.getStartIndices();
+    TypedValue<RankedTensorType> startIndices = gather.getStartIndices();
     auto startIndicesTy = cast<ShapedType>(startIndices.getType());
     if (!startIndicesTy.hasRank()) {
       return rewriter.notifyMatchFailure(gather, "unranked start_indices");
     }
 
-    TypedValue<TensorType> operand = gather.getOperand();
+    TypedValue<RankedTensorType> operand = gather.getOperand();
     auto operandTy = cast<ShapedType>(operand.getType());
     if (!operandTy.hasRank()) {
       return rewriter.notifyMatchFailure(gather, "unranked operand");

@@ -51,6 +51,8 @@ void OptimizeTensorInsertExtractSlicesPass::runOnOperation() {
 
   RewritePatternSet patterns(context);
   populateVectorTransferTensorSliceTransforms(patterns);
+  scf::ForOp::getCanonicalizationPatterns(patterns, context);
+  vector::TransferWriteOp::getCanonicalizationPatterns(patterns, context);
   if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
     return signalPassFailure();
   }

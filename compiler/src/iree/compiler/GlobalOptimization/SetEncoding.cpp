@@ -41,6 +41,9 @@
 
 namespace mlir::iree_compiler::GlobalOptimization {
 
+using IREE::LinalgExt::EncodingAttr;
+using IREE::LinalgExt::EncodingRole;
+
 //===---------------------------------------------------------------------===//
 // Utility functions
 //===---------------------------------------------------------------------===//
@@ -48,7 +51,7 @@ namespace mlir::iree_compiler::GlobalOptimization {
 /// Pads `value` enough for any actual tile sizes that could result from
 /// materialization of `encodingAttr`.
 static Value pad(OpBuilder &builder, Location loc, Value source,
-                 IREE::LinalgExt::EncodingAttr encodingAttr) {
+                 EncodingAttr encodingAttr) {
   RankedTensorType sourceType = source.getType().cast<RankedTensorType>();
   Type elemType = sourceType.getElementType();
   size_t rank = sourceType.getRank();
@@ -80,7 +83,7 @@ static Value pad(OpBuilder &builder, Location loc, Value source,
 }
 
 Value setEncoding(OpBuilder &builder, Location loc, Value source,
-                  IREE::LinalgExt::EncodingAttr encodingAttr) {
+                  EncodingAttr encodingAttr) {
   auto sourceType = source.getType().cast<RankedTensorType>();
   auto resultType = RankedTensorType::get(
       sourceType.getShape(), sourceType.getElementType(), encodingAttr);
@@ -127,38 +130,18 @@ static MatmulNarrowSizes getMatmulNarrowSizes(ShapedType outType,
   return narrow;
 }
 
-static IREE::LinalgExt::EncodingAttr
-makeEncoding(OpBuilder &builder, IREE::LinalgExt::EncodingRole role,
-             TypeRange operandTypes, Type originalType,
-             MatmulNarrowSizes narrow, ArrayAttr indexingMaps) {
-  auto *context = builder.getContext();
-  auto roleAttr = IREE::LinalgExt::EncodingRoleAttr::get(context, role);
-  SmallVector<Attribute> elemTypeAttrs =
-      llvm::map_to_vector(operandTypes, [](auto t) {
-        return TypeAttr::get(t.template cast<ShapedType>().getElementType())
-            .template cast<Attribute>();
-      });
-  auto operandElemTypesAttr = ArrayAttr::get(context, elemTypeAttrs);
-  auto originalTypeAttr =
-      originalType ? TypeAttr::get(originalType) : TypeAttr{};
-  auto getAttr = [&](std::optional<int64_t> x) {
-    return x ? builder.getIndexAttr(*x) : IntegerAttr();
-  };
-  return IREE::LinalgExt::EncodingAttr::get(
-      context, roleAttr, operandElemTypesAttr, originalTypeAttr,
-      getAttr(narrow.M), getAttr(narrow.N), indexingMaps);
-}
-
 static Value padAndSetEncoding(OpBuilder &builder, Location loc, Value source,
-                               IREE::LinalgExt::EncodingRole role,
-                               TypeRange operandTypes, MatmulNarrowSizes narrow,
-                               ArrayAttr indexingMaps) {
+                               EncodingRole role,
+                               ArrayRef<Type> operandElemTypes,
+                               MatmulNarrowSizes narrow,
+                               ArrayRef<AffineMap> indexingMaps) {
+  MLIRContext *ctx = builder.getContext();
   // No need to specify original_type in the encoding poadded to pad(), because
   // the operand there is the `source` tensor, so it will default to reading its
   // original shape.
-  auto encodingForPad =
-      makeEncoding(builder, role, operandTypes,
-                   /*originalType=*/Type{}, narrow, indexingMaps);
+  auto encodingForPad = EncodingAttr::get(ctx, role, operandElemTypes,
+                                          /*originalType=*/Type{}, narrow.M,
+                                          narrow.N, indexingMaps);
   Value padded = pad(builder, loc, source, encodingForPad);
   // For setEncoding() below, we potentially need to specify an encoding with an
   // explicit original_type, because the operand there is the padded tensor
@@ -168,8 +151,9 @@ static Value padAndSetEncoding(OpBuilder &builder, Location loc, Value source,
   // the tensor type that the encoding is applied to.
   auto encodingForSetEncoding = encodingForPad;
   if (padded.getType() != source.getType()) {
-    encodingForSetEncoding = makeEncoding(
-        builder, role, operandTypes, source.getType(), narrow, indexingMaps);
+    encodingForSetEncoding = EncodingAttr::get(
+        ctx, role, operandElemTypes,
+        /*originalType=*/source.getType(), narrow.M, narrow.N, indexingMaps);
   }
   return setEncoding(builder, loc, padded, encodingForSetEncoding);
 }
@@ -329,30 +313,22 @@ struct setContractionOpEncoding
     if (!lhsElemType || !rhsElemType || !outElemType) {
       return failure();
     }
+    SmallVector<Type> elemTypes = {lhsElemType, rhsElemType, outElemType};
 
     MatmulNarrowSizes narrowSizes =
         getMatmulNarrowSizes(out.getType().cast<ShapedType>(), linalgOp);
 
     Location loc = linalgOp.getLoc();
-    SmallVector<Type> operandTypes(linalgOp->getOperandTypes());
-    operandTypes[0] =
-        cast<RankedTensorType>(operandTypes[0]).clone(lhsElemType);
-    operandTypes[1] =
-        cast<RankedTensorType>(operandTypes[1]).clone(rhsElemType);
-    auto maps = linalgOp.getIndexingMaps();
-    Value encodedLhs = padAndSetEncoding(rewriter, loc, lhs,
-                                         IREE::LinalgExt::EncodingRole::LHS,
-                                         operandTypes, narrowSizes, maps);
-    Value encodedRhs = padAndSetEncoding(rewriter, loc, rhs,
-                                         IREE::LinalgExt::EncodingRole::RHS,
-                                         operandTypes, narrowSizes, maps);
-    Value encodedOut = padAndSetEncoding(rewriter, loc, out,
-                                         IREE::LinalgExt::EncodingRole::RESULT,
-                                         operandTypes, narrowSizes, maps);
-    Value opTiled;
-    opTiled = clone(rewriter, linalgOp, encodedOut.getType(),
-                    ValueRange{encodedLhs, encodedRhs, encodedOut})
-                  ->getResult(0);
+    SmallVector<AffineMap> maps = linalgOp.getIndexingMapsArray();
+    Value encodedLhs = padAndSetEncoding(rewriter, loc, lhs, EncodingRole::LHS,
+                                         elemTypes, narrowSizes, maps);
+    Value encodedRhs = padAndSetEncoding(rewriter, loc, rhs, EncodingRole::RHS,
+                                         elemTypes, narrowSizes, maps);
+    Value encodedOut = padAndSetEncoding(
+        rewriter, loc, out, EncodingRole::RESULT, elemTypes, narrowSizes, maps);
+    Value opTiled = clone(rewriter, linalgOp, encodedOut.getType(),
+                          ValueRange{encodedLhs, encodedRhs, encodedOut})
+                        ->getResult(0);
 
     // Sizes are computed by original output size.
     FailureOr<SmallVector<OpFoldResult>> outSizes =

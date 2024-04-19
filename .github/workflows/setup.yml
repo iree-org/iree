@@ -38,6 +38,8 @@ on:
           A comma-separated string of benchmarks to run.
         value: ${{ jobs.setup.outputs.benchmark-presets }}
 
+permissions:
+  contents: read
 
 env:
   # This duplicates the variable from ci.yml. The variable needs to be in env

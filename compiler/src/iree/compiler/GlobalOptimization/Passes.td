@@ -133,4 +133,9 @@ def GlobalLoopInvariantCodeMotion : InterfacePass<"iree-global-opt-loop-invarian
   let constructor = "mlir::iree_compiler::GlobalOptimization::createGlobalLoopInvariantCodeMotionPass()";
 }
 
+def DataLayoutPropagation : InterfacePass<"iree-global-opt-data-layout-propagation", "mlir::FunctionOpInterface"> {
+  let summary = "Propagate pack/unpack ops across other ops to improve fusion";
+  let constructor = "mlir::iree_compiler::GlobalOptimization::createDataLayoutPropagationPass()";
+}
+
 #endif // IREE_COMPILER_GLOBALOPTIMIZATION_PASSES

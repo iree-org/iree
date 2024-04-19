@@ -198,3 +198,54 @@ func.func @batch_matmul_fill_dynamic(%arg0 : tensor<?x?x?xf32>, %arg1 : tensor<?
 // CHECK-SAME:       ins(%[[LHS]], %[[RHS]] :
 // CHECK-SAME:       outs(%[[FILL]] :
 //      CHECK:   return %[[RES]]
+
+// -----
+
+func.func @drop_encoding_for_hal_flow_ops_static() {
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1x1xf32>>
+  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1x1xf32, #iree_linalg_ext.encoding<role =  LHS, element_types = [f32, f32, f32], original_type = tensor<1x1xf32>, matmul_narrow_M = 1 : index, matmul_narrow_N = 1 : index, user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>]>>>
+  %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1, 1], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<1x1xf32>> -> tensor<1x1xf32>
+  %3 = iree_linalg_ext.set_encoding %2 : tensor<1x1xf32> -> tensor<1x1xf32, #iree_linalg_ext.encoding<role =  LHS, element_types = [f32, f32, f32], original_type = tensor<1x1xf32>, matmul_narrow_M = 1 : index, matmul_narrow_N = 1 : index, user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>]>>
+  flow.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [1, 1], strides = [1, 1] : tensor<1x1xf32, #iree_linalg_ext.encoding<role =  LHS, element_types = [f32, f32, f32], original_type = tensor<1x1xf32>, matmul_narrow_M = 1 : index, matmul_narrow_N = 1 : index, user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>]>> -> !flow.dispatch.tensor<writeonly:tensor<1x1xf32, #iree_linalg_ext.encoding<role =  LHS, element_types = [f32, f32, f32], original_type = tensor<1x1xf32>, matmul_narrow_M = 1 : index, matmul_narrow_N = 1 : index, user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>]>>>
+  return
+}
+// CHECK-LABEL: func.func @drop_encoding_for_hal_flow_ops_static
+// CHECK-DAG:     %[[IN:.+]] = hal.interface.binding.subspan set(0) binding(0) {{.+}} : !flow.dispatch.tensor<readonly:tensor<1x1xf32>>
+// CHECK-DAG:     %[[OUT:.+]] = hal.interface.binding.subspan set(0) binding(1) {{.+}} : !flow.dispatch.tensor<writeonly:tensor<1x1xf32>>
+// CHECK:         %[[LOAD:.+]] = flow.dispatch.tensor.load %[[IN]]
+// CHECK:         flow.dispatch.tensor.store %[[LOAD]], %[[OUT]]
+
+// -----
+
+func.func @drop_encoding_for_hal_flow_ops_dynamic() {
+  %c0 = arith.constant 0 : index
+  %c32_i64 = arith.constant 32 : i64
+  %0 = hal.interface.constant.load[0] : i32
+  %1 = hal.interface.constant.load[1] : i32
+  %2 = hal.interface.constant.load[2] : i32
+  %3 = hal.interface.constant.load[3] : i32
+  %4 = arith.extui %0 : i32 to i64
+  %5 = arith.extui %1 : i32 to i64
+  %6 = arith.shli %5, %c32_i64 : i64
+  %7 = arith.ori %4, %6 : i64
+  %8 = arith.index_castui %7 : i64 to index
+  %9 = arith.extui %2 : i32 to i64
+  %10 = arith.extui %3 : i32 to i64
+  %11 = arith.shli %10, %c32_i64 : i64
+  %12 = arith.ori %9, %11 : i64
+  %13 = arith.index_castui %12 : i64 to index
+  %14 = flow.dispatch.workload.ordinal %8, 0 : index
+  %15 = flow.dispatch.workload.ordinal %13, 1 : index
+  %16 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<?x?xbf16>>{%14, %15}
+  %17 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<?x?xbf16, #iree_linalg_ext.encoding<role =  LHS, element_types = [bf16, bf16, bf16], original_type = tensor<?x?xbf16>, user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>]>>>{%14, %15}
+  %18 = flow.dispatch.tensor.load %16, offsets = [0, 0], sizes = [%14, %15], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<?x?xbf16>>{%14, %15} -> tensor<?x?xbf16>
+  %19 = iree_linalg_ext.set_encoding %18 : tensor<?x?xbf16> -> tensor<?x?xbf16, #iree_linalg_ext.encoding<role =  LHS, element_types = [bf16, bf16, bf16], original_type = tensor<?x?xbf16>, user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>]>>
+  flow.dispatch.tensor.store %19, %17, offsets = [0, 0], sizes = [%14, %15], strides = [1, 1] : tensor<?x?xbf16, #iree_linalg_ext.encoding<role =  LHS, element_types = [bf16, bf16, bf16], original_type = tensor<?x?xbf16>, user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>]>> -> !flow.dispatch.tensor<writeonly:tensor<?x?xbf16, #iree_linalg_ext.encoding<role =  LHS, element_types = [bf16, bf16, bf16], original_type = tensor<?x?xbf16>, user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>]>>>{%14, %15}
+  return
+}
+// CHECK-LABEL: func.func @drop_encoding_for_hal_flow_ops_dynamic
+// CHECK-DAG:     %[[IN:.+]] = hal.interface.binding.subspan set(0) binding(0) {{.+}} : !flow.dispatch.tensor<readonly:tensor<?x?xbf16>>
+// CHECK-DAG:     %[[OUT:.+]] = hal.interface.binding.subspan set(0) binding(1) {{.+}} : !flow.dispatch.tensor<writeonly:tensor<?x?xbf16>>
+// CHECK:         %[[LOAD:.+]] = flow.dispatch.tensor.load %[[IN]]
+// CHECK:         flow.dispatch.tensor.store %[[LOAD]], %[[OUT]]

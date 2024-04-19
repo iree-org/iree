@@ -16,6 +16,7 @@ iree_cc_library(
   DEPS
     IREEDialectsCAPI
     MLIRCAPIDebug
+    MLIRCAPIGPU
     MLIRCAPIIR
     MLIRCAPIInterfaces
     MLIRCAPILinalg
@@ -66,6 +67,7 @@ set(_EXPORT_OBJECT_LIBS
   obj.MLIRCAPIDebug
   obj.MLIRCAPIIR
   obj.MLIRCAPIInterfaces
+  obj.MLIRCAPIGPU
   obj.MLIRCAPILinalg
   obj.MLIRCAPIPDL
   obj.MLIRCAPITransformDialect

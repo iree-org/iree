@@ -176,13 +176,14 @@ set(_SOURCE_COMPONENTS
 
   MLIRPythonSources.Core
 
-  # Core dialects (constrained to IREE input dialects).
+  # Core dialects.
   MLIRPythonSources.Dialects.amdgpu
   MLIRPythonSources.Dialects.arith
   MLIRPythonSources.Dialects.builtin
   MLIRPythonSources.Dialects.cf
   MLIRPythonSources.Dialects.complex
   MLIRPythonSources.Dialects.func
+  MLIRPythonSources.Dialects.gpu
   MLIRPythonSources.Dialects.linalg
   MLIRPythonSources.Dialects.math
   MLIRPythonSources.Dialects.memref
@@ -193,6 +194,8 @@ set(_SOURCE_COMPONENTS
   MLIRPythonSources.Dialects.tensor
   MLIRPythonSources.Dialects.tosa
   MLIRPythonSources.Dialects.transform
+  MLIRPythonSources.Dialects.transform.extras
+  MLIRPythonSources.Dialects.transform.interpreter
   MLIRPythonSources.Dialects.vector
 
   # iree-dialects project.

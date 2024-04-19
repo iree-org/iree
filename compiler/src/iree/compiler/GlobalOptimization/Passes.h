@@ -114,6 +114,10 @@ std::unique_ptr<Pass> createSimplifyPackUnpackPass();
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createGlobalLoopInvariantCodeMotionPass();
 
+/// Propagate pack/unpack ops across other ops to improve fusion.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createDataLayoutPropagationPass();
+
 void registerGlobalOptimizationPipeline();
 
 } // namespace mlir::iree_compiler::GlobalOptimization

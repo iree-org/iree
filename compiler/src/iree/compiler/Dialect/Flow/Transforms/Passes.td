@@ -14,6 +14,14 @@ def AnnotateDispatchesPass :
   let summary = "Annotates executable dispatches based on their contents.";
 }
 
+def BubbleUpExpandShapesPass :
+    Pass<"iree-flow-bubble-up-expand-shapes"> {
+  let summary = "Propagate expand_shapes up the program (and collapse_shapes down)";
+  let dependentDialects = [
+    "mlir::affine::AffineDialect",
+  ];
+}
+
 def CaptureDynamicDimsPass :
     Pass<"iree-flow-capture-dynamic-dims", ""> {
   let summary = "Captures dynamic shape dimensions required by dispatch operands/results and control flow operations.";
@@ -211,6 +219,19 @@ def DumpDispatchGraphPass : Pass<"iree-flow-dump-dispatch-graph-pass"> {
             /*default=*/"true", "Print result types of operations">
   ];
 }
+
+def ElementwiseOpFusionPass :
+    Pass<"iree-flow-elementwise-op-fusion", ""> {
+  let summary = "Fuse elementwise operations";
+  let options = [
+    Option<"fuseMultiReduction", "fuse-multi-reduction", "bool",
+           /*default=*/"true", "Fuse ops that have multiple reduction iterators">
+  ];
+  let dependentDialects = [
+    "mlir::affine::AffineDialect",
+  ];
+}
+
 
 def ExportBenchmarkFuncsPass :
     Pass<"iree-flow-export-benchmark-funcs-pass", "mlir::ModuleOp"> {

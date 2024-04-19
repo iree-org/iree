@@ -79,6 +79,14 @@ def MakeSingleDispatchForFunctionPass :
   ];
 }
 
+def PadToIntrinsics :
+    Pass<"iree-preprocessing-pad-to-intrinsics", ""> {
+  let summary = "Pad linalg ops such that we can use target's intrinsics.";
+  let dependentDialects = [
+    "mlir::linalg::LinalgDialect",
+  ];
+}
+
 def PadLinalgOpsPass :
     Pass<"iree-preprocessing-pad-linalg-ops", ""> {
   let summary = "Pad linalg ops to the next integer multiple of paddingSize.";
