@@ -1673,44 +1673,37 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
 }
 
 /// Sets the lowering configuration for dispatch region for
-/// linalg_ext.winograd.input_transform root op.
+/// the three linalg_ext.winograd ops:
+/// linalg_ext.winograd.filter_transform
+/// linalg_ext.winograd.input_transform
+/// linalg_ext.winograd.output_transform
+/// The vector tile sizes should be 1 for each dim here, because
+/// the winograd decomposition relies on these unit dimensions.
+template <typename WinogradOp>
 static LogicalResult
-setRootConfig(mlir::FunctionOpInterface entryPointFn,
-              IREE::LinalgExt::WinogradInputTransformOp inputOp) {
-  assert(!getLoweringConfig(inputOp) && "expected lowering_config is not set");
-  auto iterationRank = inputOp.getIterationDomainRank();
+setWinogradRootConfig(mlir::FunctionOpInterface entryPointFn,
+                      WinogradOp winogradOp) {
+  static_assert(
+      std::is_same<WinogradOp, IREE::LinalgExt::WinogradInputTransformOp>() ||
+          std::is_same<WinogradOp,
+                       IREE::LinalgExt::WinogradOutputTransformOp>() ||
+          std::is_same<WinogradOp,
+                       IREE::LinalgExt::WinogradFilterTransformOp>(),
+      "op expected be a winograd op");
+  assert(!getLoweringConfig(winogradOp) &&
+         "expected lowering_config is not set");
+  auto iterationRank = winogradOp.getIterationDomainRank();
   SmallVector<int64_t> vecSizeHints(iterationRank, 1);
   DistributionHeuristicConfig distConfig;
   distConfig.vectorSizeHints = vecSizeHints;
   SmallVector<int64_t> distTileSizes =
-      getDefaultDistributedLevelTileSizes(inputOp, distConfig);
+      getDefaultDistributedLevelTileSizes(winogradOp, distConfig);
   TileSizesListType tileSizes;
   tileSizes.push_back(distTileSizes);
   SmallVector<int64_t> vecTileSizes(iterationRank, 1);
   tileSizes.push_back(vecTileSizes);
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, inputOp, tileSizes,
-      DispatchLoweringPassPipeline::CPULinalgExtTileAndVectorize);
-}
-
-/// Sets the lowering configuration for dispatch region for
-/// linalg_ext.winograd.input_transform root op.
-static LogicalResult
-setRootConfig(mlir::FunctionOpInterface entryPointFn,
-              IREE::LinalgExt::WinogradOutputTransformOp outputOp) {
-  assert(!getLoweringConfig(outputOp) && "expected lowering_config is not set");
-  auto iterationRank = outputOp.getIterationDomainRank();
-  SmallVector<int64_t> vecSizeHints(iterationRank, 1);
-  DistributionHeuristicConfig distConfig;
-  distConfig.vectorSizeHints = vecSizeHints;
-  SmallVector<int64_t> distTileSizes =
-      getDefaultDistributedLevelTileSizes(outputOp, distConfig);
-  TileSizesListType tileSizes;
-  tileSizes.push_back(distTileSizes);
-  SmallVector<int64_t> vecTileSizes(iterationRank, 1);
-  tileSizes.push_back(vecTileSizes);
-  return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, outputOp, tileSizes,
+      entryPointFn, winogradOp, tileSizes,
       DispatchLoweringPassPipeline::CPULinalgExtTileAndVectorize);
 }
 
@@ -2301,11 +2294,13 @@ setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
                                targetMLTransInfo);
         })
         .Case<IREE::LinalgExt::AttentionOp, IREE::LinalgExt::FftOp,
-              IREE::LinalgExt::WinogradInputTransformOp,
-              IREE::LinalgExt::WinogradOutputTransformOp, tensor::PackOp,
-              tensor::PadOp, tensor::UnPackOp, linalg::Mmt4DOp,
+              tensor::PackOp, tensor::PadOp, tensor::UnPackOp, linalg::Mmt4DOp,
               linalg::BatchMmt4DOp>(
             [&](auto op) { return setRootConfig(entryPointFn, op); })
+        .Case<IREE::LinalgExt::WinogradFilterTransformOp,
+              IREE::LinalgExt::WinogradInputTransformOp,
+              IREE::LinalgExt::WinogradOutputTransformOp>(
+            [&](auto op) { return setWinogradRootConfig(entryPointFn, op); })
         .Case<linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNchwFchwOp,
               linalg::PoolingNhwcSumOp, linalg::PoolingNhwcMaxOp,
               linalg::PoolingNhwcMaxUnsignedOp, linalg::PoolingNhwcMinOp,
