@@ -364,6 +364,14 @@ chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles, int64_t matmulNarrowM,
   }
   for (auto tile : enumeratedTiles) {
     if (tile.M > mUB || tile.N > nUB || tile.K > kUB) {
+      LLVM_DEBUG(llvm::dbgs() << "[" << DEBUG_TYPE << "]: tile (";
+                 llvm::interleaveComma(
+                     ArrayRef<int64_t>{tile.M, tile.N, tile.K}, llvm::dbgs());
+                 llvm::dbgs()
+                 << ") is skipped because it is not valid for upper_bound (";
+                 llvm::interleaveComma(ArrayRef<int64_t>{mUB, nUB, kUB},
+                                       llvm::dbgs());
+                 llvm::dbgs() << ")\n");
       continue;
     }
     RatedTileMxNxK ratedTile(tile);
