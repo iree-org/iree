@@ -345,13 +345,31 @@ struct DistributeBroadcast final : OpDistributionPattern<vector::BroadcastOp> {
     VectorType broadcastTargetType =
         VectorType::get(vectorLayout.getElementsPerThread(), elementType);
 
+    int64_t sourceRank = sourceLayout.getRank();
+
     for (SmallVector<int64_t> offsets :
          StaticTileOffsetRange(distShape, resultVectorUnrollShape)) {
       ArrayRef<int64_t> offsetsRef(offsets);
 
+      // Slice out the last |sourceRank| dimensions which is the inner
+      // broadcasted shape.
+      ArrayRef<int64_t> batchSourceOffsets =
+          offsetsRef.slice(rank - sourceRank, sourceRank);
+      ArrayRef<int64_t> outerSourceOffsets =
+          offsetsRef.slice(2 * rank - sourceRank, sourceRank);
+
+      // Construct the list of source offsets based on the batch/outer order of
+      // the broadcasted vector. This is because we need to compute the offsets
+      // into the distributed source vector with the distributed permutation.
+      SmallVector<int64_t> sourceOffsets;
+      sourceOffsets.append(batchSourceOffsets.begin(),
+                           batchSourceOffsets.end());
+      sourceOffsets.append(outerSourceOffsets.begin(),
+                           outerSourceOffsets.end());
+
       // Extract a slice of the input to be broadcasted.
       Value slice = rewriter.create<vector::ExtractOp>(loc, distributedSource,
-                                                       offsetsRef);
+                                                       sourceOffsets);
       // TODO: Support non-trivial element orders.
       if (vector::isBroadcastableTo(slice.getType(), broadcastTargetType) !=
           vector::BroadcastableToResult::Success) {
@@ -540,6 +558,60 @@ struct DistributeMultiReduction final
   int64_t maxBitsPerShuffle;
 };
 
+struct DistributeTranspose final : OpDistributionPattern<vector::TransposeOp> {
+  using OpDistributionPattern::OpDistributionPattern;
+
+  LogicalResult matchAndRewrite(vector::TransposeOp transposeOp,
+                                DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
+    VectorValue value = transposeOp.getVector();
+    VectorLayoutInterface layout = dyn_cast<NestedLayoutAttr>(signature[value]);
+    if (!layout) {
+      return rewriter.notifyMatchFailure(transposeOp,
+                                         "layout must be NestedLayoutAttr");
+    }
+
+    /// Transpose only changes the notion of where the data carried by each
+    /// thread comes from in the transposed SIMD vector. The data carried by
+    /// each thread is still the same, transposed as requested by the operation.
+    /// So, for distributed dimensions (thread and subgroup) transpose is a
+    /// no-op.
+    ///
+    /// Example:
+    ///
+    /// input: vector<2x4xf16>
+    ///
+    /// 0 0 1 1
+    /// 2 2 3 3
+    ///
+    /// after transpose,
+    ///
+    /// transp: vector<4x2xf16>
+    ///
+    /// 0 2
+    /// 0 2
+    /// 1 3
+    /// 1 3
+    ///
+    /// As it can be seen, each thread is still carrying the same data but
+    /// just holds a transposed version of it.
+
+    VectorValue input = getDistributed(rewriter, value, layout);
+    // Permute batch, outer and element based on the given permutation.
+    int64_t rank = value.getType().getRank();
+    SmallVector<int64_t> permutation;
+    for (int i = 0; i < 3; ++i) {
+      for (auto it : transposeOp.getPermutation()) {
+        permutation.push_back(it + (i * rank));
+      }
+    }
+    VectorValue transposed = rewriter.create<vector::TransposeOp>(
+        transposeOp.getLoc(), input, permutation);
+    replaceOpWithDistributedValues(rewriter, transposeOp, transposed);
+    return success();
+  }
+};
+
 } // namespace
 
 void populateGPUDistributeNestedLayoutAttrPatterns(RewritePatternSet &patterns,
@@ -548,7 +620,7 @@ void populateGPUDistributeNestedLayoutAttrPatterns(RewritePatternSet &patterns,
                                                    int64_t maxBitsPerShuffle) {
   patterns.add<DistributeTransferRead, DistributeTransferWrite>(
       patterns.getContext(), threadId);
-  patterns.add<DistributeBroadcast>(patterns.getContext());
+  patterns.add<DistributeBroadcast, DistributeTranspose>(patterns.getContext());
   patterns.add<DistributeMultiReduction>(patterns.getContext(), subgroupSize,
                                          maxBitsPerShuffle);
 }
