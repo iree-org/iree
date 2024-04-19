@@ -28,6 +28,7 @@ iree_cc_library(
     "PluginRegistration.cpp"
   DEPS
     ChloOps
+    VhloOps
     MLIRIR
     MLIRPass
     MLIRTransforms
