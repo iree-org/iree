@@ -48,10 +48,11 @@ computeNewLCA(ArrayRef<Operation *> computeOps, MLIRContext *context) {
 
   // 0.1 Double-check that there's only one convolution Op.
   // TODO: Make this hook work with multiple conv Ops
-  int64_t numConvOps = llvm::count_if(computeOps, [](Operation *op) {
-    return isa<linalg::ConvolutionOpInterface>(op);
-  });
-  assert(numConvOps == 1 && "Exactly 1 Linalg Conv Op is expected");
+  assert(llvm::count_if(computeOps,
+                        [](Operation *op) {
+                          return isa<linalg::ConvolutionOpInterface>(op);
+                        }) == 1 &&
+         "Exactly 1 Linalg Conv Op is expected");
 
   // 0.2 ATM only 2D depthwise HWC convs are supported.
   // TODO: Add support for other convs
