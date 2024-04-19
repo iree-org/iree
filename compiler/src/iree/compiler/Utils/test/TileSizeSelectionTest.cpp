@@ -10,20 +10,23 @@
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 
-using namespace mlir::iree_compiler;
-using namespace llvm;
-using namespace mlir;
-using namespace testing;
+namespace mlir::iree_compiler {
 
-TEST(TileSizeSelection, Basic) {
-  // 0. Init MLIR
-  // TODO: Move this to a test fixture
-  mlir::MLIRContext ctx;
+class TileSizeSelection : public ::testing::Test {
+protected:
+  TileSizeSelection() {
+    reg.insert<IREE::Codegen::IREECodegenDialect>();
+    ctx.appendDialectRegistry(reg);
+    ctx.loadAllAvailableDialects();
+  }
+
+  ~TileSizeSelection() override {}
+
+  MLIRContext ctx;
   DialectRegistry reg;
-  reg.insert<IREE::Codegen::IREECodegenDialect>();
-  ctx.appendDialectRegistry(reg);
-  ctx.loadAllAvailableDialects();
+};
 
+TEST_F(TileSizeSelection, MaxNumTileLevels) {
   // 1. Create Lowering Config
   const unsigned kMaxNumTilingLevels = 7;
   SmallVector<IREE::Codegen::LoweringConfigTilingLevelAttr> newTilingLevelsList;
@@ -31,10 +34,8 @@ TEST(TileSizeSelection, Basic) {
     SmallVector<int64_t> sizes;
     SmallVector<bool> scalableFlags;
 
-    llvm::SmallVector<int64_t> interchange = {};
-
     auto newLevel = IREE::Codegen::LoweringConfigTilingLevelAttr::get(
-        &ctx, sizes, ArrayRef<int64_t>{}, scalableFlags);
+        &ctx, sizes, /*interchange=*/ArrayRef<int64_t>{}, scalableFlags);
     newTilingLevelsList.push_back(newLevel);
   }
 
@@ -43,9 +44,9 @@ TEST(TileSizeSelection, Basic) {
   IREE::Codegen::LoweringConfigAttr loweringConfig =
       IREE::Codegen::LoweringConfigAttr::get(&ctx, newTilingLevels,
                                              /*nativeVectorSize=*/4);
-  // 2. Create Tiling Config
-  TilingConfig tilingConfig(loweringConfig);
 
-  // 3. Test
+  // 2. Create TilingConfig and check if the number of levels match.
+  TilingConfig tilingConfig(loweringConfig);
   EXPECT_EQ(tilingConfig.getNumTilingLevels(), kMaxNumTilingLevels);
 }
+} // namespace mlir::iree_compiler
