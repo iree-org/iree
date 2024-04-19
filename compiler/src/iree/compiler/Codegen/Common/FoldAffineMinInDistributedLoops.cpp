@@ -139,6 +139,8 @@ struct FoldAffineMinOverWorkgroupIDs final
       unsigned index = idOp.getDimension().getZExtValue();
       if (index >= numWorkgroup.size())
         return failure();
+      if (numWorkgroup[index] == ShapedType::kDynamic)
+        continue;
       constraints.appendDimVar({idOp});
       constraints.addBound(presburger::BoundType::LB, idOp, 0);
       constraints.addBound(presburger::BoundType::UB, idOp,

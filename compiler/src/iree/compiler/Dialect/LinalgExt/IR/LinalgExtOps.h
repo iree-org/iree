@@ -8,6 +8,7 @@
 #define IREE_COMPILER_DIALECT_LINALGEXT_IR_LINALGEXTOPS_H_
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dialect.h"
@@ -28,5 +29,20 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h.inc" // IWYU pragma: export
 
 // clang-format on
+
+//===---------------------------------------------------------------------===//
+// LinalgExt Dialect Helpers
+//===---------------------------------------------------------------------===//
+
+namespace mlir::iree_compiler::IREE::LinalgExt {
+
+/// Returns the encoding attribute from the type if there is an encoding.
+/// Otherwise, returns null.
+EncodingAttr getEncodingAttr(RankedTensorType type);
+
+/// Returns the ContractionDimensions for the encoding user_indexing_maps.
+FailureOr<linalg::ContractionDimensions>
+getEncodingContractionDims(EncodingAttr encoding);
+} // namespace mlir::iree_compiler::IREE::LinalgExt
 
 #endif // IREE_COMPILER_DIALECT_LINALGEXT_IR_LINALGEXTOPS_H_

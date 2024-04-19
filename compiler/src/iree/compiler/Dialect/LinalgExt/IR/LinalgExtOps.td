@@ -1093,6 +1093,18 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
     Value output() {
       return getDpsInitOperand(0)->get();
     }
+    Value getOriginalOperand() {
+      return input();
+    }
+    Value getTransformedOperand() {
+      return output();
+    }
+    ShapedType getOriginalOperandType() {
+      return getInputOperandType();
+    }
+    ShapedType getTransformedOperandType() {
+      return getOutputOperandType();
+    }
     ShapedType getInputOperandType() {
       return input().getType().cast<ShapedType>();
     }
@@ -1110,6 +1122,9 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
     }
     SmallVector<int64_t> imageDimensions() {
       return llvm::to_vector(getImageDimensions());
+    }
+    SmallVector<int64_t> hwDimensions() {
+      return imageDimensions();
     }
     std::array<int64_t, 2> nhwcImageDimensions() {
       return {1, 2};
@@ -1132,7 +1147,7 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
     }
     int64_t getIterationDomainRank() {
       SmallVector<int64_t> imageDims = imageDimensions();
-      return getInputOperandRank() - imageDims.size();
+      return getOutputOperandRank() - imageDims.size();
     }
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
@@ -1205,8 +1220,23 @@ def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_
     ShapedType getOutputOperandType() {
       return output().getType().cast<ShapedType>();
     }
+    Value getOriginalOperand() {
+      return output();
+    }
+    Value getTransformedOperand() {
+      return input();
+    }
+    ShapedType getOriginalOperandType() {
+      return getOutputOperandType();
+    }
+    ShapedType getTransformedOperandType() {
+      return getInputOperandType();
+    }
     SmallVector<int64_t> imageDimensions() {
       return llvm::to_vector(getImageDimensions());
+    }
+    SmallVector<int64_t> hwDimensions() {
+      return imageDimensions();
     }
     std::array<int64_t, 2> nhwcImageDimensions() {
       return {1, 2};
@@ -1235,7 +1265,7 @@ def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_
     }
     int64_t getIterationDomainRank() {
       SmallVector<int64_t> imageDims = imageDimensions();
-      return getOutputOperandRank() - imageDims.size();
+      return getInputOperandRank() - imageDims.size();
     }
     int64_t getInputTileSize() {
       return getOutputTileSize() + getKernelSize() - 1;

@@ -27,8 +27,8 @@ EXPORTS
   ireeCompilerInvocationRunPassPipeline
   ireeCompilerInvocationSetCompileFromPhase
   ireeCompilerInvocationSetCompileToPhase
-  ireeCompilerInvocationSetDumpCompilationPhasesTo
   ireeCompilerInvocationSetCrashHandler
+  ireeCompilerInvocationSetDumpCompilationPhasesTo
   ireeCompilerInvocationSetVerifyIR
   ireeCompilerOutputDestroy
   ireeCompilerOutputKeep
@@ -310,6 +310,7 @@ EXPORTS
   mlirDictionaryAttrGetElementByName
   mlirDictionaryAttrGetNumElements
   mlirDictionaryAttrGetTypeID
+  mlirDisctinctAttrCreate
   mlirElementsAttrGetNumElements
   mlirElementsAttrGetValue
   mlirElementsAttrIsValidIndex
@@ -536,6 +537,7 @@ EXPORTS
   mlirRegionInsertOwnedBlockAfter
   mlirRegionInsertOwnedBlockBefore
   mlirRegionTakeBody
+  mlirRegisterGPUPasses
   mlirRegisterLinalgPasses
   mlirShapedTypeGetDimSize
   mlirShapedTypeGetDynamicSize

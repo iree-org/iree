@@ -104,6 +104,15 @@ def EncodingAttr :
         CArg<"ArrayRef<AffineMap>", "{}">:$maps)>
   ];
 
+  let extraClassDeclaration = [{
+    /// Returns the indexing map used by the role in the encoding.
+    AffineMap getMapForRole();
+
+    /// Given the dim position of the encoding `user_indexing_maps`, returns the
+    /// matching index of the given encoding's tensor.
+    unsigned mapDimToRoleIndex(int64_t dimPos);
+  }];
+
   let genVerifyDecl = 0;
 }
 

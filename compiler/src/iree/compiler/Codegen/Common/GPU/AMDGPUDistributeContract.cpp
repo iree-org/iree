@@ -40,7 +40,7 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
       return rewriter.notifyMatchFailure(
           contractOp, "missing nested layout for contraction result");
     }
-    int64_t rank = resultLayout.getBatchOrder().size();
+    int64_t rank = resultLayout.getRank();
 
     NestedLayoutAttr lhsLayout =
         dyn_cast<NestedLayoutAttr>(signature[contractOp.getLhs()]);

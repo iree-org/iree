@@ -25,6 +25,7 @@
 #include "mlir/Dialect/Linalg/IR/ValueBoundsOpInterfaceImpl.h"
 #include "mlir/Dialect/Linalg/TransformOps/DialectExtension.h"
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
+#include "mlir/Dialect/Linalg/Transforms/SubsetInsertionOpInterfaceImpl.h"
 #include "mlir/Dialect/Linalg/Transforms/TilingInterfaceImpl.h"
 #include "mlir/Dialect/MemRef/IR/ValueBoundsOpInterfaceImpl.h"
 #include "mlir/Dialect/MemRef/TransformOps/MemRefTransformOps.h"
@@ -61,6 +62,7 @@ void registerCodegenInterfaces(DialectRegistry &registry) {
   gpu::registerTransformDialectExtension(registry);
   linalg::registerTransformDialectExtension(registry);
   linalg::registerValueBoundsOpInterfaceExternalModels(registry);
+  linalg::registerSubsetOpInterfaceExternalModels(registry);
   memref::registerTransformDialectExtension(registry);
   memref::registerValueBoundsOpInterfaceExternalModels(registry);
   scf::registerTransformDialectExtension(registry);
