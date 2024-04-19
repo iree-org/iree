@@ -106,15 +106,15 @@ collectComputeOps(mlir::FunctionOpInterface funcOp,
   return configs.front();
 }
 
-static LogicalResult tileAndDistributeToThreads(linalg::LinalgOp consumerOp,
+static LogicalResult tileAndDistributeToThreads(TilingInterface consumerOp,
                                                 ArrayRef<int64_t> tileSizes) {
-  MLIRContext *context = consumerOp.getContext();
+  MLIRContext *context = consumerOp->getContext();
   IRRewriter rewriter(context);
   SmallVector<OpFoldResult> tileSizesOfr =
       getAsIndexOpFoldResult(context, tileSizes);
   FailureOr<scf::SCFTileAndFuseResult> tileAndFuseResult =
       scf::tileConsumerAndFuseProducersUsingSCF(
-          rewriter, cast<TilingInterface>(consumerOp.getOperation()),
+          rewriter, consumerOp,
           scf::SCFTileAndFuseOptions().setTilingOptions(
               scf::SCFTilingOptions().setTileSizes(tileSizesOfr)));
 
@@ -276,8 +276,9 @@ public:
     // computation ops into the materialized loop nest.
     auto threadTileSizes = loweringConfig->getTileSizeVals(1);
     for (Operation *computeOp : computeOps) {
-      auto consumerOp = dyn_cast<linalg::LinalgOp>(computeOp);
-      if (failed(tileAndDistributeToThreads(consumerOp, threadTileSizes)))
+      auto consumerOp = dyn_cast<TilingInterface>(computeOp);
+      if (!consumerOp ||
+          failed(tileAndDistributeToThreads(consumerOp, threadTileSizes)))
         return signalPassFailure();
     }
 

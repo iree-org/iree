@@ -18,7 +18,7 @@ set -euo pipefail
 
 source /runner-root/config/functions.sh
 
-nice_curl https://raw.githubusercontent.com/openxla/iree/main/build_tools/docker/prod_digests.txt \
+nice_curl https://raw.githubusercontent.com/iree-org/iree/main/build_tools/docker/prod_digests.txt \
   --output /tmp/prod_digests.txt
 
 # Basically everything uses a derivative of one of these

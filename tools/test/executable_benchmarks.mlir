@@ -26,7 +26,7 @@
 // reduced/simplified. Dynamic shapes, for example, will usually stop a dispatch
 // from being benchmarkable without explicit shape arguments.
 
-// CHECK: BM_abs_dispatch_0_vmvx_bytecode_fb_abs_dispatch_0_generic
+// CHECK: BM_abs_dispatch_0_vmvx_bytecode_fb_abs_dispatch_0_elementwise
 func.func @abs(%input : tensor<f32>) -> (tensor<f32>) {
   %result = math.absf %input : tensor<f32>
   return %result : tensor<f32>

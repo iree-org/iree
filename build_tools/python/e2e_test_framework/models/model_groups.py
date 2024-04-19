@@ -162,13 +162,13 @@ CUDA_MODELS = [
     tf_models.MINILM_L12_H384_UNCASED_INT32_SEQLEN128,
     tf_models.BERT_FOR_MASKED_LM_FP32_SEQLEN512,
     tf_models.BERT_LARGE_TF_FP32_SEQLEN384,
-    # PyTorch model are disabled due to https://github.com/openxla/iree/issues/14993.
+    # PyTorch model are disabled due to https://github.com/iree-org/iree/issues/14993.
     # torch_models.MODEL_CLIP_TEXT_SEQLEN64_FP32_TORCH,
     # torch_models.MODEL_UNET_2D_FP32_TORCH,
 ]
 
 VULKAN_MODELS = [
-    # PyTorch model are disabled due to https://github.com/openxla/iree/issues/14993.
+    # PyTorch model are disabled due to https://github.com/iree-org/iree/issues/14993.
     # torch_models.MODEL_CLIP_TEXT_SEQLEN64_FP32_TORCH,
     # torch_models.MODEL_UNET_2D_FP32_TORCH,
 ]

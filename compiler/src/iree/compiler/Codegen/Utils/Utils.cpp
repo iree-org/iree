@@ -1105,7 +1105,7 @@ SmallVector<int64_t> getStaticNumWorkgroups(mlir::FunctionOpInterface funcOp) {
     if (auto indexOp = dyn_cast_or_null<arith::ConstantIndexOp>(defOp)) {
       result.push_back(indexOp.value());
     } else {
-      return SmallVector<int64_t>();
+      result.push_back(ShapedType::kDynamic);
     }
   }
 

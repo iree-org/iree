@@ -68,7 +68,7 @@ LogicalResult splitReductionPrecondition(Operation *op,
     return failure();
   }
   // The `linalg::splitReduction` method does not work for ops with indexing
-  // semantics. See https://github.com/openxla/iree/pull/14979
+  // semantics. See https://github.com/iree-org/iree/pull/14979
   if (linalgOp.hasIndexSemantics()) {
     LLVM_DEBUG(llvm::dbgs() << "the split method used currently doesnt support "
                                "indexing semantics\n");

@@ -198,10 +198,10 @@ if there are outlier passes that take significantly longer to run than others.
 
 Here are some previous analyses for inspiration:
 
-* <https://github.com/openxla/iree/issues/12033>
-* <https://github.com/openxla/iree/issues/12035>
-* <https://github.com/openxla/iree/issues/12183>
-* <https://github.com/openxla/iree/issues/13189>
+* <https://github.com/iree-org/iree/issues/12033>
+* <https://github.com/iree-org/iree/issues/12035>
+* <https://github.com/iree-org/iree/issues/12183>
+* <https://github.com/iree-org/iree/issues/13189>
 
 Example slow trace:
 
