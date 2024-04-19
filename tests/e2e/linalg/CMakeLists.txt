@@ -15,12 +15,14 @@ iree_check_single_backend_test_suite(
     check_llvm-cpu_local-task
   SRCS
     "conv2d.mlir"
-    "f32_to_i4.mlir"
-    "i4_to_f32.mlir"
+    "fp_to_subbyte.mlir"
+    "subbyte_to_fp.mlir"
   TARGET_BACKEND
     "llvm-cpu"
   DRIVER
     "local-task"
+  LABELS
+    "nowasm"
 )
 
 iree_check_single_backend_test_suite(
@@ -39,7 +41,7 @@ iree_check_single_backend_test_suite(
     check_vulkan-spirv_vulkan
   SRCS
     "conv2d.mlir"
-    "i4_to_f32.mlir"
+    "subbyte_to_fp.mlir"
   TARGET_BACKEND
     "vulkan-spirv"
   DRIVER
@@ -77,9 +79,9 @@ iree_check_single_backend_test_suite(
     check_large_linalg_matmul_cuda
   SRCS
     "conv2d.mlir"
-    "f32_to_i4.mlir"
-    "i4_to_f32.mlir"
+    "fp_to_subbyte.mlir"
     "large_linalg_matmul.mlir"
+    "subbyte_to_fp.mlir"
   TARGET_BACKEND
     "cuda"
   DRIVER
