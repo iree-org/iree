@@ -26,7 +26,7 @@ class semaphore_submission_test : public CtsTestBase {};
 TEST_P(semaphore_submission_test, SubmitWithNoCommandBuffers) {
   // No waits, one signal which we immediately wait on after submit.
   iree_hal_semaphore_t* signal_semaphore = CreateSemaphore();
-  uint64_t signal_payload_values[] = { 1 };
+  uint64_t signal_payload_values[] = {1};
   iree_hal_semaphore_list_t signal_semaphores = {
       1,
       &signal_semaphore,
@@ -97,8 +97,8 @@ TEST_P(semaphore_submission_test, SubmitWithWait) {
 
   // Signal the wait semaphore, work should begin and complete.
   IREE_ASSERT_OK(iree_hal_semaphore_signal(wait_semaphore, 1));
-  IREE_ASSERT_OK(iree_hal_semaphore_wait(signal_semaphore, 101,
-                                         iree_infinite_timeout()));
+  IREE_ASSERT_OK(
+      iree_hal_semaphore_wait(signal_semaphore, 101, iree_infinite_timeout()));
 
   iree_hal_command_buffer_release(command_buffer);
   iree_hal_semaphore_release(wait_semaphore);
@@ -182,9 +182,8 @@ TEST_P(semaphore_submission_test, WaitAllHostAndDeviceSemaphores) {
 
   // Start another thread and have it wait.
   std::thread thread([&]() {
-    IREE_ASSERT_OK(
-        iree_hal_semaphore_wait(host_wait_semaphore, 1,
-                                iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
+    IREE_ASSERT_OK(iree_hal_semaphore_wait(
+        host_wait_semaphore, 1, iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
     IREE_ASSERT_OK(iree_hal_semaphore_signal(host_signal_semaphore, 1));
   });
 
@@ -247,9 +246,8 @@ TEST_P(semaphore_submission_test,
 
   // Start another thread and have it wait.
   std::thread thread([&]() {
-    IREE_ASSERT_OK(
-        iree_hal_semaphore_wait(host_wait_semaphore, 1,
-                                iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
+    IREE_ASSERT_OK(iree_hal_semaphore_wait(
+        host_wait_semaphore, 1, iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
     IREE_ASSERT_OK(iree_hal_semaphore_signal(host_signal_semaphore, 1));
   });
 
@@ -317,9 +315,8 @@ TEST_P(semaphore_submission_test,
 
   // Start another thread and have it wait.
   std::thread thread([&]() {
-    IREE_ASSERT_OK(
-        iree_hal_semaphore_wait(host_wait_semaphore, 1,
-                                iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
+    IREE_ASSERT_OK(iree_hal_semaphore_wait(
+        host_wait_semaphore, 1, iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
     IREE_ASSERT_OK(iree_hal_semaphore_signal(host_signal_semaphore, 1));
   });
 
