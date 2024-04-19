@@ -54,9 +54,8 @@ tensor operations then generate loop structures for its various backend targets.
 [OpenXLA](https://github.com/openxla/community) is a community-driven, open
 source ML compiler ecosystem.
 
-IREE is one project under the
-[OpenXLA GitHub Organization](https://github.com/openxla), and it interfaces
-with many of the other projects, such as [StableHLO](#stablehlo).
+IREE interfaces with some of the OpenXLA projects, such as
+[StableHLO](#stablehlo).
 
 ## PyTorch
 

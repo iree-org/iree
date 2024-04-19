@@ -15,8 +15,8 @@ to be written in a variety of other languages.
 
 ## Official API bindings
 
-Members of the core project team and OpenXLA partners maintain these official
-bindings:
+Members of the core project team and other partner groups maintain these
+official bindings:
 
 Language | Compiler API? | Runtime API? | Published packages?
 -------- | ------------ | ----------- | ------------------
