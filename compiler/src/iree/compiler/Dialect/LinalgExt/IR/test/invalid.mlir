@@ -723,6 +723,56 @@ func.func @illegal_winograd_output_image_dimensions(%arg0: tensor<8x8x1x2x2x32xf
 
 // -----
 
+func.func @illegal_winograd_filter_kernel_shape(%arg0: tensor<3x2x64x128xf32>) -> tensor<8x8x64x128xf32> {
+  %0 = tensor.empty() : tensor<8x8x64x128xf32>
+  // expected-error @+1 {{expect all kernel dimensions to have the kernel size}}
+  %1 = iree_linalg_ext.winograd.filter_transform output_tile_size(6) kernel_size(3) kernel_dimensions([0, 1])
+    ins(%arg0 : tensor<3x2x64x128xf32>) outs(%0 : tensor<8x8x64x128xf32>) -> tensor<8x8x64x128xf32>
+  return %1 : tensor<8x8x64x128xf32>
+}
+
+// -----
+
+func.func @illegal_winograd_filter_kernel_shape_fchw(%arg0: tensor<128x64x3x2xf32>) -> tensor<8x8x64x128xf32> {
+  %0 = tensor.empty() : tensor<8x8x64x128xf32>
+  // expected-error @+1 {{expect all kernel dimensions to have the kernel size}}
+  %1 = iree_linalg_ext.winograd.filter_transform output_tile_size(6) kernel_size(3) kernel_dimensions([2, 3])
+    ins(%arg0 : tensor<128x64x3x2xf32>) outs(%0 : tensor<8x8x64x128xf32>) -> tensor<8x8x64x128xf32>
+  return %1 : tensor<8x8x64x128xf32>
+}
+
+// -----
+
+func.func @illegal_winograd_filter_result_shape(%arg0: tensor<3x3x64x128xf32>) -> tensor<8x8x128x64xf32> {
+  %0 = tensor.empty() : tensor<8x8x128x64xf32>
+  // expected-error @+1 {{incompatible output shape}}
+  %1 = iree_linalg_ext.winograd.filter_transform output_tile_size(6) kernel_size(3) kernel_dimensions([0, 1])
+    ins(%arg0 : tensor<3x3x64x128xf32>) outs(%0 : tensor<8x8x128x64xf32>) -> tensor<8x8x128x64xf32>
+  return %1 : tensor<8x8x128x64xf32>
+}
+
+// -----
+
+func.func @illegal_winograd_filter_result_shape_fchw(%arg0: tensor<128x64x3x3xf32>) -> tensor<8x8x128x64xf32> {
+  %0 = tensor.empty() : tensor<8x8x128x64xf32>
+  // expected-error @+1 {{incompatible output shape}}
+  %1 = iree_linalg_ext.winograd.filter_transform output_tile_size(6) kernel_size(3) kernel_dimensions([2, 3])
+    ins(%arg0 : tensor<128x64x3x3xf32>) outs(%0 : tensor<8x8x128x64xf32>) -> tensor<8x8x128x64xf32>
+  return %1 : tensor<8x8x128x64xf32>
+}
+
+// -----
+
+func.func @illegal_winograd_filter_kernel_dimensions(%arg0: tensor<3x3x64x128xf32>) -> tensor<8x8x64x128xf32> {
+  %0 = tensor.empty() : tensor<8x8x64x128xf32>
+  // expected-error @+1 {{expect kernel dimensions to be either [0, 1] or [2, 3]}}
+  %1 = iree_linalg_ext.winograd.filter_transform output_tile_size(6) kernel_size(3) kernel_dimensions([0, 3])
+    ins(%arg0 : tensor<3x3x64x128xf32>) outs(%0 : tensor<8x8x64x128xf32>) -> tensor<8x8x64x128xf32>
+  return %1 : tensor<8x8x64x128xf32>
+}
+
+// -----
+
 func.func @illegal_attention_inputs(%query: tensor<6x12x20x8xf32>, %key: tensor<6x12x20x8xf32>, %value: tensor<6x12x20x8xf32>) {
   %0 = tensor.empty() : tensor<6x12x20x8xf32>
   %scale = arith.constant 1.0 : f32
