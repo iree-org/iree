@@ -19,6 +19,23 @@ namespace mlir::iree_compiler {
 
 namespace {
 
+static bool foldHDim(linalg::DepthwiseConv2DNhwcHwcOp convOp) {
+  Value kernel = convOp.getInputs().back();
+  Value output = convOp.getOutputs().front();
+
+  auto kernelType = dyn_cast<RankedTensorType>(kernel.getType());
+  auto outputType = dyn_cast<RankedTensorType>(output.getType());
+
+  auto kernelShape = kernelType.getShape();
+  auto outputShape = outputType.getShape();
+
+  int64_t khSize = kernelShape[0];
+  int64_t ohSize = outputShape[1];
+  bool removeH = (khSize == 1 && ohSize == 1);
+
+  return removeH;
+}
+
 /// Computes a "decomposed" lowering config attribute for a conv OP
 ///
 /// This method complements the patterns to decompose 2D convolutions into 1D
@@ -27,27 +44,35 @@ namespace {
 ///
 /// At the moment only Depthwise HWC convolutions are supported.
 static FailureOr<IREE::Codegen::LoweringConfigAttr>
-computeNewLCA(SmallVector<Operation *> computeOps, MLIRContext *context) {
+computeNewLCA(ArrayRef<Operation *> computeOps, MLIRContext *context) {
 
-  // 0.1 Double-check that there's only one convolution Op among the compute Ops
+  // 0.1 Double-check that there's only one convolution Op.
   // TODO: Make this hook work with multiple conv Ops
   int64_t numConvOps = llvm::count_if(computeOps, [](Operation *op) {
     return isa<linalg::ConvolutionOpInterface>(op);
   });
   assert(numConvOps == 1 && "Exactly 1 Linalg Conv Op is expected");
 
-  // 0.2 ATM only 2D depthwise HWC convs are supported - check that that's the
-  // one that's present.
+  // 0.2 ATM only 2D depthwise HWC convs are supported.
   // TODO: Add support for other convs
   bool seen2DDepthwiseConvHWC = false;
+  linalg::DepthwiseConv2DNhwcHwcOp convOp;
   for (auto op : computeOps) {
-    if (isa<linalg::DepthwiseConv2DNhwcHwcOp>(op))
+    if (isa<linalg::DepthwiseConv2DNhwcHwcOp>(op)) {
       seen2DDepthwiseConvHWC = true;
+      convOp = cast<linalg::DepthwiseConv2DNhwcHwcOp>(op);
+      break;
+    }
   }
   if (!seen2DDepthwiseConvHWC)
     return failure();
 
-  // 1. Get the current lowering config attached to the Conv Op
+  // 0.3. ATM only folding of the H dim is supported.
+  // TODO: Add support for cases where the W dim is folded.
+  if (!foldHDim(convOp))
+    return failure();
+
+  // 1. Get the current lowering config attached to the Conv Op.
   FailureOr<IREE::Codegen::LoweringConfigAttr> loweringConfigAttr =
       getLoweringConfig(computeOps);
   if (failed(loweringConfigAttr))
@@ -55,11 +80,11 @@ computeNewLCA(SmallVector<Operation *> computeOps, MLIRContext *context) {
 
   TilingConfig tc(loweringConfigAttr.value());
 
-  // 2. Calculate new tiling levels
-  // FIXME: This assumes that it's the H dim that's "folded". In practice, this
-  // will depend on the tiling config.
-  unsigned inputHDim = 1;
-  unsigned filterHDim = 4;
+  // 2. Calculate new tiling levels.
+  // Note that this will basically erase the _H_ dims from the orignal lowering
+  // config.
+  SmallVector<unsigned> hDimsToErase{1, 4};
+  llvm::sort(hDimsToErase, [](auto x, auto y) { return x > y; });
 
   auto tilingLevels = loweringConfigAttr.value().getTilingLevels();
   SmallVector<IREE::Codegen::LoweringConfigTilingLevelAttr> newTilingLevelsList;
@@ -67,11 +92,13 @@ computeNewLCA(SmallVector<Operation *> computeOps, MLIRContext *context) {
     SmallVector<int64_t> newSizes(level.getSizes());
     SmallVector<bool> newScalableFlags(level.getScalableFlags());
 
-    newSizes.erase(newSizes.begin() + inputHDim);
-    newSizes.erase(newSizes.begin() + filterHDim);
+    llvm::for_each(hDimsToErase, [&newSizes](unsigned idx) {
+      newSizes.erase(newSizes.begin() + idx);
+    });
     if (newScalableFlags.size() > 0) {
-      newScalableFlags.erase(newScalableFlags.begin() + inputHDim);
-      newScalableFlags.erase(newScalableFlags.begin() + filterHDim);
+      llvm::for_each(hDimsToErase, [&newScalableFlags](unsigned idx) {
+        newScalableFlags.erase(newScalableFlags.begin() + idx);
+      });
     }
 
     SmallVector<int64_t> interchange = {};
@@ -80,7 +107,7 @@ computeNewLCA(SmallVector<Operation *> computeOps, MLIRContext *context) {
     newTilingLevelsList.push_back(newLevel);
   }
 
-  // 3. Create and return new lowering config attribute
+  // 3. Create and return a new lowering config attribute.
   auto newTilingLevels = IREE::Codegen::LoweringConfigTilingLevelsAttr::get(
       context, newTilingLevelsList);
   IREE::Codegen::LoweringConfigAttr newLCA =
@@ -127,7 +154,8 @@ class DecomposeConvolutionToLowerDimOpsPass
     }
 
     // 3. If there's exactly 1 conv in this function (most common case), attach
-    // a "decomposed" lowering config to the newly decomposed conv.
+    // a "decomposed" lowering config created earlier to the newly decomposed
+    // conv Op.
     if (numConvOps == 1 && !failed(newLCA)) {
       auto computeOps = getComputeOps(funcOp);
       for (auto computeOp : computeOps) {
