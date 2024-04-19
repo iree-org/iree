@@ -380,3 +380,37 @@ func.func @matmul_192x64x16_mmt_multi_m_and_n(%lhs: vector<4x64x16xf16>, %rhs: v
 // CHECK-SAME:   batches_per_subgroup = [2, 1, 4, 4],
 // CHECK-SAME:   subgroup_basis = [2, 2, 1, 1, 1],
 // CHECK-SAME:   subgroup_active_ids = [true, true, true, true, false]
+
+// -----
+
+func.func @dequant_anchors_on_quant_only(%quant: memref<128x128xi4, strided<[4096, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>,
+                                  %scale: memref<128xf16, strided<[32], offset: ?>, #hal.descriptor_type<storage_buffer>>,
+                                  %zp: memref<128xf16, strided<[32], offset: ?>, #hal.descriptor_type<storage_buffer>>)
+  attributes {
+    mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>,
+                   subgroup_m_count = 1, subgroup_n_count = 4, subgroup_m_tile_count = 1, subgroup_n_tile_count = 2, subgroup_k_tile_count = 8>,
+    workgroup_size = [32, 4, 1]} {
+  %alloc = memref.alloc() : memref<128x128xf16, #gpu.address_space<workgroup>>
+  %cst = arith.constant 0.000000e+00 : f16
+  %cst_0 = arith.constant 0.000000e+00 : f32
+  %c32 = arith.constant 32 : index
+  %c256 = arith.constant 256 : index
+  %c0_i4 = arith.constant 0 : i4
+  %c0 = arith.constant 0 : index
+  %0 = vector.transfer_read %quant[%c0, %c0], %c0_i4 {in_bounds = [true, true]} : memref<128x128xi4, strided<[4096, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>, vector<128x128xi4>
+  %1 = vector.transfer_read %scale[%c0], %cst {in_bounds = [true]} : memref<128xf16, strided<[32], offset: ?>, #hal.descriptor_type<storage_buffer>>, vector<128xf16>
+  %2 = vector.broadcast %1 : vector<128xf16> to vector<128x128xf16>
+  %3 = vector.transpose %2, [1, 0] : vector<128x128xf16> to vector<128x128xf16>
+  %4 = vector.transfer_read %zp[%c0], %cst {in_bounds = [true]} : memref<128xf16, strided<[32], offset: ?>, #hal.descriptor_type<storage_buffer>>, vector<128xf16>
+  %5 = vector.broadcast %4 : vector<128xf16> to vector<128x128xf16>
+  %6 = vector.transpose %5, [1, 0] : vector<128x128xf16> to vector<128x128xf16>
+  %7 = arith.extui %0 : vector<128x128xi4> to vector<128x128xi32>
+  %8 = arith.uitofp %7 : vector<128x128xi32> to vector<128x128xf16>
+  %9 = arith.subf %8, %6 : vector<128x128xf16>
+  %10 = arith.mulf %9, %3 : vector<128x128xf16>
+  vector.transfer_write %10, %alloc[%c0, %c0] {in_bounds = [true, true]} : vector<128x128xf16>, memref<128x128xf16, #gpu.address_space<workgroup>>
+  return
+}
+//      CHECK: transfer '{{.+}} memref<128x128xi4{{.+}}<storage_buffer>>, vector<128x128xi4>' vector layout: #iree_vector_ext.nested_layout<
+// CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [4, 1], outers_per_batch = [1, 1], threads_per_outer = [32, 4], elements_per_thread = [1, 32], subgroup_basis = [1, 1], thread_basis = [32, 4]>
+//  CHECK-NOT: transfer '{{.+}} memref<128xf16{{.+}}<storage_buffer>>, vector<128xf16>' vector layout
