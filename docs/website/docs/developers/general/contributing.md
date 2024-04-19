@@ -330,7 +330,7 @@ The enabled jobs can be viewed from the Summary page of an action run:
 We tend to use the "triangular" or "forking" workflow. Develop primarily on a
 clone of the repository on your development machine. Any local branches named
 the same as persistent branches from the
-[main repository](https://github.com/openxla/iree) are pristine (though
+[main repository](https://github.com/iree-org/iree) are pristine (though
 potentially stale) copies. You only fastforward these to match upstream and
 otherwise do development on other branches. When sending PRs, you push to a
 different branch on your public fork and create the PR from there.
@@ -361,7 +361,7 @@ different branch on your public fork and create the PR from there.
       # From whatever directory under which you want to nest your repo
       $ git clone https://github.com/<github_username>/iree.git
       $ cd iree
-      $ git remote add upstream https://github.com/openxla/iree.git
+      $ git remote add upstream https://github.com/iree-org/iree.git
       ```
 
     This is especially important for maintainers who have write access (so can

@@ -17,7 +17,7 @@ some of those projects and technologies.
 !!! question - "Something missing?"
 
     Don't see a project of technology here that you think should be? We welcome
-    contributions on [our GitHub page](https://github.com/openxla/iree)!
+    contributions on [our GitHub page](https://github.com/iree-org/iree)!
 
 ## JAX
 

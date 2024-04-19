@@ -160,7 +160,7 @@ jobs:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_test_all_macos_arm64')
     runs-on:
-      - ${{ github.repository == 'openxla/iree' && 'self-hosted' || 'macos-11' }} # must come first
+      - ${{ github.repository == 'iree-org/iree' && 'self-hosted' || 'macos-11' }} # must come first
       - runner-group=postsubmit
       - os-family=macOS
     env:

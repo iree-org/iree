@@ -11,7 +11,7 @@ to be written in a variety of other languages.
 
     We welcome discussions on our
     [communication channels](../../index.md#communication-channels) and
-    contributions on [our GitHub page](https://github.com/openxla/iree)!
+    contributions on [our GitHub page](https://github.com/iree-org/iree)!
 
 ## Official API bindings
 

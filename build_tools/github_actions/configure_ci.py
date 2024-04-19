@@ -8,7 +8,7 @@
 """Determines whether CI should run on a given PR.
 
 The following environment variables are required:
-- GITHUB_REPOSITORY: GitHub org and repository, e.g. openxla/iree.
+- GITHUB_REPOSITORY: GitHub org and repository, e.g. iree-org/iree.
 - GITHUB_WORKFLOW_REF: GitHub workflow ref, e.g.
     iree-org/iree/.github/workflows/ci.yml@refs/pull/1/merge.
 - GITHUB_EVENT_NAME: GitHub event name, e.g. pull_request.
