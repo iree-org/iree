@@ -11,12 +11,12 @@ to be written in a variety of other languages.
 
     We welcome discussions on our
     [communication channels](../../index.md#communication-channels) and
-    contributions on [our GitHub page](https://github.com/openxla/iree)!
+    contributions on [our GitHub page](https://github.com/iree-org/iree)!
 
 ## Official API bindings
 
-Members of the core project team and OpenXLA partners maintain these official
-bindings:
+Members of the core project team and other partner groups maintain these
+official bindings:
 
 Language | Compiler API? | Runtime API? | Published packages?
 -------- | ------------ | ----------- | ------------------
@@ -45,13 +45,13 @@ Language | Compiler API? | Runtime API? | Published packages?
 ### :simple-javascript: JavaScript
 
 * JavaScript bindings for WebAssembly and WebGPU are under development in IREE's
-[`experimental/web/`](https://github.com/openxla/iree/tree/main/experimental/web)
+[`experimental/web/`](https://github.com/iree-org/iree/tree/main/experimental/web)
 directory.
 
 ### :fontawesome-brands-java: Java
 
 * Java TFLite bindings were developed at one point in IREE's
-[`runtime/bindings/tflite/java`](https://github.com/openxla/iree/tree/main/runtime/bindings/tflite/java)
+[`runtime/bindings/tflite/java`](https://github.com/iree-org/iree/tree/main/runtime/bindings/tflite/java)
 directory.
 
 ### :simple-julia: Julia

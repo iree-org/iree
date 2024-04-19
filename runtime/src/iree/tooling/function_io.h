@@ -63,7 +63,7 @@ iree_status_t iree_tooling_parse_variants(
 // Prints buffers in the IREE standard shaped buffer format:
 //   [shape]xtype=[value]
 // described in
-// https://github.com/openxla/iree/tree/main/runtime/src/iree/hal/api.h
+// https://github.com/iree-org/iree/tree/main/runtime/src/iree/hal/api.h
 iree_status_t iree_tooling_format_variants(iree_string_view_t list_name,
                                            iree_vm_list_t* list,
                                            iree_host_size_t max_element_count,
@@ -79,7 +79,7 @@ iree_status_t iree_tooling_format_variants(iree_string_view_t list_name,
 // Prints buffers in the IREE standard shaped buffer format:
 //   [shape]xtype=[value]
 // described in
-// https://github.com/openxla/iree/tree/main/runtime/src/iree/hal/api.h
+// https://github.com/iree-org/iree/tree/main/runtime/src/iree/hal/api.h
 iree_status_t iree_tooling_print_variants(iree_string_view_t list_name,
                                           iree_vm_list_t* list,
                                           iree_host_size_t max_element_count,

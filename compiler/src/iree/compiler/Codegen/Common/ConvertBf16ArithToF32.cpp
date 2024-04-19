@@ -193,7 +193,7 @@ struct ConvertTypeSensitiveArithCastOp : public OpConversionPattern<OpTy> {
   }
 };
 
-// This is required due to https://github.com/openxla/iree/issues/13891.
+// This is required due to https://github.com/iree-org/iree/issues/13891.
 // We are not able to execute `arith.extf` or `arith.truncf` on a scalar
 // vector type. To handle materializing `vector<bf16>` to `vector<f32>`
 // we should propagate into the source operation by constant propagation

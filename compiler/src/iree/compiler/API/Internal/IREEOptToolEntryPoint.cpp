@@ -139,7 +139,7 @@ static LogicalResult ireeOptMainFromCL(int argc, char **argv,
 
 int ireeOptRunMain(int argc, char **argv) {
   llvm::setBugReportMsg(
-      "Please report issues to https://github.com/openxla/iree/issues and "
+      "Please report issues to https://github.com/iree-org/iree/issues and "
       "include the crash backtrace.\n");
 
   mlir::DialectRegistry registry;

@@ -59,7 +59,7 @@ function check_requirements() {
 function download_wheels() {
   echo ""
   echo "Downloading wheels from '${RELEASE}'"
-  gh release download "${RELEASE}" --repo openxla/iree --pattern "*.whl"
+  gh release download "${RELEASE}" --repo iree-org/iree --pattern "*.whl"
 }
 
 function upload_wheels() {
