@@ -28,11 +28,11 @@ iree_cc_library(
     "PluginRegistration.cpp"
   DEPS
     ChloOps
-    VhloOps
     MLIRIR
     MLIRPass
     MLIRTransforms
     StablehloOps
+    VhloOps
     iree::compiler::PluginAPI
     iree::compiler::plugins::input::StableHLO::Conversion
   PUBLIC
