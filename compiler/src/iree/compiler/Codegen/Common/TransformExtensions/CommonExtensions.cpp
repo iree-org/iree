@@ -15,6 +15,7 @@
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
+#include "iree/compiler/Codegen/Transforms/Patterns.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
@@ -113,52 +114,6 @@ void transform_dialect::ApplyIreeLinalgElementwiseGreedyFusionPatternsOp::
 //===---------------------------------------------------------------------===//
 // ApplyFoldFillIntoPadPatternsOp
 //===---------------------------------------------------------------------===//
-
-namespace {
-/// Fold `tensor.pad(cst, tensor.extract*(linalg.fill(cst)))` into
-/// `linalg.fill(cst, empty)` when the padding constant and the fill constant
-/// are the same.
-/// This seems generally desirable as a folding but may be too intrusive, so we
-/// only apply it selectively for now.
-// TODO: atm hardcoded on linalg.fill but we could take any result of any
-// generic that yields a constant in that result.
-struct FoldFillIntoPad : public OpRewritePattern<tensor::PadOp> {
-  using OpRewritePattern<tensor::PadOp>::OpRewritePattern;
-  LogicalResult matchAndRewrite(tensor::PadOp padOp,
-                                PatternRewriter &rewriter) const final {
-    Operation *currentOp = padOp.getSource().getDefiningOp();
-    auto maybeExtractSlice =
-        dyn_cast_or_null<tensor::ExtractSliceOp>(currentOp);
-    while (currentOp && maybeExtractSlice) {
-      currentOp = maybeExtractSlice.getSource().getDefiningOp();
-      maybeExtractSlice = dyn_cast_or_null<tensor::ExtractSliceOp>(currentOp);
-    }
-    auto fillOp = dyn_cast_or_null<linalg::FillOp>(currentOp);
-    if (!fillOp) {
-      return rewriter.notifyMatchFailure(
-          padOp, "not coming from a linalg.fill op via tensor.extract_slice*");
-    }
-
-    Value padValue = padOp.getConstantPaddingValue();
-    RankedTensorType resultType = padOp.getResultType();
-    if (!padValue ||
-        getAsOpFoldResult(padValue) !=
-            getAsOpFoldResult(fillOp.getDpsInputOperand(0)->get())) {
-      return rewriter.notifyMatchFailure(
-          padOp, "not a constant value matching the fill value");
-    }
-
-    Location loc = padOp.getLoc();
-    auto emptyOp = rewriter.create<tensor::EmptyOp>(
-        loc, tensor::getMixedSizes(rewriter, loc, padOp),
-        resultType.getElementType());
-    rewriter.replaceOpWithNewOp<linalg::FillOp>(padOp, padValue,
-                                                emptyOp.getResult());
-
-    return success();
-  }
-};
-} // namespace
 
 void transform_dialect::ApplyFoldFillIntoPadPatternsOp::populatePatterns(
     RewritePatternSet &patterns) {
@@ -723,20 +678,6 @@ static IREEOneShotBufferizationOptions getBufferizationOptions() {
 
   return options;
 }
-
-namespace {
-/// Pattern to rewrite tensor.empty to tensor.alloc.
-struct EmptyTensorLoweringPattern : public OpRewritePattern<tensor::EmptyOp> {
-  using OpRewritePattern<tensor::EmptyOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(tensor::EmptyOp op,
-                                PatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<bufferization::AllocTensorOp>(
-        op, op.getType(), op.getDynamicSizes());
-    return success();
-  }
-};
-} // namespace
 
 DiagnosedSilenceableFailure transform_dialect::IREEBufferizeOp::apply(
     transform::TransformRewriter &rewriter,

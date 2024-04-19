@@ -14,9 +14,11 @@ iree_cc_library(
   NAME
     Transforms
   HDRS
+    "Patterns.h"
     "Transforms.h"
   SRCS
     "AffineMinDistributedSCFCanonicalization.cpp"
+    "Patterns.cpp"
     "RemoveSingleIterationLoop.cpp"
     "Transforms.cpp"
   DEPS
@@ -35,6 +37,7 @@ iree_cc_library(
     MLIRPass
     MLIRSCFTransforms
     MLIRSupport
+    MLIRTensorDialect
     MLIRTransformUtils
     MLIRTransforms
     MLIRValueBoundsOpInterface
