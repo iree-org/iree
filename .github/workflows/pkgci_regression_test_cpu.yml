@@ -115,7 +115,7 @@ jobs:
       - name: Download remote files for real weight model tests
         run: |
           source ${VENV_DIR}/bin/activate
-          python SHARK-TestSuite/iree_tests/download_remote_files.py
+          python SHARK-TestSuite/iree_tests/download_remote_files.py --root-dir pytorch/models
       - name: Run external tests - Models with real weights
         run: |
           source ${VENV_DIR}/bin/activate
