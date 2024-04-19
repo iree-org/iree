@@ -1,4 +1,4 @@
-// RUN: iree-compile --compile-to=input --split-input-file %s
+// RUN: not iree-compile --compile-to=input --split-input-file %s
 
 vhlo.func_v1 @vhlo_stablehlo_func(%arg0: !vhlo.tensor_v1<!vhlo.i32_v1>) -> (!vhlo.tensor_v1<!vhlo.i32_v1>) {
   // expected-error @+1 {{failed to materialize conversion for result #0 of operation 'vhlo.constant_v1' that remained live after conversion}}
