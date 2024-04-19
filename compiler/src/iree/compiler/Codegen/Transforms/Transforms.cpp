@@ -153,7 +153,7 @@ std::optional<Value> hoistOneStaticallyBoundAllocation(
     }
     // Non-scalable target: Assume everything is fixed-size.
     auto ub = ValueBoundsConstraintSet::computeConstantBound(
-        presburger::BoundType::UB, value, {}, /*stopCondition=*/nullptr,
+        presburger::BoundType::UB, {value, {}}, /*stopCondition=*/nullptr,
         /*closedUB=*/true);
     if (failed(ub))
       return failure();

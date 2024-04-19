@@ -76,7 +76,7 @@ inferSizesFromIR(linalg::LinalgOp linalgOp, std::optional<OpResult> opResult) {
       Value operand = operandDimPair.first;
       unsigned operandDim = operandDimPair.second;
       maybeDimBound = ValueBoundsConstraintSet::computeConstantBound(
-          presburger::BoundType::UB, operand, operandDim,
+          presburger::BoundType::UB, {operand, operandDim},
           /*stopCondition=*/nullptr, /*closedUB=*/true);
 
       if (succeeded(maybeDimBound)) {
@@ -212,7 +212,7 @@ static std::optional<VectorizationTileSizes> inferSizesFromIR(Value val) {
           LLVM_DEBUG(VEC_DBGS() << "Dim #" << dim << ": ");
           FailureOr<int64_t> maybeDimBound =
               ValueBoundsConstraintSet::computeConstantBound(
-                  presburger::BoundType::UB, op, dim,
+                  presburger::BoundType::UB, {op, dim},
                   /*stopCondition=*/nullptr, /*closedUB=*/true);
           if (failed(maybeDimBound)) {
             LLVM_DEBUG(llvm::dbgs() << "failed\n");
