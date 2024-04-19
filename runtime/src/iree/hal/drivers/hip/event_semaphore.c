@@ -279,17 +279,20 @@ static iree_status_t iree_hal_hip_semaphore_wait(
     IREE_TRACE_ZONE_END(z0);
     return iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
   }
-  iree_slim_mutex_unlock(&semaphore->mutex);
 
-  // Slow path: acquire a timepoint. This should happen outside of the lock too
-  // given that acquiring has its own internal locks.
+  // Slow path: acquire a timepoint. This should happen inside of the lock too.
+  // If not locked the semaphore may be signal before acquiring a timepoint.
+  // Then we would miss the signal.
   iree_hal_hip_timepoint_t* timepoint = NULL;
   iree_status_t status = iree_hal_hip_semaphore_acquire_timepoint_host_wait(
       semaphore, value, timeout, &timepoint);
   if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
+    iree_slim_mutex_unlock(&semaphore->mutex);
     IREE_TRACE_ZONE_END(z0);
     return status;
   }
+
+  iree_slim_mutex_unlock(&semaphore->mutex);
 
   // Wait until the timepoint resolves.
   // If satisfied the timepoint is automatically cleaned up and we are done. If
