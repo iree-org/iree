@@ -50,6 +50,7 @@ iree_cc_library(
     "EraseUnusedLinalgOperands.cpp"
     "ExpandTensorShapes.cpp"
     "FuseDequantizationMatmul.cpp"
+    "FuseHorizontalContractions.cpp"
     "FuseSiluHorizontalMatmul.cpp"
     "GeneralizeLinalgNamedOps.cpp"
     "GlobalLoopInvariantCodeMotion.cpp"
