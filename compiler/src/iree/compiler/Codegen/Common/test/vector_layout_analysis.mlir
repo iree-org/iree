@@ -360,7 +360,7 @@ builtin.module attributes { transform.with_named_sequence } {
     %0 = vector.transfer_read %quant[%c0, %c0], %c0_i4 {in_bounds = [true, true], "__vector_layout_test_anchor_result_0" = #layout} : memref<128x128xi4>, vector<128x128xi4>
     // expected-remark @above {{threads_per_outer = [32, 4], elements_per_thread = [1, 32], subgroup_basis = [1, 1], thread_basis = [32, 4]}}
     %1 = vector.transfer_read %scale[%c0],   %cst {in_bounds = [true]} : memref<128xf16>, vector<128xf16>
-    // expected-remark @above {{subgroup_basis = [1, 1], subgroup_active_ids= [true, false], thread_basis = [32, 4], thread_active_ids= [true, false]}}
+    // expected-remark @above {{subgroup_active_ids = [true, false], thread_basis = [32, 4], thread_active_ids = [true, false]}}
     %2 = vector.broadcast %1 : vector<128xf16> to vector<128x128xf16>
     // expected-remark-re @above {{threads_per_outer = [4, 32], elements_per_thread = [32, 1], subgroup_order = [1, 0], {{.*}}thread_order = [1, 0], {{.*}}thread_basis = [32, 4]}}
     %3 = vector.transpose %2, [1, 0] : vector<128x128xf16> to vector<128x128xf16>
