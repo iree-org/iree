@@ -427,8 +427,6 @@ TEST_P(semaphore_submission_test, TwoBatchesWaitingOn1FormerBatchAmongst2) {
   //             ↓                        ↓
   //        semaphore21              semaphore22
 
-  printf("TwoBatchesWaitingOn1FormerBatchAmongst2 started.");
-
   iree_hal_command_buffer_t* command_buffer11 = CreateEmptyCommandBuffer();
   iree_hal_command_buffer_t* command_buffer12 = CreateEmptyCommandBuffer();
   iree_hal_command_buffer_t* command_buffer21 = CreateEmptyCommandBuffer();
