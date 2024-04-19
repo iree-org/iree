@@ -159,8 +159,8 @@ enumerateMatmulTileArm64(TypeRange elementTypes, ExecutableTargetAttr target) {
 
   if (!hasUkernel(target)) {
     if (lhs.isSignlessInteger(8) && rhs.isSignlessInteger(8) &&
-        (out.isSignlessInteger(32))) {
-      if (hasFeature(target, "+i8mm")) {
+        (out.isSignlessInteger(32) || out.isF32())) {
+      if (out.isSignlessInteger(32) && hasFeature(target, "+i8mm")) {
         return {
             TileMxNxK{8, 8, 8}, // Aim to use SMMLA.
             TileMxNxK{4, 8, 8}, // Truncation of the above.
@@ -178,8 +178,8 @@ enumerateMatmulTileArm64(TypeRange elementTypes, ExecutableTargetAttr target) {
       };
     }
     if (lhs.isSignlessInteger(8) && rhs.isSignlessInteger(4) &&
-        (out.isSignlessInteger(32))) {
-      if (hasFeature(target, "+i8mm")) {
+        (out.isSignlessInteger(32) || out.isF32())) {
+      if (out.isSignlessInteger(32) && hasFeature(target, "+i8mm")) {
         return {
             TileMxNxK{4, 8, 32},
             TileMxNxK{2, 8, 32},
