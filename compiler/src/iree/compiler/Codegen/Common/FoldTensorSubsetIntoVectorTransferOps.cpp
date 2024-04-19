@@ -224,7 +224,7 @@ public:
 /// ```
 /// %1 = vector.transfer_write %v, %t2[%a, %b, %c]
 ///   {in_bounds = [true, false, true]}
-///   : vector<4x5xf32>, tensor<?x?xf32>
+///   : vector<1x64x128xf16>, tensor<1x?x128xf16>
 /// ```
 class FoldExtractSliceIntoTransferWrite final
     : public OpRewritePattern<tensor::ExtractSliceOp> {
