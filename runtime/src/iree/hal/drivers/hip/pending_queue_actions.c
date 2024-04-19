@@ -552,11 +552,10 @@ static void iree_hal_hip_execution_device_signal_host_callback(
     void* user_data) {
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_hal_hip_queue_action_t* action = (iree_hal_hip_queue_action_t*)user_data;
-  iree_hal_hip_pending_queue_actions_t* actions = action->owning_actions;
-
-  iree_slim_mutex_lock(&actions->action_mutex);
   IREE_ASSERT_EQ(action->kind, IREE_HAL_HIP_QUEUE_ACTION_TYPE_EXECUTION);
   IREE_ASSERT_EQ(action->state, IREE_HAL_HIP_QUEUE_ACTION_STATE_ALIVE);
+  iree_hal_hip_pending_queue_actions_t* actions = action->owning_actions;
+
   // Flip the action state to zombie and enqueue it again so that we can let
   // the worker thread clean it up. Note that this is necessary because cleanup
   // may involve GPU API calls like buffer releasing or unregistering, so we can
@@ -578,7 +577,7 @@ static void iree_hal_hip_execution_device_signal_host_callback(
 
   if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
     IREE_ASSERT(false &&
-                "Can't signal semaphores and/or issue pending actions");
+                "can't signal semaphores and/or issue pending actions");
     iree_hal_hip_post_error_to_worker_state(&actions->working_area,
                                             iree_status_code(status));
   }
