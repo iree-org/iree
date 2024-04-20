@@ -493,9 +493,94 @@ TEST_P(semaphore_submission_test, TwoBatchesWaitingOn1FormerBatchAmongst2) {
   iree_hal_command_buffer_release(command_buffer22);
 }
 
-// TODO: test device -> device synchronization: submit multiple batches with
+// Test device -> device synchronization: submit multiple batches with
 // a former batch signaling a value greater than all other batches' (different)
 // wait values.
+TEST_P(semaphore_submission_test, TwoBatchesWaitingOnDifferentSemaphoreValues) {
+  // The signal-wait relation is
+  //
+  //          command_buffer11
+  //                 ↓
+  //           signal value 3
+  //                 ↓
+  //            semaphore11
+  //           ↙           ↘
+  //  wait value 1       wait value 2
+  //        ↓                  ↓
+  // command_buffer21   command_buffer22
+  //        ↓                  ↓
+  //    semaphore21       semaphore22
+
+  iree_hal_command_buffer_t* command_buffer11 = CreateEmptyCommandBuffer();
+  iree_hal_command_buffer_t* command_buffer21 = CreateEmptyCommandBuffer();
+  iree_hal_command_buffer_t* command_buffer22 = CreateEmptyCommandBuffer();
+  iree_hal_semaphore_t* semaphore11 = CreateSemaphore();
+  iree_hal_semaphore_t* semaphore21 = CreateSemaphore();
+  iree_hal_semaphore_t* semaphore22 = CreateSemaphore();
+
+  // Command buffer wait/signal lists.
+  iree_hal_semaphore_list_t command_buffer11_semaphore_wait_list = {
+      /*count=*/0, nullptr, nullptr};
+  uint64_t command_buffer11_semaphore11_signal_value = 3;
+  iree_hal_semaphore_list_t command_buffer11_semaphore_signal_list = {
+      /*count=*/1, &semaphore11, &command_buffer11_semaphore11_signal_value};
+  uint64_t command_buffer21_semaphore11_wait_value = 1;
+  iree_hal_semaphore_list_t command_buffer21_semaphore_wait_list = {
+      /*count=*/1, &semaphore11, &command_buffer21_semaphore11_wait_value};
+  uint64_t command_buffer22_semaphore11_wait_value = 2;
+  iree_hal_semaphore_list_t command_buffer22_semaphore_wait_list = {
+      /*count=*/1, &semaphore11, &command_buffer22_semaphore11_wait_value};
+  uint64_t semaphore2x_signal_value = 1;
+  iree_hal_semaphore_list_t command_buffer21_signal_list = {
+      /*count=*/1, &semaphore21, &semaphore2x_signal_value};
+  iree_hal_semaphore_list_t command_buffer22_signal_list = {
+      /*count=*/1, &semaphore22, &semaphore2x_signal_value};
+
+  // We submit the command buffers in reverse order.
+  IREE_ASSERT_OK(iree_hal_device_queue_execute(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*wait_semaphore_list=*/command_buffer22_semaphore_wait_list,
+      /*signal_semaphore_list=*/command_buffer22_signal_list, 1,
+      &command_buffer22));
+  // We submit the command buffers in reverse order.
+  IREE_ASSERT_OK(iree_hal_device_queue_execute(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*wait_semaphore_list=*/command_buffer21_semaphore_wait_list,
+      /*signal_semaphore_list=*/command_buffer21_signal_list, 1,
+      &command_buffer21));
+
+  // Semaphores have not advance since we have not yet submitted
+  // command_buffer11.
+  CheckSemaphoreValue(semaphore11, 0);
+  CheckSemaphoreValue(semaphore21, 0);
+  CheckSemaphoreValue(semaphore22, 0);
+
+  IREE_ASSERT_OK(iree_hal_device_queue_execute(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*wait_semaphore_list=*/command_buffer11_semaphore_wait_list,
+      /*signal_semaphore_list=*/command_buffer11_semaphore_signal_list, 1,
+      &command_buffer11));
+
+  // Wait and check that semaphore values have advanced.
+  IREE_ASSERT_OK(
+      iree_hal_semaphore_wait(semaphore21, semaphore2x_signal_value,
+                              iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
+  CheckSemaphoreValue(semaphore21, semaphore2x_signal_value);
+  // semaphore11 must have advanced, because semaphore22 has advanced already.
+  CheckSemaphoreValue(semaphore11, command_buffer11_semaphore11_signal_value);
+
+  IREE_ASSERT_OK(
+      iree_hal_semaphore_wait(semaphore22, semaphore2x_signal_value,
+                              iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
+  CheckSemaphoreValue(semaphore22, semaphore2x_signal_value);
+
+  iree_hal_semaphore_release(semaphore11);
+  iree_hal_semaphore_release(semaphore21);
+  iree_hal_semaphore_release(semaphore22);
+  iree_hal_command_buffer_release(command_buffer11);
+  iree_hal_command_buffer_release(command_buffer21);
+  iree_hal_command_buffer_release(command_buffer22);
+}
 
 // TODO: test host + device -> device synchronization: submit two batches
 // with a later batch waiting on both a host and device singal to proceed.
