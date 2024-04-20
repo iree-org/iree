@@ -57,26 +57,35 @@ void LLVMCPUVirtualVectorLoweringPass::runOnOperation() {
           .setVectorMultiReductionLowering(vectorMultiReductionLowering)
           .setVectorTransferSplit(vectorTransferSplit);
 
-  RewritePatternSet patterns(ctx);
-  if (enableArmI8mm) {
-    arm_neon::populateLowerContractionToSMMLAPatternPatterns(patterns);
+  // Target-dependenet patterns.
+  {
+    if (enableArmI8mm) {
+      RewritePatternSet patterns(ctx);
+      arm_neon::populateLowerContractionToSMMLAPatternPatterns(patterns);
+      (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+    }
   }
-  vector::populateVectorToVectorCanonicalizationPatterns(patterns);
-  vector::populateVectorGatherLoweringPatterns(patterns);
-  vector::populateVectorContractLoweringPatterns(
-      patterns, vectorTransformOptions,
-      /*benefit=*/1,
-      /*disableOuterProductLowering=*/false);
-  // This pattern will transform vector loads whose elements are used in a
-  // scalar fashion into scalar loads. This will let scalar loads to be folded
-  // into broadcast/arithmetic operations and reduce register pressure.
-  vector::populateScalarVectorTransferLoweringPatterns(
-      patterns, /*benefit=*/1, /*allowMultipleUses=*/true);
-  vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
-  vector::populateVectorMultiReductionLoweringPatterns(
-      patterns, vectorMultiReductionLowering);
-  populateVectorTransferFullPartialPatterns(patterns, vectorTransformOptions);
-  (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+
+  // Target-independent patterns.
+  {
+    RewritePatternSet patterns(ctx);
+    vector::populateVectorToVectorCanonicalizationPatterns(patterns);
+    vector::populateVectorGatherLoweringPatterns(patterns);
+    vector::populateVectorContractLoweringPatterns(
+        patterns, vectorTransformOptions,
+        /*benefit=*/1,
+        /*disableOuterProductLowering=*/false);
+    // This pattern will transform vector loads whose elements are used in a
+    // scalar fashion into scalar loads. This will let scalar loads to be folded
+    // into broadcast/arithmetic operations and reduce register pressure.
+    vector::populateScalarVectorTransferLoweringPatterns(
+        patterns, /*benefit=*/1, /*allowMultipleUses=*/true);
+    vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
+    vector::populateVectorMultiReductionLoweringPatterns(
+        patterns, vectorMultiReductionLowering);
+    populateVectorTransferFullPartialPatterns(patterns, vectorTransformOptions);
+    (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+  }
 }
 } // namespace
 
