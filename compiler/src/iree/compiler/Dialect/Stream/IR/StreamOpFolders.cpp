@@ -1560,7 +1560,8 @@ namespace {
 
 // Turns fills that cover an entire target resource into splats.
 // This acts as a discard as it indicates we don't care about the previous
-// resource contents.
+// resource contents. Note that we only do this when we can locally prove that
+// it's safe to disassociate the result storage.
 //
 // Example:
 //  %0 = stream.async.fill %cst, %dst[%c0 to %dstsz for %dstsz] ... {%dstsz}
@@ -1570,13 +1571,20 @@ struct FlattenFullFillToSplat : public OpRewritePattern<AsyncFillOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(AsyncFillOp fillOp,
                                 PatternRewriter &rewriter) const override {
-    if (fillOp.getTargetLength() == fillOp.getTargetSize()) {
-      rewriter.replaceOpWithNewOp<IREE::Stream::AsyncSplatOp>(
-          fillOp, fillOp.getResult().getType(), fillOp.getValue(),
-          fillOp.getTargetSize(), fillOp.getAffinityAttr());
-      return success();
+    if (fillOp.getTargetLength() != fillOp.getTargetSize())
+      return failure();
+
+    auto targetOp = fillOp.getTarget().getDefiningOp();
+    if (!targetOp || IREE::Util::TiedOpInterface::findTiedBaseValue(
+                         fillOp.getTarget()) != fillOp.getTarget()) {
+      return rewriter.notifyMatchFailure(
+          fillOp, "unable to locally determine safety of eliding the target");
     }
-    return failure();
+
+    rewriter.replaceOpWithNewOp<IREE::Stream::AsyncSplatOp>(
+        fillOp, fillOp.getResult().getType(), fillOp.getValue(),
+        fillOp.getTargetSize(), fillOp.getAffinityAttr());
+    return success();
   }
 };
 

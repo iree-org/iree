@@ -9,7 +9,7 @@
 # TODO: We should really be dumping binaries into bin/ not
 # tools/. This must line up with binaries built this way because
 # DLLs must be in the same directory as the binary.
-# See: https://github.com/openxla/iree/issues/11297
+# See: https://github.com/iree-org/iree/issues/11297
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/tools")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/lib")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${PROJECT_BINARY_DIR}/lib")
@@ -62,4 +62,3 @@ if(IREE_BUILD_COMPILER)
     add_dependencies(iree_compiler_API_SharedImpl ${_iree_compiler_dylib_depends})
   endif()
 endif()
-

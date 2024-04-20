@@ -249,7 +249,7 @@ public:
 
   // Performs optimizations on |module| (including LTO-style whole-program
   // ones). Inspired by code section in
-  // https://github.com/openxla/iree/blob/main/compiler/plugins/target/CUDA/CUDATarget.cpp
+  // https://github.com/iree-org/iree/blob/main/compiler/plugins/target/CUDA/CUDATarget.cpp
   static void optimizeModule(llvm::Module &module,
                              llvm::TargetMachine &targetMachine) {
     llvm::LoopAnalysisManager lam;

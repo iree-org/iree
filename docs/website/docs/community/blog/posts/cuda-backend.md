@@ -42,7 +42,7 @@ using CUDA streams for comparison.
 
 HAL exposes an API that can be tested independently, even if we are not able to
 create CUDA kernels yet we can test a large portion of the CUDA driver using
-[CTS tests](https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/cts/README.md).
+[CTS tests](https://github.com/iree-org/iree/blob/main/runtime/src/iree/hal/cts/README.md).
 Those can be run to make sure a system has the required CUDA support.
 
  ![Compilation flow](./cuda-compiler-flow.png){ align=left }

@@ -1,5 +1,5 @@
 func.func @reduce_min() {
-  %input = flow.tensor.constant
+  %input = flow.tensor.dynamic_constant
     dense<[[1.0, 2.0, 3.0, 4.0],[-1.0 ,-2.0 ,-3.0 ,-4.0]]> : tensor<2x4xf32> -> tensor<?x?xf32>
   %0 = stablehlo.constant dense<0x7F800000> : tensor<f32>
   %1 = "stablehlo.reduce"(%input, %0) ( {

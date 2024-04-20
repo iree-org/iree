@@ -33,7 +33,7 @@ iree_runtime_cc_test(
     srcs = ["dynamic_library_test.cc"],
     tags = [
         # This test fails with Bazel under Docker.
-        # See https://github.com/openxla/iree/pull/13131 for more information.
+        # See https://github.com/iree-org/iree/pull/13131 for more information.
         "nodocker",
     ],
     deps = [

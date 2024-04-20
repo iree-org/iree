@@ -69,7 +69,7 @@ graph LR
     === ":material-alert: Nightly releases"
 
         Nightly releases are published on
-        [GitHub releases](https://github.com/openxla/iree/releases).
+        [GitHub releases](https://github.com/iree-org/iree/releases).
 
         ``` shell
         python -m pip install \
@@ -207,13 +207,13 @@ contains test scripts to compile, run, and compare various TensorFlow Lite
 models sourced from [TensorFlow Hub](https://tfhub.dev/).
 
 * An example smoke test of the
-[TensorFlow Lite C API](https://github.com/openxla/iree/tree/main/runtime/bindings/tflite)
+[TensorFlow Lite C API](https://github.com/iree-org/iree/tree/main/runtime/bindings/tflite)
 is available
-[here](https://github.com/openxla/iree/blob/main/runtime/bindings/tflite/smoke_test.cc).
+[here](https://github.com/iree-org/iree/blob/main/runtime/bindings/tflite/smoke_test.cc).
 
 | Colab notebooks |  |
 | -- | -- |
-Text classification with TFLite and IREE | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/colab/tflite_text_classification.ipynb)
+Text classification with TFLite and IREE | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iree-org/iree/blob/main/samples/colab/tflite_text_classification.ipynb)
 
 ## :octicons-question-16: Troubleshooting
 

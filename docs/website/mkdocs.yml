@@ -1,7 +1,7 @@
 site_name: IREE
 site_url: https://iree.dev/
-repo_url: https://github.com/openxla/iree
-repo_name: openxla/iree
+repo_url: https://github.com/iree-org/iree
+repo_name: iree-org/iree
 edit_uri: blob/main/docs/website/docs/
 
 theme:
@@ -58,10 +58,10 @@ extra:
 
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/openxla/iree
+      link: https://github.com/iree-org/iree
       name: IREE on GitHub
     - icon: fontawesome/brands/discord
-      link: https://discord.gg/26P4xW4
+      link: https://discord.gg/wEWh6Z9nMU
       name: IREE Discord Server
     - icon: fontawesome/solid/users
       link: https://groups.google.com/forum/#!forum/iree-discuss

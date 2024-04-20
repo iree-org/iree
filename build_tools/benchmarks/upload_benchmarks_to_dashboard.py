@@ -32,7 +32,7 @@ from common.common_arguments import expand_and_check_file_paths
 from common import benchmark_definition, benchmark_presentation, benchmark_thresholds
 
 IREE_DASHBOARD_URL = "https://perf.iree.dev"
-IREE_GITHUB_COMMIT_URL_PREFIX = "https://github.com/openxla/iree/commit"
+IREE_GITHUB_COMMIT_URL_PREFIX = "https://github.com/iree-org/iree/commit"
 IREE_PROJECT_ID = "IREE"
 THIS_DIRECTORY = pathlib.Path(__file__).resolve().parent
 

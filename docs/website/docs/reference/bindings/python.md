@@ -77,7 +77,7 @@ To use IREE's Python bindings, you will first need to install
 === ":material-alert: Nightly releases"
 
     Nightly releases are published on
-    [GitHub releases](https://github.com/openxla/iree/releases).
+    [GitHub releases](https://github.com/iree-org/iree/releases).
 
     ``` shell
     python -m pip install \
@@ -104,7 +104,7 @@ page for instructions for building from source.
 
 ### Compile a program
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/colab/low_level_invoke_function.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iree-org/iree/blob/main/samples/colab/low_level_invoke_function.ipynb)
 
 ```python
 from iree import compiler as ireec
@@ -127,7 +127,7 @@ compiled_flatbuffer = ireec.tools.compile_str(
 
 ### Run a compiled program
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/colab/low_level_invoke_function.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iree-org/iree/blob/main/samples/colab/low_level_invoke_function.ipynb)
 
 ```python
 from iree import runtime as ireert
@@ -152,7 +152,7 @@ print("Results:", results)
 ### :octicons-code-16: Samples
 
 Check out the samples in IREE's
-[samples/colab/ directory](https://github.com/openxla/iree/tree/main/samples/colab)
+[samples/colab/ directory](https://github.com/iree-org/iree/tree/main/samples/colab)
 and the
 [iree-experimental repository](https://github.com/iree-org/iree-experimental)
 for examples using the Python APIs.

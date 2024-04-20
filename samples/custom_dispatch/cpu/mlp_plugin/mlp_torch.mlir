@@ -72,5 +72,5 @@ module @example attributes {hal.device.targets = [#cpu_target]} {
 }  // module
 
 // CHECK-LABEL: EXEC @mlp_invocation
-//       CHECK: [Plugin]: M = 2, N = 8, K = 4
+//       CHECK: [Plugin]: M = 2, N = 8, K = 4, doRelu = 1
 //       CHECK: 2x8xf32=[-24 -0 -24 -0 -24 -0 -24 -0][-0 -24 -0 -24 -0 -24 -0 -24]

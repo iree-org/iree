@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/Flow/Conversion/TensorToFlow/Patterns.h"
-#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -16,16 +15,14 @@
 
 namespace mlir::iree_compiler::IREE::Flow {
 
+#define GEN_PASS_DEF_CONVERTTOFLOWPASS
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
+
 namespace {
 
 // Pass to test conversion to flow patterns.
-struct ConvertToFlowPass : public ConvertToFlowBase<ConvertToFlowPass> {
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<affine::AffineDialect, IREE::Flow::FlowDialect,
-                    linalg::LinalgDialect, scf::SCFDialect,
-                    tensor::TensorDialect>();
-  }
-
+struct ConvertToFlowPass
+    : public IREE::Flow::impl::ConvertToFlowPassBase<ConvertToFlowPass> {
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet convertToFlowPatterns(context);
@@ -41,9 +38,5 @@ struct ConvertToFlowPass : public ConvertToFlowBase<ConvertToFlowPass> {
 };
 
 } // namespace
-
-std::unique_ptr<Pass> createConvertToFlowPass() {
-  return std::make_unique<ConvertToFlowPass>();
-}
 
 } // namespace mlir::iree_compiler::IREE::Flow

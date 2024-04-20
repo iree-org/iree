@@ -426,9 +426,9 @@ $ iree-benchmark-executable \
 ```
 
 See the comments in
-[`tools/iree-benchmark-executable-main.c`](https://github.com/openxla/iree/blob/main/tools/iree-benchmark-executable-main.c)
+[`tools/iree-benchmark-executable-main.c`](https://github.com/iree-org/iree/blob/main/tools/iree-benchmark-executable-main.c)
 and the test file at
-[`tools/test/iree-benchmark-executable.mlir`](https://github.com/openxla/iree/blob/main/tools/test/iree-benchmark-executable.mlir)
+[`tools/test/iree-benchmark-executable.mlir`](https://github.com/iree-org/iree/blob/main/tools/test/iree-benchmark-executable.mlir)
 for more information and examples.
 
 ## Compiling phase by phase
@@ -533,7 +533,7 @@ each phase, much like `--compile-to` but without exiting early:
 ```console hl_lines="3"
 $ iree-compile simple_abs.mlir \
   --iree-hal-target-backends=llvm-cpu \
-  --dump-compilation-phases-to=/tmp/iree/simple_abs
+  --dump-compilation-phases-to=/tmp/iree/simple_abs \
   -o /tmp/iree/simple_abs/simple_abs_cpu.vmfb
 
 $ ls /tmp/iree/simple_abs -1v

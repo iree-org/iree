@@ -16,11 +16,13 @@ iree_lit_test_suite(
   SRCS
     "cleanup_numeric_narrowing.mlir"
     "conv1x1_to_matmul.mlir"
+    "data_layout_propagation.mlir"
     "demote_contraction_inputs_to_bf16.mlir"
     "detach_elementwise_from_named_ops.mlir"
     "expand_tensor_shapes.mlir"
     "flow_hoist_into_globals.mlir"
     "fuse_dequantization_matmul.mlir"
+    "fuse_horizontal_contractions.mlir"
     "fuse_silu_horizontal_matmul.mlir"
     "generalize_named_ops.mlir"
     "global_loop_invariant_code_motion.mlir"

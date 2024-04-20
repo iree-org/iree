@@ -11,6 +11,7 @@ include "iree/compiler/Dialect/Flow/IR/FlowInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 include "iree/compiler/Dialect/Util/IR/UtilTypes.td"
 include "mlir/IR/AttrTypeBase.td"
+include "mlir/IR/BuiltinAttributeInterfaces.td"
 
 //===----------------------------------------------------------------------===//
 // IREE execution flow dialect
@@ -231,6 +232,35 @@ def FLOW_CollectiveReductionOpAttr :
       FLOW_CollectiveReductionOp_ReductionAverage,
     ]> {
   let cppNamespace = "mlir::iree_compiler::IREE::Flow";
+}
+
+//===----------------------------------------------------------------------===//
+// Parameter storage attributes
+//===----------------------------------------------------------------------===//
+
+def FLOW_NamedParameterAttr :
+    AttrDef<Flow_Dialect, "NamedParameter", [
+      TypedAttrInterface,
+    ]> {
+  let mnemonic = "parameter.named";
+  let summary = [{named parameter referenced an optional scope and key}];
+  let description = [{
+    Species an externally-defined parameter that can be referenced by an
+    optional scope defining a set of parameters and a key uniquely identifying
+    the parameter within its scope.
+  }];
+  let parameters = (ins
+    AttributeSelfTypeParameter<"">:$type,
+    OptionalParameter<"StringAttr">:$scope,
+    AttrParameter<"StringAttr", "">:$key,
+    OptionalParameter<"DictionaryAttr">:$config
+  );
+  let assemblyFormat = [{
+    `<`
+    custom<ParameterReference>($scope, $key)
+    (`,` $config^)?
+    `>`
+  }];
 }
 
 #endif  // IREE_DIALECT_FLOW_BASE

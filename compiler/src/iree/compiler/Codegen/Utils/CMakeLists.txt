@@ -72,6 +72,7 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRIR
+    MLIRLinalgDialect
     MLIRSupport
     MLIRVectorDialect
   PUBLIC

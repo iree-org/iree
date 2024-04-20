@@ -20,7 +20,7 @@ module {
     flow.dispatch.tensor.store %7, %2, offsets = [0, 0, 0], sizes = [64, 80, 1280], strides = [1, 1, 1] : tensor<64x80x1280xf32> -> !flow.dispatch.tensor<writeonly:tensor<64x80x1280xf32>>
     return
   }
-} 
+}
 
 
 // CHECK-LABEL: func.func @fit_shared_memory_schedule()

@@ -10,7 +10,7 @@ name: Benchmark Trigger
 # When a benchmark label is added, this cancels and then re-runs the CI
 # workflow. When the workflow is re-run, it will pick up the latest PR
 # description and labels. See
-# https://github.com/openxla/iree/issues/10042#issuecomment-1449250094 for
+# https://github.com/iree-org/iree/issues/10042#issuecomment-1449250094 for
 # more background.
 #
 # This workflow is running on the base branch the PR targets.

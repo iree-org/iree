@@ -779,12 +779,55 @@ static bool compareShapesEqual(ShapedType lhsType, ValueRange lhsDynamicDims,
 // flow.tensor.constant
 //===----------------------------------------------------------------------===//
 
-OpFoldResult TensorConstantOp::fold(FoldAdaptor operands) {
+OpFoldResult TensorConstantOp::fold(FoldAdaptor operands) { return getValue(); }
+
+//===----------------------------------------------------------------------===//
+// flow.tensor.dynamic_constant
+//===----------------------------------------------------------------------===//
+
+OpFoldResult TensorDynamicConstantOp::fold(FoldAdaptor operands) {
   auto dynamicType = getType();
   if (dynamicType.getNumDynamicDims() == 0) {
     return getValue();
   }
   return {};
+}
+
+namespace {
+
+struct ExpandDynamicShapeConstant
+    : public OpRewritePattern<TensorDynamicConstantOp> {
+  using OpRewritePattern<TensorDynamicConstantOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(TensorDynamicConstantOp op,
+                                PatternRewriter &rewriter) const override {
+    auto constantOp = rewriter.create<IREE::Flow::TensorConstantOp>(
+        op.getLoc(), op.getValue());
+    auto dynamicType = op.getType();
+    auto staticType = cast<ShapedType>(op.getValue().getType());
+    SmallVector<Value> dynamicDims;
+    for (int64_t i = 0; i < dynamicType.getRank(); ++i) {
+      if (dynamicType.isDynamicDim(i)) {
+        auto dimValue = rewriter
+                            .create<arith::ConstantIndexOp>(
+                                op.getLoc(), staticType.getDimSize(i))
+                            .getResult();
+        dynamicDims.push_back(rewriter
+                                  .create<IREE::Util::OptimizationBarrierOp>(
+                                      op.getLoc(), dimValue)
+                                  .getResult(0));
+      }
+    }
+    rewriter.replaceOpWithNewOp<IREE::Flow::TensorReshapeOp>(
+        op, dynamicType, constantOp.getResult(), dynamicDims);
+    return success();
+  }
+};
+
+} // namespace
+
+void TensorDynamicConstantOp::getCanonicalizationPatterns(
+    RewritePatternSet &results, MLIRContext *context) {
+  results.insert<ExpandDynamicShapeConstant>(context);
 }
 
 //===----------------------------------------------------------------------===//
@@ -971,26 +1014,6 @@ struct ResolveShapedDim : public OpRewritePattern<tensor::DimOp> {
       }
       rewriter.replaceOp(op, dynamicDims.value()[dimOffset]);
       return success();
-    }
-
-    // Special handling of flow.tensor.constant which may be acting as a
-    // dynamically shaped value that we want to remove the tensor.dim of but
-    // still treat the shape as dynamic. We do this by inserting an optimization
-    // barrier between the constant and the consumers. Note that this use case
-    // is very specific and generally only applicable to tests/benchmarks.
-    if (auto constantOp = dyn_cast_if_present<IREE::Flow::TensorConstantOp>(
-            op.getShapedValue().getDefiningOp())) {
-      auto valueType = dyn_cast<ShapedType>(constantOp.getValue().getType());
-      if (valueType && valueType != constantOp.getType()) {
-        // Constant op is acting as a cast. If the dimension being queried was
-        // static it would have been resolved above so we know it's dynamic
-        // here.
-        Value staticValue = rewriter.create<arith::ConstantIndexOp>(
-            op.getLoc(), valueType.getDimSize(idx));
-        rewriter.replaceOpWithNewOp<IREE::Util::OptimizationBarrierOp>(
-            op, staticValue);
-        return success();
-      }
     }
 
     return rewriter.notifyMatchFailure(op, "no dynamic dims found/usable");

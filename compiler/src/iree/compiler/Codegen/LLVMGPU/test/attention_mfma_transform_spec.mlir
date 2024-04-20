@@ -172,10 +172,11 @@ module attributes { transform.with_named_sequence } {
     %distribute_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     transform.iree.amdgpu_distribute_vectors %distribute_func test_conversion : !transform.any_op
 
-    transform.apply_patterns to %distribute_func {
+    %distribute_func_2 = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.apply_patterns to %distribute_func_2 {
       transform.apply_patterns.canonicalization
     } : !transform.any_op
-    transform.apply_cse to %distribute_func : !transform.any_op
+    transform.apply_cse to %distribute_func_2 : !transform.any_op
 
     // Distribute shared memory copies
     // ==========================================

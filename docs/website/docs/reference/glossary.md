@@ -17,7 +17,7 @@ some of those projects and technologies.
 !!! question - "Something missing?"
 
     Don't see a project of technology here that you think should be? We welcome
-    contributions on [our GitHub page](https://github.com/openxla/iree)!
+    contributions on [our GitHub page](https://github.com/iree-org/iree)!
 
 ## JAX
 
@@ -54,9 +54,8 @@ tensor operations then generate loop structures for its various backend targets.
 [OpenXLA](https://github.com/openxla/community) is a community-driven, open
 source ML compiler ecosystem.
 
-IREE is one project under the
-[OpenXLA GitHub Organization](https://github.com/openxla), and it interfaces
-with many of the other projects, such as [StableHLO](#stablehlo).
+IREE interfaces with some of the OpenXLA projects, such as
+[StableHLO](#stablehlo).
 
 ## PyTorch
 
@@ -118,5 +117,5 @@ to use TFLite programs with IREE.
 IREE also has bindings for the
 [TFLite C API](https://github.com/tensorflow/tensorflow/tree/master/tensorflow/lite/c),
 see the
-[`runtime/bindings/tflite/`](https://github.com/openxla/iree/tree/main/runtime/bindings/tflite)
+[`runtime/bindings/tflite/`](https://github.com/iree-org/iree/tree/main/runtime/bindings/tflite)
 directory for details.

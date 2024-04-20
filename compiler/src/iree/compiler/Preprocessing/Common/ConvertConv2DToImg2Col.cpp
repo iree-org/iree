@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Preprocessing/Common/PassDetail.h"
 #include "iree/compiler/Preprocessing/Common/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -20,6 +19,9 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler::Preprocessing {
+
+#define GEN_PASS_DEF_CONVERTCONV2DTOIMG2COLPASS
+#include "iree/compiler/Preprocessing/Common/Passes.h.inc" // IWYU pragma: export
 
 static bool hasAllOneValues(DenseIntElementsAttr attr) {
   return llvm::all_of(
@@ -550,8 +552,9 @@ public:
   }
 };
 
-struct ConvertConv2DToImg2ColPass
-    : ConvertConv2DToImg2ColBase<ConvertConv2DToImg2ColPass> {
+class ConvertConv2DToImg2ColPass
+    : public iree_compiler::Preprocessing::impl::ConvertConv2DToImg2ColPassBase<
+          ConvertConv2DToImg2ColPass> {
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(&getContext());
@@ -565,9 +568,5 @@ struct ConvertConv2DToImg2ColPass
 };
 
 } // namespace
-
-std::unique_ptr<Pass> createConvertConv2DToImg2ColPass() {
-  return std::make_unique<ConvertConv2DToImg2ColPass>();
-}
 
 } // namespace mlir::iree_compiler::Preprocessing

@@ -1040,26 +1040,62 @@ def OpGroupTensorOps : OpDocGroup {
 
 let opDocGroup = OpGroupTensorOps in {
 
-def FLOW_TensorConstantOp : FLOW_PureOp<"tensor.constant"> {
+def FLOW_TensorConstantOp : FLOW_PureOp<"tensor.constant", [
+  ConstantLike,
+  AllTypesMatch<["value", "result"]>,
+]> {
   let summary = [{tensor constant that can have dynamic dimensions}];
   let description = [{
-    Allows specifying a tensor constant of IREE-specific types/attributes or
-    where the return value can erase shape information.
+    Allows specifying a tensor constant of IREE-specific types/attributes.
 
     ```mlir
     %cst = flow.tensor.constant #something_tensor_like : tensor<2x2xf32>
     %res = math.absf %cst : tensor<2x2xf32>
     ```
+  }];
+  let arguments = (ins TypedAttrInterface:$value);
+  let results = (outs AnyTensor:$result);
+
+  let assemblyFormat = [{
+    attr-dict $value
+  }];
+
+  let extraClassDeclaration = [{
+    // Returns true if the constant op can be built with the given attribute.
+    static bool isBuildableWith(Attribute value, Type type);
+  }];
+
+  let hasFolder = 1;
+}
+
+def FLOW_TensorDynamicConstantOp : FLOW_Op<"tensor.dynamic_constant"> {
+  let summary = [{tensor constant that can have dynamic dimensions}];
+  let description = [{
+    Allows specifying a tensor constant of IREE-specific types/attributes with
+    a dynamic shape that approximates a value as passed from the user. This
+    disables many optimizations and should only be used when testing or
+    benchmarking and wanting to ensure that dynamic dimension behavior is
+    preserved.
 
     ```mlir
-    %cst = flow.tensor.constant dense<4.0> : tensor<2x2xf32> -> tensor<?x2xf32>
+    %cst = flow.tensor.dynamic_constant #something_tensor_like : tensor<2x2xf32> -> tensor<?x2xf32>
     %res = math.absf %cst : tensor<?x2xf32>
     ```
   }];
   let arguments = (ins TypedAttrInterface:$value);
   let results = (outs AnyTensor:$result);
 
+  let assemblyFormat = [{
+    attr-dict $value `->` type($result)
+  }];
+
+  let extraClassDeclaration = [{
+    // Returns true if the constant op can be built with the given attribute.
+    static bool isBuildableWith(Attribute value, Type type);
+  }];
+
   let hasFolder = 1;
+  let hasCanonicalizer = 1;
 }
 
 def FLOW_TensorTieShapeOp : FLOW_PureOp<"tensor.tie_shape", [

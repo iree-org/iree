@@ -402,7 +402,7 @@ setConvolutionVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
 
   // Note that the following heuristic seeds are just placeholder values.
   // We need to clean it up and make it adjusting to different targets.
-  // See https://github.com/openxla/iree/issues/16341 for details.
+  // See https://github.com/iree-org/iree/issues/16341 for details.
   GPUMMAHeuristicSeeds seeds{/*bestSubgroupCountPerWorkgroup=*/4,
                              /*bestMNTileCountPerSubgroup=*/8,
                              /*bestKTileCountPerSubgroup=*/2};
@@ -507,13 +507,19 @@ setMatmulVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   // except the inner most m, n, and k dimensions to 1.
   int64_t mDim = contractionDims->m.back();
   int64_t nDim = contractionDims->n.back();
+  int64_t kDim = contractionDims->k.back();
+
+  // Dynamic dims are expected to be taken care of earlier in the pipeline.
+  if (ShapedType::isDynamic(bounds[mDim]) ||
+      ShapedType::isDynamic(bounds[nDim]) ||
+      ShapedType::isDynamic(bounds[kDim])) {
+    return failure();
+  }
 
   // Bail out on matvec-like cases.
   if (bounds[mDim] == 1 || bounds[nDim] == 1) {
     return failure();
   }
-
-  int64_t kDim = contractionDims->k.back();
 
   Value lhs = op.getDpsInputOperand(0)->get();
   Value rhs = op.getDpsInputOperand(1)->get();
@@ -544,7 +550,7 @@ setMatmulVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
 
   // Note that the following heuristic seeds are just placeholder values.
   // We need to clean it up and make it adjusting to different targets.
-  // See https://github.com/openxla/iree/issues/16341 for details.
+  // See https://github.com/iree-org/iree/issues/16341 for details.
   if (problem.mSize * problem.nSize <= clGPUMatmulCThreshold) {
     // For matmuls with small M*N size, we want to distribute M*N onto more
     // workgroups to fill the GPU. Use a smaller bestMNTileCountPerSubgroup

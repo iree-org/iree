@@ -120,6 +120,7 @@ bool hasUkernelSupportedGpuArch(IREE::HAL::ExecutableTargetAttr targetAttr);
 //===----------------------------------------------------------------------===//
 // GPU Target Information
 //===----------------------------------------------------------------------===//
+FailureOr<ArrayAttr> getSupportedMmaTypes(DictionaryAttr config);
 
 FailureOr<ArrayAttr> getSupportedMmaTypes(mlir::FunctionOpInterface entryPoint);
 

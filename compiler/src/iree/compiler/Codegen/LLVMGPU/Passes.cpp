@@ -157,7 +157,7 @@ static LogicalResult canReorderWorkgroups(FunctionOpInterface funcOp) {
   // Workgroup reordering on ROCm currently requires all workgrup counts to be
   // static.
   SmallVector<int64_t> workgroupCounts = getStaticNumWorkgroups(funcOp);
-  if (workgroupCounts.empty())
+  if (llvm::any_of(workgroupCounts, ShapedType::isDynamic))
     return failure();
 
   // This is further restricted to 2D+ grids as we reorder along the X and Y

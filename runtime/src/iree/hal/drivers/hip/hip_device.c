@@ -456,9 +456,10 @@ static iree_status_t iree_hal_hip_device_create_command_buffer(
   switch (device->params.command_buffer_mode) {
     case IREE_HAL_HIP_COMMAND_BUFFER_MODE_GRAPH:
       return iree_hal_hip_graph_command_buffer_create(
-          base_device, device->hip_symbols, device->hip_context, mode,
-          command_categories, queue_affinity, binding_capacity,
-          &device->block_pool, device->host_allocator, out_command_buffer);
+          base_device, device->hip_symbols, device->tracing_context,
+          device->hip_context, mode, command_categories, queue_affinity,
+          binding_capacity, &device->block_pool, device->host_allocator,
+          out_command_buffer);
     case IREE_HAL_HIP_COMMAND_BUFFER_MODE_STREAM:
       return iree_hal_deferred_command_buffer_create(
           base_device, mode, command_categories, binding_capacity,

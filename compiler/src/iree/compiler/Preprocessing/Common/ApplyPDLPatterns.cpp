@@ -6,6 +6,8 @@
 
 #include "iree/compiler/Preprocessing/Common/Passes.h"
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
@@ -31,14 +33,36 @@ using namespace mlir::iree_compiler;
 
 namespace mlir::iree_compiler::Preprocessing {
 
-#define GEN_PASS_DEF_APPLYPDLPATTERNS
+#define GEN_PASS_DEF_APPLYPDLPATTERNSPASS
 #include "iree/compiler/Preprocessing/Common/Passes.h.inc" // IWYU pragma: export
 
 } // namespace mlir::iree_compiler::Preprocessing
 
+/// Get strides for row-major oredering of a tensor with the given `shape`.
+static SmallVector<int64_t> getStridesFromShape(ArrayRef<int64_t> shape) {
+  if (shape.empty()) {
+    return {};
+  }
+  SmallVector<int64_t> strides(shape.size(), ShapedType::kDynamic);
+  strides.back() = 1;
+  for (int i = strides.size() - 1; i > 0; --i) {
+    if (ShapedType::isDynamic(shape[i])) {
+      break;
+    }
+    strides[i - 1] = strides[i] * shape[i];
+  }
+  return strides;
+}
+
 // Get the `memref` type for a `tensor` type.
-static MemRefType getMemRefTypeFor(RankedTensorType tensorType) {
-  return MemRefType::get(tensorType.getShape(), tensorType.getElementType());
+static MemRefType getMemRefTypeFor(MLIRContext *context,
+                                   RankedTensorType tensorType) {
+  SmallVector<int64_t> strides = getStridesFromShape(tensorType.getShape());
+  MemRefLayoutAttrInterface layoutAttr =
+      StridedLayoutAttr::get(context,
+                             /*offset=*/ShapedType::kDynamic, strides);
+  return MemRefType::get(tensorType.getShape(), tensorType.getElementType(),
+                         layoutAttr);
 }
 
 // Generates the external function call type that corresponds to the
@@ -51,7 +75,7 @@ static FunctionType getExternalFunctionCallType(MLIRContext *context,
   SmallVector<Type> externalCallArgTypes;
   // Conversion from tensor types to call arg types.
   auto convertTensorTypeToCallArgTypes = [&](RankedTensorType tensorType) {
-    auto memRefType = getMemRefTypeFor(tensorType);
+    auto memRefType = getMemRefTypeFor(context, tensorType);
     externalCallArgTypes.push_back(
         MemRefType::get(ArrayRef<int64_t>{}, memRefType.getElementType()));
     externalCallArgTypes.push_back(IndexType::get(context));
@@ -84,11 +108,11 @@ std::pair<Value, Value>
 getBasePtrAndOffsetForTensor(PatternRewriter &rewriter, Location loc,
                              RankedTensorType tensorType, Value value,
                              Value bindingOffset, ValueRange dynamicDims) {
-  auto memrefType = getMemRefTypeFor(tensorType);
+  auto memrefType = getMemRefTypeFor(rewriter.getContext(), tensorType);
   Value memrefVal = rewriter.create<IREE::Stream::BindingSubspanOp>(
       loc, memrefType, value, bindingOffset, dynamicDims);
   auto extractMetadataOp =
-      rewriter.create<memref::ExtractStridedMetadataOp>(loc, memrefVal);
+      rewriter.create<IREE::Codegen::ExtractStridedMetadataOp>(loc, memrefVal);
   return std::make_pair<Value, Value>(extractMetadataOp.getResult(0),
                                       extractMetadataOp.getResult(1));
 }
@@ -186,6 +210,40 @@ createEntryPointFn(PatternRewriter &rewriter, Operation *rootOp,
   return entryPointFn;
 }
 
+static std::string operandTypeToString(Type operandType) {
+  std::string outputString;
+  llvm::raw_string_ostream sstream(outputString);
+  if (auto shapedType = dyn_cast<ShapedType>(operandType)) {
+    shapedType.getElementType().print(sstream);
+  } else {
+    operandType.print(sstream);
+  }
+  return outputString;
+}
+
+// Make a unique function name based on the base name and input/output types.
+static std::string makeUniqueFuncName(std::string externalFnName,
+                                      SmallVector<Type> inputTypes,
+                                      SmallVector<Type> resultTypes,
+                                      SmallVector<Type> otherOperandTypes) {
+  SmallVector<std::string> datatypeTokens;
+  for (Type inputType : inputTypes) {
+    datatypeTokens.push_back(operandTypeToString(inputType));
+  }
+  for (Type resultType : resultTypes) {
+    datatypeTokens.push_back(operandTypeToString(resultType));
+  }
+  for (Type otherOperandType : otherOperandTypes) {
+    datatypeTokens.push_back(operandTypeToString(otherOperandType));
+  }
+  std::string outputString;
+  llvm::raw_string_ostream sstream(outputString);
+  llvm::interleave(
+      datatypeTokens, [&](std::string token) { sstream << token; },
+      [&] { sstream << "_"; });
+  return externalFnName + "_" + outputString;
+}
+
 // Generate the `hal.executable` that calls into the external function.
 // Return the nested symbol reference to the entry point function generated.
 static SymbolRefAttr
@@ -201,7 +259,10 @@ createStreamExecutableOp(PatternRewriter &rewriter, Operation *rootOp,
 
   // Create the hal.executable to marshal calling the external function.
   Location loc = rootOp->getLoc();
-  std::string executableOpName = externalFnName.str() + "_executable";
+
+  std::string uniqueExternalFnName = makeUniqueFuncName(
+      externalFnName.str(), inputTypes, resultTypes, otherOperandTypes);
+  std::string executableOpName = uniqueExternalFnName + "_executable";
   auto executableOp =
       rewriter.create<IREE::Stream::ExecutableOp>(loc, executableOpName);
   executableOp.setPrivate();
@@ -389,6 +450,10 @@ static LogicalResult rewriteAsFlowDispatch(
                                        "unhandled operand/result types");
   }
   StringAttr externalFnNameAttr = dyn_cast<StringAttr>(externalFnName);
+
+  std::string uniqueExternalFnName =
+      makeUniqueFuncName(externalFnNameAttr.getValue().str(), inputTypes,
+                         resultTypes, otherOperandTypes);
   if (!externalFnNameAttr) {
     return rewriter.notifyMatchFailure(
         rootOp, "expected string attribute for external fn name");
@@ -402,10 +467,26 @@ static LogicalResult rewriteAsFlowDispatch(
         rootOp, "failed to get dynamic result dimensions");
   }
 
-  SymbolRefAttr entryPointFnRef =
-      createStreamExecutableOp(rewriter, rootOp, externalFnNameAttr.getValue(),
-                               inputTypes, resultTypes, otherOperandTypes);
+  // Parent of the rootOp is the funcOp containing it and we want the moduleOp
+  // that contains the funcOp. Then we can look at the symbol table to make sure
+  // the function we are creating doesnt already exist.
+  auto moduleOp = rootOp->getParentOp()->getParentOp();
 
+  SymbolTable symbolTableModule(moduleOp);
+
+  std::string executableOpName = uniqueExternalFnName + "_executable";
+  std::string entryPointName =
+      externalFnNameAttr.getValue().str() + "_entry_point";
+  SymbolRefAttr entryPointFnRef;
+  if (auto symbol = symbolTableModule.lookup(executableOpName)) {
+    entryPointFnRef = SymbolRefAttr::get(
+        SymbolTable::getSymbolName(symbol),
+        SymbolRefAttr::get(rewriter.getStringAttr(entryPointName)));
+  } else {
+    entryPointFnRef = createStreamExecutableOp(
+        rewriter, rootOp, externalFnNameAttr.getValue(), inputTypes,
+        resultTypes, otherOperandTypes);
+  }
   SmallVector<Value> operands = llvm::to_vector(inputOperands);
   operands.append(otherOperands.begin(), otherOperands.end());
   IREE::Flow::DispatchOp dispatchOp =
@@ -451,19 +532,11 @@ populatePDLModuleFromFileName(MLIRContext *context, RewritePatternSet &patterns,
 namespace {
 
 class ApplyPDLPatternsPass
-    : public iree_compiler::Preprocessing::impl::ApplyPDLPatternsBase<
+    : public iree_compiler::Preprocessing::impl::ApplyPDLPatternsPassBase<
           ApplyPDLPatternsPass> {
-
 public:
-  using Base::Base;
-
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<arith::ArithDialect, iree_compiler::IREE::Flow::FlowDialect,
-                    iree_compiler::IREE::Stream::StreamDialect,
-                    iree_compiler::IREE::Util::UtilDialect,
-                    memref::MemRefDialect, pdl::PDLDialect,
-                    pdl_interp::PDLInterpDialect, tensor::TensorDialect>();
-  }
+  using iree_compiler::Preprocessing::impl::ApplyPDLPatternsPassBase<
+      ApplyPDLPatternsPass>::ApplyPDLPatternsPassBase;
 
   LogicalResult initialize(MLIRContext *context) override {
     if (patternsFile.empty()) {
