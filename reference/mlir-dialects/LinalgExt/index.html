@@ -4608,7 +4608,8 @@ only the non-padded part of the output.</p>
   TypeAttr,   # original_type
   IntegerAttr,   # matmul_narrow_M
   IntegerAttr,   # matmul_narrow_N
-  ArrayAttr   # user_indexing_maps
+  ArrayAttr,   # user_indexing_maps
+  DenseArrayAttr   # round_dims_to
 &gt;
 </code></pre></div>
 <p>This attribute describes the change in the layout for
@@ -4658,6 +4659,11 @@ through operations like pack/unpack.</p>
 <td style="text-align: center;">user_indexing_maps</td>
 <td style="text-align: center;"><code>ArrayAttr</code></td>
 <td>Indexing maps of the operation using this tensor</td>
+</tr>
+<tr>
+<td style="text-align: center;">round_dims_to</td>
+<td style="text-align: center;"><code>DenseArrayAttr</code></td>
+<td>Values for padding M,N,K dimensions</td>
 </tr>
 </tbody>
 </table>
