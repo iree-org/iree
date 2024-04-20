@@ -1,4 +1,5 @@
 // RUN: iree-opt --iree-global-opt-set-encoding --cse --split-input-file %s | FileCheck %s
+// RUN: iree-opt --iree-global-opt-set-encoding="pad-factor=16" --cse --split-input-file %s | FileCheck %s --check-prefix=PAD-WITHIN-ENCODING
 
 util.func public @matmul_f32f32f32(%arg0 : tensor<100x250xf32>, %arg1 : tensor<250x500xf32>,
     %arg2 : tensor<100x500xf32>) -> tensor<100x500xf32> {
@@ -44,6 +45,21 @@ util.func public @matmul_f32f32f32(%arg0 : tensor<100x250xf32>, %arg1 : tensor<2
 //      CHECK:   %[[RESULT_PADDED:.+]] = iree_linalg_ext.unset_encoding %[[MATMUL]]
 //      CHECK:   %[[RESULT:.+]] = tensor.extract_slice %[[RESULT_PADDED]][0, 0] [100, 500] [1, 1]
 //      CHECK:   util.return %[[RESULT]]
+// The only difference with `pad-factor` being set is creating pad ops or not.
+// Having a single test for now is okay, others are covered in the other path.
+// PAD-WITHIN-ENCODING-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d0, d2)>
+// PAD-WITHIN-ENCODING-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2) -> (d2, d1)>
+// PAD-WITHIN-ENCODING-DAG: #[[MAP3:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
+// PAD-WITHIN-ENCODING:      util.func public @matmul_f32f32f32(
+// PAD-WITHIN-ENCODING-SAME:   %[[ARG0:[a-zA-Z0-9]+]]
+// PAD-WITHIN-ENCODING-SAME:   %[[ARG1:[a-zA-Z0-9]+]]
+// PAD-WITHIN-ENCODING-SAME:   %[[ARG2:[a-zA-Z0-9]+]]
+// PAD-WITHIN-ENCODING:        %[[LHS:.+]] = iree_linalg_ext.set_encoding %[[ARG0]]
+// PAD-WITHIN-ENCODING-SAME:     tensor<100x250xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32], original_type = tensor<100x250xf32>, user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 16, 16, 16>>>
+// PAD-WITHIN-ENCODING:        %[[RHS:.+]] = iree_linalg_ext.set_encoding %[[ARG1]]
+// PAD-WITHIN-ENCODING-SAME:     tensor<250x500xf32, #iree_linalg_ext.encoding<role = RHS, element_types = [f32, f32, f32], original_type = tensor<250x500xf32>, user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 16, 16, 16>>>
+// PAD-WITHIN-ENCODING:        %[[LHS:.+]] = iree_linalg_ext.set_encoding %[[ARG2]]
+// PAD-WITHIN-ENCODING-SAME:     tensor<100x500xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], original_type = tensor<100x500xf32>, user_indexing_maps = [#[[MAP1]], #[[MAP2]], #[[MAP3]]], round_dims_to = array<i64: 16, 16, 16>>>
 
 // -----
 

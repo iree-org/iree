@@ -272,9 +272,13 @@ static LogicalResult isSupportedContractionOp(PatternRewriter &rewriter,
 
 namespace {
 
-struct setContractionOpEncoding
+class setContractionOpEncoding
     : public OpInterfaceRewritePattern<linalg::LinalgOp> {
+public:
   using OpInterfaceRewritePattern<linalg::LinalgOp>::OpInterfaceRewritePattern;
+  explicit setContractionOpEncoding(MLIRContext *ctx, int64_t factor)
+      : OpInterfaceRewritePattern<linalg::LinalgOp>(ctx), padFactor(factor) {}
+
   LogicalResult matchAndRewrite(linalg::LinalgOp linalgOp,
                                 PatternRewriter &rewriter) const override {
     if (!linalgOp.hasPureTensorSemantics()) {
@@ -320,12 +324,27 @@ struct setContractionOpEncoding
 
     Location loc = linalgOp.getLoc();
     SmallVector<AffineMap> maps = linalgOp.getIndexingMapsArray();
-    Value encodedLhs = padAndSetEncoding(rewriter, loc, lhs, EncodingRole::LHS,
-                                         elemTypes, narrowSizes, maps);
-    Value encodedRhs = padAndSetEncoding(rewriter, loc, rhs, EncodingRole::RHS,
-                                         elemTypes, narrowSizes, maps);
-    Value encodedOut = padAndSetEncoding(
-        rewriter, loc, out, EncodingRole::RESULT, elemTypes, narrowSizes, maps);
+    Value encodedLhs, encodedRhs, encodedOut;
+
+    if (!padFactor) {
+      encodedLhs = padAndSetEncoding(rewriter, loc, lhs, EncodingRole::LHS,
+                                     elemTypes, narrowSizes, maps);
+      encodedRhs = padAndSetEncoding(rewriter, loc, rhs, EncodingRole::RHS,
+                                     elemTypes, narrowSizes, maps);
+      encodedOut = padAndSetEncoding(rewriter, loc, out, EncodingRole::RESULT,
+                                     elemTypes, narrowSizes, maps);
+    } else {
+      auto setEncodingWrapper = [&](Value src, EncodingRole role) -> Value {
+        SmallVector<int64_t> roundDimsTo(linalgOp.getNumLoops(), padFactor);
+        auto encoding = EncodingAttr::get(
+            linalgOp.getContext(), role, elemTypes, src.getType(),
+            narrowSizes.M, narrowSizes.N, maps, roundDimsTo);
+        return setEncoding(rewriter, loc, src, encoding);
+      };
+      encodedLhs = setEncodingWrapper(lhs, EncodingRole::LHS);
+      encodedRhs = setEncodingWrapper(rhs, EncodingRole::RHS);
+      encodedOut = setEncodingWrapper(out, EncodingRole::RESULT);
+    }
     Value opTiled = clone(rewriter, linalgOp, encodedOut.getType(),
                           ValueRange{encodedLhs, encodedRhs, encodedOut})
                         ->getResult(0);
@@ -344,6 +363,9 @@ struct setContractionOpEncoding
     rewriter.replaceOp(linalgOp, result);
     return success();
   }
+
+private:
+  int64_t padFactor = 0;
 };
 
 /// Pattern to fold a `linalg.fill` -> `iree_linalg_ext.set_encoding`
@@ -376,6 +398,7 @@ struct SetEncodingPass : public SetEncodingBase<SetEncodingPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::LinalgExt::IREELinalgExtDialect>();
   }
+  explicit SetEncodingPass(int64_t factor) { this->padFactor.setValue(factor); }
 
   void runOnOperation() override;
 };
@@ -385,7 +408,7 @@ void SetEncodingPass::runOnOperation() {
   MLIRContext *context = &getContext();
   {
     RewritePatternSet patterns(context);
-    patterns.insert<setContractionOpEncoding>(context);
+    patterns.insert<setContractionOpEncoding>(context, padFactor);
     linalg::FillOp::getCanonicalizationPatterns(patterns, context);
     patterns.insert<FoldFillWithSetEncoding>(context);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
@@ -396,8 +419,8 @@ void SetEncodingPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<Pass> createSetEncodingPass() {
-  return std::make_unique<SetEncodingPass>();
+std::unique_ptr<Pass> createSetEncodingPass(int64_t padFactor) {
+  return std::make_unique<SetEncodingPass>(padFactor);
 }
 
 } // namespace mlir::iree_compiler::GlobalOptimization
