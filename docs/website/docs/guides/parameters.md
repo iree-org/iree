@@ -82,7 +82,7 @@ graph BT
 ### :iree-ghost: IRPA
 
 The IREE Parameter Archive (IRPA) file format
-([`iree/schemas/parameter_archive.h`](https://github.com/openxla/iree/blob/main/runtime/src/iree/schemas/parameter_archive.h))
+([`iree/schemas/parameter_archive.h`](https://github.com/iree-org/iree/blob/main/runtime/src/iree/schemas/parameter_archive.h))
 is IREE's own format optimized for deployment. Formats like [GGUF](#gguf) and
 [safetensors](#safetensors) can be
 [converted to IRPA](#converting-to-the-irpa-format).
@@ -130,13 +130,13 @@ types:
   archives (see the [TensorFlow guide](./ml-frameworks/tensorflow.md))
 
 In-tree formats for file-backed parameters are defined in the
-[`iree/io/formats/`](https://github.com/openxla/iree/tree/main/runtime/src/iree/io/formats)
+[`iree/io/formats/`](https://github.com/iree-org/iree/tree/main/runtime/src/iree/io/formats)
 folder. Additional formats could be defined out-of-tree to make use of external
 libraries as needed.
 
 Parameter loading from memory (or a cache, or some other location) is possible
 by adding new providers implementing
-[`iree_io_parameter_provider_t`](https://github.com/openxla/iree/blob/main/runtime/src/iree/io/parameter_provider.h).
+[`iree_io_parameter_provider_t`](https://github.com/iree-org/iree/blob/main/runtime/src/iree/io/parameter_provider.h).
 The default parameter index provider operates on files on local disk.
 
 ## :material-hammer-wrench: Working with parameter files
@@ -201,7 +201,7 @@ parameter_index.create_archive_file("parameters.irpa")
 ```
 
 See the
-[`runtime/bindings/python/tests/io_test.py`](https://github.com/openxla/iree/blob/main/runtime/bindings/python/tests/io_test.py)
+[`runtime/bindings/python/tests/io_test.py`](https://github.com/iree-org/iree/blob/main/runtime/bindings/python/tests/io_test.py)
 file for more usage examples.
 
 ### :material-file-move: Converting to the IRPA format
@@ -308,13 +308,13 @@ iree-run-module --module=program.vmfb --parameters=data.irpa ...
 
 For concrete examples, see these test files:
 
-* [`tools/test/parameters_scoped.mlir`](https://github.com/openxla/iree/blob/main/tools/test/parameters_scoped.mlir)
-* [`tools/test/parameters_unscoped.mlir`](https://github.com/openxla/iree/blob/main/tools/test/parameters_unscoped.mlir)
+* [`tools/test/parameters_scoped.mlir`](https://github.com/iree-org/iree/blob/main/tools/test/parameters_scoped.mlir)
+* [`tools/test/parameters_unscoped.mlir`](https://github.com/iree-org/iree/blob/main/tools/test/parameters_unscoped.mlir)
 
 #### :simple-python: From Python
 
 See the
-[`runtime/bindings/python/tests/io_runtime_test.py`](https://github.com/openxla/iree/blob/main/runtime/bindings/python/tests/io_runtime_test.py)
+[`runtime/bindings/python/tests/io_runtime_test.py`](https://github.com/iree-org/iree/blob/main/runtime/bindings/python/tests/io_runtime_test.py)
 file for usage examples.
 
 #### :octicons-code-16: Using the C API

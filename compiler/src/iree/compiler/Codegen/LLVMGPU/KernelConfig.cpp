@@ -402,7 +402,7 @@ setConvolutionVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
 
   // Note that the following heuristic seeds are just placeholder values.
   // We need to clean it up and make it adjusting to different targets.
-  // See https://github.com/openxla/iree/issues/16341 for details.
+  // See https://github.com/iree-org/iree/issues/16341 for details.
   GPUMMAHeuristicSeeds seeds{/*bestSubgroupCountPerWorkgroup=*/4,
                              /*bestMNTileCountPerSubgroup=*/8,
                              /*bestKTileCountPerSubgroup=*/2};
@@ -550,7 +550,7 @@ setMatmulVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
 
   // Note that the following heuristic seeds are just placeholder values.
   // We need to clean it up and make it adjusting to different targets.
-  // See https://github.com/openxla/iree/issues/16341 for details.
+  // See https://github.com/iree-org/iree/issues/16341 for details.
   if (problem.mSize * problem.nSize <= clGPUMatmulCThreshold) {
     // For matmuls with small M*N size, we want to distribute M*N onto more
     // workgroups to fill the GPU. Use a smaller bestMNTileCountPerSubgroup

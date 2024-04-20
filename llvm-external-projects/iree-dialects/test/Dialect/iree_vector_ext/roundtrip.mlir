@@ -110,29 +110,89 @@ func.func @specify_layout(%lhs: memref<32x32xf16>) -> vector<32x32xf16> {
 func.func @specify_nested(%lhs: memref<32x32xf16>) -> vector<32x32xf16> {
   %cst_0 = arith.constant 0.0 : f16
   %c0 = arith.constant 0 : index
-  %result = vector.transfer_read %lhs[%c0, %c0], %cst_0 {in_bounds = [true, true]} : memref<32x32xf16>, vector<32x32xf16>
-  %2 = iree_vector_ext.layout_conflict_resolution %result {
-    sourceLayout = #nested_1,
-    desiredLayout = #nested_2,
-    otherLayout0 = #nested_3,
-    otherLayout1 = #nested_4,
-    otherLayout2 = #nested_5
-  } : vector<32x32xf16> -> vector<32x32xf16>
-  return %2 : vector<32x32xf16>
+  %result = vector.transfer_read %lhs[%c0, %c0], %cst_0 {
+    in_bounds = [true, true],
+    layout0 = #nested_1,
+    layout1 = #nested_2,
+    layout2 = #nested_3,
+    layout3 = #nested_4,
+    layout4 = #nested_5
+  } : memref<32x32xf16>, vector<32x32xf16>
+  return %result : vector<32x32xf16>
 }
 
-// CHECK-DAG: #[[LAYOUT0:.+]] = #iree_vector_ext.nested_layout<subgroups_per_workgroup = [1, 1], batches_per_subgroup = [4, 2], outers_per_batch = [1, 4], threads_per_outer = [2, 4], elements_per_thread = [4, 1], subgroup_order = [1, 0], batch_order = [1, 0], thread_order = [1, 0], element_order = [1, 0], subgroup_basis = [1, 1], thread_basis = [2, 4]>
-// CHECK-DAG: #[[LAYOUT1:.+]] = #iree_vector_ext.nested_layout<subgroups_per_workgroup = [1, 1], batches_per_subgroup = [2, 4], outers_per_batch = [4, 1], threads_per_outer = [4, 2], elements_per_thread = [1, 4], outer_order = [1, 0], subgroup_basis = [1, 1], thread_basis = [4, 2]>
-// CHECK-DAG: #[[LAYOUT2:.+]] = #iree_vector_ext.nested_layout<subgroups_per_workgroup = [1, 1], batches_per_subgroup = [4, 2], outers_per_batch = [1, 4], threads_per_outer = [2, 4], elements_per_thread = [4, 1], subgroup_order = [1, 0], batch_order = [1, 0], thread_order = [1, 0], element_order = [1, 0], subgroup_basis = [2, 4, 8], subgroup_active_ids= [true, true, false], thread_basis = [2, 4]>
-// CHECK-DAG: #[[LAYOUT3:.+]] = #iree_vector_ext.nested_layout<subgroups_per_workgroup = [1, 1], batches_per_subgroup = [4, 2], outers_per_batch = [1, 4], threads_per_outer = [2, 4], elements_per_thread = [4, 1], subgroup_order = [1, 0], batch_order = [1, 0], thread_order = [1, 0], element_order = [1, 0], subgroup_basis = [2, 4, 8], subgroup_active_ids= [true, true, false], thread_basis = [2, 4, 2], thread_active_ids= [false, true, true]>
-// CHECK-DAG: #[[LAYOUT4:.+]] = #iree_vector_ext.nested_layout<subgroups_per_workgroup = [1, 1], batches_per_subgroup = [4, 2], outers_per_batch = [1, 4], threads_per_outer = [2, 4], elements_per_thread = [4, 1], subgroup_order = [1, 0], batch_order = [1, 0], thread_order = [1, 0], element_order = [1, 0], subgroup_basis = [2, 4], thread_basis = [4, 2]>
+// CHECK: #[[LAYOUT0:.+]] = #iree_vector_ext.nested_layout<
+// CHECK-SAME: subgroups_per_workgroup = [1, 1],
+// CHECK-SAME: batches_per_subgroup = [2, 4],
+// CHECK-SAME: outers_per_batch = [4, 1],
+// CHECK-SAME: threads_per_outer = [4, 2],
+// CHECK-SAME: elements_per_thread = [1, 4],
+// CHECK-SAME: outer_order = [1, 0],
+// CHECK-SAME: subgroup_basis = [1, 1],
+// CHECK-SAME: thread_basis = [4, 2]>
+
+// CHECK: #[[LAYOUT1:.+]] = #iree_vector_ext.nested_layout<
+// CHECK-SAME: subgroups_per_workgroup = [1, 1],
+// CHECK-SAME: batches_per_subgroup = [4, 2],
+// CHECK-SAME: outers_per_batch = [1, 4],
+// CHECK-SAME: threads_per_outer = [2, 4],
+// CHECK-SAME: elements_per_thread = [4, 1],
+// CHECK-SAME: subgroup_order = [1, 0],
+// CHECK-SAME: batch_order = [1, 0],
+// CHECK-SAME: thread_order = [1, 0],
+// CHECK-SAME: element_order = [1, 0],
+// CHECK-SAME: subgroup_basis = [1, 1],
+// CHECK-SAME: thread_basis = [2, 4]>
+
+// CHECK: #[[LAYOUT2:.+]] = #iree_vector_ext.nested_layout<
+// CHECK-SAME: subgroups_per_workgroup = [1, 1],
+// CHECK-SAME: batches_per_subgroup = [4, 2],
+// CHECK-SAME: outers_per_batch = [1, 4],
+// CHECK-SAME: threads_per_outer = [2, 4],
+// CHECK-SAME: elements_per_thread = [4, 1],
+// CHECK-SAME: subgroup_order = [1, 0],
+// CHECK-SAME: batch_order = [1, 0],
+// CHECK-SAME: thread_order = [1, 0],
+// CHECK-SAME: element_order = [1, 0],
+// CHECK-SAME: subgroup_basis = [2, 4, 8],
+// CHECK-SAME: subgroup_active_ids = [true, true, false],
+// CHECK-SAME: thread_basis = [2, 4]>
+
+// CHECK: #[[LAYOUT3:.+]] = #iree_vector_ext.nested_layout<
+// CHECK-SAME: subgroups_per_workgroup = [1, 1],
+// CHECK-SAME: batches_per_subgroup = [4, 2],
+// CHECK-SAME: outers_per_batch = [1, 4],
+// CHECK-SAME: threads_per_outer = [2, 4],
+// CHECK-SAME: elements_per_thread = [4, 1],
+// CHECK-SAME: subgroup_order = [1, 0],
+// CHECK-SAME: batch_order = [1, 0],
+// CHECK-SAME: thread_order = [1, 0],
+// CHECK-SAME: element_order = [1, 0],
+// CHECK-SAME: subgroup_basis = [2, 4, 8],
+// CHECK-SAME: subgroup_active_ids = [true, true, false],
+// CHECK-SAME: thread_basis = [2, 4, 2],
+// CHECK-SAME: thread_active_ids = [false, true, true]>
+
+// CHECK: #[[LAYOUT4:.+]] = #iree_vector_ext.nested_layout<
+// CHECK-SAME: subgroups_per_workgroup = [1, 1],
+// CHECK-SAME: batches_per_subgroup = [4, 2],
+// CHECK-SAME: outers_per_batch = [1, 4],
+// CHECK-SAME: threads_per_outer = [2, 4],
+// CHECK-SAME: elements_per_thread = [4, 1],
+// CHECK-SAME: subgroup_order = [1, 0],
+// CHECK-SAME: batch_order = [1, 0],
+// CHECK-SAME: thread_order = [1, 0],
+// CHECK-SAME: element_order = [1, 0],
+// CHECK-SAME: subgroup_basis = [2, 4],
+// CHECK-SAME: thread_basis = [4, 2]>
+
 // CHECK-LABEL: func.func @specify_nested
-// CHECK:      iree_vector_ext.layout_conflict_resolution
-// CHECK-SAME:         desiredLayout = #[[LAYOUT0]]
-// CHECK-SAME:         otherLayout0 = #[[LAYOUT2]]
-// CHECK-SAME:         otherLayout1 = #[[LAYOUT3]]
-// CHECK-SAME:         otherLayout2 = #[[LAYOUT4]]
-// CHECK-SAME:         sourceLayout = #[[LAYOUT1]]
+// CHECK:      vector.transfer_read
+// CHECK-SAME:         layout0 = #[[LAYOUT0]]
+// CHECK-SAME:         layout1 = #[[LAYOUT1]]
+// CHECK-SAME:         layout2 = #[[LAYOUT2]]
+// CHECK-SAME:         layout3 = #[[LAYOUT3]]
+// CHECK-SAME:         layout4 = #[[LAYOUT4]]
 
 // -----
 

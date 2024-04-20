@@ -1254,7 +1254,7 @@ void ireeCompilerSetupGlobalCL(int argc, const char **argv, const char *banner,
   globalInit->registerCommandLineOptions();
 
   llvm::setBugReportMsg(
-      "Please report issues to https://github.com/openxla/iree/issues and "
+      "Please report issues to https://github.com/iree-org/iree/issues and "
       "include the crash backtrace.\n");
   llvm::cl::SetVersionPrinter(llvmVersionPrinter);
 

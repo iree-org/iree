@@ -21,7 +21,7 @@ This page walks through building IREE from source using the
 === ":fontawesome-brands-linux: Linux"
 
     1. Install Bazel, matching IREE's
-        [`.bazelversion`](https://github.com/openxla/iree/blob/main/.bazelversion)
+        [`.bazelversion`](https://github.com/iree-org/iree/blob/main/.bazelversion)
         by following the
         [official docs](https://bazel.build/install).
 
@@ -53,7 +53,7 @@ This page walks through building IREE from source using the
         ```
 
     2. Install Bazel, matching IREE's
-        [`.bazelversion`](https://github.com/openxla/iree/blob/main/.bazelversion)
+        [`.bazelversion`](https://github.com/iree-org/iree/blob/main/.bazelversion)
         by following the [official docs](https://bazel.build/install/os-x) or
         via Homebrew:
 
@@ -75,7 +75,7 @@ This page walks through building IREE from source using the
         [Scoop](https://scoop.sh/) or [Chocolatey](https://chocolatey.org/).
 
     1. Install Bazel, matching IREE's
-        [`.bazelversion`](https://github.com/openxla/iree/blob/main/.bazelversion)
+        [`.bazelversion`](https://github.com/iree-org/iree/blob/main/.bazelversion)
         by following the [official docs](https://bazel.build/install/windows).
 
         Also install [MSYS2](https://www.msys2.org/) by following Bazel's documentation.
@@ -103,7 +103,7 @@ Use [Git](https://git-scm.com/) to clone the IREE repository and initialize its
 submodules:
 
 ```shell
-git clone https://github.com/openxla/iree.git
+git clone https://github.com/iree-org/iree.git
 cd iree
 git submodule update --init
 ```
@@ -167,7 +167,7 @@ bazel test -k //... \
 !!! tip
 
     See the
-    [`build_tools/bazel/build_test_all.sh`](https://github.com/openxla/iree/blob/main/build_tools/bazel/build_test_all.sh)
+    [`build_tools/bazel/build_test_all.sh`](https://github.com/iree-org/iree/blob/main/build_tools/bazel/build_test_all.sh)
     script for examples of other flags and environment variables that can be
     used to configure what Bazel runs.
 
@@ -232,7 +232,7 @@ ls bazel-bin/tools/
 ```
 
 Translate a
-[MLIR file](https://github.com/openxla/iree/blob/main/samples/models/simple_abs.mlir)
+[MLIR file](https://github.com/iree-org/iree/blob/main/samples/models/simple_abs.mlir)
 and execute a function in the compiled module:
 
 ```shell

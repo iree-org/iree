@@ -70,14 +70,14 @@ jobs:
 
           # MacOS packages.
           - runs-on:
-              - ${{ github.repository == 'openxla/iree' && 'self-hosted' || 'macos-11' }}
+              - ${{ github.repository == 'iree-org/iree' && 'self-hosted' || 'macos-11' }}
               - os-family=macOS
               - runner-group=postsubmit
             build-family: macos
             build-package: py-compiler-pkg
             experimental: true
           - runs-on:
-              - ${{ github.repository == 'openxla/iree' && 'self-hosted' || 'macos-11' }}
+              - ${{ github.repository == 'iree-org/iree' && 'self-hosted' || 'macos-11' }}
               - os-family=macOS
               - runner-group=postsubmit
             build-family: macos
@@ -86,7 +86,7 @@ jobs:
 
           # Windows packages.
           - runs-on:
-              - ${{ github.repository == 'openxla/iree' && 'windows-2022-64core' || 'windows-2022'}}
+              - ${{ github.repository == 'iree-org/iree' && 'windows-2022-64core' || 'windows-2022'}}
             build-family: windows
             build-package: py-compiler-pkg
             experimental: true

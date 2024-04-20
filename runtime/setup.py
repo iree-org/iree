@@ -526,7 +526,7 @@ setup(
         "Programming Language :: Python :: 3.10",
         "Programming Language :: Python :: 3.11",
     ],
-    url="https://github.com/openxla/iree",
+    url="https://github.com/iree-org/iree",
     python_requires=">=3.9",
     ext_modules=(
         [
@@ -552,15 +552,17 @@ setup(
             "iree._runtime": "bindings/python/iree/_runtime",
             "iree._runtime_libs": f"{CMAKE_INSTALL_DIR_REL}/python_packages/iree_runtime/iree/_runtime_libs",
         },
-        {
-            # Note that we do a switcheroo here by populating the
-            # _runtime_libs_tracy package from the tracy-enabled build of
-            # iree._runtime_libs. It is relocatable, and the Python side looks
-            # for this stuff.
-            "iree._runtime_libs_tracy": f"{CMAKE_TRACY_INSTALL_DIR_REL}/python_packages/iree_runtime/iree/_runtime_libs",
-        }
-        if ENABLE_TRACY
-        else {},
+        (
+            {
+                # Note that we do a switcheroo here by populating the
+                # _runtime_libs_tracy package from the tracy-enabled build of
+                # iree._runtime_libs. It is relocatable, and the Python side looks
+                # for this stuff.
+                "iree._runtime_libs_tracy": f"{CMAKE_TRACY_INSTALL_DIR_REL}/python_packages/iree_runtime/iree/_runtime_libs",
+            }
+            if ENABLE_TRACY
+            else {}
+        ),
     ),
     packages=packages,
     # Matching the native extension as a data file keeps setuptools from
@@ -580,17 +582,19 @@ setup(
                 "iree-cpuinfo*",
             ],
         },
-        {
-            "iree._runtime_libs_tracy": [
-                f"*{sysconfig.get_config_var('EXT_SUFFIX')}",
-                "iree-run-module*",
-                "iree-benchmark-executable*",
-                "iree-benchmark-module*",
-            ]
-            + (["iree-tracy-capture"] if ENABLE_TRACY_TOOLS else [])
-        }
-        if ENABLE_TRACY
-        else {},
+        (
+            {
+                "iree._runtime_libs_tracy": [
+                    f"*{sysconfig.get_config_var('EXT_SUFFIX')}",
+                    "iree-run-module*",
+                    "iree-benchmark-executable*",
+                    "iree-benchmark-module*",
+                ]
+                + (["iree-tracy-capture"] if ENABLE_TRACY_TOOLS else [])
+            }
+            if ENABLE_TRACY
+            else {}
+        ),
     ),
     entry_points={
         "console_scripts": [

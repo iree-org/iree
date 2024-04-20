@@ -21,7 +21,7 @@ iree_hal_cts_test_suite(
     # HAL event is unimplemented for Metal right now.
     "event"
     # Disabled until fixing semaphore tests.
-    # https://github.com/openxla/iree/pull/17080#discussion_r1569867998
+    # https://github.com/iree-org/iree/pull/17080#discussion_r1569867998
     "semaphore_submission"
   LABELS
     driver=metal

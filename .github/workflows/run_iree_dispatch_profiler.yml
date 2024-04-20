@@ -5,7 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 #
 # Workflow for running IREE Dispatch Profiler
-# (https://github.com/openxla/iree/tree/main/experimental/dispatch_profiler).
+# (https://github.com/iree-org/iree/tree/main/experimental/dispatch_profiler).
 #
 # IREE Dispatch Profiler validates functional correctness and performs profiling
 # on matmul, conv, and other ops on IREE CUDA and other back-ends.

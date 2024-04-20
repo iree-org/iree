@@ -49,7 +49,7 @@ static LogicalResult padAlloc(MLIRContext *context, memref::AllocOp allocOp) {
     Value dim = allocOp.getDynamicSizes()[dynamicDimIdx++];
     dim = skipAffineMaxZero(dim);
     auto ub = ValueBoundsConstraintSet::computeConstantBound(
-        presburger::BoundType::UB, dim, /*dim=*/std::nullopt,
+        presburger::BoundType::UB, {dim, /*dim=*/std::nullopt},
         /*stopCondition=*/nullptr, /*closedUB=*/true);
     if (failed(ub)) {
       return allocOp.emitOpError(
