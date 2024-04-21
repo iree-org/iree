@@ -51,7 +51,7 @@ using iree_compiler::gpu::MatmulStrategy;
 using iree_compiler::gpu::scaleUpByBitWidth;
 using iree_compiler::IREE::transform_dialect::EliminateGpuBarriersOp;
 using iree_compiler::IREE::transform_dialect::
-    IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp;
+    PopulateWorkgroupCountRegionUsingNumThreadsSliceOp;
 using transform::MatchOp;
 using transform_ext::RegisterMatchCallbacksOp;
 
@@ -192,7 +192,7 @@ buildMatmulStrategyBlockDistribution(ImplicitLocOpBuilder &b, Value variantH,
           b.getArrayAttr(blockMapping.threadMapping));
 
   // Handle the workgroup count region.
-  b.create<IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp>(
+  b.create<PopulateWorkgroupCountRegionUsingNumThreadsSliceOp>(
       tileResult.forallH);
 
   // TODO: handle trailing op.
@@ -330,7 +330,7 @@ buildBatchMatmulStrategyBlockDistribution(ImplicitLocOpBuilder &b,
           b.getArrayAttr(blockMapping.threadMapping));
 
   // Handle the workgroup count region.
-  b.create<IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp>(
+  b.create<PopulateWorkgroupCountRegionUsingNumThreadsSliceOp>(
       tileResult.forallH);
   return std::make_tuple(tileResult.resultingFusedOpsHandles.front(),
                          tileResult.tiledOpH, tileResult.forallH);
