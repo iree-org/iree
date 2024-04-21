@@ -149,6 +149,12 @@ void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
             clEnableElementWiseFuseMultiReduction});
       })
       .addPass(mlir::createCanonicalizerPass)
+      .addPass(mlir::createCSEPass)
+
+      // 4. After elementwise operation fusion sink reshapes that block
+      //    producer-consumer fusion.
+      .addPass(createSinkReshapesPass)
+      .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass);
 }
 
