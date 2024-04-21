@@ -14,6 +14,7 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -37,6 +38,7 @@
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -47,10 +49,14 @@
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/Passes.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
+#include "mlir/IR/AffineExpr.h"
+#include "mlir/IR/Attributes.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/CSE.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -416,6 +422,191 @@ DiagnosedSilenceableFailure transform_dialect::ForallToWorkgroupOp::applyToOne(
 void transform_dialect::ForallToWorkgroupOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::onlyReadsHandle(getTarget(), effects);
+  transform::modifiesPayload(effects);
+}
+
+//===---------------------------------------------------------------------===//
+// FuseForallOp
+//===---------------------------------------------------------------------===//
+
+FailureOr<int64_t> getTripCount(scf::ForallOp loop) {
+  ArrayRef<int64_t> lbs = loop.getStaticLowerBound();
+  ArrayRef<int64_t> ubs = loop.getStaticUpperBound();
+  ArrayRef<int64_t> steps = loop.getStaticStep();
+
+  if (ShapedType::isDynamicShape(lbs) || ShapedType::isDynamicShape(ubs) ||
+      ShapedType::isDynamicShape(steps)) {
+    return failure();
+  }
+
+  int64_t tripCount = 1;
+  for (auto [lb, ub, step] : llvm::zip_equal(lbs, ubs, steps)) {
+    tripCount *= (ub - lb) / step;
+  }
+  return tripCount;
+}
+
+LogicalResult compareWorkerCountsAndTypes(scf::ForallOp producer,
+                                          scf::ForallOp consumer) {
+  FailureOr<int64_t> producerTripCount = getTripCount(producer);
+  FailureOr<int64_t> consumerTripCount = getTripCount(consumer);
+  if (failed(producerTripCount) || failed(consumerTripCount) ||
+      *producerTripCount != *consumerTripCount) {
+    return failure();
+  }
+
+  mlir::TypeID mappingId = producer.getMapping()
+                               ->getValue()
+                               .front()
+                               .getAbstractAttribute()
+                               .getTypeID();
+  auto compareMappingTypes = [&](ArrayAttr array) {
+    return llvm::all_of(array.getValue(), [&](const Attribute &attr) {
+      return attr.getAbstractAttribute().getTypeID() == mappingId;
+    });
+  };
+
+  if (!compareMappingTypes(producer.getMappingAttr()) ||
+      !compareMappingTypes(consumer.getMappingAttr())) {
+    return failure();
+  }
+  return success();
+}
+
+Value getReplacementSlice(RewriterBase &rewriter, Location loc,
+                          tensor::ParallelInsertSliceOp parallelInsert,
+                          tensor::ExtractSliceOp extractSlice) {
+  return rewriter.create<IREE::GPU::ShuffleTensorOp>(
+      loc, extractSlice.getType(), parallelInsert.getSource(),
+      parallelInsert.getOffsets(), parallelInsert.getSizes(),
+      parallelInsert.getStrides(), parallelInsert.getStaticOffsets(),
+      parallelInsert.getStaticSizes(), parallelInsert.getStaticStrides(),
+      parallelInsert.getDest(), extractSlice.getOffsets(),
+      extractSlice.getSizes(), extractSlice.getStrides(),
+      extractSlice.getStaticOffsets(), extractSlice.getStaticSizes(),
+      extractSlice.getStaticStrides());
+}
+
+LogicalResult fuseForallIntoSlice(RewriterBase &rewriter,
+                                  scf::ForallOp producer,
+                                  scf::ForallOp consumer,
+                                  tensor::ExtractSliceOp slice) {
+  if (producer->getNumResults() != 1) {
+    return failure();
+  }
+
+  if (failed(compareWorkerCountsAndTypes(producer, consumer))) {
+    return failure();
+  }
+
+  auto isAll = [](ArrayRef<int64_t> array, int64_t cmp) {
+    return llvm::all_of(array, [cmp](int64_t x) { return x == cmp; });
+  };
+
+  if (!isAll(producer.getStaticStep(), 1) ||
+      !isAll(producer.getStaticLowerBound(), 0) ||
+      !isAll(consumer.getStaticStep(), 1) ||
+      !isAll(consumer.getStaticLowerBound(), 0)) {
+    return failure();
+  }
+
+  rewriter.setInsertionPoint(slice);
+
+  // Step 1. Compute the producer IDs in terms of the consumer IDs.
+
+  MLIRContext *context = rewriter.getContext();
+  Location loc = producer.getLoc();
+
+  AffineExpr linearId = getAffineConstantExpr(0, context);
+  for (auto [i, workerCount] :
+       llvm::enumerate(consumer.getStaticUpperBound())) {
+    linearId = linearId * getAffineConstantExpr(workerCount, context) +
+               getAffineDimExpr(i, context);
+  }
+
+  Value linearThreadIdVal = affine::makeComposedAffineApply(
+      rewriter, loc, linearId, getAsOpFoldResult(consumer.getInductionVars()));
+  SmallVector<Value> ranges;
+  for (auto workerCount : producer.getStaticUpperBound()) {
+    ranges.push_back(rewriter.create<arith::ConstantIndexOp>(loc, workerCount));
+  }
+  ValueRange newIds = rewriter
+                          .create<affine::AffineDelinearizeIndexOp>(
+                              loc, linearThreadIdVal, ranges)
+                          .getResults();
+
+  // Step 2. Inline the region of the producer.
+  SmallVector<Value> bbArgReplacements(newIds);
+  bbArgReplacements.append(producer.getOutputs().begin(),
+                           producer.getOutputs().end());
+
+  scf::InParallelOp terminator = producer.getTerminator();
+  rewriter.inlineBlockBefore(producer.getBody(), slice, bbArgReplacements);
+
+  rewriter.setInsertionPointAfter(terminator);
+  auto parallelInsert =
+      cast<tensor::ParallelInsertSliceOp>(*terminator.getYieldingOps().begin());
+
+  Value replacementSlice =
+      getReplacementSlice(rewriter, loc, parallelInsert, slice);
+  rewriter.replaceAllUsesWith(slice, replacementSlice);
+
+  rewriter.eraseOp(parallelInsert);
+  rewriter.eraseOp(slice);
+  rewriter.eraseOp(terminator);
+  rewriter.eraseOp(producer);
+  return success();
+}
+
+DiagnosedSilenceableFailure
+transform_dialect::FuseForallOp::apply(transform::TransformRewriter &rewriter,
+                                       transform::TransformResults &results,
+                                       transform::TransformState &state) {
+  auto producers = state.getPayloadOps(getProducer());
+  auto consumers = state.getPayloadOps(getConsumer());
+
+  int64_t numProducers = llvm::range_size(producers);
+  int64_t numConsumers = llvm::range_size(consumers);
+  if (numProducers != 1 || numConsumers != 1) {
+    return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                     "More than one producer or consumer");
+  }
+
+  auto producer = dyn_cast<scf::ForallOp>(*producers.begin());
+  auto consumer = dyn_cast<scf::ForallOp>(*consumers.begin());
+  if (!producer || !consumer) {
+    return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                     "Non-forall producer or consumer");
+  }
+
+  if (!producer->hasOneUse()) {
+    return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                     "non-single use producer");
+  }
+
+  auto sliceConsumer =
+      dyn_cast<tensor::ExtractSliceOp>(*producer->user_begin());
+  if (!sliceConsumer || sliceConsumer->getParentOp() != consumer) {
+    return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                     "producer loop sole consumer is not an "
+                                     "extracted slice from the consumer loop");
+  }
+
+  if (failed(
+          fuseForallIntoSlice(rewriter, producer, consumer, sliceConsumer))) {
+    return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                     "failed to fuse forall ops");
+  }
+
+  results.set(getOperation()->getOpResult(0), {consumer});
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::FuseForallOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::consumesHandle(getProducer(), effects);
+  transform::consumesHandle(getConsumer(), effects);
+  transform::producesHandle(getResult(), effects);
   transform::modifiesPayload(effects);
 }
 
