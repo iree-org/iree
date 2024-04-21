@@ -10,6 +10,11 @@
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 
+int main(int argc, char **argv) {
+  ::testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
+}
+
 namespace mlir::iree_compiler {
 
 class TileSizeSelection : public ::testing::Test {
@@ -26,7 +31,7 @@ protected:
   DialectRegistry reg;
 };
 
-TEST_F(TileSizeSelection, MaxNumTileLevels) {
+TEST_F(TileSizeSelection, NumTilingLevels) {
   // 1. Create Lowering Config
   const unsigned kMaxNumTilingLevels = 7;
   SmallVector<IREE::Codegen::LoweringConfigTilingLevelAttr> newTilingLevelsList;
@@ -45,7 +50,7 @@ TEST_F(TileSizeSelection, MaxNumTileLevels) {
       IREE::Codegen::LoweringConfigAttr::get(&ctx, newTilingLevels,
                                              /*nativeVectorSize=*/4);
 
-  // 2. Create TilingConfig and check if the number of levels match.
+  // 2. Create TilingConfig and check if the number of tiling levels match.
   TilingConfig tilingConfig(loweringConfig);
   EXPECT_EQ(tilingConfig.getNumTilingLevels(), kMaxNumTilingLevels);
 }
