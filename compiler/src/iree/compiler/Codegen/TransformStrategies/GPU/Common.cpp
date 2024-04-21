@@ -55,8 +55,6 @@ using iree_compiler::gpu::GPUModel;
 using iree_compiler::IREE::transform_dialect::EliminateGpuBarriersOp;
 using iree_compiler::IREE::transform_dialect::IREEBufferizeOp;
 using iree_compiler::IREE::transform_dialect::IREEEliminateEmptyTensorsOp;
-using iree_compiler::IREE::transform_dialect::
-    IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp;
 using iree_compiler::IREE::transform_dialect::ShareForallOperandsOp;
 using iree_compiler::IREE::transform_dialect::SynchronizeLoopOp;
 using transform::FuseIntoContainingOp;
@@ -686,7 +684,8 @@ Value mlir::iree_compiler::gpu::buildBufferize(ImplicitLocOpBuilder &b,
   b.create<transform::ApplyPatternsOp>(funcH, [](OpBuilder &b, Location loc) {
     b.create<transform::ApplyCanonicalizationPatternsOp>(loc);
   });
-  b.create<IREE::transform_dialect::ApplyLoopIndependentCodeMotionOp>(funcH);
+  b.create<IREE::transform_dialect::IREEApplyLoopIndependentCodeMotionOp>(
+      funcH);
   b.create<mlir::transform::ApplyCommonSubexpressionEliminationOp>(funcH);
   b.create<IREEEliminateEmptyTensorsOp>(funcH);
   auto bufferizeOp = b.create<IREEBufferizeOp>(funcH, /*targetGpu=*/true);
