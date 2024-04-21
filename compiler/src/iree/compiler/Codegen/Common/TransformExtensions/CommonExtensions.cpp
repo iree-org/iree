@@ -233,11 +233,6 @@ void transform_dialect::ApplyBubblePackUnpackPatternsOp::populatePatterns(
       patterns, [](Operation *op) { return true; });
 }
 
-void transform_dialect::ApplyFoldArithExtIntoContractionOp::populatePatterns(
-    RewritePatternSet &patterns) {
-  vector::populateFoldArithExtensionPatterns(patterns);
-}
-
 void transform_dialect::ApplyFoldReshapeIntoTensorHalInterfacePatternsOp::
     populatePatterns(RewritePatternSet &patterns) {
   populateReshapeToInterfaceTensorPatterns(patterns);
