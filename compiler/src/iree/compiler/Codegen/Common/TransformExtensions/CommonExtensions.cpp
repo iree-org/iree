@@ -933,7 +933,9 @@ transform_dialect::TestGpuVectorDistribution::applyToOne(
   populateGPUDistributionPatterns(patterns);
   populateGPUDistributionLayoutAttrPatterns(laneId, patterns);
   populateGPUReductionDistributionPatterns(patterns);
-  populateGPUDistributeNestedLayoutAttrPatterns(laneId, patterns);
+  // For testing we use subgroup size = 64.
+  populateGPUDistributeNestedLayoutAttrPatterns(patterns, laneId,
+                                                /*subgroupSize=*/64);
   populateGPUDistributeNestedLayoutContractAMDGPUPatterns(patterns);
   if (getExperimental())
     populateGPULayoutResolutionDistributionPatterns(patterns);
