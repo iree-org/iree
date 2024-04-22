@@ -292,6 +292,8 @@ TEST_P(semaphore_test, WaitOnTheSameValueMultipleTimes) {
   CheckSemaphoreValue(semaphore, 1);
 
   thread.join();
+
+  iree_hal_semaphore_release(semaphore);
 }
 
 // TODO: test waiting for a finite amount of time.
