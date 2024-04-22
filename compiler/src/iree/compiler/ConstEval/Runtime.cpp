@@ -497,11 +497,7 @@ LogicalResult CompiledBinary::initialize(Location loc, void *data,
         modules.data(), iree_allocator_system(), &context);
   }
 
-  if (!iree_status_is_ok(status)) {
-    return handleRuntimeError(loc, status);
-  }
-
-  return success();
+  return handleRuntimeError(loc, status);
 }
 
 InMemoryCompiledBinary::~InMemoryCompiledBinary() { deinitialize(); }
