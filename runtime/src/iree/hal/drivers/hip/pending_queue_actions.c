@@ -561,6 +561,7 @@ static void iree_hal_hip_execution_device_signal_host_callback(
   // may involve GPU API calls like buffer releasing or unregistering, so we can
   // not inline it here.
   action->state = IREE_HAL_HIP_QUEUE_ACTION_STATE_ZOMBIE;
+  iree_slim_mutex_lock(&actions->action_mutex);
   iree_hal_hip_queue_action_list_push_back(&actions->action_list, action);
   iree_slim_mutex_unlock(&actions->action_mutex);
 
