@@ -312,8 +312,8 @@ NestedLayoutAttr::project(ArrayRef<bool> droppedDims) const {
   };
   SmallVector<bool> subgroupMask(getSubgroupActiveIds());
   SmallVector<bool> threadMask(getThreadActiveIds());
-  composeMasks(subgroupMask, droppedDims);
-  composeMasks(threadMask, droppedDims);
+  composeMasks(subgroupMask, applyPermutation(droppedDims, getSubgroupOrder()));
+  composeMasks(threadMask, applyPermutation(droppedDims, getThreadOrder()));
 
   return NestedLayoutAttr::get(getContext(), subgroupCount, subgroupOrder,
                                batchCount, batchOrder, outerCount, outerOrder,
@@ -740,7 +740,7 @@ static void printBasis(AsmPrinter &p, StringRef basisName, StringRef maskName,
   p << ']';
   if (llvm::any_of(mask, [](bool b) { return !b; })) {
     p << ',' << ' ';
-    p << maskName;
+    p << maskName << ' ';
     p << '=';
     p << ' ';
     p << '[';

@@ -1,7 +1,7 @@
 // RUN: iree-opt --iree-transform-dialect-interpreter %s | FileCheck %s
 
 // This transform was removed from MLIR by https://reviews.llvm.org/D154932 and
-// added to IREE in https://github.com/openxla/iree/pull/14373, as a workaround
+// added to IREE in https://github.com/iree-org/iree/pull/14373, as a workaround
 // for other patterns being sensitive to these exact transforms.
 
 // CHECK-LABEL: func @transfer_read_of_extract_slice(

@@ -8,7 +8,7 @@ We'd love to accept your patches and contributions to this project.
 
 !!! note "Note - coordinating efforts"
 
-    Please [file issues](https://github.com/openxla/iree/issues/new/choose) or
+    Please [file issues](https://github.com/iree-org/iree/issues/new/choose) or
     reach out on any of our other
     [communication channels](../../index.md#communication-channels) before doing
     substantial work; this will ensure that others don't duplicate the work and
@@ -55,7 +55,7 @@ they are applied consistently across the project.
     run automatically in your editor of choice.
 
     The script at
-    [`build_tools/scripts/lint.sh`](https://github.com/openxla/iree/blob/main/build_tools/scripts/lint.sh)
+    [`build_tools/scripts/lint.sh`](https://github.com/iree-org/iree/blob/main/build_tools/scripts/lint.sh)
     can also be used to run the full suite of lint checks.
 
 ### :octicons-code-review-16: Code reviews
@@ -117,27 +117,26 @@ yet).
 
 ### :octicons-git-merge-16: Obtaining commit access
 
-Access to affiliated repositories is divided into three tiers:
+Access to affiliated repositories is divided into tiers:
 
 | Tier | Description | Team link |
 | ---- | ----------- | --------- |
-Triage | **New project members should typically start here**<br>:material-check: Can be [assigned issues](https://docs.github.com/en/issues/tracking-your-work-with-issues/assigning-issues-and-pull-requests-to-other-github-users)<br>:material-check: Can apply labels to issues / PRs<br>:material-check: Can run workflows [without approval](https://docs.github.com/en/actions/managing-workflow-runs/approving-workflow-runs-from-public-forks) | [iree-triage](https://github.com/orgs/openxla/teams/iree-triage)
-Write | **Established project contributors should request this access**<br>:material-check: Can [merge approved pull requests](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/incorporating-changes-from-a-pull-request/merging-a-pull-request)<br>:material-check: Can create branches | [iree-write](https://github.com/orgs/openxla/teams/iree-write)
-Maintain | :material-check: Can [edit repository settings](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features)<br>:material-check: Can push to [protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches) | [iree-maintain](https://github.com/orgs/openxla/teams/iree-maintain)
+Triage | **New project members should typically start here**<br>:material-check: Can be [assigned issues](https://docs.github.com/en/issues/tracking-your-work-with-issues/assigning-issues-and-pull-requests-to-other-github-users)<br>:material-check: Can apply labels to issues / PRs<br>:material-check: Can run workflows [without approval](https://docs.github.com/en/actions/managing-workflow-runs/approving-workflow-runs-from-public-forks) | [iree-triage](https://github.com/orgs/iree-org/teams/iree-triage)
+Write | **Established project contributors should request this access**<br>:material-check: Can [merge approved pull requests](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/incorporating-changes-from-a-pull-request/merging-a-pull-request)<br>:material-check: Can create branches | [iree-write](https://github.com/orgs/iree-org/teams/iree-write)
+Maintain/Admin | :material-check: Can [edit repository settings](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features)<br>:material-check: Can push to [protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches) | Added case-by-case
 
 All access tiers first require joining the
-[OpenXLA GitHub organization](https://github.com/openxla/).
+[iree-org GitHub organization](https://github.com/iree-org/).
 
 <!-- markdownlint-disable-next-line -->
 [Fill out this form to request access :fontawesome-solid-paper-plane:](https://docs.google.com/forms/d/e/1FAIpQLSfEwANtMvLJWq-ED4lub_xsMch0MgNY02VxgtXE61FqNvNVUg/viewform){ .md-button .md-button--primary }
 
-Once you are a member of the OpenXLA GitHub organization, you can request to
-join any of the teams on <https://github.com/orgs/openxla/teams>.
+Once you are a member of the iree-org GitHub organization, you can request to
+join any of the teams on <https://github.com/orgs/iree-org/teams>.
 
 !!! note - "Note: other GitHub organizations"
 
     Work on IREE sometimes spans other GitHub organizations like
-    [iree-org](https://github.com/iree-org) and
     [shark-infra](https://github.com/shark-infra/). Reach out to a project
     member if you would also like access to repositories in those organizations.
 
@@ -145,7 +144,7 @@ join any of the teams on <https://github.com/orgs/openxla/teams>.
 
 If you would like additional recognition for your contributions, you may add
 yourself or your organization to the
-[AUTHORS file](https://github.com/openxla/iree/blob/main/AUTHORS) that keeps
+[AUTHORS file](https://github.com/iree-org/iree/blob/main/AUTHORS) that keeps
 track of those who have made significant contributions to the project.
 
 * Please add the entity who owns the copyright for your contribution.
@@ -181,7 +180,7 @@ IREE supports building from source with both Bazel and CMake.
 
 IREE uses [GitHub Actions](https://docs.github.com/en/actions) for CI. The
 primary CI is configured in the
-[ci.yml workflow file](https://github.com/openxla/iree/blob/main/.github/workflows/ci.yml).
+[ci.yml workflow file](https://github.com/iree-org/iree/blob/main/.github/workflows/ci.yml).
 
 #### Self-hosted runners
 
@@ -190,7 +189,7 @@ In addition to the default runners GitHub provides, IREE uses
 to run many of its workflow jobs. These enable access to additional compute and
 custom configurations such as accelerators. Configuration scripting is checked
 in to this repository (see the
-[README for that directory](https://github.com/openxla/iree/blob/main/build_tools/github_actions/runner/README.md)).
+[README for that directory](https://github.com/iree-org/iree/blob/main/build_tools/github_actions/runner/README.md)).
 
 #### Custom managed runners
 
@@ -202,7 +201,7 @@ for some platforms.
 
 The setup step of the CI determines which CI jobs to run. This is controlled by
 the
-[configure_ci.py](https://github.com/openxla/iree/blob/main/build_tools/github_actions/configure_ci.py)
+[configure_ci.py](https://github.com/iree-org/iree/blob/main/build_tools/github_actions/configure_ci.py)
 script. It will generally run a pre-determined set of jobs on presubmit with
 some jobs kept as post-submit only. If changes are only to a certain set of
 excluded files that we know don't affect CI (e.g. Markdown files), then it will
@@ -330,7 +329,7 @@ The enabled jobs can be viewed from the Summary page of an action run:
 We tend to use the "triangular" or "forking" workflow. Develop primarily on a
 clone of the repository on your development machine. Any local branches named
 the same as persistent branches from the
-[main repository](https://github.com/openxla/iree) are pristine (though
+[main repository](https://github.com/iree-org/iree) are pristine (though
 potentially stale) copies. You only fastforward these to match upstream and
 otherwise do development on other branches. When sending PRs, you push to a
 different branch on your public fork and create the PR from there.
@@ -361,7 +360,7 @@ different branch on your public fork and create the PR from there.
       # From whatever directory under which you want to nest your repo
       $ git clone https://github.com/<github_username>/iree.git
       $ cd iree
-      $ git remote add upstream https://github.com/openxla/iree.git
+      $ git remote add upstream https://github.com/iree-org/iree.git
       ```
 
     This is especially important for maintainers who have write access (so can
@@ -379,7 +378,7 @@ different branch on your public fork and create the PR from there.
     [git-sudo](https://gist.github.com/GMNGeoffrey/42dd9a9792390094a43bdb69659320c0).
 
 3. Use a script like
-    [git_update.sh](https://github.com/openxla/iree/blob/main/build_tools/scripts/git/git_update.sh)
+    [git_update.sh](https://github.com/iree-org/iree/blob/main/build_tools/scripts/git/git_update.sh)
     to easily synchronize `main` with `upstream`. Submodules make this is a
     little trickier than it should be. You can also turn this into a git command
     by adding it to your path as `git-update`.

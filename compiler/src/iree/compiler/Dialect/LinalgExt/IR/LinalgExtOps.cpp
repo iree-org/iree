@@ -122,6 +122,26 @@ static bool isSmallerThan(ArrayRef<int64_t> sourceShape,
                       });
 }
 
+/// Returns the size and offset scaled by some scale factor, and clamped to a
+/// dimSize for the dimension. `(offset + size) * scale` will be clamped to the
+/// `dimSize`.
+static std::pair<OpFoldResult, OpFoldResult>
+getScaledSizeAndOffset(OpBuilder &builder, Location loc, OpFoldResult size,
+                       OpFoldResult offset, OpFoldResult dimSize,
+                       int64_t offsetScale, int64_t sizeScale) {
+  AffineExpr dim0, dim1, dim2;
+  auto ctx = builder.getContext();
+  bindDims(ctx, dim0, dim1, dim2);
+  auto imageOffset = affine::makeComposedFoldedAffineApply(
+      builder, loc, {dim0 * offsetScale}, offset);
+  auto dimSizeValue = getValueOrCreateConstantIndexOp(builder, loc, dimSize);
+  AffineMap sizeMap =
+      AffineMap::get(3, 0, {dim0 - dim1, dim2 * sizeScale}, ctx);
+  auto imageSize = affine::makeComposedFoldedAffineMin(
+      builder, loc, sizeMap, {dimSizeValue, imageOffset, size});
+  return std::make_pair(imageSize, imageOffset);
+}
+
 //===----------------------------------------------------------------------===//
 // ScatterOp
 //===----------------------------------------------------------------------===//
@@ -2180,19 +2200,15 @@ WinogradInputTransformOp::getIterationDomain(OpBuilder &builder) {
   Location loc = getLoc();
   Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
   Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
-  Value source = input();
-  SmallVector<int64_t> imageDims = imageDimensions();
-  llvm::SmallSetVector<int64_t, 2> imageDimsSet(imageDims.begin(),
-                                                imageDims.end());
-  SmallVector<Range> loopBounds(imageDims.size());
+  Value dest = output();
+  SmallVector<Range> loopBounds(getIterationDomainRank());
   int count = 0;
-  for (auto dim : llvm::seq<int64_t>(0, getInputOperandRank())) {
-    if (!imageDimsSet.contains(dim)) {
-      loopBounds[count].offset = zero;
-      loopBounds[count].size = getDimValue(builder, loc, source, dim);
-      loopBounds[count].stride = one;
-      count++;
-    }
+  for (auto dim :
+       llvm::seq<int64_t>(imageDimensions().size(), getOutputOperandRank())) {
+    loopBounds[count].offset = zero;
+    loopBounds[count].size = getDimValue(builder, loc, dest, dim);
+    loopBounds[count].stride = one;
+    count++;
   }
   return loopBounds;
 }
@@ -2213,24 +2229,58 @@ WinogradInputTransformOp::getTiledImplementation(OpBuilder &builder,
   auto zero = builder.getIndexAttr(0);
   const int cDim = channelDim();
 
-  assert(offsets.size() == 2);
+  assert(offsets.size() == 4);
   SmallVector<OpFoldResult> inputOffsets(getInputOperandRank(), zero);
   SmallVector<OpFoldResult> outputOffsets(getOutputOperandRank(), zero);
+  const auto hDim = getImageDimensions()[0];
+  const auto wDim = getImageDimensions()[1];
   outputOffsets[2] = inputOffsets[0] = offsets[0];
-  outputOffsets[5] = inputOffsets[cDim] = offsets[1];
+  outputOffsets[3] = offsets[1];
+  outputOffsets[4] = offsets[2];
+  outputOffsets[5] = inputOffsets[cDim] = offsets[3];
 
   SmallVector<OpFoldResult> inputStrides(getInputOperandRank(), one);
   SmallVector<OpFoldResult> outputStrides(getOutputOperandRank(), one);
+  ReifiedRankedShapedTypeDims reifiedResultShapes;
+  if (failed(reifyResultShapes(builder, reifiedResultShapes))) {
+    return failure();
+  }
+  SmallVector<OpFoldResult> outputSizes = reifiedResultShapes[0];
+  SmallVector<OpFoldResult> inputSizes;
+  auto definingReifyOp =
+      input().getDefiningOp<ReifyRankedShapedTypeOpInterface>();
+  if (!definingReifyOp) {
+    auto inputShapedType = input().getType().cast<ShapedType>();
+    if (!inputShapedType.hasStaticShape()) {
+      return failure();
+    }
+    inputSizes = getAsOpFoldResult(
+        builder.getIndexArrayAttr(inputShapedType.getShape()));
+  } else {
+    ReifiedRankedShapedTypeDims inputReifyShapes;
+    if (failed(definingReifyOp.reifyResultShapes(builder, inputReifyShapes))) {
+      return failure();
+    }
+    inputSizes = inputReifyShapes[0];
+  }
 
-  assert(sizes.size() == 2);
-  auto inputShape = input().getType().cast<ShapedType>().getShape();
-  auto outputShape = output().getType().cast<ShapedType>().getShape();
-  SmallVector<OpFoldResult> inputSizes =
-      getAsOpFoldResult(builder.getIndexArrayAttr(inputShape));
-  SmallVector<OpFoldResult> outputSizes =
-      getAsOpFoldResult(builder.getIndexArrayAttr(outputShape));
+  assert(sizes.size() == 4);
   outputSizes[2] = inputSizes[0] = sizes[0];
-  outputSizes[5] = inputSizes[cDim] = sizes[1];
+  outputSizes[3] = sizes[1];
+  outputSizes[4] = sizes[2];
+  outputSizes[5] = inputSizes[cDim] = sizes[3];
+
+  auto hSizeAndOffset = getScaledSizeAndOffset(
+      builder, loc, sizes[1], offsets[1], inputSizes[hDim], getOutputTileSize(),
+      getInputTileSize());
+  auto wSizeAndOffset = getScaledSizeAndOffset(
+      builder, loc, sizes[2], offsets[2], inputSizes[wDim], getOutputTileSize(),
+      getInputTileSize());
+
+  inputSizes[hDim] = hSizeAndOffset.first;
+  inputSizes[wDim] = wSizeAndOffset.first;
+  inputOffsets[hDim] = hSizeAndOffset.second;
+  inputOffsets[wDim] = wSizeAndOffset.second;
 
   SmallVector<Value> tiledOperands;
   tiledOperands.emplace_back(
@@ -2259,9 +2309,13 @@ LogicalResult WinogradInputTransformOp::getResultTilePosition(
     resultOffsets = SmallVector<OpFoldResult>(getOutputOperandRank(),
                                               builder.getIndexAttr(0));
     resultOffsets[2] = offsets[0];
-    resultOffsets[5] = offsets[1];
+    resultOffsets[3] = offsets[1];
+    resultOffsets[4] = offsets[2];
+    resultOffsets[5] = offsets[3];
     resultSizes[2] = sizes[0];
-    resultSizes[5] = sizes[1];
+    resultSizes[3] = sizes[1];
+    resultSizes[4] = sizes[2];
+    resultSizes[5] = sizes[3];
     return success();
   }
   return failure();
@@ -2335,6 +2389,10 @@ LogicalResult WinogradOutputTransformOp::verify() {
   int outputIndex;
   for (int i = numImageDims; i < inputShape.size(); i++) {
     outputIndex = i - numImageDims;
+    if (ShapedType::isDynamic(inputShape[i])) {
+      expectedOutputShape[outputIndex] = inputShape[i];
+      continue;
+    }
     if (!imageDimsSet.contains(outputIndex)) {
       expectedOutputShape[outputIndex] = inputShape[i];
     } else {
@@ -2352,19 +2410,15 @@ WinogradOutputTransformOp::getIterationDomain(OpBuilder &builder) {
   Location loc = getLoc();
   Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
   Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
-  Value source = output();
-  SmallVector<int64_t> imageDims = imageDimensions();
-  llvm::SmallSetVector<int64_t, 2> imageDimsSet(imageDims.begin(),
-                                                imageDims.end());
-  SmallVector<Range> loopBounds(imageDims.size());
+  Value source = input();
+  SmallVector<Range> loopBounds(getIterationDomainRank());
   int count = 0;
-  for (auto dim : llvm::seq<int64_t>(0, getOutputOperandRank())) {
-    if (!imageDimsSet.contains(dim)) {
-      loopBounds[count].offset = zero;
-      loopBounds[count].size = getDimValue(builder, loc, source, dim);
-      loopBounds[count].stride = one;
-      count++;
-    }
+  for (auto dim :
+       llvm::seq<int64_t>(imageDimensions().size(), getInputOperandRank())) {
+    loopBounds[count].offset = zero;
+    loopBounds[count].size = getDimValue(builder, loc, source, dim);
+    loopBounds[count].stride = one;
+    count++;
   }
   return loopBounds;
 }
@@ -2384,24 +2438,63 @@ FailureOr<TilingResult> WinogradOutputTransformOp::getTiledImplementation(
   auto zero = builder.getIndexAttr(0);
   const int cDim = channelDim();
 
-  assert(offsets.size() == 2);
+  assert(offsets.size() == 4);
+  const auto hDim = getImageDimensions()[0];
+  const auto wDim = getImageDimensions()[1];
   SmallVector<OpFoldResult> inputOffsets(getInputOperandRank(), zero);
   SmallVector<OpFoldResult> outputOffsets(getOutputOperandRank(), zero);
+
   inputOffsets[2] = outputOffsets[0] = offsets[0];
-  inputOffsets[5] = outputOffsets[cDim] = offsets[1];
+  inputOffsets[3] = offsets[1];
+  inputOffsets[4] = offsets[2];
+  inputOffsets[5] = outputOffsets[cDim] = offsets[3];
 
   SmallVector<OpFoldResult> inputStrides(getInputOperandRank(), one);
   SmallVector<OpFoldResult> outputStrides(getOutputOperandRank(), one);
 
-  assert(sizes.size() == 2);
-  auto inputShape = input().getType().cast<ShapedType>().getShape();
-  auto outputShape = output().getType().cast<ShapedType>().getShape();
-  SmallVector<OpFoldResult> inputSizes =
-      getAsOpFoldResult(builder.getIndexArrayAttr(inputShape));
-  SmallVector<OpFoldResult> outputSizes =
-      getAsOpFoldResult(builder.getIndexArrayAttr(outputShape));
+  SmallVector<SmallVector<OpFoldResult>> reifiedResultShapes;
+  if (failed(reifyResultShapes(builder, reifiedResultShapes))) {
+    return failure();
+  }
+  SmallVector<OpFoldResult> outputSizes = reifiedResultShapes[0];
+  SmallVector<OpFoldResult> inputSizes;
+  auto definingReifyOp =
+      input().getDefiningOp<ReifyRankedShapedTypeOpInterface>();
+  if (!definingReifyOp) {
+    auto inputShapedType = input().getType().cast<ShapedType>();
+    if (!inputShapedType.hasStaticShape()) {
+      return failure();
+    }
+    inputSizes = getAsOpFoldResult(
+        builder.getIndexArrayAttr(inputShapedType.getShape()));
+  } else {
+    ReifiedRankedShapedTypeDims inputReifyShapes;
+    if (failed(definingReifyOp.reifyResultShapes(builder, inputReifyShapes))) {
+      return failure();
+    }
+    inputSizes = inputReifyShapes[0];
+  }
+
   inputSizes[2] = outputSizes[0] = sizes[0];
-  inputSizes[5] = outputSizes[cDim] = sizes[1];
+  inputSizes[5] = outputSizes[cDim] = sizes[3];
+
+  assert(sizes.size() == 4);
+  inputSizes[2] = outputSizes[0] = sizes[0];
+  inputSizes[3] = sizes[1];
+  inputSizes[4] = sizes[2];
+  inputSizes[5] = outputSizes[cDim] = sizes[3];
+
+  auto hSizeAndOffset = getScaledSizeAndOffset(
+      builder, loc, sizes[1], offsets[1], outputSizes[hDim],
+      getOutputTileSize(), getOutputTileSize());
+  auto wSizeAndOffset = getScaledSizeAndOffset(
+      builder, loc, sizes[2], offsets[2], outputSizes[wDim],
+      getOutputTileSize(), getOutputTileSize());
+
+  outputSizes[hDim] = hSizeAndOffset.first;
+  outputSizes[wDim] = wSizeAndOffset.first;
+  outputOffsets[hDim] = hSizeAndOffset.second;
+  outputOffsets[wDim] = wSizeAndOffset.second;
 
   SmallVector<Value> tiledOperands;
   tiledOperands.emplace_back(
@@ -2430,10 +2523,28 @@ LogicalResult WinogradOutputTransformOp::getResultTilePosition(
     resultOffsets = SmallVector<OpFoldResult>(getOutputOperandRank(),
                                               builder.getIndexAttr(0));
     const int cDim = channelDim();
+    const auto hDim = getImageDimensions()[0];
+    const auto wDim = getImageDimensions()[1];
+    auto loc = getLoc();
     resultOffsets[0] = offsets[0];
-    resultOffsets[cDim] = offsets[1];
+    resultOffsets[cDim] = offsets[3];
     resultSizes[0] = sizes[0];
-    resultSizes[cDim] = sizes[1];
+    resultSizes[cDim] = sizes[3];
+    SmallVector<SmallVector<OpFoldResult>> reifiedResultShapes;
+    if (failed(reifyResultShapes(builder, reifiedResultShapes))) {
+      return failure();
+    }
+    auto hSizeAndOffset = getScaledSizeAndOffset(
+        builder, loc, sizes[1], offsets[1], reifiedResultShapes[0][hDim],
+        getOutputTileSize(), getOutputTileSize());
+    auto wSizeAndOffset = getScaledSizeAndOffset(
+        builder, loc, sizes[2], offsets[2], reifiedResultShapes[0][wDim],
+        getOutputTileSize(), getOutputTileSize());
+
+    resultSizes[hDim] = hSizeAndOffset.first;
+    resultSizes[wDim] = wSizeAndOffset.first;
+    resultOffsets[hDim] = hSizeAndOffset.second;
+    resultOffsets[wDim] = wSizeAndOffset.second;
     return success();
   }
   return failure();
@@ -2783,16 +2894,20 @@ EncodingAttr EncodingAttr::get(MLIRContext *ctx, EncodingRole role,
                                ArrayRef<Type> elemTypes, Type origType,
                                std::optional<int64_t> matmulNarrowM,
                                std::optional<int64_t> matmulNarrowN,
-                               ArrayRef<AffineMap> maps) {
+                               ArrayRef<AffineMap> maps,
+                               ArrayRef<int64_t> roundDimsTo) {
   Builder b(ctx);
   auto optionalToAttr = [&](std::optional<int64_t> x) {
     return x ? b.getIndexAttr(*x) : IntegerAttr();
   };
   auto roleAttr = EncodingRoleAttr::get(ctx, role);
   auto origTypeAttr = origType ? TypeAttr::get(origType) : TypeAttr();
+  auto roundDimsToAttr = roundDimsTo.empty()
+                             ? DenseI64ArrayAttr()
+                             : b.getDenseI64ArrayAttr(roundDimsTo);
   return get(ctx, roleAttr, b.getTypeArrayAttr(elemTypes), origTypeAttr,
              optionalToAttr(matmulNarrowM), optionalToAttr(matmulNarrowN),
-             b.getAffineMapArrayAttr(maps));
+             b.getAffineMapArrayAttr(maps), roundDimsToAttr);
 }
 
 AffineMap EncodingAttr::getMapForRole() {
@@ -2814,6 +2929,14 @@ unsigned EncodingAttr::mapDimToRoleIndex(int64_t dimPos) {
   auto idx = map.getResultPosition(getAffineDimExpr(dimPos, getContext()));
   assert(idx.has_value());
   return idx.value();
+}
+
+ArrayRef<int64_t> EncodingAttr::getRoundDimsToArray() {
+  auto roundDimsTo = getRoundDimsTo();
+  if (!roundDimsTo) {
+    return {};
+  }
+  return roundDimsTo.cast<DenseI64ArrayAttr>().asArrayRef();
 }
 
 //===---------------------------------------------------------------------===//

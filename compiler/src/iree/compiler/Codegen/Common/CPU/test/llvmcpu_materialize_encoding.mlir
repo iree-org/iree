@@ -1,5 +1,36 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-cpu-materialize-encoding),canonicalize,cse)" --split-input-file %s | FileCheck %s
 
+
+func.func @set_encoding_with_padding_semantics_bf16_x86_64_avx512f() attributes {
+  hal.executable.target = #hal.executable.target<"xyz", "xyz", {target_triple="x86_64-xyz-xyz", cpu_features="+avx512f"}>
+}{
+  %c0 = arith.constant 0 : index
+  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1x1000xbf16>>
+  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1x1000xbf16, #iree_linalg_ext.encoding<role =  LHS, element_types = [bf16, bf16, bf16], original_type = tensor<1x1000xbf16>, matmul_narrow_M = 1 : index, user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>], round_dims_to = array<i64: 16, 16, 16>>>>
+  %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1, 1000], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<1x1000xbf16>> -> tensor<1x1000xbf16>
+  %3 = iree_linalg_ext.set_encoding %2 : tensor<1x1000xbf16> -> tensor<1x1000xbf16, #iree_linalg_ext.encoding<role =  LHS, element_types = [bf16, bf16, bf16], original_type = tensor<1x1000xbf16>, matmul_narrow_M = 1 : index, user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>], round_dims_to = array<i64: 16, 16, 16>>>
+  flow.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [1, 1000], strides = [1, 1] : tensor<1x1000xbf16, #iree_linalg_ext.encoding<role =  LHS, element_types = [bf16, bf16, bf16], original_type = tensor<1x1000xbf16>, matmul_narrow_M = 1  : index, user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>], round_dims_to = array<i64: 16, 16, 16>>> -> !flow.dispatch.tensor<writeonly:tensor<1x1000xbf16,  #iree_linalg_ext.encoding<role =  LHS, element_types = [bf16, bf16, bf16], original_type = tensor<1x1000xbf16>, matmul_narrow_M = 1 : index, user_indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>], round_dims_to = array<i64: 16, 16, 16>>>>
+  return
+}
+// This tests that
+//   1. The padding value is created for tensor.pack ops.
+//   2. The inner tile sizes are less than or equal to values in round_dims_to.
+//      We could choose 128 when it is a narrow matrix.
+// CHECK-LABEL: func.func @set_encoding_with_padding_semantics_bf16_x86_64_avx512f
+// CHECK-DAG:     %[[PAD:.+]] = arith.constant 0.000000e+00 : bf16
+// CHECK-DAG:     %[[IN_BINDING:.+]] = hal.interface.binding.subspan {{.+}} : !flow.dispatch.tensor<readonly:tensor<1x1000xbf16>>
+// CHECK-DAG:     %[[OUT_BINDING:.+]] = hal.interface.binding.subspan {{.+}} : !flow.dispatch.tensor<writeonly:tensor<1x1000x16x1xbf16>>
+// CHECK:         %[[SRC:.+]] = flow.dispatch.tensor.load %[[IN_BINDING]]
+// CHECK-DAG:     %[[INIT:.+]] = tensor.empty() : tensor<1x1000x16x1xbf16>
+// CHECK:         %[[PACK:.+]] = tensor.pack %[[SRC]] padding_value(%[[PAD]] : bf16)
+// CHECK-SAME:      outer_dims_perm = [0, 1]
+// CHECK-SAME:      inner_dims_pos = [0, 1]
+// CHECK-SAME:      inner_tiles = [16, 1]
+// CHECK-SAME:      into %[[INIT]] : tensor<1x1000xbf16> -> tensor<1x1000x16x1xbf16>
+// CHECK:         flow.dispatch.tensor.store %[[PACK]], %[[OUT_BINDING]]
+
+// -----
+
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>

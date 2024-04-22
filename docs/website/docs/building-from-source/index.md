@@ -3,7 +3,7 @@
 !!! info ""
 
     While IREE does offer
-    [binary distributions](https://github.com/openxla/iree/releases) for its
+    [binary distributions](https://github.com/iree-org/iree/releases) for its
     compiler tools and [Python bindings](../reference/bindings/python.md), building from
     source is still useful when using IREE's runtime or when making changes to the
     compiler or import tools themselves.

@@ -53,7 +53,7 @@ using iree_compiler::IREE::transform_dialect::
     ApplyFoldReshapeIntoTensorHalInterfacePatternsOp;
 using iree_compiler::IREE::transform_dialect::EliminateGpuBarriersOp;
 using iree_compiler::IREE::transform_dialect::
-    IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp;
+    PopulateWorkgroupCountRegionUsingNumThreadsSliceOp;
 using transform::ConvertConv2DToImg2ColOp;
 using transform::FuseIntoContainingOp;
 using transform::MatchOp;
@@ -238,7 +238,7 @@ buildConvolutionStrategyBlockDistribution(
           b.getArrayAttr(blockMapping.threadMapping));
 
   // Handle the workgroup count region.
-  b.create<IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp>(
+  b.create<PopulateWorkgroupCountRegionUsingNumThreadsSliceOp>(
       tileResult.forallH);
 
   // Rematch the fill because earlier handle is invalidated.

@@ -23,7 +23,7 @@ def parse_arguments():
     parser.add_argument(
         "--repo",
         "--repository",
-        default="openxla/iree",
+        default="iree-org/iree",
         help="The GitHub repository to fetch releases from.",
     )
     parser.add_argument(

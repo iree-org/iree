@@ -45,7 +45,6 @@ struct UpcastContractOutput : OpRewritePattern<vector::ContractionOp> {
 
     auto [dstAElemType, dstBElemType, dstCElemType] =
         intrinsic.getABCElementTypes();
-    auto [dstM, dstN, dstK] = intrinsic.getMNKShape();
 
     auto srcCElemFType = dyn_cast<FloatType>(srcCType.getElementType());
     auto dstCElemFType = dyn_cast<FloatType>(dstCElemType);
@@ -58,16 +57,6 @@ struct UpcastContractOutput : OpRewritePattern<vector::ContractionOp> {
     if (srcAType.getElementType() != dstAElemType ||
         srcBType.getElementType() != dstBElemType) {
       return rewriter.notifyMatchFailure(contractOp, "a/b type mismatch");
-    }
-
-    auto [srcCMIndex, srcCNIndex] = *opInfo.getResultMNIndex();
-    auto [srcAKIndex, srcBKIndex] = *opInfo.getOperandKIndex();
-    int64_t srcM = srcCType.getShape()[srcCMIndex];
-    int64_t srcN = srcCType.getShape()[srcCNIndex];
-    int64_t srcK = srcAType.getShape()[srcAKIndex];
-
-    if (srcM % dstM != 0 || srcN % dstN != 0 || srcK % dstK != 0) {
-      return rewriter.notifyMatchFailure(contractOp, "shape cannot divide");
     }
 
     Location loc = contractOp.getLoc();

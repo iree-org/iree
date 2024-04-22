@@ -276,12 +276,12 @@ To summarize, we need the following data structures to implement HAL semaphore:
 [cuda-driver-api]: https://docs.nvidia.com/cuda/cuda-driver-api/index.html
 [cuda-runtime-api]: https://docs.nvidia.com/cuda/cuda-runtime-api/index.html
 [vulkan-timeline-semaphore]: https://www.khronos.org/blog/vulkan-timeline-semaphores
-[iree-hal]: https://github.com/openxla/iree/tree/main/runtime/src/iree/hal
-[hal-command-buffer]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/command_buffer.h
-[hal-device]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/device.h
-[hal-executable]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/executable.h
-[hal-event]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/event.h
-[hal-deferred-command-buffer]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/utils/deferred_command_buffer.h
+[iree-hal]: https://github.com/iree-org/iree/tree/main/runtime/src/iree/hal
+[hal-command-buffer]: https://github.com/iree-org/iree/blob/main/runtime/src/iree/hal/command_buffer.h
+[hal-device]: https://github.com/iree-org/iree/blob/main/runtime/src/iree/hal/device.h
+[hal-executable]: https://github.com/iree-org/iree/blob/main/runtime/src/iree/hal/executable.h
+[hal-event]: https://github.com/iree-org/iree/blob/main/runtime/src/iree/hal/event.h
+[hal-deferred-command-buffer]: https://github.com/iree-org/iree/blob/main/runtime/src/iree/hal/utils/deferred_command_buffer.h
 [cu-device]: https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__DEVICE.html
 [cu-get-proc-address]: https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__DRIVER__ENTRY__POINT.html#group__CUDA__DRIVER__ENTRY__POINT_1gcae5adad00590572ab35b2508c2d6e0d
 [cu-mem-ops]: https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__MEMOP.html
@@ -289,6 +289,6 @@ To summarize, we need the following data structures to implement HAL semaphore:
 [cu-event]: https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__EVENT.html
 [cu-graph]: https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__GRAPH.html#group__CUDA__GRAPH
 [cu-launch-host-func]: https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__EXEC.html#group__CUDA__EXEC_1gab95a78143bae7f21eebb978f91e7f3f
-[cuda-stream-command-buffer]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/drivers/cuda/stream_command_buffer.c
-[cuda-graph-command-buffer]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/drivers/cuda/graph_command_buffer.c
+[cuda-stream-command-buffer]: https://github.com/iree-org/iree/blob/main/runtime/src/iree/hal/drivers/cuda/stream_command_buffer.c
+[cuda-graph-command-buffer]: https://github.com/iree-org/iree/blob/main/runtime/src/iree/hal/drivers/cuda/graph_command_buffer.c
 [cuda-stream-ordered-alloc]: https://docs.nvidia.com/cuda/cuda-driver-api/group__CUDA__MALLOC__ASYNC.html#group__CUDA__MALLOC__ASYNC

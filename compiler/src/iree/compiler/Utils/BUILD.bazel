@@ -49,6 +49,8 @@ iree_compiler_cc_library(
     ],
     deps = [
         "//compiler/src/iree/compiler/Dialect/Util/IR",
+        #TODO(hanchung): Move encodings to Util/, so it does not need the dep.
+        "//compiler/src/iree/compiler/Dialect/LinalgExt/IR",
         "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal/flatcc:building",
         "//runtime/src/iree/base/internal/flatcc:debugging",

@@ -426,9 +426,9 @@ $ iree-benchmark-executable \
 ```
 
 See the comments in
-[`tools/iree-benchmark-executable-main.c`](https://github.com/openxla/iree/blob/main/tools/iree-benchmark-executable-main.c)
+[`tools/iree-benchmark-executable-main.c`](https://github.com/iree-org/iree/blob/main/tools/iree-benchmark-executable-main.c)
 and the test file at
-[`tools/test/iree-benchmark-executable.mlir`](https://github.com/openxla/iree/blob/main/tools/test/iree-benchmark-executable.mlir)
+[`tools/test/iree-benchmark-executable.mlir`](https://github.com/iree-org/iree/blob/main/tools/test/iree-benchmark-executable.mlir)
 for more information and examples.
 
 ## Compiling phase by phase

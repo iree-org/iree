@@ -45,26 +45,6 @@ func.func @mfma_matmul_96x64x16_mmt(%lhs: vector<96x16xf16>, %rhs: vector<64x16x
 
 // -----
 
-func.func @mfma_matmul_96x64x16_mm_cannot_divide(%lhs: vector<95x16xf16>, %rhs: vector<16x64xf16>, %init: vector<95x64xf16>) -> vector<95x64xf16> attributes {
-    mma_schedule = #iree_gpu.mma_schedule<
-      intrinsic = #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>,
-      subgroup_m_count = 1, subgroup_n_count = 1, subgroup_m_tile_count = 3, subgroup_n_tile_count = 2, subgroup_k_tile_count = 2>,
-    workgroup_size = [64, 1, 1]} {
-    %0 = vector.contract {
-      indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
-      iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>}
-      %lhs, %rhs, %init : vector<95x16xf16>, vector<16x64xf16> into vector<95x64xf16>
-  return %0 : vector<95x64xf16>
-}
-
-// CHECK-LABEL: func.func @mfma_matmul_96x64x16_mm_cannot_divide
-//   CHECK-NOT:   arith.extf
-//       CHECK:   vector.contract
-//  CHECK-SAME:     %{{.+}}, %{{.+}}, %{{.+}} : vector<95x16xf16>, vector<16x64xf16> into vector<95x64xf16>
-//   CHECK-NOT:   arith.truncf
-
-// -----
-
 func.func @mfma_matmul_96x64x16_mm_cannot_downcast(%lhs: vector<96x16xf16>, %rhs: vector<16x64xf16>, %init: vector<96x64xf64>) -> vector<96x64xf64> attributes {
     mma_schedule = #iree_gpu.mma_schedule<
       intrinsic = #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>,

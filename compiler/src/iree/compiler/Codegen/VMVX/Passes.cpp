@@ -46,7 +46,7 @@ static void addTileAndDistributePasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(
       IREE::LinalgExt::createTileAndDecomposeAttentionPass());
   funcPassManager.addPass(
-      IREE::LinalgExt::createTileAndDecomposeWinogradTransformPass());
+      IREE::LinalgExt::createDecomposeWinogradTransformPass());
 }
 
 void addVMVXDefaultPassPipeline(OpPassManager &funcPassManager,
