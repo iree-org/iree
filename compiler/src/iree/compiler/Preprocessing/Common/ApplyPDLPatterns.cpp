@@ -21,9 +21,16 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "mlir/IR/PDLPatternMatch.h.inc"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Support/FileUtilities.h"
+#include "mlir/Tools/PDLL/AST/Context.h"
+#include "mlir/Tools/PDLL/AST/Nodes.h"
+#include "mlir/Tools/PDLL/CodeGen/CPPGen.h"
+#include "mlir/Tools/PDLL/CodeGen/MLIRGen.h"
+#include "mlir/Tools/PDLL/ODS/Context.h"
+#include "mlir/Tools/PDLL/Parser/Parser.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-preprocessing-apply-pdl-patterns"
@@ -34,6 +41,7 @@ using namespace mlir::iree_compiler;
 namespace mlir::iree_compiler::Preprocessing {
 
 #define GEN_PASS_DEF_APPLYPDLPATTERNSPASS
+#define GEN_PASS_DEF_APPLYPDLLPATTERNSPASS
 #include "iree/compiler/Preprocessing/Common/Passes.h.inc" // IWYU pragma: export
 
 } // namespace mlir::iree_compiler::Preprocessing
@@ -544,6 +552,84 @@ public:
     RewritePatternSet tmpPatterns(context);
     if (failed(populatePDLModuleFromFileName(context, tmpPatterns,
                                              patternsFile))) {
+      return failure();
+    }
+    patterns = std::move(tmpPatterns);
+    return success();
+  }
+
+  void runOnOperation() override {
+    // If there is nothing to do then return.
+    if (!patterns.getPDLByteCode()) {
+      return;
+    }
+
+    // Apply the patterns.
+    auto operation = getOperation();
+    if (failed(applyPatternsAndFoldGreedily(operation, patterns))) {
+      operation->emitOpError("failed to apply patterns specified in ")
+          << patternsFile;
+      return signalPassFailure();
+    }
+  }
+
+private:
+  /// Loaded PDL patterns
+  FrozenRewritePatternSet patterns;
+};
+} // namespace
+
+// Populate patterns from PDLL files.
+static LogicalResult
+populatePDLLModuleFromFileName(MLIRContext *context,
+                               RewritePatternSet &patterns,
+                               llvm::StringRef pdllModuleFileName) {
+  std::string errorMessage;
+  auto memoryBuffer = mlir::openInputFile(pdllModuleFileName, &errorMessage);
+  if (!memoryBuffer) {
+    return emitError(FileLineColLoc::get(
+               StringAttr::get(context, pdllModuleFileName), 0, 0))
+           << "failed to open pattern module file: " << errorMessage;
+  }
+  // Tell sourceMgr about this buffer, the parser will pick it up.
+  llvm::SourceMgr sourceMgr;
+  sourceMgr.AddNewSourceBuffer(std::move(memoryBuffer), llvm::SMLoc());
+
+  // parse file and build pdll ast module
+  pdll::ods::Context pdllOdsContext;
+  pdll::ast::Context pdllAstContext(pdllOdsContext);
+  FailureOr<pdll::ast::Module *> pdllModule =
+      pdll::parsePDLLAST(pdllAstContext, sourceMgr);
+  if (failed(pdllModule)) {
+    return failure();
+  }
+
+  PDLPatternModule pdlModule =
+      pdll::codegenPDLLToMLIR(context, pdllAstContext, sourceMgr, **pdllModule);
+  pdlModule.registerRewriteFunction("rewriteAsFlowDispatch",
+                                    rewriteAsFlowDispatch);
+  pdlModule.registerConstraintFunction("checkTensorElementType",
+                                       checkTensorElementType);
+  patterns.insert(std::move(pdlModule));
+  return success();
+}
+
+namespace {
+
+class ApplyPDLLPatternsPass
+    : public iree_compiler::Preprocessing::impl::ApplyPDLLPatternsPassBase<
+          ApplyPDLLPatternsPass> {
+public:
+  using iree_compiler::Preprocessing::impl::ApplyPDLLPatternsPassBase<
+      ApplyPDLLPatternsPass>::ApplyPDLLPatternsPassBase;
+
+  LogicalResult initialize(MLIRContext *context) override {
+    if (patternsFile.empty()) {
+      return success();
+    }
+    RewritePatternSet tmpPatterns(context);
+    if (failed(populatePDLLModuleFromFileName(context, tmpPatterns,
+                                              patternsFile))) {
       return failure();
     }
     patterns = std::move(tmpPatterns);

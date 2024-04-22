@@ -1,10 +1,10 @@
-#include "mlir/Dialect/Linalg/IR/LinalgOps.td"
-#include "mlir/Dialect/Arith/IR/ArithOps.td"
-#include "mlir/Dialect/Func/IR/FuncOps.td"
-#include "mlir/Dialect/Tensor/IR/TensorOps.td"
-#include "mlir/Dialect/Tosa/IR/TosaOps.td"
-#include "torch-mlir/Dialect/Torch/IR/TorchOps.td"
-#include "torch-mlir/Dialect/TorchConversion/IR/TorchConversionOps.td"
+//#include "mlir/Dialect/Linalg/IR/LinalgOps.td"
+//#include "mlir/Dialect/Arith/IR/ArithOps.td"
+//#include "mlir/Dialect/Func/IR/FuncOps.td"
+//#include "mlir/Dialect/Tensor/IR/TensorOps.td"
+//#include "mlir/Dialect/Tosa/IR/TosaOps.td"
+//#include "torch-mlir/Dialect/Torch/IR/TorchOps.td"
+//#include "torch-mlir/Dialect/TorchConversion/IR/TorchConversionOps.td"
 
 
 Constraint checkElementType(t1 : Type, t2 : Type);

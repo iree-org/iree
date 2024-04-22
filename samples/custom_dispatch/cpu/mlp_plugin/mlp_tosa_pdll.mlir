@@ -1,5 +1,4 @@
-// RUN: mlir-pdll %p/mlp_all_specs.pdll -x=mlir -I%S/../../../..//third_party/torch-mlir/include -I%S/../../../..//samples/custom_dispatch/cpu/mlp_plugin -I%S/../../../..//third_party/llvm-project/mlir/include -I%S/../../../../-build/llvm-project/tools/mlir/include > %t && \ 
-// RUN: iree-opt --pass-pipeline="builtin.module(iree-preprocessing-apply-pdl-patterns{patterns-file=%t})" %s | \
+// RUN: iree-opt --pass-pipeline="builtin.module(iree-preprocessing-apply-pdll-patterns{patterns-file=%p/mlp_all_specs.pdll})" %s | \
 // RUN: iree-compile - | \
 // RUN: iree-run-module --device=local-sync \
 // RUN:     --executable_plugin=$IREE_BINARY_DIR/samples/custom_dispatch/cpu/mlp_plugin/mlp_plugin$IREE_DYLIB_EXT \

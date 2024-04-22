@@ -337,6 +337,7 @@ There are several ways to author patterns and passes in MLIR. As examples:
 * [PDL](https://mlir.llvm.org/docs/Dialects/PDLOps/) is an MLIR-based way to
   express rewrite operations with strong typing, compile-time verification, and
   easily-readable and less-verbose IR.
+* [PDLL](https://mlir.llvm.org/docs/PDLL/) is a frontend language which provides a user-friendly interface for generating the underlying PDL rewrites.
 * `linalg` uses a [python-based DSL](https://mlir.llvm.org/docs/Dialects/Linalg/OpDSL/)
   for defining some of its extended ops.
 
