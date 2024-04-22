@@ -198,14 +198,11 @@ FunctionCall::importSerializableAttr(
         loc, llvm::endianness::native,
         ArrayRef<char>(reinterpret_cast<char *>(mapping.contents.data),
                        storageSize));
+    iree_status_ignore(iree_hal_buffer_unmap_range(&mapping));
     if (failed(copyResult)) {
       status =
           iree_make_status(IREE_STATUS_INTERNAL, "serializeToBuffer failed");
     }
-  }
-
-  if (iree_status_is_ok(status)) {
-    status = iree_hal_buffer_unmap_range(&mapping);
   }
 
   if (!iree_status_is_ok(status)) {
@@ -431,7 +428,7 @@ TypedAttr CompiledBinary::convertVariantToAttribute(Location loc,
           mapping.contents.data_length);
       auto convertedAttr =
           createAttributeFromRawData(loc, tensorType, rawBufferArray);
-      iree_hal_buffer_unmap_range(&mapping);
+      iree_status_ignore(iree_hal_buffer_unmap_range(&mapping));
       return convertedAttr;
     } else {
       iree_string_view_t typeName =
@@ -466,8 +463,8 @@ LogicalResult CompiledBinary::initialize(Location loc, void *data,
   }
 
   if (iree_status_is_ok(status)) {
-    iree_hal_driver_create_default_device(driver, iree_allocator_system(),
-                                          &device);
+    status = iree_hal_driver_create_default_device(
+        driver, iree_allocator_system(), &device);
   }
   iree_hal_driver_release(driver);
 

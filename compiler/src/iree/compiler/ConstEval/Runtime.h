@@ -96,7 +96,7 @@ public:
 
   iree_hal_driver_registry_t *registry = nullptr;
   iree::vm::ref<iree_vm_instance_t> instance;
-  iree_status_t initStatus;
+  iree_status_t initStatus = iree_ok_status();
 
 private:
   Runtime();
