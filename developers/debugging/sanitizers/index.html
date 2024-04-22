@@ -2436,6 +2436,26 @@
     TSan (ThreadSanitizer)
   </a>
   
+    <nav class="md-nav" aria-label="TSan (ThreadSanitizer)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#c-standard-library-with-tsan-support" class="md-nav__link">
+    C++ Standard Library with TSan support
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree-with-tsan-support" class="md-nav__link">
+    IREE with TSan support
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -3368,6 +3388,26 @@
     TSan (ThreadSanitizer)
   </a>
   
+    <nav class="md-nav" aria-label="TSan (ThreadSanitizer)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#c-standard-library-with-tsan-support" class="md-nav__link">
+    C++ Standard Library with TSan support
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#iree-with-tsan-support" class="md-nav__link">
+    IREE with TSan support
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -3552,6 +3592,77 @@ need.</p>
 </code></pre></div>
 </div>
 <h3 id="tsan-threadsanitizer">TSan (ThreadSanitizer)<a class="headerlink" href="#tsan-threadsanitizer" title="Permanent link">link</a></h3>
+<h4 id="c-standard-library-with-tsan-support">C++ Standard Library with TSan support<a class="headerlink" href="#c-standard-library-with-tsan-support" title="Permanent link">link</a></h4>
+<p>For best results to avoid false positives/negatives TSan needs all userspace
+code to be compiled with Tsan.
+This includes <code>libstdc++</code> or <code>libc++</code>.
+libstdc++ is usually the default C++ runtime on Linux.</p>
+<p>Building GCC's 12 libstdc++ on Ubuntu 22.04 with Clang has build errors.
+It seems that GCC and Clang shared their
+<a href="https://github.com/google/sanitizers">TSan implementation</a>.
+They may be interoperable, but to avoid problems we should build everything
+with GCC.
+This means using GCC both as a compiler and linker.</p>
+<h5 id="build-libstdc-with-tsan-support">Build libstdc++ with TSan support<a class="headerlink" href="#build-libstdc-with-tsan-support" title="Permanent link">link</a></h5>
+<p>Get GCC 12.3 source code.</p>
+<div class="highlight"><pre><span></span><code>git<span class="w"> </span>clone<span class="w"> </span>--depth<span class="w"> </span><span class="m">1</span><span class="w"> </span>--branch<span class="w"> </span>releases/gcc-12.3.0<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>https://github.com/gcc-mirror/gcc.git
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><span class="nv">SRC_DIR</span><span class="o">=</span><span class="nv">$PWD</span>/gcc
+<span class="nv">BIN_DIR</span><span class="o">=</span><span class="nv">$PWD</span>/gcc/build
+</code></pre></div>
+<p>Building all dependencies of libstdc++ with TSan has errors during linking of
+<code>libgcc</code>.
+libgcc is a dependency of libstdc++.
+It is desirable to build everything with TSan, but it seems this excludes
+libgcc, as the TSan runtime <code>libtsan</code> has it as a dependency.
+We build it without TSan.
+We do that to make libstdc++'s configuration find <code>gthr-default.h</code>, which
+is generated during building of libgcc.
+If not found C++ threads will silently have missing symbols.</p>
+<div class="highlight"><pre><span></span><code><span class="nv">LIBGCC_BIN_DIR</span><span class="o">=</span><span class="nv">$BIN_DIR</span>/libgcc
+mkdir<span class="w"> </span>-p<span class="w"> </span><span class="nv">$LIBGCC_BIN_DIR</span>
+<span class="nb">cd</span><span class="w"> </span><span class="nv">$LIBGCC_BIN_DIR</span>
+
+<span class="nv">$SRC_DIR</span>/configure<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">CC</span><span class="o">=</span>gcc-12<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">CXX</span><span class="o">=</span>g++-12<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--disable-multilib<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--disable-bootstrap<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--enable-languages<span class="o">=</span>c,c++
+
+make<span class="w"> </span>-j<span class="k">$(</span>nproc<span class="k">)</span><span class="w"> </span>--keep-going<span class="w"> </span>all-target-libgcc
+</code></pre></div>
+<p>Now build libstdc++.</p>
+<div class="highlight"><pre><span></span><code><span class="nv">LIBSTDCXX_BIN_DIR</span><span class="o">=</span><span class="nv">$BIN_DIR</span>/libstdc++
+mkdir<span class="w"> </span>-p<span class="w"> </span><span class="nv">$LIBSTDCXX_BIN_DIR</span>
+<span class="nv">LIBSTDCXX_INSTALL_DIR</span><span class="o">=</span><span class="nv">$BIN_DIR</span>/install/libstdc++
+mkdir<span class="w"> </span>-p<span class="w"> </span><span class="nv">$LIBSTDCXX_INSTALL_DIR</span>
+
+<span class="nv">GTHREAD_INCLUDE_DIR</span><span class="o">=</span><span class="nv">$LIBGCC_BIN_DIR</span>/x86_64-pc-linux-gnu/libgcc
+<span class="nv">CXX_AND_C_FLAGS</span><span class="o">=</span><span class="s2">&quot;-I</span><span class="nv">$GTHREAD_INCLUDE_DIR</span><span class="s2"> -g -fno-omit-frame-pointer -fsanitize=thread&quot;</span>
+
+<span class="nb">cd</span><span class="w"> </span><span class="nv">$LIBSTDCXX_BIN_DIR</span>
+<span class="nv">$SRC_DIR</span>/libstdc++-v3/configure<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">CC</span><span class="o">=</span>gcc-12<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">CXX</span><span class="o">=</span>g++-12<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">CFLAGS</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$CXX_AND_C_FLAGS</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">CXXFLAGS</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$CXX_AND_C_FLAGS</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span><span class="nv">LDFLAGS</span><span class="o">=</span><span class="s2">&quot;-fsanitize=thread&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--prefix<span class="o">=</span><span class="nv">$LIBSTDCXX_INSTALL_DIR</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--disable-multilib<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--disable-libstdcxx-pch<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--enable-libstdcxx-threads<span class="o">=</span>yes<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--with-default-libstdcxx-abi<span class="o">=</span>new
+
+make<span class="w"> </span>-j<span class="k">$(</span>nproc<span class="k">)</span>
+make<span class="w"> </span>install
+</code></pre></div>
+<p>When running programs you would need to use the sanitized version of libstdc++.</p>
+<div class="highlight"><pre><span></span><code><span class="nv">LD_LIBRARY_PATH</span><span class="o">=</span><span class="s2">&quot;</span><span class="nv">$LIBSTDCXX_INSTALL_DIR</span><span class="s2">/lib&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>my-program<span class="w"> </span>...
+</code></pre></div>
+<h4 id="iree-with-tsan-support">IREE with TSan support<a class="headerlink" href="#iree-with-tsan-support" title="Permanent link">link</a></h4>
 <p>To enable TSan:</p>
 <div class="highlight"><pre><span></span><code>cmake<span class="w"> </span>-DIREE_ENABLE_TSAN<span class="o">=</span>ON<span class="w"> </span>...
 </code></pre></div>
