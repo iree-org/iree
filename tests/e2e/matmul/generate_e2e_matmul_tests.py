@@ -115,6 +115,7 @@ class CompilationInfo:
     mma_schedule: typing.Optional[MMASchedule]
     # Compilation info
     workgroup_size: typing.List[int]
+    subgroup_size: int
 
     # Prints the workgroup size
     def workgroup_size_str(self):
@@ -286,6 +287,9 @@ def get_rocm_test_compilation_infos(compilation_info_id: CompilationInfoId):
                 workgroup_size=workgroup_size,
                 software_pipeline_depth=0,
                 mma_schedule=schedule,
+                # TODO: This is only valid for CDNA2. Change this for RDNA3
+                # architectures.
+                subgroup_size=64,
             )
         )
     return infos
@@ -360,6 +364,7 @@ def get_test_compilation_infos(
                 dispatch_lowering_pass_pipeline=compilation_info_id.value,
                 workgroup_size=tile_workgroup_size_pair.workgroup_size,
                 software_pipeline_depth=software_pipeline_depth,
+                subgroup_size=32,
                 mma_schedule=None,
             )
         )
@@ -537,7 +542,7 @@ def generate_function(
             f"#compilation{generate_function.compilation_index} = "
             "#iree_codegen.compilation_info<\n"
             f"  lowering_config = <tile_sizes = {compilation_info.tile_sizes}>,\n"
-            f"  translation_info = <{compiler_pipeline} {compilation_info.workgroup_size_str()},\n"
+            f"  translation_info = <{compiler_pipeline} {compilation_info.workgroup_size_str()} {compilation_info.subgroup_size},\n"
             f"  {{ pipeline_depth = {compilation_info.software_pipeline_depth}, "
             f"  store_stage = 1{mma_schedule} }}>>\n"
         )
