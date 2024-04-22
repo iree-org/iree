@@ -1,4 +1,4 @@
-// Native rewrite "rewriteAsFlowDispatch"
+// declare native rewrite called "rewriteAsFlowDispatch"
 Rewrite rewriteAsFlowDispatch(
         op : Op, fn_name : Attr, 
         inputs : ValueRange, 
@@ -13,12 +13,14 @@ Pattern mlp_torch with benefit(1) {
   let IndexTy = type<"index">;
   let BoolTy = type<"i1">;
   let FloatTy = type<"f32">;
+  let TensorTy = type<"tensor<?x?xf32>">;
+  let TorchTensorType : Type;
 
 
 
   // Opt to match against
-  let lhs_torch = op<torch_c.from_builtin_tensor>(lhs : Value);
-  let rhs_torch = op<torch_c.from_builtin_tensor>(rhs: Value);
+  let lhs_torch = op<torch_c.from_builtin_tensor>(lhs : Value<TensorTy>) -> (TorchTensorType);
+  let rhs_torch = op<torch_c.from_builtin_tensor>(rhs: Value<TensorTy>) -> (TorchTensorType);
   let matMulOp = op<torch.aten.mm>(lhs_torch.0, rhs_torch.0) -> (MatMulTy : TypeRange);
   let reluOp = op<torch.aten.relu>(matMulOp.0) -> (MatMulTy);
   let castOp = op<torch_c.to_builtin_tensor>(reluOp.0) -> (MatMulTy);
@@ -44,13 +46,10 @@ Pattern mlp_torch with benefit(1) {
     let repl_dims = (m.0, n.0);
     let other = (m_cast.0, n_cast.0, k_cast.0, doRelu.0);
 
-    // oof, figuring out i needed to escape the string took too long :( 
-    let fn_name = attr<"\"mlp_external\"">;
     rewriteAsFlowDispatch(
-      castOp, fn_name, 
+      castOp, attr<"\"mlp_external\"">, 
       inputs, repl_vals, 
       repl_dims, other);
-
 
   };
 }
