@@ -71,32 +71,6 @@ MacOS.
 The release is published even if the MacOS build fails. When this happens, it
 is fixed forward for the next snapshot.
 
-## Build Promotion
-
-There are presently two build promotion processes documented:
-
-* Old one focused purely on releasing IREE core packages: 
-https://iree.dev/developers/general/release-management/
-* New one driven by the Torch frontend: 
-https://github.com/nod-ai/SHARK-Turbine/blob/main/docs/releasing.md
-
-The versioning scheme for `iree-turbine` (which is 
-[in the process of being added to IREE](https://groups.google.com/g/iree-discuss/c/Bk58qwhaPEU)) is rooted on the then-current PyTorch released version, with
-optional date-based dev/pre-release suffixes (i.e. `rcYYYYMMDD` or 
-`devYYYYMMDD`) or intra PyTorch releases (i.e. `postVVVV`). This process is
-being trialed to correspond with the 2.3.0 release of PyTorch. In this scenario,
-the pinned nightly build of IREE is considered current and promoted as part of
-the Turbine release to PyPI (and the release is marked as not pre-release on the
-GitHub releases page).
-
-Promotions are done roughly monthly or at need. The schedule is shifted to
-account for extra factors as needed.
-
-In the future, we would like to adopt a real versioning scheme (beyond the
-nightly calver+build number scheme) and manage promotion and pinning of the
-core IREE dep more explicitly and in alignment with how downstreams are using
-it.
-
 ## Retention
 
 The project will keep pre-release tagged releases on its releases page for a
@@ -122,3 +96,115 @@ Deprecated projects no longer updated:
 * https://pypi.org/project/iree-runtime-instrumented/ (functionality is
   included in the main iree-runtime package)
 * https://pypi.org/project/iree-tools-xla/ (functionality is no longer needed)
+
+
+## Build Promotion
+
+There are presently two build promotion processes documented:
+
+* Old one focused purely on releasing IREE core packages: 
+https://iree.dev/developers/general/release-management/
+* New one driven by the Torch frontend and documented below.
+
+The versioning scheme for 
+[iree-turbine](https://github.com/iree-org/iree-turbine) is rooted on the
+then-current PyTorch released version, with optional date-based dev/pre-release
+suffixes (i.e. `rcYYYYMMDD` or `devYYYYMMDD`) or intra PyTorch releases
+(i.e. `postVVVV`).
+
+This process is being trialed to correspond with the 2.3.0 release of PyTorch.
+In this scenario, the pinned nightly build of IREE is considered current and
+promoted as part of the Turbine release to PyPI (and the release is marked as
+not pre-release on the GitHub releases page).
+
+Promotions are done roughly monthly or at need. The schedule is shifted to
+account for extra factors as needed.
+
+In the future, we would like to adopt a real versioning scheme (beyond the
+nightly calver+build number scheme) and manage promotion and pinning of the
+core IREE dep more explicitly and in alignment with how downstreams are using
+it.
+
+### Steps to Promote
+
+There are multiple release artifacts that are deployed from this project:
+
+* shark-turbine wheel (transitional while switching to iree-turbine)
+* iree-turbine wheel
+* iree-compiler wheels
+* iree-runtime wheels
+
+Typically we deploy IREE compiler and runtime wheels along with a turbine
+release, effectively promoting a nightly.
+
+#### Building Artifacts
+
+Start with a clean clone of iree-turbine:
+
+```
+cd scratch
+git clone git@github.com:iree-org/iree-turbine.git
+cd iree-turbine
+```
+
+Build a pre-release:
+
+```
+./build_tools/build_release.py --core-version 2.3.0 --core-pre-version=rcYYYYMMDD
+```
+
+Build an official release:
+
+```
+./build_tools/build_release.py --core-version 2.3.0
+```
+
+This will download all deps, including wheels for all supported platforms and
+Python versions for iree-compiler and iree-runtime. All wheels will be placed
+in the `wheelhouse/` directory.
+
+
+#### Testing
+
+TODO: Write a script for this.
+
+```
+python -m venv wheelhouse/test.venv
+source wheelhouse/test.venv/bin/activate
+pip install -f wheelhouse iree-turbine[testing]
+# Temp: tests require torchvision.
+pip install -f wheelhouse torchvision
+pytest core/tests
+```
+
+#### Push
+
+From the testing venv, verify that everything is sane:
+
+```
+pip freeze
+```
+
+Push IREE deps (if needed/updated):
+
+```
+twine upload wheelhouse/iree_compiler-* wheelhouse/iree_runtime-*
+```
+
+Push built wheels:
+
+```
+twine upload wheelhouse/iree_turbine-* wheelhouse/shark_turbine-*
+```
+
+#### Install from PyPI and Sanity Check
+
+TODO: Script this
+
+From the testing venv:
+
+```
+pip uninstall -y shark-turbine iree-turbine iree-compiler iree-runtime
+pip install iree-turbine
+pytest core/tests
+```

@@ -47,7 +47,7 @@ uncovered components, questions of project direction, etc.
 * Compiler C API: Stella Laurenzo (@stellaraccident)
 * Python Bindings: Stella Laurenzo (@stellaraccident)
 * Turbine: Stella Laurenzo (@stellaraccident)
-* PJRT: Jacques Pienaar (@jpienaar)
+* PJRT: Maintainer Needed
 
 ## Releasing
 
