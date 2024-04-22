@@ -70,8 +70,8 @@ API definitions can be found in the following locations:
 
 | Source location | Overview |
 | --------------- | -------- |
-[`iree/compiler/embedding_api.h`](https://github.com/openxla/iree/blob/main/compiler/bindings/c/iree/compiler/embedding_api.h) | Top-level IREE compiler embedding API
-[`iree/compiler/PluginAPI/` directory](https://github.com/openxla/iree/tree/main/compiler/src/iree/compiler/PluginAPI) | IREE compiler plugin API
+[`iree/compiler/embedding_api.h`](https://github.com/iree-org/iree/blob/main/compiler/bindings/c/iree/compiler/embedding_api.h) | Top-level IREE compiler embedding API
+[`iree/compiler/PluginAPI/` directory](https://github.com/iree-org/iree/tree/main/compiler/src/iree/compiler/PluginAPI) | IREE compiler plugin API
 [`mlir/include/mlir-c/` directory](https://github.com/llvm/llvm-project/tree/main/mlir/include/mlir-c) | MLIR C API headers
 
 ### Concepts
@@ -140,7 +140,7 @@ An _output_ (`iree_compiler_output_t`) represents a compilation artifact.
 
 A _plugin_ extends the compiler with some combination of target backends,
 options, passes, or pipelines. For documentation on compiler plugins, see
-[`compiler/PluginAPI/README.md`](https://github.com/openxla/iree/blob/main/compiler/src/iree/compiler/PluginAPI/README.md).
+[`compiler/PluginAPI/README.md`](https://github.com/iree-org/iree/blob/main/compiler/src/iree/compiler/PluginAPI/README.md).
 
 ### Usage
 
@@ -199,9 +199,9 @@ int main(int argc, char** argv) {
 | Project | Source | Description |
 | ------- | ------ | ----------- |
 [iree-org/iree-template-compiler-cmake](https://github.com/iree-org/iree-template-compiler-cmake/) |[`hello_compiler.c`](https://github.com/iree-org/iree-template-compiler-cmake/blob/main/hello_compiler/hello_compiler.c) | Compiler application template
-[openxla/iree](https://github.com/openxla/iree/) | [`integrations/pjrt/.../iree_compiler.cc`](https://github.com/openxla/iree/blob/main/integrations/pjrt/src/iree_pjrt/common/iree_compiler.cc) | JIT for TensorFlow + JAX to IREE
-[openxla/iree](https://github.com/openxla/iree/) | [`compiler/plugins`](https://github.com/openxla/iree/tree/main/compiler/plugins) | In-tree supported compiler plugins
-[openxla/iree](https://github.com/openxla/iree/) | [`samples/compiler_plugins/`](https://github.com/openxla/iree/tree/main/samples/compiler_plugins) | In-tree sample compiler plugins
+[iree-org/iree](https://github.com/iree-org/iree/) | [`integrations/pjrt/.../iree_compiler.cc`](https://github.com/iree-org/iree/blob/main/integrations/pjrt/src/iree_pjrt/common/iree_compiler.cc) | JIT for TensorFlow + JAX to IREE
+[iree-org/iree](https://github.com/iree-org/iree/) | [`compiler/plugins`](https://github.com/iree-org/iree/tree/main/compiler/plugins) | In-tree supported compiler plugins
+[iree-org/iree](https://github.com/iree-org/iree/) | [`samples/compiler_plugins/`](https://github.com/iree-org/iree/tree/main/samples/compiler_plugins) | In-tree sample compiler plugins
 [nod-ai/iree-amd-aie](https://github.com/nod-ai/iree-amd-aie/) | [`plugins/.../iree-amd-aie`](https://github.com/nod-ai/iree-amd-aie/tree/main/compiler/plugins/target/AMD-AIE/iree-amd-aie) | Early-phase plugins for interfacing with AMD AIE accelerators
 
 ## Runtime API
@@ -330,10 +330,10 @@ Runtime API header files are organized by component:
 
 | Component header file | Overview |
 | --------------------- | -------- |
-[`iree/runtime/api.h`](https://github.com/openxla/iree/blob/main/runtime/src/iree/runtime/api.h) | High level runtime API
-[`iree/base/api.h`](https://github.com/openxla/iree/blob/main/runtime/src/iree/base/api.h) | Core API, type definitions, ownership policies, utilities
-[`iree/vm/api.h`](https://github.com/openxla/iree/blob/main/runtime/src/iree/vm/api.h) | VM APIs: loading modules, I/O, calling functions
-[`iree/hal/api.h`](https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/api.h) | HAL APIs: device management, synchronization, accessing hardware features
+[`iree/runtime/api.h`](https://github.com/iree-org/iree/blob/main/runtime/src/iree/runtime/api.h) | High level runtime API
+[`iree/base/api.h`](https://github.com/iree-org/iree/blob/main/runtime/src/iree/base/api.h) | Core API, type definitions, ownership policies, utilities
+[`iree/vm/api.h`](https://github.com/iree-org/iree/blob/main/runtime/src/iree/vm/api.h) | VM APIs: loading modules, I/O, calling functions
+[`iree/hal/api.h`](https://github.com/iree-org/iree/blob/main/runtime/src/iree/hal/api.h) | HAL APIs: device management, synchronization, accessing hardware features
 
 ### High level concepts
 
@@ -403,7 +403,7 @@ instructions on the host system.
     resource constrained deployment.
 
     See the `--output-format=vm-c` compiler option and the samples in
-    [`samples/emitc_modules/`](https://github.com/openxla/iree/tree/main/samples/emitc_modules)
+    [`samples/emitc_modules/`](https://github.com/iree-org/iree/tree/main/samples/emitc_modules)
     for more information.
 
 The VM supports generic operations like loads, stores, arithmetic, function
@@ -464,7 +464,7 @@ hardware devices like CPUs, GPUs and other accelerators.
 
 === "hello_world_terse.c"
 
-    Source file: [`runtime/src/iree/runtime/demo/hello_world_terse.c`](https://github.com/openxla/iree/tree/main/runtime/src/iree/runtime/demo/hello_world_terse.c)
+    Source file: [`runtime/src/iree/runtime/demo/hello_world_terse.c`](https://github.com/iree-org/iree/tree/main/runtime/src/iree/runtime/demo/hello_world_terse.c)
 
     ```c++ title="runtime/src/iree/runtime/demo/hello_world_terse.c" linenums="1"
     --8<-- "runtime/src/iree/runtime/demo/hello_world_terse.c:7"
@@ -472,7 +472,7 @@ hardware devices like CPUs, GPUs and other accelerators.
 
 === "hello_world_explained.c"
 
-    Source file: [`runtime/src/iree/runtime/demo/hello_world_explained.c`](https://github.com/openxla/iree/tree/main/runtime/src/iree/runtime/demo/hello_world_explained.c)
+    Source file: [`runtime/src/iree/runtime/demo/hello_world_explained.c`](https://github.com/iree-org/iree/tree/main/runtime/src/iree/runtime/demo/hello_world_explained.c)
 
     ```c++ title="runtime/src/iree/runtime/demo/hello_world_explained.c" linenums="1"
     --8<-- "runtime/src/iree/runtime/demo/hello_world_explained.c:7"
@@ -483,8 +483,8 @@ hardware devices like CPUs, GPUs and other accelerators.
 | Project | Source | Description |
 | ------- |------- | ----------- |
 [iree-org/iree-template-runtime-cmake](https://github.com/iree-org/iree-template-runtime-cmake/) | [`hello_world.c`](https://github.com/iree-org/iree-template-runtime-cmake/blob/main/hello_world.c) | Runtime application template
-[openxla/iree](https://github.com/openxla/iree/) | [`runtime/demo/`](https://github.com/openxla/iree/blob/main/runtime/src/iree/runtime/demo/) | In-tree demos of the high level runtime API
-[openxla/iree](https://github.com/openxla/iree/) | [`samples/`](https://github.com/openxla/iree/tree/main/samples) | In-tree sample applications
+[iree-org/iree](https://github.com/iree-org/iree/) | [`runtime/demo/`](https://github.com/iree-org/iree/blob/main/runtime/src/iree/runtime/demo/) | In-tree demos of the high level runtime API
+[iree-org/iree](https://github.com/iree-org/iree/) | [`samples/`](https://github.com/iree-org/iree/tree/main/samples) | In-tree sample applications
 [iree-org/iree-experimental](https://github.com/iree-org/iree-experimental/) | [`runtime-library/`](https://github.com/iree-org/iree-experimental/tree/main/runtime-library) | Shared runtime library builder<br>Builds `libireert.so` to aid development
 [iml130/iree-template-cpp](https://github.com/iml130/iree-template-cpp) | [`simple_embedding.c`](https://github.com/iml130/iree-template-cpp/blob/main/iree_simple_embedding/simple_embedding.c) | Demo integration into a project
 

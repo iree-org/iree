@@ -1,7 +1,7 @@
 # IREE Plugin API
 
 This is a work in progress to enable IREE compiler plugin support per
-[RFC - Proposal to Build IREE Compiler Plugin Mechanism](https://github.com/openxla/iree/issues/12520).
+[RFC - Proposal to Build IREE Compiler Plugin Mechanism](https://github.com/iree-org/iree/issues/12520).
 This document will be replaced with a more comprehensive single-source once
 the work is complete.
 

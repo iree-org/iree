@@ -133,7 +133,7 @@ module attributes { transform.with_named_sequence } {
     // ===========================================================================
     %func_2 = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     transform.apply_patterns to %func_2 {
-      transform.apply_patterns.iree.fold_arith_ext_into_contraction
+      transform.apply_patterns.vector.fold_arith_extension
     } : !transform.any_op
 
     // Step 6. Post-bufferization vector distribution

@@ -1,4 +1,5 @@
 // RUN: iree-opt --split-input-file --iree-util-hoist-into-globals %s | FileCheck %s
+
 // Spot verification that policies for linalg ops is respected.
 
 // CHECK-LABEL: @compute_hoisted
@@ -6,6 +7,7 @@
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
 module @compute_hoisted {
   // CHECK: util.global private @[[HOISTED:.*]] : tensor<5x6xf32>
+  // CHECK: util.initializer
   // CHECK: util.func public @main
   util.func public @main() -> (tensor<5x6xf32>) {
     %cst_0 = arith.constant dense<1.270000e+02> : tensor<f32>
@@ -29,18 +31,20 @@ module @compute_hoisted {
     // CHECK: util.return %[[RESULT]]
     util.return %3 : tensor<5x6xf32>
   }
-  // CHECK: util.initializer
 }
 
 // -----
+
 // Verifies that projected permutations (broadcasts) will never be materialized
 // as a leaf. Also verifies that empty operands, which can be considered
 // const-expr, are not materialized as a leaf.
+
 // CHECK-LABEL: @broadcast_treated_as_leaf
 #map0 = affine_map<(d0, d1) -> ()>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
 module @broadcast_treated_as_leaf {
   // CHECK-NOT: util.global
+  // CHECK-NOT: util.initializer
   // CHECK: util.func public @main
   util.func public @main() -> (tensor<5x6xf32>) {
     %cst_0 = arith.constant dense<1.270000e+02> : tensor<f32>
@@ -55,5 +59,4 @@ module @broadcast_treated_as_leaf {
     // CHECK: util.return
     util.return %1 : tensor<5x6xf32>
   }
-  // CHECK-NOT: util.initializer
 }

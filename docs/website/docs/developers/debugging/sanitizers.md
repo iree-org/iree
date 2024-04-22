@@ -115,6 +115,96 @@ ASAN_SYMBOLIZER_PATH=/usr/lib/llvm-12/bin/llvm-symbolizer \
 
 ### TSan (ThreadSanitizer)
 
+#### C++ Standard Library with TSan support
+
+For best results to avoid false positives/negatives TSan needs all userspace
+code to be compiled with Tsan.
+This includes `libstdc++` or `libc++`.
+libstdc++ is usually the default C++ runtime on Linux.
+
+Building GCC's 12 libstdc++ on Ubuntu 22.04 with Clang has build errors.
+It seems that GCC and Clang shared their
+[TSan implementation](https://github.com/google/sanitizers).
+They may be interoperable, but to avoid problems we should build everything
+with GCC.
+This means using GCC both as a compiler and linker.
+
+##### Build libstdc++ with TSan support
+
+Get GCC 12.3 source code.
+
+```bash
+git clone --depth 1 --branch releases/gcc-12.3.0 \
+  https://github.com/gcc-mirror/gcc.git
+```
+
+```bash
+SRC_DIR=$PWD/gcc
+BIN_DIR=$PWD/gcc/build
+```
+
+Building all dependencies of libstdc++ with TSan has errors during linking of
+`libgcc`.
+libgcc is a dependency of libstdc++.
+It is desirable to build everything with TSan, but it seems this excludes
+libgcc, as the TSan runtime `libtsan` has it as a dependency.
+We build it without TSan.
+We do that to make libstdc++'s configuration find `gthr-default.h`, which
+is generated during building of libgcc.
+If not found C++ threads will silently have missing symbols.
+
+```bash
+LIBGCC_BIN_DIR=$BIN_DIR/libgcc
+mkdir -p $LIBGCC_BIN_DIR
+cd $LIBGCC_BIN_DIR
+
+$SRC_DIR/configure \
+  CC=gcc-12 \
+  CXX=g++-12 \
+  --disable-multilib \
+  --disable-bootstrap \
+  --enable-languages=c,c++
+
+make -j$(nproc) --keep-going all-target-libgcc
+```
+
+Now build libstdc++.
+
+```bash
+LIBSTDCXX_BIN_DIR=$BIN_DIR/libstdc++
+mkdir -p $LIBSTDCXX_BIN_DIR
+LIBSTDCXX_INSTALL_DIR=$BIN_DIR/install/libstdc++
+mkdir -p $LIBSTDCXX_INSTALL_DIR
+
+GTHREAD_INCLUDE_DIR=$LIBGCC_BIN_DIR/x86_64-pc-linux-gnu/libgcc
+CXX_AND_C_FLAGS="-I$GTHREAD_INCLUDE_DIR -g -fno-omit-frame-pointer -fsanitize=thread"
+
+cd $LIBSTDCXX_BIN_DIR
+$SRC_DIR/libstdc++-v3/configure \
+  CC=gcc-12 \
+  CXX=g++-12 \
+  CFLAGS="$CXX_AND_C_FLAGS" \
+  CXXFLAGS="$CXX_AND_C_FLAGS" \
+  LDFLAGS="-fsanitize=thread" \
+  --prefix=$LIBSTDCXX_INSTALL_DIR \
+  --disable-multilib \
+  --disable-libstdcxx-pch \
+  --enable-libstdcxx-threads=yes \
+  --with-default-libstdcxx-abi=new
+
+make -j$(nproc)
+make install
+```
+
+When running programs you would need to use the sanitized version of libstdc++.
+
+```bash
+LD_LIBRARY_PATH="$LIBSTDCXX_INSTALL_DIR/lib" \
+  my-program ...
+```
+
+#### IREE with TSan support
+
 To enable TSan:
 
 ```shell

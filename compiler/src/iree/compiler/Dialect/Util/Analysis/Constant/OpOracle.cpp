@@ -14,9 +14,12 @@
 
 namespace mlir::iree_compiler::IREE::Util {
 
-namespace {
+void registerConstExprDependentDialects(DialectRegistry &registry) {
+  registry.insert<IREE::Util::UtilDialect>();
+}
 
-void populateEscapingProducers(Operation *parentOp, ConstExprOpInfo &info) {
+static void populateEscapingProducers(Operation *parentOp,
+                                      ConstExprOpInfo &info) {
   SmallPtrSet<Operation *, 8> containedOps;
   parentOp->walk<WalkOrder::PreOrder>([&](Operation *itOp) {
     containedOps.insert(parentOp);
@@ -42,45 +45,25 @@ void populateEscapingProducers(Operation *parentOp, ConstExprOpInfo &info) {
 // constexpr operand or result types. Given MLIR's open type system,
 // it is best to be conservative here, and we limit to known value
 // types.
-bool isLegalConstExprType(Type t) {
-  // If implementing the hoistable interface, just return what the interface
+static bool isLegalConstExprType(Type t) {
+  // If implementing the hoistable interface just return what the interface
   // says.
   if (auto hoistableType = dyn_cast<IREE::Util::HoistableTypeInterface>(t)) {
     return hoistableType.isHoistableType();
-  }
-  if (llvm::isa<IntegerType, FloatType>(t)) {
-    // TODO: We shouldn't need to be this conservative about the bit widths we
-    // support, but for now the consteval JIT has interop limitations. Lift
-    // this restriction when the JIT interops for all types.
-    auto bitWidth = t.getIntOrFloatBitWidth();
-    return llvm::isPowerOf2_64(bitWidth) && bitWidth != 2 && bitWidth <= 64;
-  }
-
-  if (llvm::isa<IndexType>(t)) {
+  } else if (t.isIntOrIndexOrFloat()) {
     return true;
-  }
-
-  if (auto tensorType = llvm::dyn_cast<TensorType>(t)) {
+  } else if (auto tensorType = dyn_cast<TensorType>(t)) {
     return isLegalConstExprType(tensorType.getElementType());
   }
-
   return false;
-}
-
-void registerConstExprDependentDialects(DialectRegistry &registry) {
-  registry.insert<IREE::Util::UtilDialect>();
 }
 
 bool isLegalConstExprRootType(Type t) { return isLegalConstExprType(t); }
 
 // Check if the op can be an eligible const expr.
-bool isEligibleConstExpr(Operation *op) {
-  // If implementing the HoistableOpInterface, just use the decision made by
-  // the interface.
-  if (auto hoistableOp = dyn_cast<IREE::Util::HoistableOpInterface>(op)) {
-    if (hoistableOp.isHoistableOp()) {
-      return true;
-    }
+static bool isEligibleConstExpr(Operation *op) {
+  // Optimization barriers cannot be folded.
+  if (isa<IREE::Util::OptimizationBarrierOp>(op)) {
     return false;
   }
 
@@ -96,6 +79,15 @@ bool isEligibleConstExpr(Operation *op) {
     return false;
   }
 
+  // If implementing the HoistableOpInterface, just use the decision made by
+  // the interface.
+  if (auto hoistableOp = dyn_cast<IREE::Util::HoistableOpInterface>(op)) {
+    if (hoistableOp.isHoistableOp()) {
+      return true;
+    }
+    return false;
+  }
+
   // Forbid if part of a parent that should be treated atomically.
   Operation *parent = op;
   while (auto hoistableParent =
@@ -103,11 +95,6 @@ bool isEligibleConstExpr(Operation *op) {
     if (hoistableParent.isAtomicallyHoistableOp())
       return false;
     parent = hoistableParent;
-  }
-
-  // Optimization barriers cannot be folded.
-  if (isa<IREE::Util::OptimizationBarrierOp>(op)) {
-    return false;
   }
 
   // Special carve-out for unregistered testing ops.
@@ -135,14 +122,6 @@ bool isEligibleConstExpr(Operation *op) {
 
   return true;
 }
-
-} // namespace
-
-void registerConstExprDependentDialects(DialectRegistry &registry) {
-  registry.insert<IREE::Util::UtilDialect>();
-}
-
-bool isLegalConstExprRootType(Type t) { return isLegalConstExprType(t); }
 
 ConstExprOpInfo ConstExprOpInfo::getForOp(Operation *op) {
   ConstExprOpInfo info;
@@ -181,7 +160,7 @@ bool isHoistableConstExprLeaf(const ConstExprAnalysis::ConstValueInfo *info) {
 
   // Never hoist sub-byte aligned values: in legal programs, these will be
   // cast or packed in some successor.
-  if (auto integerType = llvm::dyn_cast<IntegerType>(
+  if (auto integerType = dyn_cast<IntegerType>(
           getElementTypeOrSelf(info->constValue.getType()))) {
     if (integerType.getWidth() % 8 != 0) {
       return false;

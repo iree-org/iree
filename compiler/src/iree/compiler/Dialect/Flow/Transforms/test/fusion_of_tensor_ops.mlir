@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-flow-fusion-of-tensor-ops{fuse-multi-use=true}))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(iree-flow-dispatch-region-formation-preprocessing-pipeline, util.func(iree-flow-fusion-of-tensor-ops{fuse-multi-use=true}))" %s | FileCheck %s
 
 util.func public @softmax(%arg0 : tensor<12x128x128xf32>) -> tensor<12x128x128xf32> {
   %cst = arith.constant 1.000000e+00 : f32
@@ -515,7 +515,7 @@ util.func public @math_sin() {
 
 // -----
 
-// Check for fix for https://github.com/openxla/iree/issues/14953
+// Check for fix for https://github.com/iree-org/iree/issues/14953
 util.func public @fix_issue_14953(%arg0: tensor<11008x32x1xf16>, %arg1: tensor<11008x32x1xf16>, %arg2: tensor<1x1x32x128xf16>) -> tensor<1x1x11008xf16> {
   %cst = arith.constant 0.000000e+00 : f16
   %cst_0 = arith.constant dense<0> : tensor<11008x32x128xi4>
@@ -662,7 +662,7 @@ util.func public @no_fuse_multi_use_dequant_with_producer(%arg0: tensor<12x128x1
 
 // -----
 
-// Check for fix for https://github.com/openxla/iree/issues/16835. The reshape
+// Check for fix for https://github.com/iree-org/iree/issues/16835. The reshape
 // should not be propagated to block fusion.
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (d1)>

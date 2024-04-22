@@ -45,7 +45,7 @@ I0401 17:27:04.085064 140182373025024 binaries.py:218] Invoke IREE Pipeline:
 ```
 
 Unfortunately, the artifacts are not dumped in the runs. There is an
-[issue](https://github.com/openxla/iree/issues/8756) for tracking this. A
+[issue](https://github.com/iree-org/iree/issues/8756) for tracking this. A
 workaround can be found in the issue.
 
 ## TensorFlow integration tests

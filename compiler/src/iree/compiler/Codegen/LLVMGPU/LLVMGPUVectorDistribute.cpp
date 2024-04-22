@@ -197,6 +197,12 @@ private:
       return success();
     }
 
+    // Take on layout of broadcast.
+    if (transfer->hasOneUse() &&
+        dyn_cast<vector::BroadcastOp>(*transfer->getUsers().begin())) {
+      return success();
+    }
+
     // TODO: Support masking.
     if (transfer.getMask()) {
       transfer->emitOpError(

@@ -39,7 +39,7 @@ import zipfile
 @functools.lru_cache
 def list_gh_artifacts(run_id: str) -> Dict[str, str]:
     print(f"Fetching artifacts for workflow run {run_id}")
-    base_path = f"/repos/openxla/iree"
+    base_path = f"/repos/iree-org/iree"
     output = subprocess.check_output(
         [
             "gh",

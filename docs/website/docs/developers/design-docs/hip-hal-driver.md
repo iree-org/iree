@@ -256,9 +256,9 @@ To summarize, we need the following data structures to implement HAL semaphore:
   recorded to some `hipStream_t` to wait on.
 
 [vulkan-timeline-semaphore]: https://www.khronos.org/blog/vulkan-timeline-semaphores
-[iree-hal]: https://github.com/openxla/iree/tree/main/runtime/src/iree/hal
-[hal-command-buffer]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/command_buffer.h
-[hal-device]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/device.h
-[hal-executable]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/executable.h
-[hal-event]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/event.h
-[hal-deferred-command-buffer]: https://github.com/openxla/iree/blob/main/runtime/src/iree/hal/utils/deferred_command_buffer.h
+[iree-hal]: https://github.com/iree-org/iree/tree/main/runtime/src/iree/hal
+[hal-command-buffer]: https://github.com/iree-org/iree/blob/main/runtime/src/iree/hal/command_buffer.h
+[hal-device]: https://github.com/iree-org/iree/blob/main/runtime/src/iree/hal/device.h
+[hal-executable]: https://github.com/iree-org/iree/blob/main/runtime/src/iree/hal/executable.h
+[hal-event]: https://github.com/iree-org/iree/blob/main/runtime/src/iree/hal/event.h
+[hal-deferred-command-buffer]: https://github.com/iree-org/iree/blob/main/runtime/src/iree/hal/utils/deferred_command_buffer.h
