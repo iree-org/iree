@@ -1,0 +1,56 @@
+// Native rewrite "rewriteAsFlowDispatch"
+Rewrite rewriteAsFlowDispatch(
+        op : Op, fn_name : Attr, 
+        inputs : ValueRange, 
+        repl_vals : ValueRange, 
+        repl_dims : ValueRange, 
+        other : ValueRange);
+
+
+Pattern mlp_torch with benefit(1) {
+  // Types
+  let IntTy = type<"i32">;
+  let IndexTy = type<"index">;
+  let BoolTy = type<"i1">;
+  let FloatTy = type<"f32">;
+
+
+
+  // Opt to match against
+  let lhs_torch = op<torch_c.from_builtin_tensor>(lhs : Value);
+  let rhs_torch = op<torch_c.from_builtin_tensor>(rhs: Value);
+  let matMulOp = op<torch.aten.mm>(lhs_torch.0, rhs_torch.0) -> (MatMulTy : TypeRange);
+  let reluOp = op<torch.aten.relu>(matMulOp.0) -> (MatMulTy);
+  let castOp = op<torch_c.to_builtin_tensor>(reluOp.0) -> (MatMulTy);
+
+
+  rewrite reluOp with {
+    let zeroOp = op<arith.constant> { value = attr<"0 : index"> } 
+      -> (IndexTy);
+    let oneOp = op<arith.constant> { value = attr<"1 : index"> } 
+      -> (IndexTy);
+    let m = op<tensor.dim>(lhs, zeroOp) -> (IndexTy);
+    let n = op<tensor.dim>(rhs, oneOp)  -> (IndexTy);
+    let k = op<tensor.dim>(lhs, oneOp); 
+    let m_cast = op<arith.index_cast>(m)  -> (IntTy);
+    let n_cast = op<arith.index_cast>(n) -> (IntTy);
+    let k_cast = op<arith.index_cast>(k) -> (IntTy);
+
+
+
+    let doRelu = op<arith.constant> { value = attr<"1 : i1">};
+    let inputs = (lhs, rhs);
+    let repl_vals = (castOp.0 );
+    let repl_dims = (m.0, n.0);
+    let other = (m_cast.0, n_cast.0, k_cast.0, doRelu.0);
+
+    // oof, figuring out i needed to escape the string took too long :( 
+    let fn_name = attr<"\"mlp_external\"">;
+    rewriteAsFlowDispatch(
+      castOp, fn_name, 
+      inputs, repl_vals, 
+      repl_dims, other);
+
+
+  };
+}

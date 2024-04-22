@@ -56,6 +56,10 @@ iree_cc_library(
     MLIRTransformDialect
     MLIRTransformDialectTransforms
     MLIRTransformUtils
+    MLIRPDLLAST
+    MLIRPDLLCodeGen
+    MLIRPDLLODS
+    MLIRPDLLParser
     MLIRTransforms
     iree::compiler::Codegen::Common::GPU::GPUHeuristics
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect

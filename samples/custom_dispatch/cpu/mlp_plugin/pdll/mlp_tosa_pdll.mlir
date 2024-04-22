@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(iree-preprocessing-apply-pdll-patterns{patterns-file=%p/mlp_all_specs.pdll})" %s | \
+// RUN: iree-opt --pass-pipeline="builtin.module(iree-preprocessing-apply-pdll-patterns{patterns-file=%p/mlp_tosa_spec.pdll})" %s | \
 // RUN: iree-compile - | \
 // RUN: iree-run-module --device=local-sync \
 // RUN:     --executable_plugin=$IREE_BINARY_DIR/samples/custom_dispatch/cpu/mlp_plugin/mlp_plugin$IREE_DYLIB_EXT \
@@ -43,34 +43,20 @@
   #x86_64_target
 ]>
 
-#map = affine_map<(d0, d1) -> (d0, d1)>
 module @example attributes {hal.device.targets = [#cpu_target]} {
-  func.func @mlp_invocation(%lhs: tensor<?x?xf32>,
-                            %rhs: tensor<?x?xf32>) -> (tensor<?x?xf32>) {
-    %c0 = arith.constant 0 : index
-    %c1 = arith.constant 1 : index
-    %cst = arith.constant 0.0 : f32
-    %dim0 = tensor.dim %lhs, %c0 : tensor<?x?xf32>
-    %dim1 = tensor.dim %rhs, %c1 : tensor<?x?xf32>
-    %empty = tensor.empty(%dim0, %dim1) : tensor<?x?xf32>
-    %torch_lhs = torch_c.from_builtin_tensor %lhs : tensor<?x?xf32> -> !torch.vtensor<[?, ?], f32>
-    %torch_rhs = torch_c.from_builtin_tensor %rhs : tensor<?x?xf32> -> !torch.vtensor<[?, ?], f32>
-    %mm = torch.aten.mm %torch_lhs, %torch_rhs
-        : !torch.vtensor<[?, ?], f32>, !torch.vtensor<[?, ?], f32> -> !torch.vtensor<[?, ?], f32>
-    %relu = torch.aten.relu %mm : !torch.vtensor<[?, ?], f32> -> !torch.vtensor<[?, ?], f32>
-    %cast= torch_c.to_builtin_tensor %relu : !torch.vtensor<[?, ?], f32> ->  tensor<?x?xf32>
-    %negf = linalg.generic {
-        indexing_maps = [#map, #map],
-        iterator_types  = ["parallel", "parallel"]}
-        ins(%cast : tensor<?x?xf32>) outs(%empty : tensor<?x?xf32>) {
-      ^bb0(%b0 : f32, %b1 : f32):
-        %0 = arith.negf %b0 : f32
-        linalg.yield %0 : f32
-    } -> tensor<?x?xf32>
-    return %negf : tensor<?x?xf32>
+  func.func @mlp_invocation(%lhs: tensor<2x4xf32>, %rhs : tensor<4x8xf32>) -> tensor<2x8xf32> {
+    %lhs_3D = tosa.reshape %lhs {new_shape = array<i64 : 1, 2, 4>} : (tensor<2x4xf32>) -> tensor<1x2x4xf32>
+    %rhs_3D = tosa.reshape %rhs {new_shape = array<i64 : 1, 4, 8>} : (tensor<4x8xf32>) -> tensor<1x4x8xf32>
+    %0 = tosa.matmul %lhs_3D, %rhs_3D : (tensor<1x2x4xf32>, tensor<1x4x8xf32>) -> tensor<1x2x8xf32>
+    %1 = tosa.clamp %0 {
+        min_int = 0 : i64, max_int = 9223372036854775807 : i64,
+        min_fp = 0.0 : f32, max_fp = 3.4028235e+38 : f32}
+        : (tensor<1x2x8xf32>) -> tensor<1x2x8xf32>
+    %2 = tosa.negate %1 : (tensor<1x2x8xf32>) -> tensor<1x2x8xf32>
+    %3 = tosa.reshape %2 {new_shape = array<i64 : 2, 8>}  : (tensor<1x2x8xf32>) -> tensor<2x8xf32>
+    return %3 : tensor<2x8xf32>
   }
-}  // module
-
+}
 // CHECK-LABEL: EXEC @mlp_invocation
 //       CHECK: [Plugin]: M = 2, N = 8, K = 4, doRelu = 1
 //       CHECK: 2x8xf32=[-24 -0 -24 -0 -24 -0 -24 -0][-0 -24 -0 -24 -0 -24 -0 -24]
