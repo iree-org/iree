@@ -113,6 +113,34 @@ iree_lit_test_suite(
     "hostonly"
 )
 
+add_mlir_pdll_library(MlpTblTarget
+  mlp_all_specs.pdll
+  mlp_all_specs.h.inc
+
+  EXTRA_INCLUDES
+  ${TORCH_MLIR_ROOT_DIR}/include
+  ${CMAKE_CURRENT_SOURCE_DIR}
+  ${MLIR_INCLUDE_DIRS}
+)
+
+add_mlir_library(mlp_all_specs
+  PARTIAL_SOURCES_INTENDED
+  mlp_all_specs.cpp
+  
+  DEPENDS
+  MlpTblTarget
+
+  LINK_COMPONENTS
+  Core
+
+  LINK_LIBS PUBLIC
+  MLIRIR
+  MLIRPass
+  MLIRTransforms
+)
+
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
+
 # Append the includes used for this file to the pdll_compilation_commands
 file(APPEND ${CMAKE_BINARY_DIR}/pdll_compile_commands.yml
   "--- !FileInfo:\n"
@@ -174,4 +202,6 @@ iree_lit_test_suite(
   DEPENDS 
     mlir-pdll
 )
+
+
 endif(IREE_HAL_EXECUTABLE_PLUGIN_SYSTEM_LIBRARY)

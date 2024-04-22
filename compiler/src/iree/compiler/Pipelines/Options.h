@@ -182,6 +182,7 @@ struct PreprocessingOptions {
   std::string preprocessingPDLSpecFilename;
   TransposeMatmulInput preprocessingTransposeMatmulInput =
       TransposeMatmulInput::None;
+  std::string preprocessingPDLLSpecFilename;
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<PreprocessingOptions>;
 };

@@ -102,6 +102,16 @@ void buildPreprocessingPassPipeline(
     passManager.addPass(
         Preprocessing::createTransposeMatmulPass(transposeMatmulOptions));
   }
+
+  if (!preprocessingOptions.preprocessingPDLLSpecFilename.empty()) {
+    Preprocessing::ApplyPDLLPatternsPassOptions applyPDLLPatternsOptions;
+    applyPDLLPatternsOptions.patternsFile =
+        preprocessingOptions.preprocessingPDLLSpecFilename;
+    passManager.addPass(
+        Preprocessing::createApplyPDLLPatternsPass(applyPDLLPatternsOptions));
+    passManager.addPass(createCanonicalizerPass());
+    passManager.addPass(createCSEPass());
+  }
 }
 
 static void
