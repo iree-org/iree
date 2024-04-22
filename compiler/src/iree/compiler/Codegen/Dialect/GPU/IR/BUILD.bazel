@@ -26,6 +26,7 @@ iree_td_library(
             "IREEGPUAttrs.td",
             "IREEGPUDialect.td",
             "IREEGPUInterfaces.td",
+            "IREEGPUOps.td",
         ],
         include = ["*.td"],
     ),
@@ -40,11 +41,13 @@ iree_compiler_cc_library(
         "IREEGPUAttrs.cpp",
         "IREEGPUDialect.cpp",
         "IREEGPUInterfaces.cpp",
+        "IREEGPUOps.cpp",
     ],
     hdrs = [
         "IREEGPUAttrs.h",
         "IREEGPUDialect.h",
         "IREEGPUInterfaces.h",
+        "IREEGPUOps.h",
     ],
     textual_hdrs = [
         "IREEGPUAttrs.cpp.inc",
@@ -53,11 +56,14 @@ iree_compiler_cc_library(
         "IREEGPUDialect.h.inc",
         "IREEGPUInterfaces.cpp.inc",
         "IREEGPUInterfaces.h.inc",
+        "IREEGPUOps.cpp.inc",
+        "IREEGPUOps.h.inc",
     ],
     deps = [
         ":IREEGPUAttrs",
         ":IREEGPUDialectGen",
         ":IREEGPUInterfaces",
+        ":IREEGPUOpsGen",
         "//compiler/src/iree/compiler/Codegen/Utils:VectorOpUtils",
         "//llvm-external-projects/iree-dialects:IREEVectorExtDialect",
         "@llvm-project//llvm:Support",
@@ -65,6 +71,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgDialect",
         "@llvm-project//mlir:Parser",
+        "@llvm-project//mlir:SideEffectInterfaces",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:VectorDialect",
     ],
@@ -127,4 +134,23 @@ iree_gentbl_cc_library(
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "IREEGPUInterfaces.td",
     deps = [":td_files"],
+)
+
+iree_gentbl_cc_library(
+    name = "IREEGPUOpsGen",
+    tbl_outs = [
+        (
+            ["--gen-op-decls"],
+            "IREEGPUOps.h.inc",
+        ),
+        (
+            ["--gen-op-defs"],
+            "IREEGPUOps.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "IREEGPUOps.td",
+    deps = [
+        ":td_files",
+    ],
 )
