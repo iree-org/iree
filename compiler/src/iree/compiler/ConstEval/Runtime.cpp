@@ -455,51 +455,50 @@ LogicalResult CompiledBinary::initialize(Location loc, void *data,
     return failure();
   }
 
+  iree_status_t status = iree_ok_status();
+
   // Create driver and device.
   iree_hal_driver_t *driver = nullptr;
-  if (failed(handleRuntimeError(loc, iree_hal_driver_registry_try_create(
-                                         runtime.registry,
-                                         iree_make_cstring_view("local-task"),
-                                         iree_allocator_system(), &driver)))) {
-    return failure();
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_driver_registry_try_create(
+        runtime.registry, iree_make_cstring_view("local-task"),
+        iree_allocator_system(), &driver);
   }
-  if (failed(handleRuntimeError(
-          loc, iree_hal_driver_create_default_device(
-                   driver, iree_allocator_system(), &device)))) {
-    return failure();
+
+  if (iree_status_is_ok(status)) {
+    iree_hal_driver_create_default_device(driver, iree_allocator_system(),
+                                          &device);
   }
   iree_hal_driver_release(driver);
 
   // Create hal module.
-  iree_hal_device_t *device_ptr = device.get();
-  if (failed(handleRuntimeError(
-          loc,
-          iree_hal_module_create(runtime.instance.get(), /*device_count=*/1,
-                                 &device_ptr, IREE_HAL_MODULE_FLAG_NONE,
-                                 iree_allocator_system(), &hal_module)))) {
-    return failure();
+  if (iree_status_is_ok(status)) {
+    iree_hal_device_t *device_ptr = device.get();
+    status = iree_hal_module_create(runtime.instance.get(), /*device_count=*/1,
+                                    &device_ptr, IREE_HAL_MODULE_FLAG_NONE,
+                                    iree_allocator_system(), &hal_module);
   }
 
   // Bytecode module.
-  if (failed(handleRuntimeError(
-          loc,
-          iree_vm_bytecode_module_create(
-              runtime.instance.get(), iree_make_const_byte_span(data, length),
-              iree_allocator_null(), iree_allocator_system(), &main_module)))) {
-    return failure();
+  if (iree_status_is_ok(status)) {
+    status = iree_vm_bytecode_module_create(
+        runtime.instance.get(), iree_make_const_byte_span(data, length),
+        iree_allocator_null(), iree_allocator_system(), &main_module);
   }
 
-  // Context.
-  std::array<iree_vm_module_t *, 2> modules = {
-      hal_module.get(),
-      main_module.get(),
-  };
-  if (failed(handleRuntimeError(loc, iree_vm_context_create_with_modules(
-                                         runtime.instance.get(),
-                                         IREE_VM_CONTEXT_FLAG_NONE,
-                                         modules.size(), modules.data(),
-                                         iree_allocator_system(), &context)))) {
-    return failure();
+  // Create context.
+  if (iree_status_is_ok(status)) {
+    std::array<iree_vm_module_t *, 2> modules = {
+        hal_module.get(),
+        main_module.get(),
+    };
+    status = iree_vm_context_create_with_modules(
+        runtime.instance.get(), IREE_VM_CONTEXT_FLAG_NONE, modules.size(),
+        modules.data(), iree_allocator_system(), &context);
+  }
+
+  if (!iree_status_is_ok(status)) {
+    return handleRuntimeError(loc, status);
   }
 
   return success();
