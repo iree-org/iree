@@ -287,6 +287,14 @@ LoweringConfigAttr::getTileInterchangeVals(unsigned level) {
   return SmallVector<int64_t>(levels[level].getInterchange());
 }
 
+bool LoweringConfigAttr::isInterchangeEmpty() {
+  bool empty = true;
+  for (auto level : getTilingLevels())
+    empty |= level.getInterchange().empty();
+
+  return empty;
+}
+
 LogicalResult
 LoweringConfigAttr::verify(function_ref<InFlightDiagnostic()> emitError,
                            LoweringConfigTilingLevelsAttr levels,

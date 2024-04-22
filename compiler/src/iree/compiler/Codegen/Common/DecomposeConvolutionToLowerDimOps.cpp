@@ -54,37 +54,42 @@ computeNewLCA(ArrayRef<Operation *> computeOps, MLIRContext *context) {
                         }) == 1 &&
          "Exactly 1 Linalg Conv Op is expected");
 
-  // 0.2 ATM only 2D depthwise HWC convs are supported.
+  // 1. Get the conv Op to update
+  // 1.1. ATM only 2D depthwise HWC convs are supported.
   // TODO: Add support for other convs
-  bool seen2DDepthwiseConvHWC = false;
   linalg::DepthwiseConv2DNhwcHwcOp convOp;
   for (auto op : computeOps) {
     if (isa<linalg::DepthwiseConv2DNhwcHwcOp>(op)) {
-      seen2DDepthwiseConvHWC = true;
       convOp = cast<linalg::DepthwiseConv2DNhwcHwcOp>(op);
       break;
     }
   }
-  if (!seen2DDepthwiseConvHWC)
-    return failure();
 
-  // 0.3. ATM only folding of the H dim is supported.
+  if (!convOp) {
+    return failure();
+  }
+
+  // 1.2. ATM only folding of the H dim is supported.
   // TODO: Add support for cases where the W dim is folded.
   if (!foldHDim(convOp))
     return failure();
 
-  // 1. Get the current lowering config attached to the Conv Op.
+  // 2. Get the current lowering config attached to the Conv Op.
   FailureOr<IREE::Codegen::LoweringConfigAttr> loweringConfigAttr =
       getLoweringConfig(computeOps);
   if (failed(loweringConfigAttr))
     return failure();
 
-  TilingConfig tc(loweringConfigAttr.value());
+  // TODO: Either remove "interchange" from lowering_config or add support in
+  // this pass.
+  if (!loweringConfigAttr->isInterchangeEmpty())
+    return failure();
 
-  // 2. Calculate new tiling levels.
+  // 3. Calculate new tiling levels.
   // Note that this will basically erase the _H_ dims from the orignal lowering
   // config.
-  SmallVector<unsigned> hDimsToErase{1, 4};
+  auto dims = linalg::inferConvolutionDims(convOp);
+  SmallVector<unsigned> hDimsToErase{dims->outputImage[0], dims->filterLoop[0]};
   llvm::sort(hDimsToErase, [](auto x, auto y) { return x > y; });
 
   auto tilingLevels = loweringConfigAttr.value().getTilingLevels();
@@ -102,13 +107,12 @@ computeNewLCA(ArrayRef<Operation *> computeOps, MLIRContext *context) {
       });
     }
 
-    SmallVector<int64_t> interchange = {};
     auto newLevel = IREE::Codegen::LoweringConfigTilingLevelAttr::get(
         context, newSizes, ArrayRef<int64_t>{}, newScalableFlags);
     newTilingLevelsList.push_back(newLevel);
   }
 
-  // 3. Create and return a new lowering config attribute.
+  // 4. Create and return a new lowering config attribute.
   auto newTilingLevels = IREE::Codegen::LoweringConfigTilingLevelsAttr::get(
       context, newTilingLevelsList);
   IREE::Codegen::LoweringConfigAttr newLCA =
