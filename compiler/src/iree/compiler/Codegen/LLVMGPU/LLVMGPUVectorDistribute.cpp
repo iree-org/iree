@@ -56,8 +56,8 @@ public:
   ContractionVectorLayoutOptions(Operation *root,
                                  ArrayRef<int64_t> workgroupSize,
                                  IREE::GPU::MMAScheduleAttr schedule,
-                                 Value laneId, bool printLayout,
-                                 int64_t subgroupSize = 64)
+                                 Value laneId, int64_t subgroupSize,
+                                 bool printLayout)
       : VectorLayoutOptions(root, /*fullConversion=*/!printLayout),
         workgroupSize(workgroupSize), schedule(schedule),
         printLayout(printLayout), patterns(root->getContext()) {
@@ -410,8 +410,16 @@ public:
     Value linearThreadIdVal = affine::makeComposedAffineApply(
         builder, func.getLoc(), linearId, threadGrid);
 
+    std::optional<int64_t> subgroupSize = getSubgroupSize(func);
+    if (!subgroupSize) {
+      func->emitOpError()
+          << "unable to query subgroup size information from entry point";
+      return signalPassFailure();
+    }
+
     ContractionVectorLayoutOptions options(func, workgroupSize, scheduleAttr,
-                                           linearThreadIdVal, testLayout);
+                                           linearThreadIdVal,
+                                           subgroupSize.value(), testLayout);
     if (failed(distributeVectorOps(func, options.getPatterns(), options))) {
       func->emitOpError() << "failed to distribute";
       return signalPassFailure();
