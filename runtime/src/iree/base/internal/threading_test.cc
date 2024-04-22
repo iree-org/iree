@@ -62,7 +62,8 @@ TEST(ThreadTest, Lifetime) {
 
   // By holding on to the thread object and releasing it here after the thread
   // has finished, we ensure that destruction occurs on the main thread,
-  // avoiding data races reported by TSan.
+  // before deinitializing the notification.
+  // This avoids data races reported by TSan.
   iree_thread_release(thread);
   iree_notification_deinitialize(&entry_data.barrier);
 }
@@ -111,8 +112,12 @@ TEST(ThreadTest, CreateSuspended) {
                                       iree_memory_order_relaxed) == (123 + 1);
       },
       &entry_data, iree_infinite_timeout());
-  iree_notification_deinitialize(&entry_data.barrier);
+  // By holding on to the thread object and releasing it here after the thread
+  // has finished, we ensure that destruction occurs on the main thread,
+  // before deinitializing the notification.
+  // This avoids data races reported by TSan.
   iree_thread_release(thread);
+  iree_notification_deinitialize(&entry_data.barrier);
 }
 
 // NOTE: testing whether priority took effect is really hard given that on
