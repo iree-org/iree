@@ -33,6 +33,8 @@ typedef struct iree_hal_hip_semaphore_t {
   // Guards value and status. We expect low contention on semaphores and since
   // iree_slim_mutex_t is (effectively) just a CAS this keeps things simpler
   // than trying to make the entire structure lock-free.
+  // If we need to hold mutex and base.timepoint_mutex locked together, the
+  // locking order must be (mutex, base.timepoint_mutex).
   iree_slim_mutex_t mutex;
 
   // Current signaled value. May be IREE_HAL_SEMAPHORE_FAILURE_VALUE to
