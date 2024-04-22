@@ -1100,22 +1100,22 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
       return output();
     }
     ShapedType getOriginalOperandType() {
-      return getInputOperandType();
+      return getInputType();
     }
     ShapedType getTransformedOperandType() {
-      return getOutputOperandType();
+      return getOutputType();
     }
-    ShapedType getInputOperandType() {
+    ShapedType getInputType() {
       return input().getType().cast<ShapedType>();
     }
-    ShapedType getOutputOperandType() {
+    ShapedType getOutputType() {
       return output().getType().cast<ShapedType>();
     }
-    int64_t getInputOperandRank() {
-      return getInputOperandType().getRank();
+    int64_t getInputRank() {
+      return getInputType().getRank();
     }
-    int64_t getOutputOperandRank() {
-      return getOutputOperandType().getRank();
+    int64_t getOutputRank() {
+      return getOutputType().getRank();
     }
     int64_t getInputTileSize() {
       return getOutputTileSize() + getKernelSize() - 1;
@@ -1147,7 +1147,7 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
     }
     int64_t getIterationDomainRank() {
       SmallVector<int64_t> imageDims = imageDimensions();
-      return getOutputOperandRank() - imageDims.size();
+      return getOutputRank() - imageDims.size();
     }
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
@@ -1196,10 +1196,10 @@ def IREELinalgExt_WinogradFilterTransformOp : IREELinalgExt_Op<"winograd.filter_
     Value output() {
       return getDpsInitOperand(0)->get();
     }
-    ShapedType getInputOperandType() {
+    ShapedType getInputType() {
       return input().getType().cast<ShapedType>();
     }
-    ShapedType getOutputOperandType() {
+    ShapedType getOutputType() {
       return output().getType().cast<ShapedType>();
     }
     Value getOriginalOperand() {
@@ -1209,19 +1209,16 @@ def IREELinalgExt_WinogradFilterTransformOp : IREELinalgExt_Op<"winograd.filter_
       return output();
     }
     ShapedType getOriginalOperandType() {
-      return getInputOperandType();
+      return getInputType();
     }
     ShapedType getTransformedOperandType() {
-      return getOutputOperandType();
+      return getOutputType();
     }
-    int64_t getInputOperandRank() {
-      return getInputOperandType().getRank();
+    int64_t getInputRank() {
+      return getInputType().getRank();
     }
-    int64_t getOutputOperandRank() {
-      return getOutputOperandType().getRank();
-    }
-    SmallVector<int64_t> kernelDimensions() {
-      return llvm::to_vector(getKernelDimensions());
+    int64_t getOutputRank() {
+      return getOutputType().getRank();
     }
     int64_t getInputTileSize() {
       return getOutputTileSize() + getKernelSize() - 1;
@@ -1237,12 +1234,12 @@ def IREELinalgExt_WinogradFilterTransformOp : IREELinalgExt_Op<"winograd.filter_
     }
     bool isHwcf() {
       std::array<int64_t, 2> hwcfKernelDims = hwcfKernelDimensions();
-      SmallVector<int64_t> kernelDims = kernelDimensions();
+      ArrayRef<int64_t> kernelDims = getKernelDimensions();
       return kernelDims == ArrayRef<int64_t>(hwcfKernelDims);
     }
     bool isFchw() {
       std::array<int64_t, 2> fchwKernelDims = fchwKernelDimensions();
-      SmallVector<int64_t> kernelDims = kernelDimensions();
+      ArrayRef<int64_t> kernelDims = getKernelDimensions();
       return kernelDims == ArrayRef<int64_t>(fchwKernelDims);
     }
     int channelDim() {
@@ -1252,8 +1249,8 @@ def IREELinalgExt_WinogradFilterTransformOp : IREELinalgExt_Op<"winograd.filter_
       return isHwcf() ? 3 : 0;
     }
     int64_t getIterationDomainRank() {
-      SmallVector<int64_t> kernelDims = kernelDimensions();
-      return getInputOperandRank() - kernelDims.size();
+      ArrayRef<int64_t> kernelDims = getKernelDimensions();
+      return getInputRank() - kernelDims.size();
     }
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
@@ -1320,10 +1317,10 @@ def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_
     Value output() {
       return getDpsInitOperand(0)->get();
     }
-    ShapedType getInputOperandType() {
+    ShapedType getInputType() {
       return input().getType().cast<ShapedType>();
     }
-    ShapedType getOutputOperandType() {
+    ShapedType getOutputType() {
       return output().getType().cast<ShapedType>();
     }
     Value getOriginalOperand() {
@@ -1333,10 +1330,10 @@ def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_
       return input();
     }
     ShapedType getOriginalOperandType() {
-      return getOutputOperandType();
+      return getOutputType();
     }
     ShapedType getTransformedOperandType() {
-      return getInputOperandType();
+      return getInputType();
     }
     SmallVector<int64_t> imageDimensions() {
       return llvm::to_vector(getImageDimensions());
@@ -1363,15 +1360,15 @@ def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_
     int channelDim() {
       return isNhwc() ? 3 : 1;
     }
-    int64_t getInputOperandRank() {
-      return getInputOperandType().getRank();
+    int64_t getInputRank() {
+      return getInputType().getRank();
     }
-    int64_t getOutputOperandRank() {
-      return getOutputOperandType().getRank();
+    int64_t getOutputRank() {
+      return getOutputType().getRank();
     }
     int64_t getIterationDomainRank() {
       SmallVector<int64_t> imageDims = imageDimensions();
-      return getInputOperandRank() - imageDims.size();
+      return getInputRank() - imageDims.size();
     }
     int64_t getInputTileSize() {
       return getOutputTileSize() + getKernelSize() - 1;

@@ -121,8 +121,7 @@ struct DecomposeWinogradInputTransform
     Location loc = transformOp.getLoc();
     Value dynamicSlice = transformOp.input();
     Value outputSlice = transformOp.output();
-    if (transformOp.getInputOperandRank() != 2 ||
-        transformOp.getOutputOperandRank() != 2) {
+    if (transformOp.getInputRank() != 2 || transformOp.getOutputRank() != 2) {
       return rewriter.notifyMatchFailure(transformOp, "Winograd op not tiled");
     }
     auto one = rewriter.getIndexAttr(1);
@@ -132,7 +131,7 @@ struct DecomposeWinogradInputTransform
     llvm::SmallSetVector<int64_t, 2> imageDimsSet(imageDims.begin(),
                                                   imageDims.end());
     SmallVector<int64_t> inputTileSquare(imageDims.size(), inputTileSize);
-    Type elementType = transformOp.getOutputOperandType().getElementType();
+    Type elementType = transformOp.getOutputType().getElementType();
     Value zeroF32 = rewriter.create<arith::ConstantOp>(
         loc, rewriter.getZeroAttr(elementType));
     Value scratch =
@@ -226,11 +225,10 @@ struct DecomposeWinogradOutputTransform
     Location loc = transformOp.getLoc();
     Value inputSlice = transformOp.input();
     Value outputSlice = transformOp.output();
-    if (transformOp.getInputOperandRank() != 2 ||
-        transformOp.getOutputOperandRank() != 2) {
+    if (transformOp.getInputRank() != 2 || transformOp.getOutputRank() != 2) {
       return rewriter.notifyMatchFailure(transformOp, "Winograd op not tiled");
     }
-    ShapedType outputType = transformOp.getOutputOperandType();
+    ShapedType outputType = transformOp.getOutputType();
     Type elementType = outputType.getElementType();
     const float *AT{nullptr};
     const float *A{nullptr};
