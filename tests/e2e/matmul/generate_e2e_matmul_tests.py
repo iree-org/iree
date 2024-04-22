@@ -541,7 +541,7 @@ def generate_function(
         subgroup_size_str = ""
         if compilation_info.subgroup_size is not None:
             subgroup_size_str = f"subgroup_size = {compilation_info.subgroup_size}"
-        
+
         compilation_info_string = (
             f"#compilation{generate_function.compilation_index} = "
             "#iree_codegen.compilation_info<\n"
