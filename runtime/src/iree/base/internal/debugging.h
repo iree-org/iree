@@ -130,6 +130,21 @@ IREE_ATTRIBUTE_ALWAYS_INLINE static inline void iree_debug_break(void) {
   ((void)(addr), (void)(size))
 #endif  // IREE_SANITIZER_ADDRESS
 
+#if defined(IREE_COMPILER_GCC_COMPAT) && defined(IREE_SANITIZER_THREAD)
+
+#define IREE_DISABLE_COMPILER_TSAN_ERRORS()           \
+  _Pragma("GCC diagnostic push")                      \
+      _Pragma("GCC diagnostic ignored \"-Wpragmas\"") \
+          _Pragma("GCC diagnostic ignored \"-Wtsan\"")
+#define IREE_RESTORE_COMPILER_TSAN_ERRORS() _Pragma("GCC diagnostic pop")
+
+#else  // IREE_COMPILER_GCC_COMPAT ...
+
+#define IREE_DISABLE_COMPILER_TSAN_ERRORS()
+#define IREE_RESTORE_COMPILER_TSAN_ERRORS()
+
+#endif  // IREE_COMPILER_GCC_COMPAT ...
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif

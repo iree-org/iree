@@ -12,6 +12,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "iree/base/internal/debugging.h"
 #include "iree/base/target_platform.h"
 
 #if defined(IREE_COMPILER_GCC)
@@ -78,7 +79,12 @@ typedef intptr_t iree_atomic_intptr_t;
   __atomic_compare_exchange_n(object, expected, desired, /*weak=*/true,   \
                               (order_succ), (order_fail))
 
-#define iree_atomic_thread_fence(order) __atomic_thread_fence(order)
+static inline void iree_atomic_thread_fence(int order) {
+  // Ignore error where TSan does not support atomic thread fence.
+  IREE_DISABLE_COMPILER_TSAN_ERRORS()
+  __atomic_thread_fence(order);
+  IREE_RESTORE_COMPILER_TSAN_ERRORS()
+}
 
 #ifdef __cplusplus
 }  // extern "C"

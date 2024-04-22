@@ -221,10 +221,14 @@ enum iree_arch_enum_e {
 #if __has_feature(memory_sanitizer)
 #define IREE_SANITIZER_MEMORY 1
 #endif  // __has_feature(memory_sanitizer)
-#if __has_feature(thread_sanitizer)
+#if __has_feature(thread_sanitizer) || defined(__SANITIZE_THREAD__)
 #define IREE_SANITIZER_THREAD 1
 #endif  // __has_feature(thread_sanitizer)
 #endif  // defined(__has_feature)
+
+#if defined(__SANITIZE_THREAD__) && !defined(IREE_SANITIZER_THREAD)
+#define IREE_SANITIZER_THREAD 1
+#endif  // __SANITIZE_THREAD__
 
 //==============================================================================
 // IREE_PLATFORM_*
