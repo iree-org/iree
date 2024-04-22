@@ -41,6 +41,9 @@ on:
           GCS path to the uploaded compilation benchmark results.
         value: ${{ jobs.compilation_benchmarks.outputs.compile-stats-results-gcs-artifact }}
 
+permissions:
+  contents: read
+
 env:
   # This duplicates the variable from ci.yml. The variable needs to be in env
   # instead of the outputs of setup because it contains the run attempt and we

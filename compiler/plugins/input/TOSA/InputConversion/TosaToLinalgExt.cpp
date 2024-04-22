@@ -32,7 +32,7 @@ public:
                                 PatternRewriter &rewriter) const final {
     auto values = op.getValuesIn();
     auto indices = llvm::cast<Value>(op.getIndices());
-    auto updates = op.getInput();
+    auto updates = llvm::cast<Value>(op.getInput());
     auto valuesTy = llvm::dyn_cast<RankedTensorType>(values.getType());
     auto indicesTy = llvm::dyn_cast<RankedTensorType>(indices.getType());
     auto updatesTy = llvm::dyn_cast<RankedTensorType>(updates.getType());

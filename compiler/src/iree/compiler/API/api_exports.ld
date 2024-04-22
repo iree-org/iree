@@ -28,8 +28,8 @@ VER_0 {
     ireeCompilerInvocationRunPassPipeline;
     ireeCompilerInvocationSetCompileFromPhase;
     ireeCompilerInvocationSetCompileToPhase;
-    ireeCompilerInvocationSetDumpCompilationPhasesTo;
     ireeCompilerInvocationSetCrashHandler;
+    ireeCompilerInvocationSetDumpCompilationPhasesTo;
     ireeCompilerInvocationSetVerifyIR;
     ireeCompilerOutputDestroy;
     ireeCompilerOutputKeep;
@@ -311,6 +311,7 @@ VER_0 {
     mlirDictionaryAttrGetElementByName;
     mlirDictionaryAttrGetNumElements;
     mlirDictionaryAttrGetTypeID;
+    mlirDisctinctAttrCreate;
     mlirElementsAttrGetNumElements;
     mlirElementsAttrGetValue;
     mlirElementsAttrIsValidIndex;
@@ -537,6 +538,7 @@ VER_0 {
     mlirRegionInsertOwnedBlockAfter;
     mlirRegionInsertOwnedBlockBefore;
     mlirRegionTakeBody;
+    mlirRegisterGPUPasses;
     mlirRegisterLinalgPasses;
     mlirShapedTypeGetDimSize;
     mlirShapedTypeGetDynamicSize;

@@ -9,7 +9,7 @@ configrations. To run the benchmark suites, see
 1.  Modify the Python scripts of benchmark generators under
     [build_tools/python/benchmark_suites/iree](/build_tools/python/benchmark_suites/iree).
 2.  Follow
-    [tests/e2e/test_artifacts](https://github.com/openxla/iree/tree/main/tests/e2e/test_artifacts)
+    [tests/e2e/test_artifacts](https://github.com/iree-org/iree/tree/main/tests/e2e/test_artifacts)
     to regenerate the cmake files that will build the benchmarks.
 
 To add a new source model, see

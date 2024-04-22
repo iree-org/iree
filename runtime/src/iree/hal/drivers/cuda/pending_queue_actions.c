@@ -784,7 +784,7 @@ iree_status_t iree_hal_cuda_pending_queue_actions_issue(
         }
         action->events[action->event_count++] = wait_event;
 
-        // Remove the wait timepoint as we have a correspnding event that we
+        // Remove the wait timepoint as we have a corresponding event that we
         // will wait on.
         iree_hal_semaphore_list_remove_element(&action->wait_semaphore_list, i);
         --i;

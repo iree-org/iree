@@ -28,12 +28,12 @@ iree_cc_library(
   SRCS
     "ConvertConv2DToWinograd.cpp"
     "ConvertToLoops.cpp"
+    "DecomposeWinogradPass.cpp"
     "PadContractionToBlockSize.cpp"
     "PassDetail.h"
     "Passes.cpp"
     "SplitReduction.cpp"
     "TileAndDecomposeAttention.cpp"
-    "TileAndDecomposeWinogradPass.cpp"
   DEPS
     ::PassesIncGen
     IREEInputDialect

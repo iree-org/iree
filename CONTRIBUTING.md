@@ -7,7 +7,7 @@ To get started with contributing, please take a look at the
 
 ## Getting in touch
 
-*   [GitHub issues](https://github.com/openxla/iree/issues): Feature requests,
+*   [GitHub issues](https://github.com/iree-org/iree/issues): Feature requests,
     bugs, and other work tracking
 *   [IREE Discord server](https://discord.gg/wEWh6Z9nMU): Daily development
     discussions with the core team and collaborators

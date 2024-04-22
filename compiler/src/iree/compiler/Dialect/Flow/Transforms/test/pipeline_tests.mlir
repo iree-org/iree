@@ -40,7 +40,7 @@ module {
 }
 // Check that the linalg op with two reduction loops get folded into a single reduction
 // which then prevents the parallel ops to be folded into it.
-// See https://github.com/openxla/iree/issues/13285
+// See https://github.com/iree-org/iree/issues/13285
 //       CHECK:   flow.executable private @[[EXECUTABLE0:[a-zA-Z0-9_]+]]
 //       CHECK:     func.func @[[FUNC0:[a-zA-Z0-9_x]+]]
 //       CHECK:       linalg.generic

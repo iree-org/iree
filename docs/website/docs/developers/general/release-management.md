@@ -5,7 +5,7 @@ icon: octicons/package-16
 # Release management
 
 IREE cuts automated releases via a workflow that is
-[triggered daily](https://github.com/openxla/iree/blob/main/.github/workflows/schedule_candidate_release.yml).
+[triggered daily](https://github.com/iree-org/iree/blob/main/.github/workflows/schedule_candidate_release.yml).
 The only constraint placed on the commit that is released is that it has passed
 all CI checks. These are published on GitHub with the "pre-release" status. For
 debugging this process, see the
@@ -30,7 +30,7 @@ request that some feature make the cut.
 ## Promoting a candidate to stable
 
 1. (Authorized users only) Push to PyPI using
-    [pypi_deploy.sh](https://github.com/openxla/iree/blob/main//build_tools/python_deploy/pypi_deploy.sh)
+    [pypi_deploy.sh](https://github.com/iree-org/iree/blob/main//build_tools/python_deploy/pypi_deploy.sh)
 
     * For Googlers, the password is stored at <http://go/iree-pypi-password>
 

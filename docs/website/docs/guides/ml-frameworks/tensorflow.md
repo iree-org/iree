@@ -74,7 +74,7 @@ graph LR
     === ":material-alert: Nightly releases"
 
         Nightly releases are published on
-        [GitHub releases](https://github.com/openxla/iree/releases).
+        [GitHub releases](https://github.com/iree-org/iree/releases).
 
         ``` shell
         python -m pip install \
@@ -148,13 +148,13 @@ supported targets by following one of the
 
 | Colab notebooks |  |
 | -- | -- |
-Training an MNIST digits classifier | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/colab/tensorflow_mnist_training.ipynb)
-Edge detection | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/colab/tensorflow_edge_detection.ipynb)
-Pretrained ResNet50 inference | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/colab/tensorflow_resnet.ipynb)
-TensorFlow Hub import | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/colab/tensorflow_hub_import.ipynb)
+Training an MNIST digits classifier | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iree-org/iree/blob/main/samples/colab/tensorflow_mnist_training.ipynb)
+Edge detection | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iree-org/iree/blob/main/samples/colab/tensorflow_edge_detection.ipynb)
+Pretrained ResNet50 inference | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iree-org/iree/blob/main/samples/colab/tensorflow_resnet.ipynb)
+TensorFlow Hub import | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iree-org/iree/blob/main/samples/colab/tensorflow_hub_import.ipynb)
 
 End-to-end execution tests can be found in IREE's
-[integrations/tensorflow/e2e/](https://github.com/openxla/iree/tree/main/integrations/tensorflow/e2e)
+[integrations/tensorflow/e2e/](https://github.com/iree-org/iree/tree/main/integrations/tensorflow/e2e)
 directory.
 
 ## :octicons-question-16: Troubleshooting
