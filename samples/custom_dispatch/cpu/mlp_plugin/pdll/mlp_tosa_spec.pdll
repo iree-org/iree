@@ -1,0 +1,51 @@
+// Native rewrite "rewriteAsFlowDispatch"
+Rewrite rewriteAsFlowDispatch(
+        op : Op, fn_name : Attr, 
+        inputs : ValueRange, 
+        repl_vals : ValueRange, 
+        repl_dims : ValueRange, 
+        other : ValueRange);
+
+
+Constraint checkElementType(t1 : Type, t2 : Type);
+
+Pattern mlp_tosa with benefit(1){
+  let elemTy = type<"f32">;
+
+  let matMulOp = op<tosa.matmul>(lhs : Value<LhsTy : Type>, rhs : Value<RhsTy : Type>) -> (MatMulTy : Type);
+  checkElementType(LhsTy, elemTy);
+  checkElementType(RhsTy, elemTy);
+  checkElementType(MatMulTy, elemTy);
+
+  let reluOp = op<tosa.clamp>(matMulOp.0) {
+    min_int = attr<"0 : i64">,
+    max_int = maxIntValue: Attr,
+    min_fp = attr<"0.000000e+00 : f32">,
+    max_fp = maxFloatValue: Attr
+  } -> (ReluTy : Type);
+
+  rewrite matMulOp with {
+    let IntTy = type<"i32">;
+    let IndexTy = type<"index">;
+    let twoOp = op<arith.constant> { value = attr<"2 : index"> } -> (IndexTy);
+    let oneOp = op<arith.constant> { value = attr<"1 : index"> } -> (IndexTy);
+    let m = op<tensor.dim>(lhs, oneOp) -> (IndexTy);
+    let n = op<tensor.dim>(rhs, twoOp)  -> (IndexTy);
+    let k = op<tensor.dim>(lhs, twoOp); 
+    let m_cast = op<arith.index_cast>(m)  -> (IntTy);
+    let n_cast = op<arith.index_cast>(n) -> (IntTy);
+    let k_cast = op<arith.index_cast>(k) -> (IntTy);
+
+
+
+    let doRelu = op<arith.constant> { value = attr<"1 : i1">};
+    let inputs = (lhs, rhs);
+    let repl_vals = (reluOp.0 );
+    let repl_dims = ();
+    let other = (m_cast.0, n_cast.0, k_cast.0, doRelu.0);
+
+    // oof, figuring out i needed to escape the string took too long :( 
+    let fn_name = attr<"\"mlp_external\"">;
+    rewriteAsFlowDispatch(reluOp, fn_name, inputs, repl_vals, repl_dims, other);
+  }; 
+}
