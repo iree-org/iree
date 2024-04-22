@@ -114,6 +114,19 @@ def ApplyIREELinalgElementwiseGreedyFusionPatternsOp : Op<Transform_Dialect,
   let assemblyFormat = "attr-dict";
 }
 
+def ApplyLowerShuffleTensorPatternsOp : Op<Transform_Dialect,
+    "apply_patterns.iree.lower_shuffle_tensor",
+    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,
+     ReportTrackingListenerFailuresOpTrait]> {
+  let description = [{
+    Populate patterns that lowers iree_gpu.shuffle_tensor ops to allocations
+    and copies.
+  }];
+
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+  let assemblyFormat = "attr-dict";
+}
+
 def ApplyPrepareVectorToMMAPatternsOp : Op<Transform_Dialect,
     "apply_patterns.iree.prepare_vector_to_mma",
     [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,
