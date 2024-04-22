@@ -76,7 +76,7 @@ func.func @matmul_192x64x16_mmt_multisubgroup(%lhs: vector<192x16xf16>, %rhs: ve
 // -----
 
 #translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute 
-                                              workgroup_size = [64, 2, 1]
+                                              workgroup_size = [64, 1, 1]
                                               subgroup_size = 64, 
       {mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, subgroup_m_count = 1, subgroup_n_count = 1, subgroup_m_tile_count = 1, subgroup_n_tile_count = 1, subgroup_k_tile_count = 2>}>
 
@@ -207,7 +207,7 @@ func.func @matmul_16x16x256_fused(%lhs: memref<16x32xf16>,
                                   %rhs: memref<32x16xf16>,
                                   %bias: memref<16x16xf32>,
                                   %out: memref<16x16xf32>)
-  attributes { translation_info = #translation_info } {
+  attributes { translation_info = #translation } {
   %cst = arith.constant 0.000000e+00 : f16
   %cst_f32 = arith.constant 0.000000e+00 : f32
   %c32 = arith.constant 32 : index
@@ -243,7 +243,7 @@ func.func @matmul_16x16x256_fused(%lhs: memref<16x32xf16>,
                                               subgroup_size = 32, 
       {mma_schedule = #iree_gpu.mma_schedule< intrinsic = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>, subgroup_m_count = 1, subgroup_n_count = 1, subgroup_m_tile_count = 3, subgroup_n_tile_count = 2, subgroup_k_tile_count = 2>}>
 
-func.func @wmma_matmul_48x32x32_mm(%lhs: vector<48x32xf16>, %rhs: vector<32x32xf16>, %init: vector<48x32xf32>) -> vector<48x32xf32> attributes { traslation_info = #translation } {
+func.func @wmma_matmul_48x32x32_mm(%lhs: vector<48x32xf16>, %rhs: vector<32x32xf16>, %init: vector<48x32xf32>) -> vector<48x32xf32> attributes { translation_info = #translation } {
     %0 = vector.contract {
       indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
       iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>}

@@ -373,7 +373,9 @@ public:
       std::optional<SmallVector<int64_t>> maybeWorkgroupSize =
           getWorkgroupSize(func);
       if (!maybeWorkgroupSize) {
-        return;
+        func->emitOpError()
+            << "unable to query workgroup_size information from entry point";
+        return signalPassFailure();
       }
       for (auto [index, value] : llvm::enumerate(maybeWorkgroupSize.value())) {
         workgroupSize[index] = value;
