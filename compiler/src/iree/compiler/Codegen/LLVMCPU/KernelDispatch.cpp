@@ -861,13 +861,13 @@ setMatmulRootConfig(mlir::FunctionOpInterface entryPointFn,
   SmallVector<int64_t> shape = linalgOp.getStaticLoopRanges();
 
   // The tiling for parallel dims and reduction dims are separated.
-  const SmallVectorImpl<int64_t> &vecTileSizes = inputTileSizes.back();
+  const SmallVectorImpl<int64_t> &inputVecTileSizes = inputTileSizes.back();
   const SmallVectorImpl<bool> &vecScalableDims = inputScalableTileFlags.back();
-  SmallVector<int64_t> parallelTileSizes;
+  SmallVector<int64_t> vecTileSizes;
   SmallVector<bool> parallelScalableFlags;
   int numScalableDims = llvm::count(vecScalableDims, true);
 
-  for (auto [index, tileSize] : llvm::enumerate(vecTileSizes)) {
+  for (auto [index, tileSize] : llvm::enumerate(inputVecTileSizes)) {
     int64_t sz = tileSize;
     bool isScalable = vecScalableDims[index];
     // The backend struggles to legalize non-power-of-two scalable vectors.
@@ -881,11 +881,12 @@ setMatmulRootConfig(mlir::FunctionOpInterface entryPointFn,
           /*numElem=*/shape[index],
           /*tileSize=*/sz, vectorSize, enforcePowerOfTwo);
     }
-    parallelTileSizes.push_back(sz);
+    vecTileSizes.push_back(sz);
     // 1x scalable vectors e.g. vector<[1]xty> are also poorly supported, so
     // fallback to fixed vectorization if they occur:
     parallelScalableFlags.push_back(sz > 1 ? isScalable : false);
   }
+  SmallVector<int64_t> parallelTileSizes = vecTileSizes;
   SmallVector<int64_t> reductionTileSizes;
   SmallVector<bool> reductionScalableFlags;
   splitParallelAndReductionTiles(
@@ -1333,11 +1334,12 @@ static TileSizesListType getMmt4dTileSizes(linalg::LinalgOp op) {
                                               distTileSizes.end());
   SmallVector<int64_t> cacheReductionTileSizes(numLoops, 0);
 
-  SmallVector<int64_t> parallelTileSizes(numLoops, 1);
-  assert(parallelTileSizes.size() == mmt4dDimBase + 6);
-  parallelTileSizes[mmt4dDimBase + 3] = M0;
-  parallelTileSizes[mmt4dDimBase + 4] = N0;
-  parallelTileSizes[mmt4dDimBase + 5] = K0;
+  SmallVector<int64_t> vecTileSizes(numLoops, 1);
+  assert(vecTileSizes.size() == mmt4dDimBase + 6);
+  vecTileSizes[mmt4dDimBase + 3] = M0;
+  vecTileSizes[mmt4dDimBase + 4] = N0;
+  vecTileSizes[mmt4dDimBase + 5] = K0;
+  SmallVector<int64_t> parallelTileSizes = vecTileSizes;
   SmallVector<int64_t> reductionTileSizes;
   splitParallelAndReductionTiles(op, parallelTileSizes, reductionTileSizes);
 
@@ -1539,16 +1541,16 @@ setRootConfig(mlir::FunctionOpInterface entryPointFn,
       DispatchLoweringPassPipeline::CPULinalgExtTileAndVectorize);
 }
 
-static void setX86VectorTileSizes(linalg::GenericOp genericOp,
-                                  unsigned numLoops,
-                                  ArrayRef<int64_t> distTileSizes,
-                                  ArrayRef<int64_t> minTileSizes,
-                                  ArrayRef<int64_t> maxTileSizes,
-                                  VectorPreProcStrategy vecPreProcStrategy,
-                                  SmallVectorImpl<int64_t> &vecTileSizes) {
+static void setVectorTileSizes(linalg::LinalgOp op,
+                               ArrayRef<int64_t> distTileSizes,
+                               ArrayRef<int64_t> minTileSizes,
+                               ArrayRef<int64_t> maxTileSizes,
+                               VectorPreProcStrategy vecPreProcStrategy,
+                               SmallVectorImpl<int64_t> &vecTileSizes) {
+  int numLoops = op.getNumLoops();
   vecTileSizes.append(numLoops, 0);
-  SmallVector<int64_t> staticLoopRanges = genericOp.getStaticLoopRanges();
-  for (auto loopNum : llvm::seq<unsigned>(0, numLoops)) {
+  SmallVector<int64_t> staticLoopRanges = op.getStaticLoopRanges();
+  for (auto loopNum : llvm::seq<int>(0, numLoops)) {
     if (distTileSizes[loopNum]) {
       vecTileSizes[loopNum] = getMaxVectorTileSize(
           distTileSizes[loopNum], minTileSizes[loopNum], minTileSizes[loopNum],
@@ -1628,11 +1630,11 @@ setDefaultGenericOpRootConfig(mlir::FunctionOpInterface entryPointFn,
                        << vecPreProcStrategy << "\n");
 
   // Set the next level tile sizes.
-  SmallVector<int64_t> parallelTileSizes;
+  SmallVector<int64_t> vecTileSizes;
+  setVectorTileSizes(genericOp, distTileSizes, distConfig.minTileSizes,
+                     distConfig.maxTileSizes, vecPreProcStrategy, vecTileSizes);
+  SmallVector<int64_t> parallelTileSizes = vecTileSizes;
   SmallVector<int64_t> reductionTileSizes;
-  setX86VectorTileSizes(genericOp, numLoops, distTileSizes,
-                        distConfig.minTileSizes, distConfig.maxTileSizes,
-                        vecPreProcStrategy, parallelTileSizes);
   splitParallelAndReductionTiles(genericOp, parallelTileSizes,
                                  reductionTileSizes);
   setVectorSizesForDynamicShapes(genericOp, vecPreProcStrategy,
@@ -1939,17 +1941,18 @@ static LogicalResult setConvRootConfig(mlir::FunctionOpInterface entryPointFn,
 
   // Shapes of N, OH, OW, OC, KH, KW, (IC)
   SmallVector<int64_t> shapes = convOp.getStaticLoopRanges();
-  SmallVector<int64_t> parallelTileSizes(targetTileSizes.begin(),
-                                         targetTileSizes.end());
-  for (auto i : llvm::seq<unsigned>(0, parallelTileSizes.size())) {
+  SmallVector<int64_t> vecTileSizes(targetTileSizes.begin(),
+                                    targetTileSizes.end());
+  for (auto i : llvm::seq<unsigned>(0, vecTileSizes.size())) {
     auto tileSize = distTileSizes[i] ? distTileSizes[i] : shapes[i];
     // If the tile size is intended to be 1, do not adjust it to `vectorSize`.
     // The ops will be decomposed to lower-rank named ops.
-    if (parallelTileSizes[i] != 1) {
-      parallelTileSizes[i] =
-          getMaxVectorTileSize(tileSize, parallelTileSizes[i], vectorSize);
+    if (vecTileSizes[i] != 1) {
+      vecTileSizes[i] =
+          getMaxVectorTileSize(tileSize, vecTileSizes[i], vectorSize);
     }
   }
+  SmallVector<int64_t> parallelTileSizes = vecTileSizes;
   SmallVector<int64_t> reductionTileSizes;
   splitParallelAndReductionTiles(convOp, parallelTileSizes, reductionTileSizes);
   setAlwaysVectorizeSizes(convOp, parallelTileSizes, reductionTileSizes);
@@ -2286,7 +2289,6 @@ adjustTileSizesForGenericOp(mlir::FunctionOpInterface entryPointFn,
         roundUpToPow2(std::min(vecTileSize, vecSize),
                       vecPreProcStrategy == VectorPreProcStrategy::Masking);
   }
-
   splitParallelAndReductionTiles(genericOp, vecTileSizes, reductionTileSizes,
                                  &parallelScalableFlags,
                                  &reductionScalableFlags);
