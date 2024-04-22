@@ -56,13 +56,15 @@ public:
   ContractionVectorLayoutOptions(Operation *root,
                                  ArrayRef<int64_t> workgroupSize,
                                  IREE::GPU::MMAScheduleAttr schedule,
-                                 Value laneId, bool printLayout)
+                                 Value laneId, bool printLayout,
+                                 int64_t subgroupSize = 64)
       : VectorLayoutOptions(root, /*fullConversion=*/!printLayout),
         workgroupSize(workgroupSize), schedule(schedule),
         printLayout(printLayout), patterns(root->getContext()) {
     populateGPUDistributionPatterns(patterns);
     populateGPUDistributionLayoutAttrPatterns(laneId, patterns);
-    populateGPUDistributeNestedLayoutAttrPatterns(laneId, patterns);
+    populateGPUDistributeNestedLayoutAttrPatterns(patterns, laneId,
+                                                  subgroupSize);
   }
 
   LogicalResult setAnchorOps(VectorLayoutAnalysis &analysis) override {

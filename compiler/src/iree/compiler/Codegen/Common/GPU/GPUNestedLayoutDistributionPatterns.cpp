@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <cstdint>
+#include <numeric>
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
@@ -460,11 +461,10 @@ struct DistributeBroadcast final : OpDistributionPattern<vector::BroadcastOp> {
 static int64_t getShuffleOffset(NestedLayoutAttr layout, int64_t dim) {
   // Get strides for dimensions based on layouts.
   SmallVector<int64_t> threadBasis(layout.getThreadBasis());
-  SmallVector<int64_t> basisStrides(threadBasis.size(), 1);
+  SmallVector<int64_t> basisStrides(threadBasis.size());
   // Take prefix sum to get strides.
-  for (int i = basisStrides.size() - 1; i >= 1; --i) {
-    basisStrides[i - 1] *= threadBasis[i];
-  }
+  std::exclusive_scan(threadBasis.rbegin(), threadBasis.rend(),
+                      basisStrides.rbegin(), 1, std::multiplies<>{});
   // Remove non-active thread ids.
   SmallVector<int64_t> activeThreadStrides;
   for (auto [i, stride] : llvm::enumerate(basisStrides)) {
@@ -472,35 +472,41 @@ static int64_t getShuffleOffset(NestedLayoutAttr layout, int64_t dim) {
       activeThreadStrides.push_back(stride);
     }
   }
-  // Apply permutation on the active thread strides.
   // TODO: Do we need to do inversion or not?
-  applyPermutationToVector(activeThreadStrides, layout.getThreadOrder());
-  return activeThreadStrides[dim];
+  return activeThreadStrides[layout.getThreadOrder()[dim]];
 }
 
 static int64_t getShuffleWidth(NestedLayoutAttr layout, int64_t dim) {
   return layout.getThreadsPerOuter()[dim];
 }
 
+/// The lowering for multi_reduction is done in two steps:
+///   1. Local Reduce: Each thread reduces all elements carried by it along
+///      the reduction dimensions. This is the batch, outer and element dims.
+///   2. Thread Reduce: Each thread reduces result of step 1 across threads
+///      by doing a butterfly shuffle.
+///
+/// Currently, reduction across warps is not supported, but it would just add
+/// another step, Warp Reduce, where threads do an atomic addition on a buffer.
 struct DistributeMultiReduction final
     : OpDistributionPattern<vector::MultiDimReductionOp> {
   using OpDistributionPattern::OpDistributionPattern;
 
-  DistributeMultiReduction(MLIRContext *context, int64_t maxBitsPerShuffle,
-                           int64_t benefit = 1)
-      : OpDistributionPattern(context, benefit),
+  DistributeMultiReduction(MLIRContext *context, int64_t subgroupSize,
+                           int64_t maxBitsPerShuffle, int64_t benefit = 1)
+      : OpDistributionPattern(context, benefit), subgroupSize(subgroupSize),
         maxBitsPerShuffle(maxBitsPerShuffle) {}
 
   LogicalResult matchAndRewrite(vector::MultiDimReductionOp multiReduceOp,
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
     VectorValue srcVector = multiReduceOp.getSource();
-    VectorValue accVector = dyn_cast<VectorValue>(multiReduceOp.getAcc());
+    auto accVector = dyn_cast<VectorValue>(multiReduceOp.getAcc());
     if (!accVector) {
       return rewriter.notifyMatchFailure(
           multiReduceOp, "unimplemented: scalar accumulator distribution");
     }
-    VectorValue resVector = dyn_cast<VectorValue>(multiReduceOp.getResult());
+    auto resVector = dyn_cast<VectorValue>(multiReduceOp.getResult());
     if (!resVector) {
       return rewriter.notifyMatchFailure(
           multiReduceOp, "unimplemented: scalar result distribution");
@@ -510,6 +516,14 @@ struct DistributeMultiReduction final
     if (!srcLayout) {
       return rewriter.notifyMatchFailure(multiReduceOp,
                                          "expected nested layout attr");
+    }
+
+    Type elemTy = srcVector.getType().getElementType();
+    unsigned elemBitwidth = elemTy.getIntOrFloatBitWidth();
+    if (elemBitwidth != maxBitsPerShuffle) {
+      return rewriter.notifyMatchFailure(
+          multiReduceOp, llvm::formatv("unimplemented: packed shuffle",
+                                       elemBitwidth, maxBitsPerShuffle));
     }
 
     VectorValue disSrc =
@@ -537,48 +551,37 @@ struct DistributeMultiReduction final
         loc, disSrc, disAcc, distributedReductionMask, multiReduceOp.getKind());
     auto locallyReduced = dyn_cast<VectorValue>(localReduction.getResult());
 
-    if (!locallyReduced) {
-      return rewriter.notifyMatchFailure(
-          localReduction, "unimplemented: scalar result distribution");
-    }
+    assert(locallyReduced && "result should have been a vector");
 
     // Flatten the locally reduced value.
     VectorType shaped = locallyReduced.getType();
     int64_t numElements = shaped.getNumElements();
     SmallVector<int64_t> flatShape(1, numElements);
-    Type elemTy = shaped.getElementType();
     VectorType flatVecType = VectorType::get(flatShape, elemTy);
     VectorValue flat =
         rewriter.create<vector::ShapeCastOp>(loc, flatVecType, locallyReduced);
 
-    FailureOr<VectorValue> globalReduced = doThreadGlobalReduction(
+    FailureOr<VectorValue> threadReduced = doThreadReduction(
         rewriter, srcLayout, flat, multiReduceOp.getKind(), reducedDims);
-    if (failed(globalReduced)) {
+    if (failed(threadReduced)) {
       return failure();
     }
 
     VectorValue unflattened = rewriter.create<vector::ShapeCastOp>(
-        loc, shaped, globalReduced.value());
+        loc, shaped, threadReduced.value());
     replaceOpWithDistributedValues(rewriter, multiReduceOp, unflattened);
 
     return failure();
   }
 
-  FailureOr<VectorValue>
-  doThreadGlobalReduction(RewriterBase &rewriter, NestedLayoutAttr layout,
-                          VectorValue flat, vector::CombiningKind kind,
-                          ArrayRef<bool> reductionMask) const {
+  FailureOr<VectorValue> doThreadReduction(RewriterBase &rewriter,
+                                           NestedLayoutAttr layout,
+                                           VectorValue flat,
+                                           vector::CombiningKind kind,
+                                           ArrayRef<bool> reductionMask) const {
     VectorType flatVecType = flat.getType();
-    Type elemTy = flatVecType.getElementType();
     int64_t numElements = flatVecType.getNumElements();
     Location loc = flat.getLoc();
-
-    unsigned elemBitwidth = elemTy.getIntOrFloatBitWidth();
-    if (elemBitwidth != maxBitsPerShuffle) {
-      return rewriter.notifyMatchFailure(
-          flat.getDefiningOp(), llvm::formatv("unimplemented: packed shuffle",
-                                              elemBitwidth, maxBitsPerShuffle));
-    }
 
     auto constOp = rewriter.create<arith::ConstantOp>(
         loc, rewriter.getZeroAttr(flatVecType));
@@ -609,9 +612,6 @@ struct DistributeMultiReduction final
     int64_t offset = getShuffleOffset(layout, dim);
     int64_t width = getShuffleWidth(layout, dim);
 
-    // TODO: Query from entrypoint.
-    int64_t subgroupSize = 64;
-
     for (int i = offset; i < offset * width; i <<= 1) {
       auto shuffleOp = rewriter.create<gpu::ShuffleOp>(
           loc, val, i, subgroupSize, gpu::ShuffleMode::XOR);
@@ -623,18 +623,21 @@ struct DistributeMultiReduction final
     return val;
   }
 
+  int64_t subgroupSize;
   int64_t maxBitsPerShuffle;
 };
 
 } // namespace
 
-void populateGPUDistributeNestedLayoutAttrPatterns(
-    Value threadId, RewritePatternSet &patterns) {
+void populateGPUDistributeNestedLayoutAttrPatterns(RewritePatternSet &patterns,
+                                                   Value threadId,
+                                                   int64_t subgroupSize,
+                                                   int64_t maxBitsPerShuffle) {
   patterns.add<DistributeTransferRead, DistributeTransferWrite>(
       patterns.getContext(), threadId);
   patterns.add<DistributeBroadcast>(patterns.getContext());
-  patterns.add<DistributeMultiReduction>(patterns.getContext(),
-                                         /*maxBitsPerShuffle=*/32);
+  patterns.add<DistributeMultiReduction>(patterns.getContext(), subgroupSize,
+                                         maxBitsPerShuffle);
 }
 
 }; // namespace mlir::iree_compiler

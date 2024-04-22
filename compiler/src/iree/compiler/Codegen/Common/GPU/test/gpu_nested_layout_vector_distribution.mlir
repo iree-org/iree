@@ -1007,14 +1007,20 @@ builtin.module attributes { transform.with_named_sequence } {
 
 #nested = #iree_vector_ext.nested_layout<
   subgroups_per_workgroup = [1, 1], 
+  // We are reducing along dim=1, so each thread will reduce 
+  // 2 batches x 4 elements = 8 elements.
   batches_per_subgroup = [2, 2], 
   outers_per_batch = [1, 1], 
+  // We are reducing on dim=1, which is distributed over 4 threads. Based
+  // on the subgroup basis and thread order, the shuffle offset is 16.
   threads_per_outer = [16, 4], 
   elements_per_thread = [1, 4], 
+
   subgroup_order = [1, 0], 
   batch_order = [1, 0], 
   outer_order = [1, 0], 
   thread_order = [1, 0], 
+
   subgroup_basis = [1, 1], 
   thread_basis = [4, 16]
 >
@@ -1039,20 +1045,27 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-DAG: %[[C16:.*]] = arith.constant 16 : i32
 // CHECK-DAG: %[[C32:.*]] = arith.constant 32 : i32
 // CHECK-DAG: %[[C64:.*]] = arith.constant 64 : i32
+// CHECK-DAG: %[[DARG0:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<32x32xf32> -> vector<2x2x1x1x1x4xf32>
+// CHECK-DAG: %[[DARG1:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<32xf32> -> vector<2x1x1xf32>
 // Local reduction
-// CHECK: vector.multi_reduction <maximumf>, %{{.*}}, %{{.*}} [0, 2, 5]
+// CHECK: vector.multi_reduction <maximumf>, %[[DARG0]], %[[DARG1]] [0, 2, 5] : vector<2x2x1x1x1x4xf32> to vector<2x1x1xf32>
 // Global reduction
 // CHECK: gpu.shuffle  xor %{{.*}}, %[[C16]], %[[C64]] : f32
 // CHECK: gpu.shuffle  xor %{{.*}}, %[[C32]], %[[C64]] : f32
 // CHECK: gpu.shuffle  xor %{{.*}}, %[[C16]], %[[C64]] : f32
 // CHECK: gpu.shuffle  xor %{{.*}}, %[[C32]], %[[C64]] : f32
+// CHECK: iree_vector_ext.to_simd %{{.*}} : vector<2x1x1xf32> -> vector<32xf32>
 
 // -----
 
 #nested = #iree_vector_ext.nested_layout<
   subgroups_per_workgroup = [1, 1],
+  // We are reducing along dim=1, so each thread will reduce 
+  // 4 batches x 4 elements = 16 elements.
   batches_per_subgroup    = [1, 4],
   outers_per_batch        = [1, 1],
+  // We are reducing on dim=1, which is distributed over 2 threads. Based
+  // on the subgroup basis and thread order, the shuffle offset is 32.
   threads_per_outer       = [32, 2],
   elements_per_thread     = [1, 4],
 
@@ -1082,6 +1095,6 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-DAG: %[[C32:.*]] = arith.constant 32 : i32
 // CHECK-DAG: %[[C64:.*]] = arith.constant 64 : i32
 // Local reduction
-// CHECK: vector.multi_reduction <maximumf>, %{{.*}}, %{{.*}} [1, 3, 5]
+// CHECK: vector.multi_reduction <maximumf>, %{{.*}}, %{{.*}} [1, 3, 5] : vector<1x4x1x1x1x4xf32> to vector<1x1x1xf32>
 // Global reduction
 // CHECK: gpu.shuffle  xor %{{.*}}, %[[C32]], %[[C64]] : f32
