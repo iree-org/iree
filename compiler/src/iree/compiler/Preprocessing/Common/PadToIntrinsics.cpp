@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "iree/compiler/Preprocessing/Common/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/SmallVectorExtras.h"
@@ -32,7 +33,7 @@ namespace {
 
 static Value getPaddedValue(RewriterBase &rewriter, Location loc,
                             Value padSource, ArrayRef<OpFoldResult> padding) {
-  auto sourceType = padSource.getType().cast<RankedTensorType>();
+  auto sourceType = cast<RankedTensorType>(padSource.getType());
   ArrayRef<int64_t> sourceShape = sourceType.getShape();
   auto paddedShape =
       llvm::map_to_vector(llvm::zip_equal(sourceShape, padding), [](auto it) {
@@ -56,7 +57,7 @@ static Value
 getExpandedValue(RewriterBase &rewriter, Location loc, Value expandSource,
                  AffineMap &operandMap,
                  SmallVector<std::pair<int64_t, int64_t>> &dimsToExpand) {
-  auto srcType = expandSource.getType().cast<RankedTensorType>();
+  auto srcType = cast<RankedTensorType>(expandSource.getType());
   auto srcShape = srcType.getShape();
   SetVector<int64_t> operandDimsToExpand;
   SmallVector<std::optional<int64_t>> operandDimToExpandSize(srcType.getRank(),
@@ -141,13 +142,39 @@ expandMapsAndIterators(SmallVector<AffineMap> &expandedMaps,
   }
 }
 
-static void padConvOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
-                      ArrayRef<GPUMatmulShapeType> intrinsics) {
+static SmallVector<GPUMatmulShapeType>
+getIntrinsics(linalg::LinalgOp linalgOp) {
+  ArrayAttr mmaKinds = nullptr;
+  auto executableTargets =
+      IREE::HAL::DeviceTargetAttr::lookupExecutableTargets(linalgOp);
+  if (executableTargets.size() != 1)
+    return {};
+  auto targetAttr = executableTargets.front();
+  FailureOr<ArrayAttr> candidateMmaKinds =
+      getSupportedMmaTypes(targetAttr.getConfiguration());
+  if (failed(candidateMmaKinds))
+    return {};
+  mmaKinds = *candidateMmaKinds;
+
+  return llvm::map_to_vector(
+      mmaKinds.getAsRange<IREE::GPU::MMAAttr>(), [](IREE::GPU::MMAAttr mma) {
+        auto [mSize, nSize, kSize] = mma.getMNKShape();
+        auto [aType, bType, cType] = mma.getABCElementTypes();
+        return GPUMatmulShapeType{mSize, nSize, kSize, aType, bType, cType};
+      });
+}
+
+static void padConvOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp) {
   if (!isa<linalg::ConvolutionOpInterface>(*linalgOp)) {
     return;
   }
   // TODO: Handle other variants.
   if (!isa<linalg::Conv2DNhwcHwcfOp>(linalgOp))
+    return;
+
+  // Early exit if cannot find intrinsics or if multiple executable targets.
+  SmallVector<GPUMatmulShapeType> intrinsics = getIntrinsics(linalgOp);
+  if (intrinsics.empty())
     return;
 
   // Check that conv has met conditions to go down mfma.
@@ -264,8 +291,7 @@ static void padConvOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
 }
 
 static void padContractionLikeOp(RewriterBase &rewriter,
-                                 linalg::LinalgOp linalgOp,
-                                 ArrayRef<GPUMatmulShapeType> intrinsics) {
+                                 linalg::LinalgOp linalgOp) {
   FailureOr<mlir::linalg::ContractionDimensions> contractionDims =
       mlir::linalg::inferContractionDims(linalgOp);
 
@@ -277,6 +303,12 @@ static void padContractionLikeOp(RewriterBase &rewriter,
       contractionDims->n.size() < 1) {
     return;
   }
+
+  // Early exit if cannot find intrinsics or if multiple executable targets.
+  SmallVector<GPUMatmulShapeType> intrinsics = getIntrinsics(linalgOp);
+  if (intrinsics.empty())
+    return;
+
   Location loc = linalgOp.getLoc();
 
   // Naive handling by only looking into most inner dimensions.
@@ -459,7 +491,7 @@ static void padContractionLikeOp(RewriterBase &rewriter,
   }
 
   // extract slice.
-  auto resultType = linalgOp->getResult(0).getType().cast<RankedTensorType>();
+  auto resultType = cast<RankedTensorType>(linalgOp->getResult(0).getType());
   auto resultShape = resultType.getShape();
   auto resultRank = resultType.getRank();
   auto one = rewriter.getIndexAttr(1);
@@ -478,56 +510,51 @@ static void padContractionLikeOp(RewriterBase &rewriter,
                                                       offsets, sizes, strides);
 }
 
-struct PadToIntrinsicsPass final
-    : impl::PadToIntrinsicsBase<PadToIntrinsicsPass> {
-  void runOnOperation() override {
-    MLIRContext *context = &getContext();
-    RewritePatternSet patterns(context);
-    Operation *rootOp = getOperation();
-    ArrayAttr mmaKinds = nullptr;
-    for (IREE::HAL::ExecutableTargetAttr targetAttr :
-         IREE::HAL::DeviceTargetAttr::lookupExecutableTargets(rootOp)) {
-      FailureOr<ArrayAttr> candidateMmaKinds =
-          getSupportedMmaTypes(targetAttr.getConfiguration());
-      if (succeeded(candidateMmaKinds)) {
-        mmaKinds = *candidateMmaKinds;
-        break;
-      }
-    }
-    if (!mmaKinds)
-      return;
-
-    auto intrinsics = llvm::map_to_vector(
-        mmaKinds.getAsRange<IREE::GPU::MMAAttr>(), [](IREE::GPU::MMAAttr mma) {
-          auto [mSize, nSize, kSize] = mma.getMNKShape();
-          auto [aType, bType, cType] = mma.getABCElementTypes();
-          return GPUMatmulShapeType{mSize, nSize, kSize, aType, bType, cType};
-        });
-
-    SmallVector<linalg::LinalgOp> targetOps;
-    rootOp->walk([&](linalg::LinalgOp linalgOp) {
-      if (isa<linalg::Conv2DNhwcHwcfOp, linalg::BatchMatmulOp, linalg::MatmulOp,
-              linalg::MatmulTransposeBOp, linalg::GenericOp>(
-              linalgOp.getOperation()))
-        targetOps.push_back(linalgOp);
-    });
-
-    IRRewriter rewriter(context);
-    for (auto linalgOp : llvm::make_early_inc_range(targetOps)) {
-      rewriter.setInsertionPoint(linalgOp);
-      TypeSwitch<Operation *, void>(linalgOp.getOperation())
-          .Case<linalg::Conv2DNhwcHwcfOp>(
-              [&](auto convOp) { padConvOp(rewriter, linalgOp, intrinsics); })
-          .Case<linalg::BatchMatmulOp, linalg::MatmulOp,
-                linalg::MatmulTransposeBOp, linalg::GenericOp>(
-              [&](auto matmulOp) {
-                padContractionLikeOp(rewriter, linalgOp, intrinsics);
-              })
-          .Default([&](Operation *op) {});
-    }
-  }
+struct PadToIntrinsicsPass
+    : public impl::PadToIntrinsicsBase<PadToIntrinsicsPass> {
+  using Base::Base;
+  void runOnOperation() override;
 };
 
 } // namespace
+
+void PadToIntrinsicsPass::runOnOperation() {
+  MLIRContext *context = &getContext();
+  RewritePatternSet patterns(context);
+  auto funcOp = getOperation();
+  bool padConvOps = padTargetType == PadTargetType::ConvOp ||
+                    padTargetType == PadTargetType::All;
+  bool padContractionOps = padTargetType == PadTargetType::ContractionOp ||
+                           padTargetType == PadTargetType::All;
+  SmallVector<linalg::LinalgOp> targetOps;
+  funcOp.walk([&](linalg::LinalgOp linalgOp) {
+    if (isa<linalg::Conv2DNhwcHwcfOp>(linalgOp.getOperation()) && padConvOps) {
+      // Add convOps into worklist.
+      targetOps.push_back(linalgOp);
+    } else if (isa<linalg::BatchMatmulOp, linalg::MatmulOp,
+                   linalg::MatmulTransposeBOp>(linalgOp.getOperation()) &&
+               padContractionOps) {
+      // Add named contractionOps into worklist.
+      targetOps.push_back(linalgOp);
+    } else if (isa<linalg::GenericOp>(linalgOp.getOperation()) &&
+               linalg::isaContractionOpInterface(linalgOp) &&
+               padContractionOps) {
+      // Add named generic contractionOps into worklist.
+      targetOps.push_back(linalgOp);
+    }
+  });
+
+  IRRewriter rewriter(context);
+  for (auto linalgOp : targetOps) {
+    rewriter.setInsertionPoint(linalgOp);
+    TypeSwitch<Operation *, void>(linalgOp.getOperation())
+        .Case<linalg::Conv2DNhwcHwcfOp>(
+            [&](auto convOp) { padConvOp(rewriter, linalgOp); })
+        .Case<linalg::BatchMatmulOp, linalg::MatmulOp,
+              linalg::MatmulTransposeBOp, linalg::GenericOp>(
+            [&](auto matmulOp) { padContractionLikeOp(rewriter, linalgOp); })
+        .Default([&](Operation *op) {});
+  }
+}
 
 } // namespace mlir::iree_compiler::Preprocessing

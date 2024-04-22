@@ -1,5 +1,7 @@
-// RUN: iree-opt --split-input-file %s --pass-pipeline="builtin.module(func.func(iree-preprocessing-pad-to-intrinsics,canonicalize))" \
-// RUN:   | FileCheck %s
+// RUN: iree-opt --split-input-file %s --pass-pipeline="builtin.module(func.func(iree-preprocessing-pad-to-intrinsics,canonicalize))" | FileCheck %s
+// RUN: iree-opt --split-input-file %s --pass-pipeline="builtin.module(func.func(iree-preprocessing-pad-to-intrinsics{pad-target-type=conv},canonicalize))" | FileCheck %s -check-prefix=CONVOLUTION
+// RUN: iree-opt --split-input-file %s --pass-pipeline="builtin.module(func.func(iree-preprocessing-pad-to-intrinsics{pad-target-type=contraction},canonicalize))" | FileCheck %s -check-prefix=CONTRACT
+
 
 #rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb",
                              {mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
@@ -29,6 +31,12 @@ func.func @main0(%arg0: tensor<2x130x130x4xf16>, %arg1: tensor<3x3x4x320xf16>, %
 // CHECK-SAME:   ins(%[[PAD0]], %[[PAD1]] : tensor<2x130x130x16xf16>, tensor<3x3x16x320xf16>)
 // CHECK-SAME:   outs(%[[ARG2]] : tensor<2x128x128x320xf32>) -> tensor<2x128x128x320xf32>
 // CHECK:      return %[[CONV]] : tensor<2x128x128x320xf32>
+
+// CONVOLUTION:      tensor.pad {{.*}} low[0, 0, 0, 0] high[0, 0, 0, 12]
+// CONVOLUTION:      tensor.pad {{.*}} low[0, 0, 0, 0] high[0, 0, 12, 0]
+
+// CONTRACT-NOT:     tensor.pad {{.*}} low[0, 0, 0, 0] high[0, 0, 0, 12]
+// CONTRACT-NOT:     tensor.pad {{.*}} low[0, 0, 0, 0] high[0, 0, 12, 0]
 
 // -----
 
@@ -60,6 +68,10 @@ func.func @main1(%arg0: tensor<2x130x130x320xf16>, %arg1: tensor<3x3x320x4xf16>,
 // CHECK-SAME:   outs(%[[PAD2]] : tensor<2x128x128x16xf32>) -> tensor<2x128x128x16xf32>
 // CHECK:      %[[RET:.+]] = tensor.extract_slice %[[CONV]][0, 0, 0, 0] [2, 128, 128, 4] [1, 1, 1, 1]
 // CHECK:      return %[[RET]] : tensor<2x128x128x4xf32>
+
+// CONVOLUTION:      tensor.pad {{.*}} low[0, 0, 0, 0] high[0, 0, 0, 12]
+
+// CONTRACT-NOT:     tensor.pad {{.*}} low[0, 0, 0, 0] high[0, 0, 0, 12]
 
 // -----
 
@@ -116,6 +128,14 @@ func.func @matmul_static(%arg0 : tensor<10x20xf16>, %arg1 : tensor<20x30xf16>, %
 // CHECK-SAME:                  outs(%[[PAD_INIT]] : tensor<16x32xf16>
 // CHECK:      %[[EXTRACT:.+]] = tensor.extract_slice %[[MATMUL]][0, 0] [10, 30] [1, 1] : tensor<16x32xf16> to tensor<10x30xf16>
 // CHECK:      return %[[EXTRACT]]
+
+// CONVOLUTION-NOT: tensor.pad {{.*}} low[0, 0] high[6, 12]
+// CONVOLUTION-NOT: tensor.pad {{.*}} low[0, 0] high[12, 2]
+// CONVOLUTION-NOT: tensor.pad {{.*}} low[0, 0] high[6, 2]
+
+// CONTRACT:        tensor.pad {{.*}} low[0, 0] high[6, 12]
+// CONTRACT:        tensor.pad {{.*}} low[0, 0] high[12, 2]
+// CONTRACT:        tensor.pad {{.*}} low[0, 0] high[6, 2]
 
 // -----
 
@@ -267,3 +287,9 @@ func.func @dequant_gemm_dynamic_m(%arg0: tensor<4096x32x128xi4>, %arg1: tensor<4
 // CHECK:      %[[COLLAPSE:.+]] = tensor.collapse_shape %[[EXP_GEMM]] {{\[}}[0, 1], [2]]
 // CHECK:      %[[EXTRACT:.+]] = tensor.extract_slice %[[COLLAPSE]][0, 0] [%[[DIM_M0]], 4096] [1, 1]
 // CHECK:      return %[[EXTRACT]]
+
+// CONVOLUTION-NOT: tensor.pad {{.*}} low[0, 0, 0]
+// CONVOLUTION-NOT: tensor.expand_shape {{.*}} {{\[}}[0, 1], [2], [3]] : tensor<?x32x128xf16> into tensor<?x16x32x128xf16>
+
+// CONTRACT:        tensor.pad {{.*}} low[0, 0, 0]
+// CONTRACT:        tensor.expand_shape {{.*}} {{\[}}[0, 1], [2], [3]] : tensor<?x32x128xf16> into tensor<?x16x32x128xf16>
