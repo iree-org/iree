@@ -10,7 +10,7 @@ module @eval_i64_scalar {
     %hoisted = util.global.load @hoisted : f64
     util.return %hoisted : f64
   }
-  util.initializer attributes {iree.compiler.consteval} {
+  util.initializer {
     %cst = arith.constant 44.0 : f64
     %offset = util.global.load @offset : f64
     %sum = arith.addf %cst, %offset : f64
