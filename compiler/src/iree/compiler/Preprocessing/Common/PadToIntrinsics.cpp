@@ -95,6 +95,20 @@ getExpandedValue(RewriterBase &rewriter, Location loc, Value expandSource,
       expandSource, reassoc);
 }
 
+// expandMapsAndIterators expands the maps and iterators of an linalgOp at
+// dimensions specified by `dimsToExpand`. The general idea is we want to view
+// the dimensions specified in `dimsToExpand` as being splitted-up to two
+// dimensions. Which means the src dim and the new child/sub dim will be
+// contiguous.
+
+// For example if we have:
+// affine_map<(d0, d1, d2) -> (d0, d2, d1)>
+// iterator_types = ["parallel, "parallel", "reduce"]
+// dimsToExpand = [1, 2]
+
+// We will turn this into:
+// affine_map<(d0, d1_A, d1_B, d2_A, d2_B) -> (d0, d2_A, d2_B, d1_A, d1_B)>
+// iterator_types = ["parallel, "parallel", "parallel", "reduce", "reduce"]
 static void
 expandMapsAndIterators(SmallVector<AffineMap> &expandedMaps,
                        SmallVector<utils::IteratorType> &expandedIterators,
@@ -104,7 +118,7 @@ expandMapsAndIterators(SmallVector<AffineMap> &expandedMaps,
       llvm::map_range(dimsToExpand, [](auto &dim) { return dim.first; }));
   llvm::sort(dimsToExpandVec);
   for (auto [expandIdx, expandDim] : llvm::enumerate(dimsToExpandVec)) {
-    // Creating iterator type for newly expanded/dst dim from it's expans
+    // Creating iterator type for newly expanded/dst dim from it's expand
     // source dim.
     int64_t expandSrcDim = expandDim + expandOffset;
     expandedIterators.insert(expandedIterators.begin() + expandSrcDim,
