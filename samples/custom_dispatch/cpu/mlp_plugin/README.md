@@ -20,6 +20,4 @@ See example in [mlp.mlir](/samples/custom_dispatch/cpu/mlp_plugin/mlp.mlir)
 ### 2. [PDL](https://mlir.llvm.org/docs/Dialects/PDLOps/)
 See example in [mlp_linalg_spec.pdl.mlir](/samples/custom_dispatch/cpu/mlp_plugin/mlp_linalg_spec.pdl.mlir)
 ### 3. [PDLL](https://mlir.llvm.org/docs/PDLL/)
-See example in[mlp_linalg_spec.pdll](/samples/custom_dispatch/cpu/mlp_plugin/pdll/mlp_linalg_spec.pdll)
-
-
+See example in [mlp_linalg_spec.pdll](/samples/custom_dispatch/cpu/mlp_plugin/pdll/mlp_linalg_spec.pdll)
