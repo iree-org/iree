@@ -155,8 +155,9 @@ LogicalResult FunctionCall::initialize(Location loc) {
                                  iree_allocator_system(), &inputs);
   }
   if (iree_status_is_ok(status)) {
-    iree_vm_list_create(iree_vm_make_undefined_type_def(), resultCapacity,
-                        iree_allocator_system(), &outputs);
+    status =
+        iree_vm_list_create(iree_vm_make_undefined_type_def(), resultCapacity,
+                            iree_allocator_system(), &outputs);
   }
   return handleRuntimeError(loc, status);
 }
@@ -177,28 +178,39 @@ FunctionCall::importSerializableAttr(
   std::memset(&params, 0, sizeof(params));
   params.type =
       IREE_HAL_MEMORY_TYPE_HOST_VISIBLE | IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE;
-  if (failed(handleRuntimeError(
-          loc, iree_hal_allocator_allocate_buffer(binary.getAllocator(), params,
-                                                  storageSize, &buffer))))
-    return failure();
+
+  iree_status_t status = iree_ok_status();
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_allocator_allocate_buffer(binary.getAllocator(), params,
+                                                storageSize, &buffer);
+  }
 
   iree_hal_buffer_mapping_t mapping;
-  if (failed(handleRuntimeError(
-          loc, iree_hal_buffer_map_range(
-                   buffer.get(), IREE_HAL_MAPPING_MODE_SCOPED,
-                   IREE_HAL_MEMORY_ACCESS_WRITE, /*byte_offset=*/0,
-                   /*byte_length=*/storageSize, &mapping))))
-    return failure();
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_buffer_map_range(
+        buffer.get(), IREE_HAL_MAPPING_MODE_SCOPED,
+        IREE_HAL_MEMORY_ACCESS_WRITE, /*byte_offset=*/0,
+        /*byte_length=*/storageSize, &mapping);
+  }
 
-  // Copy.
-  LogicalResult copyResult = serializableAttr.serializeToBuffer(
-      loc, llvm::endianness::native,
-      ArrayRef<char>(reinterpret_cast<char *>(mapping.contents.data),
-                     storageSize));
+  if (iree_status_is_ok(status)) {
+    LogicalResult copyResult = serializableAttr.serializeToBuffer(
+        loc, llvm::endianness::native,
+        ArrayRef<char>(reinterpret_cast<char *>(mapping.contents.data),
+                       storageSize));
+    if (failed(copyResult)) {
+      status =
+          iree_make_status(IREE_STATUS_INTERNAL, "serializeToBuffer failed");
+    }
+  }
 
-  if (failed(handleRuntimeError(loc, iree_hal_buffer_unmap_range(&mapping))) ||
-      failed(copyResult)) {
-    return failure();
+  if (iree_status_is_ok(status)) {
+    status = iree_hal_buffer_unmap_range(&mapping);
+  }
+
+  if (!iree_status_is_ok(status)) {
+    iree_hal_buffer_release(buffer.get());
+    return handleRuntimeError(loc, status);
   }
 
   return buffer;
