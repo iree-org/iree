@@ -226,8 +226,9 @@ void PreprocessingOptions::bindOptions(OptionsBinder &binder) {
   // 0. Through a preprocessing pass pipeline.
   // 1. Through a Transform dialect spec file.
   // 2. Through a PDL spec file.
-  // A user may simultaneously use both. The order is transform dialect
-  // transforms are applied first and then the pdl patterns.
+  // 3. Through a PDLL spec file.
+  // A user may use multiple simultaneously. The order is transform dialect
+  // transforms are applied first, then the pdl patterns, and finally pdll.
   binder.opt<std::string>(
       "iree-preprocessing-transform-spec-filename",
       preprocessingTransformSpecFilename,
@@ -236,8 +237,11 @@ void PreprocessingOptions::bindOptions(OptionsBinder &binder) {
       llvm::cl::cat(category));
   binder.opt<std::string>(
       "iree-preprocessing-pdl-spec-filename", preprocessingPDLSpecFilename,
-      llvm::cl::desc(
-          "File name of a transform dialect spec to use for preprocessing"),
+      llvm::cl::desc("File name of a PDL spec to use for preprocessing"),
+      llvm::cl::cat(category));
+  binder.opt<std::string>(
+      "iree-preprocessing-pdll-spec-filename", preprocessingPDLLSpecFilename,
+      llvm::cl::desc("File name of a PDLL spec to use for preprocessing"),
       llvm::cl::cat(category));
 }
 

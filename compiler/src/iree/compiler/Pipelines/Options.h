@@ -170,6 +170,7 @@ struct PreprocessingOptions {
   std::string preprocessingPassPipeline;
   std::string preprocessingTransformSpecFilename;
   std::string preprocessingPDLSpecFilename;
+  std::string preprocessingPDLLSpecFilename;
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<PreprocessingOptions>;
 };
