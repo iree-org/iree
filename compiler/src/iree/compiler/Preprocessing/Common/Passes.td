@@ -27,6 +27,25 @@ def ApplyPDLPatternsPass : Pass<"iree-preprocessing-apply-pdl-patterns", "Module
   ];
 }
 
+
+def ApplyPDLLPatternsPass : Pass<"iree-preprocessing-apply-pdll-patterns", "ModuleOp"> {
+  let summary = "Parse an input file containing PDLL patterns and apply them as patterns";
+  let options = [
+    Option<"patternsFile", "patterns-file", "std::string",
+      /*default=*/"", "File path to file containing PDLL patterns to use.">,
+  ];
+  let dependentDialects = [
+    "iree_compiler::IREE::Codegen::IREECodegenDialect",
+    "iree_compiler::IREE::Flow::FlowDialect",
+    "iree_compiler::IREE::Stream::StreamDialect",
+    "iree_compiler::IREE::Util::UtilDialect",
+    "mlir::arith::ArithDialect",
+    "mlir::memref::MemRefDialect, pdl::PDLDialect",
+    "mlir::pdl_interp::PDLInterpDialect",
+    "mlir::tensor::TensorDialect",
+  ];
+}
+
 def ConvertConv2DToImg2ColPass :
     Pass<"iree-preprocessing-convert-conv2d-to-img2col", ""> {
   let summary = "Convert linalg convolution ops to matmul img2col based implementation";

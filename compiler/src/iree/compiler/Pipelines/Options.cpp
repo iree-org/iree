@@ -219,7 +219,8 @@ void SchedulingOptions::bindOptions(OptionsBinder &binder) {
 void PreprocessingOptions::bindOptions(OptionsBinder &binder) {
   static llvm::cl::OptionCategory category(
       "IREE options for apply custom preprocessing before normal IREE "
-      "compilation flow");
+      "compilation flow (ordered transform dialect -> pdl -> "
+      "pdll)");
 
   binder.opt<std::string>(
       "iree-preprocessing-pass-pipeline", preprocessingPassPipeline,

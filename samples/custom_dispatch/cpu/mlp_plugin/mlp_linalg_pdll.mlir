@@ -1,8 +1,6 @@
-// RUN: mlir-pdll %p/mlp_all_specs.pdll -x=mlir -I%S/../../../..//third_party/torch-mlir/include -I%S/../../../..//samples/custom_dispatch/cpu/mlp_plugin -I%S/../../../..//third_party/llvm-project/mlir/include -I%S/../../../../-build/llvm-project/tools/mlir/include > %t && \ 
-// RUN: iree-compile --iree-preprocessing-pdl-spec-filename=%t %s --compile-to=preprocessing | FileCheck %s
+// RUN: iree-compile --iree-preprocessing-pdll-spec-filename=%p/mlp_all_specs.pdll %s --compile-to=preprocessing | FileCheck %s
 
-// RUN: mlir-pdll %p/mlp_all_specs.pdll -x=mlir -I%S/../../../..//third_party/torch-mlir/include -I%S/../../../..//samples/custom_dispatch/cpu/mlp_plugin -I%S/../../../..//third_party/llvm-project/mlir/include -I%S/../../../../-build/llvm-project/tools/mlir/include > %t && \ 
-// RUN: iree-compile --iree-preprocessing-pdl-spec-filename=%t %s | \
+// RUN: iree-compile --iree-preprocessing-pdll-spec-filename=%p/mlp_all_specs.pdll %s | \
 // RUN:   iree-run-module --device=local-sync \
 // RUN:     --executable_plugin=$IREE_BINARY_DIR/samples/custom_dispatch/cpu/mlp_plugin/mlp_plugin$IREE_DYLIB_EXT \
 // RUN:     --module=- \
