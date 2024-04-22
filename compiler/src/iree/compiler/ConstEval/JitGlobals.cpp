@@ -603,12 +603,6 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
     SupportedFeatures s;
     Builder b(context);
 
-    // Exclude vmvx backend since there is no i4 support there causing
-    // the `eval_i4_tensor` test in `jit_globals.mlir` to fail.
-    // TODO(#16321): Enable on other backends once this has been tested
-    // outside llvm-cpu.
-    if (requestedTargetDevice == "llvm-cpu" && hasRequestedTargetDevice)
-      s.addScalarType(b.getIntegerType(4));
     s.addScalarType(b.getIntegerType(8));
     s.addScalarType(b.getIntegerType(16));
     s.addScalarType(b.getIntegerType(32));
@@ -617,10 +611,6 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
 
     s.addElementType(b.getIntegerType(1));
 
-    // TODO(#16321): Enable on other backends once this has been tested outside
-    // llvm-cpu.
-    if (requestedTargetDevice == "llvm-cpu" && hasRequestedTargetDevice)
-      s.addElementType(b.getIntegerType(4));
     s.addElementType(b.getIntegerType(8));
     s.addElementType(b.getIntegerType(16));
     s.addElementType(b.getIntegerType(32));
@@ -655,6 +645,8 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
 
       FunctionCall call(binary, jitFunction.argumentBindings.size(),
                         jitFunction.resultBindings.size());
+      if (failed(call.initialize(jitFunction.loc)))
+        return failure();
 
       // Convert arguments.
       for (ArgumentBinding &arg : jitFunction.argumentBindings) {

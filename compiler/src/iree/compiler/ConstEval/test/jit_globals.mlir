@@ -1,6 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-consteval-jit-target-device=vmvx --verify-diagnostics --iree-consteval-jit-debug --iree-consteval-jit-globals  %s | FileCheck %s
-
-// TODO(laurenzo): Full type matrix for tests.
+// RUN: iree-opt --split-input-file --iree-consteval-jit-globals --iree-consteval-jit-debug --verify-diagnostics %s | FileCheck %s
 
 module @no_uninitialized {
   util.global private @hoisted : tensor<5x6xf32> = dense<4.0> : tensor<5x6xf32>
@@ -66,15 +64,17 @@ module @eval_splat_detection {
 // -----
 
 // CHECK-LABEL: @eval_f16_tensor
+// CHECK: util.global private @[[EVALED:.+]] = dense<2.000000e+02> : tensor<5x6xf16>
 module @eval_f16_tensor {
   util.global private @hoisted : tensor<5x6xf16>
-  // expected-warning @+1 {{unsupported type for current jit configuration}}
+  // CHECK-NOT: util.initializer
   util.initializer {
     %cst = arith.constant dense<2.0e+2> : tensor<5x6xf16>
     util.global.store %cst, @hoisted : tensor<5x6xf16>
     util.return
   }
   util.func public @main() -> tensor<5x6xf16> {
+    // CHECK: util.global.load @[[EVALED]]
     %hoisted = util.global.load @hoisted : tensor<5x6xf16>
     util.return %hoisted : tensor<5x6xf16>
   }
@@ -82,18 +82,18 @@ module @eval_f16_tensor {
 
 // -----
 
-// bf16 currently unsupported (initializer should remain).
-
 // CHECK-LABEL: @eval_bf16_tensor
+// CHECK: util.global private @[[EVALED:.+]] = dense<2.000000e+02> : tensor<5x6xbf16>
 module @eval_bf16_tensor {
   util.global private @hoisted : tensor<5x6xbf16>
-  // expected-warning @+1 {{unsupported type for current jit configuration}}
+  // CHECK-NOT: util.initializer
   util.initializer {
     %cst = arith.constant dense<2.0e+2> : tensor<5x6xbf16>
     util.global.store %cst, @hoisted : tensor<5x6xbf16>
     util.return
   }
   util.func public @main() -> tensor<5x6xbf16> {
+    // CHECK: util.global.load @[[EVALED]]
     %hoisted = util.global.load @hoisted : tensor<5x6xbf16>
     util.return %hoisted : tensor<5x6xbf16>
   }
@@ -121,15 +121,17 @@ module @eval_f32_tensor {
 // -----
 
 // CHECK-LABEL: @eval_f64_tensor
+// CHECK: util.global private @[[EVALED:.+]] = dense<[2.000000e+02, 3.200000e+03]> : tensor<2xf64>
 module @eval_f64_tensor {
   util.global private @hoisted : tensor<2xf64>
-  // expected-warning @+1 {{unsupported type for current jit configuration}}
+  // CHECK-NOT: util.initializer
   util.initializer {
     %cst = arith.constant dense<[2.0e+2, 3.2e+3]> : tensor<2xf64>
     util.global.store %cst, @hoisted : tensor<2xf64>
     util.return
   }
   util.func public @main() -> tensor<2xf64> {
+    // CHECK: util.global.load @[[EVALED]]
     %hoisted = util.global.load @hoisted : tensor<2xf64>
     util.return %hoisted : tensor<2xf64>
   }

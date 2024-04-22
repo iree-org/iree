@@ -68,6 +68,7 @@ iree_cc_library(
   DEPS
     LLVMSupport
     MLIRIR
+    iree::base
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::VM::Target::Bytecode
     iree::hal
