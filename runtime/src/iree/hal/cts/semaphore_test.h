@@ -277,7 +277,25 @@ TEST_P(semaphore_test, PingPong) {
   iree_hal_semaphore_release(b2a);
 }
 
-// TODO: test waiting the same value multiple times.
+// Waiting the same value multiple times.
+TEST_P(semaphore_test, WaitOnTheSameValueMultipleTimes) {
+  iree_hal_semaphore_t* semaphore = CreateSemaphore();
+  std::thread thread(
+      [&]() { IREE_ASSERT_OK(iree_hal_semaphore_signal(semaphore, 1)); });
+
+  IREE_ASSERT_OK(iree_hal_semaphore_wait(
+      semaphore, 1, iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
+  CheckSemaphoreValue(semaphore, 1);
+
+  IREE_ASSERT_OK(iree_hal_semaphore_wait(
+      semaphore, 1, iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
+  CheckSemaphoreValue(semaphore, 1);
+
+  thread.join();
+
+  iree_hal_semaphore_release(semaphore);
+}
+
 // TODO: test waiting for a finite amount of time.
 
 }  // namespace cts
