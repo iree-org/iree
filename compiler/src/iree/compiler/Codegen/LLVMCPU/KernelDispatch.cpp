@@ -2348,11 +2348,11 @@ static LogicalResult
 setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
                                ArrayRef<Operation *> computeOps,
                                Operation *rootOperation) {
-  if (isa<linalg::ConvolutionOpInterface>(rootOperation)) {
-    // TODO(dcaballe): We don't know yet how to properly propagate the lowering
-    // config of a convolution.
-    return success();
-  }
+  // if (isa<linalg::ConvolutionOpInterface>(rootOperation)) {
+  //   // TODO(dcaballe): We don't know yet how to properly propagate the lowering
+  //   // config of a convolution.
+  //   return success();
+  // }
 
   auto ctx = entryPointFn.getContext();
   auto rootLoweringConfig = getLoweringConfig(rootOperation);
