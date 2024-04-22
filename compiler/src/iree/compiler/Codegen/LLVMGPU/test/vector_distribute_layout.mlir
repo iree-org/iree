@@ -23,7 +23,6 @@ func.func @mfma_matmul_96x64x16_mm(%lhs: vector<96x16xf16>, %rhs: vector<16x64xf
 //      CHECK: contract C vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [3, 2], outers_per_batch = [4, 1], threads_per_outer = [2, 32], elements_per_thread = [4, 1],
 // CHECK-SAME:   subgroup_basis = [1, 1, 1], subgroup_active_ids = [true, true, false], thread_basis = [2, 32]>
->>>>>>> 91dd5a41ff (more test fixes)
 
 // -----
 
