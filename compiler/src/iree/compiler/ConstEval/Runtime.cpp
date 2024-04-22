@@ -20,11 +20,15 @@ namespace mlir::iree_compiler::ConstEval {
 
 namespace {
 
-LogicalResult handleRuntimeError(Location loc, iree_status_t status) {
+LogicalResult handleRuntimeError(Location loc, iree_status_t status,
+                                 bool freeStatus = true) {
   if (iree_status_is_ok(status))
     return success();
-  return emitError(loc) << "runtime error in consteval: "
-                        << iree::Status::ToString(status);
+  std::string statusString = iree::Status::ToString(status);
+  if (freeStatus) {
+    iree_status_ignore(status);
+  }
+  return emitError(loc) << "runtime error in consteval: " << statusString;
 }
 
 LogicalResult convertToElementType(Location loc, Type baseType,
@@ -433,7 +437,9 @@ TypedAttr CompiledBinary::convertVariantToAttribute(Location loc,
 LogicalResult CompiledBinary::initialize(Location loc, void *data,
                                          size_t length) {
   Runtime &runtime = Runtime::getInstance();
-  if (failed(handleRuntimeError(loc, runtime.initStatus))) {
+  // Keep the sticky initStatus alive then free in |runtime|'s destructor.
+  if (failed(
+          handleRuntimeError(loc, runtime.initStatus, /*freeStatus=*/false))) {
     return failure();
   }
 
@@ -520,6 +526,7 @@ Runtime::Runtime() {
 }
 
 Runtime::~Runtime() {
+  iree_status_free(initStatus);
   instance.reset();
   iree_hal_driver_registry_free(registry);
 }
