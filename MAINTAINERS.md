@@ -23,7 +23,7 @@ uncovered components, questions of project direction, etc.
 ## Compiler Maintainers
 
 * Runtime Interface: Ben Vanik (@benvanik)
-* High Level Optimizations:  Mahesh Ravishankar (@MaheshRavishankar)
+* High Level Optimizations: Mahesh Ravishankar (@MaheshRavishankar)
 * Code Generation: Mahesh Ravishankar (@MaheshRavishankar)
 * Input Pipelines:
 
