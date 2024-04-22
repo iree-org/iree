@@ -1,4 +1,6 @@
-// Native rewrite "rewriteAsFlowDispatch"
+// declare native rewrite called "rewriteAsFlowDispatch". This will
+// rewrite the matched op with an external function called fn_name 
+// ("mlp_external" defined in mlp_plugin.c)
 Rewrite rewriteAsFlowDispatch(
         op : Op, fn_name : Attr, 
         inputs : ValueRange, 
@@ -8,7 +10,8 @@ Rewrite rewriteAsFlowDispatch(
 
 
 Pattern mlp_linalg with benefit(1) {
-  // Types
+  // Types. These constrain the types of the various arguments and
+  // results and ensure that these values are properly matched
   let LhsTy = type<"tensor<?x?xf32>">;
   let RhsTy = type<"tensor<?x?xf32>">;
   let MatMulTy = type<"tensor<?x?xf32>">;
@@ -17,7 +20,27 @@ Pattern mlp_linalg with benefit(1) {
   let BoolTy = type<"i1">;
   let FloatTy = type<"f32">;
 
-  // Opt to match against
+  // We are trying to find 3 ops (arith.constant, linalg.fill, linalg.matmul)
+  // which form the following DAG:
+  // +----------------+                          
+  // | arith.constant |                          
+  // | value = 0.0:f32|                          
+  // +-+--------------+                          
+  //   |                                         
+  //   | FloatTy (f32)                           
+  //   v                                         
+  // +----------------+                          
+  // |  linalg.fill   | <-- empty: any type      
+  // +-+--------------+                          
+  //   |                                         
+  //   | FloatTy (f32)                           
+  //   v                                         
+  // +----------------+                          
+  // |                | <--  lhs: tensor<?x?xf32>
+  // |  linalg.matmul |                          
+  // |                | <--  rhs: tensor<?x?xf32>
+  // +----------------+                          
+  //                                             
   let zeroVal = op<arith.constant> { value = attr<"0.000000e+00 : f32"> } -> (FloatTy);
   let fillOp = op<linalg.fill> (zeroVal.0, empty : Value) -> (MatMulTy);
   let matMulOp = op<linalg.matmul> 
@@ -43,10 +66,9 @@ Pattern mlp_linalg with benefit(1) {
     let repl_dims = (m.0, n.0);
     let other = (m_cast.0, n_cast.0, k_cast.0, doRelu.0);
 
-    // oof, figuring out i needed to escape the string took too long :( 
-    let fn_name = attr<"\"mlp_external\"">;
+    // rewrite to call the external funciton "mlp_external"
     rewriteAsFlowDispatch(
-      matMulOp, fn_name, 
+      matMulOp, attr<"\"mlp_external\"">, 
       inputs, repl_vals, 
       repl_dims, other);
   };
