@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
-#include "iree/compiler/Codegen/Common/TileSizeSelection.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -44,7 +43,8 @@ static bool foldHDim(linalg::DepthwiseConv2DNhwcHwcOp convOp) {
 ///
 /// At the moment only Depthwise HWC convolutions are supported.
 static FailureOr<IREE::Codegen::LoweringConfigAttr>
-computeNewLCA(ArrayRef<Operation *> computeOps, MLIRContext *context) {
+computeDecomposedLoweringConfig(ArrayRef<Operation *> computeOps,
+                                MLIRContext *context) {
 
   // 0.1 Double-check that there's only one convolution Op.
   // TODO: Make this hook work with multiple conv Ops
@@ -55,7 +55,7 @@ computeNewLCA(ArrayRef<Operation *> computeOps, MLIRContext *context) {
          "Exactly 1 Linalg Conv Op is expected");
 
   // 1. Get the conv Op to update
-  // 1.1. ATM only 2D depthwise HWC convs are supported.
+  // ATM only 2D depthwise HWC convs are supported.
   // TODO: Add support for other convs
   linalg::DepthwiseConv2DNhwcHwcOp convOp;
   for (auto op : computeOps) {
@@ -69,7 +69,7 @@ computeNewLCA(ArrayRef<Operation *> computeOps, MLIRContext *context) {
     return failure();
   }
 
-  // 1.2. ATM only folding of the H dim is supported.
+  // ATM only folding of the H dim is supported.
   // TODO: Add support for cases where the W dim is folded.
   if (!foldHDim(convOp))
     return failure();
@@ -89,12 +89,12 @@ computeNewLCA(ArrayRef<Operation *> computeOps, MLIRContext *context) {
   // Note that this will basically erase the _H_ dims from the orignal lowering
   // config.
   auto dims = linalg::inferConvolutionDims(convOp);
-  SmallVector<unsigned> hDimsToErase{dims->outputImage[0], dims->filterLoop[0]};
+  SmallVector<unsigned> hDimsToErase = {dims->outputImage[0],
+                                        dims->filterLoop[0]};
   llvm::sort(hDimsToErase, [](auto x, auto y) { return x > y; });
 
-  auto tilingLevels = loweringConfigAttr.value().getTilingLevels();
   SmallVector<IREE::Codegen::LoweringConfigTilingLevelAttr> newTilingLevelsList;
-  for (auto level : tilingLevels) {
+  for (auto level : loweringConfigAttr.value().getTilingLevels()) {
     SmallVector<int64_t> newSizes(level.getSizes());
     SmallVector<bool> newScalableFlags(level.getScalableFlags());
 
@@ -108,19 +108,16 @@ computeNewLCA(ArrayRef<Operation *> computeOps, MLIRContext *context) {
     }
 
     auto newLevel = IREE::Codegen::LoweringConfigTilingLevelAttr::get(
-        context, newSizes, ArrayRef<int64_t>{}, newScalableFlags);
+        context, newSizes, /*interchange=*/{}, newScalableFlags);
     newTilingLevelsList.push_back(newLevel);
   }
 
   // 4. Create and return a new lowering config attribute.
   auto newTilingLevels = IREE::Codegen::LoweringConfigTilingLevelsAttr::get(
       context, newTilingLevelsList);
-  IREE::Codegen::LoweringConfigAttr newLCA =
-      IREE::Codegen::LoweringConfigAttr::get(
-          context, newTilingLevels,
-          loweringConfigAttr.value().getNativeVectorSize());
-
-  return newLCA;
+  return IREE::Codegen::LoweringConfigAttr::get(
+      context, newTilingLevels,
+      loweringConfigAttr.value().getNativeVectorSize());
 }
 
 class DecomposeConvolutionToLowerDimOpsPass
@@ -145,9 +142,9 @@ class DecomposeConvolutionToLowerDimOpsPass
       return;
     }
 
-    FailureOr<IREE::Codegen::LoweringConfigAttr> newLCA;
+    FailureOr<IREE::Codegen::LoweringConfigAttr> newLoweringConfig;
     if (numConvOps == 1) {
-      newLCA = computeNewLCA(computeOps, context);
+      newLoweringConfig = computeDecomposedLoweringConfig(computeOps, context);
     }
 
     // 2. Run the patterns. This is the key part of this pass.
@@ -161,11 +158,11 @@ class DecomposeConvolutionToLowerDimOpsPass
     // 3. If there's exactly 1 conv in this function (most common case), attach
     // a "decomposed" lowering config created earlier to the newly decomposed
     // conv Op.
-    if (numConvOps == 1 && !failed(newLCA)) {
+    if (numConvOps == 1 && succeeded(newLoweringConfig)) {
       auto computeOps = getComputeOps(funcOp);
       for (auto computeOp : computeOps) {
         if (isa<linalg::DepthwiseConv1DNwcWcOp>(computeOp))
-          setLoweringConfig(computeOp, newLCA.value());
+          setLoweringConfig(computeOp, newLoweringConfig.value());
       }
     }
   }

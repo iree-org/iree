@@ -288,11 +288,9 @@ LoweringConfigAttr::getTileInterchangeVals(unsigned level) {
 }
 
 bool LoweringConfigAttr::isInterchangeEmpty() {
-  bool empty = true;
-  for (auto level : getTilingLevels())
-    empty |= level.getInterchange().empty();
-
-  return empty;
+  return llvm::none_of(getTilingLevels(), [](auto level) {
+    return !level.getInterchange().empty();
+  });
 }
 
 LogicalResult
