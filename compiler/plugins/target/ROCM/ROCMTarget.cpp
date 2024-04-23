@@ -566,10 +566,10 @@ public:
 
       // Optional source location information for debugging/profiling.
       if (serOptions.debugLevel >= 1) {
-        // We only ever resize to the maximum -- so all previous data will
-        // be kept as-is.
-        sourceLocationRefs.resize(exportOps.size());
         if (auto loc = findFirstFileLoc(exportOp.getLoc())) {
+          // We only ever resize to the maximum -- so all previous data will
+          // be kept as-is.
+          sourceLocationRefs.resize(exportOps.size());
           auto filenameRef = builder.createString(loc->getFilename());
           sourceLocationRefs[ordinal] = iree_hal_rocm_FileLineLocDef_create(
               builder, filenameRef, loc->getLine());
