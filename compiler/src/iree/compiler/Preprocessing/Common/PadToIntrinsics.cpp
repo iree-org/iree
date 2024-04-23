@@ -525,38 +525,33 @@ void PadToIntrinsicsPass::runOnOperation() {
                     padTargetType == PadTargetType::All;
   bool padContractionOps = padTargetType == PadTargetType::ContractionOp ||
                            padTargetType == PadTargetType::All;
-  SmallVector<linalg::LinalgOp> targetOps;
+  SmallVector<linalg::LinalgOp> targetConvOps;
+  SmallVector<linalg::LinalgOp> targetContractOps;
   funcOp.walk([&](linalg::LinalgOp linalgOp) {
     if (isa<linalg::Conv2DNhwcHwcfOp>(linalgOp.getOperation()) && padConvOps) {
       // Add convOps into worklist.
-      targetOps.push_back(linalgOp);
+      targetConvOps.push_back(linalgOp);
     } else if (isa<linalg::BatchMatmulOp, linalg::MatmulOp,
                    linalg::MatmulTransposeBOp>(linalgOp.getOperation()) &&
                padContractionOps) {
       // Add named contractionOps into worklist.
-      targetOps.push_back(linalgOp);
+      targetContractOps.push_back(linalgOp);
     } else if (isa<linalg::GenericOp>(linalgOp.getOperation()) &&
                linalg::isaContractionOpInterface(linalgOp) &&
                padContractionOps) {
       // Add named generic contractionOps into worklist.
-      targetOps.push_back(linalgOp);
+      targetContractOps.push_back(linalgOp);
     }
   });
 
   IRRewriter rewriter(context);
-  for (auto linalgOp : targetOps) {
-    rewriter.setInsertionPoint(linalgOp);
-    TypeSwitch<Operation *, void>(linalgOp.getOperation())
-        .Case<linalg::Conv2DNhwcHwcfOp>(
-            [&](auto convOp) { padConvOp(rewriter, linalgOp); })
-        .Case<linalg::BatchMatmulOp, linalg::MatmulOp,
-              linalg::MatmulTransposeBOp, linalg::GenericOp>(
-            [&](auto matmulOp) { padContractionLikeOp(rewriter, linalgOp); })
-        .Default([&](Operation *op) {
-          // Should not happen since we only add ops we know into the
-          // worklist.
-          assert(false && "Unsupported op to pad.");
-        });
+  for (auto contractOp : targetContractOps) {
+    rewriter.setInsertionPoint(contractOp);
+    padContractionLikeOp(rewriter, contractOp);
+  }
+  for (auto convOp : targetConvOps) {
+    rewriter.setInsertionPoint(convOp);
+    padConvOp(rewriter, convOp);
   }
 }
 
