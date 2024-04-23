@@ -1,0 +1,114 @@
+// PDLL pattern spec to match an MLP and offload to an external function.
+
+//
+// ```
+// void mlp_external(void *params, void *context, void *reserved)
+// ```
+//
+// which is the expected signature of an external function implemented
+// provided by a system plugin. See
+// samples/custom_dispatch/cpu/plugin/system_plugin.c for an example.
+//
+// The `params` is the following struct
+//
+// ```
+// struct mlp_params_t {
+//   const float *restrict lhs;
+//   size_t lhs_offset;
+//   const float *restrict rhs;
+//   size_t rhs_offset;
+//   int32_t M;
+//   int32_t N;
+//   int32_t K;
+//   float *restrict result;
+//   size_t result_offset;
+// };
+// ```
+//
+// In MLIR this corresponds to the function
+//
+// ```
+// func.func @mlp_external(%lhs : memref<..xf32>, %rhs : memref<..xf32>,
+//     %M: i32, %N : i32, %K : i32, %result : memref<..xf32>)
+// ```
+//
+// Note: In the above struct a `pointer, offset` pair represents a buffer
+// passed into the external function. So any access to `lhs`, `rhs` and
+// `result` is valid only if accessed as `lhs[lhs_offset + ...]`,
+// `rhs[rhs_offset + ]` and `result[result_offset + ...]`.
+
+// declare native rewrite called "rewriteAsFlowDispatch"
+Rewrite rewriteAsFlowDispatch(
+        op : Op, fn_name : Attr, 
+        inputs : ValueRange, 
+        repl_vals : ValueRange, 
+        repl_dims : ValueRange, 
+        other : ValueRange);
+
+
+Pattern mlp_torch with benefit(1) {
+  // Types
+  let IntTy = type<"i32">;
+  let IndexTy = type<"index">;
+  let BoolTy = type<"i1">;
+  let FloatTy = type<"f32">;
+  let TensorTy = type<"tensor<?x?xf32>">;
+  let TorchTensorType : Type;
+
+
+
+  // Opt to match against
+  let lhs_torch = op<torch_c.from_builtin_tensor>(lhs : Value<TensorTy>) -> (TorchTensorType);
+  let rhs_torch = op<torch_c.from_builtin_tensor>(rhs: Value<TensorTy>) -> (TorchTensorType);
+  let matMulOp = op<torch.aten.mm>(lhs_torch.0, rhs_torch.0) -> (MatMulTy : TypeRange);
+  let reluOp = op<torch.aten.relu>(matMulOp.0) -> (MatMulTy);
+  let castOp = op<torch_c.to_builtin_tensor>(reluOp.0) -> (MatMulTy);
+
+
+  rewrite reluOp with {
+    let zeroOp = op<arith.constant> { value = attr<"0 : index"> } 
+      -> (IndexTy);
+    let oneOp = op<arith.constant> { value = attr<"1 : index"> } 
+      -> (IndexTy);
+    let m = op<tensor.dim>(lhs, zeroOp) -> (IndexTy);
+    let n = op<tensor.dim>(rhs, oneOp)  -> (IndexTy);
+    let k = op<tensor.dim>(lhs, oneOp); 
+    let m_cast = op<arith.index_cast>(m)  -> (IntTy);
+    let n_cast = op<arith.index_cast>(n) -> (IntTy);
+    let k_cast = op<arith.index_cast>(k) -> (IntTy);
+
+
+
+    let doRelu = op<arith.constant> { value = attr<"1 : i1">};
+    let inputs = (lhs, rhs);
+    let repl_vals = (castOp.0 );
+    let repl_dims = (m.0, n.0);
+    let other = (m_cast.0, n_cast.0, k_cast.0, doRelu.0);
+
+
+    
+    // The `rewriteAsFlowDispatch` is a rewrite function that allows
+    // converting the matched dag into a call to the external function call
+    // provided by a system plugin. The rewrite method expects the following
+    // arguments
+    // - the root of the matched DAG. This op will be erased after the call.
+    // - `fn_name` the name of the function that is provided externally
+    //   (using a plugin).
+    // - `input_values` are values that are captures as the part of the match
+    //   and are inputs to the match.
+    // - `replaced_values` are the values that are captured as part of the
+    //   match and are replaced by the `flow.dispatch`. The `flow.dispatch`
+    //   returns as many values as `replaced_values` (and of same type).
+    // - `replaced_values_dims` are the values for the dynamic dimensions of
+    //   all the `tensor` values in `replaced_values`. For matches that could
+    //   be static or dynamic, it should be assumed that the shape is dynamic
+    //   and the value needs to be passed to the rewrite function.
+    // - `other_operands` same as `input_values`, but kept separate to allow
+    //   flexibility of where the results are passed through the ABI boundary.
+    rewriteAsFlowDispatch(
+      castOp, attr<"\"mlp_external\"">, 
+      inputs, repl_vals, 
+      repl_dims, other);
+
+  };
+}
