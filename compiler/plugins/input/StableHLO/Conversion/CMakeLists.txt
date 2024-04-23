@@ -47,6 +47,7 @@ iree_cc_library(
   NAME
     StableHLOLegalization
   SRCS
+    "CheckVHLOStableHloMixUsage.cpp"
     "ConvertCollectives.cpp"
     "LegalizeCHLO.cpp"
     "LegalizeControlFlow.cpp"
