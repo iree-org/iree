@@ -80,10 +80,23 @@ def MakeSingleDispatchForFunctionPass :
 }
 
 def PadToIntrinsics :
-    Pass<"iree-preprocessing-pad-to-intrinsics", ""> {
+    InterfacePass<"iree-preprocessing-pad-to-intrinsics", "mlir::FunctionOpInterface"> {
   let summary = "Pad linalg ops such that we can use target's intrinsics.";
   let dependentDialects = [
     "mlir::linalg::LinalgDialect",
+  ];
+  let options = [
+      Option<"padTargetType", "pad-target-type", "Preprocessing::PadTargetType",
+             /*default=*/"Preprocessing::PadTargetType::All",
+             "Pad target-op type that is being specified.",
+             [{::llvm::cl::values(
+               clEnumValN(Preprocessing::PadTargetType::ConvOp, "conv",
+                "Pad convolution ops to intrinsics."),
+               clEnumValN(Preprocessing::PadTargetType::ContractionOp, "contraction",
+                "Pad contraction ops to intrinsics."),
+               clEnumValN(Preprocessing::PadTargetType::All, "all",
+                "Pad all ops to intrinsics.")
+              )}]>,
   ];
 }
 
