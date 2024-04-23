@@ -27,9 +27,9 @@ graph LR
 
 See guides on how to use each framework with IREE:
 
-* [:simple-pytorch: PyTorch](./pytorch.md)
-* [:simple-onnx: ONNX](./onnx.md)
 * [:simple-python: JAX](./jax.md)
+* [:simple-onnx: ONNX](./onnx.md)
+* [:simple-pytorch: PyTorch](./pytorch.md)
 * [:simple-tensorflow: TensorFlow](./tensorflow.md) and
   [:simple-tensorflow: TensorFlow Lite](./tflite.md)
 

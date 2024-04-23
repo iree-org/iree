@@ -25,9 +25,9 @@ considerations of mobile and edge deployments.
 
 IREE supports importing from a variety of ML frameworks:
 
-- [x] PyTorch
-- [x] ONNX
 - [x] JAX
+- [x] ONNX
+- [x] PyTorch
 - [x] TensorFlow
 - [x] TensorFlow Lite
 
