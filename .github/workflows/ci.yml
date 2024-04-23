@@ -100,53 +100,55 @@ jobs:
             ./build_tools/cmake/ctest_all.sh \
             "${BUILD_DIR}"
 
-  build_test_all_windows:
-    needs: setup
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_test_all_windows')
-    # GitHub-hosted 64 core runners are too expensive and take too long to check out the repo
-    # TODO(scotttodd): disable GitHub-hosted if too slow
-    # TODO(saienduri): switch to self-hosted
-    runs-on: windows-2022
-    defaults:
-      run:
-        shell: bash
-    env:
-      BUILD_DIR: build-windows
-    steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-        with:
-          submodules: true
-      - id: "gcp-auth"
-        name: "Authenticating to Google Cloud"
-        if: needs.setup.outputs.write-caches == 1
-        uses: "google-github-actions/auth@v1"
-        with:
-          token_format: "access_token"
-          credentials_json: "${{ secrets.IREE_OSS_GITHUB_RUNNER_BASIC_TRUST_SERVICE_ACCOUNT_KEY }}"
-          create_credentials_file: false
-      - name: "Setting up Python"
-        uses: actions/setup-python@d27e3f3d7c64b4bbf8e4abfb9b63b83e846e0435 # v4.5.0
-        with:
-          python-version: "3.10" # Needs pybind >= 2.10.1 for Python >= 3.11
-      - name: "Installing Python packages"
-        run: |
-          python3 -m venv .venv
-          .venv/Scripts/activate.bat
-          python3 -m pip install -r runtime/bindings/python/iree/runtime/build_requirements.txt
-      - name: "Installing requirements"
-        run: choco install ccache --yes
-      - name: "Configuring MSVC"
-        uses: ilammy/msvc-dev-cmd@7315a94840631165970262a99c72cfb48a65d25d # v1.12.0
-      # Finally: build and run tests.
-      - name: "Building IREE"
-        env:
-          IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
-          IREE_CCACHE_GCP_TOKEN: ${{ steps.gcp-auth.outputs.access_token }}
-          CCACHE_NAMESPACE: github-windows-2022-64core
-        run: ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
-      - name: "Testing IREE"
-        run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
+  # Disabled since
+  #   * windows-2022 is too slow
+  #   * windows-2022-64core is too expensive (and takes ~8 minutes just to checkout the repo)
+  #   * we don't have self-hosted Windows runners with enough cores yet
+  # build_test_all_windows:
+  #   needs: setup
+  #   if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_test_all_windows')
+  #   # TODO(saienduri): switch to self-hosted
+  #   runs-on: windows-2022
+  #   defaults:
+  #     run:
+  #       shell: bash
+  #   env:
+  #     BUILD_DIR: build-windows
+  #   steps:
+  #     - name: "Checking out repository"
+  #       uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+  #       with:
+  #         submodules: true
+  #     - id: "gcp-auth"
+  #       name: "Authenticating to Google Cloud"
+  #       if: needs.setup.outputs.write-caches == 1
+  #       uses: "google-github-actions/auth@v1"
+  #       with:
+  #         token_format: "access_token"
+  #         credentials_json: "${{ secrets.IREE_OSS_GITHUB_RUNNER_BASIC_TRUST_SERVICE_ACCOUNT_KEY }}"
+  #         create_credentials_file: false
+  #     - name: "Setting up Python"
+  #       uses: actions/setup-python@d27e3f3d7c64b4bbf8e4abfb9b63b83e846e0435 # v4.5.0
+  #       with:
+  #         python-version: "3.10" # Needs pybind >= 2.10.1 for Python >= 3.11
+  #     - name: "Installing Python packages"
+  #       run: |
+  #         python3 -m venv .venv
+  #         .venv/Scripts/activate.bat
+  #         python3 -m pip install -r runtime/bindings/python/iree/runtime/build_requirements.txt
+  #     - name: "Installing requirements"
+  #       run: choco install ccache --yes
+  #     - name: "Configuring MSVC"
+  #       uses: ilammy/msvc-dev-cmd@7315a94840631165970262a99c72cfb48a65d25d # v1.12.0
+  #     # Finally: build and run tests.
+  #     - name: "Building IREE"
+  #       env:
+  #         IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
+  #         IREE_CCACHE_GCP_TOKEN: ${{ steps.gcp-auth.outputs.access_token }}
+  #         CCACHE_NAMESPACE: github-windows-2022-64core
+  #       run: ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
+  #     - name: "Testing IREE"
+  #       run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
 
   build_test_all_macos_arm64:
     needs: setup
@@ -1066,7 +1068,7 @@ jobs:
 
       # Platforms
       - build_test_all_arm64
-      - build_test_all_windows
+      # - build_test_all_windows
       - build_test_all_macos_arm64
       - build_test_all_macos_x86_64
 
