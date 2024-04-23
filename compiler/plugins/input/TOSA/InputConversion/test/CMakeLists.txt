@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "apply_pdl_patterns_tosa.mlir"
+    "apply_pdll_patterns_tosa.mlir"
     "auto_input_conversion.mlir"
     "convert_i48_to_i64.mlir"
     "strip_signedness.mlir"
@@ -26,6 +27,7 @@ iree_lit_test_suite(
     iree-opt
   DATA
     tosa.pdl.mlir
+    tosa.pdll
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

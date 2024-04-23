@@ -1,3 +1,43 @@
+// PDLL pattern spec to match an MLP and offload to an external function.
+
+//
+// ```
+// void mlp_external(void *params, void *context, void *reserved)
+// ```
+//
+// which is the expected signature of an external function implemented
+// provided by a system plugin. See
+// samples/custom_dispatch/cpu/plugin/system_plugin.c for an example.
+//
+// The `params` is the following struct
+//
+// ```
+// struct mlp_params_t {
+//   const float *restrict lhs;
+//   size_t lhs_offset;
+//   const float *restrict rhs;
+//   size_t rhs_offset;
+//   int32_t M;
+//   int32_t N;
+//   int32_t K;
+//   float *restrict result;
+//   size_t result_offset;
+// };
+// ```
+//
+// In MLIR this corresponds to the function
+//
+// ```
+// func.func @mlp_external(%lhs : memref<..xf32>, %rhs : memref<..xf32>,
+//     %M: i32, %N : i32, %K : i32, %result : memref<..xf32>)
+// ```
+//
+// Note: In the above struct a `pointer, offset` pair represents a buffer
+// passed into the external function. So any access to `lhs`, `rhs` and
+// `result` is valid only if accessed as `lhs[lhs_offset + ...]`,
+// `rhs[rhs_offset + ]` and `result[result_offset + ...]`.
+
+
 // declare native rewrite called "rewriteAsFlowDispatch". This will
 // rewrite the matched op with an external function called fn_name 
 // ("mlp_external" defined in mlp_plugin.c)
@@ -66,7 +106,25 @@ Pattern mlp_linalg with benefit(1) {
     let repl_dims = (m.0, n.0);
     let other = (m_cast.0, n_cast.0, k_cast.0, doRelu.0);
 
-    // rewrite to call the external funciton "mlp_external"
+
+    // The `rewriteAsFlowDispatch` is a rewrite function that allows
+    // converting the matched dag into a call to the external function call
+    // provided by a system plugin. The rewrite method expects the following
+    // arguments
+    // - the root of the matched DAG. This op will be erased after the call.
+    // - `fn_name` the name of the function that is provided externally
+    //   (using a plugin).
+    // - `input_values` are values that are captures as the part of the match
+    //   and are inputs to the match.
+    // - `replaced_values` are the values that are captured as part of the
+    //   match and are replaced by the `flow.dispatch`. The `flow.dispatch`
+    //   returns as many values as `replaced_values` (and of same type).
+    // - `replaced_values_dims` are the values for the dynamic dimensions of
+    //   all the `tensor` values in `replaced_values`. For matches that could
+    //   be static or dynamic, it should be assumed that the shape is dynamic
+    //   and the value needs to be passed to the rewrite function.
+    // - `other_operands` same as `input_values`, but kept separate to allow
+    //   flexibility of where the results are passed through the ABI boundary.
     rewriteAsFlowDispatch(
       matMulOp, attr<"\"mlp_external\"">, 
       inputs, repl_vals, 

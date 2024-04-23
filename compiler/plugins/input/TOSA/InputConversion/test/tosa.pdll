@@ -1,4 +1,5 @@
 // PDLL pattern spec to match an MLP and offload to an external function.
+// See tosa.pdl.mlir for the implementation using PDL.
 
 //
 // ```
