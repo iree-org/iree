@@ -30,12 +30,13 @@ iree_gentbl_cc_library(
 iree_compiler_cc_library(
     name = "Transforms",
     srcs = [
-        "ApplyPDLPatterns.cpp",
         "ApplyPDLLPatterns.cpp",
+        "ApplyPDLPatterns.cpp",
         "ConvertConv2DToImg2Col.cpp",
         "ConvertConvToChannelsLast.cpp",
         "InterpreterPass.cpp",
         "MakeSingleDispatchForFunction.cpp",
+        "PDLUtilities.cpp",
         "PadLinalgOps.cpp",
         "PadToIntrinsics.cpp",
         "Passes.cpp",
@@ -43,9 +44,9 @@ iree_compiler_cc_library(
         "PDLUtilities.cpp",
     ],
     hdrs = [
+        "PDLUtilities.h",
         "Passes.h",
         "Passes.h.inc",
-        "PDLUtilities.h",
     ],
     deps = [
         ":PassesIncGen",
