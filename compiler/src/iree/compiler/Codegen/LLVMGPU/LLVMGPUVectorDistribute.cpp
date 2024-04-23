@@ -56,13 +56,15 @@ public:
   ContractionVectorLayoutOptions(Operation *root,
                                  ArrayRef<int64_t> workgroupSize,
                                  IREE::GPU::MMAScheduleAttr schedule,
-                                 Value laneId, bool printLayout)
+                                 Value laneId, int64_t subgroupSize,
+                                 bool printLayout)
       : VectorLayoutOptions(root, /*fullConversion=*/!printLayout),
         workgroupSize(workgroupSize), schedule(schedule),
         printLayout(printLayout), patterns(root->getContext()) {
     populateGPUDistributionPatterns(patterns);
     populateGPUDistributionLayoutAttrPatterns(laneId, patterns);
-    populateGPUDistributeNestedLayoutAttrPatterns(laneId, patterns);
+    populateGPUDistributeNestedLayoutAttrPatterns(patterns, laneId,
+                                                  subgroupSize);
   }
 
   LogicalResult setAnchorOps(VectorLayoutAnalysis &analysis) override {
@@ -371,7 +373,9 @@ public:
       std::optional<SmallVector<int64_t>> maybeWorkgroupSize =
           getWorkgroupSize(func);
       if (!maybeWorkgroupSize) {
-        return;
+        func->emitOpError()
+            << "unable to query workgroup_size information from entry point";
+        return signalPassFailure();
       }
       for (auto [index, value] : llvm::enumerate(maybeWorkgroupSize.value())) {
         workgroupSize[index] = value;
@@ -408,8 +412,16 @@ public:
     Value linearThreadIdVal = affine::makeComposedAffineApply(
         builder, func.getLoc(), linearId, threadGrid);
 
+    std::optional<int64_t> subgroupSize = getSubgroupSize(func);
+    if (!subgroupSize) {
+      func->emitOpError()
+          << "unable to query subgroup size information from entry point";
+      return signalPassFailure();
+    }
+
     ContractionVectorLayoutOptions options(func, workgroupSize, scheduleAttr,
-                                           linearThreadIdVal, testLayout);
+                                           linearThreadIdVal,
+                                           subgroupSize.value(), testLayout);
     if (failed(distributeVectorOps(func, options.getPatterns(), options))) {
       func->emitOpError() << "failed to distribute";
       return signalPassFailure();

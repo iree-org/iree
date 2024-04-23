@@ -37,8 +37,9 @@ void populateGPUDistributionLayoutAttrPatterns(Value laneId,
 void populateGPUReductionDistributionPatterns(RewritePatternSet &patterns,
                                               int64_t maxBitsPerShuffle = 32);
 
-void populateGPUDistributeNestedLayoutAttrPatterns(Value threadId,
-                                                   RewritePatternSet &patterns);
+void populateGPUDistributeNestedLayoutAttrPatterns(
+    RewritePatternSet &patterns, Value threadId, int64_t subgroupSize,
+    int64_t maxBitsPerShuffle = 32);
 
 // Adds patterns that distributes vector.contract ops with nested layout
 // annotations to amdgpu.mfma ops.
