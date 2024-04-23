@@ -544,14 +544,15 @@ void PadToIntrinsicsPass::runOnOperation() {
     }
   });
 
+  // Iterate through and pad ops in the worklists.
   IRRewriter rewriter(context);
-  for (auto contractOp : targetContractOps) {
-    rewriter.setInsertionPoint(contractOp);
-    padContractionLikeOp(rewriter, contractOp);
-  }
   for (auto convOp : targetConvOps) {
     rewriter.setInsertionPoint(convOp);
     padConvOp(rewriter, convOp);
+  }
+  for (auto contractOp : targetContractOps) {
+    rewriter.setInsertionPoint(contractOp);
+    padContractionLikeOp(rewriter, contractOp);
   }
 }
 
