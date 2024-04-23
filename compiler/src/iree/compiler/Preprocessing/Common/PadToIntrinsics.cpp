@@ -58,7 +58,7 @@ getExpandedValue(RewriterBase &rewriter, Location loc, Value expandSource,
                  AffineMap &operandMap,
                  SmallVector<std::pair<int64_t, int64_t>> &dimsToExpand) {
   auto srcType = cast<RankedTensorType>(expandSource.getType());
-  auto srcShape = srcType.getShape();
+  ArrayRef<int64_t> srcShape = srcType.getShape();
   SetVector<int64_t> operandDimsToExpand;
   SmallVector<std::optional<int64_t>> operandDimToExpandSize(srcType.getRank(),
                                                              std::nullopt);
@@ -115,8 +115,8 @@ expandMapsAndIterators(SmallVector<AffineMap> &expandedMaps,
                        SmallVector<utils::IteratorType> &expandedIterators,
                        SmallVector<std::pair<int64_t, int64_t>> &dimsToExpand) {
   int expandOffset = 0;
-  SmallVector<int64_t> dimsToExpandVec = llvm::to_vector(
-      llvm::map_range(dimsToExpand, [](auto &dim) { return dim.first; }));
+  auto dimsToExpandVec =
+      llvm::to_vector_of<int64_t>(llvm::make_first_range(dimsToExpand));
   llvm::sort(dimsToExpandVec);
   for (auto [expandIdx, expandDim] : llvm::enumerate(dimsToExpandVec)) {
     // Creating iterator type for newly expanded/dst dim from it's expand
@@ -126,8 +126,7 @@ expandMapsAndIterators(SmallVector<AffineMap> &expandedMaps,
                              expandedIterators[expandSrcDim]);
     // Updating map of each operand to handle newly expanded/dst dim
     // based on the location of it's expand source dim.
-    for (int operandIdx = 0; operandIdx < expandedMaps.size(); operandIdx++) {
-      AffineMap &map = expandedMaps[operandIdx];
+    for (AffineMap &map : expandedMaps) {
       int64_t expandSrcDim = expandDim + expandOffset;
       int64_t expandDstDim = expandSrcDim + 1;
       map = map.shiftDims(1, expandDstDim);
@@ -327,15 +326,15 @@ static void padContractionLikeOp(RewriterBase &rewriter,
     return;
   }
 
-  // Util to get operand and dim;
+  // Util fn to get a linalgOp dim's src operand and dim from operand's POV.
   auto getSrcOperandAndDim =
       [&](int64_t targetDim) -> std::optional<std::pair<Value, int64_t>> {
-    for (auto operand : linalgOp.getDpsInputOperands()) {
+    for (OpOperand *operand : linalgOp.getDpsInputOperands()) {
       auto operandMap = linalgOp.getMatchingIndexingMap(operand);
       std::optional<unsigned> maybeDim = operandMap.getResultPosition(
           getAffineDimExpr(targetDim, operandMap.getContext()));
       if (maybeDim)
-        return std::make_pair(operand->get(), maybeDim.value());
+        return std::pair{operand->get(), maybeDim.value()};
     }
     return std::nullopt;
   };
@@ -355,7 +354,7 @@ static void padContractionLikeOp(RewriterBase &rewriter,
   SmallVector<std::array<OpFoldResult, 3>> mnkPaddingCandidates;
   // Compute Pad and Expand metadata for linalgOp's M, N, K dimensions. Multiple
   // candidates of the metadata will be formed based on different intrinsics.
-  for (auto &intrinsic : intrinsics) {
+  for (GPUMatmulShapeType &intrinsic : intrinsics) {
     std::optional<OpFoldResult> mPadding, nPadding, kPadding;
     SmallVector<std::pair<int64_t, int64_t>> dimsToExpandCandidate;
     if (mSize % intrinsic.mSize != 0 || ShapedType::isDynamic(mSize)) {
@@ -490,10 +489,10 @@ static void padContractionLikeOp(RewriterBase &rewriter,
     }
   }
 
-  // extract slice.
+  // Extract slice.
   auto resultType = cast<RankedTensorType>(linalgOp->getResult(0).getType());
-  auto resultShape = resultType.getShape();
-  auto resultRank = resultType.getRank();
+  ArrayRef<int64_t> resultShape = resultType.getShape();
+  int64_t resultRank = resultType.getRank();
   auto one = rewriter.getIndexAttr(1);
   SmallVector<OpFoldResult> offsets(resultRank, zero), strides(resultRank, one),
       sizes;
@@ -553,7 +552,11 @@ void PadToIntrinsicsPass::runOnOperation() {
         .Case<linalg::BatchMatmulOp, linalg::MatmulOp,
               linalg::MatmulTransposeBOp, linalg::GenericOp>(
             [&](auto matmulOp) { padContractionLikeOp(rewriter, linalgOp); })
-        .Default([&](Operation *op) {});
+        .Default([&](Operation *op) {
+          // Should not happen since we only add ops we know into the
+          // worklist.
+          assert(false && "Unsupported op to pad.");
+        });
   }
 }
 
