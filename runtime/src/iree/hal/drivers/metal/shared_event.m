@@ -149,7 +149,10 @@ static iree_status_t iree_hal_metal_shared_event_wait(iree_hal_semaphore_t* base
     apple_timeout_ns = DISPATCH_TIME_NOW;
   } else {
     iree_time_t now_ns = iree_time_now();
-    timeout_ns = deadline_ns < now_ns ? 0 : (uint64_t)(deadline_ns - now_ns);
+    if (deadline_ns < now_ns) {
+      return iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
+    }
+    timeout_ns = (uint64_t)(deadline_ns - now_ns);
     apple_timeout_ns = dispatch_time(DISPATCH_TIME_NOW, timeout_ns);
   }
 
@@ -216,7 +219,10 @@ iree_status_t iree_hal_metal_shared_event_multi_wait(
     apple_timeout_ns = DISPATCH_TIME_NOW;
   } else {
     iree_time_t now_ns = iree_time_now();
-    timeout_ns = deadline_ns < now_ns ? 0 : (uint64_t)(deadline_ns - now_ns);
+    if (deadline_ns < now_ns) {
+      return iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
+    }
+    timeout_ns = (uint64_t)(deadline_ns - now_ns);
     apple_timeout_ns = dispatch_time(DISPATCH_TIME_NOW, timeout_ns);
   }
 
