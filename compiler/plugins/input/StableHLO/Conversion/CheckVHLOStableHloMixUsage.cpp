@@ -22,8 +22,6 @@ struct CheckVHLOStableHloMixUsage final
     : impl::CheckVHLOStableHloMixUsageBase<CheckVHLOStableHloMixUsage> {
   void runOnOperation() override {
     MLIRContext *ctx = &getContext();
-    auto vhloDialect = ctx->getLoadedDialect("vhlo");
-    auto stablehloDialect = ctx->getLoadedDialect("stablehlo");
     auto modOp = getOperation();
     Operation *lastStablehloOp = nullptr;
     Operation *lastVhloOp = nullptr;
@@ -37,23 +35,24 @@ struct CheckVHLOStableHloMixUsage final
     };
     modOp->walk([&](Operation *op) {
       auto opDialect = op->getDialect();
-      if (opDialect == stablehloDialect) {
-        if (lastVhloOp != nullptr) {
+      if (opDialect == ctx->getLoadedDialect("stablehlo")) {
+        if (lastVhloOp) {
           emitError(lastVhloOp, op);
-          return;
+          return WalkResult::interrupt();
         }
         lastStablehloOp = op;
-      } else if (opDialect == vhloDialect) {
-        if (lastStablehloOp != nullptr) {
+      } else if (opDialect == ctx->getLoadedDialect("vhlo")) {
+        if (lastStablehloOp) {
           emitError(op, lastStablehloOp);
-          return;
+          return WalkResult::interrupt();
         }
         lastVhloOp = op;
       }
-      if (errorsFound)
-        signalPassFailure();
-      return;
+      return WalkResult::advance();
     });
+    if (errorsFound) {
+      signalPassFailure();
+    }
   }
 };
 } // namespace
