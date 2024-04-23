@@ -1049,7 +1049,7 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
        "getTiledImplementation"]>]> {
   let summary = "Winograd Input Transform operator";
   let description = [{
-    This operator is the first step in converting a convolution to
+    This operator is part of the first step in converting a convolution to
     its Winograd equivalent. Given a tile of an input image (I),
     this operator computes matmul(tranpose(B), matmul(I, B)).
     The input tile is assumed to be square with each side of size m + r - 1,
@@ -1100,22 +1100,22 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
       return output();
     }
     ShapedType getOriginalOperandType() {
-      return getInputOperandType();
+      return getInputType();
     }
     ShapedType getTransformedOperandType() {
-      return getOutputOperandType();
+      return getOutputType();
     }
-    ShapedType getInputOperandType() {
+    ShapedType getInputType() {
       return input().getType().cast<ShapedType>();
     }
-    ShapedType getOutputOperandType() {
+    ShapedType getOutputType() {
       return output().getType().cast<ShapedType>();
     }
-    int64_t getInputOperandRank() {
-      return getInputOperandType().getRank();
+    int64_t getInputRank() {
+      return getInputType().getRank();
     }
-    int64_t getOutputOperandRank() {
-      return getOutputOperandType().getRank();
+    int64_t getOutputRank() {
+      return getOutputType().getRank();
     }
     int64_t getInputTileSize() {
       return getOutputTileSize() + getKernelSize() - 1;
@@ -1147,7 +1147,119 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
     }
     int64_t getIterationDomainRank() {
       SmallVector<int64_t> imageDims = imageDimensions();
-      return getOutputOperandRank() - imageDims.size();
+      return getOutputRank() - imageDims.size();
+    }
+    // Method to implement for specifying output range for
+    // DestinationStyleOpInterface
+    MutableOperandRange getDpsInitsMutable() {
+      return getOutputsMutable();
+    }
+  }];
+}
+
+def IREELinalgExt_WinogradFilterTransformOp : IREELinalgExt_Op<"winograd.filter_transform",
+    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>]> {
+  let summary = "Winograd Filter Transform operator";
+  let description = [{
+    This operator is part of the first step in converting a convolution to
+    its Winograd equivalent. Given a tile of a convolution filter (F),
+    this operator computes matmul(G, matmul(F, transpose(B))).
+    The filter tile is assumed to be the full m x m convolutional kernel,
+    and the result of the transformation on this tile is a square with each
+    side of size m + r - 1, where the output tile size is r x r. G is a constant
+    2-d matrix of shape (m + r - 1) x m. The input to the operator is a filter
+    of shape (H, W, C, F) or (F, C, H, W) and the output is an operator of shape
+    (m + r - 1, m + r - 1, C, F). The result of this operator is first collapsed
+    and then fed to a batch matmul op.
+  }];
+
+  let arguments = (ins Variadic<AnyShaped>:$inputs,
+                       Variadic<AnyShaped>:$outputs,
+                       I64Attr:$output_tile_size,
+                       I64Attr:$kernel_size,
+                       DenseI64ArrayAttr:$kernel_dimensions
+  );
+
+  let builders = [
+    OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$outputs,
+      CArg<"int64_t", "8">:$output_tile_size, CArg<"int64_t", "3">:$kernel_size,
+      CArg<"ArrayRef<int64_t>", "{0, 1}">:$kernel_dimensions)>
+  ];
+
+  let results = (outs Variadic<AnyRankedTensor>:$result);
+  let hasFolder = 1;
+  let assemblyFormat = [{
+    attr-dict
+    `output_tile_size` `(` $output_tile_size `)`
+    `kernel_size` `(` $kernel_size `)`
+    `kernel_dimensions` `(` $kernel_dimensions `)`
+    `ins` `(` $inputs `:` type($inputs) `)`
+    `outs` `(` $outputs `:` type($outputs) `)`
+    (`->` type($result)^)?
+  }];
+
+  let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
+    Value input() {
+      return getDpsInputOperand(0)->get();
+    }
+    Value output() {
+      return getDpsInitOperand(0)->get();
+    }
+    ShapedType getInputType() {
+      return input().getType().cast<ShapedType>();
+    }
+    ShapedType getOutputType() {
+      return output().getType().cast<ShapedType>();
+    }
+    Value getOriginalOperand() {
+      return input();
+    }
+    Value getTransformedOperand() {
+      return output();
+    }
+    ShapedType getOriginalOperandType() {
+      return getInputType();
+    }
+    ShapedType getTransformedOperandType() {
+      return getOutputType();
+    }
+    int64_t getInputRank() {
+      return getInputType().getRank();
+    }
+    int64_t getOutputRank() {
+      return getOutputType().getRank();
+    }
+    int64_t getInputTileSize() {
+      return getOutputTileSize() + getKernelSize() - 1;
+    }
+    SmallVector<int64_t> hwDimensions() {
+      return llvm::to_vector(getKernelDimensions());
+    }
+    std::array<int64_t, 2> hwcfKernelDimensions() {
+      return {0, 1};
+    }
+    std::array<int64_t, 2> fchwKernelDimensions() {
+      return {2, 3};
+    }
+    bool isHwcf() {
+      std::array<int64_t, 2> hwcfKernelDims = hwcfKernelDimensions();
+      ArrayRef<int64_t> kernelDims = getKernelDimensions();
+      return kernelDims == ArrayRef<int64_t>(hwcfKernelDims);
+    }
+    bool isFchw() {
+      std::array<int64_t, 2> fchwKernelDims = fchwKernelDimensions();
+      ArrayRef<int64_t> kernelDims = getKernelDimensions();
+      return kernelDims == ArrayRef<int64_t>(fchwKernelDims);
+    }
+    int channelDim() {
+      return isHwcf() ? 2 : 1;
+    }
+    int filterDim() {
+      return isHwcf() ? 3 : 0;
+    }
+    int64_t getIterationDomainRank() {
+      ArrayRef<int64_t> kernelDims = getKernelDimensions();
+      return getInputRank() - kernelDims.size();
     }
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
@@ -1214,10 +1326,10 @@ def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_
     Value output() {
       return getDpsInitOperand(0)->get();
     }
-    ShapedType getInputOperandType() {
+    ShapedType getInputType() {
       return input().getType().cast<ShapedType>();
     }
-    ShapedType getOutputOperandType() {
+    ShapedType getOutputType() {
       return output().getType().cast<ShapedType>();
     }
     Value getOriginalOperand() {
@@ -1227,10 +1339,10 @@ def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_
       return input();
     }
     ShapedType getOriginalOperandType() {
-      return getOutputOperandType();
+      return getOutputType();
     }
     ShapedType getTransformedOperandType() {
-      return getInputOperandType();
+      return getInputType();
     }
     SmallVector<int64_t> imageDimensions() {
       return llvm::to_vector(getImageDimensions());
@@ -1257,15 +1369,15 @@ def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_
     int channelDim() {
       return isNhwc() ? 3 : 1;
     }
-    int64_t getInputOperandRank() {
-      return getInputOperandType().getRank();
+    int64_t getInputRank() {
+      return getInputType().getRank();
     }
-    int64_t getOutputOperandRank() {
-      return getOutputOperandType().getRank();
+    int64_t getOutputRank() {
+      return getOutputType().getRank();
     }
     int64_t getIterationDomainRank() {
       SmallVector<int64_t> imageDims = imageDimensions();
-      return getInputOperandRank() - imageDims.size();
+      return getInputRank() - imageDims.size();
     }
     int64_t getInputTileSize() {
       return getOutputTileSize() + getKernelSize() - 1;
