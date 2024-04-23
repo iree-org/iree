@@ -36,15 +36,15 @@ iree_compiler_cc_library(
         "ConvertConvToChannelsLast.cpp",
         "InterpreterPass.cpp",
         "MakeSingleDispatchForFunction.cpp",
-        "Utilities.cpp",
         "PadLinalgOps.cpp",
         "PadToIntrinsics.cpp",
         "Passes.cpp",
+        "Utilities.cpp",
     ],
     hdrs = [
-        "Utilities.h",
         "Passes.h",
         "Passes.h.inc",
+        "Utilities.h",
     ],
     deps = [
         ":PassesIncGen",
