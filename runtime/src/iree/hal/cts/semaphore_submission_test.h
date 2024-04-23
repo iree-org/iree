@@ -604,10 +604,10 @@ TEST_P(semaphore_submission_test, BatchWaitingOnAnotherAndHostSignal) {
   uint64_t semaphore_signal_value = 1;
 
   // Submit command_buffer2.
-  iree_hal_semaphore_t* command_buffer2_wait_semaphore_array[2] = {semaphore1,
-                                                                   semaphore2};
-  uint64_t command_buffer2_wait_value_array[2] = {semaphore_signal_value,
-                                                  semaphore_signal_value};
+  iree_hal_semaphore_t* command_buffer2_wait_semaphore_array[] = {semaphore1,
+                                                                  semaphore2};
+  uint64_t command_buffer2_wait_value_array[] = {semaphore_signal_value,
+                                                 semaphore_signal_value};
   iree_hal_semaphore_list_t command_buffer2_wait_list = {
       /*count=*/2, command_buffer2_wait_semaphore_array,
       command_buffer2_wait_value_array};
