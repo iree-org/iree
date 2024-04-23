@@ -23,12 +23,20 @@ ${ROOT_DIR}/build_tools/testing/run_python_notebook.sh \
   ${ROOT_DIR}/samples/dynamic_shapes/tensorflow_dynamic_shapes.ipynb
 test -f ${ARTIFACTS_DIR}/dynamic_shapes.mlir && echo "dynamic_shapes.mlir exists"
 
-# 2. Build the `iree-compile` tool.
-cmake -B ${BUILD_DIR} -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo ${ROOT_DIR}
-cmake --build ${BUILD_DIR} --target iree-compile -- -k 0
+# Setup Python venv for step 2.
+python3 --version
+python3 -m venv .venv
+source .venv/bin/activate
+trap "deactivate 2> /dev/null" EXIT
+
+# 2. Install the `iree-compile` tool from pip (or build from source).
+python -m pip install \
+  --find-links https://iree.dev/pip-release-links.html \
+  --upgrade \
+  iree-compiler
 
 # 3. Compile `dynamic_shapes.mlir` using `iree-compile`.
-${BUILD_DIR}/tools/iree-compile \
+iree-compile \
   --iree-hal-target-backends=llvm-cpu \
   ${ARTIFACTS_DIR}/dynamic_shapes.mlir -o ${ARTIFACTS_DIR}/dynamic_shapes_cpu.vmfb
 
