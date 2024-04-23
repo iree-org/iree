@@ -81,9 +81,8 @@ static SmallVector<Value> getTransferIndicesFromNestedLayout(
   int64_t rank = vectorLayout.getRank();
   // Permute the batch and outer vector offsets to match the order of
   // the vector dimensions using the inverse of the batch/offset order.
-  ArrayRef<int64_t> batchOffsets = ArrayRef<int64_t>(offsets.begin(), rank);
-  ArrayRef<int64_t> outerVectorOffsets =
-      ArrayRef<int64_t>(offsets.begin() + rank, rank);
+  ArrayRef<int64_t> batchOffsets(offsets.begin(), rank);
+  ArrayRef<int64_t> outerVectorOffsets(offsets.begin() + rank, rank);
 
   SmallVector<Value> slicedIndices(indices.begin(), indices.end());
   for (const auto &[i, dim] : llvm::enumerate(permutationMap.getResults())) {
@@ -577,7 +576,7 @@ struct DistributeTranspose final : OpDistributionPattern<vector::TransposeOp> {
     /// So, for distributed dimensions (thread and subgroup) transpose is a
     /// no-op.
     ///
-    /// Example:
+    /// Example (indices [0-3] represent ids of the threads carrying the data):
     ///
     /// input: vector<2x4xf16>
     ///
