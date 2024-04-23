@@ -20,7 +20,7 @@ on:
 jobs:
   linux_x86_64:
     name: Linux (x86_64)
-    runs-on: ubuntu-20.04-64core
+    runs-on: nodai-amdgpu-w7900-x86-64
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       IREERS_ARTIFACT_DIR: ${{ github.workspace }}/artifacts
