@@ -72,9 +72,11 @@ jobs:
               -n auto -rpfE --timeout=30 --retries=2 --durations=20 \
               --config-files=build_tools/pkgci/external_test_suite/onnx_cpu_llvm_sync.json \
               --no-skip-tests-missing-files
-  # persistent runner with cache enabled for model testing
+
+  # Note: this is a persistent runner with a local cache. Downloading all input
+  # files (50GB+) without a cache can take 20+ minutes.
   linux_x86_64_models:
-    name: Linux (x86_64) Model Testing/Benchmark
+    name: Linux (x86_64) Model Testing
     runs-on: nodai-amdgpu-w7900-x86-64
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
