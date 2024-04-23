@@ -261,6 +261,11 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://iree.dev/guides/ml-frameworks/onnx/</loc>
+         <lastmod>2024-04-23</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://iree.dev/guides/ml-frameworks/pytorch/</loc>
          <lastmod>2024-04-23</lastmod>
          <changefreq>daily</changefreq>
