@@ -103,28 +103,20 @@ jobs:
   build_test_all_windows:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_test_all_windows')
-    runs-on: windows-2022-64core
+    # GitHub-hosted 64 core runners are too expensive and take too long to check out the repo
+    # TODO(scotttodd): disable GitHub-hosted if too slow
+    # TODO(saienduri): switch to self-hosted
+    runs-on: windows-2022
     defaults:
       run:
         shell: bash
     env:
       BUILD_DIR: build-windows
     steps:
-      # actions/checkout is for some reason unusably slow on the large managed
-      # Windows GitHub runners so we roll our own. See
-      # https://github.com/actions/checkout/issues/1186
-      # TODO(gcmn): Factor this out into something reusable across jobs. Can't
-      # be a script because we haven't done the checkout yet :-)
       - name: "Checking out repository"
-        env:
-          REMOTE_URL: ${{ github.server_url }}/${{ github.repository }}
-        run: |
-          mkdir -p ${GITHUB_WORKSPACE}
-          cd ${GITHUB_WORKSPACE}
-          git init
-          git fetch --depth 1 "${REMOTE_URL}" "${GITHUB_SHA}"
-          git checkout "${GITHUB_SHA}"
-          git submodule update --init --jobs 8 --depth 1
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        with:
+          submodules: true
       - id: "gcp-auth"
         name: "Authenticating to Google Cloud"
         if: needs.setup.outputs.write-caches == 1
@@ -160,7 +152,7 @@ jobs:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_test_all_macos_arm64')
     runs-on:
-      - ${{ github.repository == 'iree-org/iree' && 'self-hosted' || 'macos-11' }} # must come first
+      - ${{ github.repository == 'iree-org/iree' && 'self-hosted' || 'macos-12' }} # must come first
       - runner-group=postsubmit
       - os-family=macOS
     env:
@@ -401,7 +393,7 @@ jobs:
   build_test_runtime:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_test_runtime')
-    runs-on: ubuntu-20.04-64core
+    runs-on: ubuntu-20.04
     env:
       BUILD_DIR: build-runtime
     steps:
@@ -456,7 +448,7 @@ jobs:
   build_test_runtime_windows:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_test_runtime_windows')
-    runs-on: windows-2022-64core
+    runs-on: windows-2022
     defaults:
       run:
         shell: bash
@@ -607,7 +599,7 @@ jobs:
   small_runtime:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'small_runtime')
-    runs-on: ubuntu-20.04-64core
+    runs-on: ubuntu-20.04
     env:
       BUILD_DIR: build-runtime
     steps:
