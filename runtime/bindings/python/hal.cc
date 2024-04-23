@@ -6,6 +6,7 @@
 
 #include "./hal.h"
 
+#include "./local_dlpack.h"
 #include "./numpy_interop.h"
 #include "./vm.h"
 #include "iree/base/internal/path.h"
@@ -616,6 +617,150 @@ void HalDevice::QueueCopy(HalBuffer& source_buffer, HalBuffer& target_buffer,
                  "Copying buffer on queue");
 }
 
+HalBufferView HalDevice::FromDLPack(py::handle producer_tensor) {
+  struct State {
+    ~State() {
+      if (managed_tensor && managed_tensor->deleter) {
+        managed_tensor->deleter(managed_tensor);
+      }
+    }
+    py::object capsule;
+    void* raw = nullptr;
+    DLManagedTensor* managed_tensor = nullptr;
+  } state;
+
+  // TODO: The argument here is a 'stream' and has several special values
+  // to indicate synchronization. We will want to manage this more carefully.
+  // None can be assumed to do a lot of synchronization implicitly.
+  // NOTE: PyTorch as of 2.3 does not support the optional version and copy
+  // arguments, so we pin to the legacy version for now. May want to detect
+  // this later. The recommended code sequence which uses TypeError seems
+  // quite irresponsible to be in the default path for a 5 year old standard
+  // that has no implementations of its > v0 version.
+  state.capsule = producer_tensor.attr("__dlpack__")(py::none());
+  state.raw = PyCapsule_GetPointer(state.capsule.ptr(), "dltensor");
+  if (!state.raw) {
+    throw py::python_error();
+  }
+  state.managed_tensor = static_cast<DLManagedTensor*>(state.raw);
+  // Takes ownership.
+  if (PyCapsule_SetName(state.capsule.ptr(), "used_dltensor")) {
+    throw py::python_error();
+  }
+
+  DLTensor* dlt = &state.managed_tensor->dl_tensor;
+
+  // Some validation on what we accept.
+  if (dlt->dtype.lanes != 1) {
+    throw std::invalid_argument("Unsupported dtype lanes != 1");
+  }
+
+  iree_hal_element_type_t et;
+  switch (dlt->dtype.code) {
+    case kDLInt:
+      et = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED,
+                                       dlt->dtype.bits);
+      break;
+    case kDLUInt:
+      et = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_INTEGER_UNSIGNED,
+                                       dlt->dtype.bits);
+      break;
+    case kDLFloat:
+      et = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE,
+                                       dlt->dtype.bits);
+      break;
+    case kDLBfloat:
+      et = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_FLOAT_BRAIN,
+                                       dlt->dtype.bits);
+      break;
+    case kDLComplex:
+      et = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_FLOAT_COMPLEX,
+                                       dlt->dtype.bits);
+      break;
+    case kDLBool:
+      et = IREE_HAL_ELEMENT_TYPE_VALUE(IREE_HAL_NUMERICAL_TYPE_BOOLEAN,
+                                       dlt->dtype.bits);
+      break;
+    default:
+      throw std::invalid_argument("Unsupported dlpack dtype code");
+  }
+
+  // Verify dense row major strides (for now a requirement).
+  if (dlt->strides && dlt->ndim > 0) {
+    int64_t stride = 1;
+    for (int32_t i = dlt->ndim - 1; i >= 0; --i) {
+      if (dlt->strides[i] != stride) {
+        throw std::invalid_argument("Unsupported strided tensor");
+      }
+      stride *= dlt->shape[i];
+    }
+  }
+
+  // Verify no byte offset. We could technically allow this, but there are all
+  // kinds of bugs and caveats listed, and would like to see how it is used.
+  if (dlt->byte_offset != 0) {
+    throw std::invalid_argument("NYI: dlpack byte_offset != 0");
+  }
+
+  // Compute size.
+  auto* dims =
+      static_cast<iree_hal_dim_t*>(alloca(sizeof(iree_hal_dim_t) * dlt->ndim));
+  iree_device_size_t byte_size = iree_hal_element_bit_count(et);
+  if (dlt->ndim > 0) {
+    for (int32_t i = 0; i < dlt->ndim; ++i) {
+      byte_size *= dlt->shape[i];
+      dims[i] = dlt->shape[i];
+    }
+  }
+  if ((byte_size % 8) != 0) {
+    throw std::invalid_argument(
+        "dlpack tensor does not have a byte aligned size");
+  }
+  byte_size /= 8;
+
+  iree_hal_buffer_t* imported_buffer;
+  iree_hal_allocator_t* allocator = iree_hal_device_allocator(raw_ptr());
+  iree_hal_buffer_params_t params;
+  memset(&params, 0, sizeof(params));
+  params.usage = IREE_HAL_BUFFER_USAGE_DEFAULT;
+  params.access = IREE_HAL_MEMORY_ACCESS_ALL;
+  params.type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
+  iree_hal_external_buffer_t external_buffer;
+  memset(&external_buffer, 0, sizeof(external_buffer));
+  external_buffer.type = IREE_HAL_EXTERNAL_BUFFER_TYPE_DEVICE_ALLOCATION;
+  external_buffer.size = byte_size;
+  external_buffer.handle.device_allocation.ptr =
+      reinterpret_cast<uint64_t>(dlt->data);
+  iree_hal_buffer_release_callback_t release_callback = {
+      +[](void* user_data, struct iree_hal_buffer_t* buffer) {
+        auto managed_tensor = static_cast<DLManagedTensor*>(user_data);
+        if (managed_tensor->deleter) {
+          managed_tensor->deleter(managed_tensor);
+        }
+      },
+      state.raw,
+  };
+  CheckApiStatus(
+      iree_hal_allocator_import_buffer(allocator, params, &external_buffer,
+                                       release_callback, &imported_buffer),
+      "Could not import external device buffer");
+  state.managed_tensor = nullptr;  // Ownership transferred.
+
+  // Create Buffer View.
+  iree_hal_buffer_view_t* buffer_view;
+  iree_status_t status =
+      iree_hal_buffer_view_create(imported_buffer, dlt->ndim, dims, et,
+                                  IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR,
+                                  iree_allocator_system(), &buffer_view);
+
+  if (!iree_status_is_ok(status)) {
+    iree_hal_buffer_release(imported_buffer);
+    CheckApiStatus(status, "Failed to create buffer view");
+  }
+
+  return HalBufferView::StealFromRawPtr(buffer_view);
+}
+
 //------------------------------------------------------------------------------
 // HalDriver
 //------------------------------------------------------------------------------
@@ -967,6 +1112,7 @@ void SetupHalBindings(nanobind::module_ m) {
       .def("queue_copy", &HalDevice::QueueCopy, py::arg("source_buffer"),
            py::arg("target_buffer"), py::arg("wait_semaphores"),
            py::arg("signal_semaphores"), kHalDeviceQueueCopy)
+      .def("from_dlpack", &HalDevice::FromDLPack)
       .def("__repr__", [](HalDevice& self) {
         auto id_sv = iree_hal_device_id(self.raw_ptr());
         return std::string(id_sv.data, id_sv.size);
@@ -996,7 +1142,19 @@ void SetupHalBindings(nanobind::module_ m) {
           },
           py::keep_alive<0, 1>(), py::arg("device_info"),
           py::arg("allocators") = py::none())
-      .def("query_available_devices", &HalDriver::QueryAvailableDevices);
+      .def("query_available_devices", &HalDriver::QueryAvailableDevices)
+      .def("dump_device_info",
+           [](HalDriver& self, iree_hal_device_id_t device_id) {
+             iree_string_builder_t builder;
+             iree_string_builder_initialize(iree_allocator_system(), &builder);
+             CheckApiStatus(iree_hal_driver_dump_device_info(
+                                self.raw_ptr(), device_id, &builder),
+                            "Querying device info");
+             iree_string_view_t view = iree_string_builder_view(&builder);
+             py::str result(view.data, view.size);
+             iree_string_builder_deinitialize(&builder);
+             return result;
+           });
 
   m.def(
       "get_cached_hal_driver",

@@ -111,6 +111,12 @@ struct ApiPtrAdapter<iree_hal_command_buffer_t> {
 class HalBuffer;
 class HalSemaphore;
 
+class HalBufferView
+    : public ApiRefCounted<HalBufferView, iree_hal_buffer_view_t> {
+ public:
+  py::str Repr();
+};
+
 class HalDevice : public ApiRefCounted<HalDevice, iree_hal_device_t> {
  public:
   iree_hal_allocator_t* allocator() {
@@ -130,6 +136,7 @@ class HalDevice : public ApiRefCounted<HalDevice, iree_hal_device_t> {
                     py::handle signal_semaphores);
   void QueueCopy(HalBuffer& src_buffer, HalBuffer& dst_buffer,
                  py::handle wait_semaphores, py::handle signal_semaphores);
+  HalBufferView FromDLPack(py::handle capsule);
 };
 
 class HalDriver : public ApiRefCounted<HalDriver, iree_hal_driver_t> {
@@ -164,12 +171,6 @@ struct HalShape {
   }
 
   std::vector<iree_hal_dim_t> s;
-};
-
-class HalBufferView
-    : public ApiRefCounted<HalBufferView, iree_hal_buffer_view_t> {
- public:
-  py::str Repr();
 };
 
 class HalBuffer : public ApiRefCounted<HalBuffer, iree_hal_buffer_t> {
