@@ -7,6 +7,7 @@
 """iree_generated_e2e_matmul_test generator for e2e matmul tests.
 """
 
+from typing import Optional
 import argparse
 import os
 import yaml
@@ -115,6 +116,7 @@ class CompilationInfo:
     mma_schedule: typing.Optional[MMASchedule]
     # Compilation info
     workgroup_size: typing.List[int]
+    subgroup_size: Optional[int] = None
 
     # Prints the workgroup size
     def workgroup_size_str(self):
@@ -286,6 +288,9 @@ def get_rocm_test_compilation_infos(compilation_info_id: CompilationInfoId):
                 workgroup_size=workgroup_size,
                 software_pipeline_depth=0,
                 mma_schedule=schedule,
+                # TODO: This is only valid for gfx9. Change this for RDNA3
+                # architectures.
+                subgroup_size=64,
             )
         )
     return infos
@@ -533,11 +538,16 @@ def generate_function(
         mma_schedule = ""
         if compilation_info.mma_schedule is not None:
             mma_schedule = ", {}".format(compilation_info.mma_schedule)
+        subgroup_size_str = ""
+        if compilation_info.subgroup_size is not None:
+            subgroup_size_str = f"subgroup_size = {compilation_info.subgroup_size}"
+
         compilation_info_string = (
             f"#compilation{generate_function.compilation_index} = "
             "#iree_codegen.compilation_info<\n"
             f"  lowering_config = <tile_sizes = {compilation_info.tile_sizes}>,\n"
-            f"  translation_info = <{compiler_pipeline} {compilation_info.workgroup_size_str()},\n"
+            f"  translation_info = <{compiler_pipeline} {compilation_info.workgroup_size_str()}\n"
+            f"  {subgroup_size_str},\n"
             f"  {{ pipeline_depth = {compilation_info.software_pipeline_depth}, "
             f"  store_stage = 1{mma_schedule} }}>>\n"
         )

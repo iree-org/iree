@@ -1,12 +1,14 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(func.func(iree-llvmgpu-vector-distribute, canonicalize, cse))' -split-input-file %s | FileCheck %s
 
+#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute 
+                                              workgroup_size = [64, 1, 1]
+                                              subgroup_size = 64, 
+      {mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, subgroup_m_count = 1, subgroup_n_count = 1, subgroup_m_tile_count = 1, subgroup_n_tile_count = 1, subgroup_k_tile_count = 2>}>
+
 func.func @mfma_matmul_256x256x256(%lhs: memref<16x256xf16, strided<[256, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>,
                               %rhs: memref<256x16xf16, strided<[256, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>,
                               %out: memref<16x16xf32, strided<[256, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>)
-  attributes {
-    mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
-                     subgroup_m_count = 1, subgroup_n_count = 1, subgroup_m_tile_count = 1, subgroup_n_tile_count = 1, subgroup_k_tile_count = 2>,
-    workgroup_size = [64, 1, 1]} {
+  attributes { translation_info = #translation } {
   %alloc = memref.alloc() : memref<32x16xf16, #gpu.address_space<workgroup>>
   %alloc_0 = memref.alloc() : memref<16x32xf16, #gpu.address_space<workgroup>>
   %cst = arith.constant 0.000000e+00 : f16
@@ -54,13 +56,15 @@ func.func @mfma_matmul_256x256x256(%lhs: memref<16x256xf16, strided<[256, 1], of
 
 // -----
 
+#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute 
+                                              workgroup_size = [64, 1, 1]
+                                              subgroup_size = 64, 
+      {mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, subgroup_m_count = 1, subgroup_n_count = 1, subgroup_m_tile_count = 1, subgroup_n_tile_count = 1, subgroup_k_tile_count = 2>}>
+
 func.func @mfma_matmul_256x256x256(%lhs: memref<16x256xf16, strided<[256, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>,
                               %rhs: memref<16x256xf16, strided<[256, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>,
                               %out: memref<16x16xf32, strided<[256, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>)
-  attributes {
-    mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
-                     subgroup_m_count = 1, subgroup_n_count = 1, subgroup_m_tile_count = 1, subgroup_n_tile_count = 1, subgroup_k_tile_count = 2>,
-    workgroup_size = [64, 1, 1]} {
+  attributes { translation_info = #translation } {
   %alloc = memref.alloc() : memref<32x16xf16, #gpu.address_space<workgroup>>
   %alloc_0 = memref.alloc() : memref<16x32xf16, #gpu.address_space<workgroup>>
   %cst = arith.constant 0.000000e+00 : f16
@@ -120,13 +124,15 @@ func.func @mfma_matmul_256x256x256(%lhs: memref<16x256xf16, strided<[256, 1], of
 
 // -----
 
+#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute 
+                                              workgroup_size = [32, 1, 1]
+                                              subgroup_size = 32, 
+      {mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>, subgroup_m_count = 1, subgroup_n_count = 1, subgroup_m_tile_count = 1, subgroup_n_tile_count = 1, subgroup_k_tile_count = 2>}>
+
 func.func @wmma_matmul_256x256x256(%lhs: memref<16x256xf16, strided<[256, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>,
                               %rhs: memref<256x16xf16, strided<[256, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>,
                               %out: memref<16x16xf32, strided<[256, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>)
-  attributes {
-    mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>,
-                     subgroup_m_count = 1, subgroup_n_count = 1, subgroup_m_tile_count = 1, subgroup_n_tile_count = 1, subgroup_k_tile_count = 2>,
-    workgroup_size = [32, 1, 1]} {
+  attributes { translation_info = #translation } {
   %alloc = memref.alloc() : memref<32x16xf16, #gpu.address_space<workgroup>>
   %alloc_0 = memref.alloc() : memref<16x32xf16, #gpu.address_space<workgroup>>
   %cst = arith.constant 0.000000e+00 : f16
@@ -178,13 +184,15 @@ func.func @wmma_matmul_256x256x256(%lhs: memref<16x256xf16, strided<[256, 1], of
 
 // -----
 
+#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute 
+                                              workgroup_size = [32, 1, 1]
+                                              subgroup_size = 32, 
+      {mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>, subgroup_m_count = 1, subgroup_n_count = 1, subgroup_m_tile_count = 1, subgroup_n_tile_count = 1, subgroup_k_tile_count = 2>}>
+
 func.func @wmma_matmul_256x256x256(%lhs: memref<16x256xf16, strided<[256, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>,
                               %rhs: memref<16x256xf16, strided<[256, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>,
                               %out: memref<16x16xf32, strided<[256, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>)
-  attributes {
-    mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>,
-                     subgroup_m_count = 1, subgroup_n_count = 1, subgroup_m_tile_count = 1, subgroup_n_tile_count = 1, subgroup_k_tile_count = 2>,
-    workgroup_size = [32, 1, 1]} {
+  attributes { translation_info = #translation } {
   %alloc = memref.alloc() : memref<32x16xf16, #gpu.address_space<workgroup>>
   %alloc_0 = memref.alloc() : memref<16x32xf16, #gpu.address_space<workgroup>>
   %cst = arith.constant 0.000000e+00 : f16
