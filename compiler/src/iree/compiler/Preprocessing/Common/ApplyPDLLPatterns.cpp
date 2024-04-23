@@ -19,40 +19,56 @@
 #include "mlir/Dialect/PDL/IR/PDL.h"
 #include "mlir/Dialect/PDLInterp/IR/PDLInterp.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Support/FileUtilities.h"
+#include "mlir/Tools/PDLL/AST/Context.h"
+#include "mlir/Tools/PDLL/AST/Nodes.h"
+#include "mlir/Tools/PDLL/CodeGen/CPPGen.h"
+#include "mlir/Tools/PDLL/CodeGen/MLIRGen.h"
+#include "mlir/Tools/PDLL/ODS/Context.h"
+#include "mlir/Tools/PDLL/Parser/Parser.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-preprocessing-apply-pdl-patterns"
+#define DEBUG_TYPE "iree-preprocessing-apply-pdll-patterns"
 
 using namespace mlir;
 using namespace mlir::iree_compiler;
 
 namespace mlir::iree_compiler::Preprocessing {
 
-#define GEN_PASS_DEF_APPLYPDLPATTERNSPASS
+#define GEN_PASS_DEF_APPLYPDLLPATTERNSPASS
 #include "iree/compiler/Preprocessing/Common/Passes.h.inc" // IWYU pragma: export
 
 } // namespace mlir::iree_compiler::Preprocessing
 
-// Populate patterns from files.
+// Populate patterns from PDLL files.
 static LogicalResult
-populatePDLModuleFromFileName(MLIRContext *context, RewritePatternSet &patterns,
-                              llvm::StringRef pdlModuleFileName) {
+populatePDLLModuleFromFileName(MLIRContext *context,
+                               RewritePatternSet &patterns,
+                               llvm::StringRef pdllModuleFileName) {
   std::string errorMessage;
-  auto memoryBuffer = mlir::openInputFile(pdlModuleFileName, &errorMessage);
+  auto memoryBuffer = mlir::openInputFile(pdllModuleFileName, &errorMessage);
   if (!memoryBuffer) {
     return emitError(FileLineColLoc::get(
-               StringAttr::get(context, pdlModuleFileName), 0, 0))
+               StringAttr::get(context, pdllModuleFileName), 0, 0))
            << "failed to open pattern module file: " << errorMessage;
   }
   // Tell sourceMgr about this buffer, the parser will pick it up.
   llvm::SourceMgr sourceMgr;
   sourceMgr.AddNewSourceBuffer(std::move(memoryBuffer), llvm::SMLoc());
+
+  // parse file and build pdll ast module
+  pdll::ods::Context pdllOdsContext;
+  pdll::ast::Context pdllAstContext(pdllOdsContext);
+  FailureOr<pdll::ast::Module *> pdllModule =
+      pdll::parsePDLLAST(pdllAstContext, sourceMgr);
+  if (failed(pdllModule)) {
+    return failure();
+  }
+
   PDLPatternModule pdlModule =
-      OwningOpRef<ModuleOp>(parseSourceFile<ModuleOp>(sourceMgr, context));
+      pdll::codegenPDLLToMLIR(context, pdllAstContext, sourceMgr, **pdllModule);
   pdlModule.registerRewriteFunction("rewriteAsFlowDispatch",
                                     rewriteAsFlowDispatch);
   pdlModule.registerConstraintFunction("checkTensorElementType",
@@ -63,20 +79,20 @@ populatePDLModuleFromFileName(MLIRContext *context, RewritePatternSet &patterns,
 
 namespace {
 
-class ApplyPDLPatternsPass
-    : public iree_compiler::Preprocessing::impl::ApplyPDLPatternsPassBase<
-          ApplyPDLPatternsPass> {
+class ApplyPDLLPatternsPass
+    : public iree_compiler::Preprocessing::impl::ApplyPDLLPatternsPassBase<
+          ApplyPDLLPatternsPass> {
 public:
-  using iree_compiler::Preprocessing::impl::ApplyPDLPatternsPassBase<
-      ApplyPDLPatternsPass>::ApplyPDLPatternsPassBase;
+  using iree_compiler::Preprocessing::impl::ApplyPDLLPatternsPassBase<
+      ApplyPDLLPatternsPass>::ApplyPDLLPatternsPassBase;
 
   LogicalResult initialize(MLIRContext *context) override {
     if (patternsFile.empty()) {
       return success();
     }
     RewritePatternSet tmpPatterns(context);
-    if (failed(populatePDLModuleFromFileName(context, tmpPatterns,
-                                             patternsFile))) {
+    if (failed(populatePDLLModuleFromFileName(context, tmpPatterns,
+                                              patternsFile))) {
       return failure();
     }
     patterns = std::move(tmpPatterns);
@@ -102,4 +118,5 @@ private:
   /// Loaded PDL patterns
   FrozenRewritePatternSet patterns;
 };
+
 } // namespace
