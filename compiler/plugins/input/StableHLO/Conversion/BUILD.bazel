@@ -61,7 +61,7 @@ iree_gentbl_cc_library(
 iree_compiler_cc_library(
     name = "StableHLOLegalization",
     srcs = [
-        "CheckVHLOStableHloMixUsage.cpp"
+        "CheckVHLOStableHloMixUsage.cpp",
         "ConvertCollectives.cpp",
         "LegalizeCHLO.cpp",
         "LegalizeControlFlow.cpp",
