@@ -13,3 +13,4 @@ func.func @tensor_int() {
   check.expect_eq_const(%result, dense<[6, 8, 10, 12]> : tensor<4xi32>) : tensor<4xi32>
   return
 }
+
