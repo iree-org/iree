@@ -15,7 +15,7 @@ considerations of mobile and edge deployments.
 
 <div class="grid cards" markdown>
 
--   :material-clock-fast: __Ahead-of-time compilation__
+- :material-clock-fast: **Ahead-of-time compilation**
 
     ---
 
@@ -23,7 +23,7 @@ considerations of mobile and edge deployments.
 
     [:octicons-arrow-right-24: Project architecture](#project-architecture)
 
--   :octicons-rocket-24: Support for advanced model features
+- :octicons-rocket-24: **Support for advanced model features**
 
     ---
 
@@ -31,7 +31,7 @@ considerations of mobile and edge deployments.
 
     [:octicons-arrow-right-24: Importing from ML frameworks](#importing-models-from-ml-frameworks)
 
--   :octicons-server-24: Designed for CPUs, GPUs, and other accelerators
+- :octicons-server-24: **Designed for CPUs, GPUs, and other accelerators**
 
     ---
 
@@ -39,7 +39,7 @@ considerations of mobile and edge deployments.
 
     [:octicons-arrow-right-24: Deployment configurations](#selecting-deployment-configurations)
 
--   :fontawesome-solid-chart-gantt: Low overhead, pipelined execution
+- :fontawesome-solid-chart-gantt: **Low overhead, pipelined execution**
 
     ---
 
@@ -47,13 +47,13 @@ considerations of mobile and edge deployments.
 
     [:octicons-arrow-right-24: Benchmarking](./developers/performance/benchmarking.md)
 
--   :fontawesome-regular-floppy-disk: Binary size as low as 30KB on embedded systems
+- :fontawesome-regular-floppy-disk: **Binary size as low as 30KB on embedded systems**
 
     ---
 
     [:octicons-arrow-right-24: Running on bare-metal](./guides/deployment-configurations/bare-metal.md)
 
--   :fontawesome-solid-magnifying-glass: Debugging and profiling support
+- :fontawesome-solid-magnifying-glass: **Debugging and profiling support**
 
     ---
 
