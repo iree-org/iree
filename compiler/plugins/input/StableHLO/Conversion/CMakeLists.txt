@@ -100,6 +100,7 @@ iree_cc_library(
     MLIRVectorDialect
     StablehloBroadcastUtils
     StablehloOps
+    VhloOps
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::Util::IR
