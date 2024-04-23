@@ -23,9 +23,9 @@ iree_cc_library(
   NAME
     Transforms
   HDRS
-    "PDLUtilities.h"
     "Passes.h"
     "Passes.h.inc"
+    "Utilities.h"
   SRCS
     "ApplyPDLLPatterns.cpp"
     "ApplyPDLPatterns.cpp"
@@ -33,10 +33,10 @@ iree_cc_library(
     "ConvertConvToChannelsLast.cpp"
     "InterpreterPass.cpp"
     "MakeSingleDispatchForFunction.cpp"
-    "PDLUtilities.cpp"
     "PadLinalgOps.cpp"
     "PadToIntrinsics.cpp"
     "Passes.cpp"
+    "Utilities.cpp"
   DEPS
     ::PassesIncGen
     LLVMSupport
