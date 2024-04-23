@@ -40,6 +40,17 @@ public:
   void runOnOperation() override;
 };
 
+/// Returns true if two operations are fusable through tile and fuse. Ideally
+/// this should use the same method as dispatch region formation where this
+/// fusion analysis actually happens, but that requires a direct producer ->
+/// consumer relationship and indexing maps for the right analysis. Here
+/// we just approximate it (and try to be optimistic)
+static bool isFusableUsingTileAndFuse(Operation *producer,
+                                      Operation *consumer) {
+  return llvm::isa_and_nonnull<linalg::LinalgOp, tensor::UnPackOp,
+                               LinalgExt::UnsetEncodingOp>(producer);
+}
+
 /// Control function to check if an `tensor.expand_shape` (which is producer of
 /// `opOperand`) should be pushed past the `genericOp` (which is the consumer of
 /// `opOperand`).
@@ -54,15 +65,34 @@ static bool shouldSinkExpandShapeOp(OpOperand *opOperand) {
     return false;
   }
 
+  // Do not sink reshapes across dequantize operations since they are
+  // cloned into their producers.
+  if (isDequantizationLikeOp(consumer)) {
+    return false;
+  }
+
+  // If the op is already fusable with producer using tile and fuse,
+  // do nothing.
+  if (llvm::any_of(consumer->getOpOperands(), [](OpOperand &opOperand) {
+        Operation *currProducer = opOperand.get().getDefiningOp();
+        Operation *currConsumer = opOperand.getOwner();
+        return isFusableUsingTileAndFuse(currProducer, currConsumer) &&
+               // The check for the producer having a single use is not fully
+               // worked out. Ideally we can fuse with a producer irrespective
+               // of number of uses, but is a good thumb rule in practice.
+               llvm::hasSingleElement(currProducer->getUses());
+      })) {
+    return false;
+  }
+
   // Do not sink if consumer is a contraction/matmul like op.
   if (auto linalgConsumerOp = dyn_cast<linalg::LinalgOp>(consumer)) {
     if (linalg::isaContractionOpInterface(linalgConsumerOp))
       return false;
   }
 
-  return llvm::isa_and_nonnull<linalg::LinalgOp, tensor::UnPackOp,
-                               LinalgExt::UnsetEncodingOp>(
-      reshapeOp.getSrc().getDefiningOp());
+  return isFusableUsingTileAndFuse(reshapeOp.getSrc().getDefiningOp(),
+                                   consumer);
 }
 
 void SinkReshapesPass::runOnOperation() {
