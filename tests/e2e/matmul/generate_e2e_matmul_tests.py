@@ -288,7 +288,7 @@ def get_rocm_test_compilation_infos(compilation_info_id: CompilationInfoId):
                 workgroup_size=workgroup_size,
                 software_pipeline_depth=0,
                 mma_schedule=schedule,
-                # TODO: This is only valid for CDNA2. Change this for RDNA3
+                # TODO: This is only valid for gfx9. Change this for RDNA3
                 # architectures.
                 subgroup_size=64,
             )
