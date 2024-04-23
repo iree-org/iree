@@ -98,11 +98,6 @@ static llvm::cl::opt<bool> clDispatchGenerateWorkloadRegion(
     "iree-flow-dispatch-generate-workload-region",
     llvm::cl::desc("Generate the workload region."), llvm::cl::init(true));
 
-static llvm::cl::opt<bool> clNormalizeInputIndexingMap(
-    "iree-flow-normalize-input-indexing-map",
-    llvm::cl::desc("Enable normalizing input indexing map to identity."),
-    llvm::cl::init(false));
-
 static llvm::cl::opt<bool>
     clDumpDispatchGraph("iree-flow-dump-dispatch-graph",
                         llvm::cl::desc("Dump a dot graph for dispatches."),
@@ -193,8 +188,7 @@ void addDispatchRegionCreationPasses(OpPassManager &passManager,
       // Normalize the input indexing map to make the input indexing map
       // identity. This helps fusing named linalg op with a generic op with
       // transpose.
-      .addPredicatedPass(clNormalizeInputIndexingMap,
-                         createInterchangeTransposeGenericOpsPass)
+      .addPass(createInterchangeTransposeGenericOpsPass)
       ////////////////////////////////////////////////////////////////////////
       // Dispatch region formation.
       .addPredicatedPass(
