@@ -133,6 +133,9 @@ createGPUTensorTile(bool distributeToWarp = false);
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createGPUTensorTileToSerialLoops();
 
+/// Pass to tile Linalg ops with tensor semantics to invocations.
+std::unique_ptr<InterfacePass<FunctionOpInterface>> createGPUTilePass();
+
 /// Tile reductions and generate serial loops around reductions.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createGPUTileReductionPass();

@@ -51,6 +51,23 @@ std::optional<SmallVector<int64_t>>
 gpuMmaUnrollOrder(vector::ContractionOp contract);
 
 //===----------------------------------------------------------------------===//
+// GPU tiling and distribution
+//===----------------------------------------------------------------------===//
+
+/// Returns the attribute name carrying information about distribution.
+const char *getGPUDistributeAttrName();
+
+/// Returns the tile sizes at the given `tilingLevel` for compute ops in
+/// `funcOp`.
+FailureOr<SmallVector<int64_t>> getGPUTileSize(mlir::FunctionOpInterface funcOp,
+                                               int tilingLevel);
+
+/// Returns the functor to compute tile sizes at the given `tilingLevel` for
+/// compute ops in `funcOp`.
+FailureOr<scf::SCFTileSizeComputationFunction>
+getGPUScfTileSizeComputeFn(mlir::FunctionOpInterface funcOp, int tilingLevel);
+
+//===----------------------------------------------------------------------===//
 // GPU workgroup memory
 //===----------------------------------------------------------------------===//
 

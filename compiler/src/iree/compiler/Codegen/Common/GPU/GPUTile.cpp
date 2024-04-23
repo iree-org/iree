@@ -4,17 +4,16 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-//===- SPIRVTile.cpp ------------------------------------------------------===//
+//===- GPUTile.cpp ------------------------------------------------------===//
 //
 // This pass tiles and Linalg ops with tensor semantics to invocations.
 //
 //===----------------------------------------------------------------------===//
 
+#include "iree/compiler/Codegen/Common/GPU/PassDetail.h"
+#include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
-#include "iree/compiler/Codegen/SPIRV/PassDetail.h"
-#include "iree/compiler/Codegen/SPIRV/Passes.h"
-#include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -32,7 +31,7 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-spirv-tile"
+#define DEBUG_TYPE "iree-codegen-gpu-tile"
 
 namespace mlir::iree_compiler {
 
@@ -134,7 +133,7 @@ static LogicalResult tileAndDistributeToThreads(TilingInterface consumerOp,
   // after bufferization. So add attributes to the tiled loop nest to
   // indicate that they should be distributed to invocations.
   ArrayRef<LoopLikeOpInterface> loops = tileAndFuseResult.value().loops;
-  const char *attrName = getSPIRVDistributeAttrName();
+  const char *attrName = getGPUDistributeAttrName();
   // We can have more than 3 dimensions being tiled (e.g., for convolutions with
   // non-1 batch). But only the innermost 3 dimensions are distributed.
   for (auto [dim, loop] : zip(llvm::seq(0, 3), llvm::reverse(loops))) {
@@ -255,10 +254,10 @@ static LogicalResult tileAndUnrollConvWindow(mlir::FunctionOpInterface funcOp,
 
 namespace {
 
-class SPIRVTilePass final : public SPIRVTileBase<SPIRVTilePass> {
+class GPUTilePass final : public GPUTileBase<GPUTilePass> {
 public:
-  SPIRVTilePass() = default;
-  SPIRVTilePass(const SPIRVTilePass &pass) = default;
+  GPUTilePass() = default;
+  GPUTilePass(const GPUTilePass &pass) = default;
 
   void runOnOperation() override {
     MLIRContext *context = &getContext();
@@ -292,7 +291,7 @@ public:
 
     concretizePadShape(funcOp);
 
-    auto reductionTileComputeFn = getSPIRVScfTileSizeComputeFn(funcOp, 2);
+    auto reductionTileComputeFn = getGPUScfTileSizeComputeFn(funcOp, 2);
     if (failed(reductionTileComputeFn) ||
         failed(tileReduction(funcOp, reductionTileComputeFn.value()))) {
       return signalPassFailure();
@@ -331,9 +330,8 @@ public:
 };
 } // namespace
 
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createSPIRVTilePass() {
-  return std::make_unique<SPIRVTilePass>();
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>> createGPUTilePass() {
+  return std::make_unique<GPUTilePass>();
 }
 
 } // namespace mlir::iree_compiler

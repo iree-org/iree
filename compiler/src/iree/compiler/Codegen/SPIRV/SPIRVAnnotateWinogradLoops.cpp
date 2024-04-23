@@ -29,7 +29,7 @@ public:
 
     MLIRContext *context = &getContext();
     OpBuilder builder(context);
-    const char *attrName = getSPIRVDistributeAttrName();
+    const char *attrName = getGPUDistributeAttrName();
     for (auto [index, forOp] : llvm::enumerate(forOps)) {
       if (index > kNumGPUDims)
         break;
