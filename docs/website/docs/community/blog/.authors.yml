@@ -7,24 +7,29 @@ authors:
   ataei:
     name: Ahmed Taei
     description: Software Engineer
-    avatar: https://github.com/ataei.png
+    avatar: https://github.com/asaadaldien.png
+    url: https://github.com/asaadaldien
 
   bjacob:
     name: Benoit Jacob
     description: Software Engineer
     avatar: https://github.com/bjacob.png
+    url: https://github.com/bjacob
 
   jennik:
     name: Jenni Kilduff
     description: Software Engineer
     avatar: https://github.com/not-jenni.png
+    url: https://github.com/not-jenni
 
   rsuderman:
     name: Rob Suderman
     description: Software Engineer
     avatar: https://github.com/rsuderman.png
+    url: https://github.com/rsuderman
 
   thomasraoux:
     name: Thomas Raoux
     description: Software Engineer
     avatar: https://github.com/thomasraoux.png
+    url: https://github.com/thomasraoux
