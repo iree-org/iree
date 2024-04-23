@@ -468,14 +468,13 @@ struct DistributeMultiReduction final
 
     // Do thread local reduce.
 
+    // The distributed reduction mask is simply the same permutation appended
+    // thrice.
     SmallVector<bool> distributedReductionMask;
     distributedReductionMask.reserve(3 * rank);
-    distributedReductionMask.append(
-        applyPermutation(reducedDims, srcLayout.getBatchOrder()));
-    distributedReductionMask.append(
-        applyPermutation(reducedDims, srcLayout.getOuterOrder()));
-    distributedReductionMask.append(
-        applyPermutation(reducedDims, srcLayout.getElementOrder()));
+    for (int i = 0; i < 3; ++i) {
+      distributedReductionMask.append(reducedDims.begin(), reducedDims.end());
+    }
 
     auto localReduction = rewriter.create<vector::MultiDimReductionOp>(
         loc, disSrc, disAcc, distributedReductionMask, multiReduceOp.getKind());

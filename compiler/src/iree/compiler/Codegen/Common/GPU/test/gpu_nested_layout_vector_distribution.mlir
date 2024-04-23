@@ -919,8 +919,6 @@ builtin.module attributes { transform.with_named_sequence } {
   elements_per_thread = [1, 4],
 
   subgroup_order = [1, 0],
-  batch_order = [1, 0],
-  outer_order = [1, 0],
   thread_order = [1, 0],
 
   subgroup_basis = [1, 1],
@@ -950,7 +948,7 @@ builtin.module attributes { transform.with_named_sequence } {
 // CHECK-DAG: %[[DARG0:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<32x32xf32> -> vector<2x2x1x1x1x4xf32>
 // CHECK-DAG: %[[DARG1:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<32xf32> -> vector<2x1x1xf32>
 // Local reduction
-// CHECK: vector.multi_reduction <maximumf>, %[[DARG0]], %[[DARG1]] [0, 2, 5] : vector<2x2x1x1x1x4xf32> to vector<2x1x1xf32>
+// CHECK: vector.multi_reduction <maximumf>, %[[DARG0]], %[[DARG1]] [1, 3, 5] : vector<2x2x1x1x1x4xf32> to vector<2x1x1xf32>
 // Global reduction
 // CHECK: gpu.shuffle  xor %{{.*}}, %[[C16]], %[[C64]] : f32
 // CHECK: gpu.shuffle  xor %{{.*}}, %[[C32]], %[[C64]] : f32
