@@ -128,6 +128,7 @@ nav:
       - "ML frameworks":
           - "guides/ml-frameworks/index.md"
           - JAX: "guides/ml-frameworks/jax.md"
+          - ONNX: "guides/ml-frameworks/onnx.md"
           - PyTorch: "guides/ml-frameworks/pytorch.md"
           - TensorFlow: "guides/ml-frameworks/tensorflow.md"
           - TensorFlow Lite: "guides/ml-frameworks/tflite.md"

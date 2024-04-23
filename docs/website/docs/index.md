@@ -26,10 +26,10 @@ considerations of mobile and edge deployments.
 IREE supports importing from a variety of ML frameworks:
 
 - [x] JAX
+- [x] ONNX
 - [x] PyTorch
 - [x] TensorFlow
 - [x] TensorFlow Lite
-- [ ] ONNX (experimental)
 
 The IREE compiler tools run on :fontawesome-brands-linux: Linux,
 :fontawesome-brands-windows: Windows, and :fontawesome-brands-apple: macOS
@@ -95,18 +95,20 @@ Using IREE involves the following general steps:
 
 ### Importing models from ML frameworks
 
-IREE supports importing models from a growing list of ML frameworks and model
-formats:
+IREE supports importing models from a growing list of
+[ML frameworks](./guides/ml-frameworks/index.md) and model formats:
 
-* [JAX](./guides/ml-frameworks/jax.md)
-* [PyTorch](./guides/ml-frameworks/pytorch.md)
-* [TensorFlow](./guides/ml-frameworks/tensorflow.md) and
-  [TensorFlow Lite](./guides/ml-frameworks/tflite.md)
+* [:simple-pytorch: PyTorch](./guides/ml-frameworks/pytorch.md)
+* [:simple-onnx: ONNX](./guides/ml-frameworks/onnx.md)
+* [:simple-python: JAX](./guides/ml-frameworks/jax.md)
+* [:simple-tensorflow: TensorFlow](./guides/ml-frameworks/tensorflow.md) and
+  [:simple-tensorflow: TensorFlow Lite](./guides/ml-frameworks/tflite.md)
 
 ### Selecting deployment configurations
 
-IREE provides a flexible set of tools for various deployment scenarios.
-Fully featured environments can use IREE for dynamic model deployments taking
+IREE provides a flexible set of tools for various
+[deployment scenarios](./guides/deployment-configurations/index.md). Fully
+featured environments can use IREE for dynamic model deployments taking
 advantage of multi-threaded hardware, while embedded systems can bypass IREE's
 runtime entirely or interface with custom accelerators.
 
