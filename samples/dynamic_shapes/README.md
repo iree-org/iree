@@ -110,6 +110,7 @@ them.
 4. Build the `iree_samples_dynamic_shapes` CMake target
 
     ```
+    cmake -B ../iree-build/ -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DIREE_BUILD_COMPILER=OFF .
     cmake --build ../iree-build/ --target iree_samples_dynamic_shapes
     ```
 

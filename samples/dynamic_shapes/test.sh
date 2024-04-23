@@ -41,6 +41,7 @@ iree-compile \
   ${ARTIFACTS_DIR}/dynamic_shapes.mlir -o ${ARTIFACTS_DIR}/dynamic_shapes_cpu.vmfb
 
 # 4. Build the `iree_samples_dynamic_shapes` CMake target.
+cmake -B ${BUILD_DIR} -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DIREE_BUILD_COMPILER=OFF .
 cmake --build ${BUILD_DIR} --target iree_samples_dynamic_shapes -- -k 0
 
 # 5. Run the sample binary.
