@@ -130,8 +130,7 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
     would have 2-D tile sizes per compute hierarchy level.
 
     We now describe each level of tiling. Each level of tiling represents a
-    count of tiles over the next level (rather than a list of tile sizes) and
-    an ordering over the tiles:
+    count of tiles over the next level (rather than a list of tile sizes).
 
     1. Subgroups per Workgroup
 
@@ -178,9 +177,7 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
       for b_1 in range(batch_1):
         ...
 
-    Batches are represented using two attributes:
-      - batches_per_subgroup: Ranges of each loop
-      - batch_order: Ordering of each loop, from outermost to innermost
+    `batches_per_subgroup` represents the range of each loop.
 
     The second level, outers, is a way to represent thread layout duplication
     required by a particular intrinsic. For example, some AMDGPU matrix
@@ -193,9 +190,7 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
     0 1 2 3 4     outers_per_batch=[2, 1]
     5 6 7 8 9     threads_per_outer=[2, 5]
 
-    Outers is represented using two attributes:
-      - outers_per_batch: Number of outers in a batch
-      - outer_order: Ordering of outers, from outermost to innermost
+    `outers_per_batch` represents the number of outers in a batch.
 
     Finally, threads are distributed in a single outer. The thread
     distribution is represented by:
@@ -210,8 +205,6 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
       outers_per_batch = [2, 2]
       threads_per_outer = [2, 2]
 
-      batch_order = [0, 1]
-      outer_order = [0, 1]
       thread_order = [1, 0]
     }
 
@@ -259,10 +252,7 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
     The final level of tiling, representing the minimum shape of vector that
     is treated as an atom.
 
-    The elements are placed contigiously with their shape and ordering
-    determined by:
-      - `elements_per_thread`: Sizes of this level of tiling
-      - `element_order`: Ordering of dimensions, from outermost to innermost
+    `elements_per_thread` represents the native size of the vector.
   }];
 
   let parameters = (ins
