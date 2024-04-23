@@ -56,13 +56,15 @@ public:
   ContractionVectorLayoutOptions(Operation *root,
                                  ArrayRef<int64_t> workgroupSize,
                                  IREE::GPU::MMAScheduleAttr schedule,
-                                 Value laneId, bool printLayout)
+                                 Value laneId, int64_t subgroupSize,
+                                 bool printLayout)
       : VectorLayoutOptions(root, /*fullConversion=*/!printLayout),
         workgroupSize(workgroupSize), schedule(schedule),
         printLayout(printLayout), patterns(root->getContext()) {
     populateGPUDistributionPatterns(patterns);
     populateGPUDistributionLayoutAttrPatterns(laneId, patterns);
-    populateGPUDistributeNestedLayoutAttrPatterns(laneId, patterns);
+    populateGPUDistributeNestedLayoutAttrPatterns(patterns, laneId,
+                                                  subgroupSize);
   }
 
   LogicalResult setAnchorOps(VectorLayoutAnalysis &analysis) override {
@@ -194,6 +196,12 @@ private:
     auto sourceMemRefType =
         dyn_cast<MemRefType>(transfer.getSource().getType());
     if (!sourceMemRefType || hasSharedMemoryAddressSpace(sourceMemRefType)) {
+      return success();
+    }
+
+    // Take on layout of broadcast.
+    if (transfer->hasOneUse() &&
+        dyn_cast<vector::BroadcastOp>(*transfer->getUsers().begin())) {
       return success();
     }
 
@@ -362,7 +370,19 @@ public:
         workgroupSize[i] = llvm::cast<IntegerAttr>(size).getInt();
       }
     } else {
-      workgroupSize = getWorkgroupSize(func);
+      std::optional<SmallVector<int64_t>> maybeWorkgroupSize =
+          getWorkgroupSize(func);
+      if (!maybeWorkgroupSize) {
+        func->emitOpError()
+            << "unable to query workgroup_size information from entry point";
+        return signalPassFailure();
+      }
+      for (auto [index, value] : llvm::enumerate(maybeWorkgroupSize.value())) {
+        workgroupSize[index] = value;
+      }
+      for (auto index : llvm::seq<size_t>(maybeWorkgroupSize->size(), 3)) {
+        workgroupSize[index] = 1;
+      }
     }
 
     llvm::StringLiteral scheduleAttrName =
@@ -392,8 +412,16 @@ public:
     Value linearThreadIdVal = affine::makeComposedAffineApply(
         builder, func.getLoc(), linearId, threadGrid);
 
+    std::optional<int64_t> subgroupSize = getSubgroupSize(func);
+    if (!subgroupSize) {
+      func->emitOpError()
+          << "unable to query subgroup size information from entry point";
+      return signalPassFailure();
+    }
+
     ContractionVectorLayoutOptions options(func, workgroupSize, scheduleAttr,
-                                           linearThreadIdVal, testLayout);
+                                           linearThreadIdVal,
+                                           subgroupSize.value(), testLayout);
     if (failed(distributeVectorOps(func, options.getPatterns(), options))) {
       func->emitOpError() << "failed to distribute";
       return signalPassFailure();

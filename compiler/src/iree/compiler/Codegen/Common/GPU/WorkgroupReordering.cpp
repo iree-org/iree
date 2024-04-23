@@ -85,8 +85,9 @@ static std::pair<Value, Value>
 getWorkgroupCountsXY(OpBuilder &builder, FunctionOpInterface funcOp) {
   Location loc = funcOp.getLoc();
   SmallVector<int64_t> workgroupCounts = getStaticNumWorkgroups(funcOp);
+  bool isStaticWgCount = llvm::none_of(workgroupCounts, ShapedType::isDynamic);
   // Check if we can rely on a static grid.
-  if (workgroupCounts.size() >= 2) {
+  if (isStaticWgCount && workgroupCounts.size() >= 2) {
     LLVM_DEBUG(llvm::dbgs()
                << "Using static workgroup counts: X = " << workgroupCounts[0]
                << ", Y = " << workgroupCounts[1] << "\n");

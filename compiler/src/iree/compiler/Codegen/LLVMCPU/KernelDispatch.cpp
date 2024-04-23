@@ -861,13 +861,13 @@ setMatmulRootConfig(mlir::FunctionOpInterface entryPointFn,
   SmallVector<int64_t> shape = linalgOp.getStaticLoopRanges();
 
   // The tiling for parallel dims and reduction dims are separated.
-  const SmallVectorImpl<int64_t> &vecTileSizes = inputTileSizes.back();
+  const SmallVectorImpl<int64_t> &inputVecTileSizes = inputTileSizes.back();
   const SmallVectorImpl<bool> &vecScalableDims = inputScalableTileFlags.back();
-  SmallVector<int64_t> parallelTileSizes;
+  SmallVector<int64_t> vecTileSizes;
   SmallVector<bool> parallelScalableFlags;
   int numScalableDims = llvm::count(vecScalableDims, true);
 
-  for (auto [index, tileSize] : llvm::enumerate(vecTileSizes)) {
+  for (auto [index, tileSize] : llvm::enumerate(inputVecTileSizes)) {
     int64_t sz = tileSize;
     bool isScalable = vecScalableDims[index];
     // The backend struggles to legalize non-power-of-two scalable vectors.
@@ -881,11 +881,12 @@ setMatmulRootConfig(mlir::FunctionOpInterface entryPointFn,
           /*numElem=*/shape[index],
           /*tileSize=*/sz, vectorSize, enforcePowerOfTwo);
     }
-    parallelTileSizes.push_back(sz);
+    vecTileSizes.push_back(sz);
     // 1x scalable vectors e.g. vector<[1]xty> are also poorly supported, so
     // fallback to fixed vectorization if they occur:
     parallelScalableFlags.push_back(sz > 1 ? isScalable : false);
   }
+  SmallVector<int64_t> parallelTileSizes = vecTileSizes;
   SmallVector<int64_t> reductionTileSizes;
   SmallVector<bool> reductionScalableFlags;
   splitParallelAndReductionTiles(
@@ -1333,11 +1334,12 @@ static TileSizesListType getMmt4dTileSizes(linalg::LinalgOp op) {
                                               distTileSizes.end());
   SmallVector<int64_t> cacheReductionTileSizes(numLoops, 0);
 
-  SmallVector<int64_t> parallelTileSizes(numLoops, 1);
-  assert(parallelTileSizes.size() == mmt4dDimBase + 6);
-  parallelTileSizes[mmt4dDimBase + 3] = M0;
-  parallelTileSizes[mmt4dDimBase + 4] = N0;
-  parallelTileSizes[mmt4dDimBase + 5] = K0;
+  SmallVector<int64_t> vecTileSizes(numLoops, 1);
+  assert(vecTileSizes.size() == mmt4dDimBase + 6);
+  vecTileSizes[mmt4dDimBase + 3] = M0;
+  vecTileSizes[mmt4dDimBase + 4] = N0;
+  vecTileSizes[mmt4dDimBase + 5] = K0;
+  SmallVector<int64_t> parallelTileSizes = vecTileSizes;
   SmallVector<int64_t> reductionTileSizes;
   splitParallelAndReductionTiles(op, parallelTileSizes, reductionTileSizes);
 
@@ -1497,16 +1499,58 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
       entryPointFn, fftOp, tileSizes, DispatchLoweringPassPipeline::CPUDefault);
 }
 
-static void setX86VectorTileSizes(linalg::GenericOp genericOp,
-                                  unsigned numLoops,
-                                  ArrayRef<int64_t> distTileSizes,
-                                  ArrayRef<int64_t> minTileSizes,
-                                  ArrayRef<int64_t> maxTileSizes,
-                                  VectorPreProcStrategy vecPreProcStrategy,
-                                  SmallVectorImpl<int64_t> &vecTileSizes) {
+/// Sets the lowering configuration for dispatch region for
+/// linalg_ext.winograd.input_transform root op.
+static LogicalResult
+setRootConfig(mlir::FunctionOpInterface entryPointFn,
+              IREE::LinalgExt::WinogradInputTransformOp inputOp) {
+  assert(!getLoweringConfig(inputOp) && "expected lowering_config is not set");
+  auto iterationRank = inputOp.getIterationDomainRank();
+  SmallVector<int64_t> vecSizeHints(iterationRank, 1);
+  DistributionHeuristicConfig distConfig;
+  distConfig.vectorSizeHints = vecSizeHints;
+  SmallVector<int64_t> distTileSizes =
+      getDefaultDistributedLevelTileSizes(inputOp, distConfig);
+  TileSizesListType tileSizes;
+  tileSizes.push_back(distTileSizes);
+  SmallVector<int64_t> vecTileSizes(iterationRank, 1);
+  tileSizes.push_back(vecTileSizes);
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, inputOp, tileSizes,
+      DispatchLoweringPassPipeline::CPULinalgExtTileAndVectorize);
+}
+
+/// Sets the lowering configuration for dispatch region for
+/// linalg_ext.winograd.input_transform root op.
+static LogicalResult
+setRootConfig(mlir::FunctionOpInterface entryPointFn,
+              IREE::LinalgExt::WinogradOutputTransformOp outputOp) {
+  assert(!getLoweringConfig(outputOp) && "expected lowering_config is not set");
+  auto iterationRank = outputOp.getIterationDomainRank();
+  SmallVector<int64_t> vecSizeHints(iterationRank, 1);
+  DistributionHeuristicConfig distConfig;
+  distConfig.vectorSizeHints = vecSizeHints;
+  SmallVector<int64_t> distTileSizes =
+      getDefaultDistributedLevelTileSizes(outputOp, distConfig);
+  TileSizesListType tileSizes;
+  tileSizes.push_back(distTileSizes);
+  SmallVector<int64_t> vecTileSizes(iterationRank, 1);
+  tileSizes.push_back(vecTileSizes);
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, outputOp, tileSizes,
+      DispatchLoweringPassPipeline::CPULinalgExtTileAndVectorize);
+}
+
+static void setVectorTileSizes(linalg::LinalgOp op,
+                               ArrayRef<int64_t> distTileSizes,
+                               ArrayRef<int64_t> minTileSizes,
+                               ArrayRef<int64_t> maxTileSizes,
+                               VectorPreProcStrategy vecPreProcStrategy,
+                               SmallVectorImpl<int64_t> &vecTileSizes) {
+  int numLoops = op.getNumLoops();
   vecTileSizes.append(numLoops, 0);
-  SmallVector<int64_t> staticLoopRanges = genericOp.getStaticLoopRanges();
-  for (auto loopNum : llvm::seq<unsigned>(0, numLoops)) {
+  SmallVector<int64_t> staticLoopRanges = op.getStaticLoopRanges();
+  for (auto loopNum : llvm::seq<int>(0, numLoops)) {
     if (distTileSizes[loopNum]) {
       vecTileSizes[loopNum] = getMaxVectorTileSize(
           distTileSizes[loopNum], minTileSizes[loopNum], minTileSizes[loopNum],
@@ -1586,11 +1630,11 @@ setDefaultGenericOpRootConfig(mlir::FunctionOpInterface entryPointFn,
                        << vecPreProcStrategy << "\n");
 
   // Set the next level tile sizes.
-  SmallVector<int64_t> parallelTileSizes;
+  SmallVector<int64_t> vecTileSizes;
+  setVectorTileSizes(genericOp, distTileSizes, distConfig.minTileSizes,
+                     distConfig.maxTileSizes, vecPreProcStrategy, vecTileSizes);
+  SmallVector<int64_t> parallelTileSizes = vecTileSizes;
   SmallVector<int64_t> reductionTileSizes;
-  setX86VectorTileSizes(genericOp, numLoops, distTileSizes,
-                        distConfig.minTileSizes, distConfig.maxTileSizes,
-                        vecPreProcStrategy, parallelTileSizes);
   splitParallelAndReductionTiles(genericOp, parallelTileSizes,
                                  reductionTileSizes);
   setVectorSizesForDynamicShapes(genericOp, vecPreProcStrategy,
@@ -1897,17 +1941,18 @@ static LogicalResult setConvRootConfig(mlir::FunctionOpInterface entryPointFn,
 
   // Shapes of N, OH, OW, OC, KH, KW, (IC)
   SmallVector<int64_t> shapes = convOp.getStaticLoopRanges();
-  SmallVector<int64_t> parallelTileSizes(targetTileSizes.begin(),
-                                         targetTileSizes.end());
-  for (auto i : llvm::seq<unsigned>(0, parallelTileSizes.size())) {
+  SmallVector<int64_t> vecTileSizes(targetTileSizes.begin(),
+                                    targetTileSizes.end());
+  for (auto i : llvm::seq<unsigned>(0, vecTileSizes.size())) {
     auto tileSize = distTileSizes[i] ? distTileSizes[i] : shapes[i];
     // If the tile size is intended to be 1, do not adjust it to `vectorSize`.
     // The ops will be decomposed to lower-rank named ops.
-    if (parallelTileSizes[i] != 1) {
-      parallelTileSizes[i] =
-          getMaxVectorTileSize(tileSize, parallelTileSizes[i], vectorSize);
+    if (vecTileSizes[i] != 1) {
+      vecTileSizes[i] =
+          getMaxVectorTileSize(tileSize, vecTileSizes[i], vectorSize);
     }
   }
+  SmallVector<int64_t> parallelTileSizes = vecTileSizes;
   SmallVector<int64_t> reductionTileSizes;
   splitParallelAndReductionTiles(convOp, parallelTileSizes, reductionTileSizes);
   setAlwaysVectorizeSizes(convOp, parallelTileSizes, reductionTileSizes);
@@ -2060,7 +2105,9 @@ setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
                                targetMLTransInfo);
         })
         .Case<IREE::LinalgExt::AttentionOp, IREE::LinalgExt::FftOp,
-              tensor::PackOp, tensor::PadOp, tensor::UnPackOp, linalg::Mmt4DOp,
+              IREE::LinalgExt::WinogradInputTransformOp,
+              IREE::LinalgExt::WinogradOutputTransformOp, tensor::PackOp,
+              tensor::PadOp, tensor::UnPackOp, linalg::Mmt4DOp,
               linalg::BatchMmt4DOp>(
             [&](auto op) { return setRootConfig(entryPointFn, op); })
         .Case<linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNchwFchwOp,
@@ -2242,7 +2289,6 @@ adjustTileSizesForGenericOp(mlir::FunctionOpInterface entryPointFn,
         roundUpToPow2(std::min(vecTileSize, vecSize),
                       vecPreProcStrategy == VectorPreProcStrategy::Masking);
   }
-
   splitParallelAndReductionTiles(genericOp, vecTileSizes, reductionTileSizes,
                                  &parallelScalableFlags,
                                  &reductionScalableFlags);
@@ -2583,33 +2629,27 @@ setTranslationInfoAndRootConfig(mlir::FunctionOpInterface entryPointFn,
   return success();
 }
 
-LogicalResult initCPULaunchConfig(ModuleOp moduleOp) {
-  llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
-      getAllEntryPoints(moduleOp);
-  for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
-    auto exportOp = exportOps.lookup(funcOp.getName());
-    if (!exportOp)
-      continue;
-    if (getTranslationInfo(exportOp))
-      continue;
+LogicalResult initCPULaunchConfig(FunctionOpInterface funcOp) {
+  if (getTranslationInfo(funcOp)) {
+    return success();
+  }
 
-    // For now pick the default for functions with control flow, cause
-    // the currently built pipelines dont work so well with control flow.
-    if (funcOp.empty() || !llvm::hasSingleElement(funcOp.getFunctionBody())) {
-      return lowerUsingDefaultPipeline(funcOp);
-    }
+  // For now pick the default for functions with control flow, cause
+  // the currently built pipelines dont work so well with control flow.
+  if (funcOp.empty() || !llvm::hasSingleElement(funcOp.getFunctionBody())) {
+    return lowerUsingDefaultPipeline(funcOp);
+  }
 
-    SmallVector<Operation *> computeOps = getComputeOps(funcOp);
-    if (failed(setTranslationInfoAndRootConfig(funcOp, computeOps))) {
-      return failure();
-    }
+  SmallVector<Operation *> computeOps = getComputeOps(funcOp);
+  if (failed(setTranslationInfoAndRootConfig(funcOp, computeOps))) {
+    return failure();
   }
 
   // The root configuration setting introduces `tensor.dim` operations.
   // Resolve those away.
-  RewritePatternSet patterns(moduleOp.getContext());
+  RewritePatternSet patterns(funcOp.getContext());
   memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
-  return applyPatternsAndFoldGreedily(moduleOp, std::move(patterns));
+  return applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
 }
 
 } // namespace mlir::iree_compiler

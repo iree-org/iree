@@ -22,9 +22,10 @@ using SizesAndScalableFlags =
 /// We currently support the following scenarios:
 ///   1. [[distribution]]
 ///   2. [[distribution], [vector-common-parallel]]
-///   3. [[distribution], [vector-common-parallel], [vector-reduction],
+///   3. [[distribution], [vector-common-parallel], [vector-reduction]]
+///   4. [[distribution], [vector-common-parallel], [vector-reduction],
 ///       [vector-inner-parallel]]
-///   4. [[distribution], [cache-parallel], [cache-reduction],
+///   5. [[distribution], [cache-parallel], [cache-reduction],
 ///       [vector-parallel], [vector-reduction]]
 class TilingConfig {
 public:
@@ -109,10 +110,6 @@ public:
     return getVectorSizesForLevel(getVectorInnerParallelLevel());
   }
 
-  /// Returns the tiling level that contains the vector dim at `dimPos` (which
-  /// is an index into the result of `getVectorTileSizes()`).
-  std::optional<unsigned> getTilingLevelForVectorDimPosition(unsigned dimPos);
-
   /// Returns the tile sizes of all the vector dimensions, including parallel
   /// and reduction dimensions.
   SizesAndScalableFlags getVectorTileSizes();
@@ -122,7 +119,7 @@ public:
   /// `scalableFlags`.
   IREE::Codegen::LoweringConfigAttr
   getLoweringConfigWithNewVectorSizes(ArrayRef<int64_t> sizes,
-                                      ArrayRef<bool> scalableFlags);
+                                      ArrayRef<bool> scalableFlags = {});
 
   /// Returns a list with the tiling levels that can be fused for this
   /// configuration.
@@ -145,6 +142,11 @@ private:
   SmallVector<int64_t> getTileSizesForLevel(unsigned level) {
     return loweringConfig.getTileSizeVals(level);
   }
+
+  /// Returns the tiling level that contains the vector dim at `dimPos` (which
+  /// is an index into the result of `getVectorTileSizes()`).
+  std::optional<unsigned>
+  getTilingLevelForVectorDimPosition(unsigned dimPos) const;
 
   /// Internal representation for all the supported tiling levels. All or just
   /// a subset of them may be available in a valid configuration.

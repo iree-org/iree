@@ -1,5 +1,5 @@
 // RUN: iree-opt --split-input-file \
-// RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-llvmgpu-select-lowering-strategy, iree-llvmgpu-lower-executable-target,canonicalize)))' \
+// RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-llvmgpu-select-lowering-strategy, func.func(iree-llvmgpu-lower-executable-target,canonicalize)))))' \
 // RUN:   %s | FileCheck %s
 
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}>
@@ -111,8 +111,7 @@ hal.executable private @conv_nchw_dispatch_1 {
         #hal.interface.binding<0, 2>,
         #hal.interface.binding<0, 3>
       ],
-      translation_info = #iree_codegen.translation_info<LLVMGPUVectorize>,
-      workgroup_size = [16 : index, 2 : index, 1 : index]} {
+      translation_info = #iree_codegen.translation_info<LLVMGPUVectorize workgroup_size = [16, 2, 1]>} {
     ^bb0(%arg0: !hal.device):
       %x, %y, %z = flow.dispatch.workgroup_count_from_slice
       hal.return %x, %y, %z : index, index, index

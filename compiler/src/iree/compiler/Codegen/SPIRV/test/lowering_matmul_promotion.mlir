@@ -1,11 +1,14 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-spirv-configuration-pipeline, iree-spirv-lower-executable-target-pass)))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-spirv-configuration-pipeline, func.func(iree-spirv-lower-executable-target-pass)))))' %s | FileCheck %s
+
+// TODO (MaheshRavishankar): This test should be modified to run just on the inner module/func.func. Blocked
+// today since `TileAndDistributeToWorkgroups` runs the `FoldAffineMinOverWorkgroupIds` pattern that
+// doesnt work without the entry point.
 
 // Verify pipelining + multi-buffering.
 
 #compilation = #iree_codegen.compilation_info<
     lowering_config  = <tile_sizes = [[64, 64, 16]]>,
-    translation_info = <SPIRVMatmulPromoteVectorize, {pipeline_depth = 2, store_stage = 1}>,
-    workgroup_size = [16, 8, 1]>
+    translation_info = <SPIRVMatmulPromoteVectorize workgroup_size = [16, 8, 1], {pipeline_depth = 2, store_stage = 1}>>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -57,11 +60,9 @@ hal.executable @matmul_f32_128x256x64 {
 }
 
 //       CHECK-DAG: #[[MAP:.+]] = affine_map<(d0) -> ((d0 floordiv 16) mod 2)>
-//       CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize
-//           CHECK: hal.executable.export public @matmul_f32_128x256x64
-//      CHECK-SAME:   translation_info = #[[TRANSLATION]]
-//      CHECK-SAME:   workgroup_size = [16 : index, 8 : index, 1 : index]
+//       CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize workgroup_size = [16, 8, 1]
 //           CHECK: func.func @matmul_f32_128x256x64()
+//      CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //           CHECK:   %[[CST0:.+]] = arith.constant 0.000000e+00 : f32
 //           CHECK:   memref.alloc() : memref<2x64x20xf32, #gpu.address_space<workgroup>>
 //           CHECK:   memref.alloc() : memref<2x16x68xf32, #gpu.address_space<workgroup>>
@@ -149,11 +150,9 @@ hal.executable @matmul_f32_128x256x64 {
 }
 
 //       CHECK-DAG: #[[MAP:.+]] = affine_map<(d0) -> ((d0 floordiv 16) mod 3)>
-//       CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize
-//           CHECK: hal.executable.export public @matmul_f32_128x256x64
-//      CHECK-SAME:   translation_info = #[[TRANSLATION]]
-//      CHECK-SAME:   workgroup_size = [16 : index, 8 : index, 1 : index]
+//       CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVMatmulPromoteVectorize workgroup_size = [16, 8, 1]
 //           CHECK: func.func @matmul_f32_128x256x64()
+//      CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //           CHECK:   %[[CST0:.+]] = arith.constant 0.000000e+00 : f32
 //           CHECK:   memref.alloc() : memref<3x64x20xf32, #gpu.address_space<workgroup>>
 //           CHECK:   memref.alloc() : memref<3x16x68xf32, #gpu.address_space<workgroup>>
@@ -206,8 +205,7 @@ hal.executable @matmul_f32_128x256x64 {
 
 #compilation = #iree_codegen.compilation_info<
     lowering_config  = <tile_sizes = [[64, 256, 32]]>,
-    translation_info = <SPIRVMatmulPromoteVectorize, {pipeline_depth = 1, store_stage = 1}>,
-    workgroup_size = [32, 8, 1]>
+    translation_info = <SPIRVMatmulPromoteVectorize workgroup_size = [32, 8, 1], {pipeline_depth = 1, store_stage = 1}>>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,

@@ -49,14 +49,10 @@ static llvm::cl::opt<int>
 
 namespace {
 
-// HACK: this is not the proper way to do this; each function may have a
-// locally-scoped arch in cases of multi-versioning and randomly picking any
-// function is going to produce bad results.
-
+/// Return the target arch attached the most immediate parent.
 static StringRef getTargetArch(mlir::FunctionOpInterface entryPoint) {
-  if (auto variantOp =
-          entryPoint->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
-    IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.getTarget();
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPoint);
+  if (targetAttr) {
     if (auto config = targetAttr.getConfiguration()) {
       if (auto attr = config.getAs<StringAttr>("target_arch")) {
         return attr.getValue();

@@ -4,26 +4,25 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <memory>
-
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
-#include "mlir/Pass/Pass.h"
 
 #define DEBUG_TYPE "iree-flow-clone-producers-into-dispatch-regions"
 
 namespace mlir::iree_compiler::IREE::Flow {
 
+#define GEN_PASS_DEF_CLONEPRODUCERSINTODISPATCHREGIONSPASS
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
+
 namespace {
 
-struct CloneProducersIntoDispatchRegionPass
-    : public CloneProducersIntoDispatchRegionsBase<
-          CloneProducersIntoDispatchRegionPass> {
+struct CloneProducersIntoDispatchRegionsPass
+    : public IREE::Flow::impl::CloneProducersIntoDispatchRegionsPassBase<
+          CloneProducersIntoDispatchRegionsPass> {
   void runOnOperation() override {
     mlir::FunctionOpInterface funcOp = getOperation();
     IRRewriter rewriter(funcOp->getContext());
@@ -41,14 +40,16 @@ struct CloneProducersIntoDispatchRegionPass
         return signalPassFailure();
       }
     });
+
+    // Rerun the cloning again to move still clonable operations into
+    // dispatches.
+    funcOp->walk([&](DispatchRegionOp regionOp) {
+      if (failed(cloneProducersToRegion(rewriter, regionOp)))
+        return signalPassFailure();
+    });
   }
 };
 
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createCloneProducersIntoDispatchRegionsPass() {
-  return std::make_unique<CloneProducersIntoDispatchRegionPass>();
-}
 
 } // namespace mlir::iree_compiler::IREE::Flow

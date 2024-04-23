@@ -123,6 +123,8 @@ if(IREE_EXTERNAL_HAL_DRIVERS_USED)
   )
 endif()
 
+add_subdirectory(utils)
+
 set(_INIT_INTERNAL_DEPS)
 if(IREE_HAL_DRIVER_CUDA)
   add_subdirectory(cuda)

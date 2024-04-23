@@ -1594,6 +1594,24 @@ LogicalResult CallOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
 }
 
 //===----------------------------------------------------------------------===//
+// flow.tensor.constant
+//===----------------------------------------------------------------------===//
+
+// static
+bool TensorConstantOp::isBuildableWith(Attribute value, Type type) {
+  return isa<RankedTensorType>(type);
+}
+
+//===----------------------------------------------------------------------===//
+// flow.tensor.dynamic_constant
+//===----------------------------------------------------------------------===//
+
+// static
+bool TensorDynamicConstantOp::isBuildableWith(Attribute value, Type type) {
+  return TensorConstantOp::isBuildableWith(value, type);
+}
+
+//===----------------------------------------------------------------------===//
 // flow.tensor.tie_shape
 //===----------------------------------------------------------------------===//
 

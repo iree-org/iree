@@ -54,11 +54,11 @@ std::optional<int64_t> LayoutAttr::getShape(const LayoutDimension &dim) const {
 // specified, then return an empty vector.
 LogicalResult LayoutAttr::isValidLayout(VectorValue vector) const {
   ArrayRef<int64_t> shape = vector.getType().getShape();
-  if (shape.size() != getLayouts().size()) {
-    return emitError(vector.getLoc(),
-                     "Rank of vector (" + std::to_string(shape.size()) +
-                         ") does not match rank of layout (" +
-                         std::to_string(getLayouts().size()) + ").");
+  if (shape.size() != getRank()) {
+    return emitError(vector.getLoc(), "Rank of vector (" +
+                                          std::to_string(shape.size()) +
+                                          ") does not match rank of layout (" +
+                                          std::to_string(getRank()) + ").");
   }
   for (auto [idx, layout] : llvm::enumerate(getLayouts())) {
     ArrayRef<int64_t> layoutShape = layout.getShapes();
@@ -87,11 +87,10 @@ LogicalResult LayoutAttr::isValidLayout(VectorValue vector) const {
 // Project out the layout for the specified dimensions
 // resulting in the layout for a lower dimensional vector.
 VectorLayoutInterface LayoutAttr::project(ArrayRef<bool> droppedDims) const {
-  assert(droppedDims.size() == getLayouts().size() &&
+  assert(droppedDims.size() == getRank() &&
          "droppedDims size must match layout size");
 
   ArrayRef<PerDimLayoutAttr> layouts = getLayouts();
-  assert(droppedDims.size() == layouts.size());
   SmallVector<PerDimLayoutAttr> newLayouts;
   for (auto pair : llvm::zip(droppedDims, layouts)) {
     if (!std::get<0>(pair))
@@ -103,14 +102,13 @@ VectorLayoutInterface LayoutAttr::project(ArrayRef<bool> droppedDims) const {
 // Permute the layout according to the provided permutation
 // vector. The dimensionality of the layout remains the same.
 VectorLayoutInterface LayoutAttr::permute(ArrayRef<int64_t> permutation) const {
-  assert(permutation.size() == getLayouts().size() &&
-         "permutation size must match layout size");
+  assert(permutation.size() == getRank() &&
+         "permutation size must match layout rank");
 
   ArrayRef<PerDimLayoutAttr> layouts = getLayouts();
-  assert(permutation.size() == layouts.size());
   SmallVector<PerDimLayoutAttr> newLayouts;
   for (unsigned index : permutation) {
-    assert(index >= 0 && index < layouts.size());
+    assert(index >= 0 && index < getRank());
     newLayouts.push_back(layouts[index]);
   }
   return LayoutAttr::get(getContext(), newLayouts);
@@ -146,12 +144,12 @@ SmallVector<int64_t> LayoutAttr::getDistributedShape() const {
 }
 
 PerDimLayoutAttr LayoutAttr::getDimLayout(int64_t dim) const {
-  assert(dim >= 0 && dim < getLayouts().size());
+  assert(dim >= 0 && dim < getRank());
   return getLayouts()[dim];
 }
 
 std::optional<int64_t> LayoutAttr::getBatchDim(int64_t dim) {
-  assert(dim < getLayouts().size());
+  assert(dim < getRank());
   PerDimLayoutAttr layout = getDimLayout(dim);
   for (auto [name, shape] :
        llvm::zip_equal(layout.getLabels(), layout.getShapes())) {
@@ -162,7 +160,7 @@ std::optional<int64_t> LayoutAttr::getBatchDim(int64_t dim) {
 }
 
 std::optional<int64_t> LayoutAttr::getLaneDim(int64_t dim) {
-  assert(dim < getLayouts().size());
+  assert(dim < getRank());
   PerDimLayoutAttr layout = getDimLayout(dim);
   for (auto [name, shape] :
        llvm::zip_equal(layout.getLabels(), layout.getShapes())) {
@@ -173,7 +171,7 @@ std::optional<int64_t> LayoutAttr::getLaneDim(int64_t dim) {
 }
 
 std::optional<LayoutDimension> LayoutAttr::getLane(int64_t dim) {
-  assert(dim < getLayouts().size());
+  assert(dim < getRank());
   PerDimLayoutAttr layout = getDimLayout(dim);
   for (auto [name, shape] :
        llvm::zip_equal(layout.getLabels(), layout.getShapes())) {
@@ -182,6 +180,8 @@ std::optional<LayoutDimension> LayoutAttr::getLane(int64_t dim) {
   }
   return std::nullopt;
 }
+
+int64_t LayoutAttr::getRank() const { return getLayouts().size(); }
 
 std::tuple<int64_t, int64_t, int64_t> LayoutAttr::getLaneGrid() {
   int64_t laneX = 1;
@@ -245,7 +245,7 @@ bool LayoutAttr::hasLaneConflictWith(const LayoutAttr &other) {
 // the rank of the layout in the process.
 VectorLayoutInterface
 NestedLayoutAttr::project(ArrayRef<bool> droppedDims) const {
-  assert(droppedDims.size() == getBatchesPerSubgroup().size() &&
+  assert(droppedDims.size() == getRank() &&
          "droppedDims size must match layout rank");
 
   // Projection for this layout simply means the sizes along the projected
@@ -312,8 +312,14 @@ NestedLayoutAttr::project(ArrayRef<bool> droppedDims) const {
   };
   SmallVector<bool> subgroupMask(getSubgroupActiveIds());
   SmallVector<bool> threadMask(getThreadActiveIds());
-  composeMasks(subgroupMask, droppedDims);
-  composeMasks(threadMask, droppedDims);
+
+  SmallVector<bool> invertedDroppedThreadMask =
+      applyPermutation(droppedDims, invertPermutationVector(getThreadOrder()));
+  composeMasks(subgroupMask, invertedDroppedThreadMask);
+
+  SmallVector<bool> invertedDroppedSubgroupMask =
+      applyPermutation(droppedDims, invertPermutationVector(getThreadOrder()));
+  composeMasks(threadMask, invertedDroppedSubgroupMask);
 
   return NestedLayoutAttr::get(getContext(), subgroupCount, subgroupOrder,
                                batchCount, batchOrder, outerCount, outerOrder,
@@ -384,16 +390,25 @@ SmallVector<int64_t> NestedLayoutAttr::getDistributedShape() const {
   return shape;
 }
 
+// Gets the rank of the undistributed vector for this layout.
+int64_t NestedLayoutAttr::getRank() const {
+  // The layout requires that all size lists are the same length and match
+  // the rank of the undistributed vector, so just return the length of one
+  // of the fields.
+  return getBatchesPerSubgroup().size();
+}
+
 LogicalResult NestedLayoutAttr::isValidLayout(VectorValue vector) const {
+  int64_t rank = getRank();
   ArrayRef<int64_t> shape = vector.getType().getShape();
-  if (shape.size() != getBatchOrder().size()) {
-    return emitError(vector.getLoc(),
-                     "Rank of vector (" + std::to_string(shape.size()) +
-                         ") does not match rank of layout (" +
-                         std::to_string(getBatchOrder().size()) + ").");
+  if (shape.size() != rank) {
+    return emitError(vector.getLoc(), "Rank of vector (" +
+                                          std::to_string(shape.size()) +
+                                          ") does not match rank of layout (" +
+                                          std::to_string(rank) + ").");
   }
   // Multiply all shapes in the layout.
-  for (int i = 0, e = shape.size(); i < e; ++i) {
+  for (int i = 0, e = rank; i < e; ++i) {
     int64_t expectedShape = getSubgroupsPerWorkgroup()[i] *
                             getBatchesPerSubgroup()[i] *
                             getOutersPerBatch()[i] * getThreadsPerOuter()[i] *
@@ -731,7 +746,7 @@ static void printBasis(AsmPrinter &p, StringRef basisName, StringRef maskName,
   p << ']';
   if (llvm::any_of(mask, [](bool b) { return !b; })) {
     p << ',' << ' ';
-    p << maskName;
+    p << maskName << ' ';
     p << '=';
     p << ' ';
     p << '[';

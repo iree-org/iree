@@ -22,16 +22,16 @@
 // CHECK-NEXT:      %[[OUT_SLICE:.*]] = tensor.extract_slice %[[OUT_TENSOR_1]]{{.*}} : tensor<1024x1024xf32> to tensor<8x?xf32>
 // CHECK-NEXT:      %[[OUT_SLICE_1:.*]] = tensor.extract_slice %[[OUT_SLICE]]{{.*}} : tensor<8x?xf32> to tensor<8x?xf32>
 // CHECK-NEXT:      %[[OUT_VEC:.*]] = vector.transfer_read %[[OUT_TENSOR_1]]{{.*}} : tensor<1024x1024xf32>, vector<8x[16]xf32>
-// CHECK-NEXT:      %[[INNER_LOOP:.*]]:3 = scf.for {{.*}} iter_args({{.*}}, %[[RES:.*]] = %[[OUT_VEC]]) -> (tensor<8x?xf32>, tensor<8x?xf32>, vector<8x[16]xf32>) {
+// CHECK-NEXT:      %[[INNER_LOOP:.*]] = scf.for {{.*}} iter_args(%[[RES:.*]] = %[[OUT_VEC]]) -> (vector<8x[16]xf32>) {
 // CHECK-NEXT:        %[[LHS:.*]] = vector.transfer_read {{.*}} : tensor<1024x1024xf32>, vector<8x1xf32>
 // CHECK-NEXT:        %[[RHS:.*]] = vector.transfer_read {{.*}} : tensor<1024x1024xf32>, vector<1x[16]xf32>
 // CHECK-NEXT:        %[[CONTRACT:.*]] = vector.contract {indexing_maps = [#map1, #map2, #map3],
 // CHECK-SAME:      iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>}
 // CHECK-SAME:      %[[LHS]], %[[RHS]], %[[RES]] : vector<8x1xf32>, vector<1x[16]xf32> into vector<8x[16]xf32>
-// CHECK-NEXT:        scf.yield {{.*}}, %[[CONTRACT]] : tensor<8x?xf32>, tensor<8x?xf32>, vector<8x[16]xf32>
+// CHECK-NEXT:        scf.yield %[[CONTRACT]] : vector<8x[16]xf32>
 // CHECK-NEXT:  }
-// CHECK-NEXT:  %[[OUT_WRITE:.*]] = vector.transfer_write %[[INNER_LOOP]]#2, %[[INNER_LOOP]]#1{{.*}} {{.*}} : vector<8x[16]xf32>, tensor<8x?xf32>
-// CHECK-NEXT:  %[[INSERT_SLICE:.*]] = tensor.insert_slice %[[OUT_WRITE]] into %[[INNER_LOOP]]#0{{.*}} : tensor<8x?xf32> into tensor<8x?xf32>
+// CHECK-NEXT:  %[[OUT_WRITE:.*]] = vector.transfer_write %[[INNER_LOOP]], %[[OUT_SLICE_1]]{{.*}} {{.*}} : vector<8x[16]xf32>, tensor<8x?xf32>
+// CHECK-NEXT:  %[[INSERT_SLICE:.*]] = tensor.insert_slice %[[OUT_WRITE]] into %[[OUT_SLICE]]{{.*}} : tensor<8x?xf32> into tensor<8x?xf32>
 // CHECK-NEXT:  tensor.insert_slice %[[INSERT_SLICE]] into %[[OUT_TENSOR_1]]{{.*}} : tensor<8x?xf32> into tensor<1024x1024xf32>
 
 func.func @pipeline() {

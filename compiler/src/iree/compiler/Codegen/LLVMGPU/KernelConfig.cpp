@@ -80,6 +80,7 @@ struct TargetInfo {
   bool hasMmaSync = false;
   // These are listed in the order of preference, not necessarily monotonically.
   SmallVector<int64_t, 2> supportedSubgroupSizes = {32};
+  int64_t sharedMemoryLimitInBytes = 65536;
 };
 
 struct TileWorkgroupSizePair {
@@ -156,10 +157,9 @@ getTensorCoreConfig(SmallVectorImpl<TileWorkgroupSizePair> &tileSizes,
   }
 }
 
+// Get the target arch associated with the immediate parent.
 static StringRef getTargetArch(mlir::FunctionOpInterface entryPoint) {
-  if (auto variantOp =
-          entryPoint->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
-    IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.getTarget();
+  if (auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPoint)) {
     if (auto config = targetAttr.getConfiguration()) {
       if (auto attr = config.getAs<StringAttr>("target_arch")) {
         return attr.getValue();
@@ -170,9 +170,7 @@ static StringRef getTargetArch(mlir::FunctionOpInterface entryPoint) {
 }
 
 bool isCudaTarget(mlir::FunctionOpInterface entryPoint) {
-  if (auto variantOp =
-          entryPoint->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
-    IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.getTarget();
+  if (auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPoint)) {
     if (auto backend = targetAttr.getBackend()) {
       return backend.getValue().str() == kCudaTarget;
     }
@@ -181,9 +179,7 @@ bool isCudaTarget(mlir::FunctionOpInterface entryPoint) {
 }
 
 bool isRocmTarget(mlir::FunctionOpInterface entryPoint) {
-  if (auto variantOp =
-          entryPoint->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
-    IREE::HAL::ExecutableTargetAttr targetAttr = variantOp.getTarget();
+  if (auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPoint)) {
     if (auto backend = targetAttr.getBackend()) {
       return backend.getValue().str() == kRocmTarget;
     }
@@ -196,6 +192,7 @@ static TargetInfo getCudaTargetInfo(mlir::FunctionOpInterface entryPoint) {
   // All the cuda target are assumed to have warp support.
   info.hasWarpShuffle = true;
   info.supportedSubgroupSizes = {32};
+  info.sharedMemoryLimitInBytes = 163 * 1024;
   StringRef targetName = getTargetArch(entryPoint);
   // If no target name is set assume all the features are off.
   if (targetName == "")
@@ -221,6 +218,7 @@ static TargetInfo getCudaTargetInfo(mlir::FunctionOpInterface entryPoint) {
 static TargetInfo getRocmTargetInfo(mlir::FunctionOpInterface entryPoint) {
   TargetInfo info;
   StringRef targetName = getTargetArch(entryPoint);
+  info.sharedMemoryLimitInBytes = 65536;
   // If no target name is set assume all the features are off.
   if (targetName.empty())
     return info;
@@ -404,20 +402,23 @@ setConvolutionVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
 
   // Note that the following heuristic seeds are just placeholder values.
   // We need to clean it up and make it adjusting to different targets.
-  // See https://github.com/openxla/iree/issues/16341 for details.
+  // See https://github.com/iree-org/iree/issues/16341 for details.
   GPUMMAHeuristicSeeds seeds{/*bestSubgroupCountPerWorkgroup=*/4,
                              /*bestMNTileCountPerSubgroup=*/8,
                              /*bestKTileCountPerSubgroup=*/2};
 
+  int64_t sharedMemoryLimitInBytes = targetInfo.sharedMemoryLimitInBytes;
+
   // First try to find a schedule with an exactly matching intrinsic.
-  std::optional<GPUMMASchedule> schedule =
-      deduceMMASchedule(problem, intrinsics, seeds);
-  if (!schedule) {
+  FailureOr<GPUMMASchedule> schedule =
+      deduceMMASchedule(problem, intrinsics, seeds, sharedMemoryLimitInBytes);
+  if (failed(schedule)) {
     // Then try again by allowing upcasting accumulator.
     schedule =
-        deduceMMASchedule(problem, intrinsics, seeds, /*canUpcastAcc=*/true);
+        deduceMMASchedule(problem, intrinsics, seeds, sharedMemoryLimitInBytes,
+                          /*canUpcastAcc=*/true);
   }
-  if (!schedule) {
+  if (failed(schedule)) {
     return failure();
   }
 
@@ -506,13 +507,19 @@ setMatmulVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   // except the inner most m, n, and k dimensions to 1.
   int64_t mDim = contractionDims->m.back();
   int64_t nDim = contractionDims->n.back();
+  int64_t kDim = contractionDims->k.back();
+
+  // Dynamic dims are expected to be taken care of earlier in the pipeline.
+  if (ShapedType::isDynamic(bounds[mDim]) ||
+      ShapedType::isDynamic(bounds[nDim]) ||
+      ShapedType::isDynamic(bounds[kDim])) {
+    return failure();
+  }
 
   // Bail out on matvec-like cases.
   if (bounds[mDim] == 1 || bounds[nDim] == 1) {
     return failure();
   }
-
-  int64_t kDim = contractionDims->k.back();
 
   Value lhs = op.getDpsInputOperand(0)->get();
   Value rhs = op.getDpsInputOperand(1)->get();
@@ -543,7 +550,7 @@ setMatmulVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
 
   // Note that the following heuristic seeds are just placeholder values.
   // We need to clean it up and make it adjusting to different targets.
-  // See https://github.com/openxla/iree/issues/16341 for details.
+  // See https://github.com/iree-org/iree/issues/16341 for details.
   if (problem.mSize * problem.nSize <= clGPUMatmulCThreshold) {
     // For matmuls with small M*N size, we want to distribute M*N onto more
     // workgroups to fill the GPU. Use a smaller bestMNTileCountPerSubgroup
@@ -557,13 +564,16 @@ setMatmulVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
              /*bestKTileCountPerSubgroup=*/4};
   }
 
+  int64_t sharedMemoryLimitInBytes = targetInfo.sharedMemoryLimitInBytes;
+
   // First try to find a schedule with an exactly matching intrinsic.
   std::optional<GPUMMASchedule> schedule =
-      deduceMMASchedule(problem, intrinsics, seeds);
+      deduceMMASchedule(problem, intrinsics, seeds, sharedMemoryLimitInBytes);
   if (!schedule) {
     // Then try again by allowing upcasting accumulator.
     schedule =
-        deduceMMASchedule(problem, intrinsics, seeds, /*canUpcastAcc=*/true);
+        deduceMMASchedule(problem, intrinsics, seeds, sharedMemoryLimitInBytes,
+                          /*canUpcastAcc=*/true);
   }
   if (!schedule) {
     return failure();
@@ -1482,11 +1492,8 @@ static LogicalResult setTransposeConfig(mlir::FunctionOpInterface entryPoint,
 static LogicalResult
 setArgmaxUkernelConfig(mlir::FunctionOpInterface entryPoint,
                        linalg::GenericOp op, const TargetInfo &targetInfo) {
-
   // Checks if UKernels are enabled.
-  if (auto variantOp =
-          entryPoint->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
-    auto target = variantOp.getTarget();
+  if (auto target = IREE::HAL::ExecutableTargetAttr::lookup(entryPoint)) {
     const char ukernelName[] = "argmax";
     if (!hasUkernel(target, ukernelName) ||
         !hasUkernelSupportedGpuArch(target)) {
@@ -1801,98 +1808,92 @@ static void propagateLoweringConfig(Operation *rootOperation,
   }
 }
 
+int64_t getTargetSharedMemoryLimitInBytes(FunctionOpInterface entryPoint) {
+  return getTargetInfo(entryPoint).sharedMemoryLimitInBytes;
+}
+
 //===----------------------------------------------------------------------===//
 // Entry Point
 //===----------------------------------------------------------------------===//
+LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
 
-LogicalResult initGPULaunchConfig(ModuleOp moduleOp) {
-  llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
-      getAllEntryPoints(moduleOp);
-
-  for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
-    auto exportOp = exportOps.lookup(funcOp.getName());
-    if (!exportOp)
-      continue;
-
-    if (!getTranslationInfo(funcOp)) {
-      // If no translation info set, first check whether we already have
-      // workgroup count set--it's a "contract" to indicate that we should
-      // bypass all tiling and distribution to go down just the most basic
-      // lowering flow.
-      if (Block *body = exportOp.getWorkgroupCountBody()) {
-        auto retOp = cast<IREE::HAL::ReturnOp>(body->getTerminator());
-        // For scalar dispatch cases--using just one thread of one workgroup.
-        auto isOne = [](Value value) { return matchPattern(value, m_One()); };
-        if (llvm::all_of(retOp.getOperands(), isOne)) {
-          std::array<int64_t, 3> workgroupSize = {1, 1, 1};
-          if (failed(setDispatchConfig(funcOp, workgroupSize, std::nullopt)))
-            return failure();
-          auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-              funcOp.getContext(),
-              IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUBaseLowering);
-          if (failed(setTranslationInfo(funcOp, translationInfo))) {
-            return failure();
-          }
-          continue;
+  auto exportOp = getEntryPoint(funcOp);
+  if (!getTranslationInfo(funcOp) && exportOp) {
+    // If no translation info set, first check whether we already have
+    // workgroup count set--it's a "contract" to indicate that we should
+    // bypass all tiling and distribution to go down just the most basic
+    // lowering flow.
+    if (Block *body = exportOp->getWorkgroupCountBody()) {
+      auto retOp = cast<IREE::HAL::ReturnOp>(body->getTerminator());
+      // For scalar dispatch cases--using just one thread of one workgroup.
+      auto isOne = [](Value value) { return matchPattern(value, m_One()); };
+      if (llvm::all_of(retOp.getOperands(), isOne)) {
+        SmallVector<int64_t, 3> workgroupSize = {1, 1, 1};
+        auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+            funcOp.getContext(),
+            IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUBaseLowering,
+            workgroupSize);
+        if (failed(setTranslationInfo(funcOp, translationInfo))) {
+          return failure();
         }
+        return success();
       }
     }
+  }
 
-    SmallVector<Operation *> computeOps = getComputeOps(funcOp);
-    if (getTranslationInfo(exportOp)) {
-      // Currently LLVMGPU requires propagation of user lowering configs.
-      for (auto op : computeOps) {
-        if (getLoweringConfig(op)) {
-          propagateLoweringConfig(op, computeOps);
-          break;
-        }
+  SmallVector<Operation *> computeOps = getComputeOps(funcOp);
+  if (getTranslationInfo(funcOp)) {
+    // Currently LLVMGPU requires propagation of user lowering configs.
+    for (auto op : computeOps) {
+      if (getLoweringConfig(op)) {
+        propagateLoweringConfig(op, computeOps);
+        break;
       }
-      continue;
     }
+    return success();
+  }
 
-    Operation *rootOperation = nullptr;
+  Operation *rootOperation = nullptr;
 
-    // Find the root operation. linalg.generic and linalg.fill are not root
-    // operations if there are other compute operations present.
-    for (Operation *op : llvm::reverse(computeOps)) {
-      if (!isa<linalg::GenericOp, linalg::FillOp>(op)) {
+  // Find the root operation. linalg.generic and linalg.fill are not root
+  // operations if there are other compute operations present.
+  for (Operation *op : llvm::reverse(computeOps)) {
+    if (!isa<linalg::GenericOp, linalg::FillOp>(op)) {
+      rootOperation = op;
+      break;
+    }
+    if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
+      // linalg.generic with `reduction` iterator types are roots as well.
+      if (genericOp.getNumLoops() != genericOp.getNumParallelLoops()) {
         rootOperation = op;
         break;
       }
-      if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
-        // linalg.generic with `reduction` iterator types are roots as well.
-        if (genericOp.getNumLoops() != genericOp.getNumParallelLoops()) {
-          rootOperation = op;
-          break;
-        }
-      }
     }
-
-    if (!rootOperation) {
-      for (Operation *op : llvm::reverse(computeOps)) {
-        if (isa<linalg::GenericOp, linalg::FillOp>(op)) {
-          rootOperation = op;
-          break;
-        }
-      }
-    }
-
-    if (!rootOperation) {
-      // No root operation found, set it to none.
-      auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-          funcOp.getContext(),
-          IREE::Codegen::DispatchLoweringPassPipeline::None);
-      if (failed(setTranslationInfo(funcOp, translationInfo))) {
-        return failure();
-      }
-      continue;
-    }
-
-    if (failed(setRootConfig(funcOp, rootOperation)))
-      continue;
-
-    propagateLoweringConfig(rootOperation, computeOps);
   }
+
+  if (!rootOperation) {
+    for (Operation *op : llvm::reverse(computeOps)) {
+      if (isa<linalg::GenericOp, linalg::FillOp>(op)) {
+        rootOperation = op;
+        break;
+      }
+    }
+  }
+
+  if (!rootOperation) {
+    // No root operation found, set it to none.
+    auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+        funcOp.getContext(), IREE::Codegen::DispatchLoweringPassPipeline::None);
+    if (failed(setTranslationInfo(funcOp, translationInfo))) {
+      return failure();
+    }
+    return success();
+  }
+
+  if (failed(setRootConfig(funcOp, rootOperation)))
+    return funcOp.emitOpError("failed to set root config");
+
+  propagateLoweringConfig(rootOperation, computeOps);
   return success();
 }
 

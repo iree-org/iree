@@ -95,6 +95,7 @@ iree_lit_test_suite(
     mlp_linalg_example
   SRCS
     "mlp_linalg.mlir"
+    "mlp_linalg_two_matmul.mlir"
   TOOLS
     FileCheck
     iree-compile

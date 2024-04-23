@@ -86,3 +86,26 @@ func.func @scalable_2d_matmul_and_generic(%arg0: tensor<32400x32xf32>, %arg1: te
 //      CHECK:       }
 //      CHECK:     }
 //      CHECK:   }
+
+// -----
+
+#lowering_config_parallel_only = #iree_codegen.lowering_config<tile_sizes = [[0, 0], [[4], [4]]]>
+
+// CHECK: #[[GENERIC_CONFIG:.*]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 0], [4, [4]]]>
+///
+//      CHECK: func.func @should_not_crash
+//      CHECK:   scf.for
+//      CHECK:         linalg.generic
+// CHECK-SAME:           lowering_config = #[[GENERIC_CONFIG]]
+func.func @should_not_crash(%a: tensor<?x?xf32>, %b: tensor<?xf32>, %c: tensor<?x?xf32>) -> tensor<?x?xf32> {
+  %0 = linalg.generic {
+    indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%a, %b : tensor<?x?xf32>, tensor<?xf32>)
+    outs(%c : tensor<?x?xf32>) attrs = {lowering_config = #lowering_config_parallel_only} {
+  ^bb0(%in: f32, %in_3: f32, %out: f32):
+    %10 = arith.mulf %in, %in_3 : f32
+    linalg.yield %10 : f32
+  } -> tensor<?x?xf32>
+  return %0 : tensor<?x?xf32>
+}

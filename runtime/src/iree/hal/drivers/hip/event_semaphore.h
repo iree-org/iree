@@ -42,12 +42,14 @@ iree_status_t iree_hal_hip_event_semaphore_acquire_timepoint_device_signal(
     iree_hal_semaphore_t* base_semaphore, uint64_t to_value,
     hipEvent_t* out_event);
 
-// Acquires a timepoint to wait the timeline to reach at least the given
-// |min_value| on the device. The underlying HIP event is written into
-// |out_event| for interacting with HIP APIs.
-iree_status_t iree_hal_hip_event_semaphore_acquire_timepoint_device_wait(
+// Acquires an iree_hal_hip_event_t object to wait on the host for the
+// timeline to reach at least the given |min_value| on the device.
+// Returns true and writes to |out_event| if we can find such an event;
+// returns false otherwise.
+// The caller should release the |out_event| once done.
+bool iree_hal_hip_semaphore_acquire_event_host_wait(
     iree_hal_semaphore_t* base_semaphore, uint64_t min_value,
-    hipEvent_t* out_event);
+    iree_hal_hip_event_t** out_event);
 
 // Performs a multi-wait on one or more semaphores. Returns
 // IREE_STATUS_DEADLINE_EXCEEDED if the wait does not complete before |timeout|.

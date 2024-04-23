@@ -102,15 +102,13 @@ void LLVMCPUCheckIRBeforeLLVMConversionPass::runOnOperation() {
     return;
   }
 
-  auto moduleOp = getOperation();
-  for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
-    if (failed(checkStackAllocationSize(funcOp))) {
-      return signalPassFailure();
-    }
+  auto funcOp = getOperation();
+  if (failed(checkStackAllocationSize(funcOp))) {
+    return signalPassFailure();
   }
 }
 
-std::unique_ptr<OperationPass<ModuleOp>>
+std::unique_ptr<InterfacePass<FunctionOpInterface>>
 createLLVMCPUCheckIRBeforeLLVMConversionPass(bool failOnOutOfBounds) {
   return std::make_unique<LLVMCPUCheckIRBeforeLLVMConversionPass>(
       failOnOutOfBounds);

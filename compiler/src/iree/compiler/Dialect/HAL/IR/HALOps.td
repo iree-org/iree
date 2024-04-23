@@ -12,8 +12,8 @@ include "iree/compiler/Dialect/HAL/IR/HALBase.td"
 include "iree/compiler/Dialect/HAL/IR/HALInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilAttrs.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
-include "mlir/IR/BuiltinAttributeInterfaces.td"
 include "mlir/Interfaces/FunctionInterfaces.td"
+include "mlir/IR/BuiltinAttributeInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/CallInterfaces.td"
@@ -2095,6 +2095,15 @@ def HAL_ExecutableExportOp : HAL_Op<"executable.export", [
     // Calculates an XYZ workgroup size based on the given |workload|.
     std::array<Value, 3> calculateWorkgroupSize(
         Location loc, Value device, ValueRange workload, OpBuilder &builder);
+
+    // Helper function to return the subgroup size.
+    std::optional<uint64_t> getSubgroupSizeAsUInt() {
+      std::optional<APInt> subgroupSizeUInt = getSubgroupSize();
+      if (!subgroupSizeUInt) {
+        return std::nullopt;
+      }
+      return subgroupSizeUInt->getZExtValue();
+    }
   }];
 }
 

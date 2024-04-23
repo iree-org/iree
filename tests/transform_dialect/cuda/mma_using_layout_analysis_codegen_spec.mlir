@@ -45,36 +45,28 @@ module attributes { transform.with_named_sequence } {
       transform.apply_patterns.canonicalization
     } : !transform.any_op
     transform.apply_cse to %func_3 : !transform.any_op
-    transform.iree.eliminate_empty_tensors %variant_op : (!transform.any_op) -> ()
+    transform.iree.eliminate_empty_tensors %func_3 : (!transform.any_op) -> ()
     transform.apply_patterns to %func_3 {
       transform.apply_patterns.linalg.erase_unnecessary_inputs
     } : !transform.any_op
-    %variant_op_3 = transform.iree.bufferize { target_gpu } %variant_op : (!transform.any_op) -> (!transform.any_op)
-    %memref_func = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
+    %memref_func = transform.iree.bufferize { target_gpu } %func_3: (!transform.any_op) -> (!transform.any_op)
 
     // Step 5. Pre-process the contract and transfer ops to put it in the right form.
     // ===========================================================================
-    %func_2 = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
-    transform.apply_patterns to %func_2 {
+    transform.apply_patterns to %memref_func {
       transform.apply_patterns.iree.prepare_vector_to_mma
     } : !transform.any_op
 
     // Step 6. Post-bufferization vector distribution
     // ===========================================================================
-    %func_7 = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
-    transform.iree.forall_to_workgroup %func_7 : (!transform.any_op) -> ()
-    transform.iree.map_nested_forall_to_gpu_threads %func_7
+    transform.iree.forall_to_workgroup %memref_func : (!transform.any_op) -> ()
+    transform.iree.map_nested_forall_to_gpu_threads %memref_func
         workgroup_dims = [4, 8, 1] : (!transform.any_op) -> ()
 
     // Step 7. Do layout analysis and lower to mma
     // ===========================================================================
-    %func_10 = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
-    %func_11 = transform.iree.layout_analysis_and_distribution %func_10 : (!transform.any_op) -> (!transform.any_op)
+    %func_11 = transform.iree.layout_analysis_and_distribution %memref_func : (!transform.any_op) -> (!transform.any_op)
 
-    // Annotate the exported function as already translated.
-    %exports = transform.structured.match ops{["hal.executable.export"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
-    %none = transform.param.constant #iree_codegen.translation_info<None> -> !transform.any_param
-    transform.annotate %exports "translation_info" = %none : !transform.any_op, !transform.any_param
     transform.yield
   }
 } // module

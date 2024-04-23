@@ -34,7 +34,7 @@ using iree_compiler::IREE::transform_dialect::ForallToWorkgroupOp;
 using iree_compiler::IREE::transform_dialect::IREEBufferizeOp;
 using iree_compiler::IREE::transform_dialect::IREEEliminateEmptyTensorsOp;
 using iree_compiler::IREE::transform_dialect::
-    IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp;
+    PopulateWorkgroupCountRegionUsingNumThreadsSliceOp;
 using transform::FuseIntoContainingOp;
 using transform::HoistLoopInvariantSubsetsOp;
 using transform::MatchOp;
@@ -151,7 +151,8 @@ void mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(
     if (populatePatternsFn)
       populatePatternsFn(b, loc);
   });
-  b.create<IREE::transform_dialect::ApplyLoopIndependentCodeMotionOp>(funcH);
+  b.create<IREE::transform_dialect::IREEApplyLoopIndependentCodeMotionOp>(
+      funcH);
   b.create<mlir::transform::ApplyCommonSubexpressionEliminationOp>(funcH);
 }
 
@@ -362,8 +363,8 @@ Value mlir::iree_compiler::buildBufferize(ImplicitLocOpBuilder &b,
         b.create<IREE::transform_dialect::
                      ApplyFoldTensorSliceIntoTransferPatternsOp>(loc);
       });
-  b.create<IREEEliminateEmptyTensorsOp>(variantH);
-  variantH = b.create<IREEBufferizeOp>(variantH, targetGpu);
+  b.create<IREEEliminateEmptyTensorsOp>(funcH);
+  variantH = b.create<IREEBufferizeOp>(funcH, targetGpu);
   return variantH;
 }
 
@@ -449,7 +450,7 @@ mlir::iree_compiler::buildReductionStrategyBlockDistribution(
           /*threadDimMapping=*/b.getArrayAttr(blockDimMapping));
 
   // Handle the workgroup count region.
-  b.create<IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp>(
+  b.create<PopulateWorkgroupCountRegionUsingNumThreadsSliceOp>(
       tileResult.forallH);
 
   fillH =

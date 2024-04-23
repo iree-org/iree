@@ -55,8 +55,6 @@ using iree_compiler::gpu::GPUModel;
 using iree_compiler::IREE::transform_dialect::EliminateGpuBarriersOp;
 using iree_compiler::IREE::transform_dialect::IREEBufferizeOp;
 using iree_compiler::IREE::transform_dialect::IREEEliminateEmptyTensorsOp;
-using iree_compiler::IREE::transform_dialect::
-    IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp;
 using iree_compiler::IREE::transform_dialect::ShareForallOperandsOp;
 using iree_compiler::IREE::transform_dialect::SynchronizeLoopOp;
 using transform::FuseIntoContainingOp;
@@ -491,20 +489,23 @@ void mlir::iree_compiler::gpu::buildMatmulVectorization(
   if (!strategy.alignedLhs()) {
     MappingInfo lhsCopyMapping = strategy.lhsCopyMapping();
     SmallVector<bool> scalableSizes(lhsCopyMapping.tileSizes.size(), false);
-    b.create<transform::VectorizeOp>(lhsCopyOpH, ValueRange(), nullptr,
-                                     scalableSizes, lhsCopyMapping.tileSizes);
+    b.create<transform::VectorizeOp>(lhsCopyOpH, ValueRange(),
+                                     lhsCopyMapping.tileSizes, nullptr,
+                                     scalableSizes);
   }
   if (!strategy.alignedRhs()) {
     MappingInfo rhsCopyMapping = strategy.rhsCopyMapping();
     SmallVector<bool> scalableSizes(rhsCopyMapping.tileSizes.size(), false);
-    b.create<transform::VectorizeOp>(rhsCopyOpH, ValueRange(), nullptr,
-                                     scalableSizes, rhsCopyMapping.tileSizes);
+    b.create<transform::VectorizeOp>(rhsCopyOpH, ValueRange(),
+                                     rhsCopyMapping.tileSizes, nullptr,
+                                     scalableSizes);
   }
   if (!strategy.alignedRes()) {
     MappingInfo resCopyMapping = strategy.resCopyMapping();
     SmallVector<bool> scalableSizes(resCopyMapping.tileSizes.size(), false);
-    b.create<transform::VectorizeOp>(copyBackOpH, ValueRange(), nullptr,
-                                     scalableSizes, resCopyMapping.tileSizes);
+    b.create<transform::VectorizeOp>(copyBackOpH, ValueRange(),
+                                     resCopyMapping.tileSizes, nullptr,
+                                     scalableSizes);
   }
 
   // Lower all masked vector transfers at this point, as they make
@@ -683,10 +684,11 @@ Value mlir::iree_compiler::gpu::buildBufferize(ImplicitLocOpBuilder &b,
   b.create<transform::ApplyPatternsOp>(funcH, [](OpBuilder &b, Location loc) {
     b.create<transform::ApplyCanonicalizationPatternsOp>(loc);
   });
-  b.create<IREE::transform_dialect::ApplyLoopIndependentCodeMotionOp>(funcH);
+  b.create<IREE::transform_dialect::IREEApplyLoopIndependentCodeMotionOp>(
+      funcH);
   b.create<mlir::transform::ApplyCommonSubexpressionEliminationOp>(funcH);
-  b.create<IREEEliminateEmptyTensorsOp>(variantH);
-  auto bufferizeOp = b.create<IREEBufferizeOp>(variantH, /*targetGpu=*/true);
+  b.create<IREEEliminateEmptyTensorsOp>(funcH);
+  auto bufferizeOp = b.create<IREEBufferizeOp>(funcH, /*targetGpu=*/true);
   bufferizeOp.setTargetGpu(true);
   variantH = bufferizeOp.getResult();
   Value memrefFunc =

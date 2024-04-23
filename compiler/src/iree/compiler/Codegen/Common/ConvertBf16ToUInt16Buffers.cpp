@@ -250,7 +250,7 @@ struct ConvertBf16ToUInt16BuffersPass final
   }
 
   void runOnOperation() override {
-    ModuleOp op = getOperation();
+    auto op = getOperation();
     MLIRContext *ctx = &getContext();
 
     Bf16EmulationConverter typeConverter;
@@ -311,8 +311,7 @@ struct ConvertBf16ToUInt16BuffersPass final
 // Public interface
 //===----------------------------------------------------------------------===//
 
-std::unique_ptr<OperationPass<ModuleOp>>
-createConvertBf16ToUInt16BuffersPass() {
+std::unique_ptr<OperationPass<>> createConvertBf16ToUInt16BuffersPass() {
   return std::make_unique<ConvertBf16ToUInt16BuffersPass>();
 }
 

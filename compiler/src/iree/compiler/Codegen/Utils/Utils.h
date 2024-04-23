@@ -33,17 +33,9 @@ static constexpr unsigned kNumMaxParallelDims = 3;
 /// Returns true if the given `func` is a kernel dispatch entry point.
 bool isEntryPoint(mlir::FunctionOpInterface func);
 
-/// Returns a map from function symbol name to corresponding entry point op.
-llvm::StringMap<IREE::HAL::ExecutableExportOp>
-getAllEntryPoints(ModuleOp module);
-
 /// Returns the entry point op for the `funcOp`. Returns `nullptr` on failure.
-FailureOr<IREE::HAL::ExecutableExportOp>
+std::optional<IREE::HAL::ExecutableExportOp>
 getEntryPoint(mlir::FunctionOpInterface funcOp);
-
-/// Returns the ExecutableVariableOp enclosing `op`. Returns `nullptr` on
-/// failure.
-FailureOr<IREE::HAL::ExecutableVariantOp> getExecutableVariantOp(Operation *op);
 
 /// Returns the StringAttr with the name `stringAttr` in the `targetAttr`, if
 /// found.
@@ -103,7 +95,7 @@ bool isRISCV32(IREE::HAL::ExecutableTargetAttr targetAttr);
 bool isReadOnly(Value v);
 
 /// Return the static number of workgroup dispatched if it is known and
-/// constant. Return an empty vector otherwise.
+/// constant. If it is not known, it will return ShapedType::kDynamic.
 SmallVector<int64_t> getStaticNumWorkgroups(mlir::FunctionOpInterface funcOp);
 
 //===----------------------------------------------------------------------===//

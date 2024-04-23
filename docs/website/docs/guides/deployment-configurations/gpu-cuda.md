@@ -45,7 +45,7 @@ The core `iree-compiler` package includes the CUDA compiler:
 === ":material-alert: Nightly releases"
 
     Nightly releases are published on
-    [GitHub releases](https://github.com/openxla/iree/releases).
+    [GitHub releases](https://github.com/iree-org/iree/releases).
 
     ``` shell
     python -m pip install \

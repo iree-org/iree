@@ -10,7 +10,6 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/ConvertRegionToWorkgroups.h"
 #include "iree/compiler/Dialect/Flow/Transforms/FormDispatchRegions.h"
-#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "llvm/ADT/STLExtras.h"
@@ -31,6 +30,9 @@
 #define DEBUG_TYPE "iree-flow-form-dispatch-workgroups"
 
 namespace mlir::iree_compiler::IREE::Flow {
+
+#define GEN_PASS_DEF_FORMDISPATCHWORKGROUPSPASS
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
 
 //===----------------------------------------------------------------------===//
 // Dispatch workgroups formation
@@ -249,17 +251,10 @@ static void createDefaultWorkgroupCountRegion(
 namespace {
 /// Pass declaration.
 struct FormDispatchWorkgroupsPass
-    : public FormDispatchWorkgroupsBase<FormDispatchWorkgroupsPass> {
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<affine::AffineDialect, IREE::Flow::FlowDialect,
-                    linalg::LinalgDialect, scf::SCFDialect,
-                    tensor::TensorDialect>();
-  }
-  FormDispatchWorkgroupsPass(bool generateWorkloadRegion) {
-    this->generateWorkloadRegion = generateWorkloadRegion;
-  }
-  FormDispatchWorkgroupsPass(const FormDispatchWorkgroupsPass &pass)
-      : FormDispatchWorkgroupsPass(pass.generateWorkloadRegion) {}
+    : public IREE::Flow::impl::FormDispatchWorkgroupsPassBase<
+          FormDispatchWorkgroupsPass> {
+  using IREE::Flow::impl::FormDispatchWorkgroupsPassBase<
+      FormDispatchWorkgroupsPass>::FormDispatchWorkgroupsPassBase;
   void runOnOperation() override;
 };
 } // namespace
@@ -353,11 +348,6 @@ void FormDispatchWorkgroupsPass::runOnOperation() {
   funcOp.walk([&](Flow::DispatchWorkgroupsOp workgroupsOp) {
     createDefaultWorkgroupCountRegion(rewriter, workgroupsOp);
   });
-}
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createFormDispatchWorkgroupsPass(bool generateWorkloadRegion) {
-  return std::make_unique<FormDispatchWorkgroupsPass>(generateWorkloadRegion);
 }
 
 } // namespace mlir::iree_compiler::IREE::Flow

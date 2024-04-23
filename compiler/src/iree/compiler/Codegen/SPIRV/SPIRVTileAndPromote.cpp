@@ -144,9 +144,6 @@ private:
 void SPIRVTileAndPromotePass::runOnOperation() {
   MLIRContext *context = &getContext();
   auto funcOp = getOperation();
-  FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
-  if (failed(exportOp))
-    return;
 
   auto threadTileComputeFn = getSPIRVTileSizeComputeFn(funcOp, 1);
   if (failed(threadTileComputeFn))
@@ -191,9 +188,15 @@ void SPIRVTileAndPromotePass::runOnOperation() {
     llvm::dbgs() << "\n\n";
   });
 
-  auto workgroupSize = llvm::map_to_vector(
-      exportOp->getWorkgroupSize().value(),
-      [&](Attribute attr) { return llvm::cast<IntegerAttr>(attr).getInt(); });
+  std::optional<SmallVector<int64_t>> maybeWorkgroupSize =
+      getWorkgroupSize(funcOp);
+  if (!maybeWorkgroupSize) {
+    funcOp.emitOpError(
+        "failed to get workgroup size for tile and promote pass");
+    return signalPassFailure();
+  }
+
+  SmallVector<int64_t> &workgroupSize = maybeWorkgroupSize.value();
   int64_t totalThreads = workgroupSize[0] * workgroupSize[1] * workgroupSize[2];
   std::optional<int> subgroupSize = getSPIRVSubgroupSize(funcOp);
   if (!subgroupSize) {

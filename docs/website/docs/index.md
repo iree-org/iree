@@ -142,10 +142,10 @@ using various languages.
 ## Communication channels
 
 * :fontawesome-brands-github:
-  [GitHub issues](https://github.com/openxla/iree/issues): Feature requests,
+  [GitHub issues](https://github.com/iree-org/iree/issues): Feature requests,
   bugs, and other work tracking
 * :fontawesome-brands-discord:
-  [IREE Discord server](https://discord.gg/26P4xW4): Daily development
+  [IREE Discord server](https://discord.gg/wEWh6Z9nMU): Daily development
   discussions with the core team and collaborators
 * :fontawesome-solid-users: [iree-discuss email list](https://groups.google.com/forum/#!forum/iree-discuss):
   Announcements, general and low-priority discussion
@@ -154,8 +154,8 @@ using various languages.
 
 IREE is in the early stages of development and is not yet ready for broad
 adoption. We use both
-[GitHub Projects](https://github.com/openxla/iree/projects) and
-[GitHub Milestones](https://github.com/openxla/iree/milestones) to track
+[GitHub Projects](https://github.com/iree-org/iree/projects) and
+[GitHub Milestones](https://github.com/iree-org/iree/milestones) to track
 progress.
 
 [^1]:

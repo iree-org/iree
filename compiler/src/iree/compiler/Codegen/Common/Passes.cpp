@@ -5,20 +5,20 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Pass/PassManager.h"
 
 namespace mlir::iree_compiler {
 
 void addCommonTargetExecutablePreprocessingPasses(
-    OpPassManager &passManager, bool useDecomposeSoftmaxFusion) {
-  OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
-  nestedModulePM.addNestedPass<func::FuncOp>(createTypePropagationPass());
-  nestedModulePM.addPass(createBubbleUpOrdinalOpsPass());
-  nestedModulePM.addPass(createBufferizeCopyOnlyDispatchesPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createDecomposeSoftmaxPass(useDecomposeSoftmaxFusion));
-  passManager.addPass(createMaterializeUserConfigsPass());
+    FunctionLikeNest &funcPassManager, bool useDecomposeSoftmaxFusion) {
+  funcPassManager.addPass(createTypePropagationPass)
+      .addPass(createBubbleUpOrdinalOpsPass)
+      .addPass(createBufferizeCopyOnlyDispatchesPass)
+      .addPass([&]() {
+        return createDecomposeSoftmaxPass(useDecomposeSoftmaxFusion);
+      });
 }
 
 //===---------------------------------------------------------------------===//

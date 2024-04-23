@@ -276,4 +276,38 @@ getCollectiveElementTypeAttr(RankedTensorType type) {
                                                     *collectiveElemType);
 }
 
+//===----------------------------------------------------------------------===//
+// custom<ParameterReference>($scope, $key)
+//===----------------------------------------------------------------------===//
+
+ParseResult parseParameterReference(AsmParser &parser, StringAttr &scopeAttr,
+                                    StringAttr &keyAttr) {
+  auto builder = parser.getBuilder();
+  StringAttr firstAttr;
+  if (failed(parser.parseCustomAttributeWithFallback(firstAttr,
+                                                     builder.getNoneType()))) {
+    return failure();
+  }
+  if (failed(parser.parseOptionalColon())) {
+    keyAttr = firstAttr;
+    return success();
+  }
+  scopeAttr = firstAttr;
+  if (failed(parser.parseColon()) ||
+      failed(parser.parseCustomAttributeWithFallback(keyAttr,
+                                                     builder.getNoneType()))) {
+    return failure();
+  }
+  return success();
+}
+
+void printParameterReference(AsmPrinter &p, StringAttr scopeAttr,
+                             StringAttr keyAttr) {
+  if (scopeAttr) {
+    p << "\"" << scopeAttr.getValue() << "\"";
+    p << "::";
+  }
+  p << "\"" << keyAttr.getValue() << "\"";
+}
+
 } // namespace mlir::iree_compiler::IREE::Flow

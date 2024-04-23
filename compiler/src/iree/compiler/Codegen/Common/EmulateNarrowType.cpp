@@ -165,7 +165,7 @@ struct EmulateNarrowTypePass
 // Public interface
 //===----------------------------------------------------------------------===//
 
-std::unique_ptr<OperationPass<ModuleOp>> createEmulateNarrowTypePass() {
+std::unique_ptr<OperationPass<>> createEmulateNarrowTypePass() {
   return std::make_unique<EmulateNarrowTypePass>();
 }
 

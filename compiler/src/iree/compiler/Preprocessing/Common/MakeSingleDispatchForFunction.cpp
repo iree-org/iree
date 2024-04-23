@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Preprocessing/Common/PassDetail.h"
 #include "iree/compiler/Preprocessing/Common/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -14,11 +13,15 @@
 
 namespace mlir::iree_compiler::Preprocessing {
 
+#define GEN_PASS_DEF_MAKESINGLEDISPATCHFORFUNCTIONPASS
+#include "iree/compiler/Preprocessing/Common/Passes.h.inc" // IWYU pragma: export
+
 namespace {
 
 struct MakeSingleDispatchForFunctionPass
-    : public MakeSingleDispatchForFunctionBase<
-          MakeSingleDispatchForFunctionPass> {
+    : public iree_compiler::Preprocessing::impl::
+          MakeSingleDispatchForFunctionPassBase<
+              MakeSingleDispatchForFunctionPass> {
   void runOnOperation() override;
 };
 } // namespace
@@ -81,11 +84,6 @@ void MakeSingleDispatchForFunctionPass::runOnOperation() {
   // Return the results of the `flow.dispatch.region`.
   rewriter.setInsertionPointAfter(dispatchRegionOp);
   rewriter.create<func::ReturnOp>(loc, dispatchRegionOp.getResults());
-}
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createMakeSingleDispatchForFunctionPass() {
-  return std::make_unique<MakeSingleDispatchForFunctionPass>();
 }
 
 } // namespace mlir::iree_compiler::Preprocessing

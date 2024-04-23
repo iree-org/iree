@@ -57,7 +57,7 @@ repository you are registering it in. This access is too broad to grant to the
 runners themselves. Therefore, we mediate the token acquisition through a proxy
 hosted on [Google Cloud Run](https://cloud.google.com/run). The proxy has the
 app token for a GitHub App with permission to manage self-hosted runners for the
-"openxla" GitHub organization. It receives requests from the runners when they
+"iree-org" GitHub organization. It receives requests from the runners when they
 are trying to register or deregister and returns them the much more narrowly
 scoped [de]registration token. We use
 https://github.com/google-github-actions/github-runner-token-proxy for the
@@ -75,7 +75,7 @@ runners are "basic" trust, so they run as
 
 Using GitHub's [artifact actions](https://github.com/actions/upload-artifact)
 with runners on GCE turns out to be prohibitively slow (see discussion in
-https://github.com/openxla/iree/issues/9881). Instead we use our own
+https://github.com/iree-org/iree/issues/9881). Instead we use our own
 [Google Cloud Storage](https://cloud.google.com/storage) (GCS) buckets to save
 artifacts from jobs and fetch them in subsequent jobs:
 `iree-github-actions-presubmit-artifacts` and
@@ -107,8 +107,8 @@ code authorship and review.
 
 ## Examining Runners
 
-The runners for openxla can be viewed in the
-[GitHub UI](https://github.com/organizations/openxla/settings/actions/runners).
+The runners for iree-org can be viewed in the
+[GitHub UI](https://github.com/organizations/iree-org/settings/actions/runners).
 Unfortunately, only organization admins have access to this page. Organization
 admin gives very broad privileges, so this set is necessarily kept very small by
 Google security policy.
@@ -258,7 +258,7 @@ permissions in the organizations. A command like this would help see how many
 runners are still running the old version
 
 ```shell
-gh api --paginate '/orgs/openxla/actions/runners?per_page=100' \
+gh api --paginate '/orgs/iree-org/actions/runners?per_page=100' \
   | jq --raw-output \
   ".runners[] | select(.labels | map(.name == \"runner-version=${OLD_RUNNER_VERSION?}\") | any) | .name"
 ```

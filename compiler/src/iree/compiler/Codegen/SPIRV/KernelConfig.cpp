@@ -909,9 +909,12 @@ LogicalResult setCooperativeMatrixConfig(
   GPUMMAHeuristicSeeds seeds{numSubgroupsPerWorkgroup, numMNTilesPerSubgroup,
                              numKTilesPerSubgroup};
 
-  std::optional<GPUMMASchedule> schedule =
-      deduceMMASchedule(problem, intrinsics, seeds);
-  if (!schedule)
+  int64_t sharedMemoryLimitInBytes =
+      targetEnv.getResourceLimits().getMaxComputeSharedMemorySize();
+
+  FailureOr<GPUMMASchedule> schedule =
+      deduceMMASchedule(problem, intrinsics, seeds, sharedMemoryLimitInBytes);
+  if (failed(schedule))
     return failure();
 
   auto pipeline = CodeGenPipeline::SPIRVCooperativeMatrixVectorize;
@@ -1040,7 +1043,7 @@ static LogicalResult setWinogradOpConfig(spirv::ResourceLimitsAttr limits,
   // sizes found in the StableDiffusion model.
   auto pipeline = CodeGenPipeline::SPIRVWinogradVectorize;
   std::array<int64_t, 3> workgroupSize = {32, 4, 4};
-  TileSizesListType tileSizes = {{1, 32}};
+  TileSizesListType tileSizes = {{1, 0, 0, 32}, {1, 1, 1, 1}, {0, 0, 0, 0}};
   return setOpConfigAndEntryPointFnTranslation(
       op->getParentOfType<mlir::FunctionOpInterface>(), op, tileSizes, pipeline,
       workgroupSize);
@@ -1682,27 +1685,7 @@ static LogicalResult setSPIRVOpConfig(const spirv::TargetEnv &targetEnv,
 //===----------------------------------------------------------------------===//
 
 static LogicalResult setConfigForKernel(const spirv::TargetEnv &targetEnv,
-                                        IREE::HAL::ExecutableExportOp exportOp,
                                         mlir::FunctionOpInterface funcOp) {
-  if (!getTranslationInfo(funcOp)) {
-    // If no translation info set, first check whether we already have workgroup
-    // count set--it's a "contract" to indicate that we should bypass all tiling
-    // and distribution to go down just the most basic lowering flow.
-    if (Block *body = exportOp.getWorkgroupCountBody()) {
-      auto retOp = cast<IREE::HAL::ReturnOp>(body->getTerminator());
-      // For scalar dispatch cases--using just one thread of one workgroup.
-      auto isOne = [](Value value) { return matchPattern(value, m_One()); };
-      if (llvm::all_of(retOp.getOperands(), isOne)) {
-        std::array<int64_t, 3> workgroupSize = {1, 1, 1};
-        if (failed(setDispatchConfig(funcOp, workgroupSize, std::nullopt)))
-          return failure();
-        auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-            funcOp.getContext(), CodeGenPipeline::SPIRVBaseLowering);
-        return setTranslationInfo(funcOp, translationInfo);
-      }
-    }
-  }
-
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
   if (computeOps.empty()) {
     // No compute operations found. Allow to pass through without a config.
@@ -1739,27 +1722,38 @@ static LogicalResult setConfigForKernel(const spirv::TargetEnv &targetEnv,
       "loop body is expected to be set as root");
 }
 
-LogicalResult initSPIRVLaunchConfig(ModuleOp module) {
-  llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
-      getAllEntryPoints(module);
-  spirv::TargetEnvAttr targetEnvAttr = getSPIRVTargetEnvAttr(module);
+LogicalResult initSPIRVLaunchConfig(FunctionOpInterface funcOp) {
+  spirv::TargetEnvAttr targetEnvAttr = getSPIRVTargetEnvAttr(funcOp);
   if (!targetEnvAttr) {
-    return module.emitOpError(
+    return funcOp.emitOpError(
         "expected parent hal.executable.variant to have spirv.target_env "
         "attribute");
   }
-  spirv::TargetEnv targetEnv(targetEnvAttr);
+  if (getTranslationInfo(funcOp)) {
+    return success();
+  }
 
-  for (auto funcOp : module.getOps<mlir::FunctionOpInterface>()) {
-    auto exportOp = exportOps.lookup(funcOp.getName());
-    if (!exportOp)
-      continue;
-    if (getTranslationInfo(exportOp))
-      continue;
-
-    if (failed(setConfigForKernel(targetEnv, exportOp, funcOp))) {
-      return failure();
+  if (auto exportOp = getEntryPoint(funcOp)) {
+    // If no translation info set, first check whether we already have workgroup
+    // count set--it's a "contract" to indicate that we should bypass all tiling
+    // and distribution to go down just the most basic lowering flow.
+    if (Block *body = exportOp->getWorkgroupCountBody()) {
+      auto retOp = cast<IREE::HAL::ReturnOp>(body->getTerminator());
+      // For scalar dispatch cases--using just one thread of one workgroup.
+      auto isOne = [](Value value) { return matchPattern(value, m_One()); };
+      if (llvm::all_of(retOp.getOperands(), isOne)) {
+        std::array<int64_t, 3> workgroupSize = {1, 1, 1};
+        auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+            funcOp.getContext(), CodeGenPipeline::SPIRVBaseLowering,
+            workgroupSize);
+        return setTranslationInfo(funcOp, translationInfo);
+      }
     }
+  }
+
+  spirv::TargetEnv targetEnv(targetEnvAttr);
+  if (failed(setConfigForKernel(targetEnv, funcOp))) {
+    return failure();
   }
 
   return success();

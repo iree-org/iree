@@ -223,7 +223,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "$<$<BOOL:${IREE_ENABLE_WERROR_FLAG}>:-Werror>"
     "-Wno-error=deprecated-declarations"  # Want to see them but defaults to error.
 
-    "-Wno-address"  # https://github.com/openxla/iree/issues/16016
+    "-Wno-address"  # https://github.com/iree-org/iree/issues/16016
     "-Wno-address-of-packed-member"
     "-Wno-comment"
     "-Wno-format-zero-length"
@@ -352,7 +352,7 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
 # compatible solution.
 #
 # See also:
-#   https://github.com/openxla/iree/issues/4665.
+#   https://github.com/iree-org/iree/issues/4665.
 #   https://discourse.cmake.org/t/how-to-fix-build-warning-d9025-overriding-gr-with-gr/878
 #   https://gitlab.kitware.com/cmake/cmake/-/issues/20610
 if(CMAKE_CXX_FLAGS AND "${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
@@ -503,7 +503,7 @@ function(iree_enable_optimization_options)
         -Wno-unused-but-set-variable
     )
     set(_ADDL_INTERFACE_COPTS "${_RULE_SIZE_INTERFACE_COPTS}")
-    set(_ADDL_LINKOPTS 
+    set(_ADDL_LINKOPTS
       ${IREE_LTO_LINKOPTS}
       ${IREE_SIZE_OPTIMIZED_DEFAULT_LINKOPTS}
     )

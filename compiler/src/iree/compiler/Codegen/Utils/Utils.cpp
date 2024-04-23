@@ -35,43 +35,23 @@ namespace mlir::iree_compiler {
 // Utility functions to get entry points
 //===----------------------------------------------------------------------===//
 
-FailureOr<IREE::HAL::ExecutableExportOp>
+std::optional<IREE::HAL::ExecutableExportOp>
 getEntryPoint(mlir::FunctionOpInterface funcOp) {
   auto variantOp = funcOp->getParentOfType<IREE::HAL::ExecutableVariantOp>();
-  if (!variantOp)
-    return failure();
+  if (!variantOp) {
+    return std::nullopt;
+  }
 
   for (auto op : variantOp.getExportOps()) {
     if (op.getSymName() == funcOp.getName()) {
       return op;
     }
   }
-  return failure();
-}
-
-FailureOr<IREE::HAL::ExecutableVariantOp>
-getExecutableVariantOp(Operation *op) {
-  if (auto result = dyn_cast<IREE::HAL::ExecutableVariantOp>(op)) {
-    return result;
-  }
-  if (auto result = op->getParentOfType<IREE::HAL::ExecutableVariantOp>()) {
-    return result;
-  }
-  return failure();
+  return std::nullopt;
 }
 
 bool isEntryPoint(mlir::FunctionOpInterface func) {
-  return func.isPublic() && succeeded(getEntryPoint(func));
-}
-
-llvm::StringMap<IREE::HAL::ExecutableExportOp>
-getAllEntryPoints(ModuleOp module) {
-  auto variantOp = module->getParentOfType<IREE::HAL::ExecutableVariantOp>();
-  llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps;
-  for (auto op : variantOp.getExportOps()) {
-    exportOps[op.getSymName()] = op;
-  }
-  return exportOps;
+  return func.isPublic() && getEntryPoint(func);
 }
 
 std::optional<StringAttr>
@@ -803,19 +783,6 @@ FailureOr<int64_t> getSoftwarePipelineStoreStage(DictionaryAttr config) {
   return llvm::cast<IntegerAttr>(stage).getInt();
 }
 
-static constexpr char mmaTypeListName[] = "mma_intrinsics";
-
-FailureOr<ArrayAttr> getSupportedMmaTypes(DictionaryAttr config) {
-  if (!config) {
-    return failure();
-  }
-  Attribute types = config.get(mmaTypeListName);
-  if (!types) {
-    return failure();
-  }
-  return llvm::cast<ArrayAttr>(types);
-}
-
 //===---------------------------------------------------------------------===//
 // Misc. utility functions
 //===---------------------------------------------------------------------===//
@@ -1122,8 +1089,8 @@ void sinkOpsInCFG(const SmallVector<Operation *> &allocs,
 /// Infer the number of workgroups from exportOp.
 SmallVector<int64_t> getStaticNumWorkgroups(mlir::FunctionOpInterface funcOp) {
   SmallVector<int64_t> result;
-  FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
-  if (failed(exportOp))
+  std::optional<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
+  if (!exportOp)
     return result;
 
   Block *body = exportOp->getWorkgroupCountBody();
@@ -1138,7 +1105,7 @@ SmallVector<int64_t> getStaticNumWorkgroups(mlir::FunctionOpInterface funcOp) {
     if (auto indexOp = dyn_cast_or_null<arith::ConstantIndexOp>(defOp)) {
       result.push_back(indexOp.value());
     } else {
-      return SmallVector<int64_t>();
+      result.push_back(ShapedType::kDynamic);
     }
   }
 

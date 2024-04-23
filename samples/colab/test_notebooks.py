@@ -22,6 +22,7 @@ NOTEBOOKS_TO_SKIP = [
     # PyTorch notebooks using SHARK-Turbine require Python 3.10+ in Docker.
     "pytorch_aot_advanced.ipynb",
     "pytorch_aot_simple.ipynb",
+    "pytorch_huggingface_whisper.ipynb",
     "pytorch_jit.ipynb",
 ]
 

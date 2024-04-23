@@ -36,7 +36,7 @@ See guides on how to use each framework with IREE:
 ## :octicons-code-16: Samples
 
 Check out the samples in IREE's
-[`samples/` directory](https://github.com/openxla/iree/tree/main/samples),
+[`samples/` directory](https://github.com/iree-org/iree/tree/main/samples),
 as well as the
 [iree-experimental repository](https://github.com/iree-org/iree-experimental).
 

@@ -65,6 +65,12 @@ def FuseDequantizationMatmul:
   ];
 }
 
+def FuseHorizontalContractions:
+    InterfacePass<"iree-global-opt-fuse-horizontal-contractions", "mlir::FunctionOpInterface"> {
+  let summary = "Fuses horizontal contraction ops without fusions";
+  let constructor = "mlir::iree_compiler::GlobalOptimization::createFuseHorizontalContractionsPass()";
+}
+
 def FuseSiluHorizontalMatmul:
     InterfacePass<"iree-global-opt-fuse-silu-horizontal-matmul", "mlir::FunctionOpInterface"> {
   let summary = "Fuses matmul ops and silu linalg.generic op";
@@ -121,6 +127,13 @@ def RemoveZeroExtentTensors :
 def SetEncoding : Pass<"iree-global-opt-set-encoding", ""> {
   let summary = "Introduces tensor encoding for compute operations";
   let constructor = "mlir::iree_compiler::GlobalOptimization::createSetEncodingPass()";
+  let options = [
+    Option<"padFactor", "pad-factor", "int64_t", /*default=*/"0",
+           "The padding sizes hint will be attached to encodings if is it set"
+           "to non-zero. Otherwise, it creates"
+           "iree_linalg_ext.upper_bound_tile_size and rely on backends to"
+           "resolve them.">,
+  ];
 }
 
 def SimplifyPackUnpack : Pass<"iree-global-opt-simplify-pack-unpack", ""> {
@@ -131,6 +144,11 @@ def SimplifyPackUnpack : Pass<"iree-global-opt-simplify-pack-unpack", ""> {
 def GlobalLoopInvariantCodeMotion : InterfacePass<"iree-global-opt-loop-invariant-code-motion", "mlir::FunctionOpInterface"> {
   let summary = "Hoist loop invariants out of loops with zero-trip-check";
   let constructor = "mlir::iree_compiler::GlobalOptimization::createGlobalLoopInvariantCodeMotionPass()";
+}
+
+def DataLayoutPropagation : InterfacePass<"iree-global-opt-data-layout-propagation", "mlir::FunctionOpInterface"> {
+  let summary = "Propagate pack/unpack ops across other ops to improve fusion";
+  let constructor = "mlir::iree_compiler::GlobalOptimization::createDataLayoutPropagationPass()";
 }
 
 #endif // IREE_COMPILER_GLOBALOPTIMIZATION_PASSES

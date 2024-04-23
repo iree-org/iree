@@ -186,6 +186,17 @@ public:
   // Calls |fn| once for each global in the root.
   void forEachGlobal(std::function<void(const GlobalInfo *)> fn);
 
+  // Calls |fn| once for each initializer in the root in program order.
+  void forEachInitializer(
+      std::function<void(IREE::Util::InitializerOpInterface)> fn);
+
+  // Calls |fn| once for each non-initializer function-like op in the root.
+  void forEachFunction(std::function<void(FunctionOpInterface)> fn);
+
+  // Calls |fn| once for each initializer and then once for each function-like
+  // op in the root. Effectively just forEachInitializer + forEachFunction.
+  void forEachFunctionLikeOp(std::function<void(FunctionOpInterface)> fn);
+
   // Returns true if the two values _may_ alias each other via a tie or a join.
   // Conservative: returns true if value usage cannot be tracked.
   //

@@ -40,7 +40,7 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
       return rewriter.notifyMatchFailure(
           contractOp, "missing nested layout for contraction result");
     }
-    int64_t rank = resultLayout.getBatchOrder().size();
+    int64_t rank = resultLayout.getRank();
 
     NestedLayoutAttr lhsLayout =
         dyn_cast<NestedLayoutAttr>(signature[contractOp.getLhs()]);
@@ -97,8 +97,8 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
     LLVM_DEBUG(llvm::dbgs() << "init tile: " << finalTile << "\n");
 
     // Offsets into the LHS/RHS batches.
-    SmallVector<int64_t, 2> lhsBatchOffsets(rank, 0);
-    SmallVector<int64_t, 2> rhsBatchOffsets(rank, 0);
+    SmallVector<int64_t, 2> lhsBatchOffsets(lhsLayout.getRank(), 0);
+    SmallVector<int64_t, 2> rhsBatchOffsets(rhsLayout.getRank(), 0);
 
     // Offsets into the result batches.
     ArrayRef<int64_t> resultBatches = resultLayout.getBatchesPerSubgroup();
@@ -183,7 +183,7 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
   std::optional<int64_t> getKBatchSize(const VectorContractOpInfo &opDetail,
                                        NestedLayoutAttr lhsLayout,
                                        NestedLayoutAttr rhsLayout) const {
-    auto [lhsK, rhsK] = *opDetail.getOperandKIndex();
+    auto [lhsK, rhsK] = opDetail.getOperandKIndex();
     int64_t lhsKBatch = lhsLayout.getBatchesPerSubgroup()[lhsK];
     int64_t rhsKBatch = rhsLayout.getBatchesPerSubgroup()[rhsK];
 
@@ -201,15 +201,21 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
                                SmallVector<int64_t, 2> &rhsOffsets,
                                NestedLayoutAttr lhsLayout,
                                NestedLayoutAttr rhsLayout) const {
-    auto [lhsM, rhsN] = *opDetail.getOperandMNIndex();
-    auto [lhsK, rhsK] = *opDetail.getOperandKIndex();
-    auto [resultM, resultN] = *opDetail.getResultMNIndex();
+
     // resultOffsets contains batch indices into the C/D vector. It is a 2-D
     // index for both M and N. We need to split out for M and N, and add index
     // for K.
-    lhsOffsets[lhsM] = resultOffsets[resultM];
+    for (auto [lhsM, resultM] :
+         llvm::zip_equal(opDetail.lhsMDims, opDetail.outMDims)) {
+      lhsOffsets[lhsM] = resultOffsets[resultM];
+    }
+    for (auto [rhsN, resultN] :
+         llvm::zip_equal(opDetail.rhsNDims, opDetail.outNDims)) {
+      rhsOffsets[rhsN] = resultOffsets[resultN];
+    }
+
+    auto [lhsK, rhsK] = opDetail.getOperandKIndex();
     lhsOffsets[lhsK] = kOffset;
-    rhsOffsets[rhsN] = resultOffsets[resultN];
     rhsOffsets[rhsK] = kOffset;
 
     // Now apply permutation on LHS/RHS according to their batch order.

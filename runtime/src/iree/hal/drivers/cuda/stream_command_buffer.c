@@ -159,7 +159,7 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_begin(
       iree_hal_cuda_stream_command_buffer_cast(base_command_buffer);
   (void)command_buffer;
 
-  IREE_CUDA_TRACE_ZONE_BEGIN_EXTERNAL(
+  IREE_CUDA_STREAM_TRACE_ZONE_BEGIN_EXTERNAL(
       command_buffer->tracing_context, command_buffer->cu_stream,
       /*file_name=*/NULL, 0, /*line=*/0, "iree_hal_cuda_stream_command_buffer",
       strlen("iree_hal_cuda_stream_command_buffer"), /*name=*/NULL, 0);
@@ -195,8 +195,8 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_end(
                                        command_buffer->resource_set,
                                        &command_buffer->collective_batch);
 
-  IREE_CUDA_TRACE_ZONE_END(command_buffer->tracing_context,
-                           command_buffer->cu_stream);
+  IREE_CUDA_STREAM_TRACE_ZONE_END(command_buffer->tracing_context,
+                                  command_buffer->cu_stream);
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
@@ -210,7 +210,7 @@ static void iree_hal_cuda_stream_command_buffer_begin_debug_group(
       iree_hal_cuda_stream_command_buffer_cast(base_command_buffer);
   (void)command_buffer;
 
-  IREE_CUDA_TRACE_ZONE_BEGIN_EXTERNAL(
+  IREE_CUDA_STREAM_TRACE_ZONE_BEGIN_EXTERNAL(
       command_buffer->tracing_context, command_buffer->cu_stream,
       location ? location->file.data : NULL, location ? location->file.size : 0,
       location ? location->line : 0, /*func_name=*/NULL, 0, label.data,
@@ -227,8 +227,8 @@ static void iree_hal_cuda_stream_command_buffer_end_debug_group(
 
   // TODO: pass along to CUPTI if available.
 
-  IREE_CUDA_TRACE_ZONE_END(command_buffer->tracing_context,
-                           command_buffer->cu_stream);
+  IREE_CUDA_STREAM_TRACE_ZONE_END(command_buffer->tracing_context,
+                                  command_buffer->cu_stream);
 }
 
 static iree_status_t iree_hal_cuda_stream_command_buffer_execution_barrier(
@@ -516,7 +516,7 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_dispatch(
       z0, iree_hal_cuda_native_executable_entry_point_kernel_info(
               executable, entry_point, &kernel_info));
 
-  IREE_CUDA_TRACE_ZONE_BEGIN_EXTERNAL(
+  IREE_CUDA_STREAM_TRACE_ZONE_BEGIN_EXTERNAL(
       command_buffer->tracing_context, command_buffer->cu_stream,
       kernel_info.source_filename.data, kernel_info.source_filename.size,
       kernel_info.source_line, kernel_info.function_name.data,
@@ -602,8 +602,8 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_dispatch(
                      params_ptr, NULL),
       "cuLaunchKernel");
 
-  IREE_CUDA_TRACE_ZONE_END(command_buffer->tracing_context,
-                           command_buffer->cu_stream);
+  IREE_CUDA_STREAM_TRACE_ZONE_END(command_buffer->tracing_context,
+                                  command_buffer->cu_stream);
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();

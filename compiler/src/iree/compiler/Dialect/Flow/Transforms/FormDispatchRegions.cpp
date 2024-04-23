@@ -9,7 +9,6 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/ConvertRegionToWorkgroups.h"
-#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
@@ -74,6 +73,9 @@ void TensorDimTrackingRewriter::notifyOperationInserted(Operation *op,
 } // namespace mlir
 
 namespace mlir::iree_compiler::IREE::Flow {
+
+#define GEN_PASS_DEF_FORMDISPATCHREGIONSPASS
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
 
 LogicalResult simplifyDimOps(RewriterBase &rewriter,
                              const SmallVector<tensor::DimOp> &dimOps) {
@@ -505,7 +507,7 @@ static bool canUseInOperandAsInitOperand(OpOperand *inOperand,
 static bool
 isFusableWithConsumer(OpOperand &fusedOperand,
                       const llvm::SmallBitVector &rootOuterParallelLoops,
-                      FormDispatchRegionsOptions const &options) {
+                      FormDispatchRegionsPassOptions const &options) {
   Operation *producer = fusedOperand.get().getDefiningOp();
   Operation *consumer = fusedOperand.getOwner();
 
@@ -612,10 +614,10 @@ isFusableWithConsumer(OpOperand &fusedOperand,
 
 /// Fuses roots with its consumers. If a root is fused with its consumer, it is
 /// no more tagged as a root to aid with the dispatch region formation.
-static void fuseRootsWithConsumers(MLIRContext *context,
-                                   ArrayRef<Operation *> roots,
-                                   DominanceInfo const &dominanceInfo,
-                                   FormDispatchRegionsOptions const &options) {
+static void
+fuseRootsWithConsumers(MLIRContext *context, ArrayRef<Operation *> roots,
+                       DominanceInfo const &dominanceInfo,
+                       FormDispatchRegionsPassOptions const &options) {
   // Fuse with consumers where possible.
   for (Operation *root : roots) {
     SmallVector<Operation *> workList;
@@ -660,7 +662,7 @@ static void fuseRootsWithConsumers(MLIRContext *context,
 static bool
 isFusableWithProducer(OpOperand &operand,
                       const llvm::SmallBitVector &rootOuterParallelLoops,
-                      FormDispatchRegionsOptions const &options) {
+                      FormDispatchRegionsPassOptions const &options) {
   Operation *producer = operand.get().getDefiningOp();
   Operation *consumer = operand.getOwner();
 
@@ -712,10 +714,10 @@ isFusableWithProducer(OpOperand &operand,
 
 /// Starting from the `root` op, traverse the operand use-def chain
 /// in reverse to fuse with producers.
-static void fuseRootsWithProducers(MLIRContext *context, Operation *root,
-                                   unsigned groupNum,
-                                   DominanceInfo const &dominanceInfo,
-                                   FormDispatchRegionsOptions const &options) {
+static void
+fuseRootsWithProducers(MLIRContext *context, Operation *root, unsigned groupNum,
+                       DominanceInfo const &dominanceInfo,
+                       FormDispatchRegionsPassOptions const &options) {
   SmallVector<Operation *> worklist;
   worklist.push_back(root);
   llvm::SmallBitVector rootOuterParallelLoops = getOuterParallelLoops(root);
@@ -755,7 +757,7 @@ static void fuseRootsWithProducers(MLIRContext *context, Operation *root,
 /// enough to capture any heuristic.
 static unsigned
 decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
-                       FormDispatchRegionsOptions const &options,
+                       FormDispatchRegionsPassOptions const &options,
                        unsigned numRootOps = 0) {
   MLIRContext *context = region.getContext();
   OpBuilder builder(context);
@@ -829,7 +831,7 @@ static LogicalResult
 createFusionGroups(TensorDimTrackingRewriter &rewriter,
                    mlir::FunctionOpInterface funcOp,
                    DominanceInfo const &dominanceInfo,
-                   FormDispatchRegionsOptions const &options) {
+                   FormDispatchRegionsPassOptions const &options) {
   // Step 1: Decide fusion groups (heuristic). This marks rootOps with an
   // attribute
   unsigned numRoots =
@@ -921,33 +923,10 @@ createFusionGroups(TensorDimTrackingRewriter &rewriter,
 namespace {
 /// Pass declaration.
 struct FormDispatchRegionsPass
-    : public FormDispatchRegionsBase<FormDispatchRegionsPass> {
-  using FormDispatchRegionsBase<
-      FormDispatchRegionsPass>::FormDispatchRegionsBase;
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<affine::AffineDialect, IREE::Flow::FlowDialect,
-                    linalg::LinalgDialect, scf::SCFDialect,
-                    tensor::TensorDialect>();
-  }
-  /// These constructors are auto-generated in `Passes.h.inc` from the
-  /// tablegen file if `GEN_PASS_DEF_FORMDISPATCHREGIONS` is defined
-  /// before including that file. Doing that requires changing
-  /// all Flow passes to use similar mechanism.
-  // TODO(ravishankarm): Modify Flow passes to use the auto-generated
-  // options struct.
-  FormDispatchRegionsPass() {}
-  FormDispatchRegionsPass(const FormDispatchRegionsOptions &options)
-      : FormDispatchRegionsPass() {
-    fuseMultiUse = options.fuseMultiUse;
-    generateWorkloadRegion = options.generateWorkloadRegion;
-    fusePadWithConsumers = options.fusePadWithConsumers;
-    fusePadWithProducers = options.fusePadWithProducers;
-  }
-  FormDispatchRegionsPass(const FormDispatchRegionsPass &other)
-      : FormDispatchRegionsPass(FormDispatchRegionsOptions{
-            other.fuseMultiUse, other.generateWorkloadRegion,
-            other.fusePadWithConsumers, other.fusePadWithProducers}) {}
-
+    : public IREE::Flow::impl::FormDispatchRegionsPassBase<
+          FormDispatchRegionsPass> {
+  using IREE::Flow::impl::FormDispatchRegionsPassBase<
+      FormDispatchRegionsPass>::FormDispatchRegionsPassBase;
   void runOnOperation() override;
 };
 } // namespace
@@ -957,17 +936,12 @@ void FormDispatchRegionsPass::runOnOperation() {
   mlir::FunctionOpInterface funcOp = getOperation();
   DominanceInfo const &dominanceInfo = getAnalysis<DominanceInfo>();
   TensorDimTrackingRewriter rewriter(funcOp);
-  FormDispatchRegionsOptions options{fuseMultiUse, generateWorkloadRegion,
-                                     fusePadWithConsumers,
-                                     fusePadWithProducers};
+  FormDispatchRegionsPassOptions options{fuseMultiUse, generateWorkloadRegion,
+                                         fusePadWithConsumers,
+                                         fusePadWithProducers};
   if (failed(createFusionGroups(rewriter, funcOp, dominanceInfo, options))) {
     funcOp->emitOpError("failed to create fusion groups");
     return signalPassFailure();
   }
-}
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createFormDispatchRegionsPass(FormDispatchRegionsOptions options) {
-  return std::make_unique<FormDispatchRegionsPass>(options);
 }
 } // namespace mlir::iree_compiler::IREE::Flow

@@ -42,14 +42,12 @@ int kDefaultCUDACapability = 80;
 
 /// Return the CUDA capability of the gpu. Assumes CUDA capability is 80 (sm_80)
 /// if not specified.
-static int getCUDACapbility(Operation *op) {
-  FailureOr<IREE::HAL::ExecutableVariantOp> variantOp =
-      getExecutableVariantOp(op);
-  if (failed(variantOp)) {
-    return kDefaultCUDACapability;
+static std::optional<int> getCUDACapbility(Operation *op) {
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
+  if (!targetAttr) {
+    return std::nullopt;
   }
 
-  auto targetAttr = variantOp->getTargetAttr();
   if (auto config = targetAttr.getConfiguration()) {
     if (auto attr = config.getAs<StringAttr>("target_arch")) {
       StringRef targetName = attr.getValue();
@@ -145,7 +143,8 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
       // is faulty for them.
       // TODO: Remove this once the lowering in LLVM is fixed
       // (https://github.com/llvm/llvm-project/issues/64606).
-      if (getCUDACapbility(m) < 80) {
+      std::optional<int> cudaCapability = getCUDACapbility(m);
+      if (!cudaCapability || cudaCapability.value() < 80) {
         RewritePatternSet patterns(&getContext());
         populateReplaceSlowMinMaxOpsPatterns(patterns);
         if (failed(applyPatternsAndFoldGreedily(m, std::move(patterns)))) {

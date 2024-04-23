@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(iree-codegen-spirv-configuration-pipeline, iree-codegen-linalg-to-spirv-pipeline)))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-spirv-configuration-pipeline), iree-codegen-linalg-to-spirv-pipeline)))' %s | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -174,8 +174,7 @@ hal.executable @matmul_f16_128x256x64 {
 
 #user_config = #iree_codegen.compilation_info<
   lowering_config = <tile_sizes = [[16, 128, 16]]>,
-  translation_info = <SPIRVMatmulPromoteVectorize, {pipeline_depth = 0, store_stage = 1}>,
-  workgroup_size = [16, 8, 1]>
+  translation_info = <SPIRVMatmulPromoteVectorize workgroup_size = [16, 8, 1], {pipeline_depth = 0, store_stage = 1}>>
 
 hal.executable @matmul_f16_32x1280x1280 {
   hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-spirv-fb", {

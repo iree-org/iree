@@ -5,18 +5,17 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <cstdint>
+#include <numeric>
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.h"
-#include "iree-dialects/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
 #include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
-#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/AffineExpr.h"
@@ -79,7 +78,7 @@ static SmallVector<Value> getTransferIndicesFromNestedLayout(
       return constExpr.getValue() == 0;
     return false;
   };
-  int64_t rank = vectorLayout.getBatchOrder().size();
+  int64_t rank = vectorLayout.getRank();
   // Permute the batch and outer vector offsets to match the order of
   // the vector dimensions using the inverse of the batch/offset order.
   SmallVector<int64_t> batchOffsets =
@@ -113,7 +112,7 @@ static SmallVector<Value> getTransferIndicesFromNestedLayout(
 }
 
 static SmallVector<int64_t> getLoopOrder(NestedLayoutAttr vectorLayout) {
-  int64_t rank = vectorLayout.getBatchOrder().size();
+  int64_t rank = vectorLayout.getRank();
   // Let the unroll order first unroll the batch dimensions, then the
   // outer vector dimensions. We unroll in the order specified by the
   // layout.
@@ -137,7 +136,7 @@ static SmallVector<int64_t> getLoopOrder(NestedLayoutAttr vectorLayout) {
 
 static SmallVector<int64_t>
 getElementVectorTileShape(NestedLayoutAttr vectorLayout) {
-  int64_t rank = vectorLayout.getBatchOrder().size();
+  int64_t rank = vectorLayout.getRank();
   SmallVector<int64_t> tileShape = vectorLayout.getDistributedShape();
   // We tile to a vector with BATCH, OUTER, and ELEMENT dimensions. So to access
   // the subvector only containing elements, we need indices in all BATCH and
@@ -217,7 +216,7 @@ struct DistributeTransferRead final
     SmallVector<int64_t> distShape = vectorLayout.getDistributedShape();
     SmallVector<int64_t> tileShape = getElementVectorTileShape(vectorLayout);
     SmallVector<int64_t> loopOrder = getLoopOrder(vectorLayout);
-    int64_t rank = vectorLayout.getBatchOrder().size();
+    int64_t rank = vectorLayout.getRank();
 
     Type elementType = readOp.getSource().getType().getElementType();
     auto vectorType = VectorType::get(distShape, elementType);
@@ -304,7 +303,7 @@ struct DistributeTransferWrite final
     SmallVector<int64_t> distShape = vectorLayout.getDistributedShape();
     SmallVector<int64_t> tileShape = getElementVectorTileShape(vectorLayout);
     SmallVector<int64_t> loopOrder = getLoopOrder(vectorLayout);
-    int64_t rank = vectorLayout.getBatchOrder().size();
+    int64_t rank = vectorLayout.getRank();
 
     SmallVector<Value> warpIndices, threadIndices;
     populateWarpAndThreadIndices(rewriter, threadId, vectorLayout, warpIndices,
@@ -388,8 +387,8 @@ struct DistributeBroadcast final : OpDistributionPattern<vector::BroadcastOp> {
     Value accumulator = rewriter.create<arith::ConstantOp>(
         loc, vectorType, rewriter.getZeroAttr(vectorType));
 
-    int64_t rank = vectorLayout.getBatchOrder().size();
-    int64_t sourceRank = sourceLayout.getBatchOrder().size();
+    int64_t rank = vectorLayout.getRank();
+    int64_t sourceRank = sourceLayout.getRank();
     // We unroll along both the batch and outer dimensions for a similar reason
     // to the transfer ops. `vector.broadcast` can only broadcast along outer
     // dims, so mixing broadcasted and un-broadcasted element/outer dims can't
@@ -459,13 +458,186 @@ struct DistributeBroadcast final : OpDistributionPattern<vector::BroadcastOp> {
   }
 };
 
+static int64_t getShuffleOffset(NestedLayoutAttr layout, int64_t dim) {
+  // Get strides for dimensions based on layouts.
+  SmallVector<int64_t> threadBasis(layout.getThreadBasis());
+  SmallVector<int64_t> basisStrides(threadBasis.size());
+  // Take prefix sum to get strides.
+  std::exclusive_scan(threadBasis.rbegin(), threadBasis.rend(),
+                      basisStrides.rbegin(), 1, std::multiplies<>{});
+  // Remove non-active thread ids.
+  SmallVector<int64_t> activeThreadStrides;
+  for (auto [i, stride] : llvm::enumerate(basisStrides)) {
+    if (layout.getThreadActiveIds()[i]) {
+      activeThreadStrides.push_back(stride);
+    }
+  }
+  // TODO: Do we need to do inversion or not?
+  return activeThreadStrides[layout.getThreadOrder()[dim]];
+}
+
+static int64_t getShuffleWidth(NestedLayoutAttr layout, int64_t dim) {
+  return layout.getThreadsPerOuter()[dim];
+}
+
+/// The lowering for multi_reduction is done in two steps:
+///   1. Local Reduce: Each thread reduces all elements carried by it along
+///      the reduction dimensions. This is the batch, outer and element dims.
+///   2. Thread Reduce: Each thread reduces result of step 1 across threads
+///      by doing a butterfly shuffle.
+///
+/// Currently, reduction across warps is not supported, but it would just add
+/// another step, Warp Reduce, where threads do an atomic addition on a buffer.
+struct DistributeMultiReduction final
+    : OpDistributionPattern<vector::MultiDimReductionOp> {
+  using OpDistributionPattern::OpDistributionPattern;
+
+  DistributeMultiReduction(MLIRContext *context, int64_t subgroupSize,
+                           int64_t maxBitsPerShuffle, int64_t benefit = 1)
+      : OpDistributionPattern(context, benefit), subgroupSize(subgroupSize),
+        maxBitsPerShuffle(maxBitsPerShuffle) {}
+
+  LogicalResult matchAndRewrite(vector::MultiDimReductionOp multiReduceOp,
+                                DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
+    VectorValue srcVector = multiReduceOp.getSource();
+    auto accVector = dyn_cast<VectorValue>(multiReduceOp.getAcc());
+    if (!accVector) {
+      return rewriter.notifyMatchFailure(
+          multiReduceOp, "unimplemented: scalar accumulator distribution");
+    }
+    auto resVector = dyn_cast<VectorValue>(multiReduceOp.getResult());
+    if (!resVector) {
+      return rewriter.notifyMatchFailure(
+          multiReduceOp, "unimplemented: scalar result distribution");
+    }
+
+    auto srcLayout = dyn_cast_or_null<NestedLayoutAttr>(signature[srcVector]);
+    if (!srcLayout) {
+      return rewriter.notifyMatchFailure(multiReduceOp,
+                                         "expected nested layout attr");
+    }
+
+    Type elemTy = srcVector.getType().getElementType();
+    unsigned elemBitwidth = elemTy.getIntOrFloatBitWidth();
+    if (elemBitwidth != maxBitsPerShuffle) {
+      return rewriter.notifyMatchFailure(
+          multiReduceOp, llvm::formatv("unimplemented: packed shuffle",
+                                       elemBitwidth, maxBitsPerShuffle));
+    }
+
+    VectorValue disSrc =
+        getDistributed(rewriter, srcVector, signature[srcVector]);
+    VectorValue disAcc =
+        getDistributed(rewriter, accVector, signature[accVector]);
+
+    Location loc = multiReduceOp.getLoc();
+
+    SmallVector<bool> reducedDims = multiReduceOp.getReductionMask();
+    int64_t rank = srcVector.getType().getRank();
+
+    // Do thread local reduce.
+
+    SmallVector<bool> distributedReductionMask;
+    distributedReductionMask.reserve(3 * rank);
+    distributedReductionMask.append(
+        applyPermutation(reducedDims, srcLayout.getBatchOrder()));
+    distributedReductionMask.append(
+        applyPermutation(reducedDims, srcLayout.getOuterOrder()));
+    distributedReductionMask.append(
+        applyPermutation(reducedDims, srcLayout.getElementOrder()));
+
+    auto localReduction = rewriter.create<vector::MultiDimReductionOp>(
+        loc, disSrc, disAcc, distributedReductionMask, multiReduceOp.getKind());
+    auto locallyReduced = dyn_cast<VectorValue>(localReduction.getResult());
+
+    assert(locallyReduced && "result should have been a vector");
+
+    // Flatten the locally reduced value.
+    VectorType shaped = locallyReduced.getType();
+    int64_t numElements = shaped.getNumElements();
+    SmallVector<int64_t> flatShape(1, numElements);
+    VectorType flatVecType = VectorType::get(flatShape, elemTy);
+    VectorValue flat =
+        rewriter.create<vector::ShapeCastOp>(loc, flatVecType, locallyReduced);
+
+    FailureOr<VectorValue> threadReduced = doThreadReduction(
+        rewriter, srcLayout, flat, multiReduceOp.getKind(), reducedDims);
+    if (failed(threadReduced)) {
+      return failure();
+    }
+
+    VectorValue unflattened = rewriter.create<vector::ShapeCastOp>(
+        loc, shaped, threadReduced.value());
+    replaceOpWithDistributedValues(rewriter, multiReduceOp, unflattened);
+
+    return failure();
+  }
+
+  FailureOr<VectorValue> doThreadReduction(RewriterBase &rewriter,
+                                           NestedLayoutAttr layout,
+                                           VectorValue flat,
+                                           vector::CombiningKind kind,
+                                           ArrayRef<bool> reductionMask) const {
+    VectorType flatVecType = flat.getType();
+    int64_t numElements = flatVecType.getNumElements();
+    Location loc = flat.getLoc();
+
+    auto constOp = rewriter.create<arith::ConstantOp>(
+        loc, rewriter.getZeroAttr(flatVecType));
+    auto res = llvm::cast<VectorValue>(constOp.getResult());
+
+    for (unsigned i = 0; i < numElements; ++i) {
+      Value extracted = rewriter.create<vector::ExtractOp>(loc, flat, i);
+
+      // Reduce across all reduction dimensions 1-by-1.
+      for (unsigned i = 0; i < reductionMask.size(); ++i) {
+        if (reductionMask[i]) {
+          extracted = doPackedThreadReductionOnDim(rewriter, layout, extracted,
+                                                   kind, i);
+        }
+      }
+
+      res = rewriter.create<vector::InsertOp>(loc, extracted, res, i);
+    }
+
+    return res;
+  }
+
+  Value doPackedThreadReductionOnDim(RewriterBase &rewriter,
+                                     NestedLayoutAttr layout, Value val,
+                                     vector::CombiningKind kind,
+                                     int64_t dim) const {
+    Location loc = val.getLoc();
+    int64_t offset = getShuffleOffset(layout, dim);
+    int64_t width = getShuffleWidth(layout, dim);
+
+    for (int i = offset; i < offset * width; i <<= 1) {
+      auto shuffleOp = rewriter.create<gpu::ShuffleOp>(
+          loc, val, i, subgroupSize, gpu::ShuffleMode::XOR);
+      val =
+          makeArithReduction(rewriter, loc, kind, shuffleOp.getShuffleResult(),
+                             val, nullptr, nullptr);
+    }
+
+    return val;
+  }
+
+  int64_t subgroupSize;
+  int64_t maxBitsPerShuffle;
+};
+
 } // namespace
 
-void populateGPUDistributeNestedLayoutAttrPatterns(
-    Value threadId, RewritePatternSet &patterns) {
+void populateGPUDistributeNestedLayoutAttrPatterns(RewritePatternSet &patterns,
+                                                   Value threadId,
+                                                   int64_t subgroupSize,
+                                                   int64_t maxBitsPerShuffle) {
   patterns.add<DistributeTransferRead, DistributeTransferWrite>(
       patterns.getContext(), threadId);
   patterns.add<DistributeBroadcast>(patterns.getContext());
+  patterns.add<DistributeMultiReduction>(patterns.getContext(), subgroupSize,
+                                         maxBitsPerShuffle);
 }
 
 }; // namespace mlir::iree_compiler

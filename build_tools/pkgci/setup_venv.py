@@ -39,7 +39,7 @@ import zipfile
 @functools.lru_cache
 def list_gh_artifacts(run_id: str) -> Dict[str, str]:
     print(f"Fetching artifacts for workflow run {run_id}")
-    base_path = f"/repos/openxla/iree"
+    base_path = f"/repos/iree-org/iree"
     output = subprocess.check_output(
         [
             "gh",
@@ -169,14 +169,15 @@ def main(args):
         print(f"Running command: {' '.join([str(c) for c in cmd])}")
         subprocess.check_call(cmd)
 
-    # Now install the regression suite project, which will bring in any
-    # deps.
+    # Now install the regression suite project, which will bring in any deps.
     cmd = [
         str(python_exe),
         "-m",
         "pip",
         "install",
         "--force-reinstall",
+        "--timeout",
+        "60",
         "-e",
         str(rs_dir) + os.sep,
     ]

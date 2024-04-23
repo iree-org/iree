@@ -56,6 +56,15 @@ LogicalResult tileReductionToSerialLoops(mlir::FunctionOpInterface funcOp,
 LogicalResult swizzleWorkgroupsInFunc(mlir::FunctionOpInterface funcOp,
                                       unsigned swizzleLogTile);
 
+/// Adds padding to `memref.alloc` ops to reduce shared memory bank conflicts.
+/// The `paddingSizeBits` argument should be picked based on the target
+/// architecture, striking balance between minimizing bank conflicts and keeping
+/// the data aligned. Smaller values (close to the bank bitwidth) achieve the
+/// former, while larger (~= widest load size) the latter. We want to
+/// **misalign** the rows, but not too much.
+LogicalResult reduceSharedMemoryBankConflicts(mlir::FunctionOpInterface funcOp,
+                                              unsigned paddingSizeBits);
+
 // Lowers workgroup memory copies to distributed transfer_read/transfer_write
 // ops. Expects the memory copy to be marked with copy_to_workgroup_memory
 // marker.
@@ -73,7 +82,8 @@ LogicalResult gpuDistributeSharedMemoryCopy(mlir::FunctionOpInterface funcOp);
 // This size is used to check the allocation space required for memrefs of
 // indices. If this function is nullptr, this pass will query the datalayout to
 // get the index size.
-std::unique_ptr<OperationPass<ModuleOp>> createGPUCheckResourceUsagePass(
+std::unique_ptr<InterfacePass<FunctionOpInterface>>
+createGPUCheckResourceUsagePass(
     std::function<unsigned(mlir::FunctionOpInterface)> getSharedMemoryLimit =
         nullptr,
     std::function<unsigned(mlir::FunctionOpInterface)> getIndexBitwidth =
@@ -136,6 +146,8 @@ createGPUVectorAlloc();
 // `getWarpSize` is for deciding the warp size to use; it takes the
 // current function containing those vector ops as the argument.
 // If nullptr, warp size 32 will be used.
+// TODO: This kind of call back function is a really really bad idea
+// This should be easier to resolve than doing this.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createConvertVectorReductionToGPUPass(
     bool expandSubgroupReduction = true,

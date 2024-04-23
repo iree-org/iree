@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -21,6 +20,9 @@
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler::IREE::Flow {
+
+#define GEN_PASS_DEF_EXPORTBENCHMARKFUNCSPASS
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
 
 // Creates a util.global with a primitive value of |type| initialized to zeros.
 // Supports: ints, floats, vectors, and tensors.
@@ -256,14 +258,9 @@ createEntryPointBenchmarkFunc(mlir::ModuleOp moduleOp,
 // placeholder constant inputs instead of arguments and removes the exported
 // attribute from the old functions.
 // The input are provided using util.globals.
-class ExportBenchmarkFuncsPass
-    : public ExportBenchmarkFuncsBase<ExportBenchmarkFuncsPass> {
-public:
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<arith::ArithDialect, IREE::Flow::FlowDialect,
-                    IREE::HAL::HALDialect, IREE::Util::UtilDialect>();
-  }
-
+struct ExportBenchmarkFuncsPass
+    : public IREE::Flow::impl::ExportBenchmarkFuncsPassBase<
+          ExportBenchmarkFuncsPass> {
   void runOnOperation() override {
     auto moduleOp = getOperation();
 
@@ -288,10 +285,5 @@ public:
     }
   }
 };
-
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createExportBenchmarkFuncsPass() {
-  return std::make_unique<ExportBenchmarkFuncsPass>();
-}
 
 } // namespace mlir::iree_compiler::IREE::Flow

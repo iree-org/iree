@@ -28,7 +28,7 @@ func.func @static_pack_simple() {
 }
 
 func.func @dynamic_pack_simple() {
-  %iree_input = flow.tensor.constant dense<[
+  %iree_input = flow.tensor.dynamic_constant dense<[
     [0, 1, 2, 3],
     [4, 5, 6, 7],
     [8, 9, 10, 11],
@@ -69,7 +69,7 @@ func.func @static_pack_simple_pad_mode() {
 }
 
 func.func @dynamic_pack_simple_pad_mode() {
-  %iree_input = flow.tensor.constant dense<[
+  %iree_input = flow.tensor.dynamic_constant dense<[
     [0, 1, 2, 3],
     [4, 5, 6, 7],
     [8, 9, 10, 11],

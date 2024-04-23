@@ -12,6 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Codegen/Common/PassDetail.h"
+#include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
@@ -50,45 +51,33 @@ struct BufferizeCopyOnlyDispatchesPass
 } // namespace
 
 void BufferizeCopyOnlyDispatchesPass::runOnOperation() {
-  ModuleOp module = getOperation();
+  auto funcOp = getOperation();
 
-  SmallVector<Operation *> copyOnlyFunctions;
-  auto funcOps = module.getOps<mlir::FunctionOpInterface>();
-  for (auto funcOp : funcOps) {
-    /// Check if the dispatch has all sources for `flow.dispatch.tensor.store`
-    /// operations coming from `flow.dispatch.tensor.load` operations. If so,
-    /// this dispatch is just a copy dispatch.
-    bool hasFlowDispatchStore = false;
-    auto walkResult = funcOp.walk(
-        [&](IREE::Flow::DispatchTensorStoreOp storeOp) -> WalkResult {
-          hasFlowDispatchStore = true;
-          return success(isReadOnly(storeOp.getValue()));
-        });
-    if (walkResult.wasInterrupted())
-      continue;
-    // The function is just a copy and is not yet bufferized.
-    if (hasFlowDispatchStore)
-      copyOnlyFunctions.push_back(funcOp);
-  }
-
-  // There are no copy-only functions. So nothing to do.
-  if (copyOnlyFunctions.empty())
+  /// Check if the dispatch has all sources for `flow.dispatch.tensor.store`
+  /// operations coming from `flow.dispatch.tensor.load` operations. If so,
+  /// this dispatch is just a copy dispatch.
+  bool hasFlowDispatchStore = false;
+  auto walkResult =
+      funcOp.walk([&](IREE::Flow::DispatchTensorStoreOp storeOp) -> WalkResult {
+        hasFlowDispatchStore = true;
+        return success(isReadOnly(storeOp.getValue()));
+      });
+  if (walkResult.wasInterrupted())
+    return;
+  // The function is just a copy and is not yet bufferized.
+  if (!hasFlowDispatchStore)
     return;
 
-  // Bufferize the dispatch to create a `linalg.generic` as a copy operation.
-  // This can then be used by the backends to tile and distribute.
-  // Currently bufferization does not handle single function bufferization. So
-  // check that all functions are copy only and can be bufferized.
-  if (copyOnlyFunctions.size() !=
-      std::distance(funcOps.begin(), funcOps.end())) {
-    module.emitOpError(
-        "module contains functions that are both copy only and not copy only. "
-        "This is currently unhandled.");
+  // Apply the bufferization passes.
+  std::optional<OpPassManager> maybeBufferizationPipeline =
+      getFunctionOpInterfacePassManager(funcOp);
+  if (!maybeBufferizationPipeline) {
+    funcOp.emitOpError("unhandled operation type while creating pass pipeline "
+                       "nested on `FunctionOpInterface`");
     return signalPassFailure();
   }
+  OpPassManager &bufferizationPipeline = maybeBufferizationPipeline.value();
 
-  // Apply the bufferization passes.
-  OpPassManager bufferizationPipeline(module.getOperationName());
   // The copy-only dispatch shouldnt need an allocation. Error out on
   // allocation.
   bufferization::BufferizationOptions::AllocationFn allocationFn =
@@ -106,21 +95,21 @@ void BufferizeCopyOnlyDispatchesPass::runOnOperation() {
 
   addIREEComprehensiveBufferizePasses(bufferizationPipeline, allocationFn,
                                       memcpyFn);
-  if (failed(runPipeline(bufferizationPipeline, module))) {
+  if (failed(runPipeline(bufferizationPipeline, funcOp))) {
     return signalPassFailure();
   }
 
   // Check that there are no allocs created.
-  auto hasAlloc = module.walk(
+  auto hasAlloc = funcOp.walk(
       [&](memref::AllocOp /*op*/) -> WalkResult { return failure(); });
   if (hasAlloc.wasInterrupted()) {
-    module.emitOpError(
+    funcOp.emitOpError(
         "unexpected allocations while bufferizing copy dispatch");
     return signalPassFailure();
   }
 }
 
-std::unique_ptr<OperationPass<ModuleOp>>
+std::unique_ptr<InterfacePass<FunctionOpInterface>>
 createBufferizeCopyOnlyDispatchesPass() {
   return std::make_unique<BufferizeCopyOnlyDispatchesPass>();
 }

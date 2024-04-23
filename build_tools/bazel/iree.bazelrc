@@ -34,7 +34,7 @@ build --enable_runfiles
 # build --incompatible_default_to_explicit_init_py
 
 # Disable split PIC/non-PIC build graphs and disable heuristic to link binaries
-# dynamically by default. See: https://github.com/openxla/iree/issues/13470
+# dynamically by default. See: https://github.com/iree-org/iree/issues/13470
 build --dynamic_mode=off
 build --force_pic
 

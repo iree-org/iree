@@ -153,7 +153,8 @@ std::optional<Value> hoistOneStaticallyBoundAllocation(
     }
     // Non-scalable target: Assume everything is fixed-size.
     auto ub = ValueBoundsConstraintSet::computeConstantBound(
-        presburger::BoundType::UB, value, {}, /*stopCondition=*/nullptr,
+        presburger::BoundType::UB, {value, std::nullopt},
+        /*stopCondition=*/nullptr,
         /*closedUB=*/true);
     if (failed(ub))
       return failure();
@@ -438,9 +439,9 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
 LogicalResult lowerWorkgroupCountFromSliceOp(
     RewriterBase &rewriter, mlir::FunctionOpInterface entryPointFn,
     ArrayRef<OpFoldResult> workgroupCount, int maxWorkgroupParallelDims) {
-  FailureOr<IREE::HAL::ExecutableExportOp> exportOp =
+  std::optional<IREE::HAL::ExecutableExportOp> exportOp =
       getEntryPoint(entryPointFn);
-  if (failed(exportOp)) {
+  if (!exportOp) {
     return entryPointFn.emitOpError(
         "expected function to be entry point function");
   }

@@ -1,10 +1,10 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(iree-preprocessing-apply-pdl-patterns{patterns-file=%p/torch.pdl.mlir}, cse)" %s | FileCheck %s
 
-// CHECK-LABEL:   stream.executable private @mlp_external_executable
+// CHECK-LABEL:   stream.executable private @mlp_external_f32_f32_f32_i32_i32_i32_i1_executable
 //       CHECK:   stream.executable.export public @mlp_external_entry_point
 //       CHECK:   builtin.module
 //       CHECK:     func.func private @mlp_external
-//  CHECK-SAME:         (memref<f32>, index, memref<f32>, index, memref<f32>, index, i32, i32, i32)
+//  CHECK-SAME:         (memref<f32>, index, memref<f32>, index, memref<f32>, index, i32, i32, i32, i1)
 //  CHECK-SAME:         attributes {llvm.bareptr = [true]}
 //       CHECK:     func.func @mlp_external_entry_point
 //  CHECK-SAME:         %[[ARG0:[a-zA-Z0-9]+]]: !stream.binding
@@ -13,29 +13,31 @@
 //  CHECK-SAME:         %[[ARG3:[a-zA-Z0-9]+]]: i32
 //  CHECK-SAME:         %[[ARG4:[a-zA-Z0-9]+]]: i32
 //  CHECK-SAME:         %[[ARG5:[a-zA-Z0-9]+]]: i32
-//  CHECK-SAME:         %[[ARG6:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:         %[[ARG6:[a-zA-Z0-9]+]]: i1
 //  CHECK-SAME:         %[[ARG7:[a-zA-Z0-9]+]]: index
 //  CHECK-SAME:         %[[ARG8:[a-zA-Z0-9]+]]: index
 //  CHECK-SAME:         %[[ARG9:[a-zA-Z0-9]+]]: index
 //  CHECK-SAME:         %[[ARG10:[a-zA-Z0-9]+]]: index
 //  CHECK-SAME:         %[[ARG11:[a-zA-Z0-9]+]]: index
+//  CHECK-SAME:         %[[ARG12:[a-zA-Z0-9]+]]: index
 //       CHECK:       %[[C0:.+]] = arith.constant 0 : index
-//       CHECK:       %[[STREAM0:.+]] = stream.binding.subspan %[[ARG0]][%[[C0]]] : !stream.binding -> memref<?x?xf32>{%[[ARG6]], %[[ARG7]]}
-//  CHECK-NEXT:       %[[STREAM0_BASE:[a-zA-Z0-9_]+]],
-//  CHECK-SAME:             = memref.extract_strided_metadata %[[STREAM0]]
-//       CHECK:       %[[STREAM1:.+]] = stream.binding.subspan %[[ARG1]][%[[C0]]] : !stream.binding -> memref<?x?xf32>{%[[ARG8]], %[[ARG9]]}
-//  CHECK-NEXT:       %[[STREAM1_BASE:[a-zA-Z0-9_]+]],
-//  CHECK-SAME:             = memref.extract_strided_metadata %[[STREAM1]]
-//       CHECK:       %[[STREAM2:.+]] = stream.binding.subspan %[[ARG2]][%[[C0]]] : !stream.binding -> memref<?x?xf32>{%[[ARG10]], %[[ARG11]]}
-//  CHECK-NEXT:       %[[STREAM2_BASE:[a-zA-Z0-9_]+]],
-//  CHECK-SAME:             = memref.extract_strided_metadata %[[STREAM2]]
+//       CHECK:       %[[STREAM0:.+]] = stream.binding.subspan %[[ARG0]][%[[C0]]] : !stream.binding -> memref<?x?xf32, strided<[?, 1], offset: ?>>{%[[ARG7]], %[[ARG8]]}
+//  CHECK-NEXT:       %[[STREAM0_BASE:[a-zA-Z0-9_]+]], %[[OFFSET0:[a-zA-Z0-9_]+]],
+//  CHECK-SAME:             = iree_codegen.extract_strided_metadata %[[STREAM0]]
+//       CHECK:       %[[STREAM1:.+]] = stream.binding.subspan %[[ARG1]][%[[C0]]] : !stream.binding -> memref<?x?xf32, strided<[?, 1], offset: ?>>{%[[ARG9]], %[[ARG10]]}
+//  CHECK-NEXT:       %[[STREAM1_BASE:[a-zA-Z0-9_]+]], %[[OFFSET1:[a-zA-Z0-9_]+]],
+//  CHECK-SAME:             = iree_codegen.extract_strided_metadata %[[STREAM1]]
+//       CHECK:       %[[STREAM2:.+]] = stream.binding.subspan %[[ARG2]][%[[C0]]] : !stream.binding -> memref<?x?xf32, strided<[?, 1], offset: ?>>{%[[ARG11]], %[[ARG12]]}
+//  CHECK-NEXT:       %[[STREAM2_BASE:[a-zA-Z0-9_]+]], %[[OFFSET2:[a-zA-Z0-9_]+]],
+//  CHECK-SAME:             = iree_codegen.extract_strided_metadata %[[STREAM2]]
 //       CHECK:       call @mlp_external
-//  CHECK-SAME:           %[[STREAM0_BASE]], %[[C0]], %[[STREAM1_BASE]], %[[C0]], %[[STREAM2_BASE]], %[[C0]], %[[ARG3]], %[[ARG4]], %[[ARG5]]
+//  CHECK-SAME:           %[[STREAM0_BASE]], %[[OFFSET0]], %[[STREAM1_BASE]], %[[OFFSET1]], %[[STREAM2_BASE]], %[[OFFSET2]], %[[ARG3]], %[[ARG4]], %[[ARG5]], %[[ARG6]]
 
 //       CHECK:     func.func @mlp_invocation
 //  CHECK-SAME:         (%[[LHS:[a-zA-Z0-9]+]]: tensor<?x?xf32>, %[[RHS:[a-zA-Z0-9]+]]: tensor<?x?xf32>)
 //   CHECK-DAG:       %[[C0:.+]] = arith.constant 0
 //   CHECK-DAG:       %[[C1:.+]] = arith.constant 1
+//   CHECK-DAG:       %[[DORELU:.+]] = arith.constant true
 //       CHECK:       %[[M:.+]] = tensor.dim %[[LHS]], %[[C0]]
 //       CHECK:       %[[N:.+]] = tensor.dim %[[RHS]], %[[C1]]
 //       CHECK:       %[[K:.+]] = tensor.dim %[[LHS]], %[[C1]]
@@ -44,8 +46,8 @@
 //       CHECK:       %[[K_I32:.+]] = arith.index_cast %[[K]] : index to i32
 //       CHECK:       %[[K_0:.+]] = tensor.dim %[[RHS]], %[[C0]]
 //       CHECK:       %[[RESULT:.+]] = flow.dispatch
-//  CHECK-SAME:           @mlp_external_executable::@mlp_external_entry_point
-//  CHECK-SAME:           (%[[LHS]], %[[RHS]], %[[M_I32]], %[[N_I32]], %[[K_I32]], %[[M]], %[[K]], %[[K_0]], %[[N]], %[[M]], %[[N]])
+//  CHECK-SAME:           @mlp_external_f32_f32_f32_i32_i32_i32_i1_executable::@mlp_external_entry_point
+//  CHECK-SAME:           (%[[LHS]], %[[RHS]], %[[M_I32]], %[[N_I32]], %[[K_I32]], %[[DORELU]], %[[M]], %[[K]], %[[K_0]], %[[N]], %[[M]], %[[N]])
 //       CHECK:       linalg.generic
 //  CHECK-SAME:           ins(%[[RESULT]] :
 

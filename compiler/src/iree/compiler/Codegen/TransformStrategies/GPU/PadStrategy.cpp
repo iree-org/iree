@@ -41,7 +41,7 @@ using iree_compiler::gpu::buildDistributeOnePadOrCopyWithNumThreads;
 using iree_compiler::gpu::buildDistributeOnePadOrCopyWithTileSizes;
 using iree_compiler::gpu::PadStrategy;
 using iree_compiler::IREE::transform_dialect::
-    IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp;
+    PopulateWorkgroupCountRegionUsingNumThreadsSliceOp;
 using transform::MatchOp;
 using transform_ext::RegisterMatchCallbacksOp;
 
@@ -94,7 +94,7 @@ buildPadStrategyBlockDistribution(ImplicitLocOpBuilder &b, Value variantH,
       /*threadDimMapping=*/{blockY(ctx), blockX(ctx)}, /*foldIfBranch=*/true);
 
   // Step 3.Handle the workgroup count region.
-  b.create<IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp>(forallH);
+  b.create<PopulateWorkgroupCountRegionUsingNumThreadsSliceOp>(forallH);
   return std::make_tuple(tiledPadH, forallH);
 }
 
@@ -114,8 +114,8 @@ void iree_compiler::gpu::buildPadStrategy(ImplicitLocOpBuilder &b,
 
   // Step 3. Masked vectorization.
   SmallVector<bool> scalableSizes(strategy.vectorSize.size(), false);
-  b.create<transform::VectorizeOp>(padThreadH, ValueRange(), nullptr,
-                                   scalableSizes, strategy.vectorSize);
+  b.create<transform::VectorizeOp>(padThreadH, ValueRange(),
+                                   strategy.vectorSize, nullptr, scalableSizes);
 
   // Step 4. Lower all masked vector transfers at this point, as they make
   // canonicalization generate incorrect IR.

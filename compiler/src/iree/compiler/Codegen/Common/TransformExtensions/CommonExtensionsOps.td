@@ -57,20 +57,6 @@ def ApplyBubblePackUnpackPatternsOp : Op<Transform_Dialect,
   let assemblyFormat = "attr-dict";
 }
 
-def ApplyFoldArithExtIntoContractionOp : Op<Transform_Dialect,
-    "apply_patterns.iree.fold_arith_ext_into_contraction",
-    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,
-     ReportTrackingListenerFailuresOpTrait]> {
-  let description = [{
-    Populate pattern to fold arithmetic extensions on floating point data types into
-    vector contraction operations. linalg.matmul introduces arithmetic
-    extensions on its operands.
-  }];
-
-  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-  let assemblyFormat = "attr-dict";
-}
-
 def ApplyFoldFillIntoPadPatternsOp : Op<Transform_Dialect,
     "apply_patterns.iree.fold_fill_into_pad",
     [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,
@@ -112,7 +98,7 @@ def ApplyFoldTensorSliceIntoTransferPatternsOp : Op<Transform_Dialect,
   let assemblyFormat = "attr-dict";
 }
 
-def ApplyIreeLinalgElementwiseGreedyFusionPatternsOp : Op<Transform_Dialect,
+def ApplyIREELinalgElementwiseGreedyFusionPatternsOp : Op<Transform_Dialect,
     "apply_patterns.iree.linalg_elementwise_greedy_fusion",
     [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,
      ReportTrackingListenerFailuresOpTrait]> {
@@ -168,29 +154,30 @@ def ApplyUnrollVectorsGpuWmmaSyncPatternsOp : Op<Transform_Dialect,
   let assemblyFormat = "attr-dict";
 }
 
-def ApplyLoopIndependentCodeMotionOp : Op<Transform_Dialect, "iree.apply_licm",
+def GpuDistributeSharedMemoryCopyOp :
+  Op<Transform_Dialect, "iree.gpu_distribute_shared_memory_copy",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-     TransformEachOpTrait,
-     TransformOpInterface,
-     ReportTrackingListenerFailuresOpTrait]> {
+     TransformOpInterface, TransformEachOpTrait]> {
+  let summary = "Distribute shared memory copies";
   let description = [{
-    Apply loop-independent code motion and single iteration loop promotion.
-    This transform is applied to all FuncOps within the target.
+    Find copies to/from shared memory and distribute the copies based on the
+    workgroup size.
 
     #### Return modes
-
-    This operation does not consume the target handle and does not produce any
-    handle.
+    This operation applies to the entire function and does not consume the
+    target handle. It always return success.
   }];
 
   let arguments = (ins TransformHandleTypeInterface:$target);
-  let assemblyFormat = "$target attr-dict `:` type($target)";
+  let results = (outs);
+
+  let assemblyFormat = "$target attr-dict `:` functional-type(operands, results)";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::transform::TransformRewriter &rewriter,
-        ::mlir::Operation *target,
+        ::mlir::FunctionOpInterface target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
@@ -221,6 +208,93 @@ def HoistStaticAllocOp :  Op<Transform_Dialect, "iree.hoist_static_alloc",
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::transform::TransformRewriter &rewriter,
         ::mlir::FunctionOpInterface funcOp,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
+def ForallToWorkgroupOp : Op<Transform_Dialect,
+    "iree.forall_to_workgroup",
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     TransformEachOpTrait,
+     TransformOpInterface,
+     ReportTrackingListenerFailuresOpTrait]> {
+  let description = [{
+    Target the whole hal.executable_variant op and rewrite the unique topLevel
+    scf.forall to distributed workgroup_id and workgroup_count.
+
+    The mapping of threads to workgroup_id is currently one-to-one and in order.
+    Only **bufferized** scf.forall are currently supported.
+    Only scf.forall distributed to **at most 3 dimensions** are currently
+    supported.
+
+    Return modes:
+    =============
+    This operation ignores non-Func ops and drops them in the return.
+
+    If no unique scf.forall topLevel operation is found, then the
+    transform definitely fails.
+    If the unique topLevel scf.forall has results (i.e. tensors), then
+    the transform definitely fails.
+
+    If the unique topLevel scf.forall maps to a dynamic number of
+    threads, then the transform definitely fails. This is a temporary
+    limitation until the backward slice computing scf.forall.num_threads
+    can be extracted into the hal::executable_export workgroup_count region.
+    This region may require arbitrary computations and cannot magically match
+    what the `stream.cmd.dispatch` has already imposed on us at a distance.
+    For now we must specify the number of values properly when applying the
+    topLevel tile_using_forall.
+
+    If the unique topLevel scf.forall operation contained within the
+    FuncOp referred to by the `target` transform handle lowers to workgroup
+    properly, the transform succeeds.
+
+    Otherwise the transform definitely fails.
+
+    This transform does not consume its input handle and produces no result.
+  }];
+
+  let arguments = (ins TransformHandleTypeInterface:$target);
+  let results = (outs);
+
+  let assemblyFormat = "$target attr-dict `:` functional-type($target, results)";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::transform::TransformRewriter &rewriter,
+        ::mlir::FunctionOpInterface target,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
+def IREEApplyLoopIndependentCodeMotionOp : Op<Transform_Dialect, "iree.apply_licm",
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     TransformEachOpTrait,
+     TransformOpInterface,
+     ReportTrackingListenerFailuresOpTrait]> {
+  let description = [{
+    Apply loop-independent code motion and single iteration loop promotion.
+    This transform is applied to all FuncOps within the target. Distinguished
+    from the upstream `apply_licm` op that only applies to a single loop with
+    the `iree` prefix.
+
+    #### Return modes
+
+    This operation does not consume the target handle and does not produce any
+    handle.
+  }];
+
+  let arguments = (ins TransformHandleTypeInterface:$target);
+  let assemblyFormat = "$target attr-dict `:` type($target)";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::transform::TransformRewriter &rewriter,
+        ::mlir::Operation *target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
@@ -305,58 +379,70 @@ def IREEEliminateEmptyTensorsOp : Op<
   }];
 }
 
-def ForallToWorkgroupOp : Op<Transform_Dialect,
-    "iree.forall_to_workgroup",
+def PopulateWorkgroupCountRegionUsingNumThreadsSliceOp :
+    Op<Transform_Dialect, "iree.populate_workgroup_count_region_using_num_threads_slice",
+      [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+       TransformEachOpTrait,
+       TransformOpInterface,
+       ReportTrackingListenerFailuresOpTrait]> {
+  let description = [{
+    Populate the workgroup_count region on the `hal.executable.export` op.
+
+    The default dispatch region formation expects that the workgroup count
+    be computed from within the dispatch by using a program slice. The utility
+    method `lowerWorkgroupCountFromSliceOp` handles populating the
+    workgroup count region given the values in the dispatch that represent the
+    number of workgroups. This transform op calls the underlying function using
+    the `num_threads` value from the `scf.for_all` op that distributes the work
+    to different workgroups.
+  }];
+
+  let arguments = (ins TransformHandleTypeInterface:$for_all_op);
+  let results = (outs);
+  let assemblyFormat = [{
+    attr-dict $for_all_op `:` functional-type($for_all_op, results)
+  }];
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+      ::mlir::transform::TransformRewriter &rewriter,
+      ::mlir::Operation *target,
+      ::mlir::transform::ApplyToEachResultList &results,
+      ::mlir::transform::TransformState &state);
+  }];
+}
+
+def ReduceSharedMemoryBankConflictsOp :  Op<Transform_Dialect, "iree.reduce_shared_memory_bank_conflicts",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      TransformEachOpTrait,
      TransformOpInterface,
      ReportTrackingListenerFailuresOpTrait]> {
+  let summary = "Add padding to 'memref.alloc' ops reduce shared memory bank conflicts";
   let description = [{
-    Target the whole hal.executable_variant op and rewrite the unique topLevel
-    scf.forall to distributed workgroup_id and workgroup_count.
+    The `paddingSizeBits` argument should be picked based on the target
+    architecture, striking balance between minimizing bank conflicts and keeping
+    the data aligned. Smaller values (close to the bank bitwidth) achieve the
+    former, while larger (~= widest load size) the latter. We want to **misalign**
+    the rows, but not too much. For gfx942, 64 is a good default.
 
-    The mapping of threads to workgroup_id is currently one-to-one and in order.
-    Only **bufferized** scf.forall are currently supported.
-    Only scf.forall distributed to **at most 3 dimensions** are currently
-    supported.
+    #### Return modes
 
-    Return modes:
-    =============
-    This operation ignores non-Func ops and drops them in the return.
-
-    If no unique scf.forall topLevel operation is found, then the
-    transform definitely fails.
-    If the unique topLevel scf.forall has results (i.e. tensors), then
-    the transform definitely fails.
-
-    If the unique topLevel scf.forall maps to a dynamic number of
-    threads, then the transform definitely fails. This is a temporary
-    limitation until the backward slice computing scf.forall.num_threads
-    can be extracted into the hal::executable_export workgroup_count region.
-    This region may require arbitrary computations and cannot magically match
-    what the `stream.cmd.dispatch` has already imposed on us at a distance.
-    For now we must specify the number of values properly when applying the
-    topLevel tile_using_forall.
-
-    If the unique topLevel scf.forall operation contained within the
-    FuncOp referred to by the `target` transform handle lowers to workgroup
-    properly, the transform succeeds.
-
-    Otherwise the transform definitely fails.
-
-    This transform does not consume its input handle and produces no result.
+    This transform does not consume the target handle and always return success.
   }];
 
-  let arguments = (ins TransformHandleTypeInterface:$target);
+  let arguments = (
+      ins TransformHandleTypeInterface:$target,
+          DefaultValuedOptionalAttr<I64Attr, "64">:$padding_size_bits
+  );
   let results = (outs);
 
-  let assemblyFormat = "$target attr-dict `:` functional-type($target, results)";
+  let assemblyFormat = "$target attr-dict `:` functional-type(operands, results)";
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::transform::TransformRewriter &rewriter,
-        ::mlir::FunctionOpInterface target,
+        ::mlir::FunctionOpInterface funcOp,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
@@ -435,37 +521,80 @@ def ShareForallOperandsOp : Op<
   }];
 }
 
-def IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp :
-    Op<Transform_Dialect, "iree.populate_workgroup_count_region_using_num_threads_slice",
-      [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-       TransformEachOpTrait,
-       TransformOpInterface,
-       ReportTrackingListenerFailuresOpTrait]> {
+def TestGpuVectorDistribution :
+  Op<Transform_Dialect, "iree.test_gpu_vector_distribution",
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     TransformEachOpTrait,
+     TransformOpInterface,
+     ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
-    Populate the workgroup_count region on the `hal.executable.export` op.
+    Run GPUVectorDistribution on the target as the root.
 
-    The default dispatch region formation expects that the workgroup count
-    be computed from within the dispatch by using a program slice. The utility
-    method `lowerWorkgroupCountFromSliceOp` handles populating the
-    workgroup count region given the values in the dispatch that represent the
-    number of workgroups. This transform op calls the underlying function using
-    the `num_threads` value from the `scf.for_all` op that distributes the work
-    to different workgroups.
-  }];
+    The anchor points are set by using the attribute
+    "__vector_layout_test_anchor_operand_x" and
+    "__vector_layout_test_anchor_result_x", where "x" is the operand/result
+    number.
 
-  let arguments = (ins TransformHandleTypeInterface:$for_all_op);
-  let results = (outs);
-  let assemblyFormat = [{
-    attr-dict $for_all_op `:` functional-type($for_all_op, results)
-  }];
-  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-  let extraClassDeclaration = [{
-    ::mlir::DiagnosedSilenceableFailure applyToOne(
-      ::mlir::transform::TransformRewriter &rewriter,
-      ::mlir::Operation *target,
-      ::mlir::transform::ApplyToEachResultList &results,
-      ::mlir::transform::TransformState &state);
-  }];
+    The distribution is done for a single warp using gpu.thread x as the lane
+    ID. The optional experimental attribute enabled experimental distribution
+    patterns.
+
+    #### Return modes
+
+    This transform does not consume the target handle and always return success.
+    }];
+
+    let arguments = (ins TransformHandleTypeInterface:$target,
+                         DefaultValuedOptionalAttr<BoolAttr, "false">:$experimental);
+    let results = (outs);
+
+    let assemblyFormat = [{ $target attr-dict `:` type($target)}];
+    let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+    let extraClassDeclaration = [{
+      ::mlir::DiagnosedSilenceableFailure applyToOne(
+          ::mlir::transform::TransformRewriter &rewriter,
+          ::mlir::FunctionOpInterface funcOp,
+          ::mlir::transform::ApplyToEachResultList &results,
+          ::mlir::transform::TransformState &state);
+    }];
+}
+
+def TestVectorLayoutAnalysisOp :
+  Op<Transform_Dialect, "iree.test_vector_layout_analysis",
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     TransformEachOpTrait,
+     TransformOpInterface,
+     ReportTrackingListenerFailuresOpTrait]> {
+  let description = [{
+    Run VectorLayoutAnalysis on the target as the root.
+
+    The anchor points are set by using the attribute
+    "__vector_layout_test_anchor_operand_x" and
+    "__vector_layout_test_anchor_result_x", where "x" is the operand/result
+    number.
+
+    The analysis emits remarks for the layout for each SSA value infered
+    on it's owning operation.
+
+    #### Return modes
+
+    This transform does not consume the target handle and always return success.
+    }];
+
+    let arguments = (ins TransformHandleTypeInterface:$target);
+    let results = (outs);
+
+    let assemblyFormat = [{ $target attr-dict `:` type($target)}];
+    let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+    let extraClassDeclaration = [{
+      ::mlir::DiagnosedSilenceableFailure applyToOne(
+          ::mlir::transform::TransformRewriter &rewriter,
+          ::mlir::FunctionOpInterface funcOp,
+          ::mlir::transform::ApplyToEachResultList &results,
+          ::mlir::transform::TransformState &state);
+    }];
 }
 
 def WorkgroupSwizzleOp :  Op<Transform_Dialect, "iree.workgroup_swizzle",
@@ -506,111 +635,6 @@ def WorkgroupSwizzleOp :  Op<Transform_Dialect, "iree.workgroup_swizzle",
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::transform::TransformRewriter &rewriter,
         ::mlir::FunctionOpInterface funcOp,
-        ::mlir::transform::ApplyToEachResultList &results,
-        ::mlir::transform::TransformState &state);
-  }];
-}
-
-def TestVectorLayoutAnalysisOp :
-  Op<Transform_Dialect, "iree.test_vector_layout_analysis",
-    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-     TransformEachOpTrait,
-     TransformOpInterface,
-     ReportTrackingListenerFailuresOpTrait]> {
-  let description = [{
-    Run VectorLayoutAnalysis on the target as the root.
-
-    The anchor points are set by using the attribute
-    "__vector_layout_test_anchor_operand_x" and
-    "__vector_layout_test_anchor_result_x", where "x" is the operand/result
-    number.
-
-    The analysis emits remarks for the layout for each SSA value infered
-    on it's owning operation.
-
-    #### Return modes
-
-    This transform does not consume the target handle and always return success.
-    }];
-
-    let arguments = (ins TransformHandleTypeInterface:$target);
-    let results = (outs);
-
-    let assemblyFormat = [{ $target attr-dict `:` type($target)}];
-    let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-
-    let extraClassDeclaration = [{
-      ::mlir::DiagnosedSilenceableFailure applyToOne(
-          ::mlir::transform::TransformRewriter &rewriter,
-          ::mlir::FunctionOpInterface funcOp,
-          ::mlir::transform::ApplyToEachResultList &results,
-          ::mlir::transform::TransformState &state);
-    }];
-}
-
-def TestGpuVectorDistribution :
-  Op<Transform_Dialect, "iree.test_gpu_vector_distribution",
-    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-     TransformEachOpTrait,
-     TransformOpInterface,
-     ReportTrackingListenerFailuresOpTrait]> {
-  let description = [{
-    Run GPUVectorDistribution on the target as the root.
-
-    The anchor points are set by using the attribute
-    "__vector_layout_test_anchor_operand_x" and
-    "__vector_layout_test_anchor_result_x", where "x" is the operand/result
-    number.
-
-    The distribution is done for a single warp using gpu.thread x as the lane
-    ID. The optional experimental attribute enabled experimental distribution
-    patterns.
-
-    #### Return modes
-
-    This transform does not consume the target handle and always return success.
-    }];
-
-    let arguments = (ins TransformHandleTypeInterface:$target,
-                         DefaultValuedOptionalAttr<BoolAttr, "false">:$experimental);
-    let results = (outs);
-
-    let assemblyFormat = [{ $target attr-dict `:` type($target)}];
-    let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-
-    let extraClassDeclaration = [{
-      ::mlir::DiagnosedSilenceableFailure applyToOne(
-          ::mlir::transform::TransformRewriter &rewriter,
-          ::mlir::FunctionOpInterface funcOp,
-          ::mlir::transform::ApplyToEachResultList &results,
-          ::mlir::transform::TransformState &state);
-    }];
-}
-
-def GpuDistributeSharedMemoryCopyOp :
-  Op<Transform_Dialect, "iree.gpu_distribute_shared_memory_copy",
-    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-     TransformOpInterface, TransformEachOpTrait]> {
-  let summary = "Distribute shared memory copies";
-  let description = [{
-    Find copies to/from shared memory and distribute the copies based on the
-    workgroup size.
-
-    #### Return modes
-    This operation applies to the entire function and does not consume the
-    target handle. It always return success.
-  }];
-
-  let arguments = (ins TransformHandleTypeInterface:$target);
-  let results = (outs);
-
-  let assemblyFormat = "$target attr-dict `:` functional-type(operands, results)";
-  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
-
-  let extraClassDeclaration = [{
-    ::mlir::DiagnosedSilenceableFailure applyToOne(
-        ::mlir::transform::TransformRewriter &rewriter,
-        ::mlir::FunctionOpInterface target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
