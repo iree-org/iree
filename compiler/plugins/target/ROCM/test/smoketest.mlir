@@ -41,7 +41,8 @@ stream.executable public @add_dispatch_0 {
 
 // -----
 
-// Tests serialization with unknown source locations
+// Tests serialization with unknown source locations.
+
 #loc = loc(unknown)
 module attributes {
   hal.device.targets = [
