@@ -134,3 +134,23 @@ module @hoist_inline_parameters {
     util.return %0 : tensor<i32>
   }
 }
+
+// -----
+
+// Tests that hoistable attributes like the device affinity get cloned onto the
+// global and initializer.
+
+// CHECK-LABEL: @hoist_dialect_attrs
+module @hoist_dialect_attrs {
+  //      CHECK: util.global private @[[HOISTED:[a-z0-9]+]]
+  // CHECK-SAME:   hal.affinity = #hal.affinity.queue<[0, 1]>
+  //      CHECK: util.initializer
+  // CHECK-SAME:   hal.affinity = #hal.affinity.queue<[0, 1]>
+  util.func public @main() -> tensor<i32> attributes {
+    hal.affinity = #hal.affinity.queue<[0, 1]>
+  } {
+    %0 = arith.constant dense<3> : tensor<i32>
+    %1 = "iree_unregistered.const_expr"(%0) : (tensor<i32>) -> tensor<i32>
+    util.return %1 : tensor<i32>
+  }
+}
