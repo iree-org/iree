@@ -2166,9 +2166,9 @@ LogicalResult WinogradInputTransformOp::verify() {
       return op->emitOpError(
           "expected output operand to have rank 2 if input is of rank 2");
     }
-    if ((inputType.getDimSize(0) != ShapedType::kDynamic &&
+    if ((!inputType.isDynamicDim(0) &&
          inputType.getDimSize(0) > getInputTileSize()) ||
-        (inputType.getDimSize(1) != ShapedType::kDynamic &&
+        (inputType.isDynamicDim(1) &&
          inputType.getDimSize(1) > getInputTileSize())) {
       return op->emitOpError("expected input dims not greater than input tile "
                              "size if input is of rank 2");
@@ -2400,9 +2400,6 @@ LogicalResult WinogradFilterTransformOp::verify() {
     return op->emitOpError("expected output rank to be equal to input rank");
   }
   const ArrayRef<int64_t> kernelDims = getKernelDimensions();
-  const size_t numKernelDims = kernelDims.size();
-  llvm::SmallSetVector<int64_t, 2> kernelDimsSet(kernelDims.begin(),
-                                                 kernelDims.end());
   if (kernelDims.size() != 2) {
     return op->emitOpError("expected only 2 kernel dimensions");
   }
@@ -2418,7 +2415,9 @@ LogicalResult WinogradFilterTransformOp::verify() {
     }
   }
   const int64_t inputTileSize = getInputTileSize();
-  SmallVector<int64_t> expectedOutputShape(numKernelDims, inputTileSize);
+  SmallVector<int64_t> expectedOutputShape(kernelDims.size(), inputTileSize);
+  llvm::SmallSetVector<int64_t, 2> kernelDimsSet(kernelDims.begin(),
+                                                 kernelDims.end());
   for (int i = 0; i < inputType.getRank(); i++) {
     if (!kernelDimsSet.contains(i)) {
       expectedOutputShape.push_back(inputType.getDimSize(i));

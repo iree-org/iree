@@ -1049,7 +1049,7 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
        "getTiledImplementation"]>]> {
   let summary = "Winograd Input Transform operator";
   let description = [{
-    This operator is the first step in converting a convolution to
+    This operator is part of the first step in converting a convolution to
     its Winograd equivalent. Given a tile of an input image (I),
     this operator computes matmul(tranpose(B), matmul(I, B)).
     The input tile is assumed to be square with each side of size m + r - 1,
@@ -1161,7 +1161,16 @@ def IREELinalgExt_WinogradFilterTransformOp : IREELinalgExt_Op<"winograd.filter_
     [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>]> {
   let summary = "Winograd Filter Transform operator";
   let description = [{
-    Filter transform op.
+    This operator is part of the first step in converting a convolution to
+    its Winograd equivalent. Given a tile of a convolution filter (F),
+    this operator computes matmul(G, matmul(F, transpose(B))).
+    The filter tile is assumed to be the full m x m convolutional kernel,
+    and the result of the transformation on this tile is a square with each
+    side of size m + r - 1, where the output tile size is r x r. G is a constant
+    2-d matrix of shape (m + r - 1) x m. The input to the operator is a filter
+    of shape (H, W, C, F) or (F, C, H, W) and the output is an operator of shape
+    (m + r - 1, m + r - 1, C, F). The result of this operator is first collapsed
+    and then fed to a batch matmul op.
   }];
 
   let arguments = (ins Variadic<AnyShaped>:$inputs,
