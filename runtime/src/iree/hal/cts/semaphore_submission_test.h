@@ -585,8 +585,93 @@ TEST_P(semaphore_submission_test, TwoBatchesWaitingOnDifferentSemaphoreValues) {
 // TODO: test host + device -> device synchronization: submit two batches
 // with a later batch waiting on both a host and device singal to proceed.
 
-// TODO: test device -> host + device synchronization: submit two batches
+// Test device -> host + device synchronization: submit two batches
 // with a former batch signaling to enable both host and device to proceed.
+TEST_P(semaphore_submission_test, DeviceBatchSignalAnotherAndHost) {
+  // Signal-wait relation:
+  //
+  //         command_buffer1
+  //         ↙             ↘
+  //    semaphore11    semaphore12
+  //        ↓               ↓
+  // command_buffer2   wait on host
+  //        ↓
+  //    semaphore2
+  //        ↓
+  //   wait on host
+
+  iree_hal_command_buffer_t* command_buffer1 = CreateEmptyCommandBuffer();
+  iree_hal_command_buffer_t* command_buffer2 = CreateEmptyCommandBuffer();
+  iree_hal_semaphore_t* semaphore11 = CreateSemaphore();
+  iree_hal_semaphore_t* semaphore12 = CreateSemaphore();
+  iree_hal_semaphore_t* semaphore2 = CreateSemaphore();
+
+  uint64_t signal_value = 1;
+
+  // Submit command_buffer2.
+  iree_hal_semaphore_list_t command_buffer2_wait_list = {
+      /*count=*/1, &semaphore11, &signal_value};
+  iree_hal_semaphore_list_t command_buffer2_signal_list = {
+      /*count=*/1, &semaphore2, &signal_value};
+  IREE_ASSERT_OK(iree_hal_device_queue_execute(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*wait_semaphore_list=*/command_buffer2_wait_list,
+      /*signal_semaphore_list=*/command_buffer2_signal_list, 1,
+      &command_buffer2));
+
+  // Semaphores have not advance since we have not yet submitted
+  // command_buffer1.
+  CheckSemaphoreValue(semaphore11, 0);
+  CheckSemaphoreValue(semaphore12, 0);
+  CheckSemaphoreValue(semaphore2, 0);
+
+  // Wait in parallel for all semaphores.
+  std::thread thread11([&]() {
+    IREE_ASSERT_OK(
+        iree_hal_semaphore_wait(semaphore11, signal_value,
+                                iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
+  });
+  std::thread thread12([&]() {
+    IREE_ASSERT_OK(
+        iree_hal_semaphore_wait(semaphore12, signal_value,
+                                iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
+  });
+  std::thread thread2([&]() {
+    IREE_ASSERT_OK(
+        iree_hal_semaphore_wait(semaphore2, signal_value,
+                                iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
+  });
+
+  // Submit command_buffer1.
+  iree_hal_semaphore_list_t command_buffer1_wait_list = {/*count=*/0, nullptr,
+                                                         nullptr};
+  iree_hal_semaphore_t* command_buffer1_signal_semaphore_array[] = {
+      semaphore11, semaphore12};
+  uint64_t command_buffer1_signal_value_array[] = {signal_value, signal_value};
+  iree_hal_semaphore_list_t command_buffer1_signal_list = {
+      /*count=*/2, command_buffer1_signal_semaphore_array,
+      command_buffer1_signal_value_array};
+  IREE_ASSERT_OK(iree_hal_device_queue_execute(
+      device_, IREE_HAL_QUEUE_AFFINITY_ANY,
+      /*wait_semaphore_list=*/command_buffer1_wait_list,
+      /*signal_semaphore_list=*/command_buffer1_signal_list, 1,
+      &command_buffer1));
+
+  thread11.join();
+  thread12.join();
+  thread2.join();
+
+  // Check that semaphores have advanced.
+  CheckSemaphoreValue(semaphore11, signal_value);
+  CheckSemaphoreValue(semaphore12, signal_value);
+  CheckSemaphoreValue(semaphore2, signal_value);
+
+  iree_hal_semaphore_release(semaphore11);
+  iree_hal_semaphore_release(semaphore12);
+  iree_hal_semaphore_release(semaphore2);
+  iree_hal_command_buffer_release(command_buffer1);
+  iree_hal_command_buffer_release(command_buffer2);
+}
 
 // TODO: test signaling a larger value before/after enqueuing waiting a smaller
 // value to the device.
