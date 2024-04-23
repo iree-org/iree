@@ -1327,6 +1327,7 @@ void TensorFillOp::getCanonicalizationPatterns(RewritePatternSet &results,
 
 OpFoldResult TensorUpdateOp::fold(FoldAdaptor operands) {
   // TODO(benvanik): fold if target_size == update_size and affinity/lifetime.
+  // NOTE: must preserve in-place external storage ala AsyncUpdateOp.
   return {};
 }
 
@@ -1707,12 +1708,36 @@ void AsyncFillOp::getCanonicalizationPatterns(RewritePatternSet &results,
 // stream.async.update
 //===----------------------------------------------------------------------===//
 
+// Returns true if |value| has known value semantics (it's produced locally
+// and is safe to drop mutations on if there are no observers).
+static bool hasValueSemantics(Value value) {
+  // Can't analyze function arguments (though we could add arg attrs to indicate
+  // value semantics).
+  auto *definingOp = value.getDefiningOp();
+  if (!definingOp)
+    return false;
+
+  // If produced by a tied op then see if the particular result is tied.
+  if (auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(definingOp)) {
+    if (tiedOp.getTiedResultOperand(value))
+      return false;
+  }
+
+  // To be conservative we only allow stream dialect ops that produce the
+  // resource as we know they all indicate value semantics when non-tied - ops
+  // from other dialects may not.
+  if (!definingOp->hasTrait<OpTrait::IREE::Stream::AsyncPhaseOp>())
+    return false;
+
+  return true;
+}
+
 OpFoldResult AsyncUpdateOp::fold(FoldAdaptor operands) {
+  // If updating the entire target then just replace with the update.
+  // NOTE: we have to ensure the target is known to have value semantics as
+  // otherwise the update may be performing an update of an external resource.
   if (getUpdateSize() == getTargetSize() &&
-      getUpdate().getType() == getType()) {
-    // If updating the entire target then just replace with the update.
-    // Note that this breaks copy-on-write semantics but will be fixed up during
-    // canonicalization if needed.
+      getUpdate().getType() == getType() && hasValueSemantics(getTarget())) {
     return getUpdate();
   }
   return {};
