@@ -49,31 +49,32 @@ jobs:
             gcr.io/iree-oss/samples@sha256:0cb4a27f8fce2e6c9a425b93ecd97bf3c5c3a8ec56929ab7ef005f51d4b1e054 \
             ./build_tools/testing/test_samples.sh
 
-  # FIXME: unify this with host build from ci.yml. This is complicated by
-  # incompatibility between storage options for GitHub-managed and self-hosted
-  # runners.
-  web:
-    runs-on: ubuntu-20.04
-    # TODO: remove dependence on magic matching build dir names
-    env:
-      HOST_BUILD_DIR: build-host-install
-    steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
-        with:
-          submodules: true
-      - name: "Building host tools"
-        run: |
-          ./build_tools/github_actions/docker_run.sh  \
-            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446" \
-            gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
-            ./build_tools/cmake/build_host_tools.sh "${HOST_BUILD_DIR}"
-      - name: "Testing Experimental Web Samples"
-        env:
-          IREE_EMPSCRIPTEN_BUILD_DIR: build-emscripten
-        run: |
-          ./build_tools/github_actions/docker_run.sh  \
-            --env "IREE_HOST_BUILD_DIR=${HOST_BUILD_DIR}" \
-            --env "IREE_EMPSCRIPTEN_BUILD_DIR=${IREE_EMPSCRIPTEN_BUILD_DIR}" \
-            gcr.io/iree-oss/emscripten@sha256:2dd4c52f1bb499ab365aad0111fe5538b685d88af38636b409b0cf6a576ab214 \
-            ./experimental/web/build_and_test_samples.sh
+  # TODO(scotttodd): Convert web test scripts to use installed compiler packages and local runtime
+  #                  builds, rather than local compiler builds. The host tools are too slow to build
+  #                  on standard sized runners (and for casual users).
+
+  # web:
+  #   runs-on: ubuntu-20.04
+  #   # TODO: remove dependence on magic matching build dir names
+  #   env:
+  #     HOST_BUILD_DIR: build-host-install
+  #   steps:
+  #     - name: "Checking out repository"
+  #       uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
+  #       with:
+  #         submodules: true
+  #     - name: "Building host tools"
+  #       run: |
+  #         ./build_tools/github_actions/docker_run.sh  \
+  #           --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446" \
+  #           gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
+  #           ./build_tools/cmake/build_host_tools.sh "${HOST_BUILD_DIR}"
+  #     - name: "Testing Experimental Web Samples"
+  #       env:
+  #         IREE_EMPSCRIPTEN_BUILD_DIR: build-emscripten
+  #       run: |
+  #         ./build_tools/github_actions/docker_run.sh  \
+  #           --env "IREE_HOST_BUILD_DIR=${HOST_BUILD_DIR}" \
+  #           --env "IREE_EMPSCRIPTEN_BUILD_DIR=${IREE_EMPSCRIPTEN_BUILD_DIR}" \
+  #           gcr.io/iree-oss/emscripten@sha256:2dd4c52f1bb499ab365aad0111fe5538b685d88af38636b409b0cf6a576ab214 \
+  #           ./experimental/web/build_and_test_samples.sh
