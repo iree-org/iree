@@ -151,4 +151,13 @@ def DataLayoutPropagation : InterfacePass<"iree-global-opt-data-layout-propagati
   let constructor = "mlir::iree_compiler::GlobalOptimization::createDataLayoutPropagationPass()";
 }
 
+def TransposeMatmul : Pass<"iree-global-opt-transpose-matmul"> {
+  let summary = "Convert Linalg matmul ops to transposed variants";
+  let constructor = "mlir::iree_compiler::GlobalOptimization::createTransposeMatmulPass()";
+  let options = [
+    Option<"input", "input", "std::string", /*default=*/"",
+           "Input to transpose, one of: '' (none), 'lhs', 'rhs'">
+  ];
+}
+
 #endif // IREE_COMPILER_GLOBALOPTIMIZATION_PASSES
