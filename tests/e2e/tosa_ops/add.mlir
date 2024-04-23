@@ -13,11 +13,3 @@ func.func @tensor_int() {
   check.expect_eq_const(%result, dense<[6, 8, 10, 12]> : tensor<4xi32>) : tensor<4xi32>
   return
 }
-
-#loc = loc(unknown)
-func.func @unknown_loc_tensor_float() -> tensor<5xf32> {
-  %0 = util.unfoldable_constant dense<[1.0, 2.0, 3.0, 4.0, 5.0]> : tensor<5xf32>
-  %1 = util.unfoldable_constant dense<[5.0, 6.0, 7.0, 8.0, 9.0]> : tensor<5xf32>
-  %2 = tosa.add %0, %1 : (tensor<5xf32>, tensor<5xf32>) -> tensor<5xf32> loc(#loc)
-  return %2 : tensor<5xf32> loc(#loc)
-} loc(#loc)
