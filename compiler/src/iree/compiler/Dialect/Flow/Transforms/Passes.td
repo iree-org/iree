@@ -102,8 +102,8 @@ def FormDispatchRegionsPass :
     InterfacePass<"iree-flow-form-dispatch-regions", "mlir::FunctionOpInterface"> {
   let summary = "Form Dispatch Region Ops from Linalg operations on tensors to form dispatch.regions";
   let options = [
-    Option<"fuseMultiUse", "fuse-multi-use", "bool",
-           /*default=*/"false", "Fuse multi-use ops">,
+    Option<"aggressiveFusion", "aggressive-fusion", "bool",
+           /*default=*/"false", "Aggressive mode enabling fusions not ready for all backends">,
     Option<"generateWorkloadRegion", "genereate-workload-region", "bool",
            /*default=*/"true", "Generate workload regions of WorkgroupOps">,
     Option<"fusePadWithConsumers", "fuse-pad-with-consumers", "bool",

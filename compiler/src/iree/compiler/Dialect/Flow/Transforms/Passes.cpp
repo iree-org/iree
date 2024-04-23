@@ -88,6 +88,12 @@ static llvm::cl::opt<bool> clEnableElementWiseFuseMultiReduction(
     llvm::cl::desc("Enable element-wise fusion of multi-reduction loop ops."),
     llvm::cl::init(true));
 
+static llvm::cl::opt<bool> clEnableAggressiveFusion(
+    "iree-flow-enable-aggressive-fusion",
+    llvm::cl::desc("Aggressive fusion opportunities that are behind a flag "
+                   "since all backends dont support it yet"),
+    llvm::cl::init(false));
+
 static llvm::cl::opt<bool> clDispatchGenerateWorkloadRegion(
     "iree-flow-dispatch-generate-workload-region",
     llvm::cl::desc("Generate the workload region."), llvm::cl::init(true));
@@ -207,7 +213,7 @@ void addDispatchRegionCreationPasses(OpPassManager &passManager,
       // producers.
       .addPass([&]() {
         return createFormDispatchRegionsPass(FormDispatchRegionsPassOptions{
-            clEnableFuseMultiUse, clDispatchGenerateWorkloadRegion,
+            clEnableAggressiveFusion, clDispatchGenerateWorkloadRegion,
             clEnableFusePaddingIntoLinalgConsumerOps,
             clEnableFusePaddingIntoLinalgProducerOps});
       })

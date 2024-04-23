@@ -410,10 +410,10 @@ static bool hasCompatibleOuterParallelLoops(
 /// For all uses of an operation, finds the use that dominates all other uses.
 static std::optional<OpOperand *>
 getFusableUse(Operation *op, DominanceInfo const &dominanceInfo,
-              bool fuseMultiUse) {
-  if (!fuseMultiUse && llvm::count_if(op->getUses(), [](OpOperand &use) {
-                         return !isa<tensor::DimOp>(use.getOwner());
-                       }) != 1) {
+              bool aggressiveFusion) {
+  if (!aggressiveFusion && llvm::count_if(op->getUses(), [](OpOperand &use) {
+                             return !isa<tensor::DimOp>(use.getOwner());
+                           }) != 1) {
     return std::nullopt;
   }
 
@@ -502,6 +502,18 @@ static bool canUseInOperandAsInitOperand(OpOperand *inOperand,
   return true;
 }
 
+/// All operations in a dispatch should be vectorized, which isnt the case today
+/// This is an explicit list of operations that arent vectorized for now
+/// requiring special handling for now in dispatch region formation to avoid
+/// large stack allocations.
+static bool isVectorizedAlways(Operation *producer) {
+  if (auto convOp = dyn_cast<linalg::Conv2DNhwcHwcfOp>(producer)) {
+    auto strides = convOp.getStrides();
+    return strides.isSplat() && strides.getSplatValue<int64_t>() == 1;
+  }
+  return true;
+}
+
 /// Returns true if this is a fusable use, while fusing a root with its
 /// consumer.
 static bool
@@ -510,6 +522,12 @@ isFusableWithConsumer(OpOperand &fusedOperand,
                       FormDispatchRegionsPassOptions const &options) {
   Operation *producer = fusedOperand.get().getDefiningOp();
   Operation *consumer = fusedOperand.getOwner();
+
+  // If consumer is a dequant operation, dont fuse it. These get cloned
+  // into their consumers.
+  if (isDequantizationLikeOp(consumer)) {
+    return false;
+  }
 
   // Fuse unset_encoding operations with `tensor.extract_slice` and elementwise
   // generic ops.
@@ -564,6 +582,20 @@ isFusableWithConsumer(OpOperand &fusedOperand,
     return false;
   }
 
+  // Insert slice ops should always be fused with their producers.
+  if (auto insertSliceOp = dyn_cast<tensor::InsertSliceOp>(consumer)) {
+    // TODO: Enable multi-use slice source fusion.
+    Value source = insertSliceOp.getSource();
+    if (!source.hasOneUse() || source.getDefiningOp() != producer) {
+      return false;
+    }
+    // Fuse in `insert_slice` consumer operations if destination is a fill.
+    // TODO: This can be generalized, but destination cannot be a
+    // `arith.constant` or other constant-like objects. `linalg.fill` captures a
+    // common case of pad generalization.
+    return insertSliceOp.getDest().getDefiningOp<linalg::FillOp>();
+  }
+
   // TODO(#16025): Enable mmt4d fusion. It is disabled because the backends
   // can not set multi lowering_config properly. See the issue for more details.
   if (isa<linalg::Mmt4DOp>(producer)) {
@@ -585,6 +617,23 @@ isFusableWithConsumer(OpOperand &fusedOperand,
     return false;
   }
 
+  // Check if the iteration spaces of the producer and consumer are same.
+  // TODO(#12664): This is unnecessary requirement, but we need a better config
+  // to tile the consumer with a larger iteration space.
+  auto producerIterationSpace = producerLinalgOp.getStaticLoopRanges();
+  auto consumerIterationSpace = consumerLinalgOp.getStaticLoopRanges();
+  if (producerIterationSpace.size() < consumerIterationSpace.size()) {
+    return false;
+  }
+
+  // Under aggressive fusion assume that the dispatches are vectorized. In which
+  // case we dont need to account for the subsequent stack allocation condition.
+  if (options.aggressiveFusion) {
+    if (isVectorizedAlways(producer)) {
+      return true;
+    }
+  }
+
   // While fusing with consumer, the result of the root might not be the final
   // result of the dispatch. To avoid a stack allocation we have to ensure that
   // all operations can bufferize without needing additional memory.
@@ -598,15 +647,6 @@ isFusableWithConsumer(OpOperand &fusedOperand,
             })) {
       return false;
     }
-  }
-
-  // Check if the iteration spaces of the producer and consumer are same.
-  // TODO(#12664): This is unnecessary requirement, but we need a better config
-  // to tile the consumer with a larger iteration space.
-  auto producerIterationSpace = producerLinalgOp.getStaticLoopRanges();
-  auto consumerIterationSpace = consumerLinalgOp.getStaticLoopRanges();
-  if (producerIterationSpace.size() < consumerIterationSpace.size()) {
-    return false;
   }
 
   return true;
@@ -637,8 +677,9 @@ fuseRootsWithConsumers(MLIRContext *context, ArrayRef<Operation *> roots,
         appendToFusionGroup(currRoot, rootNumber);
       };
 
-      std::optional<OpOperand *> fusableUse = getFusableUse(
-          currRoot, dominanceInfo, /*fuseMultiUse=*/options.fuseMultiUse);
+      std::optional<OpOperand *> fusableUse =
+          getFusableUse(currRoot, dominanceInfo,
+                        /*aggressiveFusion=*/options.aggressiveFusion);
       if (!fusableUse)
         continue;
 
@@ -704,9 +745,11 @@ isFusableWithProducer(OpOperand &operand,
     return false;
   }
 
-  auto consumerLinalgOp = cast<linalg::LinalgOp>(consumer);
-  if (!consumerLinalgOp.isDpsInit(&operand)) {
-    return false;
+  if (!options.aggressiveFusion) {
+    auto consumerLinalgOp = cast<linalg::LinalgOp>(consumer);
+    if (!consumerLinalgOp.isDpsInit(&operand)) {
+      return false;
+    }
   }
 
   return areOpsFusable(producer, consumer, rootOuterParallelLoops);
@@ -732,8 +775,9 @@ fuseRootsWithProducers(MLIRContext *context, Operation *root, unsigned groupNum,
         continue;
       }
 
-      std::optional<OpOperand *> fusableUse = getFusableUse(
-          producer, dominanceInfo, /*fuseMultiUse=*/options.fuseMultiUse);
+      std::optional<OpOperand *> fusableUse =
+          getFusableUse(producer, dominanceInfo,
+                        /*aggressiveFusion=*/options.aggressiveFusion);
       if (!fusableUse || fusableUse.value()->getOwner() != candidate)
         continue;
 
@@ -936,9 +980,9 @@ void FormDispatchRegionsPass::runOnOperation() {
   mlir::FunctionOpInterface funcOp = getOperation();
   DominanceInfo const &dominanceInfo = getAnalysis<DominanceInfo>();
   TensorDimTrackingRewriter rewriter(funcOp);
-  FormDispatchRegionsPassOptions options{fuseMultiUse, generateWorkloadRegion,
-                                         fusePadWithConsumers,
-                                         fusePadWithProducers};
+  FormDispatchRegionsPassOptions options{
+      aggressiveFusion, generateWorkloadRegion, fusePadWithConsumers,
+      fusePadWithProducers};
   if (failed(createFusionGroups(rewriter, funcOp, dominanceInfo, options))) {
     funcOp->emitOpError("failed to create fusion groups");
     return signalPassFailure();
