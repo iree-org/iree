@@ -23,6 +23,7 @@ iree_hal_cts_test_suite(
     # Disabled until fixing semaphore tests.
     # https://github.com/iree-org/iree/pull/17080#discussion_r1569867998
     "semaphore_submission"
+    "semaphore_test"
   LABELS
     driver=metal
 )

@@ -216,10 +216,7 @@ iree_status_t iree_hal_vulkan_native_semaphore_multi_wait(
     timeout_ns = 0;
   } else {
     iree_time_t now_ns = iree_time_now();
-    if (deadline_ns < now_ns) {
-      return iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
-    }
-    timeout_ns = (uint64_t)(deadline_ns - now_ns);
+    timeout_ns = deadline_ns < now_ns ? 0 : (uint64_t)(deadline_ns - now_ns);
   }
 
   IREE_TRACE_ZONE_BEGIN(z0);
