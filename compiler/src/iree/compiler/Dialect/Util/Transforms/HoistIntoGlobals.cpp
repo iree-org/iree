@@ -31,6 +31,24 @@ static llvm::cl::opt<std::string> clPrintDotGraphToFile(
 // Maps an original value in the program to the symbol name of a global.
 using HoistedValueMap = llvm::DenseMap<Value, GlobalOp>;
 
+// Walks |fromOp| and up to gather all dialect attributes that want to be
+// hoisted along with it. If the same named attribute is present on multiple
+// ancestors only the most narrowly scoped value will be used.
+static void gatherHoistableAttrs(Operation *fromOp,
+                                 NamedAttrList &dialectAttrs) {
+  for (auto attr : fromOp->getDialectAttrs()) {
+    if (auto hoistableAttr =
+            dyn_cast<IREE::Util::HoistableAttrInterface>(attr.getValue())) {
+      if (hoistableAttr.shouldAttachToHoistedOps() &&
+          !dialectAttrs.get(attr.getName())) {
+        dialectAttrs.push_back(attr);
+      }
+    }
+  }
+  if (auto *parentOp = fromOp->getParentOp())
+    gatherHoistableAttrs(parentOp, dialectAttrs);
+}
+
 // Hoist expressions into globals. It is not expected that such a greedy
 // algorithm is great, but it is simple. Naive use of this algorithm very likely
 // favors programs that consume more memory at runtime than is strictly
@@ -147,17 +165,23 @@ public:
     if (existingGlobal)
       return success();
 
-    // No existing mapping - create a new global.
+    // Gather any dialect attributes we may need to preserve.
     auto *topLevelOp = getTopLevelOp(originalValue.getDefiningOp());
+    NamedAttrList dialectAttrs;
+    gatherHoistableAttrs(topLevelOp, dialectAttrs);
+
+    // No existing mapping - create a new global.
     OpBuilder moduleBuilder(topLevelOp);
     auto initializerOp =
         moduleBuilder.create<IREE::Util::InitializerOp>(originalValue.getLoc());
+    initializerOp->setDialectAttrs(dialectAttrs);
     auto initializerBuilder =
         OpBuilder::atBlockEnd(initializerOp.addEntryBlock());
     moduleBuilder.setInsertionPoint(initializerOp);
     if (failed(cloneConstExprInto(initializerOp.getLoc(), moduleBuilder,
-                                  initializerBuilder, originalValue, hoistedMap,
-                                  moduleSymbols, constExprs))) {
+                                  initializerBuilder, originalValue,
+                                  dialectAttrs, hoistedMap, moduleSymbols,
+                                  constExprs))) {
       return failure();
     }
 
@@ -221,6 +245,7 @@ public:
   LogicalResult cloneConstExprInto(Location loc, OpBuilder &moduleBuilder,
                                    OpBuilder &initializerBuilder,
                                    Value constExprValue,
+                                   NamedAttrList dialectAttrs,
                                    HoistedValueMap &hoistedMap,
                                    SymbolTable &moduleSymbols,
                                    const ConstExprAnalysis &constExprs) {
@@ -253,6 +278,7 @@ public:
       moduleSymbols.insert(globalOp);
       SymbolTable::setSymbolVisibility(globalOp,
                                        SymbolTable::Visibility::Private);
+      globalOp->setDialectAttrs(dialectAttrs);
 
       // Save the mapping for the future.
       hoistedMap[origResult] = globalOp;
