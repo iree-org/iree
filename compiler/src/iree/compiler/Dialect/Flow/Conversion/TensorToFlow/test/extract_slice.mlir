@@ -1,11 +1,11 @@
 // RUN: iree-opt --allow-unregistered-dialect --split-input-file --iree-flow-convert-to-flow %s | FileCheck %s
 
- util.func public @extract_slice1(%arg0 : tensor<5x24x48xf32>) -> tensor<4xf32> {
+util.func public @extract_slice1(%arg0 : tensor<5x24x48xf32>) -> tensor<4xf32> {
   %0 = tensor.extract_slice %arg0[2, 3, 4] [1, 1, 4] [1, 1, 1]
       : tensor<5x24x48xf32> to tensor<4xf32>
   util.return %0 : tensor<4xf32>
 }
-// CHECK-LABEL:  util.func public @extract_slice1(
+// CHECK-LABEL: util.func public @extract_slice1(
 //  CHECK-SAME:   %[[ARG0:.+]]: tensor<5x24x48xf32>)
 //   CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
 //   CHECK-DAG:   %[[C3:.+]] = arith.constant 3 : index
@@ -17,12 +17,12 @@
 
 // -----
 
- util.func public @extract_slice2(%arg0 : tensor<5x24x48xf32>) -> tensor<2x48xf32> {
+util.func public @extract_slice2(%arg0 : tensor<5x24x48xf32>) -> tensor<2x48xf32> {
   %0 = tensor.extract_slice %arg0[2, 3, 0] [1, 2, 48] [1, 1, 1]
       : tensor<5x24x48xf32> to tensor<2x48xf32>
   util.return %0 : tensor<2x48xf32>
 }
-// CHECK-LABEL:  util.func public @extract_slice2
+// CHECK-LABEL: util.func public @extract_slice2
 //  CHECK-SAME:   %[[ARG0:.+]]: tensor<5x24x48xf32>)
 //   CHECK-DAG:   %[[C3:.+]] = arith.constant 3 : index
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
@@ -35,32 +35,32 @@
 
 // -----
 
- util.func public @extract_slice3(%arg0 : tensor<5x24x48xf32>) -> tensor<2x24xf32> {
+util.func public @extract_slice3(%arg0 : tensor<5x24x48xf32>) -> tensor<2x24xf32> {
   %0 = tensor.extract_slice %arg0[2, 3, 0] [1, 2, 24] [1, 1, 1]
       : tensor<5x24x48xf32> to tensor<2x24xf32>
   util.return %0 : tensor<2x24xf32>
 }
-// CHECK-LABEL:  util.func public @extract_slice3
+// CHECK-LABEL: util.func public @extract_slice3
 //       CHECK:   tensor.extract_slice
 
 // -----
 
- util.func public @extract_slice4(%arg0 : tensor<5x24x48xf32>, %arg1 : index) -> tensor<2x24xf32> {
+util.func public @extract_slice4(%arg0 : tensor<5x24x48xf32>, %arg1 : index) -> tensor<2x24xf32> {
   %0 = tensor.extract_slice %arg0[2, 3, 0] [1, 2, 24] [1, %arg1, 1]
       : tensor<5x24x48xf32> to tensor<2x24xf32>
   util.return %0 : tensor<2x24xf32>
 }
-// CHECK-LABEL:  util.func public @extract_slice4
+// CHECK-LABEL: util.func public @extract_slice4
 //       CHECK:   tensor.extract_slice
 
 // -----
 
- util.func public @extract_slice5(%arg0 : tensor<5x24x48xf32>, %arg1 : index) -> tensor<2x48xf32> {
+util.func public @extract_slice5(%arg0 : tensor<5x24x48xf32>, %arg1 : index) -> tensor<2x48xf32> {
   %0 = tensor.extract_slice %arg0[2, %arg1, 0] [1, 2, 48] [1, 1, 1]
       : tensor<5x24x48xf32> to tensor<2x48xf32>
   util.return %0 : tensor<2x48xf32>
 }
-// CHECK-LABEL:  util.func public @extract_slice5(
+// CHECK-LABEL: util.func public @extract_slice5(
 //  CHECK-SAME:   %[[ARG0:.+]]: tensor<5x24x48xf32>
 //  CHECK-SAME:   %[[ARG1:.+]]: index)
 //   CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
@@ -73,12 +73,12 @@
 
 // -----
 
- util.func public @extract_slice6(%arg0 : tensor<5x24x48xf32>, %arg1 : index) -> tensor<?x48xf32> {
+util.func public @extract_slice6(%arg0 : tensor<5x24x48xf32>, %arg1 : index) -> tensor<?x48xf32> {
   %0 = tensor.extract_slice %arg0[2, 3, 0] [1, %arg1, 48] [1, 1, 1]
       : tensor<5x24x48xf32> to tensor<?x48xf32>
   util.return %0 : tensor<?x48xf32>
 }
-// CHECK-LABEL:  util.func public @extract_slice6(
+// CHECK-LABEL: util.func public @extract_slice6(
 //  CHECK-SAME:   %[[ARG0:.+]]: tensor<5x24x48xf32>
 //  CHECK-SAME:   %[[ARG1:.+]]: index)
 //   CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
@@ -92,12 +92,12 @@
 
 // -----
 
- util.func public @extract_slice7(%arg0 : tensor<5x?x48xf32>, %arg1 : index) -> tensor<2x48xf32> {
+util.func public @extract_slice7(%arg0 : tensor<5x?x48xf32>, %arg1 : index) -> tensor<2x48xf32> {
   %0 = tensor.extract_slice %arg0[2, 3, 0] [1, 2, 48] [1, 1, 1]
       : tensor<5x?x48xf32> to tensor<2x48xf32>
   util.return %0 : tensor<2x48xf32>
 }
-// CHECK-LABEL:  util.func public @extract_slice7(
+// CHECK-LABEL: util.func public @extract_slice7(
 //  CHECK-SAME:   %[[ARG0:.+]]: tensor<5x?x48xf32>
 //  CHECK-SAME:   %[[ARG1:.+]]: index)
 //   CHECK-DAG:   %[[C2:.+]] = arith.constant 2 : index
@@ -112,11 +112,11 @@
 
 // -----
 
- util.func public @rank_reducing_extract_slice(%arg0: tensor<?x513xi32>) -> tensor<513xi32> {
+util.func public @rank_reducing_extract_slice(%arg0: tensor<?x513xi32>) -> tensor<513xi32> {
   %0 = tensor.extract_slice %arg0[4, 0] [1, 513] [1, 1] : tensor<?x513xi32> to tensor<513xi32>
   util.return %0 : tensor<513xi32>
 }
-// CHECK-LABEL:  util.func public @rank_reducing_extract_slice
+// CHECK-LABEL: util.func public @rank_reducing_extract_slice
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
@@ -131,12 +131,12 @@
 
 // -----
 
- util.func public @rank_reducing_extract_slice_trailing_unit_dims
+util.func public @rank_reducing_extract_slice_trailing_unit_dims
    (%arg0 : tensor<1x50x20x1xf32>) -> tensor<49x20xf32> {
   %0 = tensor.extract_slice %arg0[0, 1, 0, 0] [1, 49, 20, 1] [1, 1, 1, 1] : tensor<1x50x20x1xf32> to tensor<49x20xf32>
   util.return %0 : tensor<49x20xf32>
 }
-// CHECK-LABEL:  util.func public @rank_reducing_extract_slice_trailing_unit_dims
+// CHECK-LABEL: util.func public @rank_reducing_extract_slice_trailing_unit_dims
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //   CHECK-DAG:   %[[C1:.+]] = arith.constant 1 : index
 //   CHECK-DAG:   %[[C49:.+]] = arith.constant 49 : index
@@ -146,7 +146,7 @@
 
 // -----
 
- util.func public @extract_slice_within_dispatch_workgroups_not_converted() -> tensor<f32> {
+util.func public @extract_slice_within_dispatch_workgroups_not_converted() -> tensor<f32> {
   %x = arith.constant 100 : index
   %0 = flow.dispatch.workgroups[%x]() : () -> (tensor<f32>) = () {
     // CHECK: = tensor.extract_slice %[[source:.+]][2, 3, 4] [1, 1, 4] [1, 1, 1] : tensor<5x24x48xf32> to tensor<4xf32>
