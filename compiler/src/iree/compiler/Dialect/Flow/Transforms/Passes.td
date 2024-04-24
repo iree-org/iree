@@ -266,6 +266,14 @@ def FusionOfTensorOpsPass :
   ];
 }
 
+def FusionPreprocessingPass :
+    Pass<"iree-flow-fusion-preprocessing", ""> {
+  let summary = "Run useful preprocessing patterns that help with fusion";
+  let dependentDialects = [
+    "mlir::affine::AffineDialect",
+  ];
+}
+
 def InitializeEmptyTensorsPass :
     Pass<"iree-flow-initialize-empty-tensors", ""> {
   let summary = "Initialize empty tensors";
@@ -331,14 +339,6 @@ def InsertDebugTargetAtOrdinalPass :
   let dependentDialects = [
     "IREE::Flow::FlowDialect",
     "IREE::HAL::HALDialect",
-  ];
-}
-
-def InterchangeGenericOpsPass :
-    Pass<"iree-flow-interchange-generic-ops", ""> {
-  let summary = "Interchange generic op loops to have all the reduction loops to be inner loops.";
-  let dependentDialects = [
-    "mlir::linalg::LinalgDialect",
   ];
 }
 
