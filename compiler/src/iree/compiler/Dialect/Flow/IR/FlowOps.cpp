@@ -1118,9 +1118,7 @@ bool DispatchWorkgroupsOp::canClosureContainOp(Operation *op) {
   // to requirements around tensor access checking.
   if (auto constantOp = dyn_cast<arith::ConstantOp>(op)) {
     auto constantType = constantOp.getType();
-    if (constantType.isIntOrIndexOrFloat()) {
-      return true;
-    }
+    return constantType.isIntOrIndexOrFloat();
   }
   return false;
 }
