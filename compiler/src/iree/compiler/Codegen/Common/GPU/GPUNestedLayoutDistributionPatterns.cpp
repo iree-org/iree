@@ -468,7 +468,7 @@ struct DistributeMultiReduction final
 
     // Do thread local reduce.
 
-    // The distributed reduction mask is simply the same permutation appended
+    // The distributed reduction mask is simply the same mask appended
     // thrice.
     SmallVector<bool> distributedReductionMask;
     distributedReductionMask.reserve(3 * rank);

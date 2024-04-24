@@ -624,7 +624,7 @@ NestedLayoutAttr permuteAndCreateNestedLayout(
     llvm::interleaveComma(orders.thread, llvm::errs());
     llvm::errs() << "\n    counts.element: ";
     llvm::interleaveComma(counts.element, llvm::errs());
-    llvm::errs() << "\n    orders.element: ";
+    llvm::errs() << "\n    subgroupBasis: ";
     llvm::interleaveComma(subgroupBasis, llvm::errs());
     llvm::errs() << "\n    subgroupActiveIds: ";
     llvm::interleaveComma(subgroupActiveIds, llvm::errs());
@@ -657,13 +657,13 @@ NestedLayoutAttr permuteAndCreateNestedLayout(
     llvm::interleaveComma(batchCount, llvm::errs());
     llvm::errs() << "\n    outerCount: ";
     llvm::interleaveComma(outerCount, llvm::errs());
-    llvm::errs() << "\n    outerOrder: ";
+    llvm::errs() << "\n    threadCount: ";
     llvm::interleaveComma(threadCount, llvm::errs());
     llvm::errs() << "\n    threadOrder: ";
     llvm::interleaveComma(threadOrder, llvm::errs());
     llvm::errs() << "\n    elementCount: ";
     llvm::interleaveComma(elementCount, llvm::errs());
-    llvm::errs() << "\n    elementOrder: ";
+    llvm::errs() << "\n    subgroupBasis: ";
     llvm::interleaveComma(subgroupBasis, llvm::errs());
     llvm::errs() << "\n    subgroupActiveIds: ";
     llvm::interleaveComma(subgroupActiveIds, llvm::errs());
