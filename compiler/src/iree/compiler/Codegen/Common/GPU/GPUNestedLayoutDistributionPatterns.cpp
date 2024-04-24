@@ -81,12 +81,8 @@ static SmallVector<Value> getTransferIndicesFromNestedLayout(
   int64_t rank = vectorLayout.getRank();
   // Permute the batch and outer vector offsets to match the order of
   // the vector dimensions using the inverse of the batch/offset order.
-  SmallVector<int64_t> batchOffsets =
-      applyPermutation(ArrayRef<int64_t>(offsets.begin(), rank),
-                       invertPermutationVector(vectorLayout.getBatchOrder()));
-  SmallVector<int64_t> outerVectorOffsets =
-      applyPermutation(ArrayRef<int64_t>(offsets.begin() + rank, rank),
-                       invertPermutationVector(vectorLayout.getOuterOrder()));
+  ArrayRef<int64_t> batchOffsets(offsets.begin(), rank);
+  ArrayRef<int64_t> outerVectorOffsets(offsets.begin() + rank, rank);
 
   SmallVector<Value> slicedIndices(indices.begin(), indices.end());
   for (const auto &[i, dim] : llvm::enumerate(permutationMap.getResults())) {
@@ -109,29 +105,6 @@ static SmallVector<Value> getTransferIndicesFromNestedLayout(
                                         vectorLayout.getElementsPerThread()[i]);
   }
   return slicedIndices;
-}
-
-static SmallVector<int64_t> getLoopOrder(NestedLayoutAttr vectorLayout) {
-  int64_t rank = vectorLayout.getRank();
-  // Let the unroll order first unroll the batch dimensions, then the
-  // outer vector dimensions. We unroll in the order specified by the
-  // layout.
-  SmallVector<int64_t> loopOrder;
-  int64_t base = 0;
-  for (auto b : vectorLayout.getBatchOrder()) {
-    loopOrder.push_back(base + b);
-  }
-  base += rank;
-  // We must unroll along the outer dimensions as well to match the rank
-  // requirements of vector transfer ops (<= memref rank up to broadcasts).
-  for (auto o : vectorLayout.getOuterOrder()) {
-    loopOrder.push_back(base + o);
-  }
-  base += rank;
-  for (int i = 0, e = rank; i < e; ++i) {
-    loopOrder.push_back(base + i);
-  }
-  return loopOrder;
 }
 
 static SmallVector<int64_t>
@@ -215,7 +188,6 @@ struct DistributeTransferRead final
 
     SmallVector<int64_t> distShape = vectorLayout.getDistributedShape();
     SmallVector<int64_t> tileShape = getElementVectorTileShape(vectorLayout);
-    SmallVector<int64_t> loopOrder = getLoopOrder(vectorLayout);
     int64_t rank = vectorLayout.getRank();
 
     Type elementType = readOp.getSource().getType().getElementType();
@@ -238,7 +210,7 @@ struct DistributeTransferRead final
     ValueRange indices = readOp.getIndices();
     SmallVector<int64_t> strides(rank, 1);
     for (SmallVector<int64_t> offsets :
-         StaticTileOffsetRange(distShape, tileShape, loopOrder)) {
+         StaticTileOffsetRange(distShape, tileShape)) {
       SmallVector<Value> slicedIndices = getTransferIndicesFromNestedLayout(
           rewriter, indices, offsets, vectorLayout, readOp.getPermutationMap(),
           warpIndices, threadIndices);
@@ -247,19 +219,6 @@ struct DistributeTransferRead final
           readOp.getLoc(), innerVectorType, readOp.getSource(), slicedIndices,
           readOp.getPermutationMapAttr(), readOp.getPadding(), readOp.getMask(),
           readOp.getInBoundsAttr());
-      // Transpose to the element order.
-      //
-      // A = transfer_read
-      // B = transpose A
-      //
-      // P(A) = I
-      //
-      // P(A) * perm = P(B)
-      // perm = P(B)
-      if (!isIdentityPermutation(vectorLayout.getElementOrder())) {
-        slicedRead = rewriter.create<vector::TransposeOp>(
-            slicedRead.getLoc(), slicedRead, vectorLayout.getElementOrder());
-      }
 
       acc = rewriter.create<vector::InsertStridedSliceOp>(
           readOp.getLoc(), slicedRead, acc, offsets, strides);
@@ -302,7 +261,6 @@ struct DistributeTransferWrite final
 
     SmallVector<int64_t> distShape = vectorLayout.getDistributedShape();
     SmallVector<int64_t> tileShape = getElementVectorTileShape(vectorLayout);
-    SmallVector<int64_t> loopOrder = getLoopOrder(vectorLayout);
     int64_t rank = vectorLayout.getRank();
 
     SmallVector<Value> warpIndices, threadIndices;
@@ -314,7 +272,7 @@ struct DistributeTransferWrite final
 
     ValueRange indices = writeOp.getIndices();
     for (SmallVector<int64_t> offsets :
-         StaticTileOffsetRange(distShape, tileShape, loopOrder)) {
+         StaticTileOffsetRange(distShape, tileShape)) {
       SmallVector<Value> slicedIndices = getTransferIndicesFromNestedLayout(
           rewriter, indices, offsets, vectorLayout, writeOp.getPermutationMap(),
           warpIndices, threadIndices);
@@ -326,20 +284,6 @@ struct DistributeTransferWrite final
       Value slicedVector = rewriter.create<vector::ExtractOp>(
           writeOp.getLoc(), distributedVector,
           offsetArray.take_front(rank * 2));
-      // Transpose to the native dimension order.
-      // B = transpose(A)
-      // transfer_write B
-      //
-      // P(B) = I
-      //
-      // P(A) * perm = P(B)
-      // P(A) * perm = I
-      // perm = P(A) ^ -1
-      if (!isIdentityPermutation(vectorLayout.getElementOrder())) {
-        slicedVector = rewriter.create<vector::TransposeOp>(
-            slicedVector.getLoc(), slicedVector,
-            invertPermutationVector(vectorLayout.getElementOrder()));
-      }
       rewriter.create<vector::TransferWriteOp>(
           writeOp.getLoc(), slicedVector, writeOp.getSource(), slicedIndices,
           writeOp.getPermutationMapAttr(), writeOp.getMask(),
@@ -388,53 +332,39 @@ struct DistributeBroadcast final : OpDistributionPattern<vector::BroadcastOp> {
         loc, vectorType, rewriter.getZeroAttr(vectorType));
 
     int64_t rank = vectorLayout.getRank();
-    int64_t sourceRank = sourceLayout.getRank();
     // We unroll along both the batch and outer dimensions for a similar reason
     // to the transfer ops. `vector.broadcast` can only broadcast along outer
     // dims, so mixing broadcasted and un-broadcasted element/outer dims can't
     // be represented with a single `vector.broadcast`.
     SmallVector<int64_t> resultVectorUnrollShape =
         getElementVectorTileShape(vectorLayout);
-    SmallVector<int64_t> loopOrder = getLoopOrder(vectorLayout);
 
     Value distributedSource = getDistributed(rewriter, srcVector, sourceLayout);
 
     VectorType broadcastTargetType =
-        VectorType::get(applyPermutation(vectorLayout.getElementsPerThread(),
-                                         vectorLayout.getElementOrder()),
-                        elementType);
+        VectorType::get(vectorLayout.getElementsPerThread(), elementType);
+
+    int64_t sourceRank = sourceLayout.getRank();
+
     for (SmallVector<int64_t> offsets :
-         StaticTileOffsetRange(distShape, resultVectorUnrollShape, loopOrder)) {
+         StaticTileOffsetRange(distShape, resultVectorUnrollShape)) {
       ArrayRef<int64_t> offsetsRef(offsets);
-      // Invert the permutations on the batch/outer offsets to get the offsets
-      // in the order of the vector dimensions. We are iterating over each
-      // (batch x outer) tile, and the offsets for those tiles are already
-      // permuted by the layout batch/outer orders. Hence why we apply the
-      // inverse permutation here.
-      SmallVector<int64_t> permutedBatchOffsets = applyPermutation(
-          offsetsRef.slice(0, rank),
-          invertPermutationVector(vectorLayout.getBatchOrder()));
-      SmallVector<int64_t> permutedOuterOffsets = applyPermutation(
-          offsetsRef.slice(rank, rank),
-          invertPermutationVector(vectorLayout.getOuterOrder()));
 
       // Slice out the last |sourceRank| dimensions which is the inner
       // broadcasted shape.
       ArrayRef<int64_t> batchSourceOffsets =
-          ArrayRef<int64_t>(permutedBatchOffsets)
-              .slice(rank - sourceRank, sourceRank);
+          offsetsRef.slice(rank - sourceRank, sourceRank);
       ArrayRef<int64_t> outerSourceOffsets =
-          ArrayRef<int64_t>(permutedOuterOffsets)
-              .slice(rank - sourceRank, sourceRank);
+          offsetsRef.slice(2 * rank - sourceRank, sourceRank);
 
       // Construct the list of source offsets based on the batch/outer order of
       // the broadcasted vector. This is because we need to compute the offsets
       // into the distributed source vector with the distributed permutation.
       SmallVector<int64_t> sourceOffsets;
-      sourceOffsets.append(
-          applyPermutation(batchSourceOffsets, sourceLayout.getBatchOrder()));
-      sourceOffsets.append(
-          applyPermutation(outerSourceOffsets, sourceLayout.getOuterOrder()));
+      sourceOffsets.append(batchSourceOffsets.begin(),
+                           batchSourceOffsets.end());
+      sourceOffsets.append(outerSourceOffsets.begin(),
+                           outerSourceOffsets.end());
 
       // Extract a slice of the input to be broadcasted.
       Value slice = rewriter.create<vector::ExtractOp>(loc, distributedSource,
@@ -538,14 +468,13 @@ struct DistributeMultiReduction final
 
     // Do thread local reduce.
 
+    // The distributed reduction mask is simply the same mask appended
+    // thrice.
     SmallVector<bool> distributedReductionMask;
     distributedReductionMask.reserve(3 * rank);
-    distributedReductionMask.append(
-        applyPermutation(reducedDims, srcLayout.getBatchOrder()));
-    distributedReductionMask.append(
-        applyPermutation(reducedDims, srcLayout.getOuterOrder()));
-    distributedReductionMask.append(
-        applyPermutation(reducedDims, srcLayout.getElementOrder()));
+    for (int i = 0; i < 3; ++i) {
+      distributedReductionMask.append(reducedDims.begin(), reducedDims.end());
+    }
 
     auto localReduction = rewriter.create<vector::MultiDimReductionOp>(
         loc, disSrc, disAcc, distributedReductionMask, multiReduceOp.getKind());
@@ -627,6 +556,60 @@ struct DistributeMultiReduction final
   int64_t maxBitsPerShuffle;
 };
 
+struct DistributeTranspose final : OpDistributionPattern<vector::TransposeOp> {
+  using OpDistributionPattern::OpDistributionPattern;
+
+  LogicalResult matchAndRewrite(vector::TransposeOp transposeOp,
+                                DistributionSignature &signature,
+                                PatternRewriter &rewriter) const override {
+    VectorValue value = transposeOp.getVector();
+    VectorLayoutInterface layout = dyn_cast<NestedLayoutAttr>(signature[value]);
+    if (!layout) {
+      return rewriter.notifyMatchFailure(transposeOp,
+                                         "layout must be NestedLayoutAttr");
+    }
+
+    /// Transpose only changes the notion of where the data carried by each
+    /// thread comes from in the transposed SIMD vector. The data carried by
+    /// each thread is still the same, transposed as requested by the operation.
+    /// So, for distributed dimensions (thread and subgroup) transpose is a
+    /// no-op.
+    ///
+    /// Example (indices [0-3] represent ids of the threads carrying the data):
+    ///
+    /// input: vector<2x4xf16>
+    ///
+    /// 0 0 1 1
+    /// 2 2 3 3
+    ///
+    /// after transpose,
+    ///
+    /// transp: vector<4x2xf16>
+    ///
+    /// 0 2
+    /// 0 2
+    /// 1 3
+    /// 1 3
+    ///
+    /// As it can be seen, each thread is still carrying the same data but
+    /// just holds a transposed version of it.
+
+    VectorValue input = getDistributed(rewriter, value, layout);
+    // Permute batch, outer and element based on the given permutation.
+    int64_t rank = value.getType().getRank();
+    SmallVector<int64_t> permutation;
+    for (int i = 0; i < 3; ++i) {
+      for (auto it : transposeOp.getPermutation()) {
+        permutation.push_back(it + (i * rank));
+      }
+    }
+    VectorValue transposed = rewriter.create<vector::TransposeOp>(
+        transposeOp.getLoc(), input, permutation);
+    replaceOpWithDistributedValues(rewriter, transposeOp, transposed);
+    return success();
+  }
+};
+
 } // namespace
 
 void populateGPUDistributeNestedLayoutAttrPatterns(RewritePatternSet &patterns,
@@ -635,7 +618,7 @@ void populateGPUDistributeNestedLayoutAttrPatterns(RewritePatternSet &patterns,
                                                    int64_t maxBitsPerShuffle) {
   patterns.add<DistributeTransferRead, DistributeTransferWrite>(
       patterns.getContext(), threadId);
-  patterns.add<DistributeBroadcast>(patterns.getContext());
+  patterns.add<DistributeBroadcast, DistributeTranspose>(patterns.getContext());
   patterns.add<DistributeMultiReduction>(patterns.getContext(), subgroupSize,
                                          maxBitsPerShuffle);
 }

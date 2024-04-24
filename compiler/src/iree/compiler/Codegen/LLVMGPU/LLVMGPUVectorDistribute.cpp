@@ -326,8 +326,8 @@ private:
     SmallVector<int64_t> threadBasis = threadCounts;
 
     auto layout = IREE::VectorExt::NestedLayoutAttr::get(
-        context, subgroupCounts, order, batchSizes, order, outerSizes, order,
-        threadCounts, order, elementSizes, order, subgroupBasis,
+        context, subgroupCounts, order, batchSizes, outerSizes, threadCounts,
+        order, elementSizes, subgroupBasis,
         SmallVector<bool>(subgroupBasis.size(), true), threadBasis,
         SmallVector<bool>(threadBasis.size(), true));
     if (analysis.setAnchor(transfer.getResult(), layout).failed()) {
