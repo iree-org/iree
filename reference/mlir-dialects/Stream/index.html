@@ -8806,9 +8806,10 @@ value.</p>
 <h4 id="streamasynctransfer-streamasynctransferop"><code>stream.async.transfer</code> (Stream::AsyncTransferOp)<a class="headerlink" href="#streamasynctransfer-streamasynctransferop" title="Permanent link">link</a></h4>
 <p><em>Transfers a resource from one location/state to another</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `stream.async.transfer` (`from` `(` $source_affinity^ `)`)?
-              $source `:`
-              type($source) `` `{` $source_size `}` `-&gt;`
+<div class="highlight"><pre><span></span><code>operation ::= `stream.async.transfer` $source `:` type($source)
+              `` `{` $source_size `}`
+              (`from` `(` $source_affinity^ `)`)?
+              `-&gt;`
               (`to` `(` $result_affinity^ `)`)?
               type($result) `` `{` $result_size `}`
               attr-dict-with-keyword
