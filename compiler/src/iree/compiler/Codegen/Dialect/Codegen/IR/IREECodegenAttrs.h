@@ -10,7 +10,6 @@
 #ifndef IREE_COMPILER_CODEGEN_DIALECT_LOWERINGCONFIG_H_
 #define IREE_COMPILER_CODEGEN_DIALECT_LOWERINGCONFIG_H_
 
-#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
