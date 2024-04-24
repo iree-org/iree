@@ -67,11 +67,4 @@ def VerifyCompilerStableHloInputLegality :
       "Verifies that only supported IR constructs are passed to the compiler";
 }
 
-def CheckVHLOStableHloMixUsage :
-    Pass<"iree-check-vhlostablehlo-mix-usage", "ModuleOp"> {
-  let summary =
-      "Check and report an error when VHLO and StableHLO are used in the same module";
-}
-
-
 #endif // IREE_COMPILER_PLUGINS_INPUT_STABLEHLO_CONVERSION_PASSES
