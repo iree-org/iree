@@ -664,13 +664,18 @@ TEST_P(semaphore_submission_test, BatchWaitingOnSmallerValueBeforeSignaled) {
       /*signal_semaphore_list=*/command_buffer_signal_list, 1,
       &command_buffer));
 
-  IREE_ASSERT_OK(iree_hal_semaphore_signal(semaphore1, 2));
+  std::thread signal_thread(
+      [&]() { IREE_ASSERT_OK(iree_hal_semaphore_signal(semaphore1, 2)); });
 
+  // We don't explicitly make sure that the signal has been submitted.
+  // In the majority of cases by time the signaling thread starts executing,
+  // the waiting would have begun.
   IREE_ASSERT_OK(
       iree_hal_semaphore_wait(semaphore2, semaphore2_signal_value,
                               iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
   CheckSemaphoreValue(semaphore2, semaphore2_signal_value);
 
+  signal_thread.join();
   iree_hal_semaphore_release(semaphore1);
   iree_hal_semaphore_release(semaphore2);
   iree_hal_command_buffer_release(command_buffer);
