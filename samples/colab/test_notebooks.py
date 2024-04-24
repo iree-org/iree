@@ -16,16 +16,15 @@ NOTEBOOKS_TO_SKIP = [
     #   FileNotFoundError: [Errno 2] No such file or directory: 'seaborn-whitegrid'
     # support level for TF-code and samples is also low
     "tensorflow_mnist_training.ipynb",
-    # Bug in iree-turbine==2.3.0rc20240410
-    #   `assert issubclass(type(mdl), CompiledModule)` (fixed in 2190a8a)
-    "pytorch_aot_advanced.ipynb",
     # This needs 'transformers' (and possibly other packages) preinstalled.
     # Add to run_python_notebook.sh, colab/requirements.txt, or samples.yml?
     "pytorch_huggingface_whisper.ipynb",
 ]
 
 NOTEBOOKS_EXPECTED_TO_FAIL = [
-    # None!
+    # Bug in iree-turbine==2.3.0rc20240410
+    #   `assert issubclass(type(mdl), CompiledModule)` (fixed in 2190a8a)
+    "pytorch_aot_advanced.ipynb",
 ]
 
 
