@@ -156,8 +156,7 @@ void addDispatchRegionCreationPasses(OpPassManager &passManager,
                                      const TransformOptions &transformOptions) {
   FunctionLikeNest(passManager)
       // Preprocess the input to a form more amenable for fusion
-      .addPass(createInterchangeGenericOpsPass)
-      .addPass(memref::createResolveShapedTypeResultDimsPass)
+      .addPass(createFusionPreprocessingPass)
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass);
 
@@ -178,7 +177,7 @@ void addDispatchRegionCreationPasses(OpPassManager &passManager,
       .addPass(createSplitReductionPass)
       // SplitReductionPass may create reduction dimension that are not the last
       // dimension.
-      .addPass(createInterchangeGenericOpsPass)
+      .addPass(createFusionPreprocessingPass)
       // Normalize the input indexing map to make the input indexing map
       // identity. This helps fusing named linalg op with a generic op with
       // transpose.
