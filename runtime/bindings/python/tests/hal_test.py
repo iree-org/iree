@@ -488,8 +488,8 @@ class DeviceHalTest(unittest.TestCase):
 
 class DeviceDLPackTest(unittest.TestCase):
     """Tests low level DLPack import/export against the CPU HAL backend.
-    
-    This test leverages the fact that numpy is a reasonable dlpack 
+
+    This test leverages the fact that numpy is a reasonable dlpack
     producer/consumer. It has the caveat that our low level support does not
     allow import of non page aligned data, so we have to take some extra
     steps to prep it. For pure CPU/Numpy import/export, we have better
@@ -497,6 +497,7 @@ class DeviceDLPackTest(unittest.TestCase):
     value, as it exercises code paths that are otherwise only accessible
     on devices.
     """
+
     def setUp(self):
         super().setUp()
         self.device = iree.runtime.get_device("local-task")
