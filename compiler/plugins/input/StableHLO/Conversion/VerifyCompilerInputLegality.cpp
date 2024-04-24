@@ -11,6 +11,7 @@
 #include "mlir/Transforms/DialectConversion.h"
 #include "stablehlo/dialect/ChloOps.h"
 #include "stablehlo/dialect/StablehloOps.h"
+#include "stablehlo/dialect/VhloOps.h"
 
 namespace mlir::iree_compiler::stablehlo {
 
@@ -32,6 +33,7 @@ struct VerifyCompilerStableHloInputLegality final
     // that we explicitly deny the dialects we know about.
     conversionTarget.addIllegalDialect<mlir::stablehlo::StablehloDialect>();
     conversionTarget.addIllegalDialect<mlir::chlo::ChloDialect>();
+    conversionTarget.addIllegalDialect<mlir::vhlo::VhloDialect>();
     conversionTarget.addIllegalDialect<mlir::shape::ShapeDialect>();
 
     // NOTE: It is not fully illegal to tunnel input dialect ops through to
