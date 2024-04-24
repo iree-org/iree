@@ -443,33 +443,3 @@ util.func public @bubble_through_matmul(%lhs: tensor<16x16xf32>,
 //       APROP:   %[[MATMUL:.+]] = linalg.generic
 //       APROP:     indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
 //       APROP:   util.return %[[MATMUL]]
-
-// -----
-
-util.func public @bubble_to_constant() -> tensor<16x16xf32> {
-  %empty = tensor.empty(): tensor<16x16xf32>
-  %cst = arith.constant dense<0.0> : tensor<16x16xf32>
-  %transpose = linalg.transpose ins(%cst : tensor<16x16xf32>)
-      outs(%empty : tensor<16x16xf32>) permutation = [1, 0]
-  util.return %transpose : tensor<16x16xf32>
-}
-// BUBBLE-LABEL: util.func public @bubble_to_constant
-//       BUBBLE:   %[[CST:.+]] = arith.constant
-//       BUBBLE:   %[[T:.+]] = linalg.generic {{.*}} ins(%[[CST]]
-//       BUBBLE:   util.return %[[T]]
-
-// -----
-
-util.global private @cst : tensor<16x16xf32>
-
-util.func public @bubble_to_immutable_load() -> tensor<16x16xf32> {
-  %empty = tensor.empty(): tensor<16x16xf32>
-  %cst = util.global.load immutable @cst : tensor<16x16xf32>
-  %transpose = linalg.transpose ins(%cst : tensor<16x16xf32>)
-      outs(%empty : tensor<16x16xf32>) permutation = [1, 0]
-  util.return %transpose : tensor<16x16xf32>
-}
-// BUBBLE-LABEL: util.func public @bubble_to_immutable_load
-//       BUBBLE:   %[[CST:.+]] = util.global.load
-//       BUBBLE:   %[[T:.+]] = linalg.generic {{.*}} ins(%[[CST]]
-//       BUBBLE:   util.return %[[T]]

@@ -166,12 +166,12 @@ namespace {
 //   indexing_maps = [affine_map<(d0, d1, d2) -> (d2, d0, d1)>,
 //                    affine_map<(d0, d1, d2) -> (d0, d1, d2)>]
 //   ins(%0 : tensor<2x7x5>) outs(%3 : tensor<7x5x2>)
-class BubbleTransposeThroughDpsInit
+class FuseTransposeWithProducerLinalgOp
     : public OpRewritePattern<linalg::TransposeOp> {
 public:
   using OpRewritePattern<linalg::TransposeOp>::OpRewritePattern;
-  BubbleTransposeThroughDpsInit(MLIRContext *ctx, bool aggressiveProp,
-                                PatternBenefit b = 1)
+  FuseTransposeWithProducerLinalgOp(MLIRContext *ctx, bool aggressiveProp,
+                                    PatternBenefit b = 1)
       : OpRewritePattern<linalg::TransposeOp>(ctx, b),
         allowGeneralizing(aggressiveProp) {}
 
@@ -202,6 +202,7 @@ public:
       return rewriter.notifyMatchFailure(
           transposeOp, "linalg op producer is not generic or contraction");
     }
+
     auto genericOp = maybeGenericOp.value();
     result = genericOp->getOpResult(resultIndex);
 
@@ -565,6 +566,8 @@ public:
 // and isn't the way this pass is modeled. Global data layout transformations
 // like that are better suited for pack/unpack propagation rooted on specific
 // operations.
+//
+// TODO: Rewrite this to use elementwise op fusion patterns.
 class FuseTransposeWithLinalgOpConsumer
     : public OpInterfaceRewritePattern<linalg::LinalgOp> {
 public:
@@ -768,44 +771,6 @@ public:
     if (failed(linalg::generalizeNamedOp(rewriter, linalgOp))) {
       return rewriter.notifyMatchFailure(linalgOp,
                                          "failed to generalize named op");
-    }
-    return success();
-  }
-};
-
-// Generalizes a transpose on a hoistable op, stopping propagation.
-class GeneralizeHoistableTranspose
-    : public OpRewritePattern<linalg::TransposeOp> {
-public:
-  using OpRewritePattern<linalg::TransposeOp>::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(linalg::TransposeOp transposeOp,
-                                PatternRewriter &rewriter) const override {
-    if (!IREE::Flow::isNonNullAndOutsideDispatch(transposeOp)) {
-      return failure();
-    }
-    Value source = transposeOp.getDpsInputOperand(0)->get();
-    if (!source.hasOneUse()) {
-      return rewriter.notifyMatchFailure(transposeOp,
-                                         "multi-use transpose source");
-    }
-
-    auto isImmutableGlobalLoad = [](Operation *producer) {
-      auto load = dyn_cast<IREE::Util::GlobalLoadOpInterface>(producer);
-      if (!load)
-        return false;
-      return load.isGlobalImmutable();
-    };
-
-    Operation *producer = source.getDefiningOp();
-    // This is an approximation of what is constant-hoistable.
-    if (!producer || (!isa<arith::ConstantOp>(producer) &&
-                      !isImmutableGlobalLoad(producer))) {
-      return rewriter.notifyMatchFailure(transposeOp, "no hoistable producer");
-    }
-    if (failed(linalg::generalizeNamedOp(rewriter, transposeOp))) {
-      return rewriter.notifyMatchFailure(transposeOp,
-                                         "failed to generalize transpose");
     }
     return success();
   }
@@ -1022,8 +987,7 @@ void PropagateLinalgTransposePass::runOnOperation() {
     linalg::populateFoldReshapeOpsByExpansionPatterns(bubblingPatterns,
                                                       reshapePropagationFn);
     linalg::FillOp::getCanonicalizationPatterns(bubblingPatterns, context);
-    bubblingPatterns.insert<GeneralizeHoistableTranspose>(context);
-    bubblingPatterns.insert<BubbleTransposeThroughDpsInit>(
+    bubblingPatterns.insert<FuseTransposeWithProducerLinalgOp>(
         context, enableAggressivePropagation);
     bubblingPatterns.insert<BubbleTransposeThroughCollapseShape>(context);
     bubblingPatterns.add<BubbleTransposeThroughUnaryElementwiseDpsInit>(
