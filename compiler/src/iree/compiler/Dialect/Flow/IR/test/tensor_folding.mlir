@@ -233,7 +233,7 @@ util.func public @reshapeEmpty(%dim: index) -> tensor<?xi32> {
 
 // CHECK-LABEL: @loadConst
 util.func public @loadConst() -> i32 {
-  %0 = arith.constant dense<[[0, 1], [2, 3]]> : tensor<2x2xi32>
+  %0 = flow.tensor.constant dense<[[0, 1], [2, 3]]> : tensor<2x2xi32>
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   // CHECK-NEXT: %[[C2:.+]] = arith.constant 2 : i32
@@ -246,7 +246,7 @@ util.func public @loadConst() -> i32 {
 
 // CHECK-LABEL: @loadConstScalar
 util.func public @loadConstScalar() -> i32 {
-  %0 = arith.constant dense<4> : tensor<i32>
+  %0 = flow.tensor.constant dense<4> : tensor<i32>
   // CHECK-NEXT: %[[C4:.+]] = arith.constant 4 : i32
   %1 = flow.tensor.load %0 : tensor<i32>
   // CHECK-NEXT: util.return %[[C4]]
@@ -257,11 +257,11 @@ util.func public @loadConstScalar() -> i32 {
 
 // CHECK-LABEL: @storeConst
 util.func public @storeConst() -> tensor<2x2xi32> {
-  %0 = arith.constant dense<[[0, 1], [2, 3]]> : tensor<2x2xi32>
+  %0 = flow.tensor.constant dense<[[0, 1], [2, 3]]> : tensor<2x2xi32>
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c4 = arith.constant 4 : i32
-  // CHECK-NEXT: %[[C:.+]] = arith.constant dense<[
+  // CHECK-NEXT: %[[C:.+]] = flow.tensor.constant dense<[
   // CHECK-SAME:     [0, 1], [4, 3]
   // CHECK-SAME: ]> : tensor<2x2xi32>
   %1 = flow.tensor.store %c4, %0[%c1, %c0] : tensor<2x2xi32>
@@ -273,9 +273,9 @@ util.func public @storeConst() -> tensor<2x2xi32> {
 
 // CHECK-LABEL: @storeConstScalar
 util.func public @storeConstScalar() -> tensor<i32> {
-  %0 = arith.constant dense<0> : tensor<i32>
+  %0 = flow.tensor.constant dense<0> : tensor<i32>
   %1 = arith.constant 4 : i32
-  // CHECK-NEXT: %[[C:.+]] = arith.constant dense<4> : tensor<i32>
+  // CHECK-NEXT: %[[C:.+]] = flow.tensor.constant dense<4> : tensor<i32>
   %2 = flow.tensor.store %1, %0 : tensor<i32>
   // CHECK-NEXT: util.return %[[C]]
   util.return %2 : tensor<i32>
@@ -353,8 +353,8 @@ util.func public @splatDynamicZeroElements(%value: f32, %dim: index) -> tensor<0
 
 // CHECK-LABEL: @cloneConst
 util.func public @cloneConst() -> tensor<4xi32> {
-  // CHECK-NEXT: %[[C:.+]] = arith.constant dense<[0, 1, 2, 3]> : tensor<4xi32>
-  %0 = arith.constant dense<[0, 1, 2, 3]> : tensor<4xi32>
+  // CHECK-NEXT: %[[C:.+]] = flow.tensor.constant dense<[0, 1, 2, 3]> : tensor<4xi32>
+  %0 = flow.tensor.constant dense<[0, 1, 2, 3]> : tensor<4xi32>
   %1 = flow.tensor.clone %0 : tensor<4xi32>
   // CHECK-NEXT: util.return %[[C]]
   util.return %1 : tensor<4xi32>
@@ -364,8 +364,8 @@ util.func public @cloneConst() -> tensor<4xi32> {
 
 // CHECK-LABEL: @cloneConstZeroElements
 util.func public @cloneConstZeroElements() -> tensor<0x2xi32> {
-  // CHECK-NEXT: %[[C:.+]] = arith.constant dense<> : tensor<0x2xi32>
-  %0 = arith.constant dense<> : tensor<0x2xi32>
+  // CHECK-NEXT: %[[C:.+]] = flow.tensor.constant dense<> : tensor<0x2xi32>
+  %0 = flow.tensor.constant dense<> : tensor<0x2xi32>
   // CHECK-NOT: flow.tensor.clone
   %1 = flow.tensor.clone %0 : tensor<0x2xi32>
   // CHECK-NEXT: util.return %[[C]]
@@ -399,8 +399,8 @@ util.func public @cloneDynamicZeroElements(%arg0: tensor<0x?xf32>, %dim: index) 
 
 // CHECK-LABEL: @sliceConst0D
 util.func public @sliceConst0D() -> tensor<i32> {
-  %0 = arith.constant dense<0> : tensor<i32>
-  // CHECK-NEXT: %[[C:.+]] = arith.constant dense<0> : tensor<i32>
+  %0 = flow.tensor.constant dense<0> : tensor<i32>
+  // CHECK-NEXT: %[[C:.+]] = flow.tensor.constant dense<0> : tensor<i32>
   %1 = flow.tensor.slice %0[for] : tensor<i32> -> tensor<i32>
   // CHECK-NEXT: util.return %[[C]]
   util.return %1 : tensor<i32>
@@ -410,10 +410,10 @@ util.func public @sliceConst0D() -> tensor<i32> {
 
 // CHECK-LABEL: @sliceConst1D
 util.func public @sliceConst1D() -> tensor<1xi32> {
-  %0 = arith.constant dense<0> : tensor<1xi32>
+  %0 = flow.tensor.constant dense<0> : tensor<1xi32>
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
-  // CHECK-NEXT: %[[C:.+]] = arith.constant dense<0> : tensor<1xi32>
+  // CHECK-NEXT: %[[C:.+]] = flow.tensor.constant dense<0> : tensor<1xi32>
   %1 = flow.tensor.slice %0[%c0 for %c1] : tensor<1xi32> -> tensor<1xi32>
   // CHECK-NEXT: util.return %[[C]]
   util.return %1 : tensor<1xi32>
@@ -423,9 +423,9 @@ util.func public @sliceConst1D() -> tensor<1xi32> {
 
 // CHECK-LABEL: @sliceConst1DZeroLength
 util.func public @sliceConst1DZeroLength() -> tensor<0xi32> {
-  %0 = arith.constant dense<0> : tensor<1xi32>
+  %0 = flow.tensor.constant dense<0> : tensor<1xi32>
   %c0 = arith.constant 0 : index
-  // CHECK-NEXT: %[[C:.+]] = arith.constant dense<> : tensor<0xi32>
+  // CHECK-NEXT: %[[C:.+]] = flow.tensor.constant dense<> : tensor<0xi32>
   %1 = flow.tensor.slice %0[%c0 for %c0] : tensor<1xi32> -> tensor<0xi32>
   // CHECK-NEXT: util.return %[[C]]
   util.return %1 : tensor<0xi32>
@@ -435,11 +435,11 @@ util.func public @sliceConst1DZeroLength() -> tensor<0xi32> {
 
 // CHECK-LABEL: @sliceConst2D
 util.func public @sliceConst2D() -> tensor<1x2xi32> {
-  %0 = arith.constant dense<[[0, 1, 2], [3, 4, 5]]> : tensor<2x3xi32>
+  %0 = flow.tensor.constant dense<[[0, 1, 2], [3, 4, 5]]> : tensor<2x3xi32>
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
-  // CHECK-NEXT: %[[C:.+]] = arith.constant dense<[
+  // CHECK-NEXT: %[[C:.+]] = flow.tensor.constant dense<[
   // CHECK-SAME:     [1, 2]
   // CHECK-SAME: ]> : tensor<1x2xi32>
   %1 = flow.tensor.slice %0[%c0, %c1 for %c1, %c2] : tensor<2x3xi32> -> tensor<1x2xi32>
@@ -451,10 +451,10 @@ util.func public @sliceConst2D() -> tensor<1x2xi32> {
 
 // CHECK-LABEL: @sliceConst2DZeroLength1
 util.func public @sliceConst2DZeroLength1() -> tensor<1x0xi32> {
-  %0 = arith.constant dense<[[0, 1, 2], [3, 4, 5]]> : tensor<2x3xi32>
+  %0 = flow.tensor.constant dense<[[0, 1, 2], [3, 4, 5]]> : tensor<2x3xi32>
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
-  // CHECK-NEXT: %[[C:.+]] = arith.constant dense<> : tensor<1x0xi32>
+  // CHECK-NEXT: %[[C:.+]] = flow.tensor.constant dense<> : tensor<1x0xi32>
   %1 = flow.tensor.slice %0[%c0, %c0 for %c1, %c0] : tensor<2x3xi32> -> tensor<1x0xi32>
   // CHECK-NEXT: util.return %[[C]]
   util.return %1 : tensor<1x0xi32>
@@ -464,9 +464,9 @@ util.func public @sliceConst2DZeroLength1() -> tensor<1x0xi32> {
 
 // CHECK-LABEL: @sliceConst2DZeroLength01
 util.func public @sliceConst2DZeroLength01() -> tensor<0x0xi32> {
-  %0 = arith.constant dense<[[0, 1, 2], [3, 4, 5]]> : tensor<2x3xi32>
+  %0 = flow.tensor.constant dense<[[0, 1, 2], [3, 4, 5]]> : tensor<2x3xi32>
   %c0 = arith.constant 0 : index
-  // CHECK-NEXT: %[[C:.+]] = arith.constant dense<> : tensor<0x0xi32>
+  // CHECK-NEXT: %[[C:.+]] = flow.tensor.constant dense<> : tensor<0x0xi32>
   %1 = flow.tensor.slice %0[%c0, %c0 for %c0, %c0] : tensor<2x3xi32> -> tensor<0x0xi32>
   // CHECK-NEXT: util.return %[[C]]
   util.return %1 : tensor<0x0xi32>
@@ -500,12 +500,12 @@ util.func public @sliceZeroElements(%arg0: tensor<?xi32>, %dim: index) -> tensor
 
 // CHECK-LABEL: @sliceConst3D
 util.func public @sliceConst3D() -> tensor<1x2x3xi32> {
-  %0 = arith.constant dense<[[[0, 1, 2], [3, 4, 5], [6, 7, 8]], [[9, 10, 11], [12, 13, 14], [15, 16, 17]]]> : tensor<2x3x3xi32>
+  %0 = flow.tensor.constant dense<[[[0, 1, 2], [3, 4, 5], [6, 7, 8]], [[9, 10, 11], [12, 13, 14], [15, 16, 17]]]> : tensor<2x3x3xi32>
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c2 = arith.constant 2 : index
   %c3 = arith.constant 3 : index
-  // CHECK-NEXT: %[[C:.+]] = arith.constant dense<[
+  // CHECK-NEXT: %[[C:.+]] = flow.tensor.constant dense<[
   // CHECK-SAME:                             [
   // CHECK-SAME:                              [3, 4, 5], [6, 7, 8]]]> : tensor<1x2x3xi32>
   %1 = flow.tensor.slice %0[%c0, %c1, %c0 for %c1, %c2, %c3] : tensor<2x3x3xi32> -> tensor<1x2x3xi32>
@@ -517,9 +517,9 @@ util.func public @sliceConst3D() -> tensor<1x2x3xi32> {
 
 // CHECK-LABEL: @updateConst0D
 util.func public @updateConst0D() -> tensor<i32> {
-  %0 = arith.constant dense<0> : tensor<i32>
-  %1 = arith.constant dense<1> : tensor<i32>
-  // CHECK-NEXT: %[[C:.+]] = arith.constant dense<0> : tensor<i32>
+  %0 = flow.tensor.constant dense<0> : tensor<i32>
+  %1 = flow.tensor.constant dense<1> : tensor<i32>
+  // CHECK-NEXT: %[[C:.+]] = flow.tensor.constant dense<0> : tensor<i32>
   %2 = flow.tensor.update %0, %1[] : tensor<i32> -> tensor<i32>
   // CHECK-NEXT: util.return %[[C]]
   util.return %2 : tensor<i32>
@@ -529,10 +529,10 @@ util.func public @updateConst0D() -> tensor<i32> {
 
 // CHECK-LABEL: @updateConst1D
 util.func public @updateConst1D() -> tensor<1xi32> {
-  %0 = arith.constant dense<0> : tensor<1xi32>
-  %1 = arith.constant dense<1> : tensor<1xi32>
+  %0 = flow.tensor.constant dense<0> : tensor<1xi32>
+  %1 = flow.tensor.constant dense<1> : tensor<1xi32>
   %c0 = arith.constant 0 : index
-  // CHECK-NEXT: %[[C:.+]] = arith.constant dense<0> : tensor<1xi32>
+  // CHECK-NEXT: %[[C:.+]] = flow.tensor.constant dense<0> : tensor<1xi32>
   %2 = flow.tensor.update %0, %1[%c0] : tensor<1xi32> -> tensor<1xi32>
   // CHECK-NEXT: util.return %[[C]]
   util.return %2 : tensor<1xi32>
@@ -542,10 +542,10 @@ util.func public @updateConst1D() -> tensor<1xi32> {
 
 // CHECK-LABEL: @updateConst1DUpdateZeroSize
 util.func public @updateConst1DUpdateZeroSize() -> tensor<1xi32> {
-  %0 = arith.constant dense<> : tensor<0xi32>
-  %1 = arith.constant dense<1> : tensor<1xi32>
+  %0 = flow.tensor.constant dense<> : tensor<0xi32>
+  %1 = flow.tensor.constant dense<1> : tensor<1xi32>
   %c0 = arith.constant 0 : index
-  // CHECK-NEXT: %[[C:.+]] = arith.constant dense<1> : tensor<1xi32>
+  // CHECK-NEXT: %[[C:.+]] = flow.tensor.constant dense<1> : tensor<1xi32>
   %2 = flow.tensor.update %0, %1[%c0] : tensor<0xi32> -> tensor<1xi32>
   // CHECK-NEXT: util.return %[[C]]
   util.return %2 : tensor<1xi32>
@@ -555,11 +555,11 @@ util.func public @updateConst1DUpdateZeroSize() -> tensor<1xi32> {
 
 // CHECK-LABEL: @updateConst2DUpdate1x1
 util.func public @updateConst2DUpdate1x1() -> tensor<3x4xi32> {
-  %0 = arith.constant dense<[[12]]> : tensor<1x1xi32>
-  %1 = arith.constant dense<[[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11]]> : tensor<3x4xi32>
+  %0 = flow.tensor.constant dense<[[12]]> : tensor<1x1xi32>
+  %1 = flow.tensor.constant dense<[[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11]]> : tensor<3x4xi32>
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
-  // CHECK-NEXT: %[[C:.+]] = arith.constant dense<[
+  // CHECK-NEXT: %[[C:.+]] = flow.tensor.constant dense<[
   // CHECK-SAME: [0, 12, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11]]> : tensor<3x4xi32>
   %2 = flow.tensor.update %0, %1[%c0, %c1] : tensor<1x1xi32> -> tensor<3x4xi32>
   // CHECK-NEXT: util.return %[[C]]
@@ -570,11 +570,11 @@ util.func public @updateConst2DUpdate1x1() -> tensor<3x4xi32> {
 
 // CHECK-LABEL: @updateConst2DUpdate2x2
 util.func public @updateConst2DUpdate2x2() -> tensor<3x4xi32> {
-  %0 = arith.constant dense<[[12, 13], [14, 15]]> : tensor<2x2xi32>
-  %1 = arith.constant dense<[[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11]]> : tensor<3x4xi32>
+  %0 = flow.tensor.constant dense<[[12, 13], [14, 15]]> : tensor<2x2xi32>
+  %1 = flow.tensor.constant dense<[[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11]]> : tensor<3x4xi32>
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
-  // CHECK-NEXT: %[[C:.+]] = arith.constant dense<[
+  // CHECK-NEXT: %[[C:.+]] = flow.tensor.constant dense<[
   // CHECK-SAME: [0, 12, 13, 3], [4, 14, 15, 7], [8, 9, 10, 11]]> : tensor<3x4xi32>
   %2 = flow.tensor.update %0, %1[%c0, %c1] : tensor<2x2xi32> -> tensor<3x4xi32>
   // CHECK-NEXT: util.return %[[C]]
@@ -585,11 +585,11 @@ util.func public @updateConst2DUpdate2x2() -> tensor<3x4xi32> {
 
 // CHECK-LABEL: @updateConst3DUpdate1x2x3
 util.func public @updateConst3DUpdate1x2x3() -> tensor<2x3x3xi32> {
-  %0 = arith.constant dense<[[[18, 19, 20], [21, 22, 23]]]> : tensor<1x2x3xi32>
-  %1 = arith.constant dense<[[[0, 1, 2], [3, 4, 5], [6, 7, 8]], [[9, 10, 11], [12, 13, 14], [15, 16, 17]]]> : tensor<2x3x3xi32>
+  %0 = flow.tensor.constant dense<[[[18, 19, 20], [21, 22, 23]]]> : tensor<1x2x3xi32>
+  %1 = flow.tensor.constant dense<[[[0, 1, 2], [3, 4, 5], [6, 7, 8]], [[9, 10, 11], [12, 13, 14], [15, 16, 17]]]> : tensor<2x3x3xi32>
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
-  // CHECK-NEXT: %[[C:.+]] = arith.constant dense<[
+  // CHECK-NEXT: %[[C:.+]] = flow.tensor.constant dense<[
   // CHECK-SAME:                             [
   // CHECK-SAME:                              [0, 1, 2], [18, 19, 20], [21, 22, 23]], [
   // CHECK-SAME: [9, 10, 11], [12, 13, 14], [15, 16, 17]]]> : tensor<2x3x3xi32>
@@ -602,11 +602,11 @@ util.func public @updateConst3DUpdate1x2x3() -> tensor<2x3x3xi32> {
 
 // CHECK-LABEL: @updateConst3DUpdate2x3x2
 util.func public @updateConst3DUpdate2x3x2() -> tensor<2x3x3xi32> {
-  %0 = arith.constant dense<[[[18, 19], [20, 21], [22, 23]], [[24, 25], [26, 27], [28, 29]]]> : tensor<2x3x2xi32>
-  %1 = arith.constant dense<[[[0, 1, 2], [3, 4, 5], [6, 7, 8]], [[9, 10, 11], [12, 13, 14], [15, 16, 17]]]> : tensor<2x3x3xi32>
+  %0 = flow.tensor.constant dense<[[[18, 19], [20, 21], [22, 23]], [[24, 25], [26, 27], [28, 29]]]> : tensor<2x3x2xi32>
+  %1 = flow.tensor.constant dense<[[[0, 1, 2], [3, 4, 5], [6, 7, 8]], [[9, 10, 11], [12, 13, 14], [15, 16, 17]]]> : tensor<2x3x3xi32>
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 0 : index
-  // CHECK-NEXT: %[[C:.+]] = arith.constant dense<[
+  // CHECK-NEXT: %[[C:.+]] = flow.tensor.constant dense<[
   // CHECK-SAME:                             [
   // CHECK-SAME:                              [18, 19, 2], [20, 21, 5], [22, 23, 8]], [
   // CHECK-SAME: [24, 25, 11], [26, 27, 14], [28, 29, 17]]]> : tensor<2x3x3xi32>

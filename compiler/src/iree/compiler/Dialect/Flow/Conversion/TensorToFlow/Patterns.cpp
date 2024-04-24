@@ -20,6 +20,22 @@ namespace mlir::iree_compiler::IREE::Flow {
 
 namespace {
 
+struct ConvertConstantPattern final
+    : public OpRewritePattern<arith::ConstantOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(arith::ConstantOp constantOp,
+                                PatternRewriter &rewriter) const override {
+    if (!IREE::Flow::TensorConstantOp::isBuildableWith(constantOp.getValue(),
+                                                       constantOp.getType())) {
+      return failure(); // non-tensor type
+    }
+    rewriter.replaceOpWithNewOp<IREE::Flow::TensorConstantOp>(
+        constantOp, constantOp.getType(), constantOp.getValue());
+    return success();
+  }
+};
+
 /// Converts linalg.fill ops into flow.tensor.splat ops.
 ///
 /// This is expected to improve performance because we can use DMA
@@ -295,14 +311,14 @@ struct ConvertTensorReshapePattern : public OpRewritePattern<TensorReshapeOp> {
 
 void populateTensorToFlowConversionPatterns(MLIRContext *context,
                                             RewritePatternSet &patterns) {
-  patterns
-      .insert<ConvertLinalgFillPattern, ConvertTensorBitcastPattern,
-              ConvertTensorCastPattern, ConvertTensorExtractPattern,
-              ConvertTensorExtractSlicePattern, ConvertTensorInsertSlicePattern,
-              ConvertTensorInsertPattern, ConvertTensorFromElementsPattern,
-              ConvertTensorDialectReshapeOpPattern,
-              ConvertTensorReshapePattern<tensor::CollapseShapeOp>,
-              ConvertTensorReshapePattern<tensor::ExpandShapeOp>>(context);
+  patterns.insert<ConvertConstantPattern, ConvertLinalgFillPattern,
+                  ConvertTensorBitcastPattern, ConvertTensorCastPattern,
+                  ConvertTensorExtractPattern, ConvertTensorExtractSlicePattern,
+                  ConvertTensorInsertSlicePattern, ConvertTensorInsertPattern,
+                  ConvertTensorFromElementsPattern,
+                  ConvertTensorDialectReshapeOpPattern,
+                  ConvertTensorReshapePattern<tensor::CollapseShapeOp>,
+                  ConvertTensorReshapePattern<tensor::ExpandShapeOp>>(context);
 }
 
 } // namespace mlir::iree_compiler::IREE::Flow

@@ -18,6 +18,7 @@ iree_lit_test_suite(
         [
             "bitcast.mlir",
             "cast.mlir",
+            "constant.mlir",
             "extract.mlir",
             "extract_slice.mlir",
             "fill.mlir",

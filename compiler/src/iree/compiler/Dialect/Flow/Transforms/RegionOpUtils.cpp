@@ -601,7 +601,8 @@ bool isClonableIntoDispatchOp(Operation *op) {
   if (isDequantizationLikeOp(op)) {
     return true;
   }
-  if (isa<arith::ConstantOp>(op) || isa<complex::ConstantOp>(op)) {
+  if (isa<arith::ConstantOp>(op) || isa<complex::ConstantOp>(op) ||
+      isa<IREE::Flow::TensorConstantOp>(op)) {
     if (clInlineConstantByteLength == 0)
       return false;
     Attribute constantValueAttr;
