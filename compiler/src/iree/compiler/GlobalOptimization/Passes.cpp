@@ -111,7 +111,8 @@ void buildGlobalOptimizationPassPipeline(
       .addPass(createConvert1X1FilterConv2DToMatmulPass);
   mainPassManager.addPass(createEraseUnusedLinalgOperands());
 
-  mainPassManager.addPass(createTransposeMatmulPass(clTransposeMatmul));
+  if (clTransposeMatmul != TransposeMatmulOption::None)
+    mainPassManager.addPass(createTransposeMatmulPass(clTransposeMatmul));
 
   // Expand tensor shapes into SSA values and optimize the whole program.
   // The more we are able to equate shape dimensions at this level the
