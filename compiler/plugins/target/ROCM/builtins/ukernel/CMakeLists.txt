@@ -51,15 +51,21 @@ function(iree_rocm_bitcode_library)
   endif()
   set(_COPTS
     "-x" "hip"
-    # Target architecture.
+
+    # Compile only the device code for the target architecture.
+    "--offload-device-only"
     "--offload-arch=${_ROCM_ARCH}"
 
-    # Suppress warnings about missing path to rocm lib,
-    # and benign warning about ROCM version.
-    "-nogpulib"
+    # Suppress warnings about about ROCM version (we mostly don't care).
     "-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH"
-    # Avoid error caused by clang bundling.
-    "--offload-device-only"
+
+    # Use the ROCM specified by the IREE cmake variable (instead of guessing
+    # or failing if ROCM is not on the user's path).
+    "--rocm-path=${IREE_ROCM_PATH}"
+
+    # Avoid linking in default libraries as we will link them at a later phase.
+    "-nogpulib"
+
     # Only enable necessary optimizations S.T we can use -O3.
     "-Xclang" "-disable-llvm-optzns"
     "${OPT_FLAG}"
@@ -167,7 +173,7 @@ add_custom_target(iree_builtin_ROCM_UkernelDeviceLibs
 )
 
 # Ensure that the device libs are built when the compiler dylib is built.
-set_property(GLOBAL APPEND PROPERTY IREE_COMPILER_DYLIB_DEPENDS
+set_property(GLOBAL APPEND PROPERTY IREE_COMPILER_DEPENDS
   iree_builtin_ROCM_UkernelDeviceLibs)
 
 # Install.

@@ -202,7 +202,7 @@ public:
     if (!getenv("VCToolsInstallDir") || !getenv("UniversalCRTSdkDir")) {
       llvm::errs() << "required environment for lld-link/link not specified; "
                       "ensure you are building from a shell where "
-                      "vcvarsall/VsDevCmd.bat/etc has been used";
+                      "vcvarsall/VsDevCmd.bat/etc has been used\n";
       return std::nullopt;
     }
     const char *arch;

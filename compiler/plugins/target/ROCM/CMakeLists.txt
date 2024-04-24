@@ -155,7 +155,7 @@ add_custom_target(iree_compiler_plugins_target_ROCM_GenDeviceLibs
 )
 
 # Ensure that the device libs are built when the compiler dylib is built.
-set_property(GLOBAL APPEND PROPERTY IREE_COMPILER_DYLIB_DEPENDS
+set_property(GLOBAL APPEND PROPERTY IREE_COMPILER_DEPENDS
   iree_compiler_plugins_target_ROCM_GenDeviceLibs)
 
 # Install.
