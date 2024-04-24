@@ -10,6 +10,7 @@
 include "iree/compiler/Dialect/HAL/IR/HALBase.td"
 include "iree/compiler/Dialect/HAL/IR/HALInterfaces.td"
 include "iree/compiler/Dialect/Stream/IR/StreamInterfaces.td"
+include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilTypes.td"
 include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/BuiltinAttributeInterfaces.td"
@@ -741,6 +742,7 @@ def HAL_AffinityQueueAttr : AttrDef<HAL_Dialect, "AffinityQueue", [
     "joinOR",
     "joinAND",
   ]>,
+  Util_HoistableAttrInterface,
 ]> {
   let mnemonic = "affinity.queue";
   let summary = [{specifies a set of allowed queues for an operation}];

@@ -285,12 +285,8 @@ NestedLayoutAttr::project(ArrayRef<bool> droppedDims) const {
 
   SmallVector<int64_t> subgroupOrder =
       getRankReducedPermutation(getSubgroupOrder());
-  SmallVector<int64_t> batchOrder = getRankReducedPermutation(getBatchOrder());
-  SmallVector<int64_t> outerOrder = getRankReducedPermutation(getOuterOrder());
   SmallVector<int64_t> threadOrder =
       getRankReducedPermutation(getThreadOrder());
-  SmallVector<int64_t> elementOrder =
-      getRankReducedPermutation(getElementOrder());
 
   // Compose the projected dims with the basis mask to get the new active
   // ids. Active ids indicates that we should use the ids marked as true, and
@@ -322,9 +318,8 @@ NestedLayoutAttr::project(ArrayRef<bool> droppedDims) const {
   composeMasks(threadMask, invertedDroppedSubgroupMask);
 
   return NestedLayoutAttr::get(getContext(), subgroupCount, subgroupOrder,
-                               batchCount, batchOrder, outerCount, outerOrder,
-                               threadCount, threadOrder, elementCount,
-                               elementOrder, getSubgroupBasis(), subgroupMask,
+                               batchCount, outerCount, threadCount, threadOrder,
+                               elementCount, getSubgroupBasis(), subgroupMask,
                                getThreadBasis(), threadMask);
 }
 
@@ -360,33 +355,28 @@ NestedLayoutAttr::permute(ArrayRef<int64_t> permutation) const {
       applyPermutation(invPerm, getSubgroupOrder());
   SmallVector<int64_t> batchCount =
       applyPermutation(getBatchesPerSubgroup(), permutation);
-  SmallVector<int64_t> batchOrder = applyPermutation(invPerm, getBatchOrder());
   SmallVector<int64_t> outerCount =
       applyPermutation(getOutersPerBatch(), permutation);
-  SmallVector<int64_t> outerOrder = applyPermutation(invPerm, getOuterOrder());
   SmallVector<int64_t> threadCount =
       applyPermutation(getThreadsPerOuter(), permutation);
   SmallVector<int64_t> threadOrder =
       applyPermutation(invPerm, getThreadOrder());
   SmallVector<int64_t> elementCount =
       applyPermutation(getElementsPerThread(), permutation);
-  SmallVector<int64_t> elementOrder =
-      applyPermutation(invPerm, getElementOrder());
 
   return NestedLayoutAttr::get(
-      getContext(), subgroupCount, subgroupOrder, batchCount, batchOrder,
-      outerCount, outerOrder, threadCount, threadOrder, elementCount,
-      elementOrder, getSubgroupBasis(), getSubgroupActiveIds(),
-      getThreadBasis(), getThreadActiveIds());
+      getContext(), subgroupCount, subgroupOrder, batchCount, outerCount,
+      threadCount, threadOrder, elementCount, getSubgroupBasis(),
+      getSubgroupActiveIds(), getThreadBasis(), getThreadActiveIds());
 }
 
 /// We distribute to:
 /// <BATCH x OUTER x ELEMENT>
 SmallVector<int64_t> NestedLayoutAttr::getDistributedShape() const {
   SmallVector<int64_t> shape;
-  shape.append(applyPermutation(getBatchesPerSubgroup(), getBatchOrder()));
-  shape.append(applyPermutation(getOutersPerBatch(), getOuterOrder()));
-  shape.append(applyPermutation(getElementsPerThread(), getElementOrder()));
+  shape.append(getBatchesPerSubgroup().begin(), getBatchesPerSubgroup().end());
+  shape.append(getOutersPerBatch().begin(), getOutersPerBatch().end());
+  shape.append(getElementsPerThread().begin(), getElementsPerThread().end());
   return shape;
 }
 
@@ -437,17 +427,24 @@ LogicalResult NestedLayoutAttr::isValidLayout(VectorValue vector) const {
 LogicalResult NestedLayoutAttr::verify(
     llvm::function_ref<InFlightDiagnostic()> emitError,
     ArrayRef<int64_t> subgroupsPerWorkgroup, ArrayRef<int64_t> subgroupOrder,
-    ArrayRef<int64_t> batchesPerSubgroup, ArrayRef<int64_t> batchOrder,
-    ArrayRef<int64_t> outersPerBatch, ArrayRef<int64_t> outerOrder,
+    ArrayRef<int64_t> batchesPerSubgroup, ArrayRef<int64_t> outersPerBatch,
     ArrayRef<int64_t> threadsPerOuter, ArrayRef<int64_t> threadOrder,
-    ArrayRef<int64_t> elementsPerThread, ArrayRef<int64_t> elementOrder,
-    ArrayRef<int64_t> subgroupBasis, ArrayRef<bool> subgroupActiveIds,
-    ArrayRef<int64_t> threadBasis, ArrayRef<bool> threadActiveIds) {
+    ArrayRef<int64_t> elementsPerThread, ArrayRef<int64_t> subgroupBasis,
+    ArrayRef<bool> subgroupActiveIds, ArrayRef<int64_t> threadBasis,
+    ArrayRef<bool> threadActiveIds) {
 
   size_t rank = subgroupsPerWorkgroup.size();
-  auto checkTile = [&](ArrayRef<int64_t> tileShape, ArrayRef<int64_t> order) {
-    if (tileShape.size() != rank || order.size() != rank) {
+  auto checkTile = [&](ArrayRef<int64_t> tileShape) {
+    if (tileShape.size() != rank) {
       emitError() << "all tiles must have the same rank as the layout";
+      return failure();
+    }
+    return success();
+  };
+
+  auto checkOrder = [&](ArrayRef<int64_t> order) {
+    if (order.size() != rank) {
+      emitError() << "all orders must have the same rank as the layout";
       return failure();
     }
     if (!mlir::isPermutationVector(order)) {
@@ -457,11 +454,14 @@ LogicalResult NestedLayoutAttr::verify(
     return success();
   };
 
-  if (failed(checkTile(subgroupsPerWorkgroup, subgroupOrder)) ||
-      failed(checkTile(batchesPerSubgroup, batchOrder)) ||
-      failed(checkTile(outersPerBatch, outerOrder)) ||
-      failed(checkTile(threadsPerOuter, threadOrder)) ||
-      failed(checkTile(elementsPerThread, elementOrder))) {
+  if (failed(checkTile(subgroupsPerWorkgroup)) ||
+      failed(checkTile(batchesPerSubgroup)) ||
+      failed(checkTile(outersPerBatch)) || failed(checkTile(threadsPerOuter)) ||
+      failed(checkTile(elementsPerThread))) {
+    return failure();
+  }
+
+  if (failed(checkOrder(subgroupOrder)) || failed(checkOrder(threadOrder))) {
     return failure();
   }
 

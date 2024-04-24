@@ -1129,6 +1129,36 @@ def Util_GlobalType : TypeInterface<"GlobalTypeInterface"> {
 // IREE::Util::Hoistable*Interface
 //===----------------------------------------------------------------------===//
 
+def Util_HoistableAttrInterface : AttrInterface<"HoistableAttrInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+
+  let description = [{
+    Interface used to control hoisting of dialect attributes associated with
+    ops that are hoisted. Attributes implementing this interface can opt into
+    being replicated onto the global and initializer produced during hoisting.
+
+    Hoisting will walk up ancestors of hoisted ops to see if any contain
+    attributes with this interface to allow context-scoped behavior such as
+    target execution environment for a function.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns true if dialect attributes of this type are replicated to the
+        global and initializer created during hoisting.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"shouldAttachToHoistedOps",
+      /*args=*/(ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return true;
+      }]
+    >,
+  ];
+}
+
 def Util_HoistableOpInterface : OpInterface<"HoistableOpInterface"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Util";
 

@@ -20,6 +20,29 @@ namespace mlir::iree_compiler::IREE::Flow {
 
 namespace {
 
+/// Converts linalg.fill ops into flow.tensor.splat ops.
+///
+/// This is expected to improve performance because we can use DMA
+/// functionalities for the fill, instead of dispatching kernels.
+struct ConvertLinalgFillPattern final
+    : public OpRewritePattern<linalg::FillOp> {
+  using OpRewritePattern::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(linalg::FillOp fillOp,
+                                PatternRewriter &rewriter) const override {
+    if (fillOp->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>()) {
+      // Don't convert linalg.fill ops that were fused together with other ops.
+      return failure();
+    }
+
+    SmallVector<Value> dynamicDims = tensor::createDynamicDimValues(
+        rewriter, fillOp.getLoc(), fillOp.output());
+    rewriter.replaceOpWithNewOp<IREE::Flow::TensorSplatOp>(
+        fillOp, fillOp.output().getType(), fillOp.value(), dynamicDims);
+    return success();
+  }
+};
+
 /// Convert tensor.insert_slice ops into flow.tensor.update ops where possible.
 struct ConvertTensorInsertSlicePattern
     : public OpRewritePattern<tensor::InsertSliceOp> {
@@ -35,7 +58,7 @@ struct ConvertTensorInsertPattern : public OpRewritePattern<tensor::InsertOp> {
   using OpRewritePattern<tensor::InsertOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::InsertOp insertOp,
                                 PatternRewriter &rewriter) const override {
-    if (insertOp->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
+    if (insertOp->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>()) {
       return failure();
     }
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorStoreOp>(
@@ -61,7 +84,7 @@ struct ConvertTensorExtractPattern
 
   LogicalResult matchAndRewrite(tensor::ExtractOp op,
                                 PatternRewriter &rewriter) const override {
-    if (op->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
+    if (op->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>()) {
       return failure();
     }
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorLoadOp>(
@@ -75,7 +98,7 @@ struct ConvertTensorBitcastPattern
   using OpRewritePattern<tensor::BitcastOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::BitcastOp op,
                                 PatternRewriter &rewriter) const override {
-    if (op->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
+    if (op->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>()) {
       return failure();
     }
     auto dynamicDims = IREE::Util::buildDynamicDimsForValue(
@@ -91,7 +114,7 @@ struct ConvertTensorCastPattern : public OpRewritePattern<tensor::CastOp> {
   using OpRewritePattern<tensor::CastOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::CastOp op,
                                 PatternRewriter &rewriter) const override {
-    if (op->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
+    if (op->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>()) {
       return failure();
     }
 
@@ -159,7 +182,7 @@ struct ConvertTensorFromElementsPattern
     // TODO: This pattern was mainly added to iron out some kinks specific to
     // detensoring (see: https://github.com/iree-org/iree/issues/1159). Do we
     // need to expand this check for other uses?
-    if (op->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
+    if (op->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>()) {
       return failure();
     }
     auto tensorType = op.getType();
@@ -200,7 +223,7 @@ struct ConvertTensorDialectReshapeOpPattern
   using OpRewritePattern<tensor::ReshapeOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(tensor::ReshapeOp op,
                                 PatternRewriter &rewriter) const override {
-    if (op->getParentOfType<Flow::DispatchWorkgroupsOp>()) {
+    if (op->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>()) {
       return failure();
     }
     auto loc = op.getLoc();
@@ -242,7 +265,8 @@ struct ConvertTensorReshapePattern : public OpRewritePattern<TensorReshapeOp> {
 
   LogicalResult matchAndRewrite(TensorReshapeOp reshapeOp,
                                 PatternRewriter &rewriter) const override {
-    if (reshapeOp->template getParentOfType<Flow::DispatchWorkgroupsOp>()) {
+    if (reshapeOp
+            ->template getParentOfType<IREE::Flow::DispatchWorkgroupsOp>()) {
       return failure();
     }
     SmallVector<SmallVector<OpFoldResult>> outputShape;
@@ -263,29 +287,6 @@ struct ConvertTensorReshapePattern : public OpRewritePattern<TensorReshapeOp> {
     rewriter.replaceOpWithNewOp<IREE::Flow::TensorReshapeOp>(
         reshapeOp, reshapeOp.getResultType(), reshapeOp.getSrc(),
         outputDynamicShapes);
-    return success();
-  }
-};
-
-/// Converts linalg.fill ops into flow.tensor.splat ops.
-///
-/// This is expected to improve performance because we can use DMA
-/// functionalities for the fill, instead of dispatching kernels.
-struct ConvertLinalgFillPattern final
-    : public OpRewritePattern<linalg::FillOp> {
-  using OpRewritePattern::OpRewritePattern;
-
-  LogicalResult matchAndRewrite(linalg::FillOp fillOp,
-                                PatternRewriter &rewriter) const override {
-    if (fillOp->getParentOfType<IREE::Flow::DispatchWorkgroupsOp>()) {
-      // Don't convert linalg.fill ops that were fused together with other ops.
-      return failure();
-    }
-
-    SmallVector<Value> dynamicDims = tensor::createDynamicDimValues(
-        rewriter, fillOp.getLoc(), fillOp.output());
-    rewriter.replaceOpWithNewOp<TensorSplatOp>(
-        fillOp, fillOp.output().getType(), fillOp.value(), dynamicDims);
     return success();
   }
 };

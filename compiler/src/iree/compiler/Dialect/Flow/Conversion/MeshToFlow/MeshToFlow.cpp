@@ -149,7 +149,7 @@ static Value buildChannelCreation(mesh::MeshOp mesh,
                            toOpFoldResults(reorderedMeshShape), builder);
   OpFoldResult color = linearIndexFromShape(
       toOpFoldResults(groupIndex), toOpFoldResults(groupsShape), builder);
-  return builder.create<ChannelSplitOp>(
+  return builder.create<IREE::Flow::ChannelSplitOp>(
       meshChannel,
       getValueOrCreateConstantIndexOp(builder, builder.getLoc(), color),
       getValueOrCreateConstantIndexOp(builder, builder.getLoc(),
@@ -177,14 +177,16 @@ static void buildChannelInitializer(mesh::MeshOp mesh,
                                     ArrayRef<mesh::MeshAxis> meshAxes,
                                     bool useNamedDefaultChannels,
                                     ImplicitLocOpBuilder &builder) {
-  Util::InitializerOp initOp = builder.create<Util::InitializerOp>();
+  IREE::Util::InitializerOp initOp =
+      builder.create<IREE::Util::InitializerOp>();
   Block *block = builder.createBlock(&initOp.getBody());
   ImplicitLocOpBuilder::InsertionGuard insertionGuard(builder);
   builder.setInsertionPointToStart(block);
   Value channel =
       buildChannelCreation(mesh, meshAxes, useNamedDefaultChannels, builder);
-  builder.create<Util::GlobalStoreOp>(channel, getChannelName(mesh, meshAxes));
-  builder.create<Util::ReturnOp>();
+  builder.create<IREE::Util::GlobalStoreOp>(channel,
+                                            getChannelName(mesh, meshAxes));
+  builder.create<IREE::Util::ReturnOp>();
 }
 
 // Construct a Flow channel inside `module` using
@@ -202,10 +204,10 @@ static void buildGlobalChannelCreation(mesh::MeshOp mesh,
   builder.setInsertionPointToStart(&module.getBodyRegion().getBlocks().front());
 
   auto channelName = getChannelName(mesh, meshAxes);
-  builder.create<Util::GlobalOp>(
+  builder.create<IREE::Util::GlobalOp>(
       builder.getStringAttr("private"), channelName,
-      IREE::Flow::ChannelType::get(builder.getContext()), false, TypedAttr(),
-      IREE::Util::InlineNeverAttr::get(builder.getContext()));
+      builder.getType<IREE::Flow::ChannelType>(), false, TypedAttr(),
+      builder.getAttr<IREE::Util::InlineNeverAttr>());
   buildChannelInitializer(mesh, meshAxes, useNamedDefaultChannels, builder);
 }
 
@@ -216,8 +218,9 @@ static Value buildCachedChannelLoading(mesh::MeshOp mesh,
   if (isDefaultChannel(mesh, meshAxes)) {
     return getDefaultChannel(mesh, useNamedDefaultChannels, builder);
   }
-  return builder.create<Util::GlobalLoadOp>(
-      ChannelType::get(builder.getContext()), getChannelName(mesh, meshAxes));
+  return builder.create<IREE::Util::GlobalLoadOp>(
+      IREE::Flow::ChannelType::get(builder.getContext()),
+      getChannelName(mesh, meshAxes));
 }
 
 // The !flow.channel corresponding to the mesh and mesh axes used in the op.
@@ -407,7 +410,7 @@ struct MeshAllReduceToFlow
     Value target = builder.create<tensor::EmptyOp>(
         op.getResult().getType().getShape(),
         op.getResult().getType().getElementType());
-    auto flowAllReduce = builder.create<CollectiveAllReduceOp>(
+    auto flowAllReduce = builder.create<IREE::Flow::CollectiveAllReduceOp>(
         convertReductionKind(op.getReductionAttr()),
         getCollectiveElementTypeAttr(op.getResult().getType()), target,
         op.getOperand(), channel);
@@ -449,7 +452,7 @@ struct MeshAllGatherToFlow
     Value target = builder.create<tensor::EmptyOp>(
         flowAllGatherResultType.getShape(),
         op.getResult().getType().getElementType());
-    auto flowAllGather = builder.create<CollectiveAllGatherOp>(
+    auto flowAllGather = builder.create<IREE::Flow::CollectiveAllGatherOp>(
         getCollectiveElementTypeAttr(flowAllGatherResultType), target,
         flowAllGatherOperand, channel);
 
@@ -502,7 +505,7 @@ struct MeshAllToAllToFlow
     Value target = builder.create<tensor::EmptyOp>(
         splitAxisAsMostOuter.getType().getShape(),
         splitAxisAsMostOuter.getType().getElementType());
-    auto flowAllToAll = builder.create<CollectiveAllToAllOp>(
+    auto flowAllToAll = builder.create<IREE::Flow::CollectiveAllToAllOp>(
         getCollectiveElementTypeAttr(splitAxisAsMostOuter.getType()), target,
         splitAxisAsMostOuter, channel);
 
@@ -530,8 +533,8 @@ struct MeshProcessLinearIndexToFlow
     builder.setInsertionPointAfter(op.getOperation());
     Value channel = buildCachedChannelLoading(op, symbolTableCollection,
                                               useNamedDefaultChannels, builder);
-    Value newIndex =
-        builder.create<ChannelRankOp>(builder.getIndexType(), channel);
+    Value newIndex = builder.create<IREE::Flow::ChannelRankOp>(
+        builder.getIndexType(), channel);
     rewriter.replaceAllUsesWith(op.getResult(), newIndex);
     return success();
   }
@@ -569,10 +572,11 @@ struct MeshReduceScatterToFlow
     Value target = builder.create<tensor::EmptyOp>(
         flowReduceScatterResultType.getShape(),
         op.getResult().getType().getElementType());
-    auto flowReduceScatter = builder.create<CollectiveReduceScatterOp>(
-        convertReductionKind(op.getReductionAttr()),
-        getCollectiveElementTypeAttr(flowReduceScatterResultType), target,
-        flowReduceScatterOperand, channel);
+    auto flowReduceScatter =
+        builder.create<IREE::Flow::CollectiveReduceScatterOp>(
+            convertReductionKind(op.getReductionAttr()),
+            getCollectiveElementTypeAttr(flowReduceScatterResultType), target,
+            flowReduceScatterOperand, channel);
 
     Value res = buildTranspose(flowReduceScatter, 0, scatterAxis, builder);
 
