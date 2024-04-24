@@ -30,7 +30,7 @@ util.func public @command_buffer_oneshot(%arg0: !hal.device) {
 // Tests for a no-op if there are no devices requiring legacy mode.
 
 module attributes {hal.device.targets = [
-  #hal.device.target<"vmvx", {}>,
+  #hal.device.target<"local", {}>,
   #hal.device.target<"vulkan", {}>
 ]} {
 // CHECK-LABEL: @legacy_mode_not_required
@@ -46,7 +46,7 @@ util.func public @legacy_mode_not_required(%arg0: !hal.device) {
 // Tests that any device requiring legacy_sync will trigger the pass.
 
 module attributes {hal.device.targets = [
-  #hal.device.target<"vmvx", {}>,
+  #hal.device.target<"local", {}>,
   #hal.device.target<"vulkan", {legacy_sync}>
 ]} {
 // CHECK-LABEL: @mixed_legacy_mode_required

@@ -206,6 +206,13 @@ static SmallVector<DictionaryAttr> lookupOptionalConfigAttrs(Operation *op) {
   return configAttrs;
 }
 
+void DeviceTargetAttr::getExecutableTargets(
+    SetVector<IREE::HAL::ExecutableTargetAttr> &resultAttrs) {
+  for (auto attr : getExecutableTargets()) {
+    resultAttrs.insert(attr);
+  }
+}
+
 // Returns a set of all configuration attributes from all device targets.
 // Returns nullopt if any target is missing a configuration attribute.
 static std::optional<SmallVector<DictionaryAttr>>

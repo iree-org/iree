@@ -19,8 +19,9 @@
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/HAL/Utils/LLVMLinkerUtils.h"
+#include "iree/compiler/Dialect/HAL/Target/Devices/LocalDevice.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
+#include "iree/compiler/Dialect/HAL/Utils/LLVMLinkerUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/PluginAPI/Client.h"
 #include "iree/compiler/Utils/ModuleUtils.h"
@@ -121,51 +122,6 @@ static LogicalResult appendDebugDatabase(std::vector<int8_t> &baseFile,
               sizeof(footer));
   return success();
 }
-
-class LLVMCPUTargetDevice final : public TargetDevice {
-public:
-  LLVMCPUTargetDevice() = default;
-
-  IREE::HAL::DeviceTargetAttr
-  getDefaultDeviceTarget(MLIRContext *context,
-                         const TargetRegistry &targetRegistry) const override {
-    Builder b(context);
-    SmallVector<NamedAttribute> configItems;
-
-    auto configAttr = b.getDictionaryAttr(configItems);
-
-    // If we had multiple target environments we would generate one target attr
-    // per environment, with each setting its own environment attribute.
-    SmallVector<IREE::HAL::ExecutableTargetAttr> executableTargetAttrs;
-    targetRegistry.getTargetBackend("llvm-cpu")
-        ->getDefaultExecutableTargets(context, "llvm-cpu", configAttr,
-                                      executableTargetAttrs);
-
-    return IREE::HAL::DeviceTargetAttr::get(context,
-                                            b.getStringAttr("llvm-cpu"),
-                                            configAttr, executableTargetAttrs);
-  }
-
-  std::optional<IREE::HAL::DeviceTargetAttr>
-  getHostDeviceTarget(MLIRContext *context,
-                      const TargetRegistry &targetRegistry) const override {
-    Builder b(context);
-    SmallVector<NamedAttribute> configItems;
-
-    auto configAttr = b.getDictionaryAttr(configItems);
-
-    // If we had multiple target environments we would generate one target attr
-    // per environment, with each setting its own environment attribute.
-    SmallVector<IREE::HAL::ExecutableTargetAttr> executableTargetAttrs;
-    targetRegistry.getTargetBackend("llvm-cpu")
-        ->getHostExecutableTargets(context, "llvm-cpu", configAttr,
-                                   executableTargetAttrs);
-
-    return IREE::HAL::DeviceTargetAttr::get(context,
-                                            b.getStringAttr("llvm-cpu"),
-                                            configAttr, executableTargetAttrs);
-  }
-};
 
 class LLVMCPUTargetBackend final : public TargetBackend {
 public:
@@ -858,9 +814,17 @@ struct LLVMCPUSession
     : public PluginSession<LLVMCPUSession, LLVMCPUTargetCLOptions,
                            PluginActivationPolicy::DefaultActivated> {
   void populateHALTargetDevices(IREE::HAL::TargetDeviceList &targets) {
+    // TODO(multi-device): move local device registration out.
+    // This exists here for backwards compat with the old
+    // iree-hal-target-backends flag that needs to look up the device by backend
+    // name.
     // #hal.device.target<"llvm-cpu", ...
-    targets.add("llvm-cpu",
-                [=]() { return std::make_shared<LLVMCPUTargetDevice>(); });
+    targets.add("llvm-cpu", [=]() {
+      LocalDevice::Options localDeviceOptions;
+      localDeviceOptions.defaultTargetBackends.push_back("llvm-cpu");
+      localDeviceOptions.defaultHostBackends.push_back("llvm-cpu");
+      return std::make_shared<LocalDevice>(localDeviceOptions);
+    });
   }
   void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {
     // #hal.executable.target<"llvm-cpu", ...
