@@ -15,25 +15,17 @@ NOTEBOOKS_TO_SKIP = [
     # matplotlib error when testing:
     #   FileNotFoundError: [Errno 2] No such file or directory: 'seaborn-whitegrid'
     # support level for TF-code and samples is also low
-    # "tensorflow_mnist_training.ipynb",
-    # tflite_runtime requires some deps ("version `GLIBC_2.29' not found") that
-    # samples.Dockerfile does not currently include.
-    # "tflite_text_classification.ipynb",
-    # PyTorch notebooks using SHARK-Turbine require Python 3.10+ in Docker.
-    # "pytorch_aot_advanced.ipynb",
-    # "pytorch_aot_simple.ipynb",
-    # "pytorch_huggingface_whisper.ipynb",
-    # "pytorch_jit.ipynb",
+    "tensorflow_mnist_training.ipynb",
+    # Bug in iree-turbine==2.3.0rc20240410
+    #   `assert issubclass(type(mdl), CompiledModule)` (fixed in 2190a8a)
+    "pytorch_aot_advanced.ipynb",
+    # This needs 'transformers' (and possibly other packages) preinstalled.
+    # Add to run_python_notebook.sh, colab/requirements.txt, or samples.yml?
+    "pytorch_huggingface_whisper.ipynb",
 ]
 
 NOTEBOOKS_EXPECTED_TO_FAIL = [
-    # Error:
-    # ```
-    #     module 'tensorflow.python.pywrap_mlir' has no attribute
-    #     'experimental_convert_saved_model_v1'
-    # ```
-    # convert_saved_model_v1 may be broken, but convert_saved_model works?
-    "tensorflow_hub_import.ipynb",
+    # None!
 ]
 
 
