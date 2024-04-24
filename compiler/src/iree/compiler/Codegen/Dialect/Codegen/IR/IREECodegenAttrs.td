@@ -251,6 +251,10 @@ def IREECodegen_LoweringConfigAttr :
     // Returns the tile interchange for a level set for the op.
     SmallVector<int64_t> getTileInterchangeVals(unsigned level);
 
+    // Returns true if there are no tile interchange values (this means that
+    // interchange can be ignored).
+    bool isInterchangeEmpty();
+
     // Returns the native vector size to use.
     SmallVector<int64_t> getNativeVectorSizeVals() {
       return SmallVector<int64_t>(getNativeVectorSize());
