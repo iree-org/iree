@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Hoisting.h"
@@ -202,27 +203,28 @@ static std::optional<VectorizationTileSizes> inferSizesFromIR(Value val) {
       .Case<linalg::LinalgOp>(
           [&](auto op) { result = inferSizesFromIR(op, cast<OpResult>(val)); })
       .Case<tensor::PackOp>([&](auto op) { result = inferSizesFromIR(op); })
-      .Case<tensor::ExtractSliceOp>([&](tensor::ExtractSliceOp op) {
-        // tensor::ExtractSliceOp is not vectorizable, so only `destShape` has
-        // the values.
-        result = VectorizationTileSizes();
-        LLVM_DEBUG(VEC_DBGS() << "Inferring sizes for:\n" << op << "\n");
-        int64_t destRank = op.getResult().getType().getRank();
-        for (int dim = 0; dim < destRank; ++dim) {
-          LLVM_DEBUG(VEC_DBGS() << "Dim #" << dim << ": ");
-          FailureOr<int64_t> maybeDimBound =
-              ValueBoundsConstraintSet::computeConstantBound(
-                  presburger::BoundType::UB, {op, dim},
-                  /*stopCondition=*/nullptr, /*closedUB=*/true);
-          if (failed(maybeDimBound)) {
-            LLVM_DEBUG(llvm::dbgs() << "failed\n");
-            result = std::nullopt;
-            return;
-          }
-          LLVM_DEBUG(llvm::dbgs() << maybeDimBound.value() << "\n");
-          result->destShape.push_back(maybeDimBound.value());
-        }
-      })
+      .Case<tensor::ExtractSliceOp, IREE::Flow::DispatchTensorLoadOp>(
+          [&](auto op) {
+            // The operations are not vectorizable, so only `destShape`
+            // has the values.
+            result = VectorizationTileSizes();
+            LLVM_DEBUG(VEC_DBGS() << "Inferring sizes for:\n" << op << "\n");
+            int64_t destRank = op.getResult().getType().getRank();
+            for (int dim = 0; dim < destRank; ++dim) {
+              LLVM_DEBUG(VEC_DBGS() << "Dim #" << dim << ": ");
+              FailureOr<int64_t> maybeDimBound =
+                  ValueBoundsConstraintSet::computeConstantBound(
+                      presburger::BoundType::UB, {op, dim},
+                      /*stopCondition=*/nullptr, /*closedUB=*/true);
+              if (failed(maybeDimBound)) {
+                LLVM_DEBUG(llvm::dbgs() << "failed\n");
+                result = std::nullopt;
+                return;
+              }
+              LLVM_DEBUG(llvm::dbgs() << maybeDimBound.value() << "\n");
+              result->destShape.push_back(maybeDimBound.value());
+            }
+          })
       .Default([&](Operation *) {});
   return result;
 }
