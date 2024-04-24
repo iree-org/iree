@@ -617,7 +617,141 @@ void HalDevice::QueueCopy(HalBuffer& source_buffer, HalBuffer& target_buffer,
                  "Copying buffer on queue");
 }
 
-HalBufferView HalDevice::FromDLPack(py::handle producer_tensor) {
+py::object HalDevice::CreateDLPackCapsule(HalBufferView& buffer_view,
+                                          int device_type_code, int device_id) {
+  const size_t kStaticDimLimit = 6;
+  struct ExtDLManagedTensor : public DLManagedTensor {
+    ~ExtDLManagedTensor() {
+      if (retained_buffer) {
+        iree_hal_buffer_release(retained_buffer);
+      }
+      if (dl_tensor.ndim > kStaticDimLimit) {
+        delete[] dim_storage.dynamic_shape;
+      }
+    }
+    iree_hal_buffer_t* retained_buffer = nullptr;
+    union {
+      int64_t static_shape[kStaticDimLimit];
+      int64_t* dynamic_shape;
+    } dim_storage;
+  };
+  auto tensor = std::make_unique<ExtDLManagedTensor>();
+  memset(static_cast<DLManagedTensor*>(tensor.get()), 0,
+         sizeof(DLManagedTensor));
+  auto capsule_destructor = +[](PyObject* capsule) {
+    const char* actual_name = PyCapsule_GetName(capsule);
+    if (!actual_name || strcmp(actual_name, "dltensor") != 0) {
+      // Caller consumed the capsule. Do nothing.
+      return;
+    }
+
+    // Capsule was dropped on the floor before consumed. Release resources.
+    void* capsule_ptr = PyCapsule_GetPointer(capsule, "dltensor");
+    if (!capsule_ptr) {
+      return;
+    }
+    DLManagedTensor* tensor_ptr = static_cast<DLManagedTensor*>(capsule_ptr);
+    tensor_ptr->deleter(tensor_ptr);
+  };
+  auto deleter = +[](struct DLManagedTensor* self) {
+    auto* ext_self = static_cast<ExtDLManagedTensor*>(self);
+    delete ext_self;
+  };
+
+  // Populate the DLManagedTensor.
+  tensor->deleter = deleter;
+  auto& dl_tensor = tensor->dl_tensor;
+  dl_tensor.device.device_type = static_cast<DLDeviceType>(device_type_code);
+  dl_tensor.device.device_id = device_id;
+
+  // Convert metadata.
+  iree_hal_element_type_t et =
+      iree_hal_buffer_view_element_type(buffer_view.raw_ptr());
+  switch (iree_hal_element_numerical_type(et)) {
+    case IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE:
+      dl_tensor.dtype.code = kDLFloat;
+      dl_tensor.dtype.bits = iree_hal_element_bit_count(et);
+      dl_tensor.dtype.lanes = 1;
+      break;
+    case IREE_HAL_NUMERICAL_TYPE_INTEGER_UNSIGNED:
+      dl_tensor.dtype.code = kDLUInt;
+      dl_tensor.dtype.bits = iree_hal_element_bit_count(et);
+      dl_tensor.dtype.lanes = 1;
+      break;
+    case IREE_HAL_NUMERICAL_TYPE_INTEGER:
+    case IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED:
+      dl_tensor.dtype.code = kDLInt;
+      dl_tensor.dtype.bits = iree_hal_element_bit_count(et);
+      dl_tensor.dtype.lanes = 1;
+      break;
+    case IREE_HAL_NUMERICAL_TYPE_FLOAT_BRAIN:
+      dl_tensor.dtype.code = kDLBfloat;
+      dl_tensor.dtype.bits = iree_hal_element_bit_count(et);
+      dl_tensor.dtype.lanes = 1;
+      break;
+    case IREE_HAL_NUMERICAL_TYPE_FLOAT_COMPLEX:
+      dl_tensor.dtype.code = kDLComplex;
+      dl_tensor.dtype.bits = iree_hal_element_bit_count(et);
+      dl_tensor.dtype.lanes = 1;
+      break;
+    case IREE_HAL_NUMERICAL_TYPE_BOOLEAN:
+      dl_tensor.dtype.code = kDLBool;
+      dl_tensor.dtype.bits = iree_hal_element_bit_count(et);
+      dl_tensor.dtype.lanes = 1;
+      break;
+    default:
+      throw std::invalid_argument(
+          "dlpack unsupported buffer view element type");
+  }
+
+  // Shape.
+  // Leave strides nullptr to signify dense row-major.
+  auto rank = iree_hal_buffer_view_shape_rank(buffer_view.raw_ptr());
+  auto* bv_dims = iree_hal_buffer_view_shape_dims(buffer_view.raw_ptr());
+  if (rank > kStaticDimLimit) {
+    dl_tensor.shape = new int64_t[rank];
+    tensor->dim_storage.dynamic_shape = dl_tensor.shape;
+  } else {
+    dl_tensor.shape = tensor->dim_storage.static_shape;
+  }
+  for (size_t i = 0; i < rank; ++i) {
+    dl_tensor.shape[i] = bv_dims[i];
+  }
+  dl_tensor.ndim = rank;
+
+  // Export buffer view.
+  iree_hal_buffer_t* buffer =
+      iree_hal_buffer_view_buffer(buffer_view.raw_ptr());
+  auto offset = iree_hal_buffer_byte_offset(buffer);
+  buffer = iree_hal_buffer_allocated_buffer(buffer);
+  iree_hal_allocator_t* alloc = iree_hal_device_allocator(raw_ptr());
+  iree_hal_external_buffer_t external_buffer;
+  CheckApiStatus(
+      iree_hal_allocator_export_buffer(
+          alloc, buffer, IREE_HAL_EXTERNAL_BUFFER_TYPE_DEVICE_ALLOCATION,
+          IREE_HAL_EXTERNAL_BUFFER_FLAG_NONE, &external_buffer),
+      "Cannot export device buffer");
+  static_assert(sizeof(dl_tensor.data) >=
+                sizeof(external_buffer.handle.device_allocation.ptr));
+  dl_tensor.data =
+      reinterpret_cast<void*>(external_buffer.handle.device_allocation.ptr);
+  dl_tensor.byte_offset = offset;
+
+  // Create and return capsule.
+  PyObject* capsule = PyCapsule_New(static_cast<DLManagedTensor*>(tensor.get()),
+                                    "dltensor", capsule_destructor);
+  if (!capsule) {
+    throw py::python_error();
+  }
+
+  // Retain the backing buffer view bound to the capsule lifetime.
+  tensor->retained_buffer = buffer;
+  iree_hal_buffer_retain(buffer);
+  tensor.release();
+  return py::steal<py::object>(capsule);
+}
+
+HalBufferView HalDevice::FromDLPackCapsule(py::object input_capsule) {
   struct State {
     ~State() {
       if (managed_tensor && managed_tensor->deleter) {
@@ -628,16 +762,7 @@ HalBufferView HalDevice::FromDLPack(py::handle producer_tensor) {
     void* raw = nullptr;
     DLManagedTensor* managed_tensor = nullptr;
   } state;
-
-  // TODO: The argument here is a 'stream' and has several special values
-  // to indicate synchronization. We will want to manage this more carefully.
-  // None can be assumed to do a lot of synchronization implicitly.
-  // NOTE: PyTorch as of 2.3 does not support the optional version and copy
-  // arguments, so we pin to the legacy version for now. May want to detect
-  // this later. The recommended code sequence which uses TypeError seems
-  // quite irresponsible to be in the default path for a 5 year old standard
-  // that has no implementations of its > v0 version.
-  state.capsule = producer_tensor.attr("__dlpack__")(py::none());
+  state.capsule = std::move(input_capsule);
   state.raw = PyCapsule_GetPointer(state.capsule.ptr(), "dltensor");
   if (!state.raw) {
     throw py::python_error();
@@ -723,7 +848,7 @@ HalBufferView HalDevice::FromDLPack(py::handle producer_tensor) {
   iree_hal_buffer_params_t params;
   memset(&params, 0, sizeof(params));
   params.usage = IREE_HAL_BUFFER_USAGE_DEFAULT;
-  params.access = IREE_HAL_MEMORY_ACCESS_ALL;
+  params.access = IREE_HAL_MEMORY_ACCESS_ANY;
   params.type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
   iree_hal_external_buffer_t external_buffer;
   memset(&external_buffer, 0, sizeof(external_buffer));
@@ -1112,7 +1237,10 @@ void SetupHalBindings(nanobind::module_ m) {
       .def("queue_copy", &HalDevice::QueueCopy, py::arg("source_buffer"),
            py::arg("target_buffer"), py::arg("wait_semaphores"),
            py::arg("signal_semaphores"), kHalDeviceQueueCopy)
-      .def("from_dlpack", &HalDevice::FromDLPack)
+      .def("create_dlpack_capsule", &HalDevice::CreateDLPackCapsule,
+           py::arg("buffer_view"), py::arg("device_type_code"),
+           py::arg("device_id"))
+      .def("from_dlpack_capsule", &HalDevice::FromDLPackCapsule)
       .def("__repr__", [](HalDevice& self) {
         auto id_sv = iree_hal_device_id(self.raw_ptr());
         return std::string(id_sv.data, id_sv.size);

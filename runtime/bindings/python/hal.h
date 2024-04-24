@@ -136,7 +136,9 @@ class HalDevice : public ApiRefCounted<HalDevice, iree_hal_device_t> {
                     py::handle signal_semaphores);
   void QueueCopy(HalBuffer& src_buffer, HalBuffer& dst_buffer,
                  py::handle wait_semaphores, py::handle signal_semaphores);
-  HalBufferView FromDLPack(py::handle capsule);
+  HalBufferView FromDLPackCapsule(py::object capsule);
+  py::object CreateDLPackCapsule(HalBufferView& bufferView,
+                                 int device_type_code, int device_id);
 };
 
 class HalDriver : public ApiRefCounted<HalDriver, iree_hal_driver_t> {

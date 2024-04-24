@@ -187,6 +187,30 @@ class HalDevice:
     ) -> None: ...
     @property
     def allocator(self) -> HalAllocator: ...
+    def create_dlpack_capsule(self, buffer_view: HalBufferView, device_type_code: int, device_id: int) -> Any:
+        """Creates a DLPack capsule for the given buffer view with an explicit 
+        device type code and id.
+        
+        Note that IREE's HAL hierarchy does not match 1:1 with DLPack's view of
+        the world, which combines synchronization, memory access, and device
+        identity. As such, we presume that some higher level Python class will
+        represent "framework tensors" for interop in a way that interops
+        completely. Such an implementation would delegate to this facility
+        to create the low level capsule, having explicitly mapped the devices
+        and placed appropriate synchronization guards.
+        """
+        ...
+    def from_dlpack_capsule(self, capsule: Any) -> HalBufferView:
+        """Imports a DLPack tensor capsule and returns a corresponding buffer
+        view.
+        
+        As with create_dlpack_capsule, this is just a partial implementation
+        of concerns and presumes that the caller has chosen the correct
+        device and placed any synchronization barriers necessary for actually
+        using the result.
+        """
+        ...
+
 
 class HalDeviceLoopBridge:
     def __init__(self, device: HalDevice, loop: asyncio.BaseEventLoop): ...
