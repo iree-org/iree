@@ -43,14 +43,18 @@ jobs:
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install cmake clang ninja-build
+          export CC=clang
+          export CXX=clang++
       - uses: actions/setup-python@61a6322f88396a6271a6ee3565807d608ecaddd1  # v4.7.0
         with:
           python-version: '3.11'
       - name: "Testing Samples"
         run: |
-          ./build_tools/github_actions/docker_run.sh  \
-            gcr.io/iree-oss/samples@sha256:0cb4a27f8fce2e6c9a425b93ecd97bf3c5c3a8ec56929ab7ef005f51d4b1e054 \
-            ./build_tools/testing/test_samples.sh
+          ./build_tools/testing/test_samples.sh
 
   # TODO(scotttodd): Convert web test scripts to use installed compiler packages and local runtime
   #                  builds, rather than local compiler builds. The host tools are too slow to build
