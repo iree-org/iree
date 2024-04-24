@@ -15,12 +15,7 @@ on:
 jobs:
   linux_x86_64_release_packages:
     name: Linux Release (x86_64)
-    runs-on:
-      - self-hosted # must come first
-      - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
-      - environment=prod
-      - cpu
-      - os-family=Linux
+    runs-on: nodai-amdgpu-mi250-x86-64
     strategy:
       fail-fast: false
     env:
