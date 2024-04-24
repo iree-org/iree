@@ -7,7 +7,7 @@
 #include "compiler/plugins/target/ROCM/ROCMTargetUtils.h"
 
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
-#include "iree/compiler/Dialect/HAL/Target/LLVMLinkerUtils.h"
+#include "iree/compiler/Dialect/HAL/Utils/LLVMLinkerUtils.h"
 #include "iree/compiler/Utils/ToolUtils.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Module.h"

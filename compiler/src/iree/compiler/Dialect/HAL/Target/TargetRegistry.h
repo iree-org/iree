@@ -41,20 +41,8 @@ protected:
   std::once_flag initFlag;
   std::shared_ptr<T> cachedValue;
 };
-class TargetBackendRegistration : public TargetRegistration<TargetBackend> {
-public:
-  // TODO(#15468): remove the registerStaticGlobal mode once callers are
-  // migrated and move the constructor to the template type.
-  TargetBackendRegistration(StringRef name, TargetFactoryFn<TargetBackend> fn,
-                            bool registerStaticGlobal = true);
-};
-class TargetDeviceRegistration : public TargetRegistration<TargetDevice> {
-public:
-  // TODO(#15468): remove the registerStaticGlobal mode once callers are
-  // migrated and move the constructor to the template type.
-  TargetDeviceRegistration(StringRef name, TargetFactoryFn<TargetDevice> fn,
-                           bool registerStaticGlobal = true);
-};
+using TargetBackendRegistration = TargetRegistration<TargetBackend>;
+using TargetDeviceRegistration = TargetRegistration<TargetDevice>;
 
 template <typename T>
 class TargetFactoryList {
@@ -77,50 +65,50 @@ class TargetDeviceList : public TargetFactoryList<TargetDevice> {};
 // A concrete target registry.
 class TargetRegistry {
 public:
+  // Returns the global registry.
+  // This should only be used at initialization-time for built-in devices.
+  // All other usage should use scoped registries.
+  static TargetRegistry &getMutableTargetRegistry();
   // Returns the read-only global registry.
   // This is used by passes which depend on it from their default constructor.
   static const TargetRegistry &getGlobal();
 
-  // Merge from a list of of target backends.
-  // The receiving registry will own the registration entries.
-  void mergeFrom(const TargetBackendList &targetBackends);
   // Merge from a list of of target devices.
   // The receiving registry will own the registration entries.
   void mergeFrom(const TargetDeviceList &targetDevices);
+  // Merge from a list of of target backends.
+  // The receiving registry will own the registration entries.
+  void mergeFrom(const TargetBackendList &targetBackends);
 
   // Initialize from an existing registry. This registry will not own the
   // backing registration entries. The source registry must remain live for the
   // life of this.
   void mergeFrom(const TargetRegistry &registry);
 
-  // Returns a list of registered target backends.
-  std::vector<std::string> getRegisteredTargetBackends() const;
   // Returns a list of registered target devices.
   std::vector<std::string> getRegisteredTargetDevices() const;
+  // Returns a list of registered target backends.
+  std::vector<std::string> getRegisteredTargetBackends() const;
 
-  // Returns the target backend with the given name.
-  std::shared_ptr<TargetBackend> getTargetBackend(StringRef targetName) const;
   // Returns the target device with the given name.
   std::shared_ptr<TargetDevice> getTargetDevice(StringRef targetName) const;
+  // Returns the target backend with the given name.
+  std::shared_ptr<TargetBackend> getTargetBackend(StringRef targetName) const;
 
-  // Returns one backend per entry in |targetNames|.
-  SmallVector<std::shared_ptr<TargetBackend>>
-  getTargetBackends(ArrayRef<std::string> targetNames) const;
   // Returns one device per entry in |targetNames|.
   SmallVector<std::shared_ptr<TargetDevice>>
   getTargetDevices(ArrayRef<std::string> targetNames) const;
+  // Returns one backend per entry in |targetNames|.
+  SmallVector<std::shared_ptr<TargetBackend>>
+  getTargetBackends(ArrayRef<std::string> targetNames) const;
 
 private:
-  llvm::StringMap<TargetBackendRegistration *> backendRegistrations;
-  llvm::SmallVector<std::unique_ptr<TargetBackendRegistration>>
-      ownedBackendRegistrations;
   llvm::StringMap<TargetDeviceRegistration *> deviceRegistrations;
   llvm::SmallVector<std::unique_ptr<TargetDeviceRegistration>>
       ownedDeviceRegistrations;
-
-  // TODO(#15468): remove this when not used by LLVMCPU/VulkanSPIRV.
-  friend class TargetBackendRegistration;
-  friend class TargetDeviceRegistration;
+  llvm::StringMap<TargetBackendRegistration *> backendRegistrations;
+  llvm::SmallVector<std::unique_ptr<TargetBackendRegistration>>
+      ownedBackendRegistrations;
 };
 
 } // namespace mlir::iree_compiler::IREE::HAL
@@ -140,9 +128,12 @@ struct TargetRegistryRef {
   TargetRegistryRef(const mlir::iree_compiler::IREE::HAL::TargetRegistry *value)
       : value(value) {}
   operator bool() const noexcept {
-    return value->getRegisteredTargetBackends() !=
-           mlir::iree_compiler::IREE::HAL::TargetRegistry::getGlobal()
-               .getRegisteredTargetBackends();
+    return value->getRegisteredTargetDevices() !=
+               mlir::iree_compiler::IREE::HAL::TargetRegistry::getGlobal()
+                   .getRegisteredTargetDevices() &&
+           value->getRegisteredTargetBackends() !=
+               mlir::iree_compiler::IREE::HAL::TargetRegistry::getGlobal()
+                   .getRegisteredTargetBackends();
   }
   const mlir::iree_compiler::IREE::HAL::TargetRegistry *operator->() const {
     return value;
