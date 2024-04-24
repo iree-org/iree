@@ -82,6 +82,85 @@ struct FoldWinogradOpUnitDims : public OpRewritePattern<TransformOp> {
   }
 };
 
+/// Pattern to decompose the tiled WinogradFilterTransformOp.
+/// The input should be just a single tile of the input filter of size `m x m`,
+/// where `m` is the kernel size. The output size should be `i x i`, where
+/// `i = m + r - 1` and `r` is the output tile size.
+///
+/// The tile of the filter transform decomposes into two matrix multiplications:
+/// `matmul(G, matmul(tile(f), transpose(G)))`
+/// The matrix `G` is a precomputed constant.
+///
+/// The result of the decomposition will look like the following:
+/// ```
+/// %tf = iree_linalg_ext.winograd.filter_transform
+///     output_tile_size(6) kernel_size(3) kernel_dimensions([0, 1])
+///     ins(%in_tile : tensor<3x3xf32>)
+///     outs(%out_tile : tensor<8x8xf32>) -> tensor<8x8xf32>
+/// ```
+/// Decomposes to
+/// ```
+/// %G = arith.constant dense<[...]>
+/// %GT = arith.constant dense<[...]>
+/// %init_0 = linalg.fill ins(%zero) outs(%out_tile) -> tensor<3x8xf32>
+/// %mm_0 = linalg.matmul ins(%in_tile, %GT : tensor<3x3xf32>, tensor<3x8xf32>)
+///     outs(%init_0 : tensor<3x8xf32>) -> tensor<3x8xf32>
+/// %init_1 = linalg.fill ins(%zero) outs(%out_tile) -> tensor<8x8xf32>
+/// %mm_1 = linalg.matmul ins(%G, %mm_0 : tensor<8x3xf32>, tensor<3x8xf32>)
+///     outs(%init_1 : tensor<8x8xf32>) -> tensor<8x8xf32>
+/// ````
+struct DecomposeWinogradFilterTransform
+    : public OpRewritePattern<WinogradFilterTransformOp> {
+  using OpRewritePattern<WinogradFilterTransformOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(WinogradFilterTransformOp transformOp,
+                                PatternRewriter &rewriter) const override {
+    Location loc = transformOp.getLoc();
+
+    if (transformOp.getInputRank() != 2 || transformOp.getOutputRank() != 2) {
+      return rewriter.notifyMatchFailure(transformOp, "Winograd op not tiled");
+    }
+    const int64_t inputTileSize = transformOp.getInputTileSize();
+    const int64_t kernelSize = transformOp.getKernelSize();
+    ArrayRef<int64_t> kernelDims = transformOp.getKernelDimensions();
+    llvm::SmallSetVector<int64_t, 2> kernelDimsSet(kernelDims.begin(),
+                                                   kernelDims.end());
+    Type elementType = transformOp.getOutputType().getElementType();
+    Value zeroF32 = rewriter.create<arith::ConstantOp>(
+        loc, rewriter.getZeroAttr(elementType));
+    /// The two values below are the transpose(G) [GT]
+    /// and G [G] constant matrices that convert the filter
+    /// tile from the original domain to the Winograd domain.
+    Value GT = IREE::LinalgExt::createValueFrom2DConstant(
+        IREE::LinalgExt::Winograd::GT_6x6_3x3, kernelSize, inputTileSize, loc,
+        rewriter);
+    Value G = IREE::LinalgExt::createValueFrom2DConstant(
+        IREE::LinalgExt::Winograd::G_6x6_3x3, inputTileSize, kernelSize, loc,
+        rewriter);
+
+    // Create matmul(input, GT)
+    SmallVector<int64_t> initShape(kernelDims.size(), inputTileSize);
+    initShape[0] = kernelSize;
+    Value inputSlice = transformOp.input();
+    Value outputSlice = transformOp.output();
+    auto tensorType = transformOp.getOutputType().clone(initShape);
+    Value init = rewriter.create<tensor::EmptyOp>(loc, initShape, elementType);
+    linalg::FillOp fillOp = rewriter.create<linalg::FillOp>(
+        loc, ValueRange{zeroF32}, ValueRange{init});
+    linalg::MatmulOp matmulOp = rewriter.create<linalg::MatmulOp>(
+        loc, tensorType, ValueRange{inputSlice, GT}, fillOp.result());
+
+    // Create matmul(G, matmul(input, GT))
+    fillOp = rewriter.create<linalg::FillOp>(loc, ValueRange{zeroF32},
+                                             ValueRange{outputSlice});
+    matmulOp = rewriter.create<linalg::MatmulOp>(
+        loc, outputSlice.getType(), ValueRange{G, matmulOp.getResult(0)},
+        fillOp.result());
+    rewriter.replaceOp(transformOp, matmulOp.getResult(0));
+    return success();
+  }
+};
+
 /// Pattern to decompose the tiled WinogradInputTransformOp.
 /// The input should be just a single tile of the input image of size `i x i`,
 /// where `i` is the input tile size and `i = m + r - 1`. `m` is the filter
@@ -136,14 +215,15 @@ struct DecomposeWinogradInputTransform
         loc, rewriter.getZeroAttr(elementType));
     Value scratch =
         rewriter.create<tensor::EmptyOp>(loc, inputTileSquare, elementType);
-    const float *BT{nullptr};
-    const float *B{nullptr};
-    B = IREE::LinalgExt::Winograd::B_6x6_3x3;
-    BT = IREE::LinalgExt::Winograd::BT_6x6_3x3;
-    Value BTV = IREE::LinalgExt::createValueFrom2DConstant(
-        BT, inputTileSize, inputTileSize, loc, rewriter);
-    Value BV = IREE::LinalgExt::createValueFrom2DConstant(
-        B, inputTileSize, inputTileSize, loc, rewriter);
+    /// The two values below are the transpose(B) [BT]
+    /// and B [B] constant matrices that convert the input
+    /// tile from the original domain to the Winograd domain.
+    Value BT = IREE::LinalgExt::createValueFrom2DConstant(
+        IREE::LinalgExt::Winograd::BT_6x6_3x3, inputTileSize, inputTileSize,
+        loc, rewriter);
+    Value B = IREE::LinalgExt::createValueFrom2DConstant(
+        IREE::LinalgExt::Winograd::B_6x6_3x3, inputTileSize, inputTileSize, loc,
+        rewriter);
 
     auto inputExtractSliceOp =
         dynamicSlice.getDefiningOp<tensor::ExtractSliceOp>();
@@ -175,16 +255,16 @@ struct DecomposeWinogradInputTransform
                                                ValueRange{outputSlice});
       if (i == 0) {
         AMatrix = inputSlice;
-        BMatrix = BV;
+        BMatrix = B;
       } else {
-        AMatrix = BTV;
+        AMatrix = BT;
         BMatrix = result;
       }
       matmulOp = rewriter.create<linalg::MatmulOp>(
           loc, tensorType, ValueRange{AMatrix, BMatrix}, fillOp.result());
       result = matmulOp.getResult(0);
     }
-    transformOp.getResult()[0].replaceAllUsesWith(result);
+    rewriter.replaceOp(transformOp, result);
     return success();
   }
 };
@@ -230,19 +310,17 @@ struct DecomposeWinogradOutputTransform
     }
     ShapedType outputType = transformOp.getOutputType();
     Type elementType = outputType.getElementType();
-    const float *AT{nullptr};
-    const float *A{nullptr};
-    A = IREE::LinalgExt::Winograd::A_6x6_3x3;
-    AT = IREE::LinalgExt::Winograd::AT_6x6_3x3;
     const int64_t inputTileSize = transformOp.getInputTileSize();
     const int64_t outputTileSize = transformOp.getOutputTileSize();
-    /// The two values below are the transpose(A) [ATV]
-    /// and A [AV] constant matrices that convert the output
+    /// The two values below are the transpose(A) [AT]
+    /// and A [A] constant matrices that convert the output
     /// tile from the Winograd domain to the original domain.
-    Value ATV = IREE::LinalgExt::createValueFrom2DConstant(
-        AT, outputTileSize, inputTileSize, loc, rewriter);
-    Value AV = IREE::LinalgExt::createValueFrom2DConstant(
-        A, inputTileSize, outputTileSize, loc, rewriter);
+    Value AT = IREE::LinalgExt::createValueFrom2DConstant(
+        IREE::LinalgExt::Winograd::AT_6x6_3x3, outputTileSize, inputTileSize,
+        loc, rewriter);
+    Value A = IREE::LinalgExt::createValueFrom2DConstant(
+        IREE::LinalgExt::Winograd::A_6x6_3x3, inputTileSize, outputTileSize,
+        loc, rewriter);
     Value zeroF32 = rewriter.create<arith::ConstantOp>(
         loc, rewriter.getZeroAttr(elementType));
     SmallVector<int64_t> scratchShape = {inputTileSize, outputTileSize};
@@ -259,16 +337,16 @@ struct DecomposeWinogradOutputTransform
                                                ValueRange{tmp});
       if (i == 0) {
         AMatrix = inputSlice;
-        BMatrix = AV;
+        BMatrix = A;
       } else {
-        AMatrix = ATV;
+        AMatrix = AT;
         BMatrix = result;
       }
       matmulOp = rewriter.create<linalg::MatmulOp>(
           loc, tmp.getType(), ValueRange{AMatrix, BMatrix}, fillOp.result());
       result = matmulOp.getResult(0);
     }
-    transformOp.getResult()[0].replaceAllUsesWith(result);
+    rewriter.replaceOp(transformOp, result);
     return success();
   }
 };
@@ -291,11 +369,13 @@ struct DecomposeWinogradTransformPass
 void DecomposeWinogradTransformPass::runOnOperation() {
   MLIRContext *context = &getContext();
   RewritePatternSet patterns(context);
+  patterns.add<FoldWinogradOpUnitDims<WinogradFilterTransformOp>>(context);
   patterns.add<FoldWinogradOpUnitDims<WinogradInputTransformOp>>(context);
   patterns.add<FoldWinogradOpUnitDims<WinogradOutputTransformOp>>(context);
   tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
   tensor::InsertSliceOp::getCanonicalizationPatterns(patterns, context);
   tensor::ExtractSliceOp::getCanonicalizationPatterns(patterns, context);
+  patterns.add<DecomposeWinogradFilterTransform>(context);
   patterns.add<DecomposeWinogradInputTransform>(context);
   patterns.add<DecomposeWinogradOutputTransform>(context);
   if (failed(
