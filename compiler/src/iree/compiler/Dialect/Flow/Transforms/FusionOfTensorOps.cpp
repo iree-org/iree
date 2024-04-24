@@ -261,66 +261,6 @@ void FusionOfTensorOpsPass::runOnOperation() {
   Operation *funcOp = getOperation();
   MLIRContext *context = funcOp->getContext();
 
-  {
-    // For fusion by collapsing, do so if the reshape is blocking tile and
-    // fuse.
-    linalg::ControlFusionFn fuseByCollapsingControlFn =
-        [](OpOperand *fusedOperand) {
-          Operation *producer = fusedOperand->get().getDefiningOp();
-          Operation *consumer = fusedOperand->getOwner();
-          if (!isNonNullAndOutsideDispatch({producer, consumer})) {
-            return false;
-          }
-
-          // Do not fuse if consumer is a contraction/matmul like op.
-          if (auto linalgConsumerOp = dyn_cast<linalg::LinalgOp>(consumer)) {
-            if (linalg::isaContractionOpInterface(linalgConsumerOp))
-              return false;
-          }
-
-          auto reshapeOp = dyn_cast<tensor::ExpandShapeOp>(producer);
-          if (!reshapeOp)
-            return true;
-
-          return llvm::isa_and_nonnull<linalg::LinalgOp, tensor::UnPackOp,
-                                       LinalgExt::UnsetEncodingOp>(
-              reshapeOp.getSrc().getDefiningOp());
-        };
-
-    RewritePatternSet collapsingReshapePatterns(&getContext());
-    linalg::populateFoldReshapeOpsByCollapsingPatterns(
-        collapsingReshapePatterns, fuseByCollapsingControlFn);
-    tensor::CollapseShapeOp::getCanonicalizationPatterns(
-        collapsingReshapePatterns, context);
-    tensor::ExpandShapeOp::getCanonicalizationPatterns(
-        collapsingReshapePatterns, context);
-    tensor::populateFoldTensorEmptyPatterns(collapsingReshapePatterns);
-    memref::populateResolveRankedShapedTypeResultDimsPatterns(
-        collapsingReshapePatterns);
-    if (failed(applyPatternsAndFoldGreedily(
-            funcOp, std::move(collapsingReshapePatterns)))) {
-      funcOp->emitError("failed to apply collapsing reshape patterns");
-      return signalPassFailure();
-    }
-
-    LLVM_DEBUG({
-      llvm::dbgs() << "\n--- After second fixed point ---\n";
-      funcOp->print(llvm::dbgs(), OpPrintingFlags().useLocalScope());
-      llvm::dbgs() << "\n\n";
-    });
-  }
-
-  // Run some patterns that fold away a few operations.
-  {
-    RewritePatternSet opFoldingPatterns(&getContext());
-    tensor::populateFoldTensorEmptyPatterns(opFoldingPatterns);
-    if (failed(applyPatternsAndFoldGreedily(funcOp,
-                                            std::move(opFoldingPatterns)))) {
-      funcOp->emitError("failed to apply op folding patterns");
-      return signalPassFailure();
-    }
-  }
-
   // Run fusion of producer with consumer when producer has multiple uses.
   // For now run this sequence a fixed times (2 by default). Ideally we
   // would run it till no candidates exist.

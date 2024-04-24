@@ -232,6 +232,7 @@ struct GlobalOpExpansion
 
     // Materialize the initializer if we need to setup a tensor-like constant.
     if (tensorInitializerRequired) {
+      auto affinityAttr = IREE::Stream::AffinityAttr::lookup(globalOp);
       auto initializerOp =
           rewriter.create<IREE::Util::InitializerOp>(globalOp.getLoc());
       auto *entryBlock = rewriter.createBlock(&initializerOp.getBody());
@@ -240,18 +241,17 @@ struct GlobalOpExpansion
       if (initialValueAttr.isa<IREE::Util::UninitializedAttr>()) {
         initialValueSize = rewriter.create<IREE::Stream::TensorSizeOfOp>(
             globalOp.getLoc(), TypeAttr::get(globalOp.getType()),
-            /*result_encoding_dims=*/ValueRange{},
-            /*affinity=*/nullptr);
+            /*result_encoding_dims=*/ValueRange{}, affinityAttr);
         initialValue = rewriter.create<IREE::Stream::TensorEmptyOp>(
             globalOp.getLoc(), resourceOp.getType(),
             TypeAttr::get(globalOp.getType()),
             /*result_encoding_dims=*/ValueRange{}, initialValueSize,
-            /*affinity=*/nullptr);
+            affinityAttr);
       } else {
         initialValue = rewriter.create<IREE::Stream::TensorConstantOp>(
             globalOp.getLoc(), resourceOp.getType(), initialValueAttr,
             TypeAttr::get(globalOp.getType()),
-            /*result_encoding_dims=*/ValueRange{}, /*affinity=*/nullptr);
+            /*result_encoding_dims=*/ValueRange{}, affinityAttr);
         initialValueSize = rewriter.create<IREE::Stream::ResourceSizeOp>(
             globalOp.getLoc(), indexType, initialValue);
       }

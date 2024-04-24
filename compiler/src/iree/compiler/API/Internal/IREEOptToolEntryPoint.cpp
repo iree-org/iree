@@ -99,14 +99,14 @@ static LogicalResult ireeOptMainFromCL(int argc, char **argv,
   // of target backends. However, no such layering exists for the opt tool.
   // Since it tests passes that are default initialized, we just configure the
   // global registry that such constructors depend on.
-  TargetBackendList pluginTargetBackendList;
-  pluginSession.populateHALTargetBackends(pluginTargetBackendList);
-  const_cast<TargetRegistry &>(TargetRegistry::getGlobal())
-      .mergeFrom(pluginTargetBackendList);
   TargetDeviceList pluginTargetDeviceList;
   pluginSession.populateHALTargetDevices(pluginTargetDeviceList);
   const_cast<TargetRegistry &>(TargetRegistry::getGlobal())
       .mergeFrom(pluginTargetDeviceList);
+  TargetBackendList pluginTargetBackendList;
+  pluginSession.populateHALTargetBackends(pluginTargetBackendList);
+  const_cast<TargetRegistry &>(TargetRegistry::getGlobal())
+      .mergeFrom(pluginTargetBackendList);
 
   // When reading from stdin and the input is a tty, it is often a user mistake
   // and the process "appears to be stuck". Print a message to let the user know

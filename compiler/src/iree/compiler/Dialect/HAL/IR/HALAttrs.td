@@ -547,6 +547,10 @@ def HAL_DeviceTargetAttr :
     static std::optional<StaticRange<APInt>>
     lookupConfigAttrRange(Operation *op, StringRef name);
 
+    // Returns zero or more executable targets that this device supports.
+    void getExecutableTargets(
+        SetVector<IREE::HAL::ExecutableTargetAttr> &resultAttrs);
+
     // Returns a list of all target executable configurations that may be
     // required for the given operation.
     static SmallVector<IREE::HAL::ExecutableTargetAttr, 4>

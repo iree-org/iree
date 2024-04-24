@@ -368,6 +368,15 @@ def OutlineDispatchRegionsPass :
   ];
 }
 
+def SinkReshapesPass :
+    Pass<"iree-flow-sink-reshapes", ""> {
+  let summary = "Sink reshapes to allow for compute op -> consumer fusion";
+  let dependentDialects = [
+    "arith::ArithDialect",
+    "affine::AffineDialect",
+  ];
+}
+
 def SplitReductionPass :
     Pass<"iree-flow-split-reduction-ops", ""> {
   let summary = "Split reduction dimension to increase parallelism.";

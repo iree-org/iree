@@ -179,14 +179,14 @@ public:
   // it should emit an appropriate diagnostic.
   LogicalResult activate(MLIRContext *context);
 
+  // Populates new HAL target devices, if any, into the given list.
+  // Targets will be merged into the plugin session-owned registry.
+  virtual void populateHALTargetDevices(IREE::HAL::TargetDeviceList &targets) {}
+
   // Populates new HAL target backends, if any, into the given list.
   // Targets will be merged into the plugin session-owned registry.
   virtual void
   populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {}
-
-  // Populates new HAL target devices, if any, into the given list.
-  // Targets will be merged into the plugin session-owned registry.
-  virtual void populateHALTargetDevices(IREE::HAL::TargetDeviceList &targets) {}
 
 protected:
   // Called from registerDialects() prior to initializing the context and

@@ -133,13 +133,13 @@ public:
     }
   }
 
-  // Populates the given list of HAL target backends for all initialized
-  // plugins.
-  void populateHALTargetBackends(IREE::HAL::TargetBackendList &list);
-
   // Populates the given list of HAL target devices for all initialized
   // plugins.
   void populateHALTargetDevices(IREE::HAL::TargetDeviceList &list);
+
+  // Populates the given list of HAL target backends for all initialized
+  // plugins.
+  void populateHALTargetBackends(IREE::HAL::TargetBackendList &list);
 
 private:
   PluginManagerOptions &options;
