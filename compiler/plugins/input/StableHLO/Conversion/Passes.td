@@ -70,7 +70,7 @@ def VerifyCompilerStableHloInputLegality :
 def CheckVHLOStableHloMixUsage :
     Pass<"iree-check-vhlostablehlo-mix-usage", "ModuleOp"> {
   let summary =
-      "Check and report an error when VHLO and Stablehlo are used in the same module";
+      "Check and report an error when VHLO and StableHLO are used in the same module";
 }
 
 

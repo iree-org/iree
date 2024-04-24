@@ -22,26 +22,28 @@ struct CheckVHLOStableHloMixUsage final
     : impl::CheckVHLOStableHloMixUsageBase<CheckVHLOStableHloMixUsage> {
   void runOnOperation() override {
     MLIRContext *ctx = &getContext();
-    auto modOp = getOperation();
+    auto moduleOp = getOperation();
     Operation *lastStablehloOp = nullptr;
     Operation *lastVhloOp = nullptr;
     bool errorsFound = false;
+    const Dialect *stablehloDialect = ctx->getLoadedDialect("stablehlo");
+    const Dialect *vhloDialect = ctx->getLoadedDialect("vhlo");
     auto emitError = [&](Operation *vhloOp, Operation *stablehloOp) {
       vhloOp->emitOpError()
-          << "Using VHLO and StableHLO Ops in the same module "
+          << "using VHLO and StableHLO Ops in the same module "
              "is not supported. ";
-      stablehloOp->emitRemark() << "Last Stablehlo Op was found here: ";
+      stablehloOp->emitRemark() << "last StableHLO Op was found here: ";
       errorsFound = true;
     };
-    modOp->walk([&](Operation *op) {
+    moduleOp->walk([&](Operation *op) {
       auto opDialect = op->getDialect();
-      if (opDialect == ctx->getLoadedDialect("stablehlo")) {
+      if (opDialect == stablehloDialect) {
         if (lastVhloOp) {
           emitError(lastVhloOp, op);
           return WalkResult::interrupt();
         }
         lastStablehloOp = op;
-      } else if (opDialect == ctx->getLoadedDialect("vhlo")) {
+      } else if (opDialect == vhloDialect) {
         if (lastStablehloOp) {
           emitError(op, lastStablehloOp);
           return WalkResult::interrupt();
