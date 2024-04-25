@@ -19,12 +19,12 @@ namespace {
 /// Apply dilation and padding to the input of a convolution.
 Value applyConvolutionPadding(Location loc, Value input,
                               DenseIntElementsAttr padding,
-                              DenseI64ArrayAttr lhsDilation,
+                              std::optional<ArrayRef<int64_t>> lhsDilation,
                               llvm::ArrayRef<int64_t> dimMappings,
                               OpBuilder &rewriter) {
   SmallVector<int64_t> lhsDilationValues;
-  if (lhsDilation)
-    lhsDilationValues = llvm::to_vector(lhsDilation.asArrayRef());
+  if (lhsDilation.has_value())
+    lhsDilationValues = llvm::to_vector(lhsDilation.value());
   bool noPadding = !padding || isSplatValue(padding, 0);
   bool noDilation = !lhsDilation || hlo::isSplatArray(lhsDilationValues, 1);
   if (noPadding && noDilation)
@@ -224,7 +224,7 @@ struct NormalConvolutionOpConversion final
     llvm::SmallVector<int64_t> spatialDimMapping(rank - 2);
     std::iota(spatialDimMapping.begin(), spatialDimMapping.end(), 1);
     input = applyConvolutionPadding(loc, input, op.getPaddingAttr(),
-                                    op.getLhsDilationAttr(), spatialDimMapping,
+                                    op.getLhsDilation(), spatialDimMapping,
                                     rewriter);
 
     switch (rank) {
@@ -345,10 +345,10 @@ struct ConvolutionOpGeneralConversion final
     // Decompose the convolution into an initial padding
     Value modifiedLhs = applyConvolutionPadding(
         op.getLoc(), adaptor.getLhs(), adaptor.getPaddingAttr(),
-        adaptor.getLhsDilationAttr(),
+        adaptor.getLhsDilation(),
         op.getDimensionNumbers().getInputSpatialDimensions(), rewriter);
     Value modifiedRhs = applyConvolutionPadding(
-        op.getLoc(), adaptor.getRhs(), nullptr, adaptor.getRhsDilationAttr(),
+        op.getLoc(), adaptor.getRhs(), nullptr, adaptor.getRhsDilation(),
         op.getDimensionNumbers().getKernelSpatialDimensions(), rewriter);
     modifiedRhs = applyConvolutionReversal(loc, rewriter, op, modifiedRhs);
 
@@ -640,7 +640,7 @@ struct DepthwiseConvolutionOpConversion final
     llvm::SmallVector<int64_t> spatialDimMapping(spatialRank);
     std::iota(spatialDimMapping.begin(), spatialDimMapping.end(), 1);
     input = applyConvolutionPadding(loc, input, op.getPaddingAttr(),
-                                    op.getLhsDilationAttr(), spatialDimMapping,
+                                    op.getLhsDilation(), spatialDimMapping,
                                     rewriter);
 
     auto filterDims =
