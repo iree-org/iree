@@ -32,6 +32,7 @@ iree_lit_test_suite(
     "stablehlo_to_linalg_random.mlir"
     "stablehlo_to_linalg_reduce.mlir"
     "verify_compiler_input_legality.mlir"
+    "vhlo_stablehlo_mix_invalid.mlir"
   TOOLS
     FileCheck
     iree-compile
