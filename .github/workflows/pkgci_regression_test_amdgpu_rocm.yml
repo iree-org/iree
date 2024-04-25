@@ -76,7 +76,7 @@ jobs:
               --config-files=build_tools/pkgci/external_test_suite/onnx_gpu_rocm_rdna3.json \
               --no-skip-tests-missing-files
   linux_x86_64_rocm_models:
-    name: Linux (x86_64) AMDGPU Rocm Model Testing
+    name: Linux (x86_64) AMDGPU Rocm Model Testing + Benchmark
     runs-on: nodai-amdgpu-mi250-x86-64
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
