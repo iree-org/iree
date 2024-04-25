@@ -279,6 +279,10 @@ struct GlobalLoadOpExpansion
     // Only apply to expanded types (tensors/etc).
     if (!isExpandedType(loadOp.getType()))
       return failure();
+    
+    if (!this->expansionState->globalMap.contains(adaptor.getGlobal()))
+      return rewriter.notifyMatchFailure(loadOp, "expanded global not found");
+
     auto &expandedGlobal = this->expansionState->globalMap[adaptor.getGlobal()];
 
     // Insert a load/transfer to the unknown resource lifetime.
@@ -312,6 +316,10 @@ struct GlobalStoreOpExpansion
     // Only apply to expanded types (tensors/etc).
     if (!isExpandedType(storeOp.getValue().getType()))
       return failure();
+    
+    if (!this->expansionState->globalMap.contains(adaptor.getGlobal()))
+      return rewriter.notifyMatchFailure(storeOp, "expanded global not found");
+
     auto &expandedGlobal = expansionState->globalMap[adaptor.getGlobal()];
 
     // Insert a transfer/store to the global with unknown lifetime. Lifetime
