@@ -1976,7 +1976,7 @@ static LogicalResult setConvRootConfig(mlir::FunctionOpInterface entryPointFn,
     // Level 2: Parallel
     SmallVector<bool> parallelScalableFlags(numTilingDims, false);
     // Make the channel dim scalable
-    parallelScalableFlags[3] = true;
+    parallelScalableFlags[dims->depth[0]] = true;
     scalableTileFlags.emplace_back(parallelScalableFlags);
     // Level 3: Reduction
     scalableTileFlags.emplace_back(numTilingDims, false);
