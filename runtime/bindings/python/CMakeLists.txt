@@ -68,6 +68,7 @@ nanobind_add_module(iree_runtime_bindings_python_PyExtRt
   "io.cc"
   "hal.h"
   "hal.cc"
+  "local_dlpack.h"
   "loop.h"
   "loop.cc"
   "numpy_interop.h"

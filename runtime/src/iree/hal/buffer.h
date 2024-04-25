@@ -144,6 +144,9 @@ enum iree_hal_memory_access_bits_t {
   // bypass the access verification.
   IREE_HAL_MEMORY_ACCESS_ANY = 1u << 5,
   // Memory may have any operation performed on it.
+  // Note that this explicitly includes 'DISCARD', which means that the
+  // mapped memory will have undefined contents. Do not use this access
+  // mode if you intend the existing contents to be accessible.
   IREE_HAL_MEMORY_ACCESS_ALL = IREE_HAL_MEMORY_ACCESS_READ |
                                IREE_HAL_MEMORY_ACCESS_WRITE |
                                IREE_HAL_MEMORY_ACCESS_DISCARD,

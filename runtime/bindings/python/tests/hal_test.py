@@ -486,5 +486,152 @@ class DeviceHalTest(unittest.TestCase):
         iree.runtime.HalFence.create_at(sem, 1).wait()
 
 
+class DeviceDLPackTest(unittest.TestCase):
+    """Tests low level DLPack import/export against the CPU HAL backend.
+
+    This test leverages the fact that numpy is a reasonable dlpack
+    producer/consumer. It has the caveat that our low level support does not
+    allow import of non page aligned data, so we have to take some extra
+    steps to prep it. For pure CPU/Numpy import/export, we have better
+    supported paths than this, but we leverage it here for its testing
+    value, as it exercises code paths that are otherwise only accessible
+    on devices.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.device = iree.runtime.get_device("local-task")
+        self.allocator = self.device.allocator
+        gc.collect()
+
+    def roundtrip(self, input_array, element_type):
+        # We have top copy the input array into our own buffer to ensure
+        # alignment (dlpack import/export require aligned data).
+        orig_bv = self.allocator.allocate_buffer_copy(
+            memory_type=iree.runtime.MemoryType.DEVICE_LOCAL,
+            allowed_usage=iree.runtime.BufferUsage.DEFAULT,
+            device=self.device,
+            buffer=input_array,
+            element_type=element_type,
+        )
+        aligned_input_array = orig_bv.map().asarray(
+            input_array.shape, input_array.dtype
+        )
+
+        # Export the __dlpack__ capsule from numpy, which should be a plain
+        # view over the buffer we originally allocated (therefore, aligned
+        # and importable).
+        input_capsule = aligned_input_array.__dlpack__()
+        aligned_input_array = None
+        gc.collect()
+        imported_bv = self.device.from_dlpack_capsule(input_capsule)
+
+        # Export a capsule from this imported buffer view and create a new
+        # array out of it.
+        class DummyProducer:
+            def __dlpack__(_, stream=None):
+                capsule = self.device.create_dlpack_capsule(imported_bv, 1, 0)
+                return capsule
+
+            def __dlpack_device__(self):
+                return (1, 0)  # CPU, id 0
+
+        reimported_array = np.from_dlpack(DummyProducer())
+        imported_bv = None
+        gc.collect()
+        np.testing.assert_array_equal(input_array, reimported_array)
+
+    def testImportExportF64(self):
+        self.roundtrip(np.random.rand(3, 4), iree.runtime.HalElementType.FLOAT_64)
+
+    def testImportExportF32(self):
+        self.roundtrip(
+            np.random.rand(3, 4, 16, 32, 1, 5, 2).astype(np.float32),
+            iree.runtime.HalElementType.FLOAT_32,
+        )
+
+    def testImportExportF16(self):
+        self.roundtrip(
+            np.random.rand(3, 4).astype(np.float16),
+            iree.runtime.HalElementType.FLOAT_16,
+        )
+
+    def testImportExportSI8(self):
+        self.roundtrip(
+            (np.random.rand(3, 4) * 255.0).astype(np.int8),
+            iree.runtime.HalElementType.SINT_8,
+        )
+
+    def testImportExportSI16(self):
+        self.roundtrip(
+            (np.random.rand(3, 4) * 255.0).astype(np.int16),
+            iree.runtime.HalElementType.SINT_16,
+        )
+
+    def testImportExportSI32(self):
+        self.roundtrip(
+            (np.random.rand(3, 4) * 255.0).astype(np.int32),
+            iree.runtime.HalElementType.SINT_32,
+        )
+
+    def testImportExportSI64(self):
+        self.roundtrip(
+            (np.random.rand(3, 4) * 255.0).astype(np.int64),
+            iree.runtime.HalElementType.SINT_64,
+        )
+
+    def testImportExportUI8(self):
+        self.roundtrip(
+            (np.random.rand(3, 4) * 255.0).astype(np.uint8),
+            iree.runtime.HalElementType.UINT_8,
+        )
+
+    def testImportExportUI16(self):
+        self.roundtrip(
+            (np.random.rand(3, 4) * 255.0).astype(np.uint16),
+            iree.runtime.HalElementType.UINT_16,
+        )
+
+    def testImportExportUI32(self):
+        self.roundtrip(
+            (np.random.rand(3, 4) * 255.0).astype(np.uint32),
+            iree.runtime.HalElementType.UINT_32,
+        )
+
+    def testImportExportUI64(self):
+        self.roundtrip(
+            (np.random.rand(3, 4) * 255.0).astype(np.uint64),
+            iree.runtime.HalElementType.UINT_64,
+        )
+
+    def testImportExportBool(self):
+        self.roundtrip(
+            (np.random.rand(3, 4) * 255.0).astype(np.bool_),
+            iree.runtime.HalElementType.BOOL_8,
+        )
+
+    def testImportExportUI64(self):
+        self.roundtrip(
+            (np.random.rand(3, 4) * 255.0).astype(np.uint64),
+            iree.runtime.HalElementType.UINT_64,
+        )
+
+    def testImportExportComplex64(self):
+        shape = (3, 1, 5, 6, 12, 2, 3)
+        self.roundtrip(
+            np.random.uniform(-1, 1, shape) + 1.0j * np.random.uniform(-1, 1, shape),
+            iree.runtime.HalElementType.COMPLEX_64,
+        )
+
+    def testImportExportComplex64(self):
+        shape = (3, 1, 5, 6, 12, 2, 3)
+        self.roundtrip(
+            (
+                np.random.uniform(-1, 1, shape) + 1.0j * np.random.uniform(-1, 1, shape)
+            ).astype(np.complex128),
+            iree.runtime.HalElementType.COMPLEX_64,
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
