@@ -667,37 +667,27 @@ py::object HalDevice::CreateDLPackCapsule(HalBufferView& buffer_view,
   // Convert metadata.
   iree_hal_element_type_t et =
       iree_hal_buffer_view_element_type(buffer_view.raw_ptr());
+  dl_tensor.dtype.bits = iree_hal_element_bit_count(et);
+  dl_tensor.dtype.lanes = 1;
   switch (iree_hal_element_numerical_type(et)) {
     case IREE_HAL_NUMERICAL_TYPE_FLOAT_IEEE:
       dl_tensor.dtype.code = kDLFloat;
-      dl_tensor.dtype.bits = iree_hal_element_bit_count(et);
-      dl_tensor.dtype.lanes = 1;
       break;
     case IREE_HAL_NUMERICAL_TYPE_INTEGER_UNSIGNED:
       dl_tensor.dtype.code = kDLUInt;
-      dl_tensor.dtype.bits = iree_hal_element_bit_count(et);
-      dl_tensor.dtype.lanes = 1;
       break;
     case IREE_HAL_NUMERICAL_TYPE_INTEGER:
     case IREE_HAL_NUMERICAL_TYPE_INTEGER_SIGNED:
       dl_tensor.dtype.code = kDLInt;
-      dl_tensor.dtype.bits = iree_hal_element_bit_count(et);
-      dl_tensor.dtype.lanes = 1;
       break;
     case IREE_HAL_NUMERICAL_TYPE_FLOAT_BRAIN:
       dl_tensor.dtype.code = kDLBfloat;
-      dl_tensor.dtype.bits = iree_hal_element_bit_count(et);
-      dl_tensor.dtype.lanes = 1;
       break;
     case IREE_HAL_NUMERICAL_TYPE_FLOAT_COMPLEX:
       dl_tensor.dtype.code = kDLComplex;
-      dl_tensor.dtype.bits = iree_hal_element_bit_count(et);
-      dl_tensor.dtype.lanes = 1;
       break;
     case IREE_HAL_NUMERICAL_TYPE_BOOLEAN:
       dl_tensor.dtype.code = kDLBool;
-      dl_tensor.dtype.bits = iree_hal_element_bit_count(et);
-      dl_tensor.dtype.lanes = 1;
       break;
     default:
       throw std::invalid_argument(
@@ -814,10 +804,16 @@ HalBufferView HalDevice::FromDLPackCapsule(py::object input_capsule) {
   if (dlt->strides && dlt->ndim > 0) {
     int64_t stride = 1;
     for (int32_t i = dlt->ndim - 1; i >= 0; --i) {
+      auto dim = dlt->shape[i];
+      // The stride value for 1 or 0 dims is undefined and dlpack can normalize
+      // it, so we skip validation for these.
+      // See:
+      // https://github.com/pytorch/pytorch/issues/99803#issuecomment-1521214463
+      if (dim == 1 || dim == 0) continue;
       if (dlt->strides[i] != stride) {
         throw std::invalid_argument("Unsupported strided tensor");
       }
-      stride *= dlt->shape[i];
+      stride *= dim;
     }
   }
 
@@ -828,8 +824,8 @@ HalBufferView HalDevice::FromDLPackCapsule(py::object input_capsule) {
   }
 
   // Compute size.
-  auto* dims =
-      static_cast<iree_hal_dim_t*>(alloca(sizeof(iree_hal_dim_t) * dlt->ndim));
+  auto* dims = static_cast<iree_hal_dim_t*>(
+      iree_alloca(sizeof(iree_hal_dim_t) * dlt->ndim));
   iree_device_size_t byte_size = iree_hal_element_bit_count(et);
   if (dlt->ndim > 0) {
     for (int32_t i = 0; i < dlt->ndim; ++i) {
