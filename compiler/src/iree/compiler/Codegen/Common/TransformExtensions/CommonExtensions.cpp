@@ -37,6 +37,7 @@
 #include "mlir/Dialect/Bufferization/Transforms/Transforms.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -561,6 +562,134 @@ DiagnosedSilenceableFailure transform_dialect::CopyTensorOperandOp::applyToOne(
 }
 
 void transform_dialect::CopyTensorOperandOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::producesHandle(getResult(), effects);
+  transform::modifiesPayload(effects);
+}
+
+//===---------------------------------------------------------------------===//
+// FlattenForallOp
+//===---------------------------------------------------------------------===//
+
+template <typename MappingTy>
+bool isAscendingRelativeMapping(ArrayRef<Attribute> mapping) {
+  auto start = cast<MappingTy>(*mapping.begin());
+  if (start.getMappingId() !=
+      static_cast<int64_t>(gpu::MappingId::LinearDim0)) {
+    return false;
+  }
+  int64_t prev = start.getMappingId();
+  for (auto id : llvm::drop_begin(mapping)) {
+    int64_t nextId = cast<MappingTy>(id).getMappingId();
+    if (nextId != prev + 1) {
+      return false;
+    }
+    prev = nextId;
+  }
+  return true;
+}
+
+FailureOr<scf::ForallOp> flattenForallOp(RewriterBase &rewriter,
+                                         scf::ForallOp forallOp) {
+  if (!forallOp.getMapping().has_value())
+    return forallOp->emitError("mapping must be present");
+  SmallVector<Attribute> mapping =
+      llvm::to_vector(forallOp.getMapping()->getValue());
+  if (!(llvm::all_of(mapping, llvm::IsaPred<gpu::GPUThreadMappingAttr>) ||
+        llvm::all_of(mapping, llvm::IsaPred<gpu::GPUWarpMappingAttr>))) {
+    return forallOp->emitError("mapping must be #gpu.thread or #gpu.warp");
+  }
+
+  if (forallOp.getRank() == 1) {
+    return forallOp;
+  }
+
+  bool isThreadMapping = isa<gpu::GPUThreadMappingAttr>(*mapping.begin());
+
+  if (isThreadMapping) {
+    if (!isAscendingRelativeMapping<gpu::GPUThreadMappingAttr>(mapping)) {
+      return forallOp->emitError(
+          "mapping must be descending linear thread ids");
+    }
+  } else if (!isAscendingRelativeMapping<gpu::GPUWarpMappingAttr>(mapping)) {
+    return forallOp->emitError("mapping must be descending linear warp ids");
+  }
+
+  auto isAll = [](ArrayRef<int64_t> array, int64_t cmp) {
+    return llvm::all_of(array, [cmp](int64_t x) { return x == cmp; });
+  };
+
+  if (!isAll(forallOp.getStaticStep(), 1) ||
+      !isAll(forallOp.getStaticLowerBound(), 0)) {
+    return failure();
+    return forallOp->emitError("");
+  }
+
+  MLIRContext *context = rewriter.getContext();
+  Location loc = forallOp.getLoc();
+
+  // Step 1. Construct the new mapping attribute as a single linear dim of the
+  // original type.
+  Attribute flatMapping;
+  if (isThreadMapping) {
+    flatMapping =
+        gpu::GPUThreadMappingAttr::get(context, gpu::MappingId::LinearDim0);
+  } else {
+    flatMapping =
+        gpu::GPUWarpMappingAttr::get(context, gpu::MappingId::LinearDim0);
+  }
+
+  // Step 2. Compute the flat lower bound/upper bound/step.
+  AffineExpr product = rewriter.getAffineDimExpr(0);
+  for (auto idx : llvm::seq(static_cast<int64_t>(1), forallOp.getRank())) {
+    product = product * rewriter.getAffineDimExpr(idx);
+  }
+  OpFoldResult newUpperBound = affine::makeComposedFoldedAffineApply(
+      rewriter, loc, product, forallOp.getMixedUpperBound());
+  OpFoldResult zero = rewriter.getIndexAttr(0);
+  OpFoldResult one = rewriter.getIndexAttr(1);
+
+  // Step 3. Create a new parallel loop with a single mapping id.
+  auto newForallOp = rewriter.create<scf::ForallOp>(
+      loc, ArrayRef<OpFoldResult>{zero}, ArrayRef<OpFoldResult>{newUpperBound},
+      ArrayRef<OpFoldResult>{one}, forallOp.getOutputs(),
+      rewriter.getArrayAttr({flatMapping}));
+
+  rewriter.setInsertionPointToStart(newForallOp.getBody());
+  Value linearId = newForallOp.getInductionVar(0);
+
+  // Step 4. Delinearize the flat ID to the original basis.
+  auto ids = rewriter.create<affine::AffineDelinearizeIndexOp>(
+      loc, linearId, forallOp.getMixedUpperBound());
+
+  // Step 5. Inline the region of the original forall op.
+  SmallVector<Value> newArgs(ids.getResults());
+  newArgs.append(newForallOp.getRegionIterArgs().begin(),
+                 newForallOp.getRegionIterArgs().end());
+  rewriter.eraseOp(newForallOp.getTerminator());
+  rewriter.mergeBlocks(forallOp.getBody(), newForallOp.getBody(), newArgs);
+  rewriter.replaceOp(forallOp, newForallOp);
+  return newForallOp;
+}
+
+DiagnosedSilenceableFailure
+transform_dialect::FlattenForallMappingOp::applyToOne(
+    transform::TransformRewriter &rewriter, mlir::scf::ForallOp target,
+    transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+
+  rewriter.setInsertionPoint(target);
+  auto newForallOp = flattenForallOp(rewriter, target);
+  if (failed(newForallOp)) {
+    return mlir::emitDefiniteFailure(target, "flattenForallOp failed");
+  }
+
+  results.push_back(*newForallOp);
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::FlattenForallMappingOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::onlyReadsHandle(getTarget(), effects);
   transform::producesHandle(getResult(), effects);
