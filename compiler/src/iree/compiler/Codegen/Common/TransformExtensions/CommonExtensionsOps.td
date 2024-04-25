@@ -281,6 +281,37 @@ def HoistStaticAllocOp :  Op<Transform_Dialect, "iree.hoist_static_alloc",
   }];
 }
 
+def FlattenForallMappingOp : Op<Transform_Dialect, "iree.flatten_forall_mapping",
+    [TransformEachOpTrait,
+     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     TransformOpInterface,
+     ReportTrackingListenerFailuresOpTrait]> {
+  let description = [{
+    Flattens the thread mapping of an `scf.forall` op.
+
+    #### Return modes
+    Emits a definite failure if the target is not an scf.forall op or if
+    the mapping type is not `gpu.thread` or `gpu.warp` with linear dims in
+    descending order.
+  }];
+
+  let arguments = (ins TransformHandleTypeInterface:$target);
+  let results = (outs TransformHandleTypeInterface:$result);
+
+  let assemblyFormat = [{
+    $target attr-dict `:` functional-type(operands, results)
+  }];
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::transform::TransformRewriter &rewriter,
+        ::mlir::scf::ForallOp target,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
 def ForallToWorkgroupOp : Op<Transform_Dialect,
     "iree.forall_to_workgroup",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
