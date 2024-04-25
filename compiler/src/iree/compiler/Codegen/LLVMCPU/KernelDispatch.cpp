@@ -1389,10 +1389,17 @@ getPackVectorTileSizes(mlir::FunctionOpInterface entryPointFn,
   SmallVector<int64_t> tileSizes(op.getSourceRank(), 1);
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
   int64_t vectorSize = getVectorSize(entryPointFn, op.getSourceType());
-  // TODO(#15421): Improve tile sizes selection for non f32 cases.
-  if (op.getSourceType().getElementType().isF32() &&
-      hasAVX512fFeature(targetAttr) && isPackMatmulLHS(op)) {
+  if (!hasAVX512fFeature(targetAttr) || !isPackMatmulLHS(op)) {
+    return tileSizes;
+  }
+  if (op.getSourceType().getElementType().isF32()) {
     tileSizes.back() = vectorSize;
+  }
+  // TODO(#16314): Generate efficient tile sizes for non-f32 cases.
+  if (op.getSourceType().getElementType().isF16()) {
+    // We adjust the vector size to half to use the same lowering strategy as
+    // f32.
+    tileSizes.back() = vectorSize / 2;
   }
   return tileSizes;
 }
