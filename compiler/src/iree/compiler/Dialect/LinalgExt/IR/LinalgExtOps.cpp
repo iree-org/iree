@@ -24,7 +24,9 @@
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
@@ -2436,16 +2438,14 @@ LogicalResult WinogradFilterTransformOp::verify() {
 SmallVector<Range>
 WinogradFilterTransformOp::getIterationDomain(OpBuilder &builder) {
   Location loc = getLoc();
-  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
-  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
+  OpFoldResult zero = builder.getIndexAttr(0);
+  OpFoldResult one = builder.getIndexAttr(1);
   Value source = output();
-  ArrayRef<int64_t> kernelDims = getKernelDimensions();
-  llvm::SmallSetVector<int64_t, 2> kernelDimsSet(kernelDims.begin(),
-                                                 kernelDims.end());
+  int64_t numKernelDims = getKernelDimensions().size();
   auto outRank = getOutputRank();
-  SmallVector<Range> loopBounds(outRank - kernelDims.size());
-  for (auto dim : llvm::seq<int64_t>(kernelDims.size(), outRank)) {
-    int64_t loopDim = dim - kernelDims.size();
+  SmallVector<Range> loopBounds(outRank - numKernelDims);
+  for (auto dim : llvm::seq<int64_t>(numKernelDims, outRank)) {
+    int64_t loopDim = dim - numKernelDims;
     loopBounds[loopDim].offset = zero;
     loopBounds[loopDim].size = getDimValue(builder, loc, source, dim);
     loopBounds[loopDim].stride = one;
@@ -2464,8 +2464,8 @@ FailureOr<TilingResult> WinogradFilterTransformOp::getTiledImplementation(
     OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
     ArrayRef<OpFoldResult> sizes) {
   Location loc = getLoc();
-  auto one = builder.getIndexAttr(1);
-  auto zero = builder.getIndexAttr(0);
+  OpFoldResult one = builder.getIndexAttr(1);
+  OpFoldResult zero = builder.getIndexAttr(0);
   const int cDim = channelDim();
   const int fDim = filterDim();
 
@@ -2479,8 +2479,8 @@ FailureOr<TilingResult> WinogradFilterTransformOp::getTiledImplementation(
   SmallVector<OpFoldResult> outputStrides(getOutputRank(), one);
 
   assert(sizes.size() == 2);
-  auto inputShape = input().getType().cast<ShapedType>().getShape();
-  auto outputShape = output().getType().cast<ShapedType>().getShape();
+  ArrayRef<int64_t> inputShape = getInputType().getShape();
+  ArrayRef<int64_t> outputShape = getOutputType().getShape();
   SmallVector<OpFoldResult> inputSizes =
       getAsOpFoldResult(builder.getIndexArrayAttr(inputShape));
   SmallVector<OpFoldResult> outputSizes =
@@ -2494,7 +2494,7 @@ FailureOr<TilingResult> WinogradFilterTransformOp::getTiledImplementation(
   tiledOperands.emplace_back(getSlice(builder, loc, output(), outputOffsets,
                                       outputSizes, outputStrides));
 
-  SmallVector<Type, 4> resultTypes;
+  SmallVector<Type> resultTypes;
   if (hasPureTensorSemantics()) {
     resultTypes.push_back(tiledOperands[1].getType());
   }
@@ -2509,18 +2509,18 @@ LogicalResult WinogradFilterTransformOp::getResultTilePosition(
     OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
     ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
     SmallVector<OpFoldResult> &resultSizes) {
-  if (resultNumber == 0) {
-    auto resultShape = output().getType().cast<ShapedType>().getShape();
-    resultSizes = getAsOpFoldResult(builder.getIndexArrayAttr(resultShape));
-    resultOffsets =
-        SmallVector<OpFoldResult>(getOutputRank(), builder.getIndexAttr(0));
-    resultOffsets[2] = offsets[0];
-    resultOffsets[3] = offsets[1];
-    resultSizes[2] = sizes[0];
-    resultSizes[3] = sizes[1];
-    return success();
+  if (resultNumber != 0) {
+    return failure();
   }
-  return failure();
+  ArrayRef<int64_t> resultShape = getOutputType().getShape();
+  resultSizes = getAsOpFoldResult(builder.getIndexArrayAttr(resultShape));
+  resultOffsets =
+      SmallVector<OpFoldResult>(getOutputRank(), builder.getIndexAttr(0));
+  resultOffsets[2] = offsets[0];
+  resultOffsets[3] = offsets[1];
+  resultSizes[2] = sizes[0];
+  resultSizes[3] = sizes[1];
+  return success();
 }
 
 LogicalResult WinogradFilterTransformOp::fold(FoldAdaptor,
