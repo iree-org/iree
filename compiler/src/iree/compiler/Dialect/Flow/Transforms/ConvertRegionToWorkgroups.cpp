@@ -103,7 +103,7 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
   mlir::getUsedValuesDefinedAbove(region, argumentsSet);
   // Unranked tensors are not supported.
   assert(!llvm::any_of(argumentsSet, [](Value v) {
-    return v.getType().isa<UnrankedTensorType>();
+    return isa<UnrankedTensorType>(v.getType());
   }) && "unranked tensors are not supported");
 
   // Compute dimensions of tensor args.
@@ -237,7 +237,7 @@ rewriteFlowDispatchRegionToFlowDispatchWorkgroups(
                                                  arguments, argumentDims);
       }
 #ifndef NDEBUG
-      auto tensorType = it.value().getType().cast<RankedTensorType>();
+      auto tensorType = cast<RankedTensorType>(it.value().getType());
       assert(dims.size() == tensorType.getNumDynamicDims() &&
              "mismatching number of dynamic dims");
 #endif // NDEBUG

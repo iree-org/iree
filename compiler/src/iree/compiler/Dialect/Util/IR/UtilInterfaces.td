@@ -797,7 +797,7 @@ def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
       /*args=*/(ins "Value":$result),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
-        auto resultIndex = result.cast<mlir::OpResult>().getResultNumber();
+        auto resultIndex = cast<mlir::OpResult>(result).getResultNumber();
         auto operandIndex = cast<TiedOpInterface>($_op.getOperation())
             .getTiedResultOperandIndex(resultIndex);
         return operandIndex.has_value() ?
@@ -975,7 +975,7 @@ def Util_ShapeAwareOp : OpInterface<"ShapeAwareOpInterface"> {
       /*methodBody=*/[{
         auto shapeAwareOp = dyn_cast<IREE::Util::ShapeAwareOpInterface>(result.getDefiningOp());
         return shapeAwareOp.buildResultShape(
-            result.cast<mlir::OpResult>().getResultNumber(), builder);
+            cast<mlir::OpResult>(result).getResultNumber(), builder);
       }]
     >,
   ];
@@ -1115,7 +1115,7 @@ def Util_GlobalType : TypeInterface<"GlobalTypeInterface"> {
       /*defaultImplementation=*/[{
         // If one is a shaped type, then they both must be and have compatible
         // shapes.
-        if ($_type.template isa<ShapedType>() || accessType.isa<ShapedType>()) {
+        if ($_type.template isa<ShapedType>() || isa<ShapedType>(accessType)) {
           return succeeded(mlir::verifyCompatibleShape($_type, accessType));
         }
         // Otherwise, the types must be the same.

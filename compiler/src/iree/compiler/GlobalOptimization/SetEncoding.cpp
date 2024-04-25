@@ -52,7 +52,7 @@ using IREE::LinalgExt::EncodingRole;
 /// materialization of `encodingAttr`.
 static Value pad(OpBuilder &builder, Location loc, Value source,
                  EncodingAttr encodingAttr) {
-  RankedTensorType sourceType = source.getType().cast<RankedTensorType>();
+  RankedTensorType sourceType = cast<RankedTensorType>(source.getType());
   Type elemType = sourceType.getElementType();
   size_t rank = sourceType.getRank();
   RankedTensorType tensorTypeWithEncoding =
@@ -84,7 +84,7 @@ static Value pad(OpBuilder &builder, Location loc, Value source,
 
 Value setEncoding(OpBuilder &builder, Location loc, Value source,
                   EncodingAttr encodingAttr) {
-  auto sourceType = source.getType().cast<RankedTensorType>();
+  auto sourceType = cast<RankedTensorType>(source.getType());
   auto resultType = RankedTensorType::get(
       sourceType.getShape(), sourceType.getElementType(), encodingAttr);
   return builder.create<IREE::LinalgExt::SetEncodingOp>(loc, resultType,
@@ -161,7 +161,7 @@ static Value padAndSetEncoding(OpBuilder &builder, Location loc, Value source,
 static Value unsetEncodingAndExtractSlice(OpBuilder &builder, Location loc,
                                           Value source,
                                           SmallVector<OpFoldResult> sizes) {
-  auto sourceType = source.getType().cast<RankedTensorType>();
+  auto sourceType = cast<RankedTensorType>(source.getType());
   auto unsetEncodingReturnType =
       RankedTensorType::get(sourceType.getShape(), sourceType.getElementType());
   auto unsetEncoding = builder
@@ -320,7 +320,7 @@ public:
     SmallVector<Type> elemTypes = {lhsElemType, rhsElemType, outElemType};
 
     MatmulNarrowSizes narrowSizes =
-        getMatmulNarrowSizes(out.getType().cast<ShapedType>(), linalgOp);
+        getMatmulNarrowSizes(cast<ShapedType>(out.getType()), linalgOp);
 
     Location loc = linalgOp.getLoc();
     SmallVector<AffineMap> maps = linalgOp.getIndexingMapsArray();

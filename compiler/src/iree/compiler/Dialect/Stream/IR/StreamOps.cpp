@@ -1689,7 +1689,7 @@ ValueRange TensorTraceOp::getOperandDynamicDims(unsigned idx) {
   auto resourceEncodings = getResourceEncodings().getValue();
   auto resourceEncodingDims = getResourceEncodingDims();
   for (unsigned i = 0; i <= idx; ++i) {
-    auto resourceEncoding = resourceEncodings[i].cast<TypeAttr>().getValue();
+    auto resourceEncoding = cast<TypeAttr>(resourceEncodings[i]).getValue();
     int64_t dynamicDimCount =
         cast<ShapedType>(resourceEncoding).getNumDynamicDims();
     if (i == idx) {

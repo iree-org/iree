@@ -322,7 +322,7 @@ static Value promoteElementToVector(Location loc, OpBuilder &builder,
 Value packVectorToSupportedWidth(Location loc, OpBuilder &builder,
                                  Value input) {
   LLVM_DEBUG({
-    auto vecType = input.getType().cast<VectorType>();
+    auto vecType = cast<VectorType>(input.getType());
     Type elementType = vecType.getElementType();
     assert(vecType.getDimSize(0) * elementType.getIntOrFloatBitWidth() ==
                kShuffleBitWidth &&

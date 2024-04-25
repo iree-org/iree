@@ -61,7 +61,7 @@ public:
 
     // Extract the typed attributes for conversion.
     for (auto [index, attr] : llvm::enumerate(op->getAttrs())) {
-      if (auto typedAttr = attr.getValue().dyn_cast<TypedAttr>()) {
+      if (auto typedAttr = dyn_cast<TypedAttr>(attr.getValue())) {
         oldAttrTypes.push_back(typedAttr.getType());
         typedIndices.push_back(index);
       }
@@ -89,7 +89,7 @@ public:
       // For shaped types, map the values to the new types.
       if (auto shapedType = dyn_cast<ShapedType>(newAttrType)) {
         if (auto denseAttr = dyn_cast<DenseIntElementsAttr>(attrValue)) {
-          auto eType = shapedType.getElementType().dyn_cast<IntegerType>();
+          auto eType = dyn_cast<IntegerType>(shapedType.getElementType());
           auto cast = [&](APInt value) {
             return APInt(eType.getWidth(), value.getZExtValue());
           };
@@ -152,7 +152,7 @@ void Converti48Toi64Pass::runOnOperation() {
         return false;
     }
     for (auto attr : op->getAttrs()) {
-      if (auto typedAttr = attr.getValue().dyn_cast<TypedAttr>()) {
+      if (auto typedAttr = dyn_cast<TypedAttr>(attr.getValue())) {
         if (isIllegalType(typedAttr.getType())) {
           return false;
         }

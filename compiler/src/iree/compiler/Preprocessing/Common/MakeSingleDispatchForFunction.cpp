@@ -44,7 +44,7 @@ void MakeSingleDispatchForFunctionPass::runOnOperation() {
   // a function.
   auto resultTypes = funcOp.getResultTypes();
   if (llvm::any_of(resultTypes, [&](Type t) {
-        auto shapedType = t.dyn_cast<ShapedType>();
+        auto shapedType = dyn_cast<ShapedType>(t);
         return shapedType && !shapedType.hasStaticShape();
       })) {
     return;

@@ -48,7 +48,7 @@ public:
     if (failed(getConstantIntegerFromDefiningOp(bitWidth, unpackedBitWidth)))
       return failure();
 
-    auto rhsType = rhs.getType().dyn_cast<torch::Torch::ValueTensorType>();
+    auto rhsType = dyn_cast<torch::Torch::ValueTensorType>(rhs.getType());
     if (!rhsType)
       return failure();
 

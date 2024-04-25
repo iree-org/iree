@@ -370,9 +370,8 @@ declareEntryPointOps(IREE::Stream::ExecutableOp sourceExecutableOp,
       // Check if workgroup size is set externally.
       ArrayAttr workgroupSize;
       for (auto attr : exportOp->getAttrs()) {
-        if (attr.getValue().isa<IREE::Codegen::ExportConfigAttr>()) {
-          workgroupSize = attr.getValue()
-                              .cast<IREE::Codegen::ExportConfigAttr>()
+        if (isa<IREE::Codegen::ExportConfigAttr>(attr.getValue())) {
+          workgroupSize = cast<IREE::Codegen::ExportConfigAttr>(attr.getValue())
                               .getWorkgroupSizeIndexArray();
           if (workgroupSize.size() < 3) {
             SmallVector<Attribute> workgroupSizeVals =

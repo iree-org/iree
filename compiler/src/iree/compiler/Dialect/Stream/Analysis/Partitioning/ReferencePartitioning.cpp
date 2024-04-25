@@ -388,7 +388,7 @@ partitionRegionConcurrencyReference(IREE::Stream::PartitioningConfigAttr config,
     // For each resource operand of this op we scan back through previously
     // created waves to see if there are any partitioned ops that have a hazard.
     for (auto operand : op.getOperands()) {
-      if (!operand.getType().isa<IREE::Stream::ResourceType>())
+      if (!isa<IREE::Stream::ResourceType>(operand.getType()))
         continue;
       for (auto user : operand.getUsers()) {
         if (user == &op || user->getBlock() != block ||

@@ -256,14 +256,14 @@ static Value buildCachedChannelLoading(
 static TypedValue<RankedTensorType>
 buildTranspose(Value v, ArrayRef<int64_t> transposeVector,
                ImplicitLocOpBuilder &builder) {
-  RankedTensorType type = v.getType().cast<RankedTensorType>();
+  RankedTensorType type = cast<RankedTensorType>(v.getType());
   SmallVector<int64_t> transposedShape =
       permute(type.getShape(), transposeVector);
   Value target =
       builder.create<tensor::EmptyOp>(transposedShape, type.getElementType());
-  return builder.create<linalg::TransposeOp>(v, target, transposeVector)
-      ->getResult(0)
-      .cast<TypedValue<RankedTensorType>>();
+  return cast<TypedValue<RankedTensorType>>(
+      builder.create<linalg::TransposeOp>(v, target, transposeVector)
+          ->getResult(0));
 }
 
 static SmallVector<int64_t> transpose(ArrayRef<int64_t> shape, int64_t axisA,
@@ -282,7 +282,7 @@ static RankedTensorType transpose(RankedTensorType type, int64_t axisA,
 static TypedValue<RankedTensorType>
 buildTranspose(Value v, int64_t axisA, int64_t axisB,
                ImplicitLocOpBuilder &builder) {
-  int64_t rank = v.getType().cast<RankedTensorType>().getRank();
+  int64_t rank = cast<RankedTensorType>(v.getType()).getRank();
   SmallVector<int64_t> transposeVector(rank);
   std::iota(transposeVector.begin(), transposeVector.end(), 0);
   std::swap(transposeVector[axisA], transposeVector[axisB]);
@@ -428,7 +428,7 @@ struct MeshAllGatherToFlow
   LogicalResult matchAndRewrite(mesh::AllGatherOp op,
                                 PatternRewriter &rewriter) const override {
     if (ShapedType::isDynamicShape(
-            op.getOperand().getType().cast<RankedTensorType>().getShape()) ||
+            cast<RankedTensorType>(op.getOperand().getType()).getShape()) ||
         ShapedType::isDynamicShape(op.getResult().getType().getShape())) {
       // TODO: add dynamic support.
       return rewriter.notifyMatchFailure(op->getLoc(),
@@ -448,7 +448,7 @@ struct MeshAllGatherToFlow
         buildTranspose(op.getOperand(), 0, gatherAxis, builder);
 
     RankedTensorType flowAllGatherResultType = transpose(
-        op.getResult().getType().cast<RankedTensorType>(), 0, gatherAxis);
+        cast<RankedTensorType>(op.getResult().getType()), 0, gatherAxis);
     Value target = builder.create<tensor::EmptyOp>(
         flowAllGatherResultType.getShape(),
         op.getResult().getType().getElementType());
@@ -472,7 +472,7 @@ struct MeshAllToAllToFlow
   LogicalResult matchAndRewrite(mesh::AllToAllOp op,
                                 PatternRewriter &rewriter) const override {
     if (ShapedType::isDynamicShape(
-            op.getOperand().getType().cast<RankedTensorType>().getShape()) ||
+            cast<RankedTensorType>(op.getOperand().getType()).getShape()) ||
         ShapedType::isDynamicShape(op.getResult().getType().getShape())) {
       // TODO: add dynamic support.
       return rewriter.notifyMatchFailure(op->getLoc(),
@@ -548,7 +548,7 @@ struct MeshReduceScatterToFlow
   LogicalResult matchAndRewrite(mesh::ReduceScatterOp op,
                                 PatternRewriter &rewriter) const override {
     if (ShapedType::isDynamicShape(
-            op.getOperand().getType().cast<RankedTensorType>().getShape()) ||
+            cast<RankedTensorType>(op.getOperand().getType()).getShape()) ||
         ShapedType::isDynamicShape(op.getResult().getType().getShape())) {
       // TODO: add dynamic support.
       return rewriter.notifyMatchFailure(op->getLoc(),
@@ -567,7 +567,7 @@ struct MeshReduceScatterToFlow
     Value flowReduceScatterOperand =
         buildTranspose(op.getOperand(), 0, scatterAxis, builder);
     RankedTensorType flowReduceScatterResultType = transpose(
-        op.getResult().getType().cast<RankedTensorType>(), 0, scatterAxis);
+        cast<RankedTensorType>(op.getResult().getType()), 0, scatterAxis);
 
     Value target = builder.create<tensor::EmptyOp>(
         flowReduceScatterResultType.getShape(),

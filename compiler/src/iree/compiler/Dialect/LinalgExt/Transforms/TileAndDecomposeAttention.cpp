@@ -315,7 +315,7 @@ static Value extractOrInsertOutputSlice(Value src, Value dst,
   Value slice;
   if (!dst) {
     SmallVector<int64_t> accShape{queryShape[1], queryShape[2]};
-    Type elementType = src.getType().cast<ShapedType>().getElementType();
+    Type elementType = cast<ShapedType>(src.getType()).getElementType();
     auto tensorType = RankedTensorType::get(accShape, elementType);
     slice = builder.create<tensor::ExtractSliceOp>(loc, tensorType, src,
                                                    offsets, sizes, strides);

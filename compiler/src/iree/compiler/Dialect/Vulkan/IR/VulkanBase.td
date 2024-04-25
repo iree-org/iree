@@ -42,10 +42,10 @@ def VK_Dialect : Dialect {
 // enum class with `name`.
 class VK_IsKnownBitEnumCaseFor<string name> :
     CPred<"::mlir::iree_compiler::IREE::Vulkan::symbolize" # name # "("
-          "$_self.cast<IntegerAttr>().getValue().getZExtValue()).hasValue()">;
+          "cast<IntegerAttr>($_self).getValue().getZExtValue()).hasValue()">;
 class VK_IsKnownIntEnumCaseFor<string name> :
     CPred<"::mlir::iree_compiler::IREE::Vulkan::symbolize" # name # "("
-          "$_self.cast<IntegerAttr>().getValue().getZExtValue()).hasValue()">;
+          "cast<IntegerAttr>($_self).getValue().getZExtValue()).hasValue()">;
 
 // Wrapper over base I32BitEnumAttr to set common fields.
 class VK_BitEnumAttr<string name, string description,

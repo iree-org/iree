@@ -238,7 +238,7 @@ struct GlobalOpExpansion
       auto *entryBlock = rewriter.createBlock(&initializerOp.getBody());
       rewriter.setInsertionPointToStart(entryBlock);
       Value initialValue, initialValueSize;
-      if (initialValueAttr.isa<IREE::Util::UninitializedAttr>()) {
+      if (isa<IREE::Util::UninitializedAttr>(initialValueAttr)) {
         initialValueSize = rewriter.create<IREE::Stream::TensorSizeOfOp>(
             globalOp.getLoc(), TypeAttr::get(globalOp.getType()),
             /*result_encoding_dims=*/ValueRange{}, affinityAttr);

@@ -116,10 +116,15 @@ iree_cc_library(
   DEPS
     ::defs
     ::TorchConversionDialectGen
+    ::TorchDialectTransformsGen
     ::TorchDialectIR
     MLIRIR
+    MLIRFuncTransforms
+    MLIRGPUDialect
+    MLIRLinalgTransforms
     MLIRSupport
     MLIRSideEffectInterfaces
+    MLIRVectorTransforms
 )
 
 iree_tablegen_library(

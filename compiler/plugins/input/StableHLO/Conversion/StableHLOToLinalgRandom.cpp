@@ -586,7 +586,7 @@ LogicalResult generateLinalgPhilox32(OpBuilder &builder, Location loc,
   Value dest3 = builder.create<tensor::EmptyOp>(loc, ArrayRef<int64_t>({count}),
                                                 resultETy);
 
-  ShapedType destTy = dest0.getType().cast<ShapedType>();
+  ShapedType destTy = cast<ShapedType>(dest0.getType());
 
   SmallVector<AffineMap> indexingMaps(4, builder.getMultiDimIdentityMap(1));
   SmallVector<utils::IteratorType> iterators(1, utils::IteratorType::parallel);
@@ -683,7 +683,7 @@ LogicalResult generateLinalgPhilox64(OpBuilder &builder, Location loc,
                                                 resultETy);
   Value dest1 = builder.create<tensor::EmptyOp>(loc, ArrayRef<int64_t>({count}),
                                                 resultETy);
-  ShapedType destTy = dest0.getType().cast<ShapedType>();
+  ShapedType destTy = cast<ShapedType>(dest0.getType());
 
   SmallVector<AffineMap> indexingMaps(2, builder.getMultiDimIdentityMap(1));
   SmallVector<utils::IteratorType> iterators(1, utils::IteratorType::parallel);

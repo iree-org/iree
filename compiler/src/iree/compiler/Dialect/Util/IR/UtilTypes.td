@@ -83,9 +83,9 @@ def Util_AnyListType : TypeAlias<Util_ListType>;
 
 class Util_ListOf<Type type> :
     Type<And<[
-      CPred<"$_self.isa<IREE::Util::ListType>()">,
+      CPred<"isa<IREE::Util::ListType>($_self)">,
       SubstLeaves<"$_self",
-                  "$_self.cast<IREE::Util::ListType>().getElementType()",
+                  "cast<IREE::Util::ListType>($_self).getElementType()",
                   type.predicate>
     ]>, "list<" # type.summary # ">"> {
   string builderCall = !if(!empty(type.builderCall),
@@ -131,8 +131,8 @@ def Util_AnyPtrType : TypeAlias<Util_PtrType>;
 
 class Util_PtrOf<Type type> :
     Type<And<[
-      CPred<"$_self.isa<IREE::Util::PtrType>()">,
-      SubstLeaves<"$_self", "$_self.cast<IREE::Util::PtrType>().getTargetType()",
+      CPred<"isa<IREE::Util::PtrType>($_self)">,
+      SubstLeaves<"$_self", "cast<IREE::Util::PtrType>($_self).getTargetType()",
                   type.predicate>
     ]>, "ptr<" # type.summary # ">"> {
   string builderCall = !if(!empty(type.builderCall),
@@ -141,11 +141,11 @@ class Util_PtrOf<Type type> :
 
 class Util_AnyPtrOf<list<Type> types> :
     Type<And<[
-      CPred<"$_self.isa<IREE::Util::PtrType>()">,
+      CPred<"isa<IREE::Util::PtrType>($_self)">,
       Or<!foreach(type, types,
           SubstLeaves<
               "$_self",
-              "$_self.cast<IREE::Util::PtrType>().getTargetType()",
+              "cast<IREE::Util::PtrType>($_self).getTargetType()",
               type.predicate>)>,
     ]>, !interleave(!foreach(type, types, type.summary), " or ")> {
   string builderCall = "";

@@ -214,7 +214,7 @@ struct ConvertGetRawInterfaceBindingBufferOp
     auto bindingsArg =
         op->getParentOfType<mlir::FunctionOpInterface>().getArgument(
             kEntryArgBindings);
-    assert(bindingsArg && bindingsArg.getType().isa<IREE::Util::ListType>() &&
+    assert(bindingsArg && isa<IREE::Util::ListType>(bindingsArg.getType()) &&
            "entry point not conforming to requirements");
 
     // TODO(benvanik): compact the indices - the bindings we have on the ABI
@@ -247,7 +247,7 @@ struct ConvertHALInterfaceBindingSubspanOp
     auto bindingsArg =
         op->getParentOfType<mlir::FunctionOpInterface>().getArgument(
             kEntryArgBindings);
-    assert(bindingsArg && bindingsArg.getType().isa<IREE::Util::ListType>() &&
+    assert(bindingsArg && isa<IREE::Util::ListType>(bindingsArg.getType()) &&
            "entry point not conforming to requirements");
 
     // TODO(benvanik): compact the indices - the bindings we have on the ABI

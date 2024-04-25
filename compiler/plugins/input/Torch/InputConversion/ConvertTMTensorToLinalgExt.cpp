@@ -73,11 +73,11 @@ struct ScatterOpConversion
 
 static Value collapseBatches(PatternRewriter &rewriter, Location loc,
                              Value val) {
-  auto valSizes = val.getType().cast<RankedTensorType>().getShape();
+  auto valSizes = cast<RankedTensorType>(val.getType()).getShape();
   int64_t newBatch =
       std::accumulate(valSizes.begin(), valSizes.end() - 2, 1,
                       [](int64_t x, int64_t y) { return x * y; });
-  Type elementType = val.getType().cast<RankedTensorType>().getElementType();
+  Type elementType = cast<RankedTensorType>(val.getType()).getElementType();
   SmallVector<int64_t> newSizes{newBatch};
   newSizes.append(valSizes.end() - 2, valSizes.end());
   Type newType = RankedTensorType::get(newSizes, elementType);
@@ -98,8 +98,8 @@ static Value collapseBatches(PatternRewriter &rewriter, Location loc,
 }
 static Value expandBatches(PatternRewriter &rewriter, Location loc,
                            SmallVector<int64_t> batchSizes, Value val) {
-  auto valSizes = val.getType().cast<RankedTensorType>().getShape();
-  Type elementType = val.getType().cast<RankedTensorType>().getElementType();
+  auto valSizes = cast<RankedTensorType>(val.getType()).getShape();
+  Type elementType = cast<RankedTensorType>(val.getType()).getElementType();
   SmallVector<int64_t> newSizes(batchSizes);
   newSizes.append(valSizes.end() - 2, valSizes.end());
   auto rank = newSizes.size();
@@ -124,7 +124,7 @@ struct AttentionOpConversion
     Value query = op.getQuery();
     Value key = op.getKey();
     Value value = op.getValue();
-    auto sizes = query.getType().cast<RankedTensorType>().getShape();
+    auto sizes = cast<RankedTensorType>(query.getType()).getShape();
     SmallVector<int64_t> batchSizes(sizes.begin(), sizes.end() - 2);
 
     if (sizes.size() > 3) {
@@ -134,14 +134,13 @@ struct AttentionOpConversion
     }
 
     SmallVector<int64_t> resultShape(
-        op->getResultTypes()[0].cast<RankedTensorType>().getShape());
+        cast<RankedTensorType>(op->getResultTypes()[0]).getShape());
     SmallVector<int64_t> collapsedResultShape;
     collapsedResultShape.push_back(
         std::accumulate(resultShape.begin(), resultShape.end() - 2, 1,
                         [](int64_t x, int64_t y) { return x * y; }));
     collapsedResultShape.append(resultShape.end() - 2, resultShape.end());
-    Type elementType =
-        query.getType().cast<RankedTensorType>().getElementType();
+    Type elementType = cast<RankedTensorType>(query.getType()).getElementType();
     auto collapsedResultType =
         RankedTensorType::get(collapsedResultShape, elementType);
     Value collapsedResult = rewriter.create<tensor::EmptyOp>(

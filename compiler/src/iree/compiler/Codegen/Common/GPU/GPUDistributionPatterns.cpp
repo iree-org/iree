@@ -395,7 +395,7 @@ struct DistributeReductions final
           loc, packed, i, subgroupSize, gpu::ShuffleMode::XOR);
       Value unpacked =
           unpackToVector(loc, rewriter, shuffleOp.getShuffleResult(),
-                         result.getType().cast<VectorType>());
+                         cast<VectorType>(result.getType()));
       result = makeArithReduction(rewriter, loc, combiningKind, unpacked,
                                   result, nullptr, mask);
     }

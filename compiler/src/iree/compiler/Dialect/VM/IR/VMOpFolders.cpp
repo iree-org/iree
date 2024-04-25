@@ -3050,7 +3050,7 @@ struct SwapInvertedCondBranchOpTargets : public OpRewritePattern<CondBranchOp> {
     // if (auto xorOp = dyn_cast_or_null<XorI32Op>(condValue.getDefiningOp())) {
     //   Attribute rhs;
     //   if (matchPattern(xorOp.getRhs(), m_Constant(&rhs)) &&
-    //       rhs.cast<IntegerAttr>().getInt() == 1) {
+    //       cast<IntegerAttr>(rhs).getInt() == 1) {
     //     rewriter.replaceOpWithNewOp<CondBranchOp>(
     //         op, xorOp.getLhs(), op.getFalseDest(), op.getFalseOperands(),
     //         op.getTrueDest(), op.getTrueOperands());

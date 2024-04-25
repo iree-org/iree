@@ -113,7 +113,7 @@ Attribute convertAttribute(Location loc, Attribute oldAttr,
   } else if (auto denseAttr =
                  llvm::dyn_cast<DenseFPElementsAttr>(typedOldAttr)) {
     auto newElementType =
-        llvm::cast<FloatType>(newType.cast<ShapedType>().getElementType());
+        llvm::cast<FloatType>(cast<ShapedType>(newType).getElementType());
     const auto &newFloatSemantics = newElementType.getFloatSemantics();
     return denseAttr.mapValues(newElementType, [&](APFloat src) {
       bool losesInfo = false;

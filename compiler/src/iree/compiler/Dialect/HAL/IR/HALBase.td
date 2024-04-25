@@ -20,7 +20,7 @@ include "mlir/IR/EnumAttr.td"
 
 def HAL_Allocator : DialectType<
     HAL_Dialect,
-    CPred<"$_self.isa<IREE::HAL::AllocatorType>()">,
+    CPred<"isa<IREE::HAL::AllocatorType>($_self)">,
     "allocator"> {
   let description = [{
     Allocates buffers for a particular device memory space.
@@ -30,7 +30,7 @@ def HAL_Allocator : DialectType<
 
 def HAL_Buffer : DialectType<
     HAL_Dialect,
-    CPred<"$_self.isa<IREE::HAL::BufferType>()">,
+    CPred<"isa<IREE::HAL::BufferType>($_self)">,
     "buffer"> {
   let description = [{
     A memory buffer with a specific memory_type that is used to describe the
@@ -44,7 +44,7 @@ def HAL_Buffer : DialectType<
 
 def HAL_BufferView : DialectType<
     HAL_Dialect,
-    CPred<"$_self.isa<IREE::HAL::BufferViewType>()">,
+    CPred<"isa<IREE::HAL::BufferViewType>($_self)">,
     "buffer_view"> {
   let description = [{
     A shaped and typed buffer reference. This just wraps an existing hal.buffer
@@ -57,7 +57,7 @@ def HAL_BufferView : DialectType<
 
 def HAL_Channel : DialectType<
     HAL_Dialect,
-    CPred<"$_self.isa<IREE::HAL::ChannelType>()">,
+    CPred<"isa<IREE::HAL::ChannelType>($_self)">,
     "collective.channel"> {
   let description = [{
     Channel identifier used to allow for participation in multiple collective
@@ -68,7 +68,7 @@ def HAL_Channel : DialectType<
 
 def HAL_CommandBuffer : DialectType<
     HAL_Dialect,
-    CPred<"$_self.isa<IREE::HAL::CommandBufferType>()">,
+    CPred<"isa<IREE::HAL::CommandBufferType>($_self)">,
     "command_buffer"> {
   let description = [{
     Asynchronous command buffer recording interface. Commands are recorded by
@@ -79,7 +79,7 @@ def HAL_CommandBuffer : DialectType<
 
 def HAL_DescriptorSetLayout : DialectType<
     HAL_Dialect,
-    CPred<"$_self.isa<IREE::HAL::DescriptorSetLayoutType>()">,
+    CPred<"isa<IREE::HAL::DescriptorSetLayoutType>($_self)">,
     "descriptor_set_layout"> {
   let description = [{
     Descriptor set layout.
@@ -89,7 +89,7 @@ def HAL_DescriptorSetLayout : DialectType<
 
 def HAL_Device : DialectType<
     HAL_Dialect,
-    CPred<"$_self.isa<IREE::HAL::DeviceType>()">,
+    CPred<"isa<IREE::HAL::DeviceType>($_self)">,
     "device"> {
   let description = [{
     Logical device instance.
@@ -99,7 +99,7 @@ def HAL_Device : DialectType<
 
 def HAL_Event : DialectType<
     HAL_Dialect,
-    CPred<"$_self.isa<IREE::HAL::EventType>()">,
+    CPred<"isa<IREE::HAL::EventType>($_self)">,
     "event"> {
   let description = [{
     Events are used for defining synchronization scopes within CommandBuffers.
@@ -110,7 +110,7 @@ def HAL_Event : DialectType<
 
 def HAL_Executable : DialectType<
     HAL_Dialect,
-    CPred<"$_self.isa<IREE::HAL::ExecutableType>()">,
+    CPred<"isa<IREE::HAL::ExecutableType>($_self)">,
     "executable"> {
   let description = [{
     A prepared and ready-to-dispatch executable.
@@ -120,7 +120,7 @@ def HAL_Executable : DialectType<
 
 def HAL_Fence : DialectType<
     HAL_Dialect,
-    CPred<"$_self.isa<IREE::HAL::FenceType>()">,
+    CPred<"isa<IREE::HAL::FenceType>($_self)">,
     "fence"> {
   let description = [{
     A set of semaphore timepoints defining a common point in time across
@@ -131,7 +131,7 @@ def HAL_Fence : DialectType<
 
 def HAL_File : DialectType<
     HAL_Dialect,
-    CPred<"$_self.isa<IREE::HAL::FileType>()">,
+    CPred<"isa<IREE::HAL::FileType>($_self)">,
     "buffer"> {
   let description = [{
     A stateless file handle that can be read/written using queue-ordered
@@ -142,7 +142,7 @@ def HAL_File : DialectType<
 
 def HAL_PipelineLayout : DialectType<
     HAL_Dialect,
-    CPred<"$_self.isa<IREE::HAL::PipelineLayoutType>()">,
+    CPred<"isa<IREE::HAL::PipelineLayoutType>($_self)">,
     "pipeline_layout"> {
   let description = [{
     A pipeline layout describing the descriptor sets and push constants used.

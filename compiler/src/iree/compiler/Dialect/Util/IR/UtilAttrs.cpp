@@ -492,7 +492,7 @@ static LogicalResult serializeGenericResourceElementData(
 //===----------------------------------------------------------------------===//
 
 int64_t BytePatternAttr::getStorageSize() const {
-  if (auto shapedType = getType().dyn_cast<ShapedType>()) {
+  if (auto shapedType = llvm::dyn_cast<ShapedType>(getType())) {
     return IREE::Util::getRoundedPhysicalStorageSize(shapedType);
   } else {
     return IREE::Util::getTypePhysicalStorageBitWidth(getType());
@@ -716,7 +716,7 @@ LogicalResult CompositeAttr::serializeToStream(Location loc,
 //===----------------------------------------------------------------------===//
 
 int64_t UninitializedAttr::getStorageSize() const {
-  if (auto shapedType = getType().dyn_cast<ShapedType>()) {
+  if (auto shapedType = llvm::dyn_cast<ShapedType>(getType())) {
     return IREE::Util::getRoundedPhysicalStorageSize(shapedType);
   } else {
     return IREE::Util::getTypePhysicalStorageBitWidth(getType());
