@@ -13,13 +13,53 @@ considerations of mobile and edge deployments.
 
 ## Key features
 
-- [x] Ahead-of-time compilation of scheduling and execution logic together
-- [x] Support for dynamic shapes, flow control, streaming, and other advanced
-      model features
-- [x] Optimized for many CPU and GPU architectures
-- [x] Low overhead, pipelined execution for efficient power and resource usage
-- [x] Binary size as low as 30KB on embedded systems
-- [x] Debugging and profiling support
+<div class="grid cards" markdown>
+
+- :material-clock-fast: **Ahead-of-time compilation**
+
+    ---
+
+    Scheduling and execution logic are compiled together
+
+    [:octicons-arrow-right-24: Project architecture](#project-architecture)
+
+- :octicons-rocket-24: **Support for advanced model features**
+
+    ---
+
+    Dynamic shapes, flow control, streaming, and more
+
+    [:octicons-arrow-right-24: Importing from ML frameworks](#importing-models-from-ml-frameworks)
+
+- :octicons-server-24: **Designed for CPUs, GPUs, and other accelerators**
+
+    ---
+
+    First class support for many popular devices and APIs
+
+    [:octicons-arrow-right-24: Deployment configurations](#selecting-deployment-configurations)
+
+- :fontawesome-solid-chart-gantt: **Low overhead, pipelined execution**
+
+    ---
+
+    Efficient power and resource usage on server and edge devices
+
+    [:octicons-arrow-right-24: Benchmarking](./developers/performance/benchmarking.md)
+
+- :fontawesome-regular-floppy-disk: **Binary size as low as 30KB on embedded systems**
+
+    ---
+
+    [:octicons-arrow-right-24: Running on bare-metal](./guides/deployment-configurations/bare-metal.md)
+
+- :fontawesome-solid-magnifying-glass: **Debugging and profiling support**
+
+    ---
+
+    [:octicons-arrow-right-24: Profiling with Tracy](./developers/performance/profiling-with-tracy.md)
+
+</div>
 
 ## Support matrix
 
@@ -28,8 +68,7 @@ IREE supports importing from a variety of ML frameworks:
 - [x] JAX
 - [x] ONNX
 - [x] PyTorch
-- [x] TensorFlow
-- [x] TensorFlow Lite
+- [x] TensorFlow and TensorFlow Lite
 
 The IREE compiler tools run on :fontawesome-brands-linux: Linux,
 :fontawesome-brands-windows: Windows, and :fontawesome-brands-apple: macOS
@@ -53,8 +92,8 @@ Support for hardware accelerators and APIs is also included:
 
 - [x] Vulkan
 - [x] CUDA
+- [x] ROCm
 - [x] Metal (for Apple silicon devices)
-- [ ] ROCm (experimental)
 - [ ] AMD AIE (experimental)
 - [ ] WebGPU (experimental)
 
@@ -98,9 +137,9 @@ Using IREE involves the following general steps:
 IREE supports importing models from a growing list of
 [ML frameworks](./guides/ml-frameworks/index.md) and model formats:
 
-* [:simple-pytorch: PyTorch](./guides/ml-frameworks/pytorch.md)
-* [:simple-onnx: ONNX](./guides/ml-frameworks/onnx.md)
 * [:simple-python: JAX](./guides/ml-frameworks/jax.md)
+* [:simple-onnx: ONNX](./guides/ml-frameworks/onnx.md)
+* [:simple-pytorch: PyTorch](./guides/ml-frameworks/pytorch.md)
 * [:simple-tensorflow: TensorFlow](./guides/ml-frameworks/tensorflow.md) and
   [:simple-tensorflow: TensorFlow Lite](./guides/ml-frameworks/tflite.md)
 
