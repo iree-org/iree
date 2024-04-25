@@ -29,8 +29,10 @@ LogicalResult linkUkernelBitcodeFiles(Location loc, llvm::Module *module,
                                       StringRef bitcodePath,
                                       unsigned linkerFlags,
                                       llvm::TargetMachine &targetMachine);
-// Compiles ISAToHsaco Code
-std::string createHsaco(Location loc, const std::string isa, StringRef name);
+
+// Compiles the `isa` to the HSA Code Object format. Returns the object file as
+// a blob.
+std::string createHsaco(Location loc, StringRef isa, StringRef name);
 
 // Returns true if the rocm archtecture target is supported for ukernels.
 bool hasUkernelSupportedRocmArch(IREE::HAL::ExecutableTargetAttr targetAttr);
