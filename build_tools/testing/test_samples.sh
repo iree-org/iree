@@ -11,8 +11,5 @@ set -x
 ROOT_DIR=$(git rev-parse --show-toplevel)
 cd ${ROOT_DIR?}
 
-git submodule sync
-git submodule update --init
-
 ./samples/dynamic_shapes/test.sh
 ./samples/variables_and_state/test.sh
