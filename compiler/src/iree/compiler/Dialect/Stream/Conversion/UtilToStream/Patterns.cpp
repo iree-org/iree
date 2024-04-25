@@ -279,7 +279,13 @@ struct GlobalLoadOpExpansion
     // Only apply to expanded types (tensors/etc).
     if (!isExpandedType(loadOp.getType()))
       return failure();
-    auto &expandedGlobal = this->expansionState->globalMap[adaptor.getGlobal()];
+
+    auto expandedGlobalIt =
+        this->expansionState->globalMap.find(adaptor.getGlobal());
+    if (expandedGlobalIt == this->expansionState->globalMap.end())
+      return rewriter.notifyMatchFailure(loadOp, "expanded global not found");
+
+    auto &expandedGlobal = expandedGlobalIt->getSecond();
 
     // Insert a load/transfer to the unknown resource lifetime.
     auto unknownType = IREE::Stream::ResourceType::get(rewriter.getContext());
@@ -312,7 +318,13 @@ struct GlobalStoreOpExpansion
     // Only apply to expanded types (tensors/etc).
     if (!isExpandedType(storeOp.getValue().getType()))
       return failure();
-    auto &expandedGlobal = expansionState->globalMap[adaptor.getGlobal()];
+
+    auto expandedGlobalIt =
+        this->expansionState->globalMap.find(adaptor.getGlobal());
+    if (expandedGlobalIt == this->expansionState->globalMap.end())
+      return rewriter.notifyMatchFailure(storeOp, "expanded global not found");
+
+    auto &expandedGlobal = expandedGlobalIt->getSecond();
 
     // Insert a transfer/store to the global with unknown lifetime. Lifetime
     // refinement will make this go away if possible.
