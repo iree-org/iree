@@ -203,18 +203,14 @@ struct DecomposeWinogradInputTransform
     if (transformOp.getInputRank() != 2 || transformOp.getOutputRank() != 2) {
       return rewriter.notifyMatchFailure(transformOp, "Winograd op not tiled");
     }
-    auto one = rewriter.getIndexAttr(1);
-    auto zero = rewriter.getIndexAttr(0);
     const int64_t inputTileSize = transformOp.getInputTileSize();
     ArrayRef<int64_t> imageDims = transformOp.getImageDimensions();
     llvm::SmallSetVector<int64_t, 2> imageDimsSet(imageDims.begin(),
                                                   imageDims.end());
     SmallVector<int64_t> inputTileSquare(imageDims.size(), inputTileSize);
     Type elementType = transformOp.getOutputType().getElementType();
-    Value zeroF32 = rewriter.create<arith::ConstantOp>(
+    Value zero = rewriter.create<arith::ConstantOp>(
         loc, rewriter.getZeroAttr(elementType));
-    Value scratch =
-        rewriter.create<tensor::EmptyOp>(loc, inputTileSquare, elementType);
     /// The two values below are the transpose(B) [BT]
     /// and B [B] constant matrices that convert the input
     /// tile from the original domain to the Winograd domain.
@@ -227,32 +223,38 @@ struct DecomposeWinogradInputTransform
 
     auto inputExtractSliceOp =
         dynamicSlice.getDefiningOp<tensor::ExtractSliceOp>();
-    SmallVector<OpFoldResult> mixedSizes = inputExtractSliceOp.getMixedSizes();
     // Harcoding input rank as 4 here - since we'd be getting a tiled version
     // with rank 2. We are always expected to either have a rank 4 version of
     // this op, or rank 2 (tiled). And at this point in the flow, it is
     // guaranteed to be a rank 2 version of the op as ensured by the assertion
-    // above. Copy input slice into zeroed padded scratch space
-    SmallVector<OpFoldResult> offsets(2, zero);
-    SmallVector<OpFoldResult> sizes;
-    SmallVector<OpFoldResult> strides(2, one);
-    for (int i = 0; i < 4; i++) {
-      if (imageDimsSet.contains(i)) {
-        sizes.push_back(mixedSizes[i]);
-      }
+    // above. Pad the input slice.
+
+    SmallVector<OpFoldResult> mixedSizes = inputExtractSliceOp.getMixedSizes();
+    SmallVector<OpFoldResult> dynamicSliceSizes;
+    for (auto idx : transformOp.getImageDimensions()) {
+      dynamicSliceSizes.push_back(mixedSizes[idx]);
     }
-    linalg::FillOp fillOp = rewriter.create<linalg::FillOp>(
-        loc, ValueRange{zeroF32}, ValueRange{scratch});
-    Value inputSlice = rewriter.create<tensor::InsertSliceOp>(
-        loc, dynamicSlice, fillOp.result(), offsets, sizes, strides);
+    SmallVector<OpFoldResult> padLow(inputTileSquare.size(),
+                                     rewriter.getIndexAttr(0));
+    SmallVector<OpFoldResult> padHigh;
+    for (auto [idx, size] : llvm::enumerate(dynamicSliceSizes)) {
+      AffineExpr d0;
+      bindDims(rewriter.getContext(), d0);
+      auto ub = rewriter.getAffineConstantExpr(inputTileSquare[idx]);
+      padHigh.push_back(affine::makeComposedFoldedAffineApply(rewriter, loc,
+                                                              {ub - d0}, size));
+    }
+    auto inputSliceType = transformOp.getInputType().clone(inputTileSquare);
+    Value inputSlice = rewriter.create<tensor::PadOp>(
+        loc, inputSliceType, dynamicSlice, padLow, padHigh, zero);
 
     // Create computation
     Value result, AMatrix, BMatrix;
     linalg::MatmulOp matmulOp;
     Type tensorType = outputSlice.getType();
     for (int i = 0; i < 2; i++) {
-      fillOp = rewriter.create<linalg::FillOp>(loc, ValueRange{zeroF32},
-                                               ValueRange{outputSlice});
+      linalg::FillOp fillOp = rewriter.create<linalg::FillOp>(
+          loc, ValueRange{zero}, ValueRange{outputSlice});
       if (i == 0) {
         AMatrix = inputSlice;
         BMatrix = B;

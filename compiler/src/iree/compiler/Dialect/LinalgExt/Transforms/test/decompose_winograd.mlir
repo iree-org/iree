@@ -69,6 +69,7 @@ module {
     return %inserted_slice : tensor<8x8x2x22x22x64xf16>
   }
 }
+// CHECK-DAG:  #[[MAP:.+]] = affine_map<()[s0] -> (-s0 + 8)>
 // CHECK:      func.func @winograd_input_transform(
 // CHECK-SAME:   %[[ARG0:.+]]: tensor<2x130x130x64xf16>
 // CHECK-SAME:   %[[ARG1:.+]]: tensor<8x8x2x22x22x64xf16>
@@ -77,19 +78,21 @@ module {
 // CHECK-DAG:    %[[ZERO:.+]] = arith.constant 0.000000e+00 : f16
 // CHECK-DAG:    %[[BT:.+]] = arith.constant dense<{{\[\[}}1.000000e+00, 0.000000e+00, 0.000000e+00,{{.*}} : tensor<8x8xf32>
 // CHECK-DAG:    %[[B:.+]] = arith.constant dense<{{\[\[}}1.000000e+00, 0.000000e+00, -5.250000e+00,{{.*}} : tensor<8x8xf32>
-// CHECK-DAG:    %[[EMPTY:.+]] = tensor.empty() : tensor<8x8xf16>
 // CHECK-DAG:    %[[INPUT_TILE:.+]] = tensor.extract_slice %[[ARG0]]
 // CHECK-DAG:    %[[OUTPUT_TILE:.+]] = tensor.extract_slice %[[ARG1]]
-// CHECK:        %[[FILL_0:.+]] = linalg.fill ins(%[[ZERO]] : f16) outs(%[[EMPTY]] : tensor<8x8xf16>) -> tensor<8x8xf16>
-// CHECK:        %[[INSERTED_SLICE_0:.+]] = tensor.insert_slice %[[INPUT_TILE]] into %[[FILL_0]][0, 0]
-// CHECK-SAME:                 [%[[S0]], %[[S1]]] [1, 1] : tensor<?x?xf16> into tensor<8x8xf16>
+// CHECK-DAG:    %[[PAD_HIGH0:.+]] = affine.apply #[[MAP]](){{\[}}%[[S0]]]
+// CHECK-DAG:    %[[PAD_HIGH1:.+]] = affine.apply #[[MAP]](){{\[}}%[[S1]]]
+// CHECK:        %[[PAD:.+]] = tensor.pad %[[INPUT_TILE]] low[0, 0] high{{\[}}%[[PAD_HIGH0]], %[[PAD_HIGH1]]]
+// CHECK-NEXT:     ^bb0(
+// CHECK-NEXT:       tensor.yield %[[ZERO]] : f16
+// CHECK-NEXT:    } : tensor<?x?xf16> to tensor<8x8xf16>
 // CHECK:        %[[FILL_1:.+]] = linalg.fill ins(%[[ZERO]] : f16) outs(%[[OUTPUT_TILE]] : tensor<8x8xf16>) -> tensor<8x8xf16>
-// CHECK:        %[[MATMUL_0:.+]] = linalg.matmul ins(%[[INSERTED_SLICE_0]], %[[BT]]
+// CHECK:        %[[MATMUL_0:.+]] = linalg.matmul ins(%[[PAD]], %[[BT]]
 // CHECK-SAME:     outs(%[[FILL_1]]
 // CHECK:        %[[MATMUL_1:.+]] = linalg.matmul ins(%[[B]], %[[MATMUL_0]]
 // CHECK-SAME:     outs(%[[FILL_1]]
-// CHECK:        %[[INSERTED_SLICE_1:.+]] = tensor.insert_slice %[[MATMUL_1]] into %[[ARG1]]
-// CHECK:        return %[[INSERTED_SLICE_1]] : tensor<8x8x2x22x22x64xf16>
+// CHECK:        %[[INSERTED_SLICE:.+]] = tensor.insert_slice %[[MATMUL_1]] into %[[ARG1]]
+// CHECK:        return %[[INSERTED_SLICE]] : tensor<8x8x2x22x22x64xf16>
 
 // -----
 
@@ -104,6 +107,7 @@ module {
     return %inserted_slice : tensor<8x8x2x22x22x64xf16>
   }
 }
+// CHECK-DAG:  #[[MAP:.+]] = affine_map<()[s0] -> (-s0 + 8)>
 // CHECK:      func.func @winograd_input_transform_nchw(
 // CHECK-SAME:   %[[ARG0:.+]]: tensor<2x64x130x130xf16>
 // CHECK-SAME:   %[[ARG1:.+]]: tensor<8x8x2x22x22x64xf16>
@@ -112,19 +116,21 @@ module {
 // CHECK-DAG:    %[[ZERO:.+]] = arith.constant 0.000000e+00 : f16
 // CHECK-DAG:    %[[BT:.+]] = arith.constant dense<{{\[\[}}1.000000e+00, 0.000000e+00, 0.000000e+00,{{.*}} : tensor<8x8xf32>
 // CHECK-DAG:    %[[B:.+]] = arith.constant dense<{{\[\[}}1.000000e+00, 0.000000e+00, -5.250000e+00,{{.*}} : tensor<8x8xf32>
-// CHECK-DAG:    %[[EMPTY:.+]] = tensor.empty() : tensor<8x8xf16>
 // CHECK-DAG:    %[[INPUT_TILE:.+]] = tensor.extract_slice %[[ARG0]]
 // CHECK-DAG:    %[[OUTPUT_TILE:.+]] = tensor.extract_slice %[[ARG1]]
-// CHECK:        %[[FILL_0:.+]] = linalg.fill ins(%[[ZERO]] : f16) outs(%[[EMPTY]] : tensor<8x8xf16>) -> tensor<8x8xf16>
-// CHECK:        %[[INSERTED_SLICE_0:.+]] = tensor.insert_slice %[[INPUT_TILE]] into %[[FILL_0]][0, 0]
-// CHECK-SAME:                 [%[[S0]], %[[S1]]] [1, 1] : tensor<?x?xf16> into tensor<8x8xf16>
-// CHECK:        %[[FILL_1:.+]] = linalg.fill ins(%[[ZERO]] : f16) outs(%[[OUTPUT_TILE]] : tensor<8x8xf16>) -> tensor<8x8xf16>
-// CHECK:        %[[MATMUL_0:.+]] = linalg.matmul ins(%[[INSERTED_SLICE_0]], %[[BT]]
-// CHECK-SAME:     outs(%[[FILL_1]]
+// CHECK-DAG:    %[[PAD_HIGH0:.+]] = affine.apply #[[MAP]](){{\[}}%[[S0]]]
+// CHECK-DAG:    %[[PAD_HIGH1:.+]] = affine.apply #[[MAP]](){{\[}}%[[S1]]]
+// CHECK:        %[[PAD:.+]] = tensor.pad %[[INPUT_TILE]] low[0, 0] high{{\[}}%[[PAD_HIGH0]], %[[PAD_HIGH1]]]
+// CHECK-NEXT:     ^bb0(
+// CHECK-NEXT:       tensor.yield %[[ZERO]] : f16
+// CHECK-NEXT:    } : tensor<?x?xf16> to tensor<8x8xf16>
+// CHECK:        %[[FILL:.+]] = linalg.fill ins(%[[ZERO]] : f16) outs(%[[OUTPUT_TILE]] : tensor<8x8xf16>) -> tensor<8x8xf16>
+// CHECK:        %[[MATMUL_0:.+]] = linalg.matmul ins(%[[PAD]], %[[BT]]
+// CHECK-SAME:     outs(%[[FILL]]
 // CHECK:        %[[MATMUL_1:.+]] = linalg.matmul ins(%[[B]], %[[MATMUL_0]]
-// CHECK-SAME:     outs(%[[FILL_1]]
-// CHECK:        %[[INSERTED_SLICE_1:.+]] = tensor.insert_slice %[[MATMUL_1]] into %[[ARG1]]
-// CHECK:        return %[[INSERTED_SLICE_1]] : tensor<8x8x2x22x22x64xf16>
+// CHECK-SAME:     outs(%[[FILL]]
+// CHECK:        %[[INSERTED_SLICE:.+]] = tensor.insert_slice %[[MATMUL_1]] into %[[ARG1]]
+// CHECK:        return %[[INSERTED_SLICE]] : tensor<8x8x2x22x22x64xf16>
 
 // -----
 
