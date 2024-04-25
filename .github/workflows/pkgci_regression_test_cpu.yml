@@ -122,7 +122,7 @@ jobs:
       - name: Run external tests - Models with real weights
         run: |
           source ${VENV_DIR}/bin/activate
-          pytest iree_tests/pytorch/models \
+          pytest SHARK-TestSuite/iree_tests/pytorch/models \
             -n 4 \
             -rpfE \
             -k real_weights \
@@ -137,7 +137,7 @@ jobs:
       - name: "Running real weight model tests scheduled unet cpu"
         run: |
           source ${VENV_DIR}/bin/activate
-          pytest iree_tests/pytorch/models/sdxl-scheduled-unet-3-tank \
+          pytest SHARK-TestSuite/iree_tests/pytorch/models/sdxl-scheduled-unet-3-tank \
             -rpfE \
             -k real_weights \
             --no-skip-tests-missing-files \
