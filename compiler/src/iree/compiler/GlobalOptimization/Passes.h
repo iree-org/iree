@@ -124,20 +124,6 @@ createGlobalLoopInvariantCodeMotionPass();
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createDataLayoutPropagationPass();
 
-/// Options for converting Linalg matmul ops to transposed variants.
-enum class TransposeMatmulOption {
-  /// Transpose LHS input matrix.
-  Lhs,
-  /// Transpose RHS input matrix.
-  Rhs,
-  /// Transpose neither input (disable).
-  None
-};
-
-/// Convert Linalg matmul ops to transposed variants.
-std::unique_ptr<Pass> createTransposeMatmulPass(
-    TransposeMatmulOption input = TransposeMatmulOption::None);
-
 void registerGlobalOptimizationPipeline();
 
 } // namespace mlir::iree_compiler::GlobalOptimization

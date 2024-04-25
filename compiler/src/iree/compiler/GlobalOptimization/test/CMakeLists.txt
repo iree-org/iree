@@ -35,7 +35,6 @@ iree_lit_test_suite(
     "set_encoding.mlir"
     "transformation_pipeline.mlir"
     "transpose_and_decompose_concat.mlir"
-    "transpose_matmul.mlir"
   TOOLS
     FileCheck
     iree-opt

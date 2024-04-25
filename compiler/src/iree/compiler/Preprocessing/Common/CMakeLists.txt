@@ -34,6 +34,7 @@ iree_cc_library(
     "PadLinalgOps.cpp"
     "PadToIntrinsics.cpp"
     "Passes.cpp"
+    "TransposeMatmul.cpp"
   DEPS
     ::PassesIncGen
     LLVMSupport

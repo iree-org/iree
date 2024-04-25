@@ -1,6 +1,6 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-global-opt-transpose-matmul{input=lhs}))" %s | FileCheck %s --check-prefixes=CHECK,LHS
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-global-opt-transpose-matmul{input=rhs}))" %s | FileCheck %s --check-prefixes=CHECK,RHS
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-global-opt-transpose-matmul))" %s | FileCheck %s --check-prefixes=CHECK,DISABLED
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-preprocessing-transpose-matmul{input=lhs}))" %s | FileCheck %s --check-prefixes=CHECK,LHS
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-preprocessing-transpose-matmul{input=rhs}))" %s | FileCheck %s --check-prefixes=CHECK,RHS
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-preprocessing-transpose-matmul))" %s | FileCheck %s --check-prefixes=CHECK,DISABLED
 
 // CHECK-LABEL: @matmul
 // LHS: linalg.matmul_transpose_a

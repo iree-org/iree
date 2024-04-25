@@ -167,9 +167,20 @@ struct SchedulingOptions {
 };
 
 struct PreprocessingOptions {
+  /// Options for converting Linalg matmul ops to transposed variants.
+  enum class TransposeMatmulInput {
+    /// Transpose LHS input matrix.
+    Lhs,
+    /// Transpose RHS input matrix.
+    Rhs,
+    /// Transpose neither input (disable).
+    None
+  };
+
   std::string preprocessingPassPipeline;
   std::string preprocessingTransformSpecFilename;
   std::string preprocessingPDLSpecFilename;
+  TransposeMatmulInput preprocessingTransposeMatmulInput;
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<PreprocessingOptions>;
 };

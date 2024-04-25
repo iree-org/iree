@@ -57,17 +57,6 @@ static llvm::cl::opt<bool> clEnableDemoteContractionInputsToBF16(
         "Demote inputs (LHS, RHS) of linalg matmul-like ops from f32 to bf16."),
     llvm::cl::init(false));
 
-static llvm::cl::opt<TransposeMatmulOption> clTransposeMatmul(
-    "iree-global-opt-enable-transpose-matmul",
-    llvm::cl::desc("Convert Linalg matmul ops to transposed variants."),
-    llvm::cl::values(clEnumValN(TransposeMatmulOption::Lhs, "lhs",
-                                "Transpose LHS input matrix."),
-                     clEnumValN(TransposeMatmulOption::Rhs, "rhs",
-                                "Transpose RHS input matrix."),
-                     clEnumValN(TransposeMatmulOption::None, "none",
-                                "Transpose neither input (disable).")),
-    llvm::cl::init(TransposeMatmulOption::None));
-
 void buildGlobalOptExprHoistingPassPipeline(
     OpPassManager &passManager, const TransformOptions &transformOptions) {
   IREE::Util::ExprHoistingOptions options;
@@ -110,9 +99,6 @@ void buildGlobalOptimizationPassPipeline(
       .addPass(mlir::createLinalgNamedOpConversionPass)
       .addPass(createConvert1X1FilterConv2DToMatmulPass);
   mainPassManager.addPass(createEraseUnusedLinalgOperands());
-
-  if (clTransposeMatmul != TransposeMatmulOption::None)
-    mainPassManager.addPass(createTransposeMatmulPass(clTransposeMatmul));
 
   // Expand tensor shapes into SSA values and optimize the whole program.
   // The more we are able to equate shape dimensions at this level the
