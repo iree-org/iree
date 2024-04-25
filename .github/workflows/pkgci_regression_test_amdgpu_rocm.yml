@@ -132,7 +132,6 @@ jobs:
             --retry-delay 5 \
             --durations=0 \
             --config-files=build_tools/pkgci/external_test_suite/gpu_rocm_models.json
-      
       - name: "Running real weight model tests scheduled unet"
         run: |
           source ${VENV_DIR}/bin/activate
@@ -146,7 +145,6 @@ jobs:
             --retry-delay 5 \
             --durations=0 \
             --config-files=build_tools/pkgci/external_test_suite/sdxl_scheduled_unet_gpu_rocm.json
-      
       - name: "Running SDXL rocm pipeline benchmark"
         run: |
           source ${VENV_DIR}/bin/activate

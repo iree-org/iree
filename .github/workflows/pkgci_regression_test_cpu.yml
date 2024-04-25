@@ -133,7 +133,6 @@ jobs:
             --retry-delay 5 \
             --durations=0 \
             --config-files=build_tools/pkgci/external_test_suite/pytorch_models_cpu_llvm_task.json
-      
       - name: "Running real weight model tests scheduled unet cpu"
         run: |
           source ${VENV_DIR}/bin/activate
