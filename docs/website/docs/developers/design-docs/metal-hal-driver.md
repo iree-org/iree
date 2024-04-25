@@ -188,7 +188,7 @@ caching allocator.
 ### Buffer
 
 IREE [`iree_hal_buffer_t`][hal-buffer] maps Metal `MTLBuffer`. See
-[Memory Management](#memory-management) for more details.
+[Object Lifetime Management](#object-lifetime-management) for more details.
 
 ### Executable
 
@@ -261,7 +261,7 @@ different places: the former is given when invoking
 dispatched SPIR-V code. This split does not match the Metal model, where we
 specify both in the API with `dispatchThreads:threadsPerThreadgroup:`.
 
-As said in [shader/kernel compilation](#shader-kernel-compilation), MSL kernels
+As said in [shader/kernel compilation](#shaderkernel-compilation), MSL kernels
 are cross compiled from SPIR-V code and then embeded in the module FlatBuffer.
 The module FlatBuffer provides us a way to convey the threadgroup/workgroup size
 information extracted from the SPIR-V code. We encode an additional 3-D vector
