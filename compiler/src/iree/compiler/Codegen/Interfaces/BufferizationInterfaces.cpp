@@ -242,8 +242,8 @@ struct DispatchTensorStoreOpInterface
       // Writing to a part of the tensor.
       auto subviewMemRefType =
           llvm::cast<MemRefType>(memref::SubViewOp::inferRankReducedResultType(
-              storeOp.getValue().getType().cast<ShapedType>().getShape(),
-              target.getType().cast<MemRefType>(), storeOp.getMixedOffsets(),
+              cast<ShapedType>(storeOp.getValue().getType()).getShape(),
+              cast<MemRefType>(target.getType()), storeOp.getMixedOffsets(),
               storeOp.getMixedSizes(), storeOp.getMixedStrides()));
 
       target = rewriter.create<memref::SubViewOp>(

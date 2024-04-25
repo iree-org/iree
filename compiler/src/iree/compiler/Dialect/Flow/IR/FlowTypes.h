@@ -130,7 +130,7 @@ public:
     if (boundType.isIntOrIndexOrFloat()) {
       return RankedTensorType::get({}, boundType);
     }
-    return boundType.cast<RankedTensorType>();
+    return llvm::cast<RankedTensorType>(boundType);
   }
 };
 

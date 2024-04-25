@@ -44,7 +44,7 @@ class IREEInput_Type<string name> : TypeDef<IREEInput_Dialect, name>;
 // Predicates
 //===----------------------------------------------------------------------===//
 
-class IREEInput_AliasedSymbolRefAttr : Attr<CPred<"$_self.isa<FlatSymbolRefAttr>()">,
+class IREEInput_AliasedSymbolRefAttr : Attr<CPred<"isa<FlatSymbolRefAttr>($_self)">,
                                                   "symbol reference attribute"> {
   let storageType = [{ FlatSymbolRefAttr }];
   let returnType = [{ StringRef }];
@@ -53,11 +53,11 @@ class IREEInput_AliasedSymbolRefAttr : Attr<CPred<"$_self.isa<FlatSymbolRefAttr>
 }
 class IREEInput_AnyPtrOf<list<Type> types> :
     Type<And<[
-      CPred<"$_self.isa<::mlir::iree_compiler::IREE::Input::PtrType>()">,
+      CPred<"isa<::mlir::iree_compiler::IREE::Input::PtrType>($_self)">,
       Or<!foreach(type, types,
           SubstLeaves<
               "$_self",
-              "$_self.cast<::mlir::iree_compiler::IREE::Input::PtrType>().getTargetType()",
+              "cast<::mlir::iree_compiler::IREE::Input::PtrType>($_self).getTargetType()",
               type.predicate>)>,
     ]>, !interleave(!foreach(type, types, type.summary), " or ")> {
   string builderCall = "";
@@ -68,7 +68,7 @@ def IREEInput_Tensor : TypeAlias<AnyRankedTensor>;
 
 def IREEInput_AnyList : DialectType<
     IREEInput_Dialect,
-    CPred<"$_self.isa<::mlir::iree_compiler::IREE::Input::ListType>()">,
+    CPred<"isa<::mlir::iree_compiler::IREE::Input::ListType>($_self)">,
       "list"> {
   let description = [{
     A mutable, resizable list of some type.
@@ -77,9 +77,9 @@ def IREEInput_AnyList : DialectType<
 
 class IREEInput_ListOf<Type type> :
     Type<And<[
-      CPred<"$_self.isa<::mlir::iree_compiler::IREE::Input::ListType>()">,
+      CPred<"isa<::mlir::iree_compiler::IREE::Input::ListType>($_self)">,
       SubstLeaves<"$_self",
-                  "$_self.cast<::mlir::iree_compiler::IREE::Input::ListType>().getElementType()",
+                  "cast<::mlir::iree_compiler::IREE::Input::ListType>($_self).getElementType()",
                   type.predicate>
     ]>, "list<" # type.summary # ">"> {
   // Set the builder call if the base type has a builder call.
@@ -99,8 +99,8 @@ class IREEInput_IndexAttrBase<string descr> :
     TypedAttrBase<
       Index, "IntegerAttr",
       And<[
-        CPred<"$_self.isa<IntegerAttr>()">,
-        CPred<"$_self.cast<IntegerAttr>().getType().isIndex()">,
+        CPred<"isa<IntegerAttr>($_self)">,
+        CPred<"cast<IntegerAttr>($_self).getType().isIndex()">,
       ]>,
       descr> {
   let returnType = [{ APInt }];

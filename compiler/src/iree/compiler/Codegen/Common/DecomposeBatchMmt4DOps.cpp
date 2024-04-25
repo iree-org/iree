@@ -78,7 +78,7 @@ struct ConvertBatchMmt4DtoMmt4DPattern
     auto rhs = op.getDpsInputOperand(1)->get();
     auto out = op.getDpsInitOperand(0)->get();
 
-    auto outType = out.getType().cast<RankedTensorType>();
+    auto outType = cast<RankedTensorType>(out.getType());
     // Batch dim needs to be tiled to 1 first.
     if (outType.getShape()[0] != 1) {
       return rewriter.notifyMatchFailure(op, "batch dim needs to be 1");
@@ -111,7 +111,7 @@ struct ConvertBatchMmt4DtoMmt4DPattern
       initTensor = out;
     }
 
-    auto lhsType = lhs.getType().cast<RankedTensorType>();
+    auto lhsType = cast<RankedTensorType>(lhs.getType());
     RankedTensorType reducedLhsType =
         RankedTensorType::Builder(lhsType).dropDim(0);
     auto reducedLhs = tensor::createCanonicalRankReducingExtractSliceOp(
@@ -121,7 +121,7 @@ struct ConvertBatchMmt4DtoMmt4DPattern
           lhs.getLoc(), "lhs producer should be reduced, but reduction failed");
     }
 
-    auto rhsType = rhs.getType().cast<RankedTensorType>();
+    auto rhsType = cast<RankedTensorType>(rhs.getType());
     RankedTensorType reducedRhsType =
         RankedTensorType::Builder(rhsType).dropDim(0);
     auto reducedRhs = tensor::createCanonicalRankReducingExtractSliceOp(
@@ -169,7 +169,7 @@ void DecomposeBatchMmt4DOpsPass::runOnOperation() {
   WalkResult result =
       funcOp.walk([&](linalg::BatchMmt4DOp batchMmt4DOp) -> WalkResult {
         auto out = batchMmt4DOp.getDpsInitOperand(0)->get();
-        auto outType = out.getType().cast<RankedTensorType>();
+        auto outType = cast<RankedTensorType>(out.getType());
         // Tile only non unit batch dimensions with tile size equals to 1.
         if (outType.getShape()[0] <= 1) {
           return WalkResult::advance();

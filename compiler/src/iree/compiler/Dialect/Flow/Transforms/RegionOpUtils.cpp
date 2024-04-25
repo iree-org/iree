@@ -339,7 +339,7 @@ FailureOr<IREE::Flow::DispatchRegionOp> appendDispatchRegionResults(
 
   for (auto [index, result] : llvm::enumerate(results)) {
 #ifndef NDEBUG
-    auto tensorType = result.getType().cast<RankedTensorType>();
+    auto tensorType = cast<RankedTensorType>(result.getType());
     assert(tensorType.getNumDynamicDims() == dynamicDims[index].size() &&
            "incorrect number of dynamicDims provided");
 #endif // NDEBUG

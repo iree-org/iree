@@ -57,7 +57,7 @@ template <typename To, typename From, typename Converter>
 static ArrayAttr convertArrayAttribute(ArrayAttr src, Converter fn) {
   SmallVector<Attribute> result;
   for (auto attr : src) {
-    if (auto arr = attr.dyn_cast<ArrayAttr>()) {
+    if (auto arr = dyn_cast<ArrayAttr>(attr)) {
       result.push_back(convertArrayAttribute<To, From, Converter>(arr, fn));
     } else {
       result.push_back(fn(attr.template cast<From>()));

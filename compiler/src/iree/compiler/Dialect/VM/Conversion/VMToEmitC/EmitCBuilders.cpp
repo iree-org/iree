@@ -78,7 +78,7 @@ Value contentsOf(OpBuilder builder, Location location, Value operand) {
   auto ctx = builder.getContext();
 
   Type type = operand.getType();
-  assert(type.isa<emitc::PointerType>());
+  assert(isa<emitc::PointerType>(type));
 
   return builder
       .create<emitc::ApplyOp>(

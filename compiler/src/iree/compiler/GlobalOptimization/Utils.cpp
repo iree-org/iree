@@ -49,8 +49,8 @@ std::optional<CastOpInterface> getDefiningNonI1ExtendingCastOp(Value input) {
     return std::nullopt;
   }
   Value castIn = castOp->getOperand(0);
-  if (castIn.isa<BlockArgument>() &&
-      castIn.cast<BlockArgument>().getArgNumber() != 0) {
+  if (isa<BlockArgument>(castIn) &&
+      cast<BlockArgument>(castIn).getArgNumber() != 0) {
     return std::nullopt;
   }
   if (!isI1Src(castOp) && isExtending(castOp)) {

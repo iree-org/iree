@@ -702,7 +702,7 @@ materializePolynomialApproximation(ConversionPatternRewriter &rewriter,
 static Value materializeErfcApproximationF64ForMagnituteGeOne(
     ConversionPatternRewriter &rewriter, Location loc, ValueRange args) {
   Value x = args.front();
-  assert(x.getType().cast<ShapedType>().getElementType().isF64() &&
+  assert(cast<ShapedType>(x.getType()).getElementType().isF64() &&
          "expect f64 element type");
   const double kMaxlog = 7.09782712893383996843E2;
   const double kErfcPCoefficients[] = {
@@ -841,7 +841,7 @@ static Value
 materializeErfcApproximationF64(ConversionPatternRewriter &rewriter,
                                 Location loc, ValueRange args) {
   Value x = args.front();
-  assert(x.getType().cast<ShapedType>().getElementType().isF64() &&
+  assert(cast<ShapedType>(x.getType()).getElementType().isF64() &&
          "expect f64 element type");
 
   // Rely on erfc approximation for |x| >= 1
@@ -873,7 +873,7 @@ materializeErfcApproximationF64(ConversionPatternRewriter &rewriter,
 static Value materializeErfcApproximationF32ForMagnitudeGeOne(
     ConversionPatternRewriter &rewriter, Location loc, ValueRange args) {
   Value x = args.front();
-  assert(x.getType().cast<ShapedType>().getElementType().isF32() &&
+  assert(cast<ShapedType>(x.getType()).getElementType().isF32() &&
          "expect f32 element type");
   const double kMaxlog = 88.72283905206835;
   const float kErfcPCoefficients[] = {
@@ -939,7 +939,7 @@ static Value materializeErfcApproximationF32ForMagnitudeGeOne(
 static Value materializeErfApproximationF32ForMagnitudeLeOne(
     ConversionPatternRewriter &rewriter, Location loc, ValueRange args) {
   Value x = args.front();
-  assert(x.getType().cast<ShapedType>().getElementType().isF32() &&
+  assert(cast<ShapedType>(x.getType()).getElementType().isF32() &&
          "expect f32 element type");
   const float kErfTCoefficients[] = {
       +7.853861353153693E-5f, -8.010193625184903E-4f, +5.188327685732524E-3f,
@@ -959,7 +959,7 @@ static Value materializeErfApproximationF32ForMagnitudeLeOne(
 static Value materializeErfApproximationF32(ConversionPatternRewriter &rewriter,
                                             Location loc, ValueRange args) {
   Value x = args.front();
-  assert(x.getType().cast<ShapedType>().getElementType().isF32() &&
+  assert(cast<ShapedType>(x.getType()).getElementType().isF32() &&
          "expect f32 element type");
   const float kAlpha[] = {
       -2.72614225801306e-10f, 2.77068142495902e-08f,  -2.10102402082508e-06f,
@@ -997,7 +997,7 @@ static Value
 materializeErfcApproximationF32(ConversionPatternRewriter &rewriter,
                                 Location loc, ValueRange args) {
   Value x = args.front();
-  assert(x.getType().cast<ShapedType>().getElementType().isF32() &&
+  assert(cast<ShapedType>(x.getType()).getElementType().isF32() &&
          "expect f32 element type");
 
   // Rely on erfc approximation for |x| >= 1
@@ -1583,7 +1583,7 @@ static Value materializeDigamma(ConversionPatternRewriter &rewriter,
 
 static Value getConstantLikeSmallestFiniteValue(OpBuilder &b, Location loc,
                                                 Value val) {
-  auto ty = getElementTypeOrSelf(val.getType()).cast<FloatType>();
+  auto ty = cast<FloatType>(getElementTypeOrSelf(val.getType()));
   return getConstantLike(
       b, loc, llvm::APFloat::getSmallest(ty.getFloatSemantics()), val);
 }
@@ -1997,7 +1997,7 @@ struct ConvertSinhOp final : OpConversionPattern<mlir::chlo::SinhOp> {
   matchAndRewrite(mlir::chlo::SinhOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     Value x = adaptor.getOperand();
-    if (cast<ShapedType>(x.getType()).getElementType().isa<ComplexType>()) {
+    if (isa<ComplexType>(cast<ShapedType>(x.getType()).getElementType())) {
       rewriter.replaceOp(op, materializeSinhApproximationForLargeX(
                                  rewriter, op.getLoc(), adaptor.getOperands()));
       return success();

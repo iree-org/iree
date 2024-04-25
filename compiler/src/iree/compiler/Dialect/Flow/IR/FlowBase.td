@@ -96,22 +96,22 @@ def FLOW_GlobalPtr : Util_AnyPtrOf<[FLOW_Tensor, FLOW_PrimitiveType]>;
 //===----------------------------------------------------------------------===//
 
 def FLOW_TensorAccessCanReadPred : CPred<[{
-  $_self.cast<IREE::Flow::DispatchTensorType>().getAccess() ==
+  cast<IREE::Flow::DispatchTensorType>($_self).getAccess() ==
       IREE::Flow::TensorAccess::ReadOnly ||
-  $_self.cast<IREE::Flow::DispatchTensorType>().getAccess() ==
+  cast<IREE::Flow::DispatchTensorType>($_self).getAccess() ==
       IREE::Flow::TensorAccess::ReadWrite
 }]>;
 
 def FLOW_TensorAccessCanWritePred : CPred<[{
-  $_self.cast<IREE::Flow::DispatchTensorType>().getAccess() ==
+  cast<IREE::Flow::DispatchTensorType>($_self).getAccess() ==
       IREE::Flow::TensorAccess::WriteOnly ||
-  $_self.cast<IREE::Flow::DispatchTensorType>().getAccess() ==
+  cast<IREE::Flow::DispatchTensorType>($_self).getAccess() ==
       IREE::Flow::TensorAccess::ReadWrite
 }]>;
 
 def FLOW_DispatchTensor : DialectType<
     Flow_Dialect,
-    CPred<"$_self.isa<IREE::Flow::DispatchTensorType>()">,
+    CPred<"isa<IREE::Flow::DispatchTensorType>($_self)">,
     "dispatch.tensor"> {
   let description = [{
     A placeholder for a dispatch region input/output operand. This can be used
@@ -123,7 +123,7 @@ def FLOW_DispatchTensor : DialectType<
 def FLOW_ReadableDispatchTensor : DialectType<
     Flow_Dialect,
     And<[
-      CPred<"$_self.isa<IREE::Flow::DispatchTensorType>()">,
+      CPred<"isa<IREE::Flow::DispatchTensorType>($_self)">,
       FLOW_TensorAccessCanReadPred,
     ]>,
     "dispatch.tensor"> {
@@ -137,7 +137,7 @@ def FLOW_ReadableDispatchTensor : DialectType<
 def FLOW_WritableDispatchTensor : DialectType<
     Flow_Dialect,
     And<[
-      CPred<"$_self.isa<IREE::Flow::DispatchTensorType>()">,
+      CPred<"isa<IREE::Flow::DispatchTensorType>($_self)">,
       FLOW_TensorAccessCanWritePred,
     ]>,
     "dispatch.tensor"> {

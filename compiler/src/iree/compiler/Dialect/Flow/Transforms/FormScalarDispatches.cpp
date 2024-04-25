@@ -37,7 +37,7 @@ static bool isScalarOrTensorOfLinearSizeN(int n, Type type) {
   if (type.isIntOrIndexOrFloat()) {
     return true;
   }
-  if (auto tensorType = type.dyn_cast<RankedTensorType>()) {
+  if (auto tensorType = dyn_cast<RankedTensorType>(type)) {
     if (!tensorType.hasStaticShape()) {
       return false;
     }

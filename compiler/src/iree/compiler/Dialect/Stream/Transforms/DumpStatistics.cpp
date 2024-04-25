@@ -143,7 +143,7 @@ struct Statistics {
     }
     for (auto constantOp : usageInfo.bufferConstantOps) {
       if (auto storageAttr =
-              constantOp.getValue().dyn_cast<IREE::Util::SizedStorageAttr>()) {
+              dyn_cast<IREE::Util::SizedStorageAttr>(constantOp.getValue())) {
         constantSize += storageAttr.getStorageSize();
       }
     }

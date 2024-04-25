@@ -499,7 +499,7 @@ LogicalResult SortOp::verify() {
   if (yieldOp.getNumOperands() != 1) {
     return op->emitOpError("should yield exactly one operand");
   }
-  auto ty = yieldOp.getOperand(0).getType().dyn_cast<IntegerType>();
+  auto ty = dyn_cast<IntegerType>(yieldOp.getOperand(0).getType());
   if (!ty || ty.getWidth() != 1) {
     return op->emitOpError("should yield i1 type");
   }
@@ -903,7 +903,7 @@ LogicalResult ScanOp::verify() {
   if (getNumDpsInits() != 2) {
     return op->emitOpError("expected two output operands");
   }
-  if (!input().getType().isa<ShapedType>()) {
+  if (!isa<ShapedType>(input().getType())) {
     return op->emitOpError("expected first input element type to be shaped");
   }
   auto accumulatorType = cast<ShapedType>(accumulator().getType());
@@ -1743,7 +1743,7 @@ void PackOp::build(OpBuilder &builder, OperationState &state, Value source,
   dispatchIndexOpFoldResults(innerTiles, dynamicTileSizes, staticTileSizes);
   SmallVector<Type> resultType;
   auto outputType = output.getType();
-  if (outputType.isa<RankedTensorType>()) {
+  if (isa<RankedTensorType>(outputType)) {
     resultType.push_back(outputType);
   }
   build(builder, state, resultType, source, output,
@@ -2037,7 +2037,7 @@ void UnPackOp::build(OpBuilder &builder, OperationState &state, Value source,
   dispatchIndexOpFoldResults(innerTiles, dynamicTileSizes, staticTileSizes);
   SmallVector<Type> resultType;
   auto outputType = output.getType();
-  if (outputType.isa<RankedTensorType>()) {
+  if (isa<RankedTensorType>(outputType)) {
     resultType.push_back(outputType);
   }
   build(builder, state, resultType, source, output,
@@ -3049,7 +3049,7 @@ ArrayRef<int64_t> EncodingAttr::getRoundDimsToArray() {
   if (!roundDimsTo) {
     return {};
   }
-  return roundDimsTo.cast<DenseI64ArrayAttr>().asArrayRef();
+  return llvm::cast<DenseI64ArrayAttr>(roundDimsTo).asArrayRef();
 }
 
 //===---------------------------------------------------------------------===//

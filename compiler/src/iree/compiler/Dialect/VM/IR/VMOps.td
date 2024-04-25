@@ -416,8 +416,8 @@ class VM_PrimitiveGlobalOp<string mnemonic, Attr attr_type, list<Trait> traits =
         $_state.addAttribute("is_mutable", $_builder.getUnitAttr());
       }
       if (initialValue.has_value() &&
-                 (initialValue.value().isa<IntegerAttr>() ||
-                  initialValue.value().isa<FloatAttr>())) {
+                 (isa<IntegerAttr>(initialValue.value()) ||
+                  isa<FloatAttr>(initialValue.value()))) {
         $_state.addAttribute("initial_value", initialValue.value());
       }
       $_state.addAttribute("type", TypeAttr::get(type));
@@ -1682,7 +1682,7 @@ def VM_ListAllocOp :
 
   let encoding = [
     VM_EncOpcode<VM_OPC_ListAlloc>,
-    VM_EncType<"getResult().getType().cast<IREE::VM::RefType>().getObjectType().cast<IREE::VM::ListType>().getElementType()">,
+    VM_EncType<"cast<IREE::VM::ListType>(cast<IREE::VM::RefType>(getResult().getType()).getObjectType()).getElementType()">,
     VM_EncOperand<"initial_capacity", 0>,
     VM_EncResult<"result">,
   ];
@@ -4283,7 +4283,7 @@ def VM_CallVariadicOp : VM_CallBaseOp<"call.variadic"> {
               segmentSizes));
       $_state.addAttribute("segment_types", $_builder.getArrayAttr(
           llvm::map_to_vector(segmentTypes, [&](Type type) {
-              return TypeAttr::get(type).cast<Attribute>();
+              return cast<Attribute>(TypeAttr::get(type));
           })));
       $_state.addOperands(operands);
       $_state.addTypes(resultTypes);

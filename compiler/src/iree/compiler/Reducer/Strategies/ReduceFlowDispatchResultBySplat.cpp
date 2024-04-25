@@ -66,7 +66,7 @@ void mlir::iree_compiler::Reducer::reduceFlowDispatchResultBySplatDelta(
          ++index) {
       auto result = dispatch.getResults()[index];
       auto dynamicDims = dispatch.getResultDynamicDims(index);
-      auto tensorType = result.getType().cast<RankedTensorType>();
+      auto tensorType = cast<RankedTensorType>(result.getType());
       auto elType = tensorType.getElementType();
       auto zeroAttr = builder.getZeroAttr(elType);
       auto zero = builder.create<arith::ConstantOp>(result.getLoc(), zeroAttr);

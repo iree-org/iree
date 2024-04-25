@@ -482,8 +482,8 @@ private:
 
     // And loose tensor constants.
     for (auto constantOp : funcOp.getOps<arith::ConstantOp>()) {
-      auto tensorType = constantOp.getResult().getType().dyn_cast<TensorType>();
-      auto elementsAttr = constantOp.getValue().dyn_cast<ElementsAttr>();
+      auto tensorType = dyn_cast<TensorType>(constantOp.getResult().getType());
+      auto elementsAttr = dyn_cast<ElementsAttr>(constantOp.getValue());
       if (!tensorType || !elementsAttr)
         continue;
       if (!supportedFeatures.isSupportedAbiType(tensorType)) {

@@ -190,7 +190,7 @@ def Util_NumericOptionalNarrowOp : Util_PureOp<"numeric.optional_narrow", [
 
   let extraClassDeclaration = [{
     bool isSigned() {
-      if (auto integerType = getType().dyn_cast<IntegerType>()) {
+      if (auto integerType = dyn_cast<IntegerType>(getType())) {
         return !integerType.isUnsigned();
       }
       return true;
