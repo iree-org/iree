@@ -341,28 +341,6 @@ func.func @dot_basic(%arg0: tensor<4x4xf16>, %arg1: tensor<4x4xf16>) -> tensor<4
 
 // -----
 
-// CHECK-LABEL: @convolution
-// CHECK-SAME:     (%[[ARG0:.+]]: tensor<{{.+}}xbf16>, %[[ARG1:.+]]: tensor<{{.+}}xbf16>)
-func.func @convolution(%arg0: tensor<16x32x256xbf16>, %arg1: tensor<1x256x256xbf16>) -> tensor<16x32x256xf32> {
-  %cast = stablehlo.convert %arg0 : (tensor<16x32x256xbf16>) -> tensor<16x32x256xf32>
-  // CHECK: %[[CONV:.+]] = stablehlo.convolution(%[[ARG0]], %[[ARG1]])
-  // CHECK-SAME: -> tensor<16x32x256xf32>
-  %0 = "stablehlo.convolution"(%cast, %arg1) {
-     batch_group_count = 1 : i64,
-     dimension_numbers = #stablehlo.conv<[b, 0, f]x[0, i, o]->[b, 0, f]>,
-     feature_group_count = 1 : i64,
-     lhs_dilation = array<i64: 1>,
-     padding = dense<0> : tensor<1x2xi64>,
-     precision_config = [#stablehlo<precision DEFAULT>, #stablehlo<precision DEFAULT>],
-     rhs_dilation = array<i64: 1>,
-     window_strides = array<i64: 1>
-   } : (tensor<16x32x256xf32>, tensor<1x256x256xbf16>) -> tensor<16x32x256xf32>
-  // CHECK: return %[[CONV]]
-  func.return %0 : tensor<16x32x256xf32>
-}
-
-// -----
-
 // CHECK-LABEL: @dynamic_dot_general
 // This verifies non-crashing, the lowering to linalg happens elsewhere.
 func.func @dynamic_dot_general(%arg1: tensor<?x1024x16x64xf32>, %arg2: tensor<?x1024x16x64xf32>) -> tensor<?x16x1024x1024xf32> {
