@@ -24,7 +24,9 @@
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
@@ -2430,6 +2432,94 @@ LogicalResult WinogradFilterTransformOp::verify() {
   if (failed(verifyCompatibleShape(expectedOutputShape, outputShape))) {
     return op->emitOpError("incompatible output shape");
   }
+  return success();
+}
+
+SmallVector<Range>
+WinogradFilterTransformOp::getIterationDomain(OpBuilder &builder) {
+  Location loc = getLoc();
+  OpFoldResult zero = builder.getIndexAttr(0);
+  OpFoldResult one = builder.getIndexAttr(1);
+  Value source = output();
+  int64_t numKernelDims = getKernelDimensions().size();
+  auto outRank = getOutputRank();
+  SmallVector<Range> loopBounds(outRank - numKernelDims);
+  for (auto dim : llvm::seq<int64_t>(numKernelDims, outRank)) {
+    int64_t loopDim = dim - numKernelDims;
+    loopBounds[loopDim].offset = zero;
+    loopBounds[loopDim].size = getDimValue(builder, loc, source, dim);
+    loopBounds[loopDim].stride = one;
+  }
+  return loopBounds;
+}
+
+SmallVector<utils::IteratorType>
+WinogradFilterTransformOp::getLoopIteratorTypes() {
+  SmallVector<utils::IteratorType> iteratorTypes(getIterationDomainRank(),
+                                                 utils::IteratorType::parallel);
+  return iteratorTypes;
+}
+
+FailureOr<TilingResult> WinogradFilterTransformOp::getTiledImplementation(
+    OpBuilder &builder, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes) {
+  Location loc = getLoc();
+  OpFoldResult one = builder.getIndexAttr(1);
+  OpFoldResult zero = builder.getIndexAttr(0);
+  const int cDim = channelDim();
+  const int fDim = filterDim();
+
+  assert(offsets.size() == 2);
+  SmallVector<OpFoldResult> inputOffsets(getInputRank(), zero);
+  SmallVector<OpFoldResult> outputOffsets(getOutputRank(), zero);
+  outputOffsets[2] = inputOffsets[cDim] = offsets[0];
+  outputOffsets[3] = inputOffsets[fDim] = offsets[1];
+
+  SmallVector<OpFoldResult> inputStrides(getInputRank(), one);
+  SmallVector<OpFoldResult> outputStrides(getOutputRank(), one);
+
+  assert(sizes.size() == 2);
+  ArrayRef<int64_t> inputShape = getInputType().getShape();
+  ArrayRef<int64_t> outputShape = getOutputType().getShape();
+  SmallVector<OpFoldResult> inputSizes =
+      getAsOpFoldResult(builder.getIndexArrayAttr(inputShape));
+  SmallVector<OpFoldResult> outputSizes =
+      getAsOpFoldResult(builder.getIndexArrayAttr(outputShape));
+  outputSizes[2] = inputSizes[cDim] = sizes[0];
+  outputSizes[3] = inputSizes[fDim] = sizes[1];
+
+  SmallVector<Value> tiledOperands;
+  tiledOperands.emplace_back(
+      getSlice(builder, loc, input(), inputOffsets, inputSizes, inputStrides));
+  tiledOperands.emplace_back(getSlice(builder, loc, output(), outputOffsets,
+                                      outputSizes, outputStrides));
+
+  SmallVector<Type> resultTypes;
+  if (hasPureTensorSemantics()) {
+    resultTypes.push_back(tiledOperands[1].getType());
+  }
+
+  Operation *tiledOp =
+      mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
+
+  return TilingResult{{tiledOp}, SmallVector<Value>(tiledOp->getResults())};
+}
+
+LogicalResult WinogradFilterTransformOp::getResultTilePosition(
+    OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
+    SmallVector<OpFoldResult> &resultSizes) {
+  if (resultNumber != 0) {
+    return failure();
+  }
+  ArrayRef<int64_t> resultShape = getOutputType().getShape();
+  resultSizes = getAsOpFoldResult(builder.getIndexArrayAttr(resultShape));
+  resultOffsets =
+      SmallVector<OpFoldResult>(getOutputRank(), builder.getIndexAttr(0));
+  resultOffsets[2] = offsets[0];
+  resultOffsets[3] = offsets[1];
+  resultSizes[2] = sizes[0];
+  resultSizes[3] = sizes[1];
   return success();
 }
 
