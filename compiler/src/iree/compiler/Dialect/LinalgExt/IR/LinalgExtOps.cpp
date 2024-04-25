@@ -2444,12 +2444,11 @@ WinogradFilterTransformOp::getIterationDomain(OpBuilder &builder) {
                                                  kernelDims.end());
   auto outRank = getOutputRank();
   SmallVector<Range> loopBounds(outRank - kernelDims.size());
-  int count = 0;
   for (auto dim : llvm::seq<int64_t>(kernelDims.size(), outRank)) {
-    loopBounds[count].offset = zero;
-    loopBounds[count].size = getDimValue(builder, loc, source, dim);
-    loopBounds[count].stride = one;
-    count++;
+    int64_t loopDim = dim - kernelDims.size();
+    loopBounds[loopDim].offset = zero;
+    loopBounds[loopDim].size = getDimValue(builder, loc, source, dim);
+    loopBounds[loopDim].stride = one;
   }
   return loopBounds;
 }
