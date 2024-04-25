@@ -344,10 +344,11 @@ func.func @dot_basic(%arg0: tensor<4x4xf16>, %arg1: tensor<4x4xf16>) -> tensor<4
 // CHECK-LABEL: @convolution
 // CHECK-SAME:     (%[[ARG0:.+]]: tensor<{{.+}}xbf16>, %[[ARG1:.+]]: tensor<{{.+}}xbf16>)
 func.func @convolution(%arg0: tensor<16x32x256xbf16>, %arg1: tensor<1x256x256xbf16>) -> tensor<16x32x256xf32> {
-  %cast = stablehlo.convert %arg0 : (tensor<16x32x256xbf16>) -> tensor<16x32x256xf32>
+  %cast0 = stablehlo.convert %arg0 : (tensor<16x32x256xbf16>) -> tensor<16x32x256xf32>
+  %cast1 = stablehlo.convert %arg1 : (tensor<1x256x256xbf16>) -> tensor<1x256x256xf32>
   // CHECK: %[[CONV:.+]] = stablehlo.convolution(%[[ARG0]], %[[ARG1]])
   // CHECK-SAME: -> tensor<16x32x256xf32>
-  %0 = "stablehlo.convolution"(%cast, %arg1) {
+  %0 = "stablehlo.convolution"(%cast0, %cast1) {
      batch_group_count = 1 : i64,
      dimension_numbers = #stablehlo.conv<[b, 0, f]x[0, i, o]->[b, 0, f]>,
      feature_group_count = 1 : i64,
@@ -356,7 +357,7 @@ func.func @convolution(%arg0: tensor<16x32x256xbf16>, %arg1: tensor<1x256x256xbf
      precision_config = [#stablehlo<precision DEFAULT>, #stablehlo<precision DEFAULT>],
      rhs_dilation = array<i64: 1>,
      window_strides = array<i64: 1>
-   } : (tensor<16x32x256xf32>, tensor<1x256x256xbf16>) -> tensor<16x32x256xf32>
+   } : (tensor<16x32x256xf32>, tensor<1x256x256xf32>) -> tensor<16x32x256xf32>
   // CHECK: return %[[CONV]]
   func.return %0 : tensor<16x32x256xf32>
 }
