@@ -1546,11 +1546,30 @@ FailureOr<TilingResult> WinogradOutputTransformOp::getTiledImplementation(
   outputOffsets[hDim] = hSizeAndOffset.second;
   outputOffsets[wDim] = wSizeAndOffset.second;
 
+  Value outputSlice = getSlice(builder, loc, getOutput(), outputOffsets,
+                               outputSizes, outputStrides);
+  // The image dims of the winograd.output_transform result will always be a
+  // multiple of the static output_tile_size, so insert a tensor.cast op to
+  // maintain more static information in the IR.
+  auto outSliceType = cast<ShapedType>(outputSlice.getType());
+  SmallVector<int64_t> staticOutShape = llvm::map_to_vector(
+      llvm::seq<int64_t>(outSliceType.getRank()),
+      [&](auto idx) { return outSliceType.getDimSize(idx); });
+  auto constSizeH = getConstantIntValue(sizes[1]);
+  if (constSizeH.has_value()) {
+    staticOutShape[hDim] = constSizeH.value() * getOutputTileSize();
+  }
+  auto constSizeW = getConstantIntValue(sizes[2]);
+  if (constSizeW.has_value()) {
+    staticOutShape[wDim] = constSizeW.value() * getOutputTileSize();
+  }
+  Value staticOutputSlice = builder.create<tensor::CastOp>(
+      loc, outSliceType.clone(staticOutShape), outputSlice);
+
   SmallVector<Value> tiledOperands;
   tiledOperands.emplace_back(getSlice(builder, loc, getInput(), inputOffsets,
                                       inputSizes, inputStrides));
-  tiledOperands.emplace_back(getSlice(builder, loc, getOutput(), outputOffsets,
-                                      outputSizes, outputStrides));
+  tiledOperands.emplace_back(staticOutputSlice);
 
   SmallVector<Type, 4> resultTypes;
   if (hasPureTensorSemantics()) {
