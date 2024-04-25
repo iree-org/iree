@@ -1966,12 +1966,18 @@ static LogicalResult setConvRootConfig(mlir::FunctionOpInterface entryPointFn,
   // Set "scalable" flags
   ScalableTileFlagsListType scalableTileFlags;
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
-  if (isAArch64(targetAttr) && clEnableScalableVectorization) {
+  if (isAArch64(targetAttr) && hasAnySVEFeature(targetAttr) &&
+      clEnableScalableVectorization &&
+      isa<linalg::DepthwiseConv2DNhwcHwcOp>(convOp)) {
+
+    auto dims = linalg::inferConvolutionDims(convOp);
     // Level 1: Distribution
     scalableTileFlags.emplace_back(numTilingDims, false);
     // Level 2: Parallel
-    scalableTileFlags.emplace_back(
-        SmallVector<bool>{false, false, false, true, false, false});
+    SmallVector<bool> parallelScalableFlags(numTilingDims, false);
+    // Make the channel dim scalable
+    parallelScalableFlags[3] = true;
+    scalableTileFlags.emplace_back(parallelScalableFlags);
     // Level 3: Reduction
     scalableTileFlags.emplace_back(numTilingDims, false);
     // Level 4: Inner parallel
