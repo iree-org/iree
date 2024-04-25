@@ -580,6 +580,13 @@ bool isDequantizationLikeOp(Operation *op) {
       outputElementType.getIntOrFloatBitWidth()) {
     return false;
   }
+
+  // Check if there are any operations from math dialect.
+  for (Operation &op : *genericOp.getBody()) {
+    if (op.getDialect() == op.getContext()->getLoadedDialect("math")) {
+      return false;
+    }
+  }
   return true;
 }
 

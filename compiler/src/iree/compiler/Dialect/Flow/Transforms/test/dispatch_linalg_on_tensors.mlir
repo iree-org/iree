@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --verify-diagnostics --pass-pipeline="builtin.module(util.func(iree-flow-form-dispatch-regions{fuse-multi-use=true}, iree-flow-clone-producers-into-dispatch-regions, iree-flow-form-dispatch-workgroups), cse, canonicalize, cse)" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --verify-diagnostics --pass-pipeline="builtin.module(util.func(iree-flow-form-dispatch-regions{aggressive-fusion=true}, iree-flow-clone-producers-into-dispatch-regions, iree-flow-form-dispatch-workgroups), cse, canonicalize, cse)" %s | FileCheck %s
 
 util.func public @tile_matmul_alone(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
              %arg2 : tensor<?x?xf32>) -> tensor<?x?xf32> {
@@ -1209,6 +1209,42 @@ util.func public @unit_dim_generic(%arg0 : tensor<1x?x1x1x?x?x1x?xf32>,
 
 // -----
 
+util.func public @fuse_tensor_insert_consumer(%arg0 : tensor<2x3xf32>) -> tensor<4x5xf32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %cst = arith.constant 0.0 : f32
+  %init = tensor.empty() : tensor<3x2xf32>
+  %init2 = tensor.empty() : tensor<4x5xf32>
+  %fill = linalg.fill ins(%cst : f32) outs(%init2 : tensor<4x5xf32>) -> tensor<4x5xf32>
+  %0 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1, d0)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%arg0 : tensor<2x3xf32>) outs(%init : tensor<3x2xf32>) {
+    ^bb0(%b0 : f32, %b1 : f32) :
+      %1 = arith.addf %b0, %b0 : f32
+      linalg.yield %1 : f32
+    } -> tensor<3x2xf32>
+  %1 = tensor.insert_slice %0 into %fill[1, 2] [3, 2] [1, 1]
+      : tensor<3x2xf32> into tensor<4x5xf32>
+  util.return %1 : tensor<4x5xf32>
+}
+// CHECK-LABEL: func public @fuse_tensor_insert_consumer
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<2x3xf32>
+//       CHECK:   %[[CST:.+]] = arith.constant 0.0
+//       CHECK:   %[[SPLAT:.+]] = flow.tensor.splat %[[CST]]
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroups(%[[ARG0]], %[[SPLAT]]) : (tensor<2x3xf32>, tensor<4x5xf32>) -> %[[SPLAT]]
+//  CHECK-NEXT:       %[[ARG1:.+]]: !flow.dispatch.tensor<readonly:tensor<2x3xf32>>
+//  CHECK-SAME:       %[[ARG2:.+]]: !flow.dispatch.tensor<readwrite:tensor<4x5xf32>>
+//       CHECK:     %[[LOAD:.+]] = flow.dispatch.tensor.load %[[ARG1]]
+//       CHECK:     %[[EMPTY:.+]] = tensor.empty() : tensor<3x2xf32>
+//       CHECK:     %[[GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[LOAD]] : tensor<2x3xf32>) outs(%[[EMPTY]] :
+//       CHECK:     flow.dispatch.tensor.store %[[GENERIC]], %[[ARG2]]
+//  CHECK-SAME:         offsets = [1, 2], sizes = [3, 2]
+//       CHECK:   util.return %[[DISPATCH]]
+
+// -----
+
 util.func public @dont_fuse_tensor_insert_dest_producer(%arg0 : tensor<2x2xf32>) -> tensor<3x3xf32> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
@@ -1763,27 +1799,24 @@ module {
 //       CHECK:   %[[DISPATCH0:.+]] = flow.dispatch.workgroups
 //  CHECK-SAME:       (%[[ARG0]])
 //  CHECK-NEXT:     %[[ARG1:.+]]: !flow.dispatch.tensor<readonly:tensor<12x128x128xf32>>
-//  CHECK-SAME:     %[[ARG2:.+]]: !flow.dispatch.tensor<writeonly:tensor<12x128xf32>>
-//       CHECK:     %[[LOAD0:.+]] = flow.dispatch.tensor.load %[[ARG1]]
+//  CHECK-SAME:     %[[ARG2:.+]]: !flow.dispatch.tensor<writeonly:tensor<12x128x128xf32>>
+//   CHECK-DAG:     %[[LOAD:.+]] = flow.dispatch.tensor.load %[[ARG1]]
+//   CHECK-DAG:     %[[EMPTY0:.+]] = tensor.empty() : tensor<12x128xf32>
+//   CHECK-DAG:     %[[EMPTY1:.+]] = tensor.empty() : tensor<12x128x128xf32>
 //       CHECK:     %[[FILL0:.+]] = linalg.fill
-//       CHECK:     %[[GENERIC0:.+]] = linalg.generic
-//  CHECK-SAME:         ins(%[[LOAD0]] : tensor<12x128x128xf32>) outs(%[[FILL0]] : tensor<12x128xf32>)
-//       CHECK:     flow.dispatch.tensor.store %[[GENERIC0]], %[[ARG2]]
-//       CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.workgroups
-//  CHECK-NEXT:     %[[ARG3:.+]]: !flow.dispatch.tensor<readonly:tensor<12x128x128xf32>>
-//  CHECK-SAME:     %[[ARG4:.+]]: !flow.dispatch.tensor<readonly:tensor<12x128xf32>>
-//  CHECK-SAME:     %[[ARG5:.+]]: !flow.dispatch.tensor<writeonly:tensor<12x128x128xf32>>
-//   CHECK-DAG:     %[[LOAD1:.+]] = flow.dispatch.tensor.load %[[ARG3]]
-//   CHECK-DAG:     %[[LOAD2:.+]] = flow.dispatch.tensor.load %[[ARG4]]
+//  CHECK-SAME:         outs(%[[EMPTY0]] :
 //       CHECK:     %[[FILL1:.+]] = linalg.fill
+//  CHECK-SAME:         outs(%[[EMPTY0]] :
+//       CHECK:     %[[GENERIC0:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[LOAD]] : tensor<12x128x128xf32>) outs(%[[FILL0]] : tensor<12x128xf32>)
 //       CHECK:     %[[GENERIC1:.+]]:2 = linalg.generic
-//  CHECK-SAME:         ins(%[[LOAD1]], %[[LOAD2]] : tensor<12x128x128xf32>, tensor<12x128xf32>)
-//  CHECK-SAME:         outs(%{{.*}}, %[[FILL1]] : tensor<12x128x128xf32>, tensor<12x128xf32>)
+//  CHECK-SAME:         ins(%[[LOAD]], %[[GENERIC0]] : tensor<12x128x128xf32>, tensor<12x128xf32>)
+//  CHECK-SAME:         outs(%[[EMPTY1]], %[[FILL1]] : tensor<12x128x128xf32>, tensor<12x128xf32>)
 //       CHECK:     %[[GENERIC2:.+]] = linalg.generic
 //  CHECK-SAME:         ins(%[[GENERIC1]]#0, %[[GENERIC1]]#1 :
 //       CHECK:     flow.dispatch.tensor.store %[[GENERIC2]]
 //       CHECK:     flow.return
-//       CHECK:   util.return %[[DISPATCH1]]
+//       CHECK:   util.return %[[DISPATCH0]]
 
 // -----
 
@@ -2173,7 +2206,7 @@ util.func public @clone_fill_ops(%arg0 : tensor<128x256xf32>, %arg1 : tensor<256
 
 // -----
 
-util.func public @softmax(%source : tensor<12x128x128xf32>) -> tensor<12x128x128xf32> {
+util.func public @softmax2(%source : tensor<12x128x128xf32>) -> tensor<12x128x128xf32> {
   %cst = arith.constant 1.000000e+00 : f32
   %cst_0 = arith.constant 0.000000e+00 : f32
   %cst_1 = arith.constant -3.40282347E+38 : f32
@@ -2205,39 +2238,189 @@ util.func public @softmax(%source : tensor<12x128x128xf32>) -> tensor<12x128x128
   } -> tensor<12x128x128xf32>
   util.return %8 : tensor<12x128x128xf32>
 }
-// CHECK-LABEL: util.func public @softmax(
+// CHECK-LABEL: util.func public @softmax2(
 //  CHECK-SAME:     %[[INPUT:.+]]: tensor<12x128x128xf32>)
-//       CHECK:   %[[DISPATCH0:.+]] = flow.dispatch.workgroups
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroups
 //  CHECK-SAME:       (%[[INPUT]])
 //  CHECK-NEXT:     (%[[ARG0:.+]]: !flow.dispatch.tensor<readonly:tensor<12x128x128xf32>>,
 //  CHECK-SAME:      %[[ARG1:.+]]: !flow.dispatch.tensor<writeonly:tensor<12x128x128xf32>>)
 //   CHECK-DAG:     %[[CST:.+]] = arith.constant -3.4
+//   CHECK-DAG:     %[[CST0:.+]] = arith.constant 0.0
+//   CHECK-DAG:     %[[CST1:.+]] = arith.constant 1.0
 //       CHECK:     %[[SOURCE:.+]] = flow.dispatch.tensor.load %[[ARG0]]
 //   CHECK-DAG:     %[[EMPTY0:.+]] = tensor.empty() : tensor<12x128xf32>
 //   CHECK-DAG:     %[[EMPTY1:.+]] = tensor.empty() : tensor<12x128x128xf32>
 //       CHECK:     %[[FILL0:.+]] = linalg.fill ins(%[[CST]] : f32) outs(%[[EMPTY0]] :
+//       CHECK:     %[[FILL1:.+]] = linalg.fill ins(%[[CST0]] : f32) outs(%[[EMPTY0]] :
 //       CHECK:     %[[GENERIC0:.+]] = linalg.generic
 //  CHECK-SAME:         ins(%[[SOURCE]] :
 //  CHECK-SAME:         outs(%[[FILL0]] :
 //       CHECK:     %[[GENERIC1:.+]] = linalg.generic
 //  CHECK-SAME:         ins(%[[SOURCE]], %[[GENERIC0]] :
 //  CHECK-SAME:         outs(%[[EMPTY1]] :
-//       CHECK:     flow.dispatch.tensor.store %[[GENERIC1]], %[[ARG1]]
-//       CHECK:     flow.return
-//       CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.workgroups(%[[DISPATCH0]])
-//  CHECK-NEXT:     (%[[ARG2:.+]]: !flow.dispatch.tensor<readonly:tensor<12x128x128xf32>>,
-//  CHECK-SAME:      %[[ARG3:.+]]: !flow.dispatch.tensor<writeonly:tensor<12x128x128xf32>>)
-//   CHECK-DAG:     %[[CST0:.+]] = arith.constant 0.0
-//   CHECK-DAG:     %[[CST1:.+]] = arith.constant 1.0
-//   CHECK-DAG:     %[[INPUT:.+]] = flow.dispatch.tensor.load %[[ARG2]]
-//   CHECK-DAG:     %[[EMPTY2:.+]] = tensor.empty() : tensor<12x128x128xf32>
-//   CHECK-DAG:     %[[EMPTY3:.+]] = tensor.empty() : tensor<12x128xf32>
-//       CHECK:     %[[FILL1:.+]] = linalg.fill ins(%[[CST0]] : f32) outs(%[[EMPTY3]] :
 //       CHECK:     %[[GENERIC2:.+]] = linalg.generic
-//  CHECK-SAME:         ins(%[[INPUT]] :
+//  CHECK-SAME:         ins(%[[GENERIC1]] :
 //  CHECK-SAME:         outs(%[[FILL1]] :
 //       CHECK:     %[[GENERIC3:.+]] = linalg.generic
-//  CHECK-SAME:         ins(%[[INPUT]], %[[GENERIC2]] :
-//  CHECK-SAME:         outs(%[[EMPTY2]] :
-//       CHECK:     flow.dispatch.tensor.store %[[GENERIC3]], %[[ARG3]]
+//  CHECK-SAME:         ins(%[[GENERIC1]], %[[GENERIC2]] :
+//  CHECK-SAME:         outs(%[[EMPTY1]] :
+//       CHECK:     flow.dispatch.tensor.store %[[GENERIC3]], %[[ARG1]]
+//       CHECK:   util.return %[[DISPATCH]]
+
+// -----
+
+util.func @mixed_conv(%arg0 : tensor<2x130x130x16xf16>, %arg1 : tensor<3x3x16x320xf16>) -> tensor<2x128x128x320xf16> {
+  %empty = tensor.empty() : tensor<2x128x128x320xf32>
+  %cst = arith.constant 0.0 : f32
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<2x128x128x320xf32>) -> tensor<2x128x128x320xf32>
+  %conv = linalg.conv_2d_nhwc_hwcf {
+      dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>}
+      ins(%arg0, %arg1 : tensor<2x130x130x16xf16>, tensor<3x3x16x320xf16>)
+      outs(%fill : tensor<2x128x128x320xf32>) -> tensor<2x128x128x320xf32>
+  %empty1 = tensor.empty() : tensor<2x128x128x320xf16>
+  %truncf = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%conv : tensor<2x128x128x320xf32>) outs(%empty1 : tensor<2x128x128x320xf16>) {
+    ^bb0(%b0 : f32, %b1 :f16):
+      %0 = arith.truncf %b0 : f32 to f16
+      linalg.yield %0 : f16
+  } -> tensor<2x128x128x320xf16>
+  util.return %truncf : tensor<2x128x128x320xf16>
+}
+// CHECK-LABEL: func public @mixed_conv(
+//       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.workgroups
+//       CHECK:     %[[FILL:.+]] = linalg.fill
+//       CHECK:     %[[CONV:.+]] = linalg.conv_2d_nhwc_hwcf
+//  CHECK-SAME:         outs(%[[FILL]] :
+//       CHECK:     %[[GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[CONV]] :
+//       CHECK:     flow.dispatch.tensor.store %[[GENERIC]]
+//       CHECK:   util.return %[[DISPATCH]]
+
+// -----
+
+util.func @mixed_conv_unsupported(%arg0 : tensor<2x130x130x320xf16>, %arg1 : tensor<3x3x320x320xf16>) -> tensor<2x64x64x320xf16> {
+  %empty = tensor.empty() : tensor<2x64x64x320xf32>
+  %cst = arith.constant 0.0 : f32
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<2x64x64x320xf32>) -> tensor<2x64x64x320xf32>
+  %conv = linalg.conv_2d_nhwc_hwcf {
+      dilations = dense<1> : vector<2xi64>, strides = dense<2> : vector<2xi64>}
+      ins(%arg0, %arg1 : tensor<2x130x130x320xf16>, tensor<3x3x320x320xf16>)
+      outs(%fill : tensor<2x64x64x320xf32>) -> tensor<2x64x64x320xf32>
+  %empty1 = tensor.empty() : tensor<2x64x64x320xf16>
+  %truncf = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%conv : tensor<2x64x64x320xf32>) outs(%empty1 : tensor<2x64x64x320xf16>) {
+    ^bb0(%b0 : f32, %b1 :f16):
+      %0 = arith.truncf %b0 : f32 to f16
+      linalg.yield %0 : f16
+  } -> tensor<2x64x64x320xf16>
+  util.return %truncf : tensor<2x64x64x320xf16>
+}
+// CHECK-LABEL: func public @mixed_conv_unsupported(
+//       CHECK:   %[[DISPATCH0:.+]] = flow.dispatch.workgroups
+//       CHECK:     %[[FILL:.+]] = linalg.fill
+//       CHECK:     %[[CONV:.+]] = linalg.conv_2d_nhwc_hwcf
+//  CHECK-SAME:         outs(%[[FILL]] :
+//       CHECK:     flow.dispatch.tensor.store %[[CONV]]
+//       CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.workgroups
+//       CHECK:     %[[GENERIC:.+]] = linalg.generic
+//       CHECK:     flow.dispatch.tensor.store %[[GENERIC]]
 //       CHECK:   util.return %[[DISPATCH1]]
+
+// -----
+
+util.func @no_fuse_consumer_dequantize_op(%arg0 : tensor<?x?xf16>, %arg1 : tensor<?x?xf16>) -> tensor<?x?xf32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %m = tensor.dim %arg0, %c0 : tensor<?x?xf16>
+  %n = tensor.dim %arg1, %c1 : tensor<?x?xf16>
+  %empty = tensor.empty(%m, %n) : tensor<?x?xf32>
+  %cst = arith.constant 0.0 : f32
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<?x?xf32>) -> tensor<?x?xf32>
+  %matmul = linalg.matmul ins(%arg0, %arg1 : tensor<?x?xf16>, tensor<?x?xf16>)
+      outs(%fill : tensor<?x?xf32>) -> tensor<?x?xf32>
+  %empty1 = tensor.empty(%m, %n) : tensor<?x?xf16>
+  %truncf = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                       affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%matmul : tensor<?x?xf32>) outs(%empty1 : tensor<?x?xf16>) {
+    ^bb0(%b0 : f32, %b1 :f16):
+      %0 = arith.truncf %b0 : f32 to f16
+      linalg.yield %0 : f16
+  } -> tensor<?x?xf16>
+  %extf = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                       affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%truncf : tensor<?x?xf16>) outs(%empty : tensor<?x?xf32>) {
+    ^bb0(%b0 : f16, %b1 :f32):
+      %0 = arith.extf %b0 : f16 to f32
+      linalg.yield %0 : f32
+  } -> tensor<?x?xf32>
+  util.return %extf : tensor<?x?xf32>
+}
+// CHECK-LABEL: func public @no_fuse_consumer_dequantize_op
+//       CHECK:   flow.dispatch.workgroups
+//       CHECK:     %[[MATMUL:.+]] = linalg.matmul
+//       CHECK:     %[[TRUNCF:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[MATMUL]] :
+//       CHECK:       arith.truncf
+//       CHECK:     flow.dispatch.tensor.store %[[TRUNCF]]
+//       CHECK:   %[[RESULT:.+]] = flow.dispatch.workgroups
+//       CHECK:     %[[EXTF:.+]] = linalg.generic
+//       CHECK:       arith.extf
+//       CHECK:     flow.dispatch.tensor.store %[[EXTF]]
+//       CHECK:   util.return %[[RESULT]]
+
+// -----
+
+util.func @fuse_consumer_non_dequantize_op(%arg0 : tensor<?x?xf16>, %arg1 : tensor<?x?xf16>) -> tensor<?x?xf32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %m = tensor.dim %arg0, %c0 : tensor<?x?xf16>
+  %n = tensor.dim %arg1, %c1 : tensor<?x?xf16>
+  %empty = tensor.empty(%m, %n) : tensor<?x?xf32>
+  %cst = arith.constant 0.0 : f32
+  %fill = linalg.fill ins(%cst : f32) outs(%empty : tensor<?x?xf32>) -> tensor<?x?xf32>
+  %matmul = linalg.matmul ins(%arg0, %arg1 : tensor<?x?xf16>, tensor<?x?xf16>)
+      outs(%fill : tensor<?x?xf32>) -> tensor<?x?xf32>
+  %empty1 = tensor.empty(%m, %n) : tensor<?x?xf16>
+  %truncf = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                       affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%matmul : tensor<?x?xf32>) outs(%empty1 : tensor<?x?xf16>) {
+    ^bb0(%b0 : f32, %b1 :f16):
+      %0 = arith.truncf %b0 : f32 to f16
+      linalg.yield %0 : f16
+  } -> tensor<?x?xf16>
+  %expf = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                       affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%truncf : tensor<?x?xf16>) outs(%empty : tensor<?x?xf32>) {
+    ^bb0(%b0 : f16, %b1 :f32):
+      %0 = arith.extf %b0 : f16 to f32
+      %1 = math.exp %0 : f32
+      linalg.yield %1 : f32
+  } -> tensor<?x?xf32>
+  util.return %expf : tensor<?x?xf32>
+}
+// CHECK-LABEL: func public @fuse_consumer_non_dequantize_op
+//       CHECK:   %[[RESULT:.+]] = flow.dispatch.workgroups
+//       CHECK:     %[[MATMUL:.+]] = linalg.matmul
+//       CHECK:     %[[TRUNCF:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[MATMUL]] :
+//       CHECK:       arith.truncf
+//       CHECK:     %[[EXPF:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[TRUNCF]] :
+//       CHECK:       arith.extf
+//       CHECK:       math.exp
+//       CHECK:     flow.dispatch.tensor.store %[[EXPF]]
+//       CHECK:   util.return %[[RESULT]]
