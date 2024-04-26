@@ -17,7 +17,7 @@
     "test_scatter_elements_with_negative_indices",
   ],
   "expected_compile_failures": [
-    "test_acos",
+    // "test_acos",
     "test_acos_example",
     "test_acosh",
     "test_acosh_example",
