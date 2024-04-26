@@ -53,6 +53,15 @@ static bool isDebugEnabled() {
   return false;
 }
 
+static void
+emitDebugWarning(Location loc,
+                 llvm::function_ref<void(InFlightDiagnostic &)> emit) {
+  if (isDebugEnabled()) {
+    auto diagnostic = mlir::emitWarning(loc);
+    emit(diagnostic);
+  }
+}
+
 // These options structs are not copy-constructable so we have to allocate them
 // shared.
 // TODO: See if we can make them copyable?
@@ -227,7 +236,9 @@ private:
           std::min(static_cast<unsigned>(availability),
                    static_cast<unsigned>(newAvailability)));
       if (previousAvailability != availability)
-        emitWarning(initializerOp.getLoc()) << reason;
+        emitDebugWarning(
+            initializerOp.getLoc(),
+            [&](InFlightDiagnostic &diagnostic) { diagnostic << reason; });
     };
 
     if (initializerOp->getRegions().size() != 1 ||
@@ -461,16 +472,19 @@ private:
       auto globalOp = llvm::dyn_cast_or_null<IREE::Util::GlobalOpInterface>(
           sourceSymbolTable.lookup(loadOp.getGlobalAttr().getAttr()));
       if (!globalOp || globalOp.isGlobalMutable()) {
-        emitWarning(loadOp.getLoc()) << "skipping consteval initializer: load "
-                                        "from mutable globals not supported";
+        emitDebugWarning(loadOp.getLoc(), [&](InFlightDiagnostic &diagnostic) {
+          diagnostic << "skipping consteval initializer: load from mutable "
+                        "globals not supported";
+        });
         return failure();
       }
       Type t = loadOp.getLoadedGlobalValue().getType();
       if (!supportedFeatures.isSupportedAbiType(t)) {
-        emitWarning(funcOp.getLoc())
-            << "skipping consteval initializer: unsupported type for current "
-               "jit configuration: "
-            << t;
+        emitDebugWarning(funcOp.getLoc(), [&](InFlightDiagnostic &diagnostic) {
+          diagnostic << "skipping consteval initializer: unsupported type for "
+                        "current jit configuration: "
+                     << t;
+        });
         return failure();
       }
       argumentTypes.push_back(t);
@@ -487,10 +501,11 @@ private:
       if (!tensorType || !elementsAttr)
         continue;
       if (!supportedFeatures.isSupportedAbiType(tensorType)) {
-        emitWarning(funcOp.getLoc())
-            << "skipping consteval initializer: unsupported type for current "
-               "jit configuration: "
-            << tensorType;
+        emitDebugWarning(funcOp.getLoc(), [&](InFlightDiagnostic &diagnostic) {
+          diagnostic << "skipping consteval initializer: unsupported type for "
+                        "current jit configuration: "
+                     << tensorType;
+        });
         return failure();
       }
       argumentTypes.push_back(tensorType);
@@ -510,10 +525,11 @@ private:
 
       Type t = storeOp.getStoredGlobalValue().getType();
       if (!supportedFeatures.isSupportedAbiType(t)) {
-        emitWarning(funcOp.getLoc())
-            << "skipping consteval initializer: unsupported type for current "
-               "jit configuration: "
-            << t;
+        emitDebugWarning(funcOp.getLoc(), [&](InFlightDiagnostic &diagnostic) {
+          diagnostic << "skipping consteval initializer: unsupported type for "
+                        "current jit configuration: "
+                     << t;
+        });
         return failure();
       }
 
@@ -705,9 +721,12 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
 
     auto supportedFeatures = getSupportedFeatures(&getContext());
     if (!hasRequestedTargetDevice) {
-      emitWarning(UnknownLoc::get(&getContext()))
-          << "consteval jit requested with " << requestedTargetDevice
-          << " backend, but it is not available. Falling back to vmvx";
+      emitDebugWarning(
+          UnknownLoc::get(&getContext()), [&](InFlightDiagnostic &diagnostic) {
+            diagnostic
+                << "consteval jit requested with " << requestedTargetDevice
+                << " backend, but it is not available; falling back to vmvx";
+          });
     }
     if (!targetDevice) {
       emitError(UnknownLoc::get(&getContext()))
