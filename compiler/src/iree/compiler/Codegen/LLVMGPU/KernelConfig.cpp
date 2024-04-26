@@ -1747,11 +1747,9 @@ static LogicalResult setConvolutionConfig(linalg::LinalgOp linalgOp,
 
 static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
                                    Operation *computeOp) {
-  LLVM_DEBUG(
-    DBGS() << "Selecting root config for: ";
-    computeOp->print(llvm::dbgs(), OpPrintingFlags().skipRegions());
-    llvm::dbgs() << "\n";
-  );
+  LLVM_DEBUG(DBGS() << "Selecting root config for: ";
+             computeOp->print(llvm::dbgs(), OpPrintingFlags().skipRegions());
+             llvm::dbgs() << "\n";);
   TargetInfo targetInfo = getTargetInfo(entryPointFn);
   // First try to see if there is a transform dialect configuration existing.
   if (succeeded(
