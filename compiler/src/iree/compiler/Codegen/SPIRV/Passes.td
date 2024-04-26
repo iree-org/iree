@@ -107,11 +107,6 @@ def SPIRVSelectLoweringStrategy :
       "mlir::iree_compiler::createSPIRVSelectLoweringStrategyPass()";
 }
 
-def SPIRVTile : InterfacePass<"iree-spirv-tile", "mlir::FunctionOpInterface"> {
-  let summary = "Tile Linalg ops with tensor semantics to invocations";
-  let constructor = "mlir::iree_compiler::createSPIRVTilePass()";
-}
-
 def SPIRVTileAndDistribute : InterfacePass<"iree-spirv-tile-and-distribute", "mlir::FunctionOpInterface"> {
   let summary = "Tile and distribute Linalg ops with buffer semantics to "
                 "invocations";

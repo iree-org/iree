@@ -313,7 +313,7 @@ void addSPIRVBaseVectorizePassPipeline(OpPassManager &funcPassManager) {
 
   // Tile to GPU invocations and vectorize.
   funcPassManager.addPass(createGPUCreateFastSlowPathPass());
-  funcPassManager.addPass(createSPIRVTilePass());
+  funcPassManager.addPass(createGPUTilePass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   {
@@ -347,7 +347,7 @@ void addSPIRVWinogradVectorizePassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
-  funcPassManager.addPass(createSPIRVTilePass());
+  funcPassManager.addPass(createGPUTilePass());
   funcPassManager.addPass(
       IREE::LinalgExt::createDecomposeWinogradTransformPass());
   funcPassManager.addPass(createCanonicalizerPass());

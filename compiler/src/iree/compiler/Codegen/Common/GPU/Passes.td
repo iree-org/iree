@@ -108,6 +108,11 @@ def GPUTensorTileToSerialLoops :
   let constructor = "mlir::iree_compiler::createGPUTensorTileToSerialLoops()";
 }
 
+def GPUTile : InterfacePass<"iree-codegen-gpu-tile", "mlir::FunctionOpInterface"> {
+  let summary = "Tile Linalg ops with tensor semantics to invocations";
+  let constructor = "mlir::iree_compiler::createGPUTilePass()";
+}
+
 def GPUTileReduction :
     InterfacePass<"iree-codegen-gpu-tile-reduction", "mlir::FunctionOpInterface"> {
   let summary = "Pass to tile linalg reduction dimensions.";

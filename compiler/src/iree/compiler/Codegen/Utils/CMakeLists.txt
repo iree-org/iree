@@ -51,6 +51,7 @@ iree_cc_library(
     MLIRTransformUtils
     MLIRVectorDialect
     MLIRViewLikeInterface
+    iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Interfaces::PartitionableLoopsInterface
     iree::compiler::Codegen::Interfaces::ProcessorOpInterfaces
     iree::compiler::Codegen::Interfaces::UKernelOpInterface

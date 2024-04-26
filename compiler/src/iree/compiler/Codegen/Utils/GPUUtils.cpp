@@ -150,6 +150,41 @@ gpuMmaUnrollOrder(vector::ContractionOp contract) {
 }
 
 //===----------------------------------------------------------------------===//
+// GPU tiling and distribution
+//===----------------------------------------------------------------------===//
+
+const char *getGPUDistributeAttrName() { return "iree.gpu.distribute_dim"; }
+
+FailureOr<SmallVector<int64_t>> getGPUTileSize(mlir::FunctionOpInterface funcOp,
+                                               int tilingLevel) {
+  SmallVector<Operation *> computeOps = getComputeOps(funcOp);
+  auto config = getLoweringConfig(computeOps);
+  if (failed(config)) {
+    return funcOp.emitOpError("failed to get lowering configuration");
+  }
+
+  return config->getTileSizeVals(tilingLevel);
+}
+
+FailureOr<scf::SCFTileSizeComputationFunction>
+getGPUScfTileSizeComputeFn(mlir::FunctionOpInterface funcOp, int tilingLevel) {
+  FailureOr<SmallVector<int64_t>> tileSizes =
+      getGPUTileSize(funcOp, tilingLevel);
+  if (failed(tileSizes))
+    return failure();
+  scf::SCFTileSizeComputationFunction computeFn =
+      [tileSizes](OpBuilder &builder,
+                  Operation *op) -> SmallVector<OpFoldResult> {
+    auto tileSizesOfr = getAsIndexOpFoldResult(op->getContext(), *tileSizes);
+    auto zeroAttr = builder.getIndexAttr(0);
+    int numLoops = cast<TilingInterface>(op).getLoopIteratorTypes().size();
+    tileSizesOfr.resize(numLoops, zeroAttr);
+    return tileSizesOfr;
+  };
+  return computeFn;
+}
+
+//===----------------------------------------------------------------------===//
 // GPU workgroup memory
 //===----------------------------------------------------------------------===//
 

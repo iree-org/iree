@@ -9,7 +9,7 @@ func.func @distribute_to_x(%lb : index, %ub : index, %step: index, %output: memr
   %init = tensor.empty() : tensor<2x128xf32>
   scf.for %iv = %lb to %ub step %step {
     memref.store %zero, %output[%iv] : memref<?xf32>
-  } {iree.spirv.distribute_dim = 0 : index}
+  } {iree.gpu.distribute_dim = 0 : index}
 
   return
 }
@@ -34,7 +34,7 @@ func.func @distribute_to_y(%lb : index, %ub : index, %step: index, %output: memr
   %init = tensor.empty() : tensor<2x128xf32>
   scf.for %iv = %lb to %ub step %step {
     memref.store %zero, %output[%iv] : memref<?xf32>
-  } {iree.spirv.distribute_dim = 1 : index}
+  } {iree.gpu.distribute_dim = 1 : index}
 
   return
 }
@@ -59,7 +59,7 @@ func.func @distribute_to_z(%lb : index, %ub : index, %step: index, %output: memr
   %init = tensor.empty() : tensor<2x128xf32>
   scf.for %iv = %lb to %ub step %step {
     memref.store %zero, %output[%iv] : memref<?xf32>
-  } {iree.spirv.distribute_dim = 2 : index}
+  } {iree.gpu.distribute_dim = 2 : index}
 
   return
 }

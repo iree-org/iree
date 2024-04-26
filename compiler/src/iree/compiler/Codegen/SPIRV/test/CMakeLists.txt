@@ -66,7 +66,6 @@ iree_lit_test_suite(
     "tile_and_vectorize_matmul.mlir"
     "tile_and_vectorize_pooling.mlir"
     "tile_and_vectorize_to_cooperative_ops.mlir"
-    "tile_linalg_ops.mlir"
     "trim_executable_target_env.mlir"
     "vectorize_conv.mlir"
     "vectorize_elementwise_ops.mlir"

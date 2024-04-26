@@ -6,7 +6,7 @@
 
 //===- SPIRVDistribute.cpp ------------------------------------------------===//
 //
-// This pass distributes tiled loop nests with `iree.spirv.distribute_dim`
+// This pass distributes tiled loop nests with `iree.gpu.distribute_dim`
 // attributes to invocations.
 //
 //===----------------------------------------------------------------------===//
@@ -14,6 +14,7 @@
 #include "iree/compiler/Codegen/SPIRV/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -34,7 +35,7 @@ struct DistributeLoop final : public OpRewritePattern<scf::ForOp> {
                                 PatternRewriter &rewriter) const override {
     // Only distribute if we see the marker attribute.
     auto numDimAttr =
-        forOp->getAttrOfType<IntegerAttr>(getSPIRVDistributeAttrName());
+        forOp->getAttrOfType<IntegerAttr>(getGPUDistributeAttrName());
     if (!numDimAttr)
       return failure();
 
@@ -61,7 +62,7 @@ struct DistributeLoop final : public OpRewritePattern<scf::ForOp> {
     forOp.getLowerBoundMutable().assign(newLb);
     forOp.getStepMutable().assign(newStep);
     // Remove the attribute to avoid endless recursion.
-    forOp->removeAttr(getSPIRVDistributeAttrName());
+    forOp->removeAttr(getGPUDistributeAttrName());
     return success();
   }
 };
