@@ -132,6 +132,19 @@ jobs:
             --retry-delay 5 \
             --durations=0 \
             --config-files=build_tools/pkgci/external_test_suite/gpu_rocm_models_gfx90a.json
+      - name: Run external tests - Models with real weights and additional flags
+        run: |
+          source ${VENV_DIR}/bin/activate
+          pytest SHARK-TestSuite/iree_tests/pytorch/models \
+            -rpfE \
+            -k real_weights \
+            --no-skip-tests-missing-files \
+            --capture=no \
+            --timeout=1200 \
+            --retries 2 \
+            --retry-delay 5 \
+            --durations=0 \
+            --config-files=build_tools/pkgci/external_test_suite/gpu_rocm_models_additional_flags_gfx90a.json
       - name: "Running real weight model tests scheduled unet"
         run: |
           source ${VENV_DIR}/bin/activate

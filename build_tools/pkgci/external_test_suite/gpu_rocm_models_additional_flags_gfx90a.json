@@ -2,7 +2,9 @@
     "config_name": "gpu_rocm",
     "iree_compile_flags" : [
       "--iree-hal-target-backends=rocm",
-      "--iree-rocm-target-chip=gfx90a"
+      "--iree-rocm-target-chip=gfx90a",
+      "--iree-opt-const-eval=false",
+      "--iree-codegen-transform-dialect-library=attention_and_matmul_spec.mlir"
     ],
     "iree_run_module_flags": [
       "--device=hip"
@@ -12,9 +14,7 @@
     ],
     "skip_run_tests": [],
     "expected_compile_failures": [
-      "resnet50",
-      "sdxl-prompt-encoder-tank",
-      "sdxl-vae-decode-tank"
+      "resnet50"
     ],
     "expected_run_failures": []
 }
