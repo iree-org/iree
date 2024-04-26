@@ -34,7 +34,7 @@ public:
 
 protected:
   CompiledBinary();
-  void initialize(void *data, size_t length);
+  LogicalResult initialize(Location loc, void *data, size_t length);
   // The base class does not clean up initialized state. This must be done
   // explicitly by subclasses, ensuring that any backing images remain valid
   // through the call to deinitialize().
@@ -55,6 +55,7 @@ public:
   FunctionCall(CompiledBinary &binary, iree_host_size_t argCapacity,
                iree_host_size_t resultCapacity);
 
+  LogicalResult initialize(Location loc);
   LogicalResult addArgument(Location loc, Attribute attr);
   LogicalResult invoke(Location loc, StringRef name);
   LogicalResult getResultAsAttr(Location loc, size_t index, Type mlirType,
@@ -71,6 +72,8 @@ private:
       IREE::Util::SerializableAttrInterface serializableAttr);
 
   CompiledBinary binary;
+  iree_host_size_t argCapacity;
+  iree_host_size_t resultCapacity;
   iree::vm::ref<iree_vm_list_t> inputs;
   iree::vm::ref<iree_vm_list_t> outputs;
 };
@@ -93,6 +96,7 @@ public:
 
   iree_hal_driver_registry_t *registry = nullptr;
   iree::vm::ref<iree_vm_instance_t> instance;
+  iree_status_t initStatus = iree_ok_status();
 
 private:
   Runtime();

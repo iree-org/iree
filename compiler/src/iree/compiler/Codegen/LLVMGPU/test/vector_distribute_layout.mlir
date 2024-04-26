@@ -1,10 +1,11 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(func.func(iree-llvmgpu-vector-distribute{test-layout}, canonicalize, cse))' %s | FileCheck %s
 
-func.func @mfma_matmul_96x64x16_mm(%lhs: vector<96x16xf16>, %rhs: vector<16x64xf16>, %init: vector<96x64xf32>) -> vector<96x64xf32> attributes {
-    mma_schedule = #iree_gpu.mma_schedule<
-      intrinsic = #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>,
-      subgroup_m_count = 1, subgroup_n_count = 1, subgroup_m_tile_count = 3, subgroup_n_tile_count = 2, subgroup_k_tile_count = 2>,
-    workgroup_size = [64, 1, 1]} {
+#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute 
+                                              workgroup_size = [64, 1, 1]
+                                              subgroup_size = 64, 
+      {mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>, subgroup_m_count = 1, subgroup_n_count = 1, subgroup_m_tile_count = 3, subgroup_n_tile_count = 2, subgroup_k_tile_count = 2>}>
+
+func.func @mfma_matmul_96x64x16_mm(%lhs: vector<96x16xf16>, %rhs: vector<16x64xf16>, %init: vector<96x64xf32>) -> vector<96x64xf32> attributes { translation_info = #translation } {
     %0 = vector.contract {
       indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
       iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>}
@@ -18,20 +19,19 @@ func.func @mfma_matmul_96x64x16_mm(%lhs: vector<96x16xf16>, %rhs: vector<16x64xf
 // CHECK-SAME:   subgroup_basis = [1, 1, 1], subgroup_active_ids = [true, false, true], thread_basis = [2, 32]>
 //      CHECK: contract B vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [2, 2], outers_per_batch = [1, 1], threads_per_outer = [2, 32], elements_per_thread = [4, 1],
-// CHECK-SAME:   element_order = [1, 0],
 // CHECK-SAME:   subgroup_basis = [1, 1, 1], subgroup_active_ids = [false, true, true], thread_basis = [2, 32]>
 //      CHECK: contract C vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [3, 2], outers_per_batch = [4, 1], threads_per_outer = [2, 32], elements_per_thread = [4, 1],
-// CHECK-SAME:   element_order = [1, 0],
 // CHECK-SAME:   subgroup_basis = [1, 1, 1], subgroup_active_ids = [true, true, false], thread_basis = [2, 32]>
 
 // -----
 
-func.func @mfma_matmul_96x64x16_mmt(%lhs: vector<96x16xf16>, %rhs: vector<64x16xf16>, %init: vector<96x64xf32>) -> vector<96x64xf32> attributes {
-    mma_schedule = #iree_gpu.mma_schedule<
-      intrinsic = #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>,
-      subgroup_m_count = 1, subgroup_n_count = 1, subgroup_m_tile_count = 3, subgroup_n_tile_count = 2, subgroup_k_tile_count = 2>,
-    workgroup_size = [64, 1, 1]} {
+#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute 
+                                              workgroup_size = [64, 1, 1]
+                                              subgroup_size = 64, 
+      {mma_schedule = #iree_gpu.mma_schedule< intrinsic = #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>, subgroup_m_count = 1, subgroup_n_count = 1, subgroup_m_tile_count = 3, subgroup_n_tile_count = 2, subgroup_k_tile_count = 2>}>
+
+func.func @mfma_matmul_96x64x16_mmt(%lhs: vector<96x16xf16>, %rhs: vector<64x16xf16>, %init: vector<96x64xf32>) -> vector<96x64xf32> attributes { translation_info = #translation } {
     %0 = vector.contract {
       indexing_maps = [affine_map<(m, n, k) -> (m, k)>, affine_map<(m, n, k) -> (n, k)>, affine_map<(m, n, d2) -> (m, n)>],
       iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>}
@@ -45,20 +45,20 @@ func.func @mfma_matmul_96x64x16_mmt(%lhs: vector<96x16xf16>, %rhs: vector<64x16x
 // CHECK-SAME:   subgroup_basis = [1, 1, 1], subgroup_active_ids = [true, false, true], thread_basis = [2, 32]>
 //      CHECK: contract B vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [2, 2], outers_per_batch = [1, 1], threads_per_outer = [32, 2], elements_per_thread = [1, 4],
-// CHECK-SAME:   outer_order = [1, 0], thread_order = [1, 0]
+// CHECK-SAME:   thread_order = [1, 0]
 // CHECK-SAME:   subgroup_basis = [1, 1, 1], subgroup_active_ids = [false, true, true], thread_basis = [2, 32]>
 //      CHECK: contract C vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [3, 2], outers_per_batch = [4, 1], threads_per_outer = [2, 32], elements_per_thread = [4, 1],
-// CHECK-SAME:   element_order = [1, 0]
 // CHECK-SAME:   subgroup_basis = [1, 1, 1], subgroup_active_ids = [true, true, false], thread_basis = [2, 32]>
 
 // -----
 
-func.func @matmul_192x64x16_mmt_multisubgroup(%lhs: vector<192x16xf16>, %rhs: vector<16x64xf16>, %init: vector<192x64xf32>) -> vector<192x64xf32> attributes {
-    mma_schedule = #iree_gpu.mma_schedule<
-      intrinsic = #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>,
-      subgroup_m_count = 2, subgroup_n_count = 1, subgroup_m_tile_count = 3, subgroup_n_tile_count = 2, subgroup_k_tile_count = 2>,
-    workgroup_size = [64, 2, 1]} {
+#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute 
+                                              workgroup_size = [64, 2, 1]
+                                              subgroup_size = 64, 
+      {mma_schedule = #iree_gpu.mma_schedule< intrinsic = #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>, subgroup_m_count = 2, subgroup_n_count = 1, subgroup_m_tile_count = 3, subgroup_n_tile_count = 2, subgroup_k_tile_count = 2>}>
+
+func.func @matmul_192x64x16_mmt_multisubgroup(%lhs: vector<192x16xf16>, %rhs: vector<16x64xf16>, %init: vector<192x64xf32>) -> vector<192x64xf32> attributes { translation_info = #translation } {
     %0 = vector.contract {
       indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
       iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>}
@@ -72,13 +72,15 @@ func.func @matmul_192x64x16_mmt_multisubgroup(%lhs: vector<192x16xf16>, %rhs: ve
 
 // -----
 
+#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute 
+                                              workgroup_size = [64, 1, 1]
+                                              subgroup_size = 64, 
+      {mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, subgroup_m_count = 1, subgroup_n_count = 1, subgroup_m_tile_count = 1, subgroup_n_tile_count = 1, subgroup_k_tile_count = 2>}>
+
 func.func @matmul_16x16x256_read(%lhs: memref<16x256xf16, strided<[256, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>,
                                  %rhs: memref<256x16xf16, strided<[256, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>,
                                  %out: memref<16x16xf32, strided<[256, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>)
-  attributes {
-    mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
-                     subgroup_m_count = 1, subgroup_n_count = 1, subgroup_m_tile_count = 1, subgroup_n_tile_count = 1, subgroup_k_tile_count = 2>,
-    workgroup_size = [64, 1, 1]} {
+  attributes { translation_info = #translation } {
   %alloc = memref.alloc() : memref<32x16xf16, #gpu.address_space<workgroup>>
   %alloc_0 = memref.alloc() : memref<16x32xf16, #gpu.address_space<workgroup>>
   %cst = arith.constant 0.000000e+00 : f16
@@ -120,22 +122,24 @@ func.func @matmul_16x16x256_read(%lhs: memref<16x256xf16, strided<[256, 1], offs
 // CHECK-SAME:   subgroup_active_ids = [true, false, true], thread_basis = [4, 16]>
 //      CHECK: contract B vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [2, 1], outers_per_batch = [1, 1], threads_per_outer = [4, 16], elements_per_thread = [4, 1],
-// CHECK-SAME:   subgroup_order = [1, 0], element_order = [1, 0],
+// CHECK-SAME:   subgroup_order = [1, 0]
 // CHECK-SAME:   subgroup_basis = [1, 1, 1], subgroup_active_ids = [false, true, true], thread_basis = [4, 16]>
 //      CHECK: contract C vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [1, 1], outers_per_batch = [1, 1], threads_per_outer = [4, 16], elements_per_thread = [4, 1],
-// CHECK-SAME:   element_order = [1, 0],
 // CHECK-SAME:   subgroup_basis = [1, 1, 1], subgroup_active_ids = [true, true, false], thread_basis = [4, 16]>
 
 // -----
 
+#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute 
+                                              workgroup_size = [64, 1, 1]
+                                              subgroup_size = 64, 
+      {mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, subgroup_m_count = 1, subgroup_n_count = 1, subgroup_m_tile_count = 1, subgroup_n_tile_count = 1, subgroup_k_tile_count = 2>}>
+
+
 func.func @matmul_16x16x256_read_permute(%lhs: memref<16x256xf16, strided<[256, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>,
                                          %rhs: memref<16x256xf16, strided<[256, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>,
                                          %out: memref<16x16xf32, strided<[256, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>)
-  attributes {
-    mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
-                     subgroup_m_count = 1, subgroup_n_count = 1, subgroup_m_tile_count = 1, subgroup_n_tile_count = 1, subgroup_k_tile_count = 2>,
-    workgroup_size = [64, 1, 1]} {
+  attributes { translation_info = #translation } {
   %alloc = memref.alloc() : memref<32x16xf16, #gpu.address_space<workgroup>>
   %alloc_0 = memref.alloc() : memref<16x32xf16, #gpu.address_space<workgroup>>
   %cst = arith.constant 0.000000e+00 : f16
@@ -172,7 +176,7 @@ func.func @matmul_16x16x256_read_permute(%lhs: memref<16x256xf16, strided<[256, 
 // CHECK-SAME:   subgroup_basis = [1, 1], thread_basis = [16, 4]>
 //      CHECK: transfer '{{.+}} memref<16x256xf16{{.+}}storage_buffer>>, vector<32x16xf16>' vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [1, 1], outers_per_batch = [1, 1], threads_per_outer = [4, 16], elements_per_thread = [8, 1],
-// CHECK-SAME:   subgroup_order = [1, 0], batch_order = [1, 0], outer_order = [1, 0], thread_order = [1, 0], element_order = [1, 0],
+// CHECK-SAME:   subgroup_order = [1, 0], thread_order = [1, 0],
 // CHECK-SAME:   subgroup_basis = [1, 1], thread_basis = [4, 16]>
 
 //      CHECK: contract A vector layout: #iree_vector_ext.nested_layout<
@@ -181,23 +185,23 @@ func.func @matmul_16x16x256_read_permute(%lhs: memref<16x256xf16, strided<[256, 
 // CHECK-SAME:   subgroup_basis = [1, 1, 1], subgroup_active_ids = [true, false, true], thread_basis = [4, 16]>
 //      CHECK: contract B vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [2, 1], outers_per_batch = [1, 1], threads_per_outer = [4, 16], elements_per_thread = [4, 1],
-// CHECK-SAME:   element_order = [1, 0],
 // CHECK-SAME:   subgroup_basis = [1, 1, 1], subgroup_active_ids = [false, true, true], thread_basis = [4, 16]>
 //      CHECK: contract C vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [1, 1], outers_per_batch = [1, 1], threads_per_outer = [4, 16], elements_per_thread = [4, 1],
-// CHECK-SAME:   element_order = [1, 0],
 // CHECK-SAME:   subgroup_basis = [1, 1, 1], subgroup_active_ids = [true, true, false], thread_basis = [4, 16]>
 
 // -----
+
+#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute 
+                                              workgroup_size = [64, 1, 1]
+                                              subgroup_size = 64, 
+      {mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, subgroup_m_count = 1, subgroup_n_count = 1, subgroup_m_tile_count = 1, subgroup_n_tile_count = 1, subgroup_k_tile_count = 2>}>
 
 func.func @matmul_16x16x256_fused(%lhs: memref<16x32xf16>,
                                   %rhs: memref<32x16xf16>,
                                   %bias: memref<16x16xf32>,
                                   %out: memref<16x16xf32>)
-  attributes {
-    mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
-                     subgroup_m_count = 1, subgroup_n_count = 1, subgroup_m_tile_count = 1, subgroup_n_tile_count = 1, subgroup_k_tile_count = 2>,
-    workgroup_size = [64, 1, 1]} {
+  attributes { translation_info = #translation } {
   %cst = arith.constant 0.000000e+00 : f16
   %cst_f32 = arith.constant 0.000000e+00 : f32
   %c32 = arith.constant 32 : index
@@ -228,11 +232,12 @@ func.func @matmul_16x16x256_fused(%lhs: memref<16x32xf16>,
 
 // -----
 
-func.func @wmma_matmul_48x32x32_mm(%lhs: vector<48x32xf16>, %rhs: vector<32x32xf16>, %init: vector<48x32xf32>) -> vector<48x32xf32> attributes {
-    mma_schedule = #iree_gpu.mma_schedule<
-      intrinsic = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>,
-      subgroup_m_count = 1, subgroup_n_count = 1, subgroup_m_tile_count = 3, subgroup_n_tile_count = 2, subgroup_k_tile_count = 2>,
-    workgroup_size = [32, 1, 1]} {
+#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute 
+                                              workgroup_size = [32, 1, 1]
+                                              subgroup_size = 32, 
+      {mma_schedule = #iree_gpu.mma_schedule< intrinsic = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>, subgroup_m_count = 1, subgroup_n_count = 1, subgroup_m_tile_count = 3, subgroup_n_tile_count = 2, subgroup_k_tile_count = 2>}>
+
+func.func @wmma_matmul_48x32x32_mm(%lhs: vector<48x32xf16>, %rhs: vector<32x32xf16>, %init: vector<48x32xf32>) -> vector<48x32xf32> attributes { translation_info = #translation } {
     %0 = vector.contract {
       indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d2)>, affine_map<(d0, d1, d2) -> (d2, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
       iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>}
@@ -246,20 +251,19 @@ func.func @wmma_matmul_48x32x32_mm(%lhs: vector<48x32xf16>, %rhs: vector<32x32xf
 // CHECK-SAME:   subgroup_basis = [1, 1, 1], subgroup_active_ids = [true, false, true], thread_basis = [1, 32]>
 //      CHECK: contract B vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [2, 2], outers_per_batch = [1, 1], threads_per_outer = [1, 16], elements_per_thread = [16, 1],
-// CHECK-SAME:   element_order = [1, 0],
 // CHECK-SAME:   subgroup_basis = [1, 1, 1], subgroup_active_ids = [false, true, true], thread_basis = [1, 32]>
 //      CHECK: contract C vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [3, 2], outers_per_batch = [8, 1], threads_per_outer = [2, 16], elements_per_thread = [1, 1],
-// CHECK-SAME:   element_order = [1, 0],
 // CHECK-SAME:   subgroup_basis = [1, 1, 1], subgroup_active_ids = [true, true, false], thread_basis = [2, 16]>
 
 // -----
 
-func.func @wmma_matmul_48x32x32_mmt(%lhs: vector<48x32xf16>, %rhs: vector<32x32xf16>, %init: vector<48x32xf32>) -> vector<48x32xf32> attributes {
-    mma_schedule = #iree_gpu.mma_schedule<
-      intrinsic = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>,
-      subgroup_m_count = 1, subgroup_n_count = 1, subgroup_m_tile_count = 3, subgroup_n_tile_count = 2, subgroup_k_tile_count = 2>,
-    workgroup_size = [32, 1, 1]} {
+#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute 
+                                              workgroup_size = [32, 1, 1]
+                                              subgroup_size = 32, 
+      {mma_schedule = #iree_gpu.mma_schedule< intrinsic = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>, subgroup_m_count = 1, subgroup_n_count = 1, subgroup_m_tile_count = 3, subgroup_n_tile_count = 2, subgroup_k_tile_count = 2>}>
+
+func.func @wmma_matmul_48x32x32_mmt(%lhs: vector<48x32xf16>, %rhs: vector<32x32xf16>, %init: vector<48x32xf32>) -> vector<48x32xf32> attributes { translation_info = #translation } {
     %0 = vector.contract {
       indexing_maps = [affine_map<(m, n, k) -> (m, k)>, affine_map<(m, n, k) -> (n, k)>, affine_map<(m, n, d2) -> (m, n)>],
       iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>}
@@ -273,20 +277,21 @@ func.func @wmma_matmul_48x32x32_mmt(%lhs: vector<48x32xf16>, %rhs: vector<32x32x
 // CHECK-SAME:   subgroup_basis = [1, 1, 1], subgroup_active_ids = [true, false, true], thread_basis = [1, 32]>
 //      CHECK: contract B vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [2, 2], outers_per_batch = [1, 1], threads_per_outer = [16, 1], elements_per_thread = [1, 16],
-// CHECK-SAME:   outer_order = [1, 0], thread_order = [1, 0],
+// CHECK-SAME:   thread_order = [1, 0],
 // CHECK-SAME:   subgroup_basis = [1, 1, 1], subgroup_active_ids = [false, true, true], thread_basis = [1, 32]>
 //      CHECK: contract C vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [3, 2], outers_per_batch = [8, 1], threads_per_outer = [2, 16], elements_per_thread = [1, 1],
-// CHECK-SAME:   element_order = [1, 0],
 // CHECK-SAME:   subgroup_basis = [1, 1, 1], subgroup_active_ids = [true, true, false], thread_basis = [2, 16]>
 
 // -----
 
-func.func @matmul_192x64x16_mmt_multi_m(%lhs: vector<2x64x16xf16>, %rhs: vector<16x64xf16>, %init: vector<2x64x64xf32>) -> vector<2x64x64xf32> attributes {
-    mma_schedule = #iree_gpu.mma_schedule<
-      intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
-      subgroup_m_count = 2, subgroup_n_count = 1, subgroup_m_tile_count = 4, subgroup_n_tile_count = 4, subgroup_k_tile_count = 1>,
-    workgroup_size = [64, 2, 1]} {
+#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute 
+                                              workgroup_size = [64, 2, 1]
+                                              subgroup_size = 64, 
+      {mma_schedule = #iree_gpu.mma_schedule< intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, subgroup_m_count = 2, subgroup_n_count = 1, subgroup_m_tile_count = 4, subgroup_n_tile_count = 4, subgroup_k_tile_count = 1>}>
+
+
+func.func @matmul_192x64x16_mmt_multi_m(%lhs: vector<2x64x16xf16>, %rhs: vector<16x64xf16>, %init: vector<2x64x64xf32>) -> vector<2x64x64xf32> attributes { translation_info = #translation } {
     %0 = vector.contract {
       indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>, affine_map<(d0, d1, d2, d3) -> (d3, d2)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>],
       iterator_types = ["parallel", "parallel", "parallel", "reduction"], kind = #vector.kind<add>}
@@ -311,7 +316,6 @@ func.func @matmul_192x64x16_mmt_multi_m(%lhs: vector<2x64x16xf16>, %rhs: vector<
 // CHECK-SAME:   threads_per_outer = [4, 16],
 // CHECK-SAME:   elements_per_thread = [4, 1],
 // CHECK-SAME:   subgroup_order = [1, 0],
-// CHECK-SAME:   element_order = [1, 0],
 // CHECK-SAME:   subgroup_basis = [2, 1, 1, 1],
 // CHECK-SAME:   subgroup_active_ids = [false, false, true, true],
 // CHECK-SAME:   thread_basis = [4, 16]>
@@ -321,18 +325,18 @@ func.func @matmul_192x64x16_mmt_multi_m(%lhs: vector<2x64x16xf16>, %rhs: vector<
 // CHECK-SAME:   outers_per_batch = [1, 1, 1],
 // CHECK-SAME:   threads_per_outer = [1, 4, 16],
 // CHECK-SAME:   elements_per_thread = [1, 4, 1],
-// CHECK-SAME:   element_order = [0, 2, 1],
 // CHECK-SAME:   subgroup_basis = [2, 1, 1, 1],
 // CHECK-SAME:   subgroup_active_ids = [true, true, true, false],
 // CHECK-SAME:   thread_basis = [1, 4, 16]>
 
 // -----
 
-func.func @matmul_192x64x16_mmt_multi_split_m(%lhs: vector<2x64x16xf16>, %rhs: vector<16x64xf16>, %init: vector<2x64x64xf32>) -> vector<2x64x64xf32> attributes {
-    mma_schedule = #iree_gpu.mma_schedule<
-      intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
-      subgroup_m_count = 4, subgroup_n_count = 1, subgroup_m_tile_count = 2, subgroup_n_tile_count = 4, subgroup_k_tile_count = 1>,
-    workgroup_size = [64, 2, 1]} {
+#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute 
+                                              workgroup_size = [64, 2, 1]
+                                              subgroup_size = 64, 
+      {mma_schedule = #iree_gpu.mma_schedule< intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, subgroup_m_count = 4, subgroup_n_count = 1, subgroup_m_tile_count = 2, subgroup_n_tile_count = 4, subgroup_k_tile_count = 1>}>
+
+func.func @matmul_192x64x16_mmt_multi_split_m(%lhs: vector<2x64x16xf16>, %rhs: vector<16x64xf16>, %init: vector<2x64x64xf32>) -> vector<2x64x64xf32> attributes { translation_info = #translation } {
     %0 = vector.contract {
       indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>, affine_map<(d0, d1, d2, d3) -> (d3, d2)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>],
       iterator_types = ["parallel", "parallel", "parallel", "reduction"], kind = #vector.kind<add>}
@@ -353,11 +357,12 @@ func.func @matmul_192x64x16_mmt_multi_split_m(%lhs: vector<2x64x16xf16>, %rhs: v
 
 // -----
 
-func.func @matmul_192x64x16_mmt_multi_m_and_n(%lhs: vector<4x64x16xf16>, %rhs: vector<2x16x64xf16>, %init: vector<4x2x64x64xf32>) -> vector<4x2x64x64xf32> attributes {
-    mma_schedule = #iree_gpu.mma_schedule<
-      intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
-      subgroup_m_count = 2, subgroup_n_count = 2, subgroup_m_tile_count = 8, subgroup_n_tile_count = 4, subgroup_k_tile_count = 1>,
-    workgroup_size = [128, 2, 1]} {
+#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute 
+                                              workgroup_size = [128, 2, 1]
+                                              subgroup_size = 64, 
+      {mma_schedule = #iree_gpu.mma_schedule< intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, subgroup_m_count = 2, subgroup_n_count = 2, subgroup_m_tile_count = 8, subgroup_n_tile_count = 4, subgroup_k_tile_count = 1>, workgroup_size = [128, 2, 1]}>
+
+func.func @matmul_192x64x16_mmt_multi_m_and_n(%lhs: vector<4x64x16xf16>, %rhs: vector<2x16x64xf16>, %init: vector<4x2x64x64xf32>) -> vector<4x2x64x64xf32> attributes { translation_info = #translation } {
     %0 = vector.contract {
       indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d4)>, affine_map<(d0, d1, d2, d3, d4) -> (d1, d4, d3)>, affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>],
       iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"], kind = #vector.kind<add>}
@@ -383,13 +388,15 @@ func.func @matmul_192x64x16_mmt_multi_m_and_n(%lhs: vector<4x64x16xf16>, %rhs: v
 
 // -----
 
+#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute 
+                                              workgroup_size = [32, 4, 1]
+                                              subgroup_size = 32, 
+      {mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>, subgroup_m_count = 1, subgroup_n_count = 4, subgroup_m_tile_count = 1, subgroup_n_tile_count = 2, subgroup_k_tile_count = 8>}>
+
 func.func @dequant_anchors_on_quant_only(%quant: memref<128x128xi4, strided<[4096, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>,
                                   %scale: memref<128xf16, strided<[32], offset: ?>, #hal.descriptor_type<storage_buffer>>,
                                   %zp: memref<128xf16, strided<[32], offset: ?>, #hal.descriptor_type<storage_buffer>>)
-  attributes {
-    mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>,
-                   subgroup_m_count = 1, subgroup_n_count = 4, subgroup_m_tile_count = 1, subgroup_n_tile_count = 2, subgroup_k_tile_count = 8>,
-    workgroup_size = [32, 4, 1]} {
+  attributes { translation_info = #translation } {
   %alloc = memref.alloc() : memref<128x128xf16, #gpu.address_space<workgroup>>
   %cst = arith.constant 0.000000e+00 : f16
   %cst_0 = arith.constant 0.000000e+00 : f32

@@ -797,7 +797,7 @@ def Util_TiedOpInterface : OpInterface<"TiedOpInterface"> {
       /*args=*/(ins "Value":$result),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
-        auto resultIndex = result.cast<mlir::OpResult>().getResultNumber();
+        auto resultIndex = cast<mlir::OpResult>(result).getResultNumber();
         auto operandIndex = cast<TiedOpInterface>($_op.getOperation())
             .getTiedResultOperandIndex(resultIndex);
         return operandIndex.has_value() ?
@@ -975,7 +975,7 @@ def Util_ShapeAwareOp : OpInterface<"ShapeAwareOpInterface"> {
       /*methodBody=*/[{
         auto shapeAwareOp = dyn_cast<IREE::Util::ShapeAwareOpInterface>(result.getDefiningOp());
         return shapeAwareOp.buildResultShape(
-            result.cast<mlir::OpResult>().getResultNumber(), builder);
+            cast<mlir::OpResult>(result).getResultNumber(), builder);
       }]
     >,
   ];
@@ -1115,7 +1115,7 @@ def Util_GlobalType : TypeInterface<"GlobalTypeInterface"> {
       /*defaultImplementation=*/[{
         // If one is a shaped type, then they both must be and have compatible
         // shapes.
-        if ($_type.template isa<ShapedType>() || accessType.isa<ShapedType>()) {
+        if ($_type.template isa<ShapedType>() || isa<ShapedType>(accessType)) {
           return succeeded(mlir::verifyCompatibleShape($_type, accessType));
         }
         // Otherwise, the types must be the same.
@@ -1128,6 +1128,36 @@ def Util_GlobalType : TypeInterface<"GlobalTypeInterface"> {
 //===----------------------------------------------------------------------===//
 // IREE::Util::Hoistable*Interface
 //===----------------------------------------------------------------------===//
+
+def Util_HoistableAttrInterface : AttrInterface<"HoistableAttrInterface"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::Util";
+
+  let description = [{
+    Interface used to control hoisting of dialect attributes associated with
+    ops that are hoisted. Attributes implementing this interface can opt into
+    being replicated onto the global and initializer produced during hoisting.
+
+    Hoisting will walk up ancestors of hoisted ops to see if any contain
+    attributes with this interface to allow context-scoped behavior such as
+    target execution environment for a function.
+  }];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+        Returns true if dialect attributes of this type are replicated to the
+        global and initializer created during hoisting.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"shouldAttachToHoistedOps",
+      /*args=*/(ins),
+      /*methodBody=*/[{}],
+      /*defaultImplementation=*/[{
+        return true;
+      }]
+    >,
+  ];
+}
 
 def Util_HoistableOpInterface : OpInterface<"HoistableOpInterface"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Util";

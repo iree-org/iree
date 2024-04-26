@@ -2285,9 +2285,10 @@ def Stream_AsyncTransferOp : Stream_Op<"async.transfer", [
   );
 
   let assemblyFormat = [{
+    $source `:` type($source)
+    `` `{` $source_size `}`
     (`from` `(` $source_affinity^ `)`)?
-    $source `:`
-    type($source) `` `{` $source_size `}` `->`
+    `->`
     (`to` `(` $result_affinity^ `)`)?
     type($result) `` `{` $result_size `}`
     attr-dict-with-keyword

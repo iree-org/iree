@@ -8,6 +8,7 @@
 #define IREE_COMPILER_MODULES_HAL_INLINE_TRANSFORMS_PASSES_H_
 
 #include "iree/compiler/Dialect/HAL/Target/TargetBackend.h"
+#include "iree/compiler/Dialect/HAL/Target/TargetOptions.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Modules/HAL/Inline/IR/HALInlineOps.h"
 #include "llvm/ADT/StringMap.h"

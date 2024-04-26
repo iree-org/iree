@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_PIPELINES_PIPELINES_H_
 #define IREE_COMPILER_PIPELINES_PIPELINES_H_
 
+#include "iree/compiler/Dialect/HAL/Target/TargetOptions.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/VM/Conversion/TargetOptions.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"

@@ -55,7 +55,7 @@ iree_cc_library(
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::LLVMGPU
     iree::compiler::Dialect::HAL::Target
-    iree::compiler::Dialect::HAL::Target::LLVMLinkerUtils
+    iree::compiler::Dialect::HAL::Utils::LLVMLinkerUtils
     iree::compiler::PluginAPI
     iree::compiler::Utils
     iree::schemas::cuda_executable_def_c_fbs

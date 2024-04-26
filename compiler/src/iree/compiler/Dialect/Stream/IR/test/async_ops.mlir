@@ -147,6 +147,15 @@ util.func private @asyncTransfer(%arg0: !stream.resource<constant>, %arg1: index
 
 // -----
 
+// CHECK-LABEL: @asyncTransferAffinities
+util.func private @asyncTransferAffinities(%arg0: !stream.resource<constant>, %arg1: index) -> !stream.resource<constant> {
+  // CHECK: = stream.async.transfer %arg0 : !stream.resource<constant>{%arg1} from(#hal.affinity.queue<[0]>) -> to(#hal.affinity.queue<[1]>) !stream.resource<constant>{%arg1}
+  %0 = stream.async.transfer %arg0 : !stream.resource<constant>{%arg1} from(#hal.affinity.queue<[0]>) -> to(#hal.affinity.queue<[1]>) !stream.resource<constant>{%arg1}
+  util.return %0 : !stream.resource<constant>
+}
+
+// -----
+
 // CHECK-LABEL: @asyncLoad
 util.func private @asyncLoad(%arg0: !stream.resource<staging>, %arg1: index) -> f32 {
   %c0 = arith.constant 0 : index

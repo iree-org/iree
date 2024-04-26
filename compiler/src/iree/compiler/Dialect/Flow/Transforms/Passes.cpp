@@ -88,14 +88,15 @@ static llvm::cl::opt<bool> clEnableElementWiseFuseMultiReduction(
     llvm::cl::desc("Enable element-wise fusion of multi-reduction loop ops."),
     llvm::cl::init(true));
 
+static llvm::cl::opt<bool> clEnableAggressiveFusion(
+    "iree-flow-enable-aggressive-fusion",
+    llvm::cl::desc("Aggressive fusion opportunities that are behind a flag "
+                   "since all backends dont support it yet"),
+    llvm::cl::init(false));
+
 static llvm::cl::opt<bool> clDispatchGenerateWorkloadRegion(
     "iree-flow-dispatch-generate-workload-region",
     llvm::cl::desc("Generate the workload region."), llvm::cl::init(true));
-
-static llvm::cl::opt<bool> clNormalizeInputIndexingMap(
-    "iree-flow-normalize-input-indexing-map",
-    llvm::cl::desc("Enable normalizing input indexing map to identity."),
-    llvm::cl::init(false));
 
 static llvm::cl::opt<bool>
     clDumpDispatchGraph("iree-flow-dump-dispatch-graph",
@@ -149,6 +150,12 @@ void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
             clEnableElementWiseFuseMultiReduction});
       })
       .addPass(mlir::createCanonicalizerPass)
+      .addPass(mlir::createCSEPass)
+
+      // 4. After elementwise operation fusion sink reshapes that block
+      //    producer-consumer fusion.
+      .addPass(createSinkReshapesPass)
+      .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass);
 }
 
@@ -156,8 +163,7 @@ void addDispatchRegionCreationPasses(OpPassManager &passManager,
                                      const TransformOptions &transformOptions) {
   FunctionLikeNest(passManager)
       // Preprocess the input to a form more amenable for fusion
-      .addPass(createInterchangeGenericOpsPass)
-      .addPass(memref::createResolveShapedTypeResultDimsPass)
+      .addPass(createFusionPreprocessingPass)
       .addPass(mlir::createCanonicalizerPass)
       .addPass(mlir::createCSEPass);
 
@@ -178,12 +184,11 @@ void addDispatchRegionCreationPasses(OpPassManager &passManager,
       .addPass(createSplitReductionPass)
       // SplitReductionPass may create reduction dimension that are not the last
       // dimension.
-      .addPass(createInterchangeGenericOpsPass)
+      .addPass(createFusionPreprocessingPass)
       // Normalize the input indexing map to make the input indexing map
       // identity. This helps fusing named linalg op with a generic op with
       // transpose.
-      .addPredicatedPass(clNormalizeInputIndexingMap,
-                         createInterchangeTransposeGenericOpsPass)
+      .addPass(createInterchangeTransposeGenericOpsPass)
       ////////////////////////////////////////////////////////////////////////
       // Dispatch region formation.
       .addPredicatedPass(
@@ -202,7 +207,7 @@ void addDispatchRegionCreationPasses(OpPassManager &passManager,
       // producers.
       .addPass([&]() {
         return createFormDispatchRegionsPass(FormDispatchRegionsPassOptions{
-            clEnableFuseMultiUse, clDispatchGenerateWorkloadRegion,
+            clEnableAggressiveFusion, clDispatchGenerateWorkloadRegion,
             clEnableFusePaddingIntoLinalgConsumerOps,
             clEnableFusePaddingIntoLinalgProducerOps});
       })

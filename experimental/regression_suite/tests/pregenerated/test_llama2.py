@@ -19,12 +19,12 @@ COMMON_FLAGS = [
 ]
 
 llama2_7b_f16qi4_stripped_source = fetch_source_fixture(
-    "https://storage.googleapis.com/shark_tank/llama_regression/09152023/llama2_7b_int4_stripped.mlir",
+    "https://sharktank.blob.core.windows.net/sharktank/llama_regression/09152023/llama2_7b_int4_stripped.mlir",
     group="llama2_7b_f16qi4_stripped",
 )
 
 llama2_7b_f16qi4_source = fetch_source_fixture(
-    "https://storage.googleapis.com/shark_tank/llama_regression/llama2_7b_int4.mlir",
+    "https://sharktank.blob.core.windows.net/sharktank/llama_regression/llama2_7b_int4.mlir",
     group="llama2_7b_f16qi4",
 )
 
@@ -246,22 +246,22 @@ def test_step_rdna3_rocm_stripped(llama2_7b_f16qi4_stripped_rdna3_rocm_vmfb):
 
 
 llama2_7b_f16qi4_first_input_cpu = fetch_source_fixture(
-    "https://storage.googleapis.com/shark_tank/llama_regression/llama2-7b-i4-golden-outputs/cpu/first_vicuna_forward_input.npy",
+    "https://sharktank.blob.core.windows.net/sharktank/llama_regression/llama2-7b-i4-golden-outputs/cpu/first_vicuna_forward_input.npy",
     group="llama2_7b_f16qi4_first_input_cpu",
 )
 
 llama2_7b_f16qi4_first_output_cpu = fetch_source_fixture(
-    "https://storage.googleapis.com/shark_tank/llama_regression/llama2-7b-i4-golden-outputs/cpu/first_vicuna_forward_output.npy",
+    "https://sharktank.blob.core.windows.net/sharktank/llama_regression/llama2-7b-i4-golden-outputs/cpu/first_vicuna_forward_output.npy",
     group="llama2_7b_f16qi4_first_output_cpu",
 )
 
 llama2_7b_f16qi4_second_input_cpu = fetch_source_fixture(
-    "https://storage.googleapis.com/shark_tank/llama_regression/llama2-7b-i4-golden-outputs/cpu/second_vicuna_forward_input.npy",
+    "https://sharktank.blob.core.windows.net/sharktank/llama_regression/llama2-7b-i4-golden-outputs/cpu/second_vicuna_forward_input.npy",
     group="llama2_7b_f16qi4_second_input_cpu",
 )
 
 llama2_7b_f16qi4_second_output_cpu = fetch_source_fixture(
-    "https://storage.googleapis.com/shark_tank/llama_regression/llama2-7b-i4-golden-outputs/cpu/second_vicuna_forward_output.npy",
+    "https://sharktank.blob.core.windows.net/sharktank/llama_regression/llama2-7b-i4-golden-outputs/cpu/second_vicuna_forward_output.npy",
     group="llama2_7b_f16qi4_second_output_cpu",
 )
 
@@ -297,22 +297,22 @@ def test_correctness_host_cpu(
 
 
 llama2_7b_f16qi4_first_input_cuda = fetch_source_fixture(
-    "https://storage.googleapis.com/shark_tank/llama_regression/llama2-7b-i4-golden-outputs/cuda/first_vicuna_forward_input.npy",
+    "https://sharktank.blob.core.windows.net/sharktank/llama_regression/llama2-7b-i4-golden-outputs/cuda/first_vicuna_forward_input.npy",
     group="llama2_7b_f16qi4_first_input_cuda",
 )
 
 llama2_7b_f16qi4_first_output_cuda = fetch_source_fixture(
-    "https://storage.googleapis.com/shark_tank/llama_regression/llama2-7b-i4-golden-outputs/cuda/first_vicuna_forward_output.npy",
+    "https://sharktank.blob.core.windows.net/sharktank/llama_regression/llama2-7b-i4-golden-outputs/cuda/first_vicuna_forward_output.npy",
     group="llama2_7b_f16qi4_first_output_cuda",
 )
 
 llama2_7b_f16qi4_second_input_cuda = fetch_source_fixture(
-    "https://storage.googleapis.com/shark_tank/llama_regression/llama2-7b-i4-golden-outputs/cuda/second_vicuna_forward_input.npy",
+    "https://sharktank.blob.core.windows.net/sharktank/llama_regression/llama2-7b-i4-golden-outputs/cuda/second_vicuna_forward_input.npy",
     group="llama2_7b_f16qi4_second_input_cuda",
 )
 
 llama2_7b_f16qi4_second_output_cuda = fetch_source_fixture(
-    "https://storage.googleapis.com/shark_tank/llama_regression/llama2-7b-i4-golden-outputs/cuda/second_vicuna_forward_output.npy",
+    "https://sharktank.blob.core.windows.net/sharktank/llama_regression/llama2-7b-i4-golden-outputs/cuda/second_vicuna_forward_output.npy",
     group="llama2_7b_f16qi4_second_output_cuda",
 )
 

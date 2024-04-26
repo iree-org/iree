@@ -55,9 +55,9 @@ struct ContextResolveOpPattern
         IREE::HAL::DeviceType::resolveAny(resolveOp.getLoc(), rewriter);
 
     SmallVector<Value> results;
-    if (resultTypes[0].isa<IREE::HAL::DeviceType>()) {
+    if (isa<IREE::HAL::DeviceType>(resultTypes[0])) {
       results.push_back(device);
-    } else if (resultTypes[0].isa<IREE::HAL::AllocatorType>()) {
+    } else if (isa<IREE::HAL::AllocatorType>(resultTypes[0])) {
       results.push_back(rewriter.create<IREE::HAL::DeviceAllocatorOp>(
           resolveOp.getLoc(), device));
     } else {
@@ -65,7 +65,7 @@ struct ContextResolveOpPattern
           resolveOp, "unrecognized context resolve types for a HAL target");
     }
     if (resultTypes.size() > 1) {
-      if (resultTypes[1].isa<IntegerType>()) {
+      if (isa<IntegerType>(resultTypes[1])) {
         results.push_back(buildQueueAffinityMask(
             resolveOp.getLoc(), resolveOp.getAffinityAttr(), device, rewriter));
       } else {

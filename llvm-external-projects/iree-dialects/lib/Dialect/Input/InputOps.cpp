@@ -602,15 +602,15 @@ void GlobalOp::build(OpBuilder &builder, OperationState &result, StringRef name,
 static bool isGlobalTypeCompatible(Type globalType, Type accessType) {
   // If one is a shaped type, then they both must be and have compatible
   // shapes.
-  if (globalType.isa<ShapedType>() && accessType.isa<ShapedType>()) {
+  if (isa<ShapedType>(globalType) && isa<ShapedType>(accessType)) {
     return succeeded(mlir::verifyCompatibleShape(globalType, accessType)) &&
-           globalType.cast<ShapedType>().getElementType() ==
-               accessType.cast<ShapedType>().getElementType();
+           cast<ShapedType>(globalType).getElementType() ==
+               cast<ShapedType>(accessType).getElementType();
   }
 
   // Permissively allow any other types to be marked compatible as long as
   // neither are shaped type.
-  return !globalType.isa<ShapedType>() && !accessType.isa<ShapedType>();
+  return !isa<ShapedType>(globalType) && !isa<ShapedType>(accessType);
 }
 
 LogicalResult
@@ -630,7 +630,7 @@ GlobalLoadOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
 }
 
 LogicalResult GlobalLoadIndirectOp::verify() {
-  auto globalType = getGlobal().getType().cast<PtrType>().getTargetType();
+  auto globalType = cast<PtrType>(getGlobal().getType()).getTargetType();
   auto loadType = getResult().getType();
   if (!isGlobalTypeCompatible(globalType, loadType)) {
     return emitOpError() << "global type mismatch; global pointer is "
@@ -656,7 +656,7 @@ GlobalStoreOp::verifySymbolUses(SymbolTableCollection &symbolTable) {
 }
 
 LogicalResult GlobalStoreIndirectOp::verify() {
-  auto globalType = getGlobal().getType().cast<PtrType>().getTargetType();
+  auto globalType = cast<PtrType>(getGlobal().getType()).getTargetType();
   auto storeType = getValue().getType();
   if (!isGlobalTypeCompatible(globalType, storeType)) {
     return emitOpError() << "global type mismatch; global pointer is "

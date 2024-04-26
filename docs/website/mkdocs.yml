@@ -81,11 +81,12 @@ markdown_extensions:
   - admonition
   - attr_list
   - footnotes
+  - md_in_html
   - meta
   - pymdownx.details
   - pymdownx.emoji:
-      emoji_index: !!python/name:materialx.emoji.twemoji
-      emoji_generator: !!python/name:materialx.emoji.to_svg
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
       options:
         custom_icons:
           - overrides/.icons
@@ -128,6 +129,7 @@ nav:
       - "ML frameworks":
           - "guides/ml-frameworks/index.md"
           - JAX: "guides/ml-frameworks/jax.md"
+          - ONNX: "guides/ml-frameworks/onnx.md"
           - PyTorch: "guides/ml-frameworks/pytorch.md"
           - TensorFlow: "guides/ml-frameworks/tensorflow.md"
           - TensorFlow Lite: "guides/ml-frameworks/tflite.md"

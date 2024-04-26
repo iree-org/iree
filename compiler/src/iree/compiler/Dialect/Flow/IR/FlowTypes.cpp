@@ -222,7 +222,7 @@ void FlowDialect::printType(Type type, DialectAsmPrinter &p) const {
 
 std::optional<IREE::Flow::CollectiveElementType>
 convertToFlowCollectiveElementType(Type type) {
-  if (type.isa<FloatType>()) {
+  if (isa<FloatType>(type)) {
     if (type.isF16()) {
       return IREE::Flow::CollectiveElementType::Float16;
     }
@@ -235,7 +235,7 @@ convertToFlowCollectiveElementType(Type type) {
     if (type.isF64()) {
       return IREE::Flow::CollectiveElementType::Float64;
     }
-  } else if (type.isa<IntegerType>()) {
+  } else if (isa<IntegerType>(type)) {
     if (type.isInteger(8)) {
       if (type.isSignedInteger()) {
         return IREE::Flow::CollectiveElementType::Sint8;

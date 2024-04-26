@@ -125,7 +125,7 @@ CONTROL_JOBS = frozenset(["setup", "summary"])
 DEFAULT_POSTSUBMIT_ONLY_JOBS = frozenset(
     [
         "build_test_all_arm64",
-        "build_test_all_windows",
+        # "build_test_all_windows",  # Currently disabled
         "build_test_all_macos_arm64",
         "build_test_all_macos_x86_64",
         # Due to the outstock of A100, only run this test in postsubmit.
@@ -138,10 +138,11 @@ DEFAULT_POSTSUBMIT_ONLY_JOBS = frozenset(
 # The file paths should be specified using Unix shell-style wildcards.
 PRESUBMIT_TOUCH_ONLY_JOBS = [
     ("build_test_all_macos_arm64", ["runtime/src/iree/hal/drivers/metal/*"]),
-    (
-        "build_test_all_windows",
-        ["*win32*", "*windows*", "*msvc*", "runtime/src/iree/builtins/ukernel/*"],
-    ),
+    # Currently disabled
+    # (
+    #     "build_test_all_windows",
+    #     ["*win32*", "*windows*", "*msvc*", "runtime/src/iree/builtins/ukernel/*"],
+    # ),
 ]
 
 # Default presets enabled in CI.

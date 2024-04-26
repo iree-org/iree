@@ -192,9 +192,9 @@ SmallVector<linalg::ProcInfo> getIds(OpBuilder &b, Location loc,
   AffineExpr d0 = b.getAffineDimExpr(0);
   for (Range r : llvm::reverse(parallelLoopRanges)) {
     linalg::ProcInfo info;
-    auto offset = r.offset.dyn_cast<Attribute>();
-    auto stride = r.stride.dyn_cast<Attribute>();
-    auto size = r.size.dyn_cast<Attribute>();
+    auto offset = dyn_cast<Attribute>(r.offset);
+    auto stride = dyn_cast<Attribute>(r.stride);
+    auto size = dyn_cast<Attribute>(r.size);
     assert(offset && stride && size);
     int64_t numThreadsDim = (llvm::cast<IntegerAttr>(size).getInt() -
                              llvm::cast<IntegerAttr>(offset).getInt()) /

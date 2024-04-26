@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Common/CPU/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/HAL/Target/Devices/LocalDevice.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Utils/OptionUtils.h"
 #include "iree/compiler/Utils/PassUtils.h"
@@ -542,6 +543,16 @@ void registerHALPasses() {
   // Force the flags to be bound.
   // TODO(benvanik): remove the global flags and only rely on pipeline flags.
   (void)IREE::HAL::TargetOptions::FromFlags::get();
+  // TODO(multi-device): move the local device registration somewhere more
+  // centralized. For now we piggy-back on the pass registration as that's where
+  // the local device is used.
+  (void)IREE::HAL::LocalDevice::Options::FromFlags::get();
+  IREE::HAL::TargetDeviceList deviceList;
+  deviceList.add("local", [=]() {
+    return std::make_shared<LocalDevice>(
+        IREE::HAL::LocalDevice::Options::FromFlags::get());
+  });
+  IREE::HAL::TargetRegistry::getMutableTargetRegistry().mergeFrom(deviceList);
 
   // Generated.
   registerPasses();

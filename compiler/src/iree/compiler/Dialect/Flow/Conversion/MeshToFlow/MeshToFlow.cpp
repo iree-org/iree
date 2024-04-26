@@ -149,7 +149,7 @@ static Value buildChannelCreation(mesh::MeshOp mesh,
                            toOpFoldResults(reorderedMeshShape), builder);
   OpFoldResult color = linearIndexFromShape(
       toOpFoldResults(groupIndex), toOpFoldResults(groupsShape), builder);
-  return builder.create<ChannelSplitOp>(
+  return builder.create<IREE::Flow::ChannelSplitOp>(
       meshChannel,
       getValueOrCreateConstantIndexOp(builder, builder.getLoc(), color),
       getValueOrCreateConstantIndexOp(builder, builder.getLoc(),
@@ -177,14 +177,16 @@ static void buildChannelInitializer(mesh::MeshOp mesh,
                                     ArrayRef<mesh::MeshAxis> meshAxes,
                                     bool useNamedDefaultChannels,
                                     ImplicitLocOpBuilder &builder) {
-  Util::InitializerOp initOp = builder.create<Util::InitializerOp>();
+  IREE::Util::InitializerOp initOp =
+      builder.create<IREE::Util::InitializerOp>();
   Block *block = builder.createBlock(&initOp.getBody());
   ImplicitLocOpBuilder::InsertionGuard insertionGuard(builder);
   builder.setInsertionPointToStart(block);
   Value channel =
       buildChannelCreation(mesh, meshAxes, useNamedDefaultChannels, builder);
-  builder.create<Util::GlobalStoreOp>(channel, getChannelName(mesh, meshAxes));
-  builder.create<Util::ReturnOp>();
+  builder.create<IREE::Util::GlobalStoreOp>(channel,
+                                            getChannelName(mesh, meshAxes));
+  builder.create<IREE::Util::ReturnOp>();
 }
 
 // Construct a Flow channel inside `module` using
@@ -202,10 +204,10 @@ static void buildGlobalChannelCreation(mesh::MeshOp mesh,
   builder.setInsertionPointToStart(&module.getBodyRegion().getBlocks().front());
 
   auto channelName = getChannelName(mesh, meshAxes);
-  builder.create<Util::GlobalOp>(
+  builder.create<IREE::Util::GlobalOp>(
       builder.getStringAttr("private"), channelName,
-      IREE::Flow::ChannelType::get(builder.getContext()), false, TypedAttr(),
-      IREE::Util::InlineNeverAttr::get(builder.getContext()));
+      builder.getType<IREE::Flow::ChannelType>(), false, TypedAttr(),
+      builder.getAttr<IREE::Util::InlineNeverAttr>());
   buildChannelInitializer(mesh, meshAxes, useNamedDefaultChannels, builder);
 }
 
@@ -216,8 +218,9 @@ static Value buildCachedChannelLoading(mesh::MeshOp mesh,
   if (isDefaultChannel(mesh, meshAxes)) {
     return getDefaultChannel(mesh, useNamedDefaultChannels, builder);
   }
-  return builder.create<Util::GlobalLoadOp>(
-      ChannelType::get(builder.getContext()), getChannelName(mesh, meshAxes));
+  return builder.create<IREE::Util::GlobalLoadOp>(
+      IREE::Flow::ChannelType::get(builder.getContext()),
+      getChannelName(mesh, meshAxes));
 }
 
 // The !flow.channel corresponding to the mesh and mesh axes used in the op.
@@ -253,14 +256,14 @@ static Value buildCachedChannelLoading(
 static TypedValue<RankedTensorType>
 buildTranspose(Value v, ArrayRef<int64_t> transposeVector,
                ImplicitLocOpBuilder &builder) {
-  RankedTensorType type = v.getType().cast<RankedTensorType>();
+  RankedTensorType type = cast<RankedTensorType>(v.getType());
   SmallVector<int64_t> transposedShape =
       permute(type.getShape(), transposeVector);
   Value target =
       builder.create<tensor::EmptyOp>(transposedShape, type.getElementType());
-  return builder.create<linalg::TransposeOp>(v, target, transposeVector)
-      ->getResult(0)
-      .cast<TypedValue<RankedTensorType>>();
+  return cast<TypedValue<RankedTensorType>>(
+      builder.create<linalg::TransposeOp>(v, target, transposeVector)
+          ->getResult(0));
 }
 
 static SmallVector<int64_t> transpose(ArrayRef<int64_t> shape, int64_t axisA,
@@ -279,7 +282,7 @@ static RankedTensorType transpose(RankedTensorType type, int64_t axisA,
 static TypedValue<RankedTensorType>
 buildTranspose(Value v, int64_t axisA, int64_t axisB,
                ImplicitLocOpBuilder &builder) {
-  int64_t rank = v.getType().cast<RankedTensorType>().getRank();
+  int64_t rank = cast<RankedTensorType>(v.getType()).getRank();
   SmallVector<int64_t> transposeVector(rank);
   std::iota(transposeVector.begin(), transposeVector.end(), 0);
   std::swap(transposeVector[axisA], transposeVector[axisB]);
@@ -407,7 +410,7 @@ struct MeshAllReduceToFlow
     Value target = builder.create<tensor::EmptyOp>(
         op.getResult().getType().getShape(),
         op.getResult().getType().getElementType());
-    auto flowAllReduce = builder.create<CollectiveAllReduceOp>(
+    auto flowAllReduce = builder.create<IREE::Flow::CollectiveAllReduceOp>(
         convertReductionKind(op.getReductionAttr()),
         getCollectiveElementTypeAttr(op.getResult().getType()), target,
         op.getOperand(), channel);
@@ -425,7 +428,7 @@ struct MeshAllGatherToFlow
   LogicalResult matchAndRewrite(mesh::AllGatherOp op,
                                 PatternRewriter &rewriter) const override {
     if (ShapedType::isDynamicShape(
-            op.getOperand().getType().cast<RankedTensorType>().getShape()) ||
+            cast<RankedTensorType>(op.getOperand().getType()).getShape()) ||
         ShapedType::isDynamicShape(op.getResult().getType().getShape())) {
       // TODO: add dynamic support.
       return rewriter.notifyMatchFailure(op->getLoc(),
@@ -445,11 +448,11 @@ struct MeshAllGatherToFlow
         buildTranspose(op.getOperand(), 0, gatherAxis, builder);
 
     RankedTensorType flowAllGatherResultType = transpose(
-        op.getResult().getType().cast<RankedTensorType>(), 0, gatherAxis);
+        cast<RankedTensorType>(op.getResult().getType()), 0, gatherAxis);
     Value target = builder.create<tensor::EmptyOp>(
         flowAllGatherResultType.getShape(),
         op.getResult().getType().getElementType());
-    auto flowAllGather = builder.create<CollectiveAllGatherOp>(
+    auto flowAllGather = builder.create<IREE::Flow::CollectiveAllGatherOp>(
         getCollectiveElementTypeAttr(flowAllGatherResultType), target,
         flowAllGatherOperand, channel);
 
@@ -469,7 +472,7 @@ struct MeshAllToAllToFlow
   LogicalResult matchAndRewrite(mesh::AllToAllOp op,
                                 PatternRewriter &rewriter) const override {
     if (ShapedType::isDynamicShape(
-            op.getOperand().getType().cast<RankedTensorType>().getShape()) ||
+            cast<RankedTensorType>(op.getOperand().getType()).getShape()) ||
         ShapedType::isDynamicShape(op.getResult().getType().getShape())) {
       // TODO: add dynamic support.
       return rewriter.notifyMatchFailure(op->getLoc(),
@@ -502,7 +505,7 @@ struct MeshAllToAllToFlow
     Value target = builder.create<tensor::EmptyOp>(
         splitAxisAsMostOuter.getType().getShape(),
         splitAxisAsMostOuter.getType().getElementType());
-    auto flowAllToAll = builder.create<CollectiveAllToAllOp>(
+    auto flowAllToAll = builder.create<IREE::Flow::CollectiveAllToAllOp>(
         getCollectiveElementTypeAttr(splitAxisAsMostOuter.getType()), target,
         splitAxisAsMostOuter, channel);
 
@@ -530,8 +533,8 @@ struct MeshProcessLinearIndexToFlow
     builder.setInsertionPointAfter(op.getOperation());
     Value channel = buildCachedChannelLoading(op, symbolTableCollection,
                                               useNamedDefaultChannels, builder);
-    Value newIndex =
-        builder.create<ChannelRankOp>(builder.getIndexType(), channel);
+    Value newIndex = builder.create<IREE::Flow::ChannelRankOp>(
+        builder.getIndexType(), channel);
     rewriter.replaceAllUsesWith(op.getResult(), newIndex);
     return success();
   }
@@ -545,7 +548,7 @@ struct MeshReduceScatterToFlow
   LogicalResult matchAndRewrite(mesh::ReduceScatterOp op,
                                 PatternRewriter &rewriter) const override {
     if (ShapedType::isDynamicShape(
-            op.getOperand().getType().cast<RankedTensorType>().getShape()) ||
+            cast<RankedTensorType>(op.getOperand().getType()).getShape()) ||
         ShapedType::isDynamicShape(op.getResult().getType().getShape())) {
       // TODO: add dynamic support.
       return rewriter.notifyMatchFailure(op->getLoc(),
@@ -564,15 +567,16 @@ struct MeshReduceScatterToFlow
     Value flowReduceScatterOperand =
         buildTranspose(op.getOperand(), 0, scatterAxis, builder);
     RankedTensorType flowReduceScatterResultType = transpose(
-        op.getResult().getType().cast<RankedTensorType>(), 0, scatterAxis);
+        cast<RankedTensorType>(op.getResult().getType()), 0, scatterAxis);
 
     Value target = builder.create<tensor::EmptyOp>(
         flowReduceScatterResultType.getShape(),
         op.getResult().getType().getElementType());
-    auto flowReduceScatter = builder.create<CollectiveReduceScatterOp>(
-        convertReductionKind(op.getReductionAttr()),
-        getCollectiveElementTypeAttr(flowReduceScatterResultType), target,
-        flowReduceScatterOperand, channel);
+    auto flowReduceScatter =
+        builder.create<IREE::Flow::CollectiveReduceScatterOp>(
+            convertReductionKind(op.getReductionAttr()),
+            getCollectiveElementTypeAttr(flowReduceScatterResultType), target,
+            flowReduceScatterOperand, channel);
 
     Value res = buildTranspose(flowReduceScatter, 0, scatterAxis, builder);
 

@@ -131,7 +131,7 @@ module {
     return
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 5, 20, 64, 0, 0, 0], [1, 1, 20, 64, 0, 0, 0], [0, 0, 0, 0, 1, 1, 16], [0, 0, 0, 0, 0, 0, 0]]>
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 5, 20, 64, 0, 0, 0], [1, 1, 2, 2, 0, 0, 0], [0, 0, 0, 0, 1, 1, 16], [0, 0, 0, 0, 0, 0, 0]]>
 //  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUConvTileAndDecomposeExpert>
 //      CHECK: func.func @conv_static()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]

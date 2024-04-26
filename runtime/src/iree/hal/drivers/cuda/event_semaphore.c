@@ -33,6 +33,8 @@ typedef struct iree_hal_cuda_semaphore_t {
   // Guards value and status. We expect low contention on semaphores and since
   // iree_slim_mutex_t is (effectively) just a CAS this keeps things simpler
   // than trying to make the entire structure lock-free.
+  // If we need to hold mutex and base.timepoint_mutex locked together, the
+  // locking order must be (mutex, base.timepoint_mutex).
   iree_slim_mutex_t mutex;
 
   // Current signaled value. May be IREE_HAL_SEMAPHORE_FAILURE_VALUE to
@@ -280,17 +282,20 @@ static iree_status_t iree_hal_cuda_semaphore_wait(
     IREE_TRACE_ZONE_END(z0);
     return iree_status_from_code(IREE_STATUS_DEADLINE_EXCEEDED);
   }
-  iree_slim_mutex_unlock(&semaphore->mutex);
 
-  // Slow path: acquire a timepoint. This should happen outside of the lock too
-  // given that acquiring has its own internal locks.
+  // Slow path: acquire a timepoint. This should happen inside of the lock too.
+  // If not locked the semaphore may be signal before acquiring a timepoint.
+  // Then we would miss the signal.
   iree_hal_cuda_timepoint_t* timepoint = NULL;
   iree_status_t status = iree_hal_cuda_semaphore_acquire_timepoint_host_wait(
       semaphore, value, timeout, &timepoint);
   if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
+    iree_slim_mutex_unlock(&semaphore->mutex);
     IREE_TRACE_ZONE_END(z0);
     return status;
   }
+
+  iree_slim_mutex_unlock(&semaphore->mutex);
 
   // Wait until the timepoint resolves.
   // If satisfied the timepoint is automatically cleaned up and we are done. If

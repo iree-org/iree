@@ -43,11 +43,10 @@ static Operation *dropEncodingAndCloneOp(OpBuilder &builder, Operation *op,
   operands.append(convertedInputOperands.begin(), convertedInputOperands.end());
   operands.append(convertedOutputOperands.begin(),
                   convertedOutputOperands.end());
-  return mlir::clone(
-      builder, op,
-      {dropEncoding(
-          convertedOutputOperands[0].getType().cast<RankedTensorType>())},
-      operands);
+  return mlir::clone(builder, op,
+                     {dropEncoding(cast<RankedTensorType>(
+                         convertedOutputOperands[0].getType()))},
+                     operands);
 }
 
 static FailureOr<SmallVector<OpFoldResult>>
@@ -157,7 +156,7 @@ Value getMmt4dOperand(Value value, linalg::LinalgOp linalgOp,
   // operand is a vector and must be extended
   if ((cDims->m.empty() && operandIdx != 1) ||
       (cDims->n.empty() && operandIdx != 0)) {
-    auto type = value.getType().cast<RankedTensorType>();
+    auto type = cast<RankedTensorType>(value.getType());
     RankedTensorType newType = getExpandedType(
         type, /*isBatched=*/!cDims->batch.empty(),
         /*isTransposed=*/operandIdx == 2 && cDims->n.empty(), ri);
@@ -312,9 +311,9 @@ lowerContractionOpWithEncoding(RewriterBase &rewriter,
   auto inputs = linalgOp.getDpsInputOperands();
   auto outputs = linalgOp.getDpsInits();
 
-  auto lhsType = inputs[0]->get().getType().cast<RankedTensorType>();
-  auto rhsType = inputs[1]->get().getType().cast<RankedTensorType>();
-  auto resultType = outputs[0].getType().cast<RankedTensorType>();
+  auto lhsType = cast<RankedTensorType>(inputs[0]->get().getType());
+  auto rhsType = cast<RankedTensorType>(inputs[1]->get().getType());
+  auto resultType = cast<RankedTensorType>(outputs[0].getType());
   auto lhsEncoding = getEncodingAttr(lhsType);
   auto rhsEncoding = getEncodingAttr(rhsType);
   auto resultEncoding = getEncodingAttr(resultType);
@@ -333,7 +332,7 @@ lowerContractionOpWithEncoding(RewriterBase &rewriter,
 
   FailureOr<MaterializeEncodingInfo> materializeEncodingInfo =
       materializeEncodingFn(getOriginalTypeWithEncoding(
-          linalgOp->getResultTypes()[0].cast<RankedTensorType>()));
+          cast<RankedTensorType>(linalgOp->getResultTypes()[0])));
 
   Operation *result;
   if (failed(materializeEncodingInfo)) {
@@ -343,7 +342,7 @@ lowerContractionOpWithEncoding(RewriterBase &rewriter,
   } else {
     auto elemTypes = llvm::map_to_vector(
         lhsEncoding.getElementTypes().getValue(),
-        [](Attribute a) { return a.cast<TypeAttr>().getValue(); });
+        [](Attribute a) { return cast<TypeAttr>(a).getValue(); });
     SmallVector<ReassociationIndices> ri;
     Value newLhs =
         getMmt4dOperand(operands[0], linalgOp, rewriter, ri, elemTypes,
@@ -382,7 +381,7 @@ lowerOpWithEncoding(RewriterBase &rewriter, tensor::EmptyOp emptyOp,
                     ValueRange convertedOperands,
                     MaterializeEncodingFn materializeEncodingFn,
                     MaterializeEncodingValueFn materializeEncodingValueFn) {
-  auto emptyType = emptyOp->getResultTypes()[0].cast<RankedTensorType>();
+  auto emptyType = cast<RankedTensorType>(emptyOp->getResultTypes()[0]);
   auto resultType =
       getOriginalTypeWithEncoding(emptyType).clone(emptyType.getElementType());
   FailureOr<MaterializeEncodingInfo> materializeEncodingInfo =
@@ -458,7 +457,7 @@ static FailureOr<Operation *> lowerOpWithEncoding(
               genericOp, "indexing maps are not all identity maps");
         }
         auto convertedResultType =
-            convertedOutputOperands[0].getType().cast<RankedTensorType>();
+            cast<RankedTensorType>(convertedOutputOperands[0].getType());
         SmallVector<AffineMap> maps(
             2, AffineMap::getMultiDimIdentityMap(convertedResultType.getRank(),
                                                  rewriter.getContext()));

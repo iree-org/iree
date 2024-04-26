@@ -236,6 +236,8 @@ iree_select_compiler_opts(IREE_DEFAULT_COPTS
     "-Wno-sign-compare"
     "-Wno-unused-function"
     "-Wno-unknown-pragmas"
+    "-Wno-unused-but-set-variable"
+    "-Wno-misleading-indentation"
 
   MSVC_OR_CLANG_CL
     # Default warning level (severe + significant + production quality).

@@ -7,13 +7,14 @@
 #include "compiler/plugins/target/ROCM/ROCMTargetUtils.h"
 
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
-#include "iree/compiler/Dialect/HAL/Target/LLVMLinkerUtils.h"
+#include "iree/compiler/Dialect/HAL/Utils/LLVMLinkerUtils.h"
 #include "iree/compiler/Utils/ToolUtils.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/Linker/Linker.h"
 #include "llvm/Support/FileUtilities.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/Program.h"
@@ -266,14 +267,14 @@ LogicalResult linkUkernelBitcodeFiles(Location loc, llvm::Module *module,
 // Inspiration from this section comes from LLVM-PROJECT-MLIR by
 // ROCmSoftwarePlatform
 // https://github.com/ROCmSoftwarePlatform/rocMLIR/blob/0ec7b2176308229ac05f1594f5b5019d58cd9e15/mlir/lib/ExecutionEngine/ROCm/BackendUtils.cpp
-std::string createHsaco(Location loc, const std::string isa, StringRef name) {
+std::string createHsaco(Location loc, StringRef isa, StringRef name) {
   // Save the ISA binary to a temp file.
   int tempIsaBinaryFd = -1;
   SmallString<128> tempIsaBinaryFilename;
   std::error_code ec = llvm::sys::fs::createTemporaryFile(
       "kernel", "o", tempIsaBinaryFd, tempIsaBinaryFilename);
   if (ec) {
-    mlir::emitError(loc) << "temporary file for ISA binary creation error";
+    emitError(loc) << "temporary file for ISA binary creation error";
     return {};
   }
   llvm::FileRemover cleanupIsaBinary(tempIsaBinaryFilename);
@@ -287,25 +288,25 @@ std::string createHsaco(Location loc, const std::string isa, StringRef name) {
   ec = llvm::sys::fs::createTemporaryFile("kernel", "hsaco", tempHsacoFD,
                                           tempHsacoFilename);
   if (ec) {
-    mlir::emitError(loc) << "temporary file for HSA code object creation error";
+    emitError(loc) << "temporary file for HSA code object creation error";
     return {};
   }
   llvm::FileRemover cleanupHsaco(tempHsacoFilename);
 
   // Invoke lld. Expect a true return value from lld.
-  const SmallVector<std::string> &toolNames{"iree-lld", "lld"};
+  const SmallVector<std::string> toolNames = {"iree-lld", "lld"};
   std::string lldProgram = findTool(toolNames);
   if (lldProgram.empty()) {
-    mlir::emitError(loc) << "unable to find iree-lld";
+    emitError(loc) << "unable to find iree-lld";
     return {};
   }
-  std::vector<llvm::StringRef> lldArgs{
+  SmallVector<StringRef> lldArgs{
       lldProgram,
-      llvm::StringRef("-flavor"),
-      llvm::StringRef("gnu"),
-      llvm::StringRef("-shared"),
+      "-flavor",
+      "gnu",
+      "-shared",
       tempIsaBinaryFilename.str(),
-      llvm::StringRef("-o"),
+      "-o",
       tempHsacoFilename.str(),
   };
 
@@ -313,23 +314,22 @@ std::string createHsaco(Location loc, const std::string isa, StringRef name) {
   std::string errorMessage;
   int lldResult = llvm::sys::ExecuteAndWait(
       unescapeCommandLineComponent(lldProgram),
-      llvm::ArrayRef<llvm::StringRef>(lldArgs),
-      llvm::StringRef("LLD_VERSION=IREE"), {}, 0, 0, &errorMessage);
+      ArrayRef<llvm::StringRef>(lldArgs), StringRef("LLD_VERSION=IREE"), {}, 0,
+      0, &errorMessage);
   if (lldResult) {
-    mlir::emitError(loc) << "iree-lld execute fail:" << errorMessage
-                         << "Error Code:" << lldResult;
+    emitError(loc) << "iree-lld execute fail:" << errorMessage
+                   << "Error Code:" << lldResult;
     return {};
   }
 
   // Load the HSA code object.
-  auto hsacoFile = mlir::openInputFile(tempHsacoFilename);
+  std::unique_ptr<llvm::MemoryBuffer> hsacoFile =
+      mlir::openInputFile(tempHsacoFilename);
   if (!hsacoFile) {
-    mlir::emitError(loc) << "read HSA code object from temp file error";
+    emitError(loc) << "read HSA code object from temp file error";
     return {};
   }
-  std::string strHSACO(hsacoFile->getBuffer().begin(),
-                       hsacoFile->getBuffer().end());
-  return strHSACO;
+  return hsacoFile->getBuffer().str();
 }
 
 } // namespace mlir::iree_compiler::IREE::HAL

@@ -531,6 +531,17 @@ iree_status_t iree_hal_hip_pending_queue_actions_enqueue_execution(
   return status;
 }
 
+static void iree_hal_hip_post_error_to_worker_state(
+    iree_hal_hip_working_area_t* working_area, iree_status_code_t code) {
+  iree_atomic_store_int32(&working_area->error_code, code,
+                          iree_memory_order_release);
+  // This state has the highest priority so just overwrite.
+  iree_atomic_store_int32(&working_area->worker_state,
+                          IREE_HAL_HIP_WORKER_STATE_EXIT_ERROR,
+                          iree_memory_order_release);
+  iree_notification_post(&working_area->exit_notification, IREE_ALL_WAITERS);
+}
+
 // Releases resources after action completion on the GPU and advances timeline
 // and pending actions queue.
 //
@@ -554,22 +565,23 @@ static void iree_hal_hip_execution_device_signal_host_callback(
   iree_hal_hip_queue_action_list_push_back(&actions->action_list, action);
   iree_slim_mutex_unlock(&actions->action_mutex);
 
-  // Notify the worker thread again that we have the cleanup action enqueued.
-  // Only overwrite the idle waiting state, which has lower priority.
-  iree_hal_hip_worker_state_t prev_state =
-      IREE_HAL_HIP_WORKER_STATE_IDLE_WAITING;
-  iree_atomic_compare_exchange_strong_int32(
-      &actions->working_area.worker_state, /*expected=*/&prev_state,
-      /*desired=*/IREE_HAL_HIP_WORKER_STATE_WORKLOAD_PENDING,
-      /*order_succ=*/iree_memory_order_acq_rel,
-      /*order_fail=*/iree_memory_order_acquire);
-  iree_notification_post(&actions->working_area.state_notification,
-                         IREE_ALL_WAITERS);
+  iree_status_t status;
+  if (action->signal_semaphore_list.count) {
+    // Advance semaphore timelines by calling into the host signaling function.
+    // This will internally try to release more workload to the GPU.
+    status = iree_hal_semaphore_list_signal(action->signal_semaphore_list);
+  } else {
+    // If there is no semaphores to signal we still need to trigger execution
+    // of the recently zombified action so it can be cleaned up.
+    status = iree_hal_hip_pending_queue_actions_issue(actions);
+  }
 
-  // Advance semaphore timelines by calling into the host signaling function.
-  // This will internally try to release more workload to the GPU.
-  IREE_IGNORE_ERROR(
-      iree_hal_semaphore_list_signal(action->signal_semaphore_list));
+  if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
+    IREE_ASSERT(false &&
+                "can't signal semaphores and/or issue pending actions");
+    iree_hal_hip_post_error_to_worker_state(&actions->working_area,
+                                            iree_status_code(status));
+  }
 
   IREE_TRACE_ZONE_END(z0);
 }
@@ -657,7 +669,7 @@ static iree_status_t iree_hal_hip_pending_queue_actions_issue_execution(
   }
 
   // Increase the pending action counter. We decrease it once it fully
-  // compeletes and gets cleaned up.
+  // completes and gets cleaned up.
   ++action->owning_actions->working_area.pending_action_count;
 
   // Now launch a host function on the callback stream to advance the semaphore
@@ -700,8 +712,7 @@ static iree_status_t iree_hal_hip_pending_queue_actions_issue_cleanup(
   iree_hal_hip_free_semaphore_list(host_allocator,
                                    &action->signal_semaphore_list);
 
-  // Drop reference to the pending action queue given now we are done.
-  iree_hal_resource_release(actions);
+  iree_hal_hip_queue_action_clear_events(action);
 
   iree_allocator_free(host_allocator, action);
 
@@ -709,7 +720,8 @@ static iree_status_t iree_hal_hip_pending_queue_actions_issue_cleanup(
   // action counter.
   --actions->working_area.pending_action_count;
 
-  iree_hal_hip_queue_action_clear_events(action);
+  // Drop reference to the pending action queue given now we are done.
+  iree_hal_resource_release(actions);
 
   IREE_TRACE_ZONE_END(z0);
   return iree_ok_status();
@@ -957,35 +969,38 @@ static int iree_hal_hip_worker_execute(
         /*order_succ=*/iree_memory_order_acq_rel,
         /*order_fail=*/iree_memory_order_acquire);
 
+    int32_t worker_state = iree_atomic_load_int32(&working_area->worker_state,
+                                                  iree_memory_order_acquire);
+    // Exit if HIP callbacks have posted any errors.
+    if (IREE_UNLIKELY(worker_state == IREE_HAL_HIP_WORKER_STATE_EXIT_ERROR)) {
+      return -1;
+    }
     // Check if we received request to stop processing and exit this thread.
-    bool should_exit = iree_atomic_load_int32(&working_area->worker_state,
-                                              iree_memory_order_acquire) ==
-                       IREE_HAL_HIP_WORKER_STATE_EXIT_REQUESTED;
+    bool should_exit =
+        (worker_state == IREE_HAL_HIP_WORKER_STATE_EXIT_REQUESTED);
 
     // Process the ready list. We also want this even requested to exit.
     iree_status_t status = iree_hal_hip_worker_process_ready_list(
         working_area->host_allocator, worklist);
     if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
       IREE_ASSERT(false && "error when processing ready list");
-      iree_atomic_store_int32(&working_area->error_code,
-                              iree_status_code(status),
-                              iree_memory_order_release);
-      // This state has the highest priority so just overwrite.
-      iree_atomic_store_int32(&working_area->worker_state,
-                              IREE_HAL_HIP_WORKER_STATE_EXIT_ERROR,
-                              iree_memory_order_release);
-      iree_notification_post(&working_area->exit_notification,
-                             IREE_ALL_WAITERS);
+      iree_hal_hip_post_error_to_worker_state(working_area,
+                                              iree_status_code(status));
       return -1;
     }
 
-    if (should_exit && working_area->pending_action_count == 0) {
-      // Signal that this thread is committed to exit. This state has a priority
-      // that is only lower than error exit. And we just checked error exit in
-      // the above. So also just overwrite.
-      iree_atomic_store_int32(&working_area->worker_state,
-                              IREE_HAL_HIP_WORKER_STATE_EXIT_COMMITTED,
-                              iree_memory_order_release);
+    if (IREE_UNLIKELY(should_exit && working_area->pending_action_count == 0)) {
+      // Signal that this thread is committed to exit.
+      // This state has a priority that is only lower than error exit.
+      // A HIP callback may have posted an error, make sure we don't
+      // overwrite this error state.
+      iree_hal_hip_worker_state_t prev_state =
+          IREE_HAL_HIP_WORKER_STATE_EXIT_REQUESTED;
+      iree_atomic_compare_exchange_strong_int32(
+          &working_area->worker_state, /*expected=*/&prev_state,
+          /*desired=*/IREE_HAL_HIP_WORKER_STATE_EXIT_COMMITTED,
+          /*order_succ=*/iree_memory_order_acq_rel,
+          /*order_fail=*/iree_memory_order_acquire);
       iree_notification_post(&working_area->exit_notification,
                              IREE_ALL_WAITERS);
       return 0;

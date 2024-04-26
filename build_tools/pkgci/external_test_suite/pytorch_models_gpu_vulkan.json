@@ -1,0 +1,17 @@
+{
+    "config_name": "gpu_vulkan",
+    "iree_compile_flags" : [
+      "--iree-hal-target-backends=vulkan-spirv"
+    ],
+    "iree_run_module_flags": [
+      "--device=vulkan"
+    ],
+    "skip_compile_tests": [],
+    "skip_run_tests": [],
+    "expected_compile_failures": [
+      "sdxl-prompt-encoder-tank",
+      "sdxl-scheduled-unet-3-tank",
+      "sdxl-vae-decode-tank",
+    ],
+    "expected_run_failures": []
+}

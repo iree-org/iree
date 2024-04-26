@@ -897,7 +897,7 @@ void RodataTableInlineOp::build(OpBuilder &builder, OperationState &result,
 LogicalResult ListGetRefOp::verify() {
   Operation *op = getOperation();
   auto listType = llvm::cast<IREE::VM::ListType>(
-      getList().getType().cast<IREE::VM::RefType>().getObjectType());
+      cast<IREE::VM::RefType>(getList().getType()).getObjectType());
   auto elementType = listType.getElementType();
   auto resultType = getResult().getType();
   if (!llvm::isa<IREE::VM::OpaqueType>(elementType)) {
@@ -922,7 +922,7 @@ LogicalResult ListGetRefOp::verify() {
 LogicalResult ListSetRefOp::verify() {
   Operation *op = getOperation();
   auto listType = llvm::cast<IREE::VM::ListType>(
-      getList().getType().cast<IREE::VM::RefType>().getObjectType());
+      cast<IREE::VM::RefType>(getList().getType()).getObjectType());
   auto elementType = listType.getElementType();
   auto valueType = getValue().getType();
   if (!llvm::isa<IREE::VM::OpaqueType>(elementType)) {

@@ -640,7 +640,7 @@ static void enforceLayoutToBroadcastOp(
   auto inputType = broadcast.getSourceType();
   assert(isa<VectorType>(inputType) &&
          "Scalar broadcast not supported for now.");
-  auto inputShape = inputType.cast<VectorType>().getShape();
+  auto inputShape = cast<VectorType>(inputType).getShape();
 
   SmallVector<bool> reductionMask(resultShape.size(), false);
   // Set the trailing dimensions to be reduced.

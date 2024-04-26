@@ -980,6 +980,59 @@ func.func @encoding_tensors_with_ops(%arg0 : tensor<?x?xf32>,
 
 // -----
 
+func.func @winograd_filter_transform(%arg0: tensor<3x3x64x128xf32>) -> tensor<8x8x64x128xf32> {
+  %0 = tensor.empty() : tensor<8x8x64x128xf32>
+  %1 = iree_linalg_ext.winograd.filter_transform
+    output_tile_size(6) kernel_size(3) kernel_dimensions([0, 1])
+    ins(%arg0 : tensor<3x3x64x128xf32>) outs(%0 : tensor<8x8x64x128xf32>) -> tensor<8x8x64x128xf32>
+  return %1 : tensor<8x8x64x128xf32>
+}
+// CHECK:      func.func @winograd_filter_transform(%[[ARG0:[a-zA-Z0-9_]+]]: tensor<3x3x64x128xf32>) ->
+// CHECK-SAME:   tensor<8x8x64x128xf32> {
+// CHECK:        %[[D0:.+]] = tensor.empty() : tensor<8x8x64x128xf32>
+// CHECK:        %[[D1:.+]] = iree_linalg_ext.winograd.filter_transform output_tile_size(6) kernel_size(3)
+// CHECK-SAME:     kernel_dimensions([0, 1]) ins(%[[ARG0]] : tensor<3x3x64x128xf32>) outs(%[[D0]] :
+// CHECK-SAME:     tensor<8x8x64x128xf32>) -> tensor<8x8x64x128xf32>
+// CHECK:        return %[[D1]] : tensor<8x8x64x128xf32>
+// CHECK:      }
+
+// -----
+
+func.func @winograd_filter_transform_dynamic(%arg0: tensor<3x3x?x?xf32>, %arg1: tensor<8x8x?x?xf32>) -> tensor<8x8x?x?xf32> {
+  %1 = iree_linalg_ext.winograd.filter_transform
+    output_tile_size(6) kernel_size(3) kernel_dimensions([0, 1])
+    ins(%arg0 : tensor<3x3x?x?xf32>) outs(%arg1 : tensor<8x8x?x?xf32>) -> tensor<8x8x?x?xf32>
+  return %1 : tensor<8x8x?x?xf32>
+}
+// CHECK:      func.func @winograd_filter_transform_dynamic(%[[ARG0:[a-zA-Z0-9_]+]]: tensor<3x3x?x?xf32>,
+// CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<8x8x?x?xf32>) -> tensor<8x8x?x?xf32> {
+// CHECK:        %[[D0:.+]] = iree_linalg_ext.winograd.filter_transform output_tile_size(6) kernel_size(3)
+// CHECK-SAME:     kernel_dimensions([0, 1]) ins(%[[ARG0]] : tensor<3x3x?x?xf32>) outs(%[[ARG1]] :
+// CHECK-SAME:     tensor<8x8x?x?xf32>) -> tensor<8x8x?x?xf32>
+// CHECK:        return %[[D0]] : tensor<8x8x?x?xf32>
+// CHECK:      }
+
+// -----
+
+func.func @winograd_filter_transform_fchw(%arg0: tensor<128x64x3x3xf32>) -> tensor<8x8x64x128xf32> {
+  %0 = tensor.empty() : tensor<8x8x64x128xf32>
+  %1 = iree_linalg_ext.winograd.filter_transform
+    output_tile_size(6) kernel_size(3) kernel_dimensions([2, 3])
+    ins(%arg0 : tensor<128x64x3x3xf32>) outs(%0 : tensor<8x8x64x128xf32>) -> tensor<8x8x64x128xf32>
+  return %1 : tensor<8x8x64x128xf32>
+}
+// CHECK:      func.func @winograd_filter_transform_fchw(%[[ARG0]]: tensor<128x64x3x3xf32>) ->
+// CHECK-SAME:   tensor<8x8x64x128xf32> {
+// CHECK:        %[[D0]] = tensor.empty() : tensor<8x8x64x128xf32>
+// CHECK:        %[[D1]] = iree_linalg_ext.winograd.filter_transform output_tile_size(6) kernel_size(3)
+// CHECK-SAME:     kernel_dimensions([2, 3]) ins(%[[ARG0]] : tensor<128x64x3x3xf32>) outs(%[[D0]] :
+// CHECK-SAME:     tensor<8x8x64x128xf32>) -> tensor<8x8x64x128xf32>
+// CHECK:        return %[[D1]] : tensor<8x8x64x128xf32>
+// CHECK:      }
+// CHECK:    }
+
+// -----
+
 func.func @winograd_input_transform(%arg0: tensor<1x10x10x1280xf32>) -> tensor<8x8x1x2x2x1280xf32> {
   %0 = tensor.empty() : tensor<8x8x1x2x2x1280xf32>
   %1 = iree_linalg_ext.winograd.input_transform output_tile_size(6) kernel_size(3) image_dimensions([1, 2])
@@ -1013,6 +1066,24 @@ func.func @winograd_input_transform_dynamic(%arg0: tensor<?x?x?x?xf32>, %arg1: t
 
 // -----
 
+func.func @winograd_input_transform_nchw(%arg0: tensor<1x1280x10x10xf32>) -> tensor<8x8x1x2x2x1280xf32> {
+  %0 = tensor.empty() : tensor<8x8x1x2x2x1280xf32>
+  %1 = iree_linalg_ext.winograd.input_transform output_tile_size(6) kernel_size(3) image_dimensions([2, 3])
+    ins(%arg0 : tensor<1x1280x10x10xf32>) outs(%0 : tensor<8x8x1x2x2x1280xf32>) -> tensor<8x8x1x2x2x1280xf32>
+  return %1 : tensor<8x8x1x2x2x1280xf32>
+}
+// CHECK:      func.func @winograd_input_transform_nchw(%[[ARG0]]: tensor<1x1280x10x10xf32>) ->
+// CHECK-SAME:   tensor<8x8x1x2x2x1280xf32> {
+// CHECK:        %[[D0]] = tensor.empty() : tensor<8x8x1x2x2x1280xf32>
+// CHECK:        %[[D1]] = iree_linalg_ext.winograd.input_transform output_tile_size(6) kernel_size(3)
+// CHECK-SAME:     image_dimensions([2, 3]) ins(%[[ARG0]] : tensor<1x1280x10x10xf32>) outs(%[[D0]] :
+// CHECK-SAME:     tensor<8x8x1x2x2x1280xf32>) -> tensor<8x8x1x2x2x1280xf32>
+// CHECK:        return %[[D1]] : tensor<8x8x1x2x2x1280xf32>
+// CHECK:      }
+// CHECK:    }
+
+// -----
+
 func.func @winograd_output_transform(%arg0: tensor<8x8x1x2x2x1280xf32>) -> tensor<1x12x12x1280xf32> {
   %0 = tensor.empty() : tensor<1x12x12x1280xf32>
   %1 = iree_linalg_ext.winograd.output_transform output_tile_size(6) kernel_size(3) image_dimensions([1, 2])
@@ -1042,24 +1113,6 @@ func.func @winograd_output_transform(%arg0: tensor<8x8x?x?x?x?xf32>, %arg1: tens
 // CHECK-SAME:     tensor<?x?x?x?xf32>) -> tensor<?x?x?x?xf32>
 // CHECK:        return %[[D0]] : tensor<?x?x?x?xf32>
 // CHECK:      }
-
-// -----
-
-func.func @winograd_input_transform_nchw(%arg0: tensor<1x1280x10x10xf32>) -> tensor<8x8x1x2x2x1280xf32> {
-  %0 = tensor.empty() : tensor<8x8x1x2x2x1280xf32>
-  %1 = iree_linalg_ext.winograd.input_transform output_tile_size(6) kernel_size(3) image_dimensions([2, 3])
-    ins(%arg0 : tensor<1x1280x10x10xf32>) outs(%0 : tensor<8x8x1x2x2x1280xf32>) -> tensor<8x8x1x2x2x1280xf32>
-  return %1 : tensor<8x8x1x2x2x1280xf32>
-}
-// CHECK:      func.func @winograd_input_transform_nchw(%[[ARG0]]: tensor<1x1280x10x10xf32>) ->
-// CHECK-SAME:   tensor<8x8x1x2x2x1280xf32> {
-// CHECK:        %[[D0]] = tensor.empty() : tensor<8x8x1x2x2x1280xf32>
-// CHECK:        %[[D1]] = iree_linalg_ext.winograd.input_transform output_tile_size(6) kernel_size(3)
-// CHECK-SAME:     image_dimensions([2, 3]) ins(%[[ARG0]] : tensor<1x1280x10x10xf32>) outs(%[[D0]] :
-// CHECK-SAME:     tensor<8x8x1x2x2x1280xf32>) -> tensor<8x8x1x2x2x1280xf32>
-// CHECK:        return %[[D1]] : tensor<8x8x1x2x2x1280xf32>
-// CHECK:      }
-// CHECK:    }
 
 // -----
 

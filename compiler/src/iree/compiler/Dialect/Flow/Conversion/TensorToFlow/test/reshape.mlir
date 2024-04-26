@@ -1,6 +1,6 @@
 // RUN: iree-opt --iree-flow-convert-to-flow --split-input-file %s | FileCheck %s
 
- util.func public @turn_fill_into_splat(%arg0: tensor<?x?xf32>, %arg1: tensor<f32>, %arg2: index, %arg3: index, %arg4: index, %arg5: index) -> tensor<?x?xf32> {
+util.func public @turn_fill_into_splat(%arg0: tensor<?x?xf32>, %arg1: tensor<f32>, %arg2: index, %arg3: index, %arg4: index, %arg5: index) -> tensor<?x?xf32> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %0 = tensor.extract %arg1[] : tensor<f32>
@@ -15,7 +15,7 @@
 }
 
 //       CHECK: #[[MAP:.+]] = affine_map<(d0)[s0, s1] -> (d0 + s0 + s1)>
-//       CHECK:  util.func public @turn_fill_into_splat
+//       CHECK: util.func public @turn_fill_into_splat
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
 //  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9]+]]: tensor<f32>
 //  CHECK-SAME:   %[[ARG2:[a-zA-Z0-9]+]]: index
@@ -34,7 +34,7 @@
 
 // -----
 
- util.func public @static_tensor_reshape(%arg0: tensor<2x4xf32>, %arg1: tensor<2xindex>) -> tensor<1x8xf32> {
+util.func public @static_tensor_reshape(%arg0: tensor<2x4xf32>, %arg1: tensor<2xindex>) -> tensor<1x8xf32> {
   // CHECK-DAG: %[[RESULT:.*]] = flow.tensor.reshape %arg0 : tensor<2x4xf32> -> tensor<1x8xf32>
   // CHECK: util.return %[[RESULT]]
   %0 = tensor.reshape %arg0(%arg1)
@@ -43,8 +43,8 @@
 
 // -----
 
-   util.func public @dynamic_tensor_reshape(%arg0: tensor<2x4xf32>, %arg1: tensor<2xindex>) -> tensor<?x?xf32> {
-  //      CHECK:  util.func public @dynamic_tensor_reshape
+  util.func public @dynamic_tensor_reshape(%arg0: tensor<2x4xf32>, %arg1: tensor<2xindex>) -> tensor<?x?xf32> {
+  //      CHECK: util.func public @dynamic_tensor_reshape
   // CHECK-SAME:     %[[ARG0:.+]]: tensor<2x4xf32>
   // CHECK-SAME:     %[[ARG1:.+]]: tensor<2xindex>
   // CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
@@ -59,8 +59,8 @@
 
   // -----
 
-   util.func public @mix_dynamic_and_static_tensor_reshape(%arg0: tensor<2x4xf32>, %arg1: tensor<2xindex>) -> tensor<1x?xf32> {
-  //      CHECK:  util.func public @mix_dynamic_and_static_tensor_reshape
+  util.func public @mix_dynamic_and_static_tensor_reshape(%arg0: tensor<2x4xf32>, %arg1: tensor<2xindex>) -> tensor<1x?xf32> {
+  //      CHECK: util.func public @mix_dynamic_and_static_tensor_reshape
   // CHECK-SAME:     %[[ARG0:.+]]: tensor<2x4xf32>
   // CHECK-SAME:     %[[ARG1:.+]]: tensor<2xindex>
   // CHECK-DAG: %[[C1:.*]] = arith.constant 1 : index
@@ -73,8 +73,8 @@
 
   // -----
 
-   util.func public @dynamic_input_and_output_tensor_reshape(%arg0: tensor<?x4xf32>, %arg1: tensor<2xindex>) -> tensor<1x?xf32> {
-  //      CHECK:  util.func public @dynamic_input_and_output_tensor_reshape
+  util.func public @dynamic_input_and_output_tensor_reshape(%arg0: tensor<?x4xf32>, %arg1: tensor<2xindex>) -> tensor<1x?xf32> {
+  //      CHECK: util.func public @dynamic_input_and_output_tensor_reshape
   // CHECK-SAME:     %[[ARG0:.+]]: tensor<?x4xf32>
   // CHECK-SAME:     %[[ARG1:.+]]: tensor<2xindex>
   // CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
@@ -88,7 +88,7 @@
   util.return %0 : tensor<1x?xf32> }
 
   // -----
-   util.func public @from_elements_test_reshape(%arg0: tensor<?x4xf32>, %arg1: index, %arg2: index) -> tensor<?x1xf32> {
+  util.func public @from_elements_test_reshape(%arg0: tensor<?x4xf32>, %arg1: index, %arg2: index) -> tensor<?x1xf32> {
   // CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
   // CHECK-DAG: %[[D1:.*]] = tensor.dim %arg0, %[[C0:.*]] : tensor<?x4xf32>
   // CHECK-DAG: %[[RESULT:.*]] = flow.tensor.reshape %arg0 : tensor<?x4xf32>{%[[D1]]} -> tensor<?x1xf32>{%arg1}

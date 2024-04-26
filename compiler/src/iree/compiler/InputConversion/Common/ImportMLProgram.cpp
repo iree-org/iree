@@ -109,6 +109,7 @@ public:
     auto globalOp = rewriter.replaceOpWithNewOp<IREE::Util::GlobalOp>(
         srcOp, srcOp.getName(), isMutable | isExtern, newType, srcOpTypedAttr);
     globalOp.setVisibility(SymbolTable::Visibility::Private);
+    globalOp->setDialectAttrs(srcOp->getDialectAttrs());
 
     if (isExtern)
       externGlobals.emplace_back(srcOp.getName(), newType);

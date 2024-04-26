@@ -312,9 +312,9 @@ LogicalResult QuantizedMatmulRewriter::precondition() {
   }
   Value scales = ins[2]->get();
   Value zps = ins[3]->get();
-  if (!unquantizedInputType.getElementType().isa<FloatType>() ||
-      !getElementTypeOrSelf(scales).isa<FloatType>() ||
-      !getElementTypeOrSelf(zps).isa<FloatType>()) {
+  if (!isa<FloatType>(unquantizedInputType.getElementType()) ||
+      !isa<FloatType>(getElementTypeOrSelf(scales)) ||
+      !isa<FloatType>(getElementTypeOrSelf(zps))) {
     return rewriter.notifyMatchFailure(matmul, "expected float type");
   }
   OpOperand *matmulDequantizedOperand = ins[4];
@@ -381,7 +381,7 @@ QuantizedMatmulRewriter::getGroupReductionMapsAndIterators(
 // Helper to create an init Value for reductions along the group dimension.
 Value QuantizedMatmulRewriter::getGroupReductionInit(Value input) {
   RankedTensorType inputType = llvm::cast<RankedTensorType>(input.getType());
-  assert(inputType.getElementType().isa<FloatType>() && "expected float type");
+  assert(isa<FloatType>(inputType.getElementType()) && "expected float type");
   Value zero = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getFloatAttr(inputType.getElementType(), 0.0));
   SmallVector<int64_t> inputShape(inputType.getShape());
@@ -418,7 +418,7 @@ Value QuantizedMatmulRewriter::generateGroupMaxGeneric() {
 // returns the result.
 Value QuantizedMatmulRewriter::generateScalesGeneric(Value groupMax) {
   auto groupMaxType = llvm::cast<RankedTensorType>(groupMax.getType());
-  assert(groupMaxType.getElementType().isa<FloatType>() &&
+  assert(isa<FloatType>(groupMaxType.getElementType()) &&
          "expected float type");
   Value cst = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getFloatAttr(groupMaxType.getElementType(),

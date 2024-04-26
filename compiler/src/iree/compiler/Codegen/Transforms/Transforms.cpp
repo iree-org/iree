@@ -344,7 +344,7 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
   options.inclusive = true;
   llvm::SetVector<Operation *> slice;
   for (auto ofr : workgroupCount) {
-    if (auto val = ofr.dyn_cast<Value>()) {
+    if (auto val = dyn_cast<Value>(ofr)) {
       mlir::getBackwardSlice(val, &slice, options);
     }
   }
@@ -393,7 +393,7 @@ LogicalResult lowerWorkgroupCountFromSliceOp(
   // Since the workgroup count at HAL level is in x, y, z form, process the
   // workload in reverse.
   for (auto ofr : llvm::reverse(workgroupCount)) {
-    if (auto val = ofr.dyn_cast<Value>()) {
+    if (auto val = dyn_cast<Value>(ofr)) {
       results.push_back(getAsOpFoldResult(map.lookup(val)));
     } else {
       results.push_back(ofr);

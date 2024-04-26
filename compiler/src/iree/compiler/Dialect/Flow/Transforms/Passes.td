@@ -102,8 +102,8 @@ def FormDispatchRegionsPass :
     InterfacePass<"iree-flow-form-dispatch-regions", "mlir::FunctionOpInterface"> {
   let summary = "Form Dispatch Region Ops from Linalg operations on tensors to form dispatch.regions";
   let options = [
-    Option<"fuseMultiUse", "fuse-multi-use", "bool",
-           /*default=*/"false", "Fuse multi-use ops">,
+    Option<"aggressiveFusion", "aggressive-fusion", "bool",
+           /*default=*/"false", "Aggressive mode enabling fusions not ready for all backends">,
     Option<"generateWorkloadRegion", "genereate-workload-region", "bool",
            /*default=*/"true", "Generate workload regions of WorkgroupOps">,
     Option<"fusePadWithConsumers", "fuse-pad-with-consumers", "bool",
@@ -266,6 +266,14 @@ def FusionOfTensorOpsPass :
   ];
 }
 
+def FusionPreprocessingPass :
+    Pass<"iree-flow-fusion-preprocessing", ""> {
+  let summary = "Run useful preprocessing patterns that help with fusion";
+  let dependentDialects = [
+    "mlir::affine::AffineDialect",
+  ];
+}
+
 def InitializeEmptyTensorsPass :
     Pass<"iree-flow-initialize-empty-tensors", ""> {
   let summary = "Initialize empty tensors";
@@ -334,14 +342,6 @@ def InsertDebugTargetAtOrdinalPass :
   ];
 }
 
-def InterchangeGenericOpsPass :
-    Pass<"iree-flow-interchange-generic-ops", ""> {
-  let summary = "Interchange generic op loops to have all the reduction loops to be inner loops.";
-  let dependentDialects = [
-    "mlir::linalg::LinalgDialect",
-  ];
-}
-
 def InterchangeTransposeGenericOpsPass :
     Pass<"iree-flow-interchange-transpose-generic-ops", ""> {
   let summary = "Interchange transpose generic op loops to make the input indeximg map indentity.";
@@ -365,6 +365,15 @@ def OutlineDispatchRegionsPass :
   let dependentDialects = [
     "IREE::Flow::FlowDialect",
     "mlir::func::FuncDialect",
+  ];
+}
+
+def SinkReshapesPass :
+    Pass<"iree-flow-sink-reshapes", ""> {
+  let summary = "Sink reshapes to allow for compute op -> consumer fusion";
+  let dependentDialects = [
+    "arith::ArithDialect",
+    "affine::AffineDialect",
   ];
 }
 

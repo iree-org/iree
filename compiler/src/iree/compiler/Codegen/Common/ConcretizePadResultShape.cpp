@@ -29,7 +29,7 @@ namespace mlir::iree_compiler {
 static Value getAsIndexValue(OpFoldResult attrOrValue, OpBuilder &builder,
                              Location loc) {
   IntegerAttr attr;
-  if (Value val = attrOrValue.dyn_cast<Value>()) {
+  if (Value val = dyn_cast<Value>(attrOrValue)) {
     if (val.getType().isIndex())
       return val;
     matchPattern(val, m_Constant(&attr));

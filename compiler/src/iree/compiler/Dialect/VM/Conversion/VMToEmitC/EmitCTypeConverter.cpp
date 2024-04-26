@@ -37,7 +37,7 @@ EmitCTypeConverter::EmitCTypeConverter(ModuleOp module)
   addSourceMaterialization([this](OpBuilder &builder, IREE::VM::RefType type,
                                   ValueRange inputs, Location loc) -> Value {
     assert(inputs.size() == 1);
-    assert(inputs[0].getType().isa<emitc::PointerType>());
+    assert(isa<emitc::PointerType>(inputs[0].getType()));
 
     Type objectType = IREE::VM::OpaqueType::get(builder.getContext());
     Type refType = IREE::VM::RefType::get(objectType);

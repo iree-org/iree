@@ -459,7 +459,7 @@ def FLOW_DispatchTensorLoadOp : FLOW_PureOp<"dispatch.tensor.load", [
     /// and `static_strides` attributes.
     std::array<unsigned, 3> getArrayAttrMaxRanks() {
       unsigned sourceRank =
-          getSource().getType().cast<DispatchTensorType>().asRankedTensorType().getRank();
+          cast<DispatchTensorType>(getSource().getType()).asRankedTensorType().getRank();
       return {sourceRank, sourceRank, sourceRank};
     }
 
@@ -484,12 +484,12 @@ def FLOW_DispatchTensorLoadOp : FLOW_PureOp<"dispatch.tensor.load", [
 
     /// Return the result type as a `RankedTensorType`.
     RankedTensorType getType() {
-      return getResult().getType().cast<RankedTensorType>();
+      return cast<RankedTensorType>(getResult().getType());
     }
 
     /// Return the type of the source as `IREE::Flow::DispatchTensorType`.
     IREE::Flow::DispatchTensorType getSourceType() {
-      return getSource().getType().cast<IREE::Flow::DispatchTensorType>();
+      return cast<IREE::Flow::DispatchTensorType>(getSource().getType());
     }
 
     ValueRange getOperandDynamicDims(unsigned idx) { return getSourceDims(); }
@@ -568,16 +568,16 @@ def FLOW_DispatchTensorStoreOp : FLOW_Op<"dispatch.tensor.store", [
     /// and `static_strides` attributes.
     std::array<unsigned, 3> getArrayAttrMaxRanks() {
       unsigned resultRank =
-           getTarget().getType().cast<DispatchTensorType>().asRankedTensorType().getRank();
+           cast<DispatchTensorType>(getTarget().getType()).asRankedTensorType().getRank();
       return {resultRank, resultRank, resultRank};
     }
 
     /// Return the type of the value type as a RankedTensorType.
-    RankedTensorType getValueType() { return getValue().getType().cast<RankedTensorType>(); }
+    RankedTensorType getValueType() { return cast<RankedTensorType>(getValue().getType()); }
 
     /// Return the type of the target.
     IREE::Flow::DispatchTensorType getTargetType() {
-      return getTarget().getType().cast<IREE::Flow::DispatchTensorType>();
+      return cast<IREE::Flow::DispatchTensorType>(getTarget().getType());
     }
 
     /// Return the number of leading operands before the `offsets`, `sizes` and
@@ -1248,7 +1248,7 @@ def FLOW_TensorBitCastOp : FLOW_PureOp<"tensor.bitcast", [
 def FLOW_TensorLoadOp : FLOW_PureOp<"tensor.load", [
   TypesMatchWith<"value type matches element type of target operand",
                   "source", "result",
-                  "$_self.cast<ShapedType>().getElementType()">,
+                  "cast<ShapedType>($_self).getElementType()">,
   AttrSizedOperandSegments,
   Util_ShapeAwareOp,
 ]> {
@@ -1299,7 +1299,7 @@ def FLOW_TensorStoreOp : FLOW_PureOp<"tensor.store", [
   AllTypesMatch<["target", "result"]>,
   TypesMatchWith<"value type matches element type of target operand",
                   "target", "value",
-                  "$_self.cast<ShapedType>().getElementType()">,
+                  "cast<ShapedType>($_self).getElementType()">,
   AttrSizedOperandSegments,
   Util_ShapeAwareOp,
 ]> {
@@ -1418,7 +1418,7 @@ def FLOW_TensorEmptyOp : FLOW_PureOp<"tensor.empty", [
 def FLOW_TensorSplatOp : FLOW_PureOp<"tensor.splat", [
   TypesMatchWith<"value type matches element type of result",
                   "result", "value",
-                  "$_self.cast<ShapedType>().getElementType()">,
+                  "cast<ShapedType>($_self).getElementType()">,
   DeclareOpInterfaceMethods<Util_HoistableOpInterface>,
   Util_ShapeAwareOp,
 ]> {

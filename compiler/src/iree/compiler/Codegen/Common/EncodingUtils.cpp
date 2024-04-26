@@ -28,13 +28,12 @@ getMaterializedType(RankedTensorType tensorType,
   if (failed(materializeEncodingInfo)) {
     return dropEncoding(tensorType);
   }
-  return tensor::PackOp::inferPackedType(
-             getOriginalTypeWithEncoding(tensorType)
-                 .clone(tensorType.getElementType()),
-             materializeEncodingInfo->innerTileSizes,
-             materializeEncodingInfo->innerDimsPos,
-             materializeEncodingInfo->outerDimsPerm)
-      .cast<RankedTensorType>();
+  return cast<RankedTensorType>(
+      tensor::PackOp::inferPackedType(getOriginalTypeWithEncoding(tensorType)
+                                          .clone(tensorType.getElementType()),
+                                      materializeEncodingInfo->innerTileSizes,
+                                      materializeEncodingInfo->innerDimsPos,
+                                      materializeEncodingInfo->outerDimsPerm));
 }
 
 MaterializeEncodingTypeConverter::MaterializeEncodingTypeConverter(
@@ -57,7 +56,7 @@ MaterializeEncodingConversionTarget::MaterializeEncodingConversionTarget(
   // illegal.
   markUnknownOpDynamicallyLegal([](Operation *op) {
     auto typeHasEncoding = [](Type t) -> bool {
-      auto tensorType = t.dyn_cast<RankedTensorType>();
+      auto tensorType = dyn_cast<RankedTensorType>(t);
       return tensorType && tensorType.getEncoding();
     };
     auto valueHasEncoding = [=](Value v) -> bool {
@@ -77,7 +76,7 @@ RankedTensorType getOriginalTypeWithEncoding(RankedTensorType type) {
   }
   RankedTensorType originalType = type;
   if (auto originalTypeAttr = encoding.getOriginalType()) {
-    originalType = originalTypeAttr.getValue().cast<RankedTensorType>();
+    originalType = cast<RankedTensorType>(originalTypeAttr.getValue());
   }
   return RankedTensorType::get(originalType.getShape(),
                                originalType.getElementType(), encoding);

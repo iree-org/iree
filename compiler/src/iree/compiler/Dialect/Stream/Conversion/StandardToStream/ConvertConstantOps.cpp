@@ -31,20 +31,20 @@ public:
 
     Type constantType = IREE::Stream::ResourceType::get(
         getContext(), IREE::Stream::Lifetime::Constant);
+    auto affinityAttr = IREE::Stream::AffinityAttr::lookup(constantOp);
     auto newOp = rewriter.create<IREE::Stream::TensorConstantOp>(
         constantOp.getLoc(), constantType,
         llvm::cast<ElementsAttr>(constantOp.getValue()),
         TypeAttr::get(constantOp.getType()),
-        /*result_encoding_dims=*/ValueRange{},
-        /*affinity=*/nullptr);
+        /*result_encoding_dims=*/ValueRange{}, affinityAttr);
 
     Type unknownType = IREE::Stream::ResourceType::get(getContext());
     auto constantSize = rewriter.createOrFold<IREE::Stream::ResourceSizeOp>(
         constantOp.getLoc(), rewriter.getIndexType(), newOp.getResult());
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncTransferOp>(
         constantOp, unknownType, newOp.getResult(), constantSize, constantSize,
-        /*source_affinity=*/nullptr,
-        /*result_affinity=*/nullptr);
+        /*source_affinity=*/affinityAttr,
+        /*result_affinity=*/affinityAttr);
     return success();
   }
 };

@@ -3,21 +3,21 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetBackends=vmvx,vmvx-inline})' %s | FileCheck %s --check-prefix=CHECK --check-prefix=TARGET-2
 // RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetBackends=vmvx,vmvx})' %s | FileCheck %s --check-prefix=CHECK --check-prefix=TARGET-EQ
 
-// TARGET-1: #device_target_vmvx = #hal.device.target<"vmvx"
+// TARGET-1: #device_target_local = #hal.device.target<"local"
 
-// TARGET-2: #device_target_vmvx = #hal.device.target<"vmvx"
+// TARGET-2: #device_target_local = #hal.device.target<"local"
 // TARGET-2: #device_target_vmvx_inline = #hal.device.target<"vmvx-inline"
 
-// TARGET-EQ: #device_target_vmvx = #hal.device.target<"vmvx"
+// TARGET-EQ: #device_target_local = #hal.device.target<"local"
 
 // CHECK: module
 // TARGET-0: @module {
 // TARGET-1: @module attributes {
-// TARGET-1-SAME: hal.device.targets = [#device_target_vmvx]
+// TARGET-1-SAME: hal.device.targets = [#device_target_local]
 // TARGET-2: @module attributes {
-// TARGET-2-SAME: hal.device.targets = [#device_target_vmvx, #device_target_vmvx_inline]}
+// TARGET-2-SAME: hal.device.targets = [#device_target_local, #device_target_vmvx_inline]}
 // TARGET-EQ: @module attributes {
-// TARGET-EQ-SAME: hal.device.targets = [#device_target_vmvx]}
+// TARGET-EQ-SAME: hal.device.targets = [#device_target_local]}
 module @module {}
 
 // -----

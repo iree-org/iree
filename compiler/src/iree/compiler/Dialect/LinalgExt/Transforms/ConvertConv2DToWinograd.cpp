@@ -145,7 +145,7 @@ public:
 
     // Check that kernel size = 3x3
     Value kernel = convOp.getInputs()[1];
-    auto kernelType = kernel.getType().cast<ShapedType>();
+    auto kernelType = cast<ShapedType>(kernel.getType());
     if (!kernelType) {
       return failure();
     }
@@ -167,8 +167,8 @@ public:
     }
 
     Operation *constOp = kernel.getDefiningOp();
-    ShapedType type = constOp->getResult(0).getType().cast<ShapedType>();
-    auto elemType = type.getElementType().cast<FloatType>();
+    ShapedType type = cast<ShapedType>(constOp->getResult(0).getType());
+    auto elemType = cast<FloatType>(type.getElementType());
     ArrayRef<int64_t> shape = type.getShape();
     DenseElementsAttr::iterator_range<APFloat> nonSplatValues =
         kernelAttr.getValues<APFloat>();
@@ -199,7 +199,7 @@ static Value
 createCollapse(Value tensor, Location loc, PatternRewriter &rewriter,
                SmallVectorImpl<int64_t> &outputShape,
                SmallVectorImpl<ReassociationIndices> &reassociations) {
-  auto tensorType = tensor.getType().cast<ShapedType>();
+  auto tensorType = cast<ShapedType>(tensor.getType());
   auto elementTy = tensorType.getElementType();
   auto resultType = RankedTensorType::get(outputShape, elementTy);
   return rewriter.create<tensor::CollapseShapeOp>(loc, resultType, tensor,
@@ -210,7 +210,7 @@ static Value
 createExpand(Value tensor, Location loc, PatternRewriter &rewriter,
              SmallVectorImpl<int64_t> &outputShape,
              SmallVectorImpl<ReassociationIndices> &reassociations) {
-  auto tensorType = tensor.getType().cast<ShapedType>();
+  auto tensorType = cast<ShapedType>(tensor.getType());
   auto elementTy = tensorType.getElementType();
   auto resultType = RankedTensorType::get(outputShape, elementTy);
   return rewriter.create<tensor::ExpandShapeOp>(loc, resultType, tensor,
@@ -298,7 +298,7 @@ public:
 
     // Check that kernel has been constant folded (by validating rank = 3)
     Value kernel = convOp.getInputs()[1];
-    auto kernelType = kernel.getType().cast<ShapedType>();
+    auto kernelType = cast<ShapedType>(kernel.getType());
     if (!kernelType) {
       return failure();
     }
@@ -316,7 +316,7 @@ public:
     Value zero = rewriter.create<arith::ConstantOp>(
         loc, rewriter.getZeroAttr(elementType));
     Value input = convOp.getInputs()[0];
-    auto inputType = input.getType().cast<ShapedType>();
+    auto inputType = cast<ShapedType>(input.getType());
     if (!inputType) {
       return failure();
     }
@@ -366,7 +366,7 @@ public:
     // Add BatchMatmulOp
     SmallVector<int64_t> bmmShape(collapsedShape.begin(), collapsedShape.end());
     Value output = convOp.getOutputs()[0];
-    auto outputType = output.getType().cast<RankedTensorType>();
+    auto outputType = cast<RankedTensorType>(output.getType());
     SmallVector<int64_t> outputShape(outputType.getShape());
     if (isNchw) {
       permute<IREE::LinalgExt::Permutation::NCHW_TO_NHWC>(outputShape);

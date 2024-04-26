@@ -63,8 +63,10 @@ SmallVector<int64_t> asShapeWithAnyValueAsDynamic(ArrayRef<OpFoldResult> ofrs);
 enum class Permutation {
   NCHW_TO_NHWC,
   NHWC_TO_NCHW,
+  FCHW_TO_HWCF,
   TTNHWC_TO_TTNCHW,
   TTNCHW_TO_TTNHWC,
+  TTFC_TO_TTCF,
 };
 
 // Permutes the elements of a SmallVector depending on the permutation specified
@@ -77,11 +79,18 @@ static void permute(SmallVectorImpl<T> &vector) {
   case Permutation::NHWC_TO_NCHW:
     std::rotate(vector.rbegin(), vector.rbegin() + 1, vector.rend() - 1);
     break;
+  case Permutation::FCHW_TO_HWCF:
+    std::rotate(vector.begin(), vector.begin() + 2, vector.end()); // to HWFC
+    std::rotate(vector.rbegin(), vector.rbegin() + 1, vector.rend() - 2);
+    break;
   case Permutation::TTNCHW_TO_TTNHWC:
     std::rotate(vector.begin() + 3, vector.begin() + 4, vector.end());
     break;
   case Permutation::TTNHWC_TO_TTNCHW:
     std::rotate(vector.rbegin(), vector.rbegin() + 1, vector.rend() - 3);
+    break;
+  case Permutation::TTFC_TO_TTCF:
+    std::rotate(vector.rbegin(), vector.rbegin() + 1, vector.rend() - 2);
     break;
   default:
     break;

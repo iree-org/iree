@@ -83,8 +83,8 @@ bool LinalgTransformationFilter::hasReplacementFilter(Operation *op) const {
   if (!replacement) {
     return false;
   }
-  auto attr = op->getAttr(LinalgTransforms::kLinalgTransformMarker)
-                  .dyn_cast<StringAttr>();
+  auto attr = dyn_cast<StringAttr>(
+      op->getAttr(LinalgTransforms::kLinalgTransformMarker));
   return attr && attr == *replacement;
 }
 

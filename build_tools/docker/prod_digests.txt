@@ -1,5 +1,4 @@
 gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446
-gcr.io/iree-oss/samples@sha256:0cb4a27f8fce2e6c9a425b93ecd97bf3c5c3a8ec56929ab7ef005f51d4b1e054
 gcr.io/iree-oss/riscv@sha256:62e87bad3405d691ddba6f9be0ef44eeb60461a467c8d86f0842c81a1f97da79
 gcr.io/iree-oss/nvidia@sha256:82fa00b5cdda1b35634796cd0f88cb5d6d22d80328b94bfb51e5f2820598ba23
 gcr.io/iree-oss/emscripten@sha256:2dd4c52f1bb499ab365aad0111fe5538b685d88af38636b409b0cf6a576ab214

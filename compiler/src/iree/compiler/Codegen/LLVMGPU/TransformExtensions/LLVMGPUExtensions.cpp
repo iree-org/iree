@@ -1478,7 +1478,9 @@ transform_dialect::AMDGPUDistributeVectorsOp::applyToOne(
   populateGPUDistributionPatterns(patterns);
   populateGPUDistributionLayoutAttrPatterns(laneId, patterns);
   populateGPUReductionDistributionPatterns(patterns);
-  populateGPUDistributeNestedLayoutAttrPatterns(laneId, patterns);
+  // For testing we use subgroup size = 64.
+  populateGPUDistributeNestedLayoutAttrPatterns(patterns, laneId,
+                                                /*subgroupSize=*/64);
   populateAMDGPUDistributionPatterns(patterns);
   populateGPULayoutResolutionDistributionPatterns(patterns);
   if (failed(distributeVectorOps(target, patterns, options))) {

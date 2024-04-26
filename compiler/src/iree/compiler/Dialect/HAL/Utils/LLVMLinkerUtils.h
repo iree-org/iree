@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_COMPILER_DIALECT_HAL_TARGET_LLVMLINKERUTILS_H_
-#define IREE_COMPILER_DIALECT_HAL_TARGET_LLVMLINKERUTILS_H_
+#ifndef IREE_COMPILER_DIALECT_HAL_UTILS_LLVMLINKERUTILS_H_
+#define IREE_COMPILER_DIALECT_HAL_UTILS_LLVMLINKERUTILS_H_
 
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "llvm/IR/Module.h"
@@ -55,4 +55,4 @@ LogicalResult linkCmdlineBitcodeFiles(Location loc, llvm::Linker &linker,
 
 } // namespace mlir::iree_compiler::IREE::HAL
 
-#endif //  IREE_COMPILER_DIALECT_HAL_TARGET_LLVMLINKERUTILS_H_
+#endif //  IREE_COMPILER_DIALECT_HAL_UTILS_LLVMLINKERUTILS_H_

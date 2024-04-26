@@ -14,6 +14,7 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
+#include "mlir/IR/AsmState.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/Support/LLVM.h"
 
@@ -29,6 +30,7 @@ public:
   struct ConstValueInfo;
   explicit ConstExprAnalysis(Operation *rootOp);
 
+  AsmState &getAsmState() const { return asmState; }
   void print(raw_ostream &os) const;
   void dump() const;
 
@@ -47,23 +49,17 @@ public:
   }
 
   // Returns true if the given value is only derived from immutable inputs.
-  // Note that this only returns true for derived values. Direct use of
-  // existing constants returns false.
   bool isConstExprValue(Value queryValue) const {
     ConstValueInfo *found = constInfoMap.lookup(queryValue);
     if (!found)
       return false;
-    return found->state == ConstValueInfo::CONSTANT && !found->isRoot;
+    return found->state == ConstValueInfo::CONSTANT;
   }
 
   // Returns whether the given operation is considered const-expr. Presently,
   // an operation's results will either all be const-expr or not, so we just
   // check the first. 0-result ops cannot be const-expr.
-  bool isConstExprOperation(Operation *queryOp) const {
-    if (queryOp->getNumResults() == 0)
-      return false;
-    return isConstExprValue(queryOp->getResult(0));
-  }
+  bool isConstExprOperation(Operation *queryOp) const;
 
   // Populates a set, in arbitrary order, of all const-expr ops in the
   // program. This includes root ops.
@@ -160,6 +156,9 @@ private:
   // Add a new info record for a value to analyze for const-ness.
   ConstValueInfo *addInfo(Value constValue);
 
+  // Cached asm state at the time analysis ran.
+  mutable AsmState asmState;
+
   // Map of a root value in the program that should be considered constant
   // to the operation that defines the constant. Two cases:
   //   LoadGlobalOp.result -> GlobalOp
@@ -250,12 +249,6 @@ private:
   // initialization and then the structure is not changed.
   llvm::DenseMap<const ConstExprAnalysis::ConstValueInfo *, Decision> decisions;
 };
-
-inline raw_ostream &operator<<(raw_ostream &os,
-                               const ConstExprAnalysis &analysis) {
-  analysis.print(os);
-  return os;
-}
 
 } // namespace mlir::iree_compiler::IREE::Util
 

@@ -79,7 +79,7 @@ static void applyFastSlowPathConversion(mlir::FunctionOpInterface funcOp) {
   Value cstZero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
   SmallVector<Value> eqZeroCmpVals;
   for (OpFoldResult pad : llvm::concat<OpFoldResult>(lowPads, highPads)) {
-    if (auto padValue = pad.dyn_cast<Value>()) {
+    if (auto padValue = dyn_cast<Value>(pad)) {
       getBackwardSlice(padValue, &padSizeOps, options);
       padSizeOps.insert(padValue.getDefiningOp());
     }

@@ -34,8 +34,8 @@ namespace {
 //===----------------------------------------------------------------------===//
 
 static void replaceUsesAndTransfer(Value oldValue, Value newValue) {
-  assert(oldValue.getType().isa<IREE::Stream::ResourceType>());
-  assert(newValue.getType().isa<IREE::Stream::ResourceType>());
+  assert(isa<IREE::Stream::ResourceType>(oldValue.getType()));
+  assert(isa<IREE::Stream::ResourceType>(newValue.getType()));
   if (oldValue.getType() == newValue.getType()) {
     oldValue.replaceAllUsesWith(newValue);
     return;

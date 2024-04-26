@@ -46,10 +46,10 @@ LogicalResult LinalgExtOp::reifyResultShapes(
   for (auto output : cast<DestinationStyleOpInterface>(op).getDpsInits()) {
     SmallVector<OpFoldResult> dims;
     Type outputType = output.getType();
-    if (auto rankedTensorType = outputType.dyn_cast<RankedTensorType>()) {
+    if (auto rankedTensorType = dyn_cast<RankedTensorType>(outputType)) {
       getDimValues<RankedTensorType, tensor::DimOp>(b, op->getLoc(), output,
                                                     rankedTensorType, dims);
-    } else if (auto memrefType = outputType.dyn_cast<MemRefType>()) {
+    } else if (auto memrefType = dyn_cast<MemRefType>(outputType)) {
       getDimValues<MemRefType, memref::DimOp>(b, op->getLoc(), output,
                                               memrefType, dims);
     } else if (!outputType.isIntOrIndexOrFloat()) {
