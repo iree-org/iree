@@ -14,9 +14,7 @@
     ],
     "skip_run_tests": [],
     "expected_compile_failures": [
-      "resnet50",
-      "sdxl-prompt-encoder-tank",
-      "sdxl-vae-decode-tank"
+      "resnet50"
     ],
     "expected_run_failures": []
 }
