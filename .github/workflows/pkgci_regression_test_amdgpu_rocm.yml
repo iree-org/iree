@@ -76,7 +76,7 @@ jobs:
               --config-files=build_tools/pkgci/external_test_suite/onnx_gpu_rocm_rdna3.json \
               --no-skip-tests-missing-files
   linux_x86_64_rocm_models:
-    name: Linux (x86_64) AMDGPU Rocm Model Testing + Benchmark
+    name: MI250 - Models
     runs-on: nodai-amdgpu-mi250-x86-64
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
@@ -131,7 +131,20 @@ jobs:
             --retries 2 \
             --retry-delay 5 \
             --durations=0 \
-            --config-files=build_tools/pkgci/external_test_suite/gpu_rocm_models.json
+            --config-files=build_tools/pkgci/external_test_suite/gpu_rocm_models_gfx90a.json
+      - name: Run external tests - Models with real weights and additional flags
+        run: |
+          source ${VENV_DIR}/bin/activate
+          pytest SHARK-TestSuite/iree_tests/pytorch/models \
+            -rpfE \
+            -k real_weights \
+            --no-skip-tests-missing-files \
+            --capture=no \
+            --timeout=1200 \
+            --retries 2 \
+            --retry-delay 5 \
+            --durations=0 \
+            --config-files=build_tools/pkgci/external_test_suite/gpu_rocm_models_additional_flags_gfx90a.json
       - name: "Running real weight model tests scheduled unet"
         run: |
           source ${VENV_DIR}/bin/activate
@@ -144,7 +157,7 @@ jobs:
             --retries 2 \
             --retry-delay 5 \
             --durations=0 \
-            --config-files=build_tools/pkgci/external_test_suite/sdxl_scheduled_unet_gpu_rocm.json
+            --config-files=build_tools/pkgci/external_test_suite/sdxl_scheduled_unet_gpu_rocm_gfx90a.json
       - name: "Running SDXL rocm pipeline benchmark"
         run: |
           source ${VENV_DIR}/bin/activate
