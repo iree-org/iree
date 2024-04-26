@@ -98,10 +98,7 @@ class MMASchedule:
             "mma_schedule = #iree_gpu.mma_schedule<"
             + f"intrinsic = #iree_gpu.mma_layout<{self.intrinsic}>, "
             + f"subgroup_m_count = {self.m_count}, "
-            + f"subgroup_n_count = {self.n_count}, "
-            + f"subgroup_m_tile_count = {self.m_tile_count}, "
-            + f"subgroup_n_tile_count = {self.n_tile_count}, "
-            + f"subgroup_k_tile_count = {self.k_tile_count}>"
+            + f"subgroup_n_count = {self.n_count}>"
         )
 
 
