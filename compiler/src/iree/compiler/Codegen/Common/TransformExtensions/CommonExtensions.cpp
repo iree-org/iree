@@ -1035,6 +1035,139 @@ void transform_dialect::FuseForallOp::getEffects(
   transform::modifiesPayload(effects);
 }
 
+//===---------------------------------------------------------------------===//
+// FuseThreadWithWarpForallOp
+//===---------------------------------------------------------------------===//
+
+FailureOr<scf::ForallOp>
+fuseThreadForallIntoWarpSlice(RewriterBase &rewriter, scf::ForallOp producer,
+                              scf::ForallOp consumer, OpFoldResult subgroupSize,
+                              tensor::ExtractSliceOp slice) {
+  if (producer->getNumResults() != 1) {
+    return failure();
+  }
+
+  std::optional<ArrayAttr> producerMapping = producer.getMapping();
+  std::optional<ArrayAttr> consumerMapping = consumer.getMapping();
+  if (!producerMapping || !consumerMapping) {
+    return failure();
+  }
+
+  if (producerMapping->size() != 1 || consumerMapping->size() != 1) {
+    return failure();
+  }
+
+  MLIRContext *context = rewriter.getContext();
+  Attribute threadMappingAttr =
+      gpu::GPUThreadMappingAttr::get(context, gpu::MappingId::LinearDim0);
+  Attribute warpMappingAttr =
+      gpu::GPUWarpMappingAttr::get(context, gpu::MappingId::LinearDim0);
+  if (*producerMapping->begin() != threadMappingAttr ||
+      *consumerMapping->begin() != warpMappingAttr) {
+    return failure();
+  }
+
+  auto isAll = [](ArrayRef<int64_t> array, int64_t cmp) {
+    return llvm::all_of(array, [cmp](int64_t x) { return x == cmp; });
+  };
+
+  if (!isAll(producer.getStaticStep(), 1) ||
+      !isAll(producer.getStaticLowerBound(), 0) ||
+      !isAll(consumer.getStaticStep(), 1) ||
+      !isAll(consumer.getStaticLowerBound(), 0)) {
+    return failure();
+  }
+
+  rewriter.setInsertionPoint(slice);
+  Location loc = producer.getLoc();
+
+  // Step 1. Compute the producer IDs in terms of the consumer IDs.
+
+  OpFoldResult zero = rewriter.getIndexAttr(0);
+  OpFoldResult one = rewriter.getIndexAttr(1);
+
+  // Step 3. Create a new parallel loop with a single mapping id.
+  auto newForallOp = rewriter.create<scf::ForallOp>(
+      loc, ArrayRef<OpFoldResult>{zero}, ArrayRef<OpFoldResult>{subgroupSize},
+      ArrayRef<OpFoldResult>{one}, producer.getOutputs(),
+      producer.getMapping());
+
+  rewriter.setInsertionPointToStart(newForallOp.getBody());
+
+  AffineExpr d0, d1, d2;
+  bindDims(context, d0, d1, d2);
+  OpFoldResult newId = affine::makeComposedFoldedAffineApply(
+      rewriter, loc, (d0 * d1) + d2,
+      ArrayRef<OpFoldResult>{consumer.getInductionVar(0), subgroupSize,
+                             newForallOp.getInductionVar(0)});
+
+  // Step 5. Inline the region of the original forall op.
+  SmallVector<Value> newArgs(
+      {getValueOrCreateConstantIndexOp(rewriter, loc, newId)});
+  newArgs.append(newForallOp.getRegionIterArgs().begin(),
+                 newForallOp.getRegionIterArgs().end());
+  rewriter.eraseOp(newForallOp.getTerminator());
+  rewriter.mergeBlocks(producer.getBody(), newForallOp.getBody(), newArgs);
+  rewriter.replaceOp(producer, newForallOp);
+  return newForallOp;
+}
+
+DiagnosedSilenceableFailure
+transform_dialect::FuseThreadWithWarpForallOp::apply(
+    transform::TransformRewriter &rewriter,
+    transform::TransformResults &results, transform::TransformState &state) {
+  auto producers = state.getPayloadOps(getProducer());
+  auto consumers = state.getPayloadOps(getConsumer());
+
+  int64_t numProducers = llvm::range_size(producers);
+  int64_t numConsumers = llvm::range_size(consumers);
+  if (numProducers != 1 || numConsumers != 1) {
+    return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                     "More than one producer or consumer");
+  }
+
+  auto producer = dyn_cast<scf::ForallOp>(*producers.begin());
+  auto consumer = dyn_cast<scf::ForallOp>(*consumers.begin());
+  if (!producer || !consumer) {
+    return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                     "Non-forall producer or consumer");
+  }
+
+  if (!producer->hasOneUse()) {
+    return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                     "non-single use producer");
+  }
+
+  auto sliceConsumer =
+      dyn_cast<tensor::ExtractSliceOp>(*producer->user_begin());
+  if (!sliceConsumer || sliceConsumer->getParentOp() != consumer) {
+    return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                     "producer loop sole consumer is not an "
+                                     "extracted slice from the consumer loop");
+  }
+
+  FailureOr<scf::ForallOp> newForall = fuseThreadForallIntoWarpSlice(
+      rewriter, producer, consumer, rewriter.getIndexAttr(getSubgroupSize()),
+      sliceConsumer);
+  if (failed(newForall)) {
+    return mlir::emitDefiniteFailure(
+        state.getTopLevel(), "failed to fuse warp and thread forall ops");
+  }
+
+  results.set(getOperation()->getOpResult(0), {consumer});
+  results.set(getOperation()->getOpResult(1), {*newForall});
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::FuseThreadWithWarpForallOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::consumesHandle(getProducer(), effects);
+  transform::consumesHandle(getConsumer(), effects);
+  transform::producesHandle(getFusedResult(), effects);
+  transform::producesHandle(getFusedProducer(), effects);
+  transform::modifiesPayload(effects);
+}
+
 //===----------------------------------------------------------------------===//
 // GpuDistributeSharedMemoryCopyOp
 //===----------------------------------------------------------------------===//
