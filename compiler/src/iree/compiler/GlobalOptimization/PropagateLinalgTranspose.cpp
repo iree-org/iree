@@ -735,47 +735,6 @@ public:
   }
 };
 
-// Sinks a transpose to the input of a linalg named op. The conditions for the
-// rewrite are
-//   1) One of the input producers to the named op is a linalg.transpose
-//   2) The named op is generalizable (and is not a transpose)
-// The easiest way to get the rewrite we want then is to just try to generalize
-// all transposed named ops and let the generic pattern handle the actual
-// rewrite.
-class GeneralizeInputTransposedNamedOp
-    : public OpInterfaceRewritePattern<linalg::LinalgOp> {
-public:
-  using OpInterfaceRewritePattern<linalg::LinalgOp>::OpInterfaceRewritePattern;
-
-  LogicalResult matchAndRewrite(linalg::LinalgOp linalgOp,
-                                PatternRewriter &rewriter) const override {
-    if (!IREE::Flow::isNonNullAndOutsideDispatch(linalgOp)) {
-      return failure();
-    }
-    // Don't generalize transposes.
-    if (isa<linalg::TransposeOp>(linalgOp)) {
-      return rewriter.notifyMatchFailure(linalgOp,
-                                         "do not generalize transposes");
-    }
-    bool hasTranspose = false;
-    for (Value input : linalgOp.getDpsInputs()) {
-      auto definingTranspose = input.getDefiningOp<linalg::TransposeOp>();
-      if (definingTranspose && definingTranspose->hasOneUse()) {
-        hasTranspose = true;
-        break;
-      }
-    }
-    if (!hasTranspose) {
-      return rewriter.notifyMatchFailure(linalgOp, "no transpose input");
-    }
-    if (failed(linalg::generalizeNamedOp(rewriter, linalgOp))) {
-      return rewriter.notifyMatchFailure(linalgOp,
-                                         "failed to generalize named op");
-    }
-    return success();
-  }
-};
-
 } // namespace
 
 //===----------------------------------------------------------------------===//
@@ -1046,10 +1005,6 @@ void PropagateLinalgTransposePass::runOnOperation() {
     populateNamedOpSinkingPatterns(context, sinkingPatterns);
     sinkingPatterns.add<SinkTransposeThroughUnaryElementwiseInput>(
         context, /*benefit=*/2);
-
-    if (enableAggressivePropagation) {
-      sinkingPatterns.insert<GeneralizeInputTransposedNamedOp>(context);
-    }
     if (failed(
             applyPatternsAndFoldGreedily(funcOp, std::move(sinkingPatterns)))) {
       return signalPassFailure();
