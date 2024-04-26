@@ -1672,11 +1672,10 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
       entryPointFn, fftOp, tileSizes, DispatchLoweringPassPipeline::CPUDefault);
 }
 
-/// Sets the lowering configuration for dispatch region for
-/// the three linalg_ext.winograd ops:
-/// linalg_ext.winograd.filter_transform
-/// linalg_ext.winograd.input_transform
-/// linalg_ext.winograd.output_transform
+/// Sets the lowering configuration for dispatch region for winograd ops:
+///   linalg_ext.winograd.filter_transform
+///   linalg_ext.winograd.input_transform
+///   linalg_ext.winograd.output_transform
 /// The vector tile sizes should be 1 for each dim here, because
 /// the winograd decomposition relies on these unit dimensions.
 template <typename WinogradOp>
@@ -1689,7 +1688,7 @@ setWinogradRootConfig(mlir::FunctionOpInterface entryPointFn,
                        IREE::LinalgExt::WinogradOutputTransformOp>() ||
           std::is_same<WinogradOp,
                        IREE::LinalgExt::WinogradFilterTransformOp>(),
-      "op expected be a winograd op");
+      "op expected to be a winograd op");
   assert(!getLoweringConfig(winogradOp) &&
          "expected lowering_config is not set");
   auto iterationRank = winogradOp.getIterationDomainRank();
