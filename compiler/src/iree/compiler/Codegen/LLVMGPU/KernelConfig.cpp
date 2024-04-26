@@ -569,6 +569,8 @@ setMatmulVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   int64_t sharedMemoryLimitInBytes = targetInfo.sharedMemoryLimitInBytes;
 
   // First try to find a schedule with an exactly matching intrinsic.
+  auto pipeline =
+      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorDistribute;
   std::optional<GPUMMASchedule> schedule =
       deduceMMASchedule(problem, intrinsics, seeds, sharedMemoryLimitInBytes);
   if (!schedule) {
@@ -576,6 +578,23 @@ setMatmulVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
     schedule =
         deduceMMASchedule(problem, intrinsics, seeds, sharedMemoryLimitInBytes,
                           /*canUpcastAcc=*/true);
+  }
+
+  // Only batch_matmul is supported in the LLVMGPUPadAndVectorDistribute
+  // pipeline.
+  if (!schedule && !contractionDims->batch.empty()) {
+    pipeline = IREE::Codegen::DispatchLoweringPassPipeline::
+        LLVMGPUPadAndVectorDistribute;
+    bool mustBeAligned = false;
+    schedule =
+        deduceMMASchedule(problem, intrinsics, seeds, sharedMemoryLimitInBytes,
+                          /*canUpcastAcc=*/false, mustBeAligned);
+    if (!schedule) {
+      // Then try again by allowing upcasting accumulator.
+      schedule = deduceMMASchedule(problem, intrinsics, seeds,
+                                   sharedMemoryLimitInBytes,
+                                   /*canUpcastAcc=*/true, mustBeAligned);
+    }
   }
   if (!schedule) {
     return failure();
@@ -624,10 +643,9 @@ setMatmulVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   attrs.emplace_back(StringAttr::get(context, "mma_schedule"), scheduleAttr);
   auto configDict = DictionaryAttr::get(context, attrs);
 
-  return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, op, tileSizes,
-      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorDistribute,
-      workgroupSize, targetSubgroupSize, configDict);
+  return setOpConfigAndEntryPointFnTranslation(entryPoint, op, tileSizes,
+                                               pipeline, workgroupSize,
+                                               targetSubgroupSize, configDict);
 }
 
 static LogicalResult

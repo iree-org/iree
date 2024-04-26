@@ -39,15 +39,17 @@ bool isValidSchedule(const GPUMatmulShapeType &problem,
   return isValidN && isValidM && isValidK;
 }
 
-FailureOr<GPUMMASchedule> fitScheduleInSharedMemory(
-    const GPUMatmulShapeType &problem, ArrayRef<GPUMatmulShapeType> intrinsics,
-    GPUMMASchedule schedule, int64_t sharedMemLimitInBytes) {
+FailureOr<GPUMMASchedule>
+fitScheduleInSharedMemory(const GPUMatmulShapeType &problem,
+                          ArrayRef<GPUMatmulShapeType> intrinsics,
+                          GPUMMASchedule schedule,
+                          int64_t sharedMemLimitInBytes, bool mustBeAligned) {
   int64_t lhsBitwidth =
       intrinsics[schedule.index].aType.getIntOrFloatBitWidth();
   int64_t rhsBitwidth =
       intrinsics[schedule.index].bType.getIntOrFloatBitWidth();
 
-  while (!isValidSchedule(problem, schedule) ||
+  while ((!isValidSchedule(problem, schedule) && mustBeAligned) ||
          calculateSharedMemoryUsedInBytes(schedule, lhsBitwidth, rhsBitwidth) >
              sharedMemLimitInBytes) {
     LLVM_DEBUG({
@@ -96,11 +98,10 @@ FailureOr<GPUMMASchedule> fitScheduleInSharedMemory(
   return schedule;
 }
 
-FailureOr<GPUMMASchedule>
-deduceMMASchedule(const GPUMatmulShapeType &problem,
-                  ArrayRef<GPUMatmulShapeType> intrinsics,
-                  const GPUMMAHeuristicSeeds &seeds,
-                  int64_t sharedMemLimitInBytes, bool canUpcastAcc) {
+FailureOr<GPUMMASchedule> deduceMMASchedule(
+    const GPUMatmulShapeType &problem, ArrayRef<GPUMatmulShapeType> intrinsics,
+    const GPUMMAHeuristicSeeds &seeds, int64_t sharedMemLimitInBytes,
+    bool canUpcastAcc, bool mustBeAligned) {
   for (auto [index, intrinsic] : llvm::enumerate(intrinsics)) {
     if (problem.aType != intrinsic.aType || problem.bType != intrinsic.bType) {
       continue; // Cannot use this intrinsic for mismatched types
@@ -115,9 +116,9 @@ deduceMMASchedule(const GPUMatmulShapeType &problem,
       }
     }
 
-    if (problem.mSize % intrinsic.mSize != 0 ||
-        problem.nSize % intrinsic.nSize != 0 ||
-        problem.kSize % intrinsic.kSize != 0) {
+    if (mustBeAligned && (problem.mSize % intrinsic.mSize != 0 ||
+                          problem.nSize % intrinsic.nSize != 0 ||
+                          problem.kSize % intrinsic.kSize != 0)) {
       continue; // Cannot use this intrinsic for misaligned cases
     }
 
@@ -197,7 +198,7 @@ deduceMMASchedule(const GPUMatmulShapeType &problem,
         GPUMMASchedule{index, intrinsic.mSize, intrinsic.nSize, intrinsic.kSize,
                        mWarpCount, nWarpCount, mTileCount, nTileCount,
                        kTileCount},
-        sharedMemLimitInBytes);
+        sharedMemLimitInBytes, mustBeAligned);
   }
   return failure();
 }
