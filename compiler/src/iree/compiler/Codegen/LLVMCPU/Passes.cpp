@@ -634,6 +634,7 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
                          createLLVMCPUEmitVectorizationRemarksPass)
       .addPass(createConvertLinalgToLoopsPass)
       .addPass(createConvertBf16ArithToF32Pass)
+      .addPass(createIREEExpandStridedMetadataPass)  // added this
       .addPass(createConvertBf16ToUInt16BuffersPass)
       .addPass(createCanonicalizerPass)
       .addPass(createCSEPass);
@@ -671,7 +672,7 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
   FunctionLikeNest(modulePassManager)
       // Resolve get_buffer_descriptor ops. All structural buffer manipulations
       // must conclude before this point.
-      .addPass(createIREEExpandStridedMetadataPass)
+      // .addPass(createIREEExpandStridedMetadataPass)
       .addPass(createCleanupBufferAllocViewPass)
       // Checking stack allocation before converting to CF dialect is easier.
       .addPass([&]() {
