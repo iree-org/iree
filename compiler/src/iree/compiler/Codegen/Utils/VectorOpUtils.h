@@ -6,21 +6,13 @@
 
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
-#include "mlir/IR/BuiltinTypes.h"
 
 namespace mlir::iree_compiler {
 
 /// A class for querying information about a contract op.
 class VectorContractOpInfo {
 public:
-  enum class OpKind { MK_KN_MN, MK_NK_MN, UNKNOWN };
-
-  explicit VectorContractOpInfo(vector::ContractionOp op) {
-    contractionDims = *linalg::inferContractionDims(op.getIndexingMapsArray());
-    opKind = inferOpKind(op.getContext(), op.getIndexingMapsArray());
-  }
-
-  OpKind getOpKind() const { return opKind; }
+  explicit VectorContractOpInfo(vector::ContractionOp op);
 
   // Returns the (LHS M, RHS N) dimension index pair.
   std::pair<int, int> getOperandMNIndex() const;
@@ -53,11 +45,6 @@ public:
   SmallVector<int64_t> outNDims;
 
 private:
-  // Gets the kind of a contract op with the given indexing |maps|.
-  OpKind inferOpKind(MLIRContext *ctx, SmallVector<AffineMap> maps);
-
-  OpKind opKind = OpKind::UNKNOWN;
-
   linalg::ContractionDimensions contractionDims;
 };
 
