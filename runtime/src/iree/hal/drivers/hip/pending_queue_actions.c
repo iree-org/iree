@@ -103,6 +103,17 @@ typedef struct iree_hal_hip_queue_action_t {
   bool is_pending;
 } iree_hal_hip_queue_action_t;
 
+static void iree_hal_hip_queue_action_clear_events(
+    iree_hal_hip_queue_action_t* action) {
+  for (iree_host_size_t i = 0; i < action->event_count; ++i) {
+    iree_hal_hip_event_release(action->events[i]);
+  }
+  action->event_count = 0;
+}
+
+static void iree_hal_hip_queue_action_destroy(
+    iree_hal_hip_queue_action_t* action);
+
 //===----------------------------------------------------------------------===//
 // Queue action list
 //===----------------------------------------------------------------------===//
@@ -118,38 +129,36 @@ static inline bool iree_hal_hip_queue_action_list_is_empty(
   return list->head == NULL;
 }
 
+static iree_hal_hip_queue_action_t* iree_hal_hip_queue_action_list_pop_front(
+    iree_hal_hip_queue_action_list_t* list) {
+  IREE_ASSERT(list->head && list->tail);
+
+  iree_hal_hip_queue_action_t* action = list->head;
+  IREE_ASSERT(!action->prev);
+  list->head = action->next;
+  if (action->next) {
+    action->next->prev = NULL;
+    action->next = NULL;
+  }
+  if (list->tail == action) {
+    list->tail = NULL;
+  }
+
+  return action;
+}
+
 // Pushes |action| on to the end of the given action |list|.
 static void iree_hal_hip_queue_action_list_push_back(
     iree_hal_hip_queue_action_list_t* list,
     iree_hal_hip_queue_action_t* action) {
+  IREE_ASSERT(!action->next && !action->prev);
   if (list->tail) {
     list->tail->next = action;
   } else {
     list->head = action;
   }
-  action->next = NULL;
   action->prev = list->tail;
   list->tail = action;
-}
-
-// Erases |action| from |list|.
-static void iree_hal_hip_queue_action_list_erase(
-    iree_hal_hip_queue_action_list_t* list,
-    iree_hal_hip_queue_action_t* action) {
-  iree_hal_hip_queue_action_t* next = action->next;
-  iree_hal_hip_queue_action_t* prev = action->prev;
-  if (prev) {
-    prev->next = next;
-    action->prev = NULL;
-  } else {
-    list->head = next;
-  }
-  if (next) {
-    next->prev = prev;
-    action->next = NULL;
-  } else {
-    list->tail = prev;
-  }
 }
 
 // Takes all actions from |available_list| and moves them into |ready_list|.
@@ -163,13 +172,12 @@ static void iree_hal_hip_queue_action_list_take_all(
   available_list->tail = NULL;
 }
 
-// Frees all actions in the given |list|.
-static void iree_hal_hip_queue_action_list_free_actions(
-    iree_allocator_t host_allocator, iree_hal_hip_queue_action_list_t* list) {
-  for (iree_hal_hip_queue_action_t* action = list->head; action != NULL;) {
-    iree_hal_hip_queue_action_t* next_action = action->next;
-    iree_allocator_free(host_allocator, action);
-    action = next_action;
+static void iree_hal_hip_queue_action_list_destroy(
+    iree_hal_hip_queue_action_t* head_action) {
+  while (head_action) {
+    iree_hal_hip_queue_action_t* next_action = head_action->next;
+    iree_hal_hip_queue_action_destroy(head_action);
+    head_action = next_action;
   }
 }
 
@@ -188,6 +196,33 @@ IREE_TYPED_ATOMIC_SLIST_WRAPPER(iree_hal_hip_ready_action,
                                 iree_hal_hip_atomic_slist_entry_t,
                                 offsetof(iree_hal_hip_atomic_slist_entry_t,
                                          slist_next));
+
+static void iree_hal_hip_ready_action_slist_destroy(
+    iree_hal_hip_ready_action_slist_t* list, iree_allocator_t host_allocator) {
+  while (true) {
+    iree_hal_hip_atomic_slist_entry_t* entry =
+        iree_hal_hip_ready_action_slist_pop(list);
+    if (!entry) break;
+    iree_hal_hip_queue_action_list_destroy(entry->ready_list_head);
+    iree_allocator_free(host_allocator, entry);
+  }
+  iree_hal_hip_ready_action_slist_deinitialize(list);
+}
+
+static iree_hal_hip_queue_action_t* iree_hal_hip_atomic_slist_entry_pop_front(
+    iree_hal_hip_atomic_slist_entry_t* list) {
+  IREE_ASSERT(list->ready_list_head);
+
+  iree_hal_hip_queue_action_t* action = list->ready_list_head;
+  IREE_ASSERT(!action->prev);
+  list->ready_list_head = action->next;
+  if (action->next) {
+    action->next->prev = NULL;
+    action->next = NULL;
+  }
+
+  return action;
+}
 
 // The ready-list processing worker's working/exiting state.
 //
@@ -212,20 +247,30 @@ typedef enum iree_hal_hip_worker_state_e {
 // The parent thread should push a list of ready actions to ready_worklist,
 // update worker_state, and give state_notification accordingly.
 // The worker thread waits on the state_notification and checks worker_state,
-// and pops from the ready_worklist to process. The worker thread also monintors
+// and pops from the ready_worklist to process. The worker thread also monitors
 // worker_state and stops processing if requested by the parent thread.
 typedef struct iree_hal_hip_working_area_t {
   // Notification from the parent thread to request worker state changes.
   iree_notification_t state_notification;
   // Notification to the parent thread to indicate the worker committed exiting.
+  // TODO: maybe remove this. We can just wait on the worker thread to exit.
   iree_notification_t exit_notification;
   iree_hal_hip_ready_action_slist_t ready_worklist;  // atomic
   iree_atomic_int32_t worker_state;                  // atomic
-  iree_atomic_intptr_t error_code;                   // atomic
-  // The number of actions that have been issued to the GPU but not yet fully
-  // completed both execution and cleanup. We don't need this field to be atomic
-  // given it is modified only from the worker thread.
-  int32_t pending_action_count;
+  // TODO: use status to provide more context for the error.
+  iree_atomic_intptr_t error_code;  // atomic
+
+  // The number of asynchronous work items that are scheduled and not
+  // complete.
+  // These are
+  // * the number of callbacks that are scheduled on the host stream.
+  // * the number of pending action cleanup.
+  // We need to wait for them to finish before destroying the context.
+  iree_slim_mutex_t pending_work_items_count_mutex;
+  iree_notification_t pending_work_items_count_notification;
+  int32_t pending_work_items_count
+      IREE_GUARDED_BY(pending_work_items_count_mutex);
+
   iree_allocator_t host_allocator;  // const
 } iree_hal_hip_working_area_t;
 
@@ -240,15 +285,22 @@ static void iree_hal_hip_working_area_initialize(
                           iree_memory_order_release);
   iree_atomic_store_int32(&working_area->error_code, IREE_STATUS_OK,
                           iree_memory_order_release);
-  working_area->pending_action_count = 0;
+  iree_slim_mutex_initialize(&working_area->pending_work_items_count_mutex);
+  iree_notification_initialize(
+      &working_area->pending_work_items_count_notification);
+  working_area->pending_work_items_count = 0;
   working_area->host_allocator = host_allocator;
 }
 
 static void iree_hal_hip_working_area_deinitialize(
     iree_hal_hip_working_area_t* working_area) {
-  iree_hal_hip_ready_action_slist_deinitialize(&working_area->ready_worklist);
+  iree_hal_hip_ready_action_slist_destroy(&working_area->ready_worklist,
+                                          working_area->host_allocator);
   iree_notification_deinitialize(&working_area->exit_notification);
   iree_notification_deinitialize(&working_area->state_notification);
+  iree_slim_mutex_deinitialize(&working_area->pending_work_items_count_mutex);
+  iree_notification_deinitialize(
+      &working_area->pending_work_items_count_notification);
 }
 
 // The main function for the ready-list processing worker thread.
@@ -369,8 +421,7 @@ void iree_hal_hip_pending_queue_actions_destroy(
   iree_hal_hip_working_area_deinitialize(working_area);
 
   iree_slim_mutex_deinitialize(&actions->action_mutex);
-  iree_hal_hip_queue_action_list_free_actions(host_allocator,
-                                              &actions->action_list);
+  iree_hal_hip_queue_action_list_destroy(actions->action_list.head);
   iree_allocator_free(host_allocator, actions);
 
   IREE_TRACE_ZONE_END(z0);
@@ -431,6 +482,46 @@ static void iree_hal_hip_free_semaphore_list(
     iree_hal_semaphore_list_t* semaphore_list) {
   iree_allocator_free(host_allocator, semaphore_list->semaphores);
   iree_allocator_free(host_allocator, semaphore_list->payload_values);
+}
+
+static void iree_hal_hip_queue_action_destroy(
+    iree_hal_hip_queue_action_t* action) {
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_hal_hip_pending_queue_actions_t* actions = action->owning_actions;
+  iree_allocator_t host_allocator = actions->host_allocator;
+
+  // Call user provided callback before releasing any resource.
+  if (action->cleanup_callback) {
+    action->cleanup_callback(action->callback_user_data);
+  }
+
+  // Only release resources after callbacks have been issued.
+  iree_hal_resource_set_free(action->resource_set);
+  iree_hal_hip_free_semaphore_list(host_allocator,
+                                   &action->wait_semaphore_list);
+  iree_hal_hip_free_semaphore_list(host_allocator,
+                                   &action->signal_semaphore_list);
+
+  iree_hal_hip_queue_action_clear_events(action);
+
+  iree_hal_resource_release(actions);
+
+  iree_allocator_free(host_allocator, action);
+
+  IREE_TRACE_ZONE_END(z0);
+}
+
+static void decrement_work_items_count(
+    iree_hal_hip_working_area_t* working_area) {
+  iree_slim_mutex_lock(&working_area->pending_work_items_count_mutex);
+  --working_area->pending_work_items_count;
+  if (working_area->pending_work_items_count == 0) {
+    // Notify inside the lock to make sure that we are done touching anything
+    // since the context may get destroyed in the meantime.
+    iree_notification_post(&working_area->pending_work_items_count_notification,
+                           IREE_ALL_WAITERS);
+  }
+  iree_slim_mutex_unlock(&working_area->pending_work_items_count_mutex);
 }
 
 iree_status_t iree_hal_hip_pending_queue_actions_enqueue_execution(
@@ -533,13 +624,19 @@ iree_status_t iree_hal_hip_pending_queue_actions_enqueue_execution(
 
 static void iree_hal_hip_post_error_to_worker_state(
     iree_hal_hip_working_area_t* working_area, iree_status_code_t code) {
-  iree_atomic_store_int32(&working_area->error_code, code,
-                          iree_memory_order_release);
+  // Write error code, but don't overwrite existing error codes.
+  intptr_t prev_error_code = IREE_STATUS_OK;
+  iree_atomic_compare_exchange_strong_int32(
+      &working_area->error_code, /*expected=*/&prev_error_code,
+      /*desired=*/code,
+      /*order_succ=*/iree_memory_order_acq_rel,
+      /*order_fail=*/iree_memory_order_acquire);
+
   // This state has the highest priority so just overwrite.
   iree_atomic_store_int32(&working_area->worker_state,
                           IREE_HAL_HIP_WORKER_STATE_EXIT_ERROR,
                           iree_memory_order_release);
-  iree_notification_post(&working_area->exit_notification, IREE_ALL_WAITERS);
+  iree_notification_post(&working_area->state_notification, IREE_ALL_WAITERS);
 }
 
 // Releases resources after action completion on the GPU and advances timeline
@@ -556,6 +653,19 @@ static void iree_hal_hip_execution_device_signal_host_callback(
   IREE_ASSERT_EQ(action->state, IREE_HAL_HIP_QUEUE_ACTION_STATE_ALIVE);
   iree_hal_hip_pending_queue_actions_t* actions = action->owning_actions;
 
+  iree_status_t status;
+
+  // Need to signal the list before zombifying the action, because in the mean
+  // time someone else may issue the pending queue actions.
+  // If we push first to the pending actions list, the cleanup of this action
+  // may run while we are still using the semaphore list, causing a crash.
+  status = iree_hal_semaphore_list_signal(action->signal_semaphore_list);
+  if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
+    IREE_ASSERT(false && "cannot signal semaphores in host callback");
+    iree_hal_hip_post_error_to_worker_state(&actions->working_area,
+                                            iree_status_code(status));
+  }
+
   // Flip the action state to zombie and enqueue it again so that we can let
   // the worker thread clean it up. Note that this is necessary because cleanup
   // may involve GPU API calls like buffer releasing or unregistering, so we can
@@ -565,23 +675,16 @@ static void iree_hal_hip_execution_device_signal_host_callback(
   iree_hal_hip_queue_action_list_push_back(&actions->action_list, action);
   iree_slim_mutex_unlock(&actions->action_mutex);
 
-  iree_status_t status;
-  if (action->signal_semaphore_list.count) {
-    // Advance semaphore timelines by calling into the host signaling function.
-    // This will internally try to release more workload to the GPU.
-    status = iree_hal_semaphore_list_signal(action->signal_semaphore_list);
-  } else {
-    // If there is no semaphores to signal we still need to trigger execution
-    // of the recently zombified action so it can be cleaned up.
-    status = iree_hal_hip_pending_queue_actions_issue(actions);
-  }
-
+  // We need to trigger execution of this action again, so it gets cleaned up.
+  status = iree_hal_hip_pending_queue_actions_issue(actions);
   if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
-    IREE_ASSERT(false &&
-                "can't signal semaphores and/or issue pending actions");
+    IREE_ASSERT(false && "cannot issue action for cleanup in host callback");
     iree_hal_hip_post_error_to_worker_state(&actions->working_area,
                                             iree_status_code(status));
   }
+
+  // The callback (work item) is complete.
+  decrement_work_items_count(&actions->working_area);
 
   IREE_TRACE_ZONE_END(z0);
 }
@@ -668,9 +771,13 @@ static iree_status_t iree_hal_hip_pending_queue_actions_issue_execution(
         "hipStreamWaitEvent");
   }
 
-  // Increase the pending action counter. We decrease it once it fully
-  // completes and gets cleaned up.
-  ++action->owning_actions->working_area.pending_action_count;
+  iree_slim_mutex_lock(
+      &action->owning_actions->working_area.pending_work_items_count_mutex);
+  // One work item is the host stream callback.
+  // The other is the cleanup of the action.
+  action->owning_actions->working_area.pending_work_items_count += 2;
+  iree_slim_mutex_unlock(
+      &action->owning_actions->working_area.pending_work_items_count_mutex);
 
   // Now launch a host function on the callback stream to advance the semaphore
   // timeline.
@@ -685,46 +792,19 @@ static iree_status_t iree_hal_hip_pending_queue_actions_issue_execution(
   return iree_ok_status();
 }
 
-static void iree_hal_hip_queue_action_clear_events(
-    iree_hal_hip_queue_action_t* action) {
-  for (iree_host_size_t i = 0; i < action->event_count; ++i) {
-    iree_hal_hip_event_release(action->events[i]);
-  }
-  action->event_count = 0;
-}
-
 // Performs the given cleanup |action| on the CPU.
-static iree_status_t iree_hal_hip_pending_queue_actions_issue_cleanup(
+static void iree_hal_hip_pending_queue_actions_issue_cleanup(
     iree_hal_hip_queue_action_t* action) {
   iree_hal_hip_pending_queue_actions_t* actions = action->owning_actions;
-  iree_allocator_t host_allocator = actions->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // Call user provided callback before releasing any resource.
-  if (action->cleanup_callback) {
-    action->cleanup_callback(action->callback_user_data);
-  }
+  iree_hal_hip_queue_action_destroy(action);
 
-  // Only release resources after callbacks have been issued.
-  iree_hal_resource_set_free(action->resource_set);
-  iree_hal_hip_free_semaphore_list(host_allocator,
-                                   &action->wait_semaphore_list);
-  iree_hal_hip_free_semaphore_list(host_allocator,
-                                   &action->signal_semaphore_list);
-
-  iree_hal_hip_queue_action_clear_events(action);
-
-  iree_allocator_free(host_allocator, action);
-
-  // Now we fully executed and cleaned up this action. Decrease the pending
-  // action counter.
-  --actions->working_area.pending_action_count;
-
-  // Drop reference to the pending action queue given now we are done.
-  iree_hal_resource_release(actions);
+  // Now we fully executed and cleaned up this action. Decrease the work items
+  // counter.
+  decrement_work_items_count(&actions->working_area);
 
   IREE_TRACE_ZONE_END(z0);
-  return iree_ok_status();
 }
 
 iree_status_t iree_hal_hip_pending_queue_actions_issue(
@@ -744,15 +824,13 @@ iree_status_t iree_hal_hip_pending_queue_actions_issue(
 
   // Scan through the list and categorize actions into pending and ready lists.
   iree_status_t status = iree_ok_status();
-  iree_hal_hip_queue_action_t* action = actions->action_list.head;
-  while (action) {
-    iree_hal_hip_queue_action_t* next_action = action->next;
-    action->next = NULL;
+  while (!iree_hal_hip_queue_action_list_is_empty(&actions->action_list)) {
+    iree_hal_hip_queue_action_t* action =
+        iree_hal_hip_queue_action_list_pop_front(&actions->action_list);
 
     iree_hal_semaphore_t** semaphores = action->wait_semaphore_list.semaphores;
     uint64_t* values = action->wait_semaphore_list.payload_values;
 
-    action->event_count = 0;
     action->is_pending = false;
 
     // Cleanup actions are immediately ready to release. Otherwise, look at all
@@ -785,8 +863,6 @@ iree_status_t iree_hal_hip_pending_queue_actions_issue(
         iree_hal_hip_event_t* wait_event = NULL;
         if (!iree_hal_hip_semaphore_acquire_event_host_wait(
                 semaphores[i], values[i], &wait_event)) {
-          // Clear the scratch fields.
-          action->event_count = 0;
           action->is_pending = true;
           break;
         }
@@ -807,23 +883,19 @@ iree_status_t iree_hal_hip_pending_queue_actions_issue(
       }
     }
 
-    if (IREE_UNLIKELY(!iree_status_is_ok(status))) break;
+    if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
+      // Some error happened during processing the current action.
+      // Put it back to the pending list so we don't leak.
+      action->is_pending = true;
+      iree_hal_hip_queue_action_list_push_back(&pending_list, action);
+      break;
+    }
 
     if (action->is_pending) {
       iree_hal_hip_queue_action_list_push_back(&pending_list, action);
     } else {
       iree_hal_hip_queue_action_list_push_back(&ready_list, action);
     }
-
-    action = next_action;
-  }
-
-  if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
-    // Some error happened during processing the current action. Clear the
-    // scratch fields and put it back to the pending list so we don't leak.
-    action->event_count = 0;
-    action->is_pending = true;
-    iree_hal_hip_queue_action_list_push_back(&pending_list, action);
   }
 
   // Preserve pending timepoints.
@@ -846,8 +918,7 @@ iree_status_t iree_hal_hip_pending_queue_actions_issue(
 
   if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
     // Release all actions in the ready list to avoid leaking.
-    iree_hal_hip_queue_action_list_free_actions(actions->host_allocator,
-                                                &ready_list);
+    iree_hal_hip_queue_action_list_destroy(ready_list.head);
     iree_allocator_free(actions->host_allocator, entry);
     IREE_TRACE_ZONE_END(z0);
     return status;
@@ -887,14 +958,13 @@ iree_status_t iree_hal_hip_pending_queue_actions_issue(
 // Worker routines
 //===----------------------------------------------------------------------===//
 
-static bool iree_hal_hip_worker_has_incoming_request(
+static bool iree_hal_hip_worker_has_incoming_request_or_error(
     iree_hal_hip_working_area_t* working_area) {
   iree_hal_hip_worker_state_t value = iree_atomic_load_int32(
       &working_area->worker_state, iree_memory_order_acquire);
-  // These are the only two possible states that set from the main thread to
-  // the worker thread.
   return value == IREE_HAL_HIP_WORKER_STATE_WORKLOAD_PENDING ||
-         value == IREE_HAL_HIP_WORKER_STATE_EXIT_REQUESTED;
+         value == IREE_HAL_HIP_WORKER_STATE_EXIT_REQUESTED ||
+         value == IREE_HAL_HIP_WORKER_STATE_EXIT_ERROR;
 }
 
 static bool iree_hal_hip_worker_committed_exiting(
@@ -911,36 +981,64 @@ static iree_status_t iree_hal_hip_worker_process_ready_list(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_status_t status = iree_ok_status();
-  do {
+  while (true) {
     iree_hal_hip_atomic_slist_entry_t* entry =
         iree_hal_hip_ready_action_slist_pop(worklist);
     if (!entry) break;
 
     // Process the current batch of ready actions.
-    iree_hal_hip_queue_action_t* action = entry->ready_list_head;
-    while (action) {
-      iree_hal_hip_queue_action_t* next_action = action->next;
-      action->next = NULL;
+    while (entry->ready_list_head) {
+      iree_hal_hip_queue_action_t* action =
+          iree_hal_hip_atomic_slist_entry_pop_front(entry);
 
       switch (action->state) {
         case IREE_HAL_HIP_QUEUE_ACTION_STATE_ALIVE:
           status = iree_hal_hip_pending_queue_actions_issue_execution(action);
-          if (iree_status_is_ok(status)) action->event_count = 0;
+          if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
+            iree_hal_hip_queue_action_destroy(action);
+          }
           break;
         case IREE_HAL_HIP_QUEUE_ACTION_STATE_ZOMBIE:
-          status = iree_hal_hip_pending_queue_actions_issue_cleanup(action);
+          iree_hal_hip_pending_queue_actions_issue_cleanup(action);
           break;
       }
-      if (!iree_status_is_ok(status)) break;
+      if (IREE_UNLIKELY(!iree_status_is_ok(status))) break;
+    }
 
-      action = next_action;
+    if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
+      // Let common destruction path take care of destroying the worklist.
+      // When we know all host stream callbacks are done and not touching
+      // anything.
+      iree_hal_hip_ready_action_slist_push(worklist, entry);
+      break;
     }
 
     iree_allocator_free(host_allocator, entry);
-  } while (iree_status_is_ok(status));
+  }
 
   IREE_TRACE_ZONE_END(z0);
   return status;
+}
+
+static bool iree_hal_hip_worker_has_no_pending_work_items(
+    iree_hal_hip_working_area_t* working_area) {
+  iree_slim_mutex_lock(&working_area->pending_work_items_count_mutex);
+  bool result = (working_area->pending_work_items_count == 0);
+  iree_slim_mutex_unlock(&working_area->pending_work_items_count_mutex);
+  return result;
+}
+
+// Wait for all work items to finish.
+static void iree_hal_hip_worker_wait_pending_work_items(
+    iree_hal_hip_working_area_t* working_area) {
+  iree_notification_await(
+      &working_area->pending_work_items_count_notification,
+      (iree_condition_fn_t)iree_hal_hip_worker_has_no_pending_work_items,
+      working_area, iree_infinite_timeout());
+  // Lock then unlock to make sure that all callbacks are really done.
+  // Not even touching the notification.
+  iree_slim_mutex_lock(&working_area->pending_work_items_count_mutex);
+  iree_slim_mutex_unlock(&working_area->pending_work_items_count_mutex);
 }
 
 // The main function for the ready-list processing worker thread.
@@ -950,9 +1048,15 @@ static int iree_hal_hip_worker_execute(
 
   while (true) {
     // Block waiting for incoming requests.
+    //
+    // TODO: When exit is requested with
+    // IREE_HAL_HIP_WORKER_STATE_EXIT_REQUESTED
+    // we will return immediately causing a busy wait and hogging the CPU.
+    // We need to properly wait for action cleanups to be scheduled from the
+    // host stream callbacks.
     iree_notification_await(
         &working_area->state_notification,
-        (iree_condition_fn_t)iree_hal_hip_worker_has_incoming_request,
+        (iree_condition_fn_t)iree_hal_hip_worker_has_incoming_request_or_error,
         working_area, iree_infinite_timeout());
 
     // Immediately flip the state to idle waiting if and only if the previous
@@ -973,6 +1077,7 @@ static int iree_hal_hip_worker_execute(
                                                   iree_memory_order_acquire);
     // Exit if HIP callbacks have posted any errors.
     if (IREE_UNLIKELY(worker_state == IREE_HAL_HIP_WORKER_STATE_EXIT_ERROR)) {
+      iree_hal_hip_worker_wait_pending_work_items(working_area);
       return -1;
     }
     // Check if we received request to stop processing and exit this thread.
@@ -983,13 +1088,16 @@ static int iree_hal_hip_worker_execute(
     iree_status_t status = iree_hal_hip_worker_process_ready_list(
         working_area->host_allocator, worklist);
     if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
-      IREE_ASSERT(false && "error when processing ready list");
+      iree_hal_hip_worker_wait_pending_work_items(working_area);
       iree_hal_hip_post_error_to_worker_state(working_area,
                                               iree_status_code(status));
       return -1;
     }
 
-    if (IREE_UNLIKELY(should_exit && working_area->pending_action_count == 0)) {
+    if (IREE_UNLIKELY(
+            should_exit &&
+            iree_hal_hip_worker_has_no_pending_work_items(working_area))) {
+      iree_hal_hip_worker_wait_pending_work_items(working_area);
       // Signal that this thread is committed to exit.
       // This state has a priority that is only lower than error exit.
       // A HIP callback may have posted an error, make sure we don't
