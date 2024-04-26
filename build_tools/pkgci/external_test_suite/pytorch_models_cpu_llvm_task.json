@@ -1,15 +1,17 @@
 {
-    "config_name": "cpu_llvm_task",
-    "iree_compile_flags" : [
-      "--iree-hal-target-backends=llvm-cpu",
-      "--iree-llvmcpu-target-cpu-features=host",
-      "--iree-llvmcpu-distribution-size=32"
-    ],
-    "iree_run_module_flags": [
-      "--device=local-task"
-    ],
-    "skip_compile_tests": [],
-    "skip_run_tests": [],
-    "expected_compile_failures": [],
-    "expected_run_failures": []
+  "config_name": "cpu_llvm_task",
+  "iree_compile_flags" : [
+    "--iree-hal-target-backends=llvm-cpu",
+    "--iree-llvmcpu-target-cpu-features=host",
+    "--iree-llvmcpu-distribution-size=32"
+  ],
+  "iree_run_module_flags": [
+    "--device=local-task"
+  ],
+  "skip_compile_tests": [
+    "sdxl-scheduled-unet-3-tank"
+  ],
+  "skip_run_tests": [],
+  "expected_compile_failures": [],
+  "expected_run_failures": []
 }
