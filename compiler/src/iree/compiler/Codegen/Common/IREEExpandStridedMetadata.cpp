@@ -130,7 +130,7 @@ struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
   using OpRewritePattern<memref::ExtractStridedMetadataOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(memref::ExtractStridedMetadataOp op,
                                 PatternRewriter &rewriter) const override {
-        auto binding =
+    auto binding =
         op.getSource()
             .template getDefiningOp<IREE::HAL::InterfaceBindingSubspanOp>();
     if (!binding)
