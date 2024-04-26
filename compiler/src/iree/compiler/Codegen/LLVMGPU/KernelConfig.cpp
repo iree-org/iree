@@ -29,9 +29,14 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/Matchers.h"
+#include "mlir/IR/OperationSupport.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/IR/Types.h"
 #include "mlir/IR/Value.h"
+
+#define DEBUG_TYPE "iree-llvmgpu-kernel-config"
+#define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
+#define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler {
 
@@ -1742,51 +1747,68 @@ static LogicalResult setConvolutionConfig(linalg::LinalgOp linalgOp,
 
 static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
                                    Operation *computeOp) {
+  LLVM_DEBUG(
+    DBGS() << "Selecting root config for: ";
+    computeOp->print(llvm::dbgs(), OpPrintingFlags().skipRegions());
+    llvm::dbgs() << "\n";
+  );
   TargetInfo targetInfo = getTargetInfo(entryPointFn);
   // First try to see if there is a transform dialect configuration existing.
   if (succeeded(
           setTransformDialectConfig(entryPointFn, computeOp, targetInfo))) {
+    LDBG("Transform Dialect Config");
     return success();
   }
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(computeOp)) {
     if (clGPUEnableVectorDistribution) {
       if (succeeded(setVectorDistributionConfig(entryPointFn, linalgOp,
                                                 targetInfo))) {
+        LDBG("VectorDistribution Config");
         return success();
       }
     }
     if (succeeded(setContractConfig(entryPointFn, linalgOp, targetInfo))) {
+      LDBG("Contract Config");
       return success();
     }
     if (succeeded(setWarpReductionConfig(entryPointFn, linalgOp, targetInfo))) {
+      LDBG("Warp Reduction Config");
       return success();
     }
     if (succeeded(setConvolutionConfig(
             linalgOp, targetInfo.supportedSubgroupSizes.front(), 16))) {
+      LDBG("Convolution Config");
       return success();
     }
     auto genericOp = dyn_cast<linalg::GenericOp>(computeOp);
     if (genericOp && succeeded(setTransposeConfig(entryPointFn, genericOp))) {
+      LDBG("Transpose Config");
       return success();
     } else if (genericOp && succeeded(setArgmaxUkernelConfig(
                                 entryPointFn, genericOp, targetInfo))) {
+      LDBG("Argmax Ukernel Config");
       return success();
     }
   }
 
   if (auto fftOp = dyn_cast<IREE::LinalgExt::FftOp>(computeOp)) {
+    LDBG("FFT Config");
     return setFftConfig(entryPointFn, fftOp, targetInfo);
   }
   if (auto sortOp = dyn_cast<IREE::LinalgExt::SortOp>(computeOp)) {
+    LDBG("\tSort Config");
     return setSortConfig(entryPointFn, sortOp, targetInfo);
   }
   if (auto packOp = dyn_cast<tensor::PackOp>(computeOp)) {
+    LDBG("\tPack Config");
     return setPackConfig(entryPointFn, packOp, targetInfo);
   }
   if (auto ukernelOp = dyn_cast<IREE::Codegen::UKernelOpInterface>(computeOp)) {
+    LDBG("\tUkernel Config");
     return setUKernelConfig(entryPointFn, ukernelOp);
   }
 
+  LDBG("\tDefault Config");
   return setRootDefaultConfig(entryPointFn, computeOp, targetInfo);
 }
 
