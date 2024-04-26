@@ -53,6 +53,7 @@ iree_cc_library(
     "GPUCreateFastSlowPath.cpp"
     "GPUDistribute.cpp"
     "GPUDistributeSharedMemoryCopy.cpp"
+    "GPUDistributeScfFor.cpp"
     "GPUDistributionPatterns.cpp"
     "GPUGeneralizeNamedOps.cpp"
     "GPULowerToUKernels.cpp"

@@ -18,6 +18,7 @@ iree_lit_test_suite(
     "gpu_create_fast_slow_path.mlir"
     "gpu_distribute.mlir"
     "gpu_distribute_shared_memory.mlir"
+    "gpu_distribute_scf_for.mlir"
     "gpu_generalize_named_ops.mlir"
     "gpu_lower_to_ukernels.mlir"
     "gpu_nested_layout_contract_amdgpu.mlir"

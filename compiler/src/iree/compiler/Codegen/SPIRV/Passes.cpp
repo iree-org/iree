@@ -146,7 +146,7 @@ addSPIRVBufferizePasses(OpPassManager &funcPassManager,
   // annotations in subsequent transformations. This is a bit fragile right now
   // but we expect upstream for loops to eventually recognize distribution as a
   // first-class attribute then we don't need this.
-  funcPassManager.addPass(createSPIRVDistributePass());
+  funcPassManager.addPass(createGPUDistributeScfForPass());
   funcPassManager.addPass(memref::createResolveShapedTypeResultDimsPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
