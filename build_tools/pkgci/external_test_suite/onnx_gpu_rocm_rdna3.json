@@ -8,13 +8,12 @@
     "--device=hip"
   ],
   "skip_compile_tests": [
-    // TODO(#16666): Fix these tests hanging at runtime (miscompiles?)
     "test_dequantizelinear",
-    "test_slice_default_axes",
+    "test_slice_default_axes"
   ],
   "skip_run_tests": [],
   "expected_compile_failures": [
-    // "test_acos",
+    "test_acos",
     "test_acos_example",
     "test_acosh",
     "test_acosh_example",
@@ -608,7 +607,7 @@
     "test_unique_sorted_with_negative_axis",
     "test_unique_sorted_without_axis",
     "test_upsample_nearest",
-    "test_wrap_pad",
+    "test_wrap_pad"
   ],
   "expected_run_failures": [
     "test_add_uint8",
@@ -819,6 +818,6 @@
     "test_tril_square",
     "test_tril_square_neg",
     "test_tril_zero",
-    "test_where_long_example",
+    "test_where_long_example"
   ]
 }
