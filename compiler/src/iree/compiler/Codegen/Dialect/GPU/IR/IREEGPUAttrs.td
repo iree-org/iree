@@ -185,17 +185,14 @@ def IREEGPU_MmaScheduleAttr : AttrDef<IREEGPU_Dialect, "MMASchedule"> {
   let parameters = (ins
     "::mlir::iree_compiler::IREE::GPU::MmaInterfaceAttr":$intrinsic,
     "int64_t":$subgroup_m_count,
-    "int64_t":$subgroup_n_count,
-    "int64_t":$subgroup_m_tile_count,
-    "int64_t":$subgroup_n_tile_count,
-    "int64_t":$subgroup_k_tile_count
+    "int64_t":$subgroup_n_count
   );
 
   let assemblyFormat = "`<` struct(params) `>`";
 
   let extraClassDeclaration = [{
     // Returns the A/B/C matrix concrete layout targeting |contractOp|.
-    ::std::optional<::std::tuple<VectorExt::VectorLayoutInterface,
+    ::mlir::FailureOr<::std::tuple<VectorExt::VectorLayoutInterface,
                                  VectorExt::VectorLayoutInterface,
                                  VectorExt::VectorLayoutInterface>>
       getContractionLayout(::mlir::vector::ContractionOp contractOp) const;

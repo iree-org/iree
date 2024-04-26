@@ -679,17 +679,18 @@ NestedLayoutAttr permuteAndCreateNestedLayout(
   return layoutAttr;
 }
 
-std::optional<std::tuple<VectorExt::VectorLayoutInterface,
-                         VectorExt::VectorLayoutInterface,
-                         VectorExt::VectorLayoutInterface>>
+FailureOr<std::tuple<VectorExt::VectorLayoutInterface,
+                     VectorExt::VectorLayoutInterface,
+                     VectorExt::VectorLayoutInterface>>
 MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
   VectorContractOpInfo opInfo(contractOp);
   LLVM_DEBUG({
     llvm::errs() << "Getting mma layouts for:\n" << contractOp << "\n";
     llvm::errs() << "For schedule: " << *this << "\n";
   });
-  if (opInfo.getOpKind() == VectorContractOpInfo::OpKind::UNKNOWN)
-    return std::nullopt;
+  if (opInfo.getOpKind() == VectorContractOpInfo::OpKind::UNKNOWN) {
+    return failure();
+  }
 
   auto mmaAttr = llvm::cast<MMAAttr>(getIntrinsic());
   MLIRContext *context = getContext();
@@ -712,10 +713,20 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
   // warp+thread using the subgroup/thread basis, so the subgroup basis should
   // remain the same for all A/B/C matrix.
 
+  auto [intrinsicM, intrinsicN, intrinsicK] = mmaAttr.getMNKShape();
+
   SmallVector<int64_t, 2> subgroupMBasis;
   SmallVector<int64_t, 2> batchMSizes;
   int64_t currMCount = getSubgroupMCount();
-  int64_t currMBatch = getSubgroupMTileCount();
+
+  auto divideGreedily = [](int64_t availableSubgroups, int64_t dimSize,
+                           int64_t minDimSize) -> std::pair<int64_t, int64_t> {
+    int64_t dividableDim = dimSize / minDimSize;
+    int64_t subgroupsUsed = std::gcd(availableSubgroups, dividableDim);
+    dividableDim /= subgroupsUsed;
+    int64_t batchesUsed = dividableDim;
+    return std::make_pair(subgroupsUsed, batchesUsed);
+  };
 
   // Greedily break up the M subgroup and batch counts along the "M" iteration
   // bounds. We distribute as many residual subgroups as possible per M dim, and
@@ -724,29 +735,42 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
   // batch counts and subgroup basis will satisfy
   // totalMSize / intrinsicM = product(batchMSizes) * product(subgroupMBasis)
   for (auto dim : opInfo.getMDims()) {
-    int64_t threads = std::gcd(currMCount, bounds[dim]);
-    subgroupMBasis.push_back(threads);
-    currMCount /= threads;
-    int64_t batchCount = bounds[dim] / threads;
-    batchCount = batchCount >= currMBatch ? currMBatch : batchCount;
-    batchMSizes.push_back(batchCount);
-    currMBatch /= batchCount;
+    // Get the number of subgroups and batches used for this dimension based
+    // on the intrinsic size and the bound size.
+    int64_t subgroupsUsed, batchesUsed;
+    if (dim == opInfo.getMDims().back()) {
+      std::tie(subgroupsUsed, batchesUsed) =
+          divideGreedily(currMCount, bounds[dim], intrinsicM);
+    } else {
+      std::tie(subgroupsUsed, batchesUsed) =
+          divideGreedily(currMCount, bounds[dim], 1);
+    }
+    subgroupMBasis.push_back(subgroupsUsed);
+    batchMSizes.push_back(batchesUsed);
+    // Update available subgroup count.
+    currMCount /= subgroupsUsed;
   }
 
   SmallVector<int64_t, 2> subgroupNBasis;
   SmallVector<int64_t, 2> batchNSizes;
   int64_t currNCount = getSubgroupNCount();
-  int64_t currNBatch = getSubgroupNTileCount();
 
   // Do the same for N dims.
   for (auto dim : opInfo.getNDims()) {
-    int64_t threads = std::gcd(currNCount, bounds[dim]);
-    subgroupNBasis.push_back(threads);
-    currNCount /= threads;
-    int64_t batchCount = bounds[dim] / threads;
-    batchCount = batchCount >= currNBatch ? currNBatch : batchCount;
-    batchNSizes.push_back(batchCount);
-    currNBatch /= batchCount;
+    // Get the number of subgroups and batches used for this dimension based
+    // on the intrinsic size and the bound size.
+    int64_t subgroupsUsed, batchesUsed;
+    if (dim == opInfo.getNDims().back()) {
+      std::tie(subgroupsUsed, batchesUsed) =
+          divideGreedily(currNCount, bounds[dim], intrinsicN);
+    } else {
+      std::tie(subgroupsUsed, batchesUsed) =
+          divideGreedily(currNCount, bounds[dim], 1);
+    }
+    subgroupNBasis.push_back(subgroupsUsed);
+    batchNSizes.push_back(batchesUsed);
+    // Update available subgroup count.
+    currNCount /= subgroupsUsed;
   }
 
   SmallVector<int64_t> subgroupBasis;
@@ -855,7 +879,7 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
     aSubgroupOrder[dim] = i;
   }
   aSubgroupOrder[afk] = aRank - 1;
-  aBatchSizes[afk] = getSubgroupKTileCount();
+  aBatchSizes[afk] = bounds[opInfo.getKDims().back()] / intrinsicK;
 
   SmallVector<bool> aActiveSubgroups(subgroupBasis.size(), false);
   for (auto mDim : mDims) {
@@ -890,7 +914,7 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
     bSubgroupOrder[dim] = i;
   }
   bSubgroupOrder[bfk] = bRank - 1;
-  bBatchSizes[bfk] = getSubgroupKTileCount();
+  bBatchSizes[bfk] = bounds[opInfo.getKDims().back()] / intrinsicK;
 
   SmallVector<bool> bActiveSubgroups(subgroupBasis.size(), false);
   for (auto nDim : nDims) {
@@ -907,7 +931,10 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
       bActiveSubgroups);
   LLVM_DEBUG({ llvm::errs() << "B layout: " << bLayout << "\n"; });
 
-  return std::make_tuple(aLayout, bLayout, cLayout);
+  std::tuple<VectorLayoutInterface, VectorLayoutInterface,
+             VectorLayoutInterface>
+      result = std::make_tuple(aLayout, bLayout, cLayout);
+  return result;
 }
 
 //===----------------------------------------------------------------------===//
