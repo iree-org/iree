@@ -1963,8 +1963,29 @@ static LogicalResult setConvRootConfig(mlir::FunctionOpInterface entryPointFn,
   int64_t numTilingDims = parallelTileSizes.size();
   tileSizes.emplace_back(numTilingDims, 0);
 
+  // Set "scalable" flags
+  ScalableTileFlagsListType scalableTileFlags;
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
+  if (isAArch64(targetAttr) && hasAnySVEFeature(targetAttr) &&
+      clEnableScalableVectorization &&
+      isa<linalg::DepthwiseConv2DNhwcHwcOp>(convOp)) {
+
+    auto dims = linalg::inferConvolutionDims(convOp);
+    // Level 1: Distribution
+    scalableTileFlags.emplace_back(numTilingDims, false);
+    // Level 2: Parallel
+    SmallVector<bool> parallelScalableFlags(numTilingDims, false);
+    // Make the channel dim scalable
+    parallelScalableFlags[dims->depth[0]] = true;
+    scalableTileFlags.emplace_back(parallelScalableFlags);
+    // Level 3: Reduction
+    scalableTileFlags.emplace_back(numTilingDims, false);
+    // Level 4: Inner parallel
+    scalableTileFlags.emplace_back(numTilingDims, false);
+  }
+
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, convOp, tileSizes,
+      entryPointFn, convOp, tileSizes, scalableTileFlags,
       DispatchLoweringPassPipeline::CPUConvTileAndDecomposeExpert);
 }
 
