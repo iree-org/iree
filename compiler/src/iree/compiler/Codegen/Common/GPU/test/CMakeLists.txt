@@ -27,6 +27,7 @@ iree_lit_test_suite(
     "gpu_reorder_workgroups_static.mlir"
     "gpu_tensor_alloc.mlir"
     "gpu_tensor_tile.mlir"
+    "gpu_tile.mlir"
     "gpu_tile_reduction.mlir"
     "gpu_vector_alloc.mlir"
     "gpu_vector_distribution.mlir"

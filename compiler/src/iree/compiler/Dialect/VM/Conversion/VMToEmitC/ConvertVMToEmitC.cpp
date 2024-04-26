@@ -175,7 +175,7 @@ LogicalResult
 removeBlockArguments(IREE::VM::ModuleOp moduleOp,
                      SmallVector<BlockArgument> &blockArgsToRemove) {
   for (auto &blockArg : blockArgsToRemove) {
-    assert(blockArg.getType().isa<IREE::VM::RefType>());
+    assert(isa<IREE::VM::RefType>(blockArg.getType()));
     assert(blockArg.use_empty());
     Block *block = blockArg.getOwner();
 
@@ -2400,7 +2400,7 @@ private:
     for (size_t i = 0; i < inputTypes.size(); i++) {
       BlockArgument arg = funcOp.getArgument(i + inputOffset);
       Type argType = arg.getType();
-      assert(!argType.isa<IREE::VM::RefType>());
+      assert(!isa<IREE::VM::RefType>(argType));
 
       if (argType == emitc::PointerType::get(
                          emitc::OpaqueType::get(ctx, "iree_vm_ref_t"))) {
@@ -2421,7 +2421,7 @@ private:
             /*templateArgs=*/ArrayAttr{},
             /*operands=*/ArrayRef<Value>{arg, refPtr});
       } else {
-        assert(!argType.isa<emitc::PointerType>());
+        assert(!isa<emitc::PointerType>(argType));
         Value size =
             emitc_builders::sizeOf(builder, loc, TypeAttr::get(argType));
 
@@ -2475,7 +2475,7 @@ private:
     for (size_t i = 0; i < resultTypes.size(); i++) {
       BlockArgument arg = funcOp.getArgument(i + resultOffset);
       Type argType = arg.getType();
-      assert(!argType.isa<IREE::VM::RefType>());
+      assert(!isa<IREE::VM::RefType>(argType));
 
       if (argType == emitc::PointerType::get(
                          emitc::OpaqueType::get(ctx, "iree_vm_ref_t"))) {
@@ -3110,8 +3110,8 @@ class BranchOpConversion : public EmitCConversionPattern<IREE::VM::BranchOp> {
           continue;
         }
 
-        assert(operand.getType().isa<IREE::VM::RefType>());
-        assert(blockArg.getType().isa<IREE::VM::RefType>());
+        assert(isa<IREE::VM::RefType>(operand.getType()));
+        assert(isa<IREE::VM::RefType>(blockArg.getType()));
 
         Value operandRef = getModuleAnalysis().lookupRef(operand);
         Value blockArgRef = getModuleAnalysis().lookupRef(blockArg);
@@ -3732,7 +3732,7 @@ private:
         Type originalType =
             op.getOperation()->getOperand(operand.index()).getType();
 
-        assert(originalType.isa<IREE::VM::RefType>() && "expected ref type");
+        assert(isa<IREE::VM::RefType>(originalType) && "expected ref type");
 
         Type objectType =
             llvm::cast<IREE::VM::RefType>(originalType).getObjectType();

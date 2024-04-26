@@ -32,6 +32,8 @@
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+#include <numeric>
+
 #define DEBUG_TYPE "kernel-dispatch"
 #define KD_DBGS() (llvm::dbgs() << '[' << DEBUG_TYPE << "] ")
 
@@ -578,6 +580,175 @@ static int64_t getMaxVectorTileSize(int64_t numElem, int64_t tileSize,
   return 1;
 }
 
+// Returns true if `map` is a function of `dim` and is not a function of any
+// more inner dimensions past `dim`.
+static bool isInnerMostDimThatMapIsFunctionOf(AffineMap map, int dim) {
+  if (!map.isFunctionOfDim(dim)) {
+    return false;
+  }
+  for (int d = dim + 1; d < map.getNumDims(); ++d) {
+    if (map.isFunctionOfDim(d)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Clamps in-place `vecTileSizes`, ensuring that the resulting vector tile sizes
+// for each opearand of `op` satisfy two requirements:
+// 1. No resulting operand tile size exceeds `eachOperandMaxTileBits`.
+// 2. The sum of all resulting operand tile size does not exceed
+// `allOperandsMaxTileBits`.
+static void limitVectorTileSizes(linalg::LinalgOp op,
+                                 SmallVectorImpl<int64_t> &vecTileSizes,
+                                 int64_t eachOperandMaxTileBits,
+                                 int64_t allOperandsMaxTileBits) {
+  int numLoops = op.getNumLoops();
+  assert(numLoops == vecTileSizes.size());
+  auto indexingMaps = op.getIndexingMapsArray();
+  auto operandTypes = op->getOperandTypes();
+  int numOperands = operandTypes.size();
+
+  SmallVector<int64_t> operandElemBits =
+      llvm::map_to_vector(op->getOperandTypes(), [](Type t) -> int64_t {
+        return getElementTypeOrSelf(t).getIntOrFloatBitWidth();
+      });
+
+  // For each operand, we track how big the tile is going to be based on the
+  // dimensions that we have already accounted for. Here we initialize this to
+  // just elemBitWidth, having not yet accounted for any array dimension.
+  SmallVector<int64_t> tileBits;
+  for (auto bits : operandElemBits) {
+    if (bits > eachOperandMaxTileBits) {
+      // eachOperandMaxTileBits is too small for this requirement to be
+      // satisfied. Early-returning. This might conceivably happen due to the
+      // tail-recursion in this function, where eachOperandMaxTileBits is
+      // halved.
+      return;
+    }
+    tileBits.push_back(bits);
+  }
+
+  // For each loop, we must make sure that if it's the inner-most dimension that
+  // concerns an operand with a not-multiple-of-8-bit element type, we preserve
+  // the requirement that the inner-most tile dimension is a multiple of 8 bits.
+  // For example, if the element type is `i2`, the minimum inner tile size is
+  // 8/2 = 4. If the element type if i6, since gcd(8, 6) = 2, we are in the same
+  // situation and the minimum inner tile size is again 8/2 = 4.
+  // TODO(#17178): check this actually works when we have such element types.
+  SmallVector<int64_t> minVecTileSizes(numLoops, 1);
+  for (int loopNum : llvm::seq<int>(0, numLoops)) {
+    for (int i : llvm::seq<int>(0, numOperands)) {
+      if (isInnerMostDimThatMapIsFunctionOf(indexingMaps[i], loopNum)) {
+        if (operandElemBits[i] % 8) {
+          minVecTileSizes[loopNum] = std::max(
+              minVecTileSizes[loopNum], 8 / std::gcd(8, operandElemBits[i]));
+        }
+      }
+    }
+  }
+
+  // For each loop starting from the inner-most, clamp vecTileSizes to honor
+  // `eachOperandMaxTileBits`, to the extent permitted by `minVecTileSizes`
+  // (which is a harder requirement).
+  for (int loopNum : llvm::reverse(llvm::seq<int>(0, numLoops))) {
+    // Skip 0 vecTileSizes, want to preserve them as 0.
+    if (vecTileSizes[loopNum] == 0) {
+      continue;
+    }
+    for (int i : llvm::seq<int>(0, numOperands)) {
+      // Check if this operand is concerned with this loop.
+      if (!indexingMaps[i].isFunctionOfDim(loopNum)) {
+        continue;
+      }
+      int64_t oldVal = vecTileSizes[loopNum];
+      int64_t maxVal = std::max(minVecTileSizes[loopNum],
+                                eachOperandMaxTileBits / tileBits[i]);
+      int64_t adjustedVal = std::min(oldVal, maxVal);
+      // If we are adjusting a tile size, make sure that the adjusted tile size
+      // is a power-of-two, as introducing non-power-of-two tile sizes can be a
+      // major performance regression, e.g. a 30% e2e regression in MobileNetV2
+      // just from a single occurrence in a DepthwiseConv (example discussed
+      // below in this comment).
+      //
+      // We round the adjustedVal to the nearest power of two /below/ not
+      // /above/ because doing that could make the entire adjustment a
+      // no-operation (e.g. from 8 to 5 back to 8) and then would trigger the
+      // tail recursion with halved eachOperandMaxTileBits, which would result
+      // in more aggressive tile size limitation. E.g. in MobileNetV2 on AVX-512
+      // we have a DepthwiseConv with
+      //   vecTileSizes = [1 1 8 16 1 3],
+      // without this adjustment, this becomes
+      //   vecTileSizes = [1 1 5 16 1 3].
+      // If we round this 5 back to 8, letting this function tail-recurse, we
+      // end up with this much narrower final result:
+      //   vecTileSizes = [1 1 2 16 1 3].
+      // It is best to round this 5 to 4, obtaining
+      //   vecTileSizes = [1 1 4 16 1 3].
+      //
+      // The above example also shows that some non-power-of-two tile sizes
+      // are not getting adjusted, and should not be rounded to nearest
+      // power-of-two: the inner-most dimension size 3 above.
+      if (adjustedVal != oldVal) {
+        // Round to nearest power of 2, rounding down.
+        adjustedVal = 1L << llvm::Log2_64(adjustedVal);
+      }
+      vecTileSizes[loopNum] = adjustedVal;
+      tileBits[i] *= adjustedVal;
+    }
+  }
+
+  // At this point we have satisfied our entry-wise requirements on
+  // `vecTileSizes`, but there is still the possibility that the sum of all
+  // operand tiles' bit sizes exceeds `allOperandsMaxTileBits`. Tail-recurse
+  // with halved `eachOperandMaxTileBits` until that requirement is satisfied.
+  // Note that if `eachOperandMaxTileBits` falls below some element type bit
+  // width, it will trigger an early-return above, so we don't need to worry
+  // about that here.
+  if (std::reduce(tileBits.begin(), tileBits.end()) > allOperandsMaxTileBits) {
+    limitVectorTileSizes(op, vecTileSizes, eachOperandMaxTileBits / 2,
+                         allOperandsMaxTileBits);
+  }
+}
+
+// Returns the size in bits of SIMD register space, or 0 if it can't be
+// determined (e.g. Arm SVE).
+static int getRegisterSpaceBitsIfKnown(IREE::HAL::ExecutableTargetAttr target) {
+  if (isX86(target)) {
+    if (hasFeature(target, "+avx512f")) {
+      return 32 * 512;
+    } else if (hasFeature(target, "+avx") || hasFeature(target, "+avx2")) {
+      return 16 * 256;
+    } else {
+      return 16 * 128;
+    }
+  } else if (isAArch64(target)) {
+    // Can't determine register space size at compile time on SVE.
+    if (hasFeature(target, "+sve") || hasFeature(target, "+sve2")) {
+      return 0;
+    }
+    // 32 NEON registers (128-bit each).
+    return 32 * 128;
+  } else {
+    // Don't know register space size as a compile-time constant on other
+    // architectures.
+    return 0;
+  }
+}
+
+// Clamps in-place vecTileSizes to ensure that the tile sizes of all operands of
+// `op` can simultaneously be allocated in SIMD registers. Does nothing when
+// SIMD register space can't be determined as a compile-time constant (e.g. Arm
+// SVE).
+static void limitVectorTileSizes(linalg::LinalgOp op,
+                                 SmallVectorImpl<int64_t> &vecTileSizes) {
+  if (int registerSpaceBits = getRegisterSpaceBitsIfKnown(
+          IREE::HAL::ExecutableTargetAttr::lookup(op))) {
+    limitVectorTileSizes(op, vecTileSizes, registerSpaceBits,
+                         registerSpaceBits);
+  }
+}
+
 /// Struct that holds factors for heuristic distribution tile sizes selection.
 /// The `minTileSizes`, `maxTileSizes` and `vectorSizeHints` can be empty or
 /// as many as the number of loops.
@@ -886,6 +1057,7 @@ setMatmulRootConfig(mlir::FunctionOpInterface entryPointFn,
     // fallback to fixed vectorization if they occur:
     parallelScalableFlags.push_back(sz > 1 ? isScalable : false);
   }
+  limitVectorTileSizes(cast<linalg::LinalgOp>(op.getOperation()), vecTileSizes);
   SmallVector<int64_t> parallelTileSizes = vecTileSizes;
   SmallVector<int64_t> reductionTileSizes;
   SmallVector<bool> reductionScalableFlags;
@@ -1339,6 +1511,7 @@ static TileSizesListType getMmt4dTileSizes(linalg::LinalgOp op) {
   vecTileSizes[mmt4dDimBase + 3] = M0;
   vecTileSizes[mmt4dDimBase + 4] = N0;
   vecTileSizes[mmt4dDimBase + 5] = K0;
+  limitVectorTileSizes(op, vecTileSizes);
   SmallVector<int64_t> parallelTileSizes = vecTileSizes;
   SmallVector<int64_t> reductionTileSizes;
   splitParallelAndReductionTiles(op, parallelTileSizes, reductionTileSizes);
@@ -1499,45 +1672,37 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
       entryPointFn, fftOp, tileSizes, DispatchLoweringPassPipeline::CPUDefault);
 }
 
-/// Sets the lowering configuration for dispatch region for
-/// linalg_ext.winograd.input_transform root op.
+/// Sets the lowering configuration for dispatch region for winograd ops:
+///   linalg_ext.winograd.filter_transform
+///   linalg_ext.winograd.input_transform
+///   linalg_ext.winograd.output_transform
+/// The vector tile sizes should be 1 for each dim here, because
+/// the winograd decomposition relies on these unit dimensions.
+template <typename WinogradOp>
 static LogicalResult
-setRootConfig(mlir::FunctionOpInterface entryPointFn,
-              IREE::LinalgExt::WinogradInputTransformOp inputOp) {
-  assert(!getLoweringConfig(inputOp) && "expected lowering_config is not set");
-  auto iterationRank = inputOp.getIterationDomainRank();
+setWinogradRootConfig(mlir::FunctionOpInterface entryPointFn,
+                      WinogradOp winogradOp) {
+  static_assert(
+      std::is_same<WinogradOp, IREE::LinalgExt::WinogradInputTransformOp>() ||
+          std::is_same<WinogradOp,
+                       IREE::LinalgExt::WinogradOutputTransformOp>() ||
+          std::is_same<WinogradOp,
+                       IREE::LinalgExt::WinogradFilterTransformOp>(),
+      "op expected to be a winograd op");
+  assert(!getLoweringConfig(winogradOp) &&
+         "expected lowering_config is not set");
+  auto iterationRank = winogradOp.getIterationDomainRank();
   SmallVector<int64_t> vecSizeHints(iterationRank, 1);
   DistributionHeuristicConfig distConfig;
   distConfig.vectorSizeHints = vecSizeHints;
   SmallVector<int64_t> distTileSizes =
-      getDefaultDistributedLevelTileSizes(inputOp, distConfig);
+      getDefaultDistributedLevelTileSizes(winogradOp, distConfig);
   TileSizesListType tileSizes;
   tileSizes.push_back(distTileSizes);
   SmallVector<int64_t> vecTileSizes(iterationRank, 1);
   tileSizes.push_back(vecTileSizes);
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, inputOp, tileSizes,
-      DispatchLoweringPassPipeline::CPULinalgExtTileAndVectorize);
-}
-
-/// Sets the lowering configuration for dispatch region for
-/// linalg_ext.winograd.input_transform root op.
-static LogicalResult
-setRootConfig(mlir::FunctionOpInterface entryPointFn,
-              IREE::LinalgExt::WinogradOutputTransformOp outputOp) {
-  assert(!getLoweringConfig(outputOp) && "expected lowering_config is not set");
-  auto iterationRank = outputOp.getIterationDomainRank();
-  SmallVector<int64_t> vecSizeHints(iterationRank, 1);
-  DistributionHeuristicConfig distConfig;
-  distConfig.vectorSizeHints = vecSizeHints;
-  SmallVector<int64_t> distTileSizes =
-      getDefaultDistributedLevelTileSizes(outputOp, distConfig);
-  TileSizesListType tileSizes;
-  tileSizes.push_back(distTileSizes);
-  SmallVector<int64_t> vecTileSizes(iterationRank, 1);
-  tileSizes.push_back(vecTileSizes);
-  return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, outputOp, tileSizes,
+      entryPointFn, winogradOp, tileSizes,
       DispatchLoweringPassPipeline::CPULinalgExtTileAndVectorize);
 }
 
@@ -1633,6 +1798,7 @@ setDefaultGenericOpRootConfig(mlir::FunctionOpInterface entryPointFn,
   SmallVector<int64_t> vecTileSizes;
   setVectorTileSizes(genericOp, distTileSizes, distConfig.minTileSizes,
                      distConfig.maxTileSizes, vecPreProcStrategy, vecTileSizes);
+  limitVectorTileSizes(genericOp, vecTileSizes);
   SmallVector<int64_t> parallelTileSizes = vecTileSizes;
   SmallVector<int64_t> reductionTileSizes;
   splitParallelAndReductionTiles(genericOp, parallelTileSizes,
@@ -1952,6 +2118,7 @@ static LogicalResult setConvRootConfig(mlir::FunctionOpInterface entryPointFn,
           getMaxVectorTileSize(tileSize, vecTileSizes[i], vectorSize);
     }
   }
+  limitVectorTileSizes(convOp, vecTileSizes);
   SmallVector<int64_t> parallelTileSizes = vecTileSizes;
   SmallVector<int64_t> reductionTileSizes;
   splitParallelAndReductionTiles(convOp, parallelTileSizes, reductionTileSizes);
@@ -1963,8 +2130,29 @@ static LogicalResult setConvRootConfig(mlir::FunctionOpInterface entryPointFn,
   int64_t numTilingDims = parallelTileSizes.size();
   tileSizes.emplace_back(numTilingDims, 0);
 
+  // Set "scalable" flags
+  ScalableTileFlagsListType scalableTileFlags;
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
+  if (isAArch64(targetAttr) && hasAnySVEFeature(targetAttr) &&
+      clEnableScalableVectorization &&
+      isa<linalg::DepthwiseConv2DNhwcHwcOp>(convOp)) {
+
+    auto dims = linalg::inferConvolutionDims(convOp);
+    // Level 1: Distribution
+    scalableTileFlags.emplace_back(numTilingDims, false);
+    // Level 2: Parallel
+    SmallVector<bool> parallelScalableFlags(numTilingDims, false);
+    // Make the channel dim scalable
+    parallelScalableFlags[dims->depth[0]] = true;
+    scalableTileFlags.emplace_back(parallelScalableFlags);
+    // Level 3: Reduction
+    scalableTileFlags.emplace_back(numTilingDims, false);
+    // Level 4: Inner parallel
+    scalableTileFlags.emplace_back(numTilingDims, false);
+  }
+
   return setOpConfigAndEntryPointFnTranslation(
-      entryPointFn, convOp, tileSizes,
+      entryPointFn, convOp, tileSizes, scalableTileFlags,
       DispatchLoweringPassPipeline::CPUConvTileAndDecomposeExpert);
 }
 
@@ -2105,11 +2293,13 @@ setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
                                targetMLTransInfo);
         })
         .Case<IREE::LinalgExt::AttentionOp, IREE::LinalgExt::FftOp,
-              IREE::LinalgExt::WinogradInputTransformOp,
-              IREE::LinalgExt::WinogradOutputTransformOp, tensor::PackOp,
-              tensor::PadOp, tensor::UnPackOp, linalg::Mmt4DOp,
+              tensor::PackOp, tensor::PadOp, tensor::UnPackOp, linalg::Mmt4DOp,
               linalg::BatchMmt4DOp>(
             [&](auto op) { return setRootConfig(entryPointFn, op); })
+        .Case<IREE::LinalgExt::WinogradFilterTransformOp,
+              IREE::LinalgExt::WinogradInputTransformOp,
+              IREE::LinalgExt::WinogradOutputTransformOp>(
+            [&](auto op) { return setWinogradRootConfig(entryPointFn, op); })
         .Case<linalg::Conv2DNhwcHwcfOp, linalg::Conv2DNchwFchwOp,
               linalg::PoolingNhwcSumOp, linalg::PoolingNhwcMaxOp,
               linalg::PoolingNhwcMaxUnsignedOp, linalg::PoolingNhwcMinOp,
@@ -2289,6 +2479,7 @@ adjustTileSizesForGenericOp(mlir::FunctionOpInterface entryPointFn,
         roundUpToPow2(std::min(vecTileSize, vecSize),
                       vecPreProcStrategy == VectorPreProcStrategy::Masking);
   }
+  limitVectorTileSizes(genericOp, vecTileSizes);
   splitParallelAndReductionTiles(genericOp, vecTileSizes, reductionTileSizes,
                                  &parallelScalableFlags,
                                  &reductionScalableFlags);

@@ -38,7 +38,7 @@ struct StoreLoadLikeOpRewriter : public OpRewritePattern<StoreLoadLikeOp> {
   LogicalResult matchAndRewrite(StoreLoadLikeOp storeLoadLikeOp,
                                 PatternRewriter &rewriter) const override {
     Value srcMemRef = getSrcMemRef(storeLoadLikeOp);
-    auto ldTy = srcMemRef.getType().cast<MemRefType>();
+    auto ldTy = cast<MemRefType>(srcMemRef.getType());
     unsigned storeLoadRank = ldTy.getRank();
     // Don't waste compile time if there is nothing to rewrite.
     if (storeLoadRank == 0)

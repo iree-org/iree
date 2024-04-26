@@ -151,9 +151,6 @@ std::unique_ptr<InterfacePass<FunctionOpInterface>>
 createSPIRVTileAndPromotePass(bool promoteCMatrix = false,
                               bool skipThreadLevel = false);
 
-/// Pass to tile Linalg ops with tensor semantics to invocations.
-std::unique_ptr<InterfacePass<FunctionOpInterface>> createSPIRVTilePass();
-
 /// Pass to tile Linalg ops with buffer semantics suitable for lowering to
 /// SPIR-V cooperative ops.
 std::unique_ptr<InterfacePass<FunctionOpInterface>>

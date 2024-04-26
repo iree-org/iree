@@ -124,9 +124,9 @@ static TypedAttr tryNarrowPatternBits(TypedAttr patternAttr) {
   // Get the old pattern bitcast to an APInt. Splats are bitwise operations
   // and we don't care what the value originally was.
   APInt oldPattern;
-  if (auto floatAttr = patternAttr.dyn_cast<FloatAttr>()) {
+  if (auto floatAttr = dyn_cast<FloatAttr>(patternAttr)) {
     oldPattern = floatAttr.getValue().bitcastToAPInt();
-  } else if (auto intAttr = patternAttr.dyn_cast<IntegerAttr>()) {
+  } else if (auto intAttr = dyn_cast<IntegerAttr>(patternAttr)) {
     oldPattern = intAttr.getValue();
   } else {
     // Can't handle today.

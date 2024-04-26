@@ -109,11 +109,11 @@ func.func @_wino_input_dispatch_0() {
 // CHECK-SAME:               %[[ARG4]], %[[ARG6]]] [8, 8, 1, 1, 1, 1] [1, 1, 1, 1, 1, 1] : tensor<8x8xf32> into
 // CHECK-SAME:               tensor<8x8x1x2x2x32xf32>
 // CHECK:                  scf.yield %[[INSERTED_SLICE_3]] : tensor<8x8x1x2x2x32xf32>
-// CHECK:                } {iree.spirv.distribute_dim = 0 : index}
+// CHECK:                } {iree.gpu.distribute_dim = 0 : index}
 // CHECK:                scf.yield %[[D13]] : tensor<8x8x1x2x2x32xf32>
-// CHECK:              } {iree.spirv.distribute_dim = 1 : index}
+// CHECK:              } {iree.gpu.distribute_dim = 1 : index}
 // CHECK:              scf.yield %[[D10]] : tensor<8x8x1x2x2x32xf32>
-// CHECK:            } {iree.spirv.distribute_dim = 2 : index}
+// CHECK:            } {iree.gpu.distribute_dim = 2 : index}
 // CHECK:            flow.dispatch.tensor.store %[[D7]], %[[D2]], offsets = [0, 0, %[[ARG0]], 0, 0, %[[ARG1]]], sizes =
 // CHECK-SAME:         [8, 8, 1, 2, 2, 32], strides = [1, 1, 1, 1, 1, 1] : tensor<8x8x1x2x2x32xf32> ->
 // CHECK-SAME:         !flow.dispatch.tensor<writeonly:tensor<8x8x2x2x2x1280xf32>>

@@ -67,6 +67,7 @@ iree_cc_library(
     MLIRMemRefDialect
     MLIRMemRefTransforms
     MLIRPass
+    MLIRSCFDialect
     MLIRTensorDialect
     MLIRTensorTransforms
     MLIRTransformUtils

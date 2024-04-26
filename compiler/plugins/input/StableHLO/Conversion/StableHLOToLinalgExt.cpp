@@ -484,9 +484,9 @@ struct ScanOpConversion final
     }
 
     auto input0 = inputs.front();
-    auto input0Ty = input0.getType().cast<ShapedType>();
+    auto input0Ty = cast<ShapedType>(input0.getType());
     auto init0 = op.getInitValues().front();
-    auto init0Ty = init0.getType().cast<ShapedType>();
+    auto init0Ty = cast<ShapedType>(init0.getType());
 
     auto window = llvm::to_vector(op.getWindowDimensions());
     llvm::SmallVector<int64_t, 4> reduceAxes;

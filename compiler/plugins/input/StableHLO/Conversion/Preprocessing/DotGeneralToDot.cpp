@@ -382,9 +382,9 @@ struct DotVectorOptimization final : OpRewritePattern<mlir::stablehlo::DotOp> {
     Value lhs = op.getLhs();
     Value rhs = op.getRhs();
 
-    ShapedType lhsTy = lhs.getType().cast<ShapedType>();
-    ShapedType rhsTy = rhs.getType().cast<ShapedType>();
-    ShapedType resultTy = op.getType().cast<ShapedType>();
+    ShapedType lhsTy = cast<ShapedType>(lhs.getType());
+    ShapedType rhsTy = cast<ShapedType>(rhs.getType());
+    ShapedType resultTy = cast<ShapedType>(op.getType());
 
     llvm::SmallVector<int64_t> dotShape;
     if (lhsTy.getRank() == 2 && lhsTy.getDimSize(0) == 1) {

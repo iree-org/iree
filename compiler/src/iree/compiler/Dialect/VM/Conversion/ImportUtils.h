@@ -126,7 +126,7 @@ rewriteToCall(T op, Adaptor adaptor, IREE::VM::ImportOp importOp,
     state.addAttribute("segment_types",
                        rewriter.getArrayAttr(llvm::map_to_vector(
                            importType.getInputs(), [&](Type type) {
-                             return TypeAttr::get(type).cast<Attribute>();
+                             return cast<Attribute>(TypeAttr::get(type));
                            })));
   }
 

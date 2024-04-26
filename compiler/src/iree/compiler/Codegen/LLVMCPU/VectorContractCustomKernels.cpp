@@ -168,7 +168,7 @@ static Value getUnpromotedInput(Type unpromotedType, Type promotedType,
 // Helper to create a 1D, contiguous slice of a 1D vector.
 static Value extract1DSlice(PatternRewriter &rewriter, Location loc,
                             VectorType dstVecType, Value input, int position) {
-  assert(input.getType().cast<VectorType>().getRank() == 1);
+  assert(cast<VectorType>(input.getType()).getRank() == 1);
   assert(dstVecType.getRank() == 1);
   std::array<int64_t, 1> offsets{position};
   std::array<int64_t, 1> strides{1};
@@ -742,7 +742,7 @@ private:
                        VectorType expectedType) {
       assert(vals.size() == expectedSize);
       for (const auto &val : vals) {
-        assert(val.getType().dyn_cast<VectorType>() == expectedType);
+        assert(dyn_cast<VectorType>(val.getType()) == expectedType);
         (void)val;
       }
       (void)expectedSize;

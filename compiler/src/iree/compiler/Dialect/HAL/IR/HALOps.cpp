@@ -384,7 +384,7 @@ void TensorImportOp::build(OpBuilder &builder, OperationState &result,
                            TypeAttr targetEncoding, Value waitFence,
                            StringAttr name) {
   auto shapedType = llvm::cast<ShapedType>(resultType);
-  assert((source.getType().isa<IREE::HAL::BufferViewType>() ||
+  assert((isa<IREE::HAL::BufferViewType>(source.getType()) ||
           shapedType.hasStaticShape()) &&
          "can only use this constructor for buffer views when shape "
          "information is required");
@@ -601,7 +601,7 @@ verifyWorkgroupCountRegion(Operation *op, ValueRange workload, Region &region) {
   // Verify the workload operands match the expected capture args.
   auto regionArguments =
       llvm::make_filter_range(region.getArgumentTypes(), [](Type type) {
-        return !type.isa<IREE::HAL::DeviceType>();
+        return !isa<IREE::HAL::DeviceType>(type);
       });
   if (workload.size() != llvm::range_size(regionArguments)) {
     return op->emitOpError()

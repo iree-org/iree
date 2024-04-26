@@ -55,7 +55,6 @@ iree_cc_library(
     MLIRTransformDialectTransforms
     MLIRViewLikeInterface
     iree::compiler::Codegen::Interfaces::UKernelOpInterface
-    iree::compiler::Codegen::Utils
     iree::compiler::Dialect::HAL::IR
   PUBLIC
 )

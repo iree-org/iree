@@ -117,8 +117,8 @@ verifyGPUMatmulPipeline(Operation *op,
   // Get Operand/Result types.
   mlir::Type lhsType = op->getOperand(0).getType();
   mlir::Type rhsType = op->getOperand(1).getType();
-  assert(lhsType.cast<ShapedType>().getElementType() ==
-             rhsType.cast<ShapedType>().getElementType() &&
+  assert(cast<ShapedType>(lhsType).getElementType() ==
+             cast<ShapedType>(rhsType).getElementType() &&
          "expected lhs and rhs to have same type. Mixed input types are not "
          "supported yet in IREE Codegen.");
 

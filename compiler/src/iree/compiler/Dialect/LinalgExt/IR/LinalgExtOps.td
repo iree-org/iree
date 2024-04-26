@@ -140,10 +140,7 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
 
     int64_t getIndexDepth() {
-      return getDpsInputOperand(1)
-          ->get()
-          .getType()
-          .cast<ShapedType>()
+      return cast<ShapedType>(getDpsInputOperand(1)->get().getType())
           .getShape()
           .back();
     }
@@ -153,7 +150,7 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
     }
 
     ShapedType getUpdateType() {
-      return updates().getType().cast<ShapedType>();
+      return cast<ShapedType>(updates().getType());
     }
 
     Value indices() {
@@ -161,7 +158,7 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
     }
 
     ShapedType getIndicesType() {
-      return indices().getType().cast<ShapedType>();
+      return cast<ShapedType>(indices().getType());
     }
 
     Value original() {
@@ -169,11 +166,11 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
     }
 
     ShapedType getOriginalType() {
-      return original().getType().cast<ShapedType>();
+      return cast<ShapedType>(original().getType());
     }
 
     int64_t getUpdateSliceRank() {
-      return updates().getType().cast<ShapedType>().getRank() - 1;
+      return cast<ShapedType>(updates().getType()).getRank() - 1;
     }
 
     bool isScalarUpdate() {
@@ -222,7 +219,7 @@ def IREELinalgExt_SortOp : IREELinalgExt_Op<"sort",
       return getOutputs()[index];
     }
     ShapedType getOperandType(int index) {
-      return operand(index).getType().cast<ShapedType>();
+      return cast<ShapedType>(operand(index).getType());
     }
     int64_t getOperandRank() {
       return getOperandType(0).getRank();
@@ -289,7 +286,7 @@ def IREELinalgExt_FftOp : IREELinalgExt_Op<"fft", [
       return getInputs()[2];
     }
     ShapedType getOperandType() {
-      return getReal().getType().cast<ShapedType>();
+      return cast<ShapedType>(getReal().getType());
     }
     int64_t getOperandRank() {
       return getOperandType().getRank();
@@ -356,7 +353,7 @@ def IREELinalgExt_ScanOp : IREELinalgExt_Op<"scan",
       return getDpsInitOperand(0)->get();
     }
     ShapedType getOperandType() {
-      return input().getType().cast<ShapedType>();
+      return cast<ShapedType>(input().getType());
     }
     int64_t getOperandRank() {
       return getOperandType().getRank();
@@ -406,7 +403,7 @@ def IREELinalgExt_ReverseOp : IREELinalgExt_Op<"reverse", [
       return getDpsInitOperand(0)->get();
     }
     ShapedType getOperandType() {
-      return input().getType().cast<ShapedType>();
+      return cast<ShapedType>(input().getType());
     }
     int64_t getOperandRank() {
       return getOperandType().getRank();
@@ -493,7 +490,7 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
       return getDpsInitOperand(1)->get();
     }
     ShapedType getInputType() {
-      return values().getType().cast<ShapedType>();
+      return cast<ShapedType>(values().getType());
     }
     int64_t getInputRank() {
       return getInputType().getRank();
@@ -593,29 +590,29 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
       return getDpsInitOperand(2)->get();
     }
     ShapedType getQueryType() {
-      return getQuery().getType().cast<ShapedType>();
+      return cast<ShapedType>(getQuery().getType());
     }
     ShapedType getKeyType() {
-      return getKey().getType().cast<ShapedType>();
+      return cast<ShapedType>(getKey().getType());
     }
     ShapedType getValueType() {
-      return getValue().getType().cast<ShapedType>();
+      return cast<ShapedType>(getValue().getType());
     }
     FloatType getScaleType() {
-      return getScale().getType().cast<FloatType>();
+      return cast<FloatType>(cast<ShapedType>(getScale().getType()));
     }
     ShapedType getOutputType() {
-      return getOutput().getType().cast<ShapedType>();
+      return cast<ShapedType>(getOutput().getType());
     }
     std::optional<ShapedType> getMaxType() {
       std::optional<Value> maxVal = getMax();
       if (!maxVal) return std::nullopt;
-      return maxVal->getType().cast<ShapedType>();
+      return cast<ShapedType>(maxVal->getType());
     }
     std::optional<ShapedType> getSumType() {
       std::optional<Value> sumVal = getSum();
       if (!sumVal) return std::nullopt;
-      return sumVal->getType().cast<ShapedType>();
+      return cast<ShapedType>(sumVal->getType());
     }
     int64_t getQueryRank() {
       return getQueryType().getRank();
@@ -769,12 +766,12 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
 
     // Return the output type.
     ShapedType getOutputType() {
-      return getOutput().getType().cast<ShapedType>();
+      return cast<ShapedType>(getOutput().getType());
     }
 
     // Return the input type.
     ShapedType getInputType() {
-      return getInput().getType().cast<ShapedType>();
+      return cast<ShapedType>(getInput().getType());
     }
 
     // Return the output shape.
@@ -912,12 +909,12 @@ def IREELinalgExt_UnPackOp : IREELinalgExt_Op<"unpack", [
 
     // Return the output type.
     ShapedType getOutputType() {
-      return getOutput().getType().cast<ShapedType>();
+      return cast<ShapedType>(getOutput().getType());
     }
 
     // Return the input type.
     ShapedType getInputType() {
-      return getInput().getType().cast<ShapedType>();
+      return cast<ShapedType>(getInput().getType());
     }
 
     // Return the output shape.
@@ -972,10 +969,10 @@ def IREELinalgExt_SetEncodingOp : IREELinalgExt_PureOp<"set_encoding",[
 
   let extraClassDeclaration = [{
     RankedTensorType getSourceType() {
-      return getSource().getType().cast<RankedTensorType>();
+      return cast<RankedTensorType>(getSource().getType());
     }
     RankedTensorType getResultType() {
-      return getResult().getType().cast<RankedTensorType>();
+      return cast<RankedTensorType>(getResult().getType());
     }
   }];
 }
@@ -1019,10 +1016,10 @@ def IREELinalgExt_UnsetEncodingOp : IREELinalgExt_PureOp<"unset_encoding", [
 
   let extraClassDeclaration = [{
     RankedTensorType getSourceType() {
-      return getSource().getType().cast<RankedTensorType>();
+      return cast<RankedTensorType>(getSource().getType());
     }
     RankedTensorType getResultType() {
-      return getResult().getType().cast<RankedTensorType>();
+      return cast<RankedTensorType>(getResult().getType());
     }
   }];
 }
@@ -1106,10 +1103,10 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
       return getOutputType();
     }
     ShapedType getInputType() {
-      return input().getType().cast<ShapedType>();
+      return cast<ShapedType>(input().getType());
     }
     ShapedType getOutputType() {
-      return output().getType().cast<ShapedType>();
+      return cast<ShapedType>(output().getType());
     }
     int64_t getInputRank() {
       return getInputType().getRank();
@@ -1158,7 +1155,12 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
 }
 
 def IREELinalgExt_WinogradFilterTransformOp : IREELinalgExt_Op<"winograd.filter_transform",
-    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>]> {
+    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+     DeclareOpInterfaceMethods<TilingInterface,
+      ["getIterationDomain",
+       "getLoopIteratorTypes",
+       "getResultTilePosition",
+       "getTiledImplementation"]>]> {
   let summary = "Winograd Filter Transform operator";
   let description = [{
     This operator is part of the first step in converting a convolution to
@@ -1206,10 +1208,10 @@ def IREELinalgExt_WinogradFilterTransformOp : IREELinalgExt_Op<"winograd.filter_
       return getDpsInitOperand(0)->get();
     }
     ShapedType getInputType() {
-      return input().getType().cast<ShapedType>();
+      return cast<ShapedType>(input().getType());
     }
     ShapedType getOutputType() {
-      return output().getType().cast<ShapedType>();
+      return cast<ShapedType>(output().getType());
     }
     Value getOriginalOperand() {
       return input();
@@ -1327,10 +1329,10 @@ def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_
       return getDpsInitOperand(0)->get();
     }
     ShapedType getInputType() {
-      return input().getType().cast<ShapedType>();
+      return cast<ShapedType>(input().getType());
     }
     ShapedType getOutputType() {
-      return output().getType().cast<ShapedType>();
+      return cast<ShapedType>(output().getType());
     }
     Value getOriginalOperand() {
       return output();

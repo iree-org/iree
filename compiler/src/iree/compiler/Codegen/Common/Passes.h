@@ -16,6 +16,7 @@
 
 #include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/Bufferization/IR/BufferizableOpInterface.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Pass/Pass.h"
@@ -229,8 +230,7 @@ std::unique_ptr<OperationPass<ModuleOp>> createMaterializeUserConfigsPass();
 
 /// Pass to optimize vector transfer_read and transfer_write.
 std::unique_ptr<InterfacePass<FunctionOpInterface>>
-createOptimizeVectorTransferPass(bool flatten = false,
-                                 bool dropUnitDims = true);
+createOptimizeVectorTransferPass(bool flatten = false);
 
 /// Pad dynamic alloc op to convert them into static one.
 std::unique_ptr<InterfacePass<FunctionOpInterface>> createPadDynamicAlloc();

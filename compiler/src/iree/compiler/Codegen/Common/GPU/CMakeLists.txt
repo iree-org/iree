@@ -64,6 +64,7 @@ iree_cc_library(
     "GPUTensorAlloc.cpp"
     "GPUTensorTile.cpp"
     "GPUTensorTileToSerialLoops.cpp"
+    "GPUTile.cpp"
     "GPUTileReduction.cpp"
     "GPUVectorAlloc.cpp"
     "GPUVectorDistribution.cpp"

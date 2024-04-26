@@ -45,8 +45,8 @@ getCastOpOfElementWiseCast(linalg::GenericOp genericOp) {
     return std::nullopt;
   }
   Value castIn = castOp->getOperand(0);
-  if (castIn.isa<BlockArgument>() &&
-      castIn.cast<BlockArgument>().getArgNumber() != 0) {
+  if (isa<BlockArgument>(castIn) &&
+      cast<BlockArgument>(castIn).getArgNumber() != 0) {
     return std::nullopt;
   }
   return castOp;
@@ -483,9 +483,9 @@ getFlagForUserAndOperandTypes(IREE::LinalgExt::EncodingAttr encoding,
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_NONE;
   }
 
-  Type lhs = operandTypes[0].cast<TypeAttr>().getValue();
-  Type rhs = operandTypes[1].cast<TypeAttr>().getValue();
-  Type out = operandTypes[2].cast<TypeAttr>().getValue();
+  Type lhs = cast<TypeAttr>(operandTypes[0]).getValue();
+  Type rhs = cast<TypeAttr>(operandTypes[1]).getValue();
+  Type out = cast<TypeAttr>(operandTypes[2]).getValue();
 
   if (lhs.isF32() && rhs.isF32() && out.isF32()) {
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_F32F32F32;
@@ -526,7 +526,7 @@ matchDAGForUKernel(RewriterBase &rewriter, IREE::Codegen::QueryTileSizesOp op,
   if (!hasUkernel(targetAttr, ukernelName)) {
     return failure();
   }
-  auto tensorType = op.getTensorType().dyn_cast<RankedTensorType>();
+  auto tensorType = dyn_cast<RankedTensorType>(op.getTensorType());
   if (!tensorType) {
     return rewriter.notifyMatchFailure(op,
                                        "need a ranked tensor type attribute");

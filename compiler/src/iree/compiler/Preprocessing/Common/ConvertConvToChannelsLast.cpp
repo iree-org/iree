@@ -190,7 +190,7 @@ createTransposeAsTensorPack(
     return std::make_tuple(input, std::nullopt, inputMap);
   }
 
-  RankedTensorType inType = input.getType().cast<RankedTensorType>();
+  RankedTensorType inType = cast<RankedTensorType>(input.getType());
   auto elementType = inType.getElementType();
   auto inputShape(inType.getShape());
 
@@ -259,7 +259,7 @@ static Value createTransposeAsTensorUnPack(PatternRewriter &rewriter,
                                            int tilingFactor) {
   Value packedOutput = output;
   if (tilingFactor <= 0) {
-    RankedTensorType outType = output.getType().cast<RankedTensorType>();
+    RankedTensorType outType = cast<RankedTensorType>(output.getType());
     auto elementType = outType.getElementType();
     auto outputShape(outType.getShape());
     int64_t rank = outType.getRank();
@@ -531,7 +531,7 @@ public:
       return failure();
 
     RankedTensorType destType =
-        packOp.getDest().getType().cast<RankedTensorType>();
+        cast<RankedTensorType>(packOp.getDest().getType());
     ArrayRef<int64_t> destShape = destType.getShape();
     ArrayRef<int64_t> innerDimsPos = packOp.getInnerDimsPos();
 
@@ -603,7 +603,7 @@ public:
       return failure();
 
     RankedTensorType srcType =
-        unpackOp.getSource().getType().cast<RankedTensorType>();
+        cast<RankedTensorType>(unpackOp.getSource().getType());
     ArrayRef<int64_t> srcShape = srcType.getShape();
 
     ArrayRef<int64_t> innerDimsPos = unpackOp.getInnerDimsPos();
@@ -621,7 +621,7 @@ public:
     }
 
     RankedTensorType destType =
-        unpackOp.getDest().getType().cast<RankedTensorType>();
+        cast<RankedTensorType>(unpackOp.getDest().getType());
     SmallVector<int64_t> perm;
     for (int i = 0, e = destType.getRank(); i < e; i++) {
       if (!innerDims.count(i)) {

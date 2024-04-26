@@ -22,6 +22,7 @@
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"

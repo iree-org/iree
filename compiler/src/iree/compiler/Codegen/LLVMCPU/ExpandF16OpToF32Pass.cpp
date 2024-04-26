@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"

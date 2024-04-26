@@ -297,7 +297,7 @@ int64_t NamedParameterAttr::getStorageSize() const {
       return lengthAttr.getInt();
     }
   }
-  if (auto shapedType = getType().dyn_cast<ShapedType>()) {
+  if (auto shapedType = llvm::dyn_cast<ShapedType>(getType())) {
     return IREE::Util::getRoundedPhysicalStorageSize(shapedType);
   } else {
     return IREE::Util::getTypePhysicalStorageBitWidth(getType());

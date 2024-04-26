@@ -296,12 +296,12 @@ struct DebugPrintValueWrapper {
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const DebugPrintValueWrapper &wrapper) {
-  if (auto opResult = wrapper.value.dyn_cast<OpResult>()) {
+  if (auto opResult = dyn_cast<OpResult>(wrapper.value)) {
     return os << "op result #" << opResult.getResultNumber() << " in "
               << wrapper.value;
   }
 
-  auto blockArg = wrapper.value.cast<BlockArgument>();
+  auto blockArg = cast<BlockArgument>(wrapper.value);
   os << "block argument #" << blockArg.getArgNumber();
   Block *parentBlock = blockArg.getParentBlock();
   Region *parentRegion = parentBlock->getParent();
@@ -358,7 +358,7 @@ transform_ext::ShapedValueMatcher::ShapedValueMatcher()
     : CapturingValueMatcher() {
   addPredicate([](Value value) {
     LLVM_DEBUG(DBGS() << "value is of shaped type");
-    return value && value.getType().isa<ShapedType>();
+    return value && isa<ShapedType>(value.getType());
   });
 }
 
@@ -366,7 +366,7 @@ transform_ext::ShapedValueMatcher &
 transform_ext::ShapedValueMatcher::rank(transform_ext::CaptureRank capture) {
   addPredicate([=](Value value) {
     LLVM_DEBUG(DBGS() << "capturing shaped value rank");
-    capture.value = value.getType().cast<ShapedType>().getRank();
+    capture.value = cast<ShapedType>(value.getType()).getRank();
     return true;
   });
   return *this;
@@ -376,7 +376,7 @@ transform_ext::ShapedValueMatcher &
 transform_ext::ShapedValueMatcher::dim(int64_t dimension, CaptureDim capture) {
   addPredicate([=](Value value) {
     LLVM_DEBUG(DBGS() << "capturing shaped value dimension " << dimension);
-    capture.value = value.getType().cast<ShapedType>().getDimSize(dimension);
+    capture.value = cast<ShapedType>(value.getType()).getDimSize(dimension);
     return true;
   });
   return *this;
@@ -387,7 +387,7 @@ transform_ext::ShapedValueMatcher::dim(AllDims tag, CaptureDims captures) {
   (void)tag;
   addPredicate([=](Value value) {
     LLVM_DEBUG(DBGS() << "capturing all shaped value dimensions");
-    ArrayRef<int64_t> shape = value.getType().cast<ShapedType>().getShape();
+    ArrayRef<int64_t> shape = cast<ShapedType>(value.getType()).getShape();
     captures.value.assign(shape.begin(), shape.end());
     return true;
   });
@@ -398,7 +398,7 @@ transform_ext::ShapedValueMatcher &
 transform_ext::ShapedValueMatcher::elementType(CaptureElementType captures) {
   addPredicate([=](Value value) {
     LLVM_DEBUG(DBGS() << "capturing elementType");
-    captures.value = value.getType().cast<ShapedType>().getElementType();
+    captures.value = cast<ShapedType>(value.getType()).getElementType();
     return true;
   });
   return *this;
@@ -811,10 +811,8 @@ transform_ext::StructuredOpMatcher::input(int64_t position,
     int64_t updatedPosition = position;
     if (!makeValidPositiveIndex(updatedPosition, linalgOp.getNumDpsInputs()))
       return false;
-    auto shapedType = linalgOp.getDpsInputOperand(updatedPosition)
-                          ->get()
-                          .getType()
-                          .dyn_cast<ShapedType>();
+    auto shapedType = dyn_cast<ShapedType>(
+        linalgOp.getDpsInputOperand(updatedPosition)->get().getType());
     return shapedType && shapedType.getElementType().isIntOrFloat() &&
            shapedType.getElementType().getIntOrFloatBitWidth() == width.value;
   });
@@ -828,10 +826,8 @@ transform_ext::StructuredOpMatcher::input(int64_t position,
     int64_t updatedPosition = position;
     if (!makeValidPositiveIndex(updatedPosition, linalgOp.getNumDpsInputs()))
       return false;
-    auto shapedType = linalgOp.getDpsInputOperand(updatedPosition)
-                          ->get()
-                          .getType()
-                          .dyn_cast<ShapedType>();
+    auto shapedType = dyn_cast<ShapedType>(
+        linalgOp.getDpsInputOperand(updatedPosition)->get().getType());
     if (!shapedType || !shapedType.getElementType().isIntOrFloat())
       return false;
     width.value = shapedType.getElementType().getIntOrFloatBitWidth();
@@ -848,10 +844,8 @@ transform_ext::StructuredOpMatcher::input(int64_t position,
     int64_t updatedPosition = position;
     if (!makeValidPositiveIndex(updatedPosition, linalgOp.getNumDpsInputs()))
       return false;
-    auto shapedType = linalgOp.getDpsInputOperand(updatedPosition)
-                          ->get()
-                          .getType()
-                          .dyn_cast<ShapedType>();
+    auto shapedType = dyn_cast<ShapedType>(
+        linalgOp.getDpsInputOperand(updatedPosition)->get().getType());
     if (!shapedType) {
       LLVM_DEBUG(DBGSNL() << "  not a shaped type");
       return false;
@@ -993,10 +987,8 @@ transform_ext::StructuredOpMatcher::output(int64_t position,
     int64_t updatedPosition = position;
     if (!makeValidPositiveIndex(updatedPosition, linalgOp.getNumDpsInits()))
       return false;
-    auto shapedType = linalgOp.getDpsInitOperand(updatedPosition)
-                          ->get()
-                          .getType()
-                          .dyn_cast<ShapedType>();
+    auto shapedType = dyn_cast<ShapedType>(
+        linalgOp.getDpsInitOperand(updatedPosition)->get().getType());
     return shapedType && shapedType.getElementType().isIntOrFloat() &&
            shapedType.getElementType().getIntOrFloatBitWidth() == width.value;
   });
@@ -1010,10 +1002,8 @@ transform_ext::StructuredOpMatcher::output(int64_t position,
     int64_t updatedPosition = position;
     if (!makeValidPositiveIndex(updatedPosition, linalgOp.getNumDpsInits()))
       return false;
-    auto shapedType = linalgOp.getDpsInitOperand(updatedPosition)
-                          ->get()
-                          .getType()
-                          .dyn_cast<ShapedType>();
+    auto shapedType = dyn_cast<ShapedType>(
+        linalgOp.getDpsInitOperand(updatedPosition)->get().getType());
     if (!shapedType || !shapedType.getElementType().isIntOrFloat()) {
       LLVM_DEBUG(DBGSNL() << "  could not infer element type");
       return false;
@@ -1032,10 +1022,8 @@ transform_ext::StructuredOpMatcher::output(int64_t position,
     int64_t updatedPosition = position;
     if (!makeValidPositiveIndex(updatedPosition, linalgOp.getNumDpsInits()))
       return false;
-    auto shapedType = linalgOp.getDpsInitOperand(updatedPosition)
-                          ->get()
-                          .getType()
-                          .dyn_cast<ShapedType>();
+    auto shapedType = dyn_cast<ShapedType>(
+        linalgOp.getDpsInitOperand(updatedPosition)->get().getType());
     if (!shapedType) {
       LLVM_DEBUG(DBGSNL() << "  not a shaped type");
       return false;

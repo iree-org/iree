@@ -19,7 +19,7 @@ static SmallVector<Value>
 getDynamicValues(ArrayRef<OpFoldResult> valueOrAttrList) {
   SmallVector<Value> dynamicDims;
   for (auto valueOrAttr : valueOrAttrList) {
-    if (auto value = valueOrAttr.dyn_cast<Value>()) {
+    if (auto value = dyn_cast<Value>(valueOrAttr)) {
       dynamicDims.push_back(value);
     }
   }
@@ -31,7 +31,7 @@ static SmallVector<int64_t>
 getShapeFromSizes(ArrayRef<OpFoldResult> valueOrAttrList) {
   return llvm::map_to_vector(
       valueOrAttrList, [&](OpFoldResult valueOrAttr) -> int64_t {
-        if (auto attr = valueOrAttr.dyn_cast<Attribute>()) {
+        if (auto attr = dyn_cast<Attribute>(valueOrAttr)) {
           return llvm::cast<IntegerAttr>(attr).getInt();
         }
         return ShapedType::kDynamic;
@@ -74,7 +74,7 @@ bool isOffsetSizeAndStrideMappableToFlow(ArrayRef<OpFoldResult> offsets,
     return false;
   }
   auto getVal = [](OpFoldResult valueOrAttr, int64_t dynamicVal) -> int64_t {
-    auto attr = valueOrAttr.dyn_cast<Attribute>();
+    auto attr = dyn_cast<Attribute>(valueOrAttr);
     return attr ? llvm::cast<IntegerAttr>(attr).getInt() : dynamicVal;
   };
   /// To ensure contiguity, start from the least significant dimension. As long

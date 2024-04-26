@@ -699,12 +699,12 @@ static void processMixedOperands(ArrayRef<OpFoldResult> valueOrAttrs,
                                  SmallVectorImpl<int64_t> &staticValues,
                                  int64_t dynamicIndexValue) {
   for (OpFoldResult valueOrAttr : valueOrAttrs) {
-    if (auto value = valueOrAttr.dyn_cast<Value>()) {
+    if (auto value = dyn_cast<Value>(valueOrAttr)) {
       dynamicValues.push_back(value);
       staticValues.push_back(dynamicIndexValue);
     } else {
       auto operandValue =
-          llvm::cast<IntegerAttr>(valueOrAttr.dyn_cast<Attribute>()).getInt();
+          llvm::cast<IntegerAttr>(dyn_cast<Attribute>(valueOrAttr)).getInt();
       staticValues.push_back(operandValue);
     }
   }
@@ -742,7 +742,7 @@ DispatchTensorLoadOp::inferResultType(IREE::Flow::DispatchTensorType sourceType,
                                       ArrayRef<OpFoldResult> mixedSizes) {
   auto shape =
       llvm::map_to_vector(mixedSizes, [&](OpFoldResult valueOrAttr) -> int64_t {
-        if (auto attr = valueOrAttr.dyn_cast<Attribute>()) {
+        if (auto attr = dyn_cast<Attribute>(valueOrAttr)) {
           return llvm::cast<IntegerAttr>(attr).getInt();
         }
         return ShapedType::kDynamic;
@@ -1118,7 +1118,9 @@ bool DispatchWorkgroupsOp::canClosureContainOp(Operation *op) {
   // to requirements around tensor access checking.
   if (auto constantOp = dyn_cast<arith::ConstantOp>(op)) {
     auto constantType = constantOp.getType();
-    return constantType.isIntOrIndexOrFloat();
+    if (constantType.isIntOrIndexOrFloat()) {
+      return true;
+    }
   }
   return false;
 }

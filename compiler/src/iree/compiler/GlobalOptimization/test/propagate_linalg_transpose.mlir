@@ -224,6 +224,23 @@ util.func public @propagate_to_bmm_transpose_batch(%transposed_lhs: tensor<16x2x
 
 // -----
 
+util.func public @do_not_propagate_to_conv(%transposed_lhs: tensor<18x2x18x8xf32>,
+                                           %rhs: tensor<3x3x8x32xf32>) -> tensor<2x16x16x32xf32> {
+  %empty = tensor.empty(): tensor<2x18x18x8xf32>
+  %lhs = linalg.transpose ins(%transposed_lhs : tensor<18x2x18x8xf32>)
+      outs(%empty : tensor<2x18x18x8xf32>) permutation = [1, 0, 2, 3]
+  %out = tensor.empty(): tensor<2x16x16x32xf32>
+  %conv = linalg.conv_2d_nhwc_hwcf {strides = dense<1> : tensor<2xi64>, dilations = dense<1> : tensor<2xi64>}
+    ins(%lhs, %rhs : tensor<2x18x18x8xf32>, tensor<3x3x8x32xf32>)
+    outs(%out : tensor<2x16x16x32xf32>) -> tensor<2x16x16x32xf32>
+  util.return %conv : tensor<2x16x16x32xf32>
+}
+
+// APROP-LABEL: util.func public @do_not_propagate_to_conv
+//       APROP:   linalg.conv_2d_nhwc_hwcf
+
+// -----
+
 util.func public @sink_through_expand_shape(%arg0 : tensor<?x?x?xf32>) -> tensor<32x?x16x?x?xf32> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index

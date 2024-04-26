@@ -79,7 +79,7 @@ static LogicalResult applyDefaultCheckBufferRewrite(
     // during development.
     assert(
         (!HALTypeConverter::shouldConvertToBufferView(srcOperand.getType()) ||
-         dstOperand.getType().isa<IREE::HAL::BufferViewType>()) &&
+         isa<IREE::HAL::BufferViewType>(dstOperand.getType())) &&
         "expect that tensors have been mapped to buffer views");
     state.addOperands({dstOperand});
   }

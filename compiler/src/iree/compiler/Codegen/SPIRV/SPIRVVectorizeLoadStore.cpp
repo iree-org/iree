@@ -985,7 +985,7 @@ struct ReifyExtractOfCreateMask final
   LogicalResult matchAndRewrite(vector::ExtractOp extractOp,
                                 PatternRewriter &rewriter) const override {
     // Restrict to the degenerate case where we are extracting a single element.
-    if (extractOp.getResult().getType().isa<VectorType>()) {
+    if (isa<VectorType>(extractOp.getResult().getType())) {
       return failure();
     }
     auto maskOp = extractOp.getVector().getDefiningOp<vector::CreateMaskOp>();
@@ -1001,7 +1001,7 @@ struct ReifyExtractOfCreateMask final
       Value idxVal;
       if (idx.is<Attribute>()) {
         idxVal = rewriter.create<arith::ConstantIndexOp>(
-            loc, idx.get<Attribute>().cast<IntegerAttr>().getInt());
+            loc, cast<IntegerAttr>(idx.get<Attribute>()).getInt());
       } else {
         idxVal = idx.get<Value>();
       }

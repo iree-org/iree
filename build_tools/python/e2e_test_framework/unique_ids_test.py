@@ -14,7 +14,7 @@ class UniqueIdsTest(unittest.TestCase):
     def test_hash_composite_id(self):
         output = unique_ids.hash_composite_id(["abc", "123"])
 
-        self.assertEquals(
+        self.assertEqual(
             output, hashlib.sha256(f"0-abc:1-123".encode("utf-8")).hexdigest()
         )
 
@@ -38,14 +38,14 @@ class UniqueIdsTest(unittest.TestCase):
             ["abc", unique_ids.TRANSPARENT_ID, unique_ids.TRANSPARENT_ID]
         )
 
-        self.assertEquals(existing_id, new_id_a)
-        self.assertEquals(existing_id, new_id_b)
+        self.assertEqual(existing_id, new_id_a)
+        self.assertEqual(existing_id, new_id_b)
 
     def test_hash_composite_id_with_transparent_ids_in_diff_pos(self):
         id_a = unique_ids.hash_composite_id([unique_ids.TRANSPARENT_ID, "abc"])
         id_b = unique_ids.hash_composite_id(["abc", unique_ids.TRANSPARENT_ID])
 
-        self.assertNotEquals(id_a, id_b)
+        self.assertNotEqual(id_a, id_b)
 
 
 if __name__ == "__main__":

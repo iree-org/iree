@@ -106,7 +106,7 @@ def IREEInput_TiedOpInterface : OpInterface<"TiedOpInterface"> {
       /*args=*/(ins "Value":$result),
       /*methodBody=*/[{}],
       /*defaultImplementation=*/[{
-        auto resultIndex = result.cast<mlir::OpResult>().getResultNumber();
+        auto resultIndex = cast<mlir::OpResult>(result).getResultNumber();
         auto operandIndex = cast<TiedOpInterface>($_op.getOperation())
             .getTiedResultOperandIndex(resultIndex);
         return operandIndex.has_value() ?
