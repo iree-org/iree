@@ -100,7 +100,7 @@ private:
     }
 
     auto layouts = schedule.getContractionLayout(contract);
-    if (!layouts) {
+    if (failed(layouts)) {
       return contract->emitError("cannot get concrete layout for contraction");
     }
 

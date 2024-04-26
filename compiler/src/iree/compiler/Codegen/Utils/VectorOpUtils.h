@@ -32,8 +32,8 @@ public:
   std::pair<int, int> getResultMNIndex() const;
 
   SmallVector<unsigned, 2> getMDims() const { return contractionDims.m; }
-
   SmallVector<unsigned, 2> getNDims() const { return contractionDims.n; }
+  SmallVector<unsigned, 2> getKDims() const { return contractionDims.k; }
 
   int64_t getARank() {
     return contractionDims.m.size() + contractionDims.k.size();
