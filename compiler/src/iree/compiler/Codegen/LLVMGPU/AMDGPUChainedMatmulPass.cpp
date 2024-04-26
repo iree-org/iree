@@ -85,8 +85,7 @@ struct AMDGPUPrepareForChainedMatmulPass
   ///
   /// This transformation holds for the "@" case we described above. For
   /// other indexing maps, we need to take into account transposed which are
-  /// fused into the contract. `isOperandSwapInvariant` tells us when we can
-  /// simply swap the operands without transposing them.
+  /// fused into the contract.
   void swapOperandsAndTranspose(RewriterBase &rewriter,
                                 vector::ContractionOp contractOp) const {
     Value lhs = contractOp.getLhs();
@@ -96,6 +95,30 @@ struct AMDGPUPrepareForChainedMatmulPass
 
     SmallVector<AffineMap> indexingMaps = contractOp.getIndexingMapsArray();
 
+    // Instead of emitting out transpose operations, we change the indexing
+    // maps to take the transformation into account. A vector.contract with
+    // indexing maps can be though of as:
+    //
+    // M_lhs = X_lhs(S_lhs)
+    // M_rhs = X_rhs(S_rhs)
+    // M_res = X_res(S_res)
+    // C = contract {indexing_maps = [M_lhs, M_rhs, M_res]} A @ B
+    //
+    // where S_lhs, S_rhs, S_res are "standard" indexing maps for the @
+    // operator:
+    //
+    // S_lhs = (m, n, k) -> (m, k)
+    // S_rhs = (m, n, k) -> (k, n)
+    // S_res = (m, n, k) -> (m, n)
+    //
+    // On swapping operands and transposing:
+    //
+    // M_lhs = X_lhs_T(S_lhs)
+    // M_rhs = X_rhs_T(S_rhs)
+    // M_res = X_res_T(S_res)
+    // C = contract {indexing_maps = [M_lhs, M_rhs, M_res]} B @ A
+    //
+    // findPermutedMap is used to find X_{}_T here.
     SmallVector<int64_t> perm = {1, 0};
     auto findPermutedMap = [&perm](AffineMap M, AffineMap S) -> AffineMap {
       LLVM_DEBUG(llvm::dbgs() << "M:\n"; M.print(llvm::dbgs());
@@ -116,7 +139,7 @@ struct AMDGPUPrepareForChainedMatmulPass
       LLVM_DEBUG(llvm::dbgs() << "X:\n"; interleaveComma(X, llvm::dbgs());
                  llvm::dbgs() << "\n";);
 
-      // X(T):
+      // X_T = X(T):
       applyPermutationToVector(X, perm);
 
       LLVM_DEBUG(llvm::dbgs() << "X(T):\n"; interleaveComma(X, llvm::dbgs());
