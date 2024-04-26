@@ -405,6 +405,36 @@ def FuseForallOp : Op<Transform_Dialect, "iree.fuse_forall",
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 }
 
+def FuseThreadWithWarpForallOp : Op<Transform_Dialect, "iree.fuse_thread_with_warp_forall",
+    [FunctionalStyleTransformOpTrait,
+     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     DeclareOpInterfaceMethods<TransformOpInterface>,
+     ReportTrackingListenerFailuresOpTrait]> {
+  let description = [{
+    Fuses a producer-consumer pair of scf.forall ops where the producer
+    has a single element linear dim thread mapping and the consumer
+    has a single element warp dim thread mapping.
+
+    #### Return modes
+    Emits a definite failure if either the producer or consumer are not
+    scf.forall ops.
+  }];
+
+  let arguments = (
+      ins TransformHandleTypeInterface:$producer,
+          TransformHandleTypeInterface:$consumer,
+          I64Attr:$subgroup_size
+  );
+  let results = (outs TransformHandleTypeInterface:$fused_result,
+                      TransformHandleTypeInterface:$fused_producer);
+
+  let assemblyFormat = [{
+    $producer `into` $consumer attr-dict
+    `:` functional-type(operands, results)
+  }];
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+}
+
 def IREEApplyLoopIndependentCodeMotionOp : Op<Transform_Dialect, "iree.apply_licm",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      TransformEachOpTrait,
