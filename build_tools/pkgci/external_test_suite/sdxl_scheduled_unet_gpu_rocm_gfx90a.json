@@ -4,6 +4,7 @@
       "--iree-hal-target-backends=rocm",
       "--iree-rocm-target-chip=gfx90a",
       "--iree-opt-const-eval=false",
+      "--iree-codegen-transform-dialect-library=attention_and_matmul_spec.mlir",
       "--iree-global-opt-propagate-transposes=true",
       "--iree-opt-outer-dim-concat=true",
       "--iree-vm-target-truncate-unsupported-floats",
