@@ -9,8 +9,7 @@
 #include "iree/compiler/Codegen/LLVMGPU/ConvertToLLVM.h"
 #include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
-#include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "mlir/Conversion/AMDGPUToROCDL/AMDGPUToROCDL.h"
 #include "mlir/Conversion/ArithToAMDGPU/ArithToAMDGPU.h"
 #include "mlir/Conversion/ArithToLLVM/ArithToLLVM.h"
@@ -32,9 +31,7 @@
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
-#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "mlir/Transforms/Passes.h"
 
 #define DEBUG_TYPE "iree-convert-to-rocdl"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
@@ -48,28 +45,6 @@ static llvm::cl::opt<int>
                        llvm::cl::init(64));
 
 namespace {
-
-/// Return the target arch attached the most immediate parent.
-static StringRef getTargetArch(mlir::FunctionOpInterface entryPoint) {
-  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPoint);
-  if (targetAttr) {
-    if (auto config = targetAttr.getConfiguration()) {
-      if (auto attr = config.getAs<StringAttr>("target_arch")) {
-        return attr.getValue();
-      }
-    }
-  }
-  return "";
-}
-
-static StringRef getChipset(ModuleOp m) {
-  for (auto funcOp : m.getOps<mlir::FunctionOpInterface>()) {
-    if (isEntryPoint(funcOp)) {
-      return getTargetArch(funcOp);
-    }
-  }
-  return "";
-}
 
 // Transform gpu.barrier -> amdgpu.lds_barrier
 // IREE code generation currently only ever needs to synchronize for
@@ -206,7 +181,7 @@ struct ConvertToROCDLPass : public ConvertToROCDLBase<ConvertToROCDLPass> {
       populateFuncToLLVMConversionPatterns(converter, llvmPatterns);
       cf::populateControlFlowToLLVMConversionPatterns(converter, llvmPatterns);
       arith::populateArithToLLVMConversionPatterns(converter, llvmPatterns);
-      StringRef chipset = getChipset(m);
+      StringRef chipset = getGPUTargetAttr(m).getArch();
       FailureOr<amdgpu::Chipset> maybeChipset = amdgpu::Chipset::parse(chipset);
       populateAMDGPUToROCDLConversionPatterns(
           converter, llvmPatterns, maybeChipset.value_or(amdgpu::Chipset()));

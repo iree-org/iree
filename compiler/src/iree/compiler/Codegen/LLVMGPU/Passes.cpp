@@ -752,8 +752,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
   funcPassManager
       .addPass([&]() {
         auto getSharedMemoryLimit = [](mlir::FunctionOpInterface entryPoint) {
-          IREE::GPU::TargetAttr target = getGPUTargetAttr(
-              IREE::HAL::ExecutableTargetAttr::lookup(entryPoint));
+          IREE::GPU::TargetAttr target = getGPUTargetAttr(entryPoint);
           return target.getCore().getMaxWorkgroupMemoryBytes();
         };
         auto getIndexBitwidth = [](mlir::FunctionOpInterface) { return 64; };

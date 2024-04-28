@@ -145,9 +145,12 @@ FailureOr<ArrayAttr> getSupportedMmaTypes(DictionaryAttr config);
 
 FailureOr<ArrayAttr> getSupportedMmaTypes(mlir::FunctionOpInterface entryPoint);
 
-/// Returns the GPU target attribute from |executable| if found.
-IREE::GPU::TargetAttr
-getGPUTargetAttr(IREE::HAL::ExecutableTargetAttr executable);
+/// Returns the GPU target attribute from executable |target| if found.
+/// Returns null TargetAttr othersise.
+IREE::GPU::TargetAttr getGPUTargetAttr(IREE::HAL::ExecutableTargetAttr target);
+/// Returns the GPU target attribute from the executable target wrapping |op|
+/// if found. Returns null TargetAttr othersise.
+IREE::GPU::TargetAttr getGPUTargetAttr(Operation *op);
 
 } // namespace mlir::iree_compiler
 

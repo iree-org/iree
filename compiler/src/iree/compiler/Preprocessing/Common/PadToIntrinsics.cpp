@@ -139,8 +139,7 @@ expandMapsAndIterators(SmallVector<AffineMap> &expandedMaps,
 
 static SmallVector<GPUMatmulShapeType>
 getIntrinsics(linalg::LinalgOp linalgOp) {
-  IREE::GPU::TargetAttr target =
-      getGPUTargetAttr(IREE::HAL::ExecutableTargetAttr::lookup(linalgOp));
+  IREE::GPU::TargetAttr target = getGPUTargetAttr(linalgOp);
   if (!target)
     return {};
 

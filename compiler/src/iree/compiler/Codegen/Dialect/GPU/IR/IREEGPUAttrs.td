@@ -403,6 +403,7 @@ def IREEGPU_TargetAttr : AttrDef<IREEGPU_Dialect, "Target"> {
                                 SubgroupOps::Shuffle);
     }
 
+    std::optional<int> getCUDAComputeCapability() const;
     // Returns true if this target supports TensoreCore MMA ops with TF32
     // input types.
     bool supportTF32InputMMAOps() const;

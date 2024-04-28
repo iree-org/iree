@@ -1692,8 +1692,7 @@ static void propagateLoweringConfig(Operation *rootOperation,
 // Entry Point
 //===----------------------------------------------------------------------===//
 LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
-  IREE::GPU::TargetAttr target =
-      getGPUTargetAttr(IREE::HAL::ExecutableTargetAttr::lookup(funcOp));
+  IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
   if (!target)
     return funcOp.emitError("missing GPU target in #hal.executable.target");
 

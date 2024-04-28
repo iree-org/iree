@@ -928,12 +928,10 @@ bool hasUkernelSupportedRocmArch(StringRef targetChip) {
 }
 
 bool hasUkernelSupportedRocmArch(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  auto targetArch = getConfigStringAttr(targetAttr, "target_arch");
-  if (!targetArch) {
+  auto targetArch = getGPUTargetAttr(targetAttr).getArch();
+  if (targetArch.empty())
     return false;
-  }
-  StringRef targetArchStr = targetArch->getValue();
-  return hasUkernelSupportedRocmArch(targetArchStr);
+  return hasUkernelSupportedRocmArch(targetArch);
 }
 
 /// Checks if target GPU has UKernel support.
@@ -959,6 +957,10 @@ IREE::GPU::TargetAttr getGPUTargetAttr(IREE::HAL::ExecutableTargetAttr target) {
   if (!attr)
     return nullptr;
   return attr;
+}
+
+IREE::GPU::TargetAttr getGPUTargetAttr(Operation *op) {
+  return getGPUTargetAttr(IREE::HAL::ExecutableTargetAttr::lookup(op));
 }
 
 } // namespace mlir::iree_compiler
