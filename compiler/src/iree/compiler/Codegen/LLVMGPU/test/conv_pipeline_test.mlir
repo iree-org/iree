@@ -2,7 +2,12 @@
 // RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-llvmgpu-select-lowering-strategy, func.func(iree-llvmgpu-lower-executable-target,canonicalize)))))' \
 // RUN:   %s | FileCheck %s
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}>
+#target = #iree_gpu.target<api = cuda, arch = "sm_60",
+  core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
+  subgroup = shuffle|arithmetic, dot = none, mma = [],
+  subgroup_size_choices = [32], max_workgroup_sizes = [1024, 1024, 1024],
+  max_thread_size = 1024, max_workgroup_memory_bytes = 49152>>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #target}>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>
 hal.executable private @conv2d_1x230x230x3_7x7x3x64_dispatch_0 {
   hal.executable.variant public @cuda_nvptx_fb target(#executable_target_cuda_nvptx_fb) {
@@ -43,7 +48,12 @@ hal.executable private @conv2d_1x230x230x3_7x7x3x64_dispatch_0 {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}>
+#target = #iree_gpu.target<api = cuda, arch = "sm_60",
+  core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
+  subgroup = shuffle|arithmetic, dot = none, mma = [],
+  subgroup_size_choices = [32], max_workgroup_sizes = [1024, 1024, 1024],
+  max_thread_size = 1024, max_workgroup_memory_bytes = 49152>>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #target}>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>
 hal.executable private @conv_nchw_dispatch_0 {
   hal.executable.variant public @cuda_nvptx_fb target(#executable_target_cuda_nvptx_fb) {
@@ -93,17 +103,18 @@ hal.executable private @conv_nchw_dispatch_0 {
 
 // -----
 
-#layout = #hal.pipeline.layout<push_constants = 0,
-  sets = [
-    <0, bindings = [
-      <0, storage_buffer, ReadOnly>,
-      <1, storage_buffer, ReadOnly>,
-      <2, storage_buffer, ReadOnly>,
-      <3, storage_buffer>
-    ]>
-  ]>
+#target = #iree_gpu.target<api = hip, arch = "gfx1100",
+  core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
+  subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
+  mma = [<WMMA_F16_16x16x16_F32>],
+  subgroup_size_choices = [32, 64], max_workgroup_sizes = [1024, 1024, 1024],
+  max_thread_size = 1024, max_workgroup_memory_bytes = 65536>>
+#layout = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [
+  <0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>,
+  <2, storage_buffer, ReadOnly>, <3, storage_buffer>
+]>]>
 hal.executable private @conv_nchw_dispatch_1 {
-  hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb", {target_arch = "gfx1100", ukernels = "none"}>) {
+  hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target}>) {
     hal.executable.export public @conv_2d_nchw_fchw_2x320x64x64x320x3x3_f16 ordinal(0) layout(#layout) attributes {
       hal.interface.bindings = [
         #hal.interface.binding<0, 0>,

@@ -1,7 +1,14 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-rocdl-configuration-pipeline), iree-codegen-linalg-to-rocdl-pipeline2)))" %s | FileCheck %s
 
+#target = #iree_gpu.target<api = hip, arch = "gfx942",
+  core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
+  subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
+  mma = [<MFMA_F16_16x16x16_F32>, <MFMA_F16_32x32x8_F32>],
+  subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
+  max_thread_size = 1024, max_workgroup_memory_bytes = 65536>>
+
 hal.executable private @warp_reduction {
-  hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {target_arch = "gfx940"}>) {
+  hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target}>) {
     hal.executable.export public @warp_reduction ordinal(0) layout(
       #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
@@ -37,8 +44,15 @@ hal.executable private @warp_reduction {
 
 // -----
 
+#target = #iree_gpu.target<api = hip, arch = "gfx942",
+  core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
+  subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
+  mma = [<MFMA_F16_16x16x16_F32>, <MFMA_F16_32x32x8_F32>],
+  subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
+  max_thread_size = 1024, max_workgroup_memory_bytes = 65536>>
+
 hal.executable public @main_dispatch_517 {
-  hal.executable.variant public @rocm target(<"rocm", "rocm-hsaco-fb", {target_arch = "gfx90a"}>) {
+  hal.executable.variant public @rocm target(<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target}>) {
     hal.executable.export public @warp_reduction_large_vector ordinal(0) layout(
       #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
     ^bb0(%arg0: !hal.device):

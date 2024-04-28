@@ -230,18 +230,22 @@ const CoreDetails *getTuringCoreDetails() {
 }
 
 const CoreDetails *getVoltaCoreDetails() {
+  // clang-format off
   static const CoreDetails voltaCore = {
-      allComputeBits, allStorageBits,     allSubgroupOps, allDotProductOps, 0,
-      nullptr, // TODO: Add tensor core operations
-      {32, 32},       {1024, 1024, 1024}, 1024,           96 * 1024};
+      allComputeBits, allStorageBits, allSubgroupOps, DotProductOps::None,
+      0, nullptr, // TODO: Add tensor core operations
+      {32, 32}, {1024, 1024, 1024}, 1024, 96 * 1024};
+  // clang-format on
   return &voltaCore;
 }
 
 const CoreDetails *getPascalCoreDetails() {
+  // clang-format off
   static const CoreDetails pascalCore = {
-      allComputeBits, allStorageBits,     allSubgroupOps, allDotProductOps, 0,
-      nullptr, // Pascal does not have tensor core support.
-      {32, 32},       {1024, 1024, 1024}, 1024,           48 * 1024};
+      allComputeBits, allStorageBits, allSubgroupOps, DotProductOps::None,
+      0, nullptr, // Pascal does not have tensor core support.
+      {32, 32}, {1024, 1024, 1024}, 1024, 48 * 1024};
+  // clang-format on
   return &pascalCore;
 }
 

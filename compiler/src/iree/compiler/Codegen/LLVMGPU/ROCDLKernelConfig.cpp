@@ -301,7 +301,7 @@ LogicalResult initROCDLLaunchConfig(FunctionOpInterface funcOp) {
   IREE::GPU::TargetAttr target =
       getGPUTargetAttr(IREE::HAL::ExecutableTargetAttr::lookup(funcOp));
   if (!target)
-    return funcOp.emitError("missing GPU target in hal.executable.variant op");
+    return funcOp.emitError("missing GPU target in #hal.executable.target");
 
   // First check whether we already have workgroup count set--it's a
   // "contract" to indicate that we should bypass all tiling and

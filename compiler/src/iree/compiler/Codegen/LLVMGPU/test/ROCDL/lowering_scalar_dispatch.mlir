@@ -1,6 +1,12 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-rocdl-select-lowering-strategy, func.func(iree-rocdl-lower-executable-target)))))' -mlir-print-local-scope %s | FileCheck %s
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {target_arch = "gfx90a", ukernels = "none"}>
+#target = #iree_gpu.target<api = hip, arch = "gfx942",
+  core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
+  subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
+  mma = [<MFMA_F16_16x16x16_F32>, <MFMA_F16_32x32x8_F32>],
+  subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
+  max_thread_size = 1024, max_workgroup_memory_bytes = 65536>>
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target, ukernels = "none"}>
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>
 

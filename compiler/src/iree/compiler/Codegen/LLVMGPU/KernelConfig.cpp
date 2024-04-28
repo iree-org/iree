@@ -1695,7 +1695,7 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
   IREE::GPU::TargetAttr target =
       getGPUTargetAttr(IREE::HAL::ExecutableTargetAttr::lookup(funcOp));
   if (!target)
-    return funcOp.emitError("missing GPU target in hal.executable.variant op");
+    return funcOp.emitError("missing GPU target in #hal.executable.target");
 
   auto exportOp = getEntryPoint(funcOp);
   if (!getTranslationInfo(funcOp) && exportOp) {

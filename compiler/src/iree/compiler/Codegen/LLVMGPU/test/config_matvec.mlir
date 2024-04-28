@@ -1,6 +1,12 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-llvmgpu-select-lowering-strategy)' %s | FileCheck %s
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {target_arch = "gfx1100"}>
+#target = #iree_gpu.target<api = hip, arch = "gfx1100",
+  core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
+  subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
+  mma = [<WMMA_F16_16x16x16_F32>],
+  subgroup_size_choices = [32, 64], max_workgroup_sizes = [1024, 1024, 1024],
+  max_thread_size = 1024, max_workgroup_memory_bytes = 65536>>
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target}>
 module {
   func.func @dynamic_batch_matvec() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
     %c32_i64 = arith.constant 32 : i64
@@ -39,7 +45,14 @@ module {
 
 // -----
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {target_arch = "gfx940"}>
+#target = #iree_gpu.target<api = hip, arch = "gfx942",
+  core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
+  subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
+  mma = [<MFMA_F16_16x16x16_F32>, <MFMA_F16_32x32x8_F32>],
+  subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
+  max_thread_size = 1024, max_workgroup_memory_bytes = 65536>>
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target}>
+
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
@@ -74,7 +87,13 @@ module {
 
 // -----
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {target_arch = "gfx1100"}>
+#target = #iree_gpu.target<api = hip, arch = "gfx1100",
+  core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
+  subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
+  mma = [<WMMA_F16_16x16x16_F32>],
+  subgroup_size_choices = [32, 64], max_workgroup_sizes = [1024, 1024, 1024],
+  max_thread_size = 1024, max_workgroup_memory_bytes = 65536>>
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target}>
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
@@ -109,7 +128,13 @@ module {
 
 // -----
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {target_arch = "gfx940"}>
+#target = #iree_gpu.target<api = hip, arch = "gfx942",
+  core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
+  subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
+  mma = [<MFMA_F16_16x16x16_F32>, <MFMA_F16_32x32x8_F32>],
+  subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
+  max_thread_size = 1024, max_workgroup_memory_bytes = 65536>>
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target}>
 #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d1, d2)>
@@ -162,7 +187,13 @@ module {
 
 // Send 2xNxK mmt to the warp reduction pipeline.
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {target_arch = "gfx940"}>
+#target = #iree_gpu.target<api = hip, arch = "gfx942",
+  core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
+  subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
+  mma = [<MFMA_F16_16x16x16_F32>, <MFMA_F16_32x32x8_F32>],
+  subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
+  max_thread_size = 1024, max_workgroup_memory_bytes = 65536>>
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target}>
 module {
   func.func @skinny_mmt() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
     %c0 = arith.constant 0 : index
@@ -191,7 +222,13 @@ module {
 
 // Send Mx2xK mmt to the warp reduction pipeline.
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {target_arch = "gfx940"}>
+#target = #iree_gpu.target<api = hip, arch = "gfx942",
+  core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
+  subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
+  mma = [<MFMA_F16_16x16x16_F32>, <MFMA_F16_32x32x8_F32>],
+  subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
+  max_thread_size = 1024, max_workgroup_memory_bytes = 65536>>
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target}>
 module {
   func.func @skinny_mmt() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
     %c0 = arith.constant 0 : index
@@ -218,7 +255,13 @@ module {
 
 // -----
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {target_arch = "gfx940"}>
+#target = #iree_gpu.target<api = hip, arch = "gfx942",
+  core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
+  subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
+  mma = [<MFMA_F16_16x16x16_F32>, <MFMA_F16_32x32x8_F32>],
+  subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
+  max_thread_size = 1024, max_workgroup_memory_bytes = 65536>>
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target}>
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
