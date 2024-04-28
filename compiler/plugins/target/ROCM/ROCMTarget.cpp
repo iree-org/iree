@@ -52,7 +52,7 @@ namespace mlir::iree_compiler::IREE::HAL {
 namespace {
 
 struct ROCmOptions {
-  std::string targetChip = "gfx908";
+  std::string targetChip = "gfx90a";
   std::string bitcodeDirectory = getDefaultBitcodeDirectory();
   int wavesPerEu = 0;
   std::string enableROCMUkernels = "none";
