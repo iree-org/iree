@@ -6,7 +6,7 @@ func.func @test_target_core() attributes {
   // CHECK-SAME: compute =  fp32|fp16|int8,
   // CHECK-SAME: storage =  b32|b16,
   // CHECK-SAME: subgroup =  shuffle|arithmetic,
-  // CHECK-SAME: dotproduct =  dp4xi8toi32,
+  // CHECK-SAME: dot =  dp4xi8toi32,
   // CHECK-SAME: mma = [<MFMA_F16_16x16x16_F32>, <MFMA_F16_32x32x8_F32>],
   // CHECK-SAME: subgroup_size_choices = [32, 64],
   // CHECK-SAME: max_workgroup_size = [1024, 1024, 1024],
@@ -14,7 +14,7 @@ func.func @test_target_core() attributes {
   // CHECK-SAME: max_workgroup_memory_bytes = 65536>
   core = #iree_gpu.target_core<
     compute = fp16|fp32|int8, storage = b16|b32,
-    subgroup = shuffle|arithmetic, dotproduct = dp4xi8toi32,
+    subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
     mma = [<MFMA_F16_16x16x16_F32>, <MFMA_F16_32x32x8_F32>],
     subgroup_size_choices = [32, 64],
     max_workgroup_size = [1024, 1024, 1024],
@@ -28,11 +28,11 @@ func.func @test_target_core() attributes {
 func.func @test_target_core_none() attributes {
   // CHECK: #iree_gpu.target_core<
   // CHECK-SAME: subgroup =  none,
-  // CHECK-SAME: dotproduct =  none,
+  // CHECK-SAME: dot =  none,
   // CHECK-SAME: mma = [],
   core = #iree_gpu.target_core<
     compute = fp16|fp32|int8, storage = b16|b32,
-    subgroup = none, dotproduct = none,
+    subgroup = none, dot = none,
     mma = [],
     subgroup_size_choices = [32],
     max_workgroup_size = [1024, 1024, 1024],
@@ -60,7 +60,7 @@ func.func @test_target() attributes {
     api=hip,
     core = <
       compute = fp16|fp32|int8, storage = b16|b32,
-      subgroup = shuffle|arithmetic, dotproduct = dp4xi8toi32,
+      subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
       mma = [<MFMA_F16_16x16x16_F32>, <MFMA_F16_32x32x8_F32>],
       subgroup_size_choices = [32, 64],
       max_workgroup_size = [1024, 1024, 1024],

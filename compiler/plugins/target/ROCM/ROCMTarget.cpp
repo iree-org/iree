@@ -4,16 +4,17 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "ROCMTargetFeatures.h"
 #include "ROCMTargetUtils.h"
 
 #include <cstdint>
 
-#include "compiler/plugins/target/ROCM/ROCMTargetFeatures.h"
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
+#include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/HAL/Utils/LLVMLinkerUtils.h"
@@ -183,14 +184,12 @@ public:
       configItems.emplace_back(b.getStringAttr(name), value);
     };
 
-    addConfig("target_arch", b.getStringAttr(options.targetChip));
+    if (auto target = GPU::getHIPTargetDetails(options.targetChip, context))
+      addConfig(GPU::TargetAttr::getMnemonic(), target);
+
     addConfig("ukernels", b.getStringAttr(options.enableROCMUkernels));
     if (options.wavesPerEu > 0)
       addConfig("waves_per_eu", b.getI64IntegerAttr(options.wavesPerEu));
-
-    ArrayAttr mmaAttrs = getROCMSupportedMmaAttrs(context, options.targetChip);
-    if (mmaAttrs)
-      addConfig("mma_intrinsics", mmaAttrs);
 
     return b.getAttr<IREE::HAL::ExecutableTargetAttr>(
         b.getStringAttr("rocm"), b.getStringAttr("rocm-hsaco-fb"),
@@ -271,8 +270,8 @@ public:
     ModuleOp innerModuleOp = variantOp.getInnerModule();
     auto targetAttr = variantOp.getTargetAttr();
     StringRef targetArch = options.targetChip;
-    if (auto attr = getConfigStringAttr(targetAttr, "target_arch"))
-      targetArch = attr->getValue();
+    if (auto attr = getGPUTargetAttr(targetAttr))
+      targetArch = attr.getArch();
 
     // We name our files after the executable name so that they are easy to
     // track both during compilation (logs/artifacts/etc), as outputs (final

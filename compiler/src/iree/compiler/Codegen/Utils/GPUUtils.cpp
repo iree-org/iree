@@ -970,4 +970,17 @@ getSupportedMmaTypes(mlir::FunctionOpInterface entryPoint) {
   return getSupportedMmaTypes(targetAttr.getConfiguration());
 }
 
+IREE::GPU::TargetAttr getGPUTargetAttr(IREE::HAL::ExecutableTargetAttr target) {
+  if (!target)
+    return nullptr;
+  auto config = target.getConfiguration();
+  if (!config)
+    return nullptr;
+  auto attr =
+      config.getAs<IREE::GPU::TargetAttr>(IREE::GPU::TargetAttr::getMnemonic());
+  if (!attr)
+    return nullptr;
+  return attr;
+}
+
 } // namespace mlir::iree_compiler

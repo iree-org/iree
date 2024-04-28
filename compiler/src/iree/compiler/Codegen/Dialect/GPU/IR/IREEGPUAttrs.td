@@ -324,7 +324,7 @@ def IREEGPU_TargetCoreAttr : AttrDef<IREEGPU_Dialect, "TargetCore"> {
     "ComputeBitwidthsAttr":$compute,
     "StorageBitwidthsAttr":$storage,
     "SubgroupOpsAttr":$subgroup,
-    "DotProductOpsAttr":$dotproduct,
+    "DotProductOpsAttr":$dot,
     "MMAOpsArrayAttr":$mma,
 
     // Limits
