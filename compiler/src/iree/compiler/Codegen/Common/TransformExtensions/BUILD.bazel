@@ -63,6 +63,7 @@ iree_compiler_cc_library(
     deps = [
         ":CommonExtensionsOpGen",
         "//compiler/src/iree/compiler/Codegen/Common",
+        "//compiler/src/iree/compiler/Codegen/Common:VectorLayoutAnalysis",
         "//compiler/src/iree/compiler/Codegen/Common/GPU:CommonGPUPasses",
         "//compiler/src/iree/compiler/Codegen/Interfaces:BufferizationInterfaces",
         "//compiler/src/iree/compiler/Codegen/Transforms",

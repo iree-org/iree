@@ -50,6 +50,22 @@ iree_tablegen_library(
 
 iree_cc_library(
   NAME
+    VectorLayoutAnalysis
+  HDRS
+    "VectorLayoutAnalysis.h"
+  SRCS
+    "VectorLayoutAnalysis.cpp"
+  DEPS
+    IREEVectorExtDialect
+    LLVMSupport
+    MLIRAnalysis
+    MLIRIR
+    MLIRVectorDialect
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     Common
   HDRS
     "BufferizationAnalysis.h"
@@ -60,7 +76,6 @@ iree_cc_library(
     "TileSizeSelection.h"
     "Transforms.h"
     "UserConfig.h"
-    "VectorLayoutAnalysis.h"
   SRCS
     "AddFastMathFlags.cpp"
     "BubbleUpOrdinalOps.cpp"
@@ -117,7 +132,6 @@ iree_cc_library(
     "TileSizeSelection.cpp"
     "TypePropagationPass.cpp"
     "UserConfig.cpp"
-    "VectorLayoutAnalysis.cpp"
     "VectorizePad.cpp"
   DEPS
     ::PassHeaders

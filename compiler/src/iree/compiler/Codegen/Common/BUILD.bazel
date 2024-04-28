@@ -66,6 +66,24 @@ iree_gentbl_cc_library(
 )
 
 iree_compiler_cc_library(
+    name = "VectorLayoutAnalysis",
+    srcs = [
+        "VectorLayoutAnalysis.cpp",
+    ],
+    hdrs = [
+        "VectorLayoutAnalysis.h",
+    ],
+    deps = [
+        "//llvm-external-projects/iree-dialects:IREEVectorExtDialect",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:Analysis",
+        "@llvm-project//mlir:DialectUtils",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:VectorDialect",
+    ],
+)
+
+iree_compiler_cc_library(
     name = "Common",
     srcs = [
         "AddFastMathFlags.cpp",
@@ -123,7 +141,6 @@ iree_compiler_cc_library(
         "TileSizeSelection.cpp",
         "TypePropagationPass.cpp",
         "UserConfig.cpp",
-        "VectorLayoutAnalysis.cpp",
         "VectorizePad.cpp",
     ],
     hdrs = [
@@ -135,7 +152,6 @@ iree_compiler_cc_library(
         "TileSizeSelection.h",
         "Transforms.h",
         "UserConfig.h",
-        "VectorLayoutAnalysis.h",
     ],
     deps = [
         ":PassHeaders",
