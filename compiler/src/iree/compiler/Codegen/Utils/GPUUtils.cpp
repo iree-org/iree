@@ -949,35 +949,13 @@ bool hasUkernelSupportedGpuArch(IREE::HAL::ExecutableTargetAttr targetAttr) {
 // GPU Target Information
 //===----------------------------------------------------------------------===//
 
-static constexpr char mmaTypeListName[] = "mma_intrinsics";
-FailureOr<ArrayAttr> getSupportedMmaTypes(DictionaryAttr config) {
-  if (!config) {
-    return failure();
-  }
-  ArrayAttr types = dyn_cast_or_null<ArrayAttr>(config.get(mmaTypeListName));
-  if (!types) {
-    return failure();
-  }
-  return types;
-}
-
-FailureOr<ArrayAttr>
-getSupportedMmaTypes(mlir::FunctionOpInterface entryPoint) {
-  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPoint);
-  if (!targetAttr) {
-    return failure();
-  }
-  return getSupportedMmaTypes(targetAttr.getConfiguration());
-}
-
 IREE::GPU::TargetAttr getGPUTargetAttr(IREE::HAL::ExecutableTargetAttr target) {
   if (!target)
     return nullptr;
   auto config = target.getConfiguration();
   if (!config)
     return nullptr;
-  auto attr =
-      config.getAs<IREE::GPU::TargetAttr>(IREE::GPU::TargetAttr::getMnemonic());
+  auto attr = config.getAs<IREE::GPU::TargetAttr>("iree.gpu.target");
   if (!attr)
     return nullptr;
   return attr;

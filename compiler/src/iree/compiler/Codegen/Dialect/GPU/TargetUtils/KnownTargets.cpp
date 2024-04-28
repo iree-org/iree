@@ -214,17 +214,42 @@ StringRef normalizeAMDGPUTarget(StringRef target) {
 //===----------------------------------------------------------------------===//
 
 const CoreDetails *getAmpereCoreDetails() {
-  // clang-format off
   static const CoreDetails ampereCore = {
-    allComputeBits, allStorageBits, allSubgroupOps, allDotProductOps,
-    0, nullptr, // TODO: Add tensor core operations
-    {32, 32}, {1024, 1024, 1024}, 1024, 163 * 1024};
-  // clang-format on
+      allComputeBits, allStorageBits,     allSubgroupOps, allDotProductOps, 0,
+      nullptr, // TODO: Add tensor core operations
+      {32, 32},       {1024, 1024, 1024}, 1024,           163 * 1024};
   return &ampereCore;
 }
 
+const CoreDetails *getTuringCoreDetails() {
+  static const CoreDetails turingCore = {
+      allComputeBits, allStorageBits,     allSubgroupOps, allDotProductOps, 0,
+      nullptr, // TODO: Add tensor core operations
+      {32, 32},       {1024, 1024, 1024}, 1024,           64 * 1024};
+  return &turingCore;
+}
+
+const CoreDetails *getVoltaCoreDetails() {
+  static const CoreDetails voltaCore = {
+      allComputeBits, allStorageBits,     allSubgroupOps, allDotProductOps, 0,
+      nullptr, // TODO: Add tensor core operations
+      {32, 32},       {1024, 1024, 1024}, 1024,           96 * 1024};
+  return &voltaCore;
+}
+
+const CoreDetails *getPascalCoreDetails() {
+  static const CoreDetails pascalCore = {
+      allComputeBits, allStorageBits,     allSubgroupOps, allDotProductOps, 0,
+      nullptr, // Pascal does not have tensor core support.
+      {32, 32},       {1024, 1024, 1024}, 1024,           48 * 1024};
+  return &pascalCore;
+}
+
 std::optional<TargetDetails> getNVIDIAGPUTargetDetails(StringRef target) {
-  const CoreDetails *ampereCore = getCDNA3CoreDetails();
+  const CoreDetails *ampereCore = getAmpereCoreDetails();
+  const CoreDetails *turingCore = getTuringCoreDetails();
+  const CoreDetails *voltaCore = getVoltaCoreDetails();
+  const CoreDetails *pascalCore = getPascalCoreDetails();
 
   static const ChipDetails a100Chip = {108};
   static const ChipDetails rtx3090tiChip = {84};
@@ -254,6 +279,10 @@ std::optional<TargetDetails> getNVIDIAGPUTargetDetails(StringRef target) {
       .Case("rtx3070", TargetDetails{ampereCore, &rtx3070Chip})
       .Cases("ampere", "sm_80", "sm_86", "sm_87",
              TargetDetails{ampereCore, nullptr})
+      .Cases("turing", "sm_75", TargetDetails{turingCore, nullptr})
+      .Cases("volta", "sm_70", "sm_72", TargetDetails{voltaCore, nullptr})
+      .Cases("pascal", "sm_60", "sm_61", "sm_62",
+             TargetDetails{pascalCore, nullptr})
       .Default(std::nullopt);
 }
 
@@ -269,10 +298,11 @@ StringRef normalizeNVIDIAGPUTarget(StringRef target) {
     return "sm_75";
 
   return llvm::StringSwitch<StringRef>(target.lower())
-      .Case("ada", "sm_89")
       .Case("a100", "sm_80")
       .Case("ampere", "sm_80") // Or sm_86/87; use smaller version
       .Case("turing", "sm_75")
+      .Case("volta", "sm_70")  // Or sm_72; use smaller version
+      .Case("pascal", "sm_60") // Or sm_61/62; use smaller version
       .Default(StringRef());
 }
 

@@ -392,6 +392,23 @@ def IREEGPU_TargetAttr : AttrDef<IREEGPU_Dialect, "Target"> {
   );
 
   let assemblyFormat = "`<` struct(params) `>`";
+
+  let extraClassDeclaration = [{
+    int getPreferredSubgroupSize() const {
+      return getCore().getSubgroupSizeChoices().asArrayRef().front();
+    }
+
+    bool supportSubgroupShuffle() const {
+      return bitEnumContainsAll(getCore().getSubgroup().getValue(),
+                                SubgroupOps::Shuffle);
+    }
+
+    // Returns true if this target supports TensoreCore MMA ops with TF32
+    // input types.
+    bool supportTF32InputMMAOps() const;
+    // Returns true if this target supports TensorCore synchronized MMA ops.
+    bool supportSyncMMAOps() const;
+  }];
 }
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_GPU_IREEGPUATTRS

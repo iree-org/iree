@@ -185,7 +185,7 @@ public:
     };
 
     if (auto target = GPU::getHIPTargetDetails(options.targetChip, context))
-      addConfig(GPU::TargetAttr::getMnemonic(), target);
+      addConfig("iree.gpu.target", target);
 
     addConfig("ukernels", b.getStringAttr(options.enableROCMUkernels));
     if (options.wavesPerEu > 0)

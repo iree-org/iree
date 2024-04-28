@@ -912,6 +912,31 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
 }
 
 //===----------------------------------------------------------------------===//
+// Target Attributes
+//===----------------------------------------------------------------------===//
+
+static bool isSM80AndAbove(TargetAttr target) {
+  if (target.getApi() != TargetAPI::CUDA)
+    return false;
+  StringRef arch = target.getArch();
+  if (!arch.starts_with("sm_"))
+    return false;
+  APInt version;
+  if (arch.substr(3).getAsInteger(10, version)) {
+    return false;
+  }
+  return version.getZExtValue() >= 80;
+}
+
+bool TargetAttr::supportTF32InputMMAOps() const {
+  // TODO: scan the list of MMA ops to decude after plumbing through support
+  // for NVIDIA TensorCore MMA ops.
+  return isSM80AndAbove(*this);
+}
+
+bool TargetAttr::supportSyncMMAOps() const { return isSM80AndAbove(*this); }
+
+//===----------------------------------------------------------------------===//
 // Attribute Registration
 //===----------------------------------------------------------------------===//
 
