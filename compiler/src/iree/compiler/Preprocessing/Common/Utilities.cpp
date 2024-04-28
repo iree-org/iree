@@ -19,6 +19,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Support/FileUtilities.h"
+#include "mlir/Support/LLVM.h"
 #include "mlir/Tools/PDLL/CodeGen/CPPGen.h"
 #include "mlir/Tools/PDLL/CodeGen/MLIRGen.h"
 
@@ -75,14 +76,14 @@ static FunctionType getExternalFunctionCallType(MLIRContext *context,
       return;
     }
 
-    auto tensorType = inputType.cast<RankedTensorType>();
+    auto tensorType = cast<RankedTensorType>(inputType);
     convertTensorTypeToCallArgTypes(tensorType);
     return;
   };
 
   llvm::for_each(inputTypes, convertInputTypeToCallArgTypes);
   llvm::for_each(resultTypes, [&](Type t) {
-    convertTensorTypeToCallArgTypes(t.cast<RankedTensorType>());
+    convertTensorTypeToCallArgTypes(cast<RankedTensorType>(t));
   });
   llvm::for_each(otherOperandTypes, convertInputTypeToCallArgTypes);
 
@@ -135,14 +136,13 @@ createEntryPointFn(PatternRewriter &rewriter, Operation *rootOp,
       entryPointScalarInputTypes.push_back(type);
       return;
     }
-    auto tensorType = type.cast<RankedTensorType>();
+    auto tensorType = cast<RankedTensorType>(type);
     processTensorType(tensorType);
   };
 
   llvm::for_each(inputTypes, processInputType);
-  llvm::for_each(resultTypes, [&](Type t) {
-    processTensorType(t.cast<RankedTensorType>());
-  });
+  llvm::for_each(resultTypes,
+                 [&](Type t) { processTensorType(cast<RankedTensorType>(t)); });
   llvm::for_each(otherOperandTypes, processInputType);
 
   int64_t numTensorOperands = (int64_t)entryPointInputTypes.size();
@@ -183,12 +183,12 @@ createEntryPointFn(PatternRewriter &rewriter, Operation *rootOp,
       scalarArgs = scalarArgs.drop_front();
       return;
     }
-    marshalTensorTypes(type.cast<RankedTensorType>());
+    marshalTensorTypes(cast<RankedTensorType>(type));
   };
 
   llvm::for_each(inputTypes, marshalInputTypes);
   llvm::for_each(resultTypes, [&](Type t) {
-    marshalTensorTypes(t.cast<RankedTensorType>());
+    marshalTensorTypes(cast<RankedTensorType>(t));
   });
   llvm::for_each(otherOperandTypes, marshalInputTypes);
 
@@ -306,7 +306,7 @@ createFlowDispatchOp(PatternRewriter &rewriter, SymbolRefAttr exportOp,
 
   // Get the dynamic dims for the operands.
   for (auto operand : operands) {
-    auto tensorType = operand.getType().dyn_cast<RankedTensorType>();
+    auto tensorType = dyn_cast<RankedTensorType>(operand.getType());
     if (!tensorType)
       continue;
 
@@ -338,7 +338,7 @@ getDynamicResultDims(PatternRewriter &rewriter, ValueRange givenResultDims) {
   SmallVector<Value> dynamicResultDims;
   SmallVector<OpFoldResult> mixedValues = getAsOpFoldResult(givenResultDims);
   for (auto ofr : mixedValues) {
-    auto value = ofr.dyn_cast<Value>();
+    auto value = dyn_cast<Value>(ofr);
     if (!value)
       continue;
     dynamicResultDims.push_back(value);
@@ -367,7 +367,7 @@ static LogicalResult checkOperandAndResultTypes(Operation *rootOp,
   }
 
   if (llvm::any_of(otherOperandTypes, [](Type type) {
-        return !type.isIntOrFloat() && !type.isa<RankedTensorType>();
+        return !type.isIntOrFloat() && !isa<RankedTensorType>(type);
       })) {
     return rootOp->emitOpError("operand types of external function can be "
                                "`int*`, `float*` or `tensor`");
@@ -378,7 +378,7 @@ static LogicalResult checkOperandAndResultTypes(Operation *rootOp,
 // Constraint function to check that a tensor has a given element type
 LogicalResult mlir::iree_compiler::checkTensorElementType(
     PatternRewriter &rewriter, Type operandType, Type elementType) {
-  auto tensorType = operandType.dyn_cast<RankedTensorType>();
+  auto tensorType = dyn_cast<RankedTensorType>(operandType);
   return success(tensorType && tensorType.getElementType() == elementType);
 }
 
