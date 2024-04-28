@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "mma_attrs.mlir"
+    "target_attrs.mlir"
   TOOLS
     FileCheck
     iree-opt

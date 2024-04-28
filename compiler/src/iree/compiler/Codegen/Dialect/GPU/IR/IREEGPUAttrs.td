@@ -14,8 +14,115 @@ include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/EnumAttr.td"
 
 //===----------------------------------------------------------------------===//
-// Base MMA Vector Layout Attributes
+// GPU Core Level Feature/Limit Attributes
 //===----------------------------------------------------------------------===//
+
+// This section lists hardware features/limits at a single GPU core level.
+// Here a GPU core means the basic hardware functionality unit where a software
+// workgroup is scheduled onto; that is, a compute unit for AMD GPUs or a
+// streaming multiprocessor for NVIDIA GPUs.
+
+//===----------------------------------------------------------------------===//
+// Compute
+
+// IEEE 754 double precision floating point format in computation
+def IREEGPU_CFBW_64 : I32BitEnumAttrCaseBit<"FP64", 0, "fp64">;
+// IEEE 754 single precision floating point format in computation
+def IREEGPU_CFBW_32 : I32BitEnumAttrCaseBit<"FP32", 1, "fp32">;
+// IEEE 754 half precision floating point format in computation
+def IREEGPU_CFBW_16 : I32BitEnumAttrCaseBit<"FP16", 2, "fp16">;
+// Signed/unsigned 64-bit integer format in computation
+def IREEGPU_CIBW_64 : I32BitEnumAttrCaseBit<"Int64", 3, "int64">;
+// Signed/unsigned 32-bit integer format in computation
+def IREEGPU_CIBW_32 : I32BitEnumAttrCaseBit<"Int32", 4, "int32">;
+// Signed/unsigned 16-bit integer format in computation
+def IREEGPU_CIBW_16 : I32BitEnumAttrCaseBit<"Int16", 5, "int16">;
+// Signed/unsigned 8-bit integer format in computation
+def IREEGPU_CIBW_8  : I32BitEnumAttrCaseBit<"Int8",  6, "int8">;
+
+def IREEGPU_ComputeBitwidths : I32BitEnumAttr<
+  "ComputeBitwidths", "Supported bitwidths for compute",
+  [IREEGPU_CFBW_64, IREEGPU_CFBW_32, IREEGPU_CFBW_16,
+   IREEGPU_CIBW_64, IREEGPU_CIBW_32, IREEGPU_CIBW_16, IREEGPU_CIBW_8]> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+  let genSpecializedAttr = 0;
+}
+
+def IREEGPU_ComputeBitwidthsAttr : EnumAttr<
+  IREEGPU_Dialect, IREEGPU_ComputeBitwidths, "compute_bitwidths"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+  let assemblyFormat = "$value";
+}
+
+//===----------------------------------------------------------------------===//
+// Storage
+
+// Direct 64-bit value access from/to memory storage
+def IREEGPU_SBW_64 : I32BitEnumAttrCaseBit<"B64", 0, "b64">;
+// Direct 32-bit value access from/to memory storage
+def IREEGPU_SBW_32 : I32BitEnumAttrCaseBit<"B32", 1, "b32">;
+// Direct 16-bit value access from/to memory storage
+def IREEGPU_SBW_16 : I32BitEnumAttrCaseBit<"B16", 2, "b16">;
+// Direct 8-bit value access from/to memory storage
+def IREEGPU_SBW_8  : I32BitEnumAttrCaseBit<"B8",  3, "b8">;
+
+def IREEGPU_StorageBitwidths : I32BitEnumAttr<
+  "StorageBitwidths", "Supported bitwidths for storage",
+  [IREEGPU_SBW_64, IREEGPU_SBW_32, IREEGPU_SBW_16, IREEGPU_SBW_8]> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+  let genSpecializedAttr = 0;
+}
+
+def IREEGPU_StorageBitwidthsAttr : EnumAttr<
+  IREEGPU_Dialect, IREEGPU_StorageBitwidths, "storage_bitwidths"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+  let assemblyFormat = "$value";
+}
+
+//===----------------------------------------------------------------------===//
+// Subgroup operations
+
+def IREEGPU_SO_None       : I32BitEnumAttrCaseNone<"None", "none">;
+// Subgroup shuffle index/xor operation
+def IREEGPU_SO_Shuffle    : I32BitEnumAttrCaseBit<"Shuffle",    0, "shuffle">;
+// Subgroup arithmetic add/mul/min/max/and/or/xor reduction operation
+def IREEGPU_SO_Arithmetic : I32BitEnumAttrCaseBit<"Arithmetic", 1, "arithmetic">;
+
+def IREEGPU_SubgroupOps : I32BitEnumAttr<
+  "SubgroupOps", "Supported subgroup ops",
+  [IREEGPU_SO_None, IREEGPU_SO_Shuffle, IREEGPU_SO_Arithmetic]> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+  let genSpecializedAttr = 0;
+}
+
+def IREEGPU_SubgroupOpsAttr : EnumAttr<
+  IREEGPU_Dialect, IREEGPU_SubgroupOps, "subgroup_ops"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+  let assemblyFormat = "$value";
+}
+
+//===----------------------------------------------------------------------===//
+// Dot product operations
+
+def IREEGPU_DPO_None      : I32BitEnumAttrCaseNone<"None", "none">;
+// Dot product 4xi8 -> i32 operation
+def IREEGPU_DPO_4xI8ToI32 : I32BitEnumAttrCaseBit<"DP4xI8ToI32", 0, "dp4xi8toi32">;
+
+def IREEGPU_DotProductOps : I32BitEnumAttr<
+  "DotProductOps", "Supported dot product ops",
+  [IREEGPU_DPO_None, IREEGPU_DPO_4xI8ToI32]> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+  let genSpecializedAttr = 0;
+}
+
+def IREEGPU_DotProductOpsAttr : EnumAttr<
+  IREEGPU_Dialect, IREEGPU_DotProductOps, "dotproduct_ops"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+  let assemblyFormat = "$value";
+}
+
+//===----------------------------------------------------------------------===//
+// Base MMA vector layout
 
 class IREEGPU_MmaVectorLayoutAttr<string attrname, string mmaintrinsic> :
     AttrDef<IREEGPU_Dialect, attrname, [
@@ -83,8 +190,7 @@ class IREEGPU_MmaEnumAttr<EnumAttrInfo enumInfo, string name = "">
   : EnumAttr<IREEGPU_Dialect, enumInfo, name>;
 
 //===----------------------------------------------------------------------===//
-// MMA Attributes
-//===----------------------------------------------------------------------===//
+// MMA intrinsic
 
 def MFMA_F16_16x16x16_F32 : I32EnumAttrCase<"MFMA_F16_16x16x16_F32", 0>;
 def MFMA_F16_32x32x8_F32 : I32EnumAttrCase<"MFMA_F16_32x32x8_F32", 1>;
@@ -168,9 +274,13 @@ def IREEGPU_MMAAttr : IREEGPU_MmaVectorLayoutAttr<"MMA", "MMAIntrinsicAttr"> {
   }]);
 }
 
+def IREEGPU_MMAOpsArrayAttr : ArrayOfAttr<
+  IREEGPU_Dialect, "MMAOpsArray", "mma_ops", "MMAAttr"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+}
+
 //===----------------------------------------------------------------------===//
-// MMA schedule Attributes
-//===----------------------------------------------------------------------===//
+// MMA schedule
 
 def IREEGPU_MmaScheduleAttr : AttrDef<IREEGPU_Dialect, "MMASchedule"> {
   let mnemonic = "mma_schedule";
@@ -202,5 +312,85 @@ def IREEGPU_MmaScheduleAttr : AttrDef<IREEGPU_Dialect, "MMASchedule"> {
   }];
 }
 
+//===----------------------------------------------------------------------===//
+// Core level description
+
+def IREEGPU_TargetCoreAttr : AttrDef<IREEGPU_Dialect, "TargetCore"> {
+  let mnemonic = "target_core";
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+
+  let parameters = (ins
+    // Features
+    "ComputeBitwidthsAttr":$compute,
+    "StorageBitwidthsAttr":$storage,
+    "SubgroupOpsAttr":$subgroup,
+    "DotProductOpsAttr":$dotproduct,
+    "MMAOpsArrayAttr":$mma,
+
+    // Limits
+    // Supported subgroup size choices.
+    "DenseI32ArrayAttr":$subgroup_size_choices,
+    // The maximal number of threads per X/Y/Z dimension in one workgroup.
+    "DenseI32ArrayAttr":$max_workgroup_sizes,
+    // The maximal number of threads we can have in one workgroup.
+    "uint32_t":$max_thread_size,
+    // The maximal number of shared memory bytes we can allocate per workgroup.
+    "uint32_t":$max_workgroup_memory_bytes
+  );
+
+  let assemblyFormat = "`<` struct(params) `>`";
+}
+
+//===----------------------------------------------------------------------===//
+// GPU Chip Level Feature/Limit Attributes
+//===----------------------------------------------------------------------===//
+
+// This section lists hardware features/limits at a single GPU chip level.
+// Here a GPU chip means the hardware functionality scope where the whole
+// software compute grid is scheduled onto. A chip typically contains many
+// AMD compute units or NVIDIA streaming multiprocessors; it's the final SKU.
+
+def IREEGPU_TargetChipAttr : AttrDef<IREEGPU_Dialect, "TargetChip"> {
+  let mnemonic = "target_chip";
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+
+  let parameters = (ins
+    "uint32_t":$core_count
+  );
+
+  let assemblyFormat = "`<` struct(params) `>`";
+}
+
+//===----------------------------------------------------------------------===//
+// GPU Target Attributes
+//===----------------------------------------------------------------------===//
+
+def IREEGPU_TAPI_CUDA    : I32EnumAttrCase<"CUDA",    0, "cuda">;
+def IREEGPU_TAPI_DirectX : I32EnumAttrCase<"DirectX", 1, "directx">;
+def IREEGPU_TAPI_HIP     : I32EnumAttrCase<"HIP",     2, "hip">;
+def IREEGPU_TAPI_Metal   : I32EnumAttrCase<"Metal",   3, "metal">;
+def IREEGPU_TAPI_Vulkan  : I32EnumAttrCase<"Vulkan",  4, "vulkan">;
+def IREEGPU_TAPI_WebGPU  : I32EnumAttrCase<"WebGPU",  5, "webgpu">;
+
+def IREEGPU_TargetAPI : I32EnumAttr<
+  "TargetAPI", "Supported target APIs",
+  [IREEGPU_TAPI_CUDA, IREEGPU_TAPI_DirectX, IREEGPU_TAPI_HIP,
+   IREEGPU_TAPI_Metal, IREEGPU_TAPI_Vulkan, IREEGPU_TAPI_WebGPU]> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+  let genSpecializedAttr = 0;
+}
+
+def IREEGPU_TargetAttr : AttrDef<IREEGPU_Dialect, "Target"> {
+  let mnemonic = "target";
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+
+  let parameters = (ins
+    "TargetAPI":$api,
+    "TargetCoreAttr":$core,
+    OptionalParameter<"TargetChipAttr">:$chip
+  );
+
+  let assemblyFormat = "`<` struct(params) `>`";
+}
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_GPU_IREEGPUATTRS

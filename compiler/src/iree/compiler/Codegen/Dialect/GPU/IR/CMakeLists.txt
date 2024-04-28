@@ -22,6 +22,8 @@ iree_cc_library(
     "IREEGPUAttrs.h.inc"
     "IREEGPUDialect.cpp.inc"
     "IREEGPUDialect.h.inc"
+    "IREEGPUEnums.cpp.inc"
+    "IREEGPUEnums.h.inc"
     "IREEGPUInterfaces.cpp.inc"
     "IREEGPUInterfaces.h.inc"
   SRCS
