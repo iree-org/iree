@@ -289,6 +289,8 @@ static int64_t getVectorSize(mlir::FunctionOpInterface entryPointFn,
   return getVectorSize(entryPointFn, byteWidth);
 }
 
+static bool isSupportedTransposeOp(linalg::GenericOp genericOp);
+
 /// Returns minimum tiling sizes for each dimension. One dimension is possible
 /// to access at different element types. It determines the tiling sizes by
 /// looking into all the operands.
@@ -319,8 +321,15 @@ getMinTilingSizesForEachDim(mlir::FunctionOpInterface entryPointFn,
         llvm::cast<ShapedType>(inputOutputOpOperands[index].get().getType());
     int64_t tileSize = getVectorSize(entryPointFn, operandType);
 
+    LLVM_DEBUG(KD_DBGS() << "fastestVaryingDim: " << fastestVaryingDim
+                         << ", tileSize: " << tileSize
+                         << ", operandType: " << operandType << "\n");
     minTileSizes[fastestVaryingDim] =
         std::max<int64_t>(minTileSizes[fastestVaryingDim], tileSize);
+  }
+
+  for (auto [i, val] : llvm::enumerate(minTileSizes)) {
+    LLVM_DEBUG(KD_DBGS() << "minTileSizes #" << i << ": " << val << "\n");
   }
 
   // Limit unroll factor. For now, we assume the rightmost non-one tiled
@@ -333,13 +342,24 @@ getMinTilingSizesForEachDim(mlir::FunctionOpInterface entryPointFn,
         break;
       }
     }
+    bool seen = false;
     for (int unrollDim = vecDim - 1; unrollDim >= 0; --unrollDim) {
+      if (minTileSizes[unrollDim] <= 1) {
+        continue;
+      }
+      int64_t factor = seen ? 1LL : maxUnrollFactor;
+      seen = true;
+      LLVM_DEBUG(KD_DBGS() << "Adjusted min tile sizes: "
+                           << minTileSizes[unrollDim]
+                           << " with factor=" << factor << "\n");
       minTileSizes[unrollDim] =
-          std::min<int64_t>(minTileSizes[unrollDim], maxUnrollFactor);
+          std::min<int64_t>(minTileSizes[unrollDim], factor);
     }
   };
 
-  if (linalgOpInfo.isTranspose()) {
+  auto genericOp = dyn_cast<linalg::GenericOp>(op.getOperation());
+  if (linalgOpInfo.isTranspose() && genericOp &&
+      isSupportedTransposeOp(genericOp)) {
     // Limit unrolling on transpose operations.
     // TODO(dcaballe): Consider input and output transposes.
     limitUnrollFactor(targetMLTransInfo.defaultMaxTransposeUnrollFactor);
