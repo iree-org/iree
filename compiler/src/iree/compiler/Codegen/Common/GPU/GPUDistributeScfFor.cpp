@@ -4,16 +4,15 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-//===- SPIRVDistribute.cpp ------------------------------------------------===//
+//===- GPUDistributeScfFor.cpp ----------------------------------------===//
 //
 // This pass distributes tiled loop nests with `iree.gpu.distribute_dim`
 // attributes to invocations.
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Codegen/SPIRV/PassDetail.h"
-#include "iree/compiler/Codegen/SPIRV/Passes.h"
-#include "iree/compiler/Codegen/SPIRV/Utils.h"
+#include "iree/compiler/Codegen/Common/GPU/PassDetail.h"
+#include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -22,7 +21,7 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-spirv-distribute"
+#define DEBUG_TYPE "iree-codegen-gpu-distribute-scf-for"
 
 namespace mlir::iree_compiler {
 
@@ -67,8 +66,8 @@ struct DistributeLoop final : public OpRewritePattern<scf::ForOp> {
   }
 };
 
-struct SPIRVDistributePass final
-    : public SPIRVDistributeBase<SPIRVDistributePass> {
+struct GPUDistributeScfForPass final
+    : public GPUDistributeScfForBase<GPUDistributeScfForPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<gpu::GPUDialect>();
   }
@@ -87,8 +86,8 @@ struct SPIRVDistributePass final
 } // namespace
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createSPIRVDistributePass() {
-  return std::make_unique<SPIRVDistributePass>();
+createGPUDistributeScfForPass() {
+  return std::make_unique<GPUDistributeScfForPass>();
 }
 
 } // namespace mlir::iree_compiler

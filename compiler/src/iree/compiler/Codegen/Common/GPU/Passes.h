@@ -104,6 +104,10 @@ std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>> createGPUDistribute();
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createGPUDistributeSharedMemoryCopy();
 
+/// Pass to distribute tiled loop nests to invocations.
+std::unique_ptr<InterfacePass<FunctionOpInterface>>
+createGPUDistributeScfForPass();
+
 /// Apply multi-buffering transformation.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createGPUMultiBuffering(unsigned numBuffers = 5);

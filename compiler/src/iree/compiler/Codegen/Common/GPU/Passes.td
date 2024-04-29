@@ -37,6 +37,12 @@ def GPUDistributeSharedMemoryCopy :
   let constructor = "mlir::iree_compiler::createGPUDistributeSharedMemoryCopy()";
 }
 
+def GPUDistributeScfFor :
+    InterfacePass<"iree-codegen-gpu-distribute-scf-for", "mlir::FunctionOpInterface"> {
+  let summary = "Distribute tiled loop nests to invocations";
+  let constructor = "mlir::iree_compiler::createGPUDistributeScfForPass()";
+}
+
 def GPUGeneralizeNamedOps :
     InterfacePass<"iree-codegen-gpu-generalize-named-ops", "mlir::FunctionOpInterface"> {
   let summary = "Convert named Linalg ops to linalg.generic ops";
