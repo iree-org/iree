@@ -529,12 +529,10 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager) {
 
   // Problem specific (reduction) tiling.
   funcPassManager.addPass(createGPUTensorTileToSerialLoops());
-  // TODO: Hack for now, need to actually implement reduction tiling interface
-  // for online softmax or attention.
-  IREE::LinalgExt::TileAndDecomposeAttentionOptions attnOptions;
-  attnOptions.tileSize = 64;
+  // TODO: Hack for now. We need to implement partial tiling interface or
+  // make the pass read the lowering config attribute to understand tile sizes.
   funcPassManager.addPass(
-      IREE::LinalgExt::createTileAndDecomposeAttentionPass(attnOptions));
+      IREE::LinalgExt::createTileAndDecomposeAttentionPass());
 
   // Generalize all named ops so that we can fold away unit extent dims. By this
   // point, all tiling is finished so the tiling configurations on those ops can
@@ -542,7 +540,8 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager) {
   // `vector.contract` as filter dimensions are expected to be tiled to 1 by
   // this point.
   funcPassManager.addPass(createLinalgGeneralizeNamedOpsPass());
-  // TODO: Hack for now.
+  // TODO: Hack for now. The pass needs an option to change destination passing
+  // style.
   // LinalgFoldUnitExtentDimsPassOptions options;
   // options.useRankReducingSlices = true;
   // funcPassManager.addPass(mlir::createLinalgFoldUnitExtentDimsPass(options));
@@ -554,8 +553,8 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager) {
   addGPUVectorizationPasses(funcPassManager);
 
   // Allocate tensors for copies to shared memory.
-  // TODO: Hack for now.
-  // funcPassManager.addPass(createGPUVectorAlloc());
+  // TODO: Hack for now., The pass should only promote copies from shared
+  // memory. funcPassManager.addPass(createGPUVectorAlloc());
 
   // Tensor -> Memref
   addVectorBufferizePasses(funcPassManager);
