@@ -7,12 +7,10 @@
     "--device=cuda"
   ],
   "skip_compile_tests": [
-    // TODO(#16666): Fix these tests hanging at runtime (miscompiles?)
     "test_dequantizelinear",
     "test_slice_default_axes"
   ],
   "skip_run_tests": [
-    // Hanging on some machines?
     "test_gather_elements_negative_indices",
     "test_gridsample_zeros_padding",
     "test_scatter_elements_with_negative_indices"
@@ -718,10 +716,8 @@
     "test_max_int64",
     "test_max_int8",
     "test_max_uint16",
-    "test_max_uint16",
     "test_max_uint32",
     "test_max_uint64",
-    "test_max_uint8",
     "test_max_uint8",
     "test_min_float64",
     "test_min_int16",
@@ -729,10 +725,8 @@
     "test_min_int64",
     "test_min_int8",
     "test_min_uint16",
-    "test_min_uint16",
     "test_min_uint32",
     "test_min_uint64",
-    "test_min_uint8",
     "test_min_uint8",
     "test_mod_broadcast",
     "test_mod_int64_fmod",

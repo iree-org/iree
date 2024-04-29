@@ -1,15 +1,14 @@
 {
   "config_name": "cpu_llvm_sync",
-  "iree_compile_flags" : [
+  "iree_compile_flags": [
     "--iree-hal-target-backends=llvm-cpu"
   ],
   "iree_run_module_flags": [
     "--device=local-sync"
   ],
   "skip_compile_tests": [
-    // TODO(#16666): Fix these tests hanging at runtime (miscompiles?)
     "test_dequantizelinear",
-    "test_slice_default_axes",
+    "test_slice_default_axes"
   ],
   "skip_run_tests": [],
   "expected_compile_failures": [
@@ -601,7 +600,7 @@
     "test_unique_sorted_with_negative_axis",
     "test_unique_sorted_without_axis",
     "test_upsample_nearest",
-    "test_wrap_pad",
+    "test_wrap_pad"
   ],
   "expected_run_failures": [
     "test_add_uint8",
@@ -788,6 +787,6 @@
     "test_tril_square",
     "test_tril_square_neg",
     "test_tril_zero",
-    "test_where_long_example",
+    "test_where_long_example"
   ]
 }
