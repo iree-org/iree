@@ -9,9 +9,10 @@
 
 include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.td"
 include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.td"
-include "mlir/IR/OpBase.td"
+include "mlir/Dialect/SCF/IR/DeviceMappingInterface.td"
 include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/EnumAttr.td"
+include "mlir/IR/OpBase.td"
 
 //===----------------------------------------------------------------------===//
 // Base MMA Vector Layout Attributes
@@ -199,5 +200,22 @@ def IREEGPU_MmaScheduleAttr : AttrDef<IREEGPU_Dialect, "MMASchedule"> {
   }];
 }
 
+//===----------------------------------------------------------------------===//
+// Lane ID
+//===----------------------------------------------------------------------===//
+
+def IREEGPU_LaneIdAttr : AttrDef<IREEGPU_Dialect, "LaneId", [
+      DeclareAttrInterfaceMethods<DeviceMappingAttrInterface>
+  ]> {
+  let mnemonic = "lane_id";
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+  let parameters = (ins
+    "int64_t":$dim
+  );
+  let assemblyFormat = "`<` $dim `>`";
+  let description = [{
+    An attribute for mapping scf.forall ops to subgroup lanes.
+  }];
+}
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_GPU_IREEGPUATTRS
