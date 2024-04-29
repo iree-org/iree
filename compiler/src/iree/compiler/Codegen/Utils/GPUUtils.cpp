@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
+#include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
@@ -953,10 +954,14 @@ IREE::GPU::TargetAttr getGPUTargetAttr(IREE::HAL::ExecutableTargetAttr target) {
   auto config = target.getConfiguration();
   if (!config)
     return nullptr;
-  auto attr = config.getAs<IREE::GPU::TargetAttr>("iree.gpu.target");
-  if (!attr)
-    return nullptr;
-  return attr;
+  auto fullAttr = config.getAs<IREE::GPU::TargetAttr>("iree.gpu.target");
+  if (!fullAttr) {
+    // Check whether this is an abbreviate target for IR testing purposes
+    auto abbrAttr = config.getAs<IREE::GPU::AbbrTargetAttr>("iree.gpu.target");
+    fullAttr = IREE::GPU::getFullTarget(abbrAttr);
+  }
+
+  return fullAttr;
 }
 
 IREE::GPU::TargetAttr getGPUTargetAttr(Operation *op) {

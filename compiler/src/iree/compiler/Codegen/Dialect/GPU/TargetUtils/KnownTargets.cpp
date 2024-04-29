@@ -339,4 +339,29 @@ StringRef normalizeCUDATarget(StringRef target) {
   return normalizeNVIDIAGPUTarget(target);
 }
 
+bool isKnownAbbrTarget(AbbrTargetAttr abbrTarget) {
+  switch (abbrTarget.getApi()) {
+  case TargetAPI::CUDA:
+    return getNVIDIAGPUTargetDetails(abbrTarget.getChip()).has_value();
+  case TargetAPI::HIP:
+    return getAMDGPUTargetDetails(abbrTarget.getChip()).has_value();
+  default:
+    break;
+  }
+  return false;
+}
+
+TargetAttr getFullTarget(AbbrTargetAttr abbrTarget) {
+  MLIRContext *context = abbrTarget.getContext();
+  switch (abbrTarget.getApi()) {
+  case TargetAPI::CUDA:
+    return getCUDATargetDetails(abbrTarget.getChip(), context);
+  case TargetAPI::HIP:
+    return getHIPTargetDetails(abbrTarget.getChip(), context);
+  default:
+    break;
+  }
+  return nullptr;
+}
+
 } // namespace mlir::iree_compiler::IREE::GPU

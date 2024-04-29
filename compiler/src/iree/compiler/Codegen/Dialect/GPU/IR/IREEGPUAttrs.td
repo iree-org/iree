@@ -316,6 +316,14 @@ def IREEGPU_MmaScheduleAttr : AttrDef<IREEGPU_Dialect, "MMASchedule"> {
 // Core level description
 
 def IREEGPU_TargetCoreAttr : AttrDef<IREEGPU_Dialect, "TargetCore"> {
+  let summary = "Core level target description";
+  let description = [{
+    This attribute contains hardware features/limits at a single GPU chip level.
+    Here a GPU chip means the hardware functionality scope where the whole
+    software compute grid is scheduled onto. A chip typically contains many
+    AMD compute units or NVIDIA streaming multiprocessors; it's the final SKU.
+  }];
+
   let mnemonic = "target_core";
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
 
@@ -351,6 +359,14 @@ def IREEGPU_TargetCoreAttr : AttrDef<IREEGPU_Dialect, "TargetCore"> {
 // AMD compute units or NVIDIA streaming multiprocessors; it's the final SKU.
 
 def IREEGPU_TargetChipAttr : AttrDef<IREEGPU_Dialect, "TargetChip"> {
+  let summary = "Chip level target description";
+  let description = [{
+    This attribute contains hardware features/limits at a single GPU core level.
+    Here a GPU core means the basic hardware functionality unit where a software
+    workgroup is scheduled onto; that is, a compute unit for AMD GPUs or a
+    streaming multiprocessor for NVIDIA GPUs.
+  }];
+
   let mnemonic = "target_chip";
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
 
@@ -381,6 +397,18 @@ def IREEGPU_TargetAPI : I32EnumAttr<
 }
 
 def IREEGPU_TargetAttr : AttrDef<IREEGPU_Dialect, "Target"> {
+  let summary = "Full GPU target attribute";
+  let description = [{
+    This attributes describes a full GPU target. It contains a few fields:
+    * The target GPU API, e.g., cuda, hip, vulkan
+    * The canonical target architecture for compilation, e.g., sm_80 for
+      cuda, gfx942 for hip
+    * A TargetCoreAttr describing the GPU features and limits in a single
+      GPU core (that is, AMD compute unit or NVIDIA streaming multiprocessor)
+    * An optional TargetChipAttr describing GPU features for the final chip
+      or product, e.g., core count
+  }];
+
   let mnemonic = "target";
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
 
@@ -410,6 +438,26 @@ def IREEGPU_TargetAttr : AttrDef<IREEGPU_Dialect, "Target"> {
     // Returns true if this target supports TensorCore synchronized MMA ops.
     bool supportSyncMMAOps() const;
   }];
+}
+
+def IREEGPU_AbbrTargetAttr : AttrDef<IREEGPU_Dialect, "AbbrTarget"> {
+  let summary = "Abbreviate GPU target attribute";
+  let description = [{
+    This attributes is a shorthand of the full GPU target attribute. It contains
+    two fields--the target API and the target arch/chip/product. The target
+    arch/chip/product must be known to the compiler. This attribute is primarily
+    meant for making IR tests easier.
+  }];
+
+  let mnemonic = "abbr_target";
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+
+  let parameters = (ins
+    "TargetAPI":$api,
+    StringRefParameter<"target architecture/chip/product">:$chip
+  );
+
+  let assemblyFormat = "`<` $api `:` $chip `>`";
 }
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_GPU_IREEGPUATTRS
