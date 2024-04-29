@@ -73,15 +73,17 @@ module {
 // CHECK:      func.func @winograd_input_transform(
 // CHECK-SAME:   %[[ARG0:.+]]: tensor<2x130x130x64xf16>
 // CHECK-SAME:   %[[ARG1:.+]]: tensor<8x8x2x22x22x64xf16>
-// CHECK-SAME:   %[[S0:[a-zA-Z0-9_]+]]: index
-// CHECK-SAME:   %[[S1:[a-zA-Z0-9_]+]]: index
 // CHECK-DAG:    %[[ZERO:.+]] = arith.constant 0.000000e+00 : f16
+// CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG:    %[[BT:.+]] = arith.constant dense<{{\[\[}}1.000000e+00, 0.000000e+00, 0.000000e+00,{{.*}} : tensor<8x8xf32>
 // CHECK-DAG:    %[[B:.+]] = arith.constant dense<{{\[\[}}1.000000e+00, 0.000000e+00, -5.250000e+00,{{.*}} : tensor<8x8xf32>
 // CHECK-DAG:    %[[INPUT_TILE:.+]] = tensor.extract_slice %[[ARG0]]
 // CHECK-DAG:    %[[OUTPUT_TILE:.+]] = tensor.extract_slice %[[ARG1]]
-// CHECK-DAG:    %[[PAD_HIGH0:.+]] = affine.apply #[[MAP]](){{\[}}%[[S0]]]
-// CHECK-DAG:    %[[PAD_HIGH1:.+]] = affine.apply #[[MAP]](){{\[}}%[[S1]]]
+// CHECK-DAG:    %[[DIM0:.+]] = tensor.dim %[[INPUT_TILE]], %[[C0]] : tensor<?x?xf16>
+// CHECK-DAG:    %[[PAD_HIGH0:.+]] = affine.apply #[[MAP]](){{\[}}%[[DIM0]]]
+// CHECK-DAG:    %[[DIM1:.+]] = tensor.dim %[[INPUT_TILE]], %[[C1]] : tensor<?x?xf16>
+// CHECK-DAG:    %[[PAD_HIGH1:.+]] = affine.apply #[[MAP]](){{\[}}%[[DIM1]]]
 // CHECK:        %[[PAD:.+]] = tensor.pad %[[INPUT_TILE]] low[0, 0] high{{\[}}%[[PAD_HIGH0]], %[[PAD_HIGH1]]]
 // CHECK-NEXT:     ^bb0(
 // CHECK-NEXT:       tensor.yield %[[ZERO]] : f16
@@ -114,12 +116,16 @@ module {
 // CHECK-SAME:   %[[S0:[a-zA-Z0-9_]+]]: index
 // CHECK-SAME:   %[[S1:[a-zA-Z0-9_]+]]: index
 // CHECK-DAG:    %[[ZERO:.+]] = arith.constant 0.000000e+00 : f16
+// CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:    %[[C1:.+]] = arith.constant 1 : index
 // CHECK-DAG:    %[[BT:.+]] = arith.constant dense<{{\[\[}}1.000000e+00, 0.000000e+00, 0.000000e+00,{{.*}} : tensor<8x8xf32>
 // CHECK-DAG:    %[[B:.+]] = arith.constant dense<{{\[\[}}1.000000e+00, 0.000000e+00, -5.250000e+00,{{.*}} : tensor<8x8xf32>
 // CHECK-DAG:    %[[INPUT_TILE:.+]] = tensor.extract_slice %[[ARG0]]
 // CHECK-DAG:    %[[OUTPUT_TILE:.+]] = tensor.extract_slice %[[ARG1]]
-// CHECK-DAG:    %[[PAD_HIGH0:.+]] = affine.apply #[[MAP]](){{\[}}%[[S0]]]
-// CHECK-DAG:    %[[PAD_HIGH1:.+]] = affine.apply #[[MAP]](){{\[}}%[[S1]]]
+// CHECK-DAG:    %[[DIM0:.+]] = tensor.dim %[[INPUT_TILE]], %[[C0]] : tensor<?x?xf16>
+// CHECK-DAG:    %[[PAD_HIGH0:.+]] = affine.apply #[[MAP]](){{\[}}%[[DIM0]]]
+// CHECK-DAG:    %[[DIM1:.+]] = tensor.dim %[[INPUT_TILE]], %[[C1]] : tensor<?x?xf16>
+// CHECK-DAG:    %[[PAD_HIGH1:.+]] = affine.apply #[[MAP]](){{\[}}%[[DIM1]]]
 // CHECK:        %[[PAD:.+]] = tensor.pad %[[INPUT_TILE]] low[0, 0] high{{\[}}%[[PAD_HIGH0]], %[[PAD_HIGH1]]]
 // CHECK-NEXT:     ^bb0(
 // CHECK-NEXT:       tensor.yield %[[ZERO]] : f16

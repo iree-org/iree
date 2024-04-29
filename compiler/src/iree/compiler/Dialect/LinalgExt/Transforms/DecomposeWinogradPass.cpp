@@ -18,6 +18,7 @@
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -197,23 +198,15 @@ struct DecomposeWinogradInputTransform
 
   LogicalResult matchAndRewrite(WinogradInputTransformOp transformOp,
                                 PatternRewriter &rewriter) const override {
-    Location loc = transformOp.getLoc();
-    Value dynamicSlice = transformOp.input();
-    Value outputSlice = transformOp.output();
     if (transformOp.getInputRank() != 2 || transformOp.getOutputRank() != 2) {
       return rewriter.notifyMatchFailure(transformOp, "Winograd op not tiled");
     }
-    const int64_t inputTileSize = transformOp.getInputTileSize();
-    ArrayRef<int64_t> imageDims = transformOp.getImageDimensions();
-    llvm::SmallSetVector<int64_t, 2> imageDimsSet(imageDims.begin(),
-                                                  imageDims.end());
-    SmallVector<int64_t> inputTileSquare(imageDims.size(), inputTileSize);
-    Type elementType = transformOp.getOutputType().getElementType();
-    Value zero = rewriter.create<arith::ConstantOp>(
-        loc, rewriter.getZeroAttr(elementType));
+
     /// The two values below are the transpose(B) [BT]
     /// and B [B] constant matrices that convert the input
     /// tile from the original domain to the Winograd domain.
+    Location loc = transformOp.getLoc();
+    const int64_t inputTileSize = transformOp.getInputTileSize();
     Value BT = IREE::LinalgExt::createValueFrom2DConstant(
         IREE::LinalgExt::Winograd::BT_6x6_3x3, inputTileSize, inputTileSize,
         loc, rewriter);
@@ -221,40 +214,23 @@ struct DecomposeWinogradInputTransform
         IREE::LinalgExt::Winograd::B_6x6_3x3, inputTileSize, inputTileSize, loc,
         rewriter);
 
-    auto inputExtractSliceOp =
-        dynamicSlice.getDefiningOp<tensor::ExtractSliceOp>();
-    // Harcoding input rank as 4 here - since we'd be getting a tiled version
-    // with rank 2. We are always expected to either have a rank 4 version of
-    // this op, or rank 2 (tiled). And at this point in the flow, it is
-    // guaranteed to be a rank 2 version of the op as ensured by the assertion
-    // above. Pad the input slice.
-
-    SmallVector<OpFoldResult> mixedSizes = inputExtractSliceOp.getMixedSizes();
-    SmallVector<OpFoldResult> dynamicSliceSizes;
-    for (auto idx : transformOp.getImageDimensions()) {
-      dynamicSliceSizes.push_back(mixedSizes[idx]);
-    }
-    SmallVector<OpFoldResult> padLow(inputTileSquare.size(),
-                                     rewriter.getIndexAttr(0));
-    SmallVector<OpFoldResult> padHigh;
-    for (auto [idx, size] : llvm::enumerate(dynamicSliceSizes)) {
-      AffineExpr d0;
-      bindDims(rewriter.getContext(), d0);
-      auto ub = rewriter.getAffineConstantExpr(inputTileSquare[idx]);
-      padHigh.push_back(affine::makeComposedFoldedAffineApply(rewriter, loc,
-                                                              {ub - d0}, size));
-    }
-    auto inputSliceType = transformOp.getInputType().clone(inputTileSquare);
-    Value inputSlice = rewriter.create<tensor::PadOp>(
-        loc, inputSliceType, dynamicSlice, padLow, padHigh, zero);
+    // Pad the input slice.
+    Value dynamicSlice = transformOp.input();
+    Type elementType = transformOp.getOutputType().getElementType();
+    Value zero = rewriter.create<arith::ConstantOp>(
+        loc, rewriter.getZeroAttr(elementType));
+    SmallVector<int64_t> inputTileSquare(
+        transformOp.getImageDimensions().size(), inputTileSize);
+    auto inputSliceType = RankedTensorType::get(inputTileSquare, elementType);
+    Value inputSlice = tensor::createPadHighOp(
+        inputSliceType, dynamicSlice, zero, /*nofold=*/false, loc, rewriter);
 
     // Create computation
     Value result, AMatrix, BMatrix;
     linalg::MatmulOp matmulOp;
-    Type tensorType = outputSlice.getType();
     for (int i = 0; i < 2; i++) {
-      linalg::FillOp fillOp = rewriter.create<linalg::FillOp>(
-          loc, ValueRange{zero}, ValueRange{outputSlice});
+      auto fillOp = rewriter.create<linalg::FillOp>(
+          loc, ValueRange{zero}, ValueRange{transformOp.output()});
       if (i == 0) {
         AMatrix = inputSlice;
         BMatrix = B;
@@ -263,7 +239,8 @@ struct DecomposeWinogradInputTransform
         BMatrix = result;
       }
       matmulOp = rewriter.create<linalg::MatmulOp>(
-          loc, tensorType, ValueRange{AMatrix, BMatrix}, fillOp.result());
+          loc, transformOp.getOutputType(), ValueRange{AMatrix, BMatrix},
+          fillOp.result());
       result = matmulOp.getResult(0);
     }
     rewriter.replaceOp(transformOp, result);
