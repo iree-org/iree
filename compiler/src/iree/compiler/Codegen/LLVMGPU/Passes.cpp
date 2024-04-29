@@ -532,9 +532,9 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager) {
   // TODO: Hack for now. We need to implement partial tiling interface or
   // make the pass read the lowering config attribute to understand tile sizes.
   IREE::LinalgExt::TileAndDecomposeAttentionOptions attnOptions;
-  attnOptions.tileSize = 64;
+  attnOptions.tileSize = 32;
   funcPassManager.addPass(
-      IREE::LinalgExt::createTileAndDecomposeAttentionPass());
+      IREE::LinalgExt::createTileAndDecomposeAttentionPass(attnOptions));
 
   // Generalize all named ops so that we can fold away unit extent dims. By this
   // point, all tiling is finished so the tiling configurations on those ops can
