@@ -211,6 +211,11 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
     return clPProcStrategy;
   }
 
+  // TODO: Implement heurystics for Convs
+  if (isa<linalg::ConvolutionOpInterface>(linalgOp.getOperation())) {
+    return VectorPreProcStrategy::None;
+  }
+
   // Select a strategy based on heuristics.
   if (linalgOp.hasPureBufferSemantics()) {
     return VectorPreProcStrategy::None;
@@ -2106,10 +2111,11 @@ static Conv2DDimOrder getConv2DDimOrder(Operation *op) {
 }
 
 /// Sets lowering configuration for conv ops. See below for supported conv ops.
-static LogicalResult setConvRootConfig(mlir::FunctionOpInterface entryPointFn,
-                                       linalg::LinalgOp convOp,
-                                       ArrayRef<int64_t> targetTileSizes,
-                                       int64_t vectorSize) {
+static LogicalResult
+setConvRootConfig(mlir::FunctionOpInterface entryPointFn,
+                  linalg::LinalgOp convOp, ArrayRef<int64_t> targetTileSizes,
+                  int64_t vectorSize,
+                  VectorPreProcStrategy vecPreProcStrategy) {
   if (!is2DConvOp(convOp) && !is2DDepthConvOp(convOp) &&
       !is2DPoolingOp(convOp)) {
     return failure();
@@ -2170,6 +2176,12 @@ static LogicalResult setConvRootConfig(mlir::FunctionOpInterface entryPointFn,
     scalableTileFlags.emplace_back(numTilingDims, false);
     // Level 4: Inner parallel
     scalableTileFlags.emplace_back(numTilingDims, false);
+  }
+
+  if (vecPreProcStrategy == VectorPreProcStrategy::Peeling) {
+    return setOpConfigAndEntryPointFnTranslation(
+        entryPointFn, convOp, tileSizes, scalableTileFlags,
+        DispatchLoweringPassPipeline::CPUConvTileAndDecomposeAndPeelExpert);
   }
 
   return setOpConfigAndEntryPointFnTranslation(
@@ -2260,9 +2272,11 @@ setConvInterfaceRootConfig(mlir::FunctionOpInterface entryPointFn,
     break;
   }
 
+  auto vecPreProcStrategy =
+      getVectorPreProcStrategy(cast<linalg::LinalgOp>(convOp.getOperation()));
   return setConvRootConfig(entryPointFn,
                            cast<linalg::LinalgOp>(convOp.getOperation()),
-                           targetTileSizes, vectorSize);
+                           targetTileSizes, vectorSize, vecPreProcStrategy);
 }
 
 static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,

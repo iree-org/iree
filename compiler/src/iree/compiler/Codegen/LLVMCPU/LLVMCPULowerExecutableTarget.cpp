@@ -144,6 +144,14 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
                                               pipelineOpts);
     break;
   }
+  case IREE::Codegen::DispatchLoweringPassPipeline::
+      CPUConvTileAndDecomposeAndPeelExpert: {
+    TilingConfig tilingConfig = getTilingConfigForPipeline(funcOp);
+    pipelineOpts.enablePeeling = true;
+    addConvTileAndDecomposeExpertPassPipeline(pipeline, tilingConfig,
+                                              pipelineOpts);
+    break;
+  }
   case IREE::Codegen::DispatchLoweringPassPipeline::Mmt4dTilingExpert: {
     TilingConfig tilingConfig = getTilingConfigForPipeline(funcOp);
     addMmt4dTilingExpertPassPipeline(pipeline, tilingConfig, pipelineOpts);
