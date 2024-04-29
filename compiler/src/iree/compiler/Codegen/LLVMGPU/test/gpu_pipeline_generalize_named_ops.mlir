@@ -10,7 +10,7 @@
 // CHECK-NEXT: linalg.generic
 // CHECK-NOT:  linalg.matmul_transpose_b
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {target_arch = "gfx902"}>
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx940">}>
 module {
   func.func @warp_reduction_large_vector() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
     %cst = arith.constant 0.000000e+00 : f32

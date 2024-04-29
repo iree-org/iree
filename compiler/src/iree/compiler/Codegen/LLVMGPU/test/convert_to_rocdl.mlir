@@ -12,7 +12,7 @@
   ]>
 ]>
 hal.executable @abs_ex_dispatch_0 {
-  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
+  hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx908">}>) {
     hal.executable.export @abs_ex_dispatch_0 layout(#pipeline_layout)
     builtin.module {
       func.func @abs_ex_dispatch_0() {
@@ -57,7 +57,7 @@ hal.executable @abs_ex_dispatch_0 {
   ]>
 ]>
 hal.executable @abs_ex_dispatch_0 {
-  hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
+  hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx908">}>) {
     hal.executable.export @abs_ex_dispatch_0 layout(#pipeline_layout)
     builtin.module {
       func.func @reduction_maximum() {
@@ -86,7 +86,7 @@ hal.executable @abs_ex_dispatch_0 {
   ]>
 ]>
 hal.executable @simple_barrier {
-  hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
+  hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx908">}>) {
     hal.executable.export @simple_barrier layout(#pipeline_layout)
     builtin.module {
       func.func @simple_barrier() {
@@ -107,7 +107,7 @@ hal.executable @simple_barrier {
   ]>
 ]>
 hal.executable @masked_load_store {
-  hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
+  hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx908">}>) {
     hal.executable.export @masked_load_store layout(#pipeline_layout)
     builtin.module {
       func.func @masked_load_store() {

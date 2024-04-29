@@ -14,7 +14,7 @@
 // RUN:   --td-pad-strategy-use-async-copies=false \
 // RUN: | FileCheck --check-prefix=WITH_OPTIONS %s
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_80">}>
 module {
   func.func @pad() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
     %c0 = arith.constant 0 : index
@@ -93,7 +93,7 @@ module {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_80">}>
 module {
   func.func @pad_low() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
     %c0 = arith.constant 0 : index
@@ -119,7 +119,7 @@ module {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_80">}>
 module {
   func.func @pad_local() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
     %c0 = arith.constant 0 : index

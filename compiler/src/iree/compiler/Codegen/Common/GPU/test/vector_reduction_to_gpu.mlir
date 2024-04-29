@@ -1,6 +1,6 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(func.func(iree-codegen-vector-reduction-to-gpu, cse))' %s | FileCheck %s
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>
 #map = affine_map<()[s0, s1] -> (s1 * 2 + s0 floordiv 32)>
 #translation_info = #iree_codegen.translation_info<None workgroup_size = [32, 1, 1]>
 module {
@@ -69,7 +69,7 @@ module {
 
 // Make sure memref.load from uniform buffers are hoisted out as uniform code.
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>
 #translation_info = #iree_codegen.translation_info<None workgroup_size = [32, 1, 1]>
 #map = affine_map<()[s0, s1] -> (s1 * 2 + s0 floordiv 32)>
 module {
@@ -124,7 +124,7 @@ module {
 
 // Make sure memref.load from readonly storage buffers are hoisted out as uniform code.
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>
 
 #map = affine_map<()[s0, s1] -> (s1 * 2 + s0 floordiv 32)>
 #translation_info = #iree_codegen.translation_info<None workgroup_size = [32, 1, 1]>
@@ -178,7 +178,7 @@ module {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>
 #translation_info = #iree_codegen.translation_info<None workgroup_size = [32, 1, 1]>
 module {
   func.func @shared_memory_copy() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation_info} {
@@ -212,7 +212,7 @@ module {
 
 // Check that we multi-row matvec gets distributed across subgroup threads.
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {target_arch = "gfx940"}>
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx940">}>
 #translation_info = #iree_codegen.translation_info<None workgroup_size = [64, 1, 1]>
 #map = affine_map<()[s0] -> (s0 * 4)>
 #map1 = affine_map<(d0, d1) -> (0, d1)>
@@ -262,7 +262,7 @@ module {
 //  CHECK-NEXT:   return
 
 // -----
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>
 #translation_info = #iree_codegen.translation_info<None workgroup_size = [32, 1, 1]>
 module {
   func.func @simple_nd_write() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation_info} {

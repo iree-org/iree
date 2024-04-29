@@ -350,7 +350,7 @@ StringRef normalizeHIPTarget(StringRef target) {
 
 TargetAttr getCUDATargetDetails(StringRef target, MLIRContext *context) {
   if (auto details = getNVIDIAGPUTargetDetails(target))
-    return createTargetAttr(*details, TargetAPI::HIP,
+    return createTargetAttr(*details, TargetAPI::CUDA,
                             normalizeNVIDIAGPUTarget(target), context);
   return nullptr;
 }

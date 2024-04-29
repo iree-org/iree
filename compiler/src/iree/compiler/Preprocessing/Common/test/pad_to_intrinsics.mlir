@@ -6,7 +6,7 @@
 #rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb",
                              {mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
                                                 #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>],
-                              target_arch = "gfx942", ukernels = "none"}>
+                              iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx942">, ukernels = "none"}>
 
 // CHECK-LABEL: func.func @main0(
 // CHECK-SAME:    %[[ARG0:.+]]: tensor<2x130x130x4xf16>,
@@ -43,7 +43,7 @@ func.func @main0(%arg0: tensor<2x130x130x4xf16>, %arg1: tensor<3x3x4x320xf16>, %
 #rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb",
                              {mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
                                                 #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>],
-                              target_arch = "gfx942", ukernels = "none"}>
+                              iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx942">, ukernels = "none"}>
 
 // CHECK-LABEL: func.func @main1(
 // CHECK-SAME:    %[[ARG0:.+]]: tensor<2x130x130x320xf16>,
@@ -77,7 +77,7 @@ func.func @main1(%arg0: tensor<2x130x130x320xf16>, %arg1: tensor<3x3x320x4xf16>,
 
 #rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb",
                              {mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>],
-                              target_arch = "gfx942", ukernels = "none"}>
+                              iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx942">, ukernels = "none"}>
 
 // CHECK-LABEL: func.func @main2(
 // CHECK-SAME:    %[[ARG0:.+]]: tensor<2x130x130x4xf16>,
@@ -106,7 +106,7 @@ func.func @main2(%arg0: tensor<2x130x130x4xf16>, %arg1: tensor<3x3x4x320xf16>, %
 
 #rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb",
                                     {mma_intrinsics = [#iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>],
-                                      target_arch = "gfx1100", ukernels = "none"}>
+                                      iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx1100">, ukernels = "none"}>
 
 //       CHECK: func.func @matmul_static(
 //  CHECK-SAME:    %[[ARG0:.+]]: tensor<10x20xf16>,
@@ -143,7 +143,7 @@ func.func @matmul_static(%arg0 : tensor<10x20xf16>, %arg1 : tensor<20x30xf16>, %
 
 #rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb",
                                     {mma_intrinsics = [#iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>],
-                                      target_arch = "gfx1100", ukernels = "none"}>
+                                      iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx1100">, ukernels = "none"}>
 
 //   CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (-s0 + (s0 ceildiv 16) * 16)>
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>
@@ -185,7 +185,7 @@ func.func @mmtb_dynamic_k_n(%arg0 : tensor<10x?xf16>, %arg1 : tensor<?x?xf16>, %
 
 #rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb",
                                     {mma_intrinsics = [#iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>],
-                                      target_arch = "gfx1100", ukernels = "none"}>
+                                      iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx1100">, ukernels = "none"}>
 
 //   CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (-s0 + (s0 ceildiv 16) * 16)>
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1] -> (-s0 + s1 + (s0 ceildiv 16) * 16)>
@@ -233,7 +233,7 @@ func.func @bmm_dynamic_m_k(%arg0: tensor<32x?x?xf16>, %arg1: tensor<32x?x128xf16
 
 #rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb",
                                     {mma_intrinsics = [#iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>],
-                                      target_arch = "gfx1100", ukernels = "none"}>
+                                      iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx1100">, ukernels = "none"}>
 
 //   CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (-s0 + (s0 ceildiv 16) * 16)>
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1] -> (-s0 + s1 + (s0 ceildiv 16) * 16)>

@@ -9,7 +9,7 @@
 #translation_info = #iree_codegen.translation_info<None workgroup_size = [64, 1, 1]>
 // CHECK-LABEL: func.func @dispatch_0()
 hal.executable private @dispatch_0  {
-  hal.executable.variant @cuda target(#hal.executable.target<"cuda", "cuda-nvptx-fb">) {
+  hal.executable.variant @cuda target(#hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>) {
     hal.executable.export @dispatch_0 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device) :
       %c1 = arith.constant 1 : index
@@ -58,7 +58,7 @@ hal.executable private @dispatch_0  {
 // CHECK-LABEL: func.func @workgroup_tile_loop()
 #translation = #iree_codegen.translation_info<LLVMGPUDistribute workgroup_size = [32, 1, 1]>
 hal.executable private @workgroup_tile_loop  {
-  hal.executable.variant @cuda target(#hal.executable.target<"cuda", "cuda-nvptx-fb">) {
+  hal.executable.variant @cuda target(#hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>) {
     hal.executable.export @workgroup_tile_loop layout(#pipeline_layout) {
     ^bb0(%arg0 : !hal.device, %arg1 : index):
       %c1 = arith.constant 1 : index
@@ -95,7 +95,7 @@ hal.executable private @workgroup_tile_loop  {
 // CHECK-LABEL: func.func @workgroup_tile_loop_negative()
 #translation = #iree_codegen.translation_info<LLVMGPUDistribute>
 hal.executable private @workgroup_tile_loop_negative  {
-  hal.executable.variant @cuda target(#hal.executable.target<"cuda", "cuda-nvptx-fb">) {
+  hal.executable.variant @cuda target(#hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>) {
     hal.executable.export @workgroup_tile_loop_negative layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1 : index):
       %c1 = arith.constant 1 : index
@@ -134,7 +134,7 @@ hal.executable private @workgroup_tile_loop_negative  {
 //       CHECK:   gpu.barrier
 #translation = #iree_codegen.translation_info<LLVMGPUDistribute workgroup_size = [8, 2, 1]>
 hal.executable private @both_workgroup_and_workitem  {
-  hal.executable.variant @cuda target(#hal.executable.target<"cuda", "cuda-nvptx-fb">) {
+  hal.executable.variant @cuda target(#hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>) {
     hal.executable.export @both_workgroup_and_workitem layout(#pipeline_layout) {
     ^bb0(%arg0 : !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %c1 = arith.constant 1 : index
@@ -194,7 +194,7 @@ hal.executable private @both_workgroup_and_workitem  {
 #map2 = affine_map<()[s0, s1] -> (-((s0 * -4 + 4) mod (s1 * 4)) + 4)>
 #map3 = affine_map<(d0)[s0] -> (d0 + s0)>
 hal.executable private @simple_mul {
-  hal.executable.variant public @variant target(#hal.executable.target<"cuda", "cuda-nvptx-fb">) {
+  hal.executable.variant public @variant target(#hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>) {
     hal.executable.export public @simple_mul ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
       %c1 = arith.constant 1 : index

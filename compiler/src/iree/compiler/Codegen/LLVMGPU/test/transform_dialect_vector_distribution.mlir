@@ -9,7 +9,7 @@
 // RUN: FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>, #hal.descriptor_set.binding<1, storage_buffer>]>]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>
 #translation_info = #iree_codegen.translation_info<None workgroup_size = [64, 1, 1] subgroup_size = 32>
 module {
   func.func @reduce_dispatch_0() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation_info} {
