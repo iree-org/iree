@@ -138,6 +138,19 @@ const CoreDetails *getCDNA2CoreDetails() {
   return &cdna2Core;
 }
 
+const CoreDetails *getCDNA1CoreDetails() {
+  static const MMAIntrinsic cdna1MMAOps[] = {
+      MMAIntrinsic::MFMA_F16_16x16x16_F32,
+      MMAIntrinsic::MFMA_F16_32x32x8_F32,
+  };
+  static const CoreDetails cdna1Core = {
+      allComputeBits,   allStorageBits,          allSubgroupOps,
+      allDotProductOps, ARRAY_SIZE(cdna1MMAOps), cdna1MMAOps,
+      {64, 64},         {1024, 1024, 1024},      1024,
+      64 * 1024};
+  return &cdna1Core;
+}
+
 const CoreDetails *getRDNA3CoreDetails() {
   static const MMAIntrinsic rdna3MMAOps[] = {
       MMAIntrinsic::WMMA_F16_16x16x16_F32,
@@ -153,6 +166,7 @@ const CoreDetails *getRDNA3CoreDetails() {
 std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
   const CoreDetails *cdna3Core = getCDNA3CoreDetails();
   const CoreDetails *cdna2Core = getCDNA2CoreDetails();
+  const CoreDetails *cdna1Core = getCDNA1CoreDetails();
   const CoreDetails *rdna3Core = getRDNA3CoreDetails();
 
   // "AMD Instinct MI300 Series Product Offerings" in Page 23 of
@@ -165,6 +179,10 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
   static const ChipDetails mi250xChip = {220};
   static const ChipDetails mi250Chip = {208};
   static const ChipDetails mi210Chip = {104};
+
+  // "AMD CDNA Architecture Compute Units" in Page 5 of
+  // https://www.amd.com/content/dam/amd/en/documents/instinct-business-docs/white-papers/amd-cdna-white-paper.pdf
+  static const ChipDetails mi100Chip = {120};
 
   static const ChipDetails rx7900xtxChip = {96};
   static const ChipDetails rx7900xtChip = {84};
@@ -183,6 +201,8 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
       .Case("mi250", TargetDetails{cdna2Core, &mi250Chip})
       .Case("mi210", TargetDetails{cdna2Core, &mi210Chip})
       .Cases("cdna2", "gfx90a", TargetDetails{cdna2Core, nullptr})
+      .Case("mi100", TargetDetails{cdna1Core, &mi100Chip})
+      .Cases("cdna1", "gfx908", TargetDetails{cdna1Core, nullptr})
       // https://www.techpowerup.com/gpu-specs/radeon-rx-7900-xtx.c3941
       .Case("rx7900xtx", TargetDetails{rdna3Core, &rx7900xtxChip})
       // https://www.techpowerup.com/gpu-specs/radeon-rx-7900-xt.c3912
