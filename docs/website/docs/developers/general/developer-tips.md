@@ -166,8 +166,11 @@ Flag | Files dumped
 
     module_abs_dispatch_0.mlir
     module_abs_dispatch_0_system_elf_x86_64_benchmark.mlir
+    module_abs_dispatch_0_system_elf_x86_64.codegen.ll
     module_abs_dispatch_0_system_elf_x86_64.codegen.bc
+    module_abs_dispatch_0_system_elf_x86_64.linked.ll
     module_abs_dispatch_0_system_elf_x86_64.linked.bc
+    module_abs_dispatch_0_system_elf_x86_64.optimized.ll
     module_abs_dispatch_0_system_elf_x86_64.optimized.bc
     module_abs_dispatch_0_system_elf_x86_64.o
     module_abs_dispatch_0_system_elf_x86_64.s
@@ -185,6 +188,7 @@ Flag | Files dumped
 
     ??? tip "Tip - Disassembling `.bc` files with `llvm-dis`"
 
+        This section can be skipped if the .ll files are already in the directory you choose.
         The `.bc` intermediate files use the
         [LLVM BitCode](https://llvm.org/docs/BitCodeFormat.html) format, which
         can be disassembled using
@@ -323,8 +327,11 @@ Flag | Files dumped
     $ ls /tmp/iree/simple_abs
 
     module_abs_dispatch_0_cuda_nvptx_fb_benchmark.mlir
+    module_abs_dispatch_0_cuda_nvptx_fb.codegen.ll
     module_abs_dispatch_0_cuda_nvptx_fb.codegen.bc
+    module_abs_dispatch_0_cuda_nvptx_fb.linked.ll
     module_abs_dispatch_0_cuda_nvptx_fb.linked.bc
+    module_abs_dispatch_0_cuda_nvptx_fb.optimized.ll
     module_abs_dispatch_0_cuda_nvptx_fb.optimized.bc
     module_abs_dispatch_0_cuda_nvptx_fb.ptx
     module_abs_dispatch_0.mlir
@@ -333,6 +340,7 @@ Flag | Files dumped
 
     ??? tip "Tip - Disassembling `.bc` files with `llvm-dis`"
 
+        This section can be skipped if the .ll files are already in the directory you choose.
         The `.bc` intermediate files use the
         [LLVM BitCode](https://llvm.org/docs/BitCodeFormat.html) format, which
         can be disassembled using
