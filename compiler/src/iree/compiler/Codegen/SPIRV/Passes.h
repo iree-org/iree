@@ -86,9 +86,6 @@ createSPIRVAnnotateWinogradLoopsPass();
 std::unique_ptr<InterfacePass<FunctionOpInterface>>
 createSPIRVBreakDownLargeVectorPass();
 
-/// Pass to distribute tiled loop nests to invocations.
-std::unique_ptr<InterfacePass<FunctionOpInterface>> createSPIRVDistributePass();
-
 /// Emulates bfloat 16 ops with 32-bit float ops.
 std::unique_ptr<InterfacePass<FunctionOpInterface>>
 createSPIRVEmulateBf16Pass();
