@@ -176,14 +176,16 @@ public:
     if (!kernelType) {
       return failure();
     }
-    SmallVector<int64_t> kernelShape(kernelType.getShape());
-    if (llvm::any_of(kernelShape, ShapedType::isDynamic)) {
-      return failure();
+    if (!kernelType.hasStaticShape()) {
+      return rewriter.notifyMatchFailure(convOp->getLoc(),
+                                         "Kernel shape is not static");
     }
+    SmallVector<int64_t> kernelShape(kernelType.getShape());
     const int64_t kh = isNchwFchw ? kernelShape[2] : kernelShape[0];
     const int64_t kw = isNchwFchw ? kernelShape[3] : kernelShape[1];
     if ((kh != 3) || (kw != 3)) {
-      return failure();
+      return rewriter.notifyMatchFailure(convOp->getLoc(),
+                                         "Winograd only supports 3x3 filters");
     }
     assert(kernelShape.size() == 4);
     Type elementType = kernelType.getElementType();
@@ -226,7 +228,8 @@ public:
     }
     SmallVector<int64_t> inputShape(inputType.getShape());
     if (llvm::any_of(inputShape, ShapedType::isDynamic)) {
-      return failure();
+      return rewriter.notifyMatchFailure(convOp->getLoc(),
+                                         "Input shape is not static");
     }
     assert(inputShape.size() == 4);
     if (isNchwFchw) {
