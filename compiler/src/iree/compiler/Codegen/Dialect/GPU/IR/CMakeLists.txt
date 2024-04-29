@@ -42,6 +42,7 @@ iree_cc_library(
     MLIRIR
     MLIRLinalgDialect
     MLIRParser
+    MLIRSCFDialect
     MLIRSideEffectInterfaces
     MLIRSupport
     MLIRTensorDialect
