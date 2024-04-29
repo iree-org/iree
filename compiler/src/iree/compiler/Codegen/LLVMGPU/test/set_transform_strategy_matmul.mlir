@@ -38,9 +38,14 @@
 // RUN: | FileCheck --check-prefix=WITH_OPTIONS_3 %s
 
 // RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" \
-// RUN:   --iree-codegen-llvmgpu-enable-transform-dialect-small-matmul | FileCheck --check-prefix=SMALL %s
+// RUN:   --iree-codegen-llvmgpu-enable-transform-dialect-small-matmul -mlir-print-local-scope | FileCheck --check-prefix=SMALL %s
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
+#target = #iree_gpu.target<api = cuda, arch = "sm_80", core = <
+  compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
+  subgroup = shuffle|arithmetic, dot = dp4xi8toi32, mma = [],
+  subgroup_size_choices = [32], max_workgroup_sizes = [1024, 1024, 1024],
+  max_thread_size = 1024, max_workgroup_memory_bytes = 166912>>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #target}>
 module {
   func.func @matmul_1() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
     %c0 = arith.constant 0 : index
@@ -198,7 +203,12 @@ module {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
+#target = #iree_gpu.target<api = cuda, arch = "sm_80", core = <
+  compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
+  subgroup = shuffle|arithmetic, dot = dp4xi8toi32, mma = [],
+  subgroup_size_choices = [32], max_workgroup_sizes = [1024, 1024, 1024],
+  max_thread_size = 1024, max_workgroup_memory_bytes = 166912>>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #target}>
 module {
   func.func @matmul_2() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
     %c0 = arith.constant 0 : index
@@ -244,7 +254,12 @@ module {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
+#target = #iree_gpu.target<api = cuda, arch = "sm_80", core = <
+  compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
+  subgroup = shuffle|arithmetic, dot = dp4xi8toi32, mma = [],
+  subgroup_size_choices = [32], max_workgroup_sizes = [1024, 1024, 1024],
+  max_thread_size = 1024, max_workgroup_memory_bytes = 166912>>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #target}>
 module {
   func.func @matmul_3() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
     %c0 = arith.constant 0 : index
@@ -272,7 +287,12 @@ module {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
+#target = #iree_gpu.target<api = cuda, arch = "sm_80", core = <
+  compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
+  subgroup = shuffle|arithmetic, dot = dp4xi8toi32, mma = [],
+  subgroup_size_choices = [32], max_workgroup_sizes = [1024, 1024, 1024],
+  max_thread_size = 1024, max_workgroup_memory_bytes = 166912>>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #target}>
 module {
   func.func @matmul_4_partially_unaligned() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
     %c0 = arith.constant 0 : index
@@ -336,7 +356,12 @@ module {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
+#target = #iree_gpu.target<api = cuda, arch = "sm_80", core = <
+  compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
+  subgroup = shuffle|arithmetic, dot = dp4xi8toi32, mma = [],
+  subgroup_size_choices = [32], max_workgroup_sizes = [1024, 1024, 1024],
+  max_thread_size = 1024, max_workgroup_memory_bytes = 166912>>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #target}>
 module {
   func.func @aligned_matmul() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
     %c0 = arith.constant 0 : index
@@ -399,7 +424,12 @@ module {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
+#target = #iree_gpu.target<api = cuda, arch = "sm_80", core = <
+  compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
+  subgroup = shuffle|arithmetic, dot = dp4xi8toi32, mma = [],
+  subgroup_size_choices = [32], max_workgroup_sizes = [1024, 1024, 1024],
+  max_thread_size = 1024, max_workgroup_memory_bytes = 166912>>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #target}>
 module {
   func.func @matmul_5_small() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
     %c0 = arith.constant 0 : index
@@ -431,10 +461,16 @@ module {
 // SMALL: transform.named_sequence
 // SMALL-NOT: mma
 // SMALL-NOT: wmma
+// SMALL: transform.yield
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
+#target = #iree_gpu.target<api = cuda, arch = "sm_80", core = <
+  compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
+  subgroup = shuffle|arithmetic, dot = dp4xi8toi32, mma = [],
+  subgroup_size_choices = [32], max_workgroup_sizes = [1024, 1024, 1024],
+  max_thread_size = 1024, max_workgroup_memory_bytes = 166912>>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #target}>
 module {
   func.func @f16_matmul() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
     %c0 = arith.constant 0 : index
@@ -463,7 +499,12 @@ module {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
+#target = #iree_gpu.target<api = cuda, arch = "sm_80", core = <
+  compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
+  subgroup = shuffle|arithmetic, dot = dp4xi8toi32, mma = [],
+  subgroup_size_choices = [32], max_workgroup_sizes = [1024, 1024, 1024],
+  max_thread_size = 1024, max_workgroup_memory_bytes = 166912>>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #target}>
 module {
   func.func @int8_matmul() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
     %c0 = arith.constant 0 : index
@@ -485,6 +526,7 @@ module {
 // SMALL: transform.named_sequence
 // SMALL-NOT: mma
 // SMALL-NOT: wmma
+// SMALL: transform.yield
 
 // CHECK-LABEL: func @int8_matmul
 // CHECK-NOT: transform.sequence

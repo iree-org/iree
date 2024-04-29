@@ -1,6 +1,11 @@
 // RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" --iree-codegen-llvmgpu-enable-transform-dialect-implicit-gemm-strategy | FileCheck %s
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
+#target = #iree_gpu.target<api = cuda, arch = "sm_80", core = <
+  compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
+  subgroup = shuffle|arithmetic, dot = dp4xi8toi32, mma = [],
+  subgroup_size_choices = [32], max_workgroup_sizes = [1024, 1024, 1024],
+  max_thread_size = 1024, max_workgroup_memory_bytes = 166912>>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #target}>
 module {
   func.func @nchw_convolution() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
     %c0 = arith.constant 0 : index
@@ -62,7 +67,12 @@ module {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
+#target = #iree_gpu.target<api = cuda, arch = "sm_80", core = <
+  compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
+  subgroup = shuffle|arithmetic, dot = dp4xi8toi32, mma = [],
+  subgroup_size_choices = [32], max_workgroup_sizes = [1024, 1024, 1024],
+  max_thread_size = 1024, max_workgroup_memory_bytes = 166912>>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #target}>
 module {
   func.func @nhwc_convolution() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
     %c0 = arith.constant 0 : index
@@ -98,7 +108,12 @@ module {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
+#target = #iree_gpu.target<api = cuda, arch = "sm_80", core = <
+  compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
+  subgroup = shuffle|arithmetic, dot = dp4xi8toi32, mma = [],
+  subgroup_size_choices = [32], max_workgroup_sizes = [1024, 1024, 1024],
+  max_thread_size = 1024, max_workgroup_memory_bytes = 166912>>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #target}>
 module {
   func.func @unaligned_convolution() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
     %c0 = arith.constant 0 : index
