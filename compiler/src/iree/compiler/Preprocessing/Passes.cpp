@@ -93,6 +93,15 @@ void buildPreprocessingPassPipeline(
     passManager.addPass(createCanonicalizerPass());
     passManager.addPass(createCSEPass());
   }
+
+  if (preprocessingOptions.preprocessingTransposeMatmulInput !=
+      PreprocessingOptions::TransposeMatmulInput::None) {
+    Preprocessing::TransposeMatmulPassOptions transposeMatmulOptions;
+    transposeMatmulOptions.input =
+        preprocessingOptions.preprocessingTransposeMatmulInput;
+    passManager.addPass(
+        Preprocessing::createTransposeMatmulPass(transposeMatmulOptions));
+  }
 }
 
 static void
