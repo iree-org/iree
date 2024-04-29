@@ -54,6 +54,7 @@ iree_cc_library(
     iree::compiler::Codegen
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::LLVMGPU
+    iree::compiler::Codegen::Utils
     iree::compiler::Dialect::HAL::Target
     iree::compiler::Dialect::HAL::Utils::LLVMLinkerUtils
     iree::compiler::PluginAPI
