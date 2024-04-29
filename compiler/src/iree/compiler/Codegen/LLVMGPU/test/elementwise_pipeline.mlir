@@ -1,11 +1,6 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy, func.func(iree-llvmgpu-lower-executable-target))" %s | FileCheck %s
 
-#target = #iree_gpu.target<api = cuda, arch = "sm_60",
-  core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
-  subgroup = shuffle|arithmetic, dot = none, mma = [],
-  subgroup_size_choices = [32], max_workgroup_sizes = [1024, 1024, 1024],
-  max_thread_size = 1024, max_workgroup_memory_bytes = 49152>>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #target}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}>
 #map = affine_map<(d0, d1, d2, d3) -> (d2, d1, d0, d3)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 module {

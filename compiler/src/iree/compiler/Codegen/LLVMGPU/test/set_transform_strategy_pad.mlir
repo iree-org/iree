@@ -14,12 +14,7 @@
 // RUN:   --td-pad-strategy-use-async-copies=false \
 // RUN: | FileCheck --check-prefix=WITH_OPTIONS %s
 
-#target = #iree_gpu.target<api = cuda, arch = "sm_80", core = <
-  compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
-  subgroup = shuffle|arithmetic, dot = dp4xi8toi32, mma = [],
-  subgroup_size_choices = [32], max_workgroup_sizes = [1024, 1024, 1024],
-  max_thread_size = 1024, max_workgroup_memory_bytes = 166912>>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #target}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
 module {
   func.func @pad() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
     %c0 = arith.constant 0 : index
@@ -98,12 +93,7 @@ module {
 
 // -----
 
-#target = #iree_gpu.target<api = cuda, arch = "sm_80", core = <
-  compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
-  subgroup = shuffle|arithmetic, dot = dp4xi8toi32, mma = [],
-  subgroup_size_choices = [32], max_workgroup_sizes = [1024, 1024, 1024],
-  max_thread_size = 1024, max_workgroup_memory_bytes = 166912>>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #target}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
 module {
   func.func @pad_low() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
     %c0 = arith.constant 0 : index
@@ -129,12 +119,7 @@ module {
 
 // -----
 
-#target = #iree_gpu.target<api = cuda, arch = "sm_80", core = <
-  compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
-  subgroup = shuffle|arithmetic, dot = dp4xi8toi32, mma = [],
-  subgroup_size_choices = [32], max_workgroup_sizes = [1024, 1024, 1024],
-  max_thread_size = 1024, max_workgroup_memory_bytes = 166912>>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #target}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
 module {
   func.func @pad_local() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
     %c0 = arith.constant 0 : index

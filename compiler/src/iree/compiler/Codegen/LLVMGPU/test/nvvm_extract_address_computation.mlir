@@ -72,12 +72,7 @@
 //
 // Just double check that we captured the IV
 // CHECK: %[[IV_NEXT:.*]] = llvm.mul %[[IV]], %[[C8192]]  : i64
-#target = #iree_gpu.target<api = cuda, arch = "sm_80", core = <
-  compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
-  subgroup = shuffle|arithmetic, dot = dp4xi8toi32, mma = [],
-  subgroup_size_choices = [32], max_workgroup_sizes = [1024, 1024, 1024],
-  max_thread_size = 1024, max_workgroup_memory_bytes = 166912>>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #target}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>
 hal.executable private @matmul_dispatch_0 {
   hal.executable.variant public @cuda_nvptx_fb target(#executable_target_cuda_nvptx_fb) {

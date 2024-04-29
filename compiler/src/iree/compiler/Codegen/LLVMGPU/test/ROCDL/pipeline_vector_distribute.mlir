@@ -5,13 +5,6 @@
 // to be migrated to the rocdl heuristics, but for now is just physically
 // located here.
 
-#target = #iree_gpu.target<api = hip, arch = "gfx942",
-  core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
-  subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
-  mma = [<MFMA_F16_16x16x16_F32>, <MFMA_F16_32x32x8_F32>],
-  subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
-  max_thread_size = 1024, max_workgroup_memory_bytes = 65536>>
-
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -19,7 +12,11 @@
   ]>
 ]>
 hal.executable @matmul_256x256x256_f16_f32 {
-hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target}>) {
+hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
+      target_arch = "gfx940",
+      mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+                        #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>]
+  }>) {
   hal.executable.export @matmul_256x256x256_f16_f32 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
@@ -61,13 +58,6 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {iree.gpu.target =
 
 // -----
 
-#target = #iree_gpu.target<api = hip, arch = "gfx942",
-  core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
-  subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
-  mma = [<MFMA_F16_16x16x16_F32>, <MFMA_F16_32x32x8_F32>],
-  subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
-  max_thread_size = 1024, max_workgroup_memory_bytes = 65536>>
-
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -75,7 +65,11 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {iree.gpu.target =
   ]>
 ]>
 hal.executable @matmul_256x256x256_f16_f16 {
-hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target}>) {
+hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
+      target_arch = "gfx940",
+      mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+                        #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>]
+  }>) {
   hal.executable.export @matmul_256x256x256_f16_f16 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
@@ -115,13 +109,6 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {iree.gpu.target =
 
 // -----
 
-#target = #iree_gpu.target<api = hip, arch = "gfx942",
-  core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
-  subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
-  mma = [<MFMA_F16_16x16x16_F32>, <MFMA_F16_32x32x8_F32>],
-  subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
-  max_thread_size = 1024, max_workgroup_memory_bytes = 65536>>
-
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -129,7 +116,11 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {iree.gpu.target =
   ]>
 ]>
 hal.executable @expanded_matmul_transpose_b_executable {
-hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target}>) {
+hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
+      target_arch = "gfx940",
+      mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+                        #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>]
+  }>) {
   hal.executable.export @expanded_matmul_transpose_b layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device):
       %x, %y, %z = flow.dispatch.workgroup_count_from_slice
@@ -189,13 +180,6 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {iree.gpu.target =
 
 // -----
 
-#target = #iree_gpu.target<api = hip, arch = "gfx942",
-  core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
-  subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
-  mma = [<MFMA_F16_16x16x16_F32>, <MFMA_F16_32x32x8_F32>],
-  subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
-  max_thread_size = 1024, max_workgroup_memory_bytes = 65536>>
-
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -203,7 +187,11 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {iree.gpu.target =
   ]>
 ]>
 hal.executable @conv_nhwc_dispatch_0 {
-hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target}>) {
+hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
+      target_arch = "gfx940",
+      mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+                        #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>]
+  }>) {
   hal.executable.export @conv_nhwc layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device):
       %x, %y, %z = flow.dispatch.workgroup_count_from_slice
@@ -243,13 +231,11 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {iree.gpu.target =
 
 // -----
 
-#target = #iree_gpu.target<api = hip, arch = "gfx942",
-  core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
-  subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
-  mma = [<MFMA_F16_16x16x16_F32>, <MFMA_F16_32x32x8_F32>],
-  subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
-  max_thread_size = 1024, max_workgroup_memory_bytes = 65536>>
-
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {
+  mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>],
+  target_arch = "gfx942",
+  ukernels = "none"
+}>
 #map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>
 #map1 = affine_map<(d0, d1, d2, d3, d4) -> (d2, d3, d4)>
 #map2 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>
@@ -263,7 +249,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {iree.gpu.target =
     ]>
   ]>
 hal.executable public @main_dispatch_expanded_matmul {
-  hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target}>) {
+  hal.executable.variant public @rocm_hsaco_fb target(#executable_target_rocm_hsaco_fb) {
     hal.executable.export public @generic_2x1024x20x64x1280_f16 ordinal(0) layout(#pipeline_layout) attributes {
       hal.interface.bindings = [
         #hal.interface.binding<0, 0>,
@@ -324,13 +310,6 @@ hal.executable public @main_dispatch_expanded_matmul {
 
 // -----
 
-#target = #iree_gpu.target<api = hip, arch = "gfx1100",
-  core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
-  subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
-  mma = [<WMMA_F16_16x16x16_F32>],
-  subgroup_size_choices = [32, 64], max_workgroup_sizes = [1024, 1024, 1024],
-  max_thread_size = 1024, max_workgroup_memory_bytes = 65536>>
-
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -338,7 +317,10 @@ hal.executable public @main_dispatch_expanded_matmul {
   ]>
 ]>
 hal.executable @matmul_256x256x256_f16_f32 {
-hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target}>) {
+hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
+      target_arch = "gfx1100",
+      mma_intrinsics = [#iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>]
+  }>) {
   hal.executable.export @matmul_256x256x256_f16_f32 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2

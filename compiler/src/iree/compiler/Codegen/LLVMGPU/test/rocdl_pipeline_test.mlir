@@ -3,12 +3,6 @@
 // Verify that a simple element wise op gets lowered succefully all the way to
 // nvvm/llvm dialect.
 
-#target = #iree_gpu.target<api = hip, arch = "gfx940",
-  core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
-  subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
-  mma = [<MFMA_F16_16x16x16_F32>, <MFMA_F16_32x32x8_F32>],
-  subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
-  max_thread_size = 1024, max_workgroup_memory_bytes = 65536>>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -17,7 +11,7 @@
   ]>
 ]>
 hal.executable @simpleMath_ex_dispatch_0 {
-  hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target}>) {
+  hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
   hal.executable.export @add_dispatch_0 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1
@@ -60,14 +54,8 @@ hal.executable @simpleMath_ex_dispatch_0 {
     #hal.descriptor_set.binding<2, storage_buffer>
   ]>
 ]>
-#target = #iree_gpu.target<api = hip, arch = "gfx940",
-  core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
-  subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
-  mma = [<MFMA_F16_16x16x16_F32>, <MFMA_F16_32x32x8_F32>],
-  subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
-  max_thread_size = 1024, max_workgroup_memory_bytes = 65536>>
 hal.executable @dot_dispatch_0 {
-  hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target}>) {
+  hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
     hal.executable.export @dot_dispatch_0 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
@@ -123,14 +111,8 @@ hal.executable @dot_dispatch_0 {
     #hal.descriptor_set.binding<2, storage_buffer>
   ]>
 ]>
-#target = #iree_gpu.target<api = hip, arch = "gfx940",
-  core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
-  subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
-  mma = [<MFMA_F16_16x16x16_F32>, <MFMA_F16_32x32x8_F32>],
-  subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
-  max_thread_size = 1024, max_workgroup_memory_bytes = 65536>>
 hal.executable @ext_fp8_dispatch {
-  hal.executable.variant @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target}>) {
+  hal.executable.variant @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb", {target_arch = "gfx940"}>) {
     hal.executable.export @ext_fp8_dispatch layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3

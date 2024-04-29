@@ -12,14 +12,7 @@
 // CHECK-SAME:   subgroup_m_count = 1, subgroup_n_count = 4,
 // CHECK-SAME:   subgroup_m_tile_count = 4, subgroup_n_tile_count = 1, subgroup_k_tile_count = 8
 
-#target = #iree_gpu.target<api = hip, arch = "gfx942",
-  core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
-  subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
-  mma = [<MFMA_F16_16x16x16_F32>, <MFMA_F16_32x32x8_F32>],
-  subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
-  max_thread_size = 1024, max_workgroup_memory_bytes = 65536>>
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target}>
-
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>], target_arch = "gfx940"}>
 #map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d4)>
 #map1 = affine_map<(d0, d1, d2, d3, d4) -> (d1, d3, d4)>
 #map2 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>
@@ -57,14 +50,7 @@ module {
 // CHECK-SAME:   subgroup_m_count = 2, subgroup_n_count = 2,
 // CHECK-SAME:   subgroup_m_tile_count = 2, subgroup_n_tile_count = 4, subgroup_k_tile_count = 2
 
-#target = #iree_gpu.target<api = hip, arch = "gfx942",
-  core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
-  subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
-  mma = [<MFMA_F16_16x16x16_F32>, <MFMA_F16_32x32x8_F32>],
-  subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
-  max_thread_size = 1024, max_workgroup_memory_bytes = 65536>>
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target}>
-
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>], target_arch = "gfx940"}>
 module {
   func.func @conv_nhwc() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
     %c0 = arith.constant 0 : index
@@ -87,14 +73,7 @@ module {
 
 // -----
 
-#target = #iree_gpu.target<api = hip, arch = "",
-  core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
-  subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
-  mma = [],
-  subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
-  max_thread_size = 1024, max_workgroup_memory_bytes = 65536>>
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target}>
-
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {mma_intrinsics = [], target_arch = "gfx940"}>
 module {
   func.func @matmul_256x256x256() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
     %cst = arith.constant 0.000000e+00 : f32
@@ -125,14 +104,7 @@ module {
 // CHECK-SAME:   subgroup_m_count = 2, subgroup_n_count = 2,
 // CHECK-SAME:   subgroup_m_tile_count = 2, subgroup_n_tile_count = 4, subgroup_k_tile_count = 4
 
-#target = #iree_gpu.target<api = hip, arch = "gfx942",
-  core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
-  subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
-  mma = [<MFMA_F16_16x16x16_F32>, <MFMA_F16_32x32x8_F32>],
-  subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
-  max_thread_size = 1024, max_workgroup_memory_bytes = 65536>>
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target}>
-
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>], target_arch = "gfx940"}>
 module {
   func.func @mfma_matmul_1024x1024x1024() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
     %cst = arith.constant 0.000000e+00 : f32
@@ -162,16 +134,8 @@ module {
 // CHECK-SAME:   subgroup_m_count = 2, subgroup_n_count = 2,
 // CHECK-SAME:   subgroup_m_tile_count = 1, subgroup_n_tile_count = 1, subgroup_k_tile_count = 2
 
-#target = #iree_gpu.target<api = hip, arch = "gfx942",
-  core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
-  subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
-  mma = [<MFMA_F16_16x16x16_F32>, <MFMA_F16_32x32x8_F32>],
-  subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
-  max_thread_size = 1024, max_workgroup_memory_bytes = 65536>>
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target}>
-
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 1, 1, 32, 0, 1, 1, 1, 0]]>
-
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>], target_arch = "gfx940"}>
 #map = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d5, d2 + d6, d3 + d7, d8)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d1, d5, d6, d7, d4, d8)>
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d1, d2, d3, d4)>
@@ -218,14 +182,7 @@ module {
 // CHECK-SAME:   subgroup_m_count = 2, subgroup_n_count = 2,
 // CHECK-SAME:   subgroup_m_tile_count = 2, subgroup_n_tile_count = 4, subgroup_k_tile_count = 4
 
-#target = #iree_gpu.target<api = hip, arch = "gfx1100",
-  core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
-  subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
-  mma = [<WMMA_F16_16x16x16_F32>],
-  subgroup_size_choices = [32, 64], max_workgroup_sizes = [1024, 1024, 1024],
-  max_thread_size = 1024, max_workgroup_memory_bytes = 65536>>
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target}>
-
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {mma_intrinsics = [#iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>], target_arch = "gfx1100"}>
 module {
   func.func @wmma_matmul_1024x1024x1024() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
     %cst = arith.constant 0.000000e+00 : f32
@@ -248,14 +205,7 @@ module {
 
 // -----
 
-#target = #iree_gpu.target<api = hip, arch = "gfx942",
-  core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
-  subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
-  mma = [<MFMA_F16_16x16x16_F32>, <MFMA_F16_32x32x8_F32>],
-  subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
-  max_thread_size = 1024, max_workgroup_memory_bytes = 65536>>
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target}>
-
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>], target_arch = "gfx940"}>
 module {
   func.func @matmul_dynamic_dim() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
           %c0 = arith.constant 0 : index
