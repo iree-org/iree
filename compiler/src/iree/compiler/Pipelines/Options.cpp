@@ -247,7 +247,7 @@ void PreprocessingOptions::bindOptions(OptionsBinder &binder) {
       llvm::cl::cat(category));
 
   binder.opt<TransposeMatmulInput>(
-      "iree-preprocessing-enable-transpose-matmul",
+      "iree-preprocessing-transpose-matmul",
       preprocessingTransposeMatmulInput,
       llvm::cl::desc("Convert Linalg matmul ops to transposed variants."),
       llvm::cl::cat(category),

@@ -113,7 +113,7 @@ def PadLinalgOpsPass :
   ];
 }
 
-def TransposeMatmulPass : Pass<"iree-preprocessing-transpose-matmul"> {
+def TransposeMatmulPass : Pass<"iree-preprocessing-transpose-matmul-pass"> {
   let summary = "Convert Linalg matmul ops to transposed variants";
   let options = [
     Option<"input", "input", "PreprocessingOptions::TransposeMatmulInput",
