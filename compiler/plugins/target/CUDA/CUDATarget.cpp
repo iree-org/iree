@@ -242,14 +242,26 @@ static std::string produceGpuImage(const CUDAOptions &options,
   return ptxImage;
 }
 
-static void dumpBitcodeToPath(StringRef path, StringRef baseName,
-                              StringRef suffix, StringRef extension,
-                              llvm::Module &module) {
-  llvm::SmallVector<char, 0> data;
-  llvm::raw_svector_ostream ostream(data);
-  llvm::WriteBitcodeToFile(module, ostream);
-  dumpDataToPath(path, baseName, suffix, extension,
-                 StringRef(data.data(), data.size()));
+static void dumpLLVMModuleToPath(StringRef path, StringRef baseName,
+                                 StringRef suffix, StringRef extPrefix,
+                                 llvm::Module &module) {
+  // Dump disassembly to path.
+  llvm::SmallVector<char> textData;
+  llvm::raw_svector_ostream textOstream(textData);
+
+  module.print(textOstream, nullptr);
+  std::string textExtension = extPrefix.str() + ".ll";
+  dumpDataToPath(path, baseName, suffix, textExtension,
+                 StringRef(textData.data(), textData.size()));
+
+  // Dump bitcode to path.
+  llvm::SmallVector<char> binaryData;
+  llvm::raw_svector_ostream binaryOstream(binaryData);
+  // Write the specified module to the specified output stream.
+  llvm::WriteBitcodeToFile(module, binaryOstream);
+  std::string binaryExtension = extPrefix.str() + ".bc";
+  dumpDataToPath(path, baseName, suffix, binaryExtension,
+                 StringRef(binaryData.data(), binaryData.size()));
 }
 
 static std::string translateModuleToISA(llvm::Module &module,
@@ -590,9 +602,9 @@ public:
 
       // Dump just the codegen bitcode before linking and optimization.
       if (!serOptions.dumpIntermediatesPath.empty()) {
-        dumpBitcodeToPath(serOptions.dumpIntermediatesPath,
-                          serOptions.dumpBaseName, variantOp.getName(),
-                          ".codegen.bc", *llvmModule);
+        dumpLLVMModuleToPath(serOptions.dumpIntermediatesPath,
+                             serOptions.dumpBaseName, variantOp.getName(),
+                             ".codegen", *llvmModule);
       }
 
       // Link user and device bitcode alongside the generated module.
@@ -603,9 +615,9 @@ public:
 
       // Dump all linked bitcode prior to optimization.
       if (!serOptions.dumpIntermediatesPath.empty()) {
-        dumpBitcodeToPath(serOptions.dumpIntermediatesPath,
-                          serOptions.dumpBaseName, variantOp.getName(),
-                          ".linked.bc", *llvmModule);
+        dumpLLVMModuleToPath(serOptions.dumpIntermediatesPath,
+                             serOptions.dumpBaseName, variantOp.getName(),
+                             ".linked", *llvmModule);
       }
 
       std::array<int32_t, 3> maxWorkgroupSize = {1, 1, 1};
@@ -620,9 +632,9 @@ public:
 
       // Dump bitcode post-linking and optimization.
       if (!serOptions.dumpIntermediatesPath.empty()) {
-        dumpBitcodeToPath(serOptions.dumpIntermediatesPath,
-                          serOptions.dumpBaseName, variantOp.getName(),
-                          ".optimized.bc", *llvmModule);
+        dumpLLVMModuleToPath(serOptions.dumpIntermediatesPath,
+                             serOptions.dumpBaseName, variantOp.getName(),
+                             ".optimized", *llvmModule);
       }
 
       // Serialize CUDA kernel into the binary that we will embed in the
