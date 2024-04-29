@@ -725,7 +725,7 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
     int64_t subgroupsUsed = std::gcd(availableSubgroups, dividableDim);
     dividableDim /= subgroupsUsed;
     int64_t batchesUsed = dividableDim;
-    return std::make_pair(subgroupsUsed, batchesUsed);
+    return {subgroupsUsed, batchesUsed};
   };
 
   // Greedily break up the M subgroup and batch counts along the "M" iteration
@@ -933,7 +933,7 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
 
   std::tuple<VectorLayoutInterface, VectorLayoutInterface,
              VectorLayoutInterface>
-      result = std::make_tuple(aLayout, bLayout, cLayout);
+      result = {aLayout, bLayout, cLayout};
   return result;
 }
 
