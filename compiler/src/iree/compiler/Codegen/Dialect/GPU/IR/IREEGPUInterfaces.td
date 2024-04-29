@@ -88,4 +88,34 @@ def IREEGPU_MmaInterfaceAttr : AttrInterface<"MmaInterfaceAttr"> {
   ];
 }
 
+def IREEGPU_DistributionScheduleAttr : AttrInterface<"DistributionSchedule"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+
+  let description = [{}];
+
+  let methods = [
+    InterfaceMethod<
+      /*desc=*/[{
+      }],
+      /*retTy=*/"::mlir::FailureOr<::std::tuple<"
+                  "::mlir::iree_compiler::IREE::VectorExt::VectorLayoutInterface, "
+                  "::mlir::iree_compiler::IREE::VectorExt::VectorLayoutInterface, "
+                  "::mlir::iree_compiler::IREE::VectorExt::VectorLayoutInterface>>",
+      /*methodName=*/"getContractionLayout",
+      /*args=*/(ins "::mlir::vector::ContractionOp":$contract),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return failure();
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+      }],
+      /*retTy=*/"::mlir::iree_compiler::IREE::GPU::MmaInterfaceAttr",
+      /*methodName=*/"getTargetIntrinsic",
+      /*args=*/(ins)
+    >,
+  ];
+}
+
 #endif // IREE_COMPILER_CODEGEN_DIALECT_GPU_IREEGPUINTERFACES

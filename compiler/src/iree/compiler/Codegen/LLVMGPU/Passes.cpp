@@ -207,6 +207,8 @@ static void addGPUVectorizationPasses(OpPassManager &funcPassManager) {
   options.enableCleanup = false;
   options.foldCastIntoContract = true;
   funcPassManager.addPass(createGenericVectorizationPass(options));
+  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
@@ -527,6 +529,12 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager) {
 
   // Problem specific (reduction) tiling.
   funcPassManager.addPass(createGPUTensorTileToSerialLoops());
+  // TODO: Hack for now, need to actually implement reduction tiling interface
+  // for online softmax or attention.
+  IREE::LinalgExt::TileAndDecomposeAttentionOptions attnOptions;
+  attnOptions.tileSize = 64;
+  funcPassManager.addPass(
+      IREE::LinalgExt::createTileAndDecomposeAttentionPass(attnOptions));
 
   // Generalize all named ops so that we can fold away unit extent dims. By this
   // point, all tiling is finished so the tiling configurations on those ops can
@@ -534,20 +542,20 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager) {
   // `vector.contract` as filter dimensions are expected to be tiled to 1 by
   // this point.
   funcPassManager.addPass(createLinalgGeneralizeNamedOpsPass());
-  LinalgFoldUnitExtentDimsPassOptions options;
-  options.useRankReducingSlices = true;
-  funcPassManager.addPass(mlir::createLinalgFoldUnitExtentDimsPass(options));
+  // TODO: Hack for now.
+  // LinalgFoldUnitExtentDimsPassOptions options;
+  // options.useRankReducingSlices = true;
+  // funcPassManager.addPass(mlir::createLinalgFoldUnitExtentDimsPass(options));
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
-
-  funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
   funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
 
   // Linalg -> Vector
   addGPUVectorizationPasses(funcPassManager);
 
   // Allocate tensors for copies to shared memory.
-  funcPassManager.addPass(createGPUVectorAlloc());
+  // TODO: Hack for now.
+  // funcPassManager.addPass(createGPUVectorAlloc());
 
   // Tensor -> Memref
   addVectorBufferizePasses(funcPassManager);
@@ -557,6 +565,9 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager) {
 
   // Vector SIMD -> Vector SIMT
   funcPassManager.addPass(createLLVMGPUCastTypeToFitMMAPass());
+  funcPassManager.addPass(createAMDGPUPrepareForChainedMatmulPass());
+  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createLLVMGPUVectorDistribute());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());

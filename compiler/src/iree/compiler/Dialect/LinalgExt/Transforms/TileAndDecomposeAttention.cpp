@@ -628,6 +628,11 @@ struct TileAndDecomposeAttentionPass
     onlyTile = pass.onlyTile;
     tileSize = pass.tileSize;
   }
+  TileAndDecomposeAttentionPass(
+      const TileAndDecomposeAttentionOptions &options) {
+    onlyTile = options.onlyTile;
+    tileSize = options.tileSize;
+  }
   void runOnOperation() override;
 };
 } // namespace
@@ -647,6 +652,11 @@ void TileAndDecomposeAttentionPass::runOnOperation() {
 
 std::unique_ptr<Pass> createTileAndDecomposeAttentionPass() {
   return std::make_unique<TileAndDecomposeAttentionPass>();
+}
+
+std::unique_ptr<Pass>
+createTileAndDecomposeAttentionPass(TileAndDecomposeAttentionOptions &options) {
+  return std::make_unique<TileAndDecomposeAttentionPass>(options);
 }
 
 } // namespace LinalgExt

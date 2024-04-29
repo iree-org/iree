@@ -5,11 +5,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
+#include <numeric>
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.h"
-#include "iree-dialects/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
-#include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Verifier.h"
 #include "mlir/IR/Visitors.h"
@@ -172,7 +170,6 @@ struct VectorDistributionRewriter : PatternRewriter {
 
 static void applyVectorDistribution(Operation *root,
                                     const FrozenRewritePatternSet &patterns) {
-
   SmallVector<Operation *> worklist;
 
   VectorDistributionRewriter rewriter(root->getContext());
@@ -222,6 +219,109 @@ static bool canDistribute(Operation *op, VectorLayoutAnalysis &analysis) {
   });
 }
 
+static SmallVector<int64_t> getSortedIndexes(ArrayRef<int64_t> arr) {
+  SmallVector<int64_t> indexes(arr.size());
+  std::iota(indexes.begin(), indexes.end(), 0);
+  std::sort(indexes.begin(), indexes.end(), [&arr](size_t l_idx, size_t r_idx) {
+    return arr[l_idx] < arr[r_idx];
+  });
+  return indexes;
+}
+
+/// This should ideally be a pattern rewrite, but there needs to be a refactor
+/// before we can do that. Using greedy pattern rewriter will fold operations
+/// which could cause a problem during distribution. This can be fixed by either
+/// adding a method that calls greedy pattern rewriter without folding or
+/// by running folding before this pass.
+static void resolveConflicts(Operation *root) {
+  SmallVector<Operation *> deletedOps;
+  root->walk([&](IREE::VectorExt::LayoutConflictResolutionOp conflict) {
+    auto source = dyn_cast<NestedLayoutAttr>(conflict.getSourceLayout());
+    auto dest = dyn_cast<NestedLayoutAttr>(conflict.getDesiredLayout());
+    if (!source || !dest) {
+      return;
+    }
+
+    // Check if all tile sizes are same.
+    if (source.getSubgroupsPerWorkgroup() != dest.getSubgroupsPerWorkgroup() ||
+        source.getBatchesPerSubgroup() != dest.getBatchesPerSubgroup() ||
+        source.getOutersPerBatch() != dest.getOutersPerBatch() ||
+        source.getThreadsPerOuter() != dest.getThreadsPerOuter() ||
+        source.getElementsPerThread() != dest.getElementsPerThread()) {
+      return;
+    }
+
+    auto basisCheck = [](ArrayRef<int64_t> basisA, ArrayRef<int64_t> basisB,
+                         ArrayRef<int64_t> orderA, ArrayRef<int64_t> orderB,
+                         ArrayRef<bool> activeA,
+                         ArrayRef<bool> activeB) -> bool {
+      SmallVector<int64_t> effectiveBasisA, effectiveBasisB;
+      SmallVector<int64_t> effectiveOrderA, effectiveOrderB;
+
+      int currA = 0;
+      for (int i = 0; i < activeA.size(); ++i) {
+        if (!activeA[i]) {
+          continue;
+        }
+
+        if (basisA[i] != 1) {
+          effectiveBasisA.push_back(basisA[i]);
+          effectiveOrderA.push_back(orderA[currA]);
+        }
+
+        ++currA;
+      }
+
+      int currB = 0;
+      for (int i = 0; i < activeB.size(); ++i) {
+        if (!activeB[i]) {
+          continue;
+        }
+
+        if (basisB[i] != 1) {
+          effectiveBasisB.push_back(basisB[i]);
+          effectiveOrderB.push_back(orderB[currB]);
+        }
+
+        ++currB;
+      }
+
+      if (effectiveBasisA != effectiveBasisB) {
+        return false;
+      }
+
+      if (getSortedIndexes(effectiveOrderA) !=
+          getSortedIndexes(effectiveOrderB)) {
+        return false;
+      }
+
+      return true;
+    };
+
+    // Check if the subgroup basis is equal.
+    if (!basisCheck(source.getSubgroupBasis(), dest.getSubgroupBasis(),
+                    source.getSubgroupOrder(), dest.getSubgroupOrder(),
+                    source.getSubgroupActiveIds(),
+                    dest.getSubgroupActiveIds())) {
+      return;
+    }
+
+    // Check if the thread basis is equal.
+    if (!basisCheck(source.getThreadBasis(), dest.getThreadBasis(),
+                    source.getThreadOrder(), dest.getThreadOrder(),
+                    source.getThreadActiveIds(), dest.getThreadActiveIds())) {
+      return;
+    }
+
+    conflict.replaceAllUsesWith(conflict.getOperand());
+    deletedOps.push_back(conflict);
+  });
+
+  for (Operation *op : deletedOps) {
+    op->erase();
+  }
+}
+
 LogicalResult distributeVectorOps(Operation *root,
                                   RewritePatternSet &distributionPatterns,
                                   VectorLayoutOptions &options) {
@@ -245,7 +345,19 @@ LogicalResult distributeVectorOps(Operation *root,
   });
   LLVM_DEBUG(llvm::dbgs() << "Distribution signatures set\n");
   LLVM_DEBUG(root->print(llvm::dbgs()));
-  LLVM_DEBUG(llvm::dbgs() << "\n\n");
+  LLVM_DEBUG(llvm::dbgs() << "\n");
+  root->walk([&](Operation *op) {
+    if (canDistribute(op, analysis)) {
+      setOpSignature(op, analysis);
+    }
+  });
+
+  // Try to resolve conflicts.
+  LLVM_DEBUG(llvm::dbgs() << "Resolving conflicts...\n");
+  resolveConflicts(root);
+  LLVM_DEBUG(llvm::dbgs() << "IR After conflict resolution:\n");
+  LLVM_DEBUG(root->print(llvm::dbgs()));
+  LLVM_DEBUG(llvm::dbgs() << "\n");
 
   FrozenRewritePatternSet frozenPatterns(std::move(distributionPatterns));
   applyVectorDistribution(root, frozenPatterns);

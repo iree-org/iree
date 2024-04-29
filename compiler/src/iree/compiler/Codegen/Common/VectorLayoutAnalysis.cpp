@@ -827,6 +827,10 @@ void PropagateLayout::visitRegionSuccessors(RegionBranchOpInterface branch,
     // Propagate the layouts.
     for (auto [forwardedLattice, inputLattice] :
          llvm::zip(forwardedLattices, inputLattices)) {
+      if (inputLattice->hasLayout()) {
+        continue;
+      }
+
       ChangeResult changed = inputLattice->resolve(forwardedLattice);
       propagateIfChanged(inputLattice, changed);
     }

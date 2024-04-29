@@ -172,7 +172,13 @@ def IREEGPU_MMAAttr : IREEGPU_MmaVectorLayoutAttr<"MMA", "MMAIntrinsicAttr"> {
 // MMA schedule Attributes
 //===----------------------------------------------------------------------===//
 
-def IREEGPU_MmaScheduleAttr : AttrDef<IREEGPU_Dialect, "MMASchedule"> {
+def IREEGPU_MmaScheduleAttr : AttrDef<IREEGPU_Dialect, "MMASchedule",
+  [
+    DeclareAttrInterfaceMethods<IREEGPU_DistributionScheduleAttr, [
+      "getContractionLayout",
+      "getTargetIntrinsic",
+    ]>
+]> {
   let mnemonic = "mma_schedule";
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
 
@@ -189,15 +195,28 @@ def IREEGPU_MmaScheduleAttr : AttrDef<IREEGPU_Dialect, "MMASchedule"> {
   );
 
   let assemblyFormat = "`<` struct(params) `>`";
-
-  let extraClassDeclaration = [{
-    // Returns the A/B/C matrix concrete layout targeting |contractOp|.
-    ::mlir::FailureOr<::std::tuple<VectorExt::VectorLayoutInterface,
-                                 VectorExt::VectorLayoutInterface,
-                                 VectorExt::VectorLayoutInterface>>
-      getContractionLayout(::mlir::vector::ContractionOp contractOp) const;
-  }];
 }
 
+def IREEGPU_AttentionScheduleAttr : AttrDef<IREEGPU_Dialect, 
+                                            "AttentionSchedule", [
+  DeclareAttrInterfaceMethods<IREEGPU_DistributionScheduleAttr, [
+    "getContractionLayout",
+    "getTargetIntrinsic",
+  ]>
+]> {
+  let mnemonic = "attention_schedule";
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+
+  string description = [{}];
+
+  let parameters = (ins
+    "::mlir::iree_compiler::IREE::GPU::MmaInterfaceAttr":$intrinsic,
+    "int64_t":$subgroup_q_count,
+    "int64_t":$subgroup_q_tile_count,
+    "int64_t":$subgroup_attn_tile_count
+  );
+
+  let assemblyFormat = "`<` struct(params) `>`";
+}
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_GPU_IREEGPUATTRS

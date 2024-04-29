@@ -8,7 +8,6 @@
 #include <numeric>
 
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.h"
-#include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Utils/VectorOpUtils.h"
 #include "llvm/ADT/SmallVector.h"
@@ -936,6 +935,57 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
              VectorLayoutInterface>
       result = std::make_tuple(aLayout, bLayout, cLayout);
   return result;
+}
+
+MmaInterfaceAttr MMAScheduleAttr::getTargetIntrinsic() const {
+  return getIntrinsic();
+}
+
+FailureOr<std::tuple<VectorExt::VectorLayoutInterface,
+                     VectorExt::VectorLayoutInterface,
+                     VectorExt::VectorLayoutInterface>>
+AttentionScheduleAttr::getContractionLayout(
+    vector::ContractionOp contractOp) const {
+
+  scf::ForOp forOp =
+      llvm::dyn_cast_or_null<scf::ForOp>(contractOp->getParentOp());
+  if (!forOp) {
+    return failure();
+  }
+
+  // There should be 2 contracts in the for loop.
+  SmallVector<vector::ContractionOp> contractOps;
+  for (Operation &op : forOp.getRegion().getOps()) {
+    auto contract = llvm::dyn_cast<vector::ContractionOp>(&op);
+    if (!contract) {
+      continue;
+    }
+    contractOps.push_back(contract);
+  }
+
+  if (contractOps.size() != 2) {
+    return failure();
+  }
+
+  if (contractOp == contractOps[0]) {
+    // Q.KT
+    auto qKTSchedule =
+        MMAScheduleAttr::get(getContext(), getTargetIntrinsic(), 1, 1);
+    return qKTSchedule.getContractionLayout(contractOp);
+  }
+
+  if (contractOp == contractOps[1]) {
+    // S.V
+    auto sVSchedule =
+        MMAScheduleAttr::get(getContext(), getTargetIntrinsic(), 1, 1);
+    return sVSchedule.getContractionLayout(contractOp);
+  }
+
+  return failure();
+}
+
+MmaInterfaceAttr AttentionScheduleAttr::getTargetIntrinsic() const {
+  return getIntrinsic();
 }
 
 //===----------------------------------------------------------------------===//

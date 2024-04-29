@@ -16,6 +16,9 @@
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
 
+#define GEN_PASS_DECL
+#include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h.inc"
+
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLinalgExtToLoopsPass();
 
@@ -65,6 +68,8 @@ void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
 // Creates a pass to convert the attention op into a sequence of
 // linalg ops.
 std::unique_ptr<Pass> createTileAndDecomposeAttentionPass();
+std::unique_ptr<Pass>
+createTileAndDecomposeAttentionPass(TileAndDecomposeAttentionOptions &options);
 
 //===---------------------------------------------------------------------===//
 // Codegen Strategy passes that are moved into IREE.

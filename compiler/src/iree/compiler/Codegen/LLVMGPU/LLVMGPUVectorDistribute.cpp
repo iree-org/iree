@@ -55,7 +55,7 @@ class ContractionVectorLayoutOptions : public VectorLayoutOptions {
 public:
   ContractionVectorLayoutOptions(Operation *root,
                                  ArrayRef<int64_t> workgroupSize,
-                                 IREE::GPU::MMAScheduleAttr schedule,
+                                 IREE::GPU::DistributionSchedule schedule,
                                  Value laneId, int64_t subgroupSize,
                                  bool printLayout)
       : VectorLayoutOptions(root, /*fullConversion=*/!printLayout),
@@ -117,7 +117,7 @@ private:
     if (analysis.setAnchor(contract.getResult(), cLayout).failed()) {
       return failure();
     }
-    contract->setAttr("iree.amdgpu.mma", schedule.getIntrinsic());
+    contract->setAttr("iree.amdgpu.mma", schedule.getTargetIntrinsic());
     if (printLayout) {
       llvm::outs() << "contract A vector layout: " << aLayout << "\n";
       llvm::outs() << "contract B vector layout: " << bLayout << "\n";
@@ -130,7 +130,7 @@ private:
       llvm::dbgs() << "anchor set on contract: " << contract << "\n";
     });
 
-    if (isa<IREE::GPU::MMAAttr>(schedule.getIntrinsic())) {
+    if (isa<IREE::GPU::MMAAttr>(schedule.getTargetIntrinsic())) {
       if (!populatedMma) {
         populateGPUDistributeNestedLayoutContractAMDGPUPatterns(patterns);
         populatedMma = true;
@@ -341,7 +341,7 @@ private:
   }
 
   SmallVector<int64_t, 3> workgroupSize;
-  IREE::GPU::MMAScheduleAttr schedule;
+  IREE::GPU::DistributionSchedule schedule;
   // Whether to print the chosen layout for testing purposes
   bool printLayout;
 
@@ -385,13 +385,12 @@ public:
       }
     }
 
-    llvm::StringLiteral scheduleAttrName =
-        IREE::GPU::MMAScheduleAttr::getMnemonic();
+    llvm::StringLiteral scheduleAttrName = "distribution_schedule";
     auto scheduleAttr =
-        func->getAttrOfType<IREE::GPU::MMAScheduleAttr>(scheduleAttrName);
+        func->getAttrOfType<IREE::GPU::DistributionSchedule>(scheduleAttrName);
     if (!scheduleAttr) {
       DictionaryAttr configDict = getTranslationInfo(func).getConfiguration();
-      scheduleAttr = dyn_cast_or_null<IREE::GPU::MMAScheduleAttr>(
+      scheduleAttr = dyn_cast_or_null<IREE::GPU::DistributionSchedule>(
           configDict.get(scheduleAttrName));
     }
 

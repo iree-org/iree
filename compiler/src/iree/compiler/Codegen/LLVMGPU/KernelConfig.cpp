@@ -468,7 +468,8 @@ setConvolutionVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
       context, mmaAttrs[schedule->index], schedule->mWarpCount,
       schedule->nWarpCount);
   SmallVector<NamedAttribute, 1> attrs;
-  attrs.emplace_back(StringAttr::get(context, "mma_schedule"), scheduleAttr);
+  attrs.emplace_back(StringAttr::get(context, "distribution_schedule"),
+                     scheduleAttr);
   auto configDict = DictionaryAttr::get(context, attrs);
 
   return setOpConfigAndEntryPointFnTranslation(
@@ -620,13 +621,71 @@ setMatmulVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
       context, mmaAttrs[schedule->index], schedule->mWarpCount,
       schedule->nWarpCount);
   SmallVector<NamedAttribute, 1> attrs;
-  attrs.emplace_back(StringAttr::get(context, "mma_schedule"), scheduleAttr);
+  attrs.emplace_back(StringAttr::get(context, "distribution_schedule"),
+                     scheduleAttr);
   auto configDict = DictionaryAttr::get(context, attrs);
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, tileSizes,
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorDistribute,
       workgroupSize, targetSubgroupSize, configDict);
+}
+
+static LogicalResult
+setAttentionVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
+                                     IREE::LinalgExt::AttentionOp attnOp,
+                                     const TargetInfo &targetInfo) {
+  FailureOr<ArrayAttr> mmaKinds = getSupportedMmaTypes(entryPoint);
+  if (failed(mmaKinds)) {
+    return failure();
+  }
+
+  // This pipeline needs to know the subgroup size for distributing to virtual
+  // lane IDs.
+  if (targetInfo.supportedSubgroupSizes.empty()) {
+    return failure();
+  }
+  const int64_t subgroupSize = targetInfo.supportedSubgroupSizes.front();
+
+  auto mmaAttrs = llvm::to_vector(mmaKinds->getAsRange<IREE::GPU::MMAAttr>());
+  IREE::GPU::AttentionScheduleAttr schedule;
+  for (auto mma : mmaAttrs) {
+    auto [mSize, nSize, kSize] = mma.getMNKShape();
+    auto [aType, bType, cType] = mma.getABCElementTypes();
+
+    if (attnOp.getQueryType().getElementType() != aType ||
+        attnOp.getKeyType().getElementType() != bType) {
+      continue; // Cannot use this intrinsic for mismatched types
+    }
+
+    // TODO: Add proper checks here.
+    // Always use block_m = 128, num_warps = 4, attn_tile_size = 32.
+    schedule = IREE::GPU::AttentionScheduleAttr::get(attnOp.getContext(), mma,
+                                                     4, 32 / mSize, 32);
+    break;
+  }
+
+  if (!schedule) {
+    return failure();
+  }
+
+  // TODO: Don't hardcode this.
+  SmallVector<int64_t> workgroupTileSizes({1, 128});
+  TileSizesListType tileSizes;
+  tileSizes.push_back(workgroupTileSizes);
+
+  MLIRContext *context = attnOp.getContext();
+  SmallVector<NamedAttribute, 1> attrs;
+  attrs.emplace_back(StringAttr::get(context, "distribution_schedule"),
+                     schedule);
+  auto configDict = DictionaryAttr::get(context, attrs);
+
+  std::array<int64_t, 3> workgroupSize{1, 128, 1};
+
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPoint, attnOp, tileSizes,
+      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorDistribute,
+      workgroupSize, subgroupSize, configDict);
 }
 
 static LogicalResult
@@ -648,12 +707,19 @@ setVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
       return setMatmulVectorDistributionConfig(entryPoint, linalgOp,
                                                targetInfo);
     }
+
     if (linalg::isaConvolutionOpInterface(linalgOp)) {
       LDBG(
           "VectorDistribution: trying to find a suitable convolution config\n");
       return setConvolutionVectorDistributionConfig(entryPoint, linalgOp,
                                                     targetInfo);
     }
+  }
+
+  if (auto attentionOp = dyn_cast<IREE::LinalgExt::AttentionOp>(computeOp)) {
+    LDBG("VectorDistribution: trying to find a suitable attention config\n");
+    return setAttentionVectorDistributionConfig(entryPoint, attentionOp,
+                                                targetInfo);
   }
 
   LDBG("VectorDistribution: failed to find a suitable config");
@@ -1769,6 +1835,7 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
     LDBG("Transform Dialect Config");
     return success();
   }
+
   if (succeeded(
           setVectorDistributionConfig(entryPointFn, computeOp, targetInfo))) {
     return success();

@@ -83,23 +83,23 @@ public:
   void runOnOperation() override {
     auto func = getOperation();
 
-    llvm::StringLiteral scheduleAttrName =
-        IREE::GPU::MMAScheduleAttr::getMnemonic();
-    auto scheduleAttr =
-        func->getAttrOfType<IREE::GPU::MMAScheduleAttr>(scheduleAttrName);
+    llvm::StringLiteral scheduleAttrName = "distribution_schedule";
+    auto scheduleAttr = dyn_cast_or_null<IREE::GPU::DistributionSchedule>(
+        func->getAttr(scheduleAttrName));
     if (!scheduleAttr) {
       DictionaryAttr configDict = getTranslationInfo(func).getConfiguration();
-      scheduleAttr = dyn_cast_or_null<IREE::GPU::MMAScheduleAttr>(
+      scheduleAttr = dyn_cast_or_null<IREE::GPU::DistributionSchedule>(
           configDict.get(scheduleAttrName));
     }
     if (!scheduleAttr) {
-      func.emitError() << "missing mma_schedule\n";
+      func.emitError() << "missing distribution_schedule\n";
       return signalPassFailure();
     }
 
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
-    patterns.add<UpcastContractOutput>(context, scheduleAttr.getIntrinsic());
+    patterns.add<UpcastContractOutput>(context,
+                                       scheduleAttr.getTargetIntrinsic());
 
     if (failed(applyPatternsAndFoldGreedily(func, std::move(patterns)))) {
       return signalPassFailure();
