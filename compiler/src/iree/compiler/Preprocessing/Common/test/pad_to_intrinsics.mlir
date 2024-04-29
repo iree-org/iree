@@ -3,10 +3,13 @@
 // RUN: iree-opt --split-input-file %s --pass-pipeline="builtin.module(func.func(iree-preprocessing-pad-to-intrinsics{pad-target-type=contraction},canonicalize))" | FileCheck %s -check-prefix=CONTRACT
 
 
-#rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb",
-                             {mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
-                                                #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>],
-                              iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx942">, ukernels = "none"}>
+#target = #iree_gpu.target<api = hip, arch = "gfx942",
+  core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
+  subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
+  mma = [<MFMA_F16_16x16x16_F32>, <MFMA_F16_32x32x8_F32>],
+  subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
+  max_thread_size = 1024, max_workgroup_memory_bytes = 65536>>
+#rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target, ukernels = "none"}>
 
 // CHECK-LABEL: func.func @main0(
 // CHECK-SAME:    %[[ARG0:.+]]: tensor<2x130x130x4xf16>,
@@ -14,7 +17,7 @@
 // CHECK-SAME:    %[[ARG2:.+]]: tensor<2x128x128x320xf32>)
 func.func @main0(%arg0: tensor<2x130x130x4xf16>, %arg1: tensor<3x3x4x320xf16>, %arg2: tensor<2x128x128x320xf32>)
     -> tensor<2x128x128x320xf32>
-    attributes {hal.device.targets = [#hal.device.target<"rocm", [#rocm_executable_target]>]} {
+    attributes {hal.executable.target = #rocm_executable_target} {
   %conv0 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>}
              ins(%arg0, %arg1 : tensor<2x130x130x4xf16>, tensor<3x3x4x320xf16>)
              outs(%arg2 : tensor<2x128x128x320xf32>) -> tensor<2x128x128x320xf32>
@@ -40,10 +43,13 @@ func.func @main0(%arg0: tensor<2x130x130x4xf16>, %arg1: tensor<3x3x4x320xf16>, %
 
 // -----
 
-#rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb",
-                             {mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
-                                                #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>],
-                              iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx942">, ukernels = "none"}>
+#target = #iree_gpu.target<api = hip, arch = "gfx942",
+  core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
+  subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
+  mma = [<MFMA_F16_16x16x16_F32>, <MFMA_F16_32x32x8_F32>],
+  subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
+  max_thread_size = 1024, max_workgroup_memory_bytes = 65536>>
+#rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target, ukernels = "none"}>
 
 // CHECK-LABEL: func.func @main1(
 // CHECK-SAME:    %[[ARG0:.+]]: tensor<2x130x130x320xf16>,
@@ -51,7 +57,7 @@ func.func @main0(%arg0: tensor<2x130x130x4xf16>, %arg1: tensor<3x3x4x320xf16>, %
 // CHECK-SAME:    %[[ARG2:.+]]: tensor<2x128x128x4xf32>)
 func.func @main1(%arg0: tensor<2x130x130x320xf16>, %arg1: tensor<3x3x320x4xf16>, %arg2: tensor<2x128x128x4xf32>)
     -> tensor<2x128x128x4xf32>
-    attributes {hal.device.targets = [#hal.device.target<"rocm", [#rocm_executable_target]>]} {
+    attributes {hal.executable.target = #rocm_executable_target} {
   %conv0 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>}
              ins(%arg0, %arg1 : tensor<2x130x130x320xf16>, tensor<3x3x320x4xf16>)
              outs(%arg2 : tensor<2x128x128x4xf32>) -> tensor<2x128x128x4xf32>
@@ -75,9 +81,13 @@ func.func @main1(%arg0: tensor<2x130x130x320xf16>, %arg1: tensor<3x3x320x4xf16>,
 
 // -----
 
-#rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb",
-                             {mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>],
-                              iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx942">, ukernels = "none"}>
+#target = #iree_gpu.target<api = hip, arch = "gfx942",
+  core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
+  subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
+  mma = [<MFMA_F16_32x32x8_F32>],
+  subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
+  max_thread_size = 1024, max_workgroup_memory_bytes = 65536>>
+#rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target, ukernels = "none"}>
 
 // CHECK-LABEL: func.func @main2(
 // CHECK-SAME:    %[[ARG0:.+]]: tensor<2x130x130x4xf16>,
@@ -85,7 +95,7 @@ func.func @main1(%arg0: tensor<2x130x130x320xf16>, %arg1: tensor<3x3x320x4xf16>,
 // CHECK-SAME:    %[[ARG2:.+]]: tensor<2x128x128x320xf32>)
 func.func @main2(%arg0: tensor<2x130x130x4xf16>, %arg1: tensor<3x3x4x320xf16>, %arg2: tensor<2x128x128x320xf32>)
     -> tensor<2x128x128x320xf32>
-    attributes {hal.device.targets = [#hal.device.target<"rocm", [#rocm_executable_target]>]} {
+    attributes {hal.executable.target = #rocm_executable_target} {
   %conv0 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>}
              ins(%arg0, %arg1 : tensor<2x130x130x4xf16>, tensor<3x3x4x320xf16>)
              outs(%arg2 : tensor<2x128x128x320xf32>) -> tensor<2x128x128x320xf32>
@@ -104,16 +114,20 @@ func.func @main2(%arg0: tensor<2x130x130x4xf16>, %arg1: tensor<3x3x4x320xf16>, %
 
 // -----
 
-#rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb",
-                                    {mma_intrinsics = [#iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>],
-                                      iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx1100">, ukernels = "none"}>
+#target = #iree_gpu.target<api = hip, arch = "gfx1100",
+  core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
+  subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
+  mma = [<WMMA_F16_16x16x16_F32>],
+  subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
+  max_thread_size = 1024, max_workgroup_memory_bytes = 65536>>
+#rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target, ukernels = "none"}>
 
 //       CHECK: func.func @matmul_static(
 //  CHECK-SAME:    %[[ARG0:.+]]: tensor<10x20xf16>,
 //  CHECK-SAME:    %[[ARG1:.+]]: tensor<20x30xf16>,
 //  CHECK-SAME:    %[[ARG2:.+]]: tensor<10x30xf16>)
 func.func @matmul_static(%arg0 : tensor<10x20xf16>, %arg1 : tensor<20x30xf16>, %arg2 : tensor<10x30xf16>) -> tensor<10x30xf16>
-    attributes {hal.device.targets = [#hal.device.target<"rocm", [#rocm_executable_target]>]} {
+    attributes {hal.executable.target = #rocm_executable_target} {
     %0 = linalg.matmul ins(%arg0, %arg1 : tensor<10x20xf16>, tensor<20x30xf16>)
         outs(%arg2 : tensor<10x30xf16>) -> tensor<10x30xf16>
     return %0 : tensor<10x30xf16>
@@ -141,9 +155,13 @@ func.func @matmul_static(%arg0 : tensor<10x20xf16>, %arg1 : tensor<20x30xf16>, %
 
 // Good test to ensure reassoc, new dims, and iterator types works on permuted operations.
 
-#rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb",
-                                    {mma_intrinsics = [#iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>],
-                                      iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx1100">, ukernels = "none"}>
+#target = #iree_gpu.target<api = hip, arch = "gfx1100",
+  core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
+  subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
+  mma = [<WMMA_F16_16x16x16_F32>],
+  subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
+  max_thread_size = 1024, max_workgroup_memory_bytes = 65536>>
+#rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target, ukernels = "none"}>
 
 //   CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (-s0 + (s0 ceildiv 16) * 16)>
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>
@@ -154,7 +172,7 @@ func.func @matmul_static(%arg0 : tensor<10x20xf16>, %arg1 : tensor<20x30xf16>, %
 //  CHECK-SAME:    %[[ARG1:.+]]: tensor<?x?xf16>,
 //  CHECK-SAME:    %[[ARG2:.+]]: tensor<10x?xf16>)
 func.func @mmtb_dynamic_k_n(%arg0 : tensor<10x?xf16>, %arg1 : tensor<?x?xf16>, %arg2 : tensor<10x?xf16>) -> tensor<10x?xf16>
-    attributes {hal.device.targets = [#hal.device.target<"rocm", [#rocm_executable_target]>]} {
+    attributes {hal.executable.target = #rocm_executable_target} {
     %0 = linalg.matmul_transpose_b ins(%arg0, %arg1 : tensor<10x?xf16>, tensor<?x?xf16>)
         outs(%arg2 : tensor<10x?xf16>) -> tensor<10x?xf16>
     return %0 : tensor<10x?xf16>
@@ -183,9 +201,13 @@ func.func @mmtb_dynamic_k_n(%arg0 : tensor<10x?xf16>, %arg1 : tensor<?x?xf16>, %
 
 // -----
 
-#rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb",
-                                    {mma_intrinsics = [#iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>],
-                                      iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx1100">, ukernels = "none"}>
+#target = #iree_gpu.target<api = hip, arch = "gfx1100",
+  core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
+  subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
+  mma = [<WMMA_F16_16x16x16_F32>],
+  subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
+  max_thread_size = 1024, max_workgroup_memory_bytes = 65536>>
+#rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target, ukernels = "none"}>
 
 //   CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (-s0 + (s0 ceildiv 16) * 16)>
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1] -> (-s0 + s1 + (s0 ceildiv 16) * 16)>
@@ -196,7 +218,7 @@ func.func @mmtb_dynamic_k_n(%arg0 : tensor<10x?xf16>, %arg1 : tensor<?x?xf16>, %
 //  CHECK-SAME:    %[[ARG0:.+]]: tensor<32x?x?xf16>,
 //  CHECK-SAME:    %[[ARG1:.+]]: tensor<32x?x128xf16>)
 func.func @bmm_dynamic_m_k(%arg0: tensor<32x?x?xf16>, %arg1: tensor<32x?x128xf16>) -> tensor<32x?x128xf16>
-        attributes {hal.device.targets = [#hal.device.target<"rocm", [#rocm_executable_target]>]} {
+        attributes {hal.executable.target = #rocm_executable_target} {
   %cst = arith.constant 0.000000e+00 : f16
   %c1 = arith.constant 1 : index
   %dim = tensor.dim %arg0, %c1 : tensor<32x?x?xf16>
@@ -231,9 +253,13 @@ func.func @bmm_dynamic_m_k(%arg0: tensor<32x?x?xf16>, %arg1: tensor<32x?x128xf16
 
 // -----
 
-#rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb",
-                                    {mma_intrinsics = [#iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>],
-                                      iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx1100">, ukernels = "none"}>
+#target = #iree_gpu.target<api = hip, arch = "gfx1100",
+  core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
+  subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
+  mma = [<WMMA_F16_16x16x16_F32>],
+  subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
+  max_thread_size = 1024, max_workgroup_memory_bytes = 65536>>
+#rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target, ukernels = "none"}>
 
 //   CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (-s0 + (s0 ceildiv 16) * 16)>
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1] -> (-s0 + s1 + (s0 ceildiv 16) * 16)>
@@ -245,7 +271,7 @@ func.func @bmm_dynamic_m_k(%arg0: tensor<32x?x?xf16>, %arg1: tensor<32x?x128xf16
 //  CHECK-SAME:    %[[ARG1:.+]]: tensor<4096x32xf16>, %[[ARG2:.+]]: tensor<4096x32xf16>,
 //  CHECK-SAME:    %[[ARG3:.+]]: tensor<?x32x128xf16>)
 func.func @dequant_gemm_dynamic_m(%arg0: tensor<4096x32x128xi4>, %arg1: tensor<4096x32xf16>, %arg2: tensor<4096x32xf16>, %arg3: tensor<?x32x128xf16>) -> tensor<?x4096xf16>
-  attributes {hal.device.targets = [#hal.device.target<"rocm", [#rocm_executable_target]>]} {
+  attributes {hal.executable.target = #rocm_executable_target} {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f16
   %dim = tensor.dim %arg3, %c0 : tensor<?x32x128xf16>
