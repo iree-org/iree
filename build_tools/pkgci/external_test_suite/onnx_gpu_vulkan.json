@@ -803,7 +803,6 @@
     "test_reduce_sum_square_default_axes_keepdims_example_expanded",
     "test_reduce_sum_square_default_axes_keepdims_random_expanded",
     "test_scatter_elements_with_negative_indices",
-    "test_selu_default",
     "test_shape",
     "test_shape_clip_end",
     "test_shape_clip_start",

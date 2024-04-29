@@ -760,7 +760,6 @@
     "test_reduce_min_empty_set",
     "test_reduce_sum_empty_set_non_reduced_axis_zero",
     "test_scatter_elements_with_negative_indices",
-    "test_selu_default",
     "test_shape",
     "test_shape_clip_end",
     "test_shape_clip_start",
