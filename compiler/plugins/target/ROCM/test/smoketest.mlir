@@ -3,7 +3,7 @@
 module attributes {
   hal.device.targets = [
     #hal.device.target<"rocm", [
-      #hal.executable.target<"rocm", "rocm-hsaco-fb">
+      #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx90a">}>
     ]>
   ]
 } {
@@ -47,7 +47,7 @@ stream.executable public @add_dispatch_0 {
 module attributes {
   hal.device.targets = [
     #hal.device.target<"rocm", [
-      #hal.executable.target<"rocm", "rocm-hsaco-fb">
+      #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx90a">}>
     ]>
   ]
 } {

@@ -384,7 +384,7 @@ func.func @optimization_barrier(%arg0 : tensor<f32>) -> tensor<f32> {
 
 // -----
 // CHECK: #[[SM75:.*]] = #hal.executable.target<"cuda",
-// CHECK-SAME:           "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_75">}>
+// CHECK-SAME:           "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda : "sm_75">}>
 
 // CHECK: #[[LAYOUT:.*]] = #hal.pipeline.layout<push_constants = 1,
 // CHECK-SAME: sets = [<0, bindings = [

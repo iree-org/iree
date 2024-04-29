@@ -6,7 +6,7 @@
 module attributes {
   hal.device.targets = [
     #hal.device.target<"cuda", [
-      #hal.executable.target<"cuda", "cuda-nvptx-fb">
+      #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>
     ]>
   ]
 } {

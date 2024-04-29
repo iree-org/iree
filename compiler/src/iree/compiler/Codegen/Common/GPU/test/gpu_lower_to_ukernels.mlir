@@ -257,7 +257,7 @@ func.func @argmax_2d_f32i64_not_neg_inf_init(%arg0 : tensor<1x?xf32>) -> tensor<
 //       to minimize compile time and space.
 
 func.func @argmax_ukernel_unsupported_arch(%arg0 : tensor<1x?xf32>) -> tensor<1xi64> attributes {
-  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx800">, ukernels = "all"}>
+  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx908">, ukernels = "all"}>
 } {
   %c0_i64 = arith.constant 0 : i64
   %cst = arith.constant 0xFF800000 : f32
