@@ -8,7 +8,6 @@
 #include <numeric>
 
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.h"
-#include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Utils/VectorOpUtils.h"
 #include "llvm/ADT/SmallVector.h"

@@ -60,7 +60,6 @@ iree_compiler_cc_library(
         ":IREEGPUAttrs",
         ":IREEGPUDialectGen",
         ":IREEGPUInterfaces",
-        "//compiler/src/iree/compiler/Codegen/Common:VectorLayoutAnalysis",
         "//compiler/src/iree/compiler/Codegen/Utils:VectorOpUtils",
         "//llvm-external-projects/iree-dialects:IREEVectorExtDialect",
         "@llvm-project//llvm:Support",
