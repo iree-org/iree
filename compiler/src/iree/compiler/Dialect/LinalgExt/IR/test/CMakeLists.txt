@@ -18,7 +18,6 @@ iree_lit_test_suite(
     "distribution.mlir"
     "invalid.mlir"
     "roundtrip.mlir"
-    "tiling.mlir"
   TOOLS
     FileCheck
     iree-opt
