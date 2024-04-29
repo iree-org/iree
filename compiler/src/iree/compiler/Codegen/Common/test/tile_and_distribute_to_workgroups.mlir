@@ -2605,7 +2605,7 @@ hal.executable private @set_size_to_tilesize_when_divisible {
       hal.return %x, %y, %z : index, index, index
     }
     builtin.module {
-      func.func @set_size_to_tilesize_when_divisible() attributes {translation_info = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [128, 1, 1] subgroup_size = 32, {mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>, subgroup_m_count = 1, subgroup_n_count = 4, subgroup_m_tile_count = 1, subgroup_n_tile_count = 2, subgroup_k_tile_count = 8>}>} {
+      func.func @set_size_to_tilesize_when_divisible() attributes {translation_info = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [128, 1, 1] subgroup_size = 32, {mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>, subgroup_m_count = 1, subgroup_n_count = 4>}>} {
         %c0 = arith.constant 0 : index
         %c32_i64 = arith.constant 32 : i64
         %cst = arith.constant 0.000000e+00 : f16

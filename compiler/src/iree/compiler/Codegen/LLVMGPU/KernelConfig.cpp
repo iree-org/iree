@@ -38,7 +38,6 @@
 #define DEBUG_TYPE "iree-llvmgpu-kernel-config"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 #define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
-
 namespace mlir::iree_compiler {
 
 llvm::cl::opt<bool> clGPUEnableVectorDistribution(
@@ -468,12 +467,9 @@ setConvolutionVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   MLIRContext *context = op.getContext();
   auto scheduleAttr = IREE::GPU::MMAScheduleAttr::get(
       context, mmaAttrs[schedule->index], schedule->mWarpCount,
-      schedule->nWarpCount, schedule->mTileCount, schedule->nTileCount,
-      schedule->kTileCount);
+      schedule->nWarpCount);
   SmallVector<NamedAttribute, 1> attrs;
-  attrs.emplace_back(
-      StringAttr::get(context, IREE::GPU::MMAScheduleAttr::getMnemonic()),
-      scheduleAttr);
+  attrs.emplace_back(StringAttr::get(context, "mma_schedule"), scheduleAttr);
   auto configDict = DictionaryAttr::get(context, attrs);
 
   return setOpConfigAndEntryPointFnTranslation(
@@ -623,12 +619,9 @@ setMatmulVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   MLIRContext *context = op.getContext();
   auto scheduleAttr = IREE::GPU::MMAScheduleAttr::get(
       context, mmaAttrs[schedule->index], schedule->mWarpCount,
-      schedule->nWarpCount, schedule->mTileCount, schedule->nTileCount,
-      schedule->kTileCount);
+      schedule->nWarpCount);
   SmallVector<NamedAttribute, 1> attrs;
-  attrs.emplace_back(
-      StringAttr::get(context, IREE::GPU::MMAScheduleAttr::getMnemonic()),
-      scheduleAttr);
+  attrs.emplace_back(StringAttr::get(context, "mma_schedule"), scheduleAttr);
   auto configDict = DictionaryAttr::get(context, attrs);
 
   return setOpConfigAndEntryPointFnTranslation(
@@ -639,15 +632,32 @@ setMatmulVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
 
 static LogicalResult
 setVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
-                            linalg::LinalgOp linalgOp,
+                            Operation *computeOp,
                             const TargetInfo &targetInfo) {
-  if (linalg::isaContractionOpInterface(linalgOp)) {
-    return setMatmulVectorDistributionConfig(entryPoint, linalgOp, targetInfo);
+
+  if (!clGPUEnableVectorDistribution) {
+    LDBG("vector distribution not enabled, skipping...\n");
+    return failure();
   }
-  if (linalg::isaConvolutionOpInterface(linalgOp)) {
-    return setConvolutionVectorDistributionConfig(entryPoint, linalgOp,
-                                                  targetInfo);
+
+  LDBG("VectorDistribution: finding a suitable config...\n");
+
+  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(computeOp)) {
+    if (linalg::isaContractionOpInterface(linalgOp)) {
+      LDBG(
+          "VectorDistribution: trying to find a suitable contraction config\n");
+      return setMatmulVectorDistributionConfig(entryPoint, linalgOp,
+                                               targetInfo);
+    }
+    if (linalg::isaConvolutionOpInterface(linalgOp)) {
+      LDBG(
+          "VectorDistribution: trying to find a suitable convolution config\n");
+      return setConvolutionVectorDistributionConfig(entryPoint, linalgOp,
+                                                    targetInfo);
+    }
   }
+
+  LDBG("VectorDistribution: failed to find a suitable config");
   return failure();
 }
 
@@ -1760,14 +1770,12 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
     LDBG("Transform Dialect Config");
     return success();
   }
+  if (succeeded(
+          setVectorDistributionConfig(entryPointFn, computeOp, targetInfo))) {
+    return success();
+  }
+
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(computeOp)) {
-    if (clGPUEnableVectorDistribution) {
-      if (succeeded(setVectorDistributionConfig(entryPointFn, linalgOp,
-                                                targetInfo))) {
-        LDBG("VectorDistribution Config");
-        return success();
-      }
-    }
     if (succeeded(setContractConfig(entryPointFn, linalgOp, targetInfo))) {
       LDBG("Contract Config");
       return success();
