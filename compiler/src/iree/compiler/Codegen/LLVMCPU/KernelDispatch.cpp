@@ -690,7 +690,7 @@ static void limitVectorTileSizes(linalg::LinalgOp op,
       // power-of-two: the inner-most dimension size 3 above.
       if (adjustedVal != oldVal) {
         // Round to nearest power of 2, rounding down.
-        adjustedVal = 1L << llvm::Log2_64(adjustedVal);
+        adjustedVal = 1ll << llvm::Log2_64(adjustedVal);
       }
       vecTileSizes[loopNum] = adjustedVal;
       tileBits[i] *= adjustedVal;
