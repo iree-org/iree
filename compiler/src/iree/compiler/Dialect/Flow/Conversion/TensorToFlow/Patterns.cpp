@@ -247,6 +247,11 @@ struct ConvertTensorDialectReshapeOpPattern
       Value element = rewriter.create<tensor::ExtractOp>(loc, op.getShape(),
                                                          ValueRange({idx}));
       if (ShapedType::isDynamic(resultType.getShape()[i])) {
+        auto elementTy = element.getType();
+        if (isa<IntegerType>(elementTy)) {
+          element = rewriter.create<arith::IndexCastOp>(
+              loc, rewriter.getIndexType(), element);
+        }
         destSizes.push_back(element);
       }
     }
