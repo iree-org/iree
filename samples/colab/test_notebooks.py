@@ -22,9 +22,7 @@ NOTEBOOKS_TO_SKIP = [
 ]
 
 NOTEBOOKS_EXPECTED_TO_FAIL = [
-    # Bug in iree-turbine==2.3.0rc20240410
-    #   `assert issubclass(type(mdl), CompiledModule)` (fixed in 2190a8a)
-    "pytorch_aot_advanced.ipynb",
+    # None!
 ]
 
 
