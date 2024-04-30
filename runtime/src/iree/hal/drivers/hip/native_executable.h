@@ -19,11 +19,28 @@
 extern "C" {
 #endif  // __cplusplus
 
+typedef enum iree_hal_hip_parameter_mapping_type_e {
+  IREE_HAL_HIP_PARAMETER_MAPPING_TYPE_CONSTANT = 0,
+  IREE_HAL_HIP_PARAMETER_MAPPING_TYPE_BUFFER = 1,
+} iree_hal_hip_parameter_mapping_type_t;
+
+typedef struct iree_hal_hip_parameter_mapping_op_t {
+  uint8_t type;  // iree_hal_hip_parameter_mapping_type_t
+  uint8_t size;
+  uint16_t source;
+  uint16_t target;
+} iree_hal_hip_parameter_mapping_op_t;
+
 typedef struct iree_hal_hip_kernel_info_t {
   iree_hal_pipeline_layout_t* layout;
   hipFunction_t function;
   uint32_t block_size[3];
   uint32_t shared_memory_size;
+
+  // Only used with parameter mapping:
+  uint32_t parameter_size;                              // optional
+  uint32_t mapping_count;                               // optional
+  const iree_hal_hip_parameter_mapping_op_t* mappings;  // optional
 
   IREE_TRACE(iree_string_view_t function_name;)
   IREE_TRACE(iree_string_view_t source_filename;)

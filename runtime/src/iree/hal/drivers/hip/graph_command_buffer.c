@@ -23,6 +23,13 @@
 // barriers.
 #define IREE_HAL_HIP_MAX_CONCURRENT_GRAPH_NODE_COUNT 32
 
+#define IREE_HAL_HIP_MAX_BINDING_COUNT     \
+  (IREE_HAL_HIP_MAX_DESCRIPTOR_SET_COUNT * \
+   IREE_HAL_HIP_MAX_DESCRIPTOR_SET_BINDING_COUNT)
+
+// Kernel arguments contains binding and push constants.
+#define IREE_HAL_HIP_MAX_KERNEL_ARG 128
+
 // Command buffer implementation that directly records into HIP graphs.
 // The command buffer records the commands on the calling thread without
 // additional threading indirection.
@@ -56,6 +63,9 @@ typedef struct iree_hal_hip_graph_command_buffer_t {
   iree_host_size_t graph_node_count;
 
   int32_t push_constants[IREE_HAL_HIP_MAX_PUSH_CONSTANT_COUNT];
+  hipDeviceptr_t bindings[IREE_HAL_HIP_MAX_DESCRIPTOR_SET_COUNT]
+                         [IREE_HAL_HIP_MAX_DESCRIPTOR_SET_BINDING_COUNT];
+  uint8_t parameter_buffer[IREE_HAL_HIP_MAX_PARAMETER_BUFFER_SIZE];
 
   // The current bound descriptor sets.
   struct {
@@ -652,6 +662,34 @@ static iree_status_t iree_hal_hip_graph_command_buffer_push_descriptor_set(
   }
 
   IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+}
+
+static iree_status_t iree_hal_hip_graph_command_buffer_dispatch_with_layout(
+    iree_hal_hip_graph_command_buffer_t* command_buffer,
+    const iree_hal_hip_kernel_info_t* kernel_info, uint32_t workgroup_x,
+    uint32_t workgroup_y, uint32_t workgroup_z) {
+  // Patch the push constants in the kernel arguments.
+  iree_hal_hip_dispatch_layout_t dispatch_params =
+      iree_hal_hip_pipeline_layout_dispatch_layout(kernel_info->layout);
+  iree_host_size_t num_constants = dispatch_params.push_constant_count;
+  iree_host_size_t constant_base_index =
+      dispatch_params.push_constant_base_index;
+  // Patch the push constants in the kernel arguments.
+  for (iree_host_size_t i = 0; i < num_constants; i++) {
+    *((uint32_t*)command_buffer->descriptor_sets[i + constant_base_index]
+          .bindings) = command_buffer->push_constants[i];
+  }
+
+  IREE_HIP_RETURN_IF_ERROR(
+      command_buffer->symbols,
+      hipModuleLaunchKernel(
+          kernel_info->function, workgroup_x, workgroup_y, workgroup_z,
+          kernel_info->block_size[0], kernel_info->block_size[1],
+          kernel_info->block_size[2], kernel_info->shared_memory_size, 0,
+          command_buffer->descriptor_sets[0].bindings, NULL),
+      "hipModuleLaunchKernel");
+
   return iree_ok_status();
 }
 

@@ -35,7 +35,9 @@ typedef struct iree_hal_hip_stream_command_buffer_t {
   iree_arena_allocator_t arena;
 
   int32_t push_constants[IREE_HAL_HIP_MAX_PUSH_CONSTANT_COUNT];
-
+  hipDeviceptr_t bindings[IREE_HAL_HIP_MAX_DESCRIPTOR_SET_COUNT]
+                         [IREE_HAL_HIP_MAX_DESCRIPTOR_SET_BINDING_COUNT];
+  uint8_t parameter_buffer[IREE_HAL_HIP_MAX_PARAMETER_BUFFER_SIZE];
   // The current bound descriptor sets.
   struct {
     hipDeviceptr_t bindings[IREE_HAL_HIP_MAX_DESCRIPTOR_SET_BINDING_COUNT];
@@ -424,34 +426,12 @@ static iree_status_t iree_hal_hip_stream_command_buffer_push_descriptor_set(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_hip_stream_command_buffer_dispatch(
-    iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_executable_t* executable, int32_t entry_point,
-    uint32_t workgroup_x, uint32_t workgroup_y, uint32_t workgroup_z) {
-  iree_hal_hip_stream_command_buffer_t* command_buffer =
-      iree_hal_hip_stream_command_buffer_cast(base_command_buffer);
-  IREE_TRACE_ZONE_BEGIN(z0);
-
-  // Lookup kernel parameters used for side-channeling additional launch
-  // information from the compiler.
-  iree_hal_hip_kernel_info_t kernel_info;
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_hip_native_executable_entry_point_kernel_info(
-              executable, entry_point, &kernel_info));
-
-  IREE_HIP_STREAM_TRACE_ZONE_BEGIN_EXTERNAL(
-      command_buffer->tracing_context, command_buffer->hip_stream,
-      kernel_info.source_filename.data, kernel_info.source_filename.size,
-      kernel_info.source_line, kernel_info.function_name.data,
-      kernel_info.function_name.size,
-      /*name=*/NULL, 0);
-
-  IREE_RETURN_AND_END_ZONE_IF_ERROR(
-      z0, iree_hal_resource_set_insert(command_buffer->resource_set, 1,
-                                       &executable));
-
+static iree_status_t iree_hal_hip_stream_command_buffer_dispatch_with_layout(
+    iree_hal_hip_stream_command_buffer_t* command_buffer,
+    const iree_hal_hip_kernel_info_t* kernel_info, uint32_t workgroup_x,
+    uint32_t workgroup_y, uint32_t workgroup_z) {
   iree_hal_hip_dispatch_layout_t dispatch_layout =
-      iree_hal_hip_pipeline_layout_dispatch_layout(kernel_info.layout);
+      iree_hal_hip_pipeline_layout_dispatch_layout(kernel_info->layout);
 
   // The total number of descriptors across all descriptor sets.
   iree_host_size_t descriptor_count = dispatch_layout.total_binding_count;
@@ -487,9 +467,9 @@ static iree_status_t iree_hal_hip_stream_command_buffer_dispatch(
     iree_host_size_t binding_count =
         iree_hal_hip_descriptor_set_layout_binding_count(
             iree_hal_hip_pipeline_layout_descriptor_set_layout(
-                kernel_info.layout, i));
+                kernel_info->layout, i));
     iree_host_size_t index =
-        iree_hal_hip_pipeline_layout_base_binding_index(kernel_info.layout, i);
+        iree_hal_hip_pipeline_layout_base_binding_index(kernel_info->layout, i);
     memcpy(payload_ptr + index, command_buffer->descriptor_sets[i].bindings,
            binding_count * sizeof(hipDeviceptr_t));
   }
@@ -508,16 +488,93 @@ static iree_status_t iree_hal_hip_stream_command_buffer_dispatch(
   iree_status_t status = IREE_HIP_RESULT_TO_STATUS(
       command_buffer->hip_symbols,
       hipModuleLaunchKernel(
-          kernel_info.function, workgroup_x, workgroup_y, workgroup_z,
-          kernel_info.block_size[0], kernel_info.block_size[1],
-          kernel_info.block_size[2], kernel_info.shared_memory_size,
+          kernel_info->function, workgroup_x, workgroup_y, workgroup_z,
+          kernel_info->block_size[0], kernel_info->block_size[1],
+          kernel_info->block_size[2], kernel_info->shared_memory_size,
           command_buffer->hip_stream, params_ptr, NULL),
       "hipModuleLaunchKernel");
+  return status;
+}
+
+iree_status_t iree_hal_hip_stream_command_buffer_dispatch_with_parameter_buffer(
+    iree_hal_hip_stream_command_buffer_t* command_buffer,
+    const iree_hal_hip_kernel_info_t* kernel_info, uint32_t workgroup_x,
+    uint32_t workgroup_y, uint32_t workgroup_z) {
+  for (uint32_t i = 0; i < kernel_info->mapping_count; i++) {
+    const iree_hal_hip_parameter_mapping_op_t* op = kernel_info->mappings;
+    uint8_t set = (uint8_t)(op->source >> 8);
+    uint8_t binding = (uint8_t)(op->source & 0xFF);
+    switch (op->type) {
+      case IREE_HAL_HIP_PARAMETER_MAPPING_TYPE_CONSTANT:
+        memcpy(command_buffer->parameter_buffer + op->target,
+               (const uint8_t*)command_buffer->push_constants + op->source,
+               op->size);
+        break;
+      case IREE_HAL_HIP_PARAMETER_MAPPING_TYPE_BUFFER:
+        memcpy(command_buffer->parameter_buffer + op->target,
+               &command_buffer->bindings[set][binding], op->size);
+        break;
+    }
+  }
+  void* extra[] = {
+      HIP_LAUNCH_PARAM_BUFFER_POINTER,
+      command_buffer->parameter_buffer,
+      HIP_LAUNCH_PARAM_BUFFER_SIZE,
+      (void*)(uintptr_t)kernel_info->parameter_size,
+      HIP_LAUNCH_PARAM_END,
+  };
+
+  iree_status_t status = IREE_HIP_RESULT_TO_STATUS(
+      command_buffer->hip_symbols,
+      hipModuleLaunchKernel(kernel_info->function, workgroup_x, workgroup_y,
+                            workgroup_z, kernel_info->block_size[0],
+                            kernel_info->block_size[1],
+                            kernel_info->block_size[2],
+                            kernel_info->shared_memory_size, 0, NULL, extra),
+      "hipModuleLaunchKernel");
+
+  return status;
+}
+
+static iree_status_t iree_hal_hip_stream_command_buffer_dispatch(
+    iree_hal_command_buffer_t* base_command_buffer,
+    iree_hal_executable_t* executable, int32_t entry_point,
+    uint32_t workgroup_x, uint32_t workgroup_y, uint32_t workgroup_z) {
+  iree_hal_hip_stream_command_buffer_t* command_buffer =
+      iree_hal_hip_stream_command_buffer_cast(base_command_buffer);
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // Lookup kernel parameters used for side-channeling additional launch
+  // information from the compiler.
+  iree_hal_hip_kernel_info_t kernel_info;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_hip_native_executable_entry_point_kernel_info(
+              executable, entry_point, &kernel_info));
+
+  IREE_HIP_STREAM_TRACE_ZONE_BEGIN_EXTERNAL(
+      command_buffer->tracing_context, command_buffer->hip_stream,
+      kernel_info.source_filename.data, kernel_info.source_filename.size,
+      kernel_info.source_line, kernel_info.function_name.data,
+      kernel_info.function_name.size,
+      /*name=*/NULL, 0);
+
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_resource_set_insert(command_buffer->resource_set, 1,
+                                       &executable));
 
   IREE_HIP_STREAM_TRACE_ZONE_END(command_buffer->tracing_context,
                                  command_buffer->hip_stream);
 
   IREE_TRACE_ZONE_END(z0);
+  return iree_ok_status();
+  iree_status_t status =
+      kernel_info.mappings
+          ? iree_hal_hip_stream_command_buffer_dispatch_with_layout(
+                command_buffer, &kernel_info, workgroup_x, workgroup_y,
+                workgroup_z)
+          : iree_hal_hip_stream_command_buffer_dispatch_with_parameter_buffer(
+                command_buffer, &kernel_info, workgroup_x, workgroup_y,
+                workgroup_z);
   return status;
 }
 

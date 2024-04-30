@@ -27,6 +27,8 @@ extern "C" {
 // The max number of push constants supported by the HIP HAL implementation.
 #define IREE_HAL_HIP_MAX_PUSH_CONSTANT_COUNT 64
 
+#define IREE_HAL_HIP_MAX_PARAMETER_BUFFER_SIZE 4096
+
 //===----------------------------------------------------------------------===//
 // iree_hal_hip_descriptor_set_layout_t
 //===----------------------------------------------------------------------===//
