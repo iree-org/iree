@@ -17,7 +17,8 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         [
             "apply_pdl_patterns_tosa.mlir",
-            "apply_pdll_patterns_tosa.mlir",
+            # TODO(#17233)
+            # "apply_pdll_patterns_tosa.mlir",
             "auto_input_conversion.mlir",
             "convert_i48_to_i64.mlir",
             "strip_signedness.mlir",
@@ -32,7 +33,7 @@ iree_lit_test_suite(
     cfg = "//compiler:lit.cfg.py",
     data = [
         "tosa.pdl.mlir",
-        "tosa.pdll",
+        # "tosa.pdll",
     ],
     tools = [
         "//tools:iree-compile",

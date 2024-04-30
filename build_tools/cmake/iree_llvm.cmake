@@ -84,6 +84,10 @@ macro(iree_llvm_configure_bundled)
   set(IREE_LLD_BINARY "$<TARGET_FILE:${IREE_LLD_TARGET}>")
   set(IREE_CLANG_BINARY "$<TARGET_FILE:${IREE_CLANG_TARGET}>")
   set(IREE_CLANG_BUILTIN_HEADERS_PATH "${LLVM_BINARY_DIR}/lib/clang/${LLVM_VERSION_MAJOR}/include/")
+
+  # TODO(#17233) 
+  set(IREE_LLVM_BUNDLED ON)
+  add_definitions(-DIREE_LLVM_BUNDLED)
 endmacro()
 
 macro(iree_llvm_configure_installed)

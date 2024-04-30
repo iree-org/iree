@@ -246,10 +246,13 @@ void PreprocessingOptions::bindOptions(OptionsBinder &binder) {
       "iree-preprocessing-pdl-spec-filename", preprocessingPDLSpecFilename,
       llvm::cl::desc("File name of a PDL spec to use for preprocessing"),
       llvm::cl::cat(category));
+// TODO(#17233)
+#ifdef IREE_LLVM_BUNDLED
   binder.opt<std::string>(
       "iree-preprocessing-pdll-spec-filename", preprocessingPDLLSpecFilename,
       llvm::cl::desc("File name of a PDLL spec to use for preprocessing"),
       llvm::cl::cat(category));
+#endif
 
   binder.opt<TransposeMatmulInput>(
       "iree-preprocessing-transpose-matmul", preprocessingTransposeMatmulInput,

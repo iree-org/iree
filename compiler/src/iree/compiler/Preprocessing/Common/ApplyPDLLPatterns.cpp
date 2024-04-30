@@ -47,6 +47,13 @@ static LogicalResult
 populatePDLLModuleFromFileName(MLIRContext *context,
                                RewritePatternSet &patterns,
                                llvm::StringRef pdllModuleFileName) {
+// TODO(#17233)
+// Its easier to give these functions definitions than try to dissable
+// tblgen, just return failure
+#ifndef IREE_LLVM_BUNDLED
+  return failure();
+#endif
+#ifdef IREE_LLVM_BUNDLED
   std::string errorMessage;
   auto memoryBuffer = mlir::openInputFile(pdllModuleFileName, &errorMessage);
   if (!memoryBuffer) {
@@ -75,6 +82,7 @@ populatePDLLModuleFromFileName(MLIRContext *context,
                                        checkTensorElementType);
   patterns.insert(std::move(pdlModule));
   return success();
+#endif
 }
 
 namespace {
@@ -87,6 +95,11 @@ public:
       ApplyPDLLPatternsPass>::ApplyPDLLPatternsPassBase;
 
   LogicalResult initialize(MLIRContext *context) override {
+// TODO(#17233)
+#ifndef IREE_LLVM_BUNDLED
+    return failure();
+#endif
+#ifdef IREE_LLVM_BUNDLED
     if (patternsFile.empty()) {
       return success();
     }
@@ -97,9 +110,12 @@ public:
     }
     patterns = std::move(tmpPatterns);
     return success();
+#endif
   }
 
   void runOnOperation() override {
+// TODO(#17233)
+#ifdef IREE_LLVM_BUNDLED
     // If there is nothing to do then return.
     if (!patterns.getPDLByteCode()) {
       return;
@@ -112,6 +128,7 @@ public:
           << patternsFile;
       return signalPassFailure();
     }
+#endif
   }
 
 private:

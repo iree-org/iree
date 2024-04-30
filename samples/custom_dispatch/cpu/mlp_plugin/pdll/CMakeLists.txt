@@ -4,6 +4,8 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+# TODO(#17233)
+if(IREE_LLVM_BUNDLED)
 iree_lit_test_suite(
   NAME
     mlp_pdll_linalg_example
@@ -57,4 +59,5 @@ if(IREE_INPUT_TOSA)
       "driver=local-sync"
       "hostonly"
   )
+endif()
 endif()

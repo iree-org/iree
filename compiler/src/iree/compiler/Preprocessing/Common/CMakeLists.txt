@@ -33,6 +33,7 @@ iree_cc_library(
     "ConvertConvToChannelsLast.cpp"
     "InterpreterPass.cpp"
     "MakeSingleDispatchForFunction.cpp"
+    "PDLUtilities.cpp"
     "PadLinalgOps.cpp"
     "PadToIntrinsics.cpp"
     "Passes.cpp"
@@ -51,10 +52,6 @@ iree_cc_library(
     MLIRMemRefDialect
     MLIRPDLDialect
     MLIRPDLInterpDialect
-    MLIRPDLLAST
-    MLIRPDLLCodeGen
-    MLIRPDLLODS
-    MLIRPDLLParser
     MLIRParser
     MLIRPass
     MLIRSupport
@@ -78,3 +75,13 @@ iree_cc_library(
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+
+# TODO(#17233)
+if(IREE_LLVM_BUNDLED)
+  target_link_libraries(iree_compiler_Preprocessing_Common_Transforms PRIVATE
+    MLIRPDLLAST
+    MLIRPDLLCodeGen
+    MLIRPDLLODS
+    MLIRPDLLParser
+)
+endif()

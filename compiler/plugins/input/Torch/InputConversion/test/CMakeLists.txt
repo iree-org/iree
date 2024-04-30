@@ -3,7 +3,8 @@ iree_lit_test_suite(
     lit
   SRCS
     "apply_pdl_patterns_torch.mlir"
-    "apply_pdll_patterns_torch.mlir"
+    # TODO(#17233)
+    # "apply_pdll_patterns_torch.mlir"
     "assume_strict_symbols.mlir"
     "auto_input_conversion.mlir"
     "attention.mlir"
@@ -16,7 +17,7 @@ iree_lit_test_suite(
     "torch_to_iree.mlir"
   DATA
     "torch.pdl.mlir"
-    "torch.pdll"
+    # "torch.pdll"
   TOOLS
     FileCheck
     iree-compile

@@ -20,8 +20,6 @@
 #include "mlir/Parser/Parser.h"
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/LLVM.h"
-#include "mlir/Tools/PDLL/CodeGen/CPPGen.h"
-#include "mlir/Tools/PDLL/CodeGen/MLIRGen.h"
 
 using namespace mlir;
 using namespace mlir::iree_compiler;
