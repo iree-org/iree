@@ -285,7 +285,7 @@ iree_status_t iree_wait_all(iree_wait_set_t* set, iree_time_t deadline_ns) {
 iree_status_t iree_wait_any(iree_wait_set_t* set, iree_time_t deadline_ns,
                             iree_wait_handle_t* out_wake_handle) {
   IREE_TRACE_ZONE_BEGIN(z0);
-  memset(out_wake_handle, 0, sizeof(*out_wake_handle));
+  if (out_wake_handle) memset(out_wake_handle, 0, sizeof(*out_wake_handle));
   iree_status_t status = iree_wait_multi(set, deadline_ns, out_wake_handle);
   IREE_TRACE_ZONE_END(z0);
   return status;

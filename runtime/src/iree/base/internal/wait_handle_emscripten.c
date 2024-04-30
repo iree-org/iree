@@ -135,5 +135,5 @@ void iree_event_reset(iree_event_t* event) {
   iree_wait_primitive_promise_reset(event->value.promise.handle);
 }
 
-#endif  // IREE_WAIT_API == IREE_WAIT_API_INPROC &&
+#endif  // IREE_WAIT_API == IREE_WAIT_API_PROMISE &&
         // defined(IREE_PLATFORM_EMSCRIPTEN)

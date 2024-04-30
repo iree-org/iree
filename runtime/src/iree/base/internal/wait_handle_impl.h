@@ -47,8 +47,13 @@
 // try to guess based on the target platform.
 #if !defined(IREE_WAIT_API)
 
+#if defined(IREE_SANITIZER_THREAD)
+// TSan does not support poll, ppoll, etc., which will cause it to report false
+// positives.
+// TODO: add TSan instrumentation for the other wait methods.
+#define IREE_WAIT_API IREE_WAIT_API_INPROC
 // NOTE: we could be tighter here, but we today only have win32 or not-win32.
-#if IREE_SYNCHRONIZATION_DISABLE_UNSAFE
+#elif IREE_SYNCHRONIZATION_DISABLE_UNSAFE
 #define IREE_WAIT_API IREE_WAIT_API_NULL
 #elif defined(IREE_PLATFORM_EMSCRIPTEN)
 #define IREE_WAIT_API IREE_WAIT_API_PROMISE

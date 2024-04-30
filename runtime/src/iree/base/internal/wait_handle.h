@@ -164,7 +164,7 @@ iree_status_t iree_wait_all(iree_wait_set_t* set, iree_time_t deadline_ns);
 // A deadline of IREE_TIME_INFINITE_PAST will act as a poll and not block the
 // caller. IREE_TIME_INFINITE_FUTURE can be used to block until signaled.
 //
-// Returns success if all handles were signaled either prior to the call or
+// Returns success if any handles were signaled either prior to the call or
 // during the wait. A handle of one of the signaled handles will be returned in
 // the optional |out_wake_handle| argument; note however that one or more
 // handles may have signaled and which handle is returned is unspecified.
