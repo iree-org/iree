@@ -340,6 +340,44 @@ TEST_P(semaphore_test, WaitForFiniteTime) {
   });
 }
 
+// Wait on all semaphores on multiple places simultaneously.
+TEST_P(semaphore_test, SimultaneousMultiWaitAll) {
+  iree_hal_semaphore_t* semaphore1 = this->CreateSemaphore();
+  iree_hal_semaphore_t* semaphore2 = this->CreateSemaphore();
+
+  iree_hal_semaphore_t* semaphore_array[] = {semaphore1, semaphore2};
+  uint64_t payload_array[] = {1, 1};
+  iree_hal_semaphore_list_t semaphore_list = {
+      IREE_ARRAYSIZE(semaphore_array),
+      semaphore_array,
+      payload_array,
+  };
+
+  std::thread wait_thread1([&]() {
+    IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+        semaphore_list, iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
+  });
+
+  std::thread wait_thread2([&]() {
+    IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+        semaphore_list, iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
+  });
+
+  std::thread signal_thread([&]() {
+    IREE_ASSERT_OK(iree_hal_semaphore_list_signal(semaphore_list));
+  });
+
+  wait_thread1.join();
+  wait_thread2.join();
+  signal_thread.join();
+
+  CheckSemaphoreValue(semaphore1, 1);
+  CheckSemaphoreValue(semaphore2, 1);
+
+  iree_hal_semaphore_release(semaphore1);
+  iree_hal_semaphore_release(semaphore2);
+}
+
 }  // namespace cts
 }  // namespace hal
 }  // namespace iree
