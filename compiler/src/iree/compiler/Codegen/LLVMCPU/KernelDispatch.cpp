@@ -321,20 +321,14 @@ getMinTilingSizesForEachDim(mlir::FunctionOpInterface entryPointFn,
         llvm::cast<ShapedType>(inputOutputOpOperands[index].get().getType());
     int64_t tileSize = getVectorSize(entryPointFn, operandType);
 
-    LLVM_DEBUG(KD_DBGS() << "fastestVaryingDim: " << fastestVaryingDim
-                         << ", tileSize: " << tileSize
-                         << ", operandType: " << operandType << "\n");
     minTileSizes[fastestVaryingDim] =
         std::max<int64_t>(minTileSizes[fastestVaryingDim], tileSize);
   }
 
-  for (auto [i, val] : llvm::enumerate(minTileSizes)) {
-    LLVM_DEBUG(KD_DBGS() << "minTileSizes #" << i << ": " << val << "\n");
-  }
-
   // Limit unroll factor. For now, we assume the rightmost non-one tiled
   // dimension is for vectorization and any other non-one dimension is for
-  // unrolling.
+  // unrolling. The util limits the second rightmost non-one tiled dimension
+  // to be not larger than `maxUnrollFactor` and others tiled dimension to 1.
   auto limitUnrollFactor = [&](int64_t maxUnrollFactor) {
     int vecDim;
     for (vecDim = minTileSizes.size() - 1; vecDim >= 0; --vecDim) {
