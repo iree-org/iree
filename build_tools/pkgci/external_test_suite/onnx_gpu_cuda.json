@@ -774,7 +774,6 @@
     "test_reduce_sum_negative_axes_keepdims_random",
     "test_reduce_sum_square_default_axes_keepdims_example_expanded",
     "test_reduce_sum_square_default_axes_keepdims_random_expanded",
-    "test_selu_default",
     "test_shape",
     "test_shape_clip_end",
     "test_shape_clip_start",
