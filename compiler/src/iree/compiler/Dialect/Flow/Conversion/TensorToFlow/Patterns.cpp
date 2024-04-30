@@ -251,7 +251,7 @@ struct ConvertTensorDialectReshapeOpPattern
         if (isa<IntegerType>(elementTy)) {
           element = rewriter.create<arith::IndexCastOp>(
               loc, rewriter.getIndexType(), element);
-         }
+        }
         destSizes.push_back(element);
       }
     }
