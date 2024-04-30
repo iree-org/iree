@@ -33,7 +33,7 @@ static llvm::cl::opt<bool> clEnableTransposePropagation(
     "iree-global-opt-propagate-transposes",
     llvm::cl::desc(
         "Enables propagation of transpose ops to improve fusion chances."),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 // TODO(hanchung): Remove the flag. We don't want to do early materialization by
 // default. Because it won't work for heterogeneous computing. This is not the
