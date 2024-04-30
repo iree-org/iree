@@ -327,7 +327,7 @@ static void iree_cpu_initialize_from_platform_riscv_64(uint64_t* out_fields) {
 }
 
 #endif  // IREE_PLATFORM_*
-#endif  // defined(IREE_ARCH_ARM_64)
+#endif  // defined(IREE_ARCH_RISCV_64)
 
 static void iree_cpu_initialize_from_platform(iree_allocator_t temp_allocator,
                                               uint64_t* out_fields) {
