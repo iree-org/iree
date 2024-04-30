@@ -289,7 +289,33 @@ static int64_t getVectorSize(mlir::FunctionOpInterface entryPointFn,
   return getVectorSize(entryPointFn, byteWidth);
 }
 
-static bool isSupportedTransposeOp(linalg::GenericOp genericOp);
+/// Returns true if the operation is a GenericOp implementing a supported
+/// transposition.
+static bool isSupportedTransposeOp(linalg::GenericOp genericOp) {
+  // Check that the op has at least 2 dimensions.
+  if (genericOp.getNumLoops() < 2) {
+    return false;
+  }
+
+  // Check that the op has only one input and one output.
+  // TODO(diegocaballero): Generalize to multiple inputs.
+  if ((genericOp.getNumDpsInputs() != 1) || (genericOp.getNumDpsInits() != 1)) {
+    return false;
+  }
+
+  // Check that all the iterators are parallel.
+  if (genericOp.getNumParallelLoops() != genericOp.getNumLoops()) {
+    return false;
+  }
+
+  // Check that the two indexing maps are a permutation of each other.
+  auto indexingMaps = genericOp.getIndexingMapsArray();
+  return !indexingMaps[0].isEmpty() && !indexingMaps[1].isEmpty() &&
+         ((indexingMaps[0].isIdentity() && !indexingMaps[1].isIdentity() &&
+           indexingMaps[1].isPermutation()) ||
+          (!indexingMaps[0].isIdentity() && indexingMaps[0].isPermutation() &&
+           indexingMaps[1].isIdentity()));
+}
 
 /// Returns minimum tiling sizes for each dimension. One dimension is possible
 /// to access at different element types. It determines the tiling sizes by
@@ -1741,34 +1767,6 @@ static void setVectorTileSizes(linalg::LinalgOp op,
           staticLoopRanges[loopNum] == 1 ? 0 : minTileSizes[loopNum];
     }
   }
-}
-
-/// Returns true if the operation is a GenericOp implementing a supported
-/// transposition.
-static bool isSupportedTransposeOp(linalg::GenericOp genericOp) {
-  // Check that the op has at least 2 dimensions.
-  if (genericOp.getNumLoops() < 2) {
-    return false;
-  }
-
-  // Check that the op has only one input and one output.
-  // TODO(diegocaballero): Generalize to multiple inputs.
-  if ((genericOp.getNumDpsInputs() != 1) || (genericOp.getNumDpsInits() != 1)) {
-    return false;
-  }
-
-  // Check that all the iterators are parallel.
-  if (genericOp.getNumParallelLoops() != genericOp.getNumLoops()) {
-    return false;
-  }
-
-  // Check that the two indexing maps are a permutation of each other.
-  auto indexingMaps = genericOp.getIndexingMapsArray();
-  return !indexingMaps[0].isEmpty() && !indexingMaps[1].isEmpty() &&
-         ((indexingMaps[0].isIdentity() && !indexingMaps[1].isIdentity() &&
-           indexingMaps[1].isPermutation()) ||
-          (!indexingMaps[0].isIdentity() && indexingMaps[0].isPermutation() &&
-           indexingMaps[1].isIdentity()));
 }
 
 /// Sets the default lowering configuration for a generic op to use
