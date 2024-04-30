@@ -248,9 +248,10 @@ struct ConvertTensorDialectReshapeOpPattern
                                                          ValueRange({idx}));
       if (ShapedType::isDynamic(resultType.getShape()[i])) {
         auto elementTy = element.getType();
-        if (isa<IntegerType>(elementTy))
+        if (isa<IntegerType>(elementTy)) {
           element = rewriter.create<arith::IndexCastOp>(
               loc, rewriter.getIndexType(), element);
+         }
         destSizes.push_back(element);
       }
     }
