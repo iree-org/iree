@@ -28,6 +28,8 @@ iree_lit_test_suite(
         include = ["*.mlir"],
         exclude = [
             "tosa.pdl.mlir",
+            # TODO(#17233)
+            "apply_pdll_patterns_tosa.mlir",
         ],
     ),
     cfg = "//compiler:lit.cfg.py",
