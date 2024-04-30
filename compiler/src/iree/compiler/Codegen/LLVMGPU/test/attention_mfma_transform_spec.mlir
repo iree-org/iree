@@ -170,9 +170,8 @@ module attributes { transform.with_named_sequence } {
     transform.iree.set_contraction_layout_attributes %contract2, %layout16x16x16 : !transform.any_op, !transform.any_param
 
     %distribute_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-    transform.iree.amdgpu_distribute_vectors %distribute_func test_conversion : !transform.any_op
+    %distribute_func_2 = transform.iree.amdgpu_distribute_vectors %distribute_func test_conversion : (!transform.any_op) -> !transform.any_op
 
-    %distribute_func_2 = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     transform.apply_patterns to %distribute_func_2 {
       transform.apply_patterns.canonicalization
     } : !transform.any_op

@@ -741,11 +741,11 @@ def AMDGPUDistributeVectorsOp :
 
     let arguments = (ins TransformHandleTypeInterface:$target,
                          UnitAttr:$test_conversion);
-    let results = (outs);
+    let results = (outs TransformHandleTypeInterface:$result);
 
     let assemblyFormat = [{
       $target (`test_conversion` $test_conversion^)?
-      attr-dict `:` type($target)
+      attr-dict `:` functional-type(operands, results)
     }];
     let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 
