@@ -24,7 +24,7 @@ util.func public @interchange(%arg0: tensor<?x?x?xf32>, %arg1: tensor<?x?x?xf32>
 
 // -----
 
-util.func public @fold_insert_slices(%source : tensor<?x?xf32>, 
+util.func public @fold_insert_slices(%source : tensor<?x?xf32>,
     %dest0 : tensor<?x?xf32>, %dest1 : tensor<?x?xf32>, %val: f32,
     %o1 : index, %o2 : index, %o3 : index, %o4 : index,
     %s1 : index, %s2 : index, %s3 : index, %s4 : index) -> tensor<?x?xf32> {

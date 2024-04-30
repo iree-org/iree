@@ -48,7 +48,7 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
     return true;
   if (llvm::all_of(body.getArguments(),
                    [](BlockArgument arg) { return arg.use_empty(); })) {
-    // THe operands arent used, its just an `linalg.index` op.
+    // The operands aren't used, its just an `linalg.index` op.
     return true;
   }
 

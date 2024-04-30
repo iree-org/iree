@@ -983,9 +983,8 @@ void FormDispatchRegionsPass::runOnOperation() {
   mlir::FunctionOpInterface funcOp = getOperation();
   DominanceInfo const &dominanceInfo = getAnalysis<DominanceInfo>();
   TensorDimTrackingRewriter rewriter(funcOp);
-  FormDispatchRegionsPassOptions options{
-      aggressiveFusion, generateWorkloadRegion, fusePadWithConsumers,
-      fusePadWithProducers};
+  FormDispatchRegionsPassOptions options{aggressiveFusion, fusePadWithConsumers,
+                                         fusePadWithProducers};
   if (failed(createFusionGroups(rewriter, funcOp, dominanceInfo, options))) {
     funcOp->emitOpError("failed to create fusion groups");
     return signalPassFailure();
