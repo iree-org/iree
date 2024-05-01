@@ -77,6 +77,10 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
   IsolatedFromAbove,
   AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<Util_ClosureOpInterface>,
+  DeclareOpInterfaceMethods<Util_HoistableOpInterface, [
+    "isAtomicallyHoistableOp",
+    "isOperandHoistable",
+  ]>,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
     "getTiedOperandsIndexAndLength",
   ]>,
