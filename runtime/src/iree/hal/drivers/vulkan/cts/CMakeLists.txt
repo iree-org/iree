@@ -6,7 +6,8 @@
 
 unset(ADDITIONAL_TEST_ARGS)
 if(ANDROID)
-  # Disable this test due to flaky failures on Google Pixel 6 Pro.
+  # Disable this test on Android due to flaky failures on Google Pixel 6 Pro
+  # and Moto Edge X30.
   set(ADDITIONAL_TEST_ARGS "--gtest_filter=-*WaitForFiniteTime*")
 endif()
 
