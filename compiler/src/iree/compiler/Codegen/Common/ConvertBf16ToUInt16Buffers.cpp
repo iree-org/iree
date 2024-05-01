@@ -13,6 +13,7 @@
 
 #include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Utils/ConversionUtils.h"
@@ -268,7 +269,8 @@ struct ConvertBf16ToUInt16BuffersPass final
       target.addLegalOp<arith::TruncFOp, arith::ExtFOp, ModuleOp>();
       target.addDynamicallyLegalDialect<arith::ArithDialect, func::FuncDialect,
                                         IREE::HAL::HALDialect,
-                                        memref::MemRefDialect, scf::SCFDialect>(
+                                        memref::MemRefDialect, scf::SCFDialect,
+                                        IREE::Codegen::IREECodegenDialect>(
           [&typeConverter](Operation *op) {
             bool legal = typeConverter.isLegal(op);
             LLVM_DEBUG(if (!legal) llvm::dbgs()
