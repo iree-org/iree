@@ -2,7 +2,7 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetBackends=rocm},iree-hal-transformation-pipeline{serialize-executables=false})' --iree-rocm-target-chip=gfx940 %s | FileCheck %s --check-prefix=GFX940
 // RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetBackends=rocm},iree-hal-transformation-pipeline{serialize-executables=false})' --iree-rocm-target-chip=rx7900xtx %s | FileCheck %s --check-prefix=GFX1100
 
-// GFX942: target = #iree_gpu.target<api = hip, arch = "gfx942",
+// GFX942: target = #iree_gpu.target<arch = "gfx942",
 // GFX942-SAME: core = <compute =  fp64|fp32|fp16|int64|int32|int16|int8, storage =  b64|b32|b16|b8,
 // GFX942-SAME:         subgroup =  shuffle|arithmetic, dot =  dp4xi8toi32,
 // GFX942-SAME:         mma = [<MFMA_F16_16x16x16_F32>, <MFMA_F16_32x32x8_F32>],
@@ -10,10 +10,10 @@
 // GFX942-SAME:         max_thread_size = 1024, max_workgroup_memory_bytes = 65536>,
 // GFX942-SAME: chip = <core_count = 304>>
 
-// GFX940: target = #iree_gpu.target<api = hip, arch = "gfx940",
+// GFX940: target = #iree_gpu.target<arch = "gfx940",
 // GFX940-SAME:         mma = [<MFMA_F16_16x16x16_F32>, <MFMA_F16_32x32x8_F32>]
 
-// GFX1100: target = #iree_gpu.target<api = hip, arch = "gfx1100",
+// GFX1100: target = #iree_gpu.target<arch = "gfx1100",
 // GFX1100-SAME:        mma = [<WMMA_F16_16x16x16_F32>]
 // GFX1100-SAME:        subgroup_size_choices = [32, 64]
 

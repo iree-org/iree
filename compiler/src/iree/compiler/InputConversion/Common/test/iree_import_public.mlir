@@ -384,7 +384,7 @@ func.func @optimization_barrier(%arg0 : tensor<f32>) -> tensor<f32> {
 
 // -----
 // CHECK: #[[SM75:.*]] = #hal.executable.target<"cuda",
-// CHECK-SAME:           "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda : "sm_75">}>
+// CHECK-SAME:           "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_75">}>
 
 // CHECK: #[[LAYOUT:.*]] = #hal.pipeline.layout<push_constants = 1,
 // CHECK-SAME: sets = [<0, bindings = [
@@ -403,7 +403,7 @@ func.func @optimization_barrier(%arg0 : tensor<f32>) -> tensor<f32> {
 // CHECK: flow.dispatch @executable::@add[%c0](%arg0, %arg1) : {{.*}} -> %arg1
 
 #sm75 = #iree_input.executable.target<"cuda", "cuda-nvptx-fb", {
-  iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_75">
+  iree.gpu.target = #iree_gpu.alias_target<"sm_75">
 }>
 builtin.module @executable_source {
   iree_input.executable.source private @executable attributes {

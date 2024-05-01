@@ -53,11 +53,9 @@ func.func @test_target_chip() attributes {
 // CHECK-LABEL: func.func @test_target()
 func.func @test_target() attributes {
   // CHECK: #iree_gpu.target<
-  // CHECK-SAME: api = hip,
   // CHECK-SAME: core = <
   // CHECK-SAME: chip = <
   target = #iree_gpu.target<
-    api=hip,
     arch="gfx942",
     core = <
       compute = fp16|fp32|int8, storage = b16|b32,
@@ -71,14 +69,14 @@ func.func @test_target() attributes {
   >
 } { return }
 
-// CHECK-LABEL: func.func @test_abbr_target_cuda()
-func.func @test_abbr_target_cuda() attributes {
-  // CHECK: #iree_gpu.abbr_target<cuda : "sm_80">
-  target = #iree_gpu.abbr_target<cuda:"sm_80">
+// CHECK-LABEL: func.func @test_alias_target_cuda()
+func.func @test_alias_target_cuda() attributes {
+  // CHECK: #iree_gpu.alias_target<"sm_80">
+  target = #iree_gpu.alias_target<"sm_80">
 } { return }
 
-// CHECK-LABEL: func.func @test_abbr_target_hip()
-func.func @test_abbr_target_hip() attributes {
-  // CHECK: #iree_gpu.abbr_target<hip : "mi300x">
-  target = #iree_gpu.abbr_target<hip:"mi300x">
+// CHECK-LABEL: func.func @test_alias_target_hip()
+func.func @test_alias_target_hip() attributes {
+  // CHECK: #iree_gpu.alias_target<"mi300x">
+  target = #iree_gpu.alias_target<"mi300x">
 } { return }

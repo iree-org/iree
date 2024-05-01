@@ -1,7 +1,7 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-rocdl-configuration-pipeline), iree-codegen-linalg-to-rocdl-pipeline2)))" %s | FileCheck %s
 
 hal.executable private @warp_reduction {
-  hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx940">}>) {
+  hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.alias_target<"gfx940">}>) {
     hal.executable.export public @warp_reduction ordinal(0) layout(
       #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
@@ -38,7 +38,7 @@ hal.executable private @warp_reduction {
 // -----
 
 hal.executable public @main_dispatch_517 {
-  hal.executable.variant public @rocm target(<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx90a">}>) {
+  hal.executable.variant public @rocm target(<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.alias_target<"gfx90a">}>) {
     hal.executable.export public @warp_reduction_large_vector ordinal(0) layout(
       #hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer, ReadOnly>, <2, storage_buffer>]>]>) {
     ^bb0(%arg0: !hal.device):

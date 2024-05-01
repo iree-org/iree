@@ -1,6 +1,6 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-decompose-softmax), iree-llvmgpu-select-lowering-strategy,  func.func(iree-llvmgpu-lower-executable-target))" %s | FileCheck %s
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx1100">}>
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.alias_target<"gfx1100">}>
 module {
   func.func @softmax() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
     %c0 = arith.constant 0 : index
@@ -24,7 +24,7 @@ module {
 
 // -----
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx940">}>
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.alias_target<"gfx940">}>
 module {
   func.func @softmax() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
     %c0 = arith.constant 0 : index
@@ -50,7 +50,7 @@ module {
 
 // -----
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx1100">}>
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.alias_target<"gfx1100">}>
 module {
   func.func @dynamic_softmax() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
     %c32_i64 = arith.constant 32 : i64

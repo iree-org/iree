@@ -3,7 +3,7 @@
 
 // Transform dialect attributes are tested separately.
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #map = affine_map<(d0) -> (d0)>
 module {
   func.func @add_dispatch_0() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
@@ -33,7 +33,7 @@ module {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 module {
   func.func @dot_dispatch_1() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
     %c0 = arith.constant 0 : index
@@ -59,7 +59,7 @@ module {
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
 
 // -----
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 module {
   func.func @unaligned_k() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
     %c0 = arith.constant 0 : index
@@ -85,7 +85,7 @@ module {
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
 
 // -----
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #map = affine_map<(d0) -> (d0)>
 #map1 = affine_map<(d0) -> ()>
 module {
@@ -118,7 +118,7 @@ module {
 // CHECK-SAME:   lowering_config = #[[CONFIG]]
 
 // -----
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #map = affine_map<(d0, d1, d2) -> (d2, d0, d1)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
 module {
@@ -150,7 +150,7 @@ module {
 // CHECK-SAME:   lowering_config = #[[CONFIG]]
 
 // -----
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #map = affine_map<(d0, d1) -> (d0, d1)>
 module {
   func.func @copy_as_generic() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
@@ -176,7 +176,7 @@ module {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 module {
   func.func @static_1d_fft_stage2() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
     %c0 = arith.constant 0 : index
@@ -203,7 +203,7 @@ module {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 module {
   func.func @static_3d_fft_stage3() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
     %c0 = arith.constant 0 : index
@@ -232,7 +232,7 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 128, 64]]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt workgroup_size = [16, 8, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 module {
@@ -265,7 +265,7 @@ module {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 module {
   func.func @sort_op() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
     %c1 = arith.constant 1 : index
@@ -297,7 +297,7 @@ module {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 module {
   func.func @matmul_config_sm35() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
     %cst = arith.constant 0.000000e+00 : f32
@@ -323,7 +323,7 @@ module {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_80">}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_80">}>
 module {
   func.func @matmul_config_sm80() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
     %cst = arith.constant 0.000000e+00 : f32
@@ -349,7 +349,7 @@ module {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_86">}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_86">}>
 module {
   func.func @matmul_config_sm86() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
     %cst = arith.constant 0.000000e+00 : f32
@@ -376,7 +376,7 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 128, 32]]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_86">}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_86">}>
 #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #map1 = affine_map<(d0, d1, d2) -> ()>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
@@ -413,7 +413,7 @@ module {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_86">}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_86">}>
 module {
   func.func @dynamic_pack_2x2() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
     %c0 = arith.constant 0 : index
@@ -445,7 +445,7 @@ module {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_80">}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_80">}>
 module {
   func.func @large_matmul_f16() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
     %cst = arith.constant 0.000000e+00 : f16
@@ -475,7 +475,7 @@ module {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_80">}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_80">}>
 module {
   func.func @large_matmul_f32() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
     %cst = arith.constant 0.000000e+00 : f32
@@ -506,7 +506,7 @@ module {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #map = affine_map<(d0, d1) -> (d0, d1)>
 module {
   func.func @inner_unit_dim() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
@@ -536,7 +536,7 @@ module {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d3)>
 module {
@@ -583,7 +583,7 @@ module {
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
 
 // -----
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d1, d4)>
 #map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d1, d4)>
 #map2 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>
@@ -631,7 +631,7 @@ module {
 //  CHECK-SAME:      lowering_config = #[[CONFIG]]
 
 // -----
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (d0)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d2)>

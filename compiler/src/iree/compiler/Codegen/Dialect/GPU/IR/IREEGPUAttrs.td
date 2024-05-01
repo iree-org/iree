@@ -428,7 +428,7 @@ def IREEGPU_AliasTargetAttr : AttrDef<IREEGPU_Dialect, "AliasTarget"> {
     This attribute is primarily meant for making IR tests easier.
   }];
 
-  let mnemonic = "abbr_target";
+  let mnemonic = "alias_target";
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
 
   let parameters = (ins

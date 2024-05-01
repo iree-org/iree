@@ -2,7 +2,7 @@
 // RUN:   --pass-pipeline='builtin.module(iree-llvmgpu-select-lowering-strategy, func.func(iree-llvmgpu-lower-executable-target, canonicalize))' \
 // RUN:   %s | FileCheck %s
 
-#executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx942">, ukernels = "none"}>
+#executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.alias_target<"gfx942">, ukernels = "none"}>
 module {
   func.func @fit_shared_memory_schedule() attributes {hal.executable.target = #executable_target} {
     %cst = arith.constant 0.000000e+00 : f32

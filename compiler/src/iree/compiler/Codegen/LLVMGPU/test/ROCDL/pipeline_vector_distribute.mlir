@@ -13,7 +13,7 @@
 ]>
 hal.executable @matmul_256x256x256_f16_f32 {
 hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
-      iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx940">
+      iree.gpu.target = #iree_gpu.alias_target<"gfx940">
   }>) {
   hal.executable.export @matmul_256x256x256_f16_f32 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
@@ -64,7 +64,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 ]>
 hal.executable @matmul_256x256x256_f16_f16 {
 hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
-      iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx940">
+      iree.gpu.target = #iree_gpu.alias_target<"gfx940">
   }>) {
   hal.executable.export @matmul_256x256x256_f16_f16 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
@@ -113,7 +113,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 ]>
 hal.executable @expanded_matmul_transpose_b_executable {
 hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
-      iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx940">
+      iree.gpu.target = #iree_gpu.alias_target<"gfx940">
   }>) {
   hal.executable.export @expanded_matmul_transpose_b layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device):
@@ -182,7 +182,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 ]>
 hal.executable @conv_nhwc_dispatch_0 {
 hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
-      iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx940">
+      iree.gpu.target = #iree_gpu.alias_target<"gfx940">
   }>) {
   hal.executable.export @conv_nhwc layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device):
@@ -224,7 +224,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 // -----
 
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {
-  iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx942">,
+  iree.gpu.target = #iree_gpu.alias_target<"gfx942">,
   ukernels = "none"
 }>
 #map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>
@@ -309,7 +309,7 @@ hal.executable public @main_dispatch_expanded_matmul {
 ]>
 hal.executable @matmul_256x256x256_f16_f32 {
 hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
-      iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx1100">
+      iree.gpu.target = #iree_gpu.alias_target<"gfx1100">
   }>) {
   hal.executable.export @matmul_256x256x256_f16_f32 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):

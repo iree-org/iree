@@ -11,7 +11,7 @@
 // CHECK-SAME:   intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
 // CHECK-SAME:   subgroup_m_count = 1, subgroup_n_count = 4
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx940">}>
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.alias_target<"gfx940">}>
 #map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d4)>
 #map1 = affine_map<(d0, d1, d2, d3, d4) -> (d1, d3, d4)>
 #map2 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>
@@ -48,7 +48,7 @@ module {
 // CHECK-SAME:   intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
 // CHECK-SAME:   subgroup_m_count = 2, subgroup_n_count = 2
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx940">}>
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.alias_target<"gfx940">}>
 module {
   func.func @conv_nhwc() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
     %c0 = arith.constant 0 : index
@@ -71,7 +71,7 @@ module {
 
 // -----
 
-#target = #iree_gpu.target<api = hip, arch = "gfx940", core = <
+#target = #iree_gpu.target<arch = "gfx940", core = <
   compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
   subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
   mma = [],
@@ -107,7 +107,7 @@ module {
 // CHECK-SAME:   intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
 // CHECK-SAME:   subgroup_m_count = 2, subgroup_n_count = 2
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx940">}>
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.alias_target<"gfx940">}>
 module {
   func.func @mfma_matmul_1024x1024x1024() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
     %cst = arith.constant 0.000000e+00 : f32
@@ -137,7 +137,7 @@ module {
 // CHECK-SAME:   subgroup_m_count = 2, subgroup_n_count = 2
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 1, 1, 32, 0, 1, 1, 1, 0]]>
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx940">}>
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.alias_target<"gfx940">}>
 #map = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d5, d2 + d6, d3 + d7, d8)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d1, d5, d6, d7, d4, d8)>
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d1, d2, d3, d4)>
@@ -183,7 +183,7 @@ module {
 // CHECK-SAME:   intrinsic = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>
 // CHECK-SAME:   subgroup_m_count = 2, subgroup_n_count = 2
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx1100">}>
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.alias_target<"gfx1100">}>
 module {
   func.func @wmma_matmul_1024x1024x1024() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
     %cst = arith.constant 0.000000e+00 : f32
@@ -206,7 +206,7 @@ module {
 
 // -----
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx940">}>
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.alias_target<"gfx940">}>
 module {
   func.func @matmul_dynamic_dim() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
           %c0 = arith.constant 0 : index

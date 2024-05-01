@@ -2,7 +2,7 @@
 // RUN:   --iree-codegen-transform-dialect-library=%p/attention_mfma_transform_spec.mlir | \
 // RUN: FileCheck --check-prefix=CHECK %s
 
-#executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx908">}>
+#executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.alias_target<"gfx908">}>
 module {
   func.func @attention_dispatch_0_attention_16x16384x128xf16() attributes {hal.executable.target = #executable_target} {
     %c0 = arith.constant 0 : index

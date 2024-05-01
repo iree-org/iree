@@ -1,7 +1,7 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" --verify-diagnostics --split-input-file %s
 
 #config = #iree_codegen.lowering_config<tile_sizes = []>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt workgroup_size = [32, 8, 8], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 module {
   func.func @illegal() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation} {
@@ -18,7 +18,7 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = []>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt workgroup_size = [32, 8, 2], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 module {
   func.func @illegal() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation} {
@@ -35,7 +35,7 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 32, 16]]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore workgroup_size = [64, 2, 10], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 module {
   func.func @illegal() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation} {
@@ -52,7 +52,7 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 32, 16]]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore workgroup_size = [48, 2, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 module {
   func.func @illegal() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation} {
@@ -69,7 +69,7 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 32, 16]]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore workgroup_size = [64, 2, 2], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 module {
   func.func @illegal() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation} {
@@ -86,7 +86,7 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 32, 20]]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore workgroup_size = [64, 2, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 module {
   func.func @illegal() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation} {
@@ -103,7 +103,7 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 32, 16]]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore workgroup_size = [128, 1, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 module {
   func.func @illegal() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation} {
@@ -120,7 +120,7 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 32, 16]]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore workgroup_size = [64, 2, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 module {
   func.func @illegal() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation} {
@@ -137,7 +137,7 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 32, 16]]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore workgroup_size = [64, 2, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 module {
   func.func @illegal() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation} {
@@ -154,7 +154,7 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[2, 32, 32, 16]]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #map = affine_map<()[s0] -> (s0 * 8)>
 #map1 = affine_map<()[s0] -> (s0 * 32)>
 #map2 = affine_map<(d0, d1, d2)[s0] -> (d0 * 32768 + s0 + d1 * 1024 + d2)>
@@ -203,7 +203,7 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 32, 48]]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCoreMmaSync workgroup_size = [128, 1, 1], {pipeline_depth = 4 : i64, store_stage = 1 : i64}>
 module {
   func.func @illegal() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation} {
@@ -220,7 +220,7 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 32, 4]]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCoreMmaSync workgroup_size = [128, 1, 1], {pipeline_depth = 4 : i64, store_stage = 1 : i64}>
 module {
   func.func @illegal() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation} {
@@ -237,7 +237,7 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 64]]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCoreMmaSync workgroup_size = [128, 1, 1], {pipeline_depth = 4 : i64, store_stage = 1 : i64}>
 module {
   func.func @illegal() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation} {

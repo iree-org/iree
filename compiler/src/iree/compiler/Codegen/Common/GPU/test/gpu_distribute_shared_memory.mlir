@@ -1,6 +1,6 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(func.func(iree-codegen-gpu-distribute-shared-memory-copy, fold-memref-alias-ops, canonicalize, cse))' %s | FileCheck %s
 
-#executable_target = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>
+#executable_target = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #translation_info = #iree_codegen.translation_info<None workgroup_size = [32, 4, 1]>
 #map0 = affine_map<()[s0, s1, s2] -> (s0 * 4 + s1 * 128 + s2 * 512)>
 module {
@@ -89,7 +89,7 @@ module {
 
 // -----
 
-#executable_target = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>
+#executable_target = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #translation_info = #iree_codegen.translation_info<None workgroup_size = [32, 8, 1]>
 module {
 
@@ -135,7 +135,7 @@ module {
 
 // -----
 
-#executable_target = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>
+#executable_target = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #translation_info = #iree_codegen.translation_info<None workgroup_size = [32, 8, 1]>
 module {
   func.func @zero_dim_shared_memory_copy(%global : memref<f32>, %shared : memref<f32>)
@@ -161,7 +161,7 @@ module {
 
 // -----
 
-#executable_target = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.abbr_target<cuda:"sm_60">}>
+#executable_target = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #translation_info = #iree_codegen.translation_info<None workgroup_size = [32, 8, 1]>
 module {
   func.func @zero_dim_shared_memory_copy(%A: memref<1x32x128xi4>, %B: memref<1x128xf32>, %C: memref<1x128xi4>,

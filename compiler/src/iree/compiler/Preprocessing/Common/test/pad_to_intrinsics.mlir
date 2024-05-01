@@ -3,7 +3,7 @@
 // RUN: iree-opt --split-input-file %s --pass-pipeline="builtin.module(func.func(iree-preprocessing-pad-to-intrinsics{pad-target-type=contraction},canonicalize))" | FileCheck %s -check-prefix=CONTRACT
 
 
-#target = #iree_gpu.target<api = hip, arch = "gfx942",
+#target = #iree_gpu.target<arch = "gfx942",
   core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
   subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
   mma = [<MFMA_F16_16x16x16_F32>, <MFMA_F16_32x32x8_F32>],
@@ -43,7 +43,7 @@ func.func @main0(%arg0: tensor<2x130x130x4xf16>, %arg1: tensor<3x3x4x320xf16>, %
 
 // -----
 
-#target = #iree_gpu.target<api = hip, arch = "gfx942",
+#target = #iree_gpu.target<arch = "gfx942",
   core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
   subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
   mma = [<MFMA_F16_16x16x16_F32>, <MFMA_F16_32x32x8_F32>],
@@ -81,7 +81,7 @@ func.func @main1(%arg0: tensor<2x130x130x320xf16>, %arg1: tensor<3x3x320x4xf16>,
 
 // -----
 
-#target = #iree_gpu.target<api = hip, arch = "gfx942",
+#target = #iree_gpu.target<arch = "gfx942",
   core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
   subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
   mma = [<MFMA_F16_32x32x8_F32>],
@@ -114,7 +114,7 @@ func.func @main2(%arg0: tensor<2x130x130x4xf16>, %arg1: tensor<3x3x4x320xf16>, %
 
 // -----
 
-#target = #iree_gpu.target<api = hip, arch = "gfx1100",
+#target = #iree_gpu.target<arch = "gfx1100",
   core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
   subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
   mma = [<WMMA_F16_16x16x16_F32>],
@@ -155,7 +155,7 @@ func.func @matmul_static(%arg0 : tensor<10x20xf16>, %arg1 : tensor<20x30xf16>, %
 
 // Good test to ensure reassoc, new dims, and iterator types works on permuted operations.
 
-#target = #iree_gpu.target<api = hip, arch = "gfx1100",
+#target = #iree_gpu.target<arch = "gfx1100",
   core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
   subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
   mma = [<WMMA_F16_16x16x16_F32>],
@@ -201,7 +201,7 @@ func.func @mmtb_dynamic_k_n(%arg0 : tensor<10x?xf16>, %arg1 : tensor<?x?xf16>, %
 
 // -----
 
-#target = #iree_gpu.target<api = hip, arch = "gfx1100",
+#target = #iree_gpu.target<arch = "gfx1100",
   core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
   subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
   mma = [<WMMA_F16_16x16x16_F32>],
@@ -253,7 +253,7 @@ func.func @bmm_dynamic_m_k(%arg0: tensor<32x?x?xf16>, %arg1: tensor<32x?x128xf16
 
 // -----
 
-#target = #iree_gpu.target<api = hip, arch = "gfx1100",
+#target = #iree_gpu.target<arch = "gfx1100",
   core = <compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
   subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
   mma = [<WMMA_F16_16x16x16_F32>],
