@@ -44,6 +44,8 @@ iree_cc_library(
     "pending_queue_actions.h"
     "pipeline_layout.c"
     "pipeline_layout.h"
+    "rccl_channel.c"
+    "rccl_channel.h"
     "stream_command_buffer.c"
     "stream_command_buffer.h"
     "timepoint_pool.c"
@@ -82,18 +84,24 @@ iree_cc_library(
   HDRS
     "dynamic_symbols.h"
     "status_util.h"
+    "rccl_dynamic_symbols.h"
+    "rccl_status_util.h"
   TEXTUAL_HDRS
     "dynamic_symbol_tables.h"
   SRCS
     "dynamic_symbols.c"
     "hip_headers.h"
     "status_util.c"
+    "rccl_dynamic_symbols.c"
+    "rccl_headers.h"
+    "rccl_status_util.c"
   INCLUDES
     "${HIP_API_HEADERS_ROOT}"
   DEPS
     iree::base
     iree::base::core_headers
     iree::base::internal::dynamic_library
+    rccl::headers
   PUBLIC
 )
 
