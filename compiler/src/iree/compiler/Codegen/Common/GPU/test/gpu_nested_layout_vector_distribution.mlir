@@ -760,6 +760,37 @@ builtin.module attributes { transform.with_named_sequence } {
 // -----
 
 #layout = #iree_vector_ext.nested_layout<
+  subgroups_per_workgroup = [2, 2, 2],
+  batches_per_subgroup = [2, 2, 1],
+  outers_per_batch = [2, 1, 1],
+  threads_per_outer = [4, 16, 8],
+  elements_per_thread = [1, 4, 4],
+  subgroup_basis = [2, 2, 2],
+  thread_basis = [4, 16, 8]
+>
+
+func.func @scalar_broadcast(%src: f16) -> (vector<32x256x64xf16>) {
+  %bcast = vector.broadcast %src {"__vector_layout_test_anchor_result_0" = #layout}
+    : f16 to vector<32x256x64xf16>
+  return %bcast : vector<32x256x64xf16>
+}
+
+builtin.module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    transform.iree.test_gpu_vector_distribution %top_level_func : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func @scalar_broadcast
+// CHECK-SAME:  (%[[SRC:.*]]: f16)
+// CHECK: %[[BCAST:.*]] = vector.broadcast %[[SRC]] : f16 to vector<2x2x1x2x1x1x1x4x4xf16>
+// CHECK: iree_vector_ext.to_simd %[[BCAST]] : vector<2x2x1x2x1x1x1x4x4xf16> -> vector<32x256x64xf16>
+
+// -----
+
+#layout = #iree_vector_ext.nested_layout<
   subgroups_per_workgroup = [2, 2],
   batches_per_subgroup = [2, 4],
   outers_per_batch = [2, 1],
