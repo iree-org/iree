@@ -9,8 +9,10 @@
 
 #include <iterator>
 #include <utility>
+
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/IR/OpDefinition.h"
+
 namespace mlir::iree_compiler {
 
 // Convert a `Value` or an `Attribute` range to a range of `OpFoldResult`.

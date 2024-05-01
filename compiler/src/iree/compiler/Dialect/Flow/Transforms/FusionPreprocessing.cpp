@@ -28,6 +28,7 @@ namespace {
 //===----------------------------------------------------------------------===//
 // GenericOpInterchangePattern
 //===----------------------------------------------------------------------===//
+
 struct GenericOpInterchangePattern
     : public OpRewritePattern<linalg::GenericOp> {
   using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
@@ -76,11 +77,9 @@ struct GenericOpInterchangePattern
 /// %2 = linalg.fill ins(%cst : )
 /// %3 = tensor.insert_slice %a into %2
 /// ```
-class FoldSuccessiveTensorInsertSliceOps
+struct FoldSuccessiveTensorInsertSliceOps
     : public OpRewritePattern<tensor::InsertSliceOp> {
-public:
   using OpRewritePattern::OpRewritePattern;
-
   LogicalResult matchAndRewrite(tensor::InsertSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
     auto sourceInsertSlice =
