@@ -42,6 +42,7 @@ iree_lit_test_suite(
     "pack_pipeline_test.mlir"
     "pack_shared_memory_alloc.mlir"
     "prefetch_shared_memory.mlir"
+    "promote_matmul_to_fit_mma.mlir"
     "reduction_pipeline_cuda.mlir"
     "reduction_pipeline_rocm.mlir"
     "reduction_pipeline_transform_cuda.mlir"

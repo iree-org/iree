@@ -83,6 +83,7 @@ iree_cc_library(
     "LLVMGPULowerExecutableTarget.cpp"
     "LLVMGPUPackSharedMemoryAlloc.cpp"
     "LLVMGPUPrefetching.cpp"
+    "LLVMGPUPromoteMatmulToFitMMA.cpp"
     "LLVMGPUSelectLoweringStrategy.cpp"
     "LLVMGPUTensorCoreVectorization.cpp"
     "LLVMGPUTensorPad.cpp"
