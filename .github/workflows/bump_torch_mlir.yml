@@ -7,7 +7,7 @@
 # Automatically bumps the torch-mlir submodule to match shark-infra/torch-mlir:main.
 # Manually triggered for now, but can be scheduled in the future.
 # This typically takes ~90s to run.
-name: Bump submodule - shark-infra/torch-mlir
+name: Bump submodule - torch-mlir
 
 on:
   # TODO: Uncomment the following lines to enable the schedule when this action is stable & useful enough
