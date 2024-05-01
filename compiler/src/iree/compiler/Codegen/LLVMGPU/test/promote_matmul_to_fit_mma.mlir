@@ -33,12 +33,10 @@ func.func @batch_matmul_f16() {
 // ALL:             %[[RHS_HANDLE:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<64x1281x1281xf16>>
 // ALL:             %[[OUT_HANDLE:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<64x968x1281xf16>>
 // ALL-DAG:         %[[LHS:.+]] = flow.dispatch.tensor.load %[[LHS_HANDLE]]
-// ALL-DAG:         %[[LHS_SLICE:.+]] = tensor.extract_slice %[[LHS]]
 // ALL-DAG:         %[[RHS:.+]] = flow.dispatch.tensor.load %[[RHS_HANDLE]]
-// ALL-DAG:         %[[RHS_SLICE:.+]] = tensor.extract_slice %[[RHS]]
-// PARALLEL:        %[[PADDED_LHS:.+]] = tensor.pad %[[LHS_SLICE]]
+// PARALLEL:        %[[PADDED_LHS:.+]] = tensor.pad %[[LHS]]
 // PARALLEL:        } : tensor<1x?x1281xf16> to tensor<1x64x1281xf16>
-// PARALLEL:        %[[PADDED_RHS:.+]] = tensor.pad %[[RHS_SLICE]]
+// PARALLEL:        %[[PADDED_RHS:.+]] = tensor.pad %[[RHS]]
 // PARALLEL:        } : tensor<1x1281x?xf16> to tensor<1x1281x128xf16>
 // PARALLEL:        %[[FILL:.+]] = linalg.fill
 // PARALLEL:        %[[GEMM:.+]] = linalg.batch_matmul
@@ -49,9 +47,9 @@ func.func @batch_matmul_f16() {
 // shape.
 // REDUCTION-DAG:   %[[FILL_DEST:.+]] = flow.dispatch.tensor.load %[[OUT_HANDLE]]
 // REDUCTION:       %[[FILL:.+]] = linalg.fill ins(%{{.+}}) outs(%[[FILL_DEST]]
-// REDUCTION:       %[[PADDED_LHS:.+]] = tensor.pad %[[LHS_SLICE]]
+// REDUCTION:       %[[PADDED_LHS:.+]] = tensor.pad %[[LHS]]
 // REDUCTION:       } : tensor<1x?x1281xf16> to tensor<1x?x1281xf16>
-// REDUCTION:            %[[PADDED_RHS:.+]] = tensor.pad %[[RHS_SLICE]]
+// REDUCTION:       %[[PADDED_RHS:.+]] = tensor.pad %[[RHS]]
 // REDUCTION:       } : tensor<1x1281x?xf16> to tensor<1x1281x?xf16>
 // REDUCTION:       %[[GEMM:.+]] = linalg.batch_matmul
 // REDUCTION-SAME:    ins(%[[PADDED_LHS]], %[[PADDED_RHS]]
@@ -128,10 +126,10 @@ func.func @batch_matmul_pad_reduction_after_tiling() {
 // REDUCTION:       %[[RES:.+]] = scf.for {{.+}} iter_args(%[[ITER:.+]] = %[[FILL]])
 // REDUCTION:         %[[LHS_SLICE:.+]] = tensor.extract_slice %[[LHS]]
 // REDUCTION:         %[[PADDED_LHS:.+]] = tensor.pad %[[LHS_SLICE]]
-// REDUCITON:         } : tensor<1x?x?xf16> to tensor<1x64x64xf16>
+// REDUCTION:         } : tensor<1x?x?xf16> to tensor<1x64x64xf16>
 // REDUCTION:         %[[RHS_SLICE:.+]] = tensor.extract_slice %[[RHS]]
 // REDUCTION:         %[[PADDED_RHS:.+]] = tensor.pad %[[RHS_SLICE]]
-// REDUCITON:         } : tensor<1x?x?xf16> to tensor<1x64x128xf16>
+// REDUCTION:         } : tensor<1x?x?xf16> to tensor<1x64x128xf16>
 // REDUCTION:         %[[GEMM:.+]] = linalg.batch_matmul
 // REDUCTION-SAME:      ins(%[[PADDED_LHS]], %[[PADDED_RHS]]
 // REDUCTION-SAME:      outs(%[[ITER]]

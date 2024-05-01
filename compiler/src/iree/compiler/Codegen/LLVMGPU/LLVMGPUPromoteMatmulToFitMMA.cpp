@@ -32,8 +32,8 @@ public:
     registry.insert<tensor::TensorDialect, linalg::LinalgDialect>();
   }
 
-  void pad(RewriterBase &rewriter, linalg::LinalgOp op,
-           utils::IteratorType targetIterType, bool nofold) const {
+  void padWithZeroValue(RewriterBase &rewriter, linalg::LinalgOp op,
+                        utils::IteratorType targetIterType, bool nofold) const {
     LLVM_DEBUG(llvm::dbgs() << "candidate: " << op << "\n");
     OpBuilder::InsertionGuard guard(rewriter);
     rewriter.setInsertionPointAfter(op);
@@ -104,7 +104,7 @@ public:
 
     IRRewriter rewriter(ctx);
     for (auto op : candidates) {
-      pad(rewriter, op, targetIterType, nofold);
+      padWithZeroValue(rewriter, op, targetIterType, nofold);
     }
 
     {
@@ -129,8 +129,18 @@ public:
       SmallVector<tensor::PadOp> padOps;
       funcOp.walk([&](tensor::PadOp op) { padOps.push_back(op); });
       for (auto op : padOps) {
-        auto src =
-            op.getSource().getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
+        auto srcExtractSliceOp =
+            op.getSource().getDefiningOp<tensor::ExtractSliceOp>();
+        if (!srcExtractSliceOp) {
+          continue;
+        }
+        auto producerPadOp =
+            srcExtractSliceOp.getSource().getDefiningOp<tensor::PadOp>();
+        if (!producerPadOp) {
+          continue;
+        }
+        auto src = producerPadOp.getSource()
+                       .getDefiningOp<IREE::Flow::DispatchTensorLoadOp>();
         if (!src) {
           continue;
         }
