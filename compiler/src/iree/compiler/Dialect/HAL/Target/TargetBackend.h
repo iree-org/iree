@@ -151,8 +151,8 @@ public:
   //     }
   //   }
   virtual void
-  buildConfigurationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
-                                 OpPassManager &passManager){};
+  buildConfigurationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
+                                 OpPassManager &passManager) {}
 
   // Inserts passes used to translate the `hal.executable.variant` op contents.
   // The pass manager will be nested on `hal.executable` such that the pipeline
@@ -186,7 +186,7 @@ public:
   //     }
   //   }
   virtual void
-  buildTranslationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
+  buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                OpPassManager &passManager) = 0;
 
   // Inserts passes used to link `hal.executable.variant` ops together.
