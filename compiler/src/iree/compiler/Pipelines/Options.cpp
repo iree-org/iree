@@ -245,6 +245,17 @@ void PreprocessingOptions::bindOptions(OptionsBinder &binder) {
       llvm::cl::desc(
           "File name of a transform dialect spec to use for preprocessing"),
       llvm::cl::cat(category));
+
+  binder.opt<TransposeMatmulInput>(
+      "iree-preprocessing-transpose-matmul", preprocessingTransposeMatmulInput,
+      llvm::cl::desc("Convert Linalg matmul ops to transposed variants."),
+      llvm::cl::cat(category),
+      llvm::cl::values(clEnumValN(TransposeMatmulInput::Lhs, "lhs",
+                                  "Transpose LHS input matrix."),
+                       clEnumValN(TransposeMatmulInput::Rhs, "rhs",
+                                  "Transpose RHS input matrix."),
+                       clEnumValN(TransposeMatmulInput::None, "none",
+                                  "Transpose neither input (disable).")));
 }
 
 } // namespace mlir::iree_compiler

@@ -994,6 +994,30 @@ module {
 
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "+avx512f", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 64 : index, target_triple = "x86_64-none-elf"}>
 module {
+  func.func @pack_f16() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
+    %c0 = arith.constant 0 : index
+    %cst = arith.constant 0.000000e+00 : f16
+    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<20x40xf16>>
+    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<2x48x16x1xf16>>
+    %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [20, 40], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<20x40xf16>> -> tensor<20x40xf16>
+    %3 = tensor.empty() : tensor<2x48x16x1xf16>
+    %pack = tensor.pack %2 padding_value(%cst : f16) inner_dims_pos = [0, 1] inner_tiles = [16, 1] into %3 : tensor<20x40xf16> -> tensor<2x48x16x1xf16>
+    flow.dispatch.tensor.store %pack, %1, offsets = [0, 0, 0, 0], sizes = [2, 48, 16, 1], strides = [1, 1, 1, 1] : tensor<2x48x16x1xf16> -> !flow.dispatch.tensor<writeonly:tensor<2x48x16x1xf16>>
+    return
+  }
+}
+
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 40], [1, 16]]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDataTiling>
+//      CHECK: func.func @pack_f16()
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//      CHECK:   tensor.pack
+// CHECK-SAME:       lowering_config = #[[CONFIG]]
+
+// -----
+
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "+avx512f", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 64 : index, target_triple = "x86_64-none-elf"}>
+module {
   func.func @pack_many_elements() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
     %c0 = arith.constant 0 : index
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1200x500000xf32>>

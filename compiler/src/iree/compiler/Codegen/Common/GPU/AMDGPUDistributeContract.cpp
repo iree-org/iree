@@ -212,6 +212,12 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
          llvm::zip_equal(opDetail.lhsMDims, opDetail.outMDims)) {
       lhsOffsets[lhsM] = resultOffsets[resultM];
     }
+
+    if (opDetail.getBatchCount() == 1) {
+      rhsOffsets[0] = resultOffsets[0];
+      lhsOffsets[0] = resultOffsets[0];
+    }
+
     for (auto [rhsN, resultN] :
          llvm::zip_equal(opDetail.rhsNDims, opDetail.outNDims)) {
       rhsOffsets[rhsN] = resultOffsets[resultN];

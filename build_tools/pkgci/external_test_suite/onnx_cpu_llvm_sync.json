@@ -1,15 +1,14 @@
 {
   "config_name": "cpu_llvm_sync",
-  "iree_compile_flags" : [
+  "iree_compile_flags": [
     "--iree-hal-target-backends=llvm-cpu"
   ],
   "iree_run_module_flags": [
     "--device=local-sync"
   ],
   "skip_compile_tests": [
-    // TODO(#16666): Fix these tests hanging at runtime (miscompiles?)
     "test_dequantizelinear",
-    "test_slice_default_axes",
+    "test_slice_default_axes"
   ],
   "skip_run_tests": [],
   "expected_compile_failures": [
@@ -170,14 +169,9 @@
     "test_gathernd_example_int32_batch_dim1",
     "test_globalmaxpool",
     "test_globalmaxpool_precomputed",
-    "test_gridsample",
-    "test_gridsample_aligncorners_true",
     "test_gridsample_bicubic",
     "test_gridsample_bicubic_align_corners_0_additional_1",
     "test_gridsample_bicubic_align_corners_1_additional_1",
-    "test_gridsample_bilinear",
-    "test_gridsample_bilinear_align_corners_0_additional_1",
-    "test_gridsample_bilinear_align_corners_1_additional_1",
     "test_gridsample_border_padding",
     "test_gridsample_nearest",
     "test_gridsample_nearest_align_corners_0_additional_1",
@@ -329,11 +323,8 @@
     "test_reduce_l2_negative_axes_keep_dims_example_expanded",
     "test_reduce_l2_negative_axes_keep_dims_random",
     "test_reduce_l2_negative_axes_keep_dims_random_expanded",
-    "test_reduce_log_sum_asc_axes",
     "test_reduce_log_sum_asc_axes_expanded",
-    "test_reduce_log_sum_default",
     "test_reduce_log_sum_default_expanded",
-    "test_reduce_log_sum_desc_axes",
     "test_reduce_log_sum_desc_axes_expanded",
     "test_reduce_log_sum_empty_set",
     "test_reduce_log_sum_empty_set_expanded",
@@ -355,7 +346,6 @@
     "test_reduce_log_sum_exp_negative_axes_keepdims_example_expanded",
     "test_reduce_log_sum_exp_negative_axes_keepdims_random",
     "test_reduce_log_sum_exp_negative_axes_keepdims_random_expanded",
-    "test_reduce_log_sum_negative_axes",
     "test_reduce_log_sum_negative_axes_expanded",
     "test_reduce_max_bool_inputs",
     "test_reduce_max_do_not_keepdims_example",
@@ -610,7 +600,7 @@
     "test_unique_sorted_with_negative_axis",
     "test_unique_sorted_without_axis",
     "test_upsample_nearest",
-    "test_wrap_pad",
+    "test_wrap_pad"
   ],
   "expected_run_failures": [
     "test_add_uint8",
@@ -769,7 +759,6 @@
     "test_reduce_min_empty_set",
     "test_reduce_sum_empty_set_non_reduced_axis_zero",
     "test_scatter_elements_with_negative_indices",
-    "test_selu_default",
     "test_shape",
     "test_shape_clip_end",
     "test_shape_clip_start",
@@ -797,6 +786,6 @@
     "test_tril_square",
     "test_tril_square_neg",
     "test_tril_zero",
-    "test_where_long_example",
+    "test_where_long_example"
   ]
 }

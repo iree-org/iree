@@ -13,7 +13,6 @@
 #include "iree/compiler/Codegen/Common/GPU/GPUHeuristics.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
-#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/Strategies.h"
@@ -39,7 +38,6 @@
 #define DEBUG_TYPE "iree-llvmgpu-kernel-config"
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 #define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
-
 namespace mlir::iree_compiler {
 
 llvm::cl::opt<bool> clGPUEnableVectorDistribution(
@@ -352,12 +350,9 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   MLIRContext *context = op.getContext();
   auto scheduleAttr = IREE::GPU::MMAScheduleAttr::get(
       context, target.getCore().getMma()[schedule->index], schedule->mWarpCount,
-      schedule->nWarpCount, schedule->mTileCount, schedule->nTileCount,
-      schedule->kTileCount);
+      schedule->nWarpCount);
   SmallVector<NamedAttribute, 1> attrs;
-  attrs.emplace_back(
-      StringAttr::get(context, IREE::GPU::MMAScheduleAttr::getMnemonic()),
-      scheduleAttr);
+  attrs.emplace_back(StringAttr::get(context, "mma_schedule"), scheduleAttr);
   auto configDict = DictionaryAttr::get(context, attrs);
 
   return setOpConfigAndEntryPointFnTranslation(
@@ -497,12 +492,9 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   MLIRContext *context = op.getContext();
   auto scheduleAttr = IREE::GPU::MMAScheduleAttr::get(
       context, target.getCore().getMma()[schedule->index], schedule->mWarpCount,
-      schedule->nWarpCount, schedule->mTileCount, schedule->nTileCount,
-      schedule->kTileCount);
+      schedule->nWarpCount);
   SmallVector<NamedAttribute, 1> attrs;
-  attrs.emplace_back(
-      StringAttr::get(context, IREE::GPU::MMAScheduleAttr::getMnemonic()),
-      scheduleAttr);
+  attrs.emplace_back(StringAttr::get(context, "mma_schedule"), scheduleAttr);
   auto configDict = DictionaryAttr::get(context, attrs);
 
   return setOpConfigAndEntryPointFnTranslation(
@@ -513,13 +505,30 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
 static LogicalResult
 setVectorDistributionConfig(IREE::GPU::TargetAttr target,
                             mlir::FunctionOpInterface entryPoint,
-                            linalg::LinalgOp linalgOp) {
-  if (linalg::isaContractionOpInterface(linalgOp)) {
-    return setMatmulVectorDistributionConfig(target, entryPoint, linalgOp);
+                            Operation *computeOp) {
+
+  if (!clGPUEnableVectorDistribution) {
+    LDBG("vector distribution not enabled, skipping...\n");
+    return failure();
   }
-  if (linalg::isaConvolutionOpInterface(linalgOp)) {
-    return setConvolutionVectorDistributionConfig(target, entryPoint, linalgOp);
+
+  LDBG("VectorDistribution: finding a suitable config...\n");
+
+  if (auto linalgOp = dyn_cast<linalg::LinalgOp>(computeOp)) {
+    if (linalg::isaContractionOpInterface(linalgOp)) {
+      LDBG(
+          "VectorDistribution: trying to find a suitable contraction config\n");
+      return setMatmulVectorDistributionConfig(target, entryPoint, linalgOp);
+    }
+    if (linalg::isaConvolutionOpInterface(linalgOp)) {
+      LDBG(
+          "VectorDistribution: trying to find a suitable convolution config\n");
+      return setConvolutionVectorDistributionConfig(target, entryPoint,
+                                                    linalgOp);
+    }
   }
+
+  LDBG("VectorDistribution: failed to find a suitable config");
   return failure();
 }
 
@@ -1618,14 +1627,11 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
     LDBG("Transform Dialect Config");
     return success();
   }
+  if (succeeded(setVectorDistributionConfig(target, entryPointFn, computeOp))) {
+    return success();
+  }
+
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(computeOp)) {
-    if (clGPUEnableVectorDistribution) {
-      if (succeeded(
-              setVectorDistributionConfig(target, entryPointFn, linalgOp))) {
-        LDBG("VectorDistribution Config");
-        return success();
-      }
-    }
     if (succeeded(setContractConfig(target, entryPointFn, linalgOp))) {
       LDBG("Contract Config");
       return success();

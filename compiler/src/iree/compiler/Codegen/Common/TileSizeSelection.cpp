@@ -23,9 +23,10 @@ TilingConfig::TilingConfig(IREE::Codegen::LoweringConfigAttr lc)
   // scenarios:
   //   1. [[distribution]]
   //   2. [[distribution], [vector-common-parallel]]
-  //   3. [[distribution], [vector-common-parallel], [vector-reduction],
+  //   3. [[distribution], [vector-common-parallel], [vector-reduction]]
+  //   4. [[distribution], [vector-common-parallel], [vector-reduction],
   //       [vector-inner-parallel]]
-  //   4. [[distribution], [cache-parallel], [cache-reduction],
+  //   5. [[distribution], [cache-parallel], [cache-reduction],
   //       [vector-common-parallel], [vector-reduction],
   //       [vector-inner-parallel]]
   int numTileLevels = loweringConfig.getTilingLevels().size();

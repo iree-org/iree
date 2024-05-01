@@ -22,6 +22,7 @@ iree_lit_test_suite(
     "pdl_example.mlir"
     "preprocessing_match_ops.mlir"
     "transform_symbol_importing.mlir"
+    "transpose_matmul.mlir"
   TOOLS
     FileCheck
     iree-opt

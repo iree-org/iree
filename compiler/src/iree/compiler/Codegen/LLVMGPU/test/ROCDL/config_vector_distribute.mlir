@@ -9,8 +9,7 @@
 // CHECK:      #iree_codegen.translation_info<LLVMGPUVectorDistribute
 // CHECK-SAME: mma_schedule = #iree_gpu.mma_schedule
 // CHECK-SAME:   intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
-// CHECK-SAME:   subgroup_m_count = 1, subgroup_n_count = 4,
-// CHECK-SAME:   subgroup_m_tile_count = 4, subgroup_n_tile_count = 1, subgroup_k_tile_count = 8
+// CHECK-SAME:   subgroup_m_count = 1, subgroup_n_count = 4
 
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx940">}>
 #map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d4)>
@@ -47,8 +46,7 @@ module {
 // CHECK:      #iree_codegen.translation_info<LLVMGPUVectorDistribute
 // CHECK-SAME: mma_schedule = #iree_gpu.mma_schedule
 // CHECK-SAME:   intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
-// CHECK-SAME:   subgroup_m_count = 2, subgroup_n_count = 2,
-// CHECK-SAME:   subgroup_m_tile_count = 2, subgroup_n_tile_count = 4, subgroup_k_tile_count = 2
+// CHECK-SAME:   subgroup_m_count = 2, subgroup_n_count = 2
 
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx940">}>
 module {
@@ -107,8 +105,7 @@ module {
 // CHECK:      #iree_codegen.translation_info<LLVMGPUVectorDistribute
 // CHECK-SAME: mma_schedule = #iree_gpu.mma_schedule
 // CHECK-SAME:   intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
-// CHECK-SAME:   subgroup_m_count = 2, subgroup_n_count = 2,
-// CHECK-SAME:   subgroup_m_tile_count = 2, subgroup_n_tile_count = 4, subgroup_k_tile_count = 4
+// CHECK-SAME:   subgroup_m_count = 2, subgroup_n_count = 2
 
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx940">}>
 module {
@@ -137,8 +134,7 @@ module {
 // CHECK:      #iree_codegen.translation_info<LLVMGPUVectorDistribute
 // CHECK-SAME: mma_schedule = #iree_gpu.mma_schedule
 // CHECK-SAME:   intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
-// CHECK-SAME:   subgroup_m_count = 2, subgroup_n_count = 2,
-// CHECK-SAME:   subgroup_m_tile_count = 1, subgroup_n_tile_count = 1, subgroup_k_tile_count = 2
+// CHECK-SAME:   subgroup_m_count = 2, subgroup_n_count = 2
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 1, 1, 32, 0, 1, 1, 1, 0]]>
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx940">}>
@@ -185,8 +181,7 @@ module {
 // CHECK:      #iree_codegen.translation_info<LLVMGPUVectorDistribute
 // CHECK-SAME: mma_schedule = #iree_gpu.mma_schedule
 // CHECK-SAME:   intrinsic = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>
-// CHECK-SAME:   subgroup_m_count = 2, subgroup_n_count = 2,
-// CHECK-SAME:   subgroup_m_tile_count = 2, subgroup_n_tile_count = 4, subgroup_k_tile_count = 4
+// CHECK-SAME:   subgroup_m_count = 2, subgroup_n_count = 2
 
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.abbr_target<hip:"gfx1100">}>
 module {

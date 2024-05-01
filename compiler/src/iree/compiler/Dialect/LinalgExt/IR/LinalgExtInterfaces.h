@@ -22,11 +22,11 @@ namespace detail {
 LogicalResult verifyLinalgExtOpInterface(Operation *op);
 }
 
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h.inc" // IWYU pragma: export
-
 /// Include the generated interface declarations.
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h.inc" // IWYU pragma: export
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt
+
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h.inc" // IWYU pragma: export
 
 #endif // IREE_COMPILER_DIALECT_LINALGEXT_IR_LINALGEXTINTERFACES_H_

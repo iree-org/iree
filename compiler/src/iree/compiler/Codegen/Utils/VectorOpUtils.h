@@ -32,18 +32,23 @@ public:
   std::pair<int, int> getResultMNIndex() const;
 
   SmallVector<unsigned, 2> getMDims() const { return contractionDims.m; }
-
   SmallVector<unsigned, 2> getNDims() const { return contractionDims.n; }
+  SmallVector<unsigned, 2> getKDims() const { return contractionDims.k; }
 
-  int64_t getARank() {
-    return contractionDims.m.size() + contractionDims.k.size();
+  int64_t getARank() const {
+    return contractionDims.batch.size() + contractionDims.m.size() +
+           contractionDims.k.size();
   }
-  int64_t getBRank() {
-    return contractionDims.k.size() + contractionDims.n.size();
+  int64_t getBRank() const {
+    return contractionDims.batch.size() + contractionDims.k.size() +
+           contractionDims.n.size();
   }
-  int64_t getCRank() {
-    return contractionDims.m.size() + contractionDims.n.size();
+  int64_t getCRank() const {
+    return contractionDims.batch.size() + contractionDims.m.size() +
+           contractionDims.n.size();
   }
+
+  int64_t getBatchCount() const { return contractionDims.batch.size(); }
 
   SmallVector<int64_t> lhsMDims;
   int64_t lhsKDim;

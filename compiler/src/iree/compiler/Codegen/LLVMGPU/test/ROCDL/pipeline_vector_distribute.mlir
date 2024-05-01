@@ -43,7 +43,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 
 //       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [128, 2, 1] subgroup_size = 64
 //  CHECK-SAME:   mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
-//  CHECK-SAME:     subgroup_m_count = 2, subgroup_n_count = 2, subgroup_m_tile_count = 2, subgroup_n_tile_count = 2, subgroup_k_tile_count = 8>
+//  CHECK-SAME:     subgroup_m_count = 2, subgroup_n_count = 2>
 
 //    CHECK-LABEL: func.func @matmul_256x256x256_f16_f32()
 //     CHECK-SAME:    translation_info = #[[$TRANSLATION]]
@@ -92,7 +92,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 
 //       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [128, 2, 1] subgroup_size = 64
 //  CHECK-SAME:   mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
-//  CHECK-SAME:     subgroup_m_count = 2, subgroup_n_count = 2, subgroup_m_tile_count = 2, subgroup_n_tile_count = 2, subgroup_k_tile_count = 8>
+//  CHECK-SAME:     subgroup_m_count = 2, subgroup_n_count = 2>
 
 //    CHECK-LABEL: func.func @matmul_256x256x256_f16_f16()
 //     CHECK-SAME:     translation_info = #[[$TRANSLATION]]
@@ -286,7 +286,7 @@ hal.executable public @main_dispatch_expanded_matmul {
 
 //       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [128, 2, 1] subgroup_size = 64
 //  CHECK-SAME:   mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
-//  CHECK-SAME:     subgroup_m_count = 2, subgroup_n_count = 2, subgroup_m_tile_count = 2, subgroup_n_tile_count = 2, subgroup_k_tile_count = 8>
+//  CHECK-SAME:     subgroup_m_count = 2, subgroup_n_count = 2>
 
 //    CHECK-LABEL: func.func @generic_2x1024x20x64x1280_f16
 // This has more than 2 iteartions. So we have prefetching enabled for this case. Due to
@@ -337,7 +337,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 
 //       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [64, 2, 1] subgroup_size = 32
 //  CHECK-SAME:   mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>,
-//  CHECK-SAME:     subgroup_m_count = 2, subgroup_n_count = 2, subgroup_m_tile_count = 2, subgroup_n_tile_count = 2, subgroup_k_tile_count = 8>
+//  CHECK-SAME:     subgroup_m_count = 2, subgroup_n_count = 2>
 
 
 //    CHECK-LABEL: func.func @matmul_256x256x256_f16_f32

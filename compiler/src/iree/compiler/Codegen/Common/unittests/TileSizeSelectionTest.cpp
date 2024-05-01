@@ -25,33 +25,80 @@ protected:
     ctx.loadAllAvailableDialects();
   }
 
+  // Initialize `loweringConfig` to contain `numTilingLevels` tiling levels.
+  // The actual tile sizes are not set.
+  void initLoweringConfig(unsigned numTilingLevels) {
+    SmallVector<IREE::Codegen::LoweringConfigTilingLevelAttr>
+        newTilingLevelsList;
+    for (size_t i = 0; i < numTilingLevels; i++) {
+      SmallVector<int64_t> sizes;
+      SmallVector<bool> scalableFlags;
+
+      auto newLevel = IREE::Codegen::LoweringConfigTilingLevelAttr::get(
+          &ctx, sizes, /*interchange=*/ArrayRef<int64_t>{}, scalableFlags);
+      newTilingLevelsList.push_back(newLevel);
+    }
+
+    auto newTilingLevels = IREE::Codegen::LoweringConfigTilingLevelsAttr::get(
+        &ctx, newTilingLevelsList);
+    loweringConfig =
+        IREE::Codegen::LoweringConfigAttr::get(&ctx, newTilingLevels,
+                                               /*nativeVectorSize=*/4);
+  }
+
   ~TileSizeSelection() override {}
 
   MLIRContext ctx;
   DialectRegistry reg;
+  IREE::Codegen::LoweringConfigAttr loweringConfig;
 };
 
 TEST_F(TileSizeSelection, NumTilingLevels) {
-  // 1. Create Lowering Config
   const unsigned kMaxNumTilingLevels = 7;
-  SmallVector<IREE::Codegen::LoweringConfigTilingLevelAttr> newTilingLevelsList;
-  for (size_t i = 0; i < kMaxNumTilingLevels; i++) {
-    SmallVector<int64_t> sizes;
-    SmallVector<bool> scalableFlags;
 
-    auto newLevel = IREE::Codegen::LoweringConfigTilingLevelAttr::get(
-        &ctx, sizes, /*interchange=*/ArrayRef<int64_t>{}, scalableFlags);
-    newTilingLevelsList.push_back(newLevel);
-  }
-
-  auto newTilingLevels = IREE::Codegen::LoweringConfigTilingLevelsAttr::get(
-      &ctx, newTilingLevelsList);
-  IREE::Codegen::LoweringConfigAttr loweringConfig =
-      IREE::Codegen::LoweringConfigAttr::get(&ctx, newTilingLevels,
-                                             /*nativeVectorSize=*/4);
+  // 1. Initialize Lowering Config
+  initLoweringConfig(kMaxNumTilingLevels);
 
   // 2. Create TilingConfig and check if the number of tiling levels match.
   TilingConfig tilingConfig(loweringConfig);
   EXPECT_EQ(tilingConfig.getNumTilingLevels(), kMaxNumTilingLevels);
 }
+
+TEST_F(TileSizeSelection, getLevel_4_levels) {
+  // 1. Initialize Lowering Config
+  initLoweringConfig(/*numTilingLevels=*/4);
+
+  // 2. Create TilingConfig and verify the actual tiling level numbers.
+  TilingConfig tilingConfig(loweringConfig);
+  EXPECT_EQ(tilingConfig.getVectorInnerParallelLevel(), 3);
+  EXPECT_EQ(tilingConfig.getVectorReductionLevel(), 2);
+  EXPECT_EQ(tilingConfig.getVectorCommonParallelLevel(), 1);
+  EXPECT_EQ(tilingConfig.getDistributionLevel(), 0);
+}
+
+TEST_F(TileSizeSelection, getLevel_1_level) {
+  // 1. Initialize Lowering Config
+  initLoweringConfig(/*numTilingLevels=*/1);
+
+  // 2. Create TilingConfig and verify the actual tiling level numbers.
+  TilingConfig tilingConfig(loweringConfig);
+  EXPECT_EQ(tilingConfig.getDistributionLevel(), 0);
+}
+
+#if defined(GTEST_HAS_DEATH_TEST) && !defined(NDEBUG)
+
+using TileSizeSelectionDeathTest = TileSizeSelection;
+
+TEST_F(TileSizeSelectionDeathTest, getLevel_out_of_bounds) {
+  // 1. Initialize Lowering Config
+  initLoweringConfig(/*numTilingLevels=*/3);
+
+  // 2. Create TilingConfig and verify that the "vector-inner-parallel" tiling
+  // level does not exist (it's out of bounds).
+  TilingConfig tilingConfig(loweringConfig);
+  ASSERT_DEATH_IF_SUPPORTED({ tilingConfig.getVectorInnerParallelLevel(); },
+                            "Searching for unavailable tiling level");
+}
+
+#endif
 } // namespace mlir::iree_compiler
