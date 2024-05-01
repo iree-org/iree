@@ -111,8 +111,8 @@ TEST(ThreadTest, CreateSuspended) {
                                       iree_memory_order_relaxed) == (123 + 1);
       },
       &entry_data, iree_infinite_timeout());
-  iree_notification_deinitialize(&entry_data.barrier);
   iree_thread_release(thread);
+  iree_notification_deinitialize(&entry_data.barrier);
 }
 
 // NOTE: testing whether priority took effect is really hard given that on
