@@ -28,7 +28,9 @@ static void populateEscapingProducers(Operation *parentOp,
     if (itOp == parentOp) {
       info.producers.insert(itOp->getOperands().begin(),
                             itOp->getOperands().end());
-      return;
+      return itOp->hasTrait<OpTrait::IsIsolatedFromAbove>()
+                 ? WalkResult::interrupt()
+                 : WalkResult::advance();
     }
 
     // For nested operations, only consider that they escape if they are
@@ -39,6 +41,8 @@ static void populateEscapingProducers(Operation *parentOp,
         info.producers.insert(operand);
       }
     }
+
+    return WalkResult::advance();
   });
 }
 
