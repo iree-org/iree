@@ -290,8 +290,10 @@ static int64_t getVectorSize(mlir::FunctionOpInterface entryPointFn,
 }
 
 /// Returns true if the operation is a GenericOp implementing a supported
-/// transposition.
-static bool isSupportedTransposeOp(linalg::GenericOp genericOp) {
+/// transposition:
+///   1. The op has a single input and a single output.
+///   2. One of the indexing_map is identity and the other is a permutation.
+static bool x86TransposeLoweringPrecondition(linalg::GenericOp genericOp) {
   // Check that the op has at least 2 dimensions.
   if (genericOp.getNumLoops() < 2) {
     return false;
@@ -379,7 +381,7 @@ getMinTilingSizesForEachDim(mlir::FunctionOpInterface entryPointFn,
 
   auto genericOp = dyn_cast<linalg::GenericOp>(op.getOperation());
   if (linalgOpInfo.isTranspose() && genericOp &&
-      isSupportedTransposeOp(genericOp)) {
+      x86TransposeLoweringPrecondition(genericOp)) {
     // Limit unrolling on transpose operations.
     // TODO(dcaballe): Consider input and output transposes.
     limitUnrollFactor(targetMLTransInfo.defaultMaxTransposeUnrollFactor);
@@ -1877,7 +1879,8 @@ setTransposeLikeOpRootConfig(mlir::FunctionOpInterface entryPointFn,
   LLVM_DEBUG(KD_DBGS() << "Setting transpose-like op root configuration\n");
 
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
-  if (!hasAVX2Feature(targetAttr) || !isSupportedTransposeOp(genericOp)) {
+  if (!hasAVX2Feature(targetAttr) ||
+      !x86TransposeLoweringPrecondition(genericOp)) {
     return failure();
   }
 
