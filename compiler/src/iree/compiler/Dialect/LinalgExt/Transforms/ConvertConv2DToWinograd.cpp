@@ -177,14 +177,13 @@ public:
       return failure();
     }
     if (!kernelType.hasStaticShape()) {
-      return rewriter.notifyMatchFailure(convOp->getLoc(),
-                                         "Kernel shape is not static");
+      return rewriter.notifyMatchFailure(convOp, "Kernel shape is not static");
     }
     SmallVector<int64_t> kernelShape(kernelType.getShape());
     const int64_t kh = isNchwFchw ? kernelShape[2] : kernelShape[0];
     const int64_t kw = isNchwFchw ? kernelShape[3] : kernelShape[1];
-    if ((kh != 3) || (kw != 3)) {
-      return rewriter.notifyMatchFailure(convOp->getLoc(),
+    if (kh != 3 || kw != 3) {
+      return rewriter.notifyMatchFailure(convOp,
                                          "Winograd only supports 3x3 filters");
     }
     assert(kernelShape.size() == 4);
@@ -194,19 +193,21 @@ public:
     const int64_t inputTileSize = outputTileSize + kernelSize - 1;
 
     Location loc = convOp.getLoc();
-    const std::array<int64_t, 2> hwcfKernelDims{0, 1};
-    const std::array<int64_t, 2> fchwKernelDims{2, 3};
+    const std::array<int64_t, 2> hwcfKernelDims = {0, 1};
+    const std::array<int64_t, 2> fchwKernelDims = {2, 3};
     SmallVector<int64_t> filterResultShape(4, inputTileSize);
     filterResultShape[2] = isNchwFchw ? kernelShape[1] : kernelShape[2];
     filterResultShape[3] = isNchwFchw ? kernelShape[0] : kernelShape[3];
     Value kernelInit =
         rewriter.create<tensor::EmptyOp>(loc, filterResultShape, elementType);
-    auto &kernelDims = isNchwFchw ? fchwKernelDims : hwcfKernelDims;
-    auto winogradFilterOp =
-        rewriter.create<IREE::LinalgExt::WinogradFilterTransformOp>(
-            loc, kernelInit.getType(), ValueRange{kernel},
-            ValueRange{kernelInit}, outputTileSize, kernelSize, kernelDims);
-    Value winogradFilter = winogradFilterOp.getResult()[0];
+    const std::array<int64_t, 2> kernelDims =
+        isNchwFchw ? fchwKernelDims : hwcfKernelDims;
+    Value winogradFilter =
+        rewriter
+            .create<IREE::LinalgExt::WinogradFilterTransformOp>(
+                loc, kernelInit.getType(), ValueRange{kernel},
+                ValueRange{kernelInit}, outputTileSize, kernelSize, kernelDims)
+            .getResults()[0];
 
     // Add collapse shape
     SmallVector<int64_t> collapsedFilterShape;
@@ -228,16 +229,15 @@ public:
     }
     SmallVector<int64_t> inputShape(inputType.getShape());
     if (llvm::any_of(inputShape, ShapedType::isDynamic)) {
-      return rewriter.notifyMatchFailure(convOp->getLoc(),
-                                         "Input shape is not static");
+      return rewriter.notifyMatchFailure(convOp, "Input shape is not static");
     }
     assert(inputShape.size() == 4);
     if (isNchwFchw) {
       permute<IREE::LinalgExt::Permutation::NCHW_TO_NHWC>(inputShape);
     }
 
-    const std::array<int64_t, 2> nhwcImageDims{1, 2};
-    const std::array<int64_t, 2> nchwImageDims{2, 3};
+    const std::array<int64_t, 2> nhwcImageDims = {1, 2};
+    const std::array<int64_t, 2> nchwImageDims = {2, 3};
     const size_t numImageDims = nhwcImageDims.size();
     SmallVector<int64_t> resultShape(6, inputTileSize);
     llvm::SmallSetVector<int64_t, 2> imageDimsSet(nhwcImageDims.begin(),
@@ -254,12 +254,14 @@ public:
     }
     Value emptyTensor =
         rewriter.create<tensor::EmptyOp>(loc, resultShape, elementType);
-    auto &imageDims = isNchwFchw ? nchwImageDims : nhwcImageDims;
-    auto winogradInputOp =
-        rewriter.create<IREE::LinalgExt::WinogradInputTransformOp>(
-            loc, emptyTensor.getType(), ValueRange{input},
-            ValueRange{emptyTensor}, outputTileSize, kernelSize, imageDims);
-    Value winogradInput = winogradInputOp.getResult()[0];
+    const std::array<int64_t, 2> imageDims =
+        isNchwFchw ? nchwImageDims : nhwcImageDims;
+    Value winogradInput =
+        rewriter
+            .create<IREE::LinalgExt::WinogradInputTransformOp>(
+                loc, emptyTensor.getType(), ValueRange{input},
+                ValueRange{emptyTensor}, outputTileSize, kernelSize, imageDims)
+            .getResults()[0];
 
     // Add collapse shape
     SmallVector<int64_t> collapsedShape = {
@@ -310,25 +312,24 @@ public:
     }
     emptyTensor =
         rewriter.create<tensor::EmptyOp>(loc, paddedResultShape, elementType);
-    auto winogradOutputOp =
-        rewriter.create<IREE::LinalgExt::WinogradOutputTransformOp>(
-            loc, emptyTensor.getType(), ValueRange{expandedBmmResult},
-            ValueRange{emptyTensor}, outputTileSize, kernelSize, imageDims);
-    Value paddedOutput = winogradOutputOp.getResult()[0];
+    Value paddedOutput =
+        rewriter
+            .create<IREE::LinalgExt::WinogradOutputTransformOp>(
+                loc, emptyTensor.getType(), ValueRange{expandedBmmResult},
+                ValueRange{emptyTensor}, outputTileSize, kernelSize, imageDims)
+            .getResults()[0];
 
     // Extract slice
     SmallVector<OpFoldResult> offsets(outputShape.size(),
                                       rewriter.getIndexAttr(0));
     SmallVector<OpFoldResult> strides(outputShape.size(),
                                       rewriter.getIndexAttr(1));
-    SmallVector<OpFoldResult> sizes;
-    for (const int64_t shape : outputType.getShape())
-      sizes.push_back(rewriter.getIndexAttr(shape));
+    SmallVector<OpFoldResult> sizes =
+        getAsIndexOpFoldResult(rewriter.getContext(), outputType.getShape());
     auto winogradOutput = rewriter.create<tensor::ExtractSliceOp>(
         loc, outputType, paddedOutput, offsets, sizes, strides);
 
-    Value result = convOp.getResult(0);
-    result.replaceAllUsesWith(winogradOutput);
+    rewriter.replaceOp(convOp, winogradOutput);
     return success();
   }
 };
