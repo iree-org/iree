@@ -3176,6 +3176,8 @@
       
         
       
+        
+      
     
     
       
@@ -3210,6 +3212,29 @@
             Archive
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+    
+  
+  
+    <li class="md-nav__item">
+      <a href="../../archive/2024/" class="md-nav__link">
+        
+  
+  <span class="md-ellipsis">
+    2024
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -3372,6 +3397,24 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#iree-mlir-linalg-tutorial" class="md-nav__link">
+    <span class="md-ellipsis">
+      IREE / MLIR / Linalg tutorial
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#exploring-cpu-microkernels-on-a-matmul-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      Exploring CPU microkernels on a matmul example
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#matrix-multiplication-with-mmt4d" class="md-nav__link">
     <span class="md-ellipsis">
       Matrix Multiplication with MMT4D
@@ -3485,6 +3528,24 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#iree-mlir-linalg-tutorial" class="md-nav__link">
+    <span class="md-ellipsis">
+      IREE / MLIR / Linalg tutorial
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#exploring-cpu-microkernels-on-a-matmul-example" class="md-nav__link">
+    <span class="md-ellipsis">
+      Exploring CPU microkernels on a matmul example
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#matrix-multiplication-with-mmt4d" class="md-nav__link">
     <span class="md-ellipsis">
       Matrix Multiplication with MMT4D
@@ -3507,6 +3568,129 @@
       <header class="md-typeset">
         <h1 id="performance">Performance<a class="headerlink" href="#performance" title="Permanent link">link</a></h1>
       </header>
+      
+        <article class="md-post md-post--excerpt">
+  <header class="md-post__header">
+    
+      <nav class="md-post__authors md-typeset">
+        
+          <span class="md-author">
+            <img src="https://github.com/bjacob.png" alt="Benoit Jacob">
+          </span>
+        
+      </nav>
+    
+    <div class="md-post__meta md-meta">
+      <ul class="md-meta__list">
+        <li class="md-meta__item">
+          <time datetime="2024-01-29 00:00:00">January 29, 2024</time></li>
+        
+          <li class="md-meta__item">
+            in
+            
+              <a href="./" class="md-meta__link">Performance</a></li>
+        
+        
+          
+          <li class="md-meta__item">
+            
+              13 min read
+            
+          </li>
+        
+      </ul>
+      
+    </div>
+  </header>
+  <div class="md-post__content md-typeset">
+    <h2 id="iree-mlir-linalg-tutorial"><a class="toclink" href="../../2024-01-29-iree-mlir-linalg-tutorial/">IREE / MLIR / Linalg tutorial</a></h2>
+<h3 id="introduction"><a class="toclink" href="../../2024-01-29-iree-mlir-linalg-tutorial/#introduction">Introduction</a></h3>
+<p>This tutorial is simultaneously about IREE, MLIR, and specifically the MLIR
+Linalg dialect.</p>
+<h4 id="what-is-mlir"><a class="toclink" href="../../2024-01-29-iree-mlir-linalg-tutorial/#what-is-mlir">What is MLIR?</a></h4>
+<p><a href="https://mlir.llvm.org/">MLIR</a> is a programming language, but MLIR in itself is
+almost just an empty shell. What it really provides is a framework allowing to
+define <a href="https://mlir.llvm.org/docs/Dialects/">MLIR dialects</a> which are where the
+features come from.</p>
+<p>The "IR" part of the MLIR name stands for "intermediate representation". It
+means that MLIR is meant to be primarily for compiler-internal representations
+of code. But MLIR is actually fairly nice for humans to work with, and it's not
+hard to hand-author some MLIR programs from scratch. That is exactly the topic
+of this tutorial.</p>
+
+    
+      <nav class="md-post__action">
+        <a href="../../2024-01-29-iree-mlir-linalg-tutorial/">
+          Continue reading
+        </a>
+      </nav>
+    
+  </div>
+</article>
+      
+        <article class="md-post md-post--excerpt">
+  <header class="md-post__header">
+    
+      <nav class="md-post__authors md-typeset">
+        
+          <span class="md-author">
+            <img src="https://github.com/bjacob.png" alt="Benoit Jacob">
+          </span>
+        
+      </nav>
+    
+    <div class="md-post__meta md-meta">
+      <ul class="md-meta__list">
+        <li class="md-meta__item">
+          <time datetime="2024-01-22 00:00:00">January 22, 2024</time></li>
+        
+          <li class="md-meta__item">
+            in
+            
+              <a href="./" class="md-meta__link">Performance</a></li>
+        
+        
+          
+          <li class="md-meta__item">
+            
+              10 min read
+            
+          </li>
+        
+      </ul>
+      
+    </div>
+  </header>
+  <div class="md-post__content md-typeset">
+    <h2 id="exploring-cpu-microkernels-on-a-matmul-example"><a class="toclink" href="../../2024-01-22-exploring-cpu-microkernels-on-a-matmul-example/">Exploring CPU microkernels on a matmul example</a></h2>
+<h3 id="basic-setup-command-lines"><a class="toclink" href="../../2024-01-22-exploring-cpu-microkernels-on-a-matmul-example/#basic-setup-command-lines">Basic setup, command lines</a></h3>
+<p>Source file: <code>matmul.mlir</code>:</p>
+<div class="highlight"><pre><span></span><code>func.func @matmul_dynamic(%lhs: tensor&lt;?x?xf32&gt;, %rhs: tensor&lt;?x?xf32&gt;, %acc: tensor&lt;?x?xf32&gt;) -&gt; tensor&lt;?x?xf32&gt; {
+  %result = linalg.matmul ins(%lhs, %rhs: tensor&lt;?x?xf32&gt;, tensor&lt;?x?xf32&gt;) outs(%acc: tensor&lt;?x?xf32&gt;) -&gt; tensor&lt;?x?xf32&gt;
+  return %result: tensor&lt;?x?xf32&gt;
+}
+</code></pre></div>
+<p>Basic compilation command line:</p>
+<div class="highlight"><pre><span></span><code>$<span class="w"> </span>iree-compile<span class="w"> </span>matmul.mlir<span class="w"> </span>-o<span class="w"> </span>/tmp/matmul.vmfb<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-hal-target-backends<span class="o">=</span>llvm-cpu<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-llvmcpu-target-cpu<span class="o">=</span>znver4<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--iree-llvmcpu-enable-ukernels<span class="o">=</span>all
+</code></pre></div>
+<p>This creates a IREE bytecode module:</p>
+<div class="highlight"><pre><span></span><code><span class="gp">$ </span>ls<span class="w"> </span>-l<span class="w"> </span>/tmp/matmul.vmfb
+
+<span class="go">-rw-rw-r-- 1 2884 Jan 22 10:37 /tmp/matmul.vmfb</span>
+</code></pre></div>
+
+    
+      <nav class="md-post__action">
+        <a href="../../2024-01-22-exploring-cpu-microkernels-on-a-matmul-example/">
+          Continue reading
+        </a>
+      </nav>
+    
+  </div>
+</article>
       
         <article class="md-post md-post--excerpt">
   <header class="md-post__header">

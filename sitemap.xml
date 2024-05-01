@@ -46,6 +46,16 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://iree.dev/community/blog/2024-01-29-iree-mlir-linalg-tutorial/</loc>
+         <lastmod>2024-05-01</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://iree.dev/community/blog/2024-01-22-exploring-cpu-microkernels-on-a-matmul-example/</loc>
+         <lastmod>2024-05-01</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://iree.dev/community/blog/2021-10-13-matrix-multiplication-with-mmt4d/</loc>
          <lastmod>2024-05-01</lastmod>
          <changefreq>daily</changefreq>
@@ -386,17 +396,22 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://iree.dev/community/blog/archive/2024/</loc>
+         <lastmod>2024-05-01</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://iree.dev/community/blog/archive/2021/</loc>
          <lastmod>2024-05-01</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://iree.dev/community/blog/category/platforms/</loc>
+         <loc>https://iree.dev/community/blog/category/performance/</loc>
          <lastmod>2024-05-01</lastmod>
          <changefreq>daily</changefreq>
     </url>
     <url>
-         <loc>https://iree.dev/community/blog/category/performance/</loc>
+         <loc>https://iree.dev/community/blog/category/platforms/</loc>
          <lastmod>2024-05-01</lastmod>
          <changefreq>daily</changefreq>
     </url>
