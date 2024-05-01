@@ -1,4 +1,15 @@
-# Exploring IREE CPU microkernels on a simple matmul example
+---
+date: 2024-01-22
+authors:
+  - bjacob
+categories:
+  - Performance
+tags:
+  - CPU
+readtime: 10  # code blocks inflate this (7 minutes without, 66 minutes with)
+---
+
+# Exploring CPU microkernels on a matmul example
 
 ## Basic setup, command lines
 
@@ -12,54 +23,70 @@ func.func @matmul_dynamic(%lhs: tensor<?x?xf32>, %rhs: tensor<?x?xf32>, %acc: te
 ```
 
 Basic compilation command line:
-```
-iree-compile matmul.mlir -o /tmp/matmul.vmfb \
+
+```bash
+$ iree-compile matmul.mlir -o /tmp/matmul.vmfb \
   --iree-hal-target-backends=llvm-cpu \
   --iree-llvmcpu-target-cpu=znver4 \
   --iree-llvmcpu-enable-ukernels=all
 ```
 
 This creates a IREE bytecode module:
-```
-ls -l /tmp/matmul.vmfb
--rw-rw-r-- 1 benoit benoit 22884 Jan 22 10:37 /tmp/matmul.vmfb
+
+```console
+$ ls -l /tmp/matmul.vmfb
+
+-rw-rw-r-- 1 2884 Jan 22 10:37 /tmp/matmul.vmfb
 ```
 
-The above `.vmfb` is the only thing that's needed to run this matmul on the target device. But to understand microkernels, we are now going to generate additional intermediate files.
+<!-- more -->
 
-Additional `iree-compile` flags to save intermediate files (IR, assembly, object code):
-```
+The above `.vmfb` is the only thing that's needed to run this matmul on the
+target device. But to understand microkernels, we are now going to generate
+additional intermediate files.
+
+Additional `iree-compile` flags to save intermediate files (IR, assembly, object
+code):
+
+```bash
 --iree-hal-dump-executable-intermediates-to=/tmp/matmul --x86-asm-syntax=intel
 ```
 
-This saves LLVM IR in binary serialization ("bitcode", filename extension `.bc`). To read it, we need to "disassemble" it using `llvm-dis` to obtain textual IR (filename extension `.ll`).
-```
+This saves LLVM IR in binary serialization ("bitcode", filename extension
+`.bc`). To read it, we need to "disassemble" it using `llvm-dis` to obtain
+textual IR (filename extension `.ll`).
+
+```shell
 llvm-dis /tmp/matmul/*.bc
 ```
 
 Intermediate files:
-```
--rw-rw-r-- 1 benoit benoit    35196 Jan 22 10:37 /tmp/matmul/module_matmul_linked_llvm_cpu_embedded_elf_x86_64.codegen.bc
--rw-rw-r-- 1 benoit benoit   251597 Jan 22 10:38 /tmp/matmul/module_matmul_linked_llvm_cpu_embedded_elf_x86_64.codegen.ll
--rw-rw-r-- 1 benoit benoit   181740 Jan 22 10:37 /tmp/matmul/module_matmul_linked_llvm_cpu_embedded_elf_x86_64.linked.bc
--rw-rw-r-- 1 benoit benoit  1396190 Jan 22 10:38 /tmp/matmul/module_matmul_linked_llvm_cpu_embedded_elf_x86_64.linked.ll
--rw-rw-r-- 1 benoit benoit    32096 Jan 22 10:37 /tmp/matmul/module_matmul_linked_llvm_cpu_embedded_elf_x86_64.o
--rw-rw-r-- 1 benoit benoit    34504 Jan 22 10:37 /tmp/matmul/module_matmul_linked_llvm_cpu_embedded_elf_x86_64.optimized.bc
--rw-rw-r-- 1 benoit benoit   184981 Jan 22 10:38 /tmp/matmul/module_matmul_linked_llvm_cpu_embedded_elf_x86_64.optimized.ll
--rw-rw-r-- 1 benoit benoit    82016 Jan 22 10:37 /tmp/matmul/module_matmul_linked_llvm_cpu_embedded_elf_x86_64.s
+
+```console
+  35196 /tmp/matmul/module_matmul_linked_llvm_cpu_embedded_elf_x86_64.codegen.bc
+ 251597 /tmp/matmul/module_matmul_linked_llvm_cpu_embedded_elf_x86_64.codegen.ll
+ 181740 /tmp/matmul/module_matmul_linked_llvm_cpu_embedded_elf_x86_64.linked.bc
+1396190 /tmp/matmul/module_matmul_linked_llvm_cpu_embedded_elf_x86_64.linked.ll
+  32096 /tmp/matmul/module_matmul_linked_llvm_cpu_embedded_elf_x86_64.o
+  34504 /tmp/matmul/module_matmul_linked_llvm_cpu_embedded_elf_x86_64.optimized.bc
+ 184981 /tmp/matmul/module_matmul_linked_llvm_cpu_embedded_elf_x86_64.optimized.ll
+  82016 /tmp/matmul/module_matmul_linked_llvm_cpu_embedded_elf_x86_64.s
 ```
 
-Another important `iree-compile` flag: `--mlir-print-ir-after-all` records the IR after each pass. We save that (stderr) output to a file, `ir.log` by appending to the `iree-compile` command line:
-```
+Another important `iree-compile` flag: `--mlir-print-ir-after-all` records the
+IR after each pass. We save that (stderr) output to a file, `ir.log` by
+appending to the `iree-compile` command line:
+
+```bash
 --mlir-print-ir-after-all 2>/tmp/matmul/ir.log
 ```
 
 ## Overview of the compilation and linking flow
 
-This graph shows the transformations from the source `matmul.mlir` to the final `matmul.vmfb` with the various intermediates met in the previous section:
+This graph shows the transformations from the source `matmul.mlir` to the final
+`matmul.vmfb` with the various intermediates met in the previous section:
 
 ```mermaid
-%%{ init: {"theme": "neutral" } }%%
 graph TD;
 matmulontensors-- CPUMaterializeEncoding -->mmt4dontensors;
 mmt4dontensors-- CPULowerToUKernels -->ukernelontensors;
@@ -125,83 +152,121 @@ subgraph Part3["Part 3: Linking with microkernels, optimizing, producing object 
   object
   vmfb
 end
-
-style Part1 fill:#FFF9C4, stroke:#FDD835
-style Part2 fill:#B3E5FC, stroke:#039BE5
-style Part3 fill:#C8E6C9, stroke:#43A047
 ```
 
 ## 🟨 Part 1: MLIR code generation
 
-Some initial boilerplate happens *around* our `linalg.matmul` before anything interesting happens *to* it.:
+Some initial boilerplate happens *around* our `linalg.matmul` before anything
+interesting happens *to* it.:
 
 [➤ Appendix: IR dump after WrapEntryPointsPass](#ir-dump-after-wrapentrypointspass)
 
-Next, the first interesting thing is the `CPUMaterializeEncoding` pass, where the `linalg.matmul` gets rewritten into a `linalg.mmt4d` which is a matmul with a tiled data layout. This is where we start specializing to the target ISA feature set, AVX-512, favoring a 16x16 tile size for this float32 matmul.
+Next, the first interesting thing is the `CPUMaterializeEncoding` pass, where
+the `linalg.matmul` gets rewritten into a `linalg.mmt4d` which is a matmul with
+a tiled data layout. This is where we start specializing to the target ISA
+feature set, AVX-512, favoring a 16x16 tile size for this float32 matmul.
 
 [➤ Appendix: IR Dump After CPUMaterializeEncoding](#ir-dump-after-cpumaterializeencoding)
 
-The idea is that `linalg.mmt4d` is what we will have a microkernel for, below. There is no need to have microkernels for anything but the target-optimal tiled layout, so we don't bother carrying a microkernel for `linalg.matmul` itself. The matrix layout transformation, bringing matrix data into this tiled layout, is also out of the scope of this `linalg.mmt4d` and hence of the `mmt4d` microkernel: we can rely on generic code-generation to take care of these byte-permutations, which is our preference as we aim to let that fuse into producers/consumers.
+The idea is that `linalg.mmt4d` is what we will have a microkernel for, below.
+There is no need to have microkernels for anything but the target-optimal tiled
+layout, so we don't bother carrying a microkernel for `linalg.matmul` itself.
+The matrix layout transformation, bringing matrix data into this tiled layout,
+is also out of the scope of this `linalg.mmt4d` and hence of the `mmt4d`
+microkernel: we can rely on generic code-generation to take care of these
+byte-permutations, which is our preference as we aim to let that fuse into
+producers/consumers.
 
-Next comes the rewrite of `linalg.mmt4d` into a microkernel op, done by the `CPULowerToUKernels` pass. Here is the TableGen definition of the generic microkernel op we're going to generate:
+Next comes the rewrite of `linalg.mmt4d` into a microkernel op, done by the
+`CPULowerToUKernels` pass. Here is the TableGen definition of the generic
+microkernel op we're going to generate:
 
-[TableGen definition of `ukernel.generic`](https://github.com/openxla/iree/blob/e82cfa99b3dc6447fe926329c12414bce75c0507/compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.td#L22)
+[TableGen definition of `ukernel.generic`](https://github.com/iree-org/iree/blob/e82cfa99b3dc6447fe926329c12414bce75c0507/compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.td#L22)
 
-[C++ compiler code for CPULowerToUKernels](https://github.com/openxla/iree/blob/e82cfa99b3dc6447fe926329c12414bce75c0507/compiler/src/iree/compiler/Codegen/Common/CPU/CPULowerToUKernels.cpp#L247-L251)
+[C++ compiler code for CPULowerToUKernels](https://github.com/iree-org/iree/blob/e82cfa99b3dc6447fe926329c12414bce75c0507/compiler/src/iree/compiler/Codegen/Common/CPU/CPULowerToUKernels.cpp#L247-L251)
 
 [➤ Appendix: IR Dump After CPULowerToUKernels](#ir-dump-after-cpulowertoukernels)
 
 Notice that this IR is still working on `tensor` values, not on `memref` values.
+
 * Rewrites are much nicer to perform on tensors than on memrefs.
 * `ukernel.generic` works with both tensors and memrefs.
-* Allows performing the rewrite to `ukernel.generic` while still on tensors, then just ride bufferization.
+* Allows performing the rewrite to `ukernel.generic` while still on tensors,
+  then just ride bufferization.
 
 Next, bufferization takes place. `tensor` values become `memref`.
 
 [➤ Appendix: IR Dump After IREEComprehensiveBufferize](#ir-dump-after-ireecomprehensivebufferize)
 
-Next, the `LowerUKernelOpsToCalls` runs, rewriting `ukernel.generic` ops into function calls.
-* Made possible by bufferization: there now are buffer pointers and strides to pass to the target function.
+Next, the `LowerUKernelOpsToCalls` runs, rewriting `ukernel.generic` ops into
+function calls.
+
+* Made possible by bufferization: there now are buffer pointers and strides to
+  pass to the target function.
 
 [➤ Appendix: IR Dump After LowerUKernelOpsToCalls](#ir-dump-after-lowerukernelopstocalls)
 
-Finally, this gets lowered to the MLIR LLVM dialect, in preparation for outputting plain LLVM IR.
+Finally, this gets lowered to the MLIR LLVM dialect, in preparation for
+outputting plain LLVM IR.
 
 [➤ Appendix: IR Dump After ConvertToLLVM](#ir-dump-after-converttollvm)
 
-The above gets converted to plain LLVM IR and that's our first intermediate file, `module_matmul_linked_llvm_cpu_embedded_elf_x86_64.codegen.bc`, which `llvm-dis` helps disassemble into a textual IR file (`.ll`).
+The above gets converted to plain LLVM IR and that's our first intermediate
+file, `module_matmul_linked_llvm_cpu_embedded_elf_x86_64.codegen.bc`, which
+`llvm-dis` helps disassemble into a textual IR file (`.ll`).
 
 [➤ Appendix: Intermediate file: `...codegen.bc`, disassembled to `...codegen.ll`](#intermediate-file-codegenbc-disassembled-to-codegenll)
 
-The above IR references an external symbol `iree_uk_mmt4d` for the microkernel that it calls, so it now needs to be linked against the ukernels bitcode.
+The above IR references an external symbol `iree_uk_mmt4d` for the microkernel
+that it calls, so it now needs to be linked against the ukernels bitcode.
 
 ## 🟦 Part 2: Microkernels compilation (part of the IREE build)
 
 Microkernels are:
+
 * Compiled to self-contained bitcode, once for each target architecture.
     - That puts requirement on the source languages that they can be defined in.
         - Can use C via `clang -emit-llvm` plus extra flags like `-ffreestanding`.
-            - The source must not `#include` standard library headers or do anything OS-specific.
+            - The source must not `#include` standard library headers or do
+              anything OS-specific.
         - Can use inline assembly but not out-of-line assembly.
 * Taking scalar parameters, including buffer pointers and strides.
     - Array-processing microkernels have a *memory-to-memory* interface.
     - No vector-to-vector microkernels.
-        - Store-to-load-forwarding can still happen post-linking, effectively achieving the same.
+        - Store-to-load-forwarding can still happen post-linking, effectively
+          achieving the same.
         - Microkernel ops avoid MLIR vector dialect altogether.
 
-C source code for the [`iree_uk_mmt4d` microkernel entry point](https://github.com/openxla/iree/blob/c437add6a3b1e3e873cec95505d37c4938fee74f/runtime/src/iree/builtins/ukernel/mmt4d.c#L118-L131)
+C source code for the
+[`iree_uk_mmt4d` microkernel entry point](https://github.com/iree-org/iree/blob/c437add6a3b1e3e873cec95505d37c4938fee74f/runtime/src/iree/builtins/ukernel/mmt4d.c#L118-L131)
 
-This calls  calls an [architecture-specific function](https://github.com/openxla/iree/blob/main/runtime/src/iree/builtins/ukernel/arch/x86_64/mmt4d_x86_64_entry_point.c#L395) to return a function pointer to the optimized inner-loop implementation to use for given data types and SIMD ISA features, and then uses that in a [generic outer-loop implementation](https://github.com/openxla/iree/blob/c437add6a3b1e3e873cec95505d37c4938fee74f/runtime/src/iree/builtins/ukernel/mmt4d.c#L53-L102).
+This calls an
+[architecture-specific function](https://github.com/iree-org/iree/blob/c437add6a3b1e3e873cec95505d37c4938fee74f/runtime/src/iree/builtins/ukernel/arch/x86_64/mmt4d_x86_64_entry_point.c#L395)
+to return a function pointer to the optimized inner-loop implementation to use
+for given data types and SIMD ISA features, and then uses that in a
+[generic outer-loop implementation](https://github.com/iree-org/iree/blob/c437add6a3b1e3e873cec95505d37c4938fee74f/runtime/src/iree/builtins/ukernel/mmt4d.c#L53-L102).
 
-So the really interesting part is the implementation of the inner-loop function that we got a function pointer to. For example, [here](https://github.com/openxla/iree/blob/main/runtime/src/iree/builtins/ukernel/arch/x86_64/mmt4d_x86_64_avx512_base.c#L12-L61) is the one used in our example where the element type is `f32` and the target has AVX-512.
+So the really interesting part is the implementation of the inner-loop function
+that we got a function pointer to. For example,
+[here](https://github.com/iree-org/iree/blob/c437add6a3b1e3e873cec95505d37c4938fee74f/runtime/src/iree/builtins/ukernel/arch/x86_64/mmt4d_x86_64_avx512_base.c#L12-L61)
+is the one used in our example where the element type is `f32` and the target
+has AVX-512.
 
-A custom CMake function, [`iree_bitcode_library`](https://github.com/openxla/iree/blob/main/build_tools/cmake/iree_bitcode_library.cmake#L9-L139), wraps `clang` to compile these C source files with special flags to obtain freestanding bitcode.
+A custom CMake function,
+[`iree_bitcode_library`](https://github.com/iree-org/iree/blob/c437add6a3b1e3e873cec95505d37c4938fee74f/build_tools/cmake/iree_bitcode_library.cmake#L9-L139),
+wraps `clang` to compile these C source files with special flags to obtain
+freestanding bitcode.
 
-Likewise, a custom CMake function, [`iree_link_bitcode`](https://github.com/openxla/iree/blob/main/build_tools/cmake/iree_bitcode_library.cmake#L231-L278), wraps `llvm-link` to link bitcode files.
+Likewise, a custom CMake function,
+[`iree_link_bitcode`](https://github.com/iree-org/iree/blob/c437add6a3b1e3e873cec95505d37c4938fee74f/build_tools/cmake/iree_bitcode_library.cmake#L231-L278),
+wraps `llvm-link` to link bitcode files.
 
-These are used during the IREE compiler build (as a dependency of `iree-compile`) to build microkernels as bitcode for all supported target architectures, generating one bitcode file for each architecture in the build directory:
+These are used during the IREE compiler build (as a dependency of
+`iree-compile`) to build microkernels as bitcode for all supported target
+architectures, generating one bitcode file for each architecture in the build
+directory:
 
-```
+```console
 ~/iree-build$ ls ./runtime/src/iree/builtins/ukernel/ukernel_bitcode_*.bc | grep -v generic
 ./runtime/src/iree/builtins/ukernel/ukernel_bitcode_arm_32.bc
 ./runtime/src/iree/builtins/ukernel/ukernel_bitcode_arm_64.bc
@@ -210,7 +275,8 @@ These are used during the IREE compiler build (as a dependency of `iree-compile`
 ./runtime/src/iree/builtins/ukernel/ukernel_bitcode_x86_64.bc
 ```
 
-These files are then embedded as static data within `iree-compile`, so that `iree-compile` stays self-contained.
+These files are then embedded as static data within `iree-compile`, so that
+`iree-compile` stays self-contained.
 
 Here are some samples of ukernel bitcode if you are curious what it looks like:
 
@@ -220,19 +286,38 @@ Here are some samples of ukernel bitcode if you are curious what it looks like:
 
 ## 🟩 Part 3: Linking with microkernels, optimizing, producing object code
 
-The previous two sections covered respectively the compilation of the MLIR module, and the compilation of microkernels, as two separate bitcode modules. Now we turn to how these two bitcode modules are linked together.
+The previous two sections covered respectively the compilation of the MLIR
+module, and the compilation of microkernels, as two separate bitcode modules.
+Now we turn to how these two bitcode modules are linked together.
 
-After code generation, `iree-compile` loads microkernel bitcode: https://github.com/openxla/iree/blob/main/compiler/src/iree/compiler/Dialect/HAL/Target/LLVMCPU/LLVMCPUTarget.cpp#L490
+After code generation, `iree-compile` loads microkernel bitcode:
+<https://github.com/iree-org/iree/blob/c437add6a3b1e3e873cec95505d37c4938fee74f/compiler/src/iree/compiler/Dialect/HAL/Target/LLVMCPU/LLVMCPUTarget.cpp#L490>
 
-It is worth zooming into that `loadUKernelBitcode` function as, in addition to just loading the bitcode, it does one important thing: it adds the `alwaysinline` attribute on every function. As we will see just below, always inlining microkernels is key to achieving perfect results with no downsides compared to a pure code-generation approach. https://github.com/openxla/iree/blob/main/compiler/src/iree/compiler/Dialect/HAL/Target/LLVMCPU/Builtins/UKernel.cpp#L36-L62
+It is worth zooming into that `loadUKernelBitcode` function as, in addition to
+just loading the bitcode, it does one important thing: it adds the
+`alwaysinline` attribute on every function. As we will see just below, always
+inlining microkernels is key to achieving perfect results with no downsides
+compared to a pure code-generation approach.
+<https://github.com/iree-org/iree/blob/c437add6a3b1e3e873cec95505d37c4938fee74f/compiler/src/iree/compiler/Dialect/HAL/Target/LLVMCPU/Builtins/UKernel.cpp#L36-L62>
 
-And links it into the current module: https://github.com/openxla/iree/blob/main/compiler/src/iree/compiler/Dialect/HAL/Target/LLVMCPU/LLVMCPUTarget.cpp#L499
+And links it into the current module:
+<https://github.com/iree-org/iree/blob/c437add6a3b1e3e873cec95505d37c4938fee74f/compiler/src/iree/compiler/Dialect/HAL/Target/LLVMCPU/LLVMCPUTarget.cpp#L499>
 
-The linked IR so far is not very interesting, as it is still essentially just the concatenation of the above-discussed codegen and microkernel bitcode (except now with `alwaysinline` attributes). If you are curious, it is dumped as the `...linked.bc` file.
+The linked IR so far is not very interesting, as it is still essentially just
+the concatenation of the above-discussed codegen and microkernel bitcode
+(except now with `alwaysinline` attributes). If you are curious, it is dumped as
+the `...linked.bc` file.
 
-Where it gets interesting is that immediately after that, we run LLVM IR optimization passes, which can be thought of as a form of link-time optimization (LTO): https://github.com/openxla/iree/blob/main/compiler/src/iree/compiler/Dialect/HAL/Target/LLVMCPU/LLVMCPUTarget.cpp#L527
+Where it gets interesting is that immediately after that, we run LLVM IR
+optimization passes, which can be thought of as a form of link-time optimization
+(LTO):
+<https://github.com/iree-org/iree/blob/c437add6a3b1e3e873cec95505d37c4938fee74f/compiler/src/iree/compiler/Dialect/HAL/Target/LLVMCPU/LLVMCPUTarget.cpp#L527>
 
-At this point, all the microkernel code gets inlined into the dispatch function, the correct AVX-512 optimized tile function is selected and inlined, and everything else is DCE'd. That's how the user pays no cost for what they don't use --- not only for the microkernel entry points that they don't call, but also for all the unused code paths within each microkernel.
+At this point, all the microkernel code gets inlined into the dispatch function,
+the correct AVX-512 optimized tile function is selected and inlined, and
+everything else is DCE'd. That's how the user pays no cost for what they don't
+use --- not only for the microkernel entry points that they don't call, but also
+for all the unused code paths within each microkernel.
 
 [➤ Appendix: Intermediate file: `...optimized.bc`, disassembled to `...optimized.ll`](#intermediate-file-optimizedbc-disassembled-to-optimizedll)
 
@@ -595,6 +680,7 @@ module {
 ```
 
 ### IR Dump After ConvertToLLVM
+
 ```mlir
 // -----// IR Dump After ConvertToLLVM (iree-convert-to-llvm) //----- //
 module attributes {llvm.data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128", llvm.target_triple = "x86_64-unknown-unknown-eabi-elf"} {
@@ -817,6 +903,7 @@ module attributes {llvm.data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i6
 ```
 
 ### Intermediate file: `...codegen.bc`, disassembled to `...codegen.ll`
+
 ```llvm
 define internal i32 @matmul_dynamic_dispatch_3_mmt4d_DxDxDx16x16x1_f32(ptr noalias nonnull align 16 %0, ptr noalias nonnull align 16 %1, ptr noalias nonnull align 16 %2) #0 !dbg !90 {
   %4 = load %iree_hal_executable_dispatch_state_v0_t.7, ptr %1, align 8, !dbg !91
@@ -990,7 +1077,6 @@ define internal i32 @matmul_dynamic_dispatch_3_mmt4d_DxDxDx16x16x1_f32(ptr noali
 ```
 
 ### Ukernel bitcode: entry point
-
 
 ```llvm
 ; Function Attrs: nounwind
@@ -1719,225 +1805,225 @@ iree_uk_mmt4d.exit:                               ; preds = %iree_uk_mmt4d_tile_
 ### x86 assembly
 
 ```asm
-	.section	.text.matmul_dynamic_dispatch_3_mmt4d_DxDxDx16x16x1_f32,"ax",@progbits
-	.p2align	4, 0x90
-	.type	matmul_dynamic_dispatch_3_mmt4d_DxDxDx16x16x1_f32,@function
+  .section  .text.matmul_dynamic_dispatch_3_mmt4d_DxDxDx16x16x1_f32,"ax",@progbits
+  .p2align  4, 0x90
+  .type  matmul_dynamic_dispatch_3_mmt4d_DxDxDx16x16x1_f32,@function
 matmul_dynamic_dispatch_3_mmt4d_DxDxDx16x16x1_f32:
 .Lfunc_begin3:
-	.loc	1 1 0 is_stmt 1
-	.cfi_startproc
-	push	rbp
-	.cfi_def_cfa_offset 16
-	.cfi_offset rbp, -16
-	mov	rbp, rsp
-	.cfi_def_cfa_register rbp
+  .loc  1 1 0 is_stmt 1
+  .cfi_startproc
+  push  rbp
+  .cfi_def_cfa_offset 16
+  .cfi_offset rbp, -16
+  mov  rbp, rsp
+  .cfi_def_cfa_register rbp
 .Ltmp6:
-	push	r15
-	push	r14
-	push	r13
-	push	r12
-	push	rbx
-	.cfi_offset rbx, -56
-	.cfi_offset r12, -48
-	.cfi_offset r13, -40
-	.cfi_offset r14, -32
-	.cfi_offset r15, -24
-	.loc	1 1 1 prologue_end
-	mov	rcx, qword ptr [rsi + 24]
-	mov	edi, dword ptr [rdx + 4]
-	mov	rax, qword ptr [rcx + 16]
-	mov	qword ptr [rbp - 48], rdi
-	mov	qword ptr [rbp - 112], rax
-	cmp	rax, rdi
-	jle	.LBB3_11
-	mov	eax, dword ptr [rsi + 16]
-	mov	edi, dword ptr [rsi + 12]
-	mov	r12, qword ptr [rsi + 32]
-	mov	rsi, qword ptr [rcx + 40]
-	mov	r9, qword ptr [rcx + 56]
-	mov	ebx, dword ptr [rcx + 4]
-	mov	r10d, dword ptr [rcx]
-	mov	r11, qword ptr [rcx + 24]
-	mov	r14, qword ptr [rcx + 32]
-	mov	r8, rsi
-	shl	r8, 4
-	mov	qword ptr [rbp - 104], rax
-	shl	r9, 8
-	mov	rax, qword ptr [r12 + 8]
-	shl	rbx, 32
-	mov	qword ptr [rbp - 128], r8
-	mov	r8d, dword ptr [rcx + 12]
-	mov	qword ptr [rbp - 96], r9
-	mov	r9d, dword ptr [rcx + 8]
-	or	r10, rbx
-	sar	rbx, 63
-	xor	r10, rbx
-	lea	r15, [r10 + 3]
-	mov	qword ptr [rbp - 80], rax
-	mov	eax, dword ptr [rdx]
-	shl	r8, 32
-	or	r9, r8
-	test	r10, r10
-	cmovns	r15, r10
-	sar	r8, 63
-	sar	r15, 2
-	xor	r9, r8
-	xor	r15, rbx
-	lea	rcx, [r9 + 3]
-	test	r9, r9
-	mov	qword ptr [rbp - 56], rax
-	cmovns	rcx, r9
-	imul	rax, rsi
-	mov	r9, qword ptr [r12]
-	imul	rsi, rdi
-	mov	qword ptr [rbp - 120], r15
-	sar	rcx, 2
-	xor	rcx, r8
-	shl	rax, 6
-	mov	qword ptr [rbp - 88], rcx
-	mov	rcx, r11
-	shl	rcx, 9
-	shl	rsi, 6
-	lea	rax, [rax + 4*r15]
-	mov	qword ptr [rbp - 72], rcx
-	mov	qword ptr [rbp - 64], rax
-	jmp	.LBB3_2
-	.p2align	4, 0x90
+  push  r15
+  push  r14
+  push  r13
+  push  r12
+  push  rbx
+  .cfi_offset rbx, -56
+  .cfi_offset r12, -48
+  .cfi_offset r13, -40
+  .cfi_offset r14, -32
+  .cfi_offset r15, -24
+  .loc  1 1 1 prologue_end
+  mov  rcx, qword ptr [rsi + 24]
+  mov  edi, dword ptr [rdx + 4]
+  mov  rax, qword ptr [rcx + 16]
+  mov  qword ptr [rbp - 48], rdi
+  mov  qword ptr [rbp - 112], rax
+  cmp  rax, rdi
+  jle  .LBB3_11
+  mov  eax, dword ptr [rsi + 16]
+  mov  edi, dword ptr [rsi + 12]
+  mov  r12, qword ptr [rsi + 32]
+  mov  rsi, qword ptr [rcx + 40]
+  mov  r9, qword ptr [rcx + 56]
+  mov  ebx, dword ptr [rcx + 4]
+  mov  r10d, dword ptr [rcx]
+  mov  r11, qword ptr [rcx + 24]
+  mov  r14, qword ptr [rcx + 32]
+  mov  r8, rsi
+  shl  r8, 4
+  mov  qword ptr [rbp - 104], rax
+  shl  r9, 8
+  mov  rax, qword ptr [r12 + 8]
+  shl  rbx, 32
+  mov  qword ptr [rbp - 128], r8
+  mov  r8d, dword ptr [rcx + 12]
+  mov  qword ptr [rbp - 96], r9
+  mov  r9d, dword ptr [rcx + 8]
+  or  r10, rbx
+  sar  rbx, 63
+  xor  r10, rbx
+  lea  r15, [r10 + 3]
+  mov  qword ptr [rbp - 80], rax
+  mov  eax, dword ptr [rdx]
+  shl  r8, 32
+  or  r9, r8
+  test  r10, r10
+  cmovns  r15, r10
+  sar  r8, 63
+  sar  r15, 2
+  xor  r9, r8
+  xor  r15, rbx
+  lea  rcx, [r9 + 3]
+  test  r9, r9
+  mov  qword ptr [rbp - 56], rax
+  cmovns  rcx, r9
+  imul  rax, rsi
+  mov  r9, qword ptr [r12]
+  imul  rsi, rdi
+  mov  qword ptr [rbp - 120], r15
+  sar  rcx, 2
+  xor  rcx, r8
+  shl  rax, 6
+  mov  qword ptr [rbp - 88], rcx
+  mov  rcx, r11
+  shl  rcx, 9
+  shl  rsi, 6
+  lea  rax, [rax + 4*r15]
+  mov  qword ptr [rbp - 72], rcx
+  mov  qword ptr [rbp - 64], rax
+  jmp  .LBB3_2
+  .p2align  4, 0x90
 .LBB3_10:
-	.loc	1 0 1 is_stmt 0
-	mov	rax, qword ptr [rbp - 48]
-	.loc	1 1 1
-	add	rax, qword ptr [rbp - 104]
-	mov	qword ptr [rbp - 48], rax
-	cmp	rax, qword ptr [rbp - 112]
-	jge	.LBB3_11
+  .loc  1 0 1 is_stmt 0
+  mov  rax, qword ptr [rbp - 48]
+  .loc  1 1 1
+  add  rax, qword ptr [rbp - 104]
+  mov  qword ptr [rbp - 48], rax
+  cmp  rax, qword ptr [rbp - 112]
+  jge  .LBB3_11
 .LBB3_2:
-	.loc	1 0 1
-	cmp	r14, qword ptr [rbp - 56]
-	.loc	1 1 1
-	jle	.LBB3_10
-	.loc	1 0 1
-	mov	rax, qword ptr [rbp - 96]
-	mov	rcx, qword ptr [rbp - 48]
-	mov	r10, qword ptr [rbp - 72]
-	mov	rdx, qword ptr [rbp - 80]
-	mov	r8, qword ptr [rbp - 64]
-	imul	rax, rcx
-	add	rax, qword ptr [rbp - 88]
-	imul	r10, rcx
-	sar	r10, 3
-	lea	r13, [r9 + r10]
-	.loc	1 1 1
-	lea	r15, [rdx + 4*rax]
-	mov	rax, qword ptr [rbp - 56]
-	jmp	.LBB3_4
-	.p2align	4, 0x90
+  .loc  1 0 1
+  cmp  r14, qword ptr [rbp - 56]
+  .loc  1 1 1
+  jle  .LBB3_10
+  .loc  1 0 1
+  mov  rax, qword ptr [rbp - 96]
+  mov  rcx, qword ptr [rbp - 48]
+  mov  r10, qword ptr [rbp - 72]
+  mov  rdx, qword ptr [rbp - 80]
+  mov  r8, qword ptr [rbp - 64]
+  imul  rax, rcx
+  add  rax, qword ptr [rbp - 88]
+  imul  r10, rcx
+  sar  r10, 3
+  lea  r13, [r9 + r10]
+  .loc  1 1 1
+  lea  r15, [rdx + 4*rax]
+  mov  rax, qword ptr [rbp - 56]
+  jmp  .LBB3_4
+  .p2align  4, 0x90
 .LBB3_8:
-	add	rdx, r15
-	vmovups	zmmword ptr [rdx], zmm15
-	vmovups	zmmword ptr [rdx + 64], zmm14
-	vmovups	zmmword ptr [rdx + 128], zmm13
-	vmovups	zmmword ptr [rdx + 192], zmm12
-	vmovups	zmmword ptr [rdx + 256], zmm11
-	vmovups	zmmword ptr [rdx + 320], zmm10
-	vmovups	zmmword ptr [rdx + 384], zmm9
-	vmovups	zmmword ptr [rdx + 448], zmm8
-	vmovups	zmmword ptr [rdx + 512], zmm7
-	vmovups	zmmword ptr [rdx + 576], zmm6
-	vmovups	zmmword ptr [rdx + 640], zmm5
-	vmovups	zmmword ptr [rdx + 704], zmm4
-	vmovups	zmmword ptr [rdx + 768], zmm3
-	vmovups	zmmword ptr [rdx + 832], zmm2
-	vmovups	zmmword ptr [rdx + 896], zmm1
-	vmovups	zmmword ptr [rdx + 960], zmm0
+  add  rdx, r15
+  vmovups  zmmword ptr [rdx], zmm15
+  vmovups  zmmword ptr [rdx + 64], zmm14
+  vmovups  zmmword ptr [rdx + 128], zmm13
+  vmovups  zmmword ptr [rdx + 192], zmm12
+  vmovups  zmmword ptr [rdx + 256], zmm11
+  vmovups  zmmword ptr [rdx + 320], zmm10
+  vmovups  zmmword ptr [rdx + 384], zmm9
+  vmovups  zmmword ptr [rdx + 448], zmm8
+  vmovups  zmmword ptr [rdx + 512], zmm7
+  vmovups  zmmword ptr [rdx + 576], zmm6
+  vmovups  zmmword ptr [rdx + 640], zmm5
+  vmovups  zmmword ptr [rdx + 704], zmm4
+  vmovups  zmmword ptr [rdx + 768], zmm3
+  vmovups  zmmword ptr [rdx + 832], zmm2
+  vmovups  zmmword ptr [rdx + 896], zmm1
+  vmovups  zmmword ptr [rdx + 960], zmm0
 .LBB3_9:
-	add	rax, rdi
-	add	r8, rsi
-	cmp	rax, r14
-	jge	.LBB3_10
+  add  rax, rdi
+  add  r8, rsi
+  cmp  rax, r14
+  jge  .LBB3_10
 .LBB3_4:
-	.loc	1 0 1
-	test	r11, r11
-	.loc	1 1 1
-	je	.LBB3_9
-	.loc	1 0 1
-	mov	rcx, qword ptr [rbp - 128]
-	.loc	1 1 1
-	mov	rdx, rax
-	shl	rdx, 10
-	prefetchw	byte ptr [r15 + rdx]
-	prefetcht0	byte ptr [r13]
-	imul	rcx, rax
-	add	rcx, qword ptr [rbp - 120]
-	shl	rcx, 5
-	sar	rcx, 3
-	prefetcht0	byte ptr [r9 + rcx]
-	prefetcht0	byte ptr [r13]
-	prefetcht0	byte ptr [r9 + rcx]
-	vmovups	zmm15, zmmword ptr [r15 + rdx]
-	vmovups	zmm14, zmmword ptr [r15 + rdx + 64]
-	vmovups	zmm13, zmmword ptr [r15 + rdx + 128]
-	vmovups	zmm12, zmmword ptr [r15 + rdx + 192]
-	vmovups	zmm11, zmmword ptr [r15 + rdx + 256]
-	vmovups	zmm10, zmmword ptr [r15 + rdx + 320]
-	vmovups	zmm9, zmmword ptr [r15 + rdx + 384]
-	vmovups	zmm8, zmmword ptr [r15 + rdx + 448]
-	vmovups	zmm7, zmmword ptr [r15 + rdx + 512]
-	vmovups	zmm6, zmmword ptr [r15 + rdx + 576]
-	vmovups	zmm5, zmmword ptr [r15 + rdx + 640]
-	vmovups	zmm4, zmmword ptr [r15 + rdx + 704]
-	vmovups	zmm3, zmmword ptr [r15 + rdx + 768]
-	vmovups	zmm2, zmmword ptr [r15 + rdx + 832]
-	vmovups	zmm1, zmmword ptr [r15 + rdx + 896]
-	vmovups	zmm0, zmmword ptr [r15 + rdx + 960]
-	test	r11, r11
-	jle	.LBB3_8
-	.loc	1 0 1
-	lea	rcx, [8*r8]
-	mov	r12, r9
-	mov	rbx, r11
-	sar	rcx, 3
-	add	rcx, 512
-	.p2align	4, 0x90
+  .loc  1 0 1
+  test  r11, r11
+  .loc  1 1 1
+  je  .LBB3_9
+  .loc  1 0 1
+  mov  rcx, qword ptr [rbp - 128]
+  .loc  1 1 1
+  mov  rdx, rax
+  shl  rdx, 10
+  prefetchw  byte ptr [r15 + rdx]
+  prefetcht0  byte ptr [r13]
+  imul  rcx, rax
+  add  rcx, qword ptr [rbp - 120]
+  shl  rcx, 5
+  sar  rcx, 3
+  prefetcht0  byte ptr [r9 + rcx]
+  prefetcht0  byte ptr [r13]
+  prefetcht0  byte ptr [r9 + rcx]
+  vmovups  zmm15, zmmword ptr [r15 + rdx]
+  vmovups  zmm14, zmmword ptr [r15 + rdx + 64]
+  vmovups  zmm13, zmmword ptr [r15 + rdx + 128]
+  vmovups  zmm12, zmmword ptr [r15 + rdx + 192]
+  vmovups  zmm11, zmmword ptr [r15 + rdx + 256]
+  vmovups  zmm10, zmmword ptr [r15 + rdx + 320]
+  vmovups  zmm9, zmmword ptr [r15 + rdx + 384]
+  vmovups  zmm8, zmmword ptr [r15 + rdx + 448]
+  vmovups  zmm7, zmmword ptr [r15 + rdx + 512]
+  vmovups  zmm6, zmmword ptr [r15 + rdx + 576]
+  vmovups  zmm5, zmmword ptr [r15 + rdx + 640]
+  vmovups  zmm4, zmmword ptr [r15 + rdx + 704]
+  vmovups  zmm3, zmmword ptr [r15 + rdx + 768]
+  vmovups  zmm2, zmmword ptr [r15 + rdx + 832]
+  vmovups  zmm1, zmmword ptr [r15 + rdx + 896]
+  vmovups  zmm0, zmmword ptr [r15 + rdx + 960]
+  test  r11, r11
+  jle  .LBB3_8
+  .loc  1 0 1
+  lea  rcx, [8*r8]
+  mov  r12, r9
+  mov  rbx, r11
+  sar  rcx, 3
+  add  rcx, 512
+  .p2align  4, 0x90
 .LBB3_7:
-	.loc	1 1 1
-	vmovups	zmm16, zmmword ptr [r12 + rcx - 512]
-	prefetcht0	byte ptr [r12 + rcx]
-	vfmadd231ps	zmm15, zmm16, dword ptr [r12 + r10]{1to16}
-	vfmadd231ps	zmm14, zmm16, dword ptr [r12 + r10 + 4]{1to16}
-	vfmadd231ps	zmm13, zmm16, dword ptr [r12 + r10 + 8]{1to16}
-	vfmadd231ps	zmm12, zmm16, dword ptr [r12 + r10 + 12]{1to16}
-	vfmadd231ps	zmm11, zmm16, dword ptr [r12 + r10 + 16]{1to16}
-	vfmadd231ps	zmm10, zmm16, dword ptr [r12 + r10 + 20]{1to16}
-	vfmadd231ps	zmm9, zmm16, dword ptr [r12 + r10 + 24]{1to16}
-	vfmadd231ps	zmm8, zmm16, dword ptr [r12 + r10 + 28]{1to16}
-	vfmadd231ps	zmm7, zmm16, dword ptr [r12 + r10 + 32]{1to16}
-	vfmadd231ps	zmm6, zmm16, dword ptr [r12 + r10 + 36]{1to16}
-	vfmadd231ps	zmm5, zmm16, dword ptr [r12 + r10 + 40]{1to16}
-	vfmadd231ps	zmm4, zmm16, dword ptr [r12 + r10 + 44]{1to16}
-	vfmadd231ps	zmm3, zmm16, dword ptr [r12 + r10 + 48]{1to16}
-	vfmadd231ps	zmm2, zmm16, dword ptr [r12 + r10 + 52]{1to16}
-	vfmadd231ps	zmm1, zmm16, dword ptr [r12 + r10 + 56]{1to16}
-	vfmadd231ps	zmm0, zmm16, dword ptr [r12 + r10 + 60]{1to16}
-	prefetcht0	byte ptr [r12 + r10 + 512]
-	add	r12, 64
-	dec	rbx
-	jne	.LBB3_7
-	jmp	.LBB3_8
+  .loc  1 1 1
+  vmovups  zmm16, zmmword ptr [r12 + rcx - 512]
+  prefetcht0  byte ptr [r12 + rcx]
+  vfmadd231ps  zmm15, zmm16, dword ptr [r12 + r10]{1to16}
+  vfmadd231ps  zmm14, zmm16, dword ptr [r12 + r10 + 4]{1to16}
+  vfmadd231ps  zmm13, zmm16, dword ptr [r12 + r10 + 8]{1to16}
+  vfmadd231ps  zmm12, zmm16, dword ptr [r12 + r10 + 12]{1to16}
+  vfmadd231ps  zmm11, zmm16, dword ptr [r12 + r10 + 16]{1to16}
+  vfmadd231ps  zmm10, zmm16, dword ptr [r12 + r10 + 20]{1to16}
+  vfmadd231ps  zmm9, zmm16, dword ptr [r12 + r10 + 24]{1to16}
+  vfmadd231ps  zmm8, zmm16, dword ptr [r12 + r10 + 28]{1to16}
+  vfmadd231ps  zmm7, zmm16, dword ptr [r12 + r10 + 32]{1to16}
+  vfmadd231ps  zmm6, zmm16, dword ptr [r12 + r10 + 36]{1to16}
+  vfmadd231ps  zmm5, zmm16, dword ptr [r12 + r10 + 40]{1to16}
+  vfmadd231ps  zmm4, zmm16, dword ptr [r12 + r10 + 44]{1to16}
+  vfmadd231ps  zmm3, zmm16, dword ptr [r12 + r10 + 48]{1to16}
+  vfmadd231ps  zmm2, zmm16, dword ptr [r12 + r10 + 52]{1to16}
+  vfmadd231ps  zmm1, zmm16, dword ptr [r12 + r10 + 56]{1to16}
+  vfmadd231ps  zmm0, zmm16, dword ptr [r12 + r10 + 60]{1to16}
+  prefetcht0  byte ptr [r12 + r10 + 512]
+  add  r12, 64
+  dec  rbx
+  jne  .LBB3_7
+  jmp  .LBB3_8
 .LBB3_11:
-	xor	eax, eax
-	.loc	1 1 1 epilogue_begin
-	pop	rbx
-	pop	r12
-	pop	r13
-	pop	r14
-	pop	r15
-	pop	rbp
-	.cfi_def_cfa rsp, 8
-	vzeroupper
-	ret
+  xor  eax, eax
+  .loc  1 1 1 epilogue_begin
+  pop  rbx
+  pop  r12
+  pop  r13
+  pop  r14
+  pop  r15
+  pop  rbp
+  .cfi_def_cfa rsp, 8
+  vzeroupper
+  ret
 .Ltmp7:
 .Lfunc_end3:
-	.size	matmul_dynamic_dispatch_3_mmt4d_DxDxDx16x16x1_f32, .Lfunc_end3-matmul_dynamic_dispatch_3_mmt4d_DxDxDx16x16x1_f32
-	.cfi_endproc
+  .size  matmul_dynamic_dispatch_3_mmt4d_DxDxDx16x16x1_f32, .Lfunc_end3-matmul_dynamic_dispatch_3_mmt4d_DxDxDx16x16x1_f32
+  .cfi_endproc
 ```
