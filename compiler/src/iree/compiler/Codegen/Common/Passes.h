@@ -147,6 +147,10 @@ createFoldAffineMinInDistributedLoopsPass();
 /// values.
 std::unique_ptr<OperationPass<>> createFoldTensorExtractOpPass();
 
+/// Pass to fold vector.transpose/broadcast ops into nearby vector transfers.
+std::unique_ptr<InterfacePass<FunctionOpInterface>>
+createFoldVectorOpsIntoVectorTransfersPass();
+
 /// An ad-hoc pass to canonicalize selected loop carried dependencies on
 /// scf.for.
 std::unique_ptr<InterfacePass<FunctionOpInterface>>
