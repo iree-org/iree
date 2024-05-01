@@ -4,6 +4,12 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+unset(ADDITIONAL_TEST_ARGS)
+if(ANDROID)
+  # Disable this test due to flaky failures on Google Pixel 6 Pro.
+  set(ADDITIONAL_TEST_ARGS "--gtest_filter=-*WaitForFiniteTime*")
+endif()
+
 iree_hal_cts_test_suite(
   DRIVER_NAME
     vulkan
@@ -21,4 +27,6 @@ iree_hal_cts_test_suite(
     "semaphore_submission"  # SubmitWithWait hangs (requires async)
   LABELS
     driver=vulkan
+  ARGS
+    ${ADDITIONAL_TEST_ARGS}
 )
