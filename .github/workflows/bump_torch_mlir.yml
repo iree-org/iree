@@ -55,8 +55,6 @@ jobs:
           fi
           TORCH_MLIR_COMMIT=$(git rev-parse HEAD)
           cd ../..
-          git add third_party/torch-mlir
-          git commit -m "Bump torch-mlir submodule to $TORCH_MLIR_COMMIT"
           echo "TORCH_MLIR_COMMIT=$TORCH_MLIR_COMMIT" >> $GITHUB_OUTPUT
 
       - name: Create Pull Request
