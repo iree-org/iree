@@ -988,7 +988,7 @@ std::optional<int> TargetAttr::getCUDAComputeCapability() const {
   return version.getZExtValue();
 }
 
-bool TargetAttr::supportTF32InputMMAOps() const {
+bool TargetAttr::supportsTF32InputMMAOps() const {
   // TODO: scan the list of MMA ops to decude after plumbing through support
   // for NVIDIA TensorCore MMA ops.
   if (auto cc = getCUDAComputeCapability())
@@ -996,7 +996,7 @@ bool TargetAttr::supportTF32InputMMAOps() const {
   return false;
 }
 
-bool TargetAttr::supportSyncMMAOps() const {
+bool TargetAttr::supportsSyncMMAOps() const {
   if (auto cc = getCUDAComputeCapability())
     return cc >= 80;
   return false;

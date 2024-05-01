@@ -157,7 +157,7 @@ static bool supportsTensorCore(IREE::GPU::TargetAttr target,
                                linalg::LinalgOp op) {
   // Limit tensor core pipeline to matmul as not all combinations of transpose
   // are supported upstream.
-  if (!target.supportSyncMMAOps())
+  if (!target.supportsSyncMMAOps())
     return false;
   if (!(isa<linalg::MatmulOp>(op) || isa<linalg::BatchMatmulOp>(op))) {
     assert(linalg::isaContractionOpInterface(op));
@@ -1016,9 +1016,9 @@ setTransformDialectConfig(IREE::GPU::TargetAttr target,
 
   // TODO: unify the target informations into one structure.
   iree_compiler::gpu::GPUModel gpuModel;
-  gpuModel.hasWarpShuffle = target.supportSubgroupShuffle();
-  gpuModel.hasTF32TensorCore = target.supportTF32InputMMAOps();
-  gpuModel.hasMmaSync = target.supportSyncMMAOps();
+  gpuModel.hasWarpShuffle = target.supportsSubgroupShuffle();
+  gpuModel.hasTF32TensorCore = target.supportsTF32InputMMAOps();
+  gpuModel.hasMmaSync = target.supportsSyncMMAOps();
 
   // Populates a subset of the fragment combinations supported in MLIR lowerings
   // to NVVM (which is itself a subset of what LLVM supports) based on what the
@@ -1037,7 +1037,7 @@ setTransformDialectConfig(IREE::GPU::TargetAttr target,
       /*aType=*/f16Type, /*bType=*/f16Type, /*cType=*/f16Type};
   gpuModel.supportedWMMAConfigs = {f16f32AccConfig, f16f16AccConfig};
 
-  if (target.supportTF32InputMMAOps()) {
+  if (target.supportsTF32InputMMAOps()) {
     iree_compiler::gpu::MMAConfig tf32WmmaConfig = {
         /*m=*/16,          /*n=*/16,          /*k=*/8,
         /*aType=*/f32Type, /*bType=*/f32Type, /*cType=*/f32Type};
@@ -1099,7 +1099,7 @@ static LogicalResult
 setWarpReductionConfig(IREE::GPU::TargetAttr target,
                        mlir::FunctionOpInterface entryPoint,
                        linalg::LinalgOp op) {
-  if (!target.supportSubgroupShuffle())
+  if (!target.supportsSubgroupShuffle())
     return failure();
 
   SmallVector<unsigned> parallelDims;
@@ -1386,7 +1386,7 @@ setArgmaxUkernelConfig(IREE::GPU::TargetAttr target,
     }
   }
 
-  if (!target.supportSubgroupShuffle())
+  if (!target.supportsSubgroupShuffle())
     return failure();
 
   if (failed(isArgmaxOp(op)))

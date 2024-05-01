@@ -7,7 +7,7 @@
 // GFX942-SAME:         subgroup =  shuffle|arithmetic, dot =  dp4xi8toi32,
 // GFX942-SAME:         mma = [<MFMA_F16_16x16x16_F32>, <MFMA_F16_32x32x8_F32>],
 // GFX942-SAME:         subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
-// GFX942-SAME:         max_thread_size = 1024, max_workgroup_memory_bytes = 65536>,
+// GFX942-SAME:         max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536>,
 // GFX942-SAME: chip = <core_count = 304>>
 
 // GFX940: target = #iree_gpu.target<arch = "gfx940",

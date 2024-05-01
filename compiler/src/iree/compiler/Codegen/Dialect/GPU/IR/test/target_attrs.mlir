@@ -10,7 +10,7 @@ func.func @test_target_core() attributes {
   // CHECK-SAME: mma = [<MFMA_F16_16x16x16_F32>, <MFMA_F16_32x32x8_F32>],
   // CHECK-SAME: subgroup_size_choices = [32, 64],
   // CHECK-SAME: max_workgroup_sizes = [1024, 1024, 1024],
-  // CHECK-SAME: max_thread_size = 1024,
+  // CHECK-SAME: max_thread_count_per_workgroup = 1024,
   // CHECK-SAME: max_workgroup_memory_bytes = 65536>
   core = #iree_gpu.target_core<
     compute = fp16|fp32|int8, storage = b16|b32,
@@ -18,7 +18,7 @@ func.func @test_target_core() attributes {
     mma = [<MFMA_F16_16x16x16_F32>, <MFMA_F16_32x32x8_F32>],
     subgroup_size_choices = [32, 64],
     max_workgroup_sizes = [1024, 1024, 1024],
-    max_thread_size = 1024,
+    max_thread_count_per_workgroup = 1024,
     max_workgroup_memory_bytes = 65536
   >
 } { return }
@@ -36,7 +36,7 @@ func.func @test_target_core_none() attributes {
     mma = [],
     subgroup_size_choices = [32],
     max_workgroup_sizes = [1024, 1024, 1024],
-    max_thread_size = 1024,
+    max_thread_count_per_workgroup = 1024,
     max_workgroup_memory_bytes = 65536
   >
 } { return }
@@ -63,7 +63,7 @@ func.func @test_target() attributes {
       mma = [<MFMA_F16_16x16x16_F32>, <MFMA_F16_32x32x8_F32>],
       subgroup_size_choices = [32, 64],
       max_workgroup_sizes = [1024, 1024, 1024],
-      max_thread_size = 1024,
+      max_thread_count_per_workgroup = 1024,
       max_workgroup_memory_bytes = 65536>,
     chip = <core_count = 304>
   >

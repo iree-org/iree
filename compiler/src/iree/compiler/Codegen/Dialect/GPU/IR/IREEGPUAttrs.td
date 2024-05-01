@@ -338,7 +338,7 @@ def IREEGPU_TargetCoreAttr : AttrDef<IREEGPU_Dialect, "TargetCore"> {
     // The maximal number of threads per X/Y/Z dimension in one workgroup.
     "DenseI32ArrayAttr":$max_workgroup_sizes,
     // The maximal number of threads we can have in one workgroup.
-    "uint32_t":$max_thread_size,
+    "uint32_t":$max_thread_count_per_workgroup,
     // The maximal number of shared memory bytes we can allocate per workgroup.
     "uint32_t":$max_workgroup_memory_bytes
   );
@@ -406,7 +406,7 @@ def IREEGPU_TargetAttr : AttrDef<IREEGPU_Dialect, "Target"> {
       return getCore().getSubgroupSizeChoices().asArrayRef().front();
     }
 
-    bool supportSubgroupShuffle() const {
+    bool supportsSubgroupShuffle() const {
       return bitEnumContainsAll(getCore().getSubgroup().getValue(),
                                 SubgroupOps::Shuffle);
     }
@@ -414,9 +414,9 @@ def IREEGPU_TargetAttr : AttrDef<IREEGPU_Dialect, "Target"> {
     std::optional<int> getCUDAComputeCapability() const;
     // Returns true if this target supports TensoreCore MMA ops with TF32
     // input types.
-    bool supportTF32InputMMAOps() const;
+    bool supportsTF32InputMMAOps() const;
     // Returns true if this target supports TensorCore synchronized MMA ops.
-    bool supportSyncMMAOps() const;
+    bool supportsSyncMMAOps() const;
   }];
 }
 

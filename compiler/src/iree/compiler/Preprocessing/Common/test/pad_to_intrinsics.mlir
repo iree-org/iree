@@ -8,7 +8,7 @@
   subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
   mma = [<MFMA_F16_16x16x16_F32>, <MFMA_F16_32x32x8_F32>],
   subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
-  max_thread_size = 1024, max_workgroup_memory_bytes = 65536>>
+  max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536>>
 #rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target, ukernels = "none"}>
 
 // CHECK-LABEL: func.func @main0(
@@ -48,7 +48,7 @@ func.func @main0(%arg0: tensor<2x130x130x4xf16>, %arg1: tensor<3x3x4x320xf16>, %
   subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
   mma = [<MFMA_F16_16x16x16_F32>, <MFMA_F16_32x32x8_F32>],
   subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
-  max_thread_size = 1024, max_workgroup_memory_bytes = 65536>>
+  max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536>>
 #rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target, ukernels = "none"}>
 
 // CHECK-LABEL: func.func @main1(
@@ -86,7 +86,7 @@ func.func @main1(%arg0: tensor<2x130x130x320xf16>, %arg1: tensor<3x3x320x4xf16>,
   subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
   mma = [<MFMA_F16_32x32x8_F32>],
   subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
-  max_thread_size = 1024, max_workgroup_memory_bytes = 65536>>
+  max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536>>
 #rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target, ukernels = "none"}>
 
 // CHECK-LABEL: func.func @main2(
@@ -119,7 +119,7 @@ func.func @main2(%arg0: tensor<2x130x130x4xf16>, %arg1: tensor<3x3x4x320xf16>, %
   subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
   mma = [<WMMA_F16_16x16x16_F32>],
   subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
-  max_thread_size = 1024, max_workgroup_memory_bytes = 65536>>
+  max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536>>
 #rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target, ukernels = "none"}>
 
 //       CHECK: func.func @matmul_static(
@@ -160,7 +160,7 @@ func.func @matmul_static(%arg0 : tensor<10x20xf16>, %arg1 : tensor<20x30xf16>, %
   subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
   mma = [<WMMA_F16_16x16x16_F32>],
   subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
-  max_thread_size = 1024, max_workgroup_memory_bytes = 65536>>
+  max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536>>
 #rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target, ukernels = "none"}>
 
 //   CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (-s0 + (s0 ceildiv 16) * 16)>
@@ -206,7 +206,7 @@ func.func @mmtb_dynamic_k_n(%arg0 : tensor<10x?xf16>, %arg1 : tensor<?x?xf16>, %
   subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
   mma = [<WMMA_F16_16x16x16_F32>],
   subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
-  max_thread_size = 1024, max_workgroup_memory_bytes = 65536>>
+  max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536>>
 #rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target, ukernels = "none"}>
 
 //   CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (-s0 + (s0 ceildiv 16) * 16)>
@@ -258,7 +258,7 @@ func.func @bmm_dynamic_m_k(%arg0: tensor<32x?x?xf16>, %arg1: tensor<32x?x128xf16
   subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
   mma = [<WMMA_F16_16x16x16_F32>],
   subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
-  max_thread_size = 1024, max_workgroup_memory_bytes = 65536>>
+  max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536>>
 #rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target, ukernels = "none"}>
 
 //   CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (-s0 + (s0 ceildiv 16) * 16)>

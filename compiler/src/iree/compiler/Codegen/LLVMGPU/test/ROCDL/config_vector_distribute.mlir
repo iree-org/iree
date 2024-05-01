@@ -76,7 +76,7 @@ module {
   subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
   mma = [],
   subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
-  max_thread_size = 1024, max_workgroup_memory_bytes = 65536>>
+  max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536>>
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target}>
 module {
   func.func @matmul_256x256x256() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {

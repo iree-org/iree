@@ -64,7 +64,7 @@ static LogicalResult
 setWarpReductionConfig(IREE::GPU::TargetAttr target,
                        mlir::FunctionOpInterface entryPoint,
                        linalg::LinalgOp op) {
-  if (!target.supportSubgroupShuffle())
+  if (!target.supportsSubgroupShuffle())
     return failure();
 
   SmallVector<unsigned> parallelDims;
