@@ -978,8 +978,6 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
 //===----------------------------------------------------------------------===//
 
 std::optional<int> TargetAttr::getCUDAComputeCapability() const {
-  if (getApi() != TargetAPI::CUDA)
-    return false;
   StringRef arch = getArch();
   if (!arch.starts_with("sm_"))
     return false;

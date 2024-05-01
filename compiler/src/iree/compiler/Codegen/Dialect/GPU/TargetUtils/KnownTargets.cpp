@@ -77,8 +77,8 @@ const DotProductOps allDotProductOps = DotProductOps::DP4xI8ToI32;
 #define ARRAY_SIZE(array) (sizeof(array) / sizeof(array[0]))
 
 // Creates the corresponding TargetAttr from the given target |details|.
-TargetAttr createTargetAttr(const TargetDetails &details, TargetAPI api,
-                            StringRef arch, MLIRContext *context) {
+TargetAttr createTargetAttr(const TargetDetails &details, StringRef arch,
+                            MLIRContext *context) {
   const CoreDetails *core = details.core;
 
   SmallVector<MMAAttr, 8> mmaAttrs;
@@ -105,7 +105,7 @@ TargetAttr createTargetAttr(const TargetDetails &details, TargetAPI api,
   if (details.chip)
     targetChip = TargetChipAttr::get(context, details.chip->coreCount);
 
-  return TargetAttr::get(context, api, arch, targetCore, targetChip);
+  return TargetAttr::get(context, arch, targetCore, targetChip);
 }
 
 //===----------------------------------------------------------------------===//
@@ -338,8 +338,7 @@ StringRef normalizeNVIDIAGPUTarget(StringRef target) {
 
 TargetAttr getHIPTargetDetails(StringRef target, MLIRContext *context) {
   if (auto details = getAMDGPUTargetDetails(target)) {
-    return createTargetAttr(*details, TargetAPI::HIP,
-                            normalizeAMDGPUTarget(target), context);
+    return createTargetAttr(*details, normalizeAMDGPUTarget(target), context);
   }
   return nullptr;
 }
@@ -350,8 +349,8 @@ StringRef normalizeHIPTarget(StringRef target) {
 
 TargetAttr getCUDATargetDetails(StringRef target, MLIRContext *context) {
   if (auto details = getNVIDIAGPUTargetDetails(target))
-    return createTargetAttr(*details, TargetAPI::CUDA,
-                            normalizeNVIDIAGPUTarget(target), context);
+    return createTargetAttr(*details, normalizeNVIDIAGPUTarget(target),
+                            context);
   return nullptr;
 }
 
@@ -359,29 +358,12 @@ StringRef normalizeCUDATarget(StringRef target) {
   return normalizeNVIDIAGPUTarget(target);
 }
 
-bool isKnownAbbrTarget(AbbrTargetAttr abbrTarget) {
-  switch (abbrTarget.getApi()) {
-  case TargetAPI::CUDA:
-    return getNVIDIAGPUTargetDetails(abbrTarget.getChip()).has_value();
-  case TargetAPI::HIP:
-    return getAMDGPUTargetDetails(abbrTarget.getChip()).has_value();
-  default:
-    break;
-  }
-  return false;
-}
-
-TargetAttr getFullTarget(AbbrTargetAttr abbrTarget) {
+TargetAttr getFullTarget(StringRef targetAPI, AbbrTargetAttr abbrTarget) {
   MLIRContext *context = abbrTarget.getContext();
-  switch (abbrTarget.getApi()) {
-  case TargetAPI::CUDA:
-    return getCUDATargetDetails(abbrTarget.getChip(), context);
-  case TargetAPI::HIP:
-    return getHIPTargetDetails(abbrTarget.getChip(), context);
-  default:
-    break;
-  }
-  return nullptr;
+  return llvm::StringSwitch<TargetAttr>(targetAPI)
+      .Case("cuda", getCUDATargetDetails(abbrTarget.getChip(), context))
+      .Case("rocm", getHIPTargetDetails(abbrTarget.getChip(), context))
+      .Default(nullptr);
 }
 
 } // namespace mlir::iree_compiler::IREE::GPU

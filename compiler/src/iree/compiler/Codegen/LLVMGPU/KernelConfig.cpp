@@ -1085,6 +1085,15 @@ static bool isMatvecLike(linalg::LinalgOp linalgOp) {
 // Warp Reduction Pipeline Configuration
 //====---------------------------------------------------------------------===//
 
+bool isROCmBackend(mlir::FunctionOpInterface entryPoint) {
+  if (auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPoint)) {
+    if (auto backend = targetAttr.getBackend()) {
+      return backend.getValue() == "rocm";
+    }
+  }
+  return false;
+}
+
 /// Set the configuration for reductions that can be mapped to warp reductions.
 static LogicalResult
 setWarpReductionConfig(IREE::GPU::TargetAttr target,
@@ -1255,7 +1264,7 @@ setWarpReductionConfig(IREE::GPU::TargetAttr target,
   //
   // TODO: This is enabled for matvec on ROCm for now. We should
   // validate this strategy and extend to more linalg generics and to CUDA.
-  if (target.getApi() == IREE::GPU::TargetAPI::HIP &&
+  if (isROCmBackend(entryPoint) &&
       llvm::none_of(bounds, ShapedType::isDynamic) && isMatvecLike(op)) {
     int64_t lastParallelBound = bounds[parallelDims.back()];
     int64_t numParallelReductions = 1;

@@ -378,26 +378,10 @@ def IREEGPU_TargetChipAttr : AttrDef<IREEGPU_Dialect, "TargetChip"> {
 // GPU Target Attributes
 //===----------------------------------------------------------------------===//
 
-def IREEGPU_TAPI_CUDA    : I32EnumAttrCase<"CUDA",    0, "cuda">;
-def IREEGPU_TAPI_DirectX : I32EnumAttrCase<"DirectX", 1, "directx">;
-def IREEGPU_TAPI_HIP     : I32EnumAttrCase<"HIP",     2, "hip">;
-def IREEGPU_TAPI_Metal   : I32EnumAttrCase<"Metal",   3, "metal">;
-def IREEGPU_TAPI_Vulkan  : I32EnumAttrCase<"Vulkan",  4, "vulkan">;
-def IREEGPU_TAPI_WebGPU  : I32EnumAttrCase<"WebGPU",  5, "webgpu">;
-
-def IREEGPU_TargetAPI : I32EnumAttr<
-  "TargetAPI", "Supported target APIs",
-  [IREEGPU_TAPI_CUDA, IREEGPU_TAPI_DirectX, IREEGPU_TAPI_HIP,
-   IREEGPU_TAPI_Metal, IREEGPU_TAPI_Vulkan, IREEGPU_TAPI_WebGPU]> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
-  let genSpecializedAttr = 0;
-}
-
 def IREEGPU_TargetAttr : AttrDef<IREEGPU_Dialect, "Target"> {
   let summary = "Full GPU target attribute";
   let description = [{
     This attributes describes a full GPU target. It contains a few fields:
-    * The target GPU API, e.g., cuda, hip, vulkan
     * The canonical target architecture for compilation, e.g., sm_80 for
       cuda, gfx942 for hip
     * A TargetCoreAttr describing the GPU features and limits in a single
@@ -410,7 +394,6 @@ def IREEGPU_TargetAttr : AttrDef<IREEGPU_Dialect, "Target"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
 
   let parameters = (ins
-    "TargetAPI":$api,
     StringRefParameter<"target architecture">:$arch,
     "TargetCoreAttr":$core,
     OptionalParameter<"TargetChipAttr">:$chip
@@ -441,20 +424,18 @@ def IREEGPU_AbbrTargetAttr : AttrDef<IREEGPU_Dialect, "AbbrTarget"> {
   let summary = "Abbreviate GPU target attribute";
   let description = [{
     This attributes is a shorthand of the full GPU target attribute. It contains
-    two fields--the target API and the target arch/chip/product. The target
-    arch/chip/product must be known to the compiler. This attribute is primarily
-    meant for making IR tests easier.
+    the target arch/chip/product, which must be known to the compiler.
+    This attribute is primarily meant for making IR tests easier.
   }];
 
   let mnemonic = "abbr_target";
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
 
   let parameters = (ins
-    "TargetAPI":$api,
     StringRefParameter<"target architecture/chip/product">:$chip
   );
 
-  let assemblyFormat = "`<` $api `:` $chip `>`";
+  let assemblyFormat = "`<` $chip `>`";
 }
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_GPU_IREEGPUATTRS

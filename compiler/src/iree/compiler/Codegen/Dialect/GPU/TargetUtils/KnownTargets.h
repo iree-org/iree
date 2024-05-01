@@ -34,13 +34,9 @@ TargetAttr getCUDATargetDetails(llvm::StringRef target, MLIRContext *context);
 // if the given |target| is not recognized.
 StringRef normalizeCUDATarget(StringRef target);
 
-// Returns true if the given |abbrTarget| is known and can be translated into a
-// full target.
-bool isKnownAbbrTarget(AbbrTargetAttr abbrTarget);
-
 // Returns the full target of the given |abbrTarget|. Returns null target if
 // unknown.
-TargetAttr getFullTarget(AbbrTargetAttr abbrTarget);
+TargetAttr getFullTarget(StringRef targetAPI, AbbrTargetAttr abbrTarget);
 
 } // namespace mlir::iree_compiler::IREE::GPU
 
