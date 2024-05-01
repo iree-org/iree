@@ -610,7 +610,7 @@ static void limitVectorTileSizes(linalg::LinalgOp op,
 
   SmallVector<int64_t> operandElemBits =
       llvm::map_to_vector(op->getOperandTypes(), [](Type t) -> int64_t {
-        return getElementTypeOrSelf(t).getIntOrFloatBitWidth();
+        return IREE::Util::getTypeBitWidth(getElementTypeOrSelf(t));
       });
 
   // For each operand, we track how big the tile is going to be based on the
