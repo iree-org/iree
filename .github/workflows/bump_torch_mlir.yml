@@ -18,7 +18,7 @@ on:
       bump_target:
         description: 'Commit hash or branch to bump the submodule to'
         required: false
-        default: 'HEAD'
+        default: 'origin/main'
   pull_request:
     branches:
       - main
