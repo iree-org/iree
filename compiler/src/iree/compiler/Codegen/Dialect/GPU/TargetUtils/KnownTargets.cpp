@@ -358,11 +358,11 @@ StringRef normalizeCUDATarget(StringRef target) {
   return normalizeNVIDIAGPUTarget(target);
 }
 
-TargetAttr getFullTarget(StringRef targetAPI, AbbrTargetAttr abbrTarget) {
-  MLIRContext *context = abbrTarget.getContext();
+TargetAttr getFullTarget(StringRef targetAPI, AliasTargetAttr aliasTarget) {
+  MLIRContext *context = aliasTarget.getContext();
   return llvm::StringSwitch<TargetAttr>(targetAPI)
-      .Case("cuda", getCUDATargetDetails(abbrTarget.getChip(), context))
-      .Case("rocm", getHIPTargetDetails(abbrTarget.getChip(), context))
+      .Case("cuda", getCUDATargetDetails(aliasTarget.getChip(), context))
+      .Case("rocm", getHIPTargetDetails(aliasTarget.getChip(), context))
       .Default(nullptr);
 }
 

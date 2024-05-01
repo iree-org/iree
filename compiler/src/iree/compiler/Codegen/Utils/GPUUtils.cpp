@@ -956,7 +956,7 @@ IREE::GPU::TargetAttr getGPUTargetAttr(IREE::HAL::ExecutableTargetAttr target) {
   auto fullAttr = config.getAs<IREE::GPU::TargetAttr>("iree.gpu.target");
   if (!fullAttr) {
     // Check whether this is an abbreviate target for IR testing purposes
-    auto abbrAttr = config.getAs<IREE::GPU::AbbrTargetAttr>("iree.gpu.target");
+    auto abbrAttr = config.getAs<IREE::GPU::AliasTargetAttr>("iree.gpu.target");
     fullAttr = IREE::GPU::getFullTarget(target.getBackend(), abbrAttr);
   }
 

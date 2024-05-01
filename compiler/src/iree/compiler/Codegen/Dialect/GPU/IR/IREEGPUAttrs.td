@@ -420,7 +420,7 @@ def IREEGPU_TargetAttr : AttrDef<IREEGPU_Dialect, "Target"> {
   }];
 }
 
-def IREEGPU_AbbrTargetAttr : AttrDef<IREEGPU_Dialect, "AbbrTarget"> {
+def IREEGPU_AliasTargetAttr : AttrDef<IREEGPU_Dialect, "AliasTarget"> {
   let summary = "Abbreviate GPU target attribute";
   let description = [{
     This attributes is a shorthand of the full GPU target attribute. It contains
