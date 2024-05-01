@@ -13,6 +13,7 @@
 
 #include "iree/compiler/Codegen/Common/GPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -42,16 +43,20 @@ public:
     if (!numDimAttr)
       return failure();
 
-    auto funcOp = forOp->getParentOfType<FunctionOpInterface>();
-    if (!funcOp) {
-      return failure();
+    // Get workgroup sizes if not using gpu.block_dim
+    SmallVector<int64_t> workgroupSize;
+    if (!useBlockDims) {
+      auto funcOp = forOp->getParentOfType<FunctionOpInterface>();
+      if (!funcOp) {
+        return failure();
+      }
+      std::optional<SmallVector<int64_t>> maybeWorkgroupSize =
+          getWorkgroupSize(funcOp);
+      if (!maybeWorkgroupSize) {
+        return failure();
+      }
+      workgroupSize = maybeWorkgroupSize.value();
     }
-    std::optional<SmallVector<int64_t>> maybeWorkgroupSize =
-        getWorkgroupSize(funcOp);
-    if (!maybeWorkgroupSize) {
-      return failure();
-    }
-    auto workgroupSize = maybeWorkgroupSize.value();
 
     Location loc = forOp.getLoc();
     auto indexType = rewriter.getIndexType();
