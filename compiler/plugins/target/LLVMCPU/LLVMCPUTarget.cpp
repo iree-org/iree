@@ -212,15 +212,15 @@ public:
     // clang-format on
   }
 
-  void buildConfigurationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
-                                      OpPassManager &passManager) override {
+  void
+  buildConfigurationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
+                                 OpPassManager &passManager) override {
     buildLLVMCPUCodegenConfigurationPassPipeline(passManager);
   }
 
-  void buildTranslationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
+  void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                     OpPassManager &passManager) override {
-    auto target = variantOp.getTarget();
-    bool enableAArch64SME = isAArch64(target) && hasSMEFeature(target);
+    bool enableAArch64SME = isAArch64(targetAttr) && hasSMEFeature(targetAttr);
     buildLLVMCPUCodegenPassPipeline(passManager, enableAArch64SME);
   }
 

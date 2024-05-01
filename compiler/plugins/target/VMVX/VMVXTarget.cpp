@@ -91,18 +91,19 @@ public:
     return vmOptions;
   }
 
-  void buildConfigurationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
-                                      OpPassManager &passManager) override {
+  void
+  buildConfigurationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
+                                 OpPassManager &passManager) override {
     IREE::VMVX::buildVMVXConfigurationPassPipeline(passManager);
   }
 
-  void buildTranslationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
+  void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                     OpPassManager &passManager) override {
     IREE::VMVX::buildVMVXTransformPassPipeline(passManager);
 
     OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
 
-    auto vmOptions = getTargetOptions(variantOp.getTargetAttr());
+    auto vmOptions = getTargetOptions(targetAttr);
     IREE::VM::buildVMTransformPassPipeline(nestedModulePM, vmOptions);
   }
 
@@ -215,12 +216,13 @@ public:
         .insert<IREE::Codegen::IREECodegenDialect, IREE::VMVX::VMVXDialect>();
   }
 
-  void buildConfigurationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
-                                      OpPassManager &passManager) override {
+  void
+  buildConfigurationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
+                                 OpPassManager &passManager) override {
     IREE::VMVX::buildVMVXConfigurationPassPipeline(passManager);
   }
 
-  void buildTranslationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
+  void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                     OpPassManager &passManager) override {
     IREE::VMVX::buildVMVXTransformPassPipeline(passManager);
   }
