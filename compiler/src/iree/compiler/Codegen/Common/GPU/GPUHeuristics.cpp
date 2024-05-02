@@ -122,8 +122,8 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
       continue; // Cannot use this intrinsic for misaligned cases
     }
 
-    int64_t mTotalTileCount = problem.mSize / intrinsic.mSize;
-    int64_t nTotalTileCount = problem.nSize / intrinsic.nSize;
+    int64_t mTotalTileCount = llvm::divideCeil(problem.mSize, intrinsic.mSize);
+    int64_t nTotalTileCount = llvm::divideCeil(problem.nSize, intrinsic.nSize);
 
     int64_t remainingWarps = seeds.bestSubgroupCountPerWorkgroup;
     int64_t remainingTiles = seeds.bestMNTileCountPerSubgroup;
@@ -179,7 +179,8 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
       mTileCount = mGCD.getSExtValue();
     }
 
-    const uint64_t kTotalTileCount = problem.kSize / intrinsic.kSize;
+    const uint64_t kTotalTileCount =
+        llvm::divideCeil(problem.kSize, intrinsic.kSize);
     APInt kGCD = GreatestCommonDivisor(
         APInt(64, kTotalTileCount), APInt(64, seeds.bestKTileCountPerSubgroup));
     int64_t kTileCount = kGCD.getSExtValue();
