@@ -246,6 +246,8 @@ void PreprocessingOptions::bindOptions(OptionsBinder &binder) {
           "File name of a transform dialect spec to use for preprocessing"),
       llvm::cl::cat(category));
 
+  // @andwar02 - deprecated, use `--iree-preprocessing-pass-pipeline` instead
+  // TODO: Remove once all users have switched
   binder.opt<TransposeMatmulInput>(
       "iree-preprocessing-transpose-matmul", preprocessingTransposeMatmulInput,
       llvm::cl::desc("Convert Linalg matmul ops to transposed variants."),
