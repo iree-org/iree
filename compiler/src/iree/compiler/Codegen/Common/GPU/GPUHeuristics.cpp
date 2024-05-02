@@ -122,6 +122,14 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
       continue; // Cannot use this intrinsic for misaligned cases
     }
 
+    // Cannot use the intrinsic when the tile size is greater than problem size.
+    // Because tiling is a no-op, and we can't infer tiling sizes from IR.
+    if (!mustBeAligned &&
+        (problem.mSize < intrinsic.mSize || problem.nSize < intrinsic.nSize ||
+         problem.kSize < intrinsic.kSize)) {
+      continue;
+    }
+
     int64_t mTotalTileCount = llvm::divideCeil(problem.mSize, intrinsic.mSize);
     int64_t nTotalTileCount = llvm::divideCeil(problem.nSize, intrinsic.nSize);
 
