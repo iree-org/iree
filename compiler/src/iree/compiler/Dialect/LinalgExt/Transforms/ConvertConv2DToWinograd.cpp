@@ -10,10 +10,13 @@
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/WinogradConstants.h"
+#include "iree/compiler/Utils/TransformDialectUtils.h"
 #include "llvm/ADT/SetVector.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Transform/IR/TransformDialect.h"
+#include "mlir/Dialect/Transform/Transforms/TransformInterpreterUtils.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/AffineExpr.h"
@@ -59,7 +62,10 @@ static bool hasValidStridesAndDilations(Operation *op) {
   return true;
 }
 
-static bool isValidConv2d(Operation *op, bool &isNchw) {
+static bool isValidConv2d(Operation *op, bool &isNchw, bool ignoreAnnotations) {
+  if (!ignoreAnnotations && !op->hasAttr("winograd_conv")) {
+    return false;
+  }
   isNchw = isa<linalg::Conv2DNchwFchwOp>(op);
   const bool isNhwc = isa<linalg::Conv2DNhwcHwcfOp>(op);
   if (!(isNchw || isNhwc)) {
@@ -161,12 +167,16 @@ template <typename ConvOp>
 class ConvertConvToWinograd final : public OpRewritePattern<ConvOp> {
 public:
   using OpRewritePattern<ConvOp>::OpRewritePattern;
+  ConvertConvToWinograd<ConvOp>(MLIRContext *context, bool ignoreAnnotations,
+                                PatternBenefit benefit = 1)
+      : OpRewritePattern<ConvOp>(context, benefit),
+        ignoreAnnotations(ignoreAnnotations) {}
 
   LogicalResult matchAndRewrite(ConvOp convOp,
                                 PatternRewriter &rewriter) const override {
 
     bool isNchwFchw;
-    if (!isValidConv2d(convOp, isNchwFchw)) {
+    if (!isValidConv2d(convOp, isNchwFchw, ignoreAnnotations)) {
       return failure();
     }
 
@@ -334,19 +344,63 @@ public:
     rewriter.replaceOp(convOp, winogradOutput);
     return success();
   }
+
+private:
+  bool ignoreAnnotations;
 };
 
 struct ConvertConv2DToWinogradPass
     : ConvertConv2DToWinogradBase<ConvertConv2DToWinogradPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
-        .insert<linalg::LinalgDialect, IREE::LinalgExt::IREELinalgExtDialect>();
+        .insert<linalg::LinalgDialect, IREE::LinalgExt::IREELinalgExtDialect,
+                transform::TransformDialect>();
   }
   void runOnOperation() override {
     MLIRContext *context = &getContext();
+    auto funcOp = getOperation();
+
+    // Apply annotations to convs using transform dialect. If a transform
+    // library is supplied, then only convs with the "winograd_conv" annotation
+    // will be transformed.
+    auto parsedFilePath =
+        parseTransformLibraryFileNameAndEntrySequence(tdLibraryPath);
+    if (failed(parsedFilePath)) {
+      funcOp.emitError() << "Could not parse transform dialect library";
+      return signalPassFailure();
+    }
+    std::optional<std::string> libraryFileName = parsedFilePath->first;
+    std::string entrySequenceName = parsedFilePath->second.has_value()
+                                        ? parsedFilePath->second.value()
+                                        : "__annotate_winograd_convs";
+
+    std::optional<ModuleOp> transformLibrary = std::nullopt;
+    if (libraryFileName.has_value()) {
+      OwningOpRef<ModuleOp> mergedParsedLibraries;
+      if (failed(transform::detail::assembleTransformLibraryFromPaths(
+              context, SmallVector<std::string>{libraryFileName.value()},
+              mergedParsedLibraries))) {
+        return;
+      }
+      transformLibrary = *std::move(mergedParsedLibraries);
+
+      auto runResult = runTransformConfigurationStrategy(
+          funcOp, entrySequenceName, *transformLibrary);
+      if (runResult == StrategyRunResult::NotFound) {
+        funcOp.emitError() << "transform annotation strategy `"
+                           << entrySequenceName << " not found";
+        return signalPassFailure();
+      } else if (runResult == StrategyRunResult::Failed) {
+        funcOp.emitError() << "transform annotation strategy `"
+                           << entrySequenceName << "` failed to apply";
+        return signalPassFailure();
+      }
+    }
+
     RewritePatternSet patterns(&getContext());
     patterns.insert<ConvertConvToWinograd<linalg::Conv2DNhwcHwcfOp>,
-                    ConvertConvToWinograd<linalg::Conv2DNchwFchwOp>>(context);
+                    ConvertConvToWinograd<linalg::Conv2DNchwFchwOp>>(
+        context, /*ignoreAnnotations=*/ignoreAnnotations);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
       return signalPassFailure();
@@ -356,7 +410,8 @@ struct ConvertConv2DToWinogradPass
 
 } // namespace
 
-std::unique_ptr<Pass> createConvertConv2DToWinogradPass() {
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createConvertConv2DToWinogradPass() {
   return std::make_unique<ConvertConv2DToWinogradPass>();
 }
 

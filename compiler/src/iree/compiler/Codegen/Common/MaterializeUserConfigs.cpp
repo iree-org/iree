@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Common/UserConfig.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
+#include "iree/compiler/Utils/TransformDialectUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/iterator_range.h"
@@ -39,33 +40,6 @@ namespace {
 
 static const char kTranslationInfoAttrName[] = "translation_info";
 
-enum StrategyRunResult {
-  Success = 0,
-  NotFound = 1,
-  Failed = 2,
-};
-
-static StrategyRunResult
-runTransformConfigurationStrategy(Operation *payloadRoot,
-                                  StringRef entryPointName,
-                                  ModuleOp &transformLibrary) {
-  /// If we have a symbol, verify the existence of the symbol within the
-  /// transform library.
-  Operation *entryPoint = transform::detail::findTransformEntryPoint(
-      payloadRoot, transformLibrary, entryPointName);
-  if (!entryPoint) {
-    return StrategyRunResult::NotFound;
-  }
-
-  transform::TransformOptions options;
-  if (failed(transform::applyTransformNamedSequence(
-          payloadRoot, entryPoint, transformLibrary,
-          options.enableExpensiveChecks(true)))) {
-    return StrategyRunResult::Failed;
-  }
-  return StrategyRunResult::Success;
-}
-
 struct MaterializeUserConfigsPass
     : public MaterializeUserConfigsBase<MaterializeUserConfigsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -87,53 +61,32 @@ struct MaterializeUserConfigsPass
       //   of
       //      the strategy, the variant needs to be annotated with
       //      "translation_info" = #iree_codegen.translation_info<None>
-      SmallVector<StringRef, 2> parts;
-      llvm::SplitString(
-          llvm::StringRef(clCodegenTransformDialectLibraryFileName), parts,
-          "@");
-      if (parts.size() > 2) {
-        funcOp.emitError()
-            << "Invalid transform library path and sequence name "
-            << clCodegenTransformDialectLibraryFileName;
+
+      auto parsedFilePath = parseTransformLibraryFileNameAndEntrySequence(
+          clCodegenTransformDialectLibraryFileName);
+      if (failed(parsedFilePath)) {
+        funcOp.emitError() << "Could not parse transform dialect library";
         return signalPassFailure();
       }
-      bool hasTransformLibrary = !parts.empty();
-
-      std::string libraryFileName;
-      if (hasTransformLibrary) {
-        if (parts[0].empty()) {
-          funcOp.emitError() << "Cannot specify an empty library path";
-          return signalPassFailure();
-        }
-        libraryFileName = parts[0];
-      }
-
-      std::string entrySequenceName;
-      // Check if the user specified a custom entry point name.
-      if (parts.size() == 2) {
-        if (parts[1].empty()) {
-          funcOp.emitError() << "Cannot specify an empty sequence name";
-          return signalPassFailure();
-        }
-        entrySequenceName = parts[1];
-      } else {
-        entrySequenceName = "__kernel_config";
-      }
+      std::optional<std::string> libraryFileName = parsedFilePath->first;
+      std::string entrySequenceName = parsedFilePath->second.has_value()
+                                          ? parsedFilePath->second.value()
+                                          : "__kernel_config";
 
       LDBG("MaterializeUserConfigsPass on function: " << funcOp);
       std::optional<ModuleOp> transformLibrary = std::nullopt;
-      if (hasTransformLibrary) {
+      if (libraryFileName.has_value()) {
         auto dialect =
             context->getOrLoadDialect<IREE::Codegen::IREECodegenDialect>();
         auto maybeTransformLibrary =
-            dialect->getOrLoadTransformLibraryModule(libraryFileName);
+            dialect->getOrLoadTransformLibraryModule(libraryFileName.value());
         if (failed(maybeTransformLibrary)) {
-          funcOp.emitError()
-              << "failed to load transform library module: " << libraryFileName;
+          funcOp.emitError() << "failed to load transform library module: "
+                             << libraryFileName.value();
           return signalPassFailure();
         }
         transformLibrary = *maybeTransformLibrary;
-        LDBG("--found transform library @" << libraryFileName);
+        LDBG("--found transform library @" << libraryFileName.value());
 
         auto runResult = runTransformConfigurationStrategy(
             funcOp, entrySequenceName, *transformLibrary);

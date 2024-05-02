@@ -62,9 +62,19 @@ def DecomposeWinogradTransform :
 }
 
 def ConvertConv2DToWinograd :
-    Pass<"iree-linalg-ext-convert-conv2d-to-winograd", ""> {
+    InterfacePass<"iree-linalg-ext-convert-conv2d-to-winograd", "mlir::FunctionOpInterface"> {
   let summary = "Convert linalg convolution ops to winograd based implementation";
   let constructor = "mlir::iree_compiler::IREE::LinalgExt::createConvertConv2DToWinogradPass()";
+  let options = [
+    Option<"tdLibraryPath", "td-library-path", "std::string",
+           /*default=*/"",
+           "File path to a module containing a library of transform dialect"
+           "strategies for annotating convs to be transformed.">,
+    Option<"ignoreAnnotations", "ignore-annotations", "bool",
+           /*default=*/"false",
+           "Choose to ignore `winograd_conv` annotations and transform all"
+           "compatible convolutions.">,
+  ];
 }
 
 def TileAndDecomposeAttention :

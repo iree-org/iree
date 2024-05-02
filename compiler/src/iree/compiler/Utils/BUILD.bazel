@@ -27,6 +27,7 @@ iree_compiler_cc_library(
         "StringUtils.cpp",
         "ToolUtils.cpp",
         "TracingUtils.cpp",
+        "TransformDialectUtils.cpp",
     ],
     hdrs = [
         "ConversionUtils.h",
@@ -46,6 +47,7 @@ iree_compiler_cc_library(
         "StringUtils.h",
         "ToolUtils.h",
         "TracingUtils.h",
+        "TransformDialectUtils.h",
     ],
     deps = [
         "//compiler/src/iree/compiler/Dialect/Encoding/IR",

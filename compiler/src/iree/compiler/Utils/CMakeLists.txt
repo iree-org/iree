@@ -31,6 +31,7 @@ iree_cc_library(
     "StringUtils.h"
     "ToolUtils.h"
     "TracingUtils.h"
+    "TransformDialectUtils.h"
   SRCS
     "ConversionUtils.cpp"
     "ElementPackingUtils.cpp"
@@ -42,7 +43,8 @@ iree_cc_library(
     "StringUtils.cpp"
     "ToolUtils.cpp"
     "TracingUtils.cpp"
-  DEPS
+    "TransformDialectUtils.cpp"
+    DEPS
     LLVMSupport
     MLIRArithDialect
     MLIRFuncDialect
