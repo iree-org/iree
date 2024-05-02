@@ -48,12 +48,11 @@ populatePDLLModuleFromFileName(MLIRContext *context,
                                RewritePatternSet &patterns,
                                llvm::StringRef pdllModuleFileName) {
 // TODO(#17233)
-// Its easier to give these functions definitions than try to dissable
+// Its easier to give these functions definitions than try to disable
 // tblgen, just return failure
 #ifndef IREE_LLVM_BUNDLED
   return failure();
-#endif
-#ifdef IREE_LLVM_BUNDLED
+#else
   std::string errorMessage;
   auto memoryBuffer = mlir::openInputFile(pdllModuleFileName, &errorMessage);
   if (!memoryBuffer) {
@@ -98,8 +97,7 @@ public:
 // TODO(#17233)
 #ifndef IREE_LLVM_BUNDLED
     return failure();
-#endif
-#ifdef IREE_LLVM_BUNDLED
+#else
     if (patternsFile.empty()) {
       return success();
     }
