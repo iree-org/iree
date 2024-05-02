@@ -42,6 +42,7 @@ env:
   # last ran in. It therefore can't be passed in via inputs because the env
   # context isn't available there.
   GCS_DIR: gs://iree-github-actions-${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}-artifacts/${{ github.run_id }}/${{ github.run_attempt }}
+  GCS_URL: https://storage.googleapis.com/iree-github-actions-${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}-artifacts/${{ github.run_id }}/${{ github.run_attempt }}
 
 jobs:
   build_all:
@@ -63,6 +64,7 @@ jobs:
       #   an intermediate step towards a fully package-based CI setup.
       install-dir-archive: ${{ steps.install-archive.outputs.install-dir-archive }}
       install-dir-gcs-artifact: ${{ steps.install-upload.outputs.install-dir-gcs-artifact }}
+      install-dir-gcs-url: ${{ steps.install-upload.outputs.install-dir-gcs-url }}
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
@@ -107,6 +109,8 @@ jobs:
         env:
           INSTALL_DIR_ARCHIVE: ${{ steps.install-archive.outputs.install-dir-archive }}
           INSTALL_DIR_GCS_ARTIFACT: ${{ env.GCS_DIR }}/${{ steps.install-archive.outputs.install-dir-archive }}
+          INSTALL_DIR_GCS_URL: ${{ env.GCS_URL }}/${{ steps.install-archive.outputs.install-dir-archive }}
         run: |
           gcloud storage cp "${INSTALL_DIR_ARCHIVE}" "${INSTALL_DIR_GCS_ARTIFACT}"
           echo "install-dir-gcs-artifact=${INSTALL_DIR_GCS_ARTIFACT}" >> "${GITHUB_OUTPUT}"
+          echo "install-dir-gcs-url=${INSTALL_DIR_GCS_URL}" >> "${GITHUB_OUTPUT}"
