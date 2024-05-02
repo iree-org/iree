@@ -361,3 +361,81 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 //  we will have 32 writes. We cannot do contiguous writes since the outputs columns has interleaved
 //  thread ids.
 //  CHECK-COUNT-32:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<1x1xf32>, memref<256x256xf32, #hal.descriptor_type<storage_buffer>>
+
+// -----
+
+#pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
+  #hal.descriptor_set.layout<0, bindings = [
+    #hal.descriptor_set.binding<0, storage_buffer>,
+    #hal.descriptor_set.binding<1, storage_buffer>
+  ]>
+]>
+hal.executable @unaligned_mk_batch_matmul_64x978x1281x1281_f16_f16 {
+hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
+      target_arch = "gfx940",
+      mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+                        #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>]
+  }>) {
+  hal.executable.export @unaligned_mk_batch_matmul_64x978x1281x1281_f16_f16 layout(#pipeline_layout) {
+    ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
+      hal.return %x, %y, %z : index, index, index
+    }
+  builtin.module {
+    func.func @unaligned_nk_batch_matmul() {
+      %cst = arith.constant 0.000000e+00 : f16
+      %c0 = arith.constant 0 : index
+      %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<64x968x1281xf16>>
+      %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<64x1281x1281xf16>>
+      %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<64x968x1281xf16>>
+      %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [64, 968, 1281], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<64x968x1281xf16>> -> tensor<64x968x1281xf16>
+      %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [64, 1281, 1281], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<64x1281x1281xf16>> -> tensor<64x1281x1281xf16>
+      %5 = tensor.empty() : tensor<64x968x1281xf16>
+      %6 = linalg.fill ins(%cst : f16) outs(%5 : tensor<64x968x1281xf16>) -> tensor<64x968x1281xf16>
+      %7 = linalg.batch_matmul ins(%3, %4 : tensor<64x968x1281xf16>, tensor<64x1281x1281xf16>) outs(%6 : tensor<64x968x1281xf16>) -> tensor<64x968x1281xf16>
+      flow.dispatch.tensor.store %7, %2, offsets = [0, 0, 0], sizes = [64, 968, 1281], strides = [1, 1, 1] : tensor<64x968x1281xf16> -> !flow.dispatch.tensor<writeonly:tensor<64x968x1281xf16>>
+      return
+    }
+  }
+}
+}
+// Basic pipeline test to make sure it generates the instructions we expect.
+
+// CHECK:       #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUPadAndVectorDistribute workgroup_size = [64, 1, 1] subgroup_size = 64
+// CHECK-SAME:    mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+// CHECK-SAME:    subgroup_m_count = 1, subgroup_n_count = 1>
+
+// CHECK-LABEL: func.func @unaligned_nk_batch_matmul()
+// CHECK-SAME:    translation_info = #[[$TRANSLATION]]
+// CHECK-DAG:     %[[RHS_SHARED:.+]] = memref.alloc() : memref<1x16x28xf16, #gpu.address_space<workgroup>>
+// CHECK-DAG:     %[[RHS_SHARED_SUB:.+]] =  memref.subview %[[RHS_SHARED]][0, 0, 0] [1, 16, 16] [1, 1, 1]
+// CHECK-DAG:     %[[LHS_SHARED:.+]] = memref.alloc() : memref<1x16x28xf16, #gpu.address_space<workgroup>>
+// CHECK-DAG:     %[[LHS_SHARED_SUB:.+]] =  memref.subview %[[LHS_SHARED]][0, 0, 0] [1, 16, 16] [1, 1, 1]
+// CHECK-DAG:     %[[LHS_GLOBAL:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<64x968x1281xf16, #hal.descriptor_type<storage_buffer>>
+// CHECK-DAG:     %[[RHS_GLOBAL:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<64x1281x1281xf16, #hal.descriptor_type<storage_buffer>>
+// CHECK-DAG:     %[[OUT_GLOBAL:.+]] = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : memref<64x968x1281xf16, #hal.descriptor_type<storage_buffer>>
+// CHECK-DAG:     %[[LHS_GLOBAL_SUB:.+]] = memref.subview %[[LHS_GLOBAL]]
+// CHECK-DAG:     %[[RHS_GLOBAL_SUB:.+]] = memref.subview %[[RHS_GLOBAL]]
+// CHECK:         %[[LHS_LOAD:.+]] = vector.transfer_read %[[LHS_GLOBAL_SUB]]{{.+}} {in_bounds = [true, false, false]}
+// CHECK:         %[[RHS_LOAD:.+]] = vector.transfer_read %[[RHS_GLOBAL_SUB]]{{.+}} {in_bounds = [true, false, false]}
+// CHECK:         vector.transfer_write %[[LHS_LOAD]], %[[LHS_SHARED]]
+// CHECK:         vector.transfer_write %[[RHS_LOAD]], %[[RHS_SHARED]]
+// CHECK:         %[[RES:.+]] scf.for {{.*}} = %c0 to %c1265 step %c16 iter_args({{.*}}) -> (vector<1x1x1x1x1x1x1x4x1xf16>)
+// CHECK-DAG:       %[[LHS_GLOBAL_SUB:.+]] = memref.subview %[[LHS_GLOBAL]]
+// CHECK-DAG:       %[[RHS_GLOBAL_SUB:.+]] = memref.subview %[[RHS_GLOBAL]]
+// CHECK:           %[[LHS_LOAD:.+]] = vector.transfer_read %[[LHS_GLOBAL_SUB]]
+// CHECK:           %[[RHS_LOAD:.+]] = vector.transfer_read %[[RHS_GLOBAL_SUB]]{{.+}} {in_bounds = [true, false, false]}
+// CHECK:           gpu.barrier
+// CHECK-DAG:       %{{.+}} = vector.transfer_read %[[LHS_SHARED]]
+// CHECK-DAG:       %{{.+}} = vector.transfer_read %[[RHS_SHARED]]
+// CHECK:           amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
+// CHECK:           %[[TRUNCF:.+]] = arith.truncf %{{.+}} : vector<1x1x1x1x1x1x1x4x1xf32> to vector<1x1x1x1x1x1x1x4x1xf16>
+// CHECK:           gpu.barrier
+// CHECK:           vector.transfer_write %[[LHS_LOAD]], %[[LHS_SHARED]]
+// CHECK:           vector.transfer_write %[[RHS_LOAD]], %[[RHS_SHARED]]
+// CHECK:           scf.yield %[[TRUNCF]]
+// CHECK:         }
+// CHECK:         gpu.barrier
+// CHECK:         amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
+// CHECK:         %[OUT_GLOBAL_SUB:.+]] = memref.subview %[[OUT_GLOBAL]]
+// CHECK:         vector.transfer_write %{{.+}}, %[[OUT_GLOBAL]]
