@@ -80,6 +80,7 @@ module {
 // CHECK-SAME:     lowering_config = #[[CONFIG]]
 
 // -----
+
 #executable_target_system_elf_arm_64_ = #hal.executable.target<"llvm-cpu", "system-elf-arm_64", {data_layout = "e-m:e-i8:8:32-i16:16:32-i64:64-i128:128-n32:64-S128", native_vector_size = 16 : index, target_triple = "aarch64-none-linux-android30"}>
 module {
   func.func @depthwise_conv() attributes {hal.executable.target = #executable_target_system_elf_arm_64_} {
@@ -99,7 +100,7 @@ module {
 }
 
 //   CHECK-DAG: #[[CONFIG:.+]] =  #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 0, 0, 2, 0, 0], [1, 1, 1, 2, 0, 0], [0, 0, 0, 0, 1, 4], [0, 0, 0, 0, 0, 0]]>
-//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUConvTileAndDecomposeAndPeelExpert>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUConvTileAndDecomposeExpert, {{\{}}enable_peeling = true}>
 //      CHECK: func.func @depthwise_conv()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.depthwise_conv_2d_nhwc_hwc
