@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Utils/StringUtils.h"
@@ -148,7 +149,7 @@ static std::string getLinalgDataTypes(linalg::LinalgOp op) {
 }
 
 /// Returns the op name without dialect name. E.g., it returns "set_encoding" if
-/// the input operation is iree_linalg_ext.set_encoding.
+/// the input operation is iree_encoding.set_encoding.
 static std::string getOpNameWithoutDialectName(Operation *op) {
   auto opName =
       op->getName().getStringRef().drop_until([](char c) { return c == '.'; });
@@ -312,7 +313,7 @@ static std::string summarizeDispatchRegion(Region &region) {
           LLVM_DEBUG(llvm::dbgs() << "// new best op: '" << bestOp->getName()
                                   << "', cost: " << bestEstimatedCost << "\n");
         })
-        .Case<IREE::LinalgExt::SetEncodingOp, IREE::LinalgExt::UnsetEncodingOp,
+        .Case<IREE::Encoding::SetEncodingOp, IREE::Encoding::UnsetEncodingOp,
               tensor::PackOp, tensor::UnPackOp>([&](auto op) {
           // SetEncoding/UnsetEncoding/PackOp/UnPackOp is the bestOp only if
           // there are no other operations.
@@ -365,22 +366,22 @@ static std::string summarizeDispatchRegion(Region &region) {
         auto opName = getOpNameWithoutDialectName(op);
         bestSummary = opName + "_" + operandTypeToString(op.getSource());
       })
-      .Case<IREE::LinalgExt::SetEncodingOp>([&](auto op) {
+      .Case<IREE::Encoding::SetEncodingOp>([&](auto op) {
         auto opName = getOpNameWithoutDialectName(op);
         auto encoding = op.getResultType()
                             .getEncoding()
-                            .template cast<IREE::LinalgExt::EncodingAttr>();
+                            .template cast<IREE::Encoding::EncodingAttr>();
         auto role = stringifyEnum(encoding.getRole().getValue());
         ArrayRef<int64_t> shape = op.getSourceType().getShape();
         bestSummary =
             opName + "_" + role.str() + "_" + loopRangesToString(shape);
         ;
       })
-      .Case<IREE::LinalgExt::UnsetEncodingOp>([&](auto op) {
+      .Case<IREE::Encoding::UnsetEncodingOp>([&](auto op) {
         auto opName = getOpNameWithoutDialectName(op);
         auto encoding = op.getSourceType()
                             .getEncoding()
-                            .template cast<IREE::LinalgExt::EncodingAttr>();
+                            .template cast<IREE::Encoding::EncodingAttr>();
         auto role = stringifyEnum(encoding.getRole().getValue());
         ArrayRef<int64_t> shape = op.getResultType().getShape();
         bestSummary =

@@ -10,6 +10,8 @@
 //===---------------------------------------------------------------------===//
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
@@ -41,8 +43,8 @@
 
 namespace mlir::iree_compiler::GlobalOptimization {
 
-using IREE::LinalgExt::EncodingAttr;
-using IREE::LinalgExt::EncodingRole;
+using IREE::Encoding::EncodingAttr;
+using IREE::Encoding::EncodingRole;
 
 //===---------------------------------------------------------------------===//
 // Utility functions
@@ -62,7 +64,7 @@ static Value pad(OpBuilder &builder, Location loc, Value source,
 
   ValueRange encodingPaddingSizes =
       builder
-          .create<IREE::LinalgExt::UpperBoundTileSizeOp>(
+          .create<IREE::Encoding::UpperBoundTileSizeOp>(
               loc, resultTypes, TypeAttr::get(tensorTypeWithEncoding))
           .getResults();
   SmallVector<OpFoldResult> highPad(rank);
@@ -87,8 +89,7 @@ Value setEncoding(OpBuilder &builder, Location loc, Value source,
   auto sourceType = cast<RankedTensorType>(source.getType());
   auto resultType = RankedTensorType::get(
       sourceType.getShape(), sourceType.getElementType(), encodingAttr);
-  return builder.create<IREE::LinalgExt::SetEncodingOp>(loc, resultType,
-                                                        source);
+  return builder.create<IREE::Encoding::SetEncodingOp>(loc, resultType, source);
 };
 
 struct MatmulNarrowSizes {
@@ -165,7 +166,7 @@ static Value unsetEncodingAndExtractSlice(OpBuilder &builder, Location loc,
   auto unsetEncodingReturnType =
       RankedTensorType::get(sourceType.getShape(), sourceType.getElementType());
   auto unsetEncoding = builder
-                           .create<IREE::LinalgExt::UnsetEncodingOp>(
+                           .create<IREE::Encoding::UnsetEncodingOp>(
                                loc, unsetEncodingReturnType, source)
                            .getResult();
   auto rank = sourceType.getRank();
@@ -368,13 +369,13 @@ private:
   int64_t padFactor = 0;
 };
 
-/// Pattern to fold a `linalg.fill` -> `iree_linalg_ext.set_encoding`
+/// Pattern to fold a `linalg.fill` -> `iree_encoding.set_encoding`
 /// operation into a `linalg.fill` of the encoded type.
 struct FoldFillWithSetEncoding
-    : public OpRewritePattern<IREE::LinalgExt::SetEncodingOp> {
-  using OpRewritePattern<IREE::LinalgExt::SetEncodingOp>::OpRewritePattern;
+    : public OpRewritePattern<IREE::Encoding::SetEncodingOp> {
+  using OpRewritePattern<IREE::Encoding::SetEncodingOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(IREE::LinalgExt::SetEncodingOp encodingOp,
+  LogicalResult matchAndRewrite(IREE::Encoding::SetEncodingOp encodingOp,
                                 PatternRewriter &rewriter) const override {
     auto fillOp = encodingOp.getSource().getDefiningOp<linalg::FillOp>();
     if (!fillOp)
@@ -396,7 +397,7 @@ struct FoldFillWithSetEncoding
 
 struct SetEncodingPass : public SetEncodingBase<SetEncodingPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::LinalgExt::IREELinalgExtDialect>();
+    registry.insert<IREE::Encoding::IREEEncodingDialect>();
   }
   explicit SetEncodingPass(int64_t factor) { this->padFactor.setValue(factor); }
 

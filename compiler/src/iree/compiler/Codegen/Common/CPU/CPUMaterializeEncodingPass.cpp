@@ -10,9 +10,8 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/MathExtras.h"
@@ -30,7 +29,7 @@
 
 namespace mlir::iree_compiler {
 
-using namespace IREE::LinalgExt;
+using namespace IREE::Encoding;
 using IREE::HAL::ExecutableTargetAttr;
 
 // Enumerate tile sizes to choose from when no specific architecture is
@@ -432,7 +431,6 @@ struct CPUMaterializeEncodingPass
       : targetAttr(attr) {}
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, tensor::TensorDialect,
-                    IREE::LinalgExt::IREELinalgExtDialect,
                     IREE::Codegen::IREECodegenDialect>();
   }
   void runOnOperation() override;
@@ -460,9 +458,8 @@ private:
 FailureOr<MaterializeEncodingInfo>
 materializeEncodingForTarget(RankedTensorType tensorType,
                              ExecutableTargetAttr targetAttr) {
-  IREE::LinalgExt::EncodingAttr encoding =
-      tensorType.getEncoding()
-          .dyn_cast_or_null<IREE::LinalgExt::EncodingAttr>();
+  IREE::Encoding::EncodingAttr encoding =
+      tensorType.getEncoding().dyn_cast_or_null<IREE::Encoding::EncodingAttr>();
   if (!encoding) {
     return failure();
   }

@@ -18,6 +18,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Interfaces/Interfaces.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
@@ -50,6 +51,7 @@ inline void registerIreeDialects(DialectRegistry &registry) {
                   IREE::IO::Parameters::IOParametersDialect,
                   IREE::Input::IREEInputDialect,
                   IREE::LinalgExt::IREELinalgExtDialect,
+                  IREE::Encoding::IREEEncodingDialect,
                   IREE::Stream::StreamDialect,
                   IREE::Util::UtilDialect,
                   IREE::VM::VMDialect,
