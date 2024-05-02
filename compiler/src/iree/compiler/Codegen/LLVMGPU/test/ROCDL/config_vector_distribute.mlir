@@ -200,6 +200,58 @@ module {
 
 // -----
 
+// CHECK:      #[[$TILE_SIZES:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 16, 16, 16]{{\]}}
+// CHECK:      #iree_codegen.translation_info<LLVMGPUPadAndVectorDistribute
+// CHECK-SAME: mma_schedule = #iree_gpu.mma_schedule
+// CHECK-SAME:   intrinsic =  #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
+// CHECK-SAME:   subgroup_m_count = 1, subgroup_n_count = 1
+
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>], target_arch = "gfx940"}>
+module {
+  func.func @unaligned_mk_batch_matmul() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
+    %cst = arith.constant 0.000000e+00 : f16
+    %c0 = arith.constant 0 : index
+    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<64x968x1281xf16>>
+    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<64x1281x1281xf16>>
+    %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<64x968x1281xf16>>
+    %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [64, 968, 1281], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<64x968x1281xf16>> -> tensor<64x968x1281xf16>
+    %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [64, 1281, 1281], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<64x1281x1281xf16>> -> tensor<64x1281x1281xf16>
+    %5 = tensor.empty() : tensor<64x968x1281xf16>
+    %6 = linalg.fill ins(%cst : f16) outs(%5 : tensor<64x968x1281xf16>) -> tensor<64x968x1281xf16>
+    %7 = linalg.batch_matmul ins(%3, %4 : tensor<64x968x1281xf16>, tensor<64x1281x1281xf16>) outs(%6 : tensor<64x968x1281xf16>) -> tensor<64x968x1281xf16>
+    flow.dispatch.tensor.store %7, %2, offsets = [0, 0, 0], sizes = [64, 968, 1281], strides = [1, 1, 1] : tensor<64x968x1281xf16> -> !flow.dispatch.tensor<writeonly:tensor<64x968x1281xf16>>
+    return
+  }
+}
+// CHECK-LABEL: func.func @unaligned_mk_batch_matmul()
+// CHECK:         linalg.batch_matmul
+// CHECK-SAME:      lowering_config = #[[$TILE_SIZES]]
+
+// -----
+
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>], target_arch = "gfx940"}>
+module {
+  func.func @narrow_n_batch_matmul_64x968x4x320_f16() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
+    %cst = arith.constant 0.000000e+00 : f16
+    %c0 = arith.constant 0 : index
+    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<64x968x320xf16>>
+    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<64x320x4xf16>>
+    %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<64x968x4xf16>>
+    %3 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0], sizes = [64, 968, 320], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<64x968x320xf16>> -> tensor<64x968x320xf16>
+    %4 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0], sizes = [64, 320, 4], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<64x320x4xf16>> -> tensor<64x320x4xf16>
+    %5 = tensor.empty() : tensor<64x968x4xf16>
+    %6 = linalg.fill ins(%cst : f16) outs(%5 : tensor<64x968x4xf16>) -> tensor<64x968x4xf16>
+    %7 = linalg.batch_matmul ins(%3, %4 : tensor<64x968x320xf16>, tensor<64x320x4xf16>) outs(%6 : tensor<64x968x4xf16>) -> tensor<64x968x4xf16>
+    flow.dispatch.tensor.store %7, %2, offsets = [0, 0, 0], sizes = [64, 968, 4], strides = [1, 1, 1] : tensor<64x968x4xf16> -> !flow.dispatch.tensor<writeonly:tensor<64x968x4xf16>>
+    return
+  }
+}
+// Check taht we don't support LLVMGPUPadAndVectorDistribute for narrow N/M atm.
+// CHECK-NOT:      #iree_codegen.translation_info<LLVMGPUPadAndVectorDistribute
+// CHECK-LABEL: func.func @narrow_n_batch_matmul_64x968x4x320_f16()
+
+// -----
+
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>], target_arch = "gfx940"}>
 module {
   func.func @matmul_dynamic_dim() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
