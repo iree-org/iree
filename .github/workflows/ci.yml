@@ -290,7 +290,7 @@ jobs:
           ./build_tools/scripts/check_cuda.sh
           ./build_tools/scripts/check_vulkan.sh
       - name: "Downloading install dir archive"
-        run: wget "${INSTALL_DIR_GCS_URL}" "${INSTALL_DIR_ARCHIVE}"
+        run: wget "${INSTALL_DIR_GCS_URL}" -O "${INSTALL_DIR_ARCHIVE}"
       - name: "Extracting install directory"
         run: tar -xf "${INSTALL_DIR_ARCHIVE}"
       - name: "Building tests"
@@ -354,7 +354,7 @@ jobs:
           ./build_tools/scripts/check_cuda.sh
           ./build_tools/scripts/check_vulkan.sh
       - name: "Downloading install dir archive"
-        run: wget "${INSTALL_DIR_GCS_URL}" "${INSTALL_DIR_ARCHIVE}"
+        run: wget "${INSTALL_DIR_GCS_URL}" -O "${INSTALL_DIR_ARCHIVE}"
       - name: "Extracting install directory"
         run: tar -xf "${INSTALL_DIR_ARCHIVE}"
       - name: "Building tests"
