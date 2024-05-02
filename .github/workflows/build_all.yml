@@ -31,6 +31,9 @@ on:
       install-dir-gcs-artifact:
         description: GCS path to the uploaded install archive.
         value: ${{ jobs.build_all.outputs.install-dir-gcs-artifact }}
+      install-dir-gcs-url:
+        description: GCS URL of the uploaded install archive.
+        value: ${{ jobs.build_all.outputs.install-dir-gcs-url }}
 
 permissions:
   contents: read
