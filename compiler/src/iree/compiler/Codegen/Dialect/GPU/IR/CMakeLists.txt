@@ -45,6 +45,7 @@ iree_cc_library(
     MLIRSideEffectInterfaces
     MLIRSupport
     MLIRVectorDialect
+    iree::compiler::Codegen::Utils
     iree::compiler::Codegen::Utils::VectorOpUtils
   PUBLIC
 )
