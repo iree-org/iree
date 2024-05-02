@@ -37,6 +37,7 @@ iree_compiler_cc_library(
         "CloneProducersIntoDispatchRegions.cpp",
         "CollapseDimensions.cpp",
         "CollapseReductionDimensions.cpp",
+        "ConvertMeshToFlow.cpp",
         "ConvertRegionToWorkgroups.cpp",
         "ConvertToFlow.cpp",
         "DeduplicateExecutables.cpp",
@@ -76,6 +77,7 @@ iree_compiler_cc_library(
     ],
     deps = [
         ":PassesIncGen",
+        "//compiler/src/iree/compiler/Dialect/Flow/Conversion/MeshToFlow",
         "//compiler/src/iree/compiler/Dialect/Flow/Conversion/TensorToFlow",
         "//compiler/src/iree/compiler/Dialect/Flow/IR",
         "//compiler/src/iree/compiler/Dialect/HAL/IR",
@@ -106,6 +108,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:MathDialect",
         "@llvm-project//mlir:MemRefDialect",
         "@llvm-project//mlir:MemRefTransforms",
+        "@llvm-project//mlir:MeshDialect",
         "@llvm-project//mlir:PDLDialect",
         "@llvm-project//mlir:PDLInterpDialect",
         "@llvm-project//mlir:Parser",

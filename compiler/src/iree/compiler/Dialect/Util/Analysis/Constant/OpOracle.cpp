@@ -23,11 +23,14 @@ static void populateEscapingProducers(Operation *parentOp,
   SmallPtrSet<Operation *, 8> containedOps;
   parentOp->walk<WalkOrder::PreOrder>([&](Operation *itOp) {
     containedOps.insert(parentOp);
+
     // For the outer-most op, consider that all operands escape.
     if (itOp == parentOp) {
       info.producers.insert(itOp->getOperands().begin(),
                             itOp->getOperands().end());
-      return;
+      return itOp->hasTrait<OpTrait::IsIsolatedFromAbove>()
+                 ? WalkResult::interrupt()
+                 : WalkResult::advance();
     }
 
     // For nested operations, only consider that they escape if they are
@@ -38,6 +41,8 @@ static void populateEscapingProducers(Operation *parentOp,
         info.producers.insert(operand);
       }
     }
+
+    return WalkResult::advance();
   });
 }
 
@@ -126,9 +131,11 @@ static bool isEligibleConstExpr(Operation *op) {
 ConstExprOpInfo ConstExprOpInfo::getForOp(Operation *op) {
   ConstExprOpInfo info;
   info.isEligible = isEligibleConstExpr(op);
+
   // Populate the producers for both eligible and ineligible cases, as we need
   // the producers of ineligible op to identify hoistable constant producers.
   populateEscapingProducers(op, info);
+
   return info;
 }
 

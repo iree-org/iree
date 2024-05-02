@@ -207,24 +207,14 @@ public:
     registry.insert<amdgpu::AMDGPUDialect>();
   }
 
-  void buildConfigurationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
-                                      OpPassManager &passManager) override {
-    // For now we disable configuration if the variant has external object
-    // files.
-    if (variantOp.isExternal())
-      return;
-
+  void
+  buildConfigurationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
+                                 OpPassManager &passManager) override {
     buildLLVMGPUCodegenConfigurationPassPipeline(passManager);
   }
 
-  void buildTranslationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
+  void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                     OpPassManager &passManager) override {
-    // For now we disable translation if the variant has external object files.
-    // We could instead perform linking with those objects (if they're bitcode
-    // ala libdevice.bc, etc).
-    if (variantOp.isExternal())
-      return;
-
     buildLLVMGPUCodegenPassPipeline(passManager, true);
   }
 

@@ -289,6 +289,36 @@ static int64_t getVectorSize(mlir::FunctionOpInterface entryPointFn,
   return getVectorSize(entryPointFn, byteWidth);
 }
 
+/// Returns true if the operation is a GenericOp implementing a supported
+/// transposition:
+///   1. The op has a single input and a single output.
+///   2. One of the indexing_map is identity and the other is a permutation.
+static bool x86TransposeLoweringPrecondition(linalg::GenericOp genericOp) {
+  // Check that the op has at least 2 dimensions.
+  if (genericOp.getNumLoops() < 2) {
+    return false;
+  }
+
+  // Check that the op has only one input and one output.
+  // TODO(diegocaballero): Generalize to multiple inputs.
+  if ((genericOp.getNumDpsInputs() != 1) || (genericOp.getNumDpsInits() != 1)) {
+    return false;
+  }
+
+  // Check that all the iterators are parallel.
+  if (genericOp.getNumParallelLoops() != genericOp.getNumLoops()) {
+    return false;
+  }
+
+  // Check that the two indexing maps are a permutation of each other.
+  auto indexingMaps = genericOp.getIndexingMapsArray();
+  return !indexingMaps[0].isEmpty() && !indexingMaps[1].isEmpty() &&
+         ((indexingMaps[0].isIdentity() && !indexingMaps[1].isIdentity() &&
+           indexingMaps[1].isPermutation()) ||
+          (!indexingMaps[0].isIdentity() && indexingMaps[0].isPermutation() &&
+           indexingMaps[1].isIdentity()));
+}
+
 /// Returns minimum tiling sizes for each dimension. One dimension is possible
 /// to access at different element types. It determines the tiling sizes by
 /// looking into all the operands.
@@ -325,7 +355,8 @@ getMinTilingSizesForEachDim(mlir::FunctionOpInterface entryPointFn,
 
   // Limit unroll factor. For now, we assume the rightmost non-one tiled
   // dimension is for vectorization and any other non-one dimension is for
-  // unrolling.
+  // unrolling. The util limits the second rightmost non-one tiled dimension
+  // to be not larger than `maxUnrollFactor` and others tiled dimension to 1.
   auto limitUnrollFactor = [&](int64_t maxUnrollFactor) {
     int vecDim;
     for (vecDim = minTileSizes.size() - 1; vecDim >= 0; --vecDim) {
@@ -333,13 +364,24 @@ getMinTilingSizesForEachDim(mlir::FunctionOpInterface entryPointFn,
         break;
       }
     }
+    bool seen = false;
     for (int unrollDim = vecDim - 1; unrollDim >= 0; --unrollDim) {
+      if (minTileSizes[unrollDim] <= 1) {
+        continue;
+      }
+      int64_t factor = seen ? 1LL : maxUnrollFactor;
+      seen = true;
+      LLVM_DEBUG(KD_DBGS() << "Adjusted min tile sizes: "
+                           << minTileSizes[unrollDim]
+                           << " with factor=" << factor << "\n");
       minTileSizes[unrollDim] =
-          std::min<int64_t>(minTileSizes[unrollDim], maxUnrollFactor);
+          std::min<int64_t>(minTileSizes[unrollDim], factor);
     }
   };
 
-  if (linalgOpInfo.isTranspose()) {
+  auto genericOp = dyn_cast<linalg::GenericOp>(op.getOperation());
+  if (linalgOpInfo.isTranspose() && genericOp &&
+      x86TransposeLoweringPrecondition(genericOp)) {
     // Limit unrolling on transpose operations.
     // TODO(dcaballe): Consider input and output transposes.
     limitUnrollFactor(targetMLTransInfo.defaultMaxTransposeUnrollFactor);
@@ -690,7 +732,7 @@ static void limitVectorTileSizes(linalg::LinalgOp op,
       // power-of-two: the inner-most dimension size 3 above.
       if (adjustedVal != oldVal) {
         // Round to nearest power of 2, rounding down.
-        adjustedVal = 1L << llvm::Log2_64(adjustedVal);
+        adjustedVal = 1ll << llvm::Log2_64(adjustedVal);
       }
       vecTileSizes[loopNum] = adjustedVal;
       tileBits[i] *= adjustedVal;
@@ -1736,34 +1778,6 @@ static void setVectorTileSizes(linalg::LinalgOp op,
   }
 }
 
-/// Returns true if the operation is a GenericOp implementing a supported
-/// transposition.
-static bool isSupportedTransposeOp(linalg::GenericOp genericOp) {
-  // Check that the op has at least 2 dimensions.
-  if (genericOp.getNumLoops() < 2) {
-    return false;
-  }
-
-  // Check that the op has only one input and one output.
-  // TODO(diegocaballero): Generalize to multiple inputs.
-  if ((genericOp.getNumDpsInputs() != 1) || (genericOp.getNumDpsInits() != 1)) {
-    return false;
-  }
-
-  // Check that all the iterators are parallel.
-  if (genericOp.getNumParallelLoops() != genericOp.getNumLoops()) {
-    return false;
-  }
-
-  // Check that the two indexing maps are a permutation of each other.
-  auto indexingMaps = genericOp.getIndexingMapsArray();
-  return !indexingMaps[0].isEmpty() && !indexingMaps[1].isEmpty() &&
-         ((indexingMaps[0].isIdentity() && !indexingMaps[1].isIdentity() &&
-           indexingMaps[1].isPermutation()) ||
-          (!indexingMaps[0].isIdentity() && indexingMaps[0].isPermutation() &&
-           indexingMaps[1].isIdentity()));
-}
-
 /// Sets the default lowering configuration for a generic op to use
 /// CPUDoubleTilingExpert pipeline.
 static LogicalResult
@@ -1872,7 +1886,8 @@ setTransposeLikeOpRootConfig(mlir::FunctionOpInterface entryPointFn,
   LLVM_DEBUG(KD_DBGS() << "Setting transpose-like op root configuration\n");
 
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
-  if (!hasAVX2Feature(targetAttr) || !isSupportedTransposeOp(genericOp)) {
+  if (!hasAVX2Feature(targetAttr) ||
+      !x86TransposeLoweringPrecondition(genericOp)) {
     return failure();
   }
 

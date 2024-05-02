@@ -94,6 +94,7 @@ void buildPreprocessingPassPipeline(
     passManager.addPass(createCSEPass());
   }
 
+  // DEPRECATED: do not add explicit options for specific passes.
   if (preprocessingOptions.preprocessingTransposeMatmulInput !=
       PreprocessingOptions::TransposeMatmulInput::None) {
     Preprocessing::TransposeMatmulPassOptions transposeMatmulOptions;

@@ -107,6 +107,12 @@ createLLVMGPUPackSharedMemoryAlloc();
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMGPUPrefetchSharedMemoryPass();
 
+/// Pass to pad operations on tensors in top-down order.
+enum class LLVMGPUMatmulPadOption { ParallelDims, ReductionDims };
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createLLVMGPUPromoteMatmulToFitMMAPass(
+    LLVMGPUMatmulPadOption option = LLVMGPUMatmulPadOption::ParallelDims);
+
 enum class GPUTensorCoreType {
   WMMA = 0,
   MMA_SYNC = 1,

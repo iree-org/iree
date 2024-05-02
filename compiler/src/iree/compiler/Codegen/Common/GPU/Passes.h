@@ -106,7 +106,7 @@ createGPUDistributeSharedMemoryCopy();
 
 /// Pass to distribute tiled loop nests to invocations.
 std::unique_ptr<InterfacePass<FunctionOpInterface>>
-createGPUDistributeScfForPass();
+createGPUDistributeScfForPass(bool useBlockDims = true);
 
 /// Apply multi-buffering transformation.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>

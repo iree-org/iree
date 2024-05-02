@@ -10,7 +10,6 @@
 from typing import Optional
 import argparse
 import os
-import yaml
 import re
 import enum
 import dataclasses

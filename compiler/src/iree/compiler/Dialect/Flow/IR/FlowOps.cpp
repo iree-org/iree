@@ -1125,6 +1125,12 @@ bool DispatchWorkgroupsOp::canClosureContainOp(Operation *op) {
   return false;
 }
 
+bool DispatchWorkgroupsOp::isAtomicallyHoistableOp() { return true; }
+
+bool DispatchWorkgroupsOp::isOperandHoistable(OpOperand *operand) {
+  return getOperandTiedResults(operand->getOperandNumber()).empty();
+}
+
 // Refines the tensor access from what is declared on |type| based on actual
 // usage. We expect that the access was set correctly to begin with but today
 // we sometimes specify things too wide.

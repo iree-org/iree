@@ -41,6 +41,11 @@ def GPUDistributeScfFor :
     InterfacePass<"iree-codegen-gpu-distribute-scf-for", "mlir::FunctionOpInterface"> {
   let summary = "Distribute tiled loop nests to invocations";
   let constructor = "mlir::iree_compiler::createGPUDistributeScfForPass()";
+  let options = [
+    Option<"useBlockDims", "use-block-dims", "bool",
+           /*default=*/"true",
+           "Use gpu.block_dim ops to query distribution sizes.">,
+  ];
 }
 
 def GPUGeneralizeNamedOps :

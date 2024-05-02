@@ -46,6 +46,7 @@ env:
   # the run attempt and we want that to be the current attempt, not whatever
   # attempt the setup step last ran in.
   GCS_DIR: gs://iree-github-actions-${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}-artifacts/${{ github.run_id }}/${{ github.run_attempt }}
+  GCS_URL: https://storage.googleapis.com/iree-github-actions-${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}-artifacts/${{ github.run_id }}/${{ github.run_attempt }}
 
 # Jobs are organized into groups and topologically sorted by dependencies
 jobs:
@@ -268,7 +269,7 @@ jobs:
       BUILD_DIR: build-tests
       INSTALL_DIR: ${{ needs.build_all.outputs.install-dir }}
       INSTALL_DIR_ARCHIVE: ${{ needs.build_all.outputs.install-dir-archive }}
-      INSTALL_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.install-dir-gcs-artifact }}
+      INSTALL_DIR_GCS_URL: ${{ needs.build_all.outputs.install-dir-gcs-url }}
       IREE_CPU_DISABLE: 1
       IREE_VULKAN_DISABLE: 0
       IREE_CUDA_DISABLE: 0
@@ -289,7 +290,7 @@ jobs:
           ./build_tools/scripts/check_cuda.sh
           ./build_tools/scripts/check_vulkan.sh
       - name: "Downloading install dir archive"
-        run: gcloud storage cp "${INSTALL_DIR_GCS_ARTIFACT}" "${INSTALL_DIR_ARCHIVE}"
+        run: wget "${INSTALL_DIR_GCS_URL}" -O "${INSTALL_DIR_ARCHIVE}"
       - name: "Extracting install directory"
         run: tar -xf "${INSTALL_DIR_ARCHIVE}"
       - name: "Building tests"
@@ -332,7 +333,7 @@ jobs:
       BUILD_DIR: build-tests
       INSTALL_DIR: ${{ needs.build_all.outputs.install-dir }}
       INSTALL_DIR_ARCHIVE: ${{ needs.build_all.outputs.install-dir-archive }}
-      INSTALL_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.install-dir-gcs-artifact }}
+      INSTALL_DIR_GCS_URL: ${{ needs.build_all.outputs.install-dir-gcs-url }}
       IREE_CPU_DISABLE: 1
       IREE_VULKAN_DISABLE: 0
       IREE_CUDA_DISABLE: 0
@@ -353,7 +354,7 @@ jobs:
           ./build_tools/scripts/check_cuda.sh
           ./build_tools/scripts/check_vulkan.sh
       - name: "Downloading install dir archive"
-        run: gcloud storage cp "${INSTALL_DIR_GCS_ARTIFACT}" "${INSTALL_DIR_ARCHIVE}"
+        run: wget "${INSTALL_DIR_GCS_URL}" -O "${INSTALL_DIR_ARCHIVE}"
       - name: "Extracting install directory"
         run: tar -xf "${INSTALL_DIR_ARCHIVE}"
       - name: "Building tests"

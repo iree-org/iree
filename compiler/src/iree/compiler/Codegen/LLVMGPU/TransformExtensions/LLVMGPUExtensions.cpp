@@ -1486,12 +1486,17 @@ transform_dialect::AMDGPUDistributeVectorsOp::applyToOne(
   if (failed(distributeVectorOps(target, patterns, options))) {
     return emitDefaultSilenceableFailure(target);
   }
+  // TODO: The consumption of the target handle is only required because the
+  // transform dialect interpreter will crash without it. This op should not
+  // need to invalidate the handle.
+  results.push_back(target);
   return DiagnosedSilenceableFailure::success();
 }
 
 void transform_dialect::AMDGPUDistributeVectorsOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::consumesHandle(getTarget(), effects);
+  transform::producesHandle(getResult(), effects);
   transform::modifiesPayload(effects);
 }
 

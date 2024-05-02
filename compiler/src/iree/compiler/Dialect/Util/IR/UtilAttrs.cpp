@@ -175,25 +175,23 @@ static LogicalResult serializeAPFloatRawData(Location loc, APFloat value,
   }
 }
 
-// Serializes |count| copies of |splatAttr| to |os|.
-// Significantly faster than the generic ElementsAttr path that needs to perform
-// conversion of the same splat value |count| times.
-static LogicalResult serializeSplatValue(Location loc, Attribute splatAttr,
-                                         int64_t count, llvm::endianness endian,
-                                         llvm::raw_ostream &os) {
+// static
+LogicalResult SerializableAttrInterface::serializeSplatValue(
+    Location loc, Attribute elementAttr, int64_t count, llvm::endianness endian,
+    llvm::raw_ostream &os) {
   // Get the encoded byte contents of the splat element.
   SmallVector<char> elementBuffer;
-  if (auto attr = llvm::dyn_cast<SerializableAttrInterface>(splatAttr)) {
+  if (auto attr = llvm::dyn_cast<SerializableAttrInterface>(elementAttr)) {
     if (failed(attr.serializeToVector(loc, endian, elementBuffer))) {
       return failure();
     }
-  } else if (auto attr = llvm::dyn_cast<IntegerAttr>(splatAttr)) {
+  } else if (auto attr = llvm::dyn_cast<IntegerAttr>(elementAttr)) {
     if (failed(serializeAPIntRawData(loc, attr.getValue(),
                                      attr.getType().getIntOrFloatBitWidth(),
                                      endian, elementBuffer))) {
       return failure();
     }
-  } else if (auto attr = llvm::dyn_cast<FloatAttr>(splatAttr)) {
+  } else if (auto attr = llvm::dyn_cast<FloatAttr>(elementAttr)) {
     if (failed(serializeAPFloatRawData(loc, attr.getValue(),
                                        attr.getType().getIntOrFloatBitWidth(),
                                        endian, elementBuffer))) {
@@ -792,8 +790,9 @@ struct SerializableDenseElementsAttrModel
     auto elementsAttr = llvm::cast<DenseElementsAttr>(baseAttr);
     if (elementsAttr.isSplat()) {
       // Fast-path for splat (no need to convert the value a bunch).
-      return serializeSplatValue(loc, elementsAttr.getSplatValue<Attribute>(),
-                                 elementsAttr.getNumElements(), endian, os);
+      return IREE::Util::SerializableAttrInterface::serializeSplatValue(
+          loc, elementsAttr.getSplatValue<Attribute>(),
+          elementsAttr.getNumElements(), endian, os);
     }
 
     if (canUseRawData(elementsAttr, endian)) {

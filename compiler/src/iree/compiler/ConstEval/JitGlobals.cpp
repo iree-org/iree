@@ -407,6 +407,45 @@ struct JitFunctionDesc {
   llvm::SmallVector<ResultBinding> resultBindings;
 };
 
+// Clones all object-like symbols used within the function.
+// Objects are only cloned once if used by multiple functions.
+// All object contents are cloned and symbol DCE is relied on to remove any
+// unused nested symbols later on.
+static LogicalResult cloneUsedObjects(FunctionOpInterface funcOp,
+                                      SymbolTable &sourceSymbolTable,
+                                      SymbolTable &targetSymbolTable,
+                                      OpBuilder &moduleBuilder) {
+  // Gather all symbol uses within the function.
+  auto uses = SymbolTable::getSymbolUses(funcOp);
+  if (!uses.has_value())
+    return success();
+
+  // Verify that all uses are to object-like types we can clone.
+  for (auto use : uses.value()) {
+    // Lookup the (maybe) object in the source module.
+    auto objectNameAttr = use.getSymbolRef().getRootReference();
+    auto *objectOp = sourceSymbolTable.lookup(objectNameAttr);
+    if (!objectOp) {
+      return use.getUser()->emitOpError()
+             << "references undefined symbol " << use.getSymbolRef();
+    }
+    if (!objectOp->hasTrait<OpTrait::IREE::Util::ObjectLike>())
+      continue;
+
+    // Check if the object exists in the target yet. Since we create the
+    // target we know there should be no conflicts: the only symbols with the
+    // same name will be already cloned copies of the same source.
+    if (targetSymbolTable.lookup(objectNameAttr))
+      continue;
+
+    // Clone the object. It's isolated and safe to copy wholesale.
+    auto *clonedOp = moduleBuilder.clone(*objectOp);
+    targetSymbolTable.insert(clonedOp);
+  }
+
+  return success();
+}
+
 class ProgramBuilder {
 public:
   ProgramBuilder(ModuleOp sourceModuleOp,
@@ -437,6 +476,13 @@ public:
       return failure();
 
     OpBuilder moduleBuilder = OpBuilder::atBlockEnd(targetModuleOp.getBody());
+
+    // Find any object-like symbol references used by the initializer and
+    // clone them.
+    if (failed(cloneUsedObjects(initializerOp, sourceSymbolTable,
+                                targetSymbolTable, moduleBuilder)))
+      return failure();
+
     auto funcOp = moduleBuilder.create<IREE::Util::FuncOp>(
         initializerOp.getLoc(), "jit_eval",
         moduleBuilder.getFunctionType({}, {}));
