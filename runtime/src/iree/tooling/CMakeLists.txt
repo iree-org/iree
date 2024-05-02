@@ -228,11 +228,8 @@ iree_cc_library(
     iree::base
     iree::base::internal::file_io
     iree::base::internal::flags
-    iree::base::internal::path
     iree::hal
-    iree::io::formats::gguf
-    iree::io::formats::irpa
-    iree::io::formats::safetensors
+    iree::io::formats::parser_registry
     iree::io::parameter_index
     iree::io::parameter_index_provider
     iree::io::parameter_provider
