@@ -185,12 +185,12 @@ iree-compile --iree-hal-target-backends=llvm-cpu prog.mlir -o /tmp/prog.vmfb
       `--device=` to `iree-run-module` below.
     * To cross-compile, explore `--iree-llvmcpu-target-triple=`.
     * To enable higher CPU performance by enabling CPU features:
-      * On x86, explore `--iree-llvmcpu-target-cpu=` (e.g.
-        `--iree-llvmcpu-target-cpu=znver4` to target AMD Zen4).
-      * On other architectures, explore `--iree-llvmcpu-target-cpu-features=`.
-      * To optimize for running on the same machine that the compilation ran
-        on, pass  `--iree-llvmcpu-target-cpu=host`. That works regardless of
-        CPU architecture.
+        * On x86, explore `--iree-llvmcpu-target-cpu=` (e.g.
+          `--iree-llvmcpu-target-cpu=znver4` to target AMD Zen4).
+        * On other architectures, explore `--iree-llvmcpu-target-cpu-features=`.
+        * To optimize for running on the same machine that the compilation ran
+          on, pass  `--iree-llvmcpu-target-cpu=host`. That works regardless of
+          CPU architecture.
     * Check out
       [these docs](../../../developers/general/developer-tips.md) for
       more useful `iree-compile` flags.

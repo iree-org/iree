@@ -152,6 +152,10 @@ subgraph Part3["Part 3: Linking with microkernels, optimizing, producing object 
   object
   vmfb
 end
+
+style Part1 stroke:#FDD835,stroke-width:2px
+style Part2 stroke:#039BE5,stroke-width:2px
+style Part3 stroke:#43A047,stroke-width:2px
 ```
 
 ## 🟨 Part 1: MLIR code generation
