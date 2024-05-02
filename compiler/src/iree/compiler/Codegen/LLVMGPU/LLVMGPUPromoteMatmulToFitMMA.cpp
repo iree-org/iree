@@ -155,7 +155,7 @@ public:
         auto extractSliceOp = rewriter.create<tensor::ExtractSliceOp>(
             op.getLoc(), src.getResult(), offsets, sizes, strides);
         rewriter.startOpModification(op);
-        op.getSourceMutable().assign(extractSliceOp.getResult());
+        producerPadOp.getSourceMutable().assign(extractSliceOp.getResult());
         rewriter.finalizeOpModification(op);
       }
 

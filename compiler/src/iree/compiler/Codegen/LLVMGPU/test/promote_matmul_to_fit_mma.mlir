@@ -86,17 +86,15 @@ func.func @batch_matmul_pad_reduction_after_tiling() {
   %6 = affine.min #map3()[%workgroup_id_x]
   %7 = flow.dispatch.tensor.load %0, offsets = [%workgroup_id_z, %3, 0], sizes = [1, %5, 1281], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<64x968x1281xf16>> -> tensor<1x?x1281xf16>
   %dim = tensor.dim %7, %c1 : tensor<1x?x1281xf16>
-  %extracted_slice = tensor.extract_slice %7[0, 0, 0] [1, %dim, 1281] [1, 1, 1] : tensor<1x?x1281xf16> to tensor<1x?x1281xf16>
   %8 = flow.dispatch.tensor.load %1, offsets = [%workgroup_id_z, 0, %4], sizes = [1, 1281, %6], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<64x1281x1281xf16>> -> tensor<1x1281x?xf16>
   %dim_0 = tensor.dim %8, %c2 : tensor<1x1281x?xf16>
-  %extracted_slice_1 = tensor.extract_slice %8[0, 0, 0] [1, 1281, %dim_0] [1, 1, 1] : tensor<1x1281x?xf16> to tensor<1x1281x?xf16>
   %9 = affine.apply #map4()[%5]
-  %padded = tensor.pad %extracted_slice low[0, 0, 0] high[0, %9, 0] {
+  %padded = tensor.pad %7 low[0, 0, 0] high[0, %9, 0] {
   ^bb0(%arg0: index, %arg1: index, %arg2: index):
     tensor.yield %cst : f16
   } : tensor<1x?x1281xf16> to tensor<1x64x1281xf16>
   %10 = affine.apply #map5()[%6]
-  %padded_2 = tensor.pad %extracted_slice_1 low[0, 0, 0] high[0, 0, %10] {
+  %padded_2 = tensor.pad %8 low[0, 0, 0] high[0, 0, %10] {
   ^bb0(%arg0: index, %arg1: index, %arg2: index):
     tensor.yield %cst : f16
   } : tensor<1x1281x?xf16> to tensor<1x1281x128xf16>
