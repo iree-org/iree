@@ -3864,13 +3864,15 @@ trying to maximize performance.</p>
   <code>--iree-hal-target-backends=</code>. You will then need to pass a matching
   <code>--device=</code> to <code>iree-run-module</code> below.</li>
 <li>To cross-compile, explore <code>--iree-llvmcpu-target-triple=</code>.</li>
-<li>To enable higher CPU performance by enabling CPU features:</li>
+<li>To enable higher CPU performance by enabling CPU features:<ul>
 <li>On x86, explore <code>--iree-llvmcpu-target-cpu=</code> (e.g.
-    <code>--iree-llvmcpu-target-cpu=znver4</code> to target AMD Zen4).</li>
+  <code>--iree-llvmcpu-target-cpu=znver4</code> to target AMD Zen4).</li>
 <li>On other architectures, explore <code>--iree-llvmcpu-target-cpu-features=</code>.</li>
 <li>To optimize for running on the same machine that the compilation ran
-    on, pass  <code>--iree-llvmcpu-target-cpu=host</code>. That works regardless of
-    CPU architecture.</li>
+  on, pass  <code>--iree-llvmcpu-target-cpu=host</code>. That works regardless of
+  CPU architecture.</li>
+</ul>
+</li>
 <li>Check out
   <a href="../../../developers/general/developer-tips/">these docs</a> for
   more useful <code>iree-compile</code> flags.</li>
