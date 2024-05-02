@@ -18,6 +18,7 @@ if(${IREE_TRACING_PROVIDER} STREQUAL "console")
     SRCS
       "console.c"
     DEPS
+      iree::base::base
       iree::base::core_headers
     DEFINES
       "IREE_TRACING_PROVIDER_H=\"iree/base/tracing/console.h\""
