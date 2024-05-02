@@ -1,9 +1,6 @@
-// RUN: iree-compile --iree-preprocessing-pass-pipeline="builtin.module(util.func(iree-preprocessing-transpose-matmul-pass{input=lhs}))" \
-// RUN:   --iree-hal-target-backends=llvm-cpu --compile-to=preprocessing %s  | FileCheck %s --check-prefixes=CHECK,LHS
-// RUN: iree-compile --iree-preprocessing-pass-pipeline="builtin.module(util.func(iree-preprocessing-transpose-matmul-pass{input=rhs}))" \
-// RUN:   --iree-hal-target-backends=llvm-cpu --compile-to=preprocessing %s  | FileCheck %s --check-prefixes=CHECK,RHS
-// RUN: iree-compile --iree-preprocessing-pass-pipeline="builtin.module(util.func(iree-preprocessing-transpose-matmul-pass))" \
-// RUN:   --iree-hal-target-backends=llvm-cpu --compile-to=preprocessing %s  | FileCheck %s --check-prefixes=CHECK,DISABLED
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-preprocessing-transpose-matmul-pass{input=lhs}))" %s | FileCheck %s --check-prefixes=CHECK,LHS
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-preprocessing-transpose-matmul-pass{input=rhs}))" %s | FileCheck %s --check-prefixes=CHECK,RHS
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-preprocessing-transpose-matmul-pass))" %s | FileCheck %s --check-prefixes=CHECK,DISABLED
 
 // CHECK-LABEL: @matmul
 // LHS: linalg.matmul_transpose_a
