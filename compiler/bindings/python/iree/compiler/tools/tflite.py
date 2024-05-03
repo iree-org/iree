@@ -77,10 +77,11 @@ class ImportOptions(CompilerOptions):
 
 
 def mlir_bytecode_to_text(bytecode_file):
-      with tempfile.NamedTemporaryFile() as temp_file:
-          args = __main__.parse_arguments(["copy", bytecode_file, "-o", temp_file.name] )
-          __main__.main(args)
-          return temp_file.read()
+    with tempfile.NamedTemporaryFile() as temp_file:
+        args = __main__.parse_arguments(["copy", bytecode_file, "-o", temp_file.name])
+        __main__.main(args)
+        return temp_file.read()
+
 
 def compile_file(fb_path: str, **kwargs):
     """Compiles a TFLite FlatBuffer file to an IREE binary.
