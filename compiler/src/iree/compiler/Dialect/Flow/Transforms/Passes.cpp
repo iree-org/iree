@@ -248,7 +248,8 @@ void addDispatchRegionCreationPasses(OpPassManager &passManager,
       // Collapse dimensions of linalg Ops.
       .addPass(IREE::Flow::createCollapseDimensionsPass)
       // Convert dispatch regions into dispatch workgroups by capturing values.
-      .addPass(IREE::Flow::createFormDispatchWorkgroupsPass);
+      .addPass(IREE::Flow::createFormDispatchWorkgroupsPass)
+      .addPass(IREE::Flow::createDispatchWorkgroupsCleanupPass);
 }
 
 void buildFlowTransformPassPipeline(OpPassManager &passManager,

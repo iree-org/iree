@@ -187,6 +187,21 @@ def FormDispatchWorkgroupsPass :
   ];
 }
 
+def DispatchWorkgroupsCleanupPass:
+    InterfacePass<"iree-flow-dispatch-workgroups-cleanup", "mlir::FunctionOpInterface"> {
+  let summary = "TODO";
+  let description = [{
+TODO
+  }];
+  let dependentDialects = [
+    "mlir::affine::AffineDialect",
+    "mlir::linalg::LinalgDialect",
+    "mlir::scf::SCFDialect",
+    "mlir::tensor::TensorDialect",
+    "IREE::Flow::FlowDialect",
+  ];
+}
+
 def FormScalarDispatchesPass :
     InterfacePass<"iree-flow-form-scalar-dispatches", "mlir::FunctionOpInterface"> {
   let summary = "Form Dispatch Regions for scalar computations.";

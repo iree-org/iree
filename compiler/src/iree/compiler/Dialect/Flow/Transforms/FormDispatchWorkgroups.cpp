@@ -299,36 +299,6 @@ void FormDispatchWorkgroupsPass::runOnOperation() {
     llvm::dbgs() << "\n\n";
   });
 
-  // A few extra canonicalizations/lowerings.
-  {
-    RewritePatternSet convertToFlowPatterns(context);
-    IREE::Flow::populateTensorToFlowConversionPatterns(context,
-                                                       convertToFlowPatterns);
-    memref::populateResolveRankedShapedTypeResultDimsPatterns(
-        convertToFlowPatterns);
-    IREE::Flow::TensorReshapeOp::getCanonicalizationPatterns(
-        convertToFlowPatterns, context);
-    IREE::Flow::TensorBitCastOp::getCanonicalizationPatterns(
-        convertToFlowPatterns, context);
-    if (failed(applyPatternsAndFoldGreedily(
-            funcOp, std::move(convertToFlowPatterns)))) {
-      funcOp->emitOpError("failed conversion to flow.tensor ops");
-      return signalPassFailure();
-    }
-
-    // Finally fold `tensor.insert_slice/extract_slice` operations with
-    // `flow.dispatch.tensor.load/store`.
-    RewritePatternSet foldExtractInsertSliceOps(context);
-    IREE::Flow::populateTensorSliceOpWithDispatchTensorOpFoldingPatterns(
-        foldExtractInsertSliceOps, context);
-    if (failed(applyPatternsAndFoldGreedily(
-            funcOp, std::move(foldExtractInsertSliceOps)))) {
-      funcOp->emitOpError("failed to insert/extract_slice with "
-                          "flow.dispatch.tensor.load/store");
-      return signalPassFailure();
-    }
-  }
-
   // Canonicalize the `flow.dispatch.workgroups` operation to common out common
   // arguments.
   {
