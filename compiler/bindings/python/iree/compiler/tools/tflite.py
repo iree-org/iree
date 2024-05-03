@@ -17,6 +17,8 @@ from .debugging import TempFileSaver
 from .binaries import find_tool, invoke_immediate, invoke_pipeline
 from .core import CompilerOptions, DEFAULT_TESTING_BACKENDS, build_compile_command_line
 
+from iree.compiler.tools.ir_tool import __main__
+
 __all__ = [
     "compile_file",
     "compile_str",
@@ -30,6 +32,11 @@ _IMPORT_TOOL = "iree-import-tflite"
 
 def is_available():
     """Determine if the TFLite frontend is available."""
+    try:
+        import tensorflow as tf
+    except ModuleNotFoundError:
+        logging.warn("Unable to import tensorflow")
+        return False
     try:
         import iree.tools.tflite.scripts.iree_import_tflite.__main__
     except ModuleNotFoundError:
@@ -69,6 +76,12 @@ class ImportOptions(CompilerOptions):
     input_type: Optional[str] = "tosa"
 
 
+def mlir_bytecode_to_text(bytecode_file):
+      with tempfile.NamedTemporaryFile() as temp_file:
+          args = __main__.parse_arguments(["copy", bytecode_file, "-o", temp_file.name] )
+          __main__.main(args)
+          return temp_file.read()
+
 def compile_file(fb_path: str, **kwargs):
     """Compiles a TFLite FlatBuffer file to an IREE binary.
 
@@ -105,10 +118,14 @@ def compile_file(fb_path: str, **kwargs):
         )
 
         if options.import_only:
-            if options.output_file:
+            # We need to convert MLIR bytecode to the textual format
+            # TODO: Add option to choose between bytecode and textual format
+            mlir_text = mlir_bytecode_to_text(tfl_iree_input)
+            if not options.output_file:
+                return mlir_text
+            with open(options.output_file, "wb") as f:
+                f.write(mlir_text)
                 return None
-            with open(tfl_iree_input, "r") as f:
-                return f.read()
 
         # Run IREE compilation pipeline
         compile_cl = build_compile_command_line(tfl_iree_input, tfs, options)
@@ -131,7 +148,7 @@ def compile_str(input_bytes: bytes, **kwargs):
     input_bytes = (
         input_bytes.encode("utf-8") if isinstance(input_bytes, str) else input_bytes
     )
-    with tempfile.NamedTemporaryFile(mode="w") as temp_file:
-        tempfile.write(input_bytes)
-        tempfile.close()
-        return compile_file(tempfile.name, **kwargs)
+    with tempfile.NamedTemporaryFile() as temp_file:
+        temp_file.write(input_bytes)
+        temp_file.flush()  # Ensure the data is written to disk
+        return compile_file(temp_file.name, **kwargs)
