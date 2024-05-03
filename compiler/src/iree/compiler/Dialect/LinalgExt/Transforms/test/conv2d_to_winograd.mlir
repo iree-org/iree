@@ -88,14 +88,14 @@ func.func @conv_16433136_nchw_fchw(%arg0: tensor<1x4x16x16xf32>, %arg1: tensor<1
 
 // -----
 
-func.func @conv_promoted(%arg0: tensor<1x16x16x4xf16>, %arg1: tensor<3x3x4x16xf16>, %arg2: tensor<1x14x14x16xf32>) -> tensor<1x14x14x16xf32> {
+func.func @conv_mixed_types(%arg0: tensor<1x16x16x4xf16>, %arg1: tensor<3x3x4x16xf16>, %arg2: tensor<1x14x14x16xf32>) -> tensor<1x14x14x16xf32> {
   %0 = linalg.conv_2d_nhwc_hwcf
     {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64> }
      ins(%arg0, %arg1: tensor<1x16x16x4xf16>, tensor<3x3x4x16xf16>)
     outs(%arg2: tensor<1x14x14x16xf32>) -> tensor<1x14x14x16xf32>
   return %0 : tensor<1x14x14x16xf32>
 }
-// CHECK:      func.func @conv_promoted(
+// CHECK:      func.func @conv_mixed_types(
 // CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<1x16x16x4xf16>
 // CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<3x3x4x16xf16>
 // CHECK-DAG:    %[[ZERO:.+]] = arith.constant 0.000000e+00 : f32

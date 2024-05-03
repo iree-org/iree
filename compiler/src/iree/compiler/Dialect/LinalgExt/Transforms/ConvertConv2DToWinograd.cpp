@@ -253,15 +253,15 @@ public:
             std::ceil((float)(inputShape[i] - kernelSize + 1) / outputTileSize);
       }
     }
-    Value emptyTensor =
+    Value inputTfInit =
         rewriter.create<tensor::EmptyOp>(loc, resultShape, inElemType);
     const std::array<int64_t, 2> imageDims =
         isNchwFchw ? nchwImageDims : nhwcImageDims;
     Value winogradInput =
         rewriter
             .create<IREE::LinalgExt::WinogradInputTransformOp>(
-                loc, emptyTensor.getType(), ValueRange{input},
-                ValueRange{emptyTensor}, outputTileSize, kernelSize, imageDims)
+                loc, inputTfInit.getType(), ValueRange{input},
+                ValueRange{inputTfInit}, outputTileSize, kernelSize, imageDims)
             .getResults()[0];
 
     // Add collapse shape
@@ -280,11 +280,12 @@ public:
     }
     bmmShape[2] = outputShape[3];
     auto bmmOutputType = RankedTensorType::get(bmmShape, outElemType);
-    emptyTensor = rewriter.create<tensor::EmptyOp>(loc, bmmShape, outElemType);
+    Value bmmInit =
+        rewriter.create<tensor::EmptyOp>(loc, bmmShape, outElemType);
     Value zero = rewriter.create<arith::ConstantOp>(
         loc, rewriter.getZeroAttr(outElemType));
     auto fillOp = rewriter.create<linalg::FillOp>(loc, ValueRange{zero},
-                                                  ValueRange{emptyTensor});
+                                                  ValueRange{bmmInit});
     auto bmmOp = rewriter.create<linalg::BatchMatmulOp>(
         loc, bmmOutputType,
         ValueRange({collapsedWinogradInput, collapsedWinogradFilter}),
@@ -311,13 +312,13 @@ public:
     if (isNchwFchw) {
       permute<IREE::LinalgExt::Permutation::NHWC_TO_NCHW>(paddedResultShape);
     }
-    emptyTensor =
+    Value outputTfInit =
         rewriter.create<tensor::EmptyOp>(loc, paddedResultShape, outElemType);
     Value paddedOutput =
         rewriter
             .create<IREE::LinalgExt::WinogradOutputTransformOp>(
-                loc, emptyTensor.getType(), ValueRange{expandedBmmResult},
-                ValueRange{emptyTensor}, outputTileSize, kernelSize, imageDims)
+                loc, outputTfInit.getType(), ValueRange{expandedBmmResult},
+                ValueRange{outputTfInit}, outputTileSize, kernelSize, imageDims)
             .getResults()[0];
 
     // Extract slice
