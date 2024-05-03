@@ -7,7 +7,6 @@
 #ifndef IREE_COMPILER_DIALECT_ENCODING_IR_ENCODINGOPS_H_
 #define IREE_COMPILER_DIALECT_ENCODING_IR_ENCODINGOPS_H_
 
-#include "iree/compiler/Dialect/Encoding/IR/EncodingInterfaces.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinTypes.h"

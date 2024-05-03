@@ -8,13 +8,8 @@
 #define IREE_DIALECT_ENCODING_OPS
 
 include "iree/compiler/Dialect/Encoding/IR/EncodingBase.td"
-include "iree/compiler/Dialect/Encoding/IR/EncodingInterfaces.td"
-include "mlir/Interfaces/ControlFlowInterfaces.td"
-include "mlir/Interfaces/DestinationStyleOpInterface.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
-include "mlir/Interfaces/TilingInterface.td"
-include "mlir/Interfaces/ViewLikeInterface.td"
 
 //===----------------------------------------------------------------------===//
 // Base class.
@@ -22,18 +17,6 @@ include "mlir/Interfaces/ViewLikeInterface.td"
 
 class IREEEncoding_PureOp<string mnemonic, list<Trait> traits = []> :
     Op<IREEEncoding_Dialect, mnemonic, traits> {
-}
-
-class IREEEncoding_Op<string mnemonic, list<Trait> traits = []> :
-    IREEEncoding_PureOp<mnemonic, !listconcat(traits,
-        [AttrSizedOperandSegments,
-         DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
-         DestinationStyleOpInterface, EncodingInterface,
-         SingleBlockImplicitTerminator<"::mlir::iree_compiler::IREE::Encoding::YieldOp">
-  ])> {
-  let hasVerifier = 1;
-  let hasCustomAssemblyFormat = 1;
-  code extraEncodingOpClassDeclaration = "";
 }
 
 //===----------------------------------------------------------------------===//

@@ -28,17 +28,6 @@ def IREEEncoding_Dialect : Dialect {
   let useDefaultAttributePrinterParser = 1;
 }
 
-//===----------------------------------------------------------------------===//
-// Type definitions
-//===----------------------------------------------------------------------===//
-
-class RankedTensorOrMemRefOf<list<Type> allowedTypes> :
-  ShapedContainerType<allowedTypes,
-      Or<[IsMemRefTypePred, And<[IsTensorTypePred, HasRankPred]>]>,
-  "ranked tensor or memref", "::mlir::ShapedType">;
-
-def AnyRankedTensorOrMemRefType : RankedTensorOrMemRefOf<[AnyType]>;
-
 //===---------------------------------------------------------------------===//
 // Data layout encoding attributes
 //===---------------------------------------------------------------------===//
