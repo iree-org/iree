@@ -49,6 +49,7 @@
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/CSE.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -246,6 +247,44 @@ void transform_dialect::ApplyFoldTensorSliceIntoTransferPatternsOp::
 void transform_dialect::ApplyPrepareVectorToMMAPatternsOp::populatePatterns(
     RewritePatternSet &patterns) {
   populatePrepareVectorToMMAPatterns(patterns, getUseNvGpu());
+}
+
+//===----------------------------------------------------------------------===//
+// CopyTensorOperandOp
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure transform_dialect::CopyTensorOperandOp::applyToOne(
+    transform::TransformRewriter &rewriter, Operation *target,
+    transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  int64_t operandIndex = getOperandIndex();
+  if (operandIndex > target->getNumOperands()) {
+    return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                     "Operand index out of range");
+  }
+  Value operand = target->getOperand(operandIndex);
+  auto tensorType = dyn_cast<RankedTensorType>(operand.getType());
+  if (!tensorType) {
+    return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                     "Non tensor type operand to copy");
+  }
+  rewriter.setInsertionPoint(target);
+  Value empty = rewriter.create<tensor::EmptyOp>(
+      target->getLoc(),
+      tensor::getMixedSizes(rewriter, target->getLoc(), operand),
+      tensorType.getElementType());
+  Operation *copy =
+      rewriter.create<linalg::CopyOp>(target->getLoc(), operand, empty);
+  target->setOperand(operandIndex, copy->getResult(0));
+  results.push_back(copy);
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::CopyTensorOperandOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::producesHandle(getResult(), effects);
+  transform::modifiesPayload(effects);
 }
 
 //===---------------------------------------------------------------------===//
