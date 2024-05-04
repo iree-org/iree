@@ -4,7 +4,7 @@
       "--iree-hal-target-backends=rocm",
       "--iree-rocm-target-chip=gfx90a",
       "--iree-opt-const-eval=false",
-      "--iree-codegen-transform-dialect-library=attention_and_matmul_spec.mlir"
+      "--iree-codegen-transform-dialect-library=${IREE_TEST_PATH_EXTENSION}/attention_and_matmul_spec.mlir"
     ],
     "iree_run_module_flags": [
       "--device=hip"
