@@ -60,7 +60,7 @@ jobs:
         uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
         with:
           repository: nod-ai/SHARK-TestSuite
-          ref: 9e9774632d32674e9ffa44b0a2ffc054f6c590ad
+          ref: 337083616ae6f596c0206a9edd1c47e8afc0e400
           path: SHARK-TestSuite
           submodules: false
       - name: Installing external TestSuite Python requirements
@@ -99,6 +99,7 @@ jobs:
       IREERS_ARTIFACT_DIR: ${{ github.workspace }}/artifacts
       VENV_DIR: ${{ github.workspace }}/venv
       IREE_TEST_FILES: ~/iree_tests_cache
+      IREE_TEST_PATH_EXTENSION: ${{ github.workspace }}/build_tools/pkgci/external_test_suite
     steps:
       - name: Checking out IREE repository
         uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
@@ -123,7 +124,7 @@ jobs:
         uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
         with:
           repository: nod-ai/SHARK-TestSuite
-          ref: 9e9774632d32674e9ffa44b0a2ffc054f6c590ad
+          ref: 337083616ae6f596c0206a9edd1c47e8afc0e400
           path: SHARK-TestSuite
           submodules: false
           lfs: true
