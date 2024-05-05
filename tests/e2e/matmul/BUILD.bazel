@@ -532,7 +532,7 @@ iree_generated_e2e_runner_test(
         "--lhs_rhs_type=f16",
         "--acc_type=f32",
         "--shapes=gpu_large_aligned",
-        "--compilation_info=LLVMGPUVectorDistribute",
+        "--compilation_info=LLVMGPUVectorDistributeMFMA",
     ],
     tags = [
         "noasan",
@@ -542,7 +542,7 @@ iree_generated_e2e_runner_test(
         "requires-gpu-cdna3",
     ],
     target_backends_and_drivers = [
-        ("rocm", "rocm"),
+        ("rocm", "hip"),
     ],
     test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
     test_type = "matmul",
@@ -559,7 +559,7 @@ iree_generated_e2e_runner_test(
         "--acc_type=f32",
         "--transpose_rhs",
         "--shapes=gpu_large_aligned",
-        "--compilation_info=LLVMGPUVectorDistribute",
+        "--compilation_info=LLVMGPUVectorDistributeMFMA",
     ],
     tags = [
         "noasan",
@@ -569,7 +569,61 @@ iree_generated_e2e_runner_test(
         "requires-gpu-cdna3",
     ],
     target_backends_and_drivers = [
-        ("rocm", "rocm"),
+        ("rocm", "hip"),
+    ],
+    test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
+    test_type = "matmul",
+)
+
+# Testing RDNA3 + matrix core path.
+iree_generated_e2e_runner_test(
+    name = "e2e_matmul_rocm_f16_large_rdna3_wmma",
+    compiler_flags = [
+        "--iree-rocm-target-chip=gfx1100",
+    ],
+    generator = ":generate_e2e_matmul_tests",
+    generator_args = [
+        "--lhs_rhs_type=f16",
+        "--acc_type=f32",
+        "--shapes=gpu_large_aligned",
+        "--compilation_info=LLVMGPUVectorDistributeWMMA",
+    ],
+    tags = [
+        "noasan",
+        "nomsan",
+        "notsan",
+        "noubsan",
+        "requires-gpu-rdna3",
+    ],
+    target_backends_and_drivers = [
+        ("rocm", "hip"),
+    ],
+    test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
+    test_type = "matmul",
+)
+
+iree_generated_e2e_runner_test(
+    name = "e2e_matmul_rocm_f16_large_rdna3_wmma_tb",
+    compiler_flags = [
+        "--iree-rocm-target-chip=gfx1100",
+    ],
+    generator = ":generate_e2e_matmul_tests",
+    generator_args = [
+        "--lhs_rhs_type=f16",
+        "--acc_type=f32",
+        "--transpose_rhs",
+        "--shapes=gpu_large_aligned",
+        "--compilation_info=LLVMGPUVectorDistributeWMMA",
+    ],
+    tags = [
+        "noasan",
+        "nomsan",
+        "notsan",
+        "noubsan",
+        "requires-gpu-rdna3",
+    ],
+    target_backends_and_drivers = [
+        ("rocm", "hip"),
     ],
     test_runner = "//tools/testing/e2e:iree-e2e-matmul-test",
     test_type = "matmul",
