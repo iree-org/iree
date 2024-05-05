@@ -25,6 +25,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Casting.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
@@ -56,10 +57,12 @@
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
+#include "mlir/Support/MathExtras.h"
 #include "mlir/Transforms/CSE.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -444,7 +447,7 @@ FailureOr<int64_t> getTripCount(scf::ForallOp loop) {
 
   int64_t tripCount = 1;
   for (auto [lb, ub, step] : llvm::zip_equal(lbs, ubs, steps)) {
-    tripCount *= (ub - lb) / step;
+    tripCount *= ceilDiv((ub - lb), step);
   }
   return tripCount;
 }
@@ -458,19 +461,16 @@ LogicalResult compareWorkerCountsAndTypes(scf::ForallOp producer,
     return failure();
   }
 
-  mlir::TypeID mappingId = producer.getMapping()
-                               ->getValue()
-                               .front()
-                               .getAbstractAttribute()
-                               .getTypeID();
-  auto compareMappingTypes = [&](ArrayAttr array) {
-    return llvm::all_of(array.getValue(), [&](const Attribute &attr) {
-      return attr.getAbstractAttribute().getTypeID() == mappingId;
-    });
+  auto checkMappingTypes = [&](ArrayAttr array) {
+    return llvm::all_of(array.getValue(),
+                        llvm::IsaPred<gpu::GPUThreadMappingAttr>) ||
+           llvm::all_of(array.getValue(),
+                        llvm::IsaPred<gpu::GPUWarpMappingAttr>);
   };
 
-  if (!compareMappingTypes(producer.getMappingAttr()) ||
-      !compareMappingTypes(consumer.getMappingAttr())) {
+  if (producer.getMappingAttr() != consumer.getMappingAttr() ||
+      !checkMappingTypes(producer.getMappingAttr()) ||
+      !checkMappingTypes(consumer.getMappingAttr())) {
     return failure();
   }
   return success();
@@ -520,14 +520,16 @@ LogicalResult fuseForallIntoSlice(RewriterBase &rewriter,
     return failure();
   }
 
-  auto isAll = [](ArrayRef<int64_t> array, int64_t cmp) {
-    return llvm::all_of(array, [cmp](int64_t x) { return x == cmp; });
+  auto isAll = [](ArrayRef<OpFoldResult> array, int64_t cmp) {
+    return llvm::all_of(array, [cmp](OpFoldResult val) {
+      return isConstantIntValue(val, cmp);
+    });
   };
 
-  if (!isAll(producer.getStaticStep(), 1) ||
-      !isAll(producer.getStaticLowerBound(), 0) ||
-      !isAll(consumer.getStaticStep(), 1) ||
-      !isAll(consumer.getStaticLowerBound(), 0)) {
+  if (!isAll(producer.getMixedStep(), 1) ||
+      !isAll(producer.getMixedLowerBound(), 0) ||
+      !isAll(consumer.getMixedStep(), 1) ||
+      !isAll(consumer.getMixedLowerBound(), 0)) {
     return failure();
   }
 
@@ -538,15 +540,19 @@ LogicalResult fuseForallIntoSlice(RewriterBase &rewriter,
   MLIRContext *context = rewriter.getContext();
   Location loc = producer.getLoc();
 
-  AffineExpr linearId = getAffineConstantExpr(0, context);
-  for (auto [i, workerCount] :
-       llvm::enumerate(consumer.getStaticUpperBound())) {
-    linearId = linearId * getAffineConstantExpr(workerCount, context) +
-               getAffineDimExpr(i, context);
+  AffineExpr d0, d1, d2;
+  bindDims(context, d0, d1, d2);
+  AffineExpr mulAdd = d0 * d1 + d2;
+  OpFoldResult linearId = rewriter.getIndexAttr(0);
+  for (auto [inductionVar, workerCount] :
+       llvm::zip_equal(getAsOpFoldResult(consumer.getInductionVars()),
+                       consumer.getMixedUpperBound())) {
+    linearId = affine::makeComposedFoldedAffineApply(
+        rewriter, loc, mulAdd, {linearId, workerCount, inductionVar});
   }
 
-  Value linearThreadIdVal = affine::makeComposedAffineApply(
-      rewriter, loc, linearId, getAsOpFoldResult(consumer.getInductionVars()));
+  Value linearThreadIdVal =
+      getValueOrCreateConstantIndexOp(rewriter, loc, linearId);
   SmallVector<Value> ranges;
   for (auto workerCount : producer.getStaticUpperBound()) {
     ranges.push_back(rewriter.create<arith::ConstantIndexOp>(loc, workerCount));
