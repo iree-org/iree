@@ -12,8 +12,6 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/OpBase.td"
 
-def MemrefTypeAttr : TypeAttrBase<"MemRefType", "Memref type attribute">;
-
 //===----------------------------------------------------------------------===//
 // ShuffleTensorOp
 //===----------------------------------------------------------------------===//
@@ -53,13 +51,14 @@ def IREEGPU_ShuffleTensorOp : Op<IREEGPU_Dialect, "shuffle_tensor", [
     boundary of the loops currently is.
 
     ```mlir
+      %alloc = bufferization.to_memref %empty
       %0 = scf.forall (%idy, %idx) in (8, 8) -> (tensor<4x128xf32>) {
         %ids = affine.delinearize_index %idy * 8 + %idx to (2, 32) : index
         %in = ...
         %2 = affine.apply #affine_map<(d0) -> (d0 * 2)> (%ids#0)
         %3 = affine.apply #affine_map<(d0) -> (d0 * 4)> (%ids#1)
         %4 = affine.apply #affine_map<(d0) -> (d0 * 16)> (%idx)
-        %slice = iree_gpu.shuffle_tensor %in[%2, %3] [2, 4] [1, 1] to %empty[0, %4] [4, 16] [1, 1]
+        %slice = iree_gpu.shuffle_tensor %in[%2, %3] [2, 4] [1, 1] to %alloc[0, %4] [4, 16] [1, 1]
           : tensor<2x4xf32> -> tensor<4x128xf32> -> tensor<4x16xf32>
         ...
       } {mapping = [#gpu.thread<y>, #gpu.thread<x>]}
@@ -70,6 +69,11 @@ def IREEGPU_ShuffleTensorOp : Op<IREEGPU_Dialect, "shuffle_tensor", [
     conflicting writes, and to execute the barrier, this renders any lowerings
     of the enclosing `scf.forall` to serial loops invalid. In other words, the
     lowerings/hardware must provide the number of workers requested by the loop.
+
+    This op takes an input |source| tensor to represent the slice held by this
+    worker before the shuffle, an intermediate memref |shared_alloc| that all
+    workers insert into, and yields a |result| slice of the intermediate memref
+    read by this worker after the shuffle is done.
 
     It is undefined behavior if the source or result tensor slices are out of
     bounds of the intermediate allocation.
@@ -96,7 +100,7 @@ def IREEGPU_ShuffleTensorOp : Op<IREEGPU_Dialect, "shuffle_tensor", [
     DenseI64ArrayAttr:$static_source_offsets,
     DenseI64ArrayAttr:$static_source_sizes,
     DenseI64ArrayAttr:$static_source_strides,
-    AnyRankedTensor:$shared_alloc,
+    AnyMemRef:$shared_alloc,
     Variadic<Index>:$result_offsets,
     Variadic<Index>:$result_sizes,
     Variadic<Index>:$result_strides,
@@ -125,7 +129,7 @@ def IREEGPU_ShuffleTensorOp : Op<IREEGPU_Dialect, "shuffle_tensor", [
       return getSource().getType();
     }
 
-    RankedTensorType getSharedAllocType() {
+    MemRefType getSharedAllocType() {
       return getSharedAlloc().getType();
     }
 

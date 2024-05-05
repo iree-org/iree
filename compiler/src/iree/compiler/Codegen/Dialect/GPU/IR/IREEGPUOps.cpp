@@ -25,8 +25,10 @@ namespace mlir::iree_compiler::IREE::GPU {
 
 LogicalResult ShuffleTensorOp::verify() {
   // Get the equivalent tensor type for the alloc to verify against.
-  Type allocElementType = getSharedAllocType().getElementType();
-  RankedTensorType allocTensorType = getSharedAllocType();
+  MemRefType allocType = getSharedAllocType();
+  Type allocElementType = allocType.getElementType();
+  RankedTensorType allocTensorType =
+      RankedTensorType::get(allocType.getShape(), allocElementType);
 
   // Verify source type against inferred type. Slice insertion and extraction
   // use the same verification logic.
