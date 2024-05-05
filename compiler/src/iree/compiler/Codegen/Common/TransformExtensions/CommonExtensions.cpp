@@ -37,6 +37,7 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
@@ -51,10 +52,12 @@
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/Attributes.h"
+#include "mlir/IR/BuiltinAttributeInterfaces.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/Value.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/CSE.h"
@@ -475,22 +478,40 @@ LogicalResult compareWorkerCountsAndTypes(scf::ForallOp producer,
 
 Value getReplacementSlice(RewriterBase &rewriter, Location loc,
                           tensor::ParallelInsertSliceOp parallelInsert,
-                          tensor::ExtractSliceOp extractSlice) {
+                          tensor::ExtractSliceOp extractSlice,
+                          std::optional<Attribute> addressSpace) {
+  RankedTensorType destTensorType = parallelInsert.getDestType();
+  MemRefType allocType =
+      addressSpace ? MemRefType::get(destTensorType.getShape(),
+                                     destTensorType.getElementType(),
+                                     MemRefLayoutAttrInterface{}, *addressSpace)
+                   : MemRefType::get(destTensorType.getShape(),
+                                     destTensorType.getElementType());
+  Value dest = Value();
+  if (auto empty = parallelInsert.getDest().getDefiningOp<tensor::EmptyOp>()) {
+    OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(empty);
+    dest = rewriter.create<memref::AllocOp>(loc, allocType,
+                                            empty.getDynamicSizes());
+  } else {
+    dest = rewriter.create<bufferization::ToMemrefOp>(loc, allocType,
+                                                      parallelInsert.getDest());
+  }
   return rewriter.create<IREE::GPU::ShuffleTensorOp>(
       loc, extractSlice.getType(), parallelInsert.getSource(),
       parallelInsert.getOffsets(), parallelInsert.getSizes(),
       parallelInsert.getStrides(), parallelInsert.getStaticOffsets(),
-      parallelInsert.getStaticSizes(), parallelInsert.getStaticStrides(),
-      parallelInsert.getDest(), extractSlice.getOffsets(),
-      extractSlice.getSizes(), extractSlice.getStrides(),
-      extractSlice.getStaticOffsets(), extractSlice.getStaticSizes(),
-      extractSlice.getStaticStrides());
+      parallelInsert.getStaticSizes(), parallelInsert.getStaticStrides(), dest,
+      extractSlice.getOffsets(), extractSlice.getSizes(),
+      extractSlice.getStrides(), extractSlice.getStaticOffsets(),
+      extractSlice.getStaticSizes(), extractSlice.getStaticStrides());
 }
 
 LogicalResult fuseForallIntoSlice(RewriterBase &rewriter,
                                   scf::ForallOp producer,
                                   scf::ForallOp consumer,
-                                  tensor::ExtractSliceOp slice) {
+                                  tensor::ExtractSliceOp slice,
+                                  std::optional<Attribute> addressSpace) {
   if (producer->getNumResults() != 1) {
     return failure();
   }
@@ -548,7 +569,7 @@ LogicalResult fuseForallIntoSlice(RewriterBase &rewriter,
       cast<tensor::ParallelInsertSliceOp>(*terminator.getYieldingOps().begin());
 
   Value replacementSlice =
-      getReplacementSlice(rewriter, loc, parallelInsert, slice);
+      getReplacementSlice(rewriter, loc, parallelInsert, slice, addressSpace);
   rewriter.replaceAllUsesWith(slice, replacementSlice);
 
   rewriter.eraseOp(parallelInsert);
@@ -592,8 +613,8 @@ transform_dialect::FuseForallOp::apply(transform::TransformRewriter &rewriter,
                                      "extracted slice from the consumer loop");
   }
 
-  if (failed(
-          fuseForallIntoSlice(rewriter, producer, consumer, sliceConsumer))) {
+  if (failed(fuseForallIntoSlice(rewriter, producer, consumer, sliceConsumer,
+                                 getAddressSpace()))) {
     return mlir::emitDefiniteFailure(state.getTopLevel(),
                                      "failed to fuse forall ops");
   }

@@ -316,7 +316,8 @@ def FuseForallOp : Op<Transform_Dialect, "iree.fuse_forall",
     Fuses a producer-consumer pair of scf.forall ops that share the same
     iterator mapping types and trip counts. An allocation is created to
     bridge the `parallel.insert_slice` of the producer with the per-thread
-    `extract_slice` of the consumer.
+    `extract_slice` of the consumer. If specified, uses |address_space| for
+    the intermediate allocation.
 
     NOTE: This pattern implicitly REQUIRES that the resulting scf.forall
     is capable of synchronizing all threads at the point of fusion (i.e.
@@ -330,7 +331,8 @@ def FuseForallOp : Op<Transform_Dialect, "iree.fuse_forall",
 
   let arguments = (
       ins TransformHandleTypeInterface:$producer,
-          TransformHandleTypeInterface:$consumer
+          TransformHandleTypeInterface:$consumer,
+          OptionalAttr<AnyAttr>:$address_space
   );
   let results = (outs TransformHandleTypeInterface:$result);
 
