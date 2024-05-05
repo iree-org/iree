@@ -255,7 +255,6 @@ def get_rocm_test_compilation_infos(compilation_info_id: CompilationInfoId):
     else:
         raise ValueError("Unknown pipeline for rocm")
 
-
     schedules = []
     if intrinsic == "MFMA":
         schedules = [
@@ -308,7 +307,7 @@ def get_rocm_test_compilation_infos(compilation_info_id: CompilationInfoId):
         infos.append(
             CompilationInfo(
                 tile_sizes=workgroup_tile,
-                dispatch_lowering_pass_pipeline=compilation_info_id.value,
+                dispatch_lowering_pass_pipeline="LLVMGPUVectorDistribute",
                 workgroup_size=workgroup_size,
                 software_pipeline_depth=0,
                 mma_schedule=schedule,
@@ -325,7 +324,10 @@ def get_test_compilation_infos(
     if compilation_info_id == CompilationInfoId.NONE:
         return [None]
 
-    if compilation_info_id in [CompilationInfoId.LLVMGPUVectorDistributeMFMA, CompilationInfoId.LLVMGPUVectorDistributeWMMA]:
+    if compilation_info_id in [
+        CompilationInfoId.LLVMGPUVectorDistributeMFMA,
+        CompilationInfoId.LLVMGPUVectorDistributeWMMA,
+    ]:
         return get_rocm_test_compilation_infos(compilation_info_id)
 
     software_pipeline_depth = 0
