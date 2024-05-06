@@ -68,14 +68,14 @@ static llvm::cl::opt<int> clNarrowMatmulTileBytes(
         "traverse their wide matrix operand once, there is no reuse here and "
         "this doesn't have to be sized to fit in some CPU cache. This is more "
         "about distributing work to threads."),
-    llvm::cl::init(64 * 1024));
+    llvm::cl::init(1024 * 1024 * 1024));
 
 static llvm::cl::opt<int> clGeneralMatmulTileBytes(
     "iree-llvmcpu-general-matmul-tile-bytes",
     llvm::cl::desc("target distribution tile size for matrix operands of "
                    "general matmuls, expressed in bytes. Currently only used "
                    "in data-tiled matmuls (mmt4d)."),
-    llvm::cl::init(64 * 1024));
+    llvm::cl::init(1024 * 1024 * 1024));
 
 static llvm::cl::opt<bool> clDisableVectorPeeling(
     "iree-llvmcpu-disable-vector-peeling",
@@ -1547,7 +1547,7 @@ static TileSizesListType getMmt4dTileSizes(linalg::LinalgOp op) {
                                               distTileSizes.end());
   SmallVector<int64_t> cacheReductionTileSizes(numLoops, 0);
 
-  SmallVector<int64_t> vecTileSizes(numLoops, 1);
+  SmallVector<int64_t> vecTileSizes(numLoops, 0);
   assert(vecTileSizes.size() == mmt4dDimBase + 6);
   vecTileSizes[mmt4dDimBase + 3] = M0;
   vecTileSizes[mmt4dDimBase + 4] = N0;

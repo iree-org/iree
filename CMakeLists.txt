@@ -1034,6 +1034,11 @@ if(IREE_BUILD_EXPERIMENTAL_HAL_EXECUTABLE_LIBRARY_CALL_HOOKS)
   add_subdirectory(experimental/hal_executable_library_call_hooks)
 endif()
 
+find_package(Eigen3)
+if (EIGEN3_FOUND)
+  add_subdirectory(experimental/svd_analysis)
+endif()
+
 set(IREE_PUBLIC_INCLUDE_DIRS "${IREE_COMMON_INCLUDE_DIRS}"
     CACHE INTERNAL "IREE: Include Directories" FORCE)
 
