@@ -11,13 +11,12 @@ from enum import Enum
 import logging
 import os
 import tempfile
+import importlib.util
 from typing import List, Optional, Sequence, Set, Union
 
 from .debugging import TempFileSaver
 from .binaries import find_tool, invoke_immediate, invoke_pipeline
 from .core import CompilerOptions, DEFAULT_TESTING_BACKENDS, build_compile_command_line
-
-from iree.compiler.tools.ir_tool import __main__
 
 __all__ = [
     "compile_file",
@@ -31,10 +30,8 @@ _IMPORT_TOOL = "iree-import-tflite"
 
 
 def is_available():
-    """Determine if the TFLite frontend is available."""
-    try:
-        import tensorflow as tf
-    except ModuleNotFoundError:
+    """Determine if TensorFlow and the TFLite frontend are available."""
+    if importlib.util.find_spec("tensorflow") is None:
         logging.warn("Unable to import tensorflow")
         return False
     try:
@@ -76,13 +73,6 @@ class ImportOptions(CompilerOptions):
     input_type: Optional[str] = "tosa"
 
 
-def mlir_bytecode_to_text(bytecode_file):
-    with tempfile.NamedTemporaryFile() as temp_file:
-        args = __main__.parse_arguments(["copy", bytecode_file, "-o", temp_file.name])
-        __main__.main(args)
-        return temp_file.read()
-
-
 def compile_file(fb_path: str, **kwargs):
     """Compiles a TFLite FlatBuffer file to an IREE binary.
 
@@ -121,12 +111,10 @@ def compile_file(fb_path: str, **kwargs):
         if options.import_only:
             # We need to convert MLIR bytecode to the textual format
             # TODO: Add option to choose between bytecode and textual format
-            mlir_text = mlir_bytecode_to_text(tfl_iree_input)
-            if not options.output_file:
-                return mlir_text
-            with open(options.output_file, "wb") as f:
-                f.write(mlir_text)
+            if options.output_file:
                 return None
+            with open(tfl_iree_input, "rb") as f:
+                return f.read()
 
         # Run IREE compilation pipeline
         compile_cl = build_compile_command_line(tfl_iree_input, tfs, options)

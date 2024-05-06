@@ -9,6 +9,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
+import importlib.util
 import os
 import logging
 import tempfile
@@ -34,10 +35,8 @@ __all__ = [
 
 
 def is_available():
-    """Determine if TensorFlow and the compiler are available."""
-    try:
-        import tensorflow as tf
-    except ModuleNotFoundError:
+    """Determine if TensorFlow and the TF frontend are available."""
+    if importlib.util.find_spec("tensorflow") is None:
         logging.warn("Unable to import tensorflow")
         return False
     try:
