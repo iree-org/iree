@@ -48,7 +48,8 @@ class CompilationInfoId(enum.Enum):
     LLVMGPUMatmulSimt = "LLVMGPUMatmulSimt"
     LLVMGPUMatmulTensorCore = "LLVMGPUMatmulTensorCore"
     LLVMGPUMatmulTensorCoreMmaSync = "LLVMGPUMatmulTensorCoreMmaSync"
-    LLVMGPUVectorDistribute = "LLVMGPUVectorDistribute"
+    LLVMGPUVectorDistributeMFMA = "LLVMGPUVectorDistributeMFMA"
+    LLVMGPUVectorDistributeWMMA = "LLVMGPUVectorDistributeWMMA"
     SPIRVCooperativeMatrixVectorize = "SPIRVCooperativeMatrixVectorize"
     SPIRVVectorizeMali = "SPIRVVectorizeMali"
     SPIRVVectorizeNVIDIA = "SPIRVVectorizeNVIDIA"
@@ -246,21 +247,43 @@ def get_all_spirv_tile_workgroup_size_pairs(t_tile_k):
 
 
 def get_rocm_test_compilation_infos(compilation_info_id: CompilationInfoId):
-    assert compilation_info_id == CompilationInfoId.LLVMGPUVectorDistribute
-    # TODO: Add test for WMMA layout.
-    schedules = [
-        MMASchedule("MFMA_F16_16x16x16_F32", 1, 1, 1, 1, 1),
-        MMASchedule("MFMA_F16_16x16x16_F32", 1, 1, 1, 1, 2),
-        MMASchedule("MFMA_F16_16x16x16_F32", 1, 1, 1, 2, 1),
-        MMASchedule("MFMA_F16_16x16x16_F32", 1, 1, 2, 1, 1),
-        MMASchedule("MFMA_F16_16x16x16_F32", 2, 2, 1, 1, 1),
-        MMASchedule("MFMA_F16_16x16x16_F32", 2, 4, 2, 1, 2),
-        MMASchedule("MFMA_F16_16x16x16_F32", 4, 2, 4, 2, 2),
-        MMASchedule("MFMA_F16_32x32x8_F32", 1, 1, 1, 2, 2),
-        MMASchedule("MFMA_F16_32x32x8_F32", 2, 2, 1, 1, 1),
-        MMASchedule("MFMA_F16_32x32x8_F32", 1, 4, 2, 1, 2),
-        MMASchedule("MFMA_F16_32x32x8_F32", 4, 2, 1, 2, 4),
-    ]
+    intrinsic = ""
+    if compilation_info_id == CompilationInfoId.LLVMGPUVectorDistributeMFMA:
+        intrinsic = "MFMA"
+    elif compilation_info_id == CompilationInfoId.LLVMGPUVectorDistributeWMMA:
+        intrinsic = "WMMA"
+    else:
+        raise ValueError("Unknown pipeline for rocm")
+
+    schedules = []
+    if intrinsic == "MFMA":
+        schedules = [
+            MMASchedule("MFMA_F16_16x16x16_F32", 1, 1, 1, 1, 1),
+            MMASchedule("MFMA_F16_16x16x16_F32", 1, 1, 1, 1, 2),
+            MMASchedule("MFMA_F16_16x16x16_F32", 1, 1, 1, 2, 1),
+            MMASchedule("MFMA_F16_16x16x16_F32", 1, 1, 2, 1, 1),
+            MMASchedule("MFMA_F16_16x16x16_F32", 2, 2, 1, 1, 1),
+            MMASchedule("MFMA_F16_16x16x16_F32", 2, 4, 2, 1, 2),
+            MMASchedule("MFMA_F16_16x16x16_F32", 4, 2, 4, 2, 2),
+            MMASchedule("MFMA_F16_32x32x8_F32", 1, 1, 1, 2, 2),
+            MMASchedule("MFMA_F16_32x32x8_F32", 2, 2, 1, 1, 1),
+            MMASchedule("MFMA_F16_32x32x8_F32", 1, 4, 2, 1, 2),
+            MMASchedule("MFMA_F16_32x32x8_F32", 4, 2, 1, 2, 4),
+        ]
+    elif intrinsic == "WMMA":
+        schedules = [
+            MMASchedule("WMMA_F16_16x16x16_F32", 1, 1, 1, 1, 1),
+            MMASchedule("WMMA_F16_16x16x16_F32", 1, 1, 1, 1, 2),
+            MMASchedule("WMMA_F16_16x16x16_F32", 1, 1, 1, 2, 1),
+            MMASchedule("WMMA_F16_16x16x16_F32", 1, 1, 2, 1, 1),
+            MMASchedule("WMMA_F16_16x16x16_F32", 2, 2, 1, 1, 1),
+            MMASchedule("WMMA_F16_16x16x16_F32", 2, 4, 2, 1, 2),
+            MMASchedule("WMMA_F16_16x16x16_F32", 4, 2, 4, 2, 2),
+        ]
+    else:
+        raise NotImplementedError("unhandled intrinsic case")
+
+    subgroup_size = 64 if intrinsic == "MFMA" else 32
 
     infos = []
     for schedule in schedules:
@@ -272,21 +295,23 @@ def get_rocm_test_compilation_infos(compilation_info_id: CompilationInfoId):
             wg_tile_m = schedule.m_count * schedule.m_tile_count * 32
             wg_tile_n = schedule.n_count * schedule.n_tile_count * 32
             wg_tile_k = schedule.k_tile_count * 8
+        elif schedule.intrinsic == "WMMA_F16_16x16x16_F32":
+            wg_tile_m = schedule.m_count * schedule.m_tile_count * 16
+            wg_tile_n = schedule.n_count * schedule.n_tile_count * 16
+            wg_tile_k = schedule.k_tile_count * 16
         else:
             raise NotImplementedError("unhandled intrinsic case")
 
         workgroup_tile = [[wg_tile_m, wg_tile_n, wg_tile_k]]
-        workgroup_size = [schedule.n_count * 64, schedule.m_count, 1]
+        workgroup_size = [schedule.n_count * subgroup_size, schedule.m_count, 1]
         infos.append(
             CompilationInfo(
                 tile_sizes=workgroup_tile,
-                dispatch_lowering_pass_pipeline=compilation_info_id.value,
+                dispatch_lowering_pass_pipeline="LLVMGPUVectorDistribute",
                 workgroup_size=workgroup_size,
                 software_pipeline_depth=0,
                 mma_schedule=schedule,
-                # TODO: This is only valid for gfx9. Change this for RDNA3
-                # architectures.
-                subgroup_size=64,
+                subgroup_size=subgroup_size,
             )
         )
     return infos
@@ -299,7 +324,10 @@ def get_test_compilation_infos(
     if compilation_info_id == CompilationInfoId.NONE:
         return [None]
 
-    if compilation_info_id == CompilationInfoId.LLVMGPUVectorDistribute:
+    if compilation_info_id in [
+        CompilationInfoId.LLVMGPUVectorDistributeMFMA,
+        CompilationInfoId.LLVMGPUVectorDistributeWMMA,
+    ]:
         return get_rocm_test_compilation_infos(compilation_info_id)
 
     software_pipeline_depth = 0
