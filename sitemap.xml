@@ -336,6 +336,11 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://iree.dev/reference/mlir-dialects/Encoding/</loc>
+         <lastmod>2024-05-06</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://iree.dev/reference/mlir-dialects/Flow/</loc>
          <lastmod>2024-05-06</lastmod>
          <changefreq>daily</changefreq>
