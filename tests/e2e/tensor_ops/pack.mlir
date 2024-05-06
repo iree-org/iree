@@ -104,7 +104,7 @@ func.func @static_pack_large() {
       : tensor<128x256xi32> -> tensor<4x16x32x16xi32>
 
   // Pack without padding is just a reshape followed by a transpose.
-  %reshape = tensor.expand_shape %source [[0, 1], [2, 3]] : tensor<128x256xi32> into tensor<4x32x16x16xi32>
+  %reshape = tensor.expand_shape %source [[0, 1], [2, 3]] output_shape [4, 32, 16, 16]: tensor<128x256xi32> into tensor<4x32x16x16xi32>
   %init_transpose = tensor.empty() : tensor<4x16x32x16xi32>
   %transpose = linalg.transpose
     ins(%reshape : tensor<4x32x16x16xi32>)
@@ -123,7 +123,7 @@ func.func @static_pack_transpose_inner_dims_large() {
   %init_pack = tensor.empty() : tensor<4x16x16x32xi32>
   %pack = tensor.pack %source inner_dims_pos = [1, 0] inner_tiles = [16, 32] into %init_pack
       : tensor<128x256xi32> -> tensor<4x16x16x32xi32>
-  %reshape = tensor.expand_shape %source [[0, 1], [2, 3]] : tensor<128x256xi32> into tensor<4x32x16x16xi32>
+  %reshape = tensor.expand_shape %source [[0, 1], [2, 3]] output_shape [4, 32, 16, 16]: tensor<128x256xi32> into tensor<4x32x16x16xi32>
   %init_transpose = tensor.empty() : tensor<4x16x16x32xi32>
   %transpose = linalg.transpose
     ins(%reshape : tensor<4x32x16x16xi32>)
@@ -150,7 +150,7 @@ func.func @static_pack_pad_large() {
     ^bb0(%b0 : index, %b1 : index):
       tensor.yield %padding_value : i32
   } : tensor<100x250xi32> to tensor<128x256xi32>
-  %reshape = tensor.expand_shape %pad [[0, 1], [2, 3]] : tensor<128x256xi32> into tensor<4x32x16x16xi32>
+  %reshape = tensor.expand_shape %pad [[0, 1], [2, 3]] output_shape [4, 32, 16, 16]: tensor<128x256xi32> into tensor<4x32x16x16xi32>
   %init_transpose = tensor.empty() : tensor<4x16x32x16xi32>
   %transpose = linalg.transpose
     ins(%reshape : tensor<4x32x16x16xi32>)
@@ -177,7 +177,7 @@ func.func @static_pack_pad_transpose_outer_dims_large() {
     ^bb0(%b0 : index, %b1 : index):
       tensor.yield %padding_value : i32
   } : tensor<100x250xi32> to tensor<128x256xi32>
-  %reshape = tensor.expand_shape %pad [[0, 1], [2, 3]] : tensor<128x256xi32> into tensor<4x32x16x16xi32>
+  %reshape = tensor.expand_shape %pad [[0, 1], [2, 3]] output_shape [4, 32, 16, 16]: tensor<128x256xi32> into tensor<4x32x16x16xi32>
   %init_transpose = tensor.empty() : tensor<16x4x32x16xi32>
   %transpose = linalg.transpose
     ins(%reshape : tensor<4x32x16x16xi32>)
@@ -204,7 +204,7 @@ func.func @static_pack_pad_transpose_inner_dims_large() {
     ^bb0(%b0 : index, %b1 : index):
       tensor.yield %padding_value : i32
   } : tensor<100x250xi32> to tensor<128x256xi32>
-  %reshape = tensor.expand_shape %pad [[0, 1], [2, 3]] : tensor<128x256xi32> into tensor<4x32x16x16xi32>
+  %reshape = tensor.expand_shape %pad [[0, 1], [2, 3]] output_shape [4, 32, 16, 16]: tensor<128x256xi32> into tensor<4x32x16x16xi32>
   %init_transpose = tensor.empty() : tensor<4x16x16x32xi32>
   %transpose = linalg.transpose
     ins(%reshape : tensor<4x32x16x16xi32>)
@@ -231,7 +231,7 @@ func.func @static_pack_pad_transpose_inner_and_outer_dims_large() {
     ^bb0(%b0 : index, %b1 : index):
       tensor.yield %padding_value : i32
   } : tensor<100x250xi32> to tensor<128x256xi32>
-  %reshape = tensor.expand_shape %pad [[0, 1], [2, 3]] : tensor<128x256xi32> into tensor<4x32x16x16xi32>
+  %reshape = tensor.expand_shape %pad [[0, 1], [2, 3]] output_shape [4, 32, 16, 16]: tensor<128x256xi32> into tensor<4x32x16x16xi32>
   %init_transpose = tensor.empty() : tensor<16x4x16x32xi32>
   %transpose = linalg.transpose
     ins(%reshape : tensor<4x32x16x16xi32>)

@@ -155,7 +155,7 @@ func.func @scatter_1D_large() {
      %1 = arith.index_cast %0 : index to i32
      linalg.yield %1 : i32
       } -> tensor<1400xi32>
-  %indices_reshaped = tensor.expand_shape %indices [[0, 1]] :
+  %indices_reshaped = tensor.expand_shape %indices [[0, 1]] output_shape [1400, 1]:
       tensor<1400xi32> into tensor<1400x1xi32>
   %result = "stablehlo.scatter"(%original, %indices_reshaped, %update)({
     ^bb0(%arg3 : tensor<i32>, %arg4 : tensor<i32>):
@@ -186,7 +186,7 @@ func.func @scatter_2D_large() {
         %1 = arith.index_cast %0 : index to i32
         linalg.yield %1 : i32
       } -> tensor<200xi32>
-  %indices_reshaped = tensor.expand_shape %indices [[0, 1]] :
+  %indices_reshaped = tensor.expand_shape %indices [[0, 1]] output_shape [200, 1]:
       tensor<200xi32> into tensor<200x1xi32>
   %result = "stablehlo.scatter"(%original, %indices_reshaped, %update)({
     ^bb0(%arg3 : tensor<i32>, %arg4 : tensor<i32>):
@@ -218,7 +218,7 @@ func.func @scatter_2D_large_permuted() {
         %1 = arith.index_cast %0 : index to i32
         linalg.yield %1 : i32
       } -> tensor<300xi32>
-  %indices_reshaped = tensor.expand_shape %indices [[0, 1]] :
+  %indices_reshaped = tensor.expand_shape %indices [[0, 1]] output_shape [300, 1]:
       tensor<300xi32> into tensor<300x1xi32>
   %result = "stablehlo.scatter"(%original, %indices_reshaped, %update)({
     ^bb0(%arg3 : tensor<i32>, %arg4 : tensor<i32>):
