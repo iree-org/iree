@@ -109,8 +109,6 @@ def compile_file(fb_path: str, **kwargs):
         )
 
         if options.import_only:
-            # We need to convert MLIR bytecode to the textual format
-            # TODO: Add option to choose between bytecode and textual format
             if options.output_file:
                 return None
             with open(tfl_iree_input, "rb") as f:
