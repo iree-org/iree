@@ -14,10 +14,10 @@
 
 #define NCCL_MAJOR 2
 #define NCCL_MINOR 18
-#define NCCL_PATCH 6
+#define NCCL_PATCH 3
 #define NCCL_SUFFIX ""
 
-#define NCCL_VERSION_CODE 21806
+#define NCCL_VERSION_CODE 21803
 #define NCCL_VERSION(X,Y,Z) (((X) <= 2 && (Y) <= 8) ? (X) * 1000 + (Y) * 100 + (Z) : (X) * 10000 + (Y) * 100 + (Z))
 
 #define RCCL_BFLOAT16 1
