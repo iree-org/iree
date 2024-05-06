@@ -81,8 +81,8 @@ iree_cc_library(
     iree::compiler::Codegen::Interfaces::UKernelOpInterface
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
+    iree::compiler::Dialect::Encoding::IR
     iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::LinalgExt::IR
   PUBLIC
 )
 

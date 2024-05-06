@@ -30,6 +30,7 @@ iree_cc_library(
     MLIRMLProgramDialect
     MLIRTensorDialect
     MLIRValueBoundsOpInterface
+    iree::compiler::Dialect::Encoding::IR
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::Util::IR

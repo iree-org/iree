@@ -38,6 +38,7 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::Transforms
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::HAL::Transforms
+    iree::compiler::Dialect::Encoding::IR
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::LinalgExt::TransformExtensions::LinalgExtExtensions
     iree::compiler::Dialect::LinalgExt::Transforms

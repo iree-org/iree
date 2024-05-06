@@ -131,7 +131,7 @@ def SetEncoding : Pass<"iree-global-opt-set-encoding", ""> {
     Option<"padFactor", "pad-factor", "int64_t", /*default=*/"0",
            "The padding sizes hint will be attached to encodings if is it set"
            "to non-zero. Otherwise, it creates"
-           "iree_linalg_ext.upper_bound_tile_size and rely on backends to"
+           "iree_encoding.upper_bound_tile_size and rely on backends to"
            "resolve them.">,
   ];
 }

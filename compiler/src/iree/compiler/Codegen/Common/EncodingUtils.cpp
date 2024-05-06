@@ -5,17 +5,16 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 
 namespace mlir::iree_compiler {
 
-using IREE::LinalgExt::EncodingAttr;
-using IREE::LinalgExt::EncodingRole;
-using IREE::LinalgExt::getEncodingAttr;
-using IREE::LinalgExt::getEncodingContractionDims;
+using IREE::Encoding::EncodingAttr;
+using IREE::Encoding::EncodingRole;
+using IREE::Encoding::getEncodingAttr;
+using IREE::Encoding::getEncodingContractionDims;
 
 /// For a given tensor type with an encoding, return the materialized
 /// type to use for it. If no encoding is set, then return the tensor type

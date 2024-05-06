@@ -6,9 +6,9 @@
 
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 
+#include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/FormDispatchRegions.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/CommandLine.h"
@@ -89,7 +89,7 @@ getLoopRangesImpl(ReifyRankedShapedTypeOpInterface shapedOp, Location loc,
 SmallVector<Range> getLoopRanges(Operation *op, Location loc,
                                  OpBuilder &builder) {
   return llvm::TypeSwitch<Operation *, SmallVector<Range>>(op)
-      .Case<LinalgExt::SetEncodingOp, LinalgExt::UnsetEncodingOp,
+      .Case<Encoding::SetEncodingOp, Encoding::UnsetEncodingOp,
             tensor::InsertSliceOp>([&](auto op) {
         return getLoopRangesFromValue(op.getSource(), loc, builder);
       })

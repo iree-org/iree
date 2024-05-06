@@ -25,7 +25,7 @@ util.func public @denseTensorSizeOfEmpty(%arg0: index) -> index {
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 util.func public @sizeof_lhs_encoding_dynamic(%arg0: index, %arg1: index) -> index {
-  %0 = stream.tensor.sizeof tensor<?x?xf32, #iree_linalg_ext.encoding<role = LHS, element_types = [f32, f32, f32], original_type = tensor<?x?xf32>, user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 4, 8, 16>>>{%arg0, %arg1} : index
+  %0 = stream.tensor.sizeof tensor<?x?xf32, #iree_encoding.encoding<role = LHS, element_types = [f32, f32, f32], original_type = tensor<?x?xf32>, user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 4, 8, 16>>>{%arg0, %arg1} : index
   util.return %0 : index
 }
 // CHECK-LABEL: @sizeof_lhs_encoding_dynamic
@@ -45,7 +45,7 @@ util.func public @sizeof_lhs_encoding_dynamic(%arg0: index, %arg1: index) -> ind
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 util.func public @sizeof_rhs_encoding_dynamic(%arg0: index, %arg1: index) -> index {
-  %0 = stream.tensor.sizeof tensor<?x?xf32, #iree_linalg_ext.encoding<role = RHS, element_types = [f32, f32, f32], original_type = tensor<?x?xf32>, user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 4, 8, 16>>>{%arg0, %arg1} : index
+  %0 = stream.tensor.sizeof tensor<?x?xf32, #iree_encoding.encoding<role = RHS, element_types = [f32, f32, f32], original_type = tensor<?x?xf32>, user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 4, 8, 16>>>{%arg0, %arg1} : index
   util.return %0 : index
 }
 // CHECK-LABEL: @sizeof_rhs_encoding_dynamic
@@ -66,7 +66,7 @@ util.func public @sizeof_rhs_encoding_dynamic(%arg0: index, %arg1: index) -> ind
 #map1 = affine_map<(d0, d1, d2) -> (d2, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 util.func public @sizeof_result_encoding_dynamic(%arg0: index, %arg1: index) -> index {
-  %0 = stream.tensor.sizeof tensor<?x?xf32, #iree_linalg_ext.encoding<role = RESULT, element_types = [f32, f32, f32], original_type = tensor<?x?xf32>, user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 4, 8, 16>>>{%arg0, %arg1} : index
+  %0 = stream.tensor.sizeof tensor<?x?xf32, #iree_encoding.encoding<role = RESULT, element_types = [f32, f32, f32], original_type = tensor<?x?xf32>, user_indexing_maps = [#map, #map1, #map2], round_dims_to = array<i64: 4, 8, 16>>>{%arg0, %arg1} : index
   util.return %0 : index
 }
 // CHECK-LABEL: @sizeof_result_encoding_dynamic
