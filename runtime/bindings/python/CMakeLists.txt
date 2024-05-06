@@ -91,9 +91,8 @@ target_link_libraries(iree_runtime_bindings_python_PyExtRt
   iree::base::internal::file_io
   iree::base::internal::path
   iree::io::file_handle
-  iree::io::formats::gguf
   iree::io::formats::irpa
-  iree::io::formats::safetensors
+  iree::io::formats::parser_registry
   iree::io::parameter_index
   iree::io::parameter_index_provider
   iree::io::parameter_provider

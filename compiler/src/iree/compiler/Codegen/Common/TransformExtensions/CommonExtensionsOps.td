@@ -154,6 +154,43 @@ def ApplyUnrollVectorsGpuWmmaSyncPatternsOp : Op<Transform_Dialect,
   let assemblyFormat = "attr-dict";
 }
 
+def CopyTensorOperandOp :  Op<Transform_Dialect, "iree.copy_tensor_operand",
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     FunctionalStyleTransformOpTrait,
+     TransformEachOpTrait,
+     TransformOpInterface,
+     ReportTrackingListenerFailuresOpTrait]> {
+  let summary = "Hoist static allocations";
+  let description = [{
+    Inserts a copy of the specified operand of the target operation.
+
+    #### Return modes
+    Returns a handle to the new copy.
+
+    It does not consume the target handle and emits a definite failure if the
+    operand index is out of range or if the operand is not a tensor type.
+  }];
+
+  let arguments = (ins
+    TransformHandleTypeInterface:$target,
+    I64Attr:$operand_index);
+  let results = (outs TransformHandleTypeInterface:$result);
+
+  let assemblyFormat = [{
+    $target `[` $operand_index `]` attr-dict
+    `:` functional-type(operands, results)
+  }];
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::transform::TransformRewriter &rewriter,
+        ::mlir::Operation *target,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
 def GpuDistributeSharedMemoryCopyOp :
   Op<Transform_Dialect, "iree.gpu_distribute_shared_memory_copy",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
