@@ -437,5 +437,5 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 // CHECK:         }
 // CHECK:         gpu.barrier
 // CHECK:         amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
-// CHECK:         %[OUT_GLOBAL_SUB:.+]] = memref.subview %[[OUT_GLOBAL]]
-// CHECK:         vector.transfer_write %{{.+}}, %[[OUT_GLOBAL]]
+// CHECK:         %[[OUT_GLOBAL_SUB:.+]] = memref.subview %[[OUT_GLOBAL]]
+// CHECK:         vector.transfer_write %{{.+}}, %[[OUT_GLOBAL_SUB]]
