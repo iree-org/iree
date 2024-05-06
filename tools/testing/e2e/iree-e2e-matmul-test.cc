@@ -820,7 +820,7 @@ class MatmulTestModuleState final {
     return std::move(result_view);
   }
 
-  Status CheckMatmulResults(
+  Status CheckCyclicalMatmulResults(
       const vm::ref<iree_hal_device_t> device, int64_t m, int64_t k, int64_t n,
       int64_t m_repeat_period, int64_t n_repeat_period, int32_t transpose_rhs,
       const vm::ref<iree_hal_buffer_view_t> lhs,
@@ -838,6 +838,21 @@ class MatmulTestModuleState final {
     return status;
   }
 
+  Status CheckMatmulResults(
+      const vm::ref<iree_hal_device_t> device, int64_t m, int64_t k, int64_t n,
+      int32_t transpose_rhs, const vm::ref<iree_hal_buffer_view_t> lhs,
+      const vm::ref<iree_hal_buffer_view_t> rhs,
+      const vm::ref<iree_hal_buffer_view_t> acc,
+      const vm::ref<iree_hal_buffer_view_t> actual_result,
+      const vm::ref<iree_hal_buffer_view_t> expected_result) {
+    // A repeat period of 0 denotes no repeat.
+    int64_t m_repeat_period = 0;
+    int64_t n_repeat_period = 0;
+    return CheckCyclicalMatmulResults(device, m, k, n, m_repeat_period,
+                                      n_repeat_period, transpose_rhs, lhs, rhs,
+                                      acc, actual_result);
+  }
+
  private:
   iree_allocator_t host_allocator_;
 };
@@ -849,6 +864,9 @@ static const vm::NativeFunction<MatmulTestModuleState>
         vm::MakeNativeFunction(
             "generate_random_cyclical_matrix",
             &MatmulTestModuleState::GenerateRandomCyclicalMatrix),
+        vm::MakeNativeFunction(
+            "check_cyclical_matmul_results",
+            &MatmulTestModuleState::CheckCyclicalMatmulResults),
         vm::MakeNativeFunction("check_matmul_results",
                                &MatmulTestModuleState::CheckMatmulResults),
 };
