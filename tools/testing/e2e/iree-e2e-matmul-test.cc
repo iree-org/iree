@@ -43,22 +43,22 @@
     result_data[n + m * n_size] = acc;                                         \
   }
 
-// Reference mamtul instantiations from macro REFERENCE_MATMUL
+// Reference matmul instantiations from macro REFERENCE_MATMUL
 // for the f32 input, f32 accumlation, and f32 result.
 // [float <= float * float + float]
 REFERENCE_MATMUL(float, float, float, float)
 
-// Reference mamtul instantiations from macro REFERENCE_MATMUL
+// Reference matmul instantiations from macro REFERENCE_MATMUL
 // for the int8_t input, int32_t accumlation, and int32_t result.
 // [i32 <= i8 * i8 + i32]
 REFERENCE_MATMUL(int8_t, int8_t, int32_t, int32_t)
 
-// Reference mamtul instantiations from macro REFERENCE_MATMUL
+// Reference matmul instantiations from macro REFERENCE_MATMUL
 // for the int32_t input, int32_t accumlation, and int32_t result.
 // [i32 <= i32 * i32 + i32]
 REFERENCE_MATMUL(int32_t, int32_t, int32_t, int32_t)
 
-// Reference mamtul for the f16 input, f16 accumlation, and f16 result.
+// Reference matmul for the f16 input, f16 accumlation, and f16 result.
 // [f16 <= f16 * f16 + f16]
 static void reference_matmul_f16_f16_f16_f16(
     iree_hal_dim_t m_size, iree_hal_dim_t k_size, iree_hal_dim_t n_size,
@@ -76,7 +76,7 @@ static void reference_matmul_f16_f16_f16_f16(
   result_data[n + m * n_size] = iree_math_f32_to_f16(acc);
 }
 
-// Reference mamtul for the f16 input, f32 accumlation, and f32 result.
+// Reference matmul for the f16 input, f32 accumlation, and f32 result.
 // [f32 <= f16 * f16 + f32]
 static void reference_matmul_f16_f16_f32_f32(
     iree_hal_dim_t m_size, iree_hal_dim_t k_size, iree_hal_dim_t n_size,
@@ -93,7 +93,7 @@ static void reference_matmul_f16_f16_f32_f32(
   result_data[n + m * n_size] = acc;
 }
 
-// Reference mamtul for the bf16 input, bf16 accumlation, and bf16 result.
+// Reference matmul for the bf16 input, bf16 accumlation, and bf16 result.
 // [bf16 <= bf16 * bf16 + bf16]
 static void reference_matmul_bf16_bf16_bf16_bf16(
     iree_hal_dim_t m_size, iree_hal_dim_t k_size, iree_hal_dim_t n_size,
@@ -111,7 +111,7 @@ static void reference_matmul_bf16_bf16_bf16_bf16(
   result_data[n + m * n_size] = iree_math_f32_to_bf16(acc);
 }
 
-// Reference mamtul for the bf16 input, f32 accumlation, and f32 result.
+// Reference matmul for the bf16 input, f32 accumlation, and f32 result.
 // [f32 <= bf16 * bf16 + f32]
 static void reference_matmul_bf16_bf16_f32_f32(
     iree_hal_dim_t m_size, iree_hal_dim_t k_size, iree_hal_dim_t n_size,
@@ -128,7 +128,6 @@ static void reference_matmul_bf16_bf16_f32_f32(
   result_data[n + m * n_size] = acc;
 }
 
-// Helper for reference_matmul.
 // Computes one element in the result matrix.
 static iree_status_t reference_matmul_element(
     iree_hal_dim_t m_size, iree_hal_dim_t k_size, iree_hal_dim_t n_size,
@@ -195,6 +194,7 @@ static iree_status_t reference_matmul_element(
 // Reference matmul implementation, used to compare matmul results against.
 static iree_status_t reference_matmul(
     iree_hal_dim_t m_size, iree_hal_dim_t k_size, iree_hal_dim_t n_size,
+    iree_hal_dim_t m_repeat_period, iree_hal_dim_t n_repeat_period,
     iree_hal_element_type_t lhs_type, iree_hal_element_type_t rhs_type,
     iree_hal_element_type_t acc_type, bool transpose_rhs,
     iree_byte_span_t lhs_contents, iree_byte_span_t rhs_contents,
@@ -205,20 +205,114 @@ static iree_status_t reference_matmul(
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, k_size);
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, n_size);
 
-  iree_host_size_t count = 0;
-  for (iree_hal_dim_t m = 0; m < m_size; ++m) {
-    for (iree_hal_dim_t n = 0; n < n_size; ++n) {
-      if (++count < compute_every) continue;
-      count = 0;
-      IREE_RETURN_AND_END_ZONE_IF_ERROR(
-          z0, reference_matmul_element(
-                  m_size, k_size, n_size, lhs_type, rhs_type, acc_type,
-                  transpose_rhs, lhs_contents.data, rhs_contents.data,
-                  acc_contents.data, result_contents.data, m, n));
+  // This function computes:
+  //
+  // C = matmul(A, B) + D
+  //
+  // where the correspond to function arguments is:
+  //        C - result_contents.
+  //        A - lhs_contents.
+  //        B - rhs_contents.
+  //        D - acc_contents.
+  //
+  // Because the rows of A and the columns of B repeat,
+  //
+  // C[m0, n0] == C[m1, n1] if
+  //  - m0 % m_repeat_period == m1 % m_repeat_period, and
+  //  - n0 % n_repeat_period == n1 % n_repeat_period.
+  //
+  // This cyclical repetition of the values in C can be used to accelerate the
+  // computation of C: By computing C[i, j] for all
+  //   i <= m_repeat_period, and
+  //   j <= n_repeat_period,
+  //
+  // all remaining values of C can be copied from these low-index values,
+  // avoiding computing the O(k) inner-product and instead performing an O(1)
+  // copy.
+  //
+  // Using the cyclical caching trick to compute only some of the results when
+  // 'compute_every > 1' is too complicated, unless an additional buffer is used
+  // to recored which elements have previously been computed (which we don't
+  // want to do). We therefore use only one of the two techniques to reduce
+  // computation.
+
+  // Repeat period of 0 denotes no repeat.
+  m_repeat_period = m_repeat_period > 0 ? m_repeat_period : m_size;
+  n_repeat_period = n_repeat_period > 0 ? n_repeat_period : n_size;
+
+  // The number of O(k) inner-products that will be computed using the caching
+  // trick. Only inner-products for
+  // (i,j) in {0, ..., m_repeat_period-1} x {0, ..., n_repeat_period-1}
+  // computed.
+  const int64_t caching_trick_cost = m_repeat_period * n_repeat_period;
+
+  // The number of O(k) inner-products that will be computed by computing only
+  // every compute_every-th element.
+  const int64_t compute_every_cost = m_size * n_size / compute_every;
+
+  // True if the repeat period in both the m- and n- dimensions are too large to
+  // result in any caching.
+  const bool no_cached_values =
+      m_repeat_period >= m_size && n_repeat_period >= n_size;
+
+  // Even if compute_every > 1, we use the caching trick to compute every value
+  // if it is cheaper to do so.
+  if (compute_every > 1 && compute_every_cost < caching_trick_cost) {
+    iree_host_size_t count = 0;
+    for (iree_hal_dim_t m = 0; m < m_size; ++m) {
+      for (iree_hal_dim_t n = 0; n < n_size; ++n) {
+        if (++count < compute_every) continue;
+        IREE_RETURN_AND_END_ZONE_IF_ERROR(
+            z0, reference_matmul_element(
+                    m_size, k_size, n_size, lhs_type, rhs_type, acc_type,
+                    transpose_rhs, lhs_contents.data, rhs_contents.data,
+                    acc_contents.data, result_contents.data, m, n));
+      }
+    }
+  }
+
+  else if (no_cached_values) {
+    for (iree_hal_dim_t m = 0; m < m_size; ++m) {
+      for (iree_hal_dim_t n = 0; n < n_size; ++n) {
+        IREE_RETURN_AND_END_ZONE_IF_ERROR(
+            z0, reference_matmul_element(
+                    m_size, k_size, n_size, lhs_type, rhs_type, acc_type,
+                    transpose_rhs, lhs_contents.data, rhs_contents.data,
+                    acc_contents.data, result_contents.data, m, n));
+      }
+    }
+  }
+
+  else {
+    iree_host_size_t bytes_per_element =
+        iree_hal_element_dense_byte_count(acc_type);
+    for (iree_hal_dim_t m = 0; m < m_size; ++m) {
+      for (iree_hal_dim_t n = 0; n < n_size; ++n) {
+        const iree_hal_dim_t m_in_cache_zone = m % m_repeat_period;
+        const iree_hal_dim_t n_in_cache_zone = n % n_repeat_period;
+        const iree_hal_dim_t result_offset =
+            bytes_per_element * (n + m * n_size);
+        const iree_hal_dim_t cache_offset =
+            bytes_per_element * (n_in_cache_zone + m_in_cache_zone * n_size);
+        uint8_t* result_base = result_contents.data;
+
+        const bool isCached = m != m_in_cache_zone || n != n_in_cache_zone;
+        if (isCached) {
+          memcpy(result_base + result_offset, result_base + cache_offset,
+                 bytes_per_element);
+        } else {
+          IREE_RETURN_AND_END_ZONE_IF_ERROR(
+              z0, reference_matmul_element(
+                      m_size, k_size, n_size, lhs_type, rhs_type, acc_type,
+                      transpose_rhs, lhs_contents.data, rhs_contents.data,
+                      acc_contents.data, result_base, m, n));
+        }
+      }
     }
   }
 
   IREE_TRACE_ZONE_END(z0);
+
   return iree_ok_status();
 }
 
@@ -231,6 +325,8 @@ typedef struct {
   iree_hal_dim_t m;
   iree_hal_dim_t k;
   iree_hal_dim_t n;
+  iree_hal_dim_t m_repeat_period;
+  iree_hal_dim_t n_repeat_period;
   iree_hal_element_type_t lhs_type;
   iree_hal_element_type_t rhs_type;
   iree_hal_element_type_t acc_type;
@@ -247,10 +343,11 @@ static void matmul_results_deinitialize(matmul_results_t* results);
 
 static iree_status_t matmul_results_initialize(
     iree_hal_device_t* device, iree_hal_dim_t m_size, iree_hal_dim_t k_size,
-    iree_hal_dim_t n_size, uint32_t transpose_rhs, iree_hal_buffer_view_t* lhs,
-    iree_hal_buffer_view_t* rhs, iree_hal_buffer_view_t* acc,
-    iree_hal_buffer_view_t* result, iree_allocator_t host_allocator,
-    matmul_results_t* out_results) {
+    iree_hal_dim_t n_size, iree_hal_dim_t m_repeat_period,
+    iree_hal_dim_t n_repeat_period, uint32_t transpose_rhs,
+    iree_hal_buffer_view_t* lhs, iree_hal_buffer_view_t* rhs,
+    iree_hal_buffer_view_t* acc, iree_hal_buffer_view_t* result,
+    iree_allocator_t host_allocator, matmul_results_t* out_results) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   memset(out_results, 0, sizeof(*out_results));
@@ -259,6 +356,9 @@ static iree_status_t matmul_results_initialize(
   out_results->m = m_size;
   out_results->k = k_size;
   out_results->n = n_size;
+
+  out_results->m_repeat_period = m_repeat_period;
+  out_results->n_repeat_period = n_repeat_period;
 
   out_results->lhs_type = iree_hal_buffer_view_element_type(lhs);
   out_results->rhs_type = iree_hal_buffer_view_element_type(rhs);
@@ -542,23 +642,28 @@ static iree_status_t check_matmul_results_impl(FILE* file,
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, reference_matmul(
-              results->m, results->k, results->n, results->lhs_type,
-              results->rhs_type, results->acc_type, results->transpose_rhs,
-              results->lhs_contents, results->rhs_contents,
-              results->acc_contents, results->expected_contents, check_every));
+              results->m, results->k, results->n, results->m_repeat_period,
+              results->n_repeat_period, results->lhs_type, results->rhs_type,
+              results->acc_type, results->transpose_rhs, results->lhs_contents,
+              results->rhs_contents, results->acc_contents,
+              results->expected_contents, check_every));
 
   int count = 0;
+
   for (iree_hal_dim_t m = 0; m < results->m; ++m) {
     for (iree_hal_dim_t n = 0; n < results->n; ++n) {
       if (++count < check_every) continue;
       count = 0;
       iree_hal_dim_t idx = m * results->n + n;
+
       iree_test_utils_e2e_value_t actual_value =
           iree_test_utils_read_buffer_element(idx, results->result_type,
                                               results->actual_contents.data);
+
       iree_test_utils_e2e_value_t expected_value =
           iree_test_utils_read_buffer_element(idx, results->result_type,
                                               results->expected_contents.data);
+
       if (!iree_test_utils_result_elements_agree(actual_value,
                                                  expected_value)) {
         iree_status_t status = check_matmul_failure(
@@ -581,6 +686,7 @@ static iree_status_t check_matmul_results(FILE* file,
   IREE_TRACE_ZONE_BEGIN(z0);
   int check_every = iree_test_utils_calculate_check_every(
       results->m * results->n, results->n);
+
   iree_status_t status = check_matmul_results_impl(file, results, check_every);
   if (!iree_status_is_ok(status) && check_every > 1) {
     // If we got a failure with check_every>1, that didn't log a useful
@@ -610,17 +716,33 @@ class MatmulTestModuleState final {
       : host_allocator_(host_allocator) {}
   ~MatmulTestModuleState() = default;
 
+  StatusOr<vm::ref<iree_hal_buffer_view_t>> GenerateRandomMatrix(
+      const vm::ref<iree_hal_device_t> device, int64_t dim0, int64_t dim1,
+      iree_hal_element_type_t element_type, int32_t seed) {
+    // Generate a random matrix without any row repetition or column repetition.
+    const int64_t dim0_repeat_period = 0;
+    const int64_t dim1_repeat_period = 0;
+    return GenerateRandomCyclicalMatrix(device, dim0, dim1, dim0_repeat_period,
+                                        dim1_repeat_period, element_type, seed);
+  }
+
   // Fills the destination span with pseudorandom values of the given
   // |element_type|. The given |seed| is passed to the pseudorandom generator.
   // The pseudorandom values are reproducible both across runs and across
   // machines.
-  StatusOr<vm::ref<iree_hal_buffer_view_t>> GenerateRandomMatrix(
+  StatusOr<vm::ref<iree_hal_buffer_view_t>> GenerateRandomCyclicalMatrix(
       const vm::ref<iree_hal_device_t> device, int64_t dim0, int64_t dim1,
+      int64_t dim0_repeat_period, int64_t dim1_repeat_period,
       iree_hal_element_type_t element_type, int32_t seed) {
     iree_hal_dim_t dims[2] = {
         (iree_hal_dim_t)dim0,
         (iree_hal_dim_t)dim1,
     };
+
+    // Repeat period of 0 denotes no repeat.
+    dim0_repeat_period = dim0_repeat_period <= 0 ? dim0 : dim0_repeat_period;
+    dim1_repeat_period = dim1_repeat_period <= 0 ? dim1 : dim1_repeat_period;
+
     iree_hal_buffer_params_t buffer_params = {0};
     buffer_params.usage = IREE_HAL_BUFFER_USAGE_DEFAULT;
     buffer_params.access = IREE_HAL_MEMORY_ACCESS_ALL;
@@ -629,9 +751,12 @@ class MatmulTestModuleState final {
     struct callback_state_t {
       iree_hal_element_type_t element_type;
       int32_t seed;
+      int64_t dim0;
+      int64_t dim1;
+      int64_t dim0_repeat_period;
+      int64_t dim1_repeat_period;
     } callback_state = {
-        element_type,
-        seed,
+        element_type, seed, dim0, dim1, dim0_repeat_period, dim1_repeat_period,
     };
     IREE_RETURN_IF_ERROR(iree_hal_buffer_view_generate_buffer(
         device.get(), iree_hal_device_allocator(device.get()),
@@ -648,15 +773,46 @@ class MatmulTestModuleState final {
           uint32_t range = (max - min + 1);
           iree_host_size_t element_byte_count =
               iree_hal_element_dense_byte_count(callback_state.element_type);
-          uint8_t* data_end = span.data + span.data_length;
           uint32_t state = callback_state.seed;
-          for (uint8_t* data = span.data; data < data_end;
-               data += element_byte_count) {
-            int32_t value =
-                (int32_t)iree_test_utils_pseudorandom_range(&state, range) +
-                min;
-            iree_test_utils_write_element(callback_state.element_type, value,
-                                          data);
+          uint8_t* data = span.data;
+          int64_t dim0 = callback_state.dim0;
+          int64_t dim1 = callback_state.dim1;
+          int64_t dim0_repeat_period = callback_state.dim0_repeat_period;
+          int64_t dim1_repeat_period = callback_state.dim1_repeat_period;
+          iree_hal_element_type_t element_type = callback_state.element_type;
+
+          for (int64_t i = 0; i < dim0; i++) {
+            for (int64_t j = 0; j < dim1; ++j) {
+              uint64_t distance_to_previous = 0;
+
+              // The row of the new element is greater than the repeat period
+              // for rows, so get the value from a previous row rather than
+              // generating a new value.
+              if (i >= dim0_repeat_period) {
+                distance_to_previous =
+                    dim0_repeat_period * dim1 * element_byte_count;
+              }
+
+              // The column of the new element is greater than the repeat period
+              // for columns, so get the value from a previous column rather
+              // than generating a new value.
+              else if (j >= dim1_repeat_period) {
+                distance_to_previous = dim1_repeat_period * element_byte_count;
+              }
+
+              if (distance_to_previous) {
+                uint64_t n_bytes =
+                    iree_hal_element_dense_byte_count(element_type);
+                memcpy(data, data - distance_to_previous, n_bytes);
+              } else {
+                int32_t nextValue =
+                    (int32_t)iree_test_utils_pseudorandom_range(&state, range) +
+                    min;
+                iree_test_utils_write_element(element_type, nextValue, data);
+              }
+
+              data += element_byte_count;
+            }
           }
           return iree_ok_status();
         },
@@ -666,13 +822,15 @@ class MatmulTestModuleState final {
 
   Status CheckMatmulResults(
       const vm::ref<iree_hal_device_t> device, int64_t m, int64_t k, int64_t n,
-      int32_t transpose_rhs, const vm::ref<iree_hal_buffer_view_t> lhs,
+      int64_t m_repeat_period, int64_t n_repeat_period, int32_t transpose_rhs,
+      const vm::ref<iree_hal_buffer_view_t> lhs,
       const vm::ref<iree_hal_buffer_view_t> rhs,
       const vm::ref<iree_hal_buffer_view_t> acc,
       const vm::ref<iree_hal_buffer_view_t> actual_result) {
     matmul_results_t results = {};
     IREE_RETURN_IF_ERROR(matmul_results_initialize(
         device.get(), (iree_hal_dim_t)m, (iree_hal_dim_t)k, (iree_hal_dim_t)n,
+        (iree_hal_dim_t)m_repeat_period, (iree_hal_dim_t)n_repeat_period,
         transpose_rhs, lhs.get(), rhs.get(), acc.get(), actual_result.get(),
         host_allocator_, &results));
     iree_status_t status = check_matmul_results(stderr, &results);
@@ -688,6 +846,9 @@ static const vm::NativeFunction<MatmulTestModuleState>
     kMatmulTestModuleFunctions[] = {
         vm::MakeNativeFunction("generate_random_matrix",
                                &MatmulTestModuleState::GenerateRandomMatrix),
+        vm::MakeNativeFunction(
+            "generate_random_cyclical_matrix",
+            &MatmulTestModuleState::GenerateRandomCyclicalMatrix),
         vm::MakeNativeFunction("check_matmul_results",
                                &MatmulTestModuleState::CheckMatmulResults),
 };
