@@ -163,3 +163,42 @@ util.func @foo() -> (index, index) {
   // CHECK: return %[[C6]], %[[C7]]
   util.return %0, %1 : index, index
 }
+
+// -----
+
+// Tests that globals with the same value and dialect attrs fold while ones
+// with different dialect attrs do not. We could have an interface to make this
+// controllable by the attributes.
+
+// CHECK: util.global private @dupeCst0
+// CHECK-SAME: some.attr = 100 : index
+util.global private @dupeCst0 {
+  inlining_policy = #util.inline.never,
+  some.attr = 100 : index
+} = 5 : index
+// CHECK-NOT: util.global private @dupeCst1
+util.global private @dupeCst1 {
+  inlining_policy = #util.inline.never,
+  some.attr = 100 : index
+} = 5 : index
+// CHECK: util.global private @nondupeCst0
+util.global private @nondupeCst0 {
+  inlining_policy = #util.inline.never
+} = 5 : index
+// CHECK: util.global private @nondupeCst1
+util.global private @nondupeCst1 {
+  inlining_policy = #util.inline.never,
+  some.attr = 123 : index
+} = 5 : index
+util.func @foo() -> (index, index, index, index) {
+  // CHECK-DAG: %[[VALUE0:.+]] = util.global.load immutable @dupeCst0
+  %0 = util.global.load @dupeCst0 : index
+  // CHECK-DAG: %[[VALUE1:.+]] = util.global.load immutable @dupeCst0
+  %1 = util.global.load @dupeCst1 : index
+  // CHECK-DAG: %[[VALUE2:.+]] = util.global.load immutable @nondupeCst0
+  %2 = util.global.load @nondupeCst0 : index
+  // CHECK-DAG: %[[VALUE3:.+]] = util.global.load immutable @nondupeCst1
+  %3 = util.global.load @nondupeCst1 : index
+  // CHECK: return %[[VALUE0]], %[[VALUE1]], %[[VALUE2]], %[[VALUE3]]
+  util.return %0, %1, %2, %3 : index, index, index, index
+}
