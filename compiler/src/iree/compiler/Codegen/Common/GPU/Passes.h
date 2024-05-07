@@ -96,6 +96,10 @@ createGPUCheckResourceUsagePass(
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createGPUCreateFastSlowPathPass();
 
+/// Creates a pass to decompose vector_ext ops.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createGPUDecomposeVectorExtOps();
+
 /// Creates a pass to distribute scf.forall ops to GPU processors.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>> createGPUDistribute();
 

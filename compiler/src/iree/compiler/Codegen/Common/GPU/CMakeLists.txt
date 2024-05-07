@@ -51,6 +51,7 @@ iree_cc_library(
     "AMDGPUDistributeContract.cpp"
     "GPUCheckResourceUsage.cpp"
     "GPUCreateFastSlowPath.cpp"
+    "GPUDecomposeVectorExtOps.cpp"
     "GPUDistribute.cpp"
     "GPUDistributeScfFor.cpp"
     "GPUDistributeSharedMemoryCopy.cpp"

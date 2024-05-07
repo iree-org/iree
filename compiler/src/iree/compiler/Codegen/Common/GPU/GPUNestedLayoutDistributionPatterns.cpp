@@ -126,33 +126,17 @@ static void populateWarpAndThreadIndices(RewriterBase &rewriter, Value threadId,
                                          NestedLayoutAttr vectorLayout,
                                          SmallVector<Value> &warpIndices,
                                          SmallVector<Value> &threadIndices) {
-  int64_t subgroupRank = vectorLayout.getSubgroupBasis().size();
-  // The delinearized thread IDs are returned from outer most to inner most,
-  // i.e. before applying the layout described dimensions ordering.
-  SmallVector<Value> threadIds =
-      vectorLayout.computeThreadIds(threadId, rewriter);
-
-  SmallVector<Value> filteredSubgroupIds;
-  for (auto [id, active] :
-       llvm::zip(threadIds, vectorLayout.getSubgroupActiveIds())) {
-    if (active)
-      filteredSubgroupIds.push_back(id);
-  }
-  SmallVector<Value> filteredThreadIds;
-  for (auto [id, active] : llvm::zip(llvm::drop_begin(threadIds, subgroupRank),
-                                     vectorLayout.getThreadActiveIds())) {
-    if (active)
-      filteredThreadIds.push_back(id);
-  }
-
-  // Subgroup and thread (lane) indices normalized to the order in which
-  // they are used by each dimension.
-  warpIndices = llvm::to_vector(
-      llvm::map_range(invertPermutationVector(vectorLayout.getSubgroupOrder()),
-                      [&](int64_t i) { return filteredSubgroupIds[i]; }));
-  threadIndices = llvm::to_vector(
-      llvm::map_range(invertPermutationVector(vectorLayout.getThreadOrder()),
-                      [&](int64_t i) { return filteredThreadIds[i]; }));
+  SmallVector<Type> returnTypes(vectorLayout.getRank(),
+                                rewriter.getIndexType());
+  warpIndices = rewriter
+                    .create<IREE::VectorExt::SubgroupIdsOp>(
+                        threadId.getLoc(), returnTypes, threadId, vectorLayout)
+                    .getResults();
+  threadIndices =
+      rewriter
+          .create<IREE::VectorExt::ThreadIdsOp>(threadId.getLoc(), returnTypes,
+                                                threadId, vectorLayout)
+          .getResults();
 }
 
 namespace {
@@ -395,21 +379,7 @@ struct DistributeBroadcast final : OpDistributionPattern<vector::BroadcastOp> {
 };
 
 static int64_t getShuffleOffset(NestedLayoutAttr layout, int64_t dim) {
-  // Get strides for dimensions based on layouts.
-  SmallVector<int64_t> threadBasis(layout.getThreadBasis());
-  SmallVector<int64_t> basisStrides(threadBasis.size());
-  // Take prefix sum to get strides.
-  std::exclusive_scan(threadBasis.rbegin(), threadBasis.rend(),
-                      basisStrides.rbegin(), 1, std::multiplies<>{});
-  // Remove non-active thread ids.
-  SmallVector<int64_t> activeThreadStrides;
-  for (auto [i, stride] : llvm::enumerate(basisStrides)) {
-    if (layout.getThreadActiveIds()[i]) {
-      activeThreadStrides.push_back(stride);
-    }
-  }
-  // TODO: Do we need to do inversion or not?
-  return activeThreadStrides[layout.getThreadOrder()[dim]];
+  return layout.getThreadStrides()[dim];
 }
 
 static int64_t getShuffleWidth(NestedLayoutAttr layout, int64_t dim) {

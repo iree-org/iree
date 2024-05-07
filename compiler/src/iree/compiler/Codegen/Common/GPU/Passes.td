@@ -25,6 +25,12 @@ def GPUCreateFastSlowPath :
   let constructor = "mlir::iree_compiler::createGPUCreateFastSlowPathPass()";
 }
 
+def GPUDecomposeVectorExtOps :
+    InterfacePass<"iree-codegen-gpu-decompose-vector-ext-ops", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to decompose vector_ext ops";
+  let constructor = "mlir::iree_compiler::createGPUDecomposeVectorExtOps()";
+}
+
 def GPUDistribute :
     InterfacePass<"iree-codegen-gpu-distribute", "mlir::FunctionOpInterface"> {
   let summary = "Pass to distribute scf.forall ops.";

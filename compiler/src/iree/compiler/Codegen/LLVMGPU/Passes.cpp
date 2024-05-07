@@ -567,6 +567,7 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager) {
   if (clLLVMGPUEnablePrefetch) {
     funcPassManager.addPass(createLLVMGPUPrefetchSharedMemoryPass());
   }
+  funcPassManager.addPass(createGPUDecomposeVectorExtOps());
   funcPassManager.addPass(memref::createFoldMemRefAliasOpsPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createCanonicalizerPass());

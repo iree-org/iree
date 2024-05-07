@@ -82,5 +82,33 @@ def IREEVectorExt_ToSIMTOp : IREEVectorExt_PureOp<"to_simt",
   let hasFolder = 1;
 }
 
+def IREEVectorExt_SubgroupIdsOp : IREEVectorExt_PureOp<"subgroup_ids", [Pure]> {
+  let summary = "Compute subgroup ids from a layout";
+  let description = [{}];
+  let arguments = (ins
+    Index:$tid,
+    VectorLayoutInterface:$layout
+  );
+  let results = (outs
+    Variadic<Index>:$virtualTids
+  );
+  let extraClassDeclaration = [{}];
+  let assemblyFormat = "$tid attr-dict `:` type($virtualTids)";
+}
+
+def IREEVectorExt_ThreadIdsOp : IREEVectorExt_PureOp<"thread_ids", [Pure]> {
+  let summary = "Compute thread ids from a layout";
+  let description = [{}];
+  let arguments = (ins
+    Index:$tid,
+    VectorLayoutInterface:$layout
+  );
+  let results = (outs
+    Variadic<Index>:$virtualTids
+  );
+  let extraClassDeclaration = [{}];
+  let assemblyFormat = "$tid attr-dict `:` type($virtualTids)";
+}
+
 #endif  // IREE_DIALECT_VECTOREXT_OPS
 
