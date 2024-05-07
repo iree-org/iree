@@ -59,7 +59,7 @@ def IREEGPU_ShuffleTensorOp : Op<IREEGPU_Dialect, "shuffle_tensor", [
         %3 = affine.apply #affine_map<(d0) -> (d0 * 4)> (%ids#1)
         %4 = affine.apply #affine_map<(d0) -> (d0 * 16)> (%idx)
         %slice = iree_gpu.shuffle_tensor %in[%2, %3] [2, 4] [1, 1] to %alloc[0, %4] [4, 16] [1, 1]
-          : tensor<2x4xf32> -> tensor<4x128xf32> -> tensor<4x16xf32>
+          : tensor<2x4xf32> -> memref<4x128xf32> -> tensor<4x16xf32>
         ...
       } {mapping = [#gpu.thread<y>, #gpu.thread<x>]}
     ```
