@@ -21,12 +21,10 @@ def IREEGPU_Dialect : Dialect {
     A dialect representing attributes used by GPU focused IREE code generation.
   }];
   let description = [{
-    This dialect is primarily meant to hold attributes that carry additional
-    target specific information expanded based on executable target information.
-
-    This information is only used by codegen to normalize the higher level
-    target details across backends and devices. Late lowerings to SPIR-V/LLVM
-    still rely on the information designed for those targets.
+    This dialect provides operations and attributes to aid in code generation
+    for GPU targets. The functionality in this dialect can be hardware specific,
+    but is intended to be independent of the lowering target. Late lowerings to
+    SPIR-V/LLVM are handled separately.
   }];
   let useDefaultAttributePrinterParser = 1;
 

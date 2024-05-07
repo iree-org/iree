@@ -7,9 +7,17 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.cpp.inc"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 
 namespace mlir::iree_compiler::IREE::GPU {
 
-void IREEGPUDialect::initialize() { registerAttributes(); }
+void IREEGPUDialect::initialize() {
+  registerAttributes();
+
+  addOperations<
+#define GET_OP_LIST
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.cpp.inc"
+      >();
+}
 
 } // namespace mlir::iree_compiler::IREE::GPU
