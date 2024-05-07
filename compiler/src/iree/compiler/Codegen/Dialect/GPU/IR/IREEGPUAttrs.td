@@ -14,6 +14,24 @@ include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/EnumAttr.td"
 include "mlir/IR/OpBase.td"
 
+/// TODO: This is unfortunate...
+def IREEGPU_IteratorType : I32EnumAttr<"IteratorType", "Iterator type", [
+  I32EnumAttrCase<"parallel", 0>,
+  I32EnumAttrCase<"reduction", 1>
+]> {
+    let genSpecializedAttr = 0;
+    let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+}
+
+def IREEGPU_IteratorTypeEnum
+    : EnumAttr<IREEGPU_Dialect, IREEGPU_IteratorType, "iterator_type"> {
+    let assemblyFormat = "`<` $value `>`";
+}
+
+def IREEGPU_IteratorTypeArrayAttr
+    : TypedArrayAttrBase<IREEGPU_IteratorTypeEnum,
+                         "Iterator type should be an enum.">;
+
 //===----------------------------------------------------------------------===//
 // Base MMA Vector Layout Attributes
 //===----------------------------------------------------------------------===//

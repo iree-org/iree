@@ -8,6 +8,8 @@
 #define IREE_CODEGEN_DIALECT_GPU_IREEGPU_DIALECT
 
 include "mlir/IR/OpBase.td"
+include "mlir/IR/AttrTypeBase.td"
+include "mlir/IR/EnumAttr.td"
 
 //===----------------------------------------------------------------------===//
 // IREE GPU Dialect
@@ -32,5 +34,16 @@ def IREEGPU_Dialect : Dialect {
     void registerAttributes();
   }];
 }
+
+//===----------------------------------------------------------------------===//
+// Type definitions
+//===----------------------------------------------------------------------===//
+
+class RankedTensorOrVectorOf<list<Type> allowedTypes> :
+  ShapedContainerType<allowedTypes,
+      Or<[IsVectorTypePred, And<[IsTensorTypePred, HasRankPred]>]>,
+  "ranked tensor or vector", "::mlir::ShapedType">;
+
+def AnyRankedTensorOrVector : RankedTensorOrVectorOf<[AnyType]>;
 
 #endif // IREE_CODEGEN_DIALECT_GPU_IREEGPU_DIALECT
