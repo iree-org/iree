@@ -105,7 +105,7 @@ func.func @mfma_matmul_256x256x256(%lhs: memref<16x256xf16, strided<[256, 1], of
 //       CHECK:   %[[LIN_ID:.+]] = affine.apply #[[$MAP]]()[%[[TIDX]], %[[TIDY]], %[[TIDZ]]]
 //       CHECK:   %[[RHS_ALLOC:.+]] = memref.alloc() : memref<32x16xf16, #gpu.address_space<workgroup>>
 //       CHECK:   %[[LHS_ALLOC:.+]] = memref.alloc() : memref<16x32xf16, #gpu.address_space<workgroup>>
-//       CHECK:   affine.delinearize_index %[[LIN_ID]]
+//       CHECK:   iree_vector_ext.thread_ids %[[LIN_ID]]
 //       CHECK:   %[[INIT_READ:.+]] = vector.transfer_read %{{.*}} memref<16x16xf32, {{.*}}>, vector<4x1xf32>
 //       CHECK:   %[[INIT:.+]] = vector.insert_strided_slice %[[INIT_READ]]
 //       CHECK:   scf.for {{.*}} = %c0 to %c256 step %c32 iter_args({{.*}} = %[[INIT]]) -> (vector<1x1x1x1x4x1xf32>)
@@ -234,7 +234,7 @@ func.func @wmma_matmul_256x256x256(%lhs: memref<16x256xf16, strided<[256, 1], of
 //       CHECK:   %[[LIN_ID:.+]] = affine.apply #[[$MAP]]()[%[[TIDX]], %[[TIDY]], %[[TIDZ]]]
 //       CHECK:   %[[RHS_ALLOC:.+]] = memref.alloc() : memref<32x16xf16, #gpu.address_space<workgroup>>
 //       CHECK:   %[[LHS_ALLOC:.+]] = memref.alloc() : memref<16x32xf16, #gpu.address_space<workgroup>>
-//       CHECK:   affine.delinearize_index %[[LIN_ID]]
+//       CHECK:   iree_vector_ext.thread_ids %[[LIN_ID]]
 //       CHECK:   %[[INIT_READ0:.+]] = vector.transfer_read %{{.*}} memref<16x16xf32, {{.*}}>, vector<1x1xf32>
 //       CHECK:   %[[INIT0:.+]] = vector.insert_strided_slice %[[INIT_READ0]]
 //       CHECK:   %[[INIT_READ1:.+]] = vector.transfer_read %{{.*}} memref<16x16xf32, {{.*}}>, vector<1x1xf32>

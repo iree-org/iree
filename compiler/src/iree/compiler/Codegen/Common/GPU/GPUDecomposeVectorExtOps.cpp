@@ -4,10 +4,11 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree-dialects/Dialect/VectorExt/IR/VectorExtOps.h"
+#include "iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Common/GPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler {
@@ -21,7 +22,6 @@ struct DecomposeThreadIds : public OpRewritePattern<ThreadIdsOp> {
 
   LogicalResult matchAndRewrite(ThreadIdsOp threadIdsOp,
                                 PatternRewriter &rewriter) const override {
-    Location loc = threadIdsOp.getLoc();
     Value tid = threadIdsOp.getTid();
     NestedLayoutAttr layout =
         dyn_cast<NestedLayoutAttr>(threadIdsOp.getLayout());
@@ -31,21 +31,23 @@ struct DecomposeThreadIds : public OpRewritePattern<ThreadIdsOp> {
     }
 
     SmallVector<Value> virtualTids;
-    for (auto [size, stride] :
-         llvm::zip(layout.getThreadsPerOuter(), layout.getThreadStrides())) {
-      if (size == 1) {
-        virtualTids.push_back(rewriter.create<arith::ConstantIndexOp>(loc, 0));
-        continue;
-      }
+    int64_t rank = layout.getRank();
+    // The delinearized thread IDs are returned from outer most to inner most,
+    // i.e. before applying the layout described dimensions ordering.
+    SmallVector<Value> threadIds = layout.computeThreadIds(tid, rewriter);
 
-      // (tid floordiv stride) mod size
-      AffineExpr tidExpr = rewriter.getAffineDimExpr(0);
-      AffineMap virtualTidMap = AffineMap::get(/*dims=*/1, /*syms=*/0,
-                                               tidExpr.floorDiv(stride) % size);
-      Value virtualTid =
-          rewriter.create<affine::AffineApplyOp>(loc, virtualTidMap, tid);
-      virtualTids.push_back(virtualTid);
+    SmallVector<Value> filteredThreadIds;
+    for (auto [id, active] : llvm::zip(llvm::drop_begin(threadIds, rank),
+                                       layout.getThreadActiveIds())) {
+      if (active)
+        filteredThreadIds.push_back(id);
     }
+
+    // Subgroup and thread (lane) indices normalized to the order in which
+    // they are used by each dimension.
+    virtualTids = llvm::to_vector(
+        llvm::map_range(invertPermutationVector(layout.getThreadOrder()),
+                        [&](int64_t i) { return filteredThreadIds[i]; }));
 
     rewriter.replaceOp(threadIdsOp, virtualTids);
     return success();
@@ -61,7 +63,6 @@ struct DecomposeSubgroupIds : public OpRewritePattern<SubgroupIdsOp> {
 
   LogicalResult matchAndRewrite(SubgroupIdsOp subgroupIdsOp,
                                 PatternRewriter &rewriter) const override {
-    Location loc = subgroupIdsOp.getLoc();
     Value tid = subgroupIdsOp.getTid();
     NestedLayoutAttr layout =
         dyn_cast<NestedLayoutAttr>(subgroupIdsOp.getLayout());
@@ -71,23 +72,22 @@ struct DecomposeSubgroupIds : public OpRewritePattern<SubgroupIdsOp> {
     }
 
     SmallVector<Value> virtualTids;
-    for (auto [size, stride] : llvm::zip(layout.getSubgroupsPerWorkgroup(),
-                                         layout.getSubgroupStrides())) {
-      if (size == 1) {
-        virtualTids.push_back(rewriter.create<arith::ConstantIndexOp>(loc, 0));
-        continue;
-      }
+    // The delinearized thread IDs are returned from outer most to inner most,
+    // i.e. before applying the layout described dimensions ordering.
+    SmallVector<Value> threadIds = layout.computeThreadIds(tid, rewriter);
 
-      // (tid floordiv (stride * subgroupSize)) mod size
-      AffineExpr tidExpr = rewriter.getAffineDimExpr(0);
-      AffineMap virtualTidMap =
-          AffineMap::get(/*dims=*/1, /*syms=*/0,
-                         tidExpr.floorDiv(stride * subgroupSize) % size);
-      Value virtualTid =
-          rewriter.create<affine::AffineApplyOp>(loc, virtualTidMap, tid);
-      virtualTids.push_back(virtualTid);
+    SmallVector<Value> filteredSubgroupIds;
+    for (auto [id, active] :
+         llvm::zip(threadIds, layout.getSubgroupActiveIds())) {
+      if (active)
+        filteredSubgroupIds.push_back(id);
     }
 
+    // Subgroup and thread (lane) indices normalized to the order in which
+    // they are used by each dimension.
+    virtualTids = llvm::to_vector(
+        llvm::map_range(invertPermutationVector(layout.getSubgroupOrder()),
+                        [&](int64_t i) { return filteredSubgroupIds[i]; }));
     rewriter.replaceOp(subgroupIdsOp, virtualTids);
     return success();
   }

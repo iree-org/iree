@@ -379,7 +379,21 @@ struct DistributeBroadcast final : OpDistributionPattern<vector::BroadcastOp> {
 };
 
 static int64_t getShuffleOffset(NestedLayoutAttr layout, int64_t dim) {
-  return layout.getThreadStrides()[dim];
+  // Get strides for dimensions based on layouts.
+  SmallVector<int64_t> threadBasis(layout.getThreadBasis());
+  SmallVector<int64_t> basisStrides(threadBasis.size());
+  // Take prefix sum to get strides.
+  std::exclusive_scan(threadBasis.rbegin(), threadBasis.rend(),
+                      basisStrides.rbegin(), 1, std::multiplies<>{});
+  // Remove non-active thread ids.
+  SmallVector<int64_t> activeThreadStrides;
+  for (auto [i, stride] : llvm::enumerate(basisStrides)) {
+    if (layout.getThreadActiveIds()[i]) {
+      activeThreadStrides.push_back(stride);
+    }
+  }
+  // TODO: Do we need to do inversion or not?
+  return activeThreadStrides[layout.getThreadOrder()[dim]];
 }
 
 static int64_t getShuffleWidth(NestedLayoutAttr layout, int64_t dim) {
