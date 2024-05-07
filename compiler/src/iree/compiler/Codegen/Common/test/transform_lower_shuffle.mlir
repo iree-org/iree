@@ -21,6 +21,8 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[X:[A-Za-z0-9]+]]: index
 
 //       CHECK:   %[[TENSOR:.+]] = bufferization.to_tensor %[[INIT]]
+//  CHECK-SAME:     restrict
+//  CHECK-SAME:     writable
 //       CHECK:   %[[IN:.+]] = tensor.insert_slice %[[ARG1]] into %[[TENSOR]][%[[X]], 0] [2, 3] [1, 1] : tensor<2x3xf32> into tensor<6x6xf32>
 //       CHECK:   gpu.barrier
 //       CHECK:   %[[OUT:.+]] = tensor.extract_slice %[[IN]][0, %[[X]]] [3, 2] [1, 1] : tensor<6x6xf32> to tensor<3x2xf32>
@@ -50,6 +52,8 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[Y:[A-Za-z0-9]+]]: index
 
 //       CHECK:   %[[TENSOR:.+]] = bufferization.to_tensor %[[INIT]]
+//  CHECK-SAME:     restrict
+//  CHECK-SAME:     writable
 //       CHECK:   %[[IN:.+]] = tensor.insert_slice %[[ARG1]] into %[[TENSOR]][0, %[[X]], %[[Y]]] [1, 2, 3] [1, 1, 1] : tensor<2x3xf32> into tensor<1x6x6xf32>
 //       CHECK:   gpu.barrier
 //       CHECK:   tensor.extract_slice %[[IN]][0, %[[Y]], %[[X]]] [1, 3, 2] [1, 1, 1] : tensor<1x6x6xf32> to tensor<3x2xf32>

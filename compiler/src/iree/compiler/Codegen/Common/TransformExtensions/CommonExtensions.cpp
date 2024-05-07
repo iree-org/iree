@@ -190,7 +190,8 @@ struct LowerShuffleTensor
     auto tensorType =
         RankedTensorType::get(allocType.getShape(), allocType.getElementType());
     Value tensorAlloc = rewriter.create<bufferization::ToTensorOp>(
-        loc, tensorType, shuffleOp.getSharedAlloc());
+        loc, tensorType, shuffleOp.getSharedAlloc(), /*restrict=*/true,
+        /*writeable=*/true);
 
     // Step 1. Insert the source slice into the intermediate tensor.
     SmallVector<OpFoldResult, 4> sourceOffsets =
