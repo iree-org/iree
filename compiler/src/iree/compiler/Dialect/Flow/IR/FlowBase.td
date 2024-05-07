@@ -241,6 +241,9 @@ def FLOW_CollectiveReductionOpAttr :
 def FLOW_NamedParameterAttr :
     AttrDef<Flow_Dialect, "NamedParameter", [
       TypedAttrInterface,
+      DeclareAttrInterfaceMethods<Util_SizedStorageAttr, [
+        "getStorageSize",
+      ]>,
     ]> {
   let mnemonic = "parameter.named";
   let summary = [{named parameter referenced an optional scope and key}];

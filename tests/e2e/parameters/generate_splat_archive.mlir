@@ -13,10 +13,10 @@
 // CHECK-LABEL: EXEC @main
 // CHECK: 1x2xi32=[0 0]
 
-util.global private @array_global_0 = #stream.parameter.named<"scope"::"global_0"> : tensor<1x2xi32>
-util.global private @dense_global_1 = #stream.parameter.named<"scope"::"global_1"> : tensor<2x2xi32>
-util.global private @dense_global_2 = #stream.parameter.named<"scope"::"global_2"> : tensor<1x2xi32>
-util.global private @dense_global_3 = #stream.parameter.named<"scope"::"global_3"> : tensor<2x2xi32>
+util.global private @array_global_0 = #flow.parameter.named<"scope"::"global_0"> : tensor<1x2xi32>
+util.global private @dense_global_1 = #flow.parameter.named<"scope"::"global_1"> : tensor<2x2xi32>
+util.global private @dense_global_2 = #flow.parameter.named<"scope"::"global_2"> : tensor<1x2xi32>
+util.global private @dense_global_3 = #flow.parameter.named<"scope"::"global_3"> : tensor<2x2xi32>
 func.func @main(%arg0: tensor<1x2xi32>) -> tensor<1x2xi32> {
   %cst = arith.constant 0 : i32
   %3 = util.global.load @array_global_0 : tensor<1x2xi32>

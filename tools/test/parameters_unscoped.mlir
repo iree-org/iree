@@ -12,10 +12,10 @@
 // Simple named parameters with no scope. Parameter files are combined at
 // runtime to allow for filesystem sharding while still providing a flat set of
 // parameters in the compiler input.
-util.global private @a0 = #stream.parameter.named<"a0"> : tensor<4xi64>
-util.global private @a1 = #stream.parameter.named<"a1"> : tensor<4xi64>
-util.global private @b0 = #stream.parameter.named<"b0"> : tensor<8xi64>
-util.global private @b1 = #stream.parameter.named<"b1"> : tensor<8xi64>
+util.global private @a0 = #flow.parameter.named<"a0"> : tensor<4xi64>
+util.global private @a1 = #flow.parameter.named<"a1"> : tensor<4xi64>
+util.global private @b0 = #flow.parameter.named<"b0"> : tensor<8xi64>
+util.global private @b1 = #flow.parameter.named<"b1"> : tensor<8xi64>
 func.func @echo() -> (tensor<4xi64>, tensor<4xi64>, tensor<8xi64>, tensor<8xi64>) {
   %a0 = util.global.load @a0 : tensor<4xi64>
   %a1 = util.global.load @a1 : tensor<4xi64>

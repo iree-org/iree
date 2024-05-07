@@ -100,6 +100,8 @@ static void fixupGlobalMutability(Operation *moduleOp,
       // If there are stores mark the global as mutable.
       globalInfo->op.setGlobalMutable(!globalInfo->getStores().empty());
     }
+    for (auto loadOp : globalInfo->getLoads())
+      loadOp.setGlobalImmutable(!globalInfo->op.isGlobalMutable());
   });
   for (auto *deadOp : deadOps)
     deadOp->erase();

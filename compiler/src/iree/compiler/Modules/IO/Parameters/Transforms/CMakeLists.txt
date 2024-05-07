@@ -33,7 +33,7 @@ iree_cc_library(
     MLIRTransformUtils
     MLIRTransforms
     iree::base
-    iree::compiler::Dialect::Stream::IR
+    iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Util::IR
     iree::hal
     iree::io::file_handle

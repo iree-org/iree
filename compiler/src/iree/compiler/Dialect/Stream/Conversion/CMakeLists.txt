@@ -23,6 +23,7 @@ iree_cc_library(
     MLIRIR
     MLIRTransformUtils
     MLIRTransforms
+    iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Stream::IR
   PUBLIC
 )

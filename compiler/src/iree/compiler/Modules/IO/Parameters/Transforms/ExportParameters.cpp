@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
@@ -174,7 +174,7 @@ struct ExportParametersPass
       }
 
       // Change the global to reference the parameter.
-      globalOp.setGlobalInitialValue(IREE::Stream::NamedParameterAttr::get(
+      globalOp.setGlobalInitialValue(IREE::Flow::NamedParameterAttr::get(
           context, globalOp.getGlobalType(), StringAttr::get(context, scope),
           StringAttr::get(context, name), DictionaryAttr()));
     }

@@ -28,7 +28,7 @@ iree_compiler_cc_library(
     ],
     deps = [
         ":PassesIncGen",
-        "//compiler/src/iree/compiler/Dialect/Stream/IR",
+        "//compiler/src/iree/compiler/Dialect/Flow/IR",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
         "//runtime/src/iree/base",
         "//runtime/src/iree/hal",

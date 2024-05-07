@@ -178,19 +178,25 @@ static IREE::Util::GlobalOp createDummyInput(const std::string &namePrefix,
                                              OpBuilder &moduleBuilder,
                                              Explorer &explorer) {
   std::string name = namePrefix + "_arg" + std::to_string(arg.getArgNumber());
-  return TypeSwitch<Type, IREE::Util::GlobalOp>(arg.getType())
-      .Case([&](IREE::HAL::BufferViewType type) {
-        return createImportBufferViewGlobalOp(name, arg, symbolTable,
+  auto globalOp =
+      TypeSwitch<Type, IREE::Util::GlobalOp>(arg.getType())
+          .Case([&](IREE::HAL::BufferViewType type) {
+            return createImportBufferViewGlobalOp(name, arg, symbolTable,
+                                                  moduleBuilder, explorer);
+          })
+          .Case([&](IREE::HAL::BufferType type) {
+            return createExportBufferGlobalOp(name, arg, symbolTable,
                                               moduleBuilder, explorer);
-      })
-      .Case([&](IREE::HAL::BufferType type) {
-        return createExportBufferGlobalOp(name, arg, symbolTable, moduleBuilder,
-                                          explorer);
-      })
-      .Default([&](Type type) {
-        return createPrimitiveDefaultGlobalOp(name, arg.getLoc(), type,
-                                              symbolTable, moduleBuilder);
-      });
+          })
+          .Default([&](Type type) {
+            return createPrimitiveDefaultGlobalOp(name, arg.getLoc(), type,
+                                                  symbolTable, moduleBuilder);
+          });
+  if (globalOp) {
+    // Prevent globals from folding so that we have unique buffers for each arg.
+    globalOp->setAttr("flow.unique_id", moduleBuilder.getStringAttr(name));
+  }
+  return globalOp;
 }
 
 static LogicalResult

@@ -57,6 +57,7 @@ iree_cc_library(
     "InjectTensorTracing.cpp"
     "InsertDispatchDebugTargets.cpp"
     "InterchangeTransposeGenericOps.cpp"
+    "OutlineConstants.cpp"
     "OutlineDispatchExterns.cpp"
     "OutlineDispatchRegions.cpp"
     "Passes.cpp"

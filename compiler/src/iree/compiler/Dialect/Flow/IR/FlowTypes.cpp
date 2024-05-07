@@ -310,4 +310,21 @@ void printParameterReference(AsmPrinter &p, StringAttr scopeAttr,
   p << "\"" << keyAttr.getValue() << "\"";
 }
 
+//===----------------------------------------------------------------------===//
+// #flow.parameter.named<...>
+//===----------------------------------------------------------------------===//
+
+int64_t NamedParameterAttr::getStorageSize() const {
+  if (auto configAttr = getConfig()) {
+    if (auto lengthAttr = configAttr.getAs<IntegerAttr>("length")) {
+      return lengthAttr.getInt();
+    }
+  }
+  if (auto shapedType = llvm::dyn_cast<ShapedType>(getType())) {
+    return IREE::Util::getRoundedPhysicalStorageSize(shapedType);
+  } else {
+    return IREE::Util::getTypePhysicalStorageBitWidth(getType());
+  }
+}
+
 } // namespace mlir::iree_compiler::IREE::Flow

@@ -65,14 +65,6 @@ def IPO : Pass<"iree-util-ipo", "mlir::ModuleOp"> {
   }];
 }
 
-def OutlineConstants :
-    Pass<"iree-util-outline-constants", "mlir::ModuleOp"> {
-  let summary = "Outlines tensor constants into util.globals at the module level.";
-  let constructor = [{
-    mlir::iree_compiler::IREE::Util::createOutlineConstantsPass()
-  }];
-}
-
 def PropagateSubranges : Pass<"iree-util-propagate-subranges", "mlir::ModuleOp"> {
   let summary = "Propagates resource subranges across the program.";
   let constructor = [{

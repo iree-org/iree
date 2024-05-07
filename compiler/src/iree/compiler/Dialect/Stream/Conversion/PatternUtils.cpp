@@ -6,10 +6,22 @@
 
 #include "iree/compiler/Dialect/Stream/Conversion/PatternUtils.h"
 
+#include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 
 namespace mlir::iree_compiler {
+
+TypedAttr convertAttributeToStream(TypedAttr attr) {
+  if (!attr)
+    return {};
+  if (auto parameterAttr = dyn_cast<IREE::Flow::NamedParameterAttr>(attr)) {
+    return IREE::Stream::NamedParameterAttr::get(
+        attr.getContext(), parameterAttr.getType(), parameterAttr.getScope(),
+        parameterAttr.getKey(), parameterAttr.getConfig());
+  }
+  return attr;
+}
 
 void expandResourceOperand(Location loc, Value operand,
                            SmallVectorImpl<Value> &newOperands,

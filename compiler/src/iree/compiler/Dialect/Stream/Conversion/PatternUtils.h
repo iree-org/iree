@@ -13,6 +13,10 @@
 
 namespace mlir::iree_compiler {
 
+// Converts a supported attribute type to the corresponding stream dialect
+// value. Returns the provided value if it is natively supported.
+TypedAttr convertAttributeToStream(TypedAttr attr);
+
 void expandResourceOperand(Location loc, Value operand,
                            SmallVectorImpl<Value> &newOperands,
                            OpBuilder &builder);
