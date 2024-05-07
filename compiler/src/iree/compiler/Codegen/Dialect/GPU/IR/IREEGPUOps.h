@@ -7,6 +7,8 @@
 #ifndef IREE_COMPILER_CODEGEN_DIALECT_IREEGPUOPS_H_
 #define IREE_COMPILER_CODEGEN_DIALECT_IREEGPUOPS_H_
 
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "mlir/Bytecode/BytecodeOpInterface.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Builders.h"
