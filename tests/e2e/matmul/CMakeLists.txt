@@ -2068,7 +2068,7 @@ iree_generated_e2e_runner_test(
   DRIVERS
     "hip"
   COMPILER_FLAGS
-    "--iree-rocm-target-chip=gfx942"
+    ${IREE_HIP_TEST_COMPILER_FLAGS}
   LABELS
     "noasan"
     "nomsan"
@@ -2097,7 +2097,7 @@ iree_generated_e2e_runner_test(
   DRIVERS
     "hip"
   COMPILER_FLAGS
-    "--iree-rocm-target-chip=gfx942"
+    ${IREE_HIP_TEST_COMPILER_FLAGS}
   LABELS
     "noasan"
     "nomsan"
