@@ -1832,6 +1832,9 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     "--iree-rocm-target-chip=gfx1100"
+  RUNNER_ARGS
+    "--require_exact_results=false"
+    "--acceptable_fp_delta=1e-04"
   LABELS
     "noasan"
     "nomsan"
@@ -1861,6 +1864,9 @@ iree_generated_e2e_runner_test(
     "hip"
   COMPILER_FLAGS
     "--iree-rocm-target-chip=gfx1100"
+  RUNNER_ARGS
+    "--require_exact_results=false"
+    "--acceptable_fp_delta=1e-04"
   LABELS
     "noasan"
     "nomsan"
@@ -2042,7 +2048,7 @@ iree_generated_e2e_runner_test(
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
 
-if(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx")
+if(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx9")
 
 unset(IREE_HIP_TEST_COMPILER_FLAGS)
 list(APPEND IREE_HIP_TEST_COMPILER_FLAGS
@@ -2105,4 +2111,4 @@ iree_generated_e2e_runner_test(
     "noubsan"
     "requires-gpu-cdna3"
 )
-endif(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx")
+endif(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx9")

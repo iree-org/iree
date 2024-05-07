@@ -441,7 +441,7 @@ jobs:
       IREE_VULKAN_DISABLE: 1
       IREE_CUDA_DISABLE: 1
       IREE_HIP_DISABLE: 0
-      IREE_HIP_TEST_TARGET_CHIP: "gfx90a"
+      IREE_HIP_TEST_TARGET_CHIP: "gfx1100"
     runs-on: nodai-amdgpu-w7900-x86-64
     steps:
       - name: "Checking out repository"

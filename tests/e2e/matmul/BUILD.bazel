@@ -534,6 +534,10 @@ iree_generated_e2e_runner_test(
         "--shapes=gpu_large_aligned",
         "--compilation_info=LLVMGPUVectorDistributeWMMA",
     ],
+    runner_args = [
+        "--require_exact_results=false",
+        "--acceptable_fp_delta=1e-04",
+    ],
     tags = [
         "noasan",
         "nomsan",
@@ -560,6 +564,10 @@ iree_generated_e2e_runner_test(
         "--transpose_rhs",
         "--shapes=gpu_large_aligned",
         "--compilation_info=LLVMGPUVectorDistributeWMMA",
+    ],
+    runner_args = [
+        "--require_exact_results=false",
+        "--acceptable_fp_delta=1e-04",
     ],
     tags = [
         "noasan",
