@@ -13,6 +13,26 @@ include "mlir/IR/OpBase.td"
 include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/EnumAttr.td"
 
+/// TODO: Iterator types are duplicated across dialects upstream and here due
+/// to a lack of a shared attribute. This should be deduplicated upstream and
+/// then here as well.
+def IREEGPU_IteratorType : I32EnumAttr<"IteratorType", "Iterator type", [
+  I32EnumAttrCase<"parallel", 0>,
+  I32EnumAttrCase<"reduction", 1>
+]> {
+    let genSpecializedAttr = 0;
+    let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+}
+
+def IREEGPU_IteratorTypeEnum
+    : EnumAttr<IREEGPU_Dialect, IREEGPU_IteratorType, "iterator_type"> {
+    let assemblyFormat = "`<` $value `>`";
+}
+
+def IREEGPU_IteratorTypeArrayAttr
+    : TypedArrayAttrBase<IREEGPU_IteratorTypeEnum,
+                         "Iterator type should be an enum.">;
+
 //===----------------------------------------------------------------------===//
 // Base MMA Vector Layout Attributes
 //===----------------------------------------------------------------------===//
