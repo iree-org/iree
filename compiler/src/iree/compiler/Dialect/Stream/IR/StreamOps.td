@@ -256,7 +256,6 @@ def Stream_ResourceDeallocaOp : Stream_Op<"resource.dealloca", [
 }
 
 def Stream_ResourceSizeOp : Stream_PureOp<"resource.size", [
-  Stream_AffinityOp,
   Util_SizeAwareOp,
 ]> {
   let summary = [{returns the size of the resource storage in bytes}];
@@ -276,7 +275,6 @@ def Stream_ResourceSizeOp : Stream_PureOp<"resource.size", [
   );
 
   let assemblyFormat = [{
-    (`on` `(` $affinity^ `)`)?
     $operand
     attr-dict `:` type($operand)
   }];
