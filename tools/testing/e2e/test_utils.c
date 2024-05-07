@@ -22,14 +22,43 @@
 #include "iree/tooling/device_util.h"
 #include "iree/vm/api.h"
 
+IREE_FLAG(bool, require_exact_results, true,
+          "Requires floating point result elements to match exactly.");
+
+bool iree_test_utils_require_exact_results(void) {
+  return FLAG_require_exact_results;
+}
+
+IREE_FLAG(
+    float, acceptable_fp_delta, 1e-5f,
+    "Maximum absolute difference allowed with inexact floating point results.");
+
+float iree_test_utils_acceptable_fb_delta(void) {
+  return FLAG_acceptable_fp_delta;
+}
+
+IREE_FLAG(
+    int32_t, max_elements_to_check, 10000,
+    "Maximum number of tensor elements to check for the given test. For larger "
+    "buffers, only every n-th element will be checked for some n chosed to "
+    "stay just under that threshold and to avoid being a divisor of the inner "
+    "dimension size to avoid special patterns. As the check uses a slow "
+    "reference implementation, this is a trade-off between test latency and "
+    "coverage. The value 0 means check all elements.");
+
+int32_t iree_test_utils_max_elements_to_check(void) {
+  return FLAG_max_elements_to_check;
+}
+
 const char* iree_test_utils_emoji(bool good) { return good ? "🦄" : "🐞"; }
 
 int iree_test_utils_calculate_check_every(iree_hal_dim_t tot_elements,
                                           iree_hal_dim_t no_div_of) {
   int check_every = 1;
-  if (FLAG_max_elements_to_check) {
-    check_every = ((tot_elements) + FLAG_max_elements_to_check - 1) /
-                  FLAG_max_elements_to_check;
+  if (iree_test_utils_max_elements_to_check()) {
+    check_every =
+        ((tot_elements) + iree_test_utils_max_elements_to_check() - 1) /
+        iree_test_utils_max_elements_to_check();
     if (check_every < 1) check_every = 1;
     if (check_every > 1)
       while ((no_div_of % check_every) == 0) ++check_every;
@@ -142,17 +171,17 @@ int iree_test_utils_snprintf_value(char* buf, size_t bufsize,
 
 bool iree_test_utils_result_elements_agree(iree_test_utils_e2e_value_t expected,
                                            iree_test_utils_e2e_value_t actual) {
+  float acceptable_fp_delta = iree_test_utils_acceptable_fb_delta();
   if (expected.type != actual.type) {
     iree_status_abort(
         iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "mismatched types"));
     return false;
   }
 
-  if (FLAG_acceptable_fp_delta < 0.0f) {
-    iree_status_abort(
-        iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                         "negative tolerance (acceptable_fp_delta=%.8g)",
-                         FLAG_acceptable_fp_delta));
+  if (acceptable_fp_delta < 0.0f) {
+    iree_status_abort(iree_make_status(
+        IREE_STATUS_INVALID_ARGUMENT,
+        "negative tolerance (acceptable_fp_delta=%.8g)", acceptable_fp_delta));
     return false;
   }
 
@@ -165,20 +194,20 @@ bool iree_test_utils_result_elements_agree(iree_test_utils_e2e_value_t expected,
     // `require_exact_results` flag is set to `false`.
     case IREE_TEST_UTILS_VALUE_TYPE_F16:
       if (actual.f16_u16 == expected.f16_u16) return true;
-      if (FLAG_require_exact_results) return false;
+      if (iree_test_utils_max_elements_to_check()) return false;
       return fabsf(iree_math_f16_to_f32(actual.f16_u16) -
                    iree_math_f16_to_f32(expected.f16_u16)) <
-             FLAG_acceptable_fp_delta;
+             acceptable_fp_delta;
     case IREE_TEST_UTILS_VALUE_TYPE_BF16:
       if (actual.bf16_u16 == expected.bf16_u16) return true;
-      if (FLAG_require_exact_results) return false;
+      if (iree_test_utils_require_exact_results()) return false;
       return fabsf(iree_math_bf16_to_f32(actual.bf16_u16) -
                    iree_math_bf16_to_f32(expected.bf16_u16)) <
-             FLAG_acceptable_fp_delta;
+             acceptable_fp_delta;
     case IREE_TEST_UTILS_VALUE_TYPE_F32:
       if (actual.f32 == expected.f32) return true;
-      if (FLAG_require_exact_results) return false;
-      return fabsf(actual.f32 - expected.f32) < FLAG_acceptable_fp_delta;
+      if (iree_test_utils_require_exact_results()) return false;
+      return fabsf(actual.f32 - expected.f32) < acceptable_fp_delta;
     default:
       iree_status_abort(iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                                          "unhandled value type"));
