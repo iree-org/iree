@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_HAL_DRIVERS_HIP_NCCL_STATUS_UTIL_H_
-#define IREE_HAL_DRIVERS_HIP_NCCL_STATUS_UTIL_H_
+#ifndef IREE_HAL_DRIVERS_HIP_RCCL_STATUS_UTIL_H_
+#define IREE_HAL_DRIVERS_HIP_RCCL_STATUS_UTIL_H_
 
 #include <stdint.h>
 
@@ -65,4 +65,4 @@ iree_status_t iree_hal_hip_nccl_result_to_status(
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_HAL_DRIVERS_HIP_NCCL_STATUS_UTIL_H_
+#endif  // IREE_HAL_DRIVERS_HIP_RCCL_STATUS_UTIL_H_

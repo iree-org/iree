@@ -19,8 +19,8 @@ if(IREE_TARGET_BACKEND_CUDA AND IREE_HAL_DRIVER_CUDA)
   )
 
   set(COMMON_LABELS
-    "requires-gpu-amd"
-    "driver=hip"
+    "requires-gpu-nvidia"
+    "driver=cuda"
   )
 
   iree_py_test(

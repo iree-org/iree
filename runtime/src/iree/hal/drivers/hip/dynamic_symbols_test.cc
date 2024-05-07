@@ -31,8 +31,7 @@ TEST(DynamicSymbolsTest, CreateFromSystemLoader) {
   if (!iree_status_is_ok(status)) {
     iree_status_fprint(stderr, status);
     iree_status_ignore(status);
-    std::cerr << "Symbols cannot be loaded, skipping test.";
-    GTEST_SKIP();
+    GTEST_SKIP() << "Symbols cannot be loaded, skipping test.";
   }
 
   int device_count = 0;
@@ -76,8 +75,7 @@ TEST(NCCLDynamicSymbolsTest, CreateFromSystemLoader) {
   if (!iree_status_is_ok(status)) {
     iree_status_fprint(stderr, status);
     iree_status_ignore(status);
-    std::cerr << "HIP symbols cannot be loaded, skipping test.";
-    GTEST_SKIP();
+    GTEST_SKIP() << "HIP symbols cannot be loaded, skipping test.";
   }
 
   iree_hal_hip_nccl_dynamic_symbols_t nccl_symbols;
@@ -86,8 +84,7 @@ TEST(NCCLDynamicSymbolsTest, CreateFromSystemLoader) {
   if (!iree_status_is_ok(status)) {
     iree_status_fprint(stderr, status);
     iree_status_ignore(status);
-    std::cerr << "HIP NCCL symbols cannot be loaded, skipping test.";
-    GTEST_SKIP();
+    GTEST_SKIP() << "HIP RCCL symbols cannot be loaded, skipping test.";
   }
 
   int nccl_version = 0;

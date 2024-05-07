@@ -36,7 +36,7 @@ typedef struct iree_hal_hip_driver_t {
   iree_string_view_t identifier;
   // HIP driver API dynamic symbols to interact with the HIP system.
   iree_hal_hip_dynamic_symbols_t hip_symbols;
-  // NCCL API dynamic symbols to interact with the HIP system.
+  // NCCL API dynamic symbols to use collectives (multi-gpu/multi-node).
   iree_hal_hip_nccl_dynamic_symbols_t nccl_symbols;
 
   // The default parameters for creating devices using this driver.

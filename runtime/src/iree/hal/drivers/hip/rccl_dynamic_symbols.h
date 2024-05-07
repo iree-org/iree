@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#ifndef IREE_HAL_DRIVERS_HIP_NCCL_DYNAMIC_SYMBOLS_H_
-#define IREE_HAL_DRIVERS_HIP_NCCL_DYNAMIC_SYMBOLS_H_
+#ifndef IREE_HAL_DRIVERS_HIP_RCCL_DYNAMIC_SYMBOLS_H_
+#define IREE_HAL_DRIVERS_HIP_RCCL_DYNAMIC_SYMBOLS_H_
 
 #include "iree/base/api.h"
 #include "iree/base/internal/dynamic_library.h"
@@ -54,4 +54,4 @@ void iree_hal_hip_nccl_dynamic_symbols_deinitialize(
 }  // extern "C"
 #endif  // __cplusplus
 
-#endif  // IREE_HAL_DRIVERS_HIP_NCCL_DYNAMIC_SYMBOLS_H_
+#endif  // IREE_HAL_DRIVERS_HIP_RCCL_DYNAMIC_SYMBOLS_H_
