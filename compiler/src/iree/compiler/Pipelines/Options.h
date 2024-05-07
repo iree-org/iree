@@ -68,19 +68,6 @@ struct PreprocessingOptions {
   std::string preprocessingTransformSpecFilename;
   std::string preprocessingPDLSpecFilename;
 
-  // DEPRECATED: do not put pass-specific options here and instead use the
-  // pass pipeline.
-  enum class TransposeMatmulInput {
-    /// Transpose LHS input matrix.
-    Lhs,
-    /// Transpose RHS input matrix.
-    Rhs,
-    /// Transpose neither input (disable).
-    None
-  };
-  TransposeMatmulInput preprocessingTransposeMatmulInput =
-      TransposeMatmulInput::None;
-
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<PreprocessingOptions>;
 };

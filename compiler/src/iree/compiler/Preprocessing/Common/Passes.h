@@ -9,7 +9,6 @@
 
 #include <functional>
 
-#include "iree/compiler/Pipelines/Options.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
@@ -24,6 +23,15 @@ enum class PadTargetType {
   ContractionOp = 1,
   // All ops (both convolution and contraction ops).
   All = 2,
+};
+
+enum class TransposeMatmulInput {
+  /// Transpose LHS input matrix.
+  Lhs,
+  /// Transpose RHS input matrix.
+  Rhs,
+  /// Transpose neither input (disable).
+  None
 };
 
 //===----------------------------------------------------------------------===//

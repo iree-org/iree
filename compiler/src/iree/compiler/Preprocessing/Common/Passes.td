@@ -116,15 +116,15 @@ def PadLinalgOpsPass :
 def TransposeMatmulPass : Pass<"iree-preprocessing-transpose-matmul-pass"> {
   let summary = "Convert Linalg matmul ops to transposed variants";
   let options = [
-    Option<"input", "input", "PreprocessingOptions::TransposeMatmulInput",
-           /*default=*/"PreprocessingOptions::TransposeMatmulInput::None",
+    Option<"input", "input", "Preprocessing::TransposeMatmulInput",
+           /*default=*/"Preprocessing::TransposeMatmulInput::None",
            "Input to transpose, one of: 'none' (default), 'lhs', 'rhs'",
            [{llvm::cl::values(
-              clEnumValN(PreprocessingOptions::TransposeMatmulInput::Lhs, "lhs",
+              clEnumValN(Preprocessing::TransposeMatmulInput::Lhs, "lhs",
                          "Transpose LHS input matrix."),
-              clEnumValN(PreprocessingOptions::TransposeMatmulInput::Rhs, "rhs",
+              clEnumValN(Preprocessing::TransposeMatmulInput::Rhs, "rhs",
                          "Transpose RHS input matrix."),
-              clEnumValN(PreprocessingOptions::TransposeMatmulInput::None, "none",
+              clEnumValN(Preprocessing::TransposeMatmulInput::None, "none",
                          "Transpose neither input (disable)."))
            }]>
   ];
