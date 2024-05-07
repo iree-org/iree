@@ -113,7 +113,7 @@ def do_strip_data(args) -> int:
         ):
             return 1
     if not inv.execute_text_pass_pipeline(
-        "iree-util-outline-constants, iree-util-strip-and-splat-constants"
+        "iree-flow-outline-constants, iree-util-strip-and-splat-constants"
     ):
         return 2
     write_output(inv, output, args)

@@ -121,6 +121,36 @@ namespace mlir::iree_compiler::IREE::Flow {
 using FunctionLikeNest =
     MultiOpNest<func::FuncOp, IREE::Util::InitializerOp, IREE::Util::FuncOp>;
 
+//===----------------------------------------------------------------------===//
+// Utilities
+//===----------------------------------------------------------------------===//
+
+static void addCleanupPatterns(OpPassManager &passManager) {
+  FunctionLikeNest(passManager)
+      // Standard MLIR cleanup.
+      .addPass(mlir::createCanonicalizerPass)
+      .addPass(mlir::createCSEPass)
+
+      // Simplify util.global accesses; this can help with data flow tracking as
+      // redundant store-loads are removed.
+      .addPass(IREE::Util::createSimplifyGlobalAccessesPass);
+
+  // Cleanup and canonicalization of util.global (and other util ops).
+  passManager.addPass(IREE::Util::createApplyPatternsPass());
+  passManager.addPass(IREE::Util::createFoldGlobalsPass());
+  passManager.addPass(IREE::Util::createFuseGlobalsPass());
+
+  // Large IPO pass. Note that this can introduce a significant amount of
+  // duplication/inlined constants and we'll want to ensure we're running
+  // cleanup again after (this entire set of patterns is run in a fixed-point
+  // iteration to do that).
+  passManager.addPass(IREE::Util::createIPOPass());
+}
+
+//===----------------------------------------------------------------------===//
+// Pipelines
+//===----------------------------------------------------------------------===//
+
 void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
   // 1. Do some simple elementwise op fusion. This could be skipped,
   //    but could reduce the surface area of ops to handle later.
@@ -240,6 +270,22 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
             clEnableFusePaddingIntoLinalgConsumerOps}));
   }
 
+  {
+    // We run these under a fixed-point iteration such that we can perform
+    // inter-procedural, intra-procedural, and canonicalization as separably
+    // verifiable/reusable passes. IPO will fold duplicate arguments/results
+    // and inline constants to allow the local optimizations to work more
+    // effectively.
+    OpPassManager ipoPipeline(mlir::ModuleOp::getOperationName());
+
+    // IPO and other cleanups.
+    addCleanupPatterns(ipoPipeline);
+
+    // Run fixed-point iteration on the IPO pipeline.
+    passManager.addPass(
+        IREE::Util::createFixedPointIteratorPass(std::move(ipoPipeline)));
+  }
+
   addDispatchRegionCreationPasses(passManager, transformOptions);
 
   FunctionLikeNest(passManager)
@@ -325,9 +371,28 @@ void buildFlowTransformPassPipeline(OpPassManager &passManager,
       // passes above after we've formed dispatch regions.
       .addPass(IREE::Flow::createInjectTensorTracingPass)
       // Cleanup the IR after we are done.
-      .addPass(IREE::Flow::createCleanupTensorShapesPass)
-      .addPass(mlir::createCanonicalizerPass)
-      .addPass(mlir::createCSEPass);
+      .addPass(IREE::Flow::createCleanupTensorShapesPass);
+
+  {
+    // We run these under a fixed-point iteration such that we can perform
+    // inter-procedural, intra-procedural, and canonicalization as separably
+    // verifiable/reusable passes. IPO will fold duplicate arguments/results
+    // and inline constants to allow the local optimizations to work more
+    // effectively.
+    OpPassManager ipoPipeline(mlir::ModuleOp::getOperationName());
+
+    // Turn all constant ops into global variables and fix up the IR.
+    // As many locations change and constants are deduplicated we'll end up with
+    // a lot of extraneous IR (mostly global loads) and clean those up here.
+    ipoPipeline.addPass(IREE::Flow::createOutlineConstantsPass());
+
+    // IPO and other cleanups.
+    addCleanupPatterns(ipoPipeline);
+
+    // Run fixed-point iteration on the IPO pipeline.
+    passManager.addPass(
+        IREE::Util::createFixedPointIteratorPass(std::move(ipoPipeline)));
+  }
 
   // Cleanup executable contents.
   {

@@ -11,6 +11,7 @@ include "iree/compiler/Dialect/Stream/IR/StreamBase.td"
 include "iree/compiler/Dialect/Stream/IR/StreamInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 include "mlir/Interfaces/FunctionInterfaces.td"
+include "mlir/IR/BuiltinAttributeInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/CallInterfaces.td"
@@ -1323,7 +1324,7 @@ def Stream_TensorConstantOp : Stream_PureOp<"tensor.constant", [
   }];
 
   let arguments = (ins
-    AnyAttr:$value,
+    TypedAttrInterface:$value,
     TypeAttr:$result_encoding,
     Stream_ShapeDynamicDims:$result_encoding_dims,
     OptionalAttr<Stream_AffinityAttr>:$affinity

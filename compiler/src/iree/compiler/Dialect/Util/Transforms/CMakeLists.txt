@@ -30,7 +30,6 @@ iree_cc_library(
     "HoistIntoGlobals.cpp"
     "IPO.cpp"
     "ImportResources.cpp"
-    "OutlineConstants.cpp"
     "PassDetail.h"
     "Passes.cpp"
     "Patterns.cpp"

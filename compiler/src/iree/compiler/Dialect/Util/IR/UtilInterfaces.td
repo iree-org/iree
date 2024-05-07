@@ -1157,6 +1157,17 @@ def Util_HoistableAttrInterface : AttrInterface<"HoistableAttrInterface"> {
       }]
     >,
   ];
+
+  let extraClassDeclaration = [{
+    // Walks |fromOp| and up to gather all dialect attributes that want to be
+    // hoisted along with it. If the same named attribute is present on multiple
+    // ancestors only the most narrowly scoped value will be used.
+    static void gatherHoistableAttrs(Operation *fromOp,
+                                     NamedAttrList &dialectAttrs);
+
+    // Copies any hoistable attributes from the source op to the target op.
+    static void gatherHoistableAttrs(Operation *fromOp, Operation *toOp);
+  }];
 }
 
 def Util_HoistableOpInterface : OpInterface<"HoistableOpInterface"> {

@@ -14,7 +14,7 @@ def ExportParametersPass :
   let summary = "Exports all global constants to an archive file when "
                 "they are larger than the specified minimum size.";
   let dependentDialects = [
-    "IREE::Stream::StreamDialect",
+    "IREE::Flow::FlowDialect",
     "IREE::Util::UtilDialect",
   ];
   let options = [
@@ -42,7 +42,7 @@ def ImportParametersPass :
     Pass<"iree-io-import-parameters", "mlir::ModuleOp"> {
   let summary = "Imports parameters from an archive file.";
   let dependentDialects = [
-    "IREE::Stream::StreamDialect",
+    "IREE::Flow::FlowDialect",
     "IREE::Util::UtilDialect",
   ];
   let options = [

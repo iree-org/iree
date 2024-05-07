@@ -391,6 +391,20 @@ def InterchangeTransposeGenericOpsPass :
   ];
 }
 
+def OutlineConstantsPass :
+    Pass<"iree-flow-outline-constants", "mlir::ModuleOp"> {
+  let summary = "Outlines tensor constants into util.globals at the module level.";
+  let description = [{
+    Outlines tensor constants throughout the program into globals initialized
+    with stream ops.
+  }];
+  let dependentDialects = [
+    "mlir::arith::ArithDialect",
+    "IREE::Flow::FlowDialect",
+    "IREE::Util::UtilDialect",
+  ];
+}
+
 def OutlineDispatchExternsPass :
     Pass<"iree-flow-outline-dispatch-externs", "mlir::ModuleOp"> {
   let summary = "Outlines external dispatches into executables.";

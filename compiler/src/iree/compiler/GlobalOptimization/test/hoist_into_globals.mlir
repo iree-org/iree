@@ -10,7 +10,7 @@ module @hoist_sub_byte_tensor_store {
   // CHECK:   util.return
 
   // CHECK: util.func public @main() -> tensor<64xi4>
-  // CHECK:   %[[GLOBAL_LD:.+]] = util.global.load @{{.*}} : tensor<32xi8>
+  // CHECK:   %[[GLOBAL_LD:.+]] = util.global.load immutable @{{.*}} : tensor<32xi8>
   // CHECK:   %[[ORIG_VAL:.+]] = flow.tensor.bitcast %[[GLOBAL_LD]] : tensor<32xi8> -> tensor<64xi4>
   // CHECK:   util.return %[[ORIG_VAL]]
   util.func public @main() -> (tensor<64xi4>) {
@@ -48,9 +48,9 @@ module @hoist_tree_const_expr_i4 {
 
   // CHECK: util.func public @main
   util.func public @main() -> (tensor<8xi4>, tensor<8xi4>, tensor<8xi4>) {
-    // CHECK-DAG: %[[LOAD_HOISTED_0:.*]] = util.global.load @[[HOISTED_0]] : tensor<4xi8>
+    // CHECK-DAG: %[[LOAD_HOISTED_0:.*]] = util.global.load immutable @[[HOISTED_0]] : tensor<4xi8>
     // CHECK-DAG: %[[BITCAST_0:.*]] = flow.tensor.bitcast %[[LOAD_HOISTED_0]] : tensor<4xi8> -> tensor<8xi4>
-    // CHECK-DAG: %[[LOAD_HOISTED_1:.*]] = util.global.load @[[HOISTED_1]] : tensor<4xi8>
+    // CHECK-DAG: %[[LOAD_HOISTED_1:.*]] = util.global.load immutable @[[HOISTED_1]] : tensor<4xi8>
     // CHECK-DAG: %[[BITCAST_1:.*]] = flow.tensor.bitcast %[[LOAD_HOISTED_1]] : tensor<4xi8> -> tensor<8xi4>
     // CHECK-DAG: %[[RESULT:.*]] = "iree_unregistered.var_expr"(%[[BITCAST_1]])
     // CHECK: util.return %[[BITCAST_0]], %[[BITCAST_1]], %[[RESULT]]
@@ -128,7 +128,7 @@ module @hoist_inline_parameters {
   // CHECK-NEXT:   flow.tensor.constant #flow.parameter.named<"compile"::"constant_hoisted_0">
   // CHECK-NEXT:   "iree_unregistered.const_expr"
   util.func public @main() -> tensor<i32> {
-    // CHECK: util.global.load @[[HOISTED]]
+    // CHECK: util.global.load immutable @[[HOISTED]]
     %parameter = flow.tensor.constant #flow.parameter.named<"compile"::"constant_hoisted_0"> : tensor<i32>
     %0 = "iree_unregistered.const_expr"(%parameter) : (tensor<i32>) -> tensor<i32>
     util.return %0 : tensor<i32>
@@ -142,7 +142,7 @@ module @hoist_inline_parameters {
 
 // CHECK-LABEL: @hoist_dialect_attrs
 module @hoist_dialect_attrs {
-  //      CHECK: util.global private @[[HOISTED:[a-z0-9]+]]
+  //      CHECK: util.global private @[[HOISTED:[a-z0-9_]+]]
   // CHECK-SAME:   hal.affinity = #hal.affinity.queue<[0, 1]>
   //      CHECK: util.initializer
   // CHECK-SAME:   hal.affinity = #hal.affinity.queue<[0, 1]>

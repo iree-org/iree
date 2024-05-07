@@ -4,7 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
@@ -255,7 +255,7 @@ importParameterFromFile(StringRef fullName, ShapedType globalType,
 // Import the given |parameterAttr| from |entry|.
 static FailureOr<TypedAttr>
 importParameter(StringRef fullName, ShapedType globalType,
-                IREE::Stream::NamedParameterAttr parameterAttr,
+                IREE::Flow::NamedParameterAttr parameterAttr,
                 const iree_io_parameter_index_entry_t *entry) {
   switch (entry->type) {
   case IREE_IO_PARAMETER_INDEX_ENTRY_STORAGE_TYPE_SPLAT:
@@ -292,7 +292,7 @@ struct ImportParametersPass
     for (auto &key : keys)
       importKeys.insert(key);
     auto shouldImportParameter =
-        [&](IREE::Stream::NamedParameterAttr parameterAttr) -> bool {
+        [&](IREE::Flow::NamedParameterAttr parameterAttr) -> bool {
       // Always try to import explicitly named parameters.
       if (importKeys.contains(parameterAttr.getKey().getValue()))
         return true; // key match
@@ -308,9 +308,8 @@ struct ImportParametersPass
     // Find all parameters and try to import them.
     for (auto globalOp : moduleOp.getOps<IREE::Util::GlobalOpInterface>()) {
       // Only inspect parameter globals.
-      auto parameterAttr =
-          dyn_cast_if_present<IREE::Stream::NamedParameterAttr>(
-              globalOp.getGlobalInitialValue());
+      auto parameterAttr = dyn_cast_if_present<IREE::Flow::NamedParameterAttr>(
+          globalOp.getGlobalInitialValue());
       if (!parameterAttr)
         continue;
 

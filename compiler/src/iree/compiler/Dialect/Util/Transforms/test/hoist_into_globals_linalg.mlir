@@ -27,7 +27,7 @@ module @compute_hoisted {
       linalg.yield %42 : f32
     } -> tensor<5x6xf32>
 
-    // CHECK: %[[RESULT:.*]] = util.global.load @[[HOISTED]] : tensor<5x6xf32>
+    // CHECK: %[[RESULT:.*]] = util.global.load immutable @[[HOISTED]] : tensor<5x6xf32>
     // CHECK: util.return %[[RESULT]]
     util.return %3 : tensor<5x6xf32>
   }

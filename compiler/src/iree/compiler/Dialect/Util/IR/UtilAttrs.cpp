@@ -887,6 +887,46 @@ struct SerializableStringAttrModel
 };
 
 //===----------------------------------------------------------------------===//
+// IREE::Util::Hoistable*Interface
+//===----------------------------------------------------------------------===//
+
+// Walks |fromOp| and up to gather all dialect attributes that want to be
+// hoisted along with it. If the same named attribute is present on multiple
+// ancestors only the most narrowly scoped value will be used.
+// static
+void HoistableAttrInterface::gatherHoistableAttrs(Operation *fromOp,
+                                                  NamedAttrList &dialectAttrs) {
+  for (auto attr : fromOp->getDialectAttrs()) {
+    if (auto hoistableAttr = llvm::dyn_cast<IREE::Util::HoistableAttrInterface>(
+            attr.getValue())) {
+      if (hoistableAttr.shouldAttachToHoistedOps() &&
+          !dialectAttrs.get(attr.getName())) {
+        dialectAttrs.push_back(attr);
+      }
+    }
+  }
+  if (auto *parentOp = fromOp->getParentOp())
+    gatherHoistableAttrs(parentOp, dialectAttrs);
+}
+
+// static
+void HoistableAttrInterface::gatherHoistableAttrs(Operation *fromOp,
+                                                  Operation *toOp) {
+  // Get the attributes specified on the target op first as those take
+  // precedence over any from ancestors. We also want to preserve any
+  // non-hoistable attrs when we reassign the dialect attrs.
+  NamedAttrList dialectAttrs;
+  for (auto attr : toOp->getDialectAttrs())
+    dialectAttrs.push_back(attr);
+
+  // Gather attributes from the op and its parents, only adding ones not already
+  // set on the op.
+  HoistableAttrInterface::gatherHoistableAttrs(fromOp, dialectAttrs);
+
+  toOp->setDialectAttrs(dialectAttrs);
+}
+
+//===----------------------------------------------------------------------===//
 // IREE::Util::UtilDialect
 //===----------------------------------------------------------------------===//
 

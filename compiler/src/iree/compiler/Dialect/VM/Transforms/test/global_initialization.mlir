@@ -35,6 +35,43 @@ vm.module @init_i32 {
 
 // -----
 
+// CHECK-LABEL: @mutability_change
+vm.module @mutability_change {
+  // CHECK: vm.global.i32 private @g0
+  vm.global.i32 private mutable @g0 : i32 = 0 : i32
+  // CHECK: vm.global.i32 private mutable @g1 : i32
+  vm.global.i32 private mutable @g1 = 123 : i32
+  // CHECK: vm.global.i32 private mutable @g2 : i32
+  vm.global.i32 private @g2 : i32
+
+  vm.initializer {
+    %c456 = vm.const.i32 456
+    vm.global.store.i32 %c456, @g2 : i32
+    vm.return
+  }
+
+  // CHECK: vm.func public @func
+  vm.func public @func() {
+    // CHECK: vm.global.load.i32 immutable @g0
+    vm.global.load.i32 @g0 : i32
+    // CHECK: vm.global.load.i32 @g1
+    vm.global.load.i32 @g1 : i32
+    // CHECK: vm.global.load.i32 @g2
+    vm.global.load.i32 immutable @g2 : i32
+    vm.return
+  }
+
+  // CHECK: vm.func private @__init() {
+  // CHECK-NEXT:   %c123 = vm.const.i32 123
+  // CHECK-NEXT:   vm.global.store.i32 %c123, @g1
+  // CHECK-NEXT:   %c456 = vm.const.i32 456
+  // CHECK-NEXT:   vm.global.store.i32 %c456, @g2
+  // CHECK-NEXT:   vm.return
+  // CHECK-NEXT: }
+}
+
+// -----
+
 // CHECK-LABEL: @init_ref
 vm.module @init_ref {
   // CHECK: vm.global.ref private mutable @g0 : !vm.ref<?>
