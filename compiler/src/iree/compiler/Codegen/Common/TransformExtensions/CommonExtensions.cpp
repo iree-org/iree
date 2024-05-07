@@ -61,8 +61,6 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Value.h"
 #include "mlir/Pass/PassManager.h"
-#include "mlir/Support/LogicalResult.h"
-#include "mlir/Support/MathExtras.h"
 #include "mlir/Transforms/CSE.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -447,7 +445,7 @@ FailureOr<int64_t> getTripCount(scf::ForallOp loop) {
 
   int64_t tripCount = 1;
   for (auto [lb, ub, step] : llvm::zip_equal(lbs, ubs, steps)) {
-    tripCount *= ceilDiv((ub - lb), step);
+    tripCount *= mlir::ceilDiv((ub - lb), step);
   }
   return tripCount;
 }
