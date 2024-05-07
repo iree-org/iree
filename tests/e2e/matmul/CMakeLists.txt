@@ -1814,63 +1814,6 @@ iree_generated_e2e_runner_test(
 
 iree_generated_e2e_runner_test(
   NAME
-    e2e_matmul_rocm_f16_large_cdna3_mfma
-  TEST_TYPE
-    matmul
-  GENERATOR
-    "generate_e2e_matmul_tests.py"
-  GENERATOR_ARGS
-    "--lhs_rhs_type=f16"
-    "--acc_type=f32"
-    "--shapes=gpu_large_aligned"
-    "--compilation_info=LLVMGPUVectorDistributeMFMA"
-  TEST_RUNNER
-    iree_tools_testing_e2e_iree-e2e-matmul-test
-  TARGET_BACKENDS
-    "rocm"
-  DRIVERS
-    "hip"
-  COMPILER_FLAGS
-    "--iree-rocm-target-chip=gfx942"
-  LABELS
-    "noasan"
-    "nomsan"
-    "notsan"
-    "noubsan"
-    "requires-gpu-cdna3"
-)
-
-iree_generated_e2e_runner_test(
-  NAME
-    e2e_matmul_rocm_f16_large_cdna3_mfma_tb
-  TEST_TYPE
-    matmul
-  GENERATOR
-    "generate_e2e_matmul_tests.py"
-  GENERATOR_ARGS
-    "--lhs_rhs_type=f16"
-    "--acc_type=f32"
-    "--transpose_rhs"
-    "--shapes=gpu_large_aligned"
-    "--compilation_info=LLVMGPUVectorDistributeMFMA"
-  TEST_RUNNER
-    iree_tools_testing_e2e_iree-e2e-matmul-test
-  TARGET_BACKENDS
-    "rocm"
-  DRIVERS
-    "hip"
-  COMPILER_FLAGS
-    "--iree-rocm-target-chip=gfx942"
-  LABELS
-    "noasan"
-    "nomsan"
-    "notsan"
-    "noubsan"
-    "requires-gpu-cdna3"
-)
-
-iree_generated_e2e_runner_test(
-  NAME
     e2e_matmul_rocm_f16_large_rdna3_wmma
   TEST_TYPE
     matmul
@@ -2098,3 +2041,68 @@ iree_generated_e2e_runner_test(
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+
+if(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx")
+
+unset(IREE_HIP_TEST_COMPILER_FLAGS)
+list(APPEND IREE_HIP_TEST_COMPILER_FLAGS
+  "--iree-rocm-target-chip=${IREE_HIP_TEST_TARGET_CHIP}"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_matmul_rocm_f16_large_cdna3_mfma
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f16"
+    "--acc_type=f32"
+    "--shapes=gpu_large_aligned"
+    "--compilation_info=LLVMGPUVectorDistributeMFMA"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "rocm"
+  DRIVERS
+    "hip"
+  COMPILER_FLAGS
+    "--iree-rocm-target-chip=gfx942"
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-cdna3"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_matmul_rocm_f16_large_cdna3_mfma_tb
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f16"
+    "--acc_type=f32"
+    "--transpose_rhs"
+    "--shapes=gpu_large_aligned"
+    "--compilation_info=LLVMGPUVectorDistributeMFMA"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "rocm"
+  DRIVERS
+    "hip"
+  COMPILER_FLAGS
+    "--iree-rocm-target-chip=gfx942"
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-cdna3"
+)
+endif(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx")
