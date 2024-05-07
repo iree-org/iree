@@ -338,8 +338,13 @@ class Source:
                 buffer_name.encode(),
                 buffer,
                 buffer_len,
-                # Detect if nul terminated.
-                True if buffer_len > 0 and view[-1] == 0 else False,
+                # Detect if null terminated.
+                # MLIR bytecode files are not null terminated, but could be by chance.
+                (
+                    True
+                    if buffer_len > 0 and view[-1] == 0 and view[:4].hex() != "4d4cef52"
+                    else False
+                ),
                 byref(source_p),
             )
         )
