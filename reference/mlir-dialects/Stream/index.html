@@ -8164,8 +8164,7 @@ underlying allocation buffer.</p>
 <h4 id="streamresourcesize-streamresourcesizeop"><code>stream.resource.size</code> (Stream::ResourceSizeOp)<a class="headerlink" href="#streamresourcesize-streamresourcesizeop" title="Permanent link">link</a></h4>
 <p><em>Returns the size of the resource storage in bytes</em></p>
 <p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>operation ::= `stream.resource.size` (`on` `(` $affinity^ `)`)?
-              $operand
+<div class="highlight"><pre><span></span><code>operation ::= `stream.resource.size` $operand
               attr-dict `:` type($operand)
 </code></pre></div>
 <p>Returns a possibly runtime-dynamic byte size of the resource backing
@@ -8173,7 +8172,7 @@ storage. This may differ from the logical storage size of a value based on
 the alignment requirements of the target as well as encoding of higher level
 values such as sparse tensor formats.</p>
 <p>Traits: <code>AlwaysSpeculatableImplTrait</code></p>
-<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Stream_AffinityOp</code>, <code>Util_SizeAwareOp</code></p>
+<p>Interfaces: <code>ConditionallySpeculatable</code>, <code>InferTypeOpInterface</code>, <code>NoMemoryEffect (MemoryEffectOpInterface)</code>, <code>Util_SizeAwareOp</code></p>
 <p>Effects: <code>MemoryEffects::Effect{}</code></p>
 <h5 id="attributes_28">Attributes:<a class="headerlink" href="#attributes_28" title="Permanent link">link</a></h5>
 <table>
