@@ -571,8 +571,6 @@
     "test_thresholdedrelu",
     "test_thresholdedrelu_default",
     "test_thresholdedrelu_example",
-    "test_tile",
-    "test_tile_precomputed",
     "test_training_dropout",
     "test_training_dropout_default",
     "test_training_dropout_default_mask",

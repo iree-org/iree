@@ -399,14 +399,21 @@ struct ZeroExtendIOpConversion : public OpConversionPattern<arith::ExtUIOp> {
                   ConversionPatternRewriter &rewriter) const override {
     auto srcType = srcOp.getIn().getType();
     auto dstType = getTypeConverter()->convertType(srcOp.getResult().getType());
-    if (srcType.isInteger(1) && dstType.isInteger(32)) {
-      // This may not be needed but ensures that the input was treated as a
-      // single bit.
+    if (srcType.isInteger(1)) {
       // NOTE: this may not be required - if we know that the i1 is never able
       // to have more than bit 0 manipulated then this is wasted work.
-      rewriter.replaceOpWithNewOp<IREE::VM::AndI32Op>(
-          srcOp, dstType, adaptor.getIn(),
+      auto maskedValue = rewriter.createOrFold<IREE::VM::AndI32Op>(
+          srcOp.getLoc(), rewriter.getI32Type(), adaptor.getIn(),
           rewriter.createOrFold<IREE::VM::ConstI32Op>(srcOp.getLoc(), 1));
+      if (dstType.isInteger(32)) {
+        rewriter.replaceOp(srcOp, maskedValue);
+      } else if (dstType.isInteger(64)) {
+        rewriter.replaceOpWithNewOp<IREE::VM::ExtI32I64UOp>(srcOp, dstType,
+                                                            maskedValue);
+      } else {
+        return rewriter.notifyMatchFailure(srcOp,
+                                           "unsupported i1 zero extension");
+      }
     } else if (srcType.isInteger(8) && dstType.isInteger(32)) {
       rewriter.replaceOpWithNewOp<IREE::VM::ExtI8I32UOp>(srcOp, dstType,
                                                          adaptor.getIn());
@@ -415,6 +422,9 @@ struct ZeroExtendIOpConversion : public OpConversionPattern<arith::ExtUIOp> {
                                                          adaptor.getIn());
     } else if (srcType.isInteger(16) && dstType.isInteger(32)) {
       rewriter.replaceOpWithNewOp<IREE::VM::ExtI16I32UOp>(srcOp, dstType,
+                                                          adaptor.getIn());
+    } else if (srcType.isInteger(16) && dstType.isInteger(64)) {
+      rewriter.replaceOpWithNewOp<IREE::VM::ExtI16I64UOp>(srcOp, dstType,
                                                           adaptor.getIn());
     } else if (srcType.isInteger(32) && dstType.isInteger(64)) {
       rewriter.replaceOpWithNewOp<IREE::VM::ExtI32I64UOp>(srcOp, dstType,
@@ -433,7 +443,23 @@ struct SignExtendIOpConversion : public OpConversionPattern<arith::ExtSIOp> {
                   ConversionPatternRewriter &rewriter) const override {
     auto srcType = srcOp.getIn().getType();
     auto dstType = getTypeConverter()->convertType(srcOp.getResult().getType());
-    if (srcType.isInteger(8) && dstType.isInteger(32)) {
+    if (srcType.isInteger(1)) {
+      if (dstType.isInteger(32)) {
+        rewriter.replaceOpWithNewOp<IREE::VM::SelectI32Op>(
+            srcOp, dstType, adaptor.getIn(),
+            rewriter.create<IREE::VM::ConstI32Op>(srcOp.getLoc(), 0xFFFFFFFFu),
+            rewriter.create<IREE::VM::ConstI32ZeroOp>(srcOp.getLoc()));
+      } else if (dstType.isInteger(64)) {
+        rewriter.replaceOpWithNewOp<IREE::VM::SelectI64Op>(
+            srcOp, dstType, adaptor.getIn(),
+            rewriter.create<IREE::VM::ConstI64Op>(srcOp.getLoc(),
+                                                  0xFFFFFFFFFFFFFFFFull),
+            rewriter.create<IREE::VM::ConstI64ZeroOp>(srcOp.getLoc()));
+      } else {
+        return rewriter.notifyMatchFailure(srcOp,
+                                           "unsupported i1 sign extension");
+      }
+    } else if (srcType.isInteger(8) && dstType.isInteger(32)) {
       rewriter.replaceOpWithNewOp<IREE::VM::ExtI8I32SOp>(srcOp, dstType,
                                                          adaptor.getIn());
     } else if (srcType.isInteger(8) && dstType.isInteger(64)) {
