@@ -517,7 +517,8 @@ static void addVectorBufferizePasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createCSEPass());
 }
 
-void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager) {
+void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
+                                        bool usePadToModelSharedMemcpy) {
   tileAndDistributeToWorkgroup(funcPassManager);
   funcPassManager.addPass(createReorderWorkgroups(
       clReorderWorkgroupsStrategy, clReorderWorkgroupsLogSwizzleTile,
@@ -525,22 +526,33 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
+  if (usePadToModelSharedMemcpy) {
+    LLVMGPUMatmulPadOption option = LLVMGPUMatmulPadOption::ParallelDims;
+    funcPassManager.addPass(createLLVMGPUPromoteMatmulToFitMMAPass(option));
+  }
+
   // Problem specific (reduction) tiling.
   funcPassManager.addPass(createGPUTensorTileToSerialLoops());
+
+  if (usePadToModelSharedMemcpy) {
+    LLVMGPUMatmulPadOption option = LLVMGPUMatmulPadOption::ReductionDims;
+    funcPassManager.addPass(createLLVMGPUPromoteMatmulToFitMMAPass(option));
+  }
 
   // Generalize all named ops so that we can fold away unit extent dims. By this
   // point, all tiling is finished so the tiling configurations on those ops can
   // be safely dropped. This additionally allows vectorization of convolution to
   // `vector.contract` as filter dimensions are expected to be tiled to 1 by
   // this point.
-  funcPassManager.addPass(createLinalgGeneralizeNamedOpsPass());
-  LinalgFoldUnitExtentDimsPassOptions options;
-  options.useRankReducingSlices = true;
-  funcPassManager.addPass(mlir::createLinalgFoldUnitExtentDimsPass(options));
-  funcPassManager.addPass(createCanonicalizerPass());
-  funcPassManager.addPass(createCSEPass());
+  if (!usePadToModelSharedMemcpy) {
+    funcPassManager.addPass(createLinalgGeneralizeNamedOpsPass());
+    LinalgFoldUnitExtentDimsPassOptions options;
+    options.useRankReducingSlices = true;
+    funcPassManager.addPass(mlir::createLinalgFoldUnitExtentDimsPass(options));
+    funcPassManager.addPass(createCanonicalizerPass());
+    funcPassManager.addPass(createCSEPass());
+  }
 
-  funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
   funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
 
   // Linalg -> Vector
