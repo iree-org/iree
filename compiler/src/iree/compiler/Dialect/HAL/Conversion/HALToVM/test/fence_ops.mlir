@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-convert-hal-to-vm %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-vm-conversion %s | FileCheck %s
 
 // CHECK-LABEL: @fence_create
 // CHECK-SAME: (%[[DEVICE:.+]]: !vm.ref<!hal.device>)

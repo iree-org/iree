@@ -32,15 +32,4 @@ iree_cc_library(
   PUBLIC
 )
 
-iree_cc_library(
-  NAME
-    Passes
-  HDRS
-    "Passes.h"
-  DEPS
-    MLIRPass
-    iree::compiler::Dialect::HAL::Conversion::HALToVM
-  PUBLIC
-)
-
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

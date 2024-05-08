@@ -91,13 +91,6 @@ createDropEmptyModuleInitializersPass();
 std::unique_ptr<OperationPass<IREE::VM::ModuleOp>> createSinkDefiningOpsPass();
 
 //===----------------------------------------------------------------------===//
-// Test passes
-//===----------------------------------------------------------------------===//
-
-std::unique_ptr<OperationPass<mlir::ModuleOp>>
-createConvertStandardToVMTestPass();
-
-//===----------------------------------------------------------------------===//
 // Register all Passes
 //===----------------------------------------------------------------------===//
 
@@ -112,11 +105,6 @@ inline void registerVMPasses() {
   createOrdinalAllocationPass();
   createResolveRodataLoadsPass();
   createSinkDefiningOpsPass();
-}
-
-inline void registerVMTestPasses() {
-  TargetOptions::FromFlags::get();
-  createConvertStandardToVMTestPass();
 }
 
 } // namespace mlir::iree_compiler::IREE::VM

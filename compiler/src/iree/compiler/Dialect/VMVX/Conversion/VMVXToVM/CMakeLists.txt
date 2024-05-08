@@ -27,7 +27,6 @@ iree_cc_library(
     MLIRTransforms
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::VM::Conversion
-    iree::compiler::Dialect::VM::Conversion::StandardToVM
     iree::compiler::Dialect::VM::IR
     iree::compiler::Dialect::VMVX::IR
   PUBLIC

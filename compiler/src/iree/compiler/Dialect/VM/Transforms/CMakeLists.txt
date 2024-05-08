@@ -51,6 +51,7 @@ iree_cc_library(
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms
     iree::compiler::Dialect::VM::Conversion
+    iree::compiler::Dialect::VM::Conversion::ArithToVM
     iree::compiler::Dialect::VM::Conversion::MathToVM
     iree::compiler::Dialect::VM::Conversion::StandardToVM
     iree::compiler::Dialect::VM::Conversion::UtilToVM

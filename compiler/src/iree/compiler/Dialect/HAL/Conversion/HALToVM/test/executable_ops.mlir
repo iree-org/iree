@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-convert-hal-to-vm %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-vm-conversion %s | FileCheck %s
 
 // CHECK: vm.rodata private @exe_binary1 {alignment = 16 : i64} dense<[0, 1, 2, 3]> : vector<4xi8>
 // CHECK: vm.rodata private @exe_binary2 {alignment = 16 : i64} dense<[4, 5, 6, 7]> : vector<4xi8>
