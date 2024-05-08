@@ -582,7 +582,8 @@ setMatmulVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
 
   // Only batch_matmul is supported in the LLVMGPUPadAndVectorDistribute
   // pipeline.
-  if (!schedule && !contractionDims->batch.empty()) {
+  // TODO(hanchung): Support cases that there are fused producers.
+  if (!schedule && !contractionDims->batch.empty() && !hasFusedLeadingOp(op)) {
     pipeline = IREE::Codegen::DispatchLoweringPassPipeline::
         LLVMGPUPadAndVectorDistribute;
     bool mustBeAligned = false;
