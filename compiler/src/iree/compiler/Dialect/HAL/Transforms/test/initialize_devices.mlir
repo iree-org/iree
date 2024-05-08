@@ -31,10 +31,14 @@ util.global private @device_fallback = #hal.device.fallback<@device_base> : !hal
 
 // -----
 
-// Tests that #hal.device.target<*> enumerates all devices.
+// Tests that #hal.device.target<*> enumerates all devices and tries to match
+// a particular target with the given ordinal. The ordinal allows for multiple
+// devices of the same type to be differentiated.
 
 // CHECK: util.global private @device_a : !hal.device
-util.global private @device_a = #hal.device.target<"a", [
+util.global private @device_a = #hal.device.target<"a", {
+  ordinal = 2 : index
+}, [
   #hal.executable.target<"backend0", "format0">,
   #hal.executable.target<"backend1", "format1">
 ]> : !hal.device
@@ -42,19 +46,19 @@ util.global private @device_a = #hal.device.target<"a", [
 // CHECK-NEXT: util.initializer
 //  CHECK-DAG: %[[NULL_DEVICE:.+]] = util.null : !hal.device
 //  CHECK-DAG: %[[DEVICE_COUNT:.+]] = hal.devices.count
-//      CHECK: %[[WHILE:.+]]:2 = scf.while (%arg0 = %c0, %arg1 = %[[NULL_DEVICE]])
-//  CHECK-DAG:   %[[IS_DEVICE_NULL:.+]] = util.cmp.eq %arg1, %[[NULL_DEVICE]]
+//      CHECK: %[[WHILE:.+]]:3 = scf.while (%arg0 = %c0, %arg1 = %c0, %arg2 = %[[NULL_DEVICE]])
+//  CHECK-DAG:   %[[IS_DEVICE_NULL:.+]] = util.cmp.eq %arg2, %[[NULL_DEVICE]]
 //  CHECK-DAG:   %[[IS_END:.+]] = arith.cmpi slt, %arg0, %[[DEVICE_COUNT]]
 //  CHECK-DAG:   %[[CONTINUE:.+]] = arith.andi %[[IS_DEVICE_NULL]], %[[IS_END]]
-// CHECK-NEXT:   scf.condition(%[[CONTINUE]]) %arg0, %arg1
+// CHECK-NEXT:   scf.condition(%[[CONTINUE]]) %arg0, %arg1, %arg2
 // CHECK-NEXT: } do {
-// CHECK-NEXT:  ^bb0(%arg0: index, %arg1: !hal.device)
+// CHECK-NEXT:  ^bb0(%arg0: index, %arg1: index, %arg2: !hal.device)
 //  CHECK-DAG:   %[[DEVICE_N:.+]] = hal.devices.get %arg0 : !hal.device
 
 // NOTE: this is the fallback path for device matching unregistered targets.
 // Real targets can have much more complex logic if they so choose.
 //  CHECK-DAG:   %{{.+}}, %[[ID_MATCH:.+]] = hal.device.query<%[[DEVICE_N]] : !hal.device> key("hal.device.id" :: "a")
-// CHECK-NEXT:   %[[ANY_FORMAT_MATCH:.+]] = scf.if %[[ID_MATCH]] -> (i1) {
+// CHECK-NEXT:   %[[IS_DEVICE_MATCH:.+]] = scf.if %[[ID_MATCH]] -> (i1) {
 //  CHECK-DAG:     %{{.+}}, %[[FORMAT0_MATCH:.+]] = hal.device.query<%[[DEVICE_N]] : !hal.device> key("hal.executable.format" :: "format0")
 //  CHECK-DAG:     %{{.+}}, %[[FORMAT1_MATCH:.+]] = hal.device.query<%[[DEVICE_N]] : !hal.device> key("hal.executable.format" :: "format1")
 //  CHECK-DAG:     %[[FORMAT_MATCH_OR:.+]] = arith.ori %[[FORMAT0_MATCH]], %[[FORMAT1_MATCH]]
@@ -62,13 +66,22 @@ util.global private @device_a = #hal.device.target<"a", [
 // CHECK-NEXT:   } else {
 //  CHECK-DAG:     scf.yield %false
 
-//  CHECK-DAG:   %[[YIELD_DEVICE:.+]] = arith.select %[[ANY_FORMAT_MATCH]], %[[DEVICE_N]], %[[NULL_DEVICE]]
+// Check that if the device matches this is the ordinal selected. If not the
+// correct ordinal we'll skip it and continue to look for the next.
+//  CHECK-DAG:   %[[IS_ORDINAL_MATCH:.+]] = arith.cmpi eq, %arg1, %c2
+//  CHECK-DAG:   %[[NEXT_MATCH_ADVANCE:.+]] = arith.select %[[IS_DEVICE_MATCH]], %c1, %c0
+//  CHECK-DAG:   %[[NEXT_MATCH_ORDINAL:.+]] = arith.addi %arg1, %[[NEXT_MATCH_ADVANCE]]
+
+//  CHECK-DAG:   %[[IS_MATCH:.+]] = arith.andi %[[IS_DEVICE_MATCH]], %[[IS_ORDINAL_MATCH]]
+//  CHECK-DAG:   %[[YIELD_DEVICE:.+]] = arith.select %[[IS_MATCH]], %[[DEVICE_N]], %[[NULL_DEVICE]]
 //  CHECK-DAG:   %[[NEXT_I:.+]] = arith.addi %arg0, %c1
-// CHECK-NEXT:   scf.yield %[[NEXT_I]], %[[YIELD_DEVICE]]
-//  CHECK-DAG: %[[IS_NULL:.+]] = util.cmp.eq %[[WHILE]]#1, %[[NULL_DEVICE]]
+// CHECK-NEXT:   scf.yield %[[NEXT_I]], %[[NEXT_MATCH_ORDINAL]], %[[YIELD_DEVICE]]
+
+// Error out if no device was found because at least one match is required.
+//  CHECK-DAG: %[[IS_NULL:.+]] = util.cmp.eq %[[WHILE]]#2, %[[NULL_DEVICE]]
 // CHECK-NEXT: scf.if %[[IS_NULL]] {
 //      CHECK:   util.status.check_ok %c5_i32, "HAL device `device_a` not found or unavailable: #hal.device.target<{{.+}}>"
-//      CHECK: util.global.store %[[WHILE]]#1, @device_a
+//      CHECK: util.global.store %[[WHILE]]#2, @device_a
 
 // -----
 

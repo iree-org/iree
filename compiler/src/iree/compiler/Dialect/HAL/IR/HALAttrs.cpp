@@ -191,23 +191,37 @@ void IREE::HAL::DeviceTargetAttr::printStatusDescription(
 // is effectively:
 // ```
 //   %device_count = hal.devices.count : index
-//   %result:2 = scf.while(%i = 0, %device = null) {
+//   %result:3 = scf.while(%i = 0, %match_ordinal = 0, %device = null) {
 //     %is_null = util.cmp.eq %device, null : !hal.device
 //     %in_bounds = arith.cmpi slt %i, %device_count : index
 //     %continue_while = arith.andi %is_null, %in_bounds : i1
-//     scf.condition(%continue_while) %i, %device : index, !hal.device
+//     scf.condition(%continue_while) %i, %match_ordinal %device
+//         : index, index, !hal.device
 //   } do {
 //     %device_i = hal.devices.get %i : !hal.device
-//     %is_match = <<buildDeviceMatch>>(%device_i)
+//     %device_match = <<buildDeviceMatch>>(%device_i)
+//     %ordinal_match = arith.cmpi eq %match_ordinal, %device_ordinal : index
+//     %is_match = arith.andi %device_match, %ordinal_match : i1
 //     %try_device = arith.select %is_match, %device_i, null : !hal.device
 //     %next_i = arith.addi %i, %c1 : index
-//     scf.yield %next_i, %try_device : index, !hal.device
+//     %match_adv = arith.select %device_match, %c1, %c0 : index
+//     %next_match_ordinal = arith.addi %match_ordinal, %match_adv : index
+//     scf.yield %next_i, %next_match_ordinal, %try_device
+//         : index, index !hal.device
 //   }
 // ```
 // Upon completion %result#1 contains the device (or null).
+// If the target had an ordinal specified we skip matches until a match with the
+// specified ordinal is reached.
 Value IREE::HAL::DeviceTargetAttr::buildDeviceEnumeration(
     Location loc, const IREE::HAL::TargetRegistry &targetRegistry,
     OpBuilder &builder) const {
+  // Device configuration can control selection beyond just the match
+  // expression.
+  auto configAttr = getConfiguration();
+  IntegerAttr deviceOrdinalAttr =
+      configAttr ? configAttr.getAs<IntegerAttr>("ordinal") : IntegerAttr{};
+
   // Defers to the target backend to build the device match or does a simple
   // fallback for unregistered backends (usually for testing, but may be used
   // as a way to bypass validation for out-of-tree experiments).
@@ -231,28 +245,63 @@ Value IREE::HAL::DeviceTargetAttr::buildDeviceEnumeration(
   Value c0 = builder.create<arith::ConstantIndexOp>(loc, 0);
   Value c1 = builder.create<arith::ConstantIndexOp>(loc, 1);
   Value nullDevice = builder.create<IREE::Util::NullOp>(loc, deviceType);
+  Value deviceOrdinal = deviceOrdinalAttr
+                            ? builder.create<arith::ConstantIndexOp>(
+                                  loc, deviceOrdinalAttr.getInt())
+                            : c0;
   Value deviceCount = builder.create<IREE::HAL::DevicesCountOp>(loc, indexType);
   auto whileOp = builder.create<scf::WhileOp>(
-      loc, TypeRange{indexType, deviceType}, ValueRange{c0, nullDevice},
+      loc,
+      TypeRange{
+          /*i=*/indexType,
+          /*match_ordinal=*/indexType,
+          /*device=*/deviceType,
+      },
+      ValueRange{
+          /*i=*/c0,
+          /*match_ordinal=*/c0,
+          /*device=*/nullDevice,
+      },
       [&](OpBuilder &beforeBuilder, Location loc, ValueRange operands) {
         Value isNull = beforeBuilder.create<IREE::Util::CmpEQOp>(
-            loc, operands[1], nullDevice);
+            loc, operands[/*device=*/2], nullDevice);
         Value inBounds = beforeBuilder.create<arith::CmpIOp>(
-            loc, arith::CmpIPredicate::slt, operands[0], deviceCount);
+            loc, arith::CmpIPredicate::slt, operands[/*i=*/0], deviceCount);
         Value continueWhile =
             beforeBuilder.create<arith::AndIOp>(loc, isNull, inBounds);
         beforeBuilder.create<scf::ConditionOp>(loc, continueWhile, operands);
       },
       [&](OpBuilder &afterBuilder, Location loc, ValueRange operands) {
+        // Check whether the device is a match.
         Value device = afterBuilder.create<IREE::HAL::DevicesGetOp>(
-            loc, deviceType, operands[0]);
-        Value isMatch = buildDeviceMatch(loc, device, afterBuilder);
+            loc, deviceType, operands[/*i=*/0]);
+        Value isDeviceMatch = buildDeviceMatch(loc, device, afterBuilder);
+
+        // Check whether whether this matching device ordinal is the requested
+        // ordinal out of all matching devices.
+        Value isOrdinalMatch = afterBuilder.create<arith::CmpIOp>(
+            loc, arith::CmpIPredicate::eq, operands[/*match_ordinal=*/1],
+            deviceOrdinal);
+        Value nextMatchOrdinal = afterBuilder.create<arith::AddIOp>(
+            loc, operands[/*match_ordinal=*/1],
+            afterBuilder.create<arith::SelectOp>(loc, isDeviceMatch, c1, c0));
+
+        // Break if the device and ordinal match, otherwise continue with null.
+        Value isMatch = afterBuilder.create<arith::AndIOp>(loc, isDeviceMatch,
+                                                           isOrdinalMatch);
         Value tryDevice = afterBuilder.create<arith::SelectOp>(
             loc, isMatch, device, nullDevice);
-        Value nextI = afterBuilder.create<arith::AddIOp>(loc, operands[0], c1);
-        afterBuilder.create<scf::YieldOp>(loc, ValueRange{nextI, tryDevice});
+
+        Value nextI =
+            afterBuilder.create<arith::AddIOp>(loc, operands[/*i=*/0], c1);
+        afterBuilder.create<scf::YieldOp>(
+            loc, ValueRange{
+                     /*i=*/nextI,
+                     /*match_ordinal=*/nextMatchOrdinal,
+                     /*device=*/tryDevice,
+                 });
       });
-  return whileOp.getResult(1);
+  return whileOp.getResult(/*device=*/2);
 }
 
 //===----------------------------------------------------------------------===//
