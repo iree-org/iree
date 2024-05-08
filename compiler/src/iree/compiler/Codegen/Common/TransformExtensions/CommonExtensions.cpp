@@ -51,8 +51,6 @@
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/Passes.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
-#include "mlir/IR/AffineExpr.h"
-#include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinAttributeInterfaces.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -174,6 +172,57 @@ struct FoldFillIntoPad : public OpRewritePattern<tensor::PadOp> {
 void transform_dialect::ApplyFoldFillIntoPadPatternsOp::populatePatterns(
     RewritePatternSet &patterns) {
   patterns.insert<FoldFillIntoPad>(patterns.getContext());
+}
+
+//===---------------------------------------------------------------------===//
+// ApplyLowerShuffleTensorPatternsOp
+//===---------------------------------------------------------------------===//
+
+namespace {
+struct LowerShuffleTensor
+    : public OpRewritePattern<IREE::GPU::ShuffleTensorOp> {
+  using OpRewritePattern<IREE::GPU::ShuffleTensorOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::GPU::ShuffleTensorOp shuffleOp,
+                                PatternRewriter &rewriter) const final {
+    Location loc = shuffleOp.getLoc();
+
+    MemRefType allocType = shuffleOp.getSharedAllocType();
+    auto tensorType =
+        RankedTensorType::get(allocType.getShape(), allocType.getElementType());
+    Value tensorAlloc = rewriter.create<bufferization::ToTensorOp>(
+        loc, tensorType, shuffleOp.getSharedAlloc(), /*restrict=*/true,
+        /*writeable=*/true);
+
+    // Step 1. Insert the source slice into the intermediate tensor.
+    SmallVector<OpFoldResult, 4> sourceOffsets =
+        shuffleOp.getMixedSourceOffsets();
+    SmallVector<OpFoldResult, 4> sourceSizes = shuffleOp.getMixedSourceSizes();
+    SmallVector<OpFoldResult, 4> sourceStrides =
+        shuffleOp.getMixedSourceStrides();
+    Value insertedSlice = rewriter.create<tensor::InsertSliceOp>(
+        loc, shuffleOp.getSource(), tensorAlloc, sourceOffsets, sourceSizes,
+        sourceStrides);
+
+    // Step 2. Synchronize the workers.
+    rewriter.create<gpu::BarrierOp>(loc);
+
+    // Step 3. Extract the result slice.
+    SmallVector<OpFoldResult, 4> resultOffsets =
+        shuffleOp.getMixedResultOffsets();
+    SmallVector<OpFoldResult, 4> resultSizes = shuffleOp.getMixedResultSizes();
+    SmallVector<OpFoldResult, 4> resultStrides =
+        shuffleOp.getMixedResultStrides();
+    rewriter.replaceOpWithNewOp<tensor::ExtractSliceOp>(
+        shuffleOp, shuffleOp.getType(), insertedSlice, resultOffsets,
+        resultSizes, resultStrides);
+    return success();
+  }
+};
+} // namespace
+
+void transform_dialect::ApplyLowerShuffleTensorPatternsOp::populatePatterns(
+    RewritePatternSet &patterns) {
+  patterns.insert<LowerShuffleTensor>(patterns.getContext());
 }
 
 //===---------------------------------------------------------------------===//
