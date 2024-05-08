@@ -492,8 +492,10 @@ def HAL_DeviceTargetAttr : AttrDef<HAL_Dialect, "DeviceTarget", [
     several target executable formats specified with `#hal.executable.target`.
     An optional configuration dictionary allows for overriding backend defaults.
 
-    If used to initialize a device global returns the first device matching or
-    null if no devices match.
+    If used to initialize a device global returns the first device matching the
+    target requirements or null if no devices match. An optional `ordinal`
+    index may be provided that selects the N-th matching device and is used to
+    select between multiple homogeneous devices.
 
     Example:
     ```mlir
