@@ -131,7 +131,6 @@ iree_cc_library(
     ::init_iree_passes_and_dialects
     ::init_mlir_passes_and_dialects
     iree::compiler::Codegen::Codegen
-    iree::compiler::Dialect::HAL::Conversion::Passes
   PUBLIC
 )
 

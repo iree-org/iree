@@ -14,12 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "arithmetic_ops.mlir"
-    "assignment_ops.mlir"
-    "comparison_ops.mlir"
-    "const_ops.mlir"
     "control_flow_ops.mlir"
-    "conversion_ops.mlir"
     "func_ops.mlir"
     "nesting.mlir"
     "structural_ops.mlir"

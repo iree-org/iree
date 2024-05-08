@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(test-iree-convert-std-to-vm)" --verify-diagnostics %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-vm-conversion --cse --iree-vm-target-index-bits=64 --verify-diagnostics %s | FileCheck %s
 
 // CHECK-LABEL: @t001_bitcast_i32_f32
 module @t001_bitcast_i32_f32 {
@@ -100,10 +100,11 @@ module @my_module {
 
 // -----
 
+// expected-error@+1 {{conversion to vm.module failed}}
 module @t008_fptoui_fp32_i8 {
 module @my_module {
   func.func @my_fn(%arg0 : f32) -> (i8) {
-// expected-error@+1 {{failed to legalize}}
+    // expected-error@+1 {{failed to legalize}}
     %1 = arith.fptoui %arg0 : f32 to i8
     return %1 : i8
   }
@@ -126,10 +127,11 @@ module @my_module {
 
 // -----
 
+// expected-error@+1 {{conversion to vm.module failed}}
 module @t001_bitcast_f16_bf16 {
 module @my_module {
   func.func @my_fn(%arg0 : f16) -> (bf16) {
-// expected-error@+1 {{failed to legalize}}
+    // expected-error@+1 {{failed to legalize}}
     %1 = arith.bitcast %arg0 : f16 to bf16
     return %1 : bf16
   }

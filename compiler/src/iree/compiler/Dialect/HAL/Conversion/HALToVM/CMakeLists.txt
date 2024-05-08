@@ -37,11 +37,8 @@ iree_cc_library(
     MLIRTransformUtils
     MLIRTransforms
     iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::HAL::hal_imports
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::VM::Conversion
-    iree::compiler::Dialect::VM::Conversion::StandardToVM
-    iree::compiler::Dialect::VM::Conversion::UtilToVM
     iree::compiler::Dialect::VM::IR
     iree::compiler::Utils
   PUBLIC

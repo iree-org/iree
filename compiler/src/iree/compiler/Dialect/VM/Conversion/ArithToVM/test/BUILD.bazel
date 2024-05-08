@@ -16,10 +16,11 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
-            "control_flow_ops.mlir",
-            "func_ops.mlir",
-            "nesting.mlir",
-            "structural_ops.mlir",
+            "arithmetic_ops.mlir",
+            "assignment_ops.mlir",
+            "comparison_ops.mlir",
+            "constant_ops.mlir",
+            "conversion_ops.mlir",
         ],
         include = ["*.mlir"],
     ),

@@ -14,20 +14,16 @@ iree_cc_library(
   NAME
     StandardToVM
   HDRS
-    "ConvertStandardToVM.h"
+    "Patterns.h"
   SRCS
-    "ConvertStandardToVM.cpp"
-    "ConvertStandardToVMTest.cpp"
+    "Patterns.cpp"
   DEPS
-    MLIRArithDialect
     MLIRControlFlowDialect
     MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR
-    MLIRMathDialect
     MLIRPass
     MLIRTransformUtils
-    MLIRTransforms
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::VM::Conversion
     iree::compiler::Dialect::VM::IR

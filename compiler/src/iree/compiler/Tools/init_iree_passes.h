@@ -62,7 +62,6 @@ inline void registerAllIreePasses() {
   IREE::Util::registerTransformPasses();
   IREE::VM::registerVMPasses();
   IREE::VM::registerVMAnalysisTestPasses();
-  IREE::VM::registerVMTestPasses();
   IREE::VMVX::registerVMVXPasses();
   registerIREEVMTransformPassPipeline();
 
