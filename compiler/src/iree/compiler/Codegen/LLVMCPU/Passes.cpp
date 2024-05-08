@@ -93,7 +93,7 @@ static llvm::cl::opt<bool> clEnableVectorContractCustomKernels(
     "iree-llvmcpu-enable-vector-contract-custom-kernels",
     llvm::cl::desc("Enables vector contract custom kernels for "
                    "LLVMCPUMmt4dVectorLowering pass."),
-    llvm::cl::init(true));
+    llvm::cl::init(false));
 
 static void addTileAndDistributePasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createTileAndDistributeToWorkgroupsPass());
@@ -288,8 +288,8 @@ void buildLLVMCPUVectorLoweringPipeline(
     OpPassManager &funcPassManager,
     const LLVMCPUVectorLoweringPassOptions &options) {
   funcPassManager.addPass(createLLVMCPUDropVectorUnitDimsPass());
-  funcPassManager.addPass(
-      createLLVMCPUVirtualVectorLoweringPass(options.splitVectorTransfersTo));
+  funcPassManager.addPass(createLLVMCPUVirtualVectorLoweringPass(
+      options.splitVectorTransfersTo, options.enableArmI8mm));
 
   // Make sure we remove redundant vector ops (e.g., vector tranposes) before we
   // lower them and can't be optimized away anymore.
@@ -338,6 +338,7 @@ void addCPUBufferOpsTileAndVectorizePipeline(
     LLVMCPUVectorLoweringPassOptions options;
     options.lowerVectorTransposeToAVX2 = pipelineOpt.lowerToAVX2;
     options.splitVectorTransfersTo = "linalg-copy";
+    options.enableArmI8mm = pipelineOpt.enableAArch64I8mm;
     buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
   }
 
@@ -414,6 +415,7 @@ void addMultiTilingExpertPassPipeline(OpPassManager &funcPassManager,
     LLVMCPUVectorLoweringPassOptions options;
     options.lowerVectorTransposeToAVX2 = pipelineOpt.lowerToAVX2;
     options.splitVectorTransfersTo = "linalg-copy";
+    options.enableArmI8mm = pipelineOpt.enableAArch64I8mm;
     buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
   }
 
@@ -471,6 +473,7 @@ void addConvTileAndDecomposeExpertPassPipeline(
     LLVMCPUVectorLoweringPassOptions options;
     options.lowerVectorTransposeToAVX2 = pipelineOpt.lowerToAVX2;
     options.splitVectorTransfersTo = "shuffle";
+    options.enableArmI8mm = pipelineOpt.enableAArch64I8mm;
     buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
   }
 
@@ -546,6 +549,7 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &funcPassManager,
   LLVMCPUVectorLoweringPassOptions options;
   options.lowerVectorTransposeToAVX2 = pipelineOpt.lowerToAVX2;
   options.splitVectorTransfersTo = "linalg-copy";
+  options.enableArmI8mm = pipelineOpt.enableAArch64I8mm;
   buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
 }
 
@@ -574,6 +578,7 @@ void addCPUDataTilingPipeline(OpPassManager &funcPassManager,
     LLVMCPUVectorLoweringPassOptions options;
     options.lowerVectorTransposeToAVX2 = pipelineOpt.lowerToAVX2;
     options.splitVectorTransfersTo = "linalg-copy";
+    options.enableArmI8mm = pipelineOpt.enableAArch64I8mm;
     buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
   }
 }
@@ -606,6 +611,7 @@ void addCPULinalgExtTileAndVectorizePipeline(
     LLVMCPUVectorLoweringPassOptions options;
     options.lowerVectorTransposeToAVX2 = pipelineOpt.lowerToAVX2;
     options.splitVectorTransfersTo = "linalg-copy";
+    options.enableArmI8mm = pipelineOpt.enableAArch64I8mm;
     buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
   }
 }

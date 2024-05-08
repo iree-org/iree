@@ -54,4 +54,8 @@ bool hasSMEFeature(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return hasFeature(targetAttr, "+sme");
 }
 
+bool hasI8mmFeature(IREE::HAL::ExecutableTargetAttr targetAttr) {
+  return hasFeature(targetAttr, "+i8mm");
+}
+
 } // namespace mlir::iree_compiler
