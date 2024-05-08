@@ -50,7 +50,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "--suffix",
         help="Suffix to save files with, e.g. `_v2` if exporting for an older GGUF version",
-        default="_v3",
     )
     args = parser.parse_args()
 

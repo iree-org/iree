@@ -675,7 +675,7 @@ static iree_status_t iree_io_parse_gguf_index_from_memory(
   if (version < GGUF_MIN_VERSION || version > GGUF_MAX_VERSION) {
     return iree_make_status(
         IREE_STATUS_UNIMPLEMENTED,
-        "GGUF format version %u is unsupported; expected %u < version < %u",
+        "GGUF format version %u is unsupported; expected version %u-%u",
         version, GGUF_MIN_VERSION, GGUF_MAX_VERSION);
   }
   uint64_t tensor_count = 0;
