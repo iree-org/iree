@@ -380,6 +380,8 @@ public:
         }
         if (targetArch.starts_with("gfx9"))
           addPreloadKernArgHint(llvmFunc);
+
+	llvmFunc->addFnAttr("denormal-fp-math-f32", "preserve-sign");
       }
 
       std::unique_ptr<llvm::TargetMachine> targetMachine;
