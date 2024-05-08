@@ -140,16 +140,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   case IREE::Codegen::DispatchLoweringPassPipeline::
       CPUConvTileAndDecomposeExpert: {
     TilingConfig tilingConfig = getTilingConfigForPipeline(funcOp);
-    auto peelAttrName = StringAttr::get(funcOp.getContext(), "enable_peeling");
-    auto trueAttr = BoolAttr::get(funcOp.getContext(), true);
-
-    DictionaryAttr config = translationInfo.getConfiguration();
-    if (config) {
-      auto peelAttr = translationInfo.getConfiguration().getNamed(peelAttrName);
-      if (peelAttr && peelAttr->getValue() == trueAttr) {
-        pipelineOpts.enablePeeling = true;
-      }
-    }
+    pipelineOpts.enablePeeling = isLoopPeelingEnabled(&funcOp);
     addConvTileAndDecomposeExpertPassPipeline(pipeline, tilingConfig,
                                               pipelineOpts);
     break;

@@ -2184,9 +2184,9 @@ setConvRootConfig(mlir::FunctionOpInterface entryPointFn,
     // This will later be extracted by LLVMCPULowerExecutableTargetPass.
     auto ctx = convOp.getContext();
     SmallVector<NamedAttribute> attrs;
-    auto peelAttrName = StringAttr::get(ctx, "enable_peeling");
+    auto peelAttrName = getPeelAttrName(ctx);
     auto peelAttrVal = BoolAttr::get(ctx, true);
-    attrs.push_back({peelAttrName, peelAttrVal});
+    attrs.emplace_back(peelAttrName, peelAttrVal);
     pipelineConfig = DictionaryAttr::get(ctx, attrs);
   }
 

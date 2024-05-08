@@ -19,6 +19,15 @@ namespace mlir::iree_compiler {
 /// to the end of the function is the root op.
 FailureOr<Operation *> getRootOperation(ArrayRef<Operation *> computeOps);
 
+/// Creates a string attribute containing the name of the attribute that is
+/// used to enable loop peeling.
+StringAttr getPeelAttrName(MLIRContext *ctx);
+
+/// Checks whether loop peeling has been enabled for the input function. This
+/// is infered from the config dictt. attribute that's part of to the
+/// translation info corresponding to this funciton.
+bool isLoopPeelingEnabled(FunctionOpInterface *funcOp);
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_UTILS_CPUUTILS_H_

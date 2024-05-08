@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Utils/CPUUtils.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 
 #include <numeric>
 
@@ -61,6 +62,27 @@ FailureOr<Operation *> getRootOperation(ArrayRef<Operation *> computeOps) {
   }
 
   return rootOperation;
+}
+
+StringAttr getPeelAttrName(MLIRContext *ctx) {
+  return StringAttr::get(ctx, "enable_loop_peeling");
+}
+
+bool isLoopPeelingEnabled(FunctionOpInterface *funcOp) {
+  auto peelAttrName = getPeelAttrName(funcOp->getContext());
+  auto trueAttr = BoolAttr::get(funcOp->getContext(), true);
+
+  IREE::Codegen::TranslationInfoAttr translationInfo =
+      getTranslationInfo(*funcOp);
+  DictionaryAttr config = translationInfo.getConfiguration();
+  if (config) {
+    auto peelAttr = translationInfo.getConfiguration().getNamed(peelAttrName);
+    if (peelAttr && peelAttr->getValue() == trueAttr) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 } // namespace mlir::iree_compiler

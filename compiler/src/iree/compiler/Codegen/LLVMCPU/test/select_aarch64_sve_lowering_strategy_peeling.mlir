@@ -100,7 +100,7 @@ module {
 }
 
 //   CHECK-DAG: #[[CONFIG:.+]] =  #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 0, 0, 2, 0, 0], [1, 1, 1, 2, 0, 0], [0, 0, 0, 0, 1, 4], [0, 0, 0, 0, 0, 0]]>
-//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUConvTileAndDecomposeExpert, {{\{}}enable_peeling = true}>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUConvTileAndDecomposeExpert, {{\{}}enable_loop_peeling = true}>
 //      CHECK: func.func @depthwise_conv()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.depthwise_conv_2d_nhwc_hwc
