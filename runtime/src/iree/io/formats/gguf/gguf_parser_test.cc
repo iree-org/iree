@@ -33,7 +33,7 @@ class GgufFormatTest : public ::testing::TestWithParam<std::string> {
     IREE_CHECK_OK(
         iree_make_status(IREE_STATUS_NOT_FOUND,
                          "test file `%s` not found embedded into test binary",
-                         parameterized_name));
+                         parameterized_name.c_str()));
     return NULL;
   }
 };
