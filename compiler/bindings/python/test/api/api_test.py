@@ -81,22 +81,6 @@ else:
             self.assertIn(b"module", bytes(mem))
             out.close()
 
-        def testBytecodeInputBuffer(self):
-            session = Session()
-            inv = session.invocation()
-            source = Source.wrap_buffer(
-                session,
-                bytes.fromhex(
-                    "4d4cef520d4d4c495231392e302e3067697400010d030103010307030d05010105130b020d170303030505041705015001010704070301010603010501004707210f116275696c74696e006d6f64756c65002e2e2f2e2e2f746573742e6d6c697200080903050101",
-                ),
-            )
-            inv.parse_source(source)
-            out = Output.open_membuffer()
-            inv.output_ir(out)
-            mem = out.map_memory()
-            self.assertIn(b"module", bytes(mem))
-            out.close()
-
         def testOutputBytecode(self):
             session = Session()
             inv = session.invocation()

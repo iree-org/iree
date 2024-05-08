@@ -10,7 +10,7 @@ import sys
 import tempfile
 import unittest
 
-from iree.compiler.api import Session, Source, Output
+from iree.compiler.tools.ir_tool import __main__ as ir_tool
 
 # TODO: No idea why pytype cannot find names from this module.
 # pytype: disable=name-error
@@ -24,14 +24,18 @@ if not iree.compiler.tools.tflite.is_available():
     sys.exit(0)
 
 
+def mlir_bytecode_file_to_text(bytecode_file):
+    with tempfile.NamedTemporaryFile() as temp_file:
+        args = ir_tool.parse_arguments(["copy", bytecode_file, "-o", temp_file.name])
+        ir_tool.main(args)
+        return str(temp_file.read())
+
+
 def mlir_bytecode_to_text(bytecode):
-    session = Session()
-    inv = session.invocation()
-    source = Source.wrap_buffer(inv.session, bytecode)
-    inv.parse_source(source)
-    output = Output.open_membuffer()
-    inv.output_ir(output)
-    return bytes(output.map_memory()).decode()
+    with tempfile.NamedTemporaryFile("wb") as temp_bytecode_file:
+        temp_bytecode_file.write(bytecode)
+        temp_bytecode_file.flush()
+        return mlir_bytecode_file_to_text(temp_bytecode_file.name)
 
 
 class CompilerTest(unittest.TestCase):
@@ -64,7 +68,6 @@ class CompilerTest(unittest.TestCase):
             finally:
                 os.remove(f.name)
         text = mlir_bytecode_to_text(bytecode)
-        print(text)
         logging.info("%s", text)
         self.assertIn("tosa.mul", text)
 
