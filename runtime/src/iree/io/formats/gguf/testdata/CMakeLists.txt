@@ -14,9 +14,12 @@ iree_c_embed_data(
   NAME
     gguf_files
   SRCS
-    "empty.gguf"
-    "multiple.gguf"
-    "single.gguf"
+    "empty_v2.gguf"
+    "empty_v3.gguf"
+    "multiple_v2.gguf"
+    "multiple_v3.gguf"
+    "single_v2.gguf"
+    "single_v3.gguf"
   C_FILE_OUTPUT
     "gguf_files.c"
   H_FILE_OUTPUT
