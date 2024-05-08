@@ -62,6 +62,7 @@ iree_lit_test_suite(
     "tile_and_distribute_to_workgroups.mlir"
     "transform_buffer_opt.mlir"
     "transform_copy_operand.mlir"
+    "transform_fuse_forall.mlir"
     "transform_match_partial_reduction.mlir"
     "transform_ops_invalid.mlir"
     "transpose_canonicalization.mlir"
