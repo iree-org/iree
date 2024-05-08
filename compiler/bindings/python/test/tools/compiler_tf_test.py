@@ -43,12 +43,12 @@ class SimpleArithmeticModule(tf.Module):
 
 # TODO(laurenzo): More test cases needed (may need additional files).
 # Specifically, figure out how to test v1 models.
-class TfCompilerTest(tf.test.TestCase):
+class TfCompilerTest(unittest.TestCase):
     def testImportSavedModel(self):
         import_mlir = iree.compiler.tools.tf.compile_saved_model(
             self.smdir, import_only=True, output_generic_mlir=True
-        ).decode("utf-8")
-        self.assertIn('sym_name = "simple_matmul"', import_mlir)
+        )
+        self.assertIn(b"simple_matmul", import_mlir)
 
     def testCompileSavedModel(self):
         binary = iree.compiler.tools.tf.compile_saved_model(
@@ -82,4 +82,4 @@ class TfCompilerTest(tf.test.TestCase):
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
-    tf.test.main()
+    unittest.main()

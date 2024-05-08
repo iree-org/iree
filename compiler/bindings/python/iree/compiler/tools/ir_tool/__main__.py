@@ -38,7 +38,7 @@ def parse_arguments(argv=None):
         help="sub-command help", required=True, dest="sub_command"
     )
 
-    def add_ouptut_options(subparser):
+    def add_output_options(subparser):
         subparser.add_argument(
             "--emit-bytecode", action="store_true", help="Emit bytecode"
         )
@@ -56,7 +56,7 @@ def parse_arguments(argv=None):
         help="Read a file and then output it using the given options, without "
         "modification",
     )
-    add_ouptut_options(copy_parser)
+    add_output_options(copy_parser)
     copy_parser.add_argument("input_file", help="File to process")
     copy_parser.add_argument(
         "-o", required=True, dest="output_file", help="Output file"
@@ -70,7 +70,7 @@ def parse_arguments(argv=None):
         "replacing them with pseudo data suitable for interactive "
         "debugging of IR",
     )
-    add_ouptut_options(strip_data_parser)
+    add_output_options(strip_data_parser)
     strip_data_parser.add_argument(
         "--no-import",
         action="store_true",
