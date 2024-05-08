@@ -350,7 +350,7 @@ func.func @collapse_shape(%offset : index, %i0 : index, %i1 : index) -> f32 {
 
 func.func @expand_shape(%offset : index, %i0: index, %i1: index, %i2: index, %i3: index) -> f32 {
   %subspan = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%offset) : memref<20x42xf32, strided<[42, 1], offset:?>>
-  %expand = memref.expand_shape %subspan[[0, 1], [2, 3]] : memref<20x42xf32, strided<[42, 1], offset:?>> into memref<4x5x6x7xf32, strided<[210, 42, 7, 1], offset:?>>
+  %expand = memref.expand_shape %subspan[[0, 1], [2, 3]] output_shape [4, 5, 6, 7] : memref<20x42xf32, strided<[42, 1], offset:?>> into memref<4x5x6x7xf32, strided<[210, 42, 7, 1], offset:?>>
   %value = memref.load %expand[%i0, %i1, %i2, %i3] : memref<4x5x6x7xf32, strided<[210, 42, 7, 1], offset:?>>
   return %value : f32
 }
@@ -369,7 +369,7 @@ func.func @expand_shape(%offset : index, %i0: index, %i1: index, %i2: index, %i3
 
 func.func @expand_shape2(%offset : index, %i0: index, %i1: index) -> f32 {
   %subspan = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) offset(%offset) : memref<128xf32, strided<[1], offset: ?>>
-  %expand = memref.expand_shape %subspan [[0, 1]] : memref<128xf32, strided<[1], offset: ?>> into memref<1x128xf32, strided<[128, 1], offset: ?>>
+  %expand = memref.expand_shape %subspan [[0, 1]] output_shape [1, 128] : memref<128xf32, strided<[1], offset: ?>> into memref<1x128xf32, strided<[128, 1], offset: ?>>
   %value = memref.load %expand[%i0, %i1] : memref<1x128xf32, strided<[128, 1], offset: ?>>
   return %value : f32
 }

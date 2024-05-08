@@ -19,7 +19,7 @@ func.func @i4_to_f32_3d() {
     [0, 1, 2, 3, 4, 5, 6, 7], [8, 9, 10, 11, 12, 13, 14, 15],
     [0, 1, 2, 3, 4, 5, 6, 7], [8, 9, 10, 11, 12, 13, 14, 15]
   ]> : tensor<8x8xi4>
-  %expanded_4 = tensor.expand_shape %cst [[0], [1, 2]] : tensor<8x8xi4> into tensor<8x4x2xi4>
+  %expanded_4 = tensor.expand_shape %cst [[0], [1, 2]] output_shape [8, 4, 2]: tensor<8x8xi4> into tensor<8x4x2xi4>
   %0 = tensor.empty() : tensor<8x4x2xf32>
   %5 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%expanded_4 : tensor<8x4x2xi4>) outs(%0 : tensor<8x4x2xf32>) {
   ^bb0(%in: i4, %out: f32):
@@ -57,7 +57,7 @@ func.func @i2_to_f32_3d() {
     [0, 1, 2, 3, 0, 1, 2, 3], [3, 2, 1, 0, 2, 1, 0, 3],
     [0, 1, 2, 3, 0, 1, 2, 3], [3, 2, 1, 0, 2, 1, 0, 3]
   ]> : tensor<8x8xi2>
-  %expanded_4 = tensor.expand_shape %cst [[0], [1, 2]] : tensor<8x8xi2> into tensor<8x4x2xi2>
+  %expanded_4 = tensor.expand_shape %cst [[0], [1, 2]] output_shape [8, 4, 2]: tensor<8x8xi2> into tensor<8x4x2xi2>
   %0 = tensor.empty() : tensor<8x4x2xf32>
   %5 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%expanded_4 : tensor<8x4x2xi2>) outs(%0 : tensor<8x4x2xf32>) {
   ^bb0(%in: i2, %out: f32):

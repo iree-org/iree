@@ -23,7 +23,7 @@ func.func @argmax_1d_f32i64(%arg0: tensor<1x?xf32>) -> tensor<1x1xi64> {
     %24 = arith.select %23, %21, %out_2 : i64
     linalg.yield %22, %24 : f32, i64
   } -> (tensor<1xf32>, tensor<1xi64>)
-  %expanded_1 = tensor.expand_shape %19#1 [[0, 1]] : tensor<1xi64> into tensor<1x1xi64>
+  %expanded_1 = tensor.expand_shape %19#1 [[0, 1]] output_shape [1, 1] : tensor<1xi64> into tensor<1x1xi64>
   return %expanded_1 : tensor<1x1xi64>
 }
 
@@ -50,7 +50,7 @@ func.func @argmax_1d_f16i64(%arg0: tensor<1x?xf16>) -> tensor<1x1xi64> {
     %24 = arith.select %23, %21, %out_2 : i64
     linalg.yield %22, %24 : f16, i64
   } -> (tensor<1xf16>, tensor<1xi64>)
-  %expanded_1 = tensor.expand_shape %19#1 [[0, 1]] : tensor<1xi64> into tensor<1x1xi64>
+  %expanded_1 = tensor.expand_shape %19#1 [[0, 1]]  output_shape [1, 1] : tensor<1xi64> into tensor<1x1xi64>
   return %expanded_1 : tensor<1x1xi64>
 }
 
@@ -78,7 +78,7 @@ func.func @argmax_2d_f32i64(%arg0: tensor<16x?xf32>) -> tensor<16x1xi64> {
     %24 = arith.select %23, %21, %out_2 : i64
     linalg.yield %22, %24 : f32, i64
   } -> (tensor<16xf32>, tensor<16xi64>)
-  %expanded_1 = tensor.expand_shape %19#1 [[0, 1]] : tensor<16xi64> into tensor<16x1xi64>
+  %expanded_1 = tensor.expand_shape %19#1 [[0, 1]] output_shape [16, 1] : tensor<16xi64> into tensor<16x1xi64>
   return %expanded_1 : tensor<16x1xi64>
 }
 

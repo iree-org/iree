@@ -1406,7 +1406,7 @@ module {
       %11 = arith.addf %out, %in : f32
       linalg.yield %11 : f32
     } -> tensor<128xf32>
-    %expanded = tensor.expand_shape %9 [[0, 1]] : tensor<128xf32> into tensor<1x128xf32>
+    %expanded = tensor.expand_shape %9 [[0, 1]] output_shape [1, 128] : tensor<128xf32> into tensor<1x128xf32>
     %10 = linalg.matmul ins(%expanded, %4 : tensor<1x128xf32>, tensor<128x1xf32>) outs(%8 : tensor<1x1xf32>) -> tensor<1x1xf32>
     flow.dispatch.tensor.store %10, %2, offsets = [0, 0], sizes = [1, 1], strides = [1, 1] : tensor<1x1xf32> -> !flow.dispatch.tensor<writeonly:tensor<1x1xf32>>
     return

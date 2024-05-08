@@ -369,7 +369,7 @@ util.func public @no_fuse_within_dispatch(%arg0 : tensor<10x20xf32>) -> tensor<1
 util.func public @nofuse_by_expand_dequant(%arg0 : tensor<11008x4096xi4>, %arg1 : tensor<11008x32x1xf16>, %arg2 : tensor<11008x32x1xf16>, %arg3 : tensor<1x1x32x128xf16>) -> (tensor<11008xf16>) {
   %cst_1 = arith.constant 0.000000e+00 : f16
   %0 = tensor.empty() : tensor<11008x32x128xf16>
-  %expanded = tensor.expand_shape %arg0 [[0], [1, 2]] : tensor<11008x4096xi4> into tensor<11008x32x128xi4>
+  %expanded = tensor.expand_shape %arg0 [[0], [1, 2]]  output_shape [11008, 32, 128] : tensor<11008x4096xi4> into tensor<11008x32x128xi4>
   %collapsed = tensor.collapse_shape %arg2 [[0], [1, 2]] : tensor<11008x32x1xf16> into tensor<11008x32xf16>
   %collapsed_2 = tensor.collapse_shape %arg1 [[0], [1, 2]] : tensor<11008x32x1xf16> into tensor<11008x32xf16>
   %2 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1, d2) -> (d0, d1)>, affine_map<(d0, d1, d2) -> (d0, d1, d2)>], iterator_types = ["parallel", "parallel", "parallel"]} ins(%expanded, %collapsed, %collapsed_2 : tensor<11008x32x128xi4>, tensor<11008x32xf16>, tensor<11008x32xf16>) outs(%0 : tensor<11008x32x128xf16>) {
@@ -438,7 +438,7 @@ util.func public @nofuse_by_collapse_matmul(%arg0: tensor<1x1xi64>, %arg1: tenso
     %11 = arith.addf %in, %in_0 : f16
     linalg.yield %11 : f16
   } -> tensor<1x1x4096xf16>
-  %expanded = tensor.expand_shape %6 [[0], [1], [2, 3]] : tensor<1x1x4096xf16> into tensor<1x1x32x128xf16>
+  %expanded = tensor.expand_shape %6 [[0], [1], [2, 3]] output_shape [1, 1, 32, 128] : tensor<1x1x4096xf16> into tensor<1x1x32x128xf16>
   %7 = tensor.empty() : tensor<4096x32x128xf16>
   %8 = linalg.fill ins(%cst : f16) outs(%2 : tensor<1x1x4096xf16>) -> tensor<1x1x4096xf16>
   %9 = linalg.generic {indexing_maps = [#map1, #map3, #map3, #map1], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg1, %arg2, %arg3 : tensor<4096x32x128xi4>, tensor<4096x32x1xf16>, tensor<4096x32x1xf16>) outs(%7 : tensor<4096x32x128xf16>) {
@@ -543,7 +543,7 @@ util.func public @fix_issue_14953(%arg0: tensor<11008x32x1xf16>, %arg1: tensor<1
     } -> tensor<11008xf16>
     flow.return %10 : tensor<11008xf16>
   }
-  %expanded = tensor.expand_shape %7 [[0, 1, 2]] : tensor<11008xf16> into tensor<1x1x11008xf16>
+  %expanded = tensor.expand_shape %7 [[0, 1, 2]] output_shape [1, 1, 11008] : tensor<11008xf16> into tensor<1x1x11008xf16>
   util.return %expanded : tensor<1x1x11008xf16>
 }
 // CHECK-LABEL: util.func public @fix_issue_14953
@@ -684,7 +684,7 @@ util.func public @fix_issue_16835(%arg0: tensor<49x6x16x16xf32>, %arg1: tensor<9
     %8 = arith.mulf %7, %cst_2 : f32
     linalg.yield %8 : f32
   } -> tensor<784x96xf32>
-  %expanded = tensor.expand_shape %2 [[0, 1], [2]] : tensor<784x96xf32> into tensor<28x28x96xf32>
+  %expanded = tensor.expand_shape %2 [[0, 1], [2]] output_shape [28, 28, 96] : tensor<784x96xf32> into tensor<28x28x96xf32>
   util.return %expanded : tensor<28x28x96xf32>
 }
 // CHECK-LABEL: util.func public @fix_issue_16835
