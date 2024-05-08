@@ -328,7 +328,7 @@ collectChannelInnerDimsIndices(AffineMap map,
 // using the same transposing/packing logic.
 static LogicalResult
 transposeConvLikeLinalgOp(PatternRewriter &rewriter, linalg::LinalgOp convOp,
-                          int tilingFactor,
+                          int tilingFactor, bool enableFHWCFilter = false,
                           ConvBuilderFn convBuilder = defaultConvBuilderFn) {
   Location loc = convOp.getLoc();
 
@@ -379,6 +379,11 @@ transposeConvLikeLinalgOp(PatternRewriter &rewriter, linalg::LinalgOp convOp,
       isInnerIdentityIndices(outputIndices, outputMap.getNumResults())) {
     return failure();
   }
+
+  if (enableFHWCFilter)
+    // enable FHWC Filter Layout
+    filterIndices =
+        collectChannelInnerDimsIndices(filterMap, convDims.inputChannel);
 
   int nDims = outputMap.getNumDims();
   llvm::DenseMap<int64_t, int64_t> innerDimsToDomainDims;
@@ -450,15 +455,26 @@ namespace {
 
 struct ConvertLinalgConvNchwFchw : OpRewritePattern<linalg::Conv2DNchwFchwOp> {
   using OpRewritePattern::OpRewritePattern;
-  ConvertLinalgConvNchwFchw(MLIRContext *context, PatternBenefit benefit = 2)
-      : OpRewritePattern<linalg::Conv2DNchwFchwOp>(context, benefit) {}
+  ConvertLinalgConvNchwFchw(MLIRContext *context, bool enableFHWC=false, PatternBenefit benefit = 2)
+      : OpRewritePattern<linalg::Conv2DNchwFchwOp>(context, benefit), 
+        enableFHWCFilter(enableFHWC)
+       {}
 
   LogicalResult matchAndRewrite(linalg::Conv2DNchwFchwOp convOp,
                                 PatternRewriter &rewriter) const override {
-    return transposeConvLikeLinalgOp(
-        rewriter, convOp, /*tilingFactor=*/-1,
-        namedConvBuilderFn<linalg::Conv2DNchwFchwOp, linalg::Conv2DNhwcHwcfOp>);
+    if (enableFHWCFilter)
+      return transposeConvLikeLinalgOp(
+          rewriter, convOp, /*tilingFactor=*/-1, enableFHWCFilter,
+          namedConvBuilderFn<linalg::Conv2DNchwFchwOp,
+                             linalg::Conv2DNhwcFhwcOp>);
+    else
+      return transposeConvLikeLinalgOp(
+          rewriter, convOp, /*tilingFactor=*/-1, enableFHWCFilter,
+          namedConvBuilderFn<linalg::Conv2DNchwFchwOp,
+                             linalg::Conv2DNhwcHwcfOp>);
   }
+private:
+  bool enableFHWCFilter;  
 };
 
 // Default convolution-like transposing pattern for any linalg op to a generic.
@@ -466,18 +482,20 @@ struct ConvertLinalgConvNchwFchw : OpRewritePattern<linalg::Conv2DNchwFchwOp> {
 
 struct ConvertLinalgConvOp : OpInterfaceRewritePattern<linalg::LinalgOp> {
   using OpInterfaceRewritePattern<linalg::LinalgOp>::OpInterfaceRewritePattern;
-  ConvertLinalgConvOp(MLIRContext *context, int tile,
+  ConvertLinalgConvOp(MLIRContext *context, int tile, bool enableFHWC,
                       PatternBenefit benefit = 1)
       : OpInterfaceRewritePattern<linalg::LinalgOp>(context, benefit),
-        tilingFactor(tile) {}
+        tilingFactor(tile), enableFHWCFilter(enableFHWC) {}
 
   LogicalResult matchAndRewrite(linalg::LinalgOp op,
                                 PatternRewriter &rewriter) const override {
-    return transposeConvLikeLinalgOp(rewriter, op, tilingFactor);
+    return transposeConvLikeLinalgOp(rewriter, op, tilingFactor,
+                                     enableFHWCFilter);
   }
 
 private:
   int tilingFactor;
+  bool enableFHWCFilter;
 };
 
 //=====================================================================
@@ -662,9 +680,10 @@ public:
     {
       RewritePatternSet patterns(context);
       if (tilingFactor <= 0) {
-        patterns.insert<ConvertLinalgConvNchwFchw>(context);
+        patterns.insert<ConvertLinalgConvNchwFchw>(context, enableFHWCFilter);
       }
-      patterns.insert<ConvertLinalgConvOp>(context, tilingFactor);
+      patterns.insert<ConvertLinalgConvOp>(context, tilingFactor,
+                                           enableFHWCFilter);
       if (failed(applyPatternsAndFoldGreedily(op, std::move(patterns)))) {
         return signalPassFailure();
       }

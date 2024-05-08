@@ -44,6 +44,8 @@ def ConvertConvToChannelsLastPass :
            /*default=*/"0",
            "Tiling factor for the channel dimension of NCHW-like convolutions. "
            "Defaults to fully transposing all channel-like dimensions">,
+    Option<"enableFHWCFilter", "enable-fhwc-filter", "bool", "false",
+           "enable new filter layout (FCHW ==> FHWC)">,
   ];
   let dependentDialects = [
     "mlir::linalg::LinalgDialect",
