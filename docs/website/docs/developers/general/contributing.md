@@ -227,7 +227,7 @@ Branch type | Naming scheme | Example
 -- | -- | --
 Single user | `users/[username]/*` | `users/cooldeveloper/my-awesome-feature`
 Shared feature branch | `shared/*` | `shared/pytorch-performance-sprint`
-Dependency updates | `integrates/*` | `integrates/integrate-llvm-20240501`
+Dependency updates | `integrates/*` | `integrates/llvm-20240501`
 
 Branches that do not meet these guidelines may be deleted, especially if
 they [appear to be stale](https://github.com/iree-org/iree/branches/stale).
