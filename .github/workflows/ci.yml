@@ -438,7 +438,7 @@ jobs:
       INSTALL_DIR_ARCHIVE: ${{ needs.build_all.outputs.install-dir-archive }}
       INSTALL_DIR_GCS_URL: ${{ needs.build_all.outputs.install-dir-gcs-url }}
       IREE_CPU_DISABLE: 1
-      IREE_VULKAN_DISABLE: 1
+      IREE_VULKAN_DISABLE: 0
       IREE_CUDA_DISABLE: 1
       IREE_HIP_DISABLE: 0
       IREE_HIP_TEST_TARGET_CHIP: "gfx1100"
@@ -457,11 +457,11 @@ jobs:
           ./build_tools/pkgci/build_tests_using_package.sh ${INSTALL_DIR}
       - name: "Running GPU tests"
         env:
-          IREE_CTEST_LABEL_REGEX: ^requires-gpu|^driver=hip$
-          IREE_NVIDIA_SM80_TESTS_DISABLE: 1
-          IREE_MULTI_DEVICE_TESTS_DISABLE: 0
+          IREE_CTEST_LABEL_REGEX: ^requires-gpu|^driver=vulkan$|^driver=hip$
           IREE_AMD_RDNA3_TESTS_DISABLE: 0
           IREE_NVIDIA_GPU_TESTS_DISABLE: 0
+          IREE_NVIDIA_SM80_TESTS_DISABLE: 1
+          IREE_MULTI_DEVICE_TESTS_DISABLE: 0
           IREE_CUDA_DISABLE: 1
           IREE_CPU_DISABLE: 1
           IREE_HIP_DISABLE: 0
