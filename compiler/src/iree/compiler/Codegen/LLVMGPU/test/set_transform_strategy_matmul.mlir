@@ -66,7 +66,7 @@ module {
 // CHECK: transform.structured.fuse_into_containing_op
 // CHECK: transform.iree.populate_workgroup_count_region_using_num_threads_slice
 // CHECK: transform.structured.tile_using_for %{{.*}}[0, 0, 16]
-// CHECK: transform.structured.pad %{{.*}} {copy_back_op = "none", pack_paddings = [1, 1, 1], pad_to_multiple_of = [1, 1, 1], padding_dimensions = [0, 1, 2], padding_values = [0.000000e+00 : f32, 0.000000e+00 : f32, 0.000000e+00 : f32]}
+// CHECK: transform.structured.pad %{{.*}} pad_to_multiple_of [1, 1, 1] {copy_back_op = "none", pack_paddings = [1, 1, 1], padding_dimensions = [0, 1, 2], padding_values = [0.000000e+00 : f32, 0.000000e+00 : f32, 0.000000e+00 : f32]}
 // CHECK: transform.structured.hoist_pad %{{.}} by 1 loops
 // CHECK: transform.structured.insert_slice_to_copy %{{.*}} : (!transform.any_op) -> !transform.any_op
 // CHECK: transform.structured.tile_using_forall %{{.*}}   num_threads [32, 4](mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
@@ -128,7 +128,7 @@ module {
 // WITH_OPTIONS: transform.iree.populate_workgroup_count_region_using_num_threads_slice
 // The tiling is affected by td-matmul-strategy-reduc-size: 8.
 // WITH_OPTIONS: transform.structured.tile_using_for %{{.*}}[0, 0, 8]
-// WITH_OPTIONS: transform.structured.pad %{{.*}} {copy_back_op = "none", pack_paddings = [1, 1, 1], pad_to_multiple_of = [1, 1, 1], padding_dimensions = [0, 1, 2], padding_values = [0.000000e+00 : f32, 0.000000e+00 : f32, 0.000000e+00 : f32]}
+// WITH_OPTIONS: transform.structured.pad %{{.*}} pad_to_multiple_of [1, 1, 1] {copy_back_op = "none", pack_paddings = [1, 1, 1], padding_dimensions = [0, 1, 2], padding_values = [0.000000e+00 : f32, 0.000000e+00 : f32, 0.000000e+00 : f32]}
 // WITH_OPTIONS: transform.structured.hoist_pad %{{.}} by 1 loops
 // WITH_OPTIONS: transform.structured.insert_slice_to_copy %{{.*}} : (!transform.any_op) -> !transform.any_op
 // WITH_OPTIONS: transform.structured.tile_using_forall %{{.*}}   num_threads [64, 2](mapping = [#gpu.thread<linear_dim_1>, #gpu.thread<linear_dim_0>])
@@ -292,7 +292,7 @@ module {
 
 // CHECK-LABEL: func @matmul_4_partially_unaligned
 
-// CHECK: transform.structured.tile_using_for %tiled_op[0, 0, 16]
+// CHECK: transform.structured.tile_using_for %tiled_op tile_sizes [0, 0, 16]
 
 // Make sure we do not canonicalize because the result is still aligned.
 // CHECK-NEXT: transform.structured.pad %tiled_linalg_op
@@ -357,7 +357,7 @@ module {
 // CHECK-LABEL: func @aligned_matmul
 
 // Block level is the same for aligned.
-// CHECK: transform.structured.tile_using_for %tiled_op[0, 0, 16]
+// CHECK: transform.structured.tile_using_for %tiled_op tile_sizes [0, 0, 16]
 
 // Make sure we do not canonicalize if the result is aligned to avoid folding the extract_slice on the iterator.
 // CHECK-NEXT: transform.structured.pad %tiled_linalg_op
