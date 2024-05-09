@@ -477,65 +477,6 @@ def HAL_InterfaceBindingArrayAttr :
                        "HAL binding array attribute">;
 
 //===----------------------------------------------------------------------===//
-// #hal.device.target<*>
-//===----------------------------------------------------------------------===//
-
-def HAL_DeviceTargetAttr : AttrDef<HAL_Dialect, "DeviceTarget", [
-  DeclareAttrInterfaceMethods<HAL_DeviceInitializationAttrInterface>,
-]> {
-  let mnemonic = "device.target";
-  let summary = [{generic device target specification}];
-  let description = [{
-    Specifies the properties of a target runtime device.
-    Target devices are specified with a canonical identifier matching those used
-    by the runtime (such as `cpu`, `vulkan`, etc). Target devices may support
-    several target executable formats specified with `#hal.executable.target`.
-    An optional configuration dictionary allows for overriding backend defaults.
-
-    If used to initialize a device global returns the first device matching the
-    target requirements or null if no devices match. An optional `ordinal`
-    index may be provided that selects the N-th matching device and is used to
-    select between multiple homogeneous devices.
-
-    Example:
-    ```mlir
-    #hal.device.target<"llvm-cpu", {
-      device_configuration = ...
-    }, [
-      #hal.executable.target<"llvm-cpu", "embedded-elf-arm_32">,
-      #hal.executable.target<"llvm-cpu", "embedded-elf-arm_64">,
-    ]>
-    ```
-  }];
-  let parameters = (ins
-    AttrParameter<"StringAttr", "">:$deviceID,
-    AttrParameter<"DictionaryAttr", "">:$configuration,
-    ArrayRefParameter<"ExecutableTargetAttr", "">:$executable_targets
-  );
-  let builders = [
-    AttrBuilder<(ins "StringRef":$deviceID)>,
-  ];
-
-  let extraClassDeclaration = [{
-    Type getType() { return IREE::HAL::DeviceType::get(getContext()); }
-
-    // Returns a symbol-compatible name that pseudo-uniquely identifies this
-    // target. Callers must perform deduplication when required.
-    std::string getSymbolNameFragment();
-
-    // Returns true if there's an attribute with the given name in the
-    // configuration dictionary.
-    bool hasConfigurationAttr(StringRef name);
-
-    // Returns zero or more executable targets that this device supports.
-    void getExecutableTargets(
-        SetVector<IREE::HAL::ExecutableTargetAttr> &resultAttrs);
-  }];
-
-  let hasCustomAssemblyFormat = 1;
-}
-
-//===----------------------------------------------------------------------===//
 // #hal.executable.target<*>
 //===----------------------------------------------------------------------===//
 
@@ -930,9 +871,6 @@ def HAL_DeviceSelectAttr : AttrDef<HAL_Dialect, "DeviceSelect", [
   );
 
   let builders = [
-    AttrBuilder<(ins
-      "IREE::HAL::DeviceTargetAttr":$device
-    )>,
     AttrBuilder<(ins
       "ArrayRef<Attribute>":$values
     )>,
