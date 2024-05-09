@@ -1115,7 +1115,7 @@ def Util_GlobalType : TypeInterface<"GlobalTypeInterface"> {
       /*defaultImplementation=*/[{
         // If one is a shaped type, then they both must be and have compatible
         // shapes.
-        if ($_type.template isa<ShapedType>() || isa<ShapedType>(accessType)) {
+        if (isa<ShapedType>($_type) || isa<ShapedType>(accessType)) {
           return succeeded(mlir::verifyCompatibleShape($_type, accessType));
         }
         // Otherwise, the types must be the same.
