@@ -67,13 +67,19 @@ static void reference_matmul_f16_f16_f16_f16(
     const uint16_t* lhs_data, const uint16_t* rhs_data,
     const uint16_t* acc_data, uint16_t* result_data, iree_hal_dim_t m,
     iree_hal_dim_t n) {
-  float acc = acc_data ? iree_math_f16_to_f32(acc_data[n + m * n_size]) : 0.f;
+  // Accumulator is float16
+  uint16_t acc =
+      acc_data ? acc_data[n + m * n_size] : iree_math_f32_to_f16(0.f);
   for (iree_hal_dim_t k = 0; k < k_size; ++k) {
     int64_t rhs_index = transpose_rhs ? k + n * k_size : n + k * n_size;
-    acc += iree_math_f16_to_f32(lhs_data[k + m * k_size]) *
-           iree_math_f16_to_f32(rhs_data[rhs_index]);
+    // Perform 'acc + lhs * rhs' in float32
+    float local = iree_math_f16_to_f32(acc) +
+                  iree_math_f16_to_f32(lhs_data[k + m * k_size]) *
+                      iree_math_f16_to_f32(rhs_data[rhs_index]);
+    // Convert back to float16
+    acc = iree_math_f32_to_f16(local);
   }
-  result_data[n + m * n_size] = iree_math_f32_to_f16(acc);
+  result_data[n + m * n_size] = acc;
 }
 
 // Reference mamtul for the f16 input, f32 accumlation, and f32 result.
@@ -102,13 +108,16 @@ static void reference_matmul_bf16_bf16_bf16_bf16(
     const uint16_t* lhs_data, const uint16_t* rhs_data,
     const uint16_t* acc_data, uint16_t* result_data, iree_hal_dim_t m,
     iree_hal_dim_t n) {
-  float acc = acc_data ? iree_math_bf16_to_f32(acc_data[n + m * n_size]) : 0.f;
+  uint16_t acc =
+      acc_data ? acc_data[n + m * n_size] : iree_math_f32_to_bf16(0.f);
   for (iree_hal_dim_t k = 0; k < k_size; ++k) {
     int64_t rhs_index = transpose_rhs ? k + n * k_size : n + k * n_size;
-    acc += iree_math_bf16_to_f32(lhs_data[k + m * k_size]) *
-           iree_math_bf16_to_f32(rhs_data[rhs_index]);
+    float local = iree_math_bf16_to_f32(acc) +
+                  iree_math_bf16_to_f32(lhs_data[k + m * k_size]) *
+                      iree_math_bf16_to_f32(rhs_data[rhs_index]);
+    acc = iree_math_f32_to_bf16(local);
   }
-  result_data[n + m * n_size] = iree_math_f32_to_bf16(acc);
+  result_data[n + m * n_size] = acc;
 }
 
 // Reference mamtul for the bf16 input, f32 accumlation, and f32 result.
