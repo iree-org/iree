@@ -21,7 +21,59 @@ We'd love to accept your patches and contributions to this project.
 This project follows the
 [OpenXLA Code of Conduct](https://github.com/openxla/community/blob/main/CODE-OF-CONDUCT.md).
 
+### :octicons-law-16: Developer Certificate of Origin
+
+Contributors must certify that they wrote or otherwise have the right to submit
+the code they are contributing to the project.
+
+??? quote "Expand to read the full DCO agreement text"
+
+    By making a contribution to this project, I certify that:
+
+    1. The contribution was created in whole or in part by me and I have the
+      right to submit it under the open source license indicated in the file; or
+
+    2. The contribution is based upon previous work that, to the best of my
+      knowledge, is covered under an appropriate open source license and I have
+      the right under that license to submit that work with modifications, whether
+      created in whole or in part by me, under the same open source license
+      (unless I am permitted to submit under a different license), as indicated
+      in the file; or
+
+    3. The contribution was provided directly to me by some other person who
+      certified 1., 2. or 3. and I have not modified it.
+
+    4. I understand and agree that this project and the contribution are public
+      and that a record of the contribution (including all personal information
+      I submit with it, including my sign-off) is maintained indefinitely and
+      may be redistributed consistent with this project or the open source
+      license(s) involved.
+
+Signing is enforced by the [DCO GitHub App](https://github.com/apps/dco). This
+requires that all commits included in pull requests include a `Signed-off-by`
+line:
+
+```text
+This is my commit message
+
+Signed-off-by: Random J Developer <random@developer.example.org>
+```
+
+* Git will automatically append this message if you use the `-s` option:
+
+    ```bash
+    git commit -s -m 'This is my commit message'
+    ```
+
+* Users of [Visual Studio Code](https://code.visualstudio.com/) can add
+  `"git.alwaysSignOff": true,` in their settings.
+
+* For more information about DCO enforcement and git workflows, see the
+  [dcoapp/app](https://github.com/dcoapp/app) repository.
+
 ### :octicons-law-16: Contributor License Agreement
+
+!!! info - "CLA is being replaced with DCO. Both are enabled while we migrate."
 
 Contributions to this project must be accompanied by a Contributor License
 Agreement (CLA). Head over to <https://cla.developers.google.com/> to see
