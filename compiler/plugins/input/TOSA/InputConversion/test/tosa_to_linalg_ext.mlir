@@ -60,11 +60,11 @@ func.func @scatter_static_batched(%arg0 : tensor<2x4x5xf32>, %arg1 : tensor<2x2x
 
 // CHECK-LABEL: @scatter_dynamic
 func.func @scatter_dynamic(%arg0 : tensor<?x?x?xf32>, %arg1 : tensor<?x?xi32>, %arg2 : tensor<?x?x?xf32>) ->  tensor<?x?x?xf32> {
-  // CHECK: %[[EXPAND:.+]] = tensor.expand_shape %arg1
   // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : index
   // CHECK-DAG: %[[C1:.+]] = arith.constant 1 : index
   // CHECK-DAG: %[[DIM0:.+]] = tensor.dim %arg1, %[[C0]] : tensor<?x?xi32>
   // CHECK-DAG: %[[DIM1:.+]] = tensor.dim %arg1, %[[C1]] : tensor<?x?xi32>
+  // CHECK: %[[EXPAND:.+]] = tensor.expand_shape %arg1
   // CHECK: %[[EMPTY:.+]] = tensor.empty({{.*}}) : tensor<?x?x1xi32>
   // CHECK: %[[GENERIC:.+]] = linalg.generic
   // CHECK-SAME: ins(%[[EXPAND]] : tensor<?x?x1xi32>) outs(%[[EMPTY]] : tensor<?x?x1xi32>) {
