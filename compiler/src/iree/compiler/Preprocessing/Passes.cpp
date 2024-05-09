@@ -82,8 +82,6 @@ void buildPreprocessingPassPipeline(
         preprocessingOptions.preprocessingTransformSpecFilename;
     passManager.addPass(
         Preprocessing::createInterpreterPass(interpreterOptions));
-    // Custom dispatch formation creates util.func ops that need to be inlined.
-    passManager.addPass(mlir::createInlinerPass());
   }
 
   if (!preprocessingOptions.preprocessingPDLSpecFilename.empty()) {
