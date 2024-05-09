@@ -30,12 +30,24 @@ static int64_t calculateSharedMemoryUsedInBytes(const GPUMMASchedule &schedule,
 }
 
 bool isValidSchedule(const GPUMatmulShapeType &problem,
-                     const GPUMMASchedule &schedule) {
-  bool isValidM = (problem.mSize % (schedule.mSize * schedule.mTileCount *
-                                    schedule.mWarpCount)) == 0;
-  bool isValidN = (problem.nSize % (schedule.nSize * schedule.nTileCount *
-                                    schedule.nWarpCount)) == 0;
-  bool isValidK = (problem.kSize % (schedule.kSize * schedule.kTileCount)) == 0;
+                     const GPUMMASchedule &schedule, const bool mustBeAligned) {
+  auto alignedMSize =
+      mustBeAligned
+          ? problem.mSize
+          : llvm::divideCeil(problem.mSize, schedule.mSize) * schedule.mSize;
+  auto alignedNSize =
+      mustBeAligned
+          ? problem.nSize
+          : llvm::divideCeil(problem.nSize, schedule.nSize) * schedule.nSize;
+  auto alignedKSize =
+      mustBeAligned
+          ? problem.kSize
+          : llvm::divideCeil(problem.kSize, schedule.kSize) * schedule.kSize;
+  bool isValidM = (alignedMSize % (schedule.mSize * schedule.mTileCount *
+                                   schedule.mWarpCount)) == 0;
+  bool isValidN = (alignedNSize % (schedule.nSize * schedule.nTileCount *
+                                   schedule.nWarpCount)) == 0;
+  bool isValidK = (alignedKSize % (schedule.kSize * schedule.kTileCount)) == 0;
   return isValidN && isValidM && isValidK;
 }
 
@@ -49,7 +61,7 @@ fitScheduleInSharedMemory(const GPUMatmulShapeType &problem,
   int64_t rhsBitwidth =
       intrinsics[schedule.index].bType.getIntOrFloatBitWidth();
 
-  while ((!isValidSchedule(problem, schedule) && mustBeAligned) ||
+  while (!isValidSchedule(problem, schedule, mustBeAligned) ||
          calculateSharedMemoryUsedInBytes(schedule, lhsBitwidth, rhsBitwidth) >
              sharedMemLimitInBytes) {
     LLVM_DEBUG({
