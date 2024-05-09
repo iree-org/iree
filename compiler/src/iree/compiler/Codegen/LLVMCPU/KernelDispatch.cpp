@@ -2184,10 +2184,10 @@ setConvRootConfig(mlir::FunctionOpInterface entryPointFn,
     // This will later be extracted by LLVMCPULowerExecutableTargetPass.
     auto context = convOp.getContext();
     auto enableLoopPeelingAttrName = getEnableLoopPeelingAttrName(context);
-    auto trueValue = BoolAttr::get(context, true);
+    auto unitAttr = UnitAttr::get(context);
     pipelineConfig = DictionaryAttr::get(
         context,
-        ArrayRef<NamedAttribute>({enableLoopPeelingAttrName, trueValue}));
+        ArrayRef<NamedAttribute>({enableLoopPeelingAttrName, unitAttr}));
   }
 
   return setOpConfigAndEntryPointFnTranslation(
