@@ -91,6 +91,25 @@ def ResolveDevicePromisesPass :
   ];
 }
 
+def ResolveDeviceAliasesPass :
+    Pass<"iree-hal-resolve-device-aliases", "mlir::ModuleOp"> {
+  let summary = "Resolves `#hal.device.alias` attributes to their expanded configurations.";
+  let description = [{
+    Resolves device aliases to the concrete targets using defaults, flags, and
+    registered device configurations.
+  }];
+  let options = [
+    Option<
+      "targetRegistry", "target-registry",
+      "llvm::cl::TargetRegistryRef", "",
+      "Target registry containing the list of available devices and backends."
+    >,
+  ];
+  let dependentDialects = [
+    "IREE::HAL::HALDialect",
+  ];
+}
+
 def VerifyDevicesPass :
     Pass<"iree-hal-verify-devices", "mlir::ModuleOp"> {
   let summary = "Verifies that all devices can be targeted with the available compiler plugins.";

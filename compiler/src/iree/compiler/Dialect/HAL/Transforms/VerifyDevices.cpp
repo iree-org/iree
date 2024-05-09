@@ -50,7 +50,7 @@ verifyDeviceTargetAttr(Operation *deviceOp,
     auto diagnostic = deviceOp->emitError();
     diagnostic << "unregistered target device "
                << deviceTargetAttr.getDeviceID()
-               << "; ensure it is linked in to the compiler (available = [ ";
+               << "; ensure it is linked into the compiler (available = [ ";
     for (const auto &targetName : targetRegistry.getRegisteredTargetDevices()) {
       diagnostic << "'" << targetName << "' ";
     }
@@ -65,7 +65,7 @@ verifyDeviceTargetAttr(Operation *deviceOp,
       auto diagnostic = deviceOp->emitError();
       diagnostic << "unregistered target backend "
                  << executableTargetAttr.getBackend()
-                 << "; ensure it is linked in to the compiler (available = [ ";
+                 << "; ensure it is linked into the compiler (available = [ ";
       for (const auto &targetName :
            targetRegistry.getRegisteredTargetBackends()) {
         diagnostic << "'" << targetName << "' ";

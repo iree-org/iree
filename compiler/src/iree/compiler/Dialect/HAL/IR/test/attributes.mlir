@@ -61,6 +61,20 @@
 
 // -----
 
+// CHECK-LABEL: "device.aliases"
+"device.aliases"() {
+  // CHECK-SAME: alias_0 = #hal.device.alias<"a"> : !hal.device
+  alias_0 = #hal.device.alias<"a"> : !hal.device,
+  // CHECK-SAME: alias_1 = #hal.device.alias<"b", {}> : !hal.device
+  alias_1 = #hal.device.alias<"b", {}> : !hal.device,
+  // CHECK-SAME: alias_2 = #hal.device.alias<"c"[4]> : !hal.device
+  alias_2 = #hal.device.alias<"c"[4]> : !hal.device,
+  // CHECK-SAME: alias_3 = #hal.device.alias<"d", {config = 123 : index}>
+  alias_3 = #hal.device.alias<"d", {config = 123 : index}> : !hal.device
+} : () -> ()
+
+// -----
+
 // CHECK-LABEL: "device.targets"
 "device.targets"() {
   // CHECK-SAME: target_0 = #hal.device.target<"a"> : !hal.device
