@@ -73,11 +73,11 @@ func.func @main(%arg0: !torch.vtensor<[4,5],si32>) -> !torch.vtensor<[4,5],si32>
 //   CHECK-DAG: %[[TORCH_RESULT1:.+]] = torch.operator "mutate_inplace"(%[[TORCH_ARG1]])
 //   CHECK-DAG: %[[TENSOR_ARG0:.+]] = torch_c.to_builtin_tensor %[[TORCH_RESULT0]]
 //   CHECK-DAG: %[[TENSOR_ARG1:.+]] = torch_c.to_builtin_tensor %[[TORCH_RESULT1]]
-//       CHECK: %[[BARRIER_RESULTS:.+]]:2 = hal.tensor.barrier join(%[[TENSOR_ARG1]], %[[TENSOR_ARG0]] : tensor<5x4xf32>, tensor<4x5xi32>) => %arg3 : !hal.fence
-//   CHECK-DAG: %[[EXPORT_RESULT1:.+]] = hal.tensor.export %[[BARRIER_RESULTS]]#0 into(%arg1 : !hal.buffer_view)
-//   CHECK-DAG: %[[UNUSED:.+]] = util.optimization_barrier %[[EXPORT_RESULT1]]
-//   CHECK-DAG: %[[EXPORT_RESULT0:.+]] = hal.tensor.export %[[BARRIER_RESULTS]]#1 :
-//       CHECK: util.return %[[EXPORT_RESULT0]]
+//       CHECK: %[[EXPORT_ALIAS1:.+]] = hal.tensor.alias wait(%arg2) => %[[TENSOR_ARG1]] : tensor<5x4xf32> to %arg1 : !hal.buffer_view
+//       CHECK: %[[BARRIER_RESULTS:.+]]:2 = hal.tensor.barrier join(%[[EXPORT_ALIAS1]], %[[TENSOR_ARG0]] : tensor<5x4xf32>, tensor<4x5xi32>) => %arg3 : !hal.fence
+//   CHECK-DAG: %[[EXPORT_RESULT0:.+]] = hal.tensor.export %[[BARRIER_RESULTS]]#0
+//   CHECK-DAG: %[[EXPORT_RESULT1:.+]] = hal.tensor.export %[[BARRIER_RESULTS]]#1
+//       CHECK: util.return %[[EXPORT_RESULT1]]
 builtin.module @mutable_input_overwrite_no_return {
 func.func @main(%arg0: !torch.vtensor<[4,5],si32>, %arg1: !torch.tensor<[5,4],f32>)
     -> (!torch.vtensor<[4,5],si32>) {
@@ -97,9 +97,10 @@ func.func @main(%arg0: !torch.vtensor<[4,5],si32>, %arg1: !torch.tensor<[5,4],f3
 // Not a good idea to do but legal. This verifies that if returning a mutated
 // tensor's intermediate value, you will get two exports, indicating a copy.
 // CHECK-LABEL: @mutable_input_overwrite_return_alias_copies
-//       CHECK: %[[BARRIER_RESULTS:.+]]:2 = hal.tensor.barrier join(%{{.*}}, %{{.*}} : tensor<5x4xf32>, tensor<5x4xf32>)
-//   CHECK-DAG: = hal.tensor.export %[[BARRIER_RESULTS]]#0 into(%arg0 : !hal.buffer_view)
-//   CHECK-DAG: = hal.tensor.export %[[BARRIER_RESULTS]]#1 :
+//       CHECK: %[[ALIASED:.+]] = hal.tensor.alias wait({{.+}}) => %{{.+}} : tensor<5x4xf32> to %arg0 : !hal.buffer_view
+//       CHECK: %[[BARRIER_RESULTS:.+]]:2 = hal.tensor.barrier join(%[[ALIASED]], %{{.*}} : tensor<5x4xf32>, tensor<5x4xf32>)
+//   CHECK-DAG: = hal.tensor.export %[[BARRIER_RESULTS]]#0
+//   CHECK-DAG: = hal.tensor.export %[[BARRIER_RESULTS]]#1
 builtin.module @mutable_input_overwrite_return_alias_copies {
 func.func @main(%arg0: !torch.tensor<[5,4],f32>) -> (!torch.vtensor<[5,4],f32>) {
   %0 = torch.copy.to_vtensor %arg0 : !torch.vtensor<[5,4],f32>

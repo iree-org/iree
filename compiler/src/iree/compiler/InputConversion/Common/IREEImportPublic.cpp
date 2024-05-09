@@ -244,7 +244,7 @@ class TensorExportPattern
       rewriter.replaceOpWithNewOp<IREE::HAL::TensorExportOp>(
           srcOp, resultType, adaptor.getSource(),
           TypeAttr::get(adaptor.getSource().getType()), adaptor.getSourceDims(),
-          /*target_storage=*/nullptr, /*name=*/nullptr);
+          /*name=*/nullptr);
     }
     return success();
   }
