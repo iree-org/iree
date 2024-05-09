@@ -19,6 +19,8 @@
 
 namespace mlir::iree_compiler {
 
+static const char kLoopPeelingAttrName[] = "enable_loop_peeling";
+
 FailureOr<Operation *> getRootOperation(ArrayRef<Operation *> computeOps) {
   Operation *rootOperation = nullptr;
   for (auto op : llvm::reverse(computeOps)) {
@@ -64,22 +66,25 @@ FailureOr<Operation *> getRootOperation(ArrayRef<Operation *> computeOps) {
   return rootOperation;
 }
 
-StringAttr getPeelAttrName(MLIRContext *ctx) {
-  return StringAttr::get(ctx, "enable_loop_peeling");
+StringAttr getEnableLoopPeelingAttrName(MLIRContext *ctx) {
+  return StringAttr::get(ctx, kLoopPeelingAttrName);
 }
 
-bool isLoopPeelingEnabled(FunctionOpInterface *funcOp) {
-  auto peelAttrName = getPeelAttrName(funcOp->getContext());
+bool isLoopPeelingEnabled(FunctionOpInterface funcOp) {
+  auto peelAttrName = getEnableLoopPeelingAttrName(funcOp->getContext());
   auto trueAttr = BoolAttr::get(funcOp->getContext(), true);
 
   IREE::Codegen::TranslationInfoAttr translationInfo =
-      getTranslationInfo(*funcOp);
+      getTranslationInfo(funcOp);
   DictionaryAttr config = translationInfo.getConfiguration();
-  if (config) {
-    auto peelAttr = translationInfo.getConfiguration().getNamed(peelAttrName);
-    if (peelAttr && peelAttr->getValue() == trueAttr) {
-      return true;
-    }
+
+  if (!config) {
+    return false;
+  }
+
+  auto peelAttr = translationInfo.getConfiguration().getNamed(peelAttrName);
+  if (peelAttr && peelAttr->getValue() == trueAttr) {
+    return true;
   }
 
   return false;

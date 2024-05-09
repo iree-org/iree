@@ -211,7 +211,7 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
     return clPProcStrategy;
   }
 
-  // TODO: Implement heurystics for Convs
+  // TODO: Implement heuristics for Convs
   if (isa<linalg::ConvolutionOpInterface>(linalgOp.getOperation())) {
     return VectorPreProcStrategy::None;
   }
@@ -2182,18 +2182,18 @@ setConvRootConfig(mlir::FunctionOpInterface entryPointFn,
   if (vecPreProcStrategy == VectorPreProcStrategy::Peeling) {
     // Enable peeling. To this end, attach extra info to the pipeline config.
     // This will later be extracted by LLVMCPULowerExecutableTargetPass.
-    auto ctx = convOp.getContext();
-    SmallVector<NamedAttribute> attrs;
-    auto peelAttrName = getPeelAttrName(ctx);
-    auto peelAttrVal = BoolAttr::get(ctx, true);
-    attrs.emplace_back(peelAttrName, peelAttrVal);
-    pipelineConfig = DictionaryAttr::get(ctx, attrs);
+    auto context = convOp.getContext();
+    auto enableLoopPeelingAttrName = getEnableLoopPeelingAttrName(context);
+    auto trueValue = BoolAttr::get(context, true);
+    pipelineConfig = DictionaryAttr::get(
+        context,
+        ArrayRef<NamedAttribute>({enableLoopPeelingAttrName, trueValue}));
   }
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, convOp, tileSizes, scalableTileFlags,
-      DispatchLoweringPassPipeline::CPUConvTileAndDecomposeExpert, {}, {},
-      pipelineConfig);
+      DispatchLoweringPassPipeline::CPUConvTileAndDecomposeExpert,
+      /*workgroupSize=*/{}, /*subgroupSize=*/{}, pipelineConfig);
 }
 
 /// Main utility to compute the vectorization/unrolling tile sizes.
