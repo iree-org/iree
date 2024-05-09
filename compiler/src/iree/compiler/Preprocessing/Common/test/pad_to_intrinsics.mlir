@@ -296,15 +296,17 @@ func.func @dequant_gemm_dynamic_m(%arg0: tensor<4096x32x128xi4>, %arg1: tensor<4
 
 // -----
 
+// We want to skip padding skinny matmul cases, since warpReduction is more performant for it.
+
 #rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb",
                                     {mma_intrinsics = [#iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>],
                                       target_arch = "gfx1100", ukernels = "none"}>
 
-//       CHECK: func.func @skinny_m_matmul(
+//       CHECK: func.func @skip_skinny_m_matmul(
 //  CHECK-SAME:    %[[ARG0:.+]]: tensor<2x20xf16>,
 //  CHECK-SAME:    %[[ARG1:.+]]: tensor<20x30xf16>,
 //  CHECK-SAME:    %[[ARG2:.+]]: tensor<2x30xf16>)
-func.func @skinny_m_matmul(%arg0 : tensor<2x20xf16>, %arg1 : tensor<20x30xf16>, %arg2 : tensor<2x30xf16>) -> tensor<2x30xf16>
+func.func @skip_skinny_m_matmul(%arg0 : tensor<2x20xf16>, %arg1 : tensor<20x30xf16>, %arg2 : tensor<2x30xf16>) -> tensor<2x30xf16>
     attributes {hal.device.targets = [#hal.device.target<"rocm", [#rocm_executable_target]>]} {
     %0 = linalg.matmul ins(%arg0, %arg1 : tensor<2x20xf16>, tensor<20x30xf16>)
         outs(%arg2 : tensor<2x30xf16>) -> tensor<2x30xf16>
@@ -315,15 +317,17 @@ func.func @skinny_m_matmul(%arg0 : tensor<2x20xf16>, %arg1 : tensor<20x30xf16>, 
 
 // -----
 
+// We want to skip padding skinny matmul cases, since warpReduction is more performant for it.
+
 #rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb",
                                     {mma_intrinsics = [#iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>],
                                       target_arch = "gfx1100", ukernels = "none"}>
 
-//       CHECK: func.func @skinny_n_mmtb(
+//       CHECK: func.func @skip_skinny_n_mmtb(
 //  CHECK-SAME:    %[[ARG0:.+]]: tensor<10x20xf16>,
 //  CHECK-SAME:    %[[ARG1:.+]]: tensor<4x20xf16>,
 //  CHECK-SAME:    %[[ARG2:.+]]: tensor<10x4xf16>)
-func.func @skinny_n_mmtb(%arg0 : tensor<10x20xf16>, %arg1 : tensor<4x20xf16>, %arg2 : tensor<10x4xf16>) -> tensor<10x4xf16>
+func.func @skip_skinny_n_mmtb(%arg0 : tensor<10x20xf16>, %arg1 : tensor<4x20xf16>, %arg2 : tensor<10x4xf16>) -> tensor<10x4xf16>
     attributes {hal.device.targets = [#hal.device.target<"rocm", [#rocm_executable_target]>]} {
     %0 = linalg.matmul_transpose_b ins(%arg0, %arg1 : tensor<10x20xf16>, tensor<4x20xf16>)
         outs(%arg2 : tensor<10x4xf16>) -> tensor<10x4xf16>
