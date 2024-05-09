@@ -65,7 +65,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           base: main
-          branch: bump-torch-mlir-submodule
+          branch: integrates/torch-mlir
           delete-branch: true # automatically supercedes the previous bump
           title: 'Bump torch-mlir submodule to ${{ steps.bump_submodule.outputs.TORCH_MLIR_COMMIT }}'
           body: |
