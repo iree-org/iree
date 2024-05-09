@@ -200,6 +200,8 @@ void buildHALDeviceAssignmentPassPipeline(OpPassManager &passManager,
   }
   passManager.addPass(IREE::HAL::createMaterializeTargetDevicesPass());
   passManager.addPass(IREE::HAL::createResolveDevicePromisesPass());
+  passManager.addPass(
+      IREE::HAL::createResolveDeviceAliasesPass({&targetRegistry}));
   passManager.addPass(IREE::HAL::createVerifyDevicesPass({&targetRegistry}));
 }
 
