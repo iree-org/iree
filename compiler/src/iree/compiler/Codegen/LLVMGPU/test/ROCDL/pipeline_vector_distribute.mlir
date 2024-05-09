@@ -407,9 +407,9 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 
 // CHECK-LABEL: func.func @unaligned_nk_batch_matmul()
 // CHECK-SAME:    translation_info = #[[$TRANSLATION]]
-// CHECK-DAG:     %[[RHS_SHARED:.+]] = memref.alloc() : memref<1x16x28xf16, #gpu.address_space<workgroup>>
+// CHECK-DAG:     %[[RHS_SHARED:.+]] = memref.alloc() : memref<1x16x20xf16, #gpu.address_space<workgroup>>
 // CHECK-DAG:     %[[RHS_SHARED_SUB:.+]] =  memref.subview %[[RHS_SHARED]][0, 0, 0] [1, 16, 16] [1, 1, 1]
-// CHECK-DAG:     %[[LHS_SHARED:.+]] = memref.alloc() : memref<1x16x28xf16, #gpu.address_space<workgroup>>
+// CHECK-DAG:     %[[LHS_SHARED:.+]] = memref.alloc() : memref<1x16x20xf16, #gpu.address_space<workgroup>>
 // CHECK-DAG:     %[[LHS_SHARED_SUB:.+]] =  memref.subview %[[LHS_SHARED]][0, 0, 0] [1, 16, 16] [1, 1, 1]
 // CHECK-DAG:     %[[LHS_GLOBAL:.+]] = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<64x968x1281xf16, #hal.descriptor_type<storage_buffer>>
 // CHECK-DAG:     %[[RHS_GLOBAL:.+]] = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : memref<64x1281x1281xf16, #hal.descriptor_type<storage_buffer>>
