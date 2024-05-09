@@ -48,7 +48,7 @@ iree_status_t iree_hal_modules_buffer_assert(
     iree_bitfield_string_temp_t temp0, temp1;
     iree_string_view_t actual_memory_type_str =
         iree_hal_memory_type_format(actual_memory_type, &temp0);
-    iree_string_view_t expected_memory_type_str =
+    iree_string_view_t required_memory_type_str =
         iree_hal_memory_type_format(required_memory_types, &temp1);
     return iree_make_status(
         IREE_STATUS_PERMISSION_DENIED,
@@ -56,28 +56,28 @@ iree_status_t iree_hal_modules_buffer_assert(
         "requires %.*s",
         (int)message_str.size, message_str.data,
         (int)actual_memory_type_str.size, actual_memory_type_str.data,
-        (int)expected_memory_type_str.size, expected_memory_type_str.data);
+        (int)required_memory_type_str.size, required_memory_type_str.data);
 #else
     return iree_make_status(
         IREE_STATUS_PERMISSION_DENIED,
         "%.*s buffer memory type is not compatible; buffer has %08X, operation "
         "requires %08X",
         (int)message_str.size, message_str.data, actual_memory_type,
-        expected_memory_type);
+        required_memory_types);
 #endif  // IREE_HAL_MODULE_STRING_UTIL_ENABLE
   }
 
   // All usage bits expected (indicating what the program intends to use the
   // buffer for) must be set in the buffer while the buffer is allowed to have
   // more bits.
-  iree_hal_buffer_usage_t actual_buffer_usage =
+  iree_hal_buffer_usage_t allowed_buffer_usage =
       iree_hal_buffer_allowed_usage(buffer);
-  if (!iree_all_bits_set(actual_buffer_usage, required_buffer_usage)) {
+  if (!iree_all_bits_set(allowed_buffer_usage, required_buffer_usage)) {
 #if ((IREE_STATUS_FEATURES & IREE_STATUS_FEATURE_ANNOTATIONS) != 0) && \
     IREE_HAL_MODULE_STRING_UTIL_ENABLE
     iree_bitfield_string_temp_t temp0, temp1;
     iree_string_view_t allowed_usage_str =
-        iree_hal_buffer_usage_format(actual_buffer_usage, &temp0);
+        iree_hal_buffer_usage_format(allowed_buffer_usage, &temp0);
     iree_string_view_t required_usage_str =
         iree_hal_buffer_usage_format(required_buffer_usage, &temp1);
     return iree_make_status(
