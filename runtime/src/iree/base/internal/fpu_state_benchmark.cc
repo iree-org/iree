@@ -4,30 +4,28 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <cstddef>
+#include <stddef.h>
 
-#include "benchmark/benchmark.h"
 #include "iree/base/api.h"
 #include "iree/base/internal/fpu_state.h"
+#include "iree/testing/benchmark.h"
 
-namespace {
-
-constexpr size_t kElementBufferSize = 2048;
+#define ELEMENT_BUFFER_SIZE 2048
 
 // Scales a buffer of floats by |scale| and disables autovectorization.
 // Will generally be normal scalar floating point math and indicate whether the
 // FPU has issues with denormals.
 static float UnvectorizedScaleBufferByValue(float scale) {
-  float buffer[kElementBufferSize];
+  float buffer[ELEMENT_BUFFER_SIZE];
   for (size_t i = 0; i < IREE_ARRAYSIZE(buffer); ++i) {
     buffer[i] = 1.0f;
   }
-  benchmark::DoNotOptimize(*buffer);
+  iree_optimization_barrier(*buffer);
   for (size_t i = 0; i < IREE_ARRAYSIZE(buffer); ++i) {
     buffer[i] *= scale;
-    benchmark::DoNotOptimize(buffer[i]);
+    iree_optimization_barrier(buffer[i]);
   }
-  benchmark::DoNotOptimize(*buffer);
+  iree_optimization_barrier(*buffer);
   float sum = 0.0f;
   for (size_t i = 0; i < IREE_ARRAYSIZE(buffer); ++i) {
     sum += buffer[i];
@@ -39,15 +37,15 @@ static float UnvectorizedScaleBufferByValue(float scale) {
 // Will generally be SIMD floating point math and indicate whether the vector
 // units (NEON, AVX, etc) have issues with denormals.
 static float VectorizedScaleBufferByValue(float scale) {
-  float buffer[kElementBufferSize];
+  float buffer[ELEMENT_BUFFER_SIZE];
   for (size_t i = 0; i < IREE_ARRAYSIZE(buffer); ++i) {
     buffer[i] = 1.0f;
   }
-  benchmark::DoNotOptimize(*buffer);
+  iree_optimization_barrier(*buffer);
   for (size_t i = 0; i < IREE_ARRAYSIZE(buffer); ++i) {
     buffer[i] *= scale;
   }
-  benchmark::DoNotOptimize(*buffer);
+  iree_optimization_barrier(*buffer);
   float sum = 0.0f;
   for (size_t i = 0; i < IREE_ARRAYSIZE(buffer); ++i) {
     sum += buffer[i];
@@ -55,70 +53,76 @@ static float VectorizedScaleBufferByValue(float scale) {
   return sum;
 }
 
-void BM_UnvectorizedNormals(benchmark::State& state) {
-  for (auto _ : state) {
-    benchmark::DoNotOptimize(UnvectorizedScaleBufferByValue(1.0f));
+IREE_BENCHMARK_FN(BM_UnvectorizedNormals) {
+  while (iree_benchmark_keep_running(benchmark_state, 1)) {
+    iree_optimization_barrier(UnvectorizedScaleBufferByValue(1.0f));
   }
+  return iree_ok_status();
 }
-BENCHMARK(BM_UnvectorizedNormals);
+IREE_BENCHMARK_REGISTER(BM_UnvectorizedNormals);
 
-void BM_UnvectorizedDenormals(benchmark::State& state) {
-  for (auto _ : state) {
-    benchmark::DoNotOptimize(UnvectorizedScaleBufferByValue(1e-39f));
+IREE_BENCHMARK_FN(BM_UnvectorizedDenormals) {
+  while (iree_benchmark_keep_running(benchmark_state, 1)) {
+    iree_optimization_barrier(UnvectorizedScaleBufferByValue(1e-39f));
   }
+  return iree_ok_status();
 }
-BENCHMARK(BM_UnvectorizedDenormals);
+IREE_BENCHMARK_REGISTER(BM_UnvectorizedDenormals);
 
-void BM_UnvectorizedDenormalsFlushedToZero(benchmark::State& state) {
+IREE_BENCHMARK_FN(BM_UnvectorizedDenormalsFlushedToZero) {
   iree_fpu_state_t fpu_state =
       iree_fpu_state_push(IREE_FPU_STATE_FLAG_FLUSH_DENORMALS_TO_ZERO);
-  for (auto _ : state) {
-    benchmark::DoNotOptimize(UnvectorizedScaleBufferByValue(1e-39f));
+  while (iree_benchmark_keep_running(benchmark_state, 1)) {
+    iree_optimization_barrier(UnvectorizedScaleBufferByValue(1e-39f));
   }
   iree_fpu_state_pop(fpu_state);
+  return iree_ok_status();
 }
-BENCHMARK(BM_UnvectorizedDenormalsFlushedToZero);
+IREE_BENCHMARK_REGISTER(BM_UnvectorizedDenormalsFlushedToZero);
 
-void BM_UnvectorizedDenormalsNotFlushedToZero(benchmark::State& state) {
+IREE_BENCHMARK_FN(BM_UnvectorizedDenormalsNotFlushedToZero) {
   iree_fpu_state_t fpu_state = iree_fpu_state_push(IREE_FPU_STATE_DEFAULT);
-  for (auto _ : state) {
-    benchmark::DoNotOptimize(UnvectorizedScaleBufferByValue(1e-39f));
+  while (iree_benchmark_keep_running(benchmark_state, 1)) {
+    iree_optimization_barrier(UnvectorizedScaleBufferByValue(1e-39f));
   }
   iree_fpu_state_pop(fpu_state);
+  return iree_ok_status();
 }
-BENCHMARK(BM_UnvectorizedDenormalsNotFlushedToZero);
+IREE_BENCHMARK_REGISTER(BM_UnvectorizedDenormalsNotFlushedToZero);
 
-void BM_VectorizedNormals(benchmark::State& state) {
-  for (auto _ : state) {
-    benchmark::DoNotOptimize(VectorizedScaleBufferByValue(1.0f));
+IREE_BENCHMARK_FN(BM_VectorizedNormals) {
+  while (iree_benchmark_keep_running(benchmark_state, 1)) {
+    iree_optimization_barrier(VectorizedScaleBufferByValue(1.0f));
   }
+  return iree_ok_status();
 }
-BENCHMARK(BM_VectorizedNormals);
+IREE_BENCHMARK_REGISTER(BM_VectorizedNormals);
 
-void BM_VectorizedDenormals(benchmark::State& state) {
-  for (auto _ : state) {
-    benchmark::DoNotOptimize(VectorizedScaleBufferByValue(1e-39f));
+IREE_BENCHMARK_FN(BM_VectorizedDenormals) {
+  while (iree_benchmark_keep_running(benchmark_state, 1)) {
+    iree_optimization_barrier(VectorizedScaleBufferByValue(1e-39f));
   }
+  return iree_ok_status();
 }
-BENCHMARK(BM_VectorizedDenormals);
+IREE_BENCHMARK_REGISTER(BM_VectorizedDenormals);
 
-void BM_VectorizedDenormalsFlushedToZero(benchmark::State& state) {
+IREE_BENCHMARK_FN(BM_VectorizedDenormalsFlushedToZero) {
   iree_fpu_state_t fpu_state =
       iree_fpu_state_push(IREE_FPU_STATE_FLAG_FLUSH_DENORMALS_TO_ZERO);
-  for (auto _ : state) {
-    benchmark::DoNotOptimize(VectorizedScaleBufferByValue(1e-39f));
+  while (iree_benchmark_keep_running(benchmark_state, 1)) {
+    iree_optimization_barrier(VectorizedScaleBufferByValue(1e-39f));
   }
   iree_fpu_state_pop(fpu_state);
+  return iree_ok_status();
 }
-BENCHMARK(BM_VectorizedDenormalsFlushedToZero);
+IREE_BENCHMARK_REGISTER(BM_VectorizedDenormalsFlushedToZero);
 
-void BM_VectorizedDenormalsNotFlushedToZero(benchmark::State& state) {
+IREE_BENCHMARK_FN(BM_VectorizedDenormalsNotFlushedToZero) {
   iree_fpu_state_t fpu_state = iree_fpu_state_push(IREE_FPU_STATE_DEFAULT);
-  for (auto _ : state) {
-    benchmark::DoNotOptimize(VectorizedScaleBufferByValue(1e-39f));
+  while (iree_benchmark_keep_running(benchmark_state, 1)) {
+    iree_optimization_barrier(VectorizedScaleBufferByValue(1e-39f));
   }
   iree_fpu_state_pop(fpu_state);
+  return iree_ok_status();
 }
-BENCHMARK(BM_VectorizedDenormalsNotFlushedToZero);
-
-}  // namespace
+IREE_BENCHMARK_REGISTER(BM_VectorizedDenormalsNotFlushedToZero);
