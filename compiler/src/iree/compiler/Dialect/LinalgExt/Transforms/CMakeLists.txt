@@ -34,6 +34,7 @@ iree_cc_library(
     "Passes.cpp"
     "SplitReduction.cpp"
     "TileAndDecomposeAttention.cpp"
+    "TilingInterfaceImpl.cpp"
   DEPS
     ::PassesIncGen
     IREEInputDialect
