@@ -575,7 +575,6 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(
       createGPUReduceSharedMemoryBankConflicts(/*paddingSizeBits=*/64));
 
-  funcPassManager.addPass(createGPUReduceSharedMemoryBankConflicts());
   if (clLLVMGPUEnablePrefetch) {
     funcPassManager.addPass(createLLVMGPUPrefetchSharedMemoryPass());
   }
