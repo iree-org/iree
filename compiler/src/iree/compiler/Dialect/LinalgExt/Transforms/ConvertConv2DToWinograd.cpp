@@ -27,14 +27,7 @@
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
 
-static inline int index(int y, int x, int dimy, int dimx) {
-  return (x + dimx * y);
-}
-
-static inline int index(int z, int y, int x, int w, int dimz, int dimy,
-                        int dimx, int dimw) {
-  return (w + dimw * (x + dimx * (y + dimy * z)));
-}
+static const char kWinogradAttr[] = "__winograd_conv";
 
 static bool hasAllOneValues(DenseIntElementsAttr attr) {
   return llvm::all_of(attr, [](APInt element) { return element.isOne(); });
@@ -59,7 +52,10 @@ static bool hasValidStridesAndDilations(Operation *op) {
   return true;
 }
 
-static bool isValidConv2d(Operation *op, bool &isNchw) {
+static bool isValidConv2d(Operation *op, bool &isNchw, bool ignoreAnnotations) {
+  if (!ignoreAnnotations && !op->hasAttr(kWinogradAttr)) {
+    return false;
+  }
   isNchw = isa<linalg::Conv2DNchwFchwOp>(op);
   const bool isNhwc = isa<linalg::Conv2DNhwcHwcfOp>(op);
   if (!(isNchw || isNhwc)) {
@@ -161,12 +157,16 @@ template <typename ConvOp>
 class ConvertConvToWinograd final : public OpRewritePattern<ConvOp> {
 public:
   using OpRewritePattern<ConvOp>::OpRewritePattern;
+  ConvertConvToWinograd<ConvOp>(MLIRContext *context, bool ignoreAnnotations,
+                                PatternBenefit benefit = 1)
+      : OpRewritePattern<ConvOp>(context, benefit),
+        ignoreAnnotations(ignoreAnnotations) {}
 
   LogicalResult matchAndRewrite(ConvOp convOp,
                                 PatternRewriter &rewriter) const override {
 
     bool isNchwFchw;
-    if (!isValidConv2d(convOp, isNchwFchw)) {
+    if (!isValidConv2d(convOp, isNchwFchw, ignoreAnnotations)) {
       return failure();
     }
 
@@ -334,8 +334,75 @@ public:
     rewriter.replaceOp(convOp, winogradOutput);
     return success();
   }
+
+private:
+  bool ignoreAnnotations;
 };
 
+/// The ConvertConv2DToWinograd pass will only transform convs that have been
+/// labeled with the `__winograd_conv` annotation by default. This annotation
+/// should be added by a preprocessing transform dialect interpreter pass:
+/// ```
+///   --iree-preprocessing-pass-pipeline="builtin.module(
+///       iree-preprocessing-transform-interpreter{transform-spec-path=path})"
+/// ```
+/// The transform dialect module can look something like the following (entry
+/// sequence should be named `__transform_main`):
+/// ```
+/// module attributes { transform.with_named_sequence } {
+///
+///   transform.named_sequence @match_conv2x640x128x128x3x3x320(
+///       %arg0: !transform.any_op {transform.readonly}) -> (!transform.any_op){
+///     transform.match.operation_name %arg0 ["linalg.conv_2d_nchw_fchw"]
+///       : !transform.any_op
+///     %0 = transform.match.structured failures(propagate) %arg0
+///       : (!transform.any_op) -> !transform.any_op {
+///     ^bb1(%arg1: !transform.any_op):
+///       %c7 = transform.param.constant 7 : i64 -> !transform.param<i64>
+///       %cN = transform.param.constant 2 : i64 -> !transform.param<i64>
+///       %cF = transform.param.constant 320 : i64 -> !transform.param<i64>
+///       %cC = transform.param.constant 640 : i64 -> !transform.param<i64>
+///       %cH = transform.param.constant 128 : i64 -> !transform.param<i64>
+///       %cW = transform.param.constant 128 : i64 -> !transform.param<i64>
+///       %cP = transform.param.constant 3 : i64 -> !transform.param<i64>
+///       %cQ = transform.param.constant 3 : i64 -> !transform.param<i64>
+///       %rank = transform.match.structured.rank %arg1
+///         : (!transform.any_op) -> !transform.param<i64>
+///       transform.match.param.cmpi eq %rank, %c7
+///         : !transform.param<i64>
+///
+///       %target_sizes = transform.merge_handles
+///          %cN, %cF, %cH, %cW, %cC, %cP, %cQ : !transform.param<i64>
+///       %dims = transform.match.structured.dim %arg1[all]
+///         : (!transform.any_op) -> !transform.param<i64>
+///       transform.match.param.cmpi eq %target_sizes, %dims
+///         : !transform.param<i64>
+///
+///       transform.match.structured.dim %arg1[0, 1, 2, 3] { parallel }
+///         : !transform.any_op
+///       transform.match.structured.dim %arg1[-3, -2, -1] { reduction }
+///         : !transform.any_op
+///       transform.match.structured.yield %arg1 : !transform.any_op
+///     }
+///
+///     transform.yield %arg0 : !transform.any_op
+///   }
+///
+///   transform.named_sequence @annotate_op(
+///       %target: !transform.any_op {transform.readonly}) {
+///     transform.annotate %target "__winograd_conv" : !transform.any_op
+///     transform.yield
+///   }
+///
+///   transform.named_sequence @__transform_main(
+///       %func: !transform.any_op {transform.consumed}) {
+///     transform.foreach_match in %func
+///         @match_conv2x640x128x128x3x3x320 -> @annotate_op,
+///       : (!transform.any_op) -> (!transform.any_op)
+///     transform.yield
+///   }
+/// }
+/// ```
 struct ConvertConv2DToWinogradPass
     : ConvertConv2DToWinogradBase<ConvertConv2DToWinogradPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
@@ -346,7 +413,8 @@ struct ConvertConv2DToWinogradPass
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(&getContext());
     patterns.insert<ConvertConvToWinograd<linalg::Conv2DNhwcHwcfOp>,
-                    ConvertConvToWinograd<linalg::Conv2DNchwFchwOp>>(context);
+                    ConvertConvToWinograd<linalg::Conv2DNchwFchwOp>>(
+        context, /*ignoreAnnotations=*/ignoreAnnotations);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
       return signalPassFailure();
@@ -356,7 +424,8 @@ struct ConvertConv2DToWinogradPass
 
 } // namespace
 
-std::unique_ptr<Pass> createConvertConv2DToWinogradPass() {
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createConvertConv2DToWinogradPass() {
   return std::make_unique<ConvertConv2DToWinogradPass>();
 }
 
