@@ -67,6 +67,14 @@ void buildPreprocessingPassPipeline(
     OpPassManager &passManager,
     const PreprocessingOptions &preprocessingOptions,
     PipelineExtensions *pipelineExtensions) {
+  if (!preprocessingOptions.preprocessingTransformSpecFilename.empty()) {
+    Preprocessing::InterpreterPassOptions interpreterOptions;
+    interpreterOptions.transformSpecPath =
+        preprocessingOptions.preprocessingTransformSpecFilename;
+    passManager.addPass(
+        Preprocessing::createInterpreterPass(interpreterOptions));
+  }
+
   auto pipelineStr = preprocessingOptions.preprocessingPassPipeline;
   if (!pipelineStr.empty()) {
     extendWithTextPipeline(passManager, pipelineStr);
@@ -74,14 +82,6 @@ void buildPreprocessingPassPipeline(
 
   if (pipelineExtensions) {
     pipelineExtensions->extendPreprocessingPassPipeline(passManager);
-  }
-
-  if (!preprocessingOptions.preprocessingTransformSpecFilename.empty()) {
-    Preprocessing::InterpreterPassOptions interpreterOptions;
-    interpreterOptions.transformSpecPath =
-        preprocessingOptions.preprocessingTransformSpecFilename;
-    passManager.addPass(
-        Preprocessing::createInterpreterPass(interpreterOptions));
   }
 
   if (!preprocessingOptions.preprocessingPDLSpecFilename.empty()) {
