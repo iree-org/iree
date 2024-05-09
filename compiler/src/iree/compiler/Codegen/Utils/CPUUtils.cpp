@@ -73,11 +73,7 @@ StringAttr getEnableLoopPeelingAttrName(MLIRContext *ctx) {
 bool isLoopPeelingEnabled(FunctionOpInterface funcOp) {
   DictionaryAttr config = getTranslationInfo(funcOp).getConfiguration();
 
-  if (!config) {
-    return false;
-  }
-
-  return config.contains(kLoopPeelingAttrName);
+  return config && config.contains(kLoopPeelingAttrName);
 }
 
 } // namespace mlir::iree_compiler
