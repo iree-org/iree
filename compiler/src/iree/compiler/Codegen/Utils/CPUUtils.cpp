@@ -71,17 +71,13 @@ StringAttr getEnableLoopPeelingAttrName(MLIRContext *ctx) {
 }
 
 bool isLoopPeelingEnabled(FunctionOpInterface funcOp) {
-  auto context = funcOp->getContext();
-
   DictionaryAttr config = getTranslationInfo(funcOp).getConfiguration();
 
   if (!config) {
     return false;
   }
 
-  auto enableLoopPeelingAttrName = getEnableLoopPeelingAttrName(context);
-  auto enableLoopPeelingAttr = config.getNamed(enableLoopPeelingAttrName);
-  return enableLoopPeelingAttr.has_value() ? true : false;
+  return config.contains(kLoopPeelingAttrName);
 }
 
 } // namespace mlir::iree_compiler
