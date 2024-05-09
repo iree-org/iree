@@ -99,6 +99,7 @@ module attributes {transform.with_named_sequence} {
     // Cleanup leftover dead code; cast_and_call does not do replacement, only
     // rewires uses.
     transform.apply_dce to %module : !transform.any_op
+    // Custom dispatch formation creates util.func ops that need to be inline
     transform.apply_registered_pass "inline" to %module : (!transform.any_op) -> !transform.any_op
     transform.yield
   }
