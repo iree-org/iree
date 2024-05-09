@@ -128,13 +128,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   }
   case IREE::Codegen::DispatchLoweringPassPipeline::CPUDoubleTilingExpert: {
     TilingConfig tilingConfig = getTilingConfigForPipeline(funcOp);
-    addMultiTilingExpertPassPipeline(pipeline, tilingConfig, pipelineOpts);
-    break;
-  }
-  case IREE::Codegen::DispatchLoweringPassPipeline::
-      CPUDoubleTilingPeelingExpert: {
-    TilingConfig tilingConfig = getTilingConfigForPipeline(funcOp);
-    pipelineOpts.enablePeeling = true;
+    pipelineOpts.enablePeeling = isLoopPeelingEnabled(funcOp);
     addMultiTilingExpertPassPipeline(pipeline, tilingConfig, pipelineOpts);
     break;
   }
