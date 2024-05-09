@@ -131,7 +131,7 @@ DEFAULT_POSTSUBMIT_ONLY_JOBS = frozenset(
         # Due to the outstock of A100, only run this test in postsubmit.
         "test_nvidia_a100",
         # Due to the instability issues at the current runner,
-        # only run this test in postsubmit
+        # only run this test in postsubmit.
         "test_amd_w7900",
     ]
 )
