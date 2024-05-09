@@ -32,7 +32,7 @@ namespace mlir::iree_compiler::Preprocessing {
 namespace {
 
 // Threshold used to determine whether a matmul dimension is 'very skinny'.
-// Linked to LLVMGPU/KernelConfig.cpp
+// Based on the same variable in LLVMGPU/KernelConfig.cpp.
 constexpr int64_t kVerySkinnyDimThreshold = 4;
 
 static Value getPaddedValue(RewriterBase &rewriter, Location loc,
