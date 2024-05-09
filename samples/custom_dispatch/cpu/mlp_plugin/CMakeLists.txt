@@ -103,6 +103,7 @@ iree_lit_test_suite(
     iree_samples_custom_dispatch_cpu_mlp_plugin
   DATA
     "mlp_linalg_spec.pdl.mlir"
+    "mlp_spec_matmul.mlir"
   LABELS
     "driver=local-sync"
     "hostonly"
