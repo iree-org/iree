@@ -159,6 +159,10 @@ def IREEGPU_MultiMmaOp : Op<IREEGPU_Dialect, "multi_mma", [
       return ::llvm::cast<::mlir::ShapedType>(getResult().getType());
     }
 
+    bool hasTensorSemantics() {
+      return isa<RankedTensorType>(getResultType());
+    }
+
     llvm::SmallVector<::mlir::AffineMap, 4> getIndexingMapsArray() {
       return llvm::to_vector<4>(getIndexingMaps().getAsValueRange<::mlir::AffineMapAttr>());
     }
