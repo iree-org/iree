@@ -18,6 +18,19 @@
 namespace mlir::iree_compiler {
 
 //===----------------------------------------------------------------------===//
+// Constants
+//===----------------------------------------------------------------------===//
+
+/// Named attributes used in the `translation_info`'s config dictionary
+/// attribute. These are used to override default pass heuristics at the
+/// function granularity.
+namespace LLVMGPUAttrNames {
+inline constexpr StringLiteral kNoReorderWorkgroups = "no_reorder_workgroups";
+inline constexpr StringLiteral kNoReduceSharedMemoryBankConflicts =
+    "no_reduce_shared_memory_bank_conflicts";
+} //  namespace LLVMGPUAttrNames
+
+//===----------------------------------------------------------------------===//
 // Passes
 //===----------------------------------------------------------------------===//
 

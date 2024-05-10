@@ -145,9 +145,19 @@ static LogicalResult gpuCopyFn(OpBuilder &builder, Location loc, Value from,
   return success();
 }
 
-// Returns success when workgroup reordering is supported for `funcOp`.
-// On ROCm, we require workgroup counts to be static.
+// Returns success when workgroup reordering is supported / enabled for
+// `funcOp`. On ROCm, we require workgroup counts to be static.
 static LogicalResult canReorderWorkgroups(FunctionOpInterface funcOp) {
+  if (IREE::Codegen::TranslationInfoAttr translationInfo =
+          getTranslationInfo(funcOp)) {
+    if (DictionaryAttr config = translationInfo.getConfiguration()) {
+      // Escape hatch to disable workgroup reordering.
+      if (config.contains(LLVMGPUAttrNames::kNoReorderWorkgroups)) {
+        return failure();
+      }
+    }
+  }
+
   auto target = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
   if (!target) {
     return failure();
@@ -164,6 +174,24 @@ static LogicalResult canReorderWorkgroups(FunctionOpInterface funcOp) {
   // This is further restricted to 2D+ grids as we reorder along the X and Y
   // workgroup IDs.
   return success(workgroupCounts.size() >= 2);
+}
+
+// Returns success when shared memory bank conflict reduction is supported /
+// enabled for `funcOp`.
+static LogicalResult
+canReduceSharedMemoryBankConflicts(FunctionOpInterface funcOp) {
+  if (IREE::Codegen::TranslationInfoAttr translationInfo =
+          getTranslationInfo(funcOp)) {
+    if (DictionaryAttr config = translationInfo.getConfiguration()) {
+      // Escape hatch to disable shared memory padding.
+      if (config.contains(
+              LLVMGPUAttrNames::kNoReduceSharedMemoryBankConflicts)) {
+        return failure();
+      }
+    }
+  }
+
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
