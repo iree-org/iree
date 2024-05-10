@@ -26,12 +26,13 @@ X86_64_BENCHMARK_CONFIG = [
     common_definitions.CpuBenchmarkConfig(
         model=matmul.MATMUL_256x256x2048_I8xI4_MLIR, threads=[0]
     ),
-    common_definitions.CpuBenchmarkConfig(
-        model=matmul.MATMUL_1x256x2048_I8xI8_MLIR, threads=[0]
-    ),
-    common_definitions.CpuBenchmarkConfig(
-        model=matmul.MATMUL_256x256x2048_I8xI8_MLIR, threads=[0]
-    ),
+    # TODO(#17330): regenerate .mlirbc files
+    # common_definitions.CpuBenchmarkConfig(
+    #     model=matmul.MATMUL_1x256x2048_I8xI8_MLIR, threads=[0]
+    # ),
+    # common_definitions.CpuBenchmarkConfig(
+    #     model=matmul.MATMUL_256x256x2048_I8xI8_MLIR, threads=[0]
+    # ),
     # Tiny models.
     common_definitions.CpuBenchmarkConfig(
         model=tflite_models.PERSON_DETECT_INT8, threads=[0, 1]
@@ -90,15 +91,16 @@ X86_64_BENCHMARK_CONFIG = [
     common_definitions.CpuBenchmarkConfig(
         model=tf_models.BERT_LARGE_TF_FP32_SEQLEN384, threads=[30]
     ),
-    common_definitions.CpuBenchmarkConfig(
-        model=torch_models.BERT_LARGE_384_FP32_TORCH_BATCHES[1], threads=[30]
-    ),
-    common_definitions.CpuBenchmarkConfig(
-        model=torch_models.FALCON7B_1X100XI64_GPTQ_TORCH, threads=[30]
-    ),
-    common_definitions.CpuBenchmarkConfig(
-        model=torch_models.FALCON7B_INT4_1X100XI64_GPTQ_TORCH, threads=[30]
-    ),
+    # TODO(#17330): regenerate .mlirbc files
+    # common_definitions.CpuBenchmarkConfig(
+    #     model=torch_models.BERT_LARGE_384_FP32_TORCH_BATCHES[1], threads=[30]
+    # ),
+    # common_definitions.CpuBenchmarkConfig(
+    #     model=torch_models.FALCON7B_1X100XI64_GPTQ_TORCH, threads=[30]
+    # ),
+    # common_definitions.CpuBenchmarkConfig(
+    #     model=torch_models.FALCON7B_INT4_1X100XI64_GPTQ_TORCH, threads=[30]
+    # ),
 ]
 
 X86_64_BENCHMARK_CONFIG_LARGE = [
@@ -111,12 +113,13 @@ X86_64_BENCHMARK_CONFIG_LARGE = [
     common_definitions.CpuBenchmarkConfig(
         model=jax_models.BERT_LARGE_FP32_JAX_384XI32_BATCHES[64], threads=[30]
     ),
-    common_definitions.CpuBenchmarkConfig(
-        model=torch_models.BERT_LARGE_384_FP32_TORCH_BATCHES[24], threads=[30]
-    ),
-    common_definitions.CpuBenchmarkConfig(
-        model=torch_models.BERT_LARGE_384_FP32_TORCH_BATCHES[48], threads=[30]
-    ),
+    # TODO(#17330): regenerate .mlirbc files
+    # common_definitions.CpuBenchmarkConfig(
+    #     model=torch_models.BERT_LARGE_384_FP32_TORCH_BATCHES[24], threads=[30]
+    # ),
+    # common_definitions.CpuBenchmarkConfig(
+    #     model=torch_models.BERT_LARGE_384_FP32_TORCH_BATCHES[48], threads=[30]
+    # ),
     common_definitions.CpuBenchmarkConfig(
         model=jax_models.RESNET50_FP32_JAX_3X224X224XF32_BATCHES[1], threads=[30]
     ),
