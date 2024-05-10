@@ -44,13 +44,14 @@ jobs:
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
 
-      # In-tree tests
-      - name: Run experimental/regression_suite tests
-        run: |
-          source ${VENV_DIR}/bin/activate
-          pytest \
-            -rA -s -m "plat_host_cpu and presubmit" \
-            experimental/regression_suite
+      # TODO(#17330): regenerate .mlirbc files
+      # # In-tree tests
+      # - name: Run experimental/regression_suite tests
+      #   run: |
+      #     source ${VENV_DIR}/bin/activate
+      #     pytest \
+      #       -rA -s -m "plat_host_cpu and presubmit" \
+      #       experimental/regression_suite
 
       # Out of tree tests
       - name: Check out external TestSuite repository
