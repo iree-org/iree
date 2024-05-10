@@ -68,7 +68,7 @@ jobs:
         run: |
           source ${VENV_DIR}/bin/activate
           pytest SHARK-TestSuite/iree_tests/onnx/ \
-              -rpfE --timeout=30 --retries=2 --durations=20 \
+              -n 4 -rpfE --timeout=30 --retries=2 --durations=20 \
               --config-files=build_tools/pkgci/external_test_suite/onnx_gpu_cuda.json \
               --no-skip-tests-missing-files \
               --report-log=/tmp/iree_tests_onnx_gpu_cuda_logs.json
