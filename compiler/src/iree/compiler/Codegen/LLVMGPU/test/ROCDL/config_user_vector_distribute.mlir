@@ -29,6 +29,11 @@ hal.executable public @main_0_dispatch_0 {
       // CHECK-LABEL: func.func @main_0_dispatch_0_matmul_transpose_b
       // CHECK:         memref.alloc() : memref<128x32xf16, #gpu.address_space<workgroup>>
       // CHECK:         memref.alloc() : memref<128x32xf16, #gpu.address_space<workgroup>>
+      // CHECK-DAG:     %[[WG_Y:.+]] = hal.interface.workgroup.id[1] : index
+      // CHECK-DAG:     %[[WG_X:.+]] = hal.interface.workgroup.id[0] : index
+      // CHECK-DAG:     arith.muli %[[WG_Y]], %{{.+}} : index
+      // CHECK-DAG:     arith.addi %{{.+}}, %[[WG_X]] : index
+      // CHECK:         scf.for
 
       func.func @main_0_dispatch_0_matmul_transpose_b_2048x10240x1280_f16xf16xf32()
         attributes {translation_info = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [128, 2, 1] subgroup_size = 64, {
@@ -91,6 +96,8 @@ hal.executable public @main_0_dispatch_0 {
     }
     builtin.module {
       // CHECK-LABEL: func.func @main_0_dispatch_0_matmul_transpose_b
+      // CHECK:         memref.alloc() : memref<128x36xf16, #gpu.address_space<workgroup>>
+      // CHECK:         memref.alloc() : memref<128x36xf16, #gpu.address_space<workgroup>>
       // CHECK-DAG:     hal.interface.workgroup.id[1] : index
       // CHECK-DAG:     hal.interface.workgroup.id[0] : index
       // CHECK-NEXT:    scf.for
