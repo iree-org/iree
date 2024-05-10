@@ -56,3 +56,4 @@ iree_benchmark_suite_module_test(
     "--device_allocator=caching"
     "--input=1x96x96x1xi8=0"
 )
+
