@@ -478,7 +478,7 @@ FailureOr<MaterializeEncodingInfo>
 materializeEncodingForTarget(RankedTensorType tensorType,
                              ExecutableTargetAttr targetAttr) {
   IREE::Encoding::EncodingAttr encoding =
-      tensorType.getEncoding().dyn_cast_or_null<IREE::Encoding::EncodingAttr>();
+      dyn_cast_or_null<IREE::Encoding::EncodingAttr>(tensorType.getEncoding());
   if (!encoding) {
     return failure();
   }

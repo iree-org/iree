@@ -869,7 +869,7 @@ func.func @reshape_0D_1D(%arg0: tensor<i32>) -> tensor<1xi32> {
   %0 = "stablehlo.reshape"(%arg0) : (tensor<i32>) -> tensor<1xi32>
   func.return %0 : tensor<1xi32>
 }
-// CHECK: tensor.expand_shape %{{.*}} [] : tensor<i32> into tensor<1xi32>
+// CHECK: tensor.expand_shape %{{.*}} [] output_shape [1] : tensor<i32> into tensor<1xi32>
 
 // -----
 
@@ -880,7 +880,7 @@ func.func @reshape_0D_1D_unsigned(%arg0: tensor<ui32>) -> tensor<1xui32> {
   func.return %0 : tensor<1xui32>
 }
 // CHECK:         %[[ARG_SIGNLESS:.*]] = builtin.unrealized_conversion_cast %[[ARG_UNSIGNED]] : tensor<ui32> to tensor<i32>
-// CHECK:         %[[RET_SIGNLESS:.*]] = tensor.expand_shape %[[ARG_SIGNLESS]] [] : tensor<i32> into tensor<1xi32>
+// CHECK:         %[[RET_SIGNLESS:.*]] = tensor.expand_shape %[[ARG_SIGNLESS]] [] output_shape [1] : tensor<i32> into tensor<1xi32>
 // CHECK:         %[[RET_UNSIGNED:.*]] = builtin.unrealized_conversion_cast %[[RET_SIGNLESS]] : tensor<1xi32> to tensor<1xui32>
 // CHECK:         return %[[RET_UNSIGNED]] : tensor<1xui32>
 
@@ -982,7 +982,7 @@ func.func @reshape_dynamic_in(%arg0: tensor<?x?xf32>) -> tensor<2x4x5xf32> {
 }
 // CHECK: %[[FLATTEN:.*]] = tensor.collapse_shape %{{.*}} {{\[}}[0, 1]] : tensor<?x?xf32> into tensor<?xf32>
 // CHECK: %[[CAST:.*]] = tensor.cast %[[FLATTEN]] : tensor<?xf32> to tensor<40xf32>
-// CHECK: tensor.expand_shape %[[CAST]] {{\[}}[0, 1, 2]] : tensor<40xf32> into tensor<2x4x5xf32>
+// CHECK: tensor.expand_shape %[[CAST]] {{\[}}[0, 1, 2]] output_shape [2, 4, 5] : tensor<40xf32> into tensor<2x4x5xf32>
 
 // -----
 
@@ -992,7 +992,7 @@ func.func @reshape_1D_2D_dynamic(%arg0: tensor<?xi32>) -> tensor<1x3xi32> {
   func.return %0 : tensor<1x3xi32>
 }
 // CHECK: %[[CAST:.*]] = tensor.cast %{{.*}} : tensor<?xi32> to tensor<3xi32>
-// CHECK: tensor.expand_shape %[[CAST]] {{\[}}[0, 1]] : tensor<3xi32> into tensor<1x3xi32>
+// CHECK: tensor.expand_shape %[[CAST]] {{\[}}[0, 1]] output_shape [1, 3] : tensor<3xi32> into tensor<1x3xi32>
 
 // -----
 

@@ -61,9 +61,9 @@ util.func public @test_horizontal_fuse(%arg0 : tensor<2x4096x640xf16>, %arg1: te
 // CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<10x64x640xf16>
 // CHECK-SAME:     %[[ARG3:[a-zA-Z0-9]+]]: tensor<10x64x640xf16>
 //  CHECK-DAG:    %[[CST:.+]] = arith.constant 0.0
-//  CHECK-DAG:    %[[EXP:.+]] = tensor.expand_shape %[[ARG1]] {{\[}}[0, 1], [2], [3]] : tensor<10x64x640xf16> into tensor<1x10x64x640xf16>
-//  CHECK-DAG:    %[[EXP1:.+]] = tensor.expand_shape %[[ARG2]] {{\[}}[0, 1], [2], [3]] : tensor<10x64x640xf16> into tensor<1x10x64x640xf16>
-//  CHECK-DAG:    %[[EXP2:.+]] = tensor.expand_shape %[[ARG3]] {{\[}}[0, 1], [2], [3]] : tensor<10x64x640xf16> into tensor<1x10x64x640xf16>
+//  CHECK-DAG:    %[[EXP:.+]] = tensor.expand_shape %[[ARG1]] {{\[}}[0, 1], [2], [3]] output_shape {{.*}} : tensor<10x64x640xf16> into tensor<1x10x64x640xf16>
+//  CHECK-DAG:    %[[EXP1:.+]] = tensor.expand_shape %[[ARG2]] {{\[}}[0, 1], [2], [3]] output_shape {{.*}} : tensor<10x64x640xf16> into tensor<1x10x64x640xf16>
+//  CHECK-DAG:    %[[EXP2:.+]] = tensor.expand_shape %[[ARG3]] {{\[}}[0, 1], [2], [3]] output_shape {{.*}} : tensor<10x64x640xf16> into tensor<1x10x64x640xf16>
 //      CHECK:    %[[INP:.+]] = tensor.empty() : tensor<3x10x64x640xf16>
 //      CHECK:    %[[SLC:.+]] = tensor.insert_slice %[[EXP]] into %[[INP]][0, 0, 0, 0] [1, 10, 64, 640] [1, 1, 1, 1] : tensor<1x10x64x640xf16> into tensor<3x10x64x640xf16>
 //      CHECK:    %[[SLC1:.+]] = tensor.insert_slice %[[EXP1]] into %[[SLC]][1, 0, 0, 0] [1, 10, 64, 640] [1, 1, 1, 1] : tensor<1x10x64x640xf16> into tensor<3x10x64x640xf16>
@@ -101,9 +101,9 @@ util.func public @test_horizontal_fuse(%arg0 : tensor<4096x640xf32>, %arg1: tens
 // CHECK-SAME:     %[[ARG2:[a-zA-Z0-9]+]]: tensor<640x640xf32>
 // CHECK-SAME:     %[[ARG3:[a-zA-Z0-9]+]]: tensor<640x640xf32>
 // CHECK-DAG:    %[[CST:.+]] = arith.constant 0.0
-// CHECK-DAG:    %[[EXP:.+]] = tensor.expand_shape %[[ARG1]] {{\[}}[0, 1], [2]] : tensor<640x640xf32> into tensor<1x640x640xf32>
-// CHECK-DAG:    %[[EXP1:.+]] = tensor.expand_shape %[[ARG2]] {{\[}}[0, 1], [2]] : tensor<640x640xf32> into tensor<1x640x640xf32>
-// CHECK-DAG:    %[[EXP2:.+]] = tensor.expand_shape %[[ARG3]] {{\[}}[0, 1], [2]] : tensor<640x640xf32> into tensor<1x640x640xf32>
+// CHECK-DAG:    %[[EXP:.+]] = tensor.expand_shape %[[ARG1]] {{\[}}[0, 1], [2]] output_shape {{.*}} : tensor<640x640xf32> into tensor<1x640x640xf32>
+// CHECK-DAG:    %[[EXP1:.+]] = tensor.expand_shape %[[ARG2]] {{\[}}[0, 1], [2]] output_shape {{.*}} : tensor<640x640xf32> into tensor<1x640x640xf32>
+// CHECK-DAG:    %[[EXP2:.+]] = tensor.expand_shape %[[ARG3]] {{\[}}[0, 1], [2]] output_shape {{.*}} : tensor<640x640xf32> into tensor<1x640x640xf32>
 //     CHECK:    %[[INP:.+]] = tensor.empty() : tensor<3x640x640xf32>
 //     CHECK:    %[[SLC:.+]] = tensor.insert_slice %[[EXP]] into %[[INP]][0, 0, 0] [1, 640, 640] [1, 1, 1] : tensor<1x640x640xf32> into tensor<3x640x640xf32>
 //     CHECK:    %[[SLC1:.+]] = tensor.insert_slice %[[EXP1]] into %[[SLC]][1, 0, 0] [1, 640, 640] [1, 1, 1] : tensor<1x640x640xf32> into tensor<3x640x640xf32>

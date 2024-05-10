@@ -869,7 +869,7 @@ struct TransposeOpToTransposeConverter final
         getEmptyTensorFor(rewriter, loc, resultTy, op, adaptor.getOperands());
 
     auto permutation =
-        op.getPermutationAttr().dyn_cast_or_null<DenseI64ArrayAttr>();
+        dyn_cast_or_null<DenseI64ArrayAttr>(op.getPermutationAttr());
 
     rewriter.replaceOpWithNewOp<linalg::TransposeOp>(
         op, adaptor.getOperand(), emptyTensor, permutation,

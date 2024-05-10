@@ -99,40 +99,43 @@ BERT_LARGE_FP16_URL = string.Template(
 )
 
 # Converted from https://huggingface.co/docs/transformers/v4.27.2/en/model_doc/bert#transformers.BertModel
-BERT_LARGE_384_FP32_TORCH_BATCHES = model_utils.generate_batch_models(
-    id_template=model_utils.partial_template_substitute(
-        ID_FORMAT, model_id=unique_ids.MODEL_BERT_LARGE_384_FP32_TORCH
-    ),
-    name_template=model_utils.partial_template_substitute(
-        NAME_FORMAT, name="BertLargePT"
-    ),
-    tags=["fp32", "transformer", "seqlen384"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
-    source_url_template=BERT_LARGE_FP32_URL,
-    entry_function="forward",
-    input_type_templates=[
-        string.Template("${batch_size}x384xi64"),
-        string.Template("${batch_size}x384xi64"),
-    ],
-    batch_sizes=[1, 16, 24, 32, 48, 64, 512, 1024, 1280],
-)
+# TODO(#17344): regenerate .mlirbc files
+# BERT_LARGE_384_FP32_TORCH_BATCHES = model_utils.generate_batch_models(
+#     id_template=model_utils.partial_template_substitute(
+#         ID_FORMAT, model_id=unique_ids.MODEL_BERT_LARGE_384_FP32_TORCH
+#     ),
+#     name_template=model_utils.partial_template_substitute(
+#         NAME_FORMAT, name="BertLargePT"
+#     ),
+#     tags=["fp32", "transformer", "seqlen384"],
+#     source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
+#     source_url_template=BERT_LARGE_FP32_URL,
+#     entry_function="forward",
+#     input_type_templates=[
+#         string.Template("${batch_size}x384xi64"),
+#         string.Template("${batch_size}x384xi64"),
+#     ],
+#     batch_sizes=[1, 16, 24, 32, 48, 64, 512, 1024, 1280],
+# )
 
-FALCON7B_1X100XI64_GPTQ_TORCH = common_definitions.Model(
-    id=unique_ids.MODEL_FALCON7B_1X100XI64_GPTQ_TORCH,
-    name="Falcon7bGptqPT",
-    tags=["gptq", "transformer"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
-    source_url="https://storage.googleapis.com/iree-model-artifacts/pytorch/manual/falcon_7b_gptq_linalg_1702432230.mlirbc",
-    entry_function="forward",
-    input_types=["1x100xi64"],
-)
+# TODO(#17344): regenerate .mlirbc files
+# FALCON7B_1X100XI64_GPTQ_TORCH = common_definitions.Model(
+#     id=unique_ids.MODEL_FALCON7B_1X100XI64_GPTQ_TORCH,
+#     name="Falcon7bGptqPT",
+#     tags=["gptq", "transformer"],
+#     source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
+#     source_url="https://storage.googleapis.com/iree-model-artifacts/pytorch/manual/falcon_7b_gptq_linalg_1702432230.mlirbc",
+#     entry_function="forward",
+#     input_types=["1x100xi64"],
+# )
 
-FALCON7B_INT4_1X100XI64_GPTQ_TORCH = common_definitions.Model(
-    id=unique_ids.MODEL_FALCON7B_INT4_1X100XI64_GPTQ_TORCH,
-    name="Falcon7bInt4GptqPT",
-    tags=["gptq", "transformer", "int4"],
-    source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
-    source_url="https://storage.googleapis.com/iree-model-artifacts/pytorch/manual/falcon_7b_gptq_linalg_int4_1702863828.mlirbc",
-    entry_function="forward",
-    input_types=["1x100xi64"],
-)
+# TODO(#17344): regenerate .mlirbc files
+# FALCON7B_INT4_1X100XI64_GPTQ_TORCH = common_definitions.Model(
+#     id=unique_ids.MODEL_FALCON7B_INT4_1X100XI64_GPTQ_TORCH,
+#     name="Falcon7bInt4GptqPT",
+#     tags=["gptq", "transformer", "int4"],
+#     source_type=common_definitions.ModelSourceType.EXPORTED_LINALG_MLIR,
+#     source_url="https://storage.googleapis.com/iree-model-artifacts/pytorch/manual/falcon_7b_gptq_linalg_int4_1702863828.mlirbc",
+#     entry_function="forward",
+#     input_types=["1x100xi64"],
+# )

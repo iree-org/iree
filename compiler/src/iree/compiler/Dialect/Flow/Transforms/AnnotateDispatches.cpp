@@ -368,9 +368,8 @@ static std::string summarizeDispatchRegion(Region &region) {
       })
       .Case<IREE::Encoding::SetEncodingOp>([&](auto op) {
         auto opName = getOpNameWithoutDialectName(op);
-        auto encoding = op.getResultType()
-                            .getEncoding()
-                            .template cast<IREE::Encoding::EncodingAttr>();
+        auto encoding = cast<IREE::Encoding::EncodingAttr>(
+            op.getResultType().getEncoding());
         auto role = stringifyEnum(encoding.getRole().getValue());
         ArrayRef<int64_t> shape = op.getSourceType().getShape();
         bestSummary =
@@ -379,9 +378,8 @@ static std::string summarizeDispatchRegion(Region &region) {
       })
       .Case<IREE::Encoding::UnsetEncodingOp>([&](auto op) {
         auto opName = getOpNameWithoutDialectName(op);
-        auto encoding = op.getSourceType()
-                            .getEncoding()
-                            .template cast<IREE::Encoding::EncodingAttr>();
+        auto encoding = cast<IREE::Encoding::EncodingAttr>(
+            op.getSourceType().getEncoding());
         auto role = stringifyEnum(encoding.getRole().getValue());
         ArrayRef<int64_t> shape = op.getResultType().getShape();
         bestSummary =

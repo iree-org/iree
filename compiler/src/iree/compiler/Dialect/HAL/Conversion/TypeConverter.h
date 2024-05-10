@@ -25,7 +25,7 @@ public:
   // Returns true if the given |type| maps to !hal.buffer_view by default.
   // hal.tensor.import/export can be used by frontends to map to other types.
   static bool shouldConvertToBufferView(Type type) {
-    if (auto tensorType = type.template dyn_cast<TensorType>()) {
+    if (auto tensorType = dyn_cast<TensorType>(type)) {
       return tensorType.getElementType().isIntOrFloat();
     }
     return false;

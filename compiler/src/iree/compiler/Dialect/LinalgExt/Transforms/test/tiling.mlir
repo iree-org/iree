@@ -17,7 +17,7 @@ func.func @scatter_tiling(
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["iree_linalg_ext.scatter"]} in %module_op : (!transform.any_op) -> !transform.any_op
-    %1, %loops:2 = transform.structured.tile_using_for %0 [10, 20] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+    %1, %loops:2 = transform.structured.tile_using_for %0 tile_sizes [10, 20] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
     transform.yield
   }
 }
@@ -76,7 +76,7 @@ func.func @scatter_tiling_memref(
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["iree_linalg_ext.scatter"]} in %module_op : (!transform.any_op) -> !transform.any_op
-    %1, %loops:2 = transform.structured.tile_using_for %0 [10, 20] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+    %1, %loops:2 = transform.structured.tile_using_for %0 tile_sizes [10, 20] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
     transform.yield
   }
 }
@@ -127,7 +127,7 @@ func.func @scatter_no_tiling(
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["iree_linalg_ext.scatter"]} in %module_op : (!transform.any_op) -> !transform.any_op
-    %1 = transform.structured.tile_using_for %0 [0] : (!transform.any_op) -> (!transform.any_op)
+    %1 = transform.structured.tile_using_for %0 tile_sizes [0] : (!transform.any_op) -> (!transform.any_op)
     transform.yield
   }
 }
@@ -160,7 +160,7 @@ func.func @scatter_repeated_indices_tiling(
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["iree_linalg_ext.scatter"]} in %module_op : (!transform.any_op) -> !transform.any_op
-    %1, %loops = transform.structured.tile_using_for %0 [0, 20] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    %1, %loops = transform.structured.tile_using_for %0 tile_sizes [0, 20] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
     transform.yield
   }
 }
@@ -209,7 +209,7 @@ func.func @sort_1d(%arg0: tensor<?xi32>) -> tensor<?xi32> {
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["iree_linalg_ext.sort"]} in %module_op : (!transform.any_op) -> !transform.any_op
-    %1 = transform.structured.tile_using_for %0 [0] : (!transform.any_op) -> (!transform.any_op)
+    %1 = transform.structured.tile_using_for %0 tile_sizes [0] : (!transform.any_op) -> (!transform.any_op)
     transform.yield
   }
 }
@@ -234,7 +234,7 @@ func.func @sort_2d(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["iree_linalg_ext.sort"]} in %module_op : (!transform.any_op) -> !transform.any_op
-    %1, %loops = transform.structured.tile_using_for %0 [10, 0] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    %1, %loops = transform.structured.tile_using_for %0 tile_sizes [10, 0] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
     transform.yield
   }
 }
@@ -273,7 +273,7 @@ func.func @sort_2d_inner_parallel(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["iree_linalg_ext.sort"]} in %module_op : (!transform.any_op) -> !transform.any_op
-    %1, %loops = transform.structured.tile_using_for %0 [0, 20] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    %1, %loops = transform.structured.tile_using_for %0 tile_sizes [0, 20] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
     transform.yield
   }
 }
@@ -314,7 +314,7 @@ func.func @sort_2d_multi_result(
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["iree_linalg_ext.sort"]} in %module_op : (!transform.any_op) -> !transform.any_op
-    %1, %loops = transform.structured.tile_using_for %0 [10, 0] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    %1, %loops = transform.structured.tile_using_for %0 tile_sizes [10, 0] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
     transform.yield
   }
 }
@@ -359,7 +359,7 @@ func.func @sort_2d_multi_result_memref(
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
   %0 = transform.structured.match ops{["iree_linalg_ext.sort"]} in %module_op : (!transform.any_op) -> !transform.any_op
-  %1, %loops = transform.structured.tile_using_for %0 [0, 20] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+  %1, %loops = transform.structured.tile_using_for %0 tile_sizes [0, 20] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
     transform.yield
   }
 }
@@ -395,7 +395,7 @@ func.func @fft_1d_stage_5(%arg0: tensor<1024xf32>, %arg1: tensor<1024xf32>,
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["iree_linalg_ext.fft"]} in %module_op : (!transform.any_op) -> !transform.any_op
-    %1, %loops = transform.structured.tile_using_for %0 [32] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    %1, %loops = transform.structured.tile_using_for %0 tile_sizes [32] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
     transform.yield
   }
 }
@@ -435,7 +435,7 @@ func.func @fft_2d_stage_5(%arg0: tensor<3x1024xf32>, %arg1: tensor<3x1024xf32>,
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["iree_linalg_ext.fft"]} in %module_op : (!transform.any_op) -> !transform.any_op
-    %1, %loops:2 = transform.structured.tile_using_for %0 [10, 32] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+    %1, %loops:2 = transform.structured.tile_using_for %0 tile_sizes [10, 32] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
     transform.yield
   }
 }
@@ -472,7 +472,7 @@ func.func @fft_1d_stage_5_memref(%arg0: memref<1024xf32>, %arg1: memref<1024xf32
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["iree_linalg_ext.fft"]} in %module_op : (!transform.any_op) -> !transform.any_op
-    %1, %loops = transform.structured.tile_using_for %0 [32] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    %1, %loops = transform.structured.tile_using_for %0 tile_sizes [32] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
     transform.yield
   }
 }
@@ -504,7 +504,7 @@ func.func @reverse_memref(%arg0: memref<?xi32>, %arg1: memref<?xi32>) {
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["iree_linalg_ext.reverse"]} in %module_op : (!transform.any_op) -> !transform.any_op
-    %1, %loops = transform.structured.tile_using_for %0 [10] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    %1, %loops = transform.structured.tile_using_for %0 tile_sizes [10] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
     transform.yield
   }
 }
@@ -543,7 +543,7 @@ func.func @reverse_tensor_multi_dim(%arg0: tensor<?x?xi32>) -> tensor<?x?xi32> {
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["iree_linalg_ext.reverse"]} in %module_op : (!transform.any_op) -> !transform.any_op
-    %1, %loops:2 = transform.structured.tile_using_for %0 [10, 20] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+    %1, %loops:2 = transform.structured.tile_using_for %0 tile_sizes [10, 20] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
     transform.yield
   }
 }
@@ -598,7 +598,7 @@ func.func @scan_1d(%0: tensor<128xi32>) -> tensor<128xi32> {
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["iree_linalg_ext.scan"]} in %module_op : (!transform.any_op) -> !transform.any_op
-    %1 = transform.structured.tile_using_for %0 [0] : (!transform.any_op) -> (!transform.any_op)
+    %1 = transform.structured.tile_using_for %0 tile_sizes [0] : (!transform.any_op) -> (!transform.any_op)
     transform.yield
   }
 }
@@ -628,7 +628,7 @@ func.func @scan_2d(%0: tensor<16x32xi32>) -> tensor<16x32xi32> {
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["iree_linalg_ext.scan"]} in %module_op : (!transform.any_op) -> !transform.any_op
-    %1, %loops = transform.structured.tile_using_for %0 [0, 20] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    %1, %loops = transform.structured.tile_using_for %0 tile_sizes [0, 20] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
     transform.yield
   }
 }
@@ -674,7 +674,7 @@ func.func @scan_2d_memref(%0: memref<16x32xi32>, %1: memref<16x32xi32>) {
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["iree_linalg_ext.scan"]} in %module_op : (!transform.any_op) -> !transform.any_op
-    %1, %loops = transform.structured.tile_using_for %0 [0, 20] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    %1, %loops = transform.structured.tile_using_for %0 tile_sizes [0, 20] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
     transform.yield
   }
 }
@@ -713,7 +713,7 @@ func.func @topk_tile_tensor(%input_values: tensor<?x?xf32>, %input_indices: tens
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["iree_linalg_ext.topk"]} in %module_op : (!transform.any_op) -> !transform.any_op
-    %1, %loops = transform.structured.tile_using_for %0 [10, 0] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    %1, %loops = transform.structured.tile_using_for %0 tile_sizes [10, 0] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
     transform.yield
   }
 }
@@ -760,7 +760,7 @@ func.func @topk_tile_memref(%input_values: memref<?x?xf32>, %input_indices: memr
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["iree_linalg_ext.topk"]} in %module_op : (!transform.any_op) -> !transform.any_op
-    %1, %loops = transform.structured.tile_using_for %0 [10, 0] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    %1, %loops = transform.structured.tile_using_for %0 tile_sizes [10, 0] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
     transform.yield
   }
 }
@@ -804,7 +804,7 @@ func.func @topk_tile_tensor_optional(%input_values: tensor<20x10xf32>, %out_valu
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["iree_linalg_ext.topk"]} in %module_op : (!transform.any_op) -> !transform.any_op
-    %1, %loops = transform.structured.tile_using_for %0 [10, 0] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    %1, %loops = transform.structured.tile_using_for %0 tile_sizes [10, 0] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
     transform.yield
   }
 }
@@ -840,7 +840,7 @@ func.func @winograd_filter_transform(%arg0: tensor<3x3x64x128xf32>) -> tensor<8x
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["iree_linalg_ext.winograd.filter_transform"]} in %module_op : (!transform.any_op) -> !transform.any_op
-    %1, %loops:2 = transform.structured.tile_using_for %0 [1, 1] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+    %1, %loops:2 = transform.structured.tile_using_for %0 tile_sizes [1, 1] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
     transform.yield
   }
 }
@@ -884,7 +884,7 @@ func.func @winograd_filter_transform_memref(%arg0: memref<3x3x64x128xf32>, %arg1
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["iree_linalg_ext.winograd.filter_transform"]} in %module_op : (!transform.any_op) -> !transform.any_op
-    %1, %loops:2 = transform.structured.tile_using_for %0 [1, 1] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+    %1, %loops:2 = transform.structured.tile_using_for %0 tile_sizes [1, 1] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
     transform.yield
   }
 }
@@ -921,7 +921,7 @@ func.func @winograd_filter_transform_dynamic(%arg0: tensor<3x3x?x?xf32>, %s0: in
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["iree_linalg_ext.winograd.filter_transform"]} in %module_op : (!transform.any_op) -> !transform.any_op
-    %1, %loops:2 = transform.structured.tile_using_for %0 [1, 1] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+    %1, %loops:2 = transform.structured.tile_using_for %0 tile_sizes [1, 1] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
     transform.yield
   }
 }
@@ -965,7 +965,7 @@ func.func @winograd_filter_transform_fchw(%arg0: tensor<128x64x3x3xf32>) -> tens
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["iree_linalg_ext.winograd.filter_transform"]} in %module_op : (!transform.any_op) -> !transform.any_op
-    %1, %loops:2 = transform.structured.tile_using_for %0 [1, 1] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+    %1, %loops:2 = transform.structured.tile_using_for %0 tile_sizes [1, 1] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
     transform.yield
   }
 }
@@ -1010,7 +1010,7 @@ func.func @winograd_input_transform(%arg0: tensor<1x10x10x1280xf32>) -> tensor<8
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["iree_linalg_ext.winograd.input_transform"]} in %module_op : (!transform.any_op) -> !transform.any_op
-    %1, %loops:4 = transform.structured.tile_using_for %0 [1, 1, 1, 1] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
+    %1, %loops:4 = transform.structured.tile_using_for %0 tile_sizes [1, 1, 1, 1] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
     transform.yield
   }
 }
@@ -1064,7 +1064,7 @@ func.func @winograd_input_transform_memref(%arg0: memref<1x10x10x1280xf32>, %arg
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["iree_linalg_ext.winograd.input_transform"]} in %module_op : (!transform.any_op) -> !transform.any_op
-    %1, %loops:4 = transform.structured.tile_using_for %0 [1, 1, 1, 1] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
+    %1, %loops:4 = transform.structured.tile_using_for %0 tile_sizes [1, 1, 1, 1] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
     transform.yield
   }
 }
@@ -1114,7 +1114,7 @@ func.func @winograd_input_transform_dynamic(%arg0: tensor<2x34x34x128xf32>, %i0:
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["iree_linalg_ext.winograd.input_transform"]} in %module_op : (!transform.any_op) -> !transform.any_op
-    %1, %loops:4 = transform.structured.tile_using_for %0 [1, 1, 1, 1] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
+    %1, %loops:4 = transform.structured.tile_using_for %0 tile_sizes [1, 1, 1, 1] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
     transform.yield
   }
 }
@@ -1183,7 +1183,7 @@ func.func @winograd_input_transform_nchw(%arg0: tensor<1x1280x10x10xf32>) -> ten
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["iree_linalg_ext.winograd.input_transform"]} in %module_op : (!transform.any_op) -> !transform.any_op
-    %1, %loops:4 = transform.structured.tile_using_for %0 [1, 1, 1, 1] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
+    %1, %loops:4 = transform.structured.tile_using_for %0 tile_sizes [1, 1, 1, 1] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
     transform.yield
   }
 }
@@ -1238,7 +1238,7 @@ func.func @winograd_output_transform(%arg0: tensor<8x8x1x2x2x32xf32>) -> tensor<
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["iree_linalg_ext.winograd.output_transform"]} in %module_op : (!transform.any_op) -> !transform.any_op
-    %1, %loops:4 = transform.structured.tile_using_for %0 [1, 1, 1, 1] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
+    %1, %loops:4 = transform.structured.tile_using_for %0 tile_sizes [1, 1, 1, 1] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
     transform.yield
   }
 }
@@ -1292,7 +1292,7 @@ func.func @winograd_output_transform_memref(%arg0: memref<8x8x1x2x2x32xf32>, %ar
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["iree_linalg_ext.winograd.output_transform"]} in %module_op : (!transform.any_op) -> !transform.any_op
-    %1, %loops:4 = transform.structured.tile_using_for %0 [1, 1, 1, 1] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
+    %1, %loops:4 = transform.structured.tile_using_for %0 tile_sizes [1, 1, 1, 1] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
     transform.yield
   }
 }
@@ -1336,7 +1336,7 @@ func.func @winograd_output_transform_dynamic(%arg0: tensor<8x8x?x?x?x?xf32>, %i0
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["iree_linalg_ext.winograd.output_transform"]} in %module_op : (!transform.any_op) -> !transform.any_op
-    %1, %loops:4 = transform.structured.tile_using_for %0 [1, 1, 1, 1] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
+    %1, %loops:4 = transform.structured.tile_using_for %0 tile_sizes [1, 1, 1, 1] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
     transform.yield
   }
 }
@@ -1409,7 +1409,7 @@ func.func @winograd_output_transform_nchw(%arg0: tensor<8x8x1x2x2x32xf32>) -> te
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["iree_linalg_ext.winograd.output_transform"]} in %module_op : (!transform.any_op) -> !transform.any_op
-    %1, %loops:4 = transform.structured.tile_using_for %0 [1, 1, 1, 1] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
+    %1, %loops:4 = transform.structured.tile_using_for %0 tile_sizes [1, 1, 1, 1] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op, !transform.any_op)
     transform.yield
   }
 }
@@ -1463,7 +1463,7 @@ func.func @attention(%query: tensor<192x1024x64xf32>, %key: tensor<192x1024x64xf
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["iree_linalg_ext.attention"]} in %module_op : (!transform.any_op) -> !transform.any_op
-    %1, %loops:2 = transform.structured.tile_using_for %0 [10, 30] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+    %1, %loops:2 = transform.structured.tile_using_for %0 tile_sizes [10, 30] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
     transform.yield
   }
 }
@@ -1515,7 +1515,7 @@ func.func @attention_memref(%query: memref<192x1024x64xf32>, %key: memref<192x10
 module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
     %0 = transform.structured.match ops{["iree_linalg_ext.attention"]} in %module_op : (!transform.any_op) -> !transform.any_op
-    %1, %loops:2 = transform.structured.tile_using_for %0 [10, 30] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
+    %1, %loops:2 = transform.structured.tile_using_for %0 tile_sizes [10, 30] : (!transform.any_op) -> (!transform.any_op, !transform.any_op, !transform.any_op)
     transform.yield
   }
 }

@@ -218,11 +218,11 @@ hal.executable @shared_memory_lowering {
 //  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<3>, i64, i64) -> !llvm.ptr<3>
 //       CHECK: %{{.*}} = llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<3>
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
-//  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(2048 : i64) : i64
+//  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(512 : i64) : i64
 //  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<3>, i64, i64) -> !llvm.ptr<3>
 //       CHECK: %{{.*}} = llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<3>
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
-//  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(4096 : i64) : i64
+//  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(2560 : i64) : i64
 //  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<3>, i64, i64) -> !llvm.ptr<3>
 
 // -----
@@ -283,7 +283,7 @@ hal.executable @shared_memory_lowering_aligned_alloc {
 //  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<3>, i64, i64) -> !llvm.ptr<3>
 //       CHECK: %{{.*}} = llvm.mlir.addressof @__dynamic_shared_memory__ : !llvm.ptr<3>
 //  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(0 : i64) : i64
-//  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(4 : i64) : i64
+//  CHECK-NEXT: %{{.*}} = llvm.mlir.constant(128 : i64) : i64
 //  CHECK-NEXT: %{{.*}} = llvm.getelementptr %{{.*}} : (!llvm.ptr<3>, i64, i64) -> !llvm.ptr<3>
 
 // -----
