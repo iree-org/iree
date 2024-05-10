@@ -820,6 +820,13 @@ class ZeroExtendIOpConversion : public OpConversionPattern<arith::ExtUIOp> {
       rewriter.replaceOpWithNewOp<IREE::VM::AndI32Op>(
           srcOp, dstType, adaptor.getIn(),
           rewriter.createOrFold<IREE::VM::ConstI32Op>(srcOp.getLoc(), 1));
+    } else if (srcType.isInteger(1) && dstType.isInteger(64)) {
+      // Same trick as above:
+      auto andi32 = rewriter.create<IREE::VM::AndI32Op>(
+          srcOp.getLoc(), rewriter.getIntegerType(32), adaptor.getIn(),
+          rewriter.createOrFold<IREE::VM::ConstI32Op>(srcOp.getLoc(), 1));
+      rewriter.replaceOpWithNewOp<IREE::VM::ExtI32I64UOp>(
+        srcOp, dstType, andi32);
     } else if (srcType.isInteger(8) && dstType.isInteger(32)) {
       rewriter.replaceOpWithNewOp<IREE::VM::ExtI8I32UOp>(srcOp, dstType,
                                                          adaptor.getIn());
@@ -846,7 +853,26 @@ class SignExtendIOpConversion : public OpConversionPattern<arith::ExtSIOp> {
                   ConversionPatternRewriter &rewriter) const override {
     auto srcType = srcOp.getIn().getType();
     auto dstType = getTypeConverter()->convertType(srcOp.getResult().getType());
-    if (srcType.isInteger(8) && dstType.isInteger(32)) {
+    if (srcType.isInteger(1) && dstType.isInteger(32)) {
+      // Technically this should not be required but we do the and-mul so that
+      // we guarantee that boolean value sets all bits before being sign extended.
+      auto andi32 = rewriter.create<IREE::VM::AndI32Op>(
+          srcOp.getLoc(), rewriter.getIntegerType(32), adaptor.getIn(),
+          rewriter.createOrFold<IREE::VM::ConstI32Op>(srcOp.getLoc(), 1));
+      auto muli32 = rewriter.create<IREE::VM::MulI32Op>(
+          srcOp.getLoc(), rewriter.getIntegerType(32), andi32,
+          rewriter.createOrFold<IREE::VM::ConstI32Op>(srcOp.getLoc(), -1));
+      rewriter.replaceOp(srcOp, muli32);
+    } else if (srcType.isInteger(1) && dstType.isInteger(64)) {
+      auto andi32 = rewriter.create<IREE::VM::AndI32Op>(
+          srcOp.getLoc(), rewriter.getIntegerType(32), adaptor.getIn(),
+          rewriter.createOrFold<IREE::VM::ConstI32Op>(srcOp.getLoc(), 1));
+      auto muli32 = rewriter.create<IREE::VM::MulI32Op>(
+          srcOp.getLoc(), rewriter.getIntegerType(32), andi32,
+          rewriter.createOrFold<IREE::VM::ConstI32Op>(srcOp.getLoc(), -1));
+      rewriter.replaceOpWithNewOp<IREE::VM::ExtI32I64SOp>(
+        srcOp, dstType, muli32);
+    } else if (srcType.isInteger(8) && dstType.isInteger(32)) {
       rewriter.replaceOpWithNewOp<IREE::VM::ExtI8I32SOp>(srcOp, dstType,
                                                          adaptor.getIn());
     } else if (srcType.isInteger(8) && dstType.isInteger(64)) {

@@ -126,7 +126,7 @@ module @my_module {
 
 // -----
 
-module @t001_bitcast_f16_bf16 {
+module @t010_bitcast_f16_bf16 {
 module @my_module {
   func.func @my_fn(%arg0 : f16) -> (bf16) {
 // expected-error@+1 {{failed to legalize}}
@@ -136,3 +136,71 @@ module @my_module {
 }
 }
 
+// -----
+// CHECK-LABEL: @t011_ext_ui_i32
+module @t011_ext_ui_i32 {
+
+module {
+  func.func @my_fn(%arg0: i1) -> (i32) {
+    // CHECK: %[[C1:.+]] = vm.const.i32 1
+    // CHECK: %[[AND:.+]] = vm.and.i32 %arg0, %[[C1]]
+    %1 = arith.extui %arg0 : i1 to i32
+    // CHECK: return %[[AND]]
+    return %1 : i32
+  }
+}
+
+}
+
+// -----
+// CHECK-LABEL: @t012_ext_ui_i64
+module @t012_ext_ui_i64 {
+
+module {
+  func.func @my_fn(%arg0: i1) -> (i64) {
+    // CHECK: %[[C1:.+]] = vm.const.i32 1
+    // CHECK: %[[AND:.+]] = vm.and.i32 %arg0, %[[C1]]
+    // CHECK: %[[EXT:.+]] = vm.ext.i32.i64.u %[[AND]] : i32 -> i64
+    %1 = arith.extui %arg0 : i1 to i64
+    // CHECK: return %[[EXT]]
+    return %1 : i64
+  }
+}
+
+}
+
+// CHECK-LABEL: @t013_ext_si_i32
+module @t013_ext_si_i32 {
+
+module {
+  func.func @my_fn(%arg0: i1) -> (i32) {
+    // CHECK-DAG: %[[C1:.+]] = vm.const.i32 1
+    // CHECK-DAG: %[[CN1:.+]] = vm.const.i32 -1
+    // CHECK-DAG: %[[AND:.+]] = vm.and.i32 %arg0, %[[C1]]
+    // CHECK-DAG: %[[MUL:.+]] = vm.mul.i32 %[[AND]], %[[CN1]]
+    %1 = arith.extsi %arg0 : i1 to i32
+    // CHECK: return %[[MUL]]
+    return %1 : i32
+  }
+}
+
+}
+
+// -----
+// CHECK-LABEL: @t014_ext_si_i64
+module @t014_ext_si_i64 {
+
+module {
+  func.func @my_fn(%arg0: i1) -> (i64) {
+    // CHECK-DAG: %[[C1:.+]] = vm.const.i32 1
+    // CHECK-DAG: %[[CN1:.+]] = vm.const.i32 -1
+    // CHECK-DAG: %[[AND:.+]] = vm.and.i32 %arg0, %[[C1]]
+    // CHECK-DAG: %[[MUL:.+]] = vm.mul.i32 %[[AND]], %[[CN1]]
+    // CHECK-DAG: %[[EXT:.+]] = vm.ext.i32.i64.s %[[MUL]] : i32 -> i64
+    %1 = arith.extsi %arg0 : i1 to i64
+    // CHECK: return %[[EXT]]
+    return %1 : i64
+  }
+}
+
+}
