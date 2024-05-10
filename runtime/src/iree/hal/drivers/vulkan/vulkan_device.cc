@@ -1383,6 +1383,11 @@ static iree_string_view_t iree_hal_vulkan_device_id(
   return device->identifier;
 }
 
+static int32_t iree_hal_vulkan_device_index(
+    iree_hal_device_t* base_device) {
+  return 0;
+}
+
 static iree_allocator_t iree_hal_vulkan_device_host_allocator(
     iree_hal_device_t* base_device) {
   iree_hal_vulkan_device_t* device = iree_hal_vulkan_device_cast(base_device);
@@ -1832,6 +1837,7 @@ namespace {
 const iree_hal_device_vtable_t iree_hal_vulkan_device_vtable = {
     /*.destroy=*/iree_hal_vulkan_device_destroy,
     /*.id=*/iree_hal_vulkan_device_id,
+    /*.index=*/iree_hal_vulkan_device_index,
     /*.host_allocator=*/iree_hal_vulkan_device_host_allocator,
     /*.device_allocator=*/iree_hal_vulkan_device_allocator,
     /*.replace_device_allocator=*/iree_hal_vulkan_replace_device_allocator,

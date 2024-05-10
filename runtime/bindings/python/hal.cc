@@ -260,6 +260,122 @@ HalBuffer HalAllocator::AllocateHostStagingBufferCopy(HalDevice& device,
   return HalBuffer::StealFromRawPtr(hal_buffer);
 }
 
+// avoid memory copy
+py::object HalAllocator::ImportBuffer(HalDevice& device, py::ndarray<py::pytorch> buffer,
+                                      iree_hal_element_types_t element_type) {
+  IREE_TRACE_SCOPE_NAMED("HalAllocator::ImportBuffer");
+
+  iree_hal_buffer_params_t buffer_params = {
+      IREE_HAL_BUFFER_USAGE_DEFAULT, // .usage =
+      IREE_HAL_MEMORY_ACCESS_ALL, //.access =
+      IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL,// .type = 
+      IREE_HAL_QUEUE_AFFINITY_ANY, //.queue_affinity =
+      0, // .min_alignment = 
+  };
+
+  iree_hal_external_buffer_t external_buffer = {
+      IREE_HAL_EXTERNAL_BUFFER_TYPE_DEVICE_ALLOCATION, // .type = 
+      IREE_HAL_EXTERNAL_BUFFER_FLAG_NONE, // .flags =
+      (iree_device_size_t)buffer.nbytes(), //.size = 
+      {
+              {
+                    buffer.data(), //.ptr =
+              }, //.device_allocation =
+      },//.handle =
+  };
+
+  iree_hal_buffer_release_callback_t release_callback = {
+      nullptr, //.fn =
+      nullptr, //.user_data = 
+  };
+
+  iree_hal_buffer_t* import_buffer = nullptr;
+  iree_status_t status = iree_ok_status();
+  status = iree_hal_allocator_import_buffer(raw_ptr(), buffer_params,
+                                            &external_buffer, release_callback,
+                                            &import_buffer);
+  CheckApiStatus(status, "Failed to import device buffer.");
+
+  iree_hal_encoding_type_t encoding_type =
+      IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR;
+  iree_hal_buffer_view_t* buffer_view = nullptr;
+  status = iree_hal_buffer_view_create(
+      import_buffer, buffer.ndim(),
+      reinterpret_cast<const iree_hal_dim_t*>(buffer.shape_ptr()), element_type,
+      encoding_type, iree_hal_allocator_host_allocator(raw_ptr()),
+      &buffer_view);
+  CheckApiStatus(status, "Create buffer_view failed.");
+
+  return py::cast(HalBufferView::StealFromRawPtr(buffer_view),
+                  py::rv_policy::move);
+}
+
+py::ndarray<py::pytorch> HalAllocator::ExportBuffer(
+    HalDevice& device, HalBufferView& buffer_view,
+    iree_hal_element_types_t element_type) {
+  IREE_TRACE_SCOPE_NAMED("HalAllocator::ExportBuffer");
+
+  iree_status_t status = iree_ok_status();
+  iree_hal_buffer_t* buffer =
+      iree_hal_buffer_view_buffer(buffer_view.raw_ptr());
+  size_t offset = (size_t)iree_hal_buffer_byte_offset(buffer);
+
+  // Check condition of subspan.
+  iree_hal_buffer_t* base_buffer = buffer;
+  iree_hal_buffer_t* allocated_buffer =
+      iree_hal_buffer_allocated_buffer(buffer);
+  if (allocated_buffer != buffer) {
+    buffer = allocated_buffer;
+  }
+
+  iree_hal_external_buffer_t external_buffer;
+  status = iree_hal_allocator_export_buffer(
+      raw_ptr(), buffer, IREE_HAL_EXTERNAL_BUFFER_TYPE_DEVICE_ALLOCATION,
+      IREE_HAL_EXTERNAL_BUFFER_FLAG_NONE, &external_buffer);
+  CheckApiStatus(status, "Failed to export device buffer.");
+
+  void* data = (void*)(external_buffer.handle.device_allocation.ptr + offset);
+
+  iree_hal_buffer_retain(base_buffer);
+
+  py::capsule deleter(base_buffer, [](void* buffer) noexcept {
+    iree_hal_buffer_release((iree_hal_buffer_t*)buffer);
+  });
+
+  std::map<iree_hal_element_types_t, py::dlpack::dtype> typeConvertMap = {
+      {IREE_HAL_ELEMENT_TYPE_FLOAT_32, py::dtype<float>()},
+      {IREE_HAL_ELEMENT_TYPE_FLOAT_64, py::dtype<double>()},
+      {IREE_HAL_ELEMENT_TYPE_SINT_8, py::dtype<int8_t>()},
+      {IREE_HAL_ELEMENT_TYPE_UINT_8, py::dtype<uint8_t>()},
+      {IREE_HAL_ELEMENT_TYPE_SINT_16, py::dtype<int16_t>()},
+      {IREE_HAL_ELEMENT_TYPE_UINT_16, py::dtype<uint16_t>()},
+      {IREE_HAL_ELEMENT_TYPE_SINT_32, py::dtype<int32_t>()},
+      {IREE_HAL_ELEMENT_TYPE_UINT_32, py::dtype<uint32_t>()},
+      {IREE_HAL_ELEMENT_TYPE_SINT_64, py::dtype<int64_t>()},
+      {IREE_HAL_ELEMENT_TYPE_UINT_64, py::dtype<uint64_t>()},
+      {IREE_HAL_ELEMENT_TYPE_BOOL_8, py::dtype<bool>()},
+  };
+  if (typeConvertMap.count(element_type) == 0) {
+    throw RaiseValueError("unrecognized element type");
+  }
+
+  auto deviceValue = py::device::none::value;
+  int32_t deviceIndex = 0;
+
+  if (device.GetDeviceName() == "cuda") {
+    deviceValue = py::device::cuda::value;
+    deviceIndex = device.GetDeviceIndex();
+  } else {
+    throw py::python_error();
+  }
+
+  return py::ndarray<py::pytorch>(
+      data, (size_t)iree_hal_buffer_view_shape_rank(buffer_view.raw_ptr()),
+      (const size_t*)iree_hal_buffer_view_shape_dims(buffer_view.raw_ptr()),
+      deleter, nullptr, typeConvertMap[element_type], deviceValue, deviceIndex);
+}
+
+
 //------------------------------------------------------------------------------
 // HalBuffer
 //------------------------------------------------------------------------------
@@ -333,6 +449,14 @@ py::str HalBufferView::Repr() {
 //------------------------------------------------------------------------------
 // HalDevice
 //------------------------------------------------------------------------------
+std::string HalDevice::GetDeviceName() {
+  iree_string_view_t name = iree_hal_device_id(raw_ptr());
+  return std::string(name.data);
+}
+
+int32_t HalDevice::GetDeviceIndex() {
+  return iree_hal_device_index(raw_ptr());
+}
 
 void HalDevice::BeginProfiling(std::optional<std::string> mode,
                                std::optional<std::string> file_path) {
@@ -1215,6 +1339,7 @@ void SetupHalBindings(nanobind::module_ m) {
             return HalAllocator::BorrowFromRawPtr(self.allocator());
           },
           py::keep_alive<0, 1>())
+      .def("get_name", &HalDevice::GetDeviceName)
       .def("begin_profiling", &HalDevice::BeginProfiling,
            py::arg("mode") = py::none(), py::arg("file_path") = py::none())
       .def("flush_profiling", &HalDevice::FlushProfiling)
@@ -1346,7 +1471,12 @@ void SetupHalBindings(nanobind::module_ m) {
            "object. The buffer is configured as optimal for use on the device "
            "as a transfer buffer. For buffers of unknown providence, this is a "
            "last resort method for making them compatible for transfer to "
-           "arbitrary devices.");
+           "arbitrary devices.")
+      .def("import_buffer", &HalAllocator::ImportBuffer, py::arg("device"),
+           py::arg("buffer"), py::arg("element_type"), py::keep_alive<0, 1>())
+      .def("export_buffer", &HalAllocator::ExportBuffer,
+           py::rv_policy::reference, py::arg("device"), py::arg("buffer_view"),
+           py::arg("element_type"), py::keep_alive<0, 1>());
 
   auto hal_buffer = py::class_<HalBuffer>(m, "HalBuffer");
   VmRef::BindRefProtocol(hal_buffer, iree_hal_buffer_type,

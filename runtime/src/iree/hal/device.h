@@ -206,6 +206,10 @@ IREE_API_EXPORT void iree_hal_device_release(iree_hal_device_t* device);
 IREE_API_EXPORT iree_string_view_t
 iree_hal_device_id(iree_hal_device_t* device);
 
+//device index.
+IREE_API_EXPORT int32_t
+iree_hal_device_index(iree_hal_device_t* device);
+
 // Returns the host allocator used for objects.
 IREE_API_EXPORT iree_allocator_t
 iree_hal_device_host_allocator(iree_hal_device_t* device);
@@ -517,6 +521,8 @@ typedef struct iree_hal_device_vtable_t {
   void(IREE_API_PTR* destroy)(iree_hal_device_t* device);
 
   iree_string_view_t(IREE_API_PTR* id)(iree_hal_device_t* device);
+  
+  int32_t(IREE_API_PTR* index)(iree_hal_device_t* device);
 
   iree_allocator_t(IREE_API_PTR* host_allocator)(iree_hal_device_t* device);
   iree_hal_allocator_t*(IREE_API_PTR* device_allocator)(

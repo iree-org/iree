@@ -8,6 +8,7 @@
 #define IREE_BINDINGS_PYTHON_IREE_RT_HAL_H_
 
 #include <vector>
+#include <map>
 
 #include "./binding.h"
 #include "./status_utils.h"
@@ -110,6 +111,7 @@ struct ApiPtrAdapter<iree_hal_command_buffer_t> {
 
 class HalBuffer;
 class HalSemaphore;
+class HalBufferView;
 
 class HalBufferView
     : public ApiRefCounted<HalBufferView, iree_hal_buffer_view_t> {
@@ -139,6 +141,8 @@ class HalDevice : public ApiRefCounted<HalDevice, iree_hal_device_t> {
   HalBufferView FromDLPackCapsule(py::object capsule);
   py::object CreateDLPackCapsule(HalBufferView& bufferView,
                                  int device_type_code, int device_id);
+  std::string GetDeviceName();
+  int32_t GetDeviceIndex();                                 
 };
 
 class HalDriver : public ApiRefCounted<HalDriver, iree_hal_driver_t> {
@@ -164,6 +168,12 @@ class HalAllocator : public ApiRefCounted<HalAllocator, iree_hal_allocator_t> {
       int memory_type, int allowed_usage, HalDevice& device, py::object buffer,
       std::optional<iree_hal_element_types_t> element_type);
   HalBuffer AllocateHostStagingBufferCopy(HalDevice& device, py::handle buffer);
+  py::object ImportBuffer(HalDevice& device, py::ndarray<py::pytorch> buffer,
+                          iree_hal_element_types_t element_type);
+  py::ndarray<py::pytorch> ExportBuffer(HalDevice& device,
+                                        HalBufferView& buffer_view,
+                                        iree_hal_element_types_t element_type);  
+
 };
 
 struct HalShape {
