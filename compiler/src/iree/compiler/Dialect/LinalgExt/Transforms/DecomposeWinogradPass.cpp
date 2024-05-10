@@ -44,7 +44,7 @@ struct FoldWinogradOpUnitDims : public OpRewritePattern<TransformOp> {
     }
     auto originalShape = originalType.getShape();
     auto transformedShape = transformedType.getShape();
-    auto hwDims = transformOp.hwDimensions();
+    auto hwDims = transformOp.getHwDimensions();
     SetVector<int64_t> hwDimsSet(hwDims.begin(), hwDims.end());
     if (!llvm::all_of(llvm::enumerate(originalShape),
                       [&](auto it) {
@@ -142,8 +142,8 @@ struct DecomposeWinogradFilterTransform
     // Create matmul(input, GT)
     SmallVector<int64_t> initShape(kernelDims.size(), inputTileSize);
     initShape[0] = kernelSize;
-    Value inputSlice = transformOp.input();
-    Value outputSlice = transformOp.output();
+    Value inputSlice = transformOp.getInput();
+    Value outputSlice = transformOp.getOutput();
     auto tensorType = transformOp.getOutputType().clone(initShape);
     Value init = rewriter.create<tensor::EmptyOp>(loc, initShape, elementType);
     linalg::FillOp fillOp = rewriter.create<linalg::FillOp>(
@@ -215,7 +215,7 @@ struct DecomposeWinogradInputTransform
         rewriter);
 
     // Pad the input slice.
-    Value dynamicSlice = transformOp.input();
+    Value dynamicSlice = transformOp.getInput();
     Type elementType = transformOp.getOutputType().getElementType();
     Value zero = rewriter.create<arith::ConstantOp>(
         loc, rewriter.getZeroAttr(elementType));
@@ -230,7 +230,7 @@ struct DecomposeWinogradInputTransform
     linalg::MatmulOp matmulOp;
     for (int i = 0; i < 2; i++) {
       auto fillOp = rewriter.create<linalg::FillOp>(
-          loc, ValueRange{zero}, ValueRange{transformOp.output()});
+          loc, ValueRange{zero}, ValueRange{transformOp.getOutput()});
       if (i == 0) {
         AMatrix = inputSlice;
         BMatrix = B;
@@ -282,8 +282,8 @@ struct DecomposeWinogradOutputTransform
   LogicalResult matchAndRewrite(WinogradOutputTransformOp transformOp,
                                 PatternRewriter &rewriter) const override {
     Location loc = transformOp.getLoc();
-    Value inputSlice = transformOp.input();
-    Value outputSlice = transformOp.output();
+    Value inputSlice = transformOp.getInput();
+    Value outputSlice = transformOp.getOutput();
     if (transformOp.getInputRank() != 2 || transformOp.getOutputRank() != 2) {
       return rewriter.notifyMatchFailure(transformOp, "Winograd op not tiled");
     }
