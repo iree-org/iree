@@ -67,7 +67,7 @@ def ConvertConv2DToWinograd :
                 "only convs annotated with a `__winograd_conv` attribute will be rewritten.";
   let constructor = "mlir::iree_compiler::IREE::LinalgExt::createConvertConv2DToWinogradPass()";
   let options = [
-    Option<"ignoreAnnotations", "ignore-annotations", "bool",
+    Option<"replaceAllConvs", "replace-all-convs", "bool",
            /*default=*/"false",
            "Choose to ignore `__winograd_conv` annotations and transform all"
            "compatible convolutions.">,

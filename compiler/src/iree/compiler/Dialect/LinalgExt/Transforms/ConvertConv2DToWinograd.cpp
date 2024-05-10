@@ -52,10 +52,7 @@ static bool hasValidStridesAndDilations(Operation *op) {
   return true;
 }
 
-static bool isValidConv2d(Operation *op, bool &isNchw, bool ignoreAnnotations) {
-  if (!ignoreAnnotations && !op->hasAttr(kWinogradAttr)) {
-    return false;
-  }
+static bool isValidConv2d(Operation *op, bool &isNchw) {
   isNchw = isa<linalg::Conv2DNchwFchwOp>(op);
   const bool isNhwc = isa<linalg::Conv2DNhwcHwcfOp>(op);
   if (!(isNchw || isNhwc)) {
@@ -157,16 +154,19 @@ template <typename ConvOp>
 class ConvertConvToWinograd final : public OpRewritePattern<ConvOp> {
 public:
   using OpRewritePattern<ConvOp>::OpRewritePattern;
-  ConvertConvToWinograd<ConvOp>(MLIRContext *context, bool ignoreAnnotations,
+  ConvertConvToWinograd<ConvOp>(MLIRContext *context, bool replaceAllConvs,
                                 PatternBenefit benefit = 1)
       : OpRewritePattern<ConvOp>(context, benefit),
-        ignoreAnnotations(ignoreAnnotations) {}
+        replaceAllConvs(replaceAllConvs) {}
 
   LogicalResult matchAndRewrite(ConvOp convOp,
                                 PatternRewriter &rewriter) const override {
+    if (!replaceAllConvs && !convOp->hasAttr(kWinogradAttr)) {
+      return failure();
+    }
 
     bool isNchwFchw;
-    if (!isValidConv2d(convOp, isNchwFchw, ignoreAnnotations)) {
+    if (!isValidConv2d(convOp, isNchwFchw)) {
       return failure();
     }
 
@@ -336,7 +336,7 @@ public:
   }
 
 private:
-  bool ignoreAnnotations;
+  bool replaceAllConvs;
 };
 
 /// The ConvertConv2DToWinograd pass will only transform convs that have been
@@ -414,7 +414,7 @@ struct ConvertConv2DToWinogradPass
     RewritePatternSet patterns(&getContext());
     patterns.insert<ConvertConvToWinograd<linalg::Conv2DNhwcHwcfOp>,
                     ConvertConvToWinograd<linalg::Conv2DNchwFchwOp>>(
-        context, /*ignoreAnnotations=*/ignoreAnnotations);
+        context, /*replaceAllConvs=*/replaceAllConvs);
     if (failed(applyPatternsAndFoldGreedily(getOperation(),
                                             std::move(patterns)))) {
       return signalPassFailure();
