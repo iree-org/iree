@@ -20,13 +20,14 @@ from e2e_test_framework.models import (
 # Note `0` represents sync execution.
 X86_64_BENCHMARK_CONFIG = [
     # Microbenchmarks.
-    common_definitions.CpuBenchmarkConfig(
-        model=matmul.MATMUL_1x256x2048_I8xI4_MLIR, threads=[0]
-    ),
+    # TODO(#17344): regenerate .mlirbc files
+    # common_definitions.CpuBenchmarkConfig(
+    #     model=matmul.MATMUL_1x256x2048_I8xI4_MLIR, threads=[0]
+    # ),
     common_definitions.CpuBenchmarkConfig(
         model=matmul.MATMUL_256x256x2048_I8xI4_MLIR, threads=[0]
     ),
-    # TODO(#17330): regenerate .mlirbc files
+    # TODO(#17344): regenerate .mlirbc files
     # common_definitions.CpuBenchmarkConfig(
     #     model=matmul.MATMUL_1x256x2048_I8xI8_MLIR, threads=[0]
     # ),
@@ -91,7 +92,7 @@ X86_64_BENCHMARK_CONFIG = [
     common_definitions.CpuBenchmarkConfig(
         model=tf_models.BERT_LARGE_TF_FP32_SEQLEN384, threads=[30]
     ),
-    # TODO(#17330): regenerate .mlirbc files
+    # TODO(#17344): regenerate .mlirbc files
     # common_definitions.CpuBenchmarkConfig(
     #     model=torch_models.BERT_LARGE_384_FP32_TORCH_BATCHES[1], threads=[30]
     # ),
@@ -113,7 +114,7 @@ X86_64_BENCHMARK_CONFIG_LARGE = [
     common_definitions.CpuBenchmarkConfig(
         model=jax_models.BERT_LARGE_FP32_JAX_384XI32_BATCHES[64], threads=[30]
     ),
-    # TODO(#17330): regenerate .mlirbc files
+    # TODO(#17344): regenerate .mlirbc files
     # common_definitions.CpuBenchmarkConfig(
     #     model=torch_models.BERT_LARGE_384_FP32_TORCH_BATCHES[24], threads=[30]
     # ),

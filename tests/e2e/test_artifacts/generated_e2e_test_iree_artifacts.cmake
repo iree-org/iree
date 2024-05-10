@@ -77,20 +77,6 @@ iree_import_tflite_model(
 )
 
 iree_bytecode_module(
-  NAME "iree-module-matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_matmul_1x256x2048_i8_i4_i32_tile_config_default.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=none"
-    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvmcpu-target-cpu=cascadelake"
-    "--iree-opt-data-tiling=false"
-  FRIENDLY_NAME "matmul_1x256x2048_i8_i4_i32_tile_config_default(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,no-dt]"
-  PUBLIC
-)
-
-iree_bytecode_module(
   NAME "iree-module-matmul_256x256x2048_i8_i4_i32_tile_config_default_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_"
   SRC "${ROOT_ARTIFACTS_DIR}/model_matmul_256x256x2048_i8_i4_i32_tile_config_default.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_matmul_256x256x2048_i8_i4_i32_tile_config_default_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_/module.vmfb"
@@ -353,21 +339,6 @@ iree_bytecode_module(
     "--iree-llvmcpu-target-cpu=cascadelake"
     "--iree-opt-data-tiling=false"
   FRIENDLY_NAME "BertLargeTF(stablehlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,no-dt]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_matmul_1x256x2048_i8_i4_i32_tile_config_default.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=none"
-    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvmcpu-target-cpu=cascadelake"
-    "--iree-opt-data-tiling=true"
-    "--iree-llvmcpu-enable-ukernels=none"
-  FRIENDLY_NAME "matmul_1x256x2048_i8_i4_i32_tile_config_default(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,dt-only]"
   PUBLIC
 )
 
@@ -653,21 +624,6 @@ iree_bytecode_module(
     "--iree-opt-data-tiling=true"
     "--iree-llvmcpu-enable-ukernels=none"
   FRIENDLY_NAME "BertLargeTF(stablehlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,dt-only]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_matmul_1x256x2048_i8_i4_i32_tile_config_default.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=none"
-    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvmcpu-target-cpu=cascadelake"
-    "--iree-opt-data-tiling=true"
-    "--iree-llvmcpu-enable-ukernels=all"
-  FRIENDLY_NAME "matmul_1x256x2048_i8_i4_i32_tile_config_default(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,dt-uk]"
   PUBLIC
 )
 
@@ -1730,20 +1686,6 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
-  NAME "iree-module-matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_no-dt_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_matmul_1x256x2048_i8_i4_i32_tile_config_default.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_no-dt_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=none"
-    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
-    "--iree-opt-data-tiling=false"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
-  FRIENDLY_NAME "matmul_1x256x2048_i8_i4_i32_tile_config_default(linalg) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,no-dt]"
-  PUBLIC
-)
-
-iree_bytecode_module(
   NAME "iree-module-matmul_256x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_no-dt_"
   SRC "${ROOT_ARTIFACTS_DIR}/model_matmul_256x256x2048_i8_i4_i32_tile_config_default.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_matmul_256x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_no-dt_/module.vmfb"
@@ -1754,21 +1696,6 @@ iree_bytecode_module(
     "--iree-opt-data-tiling=false"
     "--iree-llvmcpu-target-cpu-features=+dotprod"
   FRIENDLY_NAME "matmul_256x256x2048_i8_i4_i32_tile_config_default(linalg) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,no-dt]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_dt-uk_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_matmul_1x256x2048_i8_i4_i32_tile_config_default.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_dt-uk_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=none"
-    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
-    "--iree-opt-data-tiling=true"
-    "--iree-llvmcpu-enable-ukernels=all"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
-  FRIENDLY_NAME "matmul_1x256x2048_i8_i4_i32_tile_config_default(linalg) [armv8.2-a-generic-linux_android29-llvm_cpu][default-flags,dt-uk]"
   PUBLIC
 )
 
@@ -1784,21 +1711,6 @@ iree_bytecode_module(
     "--iree-llvmcpu-enable-ukernels=all"
     "--iree-llvmcpu-target-cpu-features=+dotprod"
   FRIENDLY_NAME "matmul_256x256x2048_i8_i4_i32_tile_config_default(linalg) [armv8.2-a-generic-linux_android29-llvm_cpu][default-flags,dt-uk]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_dt-only_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_matmul_1x256x2048_i8_i4_i32_tile_config_default.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_dt-only_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=none"
-    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
-    "--iree-opt-data-tiling=true"
-    "--iree-llvmcpu-enable-ukernels=none"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
-  FRIENDLY_NAME "matmul_1x256x2048_i8_i4_i32_tile_config_default(linalg) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,dt-only]"
   PUBLIC
 )
 
@@ -1987,24 +1899,6 @@ iree_bytecode_module(
     "--iree-hal-target-backends=vmvx"
     "--iree-input-type=tosa"
   FRIENDLY_NAME "MobileNetV3Small_fp32(tflite) [vmvx-generic-vmvx-vmvx][experimental-flags]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_matmul_1x256x2048_i8_i4_i32_tile_config_default.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=none"
-    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvmcpu-target-cpu=cascadelake"
-    "--iree-opt-data-tiling=false"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "matmul_1x256x2048_i8_i4_i32_tile_config_default(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,no-dt,compile-stats]"
   PUBLIC
 )
 
@@ -2347,25 +2241,6 @@ iree_bytecode_module(
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_BertLargeTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_/scheduling_stats.json"
   FRIENDLY_NAME "BertLargeTF(stablehlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,no-dt,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_matmul_1x256x2048_i8_i4_i32_tile_config_default.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=none"
-    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvmcpu-target-cpu=cascadelake"
-    "--iree-opt-data-tiling=true"
-    "--iree-llvmcpu-enable-ukernels=none"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "matmul_1x256x2048_i8_i4_i32_tile_config_default(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,dt-only,compile-stats]"
   PUBLIC
 )
 
@@ -2727,25 +2602,6 @@ iree_bytecode_module(
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_BertLargeTF_stablehlo___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_/scheduling_stats.json"
   FRIENDLY_NAME "BertLargeTF(stablehlo) [x86_64-cascadelake-linux_gnu-llvm_cpu][experimental-flags,dt-only,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_matmul_1x256x2048_i8_i4_i32_tile_config_default.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=none"
-    "--iree-llvmcpu-target-triple=x86_64-unknown-linux-gnu"
-    "--iree-llvmcpu-target-cpu=cascadelake"
-    "--iree-opt-data-tiling=true"
-    "--iree-llvmcpu-enable-ukernels=all"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "matmul_1x256x2048_i8_i4_i32_tile_config_default(linalg) [x86_64-cascadelake-linux_gnu-llvm_cpu][default-flags,dt-uk,compile-stats]"
   PUBLIC
 )
 
@@ -4096,24 +3952,6 @@ iree_bytecode_module(
 )
 
 iree_bytecode_module(
-  NAME "iree-module-matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_no-dt_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_matmul_1x256x2048_i8_i4_i32_tile_config_default.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_no-dt_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=none"
-    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
-    "--iree-opt-data-tiling=false"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_no-dt_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "matmul_1x256x2048_i8_i4_i32_tile_config_default(linalg) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,no-dt,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
   NAME "iree-module-matmul_256x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_no-dt_compile-stats_"
   SRC "${ROOT_ARTIFACTS_DIR}/model_matmul_256x256x2048_i8_i4_i32_tile_config_default.mlirbc"
   MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_matmul_256x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_no-dt_compile-stats_/module.vmfb"
@@ -4128,25 +3966,6 @@ iree_bytecode_module(
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_matmul_256x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_no-dt_compile-stats_/scheduling_stats.json"
   FRIENDLY_NAME "matmul_256x256x2048_i8_i4_i32_tile_config_default(linalg) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,no-dt,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_dt-uk_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_matmul_1x256x2048_i8_i4_i32_tile_config_default.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_dt-uk_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=none"
-    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
-    "--iree-opt-data-tiling=true"
-    "--iree-llvmcpu-enable-ukernels=all"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_dt-uk_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "matmul_1x256x2048_i8_i4_i32_tile_config_default(linalg) [armv8.2-a-generic-linux_android29-llvm_cpu][default-flags,dt-uk,compile-stats]"
   PUBLIC
 )
 
@@ -4166,25 +3985,6 @@ iree_bytecode_module(
     "--iree-scheduling-dump-statistics-format=json"
     "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_matmul_256x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_dt-uk_compile-stats_/scheduling_stats.json"
   FRIENDLY_NAME "matmul_256x256x2048_i8_i4_i32_tile_config_default(linalg) [armv8.2-a-generic-linux_android29-llvm_cpu][default-flags,dt-uk,compile-stats]"
-  PUBLIC
-)
-
-iree_bytecode_module(
-  NAME "iree-module-matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_dt-only_compile-stats_"
-  SRC "${ROOT_ARTIFACTS_DIR}/model_matmul_1x256x2048_i8_i4_i32_tile_config_default.mlirbc"
-  MODULE_FILE_NAME "${ROOT_ARTIFACTS_DIR}/iree_module_matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_dt-only_compile-stats_/module.vmfb"
-  FLAGS
-    "--iree-hal-target-backends=llvm-cpu"
-    "--iree-input-type=none"
-    "--iree-llvmcpu-target-triple=aarch64-none-linux-android29"
-    "--iree-opt-data-tiling=true"
-    "--iree-llvmcpu-enable-ukernels=none"
-    "--iree-llvmcpu-target-cpu-features=+dotprod"
-    "--iree-vm-emit-polyglot-zip=true"
-    "--iree-llvmcpu-debug-symbols=false"
-    "--iree-scheduling-dump-statistics-format=json"
-    "--iree-scheduling-dump-statistics-file=${ROOT_ARTIFACTS_DIR}/iree_module_matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_dt-only_compile-stats_/scheduling_stats.json"
-  FRIENDLY_NAME "matmul_1x256x2048_i8_i4_i32_tile_config_default(linalg) [armv8.2-a-generic-linux_android29-llvm_cpu][experimental-flags,dt-only,compile-stats]"
   PUBLIC
 )
 
@@ -4455,7 +4255,6 @@ add_dependencies(iree-benchmark-import-models
   ${PACKAGE_NAME}_model-matmul_123x2561x2561_f32t_f32t_f32t_tile_config_default
   ${PACKAGE_NAME}_model-matmul_128x256x8192_f16t_tile_config_default
   ${PACKAGE_NAME}_model-matmul_128x256x8192_f32t_tile_config_default
-  ${PACKAGE_NAME}_model-matmul_1x256x2048_i8_i4_i32_tile_config_default
   ${PACKAGE_NAME}_model-matmul_2560x2560x2560_f16t_tile_config_default
   ${PACKAGE_NAME}_model-matmul_2560x2560x2560_f32t_tile_config_default
   ${PACKAGE_NAME}_model-matmul_2562x2561x2561_f32t_f32t_f32t_tile_config_default
@@ -4491,8 +4290,6 @@ add_dependencies(iree-benchmark-suites-android-cpu
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-Vit_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_dt-uk_
   ${PACKAGE_NAME}_iree-module-Vit_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_no-dt_
-  ${PACKAGE_NAME}_iree-module-matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_dt-uk_
-  ${PACKAGE_NAME}_iree-module-matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-matmul_256x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_dt-uk_
   ${PACKAGE_NAME}_iree-module-matmul_256x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_no-dt_
 )
@@ -4504,7 +4301,6 @@ add_dependencies(iree-benchmark-suites-android-cpu-dt-only
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_fp32_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-MobileBertSquad_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-Vit_int8_tflite___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_dt-only_
-  ${PACKAGE_NAME}_iree-module-matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-matmul_256x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_dt-only_
 )
 
@@ -4627,12 +4423,6 @@ add_dependencies(iree-benchmark-suites-comp-stats
   ${PACKAGE_NAME}_iree-module-matmul_123x2561x2561_f32t_f32t_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_compile-stats_
   ${PACKAGE_NAME}_iree-module-matmul_128x256x8192_f16t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_splitk_compile-stats_
   ${PACKAGE_NAME}_iree-module-matmul_128x256x8192_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_splitk_compile-stats_
-  ${PACKAGE_NAME}_iree-module-matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_dt-uk_compile-stats_
-  ${PACKAGE_NAME}_iree-module-matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_dt-only_compile-stats_
-  ${PACKAGE_NAME}_iree-module-matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_no-dt_compile-stats_
-  ${PACKAGE_NAME}_iree-module-matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_compile-stats_
-  ${PACKAGE_NAME}_iree-module-matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_compile-stats_
-  ${PACKAGE_NAME}_iree-module-matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_compile-stats_
   ${PACKAGE_NAME}_iree-module-matmul_2560x2560x2560_f16t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_compile-stats_
   ${PACKAGE_NAME}_iree-module-matmul_2560x2560x2560_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_compile-stats_
   ${PACKAGE_NAME}_iree-module-matmul_2562x2561x2561_f32t_f32t_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_compile-stats_
@@ -4782,12 +4572,6 @@ add_dependencies(iree-benchmark-suites-default
   ${PACKAGE_NAME}_iree-module-matmul_123x2561x2561_f32t_f32t_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_
   ${PACKAGE_NAME}_iree-module-matmul_128x256x8192_f16t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_splitk_
   ${PACKAGE_NAME}_iree-module-matmul_128x256x8192_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_splitk_
-  ${PACKAGE_NAME}_iree-module-matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__default-flags_dt-uk_
-  ${PACKAGE_NAME}_iree-module-matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_dt-only_
-  ${PACKAGE_NAME}_iree-module-matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___armv8.2-a-generic-linux_android29-llvm_cpu__experimental-flags_no-dt_
-  ${PACKAGE_NAME}_iree-module-matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
-  ${PACKAGE_NAME}_iree-module-matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
-  ${PACKAGE_NAME}_iree-module-matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-matmul_2560x2560x2560_f16t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_
   ${PACKAGE_NAME}_iree-module-matmul_2560x2560x2560_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_
   ${PACKAGE_NAME}_iree-module-matmul_2562x2561x2561_f32t_f32t_f32t_tile_config_default_linalg___cuda-sm_80-linux_gnu-cuda__ukernel_matmul_
@@ -4869,8 +4653,6 @@ add_dependencies(iree-benchmark-suites-x86_64
   ${PACKAGE_NAME}_iree-module-PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-PoseNet_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
   ${PACKAGE_NAME}_iree-module-PoseNet_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
-  ${PACKAGE_NAME}_iree-module-matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
-  ${PACKAGE_NAME}_iree-module-matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
   ${PACKAGE_NAME}_iree-module-matmul_256x256x2048_i8_i4_i32_tile_config_default_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__default-flags_dt-uk_
   ${PACKAGE_NAME}_iree-module-matmul_256x256x2048_i8_i4_i32_tile_config_default_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_no-dt_
 )
@@ -4894,7 +4676,6 @@ add_dependencies(iree-benchmark-suites-x86_64-dt-only
   ${PACKAGE_NAME}_iree-module-MobileSSD_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-PersonDetect_int8_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-PoseNet_fp32_tflite___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
-  ${PACKAGE_NAME}_iree-module-matmul_1x256x2048_i8_i4_i32_tile_config_default_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
   ${PACKAGE_NAME}_iree-module-matmul_256x256x2048_i8_i4_i32_tile_config_default_linalg___x86_64-cascadelake-linux_gnu-llvm_cpu__experimental-flags_dt-only_
 )
 

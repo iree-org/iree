@@ -99,7 +99,7 @@ BERT_LARGE_FP16_URL = string.Template(
 )
 
 # Converted from https://huggingface.co/docs/transformers/v4.27.2/en/model_doc/bert#transformers.BertModel
-# TODO(#17330): regenerate .mlirbc files
+# TODO(#17344): regenerate .mlirbc files
 # BERT_LARGE_384_FP32_TORCH_BATCHES = model_utils.generate_batch_models(
 #     id_template=model_utils.partial_template_substitute(
 #         ID_FORMAT, model_id=unique_ids.MODEL_BERT_LARGE_384_FP32_TORCH
@@ -118,7 +118,7 @@ BERT_LARGE_FP16_URL = string.Template(
 #     batch_sizes=[1, 16, 24, 32, 48, 64, 512, 1024, 1280],
 # )
 
-# TODO(#17330): regenerate .mlirbc files
+# TODO(#17344): regenerate .mlirbc files
 # FALCON7B_1X100XI64_GPTQ_TORCH = common_definitions.Model(
 #     id=unique_ids.MODEL_FALCON7B_1X100XI64_GPTQ_TORCH,
 #     name="Falcon7bGptqPT",
@@ -129,7 +129,7 @@ BERT_LARGE_FP16_URL = string.Template(
 #     input_types=["1x100xi64"],
 # )
 
-# TODO(#17330): regenerate .mlirbc files
+# TODO(#17344): regenerate .mlirbc files
 # FALCON7B_INT4_1X100XI64_GPTQ_TORCH = common_definitions.Model(
 #     id=unique_ids.MODEL_FALCON7B_INT4_1X100XI64_GPTQ_TORCH,
 #     name="Falcon7bInt4GptqPT",

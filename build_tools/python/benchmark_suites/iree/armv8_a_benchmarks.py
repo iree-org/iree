@@ -27,7 +27,7 @@ class Android_ARMv8_A_Benchmarks(object):
     ]
 
     MATMULS = [
-        matmul.MATMUL_1x256x2048_I8xI4_MLIR,
+        # matmul.MATMUL_1x256x2048_I8xI4_MLIR,
         matmul.MATMUL_256x256x2048_I8xI4_MLIR,
         # matmul.MATMUL_1x256x2048_I8xI8_MLIR,
         # matmul.MATMUL_256x256x2048_I8xI8_MLIR,
