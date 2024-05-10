@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module( util.func(iree-stream-emplace-allocations))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(util.func(iree-stream-emplace-allocations))' %s | FileCheck %s
 
 // Tests that a dispatch result is placed into the target of an update.
 

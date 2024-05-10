@@ -514,33 +514,31 @@ util.func public @input_broadcast(%arg0: tensor<4x8xf32>, %arg1: tensor<4xf32>) 
 #map2 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3, d4)>
 #map3 = affine_map<(d0, d1, d2, d3, d4) -> (d2, d3, d4)>
 #map4 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
-module {
-  util.func public @quantized_matmul(%arg0: tensor<4096x32x128xi8>, %arg1: tensor<1x1x32x128xf32>) -> tensor<1x1x4096xf32> {
-    %cst = arith.constant dense_resource<__elided__> : tensor<4096x32xf32>
-    %cst_0 = arith.constant dense_resource<__elided__> : tensor<4096x32xf32>
-    %0 = flow.dispatch.region -> (tensor<1x1x4096xf32>) {
-      %cst_1 = arith.constant 0.000000e+00 : f32
-      %1 = tensor.empty() : tensor<1x1x4096xf32>
-      %2 = tensor.empty() : tensor<4096x32x128xf32>
-      %3 = linalg.fill ins(%cst_1 : f32) outs(%1 : tensor<1x1x4096xf32>) -> tensor<1x1x4096xf32>
-      %4 = linalg.generic {indexing_maps = [#map, #map1, #map1, #map], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg0, %cst, %cst_0 : tensor<4096x32x128xi8>, tensor<4096x32xf32>, tensor<4096x32xf32>) outs(%2 : tensor<4096x32x128xf32>) {
-      ^bb0(%in: i8, %in_2: f32, %in_3: f32, %out: f32):
-        %6 = arith.extui %in : i8 to i32
-        %7 = arith.uitofp %6 : i32 to f32
-        %8 = arith.subf %7, %in_3 : f32
-        %9 = arith.mulf %8, %in_2 : f32
-        linalg.yield %9 : f32
-      } -> tensor<4096x32x128xf32>
-      %5 = linalg.generic {indexing_maps = [#map2, #map3, #map4], iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction"]} ins(%arg1, %4 : tensor<1x1x32x128xf32>, tensor<4096x32x128xf32>) outs(%3 : tensor<1x1x4096xf32>) {
-      ^bb0(%in: f32, %in_2: f32, %out: f32):
-        %6 = arith.mulf %in, %in_2 : f32
-        %7 = arith.addf %6, %out : f32
-        linalg.yield %7 : f32
-      } -> tensor<1x1x4096xf32>
-      flow.return %5 : tensor<1x1x4096xf32>
-    }
-    util.return %0 : tensor<1x1x4096xf32>
+util.func public @quantized_matmul(%arg0: tensor<4096x32x128xi8>, %arg1: tensor<1x1x32x128xf32>) -> tensor<1x1x4096xf32> {
+  %cst = arith.constant dense_resource<__elided__> : tensor<4096x32xf32>
+  %cst_0 = arith.constant dense_resource<__elided__> : tensor<4096x32xf32>
+  %0 = flow.dispatch.region -> (tensor<1x1x4096xf32>) {
+    %cst_1 = arith.constant 0.000000e+00 : f32
+    %1 = tensor.empty() : tensor<1x1x4096xf32>
+    %2 = tensor.empty() : tensor<4096x32x128xf32>
+    %3 = linalg.fill ins(%cst_1 : f32) outs(%1 : tensor<1x1x4096xf32>) -> tensor<1x1x4096xf32>
+    %4 = linalg.generic {indexing_maps = [#map, #map1, #map1, #map], iterator_types = ["parallel", "parallel", "parallel"]} ins(%arg0, %cst, %cst_0 : tensor<4096x32x128xi8>, tensor<4096x32xf32>, tensor<4096x32xf32>) outs(%2 : tensor<4096x32x128xf32>) {
+    ^bb0(%in: i8, %in_2: f32, %in_3: f32, %out: f32):
+      %6 = arith.extui %in : i8 to i32
+      %7 = arith.uitofp %6 : i32 to f32
+      %8 = arith.subf %7, %in_3 : f32
+      %9 = arith.mulf %8, %in_2 : f32
+      linalg.yield %9 : f32
+    } -> tensor<4096x32x128xf32>
+    %5 = linalg.generic {indexing_maps = [#map2, #map3, #map4], iterator_types = ["parallel", "parallel", "parallel", "reduction", "reduction"]} ins(%arg1, %4 : tensor<1x1x32x128xf32>, tensor<4096x32x128xf32>) outs(%3 : tensor<1x1x4096xf32>) {
+    ^bb0(%in: f32, %in_2: f32, %out: f32):
+      %6 = arith.mulf %in, %in_2 : f32
+      %7 = arith.addf %6, %out : f32
+      linalg.yield %7 : f32
+    } -> tensor<1x1x4096xf32>
+    flow.return %5 : tensor<1x1x4096xf32>
   }
+  util.return %0 : tensor<1x1x4096xf32>
 }
 
 // CHECK-LABEL:  util.func public @quantized_matmul
@@ -554,19 +552,17 @@ module {
 
 // -----
 
-module {
-  util.func public @batchnorm_failure_repro(%arg0 : tensor<2x4xf32>, %arg1 : tensor<4xf32>) -> tensor<2x4xf32> {
-    %0 = tensor.empty() : tensor<2x4xf32>
-    %1 = linalg.generic {
-        indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>],
-        iterator_types = ["parallel", "parallel"]}
-        ins(%arg0, %arg1 : tensor<2x4xf32>, tensor<4xf32>) outs(%0 : tensor<2x4xf32>) {
-      ^bb0(%b0 : f32, %b1 : f32, %b2 : f32):
-        %2 = arith.addf %b0, %b1 : f32
-        linalg.yield %2 : f32
-    } -> tensor<2x4xf32>
-    util.return %1 : tensor<2x4xf32>
-  }
+util.func public @batchnorm_failure_repro(%arg0 : tensor<2x4xf32>, %arg1 : tensor<4xf32>) -> tensor<2x4xf32> {
+  %0 = tensor.empty() : tensor<2x4xf32>
+  %1 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d1)>, affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%arg0, %arg1 : tensor<2x4xf32>, tensor<4xf32>) outs(%0 : tensor<2x4xf32>) {
+    ^bb0(%b0 : f32, %b1 : f32, %b2 : f32):
+      %2 = arith.addf %b0, %b1 : f32
+      linalg.yield %2 : f32
+  } -> tensor<2x4xf32>
+  util.return %1 : tensor<2x4xf32>
 }
 // CHECK-LABEL: util.func public @batchnorm_failure_repro
 //       CHECK:   %[[DISPATCH:.+]] = flow.dispatch.region
@@ -577,18 +573,16 @@ module {
 
 // -----
 
-module {
-  util.func public @catch_invalid_collapse(%arg0 : tensor<10x20x30xf32>) -> tensor<10x30x40xf32> {
-    %0 = tensor.empty() : tensor<10x30x40xf32>
-    %1 = linalg.generic {
-        indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>, affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>],
-        iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
-        ins(%arg0 : tensor<10x20x30xf32>) outs(%0 : tensor<10x30x40xf32>) {
-      ^bb0(%b0 : f32, %b1 : f32):
-        linalg.yield %b0 : f32
-    } -> tensor<10x30x40xf32>
-    util.return %1 : tensor<10x30x40xf32>
-  }
+util.func public @catch_invalid_collapse(%arg0 : tensor<10x20x30xf32>) -> tensor<10x30x40xf32> {
+  %0 = tensor.empty() : tensor<10x30x40xf32>
+  %1 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>, affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%arg0 : tensor<10x20x30xf32>) outs(%0 : tensor<10x30x40xf32>) {
+    ^bb0(%b0 : f32, %b1 : f32):
+      linalg.yield %b0 : f32
+  } -> tensor<10x30x40xf32>
+  util.return %1 : tensor<10x30x40xf32>
 }
 // CHECK-LABEL: util.func public @catch_invalid_collapse
 //       CHECK:   linalg.generic
