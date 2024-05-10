@@ -141,6 +141,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   case IREE::Codegen::DispatchLoweringPassPipeline::
       CPUConvTileAndDecomposeExpert: {
     TilingConfig tilingConfig = getTilingConfigForPipeline(funcOp);
+    pipelineOpts.enablePeeling = isLoopPeelingEnabled(funcOp);
     addConvTileAndDecomposeExpertPassPipeline(pipeline, tilingConfig,
                                               pipelineOpts);
     break;

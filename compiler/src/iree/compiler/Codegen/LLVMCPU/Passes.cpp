@@ -448,6 +448,10 @@ void addConvTileAndDecomposeExpertPassPipeline(
   funcPassManager.addPass(createFuseTensorPadWithConsumerPass());
   funcPassManager.addPass(createConcretizePadResultShapePass());
 
+  if (pipelineOpt.enablePeeling) {
+    funcPassManager.addPass(createLLVMCPUPeelPass());
+  }
+
   {
     funcPassManager.addPass(createVectorizePadPass());
     GenericVectorizationPassOptions options;

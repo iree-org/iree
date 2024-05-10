@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Utils/CPUUtils.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 
 #include <numeric>
 
@@ -17,6 +18,8 @@
 #define DBGS() (llvm::dbgs() << "[" DEBUG_TYPE "]: ")
 
 namespace mlir::iree_compiler {
+
+static const char kLoopPeelingAttrName[] = "enable_loop_peeling";
 
 FailureOr<Operation *> getRootOperation(ArrayRef<Operation *> computeOps) {
   Operation *rootOperation = nullptr;
@@ -61,6 +64,16 @@ FailureOr<Operation *> getRootOperation(ArrayRef<Operation *> computeOps) {
   }
 
   return rootOperation;
+}
+
+StringAttr getEnableLoopPeelingAttrName(MLIRContext *ctx) {
+  return StringAttr::get(ctx, kLoopPeelingAttrName);
+}
+
+bool isLoopPeelingEnabled(FunctionOpInterface funcOp) {
+  DictionaryAttr config = getTranslationInfo(funcOp).getConfiguration();
+
+  return config && config.contains(kLoopPeelingAttrName);
 }
 
 } // namespace mlir::iree_compiler

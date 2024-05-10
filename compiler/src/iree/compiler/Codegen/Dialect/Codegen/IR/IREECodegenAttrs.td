@@ -130,7 +130,7 @@ def IREECodegen_TranslationInfoAttr :
   let description = [{
     Specifies the information that is used to drive the translation of
     an entry point function using Linalg based structured-op
-    lowering.. During executable translation this is attached to the
+    lowering. During executable translation this is attached to the
     `hal.executable.export` operation.
 
     If this operation is already set on the root operation (as part of
