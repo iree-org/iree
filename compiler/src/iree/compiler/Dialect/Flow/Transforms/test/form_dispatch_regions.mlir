@@ -105,24 +105,22 @@ util.func public @pack_fusion(%arg0 : tensor<?x?xf32>,
 #map1 = affine_map<(d0, d1) -> (d1, d0)>
 #map2 = affine_map<()[s0] -> (s0 ceildiv 8)>
 #map3 = affine_map<()[s0] -> (s0 ceildiv 32)>
-module {
-  util.func public @tranpose_pack_fusion(%arg0: tensor<?x?xf32>) -> tensor<?x?x8x32xf32> {
-    %cst = arith.constant 0.000000e+00 : f32
-    %c0 = arith.constant 0 : index
-    %c1 = arith.constant 1 : index
-    %dim = tensor.dim %arg0, %c0 : tensor<?x?xf32>
-    %dim_0 = tensor.dim %arg0, %c1 : tensor<?x?xf32>
-    %0 = tensor.empty(%dim, %dim_0) : tensor<?x?xf32>
-    %1 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "parallel"]} ins(%arg0 : tensor<?x?xf32>) outs(%0 : tensor<?x?xf32>) {
-    ^bb0(%in: f32, %out: f32):
-      linalg.yield %in : f32
-    } -> tensor<?x?xf32>
-    %2 = affine.apply #map2()[%dim]
-    %3 = affine.apply #map3()[%dim_0]
-    %4 = tensor.empty(%2, %3) : tensor<?x?x8x32xf32>
-    %pack = tensor.pack %1 padding_value(%cst : f32) inner_dims_pos = [0, 1] inner_tiles = [8, 32] into %4 : tensor<?x?xf32> -> tensor<?x?x8x32xf32>
-    util.return %pack : tensor<?x?x8x32xf32>
-  }
+util.func public @tranpose_pack_fusion(%arg0: tensor<?x?xf32>) -> tensor<?x?x8x32xf32> {
+  %cst = arith.constant 0.000000e+00 : f32
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %dim = tensor.dim %arg0, %c0 : tensor<?x?xf32>
+  %dim_0 = tensor.dim %arg0, %c1 : tensor<?x?xf32>
+  %0 = tensor.empty(%dim, %dim_0) : tensor<?x?xf32>
+  %1 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "parallel"]} ins(%arg0 : tensor<?x?xf32>) outs(%0 : tensor<?x?xf32>) {
+  ^bb0(%in: f32, %out: f32):
+    linalg.yield %in : f32
+  } -> tensor<?x?xf32>
+  %2 = affine.apply #map2()[%dim]
+  %3 = affine.apply #map3()[%dim_0]
+  %4 = tensor.empty(%2, %3) : tensor<?x?x8x32xf32>
+  %pack = tensor.pack %1 padding_value(%cst : f32) inner_dims_pos = [0, 1] inner_tiles = [8, 32] into %4 : tensor<?x?xf32> -> tensor<?x?x8x32xf32>
+  util.return %pack : tensor<?x?x8x32xf32>
 }
 // No fusion as the CPU backend currently can't handle fusion with transpose
 // between ops.
@@ -561,30 +559,28 @@ util.func public @no_dequantization_fusion(%arg0: tensor<4096x32x128xi8>, %arg1:
 // -----
 
 #map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
-module {
-  util.func public @no_dequantization_like_fusion(%arg0: tensor<32x1x16x1x8xi16>, %arg1: tensor<32x344x16x32x8xi4>) -> tensor<32x1x344x1x32xi32> {
-    %c0_i32 = arith.constant 0 : i32
-    %0 = tensor.empty() : tensor<32x1x16x1x8xi32>
-    %1 = linalg.generic {indexing_maps = [#map, #map],
-                         iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]}
-                         ins(%arg0 : tensor<32x1x16x1x8xi16>) outs(%0 : tensor<32x1x16x1x8xi32>) {
-    ^bb0(%in: i16, %out: i32):
-      %7 = arith.extsi %in : i16 to i32
-      linalg.yield %7 : i32
-    } -> tensor<32x1x16x1x8xi32>
-    %2 = tensor.empty() : tensor<32x344x16x32x8xi32>
-    %3 = linalg.generic {indexing_maps = [#map, #map],
-                         iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]}
-                         ins(%arg1 : tensor<32x344x16x32x8xi4>) outs(%2 : tensor<32x344x16x32x8xi32>) {
-    ^bb0(%in: i4, %out: i32):
-      %7 = arith.extui %in : i4 to i32
-      linalg.yield %7 : i32
-    } -> tensor<32x344x16x32x8xi32>
-    %4 = tensor.empty() : tensor<32x1x344x1x32xi32>
-    %5 = linalg.fill ins(%c0_i32 : i32) outs(%4 : tensor<32x1x344x1x32xi32>) -> tensor<32x1x344x1x32xi32>
-    %7 = linalg.batch_mmt4d ins(%1, %3 : tensor<32x1x16x1x8xi32>, tensor<32x344x16x32x8xi32>) outs(%5 : tensor<32x1x344x1x32xi32>) -> tensor<32x1x344x1x32xi32>
-    util.return %7 : tensor<32x1x344x1x32xi32>
-  }
+util.func public @no_dequantization_like_fusion(%arg0: tensor<32x1x16x1x8xi16>, %arg1: tensor<32x344x16x32x8xi4>) -> tensor<32x1x344x1x32xi32> {
+  %c0_i32 = arith.constant 0 : i32
+  %0 = tensor.empty() : tensor<32x1x16x1x8xi32>
+  %1 = linalg.generic {indexing_maps = [#map, #map],
+                        iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]}
+                        ins(%arg0 : tensor<32x1x16x1x8xi16>) outs(%0 : tensor<32x1x16x1x8xi32>) {
+  ^bb0(%in: i16, %out: i32):
+    %7 = arith.extsi %in : i16 to i32
+    linalg.yield %7 : i32
+  } -> tensor<32x1x16x1x8xi32>
+  %2 = tensor.empty() : tensor<32x344x16x32x8xi32>
+  %3 = linalg.generic {indexing_maps = [#map, #map],
+                        iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]}
+                        ins(%arg1 : tensor<32x344x16x32x8xi4>) outs(%2 : tensor<32x344x16x32x8xi32>) {
+  ^bb0(%in: i4, %out: i32):
+    %7 = arith.extui %in : i4 to i32
+    linalg.yield %7 : i32
+  } -> tensor<32x344x16x32x8xi32>
+  %4 = tensor.empty() : tensor<32x1x344x1x32xi32>
+  %5 = linalg.fill ins(%c0_i32 : i32) outs(%4 : tensor<32x1x344x1x32xi32>) -> tensor<32x1x344x1x32xi32>
+  %7 = linalg.batch_mmt4d ins(%1, %3 : tensor<32x1x16x1x8xi32>, tensor<32x344x16x32x8xi32>) outs(%5 : tensor<32x1x344x1x32xi32>) -> tensor<32x1x344x1x32xi32>
+  util.return %7 : tensor<32x1x344x1x32xi32>
 }
 //       CHECK: util.func public @no_dequantization_like_fusion
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<32x1x16x1x8xi16>
