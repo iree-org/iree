@@ -17,7 +17,11 @@ else:
     import tempfile
     import unittest
 
-    from iree.compiler.api import *
+    from iree.compiler.api import (
+        Session,
+        Source,
+        Output,
+    )
     from iree.compiler import ir
 
     class DlFlagsTest(unittest.TestCase):
