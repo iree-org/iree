@@ -8,6 +8,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -16,6 +17,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/BuiltinTypes.h"
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
 
@@ -1563,8 +1565,17 @@ FailureOr<TilingResult> WinogradOutputTransformOp::getTiledImplementation(
   if (constSizeW.has_value()) {
     staticOutShape[wDim] = constSizeW.value() * getOutputTileSize();
   }
-  Value staticOutputSlice = builder.create<tensor::CastOp>(
-      loc, outSliceType.clone(staticOutShape), outputSlice);
+  bool isMemref = isa<MemRefType>(outSliceType);
+  Value staticOutputSlice =
+      isMemref
+          ? builder
+                .create<memref::CastOp>(loc, outSliceType.clone(staticOutShape),
+                                        outputSlice)
+                ->getResult(0)
+          : builder
+                .create<tensor::CastOp>(loc, outSliceType.clone(staticOutShape),
+                                        outputSlice)
+                ->getResult(0);
 
   SmallVector<Value> tiledOperands;
   tiledOperands.emplace_back(getSlice(builder, loc, getInput(), inputOffsets,
@@ -1579,7 +1590,13 @@ FailureOr<TilingResult> WinogradOutputTransformOp::getTiledImplementation(
   Operation *tiledOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
 
-  return TilingResult{{tiledOp}, SmallVector<Value>(tiledOp->getResults())};
+  SmallVector<Value> results(tiledOp->getResults());
+  if (!isMemref) {
+    results.front() =
+        builder.create<tensor::CastOp>(loc, outSliceType, results.front())
+            ->getResult(0);
+  }
+  return TilingResult{{tiledOp}, results};
 }
 
 LogicalResult WinogradOutputTransformOp::getResultTilePosition(
