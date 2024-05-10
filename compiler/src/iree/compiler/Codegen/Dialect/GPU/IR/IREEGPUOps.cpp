@@ -183,6 +183,12 @@ void MultiMmaOp::getIterationBounds(SmallVectorImpl<int64_t> &iterationBounds) {
   }
 }
 
+std::optional<SmallVector<int64_t, 4>> MultiMmaOp::getShapeForUnroll() {
+  SmallVector<int64_t, 4> shape;
+  getIterationBounds(shape);
+  return shape;
+}
+
 //===----------------------------------------------------------------------===//
 // ShuffleTensorOp
 //===----------------------------------------------------------------------===//

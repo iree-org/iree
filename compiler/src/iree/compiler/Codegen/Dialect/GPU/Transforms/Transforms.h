@@ -14,7 +14,12 @@
 #define IREE_COMPILER_CODEGEN_DIALECT_GPU_TRANSFORMS_TRANSFORMS_H_
 
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
+#include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/IR/PatternMatch.h"
+
+namespace mlir::vector {
+struct UnrollVectorOptions;
+}
 
 namespace mlir::iree_compiler::IREE::GPU {
 
@@ -23,6 +28,9 @@ LogicalResult vectorizeStaticMultiMmaOp(RewriterBase &rewriter,
                                         IREE::GPU::MultiMmaOp mmaOp);
 
 void populateIREEGPUVectorizationPatterns(RewritePatternSet &patterns);
+
+void populateIREEGPUVectorUnrollPatterns(
+    RewritePatternSet &patterns, const vector::UnrollVectorOptions &options);
 
 } // namespace mlir::iree_compiler::IREE::GPU
 

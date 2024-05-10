@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "unroll_multi_mma.mlir"
     "vectorize_multi_mma.mlir"
   TOOLS
     FileCheck
