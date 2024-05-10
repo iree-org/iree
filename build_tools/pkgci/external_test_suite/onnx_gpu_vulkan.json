@@ -6,10 +6,7 @@
   "iree_run_module_flags": [
     "--device=vulkan"
   ],
-  "skip_compile_tests": [
-    "test_dequantizelinear",
-    "test_slice_default_axes"
-  ],
+  "skip_compile_tests": [],
   "skip_run_tests": [],
   "expected_compile_failures": [
     "test_acosh",
@@ -154,6 +151,7 @@
     "test_cumsum_2d_negative_axis",
     "test_deform_conv_with_mask_bias",
     "test_deform_conv_with_multiple_offset_groups",
+    "test_dequantizelinear",
     "test_dequantizelinear_axis",
     "test_dequantizelinear_blocked",
     "test_dequantizelinear_e4m3fn",
