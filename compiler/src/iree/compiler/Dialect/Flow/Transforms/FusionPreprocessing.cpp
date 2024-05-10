@@ -11,11 +11,21 @@
 //===----------------------------------------------------------------------===//
 
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
+#include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/Casting.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
+#include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/Diagnostics.h"
+#include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler::IREE::Flow {
@@ -131,14 +141,63 @@ struct FoldSuccessiveTensorInsertSliceOps
   }
 };
 
+struct GatherFusionPattern : public OpRewritePattern<linalg::YieldOp> {
+  using OpRewritePattern<linalg::YieldOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(linalg::YieldOp yieldOp,
+                                PatternRewriter &rewriter) const override {
+    // Specific case. The linalg generic implementation of "gather"
+    // cannot be fused because it there is no producer-consumer
+    // relationship between the two generics. This is because the indexing
+    // is not affine (index values come from a tensor).
+    if (yieldOp->getNumOperands() != 1) {
+      return failure();
+    }
+    auto extractOp = dyn_cast_or_null<tensor::ExtractOp>(
+        yieldOp->getOperand(0).getDefiningOp());
+    if (!extractOp) {
+      return failure();
+    }
+
+    // match the generic that gens a higher bitwidth tensor
+    auto definingOp = dyn_cast_or_null<linalg::GenericOp>(
+        extractOp.getOperand(0).getDefiningOp());
+    if (!definingOp) {
+      return rewriter.notifyMatchFailure(
+          yieldOp, "expected extract operand to be a generic op");
+    }
+
+    // generic body should contain only a arith.extf and a linalg.yield
+    auto &ops = definingOp->getRegion(0).front().getOperations();
+    if (ops.size() != 2 || !isa<arith::ExtFOp>(ops.front()) ||
+        !isa<linalg::YieldOp>(ops.back())) {
+      return rewriter.notifyMatchFailure(yieldOp,
+                                         "expected generic op to have 2 ops");
+    }
+
+    // move definingOp's body just before the yield op (root)
+    rewriter.inlineBlockBefore(
+        &definingOp.getRegion().front(), yieldOp,
+        {extractOp->getResult(0), yieldOp->getOperand(0)});
+
+    // create a new extract op that directly uses definingOp's input
+    rewriter.setInsertionPoint(extractOp);
+    auto newExtractOp = rewriter.create<tensor::ExtractOp>(
+        extractOp->getLoc(), definingOp->getOperand(0), extractOp.getIndices());
+    rewriter.replaceOp(extractOp, newExtractOp);
+    rewriter.eraseOp(yieldOp);
+    rewriter.eraseOp(definingOp);
+    return success();
+  }
+};
+
 struct FusionPreprocessingPass
     : public IREE::Flow::impl::FusionPreprocessingPassBase<
           FusionPreprocessingPass> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
-    patterns
-        .add<FoldSuccessiveTensorInsertSliceOps, GenericOpInterchangePattern>(
-            &getContext());
+    patterns.add<FoldSuccessiveTensorInsertSliceOps,
+                 GenericOpInterchangePattern, GatherFusionPattern>(
+        &getContext());
 
     // Fold away `tensor.dim` operations that can be resolved in terms of its
     // operand shapes.

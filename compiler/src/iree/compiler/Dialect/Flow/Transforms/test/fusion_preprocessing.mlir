@@ -54,3 +54,42 @@ util.func public @fold_insert_slices(%source : tensor<?x?xf32>,
 //      CHECK:   %[[RETURN:.+]] = tensor.insert_slice %[[SOURCE]] into %[[FILL]]
 // CHECK-SAME:       [%[[NEW_OFFSET0]], %[[NEW_OFFSET1]]] [%[[SIZE0]], %[[SIZE1]]]
 //      CHECK:   util.return %[[RETURN]]
+
+
+// -----
+
+util.func public @fuse_generic_gather(
+  %11 :tensor<128256x4096xf16>, %12 : tensor<4x?xi64>,
+  %13 : tensor<4x?x4096xf32>, %14 : tensor<128256x4096xf32>) 
+    -> tensor<4x?x4096xf32>{
+
+  %15 = linalg.generic {
+    indexing_maps = [ affine_map<(d0, d1) -> (d0, d1)>, 
+                      affine_map<(d0, d1) -> (d0, d1)>], 
+    iterator_types = ["parallel", "parallel"]} 
+    ins(%11 : tensor<128256x4096xf16>)
+    outs(%14 : tensor<128256x4096xf32>) {
+      ^bb0(%in: f16, %out: f32):
+        %17 = arith.extf %in : f16 to f32
+        linalg.yield %17 : f32
+    } -> tensor<128256x4096xf32>
+  %16 = linalg.generic {
+    indexing_maps = [ affine_map<(d0, d1, d2) -> (d0, d1)>, 
+                      affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+    iterator_types = ["parallel", "parallel", "parallel"]} 
+    ins(%12 : tensor<4x?xi64>) 
+    outs(%13 : tensor<4x?x4096xf32>) {
+      ^bb0(%in: i64, %out: f32):
+        %17 = arith.index_cast %in : i64 to index
+        %18 = linalg.index 2 : index
+        %extracted = tensor.extract %15[%17, %18] : tensor<128256x4096xf32>
+        linalg.yield %extracted : f32
+      } -> tensor<4x?x4096xf32>
+  util.return %16 : tensor<4x?x4096xf32> 
+}
+
+// CHECK:         %[[INDEX0:[a-zA-Z0-9]+]] = arith.index_cast %in : i64 to index
+// CHECK:         %[[INDEX1:[a-zA-Z0-9]+]] = linalg.index 2 : index
+// CHECK-NEXT:    %[[EXTRACTED:.*]] = tensor.extract %[[TENSOR0:.+]][%[[INDEX0]], %[[INDEX1]]] : tensor<128256x4096xf16>
+// CHECK-NEXT:    %[[RES:[a-zA-Z0-9]+]] = arith.extf %[[EXTRACTED]] : f16 to f32
+// CHECK-NEXT:    linalg.yield %[[RES]] : f32 
