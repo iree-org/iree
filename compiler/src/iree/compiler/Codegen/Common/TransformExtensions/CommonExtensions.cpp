@@ -190,6 +190,9 @@ struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
           loop, "Body of the loop contains more than one op");
     }
 
+    // TODO(qedawkins): It should be fine to hoist as long as there is a single
+    // forall op such that any operation within the block of the parent scf.for
+    // is independent of the destination of the forall.
     auto forallOp =
         dyn_cast<scf::ForallOp>(loop.getBody()->without_terminator().begin());
     if (!forallOp) {
