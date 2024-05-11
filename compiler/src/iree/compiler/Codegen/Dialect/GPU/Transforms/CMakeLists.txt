@@ -25,6 +25,7 @@ iree_cc_library(
     MLIRTransformUtils
     MLIRTransforms
     MLIRVectorDialect
+    MLIRVectorTransforms
     MLIRVectorUtils
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
   PUBLIC
