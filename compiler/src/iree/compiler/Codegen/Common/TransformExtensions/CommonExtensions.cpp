@@ -303,9 +303,7 @@ struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
     // indices by the block order in the scf.forall body. This ensures that we
     // hoist operations in the same order they started. Any topological ordering
     // would work too because the operations are speculatable.
-    SmallVector<Operation *> sliceVec(slice.getArrayRef());
-    std::sort(sliceVec.begin(), sliceVec.end(),
-              [](Operation *l, Operation *r) { return l->isBeforeInBlock(r); });
+    slice = mlir::topologicalSort(slice);
 
     // Step 2. Create the ForallOp.
     Location loc = forallOp.getLoc();
@@ -357,7 +355,7 @@ struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
 
       // Move all producers for the indices of the slices outside of the body
       // of the loop (and the extract_slice ops themselves).
-      for (auto sliceOperandProducer : sliceVec) {
+      for (auto sliceOperandProducer : slice) {
         rewriter.moveOpBefore(sliceOperandProducer, newLoop);
       }
       for (auto slice : pairedSlices) {
