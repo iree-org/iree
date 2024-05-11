@@ -147,19 +147,24 @@ static IREE::Util::GlobalOp createExportBufferGlobalOp(std::string name,
                                                        Explorer &explorer) {
   auto loc = arg.getLoc();
 
-  // Find a hal.tensor.export user.
-  IREE::HAL::TensorExportOp exportOp;
+  // Find a hal.tensor.export or alias user and extract the encoding.
+  Type sourceType;
   if (explorer.walkTransitiveUsers(arg, [&](Operation *op) -> WalkResult {
-        exportOp = dyn_cast<IREE::HAL::TensorExportOp>(op);
-        return exportOp ? WalkResult::interrupt() : WalkResult::advance();
+        if (auto aliasOp = dyn_cast<IREE::HAL::TensorAliasOp>(op)) {
+          sourceType = aliasOp.getResult().getType();
+          return WalkResult::interrupt();
+        } else if (auto exportOp = dyn_cast<IREE::HAL::TensorExportOp>(op)) {
+          sourceType = exportOp.getSourceEncoding();
+          return WalkResult::interrupt();
+        }
+        return WalkResult::advance();
       }) == TraversalResult::INCOMPLETE) {
     // Analysis failed to find an export op. User needs to rework their program.
     mlir::emitError(loc) << "unsupported dynamic buffer view export on " << arg;
     return {};
   }
 
-  // Extract the type, which must be a static tensor.
-  auto sourceType = exportOp.getSourceEncoding();
+  // The type must be a static tensor for this pass to work.
   auto tensorType = llvm::dyn_cast<RankedTensorType>(sourceType);
   if (!tensorType || !tensorType.hasStaticShape()) {
     mlir::emitError(loc) << "unsupported buffer view export tensor type on "
