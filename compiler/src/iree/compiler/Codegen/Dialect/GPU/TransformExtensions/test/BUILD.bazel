@@ -19,6 +19,7 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         [
             "vectorize_multi_mma.mlir",
+            "unroll_multi_mma.mlir",
         ],
         include = ["*.mlir"],
     ),

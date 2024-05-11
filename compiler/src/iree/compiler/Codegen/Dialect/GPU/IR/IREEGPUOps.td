@@ -13,6 +13,7 @@ include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/DestinationStyleOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
+include "mlir/Interfaces/VectorInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/OpBase.td"
 
@@ -23,6 +24,7 @@ include "mlir/IR/OpBase.td"
 def IREEGPU_MultiMmaOp : Op<IREEGPU_Dialect, "multi_mma", [
     Pure,
     AllTypesMatch<["acc", "result"]>,
+    DeclareOpInterfaceMethods<VectorUnrollOpInterface, ["getShapeForUnroll"]>,
     ]> {
   let summary = "Models a contraction of multiple mma operations";
   let description = [{
@@ -184,6 +186,27 @@ def IREEGPU_MultiMmaOp : Op<IREEGPU_Dialect, "multi_mma", [
           getIteratorTypes()
               .template getAsValueRange<IteratorTypeAttr, utils::IteratorType>();
       return {range.begin(), range.end()};
+    }
+
+    ArrayRef<int64_t> getLhsInnerShape() {
+      ShapedType lhsType = getLhsType();
+      int64_t lhsInnerDimRank =
+        lhsType.getRank() - getIndexingMapsArray()[0].getNumResults();
+      return lhsType.getShape().take_back(lhsInnerDimRank);
+    }
+
+    ArrayRef<int64_t> getRhsInnerShape() {
+      ShapedType rhsType = getRhsType();
+      int64_t rhsInnerDimRank =
+        rhsType.getRank() - getIndexingMapsArray()[1].getNumResults();
+      return rhsType.getShape().take_back(rhsInnerDimRank);
+    }
+
+    ArrayRef<int64_t> getAccInnerShape() {
+      ShapedType accType = getAccType();
+      int64_t accInnerDimRank =
+        accType.getRank() - getIndexingMapsArray()[2].getNumResults();
+      return accType.getShape().take_back(accInnerDimRank);
     }
   }];
 
