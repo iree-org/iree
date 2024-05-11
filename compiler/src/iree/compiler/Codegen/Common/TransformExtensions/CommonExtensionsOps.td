@@ -98,6 +98,24 @@ def ApplyFoldTensorSliceIntoTransferPatternsOp : Op<Transform_Dialect,
   let assemblyFormat = "attr-dict";
 }
 
+def ApplyHoistForallFromForPatternsOp : Op<Transform_Dialect,
+    "apply_patterns.iree.hoist_forall_from_for",
+    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>]> {
+  let description = [{
+    Hoists perfectly nested `scf.forall` ops from parent `scf.for` ops if
+    the slice the forall loop operates on is loop invariant w.r.t. the for loop.
+
+    This pattern only applies to forall ops that yield tensors. For bufferized
+    loops the parallel loop is always trivially hoistable with a barrier and
+    happens automatically when lowering the `scf.forall`.
+
+    Currently only supports a single result tensor.
+  }];
+
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+  let assemblyFormat = "attr-dict";
+}
+
 def ApplyIREELinalgElementwiseGreedyFusionPatternsOp : Op<Transform_Dialect,
     "apply_patterns.iree.linalg_elementwise_greedy_fusion",
     [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,

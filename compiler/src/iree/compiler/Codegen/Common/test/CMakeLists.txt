@@ -63,6 +63,7 @@ iree_lit_test_suite(
     "transform_buffer_opt.mlir"
     "transform_copy_operand.mlir"
     "transform_fuse_forall.mlir"
+    "transform_hoist_forall.mlir"
     "transform_lower_shuffle.mlir"
     "transform_match_partial_reduction.mlir"
     "transform_ops_invalid.mlir"
