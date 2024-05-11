@@ -6,6 +6,10 @@
 
 #include "iree/compiler/Preprocessing/Common/Passes.h"
 #include "mlir/Dialect/Transform/Transforms/TransformInterpreterUtils.h"
+#include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 
 using namespace mlir;
 

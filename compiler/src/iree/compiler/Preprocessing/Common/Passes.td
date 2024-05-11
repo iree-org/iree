@@ -61,7 +61,11 @@ def InterpreterPass : Pass<"iree-preprocessing-transform-interpreter"> {
     separate loading of the module and thus isn't suited for single-use
     transform scripts.
   }];
-  let dependentDialects = ["::mlir::transform::TransformDialect"];
+  let dependentDialects = ["::mlir::transform::TransformDialect",
+                           "iree_compiler::IREE::Stream::StreamDialect",
+                           "iree_compiler::IREE::Codegen::IREECodegenDialect",
+                           "iree_compiler::IREE::Flow::FlowDialect",
+  ];
   let options = [
     Option<"disableExpensiveChecks", "disable-expensive-checks", "bool",
            "false",
