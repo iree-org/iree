@@ -14,7 +14,10 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/raw_ostream.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
@@ -24,10 +27,14 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
+
+#define DEBUG_TYPE "iree-llvmgpu-lower-executable-target"
 
 namespace mlir::iree_compiler {
 
@@ -66,13 +73,33 @@ public:
 
   void runOnOperation() override;
 };
+
+static LLVMGPUPipelineOptions
+getPipelineOptions(FunctionOpInterface funcOp,
+                   IREE::Codegen::TranslationInfoAttr translationInfo) {
+  LLVMGPUPipelineOptions pipelineOptions = {};
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
+
+  LLVM_DEBUG(llvm::dbgs() << "Translation Info: " << translationInfo << "\n");
+  LLVM_DEBUG(llvm::dbgs() << "Target Attr: " << targetAttr << "\n");
+
+  if (DictionaryAttr config = translationInfo.getConfiguration()) {
+    if (config.contains(LLVMGPUAttrNames::kNoReduceSharedMemoryBankConflicts))
+      pipelineOptions.enableReduceSharedMemoryBankConflicts = false;
+    if (config.contains(LLVMGPUAttrNames::kNoReorderWorkgroups))
+      pipelineOptions.enableReorderWorkgroups = false;
+  }
+
+  pipelineOptions.enableUkernels = targetAttr && hasUkernel(targetAttr);
+
+  LLVM_DEBUG(llvm::dbgs() << "LLVMGPU Pipeline Options: " << pipelineOptions
+                          << "\n");
+  return pipelineOptions;
+}
 } // namespace
 
 void LLVMGPULowerExecutableTargetPass::runOnOperation() {
-  auto funcOp = getOperation();
-  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
-  bool enableMicrokernels = targetAttr && hasUkernel(targetAttr);
-
+  FunctionOpInterface funcOp = getOperation();
   IREE::Codegen::TranslationInfoAttr translationInfo =
       getTranslationInfo(funcOp);
   if (!translationInfo)
@@ -87,9 +114,12 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
   }
   OpPassManager &pipeline = maybePipeline.value();
 
+  LLVMGPUPipelineOptions pipelineOptions =
+      getPipelineOptions(funcOp, translationInfo);
+
   switch (translationInfo.getDispatchLoweringPassPipeline()) {
   case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUDefault:
-    addGPUDefaultPassPipeline(pipeline, enableMicrokernels);
+    addGPUDefaultPassPipeline(pipeline, pipelineOptions);
     break;
   case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUBaseLowering:
     addGPUBaseLoweringPassPipeline(pipeline);
@@ -101,7 +131,7 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
     addGPUVectorizationPassPipeline(pipeline);
     break;
   case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulSimt:
-    addGPUMatmulSimtPassPipeline(pipeline);
+    addGPUMatmulSimtPassPipeline(pipeline, pipelineOptions);
     break;
   case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUMatmulTensorCore: {
     FailureOr<int64_t> maybeDepth =
@@ -111,7 +141,7 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
           "invalid matmul configuration without software pipelining config");
       return signalPassFailure();
     }
-    addGPUMatmulTensorCorePassPipeline(pipeline, *maybeDepth);
+    addGPUMatmulTensorCorePassPipeline(pipeline, pipelineOptions, *maybeDepth);
     break;
   }
   case IREE::Codegen::DispatchLoweringPassPipeline::
@@ -123,19 +153,20 @@ void LLVMGPULowerExecutableTargetPass::runOnOperation() {
           "invalid matmul configuration without software pipelining config");
       return signalPassFailure();
     }
-    addGPUMatmulTensorCoreMmaSyncPassPipeline(pipeline, *maybeDepth);
+    addGPUMatmulTensorCoreMmaSyncPassPipeline(pipeline, pipelineOptions,
+                                              *maybeDepth);
     break;
   }
   case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUTransposeSharedMem:
-    addGPUTransposePassPipeline(pipeline);
+    addGPUTransposePassPipeline(pipeline, pipelineOptions);
     break;
   case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorDistribute:
-    addGPUVectorDistributePassPipeline(pipeline,
+    addGPUVectorDistributePassPipeline(pipeline, pipelineOptions,
                                        /*usePadToModelSharedMemcpy=*/false);
     break;
   case IREE::Codegen::DispatchLoweringPassPipeline::
       LLVMGPUPadAndVectorDistribute:
-    addGPUVectorDistributePassPipeline(pipeline,
+    addGPUVectorDistributePassPipeline(pipeline, pipelineOptions,
                                        /*usePadToModelSharedMemcpy=*/true);
     break;
   case IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUWarpReduction:
