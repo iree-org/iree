@@ -64,17 +64,6 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
       return rewriter.notifyMatchFailure(
           contractOp, "missing iree.amdgpu.mma intrinsic attribute");
     }
-    // Get the storage vector types that each thread is in charge of.
-    auto [aVectorType, bVectorType, cVectorType] = mmaAttr.getABCVectorTypes();
-    // Get parameters for the amdgpu.mfma operation.
-    AMDMMAParameters mmaParams;
-    std::tie(mmaParams.m, mmaParams.n, mmaParams.k) = mmaAttr.getMNKShape();
-    mmaParams.blocks = mmaAttr.getBlockSize();
-    IREE::GPU::MMAComputeType computeType = mmaAttr.getComputeType();
-    if (computeType == IREE::GPU::MMAComputeType::INVALID) {
-      return rewriter.notifyMatchFailure(
-          contractOp, "Cannot determine intrinsic compute type.");
-    }
 
     // Infer the contract kind so that we know know to correlate M/N/K dims.
     VectorContractOpInfo opDetail(contractOp);
@@ -173,8 +162,7 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
         Value rhsSlice =
             rewriter.create<vector::ExtractOp>(loc, rhs, rhsBatchOffsets);
         accSlice =
-            computeMMA(rewriter, loc, mmaParams, lhsSlice, rhsSlice, accSlice,
-                       aVectorType, bVectorType, cVectorType, computeType);
+            computeMMA(rewriter, loc, mmaAttr, lhsSlice, rhsSlice, accSlice);
       }
       finalTile = rewriter.create<vector::InsertOp>(loc, accSlice, finalTile,
                                                     resultBatchOffsets);
@@ -227,31 +215,22 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
     rhsOffsets[rhsK] = kOffset;
   }
 
-  struct AMDMMAParameters {
-    uint32_t m = 0;
-    uint32_t n = 0;
-    uint32_t k = 0;
-    uint32_t blocks = 0;
-  };
-
   // Generates amdgpu.mfma operation on the given inputs for the given MFMA
   // |intrinsic|.
-  Value computeMMA(OpBuilder &builder, Location loc,
-                   const AMDMMAParameters &mmaParams, Value a, Value b, Value c,
-                   VectorType aType, VectorType bType, VectorType cType,
-                   IREE::GPU::MMAComputeType computeType) const {
-    Value aCast = builder.create<vector::ShapeCastOp>(a.getLoc(), aType, a);
-    Value bCast = builder.create<vector::ShapeCastOp>(b.getLoc(), bType, b);
-    Value cCast = builder.create<vector::ShapeCastOp>(c.getLoc(), cType, c);
-    Value mmaOp;
-    if (computeType == IREE::GPU::MMAComputeType::MFMA) {
-      mmaOp = builder.create<amdgpu::MFMAOp>(
-          loc, cType, mmaParams.m, mmaParams.n, mmaParams.k, mmaParams.blocks,
-          aCast, bCast, cCast);
-    } else if (computeType == IREE::GPU::MMAComputeType::WMMA) {
-      mmaOp = builder.create<amdgpu::WMMAOp>(loc, cType, aCast, bCast, cCast);
-    }
-    return builder.create<vector::ShapeCastOp>(c.getLoc(), c.getType(), mmaOp);
+  Value computeMMA(OpBuilder &builder, Location loc, IREE::GPU::MMAAttr mmaAttr,
+                   Value a, Value b, Value c) const {
+    // Get the storage vector types that each thread is in charge of.
+    auto [aVectorType, bVectorType, cVectorType] = mmaAttr.getABCVectorTypes();
+    Value aCast =
+        builder.create<vector::ShapeCastOp>(a.getLoc(), aVectorType, a);
+    Value bCast =
+        builder.create<vector::ShapeCastOp>(b.getLoc(), bVectorType, b);
+    Value cCast =
+        builder.create<vector::ShapeCastOp>(c.getLoc(), cVectorType, c);
+    FailureOr<Value> mmaOp = mmaAttr.buildMmaOperation(
+        builder, loc, cVectorType, aCast, bCast, cCast);
+    assert(succeeded(mmaOp) && "Failed to construct mma op");
+    return builder.create<vector::ShapeCastOp>(c.getLoc(), c.getType(), *mmaOp);
   }
 };
 

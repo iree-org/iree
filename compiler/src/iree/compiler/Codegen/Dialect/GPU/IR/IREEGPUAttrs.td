@@ -25,6 +25,7 @@ class IREEGPU_MmaVectorLayoutAttr<string attrname, string mmaintrinsic> :
     "getContractionLayout",
     "getMNKShape",
     "getSubgroupSize",
+    "buildMmaOperation",
   ]>
 ]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
@@ -61,16 +62,6 @@ class IREEGPU_MmaVectorLayoutAttr<string attrname, string mmaintrinsic> :
     "::mlir::Type":$bType,
     "::mlir::Type":$cType
   );
-
-  string baseExtraClassDeclaration = [{
-    ::std::tuple<Type, Type, Type> getABCElementTypes() {
-      return ::std::make_tuple(getAType(), getBType(), getCType());
-    }
-
-    ::std::tuple<int64_t, int64_t, int64_t> getMNKShape() {
-      return ::std::make_tuple(getMSize(), getNSize(), getKSize());
-    }
-  }];
 }
 
 class IREEGPU_I32MmaEnumAttr<string name, string summary, list<I32EnumAttrCase> cases>
@@ -95,16 +86,6 @@ def IREEGPU_MMAIntrinsic : IREEGPU_I32MmaEnumAttr<"MMAIntrinsic",
       MFMA_F16_16x16x16_F32,
       MFMA_F16_32x32x8_F32,
       WMMA_F16_16x16x16_F32
-    ]>;
-
-def INVALID_COMPUTE_TYPE : I32EnumAttrCase<"INVALID", 0>;
-def MFMA_COMPUTE_TYPE : I32EnumAttrCase<"MFMA", 1>;
-def WMMA_COMPUTE_TYPE : I32EnumAttrCase<"WMMA", 2>;
-def IREEGPU_MMAComputeType : IREEGPU_I32MmaEnumAttr<"MMAComputeType",
-    "Descriptor for different types of MMA operations", [
-      INVALID_COMPUTE_TYPE,
-      MFMA_COMPUTE_TYPE,
-      WMMA_COMPUTE_TYPE
     ]>;
 
 def IREEGPU_MMAIntrinsicAttr
@@ -132,9 +113,8 @@ def IREEGPU_MMAAttr : IREEGPU_MmaVectorLayoutAttr<"MMA", "MMAIntrinsicAttr"> {
     AttrBuilder<(ins "MMAIntrinsic":$intrinsic)>
   ];
 
-  let extraClassDeclaration = !strconcat(baseExtraClassDeclaration, [{
+  let extraClassDeclaration = [{
     int64_t getBlockSize() const;
-    MMAComputeType getComputeType() const;
     SmallVector<int64_t> getADataDuplicate() const;
     SmallVector<int64_t> getBDataDuplicate() const;
     SmallVector<int64_t> getCDataDuplicate() const;
@@ -165,7 +145,7 @@ def IREEGPU_MMAAttr : IREEGPU_MmaVectorLayoutAttr<"MMA", "MMAIntrinsicAttr"> {
     SingleSubgroupLayout getASingleSubgroupLayoutOrder() const;
     SingleSubgroupLayout getBSingleSubgroupLayoutOrder() const;
     SingleSubgroupLayout getCSingleSubgroupLayoutOrder() const;
-  }]);
+  }];
 }
 
 //===----------------------------------------------------------------------===//

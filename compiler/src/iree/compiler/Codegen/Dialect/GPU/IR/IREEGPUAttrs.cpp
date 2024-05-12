@@ -15,6 +15,7 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -329,6 +330,14 @@ MMAAttr MMAAttr::get(MLIRContext *context, MMAIntrinsic type) {
                    layout.cType);
 }
 
+std::tuple<Type, Type, Type> MMAAttr::getABCElementTypes() const {
+  return std::make_tuple(getAType(), getBType(), getCType());
+}
+
+std::tuple<int64_t, int64_t, int64_t> MMAAttr::getMNKShape() const {
+  return std::make_tuple(getMSize(), getNSize(), getKSize());
+}
+
 // NOTE: For layout specifications of the WMMA intrinsics
 //       below we are assuming subgroupsize of 32.
 std::tuple<VectorType, VectorType, VectorType>
@@ -393,20 +402,6 @@ int64_t MMAAttr::getSubgroupSize() const {
   }
   // This should not happen but just to make GCC happy.
   return 0;
-}
-
-MMAComputeType MMAAttr::getComputeType() const {
-  switch (getIntrinsic().getValue()) {
-  case MMAIntrinsic::MFMA_F16_16x16x16_F32:
-  case MMAIntrinsic::MFMA_F16_32x32x8_F32: {
-    return MMAComputeType::MFMA;
-  }
-  case MMAIntrinsic::WMMA_F16_16x16x16_F32: {
-    return MMAComputeType::WMMA;
-  }
-  }
-  // This should not happen but just to make GCC happy.
-  return MMAComputeType::INVALID;
 }
 
 SmallVector<int64_t> MMAAttr::getADataDuplicate() const {
@@ -518,6 +513,37 @@ MMAAttr::SingleSubgroupLayout MMAAttr::getCSingleSubgroupLayoutOrder() const {
   }
   }
   return {};
+}
+
+// Generates amdgpu.mfma/wmma operation on the given inputs for this attribute
+// type.
+FailureOr<Value> MMAAttr::buildMmaOperation(OpBuilder &builder, Location loc,
+                                            Type resultType, Value lhs,
+                                            Value rhs, Value acc) const {
+  auto [aType, bType, cType] = getABCVectorTypes();
+  if (aType != lhs.getType() || bType != rhs.getType() ||
+      cType != acc.getType()) {
+    return failure();
+  }
+  if (cType != resultType) {
+    return failure();
+  }
+  Value mmaOp;
+  switch (getIntrinsic().getValue()) {
+  case MMAIntrinsic::MFMA_F16_16x16x16_F32:
+  case MMAIntrinsic::MFMA_F16_32x32x8_F32: {
+    auto [m, n, k] = getMNKShape();
+    mmaOp = builder.create<amdgpu::MFMAOp>(loc, resultType, m, n, k,
+                                           getBlockSize(), lhs, rhs, acc);
+    break;
+  }
+  case MMAIntrinsic::WMMA_F16_16x16x16_F32: {
+    mmaOp = builder.create<amdgpu::WMMAOp>(loc, resultType, lhs, rhs, acc);
+    break;
+  }
+  }
+  assert(mmaOp && mmaOp.getType() == resultType && "Invalid mma op generated");
+  return mmaOp;
 }
 
 //===----------------------------------------------------------------------===//
