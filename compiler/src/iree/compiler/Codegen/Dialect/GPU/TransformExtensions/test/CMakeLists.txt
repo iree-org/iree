@@ -15,6 +15,7 @@ iree_lit_test_suite(
     lit
   SRCS
     "drop_multi_mma_unit_dims.mlir"
+    "lower_multi_mma.mlir"
     "unroll_multi_mma.mlir"
     "vectorize_multi_mma.mlir"
   TOOLS

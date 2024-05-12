@@ -325,4 +325,40 @@ void populateIREEGPUVectorUnrollPatterns(
   patterns.add<UnrollMultiMmaPattern>(patterns.getContext(), options);
 }
 
+//===----------------------------------------------------------------------===//
+// MultiMmaOp Lowering
+//===----------------------------------------------------------------------===//
+
+namespace {
+struct LowerMultiMmaPattern : public OpRewritePattern<IREE::GPU::MultiMmaOp> {
+  using OpRewritePattern<IREE::GPU::MultiMmaOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::GPU::MultiMmaOp mmaOp,
+                                PatternRewriter &rewriter) const override {
+    if (mmaOp.hasTensorSemantics()) {
+      return rewriter.notifyMatchFailure(
+          mmaOp, "lowering to concrete op requires vector semantics");
+    }
+    SmallVector<int64_t> bounds;
+    mmaOp.getIterationBounds(bounds);
+    if (!bounds.empty()) {
+      return rewriter.notifyMatchFailure(mmaOp,
+                                         "must be a single mma operation");
+    }
+
+    FailureOr<Value> concreteMmaOp = mmaOp.getKind().buildMmaOperation(
+        rewriter, mmaOp.getLoc(), mmaOp.getResultType(), mmaOp.getLhs(),
+        mmaOp.getRhs(), mmaOp.getAcc());
+    if (failed(concreteMmaOp)) {
+      return rewriter.notifyMatchFailure(mmaOp, "Failed to construct mma op");
+    }
+    rewriter.replaceOp(mmaOp, *concreteMmaOp);
+    return success();
+  }
+};
+} // namespace
+
+void populateIREEGPULowerMultiMmaPatterns(RewritePatternSet &patterns) {
+  patterns.add<LowerMultiMmaPattern>(patterns.getContext());
+}
+
 } // namespace mlir::iree_compiler::IREE::GPU

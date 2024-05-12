@@ -33,6 +33,8 @@ void populateIREEGPUVectorUnrollPatterns(
 
 void populateIREEGPUDropUnitDimsPatterns(RewritePatternSet &patterns);
 
+void populateIREEGPULowerMultiMmaPatterns(RewritePatternSet &patterns);
+
 } // namespace mlir::iree_compiler::IREE::GPU
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_GPU_TRANSFORMS_TRANSFORMS_H_
