@@ -24,6 +24,15 @@ transform_dialect::IREEGPUExtensions::IREEGPUExtensions() {
 }
 
 //===---------------------------------------------------------------------===//
+// ApplyDropMultiMmaOpUnitDims
+//===---------------------------------------------------------------------===//
+
+void transform_dialect::ApplyDropMultiMmaOpUnitDims::populatePatterns(
+    RewritePatternSet &patterns) {
+  IREE::GPU::populateIREEGPUDropUnitDimsPatterns(patterns);
+}
+
+//===---------------------------------------------------------------------===//
 // ApplyVectorizeMultiMmaOp
 //===---------------------------------------------------------------------===//
 
