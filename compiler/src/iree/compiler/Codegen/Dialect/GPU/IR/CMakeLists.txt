@@ -39,6 +39,7 @@ iree_cc_library(
     ::IREEGPUOpsGen
     IREEVectorExtDialect
     LLVMSupport
+    MLIRAMDGPUDialect
     MLIRIR
     MLIRLinalgDialect
     MLIRParser

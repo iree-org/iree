@@ -68,6 +68,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Codegen/Utils:VectorOpUtils",
         "//llvm-external-projects/iree-dialects:IREEVectorExtDialect",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:AMDGPUDialect",
         "@llvm-project//mlir:DialectUtils",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgDialect",
