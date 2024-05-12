@@ -14,6 +14,19 @@ include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpBase.td"
 
+def ApplyDropMultiMmaOpUnitDims : Op<Transform_Dialect,
+    "apply_patterns.iree.drop_multi_mma_unit_dims",
+    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,
+     ReportTrackingListenerFailuresOpTrait]> {
+  let description = [{
+    Populate patterns to drop the unit dims from multi_mma ops with
+    only unit iteration bounds.
+  }];
+
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+  let assemblyFormat = "attr-dict";
+}
+
 def ApplyLowerValueBarrierOp : Op<Transform_Dialect,
     "apply_patterns.iree.lower_value_barrier",
     [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,
