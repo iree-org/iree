@@ -331,11 +331,11 @@ MMAAttr MMAAttr::get(MLIRContext *context, MMAIntrinsic type) {
 }
 
 std::tuple<Type, Type, Type> MMAAttr::getABCElementTypes() const {
-  return std::make_tuple(getAType(), getBType(), getCType());
+  return {getAType(), getBType(), getCType()};
 }
 
 std::tuple<int64_t, int64_t, int64_t> MMAAttr::getMNKShape() const {
-  return std::make_tuple(getMSize(), getNSize(), getKSize());
+  return {getMSize(), getNSize(), getKSize()};
 }
 
 // NOTE: For layout specifications of the WMMA intrinsics
@@ -525,25 +525,26 @@ FailureOr<Value> MMAAttr::buildMmaOperation(OpBuilder &builder, Location loc,
       cType != acc.getType()) {
     return failure();
   }
+  // Fail if the result type does not match with the expected return type of
+  // the intrinsic. We expect the caller to handle type conversions externally.
   if (cType != resultType) {
     return failure();
   }
-  Value mmaOp;
   switch (getIntrinsic().getValue()) {
   case MMAIntrinsic::MFMA_F16_16x16x16_F32:
   case MMAIntrinsic::MFMA_F16_32x32x8_F32: {
     auto [m, n, k] = getMNKShape();
-    mmaOp = builder.create<amdgpu::MFMAOp>(loc, resultType, m, n, k,
-                                           getBlockSize(), lhs, rhs, acc);
-    break;
+    return builder
+        .create<amdgpu::MFMAOp>(loc, resultType, m, n, k, getBlockSize(), lhs,
+                                rhs, acc)
+        .getResult();
   }
   case MMAIntrinsic::WMMA_F16_16x16x16_F32: {
-    mmaOp = builder.create<amdgpu::WMMAOp>(loc, resultType, lhs, rhs, acc);
-    break;
+    return builder.create<amdgpu::WMMAOp>(loc, resultType, lhs, rhs, acc)
+        .getResult();
   }
   }
-  assert(mmaOp && mmaOp.getType() == resultType && "Invalid mma op generated");
-  return mmaOp;
+  return failure();
 }
 
 //===----------------------------------------------------------------------===//
