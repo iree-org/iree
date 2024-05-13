@@ -23,6 +23,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/IRMapping.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -370,9 +371,8 @@ declareEntryPointOps(IREE::Stream::ExecutableOp sourceExecutableOp,
       // Check if workgroup size is set externally.
       ArrayAttr workgroupSize;
       for (auto attr : exportOp->getAttrs()) {
-        if (attr.getValue().isa<IREE::Codegen::ExportConfigAttr>()) {
-          workgroupSize = attr.getValue()
-                              .cast<IREE::Codegen::ExportConfigAttr>()
+        if (isa<IREE::Codegen::ExportConfigAttr>(attr.getValue())) {
+          workgroupSize = cast<IREE::Codegen::ExportConfigAttr>(attr.getValue())
                               .getWorkgroupSizeIndexArray();
           if (workgroupSize.size() < 3) {
             SmallVector<Attribute> workgroupSizeVals =

@@ -218,10 +218,10 @@ static inline uint64_t align(uint64_t value, const APInt &alignment) {
 // Returns the bit-width of the scalar type. If the type is complex, it returns
 // the type of individual elements * 2 (1 for real and 1 for complex).
 static inline unsigned getTypeBitWidth(Type type) {
-  if (auto complexType = type.dyn_cast<ComplexType>()) {
+  if (auto complexType = dyn_cast<ComplexType>(type)) {
     return 2 * complexType.getElementType().getIntOrFloatBitWidth();
   }
-  if (auto vectorType = type.dyn_cast<VectorType>()) {
+  if (auto vectorType = dyn_cast<VectorType>(type)) {
     return vectorType.getNumElements() *
            getTypeBitWidth(vectorType.getElementType());
   }
@@ -251,12 +251,12 @@ static inline unsigned getTypePhysicalStorageBitWidth(Type type) {
 //   getRoundedElementByteWidth(i33) = 8
 //   getRoundedElementByteWidth(complex<f32>) = 8
 static inline int32_t getRoundedElementByteWidth(Type type) {
-  if (auto complexType = type.dyn_cast<ComplexType>()) {
+  if (auto complexType = dyn_cast<ComplexType>(type)) {
     return 2 * getRoundedElementByteWidth(complexType.getElementType());
   }
   // TODO(ravishankarm): evaluate if this vector packing works with sub-byte
   // element types.
-  if (auto vectorType = type.dyn_cast<VectorType>()) {
+  if (auto vectorType = dyn_cast<VectorType>(type)) {
     return vectorType.getNumElements() *
            getRoundedElementByteWidth(vectorType.getElementType());
   }

@@ -18,7 +18,7 @@ def Stream_AffinityAttr : AttrInterface<"AffinityAttr"> {
 
   let summary = [{defines execution context affinity}];
   let description = [{
-    WIP; see [#10765](https://github.com/openxla/iree/issues/10765).
+    WIP; see [#10765](https://github.com/iree-org/iree/issues/10765).
 
     TBD. The intent is that this can specify host, device, and queue affinity.
     Scopes can be annotated with an affinity to ensure execution within happens
@@ -128,13 +128,27 @@ def Stream_AffinityOp : OpInterface<"AffinityOpInterface"> {
   let methods = [
     InterfaceMethod<
       /*desc=*/[{
+        Returns whether the op requires an affinity to be assigned.
+        Some ops may represent either host and device operations depending on
+        their operands/results and only sometimes require an affinity.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"requiresAffinity",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return true;
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
         Returns the stream affinity for the op, indicating where it should run.
       }],
       /*retTy=*/"IREE::Stream::AffinityAttr",
       /*methodName=*/"getAffinity",
       /*args=*/(ins),
       /*methodBody=*/[{
-        return $_self->getAttr("affinity").template dyn_cast_or_null<IREE::Stream::AffinityAttr>();
+        return dyn_cast_or_null<IREE::Stream::AffinityAttr>($_self->getAttr("affinity"));
       }]
     >,
     InterfaceMethod<

@@ -7,7 +7,6 @@
 #include <algorithm>
 #include <numeric>
 
-#include "iree/compiler/Codegen/Common/GPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
@@ -23,12 +22,15 @@
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Support/MathExtras.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "mlir/Transforms/Passes.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-distribute-shared-memory-copy"
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_GPUDISTRIBUTESHAREDMEMORYCOPYPASS
+#include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
+
+namespace {
 //====---------------------------------------------------------------------===//
 // Pass to lower workgroup memory copy to distibuted
 // transfer_read/transfer_write ops.
@@ -192,9 +194,9 @@ SmallVector<linalg::ProcInfo> getIds(OpBuilder &b, Location loc,
   AffineExpr d0 = b.getAffineDimExpr(0);
   for (Range r : llvm::reverse(parallelLoopRanges)) {
     linalg::ProcInfo info;
-    auto offset = r.offset.dyn_cast<Attribute>();
-    auto stride = r.stride.dyn_cast<Attribute>();
-    auto size = r.size.dyn_cast<Attribute>();
+    auto offset = dyn_cast<Attribute>(r.offset);
+    auto stride = dyn_cast<Attribute>(r.stride);
+    auto size = dyn_cast<Attribute>(r.size);
     assert(offset && stride && size);
     int64_t numThreadsDim = (llvm::cast<IntegerAttr>(size).getInt() -
                              llvm::cast<IntegerAttr>(offset).getInt()) /
@@ -364,16 +366,15 @@ unrollSharedMemoryLoops(mlir::FunctionOpInterface funcOp,
     (void)loopUnrollByFactor(forOp, numIteration(forOp));
   }
 }
+} // namespace
 
 LogicalResult gpuDistributeSharedMemoryCopy(mlir::FunctionOpInterface funcOp) {
-  FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(funcOp);
-  if (failed(exportOp)) {
-    // We cannot do anything because we do not have the workgroup size
-    // information, but the pass did not fail.
-    return success();
+  auto maybeWorkgroupSize = getWorkgroupSize(funcOp);
+  if (!maybeWorkgroupSize) {
+    return funcOp.emitOpError("failed to distribute shared memory copy since "
+                              "workgroup size isnt set");
   }
-
-  auto workgroupSize = getWorkgroupSize(exportOp.value());
+  SmallVector<int64_t> workgroupSize = maybeWorkgroupSize.value();
   workgroupSize.resize(3, 1);
   MLIRContext *context = funcOp.getContext();
   SmallVector<linalg::GenericOp> copiesToWorkgroupMem;
@@ -454,13 +455,9 @@ LogicalResult gpuDistributeSharedMemoryCopy(mlir::FunctionOpInterface funcOp) {
 }
 
 namespace {
-
-class GPUDistributeSharedMemoryCopyPass
-    : public GPUDistributeSharedMemoryCopyBase<
+struct GPUDistributeSharedMemoryCopyPass final
+    : impl::GPUDistributeSharedMemoryCopyPassBase<
           GPUDistributeSharedMemoryCopyPass> {
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<gpu::GPUDialect, vector::VectorDialect, scf::SCFDialect>();
-  }
   void runOnOperation() override {
     auto funcOp = getOperation();
     if (failed(gpuDistributeSharedMemoryCopy(funcOp))) {
@@ -468,12 +465,5 @@ class GPUDistributeSharedMemoryCopyPass
     }
   }
 };
-
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createGPUDistributeSharedMemoryCopy() {
-  return std::make_unique<GPUDistributeSharedMemoryCopyPass>();
-}
-
 } // namespace mlir::iree_compiler

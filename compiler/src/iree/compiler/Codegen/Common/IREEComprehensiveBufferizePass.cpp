@@ -159,28 +159,27 @@ eliminateEmptyTensors(RewriterBase &rewriter, Operation *op,
 }
 
 void EliminateEmptyTensorsPass::runOnOperation() {
-  ModuleOp moduleOp = getOperation();
+  auto funcOp = getOperation();
   MLIRContext *context = &getContext();
 
   // Run the convert to destination style patterns.
   {
     RewritePatternSet patterns(context);
     linalg::populateConvertToDestinationStylePatterns(patterns);
-    if (failed(applyPatternsAndFoldGreedily(moduleOp, std::move(patterns)))) {
-      moduleOp->emitOpError(
-          "Failed in conversion to destination style patterns");
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      funcOp->emitOpError("Failed in conversion to destination style patterns");
       return signalPassFailure();
     }
   }
 
-  IRRewriter rewriter(moduleOp->getContext());
+  IRRewriter rewriter(funcOp->getContext());
   auto bufferizationOptions = getBufferizationOptions();
-  OneShotAnalysisState state(moduleOp, bufferizationOptions);
+  OneShotAnalysisState state(funcOp, bufferizationOptions);
   // Analyze IR.
-  if (failed(analyzeOp(moduleOp, state)))
+  if (failed(analyzeOp(funcOp, state)))
     return signalPassFailure();
   // Eliminate empty tensors.
-  if (failed(bufferization::eliminateEmptyTensors(rewriter, moduleOp, state)))
+  if (failed(bufferization::eliminateEmptyTensors(rewriter, funcOp, state)))
     return signalPassFailure();
 }
 
@@ -199,14 +198,14 @@ runIREEOneShotBufferize(Operation *op,
 
 /// Run comprehensive bufferize.
 void IREEComprehensiveBufferizePass::runOnOperation() {
-  ModuleOp moduleOp = getOperation();
+  auto funcOp = getOperation();
   IREEOneShotBufferizationOptions options = getBufferizationOptions();
   options.testAnalysisOnly = testAnalysisOnly;
   options.printConflicts = printConflicts;
   options.allocationFn = allocationFn;
   options.memCpyFn = memCpyFn;
 
-  if (failed(runIREEOneShotBufferize(moduleOp, options))) {
+  if (failed(runIREEOneShotBufferize(funcOp, options))) {
     return signalPassFailure();
   }
 
@@ -214,17 +213,19 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
   {
     RewritePatternSet patterns(&getContext());
     linalg::populateEraseUnusedOperandsAndResultsPatterns(patterns);
-    if (failed(applyPatternsAndFoldGreedily(moduleOp, std::move(patterns)))) {
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       return signalPassFailure();
     }
   }
 }
 
-std::unique_ptr<OperationPass<ModuleOp>> createEliminateEmptyTensorsPass() {
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createEliminateEmptyTensorsPass() {
   return std::make_unique<EliminateEmptyTensorsPass>();
 }
 
-std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createIREEComprehensiveBufferizePass(
     std::optional<BufferizationOptions::AllocationFn> allocationFn,
     std::optional<BufferizationOptions::MemCpyFn> memCpyFn) {
   if (!allocationFn)
@@ -235,26 +236,26 @@ std::unique_ptr<OperationPass<ModuleOp>> createIREEComprehensiveBufferizePass(
                                                           memCpyFn);
 }
 
-void addIREEPostBufferizationPasses(OpPassManager &passManager) {
-  passManager.addPass(memref::createResolveShapedTypeResultDimsPass());
-  passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-  passManager.addNestedPass<func::FuncOp>(createCSEPass());
+void addIREEPostBufferizationPasses(OpPassManager &funcPassManager) {
+  funcPassManager.addPass(memref::createResolveShapedTypeResultDimsPass());
+  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createCSEPass());
   // There are redundant memcpy (with linalg.generic form) ops created, which
   // can be deleted by canonicalizer. We have to run it again because the
   // memrefs are unified in CSE pass, so we can truely remove redundant memcpy.
-  passManager.addNestedPass<func::FuncOp>(createCanonicalizerPass());
-  passManager.addNestedPass<func::FuncOp>(createCleanupBufferAllocViewPass());
+  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createCleanupBufferAllocViewPass());
 }
 
 void addIREEComprehensiveBufferizePasses(
-    OpPassManager &passManager,
+    OpPassManager &funcPassManager,
     std::optional<BufferizationOptions::AllocationFn> allocationFn,
     std::optional<BufferizationOptions::MemCpyFn> memCpyFn) {
-  passManager.addPass(createEliminateEmptyTensorsPass());
-  passManager.addPass(bufferization::createEmptyTensorToAllocTensorPass());
-  passManager.addPass(
+  funcPassManager.addPass(createEliminateEmptyTensorsPass());
+  funcPassManager.addPass(bufferization::createEmptyTensorToAllocTensorPass());
+  funcPassManager.addPass(
       createIREEComprehensiveBufferizePass(allocationFn, memCpyFn));
-  addIREEPostBufferizationPasses(passManager);
+  addIREEPostBufferizationPasses(funcPassManager);
 }
 
 } // namespace mlir::iree_compiler

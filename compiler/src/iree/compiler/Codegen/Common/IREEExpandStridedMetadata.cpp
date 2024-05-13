@@ -9,10 +9,12 @@
 #include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -224,11 +226,25 @@ struct ResolveExtractMetadataFromHalInterfaceBindingSubspan
   }
 };
 
+// Converts IREE::Codegen::ExtractStridedMetadataOp to
+// MemRef::ExtractStridedMetadataOp
+struct ConvertCodegenIREEExtractMetadataToMemRef
+    : public OpRewritePattern<IREE::Codegen::ExtractStridedMetadataOp> {
+  using OpRewritePattern<
+      IREE::Codegen::ExtractStridedMetadataOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::Codegen::ExtractStridedMetadataOp op,
+                                PatternRewriter &rewriter) const override {
+    rewriter.replaceOpWithNewOp<memref::ExtractStridedMetadataOp>(
+        op, op.getSource());
+    return success();
+  }
+};
+
 struct IREEExpandStridedMetadataPass
     : public IREEExpandStridedMetadataBase<IREEExpandStridedMetadataPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<affine::AffineDialect, arith::ArithDialect,
-                    IREE::Codegen::IREECodegenDialect>();
+                    IREE::Codegen::IREECodegenDialect, memref::MemRefDialect>();
   }
 
   void runOnOperation() override;
@@ -240,6 +256,7 @@ void populateIREEResolveExtractStridedMetadataPatterns(
   memref::populateResolveExtractStridedMetadataPatterns(patterns);
   patterns.insert<ResolveExtractMetadataFromHalInterfaceBindingSubspan>(
       context);
+  patterns.insert<ConvertCodegenIREEExtractMetadataToMemRef>(context);
 }
 
 void IREEExpandStridedMetadataPass::runOnOperation() {

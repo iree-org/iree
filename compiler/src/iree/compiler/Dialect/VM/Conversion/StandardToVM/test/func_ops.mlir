@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --allow-unregistered-dialect --pass-pipeline="builtin.module(test-iree-convert-std-to-vm)" --iree-vm-target-index-bits=32 %s | FileCheck %s
+// RUN: iree-opt --split-input-file --allow-unregistered-dialect --iree-vm-conversion --cse --iree-vm-target-index-bits=32 %s | FileCheck %s
 
 // -----
 // CHECK-LABEL: @t001_iree_reflection

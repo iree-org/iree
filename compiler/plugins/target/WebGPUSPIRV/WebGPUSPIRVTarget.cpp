@@ -8,6 +8,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/WGSL/Passes.h"
+#include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
 #include "iree/compiler/PluginAPI/Client.h"
@@ -122,22 +123,14 @@ public:
                     spirv::SPIRVDialect, gpu::GPUDialect>();
   }
 
-  void buildConfigurationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
-                                      OpPassManager &passManager) override {
-    // For now we disable configuration if the variant has external object
-    // files.
-    if (variantOp.isExternal())
-      return;
-
+  void
+  buildConfigurationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
+                                 OpPassManager &passManager) override {
     buildSPIRVCodegenConfigurationPassPipeline(passManager);
   }
 
-  void buildTranslationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
+  void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                     OpPassManager &passManager) override {
-    // For now we disable translation if the variant has external object files.
-    if (variantOp.isExternal())
-      return;
-
     // WebGPU does not support push constants (yet?), so replace loads from
     // push constants with loads from uniform buffers.
     // The corresponding runtime code must perform similar emulation, based
@@ -145,22 +138,15 @@ public:
     passManager.nest<ModuleOp>().nest<func::FuncOp>().addPass(
         createWGSLReplacePushConstantsPass());
 
-    // From WGSL spec, "Floating Point Evaluation"
-    // (https://www.w3.org/TR/WGSL/#floating-point-evaluation):
-    // - Implementations may assume that NaNs and infinities are not present at
-    //   runtime.
-    //   - In such an implementation, when an evaluation would produce an
-    //     infinity or a NaN, an undefined value of the target type is produced
-    //     instead.
-    // So WebGPU effectively assumes fast math mode. We also don't have reliable
-    // ways to check whether a floating point number is NaN or infinity.
-    // Therefore, just let the SPIR-V CodeGen to avoid generating guards w.r.t.
-    // NaN and infinity.
-    buildSPIRVCodegenPassPipeline(passManager, /*enableFastMath=*/true);
+    buildSPIRVCodegenPassPipeline(passManager);
 
-    // WGSL does not support extended multiplication:
-    // https://github.com/gpuweb/gpuweb/issues/1565. Make sure to lower it to
-    // regular multiplication before we convert SPIR-V to WGSL.
+    // Prepare SPIR-V for WebGPU by expanding or removing unsupported ops.
+    // For example,
+    //   * WGSL does not support extended multiplication:
+    //     https://github.com/gpuweb/gpuweb/issues/1565, so we lower to
+    //     regular multiplication
+    //   * WGSL does not support NaN or infinities:
+    //     https://www.w3.org/TR/WGSL/#floating-point-evaluation
     passManager.nest<ModuleOp>().nest<spirv::ModuleOp>().addPass(
         spirv::createSPIRVWebGPUPreparePass());
   }

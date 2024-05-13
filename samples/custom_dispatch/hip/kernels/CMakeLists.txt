@@ -10,7 +10,8 @@ if((NOT IREE_TARGET_BACKEND_ROCM) OR
 endif()
 
 if(NOT IREE_ROCM_PATH)
-  message(WARNING "IREE_ROCM_PATH not specified; cannot build sample")
+  message(WARNING "IREE_ROCM_PATH not specified; skipping custom_dispatch/hip/kernels sample")
+  return()
 endif()
 
 # NOTE: this is not how one should actually build their HSACO files. Do not use

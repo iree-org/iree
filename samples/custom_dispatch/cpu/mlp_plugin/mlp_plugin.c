@@ -63,10 +63,11 @@ static int mlp_external(void* params_ptr, void* context, void* reserved) {
     int32_t M;
     int32_t N;
     int32_t K;
+    bool doRelu;
   } params_t;
   const params_t* params = (const params_t*)params_ptr;
-  fprintf(plugin->file, "[Plugin]: M = %d, N = %d, K = %d\n", params->M,
-          params->N, params->K);
+  fprintf(plugin->file, "[Plugin]: M = %d, N = %d, K = %d, doRelu = %d\n",
+          params->M, params->N, params->K, params->doRelu);
   for (int32_t i = 0; i < params->M; i++) {
     for (int32_t j = 0; j < params->N; j++) {
       float curr_result = 0.0;
@@ -77,7 +78,9 @@ static int mlp_external(void* params_ptr, void* context, void* reserved) {
             get_index(k, j, params->rhs_offset, (size_t)params->N);
         curr_result += params->lhs[lhs_index] * params->rhs[rhs_index];
       }
-      curr_result = curr_result < 0.0 ? 0.0 : curr_result;
+      if (params->doRelu) {
+        curr_result = curr_result < 0.0 ? 0.0 : curr_result;
+      }
       size_t result_index = get_index(i, j, params->result_offset, params->N);
       params->result[result_index] = curr_result;
     }

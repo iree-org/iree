@@ -3,7 +3,7 @@ module attributes { transform.with_named_sequence } {
   // the name of this strategy down below before strategy selection, overriding
   // default IREE codegen.
   transform.named_sequence @custom_transform_strategy(
-      %variant_op: !transform.any_op {transform.consumed}) {
+      %variant_op: !transform.any_op) {
     // Step 1. Re-match the matmul
     // ===========================================================================
     %matmul = transform.structured.match ops{["linalg.matmul"]} in %variant_op : (!transform.any_op) -> !transform.any_op
@@ -40,19 +40,18 @@ module attributes { transform.with_named_sequence } {
     transform.apply_patterns to %func_1 {
       transform.apply_patterns.linalg.erase_unnecessary_inputs
     } : !transform.any_op
-    %variant_op_3 = transform.iree.bufferize { target_gpu } %variant_op : (!transform.any_op) -> (!transform.any_op)
-    %memref_func = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
+    %memref_func = transform.iree.bufferize { target_gpu } %func_1 : (!transform.any_op) -> (!transform.any_op)
 
     // Step 6. Post-bufferization vector distribution
     // ===========================================================================
-    %func_7 = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
+    %func_7 = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     transform.iree.forall_to_workgroup %func_7 : (!transform.any_op) -> ()
     transform.iree.map_nested_forall_to_gpu_threads %func_7
         workgroup_dims = [4, 8, 1] : (!transform.any_op) -> ()
 
     // Step 7. Do layout analysis and lower to mma
     // ===========================================================================
-    %func_10 = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
+    %func_10 = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     %func_11 = transform.iree.layout_analysis_and_distribution %func_10 : (!transform.any_op) -> (!transform.any_op)
     transform.print {name = "Ran custom_transform_strategy"}
     transform.yield
@@ -61,10 +60,10 @@ module attributes { transform.with_named_sequence } {
   // Send it down a custom transform dialect pipeline.
   transform.named_sequence @custom_matmul(%matmul: !transform.any_op {transform.readonly}) {
     %variant_op = transform.get_parent_op %matmul {op_name = "hal.executable.variant"} : (!transform.any_op) -> !transform.any_op
-    %exports = transform.structured.match ops{["hal.executable.export"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    %funcs = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     %subgroup_reduce = transform.param.constant #iree_codegen.translation_info<TransformDialectCodegen
                                                                                codegen_spec = @custom_transform_strategy> -> !transform.any_param
-    transform.annotate %exports "translation_info" = %subgroup_reduce : !transform.any_op, !transform.any_param
+    transform.annotate %funcs "translation_info" = %subgroup_reduce : !transform.any_op, !transform.any_param
     transform.print {name = "Setting matmul strategy to custom_transform_strategy"}
     transform.yield
   }
@@ -74,11 +73,9 @@ module attributes { transform.with_named_sequence } {
     %variant_op = transform.get_parent_op %reduce {op_name = "hal.executable.variant"} : (!transform.any_op) -> !transform.any_op
     %lowering_config = transform.param.constant #iree_codegen.lowering_config<tile_sizes = [[8, 0], [1, 0], [0, 0, 4]]> -> !transform.any_param
     transform.annotate %reduce "lowering_config" = %lowering_config : !transform.any_op, !transform.any_param
-    %exports = transform.structured.match ops{["hal.executable.export"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-    %subgroup_reduce = transform.param.constant #iree_codegen.translation_info<SPIRVBaseVectorize> -> !transform.any_param
-    %workgroup_size = transform.param.constant [16 : index, 1 : index, 1 : index] -> !transform.any_param
-    transform.annotate %exports "translation_info" = %subgroup_reduce : !transform.any_op, !transform.any_param
-    transform.annotate %exports "workgroup_size" = %workgroup_size : !transform.any_op, !transform.any_param
+    %funcs = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
+    %subgroup_reduce = transform.param.constant #iree_codegen.translation_info<SPIRVBaseVectorize workgroup_size = [16, 1, 1]> -> !transform.any_param
+    transform.annotate %funcs "translation_info" = %subgroup_reduce : !transform.any_op, !transform.any_param
     transform.print {name = "Setting reduce strategy to base vectorize"}
     transform.yield
   }

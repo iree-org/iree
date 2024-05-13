@@ -277,8 +277,106 @@ TEST_P(semaphore_test, PingPong) {
   iree_hal_semaphore_release(b2a);
 }
 
-// TODO: test waiting the same value multiple times.
-// TODO: test waiting for a finite amount of time.
+// Waiting the same value multiple times.
+TEST_P(semaphore_test, WaitOnTheSameValueMultipleTimes) {
+  iree_hal_semaphore_t* semaphore = CreateSemaphore();
+  std::thread thread(
+      [&]() { IREE_ASSERT_OK(iree_hal_semaphore_signal(semaphore, 1)); });
+
+  IREE_ASSERT_OK(iree_hal_semaphore_wait(
+      semaphore, 1, iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
+  CheckSemaphoreValue(semaphore, 1);
+
+  IREE_ASSERT_OK(iree_hal_semaphore_wait(
+      semaphore, 1, iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
+  CheckSemaphoreValue(semaphore, 1);
+
+  thread.join();
+
+  iree_hal_semaphore_release(semaphore);
+}
+
+// Waiting for a finite amount of time.
+TEST_P(semaphore_test, WaitForFiniteTime) {
+  auto generic_test_fn = [this](auto wait_fn) {
+    iree_hal_semaphore_t* semaphore = this->CreateSemaphore();
+
+    // Wait before signaling and make sure the semaphore value has not changed.
+    IREE_ASSERT_STATUS_IS(IREE_STATUS_DEADLINE_EXCEEDED, wait_fn(semaphore));
+    CheckSemaphoreValue(semaphore, 0);
+
+    std::thread signaling_thread(
+        [&]() { IREE_ASSERT_OK(iree_hal_semaphore_signal(semaphore, 1)); });
+
+    // The semaphore must advance at some point.
+    while (true) {
+      iree_status_t status = wait_fn(semaphore);
+      // The semaphore either timed out or has advanced.
+      IREE_ASSERT_TRUE(iree_status_is_ok(status) ||
+                       iree_status_is_deadline_exceeded(status));
+      if (iree_status_is_deadline_exceeded(status)) continue;
+      CheckSemaphoreValue(semaphore, 1);
+      break;
+    }
+
+    signaling_thread.join();
+    iree_hal_semaphore_release(semaphore);
+  };
+
+  // Immediate timeout.
+  generic_test_fn([](iree_hal_semaphore_t* semaphore) {
+    return iree_hal_semaphore_wait(semaphore, 1, iree_immediate_timeout());
+  });
+
+  // Absolute timeout.
+  generic_test_fn([](iree_hal_semaphore_t* semaphore) {
+    return iree_hal_semaphore_wait(semaphore, 1,
+                                   iree_make_deadline(iree_time_now() + 1));
+  });
+
+  // Relative timeout.
+  generic_test_fn([](iree_hal_semaphore_t* semaphore) {
+    return iree_hal_semaphore_wait(semaphore, 1, iree_make_timeout_ns(1));
+  });
+}
+
+// Wait on all semaphores on multiple places simultaneously.
+TEST_P(semaphore_test, SimultaneousMultiWaitAll) {
+  iree_hal_semaphore_t* semaphore1 = this->CreateSemaphore();
+  iree_hal_semaphore_t* semaphore2 = this->CreateSemaphore();
+
+  iree_hal_semaphore_t* semaphore_array[] = {semaphore1, semaphore2};
+  uint64_t payload_array[] = {1, 1};
+  iree_hal_semaphore_list_t semaphore_list = {
+      IREE_ARRAYSIZE(semaphore_array),
+      semaphore_array,
+      payload_array,
+  };
+
+  std::thread wait_thread1([&]() {
+    IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+        semaphore_list, iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
+  });
+
+  std::thread wait_thread2([&]() {
+    IREE_ASSERT_OK(iree_hal_semaphore_list_wait(
+        semaphore_list, iree_make_deadline(IREE_TIME_INFINITE_FUTURE)));
+  });
+
+  std::thread signal_thread([&]() {
+    IREE_ASSERT_OK(iree_hal_semaphore_list_signal(semaphore_list));
+  });
+
+  wait_thread1.join();
+  wait_thread2.join();
+  signal_thread.join();
+
+  CheckSemaphoreValue(semaphore1, 1);
+  CheckSemaphoreValue(semaphore2, 1);
+
+  iree_hal_semaphore_release(semaphore1);
+  iree_hal_semaphore_release(semaphore2);
+}
 
 }  // namespace cts
 }  // namespace hal

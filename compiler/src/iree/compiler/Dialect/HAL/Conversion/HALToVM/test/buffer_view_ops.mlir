@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-convert-hal-to-vm --iree-vm-target-index-bits=32 %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-vm-conversion --iree-vm-target-index-bits=32 %s | FileCheck %s
 
 // CHECK-LABEL: @element_type
 util.func public @element_type() -> i32 {

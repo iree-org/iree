@@ -15,6 +15,7 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -57,10 +58,10 @@ public:
 /// module.
 template <typename F>
 static LogicalResult
-verifyLoweringConfiguration(ModuleOp module,
+verifyLoweringConfiguration(FunctionOpInterface funcOp,
                             IREE::Codegen::TranslationInfoAttr translationInfo,
                             ArrayRef<int64_t> workgroupSize, F verificationFn) {
-  auto walkResult = module.walk([&](Operation *op) -> WalkResult {
+  auto walkResult = funcOp.walk([&](Operation *op) -> WalkResult {
     IREE::Codegen::LoweringConfigAttr loweringConfig = getLoweringConfig(op);
     if (!loweringConfig)
       return WalkResult::advance();
@@ -70,40 +71,27 @@ verifyLoweringConfiguration(ModuleOp module,
 }
 
 static LogicalResult
-verifyEntryPoint(ModuleOp moduleOp,
-                 IREE::Codegen::TranslationInfoAttr translationInfo,
-                 IREE::HAL::ExecutableExportOp exportOp) {
+verifyTranslationInfo(FunctionOpInterface funcOp,
+                      IREE::Codegen::TranslationInfoAttr translationInfo) {
   if (translationInfo.getDispatchLoweringPassPipeline() ==
       CodeGenPipeline::TransformDialectCodegen) {
     // Transform dialect encodes configuration into the schedule directly.
     return success();
   }
 
-  std::optional<mlir::ArrayAttr> workgroupSizeAttr =
-      exportOp.getWorkgroupSize();
-  if (!workgroupSizeAttr || workgroupSizeAttr->size() != 3) {
-    return moduleOp.emitError(
-        "expected workgroup size to have three dimensions for SPIR-V "
-        "pipelines");
-  }
-
-  std::array<int64_t, 3> workgroupSizes;
-  for (auto [index, attr] : llvm::enumerate(workgroupSizeAttr.value())) {
-    workgroupSizes[index] = llvm::cast<IntegerAttr>(attr).getInt();
-  }
-
+  SmallVector<int64_t> workgroupSizes =
+      llvm::to_vector(translationInfo.getWorkgroupSize());
   switch (translationInfo.getDispatchLoweringPassPipeline()) {
   case CodeGenPipeline::SPIRVBaseVectorize:
-    return verifyLoweringConfiguration(moduleOp, translationInfo,
-                                       workgroupSizes,
+    return verifyLoweringConfiguration(funcOp, translationInfo, workgroupSizes,
                                        verifySPIRVBaseVectorizePassPipeline);
   case CodeGenPipeline::SPIRVMatmulPromoteVectorize:
     return verifyLoweringConfiguration(
-        moduleOp, translationInfo, workgroupSizes,
+        funcOp, translationInfo, workgroupSizes,
         verifySPIRVMatmulPromoteVectorizePassPipeline);
   case CodeGenPipeline::SPIRVCooperativeMatrixVectorize:
     return verifyLoweringConfiguration(
-        moduleOp, translationInfo, workgroupSizes,
+        funcOp, translationInfo, workgroupSizes,
         verifySPIRVCooperativeMatrixVectorizePassPipeline);
   default:
     break;
@@ -112,31 +100,26 @@ verifyEntryPoint(ModuleOp moduleOp,
 }
 
 void SPIRVSelectLoweringStrategyPass::runOnOperation() {
-  IREE::HAL::ExecutableVariantOp variantOp = getOperation();
-  ModuleOp moduleOp = variantOp.getInnerModule();
+  auto moduleOp = getOperation();
+  for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
+    if (failed(initSPIRVLaunchConfig(funcOp))) {
+      funcOp.emitOpError("failed to set lowering configuration");
+      return signalPassFailure();
+    }
 
-  if (failed(initSPIRVLaunchConfig(moduleOp))) {
-    return signalPassFailure();
-  }
+    auto translationInfo = getTranslationInfo(funcOp);
+    if (!translationInfo) {
+      continue;
+    }
 
-  std::optional<IREE::Codegen::TranslationInfoAttr> translationInfo =
-      getIdenticalTranslationInfo(variantOp);
-  if (!translationInfo) {
-    moduleOp.emitOpError(
-        "unhandled compilation of entry point functions with different "
-        "translation info");
-    return signalPassFailure();
-  }
-
-  // Verify the properties of each entry point based on the target pipeline.
-  for (auto exportOp : variantOp.getExportOps()) {
-    if (failed(verifyEntryPoint(moduleOp, translationInfo.value(), exportOp))) {
+    // Verify the properties of each entry point based on the target pipeline.
+    if (failed(verifyTranslationInfo(funcOp, translationInfo))) {
       return signalPassFailure();
     }
   }
 }
 
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
+std::unique_ptr<OperationPass<ModuleOp>>
 createSPIRVSelectLoweringStrategyPass() {
   return std::make_unique<SPIRVSelectLoweringStrategyPass>();
 }

@@ -110,3 +110,25 @@ func.func @load_trunc_f32_bf16(%arg0 : memref<32xf32>, %arg1 : memref<32xbf16>) 
   vector.store %trunc, %arg1[%c0] : memref<32xbf16>, vector<4xbf16>
   return
 }
+
+// -----
+
+// Test that iree_codegen.extract_strided_metadata (or any other op from iree_codegen)
+// is rewritten correctly, along with any following ops.
+// See issue https://github.com/iree-org/iree/issues/17177
+// CHECK-LABEL: module @extract_strided_metadata
+module @extract_strided_metadata {
+  func.func private @external_func(memref<bf16>, index) attributes {llvm.bareptr = [true]}
+  // CHECK: func.func private @external_func(memref<i16>, index)
+  func.func @external_func_entry_point() attributes {translation_info = #iree_codegen.translation_info<CPUDefault>} {
+    %0 = hal.interface.constant.load[0] : i32
+    %1 = arith.index_castui %0 : i32 to index
+    %2 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%1) flags(ReadOnly) : memref<1x8x768xbf16, strided<[6144, 768, 1], offset: ?>>
+    // CHECK: %[[SUBSPAN:.+]] = hal.interface.binding.subspan {{.*}} : memref<1x8x768xi16,
+    %base_buffer, %offset, %sizes:3, %strides:3 = iree_codegen.extract_strided_metadata %2 : memref<1x8x768xbf16, strided<[6144, 768, 1], offset: ?>> -> memref<bf16>, index, index, index, index, index, index, index
+    // CHECK: {{.+}} = iree_codegen.extract_strided_metadata %[[SUBSPAN]] : memref<1x8x768xi16,
+    call @external_func(%base_buffer, %offset) : (memref<bf16>, index) -> ()
+    // CHECK: call @external_func({{.*}}) : (memref<i16>, index)
+    return
+  }
+}

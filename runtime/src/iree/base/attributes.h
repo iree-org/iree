@@ -207,4 +207,20 @@
 #define IREE_ATTRIBUTE_UNUSED
 #endif  // IREE_HAVE_ATTRIBUTE(maybe_unused / unused)
 
+//===----------------------------------------------------------------------===//
+// IREE_ATTRIBUTE_WEAK
+//===----------------------------------------------------------------------===//
+
+// Declares a symbol as weakly-linked, i.e. overridable at linking time.
+// This is only supported on certain toolchains, and has no effect on other
+// toolchains. Support is indicated by IREE_HAVE_ATTRIBUTE_WEAK.
+
+#if IREE_HAVE_ATTRIBUTE(weak) || (defined(__GNUC__) && !defined(__clang__))
+#define IREE_ATTRIBUTE_WEAK __attribute__((weak))
+#define IREE_HAVE_ATTRIBUTE_WEAK 1
+#else
+#define IREE_ATTRIBUTE_WEAK
+#define IREE_HAVE_ATTRIBUTE_WEAK 0
+#endif  // IREE_HAVE_ATTRIBUTE(weak)
+
 #endif  // IREE_BASE_ATTRIBUTES_H_

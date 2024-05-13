@@ -47,6 +47,7 @@ iree_cc_library(
   NAME
     StableHLOLegalization
   SRCS
+    "CheckVHLOStableHloMixUsage.cpp"
     "ConvertCollectives.cpp"
     "LegalizeCHLO.cpp"
     "LegalizeControlFlow.cpp"
@@ -94,10 +95,12 @@ iree_cc_library(
     MLIRSupport
     MLIRTensorDialect
     MLIRTensorUtils
+    MLIRTransformUtils
     MLIRTransforms
     MLIRVectorDialect
     StablehloBroadcastUtils
     StablehloOps
+    VhloOps
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::Util::IR
@@ -129,6 +132,7 @@ iree_cc_library(
     MLIRShapeOpsTransforms
     MLIRShapeToStandard
     MLIRTransforms
+    StablehloPasses
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::Util::Transforms

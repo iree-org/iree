@@ -44,8 +44,7 @@ the allocation you don't make_ ;)
 ### Avoiding Readbacks with `flow.stream`
 
 A majority of the readbacks we have today (manifested as `flow.tensor.load.*`
-ops) will be removed when we have an
-[HLO tensor->primitive conversion](#xla-hlo-tensor-to-primitive-conversion).
+ops) will be removed when we have an HLO tensor->primitive conversion.
 There will still be cases when readbacks are required for correctness but they
 usually fall into a small set of usage patterns. For those that don't this is
 one place where IREE will warn about performance issues, allowing programs that

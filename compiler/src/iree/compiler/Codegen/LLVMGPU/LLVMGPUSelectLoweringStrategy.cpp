@@ -13,6 +13,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
 #include "mlir/Dialect/PDL/IR/PDL.h"
 #include "mlir/Dialect/PDLInterp/IR/PDLInterp.h"
@@ -66,10 +67,10 @@ public:
 /// module.
 template <typename F>
 static LogicalResult
-verifyLoweringConfiguration(ModuleOp module,
+verifyLoweringConfiguration(FunctionOpInterface funcOp,
                             IREE::Codegen::TranslationInfoAttr translationInfo,
                             ArrayRef<int64_t> workgroupSize, F verificationFn) {
-  auto walkResult = module.walk([&](Operation *op) -> WalkResult {
+  auto walkResult = funcOp.walk([&](Operation *op) -> WalkResult {
     IREE::Codegen::LoweringConfigAttr loweringConfig = getLoweringConfig(op);
     if (!loweringConfig)
       return WalkResult::advance();
@@ -79,49 +80,41 @@ verifyLoweringConfiguration(ModuleOp module,
 }
 
 static LogicalResult
-verifyEntryPoint(ModuleOp moduleOp,
-                 IREE::Codegen::TranslationInfoAttr translationInfo,
-                 IREE::HAL::ExecutableExportOp exportOp) {
-  std::optional<mlir::ArrayAttr> workgroupSizeAttr =
-      exportOp.getWorkgroupSize();
-
-  if (workgroupSizeAttr.has_value()) {
-    std::array<int64_t, 3> workgroupSizes;
-    for (auto [index, attr] : llvm::enumerate(workgroupSizeAttr.value())) {
-      workgroupSizes[index] = llvm::cast<IntegerAttr>(attr).getInt();
-    }
-    return verifyLoweringConfiguration(moduleOp, translationInfo,
-                                       workgroupSizes, verifyGPUMatmulPipeline);
+verifyEntryPoint(FunctionOpInterface funcOp,
+                 IREE::Codegen::TranslationInfoAttr translationInfo) {
+  std::optional<SmallVector<int64_t>> workgroupSize = getWorkgroupSize(funcOp);
+  if (!workgroupSize) {
+    return funcOp->emitOpError(
+        "failed to get workgroup size needed for verification");
   }
+
+  return verifyLoweringConfiguration(
+      funcOp, translationInfo, workgroupSize.value(), verifyGPUMatmulPipeline);
   return success();
 }
 
 void LLVMGPUSelectLoweringStrategyPass::runOnOperation() {
-  IREE::HAL::ExecutableVariantOp variantOp = getOperation();
-  ModuleOp moduleOp = variantOp.getInnerModule();
+  auto moduleOp = getOperation();
+  for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
+    if (failed(initGPULaunchConfig(funcOp))) {
+      return signalPassFailure();
+    }
 
-  if (failed(initGPULaunchConfig(moduleOp))) {
-    return signalPassFailure();
-  }
+    IREE::Codegen::TranslationInfoAttr translationInfo =
+        getTranslationInfo(funcOp);
+    if (!translationInfo) {
+      // Dont do anything if translation info is not set.
+      return;
+    }
 
-  std::optional<IREE::Codegen::TranslationInfoAttr> translationInfo =
-      getIdenticalTranslationInfo(variantOp);
-  if (!translationInfo) {
-    moduleOp.emitOpError(
-        "unhandled compilation of entry point functions with different "
-        "translation info");
-    return signalPassFailure();
-  }
-
-  // Verify the properties of each entry point based on the target pipeline.
-  for (auto exportOp : variantOp.getExportOps()) {
-    if (failed(verifyEntryPoint(moduleOp, translationInfo.value(), exportOp))) {
+    // Verify the properties of each entry point based on the target pipeline.
+    if (failed(verifyEntryPoint(funcOp, translationInfo))) {
       return signalPassFailure();
     }
   }
 }
 
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
+std::unique_ptr<OperationPass<ModuleOp>>
 createLLVMGPUSelectLoweringStrategyPass() {
   return std::make_unique<LLVMGPUSelectLoweringStrategyPass>();
 }

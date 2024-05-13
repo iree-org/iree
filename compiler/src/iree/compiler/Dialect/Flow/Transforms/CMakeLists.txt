@@ -25,38 +25,44 @@ iree_cc_library(
   HDRS
     "ConvertRegionToWorkgroups.h"
     "FormDispatchRegions.h"
+    "FusionUtils.h"
     "Passes.h"
     "Passes.h.inc"
     "RegionOpUtils.h"
   SRCS
     "AnnotateDispatches.cpp"
-    "CaptureDispatchDynamicDims.cpp"
+    "BubbleUpExpandShapes.cpp"
+    "CaptureDynamicDims.cpp"
     "CleanupTensorShapes.cpp"
     "CloneProducersIntoDispatchRegions.cpp"
     "CollapseDimensions.cpp"
-    "CollapseReductionDims.cpp"
+    "CollapseReductionDimensions.cpp"
+    "ConvertMeshToFlow.cpp"
     "ConvertRegionToWorkgroups.cpp"
     "ConvertToFlow.cpp"
     "DeduplicateExecutables.cpp"
     "DispatchWithTransformDialect.cpp"
     "DumpDispatchGraph.cpp"
+    "ElementwiseOpFusion.cpp"
     "ExportBenchmarkFuncs.cpp"
     "FoldUnitExtentDims.cpp"
     "FormDispatchRegions.cpp"
     "FormDispatchWorkgroups.cpp"
     "FormScalarDispatches.cpp"
     "FusionOfTensorOps.cpp"
+    "FusionPreprocessing.cpp"
+    "FusionUtils.cpp"
     "InitializeEmptyTensors.cpp"
     "InjectDispatchTracing.cpp"
     "InjectTensorTracing.cpp"
     "InsertDispatchDebugTargets.cpp"
-    "InterchangeGenericOps.cpp"
     "InterchangeTransposeGenericOps.cpp"
+    "OutlineConstants.cpp"
     "OutlineDispatchExterns.cpp"
     "OutlineDispatchRegions.cpp"
-    "PassDetail.h"
     "Passes.cpp"
     "RegionOpUtils.cpp"
+    "SinkReshapes.cpp"
     "SplitReduction.cpp"
     "TensorPadToTensorInsertSlice.cpp"
     "TopLevelSCFToCFG.cpp"
@@ -81,6 +87,7 @@ iree_cc_library(
     MLIRMathDialect
     MLIRMemRefDialect
     MLIRMemRefTransforms
+    MLIRMeshDialect
     MLIRPDLDialect
     MLIRPDLInterpDialect
     MLIRParser
@@ -97,6 +104,8 @@ iree_cc_library(
     MLIRTransformDialectTransforms
     MLIRTransformUtils
     MLIRTransforms
+    iree::compiler::Dialect::Encoding::IR
+    iree::compiler::Dialect::Flow::Conversion::MeshToFlow
     iree::compiler::Dialect::Flow::Conversion::TensorToFlow
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR

@@ -55,6 +55,36 @@ struct InlineStringBuilder : public StringBuilder {
   char storage[Capacity] = {0};
 };
 
+struct StringPairBuilder {
+  static StringPairBuilder MakeSystem() {
+    iree_string_pair_builder_t builder;
+    iree_string_pair_builder_initialize(iree_allocator_system(), &builder);
+    return StringPairBuilder(builder);
+  }
+
+  explicit StringPairBuilder(iree_string_pair_builder_t builder)
+      : builder(std::move(builder)) {}
+
+  ~StringPairBuilder() { iree_string_pair_builder_deinitialize(&builder); }
+
+  operator iree_string_pair_builder_t*() { return &builder; }
+
+  iree_string_pair_builder_t builder;
+
+  std::string PairFirstToString(iree_host_size_t i) {
+    iree_string_pair_t* pair = iree_string_pair_builder_pairs(&builder) + i;
+    return std::string(pair->first.data, pair->first.size);
+  }
+
+  std::string PairSecondToString(iree_host_size_t i) {
+    iree_string_pair_t* pair = iree_string_pair_builder_pairs(&builder) + i;
+    return std::string(pair->second.data, pair->second.size);
+  }
+
+ protected:
+  StringPairBuilder() = default;
+};
+
 TEST(StringBuilderTest, QueryEmpty) {
   auto builder = StringBuilder::MakeEmpty();
   EXPECT_EQ(iree_string_builder_buffer(builder),
@@ -215,6 +245,74 @@ TEST(StringBuilderTest, SizeCalculation) {
   // Reservation should fail because there's no allocator.
   EXPECT_THAT(Status(iree_string_builder_reserve(builder, 4)),
               StatusIs(StatusCode::kResourceExhausted));
+}
+
+TEST(StringBuilderTest, ReserveForAppend) {
+  auto builder = StringBuilder::MakeSystem();
+  IREE_EXPECT_OK(iree_string_builder_append_format(builder, "def"));
+  char* append_buffer;
+  iree_host_size_t append_capacity;
+  // 4096 is big enough that it will exceed the initial allocation.
+  IREE_EXPECT_OK(iree_string_builder_reserve_for_append(
+      builder, 4096, &append_buffer, &append_capacity));
+  ASSERT_GE(append_capacity, 4096);
+  memset(append_buffer, 0xff, append_capacity);
+  memcpy(append_buffer, ":hello", 6);
+  iree_string_builder_commit_append(builder, 6);
+  EXPECT_EQ(builder.ToString(), std::string("def:hello"));
+  EXPECT_EQ(builder.builder.buffer[builder.builder.size], 0);
+}
+
+TEST(StringPairBuilderTest, ReallocAndSize) {
+  auto builder = StringPairBuilder::MakeSystem();
+  ASSERT_EQ(iree_string_pair_builder_size(builder), 0);
+  IREE_EXPECT_OK(iree_string_pair_builder_add(
+      builder, iree_make_cstring_pair("name", "value")));
+  auto orig_capacity = builder.builder.pairs_capacity;
+  ASSERT_GE(orig_capacity, 1);
+  for (iree_host_size_t i = 0; i < orig_capacity + 1; ++i) {
+    IREE_EXPECT_OK(iree_string_pair_builder_add(
+        builder, iree_make_cstring_pair("name", "value")));
+  }
+  ASSERT_GT(builder.builder.pairs_capacity, orig_capacity);
+
+  iree_host_size_t expected_size = orig_capacity + 2;
+  ASSERT_EQ(iree_string_pair_builder_size(builder), expected_size);
+  for (iree_host_size_t i = 0; i < expected_size; ++i) {
+    EXPECT_EQ(builder.PairFirstToString(i), "name");
+    EXPECT_EQ(builder.PairSecondToString(i), "value");
+  }
+}
+
+TEST(StringPairBuilderTest, AddInt32) {
+  auto builder = StringPairBuilder::MakeSystem();
+  IREE_EXPECT_OK(iree_string_pair_builder_add_int32(
+      builder, iree_make_cstring_view("key"), 1));
+  IREE_EXPECT_OK(iree_string_pair_builder_add_int32(
+      builder, iree_make_cstring_view("key"), 0));
+  EXPECT_EQ(builder.PairFirstToString(0), "key");
+  EXPECT_EQ(builder.PairSecondToString(0), "1");
+  EXPECT_EQ(builder.PairFirstToString(1), "key");
+  EXPECT_EQ(builder.PairSecondToString(1), "0");
+}
+
+TEST(StringPairBuilderTest, EmplaceString) {
+  auto builder = StringPairBuilder::MakeSystem();
+  std::vector<iree_string_view_t> all_emplaced;
+  // Just ensure a couple of reallocs.
+  for (int i = 0; i < 128; ++i) {
+    iree_string_view_t emplaced = iree_make_cstring_view("foobar");
+    iree_string_view_t original = emplaced;
+    IREE_EXPECT_OK(iree_string_pair_builder_emplace_string(builder, &emplaced));
+    EXPECT_NE(emplaced.data, original.data);
+    all_emplaced.push_back(emplaced);
+  }
+
+  for (iree_string_view_t emplaced : all_emplaced) {
+    EXPECT_EQ(
+        iree_string_view_compare(emplaced, iree_make_cstring_view("foobar")),
+        0);
+  }
 }
 
 }  // namespace

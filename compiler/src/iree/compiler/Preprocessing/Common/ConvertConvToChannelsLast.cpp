@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Preprocessing/Common/PassDetail.h"
 #include "iree/compiler/Preprocessing/Common/Passes.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Debug.h"
@@ -27,6 +26,9 @@
 #define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 namespace mlir::iree_compiler::Preprocessing {
+
+#define GEN_PASS_DEF_CONVERTCONVTOCHANNELSLASTPASS
+#include "iree/compiler/Preprocessing/Common/Passes.h.inc" // IWYU pragma: export
 
 using ConvBuilderFn = std::function<Value(
     OpBuilder &b, Location loc, linalg::LinalgOp srcConv, Value input,
@@ -188,7 +190,7 @@ createTransposeAsTensorPack(
     return std::make_tuple(input, std::nullopt, inputMap);
   }
 
-  RankedTensorType inType = input.getType().cast<RankedTensorType>();
+  RankedTensorType inType = cast<RankedTensorType>(input.getType());
   auto elementType = inType.getElementType();
   auto inputShape(inType.getShape());
 
@@ -257,7 +259,7 @@ static Value createTransposeAsTensorUnPack(PatternRewriter &rewriter,
                                            int tilingFactor) {
   Value packedOutput = output;
   if (tilingFactor <= 0) {
-    RankedTensorType outType = output.getType().cast<RankedTensorType>();
+    RankedTensorType outType = cast<RankedTensorType>(output.getType());
     auto elementType = outType.getElementType();
     auto outputShape(outType.getShape());
     int64_t rank = outType.getRank();
@@ -331,7 +333,7 @@ transposeConvLikeLinalgOp(PatternRewriter &rewriter, linalg::LinalgOp convOp,
   Location loc = convOp.getLoc();
 
   linalg::ConvolutionDimensions convDims;
-  auto errString = getMatchConvolutionMessage(
+  StringRef errString = getMatchConvolutionMessage(
       linalg::detail::isConvolutionInterfaceImpl(convOp, &convDims));
   if (!errString.empty()) {
     return failure();
@@ -342,6 +344,10 @@ transposeConvLikeLinalgOp(PatternRewriter &rewriter, linalg::LinalgOp convOp,
   }
 
   if (convDims.outputChannel.size() > 1) {
+    return failure();
+  }
+
+  if (convDims.filterLoop.empty()) {
     return failure();
   }
 
@@ -525,7 +531,7 @@ public:
       return failure();
 
     RankedTensorType destType =
-        packOp.getDest().getType().cast<RankedTensorType>();
+        cast<RankedTensorType>(packOp.getDest().getType());
     ArrayRef<int64_t> destShape = destType.getShape();
     ArrayRef<int64_t> innerDimsPos = packOp.getInnerDimsPos();
 
@@ -597,7 +603,7 @@ public:
       return failure();
 
     RankedTensorType srcType =
-        unpackOp.getSource().getType().cast<RankedTensorType>();
+        cast<RankedTensorType>(unpackOp.getSource().getType());
     ArrayRef<int64_t> srcShape = srcType.getShape();
 
     ArrayRef<int64_t> innerDimsPos = unpackOp.getInnerDimsPos();
@@ -615,7 +621,7 @@ public:
     }
 
     RankedTensorType destType =
-        unpackOp.getDest().getType().cast<RankedTensorType>();
+        cast<RankedTensorType>(unpackOp.getDest().getType());
     SmallVector<int64_t> perm;
     for (int i = 0, e = destType.getRank(); i < e; i++) {
       if (!innerDims.count(i)) {
@@ -641,21 +647,12 @@ public:
   }
 };
 
-struct ConvertConvToChannelsLastPass
-    : public ConvertConvToChannelsLastBase<ConvertConvToChannelsLastPass> {
+class ConvertConvToChannelsLastPass
+    : public iree_compiler::Preprocessing::impl::
+          ConvertConvToChannelsLastPassBase<ConvertConvToChannelsLastPass> {
 public:
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg::LinalgDialect>();
-    registry.insert<tensor::TensorDialect>();
-  }
-  LogicalResult initializeOptions(StringRef options) override {
-    if (failed(Pass::initializeOptions(options))) {
-      return failure();
-    }
-    tilingFactor = tileSize;
-    return success();
-  }
-
+  using iree_compiler::Preprocessing::impl::ConvertConvToChannelsLastPassBase<
+      ConvertConvToChannelsLastPass>::ConvertConvToChannelsLastPassBase;
   void runOnOperation() override {
     auto op = getOperation();
     MLIRContext *context = &getContext();
@@ -716,15 +713,8 @@ public:
 
     LDBG("after generalizing all remaining packs/unpacks\n" << *op);
   }
-
-private:
-  int64_t tilingFactor;
 };
 
 } // namespace
-
-std::unique_ptr<Pass> createConvertConvToChannelsLastPass() {
-  return std::make_unique<ConvertConvToChannelsLastPass>();
-}
 
 } // namespace mlir::iree_compiler::Preprocessing

@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/TransformStrategies/Common/Common.h"
-
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensions.h"
 #include "iree/compiler/Codegen/TransformStrategies/Common/AbstractReductionStrategy.h"
@@ -34,7 +33,7 @@ using iree_compiler::IREE::transform_dialect::ForallToWorkgroupOp;
 using iree_compiler::IREE::transform_dialect::IREEBufferizeOp;
 using iree_compiler::IREE::transform_dialect::IREEEliminateEmptyTensorsOp;
 using iree_compiler::IREE::transform_dialect::
-    IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp;
+    PopulateWorkgroupCountRegionUsingNumThreadsSliceOp;
 using transform::FuseIntoContainingOp;
 using transform::HoistLoopInvariantSubsetsOp;
 using transform::MatchOp;
@@ -151,7 +150,8 @@ void mlir::iree_compiler::buildCanonicalizationAndEnablingTransforms(
     if (populatePatternsFn)
       populatePatternsFn(b, loc);
   });
-  b.create<IREE::transform_dialect::ApplyLoopIndependentCodeMotionOp>(funcH);
+  b.create<IREE::transform_dialect::IREEApplyLoopIndependentCodeMotionOp>(
+      funcH);
   b.create<mlir::transform::ApplyCommonSubexpressionEliminationOp>(funcH);
 }
 
@@ -275,21 +275,21 @@ Value mlir::iree_compiler::buildPad(
     ImplicitLocOpBuilder &b, Value opH, ArrayRef<Attribute> paddingValues,
     ArrayRef<int64_t> paddingDimensions, ArrayRef<int64_t> packingDimensions,
     ArrayRef<SmallVector<int64_t>> transposePaddings) {
-  SmallVector<int64_t> padToMultipleOf(paddingDimensions.size(), 1);
+  SmallVector<int64_t> staticPadToMultipleOf(paddingDimensions.size(), 1);
   SmallVector<Attribute> transposeAttrs;
   for (auto &transp : transposePaddings)
     transposeAttrs.push_back(b.getI64ArrayAttr(transp));
-  SmallVector<Type> resultTypes;
-  resultTypes.push_back(opH.getType());
-  resultTypes.push_back(transform::AnyOpType::get(b.getContext()));
-  resultTypes.push_back(transform::AnyOpType::get(b.getContext()));
+
+  Type resultTypes[] = {opH.getType(),
+                        transform::AnyOpType::get(b.getContext()),
+                        transform::AnyOpType::get(b.getContext())};
   return b
-      .create<transform::PadOp>(resultTypes, opH, b.getArrayAttr(paddingValues),
-                                b.getI64ArrayAttr(paddingDimensions),
-                                b.getI64ArrayAttr(padToMultipleOf),
-                                b.getI64ArrayAttr(packingDimensions),
-                                b.getArrayAttr(transposeAttrs),
-                                /*copyBack=*/b.getStringAttr("none"))
+      .create<transform::PadOp>(
+          resultTypes, opH, b.getArrayAttr(paddingValues),
+          b.getI64ArrayAttr(paddingDimensions),
+          /*padToMultipleOf=*/ValueRange{}, staticPadToMultipleOf,
+          b.getI64ArrayAttr(packingDimensions), b.getArrayAttr(transposeAttrs),
+          /*copyBack=*/b.getStringAttr("none"))
       ->getResult(0);
 }
 
@@ -362,8 +362,8 @@ Value mlir::iree_compiler::buildBufferize(ImplicitLocOpBuilder &b,
         b.create<IREE::transform_dialect::
                      ApplyFoldTensorSliceIntoTransferPatternsOp>(loc);
       });
-  b.create<IREEEliminateEmptyTensorsOp>(variantH);
-  variantH = b.create<IREEBufferizeOp>(variantH, targetGpu);
+  b.create<IREEEliminateEmptyTensorsOp>(funcH);
+  variantH = b.create<IREEBufferizeOp>(funcH, targetGpu);
   return variantH;
 }
 
@@ -449,7 +449,7 @@ mlir::iree_compiler::buildReductionStrategyBlockDistribution(
           /*threadDimMapping=*/b.getArrayAttr(blockDimMapping));
 
   // Handle the workgroup count region.
-  b.create<IREEPopulateWorkgroupCountRegionUsingNumThreadsSliceOp>(
+  b.create<PopulateWorkgroupCountRegionUsingNumThreadsSliceOp>(
       tileResult.forallH);
 
   fillH =

@@ -4,17 +4,14 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <numeric>
-
-#include "iree/compiler/Codegen/Common/GPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
-#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/Patterns.h"
@@ -23,11 +20,17 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Interfaces/DestinationStyleOpInterface.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-tensor-tile"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_GPUTENSORTILEPASS
+#include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
+
+namespace {
 
 class TileConsumerAndFuseInputProducer final
     : public OpInterfaceRewritePattern<TilingInterface> {
@@ -177,6 +180,8 @@ static void populateTilingPatterns(RewritePatternSet &patterns,
                                                  fuseInputProducer);
 }
 
+} // namespace
+
 LogicalResult tileReductionToSerialLoops(mlir::FunctionOpInterface funcOp,
                                          bool fuseInputProducer) {
   {
@@ -206,6 +211,7 @@ LogicalResult tileReductionToSerialLoops(mlir::FunctionOpInterface funcOp,
   }
 }
 
+namespace {
 /// Tile parallel dimensions according to the attribute tile sizes attached to
 /// each op.
 static LogicalResult tileParallelDims(mlir::FunctionOpInterface funcOp,
@@ -318,27 +324,20 @@ static LogicalResult tileAndUnrollConv(mlir::FunctionOpInterface funcOp) {
   return success();
 }
 
-namespace {
-struct GPUTensorTilePass : public GPUTensorTileBase<GPUTensorTilePass> {
-private:
-  // Distribute the workloads to warp if true otherwise distribute to threads.
-  bool distributeToWarp = false;
+struct GPUTensorTilePass final
+    : impl::GPUTensorTilePassBase<GPUTensorTilePass> {
+  using GPUTensorTilePassBase::GPUTensorTilePassBase;
 
-public:
-  GPUTensorTilePass(bool distributeToWarp)
-      : distributeToWarp(distributeToWarp) {}
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<affine::AffineDialect, gpu::GPUDialect, scf::SCFDialect>();
-  }
   void runOnOperation() override {
-    auto funcOp = getOperation();
-    if (!isEntryPoint(funcOp))
-      return;
+    FunctionOpInterface funcOp = getOperation();
 
-    auto workgroupSize = llvm::map_to_vector(
-        getEntryPoint(funcOp)->getWorkgroupSize().value(),
-        [&](Attribute attr) { return llvm::cast<IntegerAttr>(attr).getInt(); });
-    if (failed(tileParallelDims(funcOp, workgroupSize, distributeToWarp))) {
+    std::optional<SmallVector<int64_t>> workgroupSize =
+        getWorkgroupSize(funcOp);
+    if (!workgroupSize) {
+      return;
+    }
+    if (failed(tileParallelDims(funcOp, workgroupSize.value(),
+                                distributeToSubgroup))) {
       return signalPassFailure();
     }
 
@@ -367,11 +366,6 @@ public:
     });
   }
 };
+
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createGPUTensorTile(bool distributeToWarp) {
-  return std::make_unique<GPUTensorTilePass>(distributeToWarp);
-}
-
 } // namespace mlir::iree_compiler

@@ -118,6 +118,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Reducer:iree_reduce_lib",
         "//compiler/src/iree/compiler/Tools:init_passes_and_dialects",
         "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:BytecodeWriter",
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:Parser",
         "@llvm-project//mlir:Pass",

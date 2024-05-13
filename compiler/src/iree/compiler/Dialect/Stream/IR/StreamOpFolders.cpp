@@ -124,9 +124,9 @@ static TypedAttr tryNarrowPatternBits(TypedAttr patternAttr) {
   // Get the old pattern bitcast to an APInt. Splats are bitwise operations
   // and we don't care what the value originally was.
   APInt oldPattern;
-  if (auto floatAttr = patternAttr.dyn_cast<FloatAttr>()) {
+  if (auto floatAttr = dyn_cast<FloatAttr>(patternAttr)) {
     oldPattern = floatAttr.getValue().bitcastToAPInt();
-  } else if (auto intAttr = patternAttr.dyn_cast<IntegerAttr>()) {
+  } else if (auto intAttr = dyn_cast<IntegerAttr>(patternAttr)) {
     oldPattern = intAttr.getValue();
   } else {
     // Can't handle today.
@@ -1327,6 +1327,7 @@ void TensorFillOp::getCanonicalizationPatterns(RewritePatternSet &results,
 
 OpFoldResult TensorUpdateOp::fold(FoldAdaptor operands) {
   // TODO(benvanik): fold if target_size == update_size and affinity/lifetime.
+  // NOTE: must preserve in-place external storage ala AsyncUpdateOp.
   return {};
 }
 
@@ -1560,7 +1561,8 @@ namespace {
 
 // Turns fills that cover an entire target resource into splats.
 // This acts as a discard as it indicates we don't care about the previous
-// resource contents.
+// resource contents. Note that we only do this when we can locally prove that
+// it's safe to disassociate the result storage.
 //
 // Example:
 //  %0 = stream.async.fill %cst, %dst[%c0 to %dstsz for %dstsz] ... {%dstsz}
@@ -1570,13 +1572,20 @@ struct FlattenFullFillToSplat : public OpRewritePattern<AsyncFillOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(AsyncFillOp fillOp,
                                 PatternRewriter &rewriter) const override {
-    if (fillOp.getTargetLength() == fillOp.getTargetSize()) {
-      rewriter.replaceOpWithNewOp<IREE::Stream::AsyncSplatOp>(
-          fillOp, fillOp.getResult().getType(), fillOp.getValue(),
-          fillOp.getTargetSize(), fillOp.getAffinityAttr());
-      return success();
+    if (fillOp.getTargetLength() != fillOp.getTargetSize())
+      return failure();
+
+    auto targetOp = fillOp.getTarget().getDefiningOp();
+    if (!targetOp || IREE::Util::TiedOpInterface::findTiedBaseValue(
+                         fillOp.getTarget()) != fillOp.getTarget()) {
+      return rewriter.notifyMatchFailure(
+          fillOp, "unable to locally determine safety of eliding the target");
     }
-    return failure();
+
+    rewriter.replaceOpWithNewOp<IREE::Stream::AsyncSplatOp>(
+        fillOp, fillOp.getResult().getType(), fillOp.getValue(),
+        fillOp.getTargetSize(), fillOp.getAffinityAttr());
+    return success();
   }
 };
 
@@ -1699,18 +1708,131 @@ void AsyncFillOp::getCanonicalizationPatterns(RewritePatternSet &results,
 // stream.async.update
 //===----------------------------------------------------------------------===//
 
+// Returns true if |value| has known value semantics (it's produced locally
+// and is safe to drop mutations on if there are no observers).
+static bool hasValueSemantics(Value value) {
+  // Can't analyze function arguments (though we could add arg attrs to indicate
+  // value semantics).
+  auto *definingOp = value.getDefiningOp();
+  if (!definingOp)
+    return false;
+
+  // If produced by a tied op then see if the particular result is tied.
+  if (auto tiedOp = dyn_cast<IREE::Util::TiedOpInterface>(definingOp)) {
+    if (tiedOp.getTiedResultOperand(value))
+      return false;
+  }
+
+  // To be conservative we only allow stream dialect ops that produce the
+  // resource as we know they all indicate value semantics when non-tied - ops
+  // from other dialects may not.
+  if (!definingOp->hasTrait<OpTrait::IREE::Stream::AsyncPhaseOp>())
+    return false;
+
+  return true;
+}
+
 OpFoldResult AsyncUpdateOp::fold(FoldAdaptor operands) {
+  // If updating the entire target then just replace with the update.
+  // NOTE: we have to ensure the target is known to have value semantics as
+  // otherwise the update may be performing an update of an external resource.
   if (getUpdateSize() == getTargetSize() &&
-      getUpdate().getType() == getType()) {
-    // If updating the entire target then just replace with the update.
-    // Note that this breaks copy-on-write semantics but will be fixed up during
-    // canonicalization if needed.
+      getUpdate().getType() == getType() && hasValueSemantics(getTarget())) {
     return getUpdate();
   }
   return {};
 }
 
 namespace {
+
+// Detects updates that are overwriting entire tensors that could be folded into
+// an in-place producer operation.
+//
+// Example:
+//  %1 = stream.async.dispatch ... %0 -> %0
+//  %2 = stream.async.update %1, %0[full]
+// ->
+//  %2 = stream.async.dispatch .... %0 -> %0
+struct ElideInPlaceUpdate : public OpRewritePattern<AsyncUpdateOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(AsyncUpdateOp updateOp,
+                                PatternRewriter &rewriter) const override {
+    // Look for entire tensor replacement.
+    const bool isOverwrite =
+        updateOp.getUpdateSize() == updateOp.getTargetSize() &&
+        updateOp.getUpdate().getType() == updateOp.getType();
+    if (!isOverwrite) {
+      // Ignore partial updates.
+      return failure();
+    }
+
+    // Detect producers that are performing their operation in-place.
+    // This should be a global analysis to detect in-place operations across
+    // control flow/calls
+    auto updateOperand =
+        IREE::Util::TiedOpInterface::findTiedBaseValue(updateOp.getUpdate());
+    auto targetOperand =
+        IREE::Util::TiedOpInterface::findTiedBaseValue(updateOp.getTarget());
+
+    // Condition: if overwriting the entire tied operand then this is a no-op.
+    if (updateOperand != targetOperand) {
+      return rewriter.notifyMatchFailure(
+          updateOp,
+          "update overwrite target is not tied to the producer operand");
+    }
+
+    // If there are multiple users we may need them for copies. We need to
+    // ensure that any uses of the produced update are reads - if not
+    // copy-on-write will require the update op to exist in order to identify
+    // the condition.
+    SmallVector<AsyncAccessRange> accessRanges;
+    for (auto &use : updateOp.getUpdate().getUses()) {
+      // Ops that are async resource access aware let us see if the particular
+      // source update resource is written. Any tied ops will have their uses
+      // marked as writes so that we don't need to walk down all transitive
+      // users to detect writes.
+      if (auto accessOp =
+              dyn_cast<IREE::Stream::AsyncAccessOpInterface>(use.getOwner())) {
+        accessOp.getAsyncAccessRanges(accessRanges);
+        for (auto &accessRange : accessRanges) {
+          if (accessRange.resource == updateOp.getUpdate() &&
+              !accessRange.isReadOnly()) {
+            // TODO(benvanik): allow non-overlapping writes by checking
+            // accessRange.mayOverlap - may not be worth it due to the update
+            // source being the entire resource. If we did this on copies as
+            // well we'd want that.
+            return rewriter.notifyMatchFailure(
+                updateOp, "usage writes the update resource and conservatively "
+                          "blocks elision");
+          }
+        }
+        accessRanges.clear();
+        continue;
+      }
+
+      // Use memory effect analysis for ops in other dialects that don't
+      // indicate their access ranges. We conservatively fail if the op doesn't
+      // declare memory effects.
+      std::optional<SmallVector<MemoryEffects::EffectInstance>> effects =
+          getEffectsRecursively(use.getOwner());
+      if (!effects) {
+        // Effect analysis failed.
+        return rewriter.notifyMatchFailure(
+            updateOp, "usage has unknown memory effects and blocks elision");
+      }
+      for (const MemoryEffects::EffectInstance &effect : *effects) {
+        if (isa<MemoryEffects::Write>(effect.getEffect())) {
+          // Write effect indicates something we can't analyze (today).
+          return rewriter.notifyMatchFailure(
+              updateOp, "usage has side-effects and blocks elision");
+        }
+      }
+    }
+
+    rewriter.replaceOp(updateOp, updateOp.getUpdate());
+    return success();
+  }
+};
 
 // Turns a splat+update-from into a fill.
 //
@@ -1783,6 +1905,7 @@ void AsyncUpdateOp::getCanonicalizationPatterns(RewritePatternSet &results,
   //                 affinity/lifetime differ.
   // TODO(#6972): updates into splats could become alloca + fill exclusive
   //              region + update into undefined contents (used in padding).
+  results.insert<ElideInPlaceUpdate>(context);
   results.insert<CombineSplatUpdateFromToFill>(context);
   results.insert<CombineSliceUpdateFromToCopy>(context);
   results.insert<ElideUnusedOp<AsyncUpdateOp>>(context);

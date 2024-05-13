@@ -186,33 +186,31 @@ util.func public @clone_dequantization(%arg0: tensor<4096x32x128xi8>, %arg1: ten
 // -----
 
 #map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
-module {
-  util.func public @clone_dequantization_like(%arg0: tensor<32x1x16x1x8xi16>, %arg1: tensor<32x344x16x32x8xi4>) -> tensor<32x1x344x1x32xi32> {
-    %c0_i32 = arith.constant 0 : i32
-    %0 = tensor.empty() : tensor<32x1x16x1x8xi32>
-    %1 = linalg.generic {indexing_maps = [#map, #map],
-                         iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]}
-                         ins(%arg0 : tensor<32x1x16x1x8xi16>) outs(%0 : tensor<32x1x16x1x8xi32>) {
-    ^bb0(%in: i16, %out: i32):
-      %7 = arith.extsi %in : i16 to i32
-      linalg.yield %7 : i32
-    } -> tensor<32x1x16x1x8xi32>
-    %2 = tensor.empty() : tensor<32x344x16x32x8xi32>
-    %3 = linalg.generic {indexing_maps = [#map, #map],
-                         iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]}
-                         ins(%arg1 : tensor<32x344x16x32x8xi4>) outs(%2 : tensor<32x344x16x32x8xi32>) {
-    ^bb0(%in: i4, %out: i32):
-      %7 = arith.extui %in : i4 to i32
-      linalg.yield %7 : i32
-    } -> tensor<32x344x16x32x8xi32>
-    %4 = tensor.empty() : tensor<32x1x344x1x32xi32>
-    %5 = linalg.fill ins(%c0_i32 : i32) outs(%4 : tensor<32x1x344x1x32xi32>) -> tensor<32x1x344x1x32xi32>
-    %6 = flow.dispatch.region -> (tensor<32x1x344x1x32xi32>) {
-      %7 = linalg.batch_mmt4d ins(%1, %3 : tensor<32x1x16x1x8xi32>, tensor<32x344x16x32x8xi32>) outs(%5 : tensor<32x1x344x1x32xi32>) -> tensor<32x1x344x1x32xi32>
-      flow.return %7 : tensor<32x1x344x1x32xi32>
-    }
-    util.return %6 : tensor<32x1x344x1x32xi32>
+util.func public @clone_dequantization_like(%arg0: tensor<32x1x16x1x8xi16>, %arg1: tensor<32x344x16x32x8xi4>) -> tensor<32x1x344x1x32xi32> {
+  %c0_i32 = arith.constant 0 : i32
+  %0 = tensor.empty() : tensor<32x1x16x1x8xi32>
+  %1 = linalg.generic {indexing_maps = [#map, #map],
+                        iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]}
+                        ins(%arg0 : tensor<32x1x16x1x8xi16>) outs(%0 : tensor<32x1x16x1x8xi32>) {
+  ^bb0(%in: i16, %out: i32):
+    %7 = arith.extsi %in : i16 to i32
+    linalg.yield %7 : i32
+  } -> tensor<32x1x16x1x8xi32>
+  %2 = tensor.empty() : tensor<32x344x16x32x8xi32>
+  %3 = linalg.generic {indexing_maps = [#map, #map],
+                        iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]}
+                        ins(%arg1 : tensor<32x344x16x32x8xi4>) outs(%2 : tensor<32x344x16x32x8xi32>) {
+  ^bb0(%in: i4, %out: i32):
+    %7 = arith.extui %in : i4 to i32
+    linalg.yield %7 : i32
+  } -> tensor<32x344x16x32x8xi32>
+  %4 = tensor.empty() : tensor<32x1x344x1x32xi32>
+  %5 = linalg.fill ins(%c0_i32 : i32) outs(%4 : tensor<32x1x344x1x32xi32>) -> tensor<32x1x344x1x32xi32>
+  %6 = flow.dispatch.region -> (tensor<32x1x344x1x32xi32>) {
+    %7 = linalg.batch_mmt4d ins(%1, %3 : tensor<32x1x16x1x8xi32>, tensor<32x344x16x32x8xi32>) outs(%5 : tensor<32x1x344x1x32xi32>) -> tensor<32x1x344x1x32xi32>
+    flow.return %7 : tensor<32x1x344x1x32xi32>
   }
+  util.return %6 : tensor<32x1x344x1x32xi32>
 }
 //       CHECK: util.func public @clone_dequantization
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<32x1x16x1x8xi16>
@@ -268,3 +266,24 @@ util.func public @dequant_like_extf_reduction(%arg0: tensor<11008x32x128xf16>) -
 //  CHECK-SAME:       iterator_types = ["parallel", "reduction", "reduction"]
 //       CHECK:   flow.return %[[GEN]] :
 //       CHECK:   util.return %[[DISP]]
+
+// -----
+
+#map1 = affine_map<(d0) -> (d0)>
+util.func public @clone_elementwise_op_empty() -> tensor<1280xf32> {
+  %0 = flow.tensor.constant #flow.parameter.named<"model"::"unet.time_embedding.linear_2.bias"> : tensor<1280xf16>
+  %1 = tensor.empty() : tensor<1280xf32>
+  %2 = linalg.generic {indexing_maps = [#map1, #map1], iterator_types = ["parallel"]} ins(%0 : tensor<1280xf16>) outs(%1 : tensor<1280xf32>) {
+  ^bb0(%in: f16, %out: f32):
+    %3 = arith.extf %in : f16 to f32
+    linalg.yield %3 : f32
+  } -> tensor<1280xf32>
+  util.return %2 : tensor<1280xf32>
+}
+//      CHECK: util.func public @clone_elementwise_op_empty()
+//      CHECK:   %[[RETURN:.+]] = flow.dispatch.region
+//      CHECK:     %[[EMPTY:.+]] = tensor.empty()
+//      CHECK:     %[[GENERIC:.+]] = linalg.generic
+// CHECK-SAME:         outs(%[[EMPTY]] :
+//      CHECK:     flow.return %[[GENERIC]]
+//      CHECK:   util.return %[[RETURN]]

@@ -4,27 +4,26 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/GPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/IR/Dominance.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 
 namespace mlir::iree_compiler {
 
-namespace {
-struct GPUMultiBufferingPass
-    : public GPUMultiBufferingBase<GPUMultiBufferingPass> {
-  GPUMultiBufferingPass(unsigned numBuffers) : numBuffers(numBuffers) {}
+#define GEN_PASS_DEF_GPUMULTIBUFFERINGPASS
+#include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
 
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<affine::AffineDialect>();
-  }
+namespace {
+struct GPUMultiBufferingPass final
+    : impl::GPUMultiBufferingPassBase<GPUMultiBufferingPass> {
+  using GPUMultiBufferingPassBase::GPUMultiBufferingPassBase;
 
   void runOnOperation() override {
-    auto funcOp = getOperation();
+    FunctionOpInterface funcOp = getOperation();
 
     // First hoist all shared memory allocations to the entry block of the
     // function. We can see memref.alloc in loops after bufferizing scf.forall
@@ -67,15 +66,7 @@ struct GPUMultiBufferingPass
       }
     }
   }
-
-private:
-  unsigned numBuffers;
 };
+
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createGPUMultiBuffering(unsigned numBuffers) {
-  return std::make_unique<GPUMultiBufferingPass>(numBuffers);
-}
-
 } // namespace mlir::iree_compiler

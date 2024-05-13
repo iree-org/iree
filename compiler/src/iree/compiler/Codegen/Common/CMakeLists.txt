@@ -31,6 +31,7 @@ iree_cc_library(
     MLIRLinalgTransforms
     MLIRMemRefDialect
     MLIRPass
+    MLIRTransformUtils
     MLIRTransforms
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Dialect::HAL::IR
@@ -49,16 +50,32 @@ iree_tablegen_library(
 
 iree_cc_library(
   NAME
+    VectorLayoutAnalysis
+  HDRS
+    "VectorLayoutAnalysis.h"
+  SRCS
+    "VectorLayoutAnalysis.cpp"
+  DEPS
+    IREEVectorExtDialect
+    LLVMSupport
+    MLIRAnalysis
+    MLIRIR
+    MLIRVectorDialect
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     Common
   HDRS
     "BufferizationAnalysis.h"
     "EncodingUtils.h"
     "ExtractAddressComputation.h"
+    "PassUtils.h"
     "Passes.h"
     "TileSizeSelection.h"
     "Transforms.h"
     "UserConfig.h"
-    "VectorLayoutAnalysis.h"
   SRCS
     "AddFastMathFlags.cpp"
     "BubbleUpOrdinalOps.cpp"
@@ -92,6 +109,7 @@ iree_cc_library(
     "IREEComprehensiveBufferizePass.cpp"
     "IREEExpandStridedMetadata.cpp"
     "InstrumentMemoryAccesses.cpp"
+    "LowerExecutableUsingTransformDialect.cpp"
     "LowerUKernelsToCalls.cpp"
     "MaterializeEncodingIntoNop.cpp"
     "MaterializeEncodingIntoPackUnPack.cpp"
@@ -99,8 +117,10 @@ iree_cc_library(
     "OptimizeTensorInsertExtractSlices.cpp"
     "OptimizeVectorTransferPass.cpp"
     "PadDynamicAlloc.cpp"
+    "PassUtils.cpp"
     "Passes.cpp"
     "PolynomialApproximationPass.cpp"
+    "ReconcileTranslationInfo.cpp"
     "RematerializeParallelOps.cpp"
     "RemoveTrivialLoops.cpp"
     "ReplaceSlowMinMaxOps.cpp"
@@ -112,11 +132,11 @@ iree_cc_library(
     "TileSizeSelection.cpp"
     "TypePropagationPass.cpp"
     "UserConfig.cpp"
-    "VectorLayoutAnalysis.cpp"
     "VectorizePad.cpp"
   DEPS
     ::PassHeaders
     ::PassesIncGen
+    IREELinalgTransformDialect
     IREEVectorExtDialect
     LLVMSupport
     MLIRAffineAnalysis
@@ -157,6 +177,7 @@ iree_cc_library(
     MLIRTensorUtils
     MLIRTilingInterface
     MLIRTransformDialect
+    MLIRTransformUtils
     MLIRTransforms
     MLIRValueBoundsOpInterface
     MLIRVectorDialect
@@ -169,6 +190,7 @@ iree_cc_library(
     iree::compiler::Codegen::Interfaces::UKernelOpInterface
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
+    iree::compiler::Dialect::Encoding::IR
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::LinalgExt::IR
@@ -230,6 +252,7 @@ iree_cc_library(
     MLIRTransformDialect
     MLIRTransformDialectTransforms
     MLIRTransformLoopExtension
+    MLIRTransformUtils
     MLIRTransforms
     MLIRVectorDialect
     MLIRVectorTransformOps
@@ -240,6 +263,7 @@ iree_cc_library(
     iree::compiler::Codegen::LLVMCPU::TransformExtensions::LLVMCPUExtensions
     iree::compiler::Codegen::LLVMGPU::TransformExtensions::LLVMGPUExtensions
     iree::compiler::Codegen::TransformStrategies::Common::TransformStrategies
+    iree::compiler::Dialect::Encoding::IR
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Flow::TransformExtensions::FlowExtensions
     iree::compiler::Dialect::LinalgExt::IR

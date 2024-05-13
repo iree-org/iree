@@ -60,7 +60,7 @@ iree_cc_library(
     iree::compiler::Codegen::LLVMGPU
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::HAL::Target
-    iree::compiler::Dialect::HAL::Target::LLVMLinkerUtils
+    iree::compiler::Dialect::HAL::Utils::LLVMLinkerUtils
     iree::compiler::PluginAPI
     iree::compiler::Utils
     iree::schemas::rocm_executable_def_c_fbs
@@ -155,7 +155,7 @@ add_custom_target(iree_compiler_plugins_target_ROCM_GenDeviceLibs
 )
 
 # Ensure that the device libs are built when the compiler dylib is built.
-set_property(GLOBAL APPEND PROPERTY IREE_COMPILER_DYLIB_DEPENDS
+set_property(GLOBAL APPEND PROPERTY IREE_COMPILER_DEPENDS
   iree_compiler_plugins_target_ROCM_GenDeviceLibs)
 
 # Install.

@@ -35,34 +35,27 @@ static llvm::cl::opt<bool> clEnableUKernelsDecomposeLinalgGeneric(
                    "ukernels are enabled (experimental)"),
     llvm::cl::init(true));
 
-static void addTileAndDistributePasses(OpPassManager &pm) {
-  pm.addPass(createTileAndDistributeToWorkgroupsPass());
-  auto &nestedModulePM = pm.nest<ModuleOp>();
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createConvertToDestinationPassingStylePass());
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createFoldAffineMinInDistributedLoopsPass());
-  nestedModulePM.addPass(createCanonicalizerPass());
-  nestedModulePM.addPass(createCSEPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createFuseTensorPadWithConsumerPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createConcretizePadResultShapePass());
-  nestedModulePM.addNestedPass<func::FuncOp>(
+static void addTileAndDistributePasses(OpPassManager &funcPassManager) {
+  funcPassManager.addPass(createTileAndDistributeToWorkgroupsPass());
+  funcPassManager.addPass(createConvertToDestinationPassingStylePass());
+  funcPassManager.addPass(createFoldAffineMinInDistributedLoopsPass());
+  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createCSEPass());
+  funcPassManager.addPass(createFuseTensorPadWithConsumerPass());
+  funcPassManager.addPass(createConcretizePadResultShapePass());
+  funcPassManager.addPass(
       IREE::LinalgExt::createTileAndDecomposeAttentionPass());
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      IREE::LinalgExt::createTileAndDecomposeWinogradTransformPass());
+  funcPassManager.addPass(
+      IREE::LinalgExt::createDecomposeWinogradTransformPass());
 }
 
-void addVMVXDefaultPassPipeline(OpPassManager &passManager,
+void addVMVXDefaultPassPipeline(OpPassManager &funcPassManager,
                                 bool enableUKernels) {
-  addTileAndDistributePasses(passManager);
+  addTileAndDistributePasses(funcPassManager);
 
-  OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
   if (enableUKernels) {
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createDecomposeBatchMmt4DOpsPass());
-    nestedModulePM.addPass(
+    funcPassManager.addPass(createDecomposeBatchMmt4DOpsPass());
+    funcPassManager.addPass(
         createCPULowerToUKernelsPass(clSkipIntermediateRoundings));
   }
 
@@ -70,37 +63,33 @@ void addVMVXDefaultPassPipeline(OpPassManager &passManager,
   // Note that this must be done post-tiling because it changes the structure
   // of the dispatch region such that tiling is not always possible.
   if (enableUKernels && clEnableUKernelsDecomposeLinalgGeneric) {
-    passManager.nest<ModuleOp>().nest<func::FuncOp>().addPass(
-        createDecomposeLinalgGenericPass());
+    funcPassManager.addPass(createDecomposeLinalgGenericPass());
   }
 
   // Lower to buffers.
-  addCPUBufferizePasses(nestedModulePM);
+  addCPUBufferizePasses(funcPassManager);
 
   // Cleanup the IR that may now have unused loops.
-  nestedModulePM.addNestedPass<func::FuncOp>(
-      createRemoveSingleIterationLoopPass());
+  funcPassManager.addPass(createRemoveSingleIterationLoopPass());
 
   // Convert buffer-level microkernels.
   if (enableUKernels) {
-    nestedModulePM.addPass(createLowerUKernelOpsToCallsPass());
-    nestedModulePM.addNestedPass<func::FuncOp>(
-        createVMVXLowerLinalgMicrokernelsPass());
+    funcPassManager.addPass(createVMVXLowerLinalgMicrokernelsPass());
   }
 }
 
 // NOTE: this runs on the top-level program module containing all
 // hal.executable ops.
-void buildVMVXLinkingPassPipeline(OpPassManager &passManager) {
+void buildVMVXLinkingPassPipeline(OpPassManager &modulePassManager) {
   // Link together executables. This may produce some IR duplication.
-  passManager.addPass(createVMVXLinkExecutablesPass());
+  modulePassManager.addPass(createVMVXLinkExecutablesPass());
 
   // Cleanup IR duplication.
-  passManager.addNestedPass<IREE::HAL::ExecutableOp>(
+  modulePassManager.addNestedPass<IREE::HAL::ExecutableOp>(
       mlir::createCanonicalizerPass());
 
   // Assign final executable constant ordinals.
-  passManager.nest<IREE::HAL::ExecutableOp>()
+  modulePassManager.nest<IREE::HAL::ExecutableOp>()
       .addNestedPass<IREE::HAL::ExecutableVariantOp>(
           createVMVXAssignConstantOrdinalsPass());
 }
@@ -121,8 +110,8 @@ void registerCodegenVMVXPasses() {
   static PassPipelineRegistration<> VMVXLinkingPipeline(
       "iree-codegen-vmvx-linking-pipeline",
       "Runs the VMVX HAL executable linking pipeline",
-      [](OpPassManager &passManager) {
-        buildVMVXLinkingPassPipeline(passManager);
+      [](OpPassManager &modulePassManager) {
+        buildVMVXLinkingPassPipeline(modulePassManager);
       });
 }
 

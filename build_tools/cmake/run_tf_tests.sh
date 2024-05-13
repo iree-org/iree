@@ -62,3 +62,9 @@ if (( ${tests_passed} != 1 )); then
    echo "Some tests failed!!!"
    exit 1
 fi
+
+echo "***** Running TF and TFLite python api tests *****"
+
+TF_API_TEST_DIR="compiler/bindings/python/test/tools"
+
+pytest ${TF_API_TEST_DIR}/compiler_tflite_test.py ${TF_API_TEST_DIR}/compiler_tf_test.py

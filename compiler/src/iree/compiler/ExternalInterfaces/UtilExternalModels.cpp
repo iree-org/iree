@@ -6,6 +6,8 @@
 
 #include "iree/compiler/ExternalInterfaces/UtilExternalModels.h"
 
+#include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
@@ -13,8 +15,6 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MLProgram/IR/MLProgram.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-
-using namespace mlir::iree_compiler::IREE;
 
 namespace mlir::iree_compiler {
 
@@ -25,7 +25,7 @@ namespace {
 //===----------------------------------------------------------------------===//
 
 struct GlobalOpInterfaceExternalModel
-    : public Util::GlobalOpInterface::ExternalModel<
+    : public IREE::Util::GlobalOpInterface::ExternalModel<
           GlobalOpInterfaceExternalModel, ml_program::GlobalOp> {
   Attribute getGlobalInitialValue(Operation *op) const {
     return cast<ml_program::GlobalOp>(op).getValueAttr();
@@ -94,8 +94,8 @@ struct GlobalOpInterfaceExternalModel
 struct GenericNumericCastExternalModel {
   template <typename OpTy>
   struct ExternalModel
-      : public Util::NumericCastOpInterface::ExternalModel<ExternalModel<OpTy>,
-                                                           OpTy> {};
+      : public IREE::Util::NumericCastOpInterface::ExternalModel<
+            ExternalModel<OpTy>, OpTy> {};
 
   template <typename OpTy>
   static void add(MLIRContext *context) {
@@ -114,8 +114,8 @@ struct GenericNumericCastExternalModel {
 //===----------------------------------------------------------------------===//
 
 struct InsertSliceOpTiedOpInterface
-    : public Util::TiedOpInterface::ExternalModel<InsertSliceOpTiedOpInterface,
-                                                  tensor::InsertSliceOp> {
+    : public IREE::Util::TiedOpInterface::ExternalModel<
+          InsertSliceOpTiedOpInterface, tensor::InsertSliceOp> {
   Value getTiedResult(Operation *op, unsigned resultIndex) const {
     auto insertSliceOp = cast<tensor::InsertSliceOp>(op);
     return IREE::Util::TiedOpInterface::findTiedBaseValue(
@@ -134,8 +134,8 @@ struct InsertSliceOpTiedOpInterface
 
 template <typename OpTy>
 struct LinalgOpTiedOpInterface
-    : public Util::TiedOpInterface::ExternalModel<LinalgOpTiedOpInterface<OpTy>,
-                                                  OpTy> {
+    : public IREE::Util::TiedOpInterface::ExternalModel<
+          LinalgOpTiedOpInterface<OpTy>, OpTy> {
   Value getTiedResult(Operation *op, unsigned resultIndex) const {
     auto linalgOp = cast<OpTy>(op);
     return IREE::Util::TiedOpInterface::findTiedBaseValue(
@@ -304,37 +304,41 @@ void registerUtilExternalModels(DialectRegistry &registry) {
   // TODO(matthias-springer): Use a helper instead of listing all ops. This is
   // tricky because LinalgExtOps.td includes YieldOp.
   registry.addExtension(+[](MLIRContext *context,
-                            LinalgExt::IREELinalgExtDialect *dialect) {
-    LinalgExt::ScatterOp::attachInterface<
-        LinalgOpTiedOpInterface<LinalgExt::ScatterOp>>(*context);
-    LinalgExt::SortOp::attachInterface<
-        LinalgOpTiedOpInterface<LinalgExt::SortOp>>(*context);
-    LinalgExt::FftOp::attachInterface<
-        LinalgOpTiedOpInterface<LinalgExt::FftOp>>(*context);
-    LinalgExt::ScanOp::attachInterface<
-        LinalgOpTiedOpInterface<LinalgExt::ScanOp>>(*context);
-    LinalgExt::ReverseOp::attachInterface<
-        LinalgOpTiedOpInterface<LinalgExt::ReverseOp>>(*context);
-    LinalgExt::TopkOp::attachInterface<
-        LinalgOpTiedOpInterface<LinalgExt::TopkOp>>(*context);
-    LinalgExt::WinogradInputTransformOp::attachInterface<
-        LinalgOpTiedOpInterface<LinalgExt::WinogradInputTransformOp>>(*context);
-    LinalgExt::WinogradOutputTransformOp::attachInterface<
-        LinalgOpTiedOpInterface<LinalgExt::WinogradOutputTransformOp>>(
+                            IREE::LinalgExt::IREELinalgExtDialect *dialect) {
+    IREE::LinalgExt::ScatterOp::attachInterface<
+        LinalgOpTiedOpInterface<IREE::LinalgExt::ScatterOp>>(*context);
+    IREE::LinalgExt::SortOp::attachInterface<
+        LinalgOpTiedOpInterface<IREE::LinalgExt::SortOp>>(*context);
+    IREE::LinalgExt::FftOp::attachInterface<
+        LinalgOpTiedOpInterface<IREE::LinalgExt::FftOp>>(*context);
+    IREE::LinalgExt::ScanOp::attachInterface<
+        LinalgOpTiedOpInterface<IREE::LinalgExt::ScanOp>>(*context);
+    IREE::LinalgExt::ReverseOp::attachInterface<
+        LinalgOpTiedOpInterface<IREE::LinalgExt::ReverseOp>>(*context);
+    IREE::LinalgExt::TopkOp::attachInterface<
+        LinalgOpTiedOpInterface<IREE::LinalgExt::TopkOp>>(*context);
+    IREE::LinalgExt::WinogradInputTransformOp::attachInterface<
+        LinalgOpTiedOpInterface<IREE::LinalgExt::WinogradInputTransformOp>>(
         *context);
-    LinalgExt::AttentionOp::attachInterface<
-        LinalgOpTiedOpInterface<LinalgExt::AttentionOp>>(*context);
+    IREE::LinalgExt::WinogradFilterTransformOp::attachInterface<
+        LinalgOpTiedOpInterface<IREE::LinalgExt::WinogradFilterTransformOp>>(
+        *context);
+    IREE::LinalgExt::WinogradOutputTransformOp::attachInterface<
+        LinalgOpTiedOpInterface<IREE::LinalgExt::WinogradOutputTransformOp>>(
+        *context);
+    IREE::LinalgExt::AttentionOp::attachInterface<
+        LinalgOpTiedOpInterface<IREE::LinalgExt::AttentionOp>>(*context);
   });
 
   // Hoistable Op Interface registration.
 
   // Register hoistable type interfaces for LinalgExt ops.
-  registry.addExtension(+[](MLIRContext *context,
-                            IREE::LinalgExt::IREELinalgExtDialect *dialect) {
-    UnhoistableOpInterfaceHelper<
-        IREE::LinalgExt::SetEncodingOp,
-        IREE::LinalgExt::UpperBoundTileSizeOp>::registerOpInterface(context);
-  });
+  registry.addExtension(
+      +[](MLIRContext *context, IREE::Encoding::IREEEncodingDialect *dialect) {
+        UnhoistableOpInterfaceHelper<
+            IREE::Encoding::SetEncodingOp,
+            IREE::Encoding::UpperBoundTileSizeOp>::registerOpInterface(context);
+      });
   // Register hoistable type interfaces for linalg ops.
   // We have a specific allow-list for Linalg ops because we want to consider
   // new additions carefully.

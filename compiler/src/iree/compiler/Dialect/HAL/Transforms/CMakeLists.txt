@@ -57,6 +57,7 @@ iree_cc_library(
     MLIRSCFToControlFlow
     MLIRSupport
     MLIRTensorDialect
+    MLIRTransformUtils
     MLIRTransforms
     iree::compiler::Codegen::Common::CPU::CommonCPUPasses
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
@@ -70,6 +71,7 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::HAL::Target
+    iree::compiler::Dialect::HAL::Target::Devices
     iree::compiler::Dialect::Stream::IR
     iree::compiler::Dialect::Stream::Transforms
     iree::compiler::Dialect::Util::Conversion

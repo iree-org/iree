@@ -9,33 +9,45 @@
 
 include "mlir/Pass/PassBase.td"
 
-def ApplyPDLPatterns : Pass<"iree-preprocessing-apply-pdl-patterns", "ModuleOp"> {
+def ApplyPDLPatternsPass : Pass<"iree-preprocessing-apply-pdl-patterns", "ModuleOp"> {
   let summary = "Parse an input file containing PDL patterns and apply them as patterns";
   let options = [
     Option<"patternsFile", "patterns-file", "std::string",
       /*default=*/"", "File path to file containing PDL patterns to use.">,
   ];
-}
-
-def ConvertConv2DToImg2Col :
-    Pass<"iree-preprocessing-convert-conv2d-to-img2col", ""> {
-  let summary = "Convert linalg convolution ops to matmul img2col based implementation";
-  let constructor = "mlir::iree_compiler::Preprocessing::createConvertConv2DToImg2ColPass()";
   let dependentDialects = [
-    "mlir::linalg::LinalgDialect",
+    "iree_compiler::IREE::Codegen::IREECodegenDialect",
+    "iree_compiler::IREE::Flow::FlowDialect",
+    "iree_compiler::IREE::Stream::StreamDialect",
+    "iree_compiler::IREE::Util::UtilDialect",
+    "mlir::arith::ArithDialect",
+    "mlir::memref::MemRefDialect, pdl::PDLDialect",
+    "mlir::pdl_interp::PDLInterpDialect",
+    "mlir::tensor::TensorDialect",
   ];
 }
 
-def ConvertConvToChannelsLast :
+def ConvertConv2DToImg2ColPass :
+    Pass<"iree-preprocessing-convert-conv2d-to-img2col", ""> {
+  let summary = "Convert linalg convolution ops to matmul img2col based implementation";
+  let dependentDialects = [
+    "mlir::linalg::LinalgDialect",
+    "mlir::tensor::TensorDialect",
+  ];
+}
+
+def ConvertConvToChannelsLastPass :
     Pass<"iree-preprocessing-convert-conv-to-channels-last", ""> {
   let summary = "Convert linalg convolutions to channels last.";
-  let constructor =
-      "mlir::iree_compiler::Preprocessing::createConvertConvToChannelsLastPass()";
   let options = [
-    Option<"tileSize", "tile-size", "int",
+    Option<"tilingFactor", "tiling-factor", "int",
            /*default=*/"0",
            "Tiling factor for the channel dimension of NCHW-like convolutions. "
            "Defaults to fully transposing all channel-like dimensions">,
+  ];
+  let dependentDialects = [
+    "mlir::linalg::LinalgDialect",
+    "mlir::tensor::TensorDialect",
   ];
 }
 
@@ -59,23 +71,62 @@ def InterpreterPass : Pass<"iree-preprocessing-transform-interpreter"> {
   ];
 }
 
-def MakeSingleDispatchForFunction :
+def MakeSingleDispatchForFunctionPass :
     InterfacePass<"iree-preprocessing-make-single-dispatch-for-function", "mlir::FunctionOpInterface"> {
   let summary = "Convert entire function into a single dispatch";
-  let constructor = "mlir::iree_compiler::Preprocessing::createMakeSingleDispatchForFunctionPass()";
   let dependentDialects = [
     "IREE::Flow::FlowDialect",
   ];
 }
 
-def PadLinalgOps :
+def PadToIntrinsics :
+    InterfacePass<"iree-preprocessing-pad-to-intrinsics", "mlir::FunctionOpInterface"> {
+  let summary = "Pad linalg ops such that we can use target's intrinsics.";
+  let dependentDialects = [
+    "mlir::linalg::LinalgDialect",
+  ];
+  let options = [
+      Option<"padTargetType", "pad-target-type", "Preprocessing::PadTargetType",
+             /*default=*/"Preprocessing::PadTargetType::All",
+             "Pad target-op type that is being specified.",
+             [{::llvm::cl::values(
+               clEnumValN(Preprocessing::PadTargetType::ConvOp, "conv",
+                "Pad convolution ops to intrinsics."),
+               clEnumValN(Preprocessing::PadTargetType::ContractionOp, "contraction",
+                "Pad contraction ops to intrinsics."),
+               clEnumValN(Preprocessing::PadTargetType::All, "all",
+                "Pad all ops to intrinsics.")
+              )}]>,
+  ];
+}
+
+def PadLinalgOpsPass :
     Pass<"iree-preprocessing-pad-linalg-ops", ""> {
   let summary = "Pad linalg ops to the next integer multiple of paddingSize.";
-  let constructor = "mlir::iree_compiler::Preprocessing::createPadLinalgOpsToIntegerMultiplePass()";
   let options = [
     Option<"paddingSize", "pad-size", "int",
            /*default=*/"4",
            "Specify the padding size">,
+  ];
+  let dependentDialects = [
+    "mlir::linalg::LinalgDialect",
+  ];
+}
+
+def TransposeMatmulPass : Pass<"iree-preprocessing-transpose-matmul-pass"> {
+  let summary = "Convert Linalg matmul ops to transposed variants";
+  let options = [
+    Option<"input", "input", "Preprocessing::TransposeMatmulInput",
+           /*default=*/"Preprocessing::TransposeMatmulInput::None",
+           "Input to transpose, one of: 'none' (default), 'lhs', 'rhs'",
+           [{llvm::cl::values(
+              clEnumValN(Preprocessing::TransposeMatmulInput::Lhs, "lhs",
+                         "Transpose LHS input matrix."),
+              clEnumValN(Preprocessing::TransposeMatmulInput::Rhs, "rhs",
+                         "Transpose RHS input matrix."),
+              clEnumValN(Preprocessing::TransposeMatmulInput::None, "none",
+                         "Transpose neither input (disable)."))
+           }]>
   ];
   let dependentDialects = [
     "mlir::linalg::LinalgDialect",

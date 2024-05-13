@@ -4,6 +4,10 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+// Needed to access dladdr on Linux. On MacOS, does nothing (available by
+// default).
+#define _GNU_SOURCE
+
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -325,6 +329,15 @@ iree_status_t iree_dynamic_library_attach_symbols_from_file(
 iree_status_t iree_dynamic_library_attach_symbols_from_memory(
     iree_dynamic_library_t* library, iree_const_byte_span_t buffer) {
   return iree_ok_status();
+}
+
+iree_status_t iree_dynamic_library_append_symbol_path_to_builder(
+    void* symbol, iree_string_builder_t* builder) {
+  Dl_info dl_info;
+  if (dladdr((void*)symbol, &dl_info) == 0) {
+    return iree_make_status(IREE_STATUS_NOT_FOUND);
+  }
+  return iree_string_builder_append_cstring(builder, dl_info.dli_fname);
 }
 
 #endif  // IREE_PLATFORM_*

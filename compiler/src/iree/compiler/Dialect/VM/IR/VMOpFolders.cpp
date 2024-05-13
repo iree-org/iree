@@ -109,11 +109,9 @@ struct InlineConstGlobalInitializer : public OpRewritePattern<InitializerOp> {
 
   bool isGlobalStoreOp(Operation *op) const {
     // TODO(benvanik): trait/interface to make this more generic?
-    return isa<IREE::VM::GlobalStoreI32Op>(op) ||
-           isa<IREE::VM::GlobalStoreI64Op>(op) ||
-           isa<IREE::VM::GlobalStoreF32Op>(op) ||
-           isa<IREE::VM::GlobalStoreF64Op>(op) ||
-           isa<IREE::VM::GlobalStoreRefOp>(op);
+    return isa<IREE::VM::GlobalStoreI32Op, IREE::VM::GlobalStoreI64Op,
+               IREE::VM::GlobalStoreF32Op, IREE::VM::GlobalStoreF64Op,
+               IREE::VM::GlobalStoreRefOp>(op);
   }
 };
 
@@ -3052,7 +3050,7 @@ struct SwapInvertedCondBranchOpTargets : public OpRewritePattern<CondBranchOp> {
     // if (auto xorOp = dyn_cast_or_null<XorI32Op>(condValue.getDefiningOp())) {
     //   Attribute rhs;
     //   if (matchPattern(xorOp.getRhs(), m_Constant(&rhs)) &&
-    //       rhs.cast<IntegerAttr>().getInt() == 1) {
+    //       cast<IntegerAttr>(rhs).getInt() == 1) {
     //     rewriter.replaceOpWithNewOp<CondBranchOp>(
     //         op, xorOp.getLhs(), op.getFalseDest(), op.getFalseOperands(),
     //         op.getTrueDest(), op.getTrueOperands());

@@ -38,13 +38,13 @@ struct ConvertHalInterfaceBindingSubspan final
   LogicalResult
   matchAndRewrite(IREE::HAL::InterfaceBindingSubspanOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto currentType = op.getType().dyn_cast<MemRefType>();
+    auto currentType = dyn_cast<MemRefType>(op.getType());
     if (!currentType) {
       return rewriter.notifyMatchFailure(op->getLoc(),
                                          "unhandled non-memref types");
     }
     auto newResultType =
-        getTypeConverter()->convertType(currentType).dyn_cast<MemRefType>();
+        dyn_cast<MemRefType>(getTypeConverter()->convertType(currentType));
     if (!newResultType) {
       return rewriter.notifyMatchFailure(
           op->getLoc(),
@@ -165,7 +165,7 @@ struct EmulateNarrowTypePass
 // Public interface
 //===----------------------------------------------------------------------===//
 
-std::unique_ptr<OperationPass<ModuleOp>> createEmulateNarrowTypePass() {
+std::unique_ptr<OperationPass<>> createEmulateNarrowTypePass() {
   return std::make_unique<EmulateNarrowTypePass>();
 }
 

@@ -61,7 +61,7 @@ def LLVMGPUCastTypeToFitMMA : InterfacePass<"iree-llvmgpu-cast-type-to-fit-mma",
 }
 
 def LLVMGPULowerExecutableTarget :
-    Pass<"iree-llvmgpu-lower-executable-target", "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
+    InterfacePass<"iree-llvmgpu-lower-executable-target", "mlir::FunctionOpInterface"> {
   let summary = "Perform lowering of executable target using one of the IREE::HAL::DispatchLoweringPassPipeline";
   let constructor = "mlir::iree_compiler::createLLVMGPULowerExecutableTargetPass()";
 }
@@ -78,8 +78,27 @@ def LLVMGPUPrefetchSharedMemory :
   let constructor = "mlir::iree_compiler::createLLVMGPUPrefetchSharedMemoryPass()";
 }
 
+def LLVMGPUPromoteMatmulToFitMMA :
+    InterfacePass<"iree-llvmgpu-promote-matmul-to-fit-mma", "mlir::FunctionOpInterface"> {
+  let summary = "Pass to promote contraction ops to fit mma shapes";
+  let constructor = "mlir::iree_compiler::createLLVMGPUPromoteMatmulToFitMMAPass()";
+  let options = [
+    Option<"targetDimensions", "target-dimensions", "mlir::iree_compiler::LLVMGPUMatmulPadOption",
+           /*default=*/"mlir::iree_compiler::LLVMGPUMatmulPadOption::ParallelDims",
+           "Select the strategy to control how multi_reduction is lowered.",
+           [{::llvm::cl::values(
+            clEnumValN(mlir::iree_compiler::LLVMGPUMatmulPadOption::ParallelDims,
+                       "parallel",
+                       "Pad all the parallel dims for contraction ops."),
+            clEnumValN(mlir::iree_compiler::LLVMGPUMatmulPadOption::ReductionDims,
+                       "reduction",
+                       "Pad all the reduction dims for contraction ops.")
+        )}]>
+  ];
+}
+
 def LLVMGPUSelectLoweringStrategy :
-    Pass<"iree-llvmgpu-select-lowering-strategy", "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
+    Pass<"iree-llvmgpu-select-lowering-strategy", "ModuleOp"> {
   let summary = "Select a IREE::HAL::DispatchLoweringPassPipeline for lowering the target variant";
   let constructor = "mlir::iree_compiler::createLLVMGPUSelectLoweringStrategyPass()";
 }

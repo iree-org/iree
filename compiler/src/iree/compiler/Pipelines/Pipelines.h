@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_PIPELINES_PIPELINES_H_
 #define IREE_COMPILER_PIPELINES_PIPELINES_H_
 
+#include "iree/compiler/Dialect/HAL/Target/TargetOptions.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/VM/Conversion/TargetOptions.h"
 #include "iree/compiler/Dialect/VM/Target/Bytecode/BytecodeModuleTarget.h"
@@ -17,20 +18,9 @@ namespace mlir::iree_compiler {
 
 class PipelineExtensions;
 
-// Hooks for injecting behavior into the IREEVM pipeline. Since these are not
-// derived from CLI options, we maintain them as a separate struct.
-struct IREEVMPipelineHooks {
-  // If the GlobalOptimizationOptions::constEval option is true, then
-  // this callback must be set to populate a pass manager to perform
-  // constant eval. It typically just adds a ConstEval::createJitGlobalsPass()
-  // pass. It must be injected like this to avoid circular dependencies from
-  // the constant evaluator, which needs to recursively invoke these
-  // pipelines.
-  std::function<void(OpPassManager &)> buildConstEvalPassPipelineCallback;
-
-  // Applies pipeline extensions to the built pipeline if not nullptr.
-  PipelineExtensions *pipelineExtensions = nullptr;
-};
+namespace IREE::HAL {
+struct PipelineHooks;
+} // namespace IREE::HAL
 
 enum class IREEVMPipelinePhase {
   Start,
@@ -82,6 +72,28 @@ inline static void enumerateIREEVMPipelinePhases(
   callback(IREEVMPipelinePhase::End, "end",
            "Complete the full compilation pipeline.");
 }
+
+// Hooks for injecting behavior into the IREEVM pipeline. Since these are not
+// derived from CLI options, we maintain them as a separate struct.
+struct IREEVMPipelineHooks {
+  // If the GlobalOptimizationOptions::constEval option is true, then
+  // this callback must be set to populate a pass manager to perform
+  // constant eval. It typically just adds a ConstEval::createJitGlobalsPass()
+  // pass. It must be injected like this to avoid circular dependencies from
+  // the constant evaluator, which needs to recursively invoke these
+  // pipelines.
+  std::function<void(OpPassManager &)> buildConstEvalPassPipelineCallback;
+
+  // Called immediately before a compilation phase.
+  std::function<void(IREEVMPipelinePhase phase, OpPassManager &)> beforePhase;
+  // Called immediately after a compilation phase.
+  std::function<void(IREEVMPipelinePhase phase, OpPassManager &)> afterPhase;
+
+  // Applies pipeline extensions to the built pipeline if not nullptr.
+  PipelineExtensions *pipelineExtensions = nullptr;
+
+  operator IREE::HAL::PipelineHooks() const;
+};
 
 // Builds a pass pipeline to perform pre-compilation global optimizations.
 void buildIREEPrecompileTransformPassPipeline(

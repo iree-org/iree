@@ -118,7 +118,7 @@ VMVX_SRCS = enforce_glob(
     ],
     include = ["*.mlir"],
     exclude = [
-        "reduce.mlir",  # Currently flakey https://github.com/openxla/iree/issues/5885
+        "reduce.mlir",  # Currently flakey https://github.com/iree-org/iree/issues/5885
     ],
 )
 

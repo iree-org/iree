@@ -68,6 +68,7 @@ nanobind_add_module(iree_runtime_bindings_python_PyExtRt
   "io.cc"
   "hal.h"
   "hal.cc"
+  "local_dlpack.h"
   "loop.h"
   "loop.cc"
   "numpy_interop.h"
@@ -90,9 +91,8 @@ target_link_libraries(iree_runtime_bindings_python_PyExtRt
   iree::base::internal::file_io
   iree::base::internal::path
   iree::io::file_handle
-  iree::io::formats::gguf
   iree::io::formats::irpa
-  iree::io::formats::safetensors
+  iree::io::formats::parser_registry
   iree::io::parameter_index
   iree::io::parameter_index_provider
   iree::io::parameter_provider
@@ -244,6 +244,13 @@ iree_py_test(
 
 iree_py_test(
   NAME
+    io_test
+  SRCS
+    "tests/io_test.py"
+)
+
+iree_py_test(
+  NAME
     system_setup_test
   SRCS
     "tests/system_setup_test.py"
@@ -261,9 +268,9 @@ if(IREE_BUILD_BUNDLED_LLVM)
 
   iree_py_test(
     NAME
-      io_test
+      io_runtime_test
     SRCS
-      "tests/io_test.py"
+      "tests/io_runtime_test.py"
   )
 
   iree_py_test(

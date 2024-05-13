@@ -38,6 +38,7 @@ iree_cc_library(
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::SPIRV
     iree::compiler::Codegen::Utils
+    iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Target
     iree::compiler::PluginAPI
     iree::compiler::Utils

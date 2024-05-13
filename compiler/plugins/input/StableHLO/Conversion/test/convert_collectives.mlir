@@ -321,7 +321,7 @@ func.func @all_to_all_split_dim_0(%input : tensor<4x4xf32>) -> tensor<2x8xf32> {
   // CHECK: %[[CHANNEL:.+]] = flow.channel.default : !flow.channel
   // CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<4x4xf32>
   // CHECK: %[[OP:.+]] = flow.collective.all_to_all f32, %[[EMPTY]], %[[ARG0]], %[[CHANNEL]]  : (tensor<4x4xf32>, tensor<4x4xf32>, !flow.channel) -> %[[EMPTY]] as tensor<4x4xf32>
-  // CHECK: %[[REARRANGE_RESHAPE:.+]] = tensor.expand_shape %[[OP]] {{\[}}[0, 1], [2]] : tensor<4x4xf32> into tensor<2x2x4xf32>
+  // CHECK: %[[REARRANGE_RESHAPE:.+]] = tensor.expand_shape %[[OP]] {{\[}}[0, 1], [2]] output_shape [2, 2, 4] : tensor<4x4xf32> into tensor<2x2x4xf32>
   // CHECK: %[[REARRANGE_TRANSPOSE:.+]] = linalg.generic
   // CHECK: %[[RESHAPE_OUT:.+]] = tensor.collapse_shape %[[REARRANGE_TRANSPOSE]] {{\[}}[0], [1, 2]] : tensor<2x2x4xf32> into tensor<2x8xf32>
   // CHECK: return %[[RESHAPE_OUT]] : tensor<2x8xf32>
@@ -344,7 +344,7 @@ func.func @all_to_all_split_dim_1(%input : tensor<4x4xf32>) -> tensor<8x2xf32> {
   // CHECK: %[[TRANSPOSE_ARG:.+]] = linalg.generic
   // CHECK: %[[OP:.+]] = flow.collective.all_to_all f32, %[[EMPTY]], %[[TRANSPOSE_ARG]], %[[CHANNEL]]  : (tensor<4x4xf32>, tensor<4x4xf32>, !flow.channel) -> %[[EMPTY]] as tensor<4x4xf32>
   // CHECK: %[[TRANSPOSE_OUT:.+]] = linalg.generic
-  // CHECK: %[[REARRANGE_RESHAPE1:.+]] = tensor.expand_shape %[[TRANSPOSE_OUT]] {{\[}}[0], [1, 2]] : tensor<4x4xf32> into tensor<4x2x2xf32>
+  // CHECK: %[[REARRANGE_RESHAPE1:.+]] = tensor.expand_shape %[[TRANSPOSE_OUT]] {{\[}}[0], [1, 2]] output_shape [4, 2, 2] : tensor<4x4xf32> into tensor<4x2x2xf32>
   // CHECK: %[[EMPTY2:.+]] = tensor.empty() : tensor<2x4x2xf32>
   // CHECK: %[[REARRANGE_TRANSPOSE:.+]] = linalg.generic
   // CHECK: %[[REARRANGE_RESHAPE2:.+]] = tensor.collapse_shape %[[REARRANGE_TRANSPOSE]] {{\[}}[0, 1], [2]] : tensor<2x4x2xf32> into tensor<8x2xf32>
@@ -368,7 +368,7 @@ func.func @all_to_all_3d_split_dim_1(%input : tensor<4x4x4xf32>) -> tensor<4x2x8
   // CHECK: %[[TRANSPOSE_ARG:.+]] = linalg.generic
   // CHECK: %[[OP:.+]] = flow.collective.all_to_all f32, %[[EMPTY]], %[[TRANSPOSE_ARG]], %[[CHANNEL]]  : (tensor<4x4x4xf32>, tensor<4x4x4xf32>, !flow.channel) -> %[[EMPTY]] as tensor<4x4x4xf32>
   // CHECK: %[[TRANSPOSE_OUT:.+]] = linalg.generic
-  // CHECK: %[[REARRANGE_RESHAPE1:.+]] = tensor.expand_shape %[[TRANSPOSE_OUT]] {{\[}}[0], [1, 2], [3]] : tensor<4x4x4xf32> into tensor<4x2x2x4xf32>
+  // CHECK: %[[REARRANGE_RESHAPE1:.+]] = tensor.expand_shape %[[TRANSPOSE_OUT]] {{\[}}[0], [1, 2], [3]] output_shape [4, 2, 2, 4] : tensor<4x4x4xf32> into tensor<4x2x2x4xf32>
   // CHECK: %[[EMPTY_1:.+]] = tensor.empty() : tensor<4x2x2x4xf32>
   // CHECK: %[[REARRANGE_TRANSPOSE:.+]] = linalg.generic
   // CHECK: %[[REARRANGE_RESHAPE2:.+]] = tensor.collapse_shape %[[REARRANGE_TRANSPOSE]] {{\[}}[0], [1], [2, 3]] : tensor<4x2x2x4xf32> into tensor<4x2x8xf32>

@@ -4,6 +4,15 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+# Yes, global compile options are evil, but this is temporary,
+# TODO(#3299): migrate to from member x.cast<T>() to mlir::cast<T>(x)
+# And this is just a copy of what we currently have in torch-mlir upstream.
+if(MSVC)
+  add_compile_options(/wd4996)
+else()
+  add_compile_options(-Wno-deprecated-declarations)
+endif()
+
 list(APPEND IREE_COMPILER_TABLEGEN_INCLUDE_DIRS
     "${TORCH_MLIR_ROOT_DIR}/include")
 
@@ -116,10 +125,15 @@ iree_cc_library(
   DEPS
     ::defs
     ::TorchConversionDialectGen
+    ::TorchDialectTransformsGen
     ::TorchDialectIR
     MLIRIR
+    MLIRFuncTransforms
+    MLIRGPUDialect
+    MLIRLinalgTransforms
     MLIRSupport
     MLIRSideEffectInterfaces
+    MLIRVectorTransforms
 )
 
 iree_tablegen_library(

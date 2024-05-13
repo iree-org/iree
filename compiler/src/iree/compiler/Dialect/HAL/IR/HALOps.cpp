@@ -384,7 +384,7 @@ void TensorImportOp::build(OpBuilder &builder, OperationState &result,
                            TypeAttr targetEncoding, Value waitFence,
                            StringAttr name) {
   auto shapedType = llvm::cast<ShapedType>(resultType);
-  assert((source.getType().isa<IREE::HAL::BufferViewType>() ||
+  assert((isa<IREE::HAL::BufferViewType>(source.getType()) ||
           shapedType.hasStaticShape()) &&
          "can only use this constructor for buffer views when shape "
          "information is required");
@@ -474,18 +474,9 @@ LogicalResult TensorImportOp::verify() {
 void TensorExportOp::build(OpBuilder &builder, OperationState &result,
                            Type resultType, Value source,
                            TypeAttr sourceEncoding, StringAttr name) {
-  build(builder, result, resultType, source, sourceEncoding,
-        /*targetStorage=*/nullptr, name);
-}
-
-void TensorExportOp::build(OpBuilder &builder, OperationState &result,
-                           Type resultType, Value source,
-                           TypeAttr sourceEncoding, Value targetStorage,
-                           StringAttr name) {
   auto dynamicDims =
       IREE::Util::buildDynamicDimsForValue(result.location, source, builder);
-  build(builder, result, resultType, source, sourceEncoding, dynamicDims,
-        targetStorage, name);
+  build(builder, result, resultType, source, sourceEncoding, dynamicDims, name);
 }
 
 Value TensorExportOp::getTiedResult(unsigned resultIndex) {
@@ -510,6 +501,33 @@ LogicalResult TensorExportOp::verify() {
   }
   return verifyTypeStorageCompatibility(op, op.getSourceEncoding(),
                                         op.getSource().getType());
+}
+
+//===----------------------------------------------------------------------===//
+// hal.tensor.alias
+//===----------------------------------------------------------------------===//
+
+Value TensorAliasOp::getTiedResult(unsigned resultIndex) {
+  return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
+}
+
+::std::optional<unsigned>
+TensorAliasOp::getTiedResultOperandIndex(unsigned resultIndex) {
+  return {0}; // source
+}
+
+SmallVector<int64_t> TensorAliasOp::getTiedResultOperandIndices() {
+  return {0}; // source
+}
+
+LogicalResult TensorAliasOp::verify() {
+  TensorAliasOp op = *this;
+  auto type = llvm::cast<TensorType>(op.getSource().getType());
+  if (type.getNumDynamicDims() != op.getSourceDims().size()) {
+    return op->emitOpError()
+           << "number of dynamic dims must match the operand type";
+  }
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
@@ -601,7 +619,7 @@ verifyWorkgroupCountRegion(Operation *op, ValueRange workload, Region &region) {
   // Verify the workload operands match the expected capture args.
   auto regionArguments =
       llvm::make_filter_range(region.getArgumentTypes(), [](Type type) {
-        return !type.isa<IREE::HAL::DeviceType>();
+        return !isa<IREE::HAL::DeviceType>(type);
       });
   if (workload.size() != llvm::range_size(regionArguments)) {
     return op->emitOpError()

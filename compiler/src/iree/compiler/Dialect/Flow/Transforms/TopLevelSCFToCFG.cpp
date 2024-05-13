@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir/Conversion/SCFToControlFlow/SCFToControlFlow.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -16,10 +15,13 @@
 
 namespace mlir::iree_compiler::IREE::Flow {
 
+#define GEN_PASS_DEF_TOPLEVELSCFTOCFGPASS
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
+
 namespace {
 
 struct TopLevelSCFToCFGPass
-    : public TopLevelSCFToCFGBase<TopLevelSCFToCFGPass> {
+    : public IREE::Flow::impl::TopLevelSCFToCFGPassBase<TopLevelSCFToCFGPass> {
   void runOnOperation() override;
 };
 
@@ -44,11 +46,6 @@ void TopLevelSCFToCFGPass::runOnOperation() {
   if (failed(
           applyPartialConversion(getOperation(), target, std::move(patterns))))
     signalPassFailure();
-}
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createTopLevelSCFToCFGPass() {
-  return std::make_unique<TopLevelSCFToCFGPass>();
 }
 
 } // namespace mlir::iree_compiler::IREE::Flow

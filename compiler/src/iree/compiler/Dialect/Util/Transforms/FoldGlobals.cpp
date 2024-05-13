@@ -356,6 +356,8 @@ static bool eraseUnusedGlobals(GlobalTable &globalTable) {
 // Deduplicates immutable globals with constant initial values.
 // This is a simplified and safer version of the global fusion pass.
 static bool deduplicateConstantGlobals(GlobalTable &globalTable) {
+  auto *context = globalTable.moduleOp.getContext();
+
   // Build sets of all equivalent globals.
   llvm::EquivalenceClasses<StringRef> ec;
   DenseMap<Attribute, StringRef> leaderMap;
@@ -371,8 +373,16 @@ static bool deduplicateConstantGlobals(GlobalTable &globalTable) {
       // No initial value, not constant.
       continue;
     }
-    auto it = leaderMap.insert(
-        {global.op.getGlobalInitialValue(), global.op.getGlobalName()});
+    auto it = leaderMap.insert({
+        ArrayAttr::get(
+            context,
+            {
+                global.op.getGlobalInitialValue(),
+                DictionaryAttr::get(
+                    context, llvm::to_vector(global.op->getDialectAttrs())),
+            }),
+        global.op.getGlobalName(),
+    });
     if (it.second) {
       // Inserted new.
       ec.insert(global.op.getGlobalName());

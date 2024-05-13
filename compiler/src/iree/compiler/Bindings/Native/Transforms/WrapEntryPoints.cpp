@@ -162,8 +162,7 @@ createImportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
     // TODO(benvanik): always pass in a signal fence? could be useful if we
     // want to allow for async work using fences that's not device-related.
     const bool haveTensorResults =
-        llvm::any_of(oldImportType.getResults(),
-                     [](Type type) { return llvm::isa<TensorType>(type); });
+        llvm::any_of(oldImportType.getResults(), llvm::IsaPred<TensorType>);
     if (!haveTensorResults && !hasSideEffects) {
       // No tensors returned from import - pass in an immediate signal.
       signalFence = entryBuilder.create<IREE::Util::NullOp>(
@@ -561,6 +560,20 @@ createExportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
                                                         exportOp, arguments);
   auto asyncResults = llvm::to_vector(callOp.getResults());
 
+  // Alias results to storage buffers if provided.
+  for (unsigned resultIndex = 0; resultIndex < asyncResults.size();
+       ++resultIndex) {
+    if (!resultStorages[resultIndex])
+      continue;
+    auto source = asyncResults[resultIndex];
+    auto sourceDims = IREE::Util::buildDynamicDimsForValue(
+        exportOp.getLoc(), source, entryBuilder);
+    auto aliasOp = entryBuilder.create<IREE::HAL::TensorAliasOp>(
+        exportOp.getLoc(), source.getType(), source, sourceDims,
+        resultStorages[resultIndex], waitFence);
+    asyncResults[resultIndex] = cast<OpResult>(aliasOp.getResult());
+  }
+
   // Insert a barrier if requested - all tensors will be calculated and the
   // fence will be signaled. Note that even if there are no tensor results we
   // need to signal the fence.
@@ -592,11 +605,9 @@ createExportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
           resultIndex, "iree.abi.encoding");
       auto dynamicDims = IREE::Util::buildDynamicDimsForValue(
           result.getLoc(), result, entryBuilder);
-      auto resultStorage = resultStorages[resultIndex];
       results.push_back(entryBuilder.create<IREE::HAL::TensorExportOp>(
           result.getLoc(), newType, result,
           encoding ? encoding : TypeAttr::get(result.getType()), dynamicDims,
-          resultStorage,
           inferResultName(entryBuilder.getContext(), resultIndex,
                           exportOp.getResultAttrDict(resultIndex))));
     } else {

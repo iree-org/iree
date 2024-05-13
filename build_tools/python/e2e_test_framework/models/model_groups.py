@@ -19,6 +19,21 @@ from e2e_test_framework.models import (
 # A list of models with thread configurations.
 # Note `0` represents sync execution.
 X86_64_BENCHMARK_CONFIG = [
+    # Microbenchmarks.
+    # TODO(#17344): regenerate .mlirbc files
+    # common_definitions.CpuBenchmarkConfig(
+    #     model=matmul.MATMUL_1x256x2048_I8xI4_MLIR, threads=[0]
+    # ),
+    common_definitions.CpuBenchmarkConfig(
+        model=matmul.MATMUL_256x256x2048_I8xI4_MLIR, threads=[0]
+    ),
+    # TODO(#17344): regenerate .mlirbc files
+    # common_definitions.CpuBenchmarkConfig(
+    #     model=matmul.MATMUL_1x256x2048_I8xI8_MLIR, threads=[0]
+    # ),
+    # common_definitions.CpuBenchmarkConfig(
+    #     model=matmul.MATMUL_256x256x2048_I8xI8_MLIR, threads=[0]
+    # ),
     # Tiny models.
     common_definitions.CpuBenchmarkConfig(
         model=tflite_models.PERSON_DETECT_INT8, threads=[0, 1]
@@ -77,15 +92,16 @@ X86_64_BENCHMARK_CONFIG = [
     common_definitions.CpuBenchmarkConfig(
         model=tf_models.BERT_LARGE_TF_FP32_SEQLEN384, threads=[30]
     ),
-    common_definitions.CpuBenchmarkConfig(
-        model=torch_models.BERT_LARGE_384_FP32_TORCH_BATCHES[1], threads=[30]
-    ),
-    common_definitions.CpuBenchmarkConfig(
-        model=torch_models.FALCON7B_1X100XI64_GPTQ_TORCH, threads=[30]
-    ),
-    common_definitions.CpuBenchmarkConfig(
-        model=torch_models.FALCON7B_INT4_1X100XI64_GPTQ_TORCH, threads=[30]
-    ),
+    # TODO(#17344): regenerate .mlirbc files
+    # common_definitions.CpuBenchmarkConfig(
+    #     model=torch_models.BERT_LARGE_384_FP32_TORCH_BATCHES[1], threads=[30]
+    # ),
+    # common_definitions.CpuBenchmarkConfig(
+    #     model=torch_models.FALCON7B_1X100XI64_GPTQ_TORCH, threads=[30]
+    # ),
+    # common_definitions.CpuBenchmarkConfig(
+    #     model=torch_models.FALCON7B_INT4_1X100XI64_GPTQ_TORCH, threads=[30]
+    # ),
 ]
 
 X86_64_BENCHMARK_CONFIG_LARGE = [
@@ -98,12 +114,13 @@ X86_64_BENCHMARK_CONFIG_LARGE = [
     common_definitions.CpuBenchmarkConfig(
         model=jax_models.BERT_LARGE_FP32_JAX_384XI32_BATCHES[64], threads=[30]
     ),
-    common_definitions.CpuBenchmarkConfig(
-        model=torch_models.BERT_LARGE_384_FP32_TORCH_BATCHES[24], threads=[30]
-    ),
-    common_definitions.CpuBenchmarkConfig(
-        model=torch_models.BERT_LARGE_384_FP32_TORCH_BATCHES[48], threads=[30]
-    ),
+    # TODO(#17344): regenerate .mlirbc files
+    # common_definitions.CpuBenchmarkConfig(
+    #     model=torch_models.BERT_LARGE_384_FP32_TORCH_BATCHES[24], threads=[30]
+    # ),
+    # common_definitions.CpuBenchmarkConfig(
+    #     model=torch_models.BERT_LARGE_384_FP32_TORCH_BATCHES[48], threads=[30]
+    # ),
     common_definitions.CpuBenchmarkConfig(
         model=jax_models.RESNET50_FP32_JAX_3X224X224XF32_BATCHES[1], threads=[30]
     ),
@@ -149,13 +166,13 @@ CUDA_MODELS = [
     tf_models.MINILM_L12_H384_UNCASED_INT32_SEQLEN128,
     tf_models.BERT_FOR_MASKED_LM_FP32_SEQLEN512,
     tf_models.BERT_LARGE_TF_FP32_SEQLEN384,
-    # PyTorch model are disabled due to https://github.com/openxla/iree/issues/14993.
+    # PyTorch model are disabled due to https://github.com/iree-org/iree/issues/14993.
     # torch_models.MODEL_CLIP_TEXT_SEQLEN64_FP32_TORCH,
     # torch_models.MODEL_UNET_2D_FP32_TORCH,
 ]
 
 VULKAN_MODELS = [
-    # PyTorch model are disabled due to https://github.com/openxla/iree/issues/14993.
+    # PyTorch model are disabled due to https://github.com/iree-org/iree/issues/14993.
     # torch_models.MODEL_CLIP_TEXT_SEQLEN64_FP32_TORCH,
     # torch_models.MODEL_UNET_2D_FP32_TORCH,
 ]

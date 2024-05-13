@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -17,6 +18,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/ScopeExit.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
@@ -28,7 +30,7 @@
 #include "mlir/Dialect/NVGPU/IR/NVGPUDialect.h"
 #include "mlir/Dialect/NVGPU/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
+#include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
@@ -82,14 +84,6 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
     transform::TransformRewriter &rewriter, mlir::FunctionOpInterface target,
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  FailureOr<IREE::HAL::ExecutableExportOp> maybeExportOp =
-      getEntryPoint(target);
-  if (failed(maybeExportOp)) {
-    state.getTopLevel()->emitOpError("no IREE::HAL::ExecutableExportOp found");
-    return emitDefaultDefiniteFailure(target);
-  }
-  IREE::HAL::ExecutableExportOp exportOp = *maybeExportOp;
-
   auto transformOp = cast<transform::TransformOpInterface>(getOperation());
 
   rewriter.setInsertionPointToStart(&target.getFunctionBody().front());
@@ -99,12 +93,15 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
           getSyncAfterDistribution());
   if (!diag.succeeded())
     return diag;
-  auto newAttr = rewriter.getIndexArrayAttr(getWorkgroupDims());
-  auto subgroupSizeAttr = rewriter.getIndexAttr(getSubgroupSize());
-  rewriter.startOpModification(exportOp);
-  exportOp->setAttr(exportOp.getWorkgroupSizeAttrName(), newAttr);
-  exportOp->setAttr(exportOp.getSubgroupSizeAttrName(), subgroupSizeAttr);
-  rewriter.finalizeOpModification(exportOp);
+  if (failed(setTranslationInfo(
+          target, IREE::Codegen::TranslationInfoAttr::get(
+                      rewriter.getContext(),
+                      IREE::Codegen::DispatchLoweringPassPipeline::None,
+                      getWorkgroupDims(), getSubgroupSize())))) {
+    target->emitOpError("failed to update translation info");
+    return emitDefaultDefiniteFailure(target);
+  }
+
   return DiagnosedSilenceableFailure::success();
 }
 
@@ -272,56 +269,17 @@ rewriteScfIfAsWarpExecuteOnLane0(RewriterBase &rewriter, Location loc,
   return VectorDistributionResult{warpOp};
 }
 
-// TODO: Refactor in a generic util that can be reused.
-static HAL::ExecutableExportOp
-getExecutableExportOpForFunc(HAL::ExecutableVariantOp halExecutableVariantOp,
-                             mlir::FunctionOpInterface funcOp) {
-  if (!halExecutableVariantOp || !funcOp)
-    return {};
-  HAL::ExecutableExportOp exportOp;
-  halExecutableVariantOp->walk([&](HAL::ExecutableExportOp op) {
-    if (op.getSymName() != funcOp.getName())
-      return WalkResult::advance();
-    exportOp = op;
-    return WalkResult::interrupt();
-  });
-  return exportOp;
-}
-
 DiagnosedSilenceableFailure
 transform_dialect::VectorToWarpExecuteOnLane0Op::applyToOne(
     transform::TransformRewriter &rewriter, scf::IfOp target,
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  if (!isa<HAL::ExecutableOp, HAL::ExecutableVariantOp>(state.getTopLevel())) {
-    results.assign(1, nullptr);
-    return emitDefaultSilenceableFailure(state.getTopLevel())
-           << "requires HAL::ExecutableOp or "
-              "HAL::ExecutableVariantOp toplevel "
-              "so that IR is properly isolated. This is required so "
-              "we can "
-              "safely inspect the HAL::ExecutableExportOp under "
-              "multi-threaded "
-              "pass assumptions.";
-  }
-
-  auto halExecutableVariantOp =
-      target->getParentOfType<HAL::ExecutableVariantOp>();
   auto funcOp = target->getParentOfType<mlir::FunctionOpInterface>();
-  HAL::ExecutableExportOp exportOp =
-      getExecutableExportOpForFunc(halExecutableVariantOp, funcOp);
-  if (!halExecutableVariantOp || !funcOp || !exportOp) {
-    // Return a silenceable failure and set the expected 1 result to
-    // nullptr.
-    results.assign(1, nullptr);
-    return emitDefaultSilenceableFailure(target)
-           << "export op is missing --- the transform is not "
-              "applied";
-  }
 
-  std::optional<ArrayAttr> maybeAttr = exportOp.getWorkgroupSize();
+  std::optional<SmallVector<int64_t>> maybeWorkgroupSize =
+      getWorkgroupSize(funcOp);
   // TODO: Pervasive 3 constant in IREE.
-  if (!maybeAttr || maybeAttr->size() != 3) {
+  if (!maybeWorkgroupSize || maybeWorkgroupSize->empty()) {
     // Return a silenceable failure and set the expected 1 result to
     // nullptr.
     results.assign(1, nullptr);
@@ -331,7 +289,7 @@ transform_dialect::VectorToWarpExecuteOnLane0Op::applyToOne(
               "--- the transform is not applied";
   }
 
-  int64_t workgroupSizeX = llvm::cast<IntegerAttr>((*maybeAttr)[0]).getInt();
+  int64_t workgroupSizeX = (*maybeWorkgroupSize)[0];
   int64_t warpSize = getWarpSize();
   if (workgroupSizeX % warpSize != 0) {
     // Return a silenceable failure and set the expected 1 result to
@@ -452,16 +410,14 @@ struct WarpOpLoad : public OpRewritePattern<vector::WarpExecuteOnLane0Op> {
   using OpRewritePattern<vector::WarpExecuteOnLane0Op>::OpRewritePattern;
   LogicalResult matchAndRewrite(vector::WarpExecuteOnLane0Op warpOp,
                                 PatternRewriter &rewriter) const override {
-    OpOperand *operand = getWarpResult(
-        warpOp, [](Operation *op) { return isa<memref::LoadOp>(op); });
+    OpOperand *operand = getWarpResult(warpOp, llvm::IsaPred<memref::LoadOp>);
     if (!operand)
       return failure();
     auto load = operand->get().getDefiningOp<memref::LoadOp>();
     unsigned operandIndex = operand->getOperandNumber();
     Value distributedVal = warpOp.getResult(operandIndex);
 
-    SmallVector<Value> indices(load.getIndices().begin(),
-                               load.getIndices().end());
+    auto indices = llvm::to_vector_of<Value>(load.getIndices());
     if (!indices.empty())
       return failure();
 
@@ -603,18 +559,10 @@ transform_dialect::VectorWarpDistributionOp::applyToOne(
     transform::TransformRewriter &rewriter, mlir::FunctionOpInterface target,
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  FailureOr<IREE::HAL::ExecutableExportOp> maybeExportOp =
-      getEntryPoint(target);
-  if (failed(maybeExportOp)) {
-    state.getTopLevel()->emitOpError("no IREE::HAL::ExecutableExportOp found");
-    return emitDefaultDefiniteFailure(target);
-  }
-  IREE::HAL::ExecutableExportOp exportOp = *maybeExportOp;
-
-  std::optional<llvm::APInt> subgroupSize = exportOp.getSubgroupSize();
+  auto subgroupSize = getSubgroupSize(target);
   if (!subgroupSize) {
-    state.getTopLevel()->emitOpError(
-        "could not extract subgroup size from IREE::HAL::ExecutableExportOp");
+    target->emitOpError(
+        "could not extract subgroup size from IREE::Codegen::TranslationInfo");
     return emitDefaultDefiniteFailure(target);
   }
 
@@ -647,9 +595,9 @@ transform_dialect::VectorWarpDistributionOp::applyToOne(
   RewritePatternSet patterns(ctx);
   populateVectorTransferWriteDistribution(target, patterns,
                                           /*benefit=*/2);
+  unsigned subgroupSizeU = static_cast<unsigned>(subgroupSize.value());
   populatePropagateVectorDistribution(target, patterns,
-                                      /*benefit=*/1,
-                                      subgroupSize->getSExtValue());
+                                      /*benefit=*/1, subgroupSizeU);
   if (failed(
           applyPatternsAndFoldGreedily(target, std::move(patterns), config))) {
     return mlir::emitDefiniteFailure(
@@ -894,23 +842,8 @@ static bool isParallelRegionBoundary(Operation *op) {
   if (op->hasAttr("__parallel_region_boundary_for_test"))
     return true;
 
-  // We consider functions inside executable variants that have the same symbol
-  // name as an export symbol.
-  auto func = dyn_cast<FunctionOpInterface>(op);
-  if (!func)
-    return false;
-  auto parent = op->getParentOfType<ModuleOp>();
-  if (!parent)
-    return false;
-  auto variant = parent->getParentOfType<HAL::ExecutableVariantOp>();
-  if (!variant)
-    return false;
-  WalkResult result = variant.walk([&](HAL::ExecutableExportOp exportOp) {
-    if (exportOp.getSymNameAttr() == func.getNameAttr())
-      return WalkResult::interrupt();
-    return WalkResult::skip();
-  });
-  return result.wasInterrupted();
+  // We consider functions inside executable variants .
+  return isa<FunctionOpInterface>(op);
 }
 
 /// Returns `true` if the op behaves like a sequential loop, e.g., the control
@@ -1526,8 +1459,7 @@ public:
       : VectorLayoutOptions(root, fullConversion) {}
 
   LogicalResult setAnchorOps(VectorLayoutAnalysis &analysis) override {
-    setAnchorOpsFromAttributes(analysis, root);
-    return success();
+    return setAnchorOpsFromAttributes(analysis, root);
   }
 };
 
@@ -1546,18 +1478,25 @@ transform_dialect::AMDGPUDistributeVectorsOp::applyToOne(
   populateGPUDistributionPatterns(patterns);
   populateGPUDistributionLayoutAttrPatterns(laneId, patterns);
   populateGPUReductionDistributionPatterns(patterns);
-  populateGPUDistributeNestedLayoutAttrPatterns(laneId, patterns);
+  // For testing we use subgroup size = 64.
+  populateGPUDistributeNestedLayoutAttrPatterns(patterns, laneId,
+                                                /*subgroupSize=*/64);
   populateAMDGPUDistributionPatterns(patterns);
   populateGPULayoutResolutionDistributionPatterns(patterns);
   if (failed(distributeVectorOps(target, patterns, options))) {
     return emitDefaultSilenceableFailure(target);
   }
+  // TODO: The consumption of the target handle is only required because the
+  // transform dialect interpreter will crash without it. This op should not
+  // need to invalidate the handle.
+  results.push_back(target);
   return DiagnosedSilenceableFailure::success();
 }
 
 void transform_dialect::AMDGPUDistributeVectorsOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
+  transform::consumesHandle(getTarget(), effects);
+  transform::producesHandle(getResult(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -1671,7 +1610,7 @@ transform_dialect::SetContractionLayoutAttributes::apply(
     return emitDefiniteFailure()
            << "invalid more than one attribute for contraction annotation";
   }
-  auto mmaType = llvm::dyn_cast<IREE::GPU::MmaAttr>(typeList.front());
+  auto mmaType = llvm::dyn_cast<IREE::GPU::MmaInterfaceAttr>(typeList.front());
   if (!mmaType) {
     return emitDefiniteFailure()
            << "invalid non-mma attribute for contraction annotation "

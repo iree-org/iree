@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/VMVX/Passes.h"
+#include "iree/compiler/Dialect/HAL/Target/Devices/LocalDevice.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/VM/Conversion/ConversionTarget.h"
@@ -53,38 +54,6 @@ getVMVXExecutableTarget(bool enableMicrokernels, MLIRContext *context,
       b.getDictionaryAttr(configItems));
 }
 
-// TODO(benvanik): move to a CPU device registration outside of VMVX.
-class VMVXTargetDevice final : public TargetDevice {
-public:
-  VMVXTargetDevice() = default;
-
-  IREE::HAL::DeviceTargetAttr
-  getDefaultDeviceTarget(MLIRContext *context,
-                         const TargetRegistry &targetRegistry) const override {
-    Builder b(context);
-    SmallVector<NamedAttribute> configItems;
-
-    auto configAttr = b.getDictionaryAttr(configItems);
-
-    // If we had multiple target environments we would generate one target attr
-    // per environment, with each setting its own environment attribute.
-    // If we had multiple target environments we would generate one target attr
-    // per environment, with each setting its own environment attribute.
-    SmallVector<IREE::HAL::ExecutableTargetAttr> executableTargetAttrs;
-    targetRegistry.getTargetBackend("vmvx")->getDefaultExecutableTargets(
-        context, "vmvx", configAttr, executableTargetAttrs);
-
-    return IREE::HAL::DeviceTargetAttr::get(context, b.getStringAttr("vmvx"),
-                                            configAttr, executableTargetAttrs);
-  }
-
-  std::optional<IREE::HAL::DeviceTargetAttr>
-  getHostDeviceTarget(MLIRContext *context,
-                      const TargetRegistry &targetRegistry) const override {
-    return getDefaultDeviceTarget(context, targetRegistry);
-  }
-};
-
 class VMVXTargetBackend final : public TargetBackend {
 public:
   VMVXTargetBackend(const VMVXOptions &options) : options(options) {}
@@ -122,18 +91,19 @@ public:
     return vmOptions;
   }
 
-  void buildConfigurationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
-                                      OpPassManager &passManager) override {
+  void
+  buildConfigurationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
+                                 OpPassManager &passManager) override {
     IREE::VMVX::buildVMVXConfigurationPassPipeline(passManager);
   }
 
-  void buildTranslationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
+  void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                     OpPassManager &passManager) override {
     IREE::VMVX::buildVMVXTransformPassPipeline(passManager);
 
     OpPassManager &nestedModulePM = passManager.nest<ModuleOp>();
 
-    auto vmOptions = getTargetOptions(variantOp.getTargetAttr());
+    auto vmOptions = getTargetOptions(targetAttr);
     IREE::VM::buildVMTransformPassPipeline(nestedModulePM, vmOptions);
   }
 
@@ -246,12 +216,13 @@ public:
         .insert<IREE::Codegen::IREECodegenDialect, IREE::VMVX::VMVXDialect>();
   }
 
-  void buildConfigurationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
-                                      OpPassManager &passManager) override {
+  void
+  buildConfigurationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
+                                 OpPassManager &passManager) override {
     IREE::VMVX::buildVMVXConfigurationPassPipeline(passManager);
   }
 
-  void buildTranslationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
+  void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                     OpPassManager &passManager) override {
     IREE::VMVX::buildVMVXTransformPassPipeline(passManager);
   }
@@ -265,20 +236,28 @@ struct VMVXSession
     : public PluginSession<VMVXSession, VMVXOptions,
                            PluginActivationPolicy::DefaultActivated> {
   void populateHALTargetDevices(IREE::HAL::TargetDeviceList &targets) {
-    // TODO(benvanik): move to a CPU device registration outside of VMVX. Note
-    // that the inline device does need to be special.
+    // TODO(multi-device): move local device registration out.
+    // This exists here for backwards compat with the old
+    // iree-hal-target-backends flag that needs to look up the device by backend
+    // name.
+    // Note that the inline device does need to be special.
     // #hal.device.target<"vmvx", ...
-    targets.add("vmvx", [&]() { return std::make_shared<VMVXTargetDevice>(); });
+    targets.add("vmvx", [=]() {
+      LocalDevice::Options localDeviceOptions;
+      localDeviceOptions.defaultTargetBackends.push_back("vmvx");
+      localDeviceOptions.defaultHostBackends.push_back("vmvx");
+      return std::make_shared<LocalDevice>(localDeviceOptions);
+    });
     // #hal.device.target<"vmvx-inline", ...
     targets.add("vmvx-inline",
-                [&]() { return std::make_shared<VMVXInlineTargetDevice>(); });
+                [=]() { return std::make_shared<VMVXInlineTargetDevice>(); });
   }
   void populateHALTargetBackends(IREE::HAL::TargetBackendList &targets) {
     // #hal.executable.target<"vmvx", ...
     targets.add("vmvx",
-                [&]() { return std::make_shared<VMVXTargetBackend>(options); });
+                [=]() { return std::make_shared<VMVXTargetBackend>(options); });
     // #hal.executable.target<"vmvx-inline", ...
-    targets.add("vmvx-inline", [&]() {
+    targets.add("vmvx-inline", [=]() {
       return std::make_shared<VMVXInlineTargetBackend>(options);
     });
   }

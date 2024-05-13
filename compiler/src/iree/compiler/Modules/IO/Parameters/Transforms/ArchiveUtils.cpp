@@ -4,11 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/base/api.h"
-#include "iree/io/formats/irpa/irpa_builder.h"
-#include "iree/tooling/parameter_util.h"
-
 #include "iree/compiler/Modules/IO/Parameters/Transforms/ArchiveUtils.h"
+
 #include "llvm/Support/FileOutputBuffer.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Operation.h"
@@ -19,83 +16,105 @@ LogicalResult handleRuntimeError(Operation *op, iree_status_t status,
                                  StringRef failureMessage) {
   if (iree_status_is_ok(status))
     return success();
+  iree_host_size_t buffer_length = 0;
+  if (!iree_status_format(status, /*buffer_capacity=*/0,
+                          /*buffer=*/nullptr, &buffer_length))
+    return op->emitError() << failureMessage;
   std::string message;
-  message.resize(512);
-  iree_host_size_t buffer_length;
-  if (!iree_status_format(status, message.size(), &message[0],
-                          &buffer_length)) {
-    message.resize(buffer_length + 1);
-    iree_status_format(status, message.size(), &message[0], &buffer_length);
-  }
-  message.resize(buffer_length);
+  message.reserve(buffer_length);
+  message.resize(buffer_length - 1);
+  iree_status_format(status, message.capacity(), &message[0], &buffer_length);
   iree_status_ignore(status);
-  return op->emitError() << failureMessage << message;
+  return op->emitError() << failureMessage << "\n" << message;
 }
 
-LogicalResult
-writeParameterIndex(Operation *op, iree_allocator_t allocator,
-                    iree_io_parameter_archive_builder_t &builder,
-                    std::unique_ptr<llvm::FileOutputBuffer> &fileBuffer,
-                    iree_io_file_handle_t **output_file_handle,
-                    iree_io_stream_t **output_stream,
-                    iree_io_parameter_index_t **output_built_index) {
+FailureOr<ArchiveBuilder> createArchiveBuilder(Operation *op) {
+  iree_allocator_t hostAllocator = iree_allocator_system();
+  iree_io_parameter_archive_builder_t *builderPtr = NULL;
+  if (failed(handleRuntimeError(op,
+                                iree_allocator_malloc(hostAllocator,
+                                                      sizeof(*builderPtr),
+                                                      (void **)&builderPtr),
+                                "allocating archive builder"))) {
+    return failure();
+  }
+  ArchiveBuilder builder(
+      builderPtr, +[](iree_io_parameter_archive_builder_t *builder) {
+        iree_allocator_t host_allocator = builder->host_allocator;
+        iree_io_parameter_archive_builder_deinitialize(builder);
+        iree_allocator_free(host_allocator, builder);
+      });
+  iree_io_parameter_archive_builder_initialize(hostAllocator, builder.get());
+  return std::move(builder);
+}
+
+FailureOr<FileStreamIndex> createParameterIndex(Operation *op,
+                                                ArchiveBuilder builder,
+                                                StringRef archivePath) {
+  // Open a file of sufficient size for writing.
+  iree_io_physical_size_t archiveLength =
+      iree_io_parameter_archive_builder_total_size(builder.get());
+  auto fileOr = llvm::FileOutputBuffer::create(archivePath, archiveLength);
+  if (!fileOr) {
+    return op->emitError()
+           << "failed to create file output buffer at " << archivePath
+           << " with error: "
+           << llvm::errorToErrorCode(fileOr.takeError()).message();
+  }
+  std::unique_ptr<llvm::FileOutputBuffer> fileBuffer = std::move(*fileOr);
 
   // Wrap the output file for use with the parameter archive builder.
-  iree_io_file_handle_t *target_file_handle = NULL;
-  iree_byte_span_t file_contents = iree_make_byte_span(
-      fileBuffer->getBufferStart(), fileBuffer->getBufferSize());
   // Release callback is a no-op, the mapping is managed by the unique_ptr.
-  iree_status_t status = iree_io_file_handle_wrap_host_allocation(
-      IREE_IO_FILE_ACCESS_WRITE, file_contents,
-      iree_io_file_handle_release_callback_null(), allocator,
-      &target_file_handle);
-  if (failed(handleRuntimeError(op, status,
-                                "Failed to open output parameter archive"))) {
-    iree_io_file_handle_release(target_file_handle);
-    return failure();
-  }
-
-  // Wrap the target file in a stream.
-  iree_io_stream_t *target_stream = NULL;
-  status = iree_io_stream_open(IREE_IO_STREAM_MODE_WRITABLE, target_file_handle,
-                               /*file_offset=*/0, allocator, &target_stream);
+  iree_io_file_handle_t *fileHandlePtr = nullptr;
   if (failed(handleRuntimeError(
-          op, status, "Failed to create I/O stream to output file"))) {
-    iree_io_file_handle_release(target_file_handle);
-    iree_io_stream_release(target_stream);
+          op,
+          iree_io_file_handle_wrap_host_allocation(
+              IREE_IO_FILE_ACCESS_WRITE,
+              iree_make_byte_span(fileBuffer->getBufferStart(),
+                                  fileBuffer->getBufferSize()),
+              iree_io_file_handle_release_callback_null(),
+              builder->host_allocator, &fileHandlePtr),
+          "failed to open output parameter archive"))) {
     return failure();
   }
+  auto fileHandle = FileHandle(fileHandlePtr, iree_io_file_handle_release);
+
+  // Wrap the target file in a stream. The stream will retain the file handle.
+  iree_io_stream_t *streamPtr = nullptr;
+  if (failed(handleRuntimeError(
+          op,
+          iree_io_stream_open(IREE_IO_STREAM_MODE_WRITABLE, fileHandle.get(),
+                              /*file_offset=*/0, builder->host_allocator,
+                              &streamPtr),
+          "failed to create I/O stream to output file"))) {
+    return failure();
+  }
+  auto stream = Stream(streamPtr, iree_io_stream_release);
 
   // Allocate an index we'll populate during building to allow us to get the
   // storage ranges of non-metadata parameters.
-  iree_io_parameter_index_t *built_index = NULL;
-  status = iree_io_parameter_index_create(allocator, &built_index);
-  if (failed(handleRuntimeError(op, status,
-                                "Failed to allocate parameter index"))) {
-    iree_io_file_handle_release(target_file_handle);
-    iree_io_stream_release(target_stream);
-    iree_io_parameter_index_release(built_index);
+  iree_io_parameter_index_t *indexPtr = nullptr;
+  if (failed(handleRuntimeError(
+          op,
+          iree_io_parameter_index_create(builder->host_allocator, &indexPtr),
+          "failed to allocate parameter index"))) {
     return failure();
   }
+  auto index = ParameterIndex(indexPtr, iree_io_parameter_index_release);
 
   // Commit the archive header to the file and produce an index referencing
   // it. This will allow us to know where to copy file contents.
-  status = iree_io_parameter_archive_builder_write(&builder, target_file_handle,
-                                                   /*file_offset=*/0,
-                                                   target_stream, built_index);
   if (failed(handleRuntimeError(
-          op, status,
-          "Failed to write parameter index header to output file"))) {
-    iree_io_file_handle_release(target_file_handle);
-    iree_io_stream_release(target_stream);
-    iree_io_parameter_index_release(built_index);
+          op,
+          iree_io_parameter_archive_builder_write(
+              builder.get(), fileHandle.get(),
+              /*file_offset=*/0, stream.get(), index.get()),
+          "failed to write parameter index header to output file"))) {
     return failure();
   }
 
-  *output_file_handle = target_file_handle;
-  *output_stream = target_stream;
-  *output_built_index = built_index;
-  return success();
+  return std::make_tuple(std::move(fileBuffer), std::move(stream),
+                         std::move(index));
 }
 
 } // namespace mlir::iree_compiler::IREE::IO::Parameters

@@ -64,6 +64,7 @@ iree_runtime_cc_library(
         "//runtime/src/iree/base/internal:wait_handle",
         "//runtime/src/iree/base/internal/flatcc:parsing",
         "//runtime/src/iree/hal",
+        "//runtime/src/iree/hal/drivers/utils",
         "//runtime/src/iree/hal/utils:collective_batch",
         "//runtime/src/iree/hal/utils:deferred_command_buffer",
         "//runtime/src/iree/hal/utils:file_transfer",

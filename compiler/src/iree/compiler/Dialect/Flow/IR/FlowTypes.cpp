@@ -222,7 +222,7 @@ void FlowDialect::printType(Type type, DialectAsmPrinter &p) const {
 
 std::optional<IREE::Flow::CollectiveElementType>
 convertToFlowCollectiveElementType(Type type) {
-  if (type.isa<FloatType>()) {
+  if (isa<FloatType>(type)) {
     if (type.isF16()) {
       return IREE::Flow::CollectiveElementType::Float16;
     }
@@ -235,7 +235,7 @@ convertToFlowCollectiveElementType(Type type) {
     if (type.isF64()) {
       return IREE::Flow::CollectiveElementType::Float64;
     }
-  } else if (type.isa<IntegerType>()) {
+  } else if (isa<IntegerType>(type)) {
     if (type.isInteger(8)) {
       if (type.isSignedInteger()) {
         return IREE::Flow::CollectiveElementType::Sint8;
@@ -274,6 +274,57 @@ getCollectiveElementTypeAttr(RankedTensorType type) {
   }
   return IREE::Flow::CollectiveElementTypeAttr::get(type.getContext(),
                                                     *collectiveElemType);
+}
+
+//===----------------------------------------------------------------------===//
+// custom<ParameterReference>($scope, $key)
+//===----------------------------------------------------------------------===//
+
+ParseResult parseParameterReference(AsmParser &parser, StringAttr &scopeAttr,
+                                    StringAttr &keyAttr) {
+  auto builder = parser.getBuilder();
+  StringAttr firstAttr;
+  if (failed(parser.parseCustomAttributeWithFallback(firstAttr,
+                                                     builder.getNoneType()))) {
+    return failure();
+  }
+  if (failed(parser.parseOptionalColon())) {
+    keyAttr = firstAttr;
+    return success();
+  }
+  scopeAttr = firstAttr;
+  if (failed(parser.parseColon()) ||
+      failed(parser.parseCustomAttributeWithFallback(keyAttr,
+                                                     builder.getNoneType()))) {
+    return failure();
+  }
+  return success();
+}
+
+void printParameterReference(AsmPrinter &p, StringAttr scopeAttr,
+                             StringAttr keyAttr) {
+  if (scopeAttr) {
+    p << "\"" << scopeAttr.getValue() << "\"";
+    p << "::";
+  }
+  p << "\"" << keyAttr.getValue() << "\"";
+}
+
+//===----------------------------------------------------------------------===//
+// #flow.parameter.named<...>
+//===----------------------------------------------------------------------===//
+
+int64_t NamedParameterAttr::getStorageSize() const {
+  if (auto configAttr = getConfig()) {
+    if (auto lengthAttr = configAttr.getAs<IntegerAttr>("length")) {
+      return lengthAttr.getInt();
+    }
+  }
+  if (auto shapedType = llvm::dyn_cast<ShapedType>(getType())) {
+    return IREE::Util::getRoundedPhysicalStorageSize(shapedType);
+  } else {
+    return IREE::Util::getTypePhysicalStorageBitWidth(getType());
+  }
 }
 
 } // namespace mlir::iree_compiler::IREE::Flow

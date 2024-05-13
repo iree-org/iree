@@ -7,9 +7,13 @@
 #ifndef IREE_COMPILER_CODEGEN_UTILS_GPUUTILS_H_
 #define IREE_COMPILER_CODEGEN_UTILS_GPUUTILS_H_
 
-#include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
+#include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 
 namespace mlir::iree_compiler {
 
@@ -35,12 +39,6 @@ llvm::SmallVector<linalg::ProcInfo, 2>
 getSubgroupIdsAndCounts(OpBuilder &builder, Location loc, unsigned warpSize,
                         unsigned numDims, llvm::ArrayRef<int64_t> numSubgroups);
 
-/// Returns the workgroup size associated to the funcOp entry point.
-std::array<int64_t, 3> getWorkgroupSize(mlir::FunctionOpInterface funcOp);
-
-/// Returns the subgroup size associated to the funcOp entry point.
-std::optional<int64_t> getSubgroupSize(mlir::FunctionOpInterface funcOp);
-
 //===----------------------------------------------------------------------===//
 // GPU vectorization
 //===----------------------------------------------------------------------===//
@@ -55,6 +53,23 @@ bool canPerformVectorAccessUsingAllThreads(ArrayRef<int64_t> shape,
 /// register. This is needed to get good performance on sm_80 target.
 std::optional<SmallVector<int64_t>>
 gpuMmaUnrollOrder(vector::ContractionOp contract);
+
+//===----------------------------------------------------------------------===//
+// GPU tiling and distribution
+//===----------------------------------------------------------------------===//
+
+/// Returns the attribute name carrying information about distribution.
+const char *getGPUDistributeAttrName();
+
+/// Returns the tile sizes at the given `tilingLevel` for compute ops in
+/// `funcOp`.
+FailureOr<SmallVector<int64_t>> getGPUTileSize(mlir::FunctionOpInterface funcOp,
+                                               int tilingLevel);
+
+/// Returns the functor to compute tile sizes at the given `tilingLevel` for
+/// compute ops in `funcOp`.
+FailureOr<scf::SCFTileSizeComputationFunction>
+getGPUScfTileSizeComputeFn(mlir::FunctionOpInterface funcOp, int tilingLevel);
 
 //===----------------------------------------------------------------------===//
 // GPU workgroup memory
@@ -126,6 +141,7 @@ bool hasUkernelSupportedGpuArch(IREE::HAL::ExecutableTargetAttr targetAttr);
 //===----------------------------------------------------------------------===//
 // GPU Target Information
 //===----------------------------------------------------------------------===//
+FailureOr<ArrayAttr> getSupportedMmaTypes(DictionaryAttr config);
 
 FailureOr<ArrayAttr> getSupportedMmaTypes(mlir::FunctionOpInterface entryPoint);
 

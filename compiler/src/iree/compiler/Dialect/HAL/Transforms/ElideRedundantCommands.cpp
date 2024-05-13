@@ -227,7 +227,7 @@ struct ElideRedundantCommandsPass
         auto resetCommandBufferBarrierBit = [&](Operation *op) {
           assert(op->getNumOperands() > 0 && "must be a command buffer op");
           auto commandBuffer = op->getOperand(0);
-          assert(commandBuffer.getType().isa<IREE::HAL::CommandBufferType>() &&
+          assert(isa<IREE::HAL::CommandBufferType>(commandBuffer.getType()) &&
                  "operand 0 must be a command buffer");
           stateMap[commandBuffer].previousFullBarrier = {};
         };

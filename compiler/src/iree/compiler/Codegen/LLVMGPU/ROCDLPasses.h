@@ -18,11 +18,11 @@ namespace mlir::iree_compiler {
 
 /// Creates a pass that calls a dynamic pipeline to progressively lower Linalg
 /// with tensor semantics to ROCDL.
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
+std::unique_ptr<InterfacePass<FunctionOpInterface>>
 createROCDLLowerExecutableTargetPass();
 
 /// Creates a pass to select the lowering strategy for converting to ROCDL.
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
+std::unique_ptr<OperationPass<ModuleOp>>
 createROCDLSelectLoweringStrategyPass();
 
 //===----------------------------------------------------------------------===//

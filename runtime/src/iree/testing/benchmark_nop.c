@@ -7,6 +7,8 @@
 #include "iree/base/api.h"
 #include "iree/testing/benchmark.h"
 
+void iree_benchmark_use_ptr(char const volatile* x) {}
+
 int64_t iree_benchmark_get_range(iree_benchmark_state_t* state,
                                  iree_host_size_t ordinal) {
   return 0;
@@ -32,8 +34,14 @@ void iree_benchmark_set_bytes_processed(iree_benchmark_state_t* state,
 void iree_benchmark_set_items_processed(iree_benchmark_state_t* state,
                                         int64_t items) {}
 
-void iree_benchmark_register(iree_string_view_t name,
-                             const iree_benchmark_def_t* benchmark_def) {}
+const iree_benchmark_def_t* iree_benchmark_register(
+    iree_string_view_t name, const iree_benchmark_def_t* benchmark_def) {
+  return benchmark_def;
+}
+
+iree_benchmark_def_t* iree_make_function_benchmark(iree_benchmark_fn_t fn) {
+  return NULL;
+}
 
 void iree_benchmark_initialize(int* argc, char** argv) {}
 

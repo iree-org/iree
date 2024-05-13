@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/LLVMGPU/ROCDLKernelConfig.h"
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
@@ -337,90 +338,82 @@ static void propagateLoweringConfig(Operation *rootOp,
 // Entry Point
 //===----------------------------------------------------------------------===//
 
-LogicalResult initROCDLLaunchConfig(ModuleOp moduleOp) {
-  llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
-      getAllEntryPoints(moduleOp);
+LogicalResult initROCDLLaunchConfig(FunctionOpInterface funcOp) {
 
-  for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
-    auto exportOp = exportOps.lookup(funcOp.getName());
-    if (!exportOp)
-      continue;
-
-    // First check whether we already have workgroup count set--it's a
-    // "contract" to indicate that we should bypass all tiling and
-    // distribution to go down just the most basic lowering flow.
-    if (Block *body = exportOp.getWorkgroupCountBody()) {
+  // First check whether we already have workgroup count set--it's a
+  // "contract" to indicate that we should bypass all tiling and
+  // distribution to go down just the most basic lowering flow.
+  if (auto exportOp = getEntryPoint(funcOp)) {
+    if (Block *body = exportOp->getWorkgroupCountBody()) {
       auto retOp = cast<IREE::HAL::ReturnOp>(body->getTerminator());
       // For scalar dispatch cases--using just one thread of one workgroup.
       auto isOne = [](Value value) { return matchPattern(value, m_One()); };
       if (llvm::all_of(retOp.getOperands(), isOne)) {
         std::array<int64_t, 3> workgroupSize = {1, 1, 1};
-        if (failed(setDispatchConfig(funcOp, workgroupSize, std::nullopt)))
-          return failure();
         auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
             funcOp.getContext(),
-            IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUBaseLowering);
+            IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUBaseLowering,
+            workgroupSize);
         if (failed(setTranslationInfo(funcOp, translationInfo))) {
           return failure();
         }
-        continue;
+        return success();
       }
     }
+  }
 
-    SmallVector<Operation *> computeOps = getComputeOps(funcOp);
-    if (getTranslationInfo(exportOp)) {
-      // Currently ROCDL requires propagation of user lowering configs.
-      for (auto op : computeOps) {
-        if (getLoweringConfig(op)) {
-          propagateLoweringConfig(op, computeOps);
-          break;
-        }
+  SmallVector<Operation *> computeOps = getComputeOps(funcOp);
+  if (getTranslationInfo(funcOp)) {
+    // Currently ROCDL requires propagation of user lowering configs.
+    for (auto op : computeOps) {
+      if (getLoweringConfig(op)) {
+        propagateLoweringConfig(op, computeOps);
+        break;
       }
-      continue;
     }
+  }
 
-    Operation *rootOp = nullptr;
+  Operation *rootOp = nullptr;
 
-    // Find the root operation. linalg.generic and linalg.fill are not root
-    // operations if there are other compute operations present.
-    for (Operation *op : llvm::reverse(computeOps)) {
-      if (!isa<linalg::GenericOp, linalg::FillOp>(op)) {
+  // Find the root operation. linalg.generic and linalg.fill are not root
+  // operations if there are other compute operations present.
+  for (Operation *op : llvm::reverse(computeOps)) {
+    if (!isa<linalg::GenericOp, linalg::FillOp>(op)) {
+      rootOp = op;
+      break;
+    }
+    if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
+      // linalg.generic with `reduction` iterator types are roots as well.
+      if (genericOp.getNumLoops() != genericOp.getNumParallelLoops()) {
         rootOp = op;
         break;
       }
-      if (auto genericOp = dyn_cast<linalg::GenericOp>(op)) {
-        // linalg.generic with `reduction` iterator types are roots as well.
-        if (genericOp.getNumLoops() != genericOp.getNumParallelLoops()) {
-          rootOp = op;
-          break;
-        }
-      }
     }
-
-    if (!rootOp) {
-      for (Operation *op : llvm::reverse(computeOps)) {
-        if (isa<linalg::GenericOp, linalg::FillOp>(op)) {
-          rootOp = op;
-          break;
-        }
-      }
-    }
-
-    if (!rootOp) {
-      // No root operation found, set it to none.
-      auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
-          funcOp.getContext(), CodeGenPipeline::None);
-      if (failed(setTranslationInfo(funcOp, translationInfo))) {
-        return failure();
-      }
-      continue;
-    }
-
-    if (failed(setRootConfig(funcOp, rootOp)))
-      continue;
-
-    propagateLoweringConfig(rootOp, computeOps);
   }
+
+  if (!rootOp) {
+    for (Operation *op : llvm::reverse(computeOps)) {
+      if (isa<linalg::GenericOp, linalg::FillOp>(op)) {
+        rootOp = op;
+        break;
+      }
+    }
+  }
+
+  if (!rootOp) {
+    // No root operation found, set it to none.
+    auto translationInfo = IREE::Codegen::TranslationInfoAttr::get(
+        funcOp.getContext(), CodeGenPipeline::None);
+    if (failed(setTranslationInfo(funcOp, translationInfo))) {
+      return failure();
+    }
+    return success();
+  }
+
+  if (failed(setRootConfig(funcOp, rootOp)))
+    return failure();
+
+  propagateLoweringConfig(rootOp, computeOps);
   return success();
 }
 

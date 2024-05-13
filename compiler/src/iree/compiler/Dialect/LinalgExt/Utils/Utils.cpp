@@ -15,7 +15,7 @@
 namespace mlir::iree_compiler::IREE::LinalgExt {
 
 Value getDimValue(OpBuilder &builder, Location loc, Value v, int64_t dim) {
-  ShapedType type = v.getType().cast<ShapedType>();
+  ShapedType type = cast<ShapedType>(v.getType());
   if (!type.isDynamicDim(dim)) {
     return builder.create<arith::ConstantIndexOp>(loc, type.getDimSize(dim));
   }
@@ -29,7 +29,7 @@ Value getDimValue(OpBuilder &builder, Location loc, Value v, int64_t dim) {
 }
 
 OpFoldResult getDim(OpBuilder &builder, Location loc, Value v, int64_t dim) {
-  auto t = v.getType().cast<ShapedType>();
+  auto t = cast<ShapedType>(v.getType());
   if (t.isDynamicDim(dim)) {
     return getDimValue(builder, loc, v, dim);
   }
@@ -39,8 +39,8 @@ OpFoldResult getDim(OpBuilder &builder, Location loc, Value v, int64_t dim) {
 SmallVector<OpFoldResult> getDims(OpBuilder &builder, Location loc,
                                   Value shapedTypeValue) {
   return llvm::map_to_vector(
-      llvm::seq<int64_t>(
-          0, shapedTypeValue.getType().cast<ShapedType>().getRank()),
+      llvm::seq<int64_t>(0,
+                         cast<ShapedType>(shapedTypeValue.getType()).getRank()),
       [&](int64_t dim) { return getDim(builder, loc, shapedTypeValue, dim); });
 }
 
@@ -83,7 +83,7 @@ SmallVector<int64_t> asShapeWithAnyValueAsDynamic(ArrayRef<OpFoldResult> ofrs) {
   SmallVector<int64_t> result;
   for (auto o : ofrs) {
     // Have to do this first, as getConstantIntValue special-cases constants.
-    if (o.dyn_cast<Value>()) {
+    if (dyn_cast<Value>(o)) {
       result.push_back(ShapedType::kDynamic);
     } else {
       result.push_back(getConstantIntValue(o).value_or(ShapedType::kDynamic));

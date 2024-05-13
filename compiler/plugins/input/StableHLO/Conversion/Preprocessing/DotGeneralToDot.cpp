@@ -237,8 +237,8 @@ struct GeneralDotConvert final
     ArrayRef<int64_t> rhsContractingDims =
         dotNumbers.getRhsContractingDimensions();
 
-    TypedValue<TensorType> lhs = op.getLhs();
-    TypedValue<TensorType> rhs = op.getRhs();
+    TypedValue<RankedTensorType> lhs = op.getLhs();
+    TypedValue<RankedTensorType> rhs = op.getRhs();
 
     RankedTensorType lhsTy = dyn_cast<RankedTensorType>(lhs.getType());
     RankedTensorType rhsTy = dyn_cast<RankedTensorType>(rhs.getType());
@@ -295,9 +295,9 @@ struct GeneralDotConvert final
       return failure();
 
     // Compute the, possibly, transposed-reshaped operands.
-    lhs = cast<mlir::TypedValue<mlir::TensorType>>(processDotArg(
+    lhs = cast<mlir::TypedValue<mlir::RankedTensorType>>(processDotArg(
         lhs, loc, lhsContractingDims, /*outerDimsFirst=*/true, rewriter));
-    rhs = cast<mlir::TypedValue<mlir::TensorType>>(processDotArg(
+    rhs = cast<mlir::TypedValue<mlir::RankedTensorType>>(processDotArg(
         rhs, loc, rhsContractingDims, /*outerDimsFirst=*/false, rewriter));
 
     // Accept only static shaped types.
@@ -382,9 +382,9 @@ struct DotVectorOptimization final : OpRewritePattern<mlir::stablehlo::DotOp> {
     Value lhs = op.getLhs();
     Value rhs = op.getRhs();
 
-    ShapedType lhsTy = lhs.getType().cast<ShapedType>();
-    ShapedType rhsTy = rhs.getType().cast<ShapedType>();
-    ShapedType resultTy = op.getType().cast<ShapedType>();
+    ShapedType lhsTy = cast<ShapedType>(lhs.getType());
+    ShapedType rhsTy = cast<ShapedType>(rhs.getType());
+    ShapedType resultTy = cast<ShapedType>(op.getType());
 
     llvm::SmallVector<int64_t> dotShape;
     if (lhsTy.getRank() == 2 && lhsTy.getDimSize(0) == 1) {

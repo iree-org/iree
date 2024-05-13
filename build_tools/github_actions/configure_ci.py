@@ -8,9 +8,9 @@
 """Determines whether CI should run on a given PR.
 
 The following environment variables are required:
-- GITHUB_REPOSITORY: GitHub org and repository, e.g. openxla/iree.
+- GITHUB_REPOSITORY: GitHub org and repository, e.g. iree-org/iree.
 - GITHUB_WORKFLOW_REF: GitHub workflow ref, e.g.
-    openxla/iree/.github/workflows/ci.yml@refs/pull/1/merge.
+    iree-org/iree/.github/workflows/ci.yml@refs/pull/1/merge.
 - GITHUB_EVENT_NAME: GitHub event name, e.g. pull_request.
 - GITHUB_OUTPUT: path to write workflow output variables.
 - GITHUB_STEP_SUMMARY: path to write workflow summary output.
@@ -125,11 +125,14 @@ CONTROL_JOBS = frozenset(["setup", "summary"])
 DEFAULT_POSTSUBMIT_ONLY_JOBS = frozenset(
     [
         "build_test_all_arm64",
-        "build_test_all_windows",
+        # "build_test_all_windows",  # Currently disabled
         "build_test_all_macos_arm64",
         "build_test_all_macos_x86_64",
         # Due to the outstock of A100, only run this test in postsubmit.
-        "test_a100",
+        "test_nvidia_a100",
+        # Due to the instability issues at the current runner,
+        # only run this test in postsubmit.
+        "test_amd_w7900",
     ]
 )
 
@@ -138,10 +141,11 @@ DEFAULT_POSTSUBMIT_ONLY_JOBS = frozenset(
 # The file paths should be specified using Unix shell-style wildcards.
 PRESUBMIT_TOUCH_ONLY_JOBS = [
     ("build_test_all_macos_arm64", ["runtime/src/iree/hal/drivers/metal/*"]),
-    (
-        "build_test_all_windows",
-        ["*win32*", "*windows*", "*msvc*", "runtime/src/iree/builtins/ukernel/*"],
-    ),
+    # Currently disabled
+    # (
+    #     "build_test_all_windows",
+    #     ["*win32*", "*windows*", "*msvc*", "runtime/src/iree/builtins/ukernel/*"],
+    # ),
 ]
 
 # Default presets enabled in CI.
@@ -165,7 +169,7 @@ PR_DESCRIPTION_TEMPLATE = string.Template("${title}\n\n${body}")
 # third_party/llvm-project submodule. This should only include PRs
 # intended to be merged and should exclude test/draft PRs as well as
 # PRs that include temporary patches to the submodule during review.
-# See also: https://github.com/openxla/iree/issues/12268
+# See also: https://github.com/iree-org/iree/issues/12268
 LLVM_INTEGRATE_TITLE_PATTERN = re.compile("^integrate.+llvm", re.IGNORECASE)
 LLVM_INTEGRATE_BRANCH_PATTERN = re.compile(
     "bump-llvm|llvm-bump|integrate-llvm", re.IGNORECASE

@@ -10,6 +10,8 @@ import sys
 import tempfile
 import unittest
 
+from iree.compiler.tools.ir_tool import __main__ as ir_tool
+
 # TODO: No idea why pytype cannot find names from this module.
 # pytype: disable=name-error
 import iree.compiler.tools.tflite
@@ -22,12 +24,25 @@ if not iree.compiler.tools.tflite.is_available():
     sys.exit(0)
 
 
+def mlir_bytecode_file_to_text(bytecode_file):
+    with tempfile.NamedTemporaryFile() as temp_file:
+        args = ir_tool.parse_arguments(["copy", bytecode_file, "-o", temp_file.name])
+        ir_tool.main(args)
+        return str(temp_file.read())
+
+
+def mlir_bytecode_to_text(bytecode):
+    with tempfile.NamedTemporaryFile("wb") as temp_bytecode_file:
+        temp_bytecode_file.write(bytecode)
+        temp_bytecode_file.flush()
+        return mlir_bytecode_file_to_text(temp_bytecode_file.name)
+
+
 class CompilerTest(unittest.TestCase):
     def testImportBinaryPbFile(self):
         path = os.path.join(os.path.dirname(__file__), "testdata", "tflite_sample.fb")
-        text = iree.compiler.tools.tflite.compile_file(path, import_only=True).decode(
-            "utf-8"
-        )
+        bytecode = iree.compiler.tools.tflite.compile_file(path, import_only=True)
+        text = mlir_bytecode_to_text(bytecode)
         logging.info("%s", text)
         self.assertIn("tosa.mul", text)
 
@@ -48,10 +63,11 @@ class CompilerTest(unittest.TestCase):
                     path, import_only=True, output_file=f.name
                 )
                 self.assertIsNone(output)
-                with open(f.name, "rt") as f_read:
-                    text = f_read.read()
+                with open(f.name, "rb") as f_read:
+                    bytecode = f_read.read()
             finally:
                 os.remove(f.name)
+        text = mlir_bytecode_to_text(bytecode)
         logging.info("%s", text)
         self.assertIn("tosa.mul", text)
 
@@ -77,9 +93,8 @@ class CompilerTest(unittest.TestCase):
         path = os.path.join(os.path.dirname(__file__), "testdata", "tflite_sample.fb")
         with open(path, "rb") as f:
             content = f.read()
-        text = iree.compiler.tools.tflite.compile_str(content, import_only=True).decode(
-            "utf-8"
-        )
+        bytecode = iree.compiler.tools.tflite.compile_str(content, import_only=True)
+        text = mlir_bytecode_to_text(bytecode)
         logging.info("%s", text)
         self.assertIn("tosa.mul", text)
 

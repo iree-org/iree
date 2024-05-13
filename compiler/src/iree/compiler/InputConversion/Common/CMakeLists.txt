@@ -29,6 +29,7 @@ iree_cc_library(
   DEPS
     ::PassesIncGen
     MLIRPass
+    MLIRTransformUtils
     MLIRTransforms
   PUBLIC
 )
@@ -66,9 +67,10 @@ iree_cc_library(
     MLIRSCFToControlFlow
     MLIRTensorDialect
     MLIRTensorUtils
+    MLIRTransformUtils
     MLIRTransforms
-    iree::compiler::Dialect::Flow::Conversion::MeshToFlow
     iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::Flow::Transforms
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::Util::IR
     iree::compiler::Utils
@@ -91,6 +93,7 @@ iree_cc_library(
     MLIRFunctionInterfaces
     MLIRIR
     MLIRPass
+    MLIRTransformUtils
     MLIRTransforms
     iree::compiler::PluginAPI
     iree::compiler::Utils

@@ -12,8 +12,8 @@ include "iree/compiler/Dialect/HAL/IR/HALBase.td"
 include "iree/compiler/Dialect/HAL/IR/HALInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilAttrs.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
-include "mlir/IR/BuiltinAttributeInterfaces.td"
 include "mlir/Interfaces/FunctionInterfaces.td"
+include "mlir/IR/BuiltinAttributeInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/CallInterfaces.td"
@@ -167,7 +167,6 @@ def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
 }
 
 def HAL_TensorExportOp : HAL_PureOp<"tensor.export", [
-  AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
     "getTiedResult",
     "getTiedResultOperandIndex",
@@ -185,18 +184,12 @@ def HAL_TensorExportOp : HAL_PureOp<"tensor.export", [
     dynamically shaped values must have the same number of dynamic dimensions.
     This allows for casting between rank-0 and rank-N types, different element
     types, etc.
-
-    An optional `target_storage` buffer can be provided to hold the exported
-    result. The export will fail at runtime if the storage is null or if it has
-    insufficient capacity to store the output. The storage must be
-    device-visible and defined for transfer-target and dispatch usage.
   }];
 
   let arguments = (ins
     AnyTensor:$source,
     TypeAttr:$source_encoding,
     HAL_ShapeDynamicDims:$source_dims,
-    Optional<AnyTypeOf<[HAL_Buffer, HAL_BufferView]>>:$target_storage,
     OptionalAttr<StrAttr>:$name
   );
   let results = (outs
@@ -206,7 +199,6 @@ def HAL_TensorExportOp : HAL_PureOp<"tensor.export", [
   let assemblyFormat = [{
     $source
     ($name^)?
-    (`into` `(` $target_storage^ `:` type($target_storage) `)`)?
     `:`
     custom<TypeAlias>($source_encoding, type($source)) (`{` $source_dims^ `}`)?
     `->`
@@ -221,13 +213,6 @@ def HAL_TensorExportOp : HAL_PureOp<"tensor.export", [
       "TypeAttr":$sourceEncoding,
       "StringAttr":$name
     )>,
-    OpBuilder<(ins
-      "Type":$resultType,
-      "Value":$source,
-      "TypeAttr":$sourceEncoding,
-      "Value":$targetStorage,
-      "StringAttr":$name
-    )>,
   ];
 
   let extraClassDeclaration = [{
@@ -238,6 +223,76 @@ def HAL_TensorExportOp : HAL_PureOp<"tensor.export", [
   let hasVerifier = 1;
 
   let hasFolder = 1;
+}
+
+// TODO(#17328): specify an allocation policy to control behavior.
+def HAL_TensorAliasOp : HAL_PureOp<"tensor.alias", [
+  AllTypesMatch<["source", "result"]>,
+  AttrSizedOperandSegments,
+  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
+    "getTiedResult",
+    "getTiedResultOperandIndex",
+    "getTiedResultOperandIndices",
+  ]>,
+  Util_ShapeAwareOp,
+]> {
+  let summary = [{hints that tensor storage should alias a HAL buffer view}];
+  let description = [{
+    Hints that the backing storage of an entire tensor aliases the given storage
+    buffer. There's no guarantee that the storage will alias and instead only
+    that the tensor contents will be written to the storage as if a copy had
+    occurred. This allows the compiler to avoid copies in the ideal case of a
+    producer that is able to produce directly into the target storage but still
+    handle cases where the producer is not able to be in-place.
+
+    The storage buffer provided must have sufficient space for the tensor once
+    encoded. Dynamically shaped tensors may not consume the entire provided
+    storage. If a buffer view is provided the metadata is ignored and only the
+    backing buffer is used.
+
+    An optional wait fence can be provided in cases where the storage is not
+    immediately available. Producers that may alias the storage will wait until
+    the storage is available before updating the contents.
+
+    Explicit aliasing side-steps any analysis that may be performed by the
+    compiler and requires users to guarantee that the safety of the aliasing.
+    Copy-on-write, alias analysis for overlap detection, and ordering via
+    use-def chains are all ignorant of the aliased buffer memory and only ensure
+    the compiler consumes or produces the aliased memory consistent with itself.
+
+    Example:
+    ```mlir
+    %init = tensor.empty
+    %value = linalg.generic ... outs(%init)
+    %aliased = hal.tensor.alias %value : tensor<...> to %buffer : !hal.buffer
+    ... linalg.generic ins(%aliased) ...
+    ```
+  }];
+
+  let arguments = (ins
+    AnyTensor:$source,
+    HAL_ShapeDynamicDims:$source_dims,
+    AnyTypeOf<[HAL_Buffer, HAL_BufferView]>:$storage,
+    Optional<HAL_Fence>:$wait_fence
+  );
+  let results = (outs
+    AnyTensor:$result
+  );
+
+  let assemblyFormat = [{
+    (`wait` `(` $wait_fence^ `)` `=` `` `>`)?
+    $source `:` type($source) (`{` $source_dims^ `}`)?
+    `to`
+    $storage `:` type($storage)
+    attr-dict
+  }];
+
+  let extraClassDeclaration = [{
+    ValueRange getOperandDynamicDims(unsigned idx) { return getSourceDims(); }
+    ValueRange getResultDynamicDims(unsigned idx) { return getSourceDims(); }
+  }];
+
+  let hasVerifier = 1;
 }
 
 def HAL_TensorBarrierOp : HAL_Op<"tensor.barrier", [
@@ -2095,6 +2150,15 @@ def HAL_ExecutableExportOp : HAL_Op<"executable.export", [
     // Calculates an XYZ workgroup size based on the given |workload|.
     std::array<Value, 3> calculateWorkgroupSize(
         Location loc, Value device, ValueRange workload, OpBuilder &builder);
+
+    // Helper function to return the subgroup size.
+    std::optional<uint64_t> getSubgroupSizeAsUInt() {
+      std::optional<APInt> subgroupSizeUInt = getSubgroupSize();
+      if (!subgroupSizeUInt) {
+        return std::nullopt;
+      }
+      return subgroupSizeUInt->getZExtValue();
+    }
   }];
 }
 

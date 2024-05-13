@@ -244,24 +244,6 @@ iree_cc_binary(
   INSTALL_COMPONENT IREETools-Runtime
 )
 
-iree_cc_binary(
-  NAME
-    iree-e2e-matmul-test
-  SRCS
-    "iree-e2e-matmul-test.cc"
-  DEPS
-    iree::base
-    iree::base::internal::cpu
-    iree::base::internal::flags
-    iree::base::internal::path
-    iree::hal
-    iree::modules::hal
-    iree::tooling::context_util
-    iree::tooling::device_util
-    iree::vm
-    iree::vm::cc
-)
-
 if(IREE_BUILD_COMPILER)
   if(IREE_LLVM_LINK_TARGET)
     install(

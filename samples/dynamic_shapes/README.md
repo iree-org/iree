@@ -15,8 +15,8 @@ Steps 1-2 are performed in Python via the
 
 | Framework | Notebook |
 | --------- | -------- |
-PyTorch | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/dynamic_shapes/pytorch_dynamic_shapes.ipynb)
-TensorFlow | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/openxla/iree/blob/main/samples/dynamic_shapes/tensorflow_dynamic_shapes.ipynb)
+PyTorch | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iree-org/iree/blob/main/samples/dynamic_shapes/pytorch_dynamic_shapes.ipynb)
+TensorFlow | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iree-org/iree/blob/main/samples/dynamic_shapes/tensorflow_dynamic_shapes.ipynb)
 
 Step 3 should be performed on your development host machine
 
@@ -88,13 +88,13 @@ them.
 1. Run either Colab notebook and download the `dynamic_shapes.mlir` file it
     generates
 
-2. Build the `iree-compile` tool (see
-    [here](https://iree.dev/building-from-source/getting-started/)
-    for general instructions on building using CMake)
+2. Get `iree-compile` either by
+    [building from source](https://iree.dev/building-from-source/getting-started/)
+    or by
+    [installing from pip](https://iree.dev/reference/bindings/python/#installing-iree-packages).
 
     ```
-    cmake -B ../iree-build/ -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo .
-    cmake --build ../iree-build/ --target iree-compile
+    python -m pip install iree-compiler
     ```
 
 3. Compile the `dynamic_shapes.mlir` file using `iree-compile`. The
@@ -102,7 +102,7 @@ them.
     has the best support for dynamic shapes:
 
     ```
-    ../iree-build/tools/iree-compile \
+    iree-compile \
         --iree-hal-target-backends=llvm-cpu \
         dynamic_shapes.mlir -o dynamic_shapes_cpu.vmfb
     ```
@@ -110,6 +110,7 @@ them.
 4. Build the `iree_samples_dynamic_shapes` CMake target
 
     ```
+    cmake -B ../iree-build/ -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DIREE_BUILD_COMPILER=OFF .
     cmake --build ../iree-build/ --target iree_samples_dynamic_shapes
     ```
 

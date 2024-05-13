@@ -140,40 +140,37 @@ def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
 
     int64_t getIndexDepth() {
-      return getDpsInputOperand(1)
-          ->get()
-          .getType()
-          .cast<ShapedType>()
+      return cast<ShapedType>(getDpsInputOperand(1)->get().getType())
           .getShape()
           .back();
     }
 
-    Value updates() {
+    Value getUpdates() {
       return getDpsInputOperand(0)->get();
     }
 
     ShapedType getUpdateType() {
-      return updates().getType().cast<ShapedType>();
+      return cast<ShapedType>(getUpdates().getType());
     }
 
-    Value indices() {
+    Value getIndices() {
       return getDpsInputOperand(1)->get();
     }
 
     ShapedType getIndicesType() {
-      return indices().getType().cast<ShapedType>();
+      return cast<ShapedType>(getIndices().getType());
     }
 
-    Value original() {
+    Value getOriginal() {
       return getDpsInitOperand(0)->get();
     }
 
     ShapedType getOriginalType() {
-      return original().getType().cast<ShapedType>();
+      return cast<ShapedType>(getOriginal().getType());
     }
 
     int64_t getUpdateSliceRank() {
-      return updates().getType().cast<ShapedType>().getRank() - 1;
+      return cast<ShapedType>(getUpdates().getType()).getRank() - 1;
     }
 
     bool isScalarUpdate() {
@@ -218,11 +215,11 @@ def IREELinalgExt_SortOp : IREELinalgExt_Op<"sort",
     $region (`->` type($results)^)?
   }];
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
-    Value operand(int index) {
+    Value getOperand(int index) {
       return getOutputs()[index];
     }
     ShapedType getOperandType(int index) {
-      return operand(index).getType().cast<ShapedType>();
+      return cast<ShapedType>(getOperand(index).getType());
     }
     int64_t getOperandRank() {
       return getOperandType(0).getRank();
@@ -289,7 +286,7 @@ def IREELinalgExt_FftOp : IREELinalgExt_Op<"fft", [
       return getInputs()[2];
     }
     ShapedType getOperandType() {
-      return getReal().getType().cast<ShapedType>();
+      return cast<ShapedType>(getReal().getType());
     }
     int64_t getOperandRank() {
       return getOperandType().getRank();
@@ -346,17 +343,17 @@ def IREELinalgExt_ScanOp : IREELinalgExt_Op<"scan",
   }];
 
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
-    Value input() {
+    Value getInput() {
       return getDpsInputOperand(0)->get();
     }
-    Value accumulator() {
+    Value getAccumulator() {
       return getDpsInitOperand(1)->get();
     }
-    Value output() {
+    Value getOutput() {
       return getDpsInitOperand(0)->get();
     }
     ShapedType getOperandType() {
-      return input().getType().cast<ShapedType>();
+      return cast<ShapedType>(getInput().getType());
     }
     int64_t getOperandRank() {
       return getOperandType().getRank();
@@ -399,14 +396,14 @@ def IREELinalgExt_ReverseOp : IREELinalgExt_Op<"reverse", [
     (`:` type($results)^)?
   }];
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
-    Value input() {
+    Value getInput() {
       return getDpsInputOperand(0)->get();
     }
-    Value output() {
+    Value getOutput() {
       return getDpsInitOperand(0)->get();
     }
     ShapedType getOperandType() {
-      return input().getType().cast<ShapedType>();
+      return cast<ShapedType>(getInput().getType());
     }
     int64_t getOperandRank() {
       return getOperandType().getRank();
@@ -414,7 +411,7 @@ def IREELinalgExt_ReverseOp : IREELinalgExt_Op<"reverse", [
     ArrayRef<int64_t> getOprerandShape() {
       return getOperandType().getShape();
     }
-    SmallVector<int64_t> dims() {
+    SmallVector<int64_t> getDimensionsArray() {
       SmallVector<int64_t> ret;
       for (const APInt& elem : getDimensions()) {
         ret.push_back(elem.getLimitedValue());
@@ -476,10 +473,10 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
   }];
 
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
-    Value values() {
+    Value getValues() {
       return getDpsInputOperand(0)->get();
     }
-    std::optional<Value> indices() {
+    std::optional<Value> getIndices() {
       if (getNumDpsInputs() < 2) {
         return {};
       } else {
@@ -493,7 +490,7 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
       return getDpsInitOperand(1)->get();
     }
     ShapedType getInputType() {
-      return values().getType().cast<ShapedType>();
+      return cast<ShapedType>(getValues().getType());
     }
     int64_t getInputRank() {
       return getInputType().getRank();
@@ -593,29 +590,29 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
       return getDpsInitOperand(2)->get();
     }
     ShapedType getQueryType() {
-      return getQuery().getType().cast<ShapedType>();
+      return cast<ShapedType>(getQuery().getType());
     }
     ShapedType getKeyType() {
-      return getKey().getType().cast<ShapedType>();
+      return cast<ShapedType>(getKey().getType());
     }
     ShapedType getValueType() {
-      return getValue().getType().cast<ShapedType>();
+      return cast<ShapedType>(getValue().getType());
     }
     FloatType getScaleType() {
-      return getScale().getType().cast<FloatType>();
+      return cast<FloatType>(cast<ShapedType>(getScale().getType()));
     }
     ShapedType getOutputType() {
-      return getOutput().getType().cast<ShapedType>();
+      return cast<ShapedType>(getOutput().getType());
     }
     std::optional<ShapedType> getMaxType() {
       std::optional<Value> maxVal = getMax();
       if (!maxVal) return std::nullopt;
-      return maxVal->getType().cast<ShapedType>();
+      return cast<ShapedType>(maxVal->getType());
     }
     std::optional<ShapedType> getSumType() {
       std::optional<Value> sumVal = getSum();
       if (!sumVal) return std::nullopt;
-      return sumVal->getType().cast<ShapedType>();
+      return cast<ShapedType>(sumVal->getType());
     }
     int64_t getQueryRank() {
       return getQueryType().getRank();
@@ -769,12 +766,12 @@ def IREELinalgExt_PackOp : IREELinalgExt_Op<"pack", [
 
     // Return the output type.
     ShapedType getOutputType() {
-      return getOutput().getType().cast<ShapedType>();
+      return cast<ShapedType>(getOutput().getType());
     }
 
     // Return the input type.
     ShapedType getInputType() {
-      return getInput().getType().cast<ShapedType>();
+      return cast<ShapedType>(getInput().getType());
     }
 
     // Return the output shape.
@@ -912,12 +909,12 @@ def IREELinalgExt_UnPackOp : IREELinalgExt_Op<"unpack", [
 
     // Return the output type.
     ShapedType getOutputType() {
-      return getOutput().getType().cast<ShapedType>();
+      return cast<ShapedType>(getOutput().getType());
     }
 
     // Return the input type.
     ShapedType getInputType() {
-      return getInput().getType().cast<ShapedType>();
+      return cast<ShapedType>(getInput().getType());
     }
 
     // Return the output shape.
@@ -950,83 +947,6 @@ def IREELinalgExt_UnPackOp : IREELinalgExt_Op<"unpack", [
   }];
 }
 
-def IREELinalgExt_SetEncodingOp : IREELinalgExt_PureOp<"set_encoding",[
-   DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>, Pure
-  ]> {
-  let summary = "perform pack and pad operation on source";
-  let description = [{
-    Operation to assign an encoding to a tensor. The operation
-    does not change the rank or extent of a tensor. Instead it
-    adds an encoding attribute to the tensor type to represent
-    a change in layout.
-  }];
-
-  let arguments = (ins AnyRankedTensor:$source);
-  let results = (outs AnyRankedTensor:$result);
-
-  let assemblyFormat = [{
-    attr-dict $source `:` type($source) `->` type($result)
-  }];
-
-  let hasVerifier = 1;
-
-  let extraClassDeclaration = [{
-    RankedTensorType getSourceType() {
-      return getSource().getType().cast<RankedTensorType>();
-    }
-    RankedTensorType getResultType() {
-      return getResult().getType().cast<RankedTensorType>();
-    }
-  }];
-}
-
-def IREELinalgExt_UpperBoundTileSizeOp : IREELinalgExt_PureOp<"upper_bound_tile_size",
-    [Pure]> {
-  let summary = "returns an upper bound on tile sizes";
-  let description = [{
-    This returns the largest tile sizes that might result from materialization
-    of the given encoding. This can be used outside of target-specific code, so
-    there may be multiple targets, and this will return the maximum tile size
-    from iterating over all of them. The evaluation happens in the
-    MaterializeUpperBoundTileSize pass.
-  }];
-
-  let arguments = (ins TypeAttrOf<AnyRankedTensor>:$tensorType);
-  let results = (outs Variadic<Index>:$results);
-
-  let assemblyFormat = [{
-    attr-dict $tensorType `->` type($results)
-  }];
-}
-
-def IREELinalgExt_UnsetEncodingOp : IREELinalgExt_PureOp<"unset_encoding", [
-    DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>, Pure
-  ]> {
-  let summary = "perfom unpack and extract operation on source";
-  let description = [{
-    Operation to convert an tensor with encoding that represents
-    its data layout into a tensor with default layout (i.e. no encoding).
-    For now in IREE the default layout is row-major.
-  }];
-  let arguments = (ins AnyRankedTensor:$source);
-  let results = (outs AnyRankedTensor:$result);
-
-  let assemblyFormat = [{
-    attr-dict $source `:` type($source) `->` type($result)
-  }];
-
-  let hasVerifier = 1;
-
-  let extraClassDeclaration = [{
-    RankedTensorType getSourceType() {
-      return getSource().getType().cast<RankedTensorType>();
-    }
-    RankedTensorType getResultType() {
-      return getResult().getType().cast<RankedTensorType>();
-    }
-  }];
-}
-
 } // OpGroupDataTilingOps
 
 //===----------------------------------------------------------------------===//
@@ -1049,7 +969,7 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
        "getTiledImplementation"]>]> {
   let summary = "Winograd Input Transform operator";
   let description = [{
-    This operator is the first step in converting a convolution to
+    This operator is part of the first step in converting a convolution to
     its Winograd equivalent. Given a tile of an input image (I),
     this operator computes matmul(tranpose(B), matmul(I, B)).
     The input tile is assumed to be square with each side of size m + r - 1,
@@ -1087,29 +1007,41 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
   }];
 
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
-    Value input() {
+    Value getInput() {
       return getDpsInputOperand(0)->get();
     }
-    Value output() {
+    Value getOutput() {
       return getDpsInitOperand(0)->get();
     }
-    ShapedType getInputOperandType() {
-      return input().getType().cast<ShapedType>();
+    Value getOriginalOperand() {
+      return getInput();
     }
-    ShapedType getOutputOperandType() {
-      return output().getType().cast<ShapedType>();
+    Value getTransformedOperand() {
+      return getOutput();
     }
-    int64_t getInputOperandRank() {
-      return getInputOperandType().getRank();
+    ShapedType getOriginalOperandType() {
+      return getInputType();
     }
-    int64_t getOutputOperandRank() {
-      return getOutputOperandType().getRank();
+    ShapedType getTransformedOperandType() {
+      return getOutputType();
+    }
+    ShapedType getInputType() {
+      return cast<ShapedType>(getInput().getType());
+    }
+    ShapedType getOutputType() {
+      return cast<ShapedType>(getOutput().getType());
+    }
+    int64_t getInputRank() {
+      return getInputType().getRank();
+    }
+    int64_t getOutputRank() {
+      return getOutputType().getRank();
     }
     int64_t getInputTileSize() {
       return getOutputTileSize() + getKernelSize() - 1;
     }
-    SmallVector<int64_t> imageDimensions() {
-      return llvm::to_vector(getImageDimensions());
+    ArrayRef<int64_t> getHwDimensions() {
+      return getImageDimensions();
     }
     std::array<int64_t, 2> nhwcImageDimensions() {
       return {1, 2};
@@ -1119,20 +1051,133 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
     }
     bool isNhwc() {
       std::array<int64_t, 2> nhwcImageDims = nhwcImageDimensions();
-      SmallVector<int64_t> imageDims = imageDimensions();
-      return imageDims == ArrayRef<int64_t>(nhwcImageDims);
+      return getImageDimensions() == ArrayRef<int64_t>(nhwcImageDims);
     }
     bool isNchw() {
       std::array<int64_t, 2> nchwImageDims = nchwImageDimensions();
-      SmallVector<int64_t> imageDims = imageDimensions();
-      return imageDims == ArrayRef<int64_t>(nchwImageDims);
+      return getImageDimensions() == ArrayRef<int64_t>(nchwImageDims);
     }
-    int channelDim() {
+    int getChannelDim() {
       return isNhwc() ? 3 : 1;
     }
     int64_t getIterationDomainRank() {
-      SmallVector<int64_t> imageDims = imageDimensions();
-      return getInputOperandRank() - imageDims.size();
+      return getOutputRank() - getImageDimensions().size();
+    }
+    // Method to implement for specifying output range for
+    // DestinationStyleOpInterface
+    MutableOperandRange getDpsInitsMutable() {
+      return getOutputsMutable();
+    }
+  }];
+}
+
+def IREELinalgExt_WinogradFilterTransformOp : IREELinalgExt_Op<"winograd.filter_transform",
+    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+     DeclareOpInterfaceMethods<TilingInterface,
+      ["getIterationDomain",
+       "getLoopIteratorTypes",
+       "getResultTilePosition",
+       "getTiledImplementation"]>]> {
+  let summary = "Winograd Filter Transform operator";
+  let description = [{
+    This operator is part of the first step in converting a convolution to
+    its Winograd equivalent. Given a tile of a convolution filter (F),
+    this operator computes matmul(G, matmul(F, transpose(B))).
+    The filter tile is assumed to be the full m x m convolutional kernel,
+    and the result of the transformation on this tile is a square with each
+    side of size m + r - 1, where the output tile size is r x r. G is a constant
+    2-d matrix of shape (m + r - 1) x m. The input to the operator is a filter
+    of shape (H, W, C, F) or (F, C, H, W) and the output is an operator of shape
+    (m + r - 1, m + r - 1, C, F). The result of this operator is first collapsed
+    and then fed to a batch matmul op.
+  }];
+
+  let arguments = (ins Variadic<AnyShaped>:$inputs,
+                       Variadic<AnyShaped>:$outputs,
+                       I64Attr:$output_tile_size,
+                       I64Attr:$kernel_size,
+                       DenseI64ArrayAttr:$kernel_dimensions
+  );
+
+  let builders = [
+    OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$outputs,
+      CArg<"int64_t", "8">:$output_tile_size, CArg<"int64_t", "3">:$kernel_size,
+      CArg<"ArrayRef<int64_t>", "{0, 1}">:$kernel_dimensions)>
+  ];
+
+  let results = (outs Variadic<AnyRankedTensor>:$result);
+  let hasFolder = 1;
+  let assemblyFormat = [{
+    attr-dict
+    `output_tile_size` `(` $output_tile_size `)`
+    `kernel_size` `(` $kernel_size `)`
+    `kernel_dimensions` `(` $kernel_dimensions `)`
+    `ins` `(` $inputs `:` type($inputs) `)`
+    `outs` `(` $outputs `:` type($outputs) `)`
+    (`->` type($result)^)?
+  }];
+
+  let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
+    Value getInput() {
+      return getDpsInputOperand(0)->get();
+    }
+    Value getOutput() {
+      return getDpsInitOperand(0)->get();
+    }
+    ShapedType getInputType() {
+      return cast<ShapedType>(getInput().getType());
+    }
+    ShapedType getOutputType() {
+      return cast<ShapedType>(getOutput().getType());
+    }
+    Value getOriginalOperand() {
+      return getInput();
+    }
+    Value getTransformedOperand() {
+      return getOutput();
+    }
+    ShapedType getOriginalOperandType() {
+      return getInputType();
+    }
+    ShapedType getTransformedOperandType() {
+      return getOutputType();
+    }
+    int64_t getInputRank() {
+      return getInputType().getRank();
+    }
+    int64_t getOutputRank() {
+      return getOutputType().getRank();
+    }
+    int64_t getInputTileSize() {
+      return getOutputTileSize() + getKernelSize() - 1;
+    }
+    ArrayRef<int64_t> getHwDimensions() {
+      return getKernelDimensions();
+    }
+    std::array<int64_t, 2> hwcfKernelDimensions() {
+      return {0, 1};
+    }
+    std::array<int64_t, 2> fchwKernelDimensions() {
+      return {2, 3};
+    }
+    bool isHwcf() {
+      std::array<int64_t, 2> hwcfKernelDims = hwcfKernelDimensions();
+      ArrayRef<int64_t> kernelDims = getKernelDimensions();
+      return kernelDims == ArrayRef<int64_t>(hwcfKernelDims);
+    }
+    bool isFchw() {
+      std::array<int64_t, 2> fchwKernelDims = fchwKernelDimensions();
+      ArrayRef<int64_t> kernelDims = getKernelDimensions();
+      return kernelDims == ArrayRef<int64_t>(fchwKernelDims);
+    }
+    int getChannelDim() {
+      return isHwcf() ? 2 : 1;
+    }
+    int getFilterDim() {
+      return isHwcf() ? 3 : 0;
+    }
+    int64_t getIterationDomainRank() {
+      return getInputRank() - getKernelDimensions().size();
     }
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
@@ -1193,20 +1238,32 @@ def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_
   }];
 
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
-    Value input() {
+    Value getInput() {
       return getDpsInputOperand(0)->get();
     }
-    Value output() {
+    Value getOutput() {
       return getDpsInitOperand(0)->get();
     }
-    ShapedType getInputOperandType() {
-      return input().getType().cast<ShapedType>();
+    ShapedType getInputType() {
+      return cast<ShapedType>(getInput().getType());
     }
-    ShapedType getOutputOperandType() {
-      return output().getType().cast<ShapedType>();
+    ShapedType getOutputType() {
+      return cast<ShapedType>(getOutput().getType());
     }
-    SmallVector<int64_t> imageDimensions() {
-      return llvm::to_vector(getImageDimensions());
+    Value getOriginalOperand() {
+      return getOutput();
+    }
+    Value getTransformedOperand() {
+      return getInput();
+    }
+    ShapedType getOriginalOperandType() {
+      return getOutputType();
+    }
+    ShapedType getTransformedOperandType() {
+      return getInputType();
+    }
+    ArrayRef<int64_t> getHwDimensions() {
+      return getImageDimensions();
     }
     std::array<int64_t, 2> nhwcImageDimensions() {
       return {1, 2};
@@ -1216,26 +1273,23 @@ def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_
     }
     bool isNhwc() {
       std::array<int64_t, 2> nhwcImageDims = nhwcImageDimensions();
-      SmallVector<int64_t> imageDims = imageDimensions();
-      return imageDims == ArrayRef<int64_t>(nhwcImageDims);
+      return getImageDimensions() == ArrayRef<int64_t>(nhwcImageDims);
     }
     bool isNchw() {
       std::array<int64_t, 2> nchwImageDims = nchwImageDimensions();
-      SmallVector<int64_t> imageDims = imageDimensions();
-      return imageDims == ArrayRef<int64_t>(nchwImageDims);
+      return getImageDimensions() == ArrayRef<int64_t>(nchwImageDims);
     }
-    int channelDim() {
+    int getChannelDim() {
       return isNhwc() ? 3 : 1;
     }
-    int64_t getInputOperandRank() {
-      return getInputOperandType().getRank();
+    int64_t getInputRank() {
+      return getInputType().getRank();
     }
-    int64_t getOutputOperandRank() {
-      return getOutputOperandType().getRank();
+    int64_t getOutputRank() {
+      return getOutputType().getRank();
     }
     int64_t getIterationDomainRank() {
-      SmallVector<int64_t> imageDims = imageDimensions();
-      return getOutputOperandRank() - imageDims.size();
+      return getInputRank() - getImageDimensions().size();
     }
     int64_t getInputTileSize() {
       return getOutputTileSize() + getKernelSize() - 1;

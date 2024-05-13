@@ -64,6 +64,8 @@ export IREE_VULKAN_DISABLE=${IREE_VULKAN_DISABLE:-1}
 export IREE_METAL_DISABLE="${IREE_METAL_DISABLE:-1}"
 # Respect the user setting, but default to turning off CUDA.
 export IREE_CUDA_DISABLE=${IREE_CUDA_DISABLE:-1}
+# Respect the user setting, but default to turning off HIP.
+export IREE_HIP_DISABLE=${IREE_HIP_DISABLE:-1}
 # The VK_KHR_shader_float16_int8 extension is optional prior to Vulkan 1.2.
 export IREE_VULKAN_F16_DISABLE=${IREE_VULKAN_F16_DISABLE:-1}
 # Respect the user setting, but default to skipping tests that require Nvidia GPU.
@@ -94,6 +96,9 @@ if (( IREE_VULKAN_DISABLE == 1 )); then
 fi
 if (( IREE_CUDA_DISABLE == 1 )); then
   label_exclude_args+=("^driver=cuda$")
+fi
+if (( IREE_HIP_DISABLE == 1 )); then
+  label_exclude_args+=("^driver=hip$")
 fi
 if (( IREE_VULKAN_F16_DISABLE == 1 )); then
   label_exclude_args+=("^vulkan_uses_vk_khr_shader_float16_int8$")

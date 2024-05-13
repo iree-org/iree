@@ -21,6 +21,7 @@
 #include "mlir/IR/BuiltinDialect.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/IRMapping.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -174,7 +175,7 @@ LogicalResult
 removeBlockArguments(IREE::VM::ModuleOp moduleOp,
                      SmallVector<BlockArgument> &blockArgsToRemove) {
   for (auto &blockArg : blockArgsToRemove) {
-    assert(blockArg.getType().isa<IREE::VM::RefType>());
+    assert(isa<IREE::VM::RefType>(blockArg.getType()));
     assert(blockArg.use_empty());
     Block *block = blockArg.getOwner();
 
@@ -2399,7 +2400,7 @@ private:
     for (size_t i = 0; i < inputTypes.size(); i++) {
       BlockArgument arg = funcOp.getArgument(i + inputOffset);
       Type argType = arg.getType();
-      assert(!argType.isa<IREE::VM::RefType>());
+      assert(!isa<IREE::VM::RefType>(argType));
 
       if (argType == emitc::PointerType::get(
                          emitc::OpaqueType::get(ctx, "iree_vm_ref_t"))) {
@@ -2420,7 +2421,7 @@ private:
             /*templateArgs=*/ArrayAttr{},
             /*operands=*/ArrayRef<Value>{arg, refPtr});
       } else {
-        assert(!argType.isa<emitc::PointerType>());
+        assert(!isa<emitc::PointerType>(argType));
         Value size =
             emitc_builders::sizeOf(builder, loc, TypeAttr::get(argType));
 
@@ -2474,7 +2475,7 @@ private:
     for (size_t i = 0; i < resultTypes.size(); i++) {
       BlockArgument arg = funcOp.getArgument(i + resultOffset);
       Type argType = arg.getType();
-      assert(!argType.isa<IREE::VM::RefType>());
+      assert(!isa<IREE::VM::RefType>(argType));
 
       if (argType == emitc::PointerType::get(
                          emitc::OpaqueType::get(ctx, "iree_vm_ref_t"))) {
@@ -3109,8 +3110,8 @@ class BranchOpConversion : public EmitCConversionPattern<IREE::VM::BranchOp> {
           continue;
         }
 
-        assert(operand.getType().isa<IREE::VM::RefType>());
-        assert(blockArg.getType().isa<IREE::VM::RefType>());
+        assert(isa<IREE::VM::RefType>(operand.getType()));
+        assert(isa<IREE::VM::RefType>(blockArg.getType()));
 
         Value operandRef = getModuleAnalysis().lookupRef(operand);
         Value blockArgRef = getModuleAnalysis().lookupRef(blockArg);
@@ -3731,7 +3732,7 @@ private:
         Type originalType =
             op.getOperation()->getOperand(operand.index()).getType();
 
-        assert(originalType.isa<IREE::VM::RefType>() && "expected ref type");
+        assert(isa<IREE::VM::RefType>(originalType) && "expected ref type");
 
         Type objectType =
             llvm::cast<IREE::VM::RefType>(originalType).getObjectType();
@@ -3964,7 +3965,6 @@ class ContainerAllocOpConversion : public EmitCConversionPattern<OpTy> {
   getOperands(IREE::VM::ListAllocOp op, Adaptor adaptor,
               ConversionPatternRewriter &rewriter, Type elementType,
               Value containerPtr, Value allocator) const {
-    SmallVector<Value> result;
 
     auto moduleOp = op.getOperation()->getParentOfType<IREE::VM::ModuleOp>();
     auto parentFuncOp =
@@ -3980,12 +3980,8 @@ class ContainerAllocOpConversion : public EmitCConversionPattern<OpTy> {
     }
 
     Value capacity = adaptor.getOperands()[0];
-
-    result.push_back(elementTypePtr.value());
-    result.push_back(capacity);
-    result.push_back(allocator);
-    result.push_back(containerPtr);
-
+    SmallVector<Value> result = {elementTypePtr.value(), capacity, allocator,
+                                 containerPtr};
     return result;
   }
 
@@ -3995,9 +3991,6 @@ class ContainerAllocOpConversion : public EmitCConversionPattern<OpTy> {
               Value containerPtr, Value allocator) const {
     auto ctx = op.getContext();
     auto loc = op.getLoc();
-
-    SmallVector<Value> result;
-
     Value access =
         rewriter
             .create<emitc::ConstantOp>(
@@ -4012,12 +4005,8 @@ class ContainerAllocOpConversion : public EmitCConversionPattern<OpTy> {
     Value length = adaptor.getOperands()[0];
     Value alignment = adaptor.getOperands()[1];
 
-    result.push_back(access);
-    result.push_back(length);
-    result.push_back(alignment);
-    result.push_back(allocator);
-    result.push_back(containerPtr);
-
+    SmallVector<Value> result = {access, length, alignment, allocator,
+                                 containerPtr};
     return result;
   }
 
@@ -4027,8 +4016,6 @@ class ContainerAllocOpConversion : public EmitCConversionPattern<OpTy> {
               Value containerPtr, Value allocator) const {
     auto ctx = op.getContext();
     auto loc = op.getLoc();
-
-    SmallVector<Value> result;
 
     Value access =
         rewriter
@@ -4061,14 +4048,8 @@ class ContainerAllocOpConversion : public EmitCConversionPattern<OpTy> {
     Value length = adaptor.getOperands()[2];
     Value alignment = adaptor.getOperands()[3];
 
-    result.push_back(access);
-    result.push_back(source);
-    result.push_back(offset);
-    result.push_back(length);
-    result.push_back(alignment);
-    result.push_back(allocator);
-    result.push_back(containerPtr);
-
+    SmallVector<Value> result = {access,    source,    offset,      length,
+                                 alignment, allocator, containerPtr};
     return result;
   }
 };

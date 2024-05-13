@@ -868,7 +868,8 @@ struct TransposeOpToTransposeConverter final
     Value emptyTensor =
         getEmptyTensorFor(rewriter, loc, resultTy, op, adaptor.getOperands());
 
-    auto permutation = op.getPermutationAttr();
+    auto permutation =
+        dyn_cast_or_null<DenseI64ArrayAttr>(op.getPermutationAttr());
 
     rewriter.replaceOpWithNewOp<linalg::TransposeOp>(
         op, adaptor.getOperand(), emptyTensor, permutation,
@@ -2156,11 +2157,9 @@ struct SelectAndScatterNoOverlapConverter final
     auto scatterInputMap =
         AffineMap::get(broadcastShape.size(), /*symbolCount=*/0, broadcastExprs,
                        b.getContext());
-    SmallVector<AffineMap> scatterIndexingMaps;
-    scatterIndexingMaps.push_back(scatterInputMap);
-    scatterIndexingMaps.push_back(scatterInputMap);
-    scatterIndexingMaps.push_back(
-        b.getMultiDimIdentityMap(broadcastShape.size()));
+    SmallVector<AffineMap> scatterIndexingMaps = {
+        scatterInputMap, scatterInputMap,
+        b.getMultiDimIdentityMap(broadcastShape.size())};
 
     auto scatterGeneric = b.create<linalg::GenericOp>(
         /*resultTensors=*/ArrayRef<Type>{scatterFill.getType()},

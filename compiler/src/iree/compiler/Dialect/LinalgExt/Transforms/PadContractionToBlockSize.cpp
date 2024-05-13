@@ -33,7 +33,7 @@ static Operation *sliceTensor(Location loc, Value expanded, Value original,
 static bool padTensor(Location loc, OpOperand *operand,
                       ArrayRef<int64_t> alignments, OpBuilder &builder) {
   Value original = operand->get();
-  auto type = original.getType().cast<RankedTensorType>();
+  auto type = cast<RankedTensorType>(original.getType());
   ArrayRef<int64_t> shape = type.getShape();
   assert(shape.size() == alignments.size() &&
          "expected shape and alignments to match");

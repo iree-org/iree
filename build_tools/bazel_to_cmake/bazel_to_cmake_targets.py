@@ -58,11 +58,13 @@ class TargetConverter:
                 ],
                 # MLIR
                 "@llvm-project//mlir:AllPassesAndDialects": ["MLIRAllDialects"],
+                "@llvm-project//mlir:BufferizationInterfaces": [""],
                 "@llvm-project//mlir:CommonFolders": [""],
                 "@llvm-project//mlir:ConversionPasses": [""],
                 "@llvm-project//mlir:DialectUtils": [""],
                 "@llvm-project//mlir:GPUDialect": ["MLIRGPUDialect"],
                 "@llvm-project//mlir:GPUTransforms": ["MLIRGPUTransforms"],
+                "@llvm-project//mlir:InliningUtils": [""],
                 "@llvm-project//mlir:LinalgOpsIncGen": ["MLIRLinalgOpsIncGenLib"],
                 "@llvm-project//mlir:LinalgStructuredOpsIncGen": [
                     "MLIRLinalgStructuredOpsIncGenLib"
@@ -83,6 +85,12 @@ class TargetConverter:
                 ],
                 "@stablehlo//:broadcast_utils": [
                     "StablehloBroadcastUtils",
+                ],
+                "@stablehlo//:stablehlo_passes": [
+                    "StablehloPasses",
+                ],
+                "@stablehlo//:vhlo_ops": [
+                    "VhloOps",
                 ],
                 # NCCL
                 "@nccl//:headers": [
@@ -218,8 +226,8 @@ class TargetConverter:
         if m:
             return ["iree::" + self._convert_to_cmake_path(m.group(1))]
 
-        # Map //tools/(.*) -> \1
-        m = re.match(f"^{iree_core_repo}//tools[/|:](.+)", target)
+        # Map //tools:(.*) -> \1
+        m = re.match(f"^{iree_core_repo}//tools[|:](.+)", target)
         if m:
             return [self._convert_to_cmake_path(m.group(1))]
 

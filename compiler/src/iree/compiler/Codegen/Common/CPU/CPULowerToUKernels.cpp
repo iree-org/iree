@@ -12,7 +12,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -45,8 +45,8 @@ getCastOpOfElementWiseCast(linalg::GenericOp genericOp) {
     return std::nullopt;
   }
   Value castIn = castOp->getOperand(0);
-  if (castIn.isa<BlockArgument>() &&
-      castIn.cast<BlockArgument>().getArgNumber() != 0) {
+  if (isa<BlockArgument>(castIn) &&
+      cast<BlockArgument>(castIn).getArgNumber() != 0) {
     return std::nullopt;
   }
   return castOp;
@@ -65,8 +65,10 @@ public:
 
   void runOnOperation() override;
 
-  LogicalResult initializeOptions(StringRef options) override {
-    if (failed(Pass::initializeOptions(options))) {
+  LogicalResult initializeOptions(
+      StringRef options,
+      function_ref<LogicalResult(const Twine &)> errorHandler) override {
+    if (failed(Pass::initializeOptions(options, errorHandler))) {
       return failure();
     }
     // This option defaults to `true` both in Passes.td and in C++ code.
@@ -174,6 +176,10 @@ matchDAGForUKernel(RewriterBase &rewriter, linalg::Mmt4DOp op,
   if (lhsElemType.isSignlessInteger(8) && rhsElemType.isSignlessInteger(8) &&
       outElemType.isSignlessInteger(32)) {
     flags = IREE_UK_FLAG_MMT4D_TYPE_S8S8S32;
+  } else if (lhsElemType.isSignlessInteger(8) &&
+             rhsElemType.isSignlessInteger(4) &&
+             outElemType.isSignlessInteger(32)) {
+    flags = IREE_UK_FLAG_MMT4D_TYPE_S8S4S32;
   } else if (lhsElemType.isSignlessInteger(16) &&
              rhsElemType.isSignlessInteger(16) &&
              outElemType.isSignlessInteger(32)) {
@@ -468,18 +474,18 @@ matchDAGForUKernel(RewriterBase &rewriter, tensor::UnPackOp op,
 }
 
 static uint32_t
-getFlagForUserAndOperandTypes(IREE::LinalgExt::EncodingAttr encoding,
+getFlagForUserAndOperandTypes(IREE::Encoding::EncodingAttr encoding,
                               ArrayRef<Attribute> operandTypes) {
   // There are currently no batch_mmt4d ukernels, so check for no batch
   // dimension.
-  auto cDims = getEncodingContractionDims(encoding);
+  auto cDims = IREE::Encoding::getEncodingContractionDims(encoding);
   if (failed(cDims) || !cDims->batch.empty() || operandTypes.size() != 3) {
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_NONE;
   }
 
-  Type lhs = operandTypes[0].cast<TypeAttr>().getValue();
-  Type rhs = operandTypes[1].cast<TypeAttr>().getValue();
-  Type out = operandTypes[2].cast<TypeAttr>().getValue();
+  Type lhs = cast<TypeAttr>(operandTypes[0]).getValue();
+  Type rhs = cast<TypeAttr>(operandTypes[1]).getValue();
+  Type out = cast<TypeAttr>(operandTypes[2]).getValue();
 
   if (lhs.isF32() && rhs.isF32() && out.isF32()) {
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_MATMUL_F32F32F32;
@@ -499,13 +505,13 @@ getFlagForUserAndOperandTypes(IREE::LinalgExt::EncodingAttr encoding,
   }
 }
 
-static uint32_t getFlagForRole(IREE::LinalgExt::EncodingRole role) {
+static uint32_t getFlagForRole(IREE::Encoding::EncodingRole role) {
   switch (role) {
-  case IREE::LinalgExt::EncodingRole::LHS:
+  case IREE::Encoding::EncodingRole::LHS:
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_LHS;
-  case IREE::LinalgExt::EncodingRole::RHS:
+  case IREE::Encoding::EncodingRole::RHS:
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RHS;
-  case IREE::LinalgExt::EncodingRole::RESULT:
+  case IREE::Encoding::EncodingRole::RESULT:
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RESULT;
   default:
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_NONE;
@@ -520,7 +526,7 @@ matchDAGForUKernel(RewriterBase &rewriter, IREE::Codegen::QueryTileSizesOp op,
   if (!hasUkernel(targetAttr, ukernelName)) {
     return failure();
   }
-  auto tensorType = op.getTensorType().dyn_cast<RankedTensorType>();
+  auto tensorType = dyn_cast<RankedTensorType>(op.getTensorType());
   if (!tensorType) {
     return rewriter.notifyMatchFailure(op,
                                        "need a ranked tensor type attribute");
@@ -528,8 +534,8 @@ matchDAGForUKernel(RewriterBase &rewriter, IREE::Codegen::QueryTileSizesOp op,
   if (tensorType.getRank() != 2) {
     return rewriter.notifyMatchFailure(op, "only the 2D case is implemented");
   }
-  auto encoding = tensorType.getEncoding()
-                      .dyn_cast_or_null<IREE::LinalgExt::EncodingAttr>();
+  auto encoding =
+      dyn_cast_or_null<IREE::Encoding::EncodingAttr>(tensorType.getEncoding());
   if (!encoding) {
     return rewriter.notifyMatchFailure(op, "no encoding attribute");
   }

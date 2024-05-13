@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-codegen-llvmgpu-bufferization-pipeline --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-llvmgpu-bufferization-pipeline))" --split-input-file %s | FileCheck %s
 
 module {
   func.func @bufferize_with_thread_private_memory(%arg0: index) {

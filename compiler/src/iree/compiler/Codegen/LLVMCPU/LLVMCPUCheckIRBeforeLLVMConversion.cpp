@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "llvm/Support/CommandLine.h"
+#include "mlir/Dialect/Vector/IR/ScalableValueBoundsConstraintSet.h"
 #include "mlir/Interfaces/ValueBoundsOpInterface.h"
 #include "mlir/Pass/Pass.h"
 
@@ -16,6 +17,12 @@ static llvm::cl::opt<int> clMaxAllocationSizeInBytes(
     "iree-llvmcpu-stack-allocation-limit",
     llvm::cl::desc("maximum allowed stack allocation size in bytes"),
     llvm::cl::init(32768));
+
+static llvm::cl::opt<unsigned> clAssumedVscaleValue(
+    "iree-llvmcpu-stack-allocation-assumed-vscale",
+    llvm::cl::desc(
+        "assumed value of vscale when checking (scalable) stack allocations"),
+    llvm::cl::init(1));
 
 namespace {
 struct LLVMCPUCheckIRBeforeLLVMConversionPass
@@ -44,6 +51,7 @@ checkStackAllocationSize(mlir::FunctionOpInterface funcOp) {
   }
 
   int cumSize = 0;
+  const unsigned assumedVscale = clAssumedVscaleValue;
   for (auto allocaOp : allocaOps) {
     if (allocaOp->getBlock() != &funcOp.getFunctionBody().front()) {
       return allocaOp->emitOpError(
@@ -58,11 +66,17 @@ checkStackAllocationSize(mlir::FunctionOpInterface funcOp) {
       allocaSize *= dimSize;
     }
     for (auto operand : allocaOp.getDynamicSizes()) {
-      auto ub = ValueBoundsConstraintSet::computeConstantBound(
-          presburger::BoundType::UB, operand, /*dim=*/std::nullopt,
-          /*stopCondition=*/nullptr, /*closedUB=*/true);
+      // Assume vscale is `clAssumedVscaleValue` for determining if the alloca
+      // is within the stack limit. This should always resolve to a constant
+      // bound. Note: This may be an underestimate if the runtime larger than
+      // `clAssumedVscaleValue`, but should still catch unreasonable allocatons
+      // (which will have large static factors).
+      auto ub = vector::ScalableValueBoundsConstraintSet::computeScalableBound(
+          operand, /*dim=*/std::nullopt,
+          /*vscaleMin=*/assumedVscale,
+          /*vscaleMax=*/assumedVscale, presburger::BoundType::UB);
       if (succeeded(ub)) {
-        allocaSize *= ub.value();
+        allocaSize *= ub->getSize()->baseSize;
         continue;
       }
       return allocaOp.emitOpError("expected no unbounded stack allocations");
@@ -88,15 +102,13 @@ void LLVMCPUCheckIRBeforeLLVMConversionPass::runOnOperation() {
     return;
   }
 
-  auto moduleOp = getOperation();
-  for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
-    if (failed(checkStackAllocationSize(funcOp))) {
-      return signalPassFailure();
-    }
+  auto funcOp = getOperation();
+  if (failed(checkStackAllocationSize(funcOp))) {
+    return signalPassFailure();
   }
 }
 
-std::unique_ptr<OperationPass<ModuleOp>>
+std::unique_ptr<InterfacePass<FunctionOpInterface>>
 createLLVMCPUCheckIRBeforeLLVMConversionPass(bool failOnOutOfBounds) {
   return std::make_unique<LLVMCPUCheckIRBeforeLLVMConversionPass>(
       failOnOutOfBounds);

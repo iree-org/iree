@@ -17,6 +17,7 @@ iree_cc_library(
     "IREEGPUAttrs.h"
     "IREEGPUDialect.h"
     "IREEGPUInterfaces.h"
+    "IREEGPUOps.h"
   TEXTUAL_HDRS
     "IREEGPUAttrs.cpp.inc"
     "IREEGPUAttrs.h.inc"
@@ -24,23 +25,28 @@ iree_cc_library(
     "IREEGPUDialect.h.inc"
     "IREEGPUInterfaces.cpp.inc"
     "IREEGPUInterfaces.h.inc"
+    "IREEGPUOps.cpp.inc"
+    "IREEGPUOps.h.inc"
   SRCS
     "IREEGPUAttrs.cpp"
     "IREEGPUDialect.cpp"
     "IREEGPUInterfaces.cpp"
+    "IREEGPUOps.cpp"
   DEPS
     ::IREEGPUAttrs
     ::IREEGPUDialectGen
     ::IREEGPUInterfaces
+    ::IREEGPUOpsGen
     IREEVectorExtDialect
     LLVMSupport
+    MLIRAMDGPUDialect
     MLIRIR
     MLIRLinalgDialect
     MLIRParser
+    MLIRSideEffectInterfaces
     MLIRSupport
+    MLIRTensorDialect
     MLIRVectorDialect
-    iree::compiler::Codegen::Common
-    iree::compiler::Codegen::Utils
     iree::compiler::Codegen::Utils::VectorOpUtils
   PUBLIC
 )
@@ -75,6 +81,16 @@ iree_tablegen_library(
   OUTS
     --gen-attr-interface-decls IREEGPUInterfaces.h.inc
     --gen-attr-interface-defs IREEGPUInterfaces.cpp.inc
+)
+
+iree_tablegen_library(
+  NAME
+    IREEGPUOpsGen
+  TD_FILE
+    "IREEGPUOps.td"
+  OUTS
+    --gen-op-decls IREEGPUOps.h.inc
+    --gen-op-defs IREEGPUOps.cpp.inc
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

@@ -49,6 +49,7 @@ iree_cc_library(
     SPIRV-Tools
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::SPIRV
+    iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::Target
     iree::compiler::PluginAPI
     iree::compiler::Utils

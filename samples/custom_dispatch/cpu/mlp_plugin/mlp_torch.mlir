@@ -5,7 +5,8 @@
 // RUN:     --module=- \
 // RUN:     --function=mlp_invocation \
 // RUN:     --input="2x4xf32=[[2.0, 2.0, 2.0, 2.0], [-2.0, -2.0, -2.0, -2.0]]" \
-// RUN:     --input="4x8xf32=[[3.0, -3.0, 3.0, -3.0], [3.0, -3.0, 3.0, -3.0], [3.0, -3.0, 3.0, -3.0], [3.0, -3.0, 3.0, -3.0], [3.0, -3.0, 3.0, -3.0], [3.0, -3.0, 3.0, -3.0], [3.0, -3.0, 3.0, -3.0], [3.0, -3.0, 3.0, -3.0]]"
+// RUN:     --input="4x8xf32=[[3.0, -3.0, 3.0, -3.0], [3.0, -3.0, 3.0, -3.0], [3.0, -3.0, 3.0, -3.0], [3.0, -3.0, 3.0, -3.0], [3.0, -3.0, 3.0, -3.0], [3.0, -3.0, 3.0, -3.0], [3.0, -3.0, 3.0, -3.0], [3.0, -3.0, 3.0, -3.0]]" | \
+// RUN: FileCheck %s
 
 // Rewrite function to rewrite a matched DAG into a flow.dispatch. Conceptually,
 // the matched DAG at the tensor level gets replaced by a function
@@ -44,10 +45,6 @@
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 module @example attributes {hal.device.targets = [#cpu_target]} {
-
-  // CHECK-LABEL: EXEC @mlp_invocation
-  //       CHECK: [Plugin]: M = 2, N = 8, K = 4
-  //       CHECK: 2x8xf32=[-24 -0 -24 -0 -24 -0 -24 -0][-0 -24 -0 -24 -0 -24 -0 -24]
   func.func @mlp_invocation(%lhs: tensor<?x?xf32>,
                             %rhs: tensor<?x?xf32>) -> (tensor<?x?xf32>) {
     %c0 = arith.constant 0 : index
@@ -75,5 +72,5 @@ module @example attributes {hal.device.targets = [#cpu_target]} {
 }  // module
 
 // CHECK-LABEL: EXEC @mlp_invocation
-//       CHECK: [Plugin]: M = 2, N = 8, K = 4
+//       CHECK: [Plugin]: M = 2, N = 8, K = 4, doRelu = 1
 //       CHECK: 2x8xf32=[-24 -0 -24 -0 -24 -0 -24 -0][-0 -24 -0 -24 -0 -24 -0 -24]

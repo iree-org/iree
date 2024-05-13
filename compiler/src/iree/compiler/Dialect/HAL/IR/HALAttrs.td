@@ -10,6 +10,7 @@
 include "iree/compiler/Dialect/HAL/IR/HALBase.td"
 include "iree/compiler/Dialect/HAL/IR/HALInterfaces.td"
 include "iree/compiler/Dialect/Stream/IR/StreamInterfaces.td"
+include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilTypes.td"
 include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/BuiltinAttributeInterfaces.td"
@@ -546,6 +547,10 @@ def HAL_DeviceTargetAttr :
     static std::optional<StaticRange<APInt>>
     lookupConfigAttrRange(Operation *op, StringRef name);
 
+    // Returns zero or more executable targets that this device supports.
+    void getExecutableTargets(
+        SetVector<IREE::HAL::ExecutableTargetAttr> &resultAttrs);
+
     // Returns a list of all target executable configurations that may be
     // required for the given operation.
     static SmallVector<IREE::HAL::ExecutableTargetAttr, 4>
@@ -741,11 +746,12 @@ def HAL_AffinityQueueAttr : AttrDef<HAL_Dialect, "AffinityQueue", [
     "joinOR",
     "joinAND",
   ]>,
+  Util_HoistableAttrInterface,
 ]> {
   let mnemonic = "affinity.queue";
   let summary = [{specifies a set of allowed queues for an operation}];
   let description = [{
-    WIP; see [#10765](https://github.com/openxla/iree/issues/10765).
+    WIP; see [#10765](https://github.com/iree-org/iree/issues/10765).
     This may change in the future to either be a nested attribute on a larger
     affinity struct or be defined by an implementation of the affinity attr
     interface. For now this allows higher levels of the stack to specify

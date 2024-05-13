@@ -175,6 +175,14 @@ def get_git_commit_hash(commit: str) -> str:
     )
 
 
+def parse_external_param_url(param_url: str) -> Tuple[str, str, str]:
+    """Parse `scope=url` into (scope, URL, filename of the URL)."""
+    scope, url = param_url.split("=", maxsplit=1)
+    url_path = urllib.parse.urlparse(url).path
+    filename = pathlib.PurePath(url_path).name
+    return scope, url, filename
+
+
 def get_iree_benchmark_module_arguments(
     driver_info: DriverInfo,
     benchmark_min_time: Optional[float] = None,

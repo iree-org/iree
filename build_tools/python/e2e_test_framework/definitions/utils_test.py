@@ -24,7 +24,7 @@ class UtilsTest(unittest.TestCase):
             ],
         )
 
-        self.assertEquals(
+        self.assertEqual(
             flags, ["val_a val_b", "--key=val_a", "--no-value-key", "--filter=x=val_a"]
         )
 
@@ -36,7 +36,7 @@ class UtilsTest(unittest.TestCase):
 
         flags = utils.substitute_flag_vars(flags=raw_flags, HOLDER_A=1, HOLDER_B="b")
 
-        self.assertEquals(flags, ["1", "--key=b"])
+        self.assertEqual(flags, ["1", "--key=b"])
 
     def test_substitute_flag_vars_missing_variable(self):
         raw_flags = [

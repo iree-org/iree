@@ -325,6 +325,9 @@ inline internal::IsOkMatcherGenerator IsOk() {
 #define IREE_EXPECT_STATUS_IS(expected_code, expr)     \
   EXPECT_THAT(expr, ::iree::testing::status::StatusIs( \
                         static_cast<::iree::StatusCode>(expected_code)))
+#define IREE_ASSERT_STATUS_IS(expected_code, expr)     \
+  ASSERT_THAT(expr, ::iree::testing::status::StatusIs( \
+                        static_cast<::iree::StatusCode>(expected_code)))
 
 // Executes an expression that returns an iree::StatusOr<T>, and assigns the
 // contained variable to lhs if the error code is OK.

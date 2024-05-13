@@ -121,7 +121,7 @@ working solution:
 
     If the CPU is working properly, we can use the same dispatch region formation
     and diff against the CPU dispatches one by one to isolate the problem. See
-    [this issue](https://github.com/openxla/iree/issues/14739) as an example.
+    [this issue](https://github.com/iree-org/iree/issues/14739) as an example.
 
 !!! tip "[correctness]"
 
@@ -132,7 +132,7 @@ working solution:
 !!! tip "[correctness]"
 
     `iree-reduce` is a great tool to reduce and isolate issues programmatically.
-    See more details [here](https://github.com/openxla/iree/blob/main/samples/reducer/README.md).
+    See more details [here](https://github.com/iree-org/iree/blob/main/samples/reducer/README.md).
 
 ## Pinpointing compiler issues
 
@@ -149,7 +149,7 @@ investigate by comparing with different paths and inputs:
 
     Assuming we have a small repro, we can also try to see if there are
     "patterns" in the wrong result (e.g.,
-    [this issue](https://github.com/openxla/iree/issues/14739#issuecomment-1685149869)).
+    [this issue](https://github.com/iree-org/iree/issues/14739#issuecomment-1685149869)).
     Or mutate the input to see if the failure has some "consistency".
 
 !!! tip "[correctness/performance]"

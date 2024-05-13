@@ -38,3 +38,30 @@ stream.executable public @add_dispatch_0 {
 //      CHECK:   hal.executable.binary public @rocm_hsaco_fb attributes {
 // CHECK-SAME:     data = dense
 // CHECK-SAME:     format = "rocm-hsaco-fb"
+
+// -----
+
+// Tests serialization with unknown source locations.
+
+#loc = loc(unknown)
+module attributes {
+  hal.device.targets = [
+    #hal.device.target<"rocm", [
+      #hal.executable.target<"rocm", "rocm-hsaco-fb">
+    ]>
+  ]
+} {
+
+stream.executable public @add_dispatch_0 {
+  stream.executable.export @add_dispatch_0 workgroups(%arg0 : index) -> (index, index, index) {
+    %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg0
+    stream.return %x, %y, %z : index, index, index
+  } loc(#loc)
+  builtin.module  {
+    func.func @add_dispatch_0() {
+      return
+    } loc(#loc)
+  } loc(#loc)
+} loc(#loc)
+
+}

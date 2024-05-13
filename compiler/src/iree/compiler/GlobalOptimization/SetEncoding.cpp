@@ -10,6 +10,8 @@
 //===---------------------------------------------------------------------===//
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
@@ -41,6 +43,9 @@
 
 namespace mlir::iree_compiler::GlobalOptimization {
 
+using IREE::Encoding::EncodingAttr;
+using IREE::Encoding::EncodingRole;
+
 //===---------------------------------------------------------------------===//
 // Utility functions
 //===---------------------------------------------------------------------===//
@@ -48,8 +53,8 @@ namespace mlir::iree_compiler::GlobalOptimization {
 /// Pads `value` enough for any actual tile sizes that could result from
 /// materialization of `encodingAttr`.
 static Value pad(OpBuilder &builder, Location loc, Value source,
-                 IREE::LinalgExt::EncodingAttr encodingAttr) {
-  RankedTensorType sourceType = source.getType().cast<RankedTensorType>();
+                 EncodingAttr encodingAttr) {
+  RankedTensorType sourceType = cast<RankedTensorType>(source.getType());
   Type elemType = sourceType.getElementType();
   size_t rank = sourceType.getRank();
   RankedTensorType tensorTypeWithEncoding =
@@ -59,7 +64,7 @@ static Value pad(OpBuilder &builder, Location loc, Value source,
 
   ValueRange encodingPaddingSizes =
       builder
-          .create<IREE::LinalgExt::UpperBoundTileSizeOp>(
+          .create<IREE::Encoding::UpperBoundTileSizeOp>(
               loc, resultTypes, TypeAttr::get(tensorTypeWithEncoding))
           .getResults();
   SmallVector<OpFoldResult> highPad(rank);
@@ -80,12 +85,11 @@ static Value pad(OpBuilder &builder, Location loc, Value source,
 }
 
 Value setEncoding(OpBuilder &builder, Location loc, Value source,
-                  IREE::LinalgExt::EncodingAttr encodingAttr) {
-  auto sourceType = source.getType().cast<RankedTensorType>();
+                  EncodingAttr encodingAttr) {
+  auto sourceType = cast<RankedTensorType>(source.getType());
   auto resultType = RankedTensorType::get(
       sourceType.getShape(), sourceType.getElementType(), encodingAttr);
-  return builder.create<IREE::LinalgExt::SetEncodingOp>(loc, resultType,
-                                                        source);
+  return builder.create<IREE::Encoding::SetEncodingOp>(loc, resultType, source);
 };
 
 struct MatmulNarrowSizes {
@@ -127,38 +131,18 @@ static MatmulNarrowSizes getMatmulNarrowSizes(ShapedType outType,
   return narrow;
 }
 
-static IREE::LinalgExt::EncodingAttr
-makeEncoding(OpBuilder &builder, IREE::LinalgExt::EncodingRole role,
-             TypeRange operandTypes, Type originalType,
-             MatmulNarrowSizes narrow, ArrayAttr indexingMaps) {
-  auto *context = builder.getContext();
-  auto roleAttr = IREE::LinalgExt::EncodingRoleAttr::get(context, role);
-  SmallVector<Attribute> elemTypeAttrs =
-      llvm::map_to_vector(operandTypes, [](auto t) {
-        return TypeAttr::get(t.template cast<ShapedType>().getElementType())
-            .template cast<Attribute>();
-      });
-  auto operandElemTypesAttr = ArrayAttr::get(context, elemTypeAttrs);
-  auto originalTypeAttr =
-      originalType ? TypeAttr::get(originalType) : TypeAttr{};
-  auto getAttr = [&](std::optional<int64_t> x) {
-    return x ? builder.getIndexAttr(*x) : IntegerAttr();
-  };
-  return IREE::LinalgExt::EncodingAttr::get(
-      context, roleAttr, operandElemTypesAttr, originalTypeAttr,
-      getAttr(narrow.M), getAttr(narrow.N), indexingMaps);
-}
-
 static Value padAndSetEncoding(OpBuilder &builder, Location loc, Value source,
-                               IREE::LinalgExt::EncodingRole role,
-                               TypeRange operandTypes, MatmulNarrowSizes narrow,
-                               ArrayAttr indexingMaps) {
+                               EncodingRole role,
+                               ArrayRef<Type> operandElemTypes,
+                               MatmulNarrowSizes narrow,
+                               ArrayRef<AffineMap> indexingMaps) {
+  MLIRContext *ctx = builder.getContext();
   // No need to specify original_type in the encoding poadded to pad(), because
   // the operand there is the `source` tensor, so it will default to reading its
   // original shape.
-  auto encodingForPad =
-      makeEncoding(builder, role, operandTypes,
-                   /*originalType=*/Type{}, narrow, indexingMaps);
+  auto encodingForPad = EncodingAttr::get(ctx, role, operandElemTypes,
+                                          /*originalType=*/Type{}, narrow.M,
+                                          narrow.N, indexingMaps);
   Value padded = pad(builder, loc, source, encodingForPad);
   // For setEncoding() below, we potentially need to specify an encoding with an
   // explicit original_type, because the operand there is the padded tensor
@@ -168,8 +152,9 @@ static Value padAndSetEncoding(OpBuilder &builder, Location loc, Value source,
   // the tensor type that the encoding is applied to.
   auto encodingForSetEncoding = encodingForPad;
   if (padded.getType() != source.getType()) {
-    encodingForSetEncoding = makeEncoding(
-        builder, role, operandTypes, source.getType(), narrow, indexingMaps);
+    encodingForSetEncoding = EncodingAttr::get(
+        ctx, role, operandElemTypes,
+        /*originalType=*/source.getType(), narrow.M, narrow.N, indexingMaps);
   }
   return setEncoding(builder, loc, padded, encodingForSetEncoding);
 }
@@ -177,11 +162,11 @@ static Value padAndSetEncoding(OpBuilder &builder, Location loc, Value source,
 static Value unsetEncodingAndExtractSlice(OpBuilder &builder, Location loc,
                                           Value source,
                                           SmallVector<OpFoldResult> sizes) {
-  auto sourceType = source.getType().cast<RankedTensorType>();
+  auto sourceType = cast<RankedTensorType>(source.getType());
   auto unsetEncodingReturnType =
       RankedTensorType::get(sourceType.getShape(), sourceType.getElementType());
   auto unsetEncoding = builder
-                           .create<IREE::LinalgExt::UnsetEncodingOp>(
+                           .create<IREE::Encoding::UnsetEncodingOp>(
                                loc, unsetEncodingReturnType, source)
                            .getResult();
   auto rank = sourceType.getRank();
@@ -288,9 +273,13 @@ static LogicalResult isSupportedContractionOp(PatternRewriter &rewriter,
 
 namespace {
 
-struct setContractionOpEncoding
+class setContractionOpEncoding
     : public OpInterfaceRewritePattern<linalg::LinalgOp> {
+public:
   using OpInterfaceRewritePattern<linalg::LinalgOp>::OpInterfaceRewritePattern;
+  explicit setContractionOpEncoding(MLIRContext *ctx, int64_t factor)
+      : OpInterfaceRewritePattern<linalg::LinalgOp>(ctx), padFactor(factor) {}
+
   LogicalResult matchAndRewrite(linalg::LinalgOp linalgOp,
                                 PatternRewriter &rewriter) const override {
     if (!linalgOp.hasPureTensorSemantics()) {
@@ -329,30 +318,37 @@ struct setContractionOpEncoding
     if (!lhsElemType || !rhsElemType || !outElemType) {
       return failure();
     }
+    SmallVector<Type> elemTypes = {lhsElemType, rhsElemType, outElemType};
 
     MatmulNarrowSizes narrowSizes =
-        getMatmulNarrowSizes(out.getType().cast<ShapedType>(), linalgOp);
+        getMatmulNarrowSizes(cast<ShapedType>(out.getType()), linalgOp);
 
     Location loc = linalgOp.getLoc();
-    SmallVector<Type> operandTypes(linalgOp->getOperandTypes());
-    operandTypes[0] =
-        cast<RankedTensorType>(operandTypes[0]).clone(lhsElemType);
-    operandTypes[1] =
-        cast<RankedTensorType>(operandTypes[1]).clone(rhsElemType);
-    auto maps = linalgOp.getIndexingMaps();
-    Value encodedLhs = padAndSetEncoding(rewriter, loc, lhs,
-                                         IREE::LinalgExt::EncodingRole::LHS,
-                                         operandTypes, narrowSizes, maps);
-    Value encodedRhs = padAndSetEncoding(rewriter, loc, rhs,
-                                         IREE::LinalgExt::EncodingRole::RHS,
-                                         operandTypes, narrowSizes, maps);
-    Value encodedOut = padAndSetEncoding(rewriter, loc, out,
-                                         IREE::LinalgExt::EncodingRole::RESULT,
-                                         operandTypes, narrowSizes, maps);
-    Value opTiled;
-    opTiled = clone(rewriter, linalgOp, encodedOut.getType(),
-                    ValueRange{encodedLhs, encodedRhs, encodedOut})
-                  ->getResult(0);
+    SmallVector<AffineMap> maps = linalgOp.getIndexingMapsArray();
+    Value encodedLhs, encodedRhs, encodedOut;
+
+    if (!padFactor) {
+      encodedLhs = padAndSetEncoding(rewriter, loc, lhs, EncodingRole::LHS,
+                                     elemTypes, narrowSizes, maps);
+      encodedRhs = padAndSetEncoding(rewriter, loc, rhs, EncodingRole::RHS,
+                                     elemTypes, narrowSizes, maps);
+      encodedOut = padAndSetEncoding(rewriter, loc, out, EncodingRole::RESULT,
+                                     elemTypes, narrowSizes, maps);
+    } else {
+      auto setEncodingWrapper = [&](Value src, EncodingRole role) -> Value {
+        SmallVector<int64_t> roundDimsTo(linalgOp.getNumLoops(), padFactor);
+        auto encoding = EncodingAttr::get(
+            linalgOp.getContext(), role, elemTypes, src.getType(),
+            narrowSizes.M, narrowSizes.N, maps, roundDimsTo);
+        return setEncoding(rewriter, loc, src, encoding);
+      };
+      encodedLhs = setEncodingWrapper(lhs, EncodingRole::LHS);
+      encodedRhs = setEncodingWrapper(rhs, EncodingRole::RHS);
+      encodedOut = setEncodingWrapper(out, EncodingRole::RESULT);
+    }
+    Value opTiled = clone(rewriter, linalgOp, encodedOut.getType(),
+                          ValueRange{encodedLhs, encodedRhs, encodedOut})
+                        ->getResult(0);
 
     // Sizes are computed by original output size.
     FailureOr<SmallVector<OpFoldResult>> outSizes =
@@ -368,15 +364,18 @@ struct setContractionOpEncoding
     rewriter.replaceOp(linalgOp, result);
     return success();
   }
+
+private:
+  int64_t padFactor = 0;
 };
 
-/// Pattern to fold a `linalg.fill` -> `iree_linalg_ext.set_encoding`
+/// Pattern to fold a `linalg.fill` -> `iree_encoding.set_encoding`
 /// operation into a `linalg.fill` of the encoded type.
 struct FoldFillWithSetEncoding
-    : public OpRewritePattern<IREE::LinalgExt::SetEncodingOp> {
-  using OpRewritePattern<IREE::LinalgExt::SetEncodingOp>::OpRewritePattern;
+    : public OpRewritePattern<IREE::Encoding::SetEncodingOp> {
+  using OpRewritePattern<IREE::Encoding::SetEncodingOp>::OpRewritePattern;
 
-  LogicalResult matchAndRewrite(IREE::LinalgExt::SetEncodingOp encodingOp,
+  LogicalResult matchAndRewrite(IREE::Encoding::SetEncodingOp encodingOp,
                                 PatternRewriter &rewriter) const override {
     auto fillOp = encodingOp.getSource().getDefiningOp<linalg::FillOp>();
     if (!fillOp)
@@ -398,8 +397,9 @@ struct FoldFillWithSetEncoding
 
 struct SetEncodingPass : public SetEncodingBase<SetEncodingPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::LinalgExt::IREELinalgExtDialect>();
+    registry.insert<IREE::Encoding::IREEEncodingDialect>();
   }
+  explicit SetEncodingPass(int64_t factor) { this->padFactor.setValue(factor); }
 
   void runOnOperation() override;
 };
@@ -409,7 +409,7 @@ void SetEncodingPass::runOnOperation() {
   MLIRContext *context = &getContext();
   {
     RewritePatternSet patterns(context);
-    patterns.insert<setContractionOpEncoding>(context);
+    patterns.insert<setContractionOpEncoding>(context, padFactor);
     linalg::FillOp::getCanonicalizationPatterns(patterns, context);
     patterns.insert<FoldFillWithSetEncoding>(context);
     memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
@@ -420,8 +420,8 @@ void SetEncodingPass::runOnOperation() {
   }
 }
 
-std::unique_ptr<Pass> createSetEncodingPass() {
-  return std::make_unique<SetEncodingPass>();
+std::unique_ptr<Pass> createSetEncodingPass(int64_t padFactor) {
+  return std::make_unique<SetEncodingPass>(padFactor);
 }
 
 } // namespace mlir::iree_compiler::GlobalOptimization

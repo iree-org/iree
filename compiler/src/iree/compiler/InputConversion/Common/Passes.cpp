@@ -6,7 +6,7 @@
 
 #include "iree/compiler/InputConversion/Common/Passes.h"
 
-#include "iree/compiler/Dialect/Flow/Conversion/MeshToFlow/MeshToFlow.h"
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/PassOptions.h"

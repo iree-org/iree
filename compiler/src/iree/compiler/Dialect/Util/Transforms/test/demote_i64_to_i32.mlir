@@ -134,9 +134,9 @@ util.func public @linalg_generic_i64(%arg: tensor<2xi64>)  -> tensor<2xi64> {
 // CHECK-LABEL: util.func public @linalg_non_structured_op
 // CHECK-SAME:    (%arg0: tensor<9xi32>) -> tensor<1x9xi32>
 util.func public @linalg_non_structured_op(%arg0: tensor<9xi64>) -> tensor<1x9xi64> {
-  // CHECK:       %[[RES:.+]] = tensor.expand_shape %arg0 {{\[}}[0, 1]] : tensor<9xi32> into tensor<1x9xi32>
+  // CHECK:       %[[RES:.+]] = tensor.expand_shape %arg0 {{\[}}[0, 1]] output_shape [1, 9] : tensor<9xi32> into tensor<1x9xi32>
   // CHECK:       util.return %[[RES:.+]] : tensor<1x9xi32>
-  %0 = tensor.expand_shape %arg0 [[0, 1]] : tensor<9xi64> into tensor<1x9xi64>
+  %0 = tensor.expand_shape %arg0 [[0, 1]] output_shape [1, 9] : tensor<9xi64> into tensor<1x9xi64>
   util.return %0 : tensor<1x9xi64>
 }
 

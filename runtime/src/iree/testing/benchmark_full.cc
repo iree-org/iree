@@ -13,7 +13,16 @@
 
 #include "benchmark/benchmark.h"
 #include "iree/base/api.h"
+#include "iree/base/internal/debugging.h"
 #include "iree/testing/benchmark.h"
+
+//===----------------------------------------------------------------------===//
+// Benchmarking tools
+//===----------------------------------------------------------------------===//
+
+// NOTE: LTO will kill this (most likely) - google benchmark warns about this
+// as well but has been letting it ride for years :shrug:
+void iree_benchmark_use_ptr(char const volatile* x) {}
 
 //===----------------------------------------------------------------------===//
 // iree_benchmark_state_t
@@ -112,10 +121,12 @@ static void iree_benchmark_run(const char* benchmark_name,
   IREE_TRACE_ZONE_END(z0);
 }
 
-void iree_benchmark_register(iree_string_view_t name,
-                             const iree_benchmark_def_t* benchmark_def) {
+const iree_benchmark_def_t* iree_benchmark_register(
+    iree_string_view_t name, const iree_benchmark_def_t* benchmark_def) {
   std::string name_str(name.data, name.size);
-  std::string prefixed_str = "BM_" + name_str;
+  std::string prefixed_str = !iree_string_view_starts_with(name, IREE_SV("BM_"))
+                                 ? "BM_" + name_str
+                                 : name_str;
   iree_benchmark_def_t cloned_def = *benchmark_def;
   auto* instance = benchmark::RegisterBenchmark(
       prefixed_str.c_str(),
@@ -154,6 +165,23 @@ void iree_benchmark_register(iree_string_view_t name,
       instance->Unit(benchmark::kNanosecond);
       break;
   }
+
+  return benchmark_def;
+}
+
+iree_benchmark_def_t* iree_make_function_benchmark(iree_benchmark_fn_t fn) {
+  // Go straight to malloc for this implementation as benchmark does the same
+  // thing. This also has the benefit of hiding the startup allocation from
+  // our stats >_>
+  iree_benchmark_def_t* def = NULL;
+  IREE_LEAK_CHECK_DISABLE_PUSH();
+  def = (iree_benchmark_def_t*)calloc(1, sizeof(*def));
+  IREE_LEAK_CHECK_DISABLE_POP();
+
+  def->run = fn;
+
+  // Return with no expectation of it ever being freed.
+  return def;
 }
 
 //===----------------------------------------------------------------------===//
@@ -178,9 +206,9 @@ void iree_benchmark_initialize(int* argc, char** argv) {
 "===----------------------------------------------------------------------===\n"
 "\n"
 "Tracing is enabled and will skew your results!\n"
-"The timings involved here can an order of magnitude off due to the tracing\n"
-"time sampling, recording, and instrumentation overhead. Disable tracing with\n"
-"IREE_ENABLE_RUNTIME_TRACING=OFF and rebuild.\n"
+"The timings involved here can be an order of magnitude off due to the\n"
+"tracing time sampling, recording, and instrumentation overhead.\n"
+"Disable tracing with IREE_ENABLE_RUNTIME_TRACING=OFF and rebuild.\n"
 "\x1b[0m"
 "\n"
   );

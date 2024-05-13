@@ -1,6 +1,6 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-preprocessing-convert-conv-to-channels-last))" %s | \
 // RUN:   FileCheck %s
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-preprocessing-convert-conv-to-channels-last{tile-size=16}))" %s | \
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-preprocessing-convert-conv-to-channels-last{tiling-factor=16}))" %s | \
 // RUN:   FileCheck %s --check-prefix=TILE16
 
 util.func @conv_nhwc_hwcf_no_transpose(%arg0: tensor<1x16x16x256xf32>, %arg1: tensor<3x3x256x128xf32>, %arg2: tensor<1x14x14x128xf32>) -> tensor<1x14x14x128xf32> {
@@ -116,3 +116,24 @@ module {
 // TILE16-SAME:    outs(%[[OUT]] : tensor<8x4x14x14x16xf32>) {
 // TILE16:      tensor.unpack %[[TILED_CONV]] inner_dims_pos = [1] inner_tiles = [16]
 // TILE16-SAME:   tensor<8x4x14x14x16xf32> -> tensor<8x64x14x14xf32>
+
+// -----
+
+// Not a convolution, should not be transposed.
+
+util.func @mmt_no_transpose(%arg0: tensor<2048x1280xf16>, %arg1: tensor<1280x1280xf16>) -> tensor<2048x1280xf32> {
+  %zero = arith.constant 0.0 : f32
+  %empty = tensor.empty() : tensor<2048x1280xf32>
+  %filled = linalg.fill ins(%zero : f32) outs(%empty : tensor<2048x1280xf32>) -> tensor<2048x1280xf32>
+  %res = linalg.matmul_transpose_b
+    ins(%arg0, %arg1 : tensor<2048x1280xf16>, tensor<1280x1280xf16>)
+    outs(%filled : tensor<2048x1280xf32>) -> tensor<2048x1280xf32>
+  util.return %res : tensor<2048x1280xf32>
+}
+// CHECK-LABEL: @mmt_no_transpose
+// CHECK-NOT:     linalg.generic
+// CHECK:         linalg.matmul_transpose_b
+
+// TILE16-LABEL: @mmt_no_transpose
+// TILE16-NOT:     linalg.generic
+// TILE16:         linalg.matmul_transpose_b

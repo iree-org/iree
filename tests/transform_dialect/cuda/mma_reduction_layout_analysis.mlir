@@ -9,7 +9,8 @@ func.func @matmul_reduction(%lhs : tensor<16x16xf16>, %rhs : tensor<16x16xf16>) 
   %1 = linalg.fill ins(%c0 : f16) outs(%0 : tensor<16x16xf16>) -> tensor<16x16xf16>
   %2 = linalg.matmul_transpose_b ins(%lhs, %rhs : tensor<16x16xf16>, tensor<16x16xf16>)
       outs(%1 : tensor<16x16xf16>) -> tensor<16x16xf16>
-  %6 = linalg.generic {indexing_maps = [#map, #map1], iterator_types = ["parallel", "reduction"]}
+  %6 = linalg.generic {indexing_maps
+ = [#map, #map1], iterator_types = ["parallel", "reduction"]}
         ins(%2 : tensor<16x16xf16>) outs(%init : tensor<16xf16>) {
         ^bb0(%in: f16, %out: f16):
           %20 = arith.maximumf %in, %out : f16

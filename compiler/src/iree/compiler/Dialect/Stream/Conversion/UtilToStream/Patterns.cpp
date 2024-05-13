@@ -232,26 +232,27 @@ struct GlobalOpExpansion
 
     // Materialize the initializer if we need to setup a tensor-like constant.
     if (tensorInitializerRequired) {
+      auto affinityAttr = IREE::Stream::AffinityAttr::lookup(globalOp);
       auto initializerOp =
           rewriter.create<IREE::Util::InitializerOp>(globalOp.getLoc());
       auto *entryBlock = rewriter.createBlock(&initializerOp.getBody());
       rewriter.setInsertionPointToStart(entryBlock);
       Value initialValue, initialValueSize;
-      if (initialValueAttr.isa<IREE::Util::UninitializedAttr>()) {
+      if (isa<IREE::Util::UninitializedAttr>(initialValueAttr)) {
         initialValueSize = rewriter.create<IREE::Stream::TensorSizeOfOp>(
             globalOp.getLoc(), TypeAttr::get(globalOp.getType()),
-            /*result_encoding_dims=*/ValueRange{},
-            /*affinity=*/nullptr);
+            /*result_encoding_dims=*/ValueRange{}, affinityAttr);
         initialValue = rewriter.create<IREE::Stream::TensorEmptyOp>(
             globalOp.getLoc(), resourceOp.getType(),
             TypeAttr::get(globalOp.getType()),
             /*result_encoding_dims=*/ValueRange{}, initialValueSize,
-            /*affinity=*/nullptr);
+            affinityAttr);
       } else {
         initialValue = rewriter.create<IREE::Stream::TensorConstantOp>(
-            globalOp.getLoc(), resourceOp.getType(), initialValueAttr,
+            globalOp.getLoc(), resourceOp.getType(),
+            convertAttributeToStream(initialValueAttr),
             TypeAttr::get(globalOp.getType()),
-            /*result_encoding_dims=*/ValueRange{}, /*affinity=*/nullptr);
+            /*result_encoding_dims=*/ValueRange{}, affinityAttr);
         initialValueSize = rewriter.create<IREE::Stream::ResourceSizeOp>(
             globalOp.getLoc(), indexType, initialValue);
       }
@@ -279,7 +280,13 @@ struct GlobalLoadOpExpansion
     // Only apply to expanded types (tensors/etc).
     if (!isExpandedType(loadOp.getType()))
       return failure();
-    auto &expandedGlobal = this->expansionState->globalMap[adaptor.getGlobal()];
+
+    auto expandedGlobalIt =
+        this->expansionState->globalMap.find(adaptor.getGlobal());
+    if (expandedGlobalIt == this->expansionState->globalMap.end())
+      return rewriter.notifyMatchFailure(loadOp, "expanded global not found");
+
+    auto &expandedGlobal = expandedGlobalIt->getSecond();
 
     // Insert a load/transfer to the unknown resource lifetime.
     auto unknownType = IREE::Stream::ResourceType::get(rewriter.getContext());
@@ -312,7 +319,13 @@ struct GlobalStoreOpExpansion
     // Only apply to expanded types (tensors/etc).
     if (!isExpandedType(storeOp.getValue().getType()))
       return failure();
-    auto &expandedGlobal = expansionState->globalMap[adaptor.getGlobal()];
+
+    auto expandedGlobalIt =
+        this->expansionState->globalMap.find(adaptor.getGlobal());
+    if (expandedGlobalIt == this->expansionState->globalMap.end())
+      return rewriter.notifyMatchFailure(storeOp, "expanded global not found");
+
+    auto &expandedGlobal = expandedGlobalIt->getSecond();
 
     // Insert a transfer/store to the global with unknown lifetime. Lifetime
     // refinement will make this go away if possible.
@@ -392,7 +405,7 @@ void populateUtilToStreamConversionPatterns(MLIRContext *context,
       [&](IREE::Util::GlobalOp op) {
         return typeConverter.isLegal(op.getType()) &&
                (!op.getInitialValueAttr() ||
-                !llvm::isa<TensorType>(op.getInitialValueAttr().getType()));
+                !isExpandedType(op.getInitialValueAttr().getType()));
       });
   conversionTarget.addDynamicallyLegalOp<IREE::Util::GlobalAddressOp>(
       [&](IREE::Util::GlobalAddressOp op) {

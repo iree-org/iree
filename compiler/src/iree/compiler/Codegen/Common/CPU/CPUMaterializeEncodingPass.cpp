@@ -10,9 +10,8 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/MathExtras.h"
@@ -26,9 +25,11 @@
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
+#define DEBUG_TYPE "cpu-materialize-encoding"
+
 namespace mlir::iree_compiler {
 
-using namespace IREE::LinalgExt;
+using namespace IREE::Encoding;
 using IREE::HAL::ExecutableTargetAttr;
 
 // Enumerate tile sizes to choose from when no specific architecture is
@@ -133,9 +134,43 @@ enumerateMatmulTileArm64(TypeRange elementTypes, ExecutableTargetAttr target) {
     }
   }
 
+  if (hasUkernel(target) && lhs.isSignlessInteger(8) &&
+      rhs.isSignlessInteger(4) && out.isSignlessInteger(32)) {
+    if (hasFeature(target, "+i8mm")) {
+      return {
+          TileMxNxK{4, 8, 16},
+          TileMxNxK{2, 8, 16},
+          TileMxNxK{1, 8, 16},
+      };
+    }
+    if (hasFeature(target, "+dotprod")) {
+      return {
+          TileMxNxK{8, 8, 8},
+          TileMxNxK{4, 8, 8},
+          TileMxNxK{2, 8, 8},
+          TileMxNxK{1, 8, 8},
+      };
+    }
+    return {
+        TileMxNxK{4, 16, 2},
+        TileMxNxK{2, 16, 2},
+        TileMxNxK{1, 16, 2},
+    };
+  }
+
   if (!hasUkernel(target)) {
     if (lhs.isSignlessInteger(8) && rhs.isSignlessInteger(8) &&
         (out.isSignlessInteger(32) || out.isF32())) {
+      if (out.isSignlessInteger(32) && hasFeature(target, "+i8mm")) {
+        return {
+            TileMxNxK{8, 8, 8}, // Aim to use SMMLA.
+            TileMxNxK{4, 8, 8}, // Truncation of the above.
+            TileMxNxK{2, 8, 8}, // Truncation of the above.
+            TileMxNxK{1, 8, 8}, // Truncation of the above.
+        };
+      }
+
+      // Default.
       return {
           TileMxNxK{8, 8, 1}, // Aim to use SMLAL.
           TileMxNxK{4, 8, 1}, // Truncation of the above.
@@ -145,6 +180,15 @@ enumerateMatmulTileArm64(TypeRange elementTypes, ExecutableTargetAttr target) {
     }
     if (lhs.isSignlessInteger(8) && rhs.isSignlessInteger(4) &&
         (out.isSignlessInteger(32) || out.isF32())) {
+      if (out.isSignlessInteger(32) && hasFeature(target, "+i8mm")) {
+        return {
+            TileMxNxK{4, 8, 32},
+            TileMxNxK{2, 8, 32},
+            TileMxNxK{1, 8, 32},
+        };
+      }
+
+      // Default.
       return {
           TileMxNxK{4, 16, 1}, // Aim to use SMLAL.
           TileMxNxK{2, 32, 1}, // Truncation of the above.
@@ -281,13 +325,23 @@ enumerateMatmulTileX86_64(TypeRange elementTypes, ExecutableTargetAttr target) {
   return {};
 }
 
-static TileMxNxK chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
-                                  int64_t matmulNarrowM,
-                                  int64_t matmulNarrowN) {
+/// Returns the best TileMxNxK from `enumeratedTiles` pool. If the
+/// `hostDefinedUpperBound` is not empty, the chosen tile sizes can not be
+/// greater than the values.
+/// TODO(#16933): Remove `hostDefinedUpperBound` once we can propagate such
+/// information to host. For now, they are defined by host.
+static TileMxNxK
+chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles, int64_t matmulNarrowM,
+                 int64_t matmulNarrowN,
+                 ArrayRef<int64_t> hostDefinedUpperBound = {}) {
+  assert((hostDefinedUpperBound.empty() || hostDefinedUpperBound.size() == 3) &&
+         "expected hostDefinedUpperBound is empty or has upper bound for {M, "
+         "N, K}");
   // Handle narrow-N by transposing to reduce to narrow-M. Note: the
   // enumeratedTiles currently only enumerate narrow-M cases.
   if (matmulNarrowN && (!matmulNarrowM || matmulNarrowN < matmulNarrowM)) {
-    TileMxNxK tile = chooseMatmulTile(enumeratedTiles, matmulNarrowN, 0);
+    TileMxNxK tile = chooseMatmulTile(enumeratedTiles, matmulNarrowN, 0,
+                                      hostDefinedUpperBound);
     std::swap(tile.M, tile.N);
     return tile;
   }
@@ -318,7 +372,26 @@ static TileMxNxK chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
   SmallVector<RatedTileMxNxK> ratedTiles;
   ratedTiles.reserve(enumeratedTiles.size());
   int64_t bestPaddingPenalty = INT64_MAX;
+  int64_t mUB = INT64_MAX;
+  int64_t nUB = INT64_MAX;
+  int64_t kUB = INT64_MAX;
+  if (!hostDefinedUpperBound.empty()) {
+    mUB = hostDefinedUpperBound[0];
+    nUB = hostDefinedUpperBound[1];
+    kUB = hostDefinedUpperBound[2];
+  }
   for (auto tile : enumeratedTiles) {
+    if (tile.M > mUB || tile.N > nUB || tile.K > kUB) {
+      LLVM_DEBUG(llvm::dbgs() << "[" << DEBUG_TYPE << "]: tile (";
+                 llvm::interleaveComma(
+                     ArrayRef<int64_t>{tile.M, tile.N, tile.K}, llvm::dbgs());
+                 llvm::dbgs()
+                 << ") is skipped because it is not valid for upper_bound (";
+                 llvm::interleaveComma(ArrayRef<int64_t>{mUB, nUB, kUB},
+                                       llvm::dbgs());
+                 llvm::dbgs() << ")\n");
+      continue;
+    }
     RatedTileMxNxK ratedTile(tile);
     ratedTile.paddingPenalty = 0;
     // If we are choosing a tile for a narrow-M case, we want to minimize
@@ -377,7 +450,6 @@ struct CPUMaterializeEncodingPass
       : targetAttr(attr) {}
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<arith::ArithDialect, tensor::TensorDialect,
-                    IREE::LinalgExt::IREELinalgExtDialect,
                     IREE::Codegen::IREECodegenDialect>();
   }
   void runOnOperation() override;
@@ -405,9 +477,8 @@ private:
 FailureOr<MaterializeEncodingInfo>
 materializeEncodingForTarget(RankedTensorType tensorType,
                              ExecutableTargetAttr targetAttr) {
-  IREE::LinalgExt::EncodingAttr encoding =
-      tensorType.getEncoding()
-          .dyn_cast_or_null<IREE::LinalgExt::EncodingAttr>();
+  IREE::Encoding::EncodingAttr encoding =
+      dyn_cast_or_null<IREE::Encoding::EncodingAttr>(tensorType.getEncoding());
   if (!encoding) {
     return failure();
   }
@@ -420,7 +491,7 @@ materializeEncodingForTarget(RankedTensorType tensorType,
   // Enumerate available tile shapes for the given encoding and target.
   auto elementTypes = llvm::to_vector(
       llvm::map_range(encoding.getElementTypes().getValue(), [](Attribute a) {
-        return a.cast<TypeAttr>().getValue();
+        return cast<TypeAttr>(a).getValue();
       }));
   SmallVector<TileMxNxK> enumeratedTileMxNxK =
       enumerateMatmulTileMxNxK(cDims.value(), elementTypes, targetAttr);
@@ -444,7 +515,9 @@ materializeEncodingForTarget(RankedTensorType tensorType,
   // Choose a final matmul TileMxNxK from the above-enumarated tile shapes,
   // taking narrow dimensions into account.
   TileMxNxK chosenTileMxNxK =
-      chooseMatmulTile(enumeratedTileMxNxK, matmulNarrowM, matmulNarrowN);
+      chooseMatmulTile(enumeratedTileMxNxK, matmulNarrowM, matmulNarrowN,
+                       encoding.getRoundDimsToArray());
+
   // Map the matmul TileMxNxK to an actual tile shape for the tensor at hand,
   // based on its role in the matmul.
   auto rank = tensorType.getRank();

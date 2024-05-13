@@ -13,6 +13,8 @@
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Pass/Pass.h"
@@ -50,25 +52,17 @@ public:
 } // namespace
 
 void VMVXSelectLoweringStrategyPass::runOnOperation() {
-  IREE::HAL::ExecutableVariantOp variantOp = getOperation();
-  ModuleOp moduleOp = variantOp.getInnerModule();
-
-  // Set the strategy with default heuristics.
-  if (failed(initVMVXLaunchConfig(moduleOp))) {
-    return signalPassFailure();
-  }
-
-  std::optional<IREE::Codegen::TranslationInfoAttr> translationInfo =
-      getIdenticalTranslationInfo(variantOp);
-  if (!translationInfo) {
-    moduleOp.emitOpError(
-        "unhandled compilation of entry point functions with different "
-        "translation info");
-    return signalPassFailure();
+  auto moduleOp = getOperation();
+  for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
+    // Set the strategy with default heuristics.
+    if (failed(initVMVXLaunchConfig(funcOp))) {
+      funcOp.emitOpError("failed to set lowering configuration");
+      return signalPassFailure();
+    }
   }
 }
 
-std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>
+std::unique_ptr<OperationPass<ModuleOp>>
 createVMVXSelectLoweringStrategyPass() {
   return std::make_unique<VMVXSelectLoweringStrategyPass>();
 }

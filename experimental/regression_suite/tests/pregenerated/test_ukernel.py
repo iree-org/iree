@@ -16,7 +16,7 @@ COMMON_FLAGS = [
 ]
 
 argmax_ukernel_source = fetch_source_fixture(
-    "https://storage.googleapis.com/shark_tank/ukernel_regression/20231217/argmax/argmax_3d_linalg.mlir",
+    "https://sharktank.blob.core.windows.net/sharktank/ukernel_regression/20231217/argmax/argmax_3d_linalg.mlir",
     group="argmax_ukernel_linalg",
 )
 
@@ -75,22 +75,22 @@ def argmax_ukernel_gfx940_rocm_vmfb(argmax_ukernel_source):
 #       cannot compare signless i64 from vmfb and by default si64 from npy.
 
 argmax_input_f16 = fetch_source_fixture(
-    "https://storage.googleapis.com/shark_tank/ukernel_regression/20231217/argmax/argmax_3d_input_f16.npy",
+    "https://sharktank.blob.core.windows.net/sharktank/ukernel_regression/20231217/argmax/argmax_3d_input_f16.npy",
     group="argmax_ukernel_input_f16",
 )
 
 argmax_output_f16 = fetch_source_fixture(
-    "https://storage.googleapis.com/shark_tank/ukernel_regression/20231217/argmax/argmax_3d_output_f16.npy",
+    "https://sharktank.blob.core.windows.net/sharktank/ukernel_regression/20231217/argmax/argmax_3d_output_f16.npy",
     group="argmax_ukernel_output_f16",
 )
 
 argmax_input_f32 = fetch_source_fixture(
-    "https://storage.googleapis.com/shark_tank/ukernel_regression/20231217/argmax/argmax_3d_input_f32.npy",
+    "https://sharktank.blob.core.windows.net/sharktank/ukernel_regression/20231217/argmax/argmax_3d_input_f32.npy",
     group="argmax_ukernel_input_f32",
 )
 
 argmax_output_f32 = fetch_source_fixture(
-    "https://storage.googleapis.com/shark_tank/ukernel_regression/20231217/argmax/argmax_3d_output_f32.npy",
+    "https://sharktank.blob.core.windows.net/sharktank/ukernel_regression/20231217/argmax/argmax_3d_output_f32.npy",
     group="argmax_ukernel_output_f32",
 )
 

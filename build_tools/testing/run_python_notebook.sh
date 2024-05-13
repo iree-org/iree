@@ -10,8 +10,9 @@
 #
 # Usage: run_python_notebook.sh /path/to/notebook.ipynb
 #
-# This is intended for use on continuous integration servers within a Docker
-# container and as a reference for users, but it can also be run locally.
+# This is intended for use on continuous integration servers (possibly within a
+# Docker container) and as a reference for users, but it can also be run
+# locally.
 
 set -e
 set -x
@@ -43,6 +44,8 @@ python3 -m pip install --ignore-installed --quiet \
   jupyter_core nbconvert ipykernel
 
 # Install common notebook requirements, reusing system versions if possible.
+# To match behavior with online Colab notebooks, the versions used here could
+# track closely with https://us-docker.pkg.dev/colab-images/public/runtime.
 python3 -m pip install --quiet \
   numpy \
   matplotlib \

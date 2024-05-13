@@ -1,5 +1,5 @@
 module attributes { transform.with_named_sequence } {
-  transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.consumed}) {
+  transform.named_sequence @__transform_main(%variant_op: !transform.any_op) {
     // Get attention op
     // ==========================================
     %attention = transform.structured.match ops{["iree_linalg_ext.attention"]} in %variant_op : (!transform.any_op) -> !transform.any_op
@@ -9,12 +9,12 @@ module attributes { transform.with_named_sequence } {
     %tiled_attention, %forall_grid =
     transform.structured.tile_using_forall %attention tile_sizes [1, 128]
       ( mapping = [#gpu.block<x>, #gpu.block<y>] ) : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
-    transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall_grid : (!transform.any_op) -> ()
+    // transform.iree.populate_workgroup_count_region_using_num_threads_slice %forall_grid : (!transform.any_op) -> ()
 
     // Tile batch dimensions of attention
     // ==========================================
     %attention2 = transform.structured.match ops{["iree_linalg_ext.attention"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-    %batch_tiled_attn, %loop = transform.structured.tile_using_for %attention2 [1] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
+    %batch_tiled_attn, %loop = transform.structured.tile_using_for %attention2 tile_sizes [1] : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     transform.apply_patterns to %top_level_func {
       transform.apply_patterns.canonicalization
@@ -123,18 +123,18 @@ module attributes { transform.with_named_sequence } {
     transform.apply_cse to %func_3 : !transform.any_op
     transform.iree.eliminate_empty_tensors %variant_op : (!transform.any_op) -> ()
     transform.apply_patterns to %func_3 { transform.apply_patterns.linalg.erase_unnecessary_inputs } : !transform.any_op
-    %variant_op_3 = transform.iree.bufferize { target_gpu } %variant_op : (!transform.any_op) -> (!transform.any_op)
+    %func_4 = transform.iree.bufferize { target_gpu } %func_3 : (!transform.any_op) -> (!transform.any_op)
 
     // Step 5. Pre-process the contract and transfer ops to put it in the right form.
     // ===========================================================================
-    %func_2 = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
+    %func_2 = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     transform.apply_patterns to %func_2 {
       transform.apply_patterns.iree.prepare_vector_to_mma
     } : !transform.any_op
 
     // Step 6. Post-bufferization vector distribution
     // ===========================================================================
-    %func_7 = transform.structured.match ops{["func.func"]} in %variant_op_3 : (!transform.any_op) -> !transform.any_op
+    %func_7 = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     transform.iree.forall_to_workgroup %func_7 : (!transform.any_op) -> ()
     transform.iree.map_nested_forall_to_gpu_threads %func_7 workgroup_dims = [4, 8, 4] subgroup_size = 32 sync_after_distribution = false : (!transform.any_op) -> ()
 

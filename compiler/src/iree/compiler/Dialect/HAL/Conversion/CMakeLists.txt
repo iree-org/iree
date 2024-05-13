@@ -25,20 +25,10 @@ iree_cc_library(
     MLIRFunctionInterfaces
     MLIRIR
     MLIRMemRefDialect
+    MLIRTransformUtils
     MLIRTransforms
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::Util::IR
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    Passes
-  HDRS
-    "Passes.h"
-  DEPS
-    MLIRPass
-    iree::compiler::Dialect::HAL::Conversion::HALToVM
   PUBLIC
 )
 

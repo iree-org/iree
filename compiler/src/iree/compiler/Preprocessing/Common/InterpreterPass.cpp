@@ -21,7 +21,8 @@ class InterpreterPass
     : public iree_compiler::Preprocessing::impl::InterpreterPassBase<
           InterpreterPass> {
 public:
-  using Base::Base;
+  using iree_compiler::Preprocessing::impl::InterpreterPassBase<
+      InterpreterPass>::InterpreterPassBase;
 
   void runOnOperation() override {
     MLIRContext *context = &getContext();
@@ -36,7 +37,7 @@ public:
         getOperation(), *transformModule, "__transform_main");
     if (!transformEntryPoint) {
       getOperation()->emitError() << "could not find transform entry point "
-                                     "__preprocessing_main in transform module";
+                                     "__transform_main in transform module";
       return signalPassFailure();
     }
 

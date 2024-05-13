@@ -50,6 +50,8 @@ def LLVMGPU_MatmulTensorCoreMmaSync
     : I32EnumAttrCase<"LLVMGPUMatmulTensorCoreMmaSync", 109>;
 def LLVMGPU_VectorDistribute
     : I32EnumAttrCase<"LLVMGPUVectorDistribute", 110>;
+def LLVMGPU_PadAndVectorDistribute
+    : I32EnumAttrCase<"LLVMGPUPadAndVectorDistribute", 111>;
 
 def SPIRV_BaseLowering
     : I32EnumAttrCase<"SPIRVBaseLowering", 200>;
@@ -68,9 +70,10 @@ def SPIRV_WinogradVectorize
 
 def VMVX_Default : I32EnumAttrCase<"VMVXDefault", 300>;
 
-
 def Linalg_TransformDialectCodegen
     : I32EnumAttrCase<"TransformDialectCodegen", 1000>;
+def Custom
+    : I32EnumAttrCase<"Custom", 1001>;
 
 def None : I32EnumAttrCase<"None", 0xffff>;
 
@@ -90,6 +93,7 @@ def DispatchLoweringPassPipelineEnum : I32EnumAttr<
     LLVMGPU_Vectorize, LLVMGPU_MatmulSimt, LLVMGPU_MatmulTensorCore,
     LLVMGPU_TransposeSharedMem, LLVMGPU_WarpReduction, LLVMGPU_PackUnPack,
     LLVMGPU_MatmulTensorCoreMmaSync, LLVMGPU_VectorDistribute,
+    LLVMGPU_PadAndVectorDistribute,
 
     // SPIR-V CodeGen pipelines
     SPIRV_BaseLowering, SPIRV_BaseDistribute, SPIRV_BaseVectorize,
@@ -99,7 +103,13 @@ def DispatchLoweringPassPipelineEnum : I32EnumAttr<
     VMVX_Default,
 
     // Transform dialect based codegen
-    Linalg_TransformDialectCodegen, None
+    Linalg_TransformDialectCodegen,
+
+    // For out of tree pass-pipelines
+    Custom,
+
+    // None to specify no in-built pipelines to use.
+    None
   ]> {
   let cppNamespace = "::mlir::iree_compiler::IREE::Codegen";
   // Don't generate a C++ class! We want to use the AttrDef
@@ -120,7 +130,7 @@ def IREECodegen_TranslationInfoAttr :
   let description = [{
     Specifies the information that is used to drive the translation of
     an entry point function using Linalg based structured-op
-    lowering.. During executable translation this is attached to the
+    lowering. During executable translation this is attached to the
     `hal.executable.export` operation.
 
     If this operation is already set on the root operation (as part of
@@ -136,6 +146,8 @@ def IREECodegen_TranslationInfoAttr :
   let assemblyFormat = [{
     `<` `` $passPipeline
     (`codegen_spec` `=` $codegenSpec^)?
+    (`workgroup_size` `=` `[` $workgroupSize^ `]`)?
+    (`subgroup_size` `=` $subgroupSize^)?
     (`,` $configuration^)? `>`
   }];
 
@@ -144,12 +156,20 @@ def IREECodegen_TranslationInfoAttr :
         "Name of the pipeline to be invoked on the translation unit.">:$passPipeline,
     OptionalParameter<"SymbolRefAttr",
         "The symbol pointing to the transform dialect codegen spec to be used">:$codegenSpec,
+    OptionalArrayRefParameter<"int64_t", "The workgroup size to use">:$workgroupSize,
+    OptionalParameter<"int64_t", "The subgroup size to use">:$subgroupSize,
     OptionalParameter<"DictionaryAttr",
         "Pipeline specific configuration">:$configuration
   );
   let builders = [
     AttrBuilder<(ins "DispatchLoweringPassPipeline":$passPipeline,
         CArg<"SymbolRefAttr", "{}">:$codegenSpec,
+        CArg<"ArrayRef<int64_t>", "{}">:$workgroupSize,
+        CArg<"std::optional<int64_t>", "std::nullopt">:$subgroupSize,
+        CArg<"DictionaryAttr", "{}">:$configuration)>,
+    AttrBuilder<(ins "DispatchLoweringPassPipeline":$passPipeline,
+        "ArrayRef<int64_t>":$workgroupSize,
+        CArg<"std::optional<int64_t>", "std::nullopt">:$subgroupSize,
         CArg<"DictionaryAttr", "{}">:$configuration)>
   ];
   let extraClassDeclaration = [{
@@ -234,6 +254,10 @@ def IREECodegen_LoweringConfigAttr :
     // Returns the tile interchange for a level set for the op.
     SmallVector<int64_t> getTileInterchangeVals(unsigned level);
 
+    // Returns true if there are no tile interchange values (this means that
+    // interchange can be ignored).
+    bool isInterchangeEmpty();
+
     // Returns the native vector size to use.
     SmallVector<int64_t> getNativeVectorSizeVals() {
       return SmallVector<int64_t>(getNativeVectorSize());
@@ -266,23 +290,13 @@ def IREECodegen_CompilationInfoAttr :
   }];
   let parameters = (ins
     AttrParameter<"LoweringConfigAttr", "">:$loweringConfig,
-    AttrParameter<"TranslationInfoAttr", "">:$translationInfo,
-    OptionalArrayRefParameter<"int64_t", "The workgroup size to use during translation.">:$workgroupSize,
-    OptionalParameter<"std::optional<int64_t>",
-        "The subgroup size to use during translation.">:$subgroupSize
+    AttrParameter<"TranslationInfoAttr", "">:$translationInfo
   );
 
   let assemblyFormat = [{
-    `<` `lowering_config` `=` $loweringConfig `,` `translation_info` `=` $translationInfo
-    (`,` `workgroup_size` `=` `[` $workgroupSize^ `]`)?
-    (`,` `subgroup_size` `=` $subgroupSize^)? `>`
+    `<` `lowering_config` `=` $loweringConfig `,` `translation_info` `=` $translationInfo `>`
   }];
 
-  let extraClassDeclaration = [{
-    SmallVector<int64_t> getWorkgroupSizeVals() {
-      return SmallVector<int64_t>(getWorkgroupSize());
-    }
-  }];
   let genVerifyDecl = 1;
 }
 

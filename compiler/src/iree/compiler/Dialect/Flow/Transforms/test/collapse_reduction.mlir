@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file -iree-flow-collapse-dims %s | FileCheck %s
+// RUN: iree-opt --split-input-file -iree-flow-collapse-reduction-dimensions %s | FileCheck %s
 
 util.func public @multi_reduce_dim(%arg0: tensor<2x32x10x4096xf32>) -> tensor<2x32x1x1xf32> {
   %cst = arith.constant -0.000000e+00 : f32
@@ -9,7 +9,7 @@ util.func public @multi_reduce_dim(%arg0: tensor<2x32x10x4096xf32>) -> tensor<2x
     %6 = arith.addf %arg1, %arg2 : f32
     linalg.yield %6 : f32
   } -> tensor<2x32xf32>
-  %4 = tensor.expand_shape %3 [[0], [1, 2, 3]] : tensor<2x32xf32> into tensor<2x32x1x1xf32>
+  %4 = tensor.expand_shape %3 [[0], [1, 2, 3]] output_shape [2, 32, 1, 1] : tensor<2x32xf32> into tensor<2x32x1x1xf32>
   util.return %4 : tensor<2x32x1x1xf32>
 }
 
@@ -52,7 +52,7 @@ util.func public @multi_reduce_dim_dispatch(%arg0: tensor<2x32x10x4096xf32>) -> 
     } -> tensor<2x32xf32>
     flow.return %6 : tensor<2x32xf32>
   }
-  %4 = tensor.expand_shape %3 [[0], [1, 2, 3]] : tensor<2x32xf32> into tensor<2x32x1x1xf32>
+  %4 = tensor.expand_shape %3 [[0], [1, 2, 3]] output_shape [2, 32, 1, 1] : tensor<2x32xf32> into tensor<2x32x1x1xf32>
   util.return %4 : tensor<2x32x1x1xf32>
 }
 

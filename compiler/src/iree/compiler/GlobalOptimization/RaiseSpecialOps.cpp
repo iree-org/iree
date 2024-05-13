@@ -65,7 +65,7 @@ static bool matchInner2DTranspose(linalg::LinalgOp genericOp, unsigned rank) {
     return false;
   }
   auto yieldOp = cast<linalg::YieldOp>(body->getTerminator());
-  auto blockArg = yieldOp.getOperand(0).dyn_cast<BlockArgument>();
+  auto blockArg = dyn_cast<BlockArgument>(yieldOp.getOperand(0));
   if (!blockArg || blockArg.getOwner() != body ||
       blockArg.getArgNumber() != 0) {
     return false;
@@ -470,7 +470,7 @@ matchCatNegateAndSlice(tensor::InsertSliceOp insertOp) {
     return std::nullopt;
   }
 
-  auto sourceType = source.getType().dyn_cast<RankedTensorType>();
+  auto sourceType = dyn_cast<RankedTensorType>(source.getType());
   if (!sourceType || sourceType.getRank() == 0) {
     return std::nullopt;
   }

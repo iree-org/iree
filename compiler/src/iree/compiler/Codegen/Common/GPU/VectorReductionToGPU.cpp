@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/GPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -16,6 +16,7 @@
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorDistribution.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -23,6 +24,10 @@
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_VECTORREDUCTIONTOGPUPASS
+#include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
+
+namespace {
 static void debugPrint(Operation *op, const char *message) {
   LLVM_DEBUG({
     llvm::dbgs() << "//--- " << message << " ---//\n";
@@ -134,13 +139,10 @@ moveScalarAndBindingUniformCode(vector::WarpExecuteOnLane0Op warpOp) {
     op->moveBefore(warpOp);
 }
 
-namespace {
-
 /// Pattern to convert InsertElement to broadcast, this is a workaround until
 /// MultiDimReduction distribution is supported.
-class InsertElementToBroadcast final
-    : public OpRewritePattern<vector::InsertElementOp> {
-public:
+struct InsertElementToBroadcast final
+    : OpRewritePattern<vector::InsertElementOp> {
   using OpRewritePattern<vector::InsertElementOp>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(vector::InsertElementOp insertOp,
@@ -154,7 +156,7 @@ public:
 };
 
 /// Pattern to sink `gpu.barrier` ops out of a `warp_execute_on_lane_0` op.
-class WarpOpBarrier : public OpRewritePattern<vector::WarpExecuteOnLane0Op> {
+struct WarpOpBarrier final : OpRewritePattern<vector::WarpExecuteOnLane0Op> {
   using OpRewritePattern<vector::WarpExecuteOnLane0Op>::OpRewritePattern;
 
   LogicalResult matchAndRewrite(vector::WarpExecuteOnLane0Op warpOp,
@@ -189,22 +191,16 @@ static Value simpleWarpShuffleFunction(Location loc, OpBuilder &builder,
   return result;
 }
 
-class VectorReductionToGPUPass
-    : public VectorReductionToGPUBase<VectorReductionToGPUPass> {
-public:
-  explicit VectorReductionToGPUPass(
+struct VectorReductionToGPUPass final
+    : impl::VectorReductionToGPUPassBase<VectorReductionToGPUPass> {
+  VectorReductionToGPUPass(
       bool expandSubgroupReduction,
       std::function<int(mlir::FunctionOpInterface)> getWarpSize)
       : expandSubgroupReduction(expandSubgroupReduction),
         getWarpSize(getWarpSize) {}
 
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<scf::SCFDialect, memref::MemRefDialect, gpu::GPUDialect,
-                    affine::AffineDialect>();
-  }
-
   void runOnOperation() override {
-    auto funcOp = getOperation();
+    FunctionOpInterface funcOp = getOperation();
     MLIRContext *ctx = &getContext();
 
     debugPrint(funcOp, "after step #0: before vector reduction to gpu");
@@ -225,9 +221,14 @@ public:
 
     debugPrint(funcOp, "after step #1: preprocessing reduction ops");
 
-    auto workgroupSize = llvm::map_to_vector(
-        getEntryPoint(funcOp)->getWorkgroupSize().value(),
-        [&](Attribute attr) { return llvm::cast<IntegerAttr>(attr).getInt(); });
+    std::optional<SmallVector<int64_t>> maybeWorkgroupSize =
+        getWorkgroupSize(funcOp);
+    if (!maybeWorkgroupSize) {
+      funcOp->emitOpError(
+          "expected workgroup size to be set as part of `translation_info`");
+      return signalPassFailure();
+    }
+    SmallVector<int64_t> &workgroupSize = maybeWorkgroupSize.value();
     assert(workgroupSize[1] == 1 && workgroupSize[2] == 1);
     // 2. Create the warp op and move the function body into it.
     const int groupSize = workgroupSize[0];

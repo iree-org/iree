@@ -1,6 +1,7 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-global-opt-propagate-linalg-transpose))" --split-input-file %s | FileCheck %s
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-global-opt-propagate-linalg-transpose{enable-aggressive-propagation=true}))" --split-input-file %s | FileCheck %s --check-prefix=APROP
 // RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-global-opt-propagate-linalg-transpose{test-sinking-only=true}))" --split-input-file %s | FileCheck %s --check-prefix=SINK
+// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-global-opt-propagate-linalg-transpose{test-bubbling-only=true}))" --split-input-file %s | FileCheck %s --check-prefix=BUBBLE
 
 util.func public @specialize_transpose_op(%arg0 : tensor<1x2x3xf32>,
                                    %empty : tensor<3x2x1xf32>) -> tensor<3x2x1xf32> {
@@ -208,10 +209,6 @@ util.func public @propagate_to_bmm_transpose_batch(%transposed_lhs: tensor<16x2x
                             outs(%empty : tensor<2x16x16xf32>) -> tensor<2x16x16xf32>
   util.return %bmm : tensor<2x16x16xf32>
 }
-// Verify that without aggressive propagation, this stays as a batch matmul
-// CHECK-LABEL: util.func public @propagate_to_bmm_transpose_batch
-//       CHECK:   linalg.batch_matmul
-
 // APROP: #[[$MAP:.+]] = affine_map<(d0, d1, d2, d3) -> (d1, d0, d3)>
 // APROP: #[[$MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
 // APROP: #[[$MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
@@ -227,18 +224,43 @@ util.func public @propagate_to_bmm_transpose_batch(%transposed_lhs: tensor<16x2x
 
 // -----
 
-util.func public @sink_through_expand_shape(%arg0 : tensor<?x?x?xf32>) -> tensor<32x?x16x?x?xf32> {
-  %c0 = arith.constant 0 : index
-  %c1 = arith.constant 1 : index
+util.func public @do_not_propagate_to_conv(%transposed_lhs: tensor<18x2x18x8xf32>,
+                                           %rhs: tensor<3x3x8x32xf32>) -> tensor<2x16x16x32xf32> {
+  %empty = tensor.empty(): tensor<2x18x18x8xf32>
+  %lhs = linalg.transpose ins(%transposed_lhs : tensor<18x2x18x8xf32>)
+      outs(%empty : tensor<2x18x18x8xf32>) permutation = [1, 0, 2, 3]
+  %out = tensor.empty(): tensor<2x16x16x32xf32>
+  %conv = linalg.conv_2d_nhwc_hwcf {strides = dense<1> : tensor<2xi64>, dilations = dense<1> : tensor<2xi64>}
+    ins(%lhs, %rhs : tensor<2x18x18x8xf32>, tensor<3x3x8x32xf32>)
+    outs(%out : tensor<2x16x16x32xf32>) -> tensor<2x16x16x32xf32>
+  util.return %conv : tensor<2x16x16x32xf32>
+}
+
+// APROP-LABEL: util.func public @do_not_propagate_to_conv
+//       APROP:   linalg.conv_2d_nhwc_hwcf
+
+// -----
+
+util.func public @sink_through_expand_shape(%arg0: tensor<?x?x?xf32>) -> tensor<32x?x16x?x?xf32> {
+  %c4 = arith.constant 4 : index
+  %c3 = arith.constant 3 : index
+  %c32 = arith.constant 32 : index
+  %c16 = arith.constant 16 : index
   %c2 = arith.constant 2 : index
-  %d0 = tensor.dim %arg0, %c0 : tensor<?x?x?xf32>
-  %d1 = tensor.dim %arg0, %c1 : tensor<?x?x?xf32>
-  %d2 = tensor.dim %arg0, %c2 : tensor<?x?x?xf32>
-  %empty = tensor.empty(%d0, %d1, %d2): tensor<?x?x?xf32>
-  %transposed = linalg.transpose ins(%arg0 : tensor<?x?x?xf32>)
-      outs(%empty : tensor<?x?x?xf32>) permutation = [1, 0, 2]
-  %expanded = tensor.expand_shape %transposed [[0, 1], [2, 3], [4]] : tensor<?x?x?xf32> into tensor<32x?x16x?x?xf32>
-  util.return %expanded : tensor<32x?x16x?x?xf32>
+  %c1 = arith.constant 1 : index
+  %c0 = arith.constant 0 : index
+  %dim = tensor.dim %arg0, %c0 : tensor<?x?x?xf32>
+  %dim_0 = tensor.dim %arg0, %c1 : tensor<?x?x?xf32>
+  %dim_1 = tensor.dim %arg0, %c2 : tensor<?x?x?xf32>
+  %0 = arith.divui %dim, %c16 : index
+  %1 = arith.divui %dim_0, %c32 : index
+  %expanded = tensor.expand_shape %arg0 [[0, 1], [2, 3], [4]] output_shape [16, %0, 32, %1, %dim_1] : tensor<?x?x?xf32> into tensor<16x?x32x?x?xf32>
+  %dim_2 = tensor.dim %expanded, %c1 : tensor<16x?x32x?x?xf32>
+  %dim_3 = tensor.dim %expanded, %c3 : tensor<16x?x32x?x?xf32>
+  %dim_4 = tensor.dim %expanded, %c4 : tensor<16x?x32x?x?xf32>
+  %2 = tensor.empty(%dim_3, %dim_2, %dim_4) : tensor<32x?x16x?x?xf32>
+  %transposed = linalg.transpose ins(%expanded : tensor<16x?x32x?x?xf32>) outs(%2 : tensor<32x?x16x?x?xf32>) permutation = [2, 3, 0, 1, 4]
+  util.return %transposed : tensor<32x?x16x?x?xf32>
 }
 // SINK-LABEL: util.func public @sink_through_expand_shape
 //       SINK:   %[[EXP:.+]] = tensor.expand_shape {{.*}} {{\[\[}}0, 1], [2, 3], [4]]
@@ -254,7 +276,7 @@ util.func public @sink_non_involution_through_expand_shape(%arg0 : tensor<2x3x4x
   %empty = tensor.empty(): tensor<3x4x2xf32>
   %transposed = linalg.transpose ins(%arg0 : tensor<2x3x4xf32>)
       outs(%empty : tensor<3x4x2xf32>) permutation = [1, 2, 0]
-  %expanded = tensor.expand_shape %transposed [[0, 1], [2], [3]] : tensor<3x4x2xf32> into tensor<1x3x4x2xf32>
+  %expanded = tensor.expand_shape %transposed [[0, 1], [2], [3]] output_shape [1, 3, 4, 2] : tensor<3x4x2xf32> into tensor<1x3x4x2xf32>
   util.return %expanded : tensor<1x3x4x2xf32>
 }
 // SINK-LABEL: util.func public @sink_non_involution_through_expand_shape
@@ -264,6 +286,23 @@ util.func public @sink_non_involution_through_expand_shape(%arg0 : tensor<2x3x4x
 //  SINK-SAME:                    outs({{.*}} : tensor<1x3x4x2xf32>)
 //  SINK-SAME:                    permutation = [1, 2, 3, 0]
 //       SINK:   util.return %[[RES]] : tensor<1x3x4x2xf32>
+
+// -----
+
+util.func public @bubble_non_involution_through_collapse_shape(%arg0 : tensor<1x2x3x5x7x11xf32>) -> tensor<35x11x6xf32> {
+  %collapsed = tensor.collapse_shape %arg0 [[0, 1, 2], [3, 4], [5]] : tensor<1x2x3x5x7x11xf32> into tensor<6x35x11xf32>
+  %empty = tensor.empty(): tensor<35x11x6xf32>
+  %transposed = linalg.transpose ins(%collapsed : tensor<6x35x11xf32>)
+      outs(%empty : tensor<35x11x6xf32>) permutation = [1, 2, 0]
+  util.return %transposed : tensor<35x11x6xf32>
+}
+// BUBBLE-LABEL: util.func public @bubble_non_involution_through_collapse_shape
+//       BUBBLE:   %[[T:.+]] = linalg.transpose ins(%{{.*}} : tensor<1x2x3x5x7x11xf32>
+//  BUBBLE-SAME:                    outs({{.*}} : tensor<5x7x11x1x2x3xf32>)
+//  BUBBLE-SAME:                    permutation = [3, 4, 5, 0, 1, 2]
+//       BUBBLE:   %[[COL:.+]] = tensor.collapse_shape %[[T]] {{\[\[}}0, 1], [2], [3, 4, 5]]
+//  BUBBLE-SAME:                   tensor<5x7x11x1x2x3xf32> into tensor<35x11x6xf32>
+//       BUBBLE:   util.return %[[COL]] : tensor<35x11x6xf32>
 
 // -----
 
@@ -290,6 +329,33 @@ util.func public @propagate_transpose_through_unary_elementwise(%arg0 : tensor<2
 //  SINK-SAME:                    outs({{.*}} : tensor<3x4x2xf32>)
 //  SINK-SAME:                    permutation = [1, 2, 0]
 //       SINK:   util.return %[[RES]] : tensor<3x4x2xf32>
+
+// -----
+
+util.func public @propagate_transpose_up_through_unary_elementwise(%arg0 : tensor<2x3x4xf32>) -> tensor<3x4x2xf32> {
+  %empty = tensor.empty(): tensor<2x3x4xf32>
+  %0 = linalg.generic {indexing_maps = [
+                    affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                    affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+                iterator_types = ["parallel", "parallel", "parallel"]}
+                ins(%arg0 : tensor<2x3x4xf32>)
+                outs(%empty : tensor<2x3x4xf32>) {
+                  ^bb0(%in: f32, %out: f32):
+                    %sqrt = math.rsqrt %in : f32
+                    linalg.yield %sqrt : f32
+                  } -> tensor<2x3x4xf32>
+  %empty1 = tensor.empty(): tensor<3x4x2xf32>
+  %transposed = linalg.transpose ins(%0 : tensor<2x3x4xf32>)
+      outs(%empty1 : tensor<3x4x2xf32>) permutation = [1, 2, 0]
+  util.return %transposed : tensor<3x4x2xf32>
+}
+// BUBBLE-LABEL: util.func public @propagate_transpose_through_unary_elementwise
+//       BUBBLE:   %[[TRANSPOSE:.+]] = linalg.transpose ins({{.*}} : tensor<2x3x4xf32>
+//  BUBBLE-SAME:                    outs({{.*}} : tensor<3x4x2xf32>)
+//  BUBBLE-SAME:                    permutation = [1, 2, 0]
+//       BUBBLE:   %[[ELEM:.+]] = linalg.generic {{.*}} ins(%[[TRANSPOSE]] : tensor<3x4x2xf32>
+//       BUBBLE:     math.rsqrt
+//       BUBBLE:   util.return %[[ELEM]] : tensor<3x4x2xf32>
 
 // -----
 
@@ -383,3 +449,22 @@ util.func public @do_not_sink_unary_multi_use(%arg0 : tensor<2x3x4xf32>) -> (ten
 //       SINK:   %[[ELEM:.+]] = linalg.generic {{.*}} ins(%[[T]]
 //       SINK:     math.rsqrt
 //       SINK:   util.return %[[ELEM]], %[[T]]
+
+// -----
+
+util.func public @bubble_through_matmul(%lhs: tensor<16x16xf32>,
+                                        %rhs: tensor<16x16xf32>) -> tensor<16x16xf32> {
+  %empty = tensor.empty(): tensor<16x16xf32>
+  %mm = linalg.matmul ins(%lhs, %rhs : tensor<16x16xf32>, tensor<16x16xf32>)
+                            outs(%empty : tensor<16x16xf32>) -> tensor<16x16xf32>
+  %transpose = linalg.transpose ins(%mm : tensor<16x16xf32>)
+      outs(%empty : tensor<16x16xf32>) permutation = [1, 0]
+  util.return %transpose : tensor<16x16xf32>
+}
+//   APROP-DAG: #[[MAP:.+]] = affine_map<(d0, d1, d2) -> (d1, d2)>
+//   APROP-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2) -> (d2, d0)>
+//   APROP-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
+//       APROP: util.func public @bubble_through_matmul
+//       APROP:   %[[MATMUL:.+]] = linalg.generic
+//       APROP:     indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
+//       APROP:   util.return %[[MATMUL]]

@@ -14,17 +14,15 @@ iree_cc_library(
   NAME
     MathToVM
   HDRS
-    "ConvertMathToVM.h"
+    "Patterns.h"
   SRCS
-    "ConvertMathToVM.cpp"
+    "Patterns.cpp"
   DEPS
-    MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR
     MLIRMathDialect
     MLIRPass
     MLIRTransformUtils
-    MLIRTransforms
     iree::compiler::Dialect::Util::IR
     iree::compiler::Dialect::VM::Conversion
     iree::compiler::Dialect::VM::IR

@@ -5,8 +5,8 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/SPIRV/PassDetail.h"
-#include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 
 namespace mlir::iree_compiler {
 
@@ -29,7 +29,7 @@ public:
 
     MLIRContext *context = &getContext();
     OpBuilder builder(context);
-    const char *attrName = getSPIRVDistributeAttrName();
+    const char *attrName = getGPUDistributeAttrName();
     for (auto [index, forOp] : llvm::enumerate(forOps)) {
       if (index > kNumGPUDims)
         break;

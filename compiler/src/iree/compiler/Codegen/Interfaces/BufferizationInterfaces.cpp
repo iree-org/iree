@@ -242,8 +242,8 @@ struct DispatchTensorStoreOpInterface
       // Writing to a part of the tensor.
       auto subviewMemRefType =
           llvm::cast<MemRefType>(memref::SubViewOp::inferRankReducedResultType(
-              storeOp.getValue().getType().cast<ShapedType>().getShape(),
-              target.getType().cast<MemRefType>(), storeOp.getMixedOffsets(),
+              cast<ShapedType>(storeOp.getValue().getType()).getShape(),
+              cast<MemRefType>(target.getType()), storeOp.getMixedOffsets(),
               storeOp.getMixedSizes(), storeOp.getMixedStrides()));
 
       target = rewriter.create<memref::SubViewOp>(
@@ -640,6 +640,8 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
         LinalgExtOpInterface<IREE::LinalgExt::TopkOp>>(*ctx);
     IREE::LinalgExt::WinogradInputTransformOp::attachInterface<
         LinalgExtOpInterface<IREE::LinalgExt::WinogradInputTransformOp>>(*ctx);
+    IREE::LinalgExt::WinogradFilterTransformOp::attachInterface<
+        LinalgExtOpInterface<IREE::LinalgExt::WinogradFilterTransformOp>>(*ctx);
     IREE::LinalgExt::WinogradOutputTransformOp::attachInterface<
         LinalgExtOpInterface<IREE::LinalgExt::WinogradOutputTransformOp>>(*ctx);
     IREE::LinalgExt::AttentionOp::attachInterface<

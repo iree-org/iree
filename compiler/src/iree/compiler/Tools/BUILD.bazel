@@ -38,7 +38,7 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Codegen/Dialect/GPU/IR:IREEGPUDialect",
         "//compiler/src/iree/compiler/Codegen/Interfaces",
         "//compiler/src/iree/compiler/ConstEval",
-        "//compiler/src/iree/compiler/Dialect/Flow/Conversion/MeshToFlow",
+        "//compiler/src/iree/compiler/Dialect/Encoding/IR",
         "//compiler/src/iree/compiler/Dialect/Flow/IR",
         "//compiler/src/iree/compiler/Dialect/Flow/Transforms",
         "//compiler/src/iree/compiler/Dialect/HAL/IR:HALDialect",
@@ -92,6 +92,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:ComplexDialect",
         "@llvm-project//mlir:ControlFlowDialect",
+        "@llvm-project//mlir:ControlFlowTransforms",
         "@llvm-project//mlir:ConversionPasses",
         "@llvm-project//mlir:EmitCDialect",
         "@llvm-project//mlir:FuncDialect",
@@ -145,7 +146,6 @@ iree_compiler_cc_library(
         ":init_iree_passes_and_dialects",
         ":init_mlir_passes_and_dialects",
         "//compiler/src/iree/compiler/Codegen",
-        "//compiler/src/iree/compiler/Dialect/HAL/Conversion:Passes",
     ],
 )
 

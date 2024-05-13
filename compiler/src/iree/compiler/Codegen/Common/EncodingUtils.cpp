@@ -11,8 +11,10 @@
 
 namespace mlir::iree_compiler {
 
-using IREE::LinalgExt::EncodingAttr;
-using IREE::LinalgExt::EncodingRole;
+using IREE::Encoding::EncodingAttr;
+using IREE::Encoding::EncodingRole;
+using IREE::Encoding::getEncodingAttr;
+using IREE::Encoding::getEncodingContractionDims;
 
 /// For a given tensor type with an encoding, return the materialized
 /// type to use for it. If no encoding is set, then return the tensor type
@@ -25,13 +27,12 @@ getMaterializedType(RankedTensorType tensorType,
   if (failed(materializeEncodingInfo)) {
     return dropEncoding(tensorType);
   }
-  return tensor::PackOp::inferPackedType(
-             getOriginalTypeWithEncoding(tensorType)
-                 .clone(tensorType.getElementType()),
-             materializeEncodingInfo->innerTileSizes,
-             materializeEncodingInfo->innerDimsPos,
-             materializeEncodingInfo->outerDimsPerm)
-      .cast<RankedTensorType>();
+  return cast<RankedTensorType>(
+      tensor::PackOp::inferPackedType(getOriginalTypeWithEncoding(tensorType)
+                                          .clone(tensorType.getElementType()),
+                                      materializeEncodingInfo->innerTileSizes,
+                                      materializeEncodingInfo->innerDimsPos,
+                                      materializeEncodingInfo->outerDimsPerm));
 }
 
 MaterializeEncodingTypeConverter::MaterializeEncodingTypeConverter(
@@ -54,7 +55,7 @@ MaterializeEncodingConversionTarget::MaterializeEncodingConversionTarget(
   // illegal.
   markUnknownOpDynamicallyLegal([](Operation *op) {
     auto typeHasEncoding = [](Type t) -> bool {
-      auto tensorType = t.dyn_cast<RankedTensorType>();
+      auto tensorType = dyn_cast<RankedTensorType>(t);
       return tensorType && tensorType.getEncoding();
     };
     auto valueHasEncoding = [=](Value v) -> bool {
@@ -67,88 +68,6 @@ MaterializeEncodingConversionTarget::MaterializeEncodingConversionTarget(
   });
 }
 
-EncodingAttr getEncodingAttr(RankedTensorType type) {
-  return type.getEncoding().dyn_cast_or_null<EncodingAttr>();
-}
-
-static AffineMap getMapForRole(EncodingAttr encoding) {
-  EncodingRole role = encoding.getRole().getValue();
-  if (role == EncodingRole::LHS)
-    return cast<AffineMapAttr>(encoding.getUserIndexingMaps()[0])
-        .getAffineMap();
-  else if (role == EncodingRole::RHS)
-    return cast<AffineMapAttr>(encoding.getUserIndexingMaps()[1])
-        .getAffineMap();
-  else
-    return cast<AffineMapAttr>(encoding.getUserIndexingMaps()[2])
-        .getAffineMap();
-}
-
-FailureOr<linalg::ContractionDimensions>
-getEncodingContractionDims(EncodingAttr encoding) {
-  auto indexingMapsAttr = encoding.getUserIndexingMaps();
-  SmallVector<AffineMap> indexingMaps = llvm::map_to_vector(
-      indexingMapsAttr.getValue(), [](Attribute m) -> AffineMap {
-        return cast<AffineMapAttr>(m).getAffineMap();
-      });
-  return linalg::inferContractionDims(indexingMaps);
-}
-
-/// Given the dim position of the encoding `user_indexing_maps`, return the
-/// matching index of the given encoding's tensor
-static unsigned mapDimToRoleIndex(int64_t dimPos, EncodingAttr encoding) {
-  AffineMap map = getMapForRole(encoding);
-  auto idx = map.getResultPosition(getAffineDimExpr(dimPos, map.getContext()));
-  assert(idx.has_value());
-  return idx.value();
-}
-
-std::optional<SmallVector<int64_t>>
-getPermutationToCanonicalMatmulShape(EncodingAttr encoding) {
-  FailureOr<linalg::ContractionDimensions> cDims =
-      getEncodingContractionDims(encoding);
-  if (failed(cDims)) {
-    return std::nullopt;
-  }
-  // Only support at most 1 Batch, M, N, K dimensions for now
-  if (cDims->m.size() > 1 || cDims->n.size() > 1 || cDims->k.size() > 1 ||
-      cDims->batch.size() > 1) {
-    return std::nullopt;
-  }
-  SmallVector<int64_t> perm;
-  EncodingRole role = encoding.getRole().getValue();
-  // Add batch dim
-  if (!cDims->batch.empty()) {
-    perm.push_back(mapDimToRoleIndex(cDims->batch[0], encoding));
-  }
-  // Add M dim
-  if (role != EncodingRole::RHS && cDims->m.size() == 1) {
-    perm.push_back(mapDimToRoleIndex(cDims->m[0], encoding));
-  }
-  // Add K dim
-  if (role != EncodingRole::RESULT) {
-    perm.push_back(mapDimToRoleIndex(cDims->k[0], encoding));
-  }
-  // Add N dim
-  if (role != EncodingRole::LHS && cDims->n.size() == 1) {
-    perm.push_back(mapDimToRoleIndex(cDims->n[0], encoding));
-  }
-  return perm;
-}
-
-RankedTensorType getCanonicalMatmulTypeWithEncoding(RankedTensorType type) {
-  auto encoding = getEncodingAttr(type);
-  if (!encoding) {
-    return type;
-  }
-  auto perm = getPermutationToCanonicalMatmulShape(encoding);
-  if (!perm) {
-    return type;
-  }
-  return RankedTensorType::get(applyPermutation(type.getShape(), perm.value()),
-                               type.getElementType(), encoding);
-}
-
 RankedTensorType getOriginalTypeWithEncoding(RankedTensorType type) {
   auto encoding = getEncodingAttr(type);
   if (!encoding) {
@@ -156,7 +75,7 @@ RankedTensorType getOriginalTypeWithEncoding(RankedTensorType type) {
   }
   RankedTensorType originalType = type;
   if (auto originalTypeAttr = encoding.getOriginalType()) {
-    originalType = originalTypeAttr.getValue().cast<RankedTensorType>();
+    originalType = cast<RankedTensorType>(originalTypeAttr.getValue());
   }
   return RankedTensorType::get(originalType.getShape(),
                                originalType.getElementType(), encoding);
@@ -182,27 +101,27 @@ MaterializeEncodingInfo getEncodingInfoForMatmul(EncodingAttr encoding,
          "Expected at most one M, N, K, and Batch dimension");
   if (!cDims->batch.empty()) {
     encodingInfo.outerDimsPerm.push_back(
-        mapDimToRoleIndex(cDims->batch[0], encoding));
+        encoding.mapDimToRoleIndex(cDims->batch[0]));
   }
   if (role != EncodingRole::RHS && !cDims->m.empty()) {
     encodingInfo.outerDimsPerm.push_back(
-        mapDimToRoleIndex(cDims->m[0], encoding));
+        encoding.mapDimToRoleIndex(cDims->m[0]));
     encodingInfo.innerDimsPos.push_back(
-        mapDimToRoleIndex(cDims->m[0], encoding));
+        encoding.mapDimToRoleIndex(cDims->m[0]));
     encodingInfo.innerTileSizes.push_back(tileMxNxK.M);
   }
   if (role != EncodingRole::LHS && !cDims->n.empty()) {
     encodingInfo.outerDimsPerm.push_back(
-        mapDimToRoleIndex(cDims->n[0], encoding));
+        encoding.mapDimToRoleIndex(cDims->n[0]));
     encodingInfo.innerDimsPos.push_back(
-        mapDimToRoleIndex(cDims->n[0], encoding));
+        encoding.mapDimToRoleIndex(cDims->n[0]));
     encodingInfo.innerTileSizes.push_back(tileMxNxK.N);
   }
   if (role != EncodingRole::RESULT) {
     encodingInfo.outerDimsPerm.push_back(
-        mapDimToRoleIndex(cDims->k[0], encoding));
+        encoding.mapDimToRoleIndex(cDims->k[0]));
     encodingInfo.innerDimsPos.push_back(
-        mapDimToRoleIndex(cDims->k[0], encoding));
+        encoding.mapDimToRoleIndex(cDims->k[0]));
     encodingInfo.innerTileSizes.push_back(tileMxNxK.K);
   }
   return encodingInfo;

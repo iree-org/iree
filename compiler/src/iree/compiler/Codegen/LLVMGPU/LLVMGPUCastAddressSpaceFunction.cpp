@@ -62,7 +62,7 @@ struct LLVMGPUCastAddressSpaceFunctionPass
     };
 
     moduleOp->walk([&](mlir::CallOpInterface callOp) {
-      auto callee = callOp.getCallableForCallee().dyn_cast<SymbolRefAttr>();
+      auto callee = dyn_cast<SymbolRefAttr>(callOp.getCallableForCallee());
       SmallVector<Value> newOperands;
       OpBuilder::InsertionGuard g(rewriter);
       rewriter.setInsertionPoint(callOp);

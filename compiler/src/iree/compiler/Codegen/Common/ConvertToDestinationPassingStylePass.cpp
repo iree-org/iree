@@ -97,7 +97,7 @@ static Value getReverseOfReshapeOp(OpBuilder &b, TensorReshapeOpTy reshapeOp,
       tensor::ExpandShapeOp, tensor::CollapseShapeOp>::type;
   return b.create<ReverseReshapeOpTy>(reshapeOp.getLoc(),
                                       reshapeOp.getSrcType(), resultBuffer,
-                                      reshapeOp.getReassociation());
+                                      reshapeOp.getReassociationIndices());
 }
 
 /// Gets the reverse of a `tensor.cast` op to get a memref type that
@@ -430,7 +430,7 @@ static LogicalResult modifyUseToGetValueIntoStoreSet(RewriterBase &rewriter,
 ///    the new use is tied to the result of the user.
 /// This makes the result of the compute op be in the store set, and
 /// bufferizable without using a new stack. See
-/// https://github.com/openxla/iree/issues/8303.
+/// https://github.com/iree-org/iree/issues/8303.
 static LogicalResult adaptComputeConsumerToAvoidStackAllocation(
     mlir::FunctionOpInterface funcOp, bool useWARForCooperativeMatrixCodegen) {
   IRRewriter rewriter(funcOp.getContext());

@@ -36,7 +36,7 @@ class Linux_RV64_Benchmarks(object):
         tflite_models.MOBILENET_V1,
         tflite_models.MOBILENET_V2_INT8,
         tflite_models.PERSON_DETECT_INT8,
-        # PyTorch model are disabled due to https://github.com/openxla/iree/issues/14993.
+        # PyTorch model are disabled due to https://github.com/iree-org/iree/issues/14993.
         # torch_models.MODEL_CLIP_TEXT_SEQLEN64_FP32_TORCH,
     ]
 

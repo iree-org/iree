@@ -55,7 +55,7 @@ protected:
   LogicalResult convertTypeAttributes(ArrayRef<NamedAttribute> attrs,
                                       SmallVector<NamedAttribute> &res) const {
     for (NamedAttribute attr : attrs) {
-      TypeAttr oldType = attr.getValue().dyn_cast<TypeAttr>();
+      TypeAttr oldType = dyn_cast<TypeAttr>(attr.getValue());
       if (!oldType) {
         res.push_back(attr);
         continue;

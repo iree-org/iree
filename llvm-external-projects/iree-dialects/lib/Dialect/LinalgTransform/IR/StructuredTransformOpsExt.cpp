@@ -31,7 +31,7 @@
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
-#include "mlir/Dialect/Transform/IR/TransformInterfaces.h"
+#include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.h"
 #include "mlir/Dialect/Transform/PDLExtension/PDLExtensionOps.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/PassManager.h"
@@ -65,7 +65,7 @@ static LogicalResult nestedInFunc(PatternRewriter &rewriter,
   auto func = operation->getParentOfType<mlir::FunctionOpInterface>();
   if (!func)
     return rewriter.notifyMatchFailure(operation, "not nested in a function");
-  auto functionSymbol = attr.dyn_cast<SymbolRefAttr>();
+  auto functionSymbol = dyn_cast<SymbolRefAttr>(attr);
   if (!functionSymbol)
     return rewriter.notifyMatchFailure(operation, "not a function identifier");
   return success(functionSymbol.getLeafReference() == func.getName());
@@ -174,7 +174,7 @@ static LogicalResult isEquivalentToOp(PatternRewriter &rewriter,
   Operation *operation = pdlValues[0].cast<Operation *>();
   Attribute attribute = pdlValues[1].cast<Attribute>();
 
-  auto modelOpNameAttr = attribute.dyn_cast<StringAttr>();
+  auto modelOpNameAttr = dyn_cast<StringAttr>(attribute);
   if (!modelOpNameAttr)
     return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
   auto modelOpName = modelOpNameAttr.strref();
@@ -215,7 +215,7 @@ static LogicalResult isDimMultipleOf(PatternRewriter &rewriter,
   ValueRange operands = pdlValues[0].cast<ValueRange>();
   Attribute attribute = pdlValues[1].cast<Attribute>();
 
-  auto dict = attribute.dyn_cast<DictionaryAttr>();
+  auto dict = dyn_cast<DictionaryAttr>(attribute);
   if (!dict)
     return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
 
@@ -239,7 +239,7 @@ static LogicalResult isDimMultipleOf(PatternRewriter &rewriter,
 
   ShapedType shapedType;
   if (static_cast<int64_t>(operands.size()) > operandNumber)
-    shapedType = operands[operandNumber].getType().dyn_cast<ShapedType>();
+    shapedType = dyn_cast<ShapedType>(operands[operandNumber].getType());
   if (!shapedType || shapedType.getRank() <= dim)
     return failure();
   return success(divisor == 0 || (shapedType.getShape()[dim] > 0 &&
@@ -259,7 +259,7 @@ static LogicalResult isDimStatic(PatternRewriter &rewriter,
   ValueRange operands = pdlValues[0].cast<ValueRange>();
   Attribute attribute = pdlValues[1].cast<Attribute>();
 
-  auto dict = attribute.dyn_cast<DictionaryAttr>();
+  auto dict = dyn_cast<DictionaryAttr>(attribute);
   if (!dict)
     return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
 
@@ -277,7 +277,7 @@ static LogicalResult isDimStatic(PatternRewriter &rewriter,
 
   ShapedType shapedType;
   if (static_cast<int64_t>(operands.size()) > operandNumber)
-    shapedType = operands[operandNumber].getType().dyn_cast<ShapedType>();
+    shapedType = dyn_cast<ShapedType>(operands[operandNumber].getType());
   return success(shapedType && !shapedType.isDynamicDim(dim));
 }
 
@@ -294,7 +294,7 @@ static LogicalResult isDimDynamic(PatternRewriter &rewriter,
   ValueRange operands = pdlValues[0].cast<ValueRange>();
   Attribute attribute = pdlValues[1].cast<Attribute>();
 
-  auto dict = attribute.dyn_cast<DictionaryAttr>();
+  auto dict = dyn_cast<DictionaryAttr>(attribute);
   if (!dict)
     return failure(); // TODO: notifyMatchFailure needs an Operation* handle.
 
@@ -312,7 +312,7 @@ static LogicalResult isDimDynamic(PatternRewriter &rewriter,
 
   ShapedType shapedType;
   if (static_cast<int64_t>(operands.size()) > operandNumber)
-    shapedType = operands[operandNumber].getType().dyn_cast<ShapedType>();
+    shapedType = dyn_cast<ShapedType>(operands[operandNumber].getType());
   return success(shapedType && shapedType.isDynamicDim(dim));
 }
 
@@ -904,7 +904,7 @@ transform_ext::TakeFirstOp::apply(mlir::transform::TransformRewriter &rewriter,
     if (payloads.empty())
       continue;
     if (!found) {
-      results.set(getFirst().cast<OpResult>(), payloads);
+      results.set(cast<OpResult>(getFirst()), payloads);
       found = true;
     } else {
       llvm::append_range(concatenated, payloads);
@@ -912,8 +912,8 @@ transform_ext::TakeFirstOp::apply(mlir::transform::TransformRewriter &rewriter,
   }
 
   if (!found)
-    results.set(getFirst().cast<OpResult>(), {});
-  results.set(getRest().cast<OpResult>(), concatenated);
+    results.set(cast<OpResult>(getFirst()), {});
+  results.set(cast<OpResult>(getRest()), concatenated);
   return DiagnosedSilenceableFailure::success();
 }
 

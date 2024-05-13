@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-convert-hal-to-vm --canonicalize --iree-vm-target-index-bits=32 %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-vm-conversion --canonicalize --iree-vm-target-index-bits=32 %s | FileCheck %s
 
 // CHECK-LABEL: @device_allocator
 // CHECK-SAME: (%[[DEVICE:.+]]: !vm.ref<!hal.device>)
@@ -72,10 +72,9 @@ util.func public @device_query_i1(%device: !hal.device) -> (i1, i1) {
   // CHECK-DAG: %[[NS:.+]] = vm.rodata.inline "_utf8_sys_
   // CHECK-DAG: %[[KEY:.+]] = vm.rodata.inline "_utf8_foo_
   // CHECK: %[[RET:.+]]:2 = vm.call @hal.device.query.i64(%[[DEVICE]], %[[NS]], %[[KEY]]) {nosideeffects} : (!vm.ref<!hal.device>, !vm.buffer, !vm.buffer) -> (i32, i64)
-  // CHECK: %[[RET_I32:.+]] = vm.trunc.i64.i32 %[[RET]]#1 : i64 -> i32
+  // CHECK: %[[RET_I1:.+]] = vm.cmp.nz.i64 %[[RET]]#1 : i64
   %ok, %value = hal.device.query<%device : !hal.device> key("sys" :: "foo") : i1, i1
-  // CHECK: %[[I1:.+]] = vm.and.i32 %[[RET_I32]], %c1 : i32
-  // CHECK: vm.return %[[RET]]#0, %[[I1]]
+  // CHECK: vm.return %[[RET]]#0, %[[RET_I1]]
   util.return %ok, %value : i1, i1
 }
 
@@ -87,10 +86,9 @@ util.func public @device_query_i1_default(%device: !hal.device) -> i1 {
   // CHECK-DAG: %[[NS:.+]] = vm.rodata.inline "_utf8_sys_
   // CHECK-DAG: %[[KEY:.+]] = vm.rodata.inline "_utf8_foo_
   // CHECK: %[[RET:.+]]:2 = vm.call @hal.device.query.i64(%[[DEVICE]], %[[NS]], %[[KEY]]) {nosideeffects} : (!vm.ref<!hal.device>, !vm.buffer, !vm.buffer) -> (i32, i64)
-  // CHECK: %[[RET_I32:.+]] = vm.trunc.i64.i32 %[[RET]]#1 : i64 -> i32
+  // CHECK: %[[RET_I1:.+]] = vm.cmp.nz.i64 %[[RET]]#1 : i64
   %ok, %value = hal.device.query<%device : !hal.device> key("sys" :: "foo") : i1, i1 = 1 : i1
-  // CHECK: %[[I1:.+]] = vm.and.i32 %[[RET_I32]], %c1 : i32
-  // CHECK: %[[OUT:.+]] = vm.select.i32 %[[RET]]#0, %[[I1]], %c1
+  // CHECK: %[[OUT:.+]] = vm.select.i32 %[[RET]]#0, %[[RET_I1]], %c1
   // CHECK: vm.return %[[OUT]]
   util.return %value : i1
 }

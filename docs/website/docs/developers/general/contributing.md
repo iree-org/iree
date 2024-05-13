@@ -8,7 +8,7 @@ We'd love to accept your patches and contributions to this project.
 
 !!! note "Note - coordinating efforts"
 
-    Please [file issues](https://github.com/openxla/iree/issues/new/choose) or
+    Please [file issues](https://github.com/iree-org/iree/issues/new/choose) or
     reach out on any of our other
     [communication channels](../../index.md#communication-channels) before doing
     substantial work; this will ensure that others don't duplicate the work and
@@ -21,7 +21,59 @@ We'd love to accept your patches and contributions to this project.
 This project follows the
 [OpenXLA Code of Conduct](https://github.com/openxla/community/blob/main/CODE-OF-CONDUCT.md).
 
+### :octicons-law-16: Developer Certificate of Origin
+
+Contributors must certify that they wrote or otherwise have the right to submit
+the code they are contributing to the project.
+
+??? quote "Expand to read the full DCO agreement text"
+
+    By making a contribution to this project, I certify that:
+
+    1. The contribution was created in whole or in part by me and I have the
+      right to submit it under the open source license indicated in the file; or
+
+    2. The contribution is based upon previous work that, to the best of my
+      knowledge, is covered under an appropriate open source license and I have
+      the right under that license to submit that work with modifications, whether
+      created in whole or in part by me, under the same open source license
+      (unless I am permitted to submit under a different license), as indicated
+      in the file; or
+
+    3. The contribution was provided directly to me by some other person who
+      certified 1., 2. or 3. and I have not modified it.
+
+    4. I understand and agree that this project and the contribution are public
+      and that a record of the contribution (including all personal information
+      I submit with it, including my sign-off) is maintained indefinitely and
+      may be redistributed consistent with this project or the open source
+      license(s) involved.
+
+Signing is enforced by the [DCO GitHub App](https://github.com/apps/dco). This
+requires that all commits included in pull requests include a `Signed-off-by`
+line:
+
+```text
+This is my commit message
+
+Signed-off-by: Random J Developer <random@developer.example.org>
+```
+
+* Git will automatically append this message if you use the `-s` option:
+
+    ```bash
+    git commit -s -m 'This is my commit message'
+    ```
+
+* Users of [Visual Studio Code](https://code.visualstudio.com/) can add
+  `"git.alwaysSignOff": true,` in their settings.
+
+* For more information about DCO enforcement and git workflows, see the
+  [dcoapp/app](https://github.com/dcoapp/app) repository.
+
 ### :octicons-law-16: Contributor License Agreement
+
+!!! info - "CLA is being replaced with DCO. Both are enabled while we migrate."
 
 Contributions to this project must be accompanied by a Contributor License
 Agreement (CLA). Head over to <https://cla.developers.google.com/> to see
@@ -33,6 +85,29 @@ your current agreements on file or to sign a new one.
 * You generally only need to submit a CLA once, so if you've already submitted
   one (even if it was for a different project), you probably don't need to do it
   again.
+
+### :octicons-people-16: AUTHORS, CODEOWNERS, and MAINTAINERS
+
+The [`AUTHORS` file](https://github.com/iree-org/iree/blob/main/AUTHORS) keeps
+track of those who have made significant contributions to the project.
+
+* If you would like additional recognition for your contributions, you may add
+  yourself or your organization (please add the entity who owns the copyright
+  for your contributions).
+* The source control history remains the most accurate source for individual
+  contributions.
+
+The
+[`.github/CODEOWNERS` file](https://github.com/iree-org/iree/blob/main/.github/CODEOWNERS)
+lets maintainers opt in to PR reviews modifying certain paths.
+
+* Review is not required from a code owner, though it is recommended.
+
+The
+[`MAINTAINERS.md` file](https://github.com/iree-org/iree/blob/main/MAINTAINERS.md)
+documents official maintainers for project components.
+
+## :octicons-code-16: Coding policies
 
 ### :octicons-pencil-16: Coding style guidelines
 
@@ -55,8 +130,18 @@ they are applied consistently across the project.
     run automatically in your editor of choice.
 
     The script at
-    [`build_tools/scripts/lint.sh`](https://github.com/openxla/iree/blob/main/build_tools/scripts/lint.sh)
+    [`build_tools/scripts/lint.sh`](https://github.com/iree-org/iree/blob/main/build_tools/scripts/lint.sh)
     can also be used to run the full suite of lint checks.
+
+### :material-test-tube: Testing policy
+
+With few exceptions, features should be accompanied by automated tests.
+
+We use a mix of in-tree and out-of-tree unit and integration tests. For more
+information about the types of tests used across the project, refer to the
+[testing guide](./testing-guide.md).
+
+## :simple-github: GitHub policies
 
 ### :octicons-code-review-16: Code reviews
 
@@ -80,8 +165,9 @@ build and test various parts of the project.
 * Most presubmit workflows will only run automatically on PRs if you are a
   project collaborator. Otherwise a maintainer must
   [approve workflow runs](https://docs.github.com/en/actions/managing-workflow-runs/approving-workflow-runs-from-public-forks).
-  If you are sending code changes to the project, please ask to be added as a
-  collaborator, so that these can run automatically.
+  If you are sending code changes to the project, please
+  [request commit access](#obtaining-commit-access), so that these can run
+  automatically.
 * It is generally expected that PRs will only be merged when all checks are
   passing. In some cases, pre-existing failures may be bypassed by a maintainer.
 
@@ -90,9 +176,6 @@ build and test various parts of the project.
     Some workflows only run on commits after they are merged. See the
     [CI behavior manipulation](#ci-behavior-manipulation) section below to
     learn how to customize this behavior.
-
-<!-- TODO(scotttodd): link to infrastructure / CI docs when they exist -->
-<!-- TODO(scotttodd): link to "obtaining commit access" -->
 
 ### :octicons-git-pull-request-16: Merging approved changes
 
@@ -109,42 +192,45 @@ yet).
 
 ### :octicons-git-merge-16: Obtaining commit access
 
-Access to affiliated repositories is divided into three tiers:
+Access to affiliated repositories is divided into tiers:
 
 | Tier | Description | Team link |
 | ---- | ----------- | --------- |
-Triage | **New project members should typically start here**<br>:material-check: Can be [assigned issues](https://docs.github.com/en/issues/tracking-your-work-with-issues/assigning-issues-and-pull-requests-to-other-github-users)<br>:material-check: Can apply labels to issues / PRs<br>:material-check: Can run workflows [without approval](https://docs.github.com/en/actions/managing-workflow-runs/approving-workflow-runs-from-public-forks) | [iree-triage](https://github.com/orgs/openxla/teams/iree-triage)
-Write | **Established project contributors should request this access**<br>:material-check: Can [merge approved pull requests](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/incorporating-changes-from-a-pull-request/merging-a-pull-request)<br>:material-check: Can create branches | [iree-write](https://github.com/orgs/openxla/teams/iree-write)
-Maintain | :material-check: Can [edit repository settings](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features)<br>:material-check: Can push to [protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches) | [iree-maintain](https://github.com/orgs/openxla/teams/iree-maintain)
+Triage | **New project members should typically start here**<br>:material-check: Can be [assigned issues](https://docs.github.com/en/issues/tracking-your-work-with-issues/assigning-issues-and-pull-requests-to-other-github-users)<br>:material-check: Can apply labels to issues / PRs<br>:material-check: Can run workflows [without approval](https://docs.github.com/en/actions/managing-workflow-runs/approving-workflow-runs-from-public-forks) | [iree-triage](https://github.com/orgs/iree-org/teams/iree-triage)
+Write | **Established project contributors should request this access**<br>:material-check: Can [merge approved pull requests](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/incorporating-changes-from-a-pull-request/merging-a-pull-request)<br>:material-check: Can create branches | [iree-write](https://github.com/orgs/iree-org/teams/iree-write)
+Maintain/Admin | :material-check: Can [edit repository settings](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features)<br>:material-check: Can push to [protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches) | Added case-by-case
 
 All access tiers first require joining the
-[OpenXLA GitHub organization](https://github.com/openxla/).
+[iree-org GitHub organization](https://github.com/iree-org/).
 
 <!-- markdownlint-disable-next-line -->
 [Fill out this form to request access :fontawesome-solid-paper-plane:](https://docs.google.com/forms/d/e/1FAIpQLSfEwANtMvLJWq-ED4lub_xsMch0MgNY02VxgtXE61FqNvNVUg/viewform){ .md-button .md-button--primary }
 
-Once you are a member of the OpenXLA GitHub organization, you can request to
-join any of the teams on <https://github.com/orgs/openxla/teams>.
+Once you are a member of the iree-org GitHub organization, you can request to
+join any of the teams on <https://github.com/orgs/iree-org/teams>.
 
 !!! note - "Note: other GitHub organizations"
 
     Work on IREE sometimes spans other GitHub organizations like
-    [iree-org](https://github.com/iree-org) and
     [shark-infra](https://github.com/shark-infra/). Reach out to a project
     member if you would also like access to repositories in those organizations.
 
-### :octicons-people-16: Credits in the AUTHORS file
+### :octicons-git-branch-16: Branch naming
 
-If you would like additional recognition for your contributions, you may add
-yourself or your organization to the
-[AUTHORS file](https://github.com/openxla/iree/blob/main/AUTHORS) that keeps
-track of those who have made significant contributions to the project.
+Most work should be done on
+[repository forks](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/about-forks).
+For developers with write access, when creating a branch in the common
+[iree-org/iree repository](https://github.com/iree-org/iree), please follow
+these naming guidelines:
 
-* Please add the entity who owns the copyright for your contribution.
-* The source control history remains the most accurate source for individual
-  contributions.
+Branch type | Naming scheme | Example
+-- | -- | --
+Single user | `users/[username]/*` | `users/cooldeveloper/my-awesome-feature`
+Shared feature branch | `shared/*` | `shared/pytorch-performance-sprint`
+Dependency updates | `integrates/*` | `integrates/llvm-20240501`
 
-<!-- TODO(scotttodd): merge the sections below into "developer overview"? -->
+Branches that do not meet these guidelines may be deleted, especially if
+they [appear to be stale](https://github.com/iree-org/iree/branches/stale).
 
 ## Tips for contributors
 
@@ -173,7 +259,7 @@ IREE supports building from source with both Bazel and CMake.
 
 IREE uses [GitHub Actions](https://docs.github.com/en/actions) for CI. The
 primary CI is configured in the
-[ci.yml workflow file](https://github.com/openxla/iree/blob/main/.github/workflows/ci.yml).
+[ci.yml workflow file](https://github.com/iree-org/iree/blob/main/.github/workflows/ci.yml).
 
 #### Self-hosted runners
 
@@ -182,19 +268,13 @@ In addition to the default runners GitHub provides, IREE uses
 to run many of its workflow jobs. These enable access to additional compute and
 custom configurations such as accelerators. Configuration scripting is checked
 in to this repository (see the
-[README for that directory](https://github.com/openxla/iree/blob/main/build_tools/github_actions/runner/README.md)).
-
-#### Custom managed runners
-
-In addition to our self-hosted runners, we use GitHub's
-[large managed runners](https://docs.github.com/en/actions/using-github-hosted-runners/about-larger-runners)
-for some platforms.
+[README for that directory](https://github.com/iree-org/iree/blob/main/build_tools/github_actions/runner/README.md)).
 
 #### CI behavior manipulation
 
 The setup step of the CI determines which CI jobs to run. This is controlled by
 the
-[configure_ci.py](https://github.com/openxla/iree/blob/main/build_tools/github_actions/configure_ci.py)
+[configure_ci.py](https://github.com/iree-org/iree/blob/main/build_tools/github_actions/configure_ci.py)
 script. It will generally run a pre-determined set of jobs on presubmit with
 some jobs kept as post-submit only. If changes are only to a certain set of
 excluded files that we know don't affect CI (e.g. Markdown files), then it will
@@ -294,7 +374,7 @@ runs.
 * Also run GPU tests on NVIDIA A100 runners (opt-in due to low availability):
 
     ``` text
-    ci-extra: test_a100
+    ci-extra: test_nvidia_a100
     ```
 
 * Skip all CI builds and tests, e.g. for comment-only changes:
@@ -316,107 +396,3 @@ For example, this PR opted in to running the `build_test_all_windows` job:
 The enabled jobs can be viewed from the Summary page of an action run:
 
 ![ci_enabled_jobs](./contributing-ci-enabled-jobs.png)
-
-### Git workflows
-
-We tend to use the "triangular" or "forking" workflow. Develop primarily on a
-clone of the repository on your development machine. Any local branches named
-the same as persistent branches from the
-[main repository](https://github.com/openxla/iree) are pristine (though
-potentially stale) copies. You only fastforward these to match upstream and
-otherwise do development on other branches. When sending PRs, you push to a
-different branch on your public fork and create the PR from there.
-
-<!-- TODO(scotttodd): screenshots / diagrams here
-  (https://mermaid.js.org/syntax/gitgraph.html?) -->
-
-#### Setup
-
-1. Create a fork of the main repository.
-
-2. Create a local git repository with remotes `upstream` (the main repository)
-    and `origin` (your personal fork). To list your current remotes
-    `git remote -v`.
-
-    a. If you already cloned from the main repository (e.g. by following the
-    getting started guide):
-
-      ```shell
-      # From your existing git repo
-      $ git remote rename origin upstream
-      $ git remote add origin https://github.com/<github_username>/iree.git
-      ```
-
-    b. If you haven't already cloned:
-
-      ```shell
-      # From whatever directory under which you want to nest your repo
-      $ git clone https://github.com/<github_username>/iree.git
-      $ cd iree
-      $ git remote add upstream https://github.com/openxla/iree.git
-      ```
-
-    This is especially important for maintainers who have write access (so can
-    push directly to the main repository) and admins who have elevated
-    privileges (so can push directly to protected branches).
-
-    These names are just suggestions, but you might find some scripts where the
-    defaults are for remotes named like this.
-
-    For extra safety, you can make it difficult to push directly to upstream by
-    setting the push url to something invalid:
-    `git remote set-url --push upstream DISABLE`, which requires re-enabling the
-    push URL explicitly before pushing. You can wrap this behavior in a custom
-    git command like
-    [git-sudo](https://gist.github.com/GMNGeoffrey/42dd9a9792390094a43bdb69659320c0).
-
-3. Use a script like
-    [git_update.sh](https://github.com/openxla/iree/blob/main/build_tools/scripts/git/git_update.sh)
-    to easily synchronize `main` with `upstream`. Submodules make this is a
-    little trickier than it should be. You can also turn this into a git command
-    by adding it to your path as `git-update`.
-
-#### Git config
-
-These are some additional options you could put in your top-level `.gitconfig`
-or repository-specific `.git/config` files that are conducive the recommended
-workflow
-
-<!-- TODO(scotttodd): move to auto-collapsed tip -->
-
-```ini
-[push]
-  default = current
-[alias]
-  # Delete branches that you pushed and have been deleted upstream, e.g. because
-  # the PR was merged.
-  gone = ! "git fetch -p  && git for-each-ref --format '%(refname:short) %(upstream:track)' | awk '$2 == \"[gone]\" {print $1}' | xargs -r git branch -D"
-  # Update from upstream (custom command) and delete obsolete local branches.
-  sync = ! (git update main && git gone)
-  # Create a new branch based off of main (requires a clean working directory).
-  new = "!f(){ \\\ngit checkout main && git switch -c $1; \\\n}; f"
-  # Display branches in a useful "latest last" format
-  br = for-each-ref --sort=committerdate refs/heads/ --format='%(HEAD) %(color:yellow)%(refname:short)%(color:reset) - %(color:red)%(objectname:short)%(color:reset) - %(contents:subject) (%(color:green)%(committerdate:relative)%(color:reset))'
-  # `git git foo` -> `git foo` typo fixer
-  git = "!f(){ \\\n git \"$@\"; \\\n}; f"
-  # Get the git root directory
-  root = rev-parse --show-toplevel
-  # checkout, but also sync submodules
-  ch = "!f() { \\\n git checkout \"$@\"; git submodule sync && git submodule update --init; \\\n}; f"
-  # See the diff for a PR branch vs the main branch
-  diffmain = diff --merge-base main
-  # See only the files that differ vs the main branch
-  whatsout = diffmain --name-only
-[checkout]
-  # If the checkout command
-  defaultRemote = origin
-[pull]
-  # When pulling, only complete the pull if its a clean fast forward.
-  ff = only
-[remote]
-  # Push to your fork (origin) by default
-  pushDefault = origin
-[url "ssh://git@github.com/"]
-  # Pull with https (so no auth required), but push with ssh.
-  pushInsteadOf = https://github.com/
-```

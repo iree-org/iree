@@ -6,19 +6,17 @@
     #hal.descriptor_set.binding<1, storage_buffer>
   ]>
 ]>
-
+#translation_info = #iree_codegen.translation_info<None workgroup_size = [64, 1, 1]>
 // CHECK-LABEL: func.func @dispatch_0()
 hal.executable private @dispatch_0  {
   hal.executable.variant @cuda target(#hal.executable.target<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export @dispatch_0 layout(#pipeline_layout) attributes {
-      workgroup_size = [64: index, 1: index, 1:index]
-    } {
+    hal.executable.export @dispatch_0 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device) :
       %c1 = arith.constant 1 : index
       hal.return %c1, %c1, %c1 : index, index, index
     }
     builtin.module {
-      func.func @dispatch_0() {
+      func.func @dispatch_0() attributes {translation_info = #translation_info} {
         %c2 = arith.constant 2 : index
         %c256 = arith.constant 256 : index
         //     CHECK: %[[C250:.+]] = arith.constant 250 : index
@@ -58,19 +56,17 @@ hal.executable private @dispatch_0  {
 ]>
 
 // CHECK-LABEL: func.func @workgroup_tile_loop()
-#translation = #iree_codegen.translation_info<LLVMGPUDistribute>
+#translation = #iree_codegen.translation_info<LLVMGPUDistribute workgroup_size = [32, 1, 1]>
 hal.executable private @workgroup_tile_loop  {
   hal.executable.variant @cuda target(#hal.executable.target<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export @workgroup_tile_loop layout(#pipeline_layout) attributes {
-      translation_info = #translation
-    } {
+    hal.executable.export @workgroup_tile_loop layout(#pipeline_layout) {
     ^bb0(%arg0 : !hal.device, %arg1 : index):
       %c1 = arith.constant 1 : index
       %c64 = arith.constant 64 : index
       hal.return %c64, %c1, %c1 : index, index, index
     }
     builtin.module {
-      func.func @workgroup_tile_loop() {
+      func.func @workgroup_tile_loop()  attributes {translation_info = #translation}  {
         %c2048 = arith.constant 2048 : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
@@ -100,16 +96,14 @@ hal.executable private @workgroup_tile_loop  {
 #translation = #iree_codegen.translation_info<LLVMGPUDistribute>
 hal.executable private @workgroup_tile_loop_negative  {
   hal.executable.variant @cuda target(#hal.executable.target<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export @workgroup_tile_loop_negative layout(#pipeline_layout) attributes {
-      translation_info = #translation
-    } {
+    hal.executable.export @workgroup_tile_loop_negative layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1 : index):
       %c1 = arith.constant 1 : index
       %0 = affine.apply affine_map<(d0) -> (d0 ceildiv 16)>(%arg1)
       hal.return %0, %c1, %c1 : index, index, index
     }
     builtin.module {
-      func.func @workgroup_tile_loop_negative() {
+      func.func @workgroup_tile_loop_negative() attributes {translation_info = #translation} {
         %c2048 = arith.constant 2048 : index
         %workgroup_id_x = hal.interface.workgroup.id[0] : index
         %workgroup_count_x = hal.interface.workgroup.count[0] : index
@@ -138,13 +132,10 @@ hal.executable private @workgroup_tile_loop_negative  {
 // CHECK-LABEL: func.func @both_workgroup_and_workitem()
 //   CHECK-NOT:   scf.for
 //       CHECK:   gpu.barrier
-#translation = #iree_codegen.translation_info<LLVMGPUDistribute>
+#translation = #iree_codegen.translation_info<LLVMGPUDistribute workgroup_size = [8, 2, 1]>
 hal.executable private @both_workgroup_and_workitem  {
   hal.executable.variant @cuda target(#hal.executable.target<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export @both_workgroup_and_workitem layout(#pipeline_layout) attributes {
-      translation_info = #translation,
-      workgroup_size = [8: index, 2: index, 1: index]
-    } {
+    hal.executable.export @both_workgroup_and_workitem layout(#pipeline_layout) {
     ^bb0(%arg0 : !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %c1 = arith.constant 1 : index
       %c14 = arith.constant 14 : index
@@ -152,7 +143,7 @@ hal.executable private @both_workgroup_and_workitem  {
       hal.return %c1, %c14, %c112 : index, index, index
     }
     builtin.module {
-      func.func @both_workgroup_and_workitem() {
+      func.func @both_workgroup_and_workitem() attributes {translation_info = #translation} {
         %c8 = arith.constant 8 : index
         %c32 = arith.constant 32 : index
         %c112 = arith.constant 112 : index
@@ -204,14 +195,14 @@ hal.executable private @both_workgroup_and_workitem  {
 #map3 = affine_map<(d0)[s0] -> (d0 + s0)>
 hal.executable private @simple_mul {
   hal.executable.variant public @variant target(#hal.executable.target<"cuda", "cuda-nvptx-fb">) {
-    hal.executable.export public @simple_mul ordinal(0) layout(#pipeline_layout) attributes {translation_info = #translation} {
+    hal.executable.export public @simple_mul ordinal(0) layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index):
       %c1 = arith.constant 1 : index
       %0 = affine.apply #map0()[%arg1]
       hal.return %0, %c1, %c1 : index, index, index
     }
     builtin.module {
-      func.func @simple_mul() {
+      func.func @simple_mul() attributes {translation_info = #translation} {
         %cst = arith.constant 0.000000e+00 : f32
         %c4 = arith.constant 4 : index
         %c0 = arith.constant 0 : index

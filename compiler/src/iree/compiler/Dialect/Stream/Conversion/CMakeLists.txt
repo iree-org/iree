@@ -21,7 +21,9 @@ iree_cc_library(
     MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR
+    MLIRTransformUtils
     MLIRTransforms
+    iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Stream::IR
   PUBLIC
 )

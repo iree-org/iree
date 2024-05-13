@@ -12,7 +12,7 @@ import pathlib
 # Add build_tools python dir to the search path.
 sys.path.insert(0, str(pathlib.Path(__file__).parent.with_name("python")))
 
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Sequence
 import atexit
 import json
 import requests
@@ -24,6 +24,7 @@ from common import benchmark_suite as benchmark_suite_module
 from common.benchmark_driver import BenchmarkDriver
 from common.benchmark_suite import BenchmarkCase, BenchmarkSuite
 from common.benchmark_config import BenchmarkConfig
+from common import benchmark_definition
 from common.benchmark_definition import (
     execute_cmd,
     execute_cmd_and_get_output,
@@ -78,6 +79,15 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
                 uri=benchmark_case.expected_output_uri,
                 dest_dir=case_tmp_dir / "expected_outputs_npy",
             )
+        external_params = []
+        if benchmark_case.external_param_urls:
+            for param_url in benchmark_case.external_param_urls:
+                scope, url, filename = benchmark_definition.parse_external_param_url(
+                    param_url
+                )
+                param_path = self.__fetch_file(uri=url, dest=case_tmp_dir / filename)
+                param_arg = f"{scope}={param_path}" if scope else param_path
+                external_params.append(param_arg)
 
         if benchmark_results_filename:
             if self.config.benchmark_tool_dir is None:
@@ -92,6 +102,7 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
                     module_path=module_path,
                     inputs_dir=inputs_dir,
                     expected_outputs_dir=expected_output_dir,
+                    external_params=external_params,
                 )
 
             self.__run_benchmark(
@@ -99,6 +110,7 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
                 benchmark_case=benchmark_case,
                 module_path=module_path,
                 results_filename=benchmark_results_filename,
+                external_params=external_params,
             )
 
 
@@ -108,12 +120,14 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
         tool_path: pathlib.Path,
         module_path: pathlib.Path,
         inputs_dir: Optional[pathlib.Path] = None,
+        external_params: Sequence[str] = (),
     ) -> List[Any]:
         run_config = benchmark_case.run_config
         cmds = [tool_path, f"--module={module_path}"]
         cmds += run_config.materialize_run_flags(
             gpu_id=self.gpu_id,
             inputs_dir=inputs_dir,
+            external_params=external_params,
         )
         cpu_params = run_config.target_device_spec.device_parameters.cpu_params
         if cpu_params:
@@ -157,12 +171,14 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
         module_path: pathlib.Path,
         inputs_dir: pathlib.Path,
         expected_outputs_dir: pathlib.Path,
+        external_params: Sequence[str] = (),
     ):
         cmd = self.__build_tool_cmds(
             benchmark_case=benchmark_case,
             tool_path=tool_dir / "iree-run-module",
             module_path=module_path,
             inputs_dir=inputs_dir,
+            external_params=external_params,
         )
         # Currently only support single output.
         cmd.append(f'--expected_output=@{expected_outputs_dir / "output_0.npy"}')
@@ -175,12 +191,14 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
         benchmark_case: BenchmarkCase,
         module_path: pathlib.Path,
         results_filename: pathlib.Path,
+        external_params: Sequence[str] = (),
     ):
         tool_name = benchmark_case.benchmark_tool_name
         cmd = self.__build_tool_cmds(
             benchmark_case=benchmark_case,
             tool_path=tool_dir / tool_name,
             module_path=module_path,
+            external_params=external_params,
         )
 
         if tool_name == "iree-benchmark-module":

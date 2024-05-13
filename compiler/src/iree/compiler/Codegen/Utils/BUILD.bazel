@@ -33,6 +33,8 @@ iree_compiler_cc_library(
         "Utils.h",
     ],
     deps = [
+        "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR:IREECodegenDialect",
+        "//compiler/src/iree/compiler/Codegen/Dialect/GPU/IR:IREEGPUDialect",
         "//compiler/src/iree/compiler/Codegen/Interfaces:PartitionableLoopsInterface",
         "//compiler/src/iree/compiler/Codegen/Interfaces:ProcessorOpInterfaces",
         "//compiler/src/iree/compiler/Codegen/Interfaces:UKernelOpInterface",
@@ -78,6 +80,7 @@ iree_compiler_cc_library(
     deps = [
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgDialect",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:VectorDialect",
     ],

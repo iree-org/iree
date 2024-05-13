@@ -16,40 +16,24 @@ iree_cc_library(
   HDRS
     "TargetBackend.h"
     "TargetDevice.h"
+    "TargetOptions.h"
     "TargetRegistry.h"
   SRCS
     "TargetBackend.cpp"
     "TargetDevice.cpp"
+    "TargetOptions.cpp"
     "TargetRegistry.cpp"
   DEPS
     LLVMSupport
+    MLIRArithDialect
     MLIRIR
     MLIRPass
+    MLIRSCFDialect
     MLIRSupport
     MLIRTransforms
-    iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::Util::IR
     iree::compiler::Utils
-  PUBLIC
-)
-
-iree_cc_library(
-  NAME
-    LLVMLinkerUtils
-  HDRS
-    "LLVMLinkerUtils.h"
-  SRCS
-    "LLVMLinkerUtils.cpp"
-  DEPS
-    LLVMBitReader
-    LLVMCore
-    LLVMLinker
-    LLVMSupport
-    LLVMTarget
-    LLVMipo
-    iree::compiler::Codegen::Utils
-    iree::compiler::Dialect::HAL::IR
   PUBLIC
 )
 

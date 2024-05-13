@@ -2,7 +2,7 @@
 
 module attributes {
   hal.device.targets = [
-    #hal.device.target<"vmvx", [
+    #hal.device.target<"local", [
       #hal.executable.target<"vmvx", "vmvx-bytecode-fb">
     ]>
   ]

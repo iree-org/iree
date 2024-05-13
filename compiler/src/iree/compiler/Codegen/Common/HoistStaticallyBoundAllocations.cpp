@@ -28,8 +28,15 @@ struct HoistStaticallyBoundAllocationsPass
 void HoistStaticallyBoundAllocationsPass::runOnOperation() {
   auto funcOp = getOperation();
   IRRewriter rewriter(funcOp->getContext());
-  hoistStaticallyBoundAllocationsInFunc<memref::AllocaOp>(rewriter, funcOp);
-  hoistStaticallyBoundAllocationsInFunc<memref::AllocOp>(rewriter, funcOp);
+
+  std::optional<VscaleRange> vscaleRange;
+  if (this->vscaleMax != 0 && this->vscaleMin <= this->vscaleMax)
+    vscaleRange = {this->vscaleMin, this->vscaleMax};
+
+  hoistStaticallyBoundAllocationsInFunc<memref::AllocaOp>(rewriter, funcOp,
+                                                          vscaleRange);
+  hoistStaticallyBoundAllocationsInFunc<memref::AllocOp>(rewriter, funcOp,
+                                                         vscaleRange);
 }
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>

@@ -130,7 +130,7 @@ public:
     if (boundType.isIntOrIndexOrFloat()) {
       return RankedTensorType::get({}, boundType);
     }
-    return boundType.cast<RankedTensorType>();
+    return llvm::cast<RankedTensorType>(boundType);
   }
 };
 
@@ -182,6 +182,20 @@ getCollectiveElementTypeAttr(RankedTensorType type);
 // If there is not correspondence nullopt is returned.
 std::optional<IREE::Flow::CollectiveElementType>
 convertToFlowCollectiveElementType(Type type);
+
+//===----------------------------------------------------------------------===//
+// custom<ParameterReference>($scope, $key)
+//===----------------------------------------------------------------------===//
+
+ParseResult parseParameterReference(AsmParser &parser, StringAttr &scopeAttr,
+                                    StringAttr &keyAttr);
+void printParameterReference(AsmPrinter &p, StringAttr scopeAttr,
+                             StringAttr keyAttr);
+static inline void printParameterReference(AsmPrinter &p, Operation *op,
+                                           StringAttr scopeAttr,
+                                           StringAttr keyAttr) {
+  printParameterReference(p, scopeAttr, keyAttr);
+}
 
 } // namespace mlir::iree_compiler::IREE::Flow
 

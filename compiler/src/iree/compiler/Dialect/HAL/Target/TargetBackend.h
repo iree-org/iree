@@ -12,54 +12,13 @@
 #include <string>
 #include <vector>
 
-#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Utils/OptionUtils.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/Pass/PassManager.h"
 
 namespace mlir::iree_compiler::IREE::HAL {
-
-// TODO(benvanik): remove this and replace with the pass pipeline options.
-// Controls executable translation targets.
-struct TargetOptions {
-  // TODO(benvanik): multiple targets of the same type, etc.
-  std::vector<std::string> targets;
-
-  // Coarse debug level for executable translation across all targets.
-  // Each target backend can use this to control its own flags, with values
-  // generally corresponding to the gcc-style levels 0-3:
-  //   0: no debug information
-  //   1: minimal debug information
-  //   2: default debug information
-  //   3: maximal debug information
-  int debugLevel = 2;
-
-  // Default path to write executable files into.
-  std::string executableFilesPath;
-
-  // A path to write individual executable source listings into (before
-  // configuration).
-  std::string executableSourcesPath;
-
-  // A path to write individual executable source listings into (after
-  // configuration).
-  std::string executableConfigurationsPath;
-
-  // A path to write standalone executable benchmarks into.
-  std::string executableBenchmarksPath;
-
-  // A path to write executable intermediates into.
-  std::string executableIntermediatesPath;
-
-  // A path to write translated and serialized executable binaries into.
-  std::string executableBinariesPath;
-
-  void bindOptions(OptionsBinder &binder);
-  using FromFlags = OptionsFromFlags<TargetOptions>;
-};
 
 // HAL executable target backend interface.
 // Multiple backends can be registered and targeted during a single compilation.
@@ -192,8 +151,8 @@ public:
   //     }
   //   }
   virtual void
-  buildConfigurationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
-                                 OpPassManager &passManager){};
+  buildConfigurationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
+                                 OpPassManager &passManager) {}
 
   // Inserts passes used to translate the `hal.executable.variant` op contents.
   // The pass manager will be nested on `hal.executable` such that the pipeline
@@ -227,7 +186,7 @@ public:
   //     }
   //   }
   virtual void
-  buildTranslationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
+  buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                OpPassManager &passManager) = 0;
 
   // Inserts passes used to link `hal.executable.variant` ops together.

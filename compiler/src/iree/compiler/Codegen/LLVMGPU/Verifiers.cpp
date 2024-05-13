@@ -5,10 +5,10 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
-#include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
+#include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
-#include "mlir/Dialect/Linalg/Passes.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 
 namespace mlir::iree_compiler {
 
@@ -117,8 +117,8 @@ verifyGPUMatmulPipeline(Operation *op,
   // Get Operand/Result types.
   mlir::Type lhsType = op->getOperand(0).getType();
   mlir::Type rhsType = op->getOperand(1).getType();
-  assert(lhsType.cast<ShapedType>().getElementType() ==
-             rhsType.cast<ShapedType>().getElementType() &&
+  assert(cast<ShapedType>(lhsType).getElementType() ==
+             cast<ShapedType>(rhsType).getElementType() &&
          "expected lhs and rhs to have same type. Mixed input types are not "
          "supported yet in IREE Codegen.");
 

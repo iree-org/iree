@@ -179,12 +179,30 @@ util.func private @PropagateSplatsThroughSlices(%arg0: index) -> !stream.resourc
 
 // -----
 
+// Allow pattern because we can verify the target is safe to elide.
+
 // CHECK-LABEL: @FlattenFullFillToSplat
-util.func private @FlattenFullFillToSplat(%arg0: !stream.resource<*>, %arg1: index, %arg2: i32) -> !stream.resource<*> {
+util.func private @FlattenFullFillToSplat(%arg0: index, %arg1: i32) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
-  // CHECK: %[[T:.+]] = stream.async.splat %arg2 : i32 -> !stream.resource<*>{%arg1}
-  %0 = stream.async.fill %arg2, %arg0[%c0 to %arg1 for %arg1] : i32 -> %arg0 as !stream.resource<*>{%arg1}
+  %c123_i32 = arith.constant 123 : i32
+  %target = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%arg0}
+  // CHECK: %[[T:.+]] = stream.async.splat %arg1 : i32 -> !stream.resource<*>{%arg0}
+  %0 = stream.async.fill %arg1, %target[%c0 to %arg0 for %arg0] : i32 -> %target as !stream.resource<*>{%arg0}
   // CHECK: util.return %[[T]]
+  util.return %0 : !stream.resource<*>
+}
+
+// -----
+
+// The target is tied and we cannot avoid the fill.
+
+// CHECK-LABEL: @FlattenFullFillToSplatUnsafe
+util.func private @FlattenFullFillToSplatUnsafe(%arg0: index, %arg1: i32, %arg2: !hal.buffer_view) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  // CHECK: stream.tensor.import
+  %target = stream.tensor.import %arg2 : !hal.buffer_view -> tensor<8xi32> in !stream.resource<*>{%arg0}
+  // CHECK: stream.async.fill
+  %0 = stream.async.fill %arg1, %target[%c0 to %arg0 for %arg0] : i32 -> %target as !stream.resource<*>{%arg0}
   util.return %0 : !stream.resource<*>
 }
 
@@ -241,13 +259,93 @@ util.func private @CoalesceAdjacentFills(%arg0: !stream.resource<*>, %arg1: inde
 
 // -----
 
-// CHECK-LABEL: @FoldAsyncUpdateOp
-util.func private @FoldAsyncUpdateOp(%arg0: !stream.resource<*>, %arg1: !stream.resource<*>, %arg2: index) -> !stream.resource<*> {
+// If we can't analyze the resources we can't fold as the update may be required
+// to preserve an in-place update of an external resource.
+
+// CHECK-LABEL: @DontFoldNonLocalAsyncUpdateOp
+util.func private @DontFoldNonLocalAsyncUpdateOp(%arg0: !stream.resource<*>, %arg1: !stream.resource<*>, %arg2: index) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
-  // CHECK-NOT: stream.async.update
+  // CHECK: stream.async.update
   %0 = stream.async.update %arg1, %arg0[%c0 to %arg2] : !stream.resource<*>{%arg2} -> %arg0 as !stream.resource<*>{%arg2}
-  // CHECK: util.return %arg1
   util.return %0 : !stream.resource<*>
+}
+
+// -----
+
+// We can only fold when we prove that the target has value semantics.
+
+// CHECK-LABEL: @FoldLocalAsyncUpdateOp
+util.func private @FoldLocalAsyncUpdateOp(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  %c123_i32 = arith.constant 123 : i32
+  // CHECK-NOT: stream.async.splat
+  %splat = stream.async.splat %c123_i32 : i32 -> !stream.resource<*>{%arg1}
+  // CHECK-NOT: stream.async.update
+  %update = stream.async.update %arg0, %splat[%c0 to %arg1] : !stream.resource<*>{%arg1} -> %result as !stream.resource<*>{%arg1}
+  // CHECK: util.return %arg0
+  util.return %update : !stream.resource<*>
+}
+
+// -----
+
+// CHECK-LABEL: @ElideInPlaceUpdateUpdate
+util.func private @ElideInPlaceUpdateUpdate(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.resource<*>, %arg3: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  // CHECK: %[[RESULT:.+]] = stream.async.update %arg0, %arg2[%c0 to %arg1] : !stream.resource<*>{%arg1} -> %arg2 as !stream.resource<*>{%arg3}
+  %0 = stream.async.update %arg0, %arg2[%c0 to %arg1] : !stream.resource<*>{%arg1} -> %arg2 as !stream.resource<*>{%arg3}
+  // CHECK-NOT: stream.async.update
+  %1 = stream.async.update %0, %arg2[%c0 to %arg3] : !stream.resource<*>{%arg3} -> %arg2 as !stream.resource<*>{%arg3}
+  // CHECK: util.return %[[RESULT]]
+  util.return %1 : !stream.resource<*>
+}
+
+// -----
+
+// CHECK-LABEL: @ElideInPlaceUpdateDispatch
+util.func private @ElideInPlaceUpdateDispatch(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  // CHECK: %[[RESULT:.+]] = stream.async.dispatch @ex::@fn(%arg0[%c0 to %arg1 for %arg1]) : (!stream.resource<*>{%arg1}) -> %arg0{%arg1}
+  %0 = stream.async.dispatch @ex::@fn(%arg0[%c0 to %arg1 for %arg1]) : (!stream.resource<*>{%arg1}) -> %arg0{%arg1}
+  // CHECK-NOT: stream.async.update
+  %1 = stream.async.update %0, %arg0[%c0 to %arg1] : !stream.resource<*>{%arg1} -> %arg0 as !stream.resource<*>{%arg1}
+  // CHECK: util.return %[[RESULT]]
+  util.return %1 : !stream.resource<*>
+}
+
+// -----
+
+// Tests that multiple users of the produced value will still allow the update
+// to be elided so long as they are reads.
+
+// CHECK-LABEL: @ElideInPlaceUpdateDispatchMultiUse
+util.func private @ElideInPlaceUpdateDispatchMultiUse(%arg0: !stream.resource<*>, %arg1: index) -> (!stream.resource<*>, !stream.resource<*>) {
+  %c0 = arith.constant 0 : index
+  // CHECK: %[[RESULT0:.+]] = stream.async.dispatch @ex::@fn0(%arg0[%c0 to %arg1 for %arg1]) : (!stream.resource<*>{%arg1}) -> %arg0{%arg1}
+  %0 = stream.async.dispatch @ex::@fn0(%arg0[%c0 to %arg1 for %arg1]) : (!stream.resource<*>{%arg1}) -> %arg0{%arg1}
+  // CHECK-NOT: stream.async.update
+  %1 = stream.async.update %0, %arg0[%c0 to %arg1] : !stream.resource<*>{%arg1} -> %arg0 as !stream.resource<*>{%arg1}
+  // CHECK: %[[RESULT1:.+]] = stream.async.dispatch @ex::@fn1(%[[RESULT0]][%c0 to %arg1 for %arg1]) : (!stream.resource<*>{%arg1}) -> !stream.resource<*>{%arg1}
+  %2 = stream.async.dispatch @ex::@fn1(%0[%c0 to %arg1 for %arg1]) : (!stream.resource<*>{%arg1}) -> !stream.resource<*>{%arg1}
+  // CHECK: util.return %[[RESULT0]], %[[RESULT1]]
+  util.return %1, %2 : !stream.resource<*>, !stream.resource<*>
+}
+
+// -----
+
+// Tests that writes on the update source will fail to elide the update.
+// TODO(benvanik): support looking for writes only prior to the update that are
+// known-safe.
+
+// CHECK-LABEL: @ElideInPlaceUpdateDispatchMultiUseWrite
+util.func private @ElideInPlaceUpdateDispatchMultiUseWrite(%arg0: !stream.resource<*>, %arg1: index) -> (!stream.resource<*>, !stream.resource<*>) {
+  %c0 = arith.constant 0 : index
+  // CHECK: stream.async.dispatch @ex::@fn0
+  %0 = stream.async.dispatch @ex::@fn0(%arg0[%c0 to %arg1 for %arg1]) : (!stream.resource<*>{%arg1}) -> %arg0{%arg1}
+  // CHECK: stream.async.update
+  %1 = stream.async.update %0, %arg0[%c0 to %arg1] : !stream.resource<*>{%arg1} -> %arg0 as !stream.resource<*>{%arg1}
+  // CHECK: stream.async.dispatch @ex::@fn1
+  %2 = stream.async.dispatch @ex::@fn1(%0[%c0 to %arg1 for %arg1]) : (!stream.resource<*>{%arg1}) -> %0{%arg1}
+  util.return %1, %2 : !stream.resource<*>, !stream.resource<*>
 }
 
 // -----

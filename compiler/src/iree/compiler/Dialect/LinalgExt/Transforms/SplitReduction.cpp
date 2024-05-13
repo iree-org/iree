@@ -77,7 +77,7 @@ LogicalResult shouldParallelTopk(iree_compiler::IREE::LinalgExt::TopkOp topkOp,
     return rewriter.notifyMatchFailure(topkOp,
                                        "cannot split dynamic dimension");
   }
-  if (topkOp.indices() && splitReductionDepth == 0) {
+  if (topkOp.getIndices() && splitReductionDepth == 0) {
     return rewriter.notifyMatchFailure(
         topkOp, "input indices aren't supported for first split");
   }
@@ -101,11 +101,11 @@ computeParallelTopk(Location loc, RewriterBase &rewriter,
                     ArrayRef<ReassociationIndices> reassociationIndices,
                     int64_t splitReductionRatio, int64_t splitDimParallel,
                     int64_t kDimParallel, int64_t kSize) {
-  Value valuesOrig = topkOp.values();
-  auto valuesOriginalType = valuesOrig.getType().cast<ShapedType>();
+  Value valuesOrig = topkOp.getValues();
+  auto valuesOriginalType = cast<ShapedType>(valuesOrig.getType());
   Type valueElementType = valuesOriginalType.getElementType();
   Type indicesElementType =
-      topkOp.getResultTypes()[1].cast<ShapedType>().getElementType();
+      cast<ShapedType>(topkOp.getResultTypes()[1]).getElementType();
 
   SmallVector<int64_t> expandedShape = getExpandedShape(
       valuesOriginalType.getShape(), splitReductionRatio, splitDimParallel);
@@ -118,8 +118,8 @@ computeParallelTopk(Location loc, RewriterBase &rewriter,
 
   // Expand input indices shape for parallel processing if they exist
   std::optional<Value> indicesExpanded;
-  if (std::optional<Value> inputIndices = topkOp.indices()) {
-    // Type inputElementType = inputIndices->getType().cast<ShapedType>();
+  if (std::optional<Value> inputIndices = topkOp.getIndices()) {
+    // Type inputElementType = cast<ShapedType>(inputIndices->getType());
     Type indicesExpandedType =
         RankedTensorType::get(expandedShape, indicesElementType);
     indicesExpanded = rewriter.create<tensor::ExpandShapeOp>(
@@ -150,12 +150,12 @@ computeParallelTopk(Location loc, RewriterBase &rewriter,
   // Initialize indices to positive infinity and values to negative infinity
   // for a top (maxk) comparison.
   TypedAttr negInfAttr;
-  if (auto intType = valueElementType.dyn_cast<IntegerType>()) {
+  if (auto intType = dyn_cast<IntegerType>(valueElementType)) {
     negInfAttr = rewriter.getIntegerAttr(
         intType, APInt::getSignedMinValue(intType.getWidth()));
   } else {
     auto negApFloat =
-        APFloat::getInf(valueElementType.cast<FloatType>().getFloatSemantics(),
+        APFloat::getInf(cast<FloatType>(valueElementType).getFloatSemantics(),
                         /*Negative=*/true);
     negInfAttr = rewriter.getFloatAttr(valueElementType, negApFloat);
   }
@@ -200,7 +200,7 @@ computeParallelTopk(Location loc, RewriterBase &rewriter,
 Value offsetParallelIndices(Location loc, RewriterBase &rewriter,
                             Value parallelIndices, int64_t kDimParallelSize,
                             int64_t splitDimParallel) {
-  auto parallelIndicesType = parallelIndices.getType().cast<ShapedType>();
+  auto parallelIndicesType = cast<ShapedType>(parallelIndices.getType());
   size_t parallelIndicesRank = parallelIndicesType.getRank();
   AffineMap mapIdentity = rewriter.getMultiDimIdentityMap(parallelIndicesRank);
   SmallVector<AffineMap> indexingMaps = {mapIdentity};
@@ -234,11 +234,11 @@ TopkOp computeReductionTopk(Location loc, RewriterBase &rewriter, TopkOp topkOp,
                             ArrayRef<ReassociationIndices> reassociationIndices,
                             int64_t splitReductionRatio, int64_t kDimOrig,
                             int64_t kSize) {
-  Value valuesOrig = topkOp.values();
-  auto valuesOriginalType = valuesOrig.getType().cast<ShapedType>();
+  Value valuesOrig = topkOp.getValues();
+  auto valuesOriginalType = cast<ShapedType>(valuesOrig.getType());
   Type valueElementType = valuesOriginalType.getElementType();
   Type indicesElementType =
-      topkOp.getResultTypes()[1].cast<ShapedType>().getElementType();
+      cast<ShapedType>(topkOp.getResultTypes()[1]).getElementType();
 
   // Define the collapsed input shapes
   SmallVector<int64_t> collapsedShape = getCollapsedShape(
@@ -348,7 +348,7 @@ splitReduction(RewriterBase &rewriter, LinalgExt::TopkOp topkOp,
   // For parallel topk: the dimension that we reduce
   int64_t kDimParallel = kDimOrig + 1;
   int64_t kSize =
-      topkOp.getResult(0).getType().cast<ShapedType>().getDimSize(kDimOrig);
+      cast<ShapedType>(topkOp.getResult(0).getType()).getDimSize(kDimOrig);
   int64_t splitReductionDepth = getSplitReductionDepth(topkOp);
   int64_t splitReductionRatio = splitReductionFn(splitReductionDepth);
   SmallVector<ReassociationIndices> reassociationIndices =
@@ -370,10 +370,10 @@ splitReduction(RewriterBase &rewriter, LinalgExt::TopkOp topkOp,
   // provided. If input indices were provided, no offsetting is needed as
   // original original indices are already known.
   Value updatedParallelIndices = parallelTopkOp.getResult(1);
-  if (!topkOp.indices()) {
+  if (!topkOp.getIndices()) {
     Value parallelIndices = parallelTopkOp.getResult(1);
     SmallVector<int64_t> expandedShape = getExpandedShape(
-        topkOp.values().getType().cast<ShapedType>().getShape(),
+        cast<ShapedType>(topkOp.getValues().getType()).getShape(),
         splitReductionRatio, splitDimParallel);
     int64_t kDimParallelSize = expandedShape[kDimParallel];
     updatedParallelIndices = offsetParallelIndices(

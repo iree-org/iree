@@ -56,6 +56,15 @@ class FileHandle:
     def wrap_memory(
         host_buffer: Any, readable: bool = True, writable: bool = False
     ) -> FileHandle: ...
+    def host_allocation(self) -> memoryview:
+        """Access the raw view of the allocated host memory.
+
+        Requires is_host_allocation.
+        """
+        ...
+
+    @property
+    def is_host_allocation(self) -> bool: ...
 
 class HalAllocator:
     def allocate_buffer(
@@ -179,6 +188,32 @@ class HalDevice:
     ) -> None: ...
     @property
     def allocator(self) -> HalAllocator: ...
+    def create_dlpack_capsule(
+        self, buffer_view: HalBufferView, device_type_code: int, device_id: int
+    ) -> Any:
+        """Creates a DLPack capsule for the given buffer view with an explicit
+        device type code and id.
+
+        Note that IREE's HAL hierarchy does not match 1:1 with DLPack's view of
+        the world, which combines synchronization, memory access, and device
+        identity. As such, we presume that some higher level Python class will
+        represent "framework tensors" for interop in a way that interops
+        completely. Such an implementation would delegate to this facility
+        to create the low level capsule, having explicitly mapped the devices
+        and placed appropriate synchronization guards.
+        """
+        ...
+
+    def from_dlpack_capsule(self, capsule: Any) -> HalBufferView:
+        """Imports a DLPack tensor capsule and returns a corresponding buffer
+        view.
+
+        As with create_dlpack_capsule, this is just a partial implementation
+        of concerns and presumes that the caller has chosen the correct
+        device and placed any synchronization barriers necessary for actually
+        using the result.
+        """
+        ...
 
 class HalDeviceLoopBridge:
     def __init__(self, device: HalDevice, loop: asyncio.BaseEventLoop): ...
@@ -308,9 +343,42 @@ class MemoryType(int):
     def __and__(self, other: MemoryType) -> int: ...
     def __or__(self, other: MemoryType) -> int: ...
 
+class ParameterIndexEntry:
+    @property
+    def key(self) -> str: ...
+    @property
+    def length(self) -> int: ...
+    @property
+    def metadata(self) -> bytes: ...
+    @property
+    def is_file(self) -> bool: ...
+    @property
+    def is_splat(self) -> bool: ...
+    @property
+    def file_storage(self) -> Tuple[FileHandle, int]:
+        """Accesses the underlying storage (if is_file).
+
+        Only valid if is_file. Returns the backing FileHandle and offset.
+        """
+        ...
+
+    @property
+    def file_view(self) -> memoryview:
+        """Accesses a memoryview of the file contents.
+
+        Only valid if is_file and the file has host accessible storage.
+        """
+        ...
+
+    @property
+    def splat_pattern(self) -> bytes:
+        """Accesses the splat pattern (if is_splat)."""
+        ...
+
 class ParameterIndex:
     def __init__() -> None: ...
     def __len__(self) -> int: ...
+    def __getitem__(self, i) -> ParameterIndexEntry: ...
     def reserve(self, new_capacity: int) -> None: ...
     def add_splat(
         self,
@@ -357,6 +425,13 @@ class ParameterIndex:
     def create_provider(
         self, *, scope: str = "", max_concurrent_operations: Optional[int] = None
     ) -> ParameterProvider: ...
+    def items(self) -> List[Tuple[str, ParameterIndexEntry]]:
+        """Accesses the items as a tuple(str, entry).
+
+        Note that the index may contain duplicates, so loading into a dict
+        is up to the user, as only they can know if this is legal.
+        """
+        ...
 
 class ParameterProvider: ...
 

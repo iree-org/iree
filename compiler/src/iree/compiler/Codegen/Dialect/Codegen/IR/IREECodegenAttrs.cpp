@@ -59,10 +59,22 @@ ArrayAttr ExportConfigAttr::getWorkgroupSizeIndexArray() {
 
 TranslationInfoAttr TranslationInfoAttr::get(
     MLIRContext *context, DispatchLoweringPassPipeline passPipeline,
-    SymbolRefAttr codegenSpec, DictionaryAttr configuration) {
+    SymbolRefAttr codegenSpec, ArrayRef<int64_t> workgroupSize,
+    std::optional<int64_t> subgroupSize, DictionaryAttr configuration) {
   auto pipelineAttr =
       DispatchLoweringPassPipelineAttr::get(context, passPipeline);
-  return get(context, pipelineAttr, codegenSpec, configuration);
+  return get(context, pipelineAttr, codegenSpec, workgroupSize,
+             subgroupSize.value_or(int64_t()), configuration);
+}
+
+TranslationInfoAttr TranslationInfoAttr::get(
+    MLIRContext *context, DispatchLoweringPassPipeline passPipeline,
+    ArrayRef<int64_t> workgroupSize, std::optional<int64_t> subgroupSize,
+    DictionaryAttr configuration) {
+  auto pipelineAttr =
+      DispatchLoweringPassPipelineAttr::get(context, passPipeline);
+  return get(context, pipelineAttr, /*codegenSpec=*/SymbolRefAttr(),
+             workgroupSize, subgroupSize.value_or(int64_t()), configuration);
 }
 
 DispatchLoweringPassPipeline
@@ -73,7 +85,8 @@ TranslationInfoAttr::getDispatchLoweringPassPipeline() {
 LogicalResult TranslationInfoAttr::verify(
     function_ref<InFlightDiagnostic()> emitError,
     IREE::Codegen::DispatchLoweringPassPipelineAttr passPipeline,
-    SymbolRefAttr codegenSpec, DictionaryAttr configuration) {
+    SymbolRefAttr codegenSpec, ArrayRef<int64_t> workgroupSize,
+    int64_t subgroupSize, DictionaryAttr configuration) {
   if (!passPipeline) {
     return emitError() << "missing pass pipeline specification";
   }
@@ -88,6 +101,15 @@ LogicalResult TranslationInfoAttr::verify(
     return emitError()
            << "transform dialect codegen spec requires pass pipeline : "
            << stringifyEnum(tdPassPipeline);
+  }
+  if (workgroupSize.size() > 3) {
+    return emitError() << "workgroup size cannot have more than 3 entries";
+  }
+  if (llvm::any_of(workgroupSize, [](int64_t value) { return value <= 0; })) {
+    return emitError() << "workgroup size value has to be greater than zero";
+  }
+  if (subgroupSize < 0) {
+    return emitError() << "subgroup size value cannot be negative";
   }
   return success();
 }
@@ -265,6 +287,12 @@ LoweringConfigAttr::getTileInterchangeVals(unsigned level) {
   return SmallVector<int64_t>(levels[level].getInterchange());
 }
 
+bool LoweringConfigAttr::isInterchangeEmpty() {
+  return llvm::none_of(getTilingLevels(), [](auto level) {
+    return !level.getInterchange().empty();
+  });
+}
+
 LogicalResult
 LoweringConfigAttr::verify(function_ref<InFlightDiagnostic()> emitError,
                            LoweringConfigTilingLevelsAttr levels,
@@ -279,10 +307,10 @@ LoweringConfigAttr::verify(function_ref<InFlightDiagnostic()> emitError,
 // iree.compilation_info
 //===----------------------------------------------------------------------===//
 
-LogicalResult CompilationInfoAttr::verify(
-    function_ref<InFlightDiagnostic()> emitError,
-    LoweringConfigAttr loweringConfig, TranslationInfoAttr translationInfo,
-    ArrayRef<int64_t> workgroupSize, std::optional<int64_t> subgroupSize) {
+LogicalResult
+CompilationInfoAttr::verify(function_ref<InFlightDiagnostic()> emitError,
+                            LoweringConfigAttr loweringConfig,
+                            TranslationInfoAttr translationInfo) {
   if (!loweringConfig) {
     return emitError() << "missing lowering config";
   }
@@ -294,10 +322,11 @@ LogicalResult CompilationInfoAttr::verify(
   if (!translationInfo) {
     return emitError() << "missing translation info";
   }
-  if (failed(TranslationInfoAttr::verify(emitError,
-                                         translationInfo.getPassPipeline(),
-                                         translationInfo.getCodegenSpec(),
-                                         translationInfo.getConfiguration()))) {
+  if (failed(TranslationInfoAttr::verify(
+          emitError, translationInfo.getPassPipeline(),
+          translationInfo.getCodegenSpec(), translationInfo.getWorkgroupSize(),
+          translationInfo.getSubgroupSize(),
+          translationInfo.getConfiguration()))) {
     return failure();
   }
   return success();
@@ -324,78 +353,44 @@ namespace mlir::iree_compiler {
 // ===----------------------------------------------------------------------===//
 
 IREE::Codegen::TranslationInfoAttr
-getTranslationInfo(IREE::HAL::ExecutableExportOp exportOp) {
-  return exportOp->getAttrOfType<IREE::Codegen::TranslationInfoAttr>(
+getTranslationInfo(FunctionOpInterface funcOp) {
+  return funcOp->getAttrOfType<IREE::Codegen::TranslationInfoAttr>(
       kTranslationInfoAttrName);
 }
 
-std::optional<IREE::Codegen::TranslationInfoAttr>
-getIdenticalTranslationInfo(IREE::HAL::ExecutableVariantOp variantOp) {
-  ModuleOp moduleOp = variantOp.getInnerModule();
-  if (!moduleOp) {
+std::optional<SmallVector<int64_t>>
+getWorkgroupSize(FunctionOpInterface funcOp) {
+  IREE::Codegen::TranslationInfoAttr translationInfo =
+      getTranslationInfo(funcOp);
+  if (!translationInfo) {
     return std::nullopt;
   }
-
-  std::optional<IREE::Codegen::TranslationInfoAttr> translationInfo;
-  for (auto exportOp : variantOp.getExportOps()) {
-    IREE::Codegen::TranslationInfoAttr currTranslationInfo =
-        getTranslationInfo(exportOp);
-    if (!currTranslationInfo) {
-      continue;
-    }
-    if (!translationInfo) {
-      translationInfo = currTranslationInfo;
-      continue;
-    }
-    if (currTranslationInfo != translationInfo.value()) {
-      return std::nullopt;
-    }
-  }
-
-  return translationInfo;
+  return llvm::to_vector(translationInfo.getWorkgroupSize());
 }
 
-SmallVector<int64_t> getWorkgroupSize(IREE::HAL::ExecutableExportOp exportOp) {
-  if (std::optional<ArrayAttr> workgroupSizeAttrList =
-          exportOp.getWorkgroupSize()) {
-    return llvm::map_to_vector(*workgroupSizeAttrList, [](auto attr) {
-      return llvm::cast<IntegerAttr>(attr).getInt();
-    });
+std::optional<int64_t> getSubgroupSize(FunctionOpInterface funcOp) {
+  IREE::Codegen::TranslationInfoAttr translationInfo =
+      getTranslationInfo(funcOp);
+  if (!translationInfo) {
+    return std::nullopt;
   }
-  return {};
-}
-
-std::optional<int64_t> getSubgroupSize(IREE::HAL::ExecutableExportOp exportOp) {
-  if (IntegerAttr attr = exportOp.getSubgroupSizeAttr()) {
-    return attr.getValue().getSExtValue();
+  // The underlying storage sets 0 to optional scalar integer value. So if set
+  // to 0, return as not set.
+  if (translationInfo.getSubgroupSize() == int64_t()) {
+    return std::nullopt;
   }
-  return {};
-}
-
-LogicalResult setDispatchConfig(mlir::FunctionOpInterface entryPoint,
-                                ArrayRef<int64_t> workgroupSize,
-                                std::optional<int64_t> subgroupSize) {
-  FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(entryPoint);
-  if (failed(exportOp))
-    return failure();
-  MLIRContext *context = exportOp->getContext();
-  if (!workgroupSize.empty()) {
-    exportOp->setWorkgroupSizeAttr(getIndexArrayAttr(context, workgroupSize));
-  }
-  if (subgroupSize) {
-    exportOp->setSubgroupSizeAttr(Builder(context).getIndexAttr(*subgroupSize));
-  }
-  return success();
+  return translationInfo.getSubgroupSize();
 }
 
 LogicalResult
 setTranslationInfo(mlir::FunctionOpInterface entryPoint,
                    IREE::Codegen::TranslationInfoAttr translationInfo) {
-  FailureOr<IREE::HAL::ExecutableExportOp> exportOp = getEntryPoint(entryPoint);
-  if (failed(exportOp))
-    return failure();
-  exportOp.value()->setAttr(kTranslationInfoAttrName, translationInfo);
+  entryPoint->setAttr(kTranslationInfoAttrName, translationInfo);
   return success();
+}
+
+void eraseTranslationInfo(FunctionOpInterface funcOp) {
+  funcOp->removeAttr(kTranslationInfoAttrName);
 }
 
 //===----------------------------------------------------------------------===//
@@ -447,6 +442,8 @@ void setLoweringConfig(Operation *op,
                        IREE::Codegen::LoweringConfigAttr config) {
   op->setAttr(kConfigAttrName, config);
 }
+
+void eraseLoweringConfig(Operation *op) { op->removeAttr(kConfigAttrName); }
 
 //===----------------------------------------------------------------------===//
 // Helpers for getting/setting `iree_codegen.compilation_info` attribute on root

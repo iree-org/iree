@@ -1,7 +1,7 @@
 // RUN: iree-opt --iree-transform-dialect-interpreter %s | FileCheck %s
 
 // This transform was removed from MLIR by https://reviews.llvm.org/D154932 and
-// added to IREE in https://github.com/openxla/iree/pull/14373, as a workaround
+// added to IREE in https://github.com/iree-org/iree/pull/14373, as a workaround
 // for other patterns being sensitive to these exact transforms.
 
 // CHECK-LABEL: func @transfer_read_of_extract_slice(
@@ -101,10 +101,11 @@ func.func @insert_slice_of_transfer_write_rank_extending(%t1 : tensor<?x?x12xf32
 }
 
 module attributes { transform.with_named_sequence } {
-  transform.named_sequence @__transform_main(%func_op: !transform.op<"func.func"> {transform.readonly}) {
-    transform.apply_patterns to %func_op {
+  transform.named_sequence @__transform_main(%module_op: !transform.any_op {transform.readonly}) {
+    %top_level_func = transform.structured.match ops{["func.func"]} in %module_op : (!transform.any_op) -> !transform.any_op
+    transform.apply_patterns to %top_level_func {
       transform.apply_patterns.iree.fold_tensor_slice_into_transfer
-    } : !transform.op<"func.func">
+    } : !transform.any_op
     transform.yield
   }
-} // module
+}

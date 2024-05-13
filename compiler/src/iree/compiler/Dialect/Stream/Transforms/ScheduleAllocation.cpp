@@ -1144,14 +1144,12 @@ static std::optional<ConstantAllocation>
 extractConstantsWithLifetime(IREE::Stream::AsyncExecuteOp executeOp,
                              IREE::Stream::Lifetime lifetime,
                              OpBuilder &externalBuilder) {
-  auto constantOps = llvm::to_vector(
-      llvm::make_filter_range(executeOp.getOps<IREE::Stream::AsyncConstantOp>(),
-                              [&](IREE::Stream::AsyncConstantOp op) {
-                                return op.getResult()
-                                           .getType()
-                                           .cast<IREE::Stream::ResourceType>()
-                                           .getLifetime() == lifetime;
-                              }));
+  auto constantOps = llvm::to_vector(llvm::make_filter_range(
+      executeOp.getOps<IREE::Stream::AsyncConstantOp>(),
+      [&](IREE::Stream::AsyncConstantOp op) {
+        return cast<IREE::Stream::ResourceType>(op.getResult().getType())
+                   .getLifetime() == lifetime;
+      }));
   if (constantOps.empty())
     return {};
 

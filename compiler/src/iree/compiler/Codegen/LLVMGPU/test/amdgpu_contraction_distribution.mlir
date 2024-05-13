@@ -8,7 +8,7 @@
 #map2 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map3 = affine_map<(d0, d1, d2) -> (d1, d0)>
 
-// A: vector<16x16>, layout = layoutA 
+// A: vector<16x16>, layout = layoutA
 #row_layout = #iree_vector_ext.per_dim_layout<[BATCHX, LANEX], [1, 16]>
 #col_layout = #iree_vector_ext.per_dim_layout<[BATCHY, LANEY, VECTORX], [1, 4, 4]>
 #layout_a = #iree_vector_ext.layout<#row_layout, #col_layout>
@@ -43,7 +43,7 @@ builtin.module attributes { transform.with_named_sequence } {
   }
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-    transform.iree.amdgpu_distribute_vectors %top_level_func test_conversion : !transform.any_op
+    transform.iree.amdgpu_distribute_vectors %top_level_func test_conversion : (!transform.any_op) -> !transform.any_op
     transform.yield
   }
 }
@@ -84,7 +84,7 @@ builtin.module attributes { transform.with_named_sequence } {
   }
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-    transform.iree.amdgpu_distribute_vectors %top_level_func test_conversion : !transform.any_op
+    transform.iree.amdgpu_distribute_vectors %top_level_func test_conversion : (!transform.any_op) -> !transform.any_op
     transform.yield
   }
 }
@@ -132,7 +132,7 @@ builtin.module attributes { transform.with_named_sequence } {
   }
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-    transform.iree.amdgpu_distribute_vectors %top_level_func test_conversion : !transform.any_op
+    transform.iree.amdgpu_distribute_vectors %top_level_func test_conversion : (!transform.any_op) -> !transform.any_op
     transform.yield
   }
 }
@@ -179,7 +179,7 @@ builtin.module attributes { transform.with_named_sequence } {
   }
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
-    transform.iree.amdgpu_distribute_vectors %top_level_func test_conversion : !transform.any_op
+    transform.iree.amdgpu_distribute_vectors %top_level_func test_conversion : (!transform.any_op) -> !transform.any_op
     transform.yield
   }
 }

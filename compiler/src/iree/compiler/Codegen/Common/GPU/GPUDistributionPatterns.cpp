@@ -8,7 +8,7 @@
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
-#include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
@@ -395,7 +395,7 @@ struct DistributeReductions final
           loc, packed, i, subgroupSize, gpu::ShuffleMode::XOR);
       Value unpacked =
           unpackToVector(loc, rewriter, shuffleOp.getShuffleResult(),
-                         result.getType().cast<VectorType>());
+                         cast<VectorType>(result.getType()));
       result = makeArithReduction(rewriter, loc, combiningKind, unpacked,
                                   result, nullptr, mask);
     }
@@ -616,17 +616,18 @@ struct DistributeScfFor final : OpDistributionPattern<scf::ForOp> {
   }
 };
 
-struct DistributeTranspose final : OpDistributionPattern<vector::TransposeOp> {
+struct DistributeTransposeLayoutAttr final
+    : OpDistributionPattern<vector::TransposeOp> {
   using OpDistributionPattern::OpDistributionPattern;
 
   LogicalResult matchAndRewrite(vector::TransposeOp transposeOp,
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
     VectorValue value = transposeOp.getVector();
-    VectorLayoutInterface layout =
-        dyn_cast<VectorLayoutInterface>(signature[value]);
+    VectorLayoutInterface layout = dyn_cast<LayoutAttr>(signature[value]);
     if (!layout) {
-      return failure();
+      return rewriter.notifyMatchFailure(transposeOp,
+                                         "layout must be LayoutAttr");
     }
 
     /// Transpose only changes the notion of where the data carried by each
@@ -849,7 +850,7 @@ void populateGPUDistributionLayoutAttrPatterns(Value laneId,
   patterns
       .add<DistributeTransferReadLayoutAttr, DistributeTransferWriteLayoutAttr>(
           patterns.getContext(), laneId);
-  patterns.add<DistributeBroadcastLayoutAttr, DistributeTranspose>(
+  patterns.add<DistributeBroadcastLayoutAttr, DistributeTransposeLayoutAttr>(
       patterns.getContext());
 }
 

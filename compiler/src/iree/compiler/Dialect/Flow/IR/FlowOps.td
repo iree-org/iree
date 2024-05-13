@@ -11,6 +11,7 @@ include "iree/compiler/Dialect/Flow/IR/FlowBase.td"
 include "iree/compiler/Dialect/Flow/IR/FlowInterfaces.td"
 include "iree/compiler/Dialect/Util/IR/UtilInterfaces.td"
 include "mlir/Interfaces/FunctionInterfaces.td"
+include "mlir/IR/BuiltinAttributeInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/SymbolInterfaces.td"
 include "mlir/Interfaces/CallInterfaces.td"
@@ -76,6 +77,10 @@ def FLOW_DispatchWorkgroupsOp : FLOW_PureOp<"dispatch.workgroups", [
   IsolatedFromAbove,
   AttrSizedOperandSegments,
   DeclareOpInterfaceMethods<Util_ClosureOpInterface>,
+  DeclareOpInterfaceMethods<Util_HoistableOpInterface, [
+    "isAtomicallyHoistableOp",
+    "isOperandHoistable",
+  ]>,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
     "getTiedOperandsIndexAndLength",
   ]>,
@@ -458,7 +463,7 @@ def FLOW_DispatchTensorLoadOp : FLOW_PureOp<"dispatch.tensor.load", [
     /// and `static_strides` attributes.
     std::array<unsigned, 3> getArrayAttrMaxRanks() {
       unsigned sourceRank =
-          getSource().getType().cast<DispatchTensorType>().asRankedTensorType().getRank();
+          cast<DispatchTensorType>(getSource().getType()).asRankedTensorType().getRank();
       return {sourceRank, sourceRank, sourceRank};
     }
 
@@ -483,12 +488,12 @@ def FLOW_DispatchTensorLoadOp : FLOW_PureOp<"dispatch.tensor.load", [
 
     /// Return the result type as a `RankedTensorType`.
     RankedTensorType getType() {
-      return getResult().getType().cast<RankedTensorType>();
+      return cast<RankedTensorType>(getResult().getType());
     }
 
     /// Return the type of the source as `IREE::Flow::DispatchTensorType`.
     IREE::Flow::DispatchTensorType getSourceType() {
-      return getSource().getType().cast<IREE::Flow::DispatchTensorType>();
+      return cast<IREE::Flow::DispatchTensorType>(getSource().getType());
     }
 
     ValueRange getOperandDynamicDims(unsigned idx) { return getSourceDims(); }
@@ -567,16 +572,16 @@ def FLOW_DispatchTensorStoreOp : FLOW_Op<"dispatch.tensor.store", [
     /// and `static_strides` attributes.
     std::array<unsigned, 3> getArrayAttrMaxRanks() {
       unsigned resultRank =
-           getTarget().getType().cast<DispatchTensorType>().asRankedTensorType().getRank();
+           cast<DispatchTensorType>(getTarget().getType()).asRankedTensorType().getRank();
       return {resultRank, resultRank, resultRank};
     }
 
     /// Return the type of the value type as a RankedTensorType.
-    RankedTensorType getValueType() { return getValue().getType().cast<RankedTensorType>(); }
+    RankedTensorType getValueType() { return cast<RankedTensorType>(getValue().getType()); }
 
     /// Return the type of the target.
     IREE::Flow::DispatchTensorType getTargetType() {
-      return getTarget().getType().cast<IREE::Flow::DispatchTensorType>();
+      return cast<IREE::Flow::DispatchTensorType>(getTarget().getType());
     }
 
     /// Return the number of leading operands before the `offsets`, `sizes` and
@@ -1039,24 +1044,58 @@ def OpGroupTensorOps : OpDocGroup {
 
 let opDocGroup = OpGroupTensorOps in {
 
-// TODO(benvanik): make this behave like std.constant if not dynamic.
-def FLOW_TensorConstantOp : FLOW_Op<"tensor.constant"> {
+def FLOW_TensorConstantOp : FLOW_PureOp<"tensor.constant", [
+  ConstantLike,
+  AllTypesMatch<["value", "result"]>,
+]> {
   let summary = [{tensor constant that can have dynamic dimensions}];
   let description = [{
-    Allows specifying a constant where the return value can erase shape
-    information. This operation is declared as having side effects and has no
-    folder, so will not be optimized away by the compiler. The underlying shape
-    information should be hidden from the compiler and resolved at runtime.
+    Allows specifying a tensor constant of IREE-specific types/attributes.
 
     ```mlir
-    %c = flow.tensor.constant tensor<2x2xf32> -> tensor<?x?xf32>
-    %res = math.absf %c : tensor<?x?xf32>
+    %cst = flow.tensor.constant #something_tensor_like : tensor<2x2xf32>
+    %res = math.absf %cst : tensor<2x2xf32>
     ```
   }];
-  let arguments = (ins ElementsAttr:$value);
+  let arguments = (ins TypedAttrInterface:$value);
   let results = (outs AnyTensor:$result);
+
   let assemblyFormat = [{
-    $value attr-dict `->` type($result)
+    attr-dict $value
+  }];
+
+  let extraClassDeclaration = [{
+    // Returns true if the constant op can be built with the given attribute.
+    static bool isBuildableWith(Attribute value, Type type);
+  }];
+
+  let hasFolder = 1;
+}
+
+def FLOW_TensorDynamicConstantOp : FLOW_Op<"tensor.dynamic_constant"> {
+  let summary = [{tensor constant that can have dynamic dimensions}];
+  let description = [{
+    Allows specifying a tensor constant of IREE-specific types/attributes with
+    a dynamic shape that approximates a value as passed from the user. This
+    disables many optimizations and should only be used when testing or
+    benchmarking and wanting to ensure that dynamic dimension behavior is
+    preserved.
+
+    ```mlir
+    %cst = flow.tensor.dynamic_constant #something_tensor_like : tensor<2x2xf32> -> tensor<?x2xf32>
+    %res = math.absf %cst : tensor<?x2xf32>
+    ```
+  }];
+  let arguments = (ins TypedAttrInterface:$value);
+  let results = (outs AnyTensor:$result);
+
+  let assemblyFormat = [{
+    attr-dict $value `->` type($result)
+  }];
+
+  let extraClassDeclaration = [{
+    // Returns true if the constant op can be built with the given attribute.
+    static bool isBuildableWith(Attribute value, Type type);
   }];
 
   let hasFolder = 1;
@@ -1213,7 +1252,7 @@ def FLOW_TensorBitCastOp : FLOW_PureOp<"tensor.bitcast", [
 def FLOW_TensorLoadOp : FLOW_PureOp<"tensor.load", [
   TypesMatchWith<"value type matches element type of target operand",
                   "source", "result",
-                  "$_self.cast<ShapedType>().getElementType()">,
+                  "cast<ShapedType>($_self).getElementType()">,
   AttrSizedOperandSegments,
   Util_ShapeAwareOp,
 ]> {
@@ -1264,7 +1303,7 @@ def FLOW_TensorStoreOp : FLOW_PureOp<"tensor.store", [
   AllTypesMatch<["target", "result"]>,
   TypesMatchWith<"value type matches element type of target operand",
                   "target", "value",
-                  "$_self.cast<ShapedType>().getElementType()">,
+                  "cast<ShapedType>($_self).getElementType()">,
   AttrSizedOperandSegments,
   Util_ShapeAwareOp,
 ]> {
@@ -1383,7 +1422,7 @@ def FLOW_TensorEmptyOp : FLOW_PureOp<"tensor.empty", [
 def FLOW_TensorSplatOp : FLOW_PureOp<"tensor.splat", [
   TypesMatchWith<"value type matches element type of result",
                   "result", "value",
-                  "$_self.cast<ShapedType>().getElementType()">,
+                  "cast<ShapedType>($_self).getElementType()">,
   DeclareOpInterfaceMethods<Util_HoistableOpInterface>,
   Util_ShapeAwareOp,
 ]> {

@@ -90,4 +90,23 @@ iree_lit_test_suite(
     "hostonly"
 )
 
+iree_lit_test_suite(
+  NAME
+    mlp_linalg_example
+  SRCS
+    "mlp_linalg.mlir"
+    "mlp_linalg_two_matmul.mlir"
+  TOOLS
+    FileCheck
+    iree-compile
+    iree-run-module
+    iree_samples_custom_dispatch_cpu_mlp_plugin
+  DATA
+    "mlp_linalg_spec.pdl.mlir"
+    "mlp_spec_matmul.mlir"
+  LABELS
+    "driver=local-sync"
+    "hostonly"
+)
+
 endif(IREE_HAL_EXECUTABLE_PLUGIN_SYSTEM_LIBRARY)

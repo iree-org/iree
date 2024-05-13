@@ -8,8 +8,8 @@
 #define IREE_COMPILER_CODEGEN_LLVMGPU_TRANSFORMEXTENSIONS_LLVMGPUEXTENSIONS
 
 include "mlir/Dialect/Transform/IR/TransformDialect.td"
-include "mlir/Dialect/Transform/IR/TransformInterfaces.td"
 include "mlir/Dialect/Transform/IR/TransformTypes.td"
+include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpBase.td"
 
@@ -741,11 +741,11 @@ def AMDGPUDistributeVectorsOp :
 
     let arguments = (ins TransformHandleTypeInterface:$target,
                          UnitAttr:$test_conversion);
-    let results = (outs);
+    let results = (outs TransformHandleTypeInterface:$result);
 
     let assemblyFormat = [{
       $target (`test_conversion` $test_conversion^)?
-      attr-dict `:` type($target)
+      attr-dict `:` functional-type(operands, results)
     }];
     let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 

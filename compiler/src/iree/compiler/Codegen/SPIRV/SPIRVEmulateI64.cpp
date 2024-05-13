@@ -152,7 +152,7 @@ populateIreeI64EmulationPatterns(arith::WideIntEmulationConverter &converter,
                                                   patterns.getContext());
 }
 
-static bool supportsI64(ModuleOp op) {
+static bool supportsI64(FunctionOpInterface op) {
   spirv::TargetEnvAttr attr = getSPIRVTargetEnvAttr(op);
   assert(attr && "Not a valid spirv module");
   spirv::TargetEnv env(attr);
@@ -170,7 +170,7 @@ struct SPIRVEmulateI64Pass final
   }
 
   void runOnOperation() override {
-    ModuleOp op = getOperation();
+    auto op = getOperation();
     if (supportsI64(op))
       return;
 
@@ -229,7 +229,8 @@ struct SPIRVEmulateI64Pass final
 // Public interface
 //===----------------------------------------------------------------------===//
 
-std::unique_ptr<OperationPass<ModuleOp>> createSPIRVEmulateI64Pass() {
+std::unique_ptr<InterfacePass<FunctionOpInterface>>
+createSPIRVEmulateI64Pass() {
   return std::make_unique<SPIRVEmulateI64Pass>();
 }
 

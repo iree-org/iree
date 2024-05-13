@@ -32,6 +32,7 @@ iree_cc_library(
     MLIRMemRefDialect
     MLIRNVGPUDialect
     MLIRPass
+    MLIRTransformUtils
     MLIRTransforms
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Dialect::HAL::IR
@@ -51,6 +52,7 @@ iree_cc_library(
     "GPUCheckResourceUsage.cpp"
     "GPUCreateFastSlowPath.cpp"
     "GPUDistribute.cpp"
+    "GPUDistributeScfFor.cpp"
     "GPUDistributeSharedMemoryCopy.cpp"
     "GPUDistributionPatterns.cpp"
     "GPUGeneralizeNamedOps.cpp"
@@ -63,12 +65,13 @@ iree_cc_library(
     "GPUTensorAlloc.cpp"
     "GPUTensorTile.cpp"
     "GPUTensorTileToSerialLoops.cpp"
+    "GPUTile.cpp"
     "GPUTileReduction.cpp"
     "GPUVectorAlloc.cpp"
     "GPUVectorDistribution.cpp"
     "Passes.cpp"
     "VectorReductionToGPU.cpp"
-    "WorkGroupSwizzle.cpp"
+    "WorkgroupReordering.cpp"
     "WorkgroupSpecializationPass.cpp"
   DEPS
     ::PassHeaders
@@ -106,13 +109,16 @@ iree_cc_library(
     MLIRSupport
     MLIRTensorDialect
     MLIRTensorTransforms
+    MLIRTransformUtils
     MLIRTransforms
     MLIRVectorDialect
     MLIRVectorToSCF
     MLIRVectorTransforms
     iree::compiler::Codegen::Common
+    iree::compiler::Codegen::Common::VectorLayoutAnalysis
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
+    iree::compiler::Codegen::Interfaces::PartitionableLoopsInterface
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
     iree::compiler::Codegen::Utils::VectorOpUtils

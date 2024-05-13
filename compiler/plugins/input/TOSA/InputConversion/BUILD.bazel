@@ -43,6 +43,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:LinalgDialect",
         "@llvm-project//mlir:Pass",
         "@llvm-project//mlir:TensorDialect",
+        "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
     ],
 )
@@ -78,6 +79,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:TosaToMLProgram",
         "@llvm-project//mlir:TosaToSCF",
         "@llvm-project//mlir:TosaToTensor",
+        "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
     ],
 )

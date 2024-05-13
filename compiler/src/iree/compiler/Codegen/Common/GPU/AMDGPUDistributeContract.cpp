@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <numeric>
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Utils/VectorOpUtils.h"
@@ -40,7 +41,7 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
       return rewriter.notifyMatchFailure(
           contractOp, "missing nested layout for contraction result");
     }
-    int64_t rank = resultLayout.getBatchOrder().size();
+    int64_t rank = resultLayout.getRank();
 
     NestedLayoutAttr lhsLayout =
         dyn_cast<NestedLayoutAttr>(signature[contractOp.getLhs()]);
@@ -57,18 +58,12 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
 
     // We assume there is an decision made before regarding which mfma intrinsic
     // to use and it is attached as an attribute to this contract op.
-    auto mfmaAttr =
-        contractOp->getAttrOfType<IREE::GPU::MFMAAttr>("iree.amdgpu.mfma");
-    if (!mfmaAttr) {
+    auto mmaAttr =
+        contractOp->getAttrOfType<IREE::GPU::MMAAttr>("iree.amdgpu.mma");
+    if (!mmaAttr) {
       return rewriter.notifyMatchFailure(
-          contractOp, "missing iree.amdgpu.mfma intrinsic attribute");
+          contractOp, "missing iree.amdgpu.mma intrinsic attribute");
     }
-    // Get the storage vector types that each thread is in charge of.
-    auto [aVectorType, bVectorType, cVectorType] = mfmaAttr.getABCVectorTypes();
-    // Get parameters for the amdgpu.mfma operation.
-    MFMAParameters mfmaParams;
-    std::tie(mfmaParams.m, mfmaParams.n, mfmaParams.k) = mfmaAttr.getMNKShape();
-    mfmaParams.blocks = mfmaAttr.getBlockSize();
 
     // Infer the contract kind so that we know know to correlate M/N/K dims.
     VectorContractOpInfo opDetail(contractOp);
@@ -92,12 +87,12 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
     LLVM_DEBUG(llvm::dbgs() << "init tile: " << finalTile << "\n");
 
     // Offsets into the LHS/RHS batches.
-    SmallVector<int64_t, 2> lhsBatchOffsets(rank, 0);
-    SmallVector<int64_t, 2> rhsBatchOffsets(rank, 0);
+    SmallVector<int64_t> lhsBatchOffsets(rank, 0);
+    SmallVector<int64_t> rhsBatchOffsets(rank, 0);
 
     // Offsets into the result batches.
     ArrayRef<int64_t> resultBatches = resultLayout.getBatchesPerSubgroup();
-    SmallVector<int64_t, 2> resultBatchTileSizes(rank, 1);
+    SmallVector<int64_t> resultBatchTileSizes(rank, 1);
     LLVM_DEBUG({
       llvm::dbgs() << "result batches: [";
       llvm::interleaveComma(resultBatches, llvm::dbgs());
@@ -109,18 +104,22 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
     Value lhs = getDistributed(rewriter, contractOp.getLhs(), lhsLayout);
     Value rhs = getDistributed(rewriter, contractOp.getRhs(), rhsLayout);
 
+    SmallVector<AffineMap> indexingMaps = contractOp.getIndexingMapsArray();
+    AffineMap lhsMap = compressUnusedDims(indexingMaps[0]);
+    AffineMap rhsMap = compressUnusedDims(indexingMaps[1]);
+    AffineMap resMap = compressUnusedDims(indexingMaps[2]);
+
+    SmallVector<int64_t> resBatchOrder(resMap.getNumResults());
+    std::iota(resBatchOrder.begin(), resBatchOrder.end(), 0);
+    resBatchOrder = applyPermutationMap(resMap, ArrayRef(resBatchOrder));
+
     // Iterate over all result batches and unroll computation to direct MFMA
     // intrinsic ops.
     Location loc = contractOp.getLoc();
     auto resultTiles = StaticTileOffsetRange(
-        resultBatches, resultBatchTileSizes, resultLayout.getBatchOrder());
+        resultBatches, resultBatchTileSizes, resBatchOrder);
     SmallVector<int64_t, 2> resultBatchOffsets;
-    for (SmallVector<int64_t, 2> originalResultBatchOffsets : resultTiles) {
-      // Permute the result batch offsets first to match the distributed shape
-      // dim order for indexing.
-      resultBatchOffsets = originalResultBatchOffsets;
-      applyPermutationToVector(resultBatchOffsets,
-                               resultLayout.getBatchOrder());
+    for (SmallVector<int64_t, 2> resultBatchOffsets : resultTiles) {
       LLVM_DEBUG({
         llvm::dbgs() << "current result batch offsets: [";
         llvm::interleaveComma(resultBatchOffsets, llvm::dbgs());
@@ -146,9 +145,9 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
         // Fills the batch offsets for LHS and RHS. For the K dimension it's the
         // induction variable; for the M/N dimension we need to extract from the
         // result batch offsets.
-        fillOperandBatchOffsets(opDetail, k, originalResultBatchOffsets,
-                                resultLayout, lhsBatchOffsets, rhsBatchOffsets,
-                                lhsLayout, rhsLayout);
+        fillOperandBatchOffsets(opDetail, k, resultBatchOffsets,
+                                lhsBatchOffsets, rhsBatchOffsets, lhsMap,
+                                rhsMap);
         LLVM_DEBUG({
           llvm::dbgs() << "current lhs batch offsets: [";
           llvm::interleaveComma(lhsBatchOffsets, llvm::dbgs());
@@ -162,8 +161,8 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
             rewriter.create<vector::ExtractOp>(loc, lhs, lhsBatchOffsets);
         Value rhsSlice =
             rewriter.create<vector::ExtractOp>(loc, rhs, rhsBatchOffsets);
-        accSlice = computeMMA(rewriter, loc, mfmaParams, lhsSlice, rhsSlice,
-                              accSlice, aVectorType, bVectorType, cVectorType);
+        accSlice =
+            computeMMA(rewriter, loc, mmaAttr, lhsSlice, rhsSlice, accSlice);
       }
       finalTile = rewriter.create<vector::InsertOp>(loc, accSlice, finalTile,
                                                     resultBatchOffsets);
@@ -177,7 +176,7 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
   std::optional<int64_t> getKBatchSize(const VectorContractOpInfo &opDetail,
                                        NestedLayoutAttr lhsLayout,
                                        NestedLayoutAttr rhsLayout) const {
-    auto [lhsK, rhsK] = *opDetail.getOperandKIndex();
+    auto [lhsK, rhsK] = opDetail.getOperandKIndex();
     int64_t lhsKBatch = lhsLayout.getBatchesPerSubgroup()[lhsK];
     int64_t rhsKBatch = rhsLayout.getBatchesPerSubgroup()[rhsK];
 
@@ -190,47 +189,48 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
   // both LHS and RHS.
   void fillOperandBatchOffsets(const VectorContractOpInfo &opDetail,
                                int64_t kOffset, ArrayRef<int64_t> resultOffsets,
-                               NestedLayoutAttr resultLayout,
-                               SmallVector<int64_t, 2> &lhsOffsets,
-                               SmallVector<int64_t, 2> &rhsOffsets,
-                               NestedLayoutAttr lhsLayout,
-                               NestedLayoutAttr rhsLayout) const {
-    auto [lhsM, rhsN] = *opDetail.getOperandMNIndex();
-    auto [lhsK, rhsK] = *opDetail.getOperandKIndex();
-    auto [resultM, resultN] = *opDetail.getResultMNIndex();
+                               SmallVector<int64_t> &lhsOffsets,
+                               SmallVector<int64_t> &rhsOffsets,
+                               AffineMap lhsMap, AffineMap rhsMap) const {
+    auto [lhsK, rhsK] = opDetail.getOperandKIndex();
     // resultOffsets contains batch indices into the C/D vector. It is a 2-D
     // index for both M and N. We need to split out for M and N, and add index
     // for K.
-    lhsOffsets[lhsM] = resultOffsets[resultM];
+    for (auto [lhsM, resultM] :
+         llvm::zip_equal(opDetail.lhsMDims, opDetail.outMDims)) {
+      lhsOffsets[lhsM] = resultOffsets[resultM];
+    }
+
+    if (opDetail.getBatchCount() == 1) {
+      rhsOffsets[0] = resultOffsets[0];
+      lhsOffsets[0] = resultOffsets[0];
+    }
+
+    for (auto [rhsN, resultN] :
+         llvm::zip_equal(opDetail.rhsNDims, opDetail.outNDims)) {
+      rhsOffsets[rhsN] = resultOffsets[resultN];
+    }
+
     lhsOffsets[lhsK] = kOffset;
-    rhsOffsets[rhsN] = resultOffsets[resultN];
     rhsOffsets[rhsK] = kOffset;
-
-    // Now apply permutation on LHS/RHS according to their batch order.
-    applyPermutationToVector(lhsOffsets, lhsLayout.getBatchOrder());
-    applyPermutationToVector(rhsOffsets, rhsLayout.getBatchOrder());
   }
-
-  struct MFMAParameters {
-    uint32_t m = 0;
-    uint32_t n = 0;
-    uint32_t k = 0;
-    uint32_t blocks = 0;
-  };
 
   // Generates amdgpu.mfma operation on the given inputs for the given MFMA
   // |intrinsic|.
-  Value computeMMA(OpBuilder &builder, Location loc,
-                   const MFMAParameters &mfmaParams, Value a, Value b, Value c,
-                   VectorType aType, VectorType bType, VectorType cType) const {
-    Value aCast = builder.create<vector::ShapeCastOp>(a.getLoc(), aType, a);
-    Value bCast = builder.create<vector::ShapeCastOp>(b.getLoc(), bType, b);
-    Value cCast = builder.create<vector::ShapeCastOp>(c.getLoc(), cType, c);
-
-    Value mfmaOp = builder.create<amdgpu::MFMAOp>(
-        loc, cType, mfmaParams.m, mfmaParams.n, mfmaParams.k, mfmaParams.blocks,
-        aCast, bCast, cCast);
-    return builder.create<vector::ShapeCastOp>(c.getLoc(), c.getType(), mfmaOp);
+  Value computeMMA(OpBuilder &builder, Location loc, IREE::GPU::MMAAttr mmaAttr,
+                   Value a, Value b, Value c) const {
+    // Get the storage vector types that each thread is in charge of.
+    auto [aVectorType, bVectorType, cVectorType] = mmaAttr.getABCVectorTypes();
+    Value aCast =
+        builder.create<vector::ShapeCastOp>(a.getLoc(), aVectorType, a);
+    Value bCast =
+        builder.create<vector::ShapeCastOp>(b.getLoc(), bVectorType, b);
+    Value cCast =
+        builder.create<vector::ShapeCastOp>(c.getLoc(), cVectorType, c);
+    FailureOr<Value> mmaOp = mmaAttr.buildMmaOperation(
+        builder, loc, cVectorType, aCast, bCast, cCast);
+    assert(succeeded(mmaOp) && "Failed to construct mma op");
+    return builder.create<vector::ShapeCastOp>(c.getLoc(), c.getType(), *mmaOp);
   }
 };
 

@@ -6,11 +6,10 @@
 
 #include "iree/compiler/Codegen/VMVX/KernelDispatch.h"
 
+#include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/Utils/CPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 
 #define DEBUG_TYPE "vmvx-kernel-dispatch"
 
@@ -117,22 +116,13 @@ setConfigForKernel(mlir::FunctionOpInterface entryPointFn) {
   return success();
 }
 
-LogicalResult initVMVXLaunchConfig(ModuleOp moduleOp) {
-  llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
-      getAllEntryPoints(moduleOp);
-  for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
-    auto exportOp = exportOps.lookup(funcOp.getName());
-    if (!exportOp) {
-      continue;
-    }
+LogicalResult initVMVXLaunchConfig(FunctionOpInterface funcOp) {
+  if (getTranslationInfo(funcOp)) {
+    return success();
+  }
 
-    if (getTranslationInfo(exportOp)) {
-      continue;
-    }
-
-    if (failed(setConfigForKernel(funcOp))) {
-      return failure();
-    }
+  if (failed(setConfigForKernel(funcOp))) {
+    return failure();
   }
 
   return success();

@@ -539,7 +539,7 @@ private:
       }
       callResults.push_back(entryBuilder.create<IREE::HAL::TensorExportOp>(
           result.getLoc(), bufferType, result, outputDynamicDims.tensorType,
-          dynamicDims, /*target_storage=*/nullptr, /*name=*/nullptr));
+          dynamicDims, /*name=*/nullptr));
       for (auto [dynamicDim, globalOp] :
            llvm::zip_equal(dynamicDims, outputDynamicDims.globalOps)) {
         globalOp.createStoreOp(result.getLoc(), dynamicDim, entryBuilder);

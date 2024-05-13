@@ -756,7 +756,7 @@ struct RewriteCallOpABI : public OpRewritePattern<LLVM::CallOp> {
 
   LogicalResult matchAndRewrite(LLVM::CallOp callOp,
                                 PatternRewriter &rewriter) const override {
-    auto symbol = callOp.getCallableForCallee().dyn_cast<SymbolRefAttr>();
+    auto symbol = dyn_cast<SymbolRefAttr>(callOp.getCallableForCallee());
     auto flatSymbol = llvm::dyn_cast_if_present<FlatSymbolRefAttr>(symbol);
     if (!flatSymbol)
       return failure();
@@ -804,7 +804,7 @@ struct RewriteExternCallOpToDynamicImportCallOp
   LogicalResult matchAndRewrite(LLVM::CallOp callOp,
                                 PatternRewriter &rewriter) const override {
     // Ignore indirect calls (they're probably already converted imports).
-    auto symbol = callOp.getCallableForCallee().dyn_cast<SymbolRefAttr>();
+    auto symbol = dyn_cast<SymbolRefAttr>(callOp.getCallableForCallee());
     auto flatSymbol = llvm::dyn_cast_if_present<FlatSymbolRefAttr>(symbol);
     if (!flatSymbol)
       return failure();

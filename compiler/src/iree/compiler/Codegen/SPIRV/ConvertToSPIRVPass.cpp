@@ -22,6 +22,7 @@
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
@@ -483,14 +484,13 @@ public:
     registry.insert<spirv::SPIRVDialect>();
   }
 
-  explicit ConvertToSPIRVPass(bool enableFastMath, unsigned indexBits)
-      : enableFastMath(enableFastMath), indexBits(indexBits) {}
+  explicit ConvertToSPIRVPass(unsigned indexBits) : indexBits(indexBits) {}
 
-  LogicalResult initializeOptions(StringRef options) override {
-    if (failed(Pass::initializeOptions(options)))
+  LogicalResult initializeOptions(
+      StringRef options,
+      function_ref<LogicalResult(const Twine &)> errorHandler) override {
+    if (failed(Pass::initializeOptions(options, errorHandler)))
       return failure();
-    // Use pass option if present.
-    enableFastMath |= enableFastMathOption;
     indexBits = indexBitsOption;
     return success();
   }
@@ -498,9 +498,6 @@ public:
   void runOnOperation() override;
 
 private:
-  // Enable fast math when doing type conversion by assuming no NaN or infinite
-  // values.
-  bool enableFastMath;
   // Use 64 bits for index widths.
   unsigned indexBits;
 };
@@ -518,32 +515,32 @@ void ConvertToSPIRVPass::runOnOperation() {
     useIndirectBindings = true;
   };
 
-  llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
-      getAllEntryPoints(moduleOp);
   for (auto funcOp : moduleOp.getOps<mlir::FunctionOpInterface>()) {
-    auto exportOp = exportOps.lookup(funcOp.getName());
+    auto exportOp = getEntryPoint(funcOp);
     if (!exportOp)
       continue;
-    // TODO(ravishankarm): This needs to be removed after ConvertToGPU is
-    // deprecated. All passes must set the `workgroup_size` on the
-    // `hal.executable.export` directly and not on the function.
     if (funcOp->hasAttr(spirv::getEntryPointABIAttrName()))
       continue;
-    SmallVector<int64_t> workgroupSize = getWorkgroupSize(exportOp);
-    if (workgroupSize.empty()) {
-      exportOp.emitOpError(
+    std::optional<ArrayAttr> workgroupSize = exportOp->getWorkgroupSize();
+    if (!workgroupSize) {
+      exportOp->emitOpError(
           "expected workgroup_size attribute to be set for SPIR-V lowering");
       return signalPassFailure();
     }
-    std::optional<int64_t> subgroupSize = getSubgroupSize(exportOp);
-    auto workgroupSize32 = llvm::map_to_vector(
-        workgroupSize, [](int64_t v) { return static_cast<int32_t>(v); });
+    auto workgroupSize32 =
+        llvm::map_to_vector(workgroupSize.value(), [](Attribute v) {
+          return static_cast<int32_t>(
+              cast<IntegerAttr>(v).getValue().getZExtValue());
+        });
+
+    std::optional<APInt> subgroupSize = exportOp->getSubgroupSize();
     std::optional<int> subgroupSize32;
-    if (subgroupSize)
-      subgroupSize32 = *subgroupSize;
+    if (subgroupSize && subgroupSize->isNonNegative()) {
+      subgroupSize32 = subgroupSize->getZExtValue();
+    }
 
     for (IREE::HAL::DescriptorSetLayoutAttr setLayout :
-         exportOp.getLayout().getSetLayouts()) {
+         exportOp->getLayout().getSetLayouts()) {
       bool isIndirect =
           setLayout.getFlags() == IREE::HAL::DescriptorSetLayoutFlags::Indirect;
       if (isIndirect != useIndirectBindings) {
@@ -631,7 +628,6 @@ void ConvertToSPIRVPass::runOnOperation() {
   }
 
   SPIRVConversionOptions options = {};
-  options.enableFastMathMode = this->enableFastMath;
   options.use64bitIndex = use64bitIndex;
 
   SPIRVTypeConverter typeConverter(targetAttr, options);
@@ -746,8 +742,8 @@ void ConvertToSPIRVPass::runOnOperation() {
 //===----------------------------------------------------------------------===//
 
 std::unique_ptr<OperationPass<ModuleOp>>
-createConvertToSPIRVPass(bool enableFastMath, unsigned indexBits) {
-  return std::make_unique<ConvertToSPIRVPass>(enableFastMath, indexBits);
+createConvertToSPIRVPass(unsigned indexBits) {
+  return std::make_unique<ConvertToSPIRVPass>(indexBits);
 }
 
 } // namespace mlir::iree_compiler

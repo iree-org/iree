@@ -83,9 +83,8 @@ struct FuncAnalysis {
 
   int getNumRefArguments() {
     assert(originalFunctionType.has_value());
-    return llvm::count_if(
-        originalFunctionType.value().getInputs(),
-        [](Type inputType) { return isa<IREE::VM::RefType>(inputType); });
+    return llvm::count_if(originalFunctionType.value().getInputs(),
+                          llvm::IsaPred<IREE::VM::RefType>);
   }
 
   int getNumLocalRefs() { return getNumRefRegisters() - getNumRefArguments(); }

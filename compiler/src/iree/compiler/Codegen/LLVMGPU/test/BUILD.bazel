@@ -55,6 +55,7 @@ iree_lit_test_suite(
             "pack_pipeline_test.mlir",
             "pack_shared_memory_alloc.mlir",
             "prefetch_shared_memory.mlir",
+            "promote_matmul_to_fit_mma.mlir",
             "tensor_pad.mlir",
             "tensorcore_vectorization.mlir",
             "transform_dialect_bufferize.mlir",

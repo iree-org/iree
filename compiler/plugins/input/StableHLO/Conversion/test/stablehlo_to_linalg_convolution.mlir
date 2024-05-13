@@ -357,7 +357,7 @@ func.func @depthwise_conv(%arg0: tensor<2x4x5x2xf32>,
 }
 // CHECK-DAG:       %[[CST:.+]] = arith.constant 0.000000e+00 : f32
 // CHECK:       %[[COLLAPSE:.+]] = tensor.collapse_shape %[[FILTER]] {{\[}}[0, 1, 2, 3]] : tensor<2x2x1x6xf32> into tensor<24xf32>
-// CHECK:       %[[EXPAND:.+]] = tensor.expand_shape %[[COLLAPSE]] {{\[}}[0, 1, 2, 3]] : tensor<24xf32> into tensor<2x2x2x3xf32>
+// CHECK:       %[[EXPAND:.+]] = tensor.expand_shape %[[COLLAPSE]] {{\[}}[0, 1, 2, 3]] output_shape [2, 2, 2, 3] : tensor<24xf32> into tensor<2x2x2x3xf32>
 // CHECK:       %[[INIT:.+]] = tensor.empty() : tensor<2x3x4x2x3xf32>
 // CHECK:       %[[FILL:.+]] = linalg.fill ins(%[[CST]] : f32) outs(%[[INIT]] : tensor<2x3x4x2x3xf32>) -> tensor<2x3x4x2x3xf32>
 // CHECK:       %[[OUT:.+]] = linalg.depthwise_conv_2d_nhwc_hwcm

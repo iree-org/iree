@@ -55,16 +55,21 @@ iree_cc_library(
     MLIRSCFDialect
     MLIRSCFTransforms
     MLIRSCFUtils
+    MLIRSubsetOpInterface
     MLIRTensorDialect
     MLIRTensorTransformOps
     MLIRTensorTransforms
     MLIRTransformDialect
+    MLIRTransformDialectInterfaces
+    MLIRTransformUtils
     MLIRTransforms
     MLIRVectorDialect
     MLIRVectorToGPU
     MLIRVectorTransforms
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Common::GPU::CommonGPUPasses
+    iree::compiler::Codegen::Common::VectorLayoutAnalysis
+    iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
     iree::compiler::Codegen::Interfaces::BufferizationInterfaces
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils

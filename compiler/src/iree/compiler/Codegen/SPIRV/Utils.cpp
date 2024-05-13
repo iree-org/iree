@@ -4,12 +4,11 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-//===- Utils.cpp - Utility functions for SPIR-V CodeGen -------------------===//
-
 #include "iree/compiler/Codegen/SPIRV/Utils.h"
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -36,10 +35,7 @@ bool usesSPIRVCodeGen(IREE::HAL::ExecutableVariantOp variantOp) {
 const char *getSPIRVDistributeAttrName() { return "iree.spirv.distribute_dim"; }
 
 DictionaryAttr getTargetConfigAttr(Operation *op) {
-  auto variant = op->getParentOfType<IREE::HAL::ExecutableVariantOp>();
-  if (!variant)
-    return nullptr;
-  IREE::HAL::ExecutableTargetAttr targetAttr = variant.getTarget();
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
   if (!targetAttr)
     return nullptr;
   return targetAttr.getConfiguration();
@@ -61,14 +57,10 @@ UnitAttr getIndirectBindingsAttr(Operation *op) {
 }
 
 std::optional<int> getSPIRVSubgroupSize(mlir::FunctionOpInterface funcOp) {
-  auto moduleOp = funcOp->getParentOfType<ModuleOp>();
-  llvm::StringMap<IREE::HAL::ExecutableExportOp> exportOps =
-      getAllEntryPoints(moduleOp);
-  auto exportOp = exportOps.lookup(funcOp.getName());
-  if (!exportOp)
-    return std::nullopt;
-  if (auto size = exportOp.getSubgroupSize())
-    return size->getSExtValue();
+  std::optional<int64_t> subgroupSize = getSubgroupSize(funcOp);
+  if (subgroupSize) {
+    return subgroupSize.value();
+  }
 
   spirv::TargetEnvAttr target = getSPIRVTargetEnvAttr(funcOp);
   if (!target)

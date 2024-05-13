@@ -23,6 +23,8 @@ using namespace mlir;
 
 namespace mlir::iree_compiler::IREE::VectorExt {
 
+using VectorValue = TypedValue<VectorType>;
+
 bool PerDimLayoutAttr::contains(const LayoutDimension &dim) {
   for (LayoutDimensionAttr label : getLabels()) {
     if (label.getValue() == dim)
@@ -50,28 +52,45 @@ std::optional<int64_t> LayoutAttr::getShape(const LayoutDimension &dim) const {
 
 // Get the SIMT Vector shape in the order specified by dims. If no dims are
 // specified, then return an empty vector.
-bool LayoutAttr::isValidLayout(ArrayRef<int64_t> shape) const {
-  for (auto perDimLayout : llvm::enumerate(getLayouts())) {
-    ArrayRef<int64_t> layoutShape = perDimLayout.value().getShapes();
-    int64_t computedShape =
+LogicalResult LayoutAttr::isValidLayout(VectorValue vector) const {
+  ArrayRef<int64_t> shape = vector.getType().getShape();
+  if (shape.size() != getRank()) {
+    return emitError(vector.getLoc(), "Rank of vector (" +
+                                          std::to_string(shape.size()) +
+                                          ") does not match rank of layout (" +
+                                          std::to_string(getRank()) + ").");
+  }
+  for (auto [idx, layout] : llvm::enumerate(getLayouts())) {
+    ArrayRef<int64_t> layoutShape = layout.getShapes();
+    int64_t expectedShape =
         std::reduce(layoutShape.begin(), layoutShape.end(),
                     static_cast<int64_t>(1), std::multiplies<int64_t>());
-    int64_t expectedShape = shape[perDimLayout.index()];
-    if (computedShape != expectedShape) {
-      return false;
+    if (expectedShape != shape[idx]) {
+      std::string shapeStr;
+      llvm::raw_string_ostream shapeOs(shapeStr);
+      llvm::interleaveComma(shape, shapeOs);
+      std::string layoutStr;
+      llvm::raw_string_ostream layoutOs(layoutStr);
+      printStripped(layoutOs);
+      return emitError(vector.getLoc(),
+                       "Vector shape: [" + shapeStr +
+                           "] does not match the layout (" + layoutStr +
+                           ") at dim " + std::to_string(idx) +
+                           ". Dimension expected by layout: " +
+                           std::to_string(expectedShape) +
+                           " actual: " + std::to_string(shape[idx]));
     }
   }
-  return true;
+  return success();
 }
 
 // Project out the layout for the specified dimensions
 // resulting in the layout for a lower dimensional vector.
 VectorLayoutInterface LayoutAttr::project(ArrayRef<bool> droppedDims) const {
-  assert(droppedDims.size() == getLayouts().size() &&
+  assert(droppedDims.size() == getRank() &&
          "droppedDims size must match layout size");
 
   ArrayRef<PerDimLayoutAttr> layouts = getLayouts();
-  assert(droppedDims.size() == layouts.size());
   SmallVector<PerDimLayoutAttr> newLayouts;
   for (auto pair : llvm::zip(droppedDims, layouts)) {
     if (!std::get<0>(pair))
@@ -83,14 +102,13 @@ VectorLayoutInterface LayoutAttr::project(ArrayRef<bool> droppedDims) const {
 // Permute the layout according to the provided permutation
 // vector. The dimensionality of the layout remains the same.
 VectorLayoutInterface LayoutAttr::permute(ArrayRef<int64_t> permutation) const {
-  assert(permutation.size() == getLayouts().size() &&
-         "permutation size must match layout size");
+  assert(permutation.size() == getRank() &&
+         "permutation size must match layout rank");
 
   ArrayRef<PerDimLayoutAttr> layouts = getLayouts();
-  assert(permutation.size() == layouts.size());
   SmallVector<PerDimLayoutAttr> newLayouts;
   for (unsigned index : permutation) {
-    assert(index >= 0 && index < layouts.size());
+    assert(index >= 0 && index < getRank());
     newLayouts.push_back(layouts[index]);
   }
   return LayoutAttr::get(getContext(), newLayouts);
@@ -126,12 +144,12 @@ SmallVector<int64_t> LayoutAttr::getDistributedShape() const {
 }
 
 PerDimLayoutAttr LayoutAttr::getDimLayout(int64_t dim) const {
-  assert(dim >= 0 && dim < getLayouts().size());
+  assert(dim >= 0 && dim < getRank());
   return getLayouts()[dim];
 }
 
 std::optional<int64_t> LayoutAttr::getBatchDim(int64_t dim) {
-  assert(dim < getLayouts().size());
+  assert(dim < getRank());
   PerDimLayoutAttr layout = getDimLayout(dim);
   for (auto [name, shape] :
        llvm::zip_equal(layout.getLabels(), layout.getShapes())) {
@@ -142,7 +160,7 @@ std::optional<int64_t> LayoutAttr::getBatchDim(int64_t dim) {
 }
 
 std::optional<int64_t> LayoutAttr::getLaneDim(int64_t dim) {
-  assert(dim < getLayouts().size());
+  assert(dim < getRank());
   PerDimLayoutAttr layout = getDimLayout(dim);
   for (auto [name, shape] :
        llvm::zip_equal(layout.getLabels(), layout.getShapes())) {
@@ -153,7 +171,7 @@ std::optional<int64_t> LayoutAttr::getLaneDim(int64_t dim) {
 }
 
 std::optional<LayoutDimension> LayoutAttr::getLane(int64_t dim) {
-  assert(dim < getLayouts().size());
+  assert(dim < getRank());
   PerDimLayoutAttr layout = getDimLayout(dim);
   for (auto [name, shape] :
        llvm::zip_equal(layout.getLabels(), layout.getShapes())) {
@@ -162,6 +180,8 @@ std::optional<LayoutDimension> LayoutAttr::getLane(int64_t dim) {
   }
   return std::nullopt;
 }
+
+int64_t LayoutAttr::getRank() const { return getLayouts().size(); }
 
 std::tuple<int64_t, int64_t, int64_t> LayoutAttr::getLaneGrid() {
   int64_t laneX = 1;
@@ -225,7 +245,7 @@ bool LayoutAttr::hasLaneConflictWith(const LayoutAttr &other) {
 // the rank of the layout in the process.
 VectorLayoutInterface
 NestedLayoutAttr::project(ArrayRef<bool> droppedDims) const {
-  assert(droppedDims.size() == getBatchesPerSubgroup().size() &&
+  assert(droppedDims.size() == getRank() &&
          "droppedDims size must match layout rank");
 
   // Projection for this layout simply means the sizes along the projected
@@ -265,12 +285,8 @@ NestedLayoutAttr::project(ArrayRef<bool> droppedDims) const {
 
   SmallVector<int64_t> subgroupOrder =
       getRankReducedPermutation(getSubgroupOrder());
-  SmallVector<int64_t> batchOrder = getRankReducedPermutation(getBatchOrder());
-  SmallVector<int64_t> outerOrder = getRankReducedPermutation(getOuterOrder());
   SmallVector<int64_t> threadOrder =
       getRankReducedPermutation(getThreadOrder());
-  SmallVector<int64_t> elementOrder =
-      getRankReducedPermutation(getElementOrder());
 
   // Compose the projected dims with the basis mask to get the new active
   // ids. Active ids indicates that we should use the ids marked as true, and
@@ -292,68 +308,118 @@ NestedLayoutAttr::project(ArrayRef<bool> droppedDims) const {
   };
   SmallVector<bool> subgroupMask(getSubgroupActiveIds());
   SmallVector<bool> threadMask(getThreadActiveIds());
-  composeMasks(subgroupMask, droppedDims);
-  composeMasks(threadMask, droppedDims);
+
+  SmallVector<bool> invertedDroppedThreadMask =
+      applyPermutation(droppedDims, invertPermutationVector(getThreadOrder()));
+  composeMasks(subgroupMask, invertedDroppedThreadMask);
+
+  SmallVector<bool> invertedDroppedSubgroupMask =
+      applyPermutation(droppedDims, invertPermutationVector(getThreadOrder()));
+  composeMasks(threadMask, invertedDroppedSubgroupMask);
 
   return NestedLayoutAttr::get(getContext(), subgroupCount, subgroupOrder,
-                               batchCount, batchOrder, outerCount, outerOrder,
-                               threadCount, threadOrder, elementCount,
-                               elementOrder, getSubgroupBasis(), subgroupMask,
+                               batchCount, outerCount, threadCount, threadOrder,
+                               elementCount, getSubgroupBasis(), subgroupMask,
                                getThreadBasis(), threadMask);
 }
 
 VectorLayoutInterface
 NestedLayoutAttr::permute(ArrayRef<int64_t> permutation) const {
+  // The order fields are permuted by the inverse permutation to map the
+  // permuted sizes back to their original positions.
+  //
+  // Shape = S
+  // Distributed Shape = DS
+  // Ordering = P
+  //
+  // S(A) * P(A) = DS(A)
+  //
+  // AT = transpose(A)
+  //
+  // Given:
+  // DS(A) = DS(AT) -- 1
+  // S(AT) = S(A) * perm -- 2
+  //
+  // :=
+  //
+  // Using 1
+  // S(A) * P(A) = S(AT) * P(AT)
+  // Using 2
+  // S(A) * P(A) =  S(A) * perm * P(AT)
+  // P(A) = perm * P(AT)
+  // P(AT) = perm^-1 * P(A)
+  SmallVector<int64_t> invPerm = invertPermutationVector(permutation);
   SmallVector<int64_t> subgroupCount =
       applyPermutation(getSubgroupsPerWorkgroup(), permutation);
   SmallVector<int64_t> subgroupOrder =
-      applyPermutation(getSubgroupOrder(), permutation);
+      applyPermutation(invPerm, getSubgroupOrder());
   SmallVector<int64_t> batchCount =
       applyPermutation(getBatchesPerSubgroup(), permutation);
-  SmallVector<int64_t> batchOrder =
-      applyPermutation(getBatchOrder(), permutation);
   SmallVector<int64_t> outerCount =
       applyPermutation(getOutersPerBatch(), permutation);
-  SmallVector<int64_t> outerOrder =
-      applyPermutation(getOuterOrder(), permutation);
   SmallVector<int64_t> threadCount =
       applyPermutation(getThreadsPerOuter(), permutation);
   SmallVector<int64_t> threadOrder =
-      applyPermutation(getThreadOrder(), permutation);
+      applyPermutation(invPerm, getThreadOrder());
   SmallVector<int64_t> elementCount =
       applyPermutation(getElementsPerThread(), permutation);
-  SmallVector<int64_t> elementOrder =
-      applyPermutation(getElementOrder(), permutation);
 
   return NestedLayoutAttr::get(
-      getContext(), subgroupCount, subgroupOrder, batchCount, batchOrder,
-      outerCount, outerOrder, threadCount, threadOrder, elementCount,
-      elementOrder, getSubgroupBasis(), getSubgroupActiveIds(),
-      getThreadBasis(), getThreadActiveIds());
+      getContext(), subgroupCount, subgroupOrder, batchCount, outerCount,
+      threadCount, threadOrder, elementCount, getSubgroupBasis(),
+      getSubgroupActiveIds(), getThreadBasis(), getThreadActiveIds());
 }
 
 /// We distribute to:
 /// <BATCH x OUTER x ELEMENT>
 SmallVector<int64_t> NestedLayoutAttr::getDistributedShape() const {
   SmallVector<int64_t> shape;
-  shape.append(applyPermutation(getBatchesPerSubgroup(), getBatchOrder()));
-  shape.append(applyPermutation(getOutersPerBatch(), getOuterOrder()));
-  shape.append(applyPermutation(getElementsPerThread(), getElementOrder()));
+  shape.append(getBatchesPerSubgroup().begin(), getBatchesPerSubgroup().end());
+  shape.append(getOutersPerBatch().begin(), getOutersPerBatch().end());
+  shape.append(getElementsPerThread().begin(), getElementsPerThread().end());
   return shape;
 }
 
-bool NestedLayoutAttr::isValidLayout(ArrayRef<int64_t> shape) const {
+// Gets the rank of the undistributed vector for this layout.
+int64_t NestedLayoutAttr::getRank() const {
+  // The layout requires that all size lists are the same length and match
+  // the rank of the undistributed vector, so just return the length of one
+  // of the fields.
+  return getBatchesPerSubgroup().size();
+}
+
+LogicalResult NestedLayoutAttr::isValidLayout(VectorValue vector) const {
+  int64_t rank = getRank();
+  ArrayRef<int64_t> shape = vector.getType().getShape();
+  if (shape.size() != rank) {
+    return emitError(vector.getLoc(), "Rank of vector (" +
+                                          std::to_string(shape.size()) +
+                                          ") does not match rank of layout (" +
+                                          std::to_string(rank) + ").");
+  }
   // Multiply all shapes in the layout.
-  for (int i = 0, e = shape.size(); i < e; ++i) {
+  for (int i = 0, e = rank; i < e; ++i) {
     int64_t expectedShape = getSubgroupsPerWorkgroup()[i] *
                             getBatchesPerSubgroup()[i] *
                             getOutersPerBatch()[i] * getThreadsPerOuter()[i] *
                             getElementsPerThread()[i];
     if (expectedShape != shape[i]) {
-      return false;
+      std::string shapeStr;
+      llvm::raw_string_ostream shapeOs(shapeStr);
+      llvm::interleaveComma(shape, shapeOs);
+      std::string layoutStr;
+      llvm::raw_string_ostream layoutOs(layoutStr);
+      printStripped(layoutOs);
+      return emitError(vector.getLoc(),
+                       "Vector shape: [" + shapeStr +
+                           "] does not match the layout (" + layoutStr +
+                           ") at dim " + std::to_string(i) +
+                           ". Dimension expected by layout: " +
+                           std::to_string(expectedShape) +
+                           " actual: " + std::to_string(shape[i]));
     }
   }
-  return true;
+  return success();
 }
 
 // TODO: These things should ideally go into the parser when we have a custom
@@ -361,17 +427,24 @@ bool NestedLayoutAttr::isValidLayout(ArrayRef<int64_t> shape) const {
 LogicalResult NestedLayoutAttr::verify(
     llvm::function_ref<InFlightDiagnostic()> emitError,
     ArrayRef<int64_t> subgroupsPerWorkgroup, ArrayRef<int64_t> subgroupOrder,
-    ArrayRef<int64_t> batchesPerSubgroup, ArrayRef<int64_t> batchOrder,
-    ArrayRef<int64_t> outersPerBatch, ArrayRef<int64_t> outerOrder,
+    ArrayRef<int64_t> batchesPerSubgroup, ArrayRef<int64_t> outersPerBatch,
     ArrayRef<int64_t> threadsPerOuter, ArrayRef<int64_t> threadOrder,
-    ArrayRef<int64_t> elementsPerThread, ArrayRef<int64_t> elementOrder,
-    ArrayRef<int64_t> subgroupBasis, ArrayRef<bool> subgroupActiveIds,
-    ArrayRef<int64_t> threadBasis, ArrayRef<bool> threadActiveIds) {
+    ArrayRef<int64_t> elementsPerThread, ArrayRef<int64_t> subgroupBasis,
+    ArrayRef<bool> subgroupActiveIds, ArrayRef<int64_t> threadBasis,
+    ArrayRef<bool> threadActiveIds) {
 
   size_t rank = subgroupsPerWorkgroup.size();
-  auto checkTile = [&](ArrayRef<int64_t> tileShape, ArrayRef<int64_t> order) {
-    if (tileShape.size() != rank || order.size() != rank) {
+  auto checkTile = [&](ArrayRef<int64_t> tileShape) {
+    if (tileShape.size() != rank) {
       emitError() << "all tiles must have the same rank as the layout";
+      return failure();
+    }
+    return success();
+  };
+
+  auto checkOrder = [&](ArrayRef<int64_t> order) {
+    if (order.size() != rank) {
+      emitError() << "all orders must have the same rank as the layout";
       return failure();
     }
     if (!mlir::isPermutationVector(order)) {
@@ -381,11 +454,14 @@ LogicalResult NestedLayoutAttr::verify(
     return success();
   };
 
-  if (failed(checkTile(subgroupsPerWorkgroup, subgroupOrder)) ||
-      failed(checkTile(batchesPerSubgroup, batchOrder)) ||
-      failed(checkTile(outersPerBatch, outerOrder)) ||
-      failed(checkTile(threadsPerOuter, threadOrder)) ||
-      failed(checkTile(elementsPerThread, elementOrder))) {
+  if (failed(checkTile(subgroupsPerWorkgroup)) ||
+      failed(checkTile(batchesPerSubgroup)) ||
+      failed(checkTile(outersPerBatch)) || failed(checkTile(threadsPerOuter)) ||
+      failed(checkTile(elementsPerThread))) {
+    return failure();
+  }
+
+  if (failed(checkOrder(subgroupOrder)) || failed(checkOrder(threadOrder))) {
     return failure();
   }
 
@@ -670,7 +746,7 @@ static void printBasis(AsmPrinter &p, StringRef basisName, StringRef maskName,
   p << ']';
   if (llvm::any_of(mask, [](bool b) { return !b; })) {
     p << ',' << ' ';
-    p << maskName;
+    p << maskName << ' ';
     p << '=';
     p << ' ';
     p << '[';

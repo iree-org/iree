@@ -57,7 +57,7 @@ setup(
     description="IREE PJRT Plugin for Vulkan (generic)",
     long_description=README,
     long_description_content_type="text/markdown",
-    url="https://github.com/openxla/iree",
+    url="https://github.com/iree-org/iree",
     classifiers=[
         "Development Status :: 3 - Alpha",
         "License :: OSI Approved :: Apache Software License",

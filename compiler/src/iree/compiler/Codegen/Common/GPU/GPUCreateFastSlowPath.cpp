@@ -13,7 +13,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Codegen/Common/GPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
@@ -26,12 +25,17 @@
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/Pass/Pass.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-spirv-create-fast-slow-path"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_GPUCREATEFASTSLOWPATHPASS
+#include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
+
+namespace {
 
 /// Returns true if the the given `attrOrValue` is a constant zero.
 static bool isZero(OpFoldResult attrOrValue) {
@@ -79,7 +83,7 @@ static void applyFastSlowPathConversion(mlir::FunctionOpInterface funcOp) {
   Value cstZero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
   SmallVector<Value> eqZeroCmpVals;
   for (OpFoldResult pad : llvm::concat<OpFoldResult>(lowPads, highPads)) {
-    if (auto padValue = pad.dyn_cast<Value>()) {
+    if (auto padValue = dyn_cast<Value>(pad)) {
       getBackwardSlice(padValue, &padSizeOps, options);
       padSizeOps.insert(padValue.getDefiningOp());
     }
@@ -127,17 +131,11 @@ static void applyFastSlowPathConversion(mlir::FunctionOpInterface funcOp) {
     rewriter.eraseOp(op);
 }
 
-namespace {
-
 struct GPUCreateFastSlowPathPass final
-    : public GPUCreateFastSlowPathBase<GPUCreateFastSlowPathPass> {
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<scf::SCFDialect>();
-  }
-
+    : impl::GPUCreateFastSlowPathPassBase<GPUCreateFastSlowPathPass> {
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    auto funcOp = getOperation();
+    FunctionOpInterface funcOp = getOperation();
 
     applyFastSlowPathConversion(funcOp);
 
@@ -153,10 +151,5 @@ struct GPUCreateFastSlowPathPass final
 };
 
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createGPUCreateFastSlowPathPass() {
-  return std::make_unique<GPUCreateFastSlowPathPass>();
-}
 
 } // namespace mlir::iree_compiler

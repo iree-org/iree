@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-consteval-jit-target-device=vmvx --verify-diagnostics --iree-consteval-jit-debug --iree-consteval-jit-globals  %s | FileCheck %s
+// RUN: iree-opt --split-input-file --verify-diagnostics --iree-consteval-jit-debug --iree-consteval-jit-globals  %s | FileCheck %s
 
 // CHECK-LABEL: @eval_i8_scalar
 // CHECK: 42 : i8
@@ -9,7 +9,7 @@ module @eval_i8_scalar {
     %hoisted = util.global.load @hoisted : i8
     util.return %hoisted : i8
   }
-  util.initializer attributes {iree.compiler.consteval} {
+  util.initializer {
     %cst = arith.constant 44 : i8
     %offset = util.global.load @offset : i8
     %sum = arith.addi %cst, %offset : i8
@@ -28,7 +28,7 @@ module @eval_i16_scalar {
     %hoisted = util.global.load @hoisted : i16
     util.return %hoisted : i16
   }
-  util.initializer attributes {iree.compiler.consteval} {
+  util.initializer {
     %cst = arith.constant 44 : i16
     %offset = util.global.load @offset : i16
     %sum = arith.addi %cst, %offset : i16
@@ -47,7 +47,7 @@ module @eval_i32_scalar {
     %hoisted = util.global.load @hoisted : i32
     util.return %hoisted : i32
   }
-  util.initializer attributes {iree.compiler.consteval} {
+  util.initializer {
     %cst = arith.constant 44 : i32
     %offset = util.global.load @offset : i32
     %sum = arith.addi %cst, %offset : i32
@@ -66,7 +66,7 @@ module @eval_i64_scalar {
     %hoisted = util.global.load @hoisted : i64
     util.return %hoisted : i64
   }
-  util.initializer attributes {iree.compiler.consteval} {
+  util.initializer {
     %cst = arith.constant 44 : i64
     %offset = util.global.load @offset : i64
     %sum = arith.addi %cst, %offset : i64
@@ -85,7 +85,7 @@ module @eval_f32_scalar {
     %hoisted = util.global.load @hoisted : f32
     util.return %hoisted : f32
   }
-  util.initializer attributes {iree.compiler.consteval} {
+  util.initializer {
     %cst = arith.constant 44.0 : f32
     %offset = util.global.load @offset : f32
     %sum = arith.addf %cst, %offset : f32

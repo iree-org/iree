@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-flow-capture-dispatch-dynamic-dims %s | FileCheck %s
+// RUN: iree-opt --iree-flow-capture-dynamic-dims %s | FileCheck %s
 
 // Tests that both operands and results get any dims captured that aren't
 // already captured.

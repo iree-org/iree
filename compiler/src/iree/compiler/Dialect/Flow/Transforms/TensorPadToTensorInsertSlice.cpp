@@ -10,9 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
@@ -26,6 +25,9 @@
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler::IREE::Flow {
+
+#define GEN_PASS_DEF_TENSORPADTOTENSORINSERTSLICEPASS
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
 
 namespace {
 /// Pattern to convert a tensor.tensor operation into a fill +
@@ -66,7 +68,7 @@ struct TensorPadOpConversion : public OpRewritePattern<tensor::PadOp> {
       // (pad + set_encoding) gets folded in to tensor.pack in the
       // MaterializeEncoding pass. Rewriting those pads into insert_slice would
       // defeat that.
-      if (isa<IREE::LinalgExt::SetEncodingOp>(use)) {
+      if (isa<IREE::Encoding::SetEncodingOp>(use)) {
         return failure();
       }
     }
@@ -83,26 +85,10 @@ private:
 };
 
 struct TensorPadToTensorInsertSlicePass
-    : public TensorPadToTensorInsertSliceBase<
+    : public IREE::Flow::impl::TensorPadToTensorInsertSlicePassBase<
           TensorPadToTensorInsertSlicePass> {
-  TensorPadToTensorInsertSlicePass(bool skipSingleLinalgOpUses)
-      : skipSingleLinalgOpUses(skipSingleLinalgOpUses) {}
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg::LinalgDialect, memref::MemRefDialect,
-                    mlir::math::MathDialect, mlir::arith::ArithDialect>();
-  }
-
-  LogicalResult initializeOptions(StringRef options) override {
-    if (failed(Pass::initializeOptions(options))) {
-      return failure();
-    }
-    // `skipSingleLinalgOpUses` may have been set to `true` in the constructor
-    // already. The |= is so we preserve that rather than overwrite it with the
-    // default value `false` of `optionSkipSingleLinalgOpUses`.
-    skipSingleLinalgOpUses |= optionSkipSingleLinalgOpUses;
-    return success();
-  }
-
+  using IREE::Flow::impl::TensorPadToTensorInsertSlicePassBase<
+      TensorPadToTensorInsertSlicePass>::TensorPadToTensorInsertSlicePassBase;
   void runOnOperation() override {
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
@@ -112,17 +98,8 @@ struct TensorPadToTensorInsertSlicePass
       return signalPassFailure();
     }
   }
-
-private:
-  bool skipSingleLinalgOpUses;
 };
 
 } // namespace
-
-std::unique_ptr<Pass>
-createTensorPadToTensorInsertSlicePass(bool skipSingleLinalgOpUses) {
-  return std::make_unique<TensorPadToTensorInsertSlicePass>(
-      skipSingleLinalgOpUses);
-}
 
 } // namespace mlir::iree_compiler::IREE::Flow

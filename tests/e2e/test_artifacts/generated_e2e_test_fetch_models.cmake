@@ -1,4 +1,11 @@
 iree_fetch_artifact(
+  NAME "model-matmul_256x256x2048_i8_i4_i32_tile_config_default"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/linalg/jax_derived_0.4.25_1710887127/matmul_256x256x2048_i8_i4_i32_tile_config_default.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_matmul_256x256x2048_i8_i4_i32_tile_config_default.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
   NAME "model-PersonDetect_int8"
   SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/person_detect.tflite"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_PersonDetect_int8.tflite"
@@ -125,27 +132,6 @@ iree_fetch_artifact(
 )
 
 iree_fetch_artifact(
-  NAME "model-BertLargePTBatch1"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/pt_models_20240124.1093_1706139741/BERT_LARGE_FP32_PT_384XI32_BATCH1/linalg.mlirbc"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch1.mlirbc"
-  UNPACK
-)
-
-iree_fetch_artifact(
-  NAME "model-Falcon7bGptqPT"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/manual/falcon_7b_gptq_linalg_1702432230.mlirbc"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Falcon7bGptqPT.mlirbc"
-  UNPACK
-)
-
-iree_fetch_artifact(
-  NAME "model-Falcon7bInt4GptqPT"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/manual/falcon_7b_gptq_linalg_int4_1702863828.mlirbc"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Falcon7bInt4GptqPT.mlirbc"
-  UNPACK
-)
-
-iree_fetch_artifact(
   NAME "model-BERT_LARGE_JAX_384XI32_BATCH1"
   SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.25_1709787220/BERT_LARGE_FP32_JAX_384XI32_BATCH1/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BERT_LARGE_JAX_384XI32_BATCH1.mlirbc"
@@ -163,20 +149,6 @@ iree_fetch_artifact(
   NAME "model-BERT_LARGE_JAX_384XI32_BATCH64"
   SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.25_1709787220/BERT_LARGE_FP32_JAX_384XI32_BATCH64/stablehlo.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BERT_LARGE_JAX_384XI32_BATCH64.mlirbc"
-  UNPACK
-)
-
-iree_fetch_artifact(
-  NAME "model-BertLargePTBatch24"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/pt_models_20240124.1093_1706139741/BERT_LARGE_FP32_PT_384XI32_BATCH24/linalg.mlirbc"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch24.mlirbc"
-  UNPACK
-)
-
-iree_fetch_artifact(
-  NAME "model-BertLargePTBatch48"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/pytorch/pt_models_20240124.1093_1706139741/BERT_LARGE_FP32_PT_384XI32_BATCH48/linalg.mlirbc"
-  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_BertLargePTBatch48.mlirbc"
   UNPACK
 )
 

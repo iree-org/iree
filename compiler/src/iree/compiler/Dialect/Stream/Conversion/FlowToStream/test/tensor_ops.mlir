@@ -1,5 +1,45 @@
 // RUN: iree-opt --split-input-file --iree-stream-conversion %s | FileCheck %s
 
+// CHECK-LABEL: @tensorConstantStatic
+util.func public @tensorConstantStatic() -> tensor<4x2xi32> {
+  // CHECK-DAG: %[[CST:.+]] = stream.tensor.constant : tensor<4x2xi32> in !stream.resource<constant> = dense<2> : tensor<4x2xi32>
+  // CHECK-DAG: %[[SIZE:.+]] = stream.resource.size %[[CST]] : !stream.resource<constant>
+  // CHECK-DAG: %[[TRANSFER:.+]] = stream.async.transfer %[[CST]] : !stream.resource<constant>{%[[SIZE]]} -> !stream.resource<*>{%[[SIZE]]}
+  %cst = flow.tensor.constant dense<2> : tensor<4x2xi32>
+  // CHECK: util.return %[[TRANSFER]], %[[SIZE]]
+  util.return %cst : tensor<4x2xi32>
+}
+
+// -----
+
+// CHECK-LABEL: @tensorConstantParameter
+util.func public @tensorConstantParameter() -> tensor<4x2xi32> {
+  // CHECK-DAG: %[[CST:.+]] = stream.tensor.constant : tensor<4x2xi32> in !stream.resource<constant> = #stream.parameter.named<"scope"::"key"> : tensor<4x2xi32>
+  // CHECK-DAG: %[[SIZE:.+]] = stream.resource.size %[[CST]] : !stream.resource<constant>
+  // CHECK-DAG: %[[TRANSFER:.+]] = stream.async.transfer %[[CST]] : !stream.resource<constant>{%[[SIZE]]} -> !stream.resource<*>{%[[SIZE]]}
+  %cst = flow.tensor.constant #flow.parameter.named<"scope"::"key"> : tensor<4x2xi32>
+  // CHECK: util.return %[[TRANSFER]], %[[SIZE]]
+  util.return %cst : tensor<4x2xi32>
+}
+
+// -----
+
+// CHECK-LABEL: @tensorConstantDynamic
+util.func public @tensorConstantDynamic() -> tensor<?x?xi32> {
+  // CHECK-DAG: %[[C2:.+]] = arith.constant 2 : index
+  // CHECK-DAG: %[[D0:.+]] = util.optimization_barrier %[[C2]] : index
+  // CHECK-DAG: %[[C4:.+]] = arith.constant 4 : index
+  // CHECK-DAG: %[[D1:.+]] = util.optimization_barrier %[[C4]] : index
+  // CHECK-DAG: %[[CST:.+]] = stream.tensor.constant : tensor<?x?xi32>{%[[D0]], %[[D1]]} in !stream.resource<constant> = dense<2> : tensor<2x4xi32>
+  // CHECK-DAG: %[[SIZE:.+]] = stream.resource.size %[[CST]] : !stream.resource<constant>
+  // CHECK-DAG: %[[TRANSFER:.+]] = stream.async.transfer %[[CST]] : !stream.resource<constant>{%[[SIZE]]} -> !stream.resource<*>{%[[SIZE]]}
+  %cst = flow.tensor.dynamic_constant dense<2> : tensor<2x4xi32> -> tensor<?x?xi32>
+  // CHECK: util.return %[[TRANSFER]], %[[SIZE]]
+  util.return %cst : tensor<?x?xi32>
+}
+
+// -----
+
 // CHECK-LABEL: @tensorReshapePassThrough
 //  CHECK-SAME: (%[[INPUT:.+]]: !stream.resource<*>, %[[INPUT_SIZE:.+]]: index)
 util.func public @tensorReshapePassThrough(%input: tensor<5x24x48xf32>) -> tensor<30x2x96xf32> {
@@ -131,8 +171,9 @@ util.func public @tensorUpdate(%update : tensor<1x1x10xf32>, %target : tensor<5x
 util.func public @tensorLoad(%source : tensor<2x3xi32>) -> i32 {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
-  // CHECK: %[[T0:.+]] = stream.async.transfer from(#hal.affinity.queue<[0, 1]>) %[[SOURCE]] :
-  // CHECK-SAME:           !stream.resource<*>{%[[SOURCE_SIZE]]} -> !stream.resource<staging>{%[[SOURCE_SIZE]]}
+  // CHECK: %[[T0:.+]] = stream.async.transfer
+  // CHECK-SAME:           %[[SOURCE]] : !stream.resource<*>{%[[SOURCE_SIZE]]}
+  // CHECK-SAME:           from(#hal.affinity.queue<[0, 1]>) -> !stream.resource<staging>{%[[SOURCE_SIZE]]}
   // CHECK: %[[T1:.+]] = stream.tensor.load %[[T0]][%c0, %c1] : tensor<2x3xi32> in !stream.resource<staging>{%[[SOURCE_SIZE]]} -> i32
   %0 = flow.tensor.load %source[%c0, %c1] : tensor<2x3xi32> attributes {
     stream.affinity = #hal.affinity.queue<[0, 1]>
@@ -149,12 +190,12 @@ util.func public @tensorStore(%target : tensor<2x3xi32>) -> tensor<2x3xi32> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %c9 = arith.constant 9 : i32
-  // CHECK: %[[T0:.+]] = stream.async.transfer from(#hal.affinity.queue<[0, 1]>) %[[TARGET]] :
-  // CHECK-SAME:           !stream.resource<*>{%[[TARGET_SIZE]]} -> !stream.resource<staging>{%[[TARGET_SIZE]]}
+  // CHECK: %[[T0:.+]] = stream.async.transfer %[[TARGET]] : !stream.resource<*>{%[[TARGET_SIZE]]}
+  // CHECK-SAME:           from(#hal.affinity.queue<[0, 1]>) -> !stream.resource<staging>{%[[TARGET_SIZE]]}
   // CHECK: %[[T1:.+]] = stream.tensor.store %c9_i32, %[[T0]][%c0, %c1] :
   // CHECK-SAME:           i32 -> tensor<2x3xi32> in %[[T0]] as !stream.resource<staging>{%[[TARGET_SIZE]]}
-  // CHECK: %[[T2:.+]] = stream.async.transfer %[[T1]] :
-  // CHECK-SAME:           !stream.resource<staging>{%[[TARGET_SIZE]]} -> to(#hal.affinity.queue<[0, 1]>) !stream.resource<*>{%[[TARGET_SIZE]]}
+  // CHECK: %[[T2:.+]] = stream.async.transfer %[[T1]] : !stream.resource<staging>{%[[TARGET_SIZE]]} ->
+  // CHECK-SAME:           to(#hal.affinity.queue<[0, 1]>) !stream.resource<*>{%[[TARGET_SIZE]]}
   %0 = flow.tensor.store %c9, %target[%c0, %c1] : tensor<2x3xi32> attributes {
     stream.affinity = #hal.affinity.queue<[0, 1]>
   }

@@ -32,8 +32,8 @@ struct ConvertComplexDot final : OpRewritePattern<mlir::stablehlo::DotOp> {
   LogicalResult matchAndRewrite(mlir::stablehlo::DotOp dot,
                                 PatternRewriter &rewriter) const override {
     ArrayAttr precision = dot.getPrecisionConfigAttr();
-    TypedValue<TensorType> lhs = dot.getLhs();
-    TypedValue<TensorType> rhs = dot.getRhs();
+    TypedValue<RankedTensorType> lhs = dot.getLhs();
+    TypedValue<RankedTensorType> rhs = dot.getRhs();
     ShapedType lhsType = lhs.getType();
     ShapedType rhsType = rhs.getType();
     if (!isa<ComplexType>(lhsType.getElementType()) ||

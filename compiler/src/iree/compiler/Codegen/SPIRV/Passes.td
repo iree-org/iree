@@ -17,8 +17,6 @@ def ConvertToSPIRV : Pass<"iree-convert-to-spirv", "ModuleOp"> {
   let summary = "Perform the final conversion to SPIR-V dialect";
   let constructor = "mlir::iree_compiler::createConvertToSPIRVPass()";
   let options = [
-    Option<"enableFastMathOption", "enable-fast-math", "bool", /*default=*/"false",
-          "Enable fast math mode during type conversion (i.e. assume no NaN/infinity)">,
     Option<"indexBitsOption", "index-bits", "unsigned", /*default=*/"32",
           "Specify the bit widths for SPIR-V indices">,
   ];
@@ -35,13 +33,8 @@ def SPIRVBreakDownLargeVector : InterfacePass<"iree-spirv-breakdown-large-vector
   let constructor = "mlir::iree_compiler::createSPIRVBreakDownLargeVectorPass()";
 }
 
-def SPIRVDistribute : InterfacePass<"iree-spirv-distribute", "mlir::FunctionOpInterface"> {
-  let summary = "Distribute tiled loop nests to invocations";
-  let constructor = "mlir::iree_compiler::createSPIRVDistributePass()";
-}
-
 def SPIRVEmulateI64 :
-    Pass<"iree-spirv-emulate-i64", "ModuleOp"> {
+    InterfacePass<"iree-spirv-emulate-i64", "mlir::FunctionOpInterface"> {
   let summary = "Emulate 64-bit integer ops with 32-bit integer ops";
   let constructor = "mlir::iree_compiler::createSPIRVEmulateI64Pass()";
 }
@@ -71,12 +64,19 @@ def SPIRVLinkExecutables :
 }
 
 def SPIRVLowerExecutableTarget :
-    Pass<"iree-spirv-lower-executable-target-pass",
-         "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
+    InterfacePass<"iree-spirv-lower-executable-target-pass",
+         "mlir::FunctionOpInterface"> {
   let summary = "Lower the executable target to SPIR-V using one of the "
                 "IREE::HAL::DispatchLoweringPassPipeline";
   let constructor =
       "mlir::iree_compiler::createSPIRVLowerExecutableTargetPass()";
+}
+
+def SPIRVLowerExecutableUsingTransformDialect :
+    Pass<"iree-spirv-lower-executable-using-transform-dialect", "ModuleOp"> {
+  let summary = "Lower the executable target to SPIR-V using transform dialect"
+                " followed by some passes to do SPIR-V specific vectorization";
+  let constructor = "mlir::iree_compiler::createSPIRVLowerExecutableUsingTransformDialectPass()";
 }
 
 def SPIRVMapMemRefStorageClass :
@@ -95,17 +95,11 @@ def SPIRVMaterializeExecutableConditions :
 }
 
 def SPIRVSelectLoweringStrategy :
-    Pass<"iree-spirv-select-lowering-strategy-pass",
-         "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
+    Pass<"iree-spirv-select-lowering-strategy-pass", "ModuleOp"> {
   let summary = "Select the IREE::HAL::DispatchLoweringPassPipeline for lowering"
                 "to SPIR-V";
   let constructor =
       "mlir::iree_compiler::createSPIRVSelectLoweringStrategyPass()";
-}
-
-def SPIRVTile : InterfacePass<"iree-spirv-tile", "mlir::FunctionOpInterface"> {
-  let summary = "Tile Linalg ops with tensor semantics to invocations";
-  let constructor = "mlir::iree_compiler::createSPIRVTilePass()";
 }
 
 def SPIRVTileAndDistribute : InterfacePass<"iree-spirv-tile-and-distribute", "mlir::FunctionOpInterface"> {
@@ -147,7 +141,7 @@ def SPIRVTrimExecutableTargetEnv :
 }
 
 def SPIRVVectorizeLoadStore :
-    Pass<"iree-spirv-vectorize-load-store", "ModuleOp"> {
+    InterfacePass<"iree-spirv-vectorize-load-store", "mlir::FunctionOpInterface"> {
   let summary = "Vectorize load/store of memrefs for better memory access";
   let constructor = "mlir::iree_compiler::createSPIRVVectorizeLoadStore()";
 }

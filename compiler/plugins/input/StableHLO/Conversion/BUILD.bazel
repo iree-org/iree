@@ -61,6 +61,7 @@ iree_gentbl_cc_library(
 iree_compiler_cc_library(
     name = "StableHLOLegalization",
     srcs = [
+        "CheckVHLOStableHloMixUsage.cpp",
         "ConvertCollectives.cpp",
         "LegalizeCHLO.cpp",
         "LegalizeControlFlow.cpp",
@@ -115,11 +116,13 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:TensorUtils",
+        "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
         "@llvm-project//mlir:VectorDialect",
         "@stablehlo//:broadcast_utils",
         "@stablehlo//:chlo_ops",
         "@stablehlo//:stablehlo_ops",
+        "@stablehlo//:vhlo_ops",
     ],
 )
 
@@ -151,5 +154,6 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:ShapeToStandard",
         "@llvm-project//mlir:ShapeTransforms",
         "@llvm-project//mlir:Transforms",
+        "@stablehlo//:stablehlo_passes",
     ],
 )

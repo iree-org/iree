@@ -31,6 +31,7 @@ iree_cc_library(
     MLIRLinalgTransforms
     MLIRMemRefDialect
     MLIRPass
+    MLIRTransformUtils
     MLIRTransforms
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Dialect::HAL::IR
@@ -56,17 +57,16 @@ iree_cc_library(
     "Passes.cpp"
     "SPIRVAnnotateWinogradLoops.cpp"
     "SPIRVBreakDownLargeVector.cpp"
-    "SPIRVDistribute.cpp"
     "SPIRVEmulateI64.cpp"
     "SPIRVEraseStorageBufferStaticShape.cpp"
     "SPIRVFinalVectorLowering.cpp"
     "SPIRVInitialVectorLowering.cpp"
     "SPIRVLinkExecutables.cpp"
     "SPIRVLowerExecutableTargetPass.cpp"
+    "SPIRVLowerExecutableUsingTransformDialect.cpp"
     "SPIRVMapMemRefStorageClass.cpp"
     "SPIRVMaterializeExecutableConditions.cpp"
     "SPIRVSelectLoweringStrategy.cpp"
-    "SPIRVTile.cpp"
     "SPIRVTileAndDistribute.cpp"
     "SPIRVTileAndPromote.cpp"
     "SPIRVTileAndVectorizeToCooperativeOps.cpp"
@@ -127,6 +127,7 @@ iree_cc_library(
     MLIRTosaDialect
     MLIRTosaToArith
     MLIRTransformDialect
+    MLIRTransformUtils
     MLIRTransforms
     MLIRVectorDialect
     MLIRVectorInterfaces
@@ -138,6 +139,7 @@ iree_cc_library(
     iree::compiler::Codegen::Common::GPU::GPUHeuristics
     iree::compiler::Codegen::Common::TransformDialectInterpreterPass
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
+    iree::compiler::Codegen::Interfaces::PartitionableLoopsInterface
     iree::compiler::Codegen::TransformStrategies::GPU
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils

@@ -11,6 +11,7 @@ from enum import Enum
 import logging
 import os
 import tempfile
+import importlib.util
 from typing import List, Optional, Sequence, Set, Union
 
 from .debugging import TempFileSaver
@@ -29,7 +30,10 @@ _IMPORT_TOOL = "iree-import-tflite"
 
 
 def is_available():
-    """Determine if the TFLite frontend is available."""
+    """Determine if TensorFlow and the TFLite frontend are available."""
+    if importlib.util.find_spec("tensorflow") is None:
+        logging.warn("Unable to import tensorflow")
+        return False
     try:
         import iree.tools.tflite.scripts.iree_import_tflite.__main__
     except ModuleNotFoundError:
@@ -107,7 +111,7 @@ def compile_file(fb_path: str, **kwargs):
         if options.import_only:
             if options.output_file:
                 return None
-            with open(tfl_iree_input, "r") as f:
+            with open(tfl_iree_input, "rb") as f:
                 return f.read()
 
         # Run IREE compilation pipeline
@@ -131,7 +135,7 @@ def compile_str(input_bytes: bytes, **kwargs):
     input_bytes = (
         input_bytes.encode("utf-8") if isinstance(input_bytes, str) else input_bytes
     )
-    with tempfile.NamedTemporaryFile(mode="w") as temp_file:
-        tempfile.write(input_bytes)
-        tempfile.close()
-        return compile_file(tempfile.name, **kwargs)
+    with tempfile.NamedTemporaryFile() as temp_file:
+        temp_file.write(input_bytes)
+        temp_file.flush()  # Ensure the data is written to disk
+        return compile_file(temp_file.name, **kwargs)

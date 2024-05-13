@@ -15,19 +15,24 @@
 
 namespace mlir::iree_compiler::Preprocessing {
 
-/// Creates a pass to convert linalg convolution ops into linalg.matmul ops
-/// using im2col tranformation.
-std::unique_ptr<Pass> createConvertConv2DToImg2ColPass();
+// Enum to represent target op types to be padded.
+enum class PadTargetType {
+  // Convolution Ops.
+  ConvOp = 0,
+  // Contraction-like Ops.
+  ContractionOp = 1,
+  // All ops (both convolution and contraction ops).
+  All = 2,
+};
 
-/// A pass to convert convolutions to channels last and propagate.
-std::unique_ptr<Pass> createConvertConvToChannelsLastPass();
-
-/// Moves the body of the entire function into a single dispatch.
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createMakeSingleDispatchForFunctionPass();
-
-/// A pass to pad linalg ops to the next integer multiple of `paddingSize`.
-std::unique_ptr<Pass> createPadLinalgOpsToIntegerMultiplePass();
+enum class TransposeMatmulInput {
+  /// Transpose LHS input matrix.
+  Lhs,
+  /// Transpose RHS input matrix.
+  Rhs,
+  /// Transpose neither input (disable).
+  None
+};
 
 //===----------------------------------------------------------------------===//
 // Register all Passes

@@ -11,7 +11,7 @@ from benchmark_suites.iree import benchmark_presets, module_execution_configs, u
 from e2e_test_framework import unique_ids
 from e2e_test_framework.definitions import common_definitions, iree_definitions
 from e2e_test_framework.device_specs import device_collections
-from e2e_test_framework.models import tflite_models, tf_models
+from e2e_test_framework.models import tflite_models, tf_models, matmul
 
 
 class Android_ARMv8_A_Benchmarks(object):
@@ -24,6 +24,13 @@ class Android_ARMv8_A_Benchmarks(object):
         tf_models.GPT2_117M_1x1_FP32_TF,
         tflite_models.MOBILEBERT_INT8,
         tflite_models.VIT_INT8_TFL,
+    ]
+
+    MATMULS = [
+        # matmul.MATMUL_1x256x2048_I8xI4_MLIR,
+        matmul.MATMUL_256x256x2048_I8xI4_MLIR,
+        # matmul.MATMUL_1x256x2048_I8xI8_MLIR,
+        # matmul.MATMUL_256x256x2048_I8xI8_MLIR,
     ]
 
     ARMV8_A_CPU_TARGET = iree_definitions.CompileTarget(
@@ -76,11 +83,10 @@ class Android_ARMv8_A_Benchmarks(object):
             presets=presets,
         )
 
-    def generate(
-        self,
+    def _generate_model_configs(
+        self, device_specs: List[common_definitions.DeviceSpec]
     ) -> List[iree_definitions.E2EModelRunConfig]:
-        """Generates IREE compile and run configs."""
-
+        """Generates IREE compile and run configs for list of models."""
         local_sync_execution_configs = [module_execution_configs.ELF_LOCAL_SYNC_CONFIG]
         local_task_execution_configs = [
             module_execution_configs.get_elf_system_scheduling_local_task_config(
@@ -88,29 +94,79 @@ class Android_ARMv8_A_Benchmarks(object):
             )
             for thread_num in [1, 2]
         ]
-
-        no_dt_gen_confings = [
+        no_dt_gen_configs = [
             iree_definitions.ModuleGenerationConfig.build(
                 compile_config=self.NO_DT_COMPILE_CONFIG,
                 imported_model=iree_definitions.ImportedModel.from_model(model),
             )
             for model in self.MODELS
         ]
-        dt_only_gen_confings = [
+        dt_only_gen_configs = [
             iree_definitions.ModuleGenerationConfig.build(
                 compile_config=self.DT_ONLY_COMPILE_CONFIG,
                 imported_model=iree_definitions.ImportedModel.from_model(model),
             )
             for model in self.MODELS
         ]
-        dt_uk_gen_confings = [
+        dt_uk_gen_configs = [
             iree_definitions.ModuleGenerationConfig.build(
                 compile_config=self.DT_UK_COMPILE_CONFIG,
                 imported_model=iree_definitions.ImportedModel.from_model(model),
             )
             for model in self.MODELS
         ]
+        return self._build_run_configs(
+            no_dt_gen_configs + dt_uk_gen_configs,
+            local_sync_execution_configs + local_task_execution_configs,
+            device_specs,
+            [benchmark_presets.ANDROID_CPU],
+        ) + self._build_run_configs(
+            dt_only_gen_configs,
+            local_sync_execution_configs + local_task_execution_configs,
+            device_specs,
+            [benchmark_presets.ANDROID_CPU_DT_ONLY],
+        )
 
+    def _generate_matmul_configs(
+        self, device_specs: List[common_definitions.DeviceSpec]
+    ) -> List[iree_definitions.E2EModelRunConfig]:
+        no_dt_gen_configs = [
+            iree_definitions.ModuleGenerationConfig.build(
+                compile_config=self.NO_DT_COMPILE_CONFIG,
+                imported_model=iree_definitions.ImportedModel.from_model(model),
+            )
+            for model in self.MATMULS
+        ]
+        dt_only_gen_configs = [
+            iree_definitions.ModuleGenerationConfig.build(
+                compile_config=self.DT_ONLY_COMPILE_CONFIG,
+                imported_model=iree_definitions.ImportedModel.from_model(model),
+            )
+            for model in self.MATMULS
+        ]
+        dt_uk_gen_configs = [
+            iree_definitions.ModuleGenerationConfig.build(
+                compile_config=self.DT_UK_COMPILE_CONFIG,
+                imported_model=iree_definitions.ImportedModel.from_model(model),
+            )
+            for model in self.MATMULS
+        ]
+        return self._build_run_configs(
+            no_dt_gen_configs + dt_uk_gen_configs,
+            [module_execution_configs.ELF_LOCAL_SYNC_CONFIG],
+            device_specs,
+            [benchmark_presets.ANDROID_CPU],
+        ) + self._build_run_configs(
+            dt_only_gen_configs,
+            [module_execution_configs.ELF_LOCAL_SYNC_CONFIG],
+            device_specs,
+            [benchmark_presets.ANDROID_CPU_DT_ONLY],
+        )
+
+    def generate(
+        self,
+    ) -> List[iree_definitions.E2EModelRunConfig]:
+        """Generates IREE compile and run configs."""
         big_cores_devices = (
             device_collections.DEFAULT_DEVICE_COLLECTION.query_device_specs(
                 architecture=common_definitions.DeviceArchitecture.ARMV8_2_A_GENERIC,
@@ -118,16 +174,7 @@ class Android_ARMv8_A_Benchmarks(object):
                 tags=["big-cores"],
             )
         )
-        run_configs = self._build_run_configs(
-            no_dt_gen_confings + dt_uk_gen_confings,
-            local_sync_execution_configs + local_task_execution_configs,
-            big_cores_devices,
-            [benchmark_presets.ANDROID_CPU],
-        ) + self._build_run_configs(
-            dt_only_gen_confings,
-            local_sync_execution_configs + local_task_execution_configs,
-            big_cores_devices,
-            [benchmark_presets.ANDROID_CPU_DT_ONLY],
-        )
 
-        return run_configs
+        return self._generate_model_configs(
+            big_cores_devices
+        ) + self._generate_matmul_configs(big_cores_devices)

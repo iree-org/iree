@@ -8,7 +8,6 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
-#include "iree/compiler/Dialect/Flow/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -20,6 +19,9 @@
 #include "mlir/Transforms/RegionUtils.h"
 
 namespace mlir::iree_compiler::IREE::Flow {
+
+#define GEN_PASS_DEF_INJECTTENSORTRACINGPASS
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
 
 static std::string inferTraceKey(Operation *op) {
   return TypeSwitch<Operation *, std::string>(op)
@@ -65,16 +67,9 @@ static void injectTracingOnOp(Operation *op, StringRef traceKey) {
   }
 }
 
-class InjectTensorTracingPass
-    : public InjectTensorTracingBase<InjectTensorTracingPass> {
-public:
-  InjectTensorTracingPass() = default;
-
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<arith::ArithDialect, IREE::Flow::FlowDialect,
-                    tensor::TensorDialect>();
-  }
-
+struct InjectTensorTracingPass
+    : public IREE::Flow::impl::InjectTensorTracingPassBase<
+          InjectTensorTracingPass> {
   void runOnOperation() override {
     auto attrName = StringAttr::get(&getContext(), "iree.tensor.trace");
     auto funcOp = getOperation();
@@ -91,10 +86,5 @@ public:
     });
   }
 };
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createInjectTensorTracingPass() {
-  return std::make_unique<InjectTensorTracingPass>();
-}
 
 } // namespace mlir::iree_compiler::IREE::Flow

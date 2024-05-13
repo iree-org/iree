@@ -7,6 +7,10 @@
 #include "iree/compiler/ConstEval/PassDetail.h"
 #include "iree/compiler/ConstEval/Passes.h"
 #include "iree/compiler/ConstEval/Runtime.h"
+#include "iree/compiler/Dialect/HAL/Target/TargetOptions.h"
+#include "iree/compiler/Dialect/Util/Analysis/Constant/ConstExpr.h"
+#include "iree/compiler/Dialect/Util/Analysis/Constant/OpOracle.h"
+#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Pipelines/Pipelines.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "llvm/ADT/DenseSet.h"
@@ -14,7 +18,6 @@
 #include "llvm/Support/Timer.h"
 #include "llvm/Support/raw_ostream.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -24,7 +27,6 @@
 #include <cstdlib>
 
 #define DEBUG_TYPE "iree-const-eval"
-using llvm::dbgs;
 
 namespace mlir::iree_compiler::ConstEval {
 
@@ -49,6 +51,15 @@ static bool isDebugEnabled() {
   if (std::getenv("IREE_COMPILER_DEBUG_CONSTEVAL"))
     return true;
   return false;
+}
+
+static void
+emitDebugWarning(Location loc,
+                 llvm::function_ref<void(InFlightDiagnostic &)> emit) {
+  if (isDebugEnabled()) {
+    auto diagnostic = mlir::emitWarning(loc);
+    emit(diagnostic);
+  }
 }
 
 // These options structs are not copy-constructable so we have to allocate them
@@ -87,6 +98,242 @@ public:
 private:
   llvm::DenseSet<Type> scalarTypes;
   llvm::DenseSet<Type> elementTypes;
+};
+
+template <typename AccessorTy>
+static inline bool isAccessorParameterized(const SymbolTable &moduleSymbols,
+                                           AccessorTy op) {
+  auto global =
+      moduleSymbols.lookup<IREE::Util::GlobalOpInterface>(op.getGlobalName());
+  if (!global)
+    return true;
+  auto attr = global.getGlobalInitialValue();
+  if (!attr)
+    return false;
+  return !isa<IntegerAttr>(attr) && !isa<FloatAttr>(attr) &&
+         !isa<IREE::Util::SerializableAttrInterface>(
+             global.getGlobalInitialValue());
+}
+
+// Today the only way to interact with a global is with loads, stores, and
+// addresses, and globals are the only way to reference parameters given where
+// const-eval is run today. This is a workaround until we have proper dialect
+// interfaces for detecting whether something is evaluatable at compile time.
+static bool isParameterized(const SymbolTable &moduleSymbols,
+                            IREE::Util::InitializerOpInterface initializerOp) {
+  WalkResult res = initializerOp->walk([&](Operation *op) {
+    const bool parameterized =
+        llvm::TypeSwitch<Operation *, bool>(op)
+            .Case([=](IREE::Util::GlobalLoadOpInterface accessor) {
+              return isAccessorParameterized(moduleSymbols, accessor);
+            })
+            .Case([=](IREE::Util::GlobalStoreOpInterface accessor) {
+              return isAccessorParameterized(moduleSymbols, accessor);
+            })
+            .Default([=](auto) { return false; });
+    if (parameterized)
+      return WalkResult::interrupt();
+    return WalkResult::advance();
+  });
+  return res.wasInterrupted();
+}
+
+// WIP specialized analysis for tracking initialization order in a module.
+// This attempts to provide a "is this value initialized?" query with the
+// differentiation of whether that initialization is possible within the
+// compiler or if it relies on runtime information.
+//
+// This is currently fairly limited and bails on many common cases that we don't
+// naturally generate in early phases of program compilation. More sophisticated
+// analysis is required to use this elsewhere once calls, control flow, and
+// more dynamic values are used.
+class InitializationAnalysis {
+public:
+  enum class Availability {
+    // Analysis failure, assume runtime.
+    Unknown = 0,
+    // Can only be evaluated fully at runtime. May depend on runtime-derived
+    // values from the HAL, custom modules, or parameters.
+    Runtime,
+    // Can be entirely evaluated at compile-time.
+    Compiler,
+  };
+
+  InitializationAnalysis(
+      Operation *rootOp, SymbolTable &symbolTable,
+      const IREE::Util::ConstExprAnalysis &constExprAnalysis) {
+    run(rootOp, symbolTable, constExprAnalysis);
+  }
+
+  // Returns the calculated availability of an initializer indicating when it is
+  // able to be evaluated.
+  Availability
+  getInitializerAvailability(IREE::Util::InitializerOpInterface initializerOp) {
+    auto it = initializerAvailability.find(initializerOp);
+    if (it == initializerAvailability.end())
+      return Availability::Unknown;
+    return it->second;
+  }
+
+private:
+  void run(Operation *rootOp, SymbolTable &symbolTable,
+           const IREE::Util::ConstExprAnalysis &constExprAnalysis) {
+    unsigned nextOpOrdinal = 0;
+    for (auto &region : rootOp->getRegions()) {
+      for (auto &op : region.getOps()) {
+        if (auto globalOp = dyn_cast<IREE::Util::GlobalOpInterface>(op)) {
+          // Globals with initial values are initialized in order with where
+          // they are in the module.
+          auto &timeline = globalTimelines[globalOp.getGlobalName().getValue()];
+          assert(timeline.empty() && "out-of-order global store");
+          timeline.push_back(
+              std::make_pair(nextOpOrdinal++, Availability::Compiler));
+        } else if (auto initializerOp =
+                       dyn_cast<IREE::Util::InitializerOpInterface>(op)) {
+          // Initializer availability depends on all dependent initialized
+          // values.
+          initializerAvailability[initializerOp] =
+              calculateInitializerAvailability(
+                  initializerOp, symbolTable, constExprAnalysis, nextOpOrdinal);
+        }
+      }
+    }
+  }
+
+  // Returns the availability of |globalName| by the time |opOrdinal| is
+  // executed. Note that some globals may be initialized multiple times (yuck,
+  // but valid).
+  Availability queryGlobalInitializationStatus(StringRef globalName,
+                                               unsigned opOrdinal) {
+    auto &timeline = globalTimelines[globalName];
+    if (timeline.empty())
+      return Availability::Unknown;
+    for (auto &timepoint : timeline) {
+      if (timepoint.first > opOrdinal)
+        return timepoint.second;
+    }
+    return timeline.back().second;
+  }
+
+  // Returns true if the given |initializerOp| is a constant expression that is
+  // able to be evaluated by this pass.
+  Availability calculateInitializerAvailability(
+      IREE::Util::InitializerOpInterface initializerOp,
+      SymbolTable &symbolTable,
+      const IREE::Util::ConstExprAnalysis &constExprAnalysis,
+      unsigned &nextOpOrdinal) {
+    SmallVector<std::pair<IREE::Util::GlobalStoreOpInterface, unsigned>>
+        globalStoreOps;
+
+    // Assume compile-time availability unless we see anything that may prevent
+    // it. As we analyze the initializer we may "lower" the availability from
+    // the most available (compile-time) to least available (run-time/unknown).
+    auto availability = Availability::Compiler;
+    auto lowerAvailability = [&](Availability newAvailability,
+                                 StringRef reason) {
+      auto previousAvailability = availability;
+      availability = static_cast<Availability>(
+          std::min(static_cast<unsigned>(availability),
+                   static_cast<unsigned>(newAvailability)));
+      if (previousAvailability != availability)
+        emitDebugWarning(
+            initializerOp.getLoc(),
+            [&](InFlightDiagnostic &diagnostic) { diagnostic << reason; });
+    };
+
+    if (initializerOp->getRegions().size() != 1 ||
+        !initializerOp->getRegion(0).hasOneBlock()) {
+      // Skip if multiple blocks. It would be possible to support these in
+      // theory but unclear if worth it in practice given the predominance of
+      // SCF at the levels we run things. What we'd require is adding a single
+      // exit block that stored to the globals unconditionally.
+      lowerAvailability(Availability::Unknown,
+                        "skipping consteval initializer: initializers with >1 "
+                        "block not yet supported");
+    } else if (isParameterized(symbolTable, initializerOp)) {
+      // We don't allow anything with parameters today. We could handle these by
+      // passing in the parameter file for use but would likely also want to
+      // bind a writeable parameter file to produce into.
+      lowerAvailability(Availability::Runtime,
+                        "skipping consteval initializer: uses parameters or "
+                        "other runtime-dependent values");
+    }
+
+    // Today we require that all values are constant expressions. We could slice
+    // out just the ones that are.
+    for (auto &op : initializerOp.getInitializerRegion().getOps()) {
+      if (op.hasTrait<OpTrait::ConstantLike>() ||
+          isa<IREE::Util::ReturnOp>(op)) {
+        continue;
+      } else if (isa<RegionBranchOpInterface>(op)) {
+        // Control flow currently isn't evaluated properly; we'd need much
+        // better analysis for things like conditional stores to globals. We
+        // could make this more permissive for cases where the globals are
+        // stored unconditionally/once but still allow control flow in other
+        // places.
+        lowerAvailability(
+            Availability::Unknown,
+            "skipping consteval initializer: has control flow ops");
+      } else if (isa<CallOpInterface>(op)) {
+        // Calls aren't currently analyzed - we need to rewrite this to use DFX
+        // and walk the call graph to do that.
+        lowerAvailability(Availability::Unknown,
+                          "skipping consteval initializer: has call");
+      } else if (isa<IREE::Util::GlobalLoadIndirectOpInterface>(op) ||
+                 isa<IREE::Util::GlobalStoreIndirectOpInterface>(op)) {
+        // Pessimistic case as we need analysis to know if the global
+        // being loaded may potentially be a parameter.
+        lowerAvailability(
+            Availability::Unknown,
+            "skipping consteval initializer: has indirect global accesses");
+      } else if (auto loadOp =
+                     dyn_cast<IREE::Util::GlobalLoadOpInterface>(op)) {
+        // Globals must be initialized prior to this initializer and if they are
+        // initialized at runtime it means this initializer must be too.
+        auto globalStatus = queryGlobalInitializationStatus(
+            loadOp.getGlobalName(), nextOpOrdinal++);
+        if (globalStatus != Availability::Compiler) {
+          lowerAvailability(globalStatus, "skipping consteval initializer: has "
+                                          "runtime-dependent global load");
+        }
+      } else if (auto storeOp =
+                     dyn_cast<IREE::Util::GlobalStoreOpInterface>(op)) {
+        // Only allow stores to immutable globals (ones we initialize).
+        auto globalOp = symbolTable.lookup<IREE::Util::GlobalOpInterface>(
+            storeOp.getGlobalAttr().getAttr());
+        if (!globalOp || globalOp.isGlobalMutable()) {
+          lowerAvailability(
+              Availability::Runtime,
+              "skipping consteval initializer: has mutable global store");
+        }
+        globalStoreOps.push_back(std::make_pair(storeOp, nextOpOrdinal++));
+      } else if (!constExprAnalysis.isConstExprOperation(&op)) {
+        lowerAvailability(
+            Availability::Runtime,
+            "skipping consteval initializer: has non-const-expr values");
+      }
+    }
+
+    // Record global availability produced by this initializer.
+    for (auto [storeOp, opOrdinal] : globalStoreOps) {
+      auto &timeline = globalTimelines[storeOp.getGlobalName()];
+      timeline.push_back(std::make_pair(opOrdinal, availability));
+    }
+    return availability;
+  }
+
+  // An initialization-ordered sequence denoting changes in availability.
+  // Example:
+  //   * [-1, Compiler]: initialized with a constant primitive at startup
+  //   * [2, Runtime]: reinitialized with a value computed at runtime
+  //   * [4, Compiler]: reinitialized with a value available at compile time
+  //   * [8, Unknown]: reinitialized with a value that failed analysis
+  // The timeline can be queried by walking in order looking for any ordinal
+  // under the requested point. A query at 3 would return Runtime as it is after
+  // the first initialization but prior to the subsequent reinitializations.
+  using AvailabilityTimeline = SmallVector<std::pair<unsigned, Availability>>;
+  DenseMap<StringRef, AvailabilityTimeline> globalTimelines;
+  DenseMap<Operation *, Availability> initializerAvailability;
 };
 
 // JIT functions take arguments, generally from the source program. We capture
@@ -160,47 +407,92 @@ struct JitFunctionDesc {
   llvm::SmallVector<ResultBinding> resultBindings;
 };
 
+// Clones all object-like symbols used within the function.
+// Objects are only cloned once if used by multiple functions.
+// All object contents are cloned and symbol DCE is relied on to remove any
+// unused nested symbols later on.
+static LogicalResult cloneUsedObjects(FunctionOpInterface funcOp,
+                                      SymbolTable &sourceSymbolTable,
+                                      SymbolTable &targetSymbolTable,
+                                      OpBuilder &moduleBuilder) {
+  // Gather all symbol uses within the function.
+  auto uses = SymbolTable::getSymbolUses(funcOp);
+  if (!uses.has_value())
+    return success();
+
+  // Verify that all uses are to object-like types we can clone.
+  for (auto use : uses.value()) {
+    // Lookup the (maybe) object in the source module.
+    auto objectNameAttr = use.getSymbolRef().getRootReference();
+    auto *objectOp = sourceSymbolTable.lookup(objectNameAttr);
+    if (!objectOp) {
+      return use.getUser()->emitOpError()
+             << "references undefined symbol " << use.getSymbolRef();
+    }
+    if (!objectOp->hasTrait<OpTrait::IREE::Util::ObjectLike>())
+      continue;
+
+    // Check if the object exists in the target yet. Since we create the
+    // target we know there should be no conflicts: the only symbols with the
+    // same name will be already cloned copies of the same source.
+    if (targetSymbolTable.lookup(objectNameAttr))
+      continue;
+
+    // Clone the object. It's isolated and safe to copy wholesale.
+    auto *clonedOp = moduleBuilder.clone(*objectOp);
+    targetSymbolTable.insert(clonedOp);
+  }
+
+  return success();
+}
+
 class ProgramBuilder {
 public:
   ProgramBuilder(ModuleOp sourceModuleOp,
-                 const SupportedFeatures &supportedFeatures)
+                 const SupportedFeatures &supportedFeatures,
+                 const IREE::Util::ConstExprAnalysis &constExprAnalysis)
       : targetModuleOp(createInnerModule(sourceModuleOp)),
         sourceSymbolTable(sourceModuleOp), targetSymbolTable(targetModuleOp),
-        supportedFeatures(supportedFeatures) {}
+        supportedFeatures(supportedFeatures),
+        constExprAnalysis(constExprAnalysis),
+        initializationAnalysis(sourceModuleOp, sourceSymbolTable,
+                               constExprAnalysis) {}
 
   llvm::SmallVector<JitFunctionDesc> &getJitFunctions() { return jitFunctions; }
   ModuleOp getTargetModule() { return targetModuleOp; }
 
-  LogicalResult importInitializer(IREE::Util::InitializerOp initOp) {
+  LogicalResult importInitializer(IREE::Util::InitializerOp initializerOp) {
     //  We convert each initializer into a public FuncOp by converting each:
     //    - Tensor constant into an argument
-    //    - util.global_load into an argument
-    //    - util.global_store into a result
+    //    - util.global.load into an argument
+    //    - util.global.store into a result
     //  It is considered an eval'able initializer if it contains stores
     //  into immutable global(s). In the future, we will also want to
     //  condition this on an attribute so as to not try to statically
     //  compile dynamic initializers.
-    // Build it into a new function.
-    if (!initOp.getBody().hasOneBlock()) {
-      // It would be possible to support these in theory but unclear if
-      // worth it in practice.
-      emitWarning(initOp.getLoc())
-          << "skipping consteval initializer: initializers with >1 block not "
-             "yet supported";
+    auto availability =
+        initializationAnalysis.getInitializerAvailability(initializerOp);
+    if (availability != InitializationAnalysis::Availability::Compiler)
       return failure();
-    }
 
     OpBuilder moduleBuilder = OpBuilder::atBlockEnd(targetModuleOp.getBody());
-    auto funcOp = moduleBuilder.create<func::FuncOp>(
-        initOp.getLoc(), "jit_eval", moduleBuilder.getFunctionType({}, {}));
+
+    // Find any object-like symbol references used by the initializer and
+    // clone them.
+    if (failed(cloneUsedObjects(initializerOp, sourceSymbolTable,
+                                targetSymbolTable, moduleBuilder)))
+      return failure();
+
+    auto funcOp = moduleBuilder.create<IREE::Util::FuncOp>(
+        initializerOp.getLoc(), "jit_eval",
+        moduleBuilder.getFunctionType({}, {}));
     targetSymbolTable.insert(funcOp);
     IRMapping unusedMapping;
-    initOp.getBody().cloneInto(&funcOp.getBody(), unusedMapping);
+    initializerOp.getBody().cloneInto(&funcOp.getBody(), unusedMapping);
     if (failed(transformToJitFunction(funcOp))) {
       funcOp.erase();
       return failure();
     }
-
     return success();
   }
 
@@ -212,7 +504,7 @@ private:
     return m;
   }
 
-  LogicalResult transformToJitFunction(func::FuncOp funcOp) {
+  LogicalResult transformToJitFunction(IREE::Util::FuncOp funcOp) {
     JitFunctionDesc desc(funcOp.getLoc(), funcOp.getName().str());
     llvm::SmallVector<Type> argumentTypes;
     llvm::SmallVector<Type> returnTypes;
@@ -226,16 +518,19 @@ private:
       auto globalOp = llvm::dyn_cast_or_null<IREE::Util::GlobalOpInterface>(
           sourceSymbolTable.lookup(loadOp.getGlobalAttr().getAttr()));
       if (!globalOp || globalOp.isGlobalMutable()) {
-        emitWarning(loadOp.getLoc()) << "skipping consteval initializer: load "
-                                        "from mutable globals not supported";
+        emitDebugWarning(loadOp.getLoc(), [&](InFlightDiagnostic &diagnostic) {
+          diagnostic << "skipping consteval initializer: load from mutable "
+                        "globals not supported";
+        });
         return failure();
       }
       Type t = loadOp.getLoadedGlobalValue().getType();
       if (!supportedFeatures.isSupportedAbiType(t)) {
-        emitWarning(funcOp.getLoc())
-            << "skipping consteval initializer: unsupported type for current "
-               "jit configuration: "
-            << t;
+        emitDebugWarning(funcOp.getLoc(), [&](InFlightDiagnostic &diagnostic) {
+          diagnostic << "skipping consteval initializer: unsupported type for "
+                        "current jit configuration: "
+                     << t;
+        });
         return failure();
       }
       argumentTypes.push_back(t);
@@ -247,15 +542,16 @@ private:
 
     // And loose tensor constants.
     for (auto constantOp : funcOp.getOps<arith::ConstantOp>()) {
-      auto tensorType = constantOp.getResult().getType().dyn_cast<TensorType>();
-      auto elementsAttr = constantOp.getValue().dyn_cast<ElementsAttr>();
+      auto tensorType = dyn_cast<TensorType>(constantOp.getResult().getType());
+      auto elementsAttr = dyn_cast<ElementsAttr>(constantOp.getValue());
       if (!tensorType || !elementsAttr)
         continue;
       if (!supportedFeatures.isSupportedAbiType(tensorType)) {
-        emitWarning(funcOp.getLoc())
-            << "skipping consteval initializer: unsupported type for current "
-               "jit configuration: "
-            << tensorType;
+        emitDebugWarning(funcOp.getLoc(), [&](InFlightDiagnostic &diagnostic) {
+          diagnostic << "skipping consteval initializer: unsupported type for "
+                        "current jit configuration: "
+                     << tensorType;
+        });
         return failure();
       }
       argumentTypes.push_back(tensorType);
@@ -271,17 +567,15 @@ private:
     for (auto storeOp : funcOp.getOps<IREE::Util::GlobalStoreOpInterface>()) {
       auto globalOp = llvm::dyn_cast_or_null<IREE::Util::GlobalOpInterface>(
           sourceSymbolTable.lookup(storeOp.getGlobalAttr().getAttr()));
-      if (!globalOp || globalOp.isGlobalMutable()) {
-        emitWarning(storeOp.getLoc()) << "skipping consteval initializer: stor "
-                                         "to mutable globals not supported";
-        return failure();
-      }
+      assert(globalOp && "should have been checked in isConstExpr");
+
       Type t = storeOp.getStoredGlobalValue().getType();
       if (!supportedFeatures.isSupportedAbiType(t)) {
-        emitWarning(funcOp.getLoc())
-            << "skipping consteval initializer: unsupported type for current "
-               "jit configuration: "
-            << t;
+        emitDebugWarning(funcOp.getLoc(), [&](InFlightDiagnostic &diagnostic) {
+          diagnostic << "skipping consteval initializer: unsupported type for "
+                        "current jit configuration: "
+                     << t;
+        });
         return failure();
       }
 
@@ -299,7 +593,7 @@ private:
     // Rewrite the terminator and the function type.
     entryBlock->getTerminator()->erase();
     OpBuilder termBuilder = OpBuilder::atBlockEnd(entryBlock);
-    termBuilder.create<func::ReturnOp>(funcOp.getLoc(), returns);
+    termBuilder.create<IREE::Util::ReturnOp>(funcOp.getLoc(), returns);
     funcOp.setType(termBuilder.getFunctionType(argumentTypes, returnTypes));
 
     jitFunctions.push_back(std::move(desc));
@@ -311,6 +605,8 @@ private:
   SymbolTable targetSymbolTable;
   llvm::SmallVector<JitFunctionDesc> jitFunctions;
   const SupportedFeatures &supportedFeatures;
+  const IREE::Util::ConstExprAnalysis &constExprAnalysis;
+  InitializationAnalysis initializationAnalysis;
 };
 
 struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
@@ -370,12 +666,6 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
     SupportedFeatures s;
     Builder b(context);
 
-    // Exclude vmvx backend since there is no i4 support there causing
-    // the `eval_i4_tensor` test in `jit_globals.mlir` to fail.
-    // TODO(#16321): Enable on other backends once this has been tested
-    // outside llvm-cpu.
-    if (requestedTargetDevice == "llvm-cpu" && hasRequestedTargetDevice)
-      s.addScalarType(b.getIntegerType(4));
     s.addScalarType(b.getIntegerType(8));
     s.addScalarType(b.getIntegerType(16));
     s.addScalarType(b.getIntegerType(32));
@@ -384,10 +674,6 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
 
     s.addElementType(b.getIntegerType(1));
 
-    // TODO(#16321): Enable on other backends once this has been tested outside
-    // llvm-cpu.
-    if (requestedTargetDevice == "llvm-cpu" && hasRequestedTargetDevice)
-      s.addElementType(b.getIntegerType(4));
     s.addElementType(b.getIntegerType(8));
     s.addElementType(b.getIntegerType(16));
     s.addElementType(b.getIntegerType(32));
@@ -417,26 +703,28 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
         timerName.append(jitFunction.name);
         invokeTimer.emplace(timerName, timerName, tg);
         invokeTimer->startTimer();
-        dbgs() << "::: Invoking " << jitFunction.name << "\n";
+        llvm::dbgs() << "::: Invoking " << jitFunction.name << "\n";
       }
 
       FunctionCall call(binary, jitFunction.argumentBindings.size(),
                         jitFunction.resultBindings.size());
+      if (failed(call.initialize(jitFunction.loc)))
+        return failure();
 
       // Convert arguments.
       for (ArgumentBinding &arg : jitFunction.argumentBindings) {
         switch (arg.getType()) {
-        case ArgumentBinding::Type::ElementsAttr:
+        case ArgumentBinding::Type::ElementsAttr: {
           if (failed(call.addArgument(jitFunction.loc, arg.getElementsAttr())))
             return failure();
           break;
-
+        }
         case ArgumentBinding::Type::GlobalOp: {
           auto globalValue = arg.getGlobalOp().getGlobalInitialValue();
           if (!globalValue) {
             return emitError(jitFunction.loc)
-                   << "internal error: jit global source initialization order. "
-                      "global "
+                   << "internal error: jit global source initialization order "
+                      "invalid: global "
                    << arg.getGlobalOp().getGlobalName() << " has no value";
           }
           if (failed(call.addArgument(arg.getGlobalOp().getLoc(), globalValue)))
@@ -476,11 +764,15 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
   void runOnOperation() override {
     llvm::TimerGroup tg("iree-consteval-jit", "Consteval Jit");
     auto outerModule = getOperation();
+
     auto supportedFeatures = getSupportedFeatures(&getContext());
     if (!hasRequestedTargetDevice) {
-      emitWarning(UnknownLoc::get(&getContext()))
-          << "consteval jit requested with " << requestedTargetDevice
-          << " backend, but it is not available. Falling back to vmvx";
+      emitDebugWarning(
+          UnknownLoc::get(&getContext()), [&](InFlightDiagnostic &diagnostic) {
+            diagnostic
+                << "consteval jit requested with " << requestedTargetDevice
+                << " backend, but it is not available; falling back to vmvx";
+          });
     }
     if (!targetDevice) {
       emitError(UnknownLoc::get(&getContext()))
@@ -490,14 +782,15 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
       return;
     }
 
-    llvm::SmallVector<IREE::Util::InitializerOp> initOps;
+    llvm::SmallVector<IREE::Util::InitializerOp> initializerOps;
     llvm::SmallVector<IREE::Util::InitializerOp> deadInitOps;
     for (auto childOp : outerModule.getOps<IREE::Util::InitializerOp>()) {
-      initOps.push_back(childOp);
+      initializerOps.push_back(childOp);
     }
 
     // Build the program.
-    ProgramBuilder programBuilder(outerModule, supportedFeatures);
+    ProgramBuilder programBuilder(outerModule, supportedFeatures,
+                                  getAnalysis<IREE::Util::ConstExprAnalysis>());
 
     // Set the target.
     std::optional<IREE::HAL::DeviceTargetAttr> targetAttr =
@@ -517,14 +810,12 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
     }
 
     // Iterate over initializers.
-    for (auto initOp : initOps) {
-      if (!initOp->hasAttr("iree.compiler.consteval"))
-        continue;
-
-      if (succeeded(programBuilder.importInitializer(initOp))) {
-        deadInitOps.push_back(initOp);
+    for (auto initializerOp : initializerOps) {
+      if (succeeded(programBuilder.importInitializer(initializerOp))) {
+        deadInitOps.push_back(initializerOp);
       } else if (debugEnabled) {
-        dbgs() << "::: Rejected consteval initializer:\n" << initOp << "\n";
+        llvm::dbgs() << "::: Rejected consteval initializer:\n"
+                     << initializerOp << "\n";
       }
     }
     if (programBuilder.getJitFunctions().empty()) {
@@ -534,8 +825,8 @@ struct JitGlobalsPass : public JitGlobalsBase<JitGlobalsPass> {
 
     std::optional<llvm::Timer> compileTimer;
     if (debugEnabled) {
-      dbgs() << "::: COMPILING JIT (" << requestedTargetDevice
-             << "): " << programBuilder.getTargetModule() << "\n";
+      llvm::dbgs() << "::: COMPILING JIT (" << requestedTargetDevice
+                   << "): " << programBuilder.getTargetModule() << "\n";
       compileTimer.emplace("iree-consteval-jit-compile", "Compiling", tg);
       compileTimer->startTimer();
     }

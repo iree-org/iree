@@ -6,7 +6,10 @@
 
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Debug.h"
@@ -83,32 +86,6 @@ getSubgroupIdsAndCounts(mlir::OpBuilder &builder, mlir::Location loc,
   return procInfo;
 }
 
-std::array<int64_t, 3> getWorkgroupSize(mlir::FunctionOpInterface funcOp) {
-  std::array<int64_t, 3> workgroupSize;
-  FailureOr<IREE::HAL::ExecutableExportOp> exportOp =
-      mlir::iree_compiler::getEntryPoint(funcOp);
-  std::optional<mlir::ArrayAttr> workgroupSizeAttr =
-      exportOp->getWorkgroupSize();
-  assert(workgroupSizeAttr.has_value());
-  for (auto [index, attr] : llvm::enumerate(workgroupSizeAttr.value())) {
-    workgroupSize[index] =
-        llvm::cast<mlir::IntegerAttr>(attr).getValue().getZExtValue();
-  }
-  return workgroupSize;
-}
-
-std::optional<int64_t> getSubgroupSize(mlir::FunctionOpInterface funcOp) {
-  FailureOr<IREE::HAL::ExecutableExportOp> exportOp =
-      mlir::iree_compiler::getEntryPoint(funcOp);
-  if (failed(exportOp)) {
-    return std::nullopt;
-  }
-  if (IntegerAttr attr = exportOp->getSubgroupSizeAttr()) {
-    return attr.getValue().getSExtValue();
-  }
-  return std::nullopt;
-}
-
 //===----------------------------------------------------------------------===//
 // GPU vectorization
 //===----------------------------------------------------------------------===//
@@ -173,6 +150,41 @@ gpuMmaUnrollOrder(vector::ContractionOp contract) {
     }
   }
   return order;
+}
+
+//===----------------------------------------------------------------------===//
+// GPU tiling and distribution
+//===----------------------------------------------------------------------===//
+
+const char *getGPUDistributeAttrName() { return "iree.gpu.distribute_dim"; }
+
+FailureOr<SmallVector<int64_t>> getGPUTileSize(mlir::FunctionOpInterface funcOp,
+                                               int tilingLevel) {
+  SmallVector<Operation *> computeOps = getComputeOps(funcOp);
+  auto config = getLoweringConfig(computeOps);
+  if (failed(config)) {
+    return funcOp.emitOpError("failed to get lowering configuration");
+  }
+
+  return config->getTileSizeVals(tilingLevel);
+}
+
+FailureOr<scf::SCFTileSizeComputationFunction>
+getGPUScfTileSizeComputeFn(mlir::FunctionOpInterface funcOp, int tilingLevel) {
+  FailureOr<SmallVector<int64_t>> tileSizes =
+      getGPUTileSize(funcOp, tilingLevel);
+  if (failed(tileSizes))
+    return failure();
+  scf::SCFTileSizeComputationFunction computeFn =
+      [tileSizes](OpBuilder &builder,
+                  Operation *op) -> SmallVector<OpFoldResult> {
+    auto tileSizesOfr = getAsIndexOpFoldResult(op->getContext(), *tileSizes);
+    auto zeroAttr = builder.getIndexAttr(0);
+    int numLoops = cast<TilingInterface>(op).getLoopIteratorTypes().size();
+    tileSizesOfr.resize(numLoops, zeroAttr);
+    return tileSizesOfr;
+  };
+  return computeFn;
 }
 
 //===----------------------------------------------------------------------===//
@@ -348,7 +360,7 @@ static Value promoteElementToVector(Location loc, OpBuilder &builder,
 Value packVectorToSupportedWidth(Location loc, OpBuilder &builder,
                                  Value input) {
   LLVM_DEBUG({
-    auto vecType = input.getType().cast<VectorType>();
+    auto vecType = cast<VectorType>(input.getType());
     Type elementType = vecType.getElementType();
     assert(vecType.getDimSize(0) * elementType.getIntOrFloatBitWidth() ==
                kShuffleBitWidth &&
@@ -938,7 +950,7 @@ bool hasUkernelSupportedGpuArch(IREE::HAL::ExecutableTargetAttr targetAttr) {
 //===----------------------------------------------------------------------===//
 
 static constexpr char mmaTypeListName[] = "mma_intrinsics";
-static FailureOr<ArrayAttr> getSupportedMmaTypes(DictionaryAttr config) {
+FailureOr<ArrayAttr> getSupportedMmaTypes(DictionaryAttr config) {
   if (!config) {
     return failure();
   }

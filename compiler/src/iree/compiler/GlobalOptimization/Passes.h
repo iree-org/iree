@@ -70,6 +70,10 @@ std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createFuseDequantizationMatmulPass(
     bool enableQuantizedMatmulReassociation = false);
 
+/// Horizontally fuses multiple contraction ops.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createFuseHorizontalContractionsPass();
+
 /// Fuses two matmul ops and a linalg.generic Silu op
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createFuseSiluHorizontalMatmulPass();
@@ -104,8 +108,10 @@ std::unique_ptr<Pass> createRaiseSpecialOps();
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createRemoveZeroExtentTensorsPass();
 
-/// Sets encoding for tensors to allow tiled execution of operations.
-std::unique_ptr<Pass> createSetEncodingPass();
+/// Sets encoding for tensors to allow tiled execution of operations. If
+/// `padFactor` is set to non-zero, the padding sizes hint will be attached to
+/// encodings. It makes the host and device agree with the same padding sizes.
+std::unique_ptr<Pass> createSetEncodingPass(int64_t padFactor = 0);
 
 /// Simplifies tensor pack/unpack ops to reshape ops.
 std::unique_ptr<Pass> createSimplifyPackUnpackPass();
@@ -113,6 +119,10 @@ std::unique_ptr<Pass> createSimplifyPackUnpackPass();
 /// Hoist loop invariants out of loops with zero-trip-check.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createGlobalLoopInvariantCodeMotionPass();
+
+/// Propagate pack/unpack ops across other ops to improve fusion.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createDataLayoutPropagationPass();
 
 void registerGlobalOptimizationPipeline();
 

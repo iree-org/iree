@@ -58,6 +58,20 @@ struct InputDialectOptions {
   using FromFlags = OptionsFromFlags<InputDialectOptions>;
 };
 
+// Allows specifying one of several ways of doing custom transformations at the
+// pre-processing phase, multiple ways may be used and they are run in order:
+//   1. Through a preprocessing pass pipeline.
+//   2. Through a Transform dialect spec file.
+//   3. Through a PDL spec file.
+struct PreprocessingOptions {
+  std::string preprocessingPassPipeline;
+  std::string preprocessingTransformSpecFilename;
+  std::string preprocessingPDLSpecFilename;
+
+  void bindOptions(OptionsBinder &binder);
+  using FromFlags = OptionsFromFlags<PreprocessingOptions>;
+};
+
 // Options controlling high level optimizations.
 struct GlobalOptimizationOptions {
   // Gate various type based demotion passes that run before anything else.
@@ -94,18 +108,24 @@ struct GlobalOptimizationOptions {
   // allow hoisting. The threshold is 1MB by default.
   int64_t constExprMaxSizeIncreaseThreshold = 1024 * 1024;
 
-  // File path to create a parameter archive out of global initial values.
-  std::string parameterArchiveExportPath = "";
+  // File paths to archives to import parameters from with an optional
+  // `scope=` prefix.
+  std::vector<std::string> parameterImportPaths;
+  // List of parameter keys to import. Any matching keys from any scope will be
+  // imported.
+  std::vector<std::string> parameterImportKeys;
+  // Maximum size of parameters to import or 0 to disable automatic import.
+  int64_t parameterImportMaximumSize = 0;
 
-  // Optional scope to use for the created parameter archive.
-  std::string parameterExportScope = "";
+  // File path to an archive to export parameters to with an optional
+  // `scope=` prefix.
+  std::string parameterExportPath;
+  // Minimum size of constants to export as parameters.
+  int64_t parameterExportMinimumSize = 0;
 
   // File path to create a splat parameter archive out of all parameters in the
   // module.
-  std::string splatParameterArchiveExportPath = "";
-
-  // Minimum size of constants to export as parameters.
-  int64_t minimumParameterExportSize = 256;
+  std::string parameterSplatExportFile = "";
 
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<GlobalOptimizationOptions>;
@@ -164,13 +184,6 @@ struct SchedulingOptions {
 
   void bindOptions(OptionsBinder &binder);
   using FromFlags = OptionsFromFlags<SchedulingOptions>;
-};
-
-struct PreprocessingOptions {
-  std::string preprocessingPassPipeline;
-  std::string preprocessingTransformSpecFilename;
-  void bindOptions(OptionsBinder &binder);
-  using FromFlags = OptionsFromFlags<PreprocessingOptions>;
 };
 
 } // namespace mlir::iree_compiler
