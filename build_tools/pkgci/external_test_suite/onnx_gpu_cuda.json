@@ -7,8 +7,7 @@
     "--device=cuda"
   ],
   "skip_compile_tests": [
-    "test_dequantizelinear",
-    "test_slice_default_axes"
+    "test_dequantizelinear"
   ],
   "skip_run_tests": [
     "test_gather_elements_negative_indices",

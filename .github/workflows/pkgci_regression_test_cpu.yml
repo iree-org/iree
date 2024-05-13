@@ -59,7 +59,7 @@ jobs:
         run: |
           source ${VENV_DIR}/bin/activate
           pytest SHARK-TestSuite/iree_tests/onnx/ \
-              -n auto -rpfE --timeout=30 --retries=2 --durations=20 \
+              -n auto -rpfE --timeout=30 --durations=20 \
               --config-files=build_tools/pkgci/external_test_suite/onnx_cpu_llvm_sync.json \
               --no-skip-tests-missing-files \
               --report-log=/tmp/iree_tests_onnx_cpu_llvm_sync_logs.json
