@@ -136,6 +136,19 @@ util.func public @tensorSplat(%value: i8, %dim0: index) -> tensor<?x128xi8> {
 
 // -----
 
+util.global private @device : !hal.device
+
+// CHECK-LABEL: @tensorTransfer
+//  CHECK-SAME: (%[[INPUT:.+]]: !stream.resource<*>, %[[INPUT_SIZE:.+]]: index, %[[DIM0:.+]]: index)
+util.func public @tensorTransfer(%input: tensor<?x128xi8>, %dim0: index) -> tensor<?x128xi8> {
+  // CHECK: %[[TRANSFER:.+]] = stream.async.transfer %[[INPUT]] : !stream.resource<*>{%[[INPUT_SIZE]]} -> to(#hal.device.affinity<@device>) !stream.resource<*>{%[[INPUT_SIZE]]}
+  %transfer = flow.tensor.transfer %input : tensor<?x128xi8>{%dim0} to #hal.device.affinity<@device>
+  // CHECK: util.return %[[TRANSFER]], %[[INPUT_SIZE]]
+  util.return %transfer : tensor<?x128xi8>
+}
+
+// -----
+
 // CHECK-LABEL: @tensorSlice
 //  CHECK-SAME: (%[[INPUT:.+]]: !stream.resource<*>, %[[INPUT_SIZE:.+]]: index)
 util.func public @tensorSlice(%input : tensor<5x24x48xf32>) -> tensor<3x24x48xf32> {

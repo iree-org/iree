@@ -200,6 +200,27 @@ struct ConvertTensorCloneOp
   }
 };
 
+struct ConvertTensorTransferOp
+    : public OpConversionPattern<IREE::Flow::TensorTransferOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::Flow::TensorTransferOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto targetAffinityAttr =
+        dyn_cast<IREE::Stream::AffinityAttr>(adaptor.getTarget());
+    if (!targetAffinityAttr)
+      return rewriter.notifyMatchFailure(op, "invalid stream affinity attr");
+    auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
+    auto operand =
+        consumeTensorOperand(op.getLoc(), adaptor.getOperand(), rewriter);
+    rewriter.replaceOpWithNewOp<IREE::Stream::AsyncTransferOp>(
+        op, unknownType, operand.resource, operand.resourceSize,
+        operand.resourceSize,
+        /*source_affinity=*/IREE::Stream::AffinityAttr{}, targetAffinityAttr);
+    return success();
+  }
+};
+
 struct ConvertTensorSliceOp
     : public OpConversionPattern<IREE::Flow::TensorSliceOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -969,9 +990,10 @@ void populateFlowToStreamConversionPatterns(MLIRContext *context,
               ConvertTensorCastLikeOp<IREE::Flow::TensorReshapeOp>,
               ConvertTensorCastLikeOp<IREE::Flow::TensorBitCastOp>,
               ConvertTensorAllocaOp, ConvertTensorEmptyOp, ConvertTensorSplatOp,
-              ConvertTensorCloneOp, ConvertTensorSliceOp, ConvertTensorUpdateOp,
-              ConvertTensorLoadOp, ConvertTensorStoreOp, ConvertTensorTraceOp>(
-          typeConverter, context);
+              ConvertTensorCloneOp, ConvertTensorTransferOp,
+              ConvertTensorSliceOp, ConvertTensorUpdateOp, ConvertTensorLoadOp,
+              ConvertTensorStoreOp, ConvertTensorTraceOp>(typeConverter,
+                                                          context);
   patterns.insert<ConvertChannelDefaultOp, ConvertChannelSplitOp,
                   ConvertChannelRankOp, ConvertChannelCountOp>(typeConverter,
                                                                context);
