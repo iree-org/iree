@@ -23,24 +23,6 @@ namespace mlir::iree_compiler::IREE::LinalgExt {
 // Utils.
 //===----------------------------------------------------------------------===//
 
-/// Returns a memref.subview or a tensor.extract_slice based on the type of the
-/// `source`.
-static Value getSlice(OpBuilder &b, Location loc, Value source,
-                      ArrayRef<OpFoldResult> offsets,
-                      ArrayRef<OpFoldResult> sizes,
-                      ArrayRef<OpFoldResult> strides) {
-  return TypeSwitch<Type, Value>(source.getType())
-      .Case<RankedTensorType>([&](RankedTensorType t) -> Value {
-        return b.create<tensor::ExtractSliceOp>(loc, source, offsets, sizes,
-                                                strides);
-      })
-      .Case<MemRefType>([&](MemRefType type) -> Value {
-        return b.create<memref::SubViewOp>(loc, source, offsets, sizes,
-                                           strides);
-      })
-      .Default([&](Type t) { return nullptr; });
-}
-
 /// Returns the size and offset scaled by some scale factor, and clamped to a
 /// dimSize for the dimension. `(offset + size) * scale` will be clamped to the
 /// `dimSize`.
@@ -1552,9 +1534,7 @@ FailureOr<TilingResult> WinogradOutputTransformOp::getTiledImplementation(
   // multiple of the static output_tile_size, so insert a tensor.cast op to
   // maintain more static information in the IR.
   auto outSliceType = cast<ShapedType>(outputSlice.getType());
-  SmallVector<int64_t> staticOutShape = llvm::map_to_vector(
-      llvm::seq<int64_t>(outSliceType.getRank()),
-      [&](auto idx) { return outSliceType.getDimSize(idx); });
+  SmallVector<int64_t> staticOutShape(outSliceType.getShape());
   auto constSizeH = getConstantIntValue(sizes[1]);
   if (constSizeH.has_value()) {
     staticOutShape[hDim] = constSizeH.value() * getOutputTileSize();
@@ -1563,17 +1543,8 @@ FailureOr<TilingResult> WinogradOutputTransformOp::getTiledImplementation(
   if (constSizeW.has_value()) {
     staticOutShape[wDim] = constSizeW.value() * getOutputTileSize();
   }
-  bool isMemref = isa<MemRefType>(outSliceType);
   Value staticOutputSlice =
-      isMemref
-          ? builder
-                .create<memref::CastOp>(loc, outSliceType.clone(staticOutShape),
-                                        outputSlice)
-                ->getResult(0)
-          : builder
-                .create<tensor::CastOp>(loc, outSliceType.clone(staticOutShape),
-                                        outputSlice)
-                ->getResult(0);
+      castValue(builder, loc, outputSlice, outSliceType.clone(staticOutShape));
 
   SmallVector<Value> tiledOperands;
   tiledOperands.emplace_back(getSlice(builder, loc, getInput(), inputOffsets,
@@ -1589,10 +1560,8 @@ FailureOr<TilingResult> WinogradOutputTransformOp::getTiledImplementation(
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
 
   SmallVector<Value> results(tiledOp->getResults());
-  if (!isMemref) {
-    results.front() =
-        builder.create<tensor::CastOp>(loc, outSliceType, results.front())
-            ->getResult(0);
+  if (!results.empty()) {
+    results.front() = castValue(builder, loc, results.front(), outSliceType);
   }
   return TilingResult{{tiledOp}, results};
 }
