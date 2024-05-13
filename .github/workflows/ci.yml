@@ -429,7 +429,7 @@ jobs:
         run: |
           ./build_tools/cmake/ctest_all.sh ${BUILD_DIR}
 
-  # Disabled while the 'nodai-amdgpu-w7900-x86-64' runner is unstable.
+  # TODO(#17370): re-enable when nodai-amdgpu-w7900-x86-64 runner is stable
   # test_amd_w7900:
   #   needs: [setup, build_all]
   #   if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_amd_w7900')
