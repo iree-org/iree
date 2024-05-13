@@ -22,7 +22,7 @@
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
-#include "mlir/Dialect/Tensor/Transforms/Transforms.h"
+#include "mlir/IR/Block.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/Support/LogicalResult.h"
@@ -141,51 +141,57 @@ struct FoldSuccessiveTensorInsertSliceOps
   }
 };
 
-struct GatherFusionPattern : public OpRewritePattern<linalg::YieldOp> {
-  using OpRewritePattern<linalg::YieldOp>::OpRewritePattern;
-  LogicalResult matchAndRewrite(linalg::YieldOp yieldOp,
+//===----------------------------------------------------------------------===//
+// GatherFusionPattern
+//===----------------------------------------------------------------------===//
+
+// Specific case. The linalg generic implementation of "gather"
+// cannot be fused because it there is no producer-consumer
+// relationship between the two generics. This is because the indexing
+// is not affine (index values come from a tensor).
+struct GatherFusionPattern : public OpRewritePattern<linalg::GenericOp> {
+  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(linalg::GenericOp consumerOp,
                                 PatternRewriter &rewriter) const override {
-    // Specific case. The linalg generic implementation of "gather"
-    // cannot be fused because it there is no producer-consumer
-    // relationship between the two generics. This is because the indexing
-    // is not affine (index values come from a tensor).
-    if (yieldOp->getNumOperands() != 1) {
-      return failure();
-    }
-    auto extractOp = dyn_cast_or_null<tensor::ExtractOp>(
-        yieldOp->getOperand(0).getDefiningOp());
-    if (!extractOp) {
+    auto extractOps = consumerOp.getOps<tensor::ExtractOp>();
+    if (extractOps.empty()) {
       return failure();
     }
 
-    // match the generic that gens a higher bitwidth tensor
-    auto definingOp = dyn_cast_or_null<linalg::GenericOp>(
-        extractOp.getOperand(0).getDefiningOp());
-    if (!definingOp) {
-      return rewriter.notifyMatchFailure(
-          yieldOp, "expected extract operand to be a generic op");
+    for (tensor::ExtractOp extractOp : extractOps) {
+      auto producerOp = dyn_cast_or_null<linalg::GenericOp>(
+          extractOp.getOperand(0).getDefiningOp());
+      if (!producerOp) {
+        return rewriter.notifyMatchFailure(
+            consumerOp, "expected extract operand to be a generic op");
+      }
+
+      // Check if the producerOp is fusible
+      if (producerOp.getNumDpsInputs() != 1 || !isElementwise(producerOp) ||
+          !isDequantizationLikeOp(producerOp)) {
+        return rewriter.notifyMatchFailure(producerOp,
+                                           "producer op is not fusible");
+      }
+
+      // fuse by performing the dequantization after extracting
+      rewriter.setInsertionPoint(extractOp);
+      auto newExtractOp = rewriter.create<tensor::ExtractOp>(
+          extractOp->getLoc(), producerOp->getOperand(0),
+          extractOp.getIndices());
+      rewriter.cloneRegionBefore(producerOp.getRegion(), consumerOp.getRegion(),
+                                 consumerOp.getRegion().begin());
+      Block &clonedBlock = consumerOp.getRegion().front();
+      auto terminator = clonedBlock.getTerminator();
+
+      rewriter.inlineBlockBefore(
+          &clonedBlock, extractOp->getNextNode(),
+          {newExtractOp.getResult(), newExtractOp->getResult(0)});
+
+      extractOp->getResult(0).replaceAllUsesWith(terminator->getOperand(0));
+      rewriter.eraseOp(terminator);
+      rewriter.eraseOp(extractOp);
     }
 
-    // generic body should contain only a arith.extf and a linalg.yield
-    auto &ops = definingOp->getRegion(0).front().getOperations();
-    if (ops.size() != 2 || !isa<arith::ExtFOp>(ops.front()) ||
-        !isa<linalg::YieldOp>(ops.back())) {
-      return rewriter.notifyMatchFailure(yieldOp,
-                                         "expected generic op to have 2 ops");
-    }
-
-    // move definingOp's body just before the yield op (root)
-    rewriter.inlineBlockBefore(
-        &definingOp.getRegion().front(), yieldOp,
-        {extractOp->getResult(0), yieldOp->getOperand(0)});
-
-    // create a new extract op that directly uses definingOp's input
-    rewriter.setInsertionPoint(extractOp);
-    auto newExtractOp = rewriter.create<tensor::ExtractOp>(
-        extractOp->getLoc(), definingOp->getOperand(0), extractOp.getIndices());
-    rewriter.replaceOp(extractOp, newExtractOp);
-    rewriter.eraseOp(yieldOp);
-    rewriter.eraseOp(definingOp);
     return success();
   }
 };
