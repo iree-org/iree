@@ -292,13 +292,15 @@ LogicalResult ConvertedAsyncFunctionInfo::postProcess() {
         aliasedResults.push_back(
             postambleBuilder.create<IREE::HAL::TensorAliasOp>(
                 barrierInput.getLoc(), barrierInput.getType(), barrierInput,
-                barrierInputDims, exportStorage, waitFence));
+                barrierInputDims, exportStorage, waitFence,
+                /*affinity=*/nullptr));
       } else {
         aliasedResults.push_back(barrierInput);
       }
     }
     auto barrierOp = postambleBuilder.create<IREE::HAL::TensorBarrierOp>(
-        funcOp.getLoc(), aliasedResults, coarseSignalFence);
+        funcOp.getLoc(), aliasedResults, coarseSignalFence,
+        /*affinity=*/nullptr);
     for (auto [barrierResult, meta] :
          llvm::zip_equal(barrierOp.getResults(), barrierResultMeta)) {
       Value exportStorage;
@@ -308,7 +310,8 @@ LogicalResult ConvertedAsyncFunctionInfo::postProcess() {
       Value exportedValue = postambleBuilder.create<IREE::HAL::TensorExportOp>(
           funcOp.getLoc(),
           postambleBuilder.getType<IREE::HAL::BufferViewType>(), barrierResult,
-          TypeAttr::get(barrierResult.getType()), StringAttr());
+          TypeAttr::get(barrierResult.getType()), /*name=*/nullptr,
+          /*affinity=*/nullptr);
       if (returnIndex >= 0) {
         newReturnOperands[returnIndex] = exportedValue;
       }
@@ -380,7 +383,8 @@ LogicalResult ConvertedAsyncFunctionInfo::convertImmutableTensorArg(
   Value importedTensor = builder.create<IREE::HAL::TensorImportOp>(
       loc, builtinTensorType, argValue, TypeAttr::get(builtinTensorType),
       waitFence,
-      /*name=*/StringAttr());
+      /*name=*/nullptr,
+      /*affinity=*/nullptr);
   if (builtinTensorType != torchType) {
     importedTensor = builder.create<TorchConversion::FromBuiltinTensorOp>(
         loc, torchType, importedTensor);
@@ -415,7 +419,8 @@ LogicalResult ConvertedAsyncFunctionInfo::convertMutableTensorArg(
           loc, builtinTensorType, argValue,
           /*target_encoding=*/TypeAttr::get(builtinTensorType),
           /*wait_fence*/ fences->first,
-          /*name=*/StringAttr());
+          /*name=*/nullptr,
+          /*affinity=*/nullptr);
       rewriter.replaceOpWithNewOp<TorchConversion::FromBuiltinTensorOp>(
           userOp, copyToVtOp.getResult().getType(), imported);
     } else if (auto overwriteOp =
