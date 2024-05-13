@@ -252,6 +252,7 @@ static iree_status_t iree_tooling_run_function(
   }
 
   // Invoke the function with the provided inputs.
+  fprintf(stderr, "Calling iree_vm_invoke\n");
   if (iree_status_is_ok(status)) {
     status = iree_status_annotate_f(
         iree_vm_invoke(context, function, IREE_VM_INVOCATION_FLAG_NONE,
@@ -263,11 +264,14 @@ static iree_status_t iree_tooling_run_function(
 
   // If the function is async we need to wait for it to complete.
   if (iree_status_is_ok(status) && finish_fence) {
+    fprintf(stderr, "Async, waiting\n");
     iree_timeout_t wait_timeout = FLAG_timeout_ms > 0
                                       ? iree_make_timeout_ms(FLAG_timeout_ms)
                                       : iree_infinite_timeout();
     IREE_RETURN_IF_ERROR(iree_hal_fence_wait(finish_fence, wait_timeout),
                          "waiting on finish fence");
+  } else {
+    fprintf(stderr, "Not async, no need to wait\n");
   }
   iree_hal_fence_release(finish_fence);
 
