@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --verify-diagnostics --pass-pipeline="builtin.module(util.func(iree-flow-interchange-transpose-generic-ops,iree-flow-form-dispatch-regions{aggressive-fusion=true}, iree-flow-form-dispatch-workgroups, canonicalize, cse))" --mlir-print-local-scope %s | FileCheck %s
+// RUN: iree-opt --split-input-file --verify-diagnostics --pass-pipeline="builtin.module(util.func(iree-flow-interchange-transpose-generic-ops,iree-flow-form-dispatch-regions{aggressive-fusion=true}, iree-flow-dispatch-regions-to-workgroups, canonicalize, cse))" --mlir-print-local-scope %s | FileCheck %s
 
 util.func @fuse_conv(%arg0 : tensor<2x130x130x16xf32>, %arg1 : tensor<3x3x16x320xf32>) -> tensor<2x320x128x128xf32> {
   %empty = tensor.empty() : tensor<2x128x128x320xf32>
