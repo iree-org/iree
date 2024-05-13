@@ -125,13 +125,15 @@ def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
     TypeAttr:$target_encoding,
     HAL_ShapeDynamicDims:$target_dims,
     Optional<HAL_Fence>:$wait_fence,
-    OptionalAttr<StrAttr>:$name
+    OptionalAttr<StrAttr>:$name,
+    OptionalAttr<AnyAttr>:$affinity
   );
   let results = (outs
     AnyTensor:$target
   );
 
   let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
     (`wait` `(` $wait_fence^ `)` `=` `` `>`)?
     $source
     ($name^)?
@@ -145,14 +147,16 @@ def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
       "Type":$resultType,
       "Value":$source,
       "TypeAttr":$targetEncoding,
-      "StringAttr":$name
+      "StringAttr":$name,
+      "Attribute":$affinity
     )>,
     OpBuilder<(ins
       "Type":$resultType,
       "Value":$source,
       "TypeAttr":$targetEncoding,
       "Value":$waitFence,
-      "StringAttr":$name
+      "StringAttr":$name,
+      "Attribute":$affinity
     )>,
   ];
 
@@ -190,13 +194,15 @@ def HAL_TensorExportOp : HAL_PureOp<"tensor.export", [
     AnyTensor:$source,
     TypeAttr:$source_encoding,
     HAL_ShapeDynamicDims:$source_dims,
-    OptionalAttr<StrAttr>:$name
+    OptionalAttr<StrAttr>:$name,
+    OptionalAttr<AnyAttr>:$affinity
   );
   let results = (outs
     AnyTypeOf<[HAL_Buffer, HAL_BufferView]>:$target
   );
 
   let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
     $source
     ($name^)?
     `:`
@@ -211,7 +217,8 @@ def HAL_TensorExportOp : HAL_PureOp<"tensor.export", [
       "Type":$resultType,
       "Value":$source,
       "TypeAttr":$sourceEncoding,
-      "StringAttr":$name
+      "StringAttr":$name,
+      "Attribute":$affinity
     )>,
   ];
 
@@ -273,13 +280,15 @@ def HAL_TensorAliasOp : HAL_PureOp<"tensor.alias", [
     AnyTensor:$source,
     HAL_ShapeDynamicDims:$source_dims,
     AnyTypeOf<[HAL_Buffer, HAL_BufferView]>:$storage,
-    Optional<HAL_Fence>:$wait_fence
+    Optional<HAL_Fence>:$wait_fence,
+    OptionalAttr<AnyAttr>:$affinity
   );
   let results = (outs
     AnyTensor:$result
   );
 
   let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
     (`wait` `(` $wait_fence^ `)` `=` `` `>`)?
     $source `:` type($source) (`{` $source_dims^ `}`)?
     `to`
@@ -311,13 +320,15 @@ def HAL_TensorBarrierOp : HAL_Op<"tensor.barrier", [
 
   let arguments = (ins
     Variadic<AnyTensor>:$sources,
-    HAL_Fence:$signal_fence
+    HAL_Fence:$signal_fence,
+    OptionalAttr<AnyAttr>:$affinity
   );
   let results = (outs
     Variadic<AnyTensor>:$results
   );
 
   let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
     `join` `` `(` $sources `:` type($sources) `)`
     `=` `` `>`
     $signal_fence `:` type($signal_fence)
@@ -327,7 +338,8 @@ def HAL_TensorBarrierOp : HAL_Op<"tensor.barrier", [
   let builders = [
     OpBuilder<(ins
       "ValueRange":$sources,
-      "Value":$signalFence
+      "Value":$signalFence,
+      "Attribute":$affinity
     )>,
   ];
 
