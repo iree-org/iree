@@ -7,10 +7,7 @@
   "iree_run_module_flags": [
     "--device=hip"
   ],
-  "skip_compile_tests": [
-    "test_dequantizelinear",
-    "test_slice_default_axes"
-  ],
+  "skip_compile_tests": [],
   "skip_run_tests": [],
   "expected_compile_failures": [
     "test_acosh",

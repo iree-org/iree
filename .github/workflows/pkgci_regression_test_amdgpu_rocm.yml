@@ -74,7 +74,7 @@ jobs:
   #         source ${VENV_DIR}/bin/activate
   #         export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/rocm/lib:/opt/rocm/hip/lib
   #         pytest SHARK-TestSuite/iree_tests/onnx/ \
-  #             -rpfE --timeout=30 --retries=2 --durations=20 \
+  #             -rpfE --timeout=30 --durations=20 \
   #             --config-files=build_tools/pkgci/external_test_suite/onnx_gpu_rocm_rdna3.json \
   #             --no-skip-tests-missing-files \
   #             --report-log=/tmp/iree_tests_onnx_gpu_rocm_rdna3_logs.json
