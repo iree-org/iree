@@ -26,9 +26,9 @@ namespace mlir::iree_compiler::IREE::ABI {
 static IREE::ABI::InvocationModel
 getInvocationModel(Operation *op, IREE::ABI::InvocationModel defaultModel) {
   auto modelAttr = op->getAttrOfType<StringAttr>("iree.abi.model");
-  if (!modelAttr)
+  if (!modelAttr) {
     return defaultModel;
-  if (modelAttr == "coarse-fences") {
+  } else if (modelAttr == "coarse-fences") {
     return IREE::ABI::InvocationModel::CoarseFences;
   } else {
     return IREE::ABI::InvocationModel::Sync;
@@ -51,12 +51,24 @@ static void stripABIAttrs(SmallVectorImpl<DictionaryAttr> &allAttrs) {
     for (auto attr : attrDict) {
       // TODO(benvanik): faster lookup.
       if (attr.getName() != "iree.abi.output" &&
-          attr.getName() != "iree.abi.encoding") {
+          attr.getName() != "iree.abi.encoding" &&
+          attr.getName() != "iree.abi.affinity") {
         attrs.push_back(attr);
       }
     }
     attrDict = DictionaryAttr::get(attrDict.getContext(), attrs);
   }
+}
+
+static void stripABIAttrs(FunctionOpInterface op) {
+  SmallVector<DictionaryAttr> argAttrs;
+  op.getAllArgAttrs(argAttrs);
+  stripABIAttrs(argAttrs);
+  op.setAllArgAttrs(argAttrs);
+  SmallVector<DictionaryAttr> resultAttrs;
+  op.getAllResultAttrs(resultAttrs);
+  stripABIAttrs(resultAttrs);
+  op.setAllResultAttrs(resultAttrs);
 }
 
 // Creates the corresponding wrapper function for the given import function.
@@ -150,7 +162,7 @@ createImportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
           importOp.getLoc(), entryBuilder.getType<IREE::HAL::FenceType>(),
           device, IREE::HAL::FenceFlagBitfield::None);
       auto barrierOp = entryBuilder.create<IREE::HAL::TensorBarrierOp>(
-          importOp.getLoc(), tensorArgs, waitFence);
+          importOp.getLoc(), tensorArgs, waitFence, /*affinity=*/nullptr);
       for (auto [argIndex, readyArg] :
            llvm::zip_equal(tensorArgIndices, barrierOp.getResults())) {
         entryArgs[argIndex] = readyArg;
@@ -187,20 +199,24 @@ createImportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
       // NOTE: we insert a barrier on this above if needed so that the wait
       // fence will be signaled when the tensor is ready for consumption by the
       // import.
-      auto encoding =
+      auto encodingAttr =
           importOp.getArgAttrOfType<TypeAttr>(argIndex, "iree.abi.encoding");
-      auto exportOp = entryBuilder.create<IREE::HAL::TensorExportOp>(
+      auto tensorExportOp = entryBuilder.create<IREE::HAL::TensorExportOp>(
           arg.getLoc(), newType, arg,
-          encoding ? encoding : TypeAttr::get(oldType), /*name=*/nullptr);
-      arguments.push_back(exportOp.getTarget());
+          encodingAttr ? encodingAttr : TypeAttr::get(oldType),
+          /*name=*/nullptr,
+          /*affinity=*/nullptr);
+      arguments.push_back(tensorExportOp.getTarget());
     } else {
       arguments.push_back(arg);
     }
   }
-  if (waitFence)
+  if (waitFence) {
     arguments.push_back(waitFence);
-  if (signalFence)
+  }
+  if (signalFence) {
     arguments.push_back(signalFence);
+  }
 
   // Make the call with the updated types.
   auto callOp = entryBuilder.create<IREE::Util::CallOp>(importOp.getLoc(),
@@ -225,12 +241,14 @@ createImportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
       // NOTE: we set the import pending on the signal fence from the import
       // indicating when the returned tensor is ready for consumption by the
       // program.
-      auto encoding = importOp.getResultAttrOfType<TypeAttr>(
+      auto encodingAttr = importOp.getResultAttrOfType<TypeAttr>(
           resultIndex, "iree.abi.encoding");
-      results.push_back(entryBuilder.create<IREE::HAL::TensorImportOp>(
+      auto tensorImportOp = entryBuilder.create<IREE::HAL::TensorImportOp>(
           importOp.getLoc(), oldType, result,
-          encoding ? encoding : TypeAttr::get(oldType), signalFence,
-          /*name=*/nullptr));
+          encodingAttr ? encodingAttr : TypeAttr::get(oldType), signalFence,
+          /*name=*/nullptr,
+          /*affinity=*/nullptr);
+      results.push_back(tensorImportOp);
     } else {
       results.push_back(result);
     }
@@ -285,8 +303,9 @@ static LogicalResult wrapImportFunc(IREE::ABI::InvocationModel invocationModel,
   auto wrapperOp = createImportWrapperFunc(
       invocationModel, importOp, cast<FunctionType>(importOp.getFunctionType()),
       newImportType, privateName);
-  if (!wrapperOp)
+  if (!wrapperOp) {
     return failure();
+  }
   moduleOp.insert(++Block::iterator(importOp), wrapperOp);
 
   // Update the import to the new type and mark it as being converted so we
@@ -302,15 +321,17 @@ static StringAttr getNameFromDictAttr(DictionaryAttr attr) {
 
 static StringAttr inferArgumentName(MLIRContext *context, int index,
                                     DictionaryAttr attrs) {
-  if (auto attrName = getNameFromDictAttr(attrs))
+  if (auto attrName = getNameFromDictAttr(attrs)) {
     return attrName;
+  }
   return StringAttr::get(context, "input" + std::to_string(index));
 }
 
 static StringAttr inferResultName(MLIRContext *context, int index,
                                   DictionaryAttr attrs) {
-  if (auto attrName = getNameFromDictAttr(attrs))
+  if (auto attrName = getNameFromDictAttr(attrs)) {
     return attrName;
+  }
   return StringAttr::get(context, "output" + std::to_string(index));
 }
 
@@ -326,8 +347,9 @@ static void formatIOAttr(DictionaryAttr attrs, llvm::raw_ostream &os) {
   auto shouldIncludeAttr = [](const NamedAttribute &attr) {
     return attr.getName().getValue() != "iree.abi.name";
   };
-  if (!llvm::any_of(attrs, shouldIncludeAttr))
+  if (!llvm::any_of(attrs, shouldIncludeAttr)) {
     return;
+  }
   os << " {";
   llvm::interleaveComma(llvm::make_filter_range(attrs, shouldIncludeAttr), os,
                         [&](auto argAttr) {
@@ -363,8 +385,9 @@ formatSourceDeclaration(IREE::ABI::InvocationModel invocationModel,
   os << "func @" << publicName;
   os << "(";
   for (auto arg : exportOp.getArguments()) {
-    if (arg.getArgNumber() > 0)
+    if (arg.getArgNumber() > 0) {
       os << ", ";
+    }
     os << "%";
     os << inferArgumentName(exportOp.getContext(), arg.getArgNumber(),
                             getIOAttr(allArgAttrs, arg.getArgNumber()))
@@ -377,8 +400,9 @@ formatSourceDeclaration(IREE::ABI::InvocationModel invocationModel,
   os << ") -> (";
   for (auto [resultNumber, resultType] :
        llvm::enumerate(exportOp.getResultTypes())) {
-    if (resultNumber > 0)
+    if (resultNumber > 0) {
       os << ", ";
+    }
     os << "%";
     os << inferResultName(exportOp.getContext(), resultNumber,
                           getIOAttr(allResultAttrs, resultNumber))
@@ -494,8 +518,9 @@ createExportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
   // Populate the reflection attrs based on the original types.
   populateReflectionAttrs(invocationModel, exportOp, wrapperOp);
   exportOp->removeAttr("iree.reflection");
-  if (auto affinityAttr = exportOp->getAttr("stream.affinity"))
+  if (auto affinityAttr = exportOp->getAttr("stream.affinity")) {
     wrapperOp->setAttr("stream.affinity", affinityAttr);
+  }
 
   auto *entryBlock = wrapperOp.addEntryBlock();
   auto entryBuilder = OpBuilder::atBlockBegin(entryBlock);
@@ -506,8 +531,9 @@ createExportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
   for (unsigned i = 0; i < exportOp.getNumArguments(); ++i) {
     auto outputAttr =
         exportOp.getArgAttrOfType<IntegerAttr>(i, "iree.abi.output");
-    if (!outputAttr)
+    if (!outputAttr) {
       continue;
+    }
     // Today all outputs need to be a !hal.buffer - we could change this
     // in the future to be something more generalized.
     auto storageArg = entryBlock->getArgument(i);
@@ -544,14 +570,15 @@ createExportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
            entryBlock->getArguments().slice(0, oldExportType.getNumInputs()))) {
     auto oldType = oldExportType.getInput(argIndex);
     if (llvm::isa<TensorType>(oldType)) {
-      auto encoding =
+      auto encodingAttr =
           exportOp.getArgAttrOfType<TypeAttr>(argIndex, "iree.abi.encoding");
-      auto importOp = entryBuilder.create<IREE::HAL::TensorImportOp>(
+      auto tensorImportOp = entryBuilder.create<IREE::HAL::TensorImportOp>(
           arg.getLoc(), oldType, arg,
-          encoding ? encoding : TypeAttr::get(oldType), waitFence,
+          encodingAttr ? encodingAttr : TypeAttr::get(oldType), waitFence,
           inferArgumentName(entryBuilder.getContext(), argIndex,
-                            exportOp.getArgAttrDict(argIndex)));
-      arguments.push_back(importOp.getTarget());
+                            exportOp.getArgAttrDict(argIndex)),
+          exportOp.getArgAttr(argIndex, "iree.abi.affinity"));
+      arguments.push_back(tensorImportOp.getTarget());
     } else {
       arguments.push_back(arg);
     }
@@ -565,14 +592,16 @@ createExportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
   // Alias results to storage buffers if provided.
   for (unsigned resultIndex = 0; resultIndex < asyncResults.size();
        ++resultIndex) {
-    if (!resultStorages[resultIndex])
+    if (!resultStorages[resultIndex]) {
       continue;
+    }
     auto source = asyncResults[resultIndex];
     auto sourceDims = IREE::Util::buildDynamicDimsForValue(
         exportOp.getLoc(), source, entryBuilder);
     auto aliasOp = entryBuilder.create<IREE::HAL::TensorAliasOp>(
         exportOp.getLoc(), source.getType(), source, sourceDims,
-        resultStorages[resultIndex], waitFence);
+        resultStorages[resultIndex], waitFence,
+        exportOp.getResultAttr(resultIndex, "iree.abi.affinity"));
     asyncResults[resultIndex] = cast<OpResult>(aliasOp.getResult());
   }
 
@@ -582,8 +611,9 @@ createExportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
   if (signalFence) {
     SmallVector<Value> asyncTensors;
     for (auto result : asyncResults) {
-      if (llvm::isa<TensorType>(result.getType()))
+      if (llvm::isa<TensorType>(result.getType())) {
         asyncTensors.push_back(result);
+      }
     }
     if (asyncTensors.empty()) {
       // TODO(benvanik): maybe use a global timeline? global stores may not
@@ -592,7 +622,7 @@ createExportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
                                                     signalFence);
     } else {
       auto barrierOp = entryBuilder.create<IREE::HAL::TensorBarrierOp>(
-          exportOp.getLoc(), asyncTensors, signalFence);
+          exportOp.getLoc(), asyncTensors, signalFence, /*affinity=*/nullptr);
       asyncResults = llvm::to_vector(barrierOp.getResults());
     }
   }
@@ -603,19 +633,24 @@ createExportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
     auto oldType = oldExportType.getResult(resultIndex);
     auto newType = newExportType.getResult(resultIndex);
     if (llvm::isa<TensorType>(oldType)) {
-      auto encoding = exportOp.getResultAttrOfType<TypeAttr>(
+      auto encodingAttr = exportOp.getResultAttrOfType<TypeAttr>(
           resultIndex, "iree.abi.encoding");
       auto dynamicDims = IREE::Util::buildDynamicDimsForValue(
           result.getLoc(), result, entryBuilder);
-      results.push_back(entryBuilder.create<IREE::HAL::TensorExportOp>(
+      auto tensorExportOp = entryBuilder.create<IREE::HAL::TensorExportOp>(
           result.getLoc(), newType, result,
-          encoding ? encoding : TypeAttr::get(result.getType()), dynamicDims,
+          encodingAttr ? encodingAttr : TypeAttr::get(result.getType()),
+          dynamicDims,
           inferResultName(entryBuilder.getContext(), resultIndex,
-                          exportOp.getResultAttrDict(resultIndex))));
+                          exportOp.getResultAttrDict(resultIndex)),
+          exportOp.getResultAttr(resultIndex, "iree.abi.affinity"));
+      results.push_back(tensorExportOp);
     } else {
       results.push_back(result);
     }
   }
+
+  stripABIAttrs(exportOp);
 
   entryBuilder.create<IREE::Util::ReturnOp>(exportOp.getLoc(), results);
   return wrapperOp;
@@ -643,8 +678,9 @@ static LogicalResult wrapExportFunc(IREE::ABI::InvocationModel invocationModel,
   // marshals arguments/results to the original function.
   auto wrapperOp =
       createExportWrapperFunc(invocationModel, exportOp, publicName);
-  if (!wrapperOp)
+  if (!wrapperOp) {
     return failure();
+  }
   symbolTable.insert(wrapperOp, Block::iterator(exportOp));
 
   return success();

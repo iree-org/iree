@@ -49,11 +49,16 @@ struct ConvertTensorImportOp
       }
     }
 
+    auto affinityAttr =
+        dyn_cast_if_present<IREE::Stream::AffinityAttr>(op.getAffinityAttr());
+    if (!affinityAttr) {
+      affinityAttr = IREE::Stream::AffinityAttr::lookup(op);
+    }
+
     // Import (buffer view to stream resource).
-    auto affinityAttr = IREE::Stream::AffinityAttr::lookup(op);
     auto resultType = rewriter.getType<IREE::Stream::ResourceType>(
         IREE::Stream::Lifetime::External);
-    auto resultSize = rewriter.createOrFold<IREE::Stream::TensorSizeOfOp>(
+    Value resultSize = rewriter.create<IREE::Stream::TensorSizeOfOp>(
         op.getLoc(), rewriter.getIndexType(),
         TypeAttr::get(op.getTarget().getType()), adaptor.getTargetDims(),
         affinityAttr);
@@ -77,7 +82,7 @@ struct ConvertTensorImportOp
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncTransferOp>(
         op, unknownType, resource, resultSize, resultSize, affinityAttr,
-        affinityAttr);
+        /*target_affinity=*/IREE::Stream::AffinityAttr{});
     return success();
   }
 
@@ -133,7 +138,11 @@ struct ConvertTensorExportOp
       return rewriter.notifyMatchFailure(op, "unsupported HAL cast conversion");
     }
 
-    auto affinityAttr = IREE::Stream::AffinityAttr::lookup(op);
+    auto affinityAttr =
+        dyn_cast_if_present<IREE::Stream::AffinityAttr>(op.getAffinityAttr());
+    if (!affinityAttr) {
+      affinityAttr = IREE::Stream::AffinityAttr::lookup(op);
+    }
     auto source =
         consumeTensorOperand(op.getLoc(), adaptor.getSource(), rewriter);
 
@@ -145,7 +154,8 @@ struct ConvertTensorExportOp
     if (source.resource.getType() != externalType) {
       exportSource = rewriter.create<IREE::Stream::AsyncTransferOp>(
           op.getLoc(), externalType, source.resource, source.resourceSize,
-          source.resourceSize, affinityAttr, affinityAttr);
+          source.resourceSize, /*source_affinity=*/IREE::Stream::AffinityAttr{},
+          affinityAttr);
     }
 
     // Export (stream resource to buffer view).
@@ -179,11 +189,15 @@ struct ConvertTensorAliasOp
 
     // All operations (if any) will happen on the device specified by the alias
     // as that indicates the affinity of the storage.
-    auto affinityAttr = IREE::Stream::AffinityAttr::lookup(op);
+    auto affinityAttr =
+        dyn_cast_if_present<IREE::Stream::AffinityAttr>(op.getAffinityAttr());
+    if (!affinityAttr) {
+      affinityAttr = IREE::Stream::AffinityAttr::lookup(op);
+    }
 
     // Query the target storage buffer length; we will only populate up to
     // what is required for the output.
-    auto storageSize = rewriter.createOrFold<IREE::Stream::TensorSizeOfOp>(
+    Value storageSize = rewriter.create<IREE::Stream::TensorSizeOfOp>(
         op.getLoc(), rewriter.getIndexType(),
         TypeAttr::get(op.getSource().getType()), adaptor.getSourceDims(),
         affinityAttr);

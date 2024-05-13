@@ -96,8 +96,8 @@ struct DeduplicateTensorBarrierSources
     }
     if (orderedSources.size() == op.getSources().size())
       return failure();
-    auto newOp = rewriter.create<TensorBarrierOp>(op.getLoc(), orderedSources,
-                                                  op.getSignalFence());
+    auto newOp = rewriter.create<TensorBarrierOp>(
+        op.getLoc(), orderedSources, op.getSignalFence(), op.getAffinityAttr());
     SmallVector<Value> newResults;
     newResults.reserve(newOp.getNumResults());
     for (unsigned newIndex : resultMapping) {

@@ -1183,7 +1183,7 @@ struct TensorConstantToEmpty : public OpRewritePattern<TensorConstantOp> {
       return failure();
 
     // Definitely empty if here.
-    auto resultSize = rewriter.createOrFold<IREE::Stream::TensorSizeOfOp>(
+    Value resultSize = rewriter.create<IREE::Stream::TensorSizeOfOp>(
         constantOp.getLoc(), rewriter.getIndexType(),
         TypeAttr::get(constantOp.getResultEncoding()),
         constantOp.getResultEncodingDims(), constantOp.getAffinityAttr());
@@ -1219,7 +1219,7 @@ struct TensorConstantToSplat : public OpRewritePattern<TensorConstantOp> {
     }
 
     auto resultType = IREE::Stream::ResourceType::get(constantOp.getContext());
-    auto resultSize = rewriter.createOrFold<IREE::Stream::TensorSizeOfOp>(
+    Value resultSize = rewriter.create<IREE::Stream::TensorSizeOfOp>(
         constantOp.getLoc(), rewriter.getIndexType(),
         TypeAttr::get(constantOp.getResultEncoding()),
         constantOp.getResultEncodingDims(), constantOp.getAffinityAttr());
