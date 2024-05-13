@@ -7,15 +7,8 @@
     "--device=cuda",
     "--timeout_ms=2000"
   ],
-  "skip_compile_tests": [
-    "test_dequantizelinear",
-    "test_slice_default_axes"
-  ],
-  "skip_run_tests": [
-    // "test_gather_elements_negative_indices",
-    // "test_gridsample_zeros_padding",
-    // "test_scatter_elements_with_negative_indices"
-  ],
+  "skip_compile_tests": [],
+  "skip_run_tests": [],
   "expected_compile_failures": [
     "test_acosh",
     "test_acosh_example",
@@ -616,6 +609,8 @@
     "test_einsum_transpose",
     "test_elu_default",
     "test_eyelike_with_dtype",
+    "test_gather_elements_negative_indices",
+    "test_gridsample_zeros_padding",
     "test_hardsigmoid",
     "test_hardsigmoid_default",
     "test_hardsigmoid_example",
@@ -658,6 +653,7 @@
     "test_reduce_sum_square_default_axes_keepdims_example_expanded",
     "test_reduce_sum_square_default_axes_keepdims_random",
     "test_reduce_sum_square_default_axes_keepdims_random_expanded",
+    "test_scatter_elements_with_negative_indices",
     "test_sce_mean_no_weight_ii",
     "test_sce_mean_no_weight_ii_log_prob",
     "test_shape_end_1",
