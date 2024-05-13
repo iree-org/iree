@@ -1692,10 +1692,10 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   SmallVector<int64_t> distTileSizes = getDefaultDistributedLevelTileSizes(
       attnOp, DistributionHeuristicConfig{});
   int64_t iterationDomainRank = attnOp.getIterationDomainRank();
-  // There are some dimensions are not tiled. Set vector tile sizes being ones
-  // to avoid huge vectors.
-  // TODO: We should be able to tile other dimensions.
   SmallVector<int64_t> vecTileSizes(iterationDomainRank, 1);
+  int64_t vectorSize = getVectorSize(entryPointFn, attnOp.getOutputType());
+  vecTileSizes.back() = getMaxVectorTileSize(
+      /*numElem=*/distTileSizes.back(), vectorSize, vectorSize);
   TileSizesListType tileSizes = {distTileSizes, vecTileSizes};
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, attnOp, tileSizes,
