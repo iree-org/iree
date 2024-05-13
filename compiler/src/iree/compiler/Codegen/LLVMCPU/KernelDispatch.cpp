@@ -263,10 +263,9 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
 DictionaryAttr getPipelineConfWithPeelingAttr(MLIRContext *context) {
   auto enableLoopPeelingAttrName = getEnableLoopPeelingAttrName(context);
   auto unitAttr = UnitAttr::get(context);
-  DictionaryAttr pipelineConfig = DictionaryAttr::get(
-      context, ArrayRef<NamedAttribute>({enableLoopPeelingAttrName, unitAttr}));
 
-  return pipelineConfig;
+  return DictionaryAttr::get(
+      context, ArrayRef<NamedAttribute>({enableLoopPeelingAttrName, unitAttr}));
 }
 
 /// Looks for the `native_vector_size` attribute in the hal.executable.target
@@ -2495,11 +2494,19 @@ adjustTileSizesForUnPackOp(mlir::FunctionOpInterface entryPointFn,
   auto pipeline = tInfo.getPassPipeline().getValue();
   auto pipelineConfig = tInfo.getConfiguration();
   if (isLoopPeelingEnabled(entryPointFn)) {
+    // See #16406
     LLVM_DEBUG(KD_DBGS() << "unpack fusion does not work with peeling, falling "
                             "back to non-peeling path");
     pipeline = DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
-    // FIXME: This will overwrite any existing config
-    pipelineConfig = {};
+
+    // Remove the "enable_loop_peeling" attr from pipelineConfig
+    auto enableLoopPeelingAttrName = getEnableLoopPeelingAttrName(rootOp->getContext());
+    auto newAttrs = pipelineConfig.getValue().take_until(
+        [&enableLoopPeelingAttrName](NamedAttribute attr) {
+          return attr.getName() != enableLoopPeelingAttrName;
+        });
+
+    pipelineConfig = DictionaryAttr::get(rootOp->getContext(), newAttrs);
   }
 
   return setOpConfigAndEntryPointFnTranslation(
