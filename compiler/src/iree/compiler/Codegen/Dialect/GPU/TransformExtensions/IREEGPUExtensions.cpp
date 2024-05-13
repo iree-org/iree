@@ -35,6 +35,15 @@ void transform_dialect::ApplyDropMultiMmaOpUnitDims::populatePatterns(
 }
 
 //===---------------------------------------------------------------------===//
+// ApplyLowerMultiMmaOp
+//===---------------------------------------------------------------------===//
+
+void transform_dialect::ApplyLowerMultiMmaOp::populatePatterns(
+    RewritePatternSet &patterns) {
+  IREE::GPU::populateIREEGPULowerMultiMmaPatterns(patterns);
+}
+
+//===---------------------------------------------------------------------===//
 // ApplyLowerValueBarrierOp
 //===---------------------------------------------------------------------===//
 
