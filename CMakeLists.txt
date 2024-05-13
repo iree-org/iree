@@ -113,8 +113,6 @@ if(IREE_BUILD_E2E_TEST_ARTIFACTS AND NOT "${IREE_E2E_TEST_ARTIFACTS_DIR}" STREQU
   )
 endif()
 
-option(IREE_ENABLE_COLLECTIVE_RUNTIME_TESTS "Enable runtime tests for collective operations." OFF)
-
 # For development, builds LLVM (and in the future) the whole compiler as
 # individual shared libraries similar to if passing -DBUILD_SHARED_LIBS=ON
 # to a standalone LLVM build. This can dramatically reduce linking time and
@@ -856,7 +854,9 @@ else()
   endif()
 
   # Ensure that LLVM-based dependencies needed for testing are included.
-  add_dependencies(iree-test-deps FileCheck)
+  if(FileCheck)
+    add_dependencies(iree-test-deps FileCheck)
+  endif()
   if(IREE_LLD_TARGET)
     add_dependencies(iree-test-deps ${IREE_LLD_TARGET})
   endif()

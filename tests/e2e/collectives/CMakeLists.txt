@@ -6,72 +6,73 @@
 
 # These tests perform linking via the Compiler API, which is only supported
 # in bundled-LLVM builds at the moment (#14086).
-if(NOT IREE_BUILD_BUNDLED_LLVM OR NOT IREE_ENABLE_COLLECTIVE_RUNTIME_TESTS)
+if(NOT IREE_BUILD_BUNDLED_LLVM)
   return()
 endif()
 
-if(IREE_TARGET_BACKEND_CUDA AND IREE_HAL_DRIVER_CUDA)
 
-  set(COMMON_ARGS
-    "--target_backend=cuda"
-    "--driver=cuda"
-    "--iree_compiler_args=--iree-hal-cuda-llvm-target-arch=sm_53"
-  )
+set(CUDA_COMMON_ARGS
+  "--target_backend=cuda"
+  "--driver=cuda"
+  "--iree_compiler_args=--iree-hal-cuda-llvm-target-arch=sm_53"
+)
 
-  set(COMMON_LABELS
-    "requires-gpu-nvidia"
-    "driver=cuda"
-  )
+set(CUDA_COMMON_LABELS
+  "requires-gpu-nvidia"
+  "driver=cuda"
+)
 
-  iree_py_test(
-    NAME
-      collectives_test_cuda_1_gpu
-    SRCS
-      "collectives_test.py"
-    ARGS
-      "-k" "SingleRank"
-      ${COMMON_ARGS}
-    LABELS
-      ${COMMON_LABELS}
-  )
+iree_py_test(
+  NAME
+    collectives_test_cuda_1_gpu
+  SRCS
+    "collectives_test.py"
+  ARGS
+    "-k" "SingleRank"
+    ${CUDA_COMMON_ARGS}
+  LABELS
+    ${CUDA_COMMON_LABELS}
+)
 
-  iree_py_test(
-    NAME
-      collectives_test_cuda_2_gpus
-    SRCS
-      "collectives_test.py"
-    ARGS
-      "-k" "TwoRanks"
-      ${COMMON_ARGS}
-    LABELS
-      ${COMMON_LABELS}
-      # The NCCL collectives backend requires 1 GPU per rank.
-      # To properly test for 2 ranks we need 2 GPUs.
-      "requires-multiple-devices"
-  )
+iree_py_test(
+  NAME
+    collectives_test_cuda_2_gpus
+  SRCS
+    "collectives_test.py"
+  ARGS
+    "-k" "TwoRanks"
+    ${CUDA_COMMON_ARGS}
+  LABELS
+    ${CUDA_COMMON_LABELS}
+    # The NCCL collectives backend requires 1 GPU per rank.
+    # To properly test for 2 ranks we need 2 GPUs.
+    "requires-multiple-devices"
+    "requires-2-devices"
+)
 
-  iree_py_test(
-    NAME
-      collectives_test_cuda_4_gpus
-    SRCS
-      "collectives_test.py"
-    ARGS
-      "-k" "FourRanks"
-      ${COMMON_ARGS}
-    LABELS
-      ${COMMON_LABELS}
-      "requires-multiple-devices"
-  )
-endif()
+iree_py_test(
+  NAME
+    collectives_test_cuda_4_gpus
+  SRCS
+    "collectives_test.py"
+  ARGS
+    "-k" "FourRanks"
+    ${CUDA_COMMON_ARGS}
+  LABELS
+    ${CUDA_COMMON_LABELS}
+    "requires-multiple-devices"
+    "requires-4-devices"
+)
 
-if(IREE_TARGET_BACKEND_ROCM AND IREE_HAL_DRIVER_HIP AND IREE_HIP_TEST_TARGET_CHIP)
-  set(COMMON_ARGS
+
+if(IREE_HIP_TEST_TARGET_CHIP)
+  set(HIP_COMMON_ARGS
     "--target_backend=rocm"
     "--driver=hip"
     "--iree_compiler_args=--iree-rocm-target-chip=${IREE_HIP_TEST_TARGET_CHIP}"
   )
 
-  set(COMMON_LABELS
+  set(HIP_COMMON_LABELS
     "requires-gpu-amd"
     "driver=hip"
   )
@@ -83,9 +84,9 @@ if(IREE_TARGET_BACKEND_ROCM AND IREE_HAL_DRIVER_HIP AND IREE_HIP_TEST_TARGET_CHI
       "collectives_test.py"
     ARGS
       "-k" "SingleRank"
-      ${COMMON_ARGS}
+      ${HIP_COMMON_ARGS}
     LABELS
-      ${COMMON_LABELS}
+      ${HIP_COMMON_LABELS}
   )
 
   iree_py_test(
@@ -95,12 +96,13 @@ if(IREE_TARGET_BACKEND_ROCM AND IREE_HAL_DRIVER_HIP AND IREE_HIP_TEST_TARGET_CHI
       "collectives_test.py"
     ARGS
       "-k" "TwoRanks"
-      ${COMMON_ARGS}
+      ${HIP_COMMON_ARGS}
     LABELS
-      ${COMMON_LABELS}
-      # The NCCL collectives backend requires 1 GPU per rank.
+      ${HIP_COMMON_LABELS}
+      # The RCCL collectives backend requires 1 GPU per rank.
       # To properly test for 2 ranks we need 2 GPUs.
       "requires-multiple-devices"
+      "requires-2-devices"
   )
 
   iree_py_test(
@@ -110,9 +112,10 @@ if(IREE_TARGET_BACKEND_ROCM AND IREE_HAL_DRIVER_HIP AND IREE_HIP_TEST_TARGET_CHI
       "collectives_test.py"
     ARGS
       "-k" "FourRanks"
-      ${COMMON_ARGS}
+      ${HIP_COMMON_ARGS}
     LABELS
-      ${COMMON_LABELS}
+      ${HIP_COMMON_LABELS}
       "requires-multiple-devices"
+      "requires-4-devices"
   )
 endif()

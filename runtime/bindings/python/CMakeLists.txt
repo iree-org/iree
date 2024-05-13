@@ -133,6 +133,7 @@ iree_py_library(
     "iree/runtime/_binding.pyi"
     "iree/runtime/array_interop.py"
     "iree/runtime/benchmark.py"
+    "iree/runtime/exception.py"
     "iree/runtime/flags.py"
     "iree/runtime/function.py"
     "iree/runtime/io.py"

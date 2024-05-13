@@ -56,7 +56,7 @@ def run_module(
     config = iree.runtime.Config(device=device)
     with open(module_filepath, "rb") as f:
         vm_flatbuffer = f.read()
-    vm_module = iree.runtime.VmModule.from_flatbuffer(config.vm_instance, vm_flatbuffer)
+    vm_module = iree.runtime.VmModule.copy_buffer(config.vm_instance, vm_flatbuffer)
     bound_module = iree.runtime.load_vm_module(vm_module, config)
     input_args = test_utils.read_numpy_arrays_from_file(input_filepath)
     results = getattr(bound_module, function)(*input_args)

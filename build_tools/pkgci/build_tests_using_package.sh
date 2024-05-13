@@ -30,7 +30,11 @@ set -xeuo pipefail
 PACKAGE_DIR="$1"
 BUILD_DIR="${BUILD_DIR:-build-tests}"
 
+echo "::group::Install dependencies"
 source build_tools/scripts/install_lit.sh
+source build_tools/cmake/setup_build.sh
+echo "::endgroup::"
+
 
 # CPU drivers and tests are enabled by default.
 export IREE_CPU_DISABLE="${IREE_CPU_DISABLE:-0}"

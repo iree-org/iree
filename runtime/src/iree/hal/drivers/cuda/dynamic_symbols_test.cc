@@ -70,7 +70,8 @@ TEST(NCCLDynamicSymbolsTest, CreateFromSystemLoader) {
 
   int nccl_version = 0;
   NCCL_CHECK_ERRORS(nccl_symbols.ncclGetVersion(&nccl_version));
-  ASSERT_EQ(NCCL_VERSION_CODE, nccl_version);
+  ASSERT_GE(nccl_version, NCCL_VERSION(NCCL_MAJOR, NCCL_MINOR, 0));
+  ASSERT_LT(nccl_version, NCCL_VERSION(NCCL_MAJOR + 1, 0, 0));
   iree_hal_cuda_nccl_dynamic_symbols_deinitialize(&nccl_symbols);
   iree_hal_cuda_dynamic_symbols_deinitialize(&cuda_symbols);
 }

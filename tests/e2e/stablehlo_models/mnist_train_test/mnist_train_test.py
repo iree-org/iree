@@ -13,11 +13,12 @@ import tempfile
 import unittest
 from typing import List, TypeVar
 from urllib.request import urlretrieve
-
 import numpy as np
+import iree.testing
 
-from iree.compiler.tools import InputType, compile_file
-from iree.runtime import load_vm_flatbuffer_file
+if iree.testing.has_requirements(compiler=True, runtime=True):
+    from iree.compiler.tools import InputType, compile_file
+    from iree.runtime import load_vm_flatbuffer_file
 
 MODEL_ARTIFACTS_URL = "https://storage.googleapis.com/iree-model-artifacts/mnist_train.2bec0cb356ae7c059e04624a627eb3b15b0a556cbd781bbed9f8d32e80a4311d.tar"
 
@@ -114,6 +115,20 @@ def extract_test_data(archive_path: str, out_dir: str):
 
 
 class MnistTrainTest(unittest.TestCase):
+    def setUp(self):
+        if not iree.testing.has_requirements(
+            compiler=True,
+            runtime=True,
+            compiler_target_backends=[args.target_backend],
+            device_count={args.driver: 1},
+        ):
+            raise unittest.SkipTest(
+                (
+                    f'Skipping tests for driver "{args.driver}". '
+                    "Requirements not satisfied."
+                )
+            )
+
     def test_mnist_training(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             archive_path = os.path.join(tmp_dir, "mnist_train.tar")

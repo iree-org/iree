@@ -341,6 +341,27 @@ function(iree_package_name PACKAGE_NAME)
   set(${PACKAGE_NAME} ${_PACKAGE_NAME} PARENT_SCOPE)
 endfunction()
 
+# Get the CMake target name from an IREE target name.
+# Accepts IREE-root relative target names.
+# Example:
+# iree_target_cmake_name(NAME my_target RESULT MY_CMAKE_TARGET)
+# when called form tests/python/CMakeLists.txt
+# the result is iree_tests_python_my_target
+function(iree_target_cmake_name)
+  cmake_parse_arguments(
+    _ARG
+    ""
+    "NAME;RESULT"
+    ""
+    ${ARGN}
+  )
+  iree_package_ns(_PACKAGE_NS)
+  set(_RESULT "${_ARG_NAME}")
+  string(REGEX REPLACE "^::" "${_PACKAGE_NS}::" _RESULT "${_ARG_NAME}")
+  string(REPLACE "::" "_" _RESULT "${_RESULT}")
+  set(${_ARG_RESULT} ${_RESULT} PARENT_SCOPE)
+endfunction()
+
 # Sets ${PACKAGE_PATH} to the IREE-root relative package path.
 #
 # Example when called from iree/base/CMakeLists.txt:

@@ -97,6 +97,7 @@ jobs:
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "IREE_ARM_SME_QEMU_AARCH64_BIN=/usr/bin/qemu-aarch64" \
+            --env "IREE_PYTHON_VENV_DIR=${BUILD_DIR}/.venv" \
             gcr.io/iree-oss/base-arm64@sha256:9daa1cdbbf12da8527319ece76a64d06219e04ecb99a4cff6e6364235ddf6c59 \
             ./build_tools/cmake/ctest_all.sh \
             "${BUILD_DIR}"
@@ -270,6 +271,8 @@ jobs:
       INSTALL_DIR: ${{ needs.build_all.outputs.install-dir }}
       INSTALL_DIR_ARCHIVE: ${{ needs.build_all.outputs.install-dir-archive }}
       INSTALL_DIR_GCS_URL: ${{ needs.build_all.outputs.install-dir-gcs-url }}
+      IREE_BUILD_SETUP_PYTHON_VENV: "${BUILD_DIR}/.venv"
+      PYTHONPATH: "${INSTALL_DIR}/python_packages"
       IREE_CPU_DISABLE: 1
       IREE_VULKAN_DISABLE: 0
       IREE_CUDA_DISABLE: 0
@@ -296,6 +299,8 @@ jobs:
       - name: "Building tests"
         run: |
           ./build_tools/github_actions/docker_run.sh \
+              --env IREE_BUILD_SETUP_PYTHON_VENV \
+              --env PYTHONPATH \
               --env IREE_CPU_DISABLE \
               --env IREE_VULKAN_DISABLE \
               --env IREE_CUDA_DISABLE \
@@ -309,6 +314,7 @@ jobs:
           IREE_MULTI_DEVICE_TESTS_DISABLE: 1
         run: |
           ./build_tools/github_actions/docker_run.sh \
+              --env IREE_PYTHON_VENV_DIR="${IREE_BUILD_SETUP_PYTHON_VENV}" \
               --env IREE_VULKAN_DISABLE \
               --env IREE_CUDA_DISABLE \
               --env IREE_HIP_DISABLE \
@@ -334,6 +340,8 @@ jobs:
       INSTALL_DIR: ${{ needs.build_all.outputs.install-dir }}
       INSTALL_DIR_ARCHIVE: ${{ needs.build_all.outputs.install-dir-archive }}
       INSTALL_DIR_GCS_URL: ${{ needs.build_all.outputs.install-dir-gcs-url }}
+      IREE_BUILD_SETUP_PYTHON_VENV: "${BUILD_DIR}/.venv"
+      PYTHONPATH: "${INSTALL_DIR}/python_packages"
       IREE_CPU_DISABLE: 1
       IREE_VULKAN_DISABLE: 0
       IREE_CUDA_DISABLE: 0
@@ -360,6 +368,8 @@ jobs:
       - name: "Building tests"
         run: |
           ./build_tools/github_actions/docker_run.sh \
+              --env IREE_BUILD_SETUP_PYTHON_VENV \
+              --env PYTHONPATH \
               --env IREE_CPU_DISABLE \
               --env IREE_VULKAN_DISABLE \
               --env IREE_CUDA_DISABLE \
@@ -373,6 +383,7 @@ jobs:
           IREE_MULTI_DEVICE_TESTS_DISABLE: 1
         run: |
           ./build_tools/github_actions/docker_run.sh \
+              --env IREE_PYTHON_VENV_DIR="${IREE_BUILD_SETUP_PYTHON_VENV}" \
               --env IREE_VULKAN_DISABLE \
               --env IREE_CUDA_DISABLE \
               --env IREE_HIP_DISABLE \
@@ -398,6 +409,8 @@ jobs:
       INSTALL_DIR: ${{ needs.build_all.outputs.install-dir }}
       INSTALL_DIR_ARCHIVE: ${{ needs.build_all.outputs.install-dir-archive }}
       INSTALL_DIR_GCS_URL: ${{ needs.build_all.outputs.install-dir-gcs-url }}
+      IREE_BUILD_SETUP_PYTHON_VENV: "${BUILD_DIR}/.venv"
+      PYTHONPATH: "${INSTALL_DIR}/python_packages"
       IREE_CPU_DISABLE: 1
       IREE_VULKAN_DISABLE: 1
       IREE_CUDA_DISABLE: 1
@@ -415,6 +428,15 @@ jobs:
         run: tar -xf "${INSTALL_DIR_ARCHIVE}"
       - name: "Building tests"
         run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env IREE_BUILD_SETUP_PYTHON_VENV \
+            --env PYTHONPATH \
+            --env IREE_CPU_DISABLE \
+            --env IREE_VULKAN_DISABLE \
+            --env IREE_CUDA_DISABLE \
+            --env IREE_HIP_DISABLE \
+            --env IREE_HIP_TEST_TARGET_CHIP \
+          ghcr.io/nod-ai/amdgpu_ubuntu_jammy_x86_64@sha256:c623e1c62a59c9eb756211fe7f4498c6cd909db7943670764ab11b7fd3929671 \
           ./build_tools/pkgci/build_tests_using_package.sh ${INSTALL_DIR}
       - name: "Running GPU tests"
         env:
@@ -427,6 +449,19 @@ jobs:
           IREE_CPU_DISABLE: 1
           IREE_HIP_DISABLE: 0
         run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --device=/dev/kfd --device=/dev/dri \
+            --security-opt seccomp=unconfined \
+            --env "IREE_PYTHON_VENV_DIR=${IREE_BUILD_SETUP_PYTHON_VENV}" \
+            --env IREE_CTEST_LABEL_REGEX \
+            --env IREE_NVIDIA_SM80_TESTS_DISABLE \
+            --env IREE_MULTI_DEVICE_TESTS_DISABLE \
+            --env IREE_AMD_RDNA3_TESTS_DISABLE \
+            --env IREE_NVIDIA_GPU_TESTS_DISABLE \
+            --env IREE_CUDA_DISABLE \
+            --env IREE_CPU_DISABLE \
+            --env IREE_HIP_DISABLE \
+          ghcr.io/nod-ai/amdgpu_ubuntu_jammy_x86_64@sha256:c623e1c62a59c9eb756211fe7f4498c6cd909db7943670764ab11b7fd3929671 \
           ./build_tools/cmake/ctest_all.sh ${BUILD_DIR}
 
   # TODO(saienduri): re-enable when iree/hal/drivers/hip/dynamic_symbols_test is fixed

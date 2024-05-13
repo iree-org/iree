@@ -5,27 +5,78 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 import unittest
-import iree.compiler
 import argparse
 import sys
-import iree.runtime
-from iree.runtime.array_interop import DeviceArray
 import os
-from typing import List, Tuple
+from typing import List, Tuple, Optional, Union
 import numpy as np
 import tempfile
 import subprocess
 import test_utils
+import multiprocessing
+import iree.testing
+
+if iree.testing.has_requirements(compiler=True, runtime=True):
+    import iree.compiler
 
 ArrayLike = object
 
 
 def parse_args():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--target_backend", type=str, default="llvm-cpu")
     parser.add_argument("--driver", type=str, default="local-task")
     parser.add_argument("--iree_compiler_args", type=str, default="")
-    return parser.parse_known_args()
+    parser.add_argument("-h,", "--help", action="store_true", default=False)
+    args, remaining_args = parser.parse_known_args()
+    if args.help:
+        # Let also unittest print its help.
+        remaining_args += ["--help"]
+        parser.print_help()
+    return args, remaining_args
+
+
+def get_device_count(driver: str) -> int:
+    available_driver_names = iree.runtime.query_available_drivers()
+    if driver not in available_driver_names:
+        return 0
+    try:
+        hal_driver = iree.runtime.get_driver(driver)
+    except iree.runtime.ErrorUnavailable:
+        # If the driver is unavailable we do not consider it a hard error.
+        # It means there are no devices associated with that driver.
+        return 0
+    except:
+        raise
+
+    device_infos = hal_driver.query_available_devices()
+    return len(device_infos)
+
+
+def get_device_count_inplace(driver: str, queue: multiprocessing.Queue) -> None:
+    device_count = get_device_count(driver)
+    queue.put(device_count)
+
+
+def get_device_count_in_subprocess(driver: str) -> int:
+    queue = multiprocessing.Queue()
+    process = multiprocessing.Process(
+        target=get_device_count_inplace, args=[driver, queue]
+    )
+    process.start()
+    process.join()
+    assert process.exitcode == 0
+    return queue.get()
+
+
+def has_needed_device_count(driver: str, shard_count: int) -> bool:
+    # Run in a subprocess to avoid initializing the driver context in this
+    # process as it may interfere when other subprocesses need it.
+    device_count = get_device_count_in_subprocess(driver)
+    # No support for other drivers.
+    if driver not in ["cuda", "hip"]:
+        return False
+    return device_count >= shard_count
 
 
 def prepare_shards_io_files(
@@ -49,7 +100,7 @@ def run_ranks(
     function: str,
     inputs: List[List[ArrayLike]],
     driver: str,
-) -> List[List[DeviceArray]]:
+) -> List[List["iree.runtime.array_interop.DeviceArray"]]:
     """
     Start all ranks with mpirun.
     On all ranks run the function |function| from the given module.
@@ -96,8 +147,11 @@ def run_test(
     mlir: str,
     inputs: List[List[ArrayLike]],
     expected_outputs: List[List[ArrayLike]],
-    mlir_input_type: iree.compiler.InputType | str = iree.compiler.InputType.AUTO,
+    mlir_input_type: Optional[Union["iree.compiler.InputType", str]] = None,
 ):
+    mlir_input_type = (
+        iree.compiler.InputType.AUTO if mlir_input_type is None else mlir_input_type
+    )
     with tempfile.TemporaryDirectory() as tmp_dir:
         module_filepath = os.path.join(tmp_dir, "module.vmfb")
         iree.compiler.tools.compile_str(
@@ -124,7 +178,27 @@ def run_test(
             )
 
 
-class SingleRank(unittest.TestCase):
+class TestCase(unittest.TestCase):
+    shard_count: int = None
+
+    def setUp(self):
+        if not iree.testing.has_requirements(
+            compiler=True,
+            runtime=True,
+            compiler_target_backends=[args.target_backend],
+            device_count={args.driver: self.shard_count},
+        ):
+            raise unittest.SkipTest(
+                (
+                    f'Skipping tests for driver "{args.driver}". '
+                    "Requirements not satisfied."
+                )
+            )
+
+
+class SingleRank(TestCase):
+    shard_count: int = 1
+
     def test_stablehlo_all_reduce(self):
         """
         Test trivial case of all_reduce with one rank.
@@ -200,7 +274,9 @@ class SingleRank(unittest.TestCase):
         )
 
 
-class TwoRanks(unittest.TestCase):
+class TwoRanks(TestCase):
+    shard_count: int = 2
+
     def test_stablehlo_all_reduce(self):
         """
         Test all_reduce([1, 2, 3, 4], [5, 6, 7, 8]) == [6, 8, 10, 12].
@@ -276,7 +352,9 @@ class TwoRanks(unittest.TestCase):
         )
 
 
-class FourRanks(unittest.TestCase):
+class FourRanks(TestCase):
+    shard_count: int = 4
+
     def test_mesh_all_reduce_on_2d_mesh_along_axis_1(self):
         """
         Test on a 2x2 device mesh reduction along dimension 1.

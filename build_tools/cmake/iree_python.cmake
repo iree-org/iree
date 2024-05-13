@@ -114,7 +114,7 @@ function(iree_local_py_test)
   set_property(TEST ${_NAME_PATH} PROPERTY LABELS "${_RULE_LABELS}")
   set_property(TEST ${_NAME_PATH} PROPERTY TIMEOUT ${_RULE_ARGS})
 
-  # Extend the PYTHONPATH environment variable with _RULE_PACKAGE_DIRS.
+  # Extend _RULE_PACKAGE_DIRS with the PYTHONPATH environment variable.
   list(APPEND _RULE_PACKAGE_DIRS "$ENV{PYTHONPATH}")
   if(${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
     # Windows uses semi-colon delimiters, but so does CMake, so escape them.
@@ -156,9 +156,17 @@ function(iree_py_test)
     "ARGS;LABELS;TIMEOUT"
     ${ARGN}
   )
-  if(NOT IREE_BUILD_PYTHON_BINDINGS)
-    return()
+  unset(_PACKAGE_DIRS)
+  # If we are not building the bindings then the Python environment must
+  # provide required IREE modules.
+  if(IREE_BUILD_PYTHON_BINDINGS)
+    list(APPEND _PACKAGE_DIRS
+      "${IREE_BINARY_DIR}/compiler/bindings/python"
+      "${IREE_BINARY_DIR}/runtime/bindings/python"
+    )
   endif()
+
+  list(APPEND _PACKAGE_DIRS "${IREE_BINARY_DIR}/tests/python")
 
   iree_local_py_test(
     NAME
@@ -170,8 +178,7 @@ function(iree_py_test)
     LABELS
       ${_RULE_LABELS}
     PACKAGE_DIRS
-      "${IREE_BINARY_DIR}/compiler/bindings/python"
-      "${IREE_BINARY_DIR}/runtime/bindings/python"
+      ${_PACKAGE_DIRS}
     GENERATED_IN_BINARY_DIR
       "${_RULE_GENERATED_IN_BINARY_DIR}"
     TIMEOUT

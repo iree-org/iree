@@ -51,6 +51,8 @@ export IREE_CTEST_TESTS_REGEX="${IREE_CTEST_TESTS_REGEX:-}"
 # Respect the user setting, default to no --label-regex
 export IREE_CTEST_LABEL_REGEX="${IREE_CTEST_LABEL_REGEX:-}"
 
+source build_tools/cmake/setup_test_run_dependencies.sh
+
 # Tests to exclude by label. In addition to any custom labels (which are carried
 # over from Bazel tags), every test should be labeled with its directory.
 declare -a label_exclude_args=(

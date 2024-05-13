@@ -10,45 +10,39 @@ if(NOT IREE_BUILD_BUNDLED_LLVM)
   return()
 endif()
 
-if(IREE_TARGET_BACKEND_LLVM_CPU AND IREE_HAL_DRIVER_LOCAL_TASK)
-  iree_py_test(
-    NAME
-      mnist_train_test_cpu
-    SRCS
-      "mnist_train_test.py"
-    ARGS
-      "--target_backend=llvm-cpu"
-      "--driver=local-task"
-    LABELS
-      "driver=local-task"
-  )
-endif()
+iree_py_test(
+  NAME
+    mnist_train_test_cpu
+  SRCS
+    "mnist_train_test.py"
+  ARGS
+    "--target_backend=llvm-cpu"
+    "--driver=local-task"
+  LABELS
+    "driver=local-task"
+)
 
-if(IREE_TARGET_BACKEND_CUDA AND IREE_HAL_DRIVER_CUDA)
-  iree_py_test(
-    NAME
-      mnist_train_test_cuda
-    SRCS
-      "mnist_train_test.py"
-    ARGS
-      "--target_backend=cuda"
-      "--driver=cuda"
-    LABELS
-      "requires-gpu-nvidia"
-      "driver=cuda"
-  )
-endif()
+iree_py_test(
+  NAME
+    mnist_train_test_cuda
+  SRCS
+    "mnist_train_test.py"
+  ARGS
+    "--target_backend=cuda"
+    "--driver=cuda"
+  LABELS
+    "requires-gpu-nvidia"
+    "driver=cuda"
+)
 
-if(IREE_TARGET_BACKEND_VULKAN_SPIRV AND IREE_HAL_DRIVER_VULKAN)
-  iree_py_test(
-    NAME
-      mnist_train_test_vulkan
-    SRCS
-      "mnist_train_test.py"
-    ARGS
-      "--target_backend=vulkan-spirv"
-      "--driver=vulkan"
-    LABELS
-      "driver=vulkan"
-  )
-endif()
+iree_py_test(
+  NAME
+    mnist_train_test_vulkan
+  SRCS
+    "mnist_train_test.py"
+  ARGS
+    "--target_backend=vulkan-spirv"
+    "--driver=vulkan"
+  LABELS
+    "driver=vulkan"
+)

@@ -65,6 +65,7 @@ from .system_setup import (
     get_driver,
     query_available_drivers,
 )
+from .exception import *
 from .function import *
 from .io import *
 

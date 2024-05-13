@@ -6,10 +6,22 @@
 
 #include "./status_utils.h"
 
+#include <nanobind/nanobind.h>
+
+#include "iree/base/status.h"
+
 namespace iree {
 namespace python {
 
 namespace {
+
+static PyObject* GetErrorUnavailableClass() {
+  nanobind::module_ iree_runtime_ex =
+      nanobind::module_::import_("iree.runtime.exception");
+  nanobind::object error_unavailable = iree_runtime_ex.attr("ErrorUnavailable");
+  error_unavailable.inc_ref();
+  return error_unavailable.ptr();
+}
 
 PyObject* ApiStatusToPyExcClass(iree_status_t status) {
   switch (iree_status_code(status)) {
@@ -19,6 +31,8 @@ PyObject* ApiStatusToPyExcClass(iree_status_t status) {
       return PyExc_ValueError;
     case IREE_STATUS_OUT_OF_RANGE:
       return PyExc_IndexError;
+    case IREE_STATUS_UNAVAILABLE:
+      return GetErrorUnavailableClass();
     case IREE_STATUS_UNIMPLEMENTED:
       return PyExc_NotImplementedError;
     default:
