@@ -11,15 +11,18 @@
 //
 //===---------------------------------------------------------------------===//
 
-#include "iree/compiler/Codegen/Common/GPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_GPUGENERALIZENAMEDOPSPASS
+#include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
 
 LogicalResult
 generalizeCandidates(MLIRContext *context,
@@ -44,30 +47,22 @@ generalizeCandidates(MLIRContext *context,
 }
 
 namespace {
-struct GPUGeneralizeNamedOpsPass
-    : public GPUGeneralizeNamedOpsBase<GPUGeneralizeNamedOpsPass> {
+struct GPUGeneralizeNamedOpsPass final
+    : impl::GPUGeneralizeNamedOpsPassBase<GPUGeneralizeNamedOpsPass> {
+  void runOnOperation() override {
+    FunctionOpInterface funcOp = getOperation();
+    SmallVector<linalg::LinalgOp> namedOpCandidates;
+    funcOp.walk([&](linalg::LinalgOp linalgOp) {
+      if (isa<linalg::BatchMatmulTransposeBOp, linalg::MatmulTransposeBOp,
+              linalg::VecmatOp, linalg::MatvecOp>(linalgOp))
+        namedOpCandidates.push_back(linalgOp);
+    });
 
-  void runOnOperation() override;
+    if (failed(generalizeCandidates(&getContext(), namedOpCandidates))) {
+      return signalPassFailure();
+    }
+  }
 };
 } // namespace
-
-void GPUGeneralizeNamedOpsPass::runOnOperation() {
-  auto funcOp = getOperation();
-  SmallVector<linalg::LinalgOp> namedOpCandidates;
-  funcOp.walk([&](linalg::LinalgOp linalgOp) {
-    if (isa<linalg::BatchMatmulTransposeBOp, linalg::MatmulTransposeBOp,
-            linalg::VecmatOp, linalg::MatvecOp>(linalgOp))
-      namedOpCandidates.push_back(linalgOp);
-  });
-
-  if (failed(generalizeCandidates(&getContext(), namedOpCandidates))) {
-    return signalPassFailure();
-  }
-}
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createGPUGeneralizeNamedOpsPass() {
-  return std::make_unique<GPUGeneralizeNamedOpsPass>();
-}
 
 } // namespace mlir::iree_compiler

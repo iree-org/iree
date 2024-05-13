@@ -22,6 +22,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
+#include "llvm/ADT/STLForwardCompat.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/ComplexToStandard/ComplexToStandard.h"
@@ -225,7 +226,7 @@ void addGPUVectorizationPassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createCSEPass());
 
   // Distribute linalg onto threads within the workgroup.
-  funcPassManager.addPass(createGPUTensorTile(false));
+  funcPassManager.addPass(createGPUTensorTilePass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
@@ -234,7 +235,7 @@ void addGPUVectorizationPassPipeline(OpPassManager &funcPassManager) {
 
   // tensor to memref
   addBufferizePasses(funcPassManager);
-  funcPassManager.addPass(createGPUDistribute());
+  funcPassManager.addPass(createGPUDistributePass());
 
   // Post bufferization optimizations.
   funcPassManager.addPass(createLoopInvariantCodeMotionPass());
@@ -257,9 +258,9 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
-  funcPassManager.addPass(createGPUTensorTileToSerialLoops());
+  funcPassManager.addPass(createGPUTensorTileToSerialLoopsPass());
   funcPassManager.addPass(createGPUTensorAlloc());
-  funcPassManager.addPass(createGPUTensorTile(false));
+  funcPassManager.addPass(createGPUTensorTilePass());
 
   // Linalg -> vector
   addGPUVectorizationPasses(funcPassManager);
@@ -268,14 +269,14 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &funcPassManager) {
   addBufferizePasses(funcPassManager);
 
   // distribute foreach threads
-  funcPassManager.addPass(createGPUDistribute());
+  funcPassManager.addPass(createGPUDistributePass());
 
   funcPassManager.addPass(createMemrefCopyToLinalgPass());
-  funcPassManager.addPass(createGPUDistributeSharedMemoryCopy());
+  funcPassManager.addPass(createGPUDistributeSharedMemoryCopyPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
-  funcPassManager.addPass(createGPUReduceSharedMemoryBankConflicts());
+  funcPassManager.addPass(createGPUReduceBankConflictsPass());
   funcPassManager.addPass(createReorderWorkgroups(
       clReorderWorkgroupsStrategy, clReorderWorkgroupsLogSwizzleTile,
       canReorderWorkgroups));
@@ -312,8 +313,10 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(
       createLLVMGPUTileAndDistribute(/*distributeToWarp=*/true));
   funcPassManager.addPass(createRemoveSingleIterationLoopPass());
-  if (pipelineDepth > 1)
-    funcPassManager.addPass(createGPUMultiBuffering(pipelineDepth));
+  if (pipelineDepth > 1) {
+    funcPassManager.addPass(createGPUMultiBufferingPass(
+        GPUMultiBufferingPassOptions{pipelineDepth}));
+  }
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
@@ -333,10 +336,10 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &funcPassManager,
 
   // Distribute shared memory copies.
   funcPassManager.addPass(createMemrefCopyToLinalgPass());
-  funcPassManager.addPass(createGPUDistributeSharedMemoryCopy());
+  funcPassManager.addPass(createGPUDistributeSharedMemoryCopyPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
-  funcPassManager.addPass(createGPUReduceSharedMemoryBankConflicts());
+  funcPassManager.addPass(createGPUReduceBankConflictsPass());
 
   // Vector -> MMA ops
   funcPassManager.addPass(memref::createFoldMemRefAliasOpsPass());
@@ -349,9 +352,12 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &funcPassManager,
   // Hoist loop invariant code to avoid pipelining it.
   funcPassManager.addPass(createLoopInvariantCodeMotionPass());
   // Pipeline memory operations.
-  funcPassManager.addPass(createGPUPipeliningPass(
-      /*epiloguePeeling=*/false, pipelineDepth,
-      PipeliningSchedulingStrategy::loadGlobalStage0));
+  GPUPipeliningPassOptions pipelieningOptions = {};
+  pipelieningOptions.epiloguePeeling = false;
+  pipelieningOptions.depth = pipelineDepth;
+  pipelieningOptions.scheduleIndex =
+      llvm::to_underlying(PipeliningSchedulingStrategy::loadGlobalStage0);
+  funcPassManager.addPass(createGPUPipeliningPass(pipelieningOptions));
   // Optimize shared memory usage.
   funcPassManager.addPass(createLLVMGPUPackSharedMemoryAlloc());
 }
@@ -368,8 +374,10 @@ void addGPUMatmulTensorCoreMmaSyncPassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(
       createLLVMGPUTileAndDistribute(/*distributeToWarp=*/true));
   funcPassManager.addPass(createRemoveSingleIterationLoopPass());
-  if (pipelineDepth > 1)
-    funcPassManager.addPass(createGPUMultiBuffering(pipelineDepth));
+  if (pipelineDepth > 1) {
+    funcPassManager.addPass(createGPUMultiBufferingPass(
+        GPUMultiBufferingPassOptions{pipelineDepth}));
+  }
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
@@ -390,7 +398,7 @@ void addGPUMatmulTensorCoreMmaSyncPassPipeline(OpPassManager &funcPassManager,
 
   // Distribute shared memory copies.
   funcPassManager.addPass(createMemrefCopyToLinalgPass());
-  funcPassManager.addPass(createGPUDistributeSharedMemoryCopy());
+  funcPassManager.addPass(createGPUDistributeSharedMemoryCopyPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
@@ -406,9 +414,12 @@ void addGPUMatmulTensorCoreMmaSyncPassPipeline(OpPassManager &funcPassManager,
   // Hoist loop invariant code to avoid pipelining it.
   funcPassManager.addPass(createLoopInvariantCodeMotionPass());
   // Pipeline memory operations.
-  funcPassManager.addPass(createGPUPipeliningPass(
-      /*epiloguePeeling=*/false, pipelineDepth,
-      PipeliningSchedulingStrategy::nvidiaTensorCore));
+  GPUPipeliningPassOptions pipelieningOptions = {};
+  pipelieningOptions.epiloguePeeling = false;
+  pipelieningOptions.depth = pipelineDepth;
+  pipelieningOptions.scheduleIndex =
+      llvm::to_underlying(PipeliningSchedulingStrategy::nvidiaTensorCore);
+  funcPassManager.addPass(createGPUPipeliningPass(pipelieningOptions));
   // Optimize shared memory usage.
   funcPassManager.addPass(createLLVMGPUPackSharedMemoryAlloc());
 }
@@ -427,7 +438,7 @@ void addGPUTransposePassPipeline(OpPassManager &funcPassManager) {
 
   funcPassManager.addPass(
       createGPUTensorAlloc(GPUPromoteSharedMemPattern::TransposeOpPattern));
-  funcPassManager.addPass(createGPUTensorTile(false));
+  funcPassManager.addPass(createGPUTensorTilePass());
 
   // Linalg -> vector
   addGPUVectorizationPasses(funcPassManager);
@@ -438,16 +449,20 @@ void addGPUTransposePassPipeline(OpPassManager &funcPassManager) {
   addBufferizePasses(funcPassManager);
 
   // distribute foreach threads
-  funcPassManager.addPass(createGPUDistribute());
+  funcPassManager.addPass(createGPUDistributePass());
 
   funcPassManager.addPass(createMemrefCopyToLinalgPass());
-  funcPassManager.addPass(createGPUDistributeSharedMemoryCopy());
+  funcPassManager.addPass(createGPUDistributeSharedMemoryCopyPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
   // May or may not need to reduce shared mememory conflicts
-  funcPassManager.addPass(
-      createGPUReduceSharedMemoryBankConflicts(/*paddingSizeBits=*/32));
+  {
+    GPUReduceBankConflictsPassOptions options = {};
+    options.paddingBits = 32;
+    funcPassManager.addPass(createGPUReduceBankConflictsPass(options));
+  }
+
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 }
@@ -532,7 +547,7 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   }
 
   // Problem specific (reduction) tiling.
-  funcPassManager.addPass(createGPUTensorTileToSerialLoops());
+  funcPassManager.addPass(createGPUTensorTileToSerialLoopsPass());
 
   if (usePadToModelSharedMemcpy) {
     LLVMGPUMatmulPadOption option = LLVMGPUMatmulPadOption::ReductionDims;
@@ -559,7 +574,7 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   addGPUVectorizationPasses(funcPassManager);
 
   // Allocate tensors for copies to shared memory.
-  funcPassManager.addPass(createGPUVectorAlloc());
+  funcPassManager.addPass(createGPUVectorAllocPass());
 
   // Tensor -> Memref
   addVectorBufferizePasses(funcPassManager);
@@ -572,8 +587,12 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createLLVMGPUVectorDistribute());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
-  funcPassManager.addPass(
-      createGPUReduceSharedMemoryBankConflicts(/*paddingSizeBits=*/64));
+
+  {
+    GPUReduceBankConflictsPassOptions options = {};
+    options.paddingBits = 64;
+    funcPassManager.addPass(createGPUReduceBankConflictsPass(options));
+  }
 
   if (clLLVMGPUEnablePrefetch) {
     funcPassManager.addPass(createLLVMGPUPrefetchSharedMemoryPass());
@@ -645,7 +664,7 @@ void addGPUPackUnPackPasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
-  funcPassManager.addPass(createGPUTensorTile(false));
+  funcPassManager.addPass(createGPUTensorTilePass());
   funcPassManager.addPass(
       createDecomposePackUnPackOpsPass(/*tileOuterToOne=*/true));
   addGPUVectorizationPasses(funcPassManager);
@@ -653,7 +672,7 @@ void addGPUPackUnPackPasses(OpPassManager &funcPassManager) {
   addBufferizePasses(funcPassManager);
 
   // distribute foreach threads
-  funcPassManager.addPass(createGPUDistribute());
+  funcPassManager.addPass(createGPUDistributePass());
 
   funcPassManager.addPass(createSplitFullPartialTransferPass("linalg-copy"));
 }

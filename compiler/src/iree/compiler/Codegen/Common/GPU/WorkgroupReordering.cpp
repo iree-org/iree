@@ -5,7 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <cassert>
-#include "iree/compiler/Codegen/Common/GPU/PassDetail.h"
+
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
@@ -22,6 +22,10 @@
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_REORDERWORKGROUPSPASS
+#include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
+
+namespace {
 /// Implements the following swizzling logic:
 /// void getTiledId2(unsigned x, unsigned y, unsigned* tiledx,
 ///                  unsigned* tiledy) {
@@ -165,6 +169,8 @@ static LogicalResult reorderWorkgroupsInFunc(FunctionOpInterface funcOp,
   return success();
 }
 
+} // namespace
+
 LogicalResult swizzleWorkgroupsInFunc(FunctionOpInterface funcOp,
                                       unsigned swizzleLogTile) {
   // We have the same early exit in the pass but we need to duplicate it here
@@ -178,16 +184,13 @@ LogicalResult swizzleWorkgroupsInFunc(FunctionOpInterface funcOp,
 
 namespace {
 struct ReorderWorkgroupsPass final
-    : ReorderWorkgroupsBase<ReorderWorkgroupsPass> {
+    : impl::ReorderWorkgroupsPassBase<ReorderWorkgroupsPass> {
   ReorderWorkgroupsPass(
       ReorderWorkgrupsStrategy strategy, unsigned logSwizzleTile,
       std::function<LogicalResult(mlir::FunctionOpInterface)> filterFn)
       : reorderingStrategy(strategy), logSwizzleTile(logSwizzleTile),
         filterFn(std::move(filterFn)) {}
 
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<affine::AffineDialect>();
-  }
   LogicalResult initializeOptions(
       StringRef options,
       function_ref<LogicalResult(const Twine &)> errorHandler) override {
