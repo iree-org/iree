@@ -132,15 +132,15 @@ hal.executable private @target_func_attrs {
   hal.executable.variant public @target_func_attrs target(#hal.executable.target<"", "", {}>) {
     hal.executable.export public @entry_point layout(#pipeline_layout)
     builtin.module {
-      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<None, {target_func_attrs = {"amdgpu-waves-per-eu" = 2}}>}  {
+      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<None, {target_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>}  {
         return
       }
-      func.func @fn2() attributes {translation_info = #iree_codegen.translation_info<None, {target_func_attrs = {"amdgpu-waves-per-eu" = 4}}>} {
+      func.func @fn2() attributes {translation_info = #iree_codegen.translation_info<None, {target_func_attrs = {"amdgpu-waves-per-eu" = "4"}}>} {
         return
       }
     }
   }
 }
 // CHECK-LABEL: hal.executable private @target_func_attrs
-//       CHECK:   func.func @fn1() attributes {target_func_attrs = {"amdgpu-waves-per-eu" = 2 : i64}}
-//       CHECK:   func.func @fn2() attributes {target_func_attrs = {"amdgpu-waves-per-eu" = 4 : i64}}
+//       CHECK:   func.func @fn1() attributes {target_func_attrs = {"amdgpu-waves-per-eu" = "2"}}
+//       CHECK:   func.func @fn2() attributes {target_func_attrs = {"amdgpu-waves-per-eu" = "4"}}
