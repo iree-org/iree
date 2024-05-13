@@ -28,7 +28,7 @@ static Value buildResultSizeOf(Location loc, Value tensorValue,
                                ConversionPatternRewriter &rewriter) {
   // TODO(benvanik): see if we can stash this on the side to avoid expensive
   // materialization of a bunch of redundant IR.
-  return rewriter.createOrFold<IREE::Stream::TensorSizeOfOp>(
+  return rewriter.create<IREE::Stream::TensorSizeOfOp>(
       loc, rewriter.getIndexType(), TypeAttr::get(tensorValue.getType()),
       dynamicDims,
       IREE::Stream::AffinityAttr::lookup(tensorValue.getDefiningOp()));
