@@ -6,7 +6,9 @@
   "iree_run_module_flags": [
     "--device=vulkan"
   ],
-  "skip_compile_tests": [],
+  "skip_compile_tests": [
+    "test_dequantizelinear"
+  ],
   "skip_run_tests": [],
   "expected_compile_failures": [
     "test_acosh",

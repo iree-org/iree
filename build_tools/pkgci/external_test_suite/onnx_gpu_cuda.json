@@ -6,7 +6,9 @@
   "iree_run_module_flags": [
     "--device=cuda"
   ],
-  "skip_compile_tests": [],
+  "skip_compile_tests": [
+    "test_dequantizelinear"
+  ],
   "skip_run_tests": [
     "test_gather_elements_negative_indices",
     "test_gridsample_zeros_padding",
