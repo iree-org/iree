@@ -1154,6 +1154,40 @@ void TensorCloneOp::getCanonicalizationPatterns(RewritePatternSet &results,
 }
 
 //===----------------------------------------------------------------------===//
+// flow.tensor.transfer
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+// Attempts to identify trivial cases where we locally recognize that a tensor
+// is transferred to the same context it's already on. This does not look across
+// control flow edges or globals and is mostly for simplifying IR that may come
+// in with a transfer on every single tensor.
+struct ElideRedundantTransfer : public OpRewritePattern<TensorTransferOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(TensorTransferOp op,
+                                PatternRewriter &rewriter) const override {
+    auto baseValue =
+        IREE::Util::TiedOpInterface::findTiedBaseValue(op.getOperand());
+    if (auto transferOp = dyn_cast_if_present<IREE::Flow::TensorTransferOp>(
+            baseValue.getDefiningOp())) {
+      if (transferOp.getTarget() == op.getTarget()) {
+        rewriter.replaceOp(op, op.getOperand());
+        return success();
+      }
+    }
+    return failure();
+  }
+};
+
+} // namespace
+
+void TensorTransferOp::getCanonicalizationPatterns(RewritePatternSet &results,
+                                                   MLIRContext *context) {
+  results.insert<ElideRedundantTransfer>(context);
+}
+
+//===----------------------------------------------------------------------===//
 // flow.tensor.slice
 //===----------------------------------------------------------------------===//
 
