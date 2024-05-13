@@ -10,7 +10,6 @@
 #include "mlir/Dialect/GPU/Transforms/Passes.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
-#include "mlir/Support/LogicalResult.h"
 
 namespace mlir::iree_compiler {
 
