@@ -64,14 +64,58 @@ jobs:
         run: |
           source ${VENV_DIR}/bin/activate
           python -m pip install -r SHARK-TestSuite/iree_tests/requirements.txt
+
+      # test_gather_, one test at a time
+      #   pytest-timeout catches this:
+      #   FAILED SHARK-TestSuite/iree_tests/onnx/node/generated/test_gather_elements_negative_indices/model.mlir::gpu_cuda_t4_test - Failed: Timeout >30.0s
       - name: Run external tests - ONNX test suite
         run: |
           source ${VENV_DIR}/bin/activate
           pytest SHARK-TestSuite/iree_tests/onnx/ \
-              -k "test_gather_" -rpfE --timeout=30 --durations=20 \
-              --config-files=build_tools/pkgci/external_test_suite/onnx_gpu_cuda.json \
-              --no-skip-tests-missing-files \
-              --report-log=/tmp/iree_tests_onnx_gpu_cuda_logs.json
+              -k "test_gather_" -rpfE --timeout=10 --durations=20 \
+              --config-files=build_tools/pkgci/external_test_suite/onnx_gpu_cuda.json
+
+      # test_gather_, pytest-xdist
+      - name: Run external tests - ONNX test suite
+        run: |
+          source ${VENV_DIR}/bin/activate
+          pytest SHARK-TestSuite/iree_tests/onnx/ \
+              -n 4 -k "test_gather_" -rpfE --timeout=10 --durations=20 \
+              --config-files=build_tools/pkgci/external_test_suite/onnx_gpu_cuda.json
+
+      # test_gridsample_, one test at a time
+      - name: Run external tests - ONNX test suite
+        run: |
+          source ${VENV_DIR}/bin/activate
+          pytest SHARK-TestSuite/iree_tests/onnx/ \
+              -k "test_gridsample_" -rpfE --timeout=10 --durations=20 \
+              --config-files=build_tools/pkgci/external_test_suite/onnx_gpu_cuda.json
+
+      # test_gridsample_, pytest-xdist
+      - name: Run external tests - ONNX test suite
+        run: |
+          source ${VENV_DIR}/bin/activate
+          pytest SHARK-TestSuite/iree_tests/onnx/ \
+              -n 4 -k "test_gridsample_" -rpfE --timeout=10 --durations=20 \
+              --config-files=build_tools/pkgci/external_test_suite/onnx_gpu_cuda.json
+
+      # test_scatter_, one test at a time
+      - name: Run external tests - ONNX test suite
+        run: |
+          source ${VENV_DIR}/bin/activate
+          pytest SHARK-TestSuite/iree_tests/onnx/ \
+              -k "test_scatter_" -rpfE --timeout=10 --durations=20 \
+              --config-files=build_tools/pkgci/external_test_suite/onnx_gpu_cuda.json
+
+      # test_scatter_, pytest-xdist
+      - name: Run external tests - ONNX test suite
+        run: |
+          source ${VENV_DIR}/bin/activate
+          pytest SHARK-TestSuite/iree_tests/onnx/ \
+              -n 4 -k "test_scatter_" -rpfE --timeout=10 --durations=20 \
+              --config-files=build_tools/pkgci/external_test_suite/onnx_gpu_cuda.json
+
+
       # - name: "Updating config file with latest XFAIL lists"
       #   if: failure()
       #   run: |
