@@ -107,8 +107,10 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
   // be set to None here.
   if (translationInfo) {
     updatedTranslationInfo = IREE::Codegen::TranslationInfoAttr::get(
-        rewriter.getContext(), translationInfo.getPassPipeline(),
-        translationInfo.getCodegenSpec(), getWorkgroupDims(), getSubgroupSize(),
+        rewriter.getContext(), updatedTranslationInfo.getPassPipeline(),
+        updatedTranslationInfo.getCodegenSpec(),
+        updatedTranslationInfo.getWorkgroupSize(),
+        updatedTranslationInfo.getSubgroupSize(),
         translationInfo.getConfiguration());
   }
 
