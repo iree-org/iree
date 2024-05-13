@@ -1786,6 +1786,20 @@ LogicalResult TensorCloneOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
+// flow.tensor.transfer
+//===----------------------------------------------------------------------===//
+
+LogicalResult TensorTransferOp::verify() {
+  if (failed(verifyOpDynamicDims(getOperation(), {getOperand()},
+                                 getArgumentDims())) ||
+      failed(verifyOpDynamicDims(getOperation(), {getResult()},
+                                 getArgumentDims()))) {
+    return failure();
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
 // flow.tensor.slice
 //===----------------------------------------------------------------------===//
 
