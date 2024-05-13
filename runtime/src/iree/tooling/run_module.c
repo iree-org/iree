@@ -91,6 +91,10 @@ IREE_FLAG(
 IREE_FLAG(bool, print_statistics, false,
           "Prints runtime statistics to stderr on exit.");
 
+IREE_FLAG(
+    int32_t, timeout_ms, 0,
+    "Invocation wait timeout in milliseconds, or 0 for infinite (no timeout).")
+
 static iree_status_t iree_tooling_process_results(
     iree_hal_device_t* device, iree_string_view_t results_cconv,
     iree_vm_list_t* results, iree_io_stream_t* stream,
@@ -259,9 +263,11 @@ static iree_status_t iree_tooling_run_function(
 
   // If the function is async we need to wait for it to complete.
   if (iree_status_is_ok(status) && finish_fence) {
-    IREE_RETURN_IF_ERROR(
-        iree_hal_fence_wait(finish_fence, iree_infinite_timeout()),
-        "waiting on finish fence");
+    iree_timeout_t wait_timeout = FLAG_timeout_ms > 0
+                                      ? iree_make_timeout_ms(FLAG_timeout_ms)
+                                      : iree_infinite_timeout();
+    IREE_RETURN_IF_ERROR(iree_hal_fence_wait(finish_fence, wait_timeout),
+                         "waiting on finish fence");
   }
   iree_hal_fence_release(finish_fence);
 
