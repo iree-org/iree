@@ -352,19 +352,6 @@ public:
           }
         }
 
-        // Try to get waves-per-eu from the export-specific translation info in
-        // cases where codegen decides to override the value.
-        // Otherwise, fallback to the default option.
-        int64_t wavesPerEu = 0;
-        if (auto attr = func->getAttrOfType<IntegerAttr>("waves_per_eu")) {
-          wavesPerEu = attr.getValue().getSExtValue();
-        }
-        if (wavesPerEu == 0) {
-          if (std::optional<IntegerAttr> attr =
-                  getConfigIntegerAttr(targetAttr, "waves_per_eu"))
-            wavesPerEu = attr->getValue().getSExtValue();
-        }
-
         // For GPU kernels,
         // 1. Insert AMDGPU_KERNEL calling convention.
         // 2. Insert amdgpu-flat-workgroup-size(1, 256) attribute.
@@ -374,12 +361,30 @@ public:
         llvmFunc->addFnAttr(
             "amdgpu-flat-work-group-size",
             (llvm::Twine("1, ") + llvm::Twine(flatWgSize)).str());
-        if (wavesPerEu > 0) {
-          llvmFunc->addFnAttr("amdgpu-waves-per-eu",
-                              std::to_string(wavesPerEu));
-        }
         if (targetArch.starts_with("gfx9"))
           addPreloadKernArgHint(llvmFunc);
+
+        // Set the amdgpu-waves-per-eu flag from config if given.
+        if (std::optional<IntegerAttr> attr =
+                getConfigIntegerAttr(targetAttr, "waves_per_eu")) {
+          llvmFunc->addFnAttr("amdgpu-waves-per-eu",
+                              std::to_string(attr->getValue().getSExtValue()));
+        }
+
+        // Override flags as given by target func attrs.
+        if (auto funcAttrs =
+                func->getAttrOfType<DictionaryAttr>("target_func_attrs")) {
+          for (NamedAttribute funcAttr : funcAttrs) {
+            auto value = dyn_cast<StringAttr>(funcAttr.getValue());
+            if (!value) {
+              return variantOp->emitError(
+                  "target_func_attrs attribute must be a "
+                  "dictionary of strings. Attribute " +
+                  llvm::Twine(funcAttr.getName()) + " is not a StringAttr.");
+            }
+            llvmFunc->addFnAttr(funcAttr.getName(), value.getValue());
+          }
+        }
       }
 
       std::unique_ptr<llvm::TargetMachine> targetMachine;

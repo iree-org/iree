@@ -61,18 +61,19 @@ static FailureOr<int64_t> reconcileSubgroupSize(
   return subgroupSize;
 }
 
-/// Helper function to retrieve the waves-per-eu value from translation info.
-static std::optional<int64_t>
-getWavesPerEu(IREE::Codegen::TranslationInfoAttr translationInfo) {
+/// Helper function to retrieve the target-func-attrs value from translation
+/// info.
+static DictionaryAttr
+getTargetFuncAttrs(IREE::Codegen::TranslationInfoAttr translationInfo) {
   auto translationConfig = translationInfo.getConfiguration();
   if (!translationConfig) {
-    return std::nullopt;
+    return nullptr;
   }
-  auto attr = translationConfig.getAs<IntegerAttr>("waves_per_eu");
+  auto attr = translationConfig.getAs<DictionaryAttr>("target_func_attrs");
   if (!attr) {
-    return std::nullopt;
+    return nullptr;
   }
-  return attr.getValue().getSExtValue();
+  return attr;
 }
 
 void ReconcileTranslationInfoPass::runOnOperation() {
@@ -85,7 +86,6 @@ void ReconcileTranslationInfoPass::runOnOperation() {
     return signalPassFailure();
   }
   auto exportOp = *exportOps.begin();
-  MLIRContext *context = &getContext();
   Builder builder(&getContext());
 
   SmallVector<IREE::Codegen::TranslationInfoAttr> translationInfos;
@@ -96,14 +96,13 @@ void ReconcileTranslationInfoPass::runOnOperation() {
     }
 
     translationInfos.push_back(translationInfo);
-    // The following is moving the waves-per-eu specification from
+    // The following is moving the target-func-attrs specification from
     // translation info into the func-like op. This is not the best
     // place to do this, but the intent is after this pass all the
     // lowering configs and translation infos will be deleted.
-    std::optional<int64_t> wavesPerEu = getWavesPerEu(translationInfo);
-    if (wavesPerEu) {
-      funcOp->setAttr("waves_per_eu", IntegerAttr::get(IndexType::get(context),
-                                                       wavesPerEu.value()));
+    DictionaryAttr targetFuncAttrs = getTargetFuncAttrs(translationInfo);
+    if (targetFuncAttrs) {
+      funcOp->setAttr("target_func_attrs", targetFuncAttrs);
     }
   });
 
