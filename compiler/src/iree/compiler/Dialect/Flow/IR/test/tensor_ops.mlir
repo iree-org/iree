@@ -158,6 +158,15 @@ util.func public @tensorClone(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
 
 // -----
 
+// CHECK-LABEL: @tensorTransfer
+util.func public @tensorTransfer(%arg0 : tensor<4x4xf32>) -> tensor<4x4xf32> {
+  // CHECK-NEXT: %0 = flow.tensor.transfer %arg0 : tensor<4x4xf32> to "dummy"
+  %0 = flow.tensor.transfer %arg0 : tensor<4x4xf32> to "dummy"
+  util.return %0 : tensor<4x4xf32>
+}
+
+// -----
+
 // CHECK-LABEL: @tensorCloneScalar
 util.func public @tensorCloneScalar(%arg0 : tensor<f32>) -> tensor<f32> {
   // CHECK-NEXT: %0 = flow.tensor.clone %arg0 : tensor<f32>
