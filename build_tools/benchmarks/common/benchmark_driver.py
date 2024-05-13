@@ -186,8 +186,7 @@ class BenchmarkDriver(object):
         return self.benchmark_errors
 
     def __get_output_paths(self, benchmark_name: str):
-        """Get output path for the results. The path is None if the benchmark doesn't need to be run.
-        """
+        """Get output path for the results. The path is None if the benchmark doesn't need to be run."""
 
         benchmark_results_filename = None
         if self.config.benchmark_tool_dir:

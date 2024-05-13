@@ -113,7 +113,6 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
                 external_params=external_params,
             )
 
-
     def __build_tool_cmds(
         self,
         benchmark_case: BenchmarkCase,

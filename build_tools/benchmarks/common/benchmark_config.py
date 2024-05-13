@@ -72,9 +72,7 @@ class BenchmarkConfig:
             return path.resolve() if path else None
 
         if not args.benchmark_tool_dir:
-            raise ValueError(
-                "--benchmark_tool_dir should be specified."
-            )
+            raise ValueError("--benchmark_tool_dir should be specified.")
 
         per_commit_tmp_dir: pathlib.Path = (args.tmp_dir / git_commit_hash).resolve()
 
