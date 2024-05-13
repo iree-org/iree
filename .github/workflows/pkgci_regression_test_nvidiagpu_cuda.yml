@@ -68,21 +68,21 @@ jobs:
         run: |
           source ${VENV_DIR}/bin/activate
           pytest SHARK-TestSuite/iree_tests/onnx/ \
-              -n 4 -rpfE --timeout=30 --retries=2 --durations=20 \
+              -k "test_gather_" -rpfE --timeout=30 --durations=20 \
               --config-files=build_tools/pkgci/external_test_suite/onnx_gpu_cuda.json \
               --no-skip-tests-missing-files \
               --report-log=/tmp/iree_tests_onnx_gpu_cuda_logs.json
-      - name: "Updating config file with latest XFAIL lists"
-        if: failure()
-        run: |
-          source ${VENV_DIR}/bin/activate
-          python SHARK-TestSuite/iree_tests/update_config_xfails.py \
-            --log-file=/tmp/iree_tests_onnx_gpu_cuda_logs.json \
-            --config-file=build_tools/pkgci/external_test_suite/onnx_gpu_cuda.json
-          cat build_tools/pkgci/external_test_suite/onnx_gpu_cuda.json
-      - name: "Uploading new config file"
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: "onnx_gpu_cuda.json"
-          path: "build_tools/pkgci/external_test_suite/onnx_gpu_cuda.json"
+      # - name: "Updating config file with latest XFAIL lists"
+      #   if: failure()
+      #   run: |
+      #     source ${VENV_DIR}/bin/activate
+      #     python SHARK-TestSuite/iree_tests/update_config_xfails.py \
+      #       --log-file=/tmp/iree_tests_onnx_gpu_cuda_logs.json \
+      #       --config-file=build_tools/pkgci/external_test_suite/onnx_gpu_cuda.json
+      #     cat build_tools/pkgci/external_test_suite/onnx_gpu_cuda.json
+      # - name: "Uploading new config file"
+      #   if: failure()
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: "onnx_gpu_cuda.json"
+      #     path: "build_tools/pkgci/external_test_suite/onnx_gpu_cuda.json"

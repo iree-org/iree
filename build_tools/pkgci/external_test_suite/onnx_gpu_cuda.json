@@ -4,16 +4,17 @@
     "--iree-hal-target-backends=cuda"
   ],
   "iree_run_module_flags": [
-    "--device=cuda"
+    "--device=cuda",
+    "--timeout_ms=2000"
   ],
   "skip_compile_tests": [
     "test_dequantizelinear",
     "test_slice_default_axes"
   ],
   "skip_run_tests": [
-    "test_gather_elements_negative_indices",
-    "test_gridsample_zeros_padding",
-    "test_scatter_elements_with_negative_indices"
+    // "test_gather_elements_negative_indices",
+    // "test_gridsample_zeros_padding",
+    // "test_scatter_elements_with_negative_indices"
   ],
   "expected_compile_failures": [
     "test_acosh",
