@@ -55,7 +55,7 @@ static Value buildTensorImportOp(Location loc, Value sourceTensor,
   // This may differ from the external encoding of the tensor as imports are
   // a transfer operation that may need to reformat the tensor.
   auto encodingAttr = TypeAttr::get(sourceTensor.getType());
-  auto resultSize = builder.createOrFold<IREE::Stream::TensorSizeOfOp>(
+  Value resultSize = builder.create<IREE::Stream::TensorSizeOfOp>(
       loc, builder.getIndexType(), encodingAttr, dynamicDims,
       /*affinity=*/nullptr);
 

@@ -374,15 +374,16 @@ LogicalResult ReturnOp::verify() {
 
 void TensorImportOp::build(OpBuilder &builder, OperationState &result,
                            Type resultType, Value source,
-                           TypeAttr targetEncoding, StringAttr name) {
+                           TypeAttr targetEncoding, StringAttr name,
+                           Attribute affinity) {
   build(builder, result, resultType, source, targetEncoding,
-        /*waitFence=*/Value{}, name);
+        /*waitFence=*/Value{}, name, affinity);
 }
 
 void TensorImportOp::build(OpBuilder &builder, OperationState &result,
                            Type resultType, Value source,
                            TypeAttr targetEncoding, Value waitFence,
-                           StringAttr name) {
+                           StringAttr name, Attribute affinity) {
   auto shapedType = llvm::cast<ShapedType>(resultType);
   assert((isa<IREE::HAL::BufferViewType>(source.getType()) ||
           shapedType.hasStaticShape()) &&
@@ -397,7 +398,7 @@ void TensorImportOp::build(OpBuilder &builder, OperationState &result,
         builder.getIndexAttr(i)));
   }
   build(builder, result, resultType, source, targetEncoding, dynamicDims,
-        waitFence, name);
+        waitFence, name, affinity);
 }
 
 Value TensorImportOp::getTiedResult(unsigned resultIndex) {
@@ -473,10 +474,12 @@ LogicalResult TensorImportOp::verify() {
 
 void TensorExportOp::build(OpBuilder &builder, OperationState &result,
                            Type resultType, Value source,
-                           TypeAttr sourceEncoding, StringAttr name) {
+                           TypeAttr sourceEncoding, StringAttr name,
+                           Attribute affinity) {
   auto dynamicDims =
       IREE::Util::buildDynamicDimsForValue(result.location, source, builder);
-  build(builder, result, resultType, source, sourceEncoding, dynamicDims, name);
+  build(builder, result, resultType, source, sourceEncoding, dynamicDims, name,
+        affinity);
 }
 
 Value TensorExportOp::getTiedResult(unsigned resultIndex) {
@@ -535,10 +538,11 @@ LogicalResult TensorAliasOp::verify() {
 //===----------------------------------------------------------------------===//
 
 void TensorBarrierOp::build(OpBuilder &builder, OperationState &result,
-                            ValueRange sources, Value signalFence) {
+                            ValueRange sources, Value signalFence,
+                            Attribute affinity) {
   auto resultTypes = llvm::map_to_vector(
       sources, [](Value source) { return source.getType(); });
-  build(builder, result, resultTypes, sources, signalFence);
+  build(builder, result, resultTypes, sources, signalFence, affinity);
 }
 
 Value TensorBarrierOp::getTiedResult(unsigned resultIndex) {
