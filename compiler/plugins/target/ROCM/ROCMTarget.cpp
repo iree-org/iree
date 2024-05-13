@@ -373,14 +373,14 @@ public:
 
         // Override flags as given by target func attrs.
         if (auto funcAttrs =
-                func->getAttrOfType<DictionaryAttr>("target_func_attrs")) {
+                func->getAttrOfType<DictionaryAttr>("llvm_func_attrs")) {
           for (NamedAttribute funcAttr : funcAttrs) {
             auto value = dyn_cast<StringAttr>(funcAttr.getValue());
             if (!value) {
-              return variantOp->emitError(
-                  "target_func_attrs attribute must be a "
-                  "dictionary of strings. Attribute " +
-                  llvm::Twine(funcAttr.getName()) + " is not a StringAttr.");
+              return variantOp->emitError("llvm_func_attrs attribute must be "
+                                          "adictionary of strings. Attribute " +
+                                          llvm::Twine(funcAttr.getName()) +
+                                          " is not a StringAttr.");
             }
             llvmFunc->addFnAttr(funcAttr.getName(), value.getValue());
           }

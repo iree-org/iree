@@ -69,7 +69,7 @@ getTargetFuncAttrs(IREE::Codegen::TranslationInfoAttr translationInfo) {
   if (!translationConfig) {
     return nullptr;
   }
-  auto attr = translationConfig.getAs<DictionaryAttr>("target_func_attrs");
+  auto attr = translationConfig.getAs<DictionaryAttr>("llvm_func_attrs");
   if (!attr) {
     return nullptr;
   }
@@ -102,7 +102,7 @@ void ReconcileTranslationInfoPass::runOnOperation() {
     // lowering configs and translation infos will be deleted.
     DictionaryAttr targetFuncAttrs = getTargetFuncAttrs(translationInfo);
     if (targetFuncAttrs) {
-      funcOp->setAttr("target_func_attrs", targetFuncAttrs);
+      funcOp->setAttr("llvm_func_attrs", targetFuncAttrs);
     }
   });
 
