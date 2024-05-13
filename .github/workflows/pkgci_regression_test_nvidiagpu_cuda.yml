@@ -69,6 +69,7 @@ jobs:
       #   pytest-timeout catches this:
       #   FAILED SHARK-TestSuite/iree_tests/onnx/node/generated/test_gather_elements_negative_indices/model.mlir::gpu_cuda_t4_test - Failed: Timeout >30.0s
       - name: Run external tests - ONNX test suite
+        if: always()
         run: |
           source ${VENV_DIR}/bin/activate
           pytest SHARK-TestSuite/iree_tests/onnx/ \
@@ -77,6 +78,7 @@ jobs:
 
       # test_gather_, pytest-xdist
       - name: Run external tests - ONNX test suite
+        if: always()
         run: |
           source ${VENV_DIR}/bin/activate
           pytest SHARK-TestSuite/iree_tests/onnx/ \
@@ -85,6 +87,7 @@ jobs:
 
       # test_gridsample_, one test at a time
       - name: Run external tests - ONNX test suite
+        if: always()
         run: |
           source ${VENV_DIR}/bin/activate
           pytest SHARK-TestSuite/iree_tests/onnx/ \
@@ -93,6 +96,7 @@ jobs:
 
       # test_gridsample_, pytest-xdist
       - name: Run external tests - ONNX test suite
+        if: always()
         run: |
           source ${VENV_DIR}/bin/activate
           pytest SHARK-TestSuite/iree_tests/onnx/ \
@@ -101,6 +105,7 @@ jobs:
 
       # test_scatter_, one test at a time
       - name: Run external tests - ONNX test suite
+        if: always()
         run: |
           source ${VENV_DIR}/bin/activate
           pytest SHARK-TestSuite/iree_tests/onnx/ \
@@ -109,6 +114,7 @@ jobs:
 
       # test_scatter_, pytest-xdist
       - name: Run external tests - ONNX test suite
+        if: always()
         run: |
           source ${VENV_DIR}/bin/activate
           pytest SHARK-TestSuite/iree_tests/onnx/ \
