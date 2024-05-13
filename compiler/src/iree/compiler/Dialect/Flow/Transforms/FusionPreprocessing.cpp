@@ -173,22 +173,31 @@ struct GatherFusionPattern : public OpRewritePattern<linalg::GenericOp> {
                                            "producer op is not fusible");
       }
 
-      // fuse by performing the dequantization after extracting
+      // fuse by performing the dequantization-like operation after
+      // tensor.extract
+      OpBuilder::InsertionGuard g(rewriter);
       rewriter.setInsertionPoint(extractOp);
+
+      // Create a new extract op that extracts from the original tensor
+      // (after the original extract). Clone the producerOp's body into the
+      // consumerOp, inline the cloned block (erases the block) after the new
+      // extract, and clean up.
       auto newExtractOp = rewriter.create<tensor::ExtractOp>(
           extractOp->getLoc(), producerOp->getOperand(0),
           extractOp.getIndices());
       rewriter.cloneRegionBefore(producerOp.getRegion(), consumerOp.getRegion(),
                                  consumerOp.getRegion().begin());
       Block &clonedBlock = consumerOp.getRegion().front();
-      auto terminator = clonedBlock.getTerminator();
+      auto producerTermOp = clonedBlock.getTerminator();
 
       rewriter.inlineBlockBefore(
           &clonedBlock, extractOp->getNextNode(),
           {newExtractOp.getResult(), newExtractOp->getResult(0)});
 
-      extractOp->getResult(0).replaceAllUsesWith(terminator->getOperand(0));
-      rewriter.eraseOp(terminator);
+      // Replace the the all references to the original extract result with the
+      // result from the inlined producerOp.
+      extractOp->getResult(0).replaceAllUsesWith(producerTermOp->getOperand(0));
+      rewriter.eraseOp(producerTermOp);
       rewriter.eraseOp(extractOp);
     }
 
