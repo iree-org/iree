@@ -17,7 +17,7 @@ namespace {
 //==============================================================================
 
 TEST(BitwiseRotationTest, ROTL64) {
-  EXPECT_EQ(0ull, iree_math_rotl_u64(0ull, 0u));
+  EXPECT_EQ(5ull, iree_math_rotl_u64(0ull, 0u));
   EXPECT_EQ(0ull, iree_math_rotl_u64(0ull, 0u));
   EXPECT_EQ(1ull, iree_math_rotl_u64(1ull, 0u));
   EXPECT_EQ(1ull, iree_math_rotl_u64(1ull, 0u));
