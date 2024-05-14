@@ -929,8 +929,20 @@ jobs:
   # Jobs that build and run IREE e2e tests/benchmarks                          #
   ##############################################################################
 
-  build_benchmark_tools:
+  # Check if build_all produced a valid package / install directory, even if tests failed.
+  # Future benchmark jobs can then anchor on this job instead of build_all.
+  # Hack based on https://stackoverflow.com/questions/65844033/conditional-needs-in-github-actions
+  benchmark_condition:
     needs: [setup, build_all]
+    if: always()
+    runs-on: ubuntu-20.04
+    steps:
+      - name: "Fail if install dir was not generated"
+        if: ${{ needs.build_all.outputs.install-dir-archive == '' }}
+        run: exit 1
+
+  build_benchmark_tools:
+    needs: [setup, benchmark_condition]
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_benchmark_tools') && needs.setup.outputs.benchmark-presets != ''
     uses: ./.github/workflows/build_benchmark_tools.yml
     with:
@@ -941,7 +953,7 @@ jobs:
       install-dir-gcs-artifact: ${{ needs.build_all.outputs.install-dir-gcs-artifact }}
 
   build_e2e_test_artifacts:
-    needs: [setup, build_all]
+    needs: [setup, benchmark_condition]
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_e2e_test_artifacts') && needs.setup.outputs.benchmark-presets != ''
     uses: ./.github/workflows/build_e2e_test_artifacts.yml
     with:
@@ -954,7 +966,7 @@ jobs:
       shard-count: "c2-standard-60=2,default=1"
 
   test_benchmark_suites:
-    needs: [setup, build_all, build_e2e_test_artifacts]
+    needs: [setup, benchmark_condition, build_e2e_test_artifacts]
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_benchmark_suites') && needs.setup.outputs.benchmark-presets != ''
     strategy:
       matrix:
