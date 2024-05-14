@@ -87,17 +87,34 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
   auto transformOp = cast<transform::TransformOpInterface>(getOperation());
 
   rewriter.setInsertionPointToStart(&target.getFunctionBody().front());
+  IREE::Codegen::TranslationInfoAttr translationInfo =
+      getTranslationInfo(target);
   DiagnosedSilenceableFailure diag =
       mlir::transform::gpu::mapNestedForallToThreadsImpl(
           rewriter, transformOp, target, getWorkgroupDims(), getSubgroupSize(),
           getSyncAfterDistribution());
   if (!diag.succeeded())
     return diag;
-  if (failed(setTranslationInfo(
-          target, IREE::Codegen::TranslationInfoAttr::get(
-                      rewriter.getContext(),
-                      IREE::Codegen::DispatchLoweringPassPipeline::None,
-                      getWorkgroupDims(), getSubgroupSize())))) {
+
+  IREE::Codegen::TranslationInfoAttr updatedTranslationInfo =
+      IREE::Codegen::TranslationInfoAttr::get(
+          rewriter.getContext(),
+          IREE::Codegen::DispatchLoweringPassPipeline::None, getWorkgroupDims(),
+          getSubgroupSize());
+
+  // Set config dictionary.
+  // Transform Dialect pipeline requires translation_info pass pipeline to
+  // be set to None here.
+  if (translationInfo) {
+    updatedTranslationInfo = IREE::Codegen::TranslationInfoAttr::get(
+        rewriter.getContext(), updatedTranslationInfo.getPassPipeline(),
+        updatedTranslationInfo.getCodegenSpec(),
+        updatedTranslationInfo.getWorkgroupSize(),
+        updatedTranslationInfo.getSubgroupSize(),
+        translationInfo.getConfiguration());
+  }
+
+  if (failed(setTranslationInfo(target, updatedTranslationInfo))) {
     target->emitOpError("failed to update translation info");
     return emitDefaultDefiniteFailure(target);
   }
