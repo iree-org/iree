@@ -936,10 +936,23 @@ jobs:
     needs: [setup, build_all]
     if: always()
     runs-on: ubuntu-20.04
+    outputs:
+      # install-dir: ${{ steps.forward-outputs.install-dir }}
+      # install-dir-archive: ${{ steps.forward-outputs.install-dir-archive }}
+      # install-dir-gcs-artifact: ${{ steps.forward-outputs.install-dir-gcs-artifact }}
+      install-dir: ${{ needs.build_all.outputs.install-dir }}
+      install-dir-archive: ${{ needs.build_all.outputs.install-dir-archive }}
+      install-dir-gcs-artifact: ${{ needs.build_all.outputs.install-dir-gcs-artifact }}
     steps:
       - name: "Fail if install dir was not generated"
         if: ${{ needs.build_all.outputs.install-dir-archive == '' }}
         run: exit 1
+      # - name: "Forward outputs from build_all"
+      #   id: forward-outputs
+      #   run: |
+      #     echo "install-dir=${{ needs.build_all.outputs.install-dir }}" >> "${GITHUB_OUTPUT}"
+      #     echo "install-dir-archive=${{ needs.build_all.outputs.install-dir-archive }}" >> "${GITHUB_OUTPUT}"
+      #     echo "install-dir-gcs-artifact=${{ needs.build_all.outputs.install-dir-gcs-artifact }}" >> "${GITHUB_OUTPUT}"
 
   build_benchmark_tools:
     needs: [setup, benchmark_condition]
@@ -948,9 +961,9 @@ jobs:
     with:
       runner-group: ${{ needs.setup.outputs.runner-group }}
       runner-env: ${{ needs.setup.outputs.runner-env }}
-      install-dir: ${{ needs.build_all.outputs.install-dir }}
-      install-dir-archive: ${{ needs.build_all.outputs.install-dir-archive }}
-      install-dir-gcs-artifact: ${{ needs.build_all.outputs.install-dir-gcs-artifact }}
+      install-dir: ${{ needs.benchmark_condition.outputs.install-dir }}
+      install-dir-archive: ${{ needs.benchmark_condition.outputs.install-dir-archive }}
+      install-dir-gcs-artifact: ${{ needs.benchmark_condition.outputs.install-dir-gcs-artifact }}
 
   build_e2e_test_artifacts:
     needs: [setup, benchmark_condition]
@@ -959,9 +972,9 @@ jobs:
     with:
       runner-group: ${{ needs.setup.outputs.runner-group }}
       runner-env: ${{ needs.setup.outputs.runner-env }}
-      install-dir: ${{ needs.build_all.outputs.install-dir }}
-      install-dir-archive: ${{ needs.build_all.outputs.install-dir-archive }}
-      install-dir-gcs-artifact: ${{ needs.build_all.outputs.install-dir-gcs-artifact }}
+      install-dir: ${{ needs.benchmark_condition.outputs.install-dir }}
+      install-dir-archive: ${{ needs.benchmark_condition.outputs.install-dir-archive }}
+      install-dir-gcs-artifact: ${{ needs.benchmark_condition.outputs.install-dir-gcs-artifact }}
       benchmark-presets: ${{ needs.setup.outputs.benchmark-presets }}
       shard-count: "c2-standard-60=2,default=1"
 
@@ -995,9 +1008,9 @@ jobs:
       ARCH: ${{ matrix.target.arch }}
       DOCKER_IMAGE: ${{ matrix.target.docker_image }}
       RUN_SCRIPTS: ${{ matrix.target.run_scripts }}
-      INSTALL_DIR: ${{ needs.build_all.outputs.install-dir }}
-      INSTALL_DIR_ARCHIVE: ${{ needs.build_all.outputs.install-dir-archive }}
-      INSTALL_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.install-dir-gcs-artifact }}
+      INSTALL_DIR: ${{ needs.benchmark_condition.outputs.install-dir }}
+      INSTALL_DIR_ARCHIVE: ${{ needs.benchmark_condition.outputs.install-dir-archive }}
+      INSTALL_DIR_GCS_ARTIFACT: ${{ needs.benchmark_condition.outputs.install-dir-gcs-artifact }}
       TARGET_BUILD_DIR: build-${{ matrix.target.platform }}-${{ matrix.target.arch }}
       E2E_TEST_ARTIFACTS_DIR: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-dir }}
       E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-gcs-artifact-dir }}
