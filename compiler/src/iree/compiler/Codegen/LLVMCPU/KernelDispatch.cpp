@@ -2500,13 +2500,15 @@ adjustTileSizesForUnPackOp(mlir::FunctionOpInterface entryPointFn,
     pipeline = DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
 
     // Remove the "enable_loop_peeling" attr from pipelineConfig
-    auto enableLoopPeelingAttrName = getEnableLoopPeelingAttrName(rootOp->getContext());
-    auto newAttrs = pipelineConfig.getValue().take_until(
-        [&enableLoopPeelingAttrName](NamedAttribute attr) {
-          return attr.getName() != enableLoopPeelingAttrName;
-        });
+    auto enableLoopPeelingAttrName =
+        getEnableLoopPeelingAttrName(rootOp->getContext());
+    auto newPipelineConfigEntries = llvm::to_vector(llvm::make_filter_range(
+        pipelineConfig.getValue(), [&](NamedAttribute entry) {
+          return entry.getName() != enableLoopPeelingAttrName;
+        }));
 
-    pipelineConfig = DictionaryAttr::get(rootOp->getContext(), newAttrs);
+    pipelineConfig =
+        DictionaryAttr::get(rootOp->getContext(), newPipelineConfigEntries);
   }
 
   return setOpConfigAndEntryPointFnTranslation(
