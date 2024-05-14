@@ -117,16 +117,14 @@ def TransposeMatmulPass : Pass<"iree-preprocessing-transpose-matmul-pass"> {
   let summary = "Convert Linalg matmul ops to transposed variants";
   let options = [
     Option<"input", "input", "Preprocessing::TransposeMatmulInput",
-           /*default=*/"Preprocessing::TransposeMatmulInput::None",
-           "Input to transpose, one of: 'none' (default), 'lhs', 'rhs'",
+           /*default=*/"Preprocessing::TransposeMatmulInput::Lhs",
+           "Input to transpose, one of: 'lhs' (default), 'rhs'",
            [{llvm::cl::values(
               clEnumValN(Preprocessing::TransposeMatmulInput::Lhs, "lhs",
                          "Transpose LHS input matrix."),
               clEnumValN(Preprocessing::TransposeMatmulInput::Rhs, "rhs",
-                         "Transpose RHS input matrix."),
-              clEnumValN(Preprocessing::TransposeMatmulInput::None, "none",
-                         "Transpose neither input (disable)."))
-           }]>
+                         "Transpose RHS input matrix.")
+           )}]>
   ];
   let dependentDialects = [
     "mlir::linalg::LinalgDialect",

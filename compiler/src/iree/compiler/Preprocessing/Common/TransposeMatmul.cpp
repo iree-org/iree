@@ -21,9 +21,6 @@ struct TransposeMatmulPass
       TransposeMatmulPass>::TransposeMatmulPassBase;
 
   void runOnOperation() override {
-    if (input == Preprocessing::TransposeMatmulInput::None)
-      return;
-
     bool transposeLHS = input == Preprocessing::TransposeMatmulInput::Lhs;
 
     RewritePatternSet patterns(&getContext());
