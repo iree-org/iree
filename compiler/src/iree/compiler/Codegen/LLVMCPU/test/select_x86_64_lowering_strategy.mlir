@@ -19,7 +19,7 @@ module {
 }
 
 //   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 0], [64, 0], [0, 0], [32, 0], [0, 16], [0, 0]]>
-//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>
+//   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert, {{\{}}enable_loop_peeling}>
 //       CHECK: func.func @matvec_static()
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //       CHECK: linalg.matvec
@@ -54,7 +54,7 @@ module {
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 0], [64, 0], [0, 0], [32, 0], [0, 16], [0, 0]]>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert, {{\{}}enable_loop_peeling}>
 //      CHECK: func.func @matvec_dynamic()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.matvec
@@ -81,7 +81,7 @@ module {
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0], [0], [0], [0], [16], [0]]>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert, {{\{}}enable_loop_peeling}>
 //      CHECK: func.func @dot_static()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.dot
@@ -112,7 +112,7 @@ module {
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0], [0], [0], [0], [16], [0]]>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert, {{\{}}enable_loop_peeling}>
 //      CHECK: func.func @dot_dynamic()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.dot
@@ -214,7 +214,7 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0], [64, 64, 0], [0, 0, 0], [32, 32, 0], [0, 0, 32], [0, 0, 0]]>
-#translation = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>
+#translation = #iree_codegen.translation_info<CPUDoubleTilingExpert, {enable_loop_peeling}>
 #executable_target_system_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "system-elf-x86_64", {data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-unknown-linux-gnu"}>
 module {
   func.func @preset_config_matmul_tensors() attributes {
@@ -236,7 +236,7 @@ module {
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [64, 64, 0], [0, 0, 0], [32, 32, 0], [0, 0, 32], [0, 0, 0]]>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert, {{\{}}enable_loop_peeling}>
 //      CHECK: func.func @preset_config_matmul_tensors()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.matmul
@@ -262,7 +262,7 @@ module {
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[43, 8, 0], [43, 8, 0], [0, 0, 0], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert, {{\{}}enable_loop_peeling}>
 //      CHECK: func.func @matmul_partially_peel()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.matmul
@@ -604,7 +604,7 @@ module {
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] =  #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [64, 64, 0], [0, 0, 0], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert, {{\{}}enable_loop_peeling}>
 //      CHECK: func.func @matmul_static()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK: linalg.matmul
@@ -666,7 +666,7 @@ module {
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], [64, 64, 0], [0, 0, 0], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert, {{\{}}enable_loop_peeling}>
 //      CHECK: func.func @matmul_i8_i8_i32_static()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.matmul
@@ -693,7 +693,7 @@ module {
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 0, 0], [64, 0, 0], [0, 0, 0], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert, {{\{}}enable_loop_peeling}>
 //      CHECK: func.func @gemm_unit_N()
 // CHECK-SAME:       translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.matmul
@@ -719,7 +719,7 @@ module {
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 0, 0], [0, 0, 0], [0, 0, 0], [1, 32, 0], [0, 0, 16], [0, 0, 0]]>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert, {{\{}}enable_loop_peeling}>
 //      CHECK: func.func @gemm_unit_M_unit_N()
 // CHECK-SAME:       translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.matmul
@@ -748,7 +748,7 @@ module {
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[11, 49, 0], [11, 49, 0], [0, 0, 0], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert, {{\{}}enable_loop_peeling}>
 //      CHECK: func.func @matmul_odd()
 // CHECK-SAME:       translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.matmul
@@ -1352,7 +1352,7 @@ module {
 }
 
 //  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 48, 0], [64, 48, 0], [0, 0, 0], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingPeelingExpert>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert, {{\{}}enable_loop_peeling}>
 //      CHECK: func.func @quant_model()
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //      CHECK:   linalg.matmul

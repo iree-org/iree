@@ -260,6 +260,14 @@ getVectorPreProcStrategy(linalg::LinalgOp linalgOp) {
   return VectorPreProcStrategy::None;
 }
 
+DictionaryAttr getPipelineConfWithPeelingAttr(MLIRContext *context) {
+  auto enableLoopPeelingAttrName = getEnableLoopPeelingAttrName(context);
+  auto unitAttr = UnitAttr::get(context);
+
+  return DictionaryAttr::get(
+      context, ArrayRef<NamedAttribute>({enableLoopPeelingAttrName, unitAttr}));
+}
+
 /// Looks for the `native_vector_size` attribute in the hal.executable.target
 /// looked up from this op.
 static int64_t
@@ -1063,9 +1071,12 @@ static LogicalResult setMatmulPeelingRootConfig(
   LLVM_DEBUG(KD_DBGS() << "Final tile scalable flags for contraction: "
                        << newScalableTileFlags << "\n");
 
+  DictionaryAttr pipelineConfig =
+      getPipelineConfWithPeelingAttr(op.getContext());
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, op, tileSizes, newScalableTileFlags,
-      DispatchLoweringPassPipeline::CPUDoubleTilingPeelingExpert);
+      DispatchLoweringPassPipeline::CPUDoubleTilingExpert,
+      /*workgroupSize=*/{}, /*subgroupSize=*/{}, pipelineConfig);
 }
 
 static LogicalResult
@@ -1151,11 +1162,14 @@ setMatmulRootConfig(mlir::FunctionOpInterface entryPointFn,
                        << newScalableTileFlags << "\n");
 
   auto pipeline = DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
+  DictionaryAttr pipelineConfig;
   if (vecPreProcStrategy == VectorPreProcStrategy::Peeling) {
-    pipeline = DispatchLoweringPassPipeline::CPUDoubleTilingPeelingExpert;
+    pipelineConfig = getPipelineConfWithPeelingAttr(op.getContext());
   }
-  return setOpConfigAndEntryPointFnTranslation(entryPointFn, op, newTileSizes,
-                                               newScalableTileFlags, pipeline);
+
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, op, newTileSizes, newScalableTileFlags, pipeline,
+      /*workgroupSize=*/{}, /*subgroupSize=*/{}, pipelineConfig);
 }
 
 /// Returns default hard-coded vector sizes for a give target. No smartness
@@ -1843,17 +1857,19 @@ setDefaultGenericOpRootConfig(mlir::FunctionOpInterface entryPointFn,
 
   // For non-tensor based ops use the Buffer ops pipeline.
   DispatchLoweringPassPipeline passPipeline;
+  DictionaryAttr pipelineConfig;
   if (genericOp.hasPureTensorSemantics()) {
-    passPipeline =
-        vecPreProcStrategy == VectorPreProcStrategy::Peeling
-            ? DispatchLoweringPassPipeline::CPUDoubleTilingPeelingExpert
-            : DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
+    passPipeline = DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
+    if (vecPreProcStrategy == VectorPreProcStrategy::Peeling) {
+      pipelineConfig = getPipelineConfWithPeelingAttr(genericOp.getContext());
+    }
   } else {
     passPipeline = DispatchLoweringPassPipeline::CPUBufferOpsTileAndVectorize;
   }
 
-  return setOpConfigAndEntryPointFnTranslation(entryPointFn, genericOp,
-                                               tileSizes, passPipeline);
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, genericOp, tileSizes, passPipeline, /*workgroupSize=*/{},
+      /*subgroupSize=*/{}, pipelineConfig);
 }
 
 /// Set lowering info to be used by the transform dialect jitter.
@@ -2034,16 +2050,20 @@ static LogicalResult setElementwiseGenericOpRootConfig(
                        << "\n");
 
   DispatchLoweringPassPipeline passPipeline;
+  DictionaryAttr pipelineConfig;
   if (genericOp.hasPureBufferSemantics()) {
     passPipeline = DispatchLoweringPassPipeline::CPUBufferOpsTileAndVectorize;
-  } else if (vecPreProcStrategy == VectorPreProcStrategy::Peeling) {
-    passPipeline = DispatchLoweringPassPipeline::CPUDoubleTilingPeelingExpert;
   } else {
     passPipeline = DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
   }
 
-  return setOpConfigAndEntryPointFnTranslation(entryPointFn, genericOp,
-                                               tileSizes, passPipeline);
+  if (vecPreProcStrategy == VectorPreProcStrategy::Peeling) {
+    pipelineConfig = getPipelineConfWithPeelingAttr(genericOp.getContext());
+  }
+
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, genericOp, tileSizes, passPipeline, /*workgroupSize=*/{},
+      /*subgroupSize=*/{}, pipelineConfig);
 }
 
 /// Sets the lowering configuration for a generic op to use
@@ -2180,14 +2200,7 @@ setConvRootConfig(mlir::FunctionOpInterface entryPointFn,
 
   DictionaryAttr pipelineConfig;
   if (vecPreProcStrategy == VectorPreProcStrategy::Peeling) {
-    // Enable peeling. To this end, attach extra info to the pipeline config.
-    // This will later be extracted by LLVMCPULowerExecutableTargetPass.
-    auto context = convOp.getContext();
-    auto enableLoopPeelingAttrName = getEnableLoopPeelingAttrName(context);
-    auto unitAttr = UnitAttr::get(context);
-    pipelineConfig = DictionaryAttr::get(
-        context,
-        ArrayRef<NamedAttribute>({enableLoopPeelingAttrName, unitAttr}));
+    pipelineConfig = getPipelineConfWithPeelingAttr(convOp.getContext());
   }
 
   return setOpConfigAndEntryPointFnTranslation(
@@ -2477,16 +2490,31 @@ adjustTileSizesForUnPackOp(mlir::FunctionOpInterface entryPointFn,
     }
   }
 
-  auto pipeline = getTranslationInfo(entryPointFn).getPassPipeline().getValue();
-  if (pipeline == DispatchLoweringPassPipeline::CPUDoubleTilingPeelingExpert) {
+  auto tInfo = getTranslationInfo(entryPointFn);
+  auto pipeline = tInfo.getPassPipeline().getValue();
+  auto pipelineConfig = tInfo.getConfiguration();
+  if (isLoopPeelingEnabled(entryPointFn)) {
+    // See #16406
     LLVM_DEBUG(KD_DBGS() << "unpack fusion does not work with peeling, falling "
                             "back to non-peeling path");
     pipeline = DispatchLoweringPassPipeline::CPUDoubleTilingExpert;
+
+    // Remove the "enable_loop_peeling" attr from pipelineConfig
+    auto enableLoopPeelingAttrName =
+        getEnableLoopPeelingAttrName(rootOp->getContext());
+    auto newPipelineConfigEntries = llvm::to_vector(llvm::make_filter_range(
+        pipelineConfig.getValue(), [&](NamedAttribute entry) {
+          return entry.getName() != enableLoopPeelingAttrName;
+        }));
+
+    pipelineConfig =
+        DictionaryAttr::get(rootOp->getContext(), newPipelineConfigEntries);
   }
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, rootOp, tileSizesList,
-      loweringConfig.getScalableTileFlagVals(), pipeline);
+      loweringConfig.getScalableTileFlagVals(), pipeline, /*workgroupSize=*/{},
+      /*subgroupSize=*/{}, pipelineConfig);
 }
 
 /// Get tile sizes for the generic op and fill into the parallel vector tile
