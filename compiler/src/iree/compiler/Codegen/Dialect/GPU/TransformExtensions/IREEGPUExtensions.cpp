@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Transforms.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Transform/IR/TransformTypes.h"
 #include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
@@ -112,6 +113,31 @@ void transform_dialect::ApplyUnrollMultiMmaOp::populatePatterns(
       patterns, vector::UnrollVectorOptions()
                     .setNativeShapeFn(getMultiMmaUnitShape)
                     .setUnrollTraversalOrderFn(gpuMultiMmaUnrollOrder));
+}
+
+//===---------------------------------------------------------------------===//
+// ConvertToMultiMmaOp
+//===---------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure transform_dialect::ConvertToMultiMmaOp::applyToOne(
+    transform::TransformRewriter &rewriter, linalg::LinalgOp target,
+    transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  rewriter.setInsertionPoint(target);
+  auto multiMmaOp =
+      GPU::convertContractionToMultiMma(rewriter, target, getIntrinsicKind());
+  if (failed(multiMmaOp)) {
+    return mlir::emitDefiniteFailure(target, "conversion to multi_mma failed");
+  }
+  results.push_back(*multiMmaOp);
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::ConvertToMultiMmaOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::producesHandle(getResult(), effects);
+  transform::modifiesPayload(effects);
 }
 
 } // namespace mlir::iree_compiler::IREE

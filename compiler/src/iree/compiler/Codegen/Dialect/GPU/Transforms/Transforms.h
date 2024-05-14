@@ -13,8 +13,13 @@
 #ifndef IREE_COMPILER_CODEGEN_DIALECT_GPU_TRANSFORMS_TRANSFORMS_H_
 #define IREE_COMPILER_CODEGEN_DIALECT_GPU_TRANSFORMS_TRANSFORMS_H_
 
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "mlir/IR/PatternMatch.h"
+
+namespace mlir::linalg {
+class LinalgOp;
+}
 
 namespace mlir::vector {
 struct UnrollVectorOptions;
@@ -25,6 +30,11 @@ namespace mlir::iree_compiler::IREE::GPU {
 // Helper to vectorize a static multi-mma op.
 LogicalResult vectorizeStaticMultiMmaOp(RewriterBase &rewriter,
                                         IREE::GPU::MultiMmaOp mmaOp);
+
+// Helper to convert a contraction-like linalg op to an iree_gpu.multi_mma.
+FailureOr<IREE::GPU::MultiMmaOp>
+convertContractionToMultiMma(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
+                             IREE::GPU::MmaInterfaceAttr mmaKind);
 
 void populateIREEGPUVectorizationPatterns(RewritePatternSet &patterns);
 
