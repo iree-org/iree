@@ -51,6 +51,7 @@ jobs:
       runner-group: ${{ needs.setup.outputs.runner-group }}
       runner-env: ${{ needs.setup.outputs.runner-env }}
       write-caches: ${{ needs.setup.outputs.write-caches }}
+      run-tests: false
 
   build_benchmark_tools:
     needs: [setup, build_all]
