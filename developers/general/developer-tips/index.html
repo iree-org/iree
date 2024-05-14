@@ -3865,8 +3865,11 @@ starting point.</p>
 
 <span class="go">module_abs_dispatch_0.mlir</span>
 <span class="go">module_abs_dispatch_0_system_elf_x86_64_benchmark.mlir</span>
+<span class="go">module_abs_dispatch_0_system_elf_x86_64.codegen.ll</span>
 <span class="go">module_abs_dispatch_0_system_elf_x86_64.codegen.bc</span>
+<span class="go">module_abs_dispatch_0_system_elf_x86_64.linked.ll</span>
 <span class="go">module_abs_dispatch_0_system_elf_x86_64.linked.bc</span>
+<span class="go">module_abs_dispatch_0_system_elf_x86_64.optimized.ll</span>
 <span class="go">module_abs_dispatch_0_system_elf_x86_64.optimized.bc</span>
 <span class="go">module_abs_dispatch_0_system_elf_x86_64.o</span>
 <span class="go">module_abs_dispatch_0_system_elf_x86_64.s</span>
@@ -3883,7 +3886,8 @@ artifacts is easier with platform-standard shared object files.</p>
 </div>
 <details class="tip">
 <summary>Tip - Disassembling <code>.bc</code> files with <code>llvm-dis</code></summary>
-<p>The <code>.bc</code> intermediate files use the
+<p>This section can be skipped if the .ll files are already in the directory you choose.
+The <code>.bc</code> intermediate files use the
 <a href="https://llvm.org/docs/BitCodeFormat.html">LLVM BitCode</a> format, which
 can be disassembled using
 <a href="https://llvm.org/docs/CommandGuide/llvm-dis.html"><code>llvm-dis</code></a>:</p>
@@ -4014,8 +4018,11 @@ be disassembled using <code>spirv-dis</code> from
 <span class="gp">$ </span>ls<span class="w"> </span>/tmp/iree/simple_abs
 
 <span class="go">module_abs_dispatch_0_cuda_nvptx_fb_benchmark.mlir</span>
+<span class="go">module_abs_dispatch_0_cuda_nvptx_fb.codegen.ll</span>
 <span class="go">module_abs_dispatch_0_cuda_nvptx_fb.codegen.bc</span>
+<span class="go">module_abs_dispatch_0_cuda_nvptx_fb.linked.ll</span>
 <span class="go">module_abs_dispatch_0_cuda_nvptx_fb.linked.bc</span>
+<span class="go">module_abs_dispatch_0_cuda_nvptx_fb.optimized.ll</span>
 <span class="go">module_abs_dispatch_0_cuda_nvptx_fb.optimized.bc</span>
 <span class="go">module_abs_dispatch_0_cuda_nvptx_fb.ptx</span>
 <span class="go">module_abs_dispatch_0.mlir</span>
@@ -4023,7 +4030,8 @@ be disassembled using <code>spirv-dis</code> from
 </code></pre></div>
 <details class="tip">
 <summary>Tip - Disassembling <code>.bc</code> files with <code>llvm-dis</code></summary>
-<p>The <code>.bc</code> intermediate files use the
+<p>This section can be skipped if the .ll files are already in the directory you choose.
+The <code>.bc</code> intermediate files use the
 <a href="https://llvm.org/docs/BitCodeFormat.html">LLVM BitCode</a> format, which
 can be disassembled using
 <a href="https://llvm.org/docs/CommandGuide/llvm-dis.html"><code>llvm-dis</code></a>:</p>
