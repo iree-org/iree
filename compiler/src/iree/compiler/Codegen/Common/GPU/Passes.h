@@ -50,7 +50,8 @@ pipelineSharedMemoryCopy(RewriterBase &rewriter, scf::ForOp forOp,
 /// loops without distribution. If `fuseInputProducer` is true, input producers
 /// will be fused into the serial loop.
 LogicalResult tileReductionToSerialLoops(mlir::FunctionOpInterface funcOp,
-                                         bool fuseInputProducer = false);
+                                         bool fuseInputProducer = false,
+                                         bool coalesceLoops = false);
 
 /// Swizzles the workgroup order in `funcOp` according to the `swizzleLogTile`
 /// size. `swizzleLogTile` of 0 disables any swizzling.
