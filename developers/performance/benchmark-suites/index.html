@@ -3876,17 +3876,13 @@ unnecessary builds</p>
 </code></pre></div>
 <p>Run benchmarks (currently only support running on a Linux host):</p>
 <div class="highlight"><pre><span></span><code>build_tools/benchmarks/run_benchmarks_on_linux.py<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--normal_benchmark_tool_dir<span class="o">=</span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">IREE_BUILD_DIR</span><span class="p">?</span><span class="si">}</span><span class="s2">/tools&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--benchmark_tool_dir<span class="o">=</span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">IREE_BUILD_DIR</span><span class="p">?</span><span class="si">}</span><span class="s2">/tools&quot;</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--e2e_test_artifacts_dir<span class="o">=</span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">E2E_TEST_ARTIFACTS_DIR</span><span class="p">?</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--execution_benchmark_config<span class="o">=</span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">E2E_TEST_ARTIFACTS_DIR</span><span class="p">?</span><span class="si">}</span><span class="s2">/exec_config.json&quot;</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--target_device_name<span class="o">=</span><span class="s2">&quot;&lt;target_device_name, e.g. c2-standard-60&gt;&quot;</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--output<span class="o">=</span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">E2E_TEST_ARTIFACTS_DIR</span><span class="p">?</span><span class="si">}</span><span class="s2">/benchmark_results.json&quot;</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--verbose<span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--cpu_uarch<span class="o">=</span><span class="s2">&quot;&lt;host CPU uarch, e.g. CascadeLake&gt;&quot;</span>
-<span class="c1"># Traces can be collected by adding:</span>
-<span class="c1"># --traced_benchmark_tool_dir=&quot;${IREE_TRACED_BUILD_DIR?}/tools&quot; \</span>
-<span class="c1"># --trace_capture_tool=/path/to/iree-tracy-capture \</span>
-<span class="c1"># --capture_tarball=captured_tracy_files.tar.gz</span>
 </code></pre></div>
 <p>Note that:</p>
 <ul>
@@ -3902,12 +3898,10 @@ unnecessary builds</p>
 </li>
 <li>To run x86_64 benchmarks, right now <code>--cpu_uarch</code> needs to be provided and
     only <code>CascadeLake</code> is available currently.</li>
-<li>To build traced benchmark tools, see
-    <a href="../profiling-with-tracy/">Profiling with Tracy</a>.</li>
 </ul>
 <p>Filters can be used to select the benchmarks:</p>
 <div class="highlight"><pre><span></span><code>build_tools/benchmarks/run_benchmarks_on_linux.py<span class="w"> </span><span class="se">\</span>
-<span class="w">  </span>--normal_benchmark_tool_dir<span class="o">=</span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">IREE_BUILD_DIR</span><span class="p">?</span><span class="si">}</span><span class="s2">/tools&quot;</span><span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--benchmark_tool_dir<span class="o">=</span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">IREE_BUILD_DIR</span><span class="p">?</span><span class="si">}</span><span class="s2">/tools&quot;</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--e2e_test_artifacts_dir<span class="o">=</span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">E2E_TEST_ARTIFACTS_DIR</span><span class="p">?</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--execution_benchmark_config<span class="o">=</span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">E2E_TEST_ARTIFACTS_DIR</span><span class="p">?</span><span class="si">}</span><span class="s2">/exec_config.json&quot;</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span>--target_device_name<span class="o">=</span><span class="s2">&quot;c2-standard-60&quot;</span><span class="w"> </span><span class="se">\</span>
@@ -4031,15 +4025,12 @@ gcloud<span class="w"> </span>storage<span class="w"> </span>cp<span class="w"> 
 <span class="w">  </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">E2E_TEST_ARTIFACTS_DIR_URL</span><span class="p">?</span><span class="si">}</span><span class="s2">/compilation-benchmark-config.json&quot;</span><span class="w"> </span><span class="se">\</span>
 <span class="w">  </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">E2E_TEST_ARTIFACTS_DIR</span><span class="p">?</span><span class="si">}</span><span class="s2">/comp_config.json&quot;</span>
 </code></pre></div>
-<p>Benchmark raw results and traces can be downloaded at:</p>
+<p>Benchmark raw results can be downloaded at:</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># Execution benchmark raw results</span>
 gcloud<span class="w"> </span>storage<span class="w"> </span>cp<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">EXECUTION_BENCHMARK_RESULTS_DIR_URL</span><span class="p">?</span><span class="si">}</span><span class="s2">/benchmark-results-*.json&quot;</span><span class="w"> </span>.
 
 <span class="c1"># Optional: Merge raw results into a single file</span>
 build_tools/benchmarks/benchmark_helper.py<span class="w"> </span>merge-results<span class="w"> </span>benchmark-results-*.json<span class="w"> </span>&gt;<span class="w"> </span>benchmark_results.json
-
-<span class="c1"># Execution benchmark traces</span>
-gcloud<span class="w"> </span>storage<span class="w"> </span>cp<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">EXECUTION_BENCHMARK_RESULTS_DIR_URL</span><span class="p">?</span><span class="si">}</span><span class="s2">/benchmark-traces-*.tar.gz&quot;</span><span class="w"> </span>.
 
 <span class="c1"># Compilation benchmark results</span>
 gcloud<span class="w"> </span>storage<span class="w"> </span>cp<span class="w"> </span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">COMPILATION_BENCHMARK_RESULTS_URL</span><span class="p">?</span><span class="si">}</span><span class="s2">&quot;</span><span class="w"> </span>.
