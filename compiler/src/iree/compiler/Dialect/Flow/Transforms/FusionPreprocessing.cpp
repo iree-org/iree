@@ -162,22 +162,19 @@ struct GatherFusionPattern : public OpRewritePattern<tensor::ExtractOp> {
           extractOp, "expected extract op to be inside a generic op");
     }
 
-    auto producerOp = dyn_cast_or_null<linalg::GenericOp>(
-        extractOp.getOperand(0).getDefiningOp());
+    auto producerOp = extractOp.getTensor().getDefiningOp<linalg::GenericOp>(); 
     if (!producerOp) {
       return rewriter.notifyMatchFailure(
           consumerOp, "expected extract operand to be a generic op");
     }
 
     // Check if the producerOp is fusible
-    if (producerOp.getNumDpsInputs() != 1 || producerOp->getNumResults() != 1 ||
+    if (producerOp.getNumDpsInputs() != 1 || producerOp.getNumResults() != 1 ||
         !isElementwise(producerOp) || !isDequantizationLikeOp(producerOp)) {
       return rewriter.notifyMatchFailure(producerOp,
                                          "producer op is not fusible");
     }
 
-    // fuse by performing the dequantization-like operation after
-    // tensor.extract
     OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPoint(extractOp);
 
@@ -186,7 +183,7 @@ struct GatherFusionPattern : public OpRewritePattern<tensor::ExtractOp> {
     // consumerOp, inline the cloned block (erases the block) after the new
     // extract, and clean up.
     auto newExtractOp = rewriter.create<tensor::ExtractOp>(
-        extractOp->getLoc(), producerOp->getOperand(0), extractOp.getIndices());
+        extractOp.getLoc(), producerOp.getDpsInputOperand(0)->get(), extractOp.getIndices());
     rewriter.cloneRegionBefore(producerOp.getRegion(), consumerOp.getRegion(),
                                consumerOp.getRegion().begin());
     Block &clonedBlock = consumerOp.getRegion().front();
@@ -194,11 +191,11 @@ struct GatherFusionPattern : public OpRewritePattern<tensor::ExtractOp> {
 
     rewriter.inlineBlockBefore(
         &clonedBlock, extractOp->getNextNode(),
-        {newExtractOp.getResult(), newExtractOp->getResult(0)});
+        {newExtractOp.getResult(), newExtractOp.getResult()});
 
     // Replace the the all references to the original extract result with the
     // result from the inlined producerOp.
-    extractOp->getResult(0).replaceAllUsesWith(producerTermOp->getOperand(0));
+    extractOp.getResult().replaceAllUsesWith(producerTermOp->getOperand(0));
     rewriter.eraseOp(producerTermOp);
     rewriter.eraseOp(extractOp);
 
