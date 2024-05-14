@@ -162,7 +162,7 @@ struct GatherFusionPattern : public OpRewritePattern<tensor::ExtractOp> {
           extractOp, "expected extract op to be inside a generic op");
     }
 
-    auto producerOp = extractOp.getTensor().getDefiningOp<linalg::GenericOp>(); 
+    auto producerOp = extractOp.getTensor().getDefiningOp<linalg::GenericOp>();
     if (!producerOp) {
       return rewriter.notifyMatchFailure(
           consumerOp, "expected extract operand to be a generic op");
@@ -183,7 +183,8 @@ struct GatherFusionPattern : public OpRewritePattern<tensor::ExtractOp> {
     // consumerOp, inline the cloned block (erases the block) after the new
     // extract, and clean up.
     auto newExtractOp = rewriter.create<tensor::ExtractOp>(
-        extractOp.getLoc(), producerOp.getDpsInputOperand(0)->get(), extractOp.getIndices());
+        extractOp.getLoc(), producerOp.getDpsInputOperand(0)->get(),
+        extractOp.getIndices());
     rewriter.cloneRegionBefore(producerOp.getRegion(), consumerOp.getRegion(),
                                consumerOp.getRegion().begin());
     Block &clonedBlock = consumerOp.getRegion().front();
