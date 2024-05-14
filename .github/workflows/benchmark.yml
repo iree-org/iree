@@ -31,9 +31,9 @@ jobs:
   setup:
     uses: ./.github/workflows/setup.yml
 
-  build_all:
+  build_for_benchmarks:
     needs: setup
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_all')
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_for_benchmarks') && needs.setup.outputs.benchmark-presets != ''
     uses: ./.github/workflows/build_all.yml
     with:
       runner-group: ${{ needs.setup.outputs.runner-group }}
@@ -42,31 +42,31 @@ jobs:
       run-tests: false
 
   build_benchmark_tools:
-    needs: [setup, build_all]
+    needs: [setup, build_for_benchmarks]
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_benchmark_tools') && needs.setup.outputs.benchmark-presets != ''
     uses: ./.github/workflows/build_benchmark_tools.yml
     with:
       runner-group: ${{ needs.setup.outputs.runner-group }}
       runner-env: ${{ needs.setup.outputs.runner-env }}
-      install-dir: ${{ needs.build_all.outputs.install-dir }}
-      install-dir-archive: ${{ needs.build_all.outputs.install-dir-archive }}
-      install-dir-gcs-artifact: ${{ needs.build_all.outputs.install-dir-gcs-artifact }}
+      install-dir: ${{ needs.build_for_benchmarks.outputs.install-dir }}
+      install-dir-archive: ${{ needs.build_for_benchmarks.outputs.install-dir-archive }}
+      install-dir-gcs-artifact: ${{ needs.build_for_benchmarks.outputs.install-dir-gcs-artifact }}
 
   build_e2e_test_artifacts:
-    needs: [setup, build_all]
+    needs: [setup, build_for_benchmarks]
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_e2e_test_artifacts') && needs.setup.outputs.benchmark-presets != ''
     uses: ./.github/workflows/build_e2e_test_artifacts.yml
     with:
       runner-group: ${{ needs.setup.outputs.runner-group }}
       runner-env: ${{ needs.setup.outputs.runner-env }}
-      install-dir: ${{ needs.build_all.outputs.install-dir }}
-      install-dir-archive: ${{ needs.build_all.outputs.install-dir-archive }}
-      install-dir-gcs-artifact: ${{ needs.build_all.outputs.install-dir-gcs-artifact }}
+      install-dir: ${{ needs.build_for_benchmarks.outputs.install-dir }}
+      install-dir-archive: ${{ needs.build_for_benchmarks.outputs.install-dir-archive }}
+      install-dir-gcs-artifact: ${{ needs.build_for_benchmarks.outputs.install-dir-gcs-artifact }}
       benchmark-presets: ${{ needs.setup.outputs.benchmark-presets }}
       shard-count: "c2-standard-60=2,default=1"
 
   test_benchmark_suites:
-    needs: [setup, build_all, build_e2e_test_artifacts]
+    needs: [setup, build_for_benchmarks, build_e2e_test_artifacts]
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_benchmark_suites') && needs.setup.outputs.benchmark-presets != ''
     strategy:
       matrix:
@@ -95,9 +95,9 @@ jobs:
       ARCH: ${{ matrix.target.arch }}
       DOCKER_IMAGE: ${{ matrix.target.docker_image }}
       RUN_SCRIPTS: ${{ matrix.target.run_scripts }}
-      INSTALL_DIR: ${{ needs.build_all.outputs.install-dir }}
-      INSTALL_DIR_ARCHIVE: ${{ needs.build_all.outputs.install-dir-archive }}
-      INSTALL_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.install-dir-gcs-artifact }}
+      INSTALL_DIR: ${{ needs.build_for_benchmarks.outputs.install-dir }}
+      INSTALL_DIR_ARCHIVE: ${{ needs.build_for_benchmarks.outputs.install-dir-archive }}
+      INSTALL_DIR_GCS_ARTIFACT: ${{ needs.build_for_benchmarks.outputs.install-dir-gcs-artifact }}
       TARGET_BUILD_DIR: build-${{ matrix.target.platform }}-${{ matrix.target.arch }}
       E2E_TEST_ARTIFACTS_DIR: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-dir }}
       E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-gcs-artifact-dir }}
@@ -251,7 +251,7 @@ jobs:
     runs-on: ubuntu-20.04
     needs:
       - setup
-      - build_all
+      - build_for_benchmarks
 
       # Benchmark pipeline
       - build_benchmark_tools
@@ -280,7 +280,7 @@ jobs:
         if: always()
         env:
           # If the job of an artifact is skipped or failed, we show "NOT_PRESENT".
-          INSTALL_DIR_GCS_ARTIFACT: ${{ needs.build_all.outputs.install-dir-gcs-artifact || 'NOT_PRESENT' }}
+          INSTALL_DIR_GCS_ARTIFACT: ${{ needs.build_for_benchmarks.outputs.install-dir-gcs-artifact || 'NOT_PRESENT' }}
           E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR: ${{ needs.build_e2e_test_artifacts.outputs.e2e-test-artifacts-gcs-artifact-dir || 'NOT_PRESENT' }}
           BENCHMARK_TOOLS_GCS_ARTIFACT_DIR: ${{ needs.build_benchmark_tools.outputs.benchmark-tools-gcs-artifact-dir || 'NOT_PRESENT' }}
           EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR: ${{ needs.execution_benchmarks.outputs.benchmark-results-gcs-artifact-dir || 'NOT_PRESENT' }}
