@@ -51,25 +51,11 @@ class Parser(argparse.ArgumentParser):
         )
 
         self.add_argument(
-            "--normal_benchmark_tool_dir",
+            "--benchmark_tool_dir",
             "--normal-benchmark-tool-dir",
             type=_check_dir_path,
             default=None,
             help="Path to the normal (non-tracing) iree tool directory",
-        )
-        self.add_argument(
-            "--traced_benchmark_tool_dir",
-            "--traced-benchmark-tool-dir",
-            type=_check_dir_path,
-            default=None,
-            help="Path to the tracing-enabled iree tool directory",
-        )
-        self.add_argument(
-            "--trace_capture_tool",
-            "--trace-capture-tool",
-            type=_check_exe_path,
-            default=None,
-            help="Path to the tool for collecting captured traces",
         )
         self.add_argument(
             "--driver-filter-regex",
@@ -98,13 +84,6 @@ class Parser(argparse.ArgumentParser):
             default=None,
             type=pathlib.Path,
             help="Path to the output file",
-        )
-        self.add_argument(
-            "--capture_tarball",
-            "--capture-tarball",
-            default=None,
-            type=pathlib.Path,
-            help="Path to the tarball for captures",
         )
         self.add_argument(
             "--no-clean",
@@ -149,7 +128,7 @@ class Parser(argparse.ArgumentParser):
             "--continue_from_previous",
             "--continue-from-previous",
             action="store_true",
-            help="Previous benchmark and capture results will be used and not "
+            help="Previous benchmark results will be used and not "
             "rerun if they are found in the benchmark results directory.",
         )
         self.add_argument(
