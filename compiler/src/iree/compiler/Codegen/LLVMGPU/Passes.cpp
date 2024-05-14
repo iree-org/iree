@@ -570,12 +570,7 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   }
 
   // Problem specific (reduction) tiling.
-  {
-    GPUTensorTileToSerialLoopsPassOptions tensorTileToSerialLoopsPassOptions;
-    tensorTileToSerialLoopsPassOptions.coalesceLoops = true;
-    funcPassManager.addPass(createGPUTensorTileToSerialLoopsPass(
-        tensorTileToSerialLoopsPassOptions));
-  }
+  funcPassManager.addPass(createGPUTensorTileToSerialLoopsPass());
 
   if (usePadToModelSharedMemcpy) {
     LLVMGPUMatmulPadOption option = LLVMGPUMatmulPadOption::ReductionDims;

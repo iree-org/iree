@@ -1,5 +1,4 @@
 // RUN: iree-opt %s --allow-unregistered-dialect --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-tensor-tile-to-serial-loops,iree-codegen-gpu-tensor-alloc))" | FileCheck %s
-// RUN: iree-opt %s --allow-unregistered-dialect --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-tensor-tile-to-serial-loops{coalesce-loops},iree-codegen-gpu-tensor-alloc))" | FileCheck %s --check-prefix=COALESCE_LOOPS
 
 func.func @matmul_2048x512x1024() {
   %c0 = arith.constant 0 : index
@@ -195,29 +194,3 @@ func.func @weight_dequant_matmul() {
 //  CHECK-SAME:         outs(%[[ARG2]] : tensor<32x128xf32>)
 //       CHECK:       scf.yield
 //       CHECK:     scf.yield
-
-// -----
-
-func.func @conv() attributes {translation_info = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [256, 1, 1] subgroup_size = 64, {mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, subgroup_m_count = 1, subgroup_n_count = 4>}>} {
-  %cst = arith.constant 0.000000e+00 : f32
-  %c0 = arith.constant 0 : index
-  %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2x34x34x1280xf16>>
-  %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<3x3x1280x1280xf16>>
-  %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<2x32x32x1280xf32>>
-  %workgroup_id_z = hal.interface.workgroup.id[2] : index
-  %workgroup_id_y = hal.interface.workgroup.id[1] : index
-  %workgroup_id_x = hal.interface.workgroup.id[0] : index
-  %3 = affine.apply affine_map<()[s0] -> (s0 * 256)>()[%workgroup_id_x]
-  %4 = flow.dispatch.tensor.load %2, offsets = [%workgroup_id_z, %workgroup_id_y, 0, %3], sizes = [1, 1, 32, 256], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<writeonly:tensor<2x32x32x1280xf32>> -> tensor<1x1x32x256xf32>
-  %5 = flow.dispatch.tensor.load %0, offsets = [%workgroup_id_z, %workgroup_id_y, 0, 0], sizes = [1, 3, 34, 1280], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<2x34x34x1280xf16>> -> tensor<1x3x34x1280xf16>
-  %6 = flow.dispatch.tensor.load %1, offsets = [0, 0, 0, %3], sizes = [3, 3, 1280, 256], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<3x3x1280x1280xf16>> -> tensor<3x3x1280x256xf16>
-  %7 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 1, 32, 256, 1, 1, 32]]>} ins(%cst : f32) outs(%4 : tensor<1x1x32x256xf32>) -> tensor<1x1x32x256xf32>
-  %8 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : vector<2xi64>, lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 1, 32, 256, 1, 1, 32]]>, strides = dense<1> : vector<2xi64>} ins(%5, %6 : tensor<1x3x34x1280xf16>, tensor<3x3x1280x256xf16>) outs(%7 : tensor<1x1x32x256xf32>) -> tensor<1x1x32x256xf32>
-  flow.dispatch.tensor.store %8, %2, offsets = [%workgroup_id_z, %workgroup_id_y, 0, %3], sizes = [1, 1, 32, 256], strides = [1, 1, 1, 1] : tensor<1x1x32x256xf32> -> !flow.dispatch.tensor<writeonly:tensor<2x32x32x1280xf32>>
-  return
-}
-// Check loops coalescing works
-//     COALESCE_LOOPS: func.func @conv()
-//     COALESCE_LOOPS:   scf.for
-// COALESCE_LOOPS-NOT:   scf.for
-//     COALESCE_LOOPS:   return

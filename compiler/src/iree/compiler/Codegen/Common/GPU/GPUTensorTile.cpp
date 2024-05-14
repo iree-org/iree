@@ -37,11 +37,10 @@ class TileConsumerAndFuseInputProducer final
 public:
   TileConsumerAndFuseInputProducer(MLIRContext *context,
                                    LinalgTransformationFilter filter,
-                                   bool fuseInputProducer, bool coalesceLoops,
+                                   bool fuseInputProducer,
                                    PatternBenefit benefit = 1)
       : OpInterfaceRewritePattern<TilingInterface>(context, benefit),
-        filter(std::move(filter)), fuseInputProducer(fuseInputProducer),
-        coalesceLoops(coalesceLoops) {}
+        filter(std::move(filter)), fuseInputProducer(fuseInputProducer) {}
 
   LogicalResult matchAndRewrite(TilingInterface op,
                                 PatternRewriter &rewriter) const override {
@@ -70,7 +69,7 @@ public:
     // producer linalg.fill op. It implicitly assumes that the leading
     // dimensions of different linalg ops match, which is the current status;
     // but may not hold true in the long term.
-    tileSizes.resize(op.getLoopIteratorTypes().size(), 0);
+    tileSizes.resize(op.getLoopIteratorTypes().size());
 
     if (llvm::all_of(tileSizes, [](int64_t s) { return s == 0; })) {
       return failure();
@@ -89,17 +88,6 @@ public:
     rewriter.replaceOp(op, tilingResult->replacements);
     filter.replaceLinalgTransformationFilter(rewriter,
                                              tilingResult->tiledOps.front());
-
-    if (coalesceLoops && tilingResult->loops.size() > 1) {
-      SmallVector<scf::ForOp> loops = llvm::map_to_vector(
-          tilingResult->loops, [](LoopLikeOpInterface loop) {
-            return cast<scf::ForOp>(loop.getOperation());
-          });
-      if (failed(mlir::coalesceLoops(rewriter, loops))) {
-        return failure();
-      }
-    }
-
     return success();
   }
 
@@ -173,14 +161,13 @@ private:
 
   LinalgTransformationFilter filter;
   bool fuseInputProducer;
-  bool coalesceLoops;
 };
 
 /// Patterns for workgroup level tiling. Workgroup tiling is done at the flow
 /// level but we may have extra tiling for the reduction dimension. Therefore we
 /// tile again without distributing.
 static void populateTilingPatterns(RewritePatternSet &patterns,
-                                   bool fuseInputProducer, bool coalesceLoops) {
+                                   bool fuseInputProducer) {
   MLIRContext *context = patterns.getContext();
 
   LinalgTransformationFilter filter(
@@ -189,21 +176,20 @@ static void populateTilingPatterns(RewritePatternSet &patterns,
       StringAttr::get(context, getWorkgroupKTiledMarker()));
   filter.setMatchByDefault();
 
-  patterns.add<TileConsumerAndFuseInputProducer>(
-      context, filter, fuseInputProducer, coalesceLoops);
+  patterns.add<TileConsumerAndFuseInputProducer>(context, filter,
+                                                 fuseInputProducer);
 }
 
 } // namespace
 
 LogicalResult tileReductionToSerialLoops(mlir::FunctionOpInterface funcOp,
-                                         bool fuseInputProducer,
-                                         bool coalesceLoops) {
+                                         bool fuseInputProducer) {
   {
     // Tile again at the workgroup level since redution dimension were
     // ignored. Dimensions already tiled will be ignore since we tile to the
     // same size.
     RewritePatternSet wgTilingPatterns(funcOp.getContext());
-    populateTilingPatterns(wgTilingPatterns, fuseInputProducer, coalesceLoops);
+    populateTilingPatterns(wgTilingPatterns, fuseInputProducer);
     if (failed(applyPatternsAndFoldGreedily(funcOp,
                                             std::move(wgTilingPatterns)))) {
       return failure();
@@ -362,8 +348,7 @@ struct GPUTensorTilePass final
 
     // Tile to serial loops to the wg tile size to handle reductions and other
     // dimension that have not been distributed.
-    if (failed(tileReductionToSerialLoops(funcOp, /*fuseInputProducer=*/false,
-                                          /*coalesceLoops=*/false)))
+    if (failed(tileReductionToSerialLoops(funcOp)))
       return signalPassFailure();
 
     LLVM_DEBUG({

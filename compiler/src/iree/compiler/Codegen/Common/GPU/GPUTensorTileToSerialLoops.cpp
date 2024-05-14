@@ -17,18 +17,13 @@ namespace mlir::iree_compiler {
 namespace {
 struct GPUTensorTileToSerialLoopsPass final
     : impl::GPUTensorTileToSerialLoopsPassBase<GPUTensorTileToSerialLoopsPass> {
-  using Base::Base;
-
   void runOnOperation() override {
     // Tile reductions based on the annotated tiling configuration.
     if (failed(tileReductionToSerialLoops(getOperation(),
-                                          /*fuseInputProducer=*/true,
-                                          coalesceLoops))) {
+                                          /*fuseInputProducer=*/true))) {
       return signalPassFailure();
     }
   }
 };
-
 } // namespace
-
 } // namespace mlir::iree_compiler
