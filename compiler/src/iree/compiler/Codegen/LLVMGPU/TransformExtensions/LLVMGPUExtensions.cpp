@@ -103,7 +103,7 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
           getSubgroupSize());
 
   // Set config dictionary.
-  // TODO: Transform Dialect pipeline requires translation_info pass pipeline to
+  // Transform Dialect pipeline requires translation_info pass pipeline to
   // be set to None here.
   if (translationInfo) {
     updatedTranslationInfo = IREE::Codegen::TranslationInfoAttr::get(
