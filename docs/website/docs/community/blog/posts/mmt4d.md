@@ -63,7 +63,7 @@ future, and in this case, it let us spring board off of high quality code
 generation which was already well integrated and composed well with other
 features of the compiler.
 
-## Existing Matrix Multplication Code Generation
+## Existing Matrix Multiplication Code Generation
 
 Let us start by discussing IREE’s existing matmul code generation and highlight
 the issues that `mmt4d` aims to overcome.
