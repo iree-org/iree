@@ -701,14 +701,12 @@ setVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
 
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(computeOp)) {
     if (linalg::isaContractionOpInterface(linalgOp)) {
-      LDBG(
-          "VectorDistribution: trying to find a suitable contraction config");
+      LDBG("VectorDistribution: trying to find a suitable contraction config");
       return setMatmulVectorDistributionConfig(entryPoint, linalgOp,
                                                targetInfo);
     }
     if (linalg::isaConvolutionOpInterface(linalgOp)) {
-      LDBG(
-          "VectorDistribution: trying to find a suitable convolution config");
+      LDBG("VectorDistribution: trying to find a suitable convolution config");
       return setConvolutionVectorDistributionConfig(entryPoint, linalgOp,
                                                     targetInfo);
     }
