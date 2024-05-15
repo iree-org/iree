@@ -970,11 +970,9 @@ static LogicalResult setWinogradOpConfig(mlir::FunctionOpInterface entryPoint,
                                          WinogradOp op,
                                          const TargetInfo &targetInfo) {
   static_assert(
-      std::is_same<WinogradOp, IREE::LinalgExt::WinogradInputTransformOp>() ||
-          std::is_same<WinogradOp,
-                       IREE::LinalgExt::WinogradFilterTransformOp>() ||
-          std::is_same<WinogradOp,
-                       IREE::LinalgExt::WinogradOutputTransformOp>(),
+      llvm::is_one_of<WinogradOp, IREE::LinalgExt::WinogradInputTransformOp,
+                      IREE::LinalgExt::WinogradFilterTransformOp,
+                      IREE::LinalgExt::WinogradOutputTransformOp>::value,
       "expected winograd transform op");
   auto pipeline =
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUWinogradVectorize;
