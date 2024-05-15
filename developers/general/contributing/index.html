@@ -2143,6 +2143,30 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Developer Certificate of Origin">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#crypographically-signing-commits" class="md-nav__link">
+    <span class="md-ellipsis">
+      Crypographically signing commits
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#adding-signed-off-by-to-commits" class="md-nav__link">
+    <span class="md-ellipsis">
+      Adding Signed-off-by to commits
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -3751,6 +3775,30 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Developer Certificate of Origin">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#crypographically-signing-commits" class="md-nav__link">
+    <span class="md-ellipsis">
+      Crypographically signing commits
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#adding-signed-off-by-to-commits" class="md-nav__link">
+    <span class="md-ellipsis">
+      Adding Signed-off-by to commits
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
         
           <li class="md-nav__item">
@@ -4004,9 +4052,52 @@ the code they are contributing to the project.</p>
 </li>
 </ol>
 </details>
-<p>Signing is enforced by the <a href="https://github.com/apps/dco">DCO GitHub App</a>. This
-requires that all commits included in pull requests include a <code>Signed-off-by</code>
-line:</p>
+<p>Signing is enforced by the <a href="https://github.com/apps/dco">DCO GitHub App</a> (see
+also the <a href="https://github.com/dcoapp/app">dcoapp/app</a> repository).</p>
+<p>The DCO check requires that all commits included in pull requests <em>either</em>
+are cryptographically signed by a member of the repository's organization <em>or</em>
+include a <code>Signed-off-by</code> message as a git trailer.</p>
+<h4 id="crypographically-signing-commits">Crypographically signing commits<a class="headerlink" href="#crypographically-signing-commits" title="Permanent link">link</a></h4>
+<p><em>This is the recommended approach for frequent contributors!</em></p>
+<p>For members of the repository's organization
+(see <a href="#obtaining-commit-access">obtaining commit access</a>), commits that are
+signed do not require the <code>Signed-off-by</code> text. See these references:</p>
+<ul>
+<li><a href="https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits">Signing commits</a>
+    (generate key, add to <a href="https://github.com/settings/keys">https://github.com/settings/keys</a>, <code>git commit -S</code>)</li>
+<li>
+<p><a href="https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification#ssh-commit-signature-verification">SSH commit signature verification</a>
+    (recommended if you already use SSH keys with GitHub) and
+    <a href="https://blog.dbrgn.ch/2021/11/16/git-ssh-signatures/">Signing Git Commits with SSH Keys</a>
+    (streamlined version of the previous page).</p>
+<p>SSH keys can be added at <a href="https://github.com/settings/ssh/new">https://github.com/settings/ssh/new</a>, then:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Sign commits automatically</span>
+git<span class="w"> </span>config<span class="w"> </span>--global<span class="w"> </span>commit.gpgsign<span class="w"> </span><span class="nb">true</span>
+git<span class="w"> </span>config<span class="w"> </span>--global<span class="w"> </span>tag.gpgsign<span class="w"> </span><span class="nb">true</span>
+
+<span class="c1"># Sign using SSH, not GPG</span>
+git<span class="w"> </span>config<span class="w"> </span>--global<span class="w"> </span>user.signingkey<span class="w"> </span>~/.ssh/id_rsa.pub
+git<span class="w"> </span>config<span class="w"> </span>--global<span class="w"> </span>gpg.format<span class="w"> </span>ssh
+
+<span class="c1"># Create an &quot;allowed_signers&quot; file</span>
+<span class="nb">echo</span><span class="w"> </span>your@email<span class="w"> </span><span class="sb">`</span>cat<span class="w"> </span>~/.ssh/id_rsa.pub<span class="sb">`</span><span class="w"> </span>&gt;<span class="w"> </span>~/.ssh/allowed_signers
+git<span class="w"> </span>config<span class="w"> </span>--global<span class="w"> </span>gpg.ssh.allowedSignersFile<span class="w"> </span>~/.ssh/allowed_signers
+</code></pre></div>
+</li>
+<li>
+<p><a href="https://docs.github.com/en/authentication/managing-commit-signature-verification/generating-a-new-gpg-key">Generating GPG keys</a>
+    (alternative to using SSH keys)</p>
+<p>GPG keys can be added at <a href="https://github.com/settings/gpg/new">https://github.com/settings/gpg/new</a>, then:</p>
+<div class="highlight"><pre><span></span><code><span class="c1"># Sign commits automatically</span>
+git<span class="w"> </span>config<span class="w"> </span>--global<span class="w"> </span>commit.gpgsign<span class="w"> </span><span class="nb">true</span>
+git<span class="w"> </span>config<span class="w"> </span>--global<span class="w"> </span>tag.gpgsign<span class="w"> </span><span class="nb">true</span>
+</code></pre></div>
+</li>
+</ul>
+<h4 id="adding-signed-off-by-to-commits">Adding <code>Signed-off-by</code> to commits<a class="headerlink" href="#adding-signed-off-by-to-commits" title="Permanent link">link</a></h4>
+<p><em>This requires less setup and is suitable for first time contributors.</em></p>
+<p>Contributors <em>sign-off</em> their agreement by adding a <code>Signed-off-by</code> line to
+commit messages:</p>
 <div class="highlight"><pre><span></span><code>This is my commit message
 
 Signed-off-by: Random J Developer &lt;random@developer.example.org&gt;
@@ -4019,11 +4110,11 @@ Signed-off-by: Random J Developer &lt;random@developer.example.org&gt;
 </li>
 <li>
 <p>Users of <a href="https://code.visualstudio.com/">Visual Studio Code</a> can add
-  <code>"git.alwaysSignOff": true,</code> in their settings.</p>
+  <code>"git.alwaysSignOff": true,</code> in their settings</p>
 </li>
 <li>
-<p>For more information about DCO enforcement and git workflows, see the
-  <a href="https://github.com/dcoapp/app">dcoapp/app</a> repository.</p>
+<p>See <code>.git/hooks/prepare-commit-msg.sample</code> for how to automatically
+  add this using a <a href="https://git-scm.com/docs/githooks">git hook</a></p>
 </li>
 </ul>
 <h3 id="contributor-license-agreement"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M8.75.75V2h.985c.304 0 .603.08.867.231l1.29.736c.038.022.08.033.124.033h2.234a.75.75 0 0 1 0 1.5h-.427l2.111 4.692a.75.75 0 0 1-.154.838l-.53-.53.529.531-.001.002-.002.002-.006.006-.006.005-.01.01-.045.04c-.21.176-.441.327-.686.45C14.556 10.78 13.88 11 13 11a4.498 4.498 0 0 1-2.023-.454 3.544 3.544 0 0 1-.686-.45l-.045-.04-.016-.015-.006-.006-.004-.004v-.001a.75.75 0 0 1-.154-.838L12.178 4.5h-.162c-.305 0-.604-.079-.868-.231l-1.29-.736a.245.245 0 0 0-.124-.033H8.75V13h2.5a.75.75 0 0 1 0 1.5h-6.5a.75.75 0 0 1 0-1.5h2.5V3.5h-.984a.245.245 0 0 0-.124.033l-1.289.737c-.265.15-.564.23-.869.23h-.162l2.112 4.692a.75.75 0 0 1-.154.838l-.53-.53.529.531-.001.002-.002.002-.006.006-.016.015-.045.04c-.21.176-.441.327-.686.45C4.556 10.78 3.88 11 3 11a4.498 4.498 0 0 1-2.023-.454 3.544 3.544 0 0 1-.686-.45l-.045-.04-.016-.015-.006-.006-.004-.004v-.001a.75.75 0 0 1-.154-.838L2.178 4.5H1.75a.75.75 0 0 1 0-1.5h2.234a.249.249 0 0 0 .125-.033l1.288-.737c.265-.15.564-.23.869-.23h.984V.75a.75.75 0 0 1 1.5 0Zm2.945 8.477c.285.135.718.273 1.305.273s1.02-.138 1.305-.273L13 6.327Zm-10 0c.285.135.718.273 1.305.273s1.02-.138 1.305-.273L3 6.327Z"/></svg></span> Contributor License Agreement<a class="headerlink" href="#contributor-license-agreement" title="Permanent link">link</a></h3>
