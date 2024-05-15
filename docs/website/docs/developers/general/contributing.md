@@ -49,9 +49,43 @@ the code they are contributing to the project.
       may be redistributed consistent with this project or the open source
       license(s) involved.
 
-Signing is enforced by the [DCO GitHub App](https://github.com/apps/dco). This
-requires that all commits included in pull requests include a `Signed-off-by`
-line:
+Signing is enforced by the [DCO GitHub App](https://github.com/apps/dco) (see
+also the [dcoapp/app](https://github.com/dcoapp/app) repository).
+
+The DCO check requires that all commits included in pull requests _either_
+are cryptographically signed by a member of the repository's organization _or_
+include a `Signed-off-by` message as a git trailer.
+
+#### Crypographically signing commits
+
+_This is the recommended approach for frequent contributors!_
+
+For members of the repository's organization
+(see [obtaining commit access](#obtaining-commit-access)), commits that are
+signed do not require the `Signed-off-by` text. See these references:
+
+* [Signing commits](https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits)
+    (generate key, add to <https://github.com/settings/keys>, `git commit -S`)
+* [SSH commit signature verification](https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification#ssh-commit-signature-verification)
+    (recommended if you already use SSH keys with GitHub)
+* [Signing Git Commits with SSH Keys](https://blog.dbrgn.ch/2021/11/16/git-ssh-signatures/)
+    (streamlined version of the previous page)
+* [Generating GPG keys](https://docs.github.com/en/authentication/managing-commit-signature-verification/generating-a-new-gpg-key)
+    (alternative to using SSH keys)
+
+Once you have a key registered, set your local or global `git config` to sign
+automatically:
+
+```bash
+git config --global commit.gpgsign true
+```
+
+#### Adding `Signed-off-by` to commits
+
+_This requires less setup and is suitable for first time contributors._
+
+Contributors _sign-off_ their agreement by adding a `Signed-off-by` line to
+commit messages:
 
 ```text
 This is my commit message
@@ -66,10 +100,10 @@ Signed-off-by: Random J Developer <random@developer.example.org>
     ```
 
 * Users of [Visual Studio Code](https://code.visualstudio.com/) can add
-  `"git.alwaysSignOff": true,` in their settings.
+  `"git.alwaysSignOff": true,` in their settings
 
-* For more information about DCO enforcement and git workflows, see the
-  [dcoapp/app](https://github.com/dcoapp/app) repository.
+* See `.git/hooks/prepare-commit-msg.sample` for how to automatically
+  add this using a [git hook](https://git-scm.com/docs/githooks)
 
 ### :octicons-law-16: Contributor License Agreement
 
