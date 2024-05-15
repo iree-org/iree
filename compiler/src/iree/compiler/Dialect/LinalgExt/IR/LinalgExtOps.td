@@ -78,6 +78,12 @@ let opDocGroup = OpGroupNonStructuredOps in {
 
 def IREELinalgExt_ScatterOp : IREELinalgExt_Op<"scatter",
     [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+     DeclareOpInterfaceMethods<LinalgFusionInterface, 
+        ["getNumParallelLoops", 
+         "getNumLoops", 
+         "getStaticLoopRanges",
+         "getIndexingMaps",
+        ]>,
      DeclareOpInterfaceMethods<TilingInterface,
         ["generateScalarImplementation",
          "getIterationDomain",

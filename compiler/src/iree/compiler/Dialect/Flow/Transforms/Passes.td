@@ -167,6 +167,7 @@ def FormDispatchRegionsPass :
     "mlir::scf::SCFDialect",
     "mlir::tensor::TensorDialect",
     "IREE::Flow::FlowDialect",
+    "IREE::LinalgExt::IREELinalgExtDialect",
   ];
 }
 

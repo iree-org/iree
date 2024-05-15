@@ -5,8 +5,10 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include <cstdint>
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
@@ -22,8 +24,10 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
+#include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/OpDefinition.h"
@@ -31,6 +35,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/IR/Value.h"
+#include "mlir/IR/ValueRange.h"
 #include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
@@ -243,6 +248,38 @@ ScatterOp::reifyResultShapes(OpBuilder &b,
                              ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
   return cast<LinalgExtOp>(getOperation())
       .reifyResultShapes(b, reifiedReturnShapes);
+}
+
+// TODO: Could be implemented for all ops in tblgen
+unsigned ScatterOp::getNumParallelLoops() {
+  return llvm::count(getLoopIteratorTypes(), utils::IteratorType::parallel);
+}
+
+// TODO: Could be implemented for all ops in tblgen
+unsigned ScatterOp::getNumLoops() { return getLoopIteratorTypes().size(); }
+
+SmallVector<int64_t, 4> ScatterOp::getStaticLoopRanges() {
+  // TODO: remove stub implementation.
+  SmallVector<int64_t, 4> loopRanges;
+  for (auto operand : getOperands()) {
+    if (auto shapedType = dyn_cast<ShapedType>(operand.getType())) {
+      auto shape = shapedType.getShape();
+      llvm::append_range(loopRanges, shape);
+    }
+  }
+  return loopRanges;
+}
+
+ArrayAttr ScatterOp::getIndexingMaps() {
+  // TODO: remove stub implementation.
+  Builder builder(getContext());
+  int64_t updateRank = getUpdateType().getRank();
+  int64_t indicesRank = getIndicesType().getRank();
+  int64_t originalRank = getOriginalType().getRank();
+  return builder.getAffineMapArrayAttr(
+      SmallVector<AffineMap>({builder.getMultiDimIdentityMap(updateRank),
+                              builder.getMultiDimIdentityMap(indicesRank),
+                              builder.getMultiDimIdentityMap(originalRank)}));
 }
 
 //===----------------------------------------------------------------------===//

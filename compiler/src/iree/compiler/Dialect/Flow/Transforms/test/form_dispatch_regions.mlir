@@ -605,3 +605,51 @@ util.func public @no_dequantization_like_fusion(%arg0: tensor<32x1x16x1x8xi16>, 
 //  CHECK-SAME:       outs(%[[FILL]] :
 //       CHECK:   flow.return %[[MMT4D]] :
 //       CHECK:   util.return %[[DISP]]
+
+
+// -----
+
+
+#map = affine_map<(d0, d1) -> (d0, d1)>
+#map1 = affine_map<(d0, d1) -> (d0, d1)>
+#map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+#map3 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+util.func public @linalgext_scatter_fusion() -> tensor<8192x16x8x128xf32> {
+    %3 = tensor.empty() : tensor<4x1xi32>
+    %expanded = tensor.empty() : tensor<4x1xi64>
+    %expanded_0 = tensor.empty() : tensor<4x1x16x8x128xf32>
+    %2 = tensor.empty() : tensor<8192x16x8x128xf32>
+    %result = tensor.empty() : tensor<8192x16x8x128xf32> 
+
+    %4 = linalg.generic {indexing_maps = [#map, #map1], 
+     iterator_types = ["parallel", "parallel"]}
+     ins(%expanded : tensor<4x1xi64>)
+     outs(%3 : tensor<4x1xi32>) {
+    ^bb0(%in: i64, %out: i32):
+      %10 = arith.trunci %in : i64 to i32
+      linalg.yield %10 : i32
+    } -> tensor<4x1xi32>
+    %5 = iree_linalg_ext.scatter 
+      dimension_map = [0] 
+      unique_indices(false) 
+      ins(%expanded_0, %4 : tensor<4x1x16x8x128xf32>, tensor<4x1xi32>)
+      outs(%2 : tensor<8192x16x8x128xf32>) {
+    ^bb0(%arg5: f32, %arg6: f32):
+      iree_linalg_ext.yield %arg5 : f32
+    } -> tensor<8192x16x8x128xf32> 
+    %6 = linalg.generic {indexing_maps = [#map2, #map3], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%5 : tensor<8192x16x8x128xf32>) outs(%result : tensor<8192x16x8x128xf32>) {
+    ^bb0(%in: f32, %out: f32):
+      %10 = arith.addf %in, %out : f32
+      linalg.yield %10 : f32
+    } -> tensor<8192x16x8x128xf32>
+
+    util.return %6 : tensor<8192x16x8x128xf32>
+} 
+
+// COM: Only checking for 2nd and 3rd op fusion
+// CHECK:     util.func public @linalgext_scatter_fusion
+// CHECK:       %[[RESULT:.+]] = flow.dispatch.region
+// CHECK:         %[[SCATTER_RESULT:.+]] = iree_linalg_ext.scatter
+// CHECK:         %[[GEN:.+]] = linalg.generic
+// CHECK-SAME:      ins(%[[SCATTER_RESULT]] : tensor<8192x16x8x128xf32>)
+// CHECK:         flow.return %[[GEN]] 

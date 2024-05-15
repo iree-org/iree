@@ -8,6 +8,7 @@
 #define IREE_DIALECT_LINALGEXT_INTERFACES
 
 include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtBase.td"
+include "mlir/Interfaces/DestinationStyleOpInterface.td"
 
 // The interface is a subset of LinalgStructuredInterface.
 def LinalgExtInterface : OpInterface<"LinalgExtOp"> {
@@ -38,6 +39,88 @@ def LinalgExtInterface : OpInterface<"LinalgExtOp"> {
   }];
 
   let verify = [{ return detail::verifyLinalgExtOpInterface($_op); }];
+}
+
+// Interface that allows for fusion of both LinalgExt and Linalg ops.
+def LinalgFusionInterface : OpInterface<"LinalgFusionOpInterface", [DestinationStyleOpInterface]> {
+  let methods = [
+    //===------------------------------------------------------------------===//
+    // Interface methods for fusion. 
+    // For linalg ops, these methods are already implemented
+    //===------------------------------------------------------------------===//
+      InterfaceMethod<
+      /*desc=*/[{
+        Return the number of parallel loops.
+      }],
+      /*retTy=*/"unsigned",
+      /*methodName=*/"getNumParallelLoops",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return $_op.getNumParallelLoops();
+      }]
+    >,
+
+    InterfaceMethod<
+      /*desc=*/[{
+        Return the number of loops.
+      }],
+      /*retTy=*/"unsigned",
+      /*methodName=*/"getNumLoops",
+      /*args=*/(ins),
+      /*methodBody=*/""
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Return the static loop ranges.
+      }],
+      /*retTy=*/"SmallVector<int64_t, 4>",
+      /*methodName=*/"getStaticLoopRanges",
+      /*args=*/(ins),
+      /*methodBody=*/""
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Return the indexing map for a `result`.
+      }],
+      /*retTy=*/"AffineMap",
+      /*methodName=*/"getIndexingMapMatchingResult",
+      /*args=*/(ins "OpResult":$result),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        assert(result.getOwner() == $_op);
+        auto indexingMaps =
+          $_op.getIndexingMaps().template getAsValueRange<AffineMapAttr>();
+        return *(indexingMaps.begin() + $_op.getNumDpsInputs() +
+                 result.getResultNumber());
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Return the input or output indexing map for `opOperand`.
+      }],
+      /*retTy=*/"AffineMap",
+      /*methodName=*/"getMatchingIndexingMap",
+      /*args=*/(ins "OpOperand*":$opOperand),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        assert(opOperand->getOwner() == $_op);
+        auto indexingMaps =
+          $_op.getIndexingMaps().template getAsValueRange<AffineMapAttr>();
+        return *(indexingMaps.begin() + opOperand->getOperandNumber());
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Return the indexing maps attribute within the current operation.
+      }],
+      /*retTy=*/"ArrayAttr",
+      /*methodName=*/"getIndexingMaps",
+      /*args=*/(ins),
+      /*methodBody=*/""
+    >,
+ 
+  ];
 }
 
 #endif  // IREE_DIALECT_LINALGEXT_INTERFACES

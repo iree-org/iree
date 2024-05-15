@@ -12,8 +12,12 @@
 #include "iree/compiler/Dialect/Flow/Transforms/ConvertRegionToWorkgroups.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Casting.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -390,8 +394,10 @@ static bool hasCompatibleOuterParallelLoops(
 // relationship through `operand` have compatible outer-parallel loops.
 static bool hasCompatibleOuterParallelLoops(
     OpOperand &operand, const llvm::SmallBitVector &rootOuterParallelLoops) {
-  auto producer = operand.get().getDefiningOp<linalg::LinalgOp>();
-  auto consumer = dyn_cast<linalg::LinalgOp>(operand.getOwner());
+  auto producer =
+      operand.get().getDefiningOp<LinalgExt::LinalgFusionOpInterface>();
+  auto consumer =
+      dyn_cast<LinalgExt::LinalgFusionOpInterface>(operand.getOwner());
   if (!producer || !consumer)
     return false;
 
@@ -580,7 +586,7 @@ isFusableWithConsumer(OpOperand &fusedOperand,
   // Either fuse pad with producer or with consumer.
   if (auto padOp = dyn_cast<tensor::PadOp>(consumer)) {
     if (options.fusePadWithProducers || isPadUsedInSetEncoding(padOp)) {
-      return isa<linalg::LinalgOp>(producer);
+      return isa<LinalgExt::LinalgFusionOpInterface>(producer);
     }
     return false;
   }
@@ -605,8 +611,10 @@ isFusableWithConsumer(OpOperand &fusedOperand,
     return false;
   }
 
-  auto producerLinalgOp = dyn_cast<linalg::LinalgOp>(producer);
-  auto consumerLinalgOp = dyn_cast<linalg::LinalgOp>(consumer);
+  auto producerLinalgOp =
+      dyn_cast<LinalgExt::LinalgFusionOpInterface>(producer);
+  auto consumerLinalgOp =
+      dyn_cast<LinalgExt::LinalgFusionOpInterface>(consumer);
   if (!producerLinalgOp || !consumerLinalgOp)
     return false;
 
@@ -712,7 +720,7 @@ isFusableWithProducer(OpOperand &operand,
 
   if (auto padOp = dyn_cast<tensor::PadOp>(consumer)) {
     if (options.fusePadWithProducers || isPadUsedInSetEncoding(padOp)) {
-      return isa<linalg::LinalgOp>(producer);
+      return isa<LinalgExt::LinalgFusionOpInterface>(producer);
     }
     return false;
   }
@@ -744,12 +752,13 @@ isFusableWithProducer(OpOperand &operand,
         .Default([](Operation *) { return false; });
   }
 
-  if (!isa<linalg::LinalgOp>(consumer) || !isa<linalg::LinalgOp>(producer)) {
+  if (!isa<LinalgExt::LinalgFusionOpInterface>(consumer) ||
+      !isa<LinalgExt::LinalgFusionOpInterface>(producer)) {
     return false;
   }
 
   if (!options.aggressiveFusion) {
-    auto consumerLinalgOp = cast<linalg::LinalgOp>(consumer);
+    auto consumerLinalgOp = cast<LinalgExt::LinalgFusionOpInterface>(consumer);
     if (!consumerLinalgOp.isDpsInit(&operand)) {
       return false;
     }
