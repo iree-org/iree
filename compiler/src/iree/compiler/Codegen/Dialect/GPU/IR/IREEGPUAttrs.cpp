@@ -290,8 +290,8 @@ static ConcreteMmaLayout getConcreteMFMALayout(MLIRContext *context,
     auto aKLayout = inner;
     auto bKLayout = inner;
     auto bNLayout = outer;
-    auto cMLayout = PerDimLayoutAttr::get(context, {laneY, vectorX}, {8, 2});
-    auto cNLayout = outer;
+    auto cMLayout = PerDimLayoutAttr::get(context, {vectorY, laneY}, {8, 2});
+    auto cNLayout = PerDimLayoutAttr::get(context, {laneX}, {16});
     return ConcreteMmaLayout{opaqueLayout, aMLayout, aKLayout, bKLayout,
                              bNLayout,     cMLayout, cNLayout};
   }
@@ -531,11 +531,13 @@ FailureOr<Value> MMAAttr::buildMmaOperation(OpBuilder &builder, Location loc,
   auto [aType, bType, cType] = getABCVectorTypes();
   if (aType != lhs.getType() || bType != rhs.getType() ||
       cType != acc.getType()) {
+    llvm::errs() << "mismatched type\n";
     return failure();
   }
   // Fail if the result type does not match with the expected return type of
   // the intrinsic. We expect the caller to handle type conversions externally.
   if (cType != resultType) {
+    llvm::errs() << "mismatched result type\n";
     return failure();
   }
   switch (getIntrinsic().getValue()) {
