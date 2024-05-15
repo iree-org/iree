@@ -67,18 +67,36 @@ signed do not require the `Signed-off-by` text. See these references:
 * [Signing commits](https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits)
     (generate key, add to <https://github.com/settings/keys>, `git commit -S`)
 * [SSH commit signature verification](https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification#ssh-commit-signature-verification)
-    (recommended if you already use SSH keys with GitHub)
-* [Signing Git Commits with SSH Keys](https://blog.dbrgn.ch/2021/11/16/git-ssh-signatures/)
-    (streamlined version of the previous page)
+    (recommended if you already use SSH keys with GitHub) and
+    [Signing Git Commits with SSH Keys](https://blog.dbrgn.ch/2021/11/16/git-ssh-signatures/)
+    (streamlined version of the previous page).
+
+    SSH keys can be added at <https://github.com/settings/ssh/new>, then:
+
+    ```bash
+    # Sign commits automatically
+    git config --global commit.gpgsign true
+    git config --global tag.gpgsign true
+
+    # Sign using SSH, not GPG
+    git config --global user.signingkey ~/.ssh/id_rsa.pub
+    git config --global gpg.format ssh
+
+    # Create an "allowed_signers" file
+    echo your@email `cat ~/.ssh/id_rsa.pub` > ~/.ssh/allowed_signers
+    git config --global gpg.ssh.allowedSignersFile ~/.ssh/allowed_signers
+    ```
+
 * [Generating GPG keys](https://docs.github.com/en/authentication/managing-commit-signature-verification/generating-a-new-gpg-key)
     (alternative to using SSH keys)
 
-Once you have a key registered, set your local or global `git config` to sign
-automatically:
+    GPG keys can be added at <https://github.com/settings/gpg/new>, then:
 
-```bash
-git config --global commit.gpgsign true
-```
+    ```bash
+    # Sign commits automatically
+    git config --global commit.gpgsign true
+    git config --global tag.gpgsign true
+    ```
 
 #### Adding `Signed-off-by` to commits
 
