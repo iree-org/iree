@@ -573,7 +573,7 @@ void transform_dialect::CopyTensorOperandOp::getEffects(
 //===---------------------------------------------------------------------===//
 
 template <typename MappingTy>
-bool isAscendingRelativeMapping(ArrayRef<Attribute> mapping) {
+static bool isAscendingRelativeMapping(ArrayRef<Attribute> mapping) {
   auto start = cast<MappingTy>(*mapping.begin());
   if (start.getMappingId() !=
       static_cast<int64_t>(gpu::MappingId::LinearDim0)) {
@@ -590,8 +590,8 @@ bool isAscendingRelativeMapping(ArrayRef<Attribute> mapping) {
   return true;
 }
 
-FailureOr<scf::ForallOp> flattenForallOp(RewriterBase &rewriter,
-                                         scf::ForallOp forallOp) {
+static FailureOr<scf::ForallOp> flattenForallOp(RewriterBase &rewriter,
+                                                scf::ForallOp forallOp) {
   if (!forallOp.getMapping().has_value())
     return forallOp->emitError("mapping must be present");
   SmallVector<Attribute> mapping =
