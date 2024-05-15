@@ -37,7 +37,6 @@
 #include "mlir/Dialect/Bufferization/Transforms/Transforms.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -608,13 +607,13 @@ FailureOr<scf::ForallOp> flattenForallOp(RewriterBase &rewriter,
 
   bool isThreadMapping = isa<gpu::GPUThreadMappingAttr>(*mapping.begin());
 
-  if (isThreadMapping) {
-    if (!isAscendingRelativeMapping<gpu::GPUThreadMappingAttr>(mapping)) {
-      return forallOp->emitError(
-          "mapping must be descending linear thread ids");
-    }
-  } else if (!isAscendingRelativeMapping<gpu::GPUWarpMappingAttr>(mapping)) {
-    return forallOp->emitError("mapping must be descending linear warp ids");
+  if (isThreadMapping &&
+      !isAscendingRelativeMapping<gpu::GPUThreadMappingAttr>(mapping)) {
+    return forallOp->emitError("mapping must be ascending linear thread ids");
+  }
+  if (!isThreadMapping &&
+      !isAscendingRelativeMapping<gpu::GPUWarpMappingAttr>(mapping)) {
+    return forallOp->emitError("mapping must be ascending linear warp ids");
   }
 
   auto isAll = [](ArrayRef<int64_t> array, int64_t cmp) {
@@ -623,8 +622,8 @@ FailureOr<scf::ForallOp> flattenForallOp(RewriterBase &rewriter,
 
   if (!isAll(forallOp.getStaticStep(), 1) ||
       !isAll(forallOp.getStaticLowerBound(), 0)) {
-    return failure();
-    return forallOp->emitError("");
+    return forallOp->emitError(
+        "unimplemented: trying to flatten non-normalized forall op");
   }
 
   MLIRContext *context = rewriter.getContext();
