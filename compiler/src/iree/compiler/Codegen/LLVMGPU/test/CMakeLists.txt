@@ -21,6 +21,7 @@ iree_lit_test_suite(
     "cast_address_space_function.mlir"
     "cast_type_to_fit_mma.mlir"
     "config_matvec.mlir"
+    "config_winograd.mlir"
     "conv_pipeline_test.mlir"
     "convert_to_nvvm.mlir"
     "convert_to_rocdl.mlir"
@@ -70,6 +71,7 @@ iree_lit_test_suite(
     "vector_distribute_layout.mlir"
     "vector_lowering.mlir"
     "vector_to_gpu.mlir"
+    "winograd_pipeline_test.mlir"
     "workgroup_specialization_pipeline_test.mlir"
   TOOLS
     FileCheck

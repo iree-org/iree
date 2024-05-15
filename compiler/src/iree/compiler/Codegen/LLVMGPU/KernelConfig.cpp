@@ -962,6 +962,44 @@ static LogicalResult setFftConfig(mlir::FunctionOpInterface entryPoint,
       workgroupSize);
 }
 
+//===----------------------------------------------------------------------===//
+// Winograd Pipeline Configuration
+//===----------------------------------------------------------------------===//
+template <typename WinogradOp>
+static LogicalResult setWinogradOpConfig(mlir::FunctionOpInterface entryPoint,
+                                         WinogradOp op,
+                                         const TargetInfo &targetInfo) {
+  static_assert(
+      std::is_same<WinogradOp, IREE::LinalgExt::WinogradInputTransformOp>() ||
+          std::is_same<WinogradOp,
+                       IREE::LinalgExt::WinogradFilterTransformOp>() ||
+          std::is_same<WinogradOp,
+                       IREE::LinalgExt::WinogradOutputTransformOp>(),
+      "expected winograd transform op");
+  auto pipeline =
+      IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUWinogradVectorize;
+  TileSizesListType tileSizes;
+  std::array<int64_t, 3> workgroupSize = {32, 4, 4};
+  int64_t iterationRank = op.getIterationDomainRank();
+  SmallVector<int64_t> workgroupTileSizes(iterationRank, 4);
+  // Set batch workgroup size
+  workgroupTileSizes.front() = 1;
+  // Set input channel workgroup size
+  workgroupTileSizes.back() = 32;
+  if (isa<IREE::LinalgExt::WinogradFilterTransformOp>(op)) {
+    // Set input channel workgroup size
+    workgroupTileSizes.front() = 32;
+    // Set output channel workgroup size
+    workgroupTileSizes.back() = 16;
+    workgroupSize = {16, 32, 1};
+  }
+  tileSizes.push_back(workgroupTileSizes);
+  SmallVector<int64_t> threadTileSizes(iterationRank, 1);
+  tileSizes.push_back(threadTileSizes);
+  return setOpConfigAndEntryPointFnTranslation(entryPoint, op, tileSizes,
+                                               pipeline, workgroupSize);
+}
+
 //====---------------------------------------------------------------------===//
 // Sort Pipeline Configuration
 //====---------------------------------------------------------------------===//
@@ -1854,26 +1892,33 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
       return success();
     }
   }
-
-  if (auto fftOp = dyn_cast<IREE::LinalgExt::FftOp>(computeOp)) {
-    LDBG("FFT Config");
-    return setFftConfig(entryPointFn, fftOp, targetInfo);
-  }
-  if (auto sortOp = dyn_cast<IREE::LinalgExt::SortOp>(computeOp)) {
-    LDBG("Sort Config");
-    return setSortConfig(entryPointFn, sortOp, targetInfo);
-  }
-  if (auto packOp = dyn_cast<tensor::PackOp>(computeOp)) {
-    LDBG("Pack Config");
-    return setPackConfig(entryPointFn, packOp, targetInfo);
-  }
-  if (auto ukernelOp = dyn_cast<IREE::Codegen::UKernelOpInterface>(computeOp)) {
-    LDBG("Ukernel Config");
-    return setUKernelConfig(entryPointFn, ukernelOp);
-  }
-
-  LDBG("Default Config");
-  return setRootDefaultConfig(entryPointFn, computeOp, targetInfo);
+  return TypeSwitch<Operation *, LogicalResult>(computeOp)
+      .Case<IREE::LinalgExt::FftOp>([&](auto fftOp) {
+        LDBG("FFT Config");
+        return setFftConfig(entryPointFn, fftOp, targetInfo);
+      })
+      .Case<IREE::LinalgExt::SortOp>([&](auto sortOp) {
+        LDBG("Sort Config");
+        return setSortConfig(entryPointFn, sortOp, targetInfo);
+      })
+      .Case<IREE::LinalgExt::WinogradInputTransformOp,
+            IREE::LinalgExt::WinogradOutputTransformOp,
+            IREE::LinalgExt::WinogradFilterTransformOp>([&](auto winogradOp) {
+        LDBG("Winograd Config");
+        return setWinogradOpConfig(entryPointFn, winogradOp, targetInfo);
+      })
+      .Case<tensor::PackOp>([&](auto packOp) {
+        LDBG("Pack Config");
+        return setPackConfig(entryPointFn, packOp, targetInfo);
+      })
+      .Case<IREE::Codegen::UKernelOpInterface>([&](auto ukernelOp) {
+        LDBG("Ukernel Config");
+        return setUKernelConfig(entryPointFn, ukernelOp);
+      })
+      .Default([&](auto op) {
+        LDBG("Default Config");
+        return setRootDefaultConfig(entryPointFn, computeOp, targetInfo);
+      });
 }
 
 // Propogate the configuration to the other ops.

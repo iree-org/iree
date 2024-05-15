@@ -76,6 +76,10 @@ void addGPUTransposePassPipeline(OpPassManager &funcPassManager,
 /// module-level pass manager.
 void addGPUVectorizationPassPipeline(OpPassManager &funcPassManager);
 
+/// Lowering for winograd transform ops. Follows `VectorizationPassPipeline`
+/// with different tiling and distribution passes.
+void addGPUWinogradVectorizePassPipeline(OpPassManager &funcPassManager);
+
 /// Lowering based on vector distribution patterns.
 void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
                                         const LLVMGPUPipelineOptions &options,
