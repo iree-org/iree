@@ -206,11 +206,15 @@ bool tryMoveProducerBefore(Value value, Operation *consumerOp) {
       // satisfies the request based on SSA dominance.
       return true;
     }
+
+    // Recursively try to move each operand.
+    // TODO(benvanik): change to a worklist to avoid potential stack explosion.
     for (auto operand : producerOp->getOperands()) {
-      if (!isValueUsableForOp(operand, consumerOp)) {
+      if (!tryMoveProducerBefore(operand, consumerOp)) {
         return false;
       }
     }
+
     producerOp->moveBefore(consumerOp);
     return true;
   }

@@ -95,8 +95,9 @@ util.func public @importDynamicBufferView(%view: !hal.buffer_view) -> !hal.buffe
 util.func public @exportBufferViewInPlace(%view: !hal.buffer_view, %storage: !hal.buffer) -> !hal.buffer_view {
   %0 = hal.tensor.import %view : !hal.buffer_view -> tensor<4xi32>
   %1 = arith.muli %0, %0 : tensor<4xi32>
-  %2 = hal.tensor.export %1 into(%storage : !hal.buffer) : tensor<4xi32> -> !hal.buffer_view
-  util.return %2 : !hal.buffer_view
+  %2 = hal.tensor.alias %1 : tensor<4xi32> to %storage : !hal.buffer
+  %3 = hal.tensor.export %2 : tensor<4xi32> -> !hal.buffer_view
+  util.return %3 : !hal.buffer_view
 }
 
 //      CHECK: util.global private @[[GLOBAL_ARG0:.+]] {

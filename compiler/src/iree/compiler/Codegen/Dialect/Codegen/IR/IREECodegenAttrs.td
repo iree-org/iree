@@ -15,18 +15,16 @@ def CPU_Default
     : I32EnumAttrCase<"CPUDefault", 0>;
 def CPU_DoubleTilingExpert
     : I32EnumAttrCase<"CPUDoubleTilingExpert", 1>;
-def CPU_DoubleTilingPeelingExpert
-    : I32EnumAttrCase<"CPUDoubleTilingPeelingExpert", 2>;
 def CPU_ConvTileAndDecomposeExpert
-    : I32EnumAttrCase<"CPUConvTileAndDecomposeExpert", 3>;
+    : I32EnumAttrCase<"CPUConvTileAndDecomposeExpert", 2>;
 def CPU_Mmt4dTilingExpert
-    : I32EnumAttrCase<"Mmt4dTilingExpert", 4>;
+    : I32EnumAttrCase<"Mmt4dTilingExpert", 3>;
 def CPU_BufferOpsTileAndVectorize
-    : I32EnumAttrCase<"CPUBufferOpsTileAndVectorize", 5>;
+    : I32EnumAttrCase<"CPUBufferOpsTileAndVectorize", 4>;
 def CPU_DataTiling
-    : I32EnumAttrCase<"CPUDataTiling", 6>;
+    : I32EnumAttrCase<"CPUDataTiling", 5>;
 def CPU_LinalgExtTileAndVectorize
-    : I32EnumAttrCase<"CPULinalgExtTileAndVectorize", 7>;
+    : I32EnumAttrCase<"CPULinalgExtTileAndVectorize", 6>;
 
 def LLVMGPU_Default
     : I32EnumAttrCase<"LLVMGPUDefault", 100>;
@@ -84,7 +82,7 @@ def DispatchLoweringPassPipelineEnum : I32EnumAttr<
   "identifier for pass pipeline use to lower dispatch region", [
     // CPU CodeGen pipelines
     CPU_Default, CPU_DoubleTilingExpert,
-    CPU_DoubleTilingPeelingExpert, CPU_ConvTileAndDecomposeExpert,
+    CPU_ConvTileAndDecomposeExpert,
     CPU_Mmt4dTilingExpert, CPU_BufferOpsTileAndVectorize,
     CPU_DataTiling, CPU_LinalgExtTileAndVectorize,
 
@@ -130,7 +128,7 @@ def IREECodegen_TranslationInfoAttr :
   let description = [{
     Specifies the information that is used to drive the translation of
     an entry point function using Linalg based structured-op
-    lowering.. During executable translation this is attached to the
+    lowering. During executable translation this is attached to the
     `hal.executable.export` operation.
 
     If this operation is already set on the root operation (as part of

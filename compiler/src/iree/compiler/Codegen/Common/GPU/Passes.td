@@ -13,34 +13,36 @@ include "mlir/Pass/PassBase.td"
 // Common Passes used for GPU-like backends (keep alphabetical)
 //===---------------------------------------------------------------------===//
 
-def GPUCheckResourceUsage :
+def GPUCheckResourceUsagePass :
     InterfacePass<"iree-codegen-gpu-check-resource-usage", "mlir::FunctionOpInterface"> {
   let summary = "Checks GPU specific resource usage constraints like shared memory limits";
   let constructor = "mlir::iree_compiler::createGPUCheckResourceUsagePass()";
 }
 
-def GPUCreateFastSlowPath :
+def GPUCreateFastSlowPathPass :
     InterfacePass<"iree-codegen-gpu-create-fast-slow-path", "mlir::FunctionOpInterface"> {
   let summary = "Create separate fast and slow paths to handle padding";
-  let constructor = "mlir::iree_compiler::createGPUCreateFastSlowPathPass()";
+  let dependentDialects = ["::mlir::scf::SCFDialect"];
 }
 
-def GPUDistribute :
+def GPUDistributePass :
     InterfacePass<"iree-codegen-gpu-distribute", "mlir::FunctionOpInterface"> {
   let summary = "Pass to distribute scf.forall ops.";
-  let constructor = "mlir::iree_compiler::createGPUDistribute()";
+  let dependentDialects = ["::mlir::affine::AffineDialect", "::mlir::gpu::GPUDialect"];
 }
 
-def GPUDistributeSharedMemoryCopy :
+def GPUDistributeSharedMemoryCopyPass :
     InterfacePass<"iree-codegen-gpu-distribute-shared-memory-copy", "mlir::FunctionOpInterface"> {
   let summary = "Pass to distribute shared memory copies to threads.";
-  let constructor = "mlir::iree_compiler::createGPUDistributeSharedMemoryCopy()";
+  let dependentDialects = [
+    "::mlir::gpu::GPUDialect", "::mlir::scf::SCFDialect", "::mlir::vector::VectorDialect"
+  ];
 }
 
-def GPUDistributeScfFor :
+def GPUDistributeScfForPass :
     InterfacePass<"iree-codegen-gpu-distribute-scf-for", "mlir::FunctionOpInterface"> {
   let summary = "Distribute tiled loop nests to invocations";
-  let constructor = "mlir::iree_compiler::createGPUDistributeScfForPass()";
+  let dependentDialects = ["::mlir::gpu::GPUDialect"];
   let options = [
     Option<"useBlockDims", "use-block-dims", "bool",
            /*default=*/"true",
@@ -48,29 +50,31 @@ def GPUDistributeScfFor :
   ];
 }
 
-def GPUGeneralizeNamedOps :
+def GPUGeneralizeNamedOpsPass :
     InterfacePass<"iree-codegen-gpu-generalize-named-ops", "mlir::FunctionOpInterface"> {
   let summary = "Convert named Linalg ops to linalg.generic ops";
-  let constructor = "mlir::iree_compiler::createGPUGeneralizeNamedOpsPass()";
 }
 
-def GPULowerToUKernels :
+def GPULowerToUKernelsPass :
     Pass<"iree-codegen-gpu-lower-to-ukernels", ""> {
-  let summary =
-      "Separate out parts of the IR that lower to a micro-kernel";
-  let constructor =
-      "mlir::iree_compiler::createGPULowerToUKernelsPass()";
+  let summary = "Separate out parts of the IR that lower to a micro-kernel";
+  let dependentDialects = ["::mlir::iree_compiler::IREE::Codegen::IREECodegenDialect"];
 }
 
-def GPUMultiBuffering :
+def GPUMultiBufferingPass :
     InterfacePass<"iree-codegen-gpu-multi-buffering", "mlir::FunctionOpInterface"> {
   let summary = "Pass to do multi buffering.";
-  let constructor = "mlir::iree_compiler::createGPUMultiBuffering()";
+  let dependentDialects = ["::mlir::affine::AffineDialect"];
+  let options = [
+    Option<"numBuffers", "num-buffers", "unsigned",
+            /*default=*/"5",
+            "Number of buffers to use.">,
+  ];
 }
 
-def GPUPipelining : InterfacePass<"iree-codegen-gpu-pipelining", "mlir::FunctionOpInterface"> {
+def GPUPipeliningPass :
+    InterfacePass<"iree-codegen-gpu-pipelining", "mlir::FunctionOpInterface"> {
   let summary = "Pass to do software pipelining.";
-  let constructor = "mlir::iree_compiler::createGPUPipeliningPass()";
   let options = [
     Option<"epiloguePeeling", "epilogue-peeling", "bool",
             /*default=*/"true",
@@ -89,10 +93,9 @@ def GPUPipelining : InterfacePass<"iree-codegen-gpu-pipelining", "mlir::Function
   ];
 }
 
-def GPUReduceBankConflicts :
+def GPUReduceBankConflictsPass :
     InterfacePass<"iree-codegen-gpu-reduce-bank-conflicts", "mlir::FunctionOpInterface"> {
   let summary = "Pass to try to reduce the number of bank conflicts by padding memref.alloc ops.";
-  let constructor = "mlir::iree_compiler::createGPUReduceSharedMemoryBankConflicts()";
   let options = [
     Option<"paddingBits", "padding-bits", "unsigned",
             /*default=*/"128",
@@ -100,65 +103,86 @@ def GPUReduceBankConflicts :
   ];
 }
 
-def GPUTensorAlloc :
+def GPUTensorAllocPass :
     InterfacePass<"iree-codegen-gpu-tensor-alloc", "mlir::FunctionOpInterface"> {
   let summary = "Pass to create allocations for some tensor values to use"
                 "GPU shared memory";
   let constructor = "mlir::iree_compiler::createGPUTensorAlloc()";
+  let dependentDialects = ["::mlir::bufferization::BufferizationDialect"];
 }
 
-def GPUTensorTile :
+def GPUTensorTilePass :
     InterfacePass<"iree-codegen-gpu-tensor-tile", "mlir::FunctionOpInterface"> {
   let summary = "Pass to tile tensor (linalg) ops within a GPU workgroup";
-  let constructor = "mlir::iree_compiler::createGPUTensorTile()";
+  let dependentDialects = [
+    "::mlir::affine::AffineDialect", "::mlir::gpu::GPUDialect", "::mlir::scf::SCFDialect"
+  ];
+  let options = [
+    Option<"distributeToSubgroup", "distribute-to-subgroup", "bool",
+           /*default=*/"false",
+           "Distribute the workloads to subgroup if true, otherwise distribute to threads.">,
+  ];
 }
 
-def GPUTensorTileToSerialLoops :
+def GPUTensorTileToSerialLoopsPass :
     InterfacePass<"iree-codegen-gpu-tensor-tile-to-serial-loops", "mlir::FunctionOpInterface"> {
   let summary = "Pass to tile reduction dimensions for certain GPU ops";
-  let constructor = "mlir::iree_compiler::createGPUTensorTileToSerialLoops()";
+  let dependentDialects = ["::mlir::scf::SCFDialect"];
+  let options = [
+    Option<"coalesceLoops", "coalesce-loops", "bool", /*default=*/"false",
+           "Collapse the loops that are generated to a single loops">,
+  ];
 }
 
-def GPUTile : InterfacePass<"iree-codegen-gpu-tile", "mlir::FunctionOpInterface"> {
+def GPUTilePass : InterfacePass<"iree-codegen-gpu-tile", "mlir::FunctionOpInterface"> {
   let summary = "Tile Linalg ops with tensor semantics to invocations";
-  let constructor = "mlir::iree_compiler::createGPUTilePass()";
 }
 
-def GPUTileReduction :
+def GPUTileReductionPass :
     InterfacePass<"iree-codegen-gpu-tile-reduction", "mlir::FunctionOpInterface"> {
   let summary = "Pass to tile linalg reduction dimensions.";
-  let constructor = "mlir::iree_compiler::createGPUTileReductionPass()";
+  let dependentDialects = ["::mlir::scf::SCFDialect"];
 }
 
-def GPUVectorAlloc :
+def GPUVectorAllocPass :
     InterfacePass<"iree-codegen-gpu-vector-alloc", "mlir::FunctionOpInterface"> {
   let summary = "Pass to create allocations for contraction inputs to copy "
                 "to GPU shared memory";
-  let constructor = "mlir::iree_compiler::createGPUVectorAlloc()";
+  let dependentDialects = [
+    "::mlir::gpu::GPUDialect", "::mlir::bufferization::BufferizationDialect"
+  ];
 }
 
-def VectorReductionToGPU :
-    InterfacePass<"iree-codegen-vector-reduction-to-gpu", "mlir::FunctionOpInterface"> {
-  let summary = "Convert vector reduction to GPU ops.";
-  let constructor = "mlir::iree_compiler::createConvertVectorReductionToGPUPass()";
-}
-
-def WorkgroupSpecialization :
-    InterfacePass<"iree-codegen-workgroup-specialization", "mlir::FunctionOpInterface"> {
-  let summary = "Specialize workgroup distribution loops";
-  let constructor = "mlir::iree_compiler::createWorkgroupSpecializationPass()";
-}
-
-def ReorderWorkgroups :
+def ReorderWorkgroupsPass :
     InterfacePass<"iree-codegen-reorder-workgroups", "mlir::FunctionOpInterface"> {
   let summary = "Reorder workgroup ids for better cache reuse";
   let constructor = "mlir::iree_compiler::createReorderWorkgroups()";
+  let dependentDialects = ["::mlir::affine::AffineDialect"];
   let options = [
     Option<"strategy", "strategy", "std::string", /*default=*/"",
            "Workgroup reordering strategy, one of: '' (none),  'transpose', 'swizzle'">,
     Option<"logTile", "logTile", "unsigned",
             /*default=*/"0",
            "The log2 of the tile size used for swizzling. (0: disabled, non-0: swizzling enabled)">,
+  ];
+}
+
+def VectorReductionToGPUPass :
+    InterfacePass<"iree-codegen-vector-reduction-to-gpu", "mlir::FunctionOpInterface"> {
+  let summary = "Convert vector reduction to GPU ops.";
+  let constructor = "mlir::iree_compiler::createConvertVectorReductionToGPUPass()";
+  let dependentDialects = [
+    "::mlir::affine::AffineDialect", "::mlir::gpu::GPUDialect",
+    "::mlir::memref::MemRefDialect", "::mlir::scf::SCFDialect",
+  ];
+}
+
+def WorkgroupSpecializationPass :
+    InterfacePass<"iree-codegen-workgroup-specialization", "mlir::FunctionOpInterface"> {
+  let summary = "Specialize workgroup distribution loops";
+  let dependentDialects = [
+    "::mlir::affine::AffineDialect", "::mlir::linalg::LinalgDialect",
+    "::mlir::scf::SCFDialect", "::mlir::tensor::TensorDialect",
   ];
 }
 

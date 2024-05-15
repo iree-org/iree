@@ -17,5 +17,5 @@ export PATH="$PYTHON_SCRIPTS_DIR:$PATH"
 # TODO(scotttodd): use iree-tools-tf wheel on CI instead of this source code
 "${IREE_PYTHON3_EXECUTABLE}" -m pip install integrations/tensorflow/python_projects/iree_tf integrations/tensorflow/python_projects/iree_tflite
 
-# Install test requirements (notably tensorflow/tf-nightly)
+# Install test requirements (notably tensorflow)
 "${IREE_PYTHON3_EXECUTABLE}" -m pip install -r integrations/tensorflow/test/requirements.txt

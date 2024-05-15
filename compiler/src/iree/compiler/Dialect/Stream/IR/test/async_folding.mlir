@@ -288,6 +288,68 @@ util.func private @FoldLocalAsyncUpdateOp(%arg0: !stream.resource<*>, %arg1: ind
 
 // -----
 
+// CHECK-LABEL: @ElideInPlaceUpdateUpdate
+util.func private @ElideInPlaceUpdateUpdate(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.resource<*>, %arg3: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  // CHECK: %[[RESULT:.+]] = stream.async.update %arg0, %arg2[%c0 to %arg1] : !stream.resource<*>{%arg1} -> %arg2 as !stream.resource<*>{%arg3}
+  %0 = stream.async.update %arg0, %arg2[%c0 to %arg1] : !stream.resource<*>{%arg1} -> %arg2 as !stream.resource<*>{%arg3}
+  // CHECK-NOT: stream.async.update
+  %1 = stream.async.update %0, %arg2[%c0 to %arg3] : !stream.resource<*>{%arg3} -> %arg2 as !stream.resource<*>{%arg3}
+  // CHECK: util.return %[[RESULT]]
+  util.return %1 : !stream.resource<*>
+}
+
+// -----
+
+// CHECK-LABEL: @ElideInPlaceUpdateDispatch
+util.func private @ElideInPlaceUpdateDispatch(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  // CHECK: %[[RESULT:.+]] = stream.async.dispatch @ex::@fn(%arg0[%c0 to %arg1 for %arg1]) : (!stream.resource<*>{%arg1}) -> %arg0{%arg1}
+  %0 = stream.async.dispatch @ex::@fn(%arg0[%c0 to %arg1 for %arg1]) : (!stream.resource<*>{%arg1}) -> %arg0{%arg1}
+  // CHECK-NOT: stream.async.update
+  %1 = stream.async.update %0, %arg0[%c0 to %arg1] : !stream.resource<*>{%arg1} -> %arg0 as !stream.resource<*>{%arg1}
+  // CHECK: util.return %[[RESULT]]
+  util.return %1 : !stream.resource<*>
+}
+
+// -----
+
+// Tests that multiple users of the produced value will still allow the update
+// to be elided so long as they are reads.
+
+// CHECK-LABEL: @ElideInPlaceUpdateDispatchMultiUse
+util.func private @ElideInPlaceUpdateDispatchMultiUse(%arg0: !stream.resource<*>, %arg1: index) -> (!stream.resource<*>, !stream.resource<*>) {
+  %c0 = arith.constant 0 : index
+  // CHECK: %[[RESULT0:.+]] = stream.async.dispatch @ex::@fn0(%arg0[%c0 to %arg1 for %arg1]) : (!stream.resource<*>{%arg1}) -> %arg0{%arg1}
+  %0 = stream.async.dispatch @ex::@fn0(%arg0[%c0 to %arg1 for %arg1]) : (!stream.resource<*>{%arg1}) -> %arg0{%arg1}
+  // CHECK-NOT: stream.async.update
+  %1 = stream.async.update %0, %arg0[%c0 to %arg1] : !stream.resource<*>{%arg1} -> %arg0 as !stream.resource<*>{%arg1}
+  // CHECK: %[[RESULT1:.+]] = stream.async.dispatch @ex::@fn1(%[[RESULT0]][%c0 to %arg1 for %arg1]) : (!stream.resource<*>{%arg1}) -> !stream.resource<*>{%arg1}
+  %2 = stream.async.dispatch @ex::@fn1(%0[%c0 to %arg1 for %arg1]) : (!stream.resource<*>{%arg1}) -> !stream.resource<*>{%arg1}
+  // CHECK: util.return %[[RESULT0]], %[[RESULT1]]
+  util.return %1, %2 : !stream.resource<*>, !stream.resource<*>
+}
+
+// -----
+
+// Tests that writes on the update source will fail to elide the update.
+// TODO(benvanik): support looking for writes only prior to the update that are
+// known-safe.
+
+// CHECK-LABEL: @ElideInPlaceUpdateDispatchMultiUseWrite
+util.func private @ElideInPlaceUpdateDispatchMultiUseWrite(%arg0: !stream.resource<*>, %arg1: index) -> (!stream.resource<*>, !stream.resource<*>) {
+  %c0 = arith.constant 0 : index
+  // CHECK: stream.async.dispatch @ex::@fn0
+  %0 = stream.async.dispatch @ex::@fn0(%arg0[%c0 to %arg1 for %arg1]) : (!stream.resource<*>{%arg1}) -> %arg0{%arg1}
+  // CHECK: stream.async.update
+  %1 = stream.async.update %0, %arg0[%c0 to %arg1] : !stream.resource<*>{%arg1} -> %arg0 as !stream.resource<*>{%arg1}
+  // CHECK: stream.async.dispatch @ex::@fn1
+  %2 = stream.async.dispatch @ex::@fn1(%0[%c0 to %arg1 for %arg1]) : (!stream.resource<*>{%arg1}) -> %0{%arg1}
+  util.return %1, %2 : !stream.resource<*>, !stream.resource<*>
+}
+
+// -----
+
 // CHECK-LABEL: @CombineSplatUpdateFromToFill
 util.func private @CombineSplatUpdateFromToFill(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index

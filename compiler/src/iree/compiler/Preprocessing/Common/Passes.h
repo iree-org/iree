@@ -26,12 +26,10 @@ enum class PadTargetType {
 };
 
 enum class TransposeMatmulInput {
-  /// Transpose LHS input matrix.
+  // Transpose LHS input matrix.
   Lhs,
-  /// Transpose RHS input matrix.
-  Rhs,
-  /// Transpose neither input (disable).
-  None
+  // Transpose RHS input matrix.
+  Rhs
 };
 
 //===----------------------------------------------------------------------===//

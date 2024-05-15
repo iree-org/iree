@@ -39,4 +39,4 @@ func.func @broadcast_extui() -> vector<1x1x64xi32> {
 }
 // CHECK-LABEL: func @broadcast_extui()
 //   CHECK-NOT:   vector.bitcast
-//       CHECK:   vector.shuffle
+//       CHECK:   vector.interleave

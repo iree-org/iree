@@ -2094,8 +2094,8 @@ func.func @vecmat(%arg0: tensor<128xi8>, %arg1: tensor<128x11008xi8>) -> tensor<
 //  CHECK-NEXT:       %[[RHS_EXT_OP:.+]] = arith.extsi %[[RHS_EXT_ARG_IN]] : i8 to i32
 //  CHECK-NEXT:       linalg.yield %[[RHS_EXT_OP]] : i32
 //       CHECK:   %[[INIT_FILL:.+]] = tensor.empty() : tensor<688x16xi32>
-//       CHECK:   %[[EXPAND_LHS:.+]] = tensor.expand_shape %[[LHS_EXT]] {{\[}}[0, 1], [2, 3]] : tensor<64x2xi32> into tensor<1x64x1x2xi32>
-//       CHECK:   %[[EXPAND_INIT:.+]] = tensor.expand_shape %[[INIT_FILL:.+]] {{\[}}[0, 1], [2, 3]] : tensor<688x16xi32> into tensor<1x688x1x16xi32>
+//       CHECK:   %[[EXPAND_LHS:.+]] = tensor.expand_shape %[[LHS_EXT]] {{\[}}[0, 1], [2, 3]] output_shape [1, 64, 1, 2] : tensor<64x2xi32> into tensor<1x64x1x2xi32>
+//       CHECK:   %[[EXPAND_INIT:.+]] = tensor.expand_shape %[[INIT_FILL:.+]] {{\[}}[0, 1], [2, 3]] output_shape [1, 688, 1, 16] : tensor<688x16xi32> into tensor<1x688x1x16xi32>
 //       CHECK:   %[[FILL:.+]] = linalg.fill ins(%[[C0_I32]] : i32) outs(%[[EXPAND_INIT]] : tensor<1x688x1x16xi32>) -> tensor<1x688x1x16xi32>
 //       CHECK:   %[[MMT4D:.+]] = linalg.mmt4d ins(%[[EXPAND_LHS]], %[[RHS_EXT]] : tensor<1x64x1x2xi32>, tensor<688x64x16x2xi32>) outs(%[[FILL]] : tensor<1x688x1x16xi32>) -> tensor<1x688x1x16xi32>
 //       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[MMT4D]] {{\[}}[0, 1], [2, 3]] : tensor<1x688x1x16xi32> into tensor<688x16xi32>
@@ -2167,8 +2167,8 @@ func.func @matvec(%arg0: tensor<11008x128xi8>, %arg1: tensor<128xi8>) -> tensor<
 //  CHECK-NEXT:       %[[RHS_EXT_OP:.+]] = arith.extsi %[[RHS_EXT_ARG_IN]] : i8 to i32
 //  CHECK-NEXT:       linalg.yield %[[RHS_EXT_OP]] : i32
 //       CHECK:   %[[INIT_FILL:.+]] = tensor.empty() : tensor<688x16xi32>
-//       CHECK:   %[[EXPAND_RHS:.+]] = tensor.expand_shape %[[RHS_EXT]] {{\[}}[0, 1], [2, 3]] : tensor<64x2xi32> into tensor<1x64x1x2xi32>
-//       CHECK:   %[[EXPAND_INIT:.+]] = tensor.expand_shape %[[INIT_FILL:.+]] {{\[}}[0, 1], [2, 3]] : tensor<688x16xi32> into tensor<688x1x16x1xi32>
+//       CHECK:   %[[EXPAND_RHS:.+]] = tensor.expand_shape %[[RHS_EXT]] {{\[}}[0, 1], [2, 3]] output_shape [1, 64, 1, 2] : tensor<64x2xi32> into tensor<1x64x1x2xi32>
+//       CHECK:   %[[EXPAND_INIT:.+]] = tensor.expand_shape %[[INIT_FILL:.+]] {{\[}}[0, 1], [2, 3]] output_shape [688, 1, 16, 1] : tensor<688x16xi32> into tensor<688x1x16x1xi32>
 //       CHECK:   %[[FILL:.+]] = linalg.fill ins(%[[C0_I32]] : i32) outs(%[[EXPAND_INIT]] : tensor<688x1x16x1xi32>) -> tensor<688x1x16x1xi32>
 //       CHECK:   %[[MMT4D:.+]] = linalg.mmt4d ins(%[[LHS_EXT]], %[[EXPAND_RHS]]  : tensor<688x64x16x2xi32>, tensor<1x64x1x2xi32>) outs(%[[FILL]] : tensor<688x1x16x1xi32>) -> tensor<688x1x16x1xi32>
 //       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[MMT4D]] {{\[}}[0, 1], [2, 3]] : tensor<688x1x16x1xi32> into tensor<688x16xi32>
@@ -2241,8 +2241,8 @@ func.func @matvec_with_narrow_M(%arg0: tensor<15x128xi8>, %arg1: tensor<128xi8>)
 //  CHECK-NEXT:       %[[RHS_EXT_OP:.+]] = arith.extsi %[[RHS_EXT_ARG_IN]] : i8 to i32
 //  CHECK-NEXT:       linalg.yield %[[RHS_EXT_OP]] : i32
 //       CHECK:   %[[INIT_FILL:.+]] = tensor.empty() : tensor<1x16xi32>
-//       CHECK:   %[[EXPAND_RHS:.+]] = tensor.expand_shape %[[RHS_EXT]] {{\[}}[0, 1], [2, 3]] : tensor<64x2xi32> into tensor<1x64x1x2xi32>
-//       CHECK:   %[[EXPAND_INIT:.+]] = tensor.expand_shape %[[INIT_FILL:.+]] {{\[}}[0, 1], [2, 3]] : tensor<1x16xi32> into tensor<1x1x16x1xi32>
+//       CHECK:   %[[EXPAND_RHS:.+]] = tensor.expand_shape %[[RHS_EXT]] {{\[}}[0, 1], [2, 3]] output_shape [1, 64, 1, 2] : tensor<64x2xi32> into tensor<1x64x1x2xi32>
+//       CHECK:   %[[EXPAND_INIT:.+]] = tensor.expand_shape %[[INIT_FILL:.+]] {{\[}}[0, 1], [2, 3]] output_shape [1, 1, 16, 1] : tensor<1x16xi32> into tensor<1x1x16x1xi32>
 //       CHECK:   %[[FILL:.+]] = linalg.fill ins(%[[C0_I32]] : i32) outs(%[[EXPAND_INIT]] : tensor<1x1x16x1xi32>) -> tensor<1x1x16x1xi32>
 //       CHECK:   %[[MMT4D:.+]] = linalg.mmt4d ins(%[[LHS_EXT]], %[[EXPAND_RHS]]  : tensor<1x64x16x2xi32>, tensor<1x64x1x2xi32>) outs(%[[FILL]] : tensor<1x1x16x1xi32>) -> tensor<1x1x16x1xi32>
 //       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[MMT4D]] {{\[}}[0, 1], [2, 3]] : tensor<1x1x16x1xi32> into tensor<1x16xi32>
@@ -2315,8 +2315,8 @@ func.func @batch_vecmat(%arg0: tensor<32x128xi8>, %arg1: tensor<32x128x11008xi8>
 //  CHECK-NEXT:       %[[RHS_EXT_OP:.+]] = arith.extsi %[[RHS_EXT_ARG_IN]] : i8 to i32
 //  CHECK-NEXT:       linalg.yield %[[RHS_EXT_OP]] : i32
 //   CHECK-DAG:   %[[INIT_FILL:.+]] = tensor.empty() : tensor<32x688x16xi32>
-//   CHECK-DAG:   %[[EXPAND_LHS:.+]] = tensor.expand_shape %[[LHS_EXT]] {{\[}}[0], [1, 2], [3, 4]] : tensor<32x64x2xi32> into tensor<32x1x64x1x2xi32>
-//   CHECK-DAG:   %[[EXPAND_INIT:.+]] = tensor.expand_shape %[[INIT_FILL:.+]] {{\[}}[0], [1, 2], [3, 4]] : tensor<32x688x16xi32> into tensor<32x1x688x1x16xi32>
+//   CHECK-DAG:   %[[EXPAND_LHS:.+]] = tensor.expand_shape %[[LHS_EXT]] {{\[}}[0], [1, 2], [3, 4]] output_shape [32, 1, 64, 1, 2] : tensor<32x64x2xi32> into tensor<32x1x64x1x2xi32>
+//   CHECK-DAG:   %[[EXPAND_INIT:.+]] = tensor.expand_shape %[[INIT_FILL:.+]] {{\[}}[0], [1, 2], [3, 4]] output_shape [32, 1, 688, 1, 16] : tensor<32x688x16xi32> into tensor<32x1x688x1x16xi32>
 //   CHECK-DAG:   %[[FILL:.+]] = linalg.fill ins(%[[C0_I32]] : i32) outs(%[[EXPAND_INIT]] : tensor<32x1x688x1x16xi32>) -> tensor<32x1x688x1x16xi32>
 //       CHECK:   %[[MMT4D:.+]] = linalg.batch_mmt4d ins(%[[EXPAND_LHS]], %[[RHS_EXT]] : tensor<32x1x64x1x2xi32>, tensor<32x688x64x16x2xi32>) outs(%[[FILL]] : tensor<32x1x688x1x16xi32>) -> tensor<32x1x688x1x16xi32>
 //       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[MMT4D]] {{\[}}[0], [1, 2], [3, 4]] : tensor<32x1x688x1x16xi32> into tensor<32x688x16xi32>
@@ -2389,8 +2389,8 @@ func.func @batch_matvec(%arg0: tensor<32x11008x128xi8>, %arg1: tensor<32x128xi8>
 //  CHECK-NEXT:       %[[RHS_EXT_OP:.+]] = arith.extsi %[[RHS_EXT_ARG_IN]] : i8 to i32
 //  CHECK-NEXT:       linalg.yield %[[RHS_EXT_OP]] : i32
 //       CHECK:   %[[INIT_FILL:.+]] = tensor.empty() : tensor<32x688x16xi32>
-//       CHECK:   %[[EXPAND_RHS:.+]] = tensor.expand_shape %[[RHS_EXT]] {{\[}}[0], [1, 2], [3, 4]] : tensor<32x64x2xi32> into tensor<32x1x64x1x2xi32>
-//       CHECK:   %[[EXPAND_INIT:.+]] = tensor.expand_shape %[[INIT_FILL:.+]] {{\[}}[0], [1, 2], [3, 4]] : tensor<32x688x16xi32> into tensor<32x688x1x16x1xi32>
+//       CHECK:   %[[EXPAND_RHS:.+]] = tensor.expand_shape %[[RHS_EXT]] {{\[}}[0], [1, 2], [3, 4]] output_shape [32, 1, 64, 1, 2] : tensor<32x64x2xi32> into tensor<32x1x64x1x2xi32>
+//       CHECK:   %[[EXPAND_INIT:.+]] = tensor.expand_shape %[[INIT_FILL:.+]] {{\[}}[0], [1, 2], [3, 4]] output_shape [32, 688, 1, 16, 1] : tensor<32x688x16xi32> into tensor<32x688x1x16x1xi32>
 //       CHECK:   %[[FILL:.+]] = linalg.fill ins(%[[C0_I32]] : i32) outs(%[[EXPAND_INIT]] : tensor<32x688x1x16x1xi32>) -> tensor<32x688x1x16x1xi32>
 //       CHECK:   %[[MMT4D:.+]] = linalg.batch_mmt4d ins(%[[LHS_EXT]], %[[EXPAND_RHS]] : tensor<32x688x64x16x2xi32>, tensor<32x1x64x1x2xi32>) outs(%[[FILL]] : tensor<32x688x1x16x1xi32>) -> tensor<32x688x1x16x1xi32>
 //       CHECK:   %[[COLLAPSED:.+]] = tensor.collapse_shape %[[MMT4D]] {{\[}}[0], [1, 2], [3, 4]] : tensor<32x688x1x16x1xi32> into tensor<32x688x16xi32>
@@ -2693,7 +2693,7 @@ func.func @generic_batch_vecmat_transposed_i16u4i32(%arg0: tensor<32x128xi16>, %
 //  CHECK-SAME:   %[[LHS:.+]]: tensor<32x128xi16>, %[[RHS:.+]]: tensor<4096x32x128xi4>, %[[RESULT:.+]]: tensor<4096x32xi32>) -> tensor<4096x32xi32>
 //   CHECK-DAG:   %[[PACK_LHS_DEST:.+]] = tensor.empty() : tensor<32x16x8xi16>
 //   CHECK-DAG:   %[[PACK_LHS:.+]] = tensor.pack %[[LHS]] outer_dims_perm = [0, 1] inner_dims_pos = [1] inner_tiles = [8] into %[[PACK_LHS_DEST]] : tensor<32x128xi16> -> tensor<32x16x8xi16>
-//   CHECK-DAG:   %[[EXPAND_LHS:.+]] = tensor.expand_shape %[[PACK_LHS]] {{.*}} : tensor<32x16x8xi16> into tensor<32x1x16x1x8xi16>
+//   CHECK-DAG:   %[[EXPAND_LHS:.+]] = tensor.expand_shape %[[PACK_LHS]] {{.*}} output_shape [32, 1, 16, 1, 8] : tensor<32x16x8xi16> into tensor<32x1x16x1x8xi16>
 //   CHECK-DAG:   %[[PACK_RHS_DEST:.+]] = tensor.empty() : tensor<32x128x16x32x8xi4>
 //   CHECK-DAG:   %[[PACK_RHS:.+]] = tensor.pack %[[RHS]] outer_dims_perm = [1, 0, 2] inner_dims_pos = [0, 2] inner_tiles = [32, 8] into %[[PACK_RHS_DEST]] : tensor<4096x32x128xi4> -> tensor<32x128x16x32x8xi4>
 //   CHECK-DAG:   %[[PACK_RES_DEST:.+]] = tensor.empty() : tensor<32x128x32xi32>
@@ -2703,7 +2703,7 @@ func.func @generic_batch_vecmat_transposed_i16u4i32(%arg0: tensor<32x128xi16>, %
 //  CHECK-SAME:       indexing_maps = [#[[$MAP]], #[[$MAP]]]
 //  CHECK-SAME:       ins(%[[PACK_RHS]] : tensor<32x128x16x32x8xi4>)
 //  CHECK-SAME:       outs(%[[EXTEND_DEST]] : tensor<32x128x16x32x8xi32>)
-//       CHECK:   %[[EXPAND_RES:.+]] = tensor.expand_shape %[[PACK_RES]] {{.*}} : tensor<32x128x32xi32> into tensor<32x1x128x1x32xi32>
+//       CHECK:   %[[EXPAND_RES:.+]] = tensor.expand_shape %[[PACK_RES]] {{.*}} output_shape [32, 1, 128, 1, 32] : tensor<32x128x32xi32> into tensor<32x1x128x1x32xi32>
 //       CHECK:   %[[BATCH_MMT4D:.+]] = linalg.batch_mmt4d
 //  CHECK-SAME:       ins(%[[EXPAND_LHS]], %[[EXTEND]] :
 //  CHECK-SAME:       outs(%[[EXPAND_RES]] :

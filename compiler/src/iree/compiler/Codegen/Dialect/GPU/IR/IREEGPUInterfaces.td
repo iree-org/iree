@@ -85,6 +85,25 @@ def IREEGPU_MmaInterfaceAttr : AttrInterface<"MmaInterfaceAttr"> {
       /*methodName=*/"getSubgroupSize",
       /*args=*/(ins)
     >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Constructs a concrete instance of the associated mma operation.
+      }],
+      /*retTy=*/"::mlir::FailureOr<::mlir::Value>",
+      /*methodName=*/"buildMmaOperation",
+      /*args=*/(ins
+        "::mlir::OpBuilder&":$builder,
+        "::mlir::Location":$loc,
+        "::mlir::Type":$result_type,
+        "::mlir::Value":$lhs,
+        "::mlir::Value":$rhs,
+        "::mlir::Value":$acc
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return failure();
+      }]
+    >,
   ];
 }
 

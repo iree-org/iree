@@ -11,7 +11,7 @@
 # build_tools/docker/docker_run.sh if IREE_DOCKER_WRAPPER is not specified. See
 # the script to learn about the required setup.
 #
-# IREE_NORMAL_BENCHMARK_TOOLS_DIR needs to point to a directory contains IREE
+# IREE_BENCHMARK_TOOLS_DIR needs to point to a directory contains IREE
 # benchmark tools. See benchmarks/README.md for more information.
 #
 # Command line arguments:
@@ -20,20 +20,16 @@
 # 3. The target device name
 # 4. The shard index
 # 5. The path to write benchmark results
-# 6. The path to write benchmark traces
 
 set -euo pipefail
 
 DOCKER_WRAPPER="${IREE_DOCKER_WRAPPER:-./build_tools/docker/docker_run.sh}"
-NORMAL_BENCHMARK_TOOLS_DIR="${IREE_NORMAL_BENCHMARK_TOOLS_DIR}"
-TRACED_BENCHMARK_TOOLS_DIR="${IREE_TRACED_BENCHMARK_TOOLS_DIR}"
-TRACY_CAPTURE_TOOL="${IREE_TRACY_CAPTURE_TOOL}"
+BENCHMARK_TOOLS_DIR="${IREE_BENCHMARK_TOOLS_DIR}"
 E2E_TEST_ARTIFACTS_DIR="${1:-${IREE_E2E_TEST_ARTIFACTS_DIR}}"
 EXECUTION_BENCHMARK_CONFIG="${2:-${IREE_EXECUTION_BENCHMARK_CONFIG}}"
 TARGET_DEVICE_NAME="${3:-${IREE_TARGET_DEVICE_NAME}}"
 SHARD_INDEX="${4:-${IREE_SHARD_INDEX}}"
 BENCHMARK_RESULTS="${5:-${IREE_BENCHMARK_RESULTS}}"
-BENCHMARK_TRACES="${6:-${IREE_BENCHMARK_TRACES}}"
 
 if [[ "${TARGET_DEVICE_NAME}" == "a2-highgpu-1g" ]]; then
   ${DOCKER_WRAPPER} \
@@ -41,25 +37,18 @@ if [[ "${TARGET_DEVICE_NAME}" == "a2-highgpu-1g" ]]; then
     --env NVIDIA_DRIVER_CAPABILITIES=all \
     gcr.io/iree-oss/nvidia-bleeding-edge@sha256:81b3b5485f962c978bb7e5b2a6ded44ae4ef432048cafffe2b74fcf6dbe1bbca \
       ./build_tools/benchmarks/run_benchmarks_on_linux.py \
-        --normal_benchmark_tool_dir="${NORMAL_BENCHMARK_TOOLS_DIR}" \
+        --benchmark_tool_dir="${BENCHMARK_TOOLS_DIR}" \
         --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR}" \
         --execution_benchmark_config="${EXECUTION_BENCHMARK_CONFIG}" \
         --target_device_name="${TARGET_DEVICE_NAME}" \
         --shard_index="${SHARD_INDEX}" \
         --output="${BENCHMARK_RESULTS}" \
         --verbose
-        # TODO(#16157): Renable tracy capture after fixing unresponsiveness.
-        # --traced_benchmark_tool_dir="${TRACED_BENCHMARK_TOOLS_DIR}" \
-        # --trace_capture_tool="${TRACY_CAPTURE_TOOL}" \
-        # --capture_tarball="${BENCHMARK_TRACES}" \
 elif [[ "${TARGET_DEVICE_NAME}" == "c2-standard-60" ]]; then
   ${DOCKER_WRAPPER} \
     gcr.io/iree-oss/base-bleeding-edge@sha256:c5f28883e6c570c20128fb37d7af3a00a25df3ce4e2b3a24c3a8dcd183182a27 \
       ./build_tools/benchmarks/run_benchmarks_on_linux.py \
-        --normal_benchmark_tool_dir="${NORMAL_BENCHMARK_TOOLS_DIR}" \
-        --traced_benchmark_tool_dir="${TRACED_BENCHMARK_TOOLS_DIR}" \
-        --trace_capture_tool="${TRACY_CAPTURE_TOOL}" \
-        --capture_tarball="${BENCHMARK_TRACES}" \
+        --benchmark_tool_dir="${BENCHMARK_TOOLS_DIR}" \
         --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR}" \
         --execution_benchmark_config="${EXECUTION_BENCHMARK_CONFIG}" \
         --target_device_name="${TARGET_DEVICE_NAME}" \
@@ -70,10 +59,7 @@ elif [[ "${TARGET_DEVICE_NAME}" == "c2-standard-60" ]]; then
         --verbose
 elif [[ "${TARGET_DEVICE_NAME}" =~ ^(pixel-4|pixel-6-pro|moto-edge-x30)$ ]]; then
   ./build_tools/benchmarks/run_benchmarks_on_android.py \
-    --normal_benchmark_tool_dir="${NORMAL_BENCHMARK_TOOLS_DIR}" \
-    --traced_benchmark_tool_dir="${TRACED_BENCHMARK_TOOLS_DIR}" \
-    --trace_capture_tool="${TRACY_CAPTURE_TOOL}" \
-    --capture_tarball="${BENCHMARK_TRACES}" \
+    --benchmark_tool_dir="${BENCHMARK_TOOLS_DIR}" \
     --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR}" \
     --execution_benchmark_config="${EXECUTION_BENCHMARK_CONFIG}" \
     --target_device_name="${TARGET_DEVICE_NAME}" \

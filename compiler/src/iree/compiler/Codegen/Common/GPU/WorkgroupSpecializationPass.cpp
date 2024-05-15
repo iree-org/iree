@@ -28,7 +28,6 @@
 //
 //===---------------------------------------------------------------------===//
 
-#include "iree/compiler/Codegen/Common/GPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "llvm/Support/CommandLine.h"
@@ -37,11 +36,16 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 
 #define DEBUG_TYPE "iree-codegen-workgroup-specialization"
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_WORKGROUPSPECIALIZATIONPASS
+#include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
+
+namespace {
 static llvm::cl::opt<bool> clEnableWorkgroupSpecialization(
     "iree-codegen-enable-workgroup-specialization",
     llvm::cl::desc("Enable workgroup specialization."), llvm::cl::init(true));
@@ -147,27 +151,16 @@ static void specializeFunction(mlir::FunctionOpInterface funcOp) {
   return;
 }
 
-namespace {
-struct WorkgroupSpecializationPass
-    : public WorkgroupSpecializationBase<WorkgroupSpecializationPass> {
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<affine::AffineDialect, linalg::LinalgDialect,
-                    scf::SCFDialect, tensor::TensorDialect>();
-  }
-
+struct WorkgroupSpecializationPass final
+    : impl::WorkgroupSpecializationPassBase<WorkgroupSpecializationPass> {
   void runOnOperation() override {
     if (!clEnableWorkgroupSpecialization)
       return;
 
-    auto funcOp = getOperation();
+    FunctionOpInterface funcOp = getOperation();
     specializeFunction(funcOp);
   }
 };
+
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createWorkgroupSpecializationPass() {
-  return std::make_unique<WorkgroupSpecializationPass>();
-}
-
 } // namespace mlir::iree_compiler

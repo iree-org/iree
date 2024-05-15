@@ -110,17 +110,13 @@ Run benchmarks (currently only support running on a Linux host):
 
 ```sh
 build_tools/benchmarks/run_benchmarks_on_linux.py \
-  --normal_benchmark_tool_dir="${IREE_BUILD_DIR?}/tools" \
+  --benchmark_tool_dir="${IREE_BUILD_DIR?}/tools" \
   --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR?}" \
   --execution_benchmark_config="${E2E_TEST_ARTIFACTS_DIR?}/exec_config.json" \
   --target_device_name="<target_device_name, e.g. c2-standard-60>" \
   --output="${E2E_TEST_ARTIFACTS_DIR?}/benchmark_results.json" \
   --verbose \
   --cpu_uarch="<host CPU uarch, e.g. CascadeLake>"
-# Traces can be collected by adding:
-# --traced_benchmark_tool_dir="${IREE_TRACED_BUILD_DIR?}/tools" \
-# --trace_capture_tool=/path/to/iree-tracy-capture \
-# --capture_tarball=captured_tracy_files.tar.gz
 ```
 
 Note that:
@@ -133,14 +129,12 @@ Note that:
         [build_tools/python/e2e_test_framework/device_specs](https://github.com/iree-org/iree/tree/main/build_tools/python/e2e_test_framework/device_specs).
 - To run x86_64 benchmarks, right now `--cpu_uarch` needs to be provided and
     only `CascadeLake` is available currently.
-- To build traced benchmark tools, see
-    [Profiling with Tracy](profiling-with-tracy.md).
 
 Filters can be used to select the benchmarks:
 
 ```sh
 build_tools/benchmarks/run_benchmarks_on_linux.py \
-  --normal_benchmark_tool_dir="${IREE_BUILD_DIR?}/tools" \
+  --benchmark_tool_dir="${IREE_BUILD_DIR?}/tools" \
   --e2e_test_artifacts_dir="${E2E_TEST_ARTIFACTS_DIR?}" \
   --execution_benchmark_config="${E2E_TEST_ARTIFACTS_DIR?}/exec_config.json" \
   --target_device_name="c2-standard-60" \
@@ -303,7 +297,7 @@ gcloud storage cp \
   "${E2E_TEST_ARTIFACTS_DIR?}/comp_config.json"
 ```
 
-Benchmark raw results and traces can be downloaded at:
+Benchmark raw results can be downloaded at:
 
 ```sh
 # Execution benchmark raw results
@@ -311,9 +305,6 @@ gcloud storage cp "${EXECUTION_BENCHMARK_RESULTS_DIR_URL?}/benchmark-results-*.j
 
 # Optional: Merge raw results into a single file
 build_tools/benchmarks/benchmark_helper.py merge-results benchmark-results-*.json > benchmark_results.json
-
-# Execution benchmark traces
-gcloud storage cp "${EXECUTION_BENCHMARK_RESULTS_DIR_URL?}/benchmark-traces-*.tar.gz" .
 
 # Compilation benchmark results
 gcloud storage cp "${COMPILATION_BENCHMARK_RESULTS_URL?}" .

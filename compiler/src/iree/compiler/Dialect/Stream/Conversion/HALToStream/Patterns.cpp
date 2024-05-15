@@ -136,53 +136,106 @@ struct ConvertTensorExportOp
     auto affinityAttr = IREE::Stream::AffinityAttr::lookup(op);
     auto source =
         consumeTensorOperand(op.getLoc(), adaptor.getSource(), rewriter);
+
+    // Exporting a produced value - transfer our source value to an externally
+    // usable resource and directly export it. This will cause an allocation.
+    auto exportSource = adaptor.getSource();
     auto externalType = rewriter.getType<IREE::Stream::ResourceType>(
         IREE::Stream::Lifetime::External);
-    auto exportSource = adaptor.getSource();
-    auto exportSize = source.resourceSize;
-    if (adaptor.getTargetStorage()) {
-      // Query the target storage buffer length; we will only populate up to
-      // what is required for the output.
-      auto storageSize = rewriter.createOrFold<IREE::Stream::TensorSizeOfOp>(
-          op.getLoc(), rewriter.getIndexType(),
-          TypeAttr::get(op.getSource().getType()), adaptor.getSourceDims(),
-          affinityAttr);
-
-      // Import the target storage as a resource that we can use as an update
-      // target. We overwrite the contents and just cast the storage to the
-      // target type so we know we can update it.
-      auto importOp = rewriter.create<IREE::Stream::TensorImportOp>(
-          op.getLoc(), externalType, adaptor.getTargetStorage(),
-          TypeAttr::get(sourceType), adaptor.getSourceDims(), storageSize,
-          affinityAttr);
-
-      // Copy the source value into the imported target storage.
-      auto zeroOffset = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
-      auto updateOp = rewriter.create<IREE::Stream::AsyncUpdateOp>(
-          op.getLoc(), externalType, importOp.getResult(),
-          importOp.getResultSize(), zeroOffset, source.resourceSize,
-          source.resource, source.resourceSize, affinityAttr);
-
-      // Export the updated resource.
-      // NOTE: the buffer size wrapped in the buffer view is the full size of
-      // the input buffer. This is so that we don't insert a data dependency on
-      // sparse operations or data-dependent dynamic shape dimensions.
-      exportSource = updateOp.getResult();
-      exportSize = updateOp.getTargetSize();
-    } else {
-      // Exporting a produced value - transfer our source value to an externally
-      // usable resource and directly export it. This will cause an allocation.
-      if (source.resource.getType() != externalType) {
-        exportSource = rewriter.create<IREE::Stream::AsyncTransferOp>(
-            op.getLoc(), externalType, source.resource, source.resourceSize,
-            source.resourceSize, affinityAttr, affinityAttr);
-      }
+    if (source.resource.getType() != externalType) {
+      exportSource = rewriter.create<IREE::Stream::AsyncTransferOp>(
+          op.getLoc(), externalType, source.resource, source.resourceSize,
+          source.resourceSize, affinityAttr, affinityAttr);
     }
 
     // Export (stream resource to buffer view).
     rewriter.replaceOpWithNewOp<IREE::Stream::TensorExportOp>(
         op, targetType, exportSource, TypeAttr::get(sourceType),
-        adaptor.getSourceDims(), exportSize, affinityAttr);
+        adaptor.getSourceDims(), source.resourceSize, affinityAttr);
+    return success();
+  }
+};
+
+// Imports the storage to alias as a resource, copies the source value into it,
+// and slices out the source value. This should allow allocation placement to
+// elide the update (and subsequently the slice) if possible and otherwise will
+// turn into a copy.
+//
+// Effectively:
+//   %2 = hal.tensor.alias %0 : tensor<4xf32> to %1 : !hal.buffer_view
+// ->
+//   %storage = stream.tensor.import %1 : !hal.buffer -> tensor<...>
+//   %update = stream.async.update %0, %storage[...]
+//   %2 = stream.async.slice %update[...]
+struct ConvertTensorAliasOp
+    : public OpConversionPattern<IREE::HAL::TensorAliasOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult
+  matchAndRewrite(IREE::HAL::TensorAliasOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto sourceType = op.getSource().getType();
+    auto source =
+        consumeTensorOperand(op.getLoc(), adaptor.getSource(), rewriter);
+
+    // All operations (if any) will happen on the device specified by the alias
+    // as that indicates the affinity of the storage.
+    auto affinityAttr = IREE::Stream::AffinityAttr::lookup(op);
+
+    // Query the target storage buffer length; we will only populate up to
+    // what is required for the output.
+    auto storageSize = rewriter.createOrFold<IREE::Stream::TensorSizeOfOp>(
+        op.getLoc(), rewriter.getIndexType(),
+        TypeAttr::get(op.getSource().getType()), adaptor.getSourceDims(),
+        affinityAttr);
+
+    // Import the target storage as a resource that we can use as an update
+    // target. We overwrite the contents and just cast the storage to the
+    // target type so we know we can update it.
+    auto externalType = rewriter.getType<IREE::Stream::ResourceType>(
+        IREE::Stream::Lifetime::External);
+    auto importOp = rewriter.create<IREE::Stream::TensorImportOp>(
+        op.getLoc(), externalType, adaptor.getStorage(),
+        TypeAttr::get(sourceType), adaptor.getSourceDims(), storageSize,
+        affinityAttr);
+
+    // Await the fence, if needed. When not specified the storage is assumed to
+    // be immediately available.
+    Value storage = importOp.getResult();
+    if (auto waitFence = op.getWaitFence()) {
+      Value waitTimepoint = rewriter.create<IREE::Stream::TimepointImportOp>(
+          op.getLoc(), rewriter.getType<IREE::Stream::TimepointType>(),
+          ValueRange{waitFence}, affinityAttr);
+      storage = rewriter
+                    .create<IREE::Stream::TimepointAwaitOp>(
+                        op.getLoc(), ValueRange{storage},
+                        ValueRange{storageSize}, waitTimepoint)
+                    .getResult(0);
+    }
+
+    // Copy the source value into the imported target storage.
+    auto zeroOffset = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
+    auto updateOp = rewriter.create<IREE::Stream::AsyncUpdateOp>(
+        op.getLoc(), externalType, storage, storageSize, zeroOffset,
+        source.resourceSize, source.resource, source.resourceSize,
+        affinityAttr);
+
+    // Slice out the value from the updated tensor.
+    // This preserves the use-def chain but is almost always elided by aliasing
+    // the input value later on.
+    auto sliceOp = rewriter.create<IREE::Stream::AsyncSliceOp>(
+        op.getLoc(), externalType, updateOp.getResult(),
+        updateOp.getTargetSize(), zeroOffset, source.resourceSize,
+        source.resourceSize, affinityAttr);
+
+    // Transfer to match original lifetime (if needed).
+    Value result = sliceOp.getResult();
+    if (source.resource.getType() != result.getType()) {
+      result = rewriter.create<IREE::Stream::AsyncTransferOp>(
+          op.getLoc(), source.resource.getType(), result, source.resourceSize,
+          source.resourceSize, affinityAttr, affinityAttr);
+    }
+    rewriter.replaceOp(op, result);
+
     return success();
   }
 };
@@ -233,6 +286,7 @@ void populateHALToStreamConversionPatterns(MLIRContext *context,
       [](IREE::HAL::BufferViewType type) { return type; });
   patterns.insert<ConvertTensorImportOp>(typeConverter, context);
   patterns.insert<ConvertTensorExportOp>(typeConverter, context);
+  patterns.insert<ConvertTensorAliasOp>(typeConverter, context);
   patterns.insert<ConvertTensorBarrierOp>(typeConverter, context);
 }
 

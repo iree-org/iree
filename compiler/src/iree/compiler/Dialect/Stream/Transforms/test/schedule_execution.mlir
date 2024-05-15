@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module( util.func(iree-stream-schedule-execution))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-stream-schedule-execution))" %s | FileCheck %s
 
 // Tests basic partitioning of multiple ops.
 

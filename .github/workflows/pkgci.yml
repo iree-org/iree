@@ -43,11 +43,12 @@ jobs:
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'regression_test_cpu')
     uses: ./.github/workflows/pkgci_regression_test_cpu.yml
 
-  regression_test_amdgpu_vulkan:
-    name: Regression Test AMDGPU-Vulkan
-    needs: [setup, build_packages]
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'regression_test_amdgpu_vulkan')
-    uses: ./.github/workflows/pkgci_regression_test_amdgpu_vulkan.yml
+  # TODO(#17370): re-enable when nodai-amdgpu-w7900-x86-64 runner is stable
+  # regression_test_amdgpu_vulkan:
+  #   name: Regression Test AMDGPU-Vulkan
+  #   needs: [setup, build_packages]
+  #   if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'regression_test_amdgpu_vulkan')
+  #   uses: ./.github/workflows/pkgci_regression_test_amdgpu_vulkan.yml
 
   regression_test_amdgpu_rocm:
     name: Regression Test AMDGPU-ROCm

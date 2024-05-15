@@ -118,8 +118,11 @@ splitAxis(TypedValue<RankedTensorType> tensor, int64_t splitAxis,
   RankedTensorType resultType = tensor.getType().clone(newShape);
   std::optional<SmallVector<ReassociationIndices>> reassociation =
       getReassociationIndicesForReshape(tensor.getType(), resultType);
-  return builder.create<tensor::ExpandShapeOp>(resultType, tensor,
-                                               reassociation.value());
+  return cast<TypedValue<RankedTensorType>>(
+      builder
+          .create<tensor::ExpandShapeOp>(resultType, tensor,
+                                         reassociation.value())
+          .getResult());
 }
 
 // Transposes the input tensor by moving an axis to a new position by inserting
@@ -158,7 +161,9 @@ collapseAxesN(TypedValue<RankedTensorType> tensor, int64_t firstAxis, int64_t n,
   SmallVector<int64_t> newShape = collapseAxesN(shape, firstAxis, n);
   std::optional<SmallVector<ReassociationIndices>> reassociation =
       getReassociationIndicesForCollapse(shape, newShape);
-  return builder.create<tensor::CollapseShapeOp>(tensor, reassociation.value());
+  return cast<TypedValue<RankedTensorType>>(
+      builder.create<tensor::CollapseShapeOp>(tensor, reassociation.value())
+          .getResult());
 }
 
 // Splits an axis into 2 new dimensions and then move the new splitCount axis

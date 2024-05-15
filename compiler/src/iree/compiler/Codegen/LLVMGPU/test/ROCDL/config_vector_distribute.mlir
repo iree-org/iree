@@ -275,7 +275,7 @@ module {
     return
   }
 }
-// Check taht we don't support LLVMGPUPadAndVectorDistribute for narrow N/M atm.
+// Check that we don't support LLVMGPUPadAndVectorDistribute for narrow N/M atm.
 // CHECK-NOT:      #iree_codegen.translation_info<LLVMGPUPadAndVectorDistribute
 // CHECK-LABEL: func.func @narrow_n_batch_matmul_64x968x4x320_f16()
 

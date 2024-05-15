@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module( util.func(iree-stream-layout-slices, cse))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(util.func(iree-stream-layout-slices, cse))' %s | FileCheck %s
 
 #layoutStaticConfig = #stream.resource_config<{
   max_allocation_size = 1073741824,

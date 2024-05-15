@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/GPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
@@ -21,21 +20,28 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Interfaces/DestinationStyleOpInterface.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-tensor-tile"
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_GPUTENSORTILEPASS
+#include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
+
+namespace {
+
 class TileConsumerAndFuseInputProducer final
     : public OpInterfaceRewritePattern<TilingInterface> {
 public:
   TileConsumerAndFuseInputProducer(MLIRContext *context,
                                    LinalgTransformationFilter filter,
-                                   bool fuseInputProducer,
+                                   bool fuseInputProducer, bool coalesceLoops,
                                    PatternBenefit benefit = 1)
       : OpInterfaceRewritePattern<TilingInterface>(context, benefit),
-        filter(std::move(filter)), fuseInputProducer(fuseInputProducer) {}
+        filter(std::move(filter)), fuseInputProducer(fuseInputProducer),
+        coalesceLoops(coalesceLoops) {}
 
   LogicalResult matchAndRewrite(TilingInterface op,
                                 PatternRewriter &rewriter) const override {
@@ -64,7 +70,7 @@ public:
     // producer linalg.fill op. It implicitly assumes that the leading
     // dimensions of different linalg ops match, which is the current status;
     // but may not hold true in the long term.
-    tileSizes.resize(op.getLoopIteratorTypes().size());
+    tileSizes.resize(op.getLoopIteratorTypes().size(), 0);
 
     if (llvm::all_of(tileSizes, [](int64_t s) { return s == 0; })) {
       return failure();
@@ -83,6 +89,17 @@ public:
     rewriter.replaceOp(op, tilingResult->replacements);
     filter.replaceLinalgTransformationFilter(rewriter,
                                              tilingResult->tiledOps.front());
+
+    if (coalesceLoops && tilingResult->loops.size() > 1) {
+      SmallVector<scf::ForOp> loops = llvm::map_to_vector(
+          tilingResult->loops, [](LoopLikeOpInterface loop) {
+            return cast<scf::ForOp>(loop.getOperation());
+          });
+      if (failed(mlir::coalesceLoops(rewriter, loops))) {
+        return failure();
+      }
+    }
+
     return success();
   }
 
@@ -156,13 +173,14 @@ private:
 
   LinalgTransformationFilter filter;
   bool fuseInputProducer;
+  bool coalesceLoops;
 };
 
 /// Patterns for workgroup level tiling. Workgroup tiling is done at the flow
 /// level but we may have extra tiling for the reduction dimension. Therefore we
 /// tile again without distributing.
 static void populateTilingPatterns(RewritePatternSet &patterns,
-                                   bool fuseInputProducer) {
+                                   bool fuseInputProducer, bool coalesceLoops) {
   MLIRContext *context = patterns.getContext();
 
   LinalgTransformationFilter filter(
@@ -171,18 +189,21 @@ static void populateTilingPatterns(RewritePatternSet &patterns,
       StringAttr::get(context, getWorkgroupKTiledMarker()));
   filter.setMatchByDefault();
 
-  patterns.add<TileConsumerAndFuseInputProducer>(context, filter,
-                                                 fuseInputProducer);
+  patterns.add<TileConsumerAndFuseInputProducer>(
+      context, filter, fuseInputProducer, coalesceLoops);
 }
 
+} // namespace
+
 LogicalResult tileReductionToSerialLoops(mlir::FunctionOpInterface funcOp,
-                                         bool fuseInputProducer) {
+                                         bool fuseInputProducer,
+                                         bool coalesceLoops) {
   {
     // Tile again at the workgroup level since redution dimension were
     // ignored. Dimensions already tiled will be ignore since we tile to the
     // same size.
     RewritePatternSet wgTilingPatterns(funcOp.getContext());
-    populateTilingPatterns(wgTilingPatterns, fuseInputProducer);
+    populateTilingPatterns(wgTilingPatterns, fuseInputProducer, coalesceLoops);
     if (failed(applyPatternsAndFoldGreedily(funcOp,
                                             std::move(wgTilingPatterns)))) {
       return failure();
@@ -204,6 +225,7 @@ LogicalResult tileReductionToSerialLoops(mlir::FunctionOpInterface funcOp,
   }
 }
 
+namespace {
 /// Tile parallel dimensions according to the attribute tile sizes attached to
 /// each op.
 static LogicalResult tileParallelDims(mlir::FunctionOpInterface funcOp,
@@ -316,20 +338,12 @@ static LogicalResult tileAndUnrollConv(mlir::FunctionOpInterface funcOp) {
   return success();
 }
 
-namespace {
-struct GPUTensorTilePass : public GPUTensorTileBase<GPUTensorTilePass> {
-private:
-  // Distribute the workloads to warp if true otherwise distribute to threads.
-  bool distributeToWarp = false;
+struct GPUTensorTilePass final
+    : impl::GPUTensorTilePassBase<GPUTensorTilePass> {
+  using GPUTensorTilePassBase::GPUTensorTilePassBase;
 
-public:
-  GPUTensorTilePass(bool distributeToWarp)
-      : distributeToWarp(distributeToWarp) {}
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<affine::AffineDialect, gpu::GPUDialect, scf::SCFDialect>();
-  }
   void runOnOperation() override {
-    auto funcOp = getOperation();
+    FunctionOpInterface funcOp = getOperation();
 
     std::optional<SmallVector<int64_t>> workgroupSize =
         getWorkgroupSize(funcOp);
@@ -337,7 +351,7 @@ public:
       return;
     }
     if (failed(tileParallelDims(funcOp, workgroupSize.value(),
-                                distributeToWarp))) {
+                                distributeToSubgroup))) {
       return signalPassFailure();
     }
 
@@ -348,7 +362,8 @@ public:
 
     // Tile to serial loops to the wg tile size to handle reductions and other
     // dimension that have not been distributed.
-    if (failed(tileReductionToSerialLoops(funcOp)))
+    if (failed(tileReductionToSerialLoops(funcOp, /*fuseInputProducer=*/false,
+                                          /*coalesceLoops=*/false)))
       return signalPassFailure();
 
     LLVM_DEBUG({
@@ -366,11 +381,6 @@ public:
     });
   }
 };
+
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createGPUTensorTile(bool distributeToWarp) {
-  return std::make_unique<GPUTensorTilePass>(distributeToWarp);
-}
-
 } // namespace mlir::iree_compiler

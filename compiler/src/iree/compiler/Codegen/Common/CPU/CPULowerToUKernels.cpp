@@ -535,7 +535,7 @@ matchDAGForUKernel(RewriterBase &rewriter, IREE::Codegen::QueryTileSizesOp op,
     return rewriter.notifyMatchFailure(op, "only the 2D case is implemented");
   }
   auto encoding =
-      tensorType.getEncoding().dyn_cast_or_null<IREE::Encoding::EncodingAttr>();
+      dyn_cast_or_null<IREE::Encoding::EncodingAttr>(tensorType.getEncoding());
   if (!encoding) {
     return rewriter.notifyMatchFailure(op, "no encoding attribute");
   }

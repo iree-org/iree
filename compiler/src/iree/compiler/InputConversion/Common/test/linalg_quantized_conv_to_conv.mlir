@@ -80,7 +80,7 @@ func.func @conv2d_input_zp(%arg0: tensor<1x14x16x5xi8>, %arg1: tensor<3x4x5x1024
   // CHECK-SAME:  ins(%arg0 : tensor<1x14x16x5xi8>)
   // CHECK-SAME:  outs(%[[FILL]] : tensor<1x14x16xi32>)
 
-  // CHECK: %[[EXPAND:.+]] = tensor.expand_shape %[[SUM]] {{\[\[}}0], [1], [2, 3]] : tensor<1x14x16xi32> into tensor<1x14x16x1xi32>
+  // CHECK: %[[EXPAND:.+]] = tensor.expand_shape %[[SUM]] {{\[\[}}0], [1], [2, 3]]
   // CHECK: %[[INIT:.+]] = tensor.empty()
   // CHECK: %[[FILL:.+]] = linalg.fill ins(%[[C0]] : i32) outs(%[[INIT]] : tensor<1x12x13x1xi32>)
   // CHECK: %[[KERNEL:.+]] = tensor.empty() : tensor<3x4xi32>

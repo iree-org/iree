@@ -105,6 +105,7 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   pipelineOpts.enableAArch64SSVE =
       isAArch64(target) && hasAnySVEFeature(target) && hasSMEFeature(target);
   pipelineOpts.enableAArch64I8mm = isAArch64(target) && hasI8mmFeature(target);
+  pipelineOpts.enablePeeling = isLoopPeelingEnabled(funcOp);
 
   IREE::Codegen::TranslationInfoAttr translationInfo =
       getTranslationInfo(funcOp);
@@ -128,13 +129,6 @@ void LLVMCPULowerExecutableTargetPass::runOnOperation() {
   }
   case IREE::Codegen::DispatchLoweringPassPipeline::CPUDoubleTilingExpert: {
     TilingConfig tilingConfig = getTilingConfigForPipeline(funcOp);
-    addMultiTilingExpertPassPipeline(pipeline, tilingConfig, pipelineOpts);
-    break;
-  }
-  case IREE::Codegen::DispatchLoweringPassPipeline::
-      CPUDoubleTilingPeelingExpert: {
-    TilingConfig tilingConfig = getTilingConfigForPipeline(funcOp);
-    pipelineOpts.enablePeeling = true;
     addMultiTilingExpertPassPipeline(pipeline, tilingConfig, pipelineOpts);
     break;
   }

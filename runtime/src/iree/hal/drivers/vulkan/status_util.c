@@ -255,6 +255,6 @@ iree_status_t iree_hal_vulkan_result_to_status(VkResult result,
           "VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT");
     default:
       return iree_make_status_with_location(file, line, IREE_STATUS_UNKNOWN,
-                                            "VkResult=%u", (uint32_t)result);
+                                            "VkResult=%d", (int32_t)result);
   }
 }

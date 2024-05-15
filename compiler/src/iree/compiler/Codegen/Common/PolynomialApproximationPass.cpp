@@ -28,6 +28,11 @@ class PolynomialApproximationPass
   void runOnOperation() override {
     RewritePatternSet mathPatterns(&getContext());
     populateExpandTanPattern(mathPatterns);
+    populateExpandSinhPattern(mathPatterns);
+    populateExpandCoshPattern(mathPatterns);
+    populateExpandAsinhPattern(mathPatterns);
+    populateExpandAcoshPattern(mathPatterns);
+    populateExpandAtanhPattern(mathPatterns);
     populateExpandPowFPattern(mathPatterns);
     populateExpandFPowIPattern(mathPatterns);
 

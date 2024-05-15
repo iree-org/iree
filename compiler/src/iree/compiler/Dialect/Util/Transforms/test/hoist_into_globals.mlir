@@ -290,7 +290,7 @@ module @do_not_hoist_uses_within_dispatches {
   util.func public @main() -> tensor<2x2xi32> {
     %0 = arith.constant dense<[1, 2, 3, 4]> : tensor<4xi32>
     %1 = arith.constant dense<[[6, 7], [8,9]]> : tensor<2x2xi32>
-    %expanded = tensor.expand_shape %0[[0, 1]] : tensor<4xi32> into tensor<2x2xi32>
+    %expanded = tensor.expand_shape %0[[0, 1]] output_shape [2, 2] : tensor<4xi32> into tensor<2x2xi32>
     %2 = tensor.empty() : tensor<2x2xi32>
     // CHECK: flow.dispatch.region
     %3 = flow.dispatch.region -> (tensor<2x2xi32>) {

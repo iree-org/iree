@@ -11,7 +11,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Codegen/Common/GPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -26,12 +25,13 @@
 
 namespace mlir::iree_compiler {
 
-namespace {
+#define GEN_PASS_DEF_GPUDISTRIBUTESCFFORPASS
+#include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
 
-struct DistributeLoop final : public OpRewritePattern<scf::ForOp> {
+namespace {
+struct DistributeLoop final : OpRewritePattern<scf::ForOp> {
   using OpRewritePattern::OpRewritePattern;
 
-public:
   DistributeLoop(MLIRContext *context, bool useBD, PatternBenefit benefit = 1)
       : OpRewritePattern(context, benefit), useBlockDims(useBD) {}
 
@@ -96,15 +96,8 @@ private:
 };
 
 struct GPUDistributeScfForPass final
-    : public GPUDistributeScfForBase<GPUDistributeScfForPass> {
-public:
-  GPUDistributeScfForPass(bool useBlockDims) {
-    this->useBlockDims = useBlockDims;
-  }
-
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<gpu::GPUDialect>();
-  }
+    : impl::GPUDistributeScfForPassBase<GPUDistributeScfForPass> {
+  using GPUDistributeScfForPassBase::GPUDistributeScfForPassBase;
 
   void runOnOperation() override {
     MLIRContext *context = &getContext();
@@ -118,10 +111,4 @@ public:
 };
 
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createGPUDistributeScfForPass(bool useBlockDims) {
-  return std::make_unique<GPUDistributeScfForPass>(useBlockDims);
-}
-
 } // namespace mlir::iree_compiler

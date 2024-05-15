@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/GPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
@@ -18,20 +17,12 @@
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir {
-namespace iree_compiler {
+namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_GPULOWERTOUKERNELSPASS
+#include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
 
 namespace {
-class GPULowerToUKernelsPass
-    : public GPULowerToUKernelsBase<GPULowerToUKernelsPass> {
-public:
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Codegen::IREECodegenDialect>();
-  }
-
-  void runOnOperation() override;
-};
-} // namespace
 
 /// Holds a function name and attributes.
 struct FnNameAndDefAttrs {
@@ -135,8 +126,6 @@ matchArgmaxDAGForUKernel(RewriterBase &rewriter, linalg::GenericOp op) {
       genericMicroKernelOp.getOperation());
 }
 
-namespace {
-
 using TargetPredicate = std::function<bool(IREE::HAL::ExecutableTargetAttr)>;
 
 struct LowerArgmaxToUKernelPattern : OpRewritePattern<linalg::GenericOp> {
@@ -168,33 +157,30 @@ struct LowerArgmaxToUKernelPattern : OpRewritePattern<linalg::GenericOp> {
   TargetPredicate targetPredicate;
 };
 
-} // namespace
+struct GPULowerToUKernelsPass final
+    : impl::GPULowerToUKernelsPassBase<GPULowerToUKernelsPass> {
+  void runOnOperation() override {
+    MLIRContext *context = &getContext();
+    RewritePatternSet patterns(context);
+    // Enabling a lowering of an op to a microkernel is a trade-off between the
+    // potential performance advantage of a microkernel over pure code
+    // generation for that op, and the potential benefits of fusions. Indeed,
+    // once an op lowered into a microkernel, it will never be fused at any MLIR
+    // level. Since microkernels are linked as bitcode, they will still undergo
+    // LTO-like optimization in their calling contexts, but we shouldn't expect
+    // this to achieve similar results as fusing structured ops.
 
-void GPULowerToUKernelsPass::runOnOperation() {
-  MLIRContext *context = &getContext();
-  RewritePatternSet patterns(context);
-  // Enabling a lowering of an op to a microkernel is a trade-off between the
-  // potential performance advantage of a microkernel over pure code generation
-  // for that op, and the potential benefits of fusions. Indeed, once an op
-  // lowered into a microkernel, it will never be fused at any MLIR level.
-  // Since microkernels are linked as bitcode, they will still undergo LTO-like
-  // optimization in their calling contexts, but we shouldn't expect this to
-  // achieve similar results as fusing structured ops.
-
-  // These patterns are unconditionally enabled, because we have strong evidence
-  // that it is difficult for codegen to consistently approach microkernels
-  // performance, and that consideration overrides the benefit of fusions for
-  // these ops.
-  patterns.insert<LowerArgmaxToUKernelPattern>(context, isROCMBackend);
-  if (failed(
-          applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
-    return signalPassFailure();
+    // These patterns are unconditionally enabled, because we have strong
+    // evidence that it is difficult for codegen to consistently approach
+    // microkernels performance, and that consideration overrides the benefit of
+    // fusions for these ops.
+    patterns.insert<LowerArgmaxToUKernelPattern>(context, isROCMBackend);
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(patterns)))) {
+      return signalPassFailure();
+    }
   }
-}
+};
 
-std::unique_ptr<OperationPass<>> createGPULowerToUKernelsPass() {
-  return std::make_unique<GPULowerToUKernelsPass>();
-}
-
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace
+} // namespace mlir::iree_compiler
