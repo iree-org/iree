@@ -65,6 +65,9 @@ Signed-off-by: Random J Developer <random@developer.example.org>
     git commit -s -m 'This is my commit message'
     ```
 
+  See `.git/hooks/prepare-commit-msg.sample` for an example of automaticall
+  adding as part of hook to prepare commit message.
+
 * Users of [Visual Studio Code](https://code.visualstudio.com/) can add
   `"git.alwaysSignOff": true,` in their settings.
 
