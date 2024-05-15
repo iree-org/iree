@@ -252,6 +252,42 @@ void addGPUVectorizationPassPipeline(OpPassManager &funcPassManager) {
 }
 
 //===---------------------------------------------------------------------===//
+// Winograd Vectorize
+//===---------------------------------------------------------------------===//
+
+void addGPUWinogradVectorizePassPipeline(OpPassManager &funcPassManager) {
+  tileAndDistributeToWorkgroup(funcPassManager);
+
+  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createCSEPass());
+
+  // Distribute linalg onto threads within the workgroup.
+  funcPassManager.addPass(createGPUTilePass());
+  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createCSEPass());
+  funcPassManager.addPass(
+      IREE::LinalgExt::createDecomposeWinogradTransformPass());
+
+  // Linalg -> vector
+  addGPUVectorizationPasses(funcPassManager);
+
+  // tensor to memref
+  addBufferizePasses(funcPassManager);
+  GPUDistributeScfForPassOptions options;
+  options.useBlockDims = false;
+  funcPassManager.addPass(createGPUDistributeScfForPass(options));
+
+  // Post bufferization optimizations.
+  funcPassManager.addPass(createLoopInvariantCodeMotionPass());
+  funcPassManager.addPass(memref::createFoldMemRefAliasOpsPass());
+  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createCSEPass());
+  funcPassManager.addPass(createOptimizeVectorTransferPass());
+  funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
+}
+
+//===---------------------------------------------------------------------===//
 // MatmulSIMT
 //===---------------------------------------------------------------------===//
 
