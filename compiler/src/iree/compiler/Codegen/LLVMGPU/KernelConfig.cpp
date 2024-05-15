@@ -23,6 +23,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
@@ -478,6 +479,27 @@ setConvolutionVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
       workgroupSize, targetSubgroupSize, configDict);
 }
 
+[[maybe_unused]] static void
+debugPrintContractionInfo(unsigned numLoops,
+                          linalg::ContractionDimensions contractionDims,
+                          ArrayRef<int64_t> workgroupTileSizes) {
+  ArrayRef<unsigned> dimVals[] = {contractionDims.batch, contractionDims.m,
+                                  contractionDims.n, contractionDims.k};
+  std::string dimSymbols(numLoops, '*');
+  for (auto [idx, val] : llvm::enumerate(dimSymbols)) {
+    for (auto [letter, dim] : llvm::zip_equal(StringRef("bmnk"), dimVals))
+      if (llvm::is_contained(dim, idx))
+        val = letter;
+  }
+  DBGS() << "Contraction dims: [";
+  llvm::interleaveComma(dimSymbols, llvm::dbgs());
+  llvm::dbgs() << "]\n";
+
+  DBGS() << "Workgroup tile sizes: [";
+  llvm::interleaveComma(workgroupTileSizes, llvm::dbgs());
+  llvm::dbgs() << "]\n";
+}
+
 static LogicalResult
 setMatmulVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
                                   linalg::LinalgOp op,
@@ -568,6 +590,8 @@ setMatmulVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
 
   int64_t sharedMemoryLimitInBytes = targetInfo.sharedMemoryLimitInBytes;
 
+  LDBG("Matmul Vector Distribution Config");
+
   // First try to find a schedule with an exactly matching intrinsic.
   auto pipeline =
       IREE::Codegen::DispatchLoweringPassPipeline::LLVMGPUVectorDistribute;
@@ -584,6 +608,7 @@ setMatmulVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   // pipeline.
   // TODO(hanchung): Support cases that there are fused producers.
   if (!schedule && !contractionDims->batch.empty() && !hasFusedLeadingOp(op)) {
+    LDBG("Matmul Pad and Vector Distribute");
     pipeline = IREE::Codegen::DispatchLoweringPassPipeline::
         LLVMGPUPadAndVectorDistribute;
     bool mustBeAligned = false;
@@ -598,8 +623,18 @@ setMatmulVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
     }
   }
   if (!schedule) {
+    LDBG("Failed to deduce MMA schedule");
     return failure();
   }
+
+  LDBG("Target Subgroup size: " << targetSubgroupSize);
+  LDBG("Schedule: sizes [" << schedule->mSize << ", " << schedule->nSize << ", "
+                           << schedule->kSize << "]");
+  LDBG("Schedule: tile counts [" << schedule->mTileCount << ", "
+                                 << schedule->nTileCount << ", "
+                                 << schedule->kTileCount << "]");
+  LDBG("Schedule: warp counts [" << schedule->mWarpCount << ", "
+                                 << schedule->nWarpCount << "]");
 
   std::array<int64_t, 3> workgroupSize{
       schedule->nWarpCount * targetSubgroupSize, schedule->mWarpCount, 1};
@@ -631,6 +666,9 @@ setMatmulVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
   // Follow the LLVMGPU convention of keeping all of the tile sizes in one list.
   workgroupTileSizes[kDim] = schedule->kTileCount * schedule->kSize;
 
+  LLVM_DEBUG(debugPrintContractionInfo(op.getNumLoops(), *contractionDims,
+                                       workgroupTileSizes));
+
   TileSizesListType tileSizes;
   tileSizes.push_back(workgroupTileSizes);
 
@@ -655,22 +693,22 @@ setVectorDistributionConfig(mlir::FunctionOpInterface entryPoint,
                             const TargetInfo &targetInfo) {
 
   if (!clGPUEnableVectorDistribution) {
-    LDBG("vector distribution not enabled, skipping...\n");
+    LDBG("Vector Distribution not enabled, skipping...");
     return failure();
   }
 
-  LDBG("VectorDistribution: finding a suitable config...\n");
+  LDBG("VectorDistribution: finding a suitable config...");
 
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(computeOp)) {
     if (linalg::isaContractionOpInterface(linalgOp)) {
       LDBG(
-          "VectorDistribution: trying to find a suitable contraction config\n");
+          "VectorDistribution: trying to find a suitable contraction config");
       return setMatmulVectorDistributionConfig(entryPoint, linalgOp,
                                                targetInfo);
     }
     if (linalg::isaConvolutionOpInterface(linalgOp)) {
       LDBG(
-          "VectorDistribution: trying to find a suitable convolution config\n");
+          "VectorDistribution: trying to find a suitable convolution config");
       return setConvolutionVectorDistributionConfig(entryPoint, linalgOp,
                                                     targetInfo);
     }
