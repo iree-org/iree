@@ -104,6 +104,69 @@ def IREEGPU_MmaInterfaceAttr : AttrInterface<"MmaInterfaceAttr"> {
         return failure();
       }]
     >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Constructs the offsets/sizes/strides for extracting the per-thread
+        slice of the LHS.
+      }],
+      /*retTy=*/"::mlir::LogicalResult",
+      /*methodName=*/"populateLhsOffsetsSizesStrides",
+      /*args=*/(ins
+        "::mlir::OpBuilder&":$builder,
+        "::mlir::Location":$loc,
+        "::mlir::Value":$lane_id,
+        "::llvm::ArrayRef<int64_t>":$permutation,
+        "::llvm::SmallVector<::mlir::OpFoldResult>&":$offsets,
+        "::llvm::SmallVector<::mlir::OpFoldResult>&":$sizes,
+        "::llvm::SmallVector<::mlir::OpFoldResult>&":$strides
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return failure();
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Constructs the offsets/sizes/strides for extracting the per-thread
+        slice of the RHS.
+      }],
+      /*retTy=*/"::mlir::LogicalResult",
+      /*methodName=*/"populateRhsOffsetsSizesStrides",
+      /*args=*/(ins
+        "::mlir::OpBuilder&":$builder,
+        "::mlir::Location":$loc,
+        "::mlir::Value":$lane_id,
+        "::llvm::ArrayRef<int64_t>":$permutation,
+        "::llvm::SmallVector<::mlir::OpFoldResult>&":$offsets,
+        "::llvm::SmallVector<::mlir::OpFoldResult>&":$sizes,
+        "::llvm::SmallVector<::mlir::OpFoldResult>&":$strides
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return failure();
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Constructs the offsets/sizes/strides for extracting the per-thread
+        slice of the accumulator/result.
+      }],
+      /*retTy=*/"::mlir::LogicalResult",
+      /*methodName=*/"populateAccOffsetsSizesStrides",
+      /*args=*/(ins
+        "::mlir::OpBuilder&":$builder,
+        "::mlir::Location":$loc,
+        "::mlir::Value":$lane_id,
+        "::llvm::ArrayRef<int64_t>":$permutation,
+        "::llvm::SmallVector<::mlir::OpFoldResult>&":$offsets,
+        "::llvm::SmallVector<::mlir::OpFoldResult>&":$sizes,
+        "::llvm::SmallVector<::mlir::OpFoldResult>&":$strides
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return failure();
+      }]
+    >,
   ];
 }
 

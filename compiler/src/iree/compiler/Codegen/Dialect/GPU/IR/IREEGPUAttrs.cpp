@@ -19,6 +19,8 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -550,6 +552,140 @@ FailureOr<Value> MMAAttr::buildMmaOperation(OpBuilder &builder, Location loc,
   }
   }
   return failure();
+}
+
+static SmallVector<int64_t>
+getRankReducedSingleSubgroupShape(const MMAAttr::SingleSubgroupLayout &counts) {
+  SmallVector<int64_t> rankReducedShape;
+  for (auto [outer, thread, element] :
+       llvm::zip_equal(counts.outer, counts.thread, counts.element)) {
+    if (outer != 1) {
+      rankReducedShape.push_back(outer);
+    }
+    rankReducedShape.push_back(thread * element);
+  }
+  return rankReducedShape;
+}
+
+// Generates amdgpu.mfma/wmma operation on the given inputs for this attribute
+// type.
+static LogicalResult populateCanonicalOffsetsSizesAndStrides(
+    OpBuilder &builder, Location loc, Value laneId,
+    ArrayRef<int64_t> permutation, MMAAttr::SingleSubgroupLayout counts,
+    MMAAttr::SingleSubgroupLayout orders,
+    SmallVector<OpFoldResult> &canonicalOffsets,
+    SmallVector<OpFoldResult> &canonicalSizes,
+    SmallVector<OpFoldResult> &canonicalStrides) {
+  SmallVector<int64_t> rankReducedShape;
+  for (auto [outer, thread, element] :
+       llvm::zip_equal(counts.outer, counts.thread, counts.element)) {
+    if (outer != 1) {
+      rankReducedShape.push_back(outer);
+    }
+    rankReducedShape.push_back(thread * element);
+  }
+
+  if (permutation.size() != rankReducedShape.size()) {
+    return failure();
+  }
+
+  OpFoldResult zero = builder.getIndexAttr(0);
+  OpFoldResult one = builder.getIndexAttr(1);
+  canonicalStrides.append(rankReducedShape.size(), one);
+
+  SmallVector<int64_t> threadDimSizes =
+      applyPermutation(counts.thread, orders.thread);
+  SmallVector<Value> basis;
+  for (auto dimSize : threadDimSizes) {
+    basis.push_back(builder.create<arith::ConstantIndexOp>(loc, dimSize));
+  }
+  SmallVector<Value> threadIds =
+      builder.create<affine::AffineDelinearizeIndexOp>(loc, laneId, basis)
+          .getResults();
+  applyPermutationToVector(threadIds, orders.thread);
+
+  int64_t idx = 0;
+  for (auto [outer, thread, element] :
+       llvm::zip_equal(counts.outer, counts.thread, counts.element)) {
+    if (outer != 1) {
+      canonicalSizes.push_back(builder.getIndexAttr(outer));
+      canonicalOffsets.push_back(zero);
+    }
+    canonicalSizes.push_back(builder.getIndexAttr(element));
+    canonicalOffsets.push_back(threadIds[idx++]);
+  }
+  applyPermutationToVector(canonicalOffsets, permutation);
+  applyPermutationToVector(canonicalSizes, permutation);
+  return success();
+}
+
+LogicalResult MMAAttr::populateLhsOffsetsSizesStrides(
+    OpBuilder &builder, Location loc, Value laneId,
+    ArrayRef<int64_t> permutation, SmallVector<OpFoldResult> &offsets,
+    SmallVector<OpFoldResult> &sizes,
+    SmallVector<OpFoldResult> &strides) const {
+  if (getIntrinsic().getValue() != MMAIntrinsic::MFMA_F16_16x16x16_F32) {
+    return failure();
+  }
+
+  SmallVector<OpFoldResult> canonicalOffsets;
+  SmallVector<OpFoldResult> canonicalSizes;
+  if (failed(populateCanonicalOffsetsSizesAndStrides(
+          builder, loc, laneId, permutation, getASingleSubgroupLayoutCount(),
+          getASingleSubgroupLayoutOrder(), canonicalOffsets, canonicalSizes,
+          strides))) {
+    return failure();
+  }
+  offsets.append(canonicalOffsets);
+  sizes.append(canonicalSizes);
+
+  return success();
+}
+
+LogicalResult MMAAttr::populateRhsOffsetsSizesStrides(
+    OpBuilder &builder, Location loc, Value laneId,
+    ArrayRef<int64_t> permutation, SmallVector<OpFoldResult> &offsets,
+    SmallVector<OpFoldResult> &sizes,
+    SmallVector<OpFoldResult> &strides) const {
+  if (getIntrinsic().getValue() != MMAIntrinsic::MFMA_F16_16x16x16_F32) {
+    return failure();
+  }
+
+  SmallVector<OpFoldResult> canonicalOffsets;
+  SmallVector<OpFoldResult> canonicalSizes;
+  if (failed(populateCanonicalOffsetsSizesAndStrides(
+          builder, loc, laneId, permutation, getBSingleSubgroupLayoutCount(),
+          getBSingleSubgroupLayoutOrder(), canonicalOffsets, canonicalSizes,
+          strides))) {
+    return failure();
+  }
+  offsets.append(canonicalOffsets);
+  sizes.append(canonicalSizes);
+
+  return success();
+}
+
+LogicalResult MMAAttr::populateAccOffsetsSizesStrides(
+    OpBuilder &builder, Location loc, Value laneId,
+    ArrayRef<int64_t> permutation, SmallVector<OpFoldResult> &offsets,
+    SmallVector<OpFoldResult> &sizes,
+    SmallVector<OpFoldResult> &strides) const {
+  if (getIntrinsic().getValue() != MMAIntrinsic::MFMA_F16_16x16x16_F32) {
+    return failure();
+  }
+
+  SmallVector<OpFoldResult> canonicalOffsets;
+  SmallVector<OpFoldResult> canonicalSizes;
+  if (failed(populateCanonicalOffsetsSizesAndStrides(
+          builder, loc, laneId, permutation, getCSingleSubgroupLayoutCount(),
+          getCSingleSubgroupLayoutOrder(), canonicalOffsets, canonicalSizes,
+          strides))) {
+    return failure();
+  }
+  offsets.append(canonicalOffsets);
+  sizes.append(canonicalSizes);
+
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
