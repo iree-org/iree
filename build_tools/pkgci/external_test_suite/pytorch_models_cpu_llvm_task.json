@@ -1,6 +1,6 @@
 {
   "config_name": "cpu_llvm_task",
-  "iree_compile_flags" : [
+  "iree_compile_flags": [
     "--iree-hal-target-backends=llvm-cpu",
     "--iree-llvmcpu-target-cpu-features=host"
   ],
@@ -12,9 +12,9 @@
   ],
   "skip_run_tests": [],
   "expected_compile_failures": [
-    "opt-125M", // TODO(#17344): need to regenerate .mlirbc
-    "resnet50", // TODO(#17344): need to regenerate .mlirbc
-
+    // TODO(#17344): need to regenerate .mlirbc
+    "opt-125M",
+    "resnet50",
   ],
   "expected_run_failures": []
 }

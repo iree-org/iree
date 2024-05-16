@@ -23,7 +23,7 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir::iree_compiler {
+namespace mlir::iree_compiler::InputConversion {
 
 namespace {
 
@@ -600,4 +600,4 @@ std::unique_ptr<OperationPass<ModuleOp>> createIREEImportPublicPass() {
   return std::make_unique<IREEImportPublicPass>();
 }
 
-} // namespace mlir::iree_compiler
+} // namespace mlir::iree_compiler::InputConversion

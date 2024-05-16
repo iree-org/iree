@@ -19,7 +19,7 @@
 #include "mlir/Transforms/FoldUtils.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir::iree_compiler {
+namespace mlir::iree_compiler::InputConversion {
 
 namespace {
 
@@ -196,4 +196,4 @@ createLinalgQuantizedMatmulToMatmulPass() {
   return std::make_unique<LinalgQuantizedMatmulToMatmulPass>();
 }
 
-} // namespace mlir::iree_compiler
+} // namespace mlir::iree_compiler::InputConversion

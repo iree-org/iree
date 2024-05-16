@@ -1774,7 +1774,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=vulkan-spirv"
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=valhall-unknown-android31"
-    "--iree-opt-demote-f32-to-f16"
+    "--iree-input-demote-f32-to-f16"
   FRIENDLY_NAME "MobileBertSquad_fp16(tflite) [arm-valhall-vulkan_android31-vulkan_spirv][default-flags,demote-f32-to-f16]"
   PUBLIC
 )
@@ -1815,7 +1815,7 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=valhall-unknown-android31"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-stream-partitioning-favor=max-concurrency"
-    "--iree-opt-demote-f32-to-f16"
+    "--iree-input-demote-f32-to-f16"
   FRIENDLY_NAME "MobileBertSquad_fp16(tflite) [arm-valhall-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,max-concurrency,demote-f32-to-f16]"
   PUBLIC
 )
@@ -1860,7 +1860,7 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-stream-partitioning-favor=max-concurrency"
     "--iree-hal-benchmark-dispatch-repeat-count=32"
-    "--iree-opt-demote-f32-to-f16"
+    "--iree-input-demote-f32-to-f16"
   FRIENDLY_NAME "MobileBertSquad_fp16(tflite) [arm-valhall-vulkan_android31-vulkan_spirv][experimental-flags,fuse-padding,max-concurrency,repeated-kernel,demote-f32-to-f16]"
   PUBLIC
 )
@@ -4064,7 +4064,7 @@ iree_bytecode_module(
     "--iree-hal-target-backends=vulkan-spirv"
     "--iree-input-type=tosa"
     "--iree-vulkan-target-triple=valhall-unknown-android31"
-    "--iree-opt-demote-f32-to-f16"
+    "--iree-input-demote-f32-to-f16"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4117,7 +4117,7 @@ iree_bytecode_module(
     "--iree-vulkan-target-triple=valhall-unknown-android31"
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-stream-partitioning-favor=max-concurrency"
-    "--iree-opt-demote-f32-to-f16"
+    "--iree-input-demote-f32-to-f16"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"
@@ -4174,7 +4174,7 @@ iree_bytecode_module(
     "--iree-flow-enable-fuse-padding-into-linalg-consumer-ops"
     "--iree-stream-partitioning-favor=max-concurrency"
     "--iree-hal-benchmark-dispatch-repeat-count=32"
-    "--iree-opt-demote-f32-to-f16"
+    "--iree-input-demote-f32-to-f16"
     "--iree-vm-emit-polyglot-zip=true"
     "--iree-llvmcpu-debug-symbols=false"
     "--iree-scheduling-dump-statistics-format=json"

@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-util-demote-f64-to-f32 %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-input-conversion-demote-f64-to-f32 %s | FileCheck %s
 
 // NOTE: for more comprehensive tests see demote_i64_to_i32.mlir.
 
