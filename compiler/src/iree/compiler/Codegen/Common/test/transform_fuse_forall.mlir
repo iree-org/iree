@@ -32,7 +32,7 @@ module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%root: !transform.any_op {transform.readonly}) {
     %loops = transform.structured.match ops{["scf.forall"]} in %root : (!transform.any_op) -> !transform.any_op
     %producer, %consumer = transform.split_handle %loops : (!transform.any_op) -> (!transform.any_op, !transform.any_op)
-    transform.iree.fuse_forall %producer into %consumer {address_space = #gpu.address_space<workgroup>} : (!transform.any_op, !transform.any_op) -> (!transform.any_op)
+    transform.iree.fuse_forall %producer into %consumer : (!transform.any_op, !transform.any_op) -> (!transform.any_op)
     transform.yield
   }
 }
@@ -45,7 +45,6 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[ARG0:[A-Za-z0-9]+]]: tensor<128x128xf32>
 
 //   CHECK-DAG:   %[[EMPTY:.+]] = tensor.empty() : tensor<128x128xf32>
-//   CHECK-DAG:   %[[ALLOC:.+]] = memref.alloc() : memref<128x128xf32, #gpu.address_space<workgroup>>
 //       CHECK:   scf.forall (%[[IDX:.+]], %[[IDY:.+]]) in (8, 8) shared_outs(%[[INIT:.+]] = %[[EMPTY]]) -> (tensor<128x128xf32>) {
 //   CHECK-DAG:     %[[OUTID0:.+]] = affine.apply #[[$MAP]](%[[IDX]])
 //   CHECK-DAG:     %[[OUTID1:.+]] = affine.apply #[[$MAP]](%[[IDY]])
@@ -55,9 +54,11 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:     %[[INSLICE0:.+]] = tensor.extract_slice %[[ARG0]][%[[INID0]], %[[IDS]]#1] [2, 128] [1, 1] : tensor<128x128xf32> to tensor<2x128xf32>
 //       CHECK:     %[[INSLICE1:.+]] = tensor.extract_slice %[[EMPTY]][%[[INID0]], %[[IDS]]#1] [2, 128] [1, 1] : tensor<128x128xf32> to tensor<2x128xf32>
 //       CHECK:     %[[COPY:.+]] = linalg.copy ins(%[[INSLICE0]] : tensor<2x128xf32>) outs(%[[INSLICE1]] : tensor<2x128xf32>) -> tensor<2x128xf32>
-//       CHECK:     %[[SHUFFLE:.+]] = iree_gpu.shuffle_tensor %[[COPY]][%[[INID0]], %[[IDS]]#1] [2, 128] [1, 1]
-//  CHECK-SAME:       to %[[ALLOC]] [%[[OUTID0]], %[[OUTID1]]] [16, 16] [1, 1]
-//  CHECK-SAME:       : tensor<2x128xf32> -> memref<128x128xf32, #gpu.address_space<workgroup>> -> tensor<16x16xf32>
+//       CHECK:     %[[SHUFFLE:.+]] = iree_gpu.shuffle_tensor %[[COPY]][%[[INID0]], %[[IDS]]#1] [2, 128] [1, 1] to %[[EMPTY]]
+//       CHECK:     ^bb0(%[[INTERMEDIATE:.+]]: tensor<128x128xf32>):
+//       CHECK:       %[[SLICE:.+]] = tensor.extract_slice %[[INTERMEDIATE]][%[[OUTID0]], %[[OUTID1]]] [16, 16] [1, 1] : tensor<128x128xf32> to tensor<16x16xf32>
+//       CHECK:       iree_gpu.yield %[[SLICE]]
+//       CHECK:     } : tensor<2x128xf32> -> tensor<128x128xf32> -> tensor<16x16xf32>
 //       CHECK:     %[[OUTSLICE:.+]] = tensor.extract_slice %[[INIT]][%[[OUTID0]], %[[OUTID1]]] [16, 16] [1, 1] : tensor<128x128xf32> to tensor<16x16xf32>
 //       CHECK:     %[[MM:.+]] = linalg.matmul ins(%[[SHUFFLE]], %[[SHUFFLE]] : tensor<16x16xf32>, tensor<16x16xf32>)
 //  CHECK-SAME:       outs(%[[OUTSLICE]] : tensor<16x16xf32>) -> tensor<16x16xf32>
@@ -113,7 +114,6 @@ module attributes { transform.with_named_sequence } {
 //  CHECK-SAME:   %[[ARG1:[A-Za-z0-9]+]]: tensor<128x128xf32>
 
 //       CHECK:   scf.forall (%[[IDX:.+]], %[[IDY:.+]]) in (8, 8) shared_outs(%[[INIT:.+]] = %[[ARG1]]) -> (tensor<128x128xf32>) {
-//       CHECK:     %[[ALLOC:.+]] = bufferization.to_memref %[[ARG1]]
-//       CHECK:     %[[SHUFFLE:.+]] = iree_gpu.shuffle_tensor %{{.*}} to %[[ALLOC]]
-//  CHECK-SAME:       : tensor<2x128xf32> -> memref<128x128xf32> -> tensor<16x16xf32>
+//       CHECK:     %[[SHUFFLE:.+]] = iree_gpu.shuffle_tensor %{{.*}} to %[[ARG1]]
+//       CHECK:       } : tensor<2x128xf32> -> tensor<128x128xf32> -> tensor<16x16xf32>
 //       CHECK:   } {mapping = [#gpu.warp<y>, #gpu.warp<x>]}
