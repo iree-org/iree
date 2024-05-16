@@ -91,7 +91,7 @@ typedef uint8_t iree_hal_numerical_type_t;
 // TODO(#8193): split out logical and physical bit widths.
 // Returns the bit width of each element.
 #define iree_hal_element_bit_count(element_type) \
-  (iree_host_size_t)((element_type)&0xFF)
+  (iree_host_size_t)((element_type) & 0xFF)
 
 // Returns true if the element is byte-aligned.
 // Sub-byte aligned types such as i4 require user handling of the packing.

@@ -29,8 +29,7 @@ typedef enum iree_memory_order_e {
   iree_memory_order_seq_cst,
 } iree_memory_order_t;
 
-#define IREE_ATOMIC_VAR_INIT(value) \
-  { (value) }
+#define IREE_ATOMIC_VAR_INIT(value) {(value)}
 
 typedef struct {
   int32_t __val;

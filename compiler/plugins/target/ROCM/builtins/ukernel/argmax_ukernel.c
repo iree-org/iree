@@ -9,10 +9,10 @@
 #include <hip/hip_runtime.h>
 
 extern "C" __device__ __attribute__((const)) half __ockl_wfred_max_f16(half);
-extern "C" __device__ __attribute__((const))
-int64_t __ockl_wfred_min_i64(int64_t);
-extern "C" __device__ __attribute__((const))
-int32_t __ockl_wfred_min_i32(int32_t);
+extern "C" __device__
+    __attribute__((const)) int64_t __ockl_wfred_min_i64(int64_t);
+extern "C" __device__
+    __attribute__((const)) int32_t __ockl_wfred_min_i32(int32_t);
 
 /*
 Constraint/Tiling note:

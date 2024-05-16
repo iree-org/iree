@@ -93,7 +93,7 @@ jobs:
         run: ./build_tools/pytype/check_diff.sh "${GITHUB_BASE_REF?}"
 
   clang-format:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Installing dependencies
         run: |
@@ -106,7 +106,7 @@ jobs:
         run: git fetch --no-tags --prune --depth=1 origin "${GITHUB_BASE_REF?}:${GITHUB_BASE_REF?}"
       - name: Running clang-format on changed source files
         run: |
-          /tmp/git-clang-format "${GITHUB_BASE_REF?}" --binary=clang-format-15 --style=file
+          /tmp/git-clang-format "${GITHUB_BASE_REF?}" --binary=clang-format-18 --style=file
           git diff --exit-code
 
   tabs:
