@@ -79,7 +79,7 @@ graph BT
 
 ## :octicons-file-directory-16: Supported formats
 
-### :iree-ghost: IRPA
+### IRPA
 
 The IREE Parameter Archive (IRPA) file format
 ([`iree/schemas/parameter_archive.h`](https://github.com/iree-org/iree/blob/main/runtime/src/iree/schemas/parameter_archive.h))

@@ -1,4 +1,4 @@
-# IREE: Intermediate Representation Execution Environment
+# <img src="docs/website/docs/assets/images/IREE_Logo_Icon_Color.svg" style="height: 1.5em; vertical-align: middle"> IREE: Intermediate Representation Execution Environment
 
 IREE (**I**ntermediate **R**epresentation **E**xecution **E**nvironment,
 pronounced as "eerie") is an [MLIR](https://mlir.llvm.org/)-based end-to-end

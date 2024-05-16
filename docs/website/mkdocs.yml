@@ -6,7 +6,7 @@ edit_uri: blob/main/docs/website/docs/
 
 theme:
   name: material
-  logo: assets/images/ghost.svg
+  logo: assets/images/IREE_Logo_Icon_Color.svg
   logo_alt: IREE
   icon:
     repo: fontawesome/brands/github
@@ -14,7 +14,7 @@ theme:
   font:
     text: Noto
     code: Noto Sans Mono
-  favicon: assets/images/ghost.svg
+  favicon: assets/images/IREE_Logo_Icon_Color.svg
 
   custom_dir: overrides
 
