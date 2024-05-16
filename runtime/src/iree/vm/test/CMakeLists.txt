@@ -20,21 +20,26 @@ iree_c_embed_data(
   SRCS
     "arithmetic_ops.vmfb"
     "arithmetic_ops_f32.vmfb"
+    "arithmetic_ops_f64.vmfb"
     "arithmetic_ops_i64.vmfb"
     "assignment_ops.vmfb"
     "assignment_ops_f32.vmfb"
+    "assignment_ops_f64.vmfb"
     "assignment_ops_i64.vmfb"
     "buffer_ops.vmfb"
     "call_ops.vmfb"
     "comparison_ops.vmfb"
     "comparison_ops_f32.vmfb"
+    "comparison_ops_f64.vmfb"
     "comparison_ops_i64.vmfb"
     "control_flow_ops.vmfb"
     "conversion_ops.vmfb"
     "conversion_ops_f32.vmfb"
+    "conversion_ops_f64.vmfb"
     "conversion_ops_i64.vmfb"
     "global_ops.vmfb"
     "global_ops_f32.vmfb"
+    "global_ops_f64.vmfb"
     "global_ops_i64.vmfb"
     "list_ops.vmfb"
     "list_ops_i64.vmfb"
@@ -67,6 +72,18 @@ iree_bytecode_module(
     "arithmetic_ops_f32.mlir"
   FLAGS
     "--compile-mode=vm"
+    "--iree-vm-target-extension-f32=true"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    arithmetic_ops_f64
+  SRC
+    "arithmetic_ops_f64.mlir"
+  FLAGS
+    "--compile-mode=vm"
+    "--iree-vm-target-extension-f64=true"
   PUBLIC
 )
 
@@ -97,6 +114,18 @@ iree_bytecode_module(
     "assignment_ops_f32.mlir"
   FLAGS
     "--compile-mode=vm"
+    "--iree-vm-target-extension-f32=true"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    assignment_ops_f64
+  SRC
+    "assignment_ops_f64.mlir"
+  FLAGS
+    "--compile-mode=vm"
+    "--iree-vm-target-extension-f64=true"
   PUBLIC
 )
 
@@ -147,6 +176,18 @@ iree_bytecode_module(
     "comparison_ops_f32.mlir"
   FLAGS
     "--compile-mode=vm"
+    "--iree-vm-target-extension-f32=true"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    comparison_ops_f64
+  SRC
+    "comparison_ops_f64.mlir"
+  FLAGS
+    "--compile-mode=vm"
+    "--iree-vm-target-extension-f64=true"
   PUBLIC
 )
 
@@ -187,6 +228,18 @@ iree_bytecode_module(
     "conversion_ops_f32.mlir"
   FLAGS
     "--compile-mode=vm"
+    "--iree-vm-target-extension-f32=true"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    conversion_ops_f64
+  SRC
+    "conversion_ops_f64.mlir"
+  FLAGS
+    "--compile-mode=vm"
+    "--iree-vm-target-extension-f64=true"
   PUBLIC
 )
 
@@ -217,6 +270,18 @@ iree_bytecode_module(
     "global_ops_f32.mlir"
   FLAGS
     "--compile-mode=vm"
+    "--iree-vm-target-extension-f32=true"
+  PUBLIC
+)
+
+iree_bytecode_module(
+  NAME
+    global_ops_f64
+  SRC
+    "global_ops_f64.mlir"
+  FLAGS
+    "--compile-mode=vm"
+    "--iree-vm-target-extension-f64=true"
   PUBLIC
 )
 

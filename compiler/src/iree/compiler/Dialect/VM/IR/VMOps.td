@@ -2659,7 +2659,7 @@ def VM_MaxF32Op :
 
 def VM_MaxF64Op :
     VM_TotalBinaryArithmeticOp<F64, "max.f64", VM_OPC_MaxF64,
-                               [VM_ExtF32, Commutative]> {
+                               [VM_ExtF64, Commutative]> {
   let summary = [{floating point maximum operation}];
   let hasFolder = 1;
 }
@@ -3161,6 +3161,20 @@ def VM_CastUI32F32Op :
   let hasFolder = 1;
 }
 
+def VM_CastSI64F64Op :
+    VM_ConversionOp<I64, F64, "cast.si64.f64", VM_OPC_CastSI64F64,
+                    [VM_ExtF64]> {
+  let summary = [{cast from a signed integer to a float-point value}];
+  let hasFolder = 1;
+}
+
+def VM_CastUI64F64Op :
+    VM_ConversionOp<I64, F64, "cast.ui64.f64", VM_OPC_CastUI64F64,
+                    [VM_ExtF64]> {
+  let summary = [{cast from an unsigned integer to a float-point value}];
+  let hasFolder = 1;
+}
+
 def VM_CastF32SI32Op :
     VM_ConversionOp<F32, I32, "cast.f32.si32", VM_OPC_CastF32SI32,
                     [VM_ExtF32]> {
@@ -3171,6 +3185,20 @@ def VM_CastF32SI32Op :
 def VM_CastF32UI32Op :
     VM_ConversionOp<F32, I32, "cast.f32.ui32", VM_OPC_CastF32UI32,
                     [VM_ExtF32]> {
+  let summary = [{cast from an float-point value to an unsigned integer}];
+  let hasFolder = 1;
+}
+
+def VM_CastF64SI64Op :
+    VM_ConversionOp<F64, I64, "cast.f64.si64", VM_OPC_CastF64SI64,
+                    [VM_ExtF64]> {
+  let summary = [{cast from a float-point value to a signed integer}];
+  let hasFolder = 1;
+}
+
+def VM_CastF64UI64Op :
+    VM_ConversionOp<F64, I64, "cast.f64.ui64", VM_OPC_CastF64UI64,
+                    [VM_ExtF64]> {
   let summary = [{cast from an float-point value to an unsigned integer}];
   let hasFolder = 1;
 }
