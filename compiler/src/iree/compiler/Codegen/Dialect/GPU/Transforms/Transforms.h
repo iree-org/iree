@@ -21,6 +21,10 @@ namespace mlir::linalg {
 class LinalgOp;
 }
 
+namespace mlir::scf {
+class ForallOp;
+}
+
 namespace mlir::vector {
 struct UnrollVectorOptions;
 }
@@ -35,6 +39,10 @@ LogicalResult vectorizeStaticMultiMmaOp(RewriterBase &rewriter,
 FailureOr<IREE::GPU::MultiMmaOp>
 convertContractionToMultiMma(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
                              IREE::GPU::MmaInterfaceAttr mmaKind);
+
+// Helper to distribute a multi_mma op to lanes.
+FailureOr<Operation *> distributeMultiMmaOp(RewriterBase &rewriter,
+                                            IREE::GPU::MultiMmaOp mmaOp);
 
 void populateIREEGPUVectorizationPatterns(RewritePatternSet &patterns);
 

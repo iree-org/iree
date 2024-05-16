@@ -40,6 +40,8 @@ iree_cc_library(
     IREEVectorExtDialect
     LLVMSupport
     MLIRAMDGPUDialect
+    MLIRAffineDialect
+    MLIRArithDialect
     MLIRIR
     MLIRLinalgDialect
     MLIRParser

@@ -140,6 +140,34 @@ void transform_dialect::ConvertToMultiMmaOp::getEffects(
   transform::modifiesPayload(effects);
 }
 
+//===---------------------------------------------------------------------===//
+// DistributeMultiMmaOp
+//===---------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure transform_dialect::DistributeMultiMmaOp::applyToOne(
+    transform::TransformRewriter &rewriter, Operation *target,
+    transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  auto mmaOp = dyn_cast<IREE::GPU::MultiMmaOp>(target);
+  if (!mmaOp) {
+    return mlir::emitDefiniteFailure(target, "target is not a multi_mma op");
+  }
+  rewriter.setInsertionPoint(mmaOp);
+  auto maybeForall = IREE::GPU::distributeMultiMmaOp(rewriter, mmaOp);
+  if (failed(maybeForall)) {
+    return mlir::emitDefiniteFailure(mmaOp, "multi_mma distribution failed");
+  }
+  results.push_back(*maybeForall);
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::DistributeMultiMmaOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::producesHandle(getResult(), effects);
+  transform::modifiesPayload(effects);
+}
+
 } // namespace mlir::iree_compiler::IREE
 
 void mlir::iree_compiler::registerTransformDialectIREEGPUExtension(
