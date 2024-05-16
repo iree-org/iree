@@ -1279,6 +1279,11 @@ LogicalResult AttentionOp::verify() {
   auto checkShape = [&shape, &op](StringRef operandName,
                                   ArrayRef<int64_t> valShape,
                                   AffineMap indexingMap) -> LogicalResult {
+    if (indexingMap.getNumResults() != valShape.size()) {
+      return op->emitError("Rank Mismatch for ")
+             << operandName << ". Expected: " << indexingMap.getNumResults()
+             << " Got: " << valShape.size();
+    }
     for (auto [i, dimExpr] : llvm::enumerate(indexingMap.getResults())) {
       AffineDimExpr dim = cast<AffineDimExpr>(dimExpr);
       int64_t pos = dim.getPosition();
@@ -1389,7 +1394,7 @@ SmallVector<AffineMap> AttentionOp::getIndexingMapsArray() {
   bool isTiled = getNumResults() == 3;
   if (isTiled) {
     for (AffineMap &map : results) {
-      map.dropResult(0);
+      map = map.dropResult(0);
     }
   }
 
