@@ -26,6 +26,8 @@ iree_bitcode_library(
     "mmt4d_x86_64_tiles.inl"
   SRCS
     "mmt4d_x86_64_entry_point.c"
+    "pack_x86_64_entry_point.c"
+    "unpack_x86_64_entry_point.c"
 )
 
 iree_bitcode_library(
@@ -41,6 +43,8 @@ iree_bitcode_library(
     "mmt4d_x86_64_tiles.inl"
   SRCS
     "mmt4d_x86_64_avx2_fma.c"
+    "pack_x86_64_avx2_fma.c"
+    "unpack_x86_64_avx2_fma.c"
   COPTS
     "-mavx"
     "-mavx2"
@@ -61,6 +65,8 @@ iree_bitcode_library(
     "mmt4d_x86_64_tiles.inl"
   SRCS
     "mmt4d_x86_64_avx512_base.c"
+    "pack_x86_64_avx512_base.c"
+    "unpack_x86_64_avx512_base.c"
   COPTS
     "-mavx"
     "-mavx2"

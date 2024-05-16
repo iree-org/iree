@@ -154,6 +154,19 @@ static Type getElementTypeForUKernel(Value input) {
   return castOpSrcType;
 }
 
+static SmallVector<Type>
+getUKernelGenericReturnTypes(IREE::HAL::ExecutableTargetAttr targetAttr,
+                             Type outType) {
+  SmallVector<Type> returnTypes{outType};
+  if (!isVMVXBackend(targetAttr)) {
+    // Hack to avoid issues with void-returning functions in llvm-cpu.
+    // Note that the first return value, of tensor type, disappears in
+    // bufferization.
+    returnTypes.push_back(IntegerType::get(outType.getContext(), 32));
+  }
+  return returnTypes;
+}
+
 /// Matches an (linalg.fill -> )? linalg.mmt4d operation sequence and converts
 /// it into a iree_codegen.ukernel.mmt4d operation, that is later lowered
 /// into a call to the microkernel.
@@ -250,13 +263,8 @@ matchDAGForUKernel(RewriterBase &rewriter, linalg::Mmt4DOp op,
   Value flagsVal = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getI32IntegerAttr(flags));
   auto fn = getFnNameAndDefAttrs(ukernelName, rewriter, targetAttr);
-  SmallVector<Type> returnTypes{outType};
-  if (!isVMVXBackend(targetAttr)) {
-    // Hack to avoid issues with void-returning functions in llvm-cpu.
-    // Note that the first return value, of tensor type, disappears in
-    // bufferization.
-    returnTypes.push_back(rewriter.getI32Type());
-  }
+  SmallVector<Type> returnTypes =
+      getUKernelGenericReturnTypes(targetAttr, outType);
   auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
       loc, returnTypes, fn.name, ValueRange{lhs, rhs}, out,
       ValueRange{m, n, k, m0, n0, k0, flagsVal},
@@ -377,8 +385,10 @@ matchDAGForUKernel(RewriterBase &rewriter, tensor::PackOp op,
   Value flagsVal = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getI32IntegerAttr(flags));
   auto fn = getFnNameAndDefAttrs(ukernelName, rewriter, targetAttr);
+  SmallVector<Type> returnTypes =
+      getUKernelGenericReturnTypes(targetAttr, outType);
   auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
-      loc, outType, fn.name, in, out,
+      loc, returnTypes, fn.name, in, out,
       ValueRange{in_size0, in_size1, out_size0, out_size1, out_size2, out_size3,
                  paddingVal, flagsVal},
       /*fn_def_attrs=*/rewriter.getDictionaryAttr(fn.defAttrs),
@@ -463,8 +473,10 @@ matchDAGForUKernel(RewriterBase &rewriter, tensor::UnPackOp op,
   Value flagsVal = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getI32IntegerAttr(flags));
   auto fn = getFnNameAndDefAttrs(ukernelName, rewriter, targetAttr);
+  SmallVector<Type> returnTypes =
+      getUKernelGenericReturnTypes(targetAttr, outType);
   auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
-      loc, outType, fn.name, in, out,
+      loc, returnTypes, fn.name, in, out,
       ValueRange{in_size0, in_size1, in_size2, in_size3, out_size0, out_size1,
                  flagsVal},
       /*fn_def_attrs=*/rewriter.getDictionaryAttr(fn.defAttrs),
@@ -614,20 +626,10 @@ void CPULowerToUKernelsPass::runOnOperation() {
   // performance, and that consideration overrides the benefit of fusions for
   // these ops.
   auto allTargets = [](auto target) { return true; };
-  patterns.insert<LowerToUKernelPattern<linalg::Mmt4DOp>>(
+  patterns.insert<LowerToUKernelPattern<linalg::Mmt4DOp>,
+                  LowerToUKernelPattern<tensor::PackOp>,
+                  LowerToUKernelPattern<tensor::UnPackOp>>(
       context, allTargets, skipIntermediateRoundings);
-  // These patterns could in principle be used on LLVMCPU, not just VMVX, but
-  // we choose not to, for two reasons:
-  // 1. Codegen for these ops is thought to be good enough, that we do not
-  //    really need microkernels.
-  // 2. Fusions matter particularly for pack/unpack ops due to the memcpy-like
-  //    nature of these ops and the typical patterns ML workload offering
-  //    fusions opportunities there. The combinatorics of what could get fused
-  //    there seem unbounded, so any attempt to add microkernels for fusions
-  //    would have difficulty scaling.
-  patterns.insert<LowerToUKernelPattern<tensor::PackOp>,
-                  LowerToUKernelPattern<tensor::UnPackOp>>(context,
-                                                           isVMVXBackend);
   // These patterns are inherently specific to the VMVX backend.
   patterns.insert<LowerToUKernelPattern<IREE::Codegen::QueryTileSizesOp>>(
       context, isVMVXBackend);
