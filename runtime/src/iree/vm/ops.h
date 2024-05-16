@@ -651,6 +651,206 @@ static inline int32_t vm_cmp_nan_f32(float operand) {
   return isnan(operand) ? 1 : 0;
 }
 
+//===------------------------------------------------------------------===//
+// ExtF64: Globals
+//===------------------------------------------------------------------===//
+
+static inline double vm_global_load_f64(uint8_t* base, uint32_t byte_offset) {
+  const double* global_ptr = (const double*)(base + byte_offset);
+  return *global_ptr;
+}
+
+static inline void vm_global_store_f64(uint8_t* base, uint32_t byte_offset,
+                                       double value) {
+  double* global_ptr = (double*)(base + byte_offset);
+  *global_ptr = value;
+}
+
+//===------------------------------------------------------------------===//
+// ExtF64: Buffers
+//===------------------------------------------------------------------===//
+
+#define vm_buffer_fill_f64_inline(buffer, element_offset, element_length, \
+                                  value)                                  \
+  vm_buffer_fill_inline(buffer, element_offset, element_length, double, value)
+static inline iree_status_t vm_buffer_fill_f64(iree_vm_buffer_t* buffer,
+                                               iree_host_size_t offset,
+                                               iree_host_size_t length,
+                                               double value) {
+  vm_buffer_fill_f64_inline(buffer, offset, length, value);
+  return iree_ok_status();
+}
+
+#define vm_buffer_load_f64_inline(buffer, element_offset, result)         \
+  const double* IREE_RESTRICT buffer_ptr = NULL;                          \
+  iree_vm_buffer_check_ro(buffer, element_offset, 1, double, buffer_ptr); \
+  *result = *buffer_ptr;
+static inline iree_status_t vm_buffer_load_f64(iree_vm_buffer_t* buffer,
+                                               iree_host_size_t offset,
+                                               double* result) {
+  vm_buffer_load_f64_inline(buffer, offset, result);
+  return iree_ok_status();
+}
+
+#define vm_buffer_store_f64_inline(buffer, element_offset, value)         \
+  double* IREE_RESTRICT buffer_ptr = NULL;                                \
+  iree_vm_buffer_check_rw(buffer, element_offset, 1, double, buffer_ptr); \
+  *buffer_ptr = value;
+static inline iree_status_t vm_buffer_store_f64(iree_vm_buffer_t* buffer,
+                                                iree_host_size_t offset,
+                                                double value) {
+  vm_buffer_store_f64_inline(buffer, offset, value);
+  return iree_ok_status();
+}
+
+//===------------------------------------------------------------------===//
+// ExtF64: Conditional assignment
+//===------------------------------------------------------------------===//
+
+static inline double vm_select_f64(int32_t condition, double true_value,
+                                   double false_value) {
+  return condition ? true_value : false_value;
+}
+
+//===------------------------------------------------------------------===//
+// ExtF64: Native floating-point arithmetic
+//===------------------------------------------------------------------===//
+
+static inline double vm_add_f64(double lhs, double rhs) { return lhs + rhs; }
+static inline double vm_sub_f64(double lhs, double rhs) { return lhs - rhs; }
+static inline double vm_mul_f64(double lhs, double rhs) { return lhs * rhs; }
+static inline double vm_div_f64(double lhs, double rhs) { return lhs / rhs; }
+static inline double vm_rem_f64(double lhs, double rhs) {
+  return remainder(lhs, rhs);
+}
+static inline double vm_fma_f64(double a, double b, double c) {
+#ifdef FP_FAST_FMA
+  return fma(a, b, c);
+#else
+  return a * b + c;
+#endif  // FP_FAST_FMA
+}
+static inline double vm_abs_f64(double operand) { return fabs(operand); }
+static inline double vm_neg_f64(double operand) { return -operand; }
+static inline double vm_ceil_f64(double operand) { return ceil(operand); }
+static inline double vm_floor_f64(double operand) { return floor(operand); }
+static inline double vm_round_f64(double operand) { return round(operand); }
+static inline double vm_round_f64_even(double operand) {
+#if __STC_VERSION__ >= 202300L  // C23
+  return roundeven(operand);
+#else
+  double rounded = round(operand);
+  if (fabs(operand - rounded) == 0.5) {
+    if (fmod(rounded, 2.0) != 0) {
+      if (rounded > 0.0) {
+        rounded -= 1.0;
+      } else {
+        rounded += 1.0;
+      }
+    }
+  }
+  return rounded;
+#endif  // C23
+}
+static inline double vm_min_f64(double lhs, double rhs) {
+  return rhs < lhs ? rhs : lhs;
+}
+static inline double vm_max_f64(double lhs, double rhs) {
+  return lhs < rhs ? rhs : lhs;
+}
+
+static inline double vm_atan_f64(double operand) { return atan(operand); }
+static inline double vm_atan2_f64(double y, double x) { return atan2(y, x); }
+static inline double vm_cos_f64(double operand) { return cos(operand); }
+static inline double vm_sin_f64(double operand) { return sin(operand); }
+static inline double vm_exp_f64(double operand) { return exp(operand); }
+static inline double vm_exp2_f64(double operand) { return exp2(operand); }
+static inline double vm_expm1_f64(double operand) { return expm1(operand); }
+static inline double vm_log_f64(double operand) { return log(operand); }
+static inline double vm_log10_f64(double operand) { return log10(operand); }
+static inline double vm_log1p_f64(double operand) { return log1p(operand); }
+static inline double vm_log2_f64(double operand) { return log2(operand); }
+static inline double vm_pow_f64(double b, double e) { return pow(b, e); }
+static inline double vm_rsqrt_f64(double operand) {
+  return 1.0 / sqrt(operand);
+}
+static inline double vm_sqrt_f64(double operand) { return sqrt(operand); }
+static inline double vm_tanh_f64(double operand) { return tanh(operand); }
+static inline double vm_erf_f64(double operand) { return erf(operand); }
+
+//===------------------------------------------------------------------===//
+// ExtF64: Casting and type conversion/emulation
+//===------------------------------------------------------------------===//
+
+static inline double vm_trunc_f64f32(double operand) { return (float)operand; }
+static inline double vm_ext_f32f64(float operand) { return (double)operand; }
+static inline double vm_cast_si32f64(int32_t operand) {
+  return (double)operand;
+}
+static inline double vm_cast_ui32f64(int32_t operand) {
+  return (double)(uint32_t)operand;
+}
+static inline int32_t vm_cast_f64si32(double operand) {
+  return (int32_t)lroundf(operand);
+}
+static inline int32_t vm_cast_f64ui32(double operand) {
+  return (uint32_t)llroundf(operand);
+}
+static inline double vm_cast_si64f64(int64_t operand) {
+  return (double)operand;
+}
+static inline double vm_cast_ui64f64(uint64_t operand) {
+  return (double)(uint64_t)operand;
+}
+static inline int64_t vm_cast_f64si64(double operand) {
+  return (int64_t)lround(operand);
+}
+static inline int64_t vm_cast_f64ui64(double operand) {
+  return (uint64_t)llround(operand);
+}
+static inline double vm_bitcast_i64f64(int64_t operand) {
+  double result;
+  memcpy(&result, &operand, sizeof(result));
+  return result;
+}
+static inline int64_t vm_bitcast_f64i64(double operand) {
+  int64_t result;
+  memcpy(&result, &operand, sizeof(result));
+  return result;
+}
+
+//===------------------------------------------------------------------===//
+// ExtF64: Comparison ops
+//===------------------------------------------------------------------===//
+
+static inline int32_t vm_cmp_eq_f64o(double lhs, double rhs) {
+  return (lhs == rhs) ? 1 : 0;
+}
+static inline int32_t vm_cmp_eq_f64u(double lhs, double rhs) {
+  return (isunordered(lhs, rhs) || (lhs == rhs)) ? 1 : 0;
+}
+static inline int32_t vm_cmp_ne_f64o(double lhs, double rhs) {
+  return (lhs != rhs) ? 1 : 0;
+}
+static inline int32_t vm_cmp_ne_f64u(double lhs, double rhs) {
+  return (isunordered(lhs, rhs) || (lhs != rhs)) ? 1 : 0;
+}
+static inline int32_t vm_cmp_lt_f64o(double lhs, double rhs) {
+  return isless(lhs, rhs) ? 1 : 0;
+}
+static inline int32_t vm_cmp_lt_f64u(double lhs, double rhs) {
+  return (isunordered(lhs, rhs) || isless(lhs, rhs)) ? 1 : 0;
+}
+static inline int32_t vm_cmp_lte_f64o(double lhs, double rhs) {
+  return islessequal(lhs, rhs) ? 1 : 0;
+}
+static inline int32_t vm_cmp_lte_f64u(double lhs, double rhs) {
+  return (isunordered(lhs, rhs) || islessequal(lhs, rhs)) ? 1 : 0;
+}
+static inline int32_t vm_cmp_nan_f64(double operand) {
+  return isnan(operand) ? 1 : 0;
+}
+
 #if defined(IREE_COMPILER_CLANG) && !IREE_VM_UBSAN_CHECKABLE_ENABLE
 #pragma clang attribute pop
 #endif  // IREE_COMPILER_CLANG && !IREE_VM_UBSAN_CHECKABLE_ENABLE

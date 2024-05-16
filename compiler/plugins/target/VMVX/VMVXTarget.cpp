@@ -87,6 +87,7 @@ public:
     // TODO(benvanik): derive these from a vm target triple.
     auto vmOptions = IREE::VM::TargetOptions::FromFlags::get();
     vmOptions.f32Extension = true;
+    vmOptions.f64Extension = true;
     vmOptions.optimizeForStackSize = false;
     return vmOptions;
   }
