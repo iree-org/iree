@@ -40,6 +40,7 @@ iree_cc_library(
     IREEVectorExtDialect
     LLVMSupport
     MLIRAMDGPUDialect
+    MLIRControlFlowInterfaces
     MLIRIR
     MLIRLinalgDialect
     MLIRParser
