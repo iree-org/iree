@@ -9,17 +9,14 @@
 
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
-#include "iree/compiler/Dialect/Util/Transforms/PassDetail.h"
-#include "iree/compiler/Dialect/Util/Transforms/Passes.h"
+#include "iree/compiler/InputConversion/Common/PassDetail.h"
+#include "iree/compiler/InputConversion/Common/Passes.h"
 #include "iree/compiler/Utils/ConversionUtils.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
-#include "mlir/Dialect/Linalg/IR/Linalg.h"
-#include "mlir/Dialect/Math/IR/Math.h"
-#include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
@@ -31,7 +28,7 @@
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir::iree_compiler::IREE::Util {
+namespace mlir::iree_compiler::InputConversion {
 namespace {
 
 Value convertRankedFloat(OpBuilder &builder, Type type, ValueRange inputs,
@@ -371,4 +368,4 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createDemoteF64ToF32Pass() {
   return std::make_unique<DemoteF64ToF32Pass>();
 }
 
-} // namespace mlir::iree_compiler::IREE::Util
+} // namespace mlir::iree_compiler::InputConversion

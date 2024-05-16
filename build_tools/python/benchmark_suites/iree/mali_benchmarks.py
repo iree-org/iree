@@ -120,7 +120,7 @@ class Android_Mali_Benchmarks(object):
             id=compile_config.id + "-demote-f32-to-16",
             tags=compile_config.tags + ["demote-f32-to-f16"],
             compile_targets=compile_config.compile_targets,
-            extra_flags=compile_config.extra_flags + ["--iree-opt-demote-f32-to-f16"],
+            extra_flags=compile_config.extra_flags + ["--iree-input-demote-f32-to-f16"],
         )
         return (
             [

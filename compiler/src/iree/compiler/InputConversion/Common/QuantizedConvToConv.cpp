@@ -22,7 +22,7 @@
 #include "mlir/Transforms/FoldUtils.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-namespace mlir::iree_compiler {
+namespace mlir::iree_compiler::InputConversion {
 
 namespace {
 
@@ -359,4 +359,4 @@ createLinalgQuantizedConvToConvPass() {
   return std::make_unique<LinalgQuantizedConvToConvPass>();
 }
 
-} // namespace mlir::iree_compiler
+} // namespace mlir::iree_compiler::InputConversion

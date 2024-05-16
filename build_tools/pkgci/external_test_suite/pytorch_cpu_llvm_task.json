@@ -1,6 +1,6 @@
 {
   "config_name": "cpu_llvm_task",
-  "iree_compile_flags" : [
+  "iree_compile_flags": [
     "--iree-hal-target-backends=llvm-cpu"
   ],
   "iree_run_module_flags": [

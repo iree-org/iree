@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-util-promote-bf16-to-f32 %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-input-conversion-promote-bf16-to-f32 %s | FileCheck %s
 
 // CHECK: util.global {{.*}} : tensor<4xf32>
 // CHECK-LABEL: util.func public @simple_bf16() -> tensor<4xf32>

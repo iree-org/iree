@@ -55,13 +55,6 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createHoistIntoGlobalsPass();
 // Resource Management.
 std::unique_ptr<OperationPass<void>> createImportResourcesPass();
 
-// Type conversion.
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createDemoteI64ToI32Pass();
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createDemoteF32ToF16Pass();
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createDemoteF64ToF32Pass();
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createPromoteF16ToF32Pass();
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createPromoteBF16ToF32Pass();
-
 // Debug/test passes.
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createAnnotateOpOrdinalsPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createTestConversionPass();

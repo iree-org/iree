@@ -209,7 +209,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "local-task"
   COMPILER_FLAGS
-    "-iree-opt-demote-f64-to-f32=false"
+    "-iree-input-demote-f64-to-f32=false"
 )
 
 iree_check_single_backend_test_suite(
