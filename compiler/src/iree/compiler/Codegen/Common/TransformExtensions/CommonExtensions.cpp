@@ -943,9 +943,10 @@ LogicalResult compareWorkerCountsAndTypes(scf::ForallOp producer,
   return success();
 }
 
-void replaceExtractSlice(RewriterBase &rewriter, Location loc,
-                         tensor::ParallelInsertSliceOp parallelInsert,
-                         tensor::ExtractSliceOp extractSlice) {
+void replaceConsumerChain(RewriterBase &rewriter, Location loc, Value source,
+                          tensor::ParallelInsertSliceOp parallelInsert,
+                          SmallVector<Operation *> consumerChain) {
+  auto extractSlice = cast<tensor::ExtractSliceOp>(consumerChain.back());
   OpBuilder::InsertionGuard g(rewriter);
   auto shuffleOp = rewriter.create<IREE::GPU::ShuffleTensorOp>(
       loc, extractSlice.getType(), parallelInsert.getSource(),
@@ -960,8 +961,11 @@ void replaceExtractSlice(RewriterBase &rewriter, Location loc,
   rewriter.setInsertionPointToStart(shuffleOp.getBody());
   auto terminator =
       rewriter.create<IREE::GPU::YieldOp>(loc, extractSlice.getResult());
-  rewriter.moveOpBefore(extractSlice, terminator);
-  extractSlice.getSourceMutable().assign(shuffleOp.getBody()->getArgument(0));
+  for (auto consumer : consumerChain) {
+    rewriter.moveOpBefore(consumer, terminator);
+  }
+  (*consumerChain.begin())
+      ->replaceUsesOfWith(source, shuffleOp.getBody()->getArgument(0));
   rewriter.replaceAllUsesExcept(extractSlice.getResult(), shuffleOp,
                                 terminator);
 }
@@ -969,8 +973,16 @@ void replaceExtractSlice(RewriterBase &rewriter, Location loc,
 LogicalResult fuseForallIntoSlice(RewriterBase &rewriter,
                                   scf::ForallOp producer,
                                   scf::ForallOp consumer,
-                                  tensor::ExtractSliceOp slice,
-                                  std::optional<Attribute> addressSpace) {
+                                  SmallVector<Operation *> consumerChain) {
+  if (consumerChain.empty()) {
+    return failure();
+  }
+
+  auto slice = dyn_cast<tensor::ExtractSliceOp>(consumerChain.back());
+  if (!slice) {
+    return failure();
+  }
+
   if (producer->getNumResults() != 1) {
     return failure();
   }
@@ -1033,7 +1045,8 @@ LogicalResult fuseForallIntoSlice(RewriterBase &rewriter,
   auto parallelInsert =
       cast<tensor::ParallelInsertSliceOp>(*terminator.getYieldingOps().begin());
 
-  replaceExtractSlice(rewriter, loc, parallelInsert, slice);
+  replaceConsumerChain(rewriter, loc, producer.getResult(0), parallelInsert,
+                       consumerChain);
 
   rewriter.eraseOp(parallelInsert);
   rewriter.eraseOp(terminator);
@@ -1062,21 +1075,32 @@ transform_dialect::FuseForallOp::apply(transform::TransformRewriter &rewriter,
                                      "Non-forall producer or consumer");
   }
 
-  if (!producer->hasOneUse()) {
-    return mlir::emitDefiniteFailure(state.getTopLevel(),
-                                     "non-single use producer");
+  tensor::ExtractSliceOp sliceConsumer;
+  Operation *currProducer = producer;
+
+  SmallVector<Operation *> consumerChain;
+  while (currProducer->hasOneUse()) {
+    Operation *nextConsumer = *currProducer->user_begin();
+    if (auto maybeSlice = dyn_cast<tensor::ExtractSliceOp>(nextConsumer)) {
+      sliceConsumer = maybeSlice;
+      consumerChain.push_back(sliceConsumer);
+      break;
+    }
+    if (isa<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(nextConsumer)) {
+      consumerChain.push_back(nextConsumer);
+      currProducer = nextConsumer;
+      continue;
+    }
   }
 
-  auto sliceConsumer =
-      dyn_cast<tensor::ExtractSliceOp>(*producer->user_begin());
   if (!sliceConsumer || sliceConsumer->getParentOp() != consumer) {
     return mlir::emitDefiniteFailure(state.getTopLevel(),
-                                     "producer loop sole consumer is not an "
+                                     "producer loop not consumed by single "
                                      "extracted slice from the consumer loop");
   }
 
-  if (failed(fuseForallIntoSlice(rewriter, producer, consumer, sliceConsumer,
-                                 getAddressSpace()))) {
+  if (failed(
+          fuseForallIntoSlice(rewriter, producer, consumer, consumerChain))) {
     return mlir::emitDefiniteFailure(state.getTopLevel(),
                                      "failed to fuse forall ops");
   }
