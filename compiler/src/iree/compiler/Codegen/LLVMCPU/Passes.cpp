@@ -668,7 +668,6 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
         .addPass(createCSEPass)
         .addPass(mlir::createArithToArmSMEConversionPass)
         .addPass(mlir::createConvertVectorToArmSMEPass)
-        .addPass(mlir::arm_sme::createTileAllocationPass)
         .addPass([]() {
           return mlir::arm_sme::createEnableArmStreamingPass(
               mlir::arm_sme::ArmStreamingMode::StreamingLocally,
@@ -703,7 +702,9 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
                          createInstrumentMemoryAccessesPass);
 
   if (enableAArch64SME) {
-    modulePassManager.addPass(createConvertArmSMEToLLVMPass());
+    FunctionLikeNest(modulePassManager).addPass([&] {
+      return createConvertArmSMEToLLVMPass();
+    });
   }
   modulePassManager.addPass(
       createConvertToLLVMPass(clEnableReassociateFpReductions));
