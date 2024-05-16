@@ -295,38 +295,46 @@ std::optional<SmallVector<int64_t, 4>> MultiMmaOp::getShapeForUnroll() {
 
 LogicalResult ShuffleTensorOp::verify() {
   // Get the equivalent tensor type for the alloc to verify against.
-  MemRefType allocType = getSharedAllocType();
-  Type allocElementType = allocType.getElementType();
+  RankedTensorType destType = getDestType();
+  Type allocElementType = destType.getElementType();
   RankedTensorType allocTensorType =
-      RankedTensorType::get(allocType.getShape(), allocElementType);
+      RankedTensorType::get(destType.getShape(), allocElementType);
 
   // Verify source type against inferred type. Slice insertion and extraction
   // use the same verification logic.
   RankedTensorType expectedType = tensor::ExtractSliceOp::inferResultType(
-      allocTensorType, getMixedSourceOffsets(), getMixedSourceSizes(),
-      getMixedSourceStrides());
+      allocTensorType, getMixedOffsets(), getMixedSizes(), getMixedStrides());
   SliceVerificationResult result =
       isRankReducedType(expectedType, getSourceType());
   if (result != SliceVerificationResult::Success) {
     return emitError("Invalid source slice type");
   }
 
-  // Do the same for the resulting tensor type
-  expectedType = tensor::ExtractSliceOp::inferResultType(
-      allocTensorType, getMixedResultOffsets(), getMixedResultSizes(),
-      getMixedResultStrides());
-  result = isRankReducedType(expectedType, getType());
-  if (result != SliceVerificationResult::Success) {
-    return emitError("Invalid result slice type");
-  }
-
   if (allocElementType != getSourceType().getElementType() ||
       allocElementType != getType().getElementType()) {
-    return emitError(
-        "Element type mismatch between source, allocation, and result");
+    return emitError("Element type mismatch between source and destination");
+  }
+  return success();
+}
+
+LogicalResult ShuffleTensorOp::verifyRegions() {
+  auto &region = getRegion();
+  Block &block = region.front();
+  if (block.getNumArguments() != 1) {
+    return emitError("expected the block to have a single argument");
   }
 
-  // TODO: Verification of the allocation size in the static case.
+  if (block.getArgumentTypes()[0] != getDestType()) {
+    return emitError("expected block to have single argument type of")
+           << getDestType();
+  }
+
+  // Ensure that the region yields an element of the right type.
+  auto yieldOp = llvm::cast<GPU::YieldOp>(block.getTerminator());
+  if (yieldOp.getValue().getType() != getResult().getType()) {
+    return emitOpError("expected yield type to match result type");
+  }
+
   return success();
 }
 

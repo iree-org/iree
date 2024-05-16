@@ -410,35 +410,30 @@ struct LowerShuffleTensor
                                 PatternRewriter &rewriter) const final {
     Location loc = shuffleOp.getLoc();
 
-    MemRefType allocType = shuffleOp.getSharedAllocType();
-    auto tensorType =
-        RankedTensorType::get(allocType.getShape(), allocType.getElementType());
-    Value tensorAlloc = rewriter.create<bufferization::ToTensorOp>(
-        loc, tensorType, shuffleOp.getSharedAlloc(), /*restrict=*/true,
-        /*writeable=*/true);
-
     // Step 1. Insert the source slice into the intermediate tensor.
-    SmallVector<OpFoldResult, 4> sourceOffsets =
-        shuffleOp.getMixedSourceOffsets();
-    SmallVector<OpFoldResult, 4> sourceSizes = shuffleOp.getMixedSourceSizes();
-    SmallVector<OpFoldResult, 4> sourceStrides =
-        shuffleOp.getMixedSourceStrides();
+    SmallVector<OpFoldResult, 4> sourceOffsets = shuffleOp.getMixedOffsets();
+    SmallVector<OpFoldResult, 4> sourceSizes = shuffleOp.getMixedSizes();
+    SmallVector<OpFoldResult, 4> sourceStrides = shuffleOp.getMixedStrides();
     Value insertedSlice = rewriter.create<tensor::InsertSliceOp>(
-        loc, shuffleOp.getSource(), tensorAlloc, sourceOffsets, sourceSizes,
-        sourceStrides);
+        loc, shuffleOp.getSource(), shuffleOp.getDest(), sourceOffsets,
+        sourceSizes, sourceStrides);
 
     // Step 2. Synchronize the workers.
     rewriter.create<gpu::BarrierOp>(loc);
 
-    // Step 3. Extract the result slice.
-    SmallVector<OpFoldResult, 4> resultOffsets =
-        shuffleOp.getMixedResultOffsets();
-    SmallVector<OpFoldResult, 4> resultSizes = shuffleOp.getMixedResultSizes();
-    SmallVector<OpFoldResult, 4> resultStrides =
-        shuffleOp.getMixedResultStrides();
-    rewriter.replaceOpWithNewOp<tensor::ExtractSliceOp>(
-        shuffleOp, shuffleOp.getType(), insertedSlice, resultOffsets,
-        resultSizes, resultStrides);
+    auto terminator = shuffleOp.getBody()->getTerminator();
+    Value replacement = terminator->getOperand(0);
+    rewriter.inlineBlockBefore(shuffleOp.getBody(), shuffleOp, {insertedSlice});
+    rewriter.replaceAllUsesWith(shuffleOp.getResult(), replacement);
+    rewriter.setInsertionPointAfterValue(replacement);
+
+    // Step 2. Synchronize the workers again after reading the shuffled values.
+    // TODO: This barrier is an approximation for what we expect bufferization +
+    // vectorization to produce. There is no guarantee that this barrier is
+    // adhered to, but the way that bufferization and vectorization works
+    // is unfriendly towards barrier-like constructs.
+    rewriter.create<gpu::BarrierOp>(loc);
+    rewriter.eraseOp(terminator);
     return success();
   }
 };
@@ -948,35 +943,27 @@ LogicalResult compareWorkerCountsAndTypes(scf::ForallOp producer,
   return success();
 }
 
-Value getReplacementSlice(RewriterBase &rewriter, Location loc,
-                          tensor::ParallelInsertSliceOp parallelInsert,
-                          tensor::ExtractSliceOp extractSlice,
-                          std::optional<Attribute> addressSpace) {
-  RankedTensorType destTensorType = parallelInsert.getDestType();
-  MemRefType allocType =
-      addressSpace ? MemRefType::get(destTensorType.getShape(),
-                                     destTensorType.getElementType(),
-                                     MemRefLayoutAttrInterface{}, *addressSpace)
-                   : MemRefType::get(destTensorType.getShape(),
-                                     destTensorType.getElementType());
-  Value dest = Value();
-  if (auto empty = parallelInsert.getDest().getDefiningOp<tensor::EmptyOp>()) {
-    OpBuilder::InsertionGuard g(rewriter);
-    rewriter.setInsertionPoint(empty);
-    dest = rewriter.create<memref::AllocOp>(loc, allocType,
-                                            empty.getDynamicSizes());
-  } else {
-    dest = rewriter.create<bufferization::ToMemrefOp>(loc, allocType,
-                                                      parallelInsert.getDest());
-  }
-  return rewriter.create<IREE::GPU::ShuffleTensorOp>(
+void replaceExtractSlice(RewriterBase &rewriter, Location loc,
+                         tensor::ParallelInsertSliceOp parallelInsert,
+                         tensor::ExtractSliceOp extractSlice) {
+  OpBuilder::InsertionGuard g(rewriter);
+  auto shuffleOp = rewriter.create<IREE::GPU::ShuffleTensorOp>(
       loc, extractSlice.getType(), parallelInsert.getSource(),
       parallelInsert.getOffsets(), parallelInsert.getSizes(),
       parallelInsert.getStrides(), parallelInsert.getStaticOffsets(),
-      parallelInsert.getStaticSizes(), parallelInsert.getStaticStrides(), dest,
-      extractSlice.getOffsets(), extractSlice.getSizes(),
-      extractSlice.getStrides(), extractSlice.getStaticOffsets(),
-      extractSlice.getStaticSizes(), extractSlice.getStaticStrides());
+      parallelInsert.getStaticSizes(), parallelInsert.getStaticStrides(),
+      parallelInsert.getDest());
+  Region *region = &shuffleOp.getRegion();
+  rewriter.createBlock(region, region->end(),
+                       ArrayRef<Type>{parallelInsert.getDestType()},
+                       ArrayRef<Location>{loc});
+  rewriter.setInsertionPointToStart(shuffleOp.getBody());
+  auto terminator =
+      rewriter.create<IREE::GPU::YieldOp>(loc, extractSlice.getResult());
+  rewriter.moveOpBefore(extractSlice, terminator);
+  extractSlice.getSourceMutable().assign(shuffleOp.getBody()->getArgument(0));
+  rewriter.replaceAllUsesExcept(extractSlice.getResult(), shuffleOp,
+                                terminator);
 }
 
 LogicalResult fuseForallIntoSlice(RewriterBase &rewriter,
@@ -1046,12 +1033,9 @@ LogicalResult fuseForallIntoSlice(RewriterBase &rewriter,
   auto parallelInsert =
       cast<tensor::ParallelInsertSliceOp>(*terminator.getYieldingOps().begin());
 
-  Value replacementSlice =
-      getReplacementSlice(rewriter, loc, parallelInsert, slice, addressSpace);
-  rewriter.replaceAllUsesWith(slice, replacementSlice);
+  replaceExtractSlice(rewriter, loc, parallelInsert, slice);
 
   rewriter.eraseOp(parallelInsert);
-  rewriter.eraseOp(slice);
   rewriter.eraseOp(terminator);
   rewriter.eraseOp(producer);
   return success();
