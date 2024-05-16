@@ -1,7 +1,8 @@
 {
   "config_name": "gpu_vulkan",
   "iree_compile_flags": [
-    "--iree-hal-target-backends=vulkan-spirv"
+    "--iree-hal-target-backends=vulkan-spirv",
+    "--iree-opt-demote-f64-to-f32"
   ],
   "iree_run_module_flags": [
     "--device=vulkan"

@@ -75,7 +75,7 @@ struct PreprocessingOptions {
 // Options controlling high level optimizations.
 struct GlobalOptimizationOptions {
   // Gate various type based demotion passes that run before anything else.
-  bool demoteF64ToF32 = true;
+  bool demoteF64ToF32 = false;
   bool demoteF32ToF16 = false;
   bool promoteF16ToF32 = false;
   bool promoteBF16ToF32 = false;

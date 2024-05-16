@@ -19,7 +19,7 @@ namespace {
 
 struct StableHLOOptions {
   bool demoteI64ToI32 = true;
-  bool demoteF64ToF32 = false;
+  bool demoteF64ToF32 = true;
   bool promoteBF16ToF32 = false;
 
   void bindOptions(OptionsBinder &binder) {
