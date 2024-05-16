@@ -391,9 +391,11 @@ void addMultiTilingExpertPassPipeline(OpPassManager &funcPassManager,
 
   {
     funcPassManager.addPass(createVectorizePadPass());
-    funcPassManager.addPass(createDecomposePackUnPackOpsPass());
-    funcPassManager.addPass(createCanonicalizerPass());
-    funcPassManager.addPass(createCSEPass());
+    if (pipelineOpt.decomposePackUnPackOps) {
+      funcPassManager.addPass(createDecomposePackUnPackOpsPass());
+      funcPassManager.addPass(createCanonicalizerPass());
+      funcPassManager.addPass(createCSEPass());
+    }
 
     GenericVectorizationPassOptions options;
     options.useConfiguredVectorSizes = pipelineOpt.useConfiguredVectorSizes;
@@ -563,7 +565,9 @@ void addCPUDataTilingPipeline(OpPassManager &funcPassManager,
   addTileAndDistributePasses(funcPassManager);
   funcPassManager.addPass(
       createLLVMCPUTilePass(tilingConfig.getVectorCommonParallelLevel()));
-  funcPassManager.addPass(createDecomposePackUnPackOpsPass());
+  if (pipelineOpt.decomposePackUnPackOps) {
+    funcPassManager.addPass(createDecomposePackUnPackOpsPass());
+  }
 
   {
     GenericVectorizationPassOptions options;
