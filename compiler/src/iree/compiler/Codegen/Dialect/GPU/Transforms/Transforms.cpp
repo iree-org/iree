@@ -6,18 +6,182 @@
 
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Transforms.h"
 
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
+#include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/Dialect/Vector/Utils/VectorUtils.h"
+#include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-transforms"
 
 namespace mlir::iree_compiler::IREE::GPU {
+
+//===----------------------------------------------------------------------===//
+// Conversion to MultiMmaOp
+//===----------------------------------------------------------------------===//
+
+AffineMap dropDims(MLIRContext *context, int64_t newDimCount, AffineMap map,
+                   llvm::SmallDenseMap<int64_t, int64_t> &oldDimsToNewDimsMap) {
+  assert(map.isProjectedPermutation() && "expected projected permutation");
+
+  SmallVector<AffineExpr> newResults;
+  for (auto expr : map.getResults()) {
+    int64_t dimPos = cast<AffineDimExpr>(expr).getPosition();
+    if (!oldDimsToNewDimsMap.contains(dimPos)) {
+      continue;
+    }
+    newResults.push_back(
+        getAffineDimExpr(oldDimsToNewDimsMap[dimPos], context));
+  }
+  return AffineMap::get(/*dimCount=*/newDimCount, /*symbolCount=*/0, newResults,
+                        context);
+}
+
+// Helper to convert a contraction-like linalg op to an iree_gpu.multi_mma.
+FailureOr<IREE::GPU::MultiMmaOp>
+convertContractionToMultiMma(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
+                             IREE::GPU::MmaInterfaceAttr mmaKind) {
+  if (!linalgOp.hasPureTensorSemantics()) {
+    return failure();
+  }
+
+  FailureOr<linalg::ContractionDimensions> maybeContractionDims =
+      linalg::inferContractionDims(linalgOp);
+  if (failed(maybeContractionDims)) {
+    return failure();
+  }
+
+  linalg::ContractionDimensions contractionDims = *maybeContractionDims;
+  if (contractionDims.m.empty() || contractionDims.n.empty() ||
+      contractionDims.k.empty()) {
+    return failure();
+  }
+
+  MLIRContext *context = rewriter.getContext();
+
+  int64_t innerM = contractionDims.m.back();
+  int64_t innerN = contractionDims.n.back();
+  int64_t innerK = contractionDims.k.back();
+
+  AffineExpr d0, d1, d2;
+  bindDims(context, d0, d1, d2);
+  llvm::SmallDenseMap<AffineExpr, AffineExpr> newDims;
+  AffineExpr mExpr = rewriter.getAffineDimExpr(innerM);
+  AffineExpr nExpr = rewriter.getAffineDimExpr(innerN);
+  AffineExpr kExpr = rewriter.getAffineDimExpr(innerK);
+
+  SmallVector<AffineMap> indexingMaps = linalgOp.getIndexingMapsArray();
+  AffineMap lhsMap = indexingMaps[0];
+  AffineMap rhsMap = indexingMaps[1];
+  AffineMap accMap = indexingMaps[2];
+
+  auto getNormalizedPermutation =
+      [&](AffineMap map,
+          ArrayRef<AffineExpr> expectedDimOrder) -> SmallVector<int64_t> {
+    llvm::SmallDenseMap<AffineExpr, int64_t> dimMap;
+    for (auto [i, expr] : llvm::enumerate(expectedDimOrder)) {
+      dimMap[expr] = i;
+    }
+    SmallVector<int64_t> permutation;
+    for (AffineExpr resExpr : map.getResults()) {
+      if (!dimMap.contains(resExpr)) {
+        return {};
+      }
+      permutation.push_back(dimMap[resExpr]);
+    }
+    return permutation;
+  };
+
+  // TODO: Enable batched intrinsics and get the appropriate sub-map here.
+  SmallVector<int64_t> lhsInnerPerm =
+      getNormalizedPermutation(lhsMap.getMinorSubMap(2), {mExpr, kExpr});
+  SmallVector<int64_t> rhsInnerPerm =
+      getNormalizedPermutation(rhsMap.getMinorSubMap(2), {kExpr, nExpr});
+  SmallVector<int64_t> accInnerPerm =
+      getNormalizedPermutation(accMap.getMinorSubMap(2), {mExpr, nExpr});
+
+  if (lhsInnerPerm.empty() || rhsInnerPerm.empty() || accInnerPerm.empty()) {
+    return failure();
+  }
+
+  SmallVector<int64_t> bounds = linalgOp.getStaticLoopRanges();
+
+  auto [intrinsicM, intrinsicN, intrinsicK] = mmaKind.getMNKShape();
+  if (intrinsicM != bounds[innerM] || intrinsicN != bounds[innerN] ||
+      intrinsicK != bounds[innerK]) {
+    return failure();
+  }
+
+  SmallVector<Value> inputs = linalgOp->getOperands();
+  auto [lhsElementType, rhsElementType, accElementType] =
+      mmaKind.getABCElementTypes();
+  if (cast<RankedTensorType>(inputs[0].getType()).getElementType() !=
+          lhsElementType ||
+      cast<RankedTensorType>(inputs[1].getType()).getElementType() !=
+          rhsElementType ||
+      cast<RankedTensorType>(inputs[2].getType()).getElementType() !=
+          accElementType) {
+    return failure();
+  }
+
+  SmallVector<utils::IteratorType> linalgIteratorTypes =
+      linalgOp.getIteratorTypesArray();
+  auto convertIteratorType = [](utils::IteratorType iteratorType) {
+    if (iteratorType == utils::IteratorType::parallel) {
+      return IREE::GPU::IteratorType::parallel;
+    }
+    return IREE::GPU::IteratorType::reduction;
+  };
+
+  llvm::SmallDenseSet<int64_t> droppedDims = {innerM, innerN, innerK};
+  llvm::SmallDenseMap<int64_t, int64_t> oldDimsToNewDimsMap;
+  int64_t currentDim = 0;
+  int64_t numDims = lhsMap.getNumDims();
+  SmallVector<IREE::GPU::IteratorType> iteratorTypes;
+  for (int64_t dim = 0, e = numDims; dim < e; ++dim) {
+    if (droppedDims.contains(dim)) {
+      continue;
+    }
+    iteratorTypes.push_back(convertIteratorType(linalgIteratorTypes[dim]));
+    oldDimsToNewDimsMap[dim] = currentDim++;
+  }
+
+  AffineMap outerLhsMap =
+      dropDims(context, numDims - 3, lhsMap, oldDimsToNewDimsMap);
+  AffineMap outerRhsMap =
+      dropDims(context, numDims - 3, rhsMap, oldDimsToNewDimsMap);
+  AffineMap outerAccMap =
+      dropDims(context, numDims - 3, accMap, oldDimsToNewDimsMap);
+
+  SmallVector<int64_t> identityPerm = {0, 1};
+
+  std::optional<SmallVector<int64_t>> lhsPerm = std::nullopt;
+  if (lhsInnerPerm != identityPerm) {
+    lhsPerm = lhsInnerPerm;
+  }
+  std::optional<SmallVector<int64_t>> rhsPerm = std::nullopt;
+  if (rhsInnerPerm != identityPerm) {
+    rhsPerm = rhsInnerPerm;
+  }
+  std::optional<SmallVector<int64_t>> accPerm = std::nullopt;
+  if (accInnerPerm != identityPerm) {
+    accPerm = accInnerPerm;
+  }
+
+  auto newMmaOp = rewriter.replaceOpWithNewOp<IREE::GPU::MultiMmaOp>(
+      linalgOp, inputs[0], inputs[1], inputs[2],
+      ArrayRef<AffineMap>{outerLhsMap, outerRhsMap, outerAccMap}, iteratorTypes,
+      mmaKind, lhsPerm, rhsPerm, accPerm);
+  return newMmaOp;
+}
 
 //===----------------------------------------------------------------------===//
 // MultiMmaOp Unit Dim Folding

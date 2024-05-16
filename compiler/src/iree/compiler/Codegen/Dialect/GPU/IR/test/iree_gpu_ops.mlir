@@ -78,3 +78,91 @@ func.func @single_multi_mma(%lhs: vector<4xf16>, %rhs: vector<4xf16>, %acc: vect
   } : vector<4xf16>, vector<4xf16> into vector<4xf32>
   return %0 : vector<4xf32>
 }
+
+// -----
+
+#contraction_accesses = [
+ affine_map<(i, j, k) -> (i, k)>,
+ affine_map<(i, j, k) -> (k, j)>,
+ affine_map<(i, j, k) -> (i, j)>
+]
+func.func @tensor_subgroup_multi_mma(%lhs: tensor<?x?x16x16xf16>, %rhs: tensor<?x?x16x16xf16>, %acc: tensor<?x?x16x16xf32>) -> tensor<?x?x16x16xf32> {
+  %0 = iree_gpu.multi_mma %lhs, %rhs, %acc {
+    indexing_maps = #contraction_accesses,
+    iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>],
+    kind = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
+  } : tensor<?x?x16x16xf16>, tensor<?x?x16x16xf16> into tensor<?x?x16x16xf32>
+  return %0 : tensor<?x?x16x16xf32>
+}
+
+// CHECK: #[[$MAP:.+]] = affine_map<(d0, d1, d2) -> (d0, d2)>
+// CHECK: #[[$MAP1:.+]] = affine_map<(d0, d1, d2) -> (d2, d1)>
+// CHECK: #[[$MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
+
+// CHECK-LABEL: func @tensor_subgroup_multi_mma
+//       CHECK:   iree_gpu.multi_mma %arg0, %arg1, %arg2
+//  CHECK-SAME:     indexing_maps = [#[[$MAP]], #[[$MAP1]], #[[$MAP2]]],
+//  CHECK-SAME:     iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>],
+//  CHECK-SAME:     kind = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>}
+//  CHECK-SAME:     : tensor<?x?x16x16xf16>, tensor<?x?x16x16xf16> into tensor<?x?x16x16xf32>
+
+// -----
+
+#contraction_accesses = [
+ affine_map<(i, j, k) -> (i, k)>,
+ affine_map<(i, j, k) -> (k, j)>,
+ affine_map<(i, j, k) -> (i, j)>
+]
+func.func @tensor_subgroup_matmul_transpose_b_multi_mma(%lhs: tensor<?x?x16x16xf16>, %rhs: tensor<?x?x16x16xf16>, %acc: tensor<?x?x16x16xf32>) -> tensor<?x?x16x16xf32> {
+  %0 = iree_gpu.multi_mma %lhs, %rhs, %acc {
+    indexing_maps = #contraction_accesses,
+    iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>],
+    kind = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+    rhs_permutation = array<i64: 1, 0>
+  } : tensor<?x?x16x16xf16>, tensor<?x?x16x16xf16> into tensor<?x?x16x16xf32>
+  return %0 : tensor<?x?x16x16xf32>
+}
+
+// CHECK: #[[$MAP:.+]] = affine_map<(d0, d1, d2) -> (d0, d2)>
+// CHECK: #[[$MAP1:.+]] = affine_map<(d0, d1, d2) -> (d2, d1)>
+// CHECK: #[[$MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
+
+// CHECK-LABEL: func @tensor_subgroup_matmul_transpose_b_multi_mma
+//       CHECK:   iree_gpu.multi_mma %arg0, %arg1, %arg2
+//  CHECK-SAME:     indexing_maps = [#[[$MAP]], #[[$MAP1]], #[[$MAP2]]],
+//  CHECK-SAME:     iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>],
+//  CHECK-SAME:     kind = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+//  CHECK-SAME:     rhs_permutation = array<i64: 1, 0>}
+//  CHECK-SAME:     : tensor<?x?x16x16xf16>, tensor<?x?x16x16xf16> into tensor<?x?x16x16xf32>
+
+// -----
+
+#contraction_accesses = [
+ affine_map<(i, j, k) -> (i, k)>,
+ affine_map<(i, j, k) -> (k, j)>,
+ affine_map<(i, j, k) -> (i, j)>
+]
+func.func @tensor_subgroup_matmul_transpose_b_32x32x8_multi_mma(
+  %lhs: tensor<?x?x32x8xf16>,
+  %rhs: tensor<?x?x32x8xf16>,
+  %acc: tensor<?x?x32x32xf32>) -> tensor<?x?x32x32xf32> {
+  %0 = iree_gpu.multi_mma %lhs, %rhs, %acc {
+    indexing_maps = #contraction_accesses,
+    iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>],
+    kind = #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>,
+    rhs_permutation = array<i64: 1, 0>
+  } : tensor<?x?x32x8xf16>, tensor<?x?x32x8xf16> into tensor<?x?x32x32xf32>
+  return %0 : tensor<?x?x32x32xf32>
+}
+
+// CHECK: #[[$MAP:.+]] = affine_map<(d0, d1, d2) -> (d0, d2)>
+// CHECK: #[[$MAP1:.+]] = affine_map<(d0, d1, d2) -> (d2, d1)>
+// CHECK: #[[$MAP2:.+]] = affine_map<(d0, d1, d2) -> (d0, d1)>
+
+// CHECK-LABEL: func @tensor_subgroup_matmul_transpose_b_32x32x8_multi_mma
+//       CHECK:   iree_gpu.multi_mma %arg0, %arg1, %arg2
+//  CHECK-SAME:     indexing_maps = [#[[$MAP]], #[[$MAP1]], #[[$MAP2]]],
+//  CHECK-SAME:     iterator_types = [#iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<parallel>, #iree_gpu.iterator_type<reduction>],
+//  CHECK-SAME:     kind = #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>,
+//  CHECK-SAME:     rhs_permutation = array<i64: 1, 0>}
+//  CHECK-SAME:     : tensor<?x?x32x8xf16>, tensor<?x?x32x8xf16> into tensor<?x?x32x32xf32>
