@@ -16,8 +16,8 @@ namespace mlir::iree_compiler::Reducer {
 /// Represents the range: [begin, end).
 class Chunk {
 public:
-  Chunk(unsigned begin, unsigned end) : range({begin, end}) {};
-  Chunk(unsigned numTargets) : Chunk(0, numTargets) {};
+  Chunk(unsigned begin, unsigned end) : range({begin, end}) {}
+  Chunk(unsigned numTargets) : Chunk(0, numTargets) {}
 
   unsigned getBegin() const { return range.first; }
   unsigned getEnd() const { return range.second; }
@@ -40,7 +40,7 @@ bool operator<(const Chunk &C1, const Chunk &C2);
 class ChunkManager {
 public:
   explicit ChunkManager(ArrayRef<Chunk> chunksToKeep)
-      : chunksToKeep(chunksToKeep) {};
+      : chunksToKeep(chunksToKeep) {}
 
   /// Should be called for each feature being processed. Returns true if the
   /// feature should be preserved.

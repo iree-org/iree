@@ -90,7 +90,7 @@ static inline iree_string_pair_t iree_make_cstring_pair(const char* first,
 }
 
 #define iree_string_view_literal(str) \
-  {.data = (str), .size = IREE_ARRAYSIZE(str) - 1}
+  { .data = (str), .size = IREE_ARRAYSIZE(str) - 1 }
 
 // Returns a string view initialized with the given cstring.
 #define IREE_SV(cstr) iree_make_cstring_view(cstr)

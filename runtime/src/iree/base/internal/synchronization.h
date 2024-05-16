@@ -366,12 +366,14 @@ typedef struct iree_notification_t {
 } iree_notification_t;
 
 #if IREE_SYNCHRONIZATION_DISABLE_UNSAFE
-#define IREE_NOTIFICATION_INIT {IREE_ATOMIC_VAR_INIT(0)}
+#define IREE_NOTIFICATION_INIT \
+  { IREE_ATOMIC_VAR_INIT(0) }
 #elif !defined(IREE_RUNTIME_USE_FUTEX)
 #define IREE_NOTIFICATION_INIT \
-  {PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER, 0, 0}
+  { PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER, 0, 0 }
 #else
-#define IREE_NOTIFICATION_INIT {IREE_ATOMIC_VAR_INIT(0)}
+#define IREE_NOTIFICATION_INIT \
+  { IREE_ATOMIC_VAR_INIT(0) }
 #endif  // notification type
 
 // Initializes a notification to no waiters and an initial epoch of 0.

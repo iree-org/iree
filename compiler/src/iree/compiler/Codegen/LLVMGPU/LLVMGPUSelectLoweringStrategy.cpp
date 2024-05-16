@@ -57,7 +57,7 @@ public:
 
   LLVMGPUSelectLoweringStrategyPass() = default;
   LLVMGPUSelectLoweringStrategyPass(
-      const LLVMGPUSelectLoweringStrategyPass &pass) {};
+      const LLVMGPUSelectLoweringStrategyPass &pass) {}
 
   void runOnOperation() override;
 };
