@@ -19,6 +19,7 @@ c_embed_data(
         "empty.gguf",
         "multiple.gguf",
         "single.gguf",
+        "single_v2.gguf",
     ],
     c_file_output = "gguf_files.c",
     flatten = True,
