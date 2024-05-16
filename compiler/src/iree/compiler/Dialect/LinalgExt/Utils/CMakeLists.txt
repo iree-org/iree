@@ -14,9 +14,11 @@ iree_cc_library(
   NAME
     Utils
   HDRS
+    "IndexingUtils.h"
     "Utils.h"
     "WinogradConstants.h"
   SRCS
+    "IndexingUtils.cpp"
     "Utils.cpp"
   DEPS
     LLVMSupport

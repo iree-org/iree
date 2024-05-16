@@ -17,6 +17,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -1713,14 +1714,72 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
 
 static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
                                    IREE::LinalgExt::AttentionOp attnOp) {
+  FailureOr<IREE::LinalgExt::AttentionOpDetail> maybeOpInfo =
+      IREE::LinalgExt::AttentionOpDetail::get(attnOp.getIndexingMapsArray());
+  assert(succeeded(maybeOpInfo) && "failed to infer attention dims");
+  auto opInfo = maybeOpInfo.value();
+
+  SmallVector<int64_t> lbs, ubs;
+  getRangeBounds(attnOp, lbs, ubs);
+
+  LLVM_DEBUG({
+    KD_DBGS() << "Attention Detail:\n";
+    KD_DBGS() << "Batch: [";
+    llvm::interleaveComma(opInfo.getBatchDims(), llvm::dbgs());
+    llvm::dbgs() << "]\n";
+    KD_DBGS() << "M: [";
+    llvm::interleaveComma(opInfo.getMDims(), llvm::dbgs());
+    llvm::dbgs() << "]\n";
+    KD_DBGS() << "K1: [";
+    llvm::interleaveComma(opInfo.getK1Dims(), llvm::dbgs());
+    llvm::dbgs() << "]\n";
+    KD_DBGS() << "K2: [";
+    llvm::interleaveComma(opInfo.getK2Dims(), llvm::dbgs());
+    llvm::dbgs() << "]\n";
+    KD_DBGS() << "N: [";
+    llvm::interleaveComma(opInfo.getNDims(), llvm::dbgs());
+    llvm::dbgs() << "]\n";
+  });
+
+  // TODO (Groverkss): Flash Attention 2 (current algorithm we use for
+  // attention) was originally designed for GPUs. N, K1 are the head dimension
+  // and are usually very small (64, 128, See AttentionOpDetail docs for more
+  // detail). For larger sizes, fusing attention doesn't have many gains (as
+  // pointed out by the original author). We should explore if we should tile N
+  // and K1 dimensions on CPU and if it has any gains. On GPUs, we don't tile
+  // these dimensions as subgroups can hold much larger register sizes.
+  TileSizesListType tileSizes;
+
+  // Batch, M and N (parallel dimensions) are distributed on workgroups.
+  DistributionHeuristicConfig config;
   SmallVector<int64_t> distTileSizes = getDefaultDistributedLevelTileSizes(
       attnOp, DistributionHeuristicConfig{});
-  int64_t iterationDomainRank = attnOp.getIterationDomainRank();
-  SmallVector<int64_t> vecTileSizes(iterationDomainRank, 1);
+  tileSizes.push_back(distTileSizes);
+
+  // Batch, M and N (parallel dimensions) are distributed on workgroups.
+  SmallVector<int64_t> vecTileSizes(attnOp.getIterationDomainRank(), 1);
+  // Mark reduction dimensions not to distribute.
+  for (int64_t i :
+       llvm::concat<const int64_t>(opInfo.getK1Dims(), opInfo.getK2Dims())) {
+    vecTileSizes[i] = 0;
+  }
   int64_t vectorSize = getVectorSize(entryPointFn, attnOp.getOutputType());
-  vecTileSizes.back() = getMaxVectorTileSize(
-      /*numElem=*/distTileSizes.back(), vectorSize, vectorSize);
-  TileSizesListType tileSizes = {distTileSizes, vecTileSizes};
+  for (auto i : llvm::seq<unsigned>(0, vecTileSizes.size())) {
+    // Do not tile reduction dimensions.
+    if (vecTileSizes[i] == 0) {
+      continue;
+    }
+    auto tileSize = distTileSizes[i] ? distTileSizes[i] : ubs[i];
+    // TODO: Use native tile size here once bufferization is fixed for scf.
+    vecTileSizes[i] = getMaxVectorTileSize(
+        /*numElem=*/tileSize, vectorSize, vectorSize);
+  }
+  tileSizes.push_back(vecTileSizes);
+
+  // TODO (Groverkss): Tile K2 here using reduction tiling interface once we
+  // have it. TileAndDecomposeAttention pass only tiles K2. I think it should
+  // be possible to tile K1 also, but need to explore it more.
+
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, attnOp, tileSizes,
       DispatchLoweringPassPipeline::CPULinalgExtTileAndVectorize);
