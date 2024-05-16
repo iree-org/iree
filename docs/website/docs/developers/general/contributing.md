@@ -71,7 +71,11 @@ signed do not require the `Signed-off-by` text. See these references:
     [Signing Git Commits with SSH Keys](https://blog.dbrgn.ch/2021/11/16/git-ssh-signatures/)
     (streamlined version of the previous page).
 
-    SSH keys can be added at <https://github.com/settings/ssh/new>, then:
+    SSH keys can be added at <https://github.com/settings/ssh/new> 
+    (Note that even if you have added your ssh key as an authorized key, you
+    need to add it again as a signing key).
+
+    Then,
 
     ```bash
     # Sign commits automatically
