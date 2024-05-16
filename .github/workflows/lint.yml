@@ -104,8 +104,11 @@ jobs:
       - name: Fetching Base Branch
         # We have to explicitly fetch the base branch as well
         run: git fetch --no-tags --prune --depth=1 origin "${GITHUB_BASE_REF?}:${GITHUB_BASE_REF?}"
+      # See which versions are available for the GitHub-hosted runner here:
+      # https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md#language-and-runtime
       - name: Running clang-format on changed source files
         run: |
+          clang-format-18 --version
           /tmp/git-clang-format "${GITHUB_BASE_REF?}" --binary=clang-format-18 --style=file || true
           git diff --exit-code
 
