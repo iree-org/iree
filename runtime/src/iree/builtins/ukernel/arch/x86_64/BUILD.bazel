@@ -38,6 +38,8 @@ iree_bitcode_library(
     name = "ukernel_bitcode_arch_x86_64_entry_points",
     srcs = [
         "mmt4d_x86_64_entry_point.c",
+        "pack_x86_64_entry_point.c",
+        "unpack_x86_64_entry_point.c",
     ],
     arch = "x86_64",
     internal_hdrs = UKERNEL_X86_64_INTERNAL_HEADERS,
@@ -54,6 +56,8 @@ iree_bitcode_library(
     name = "ukernel_bitcode_arch_x86_64_avx2_fma",
     srcs = [
         "mmt4d_x86_64_avx2_fma.c",
+        "pack_x86_64_avx2_fma.c",
+        "unpack_x86_64_avx2_fma.c",
     ],
     arch = "x86_64",
     copts = UKERNEL_X86_64_AVX2_FMA_COPTS,
@@ -72,6 +76,8 @@ iree_bitcode_library(
     name = "ukernel_bitcode_arch_x86_64_avx512_base",
     srcs = [
         "mmt4d_x86_64_avx512_base.c",
+        "pack_x86_64_avx512_base.c",
+        "unpack_x86_64_avx512_base.c",
     ],
     arch = "x86_64",
     copts = UKERNEL_X86_64_AVX512_BASE_COPTS,

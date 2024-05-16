@@ -26,6 +26,8 @@ iree_bitcode_library(
     "mmt4d_arm_64_tiles.inl"
   SRCS
     "mmt4d_arm_64_entry_point.c"
+    "pack_arm_64_entry_point.c"
+    "unpack_arm_64_entry_point.c"
 )
 
 iree_bitcode_library(
@@ -41,6 +43,8 @@ iree_bitcode_library(
     "mmt4d_arm_64_tiles.inl"
   SRCS
     "mmt4d_arm_64_base.c"
+    "pack_arm_64_base.c"
+    "unpack_arm_64_base.c"
 )
 
 iree_bitcode_library(

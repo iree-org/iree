@@ -38,6 +38,8 @@ iree_bitcode_library(
     name = "ukernel_bitcode_arch_arm_64_entry_points",
     srcs = [
         "mmt4d_arm_64_entry_point.c",
+        "pack_arm_64_entry_point.c",
+        "unpack_arm_64_entry_point.c",
     ],
     arch = "arm_64",
     internal_hdrs = UKERNEL_ARM_64_INTERNAL_HEADERS,
@@ -47,6 +49,8 @@ iree_bitcode_library(
     name = "ukernel_bitcode_arch_arm_64_base",
     srcs = [
         "mmt4d_arm_64_base.c",
+        "pack_arm_64_base.c",
+        "unpack_arm_64_base.c",
     ],
     arch = "arm_64",
     internal_hdrs = UKERNEL_ARM_64_INTERNAL_HEADERS,

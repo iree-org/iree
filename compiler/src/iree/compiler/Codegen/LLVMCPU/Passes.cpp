@@ -563,6 +563,12 @@ void addCPUDataTilingPipeline(OpPassManager &funcPassManager,
                               TilingConfig &tilingConfig,
                               LLVMCPUPipelineOptions &pipelineOpt) {
   addTileAndDistributePasses(funcPassManager);
+
+  if (pipelineOpt.enableUkernels) {
+    funcPassManager.addPass(
+        createCPULowerToUKernelsPass(clSkipIntermediateRoundings));
+  }
+
   funcPassManager.addPass(
       createLLVMCPUTilePass(tilingConfig.getVectorCommonParallelLevel()));
   if (pipelineOpt.decomposePackUnPackOps) {
