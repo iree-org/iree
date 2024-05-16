@@ -89,7 +89,7 @@ JNI_FUNC jint JNI_PREFIX(nativeBytesSize)(JNIEnv* env, jobject thiz) {
   TfLiteTensor* tensor = GetTensor(env, thiz);
   if (!tensor) {
     return kTfLiteError;  // Failed get handle. Returning to error in Java.
-  }                       // size_t is an unsigned int. This may roll over;
+  }  // size_t is an unsigned int. This may roll over;
   return (jint)TfLiteTensorByteSize(tensor);
 }
 

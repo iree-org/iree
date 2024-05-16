@@ -460,7 +460,7 @@ iree_status_t iree_vm_bytecode_function_verify(
   IREE_VM_VERIFY_PC_RANGE(pc + IREE_REGISTER_ORDINAL_SIZE, max_pc); \
   const uint32_t name = OP_I16(0);
 #define IREE_VM_VERIFY_REG_ORDINAL_X32(ordinal, category)                      \
-  if (IREE_UNLIKELY(((ordinal)&IREE_REF_REGISTER_TYPE_BIT) != 0)) {            \
+  if (IREE_UNLIKELY(((ordinal) & IREE_REF_REGISTER_TYPE_BIT) != 0)) {          \
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,                      \
                             category                                           \
                             " register required but ref register %u provided", \
@@ -471,7 +471,7 @@ iree_status_t iree_vm_bytecode_function_verify(
                             (ordinal), verify_state->i32_register_count);      \
   }
 #define IREE_VM_VERIFY_REG_ORDINAL_X64(ordinal, category)                      \
-  if (IREE_UNLIKELY(((ordinal)&IREE_REF_REGISTER_TYPE_BIT) != 0)) {            \
+  if (IREE_UNLIKELY(((ordinal) & IREE_REF_REGISTER_TYPE_BIT) != 0)) {          \
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,                      \
                             category                                           \
                             " register required but ref register %u provided", \
@@ -496,19 +496,19 @@ iree_status_t iree_vm_bytecode_function_verify(
 #define IREE_VM_VERIFY_REG_F64(ordinal) \
   IREE_VM_VERIFY_REG_ORDINAL_X64(ordinal, "f64");
 #define IREE_VM_VERIFY_REG_REF(ordinal)                                      \
-  if (IREE_UNLIKELY(((ordinal)&IREE_REF_REGISTER_TYPE_BIT) == 0)) {          \
+  if (IREE_UNLIKELY(((ordinal) & IREE_REF_REGISTER_TYPE_BIT) == 0)) {        \
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,                    \
                             "ref register required but non-ref %u provided", \
                             (ordinal));                                      \
-  } else if (IREE_UNLIKELY(((ordinal)&IREE_REF_REGISTER_MASK) >=             \
+  } else if (IREE_UNLIKELY(((ordinal) & IREE_REF_REGISTER_MASK) >=           \
                            verify_state->ref_register_count)) {              \
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,                        \
                             "ref register ordinal %u out of range %u",       \
                             (ordinal), verify_state->ref_register_count);    \
   }
-#define IREE_VM_VERIFY_REG_ANY(ordinal)                             \
-  if (IREE_UNLIKELY(((ordinal)&IREE_REF_REGISTER_TYPE_BIT) == 0)) { \
-  } else {                                                          \
+#define IREE_VM_VERIFY_REG_ANY(ordinal)                               \
+  if (IREE_UNLIKELY(((ordinal) & IREE_REF_REGISTER_TYPE_BIT) == 0)) { \
+  } else {                                                            \
   }
 
 #define VM_VerifyConstI8(name)             \
@@ -543,7 +543,7 @@ iree_status_t iree_vm_bytecode_function_verify(
   pc += 8;
 
 #define VM_VerifyFuncAttr(name) VM_VerifyConstI32(name)
-#define VM_IsImportOrdinal(name) (((name)&0x80000000u) != 0)
+#define VM_IsImportOrdinal(name) (((name) & 0x80000000u) != 0)
 #define VM_UnmaskImportOrdinal(name) name &= ~0x80000000u
 #define VM_VerifyImportOrdinal(name)                                          \
   if (IREE_UNLIKELY((name) >= iree_vm_ImportFunctionDef_vec_len(              \

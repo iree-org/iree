@@ -21,8 +21,7 @@ LinalgExt::LinalgExtTransformOpsExtension::LinalgExtTransformOpsExtension() {
       >();
 }
 
-void LinalgExt::LinalgExtTransformOpsExtension::init() {
-}
+void LinalgExt::LinalgExtTransformOpsExtension::init() {}
 
 //===---------------------------------------------------------------------===//
 // TileAndDecomposeAttention

@@ -36,7 +36,7 @@ typedef struct iree_io_vec_block_t {
 } iree_io_vec_block_t;
 
 #define IREE_IO_VEC_BLOCK_STORAGE_CAPACITY(block_size) \
-  ((block_size)-offsetof(iree_io_vec_block_t, contents))
+  ((block_size) - offsetof(iree_io_vec_block_t, contents))
 
 typedef struct iree_io_vec_stream_t {
   iree_io_stream_t base;

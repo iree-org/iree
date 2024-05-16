@@ -101,27 +101,27 @@
   pc += IREE_REGISTER_ORDINAL_SIZE;
 #define VM_ParseVariadicResults(name) VM_ParseVariadicOperands(name)
 
-#define EMIT_REG_NAME(reg)                \
-  if ((reg)&IREE_REF_REGISTER_TYPE_BIT) { \
-    EMIT_REF_REG_NAME(reg);               \
-  } else {                                \
-    EMIT_I32_REG_NAME(reg);               \
+#define EMIT_REG_NAME(reg)                  \
+  if ((reg) & IREE_REF_REGISTER_TYPE_BIT) { \
+    EMIT_REF_REG_NAME(reg);                 \
+  } else {                                  \
+    EMIT_I32_REG_NAME(reg);                 \
   }
 #define EMIT_I32_REG_NAME(reg)                            \
   IREE_RETURN_IF_ERROR(iree_string_builder_append_format( \
-      b, "%%i%u", ((reg)&IREE_I32_REGISTER_MASK)));
+      b, "%%i%u", ((reg) & IREE_I32_REGISTER_MASK)));
 #define EMIT_I64_REG_NAME(reg)                            \
   IREE_RETURN_IF_ERROR(iree_string_builder_append_format( \
-      b, "%%i%u:%u", ((reg)&IREE_I32_REGISTER_MASK),      \
-      ((reg)&IREE_I32_REGISTER_MASK) + 1));
+      b, "%%i%u:%u", ((reg) & IREE_I32_REGISTER_MASK),    \
+      ((reg) & IREE_I32_REGISTER_MASK) + 1));
 #define EMIT_F32_REG_NAME(reg) EMIT_I32_REG_NAME(reg)
 #define EMIT_REF_REG_NAME(reg)                            \
   IREE_RETURN_IF_ERROR(iree_string_builder_append_format( \
-      b, "%%r%u", ((reg)&IREE_REF_REGISTER_MASK)));
+      b, "%%r%u", ((reg) & IREE_REF_REGISTER_MASK)));
 
 #define EMIT_REG_VALUE(regs, reg)                                           \
-  if ((reg)&IREE_REF_REGISTER_TYPE_BIT) {                                   \
-    iree_vm_ref_t* ref = &(regs)->ref[(reg)&IREE_REF_REGISTER_MASK];        \
+  if ((reg) & IREE_REF_REGISTER_TYPE_BIT) {                                 \
+    iree_vm_ref_t* ref = &(regs)->ref[(reg) & IREE_REF_REGISTER_MASK];      \
     if (iree_vm_ref_is_null(ref)) {                                         \
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "null"));  \
     } else {                                                                \
@@ -131,7 +131,7 @@
     }                                                                       \
   } else {                                                                  \
     IREE_RETURN_IF_ERROR(iree_string_builder_append_format(                 \
-        b, "%u", ((regs)->i32[(reg)&IREE_I32_REGISTER_MASK])));             \
+        b, "%u", ((regs)->i32[(reg) & IREE_I32_REGISTER_MASK])));           \
   }
 
 static iree_status_t iree_vm_bytecode_disassembler_emit_type_name(

@@ -24,7 +24,7 @@
 #define VMMIN(a, b) (((a) < (b)) ? (a) : (b))
 
 #define VM_AlignPC(pc, alignment) \
-  (pc) = ((pc) + ((alignment)-1)) & ~((alignment)-1)
+  (pc) = ((pc) + ((alignment) - 1)) & ~((alignment) - 1)
 
 //===----------------------------------------------------------------------===//
 // Bytecode versioning

@@ -32,7 +32,7 @@ typedef struct iree_hal_rocm_driver_t {
 
 // Utility macros to convert between HIPDevice and iree_hal_device_id_t.
 #define IREE_HIPDEVICE_TO_DEVICE_ID(device) (iree_hal_device_id_t)((device) + 1)
-#define IREE_DEVICE_ID_TO_HIPDEVICE(device_id) (hipDevice_t)((device_id)-1)
+#define IREE_DEVICE_ID_TO_HIPDEVICE(device_id) (hipDevice_t)((device_id) - 1)
 
 static const iree_hal_driver_vtable_t iree_hal_rocm_driver_vtable;
 

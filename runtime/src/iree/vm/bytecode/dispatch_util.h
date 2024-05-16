@@ -296,7 +296,7 @@ static inline const iree_vm_register_list_t* VM_DecVariadicOperandsImpl(
   }
 
 #define DISPATCH_OP(ext, op_name, body)                               \
-  _dispatch_##ext##_##op_name:;                                       \
+  _dispatch_##ext##_##op_name :;                                      \
   IREE_DISPATCH_TRACE_INSTRUCTION(IREE_VM_PC_OFFSET_##ext, #op_name); \
   body;                                                               \
   goto* kDispatchTable_CORE[bytecode_data[pc++]];
