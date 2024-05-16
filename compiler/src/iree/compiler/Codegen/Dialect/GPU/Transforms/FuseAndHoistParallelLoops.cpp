@@ -8,8 +8,11 @@
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Passes.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
+#include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Casting.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -35,7 +38,25 @@ struct FuseForalls final : OpRewritePattern<tensor::ExtractSliceOp> {
       return failure();
     }
 
-    auto producerForall = sliceOp.getSource().getDefiningOp<scf::ForallOp>();
+    SmallVector<Operation *> consumerChain = {sliceOp};
+    Operation *currProducer = sliceOp.getSource().getDefiningOp();
+    while (currProducer && !llvm::isa<scf::ForallOp>(currProducer) &&
+           currProducer->hasOneUse()) {
+      consumerChain.insert(consumerChain.begin(), currProducer);
+      currProducer =
+          llvm::TypeSwitch<Operation *, Operation *>(currProducer)
+              .Case<tensor::ExpandShapeOp>([](tensor::ExpandShapeOp expand) {
+                return expand.getSrc().getDefiningOp();
+              })
+              .Case<tensor::CollapseShapeOp>(
+                  [](tensor::CollapseShapeOp collapse) {
+                    return collapse.getSrc().getDefiningOp();
+                  })
+              .Default([](Operation *) { return nullptr; });
+    }
+
+    auto producerForall =
+        llvm::dyn_cast_if_present<scf::ForallOp>(currProducer);
     if (!producerForall) {
       return failure();
     }
@@ -47,7 +68,8 @@ struct FuseForalls final : OpRewritePattern<tensor::ExtractSliceOp> {
       return failure();
     }
 
-    return fuseForallIntoSlice(rewriter, producerForall, sliceParent, sliceOp);
+    return fuseForallIntoSlice(rewriter, producerForall, sliceParent,
+                               consumerChain);
   }
 };
 
