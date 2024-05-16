@@ -7,7 +7,7 @@
 #ifndef IREE_COMPILER_DIALECT_LINALGEXT_UTILS_INDEXINGUTILS_H_
 #define IREE_COMPILER_DIALECT_LINALGEXT_UTILS_INDEXINGUTILS_H_
 
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "mlir/IR/AffineMap.h"
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
 
