@@ -106,7 +106,7 @@ jobs:
         run: git fetch --no-tags --prune --depth=1 origin "${GITHUB_BASE_REF?}:${GITHUB_BASE_REF?}"
       - name: Running clang-format on changed source files
         run: |
-          /tmp/git-clang-format "${GITHUB_BASE_REF?}" --binary=clang-format-18 --style=file
+          /tmp/git-clang-format "${GITHUB_BASE_REF?}" --binary=clang-format-18 --style=file || true
           git diff --exit-code
 
   tabs:
