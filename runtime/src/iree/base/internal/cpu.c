@@ -194,8 +194,8 @@ static iree_cpuid_regs_t iree_cpuid_raw(uint32_t eax, uint32_t ecx) {
 // The noinline is a tentative work-around for what might be a MSVC miscompile.
 // The symptom is that MSVC builds incorrectly report some CPU features as
 // supported. This only happens for CPU feature bits in the EDX output register.
-__declspec(noinline) static iree_cpuid_regs_t
-    iree_cpuid_raw(uint32_t eax, uint32_t ecx) {
+__declspec(noinline) static iree_cpuid_regs_t iree_cpuid_raw(uint32_t eax,
+                                                             uint32_t ecx) {
   int eax_int;
   int ecx_int;
   memcpy(&eax_int, &eax, sizeof eax);

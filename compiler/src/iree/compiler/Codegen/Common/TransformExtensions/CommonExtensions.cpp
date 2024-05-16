@@ -575,7 +575,7 @@ void transform_dialect::CopyTensorOperandOp::getEffects(
 //===---------------------------------------------------------------------===//
 
 template <typename MappingTy>
-bool isAscendingRelativeMapping(ArrayRef<Attribute> mapping) {
+static bool isAscendingRelativeMapping(ArrayRef<Attribute> mapping) {
   auto start = cast<MappingTy>(*mapping.begin());
   if (start.getMappingId() !=
       static_cast<int64_t>(gpu::MappingId::LinearDim0)) {
@@ -592,8 +592,8 @@ bool isAscendingRelativeMapping(ArrayRef<Attribute> mapping) {
   return true;
 }
 
-FailureOr<scf::ForallOp> flattenForallOp(RewriterBase &rewriter,
-                                         scf::ForallOp forallOp) {
+static FailureOr<scf::ForallOp> flattenForallOp(RewriterBase &rewriter,
+                                                scf::ForallOp forallOp) {
   if (!forallOp.getMapping().has_value())
     return forallOp->emitError("mapping must be present");
   SmallVector<Attribute> mapping =
@@ -609,13 +609,13 @@ FailureOr<scf::ForallOp> flattenForallOp(RewriterBase &rewriter,
 
   bool isThreadMapping = isa<gpu::GPUThreadMappingAttr>(*mapping.begin());
 
-  if (isThreadMapping) {
-    if (!isAscendingRelativeMapping<gpu::GPUThreadMappingAttr>(mapping)) {
-      return forallOp->emitError(
-          "mapping must be descending linear thread ids");
-    }
-  } else if (!isAscendingRelativeMapping<gpu::GPUWarpMappingAttr>(mapping)) {
-    return forallOp->emitError("mapping must be descending linear warp ids");
+  if (isThreadMapping &&
+      !isAscendingRelativeMapping<gpu::GPUThreadMappingAttr>(mapping)) {
+    return forallOp->emitError("mapping must be ascending linear thread ids");
+  }
+  if (!isThreadMapping &&
+      !isAscendingRelativeMapping<gpu::GPUWarpMappingAttr>(mapping)) {
+    return forallOp->emitError("mapping must be ascending linear warp ids");
   }
 
   auto isAll = [](ArrayRef<int64_t> array, int64_t cmp) {
@@ -624,8 +624,8 @@ FailureOr<scf::ForallOp> flattenForallOp(RewriterBase &rewriter,
 
   if (!isAll(forallOp.getStaticStep(), 1) ||
       !isAll(forallOp.getStaticLowerBound(), 0)) {
-    return failure();
-    return forallOp->emitError("");
+    return forallOp->emitError(
+        "unimplemented: trying to flatten non-normalized forall op");
   }
 
   MLIRContext *context = rewriter.getContext();
@@ -643,12 +643,16 @@ FailureOr<scf::ForallOp> flattenForallOp(RewriterBase &rewriter,
   }
 
   // Step 2. Compute the flat lower bound/upper bound/step.
-  AffineExpr product = rewriter.getAffineDimExpr(0);
-  for (auto idx : llvm::seq(static_cast<int64_t>(1), forallOp.getRank())) {
-    product = product * rewriter.getAffineDimExpr(idx);
+  AffineExpr d0, d1;
+  bindDims(context, d0, d1);
+  AffineExpr mulExpr = d0 * d1;
+  SmallVector<OpFoldResult> upperBounds = forallOp.getMixedUpperBound();
+  OpFoldResult newUpperBound = upperBounds.front();
+  for (OpFoldResult ub : llvm::drop_begin(upperBounds)) {
+    newUpperBound = affine::makeComposedFoldedAffineApply(
+        rewriter, loc, mulExpr, {newUpperBound, ub});
   }
-  OpFoldResult newUpperBound = affine::makeComposedFoldedAffineApply(
-      rewriter, loc, product, forallOp.getMixedUpperBound());
+
   OpFoldResult zero = rewriter.getIndexAttr(0);
   OpFoldResult one = rewriter.getIndexAttr(1);
 

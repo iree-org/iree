@@ -9,7 +9,7 @@
 #include "iree/base/api.h"
 #include "iree/base/internal/cpu.h"
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
   iree_cpu_initialize(iree_allocator_system());
   const uint64_t* cpu_data = iree_cpu_data_fields();
 

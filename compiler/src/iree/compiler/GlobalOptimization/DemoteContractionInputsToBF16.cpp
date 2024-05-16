@@ -23,11 +23,14 @@ namespace {
 
 // For narrowable inputs, selects
 struct DemoteContractionInputsToBF16Pattern
-    : public OpInterfaceRewritePattern<linalg::ContractionOpInterface> {
+    : public OpInterfaceRewritePattern<linalg::LinalgOp> {
   using OpInterfaceRewritePattern::OpInterfaceRewritePattern;
-  LogicalResult matchAndRewrite(linalg::ContractionOpInterface op,
+  LogicalResult matchAndRewrite(linalg::LinalgOp linalgOp,
                                 PatternRewriter &rewriter) const override {
-    linalg::LinalgOp linalgOp = cast<linalg::LinalgOp>(op.getOperation());
+    if (!isa<linalg::ContractionOpInterface, linalg::ConvolutionOpInterface>(
+            linalgOp.getOperation())) {
+      return failure();
+    }
     for (auto operand : linalgOp->getOperands()) {
       auto operandType = dyn_cast<RankedTensorType>(operand.getType());
       if (!operandType ||
@@ -65,32 +68,44 @@ struct DemoteContractionInputsToBF16Pattern
     }
 
     auto replaceOpInputs = [&](auto *typePtr) {
-      auto namedOp = cast<std::remove_pointer_t<decltype(typePtr)>>(op);
+      auto namedOp = cast<std::remove_pointer_t<decltype(typePtr)>>(linalgOp);
       rewriter.replaceOpWithNewOp<std::remove_pointer_t<decltype(typePtr)>>(
           linalgOp, demotedInputs, linalgOp.getDpsInits(),
           linalg::getPrunedAttributeList(namedOp));
     };
 
-    if (isa<linalg::MatmulOp>(op)) {
+    if (isa<linalg::MatmulOp>(linalgOp)) {
       replaceOpInputs(static_cast<linalg::MatmulOp *>(nullptr));
-    } else if (isa<linalg::MatvecOp>(op)) {
+    } else if (isa<linalg::MatvecOp>(linalgOp)) {
       replaceOpInputs(static_cast<linalg::MatvecOp *>(nullptr));
-    } else if (isa<linalg::VecmatOp>(op)) {
+    } else if (isa<linalg::VecmatOp>(linalgOp)) {
       replaceOpInputs(static_cast<linalg::VecmatOp *>(nullptr));
-    } else if (isa<linalg::BatchMatmulOp>(op)) {
+    } else if (isa<linalg::BatchMatmulOp>(linalgOp)) {
       replaceOpInputs(static_cast<linalg::BatchMatmulOp *>(nullptr));
-    } else if (isa<linalg::BatchMatvecOp>(op)) {
+    } else if (isa<linalg::BatchMatvecOp>(linalgOp)) {
       replaceOpInputs(static_cast<linalg::BatchMatvecOp *>(nullptr));
-    } else if (isa<linalg::BatchVecmatOp>(op)) {
+    } else if (isa<linalg::BatchVecmatOp>(linalgOp)) {
       replaceOpInputs(static_cast<linalg::BatchVecmatOp *>(nullptr));
-    } else if (isa<linalg::MatmulTransposeAOp>(op)) {
+    } else if (isa<linalg::MatmulTransposeAOp>(linalgOp)) {
       replaceOpInputs(static_cast<linalg::MatmulTransposeAOp *>(nullptr));
-    } else if (isa<linalg::MatmulTransposeBOp>(op)) {
+    } else if (isa<linalg::MatmulTransposeBOp>(linalgOp)) {
       replaceOpInputs(static_cast<linalg::MatmulTransposeBOp *>(nullptr));
-    } else if (isa<linalg::BatchMatmulTransposeAOp>(op)) {
+    } else if (isa<linalg::BatchMatmulTransposeAOp>(linalgOp)) {
       replaceOpInputs(static_cast<linalg::BatchMatmulTransposeAOp *>(nullptr));
-    } else if (isa<linalg::BatchMatmulTransposeBOp>(op)) {
+    } else if (isa<linalg::BatchMatmulTransposeBOp>(linalgOp)) {
       replaceOpInputs(static_cast<linalg::BatchMatmulTransposeBOp *>(nullptr));
+    } else if (isa<linalg::Conv2DOp>(linalgOp)) {
+      replaceOpInputs(static_cast<linalg::Conv2DOp *>(nullptr));
+    } else if (isa<linalg::Conv2DNchwFchwOp>(linalgOp)) {
+      replaceOpInputs(static_cast<linalg::Conv2DNchwFchwOp *>(nullptr));
+    } else if (isa<linalg::Conv2DNhwcHwcfOp>(linalgOp)) {
+      replaceOpInputs(static_cast<linalg::Conv2DNhwcHwcfOp *>(nullptr));
+    } else if (isa<linalg::Conv2DNhwcFhwcOp>(linalgOp)) {
+      replaceOpInputs(static_cast<linalg::Conv2DNhwcFhwcOp *>(nullptr));
+    } else if (isa<linalg::Conv2DNgchwFgchwOp>(linalgOp)) {
+      replaceOpInputs(static_cast<linalg::Conv2DNgchwFgchwOp *>(nullptr));
+    } else if (isa<linalg::Conv2DNgchwGfchwOp>(linalgOp)) {
+      replaceOpInputs(static_cast<linalg::Conv2DNgchwGfchwOp *>(nullptr));
     } else {
       return failure();
     }

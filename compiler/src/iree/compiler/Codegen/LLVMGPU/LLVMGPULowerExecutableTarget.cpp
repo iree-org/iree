@@ -69,7 +69,7 @@ public:
 
   LLVMGPULowerExecutableTargetPass() = default;
   LLVMGPULowerExecutableTargetPass(
-      const LLVMGPULowerExecutableTargetPass &pass){};
+      const LLVMGPULowerExecutableTargetPass &pass) {}
 
   void runOnOperation() override;
 };

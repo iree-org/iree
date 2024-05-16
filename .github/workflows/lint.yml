@@ -93,20 +93,23 @@ jobs:
         run: ./build_tools/pytype/check_diff.sh "${GITHUB_BASE_REF?}"
 
   clang-format:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - name: Installing dependencies
         run: |
-          wget https://raw.githubusercontent.com/llvm-mirror/clang/master/tools/clang-format/git-clang-format -O /tmp/git-clang-format
+          wget https://raw.githubusercontent.com/llvm/llvm-project/main/clang/tools/clang-format/git-clang-format -O /tmp/git-clang-format
           chmod +x /tmp/git-clang-format
       - name: Checking out repository
         uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
       - name: Fetching Base Branch
         # We have to explicitly fetch the base branch as well
         run: git fetch --no-tags --prune --depth=1 origin "${GITHUB_BASE_REF?}:${GITHUB_BASE_REF?}"
+      # See which versions are available for the GitHub-hosted runner here:
+      # https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md#language-and-runtime
       - name: Running clang-format on changed source files
         run: |
-          /tmp/git-clang-format "${GITHUB_BASE_REF?}" --binary=clang-format-12 --style=file
+          clang-format-18 --version
+          /tmp/git-clang-format "${GITHUB_BASE_REF?}" --binary=clang-format-18 --style=file || true
           git diff --exit-code
 
   tabs:

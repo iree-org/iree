@@ -1693,6 +1693,26 @@ OpFoldResult CastUI32F32Op::fold(FoldAdaptor operands) {
       });
 }
 
+OpFoldResult CastSI64F64Op::fold(FoldAdaptor operands) {
+  return constFoldCastOp<IntegerAttr, FloatAttr>(
+      Float64Type::get(getContext()), operands.getOperand(),
+      [&](const APInt &a) {
+        APFloat b = APFloat(0.0f);
+        b.convertFromAPInt(a, /*IsSigned=*/true, APFloat::rmNearestTiesToAway);
+        return b;
+      });
+}
+
+OpFoldResult CastUI64F64Op::fold(FoldAdaptor operands) {
+  return constFoldCastOp<IntegerAttr, FloatAttr>(
+      Float64Type::get(getContext()), operands.getOperand(),
+      [&](const APInt &a) {
+        APFloat b = APFloat(0.0f);
+        b.convertFromAPInt(a, /*IsSigned=*/false, APFloat::rmNearestTiesToAway);
+        return b;
+      });
+}
+
 OpFoldResult CastF32SI32Op::fold(FoldAdaptor operands) {
   return constFoldCastOp<FloatAttr, IntegerAttr>(
       IntegerType::get(getContext(), 32), operands.getOperand(),
@@ -1710,6 +1730,29 @@ OpFoldResult CastF32UI32Op::fold(FoldAdaptor operands) {
       [&](const APFloat &a) {
         bool isExact = false;
         llvm::APSInt b(/*BitWidth=*/32, /*isUnsigned=*/false);
+        a.convertToInteger(b, APFloat::rmNearestTiesToAway, &isExact);
+        b.setIsUnsigned(true);
+        return b;
+      });
+}
+
+OpFoldResult CastF64SI64Op::fold(FoldAdaptor operands) {
+  return constFoldCastOp<FloatAttr, IntegerAttr>(
+      IntegerType::get(getContext(), 64), operands.getOperand(),
+      [&](const APFloat &a) {
+        bool isExact = false;
+        llvm::APSInt b(/*BitWidth=*/64, /*isUnsigned=*/false);
+        a.convertToInteger(b, APFloat::rmNearestTiesToAway, &isExact);
+        return b;
+      });
+}
+
+OpFoldResult CastF64UI64Op::fold(FoldAdaptor operands) {
+  return constFoldCastOp<FloatAttr, IntegerAttr>(
+      IntegerType::get(getContext(), 64), operands.getOperand(),
+      [&](const APFloat &a) {
+        bool isExact = false;
+        llvm::APSInt b(/*BitWidth=*/64, /*isUnsigned=*/false);
         a.convertToInteger(b, APFloat::rmNearestTiesToAway, &isExact);
         b.setIsUnsigned(true);
         return b;
@@ -2337,10 +2380,15 @@ void CmpEQF64UOp::getCanonicalizationPatterns(RewritePatternSet &results,
 
 namespace {
 
+// The constant chosen here is arbitrary. Higher values increase the
+// distance between arguments that is tolerated. The f64 value is made up.
+static constexpr int64_t kMaxUlpsDiffF32 = 100ll;
+static constexpr int64_t kMaxUlpsDiffF64 = 50000000000ll;
+
 /// Rewrites a vm.cmp.f*.near pseudo op to a ULP-based comparison.
 template <typename T, typename ConstFOp, typename ConstIOp, typename CmpGTEFOp,
           typename CmpEQFOp, typename CmpLTIOp, typename BitcastFToIOp,
-          typename SubIOp, typename AbsIOp>
+          typename SubIOp, typename AbsIOp, int64_t kMaxUlpsDiff>
 struct RewritePseudoCmpNear : public OpRewritePattern<T> {
   using OpRewritePattern<T>::OpRewritePattern;
   LogicalResult matchAndRewrite(T op,
@@ -2351,6 +2399,8 @@ struct RewritePseudoCmpNear : public OpRewritePattern<T> {
 
     auto loc = op.getLoc();
     Type i32Type = rewriter.getI32Type();
+    Type intType =
+        rewriter.getIntegerType(op.getLhs().getType().getIntOrFloatBitWidth());
 
     auto *originalBlock = rewriter.getInsertionBlock();
     auto *continuationBlock = rewriter.splitBlock(
@@ -2379,16 +2429,14 @@ struct RewritePseudoCmpNear : public OpRewritePattern<T> {
     // ...else, perform a full ULP-based comparison.
     auto *ulpComparisonBlock = rewriter.createBlock(continuationBlock);
     auto lhsInt =
-        rewriter.createOrFold<BitcastFToIOp>(loc, i32Type, op.getLhs());
+        rewriter.createOrFold<BitcastFToIOp>(loc, intType, op.getLhs());
     auto rhsInt =
-        rewriter.createOrFold<BitcastFToIOp>(loc, i32Type, op.getRhs());
+        rewriter.createOrFold<BitcastFToIOp>(loc, intType, op.getRhs());
     auto signedUlpsDiff =
-        rewriter.createOrFold<SubIOp>(loc, i32Type, lhsInt, rhsInt);
+        rewriter.createOrFold<SubIOp>(loc, intType, lhsInt, rhsInt);
     auto absUlpsDiff =
-        rewriter.createOrFold<AbsIOp>(loc, i32Type, signedUlpsDiff);
-    // The constant chosen here is arbitrary. Higher values increase the
-    // distance between arguments that is tolerated.
-    auto maxUlpsDiff = rewriter.createOrFold<ConstIOp>(loc, 100);
+        rewriter.createOrFold<AbsIOp>(loc, intType, signedUlpsDiff);
+    auto maxUlpsDiff = rewriter.createOrFold<ConstIOp>(loc, kMaxUlpsDiff);
     auto ulpCompare =
         rewriter.createOrFold<CmpLTIOp>(loc, i32Type, absUlpsDiff, maxUlpsDiff);
     rewriter.createOrFold<IREE::VM::BranchOp>(loc, continuationBlock,
@@ -2406,7 +2454,7 @@ struct RewritePseudoCmpNear : public OpRewritePattern<T> {
 
 } // namespace
 
-template <typename T>
+template <typename T, int64_t maxUlpsDiff>
 static OpFoldResult foldCmpEQNearOp(T op, Attribute lhs, Attribute rhs) {
   if (op.getLhs() == op.getRhs()) {
     // x ~ x = true
@@ -2422,32 +2470,34 @@ static OpFoldResult foldCmpEQNearOp(T op, Attribute lhs, Attribute rhs) {
           auto rhsInt = b.bitcastToAPInt();
           auto signedUlpsDiff = lhsInt - rhsInt;
           auto absUlpsDiff = signedUlpsDiff.abs();
-          return absUlpsDiff.slt(100);
+          return absUlpsDiff.slt(maxUlpsDiff);
         }
       });
 }
 
 OpFoldResult CmpEQF32NearOp::fold(FoldAdaptor operands) {
-  return foldCmpEQNearOp(*this, operands.getLhs(), operands.getRhs());
+  return foldCmpEQNearOp<CmpEQF32NearOp, kMaxUlpsDiffF32>(
+      *this, operands.getLhs(), operands.getRhs());
 }
 
 OpFoldResult CmpEQF64NearOp::fold(FoldAdaptor operands) {
-  return foldCmpEQNearOp(*this, operands.getLhs(), operands.getRhs());
+  return foldCmpEQNearOp<CmpEQF64NearOp, kMaxUlpsDiffF64>(
+      *this, operands.getLhs(), operands.getRhs());
 }
 
 void CmpEQF32NearOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                  MLIRContext *context) {
-  results.insert<RewritePseudoCmpNear<CmpEQF32NearOp, ConstF32Op, ConstI32Op,
-                                      CmpGTEF32OOp, CmpEQF32OOp, CmpLTI32SOp,
-                                      BitcastF32I32Op, SubI32Op, AbsI32Op>>(
+  results.insert<RewritePseudoCmpNear<
+      CmpEQF32NearOp, ConstF32Op, ConstI32Op, CmpGTEF32OOp, CmpEQF32OOp,
+      CmpLTI32SOp, BitcastF32I32Op, SubI32Op, AbsI32Op, kMaxUlpsDiffF32>>(
       context);
 }
 
 void CmpEQF64NearOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                  MLIRContext *context) {
-  results.insert<RewritePseudoCmpNear<CmpEQF64NearOp, ConstF64Op, ConstI64Op,
-                                      CmpGTEF64OOp, CmpEQF64OOp, CmpLTI64SOp,
-                                      BitcastF64I64Op, SubI64Op, AbsI64Op>>(
+  results.insert<RewritePseudoCmpNear<
+      CmpEQF64NearOp, ConstF64Op, ConstI64Op, CmpGTEF64OOp, CmpEQF64OOp,
+      CmpLTI64SOp, BitcastF64I64Op, SubI64Op, AbsI64Op, kMaxUlpsDiffF64>>(
       context);
 }
 

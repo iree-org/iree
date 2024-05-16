@@ -20,7 +20,7 @@ struct TargetOptions {
   // Whether the f32 extension is enabled in the target VM.
   bool f32Extension = true;
   // Whether the f64 extension is enabled in the target VM.
-  bool f64Extension = false;
+  bool f64Extension = true;
 
   // Whether to truncate f64 types to f32 when the f64 extension is not
   // enabled.

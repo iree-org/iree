@@ -96,8 +96,9 @@ TEST_F(TileSizeSelectionDeathTest, getLevel_out_of_bounds) {
   // 2. Create TilingConfig and verify that the "vector-inner-parallel" tiling
   // level does not exist (it's out of bounds).
   TilingConfig tilingConfig(loweringConfig);
-  ASSERT_DEATH_IF_SUPPORTED({ tilingConfig.getVectorInnerParallelLevel(); },
-                            "Searching for unavailable tiling level");
+  ASSERT_DEATH_IF_SUPPORTED(
+      { tilingConfig.getVectorInnerParallelLevel(); },
+      "Searching for unavailable tiling level");
 }
 
 #endif
