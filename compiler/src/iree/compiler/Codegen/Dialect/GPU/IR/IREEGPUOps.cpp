@@ -11,14 +11,12 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
-#include "llvm/ADT/iterator_range.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/OpImplementation.h"
 #include "mlir/Support/LLVM.h"
 
 // clang-format off
@@ -336,6 +334,14 @@ LogicalResult ShuffleTensorOp::verifyRegions() {
   }
 
   return success();
+}
+
+//===----------------------------------------------------------------------===//
+// TensorBarrierOp
+//===----------------------------------------------------------------------===//
+
+MutableOperandRange TensorBarrierOp::getDpsInitsMutable() {
+  return getInputMutable();
 }
 
 } // namespace mlir::iree_compiler::IREE::GPU

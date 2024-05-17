@@ -187,3 +187,14 @@ func.func @tensor_subgroup_matmul_transpose_b_32x32x8_multi_mma(
 //  CHECK-SAME:     kind = #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>,
 //  CHECK-SAME:     rhs_permutation = array<i64: 1, 0>}
 //  CHECK-SAME:     : tensor<?x?x32x8xf16>, tensor<?x?x32x8xf16> into tensor<?x?x32x32xf32>
+
+// -----
+
+func.func @tensor_barrier(%input: tensor<?xf16>) -> tensor<?xf16> {
+  %out = iree_gpu.tensor_barrier %input : tensor<?xf16>
+  return %out : tensor<?xf16>
+}
+
+// CHECK-LABEL: func @tensor_barrier
+//  CHECK-SAME:   %[[INPUT:[A-Za-z0-9]+]]: tensor<?xf16>
+//       CHECK:   iree_gpu.tensor_barrier %[[INPUT]] : tensor<?xf16>
