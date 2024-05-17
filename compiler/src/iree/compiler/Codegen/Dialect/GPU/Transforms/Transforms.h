@@ -39,6 +39,8 @@ void populateIREEGPUVectorUnrollPatterns(
 
 void populateIREEGPUVectorizationPatterns(RewritePatternSet &patterns);
 
+void populateIREEGPULowerValueBarrierPatterns(RewritePatternSet &patterns);
+
 } // namespace mlir::iree_compiler::IREE::GPU
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_GPU_TRANSFORMS_TRANSFORMS_H_

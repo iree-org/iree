@@ -352,36 +352,39 @@ def IREEGPU_ShuffleTensorOp : Op<IREEGPU_Dialect, "shuffle_tensor", [
 }
 
 //===----------------------------------------------------------------------===//
-// TensorBarrierOp
+// ValueBarrierOp
 //===----------------------------------------------------------------------===//
 
-def IREEGPU_TensorBarrierOp : Op<IREEGPU_Dialect, "tensor_barrier", [
+def IREEGPU_ValueBarrierOp : Op<IREEGPU_Dialect, "value_barrier", [
     Pure,
-    DeclareOpInterfaceMethods<DestinationStyleOpInterface>,
     AllTypesMatch<["input", "result"]>,
     ]> {
   let summary = "Shuffles a private tensor across a shared allocation";
   let description = [{
-    This operation acts as a barrier on a tensor value. It takes a single
-    tensor operand and produces an equivalent tensor. This does not have copy
-    and/or data movement semantics and simply represents a barrier on all writes
-    to the input tensor.
+    This operation acts as a barrier on a value semantic SSA value (tensor or
+    vector). It takes a single operand and produces a value equivalent to the
+    input. This does not have copy and/or data movement semantics and simply
+    represents a barrier on all writes in the tensor case, and a barrier until
+    all threads acquire the input vector in the vector case.
 
     This operation is a no-op when not present in a parallel context. This
     operation is pure as it only requires synchronization for the value it
     produces.
   }];
 
-  let arguments = (ins AnyRankedTensor:$input);
-  let results = (outs AnyRankedTensor:$result);
+  let arguments = (ins AnyRankedTensorOrVector:$input);
+  let results = (outs AnyRankedTensorOrVector:$result);
 
   let assemblyFormat = [{
     $input attr-dict `:` type($result)
   }];
 
   let extraClassDeclaration = [{
-    RankedTensorType getInputType() {
-      return getInput().getType();
+    bool hasTensorSemantics() {
+      return isa<::mlir::RankedTensorType>(getInput().getType());
+    }
+    ::mlir::ShapedType getInputType() {
+      return ::llvm::cast<::mlir::ShapedType>(getInput().getType());
     }
   }];
 }

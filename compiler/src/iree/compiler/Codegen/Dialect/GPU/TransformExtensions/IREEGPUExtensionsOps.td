@@ -14,6 +14,19 @@ include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpBase.td"
 
+def ApplyLowerValueBarrierOp : Op<Transform_Dialect,
+    "apply_patterns.iree.lower_value_barrier",
+    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,
+     ReportTrackingListenerFailuresOpTrait]> {
+  let description = [{
+    Populate patterns to convert value barriers on vectors into gpu.barrier ops.
+    Barriers on tensors are ignored.
+  }];
+
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+  let assemblyFormat = "attr-dict";
+}
+
 def ApplyUnrollMultiMmaOp : Op<Transform_Dialect,
     "apply_patterns.iree.unroll_multi_mma",
     [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,

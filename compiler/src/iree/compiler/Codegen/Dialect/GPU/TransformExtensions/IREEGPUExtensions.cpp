@@ -26,6 +26,15 @@ transform_dialect::IREEGPUExtensions::IREEGPUExtensions() {
 }
 
 //===---------------------------------------------------------------------===//
+// ApplyLowerValueBarrierOp
+//===---------------------------------------------------------------------===//
+
+void transform_dialect::ApplyLowerValueBarrierOp::populatePatterns(
+    RewritePatternSet &patterns) {
+  IREE::GPU::populateIREEGPULowerValueBarrierPatterns(patterns);
+}
+
+//===---------------------------------------------------------------------===//
 // ApplyUnrollMultiMmaOp
 //===---------------------------------------------------------------------===//
 

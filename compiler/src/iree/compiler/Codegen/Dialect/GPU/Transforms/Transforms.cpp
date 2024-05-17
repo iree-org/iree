@@ -11,8 +11,6 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/Dialect/Vector/Utils/VectorUtils.h"
@@ -404,6 +402,30 @@ struct VectorizeStaticMultiMmaOpPattern final
 
 void populateIREEGPUVectorizationPatterns(RewritePatternSet &patterns) {
   patterns.add<VectorizeStaticMultiMmaOpPattern>(patterns.getContext());
+}
+
+//===----------------------------------------------------------------------===//
+// VectorBarrierOp Lowering
+//===----------------------------------------------------------------------===//
+
+namespace {
+struct LowerValueBarrierPattern
+    : public OpRewritePattern<IREE::GPU::ValueBarrierOp> {
+  using OpRewritePattern<IREE::GPU::ValueBarrierOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::GPU::ValueBarrierOp barrier,
+                                PatternRewriter &rewriter) const override {
+    if (barrier.hasTensorSemantics()) {
+      return failure();
+    }
+    rewriter.create<gpu::BarrierOp>(barrier.getLoc());
+    rewriter.replaceOp(barrier, barrier.getInput());
+    return success();
+  }
+};
+} // namespace
+
+void populateIREEGPULowerValueBarrierPatterns(RewritePatternSet &patterns) {
+  patterns.add<LowerValueBarrierPattern>(patterns.getContext());
 }
 
 } // namespace mlir::iree_compiler::IREE::GPU
