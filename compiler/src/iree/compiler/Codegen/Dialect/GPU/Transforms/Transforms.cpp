@@ -405,17 +405,12 @@ LogicalResult vectorizeStaticMultiMmaOp(RewriterBase &rewriter,
       mmaOp.getKind());
 
   // Create the write back to a tensor.
-  SmallVector<OpFoldResult> sizes;
-  for (auto size : mmaOp.getResultType().getShape()) {
-    sizes.push_back(rewriter.getIndexAttr(size));
-  }
-  Value dest = rewriter.create<tensor::EmptyOp>(loc, sizes, resultElementType);
   int64_t rank = mmaOp.getResultType().getRank();
   auto zero = rewriter.create<arith::ConstantIndexOp>(loc, 0);
   rewriter.replaceOpWithNewOp<vector::TransferWriteOp>(
       mmaOp,
       /*vector=*/newMmaOp,
-      /*source=*/dest,
+      /*source=*/mmaOp.getAcc(),
       /*indices=*/SmallVector<Value>(rank, zero),
       /*inBounds=*/SmallVector<bool>(rank, true));
   return success();
