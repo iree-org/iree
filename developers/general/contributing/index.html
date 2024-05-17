@@ -4070,10 +4070,7 @@ signed do not require the <code>Signed-off-by</code> text. See these references:
     (recommended if you already use SSH keys with GitHub) and
     <a href="https://blog.dbrgn.ch/2021/11/16/git-ssh-signatures/">Signing Git Commits with SSH Keys</a>
     (streamlined version of the previous page).</p>
-<p>SSH keys can be added at <a href="https://github.com/settings/ssh/new">https://github.com/settings/ssh/new</a>
-(Note that even if you have added your SSH key as an authorized key, you
-need to add it again as a signing key).</p>
-<p>Then,</p>
+<p>SSH keys can be added at <a href="https://github.com/settings/ssh/new">https://github.com/settings/ssh/new</a>, then:</p>
 <div class="highlight"><pre><span></span><code><span class="c1"># Sign commits automatically</span>
 git<span class="w"> </span>config<span class="w"> </span>--global<span class="w"> </span>commit.gpgsign<span class="w"> </span><span class="nb">true</span>
 git<span class="w"> </span>config<span class="w"> </span>--global<span class="w"> </span>tag.gpgsign<span class="w"> </span><span class="nb">true</span>
