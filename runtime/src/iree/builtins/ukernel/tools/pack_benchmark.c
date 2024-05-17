@@ -152,6 +152,8 @@ int main(int argc, char** argv) {
                                   "avx2_fma");
   iree_uk_benchmark_register_pack(IREE_UK_FLAG_PACK_TYPE_F32F32, 16, 1,
                                   "avx512_base");
+  iree_uk_benchmark_register_pack(IREE_UK_FLAG_PACK_TYPE_BF16BF16, 16, 2,
+                                  "avx512_base");
   iree_uk_benchmark_register_pack(IREE_UK_FLAG_PACK_TYPE_F32F32, 8, 8,
                                   "avx2_fma");
   iree_uk_benchmark_register_pack(IREE_UK_FLAG_PACK_TYPE_F32F32, 16, 16,
