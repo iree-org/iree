@@ -20,6 +20,8 @@
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/Dialect/Vector/Utils/VectorUtils.h"
 #include "mlir/IR/AffineExpr.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
 
@@ -190,20 +192,6 @@ convertContractionToMultiMma(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
 // MultiMmaOp Distribution
 //===----------------------------------------------------------------------===//
 
-static Value extractSliceOfInnerShape(OpBuilder &builder, Location loc,
-                                      Value source, int64_t outerRank,
-                                      ArrayRef<int64_t> innerShape,
-                                      ArrayRef<OpFoldResult> offsets,
-                                      ArrayRef<OpFoldResult> sizes,
-                                      ArrayRef<OpFoldResult> strides) {
-  auto sourceType = cast<RankedTensorType>(source.getType());
-  SmallVector<int64_t> newShape(sourceType.getShape().take_front(outerRank));
-  newShape.append(innerShape.begin(), innerShape.end());
-  auto newType = RankedTensorType::get(newShape, sourceType.getElementType());
-  return builder.create<tensor::ExtractSliceOp>(loc, newType, source, offsets,
-                                                sizes, strides);
-}
-
 FailureOr<Operation *> distributeMultiMmaOp(RewriterBase &rewriter,
                                             IREE::GPU::MultiMmaOp mmaOp) {
   if (!mmaOp.hasTensorSemantics() || mmaOp.hasThreadSemantics()) {
@@ -238,9 +226,6 @@ FailureOr<Operation *> distributeMultiMmaOp(RewriterBase &rewriter,
     return llvm::to_vector(llvm::seq(static_cast<int64_t>(0), rank));
   };
 
-  auto [lhsInnerType, rhsInnerType, accInnerType] =
-      mmaOp.getKind().getABCVectorTypes();
-
   // LHS slice offsets.
   int64_t lhsOuterRank = mmaOp.getLhsOuterRank();
   SmallVector<OpFoldResult> lhsOffsets(lhsOuterRank, zero);
@@ -258,9 +243,8 @@ FailureOr<Operation *> distributeMultiMmaOp(RewriterBase &rewriter,
   }
   // Extract the rank-reduced slice of the lhs based on the expected inner
   // vector shape.
-  Value lhsSlice = extractSliceOfInnerShape(
-      rewriter, loc, mmaOp.getLhs(), lhsOuterRank, lhsInnerType.getShape(),
-      lhsOffsets, lhsSizes, lhsStrides);
+  Value lhsSlice = rewriter.create<tensor::ExtractSliceOp>(
+      loc, mmaOp.getLhs(), lhsOffsets, lhsSizes, lhsStrides);
 
   // RHS slice offsets.
   int64_t rhsOuterRank = mmaOp.getRhsOuterRank();
@@ -279,9 +263,8 @@ FailureOr<Operation *> distributeMultiMmaOp(RewriterBase &rewriter,
   }
   // Extract the rank-reduced slice of the rhs based on the expected inner
   // vector shape.
-  Value rhsSlice = extractSliceOfInnerShape(
-      rewriter, loc, mmaOp.getRhs(), rhsOuterRank, rhsInnerType.getShape(),
-      rhsOffsets, rhsSizes, rhsStrides);
+  Value rhsSlice = rewriter.create<tensor::ExtractSliceOp>(
+      loc, mmaOp.getRhs(), rhsOffsets, rhsSizes, rhsStrides);
 
   // Accumulator slice offsets.
   int64_t accOuterRank = mmaOp.getAccOuterRank();
@@ -300,9 +283,9 @@ FailureOr<Operation *> distributeMultiMmaOp(RewriterBase &rewriter,
   }
   // Extract the rank-reduced slice of the accumulator based on the expected
   // inner vector shape.
-  Value accSlice = extractSliceOfInnerShape(
-      rewriter, loc, newForallOp.getRegionIterArgs()[0], accOuterRank,
-      accInnerType.getShape(), accOffsets, accSizes, accStrides);
+  Value accSlice = rewriter.create<tensor::ExtractSliceOp>(
+      loc, newForallOp.getRegionIterArgs()[0], accOffsets, accSizes,
+      accStrides);
 
   // Step 3. Create the new multi_mma op.
   auto newMmaOp = rewriter.create<IREE::GPU::MultiMmaOp>(
@@ -310,8 +293,7 @@ FailureOr<Operation *> distributeMultiMmaOp(RewriterBase &rewriter,
       mmaOp.getIteratorTypes(), mmaOp.getKind());
 
   // Step 4. Insert the result of the multi_mma using the same offsets/sizes as
-  // the accumulator slice. auto terminator =
-  // rewriter.create<scf::InParallelOp>(loc);
+  // the accumulator slice.
   scf::InParallelOp terminator = newForallOp.getTerminator();
   rewriter.setInsertionPointToStart(terminator.getBody());
   rewriter.create<tensor::ParallelInsertSliceOp>(
