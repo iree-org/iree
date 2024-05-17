@@ -52,6 +52,7 @@ void populateIREEGPUVectorUnrollPatterns(
 void populateIREEGPUDropUnitDimsPatterns(RewritePatternSet &patterns);
 
 void populateIREEGPULowerMultiMmaPatterns(RewritePatternSet &patterns);
+void populateIREEGPULowerVectorBarrierPatterns(RewritePatternSet &patterns);
 
 } // namespace mlir::iree_compiler::IREE::GPU
 

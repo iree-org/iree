@@ -446,6 +446,36 @@ def IREEGPU_TensorBarrierOp : Op<IREEGPU_Dialect, "tensor_barrier", [
 }
 
 //===----------------------------------------------------------------------===//
+// VectorBarrierOp
+//===----------------------------------------------------------------------===//
+
+def IREEGPU_VectorBarrierOp : Op<IREEGPU_Dialect, "vector_barrier", [
+    Pure,
+    AllTypesMatch<["input", "result"]>,
+    ]> {
+  let summary = "Shuffles a private tensor across a shared allocation";
+  let description = [{
+    This operation acts as a barrier on a vector value. It takes a single
+    vector operand and produces an equivalent vector. This represents the
+    read equivalent of `iree_gpu.tensor_barrier`, in that this can be used to
+    represent a wait until all reads have finished.
+  }];
+
+  let arguments = (ins AnyVector:$input);
+  let results = (outs AnyVector:$result);
+
+  let assemblyFormat = [{
+    $input attr-dict `:` type($result)
+  }];
+
+  let extraClassDeclaration = [{
+    VectorType getInputType() {
+      return getInput().getType();
+    }
+  }];
+}
+
+//===----------------------------------------------------------------------===//
 // YieldOp
 //===----------------------------------------------------------------------===//
 

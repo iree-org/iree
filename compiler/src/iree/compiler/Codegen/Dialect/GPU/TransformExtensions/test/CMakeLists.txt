@@ -18,6 +18,7 @@ iree_lit_test_suite(
     "distribute_multi_mma.mlir"
     "drop_multi_mma_unit_dims.mlir"
     "lower_multi_mma.mlir"
+    "lower_vector_barrier.mlir"
     "unroll_multi_mma.mlir"
     "vectorize_multi_mma.mlir"
   TOOLS
