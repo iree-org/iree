@@ -65,6 +65,20 @@ void iree_uk_pack_tile_16x1_x32_x86_64_avx512_base_direct(
       1, 16, 4);
 }
 
+void iree_uk_pack_tile_16x2_x16_x86_64_avx512_base_direct(
+    void* IREE_UK_RESTRICT out_tile_ptr,
+    const void* IREE_UK_RESTRICT in_tile_ptr, iree_uk_index_t outer_size1,
+    iree_uk_index_t out_stride1, iree_uk_index_t in_stride0,
+    iree_uk_index_t elem_size, iree_uk_index_t tile_size0,
+    iree_uk_index_t tile_size1) {
+  IREE_UK_ASSERT(elem_size == 2);
+  IREE_UK_ASSERT(tile_size0 == 16);
+  IREE_UK_ASSERT(tile_size1 == 2);
+  iree_uk_pack_tile_16x4_x8_x86_64_avx512_base_direct(
+      out_tile_ptr, in_tile_ptr, outer_size1, out_stride1 * 2, in_stride0 * 2,
+      1, 16, 4);
+}
+
 void iree_uk_pack_tile_16x1_x32_x86_64_avx512_base_transpose(
     void* IREE_UK_RESTRICT out_tile_ptr,
     const void* IREE_UK_RESTRICT in_tile_ptr, iree_uk_index_t outer_size1,
@@ -80,6 +94,49 @@ void iree_uk_pack_tile_16x1_x32_x86_64_avx512_base_transpose(
     iree_uk_memcpy(out_tile_i32_ptr, in_tile_ptr_i32, 64);
     out_tile_i32_ptr += out_stride1;
     in_tile_ptr_i32 += 16;
+  }
+}
+
+void iree_uk_pack_tile_16x2_x16_x86_64_avx512_base_transpose(
+    void* IREE_UK_RESTRICT out_tile_ptr,
+    const void* IREE_UK_RESTRICT in_tile_ptr, iree_uk_index_t outer_size1,
+    iree_uk_index_t out_stride1, iree_uk_index_t in_stride0,
+    iree_uk_index_t elem_size, iree_uk_index_t tile_size0,
+    iree_uk_index_t tile_size1) {
+  IREE_UK_ASSERT(elem_size == 2);
+  IREE_UK_ASSERT(tile_size0 == 2);
+  IREE_UK_ASSERT(tile_size1 == 16);
+  const iree_uk_int16_t* IREE_UK_RESTRICT in_ptr = in_tile_ptr;
+  iree_uk_int16_t* IREE_UK_RESTRICT out_ptr = out_tile_ptr;
+  iree_uk_index_t outer_i1 = 0;
+  for (; outer_i1 <= outer_size1 - 2; outer_i1 += 2) {
+    __m512i in0 =
+        _mm512_permutex_epi64(_mm512_loadu_si512((const __m512i*)in_ptr), 0xD8);
+    __m512i in1 = _mm512_permutex_epi64(
+        _mm512_loadu_si512((const __m512i*)(in_ptr + in_stride0)), 0xD8);
+    __m512i out0 = _mm512_unpacklo_epi16(in0, in1);
+    __m512i out1 = _mm512_unpackhi_epi16(in0, in1);
+    _mm256_storeu_si256((__m256i*)out_ptr, _mm512_extracti64x4_epi64(out0, 0));
+    _mm256_storeu_si256(((__m256i*)out_ptr) + 1,
+                        _mm512_extracti64x4_epi64(out1, 0));
+    _mm256_storeu_si256((__m256i*)(out_ptr + out_stride1),
+                        _mm512_extracti64x4_epi64(out0, 1));
+    _mm256_storeu_si256((__m256i*)(out_ptr + out_stride1 + 16),
+                        _mm512_extracti64x4_epi64(out1, 1));
+    out_ptr += 2 * out_stride1;
+    in_ptr += 32;
+  }
+  for (; outer_i1 < outer_size1; ++outer_i1) {
+    __m256i in0 = _mm256_permute4x64_epi64(
+        _mm256_loadu_si256((const __m256i*)in_ptr), 0xD8);
+    __m256i in1 = _mm256_permute4x64_epi64(
+        _mm256_loadu_si256((const __m256i*)(in_ptr + in_stride0)), 0xD8);
+    __m256i out0 = _mm256_unpacklo_epi16(in0, in1);
+    __m256i out1 = _mm256_unpackhi_epi16(in0, in1);
+    _mm256_storeu_si256((__m256i*)out_ptr, out0);
+    _mm256_storeu_si256(((__m256i*)out_ptr) + 1, out1);
+    out_ptr += out_stride1;
+    in_ptr += 16;
   }
 }
 
