@@ -42,6 +42,18 @@ def ApplyLowerMultiMmaOp : Op<Transform_Dialect,
   let assemblyFormat = "attr-dict";
 }
 
+def ApplyLowerVectorBarrierOp : Op<Transform_Dialect,
+    "apply_patterns.iree.lower_vector_barrier",
+    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,
+     ReportTrackingListenerFailuresOpTrait]> {
+  let description = [{
+    Populate patterns to convert vector barriers into gpu.barrier ops.
+  }];
+
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+  let assemblyFormat = "attr-dict";
+}
+
 def ApplyVectorizeMultiMmaOp : Op<Transform_Dialect,
     "apply_patterns.iree.vectorize_multi_mma",
     [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,

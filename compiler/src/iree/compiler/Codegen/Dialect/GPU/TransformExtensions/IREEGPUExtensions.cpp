@@ -43,6 +43,15 @@ void transform_dialect::ApplyLowerMultiMmaOp::populatePatterns(
 }
 
 //===---------------------------------------------------------------------===//
+// ApplyLowerVectorBarrierOp
+//===---------------------------------------------------------------------===//
+
+void transform_dialect::ApplyLowerVectorBarrierOp::populatePatterns(
+    RewritePatternSet &patterns) {
+  IREE::GPU::populateIREEGPULowerVectorBarrierPatterns(patterns);
+}
+
+//===---------------------------------------------------------------------===//
 // ApplyVectorizeMultiMmaOp
 //===---------------------------------------------------------------------===//
 

@@ -11,6 +11,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
@@ -657,6 +658,27 @@ struct LowerMultiMmaPattern : public OpRewritePattern<IREE::GPU::MultiMmaOp> {
 
 void populateIREEGPULowerMultiMmaPatterns(RewritePatternSet &patterns) {
   patterns.add<LowerMultiMmaPattern>(patterns.getContext());
+}
+
+//===----------------------------------------------------------------------===//
+// VectorBarrierOp Lowering
+//===----------------------------------------------------------------------===//
+
+namespace {
+struct LowerVectorBarrierPattern
+    : public OpRewritePattern<IREE::GPU::VectorBarrierOp> {
+  using OpRewritePattern<IREE::GPU::VectorBarrierOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::GPU::VectorBarrierOp barrier,
+                                PatternRewriter &rewriter) const override {
+    rewriter.create<gpu::BarrierOp>(barrier.getLoc());
+    rewriter.replaceOp(barrier, barrier.getInput());
+    return success();
+  }
+};
+} // namespace
+
+void populateIREEGPULowerVectorBarrierPatterns(RewritePatternSet &patterns) {
+  patterns.add<LowerVectorBarrierPattern>(patterns.getContext());
 }
 
 } // namespace mlir::iree_compiler::IREE::GPU
