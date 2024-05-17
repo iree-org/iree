@@ -57,18 +57,21 @@ def LinalgFusionInterface : OpInterface<"LinalgFusionOpInterface", [DestinationS
       /*args=*/(ins),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
-        return $_op.getNumParallelLoops();
+        return llvm::count($_op.getLoopIteratorTypes(), utils::IteratorType::parallel);
       }]
     >,
 
     InterfaceMethod<
       /*desc=*/[{
-        Return the number of loops.
+        Return the total number of loops.
       }],
       /*retTy=*/"unsigned",
       /*methodName=*/"getNumLoops",
       /*args=*/(ins),
-      /*methodBody=*/""
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return $_op.getLoopIteratorTypes().size(); 
+      }]
     >,
     InterfaceMethod<
       /*desc=*/[{
@@ -77,11 +80,20 @@ def LinalgFusionInterface : OpInterface<"LinalgFusionOpInterface", [DestinationS
       /*retTy=*/"SmallVector<int64_t, 4>",
       /*methodName=*/"getStaticLoopRanges",
       /*args=*/(ins),
-      /*methodBody=*/""
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+          SmallVector<int64_t, 4> loopRanges;
+          llvm::for_each($_op.getOperands(), [&](Value operand) {
+          if (auto shapedType = dyn_cast<ShapedType>(operand.getType())) {
+            llvm::append_range(loopRanges, shapedType.getShape());
+            }
+          });
+          return loopRanges;
+      }]
     >,
     InterfaceMethod<
       /*desc=*/[{
-        Return the indexing map for a `result`.
+        Return the indexing map for an op's `result`.
       }],
       /*retTy=*/"AffineMap",
       /*methodName=*/"getIndexingMapMatchingResult",
@@ -112,7 +124,7 @@ def LinalgFusionInterface : OpInterface<"LinalgFusionOpInterface", [DestinationS
     >,
     InterfaceMethod<
       /*desc=*/[{
-        Return the indexing maps attribute within the current operation.
+        Return the indexing maps for this op.
       }],
       /*retTy=*/"ArrayAttr",
       /*methodName=*/"getIndexingMaps",

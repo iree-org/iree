@@ -107,11 +107,6 @@ void IREELinalgExtDialect::initialize() {
       >(context);
   addInterfaces<IREELinalgExtInlinerInterface>();
 
-  [[maybe_unused]] bool isInterfacePromised =
-      hasPromisedInterface<linalg::GenericOp, LinalgFusionOpInterface>();
-  assert(isInterfacePromised &&
-         "linalg::GenericOp should have LinalgFusionOpInterface");
-
   addAttributes<
 #define GET_ATTRDEF_LIST
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtAttrs.cpp.inc"

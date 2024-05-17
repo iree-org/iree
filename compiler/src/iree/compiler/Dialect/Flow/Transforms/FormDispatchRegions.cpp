@@ -586,7 +586,7 @@ isFusableWithConsumer(OpOperand &fusedOperand,
   // Either fuse pad with producer or with consumer.
   if (auto padOp = dyn_cast<tensor::PadOp>(consumer)) {
     if (options.fusePadWithProducers || isPadUsedInSetEncoding(padOp)) {
-      return isa<LinalgExt::LinalgFusionOpInterface>(producer);
+      return isa<linalg::LinalgOp>(producer);
     }
     return false;
   }
@@ -611,16 +611,16 @@ isFusableWithConsumer(OpOperand &fusedOperand,
     return false;
   }
 
-  auto producerLinalgOp =
+  auto producerFusionOp =
       dyn_cast<LinalgExt::LinalgFusionOpInterface>(producer);
-  auto consumerLinalgOp =
+  auto consumerFusionOp =
       dyn_cast<LinalgExt::LinalgFusionOpInterface>(consumer);
-  if (!producerLinalgOp || !consumerLinalgOp)
+  if (!producerFusionOp || !consumerFusionOp)
     return false;
 
   // Check that the consumer is all parallel.
-  if (consumerLinalgOp.getNumLoops() !=
-      consumerLinalgOp.getNumParallelLoops()) {
+  if (consumerFusionOp.getNumLoops() !=
+      consumerFusionOp.getNumParallelLoops()) {
     return false;
   }
 
@@ -631,8 +631,8 @@ isFusableWithConsumer(OpOperand &fusedOperand,
   // Check if the iteration spaces of the producer and consumer are same.
   // TODO(#12664): This is unnecessary requirement, but we need a better config
   // to tile the consumer with a larger iteration space.
-  auto producerIterationSpace = producerLinalgOp.getStaticLoopRanges();
-  auto consumerIterationSpace = consumerLinalgOp.getStaticLoopRanges();
+  auto producerIterationSpace = producerFusionOp.getStaticLoopRanges();
+  auto consumerIterationSpace = consumerFusionOp.getStaticLoopRanges();
   if (producerIterationSpace.size() < consumerIterationSpace.size()) {
     return false;
   }
@@ -648,12 +648,12 @@ isFusableWithConsumer(OpOperand &fusedOperand,
   // While fusing with consumer, the result of the root might not be the final
   // result of the dispatch. To avoid a stack allocation we have to ensure that
   // all operations can bufferize without needing additional memory.
-  for (OpOperand *inputOperand : consumerLinalgOp.getDpsInputOperands()) {
+  for (OpOperand *inputOperand : consumerFusionOp.getDpsInputOperands()) {
     if (inputOperand->get().getDefiningOp() != producer)
       continue;
     if (isa<linalg::ConvolutionOpInterface>(producer) &&
         !llvm::any_of(
-            consumerLinalgOp.getDpsInitsMutable(), [&](OpOperand &initOperand) {
+            consumerFusionOp.getDpsInitsMutable(), [&](OpOperand &initOperand) {
               return canUseInOperandAsInitOperand(inputOperand, &initOperand);
             })) {
       return false;
@@ -720,7 +720,7 @@ isFusableWithProducer(OpOperand &operand,
 
   if (auto padOp = dyn_cast<tensor::PadOp>(consumer)) {
     if (options.fusePadWithProducers || isPadUsedInSetEncoding(padOp)) {
-      return isa<LinalgExt::LinalgFusionOpInterface>(producer);
+      return isa<linalg::LinalgOp>(producer);
     }
     return false;
   }
@@ -758,8 +758,8 @@ isFusableWithProducer(OpOperand &operand,
   }
 
   if (!options.aggressiveFusion) {
-    auto consumerLinalgOp = cast<LinalgExt::LinalgFusionOpInterface>(consumer);
-    if (!consumerLinalgOp.isDpsInit(&operand)) {
+    auto consumerFusionOp = cast<LinalgExt::LinalgFusionOpInterface>(consumer);
+    if (!consumerFusionOp.isDpsInit(&operand)) {
       return false;
     }
   }
