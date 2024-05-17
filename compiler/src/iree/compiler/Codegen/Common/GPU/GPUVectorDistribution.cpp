@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
+#include <numeric>
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
@@ -222,6 +223,96 @@ static bool canDistribute(Operation *op, VectorLayoutAnalysis &analysis) {
   });
 }
 
+// When there exist a layout conflict, we'll try to write back to shared memory
+// and read back to register with correct layout.
+struct DecomposeLayoutConflictResolutions final
+    : OpDistributionPattern<IREE::VectorExt::LayoutConflictResolutionOp> {
+  using OpDistributionPattern::OpDistributionPattern;
+
+  LogicalResult
+  matchAndRewrite(IREE::VectorExt::LayoutConflictResolutionOp resolutionOp,
+                  DistributionSignature &signature,
+                  PatternRewriter &rewriter) const override {
+    auto loc = resolutionOp.getLoc();
+    VectorValue vector = resolutionOp.getInput();
+    VectorValue result = resolutionOp.getOutput();
+    LayoutAttr currentLayout = dyn_cast<LayoutAttr>(signature[vector]);
+    if (!currentLayout)
+      return failure();
+    LayoutAttr targetLayout = dyn_cast<LayoutAttr>(signature[result]);
+    if (!targetLayout)
+      return failure();
+
+    SmallVector<int64_t> currentVecShape = currentLayout.getDistributedShape();
+    SmallVector<int64_t> targetVecShape = targetLayout.getDistributedShape();
+    if (currentVecShape.size() != targetVecShape.size())
+      return failure();
+
+    // If the conditions suffice, we can skip the trip to shared memory
+    // and just use the default/more efficient layout conflict resolution
+    // distribution.
+    auto numElements = [](ArrayRef<int64_t> vector) {
+      return std::accumulate(vector.begin(), vector.end(), 1,
+                             std::multiplies<int64_t>());
+    };
+    if (numElements(currentVecShape) == numElements(targetVecShape) &&
+        !currentLayout.hasLaneConflictWith(targetLayout))
+      return failure();
+
+    // Create shared memory to store the intermediate from src layout.
+    auto resolutionType =
+        llvm::dyn_cast_or_null<VectorType>(resolutionOp.getResult().getType());
+    if (!resolutionType)
+      return failure();
+    if (!resolutionType.hasStaticShape())
+      return failure();
+    ArrayRef<int64_t> resolutionShape = resolutionType.getShape();
+    auto workgroupMemoryAddressSpace = Attribute(gpu::AddressSpaceAttr::get(
+        rewriter.getContext(), gpu::AddressSpace::Workgroup));
+    MemRefType allocType =
+        MemRefType::get(resolutionShape, resolutionType.getElementType(),
+                        AffineMap(), workgroupMemoryAddressSpace);
+    auto alloc = rewriter.create<memref::AllocOp>(loc, allocType);
+
+    // Creating write/trip to shared memory using src layout.
+    Value c0 = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    SmallVector<Value> indices(resolutionType.getRank(), c0);
+    SmallVector<bool> inBounds(resolutionType.getRank(), true);
+    auto write = rewriter.create<vector::TransferWriteOp>(loc, vector, alloc,
+                                                          indices, inBounds);
+    // Insert gpu.barrier
+    rewriter.create<gpu::BarrierOp>(write.getLoc());
+
+    // Creating read from shared memory using dst layout.
+    auto read = rewriter.create<vector::TransferReadOp>(
+        loc, resolutionType, alloc, indices, inBounds);
+
+    // Set layouts to read and write.
+    auto unitAttr = UnitAttr::get(rewriter.getContext());
+    auto writeAttrs = SmallVector<Attribute>(write->getNumOperands(), unitAttr);
+    writeAttrs[0] =
+        currentLayout; // 1st operand is src which requires currentLayout.
+    ArrayAttr writeOperandsAttr =
+        ArrayAttr::get(rewriter.getContext(), writeAttrs);
+    ArrayAttr writeResultsAttr = ArrayAttr::get(rewriter.getContext(), {});
+    Attribute writeSignature[] = {writeOperandsAttr, writeResultsAttr};
+    write->setAttr(kVectorLayoutFetcherStorageAttrName,
+                   ArrayAttr::get(rewriter.getContext(), writeSignature));
+
+    ArrayAttr readOperandsAttr = ArrayAttr::get(
+        rewriter.getContext(),
+        SmallVector<Attribute>(read->getNumOperands(), unitAttr));
+    ArrayAttr readResultsAttr =
+        ArrayAttr::get(rewriter.getContext(), {targetLayout});
+    Attribute readSignature[] = {readOperandsAttr, readResultsAttr};
+    read->setAttr(kVectorLayoutFetcherStorageAttrName,
+                  ArrayAttr::get(rewriter.getContext(), readSignature));
+
+    rewriter.replaceOp(resolutionOp, read.getResult());
+    return success();
+  }
+};
+
 LogicalResult distributeVectorOps(Operation *root,
                                   RewritePatternSet &distributionPatterns,
                                   VectorLayoutOptions &options) {
@@ -246,6 +337,19 @@ LogicalResult distributeVectorOps(Operation *root,
   LLVM_DEBUG(llvm::dbgs() << "Distribution signatures set\n");
   LLVM_DEBUG(root->print(llvm::dbgs()));
   LLVM_DEBUG(llvm::dbgs() << "\n\n");
+
+  {
+    RewritePatternSet preprocessPatterns(root->getContext());
+    preprocessPatterns.add<DecomposeLayoutConflictResolutions>(
+        preprocessPatterns.getContext());
+    FrozenRewritePatternSet frozenPreprocessPatterns(
+        std::move(preprocessPatterns));
+    applyVectorDistribution(root, frozenPreprocessPatterns);
+
+    LLVM_DEBUG(llvm::dbgs() << "After Decomposition of Layout Conflicts\n");
+    LLVM_DEBUG(root->print(llvm::dbgs()));
+    LLVM_DEBUG(llvm::dbgs() << "\n\n");
+  }
 
   FrozenRewritePatternSet frozenPatterns(std::move(distributionPatterns));
   applyVectorDistribution(root, frozenPatterns);
