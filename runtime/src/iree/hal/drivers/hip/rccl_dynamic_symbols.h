@@ -19,7 +19,7 @@ extern "C" {
 // iree_dynamic_library_t allows dynamically loading a subset of the NCCL API.
 // We load all the symbols in `nccl_dynamic_symbol_table.h` and fail if any of
 // the symbol is not available. The functions signatures are matching the
-// declarations in `nccl.h"`.
+// declarations in `nccl.h`.
 
 // NCCL API dynamic symbols.
 typedef struct iree_hal_hip_nccl_dynamic_symbols_t {
