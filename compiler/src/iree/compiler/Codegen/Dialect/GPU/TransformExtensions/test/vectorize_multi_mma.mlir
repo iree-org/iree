@@ -33,8 +33,7 @@ module attributes { transform.with_named_sequence } {
 //   CHECK-DAG:   %[[ACC:.+]] = vector.transfer_read %arg2[%c0, %c0, %c0], %[[CSTF32]] {{.*}} : tensor<2x5x4xf32>, vector<2x5x4xf32>
 //       CHECK:   %[[MMA:.+]] = iree_gpu.multi_mma %[[LHS]], %[[RHS]], %[[ACC]]
 //  CHECK-SAME:     : vector<2x3x4xf16>, vector<3x5x4xf16> into vector<2x5x4xf32>
-//       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<2x5x4xf32>
-//       CHECK:   vector.transfer_write %[[MMA]], %[[EMPTY]][%c0, %c0, %c0] {{.*}} : vector<2x5x4xf32>, tensor<2x5x4xf32>
+//       CHECK:   vector.transfer_write %[[MMA]], %arg2[%c0, %c0, %c0] {{.*}} : vector<2x5x4xf32>, tensor<2x5x4xf32>
 
 // -----
 
@@ -71,5 +70,4 @@ module attributes { transform.with_named_sequence } {
 //   CHECK-DAG:   %[[ACC:.+]] = vector.transfer_read %arg2[%c0], %[[CSTF32]] {in_bounds = [true]} : tensor<4xf32>, vector<4xf32>
 //       CHECK:   %[[MMA:.+]] = iree_gpu.multi_mma %[[LHS]], %[[RHS]], %[[ACC]]
 //  CHECK-SAME:     : vector<4xf16>, vector<4xf16> into vector<4xf32>
-//       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<4xf32>
-//       CHECK:   vector.transfer_write %[[MMA]], %[[EMPTY]][%c0] {in_bounds = [true]} : vector<4xf32>, tensor<4xf32>
+//       CHECK:   vector.transfer_write %[[MMA]], %arg2[%c0] {in_bounds = [true]} : vector<4xf32>, tensor<4xf32>
