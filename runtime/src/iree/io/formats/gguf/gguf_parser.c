@@ -46,7 +46,8 @@
 // variable-sized craziness.
 
 #define GGUF_MAGIC 0x46554747
-#define GGUF_VERSION 3
+#define GGUF_MIN_VERSION 2
+#define GGUF_MAX_VERSION 3
 #define GGUF_DEFAULT_ALIGNMENT 32
 
 enum ggml_type_e {
@@ -671,11 +672,11 @@ static iree_status_t iree_io_parse_gguf_index_from_memory(
   }
   uint32_t version = 0;
   IREE_RETURN_IF_ERROR(iree_io_gguf_parse_uint32(&contents, &version));
-  if (version != GGUF_VERSION) {
+  if (version < GGUF_MIN_VERSION || version > GGUF_MAX_VERSION) {
     return iree_make_status(
         IREE_STATUS_UNIMPLEMENTED,
-        "GGUF format version %u is unsupported; expected version %u", version,
-        GGUF_VERSION);
+        "GGUF format version %u is unsupported; expected version %u-%u",
+        version, GGUF_MIN_VERSION, GGUF_MAX_VERSION);
   }
   uint64_t tensor_count = 0;
   IREE_RETURN_IF_ERROR(iree_io_gguf_parse_uint64(&contents, &tensor_count));

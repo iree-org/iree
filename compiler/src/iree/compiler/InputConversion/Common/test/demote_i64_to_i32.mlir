@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --allow-unregistered-dialect --iree-util-demote-i64-to-i32 %s | FileCheck %s
+// RUN: iree-opt --split-input-file --allow-unregistered-dialect --iree-input-conversion-demote-i64-to-i32 %s | FileCheck %s
 
 // CHECK-LABEL: util.func public @constant_i64
 // CHECK-SAME: () -> i32

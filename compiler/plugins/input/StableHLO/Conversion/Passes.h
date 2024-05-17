@@ -16,11 +16,7 @@ namespace iree_compiler::stablehlo {
 
 std::unique_ptr<TypeConverter> createStableHloToLinalgTypeConverter();
 
-struct StableHloOptions : public PassPipelineOptions<StableHloOptions> {
-  bool demoteI64ToI32 = true;
-  bool demoteF64ToF32 = false;
-  bool promoteBF16ToF32 = false;
-};
+struct StableHloOptions : public PassPipelineOptions<StableHloOptions> {};
 
 //===----------------------------------------------------------------------===//
 // Pipelines

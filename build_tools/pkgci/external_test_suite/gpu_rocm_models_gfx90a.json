@@ -1,20 +1,22 @@
 {
-    "config_name": "gpu_rocm",
-    "iree_compile_flags" : [
-      "--iree-hal-target-backends=rocm",
-      "--iree-rocm-target-chip=gfx90a"
-    ],
-    "iree_run_module_flags": [
-      "--device=hip"
-    ],
-    "skip_compile_tests": [
-      "sdxl-scheduled-unet-3-tank"
-    ],
-    "skip_run_tests": [],
-    "expected_compile_failures": [
-      "opt-125M", // TODO(#17344): need to regenerate .mlirbc
-      "resnet50",
-      "sdxl-vae-decode-tank"
-    ],
-    "expected_run_failures": []
+  "config_name": "gpu_rocm",
+  "iree_compile_flags": [
+    "--iree-hal-target-backends=rocm",
+    "--iree-rocm-target-chip=gfx90a",
+    "--iree-input-demote-f64-to-f32"
+  ],
+  "iree_run_module_flags": [
+    "--device=hip"
+  ],
+  "skip_compile_tests": [
+    "sdxl-scheduled-unet-3-tank"
+  ],
+  "skip_run_tests": [],
+  "expected_compile_failures": [
+    // TODO(#17344): need to regenerate .mlirbc
+    "opt-125M",
+    "resnet50",
+    "sdxl-vae-decode-tank"
+  ],
+  "expected_run_failures": []
 }

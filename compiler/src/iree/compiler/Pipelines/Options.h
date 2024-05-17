@@ -50,8 +50,11 @@ struct InputDialectOptions {
   // plugin system for resolution.
   Type parseInputTypeMnemonic();
 
-  bool demoteI64ToI32 = true;
+  // Gate various type based demotion passes that run before anything else.
+  bool demoteI64ToI32 = false;
+  bool demoteF32ToF16 = false;
   bool demoteF64ToF32 = true;
+  bool promoteF16ToF32 = false;
   bool promoteBF16ToF32 = false;
 
   void bindOptions(OptionsBinder &binder);
@@ -74,13 +77,6 @@ struct PreprocessingOptions {
 
 // Options controlling high level optimizations.
 struct GlobalOptimizationOptions {
-  // Gate various type based demotion passes that run before anything else.
-  bool demoteF64ToF32 = true;
-  bool demoteF32ToF16 = false;
-  bool promoteF16ToF32 = false;
-  bool promoteBF16ToF32 = false;
-  bool demoteI64ToI32 = false;
-
   // Enables aggressive propagation of transposes to the inputs of named ops,
   // rewriting named ops as fused generics.
   bool aggressiveTransposePropagation = false;

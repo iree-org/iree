@@ -176,7 +176,7 @@ for i in $(ls ${ROOT_DIR}/models/tflite/); do
       --iree-input-type=tosa \
       --iree-hal-target-backends=vulkan-spirv \
       --iree-vulkan-target-triple=valhall-unknown-android31 \
-      --iree-opt-demote-f32-to-f16 \
+      --iree-input-demote-f32-to-f16 \
       --iree-llvmcpu-debug-symbols=false \
       --iree-vm-bytecode-module-strip-source-map=true \
       --iree-vm-emit-polyglot-zip=false \

@@ -16,9 +16,6 @@ iree_lit_test_suite(
   SRCS
     "annotate_op_ordinals.mlir"
     "combine_initializers.mlir"
-    "demote_f32_to_f16.mlir"
-    "demote_f64_to_f32.mlir"
-    "demote_i64_to_i32.mlir"
     "drop_compiler_hints.mlir"
     "fold_globals.mlir"
     "fuse_globals.mlir"
@@ -27,8 +24,6 @@ iree_lit_test_suite(
     "import_resources.mlir"
     "ipo.mlir"
     "patterns.mlir"
-    "promote_bf16_to_f32.mlir"
-    "promote_f16_to_f32.mlir"
     "propagate_subranges.mlir"
     "simplify_global_accesses.mlir"
     "strip_and_splat_constants.mlir"
