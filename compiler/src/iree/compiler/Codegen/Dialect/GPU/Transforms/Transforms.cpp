@@ -626,13 +626,30 @@ struct LowerMultiMmaPattern : public OpRewritePattern<IREE::GPU::MultiMmaOp> {
                                          "must be a single mma operation");
     }
 
-    FailureOr<Value> concreteMmaOp = mmaOp.getKind().buildMmaOperation(
-        rewriter, mmaOp.getLoc(), mmaOp.getResultType(), mmaOp.getLhs(),
-        mmaOp.getRhs(), mmaOp.getAcc());
-    if (failed(concreteMmaOp)) {
-      return rewriter.notifyMatchFailure(mmaOp, "Failed to construct mma op");
+    auto [lhsVectorType, rhsVectorType, accVectorType] =
+        mmaOp.getKind().getABCVectorTypes();
+
+    Value aCast = mmaOp.getLhs();
+    Value bCast = mmaOp.getRhs();
+    Value cCast = mmaOp.getAcc();
+    if (aCast.getType() != lhsVectorType) {
+      aCast = rewriter.create<vector::ShapeCastOp>(mmaOp.getLoc(),
+                                                   lhsVectorType, aCast);
     }
-    rewriter.replaceOp(mmaOp, *concreteMmaOp);
+    if (bCast.getType() != rhsVectorType) {
+      bCast = rewriter.create<vector::ShapeCastOp>(mmaOp.getLoc(),
+                                                   rhsVectorType, bCast);
+    }
+    if (cCast.getType() != accVectorType) {
+      cCast = rewriter.create<vector::ShapeCastOp>(mmaOp.getLoc(),
+                                                   accVectorType, cCast);
+    }
+
+    FailureOr<Value> concreteMmaOp = mmaOp.getKind().buildMmaOperation(
+        rewriter, mmaOp.getLoc(), cCast.getType(), aCast, bCast, cCast);
+    assert(succeeded(concreteMmaOp) && "Failed to create mma op");
+    rewriter.replaceOpWithNewOp<vector::ShapeCastOp>(
+        mmaOp, mmaOp.getAcc().getType(), *concreteMmaOp);
     return success();
   }
 };
