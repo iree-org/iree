@@ -291,6 +291,31 @@ std::optional<SmallVector<int64_t, 4>> MultiMmaOp::getShapeForUnroll() {
 // ShuffleTensorOp
 //===----------------------------------------------------------------------===//
 
+// Build a InsertSliceOp with mixed static and dynamic entries and an empty
+// body.
+void ShuffleTensorOp::build(OpBuilder &b, OperationState &result,
+                            Type resultType, Value source, Value dest,
+                            ArrayRef<OpFoldResult> offsets,
+                            ArrayRef<OpFoldResult> sizes,
+                            ArrayRef<OpFoldResult> strides) {
+  SmallVector<int64_t> staticOffsets, staticSizes, staticStrides;
+  SmallVector<Value> dynamicOffsets, dynamicSizes, dynamicStrides;
+  dispatchIndexOpFoldResults(offsets, dynamicOffsets, staticOffsets);
+  dispatchIndexOpFoldResults(sizes, dynamicSizes, staticSizes);
+  dispatchIndexOpFoldResults(strides, dynamicStrides, staticStrides);
+  build(b, result, resultType, source, dynamicOffsets, dynamicSizes,
+        dynamicStrides, b.getDenseI64ArrayAttr(staticOffsets),
+        b.getDenseI64ArrayAttr(staticSizes),
+        b.getDenseI64ArrayAttr(staticStrides), dest);
+  Region *region = result.regions[0].get();
+
+  // `builder.createBlock` changes the insertion point within the block. Create
+  // a guard to reset the insertion point of the builder after it is destroyed.
+  OpBuilder::InsertionGuard guard(b);
+  b.createBlock(region, region->end(), ArrayRef<Type>{dest.getType()},
+                ArrayRef<Location>{result.location});
+}
+
 LogicalResult ShuffleTensorOp::verify() {
   // Get the equivalent tensor type for the alloc to verify against.
   RankedTensorType destType = getDestType();

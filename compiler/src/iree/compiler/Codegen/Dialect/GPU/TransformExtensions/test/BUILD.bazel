@@ -23,7 +23,7 @@ iree_lit_test_suite(
             "drop_multi_mma_unit_dims.mlir",
             "lower_multi_mma.mlir",
             "lower_vector_barrier.mlir",
-            "vectorize_multi_mma.mlir",
+            "vectorize_iree_gpu_ops.mlir",
             "unroll_multi_mma.mlir",
         ],
         include = ["*.mlir"],

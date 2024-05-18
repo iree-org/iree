@@ -18,7 +18,7 @@ module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%root: !transform.any_op {transform.readonly}) {
     %func = transform.structured.match ops{["func.func"]} in %root : (!transform.any_op) -> !transform.any_op
     transform.apply_patterns to %func {
-      transform.apply_patterns.iree.vectorize_multi_mma
+      transform.apply_patterns.iree.vectorize_iree_gpu_ops
     } : !transform.any_op
     transform.yield
   }
@@ -55,7 +55,7 @@ module attributes { transform.with_named_sequence } {
   transform.named_sequence @__transform_main(%root: !transform.any_op {transform.readonly}) {
     %func = transform.structured.match ops{["func.func"]} in %root : (!transform.any_op) -> !transform.any_op
     transform.apply_patterns to %func {
-      transform.apply_patterns.iree.vectorize_multi_mma
+      transform.apply_patterns.iree.vectorize_iree_gpu_ops
     } : !transform.any_op
     transform.yield
   }
@@ -71,3 +71,34 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:   %[[MMA:.+]] = iree_gpu.multi_mma %[[LHS]], %[[RHS]], %[[ACC]]
 //  CHECK-SAME:     : vector<4xf16>, vector<4xf16> into vector<4xf32>
 //       CHECK:   vector.transfer_write %[[MMA]], %arg2[%c0] {in_bounds = [true]} : vector<4xf32>, tensor<4xf32>
+
+// -----
+
+func.func @shuffle_tensor(%init: tensor<6x6xf32>, %source: tensor<2x3xf32>) -> tensor<3x2xf32> {
+  %0 = iree_gpu.shuffle_tensor %source[0, 0] [2, 3] [1, 1] to %init {
+  ^bb0(%intermediate: tensor<6x6xf32>):
+    %slice = tensor.extract_slice %intermediate[0, 0] [3, 2] [1, 1] : tensor<6x6xf32> to tensor<3x2xf32>
+    iree_gpu.yield %slice : tensor<3x2xf32>
+  } : tensor<2x3xf32> -> tensor<6x6xf32> -> tensor<3x2xf32>
+  return %0 : tensor<3x2xf32>
+}
+
+module attributes { transform.with_named_sequence } {
+  transform.named_sequence @__transform_main(%root: !transform.any_op {transform.readonly}) {
+    %func = transform.structured.match ops{["func.func"]} in %root : (!transform.any_op) -> !transform.any_op
+    transform.apply_patterns to %func {
+      transform.apply_patterns.iree.vectorize_iree_gpu_ops
+    } : !transform.any_op
+    transform.yield
+  }
+}
+
+// CHECK-LABEL: func @shuffle_tensor
+//       CHECK:   %[[SHUFFLE:.+]] = iree_gpu.shuffle_tensor %arg1[0, 0] [2, 3] [1, 1] to %arg0 {
+//       CHECK:     ^bb0(%[[INTERMEDIATE:.+]]: tensor<6x6xf32>):
+//       CHECK:       %[[SLICE:.+]] = tensor.extract_slice %[[INTERMEDIATE]][0, 0] [3, 2] [1, 1] : tensor<6x6xf32> to tensor<3x2xf32>
+//       CHECK:       %[[READ:.+]] = vector.transfer_read {{.*}} : tensor<3x2xf32>, vector<3x2xf32>
+//       CHECK:       iree_gpu.yield %[[READ]] : vector<3x2xf32>
+//       CHECK:   } : tensor<2x3xf32> -> tensor<6x6xf32> -> vector<3x2xf32>
+//       CHECK:   %[[EMPTY:.+]] = tensor.empty() : tensor<3x2xf32>
+//       CHECK:   vector.transfer_write %[[SHUFFLE]], %[[EMPTY]]

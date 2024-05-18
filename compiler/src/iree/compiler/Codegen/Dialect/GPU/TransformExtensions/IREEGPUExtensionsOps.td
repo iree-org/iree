@@ -55,11 +55,12 @@ def ApplyLowerVectorBarrierOp : Op<Transform_Dialect,
 }
 
 def ApplyVectorizeMultiMmaOp : Op<Transform_Dialect,
-    "apply_patterns.iree.vectorize_multi_mma",
+    "apply_patterns.iree.vectorize_iree_gpu_ops",
     [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,
      ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
-    Populate patterns to vectorize static iree_gpu.multi_mma ops.
+    Populate patterns to vectorize various iree_gpu ops. Expected to run
+    before or as a part of a larger vectorization pass.
   }];
 
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";

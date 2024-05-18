@@ -428,8 +428,74 @@ struct VectorizeStaticMultiMmaOpPattern
 };
 } // namespace
 
+LogicalResult
+vectorizeStaticShuffleTensorResult(RewriterBase &rewriter,
+                                   IREE::GPU::ShuffleTensorOp shuffle) {
+  if (isa<VectorType>(shuffle.getResult().getType())) {
+    return failure();
+  }
+
+  auto tensorResultType = cast<RankedTensorType>(shuffle.getResult().getType());
+  if (!tensorResultType.hasStaticShape()) {
+    return failure();
+  }
+
+  VectorType newResultType = VectorType::get(tensorResultType.getShape(),
+                                             tensorResultType.getElementType());
+
+  auto paddingValue = rewriter.create<arith::ConstantOp>(
+      shuffle.getLoc(), rewriter.getZeroAttr(newResultType.getElementType()));
+
+  auto newShuffle = rewriter.create<IREE::GPU::ShuffleTensorOp>(
+      shuffle.getLoc(), newResultType, shuffle.getSource(), shuffle.getDest(),
+      shuffle.getMixedOffsets(), shuffle.getMixedSizes(),
+      shuffle.getMixedStrides());
+
+  auto currentTerminator =
+      cast<IREE::GPU::YieldOp>(shuffle.getBody()->getTerminator());
+  rewriter.mergeBlocks(shuffle.getBody(), newShuffle.getBody(),
+                       newShuffle.getBody()->getArguments());
+  rewriter.setInsertionPointToEnd(newShuffle.getBody());
+
+  auto innerRead = vector::createReadOrMaskedRead(
+      rewriter, currentTerminator.getLoc(), currentTerminator->getOperand(0),
+      newResultType.getShape(), paddingValue,
+      /*useInBoundsInsteadOfMasking=*/true);
+  rewriter.create<IREE::GPU::YieldOp>(currentTerminator->getLoc(), innerRead);
+  rewriter.eraseOp(currentTerminator);
+
+  rewriter.setInsertionPointAfter(newShuffle);
+
+  // Create the write back to a tensor.
+  auto empty = rewriter.create<tensor::EmptyOp>(
+      shuffle.getLoc(), tensorResultType.getShape(),
+      tensorResultType.getElementType());
+  int64_t rank = tensorResultType.getRank();
+  auto zero = rewriter.create<arith::ConstantIndexOp>(shuffle.getLoc(), 0);
+  rewriter.replaceOpWithNewOp<vector::TransferWriteOp>(
+      shuffle,
+      /*vector=*/newShuffle,
+      /*source=*/empty,
+      /*indices=*/SmallVector<Value>(rank, zero),
+      /*inBounds=*/SmallVector<bool>(rank, true));
+  return success();
+}
+
+namespace {
+struct VectorizeStaticShuffleTensorResultPattern
+    : public OpRewritePattern<IREE::GPU::ShuffleTensorOp> {
+  using OpRewritePattern<IREE::GPU::ShuffleTensorOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::GPU::ShuffleTensorOp shuffle,
+                                PatternRewriter &rewriter) const override {
+    return vectorizeStaticShuffleTensorResult(rewriter, shuffle);
+  }
+};
+} // namespace
+
 void populateIREEGPUVectorizationPatterns(RewritePatternSet &patterns) {
   patterns.add<VectorizeStaticMultiMmaOpPattern>(patterns.getContext());
+  patterns.add<VectorizeStaticShuffleTensorResultPattern>(
+      patterns.getContext());
 }
 
 //===----------------------------------------------------------------------===//

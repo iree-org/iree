@@ -979,14 +979,8 @@ void replaceConsumerChain(RewriterBase &rewriter, Location loc, Value source,
   OpBuilder::InsertionGuard g(rewriter);
   auto shuffleOp = rewriter.create<IREE::GPU::ShuffleTensorOp>(
       loc, extractSlice.getType(), parallelInsert.getSource(),
-      parallelInsert.getOffsets(), parallelInsert.getSizes(),
-      parallelInsert.getStrides(), parallelInsert.getStaticOffsets(),
-      parallelInsert.getStaticSizes(), parallelInsert.getStaticStrides(),
-      parallelInsert.getDest());
-  Region *region = &shuffleOp.getRegion();
-  rewriter.createBlock(region, region->end(),
-                       ArrayRef<Type>{parallelInsert.getDestType()},
-                       ArrayRef<Location>{loc});
+      parallelInsert.getDest(), parallelInsert.getMixedOffsets(),
+      parallelInsert.getMixedSizes(), parallelInsert.getMixedStrides());
   rewriter.setInsertionPointToStart(shuffleOp.getBody());
   auto terminator =
       rewriter.create<IREE::GPU::YieldOp>(loc, extractSlice.getResult());

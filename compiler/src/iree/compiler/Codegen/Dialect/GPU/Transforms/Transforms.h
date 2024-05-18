@@ -31,9 +31,12 @@ struct UnrollVectorOptions;
 
 namespace mlir::iree_compiler::IREE::GPU {
 
-// Helper to vectorize a static multi-mma op.
+// Helper to vectorize various iree_gpu ops.
 LogicalResult vectorizeStaticMultiMmaOp(RewriterBase &rewriter,
                                         IREE::GPU::MultiMmaOp mmaOp);
+LogicalResult
+vectorizeStaticShuffleTensorResult(RewriterBase &rewriter,
+                                   IREE::GPU::ShuffleTensorOp shuffle);
 
 // Helper to convert a contraction-like linalg op to an iree_gpu.multi_mma.
 FailureOr<IREE::GPU::MultiMmaOp>
