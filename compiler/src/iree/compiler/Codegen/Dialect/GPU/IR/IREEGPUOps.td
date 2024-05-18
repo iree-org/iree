@@ -444,6 +444,10 @@ def IREEGPU_TensorBarrierOp : Op<IREEGPU_Dialect, "tensor_barrier", [
     $input attr-dict `:` type($result)
   }];
 
+  let builders = [
+    OpBuilder<(ins "Value":$input)>
+  ];
+
   let extraClassDeclaration = [{
     RankedTensorType getInputType() {
       return getInput().getType();
@@ -473,6 +477,10 @@ def IREEGPU_VectorBarrierOp : Op<IREEGPU_Dialect, "vector_barrier", [
   let assemblyFormat = [{
     $input attr-dict `:` type($result)
   }];
+
+  let builders = [
+    OpBuilder<(ins "Value":$input)>
+  ];
 
   let extraClassDeclaration = [{
     VectorType getInputType() {

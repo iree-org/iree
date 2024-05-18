@@ -365,8 +365,24 @@ LogicalResult ShuffleTensorOp::verifyRegions() {
 // TensorBarrierOp
 //===----------------------------------------------------------------------===//
 
+void TensorBarrierOp::build(OpBuilder &builder, OperationState &result,
+                            Value input) {
+  result.addOperands({input});
+  result.addTypes(input.getType());
+}
+
 MutableOperandRange TensorBarrierOp::getDpsInitsMutable() {
   return getInputMutable();
+}
+
+//===----------------------------------------------------------------------===//
+// VectorBarrierOp
+//===----------------------------------------------------------------------===//
+
+void VectorBarrierOp::build(OpBuilder &builder, OperationState &result,
+                            Value input) {
+  result.addOperands({input});
+  result.addTypes(input.getType());
 }
 
 } // namespace mlir::iree_compiler::IREE::GPU

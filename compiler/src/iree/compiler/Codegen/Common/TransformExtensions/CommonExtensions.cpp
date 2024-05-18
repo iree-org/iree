@@ -419,20 +419,21 @@ struct LowerShuffleTensor
         sourceSizes, sourceStrides);
 
     // Step 2. Synchronize the workers.
-    rewriter.create<gpu::BarrierOp>(loc);
+    auto writeBarrier =
+        rewriter.create<IREE::GPU::TensorBarrierOp>(loc, insertedSlice);
 
     auto terminator = shuffleOp.getBody()->getTerminator();
     Value replacement = terminator->getOperand(0);
-    rewriter.inlineBlockBefore(shuffleOp.getBody(), shuffleOp, {insertedSlice});
-    rewriter.replaceAllUsesWith(shuffleOp.getResult(), replacement);
+    rewriter.inlineBlockBefore(shuffleOp.getBody(), shuffleOp, {writeBarrier});
     rewriter.setInsertionPointAfterValue(replacement);
-
-    // Step 2. Synchronize the workers again after reading the shuffled values.
-    // TODO: This barrier is an approximation for what we expect bufferization +
-    // vectorization to produce. There is no guarantee that this barrier is
-    // adhered to, but the way that bufferization and vectorization works
-    // is unfriendly towards barrier-like constructs.
-    rewriter.create<gpu::BarrierOp>(loc);
+    Value barrier;
+    // Step 3. Synchronize the read value.
+    if (isa<VectorType>(replacement.getType())) {
+      barrier = rewriter.create<IREE::GPU::VectorBarrierOp>(loc, replacement);
+    } else {
+      barrier = rewriter.create<IREE::GPU::TensorBarrierOp>(loc, replacement);
+    }
+    rewriter.replaceAllUsesWith(shuffleOp.getResult(), barrier);
     rewriter.eraseOp(terminator);
     return success();
   }
