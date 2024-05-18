@@ -188,52 +188,6 @@ void transform_dialect::ApplyHoistForallFromForPatternsOp::populatePatterns(
 }
 
 //===---------------------------------------------------------------------===//
-// ApplyLowerShuffleTensorPatternsOp
-//===---------------------------------------------------------------------===//
-
-namespace {
-struct LowerShuffleTensor
-    : public OpRewritePattern<IREE::GPU::ShuffleTensorOp> {
-  using OpRewritePattern<IREE::GPU::ShuffleTensorOp>::OpRewritePattern;
-  LogicalResult matchAndRewrite(IREE::GPU::ShuffleTensorOp shuffleOp,
-                                PatternRewriter &rewriter) const final {
-    Location loc = shuffleOp.getLoc();
-
-    // Step 1. Insert the source slice into the intermediate tensor.
-    SmallVector<OpFoldResult, 4> sourceOffsets = shuffleOp.getMixedOffsets();
-    SmallVector<OpFoldResult, 4> sourceSizes = shuffleOp.getMixedSizes();
-    SmallVector<OpFoldResult, 4> sourceStrides = shuffleOp.getMixedStrides();
-    Value insertedSlice = rewriter.create<tensor::InsertSliceOp>(
-        loc, shuffleOp.getSource(), shuffleOp.getDest(), sourceOffsets,
-        sourceSizes, sourceStrides);
-
-    // Step 2. Synchronize the workers.
-    rewriter.create<gpu::BarrierOp>(loc);
-
-    auto terminator = shuffleOp.getBody()->getTerminator();
-    Value replacement = terminator->getOperand(0);
-    rewriter.inlineBlockBefore(shuffleOp.getBody(), shuffleOp, {insertedSlice});
-    rewriter.replaceAllUsesWith(shuffleOp.getResult(), replacement);
-    rewriter.setInsertionPointAfterValue(replacement);
-
-    // Step 2. Synchronize the workers again after reading the shuffled values.
-    // TODO: This barrier is an approximation for what we expect bufferization +
-    // vectorization to produce. There is no guarantee that this barrier is
-    // adhered to, but the way that bufferization and vectorization works
-    // is unfriendly towards barrier-like constructs.
-    rewriter.create<gpu::BarrierOp>(loc);
-    rewriter.eraseOp(terminator);
-    return success();
-  }
-};
-} // namespace
-
-void transform_dialect::ApplyLowerShuffleTensorPatternsOp::populatePatterns(
-    RewritePatternSet &patterns) {
-  patterns.insert<LowerShuffleTensor>(patterns.getContext());
-}
-
-//===---------------------------------------------------------------------===//
 // ApplyUnrollVectorsGpuMmaSyncPatternsOp
 //===---------------------------------------------------------------------===//
 

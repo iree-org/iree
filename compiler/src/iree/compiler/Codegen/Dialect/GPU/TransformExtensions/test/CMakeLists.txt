@@ -18,8 +18,9 @@ iree_lit_test_suite(
     "lower_multi_mma.mlir"
     "lower_vector_barrier.mlir"
     "transform_fuse_forall.mlir"
+    "transform_lower_shuffle.mlir"
     "unroll_multi_mma.mlir"
-    "vectorize_multi_mma.mlir"
+    "vectorize_iree_gpu_ops.mlir"
   TOOLS
     FileCheck
     iree-opt

@@ -44,6 +44,15 @@ void transform_dialect::ApplyLowerMultiMmaOp::populatePatterns(
 }
 
 //===---------------------------------------------------------------------===//
+// ApplyLowerShuffleTensorPatternsOp
+//===---------------------------------------------------------------------===//
+
+void transform_dialect::ApplyLowerShuffleTensorPatternsOp::populatePatterns(
+    RewritePatternSet &patterns) {
+  GPU::populateIREEGPULowerShuffleTensorPatterns(patterns);
+}
+
+//===---------------------------------------------------------------------===//
 // ApplyLowerValueBarrierOp
 //===---------------------------------------------------------------------===//
 
@@ -117,10 +126,10 @@ void transform_dialect::ApplyUnrollMultiMmaOp::populatePatterns(
 }
 
 //===---------------------------------------------------------------------===//
-// ApplyVectorizeMultiMmaOp
+// ApplyVectorizeIREEGPUOp
 //===---------------------------------------------------------------------===//
 
-void transform_dialect::ApplyVectorizeMultiMmaOp::populatePatterns(
+void transform_dialect::ApplyVectorizeIREEGPUOp::populatePatterns(
     RewritePatternSet &patterns) {
   IREE::GPU::populateIREEGPUVectorizationPatterns(patterns);
 }
