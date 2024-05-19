@@ -6,6 +6,8 @@
 
 #include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
+#include "mlir/Dialect/ArmNeon/ArmNeonDialect.h"
+#include "mlir/Dialect/ArmNeon/Transforms.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/VectorTransforms.h"
@@ -21,12 +23,15 @@ class LLVMCPUVirtualVectorLoweringPass
           LLVMCPUVirtualVectorLoweringPass> {
 public:
   using LLVMCPUVirtualVectorLoweringBase::LLVMCPUVirtualVectorLoweringBase;
-  LLVMCPUVirtualVectorLoweringPass(std::string splitVectorTransfersTo) {
+  LLVMCPUVirtualVectorLoweringPass(std::string splitVectorTransfersTo,
+                                   bool enableArmI8mm) {
     this->splitVectorTransfersTo = splitVectorTransfersTo;
+    this->enableArmI8mm = enableArmI8mm;
   }
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<linalg::LinalgDialect, vector::VectorDialect>();
+    registry.insert<linalg::LinalgDialect, vector::VectorDialect,
+                    arm_neon::ArmNeonDialect>();
   }
   void runOnOperation() override;
 };
@@ -52,30 +57,43 @@ void LLVMCPUVirtualVectorLoweringPass::runOnOperation() {
           .setVectorMultiReductionLowering(vectorMultiReductionLowering)
           .setVectorTransferSplit(vectorTransferSplit);
 
-  RewritePatternSet patterns(ctx);
-  vector::populateVectorToVectorCanonicalizationPatterns(patterns);
-  vector::populateVectorGatherLoweringPatterns(patterns);
-  vector::populateVectorContractLoweringPatterns(
-      patterns, vectorTransformOptions,
-      /*benefit=*/1,
-      /*disableOuterProductLowering=*/false);
-  // This pattern will transform vector loads whose elements are used in a
-  // scalar fashion into scalar loads. This will let scalar loads to be folded
-  // into broadcast/arithmetic operations and reduce register pressure.
-  vector::populateScalarVectorTransferLoweringPatterns(
-      patterns, /*benefit=*/1, /*allowMultipleUses=*/true);
-  vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
-  vector::populateVectorMultiReductionLoweringPatterns(
-      patterns, vectorMultiReductionLowering);
-  populateVectorTransferFullPartialPatterns(patterns, vectorTransformOptions);
-  (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+  // Target-dependenet patterns.
+  {
+    if (enableArmI8mm) {
+      RewritePatternSet patterns(ctx);
+      arm_neon::populateLowerContractionToSMMLAPatternPatterns(patterns);
+      (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+    }
+  }
+
+  // Target-independent patterns.
+  {
+    RewritePatternSet patterns(ctx);
+    vector::populateVectorToVectorCanonicalizationPatterns(patterns);
+    vector::populateVectorGatherLoweringPatterns(patterns);
+    vector::populateVectorContractLoweringPatterns(
+        patterns, vectorTransformOptions,
+        /*benefit=*/1,
+        /*disableOuterProductLowering=*/false);
+    // This pattern will transform vector loads whose elements are used in a
+    // scalar fashion into scalar loads. This will let scalar loads to be folded
+    // into broadcast/arithmetic operations and reduce register pressure.
+    vector::populateScalarVectorTransferLoweringPatterns(
+        patterns, /*benefit=*/1, /*allowMultipleUses=*/true);
+    vector::populateVectorTransferPermutationMapLoweringPatterns(patterns);
+    vector::populateVectorMultiReductionLoweringPatterns(
+        patterns, vectorMultiReductionLowering);
+    populateVectorTransferFullPartialPatterns(patterns, vectorTransformOptions);
+    (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+  }
 }
 } // namespace
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createLLVMCPUVirtualVectorLoweringPass(std::string splitVectorTransfersTo) {
+createLLVMCPUVirtualVectorLoweringPass(std::string splitVectorTransfersTo,
+                                       bool enableArmI8mm) {
   return std::make_unique<LLVMCPUVirtualVectorLoweringPass>(
-      splitVectorTransfersTo);
+      splitVectorTransfersTo, enableArmI8mm);
 }
 
 } // namespace mlir::iree_compiler

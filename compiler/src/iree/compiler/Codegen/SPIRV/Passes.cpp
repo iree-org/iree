@@ -22,6 +22,7 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Utils/PassUtils.h"
+#include "llvm/ADT/STLForwardCompat.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Conversion/AffineToStandard/AffineToStandard.h"
 #include "mlir/Conversion/ComplexToStandard/ComplexToStandard.h"
@@ -294,7 +295,7 @@ void addSPIRVBaseDistributePassPipeline(OpPassManager &funcPassManager) {
   // Tile and distribute to GPU invocations.
   funcPassManager.addPass(createSPIRVTileAndDistributePass());
   funcPassManager.addPass(createMemrefCopyToLinalgPass());
-  funcPassManager.addPass(createGPUDistributeSharedMemoryCopy());
+  funcPassManager.addPass(createGPUDistributeSharedMemoryCopyPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
@@ -405,14 +406,18 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(
 
   // Multi-buffer depending on pipeline depth and distribute to shared memory.
   if (pipelineDepth > 0) {
-    funcPassManager.addPass(createGPUMultiBuffering(pipelineDepth + 1));
+    funcPassManager.addPass(createGPUMultiBufferingPass(
+        GPUMultiBufferingPassOptions{pipelineDepth + 1}));
   }
   funcPassManager.addPass(createMemrefCopyToLinalgPass());
-  funcPassManager.addPass(createGPUDistributeSharedMemoryCopy());
+  funcPassManager.addPass(createGPUDistributeSharedMemoryCopyPass());
 
   // Reduce bank conflicts by padding.
-  funcPassManager.addPass(createGPUReduceSharedMemoryBankConflicts(
-      detail::bankConflictReductionPaddingBits));
+  {
+    GPUReduceBankConflictsPassOptions options = {};
+    options.paddingBits = detail::bankConflictReductionPaddingBits;
+    funcPassManager.addPass(createGPUReduceBankConflictsPass(options));
+  }
 
   // Performs high-level n-D mechanical vectorization. This does not perform
   // unrolling or lowering, which is done later.
@@ -452,8 +457,11 @@ void addSPIRVCooperativeMatrixVectorizePassPipeline(
     PipeliningSchedulingStrategy schedule =
         storeStage == 0 ? PipeliningSchedulingStrategy::loadStoreStage0
                         : PipeliningSchedulingStrategy::loadGlobalStage0;
-    funcPassManager.addPass(createGPUPipeliningPass(
-        /*epiloguePeeling=*/true, pipelineDepth, schedule));
+    GPUPipeliningPassOptions pipelieningOptions = {};
+    pipelieningOptions.epiloguePeeling = true;
+    pipelieningOptions.depth = pipelineDepth;
+    pipelieningOptions.scheduleIndex = llvm::to_underlying(schedule);
+    funcPassManager.addPass(createGPUPipeliningPass(pipelieningOptions));
   }
 }
 
@@ -469,9 +477,9 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &funcPassManager,
       /*useWARForCooperativeMatrixCodegen=*/true);
 
   // Promote to workgroups and tile to threads.
-  funcPassManager.addPass(createGPUTensorTileToSerialLoops());
+  funcPassManager.addPass(createGPUTensorTileToSerialLoopsPass());
   funcPassManager.addPass(createGPUTensorAlloc());
-  funcPassManager.addPass(createGPUTensorTile(/*distributeToWarp=*/false));
+  funcPassManager.addPass(createGPUTensorTilePass());
 
   // Performs high-level n-D mechanical vectorization. This does not perform
   // unrolling or lowering, which is done later.
@@ -491,20 +499,24 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &funcPassManager,
   addBufferizePasses(funcPassManager, gpuAllocateWorkgroupMemoryFn);
 
   // Distribute scf.forall to GPU threads.
-  funcPassManager.addPass(createGPUDistribute());
+  funcPassManager.addPass(createGPUDistributePass());
 
   if (pipelineDepth > 1 || storeStage == 0) {
-    funcPassManager.addPass(createGPUMultiBuffering(
-        storeStage == 0 ? pipelineDepth + 1 : pipelineDepth));
+    GPUMultiBufferingPassOptions multibufferingOptions = {
+        storeStage == 0 ? pipelineDepth + 1 : pipelineDepth};
+    funcPassManager.addPass(createGPUMultiBufferingPass(multibufferingOptions));
   }
 
   funcPassManager.addPass(createMemrefCopyToLinalgPass());
-  funcPassManager.addPass(createGPUDistributeSharedMemoryCopy());
+  funcPassManager.addPass(createGPUDistributeSharedMemoryCopyPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
-  funcPassManager.addPass(createGPUReduceSharedMemoryBankConflicts(
-      detail::bankConflictReductionPaddingBits));
+  {
+    GPUReduceBankConflictsPassOptions options = {};
+    options.paddingBits = detail::bankConflictReductionPaddingBits;
+    funcPassManager.addPass(createGPUReduceBankConflictsPass(options));
+  }
 
   // With subview ops, vector hoisting won't kick in. So fold memref subview ops
   // before performing vector unrolling and hoisting.
@@ -525,8 +537,11 @@ void addSPIRVMatmulPromoteVectorizePassPipeline(OpPassManager &funcPassManager,
   PipeliningSchedulingStrategy schedule =
       storeStage == 0 ? PipeliningSchedulingStrategy::loadStoreStage0
                       : PipeliningSchedulingStrategy::loadGlobalStage0;
-  funcPassManager.addPass(createGPUPipeliningPass(
-      /*epiloguePeeling=*/true, pipelineDepth, schedule));
+  GPUPipeliningPassOptions pipelieningOptions = {};
+  pipelieningOptions.epiloguePeeling = true;
+  pipelieningOptions.depth = pipelineDepth;
+  pipelieningOptions.scheduleIndex = llvm::to_underlying(schedule);
+  funcPassManager.addPass(createGPUPipeliningPass(pipelieningOptions));
 
   addLoopMaterializationPasses(funcPassManager);
 }

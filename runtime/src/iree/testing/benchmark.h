@@ -12,11 +12,110 @@
 // systems and use some simple tooling while also allowing them to run on
 // the full benchmark library with all its useful reporting and statistics.
 
+#include <math.h>
+
 #include "iree/base/api.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
+
+//===----------------------------------------------------------------------===//
+// Benchmarking tools
+//===----------------------------------------------------------------------===//
+
+void iree_benchmark_use_ptr(char const volatile* x);
+
+#if !defined(IREE_BENCHMARK_HAS_INLINE_ASSEMBLY)
+#if defined(IREE_COMPILER_MSVC) || defined(IREE_PLATFORM_EMSCRIPTEN)
+#define IREE_BENCHMARK_HAS_INLINE_ASSEMBLY 0
+#elif defined(IREE_COMPILER_CLANG) || defined(IREE_COMPILER_GCC)
+#define IREE_BENCHMARK_HAS_INLINE_ASSEMBLY 1
+#else
+#define IREE_BENCHMARK_HAS_INLINE_ASSEMBLY 0
+#endif  // non-asm-targets
+#endif  // !IREE_BENCHMARK_HAS_INLINE_ASSEMBLY
+
+#if IREE_BENCHMARK_HAS_INLINE_ASSEMBLY == 0
+
+#if defined(IREE_COMPILER_MSVC)
+#define iree_benchmark_clobber() _ReadWriteBarrier()
+#else
+#define iree_benchmark_clobber()
+#endif  // IREE_COMPILER_MSVC
+
+#if defined(__cplusplus)
+}  // extern "C"
+template <typename T>
+inline IREE_ATTRIBUTE_ALWAYS_INLINE void iree_optimization_barrier(T&& value) {
+  iree_benchmark_use_ptr(&reinterpret_cast<char const volatile&>(value));
+  iree_benchmark_clobber();
+}
+extern "C" {
+#else
+// TODO: a C-compatible optimization barrier.
+#define iree_optimization_barrier(x)
+#endif  // __cplusplus
+
+#elif defined(IREE_COMPILER_CLANG)
+
+#if defined(__cplusplus)
+}  // extern "C"
+inline IREE_ATTRIBUTE_ALWAYS_INLINE void iree_benchmark_clobber() {
+  asm volatile("" : : : "memory");
+}
+template <typename T>
+inline IREE_ATTRIBUTE_ALWAYS_INLINE void iree_optimization_barrier(T&& value) {
+  asm volatile("" : "+r,m"(value) : : "memory");
+}
+extern "C" {
+#else
+// TODO: a C-compatible optimization barrier.
+#define iree_optimization_barrier(x)
+#endif  // __cplusplus
+
+#elif defined(IREE_COMPILER_GCC)
+
+#if defined(__cplusplus)
+}  // extern "C"
+inline IREE_ATTRIBUTE_ALWAYS_INLINE void iree_benchmark_clobber() {
+  asm volatile("" : : : "memory");
+}
+template <typename T>
+inline IREE_ATTRIBUTE_ALWAYS_INLINE
+    typename std::enable_if<std::is_trivially_copyable<T>::value &&
+                            (sizeof(T) <= sizeof(T*))>::type
+    iree_optimization_barrier(T& value) {
+  asm volatile("" : "+m,r"(value) : : "memory");
+}
+template <typename T>
+inline IREE_ATTRIBUTE_ALWAYS_INLINE
+    typename std::enable_if<!std::is_trivially_copyable<T>::value ||
+                            (sizeof(T) > sizeof(T*))>::type
+    iree_optimization_barrier(T& value) {
+  asm volatile("" : "+m"(value) : : "memory");
+}
+template <typename T>
+inline IREE_ATTRIBUTE_ALWAYS_INLINE
+    typename std::enable_if<std::is_trivially_copyable<T>::value &&
+                            (sizeof(T) <= sizeof(T*))>::type
+    iree_optimization_barrier(T&& value) {
+  asm volatile("" : "+m,r"(value) : : "memory");
+}
+template <typename T>
+inline IREE_ATTRIBUTE_ALWAYS_INLINE
+    typename std::enable_if<!std::is_trivially_copyable<T>::value ||
+                            (sizeof(T) > sizeof(T*))>::type
+    iree_optimization_barrier(T&& value) {
+  asm volatile("" : "+m"(value) : : "memory");
+}
+extern "C" {
+#else
+// TODO: a C-compatible optimization barrier.
+#define iree_optimization_barrier(x)
+#endif  // __cplusplus
+
+#endif  // IREE_BENCHMARK_HAS_INLINE_ASSEMBLY
 
 //===----------------------------------------------------------------------===//
 // iree_benchmark_state_t
@@ -98,6 +197,10 @@ typedef enum iree_benchmark_unit_e {
 
 typedef struct iree_benchmark_def_t iree_benchmark_def_t;
 
+typedef iree_status_t(IREE_API_PTR* iree_benchmark_fn_t)(
+    const iree_benchmark_def_t* benchmark_def,
+    iree_benchmark_state_t* benchmark_state);
+
 // A benchmark case definition.
 struct iree_benchmark_def_t {
   // IREE_BENCHMARK_FLAG_* bitmask controlling benchmark behavior and reporting.
@@ -116,16 +219,54 @@ struct iree_benchmark_def_t {
   // Runs the benchmark to completion.
   // Implementations must call iree_benchmark_keep_running in a loop until it
   // returns false.
-  iree_status_t (*run)(const iree_benchmark_def_t* benchmark_def,
-                       iree_benchmark_state_t* benchmark_state);
+  iree_benchmark_fn_t run;
 
   // User-defined data accessible in the run function.
   const void* user_data;
 };
 
 // Registers a benchmark with the given definition.
-void iree_benchmark_register(iree_string_view_t name,
-                             const iree_benchmark_def_t* benchmark_def);
+const iree_benchmark_def_t* iree_benchmark_register(
+    iree_string_view_t name, const iree_benchmark_def_t* benchmark_def);
+
+//===----------------------------------------------------------------------===//
+// Benchmark registration utilities
+//===----------------------------------------------------------------------===//
+
+#define IREE_BENCHMARK_IMPL_NAME_(name) \
+  IREE_BENCHMARK_IMPL_CONCAT_(iree_benchmark_, __COUNTER__, name)
+#define IREE_BENCHMARK_IMPL_CONCAT_(a, b, c) \
+  IREE_BENCHMARK_IMPL_CONCAT2_(a, b, c)
+#define IREE_BENCHMARK_IMPL_CONCAT2_(a, b, c) a##b##c
+
+#define IREE_BENCHMARK_FN(name)                                        \
+  static iree_status_t name(const iree_benchmark_def_t* benchmark_def, \
+                            iree_benchmark_state_t* benchmark_state)
+
+// Allocates a benchmark definition for the given function and returns it.
+// The returned pointer is safe to store in a static variable.
+// TODO(benvanik): allow optionally passing flags with variadic macros.
+iree_benchmark_def_t* iree_make_function_benchmark(iree_benchmark_fn_t fn);
+
+// TODO(benvanik): find a way to make this C-compatible.
+// Today this requires C++ in order to initialize the benchmark via the function
+// and C disallows this. We can probably use some tricky attributes to run
+// functions instead.
+//
+// Defines a benchmark of a function with default parameters.
+//
+// Example:
+//  IREE_BENCHMARK_FN(my_benchmark) {
+//    while (iree_benchmark_keep_running(benchmark_state, 1000)) {
+//      // process 1000 elements
+//    }
+//    return iree_ok_status();
+//  }
+//  IREE_BENCHMARK_REGISTER(my_benchmark);
+#define IREE_BENCHMARK_REGISTER(name)                                         \
+  static const iree_benchmark_def_t* IREE_BENCHMARK_IMPL_NAME_(name)          \
+      IREE_ATTRIBUTE_UNUSED = (iree_benchmark_def_t*)iree_benchmark_register( \
+          iree_make_cstring_view(#name), iree_make_function_benchmark(name))
 
 //===----------------------------------------------------------------------===//
 // Benchmark infra management

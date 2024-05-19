@@ -85,8 +85,10 @@ jobs:
             experimental: true
 
           # Windows packages.
-          - runs-on:
-              - ${{ github.repository == 'iree-org/iree' && 'windows-2022-64core' || 'windows-2022'}}
+          # TODO(scotttodd): build on larger runner when available (self-hosted or GitHub)
+          # - runs-on:
+          #     - ${{ github.repository == 'iree-org/iree' && 'windows-2022-64core' || 'windows-2022'}}
+          - runs-on: windows-2022
             build-family: windows
             build-package: py-compiler-pkg
             experimental: true

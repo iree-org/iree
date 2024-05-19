@@ -21,6 +21,7 @@ iree_lit_test_suite(
     "cast_address_space_function.mlir"
     "cast_type_to_fit_mma.mlir"
     "config_matvec.mlir"
+    "config_winograd.mlir"
     "conv_pipeline_test.mlir"
     "convert_to_nvvm.mlir"
     "convert_to_rocdl.mlir"
@@ -42,6 +43,7 @@ iree_lit_test_suite(
     "pack_pipeline_test.mlir"
     "pack_shared_memory_alloc.mlir"
     "prefetch_shared_memory.mlir"
+    "promote_matmul_to_fit_mma.mlir"
     "reduction_pipeline_cuda.mlir"
     "reduction_pipeline_rocm.mlir"
     "reduction_pipeline_transform_cuda.mlir"
@@ -67,9 +69,9 @@ iree_lit_test_suite(
     "ukernel_pipeline_transform.mlir"
     "vector_distribute_conversion.mlir"
     "vector_distribute_layout.mlir"
-    "vector_distribution_pipeline_test.mlir"
     "vector_lowering.mlir"
     "vector_to_gpu.mlir"
+    "winograd_pipeline_test.mlir"
     "workgroup_specialization_pipeline_test.mlir"
   TOOLS
     FileCheck

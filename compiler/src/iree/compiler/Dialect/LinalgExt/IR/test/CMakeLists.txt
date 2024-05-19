@@ -15,10 +15,8 @@ iree_lit_test_suite(
     lit
   SRCS
     "canonicalize.mlir"
-    "distribution.mlir"
     "invalid.mlir"
     "roundtrip.mlir"
-    "tiling.mlir"
   TOOLS
     FileCheck
     iree-opt

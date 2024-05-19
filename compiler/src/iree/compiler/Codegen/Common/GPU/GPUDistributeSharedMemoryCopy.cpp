@@ -7,7 +7,6 @@
 #include <algorithm>
 #include <numeric>
 
-#include "iree/compiler/Codegen/Common/GPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
@@ -23,12 +22,15 @@
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Support/MathExtras.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "mlir/Transforms/Passes.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-distribute-shared-memory-copy"
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_GPUDISTRIBUTESHAREDMEMORYCOPYPASS
+#include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
+
+namespace {
 //====---------------------------------------------------------------------===//
 // Pass to lower workgroup memory copy to distibuted
 // transfer_read/transfer_write ops.
@@ -364,6 +366,7 @@ unrollSharedMemoryLoops(mlir::FunctionOpInterface funcOp,
     (void)loopUnrollByFactor(forOp, numIteration(forOp));
   }
 }
+} // namespace
 
 LogicalResult gpuDistributeSharedMemoryCopy(mlir::FunctionOpInterface funcOp) {
   auto maybeWorkgroupSize = getWorkgroupSize(funcOp);
@@ -452,13 +455,9 @@ LogicalResult gpuDistributeSharedMemoryCopy(mlir::FunctionOpInterface funcOp) {
 }
 
 namespace {
-
-class GPUDistributeSharedMemoryCopyPass
-    : public GPUDistributeSharedMemoryCopyBase<
+struct GPUDistributeSharedMemoryCopyPass final
+    : impl::GPUDistributeSharedMemoryCopyPassBase<
           GPUDistributeSharedMemoryCopyPass> {
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<gpu::GPUDialect, vector::VectorDialect, scf::SCFDialect>();
-  }
   void runOnOperation() override {
     auto funcOp = getOperation();
     if (failed(gpuDistributeSharedMemoryCopy(funcOp))) {
@@ -466,12 +465,5 @@ class GPUDistributeSharedMemoryCopyPass
     }
   }
 };
-
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createGPUDistributeSharedMemoryCopy() {
-  return std::make_unique<GPUDistributeSharedMemoryCopyPass>();
-}
-
 } // namespace mlir::iree_compiler

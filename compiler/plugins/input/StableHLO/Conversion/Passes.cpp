@@ -74,20 +74,6 @@ void buildStableHLOInputConversionPassPipelineImpl(
   // use of the CFG we can continue inlining.
   passManager.addPass(mlir::createInlinerPass());
 
-  // Hacky type conversion to work around lack of type support lower in the
-  // stack. This is often required because of implicit i64 insertion by JAX/HLO
-  // that we don't want forcing 32-bit embedded devices to support.
-  // TODO(#8745): remove these and prefer the flow pipeline options instead.
-  if (options.demoteI64ToI32) {
-    passManager.addPass(IREE::Util::createDemoteI64ToI32Pass());
-  }
-  if (options.demoteF64ToF32) {
-    passManager.addPass(IREE::Util::createDemoteF64ToF32Pass());
-  }
-  if (options.promoteBF16ToF32) {
-    passManager.addPass(IREE::Util::createPromoteBF16ToF32Pass());
-  }
-
   // Perform initial cleanup. createLegalizeInputTypes could rewrite types. In
   // this context, some operations could be folded away.
   passManager.addNestedPass<func::FuncOp>(mlir::createCanonicalizerPass());

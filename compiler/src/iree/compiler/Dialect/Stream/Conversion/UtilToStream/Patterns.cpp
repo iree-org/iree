@@ -249,7 +249,8 @@ struct GlobalOpExpansion
             affinityAttr);
       } else {
         initialValue = rewriter.create<IREE::Stream::TensorConstantOp>(
-            globalOp.getLoc(), resourceOp.getType(), initialValueAttr,
+            globalOp.getLoc(), resourceOp.getType(),
+            convertAttributeToStream(initialValueAttr),
             TypeAttr::get(globalOp.getType()),
             /*result_encoding_dims=*/ValueRange{}, affinityAttr);
         initialValueSize = rewriter.create<IREE::Stream::ResourceSizeOp>(
@@ -404,7 +405,7 @@ void populateUtilToStreamConversionPatterns(MLIRContext *context,
       [&](IREE::Util::GlobalOp op) {
         return typeConverter.isLegal(op.getType()) &&
                (!op.getInitialValueAttr() ||
-                !llvm::isa<TensorType>(op.getInitialValueAttr().getType()));
+                !isExpandedType(op.getInitialValueAttr().getType()));
       });
   conversionTarget.addDynamicallyLegalOp<IREE::Util::GlobalAddressOp>(
       [&](IREE::Util::GlobalAddressOp op) {

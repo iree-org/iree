@@ -79,7 +79,6 @@ int main(int argc, char **argv) {
   registerTransformsPasses();
   registerSCFPasses();
   // Local dialect passes.
-  mlir::linalg::transform::registerTransformDialectInterpreterPass();
   mlir::linalg::transform::registerDropSchedulePass();
   // Local test passes.
   mlir::test_ext::registerVectorExtTestPasses();

@@ -1115,7 +1115,7 @@ def Util_GlobalType : TypeInterface<"GlobalTypeInterface"> {
       /*defaultImplementation=*/[{
         // If one is a shaped type, then they both must be and have compatible
         // shapes.
-        if ($_type.template isa<ShapedType>() || isa<ShapedType>(accessType)) {
+        if (isa<ShapedType>($_type) || isa<ShapedType>(accessType)) {
           return succeeded(mlir::verifyCompatibleShape($_type, accessType));
         }
         // Otherwise, the types must be the same.
@@ -1157,6 +1157,17 @@ def Util_HoistableAttrInterface : AttrInterface<"HoistableAttrInterface"> {
       }]
     >,
   ];
+
+  let extraClassDeclaration = [{
+    // Walks |fromOp| and up to gather all dialect attributes that want to be
+    // hoisted along with it. If the same named attribute is present on multiple
+    // ancestors only the most narrowly scoped value will be used.
+    static void gatherHoistableAttrs(Operation *fromOp,
+                                     NamedAttrList &dialectAttrs);
+
+    // Copies any hoistable attributes from the source op to the target op.
+    static void gatherHoistableAttrs(Operation *fromOp, Operation *toOp);
+  }];
 }
 
 def Util_HoistableOpInterface : OpInterface<"HoistableOpInterface"> {
@@ -1532,6 +1543,13 @@ def Util_SerializableAttrInterface :
       }]
     >,
   ];
+
+  let extraClassDeclaration = [{
+    // Serializes |count| copies of |elementAttr| to |os|.
+    static LogicalResult serializeSplatValue(
+        Location loc, Attribute elementAttr, int64_t count,
+        llvm::endianness endian, llvm::raw_ostream &os);
+  }];
 }
 
 #endif  // IREE_DIALECT_UTIL_IR_UTIL_INTERFACES

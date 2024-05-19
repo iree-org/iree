@@ -10,6 +10,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "iree/compiler/Dialect/Util/Transforms/PassDetail.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
+#include "iree/compiler/Utils/StringUtils.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/IR/Builders.h"
@@ -31,22 +32,15 @@ static llvm::cl::opt<std::string> clPrintDotGraphToFile(
 // Maps an original value in the program to the symbol name of a global.
 using HoistedValueMap = llvm::DenseMap<Value, GlobalOp>;
 
-// Walks |fromOp| and up to gather all dialect attributes that want to be
-// hoisted along with it. If the same named attribute is present on multiple
-// ancestors only the most narrowly scoped value will be used.
-static void gatherHoistableAttrs(Operation *fromOp,
-                                 NamedAttrList &dialectAttrs) {
-  for (auto attr : fromOp->getDialectAttrs()) {
-    if (auto hoistableAttr =
-            dyn_cast<IREE::Util::HoistableAttrInterface>(attr.getValue())) {
-      if (hoistableAttr.shouldAttachToHoistedOps() &&
-          !dialectAttrs.get(attr.getName())) {
-        dialectAttrs.push_back(attr);
-      }
-    }
-  }
-  if (auto *parentOp = fromOp->getParentOp())
-    gatherHoistableAttrs(parentOp, dialectAttrs);
+static std::string getHoistedName(Type type) {
+  std::string str;
+  llvm::raw_string_ostream os(str);
+  os << "__hoisted_";
+  type.print(os);
+  str = sanitizeSymbolName(str);
+  if (str.substr(str.size() - 1) == "_")
+    str = str.substr(0, str.size() - 1); // strip trailing _
+  return str;
 }
 
 // Hoist expressions into globals. It is not expected that such a greedy
@@ -130,22 +124,27 @@ public:
     OpBuilder builder(&getContext());
     for (auto [originalValue, globalOp] : hoistedMap) {
       builder.setInsertionPointAfterValue(originalValue);
-      Value load = globalOp.createLoadOp(globalOp->getLoc(), builder)
-                       .getLoadedGlobalValue();
+      auto loadOp = globalOp.createLoadOp(globalOp->getLoc(), builder);
+      if (!originalValue.getDefiningOp()
+               ->getParentOfType<IREE::Util::InitializerOpInterface>()) {
+        loadOp.setGlobalImmutable(true);
+      }
+      Value loadedValue = loadOp.getLoadedGlobalValue();
       // Call user hook to cast back to the original type.
       if (auto hoistableType = dyn_cast<IREE::Util::HoistableTypeInterface>(
               originalValue.getType())) {
-        load = hoistableType.decodeStorageType(builder, load.getLoc(),
-                                               originalValue.getType(), load);
+        loadedValue = hoistableType.decodeStorageType(
+            builder, loadedValue.getLoc(), originalValue.getType(),
+            loadedValue);
       }
-      if (load.getType() != originalValue.getType()) {
+      if (loadedValue.getType() != originalValue.getType()) {
         getOperation().emitError()
             << "Unresolved conflict between casted global of type "
-            << load.getType() << " and original type "
+            << loadedValue.getType() << " and original type "
             << originalValue.getType();
         return signalPassFailure();
       }
-      originalValue.replaceAllUsesWith(load);
+      originalValue.replaceAllUsesWith(loadedValue);
     }
     cleanupDeadOps(constExprs);
   }
@@ -168,7 +167,8 @@ public:
     // Gather any dialect attributes we may need to preserve.
     auto *topLevelOp = getTopLevelOp(originalValue.getDefiningOp());
     NamedAttrList dialectAttrs;
-    gatherHoistableAttrs(topLevelOp, dialectAttrs);
+    IREE::Util::HoistableAttrInterface::gatherHoistableAttrs(topLevelOp,
+                                                             dialectAttrs);
 
     // No existing mapping - create a new global.
     OpBuilder moduleBuilder(topLevelOp);
@@ -269,12 +269,12 @@ public:
       // functions for setting the preferred storage type.
       auto hoistableType =
           dyn_cast<IREE::Util::HoistableTypeInterface>(globalType);
-      // Get the preferred global storage type.
       if (hoistableType) {
+        // Allow the storage type of the global to differ from the local type.
         globalType = hoistableType.getPreferredStorageType();
       }
       auto globalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
-          loc, "hoisted", false, globalType);
+          loc, getHoistedName(globalType), false, globalType);
       moduleSymbols.insert(globalOp);
       SymbolTable::setSymbolVisibility(globalOp,
                                        SymbolTable::Visibility::Private);
@@ -290,17 +290,16 @@ public:
         clonedResult.print(llvm::dbgs());
         llvm::dbgs() << "\n";
       });
-      // Cast to the preferred global storage type.
       if (hoistableType) {
+        // Allow casting to the global type if it differs from the local type.
         clonedResult = hoistableType.encodeStorageType(
             initializerBuilder, clonedResult.getLoc(), globalType,
             clonedResult);
       }
       if (clonedResult.getType() != globalType) {
-        globalOp.emitError()
-            << "Unresolved conflict between global of type " << globalType
-            << " and stored type " << clonedResult.getType();
-        return failure();
+        return globalOp.emitError()
+               << "unresolved conflict between global of type " << globalType
+               << " and stored type " << clonedResult.getType();
       }
       globalOp.createStoreOp(loc, clonedResult, initializerBuilder);
     }

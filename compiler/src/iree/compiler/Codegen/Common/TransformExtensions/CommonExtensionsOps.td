@@ -98,6 +98,24 @@ def ApplyFoldTensorSliceIntoTransferPatternsOp : Op<Transform_Dialect,
   let assemblyFormat = "attr-dict";
 }
 
+def ApplyHoistForallFromForPatternsOp : Op<Transform_Dialect,
+    "apply_patterns.iree.hoist_forall_from_for",
+    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>]> {
+  let description = [{
+    Hoists perfectly nested `scf.forall` ops from parent `scf.for` ops if
+    the slice the forall loop operates on is loop invariant w.r.t. the for loop.
+
+    This pattern only applies to forall ops that yield tensors. For bufferized
+    loops the parallel loop is always trivially hoistable with a barrier and
+    happens automatically when lowering the `scf.forall`.
+
+    Currently only supports a single result tensor.
+  }];
+
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+  let assemblyFormat = "attr-dict";
+}
+
 def ApplyIREELinalgElementwiseGreedyFusionPatternsOp : Op<Transform_Dialect,
     "apply_patterns.iree.linalg_elementwise_greedy_fusion",
     [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,
@@ -108,6 +126,19 @@ def ApplyIREELinalgElementwiseGreedyFusionPatternsOp : Op<Transform_Dialect,
 
     Note: This pattern set is parameterized for usage in IREE, therefore
     it is called "iree.linalg_elementwise_greedy_fusion".
+  }];
+
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+  let assemblyFormat = "attr-dict";
+}
+
+def ApplyLowerShuffleTensorPatternsOp : Op<Transform_Dialect,
+    "apply_patterns.iree.lower_shuffle_tensor",
+    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,
+     ReportTrackingListenerFailuresOpTrait]> {
+  let description = [{
+    Populate patterns that lowers iree_gpu.shuffle_tensor ops to allocations
+    and copies.
   }];
 
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
@@ -152,6 +183,43 @@ def ApplyUnrollVectorsGpuWmmaSyncPatternsOp : Op<Transform_Dialect,
 
   let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
   let assemblyFormat = "attr-dict";
+}
+
+def CopyTensorOperandOp :  Op<Transform_Dialect, "iree.copy_tensor_operand",
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     FunctionalStyleTransformOpTrait,
+     TransformEachOpTrait,
+     TransformOpInterface,
+     ReportTrackingListenerFailuresOpTrait]> {
+  let summary = "Hoist static allocations";
+  let description = [{
+    Inserts a copy of the specified operand of the target operation.
+
+    #### Return modes
+    Returns a handle to the new copy.
+
+    It does not consume the target handle and emits a definite failure if the
+    operand index is out of range or if the operand is not a tensor type.
+  }];
+
+  let arguments = (ins
+    TransformHandleTypeInterface:$target,
+    I64Attr:$operand_index);
+  let results = (outs TransformHandleTypeInterface:$result);
+
+  let assemblyFormat = [{
+    $target `[` $operand_index `]` attr-dict
+    `:` functional-type(operands, results)
+  }];
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::transform::TransformRewriter &rewriter,
+        ::mlir::Operation *target,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
 }
 
 def GpuDistributeSharedMemoryCopyOp :
@@ -213,6 +281,37 @@ def HoistStaticAllocOp :  Op<Transform_Dialect, "iree.hoist_static_alloc",
   }];
 }
 
+def FlattenForallMappingOp : Op<Transform_Dialect, "iree.flatten_forall_mapping",
+    [TransformEachOpTrait,
+     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     TransformOpInterface,
+     ReportTrackingListenerFailuresOpTrait]> {
+  let description = [{
+    Flattens the thread mapping of an `scf.forall` op.
+
+    #### Return modes
+    Emits a definite failure if the target is not an scf.forall op or if
+    the mapping type is not `gpu.thread` or `gpu.warp` with linear dims in
+    descending order.
+  }];
+
+  let arguments = (ins TransformHandleTypeInterface:$target);
+  let results = (outs TransformHandleTypeInterface:$result);
+
+  let assemblyFormat = [{
+    $target attr-dict `:` functional-type(operands, results)
+  }];
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::transform::TransformRewriter &rewriter,
+        ::mlir::scf::ForallOp target,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
 def ForallToWorkgroupOp : Op<Transform_Dialect,
     "iree.forall_to_workgroup",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
@@ -268,6 +367,42 @@ def ForallToWorkgroupOp : Op<Transform_Dialect,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
+}
+
+def FuseForallOp : Op<Transform_Dialect, "iree.fuse_forall",
+    [FunctionalStyleTransformOpTrait,
+     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     DeclareOpInterfaceMethods<TransformOpInterface>,
+     ReportTrackingListenerFailuresOpTrait]> {
+  let description = [{
+    Fuses a producer-consumer pair of scf.forall ops that share the same
+    iterator mapping types and trip counts. An allocation is created to
+    bridge the `parallel.insert_slice` of the producer with the per-thread
+    `extract_slice` of the consumer. If specified, uses |address_space| for
+    the intermediate allocation.
+
+    NOTE: This pattern implicitly REQUIRES that the resulting scf.forall
+    is capable of synchronizing all threads at the point of fusion (i.e.
+    inserting a barrier). This invalidates certain kinds of lowerings of
+    scf.forall ops such as lowering it to loops.
+
+    #### Return modes
+    Emits a definite failure if either the producer or consumer are not
+    scf.forall ops.
+  }];
+
+  let arguments = (
+      ins TransformHandleTypeInterface:$producer,
+          TransformHandleTypeInterface:$consumer,
+          OptionalAttr<AnyAttr>:$address_space
+  );
+  let results = (outs TransformHandleTypeInterface:$result);
+
+  let assemblyFormat = [{
+    $producer `into` $consumer attr-dict
+    `:` functional-type(operands, results)
+  }];
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
 }
 
 def IREEApplyLoopIndependentCodeMotionOp : Op<Transform_Dialect, "iree.apply_licm",

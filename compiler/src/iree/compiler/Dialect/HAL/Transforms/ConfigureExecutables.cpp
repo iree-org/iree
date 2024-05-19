@@ -59,7 +59,8 @@ class ConfigureTargetExecutableVariantsPass
     }
 
     OpPassManager passManager(variantOp.getOperationName());
-    targetBackend->buildConfigurationPassPipeline(variantOp, passManager);
+    targetBackend->buildConfigurationPassPipeline(variantOp.getTargetAttr(),
+                                                  passManager);
 
     // This pipeline is optional, and the default is no passes, in which case
     // nothing is needed.

@@ -53,6 +53,8 @@ struct TranslateTargetExecutableVariantsPass
     auto variantOp = getOperation();
     if (variantOp.getTarget().getBackend().getValue() != target)
       return;
+    if (variantOp.isExternal())
+      return;
 
     auto targetBackend = targetRegistry->getTargetBackend(target);
     if (!targetBackend) {
@@ -61,7 +63,8 @@ struct TranslateTargetExecutableVariantsPass
     }
 
     OpPassManager passManager(variantOp.getOperationName());
-    targetBackend->buildTranslationPassPipeline(variantOp, passManager);
+    targetBackend->buildTranslationPassPipeline(variantOp.getTargetAttr(),
+                                                passManager);
     if (failed(runPipeline(passManager, variantOp))) {
       variantOp.emitError() << "failed to run translation of source "
                                "executable to target executable for backend "

@@ -24,6 +24,15 @@ Value getDimValue(OpBuilder &builder, Location loc, Value v, int64_t dim);
 OpFoldResult getDim(OpBuilder &builder, Location loc, Value v, int64_t dim);
 SmallVector<OpFoldResult> getDims(OpBuilder &builder, Location loc, Value v);
 
+/// Returns a `memref.subview` or a `tensor.extract_slice` based on the type of
+/// `src`.
+Value getSlice(OpBuilder &b, Location loc, Value src,
+               ArrayRef<OpFoldResult> offsets, ArrayRef<OpFoldResult> sizes,
+               ArrayRef<OpFoldResult> strides);
+
+/// Returns a `memref.cast` or `tensor.cast` based on the type of `src`.
+Value castValue(OpBuilder &builder, Location loc, Value src, ShapedType type);
+
 /// Returns a vector that interchanges `elements` starting at offset `offset`
 /// based on the indexes in `interchangeVector`.
 template <typename T>

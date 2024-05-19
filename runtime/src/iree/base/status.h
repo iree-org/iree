@@ -299,7 +299,7 @@ typedef struct iree_status_handle_t* iree_status_t;
 // We cut out all status storage code when not used.
 #if IREE_STATUS_FEATURES == 0
 #define IREE_STATUS_IMPL_MAKE_(code, ...) \
-  (iree_status_t)(uintptr_t)((code)&IREE_STATUS_CODE_MASK)
+  (iree_status_t)(uintptr_t)((code) & IREE_STATUS_CODE_MASK)
 #define IREE_STATUS_IMPL_MAKE_LOC_(file, line, code, ...) \
   IREE_STATUS_IMPL_MAKE_(code)
 #undef IREE_STATUS_IMPL_RETURN_IF_API_ERROR_

@@ -70,26 +70,17 @@ void buildGlobalOptExprHoistingPassPipeline(
 
 void buildGlobalOptimizationPassPipeline(
     OpPassManager &mainPassManager, const TransformOptions &transformOptions) {
-  // ML frontends have very uneven support for user-controlled types _and_ users
-  // tend to use types not well suited for the work they are doing. These
-  // demotions/promotions allow users to change the types after lowering out of
-  // the frontends. It'll always be better to do this higher up in the stack
-  // as these kind of blanket conversions have corner cases and potential
-  // accuracy/precision losses beyond what the user may expect.
-  if (transformOptions.options.demoteF64ToF32) {
-    mainPassManager.addPass(IREE::Util::createDemoteF64ToF32Pass());
-  }
-  if (transformOptions.options.demoteF32ToF16) {
-    mainPassManager.addPass(IREE::Util::createDemoteF32ToF16Pass());
-  }
-  if (transformOptions.options.promoteF16ToF32) {
-    mainPassManager.addPass(IREE::Util::createPromoteF16ToF32Pass());
-  }
-  if (transformOptions.options.promoteBF16ToF32) {
-    mainPassManager.addPass(IREE::Util::createPromoteBF16ToF32Pass());
-  }
-  if (transformOptions.options.demoteI64ToI32) {
-    mainPassManager.addPass(IREE::Util::createDemoteI64ToI32Pass());
+  // Import parameters before any global optimization passes so that the inlined
+  // parameters are available for folding.
+  if (!transformOptions.options.parameterImportPaths.empty()) {
+    IREE::IO::Parameters::ImportParametersPassOptions importParametersOptions;
+    importParametersOptions.scopePaths =
+        transformOptions.options.parameterImportPaths;
+    importParametersOptions.keys = transformOptions.options.parameterImportKeys;
+    importParametersOptions.maximumSize =
+        transformOptions.options.parameterImportMaximumSize;
+    mainPassManager.addPass(IREE::IO::Parameters::createImportParametersPass(
+        importParametersOptions));
   }
 
   // Preprocessing passes to get the program into a canonical state.
@@ -232,23 +223,21 @@ void buildGlobalOptimizationPassPipeline(
   // constants that aren't exported and skip it for larger parameters, but this
   // is a sensible place for the common case of wanting const-eval in the final
   // artifact + archive.
-  if (!transformOptions.options.parameterArchiveExportPath.empty()) {
+  if (!transformOptions.options.parameterExportPath.empty()) {
     IREE::IO::Parameters::ExportParametersPassOptions exportParametersOptions;
-    exportParametersOptions.archivePath =
-        transformOptions.options.parameterArchiveExportPath;
-    exportParametersOptions.parameterScope =
-        transformOptions.options.parameterExportScope;
+    exportParametersOptions.scopePath =
+        transformOptions.options.parameterExportPath;
     exportParametersOptions.minimumSize =
-        transformOptions.options.minimumParameterExportSize;
+        transformOptions.options.parameterExportMinimumSize;
     mainPassManager.addPass(IREE::IO::Parameters::createExportParametersPass(
         exportParametersOptions));
   }
 
-  if (!transformOptions.options.splatParameterArchiveExportPath.empty()) {
+  if (!transformOptions.options.parameterSplatExportFile.empty()) {
     IREE::IO::Parameters::GenerateSplatParameterArchivePassOptions
         generateSplatOptions;
-    generateSplatOptions.archivePath =
-        transformOptions.options.splatParameterArchiveExportPath;
+    generateSplatOptions.filePath =
+        transformOptions.options.parameterSplatExportFile;
     mainPassManager.addPass(
         IREE::IO::Parameters::createGenerateSplatParameterArchivePass(
             generateSplatOptions));

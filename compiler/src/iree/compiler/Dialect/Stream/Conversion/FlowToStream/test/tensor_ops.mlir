@@ -17,7 +17,7 @@ util.func public @tensorConstantParameter() -> tensor<4x2xi32> {
   // CHECK-DAG: %[[CST:.+]] = stream.tensor.constant : tensor<4x2xi32> in !stream.resource<constant> = #stream.parameter.named<"scope"::"key"> : tensor<4x2xi32>
   // CHECK-DAG: %[[SIZE:.+]] = stream.resource.size %[[CST]] : !stream.resource<constant>
   // CHECK-DAG: %[[TRANSFER:.+]] = stream.async.transfer %[[CST]] : !stream.resource<constant>{%[[SIZE]]} -> !stream.resource<*>{%[[SIZE]]}
-  %cst = flow.tensor.constant #stream.parameter.named<"scope"::"key"> : tensor<4x2xi32>
+  %cst = flow.tensor.constant #flow.parameter.named<"scope"::"key"> : tensor<4x2xi32>
   // CHECK: util.return %[[TRANSFER]], %[[SIZE]]
   util.return %cst : tensor<4x2xi32>
 }

@@ -4,17 +4,20 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/GPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-tile-reduction"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_GPUTILEREDUCTIONPASS
+#include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
 
 namespace {
 
@@ -58,14 +61,10 @@ static LogicalResult tileFusedOps(linalg::LinalgOp op) {
   return success();
 }
 
-struct GPUTileReductionPass
-    : public GPUTileReductionBase<GPUTileReductionPass> {
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<scf::SCFDialect>();
-  }
-
+struct GPUTileReductionPass final
+    : impl::GPUTileReductionPassBase<GPUTileReductionPass> {
   void runOnOperation() override {
-    auto funcOp = getOperation();
+    FunctionOpInterface funcOp = getOperation();
     SmallVector<linalg::LinalgOp> linalgOps;
     funcOp.walk([&](linalg::LinalgOp op) { linalgOps.push_back(op); });
     for (linalg::LinalgOp op : linalgOps) {
@@ -81,11 +80,6 @@ struct GPUTileReductionPass
     }
   }
 };
+
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createGPUTileReductionPass() {
-  return std::make_unique<GPUTileReductionPass>();
-}
-
 } // namespace mlir::iree_compiler

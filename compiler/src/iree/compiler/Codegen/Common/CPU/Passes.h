@@ -19,15 +19,15 @@
 namespace mlir::iree_compiler {
 
 /// Convert encoding-specific operations based on target attributes. Examples:
-///   linalg_ext.set_encoding   -> tensor.pack
-///   linalg_ext.unset_encoding -> tensor.unpack
+///   encoding.set_encoding   -> tensor.pack
+///   encoding.unset_encoding -> tensor.unpack
 ///   linalg.matmul             -> linalg.mmt4d
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createCPUMaterializeEncodingPass(
     IREE::HAL::ExecutableTargetAttr targetAttr = nullptr);
 
 /// Like createLLVMCPUMaterializeEncodingPass, but specifically for
-/// linalg_ext.upper_bound_tile_size, converting it to constants.
+/// encoding.upper_bound_tile_size, converting it to constants.
 ///
 /// Unlike createLLVMCPUMaterializeEncodingPass, this does not require the
 /// op to have a specific HAL target attribute. Instead, this will iterate over

@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/TransformStrategies/Common/Common.h"
-
 #include "iree-dialects/Dialect/LinalgTransform/StructuredTransformOpsExt.h"
 #include "iree/compiler/Codegen/Common/TransformExtensions/CommonExtensions.h"
 #include "iree/compiler/Codegen/TransformStrategies/Common/AbstractReductionStrategy.h"
@@ -276,7 +275,7 @@ Value mlir::iree_compiler::buildPad(
     ImplicitLocOpBuilder &b, Value opH, ArrayRef<Attribute> paddingValues,
     ArrayRef<int64_t> paddingDimensions, ArrayRef<int64_t> packingDimensions,
     ArrayRef<SmallVector<int64_t>> transposePaddings) {
-  SmallVector<int64_t> padToMultipleOf(paddingDimensions.size(), 1);
+  SmallVector<int64_t> staticPadToMultipleOf(paddingDimensions.size(), 1);
   SmallVector<Attribute> transposeAttrs;
   for (auto &transp : transposePaddings)
     transposeAttrs.push_back(b.getI64ArrayAttr(transp));
@@ -285,12 +284,12 @@ Value mlir::iree_compiler::buildPad(
                         transform::AnyOpType::get(b.getContext()),
                         transform::AnyOpType::get(b.getContext())};
   return b
-      .create<transform::PadOp>(resultTypes, opH, b.getArrayAttr(paddingValues),
-                                b.getI64ArrayAttr(paddingDimensions),
-                                b.getI64ArrayAttr(padToMultipleOf),
-                                b.getI64ArrayAttr(packingDimensions),
-                                b.getArrayAttr(transposeAttrs),
-                                /*copyBack=*/b.getStringAttr("none"))
+      .create<transform::PadOp>(
+          resultTypes, opH, b.getArrayAttr(paddingValues),
+          b.getI64ArrayAttr(paddingDimensions),
+          /*padToMultipleOf=*/ValueRange{}, staticPadToMultipleOf,
+          b.getI64ArrayAttr(packingDimensions), b.getArrayAttr(transposeAttrs),
+          /*copyBack=*/b.getStringAttr("none"))
       ->getResult(0);
 }
 

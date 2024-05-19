@@ -42,6 +42,7 @@ iree_lit_test_suite(
             "inject_tensor_tracing.mlir",
             "insert_dispatch_debug_targets.mlir",
             "interchange_transpose_generic_ops.mlir",
+            "outline_constants.mlir",
             "outline_dispatch_externs.mlir",
             "outline_dispatch_regions.mlir",
             "pad_fusion_with_consumer.mlir",

@@ -79,6 +79,8 @@ iree_check_single_backend_test_suite(
     "llvm-cpu"
   DRIVER
     "local-task"
+  COMPILER_FLAGS
+    "--iree-input-demote-f64-to-f32"
   INPUT_TYPE
     "stablehlo"
 )
@@ -150,6 +152,8 @@ iree_check_single_backend_test_suite(
     "vmvx"
   DRIVER
     "local-task"
+  COMPILER_FLAGS
+    "--iree-input-demote-f64-to-f32"
   INPUT_TYPE
     "stablehlo"
 )
@@ -220,6 +224,8 @@ iree_check_single_backend_test_suite(
     "vulkan-spirv"
   DRIVER
     "vulkan"
+  COMPILER_FLAGS
+    "--iree-input-demote-f64-to-f32"
   INPUT_TYPE
     "stablehlo"
 )
@@ -294,6 +300,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "local-task"
   COMPILER_FLAGS
+    "--iree-input-demote-f64-to-f32"
     "--iree-llvmcpu-target-cpu-features=host"
   INPUT_TYPE
     "stablehlo"
@@ -372,6 +379,7 @@ iree_check_single_backend_test_suite(
   DRIVER
     "cuda"
   COMPILER_FLAGS
+    "--iree-input-demote-f64-to-f32"
     "--iree-stream-emulate-memset"
   INPUT_TYPE
     "stablehlo"
@@ -454,6 +462,8 @@ iree_check_single_backend_test_suite(
     "cuda"
   DRIVER
     "cuda"
+  COMPILER_FLAGS
+    "--iree-input-demote-f64-to-f32"
   INPUT_TYPE
     "stablehlo"
   RUNNER_ARGS

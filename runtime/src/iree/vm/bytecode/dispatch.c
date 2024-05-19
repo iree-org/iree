@@ -840,7 +840,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
     //===------------------------------------------------------------------===//
 
     DISPATCH_OP(CORE, ConstI32, {
-      int32_t value = VM_DecIntAttr32("value");
+      int32_t value = VM_DecAttrI32("value");
       int32_t* result = VM_DecResultRegI32("result");
       *result = value;
     });
@@ -851,7 +851,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
     });
 
     DISPATCH_OP(CORE, ConstI64, {
-      int64_t value = VM_DecIntAttr64("value");
+      int64_t value = VM_DecAttrI64("value");
       int64_t* result = VM_DecResultRegI64("result");
       *result = value;
     });
@@ -1929,7 +1929,7 @@ static iree_status_t iree_vm_bytecode_dispatch(
       //===----------------------------------------------------------------===//
 
       DISPATCH_OP(EXT_F32, ConstF32, {
-        float value = VM_DecFloatAttr32("value");
+        float value = VM_DecAttrF32("value");
         float* result = VM_DecResultRegF32("result");
         *result = value;
       });
@@ -2145,8 +2145,310 @@ static iree_status_t iree_vm_bytecode_dispatch(
     UNHANDLED_DISPATCH_PREFIX(PrefixExtF32, EXT_F32);
 #endif  // IREE_VM_EXT_F32_ENABLE
 
-    DISPATCH_OP(CORE, PrefixExtF64,
-                { return iree_make_status(IREE_STATUS_UNIMPLEMENTED); });
+#if IREE_VM_EXT_F64_ENABLE
+    BEGIN_DISPATCH_PREFIX(PrefixExtF64, EXT_F64) {
+      //===----------------------------------------------------------------===//
+      // ExtF64: Globals
+      //===----------------------------------------------------------------===//
+
+      DISPATCH_OP(EXT_F64, GlobalLoadF64, {
+        uint32_t byte_offset = VM_DecGlobalAttr("global");
+        IREE_ASSERT(byte_offset + 4 <=
+                    module_state->rwdata_storage.data_length);
+        double* value = VM_DecResultRegF64("value");
+        const double global_value =
+            vm_global_load_f64(module_state->rwdata_storage.data, byte_offset);
+        *value = global_value;
+      });
+
+      DISPATCH_OP(EXT_F64, GlobalStoreF64, {
+        uint32_t byte_offset = VM_DecGlobalAttr("global");
+        IREE_ASSERT(byte_offset + 4 <=
+                    module_state->rwdata_storage.data_length);
+        double value = VM_DecOperandRegF64("value");
+        vm_global_store_f64(module_state->rwdata_storage.data, byte_offset,
+                            value);
+      });
+
+      DISPATCH_OP(EXT_F64, GlobalLoadIndirectF64, {
+        uint32_t byte_offset = VM_DecOperandRegI32("global");
+        if (IREE_UNLIKELY(byte_offset + 4 >
+                          module_state->rwdata_storage.data_length)) {
+          return iree_make_status(
+              IREE_STATUS_OUT_OF_RANGE,
+              "global byte_offset out of range: %d (rwdata=%" PRIhsz ")",
+              byte_offset, module_state->rwdata_storage.data_length);
+        }
+        double* value = VM_DecResultRegF64("value");
+        const double global_value =
+            vm_global_load_f64(module_state->rwdata_storage.data, byte_offset);
+        *value = global_value;
+      });
+
+      DISPATCH_OP(EXT_F64, GlobalStoreIndirectF64, {
+        uint32_t byte_offset = VM_DecOperandRegI32("global");
+        if (IREE_UNLIKELY(byte_offset + 4 >
+                          module_state->rwdata_storage.data_length)) {
+          return iree_make_status(
+              IREE_STATUS_OUT_OF_RANGE,
+              "global byte_offset out of range: %d (rwdata=%" PRIhsz ")",
+              byte_offset, module_state->rwdata_storage.data_length);
+        }
+        double value = VM_DecOperandRegF64("value");
+        vm_global_store_f64(module_state->rwdata_storage.data, byte_offset,
+                            value);
+      });
+
+      //===----------------------------------------------------------------===//
+      // ExtF64: Constants
+      //===----------------------------------------------------------------===//
+
+      DISPATCH_OP(EXT_F64, ConstF64, {
+        double value = VM_DecAttrF64("value");
+        double* result = VM_DecResultRegF64("result");
+        *result = value;
+      });
+
+      DISPATCH_OP(EXT_F64, ConstF64Zero, {
+        double* result = VM_DecResultRegF64("result");
+        *result = 0;
+      });
+
+      //===----------------------------------------------------------------===//
+      // ExtF64: Lists
+      //===----------------------------------------------------------------===//
+
+      DISPATCH_OP(EXT_F64, ListGetF64, {
+        bool list_is_move;
+        iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
+        iree_vm_list_t* list = iree_vm_list_deref(*list_ref);
+        if (IREE_UNLIKELY(!list)) {
+          return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
+        }
+        uint32_t index = VM_DecOperandRegI32("index");
+        double* result = VM_DecResultRegF64("result");
+        iree_vm_value_t value;
+        IREE_RETURN_IF_ERROR(iree_vm_list_get_value_as(
+            list, index, IREE_VM_VALUE_TYPE_F64, &value));
+        *result = value.f64;
+      });
+
+      DISPATCH_OP(EXT_F64, ListSetF64, {
+        bool list_is_move;
+        iree_vm_ref_t* list_ref = VM_DecOperandRegRef("list", &list_is_move);
+        iree_vm_list_t* list = iree_vm_list_deref(*list_ref);
+        if (IREE_UNLIKELY(!list)) {
+          return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, "list is null");
+        }
+        uint32_t index = VM_DecOperandRegI32("index");
+        double raw_value = VM_DecOperandRegF64("value");
+        iree_vm_value_t value = iree_vm_value_make_f64(raw_value);
+        IREE_RETURN_IF_ERROR(iree_vm_list_set_value(list, index, &value));
+      });
+
+      //===----------------------------------------------------------------===//
+      // ExtF64: Conditional assignment
+      //===----------------------------------------------------------------===//
+
+      DISPATCH_OP(EXT_F64, SelectF64, {
+        int32_t condition = VM_DecOperandRegI32("condition");
+        double true_value = VM_DecOperandRegF64("true_value");
+        double false_value = VM_DecOperandRegF64("false_value");
+        double* result = VM_DecResultRegF64("result");
+        *result = vm_select_f64(condition, true_value, false_value);
+      });
+
+      DISPATCH_OP(EXT_F64, SwitchF64, {
+        int32_t index = VM_DecOperandRegI32("index");
+        double default_value = VM_DecOperandRegF64("default_value");
+        const iree_vm_register_list_t* value_reg_list =
+            VM_DecVariadicOperands("values");
+        double* result = VM_DecResultRegF64("result");
+        if (index >= 0 && index < value_reg_list->size) {
+          *result = *((double*)&regs_i32[value_reg_list->registers[index]]);
+        } else {
+          *result = default_value;
+        }
+      });
+
+      //===----------------------------------------------------------------===//
+      // ExtF64: Native floating-point arithmetic
+      //===----------------------------------------------------------------===//
+
+      DISPATCH_OP_EXT_F64_BINARY_F64(AddF64, vm_add_f64);
+      DISPATCH_OP_EXT_F64_BINARY_F64(SubF64, vm_sub_f64);
+      DISPATCH_OP_EXT_F64_BINARY_F64(MulF64, vm_mul_f64);
+      DISPATCH_OP_EXT_F64_BINARY_F64(DivF64, vm_div_f64);
+      DISPATCH_OP_EXT_F64_BINARY_F64(RemF64, vm_rem_f64);
+      DISPATCH_OP_EXT_F64_TERNARY_F64(FMAF64, vm_fma_f64);
+      DISPATCH_OP_EXT_F64_UNARY_F64(AbsF64, vm_abs_f64);
+      DISPATCH_OP_EXT_F64_UNARY_F64(NegF64, vm_neg_f64);
+      DISPATCH_OP_EXT_F64_UNARY_F64(CeilF64, vm_ceil_f64);
+      DISPATCH_OP_EXT_F64_UNARY_F64(FloorF64, vm_floor_f64);
+      DISPATCH_OP_EXT_F64_UNARY_F64(RoundF64, vm_round_f64);
+      DISPATCH_OP_EXT_F64_UNARY_F64(RoundF64Even, vm_round_f64_even);
+      DISPATCH_OP_EXT_F64_BINARY_F64(MinF64, vm_min_f64);
+      DISPATCH_OP_EXT_F64_BINARY_F64(MaxF64, vm_max_f64);
+
+      DISPATCH_OP_EXT_F64_UNARY_F64(AtanF64, vm_atan_f64);
+      DISPATCH_OP_EXT_F64_BINARY_F64(Atan2F64, vm_atan2_f64);
+      DISPATCH_OP_EXT_F64_UNARY_F64(CosF64, vm_cos_f64);
+      DISPATCH_OP_EXT_F64_UNARY_F64(SinF64, vm_sin_f64);
+      DISPATCH_OP_EXT_F64_UNARY_F64(ExpF64, vm_exp_f64);
+      DISPATCH_OP_EXT_F64_UNARY_F64(Exp2F64, vm_exp2_f64);
+      DISPATCH_OP_EXT_F64_UNARY_F64(ExpM1F64, vm_expm1_f64);
+      DISPATCH_OP_EXT_F64_UNARY_F64(LogF64, vm_log_f64);
+      DISPATCH_OP_EXT_F64_UNARY_F64(Log10F64, vm_log10_f64);
+      DISPATCH_OP_EXT_F64_UNARY_F64(Log1pF64, vm_log1p_f64);
+      DISPATCH_OP_EXT_F64_UNARY_F64(Log2F64, vm_log2_f64);
+      DISPATCH_OP_EXT_F64_BINARY_F64(PowF64, vm_pow_f64);
+      DISPATCH_OP_EXT_F64_UNARY_F64(RsqrtF64, vm_rsqrt_f64);
+      DISPATCH_OP_EXT_F64_UNARY_F64(SqrtF64, vm_sqrt_f64);
+      DISPATCH_OP_EXT_F64_UNARY_F64(TanhF64, vm_tanh_f64);
+      DISPATCH_OP_EXT_F64_UNARY_F64(ErfF64, vm_erf_f64);
+
+      //===----------------------------------------------------------------===//
+      // ExtF64: Casting and type conversion/emulation
+      //===----------------------------------------------------------------===//
+
+      DISPATCH_OP(EXT_F64, TruncF64F32, {
+        double operand = (double)VM_DecOperandRegF64("operand");
+        float* result = VM_DecResultRegF32("result");
+        *result = vm_trunc_f64f32(operand);
+      });
+      DISPATCH_OP(EXT_F64, ExtF32F64, {
+        float operand = (float)VM_DecOperandRegF32("operand");
+        double* result = VM_DecResultRegF64("result");
+        *result = vm_ext_f32f64(operand);
+      });
+      DISPATCH_OP(EXT_F64, CastSI32F64, {
+        int32_t operand = (int32_t)VM_DecOperandRegI32("operand");
+        double* result = VM_DecResultRegF64("result");
+        *result = vm_cast_si32f64(operand);
+      });
+      DISPATCH_OP(EXT_F64, CastUI32F64, {
+        int32_t operand = (int32_t)VM_DecOperandRegI32("operand");
+        double* result = VM_DecResultRegF64("result");
+        *result = vm_cast_ui32f64(operand);
+      });
+      DISPATCH_OP(EXT_F64, CastF64SI32, {
+        double operand = VM_DecOperandRegF64("operand");
+        int32_t* result = VM_DecResultRegI32("result");
+        *result = vm_cast_f64si32(operand);
+      });
+      DISPATCH_OP(EXT_F64, CastF64UI32, {
+        double operand = VM_DecOperandRegF64("operand");
+        int32_t* result = VM_DecResultRegI32("result");
+        *result = vm_cast_f64ui32(operand);
+      });
+      DISPATCH_OP(EXT_F64, CastSI64F64, {
+        int64_t operand = (int64_t)VM_DecOperandRegI64("operand");
+        double* result = VM_DecResultRegF64("result");
+        *result = vm_cast_si64f64(operand);
+      });
+      DISPATCH_OP(EXT_F64, CastUI64F64, {
+        int64_t operand = (int64_t)VM_DecOperandRegI64("operand");
+        double* result = VM_DecResultRegF64("result");
+        *result = vm_cast_ui64f64(operand);
+      });
+      DISPATCH_OP(EXT_F64, CastF64SI64, {
+        double operand = VM_DecOperandRegF64("operand");
+        int64_t* result = VM_DecResultRegI64("result");
+        *result = vm_cast_f64si64(operand);
+      });
+      DISPATCH_OP(EXT_F64, CastF64UI64, {
+        double operand = VM_DecOperandRegF64("operand");
+        int64_t* result = VM_DecResultRegI64("result");
+        *result = vm_cast_f64ui64(operand);
+      });
+      DISPATCH_OP(EXT_F64, BitcastI64F64, {
+        int64_t operand = (int64_t)VM_DecOperandRegI64("operand");
+        double* result = VM_DecResultRegF64("result");
+        *result = vm_bitcast_i64f64(operand);
+      });
+      DISPATCH_OP(EXT_F64, BitcastF64I64, {
+        double operand = VM_DecOperandRegF64("operand");
+        int64_t* result = VM_DecResultRegI64("result");
+        *result = vm_bitcast_f64i64(operand);
+      });
+
+      //===----------------------------------------------------------------===//
+      // ExtF64: Comparison ops
+      //===----------------------------------------------------------------===//
+
+#define DISPATCH_OP_EXT_F64_CMP_F64(op_name, op_func) \
+  DISPATCH_OP(EXT_F64, op_name, {                     \
+    double lhs = VM_DecOperandRegF64("lhs");          \
+    double rhs = VM_DecOperandRegF64("rhs");          \
+    int32_t* result = VM_DecResultRegI32("result");   \
+    *result = op_func(lhs, rhs);                      \
+  });
+
+      DISPATCH_OP_EXT_F64_CMP_F64(CmpEQF64O, vm_cmp_eq_f64o);
+      DISPATCH_OP_EXT_F64_CMP_F64(CmpEQF64U, vm_cmp_eq_f64u);
+      DISPATCH_OP_EXT_F64_CMP_F64(CmpNEF64O, vm_cmp_ne_f64o);
+      DISPATCH_OP_EXT_F64_CMP_F64(CmpNEF64U, vm_cmp_ne_f64u);
+      DISPATCH_OP_EXT_F64_CMP_F64(CmpLTF64O, vm_cmp_lt_f64o);
+      DISPATCH_OP_EXT_F64_CMP_F64(CmpLTF64U, vm_cmp_lt_f64u);
+      DISPATCH_OP_EXT_F64_CMP_F64(CmpLTEF64O, vm_cmp_lte_f64o);
+      DISPATCH_OP_EXT_F64_CMP_F64(CmpLTEF64U, vm_cmp_lte_f64u);
+      DISPATCH_OP(EXT_F64, CmpNaNF64, {
+        double operand = VM_DecOperandRegF64("operand");
+        int32_t* result = VM_DecResultRegI32("result");
+        *result = vm_cmp_nan_f64(operand);
+      });
+
+      //===----------------------------------------------------------------===//
+      // ExtF64: Buffers
+      //===----------------------------------------------------------------===//
+
+      DISPATCH_OP(EXT_F64, BufferFillF64, {
+        bool buffer_is_move;
+        iree_vm_ref_t* buffer_ref =
+            VM_DecOperandRegRef("target_buffer", &buffer_is_move);
+        iree_vm_buffer_t* buffer = iree_vm_buffer_deref(*buffer_ref);
+        if (IREE_UNLIKELY(!buffer)) {
+          return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                  "buffer is null");
+        }
+        iree_host_size_t offset = VM_DecOperandRegI64HostSize("target_offset");
+        iree_host_size_t length = VM_DecOperandRegI64HostSize("length");
+        double value = VM_DecOperandRegF64("value");
+        IREE_RETURN_IF_ERROR(vm_buffer_fill_f64(buffer, offset, length, value));
+      });
+
+      DISPATCH_OP(EXT_F64, BufferLoadF64, {
+        bool buffer_is_move;
+        iree_vm_ref_t* buffer_ref =
+            VM_DecOperandRegRef("source_buffer", &buffer_is_move);
+        iree_vm_buffer_t* buffer = iree_vm_buffer_deref(*buffer_ref);
+        if (IREE_UNLIKELY(!buffer)) {
+          return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                  "source_buffer is null");
+        }
+        iree_host_size_t offset = VM_DecOperandRegI64HostSize("source_offset");
+        double* result = VM_DecResultRegF64("result");
+        vm_buffer_load_f64_inline(buffer, offset, result);
+      });
+
+      DISPATCH_OP(EXT_F64, BufferStoreF64, {
+        bool buffer_is_move;
+        iree_vm_ref_t* buffer_ref =
+            VM_DecOperandRegRef("target_buffer", &buffer_is_move);
+        iree_vm_buffer_t* buffer = iree_vm_buffer_deref(*buffer_ref);
+        if (IREE_UNLIKELY(!buffer)) {
+          return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                                  "target_buffer is null");
+        }
+        iree_host_size_t offset = VM_DecOperandRegI64HostSize("target_offset");
+        double value = VM_DecOperandRegF64("value");
+        vm_buffer_store_f64_inline(buffer, offset, value);
+      });
+    }
+    END_DISPATCH_PREFIX();
+#else
+    UNHANDLED_DISPATCH_PREFIX(PrefixExtF64, EXT_F64);
+#endif  // IREE_VM_EXT_F64_ENABLE
 
     // NOLINTNEXTLINE(misc-static-assert)
     DISPATCH_UNHANDLED_CORE();

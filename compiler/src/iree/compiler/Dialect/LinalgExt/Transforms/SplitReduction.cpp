@@ -77,7 +77,7 @@ LogicalResult shouldParallelTopk(iree_compiler::IREE::LinalgExt::TopkOp topkOp,
     return rewriter.notifyMatchFailure(topkOp,
                                        "cannot split dynamic dimension");
   }
-  if (topkOp.indices() && splitReductionDepth == 0) {
+  if (topkOp.getIndices() && splitReductionDepth == 0) {
     return rewriter.notifyMatchFailure(
         topkOp, "input indices aren't supported for first split");
   }
@@ -101,7 +101,7 @@ computeParallelTopk(Location loc, RewriterBase &rewriter,
                     ArrayRef<ReassociationIndices> reassociationIndices,
                     int64_t splitReductionRatio, int64_t splitDimParallel,
                     int64_t kDimParallel, int64_t kSize) {
-  Value valuesOrig = topkOp.values();
+  Value valuesOrig = topkOp.getValues();
   auto valuesOriginalType = cast<ShapedType>(valuesOrig.getType());
   Type valueElementType = valuesOriginalType.getElementType();
   Type indicesElementType =
@@ -118,7 +118,7 @@ computeParallelTopk(Location loc, RewriterBase &rewriter,
 
   // Expand input indices shape for parallel processing if they exist
   std::optional<Value> indicesExpanded;
-  if (std::optional<Value> inputIndices = topkOp.indices()) {
+  if (std::optional<Value> inputIndices = topkOp.getIndices()) {
     // Type inputElementType = cast<ShapedType>(inputIndices->getType());
     Type indicesExpandedType =
         RankedTensorType::get(expandedShape, indicesElementType);
@@ -234,7 +234,7 @@ TopkOp computeReductionTopk(Location loc, RewriterBase &rewriter, TopkOp topkOp,
                             ArrayRef<ReassociationIndices> reassociationIndices,
                             int64_t splitReductionRatio, int64_t kDimOrig,
                             int64_t kSize) {
-  Value valuesOrig = topkOp.values();
+  Value valuesOrig = topkOp.getValues();
   auto valuesOriginalType = cast<ShapedType>(valuesOrig.getType());
   Type valueElementType = valuesOriginalType.getElementType();
   Type indicesElementType =
@@ -370,11 +370,11 @@ splitReduction(RewriterBase &rewriter, LinalgExt::TopkOp topkOp,
   // provided. If input indices were provided, no offsetting is needed as
   // original original indices are already known.
   Value updatedParallelIndices = parallelTopkOp.getResult(1);
-  if (!topkOp.indices()) {
+  if (!topkOp.getIndices()) {
     Value parallelIndices = parallelTopkOp.getResult(1);
-    SmallVector<int64_t> expandedShape =
-        getExpandedShape(cast<ShapedType>(topkOp.values().getType()).getShape(),
-                         splitReductionRatio, splitDimParallel);
+    SmallVector<int64_t> expandedShape = getExpandedShape(
+        cast<ShapedType>(topkOp.getValues().getType()).getShape(),
+        splitReductionRatio, splitDimParallel);
     int64_t kDimParallelSize = expandedShape[kDimParallel];
     updatedParallelIndices = offsetParallelIndices(
         loc, rewriter, parallelIndices, kDimParallelSize, splitDimParallel);

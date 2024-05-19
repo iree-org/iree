@@ -23,6 +23,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/CommandLine.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
@@ -43,7 +44,7 @@ namespace mlir::iree_compiler {
 llvm::cl::opt<bool> clGPUEnableVectorDistribution(
     "iree-codegen-llvmgpu-use-vector-distribution",
     llvm::cl::desc("enable the usage of the vector distribution pipeline"),
-    llvm::cl::init(false));
+    llvm::cl::init(true));
 
 llvm::cl::opt<bool> clGPUEnableTransformDialectJit(
     "iree-codegen-llvmgpu-enable-transform-dialect-jit",
@@ -360,6 +361,27 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
       workgroupSize, targetSubgroupSize, configDict);
 }
 
+[[maybe_unused]] static void
+debugPrintContractionInfo(unsigned numLoops,
+                          linalg::ContractionDimensions contractionDims,
+                          ArrayRef<int64_t> workgroupTileSizes) {
+  ArrayRef<unsigned> dimVals[] = {contractionDims.batch, contractionDims.m,
+                                  contractionDims.n, contractionDims.k};
+  std::string dimSymbols(numLoops, '*');
+  for (auto [idx, val] : llvm::enumerate(dimSymbols)) {
+    for (auto [letter, dim] : llvm::zip_equal(StringRef("bmnk"), dimVals))
+      if (llvm::is_contained(dim, idx))
+        val = letter;
+  }
+  DBGS() << "Contraction dims: [";
+  llvm::interleaveComma(dimSymbols, llvm::dbgs());
+  llvm::dbgs() << "]\n";
+
+  DBGS() << "Workgroup tile sizes: [";
+  llvm::interleaveComma(workgroupTileSizes, llvm::dbgs());
+  llvm::dbgs() << "]\n";
+}
+
 static LogicalResult
 setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
                                   mlir::FunctionOpInterface entryPoint,
@@ -441,7 +463,10 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   int64_t maxSharedMemoryBytes = target.getCore().getMaxWorkgroupMemoryBytes();
 
+  LDBG("Matmul Vector Distribution Config");
+
   // First try to find a schedule with an exactly matching intrinsic.
+  auto pipeline = CodeGenPipeline::LLVMGPUVectorDistribute;
   std::optional<GPUMMASchedule> schedule =
       deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes);
   if (!schedule) {
@@ -450,9 +475,37 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
         deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
                           /*canUpcastAcc=*/true);
   }
+
+  // Only batch_matmul is supported in the LLVMGPUPadAndVectorDistribute
+  // pipeline.
+  // TODO(hanchung): Support cases that there are fused producers.
+  if (!schedule && !contractionDims->batch.empty() && !hasFusedLeadingOp(op)) {
+    LDBG("Matmul Pad and Vector Distribute");
+    pipeline = CodeGenPipeline::LLVMGPUPadAndVectorDistribute;
+    bool mustBeAligned = false;
+    schedule =
+        deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
+                          /*canUpcastAcc=*/false, mustBeAligned);
+    if (!schedule) {
+      // Then try again by allowing upcasting accumulator.
+      schedule =
+          deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
+                            /*canUpcastAcc=*/true, mustBeAligned);
+    }
+  }
   if (!schedule) {
+    LDBG("Failed to deduce MMA schedule");
     return failure();
   }
+
+  LDBG("Target Subgroup size: " << targetSubgroupSize);
+  LDBG("Schedule: sizes [" << schedule->mSize << ", " << schedule->nSize << ", "
+                           << schedule->kSize << "]");
+  LDBG("Schedule: tile counts [" << schedule->mTileCount << ", "
+                                 << schedule->nTileCount << ", "
+                                 << schedule->kTileCount << "]");
+  LDBG("Schedule: warp counts [" << schedule->mWarpCount << ", "
+                                 << schedule->nWarpCount << "]");
 
   std::array<int64_t, 3> workgroupSize{
       schedule->nWarpCount * targetSubgroupSize, schedule->mWarpCount, 1};
@@ -484,6 +537,9 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // Follow the LLVMGPU convention of keeping all of the tile sizes in one list.
   workgroupTileSizes[kDim] = schedule->kTileCount * schedule->kSize;
 
+  LLVM_DEBUG(debugPrintContractionInfo(op.getNumLoops(), *contractionDims,
+                                       workgroupTileSizes));
+
   TileSizesListType tileSizes;
   tileSizes.push_back(workgroupTileSizes);
 
@@ -497,9 +553,9 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   attrs.emplace_back(StringAttr::get(context, "mma_schedule"), scheduleAttr);
   auto configDict = DictionaryAttr::get(context, attrs);
 
-  return setOpConfigAndEntryPointFnTranslation(
-      entryPoint, op, tileSizes, CodeGenPipeline::LLVMGPUVectorDistribute,
-      workgroupSize, targetSubgroupSize, configDict);
+  return setOpConfigAndEntryPointFnTranslation(entryPoint, op, tileSizes,
+                                               pipeline, workgroupSize,
+                                               targetSubgroupSize, configDict);
 }
 
 static LogicalResult
@@ -508,21 +564,19 @@ setVectorDistributionConfig(IREE::GPU::TargetAttr target,
                             Operation *computeOp) {
 
   if (!clGPUEnableVectorDistribution) {
-    LDBG("vector distribution not enabled, skipping...\n");
+    LDBG("Vector Distribution not enabled, skipping...");
     return failure();
   }
 
-  LDBG("VectorDistribution: finding a suitable config...\n");
+  LDBG("VectorDistribution: finding a suitable config...");
 
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(computeOp)) {
     if (linalg::isaContractionOpInterface(linalgOp)) {
-      LDBG(
-          "VectorDistribution: trying to find a suitable contraction config\n");
+      LDBG("VectorDistribution: trying to find a suitable contraction config");
       return setMatmulVectorDistributionConfig(target, entryPoint, linalgOp);
     }
     if (linalg::isaConvolutionOpInterface(linalgOp)) {
-      LDBG(
-          "VectorDistribution: trying to find a suitable convolution config\n");
+      LDBG("VectorDistribution: trying to find a suitable convolution config");
       return setConvolutionVectorDistributionConfig(target, entryPoint,
                                                     linalgOp);
     }
@@ -771,6 +825,41 @@ static LogicalResult setFftConfig(IREE::GPU::TargetAttr target,
   return setOpConfigAndEntryPointFnTranslation(
       entryPoint, op, tileSizes, CodeGenPipeline::LLVMGPUDistribute,
       workgroupSize);
+}
+
+//===----------------------------------------------------------------------===//
+// Winograd Pipeline Configuration
+//===----------------------------------------------------------------------===//
+template <typename WinogradOp>
+static LogicalResult setWinogradOpConfig(IREE::GPU::TargetAttr target,
+                                         mlir::FunctionOpInterface entryPoint,
+                                         WinogradOp op) {
+  static_assert(
+      llvm::is_one_of<WinogradOp, IREE::LinalgExt::WinogradInputTransformOp,
+                      IREE::LinalgExt::WinogradFilterTransformOp,
+                      IREE::LinalgExt::WinogradOutputTransformOp>::value,
+      "expected winograd transform op");
+  auto pipeline = CodeGenPipeline::LLVMGPUWinogradVectorize;
+  TileSizesListType tileSizes;
+  std::array<int64_t, 3> workgroupSize = {32, 4, 4};
+  int64_t iterationRank = op.getIterationDomainRank();
+  SmallVector<int64_t> workgroupTileSizes(iterationRank, 4);
+  // Set batch workgroup size
+  workgroupTileSizes.front() = 1;
+  // Set input channel workgroup size
+  workgroupTileSizes.back() = 32;
+  if (isa<IREE::LinalgExt::WinogradFilterTransformOp>(op)) {
+    // Set input channel workgroup size
+    workgroupTileSizes.front() = 32;
+    // Set output channel workgroup size
+    workgroupTileSizes.back() = 16;
+    workgroupSize = {16, 32, 1};
+  }
+  tileSizes.push_back(workgroupTileSizes);
+  SmallVector<int64_t> threadTileSizes(iterationRank, 1);
+  tileSizes.push_back(threadTileSizes);
+  return setOpConfigAndEntryPointFnTranslation(entryPoint, op, tileSizes,
+                                               pipeline, workgroupSize);
 }
 
 //====---------------------------------------------------------------------===//
@@ -1663,26 +1752,33 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
       return success();
     }
   }
-
-  if (auto fftOp = dyn_cast<IREE::LinalgExt::FftOp>(computeOp)) {
-    LDBG("FFT Config");
-    return setFftConfig(target, entryPointFn, fftOp);
-  }
-  if (auto sortOp = dyn_cast<IREE::LinalgExt::SortOp>(computeOp)) {
-    LDBG("Sort Config");
-    return setSortConfig(target, entryPointFn, sortOp);
-  }
-  if (auto packOp = dyn_cast<tensor::PackOp>(computeOp)) {
-    LDBG("Pack Config");
-    return setPackConfig(target, entryPointFn, packOp);
-  }
-  if (auto ukernelOp = dyn_cast<IREE::Codegen::UKernelOpInterface>(computeOp)) {
-    LDBG("Ukernel Config");
-    return setUKernelConfig(entryPointFn, ukernelOp);
-  }
-
-  LDBG("Default Config");
-  return setRootDefaultConfig(target, entryPointFn, computeOp);
+  return TypeSwitch<Operation *, LogicalResult>(computeOp)
+      .Case<IREE::LinalgExt::FftOp>([&](auto fftOp) {
+        LDBG("FFT Config");
+        return setFftConfig(target, entryPointFn, fftOp);
+      })
+      .Case<IREE::LinalgExt::SortOp>([&](auto sortOp) {
+        LDBG("Sort Config");
+        return setSortConfig(target, entryPointFn, sortOp);
+      })
+      .Case<IREE::LinalgExt::WinogradInputTransformOp,
+            IREE::LinalgExt::WinogradOutputTransformOp,
+            IREE::LinalgExt::WinogradFilterTransformOp>([&](auto winogradOp) {
+        LDBG("Winograd Config");
+        return setWinogradOpConfig(target, entryPointFn, winogradOp);
+      })
+      .Case<tensor::PackOp>([&](auto packOp) {
+        LDBG("Pack Config");
+        return setPackConfig(target, entryPointFn, packOp);
+      })
+      .Case<IREE::Codegen::UKernelOpInterface>([&](auto ukernelOp) {
+        LDBG("Ukernel Config");
+        return setUKernelConfig(entryPointFn, ukernelOp);
+      })
+      .Default([&](auto op) {
+        LDBG("Default Config");
+        return setRootDefaultConfig(target, entryPointFn, computeOp);
+      });
 }
 
 // Propogate the configuration to the other ops.

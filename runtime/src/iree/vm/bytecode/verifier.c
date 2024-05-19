@@ -460,7 +460,7 @@ iree_status_t iree_vm_bytecode_function_verify(
   IREE_VM_VERIFY_PC_RANGE(pc + IREE_REGISTER_ORDINAL_SIZE, max_pc); \
   const uint32_t name = OP_I16(0);
 #define IREE_VM_VERIFY_REG_ORDINAL_X32(ordinal, category)                      \
-  if (IREE_UNLIKELY(((ordinal)&IREE_REF_REGISTER_TYPE_BIT) != 0)) {            \
+  if (IREE_UNLIKELY(((ordinal) & IREE_REF_REGISTER_TYPE_BIT) != 0)) {          \
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,                      \
                             category                                           \
                             " register required but ref register %u provided", \
@@ -471,7 +471,7 @@ iree_status_t iree_vm_bytecode_function_verify(
                             (ordinal), verify_state->i32_register_count);      \
   }
 #define IREE_VM_VERIFY_REG_ORDINAL_X64(ordinal, category)                      \
-  if (IREE_UNLIKELY(((ordinal)&IREE_REF_REGISTER_TYPE_BIT) != 0)) {            \
+  if (IREE_UNLIKELY(((ordinal) & IREE_REF_REGISTER_TYPE_BIT) != 0)) {          \
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,                      \
                             category                                           \
                             " register required but ref register %u provided", \
@@ -496,19 +496,19 @@ iree_status_t iree_vm_bytecode_function_verify(
 #define IREE_VM_VERIFY_REG_F64(ordinal) \
   IREE_VM_VERIFY_REG_ORDINAL_X64(ordinal, "f64");
 #define IREE_VM_VERIFY_REG_REF(ordinal)                                      \
-  if (IREE_UNLIKELY(((ordinal)&IREE_REF_REGISTER_TYPE_BIT) == 0)) {          \
+  if (IREE_UNLIKELY(((ordinal) & IREE_REF_REGISTER_TYPE_BIT) == 0)) {        \
     return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,                    \
                             "ref register required but non-ref %u provided", \
                             (ordinal));                                      \
-  } else if (IREE_UNLIKELY(((ordinal)&IREE_REF_REGISTER_MASK) >=             \
+  } else if (IREE_UNLIKELY(((ordinal) & IREE_REF_REGISTER_MASK) >=           \
                            verify_state->ref_register_count)) {              \
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,                        \
                             "ref register ordinal %u out of range %u",       \
                             (ordinal), verify_state->ref_register_count);    \
   }
-#define IREE_VM_VERIFY_REG_ANY(ordinal)                             \
-  if (IREE_UNLIKELY(((ordinal)&IREE_REF_REGISTER_TYPE_BIT) == 0)) { \
-  } else {                                                          \
+#define IREE_VM_VERIFY_REG_ANY(ordinal)                               \
+  if (IREE_UNLIKELY(((ordinal) & IREE_REF_REGISTER_TYPE_BIT) == 0)) { \
+  } else {                                                            \
   }
 
 #define VM_VerifyConstI8(name)             \
@@ -543,7 +543,7 @@ iree_status_t iree_vm_bytecode_function_verify(
   pc += 8;
 
 #define VM_VerifyFuncAttr(name) VM_VerifyConstI32(name)
-#define VM_IsImportOrdinal(name) (((name)&0x80000000u) != 0)
+#define VM_IsImportOrdinal(name) (((name) & 0x80000000u) != 0)
 #define VM_UnmaskImportOrdinal(name) name &= ~0x80000000u
 #define VM_VerifyImportOrdinal(name)                                          \
   if (IREE_UNLIKELY((name) >= iree_vm_ImportFunctionDef_vec_len(              \
@@ -598,10 +598,10 @@ iree_status_t iree_vm_bytecode_function_verify(
   (void)(name);                                                                \
   pc += 4;
 #define VM_VerifyTypeOf(name) VM_VerifyType(name)
-#define VM_VerifyIntAttr32(name) VM_VerifyConstI32(name)
-#define VM_VerifyIntAttr64(name) VM_VerifyConstI64(name)
-#define VM_VerifyFloatAttr32(name) VM_VerifyConstF32(name)
-#define VM_VerifyFloatAttr64(name) VM_VerifyConstF64(name)
+#define VM_VerifyAttrI32(name) VM_VerifyConstI32(name)
+#define VM_VerifyAttrI64(name) VM_VerifyConstI64(name)
+#define VM_VerifyAttrF32(name) VM_VerifyConstF32(name)
+#define VM_VerifyAttrF64(name) VM_VerifyConstF64(name)
 #define VM_VerifyStrAttr(name, out_str)                      \
   IREE_VM_VERIFY_PC_RANGE(pc + 2, max_pc);                   \
   (out_str)->size = (iree_host_size_t)OP_I16(0);             \
@@ -1000,12 +1000,13 @@ static iree_status_t iree_vm_bytecode_function_verify_call(
     IREE_VM_VERIFY_PC_RANGE(pc + 1, max_pc); \
     IREE_VM_VERIFY_REQUIREMENT(ext);         \
     switch (bytecode_data[pc++]) {
-#define END_VERIFY_PREFIX()                               \
-  default:                                                \
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT, \
-                            "unhandled ext opcode");      \
-    }                                                     \
-    break;                                                \
+#define END_VERIFY_PREFIX(op_name, ext)                               \
+  default:                                                            \
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,             \
+                            "unhandled ext " #op_name " opcode %02X", \
+                            bytecode_data[pc - 1]);                   \
+    }                                                                 \
+    break;                                                            \
     }
 #define UNHANDLED_VERIFY_PREFIX(op_name, ext)                                 \
   case IREE_VM_OP_CORE_##op_name: {                                           \
@@ -1133,14 +1134,14 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
     //===------------------------------------------------------------------===//
 
     VERIFY_OP(CORE, ConstI32, {
-      VM_VerifyIntAttr32(value);
+      VM_VerifyAttrI32(value);
       VM_VerifyResultRegI32(result);
     });
 
     VERIFY_OP(CORE, ConstI32Zero, { VM_VerifyResultRegI32(result); });
 
     VERIFY_OP(CORE, ConstI64, {
-      VM_VerifyIntAttr64(value);
+      VM_VerifyAttrI64(value);
       VM_VerifyResultRegI64(result);
     });
 
@@ -1729,7 +1730,7 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
     //===----------------------------------------------------------------===//
 
     VERIFY_OP(EXT_F32, ConstF32, {
-      VM_VerifyFloatAttr32(value);
+      VM_VerifyAttrF32(value);
       VM_VerifyResultRegF32(result);
     });
 
@@ -1881,16 +1882,227 @@ static iree_status_t iree_vm_bytecode_function_verify_bytecode_op(
       VM_VerifyOperandRegF32(value);
     });
 
-    END_VERIFY_PREFIX();
+    END_VERIFY_PREFIX(PrefixExtF32, iree_vm_FeatureBits_EXT_F32);
 #else
     UNHANDLED_VERIFY_PREFIX(PrefixExtF32, iree_vm_FeatureBits_EXT_F32);
 #endif  // IREE_VM_EXT_F32_ENABLE
 
-    VERIFY_OP(CORE, PrefixExtF64, {
-      IREE_VM_VERIFY_REQUIREMENT(iree_vm_FeatureBits_EXT_F64);
-      return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                              "EXT_64 not yet implemented");
+#if IREE_VM_EXT_F64_ENABLE
+    BEGIN_VERIFY_PREFIX(PrefixExtF64, iree_vm_FeatureBits_EXT_F64)
+
+    //===----------------------------------------------------------------===//
+    // ExtF64: Globals
+    //===----------------------------------------------------------------===//
+
+    VERIFY_OP(EXT_F64, GlobalLoadF64, {
+      VM_VerifyGlobalAttr(byte_offset);
+      VM_VerifyRwdataOffset(byte_offset, 4);
+      VM_VerifyResultRegF64(value);
     });
+
+    VERIFY_OP(EXT_F64, GlobalStoreF64, {
+      VM_VerifyGlobalAttr(byte_offset);
+      VM_VerifyRwdataOffset(byte_offset, 4);
+      VM_VerifyOperandRegF64(value);
+    });
+
+    VERIFY_OP(EXT_F64, GlobalLoadIndirectF64, {
+      VM_VerifyOperandRegI32(byte_offset);
+      // NOTE: we have to verify the offset at runtime.
+      VM_VerifyResultRegF64(value);
+    });
+
+    VERIFY_OP(EXT_F64, GlobalStoreIndirectF64, {
+      VM_VerifyOperandRegI32(byte_offset);
+      // NOTE: we have to verify the offset at runtime.
+      VM_VerifyOperandRegF64(value);
+    });
+
+    //===----------------------------------------------------------------===//
+    // ExtF64: Constants
+    //===----------------------------------------------------------------===//
+
+    VERIFY_OP(EXT_F64, ConstF64, {
+      VM_VerifyAttrF64(value);
+      VM_VerifyResultRegF64(result);
+    });
+
+    VERIFY_OP(EXT_F64, ConstF64Zero, { VM_VerifyResultRegF64(result); });
+
+    //===----------------------------------------------------------------===//
+    // ExtF64: Lists
+    //===----------------------------------------------------------------===//
+
+    VERIFY_OP(EXT_F64, ListGetF64, {
+      VM_VerifyOperandRegRef(list);
+      VM_VerifyOperandRegI32(index);
+      VM_VerifyResultRegF64(result);
+    });
+
+    VERIFY_OP(EXT_F64, ListSetF64, {
+      VM_VerifyOperandRegRef(list);
+      VM_VerifyOperandRegI32(index);
+      VM_VerifyOperandRegF64(value);
+    });
+
+    //===----------------------------------------------------------------===//
+    // ExtF64: Conditional assignment
+    //===----------------------------------------------------------------===//
+
+    VERIFY_OP(EXT_F64, SelectF64, {
+      VM_VerifyOperandRegI32(condition);
+      VM_VerifyOperandRegF64(true_value);
+      VM_VerifyOperandRegF64(false_value);
+      VM_VerifyResultRegF64(result);
+    });
+
+    VERIFY_OP(EXT_F64, SwitchF64, {
+      VM_VerifyOperandRegI32(index);
+      VM_VerifyOperandRegF64(default_value);
+      VM_VerifyVariadicOperandsF64(values);
+      VM_VerifyResultRegF64(result);
+    });
+
+    //===----------------------------------------------------------------===//
+    // ExtF64: Native floating-point arithmetic
+    //===----------------------------------------------------------------===//
+
+    VERIFY_OP_EXT_F64_BINARY_F64(AddF64);
+    VERIFY_OP_EXT_F64_BINARY_F64(SubF64);
+    VERIFY_OP_EXT_F64_BINARY_F64(MulF64);
+    VERIFY_OP_EXT_F64_BINARY_F64(DivF64);
+    VERIFY_OP_EXT_F64_BINARY_F64(RemF64);
+    VERIFY_OP_EXT_F64_TERNARY_F64(FMAF64);
+    VERIFY_OP_EXT_F64_UNARY_F64(AbsF64);
+    VERIFY_OP_EXT_F64_UNARY_F64(NegF64);
+    VERIFY_OP_EXT_F64_UNARY_F64(CeilF64);
+    VERIFY_OP_EXT_F64_UNARY_F64(FloorF64);
+    VERIFY_OP_EXT_F64_UNARY_F64(RoundF64);
+    VERIFY_OP_EXT_F64_UNARY_F64(RoundF64Even);
+    VERIFY_OP_EXT_F64_BINARY_F64(MinF64);
+    VERIFY_OP_EXT_F64_BINARY_F64(MaxF64);
+
+    VERIFY_OP_EXT_F64_UNARY_F64(AtanF64);
+    VERIFY_OP_EXT_F64_BINARY_F64(Atan2F64);
+    VERIFY_OP_EXT_F64_UNARY_F64(CosF64);
+    VERIFY_OP_EXT_F64_UNARY_F64(SinF64);
+    VERIFY_OP_EXT_F64_UNARY_F64(ExpF64);
+    VERIFY_OP_EXT_F64_UNARY_F64(Exp2F64);
+    VERIFY_OP_EXT_F64_UNARY_F64(ExpM1F64);
+    VERIFY_OP_EXT_F64_UNARY_F64(LogF64);
+    VERIFY_OP_EXT_F64_UNARY_F64(Log10F64);
+    VERIFY_OP_EXT_F64_UNARY_F64(Log1pF64);
+    VERIFY_OP_EXT_F64_UNARY_F64(Log2F64);
+    VERIFY_OP_EXT_F64_BINARY_F64(PowF64);
+    VERIFY_OP_EXT_F64_UNARY_F64(RsqrtF64);
+    VERIFY_OP_EXT_F64_UNARY_F64(SqrtF64);
+    VERIFY_OP_EXT_F64_UNARY_F64(TanhF64);
+    VERIFY_OP_EXT_F64_UNARY_F64(ErfF64);
+
+    //===----------------------------------------------------------------===//
+    // ExtF64: Casting and type conversion/emulation
+    //===----------------------------------------------------------------===//
+
+    VERIFY_OP(EXT_F64, TruncF64F32, {
+      VM_VerifyOperandRegF64(operand);
+      VM_VerifyResultRegF32(result);
+    });
+    VERIFY_OP(EXT_F64, ExtF32F64, {
+      VM_VerifyOperandRegF32(operand);
+      VM_VerifyResultRegF64(result);
+    });
+    VERIFY_OP(EXT_F64, CastSI32F64, {
+      VM_VerifyOperandRegI32(operand);
+      VM_VerifyResultRegF64(result);
+    });
+    VERIFY_OP(EXT_F64, CastUI32F64, {
+      VM_VerifyOperandRegI32(operand);
+      VM_VerifyResultRegF64(result);
+    });
+    VERIFY_OP(EXT_F64, CastF64SI32, {
+      VM_VerifyOperandRegF64(operand);
+      VM_VerifyResultRegI32(result);
+    });
+    VERIFY_OP(EXT_F64, CastF64UI32, {
+      VM_VerifyOperandRegF64(operand);
+      VM_VerifyResultRegI32(result);
+    });
+    VERIFY_OP(EXT_F64, CastSI64F64, {
+      VM_VerifyOperandRegI64(operand);
+      VM_VerifyResultRegF64(result);
+    });
+    VERIFY_OP(EXT_F64, CastUI64F64, {
+      VM_VerifyOperandRegI64(operand);
+      VM_VerifyResultRegF64(result);
+    });
+    VERIFY_OP(EXT_F64, CastF64SI64, {
+      VM_VerifyOperandRegF64(operand);
+      VM_VerifyResultRegI64(result);
+    });
+    VERIFY_OP(EXT_F64, CastF64UI64, {
+      VM_VerifyOperandRegF64(operand);
+      VM_VerifyResultRegI64(result);
+    });
+    VERIFY_OP(EXT_F64, BitcastI64F64, {
+      VM_VerifyOperandRegI64(operand);
+      VM_VerifyResultRegF64(result);
+    });
+    VERIFY_OP(EXT_F64, BitcastF64I64, {
+      VM_VerifyOperandRegF64(operand);
+      VM_VerifyResultRegI64(result);
+    });
+
+    //===----------------------------------------------------------------===//
+    // ExtF64: Comparison ops
+    //===----------------------------------------------------------------===//
+
+#define VERIFY_OP_EXT_F64_CMP_F64(op_name) \
+  VERIFY_OP(EXT_F64, op_name, {            \
+    VM_VerifyOperandRegF64(lhs);           \
+    VM_VerifyOperandRegF64(rhs);           \
+    VM_VerifyResultRegI32(result);         \
+  });
+
+    VERIFY_OP_EXT_F64_CMP_F64(CmpEQF64O);
+    VERIFY_OP_EXT_F64_CMP_F64(CmpEQF64U);
+    VERIFY_OP_EXT_F64_CMP_F64(CmpNEF64O);
+    VERIFY_OP_EXT_F64_CMP_F64(CmpNEF64U);
+    VERIFY_OP_EXT_F64_CMP_F64(CmpLTF64O);
+    VERIFY_OP_EXT_F64_CMP_F64(CmpLTF64U);
+    VERIFY_OP_EXT_F64_CMP_F64(CmpLTEF64O);
+    VERIFY_OP_EXT_F64_CMP_F64(CmpLTEF64U);
+    VERIFY_OP(EXT_F64, CmpNaNF64, {
+      VM_VerifyOperandRegF64(operand);
+      VM_VerifyResultRegI32(result);
+    });
+
+    //===----------------------------------------------------------------===//
+    // ExtF64: Buffers
+    //===----------------------------------------------------------------===//
+
+    VERIFY_OP(EXT_F64, BufferFillF64, {
+      VM_VerifyOperandRegRef(target_buffer);
+      VM_VerifyOperandRegI64HostSize(target_offset);
+      VM_VerifyOperandRegI64HostSize(length);
+      VM_VerifyOperandRegF64(value);
+    });
+
+    VERIFY_OP(EXT_F64, BufferLoadF64, {
+      VM_VerifyOperandRegRef(source_buffer);
+      VM_VerifyOperandRegI64HostSize(source_offset);
+      VM_VerifyResultRegF64(result);
+    });
+
+    VERIFY_OP(EXT_F64, BufferStoreF64, {
+      VM_VerifyOperandRegRef(target_buffer);
+      VM_VerifyOperandRegI64HostSize(target_offset);
+      VM_VerifyOperandRegF64(value);
+    });
+
+    END_VERIFY_PREFIX(PrefixExtF64, iree_vm_FeatureBits_EXT_F64);
+#else
+    UNHANDLED_VERIFY_PREFIX(PrefixExtF64, iree_vm_FeatureBits_EXT_F64);
+#endif  // IREE_VM_EXT_F64_ENABLE
 
     default:
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,

@@ -24,7 +24,6 @@ iree_compiler_cc_library(
         "//compiler/src/iree/compiler/Dialect/HAL/Conversion/HALToVM",
         "//compiler/src/iree/compiler/Dialect/Util/IR",
         "//compiler/src/iree/compiler/Dialect/VM/Conversion",
-        "//compiler/src/iree/compiler/Dialect/VM/Conversion/StandardToVM",
         "//compiler/src/iree/compiler/Dialect/VM/IR",
         "//compiler/src/iree/compiler/Modules/HAL/Loader/IR",
         "@llvm-project//mlir:ArithDialect",

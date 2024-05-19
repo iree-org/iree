@@ -21,7 +21,7 @@
 
 // Utility macros to convert between CUDevice and iree_hal_device_id_t.
 #define IREE_CUDEVICE_TO_DEVICE_ID(device) (iree_hal_device_id_t)((device) + 1)
-#define IREE_DEVICE_ID_TO_CUDEVICE(device_id) (CUdevice)((device_id)-1)
+#define IREE_DEVICE_ID_TO_CUDEVICE(device_id) (CUdevice)((device_id) - 1)
 
 typedef struct iree_hal_cuda_driver_t {
   // Abstract resource used for injecting reference counting and vtable;
@@ -34,7 +34,7 @@ typedef struct iree_hal_cuda_driver_t {
   iree_string_view_t identifier;
   // CUDA driver API dynamic symbols to interact with the CUDA system.
   iree_hal_cuda_dynamic_symbols_t cuda_symbols;
-  // NCCL API dynamic symbols to interact with the CUDA system.
+  // NCCL API dynamic symbols to use collectives (multi-gpu/multi-node).
   iree_hal_cuda_nccl_dynamic_symbols_t nccl_symbols;
 
   // The default parameters for creating devices using this driver.

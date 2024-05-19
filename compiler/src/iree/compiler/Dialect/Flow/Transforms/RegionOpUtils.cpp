@@ -6,9 +6,9 @@
 
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 
+#include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/FormDispatchRegions.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/CommandLine.h"
@@ -80,16 +80,15 @@ getLoopRangesImpl(ReifyRankedShapedTypeOpInterface shapedOp, Location loc,
   LogicalResult status = shapedOp.reifyResultShapes(builder, resultDims);
   (void)status;
   assert(succeeded(status) && "reifyResultShapes failed");
-  return llvm::map_to_vector(resultDims[0], [&](OpFoldResult v) {
-    return Range{zero, v, one};
-  });
+  return llvm::map_to_vector(
+      resultDims[0], [&](OpFoldResult v) { return Range{zero, v, one}; });
 }
 
 /// For a given operation returns the loop ranges needed to compute the op.
 SmallVector<Range> getLoopRanges(Operation *op, Location loc,
                                  OpBuilder &builder) {
   return llvm::TypeSwitch<Operation *, SmallVector<Range>>(op)
-      .Case<LinalgExt::SetEncodingOp, LinalgExt::UnsetEncodingOp,
+      .Case<Encoding::SetEncodingOp, Encoding::UnsetEncodingOp,
             tensor::InsertSliceOp>([&](auto op) {
         return getLoopRangesFromValue(op.getSource(), loc, builder);
       })

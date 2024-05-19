@@ -87,17 +87,34 @@ transform_dialect::MapNestedForallToGpuThreadsOp::applyToOne(
   auto transformOp = cast<transform::TransformOpInterface>(getOperation());
 
   rewriter.setInsertionPointToStart(&target.getFunctionBody().front());
+  IREE::Codegen::TranslationInfoAttr translationInfo =
+      getTranslationInfo(target);
   DiagnosedSilenceableFailure diag =
       mlir::transform::gpu::mapNestedForallToThreadsImpl(
           rewriter, transformOp, target, getWorkgroupDims(), getSubgroupSize(),
           getSyncAfterDistribution());
   if (!diag.succeeded())
     return diag;
-  if (failed(setTranslationInfo(
-          target, IREE::Codegen::TranslationInfoAttr::get(
-                      rewriter.getContext(),
-                      IREE::Codegen::DispatchLoweringPassPipeline::None,
-                      getWorkgroupDims(), getSubgroupSize())))) {
+
+  IREE::Codegen::TranslationInfoAttr updatedTranslationInfo =
+      IREE::Codegen::TranslationInfoAttr::get(
+          rewriter.getContext(),
+          IREE::Codegen::DispatchLoweringPassPipeline::None, getWorkgroupDims(),
+          getSubgroupSize());
+
+  // Set config dictionary.
+  // Transform Dialect pipeline requires translation_info pass pipeline to
+  // be set to None here.
+  if (translationInfo) {
+    updatedTranslationInfo = IREE::Codegen::TranslationInfoAttr::get(
+        rewriter.getContext(), updatedTranslationInfo.getPassPipeline(),
+        updatedTranslationInfo.getCodegenSpec(),
+        updatedTranslationInfo.getWorkgroupSize(),
+        updatedTranslationInfo.getSubgroupSize(),
+        translationInfo.getConfiguration());
+  }
+
+  if (failed(setTranslationInfo(target, updatedTranslationInfo))) {
     target->emitOpError("failed to update translation info");
     return emitDefaultDefiniteFailure(target);
   }
@@ -1486,12 +1503,17 @@ transform_dialect::AMDGPUDistributeVectorsOp::applyToOne(
   if (failed(distributeVectorOps(target, patterns, options))) {
     return emitDefaultSilenceableFailure(target);
   }
+  // TODO: The consumption of the target handle is only required because the
+  // transform dialect interpreter will crash without it. This op should not
+  // need to invalidate the handle.
+  results.push_back(target);
   return DiagnosedSilenceableFailure::success();
 }
 
 void transform_dialect::AMDGPUDistributeVectorsOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::consumesHandle(getTarget(), effects);
+  transform::producesHandle(getResult(), effects);
   transform::modifiesPayload(effects);
 }
 

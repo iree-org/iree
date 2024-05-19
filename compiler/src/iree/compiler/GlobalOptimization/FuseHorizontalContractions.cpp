@@ -59,6 +59,23 @@ struct HorizontalFusionGroup {
   Operation *dominatedByAll;
 };
 
+/// Check that an operation is a `empty -> fill -> contraction`
+static bool isEmptyFillContractionDAGRootOp(linalg::LinalgOp linalgOp) {
+  if (!linalg::isaContractionOpInterface(linalgOp)) {
+    return false;
+  }
+  auto fillOp = linalgOp.getDpsInits()[0].getDefiningOp<linalg::FillOp>();
+  if (!fillOp) {
+    return false;
+  }
+  // For convenience check that the fill value is 0. This is not
+  // a necessity, but easier to handle the rewrite this way.
+  if (!matchPattern(fillOp.getDpsInputOperand(0)->get(), m_AnyZeroFloat())) {
+    return false;
+  }
+  return fillOp.getDpsInitOperand(0)->get().getDefiningOp<tensor::EmptyOp>();
+}
+
 /// Get user of operation that is a truncate operation.
 static std::optional<linalg::GenericOp> getTruncFUser(Operation *op) {
   if (op->getNumResults() != 1) {
@@ -94,28 +111,6 @@ static std::optional<linalg::GenericOp> getTruncFUser(Operation *op) {
     return std::nullopt;
   }
   return genericOp;
-}
-
-/// Find the operation that is dominated by all other operation.
-std::optional<Operation *>
-findDominatedByAllOps(const SetVector<Operation *> &ops,
-                      const DominanceInfo &dominanceInfo) {
-  for (auto opA : ops) {
-    bool opAIsDominatedByAll = true;
-    for (auto opB : ops) {
-      if (opA == opB) {
-        continue;
-      }
-      if (!dominanceInfo.properlyDominates(opB, opA)) {
-        opAIsDominatedByAll = false;
-        break;
-      }
-    }
-    if (opAIsDominatedByAll) {
-      return opA;
-    }
-  }
-  return std::nullopt;
 }
 
 /// Find all candidates that can be used for horizontal fusion. For example
@@ -167,7 +162,11 @@ static std::optional<HorizontalFusionGroup> getHorizontalFusionGroupMembers(
     if (linalgOp->getParentOp() != seedOp->getParentOp()) {
       return false;
     }
-    if (!linalg::isaContractionOpInterface(linalgOp)) {
+    // The seed has to dominate the op.
+    if (!dominanceInfo.properlyDominates(seedOp, linalgOp)) {
+      return false;
+    }
+    if (!isEmptyFillContractionDAGRootOp(linalgOp)) {
       return false;
     }
     if (groupedOperations.contains(linalgOp) || allOps.contains(linalgOp)) {
@@ -178,35 +177,43 @@ static std::optional<HorizontalFusionGroup> getHorizontalFusionGroupMembers(
         linalgOp->getOperand(2).getType() != outType) {
       return false;
     }
-    // Either this has to dominate the seed or seed has to dominate this.
-    if (!dominanceInfo.properlyDominates(linalgOp, seedOp) &&
-        !dominanceInfo.properlyDominates(seedOp, linalgOp)) {
-      return false;
+    // To not move around the code too much check that the new op
+    // dominates all users of other ops.
+    for (auto op : allOps) {
+      for (auto user : op->getUsers()) {
+        if (allOps.contains(user))
+          continue;
+        if (!dominanceInfo.properlyDominates(linalgOp, user)) {
+          return false;
+        }
+      }
     }
     return true;
   };
 
-  // Iterating over the users as is bad cause the users have no ordering
-  // gaurantees. So look for only ops within the same block as the seed op and
-  // sort them.
+  // Iterate over users of LHS to find ops that can be grouped with the seed.
   SmallVector<Operation *> lhsUsers;
   for (Operation *lhsUser : lhs.getUsers()) {
-    if (lhsUser->getBlock() == seedOp->getBlock()) {
-      lhsUsers.push_back(lhsUser);
+    if (lhsUser->getBlock() != seedOp->getBlock() || lhsUser == seedOp) {
+      continue;
     }
+
+    auto linalgUser = dyn_cast<linalg::LinalgOp>(lhsUser);
+    if (!linalgUser || !canBeGrouped(linalgUser)) {
+      continue;
+    }
+    lhsUsers.push_back(lhsUser);
   }
+
+  // Sort the users so that the order is deterministic
   llvm::sort(lhsUsers, [&](Operation *lhs, Operation *rhs) {
     return dominanceInfo.properlyDominates(lhs, rhs);
   });
 
   // Collect all contraction op users of lhs.
   for (Operation *lhsUser : lhsUsers) {
-    if (lhsUser == seedOp.getOperation()) {
-      continue;
-    }
-
     auto linalgUser = dyn_cast<linalg::LinalgOp>(lhsUser);
-    if (!linalgUser || !canBeGrouped(linalgUser)) {
+    if (!linalgUser) {
       continue;
     }
 
@@ -227,31 +234,7 @@ static std::optional<HorizontalFusionGroup> getHorizontalFusionGroupMembers(
     return std::nullopt;
   }
 
-  // Check that all uses are "self-contained", i.e. one of the ops dominates
-  // all the ops (for both the contraction and the truncation ops)
-  // and that this op dominates all the other uses of all the ops.
-  std::optional<Operation *> dominatedByAllOps =
-      findDominatedByAllOps(allOps, dominanceInfo);
-  if (!dominatedByAllOps) {
-    return std::nullopt;
-  }
-
-  // Check that this operation dominates all other uses of allOps.
-  for (auto op : allOps) {
-    if (op == dominatedByAllOps.value()) {
-      continue;
-    }
-    for (Operation *user : op->getUsers()) {
-      if (allOps.contains(user)) {
-        continue;
-      }
-      if (!dominanceInfo.properlyDominates(dominatedByAllOps.value(), user)) {
-        return std::nullopt;
-      }
-    }
-  }
-  return HorizontalFusionGroup{contractionOps, truncateOps,
-                               dominatedByAllOps.value()};
+  return HorizontalFusionGroup{contractionOps, truncateOps, seedOp};
 }
 
 /// On finding this pattern
@@ -286,7 +269,7 @@ static std::optional<HorizontalFusionGroup> getHorizontalFusionGroupMembers(
 /// quantized sizes.
 static LogicalResult fuseGroup(RewriterBase &rewriter,
                                HorizontalFusionGroup &fusionGroup) {
-  rewriter.setInsertionPointAfter(fusionGroup.dominatedByAll);
+  rewriter.setInsertionPoint(fusionGroup.dominatedByAll);
 
   linalg::LinalgOp base = fusionGroup.contractionOps.front();
   Location loc = base.getLoc();
@@ -425,7 +408,7 @@ void FuseHorizontalContractionsPass::runOnOperation() {
   llvm::SmallDenseSet<linalg::LinalgOp> groupedOperations;
 
   getOperation()->walk([&](linalg::LinalgOp linalgOp) {
-    if (!linalg::isaContractionOpInterface(linalgOp)) {
+    if (!isEmptyFillContractionDAGRootOp(linalgOp)) {
       return;
     }
     // Avoid already grouped operations;

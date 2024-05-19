@@ -109,7 +109,8 @@ void buildIREEPrecompileTransformPassPipeline(
     case InputDialectOptions::Type::auto_detect:
       // Run the auto pipeline that chooses from plugins using module contents.
       passManager.addPass(
-          createAutoInputConversionPipelinePass(hooks.pipelineExtensions));
+          InputConversion::createAutoInputConversionPipelinePass(
+              hooks.pipelineExtensions));
       break;
     case InputDialectOptions::Type::plugin: {
       // Explicitly use a single plugin.
@@ -132,7 +133,11 @@ void buildIREEPrecompileTransformPassPipeline(
     }
     }
 
-    buildCommonInputConversionPassPipeline(passManager);
+    InputConversion::TransformOptions inputTransformOptions;
+    inputTransformOptions.options = inputOptions;
+
+    InputConversion::buildCommonInputConversionPassPipeline(
+        passManager, inputTransformOptions);
     if (hooks.afterPhase)
       hooks.afterPhase(IREEVMPipelinePhase::Input, passManager);
     IREE_TRACE_ADD_END_FRAME_PASS(passManager, "Input");

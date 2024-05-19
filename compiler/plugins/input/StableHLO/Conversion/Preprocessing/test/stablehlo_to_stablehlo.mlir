@@ -126,6 +126,18 @@ func.func @reorder_broadcast_in_dim_2d_binary(%arg0: tensor<2x4xi32>, %arg1: ten
 
 // -----
 
+// CHECK: @reorder_broadcast_in_dim_2d_binary_duplicate(%[[ARG0:.*]]: tensor<2x4xi32>) -> tensor<3x2x4xi32>
+func.func @reorder_broadcast_in_dim_2d_binary_duplicate(%arg0: tensor<2x4xi32>) -> tensor<3x2x4xi32> {
+  // CHECK: %[[POWER:.*]] = stablehlo.power %[[ARG0]], %[[ARG0]] : tensor<2x4xi32>
+  // CHECK: %[[BCAST:.*]] = stablehlo.broadcast_in_dim %[[POWER]], dims = [1, 2] : (tensor<2x4xi32>) -> tensor<3x2x4xi32>
+  %0 = "stablehlo.broadcast_in_dim"(%arg0) {broadcast_dimensions = array<i64: 1, 2>} : (tensor<2x4xi32>) -> tensor<3x2x4xi32>
+  %1 = stablehlo.power %0, %0 : tensor<3x2x4xi32>
+  // CHECK: return %[[BCAST]]
+  return %1 : tensor<3x2x4xi32>
+}
+
+// -----
+
 // CHECK: @reorder_broadcast_in_dim_scalar_unary(%[[ARG0:.*]]: tensor<f32>)
 func.func @reorder_broadcast_in_dim_scalar_unary(%arg0: tensor<f32>) -> (tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>, tensor<1x8x8x64xf32>) {
   // CHECK: %[[ABS:.*]] = stablehlo.abs %[[ARG0]] : tensor<f32>

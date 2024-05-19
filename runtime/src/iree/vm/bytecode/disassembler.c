@@ -54,10 +54,10 @@
   iree_vm_map_type(module, OP_I32(0)); \
   pc += 4;
 #define VM_ParseTypeOf(name) VM_ParseType(name)
-#define VM_ParseIntAttr32(name) VM_ParseConstI32(name)
-#define VM_ParseIntAttr64(name) VM_ParseConstI64(name)
-#define VM_ParseFloatAttr32(name) VM_ParseConstF32(name)
-#define VM_ParseFloatAttr64(name) VM_ParseConstF64(name)
+#define VM_ParseAttrI32(name) VM_ParseConstI32(name)
+#define VM_ParseAttrI64(name) VM_ParseConstI64(name)
+#define VM_ParseAttrF32(name) VM_ParseConstF32(name)
+#define VM_ParseAttrF64(name) VM_ParseConstF64(name)
 #define VM_ParseStrAttr(name, out_str)                   \
   (out_str)->size = (iree_host_size_t)OP_I16(0);         \
   (out_str)->data = (const char*)&bytecode_data[pc + 2]; \
@@ -101,27 +101,28 @@
   pc += IREE_REGISTER_ORDINAL_SIZE;
 #define VM_ParseVariadicResults(name) VM_ParseVariadicOperands(name)
 
-#define EMIT_REG_NAME(reg)                \
-  if ((reg)&IREE_REF_REGISTER_TYPE_BIT) { \
-    EMIT_REF_REG_NAME(reg);               \
-  } else {                                \
-    EMIT_I32_REG_NAME(reg);               \
+#define EMIT_REG_NAME(reg)                  \
+  if ((reg) & IREE_REF_REGISTER_TYPE_BIT) { \
+    EMIT_REF_REG_NAME(reg);                 \
+  } else {                                  \
+    EMIT_I32_REG_NAME(reg);                 \
   }
 #define EMIT_I32_REG_NAME(reg)                            \
   IREE_RETURN_IF_ERROR(iree_string_builder_append_format( \
-      b, "%%i%u", ((reg)&IREE_I32_REGISTER_MASK)));
+      b, "%%i%u", ((reg) & IREE_I32_REGISTER_MASK)));
 #define EMIT_I64_REG_NAME(reg)                            \
   IREE_RETURN_IF_ERROR(iree_string_builder_append_format( \
-      b, "%%i%u:%u", ((reg)&IREE_I32_REGISTER_MASK),      \
-      ((reg)&IREE_I32_REGISTER_MASK) + 1));
+      b, "%%i%u:%u", ((reg) & IREE_I32_REGISTER_MASK),    \
+      ((reg) & IREE_I32_REGISTER_MASK) + 1));
 #define EMIT_F32_REG_NAME(reg) EMIT_I32_REG_NAME(reg)
+#define EMIT_F64_REG_NAME(reg) EMIT_I64_REG_NAME(reg)
 #define EMIT_REF_REG_NAME(reg)                            \
   IREE_RETURN_IF_ERROR(iree_string_builder_append_format( \
-      b, "%%r%u", ((reg)&IREE_REF_REGISTER_MASK)));
+      b, "%%r%u", ((reg) & IREE_REF_REGISTER_MASK)));
 
 #define EMIT_REG_VALUE(regs, reg)                                           \
-  if ((reg)&IREE_REF_REGISTER_TYPE_BIT) {                                   \
-    iree_vm_ref_t* ref = &(regs)->ref[(reg)&IREE_REF_REGISTER_MASK];        \
+  if ((reg) & IREE_REF_REGISTER_TYPE_BIT) {                                 \
+    iree_vm_ref_t* ref = &(regs)->ref[(reg) & IREE_REF_REGISTER_MASK];      \
     if (iree_vm_ref_is_null(ref)) {                                         \
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "null"));  \
     } else {                                                                \
@@ -131,7 +132,7 @@
     }                                                                       \
   } else {                                                                  \
     IREE_RETURN_IF_ERROR(iree_string_builder_append_format(                 \
-        b, "%u", ((regs)->i32[(reg)&IREE_I32_REGISTER_MASK])));             \
+        b, "%u", ((regs)->i32[(reg) & IREE_I32_REGISTER_MASK])));           \
   }
 
 static iree_status_t iree_vm_bytecode_disassembler_emit_type_name(
@@ -409,6 +410,54 @@ static iree_status_t iree_vm_bytecode_disassembler_emit_remap_list(
     break;                                                             \
   }
 
+#define DISASM_OP_EXT_F64_UNARY_F64(op_name, op_mnemonic)             \
+  DISASM_OP(EXT_F64, op_name) {                                       \
+    uint16_t operand_reg = VM_ParseOperandRegF64("operand");          \
+    uint16_t result_reg = VM_ParseResultRegF64("result");             \
+    EMIT_F64_REG_NAME(result_reg);                                    \
+    IREE_RETURN_IF_ERROR(                                             \
+        iree_string_builder_append_format(b, " = %s ", op_mnemonic)); \
+    EMIT_F64_REG_NAME(operand_reg);                                   \
+    EMIT_OPTIONAL_VALUE_F64(regs->i32[operand_reg]);                  \
+    break;                                                            \
+  }
+
+#define DISASM_OP_EXT_F64_BINARY_F64(op_name, op_mnemonic)             \
+  DISASM_OP(EXT_F64, op_name) {                                        \
+    uint16_t lhs_reg = VM_ParseOperandRegF64("lhs");                   \
+    uint16_t rhs_reg = VM_ParseOperandRegF64("rhs");                   \
+    uint16_t result_reg = VM_ParseResultRegF64("result");              \
+    EMIT_F64_REG_NAME(result_reg);                                     \
+    IREE_RETURN_IF_ERROR(                                              \
+        iree_string_builder_append_format(b, " = %s ", op_mnemonic));  \
+    EMIT_F64_REG_NAME(lhs_reg);                                        \
+    EMIT_OPTIONAL_VALUE_F64(regs->i32[lhs_reg]);                       \
+    IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", ")); \
+    EMIT_F64_REG_NAME(rhs_reg);                                        \
+    EMIT_OPTIONAL_VALUE_F64(regs->i32[rhs_reg]);                       \
+    break;                                                             \
+  }
+
+#define DISASM_OP_EXT_F64_TERNARY_F64(op_name, op_mnemonic)            \
+  DISASM_OP(EXT_F64, op_name) {                                        \
+    uint16_t a_reg = VM_ParseOperandRegF64("a");                       \
+    uint16_t b_reg = VM_ParseOperandRegF64("b");                       \
+    uint16_t c_reg = VM_ParseOperandRegF64("c");                       \
+    uint16_t result_reg = VM_ParseResultRegF64("result");              \
+    EMIT_F64_REG_NAME(result_reg);                                     \
+    IREE_RETURN_IF_ERROR(                                              \
+        iree_string_builder_append_format(b, " = %s ", op_mnemonic));  \
+    EMIT_F64_REG_NAME(a_reg);                                          \
+    EMIT_OPTIONAL_VALUE_F64(regs->i32[a_reg]);                         \
+    IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", ")); \
+    EMIT_F64_REG_NAME(b_reg);                                          \
+    EMIT_OPTIONAL_VALUE_F64(regs->i32[b_reg]);                         \
+    IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", ")); \
+    EMIT_F64_REG_NAME(c_reg);                                          \
+    EMIT_OPTIONAL_VALUE_F64(regs->i32[c_reg]);                         \
+    break;                                                             \
+  }
+
 iree_status_t iree_vm_bytecode_disassemble_op(
     iree_vm_bytecode_module_t* module,
     iree_vm_bytecode_module_state_t* module_state, uint16_t function_ordinal,
@@ -593,7 +642,7 @@ iree_status_t iree_vm_bytecode_disassemble_op(
     //===------------------------------------------------------------------===//
 
     DISASM_OP(CORE, ConstI32) {
-      int32_t value = VM_ParseIntAttr32("value");
+      int32_t value = VM_ParseAttrI32("value");
       uint16_t result_reg = VM_ParseResultRegI32("result");
       EMIT_I32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
@@ -610,7 +659,7 @@ iree_status_t iree_vm_bytecode_disassemble_op(
     }
 
     DISASM_OP(CORE, ConstI64) {
-      int64_t value = VM_ParseIntAttr64("value");
+      int64_t value = VM_ParseAttrI64("value");
       uint16_t result_reg = VM_ParseResultRegI64("result");
       EMIT_I64_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
@@ -1912,7 +1961,7 @@ iree_status_t iree_vm_bytecode_disassemble_op(
     //===----------------------------------------------------------------===//
 
     DISASM_OP(EXT_F32, ConstF32) {
-      float value = VM_ParseFloatAttr32("value");
+      float value = VM_ParseAttrF32("value");
       uint16_t result_reg = VM_ParseResultRegF32("result");
       EMIT_F32_REG_NAME(result_reg);
       IREE_RETURN_IF_ERROR(
@@ -2214,7 +2263,431 @@ iree_status_t iree_vm_bytecode_disassemble_op(
 #else
     UNHANDLED_DISASM_PREFIX(PrefixExtF32, EXT_F32)
 #endif  // IREE_VM_EXT_F32_ENABLE
+
+#if IREE_VM_EXT_F64_ENABLE
+    BEGIN_DISASM_PREFIX(PrefixExtF64, EXT_F64)
+
+    //===----------------------------------------------------------------===//
+    // ExtF64: Globals
+    //===----------------------------------------------------------------===//
+
+    DISASM_OP(EXT_F64, GlobalLoadF64) {
+      uint32_t byte_offset = VM_ParseGlobalAttr("global");
+      uint16_t value_reg = VM_ParseResultRegF64("value");
+      EMIT_F64_REG_NAME(value_reg);
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
+          b, " = vm.global.load.f64 .rwdata[%u]", byte_offset));
+      EMIT_OPTIONAL_VALUE_F64(module_state->rwdata_storage.data[byte_offset]);
+      break;
+    }
+
+    DISASM_OP(EXT_F64, GlobalStoreF64) {
+      uint32_t byte_offset = VM_ParseGlobalAttr("global");
+      uint16_t value_reg = VM_ParseOperandRegF64("value");
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_append_format(b, "vm.global.store.f64 "));
+      EMIT_F64_REG_NAME(value_reg);
+      EMIT_OPTIONAL_VALUE_F64(regs->i32[value_reg]);
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_append_format(b, ", .rwdata[%u]", byte_offset));
+      break;
+    }
+
+    DISASM_OP(EXT_F64, GlobalLoadIndirectF64) {
+      uint16_t byte_offset_reg = VM_ParseOperandRegI32("global");
+      uint16_t value_reg = VM_ParseResultRegI32("value");
+      EMIT_F64_REG_NAME(value_reg);
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(
+          b, " = vm.global.load.indirect.f64 .rwdata["));
+      EMIT_I32_REG_NAME(byte_offset_reg);
+      EMIT_OPTIONAL_VALUE_I32(regs->i32[byte_offset_reg]);
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "]"));
+      EMIT_OPTIONAL_VALUE_F64(
+          module_state->rwdata_storage.data[regs->i32[byte_offset_reg]]);
+      break;
+    }
+
+    DISASM_OP(EXT_F64, GlobalStoreIndirectF64) {
+      uint16_t byte_offset_reg = VM_ParseOperandRegI32("global");
+      uint16_t value_reg = VM_ParseOperandRegF64("value");
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(
+          b, "vm.global.store.indirect.f64 "));
+      EMIT_F64_REG_NAME(value_reg);
+      EMIT_OPTIONAL_VALUE_F64(regs->i32[value_reg]);
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", .rwdata["));
+      EMIT_I32_REG_NAME(byte_offset_reg);
+      EMIT_OPTIONAL_VALUE_I32(regs->i32[byte_offset_reg]);
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "]"));
+      break;
+    }
+
+    //===----------------------------------------------------------------===//
+    // ExtF64: Constants
+    //===----------------------------------------------------------------===//
+
+    DISASM_OP(EXT_F64, ConstF64) {
+      double value = VM_ParseAttrF64("value");
+      uint16_t result_reg = VM_ParseResultRegF64("result");
+      EMIT_F64_REG_NAME(result_reg);
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_append_format(b, " = vm.const.f64 %f", value));
+      break;
+    }
+
+    DISASM_OP(EXT_F64, ConstF64Zero) {
+      uint16_t result_reg = VM_ParseResultRegF64("result");
+      EMIT_F64_REG_NAME(result_reg);
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_append_cstring(b, " = vm.const.f64.zero"));
+      break;
+    }
+
+    //===----------------------------------------------------------------===//
+    // ExtF64: Lists
+    //===----------------------------------------------------------------===//
+
+    DISASM_OP(EXT_F64, ListGetF64) {
+      bool list_is_move;
+      uint16_t list_reg = VM_ParseOperandRegRef("list", &list_is_move);
+      uint16_t index_reg = VM_ParseOperandRegI32("index");
+      uint16_t result_reg = VM_ParseResultRegF64("result");
+      EMIT_F64_REG_NAME(result_reg);
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_append_cstring(b, " = vm.list.get.f64 "));
+      EMIT_REF_REG_NAME(list_reg);
+      EMIT_OPTIONAL_VALUE_REF(&regs->ref[list_reg]);
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
+      EMIT_I32_REG_NAME(index_reg);
+      EMIT_OPTIONAL_VALUE_I32(regs->i32[index_reg]);
+      break;
+    }
+
+    DISASM_OP(EXT_F64, ListSetF64) {
+      bool list_is_move;
+      uint16_t list_reg = VM_ParseOperandRegRef("list", &list_is_move);
+      uint16_t index_reg = VM_ParseOperandRegI32("index");
+      uint16_t raw_value_reg = VM_ParseOperandRegF64("raw_value");
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_append_cstring(b, "vm.list.set.f64 "));
+      EMIT_REF_REG_NAME(list_reg);
+      EMIT_OPTIONAL_VALUE_REF(&regs->ref[list_reg]);
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
+      EMIT_I32_REG_NAME(index_reg);
+      EMIT_OPTIONAL_VALUE_I32(regs->i32[index_reg]);
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
+      EMIT_F64_REG_NAME(raw_value_reg);
+      EMIT_OPTIONAL_VALUE_F64(regs->i32[raw_value_reg]);
+      break;
+    }
+
+    //===----------------------------------------------------------------===//
+    // ExtF64: Conditional assignment
+    //===----------------------------------------------------------------===//
+
+    DISASM_OP(EXT_F64, SelectF64) {
+      uint16_t condition_reg = VM_ParseOperandRegI32("condition");
+      uint16_t true_value_reg = VM_ParseOperandRegF64("true_value");
+      uint16_t false_value_reg = VM_ParseOperandRegF64("false_value");
+      uint16_t result_reg = VM_ParseResultRegF64("result");
+      EMIT_F64_REG_NAME(result_reg);
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_append_cstring(b, " = vm.select.f64 "));
+      EMIT_I32_REG_NAME(condition_reg);
+      EMIT_OPTIONAL_VALUE_I32(regs->i32[condition_reg]);
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, " ? "));
+      EMIT_F64_REG_NAME(true_value_reg);
+      EMIT_OPTIONAL_VALUE_F64(regs->i32[true_value_reg]);
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, " : "));
+      EMIT_F64_REG_NAME(false_value_reg);
+      EMIT_OPTIONAL_VALUE_F64(regs->i32[false_value_reg]);
+      break;
+    }
+
+    DISASM_OP(EXT_F64, SwitchF64) {
+      uint16_t index_reg = VM_ParseOperandRegI32("index");
+      double default_value = VM_ParseOperandRegF64("default_value");
+      const iree_vm_register_list_t* value_reg_list =
+          VM_ParseVariadicOperands("values");
+      uint16_t result_reg = VM_ParseResultRegF64("result");
+      EMIT_F64_REG_NAME(result_reg);
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_append_cstring(b, " = vm.switch.f64 "));
+      EMIT_I32_REG_NAME(index_reg);
+      EMIT_OPTIONAL_VALUE_I32(regs->i32[index_reg]);
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, "["));
+      EMIT_OPERAND_REG_LIST(value_reg_list);
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_append_format(b, "] else %f", default_value));
+      break;
+    }
+
+    //===----------------------------------------------------------------===//
+    // ExtF64: Native floating-point arithmetic
+    //===----------------------------------------------------------------===//
+
+    DISASM_OP_EXT_F64_BINARY_F64(AddF64, "vm.add.f64");
+    DISASM_OP_EXT_F64_BINARY_F64(SubF64, "vm.sub.f64");
+    DISASM_OP_EXT_F64_BINARY_F64(MulF64, "vm.mul.f64");
+    DISASM_OP_EXT_F64_BINARY_F64(DivF64, "vm.div.f64");
+    DISASM_OP_EXT_F64_BINARY_F64(RemF64, "vm.rem.f64");
+    DISASM_OP_EXT_F64_TERNARY_F64(FMAF64, "vm.fma.f64");
+    DISASM_OP_EXT_F64_UNARY_F64(AbsF64, "vm.abs.f64");
+    DISASM_OP_EXT_F64_UNARY_F64(NegF64, "vm.neg.f64");
+    DISASM_OP_EXT_F64_UNARY_F64(CeilF64, "vm.ceil.f64");
+    DISASM_OP_EXT_F64_UNARY_F64(FloorF64, "vm.floor.f64");
+    DISASM_OP_EXT_F64_UNARY_F64(RoundF64, "vm.round.f64");
+    DISASM_OP_EXT_F64_UNARY_F64(RoundF64Even, "vm.round.f64.even");
+    DISASM_OP_EXT_F64_BINARY_F64(MinF64, "vm.min.f64");
+    DISASM_OP_EXT_F64_BINARY_F64(MaxF64, "vm.max.f64");
+
+    DISASM_OP_EXT_F64_UNARY_F64(AtanF64, "vm.atan.f64");
+    DISASM_OP_EXT_F64_BINARY_F64(Atan2F64, "vm.atan2.f64");
+    DISASM_OP_EXT_F64_UNARY_F64(CosF64, "vm.cos.f64");
+    DISASM_OP_EXT_F64_UNARY_F64(SinF64, "vm.sin.f64");
+    DISASM_OP_EXT_F64_UNARY_F64(ExpF64, "vm.exp.f64");
+    DISASM_OP_EXT_F64_UNARY_F64(Exp2F64, "vm.exp2.f64");
+    DISASM_OP_EXT_F64_UNARY_F64(ExpM1F64, "vm.expm1.f64");
+    DISASM_OP_EXT_F64_UNARY_F64(LogF64, "vm.log.f64");
+    DISASM_OP_EXT_F64_UNARY_F64(Log10F64, "vm.log10.f64");
+    DISASM_OP_EXT_F64_UNARY_F64(Log1pF64, "vm.log1p.f64");
+    DISASM_OP_EXT_F64_UNARY_F64(Log2F64, "vm.log2.f64");
+    DISASM_OP_EXT_F64_BINARY_F64(PowF64, "vm.pow.f64");
+    DISASM_OP_EXT_F64_UNARY_F64(RsqrtF64, "vm.rsqrt.f64");
+    DISASM_OP_EXT_F64_UNARY_F64(SqrtF64, "vm.sqrt.f64");
+    DISASM_OP_EXT_F64_UNARY_F64(TanhF64, "vm.tanh.f64");
+    DISASM_OP_EXT_F64_UNARY_F64(ErfF64, "vm.erf.f64");
+
+    //===----------------------------------------------------------------===//
+    // ExtF64: Casting and type conversion/emulation
+    //===----------------------------------------------------------------===//
+
+    DISASM_OP(EXT_F64, TruncF64F32) {
+      uint16_t operand_reg = VM_ParseOperandRegF64("operand");
+      uint16_t result_reg = VM_ParseResultRegF32("result");
+      EMIT_F32_REG_NAME(result_reg);
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_append_cstring(b, " = vm.trunc.f64.f32 "));
+      EMIT_F64_REG_NAME(operand_reg);
+      EMIT_OPTIONAL_VALUE_F64(regs->i32[operand_reg]);
+      break;
+    }
+    DISASM_OP(EXT_F64, ExtF32F64) {
+      uint16_t operand_reg = VM_ParseOperandRegF32("operand");
+      uint16_t result_reg = VM_ParseResultRegF64("result");
+      EMIT_F64_REG_NAME(result_reg);
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_append_cstring(b, " = vm.ext.f32.f64 "));
+      EMIT_F32_REG_NAME(operand_reg);
+      EMIT_OPTIONAL_VALUE_F32(regs->i32[operand_reg]);
+      break;
+    }
+    DISASM_OP(EXT_F64, CastSI32F64) {
+      uint16_t operand_reg = VM_ParseOperandRegI32("operand");
+      uint16_t result_reg = VM_ParseResultRegF64("result");
+      EMIT_F64_REG_NAME(result_reg);
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_append_cstring(b, " = vm.cast.si32.f64 "));
+      EMIT_I32_REG_NAME(operand_reg);
+      EMIT_OPTIONAL_VALUE_I32(regs->i32[operand_reg]);
+      break;
+    }
+    DISASM_OP(EXT_F64, CastUI32F64) {
+      uint16_t operand_reg = VM_ParseOperandRegI32("operand");
+      uint16_t result_reg = VM_ParseResultRegF64("result");
+      EMIT_F64_REG_NAME(result_reg);
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_append_cstring(b, " = vm.cast.ui32.f64 "));
+      EMIT_I32_REG_NAME(operand_reg);
+      EMIT_OPTIONAL_VALUE_I32(regs->i32[operand_reg]);
+      break;
+    }
+    DISASM_OP(EXT_F64, CastF64SI32) {
+      uint16_t operand_reg = VM_ParseOperandRegF64("operand");
+      uint16_t result_reg = VM_ParseResultRegI32("result");
+      EMIT_I32_REG_NAME(result_reg);
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_append_cstring(b, " = vm.cast.f64.si32 "));
+      EMIT_F64_REG_NAME(operand_reg);
+      EMIT_OPTIONAL_VALUE_F64(regs->i32[operand_reg]);
+      break;
+    }
+    DISASM_OP(EXT_F64, CastF64UI32) {
+      uint16_t operand_reg = VM_ParseOperandRegF64("operand");
+      uint16_t result_reg = VM_ParseResultRegI32("result");
+      EMIT_I32_REG_NAME(result_reg);
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_append_cstring(b, " = vm.cast.f64.ui32 "));
+      EMIT_F64_REG_NAME(operand_reg);
+      EMIT_OPTIONAL_VALUE_F64(regs->i32[operand_reg]);
+      break;
+    }
+    DISASM_OP(EXT_F64, CastSI64F64) {
+      uint16_t operand_reg = VM_ParseOperandRegI64("operand");
+      uint16_t result_reg = VM_ParseResultRegF64("result");
+      EMIT_F64_REG_NAME(result_reg);
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_append_cstring(b, " = vm.cast.si64.f64 "));
+      EMIT_I64_REG_NAME(operand_reg);
+      EMIT_OPTIONAL_VALUE_I64(regs->i32[operand_reg]);
+      break;
+    }
+    DISASM_OP(EXT_F64, CastUI64F64) {
+      uint16_t operand_reg = VM_ParseOperandRegI64("operand");
+      uint16_t result_reg = VM_ParseResultRegF64("result");
+      EMIT_F64_REG_NAME(result_reg);
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_append_cstring(b, " = vm.cast.ui64.f64 "));
+      EMIT_I64_REG_NAME(operand_reg);
+      EMIT_OPTIONAL_VALUE_I64(regs->i32[operand_reg]);
+      break;
+    }
+    DISASM_OP(EXT_F64, CastF64SI64) {
+      uint16_t operand_reg = VM_ParseOperandRegF64("operand");
+      uint16_t result_reg = VM_ParseResultRegI64("result");
+      EMIT_I64_REG_NAME(result_reg);
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_append_cstring(b, " = vm.cast.f64.si64 "));
+      EMIT_F64_REG_NAME(operand_reg);
+      EMIT_OPTIONAL_VALUE_F64(regs->i32[operand_reg]);
+      break;
+    }
+    DISASM_OP(EXT_F64, CastF64UI64) {
+      uint16_t operand_reg = VM_ParseOperandRegF64("operand");
+      uint16_t result_reg = VM_ParseResultRegI64("result");
+      EMIT_I64_REG_NAME(result_reg);
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_append_cstring(b, " = vm.cast.f64.ui64 "));
+      EMIT_F64_REG_NAME(operand_reg);
+      EMIT_OPTIONAL_VALUE_F64(regs->i32[operand_reg]);
+      break;
+    }
+    DISASM_OP(EXT_F64, BitcastI64F64) {
+      uint16_t operand_reg = VM_ParseOperandRegI64("operand");
+      uint16_t result_reg = VM_ParseResultRegF64("result");
+      EMIT_F64_REG_NAME(result_reg);
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_append_cstring(b, " = vm.bitcast.i64.f64 "));
+      EMIT_I32_REG_NAME(operand_reg);
+      EMIT_OPTIONAL_VALUE_I64(regs->i32[operand_reg]);
+      break;
+    }
+    DISASM_OP(EXT_F64, BitcastF64I64) {
+      uint16_t operand_reg = VM_ParseOperandRegF64("operand");
+      uint16_t result_reg = VM_ParseResultRegI64("result");
+      EMIT_I64_REG_NAME(result_reg);
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_append_cstring(b, " = vm.bitcast.f64.i64 "));
+      EMIT_F64_REG_NAME(operand_reg);
+      EMIT_OPTIONAL_VALUE_F64(regs->i32[operand_reg]);
+      break;
+    }
+
+    //===----------------------------------------------------------------===//
+    // ExtF64: Comparison ops
+    //===----------------------------------------------------------------===//
+
+#define DISASM_OP_EXT_F64_CMP_F64(op_name, op_mnemonic)                \
+  DISASM_OP(EXT_F64, op_name) {                                        \
+    uint16_t lhs_reg = VM_ParseOperandRegF64("lhs");                   \
+    uint16_t rhs_reg = VM_ParseOperandRegF64("rhs");                   \
+    uint16_t result_reg = VM_ParseResultRegI32("result");              \
+    EMIT_I32_REG_NAME(result_reg);                                     \
+    IREE_RETURN_IF_ERROR(                                              \
+        iree_string_builder_append_format(b, " = %s ", op_mnemonic));  \
+    EMIT_F64_REG_NAME(lhs_reg);                                        \
+    EMIT_OPTIONAL_VALUE_F64(regs->i32[lhs_reg]);                       \
+    IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", ")); \
+    EMIT_F64_REG_NAME(rhs_reg);                                        \
+    EMIT_OPTIONAL_VALUE_F64(regs->i32[rhs_reg]);                       \
+    break;                                                             \
+  }
+
+    DISASM_OP_EXT_F64_CMP_F64(CmpEQF64O, "vm.cmp.eq.f64.o");
+    DISASM_OP_EXT_F64_CMP_F64(CmpEQF64U, "vm.cmp.eq.f64.u");
+    DISASM_OP_EXT_F64_CMP_F64(CmpNEF64O, "vm.cmp.ne.f64.o");
+    DISASM_OP_EXT_F64_CMP_F64(CmpNEF64U, "vm.cmp.ne.f64.u");
+    DISASM_OP_EXT_F64_CMP_F64(CmpLTF64O, "vm.cmp.lt.f64.o");
+    DISASM_OP_EXT_F64_CMP_F64(CmpLTF64U, "vm.cmp.lt.f64.u");
+    DISASM_OP_EXT_F64_CMP_F64(CmpLTEF64O, "vm.cmp.lte.f64.o");
+    DISASM_OP_EXT_F64_CMP_F64(CmpLTEF64U, "vm.cmp.lte.f64.u");
+    DISASM_OP(EXT_F64, CmpNaNF64) {
+      uint16_t operand_reg = VM_ParseOperandRegF64("operand");
+      uint16_t result_reg = VM_ParseResultRegI32("result");
+      EMIT_I32_REG_NAME(result_reg);
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_append_cstring(b, " = vm.cmp.nan.f64 "));
+      EMIT_F64_REG_NAME(operand_reg);
+      EMIT_OPTIONAL_VALUE_F64(regs->i32[operand_reg]);
+      break;
+    }
+
+    //===----------------------------------------------------------------===//
+    // ExtF64: Buffers
+    //===----------------------------------------------------------------===//
+
+    DISASM_OP(EXT_F64, BufferFillF64) {
+      bool buffer_is_move;
+      uint16_t buffer_reg =
+          VM_ParseOperandRegRef("target_buffer", &buffer_is_move);
+      uint16_t offset_reg = VM_ParseOperandRegI64("target_offset");
+      uint16_t length_reg = VM_ParseOperandRegI64("length");
+      uint16_t value_reg = VM_ParseOperandRegF64("value");
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_append_cstring(b, "vm.buffer.fill.f64 "));
+      EMIT_REF_REG_NAME(buffer_reg);
+      EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
+      EMIT_I64_REG_NAME(offset_reg);
+      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
+      EMIT_I64_REG_NAME(length_reg);
+      EMIT_OPTIONAL_VALUE_I64(regs->i32[length_reg]);
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
+      EMIT_F64_REG_NAME(value_reg);
+      EMIT_OPTIONAL_VALUE_F64(regs->i32[value_reg]);
+      break;
+    }
+
+    DISASM_OP(EXT_F64, BufferLoadF64) {
+      bool buffer_is_move;
+      uint16_t buffer_reg =
+          VM_ParseOperandRegRef("source_buffer", &buffer_is_move);
+      uint16_t offset_reg = VM_ParseOperandRegI64("source_offset");
+      uint16_t result_reg = VM_ParseResultRegF64("result");
+      EMIT_F64_REG_NAME(result_reg);
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_append_cstring(b, " = vm.buffer.load.f64 "));
+      EMIT_REF_REG_NAME(buffer_reg);
+      EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
+      EMIT_I64_REG_NAME(offset_reg);
+      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
+      break;
+    }
+
+    DISASM_OP(EXT_F64, BufferStoreF64) {
+      bool buffer_is_move;
+      uint16_t buffer_reg =
+          VM_ParseOperandRegRef("target_buffer", &buffer_is_move);
+      uint16_t offset_reg = VM_ParseOperandRegI64("target_offset");
+      uint16_t value_reg = VM_ParseOperandRegF64("value");
+      IREE_RETURN_IF_ERROR(
+          iree_string_builder_append_cstring(b, "vm.buffer.store.f64 "));
+      EMIT_F64_REG_NAME(value_reg);
+      EMIT_OPTIONAL_VALUE_F64(regs->i32[value_reg]);
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
+      EMIT_REF_REG_NAME(buffer_reg);
+      EMIT_OPTIONAL_VALUE_REF(&regs->ref[buffer_reg]);
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, ", "));
+      EMIT_I64_REG_NAME(offset_reg);
+      EMIT_OPTIONAL_VALUE_I64(regs->i32[offset_reg]);
+      break;
+    }
+
+    END_DISASM_PREFIX()
+#else
     UNHANDLED_DISASM_PREFIX(PrefixExtF64, EXT_F64)
+#endif  // IREE_VM_EXT_F64_ENABLE
 
     default:
       return iree_make_status(IREE_STATUS_UNIMPLEMENTED,

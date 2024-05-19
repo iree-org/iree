@@ -258,14 +258,40 @@ LogicalResult ConvertedAsyncFunctionInfo::postProcess() {
   }
 
   // Emit the barrier and exports.
+  // If any of the exports are in-place we need to alias their storage to the
+  // provided buffers.
   Value coarseSignalFence =
       entryBlock->getArgument(entryBlock->getNumArguments() - 1);
   if (barrierInputs.empty()) {
     postambleBuilder.create<IREE::HAL::FenceSignalOp>(funcOp.getLoc(),
                                                       coarseSignalFence);
   } else {
+    SmallVector<Value> aliasedResults;
+    for (auto [barrierInput, meta] :
+         llvm::zip_equal(barrierInputs, barrierResultMeta)) {
+      Value exportStorage;
+      Type torchType;
+      int returnIndex;
+      std::tie(exportStorage, torchType, returnIndex) = meta;
+      if (exportStorage) {
+        // Use the wait fence indicating when the storage is available for
+        // mutation. We need to ensure that no writes are made to the storage
+        // until it indicates it's safe to do so.
+        auto waitSignalFences = getEnclosingWaitSignalFences(exportStorage);
+        assert(waitSignalFences && "async function missing fences");
+        Value waitFence = waitSignalFences->first;
+        auto barrierInputDims = IREE::Util::buildDynamicDimsForValue(
+            barrierInput.getLoc(), barrierInput, postambleBuilder);
+        aliasedResults.push_back(
+            postambleBuilder.create<IREE::HAL::TensorAliasOp>(
+                barrierInput.getLoc(), barrierInput.getType(), barrierInput,
+                barrierInputDims, exportStorage, waitFence));
+      } else {
+        aliasedResults.push_back(barrierInput);
+      }
+    }
     auto barrierOp = postambleBuilder.create<IREE::HAL::TensorBarrierOp>(
-        funcOp.getLoc(), barrierInputs, coarseSignalFence);
+        funcOp.getLoc(), aliasedResults, coarseSignalFence);
     for (auto [barrierResult, meta] :
          llvm::zip_equal(barrierOp.getResults(), barrierResultMeta)) {
       Value exportStorage;
@@ -275,13 +301,9 @@ LogicalResult ConvertedAsyncFunctionInfo::postProcess() {
       Value exportedValue = postambleBuilder.create<IREE::HAL::TensorExportOp>(
           funcOp.getLoc(),
           postambleBuilder.getType<IREE::HAL::BufferViewType>(), barrierResult,
-          TypeAttr::get(barrierResult.getType()), exportStorage, StringAttr());
+          TypeAttr::get(barrierResult.getType()), StringAttr());
       if (returnIndex >= 0) {
         newReturnOperands[returnIndex] = exportedValue;
-      } else {
-        // Don't drop it.
-        postambleBuilder.create<IREE::Util::OptimizationBarrierOp>(
-            funcOp.getLoc(), exportedValue);
       }
     }
   }

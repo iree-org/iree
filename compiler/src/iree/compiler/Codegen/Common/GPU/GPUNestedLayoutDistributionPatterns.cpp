@@ -303,31 +303,37 @@ struct DistributeBroadcast final : OpDistributionPattern<vector::BroadcastOp> {
   LogicalResult matchAndRewrite(vector::BroadcastOp broadcastOp,
                                 DistributionSignature &signature,
                                 PatternRewriter &rewriter) const override {
-
-    VectorValue srcVector = dyn_cast<VectorValue>(broadcastOp.getSource());
-    if (!srcVector) {
-      // TODO: Add support for scalar broadcasting.
-      return rewriter.notifyMatchFailure(
-          broadcastOp, "unimplemented: scalar broadcast distribution");
-    }
-    auto sourceLayout = dyn_cast<NestedLayoutAttr>(signature[srcVector]);
-    if (!sourceLayout) {
-      return rewriter.notifyMatchFailure(broadcastOp,
-                                         "non-nested source vector layout");
-    }
-
+    Location loc = broadcastOp.getLoc();
     VectorValue dstVector = broadcastOp.getVector();
     auto vectorLayout = dyn_cast<NestedLayoutAttr>(signature[dstVector]);
     if (!vectorLayout) {
       return rewriter.notifyMatchFailure(broadcastOp,
                                          "non-nested result vector layout");
     }
-
     SmallVector<int64_t> distShape = vectorLayout.getDistributedShape();
     Type elementType =
         llvm::cast<ShapedType>(dstVector.getType()).getElementType();
     auto vectorType = VectorType::get(distShape, elementType);
-    Location loc = broadcastOp.getLoc();
+
+    VectorValue srcVector = dyn_cast<VectorValue>(broadcastOp.getSource());
+    if (!srcVector) {
+      // The way distribution currently works, there is no partial thread
+      // distribution, so a scalar is available to all threads. Scalar
+      // distribution is simply a broadcast from scalar to the distributed
+      // result shape.
+      Value source = broadcastOp.getSource();
+      VectorValue accumulator =
+          rewriter.create<vector::BroadcastOp>(loc, vectorType, source);
+      replaceOpWithDistributedValues(rewriter, broadcastOp, accumulator);
+      return success();
+    }
+
+    auto sourceLayout = dyn_cast<NestedLayoutAttr>(signature[srcVector]);
+    if (!sourceLayout) {
+      return rewriter.notifyMatchFailure(broadcastOp,
+                                         "non-nested source vector layout");
+    }
+
     Value accumulator = rewriter.create<arith::ConstantOp>(
         loc, vectorType, rewriter.getZeroAttr(vectorType));
 

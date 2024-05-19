@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/GPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
@@ -13,6 +12,11 @@
 #include "mlir/Interfaces/FunctionInterfaces.h"
 
 namespace mlir::iree_compiler {
+
+#define GEN_PASS_DEF_GPUREDUCEBANKCONFLICTSPASS
+#include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
+
+namespace {
 
 /// Pad out the inner dimension of the `memref.alloc` op in order reduce the
 /// chances to have bank conflicts when reading 2D shapes within shared memory.
@@ -47,6 +51,25 @@ static void padAlloc(MLIRContext *context, memref::AllocOp allocOp,
   rewriter.eraseOp(allocOp);
 }
 
+/// Pass to reduce the number of bank conflicts when accessing shared memory in
+/// a 2D manner. This is a simple version just padding allocation.
+/// This doesn't fully remove bank conflicts and increase the shared memory
+/// usage. In order to get better memory access patterns we should do shared
+/// memory swizzling which requires more complex transformations. This pass can
+/// be removed once the better solution is implemented.
+struct GPUReduceBankConflictsPass final
+    : impl::GPUReduceBankConflictsPassBase<GPUReduceBankConflictsPass> {
+  using GPUReduceBankConflictsPassBase::GPUReduceBankConflictsPassBase;
+
+  void runOnOperation() override {
+    FunctionOpInterface funcOp = getOperation();
+    if (failed(reduceSharedMemoryBankConflicts(funcOp, paddingBits)))
+      signalPassFailure();
+  }
+};
+
+} // namespace
+
 LogicalResult reduceSharedMemoryBankConflicts(mlir::FunctionOpInterface funcOp,
                                               unsigned paddingSize) {
   SmallVector<memref::AllocOp> sharedMemAllocs;
@@ -62,41 +85,6 @@ LogicalResult reduceSharedMemoryBankConflicts(mlir::FunctionOpInterface funcOp,
 
   // In the current form this always succeeds.
   return success();
-}
-
-namespace {
-
-/// Pass to reduce the number of bank conflicts when accessing shared memory in
-/// a 2D manner. This is a simple version just padding allocation.
-/// This doesn't fully remove bank conflicts and increase the shared memory
-/// usage. In order to get better memory access patterns we should do shared
-/// memory swizzling which requires more complex transformations. This pass can
-/// be removed once the better solution is implemented.
-struct GPUReduceBankConflictsPass final
-    : GPUReduceBankConflictsBase<GPUReduceBankConflictsPass> {
-  GPUReduceBankConflictsPass(int64_t paddingSizeBits)
-      : paddingSizeBits(paddingSizeBits) {}
-  void initOptions() {
-    if (GPUReduceBankConflictsBase::paddingBits.hasValue())
-      paddingSizeBits = GPUReduceBankConflictsBase::paddingBits;
-  }
-
-  void runOnOperation() override {
-    initOptions();
-    FunctionOpInterface funcOp = getOperation();
-    if (failed(reduceSharedMemoryBankConflicts(funcOp, paddingSizeBits)))
-      signalPassFailure();
-  }
-
-private:
-  unsigned paddingSizeBits;
-};
-
-} // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createGPUReduceSharedMemoryBankConflicts(int64_t paddingSizeBits) {
-  return std::make_unique<GPUReduceBankConflictsPass>(paddingSizeBits);
 }
 
 } // namespace mlir::iree_compiler

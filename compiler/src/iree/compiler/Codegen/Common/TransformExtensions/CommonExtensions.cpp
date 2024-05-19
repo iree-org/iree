@@ -14,6 +14,7 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -24,6 +25,8 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Casting.h"
+#include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
@@ -36,7 +39,9 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -47,8 +52,14 @@
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/Passes.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
+#include "mlir/IR/BuiltinAttributeInterfaces.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/OpDefinition.h"
+#include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/Value.h"
+#include "mlir/Interfaces/SubsetOpInterface.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/CSE.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -166,6 +177,277 @@ void transform_dialect::ApplyFoldFillIntoPadPatternsOp::populatePatterns(
 }
 
 //===---------------------------------------------------------------------===//
+// ApplyHoistForallFromForPatternsOp
+//===---------------------------------------------------------------------===//
+
+namespace {
+struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
+  using OpRewritePattern<scf::ForOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(scf::ForOp loop,
+                                PatternRewriter &rewriter) const final {
+    if (loop.getBody()->getOperations().size() != 2) {
+      return rewriter.notifyMatchFailure(
+          loop, "Body of the loop contains more than one op");
+    }
+
+    // TODO(qedawkins): It should be fine to hoist as long as there is a single
+    // forall op such that any operation within the block of the parent scf.for
+    // is independent of the destination of the forall.
+    auto forallOp =
+        dyn_cast<scf::ForallOp>(loop.getBody()->without_terminator().begin());
+    if (!forallOp) {
+      return rewriter.notifyMatchFailure(
+          loop, "Loop single contained op is not scf.forall op");
+    }
+
+    if (forallOp.getNumResults() != 1 || loop.getNumResults() != 1) {
+      return rewriter.notifyMatchFailure(
+          loop, "unimplemented: multi-result hoisting");
+    }
+
+    if (loop.getBody()->getTerminator()->getOperand(0).getDefiningOp() !=
+        forallOp) {
+      return rewriter.notifyMatchFailure(
+          loop, "Single for loop return is not forall result");
+    }
+
+    // Step 1. Collect the set of tensor.parallel_insert_slice ops in the
+    // terminator and their paired extract_slice ops from the for loop iter arg.
+    SmallVector<Operation *> sliceOperandProducers;
+
+    BackwardSliceOptions backwardOptions;
+    backwardOptions.inclusive = true;
+    backwardOptions.filter = [&](Operation *op) -> bool {
+      return forallOp->isProperAncestor(op);
+    };
+    SetVector<Operation *> slice;
+
+    scf::InParallelOp parallelTerminator = forallOp.getTerminator();
+    SmallVector<tensor::ParallelInsertSliceOp> terminators(
+        forallOp.getNumResults());
+    SmallVector<tensor::ExtractSliceOp> pairedSlices(forallOp.getNumResults());
+    int64_t numInductionVars = forallOp.getInductionVars().size();
+    for (auto &yieldingOp : parallelTerminator.getYieldingOps()) {
+      auto parallelInsert = cast<tensor::ParallelInsertSliceOp>(&yieldingOp);
+      BlockArgument destBbArg =
+          llvm::cast<BlockArgument>(parallelInsert.getDest());
+      tensor::ExtractSliceOp destSlice;
+      for (auto user : destBbArg.getUsers()) {
+        if (user == parallelInsert)
+          continue;
+        auto maybeSlice = dyn_cast<tensor::ExtractSliceOp>(user);
+        // Fail if the destination has more users than a direct insert and
+        // extract slice.
+        if (!maybeSlice) {
+          return failure();
+        }
+        // Require a single extract per destination.
+        if (destSlice) {
+          return failure();
+        }
+        destSlice = maybeSlice;
+      }
+      // Verify they operate on equivalent subsets, ensuring the slices are
+      // hoistable. It is still possible to hoist the loop if this is not true,
+      // however in such cases we likely formed the loops in the wrong order.
+      if (!cast<SubsetOpInterface>(*destSlice)
+               .operatesOnEquivalentSubset(
+                   cast<SubsetOpInterface>(*parallelInsert),
+                   [](Value v1, Value v2) { return v1 == v2; })) {
+        return failure();
+      }
+      terminators[destBbArg.getArgNumber() - numInductionVars] = parallelInsert;
+      pairedSlices[destBbArg.getArgNumber() - numInductionVars] = destSlice;
+
+      // Collect all of the offset/size/stride operands for both slices and
+      // compute a backwards slice of the program from them. Fail if any of
+      // them depend on the serial loop iterator.
+      llvm::SmallDenseSet<Value> sliceOperands;
+      sliceOperands.insert(
+          parallelInsert.getOperands().begin() +
+              parallelInsert.getOffsetSizeAndStrideStartOperandIndex(),
+          parallelInsert.getOperands().end());
+      sliceOperands.insert(
+          destSlice.getOperands().begin() +
+              destSlice.getOffsetSizeAndStrideStartOperandIndex(),
+          destSlice.getOperands().end());
+      for (Value operand : sliceOperands) {
+        if (auto bbArg = dyn_cast<BlockArgument>(operand)) {
+          if (bbArg.getOwner()->getParentOp() == loop) {
+            return rewriter.notifyMatchFailure(
+                loop, "Slice operand producers depend on loop");
+          }
+        }
+        SetVector<Operation *> tmpBackwardSlice;
+        getBackwardSlice(operand, &tmpBackwardSlice, backwardOptions);
+        slice.set_union(tmpBackwardSlice);
+      }
+    }
+
+    // An operation is safe to hoist if it is speculatable and none of its
+    // operands depend on the serial loop.
+    auto isSafeToHoist = [&](Operation *op) {
+      return op->getBlock() == forallOp.getBody() && isMemoryEffectFree(op) &&
+             isSpeculatable(op) &&
+             llvm::none_of(op->getOperands(), [&](Value operand) {
+               if (auto blockArg = dyn_cast<BlockArgument>(operand)) {
+                 return blockArg.getOwner() == loop.getBody();
+               }
+               return false;
+             });
+    };
+
+    if (!llvm::all_of(slice, isSafeToHoist)) {
+      return rewriter.notifyMatchFailure(
+          loop, "Slice operand producers not safe to hoist out of loop");
+    }
+
+    // Sort the backwards slice of the producers for the insertion/extraction
+    // indices by the block order in the scf.forall body. This ensures that we
+    // hoist operations in the same order they started. Any topological ordering
+    // would work too because the operations are speculatable.
+    slice = mlir::topologicalSort(slice);
+
+    // Step 2. Create the ForallOp.
+    Location loc = forallOp.getLoc();
+    scf::ForallOp newForallOp = rewriter.create<scf::ForallOp>(
+        loc, forallOp.getMixedLowerBound(), forallOp.getMixedUpperBound(),
+        forallOp.getMixedStep(), loop.getInitArgs(), forallOp.getMappingAttr());
+
+    {
+      // RAII guard, inserting within forallOp, before terminator.
+      OpBuilder::InsertionGuard g(rewriter);
+      rewriter.setInsertionPoint(newForallOp.getTerminator());
+      SmallVector<Value> newInits;
+      for (auto slice : pairedSlices) {
+        newInits.push_back(slice.getResult());
+      }
+      // Step 3. Create a new for loop with new inits for the result of the
+      // extracted slices.
+      auto newLoop = rewriter.create<scf::ForOp>(
+          loop.getLoc(), loop.getLowerBound(), loop.getUpperBound(),
+          loop.getStep(), newInits,
+          [](OpBuilder &, Location, Value, ValueRange) {});
+
+      {
+        // Step 4. Inline the body of the original forall into the new for loop.
+        OpBuilder::InsertionGuard g2(rewriter);
+        SmallVector<Value> argReplacements(newForallOp.getInductionVars());
+        argReplacements.append(newForallOp.getRegionIterArgs().begin(),
+                               newForallOp.getRegionIterArgs().end());
+        rewriter.mergeBlocks(forallOp.getBody(), newLoop.getBody(),
+                             argReplacements);
+        rewriter.replaceAllUsesWith(loop.getInductionVar(),
+                                    newLoop.getInductionVar());
+        // Replace the users of the to-be-hoisted slices with the loop iter
+        // args.
+        for (auto [hoistedSlice, iterArg] :
+             llvm::zip_equal(pairedSlices, newLoop.getRegionIterArgs())) {
+          rewriter.replaceAllUsesExcept(hoistedSlice, iterArg, newLoop);
+        }
+
+        // Create the terminator for the new loop using the sources of the
+        // parallel inserts.
+        SmallVector<Value> newYields;
+        for (auto parallelSlice : terminators) {
+          newYields.push_back(parallelSlice.getSource());
+        }
+        rewriter.setInsertionPointToEnd(newLoop.getBody());
+        rewriter.create<scf::YieldOp>(loop.getLoc(), newYields);
+      }
+
+      // Move all producers for the indices of the slices outside of the body
+      // of the loop (and the extract_slice ops themselves).
+      for (auto sliceOperandProducer : slice) {
+        rewriter.moveOpBefore(sliceOperandProducer, newLoop);
+      }
+      for (auto slice : pairedSlices) {
+        rewriter.moveOpBefore(slice, newLoop);
+      }
+
+      // Create the new terminator for the hoisted forall loop using the results
+      // of the new for loop.
+      rewriter.setInsertionPointToEnd(newForallOp.getTerminator().getBody());
+      for (auto [parallelSlice, source, dest] :
+           llvm::zip_equal(terminators, newLoop.getResults(),
+                           newForallOp.getRegionIterArgs())) {
+        rewriter.create<tensor::ParallelInsertSliceOp>(
+            parallelSlice.getLoc(), source, dest, parallelSlice.getOffsets(),
+            parallelSlice.getSizes(), parallelSlice.getStrides(),
+            parallelSlice.getStaticOffsets(), parallelSlice.getStaticSizes(),
+            parallelSlice.getStaticStrides());
+      }
+    }
+
+    // Step 5. Erase the original terminator and replace the loop with
+    // the hoisted loop.
+    for (auto parallelSlice : terminators) {
+      rewriter.eraseOp(parallelSlice);
+    }
+    rewriter.eraseOp(parallelTerminator);
+    rewriter.replaceOp(loop, newForallOp);
+    return success();
+  }
+};
+} // namespace
+
+void transform_dialect::ApplyHoistForallFromForPatternsOp::populatePatterns(
+    RewritePatternSet &patterns) {
+  patterns.insert<HoistForallFromFor>(patterns.getContext());
+}
+
+//===---------------------------------------------------------------------===//
+// ApplyLowerShuffleTensorPatternsOp
+//===---------------------------------------------------------------------===//
+
+namespace {
+struct LowerShuffleTensor
+    : public OpRewritePattern<IREE::GPU::ShuffleTensorOp> {
+  using OpRewritePattern<IREE::GPU::ShuffleTensorOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::GPU::ShuffleTensorOp shuffleOp,
+                                PatternRewriter &rewriter) const final {
+    Location loc = shuffleOp.getLoc();
+
+    MemRefType allocType = shuffleOp.getSharedAllocType();
+    auto tensorType =
+        RankedTensorType::get(allocType.getShape(), allocType.getElementType());
+    Value tensorAlloc = rewriter.create<bufferization::ToTensorOp>(
+        loc, tensorType, shuffleOp.getSharedAlloc(), /*restrict=*/true,
+        /*writeable=*/true);
+
+    // Step 1. Insert the source slice into the intermediate tensor.
+    SmallVector<OpFoldResult, 4> sourceOffsets =
+        shuffleOp.getMixedSourceOffsets();
+    SmallVector<OpFoldResult, 4> sourceSizes = shuffleOp.getMixedSourceSizes();
+    SmallVector<OpFoldResult, 4> sourceStrides =
+        shuffleOp.getMixedSourceStrides();
+    Value insertedSlice = rewriter.create<tensor::InsertSliceOp>(
+        loc, shuffleOp.getSource(), tensorAlloc, sourceOffsets, sourceSizes,
+        sourceStrides);
+
+    // Step 2. Synchronize the workers.
+    rewriter.create<gpu::BarrierOp>(loc);
+
+    // Step 3. Extract the result slice.
+    SmallVector<OpFoldResult, 4> resultOffsets =
+        shuffleOp.getMixedResultOffsets();
+    SmallVector<OpFoldResult, 4> resultSizes = shuffleOp.getMixedResultSizes();
+    SmallVector<OpFoldResult, 4> resultStrides =
+        shuffleOp.getMixedResultStrides();
+    rewriter.replaceOpWithNewOp<tensor::ExtractSliceOp>(
+        shuffleOp, shuffleOp.getType(), insertedSlice, resultOffsets,
+        resultSizes, resultStrides);
+    return success();
+  }
+};
+} // namespace
+
+void transform_dialect::ApplyLowerShuffleTensorPatternsOp::populatePatterns(
+    RewritePatternSet &patterns) {
+  patterns.insert<LowerShuffleTensor>(patterns.getContext());
+}
+
+//===---------------------------------------------------------------------===//
 // ApplyUnrollVectorsGpuMmaSyncPatternsOp
 //===---------------------------------------------------------------------===//
 
@@ -246,6 +528,176 @@ void transform_dialect::ApplyFoldTensorSliceIntoTransferPatternsOp::
 void transform_dialect::ApplyPrepareVectorToMMAPatternsOp::populatePatterns(
     RewritePatternSet &patterns) {
   populatePrepareVectorToMMAPatterns(patterns, getUseNvGpu());
+}
+
+//===----------------------------------------------------------------------===//
+// CopyTensorOperandOp
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure transform_dialect::CopyTensorOperandOp::applyToOne(
+    transform::TransformRewriter &rewriter, Operation *target,
+    transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  int64_t operandIndex = getOperandIndex();
+  if (operandIndex > target->getNumOperands()) {
+    return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                     "Operand index out of range");
+  }
+  Value operand = target->getOperand(operandIndex);
+  auto tensorType = dyn_cast<RankedTensorType>(operand.getType());
+  if (!tensorType) {
+    return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                     "Non tensor type operand to copy");
+  }
+  rewriter.setInsertionPoint(target);
+  Value empty = rewriter.create<tensor::EmptyOp>(
+      target->getLoc(),
+      tensor::getMixedSizes(rewriter, target->getLoc(), operand),
+      tensorType.getElementType());
+  Operation *copy =
+      rewriter.create<linalg::CopyOp>(target->getLoc(), operand, empty);
+  target->setOperand(operandIndex, copy->getResult(0));
+  results.push_back(copy);
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::CopyTensorOperandOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::producesHandle(getResult(), effects);
+  transform::modifiesPayload(effects);
+}
+
+//===---------------------------------------------------------------------===//
+// FlattenForallOp
+//===---------------------------------------------------------------------===//
+
+template <typename MappingTy>
+static bool isAscendingRelativeMapping(ArrayRef<Attribute> mapping) {
+  auto start = cast<MappingTy>(*mapping.begin());
+  if (start.getMappingId() !=
+      static_cast<int64_t>(gpu::MappingId::LinearDim0)) {
+    return false;
+  }
+  int64_t prev = start.getMappingId();
+  for (auto id : llvm::drop_begin(mapping)) {
+    int64_t nextId = cast<MappingTy>(id).getMappingId();
+    if (nextId != prev + 1) {
+      return false;
+    }
+    prev = nextId;
+  }
+  return true;
+}
+
+static FailureOr<scf::ForallOp> flattenForallOp(RewriterBase &rewriter,
+                                                scf::ForallOp forallOp) {
+  if (!forallOp.getMapping().has_value())
+    return forallOp->emitError("mapping must be present");
+  SmallVector<Attribute> mapping =
+      llvm::to_vector(forallOp.getMapping()->getValue());
+  if (!(llvm::all_of(mapping, llvm::IsaPred<gpu::GPUThreadMappingAttr>) ||
+        llvm::all_of(mapping, llvm::IsaPred<gpu::GPUWarpMappingAttr>))) {
+    return forallOp->emitError("mapping must be #gpu.thread or #gpu.warp");
+  }
+
+  if (forallOp.getRank() == 1) {
+    return forallOp;
+  }
+
+  bool isThreadMapping = isa<gpu::GPUThreadMappingAttr>(*mapping.begin());
+
+  if (isThreadMapping &&
+      !isAscendingRelativeMapping<gpu::GPUThreadMappingAttr>(mapping)) {
+    return forallOp->emitError("mapping must be ascending linear thread ids");
+  }
+  if (!isThreadMapping &&
+      !isAscendingRelativeMapping<gpu::GPUWarpMappingAttr>(mapping)) {
+    return forallOp->emitError("mapping must be ascending linear warp ids");
+  }
+
+  auto isAll = [](ArrayRef<int64_t> array, int64_t cmp) {
+    return llvm::all_of(array, [cmp](int64_t x) { return x == cmp; });
+  };
+
+  if (!isAll(forallOp.getStaticStep(), 1) ||
+      !isAll(forallOp.getStaticLowerBound(), 0)) {
+    return forallOp->emitError(
+        "unimplemented: trying to flatten non-normalized forall op");
+  }
+
+  MLIRContext *context = rewriter.getContext();
+  Location loc = forallOp.getLoc();
+
+  // Step 1. Construct the new mapping attribute as a single linear dim of the
+  // original type.
+  Attribute flatMapping;
+  if (isThreadMapping) {
+    flatMapping =
+        gpu::GPUThreadMappingAttr::get(context, gpu::MappingId::LinearDim0);
+  } else {
+    flatMapping =
+        gpu::GPUWarpMappingAttr::get(context, gpu::MappingId::LinearDim0);
+  }
+
+  // Step 2. Compute the flat lower bound/upper bound/step.
+  AffineExpr d0, d1;
+  bindDims(context, d0, d1);
+  AffineExpr mulExpr = d0 * d1;
+  SmallVector<OpFoldResult> upperBounds = forallOp.getMixedUpperBound();
+  OpFoldResult newUpperBound = upperBounds.front();
+  for (OpFoldResult ub : llvm::drop_begin(upperBounds)) {
+    newUpperBound = affine::makeComposedFoldedAffineApply(
+        rewriter, loc, mulExpr, {newUpperBound, ub});
+  }
+
+  OpFoldResult zero = rewriter.getIndexAttr(0);
+  OpFoldResult one = rewriter.getIndexAttr(1);
+
+  // Step 3. Create a new parallel loop with a single mapping id.
+  auto newForallOp = rewriter.create<scf::ForallOp>(
+      loc, ArrayRef<OpFoldResult>{zero}, ArrayRef<OpFoldResult>{newUpperBound},
+      ArrayRef<OpFoldResult>{one}, forallOp.getOutputs(),
+      rewriter.getArrayAttr({flatMapping}));
+
+  rewriter.setInsertionPointToStart(newForallOp.getBody());
+  Value linearId = newForallOp.getInductionVar(0);
+
+  // Step 4. Delinearize the flat ID to the original basis.
+  auto ids = rewriter.create<affine::AffineDelinearizeIndexOp>(
+      loc, linearId, forallOp.getMixedUpperBound());
+
+  // Step 5. Inline the region of the original forall op.
+  SmallVector<Value> newArgs(ids.getResults());
+  newArgs.append(newForallOp.getRegionIterArgs().begin(),
+                 newForallOp.getRegionIterArgs().end());
+  rewriter.eraseOp(newForallOp.getTerminator());
+  rewriter.mergeBlocks(forallOp.getBody(), newForallOp.getBody(), newArgs);
+  rewriter.replaceOp(forallOp, newForallOp);
+  return newForallOp;
+}
+
+DiagnosedSilenceableFailure
+transform_dialect::FlattenForallMappingOp::applyToOne(
+    transform::TransformRewriter &rewriter, mlir::scf::ForallOp target,
+    transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+
+  rewriter.setInsertionPoint(target);
+  auto newForallOp = flattenForallOp(rewriter, target);
+  if (failed(newForallOp)) {
+    return mlir::emitDefiniteFailure(target, "flattenForallOp failed");
+  }
+
+  results.push_back(*newForallOp);
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::FlattenForallMappingOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::producesHandle(getResult(), effects);
+  transform::modifiesPayload(effects);
 }
 
 //===---------------------------------------------------------------------===//
@@ -377,6 +829,212 @@ DiagnosedSilenceableFailure transform_dialect::ForallToWorkgroupOp::applyToOne(
 void transform_dialect::ForallToWorkgroupOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
   transform::onlyReadsHandle(getTarget(), effects);
+  transform::modifiesPayload(effects);
+}
+
+//===---------------------------------------------------------------------===//
+// FuseForallOp
+//===---------------------------------------------------------------------===//
+
+FailureOr<int64_t> getTripCount(scf::ForallOp loop) {
+  ArrayRef<int64_t> lbs = loop.getStaticLowerBound();
+  ArrayRef<int64_t> ubs = loop.getStaticUpperBound();
+  ArrayRef<int64_t> steps = loop.getStaticStep();
+
+  if (ShapedType::isDynamicShape(lbs) || ShapedType::isDynamicShape(ubs) ||
+      ShapedType::isDynamicShape(steps)) {
+    return failure();
+  }
+
+  int64_t tripCount = 1;
+  for (auto [lb, ub, step] : llvm::zip_equal(lbs, ubs, steps)) {
+    tripCount *= mlir::ceilDiv((ub - lb), step);
+  }
+  return tripCount;
+}
+
+LogicalResult compareWorkerCountsAndTypes(scf::ForallOp producer,
+                                          scf::ForallOp consumer) {
+  FailureOr<int64_t> producerTripCount = getTripCount(producer);
+  FailureOr<int64_t> consumerTripCount = getTripCount(consumer);
+  if (failed(producerTripCount) || failed(consumerTripCount) ||
+      *producerTripCount != *consumerTripCount) {
+    return failure();
+  }
+
+  auto checkMappingTypes = [&](ArrayAttr array) {
+    return llvm::all_of(array.getValue(),
+                        llvm::IsaPred<gpu::GPUThreadMappingAttr>) ||
+           llvm::all_of(array.getValue(),
+                        llvm::IsaPred<gpu::GPUWarpMappingAttr>);
+  };
+
+  if (producer.getMappingAttr() != consumer.getMappingAttr() ||
+      !checkMappingTypes(producer.getMappingAttr()) ||
+      !checkMappingTypes(consumer.getMappingAttr())) {
+    return failure();
+  }
+  return success();
+}
+
+Value getReplacementSlice(RewriterBase &rewriter, Location loc,
+                          tensor::ParallelInsertSliceOp parallelInsert,
+                          tensor::ExtractSliceOp extractSlice,
+                          std::optional<Attribute> addressSpace) {
+  RankedTensorType destTensorType = parallelInsert.getDestType();
+  MemRefType allocType =
+      addressSpace ? MemRefType::get(destTensorType.getShape(),
+                                     destTensorType.getElementType(),
+                                     MemRefLayoutAttrInterface{}, *addressSpace)
+                   : MemRefType::get(destTensorType.getShape(),
+                                     destTensorType.getElementType());
+  Value dest = Value();
+  if (auto empty = parallelInsert.getDest().getDefiningOp<tensor::EmptyOp>()) {
+    OpBuilder::InsertionGuard g(rewriter);
+    rewriter.setInsertionPoint(empty);
+    dest = rewriter.create<memref::AllocOp>(loc, allocType,
+                                            empty.getDynamicSizes());
+  } else {
+    dest = rewriter.create<bufferization::ToMemrefOp>(loc, allocType,
+                                                      parallelInsert.getDest());
+  }
+  return rewriter.create<IREE::GPU::ShuffleTensorOp>(
+      loc, extractSlice.getType(), parallelInsert.getSource(),
+      parallelInsert.getOffsets(), parallelInsert.getSizes(),
+      parallelInsert.getStrides(), parallelInsert.getStaticOffsets(),
+      parallelInsert.getStaticSizes(), parallelInsert.getStaticStrides(), dest,
+      extractSlice.getOffsets(), extractSlice.getSizes(),
+      extractSlice.getStrides(), extractSlice.getStaticOffsets(),
+      extractSlice.getStaticSizes(), extractSlice.getStaticStrides());
+}
+
+LogicalResult fuseForallIntoSlice(RewriterBase &rewriter,
+                                  scf::ForallOp producer,
+                                  scf::ForallOp consumer,
+                                  tensor::ExtractSliceOp slice,
+                                  std::optional<Attribute> addressSpace) {
+  if (producer->getNumResults() != 1) {
+    return failure();
+  }
+
+  if (failed(compareWorkerCountsAndTypes(producer, consumer))) {
+    return failure();
+  }
+
+  auto isAll = [](ArrayRef<OpFoldResult> array, int64_t cmp) {
+    return llvm::all_of(array, [cmp](OpFoldResult val) {
+      return isConstantIntValue(val, cmp);
+    });
+  };
+
+  if (!isAll(producer.getMixedStep(), 1) ||
+      !isAll(producer.getMixedLowerBound(), 0) ||
+      !isAll(consumer.getMixedStep(), 1) ||
+      !isAll(consumer.getMixedLowerBound(), 0)) {
+    return failure();
+  }
+
+  rewriter.setInsertionPoint(slice);
+
+  // Step 1. Compute the producer IDs in terms of the consumer IDs.
+
+  MLIRContext *context = rewriter.getContext();
+  Location loc = producer.getLoc();
+
+  AffineExpr d0, d1, d2;
+  bindDims(context, d0, d1, d2);
+  AffineExpr mulAdd = d0 * d1 + d2;
+  OpFoldResult linearId = rewriter.getIndexAttr(0);
+  for (auto [inductionVar, workerCount] :
+       llvm::zip_equal(getAsOpFoldResult(consumer.getInductionVars()),
+                       consumer.getMixedUpperBound())) {
+    linearId = affine::makeComposedFoldedAffineApply(
+        rewriter, loc, mulAdd, {linearId, workerCount, inductionVar});
+  }
+
+  Value linearThreadIdVal =
+      getValueOrCreateConstantIndexOp(rewriter, loc, linearId);
+  SmallVector<Value> ranges;
+  for (auto workerCount : producer.getStaticUpperBound()) {
+    ranges.push_back(rewriter.create<arith::ConstantIndexOp>(loc, workerCount));
+  }
+  ValueRange newIds = rewriter
+                          .create<affine::AffineDelinearizeIndexOp>(
+                              loc, linearThreadIdVal, ranges)
+                          .getResults();
+
+  // Step 2. Inline the region of the producer.
+  SmallVector<Value> bbArgReplacements(newIds);
+  bbArgReplacements.append(producer.getOutputs().begin(),
+                           producer.getOutputs().end());
+
+  scf::InParallelOp terminator = producer.getTerminator();
+  rewriter.inlineBlockBefore(producer.getBody(), slice, bbArgReplacements);
+
+  rewriter.setInsertionPointAfter(terminator);
+  auto parallelInsert =
+      cast<tensor::ParallelInsertSliceOp>(*terminator.getYieldingOps().begin());
+
+  Value replacementSlice =
+      getReplacementSlice(rewriter, loc, parallelInsert, slice, addressSpace);
+  rewriter.replaceAllUsesWith(slice, replacementSlice);
+
+  rewriter.eraseOp(parallelInsert);
+  rewriter.eraseOp(slice);
+  rewriter.eraseOp(terminator);
+  rewriter.eraseOp(producer);
+  return success();
+}
+
+DiagnosedSilenceableFailure
+transform_dialect::FuseForallOp::apply(transform::TransformRewriter &rewriter,
+                                       transform::TransformResults &results,
+                                       transform::TransformState &state) {
+  auto producers = state.getPayloadOps(getProducer());
+  auto consumers = state.getPayloadOps(getConsumer());
+
+  int64_t numProducers = llvm::range_size(producers);
+  int64_t numConsumers = llvm::range_size(consumers);
+  if (numProducers != 1 || numConsumers != 1) {
+    return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                     "More than one producer or consumer");
+  }
+
+  auto producer = dyn_cast<scf::ForallOp>(*producers.begin());
+  auto consumer = dyn_cast<scf::ForallOp>(*consumers.begin());
+  if (!producer || !consumer) {
+    return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                     "Non-forall producer or consumer");
+  }
+
+  if (!producer->hasOneUse()) {
+    return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                     "non-single use producer");
+  }
+
+  auto sliceConsumer =
+      dyn_cast<tensor::ExtractSliceOp>(*producer->user_begin());
+  if (!sliceConsumer || sliceConsumer->getParentOp() != consumer) {
+    return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                     "producer loop sole consumer is not an "
+                                     "extracted slice from the consumer loop");
+  }
+
+  if (failed(fuseForallIntoSlice(rewriter, producer, consumer, sliceConsumer,
+                                 getAddressSpace()))) {
+    return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                     "failed to fuse forall ops");
+  }
+
+  results.set(getOperation()->getOpResult(0), {consumer});
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::FuseForallOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::consumesHandle(getProducer(), effects);
+  transform::consumesHandle(getConsumer(), effects);
+  transform::producesHandle(getResult(), effects);
   transform::modifiesPayload(effects);
 }
 

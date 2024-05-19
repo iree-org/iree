@@ -7,6 +7,15 @@
 // RUN:     --input="8x8xf32=5" | \
 // RUN:   FileCheck %s
 
+// RUN: iree-compile --iree-preprocessing-transform-spec-filename=%p/mlp_spec_matmul.mlir %s | \
+// RUN:   iree-run-module --device=local-sync \
+// RUN:     --executable_plugin=$IREE_BINARY_DIR/samples/custom_dispatch/cpu/mlp_plugin/mlp_plugin$IREE_DYLIB_EXT \
+// RUN:     --module=- \
+// RUN:     --function=mlp_invocation \
+// RUN:     --input="8x8xf32=6" \
+// RUN:     --input="8x8xf32=5" | \
+// RUN:   FileCheck %s --check-prefix=TRANSFORM
+
 
 #x86_64_target = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {
   data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128",
@@ -61,3 +70,8 @@ module @example attributes {hal.device.targets = [#cpu_target]} {
   //       CHECK: [Plugin]: M = 8, N = 8, K = 8
   //       CHECK: [Plugin]: M = 8, N = 8, K = 8
   //       CHECK: 8x8xf32=[-9600 -9600 -9600 -9600 -9600 -9600 -9600 -9600][-9600 -9600 -9600 -9600 -9600 -9600 -9600 -9600][-9600 -9600 -9600 -9600 -9600 -9600 -9600 -9600][-9600 -9600 -9600 -9600 -9600 -9600 -9600 -9600][-9600 -9600 -9600 -9600 -9600 -9600 -9600 -9600][-9600 -9600 -9600 -9600 -9600 -9600 -9600 -9600][-9600 -9600 -9600 -9600 -9600 -9600 -9600 -9600][-9600 -9600 -9600 -9600 -9600 -9600 -9600 -9600]
+
+  // TRANSFORM-LABEL: EXEC @mlp_invocation
+  //       TRANSFORM: [Plugin]: M = 8, N = 8, K = 8
+  //       TRANSFORM: [Plugin]: M = 8, N = 8, K = 8
+  //       TRANSFORM: 8x8xf32=[-9600 -9600 -9600 -9600 -9600 -9600 -9600 -9600][-9600 -9600 -9600 -9600 -9600 -9600 -9600 -9600][-9600 -9600 -9600 -9600 -9600 -9600 -9600 -9600][-9600 -9600 -9600 -9600 -9600 -9600 -9600 -9600][-9600 -9600 -9600 -9600 -9600 -9600 -9600 -9600][-9600 -9600 -9600 -9600 -9600 -9600 -9600 -9600][-9600 -9600 -9600 -9600 -9600 -9600 -9600 -9600][-9600 -9600 -9600 -9600 -9600 -9600 -9600 -9600]

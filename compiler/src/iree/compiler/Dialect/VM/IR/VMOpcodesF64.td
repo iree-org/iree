@@ -41,11 +41,11 @@ def VM_OPC_CeilF64               : VM_OPC<0x12, "CeilF64">;
 def VM_OPC_FloorF64              : VM_OPC<0x13, "FloorF64">;
 def VM_OPC_RoundF64              : VM_OPC<0x3C, "RoundF64">;
 def VM_OPC_RoundF64Even          : VM_OPC<0x3F, "RoundF64Even">;
-def VM_OPC_TruncF64F32           : VM_OPC<0x14, "TruncF64F32">;
-def VM_OPC_ExtF32F64             : VM_OPC<0x15, "ExtF32F64">;
 def VM_OPC_MinF64                : VM_OPC<0x3D, "MinF64">;
 def VM_OPC_MaxF64                : VM_OPC<0x3E, "MaxF64">;
 
+def VM_OPC_TruncF64F32           : VM_OPC<0x14, "TruncF64F32">;
+def VM_OPC_ExtF32F64             : VM_OPC<0x15, "ExtF32F64">;
 def VM_OPC_CastSI32F64           : VM_OPC<0x16, "CastSI32F64">;
 def VM_OPC_CastUI32F64           : VM_OPC<0x17, "CastUI32F64">;
 def VM_OPC_CastF64SI32           : VM_OPC<0x18, "CastF64SI32">;
@@ -84,7 +84,6 @@ def VM_OPC_CmpLTEF64O            : VM_OPC<0x36, "CmpLTEF64O">;
 def VM_OPC_CmpLTEF64U            : VM_OPC<0x37, "CmpLTEF64U">;
 def VM_OPC_CmpNaNF64             : VM_OPC<0x38, "CmpNaNF64">;
 
-// Buffer load/store:
 def VM_OPC_BufferLoadF64         : VM_OPC<0x39, "BufferLoadF64">;
 def VM_OPC_BufferStoreF64        : VM_OPC<0x3A, "BufferStoreF64">;
 def VM_OPC_BufferFillF64         : VM_OPC<0x3B, "BufferFillF64">;
@@ -121,6 +120,7 @@ def VM_ExtF64OpcodeAttr :
     VM_OPC_CeilF64,
     VM_OPC_FloorF64,
     VM_OPC_RoundF64,
+    VM_OPC_RoundF64Even,
     VM_OPC_MinF64,
     VM_OPC_MaxF64,
 

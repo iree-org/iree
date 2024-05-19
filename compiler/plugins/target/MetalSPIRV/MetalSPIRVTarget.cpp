@@ -170,24 +170,14 @@ public:
                     IREE::Flow::FlowDialect, spirv::SPIRVDialect>();
   }
 
-  void buildConfigurationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
-                                      OpPassManager &passManager) override {
-    // For now we disable configuration if the variant has external object
-    // files.
-    if (variantOp.isExternal())
-      return;
-
+  void
+  buildConfigurationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
+                                 OpPassManager &passManager) override {
     buildSPIRVCodegenConfigurationPassPipeline(passManager);
   }
 
-  void buildTranslationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
+  void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                     OpPassManager &passManager) override {
-    // For now we disable translation if the variant has external object files.
-    // We could instead perform linking with those objects (if they're Metal
-    // archives, etc).
-    if (variantOp.isExternal())
-      return;
-
     buildSPIRVCodegenPassPipeline(passManager);
   }
 

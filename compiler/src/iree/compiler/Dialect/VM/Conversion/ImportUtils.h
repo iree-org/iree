@@ -92,7 +92,7 @@ rewriteToCall(T op, Adaptor adaptor, IREE::VM::ImportOp importOp,
       auto oldOperands = llvm::to_vector(op.getODSOperands(inputSetIndex));
       auto newOperands = llvm::to_vector(adaptor.getODSOperands(inputSetIndex));
       ++inputSetIndex;
-      if (auto inputTupleType = inputType.template dyn_cast<TupleType>()) {
+      if (auto inputTupleType = dyn_cast<TupleType>(inputType)) {
         // Unpack a tuple<...> from the variadic.
         // This only supports a single level of unpacking.
         if (inputTupleType.size() != newOperands.size()) {

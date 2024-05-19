@@ -128,19 +128,19 @@ hal.executable private @err_reconcile_subgroup_size {
 // -----
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>]>]>
-hal.executable private @waves_per_eu {
-  hal.executable.variant public @waves_per_eu target(#hal.executable.target<"", "", {}>) {
+hal.executable private @llvm_func_attrs {
+  hal.executable.variant public @llvm_func_attrs target(#hal.executable.target<"", "", {}>) {
     hal.executable.export public @entry_point layout(#pipeline_layout)
     builtin.module {
-      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<None, {waves_per_eu = 2}>}  {
+      func.func @fn1() attributes {translation_info = #iree_codegen.translation_info<None, {llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}>}  {
         return
       }
-      func.func @fn2() attributes {translation_info = #iree_codegen.translation_info<None, {waves_per_eu = 4}>} {
+      func.func @fn2() attributes {translation_info = #iree_codegen.translation_info<None, {llvm_func_attrs = {"amdgpu-waves-per-eu" = "4"}}>} {
         return
       }
     }
   }
 }
-// CHECK-LABEL: hal.executable private @waves_per_eu
-//       CHECK:   func.func @fn1() attributes {waves_per_eu = 2 : index}
-//       CHECK:   func.func @fn2() attributes {waves_per_eu = 4 : index}
+// CHECK-LABEL: hal.executable private @llvm_func_attrs
+//       CHECK:   func.func @fn1() attributes {llvm_func_attrs = {"amdgpu-waves-per-eu" = "2"}}
+//       CHECK:   func.func @fn2() attributes {llvm_func_attrs = {"amdgpu-waves-per-eu" = "4"}}

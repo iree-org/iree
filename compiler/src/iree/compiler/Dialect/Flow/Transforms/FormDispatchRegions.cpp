@@ -6,12 +6,12 @@
 
 #include "iree/compiler/Dialect/Flow/Transforms/FormDispatchRegions.h"
 
+#include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/ConvertRegionToWorkgroups.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
@@ -236,14 +236,14 @@ static bool isRootOp(Operation *op) {
   if (isa<TilingInterface>(op)) {
     return !isa<tensor::PadOp, tensor::PackOp>(op);
   }
-  return isa<LinalgExt::UnsetEncodingOp, tensor::UnPackOp>(op);
+  return isa<Encoding::UnsetEncodingOp, tensor::UnPackOp>(op);
 }
 
 /// Returns true if the operation is a `pack` op or a `set_encoding` op that
 /// has pack semantics.
 // TODO(ravishankarm): This seems like a use case for an interface.
 static bool isPackLikeOp(Operation *op) {
-  return isa<IREE::LinalgExt::SetEncodingOp, tensor::PackOp>(op);
+  return isa<IREE::Encoding::SetEncodingOp, tensor::PackOp>(op);
 }
 
 /// Returns true if the operation is an `unpack` op or an `unset_encoding` op,
@@ -257,7 +257,7 @@ static bool isPackLikeOp(Operation *op) {
 /// we are not content to be fusing %1 into %0, we also want to be fusing %2,
 /// so we want to prevent %1 from acting as a consumer fusion barrier.
 static bool isUnpackLikeOpViaExtractSliceOps(Operation *op) {
-  if (isa<IREE::LinalgExt::UnsetEncodingOp, tensor::UnPackOp>(op)) {
+  if (isa<IREE::Encoding::UnsetEncodingOp, tensor::UnPackOp>(op)) {
     return true;
   }
   if (isa<tensor::ExtractSliceOp>(op)) {
@@ -270,7 +270,7 @@ static bool isUnpackLikeOpViaExtractSliceOps(Operation *op) {
   return false;
 }
 
-/// Since `iree_linalg_ext.set_encoding` doesnt have padding semantics a
+/// Since `iree_encoding.set_encoding` doesnt have padding semantics a
 /// `tensor.pad` is introduced to get the shapes of the input and output to
 /// match. The `tensor.pad` -> `set_encoding` can be folded later on into a
 /// single `tensor.pack` operation. But it means the fusion has to try to keep
@@ -279,7 +279,7 @@ static bool isUnpackLikeOpViaExtractSliceOps(Operation *op) {
 // explicitly broken down if needed.
 static bool isPadUsedInSetEncoding(tensor::PadOp padOp) {
   return llvm::any_of(padOp->getUsers(),
-                      llvm::IsaPred<IREE::LinalgExt::SetEncodingOp>);
+                      llvm::IsaPred<IREE::Encoding::SetEncodingOp>);
 }
 
 //===----------------------------------------------------------------------===//
@@ -289,10 +289,10 @@ static bool isPadUsedInSetEncoding(tensor::PadOp padOp) {
 /// Returns a bit vector of size number of loops of the `interfaceOp` with
 /// the bits corresponding to outer parallel loops set to `true`.
 static llvm::SmallBitVector getOuterParallelLoops(Operation *op) {
-  if (auto setEncodingOp = dyn_cast<IREE::LinalgExt::SetEncodingOp>(op)) {
+  if (auto setEncodingOp = dyn_cast<IREE::Encoding::SetEncodingOp>(op)) {
     return llvm::SmallBitVector(setEncodingOp.getResultType().getRank(), true);
   }
-  if (auto unsetEncodingOp = dyn_cast<IREE::LinalgExt::UnsetEncodingOp>(op)) {
+  if (auto unsetEncodingOp = dyn_cast<IREE::Encoding::UnsetEncodingOp>(op)) {
     return llvm::SmallBitVector(unsetEncodingOp.getResultType().getRank(),
                                 true);
   }
@@ -851,7 +851,7 @@ decideFusableLinalgOps(Region &region, DominanceInfo const &dominanceInfo,
       // into their own dispatch since it is better to clone these ops and avoid
       // materializing large tensors between dispatches.
       if (!isa<linalg::LinalgOp, tensor::PadOp, tensor::PackOp,
-               IREE::LinalgExt::SetEncodingOp>(op) ||
+               IREE::Encoding::SetEncodingOp>(op) ||
           isa<linalg::FillOp>(op) || isDequantizationLikeOp(&op)) {
         continue;
       }
@@ -983,9 +983,8 @@ void FormDispatchRegionsPass::runOnOperation() {
   mlir::FunctionOpInterface funcOp = getOperation();
   DominanceInfo const &dominanceInfo = getAnalysis<DominanceInfo>();
   TensorDimTrackingRewriter rewriter(funcOp);
-  FormDispatchRegionsPassOptions options{
-      aggressiveFusion, generateWorkloadRegion, fusePadWithConsumers,
-      fusePadWithProducers};
+  FormDispatchRegionsPassOptions options{aggressiveFusion, fusePadWithConsumers,
+                                         fusePadWithProducers};
   if (failed(createFusionGroups(rewriter, funcOp, dominanceInfo, options))) {
     funcOp->emitOpError("failed to create fusion groups");
     return signalPassFailure();

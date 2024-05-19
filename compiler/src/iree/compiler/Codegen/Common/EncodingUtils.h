@@ -7,8 +7,8 @@
 #ifndef IREE_COMPILER_SRC_IREE_COMPILER_CODEGEN_COMMON_ENCODINGUTILS_H_
 #define IREE_COMPILER_SRC_IREE_COMPILER_CODEGEN_COMMON_ENCODINGUTILS_H_
 
+#include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "mlir/Transforms/DialectConversion.h"
 
 namespace mlir::iree_compiler {
@@ -88,7 +88,7 @@ struct TileMxNxK {
 };
 
 MaterializeEncodingInfo
-getEncodingInfoForMatmul(IREE::LinalgExt::EncodingAttr encoding, int64_t rank,
+getEncodingInfoForMatmul(IREE::Encoding::EncodingAttr encoding, int64_t rank,
                          TileMxNxK tileMxNxK);
 
 void populateMaterializeEncodingIntoPackUnPackPatterns(

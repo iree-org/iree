@@ -22,11 +22,6 @@ class BenchmarkConfigTest(unittest.TestCase):
         self.e2e_test_artifacts_dir.mkdir()
         self.normal_tool_dir = self.build_dir / "normal_tool"
         self.normal_tool_dir.mkdir()
-        self.traced_tool_dir = self.build_dir / "traced_tool"
-        self.traced_tool_dir.mkdir()
-        self.trace_capture_tool = self.build_dir / "tracy_capture"
-        # Create capture tool with executable file mode.
-        self.trace_capture_tool.touch(mode=0o755)
         self.execution_config = self.build_dir / "execution_config.json"
         self.execution_config.touch()
 
@@ -38,10 +33,7 @@ class BenchmarkConfigTest(unittest.TestCase):
         args = common_arguments.Parser().parse_args(
             [
                 f"--tmp_dir={self.tmp_dir}",
-                f"--normal_benchmark_tool_dir={self.normal_tool_dir}",
-                f"--traced_benchmark_tool_dir={self.traced_tool_dir}",
-                f"--trace_capture_tool={self.trace_capture_tool}",
-                f"--capture_tarball=capture.tar",
+                f"--benchmark_tool_dir={self.normal_tool_dir}",
                 f"--driver_filter_regex=a",
                 f"--model_name_regex=b",
                 f"--mode_regex=c",
@@ -60,12 +52,6 @@ class BenchmarkConfigTest(unittest.TestCase):
         )
 
         per_commit_tmp_dir = self.tmp_dir / "abcd"
-        expected_trace_capture_config = benchmark_config.TraceCaptureConfig(
-            traced_benchmark_tool_dir=self.traced_tool_dir,
-            trace_capture_tool=pathlib.Path(self.trace_capture_tool).resolve(),
-            capture_tarball=pathlib.Path("capture.tar").resolve(),
-            capture_tmp_dir=per_commit_tmp_dir / "captures",
-        )
         expected_config = benchmark_config.BenchmarkConfig(
             tmp_dir=per_commit_tmp_dir,
             root_benchmark_dir=benchmark_definition.ResourceLocation.build_local_path(
@@ -73,8 +59,7 @@ class BenchmarkConfigTest(unittest.TestCase):
             ),
             benchmark_results_dir=per_commit_tmp_dir / "benchmark-results",
             git_commit_hash="abcd",
-            normal_benchmark_tool_dir=self.normal_tool_dir,
-            trace_capture_config=expected_trace_capture_config,
+            benchmark_tool_dir=self.normal_tool_dir,
             driver_filter="a",
             model_name_filter="b",
             mode_filter="c",
@@ -89,7 +74,7 @@ class BenchmarkConfigTest(unittest.TestCase):
         args = common_arguments.Parser().parse_args(
             [
                 f"--tmp_dir={self.tmp_dir}",
-                f"--normal_benchmark_tool_dir={self.normal_tool_dir}",
+                f"--benchmark_tool_dir={self.normal_tool_dir}",
                 f"--e2e_test_artifacts_dir={self.e2e_test_artifacts_dir}",
                 f"--execution_benchmark_config={self.execution_config}",
                 "--target_device=test",
@@ -100,13 +85,11 @@ class BenchmarkConfigTest(unittest.TestCase):
             args=args, git_commit_hash="abcd"
         )
 
-        self.assertIsNone(config.trace_capture_config)
-
     def test_build_from_args_with_test_artifacts_dir_url(self):
         args = common_arguments.Parser().parse_args(
             [
                 f"--tmp_dir={self.tmp_dir}",
-                f"--normal_benchmark_tool_dir={self.normal_tool_dir}",
+                f"--benchmark_tool_dir={self.normal_tool_dir}",
                 f"--e2e_test_artifacts_dir=https://example.com/testdata",
                 f"--execution_benchmark_config={self.execution_config}",
                 "--target_device=test",
@@ -119,25 +102,6 @@ class BenchmarkConfigTest(unittest.TestCase):
 
         self.assertEqual(
             config.root_benchmark_dir.get_url(), "https://example.com/testdata"
-        )
-
-    def test_build_from_args_invalid_capture_args(self):
-        args = common_arguments.Parser().parse_args(
-            [
-                f"--tmp_dir={self.tmp_dir}",
-                f"--normal_benchmark_tool_dir={self.normal_tool_dir}",
-                f"--traced_benchmark_tool_dir={self.traced_tool_dir}",
-                f"--e2e_test_artifacts_dir={self.e2e_test_artifacts_dir}",
-                f"--execution_benchmark_config={self.execution_config}",
-                "--target_device=test",
-            ]
-        )
-
-        self.assertRaises(
-            ValueError,
-            lambda: benchmark_config.BenchmarkConfig.build_from_args(
-                args=args, git_commit_hash="abcd"
-            ),
         )
 
 

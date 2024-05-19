@@ -38,6 +38,7 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::Transforms
     iree::compiler::Dialect::HAL::IR::HALDialect
     iree::compiler::Dialect::HAL::Transforms
+    iree::compiler::Dialect::Encoding::IR
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::LinalgExt::TransformExtensions::LinalgExtExtensions
     iree::compiler::Dialect::LinalgExt::Transforms
@@ -130,7 +131,6 @@ iree_cc_library(
     ::init_iree_passes_and_dialects
     ::init_mlir_passes_and_dialects
     iree::compiler::Codegen::Codegen
-    iree::compiler::Dialect::HAL::Conversion::Passes
   PUBLIC
 )
 

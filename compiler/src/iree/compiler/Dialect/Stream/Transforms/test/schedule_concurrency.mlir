@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module( util.func(iree-stream-schedule-concurrency))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-stream-schedule-concurrency))" %s | FileCheck %s
 
 // Tests that when favor=min-peak-memory we assume ops are in an order that
 // reduces live memory ranges and only optimistically put them in concurrency

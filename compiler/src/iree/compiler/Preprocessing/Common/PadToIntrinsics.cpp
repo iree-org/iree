@@ -26,6 +26,10 @@ namespace mlir::iree_compiler::Preprocessing {
 
 namespace {
 
+// Threshold used to determine whether a matmul dimension is 'very skinny'.
+// Based on the same variable in LLVMGPU/KernelConfig.cpp.
+constexpr int64_t kVerySkinnyDimThreshold = 4;
+
 static Value getPaddedValue(RewriterBase &rewriter, Location loc,
                             Value padSource, ArrayRef<OpFoldResult> padding) {
   auto sourceType = cast<RankedTensorType>(padSource.getType());
@@ -309,8 +313,9 @@ static void padContractionLikeOp(RewriterBase &rewriter,
   int64_t nSize = bounds[nDim];
   int64_t kSize = bounds[kDim];
 
-  // Bail out on matvec-like cases.
-  if (mSize == 1 || nSize == 1) {
+  // Bail out on matvec-like/skinny matmul cases.
+  if ((!ShapedType::isDynamic(mSize) && mSize <= kVerySkinnyDimThreshold) ||
+      (!ShapedType::isDynamic(nSize) && nSize <= kVerySkinnyDimThreshold)) {
     return;
   }
 

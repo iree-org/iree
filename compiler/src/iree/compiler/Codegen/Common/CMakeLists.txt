@@ -190,6 +190,7 @@ iree_cc_library(
     iree::compiler::Codegen::Interfaces::UKernelOpInterface
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
+    iree::compiler::Dialect::Encoding::IR
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::LinalgExt::IR
@@ -262,6 +263,7 @@ iree_cc_library(
     iree::compiler::Codegen::LLVMCPU::TransformExtensions::LLVMCPUExtensions
     iree::compiler::Codegen::LLVMGPU::TransformExtensions::LLVMGPUExtensions
     iree::compiler::Codegen::TransformStrategies::Common::TransformStrategies
+    iree::compiler::Dialect::Encoding::IR
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Flow::TransformExtensions::FlowExtensions
     iree::compiler::Dialect::LinalgExt::IR

@@ -49,7 +49,7 @@ func.func @KCRS_to_KCRSsr(%arg0: tensor<1x1x128x64xf32>, %arg1: tensor<1x1x4x8x8
 // CHECK:       func.func @KCRS_to_KCRSsr
 // CHECK-SAME:    %[[IN:[A-Za-z0-9]+]]:
 // CHECK-SAME:    %[[OUT:[A-Za-z0-9]+]]:
-// CHECK:         %[[EXPAND:.+]] = tensor.expand_shape %[[IN]] {{\[}}[0], [1], [2, 3], [4, 5]] : tensor<1x1x128x64xf32> into tensor<1x1x4x32x8x8xf32>
+// CHECK:         %[[EXPAND:.+]] = tensor.expand_shape %[[IN]] {{\[}}[0], [1], [2, 3], [4, 5]] output_shape [1, 1, 4, 32, 8, 8] : tensor<1x1x128x64xf32> into tensor<1x1x4x32x8x8xf32>
 // CHECK:          %[[TRANSP:.+]] = linalg.transpose
 // CHECK-SAME:       ins(%[[EXPAND]] : tensor<1x1x4x32x8x8xf32>)
 // CHECK-SAME:       outs(%[[OUT]] : tensor<1x1x4x8x8x32xf32>)
@@ -69,7 +69,7 @@ func.func @pad_and_pack(%arg0: tensor<13x15xf32>, %arg1: tensor<2x8x8x2xf32>, %a
 // CHECK:         %[[PAD:.+]] = tensor.pad %[[IN]] low[0, 0] high[3, 1]
 // CHECK:           tensor.yield %[[PAD_VAL]]
 // CHECK:         } : tensor<13x15xf32> to tensor<16x16xf32>
-// CHECK:         %[[EXPAND:.+]] = tensor.expand_shape %[[PAD]] {{\[}}[0, 1], [2, 3]] : tensor<16x16xf32> into tensor<2x8x8x2xf32>
+// CHECK:         %[[EXPAND:.+]] = tensor.expand_shape %[[PAD]] {{\[}}[0, 1], [2, 3]] output_shape [2, 8, 8, 2] : tensor<16x16xf32> into tensor<2x8x8x2xf32>
 // CHECK:         %[[TRANS:.+]] = linalg.transpose
 // CHECK-SAME:      ins(%[[EXPAND]] : tensor<2x8x8x2xf32>)
 // CHECK-SAME:      outs(%[[OUT:.+]] : tensor<2x8x8x2xf32>)
@@ -85,7 +85,7 @@ func.func @KC_to_CKck(%arg0: tensor<128x256xf32>, %arg1: tensor<32x4x32x8xf32>) 
 // CHECK:       func.func @KC_to_CKck
 // CHECK-SAME:    %[[IN:[A-Za-z0-9]+]]:
 // CHECK-SAME:    %[[OUT:[A-Za-z0-9]+]]:
-// CHECK:         %[[EXPAND:.+]] = tensor.expand_shape %[[IN]] {{\[}}[0, 1], [2, 3]] : tensor<128x256xf32> into tensor<4x32x32x8xf32>
+// CHECK:         %[[EXPAND:.+]] = tensor.expand_shape %[[IN]] {{\[}}[0, 1], [2, 3]] output_shape [4, 32, 32, 8] : tensor<128x256xf32> into tensor<4x32x32x8xf32>
 // CHECK:         %[[TRANSP:.+]] = linalg.transpose
 // CHECK-SAME:      ins(%[[EXPAND]] : tensor<4x32x32x8xf32>)
 // CHECK-SAME:      outs(%[[OUT]] : tensor<32x4x32x8xf32>)
@@ -222,7 +222,7 @@ func.func @pack_matmul_DYN_LHS(%src: tensor<?x?xf32>, %dest: tensor<?x?x16x1xf32
 // CHECK-DAG:    %[[H1:.+]] = affine.apply #[[MAP1]]
 // CHECK:        %[[PAD:.+]] = tensor.pad %[[IN]] low[0, 0] high[%[[H0]], %[[H1]]]
 // CHECK:        %[[EXPANDED:.+]] = tensor.expand_shape %[[PAD]]
-// CHECK-SAME:     {{\[}}[0, 1], [2, 3]] : tensor<?x?xf32> into tensor<?x16x?x1xf32>
+// CHECK-SAME:     {{\[}}[0, 1], [2, 3]]
 // CHECK:        %[[TRANSP:.+]] = linalg.transpose
 // CHECK-SAME:     ins(%[[EXPANDED]] : tensor<?x16x?x1xf32>)
 // CHECK-SAME:     outs(%[[OUT]] : tensor<?x?x16x1xf32>)
@@ -245,7 +245,7 @@ func.func @pack_matmul_DYN_RHS(%src: tensor<?x?xf32>, %dest: tensor<?x?x16x1xf32
 // CHECK-DAG:    %[[H1:.+]] = affine.apply #[[MAP0]]
 // CHECK:        %[[PAD:.+]] = tensor.pad %[[IN]] low[0, 0] high[%[[H0]], %[[H1]]]
 // CHECK:        %[[EXPANDED:.+]] = tensor.expand_shape %[[PAD]]
-// CHECK-SAME:     {{\[}}[0, 1], [2, 3]] : tensor<?x?xf32> into tensor<?x1x?x16xf32>
+// CHECK-SAME:     {{\[}}[0, 1], [2, 3]]
 // CHECK:        %[[TRANSP:.+]] = linalg.transpose
 // CHECK-SAME:     ins(%[[EXPANDED]] : tensor<?x1x?x16xf32>)
 // CHECK-SAME:     outs(%[[OUT]] : tensor<?x?x16x1xf32>)

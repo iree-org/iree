@@ -10,8 +10,10 @@
 #include "iree/hal/drivers/hip/hip_buffer.h"
 #include "iree/hal/drivers/hip/native_executable.h"
 #include "iree/hal/drivers/hip/pipeline_layout.h"
+#include "iree/hal/drivers/hip/rccl_channel.h"
 #include "iree/hal/drivers/hip/status_util.h"
 #include "iree/hal/drivers/hip/tracing.h"
+#include "iree/hal/utils/collective_batch.h"
 #include "iree/hal/utils/resource_set.h"
 
 typedef struct iree_hal_hip_stream_command_buffer_t {
@@ -19,6 +21,7 @@ typedef struct iree_hal_hip_stream_command_buffer_t {
   iree_allocator_t host_allocator;
 
   const iree_hal_hip_dynamic_symbols_t* hip_symbols;
+  const iree_hal_hip_nccl_dynamic_symbols_t* nccl_symbols;
 
   // Per-stream HIP tracing context.
   iree_hal_hip_tracing_context_t* tracing_context;
@@ -33,6 +36,9 @@ typedef struct iree_hal_hip_stream_command_buffer_t {
   // Used for when we need HIP to be able to reference memory as it performs
   // asynchronous operations.
   iree_arena_allocator_t arena;
+
+  // Iteratively constructed batch of collective operations.
+  iree_hal_collective_batch_t collective_batch;
 
   int32_t push_constants[IREE_HAL_HIP_MAX_PUSH_CONSTANT_COUNT];
 
@@ -54,6 +60,7 @@ iree_hal_hip_stream_command_buffer_cast(iree_hal_command_buffer_t* base_value) {
 iree_status_t iree_hal_hip_stream_command_buffer_create(
     iree_hal_device_t* device,
     const iree_hal_hip_dynamic_symbols_t* hip_symbols,
+    const iree_hal_hip_nccl_dynamic_symbols_t* nccl_symbols,
     iree_hal_hip_tracing_context_t* tracing_context,
     iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
@@ -62,6 +69,7 @@ iree_status_t iree_hal_hip_stream_command_buffer_create(
     iree_hal_command_buffer_t** out_command_buffer) {
   IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(hip_symbols);
+  IREE_ASSERT_ARGUMENT(nccl_symbols);
   IREE_ASSERT_ARGUMENT(out_command_buffer);
   *out_command_buffer = NULL;
 
@@ -84,12 +92,19 @@ iree_status_t iree_hal_hip_stream_command_buffer_create(
       &command_buffer->base);
   command_buffer->host_allocator = host_allocator;
   command_buffer->hip_symbols = hip_symbols;
+  command_buffer->nccl_symbols = nccl_symbols;
   command_buffer->tracing_context = tracing_context;
   command_buffer->hip_stream = stream;
   iree_arena_initialize(block_pool, &command_buffer->arena);
 
   iree_status_t status =
       iree_hal_resource_set_allocate(block_pool, &command_buffer->resource_set);
+
+  if (iree_status_is_ok(status)) {
+    iree_hal_collective_batch_initialize(&command_buffer->arena,
+                                         command_buffer->resource_set,
+                                         &command_buffer->collective_batch);
+  }
 
   *out_command_buffer = &command_buffer->base;
   IREE_TRACE_ZONE_END(z0);
@@ -103,6 +118,7 @@ static void iree_hal_hip_stream_command_buffer_destroy(
   iree_allocator_t host_allocator = command_buffer->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  iree_hal_collective_batch_deinitialize(&command_buffer->collective_batch);
   iree_hal_resource_set_free(command_buffer->resource_set);
   iree_arena_deinitialize(&command_buffer->arena);
   iree_allocator_free(host_allocator, command_buffer);
@@ -114,6 +130,27 @@ bool iree_hal_hip_stream_command_buffer_isa(
     iree_hal_command_buffer_t* command_buffer) {
   return iree_hal_resource_is(&command_buffer->resource,
                               &iree_hal_hip_stream_command_buffer_vtable);
+}
+
+// Flushes any pending batched collective operations.
+// Must be called before any other non-collective nodes are added to the graph
+// or a barrier is encountered.
+static iree_status_t iree_hal_hip_stream_command_buffer_flush_collectives(
+    iree_hal_hip_stream_command_buffer_t* command_buffer) {
+  // NOTE: we could move this out into callers by way of an always-inline shim -
+  // that would make this a single compare against the command buffer state we
+  // are likely to access immediately after anyway and keep overheads minimal.
+  if (IREE_LIKELY(iree_hal_collective_batch_is_empty(
+          &command_buffer->collective_batch))) {
+    return iree_ok_status();
+  }
+  IREE_TRACE_ZONE_BEGIN(z0);
+  iree_status_t status = iree_hal_hip_nccl_submit_batch(
+      command_buffer->nccl_symbols, command_buffer->tracing_context,
+      &command_buffer->collective_batch, command_buffer->hip_stream);
+  iree_hal_collective_batch_clear(&command_buffer->collective_batch);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
 }
 
 static iree_status_t iree_hal_hip_stream_command_buffer_begin(
@@ -135,6 +172,9 @@ static iree_status_t iree_hal_hip_stream_command_buffer_end(
   iree_hal_hip_stream_command_buffer_t* command_buffer =
       iree_hal_hip_stream_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
+
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_hip_stream_command_buffer_flush_collectives(command_buffer));
 
   // Reset the arena as there should be nothing using it now that we've
   // dispatched all our operations inline.
@@ -190,6 +230,9 @@ static iree_status_t iree_hal_hip_stream_command_buffer_execution_barrier(
     const iree_hal_memory_barrier_t* memory_barriers,
     iree_host_size_t buffer_barrier_count,
     const iree_hal_buffer_barrier_t* buffer_barriers) {
+  iree_hal_hip_stream_command_buffer_t* command_buffer =
+      iree_hal_hip_stream_command_buffer_cast(base_command_buffer);
+
   if (iree_any_bit_set(source_stage_mask, IREE_HAL_EXECUTION_STAGE_HOST) ||
       iree_any_bit_set(target_stage_mask, IREE_HAL_EXECUTION_STAGE_HOST)) {
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
@@ -201,6 +244,9 @@ static iree_status_t iree_hal_hip_stream_command_buffer_execution_barrier(
                             "non-zero barrier flag not yet supported");
   }
   IREE_TRACE_ZONE_BEGIN(z0);
+
+  IREE_RETURN_IF_ERROR(
+      iree_hal_hip_stream_command_buffer_flush_collectives(command_buffer));
 
   // Nothing to do for barriers between memory operations or dispatches--HIP
   // stream semantics guarantees execution and memory visibility in program
@@ -249,6 +295,9 @@ static iree_status_t iree_hal_hip_stream_command_buffer_fill_buffer(
   iree_hal_hip_stream_command_buffer_t* command_buffer =
       iree_hal_hip_stream_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
+
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_hip_stream_command_buffer_flush_collectives(command_buffer));
 
   hipDeviceptr_t target_device_buffer = iree_hal_hip_buffer_device_pointer(
       iree_hal_buffer_allocated_buffer(target_buffer));
@@ -299,6 +348,9 @@ static iree_status_t iree_hal_hip_stream_command_buffer_update_buffer(
       iree_hal_hip_stream_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_hip_stream_command_buffer_flush_collectives(command_buffer));
+
   // Allocate scratch space in the arena for the data and copy it in.
   // The update buffer API requires that the command buffer capture the host
   // memory at the time the method is called in case the caller wants to reuse
@@ -339,6 +391,9 @@ static iree_status_t iree_hal_hip_stream_command_buffer_copy_buffer(
       iree_hal_hip_stream_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_hip_stream_command_buffer_flush_collectives(command_buffer));
+
   hipDeviceptr_t target_device_buffer = iree_hal_hip_buffer_device_pointer(
       iree_hal_buffer_allocated_buffer(target_buffer));
   target_offset += iree_hal_buffer_byte_offset(target_buffer);
@@ -363,8 +418,16 @@ static iree_status_t iree_hal_hip_stream_command_buffer_collective(
     iree_hal_collective_op_t op, uint32_t param,
     iree_hal_buffer_binding_t send_binding,
     iree_hal_buffer_binding_t recv_binding, iree_device_size_t element_count) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "collectives not yet supported");
+  iree_hal_hip_stream_command_buffer_t* command_buffer =
+      iree_hal_hip_stream_command_buffer_cast(base_command_buffer);
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_status_t status = iree_hal_collective_batch_append(
+      &command_buffer->collective_batch, channel, op, param, send_binding,
+      recv_binding, element_count);
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
 }
 
 static iree_status_t iree_hal_hip_stream_command_buffer_push_constants(
@@ -431,6 +494,9 @@ static iree_status_t iree_hal_hip_stream_command_buffer_dispatch(
   iree_hal_hip_stream_command_buffer_t* command_buffer =
       iree_hal_hip_stream_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
+
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_hip_stream_command_buffer_flush_collectives(command_buffer));
 
   // Lookup kernel parameters used for side-channeling additional launch
   // information from the compiler.

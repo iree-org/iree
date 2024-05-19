@@ -33,7 +33,7 @@ module {
 // CHECK: transform.structured.fuse_into_containing_op
 // CHECK: transform.structured.tile_using_for %{{.*}}[0, 0, 0, 16]
 // CHECK: transform.structured.fuse_into_containing_op
-// CHECK: transform.structured.pad %{{.*}} {copy_back_op = "none", pack_paddings = [1, 0, 1], pad_to_multiple_of = [1, 1, 1, 1], padding_dimensions = [0, 1, 2, 3], padding_values = [0.000000e+00 : f32, 0.000000e+00 : f32, 0.000000e+00 : f32]}
+// CHECK: transform.structured.pad %{{.*}} pad_to_multiple_of [1, 1, 1, 1] {copy_back_op = "none", pack_paddings = [1, 0, 1], padding_dimensions = [0, 1, 2, 3], padding_values = [0.000000e+00 : f32, 0.000000e+00 : f32, 0.000000e+00 : f32]}
 // CHECK: transform.structured.match ops{["linalg.fill"]}
 // CHECK: %[[RES:.+]] = transform.get_producer_of_operand %{{.*}}[2]
 // CHECK: transform.structured.rewrite_in_destination_passing_style %[[RES]]
@@ -84,7 +84,7 @@ module {
 
 // CHECK: transform.named_sequence
 // CHECK: transform.structured.tile_using_forall %{{.*}}   tile_sizes [1, 128, 128](mapping = [#gpu.block<z>, #gpu.block<y>, #gpu.block<x>])
-// CHECK: transform.structured.pad %{{.*}} {copy_back_op = "none", pack_paddings = [0, 1, 1], pad_to_multiple_of = [1, 1, 1, 1], padding_dimensions = [0, 1, 2, 3], padding_values = [0.000000e+00 : f32, 0.000000e+00 : f32, 0.000000e+00 : f32]}
+// CHECK: transform.structured.pad %{{.*}} pad_to_multiple_of [1, 1, 1, 1] {copy_back_op = "none", pack_paddings = [0, 1, 1], padding_dimensions = [0, 1, 2, 3], padding_values = [0.000000e+00 : f32, 0.000000e+00 : f32, 0.000000e+00 : f32]}
 // CHECK: %[[RES:.+]] = transform.get_producer_of_operand %{{.*}}[2]
 // CHECK: transform.structured.rewrite_in_destination_passing_style %[[RES]]
 // CHECK: %[[LHS:.+]] = transform.get_producer_of_operand %{{.*}}[0]

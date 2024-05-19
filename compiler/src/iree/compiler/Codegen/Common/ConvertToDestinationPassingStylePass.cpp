@@ -97,7 +97,7 @@ static Value getReverseOfReshapeOp(OpBuilder &b, TensorReshapeOpTy reshapeOp,
       tensor::ExpandShapeOp, tensor::CollapseShapeOp>::type;
   return b.create<ReverseReshapeOpTy>(reshapeOp.getLoc(),
                                       reshapeOp.getSrcType(), resultBuffer,
-                                      reshapeOp.getReassociation());
+                                      reshapeOp.getReassociationIndices());
 }
 
 /// Gets the reverse of a `tensor.cast` op to get a memref type that

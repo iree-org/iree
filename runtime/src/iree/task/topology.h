@@ -27,7 +27,7 @@ extern "C" {
 typedef uint32_t iree_task_topology_node_id_t;
 
 // Use any NUMA node (usually the first).
-#define IREE_TASK_TOPOLOGY_NODE_ID_ANY ((iree_task_topology_node_id_t)-1)
+#define IREE_TASK_TOPOLOGY_NODE_ID_ANY ((iree_task_topology_node_id_t) - 1)
 
 // Returns the total number of NUMA nodes in the system or 1 if the query is
 // not available on the platform.

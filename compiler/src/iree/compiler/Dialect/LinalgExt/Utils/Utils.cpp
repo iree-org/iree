@@ -44,6 +44,39 @@ SmallVector<OpFoldResult> getDims(OpBuilder &builder, Location loc,
       [&](int64_t dim) { return getDim(builder, loc, shapedTypeValue, dim); });
 }
 
+Value getSlice(OpBuilder &b, Location loc, Value src,
+               ArrayRef<OpFoldResult> offsets, ArrayRef<OpFoldResult> sizes,
+               ArrayRef<OpFoldResult> strides) {
+  return TypeSwitch<Type, Value>(src.getType())
+      .Case<RankedTensorType>([&](RankedTensorType t) -> Value {
+        return b.create<tensor::ExtractSliceOp>(loc, src, offsets, sizes,
+                                                strides);
+      })
+      .Case<MemRefType>([&](MemRefType type) -> Value {
+        return b.create<memref::SubViewOp>(loc, src, offsets, sizes, strides);
+      })
+      .Default([&](Type t) {
+        assert(false && "invalid type");
+        return nullptr;
+      });
+}
+
+Value castValue(OpBuilder &b, Location loc, Value src, ShapedType type) {
+  return TypeSwitch<Type, Value>(src.getType())
+      .Case<RankedTensorType>([&](RankedTensorType t) -> Value {
+        assert(isa<RankedTensorType>(type) && "expected compatible type");
+        return b.create<tensor::CastOp>(loc, type, src)->getResult(0);
+      })
+      .Case<MemRefType>([&](MemRefType type) -> Value {
+        assert(isa<MemRefType>(type) && "expected compatible type");
+        return b.create<memref::CastOp>(loc, type, src)->getResult(0);
+      })
+      .Default([&](Type t) {
+        assert(false && "invalid type");
+        return nullptr;
+      });
+}
+
 SmallVector<int64_t> computeInterchangeFromDimPos(ArrayRef<int64_t> dimsPos,
                                                   int64_t rank) {
   SmallVector<int64_t> interchangeVector;

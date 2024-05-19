@@ -22,10 +22,10 @@ iree_compiler_cc_library(
         "ConvertListOps.cpp",
         "ConvertStatusOps.cpp",
         "ConvertStructuralOps.cpp",
-        "ConvertUtilToVM.cpp",
+        "Patterns.cpp",
     ],
     hdrs = [
-        "ConvertUtilToVM.h",
+        "Patterns.h",
     ],
     deps = [
         "//compiler/src/iree/compiler/Dialect/Util/IR",

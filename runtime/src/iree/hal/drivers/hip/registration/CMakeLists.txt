@@ -14,6 +14,7 @@ iree_cc_library(
   DEPS
     iree::base
     iree::base::core_headers
+    iree::base::internal::flags
     iree::hal::drivers::hip
     iree::hal
   DEFINES

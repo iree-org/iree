@@ -57,7 +57,8 @@ bool ConstExprAnalysis::ConstValueInfo::hasNonAnalyzedConsumer() const {
 }
 
 ConstExprAnalysis::ConstExprAnalysis(Operation *rootOp)
-    : asmState(rootOp, OpPrintingFlags().elideLargeElementsAttrs()) {
+    : asmState(rootOp,
+               OpPrintingFlags().elideLargeElementsAttrs().skipRegions()) {
   Explorer explorer(rootOp, TraversalAction::SHALLOW);
   explorer.initialize();
 

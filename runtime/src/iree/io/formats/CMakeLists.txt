@@ -10,4 +10,22 @@
 
 iree_add_all_subdirs()
 
+iree_cc_library(
+  NAME
+    parser_registry
+  HDRS
+    "parser_registry.h"
+  SRCS
+    "parser_registry.c"
+  DEPS
+    iree::base
+    iree::base::internal::path
+    iree::io::file_handle
+    iree::io::formats::gguf
+    iree::io::formats::irpa
+    iree::io::formats::safetensors
+    iree::io::parameter_index
+  PUBLIC
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

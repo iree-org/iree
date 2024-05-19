@@ -32,15 +32,13 @@
 # Experimental
 # It's experimental, but we still don't want any old directory added here.
 /experimental/ @benvanik @stellaraccident
-/experimental/dispatch_profiler/ @manishucsd
 /experimental/rocm/ @benvanik
 /experimental/web/ @ScottTodd
 /experimental/webgpu/ @benvanik @ScottTodd
 
 # Infra Top-Level Directories
-/build_tools/ @ScottTodd @pzread
-/build_tools/benchmarks/ @antiagainst @pzread
-/build_tools/python/ @pzread
+/build_tools/ @ScottTodd
+/build_tools/benchmarks/ @antiagainst
 /build_tools/python_deploy/ @stellaraccident
 /build_tools/scripts/ @ScottTodd
 /build_tools/third_party/ @ScottTodd @stellaraccident
@@ -60,18 +58,23 @@
 /compiler/src/iree/compiler/Codegen/ @MaheshRavishankar
 /compiler/src/iree/compiler/Codegen/Common @hanhanW @dcaballe
 /compiler/src/iree/compiler/Codegen/Common/GPU @antiagainst @qedawkins
+/compiler/src/iree/compiler/Codegen/Dialect/GPU @antiagainst @qedawkins
 /compiler/src/iree/compiler/Codegen/LLVMCPU/ @dcaballe @hanhanW @MaheshRavishankar
-/compiler/src/iree/compiler/Codegen/LLVMGPU/ @MaheshRavishankar
-/compiler/src/iree/compiler/Codegen/SPIRV/ @antiagainst @MaheshRavishankar
+/compiler/src/iree/compiler/Codegen/LLVMGPU/ @MaheshRavishankar @qedawkins @kuhar
+/compiler/src/iree/compiler/Codegen/SPIRV/ @antiagainst @MaheshRavishankar @kuhar
 /compiler/src/iree/compiler/Codegen/TransformStrategies/ @qedawkins @MaheshRavishankar
 /compiler/src/iree/compiler/ConstEval/ @hanhanW @stellaraccident
 /compiler/src/iree/compiler/Dialect/Flow/ @hanhanW @MaheshRavishankar
 /compiler/src/iree/compiler/Dialect/LinalgExt/ @hanhanW @MaheshRavishankar
-/compiler/src/iree/compiler/Dialect/Vulkan/ @antiagainst
+/compiler/src/iree/compiler/Dialect/Vulkan/ @antiagainst @kuhar
 /compiler/src/iree/compiler/GlobalOptimization/ @hanhanW
 /compiler/src/iree/compiler/InputConversion/ @MaheshRavishankar @stellaraccident
+/compiler/src/iree/compiler/Preprocessing/ @qedawkins @MaheshRavishankar
+
+# Compiler Plugins
 /compiler/plugins/input/StableHLO/ @hanhanW @MaheshRavishankar @rsuderman
 /compiler/plugins/input/TOSA/ @MaheshRavishankar @rsuderman
+/compiler/plugins/target/ROCM/ @kuhar
 
 # Runtime
 /runtime/src/iree/ @benvanik

@@ -12,7 +12,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -474,11 +474,11 @@ matchDAGForUKernel(RewriterBase &rewriter, tensor::UnPackOp op,
 }
 
 static uint32_t
-getFlagForUserAndOperandTypes(IREE::LinalgExt::EncodingAttr encoding,
+getFlagForUserAndOperandTypes(IREE::Encoding::EncodingAttr encoding,
                               ArrayRef<Attribute> operandTypes) {
   // There are currently no batch_mmt4d ukernels, so check for no batch
   // dimension.
-  auto cDims = IREE::LinalgExt::getEncodingContractionDims(encoding);
+  auto cDims = IREE::Encoding::getEncodingContractionDims(encoding);
   if (failed(cDims) || !cDims->batch.empty() || operandTypes.size() != 3) {
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_NONE;
   }
@@ -505,13 +505,13 @@ getFlagForUserAndOperandTypes(IREE::LinalgExt::EncodingAttr encoding,
   }
 }
 
-static uint32_t getFlagForRole(IREE::LinalgExt::EncodingRole role) {
+static uint32_t getFlagForRole(IREE::Encoding::EncodingRole role) {
   switch (role) {
-  case IREE::LinalgExt::EncodingRole::LHS:
+  case IREE::Encoding::EncodingRole::LHS:
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_LHS;
-  case IREE::LinalgExt::EncodingRole::RHS:
+  case IREE::Encoding::EncodingRole::RHS:
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RHS;
-  case IREE::LinalgExt::EncodingRole::RESULT:
+  case IREE::Encoding::EncodingRole::RESULT:
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RESULT;
   default:
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_NONE;
@@ -534,8 +534,8 @@ matchDAGForUKernel(RewriterBase &rewriter, IREE::Codegen::QueryTileSizesOp op,
   if (tensorType.getRank() != 2) {
     return rewriter.notifyMatchFailure(op, "only the 2D case is implemented");
   }
-  auto encoding = tensorType.getEncoding()
-                      .dyn_cast_or_null<IREE::LinalgExt::EncodingAttr>();
+  auto encoding =
+      dyn_cast_or_null<IREE::Encoding::EncodingAttr>(tensorType.getEncoding());
   if (!encoding) {
     return rewriter.notifyMatchFailure(op, "no encoding attribute");
   }

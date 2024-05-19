@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Dialect/Stream/Conversion/PatternUtils.h"
 #include "iree/compiler/Dialect/Stream/Conversion/StandardToStream/Patterns.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
@@ -34,7 +35,7 @@ public:
     auto affinityAttr = IREE::Stream::AffinityAttr::lookup(constantOp);
     auto newOp = rewriter.create<IREE::Stream::TensorConstantOp>(
         constantOp.getLoc(), constantType,
-        llvm::cast<ElementsAttr>(constantOp.getValue()),
+        convertAttributeToStream(constantOp.getValue()),
         TypeAttr::get(constantOp.getType()),
         /*result_encoding_dims=*/ValueRange{}, affinityAttr);
 

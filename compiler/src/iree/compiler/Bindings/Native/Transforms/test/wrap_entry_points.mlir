@@ -105,10 +105,11 @@ util.func public @exportEncodings(%arg0: tensor<?x8x8x3xf32> {iree.abi.encoding 
 //  CHECK-NEXT:   %[[ARG0_DIM0:.+]] = hal.buffer_view.dim<%[[ARG0]] : !hal.buffer_view>[0] : index
 //  CHECK-NEXT:   %[[ARG0_TENSOR:.+]] = hal.tensor.import %[[ARG0]] "input0" : !hal.buffer_view -> tensor<?x8x8x3xf32>{%[[ARG0_DIM0]]}
 //  CHECK-NEXT:   %[[RET_TENSORS:.+]]:2 = util.call @_outputStorage(%[[ARG0_TENSOR]], %[[RET1_STORAGE]])
-//       CHECK:   %[[RET0_DIM0:.+]] = tensor.dim %[[RET_TENSORS]]#0, %c0{{.*}} : tensor<?x8x8x3xf32>
+//   CHECK-DAG:   %[[RET1_DIM0:.+]] = tensor.dim %[[RET_TENSORS]]#1, %c0{{.*}} : tensor<?x8x8x3xf32>
+//   CHECK-DAG:   %[[RET1_ALIAS:.+]] = hal.tensor.alias %[[RET_TENSORS]]#1 : tensor<?x8x8x3xf32>{%[[RET1_DIM0]]} to %[[RET1_STORAGE]] : !hal.buffer
+//   CHECK-DAG:   %[[RET0_DIM0:.+]] = tensor.dim %[[RET_TENSORS]]#0, %c0{{.*}} : tensor<?x8x8x3xf32>
 //  CHECK-NEXT:   %[[RET0_VIEW:.+]] = hal.tensor.export %[[RET_TENSORS]]#0 "output0" : tensor<?x8x8x3xf32>{%[[RET0_DIM0]]} -> !hal.buffer_view
-//       CHECK:   %[[RET1_DIM0:.+]] = tensor.dim %[[RET_TENSORS]]#1, %c0{{.*}} : tensor<?x8x8x3xf32>
-//  CHECK-NEXT:   %[[RET1_VIEW:.+]] = hal.tensor.export %[[RET_TENSORS]]#1 "output1" into(%[[RET1_STORAGE]] : !hal.buffer) : tensor<?x8x8x3xf32>{%[[RET1_DIM0]]} -> !hal.buffer_view
+//  CHECK-NEXT:   %[[RET1_VIEW:.+]] = hal.tensor.export %[[RET1_ALIAS]] "output1" : tensor<?x8x8x3xf32>{%[[RET1_DIM0]]} -> !hal.buffer_view
 //  CHECK-NEXT:   util.return %[[RET0_VIEW]], %[[RET1_VIEW]] : !hal.buffer_view, !hal.buffer_view
 //  CHECK-NEXT: }
 
