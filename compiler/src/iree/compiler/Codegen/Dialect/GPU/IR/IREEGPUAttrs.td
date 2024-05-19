@@ -320,7 +320,12 @@ def IREEGPU_TargetCoreAttr : AttrDef<IREEGPU_Dialect, "TargetCore"> {
     // The maximal number of threads we can have in one workgroup.
     "uint32_t":$max_thread_count_per_workgroup,
     // The maximal number of shared memory bytes we can allocate per workgroup.
-    "uint32_t":$max_workgroup_memory_bytes
+    "uint32_t":$max_workgroup_memory_bytes,
+
+    // An optional extra dict
+    // This field allows to inject more features/limits not supported in the
+    // above list for better flexibility.
+    OptionalParameter<"DictionaryAttr">:$extra
   );
 
   let assemblyFormat = "`<` struct(params) `>`";
@@ -348,7 +353,12 @@ def IREEGPU_TargetChipAttr : AttrDef<IREEGPU_Dialect, "TargetChip"> {
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
 
   let parameters = (ins
-    "uint32_t":$core_count
+    "uint32_t":$core_count,
+
+    // An optional extra dict
+    // This field allows to inject more features/limits not supported in the
+    // above list for better flexibility.
+    OptionalParameter<"DictionaryAttr">:$extra
   );
 
   let assemblyFormat = "`<` struct(params) `>`";

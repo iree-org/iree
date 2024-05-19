@@ -9,6 +9,7 @@
 #include <optional>
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "mlir/IR/BuiltinAttributes.h"
 
 namespace mlir::iree_compiler::IREE::GPU {
 
@@ -99,11 +100,12 @@ TargetAttr createTargetAttr(const TargetDetails &details, StringRef arch,
       MMAOpsArrayAttr::get(context, mmaAttrs),
       DenseI32ArrayAttr::get(context, subgroupSizes),
       DenseI32ArrayAttr::get(context, core->maxWorkgroupSizes),
-      core->maxThreadSize, core->maxWorkgroupMemoryBytes);
+      core->maxThreadSize, core->maxWorkgroupMemoryBytes, DictionaryAttr{});
 
   TargetChipAttr targetChip;
   if (details.chip)
-    targetChip = TargetChipAttr::get(context, details.chip->coreCount);
+    targetChip =
+        TargetChipAttr::get(context, details.chip->coreCount, DictionaryAttr{});
 
   return TargetAttr::get(context, arch, targetCore, targetChip);
 }
