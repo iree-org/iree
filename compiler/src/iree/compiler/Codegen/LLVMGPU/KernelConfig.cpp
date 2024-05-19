@@ -1927,7 +1927,7 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
 // determined based on the op.
 static void propagateLoweringConfig(Operation *rootOperation,
                                     SmallVector<Operation *> computeOps) {
-  if (IREE::Codegen::LoweringConfigAttr config =
+  if (IREE::Codegen::LoweringConfigAttrInterface config =
           getLoweringConfig(rootOperation)) {
     for (auto op : computeOps) {
       if (op == rootOperation)

@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
@@ -111,7 +112,8 @@ dropScalabilityFromUnsupportedOperations(mlir::FunctionOpInterface funcOp,
   });
 
   for (TilingInterface tilingOp : computeOps) {
-    auto loweringConfigAttr = getLoweringConfig(tilingOp);
+    auto loweringConfigAttr =
+        getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(tilingOp);
     if (!loweringConfigAttr)
       continue;
 

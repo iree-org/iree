@@ -71,7 +71,8 @@ std::optional<int> getSPIRVSubgroupSize(mlir::FunctionOpInterface funcOp) {
 FailureOr<SmallVector<int64_t>>
 getSPIRVTileSize(mlir::FunctionOpInterface funcOp, int tilingLevel) {
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
-  auto config = getLoweringConfig(computeOps);
+  auto config =
+      getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(computeOps);
   if (failed(config)) {
     return funcOp.emitOpError("failed to get lowering configuration");
   }

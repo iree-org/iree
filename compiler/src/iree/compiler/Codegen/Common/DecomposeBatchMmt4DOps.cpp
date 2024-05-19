@@ -99,8 +99,8 @@ struct ConvertBatchMmt4DtoMmt4DPattern
                                       ValueRange{newInit})
               .result();
 
-      IREE::Codegen::LoweringConfigAttr loweringConfig =
-          getLoweringConfig(oldFillOp);
+      auto loweringConfig =
+          getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(oldFillOp);
       if (loweringConfig) {
         auto config = dropBatchTileSize(loweringConfig);
         setLoweringConfig(reducedOut.getDefiningOp(), config);
@@ -135,7 +135,8 @@ struct ConvertBatchMmt4DtoMmt4DPattern
         loc, reducedOut.getType(), ValueRange{reducedLhs, reducedRhs},
         ValueRange{reducedOut});
 
-    IREE::Codegen::LoweringConfigAttr loweringConfig = getLoweringConfig(op);
+    auto loweringConfig =
+        getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(op);
     if (loweringConfig) {
       auto config = dropBatchTileSize(loweringConfig);
       setLoweringConfig(mmt4DOp, config);

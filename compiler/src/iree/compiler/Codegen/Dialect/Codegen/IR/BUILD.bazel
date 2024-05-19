@@ -16,6 +16,7 @@ package(
 exports_files([
     "IREECodegenAttrs.td",
     "IREECodegenDialect.td",
+    "IREECodegenInterfaces.td",
     "IREECodegenOps.td",
     "UKernelOps.td",
 ])
@@ -26,6 +27,7 @@ iree_td_library(
         [
             "IREECodegenAttrs.td",
             "IREECodegenDialect.td",
+            "IREECodegenInterfaces.td",
             "IREECodegenOps.td",
             "UKernelOps.td",
         ],
@@ -46,6 +48,7 @@ iree_compiler_cc_library(
     srcs = [
         "IREECodegenAttrs.cpp",
         "IREECodegenDialect.cpp",
+        "IREECodegenInterfaces.cpp",
         "IREECodegenLibraryManager.cpp",
         "IREECodegenOps.cpp",
         "UKernelOps.cpp",
@@ -53,16 +56,19 @@ iree_compiler_cc_library(
     hdrs = [
         "IREECodegenAttrs.h",
         "IREECodegenDialect.h",
+        "IREECodegenInterfaces.h",
         "IREECodegenOps.h",
         "UKernelOps.h",
     ],
     textual_hdrs = [
-        "IREECodegenDialect.cpp.inc",
-        "IREECodegenDialect.h.inc",
-        "IREECodegenOps.cpp.inc",
-        "IREECodegenOps.h.inc",
         "IREECodegenAttrs.cpp.inc",
         "IREECodegenAttrs.h.inc",
+        "IREECodegenDialect.cpp.inc",
+        "IREECodegenDialect.h.inc",
+        "IREECodegenInterfaces.cpp.inc",
+        "IREECodegenInterfaces.h.inc",
+        "IREECodegenOps.cpp.inc",
+        "IREECodegenOps.h.inc",
         "LoweringConfigEnums.cpp.inc",
         "LoweringConfigEnums.h.inc",
         "UKernelOps.cpp.inc",
@@ -72,11 +78,13 @@ iree_compiler_cc_library(
         ":IREECodegenDialectGen",
         ":IREECodegenOpsGen",
         ":LoweringConfigGen",
+        ":LoweringConfigInterfaceGen",
         ":UKernelOpsGen",
         "//compiler/src/iree/compiler/Codegen/Interfaces:UKernelOpInterface",
         "//compiler/src/iree/compiler/Dialect/HAL/IR",
         "@llvm-project//llvm:Support",
         "@llvm-project//mlir:ArithDialect",
+        "@llvm-project//mlir:ArithUtils",
         "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:DestinationStyleOpInterface",
         "@llvm-project//mlir:DialectUtils",
@@ -128,6 +136,23 @@ iree_gentbl_cc_library(
         ":td_files",
         "//compiler/src/iree/compiler/Codegen/Interfaces:td_files",
     ],
+)
+
+iree_gentbl_cc_library(
+    name = "LoweringConfigInterfaceGen",
+    tbl_outs = [
+        (
+            ["--gen-attr-interface-decls"],
+            "IREECodegenInterfaces.h.inc",
+        ),
+        (
+            ["--gen-attr-interface-defs"],
+            "IREECodegenInterfaces.cpp.inc",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "IREECodegenInterfaces.td",
+    deps = [":td_files"],
 )
 
 iree_gentbl_cc_library(
