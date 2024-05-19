@@ -15,8 +15,7 @@
 ]>
 hal.executable public @main_0_dispatch_0 {
   hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb", {
-        mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>],
-        target_arch = "gfx942",
+        iree.gpu.target = #iree_gpu.alias_target<"gfx942">,
         ukernels = "none"
       }>) {
     hal.executable.export public @main_0_dispatch_0_matmul_transpose_b_2048x10240x1280_f16xf16xf32 ordinal(0) layout(#pipeline_layout)
@@ -84,8 +83,7 @@ hal.executable public @main_0_dispatch_0 {
 ]>
 hal.executable public @main_0_dispatch_0 {
   hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb", {
-        mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>],
-        target_arch = "gfx942",
+        iree.gpu.target = #iree_gpu.alias_target<"gfx942">,
         ukernels = "none"
       }>) {
     hal.executable.export public @main_0_dispatch_0_matmul_transpose_b_2048x10240x1280_f16xf16xf32 ordinal(0) layout(#pipeline_layout)

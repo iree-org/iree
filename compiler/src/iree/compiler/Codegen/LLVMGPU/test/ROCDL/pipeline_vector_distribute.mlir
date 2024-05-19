@@ -355,11 +355,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
   ]>
 ]>
 hal.executable @unaligned_mk_batch_matmul_64x978x1281x1281_f16_f16 {
-hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
-      target_arch = "gfx940",
-      mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
-                        #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>]
-  }>) {
+hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.alias_target<"gfx940">}>) {
   hal.executable.export @unaligned_mk_batch_matmul_64x978x1281x1281_f16_f16 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2

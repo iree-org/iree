@@ -1,6 +1,6 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy, func.func(iree-llvmgpu-lower-executable-target))" %s | FileCheck %s
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {target_arch = "gfx1100"}>
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.alias_target<"gfx1100">}>
 module {
   func.func @winograd_filter_transform() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
     %c0 = arith.constant 0 : index
@@ -26,7 +26,7 @@ module {
 
 // -----
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {target_arch = "gfx1100"}>
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.alias_target<"gfx1100">}>
 module {
   func.func @winograd_input_transform() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
     %c0 = arith.constant 0 : index
@@ -53,7 +53,7 @@ module {
 
 // -----
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {target_arch = "gfx1100"}>
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.alias_target<"gfx1100">}>
 module {
   func.func @winograd_output_transform() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
     %c0 = arith.constant 0 : index

@@ -324,9 +324,7 @@ func.func @dequant_gemm_dynamic_m(%arg0: tensor<4096x32x128xi4>, %arg1: tensor<4
 
 // We want to skip padding skinny matmul cases, since warpReduction is more performant for it.
 
-#rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb",
-                                    {mma_intrinsics = [#iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>],
-                                      target_arch = "gfx1100", ukernels = "none"}>
+#rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.alias_target<"gfx1100">}>
 
 //       CHECK: func.func @skip_skinny_m_matmul(
 //  CHECK-SAME:    %[[ARG0:.+]]: tensor<2x20xf16>,
@@ -345,9 +343,7 @@ func.func @skip_skinny_m_matmul(%arg0 : tensor<2x20xf16>, %arg1 : tensor<20x30xf
 
 // We want to skip padding skinny matmul cases, since warpReduction is more performant for it.
 
-#rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb",
-                                    {mma_intrinsics = [#iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>],
-                                      target_arch = "gfx1100", ukernels = "none"}>
+#rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.alias_target<"gfx1100">}>
 
 //       CHECK: func.func @skip_skinny_n_mmtb(
 //  CHECK-SAME:    %[[ARG0:.+]]: tensor<10x20xf16>,

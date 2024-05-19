@@ -206,14 +206,13 @@ module {
 
 // -----
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.alias_target<"gfx940">}>
 // CHECK:      #[[$TILE_SIZES:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 16, 16, 16]{{\]}}
 // CHECK:      #iree_codegen.translation_info<LLVMGPUPadAndVectorDistribute
 // CHECK-SAME: mma_schedule = #iree_gpu.mma_schedule
 // CHECK-SAME:   intrinsic =  #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
 // CHECK-SAME:   subgroup_m_count = 1, subgroup_n_count = 1
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>], target_arch = "gfx940"}>
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.alias_target<"gfx940">}>
 module {
   func.func @unaligned_mk_batch_matmul() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
     %cst = arith.constant 0.000000e+00 : f16
@@ -242,7 +241,7 @@ module {
 // CHECK-SAME:   intrinsic =  #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
 // CHECK-SAME:   subgroup_m_count = 1, subgroup_n_count = 4
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>], target_arch = "gfx940"}>
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.alias_target<"gfx940">}>
 module {
   func.func @unaligned_m_batch_matmul_64x72x1280x1280() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
     %cst = arith.constant 0.000000e+00 : f16
@@ -265,7 +264,7 @@ module {
 
 // -----
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>], target_arch = "gfx940"}>
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.alias_target<"gfx940">}>
 module {
   func.func @narrow_n_batch_matmul_64x968x4x320_f16() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
     %cst = arith.constant 0.000000e+00 : f16
