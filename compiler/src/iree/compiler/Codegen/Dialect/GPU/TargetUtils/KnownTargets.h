@@ -36,7 +36,8 @@ StringRef normalizeCUDATarget(StringRef target);
 
 // Returns the full target of the given |aliasTarget|. Returns null target if
 // unknown.
-TargetAttr getFullTarget(StringRef targetAPI, AliasTargetAttr aliasTarget);
+TargetAttr getFullTarget(StringRef targetAPI, StringRef aliasTarget,
+                         MLIRContext *context);
 
 } // namespace mlir::iree_compiler::IREE::GPU
 

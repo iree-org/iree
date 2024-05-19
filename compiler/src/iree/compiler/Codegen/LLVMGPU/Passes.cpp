@@ -890,9 +890,6 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
   }
 }
 
-extern llvm::cl::opt<std::string> clGPUCodegenTransformDialectDebugPayloadTag;
-extern llvm::cl::opt<std::string> clGPUCodegenTransformDialectDebugTransformTag;
-
 void addGPUTransformDialectPasses(OpPassManager &funcPassManager,
                                   StringRef entryPoint) {
   funcPassManager.addPass(

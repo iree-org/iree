@@ -29,7 +29,7 @@ namespace {
 // attribute definitions, but it takes quite some efforts to plumb all pieces
 // through. So now fine with some duplication.
 
-// Wgp level feature/limit details
+// Workgroup processor level feature/limit details
 struct WgpDetails {
   ComputeBitwidths compute;
   StorageBitwidths storage;
@@ -360,11 +360,11 @@ StringRef normalizeCUDATarget(StringRef target) {
   return normalizeNVIDIAGPUTarget(target);
 }
 
-TargetAttr getFullTarget(StringRef targetAPI, AliasTargetAttr aliasTarget) {
-  MLIRContext *context = aliasTarget.getContext();
+TargetAttr getFullTarget(StringRef targetAPI, StringRef aliasTarget,
+                         MLIRContext *context) {
   return llvm::StringSwitch<TargetAttr>(targetAPI)
-      .Case("cuda", getCUDATargetDetails(aliasTarget.getChip(), context))
-      .Case("rocm", getHIPTargetDetails(aliasTarget.getChip(), context))
+      .Case("cuda", getCUDATargetDetails(aliasTarget, context))
+      .Case("rocm", getHIPTargetDetails(aliasTarget, context))
       .Default(nullptr);
 }
 

@@ -13,6 +13,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -33,6 +34,13 @@
 #define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 static constexpr unsigned kShuffleBitWidth = 32;
+
+static llvm::cl::opt<std::string> clTestTarget(
+    "iree-codegen-test-target",
+    llvm::cl::desc(
+        "The target for IR LIT tests; the interpretation depends on the target "
+        "API. e.g., \"gfx942\" for HIP, \"sm_80\" for CUDA"),
+    llvm::cl::init(""));
 
 namespace mlir::iree_compiler {
 
@@ -954,10 +962,10 @@ IREE::GPU::TargetAttr getGPUTargetAttr(IREE::HAL::ExecutableTargetAttr target) {
   if (!config)
     return nullptr;
   auto fullAttr = config.getAs<IREE::GPU::TargetAttr>("iree.gpu.target");
-  if (!fullAttr) {
-    // Check whether this is an abbreviate target for IR testing purposes
-    auto abbrAttr = config.getAs<IREE::GPU::AliasTargetAttr>("iree.gpu.target");
-    fullAttr = IREE::GPU::getFullTarget(target.getBackend(), abbrAttr);
+  if (!fullAttr && !clTestTarget.empty()) {
+    // Use the target specified in the command line for testing purposes.
+    fullAttr = IREE::GPU::getFullTarget(target.getBackend(), clTestTarget,
+                                        target.getContext());
   }
 
   return fullAttr;
