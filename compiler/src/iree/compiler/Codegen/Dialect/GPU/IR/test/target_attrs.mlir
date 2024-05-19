@@ -1,8 +1,8 @@
 // RUN: iree-opt %s | FileCheck %s
 
-// CHECK-LABEL: func.func @test_target_core()
-func.func @test_target_core() attributes {
-  // CHECK: #iree_gpu.target_core<
+// CHECK-LABEL: func.func @test_target_wgp()
+func.func @test_target_wgp() attributes {
+  // CHECK: #iree_gpu.target_wgp<
   // CHECK-SAME: compute =  fp32|fp16|int8,
   // CHECK-SAME: storage =  b32|b16,
   // CHECK-SAME: subgroup =  shuffle|arithmetic,
@@ -12,7 +12,7 @@ func.func @test_target_core() attributes {
   // CHECK-SAME: max_workgroup_sizes = [1024, 1024, 1024],
   // CHECK-SAME: max_thread_count_per_workgroup = 1024,
   // CHECK-SAME: max_workgroup_memory_bytes = 65536>
-  core = #iree_gpu.target_core<
+  wgp = #iree_gpu.target_wgp<
     compute = fp16|fp32|int8, storage = b16|b32,
     subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
     mma = [<MFMA_F16_16x16x16_F32>, <MFMA_F16_32x32x8_F32>],
@@ -24,13 +24,13 @@ func.func @test_target_core() attributes {
 } { return }
 
 
-// CHECK-LABEL: func.func @test_target_core_none()
-func.func @test_target_core_none() attributes {
-  // CHECK: #iree_gpu.target_core<
+// CHECK-LABEL: func.func @test_target_wgp_none()
+func.func @test_target_wgp_none() attributes {
+  // CHECK: #iree_gpu.target_wgp<
   // CHECK-SAME: subgroup =  none,
   // CHECK-SAME: dot =  none,
   // CHECK-SAME: mma = [],
-  core = #iree_gpu.target_core<
+  wgp = #iree_gpu.target_wgp<
     compute = fp16|fp32|int8, storage = b16|b32,
     subgroup = none, dot = none,
     mma = [],
@@ -44,20 +44,20 @@ func.func @test_target_core_none() attributes {
 // CHECK-LABEL: func.func @test_target_chip()
 func.func @test_target_chip() attributes {
   // CHECK: #iree_gpu.target_chip<
-  // CHECK-SAME: core_count = 304>
+  // CHECK-SAME: wgp_count = 304>
   chip = #iree_gpu.target_chip<
-    core_count = 304
+    wgp_count = 304
   >
 } { return }
 
 // CHECK-LABEL: func.func @test_target()
 func.func @test_target() attributes {
   // CHECK: #iree_gpu.target<
-  // CHECK-SAME: core = <
+  // CHECK-SAME: wgp = <
   // CHECK-SAME: chip = <
   target = #iree_gpu.target<
     arch="gfx942",
-    core = <
+    wgp = <
       compute = fp16|fp32|int8, storage = b16|b32,
       subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
       mma = [<MFMA_F16_16x16x16_F32>, <MFMA_F16_32x32x8_F32>],
@@ -65,7 +65,7 @@ func.func @test_target() attributes {
       max_workgroup_sizes = [1024, 1024, 1024],
       max_thread_count_per_workgroup = 1024,
       max_workgroup_memory_bytes = 65536>,
-    chip = <core_count = 304>
+    chip = <wgp_count = 304>
   >
 } { return }
 

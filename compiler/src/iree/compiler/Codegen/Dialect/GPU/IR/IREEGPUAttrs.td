@@ -14,13 +14,13 @@ include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/EnumAttr.td"
 
 //===----------------------------------------------------------------------===//
-// GPU Core Level Feature/Limit Attributes
+// GPU Workgroup Processor (WGP) Level Feature/Limit Attributes
 //===----------------------------------------------------------------------===//
 
-// This section lists hardware features/limits at a single GPU core level.
-// Here a GPU core means the basic hardware functionality unit where a software
-// workgroup is scheduled onto; that is, a compute unit for AMD GPUs or a
-// streaming multiprocessor for NVIDIA GPUs.
+// This section lists hardware features/limits at a single GPU workgroup
+// processor level. Here a GPU workgroup processor means the basic hardware
+// functionality unit where a software workgroup is scheduled onto; that is,
+// a compute unit for AMD GPUs or a streaming multiprocessor for NVIDIA GPUs.
 
 //===----------------------------------------------------------------------===//
 // Compute
@@ -290,18 +290,19 @@ def IREEGPU_MmaScheduleAttr : AttrDef<IREEGPU_Dialect, "MMASchedule"> {
 }
 
 //===----------------------------------------------------------------------===//
-// Core level description
+// Workgroup processor level description
 
-def IREEGPU_TargetCoreAttr : AttrDef<IREEGPU_Dialect, "TargetCore"> {
-  let summary = "Core level target description";
+def IREEGPU_TargetWgpAttr : AttrDef<IREEGPU_Dialect, "TargetWgp"> {
+  let summary = "Workgroup processor level target description";
   let description = [{
-    This attribute contains hardware features/limits at a single GPU chip level.
-    Here a GPU chip means the hardware functionality scope where the whole
-    software compute grid is scheduled onto. A chip typically contains many
-    AMD compute units or NVIDIA streaming multiprocessors; it's the final SKU.
+    This attribute contains hardware features/limits at a single GPU workgroup
+    processor (WGP) level. Here a GPU workgroup processor means the basic
+    hardware functionality unit where a software workgroup is scheduled onto;
+    that is, a compute unit for AMD GPUs or a streaming multiprocessor for
+    NVIDIA GPUs.
   }];
 
-  let mnemonic = "target_core";
+  let mnemonic = "target_wgp";
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
 
   let parameters = (ins
@@ -343,17 +344,17 @@ def IREEGPU_TargetCoreAttr : AttrDef<IREEGPU_Dialect, "TargetCore"> {
 def IREEGPU_TargetChipAttr : AttrDef<IREEGPU_Dialect, "TargetChip"> {
   let summary = "Chip level target description";
   let description = [{
-    This attribute contains hardware features/limits at a single GPU core level.
-    Here a GPU core means the basic hardware functionality unit where a software
-    workgroup is scheduled onto; that is, a compute unit for AMD GPUs or a
-    streaming multiprocessor for NVIDIA GPUs.
+    This attribute contains hardware features/limits at a single GPU chip level.
+    Here a GPU chip means the hardware functionality scope where the whole
+    software compute grid is scheduled onto. A chip typically contains many
+    AMD compute units or NVIDIA streaming multiprocessors; it's the final SKU.
   }];
 
   let mnemonic = "target_chip";
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
 
   let parameters = (ins
-    "uint32_t":$core_count,
+    "uint32_t":$wgp_count,
 
     // An optional extra dict
     // This field allows to inject more features/limits not supported in the
@@ -374,10 +375,11 @@ def IREEGPU_TargetAttr : AttrDef<IREEGPU_Dialect, "Target"> {
     This attributes describes a full GPU target. It contains a few fields:
     * The canonical target architecture for compilation, e.g., sm_80 for
       cuda, gfx942 for hip
-    * A TargetCoreAttr describing the GPU features and limits in a single
-      GPU core (that is, AMD compute unit or NVIDIA streaming multiprocessor)
+    * A TargetWgpAttr describing the GPU features and limits in a single
+      GPU workgroup processor (WGP), that is, AMD compute unit or NVIDIA
+      streaming multiprocessor
     * An optional TargetChipAttr describing GPU features for the final chip
-      or product, e.g., core count
+      or product, e.g., wgp count
   }];
 
   let mnemonic = "target";
@@ -385,7 +387,7 @@ def IREEGPU_TargetAttr : AttrDef<IREEGPU_Dialect, "Target"> {
 
   let parameters = (ins
     StringRefParameter<"target architecture">:$arch,
-    "TargetCoreAttr":$core,
+    "TargetWgpAttr":$wgp,
     OptionalParameter<"TargetChipAttr">:$chip
   );
 
@@ -393,11 +395,11 @@ def IREEGPU_TargetAttr : AttrDef<IREEGPU_Dialect, "Target"> {
 
   let extraClassDeclaration = [{
     int getPreferredSubgroupSize() const {
-      return getCore().getSubgroupSizeChoices().asArrayRef().front();
+      return getWgp().getSubgroupSizeChoices().asArrayRef().front();
     }
 
     bool supportsSubgroupShuffle() const {
-      return bitEnumContainsAll(getCore().getSubgroup().getValue(),
+      return bitEnumContainsAll(getWgp().getSubgroup().getValue(),
                                 SubgroupOps::Shuffle);
     }
 

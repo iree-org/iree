@@ -29,8 +29,8 @@ namespace {
 // attribute definitions, but it takes quite some efforts to plumb all pieces
 // through. So now fine with some duplication.
 
-// Core level feature/limit details
-struct CoreDetails {
+// Wgp level feature/limit details
+struct WgpDetails {
   ComputeBitwidths compute;
   StorageBitwidths storage;
   SubgroupOps subgroupOps;
@@ -46,12 +46,12 @@ struct CoreDetails {
 
 // Chip level feature/limit details
 struct ChipDetails {
-  uint32_t coreCount;
+  uint32_t wgpCount;
 };
 
 // Full target details
 struct TargetDetails {
-  const CoreDetails *core;
+  const WgpDetails *wgp;
   const ChipDetails *chip;
 };
 
@@ -80,96 +80,96 @@ const DotProductOps allDotProductOps = DotProductOps::DP4xI8ToI32;
 // Creates the corresponding TargetAttr from the given target |details|.
 TargetAttr createTargetAttr(const TargetDetails &details, StringRef arch,
                             MLIRContext *context) {
-  const CoreDetails *core = details.core;
+  const WgpDetails *wgp = details.wgp;
 
   SmallVector<MMAAttr, 8> mmaAttrs;
-  mmaAttrs.reserve(core->mmaCount);
-  for (int i = 0; i < core->mmaCount; ++i)
-    mmaAttrs.push_back(MMAAttr::get(context, core->mmaOps[i]));
+  mmaAttrs.reserve(wgp->mmaCount);
+  for (int i = 0; i < wgp->mmaCount; ++i)
+    mmaAttrs.push_back(MMAAttr::get(context, wgp->mmaOps[i]));
 
   SmallVector<int32_t, 2> subgroupSizes;
-  subgroupSizes.push_back(core->subgroupSizeChoices.front());
-  if (core->subgroupSizeChoices.back() != core->subgroupSizeChoices.front())
-    subgroupSizes.push_back(core->subgroupSizeChoices.back());
+  subgroupSizes.push_back(wgp->subgroupSizeChoices.front());
+  if (wgp->subgroupSizeChoices.back() != wgp->subgroupSizeChoices.front())
+    subgroupSizes.push_back(wgp->subgroupSizeChoices.back());
 
-  auto targetCore = TargetCoreAttr::get(
-      context, ComputeBitwidthsAttr::get(context, details.core->compute),
-      StorageBitwidthsAttr::get(context, core->storage),
-      SubgroupOpsAttr::get(context, core->subgroupOps),
-      DotProductOpsAttr::get(context, core->dotproductOps),
+  auto targetWgp = TargetWgpAttr::get(
+      context, ComputeBitwidthsAttr::get(context, details.wgp->compute),
+      StorageBitwidthsAttr::get(context, wgp->storage),
+      SubgroupOpsAttr::get(context, wgp->subgroupOps),
+      DotProductOpsAttr::get(context, wgp->dotproductOps),
       MMAOpsArrayAttr::get(context, mmaAttrs),
       DenseI32ArrayAttr::get(context, subgroupSizes),
-      DenseI32ArrayAttr::get(context, core->maxWorkgroupSizes),
-      core->maxThreadSize, core->maxWorkgroupMemoryBytes, DictionaryAttr{});
+      DenseI32ArrayAttr::get(context, wgp->maxWorkgroupSizes),
+      wgp->maxThreadSize, wgp->maxWorkgroupMemoryBytes, DictionaryAttr{});
 
   TargetChipAttr targetChip;
   if (details.chip)
     targetChip =
-        TargetChipAttr::get(context, details.chip->coreCount, DictionaryAttr{});
+        TargetChipAttr::get(context, details.chip->wgpCount, DictionaryAttr{});
 
-  return TargetAttr::get(context, arch, targetCore, targetChip);
+  return TargetAttr::get(context, arch, targetWgp, targetChip);
 }
 
 //===----------------------------------------------------------------------===//
 // Known AMD target details
 //===----------------------------------------------------------------------===//
 
-const CoreDetails *getCDNA3CoreDetails() {
+const WgpDetails *getCDNA3WgpDetails() {
   static const MMAIntrinsic cdna3MMAOps[] = {
       MMAIntrinsic::MFMA_F16_16x16x16_F32,
       MMAIntrinsic::MFMA_F16_32x32x8_F32,
   };
-  static const CoreDetails cdna3Core = {
+  static const WgpDetails cdna3Wgp = {
       allComputeBits,   allStorageBits,          allSubgroupOps,
       allDotProductOps, ARRAY_SIZE(cdna3MMAOps), cdna3MMAOps,
       {64, 64},         {1024, 1024, 1024},      1024,
       64 * 1024};
-  return &cdna3Core;
+  return &cdna3Wgp;
 }
 
-const CoreDetails *getCDNA2CoreDetails() {
+const WgpDetails *getCDNA2WgpDetails() {
   static const MMAIntrinsic cdna2MMAOps[] = {
       MMAIntrinsic::MFMA_F16_16x16x16_F32,
       MMAIntrinsic::MFMA_F16_32x32x8_F32,
   };
-  static const CoreDetails cdna2Core = {
+  static const WgpDetails cdna2Wgp = {
       allComputeBits,   allStorageBits,          allSubgroupOps,
       allDotProductOps, ARRAY_SIZE(cdna2MMAOps), cdna2MMAOps,
       {64, 64},         {1024, 1024, 1024},      1024,
       64 * 1024};
-  return &cdna2Core;
+  return &cdna2Wgp;
 }
 
-const CoreDetails *getCDNA1CoreDetails() {
+const WgpDetails *getCDNA1WgpDetails() {
   static const MMAIntrinsic cdna1MMAOps[] = {
       MMAIntrinsic::MFMA_F16_16x16x16_F32,
       MMAIntrinsic::MFMA_F16_32x32x8_F32,
   };
-  static const CoreDetails cdna1Core = {
+  static const WgpDetails cdna1Wgp = {
       allComputeBits,   allStorageBits,          allSubgroupOps,
       allDotProductOps, ARRAY_SIZE(cdna1MMAOps), cdna1MMAOps,
       {64, 64},         {1024, 1024, 1024},      1024,
       64 * 1024};
-  return &cdna1Core;
+  return &cdna1Wgp;
 }
 
-const CoreDetails *getRDNA3CoreDetails() {
+const WgpDetails *getRDNA3WgpDetails() {
   static const MMAIntrinsic rdna3MMAOps[] = {
       MMAIntrinsic::WMMA_F16_16x16x16_F32,
   };
-  static const CoreDetails rdna3Core = {
+  static const WgpDetails rdna3Wgp = {
       allComputeBits,   allStorageBits,          allSubgroupOps,
       allDotProductOps, ARRAY_SIZE(rdna3MMAOps), rdna3MMAOps,
       {32, 64},         {1024, 1024, 1024},      1024,
       64 * 1024};
-  return &rdna3Core;
+  return &rdna3Wgp;
 }
 
 std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
-  const CoreDetails *cdna3Core = getCDNA3CoreDetails();
-  const CoreDetails *cdna2Core = getCDNA2CoreDetails();
-  const CoreDetails *cdna1Core = getCDNA1CoreDetails();
-  const CoreDetails *rdna3Core = getRDNA3CoreDetails();
+  const WgpDetails *cdna3Wgp = getCDNA3WgpDetails();
+  const WgpDetails *cdna2Wgp = getCDNA2WgpDetails();
+  const WgpDetails *cdna1Wgp = getCDNA1WgpDetails();
+  const WgpDetails *rdna3Wgp = getRDNA3WgpDetails();
 
   // "AMD Instinct MI300 Series Product Offerings" in Page 23 of
   // https://www.amd.com/content/dam/amd/en/documents/instinct-tech-docs/white-papers/amd-cdna-3-white-paper.pdf
@@ -195,26 +195,26 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
   // cdnaN/rdnaN mapping.
 
   return llvm::StringSwitch<std::optional<TargetDetails>>(target.lower())
-      .Case("mi300x", TargetDetails{cdna3Core, &mi300xChip})
-      .Case("mi300a", TargetDetails{cdna3Core, &mi300aChip})
+      .Case("mi300x", TargetDetails{cdna3Wgp, &mi300xChip})
+      .Case("mi300a", TargetDetails{cdna3Wgp, &mi300aChip})
       .Cases("cdna3", "gfx940", "gfx941", "gfx942",
-             TargetDetails{cdna3Core, nullptr})
-      .Case("mi250x", TargetDetails{cdna2Core, &mi250xChip})
-      .Case("mi250", TargetDetails{cdna2Core, &mi250Chip})
-      .Case("mi210", TargetDetails{cdna2Core, &mi210Chip})
-      .Cases("cdna2", "gfx90a", TargetDetails{cdna2Core, nullptr})
-      .Case("mi100", TargetDetails{cdna1Core, &mi100Chip})
-      .Cases("cdna1", "gfx908", TargetDetails{cdna1Core, nullptr})
+             TargetDetails{cdna3Wgp, nullptr})
+      .Case("mi250x", TargetDetails{cdna2Wgp, &mi250xChip})
+      .Case("mi250", TargetDetails{cdna2Wgp, &mi250Chip})
+      .Case("mi210", TargetDetails{cdna2Wgp, &mi210Chip})
+      .Cases("cdna2", "gfx90a", TargetDetails{cdna2Wgp, nullptr})
+      .Case("mi100", TargetDetails{cdna1Wgp, &mi100Chip})
+      .Cases("cdna1", "gfx908", TargetDetails{cdna1Wgp, nullptr})
       // https://www.techpowerup.com/gpu-specs/radeon-rx-7900-xtx.c3941
-      .Case("rx7900xtx", TargetDetails{rdna3Core, &rx7900xtxChip})
+      .Case("rx7900xtx", TargetDetails{rdna3Wgp, &rx7900xtxChip})
       // https://www.techpowerup.com/gpu-specs/radeon-rx-7900-xt.c3912
-      .Case("rx7900xt", TargetDetails{rdna3Core, &rx7900xtChip})
+      .Case("rx7900xt", TargetDetails{rdna3Wgp, &rx7900xtChip})
       // https://www.techpowerup.com/gpu-specs/radeon-rx-7800-xt.c3839
-      .Case("rx7800xt", TargetDetails{rdna3Core, &rx7800xtChip})
+      .Case("rx7800xt", TargetDetails{rdna3Wgp, &rx7800xtChip})
       // https://www.techpowerup.com/gpu-specs/radeon-rx-7700-xt.c3911
-      .Case("rx7700xt", TargetDetails{rdna3Core, &rx7700xtChip})
+      .Case("rx7700xt", TargetDetails{rdna3Wgp, &rx7700xtChip})
       .Cases("rdna3", "gfx1100", "gfx1101", "gfx1102", "gfx1103",
-             TargetDetails{rdna3Core, nullptr})
+             TargetDetails{rdna3Wgp, nullptr})
       .Default(std::nullopt);
 }
 
@@ -235,47 +235,47 @@ StringRef normalizeAMDGPUTarget(StringRef target) {
 // Known NVIDIA target details
 //===----------------------------------------------------------------------===//
 
-const CoreDetails *getAmpereCoreDetails() {
-  static const CoreDetails ampereCore = {
+const WgpDetails *getAmpereWgpDetails() {
+  static const WgpDetails ampereWgp = {
       allComputeBits, allStorageBits,     allSubgroupOps, allDotProductOps, 0,
       nullptr, // TODO: Add tensor core operations
       {32, 32},       {1024, 1024, 1024}, 1024,           163 * 1024};
-  return &ampereCore;
+  return &ampereWgp;
 }
 
-const CoreDetails *getTuringCoreDetails() {
-  static const CoreDetails turingCore = {
+const WgpDetails *getTuringWgpDetails() {
+  static const WgpDetails turingWgp = {
       allComputeBits, allStorageBits,     allSubgroupOps, allDotProductOps, 0,
       nullptr, // TODO: Add tensor core operations
       {32, 32},       {1024, 1024, 1024}, 1024,           64 * 1024};
-  return &turingCore;
+  return &turingWgp;
 }
 
-const CoreDetails *getVoltaCoreDetails() {
+const WgpDetails *getVoltaWgpDetails() {
   // clang-format off
-  static const CoreDetails voltaCore = {
+  static const WgpDetails voltaWgp = {
       allComputeBits, allStorageBits, allSubgroupOps, DotProductOps::None,
       0, nullptr, // TODO: Add tensor core operations
       {32, 32}, {1024, 1024, 1024}, 1024, 96 * 1024};
   // clang-format on
-  return &voltaCore;
+  return &voltaWgp;
 }
 
-const CoreDetails *getPascalCoreDetails() {
+const WgpDetails *getPascalWgpDetails() {
   // clang-format off
-  static const CoreDetails pascalCore = {
+  static const WgpDetails pascalWgp = {
       allComputeBits, allStorageBits, allSubgroupOps, DotProductOps::None,
       0, nullptr, // Pascal does not have tensor core support.
       {32, 32}, {1024, 1024, 1024}, 1024, 48 * 1024};
   // clang-format on
-  return &pascalCore;
+  return &pascalWgp;
 }
 
 std::optional<TargetDetails> getNVIDIAGPUTargetDetails(StringRef target) {
-  const CoreDetails *ampereCore = getAmpereCoreDetails();
-  const CoreDetails *turingCore = getTuringCoreDetails();
-  const CoreDetails *voltaCore = getVoltaCoreDetails();
-  const CoreDetails *pascalCore = getPascalCoreDetails();
+  const WgpDetails *ampereWgp = getAmpereWgpDetails();
+  const WgpDetails *turingWgp = getTuringWgpDetails();
+  const WgpDetails *voltaWgp = getVoltaWgpDetails();
+  const WgpDetails *pascalWgp = getPascalWgpDetails();
 
   static const ChipDetails a100Chip = {108};
   static const ChipDetails rtx3090tiChip = {84};
@@ -290,25 +290,25 @@ std::optional<TargetDetails> getNVIDIAGPUTargetDetails(StringRef target) {
 
   return llvm::StringSwitch<std::optional<TargetDetails>>(target.lower())
       // https://www.techpowerup.com/gpu-specs/a100-sxm4-80-gb.c3746
-      .Case("a100", TargetDetails{ampereCore, &a100Chip})
+      .Case("a100", TargetDetails{ampereWgp, &a100Chip})
       // https://www.techpowerup.com/gpu-specs/geforce-rtx-3090-ti.c3829
-      .Case("rtx3090ti", TargetDetails{ampereCore, &rtx3090tiChip})
+      .Case("rtx3090ti", TargetDetails{ampereWgp, &rtx3090tiChip})
       // https://www.techpowerup.com/gpu-specs/geforce-rtx-3090.c3622
-      .Case("rtx3090", TargetDetails{ampereCore, &rtx3090Chip})
+      .Case("rtx3090", TargetDetails{ampereWgp, &rtx3090Chip})
       // https://www.techpowerup.com/gpu-specs/geforce-rtx-3080-ti.c3735
-      .Case("rtx3080ti", TargetDetails{ampereCore, &rtx3080tiChip})
+      .Case("rtx3080ti", TargetDetails{ampereWgp, &rtx3080tiChip})
       // https://www.techpowerup.com/gpu-specs/geforce-rtx-3080.c3621
-      .Case("rtx3080", TargetDetails{ampereCore, &rtx3080Chip})
+      .Case("rtx3080", TargetDetails{ampereWgp, &rtx3080Chip})
       // https://www.techpowerup.com/gpu-specs/geforce-rtx-3070-ti.c3675
-      .Case("rtx3070ti", TargetDetails{ampereCore, &rtx3070tiChip})
+      .Case("rtx3070ti", TargetDetails{ampereWgp, &rtx3070tiChip})
       // https://www.techpowerup.com/gpu-specs/geforce-rtx-3070.c3674
-      .Case("rtx3070", TargetDetails{ampereCore, &rtx3070Chip})
+      .Case("rtx3070", TargetDetails{ampereWgp, &rtx3070Chip})
       .Cases("ampere", "sm_80", "sm_86", "sm_87",
-             TargetDetails{ampereCore, nullptr})
-      .Cases("turing", "sm_75", TargetDetails{turingCore, nullptr})
-      .Cases("volta", "sm_70", "sm_72", TargetDetails{voltaCore, nullptr})
+             TargetDetails{ampereWgp, nullptr})
+      .Cases("turing", "sm_75", TargetDetails{turingWgp, nullptr})
+      .Cases("volta", "sm_70", "sm_72", TargetDetails{voltaWgp, nullptr})
       .Cases("pascal", "sm_60", "sm_61", "sm_62",
-             TargetDetails{pascalCore, nullptr})
+             TargetDetails{pascalWgp, nullptr})
       .Default(std::nullopt);
 }
 

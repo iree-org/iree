@@ -146,7 +146,7 @@ getIntrinsics(linalg::LinalgOp linalgOp) {
   if (!target)
     return {};
 
-  IREE::GPU::MMAOpsArrayAttr mmaKinds = target.getCore().getMma();
+  IREE::GPU::MMAOpsArrayAttr mmaKinds = target.getWgp().getMma();
 
   return llvm::map_to_vector(mmaKinds, [](IREE::GPU::MMAAttr mma) {
     auto [mSize, nSize, kSize] = mma.getMNKShape();

@@ -151,7 +151,7 @@ setWarpReductionConfig(IREE::GPU::TargetAttr target,
     reductionSize *= bounds[dim];
 
   int64_t subgroupSize = 0;
-  for (int s : target.getCore().getSubgroupSizeChoices().asArrayRef()) {
+  for (int s : target.getWgp().getSubgroupSizeChoices().asArrayRef()) {
     if (reductionSize % s == 0) {
       subgroupSize = s;
       break;

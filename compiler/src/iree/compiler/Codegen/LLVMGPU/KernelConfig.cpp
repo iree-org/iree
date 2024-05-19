@@ -215,7 +215,7 @@ static LogicalResult
 setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
                                        mlir::FunctionOpInterface entryPoint,
                                        linalg::LinalgOp op) {
-  if (target.getCore().getMma().empty())
+  if (target.getWgp().getMma().empty())
     return failure();
 
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
@@ -278,8 +278,8 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
                              lhsElemType,  rhsElemType,  initElemType};
 
   SmallVector<GPUMatmulShapeType> intrinsics;
-  intrinsics.reserve(target.getCore().getMma().size());
-  for (IREE::GPU::MMAAttr mma : target.getCore().getMma()) {
+  intrinsics.reserve(target.getWgp().getMma().size());
+  for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
     auto [mSize, nSize, kSize] = mma.getMNKShape();
     auto [aType, bType, cType] = mma.getABCElementTypes();
     if (mma.getSubgroupSize() != targetSubgroupSize)
@@ -296,7 +296,7 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
                              /*bestMNTileCountPerSubgroup=*/8,
                              /*bestKTileCountPerSubgroup=*/2};
 
-  int64_t maxSharedMemoryBytes = target.getCore().getMaxWorkgroupMemoryBytes();
+  int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
 
   // First try to find a schedule with an exactly matching intrinsic.
   FailureOr<GPUMMASchedule> schedule =
@@ -350,7 +350,7 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // for later access in the pipeline.
   MLIRContext *context = op.getContext();
   auto scheduleAttr = IREE::GPU::MMAScheduleAttr::get(
-      context, target.getCore().getMma()[schedule->index], schedule->mWarpCount,
+      context, target.getWgp().getMma()[schedule->index], schedule->mWarpCount,
       schedule->nWarpCount);
   SmallVector<NamedAttribute, 1> attrs;
   attrs.emplace_back(StringAttr::get(context, "mma_schedule"), scheduleAttr);
@@ -386,7 +386,7 @@ static LogicalResult
 setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
                                   mlir::FunctionOpInterface entryPoint,
                                   linalg::LinalgOp op) {
-  if (target.getCore().getMma().empty())
+  if (target.getWgp().getMma().empty())
     return failure();
 
   const int64_t targetSubgroupSize = target.getPreferredSubgroupSize();
@@ -432,8 +432,8 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
                              lhsElemType,  rhsElemType,  initElemType};
 
   SmallVector<GPUMatmulShapeType> intrinsics;
-  intrinsics.reserve(target.getCore().getMma().size());
-  for (IREE::GPU::MMAAttr mma : target.getCore().getMma()) {
+  intrinsics.reserve(target.getWgp().getMma().size());
+  for (IREE::GPU::MMAAttr mma : target.getWgp().getMma()) {
     auto [mSize, nSize, kSize] = mma.getMNKShape();
     auto [aType, bType, cType] = mma.getABCElementTypes();
     if (mma.getSubgroupSize() != targetSubgroupSize)
@@ -461,7 +461,7 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
              /*bestKTileCountPerSubgroup=*/4};
   }
 
-  int64_t maxSharedMemoryBytes = target.getCore().getMaxWorkgroupMemoryBytes();
+  int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
 
   LDBG("Matmul Vector Distribution Config");
 
@@ -547,7 +547,7 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // for later access in the pipeline.
   MLIRContext *context = op.getContext();
   auto scheduleAttr = IREE::GPU::MMAScheduleAttr::get(
-      context, target.getCore().getMma()[schedule->index], schedule->mWarpCount,
+      context, target.getWgp().getMma()[schedule->index], schedule->mWarpCount,
       schedule->nWarpCount);
   SmallVector<NamedAttribute, 1> attrs;
   attrs.emplace_back(StringAttr::get(context, "mma_schedule"), scheduleAttr);
@@ -739,7 +739,7 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
           return setMatmulConfig(
               config.tileSize[0], config.tileSize[1], config.tileSize[2],
               config.workgroupSize,
-              target.getCore().getSubgroupSizeChoices().asArrayRef(),
+              target.getWgp().getSubgroupSizeChoices().asArrayRef(),
               sizeK == config.tileSize[2] ? 1 : config.pipelineDepth,
               codegenPipeline);
         }
@@ -749,7 +749,7 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
     if (sizeM * sizeN <= target.getPreferredSubgroupSize()) {
       return setMatmulConfig(
           sizeN, sizeM, 4, {sizeM, sizeN, 1},
-          target.getCore().getSubgroupSizeChoices().asArrayRef(),
+          target.getWgp().getSubgroupSizeChoices().asArrayRef(),
           softwarePipelineDepthSimt, CodeGenPipeline::LLVMGPUMatmulSimt);
     }
 
@@ -763,7 +763,7 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
         return setMatmulConfig(
             config.tileSize[0], config.tileSize[1], config.tileSize[2],
             config.workgroupSize,
-            target.getCore().getSubgroupSizeChoices().asArrayRef(),
+            target.getWgp().getSubgroupSizeChoices().asArrayRef(),
             softwarePipelineDepthSimt, CodeGenPipeline::LLVMGPUMatmulSimt);
       }
     }
@@ -787,7 +787,7 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
                                              config.workgroupSize[1],
                                              config.workgroupSize[2]};
   return setMatmulConfig(tileX, tileY, tileK, workgroupSize,
-                         target.getCore().getSubgroupSizeChoices().asArrayRef(),
+                         target.getWgp().getSubgroupSizeChoices().asArrayRef(),
                          softwarePipelineDepthSimt,
                          CodeGenPipeline::LLVMGPUMatmulSimt);
 }
@@ -1275,7 +1275,7 @@ setWarpReductionConfig(IREE::GPU::TargetAttr target,
     reductionSize *= bounds[dim];
 
   int64_t subgroupSize = 0;
-  for (int s : target.getCore().getSubgroupSizeChoices().asArrayRef()) {
+  for (int s : target.getWgp().getSubgroupSizeChoices().asArrayRef()) {
     if (reductionSize % s == 0) {
       subgroupSize = s;
       break;
