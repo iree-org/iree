@@ -340,7 +340,7 @@ module {
     %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<8x8x2x6x6x128xf16>>
     %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0], sizes = [2, 34, 34, 128], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<2x34x34x128xf32>> -> tensor<2x34x34x128xf32>
     %3 = tensor.empty() : tensor<8x8x2x6x6x128xf32>
-    %4 = iree_linalg_ext.winograd.input_transform output_tile_size(6) kernel_size(3) image_dimensions([1, 2]) ins(%2 : tensor<2x34x34x128xf32>) outs(%3 : tensor<8x8x2x6x6x128xf32>) -> tensor<8x8x2x6x6x128xf32>
+    %4 = iree_linalg_ext.winograd.input_transform output_tile_size(6) kernel_size(3) image_dimensions([1, 2]) input_tile_dimensions([0, 1]) ins(%2 : tensor<2x34x34x128xf32>) outs(%3 : tensor<8x8x2x6x6x128xf32>) -> tensor<8x8x2x6x6x128xf32>
     %5 = tensor.empty() : tensor<8x8x2x6x6x128xf16>
     %truncf = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3, d4, d5)>,
                                                 affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d3, d4, d5)>],

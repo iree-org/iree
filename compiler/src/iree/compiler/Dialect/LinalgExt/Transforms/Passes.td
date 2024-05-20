@@ -79,6 +79,9 @@ def ConvertConv2DToWinograd :
            /*default=*/"false",
            "Choose to ignore `__winograd_conv` annotations and transform all"
            "compatible convolutions.">,
+    Option<"innerInputTile", "inner-input-tile", "bool",
+           /*default=*/"false",
+           "Choose for the input tile dimensions to be innermost in the transformed shape.">,
   ];
 }
 

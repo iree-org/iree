@@ -918,6 +918,13 @@ static LogicalResult setWinogradOpConfig(IREE::GPU::TargetAttr target,
   threadTileSizes[0] = 0;
   threadTileSizes[1] = 0;
   tileSizes.push_back(threadTileSizes);
+  SmallVector<int64_t> inputTileDims(op.getInputTileDimensions());
+  SmallVector<int64_t> perm(inputTileDims);
+  perm.append(op.getNonInputTileDims());
+  perm = invertPermutationVector(perm);
+  for (auto &tiles : tileSizes) {
+    applyPermutationToVector(tiles, perm);
+  }
   return setOpConfigAndEntryPointFnTranslation(entryPoint, op, tileSizes,
                                                pipeline, workgroupSize);
 }

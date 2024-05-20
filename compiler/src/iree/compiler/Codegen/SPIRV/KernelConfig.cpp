@@ -29,6 +29,7 @@
 #include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVEnums.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
@@ -1046,8 +1047,13 @@ static LogicalResult setFftOpConfig(spirv::ResourceLimitsAttr limits,
 // Winograd Default Configuration
 //===----------------------------------------------------------------------===//
 
+template <typename WinogradOp>
 static LogicalResult setWinogradOpConfig(spirv::ResourceLimitsAttr limits,
-                                         IREE::LinalgExt::LinalgExtOp op) {
+                                         WinogradOp op) {
+  static_assert(
+      llvm::is_one_of<WinogradOp, IREE::LinalgExt::WinogradInputTransformOp,
+                      IREE::LinalgExt::WinogradOutputTransformOp>::value,
+      "op expected to be a winograd input or output transform op");
   // Tiling is already done by tile and decompose, so we only set pipeline and
   // workgroup size. The tile sizes below are placeholders and were obtained
   // by manual tuning on the AMD Navi2 GPU on a small set of convolution
@@ -1056,9 +1062,16 @@ static LogicalResult setWinogradOpConfig(spirv::ResourceLimitsAttr limits,
   std::array<int64_t, 3> workgroupSize = {32, 4, 4};
   TileSizesListType tileSizes = {
       {0, 0, 1, 0, 0, 32}, {0, 0, 1, 1, 1, 1}, {0, 0, 0, 0, 0, 0}};
+  SmallVector<int64_t> inputTileDims(op.getInputTileDimensions());
+  SmallVector<int64_t> perm(inputTileDims);
+  perm.append(op.getNonInputTileDims());
+  perm = invertPermutationVector(perm);
+  for (auto &tiles : tileSizes) {
+    applyPermutationToVector(tiles, perm);
+  }
   return setOpConfigAndEntryPointFnTranslation(
-      op->getParentOfType<mlir::FunctionOpInterface>(), op, tileSizes, pipeline,
-      workgroupSize);
+      op->template getParentOfType<mlir::FunctionOpInterface>(), op, tileSizes,
+      pipeline, workgroupSize);
 }
 
 //===----------------------------------------------------------------------===//
