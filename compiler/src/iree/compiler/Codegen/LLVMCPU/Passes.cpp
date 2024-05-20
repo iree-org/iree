@@ -586,8 +586,8 @@ void addCPULinalgExtTileAndVectorizePipeline(
     OpPassManager &funcPassManager, TilingConfig &tilingConfig,
     LLVMCPUPipelineOptions &pipelineOpt) {
   addTileAndDistributePasses(funcPassManager);
-  funcPassManager.addPass(
-      createLLVMCPUTilePass(tilingConfig.getVectorCommonParallelLevel()));
+  funcPassManager.addPass(createLLVMCPUTileAndFusePass(
+      tilingConfig.getVectorCommonParallelLevel()));
   // TODO: Remove the pass once we have PartialReductionOpInterface implemented
   // for AttentionOp.
   funcPassManager.addPass(

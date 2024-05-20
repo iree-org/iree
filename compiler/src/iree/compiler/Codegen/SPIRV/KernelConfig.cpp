@@ -1054,7 +1054,8 @@ static LogicalResult setWinogradOpConfig(spirv::ResourceLimitsAttr limits,
   // sizes found in the StableDiffusion model.
   auto pipeline = CodeGenPipeline::SPIRVWinogradVectorize;
   std::array<int64_t, 3> workgroupSize = {32, 4, 4};
-  TileSizesListType tileSizes = {{1, 0, 0, 32}, {1, 1, 1, 1}, {0, 0, 0, 0}};
+  TileSizesListType tileSizes = {
+      {0, 0, 1, 0, 0, 32}, {0, 0, 1, 1, 1, 1}, {0, 0, 0, 0, 0, 0}};
   return setOpConfigAndEntryPointFnTranslation(
       op->getParentOfType<mlir::FunctionOpInterface>(), op, tileSizes, pipeline,
       workgroupSize);

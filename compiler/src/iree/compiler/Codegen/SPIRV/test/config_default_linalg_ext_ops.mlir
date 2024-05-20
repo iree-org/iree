@@ -123,7 +123,7 @@ module {
   }
 }
 
-//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 0, 0, 32], [1, 1, 1, 1], [0, 0, 0, 0]]>
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 0, 1, 0, 0, 32], [0, 0, 1, 1, 1, 1], [0, 0, 0, 0, 0, 0]]>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVWinogradVectorize workgroup_size = [32, 4, 4]>
 //       CHECK: func.func @winograd_input_transform()
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]
@@ -145,7 +145,7 @@ module {
   }
 }
 
-//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 0, 0, 32], [1, 1, 1, 1], [0, 0, 0, 0]]>
+//   CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 0, 1, 0, 0, 32], [0, 0, 1, 1, 1, 1], [0, 0, 0, 0, 0, 0]]>
 //   CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVWinogradVectorize workgroup_size = [32, 4, 4]>
 //       CHECK: func.func @winograd_output_transform()
 //  CHECK-SAME:     translation_info = #[[TRANSLATION]]

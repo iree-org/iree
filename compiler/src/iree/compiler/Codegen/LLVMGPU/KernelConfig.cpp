@@ -899,19 +899,24 @@ static LogicalResult setWinogradOpConfig(IREE::GPU::TargetAttr target,
   std::array<int64_t, 3> workgroupSize = {32, 4, 4};
   int64_t iterationRank = op.getIterationDomainRank();
   SmallVector<int64_t> workgroupTileSizes(iterationRank, 4);
+  // Do not tile the input tile dimensions
+  workgroupTileSizes[0] = 0;
+  workgroupTileSizes[1] = 0;
   // Set batch workgroup size
-  workgroupTileSizes.front() = 1;
+  workgroupTileSizes[2] = 1;
   // Set input channel workgroup size
   workgroupTileSizes.back() = 32;
   if (isa<IREE::LinalgExt::WinogradFilterTransformOp>(op)) {
     // Set input channel workgroup size
-    workgroupTileSizes.front() = 32;
+    workgroupTileSizes[2] = 32;
     // Set output channel workgroup size
     workgroupTileSizes.back() = 16;
     workgroupSize = {16, 32, 1};
   }
   tileSizes.push_back(workgroupTileSizes);
   SmallVector<int64_t> threadTileSizes(iterationRank, 1);
+  threadTileSizes[0] = 0;
+  threadTileSizes[1] = 0;
   tileSizes.push_back(threadTileSizes);
   return setOpConfigAndEntryPointFnTranslation(entryPoint, op, tileSizes,
                                                pipeline, workgroupSize);
