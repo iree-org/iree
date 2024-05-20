@@ -1665,9 +1665,8 @@ FailureOr<TilingResult>
 AttentionOp::getTiledImplementation(OpBuilder &builder,
                                     ArrayRef<OpFoldResult> offsets,
                                     ArrayRef<OpFoldResult> sizes) {
-  int64_t domainRank = getIterationDomainRank();
-  assert(offsets.size() == domainRank);
-  assert(sizes.size() == domainRank);
+  assert(offsets.size() == getIterationDomainRank());
+  assert(sizes.size() == getIterationDomainRank());
 
   Location loc = getLoc();
   auto one = builder.getIndexAttr(1);
