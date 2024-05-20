@@ -179,7 +179,7 @@ iree_generated_e2e_runner_test(
   DRIVERS
     "local-task"
   COMPILER_FLAGS
-    "--iree-preprocessing-pass-pipeline=builtin.module\(func.func\(iree-linalg-ext-convert-conv2d-to-winograd\)\)"
+    "--iree-preprocessing-pass-pipeline=builtin.module\(func.func\(iree-linalg-ext-convert-conv2d-to-winograd{replace-all-convs=true}\)\)"
   LABELS
     "hostonly"
     "local"
@@ -206,7 +206,7 @@ iree_generated_e2e_runner_test(
   DRIVERS
     "local-task"
   COMPILER_FLAGS
-    "--iree-preprocessing-pass-pipeline=builtin.module\(func.func\(iree-linalg-ext-convert-conv2d-to-winograd\)\)"
+    "--iree-preprocessing-pass-pipeline=builtin.module\(func.func\(iree-linalg-ext-convert-conv2d-to-winograd{replace-all-convs=true}\)\)"
   LABELS
     "hostonly"
     "local"
@@ -233,7 +233,7 @@ iree_generated_e2e_runner_test(
   DRIVERS
     "local-task"
   COMPILER_FLAGS
-    "--iree-preprocessing-pass-pipeline=builtin.module\(func.func\(iree-linalg-ext-convert-conv2d-to-winograd\)\)"
+    "--iree-preprocessing-pass-pipeline=builtin.module\(func.func\(iree-linalg-ext-convert-conv2d-to-winograd{replace-all-convs=true}\)\)"
   LABELS
     "hostonly"
     "local"
@@ -260,7 +260,7 @@ iree_generated_e2e_runner_test(
   DRIVERS
     "local-task"
   COMPILER_FLAGS
-    "--iree-preprocessing-pass-pipeline=builtin.module\(func.func\(iree-linalg-ext-convert-conv2d-to-winograd\)\)"
+    "--iree-preprocessing-pass-pipeline=builtin.module\(func.func\(iree-linalg-ext-convert-conv2d-to-winograd{replace-all-convs=true}\)\)"
   LABELS
     "hostonly"
     "local"
@@ -287,7 +287,7 @@ iree_generated_e2e_runner_test(
   DRIVERS
     "local-task"
   COMPILER_FLAGS
-    "--iree-preprocessing-pass-pipeline=builtin.module\(func.func\(iree-linalg-ext-convert-conv2d-to-winograd\)\)"
+    "--iree-preprocessing-pass-pipeline=builtin.module\(func.func\(iree-linalg-ext-convert-conv2d-to-winograd{replace-all-convs=true}\)\)"
   LABELS
     "hostonly"
     "local"
@@ -314,7 +314,7 @@ iree_generated_e2e_runner_test(
   DRIVERS
     "local-task"
   COMPILER_FLAGS
-    "--iree-preprocessing-pass-pipeline=builtin.module\(func.func\(iree-linalg-ext-convert-conv2d-to-winograd\)\)"
+    "--iree-preprocessing-pass-pipeline=builtin.module\(func.func\(iree-linalg-ext-convert-conv2d-to-winograd{replace-all-convs=true}\)\)"
   LABELS
     "hostonly"
     "local"
