@@ -545,7 +545,9 @@ isFusableWithConsumer(OpOperand &fusedOperand,
 
   // Fuse unset_encoding operations with `tensor.extract_slice` and elementwise
   // generic ops.
-  if (isUnpackLikeOpViaExtractSliceOps(producer)) {
+  if (isUnpackLikeOpViaExtractSliceOps(producer) ||
+      isa<IREE::LinalgExt::WinogradInputTransformOp,
+          IREE::LinalgExt::WinogradFilterTransformOp>(producer)) {
     // Fuse `unset_encoding` -> `extract_slice` op since they get folded into
     // `unpack` on materialization.
     if (isa<tensor::ExtractSliceOp>(consumer)) {
@@ -764,7 +766,9 @@ isFusableWithProducer(OpOperand &operand,
   }
 
   if (!isa<LinalgExt::LinalgFusionOpInterface>(consumer) ||
-      !isa<LinalgExt::LinalgFusionOpInterface>(producer)) {
+      !isa<LinalgExt::LinalgFusionOpInterface>(producer) ||
+      !isa<IREE::LinalgExt::WinogradInputTransformOp,
+           IREE::LinalgExt::WinogradFilterTransformOp>(producer)) {
     return false;
   }
 
