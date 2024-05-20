@@ -8,6 +8,7 @@
 #define IREE_CODEGEN_DIALECT_IREEGPUOPS
 
 include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.td"
+include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/OpBase.td"
@@ -18,7 +19,8 @@ include "mlir/IR/OpBase.td"
 
 def IREEGPU_ShuffleTensorOp : Op<IREEGPU_Dialect, "shuffle_tensor", [
     Pure,
-    AttrSizedOperandSegments
+    AttrSizedOperandSegments,
+    SingleBlockImplicitTerminator<"mlir::iree_compiler::IREE::GPU::YieldOp">
     ]> {
   let summary = "Shuffles a private tensor across a shared allocation";
   let description = [{
@@ -51,32 +53,36 @@ def IREEGPU_ShuffleTensorOp : Op<IREEGPU_Dialect, "shuffle_tensor", [
     boundary of the loops currently is.
 
     ```mlir
-      %alloc = bufferization.to_memref %empty
       %0 = scf.forall (%idy, %idx) in (8, 8) -> (tensor<4x128xf32>) {
         %ids = affine.delinearize_index %idy * 8 + %idx to (2, 32) : index
         %in = ...
         %2 = affine.apply #affine_map<(d0) -> (d0 * 2)> (%ids#0)
         %3 = affine.apply #affine_map<(d0) -> (d0 * 4)> (%ids#1)
         %4 = affine.apply #affine_map<(d0) -> (d0 * 16)> (%idx)
-        %slice = iree_gpu.shuffle_tensor %in[%2, %3] [2, 4] [1, 1] to %alloc[0, %4] [4, 16] [1, 1]
-          : tensor<2x4xf32> -> memref<4x128xf32> -> tensor<4x16xf32>
+        %slice = iree_gpu.shuffle_tensor %in[%2, %3] [2, 4] [1, 1] to %empty {
+        ^bb0(%intermediate: tensor<4x128xf32>):
+          %slice = tensor.extract_slice %intermediate[0, %4] [4, 16] [1, 1] : tensor<4x128xf32> to tensor<4x16xf32>
+          iree_gpu.yield %slice : tensor<4x16xf32>
+        } : tensor<2x4xf32> -> tensor<4x128xf32> -> tensor<4x16xf32>
         ...
       } {mapping = [#gpu.thread<y>, #gpu.thread<x>]}
     ```
 
     A shuffle can be lowered to a shared allocation with a write of the source
-    slice, a barrier, and a read of the result slice. Note that to avoid both
-    conflicting writes, and to execute the barrier, this renders any lowerings
-    of the enclosing `scf.forall` to serial loops invalid. In other words, the
-    lowerings/hardware must provide the number of workers requested by the loop.
+    slice, a barrier, inlining the body of the shuffle op (the read), and then
+    a barrier to synchronize all workers on the result of the read. Note that
+    it is undefined behavior if there are any conflicting writes to the
+    intermediate. Also to execute the barrier, any lowerings of the enclosing
+    `scf.forall` to serial loops is invalid. In other words, the lowerings must
+    provide the number of workers requested by the loop.
 
     This op takes an input |source| tensor to represent the slice held by this
-    worker before the shuffle, an intermediate memref |shared_alloc| that all
-    workers insert into, and yields a |result| slice of the intermediate memref
-    read by this worker after the shuffle is done.
+    worker before the shuffle, an intermediate tensor |dest| that all workers
+    insert into, and performs a synchronized read from that intermediate
+    tensor.
 
-    It is undefined behavior if the source or result tensor slices are out of
-    bounds of the intermediate allocation.
+    It is undefined behavior if the source tensor is out of bounds of the
+    intermediate allocation.
 
     Movtivation and Intended Use Cases:
 
@@ -94,34 +100,24 @@ def IREEGPU_ShuffleTensorOp : Op<IREEGPU_Dialect, "shuffle_tensor", [
 
   let arguments = (ins
     AnyRankedTensor:$source,
-    Variadic<Index>:$source_offsets,
-    Variadic<Index>:$source_sizes,
-    Variadic<Index>:$source_strides,
-    DenseI64ArrayAttr:$static_source_offsets,
-    DenseI64ArrayAttr:$static_source_sizes,
-    DenseI64ArrayAttr:$static_source_strides,
-    AnyMemRef:$shared_alloc,
-    Variadic<Index>:$result_offsets,
-    Variadic<Index>:$result_sizes,
-    Variadic<Index>:$result_strides,
-    DenseI64ArrayAttr:$static_result_offsets,
-    DenseI64ArrayAttr:$static_result_sizes,
-    DenseI64ArrayAttr:$static_result_strides
+    Variadic<Index>:$offsets,
+    Variadic<Index>:$sizes,
+    Variadic<Index>:$strides,
+    DenseI64ArrayAttr:$static_offsets,
+    DenseI64ArrayAttr:$static_sizes,
+    DenseI64ArrayAttr:$static_strides,
+    AnyRankedTensor:$dest
   );
-  let results = (outs
-    AnyRankedTensor:$result
-  );
+  let regions = (region SizedRegion<1>:$region);
+  let results = (outs AnyRankedTensor:$result);
 
   let assemblyFormat = [{
     $source ``
-    custom<DynamicIndexList>($source_offsets, $static_source_offsets)
-    custom<DynamicIndexList>($source_sizes, $static_source_sizes)
-    custom<DynamicIndexList>($source_strides, $static_source_strides)
-    `to` $shared_alloc
-    custom<DynamicIndexList>($result_offsets, $static_result_offsets)
-    custom<DynamicIndexList>($result_sizes, $static_result_sizes)
-    custom<DynamicIndexList>($result_strides, $static_result_strides)
-    attr-dict `:` type($source) `->` type($shared_alloc) `->` type($result)
+    custom<DynamicIndexList>($offsets, $static_offsets)
+    custom<DynamicIndexList>($sizes, $static_sizes)
+    custom<DynamicIndexList>($strides, $static_strides)
+    `to` $dest $region attr-dict
+    `:` type($source) `->` type($dest) `->` type($result)
   }];
 
   let extraClassDeclaration = [{
@@ -129,49 +125,47 @@ def IREEGPU_ShuffleTensorOp : Op<IREEGPU_Dialect, "shuffle_tensor", [
       return getSource().getType();
     }
 
-    MemRefType getSharedAllocType() {
-      return getSharedAlloc().getType();
+    RankedTensorType getDestType() {
+      return getDest().getType();
     }
-
-    // Because we have two sets of offsets/sizes/strides, we cannot use
-    // interface boilerplate and instead redefine it.
 
     // Source slice view-like getters.
-    ::llvm::SmallVector<::mlir::OpFoldResult, 4> getMixedSourceOffsets() {
+    ::llvm::SmallVector<::mlir::OpFoldResult, 4> getMixedOffsets() {
       Builder b(getContext());
-      return ::mlir::getMixedValues(getStaticSourceOffsets(),
-                                    getSourceOffsets(), b);
+      return ::mlir::getMixedValues(getStaticOffsets(),
+                                    getOffsets(), b);
     }
-    ::llvm::SmallVector<::mlir::OpFoldResult, 4> getMixedSourceSizes() {
+    ::llvm::SmallVector<::mlir::OpFoldResult, 4> getMixedSizes() {
       Builder b(getContext());
-      return ::mlir::getMixedValues(getStaticSourceSizes(),
-                                    getSourceSizes(), b);
+      return ::mlir::getMixedValues(getStaticSizes(),
+                                    getSizes(), b);
     }
-    ::llvm::SmallVector<::mlir::OpFoldResult, 4> getMixedSourceStrides() {
+    ::llvm::SmallVector<::mlir::OpFoldResult, 4> getMixedStrides() {
       Builder b(getContext());
-      return ::mlir::getMixedValues(getStaticSourceStrides(),
-                                    getSourceStrides(), b);
-    }
-
-    // Result slice view-like getters.
-    ::llvm::SmallVector<::mlir::OpFoldResult, 4> getMixedResultOffsets() {
-      Builder b(getContext());
-      return ::mlir::getMixedValues(getStaticResultOffsets(),
-                                    getResultOffsets(), b);
-    }
-    ::llvm::SmallVector<::mlir::OpFoldResult, 4> getMixedResultSizes() {
-      Builder b(getContext());
-      return ::mlir::getMixedValues(getStaticResultSizes(),
-                                    getResultSizes(), b);
-    }
-    ::llvm::SmallVector<::mlir::OpFoldResult, 4> getMixedResultStrides() {
-      Builder b(getContext());
-      return ::mlir::getMixedValues(getStaticResultStrides(),
-                                    getResultStrides(), b);
+      return ::mlir::getMixedValues(getStaticStrides(),
+                                    getStrides(), b);
     }
   }];
 
   let hasVerifier = 1;
+  let hasRegionVerifier = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// YieldOp
+//===----------------------------------------------------------------------===//
+
+def IREEGPU_YieldOp : Op<IREEGPU_Dialect, "yield", [
+    Pure, ReturnLike, Terminator,
+    HasParent<"::mlir::iree_compiler::IREE::GPU::ShuffleTensorOp">]> {
+  let summary = "Yield a value from a region";
+  let description = [{
+     This operation is used to yield a single value from a within a region.
+  }];
+
+  let arguments = (ins AnyType:$value);
+  let assemblyFormat = "$value attr-dict `:` type($value)";
+  let builders = [OpBuilder<(ins), [{ /* nothing to do */ }]>];
 }
 
 #endif // IREE_CODEGEN_DIALECT_IREEGPUOPS
