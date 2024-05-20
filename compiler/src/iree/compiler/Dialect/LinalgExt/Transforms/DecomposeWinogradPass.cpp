@@ -357,6 +357,7 @@ void DecomposeWinogradTransformPass::runOnOperation() {
   patterns.add<DecomposeWinogradFilterTransform>(context);
   patterns.add<DecomposeWinogradInputTransform>(context);
   patterns.add<DecomposeWinogradOutputTransform>(context);
+  memref::populateResolveRankedShapedTypeResultDimsPatterns(patterns);
   if (failed(
           applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
     return signalPassFailure();
