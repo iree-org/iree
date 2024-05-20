@@ -52,3 +52,35 @@ py_binary(
     "medium",
     "large",
 ]]
+
+# Default CPU backend + winograd.
+[iree_generated_e2e_runner_test(
+    name = "e2e_winograd_conv2d_cpu_%s_%s_%s_%s" % (dtype, dtype, dtype, size),
+    compiler_flags = [
+        "--iree-preprocessing-pass-pipeline=builtin.module\\(func.func\\(iree-linalg-ext-convert-conv2d-to-winograd\\)\\)",
+    ],
+    generator = ":generate_e2e_conv2d_tests",
+    generator_args = [
+        "--input_type=%s" % dtype,
+        "--kernel_type=%s" % dtype,
+        "--acc_type=%s" % dtype,
+        "--shapes=%s" % size,
+    ],
+    tags = [
+        "hostonly",
+        "local",
+    ],
+    target_backends_and_drivers = [
+        ("llvm-cpu", "local-task"),
+    ],
+    target_cpu_features_variants = ["default"],
+    test_runner = "//tools/testing/e2e:iree-e2e-conv2d-test",
+    test_type = "conv2d",
+) for dtype in [
+    "f32",
+    "f16",
+] for size in [
+    "small",
+    "medium",
+    "large",
+]]
