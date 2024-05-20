@@ -158,9 +158,6 @@ struct DistributeContractions final
         Value bMatrix = rewriter.create<vector::ExtractOp>(
             loc, getDistributed(rewriter, operands[RHS], layouts[RHS]),
             getIndices(contractType, ContractMatrixType::B, k, indices[1]));
-        aMatrix.dump();
-        bMatrix.dump();
-        dMatrix.dump();
         dMatrix = mmaAttr
                       .buildMmaOperation(rewriter, loc, dMatrix.getType(),
                                          aMatrix, bMatrix, dMatrix)
