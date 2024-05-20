@@ -23,6 +23,8 @@ iree_cc_library(
     "IREEGPUAttrs.h.inc"
     "IREEGPUDialect.cpp.inc"
     "IREEGPUDialect.h.inc"
+    "IREEGPUEnums.cpp.inc"
+    "IREEGPUEnums.h.inc"
     "IREEGPUInterfaces.cpp.inc"
     "IREEGPUInterfaces.h.inc"
     "IREEGPUOps.cpp.inc"
@@ -35,6 +37,7 @@ iree_cc_library(
   DEPS
     ::IREEGPUAttrs
     ::IREEGPUDialectGen
+    ::IREEGPUEnums
     ::IREEGPUInterfaces
     ::IREEGPUOpsGen
     IREEVectorExtDialect
@@ -64,12 +67,20 @@ iree_tablegen_library(
 
 iree_tablegen_library(
   NAME
+    IREEGPUEnums
+  TD_FILE
+    "IREEGPUEnums.td"
+  OUTS
+    --gen-enum-decls IREEGPUEnums.h.inc
+    --gen-enum-defs IREEGPUEnums.cpp.inc
+)
+
+iree_tablegen_library(
+  NAME
     IREEGPUAttrs
   TD_FILE
     "IREEGPUAttrs.td"
   OUTS
-    --gen-enum-decls IREEGPUEnums.h.inc
-    --gen-enum-defs IREEGPUEnums.cpp.inc
     --gen-attrdef-decls IREEGPUAttrs.h.inc
     --gen-attrdef-defs IREEGPUAttrs.cpp.inc
 )

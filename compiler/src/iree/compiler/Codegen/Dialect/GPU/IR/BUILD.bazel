@@ -16,6 +16,7 @@ package(
 exports_files([
     "IREEGPUAttrs.td",
     "IREEGPUDialect.td",
+    "IREEGPUEnums.td",
     "IREEGPUInterfaces.td",
 ])
 
@@ -25,6 +26,7 @@ iree_td_library(
         [
             "IREEGPUAttrs.td",
             "IREEGPUDialect.td",
+            "IREEGPUEnums.td",
             "IREEGPUInterfaces.td",
             "IREEGPUOps.td",
         ],
@@ -32,6 +34,7 @@ iree_td_library(
     ),
     deps = [
         "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
+        "@llvm-project//mlir:DialectUtilsTdFiles",
         "@llvm-project//mlir:OpBaseTdFiles",
         "@llvm-project//mlir:SideEffectInterfacesTdFiles",
     ],
@@ -52,6 +55,8 @@ iree_compiler_cc_library(
         "IREEGPUOps.h",
     ],
     textual_hdrs = [
+        "IREEGPUEnums.cpp.inc",
+        "IREEGPUEnums.h.inc",
         "IREEGPUAttrs.cpp.inc",
         "IREEGPUAttrs.h.inc",
         "IREEGPUDialect.cpp.inc",
@@ -64,6 +69,7 @@ iree_compiler_cc_library(
     deps = [
         ":IREEGPUAttrs",
         ":IREEGPUDialectGen",
+        ":IREEGPUEnums",
         ":IREEGPUInterfaces",
         ":IREEGPUOpsGen",
         "//compiler/src/iree/compiler/Codegen/Utils:VectorOpUtils",
@@ -100,7 +106,7 @@ iree_gentbl_cc_library(
 )
 
 iree_gentbl_cc_library(
-    name = "IREEGPUAttrs",
+    name = "IREEGPUEnums",
     tbl_outs = [
         (
             ["--gen-enum-decls"],
@@ -110,6 +116,15 @@ iree_gentbl_cc_library(
             ["--gen-enum-defs"],
             "IREEGPUEnums.cpp.inc",
         ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "IREEGPUEnums.td",
+    deps = [":td_files"],
+)
+
+iree_gentbl_cc_library(
+    name = "IREEGPUAttrs",
+    tbl_outs = [
         (
             ["--gen-attrdef-decls"],
             "IREEGPUAttrs.h.inc",
