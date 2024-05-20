@@ -9,9 +9,9 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
-#include "llvm/ADT/iterator_range.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OpImplementation.h"
@@ -31,7 +31,7 @@ namespace mlir::iree_compiler::IREE::GPU {
 void MultiMmaOp::build(OpBuilder &builder, OperationState &result, Value lhs,
                        Value rhs, Value acc,
                        ArrayRef<ArrayRef<AffineExpr>> indexingExprs,
-                       ArrayRef<GPU::IteratorType> iteratorTypes,
+                       ArrayRef<utils::IteratorType> iteratorTypes,
                        MmaInterfaceAttr kind) {
   result.addOperands({lhs, rhs, acc});
   result.addTypes(acc.getType());
@@ -42,7 +42,7 @@ void MultiMmaOp::build(OpBuilder &builder, OperationState &result, Value lhs,
   result.addAttribute(
       getIteratorTypesAttrName(result.name),
       builder.getArrayAttr(llvm::to_vector(llvm::map_range(
-          iteratorTypes, [&](IteratorType t) -> mlir::Attribute {
+          iteratorTypes, [&](utils::IteratorType t) -> mlir::Attribute {
             return IteratorTypeAttr::get(builder.getContext(), t);
           }))));
   result.addAttribute(getKindAttrName(result.name), kind);
@@ -169,7 +169,7 @@ void MultiMmaOp::getIterationBounds(SmallVectorImpl<int64_t> &iterationBounds) {
     // Search lhs/rhs map results for 'targetExpr'.
     auto targetExpr = getAffineDimExpr(it.index(), getContext());
     auto iteratorType = llvm::cast<IteratorTypeAttr>(it.value()).getValue();
-    if (iteratorType == IteratorType::reduction) {
+    if (iteratorType == utils::IteratorType::reduction) {
       // Get reduction dim size from lhs shape (same size in rhsShape).
       int64_t lhsDimIndex = getResultIndex(indexingMaps[0], targetExpr);
       assert(lhsDimIndex >= 0);

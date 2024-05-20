@@ -8,24 +8,17 @@
 #define IREE_COMPILER_CODEGEN_DIALECT_GPU_IREEGPUATTRS
 
 include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.td"
+include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.td"
 include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.td"
+include "mlir/Dialect/Utils/StructuredOpsUtils.td"
 include "mlir/IR/OpBase.td"
 include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/EnumAttr.td"
 
-/// TODO: Iterator types are duplicated across dialects upstream and here due
-/// to a lack of a shared attribute. This should be deduplicated upstream and
-/// then here as well.
-def IREEGPU_IteratorType : I32EnumAttr<"IteratorType", "Iterator type", [
-  I32EnumAttrCase<"parallel", 0>,
-  I32EnumAttrCase<"reduction", 1>
-]> {
-    let genSpecializedAttr = 0;
-    let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
-}
-
+/// TODO: Iterator type arrays are duplicated across dialects upstream and here.
+/// These should be unified somewhere as a common iterator type array attr.
 def IREEGPU_IteratorTypeEnum
-    : EnumAttr<IREEGPU_Dialect, IREEGPU_IteratorType, "iterator_type"> {
+    : EnumAttr<IREEGPU_Dialect, IteratorType, "iterator_type"> {
     let assemblyFormat = "`<` $value `>`";
 }
 
@@ -84,29 +77,12 @@ class IREEGPU_MmaVectorLayoutAttr<string attrname, string mmaintrinsic> :
   );
 }
 
-class IREEGPU_I32MmaEnumAttr<string name, string summary, list<I32EnumAttrCase> cases>
-    : I32EnumAttr<name, summary, cases> {
-  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
-  let genSpecializedAttr = 0;
-}
-
-class IREEGPU_MmaEnumAttr<EnumAttrInfo enumInfo, string name = "">
-  : EnumAttr<IREEGPU_Dialect, enumInfo, name>;
-
 //===----------------------------------------------------------------------===//
 // MMA Attributes
 //===----------------------------------------------------------------------===//
 
-def MFMA_F16_16x16x16_F32 : I32EnumAttrCase<"MFMA_F16_16x16x16_F32", 0>;
-def MFMA_F16_32x32x8_F32 : I32EnumAttrCase<"MFMA_F16_32x32x8_F32", 1>;
-def WMMA_F16_16x16x16_F32 : I32EnumAttrCase<"WMMA_F16_16x16x16_F32", 2>;
-
-def IREEGPU_MMAIntrinsic : IREEGPU_I32MmaEnumAttr<"MMAIntrinsic",
-    "Descriptor for different MMA intrinsics", [
-      MFMA_F16_16x16x16_F32,
-      MFMA_F16_32x32x8_F32,
-      WMMA_F16_16x16x16_F32
-    ]>;
+class IREEGPU_MmaEnumAttr<EnumAttrInfo enumInfo, string name = "">
+  : EnumAttr<IREEGPU_Dialect, enumInfo, name>;
 
 def IREEGPU_MMAIntrinsicAttr
   : IREEGPU_MmaEnumAttr<IREEGPU_MMAIntrinsic, "mma_intrinsic">;
@@ -180,7 +156,6 @@ def IREEGPU_MmaScheduleAttr : AttrDef<IREEGPU_Dialect, "MMASchedule"> {
     A schedule of MMA intrinsic instruction and various levels of tile sizes
     to solve a specific contraction problem.
   }];
-
 
   let parameters = (ins
     "::mlir::iree_compiler::IREE::GPU::MmaInterfaceAttr":$intrinsic,

@@ -142,7 +142,7 @@ def IREEGPU_MultiMmaOp : Op<IREEGPU_Dialect, "multi_mma", [
       "MmaInterfaceAttr":$intrinsic)>,
     OpBuilder<(ins "Value":$lhs, "Value":$rhs, "Value":$acc,
       "ArrayRef<ArrayRef<AffineExpr>>":$indexingExprs,
-      "ArrayRef<IteratorType>":$iteratorTypes,
+      "ArrayRef<utils::IteratorType>":$iteratorTypes,
       "MmaInterfaceAttr":$intrinsic)>
   ];
   let extraClassDeclaration = [{
@@ -174,10 +174,10 @@ def IREEGPU_MultiMmaOp : Op<IREEGPU_Dialect, "multi_mma", [
     void getIterationIndexMap(
       std::vector<DenseMap<int64_t, int64_t>> &iterationIndexMap);
 
-    SmallVector<IteratorType> getIteratorTypesArray() {
+    SmallVector<utils::IteratorType> getIteratorTypesArray() {
       auto range =
           getIteratorTypes()
-              .template getAsValueRange<IteratorTypeAttr, IteratorType>();
+              .template getAsValueRange<IteratorTypeAttr, utils::IteratorType>();
       return {range.begin(), range.end()};
     }
   }];
