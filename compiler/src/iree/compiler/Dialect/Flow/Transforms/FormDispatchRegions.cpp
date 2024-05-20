@@ -12,6 +12,7 @@
 #include "iree/compiler/Dialect/Flow/Transforms/ConvertRegionToWorkgroups.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
@@ -534,7 +535,9 @@ isFusableWithConsumer(OpOperand &fusedOperand,
 
   // Fuse unset_encoding operations with `tensor.extract_slice` and elementwise
   // generic ops.
-  if (isUnpackLikeOpViaExtractSliceOps(producer)) {
+  if (isUnpackLikeOpViaExtractSliceOps(producer) ||
+      isa<IREE::LinalgExt::WinogradInputTransformOp,
+          IREE::LinalgExt::WinogradFilterTransformOp>(producer)) {
     // Fuse `unset_encoding` -> `extract_slice` op since they get folded into
     // `unpack` on materialization.
     if (isa<tensor::ExtractSliceOp>(consumer)) {
@@ -744,7 +747,9 @@ isFusableWithProducer(OpOperand &operand,
         .Default([](Operation *) { return false; });
   }
 
-  if (!isa<linalg::LinalgOp>(consumer) || !isa<linalg::LinalgOp>(producer)) {
+  if (!isa<linalg::LinalgOp>(consumer) ||
+      !isa<linalg::LinalgOp, IREE::LinalgExt::WinogradInputTransformOp,
+           IREE::LinalgExt::WinogradFilterTransformOp>(producer)) {
     return false;
   }
 
