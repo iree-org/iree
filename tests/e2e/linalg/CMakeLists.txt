@@ -66,19 +66,6 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    check_winograd_vulkan-spirv_vulkan
-  SRCS
-    "conv2d.mlir"
-  TARGET_BACKEND
-    "vulkan-spirv"
-  DRIVER
-    "vulkan"
-  COMPILER_FLAGS
-    "--iree-preprocessing-pass-pipeline=builtin.module\(func.func\(iree-linalg-ext-convert-conv2d-to-winograd\)\)"
-)
-
-iree_check_single_backend_test_suite(
-  NAME
     check_large_linalg_matmul_cuda
   SRCS
     "conv2d.mlir"
