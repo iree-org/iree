@@ -254,12 +254,10 @@ func.func @mmt4d_bf16bf16f32(%arg0 : tensor<?x?x16x2xbf16>, %arg1 : tensor<?x?x1
 
 // -----
 
-// Check that tensor.pack is not lowered to a microkernel by default - it should
-// only be on VMVX.
-// CHECK-LABEL: func @pack_i8i8_default(
-//       CHECK: tensor.pack
+// CHECK-LABEL: func @pack_i8i8_x86(
+//       CHECK: ukernel.generic "iree_uk_pack"
 func.func @pack_i8i8_default(%arg0 : tensor<?x?xi8>, %arg1 : tensor<?x?x7x8xi8>, %arg2 : i8) -> tensor<?x?x7x8xi8> attributes {
-  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {ukernels = "all", target_triple="x86_64-xyz-xyz"}>
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {ukernels = "all", target_triple="x86_64-xyz-xyz", cpu_features="+avx512f"}>
 } {
   %result = tensor.pack %arg0 padding_value(%arg2 : i8) inner_dims_pos = [0, 1] inner_tiles = [7, 8] into %arg1
       : tensor<?x?xi8> -> tensor<?x?x7x8xi8>
