@@ -16,6 +16,7 @@ package(
 exports_files([
     "IREEGPUAttrs.td",
     "IREEGPUDialect.td",
+    "IREEGPUEnums.td",
     "IREEGPUInterfaces.td",
 ])
 
@@ -25,6 +26,7 @@ iree_td_library(
         [
             "IREEGPUAttrs.td",
             "IREEGPUDialect.td",
+            "IREEGPUEnums.td",
             "IREEGPUInterfaces.td",
             "IREEGPUOps.td",
         ],
