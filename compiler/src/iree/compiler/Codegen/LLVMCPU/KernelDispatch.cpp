@@ -1754,6 +1754,11 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   DistributionHeuristicConfig config;
   SmallVector<int64_t> distTileSizes = getDefaultDistributedLevelTileSizes(
       attnOp, DistributionHeuristicConfig{});
+  // TODO (Groverkss): Due to a bug in TileAndDecomposeAttention, N dimension
+  // cannot be tiled. Remove this once fixed.
+  for (int64_t i : opInfo.getNDims()) {
+    distTileSizes[i] = 0;
+  }
   tileSizes.push_back(distTileSizes);
 
   // Batch, M and N (parallel dimensions) are distributed on workgroups.
@@ -1773,6 +1778,11 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
     // TODO: Use native tile size here once bufferization is fixed for scf.
     vecTileSizes[i] = getMaxVectorTileSize(
         /*numElem=*/tileSize, vectorSize, vectorSize);
+  }
+  // TODO (Groverkss): Due to a bug in TileAndDecomposeAttention, N dimension
+  // cannot be tiled. Remove this once fixed.
+  for (int64_t i : opInfo.getNDims()) {
+    vecTileSizes[i] = 0;
   }
   tileSizes.push_back(vecTileSizes);
 
