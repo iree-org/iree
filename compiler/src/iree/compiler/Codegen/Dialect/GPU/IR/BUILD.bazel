@@ -34,6 +34,7 @@ iree_td_library(
     ),
     deps = [
         "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
+        "@llvm-project//mlir:DialectUtilsIncGen",
         "@llvm-project//mlir:OpBaseTdFiles",
         "@llvm-project//mlir:SideEffectInterfacesTdFiles",
     ],
@@ -135,10 +136,7 @@ iree_gentbl_cc_library(
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "IREEGPUAttrs.td",
-    deps = [
-        ":td_files",
-        "@llvm-project//mlir:DialectUtilsIncGen",
-    ],
+    deps = [":td_files"],
 )
 
 iree_gentbl_cc_library(
