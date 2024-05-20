@@ -12,8 +12,10 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 
-namespace mlir::iree_compiler {
+namespace mlir::iree_compiler::InputConversion {
+
 namespace {
+
 struct AutoInputConversionPipelinePass final
     : AutoInputConversionPipelineBase<AutoInputConversionPipelinePass> {
   AutoInputConversionPipelinePass(PipelineExtensions *pipelineExtensions)
@@ -72,6 +74,7 @@ void AutoInputConversionPipelinePass::getDependentDialects(
     pipelineExtensions->registerDialects(registry);
   }
 }
+
 } // namespace
 
 std::unique_ptr<OperationPass<ModuleOp>>
@@ -84,4 +87,4 @@ createAutoInputConversionPipelinePass(PipelineExtensions *pipelineExtensions) {
   return std::make_unique<AutoInputConversionPipelinePass>(pipelineExtensions);
 }
 
-} // namespace mlir::iree_compiler
+} // namespace mlir::iree_compiler::InputConversion

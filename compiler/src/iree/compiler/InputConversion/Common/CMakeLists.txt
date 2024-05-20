@@ -41,6 +41,7 @@ iree_cc_library(
     "Passes.h"
     "Utils.h"
   SRCS
+    "ConvertPrimitiveType.cpp"
     "IREEImportPublic.cpp"
     "ImportMLProgram.cpp"
     "Passes.cpp"
@@ -65,6 +66,7 @@ iree_cc_library(
     MLIRPass
     MLIRSCFDialect
     MLIRSCFToControlFlow
+    MLIRSupport
     MLIRTensorDialect
     MLIRTensorUtils
     MLIRTransformUtils
@@ -73,6 +75,8 @@ iree_cc_library(
     iree::compiler::Dialect::Flow::Transforms
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::Util::IR
+    iree::compiler::Dialect::Util::Transforms
+    iree::compiler::Pipelines::Options
     iree::compiler::Utils
   PUBLIC
 )
@@ -95,6 +99,7 @@ iree_cc_library(
     MLIRPass
     MLIRTransformUtils
     MLIRTransforms
+    iree::compiler::Pipelines::Options
     iree::compiler::PluginAPI
     iree::compiler::Utils
   PUBLIC

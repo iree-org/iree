@@ -146,45 +146,6 @@ def ImportResources : Pass<"iree-util-import-resources", ""> {
 }
 
 //===----------------------------------------------------------------------===//
-// Type Conversion
-//===----------------------------------------------------------------------===//
-
-def DemoteI64ToI32 : Pass<"iree-util-demote-i64-to-i32", "mlir::ModuleOp"> {
-  let summary = "Demotes i64 types to i32 types.";
-  let constructor = [{
-    mlir::iree_compiler::IREE::Util::createDemoteI64ToI32Pass()
-  }];
-}
-
-def DemoteF32ToF16 : Pass<"iree-util-demote-f32-to-f16", "mlir::ModuleOp"> {
-  let summary = "Demotes f32 types to f16 types.";
-  let constructor = [{
-    mlir::iree_compiler::IREE::Util::createDemoteF32ToF16Pass()
-  }];
-}
-
-def DemoteF64ToF32 : Pass<"iree-util-demote-f64-to-f32", "mlir::ModuleOp"> {
-  let summary = "Demotes f64 types to f32 types.";
-  let constructor = [{
-    mlir::iree_compiler::IREE::Util::createDemoteF64ToF32Pass()
-  }];
-}
-
-def PromoteF16ToF32 : Pass<"iree-util-promote-f16-to-f32", "mlir::ModuleOp"> {
-  let summary = "Promotes f16 types to f32 types.";
-  let constructor = [{
-    mlir::iree_compiler::IREE::Util::createPromoteF16ToF32Pass()
-  }];
-}
-
-def PromoteBF16ToF32 : Pass<"iree-util-promote-bf16-to-f32", "mlir::ModuleOp"> {
-  let summary = "Promotes bf16 types to f32 types.";
-  let constructor = [{
-    mlir::iree_compiler::IREE::Util::createPromoteBF16ToF32Pass()
-  }];
-}
-
-//===----------------------------------------------------------------------===//
 // Debug/test passes
 //===----------------------------------------------------------------------===//
 

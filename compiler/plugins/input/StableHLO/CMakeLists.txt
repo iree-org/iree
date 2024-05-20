@@ -30,6 +30,7 @@ iree_cc_library(
     ChloOps
     MLIRIR
     MLIRPass
+    MLIRShapeDialect
     MLIRTransforms
     StablehloOps
     VhloOps

@@ -17,6 +17,7 @@
 #include "iree/hal/drivers/hip/pipeline_layout.h"
 #include "iree/hal/drivers/hip/status_util.h"
 #include "iree/hal/drivers/hip/tracing.h"
+#include "iree/hal/utils/collective_batch.h"
 #include "iree/hal/utils/resource_set.h"
 
 // The maximal number of HIP graph nodes that can run concurrently between
@@ -54,6 +55,9 @@ typedef struct iree_hal_hip_graph_command_buffer_t {
   // Nodes added to the command buffer after the last barrier.
   hipGraphNode_t hip_graph_nodes[IREE_HAL_HIP_MAX_CONCURRENT_GRAPH_NODE_COUNT];
   iree_host_size_t graph_node_count;
+
+  // Iteratively constructed batch of collective operations.
+  iree_hal_collective_batch_t collective_batch;
 
   int32_t push_constants[IREE_HAL_HIP_MAX_PUSH_CONSTANT_COUNT];
 
@@ -196,6 +200,12 @@ iree_status_t iree_hal_hip_graph_command_buffer_create(
       iree_hal_resource_set_allocate(block_pool, &command_buffer->resource_set);
 
   if (iree_status_is_ok(status)) {
+    iree_hal_collective_batch_initialize(&command_buffer->arena,
+                                         command_buffer->resource_set,
+                                         &command_buffer->collective_batch);
+  }
+
+  if (iree_status_is_ok(status)) {
     *out_command_buffer = &command_buffer->base;
   } else {
     iree_hal_command_buffer_release(&command_buffer->base);
@@ -212,6 +222,9 @@ static void iree_hal_hip_graph_command_buffer_destroy(
   iree_allocator_t host_allocator = command_buffer->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  // Drop any pending collective batches before we tear things down.
+  iree_hal_collective_batch_clear(&command_buffer->collective_batch);
+
   if (command_buffer->hip_graph != NULL) {
     IREE_HIP_IGNORE_ERROR(command_buffer->symbols,
                           hipGraphDestroy(command_buffer->hip_graph));
@@ -225,6 +238,7 @@ static void iree_hal_hip_graph_command_buffer_destroy(
   command_buffer->hip_barrier_node = NULL;
   command_buffer->graph_node_count = 0;
 
+  iree_hal_collective_batch_deinitialize(&command_buffer->collective_batch);
   iree_hal_resource_set_free(command_buffer->resource_set);
   iree_arena_deinitialize(&command_buffer->arena);
   iree_allocator_free(host_allocator, command_buffer);
@@ -243,6 +257,47 @@ hipGraphExec_t iree_hal_hip_graph_command_buffer_handle(
   iree_hal_hip_graph_command_buffer_t* command_buffer =
       iree_hal_hip_graph_command_buffer_cast(base_command_buffer);
   return command_buffer->hip_exec;
+}
+
+// Flushes any pending batched collective operations.
+// Must be called before any other non-collective nodes are added to the graph
+// or a barrier is encountered.
+static iree_status_t iree_hal_hip_graph_command_buffer_flush_collectives(
+    iree_hal_hip_graph_command_buffer_t* command_buffer) {
+  // NOTE: we could move this out into callers by way of an always-inline shim -
+  // that would make this a single compare against the command buffer state we
+  // are likely to access immediately after anyway and keep overheads minimal.
+  if (IREE_LIKELY(iree_hal_collective_batch_is_empty(
+          &command_buffer->collective_batch))) {
+    return iree_ok_status();
+  }
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  // TODO(#9580): use HIP graph capture so that the NCCL calls end up in the
+  // graph:
+  // https://docs.nvidia.com/deeplearning/nccl/user-guide/docs/usage/hipgraph.html
+  //
+  // Something like:
+  //  syms->cuStreamBeginCapture(nccl_stream);
+  //  iree_hal_hip_nccl_submit_batch(command_buffer->context,
+  //                                  &command_buffer->collective_batch,
+  //                                  nccl_stream);
+  //  syms->cuStreamEndCapture(nccl_stream, &child_graph);
+  //  syms->cuGraphAddChildGraphNode(..., child_graph);
+  //  syms->cuGraphDestroy(child_graph);  // probably, I think it gets cloned
+  //
+  // Note that we'll want to create a scratch stream that we use to perform the
+  // capture - we could memoize that on the command buffer or on the device
+  // (though that introduces potential threading issues). There may be a special
+  // stream mode for these capture-only streams that is lighter weight than a
+  // normal stream.
+  iree_status_t status = iree_make_status(
+      IREE_STATUS_UNIMPLEMENTED,
+      "HIP graph capture of collective operations not yet implemented");
+
+  iree_hal_collective_batch_clear(&command_buffer->collective_batch);
+  IREE_TRACE_ZONE_END(z0);
+  return status;
 }
 
 static iree_status_t iree_hal_hip_graph_command_buffer_begin(
@@ -270,6 +325,10 @@ static iree_status_t iree_hal_hip_graph_command_buffer_end(
     iree_hal_command_buffer_t* base_command_buffer) {
   iree_hal_hip_graph_command_buffer_t* command_buffer =
       iree_hal_hip_graph_command_buffer_cast(base_command_buffer);
+
+  // Flush any pending collective batches.
+  IREE_RETURN_IF_ERROR(
+      iree_hal_hip_graph_command_buffer_flush_collectives(command_buffer));
 
   IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_END(command_buffer);
 
@@ -322,6 +381,9 @@ static void iree_hal_hip_graph_command_buffer_end_debug_group(
 static iree_status_t
 iree_hal_hip_graph_command_buffer_execution_barrier_internal(
     iree_hal_hip_graph_command_buffer_t* command_buffer) {
+  IREE_RETURN_IF_ERROR(
+      iree_hal_hip_graph_command_buffer_flush_collectives(command_buffer));
+
   IREE_ASSERT_GT(command_buffer->graph_node_count, 0,
                  "expected at least one node before a barrier");
 
@@ -429,6 +491,9 @@ static iree_status_t iree_hal_hip_graph_command_buffer_fill_buffer(
   IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_BEGIN(command_buffer);
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_hip_graph_command_buffer_flush_collectives(command_buffer));
+
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0, iree_hal_resource_set_insert(command_buffer->resource_set, 1,
                                        &target_buffer));
 
@@ -478,6 +543,9 @@ static iree_status_t iree_hal_hip_graph_command_buffer_update_buffer(
   }
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_BEGIN(command_buffer);
+
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_hip_graph_command_buffer_flush_collectives(command_buffer));
 
   // Allocate scratch space in the arena for the data and copy it in.
   // The update buffer API requires that the command buffer capture the host
@@ -544,6 +612,9 @@ static iree_status_t iree_hal_hip_graph_command_buffer_copy_buffer(
   IREE_TRACE_ZONE_BEGIN(z0);
   IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_BEGIN(command_buffer);
 
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_hip_graph_command_buffer_flush_collectives(command_buffer));
+
   const iree_hal_buffer_t* buffers[2] = {source_buffer, target_buffer};
   IREE_RETURN_AND_END_ZONE_IF_ERROR(
       z0,
@@ -593,7 +664,11 @@ static iree_status_t iree_hal_hip_graph_command_buffer_collective(
     iree_hal_collective_op_t op, uint32_t param,
     iree_hal_buffer_binding_t send_binding,
     iree_hal_buffer_binding_t recv_binding, iree_device_size_t element_count) {
-  return iree_status_from_code(IREE_STATUS_UNIMPLEMENTED);
+  iree_hal_hip_graph_command_buffer_t* command_buffer =
+      iree_hal_hip_graph_command_buffer_cast(base_command_buffer);
+  return iree_hal_collective_batch_append(&command_buffer->collective_batch,
+                                          channel, op, param, send_binding,
+                                          recv_binding, element_count);
 }
 
 static iree_status_t iree_hal_hip_graph_command_buffer_push_constants(
@@ -662,6 +737,9 @@ static iree_status_t iree_hal_hip_graph_command_buffer_dispatch(
   iree_hal_hip_graph_command_buffer_t* command_buffer =
       iree_hal_hip_graph_command_buffer_cast(base_command_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
+
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_hip_graph_command_buffer_flush_collectives(command_buffer));
 
   // Lookup kernel parameters used for side-channeling additional launch
   // information from the compiler.

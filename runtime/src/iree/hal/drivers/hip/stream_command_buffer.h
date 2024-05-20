@@ -11,6 +11,7 @@
 #include "iree/hal/api.h"
 #include "iree/hal/drivers/hip/dynamic_symbols.h"
 #include "iree/hal/drivers/hip/hip_headers.h"
+#include "iree/hal/drivers/hip/rccl_dynamic_symbols.h"
 #include "iree/hal/drivers/hip/tracing.h"
 
 #ifdef __cplusplus
@@ -31,6 +32,7 @@ extern "C" {
 iree_status_t iree_hal_hip_stream_command_buffer_create(
     iree_hal_device_t* device,
     const iree_hal_hip_dynamic_symbols_t* hip_symbols,
+    const iree_hal_hip_nccl_dynamic_symbols_t* nccl_symbols,
     iree_hal_hip_tracing_context_t* tracing_context,
     iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
