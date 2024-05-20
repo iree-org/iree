@@ -37,11 +37,13 @@ iree_cc_library(
   DEPS
     ::IREEGPUAttrs
     ::IREEGPUDialectGen
+    ::IREEGPUEnums
     ::IREEGPUInterfaces
     ::IREEGPUOpsGen
     IREEVectorExtDialect
     LLVMSupport
     MLIRAMDGPUDialect
+    MLIRControlFlowInterfaces
     MLIRIR
     MLIRLinalgDialect
     MLIRParser
@@ -65,12 +67,20 @@ iree_tablegen_library(
 
 iree_tablegen_library(
   NAME
+    IREEGPUEnums
+  TD_FILE
+    "IREEGPUEnums.td"
+  OUTS
+    --gen-enum-decls IREEGPUEnums.h.inc
+    --gen-enum-defs IREEGPUEnums.cpp.inc
+)
+
+iree_tablegen_library(
+  NAME
     IREEGPUAttrs
   TD_FILE
     "IREEGPUAttrs.td"
   OUTS
-    --gen-enum-decls IREEGPUEnums.h.inc
-    --gen-enum-defs IREEGPUEnums.cpp.inc
     --gen-attrdef-decls IREEGPUAttrs.h.inc
     --gen-attrdef-defs IREEGPUAttrs.cpp.inc
 )
