@@ -844,7 +844,7 @@ HalBufferView HalDevice::FromDLPackCapsule(py::object input_capsule) {
   iree_hal_buffer_params_t params;
   memset(&params, 0, sizeof(params));
   params.usage = IREE_HAL_BUFFER_USAGE_DEFAULT;
-  params.access = IREE_HAL_MEMORY_ACCESS_ANY;
+  params.access = IREE_HAL_MEMORY_ACCESS_ALL;
   params.type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
   iree_hal_external_buffer_t external_buffer;
   memset(&external_buffer, 0, sizeof(external_buffer));
