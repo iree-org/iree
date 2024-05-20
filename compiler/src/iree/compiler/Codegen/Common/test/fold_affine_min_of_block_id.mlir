@@ -1,8 +1,8 @@
-// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-codegen-fold-affinemin-in-distributed-loops, canonicalize)))))' --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-codegen-fold-affinemin-in-distributed-loops, canonicalize)))))' %s | FileCheck %s
 
 hal.executable public @generic_static {
-  hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_80">}>) {
-    hal.executable.export public @generic_static ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) attributes {translation_info = #iree_codegen.translation_info<LLVMGPUTransposeSharedMem>, workgroup_size = [8 : index, 32 : index, 1 : index]} {
+  hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb">) {
+    hal.executable.export public @generic_static ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer, ReadOnly>, <1, storage_buffer>]>]>) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index):
       %c128 = arith.constant 128 : index
       %c1 = arith.constant 1 : index
@@ -27,7 +27,7 @@ hal.executable public @generic_static {
         %5 = affine.apply affine_map<()[s0] -> (s0 * 32)>()[%workgroup_id_y]
         %6 = flow.dispatch.tensor.load %0, offsets = [%4, %5], sizes = [%3, %2], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<4096x4096xf32>> -> tensor<?x?xf32>
         %7 = tensor.empty(%2, %3) : tensor<?x?xf32>
-        %8 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%6 : tensor<?x?xf32>) outs(%7 : tensor<?x?xf32>) attrs =  {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[32, 32]]>} {
+        %8 = linalg.generic {indexing_maps = [affine_map<(d0, d1) -> (d1, d0)>, affine_map<(d0, d1) -> (d0, d1)>], iterator_types = ["parallel", "parallel"]} ins(%6 : tensor<?x?xf32>) outs(%7 : tensor<?x?xf32>) {
         ^bb0(%in: f32, %out: f32):
           linalg.yield %in : f32
         } -> tensor<?x?xf32>

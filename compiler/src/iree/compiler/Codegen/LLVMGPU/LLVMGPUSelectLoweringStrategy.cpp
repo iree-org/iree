@@ -41,6 +41,7 @@ public:
     // clang-format off
     registry
         .insert<IREE::Codegen::IREECodegenDialect,
+                IREE::GPU::IREEGPUDialect,
                 IREE::HAL::HALDialect,
                 IREE::LinalgExt::IREELinalgExtDialect,
                 linalg::LinalgDialect,

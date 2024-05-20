@@ -1,13 +1,12 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-llvmgpu-tile-and-distribute))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-codegen-test-target=sm_60 --pass-pipeline="builtin.module(func.func(iree-llvmgpu-tile-and-distribute))" %s | FileCheck %s
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[2, 256, 4]]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #map = affine_map<()[s0] -> (s0 * 2)>
 #map1 = affine_map<()[s0] -> (s0 * 256)>
 #map2 = affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt workgroup_size = [64, 1, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 module {
-  func.func @dot_dispatch_0() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation} {
+  func.func @dot_dispatch_0() attributes {translation_info = #translation} {
     %cst = arith.constant 0.000000e+00 : f32
     %c0 = arith.constant 0 : index
     %c1024 = arith.constant 1024 : index
@@ -67,7 +66,6 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 8, 32, 32]]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #map = affine_map<()[s0] -> (s0 * 8)>
 #map1 = affine_map<()[s0] -> (s0 * 32)>
 #map2 = affine_map<(d0, d1, d2)[s0] -> (d0 * 32768 + s0 + d1 * 1024 + d2)>
@@ -75,7 +73,7 @@ module {
 #map4 = affine_map<(d0, d1, d2)[s0] -> (d0 * 2048 + s0 + d1 * 64 + d2)>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt workgroup_size = [8, 8, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 module {
-  func.func @batch_matmul_func() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation} {
+  func.func @batch_matmul_func() attributes {translation_info = #translation} {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f32
     %c4 = arith.constant 4 : index
@@ -136,13 +134,12 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[2, 32, 4]]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #map = affine_map<()[s0] -> (s0 * 2)>
 #map1 = affine_map<()[s0] -> (s0 * 32)>
 #map2 = affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt workgroup_size = [64, 8, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 module {
-  func.func @dot_dispatch_0() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation} {
+  func.func @dot_dispatch_0() attributes {translation_info = #translation} {
     %cst = arith.constant 0.000000e+00 : f32
     %c0 = arith.constant 0 : index
     %c1024 = arith.constant 1024 : index
@@ -204,12 +201,11 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[]]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #map = affine_map<(d0) -> (d0)>
 #map1 = affine_map<(d0) -> ()>
 #translation = #iree_codegen.translation_info<LLVMGPUVectorize workgroup_size = [1, 1, 1]>
 module {
-  func.func @predict_dispatch_153() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation} {
+  func.func @predict_dispatch_153() attributes {translation_info = #translation} {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0x7FC00000 : f32
     %cst_0 = arith.constant 0xFF800000 : f32
@@ -239,14 +235,13 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 1, 1, 256, 4, 4, 4]]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #map = affine_map<()[s0] -> (s0 * 256)>
 #map1 = affine_map<(d0) -> (256, -d0 + 56)>
 #map2 = affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 200704 + s0 + d1 * 3136 + d2 * 56 + d3)>
 #map3 = affine_map<(d0, d1, d2, d3)[s0] -> (d0 * 64 + s0 + d1 + d2 + d3)>
 #translation = #iree_codegen.translation_info<LLVMGPUVectorize workgroup_size = [64, 1, 1]>
 module {
-  func.func @conv_dispatch() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation} {
+  func.func @conv_dispatch() attributes {translation_info = #translation} {
     %c56 = arith.constant 56 : index
     %c64 = arith.constant 64 : index
     %c802816 = arith.constant 802816 : index
@@ -297,7 +292,6 @@ module {
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[0, 1, 2, 256, 4]]>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt workgroup_size = [64, 8, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #map = affine_map<()[s0] -> (s0 * 2)>
 #map1 = affine_map<()[s0] -> (s0 * 256)>
 #map2 = affine_map<(d0)[s0] -> (-d0 + s0, 2)>
@@ -308,7 +302,7 @@ module {
 #map7 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d1, d4)>
 #map8 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>
 module {
-  func.func @contract_4d() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation} {
+  func.func @contract_4d() attributes {translation_info = #translation} {
     %c12 = arith.constant 12 : index
     %c0 = arith.constant 0 : index
     %cst = arith.constant 8.000000e+00 : f32

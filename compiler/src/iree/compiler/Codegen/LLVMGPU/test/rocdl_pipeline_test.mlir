@@ -1,4 +1,6 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-llvmgpu-configuration-pipeline), iree-codegen-linalg-to-rocdl-pipeline)))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-codegen-test-target=gfx908 --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-llvmgpu-configuration-pipeline), iree-codegen-linalg-to-rocdl-pipeline)))" %s | FileCheck %s --check-prefix=CDNA1
+// RUN: iree-opt --split-input-file --iree-codegen-test-target=gfx940 --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-llvmgpu-configuration-pipeline), iree-codegen-linalg-to-rocdl-pipeline)))" %s | FileCheck %s --check-prefix=CDNA3
+// RUN: iree-opt --split-input-file --iree-codegen-test-target=gfx1100 --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-llvmgpu-configuration-pipeline), iree-codegen-linalg-to-rocdl-pipeline)))" %s | FileCheck %s --check-prefix=RDNA3
 
 // Verify that a simple element wise op gets lowered succefully all the way to
 // nvvm/llvm dialect.
@@ -11,7 +13,7 @@
   ]>
 ]>
 hal.executable @simpleMath_ex_dispatch_0 {
-  hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.alias_target<"gfx908">}>) {
+  hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
   hal.executable.export @add_dispatch_0 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1
@@ -38,9 +40,9 @@ hal.executable @simpleMath_ex_dispatch_0 {
   }
 }
 
-// CHECK-LABEL: hal.executable public @simpleMath_ex_dispatch_0
-//       CHECK:   hal.executable.variant public @rocm
-//       CHECK:   llvm.fadd
+// CDNA1-LABEL: hal.executable public @simpleMath_ex_dispatch_0
+//       CDNA1:   hal.executable.variant public @rocm
+//       CDNA1:   llvm.fadd
 
 // -----
 
@@ -55,7 +57,7 @@ hal.executable @simpleMath_ex_dispatch_0 {
   ]>
 ]>
 hal.executable @dot_dispatch_0 {
-  hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.alias_target<"gfx1100">}>) {
+  hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
     hal.executable.export @dot_dispatch_0 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
@@ -86,20 +88,20 @@ hal.executable @dot_dispatch_0 {
   }
 }
 
-//   CHECK-LABEL: hal.executable public @dot_dispatch_0
-//         CHECK:   hal.executable.variant public @rocm
-//       CHECK-NOT:   llvm.store
-//   CHECK-COUNT-3:   llvm.load {{.*}} : !llvm.ptr<1> -> vector<4xf32>
-//           CHECK:   llvm.br
-//   CHECK-COUNT-3:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr<3>
-//  CHECK-COUNT-32:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<4xf32>
-// CHECK-COUNT-128:   llvm.intr.fmuladd({{.*}}) : (vector<4xf32>, vector<4xf32>, vector<4xf32>) -> vector<4xf32>
-//   CHECK-COUNT-3:   llvm.load {{.*}} : !llvm.ptr<1> -> vector<4xf32>
-//           CHECK:   llvm.br
-//   CHECK-COUNT-3:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr<3>
-//  CHECK-COUNT-32:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<4xf32>
-// CHECK-COUNT-128:   llvm.intr.fmuladd({{.*}}) : (vector<4xf32>, vector<4xf32>, vector<4xf32>) -> vector<4xf32>
-//   CHECK-COUNT-4:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr<1>
+//   RDNA3-LABEL: hal.executable public @dot_dispatch_0
+//         RDNA3:   hal.executable.variant public @rocm
+//       RDNA3-NOT:   llvm.store
+//   RDNA3-COUNT-3:   llvm.load {{.*}} : !llvm.ptr<1> -> vector<4xf32>
+//           RDNA3:   llvm.br
+//   RDNA3-COUNT-3:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr<3>
+//  RDNA3-COUNT-32:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<4xf32>
+// RDNA3-COUNT-128:   llvm.intr.fmuladd({{.*}}) : (vector<4xf32>, vector<4xf32>, vector<4xf32>) -> vector<4xf32>
+//   RDNA3-COUNT-3:   llvm.load {{.*}} : !llvm.ptr<1> -> vector<4xf32>
+//           RDNA3:   llvm.br
+//   RDNA3-COUNT-3:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr<3>
+//  RDNA3-COUNT-32:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<4xf32>
+// RDNA3-COUNT-128:   llvm.intr.fmuladd({{.*}}) : (vector<4xf32>, vector<4xf32>, vector<4xf32>) -> vector<4xf32>
+//   RDNA3-COUNT-4:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr<1>
 
 // -----
 
@@ -112,7 +114,7 @@ hal.executable @dot_dispatch_0 {
   ]>
 ]>
 hal.executable @ext_fp8_dispatch {
-  hal.executable.variant @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.alias_target<"gfx940">}>) {
+  hal.executable.variant @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
     hal.executable.export @ext_fp8_dispatch layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index, %arg3 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3
@@ -144,9 +146,9 @@ hal.executable @ext_fp8_dispatch {
   }
 }
 
-//   CHECK-LABEL: hal.executable public @ext_fp8_dispatch
-//         CHECK:   hal.executable.variant public @rocm
-//     CHECK-DAG:     %[[EXTF8E4M3:.+]] = rocdl.cvt.f32.fp8 %{{.*}} : f32
-//     CHECK-DAG:     %[[EXTF8E5M2:.+]] = rocdl.cvt.f32.bf8 %{{.*}} : f32
-//         CHECK:     %[[ADD:.+]] = llvm.fadd %[[EXTF8E4M3]], %[[EXTF8E5M2]] : f32
-//         CHECK:     llvm.store %[[ADD]], %{{.*}} : f32, !llvm.ptr<1>
+//   CDNA3-LABEL: hal.executable public @ext_fp8_dispatch
+//         CDNA3:   hal.executable.variant public @rocm
+//     CDNA3-DAG:     %[[EXTF8E4M3:.+]] = rocdl.cvt.f32.fp8 %{{.*}} : f32
+//     CDNA3-DAG:     %[[EXTF8E5M2:.+]] = rocdl.cvt.f32.bf8 %{{.*}} : f32
+//         CDNA3:     %[[ADD:.+]] = llvm.fadd %[[EXTF8E4M3]], %[[EXTF8E5M2]] : f32
+//         CDNA3:     llvm.store %[[ADD]], %{{.*}} : f32, !llvm.ptr<1>

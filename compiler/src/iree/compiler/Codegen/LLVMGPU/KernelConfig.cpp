@@ -724,9 +724,9 @@ static LogicalResult setContractConfig(IREE::GPU::TargetAttr target,
     /// Try tensorcore config first.
     if (supportsTensorCore(target, op)) {
       SmallVector<TileWorkgroupSizePair> TCtileSizeConfig;
-      Type elementType = llvm::cast<RankedTensorType>(
-                             op.getDpsInputOperand(0)->get().getType())
-                             .getElementType();
+      Type elementType =
+          cast<ShapedType>(op.getDpsInputOperand(0)->get().getType())
+              .getElementType();
 
       getTensorCoreConfig(TCtileSizeConfig, elementType, sizeM, sizeN, sizeK);
       // Pick the best configuration where the original shape is aligned on the

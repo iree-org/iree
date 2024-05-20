@@ -1,12 +1,11 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-distribute, cse))" %s | FileCheck %s
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #map = affine_map<()[s0] -> (s0 * 256)>
 #map1 = affine_map<(d0, d1)[s0] -> (d0 * 1024 + s0 + d1)>
 #map2 = affine_map<(d0) -> (d0 * 4)>
 #translation = #iree_codegen.translation_info<LLVMGPUVectorize workgroup_size = [64, 1, 1]>
 module {
-  func.func @add_tensor() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation} {
+  func.func @add_tensor() attributes {translation_info = #translation} {
     %cst = arith.constant 0.000000e+00 : f32
     %c64 = arith.constant 64 : index
     %c0 = arith.constant 0 : index

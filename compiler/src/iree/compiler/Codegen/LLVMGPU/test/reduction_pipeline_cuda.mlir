@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-codegen-decompose-softmax), iree-llvmgpu-select-lowering-strategy, iree-codegen-lower-executable-using-transform-dialect, func.func(iree-llvmgpu-lower-executable-target)))))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-codegen-test-target=sm_60 --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(func.func(iree-codegen-decompose-softmax), iree-llvmgpu-select-lowering-strategy, iree-codegen-lower-executable-using-transform-dialect, func.func(iree-llvmgpu-lower-executable-target)))))" %s | FileCheck %s
 
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -7,7 +7,7 @@
   ]>
 ]>
 hal.executable @warp_reduction_dispatch {
-hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>) {
+hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
   hal.executable.export @warp_reduction_dispatch layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
@@ -110,7 +110,7 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb", {iree.gpu.target =
   ]>
 ]>
 hal.executable @warp_reduction_broadcast_dispatch {
-hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>) {
+hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
   hal.executable.export @warp_reduction_broadcast_dispatch layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
@@ -203,7 +203,7 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb", {iree.gpu.target =
   ]>
 ]>
 hal.executable @softmax {
-hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>) {
+hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
   hal.executable.export @softmax layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2

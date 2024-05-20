@@ -1,5 +1,5 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-convert-to-rocdl))))" %s | FileCheck %s
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-convert-to-rocdl))))" --iree-rocm-index-bits=32 %s | FileCheck %s --check-prefix=INDEX32
+// RUN: iree-opt --split-input-file --iree-codegen-test-target=gfx908 --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-convert-to-rocdl))))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-codegen-test-target=gfx908 --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-convert-to-rocdl))))" --iree-rocm-index-bits=32 %s | FileCheck %s --check-prefix=INDEX32
 
 // Test that that standard and GPU ops are converted to LLVM and NVVM.
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
@@ -12,7 +12,7 @@
   ]>
 ]>
 hal.executable @abs_ex_dispatch_0 {
-  hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.alias_target<"gfx908">}>) {
+  hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
     hal.executable.export @abs_ex_dispatch_0 layout(#pipeline_layout)
     builtin.module {
       func.func @abs_ex_dispatch_0() {
@@ -57,7 +57,7 @@ hal.executable @abs_ex_dispatch_0 {
   ]>
 ]>
 hal.executable @abs_ex_dispatch_0 {
-  hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.alias_target<"gfx908">}>) {
+  hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
     hal.executable.export @abs_ex_dispatch_0 layout(#pipeline_layout)
     builtin.module {
       func.func @reduction_maximum() {
@@ -86,7 +86,7 @@ hal.executable @abs_ex_dispatch_0 {
   ]>
 ]>
 hal.executable @simple_barrier {
-  hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.alias_target<"gfx908">}>) {
+  hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
     hal.executable.export @simple_barrier layout(#pipeline_layout)
     builtin.module {
       func.func @simple_barrier() {
@@ -107,7 +107,7 @@ hal.executable @simple_barrier {
   ]>
 ]>
 hal.executable @masked_load_store {
-  hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.alias_target<"gfx908">}>) {
+  hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
     hal.executable.export @masked_load_store layout(#pipeline_layout)
     builtin.module {
       func.func @masked_load_store() {

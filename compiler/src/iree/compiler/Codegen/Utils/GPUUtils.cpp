@@ -956,23 +956,38 @@ bool hasUkernelSupportedGpuArch(IREE::HAL::ExecutableTargetAttr targetAttr) {
 //===----------------------------------------------------------------------===//
 
 IREE::GPU::TargetAttr getGPUTargetAttr(IREE::HAL::ExecutableTargetAttr target) {
-  if (!target)
-    return nullptr;
-  auto config = target.getConfiguration();
-  if (!config)
-    return nullptr;
-  auto fullAttr = config.getAs<IREE::GPU::TargetAttr>("iree.gpu.target");
-  if (!fullAttr && !clTestTarget.empty()) {
+  if (auto config = target.getConfiguration()) {
+    if (auto attr = config.getAs<IREE::GPU::TargetAttr>("iree.gpu.target"))
+      return attr;
+  }
+  if (!clTestTarget.empty()) {
     // Use the target specified in the command line for testing purposes.
-    fullAttr = IREE::GPU::getFullTarget(target.getBackend(), clTestTarget,
-                                        target.getContext());
+    return IREE::GPU::getFullTarget(target.getBackend(), clTestTarget,
+                                    target.getContext());
   }
 
-  return fullAttr;
+  return nullptr;
 }
 
 IREE::GPU::TargetAttr getGPUTargetAttr(Operation *op) {
-  return getGPUTargetAttr(IREE::HAL::ExecutableTargetAttr::lookup(op));
+  if (auto target = IREE::HAL::ExecutableTargetAttr::lookup(op)) {
+    return getGPUTargetAttr(IREE::HAL::ExecutableTargetAttr::lookup(op));
+  }
+  if (!clTestTarget.empty()) {
+    // Guess what the target API is based on common scheme. This does not work
+    // for cases like "ampere" which can be accepted by both CUDA and Vulkan.
+    // So it's very limited. However, it makes writing tests simpler. Maybe we
+    // should consider making it explicit in the clTestTarget what API we are
+    // targeting.
+    StringRef backend;
+    if (StringRef(clTestTarget).starts_with("sm_"))
+      backend = "cuda";
+    else if (StringRef(clTestTarget).starts_with("gfx"))
+      backend = "rocm";
+    // Use the target specified in the command line for testing purposes.
+    return IREE::GPU::getFullTarget(backend, clTestTarget, op->getContext());
+  }
+  return nullptr;
 }
 
 } // namespace mlir::iree_compiler

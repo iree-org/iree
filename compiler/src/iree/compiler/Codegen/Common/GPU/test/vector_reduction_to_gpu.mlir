@@ -1,10 +1,10 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(func.func(iree-codegen-vector-reduction-to-gpu, cse))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-codegen-test-target=sm_60 --pass-pipeline='builtin.module(func.func(iree-codegen-vector-reduction-to-gpu, cse))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-codegen-test-target=gfx940 --pass-pipeline='builtin.module(func.func(iree-codegen-vector-reduction-to-gpu, cse))' %s | FileCheck %s --check-prefix=CDNA3
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #map = affine_map<()[s0, s1] -> (s1 * 2 + s0 floordiv 32)>
 #translation_info = #iree_codegen.translation_info<None workgroup_size = [32, 1, 1]>
 module {
-  func.func @simple_reduce() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation_info} {
+  func.func @simple_reduce() attributes {translation_info = #translation_info} {
     %c0 = arith.constant 0 : index
     %cst = arith.constant dense<0.000000e+00> : vector<1xf32>
     %cst_0 = arith.constant 0.000000e+00 : f32
@@ -69,11 +69,10 @@ module {
 
 // Make sure memref.load from uniform buffers are hoisted out as uniform code.
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #translation_info = #iree_codegen.translation_info<None workgroup_size = [32, 1, 1]>
 #map = affine_map<()[s0, s1] -> (s1 * 2 + s0 floordiv 32)>
 module {
-  func.func @reduce_uniform_buffer_offset() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation_info} {
+  func.func @reduce_uniform_buffer_offset() attributes {translation_info = #translation_info} {
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
     %cst = arith.constant dense<0.000000e+00> : vector<1xf32>
@@ -124,12 +123,11 @@ module {
 
 // Make sure memref.load from readonly storage buffers are hoisted out as uniform code.
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 
 #map = affine_map<()[s0, s1] -> (s1 * 2 + s0 floordiv 32)>
 #translation_info = #iree_codegen.translation_info<None workgroup_size = [32, 1, 1]>
 module {
-  func.func @reduce_storage_buffer_offset() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation_info} {
+  func.func @reduce_storage_buffer_offset() attributes {translation_info = #translation_info} {
     %c0 = arith.constant 0 : index
     %c1 = arith.constant 1 : index
     %cst = arith.constant dense<0.000000e+00> : vector<1xf32>
@@ -178,10 +176,9 @@ module {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #translation_info = #iree_codegen.translation_info<None workgroup_size = [32, 1, 1]>
 module {
-  func.func @shared_memory_copy() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation_info} {
+  func.func @shared_memory_copy() attributes {translation_info = #translation_info} {
     %c0 = arith.constant 0 : index
     %cst = arith.constant dense<0.000000e+00> : vector<1xf32>
     %cst_0 = arith.constant 0.000000e+00 : f32
@@ -212,12 +209,11 @@ module {
 
 // Check that we multi-row matvec gets distributed across subgroup threads.
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.alias_target<"gfx940">}>
 #translation_info = #iree_codegen.translation_info<None workgroup_size = [64, 1, 1]>
 #map = affine_map<()[s0] -> (s0 * 4)>
 #map1 = affine_map<(d0, d1) -> (0, d1)>
 module {
-  func.func @multirow() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb, translation_info = #translation_info} {
+  func.func @multirow() attributes {translation_info = #translation_info} {
     %cst = arith.constant dense<0.000000e+00> : vector<4x512xf16>
     %c0 = arith.constant 0 : index
     %cst_0 = arith.constant dense<0.000000e+00> : vector<1x4xf16>
@@ -248,24 +244,23 @@ module {
   }
 }
 
-// CHECK-LABEL: func.func @multirow()
-//       CHECK:   scf.for {{.*}} -> (vector<4x8xf16>) {
-//       CHECK:     vector.transfer_read {{.*}} : memref<32000x4096xf16, #hal.descriptor_type<storage_buffer>>, vector<4x8xf16>
-//       CHECK:     vector.transfer_read {{.*}} : memref<1x4096xf16, #hal.descriptor_type<storage_buffer>>, vector<4x8xf16>
-//       CHECK:     arith.mulf %{{.*}}, %{{.*}} : vector<4x8xf16>
-//       CHECK:     arith.addf %{{.*}}, %{{.*}} : vector<4x8xf16>
-//       CHECK:   }
-// CHECK-COUNT-12: gpu.shuffle xor
-//       CHECK:   scf.if {{.*}} {
-//       CHECK:     vector.transfer_write {{.*}} : vector<4xf16>, memref<1x32000xf16, #hal.descriptor_type<storage_buffer>>
-//       CHECK:   }
-//  CHECK-NEXT:   return
+// CDNA3-LABEL: func.func @multirow()
+//       CDNA3:   scf.for {{.*}} -> (vector<4x8xf16>) {
+//       CDNA3:     vector.transfer_read {{.*}} : memref<32000x4096xf16, #hal.descriptor_type<storage_buffer>>, vector<4x8xf16>
+//       CDNA3:     vector.transfer_read {{.*}} : memref<1x4096xf16, #hal.descriptor_type<storage_buffer>>, vector<4x8xf16>
+//       CDNA3:     arith.mulf %{{.*}}, %{{.*}} : vector<4x8xf16>
+//       CDNA3:     arith.addf %{{.*}}, %{{.*}} : vector<4x8xf16>
+//       CDNA3:   }
+// CDNA3-COUNT-12: gpu.shuffle xor
+//       CDNA3:   scf.if {{.*}} {
+//       CDNA3:     vector.transfer_write {{.*}} : vector<4xf16>, memref<1x32000xf16, #hal.descriptor_type<storage_buffer>>
+//       CDNA3:   }
+//  CDNA3-NEXT:   return
 
 // -----
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #translation_info = #iree_codegen.translation_info<None workgroup_size = [32, 1, 1]>
 module {
-  func.func @simple_nd_write() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation_info} {
+  func.func @simple_nd_write() attributes {translation_info = #translation_info} {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f32
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : memref<4x1024xf32>

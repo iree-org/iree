@@ -1,12 +1,13 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(iree-codegen-llvmgpu-configuration-pipeline)" \
-// RUN:   --iree-codegen-llvmgpu-enable-transform-dialect-jit=false %s | FileCheck %s
+// RUN:   --iree-codegen-llvmgpu-enable-transform-dialect-jit=false --iree-codegen-test-target=sm_60 %s | FileCheck %s
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(iree-codegen-llvmgpu-configuration-pipeline)" \
+// RUN:   --iree-codegen-llvmgpu-enable-transform-dialect-jit=false --iree-codegen-test-target=sm_80 %s | FileCheck %s --check-prefix=SM80
 
 // Transform dialect attributes are tested separately.
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #map = affine_map<(d0) -> (d0)>
 module {
-  func.func @add_dispatch_0() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
+  func.func @add_dispatch_0() {
     %c0 = arith.constant 0 : index
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<16384xf32>>
     %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<16384xf32>>
@@ -33,9 +34,8 @@ module {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 module {
-  func.func @dot_dispatch_1() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
+  func.func @dot_dispatch_1() {
     %c0 = arith.constant 0 : index
     %c4 = arith.constant 4 : index
     %c2 = arith.constant 2 : index
@@ -59,9 +59,9 @@ module {
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
 
 // -----
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
+
 module {
-  func.func @unaligned_k() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
+  func.func @unaligned_k() {
     %c0 = arith.constant 0 : index
     %c4 = arith.constant 4 : index
     %c2 = arith.constant 2 : index
@@ -85,11 +85,11 @@ module {
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
 
 // -----
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
+
 #map = affine_map<(d0) -> (d0)>
 #map1 = affine_map<(d0) -> ()>
 module {
-  func.func @predict_dispatch_153() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
+  func.func @predict_dispatch_153() {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0x7FC00000 : f32
     %cst_0 = arith.constant 0xFF800000 : f32
@@ -118,11 +118,11 @@ module {
 // CHECK-SAME:   lowering_config = #[[CONFIG]]
 
 // -----
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
+
 #map = affine_map<(d0, d1, d2) -> (d2, d0, d1)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
 module {
-  func.func @reduction_aligned2() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
+  func.func @reduction_aligned2() {
     %cst = arith.constant 0.000000e+00 : f32
     %c0 = arith.constant 0 : index
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<4x128x384xf32>>
@@ -150,10 +150,10 @@ module {
 // CHECK-SAME:   lowering_config = #[[CONFIG]]
 
 // -----
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
+
 #map = affine_map<(d0, d1) -> (d0, d1)>
 module {
-  func.func @copy_as_generic() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
+  func.func @copy_as_generic() {
     %c0 = arith.constant 0 : index
     %0 = hal.interface.constant.load[0] : index
     %1 = hal.interface.constant.load[1] : index
@@ -176,9 +176,8 @@ module {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 module {
-  func.func @static_1d_fft_stage2() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
+  func.func @static_1d_fft_stage2() {
     %c0 = arith.constant 0 : index
     %c2 = arith.constant 2 : index
     %cst = arith.constant dense<[1.000000e+00, 6.12323426E-17]> : tensor<2xf32>
@@ -203,9 +202,8 @@ module {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 module {
-  func.func @static_3d_fft_stage3() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
+  func.func @static_3d_fft_stage3() {
     %c0 = arith.constant 0 : index
     %c3 = arith.constant 3 : index
     %c64 = arith.constant 64 : index
@@ -232,11 +230,10 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 128, 64]]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt workgroup_size = [16, 8, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 #compilation = #iree_codegen.compilation_info<lowering_config = #config, translation_info = #translation>
 module {
-  func.func @_lowering_config_test_dispatch_1() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
+  func.func @_lowering_config_test_dispatch_1() {
     %cst = arith.constant 0.000000e+00 : f32
     %c128 = arith.constant 128 : index
     %c1024 = arith.constant 1024 : index
@@ -265,9 +262,8 @@ module {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 module {
-  func.func @sort_op() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
+  func.func @sort_op() {
     %c1 = arith.constant 1 : index
     %c0 = arith.constant 0 : index
     %c2304000 = arith.constant 2304000 : index
@@ -297,9 +293,8 @@ module {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 module {
-  func.func @matmul_config_sm35() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
+  func.func @matmul_config_sm35() {
     %cst = arith.constant 0.000000e+00 : f32
     %c128 = arith.constant 128 : index
     %c1024 = arith.constant 1024 : index
@@ -323,9 +318,8 @@ module {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_80">}>
 module {
-  func.func @matmul_config_sm80() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
+  func.func @matmul_config_sm80() {
     %cst = arith.constant 0.000000e+00 : f32
     %c128 = arith.constant 128 : index
     %c1024 = arith.constant 1024 : index
@@ -343,15 +337,14 @@ module {
   }
 }
 
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUMatmulTensorCoreMmaSync workgroup_size = [64, 2, 1] subgroup_size = 32
-//      CHECK: func.func @matmul_config_sm80()
-// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//  SM80-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUMatmulTensorCoreMmaSync workgroup_size = [64, 2, 1] subgroup_size = 32
+//      SM80: func.func @matmul_config_sm80()
+// SM80-SAME:     translation_info = #[[TRANSLATION]]
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_86">}>
 module {
-  func.func @matmul_config_sm86() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
+  func.func @matmul_config_sm86() {
     %cst = arith.constant 0.000000e+00 : f32
     %c128 = arith.constant 128 : index
     %c1024 = arith.constant 1024 : index
@@ -369,19 +362,18 @@ module {
   }
 }
 
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUMatmulTensorCoreMmaSync workgroup_size = [64, 2, 1] subgroup_size = 32
-//      CHECK: func.func @matmul_config_sm86()
-// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//  SM80-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUMatmulTensorCoreMmaSync workgroup_size = [64, 2, 1] subgroup_size = 32
+//      SM80: func.func @matmul_config_sm86()
+// SM80-SAME:     translation_info = #[[TRANSLATION]]
 
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 128, 32]]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_86">}>
 #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #map1 = affine_map<(d0, d1, d2) -> ()>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 module {
-  func.func @contract_reduction() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
+  func.func @contract_reduction() {
     %c0 = arith.constant 0 : index
     %c40064 = arith.constant 40064 : index
     %c34752 = arith.constant 34752 : index
@@ -407,15 +399,14 @@ module {
 
 }
 
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorize workgroup_size = [64, 1, 1] subgroup_size = 32
-//      CHECK: func.func @contract_reduction()
-// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//  SM80-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorize workgroup_size = [64, 1, 1] subgroup_size = 32
+//      SM80: func.func @contract_reduction()
+// SM80-SAME:     translation_info = #[[TRANSLATION]]
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_86">}>
 module {
-  func.func @dynamic_pack_2x2() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
+  func.func @dynamic_pack_2x2() {
     %c0 = arith.constant 0 : index
     %c64 = arith.constant 64 : index
     %0 = hal.interface.constant.load[0] : i32
@@ -436,18 +427,17 @@ module {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[16, 16]]>
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUPackUnPack workgroup_size = [32, 1, 1]>
-//      CHECK:   func.func @dynamic_pack_2x2()
-// CHECK-SAME:     translation_info = #[[TRANSLATION]]
-//      CHECK:     tensor.pack
-// CHECK-SAME:       lowering_config = #[[CONFIG]]
+//  SM80-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[16, 16]]>
+//  SM80-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUPackUnPack workgroup_size = [32, 1, 1]>
+//      SM80:   func.func @dynamic_pack_2x2()
+// SM80-SAME:     translation_info = #[[TRANSLATION]]
+//      SM80:     tensor.pack
+// SM80-SAME:       lowering_config = #[[CONFIG]]
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_80">}>
 module {
-  func.func @large_matmul_f16() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
+  func.func @large_matmul_f16() {
     %cst = arith.constant 0.000000e+00 : f16
     %c128 = arith.constant 128 : index
     %c1024 = arith.constant 1024 : index
@@ -464,20 +454,19 @@ module {
     return
   }
 }
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[128, 256, 32]{{\]}}
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUMatmulTensorCoreMmaSync workgroup_size = [128, 2, 1] subgroup_size = 32, {pipeline_depth = 3 : i64, store_stage = 1 : i64}>
-//      CHECK: func.func @large_matmul_f16()
-// CHECK-SAME:     translation_info = #[[TRANSLATION]]
-//      CHECK: linalg.fill
-// CHECK-SAME:     lowering_config = #[[CONFIG]]
-//      CHECK: linalg.matmul
-// CHECK-SAME:     lowering_config = #[[CONFIG]]
+//  SM80-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[128, 256, 32]{{\]}}
+//  SM80-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUMatmulTensorCoreMmaSync workgroup_size = [128, 2, 1] subgroup_size = 32, {pipeline_depth = 3 : i64, store_stage = 1 : i64}>
+//      SM80: func.func @large_matmul_f16()
+// SM80-SAME:     translation_info = #[[TRANSLATION]]
+//      SM80: linalg.fill
+// SM80-SAME:     lowering_config = #[[CONFIG]]
+//      SM80: linalg.matmul
+// SM80-SAME:     lowering_config = #[[CONFIG]]
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_80">}>
 module {
-  func.func @large_matmul_f32() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
+  func.func @large_matmul_f32() {
     %cst = arith.constant 0.000000e+00 : f32
     %c128 = arith.constant 128 : index
     %c1024 = arith.constant 1024 : index
@@ -495,21 +484,20 @@ module {
   }
 }
 
-//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[128, 256, 16]{{\]}}
-//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUMatmulTensorCoreMmaSync workgroup_size = [128, 2, 1] subgroup_size = 32, {pipeline_depth = 4 : i64, store_stage = 1 : i64}>
-//      CHECK: func.func @large_matmul_f32()
-// CHECK-SAME:     translation_info = #[[TRANSLATION]]
-//      CHECK: linalg.fill
-// CHECK-SAME:     lowering_config = #[[CONFIG]]
-//      CHECK: linalg.matmul
-// CHECK-SAME:     lowering_config = #[[CONFIG]]
+//  SM80-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[128, 256, 16]{{\]}}
+//  SM80-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUMatmulTensorCoreMmaSync workgroup_size = [128, 2, 1] subgroup_size = 32, {pipeline_depth = 4 : i64, store_stage = 1 : i64}>
+//      SM80: func.func @large_matmul_f32()
+// SM80-SAME:     translation_info = #[[TRANSLATION]]
+//      SM80: linalg.fill
+// SM80-SAME:     lowering_config = #[[CONFIG]]
+//      SM80: linalg.matmul
+// SM80-SAME:     lowering_config = #[[CONFIG]]
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #map = affine_map<(d0, d1) -> (d0, d1)>
 module {
-  func.func @inner_unit_dim() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
+  func.func @inner_unit_dim() {
     %c0 = arith.constant 0 : index
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<16384x1xf32>>
     %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<16384x1xf32>>
@@ -536,11 +524,10 @@ module {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d3)>
 module {
-  func.func @forward_dispatch_1_conv_2d_nhwc_hwcf_256x112x112x64x7x7x3_f32() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
+  func.func @forward_dispatch_1_conv_2d_nhwc_hwcf_256x112x112x64x7x7x3_f32() {
     %c0 = arith.constant 0 : index
     %c162508800 = arith.constant 162508800 : index
     %cst = arith.constant 1.001000e-05 : f32
@@ -583,13 +570,13 @@ module {
 // CHECK-SAME:       lowering_config = #[[CONFIG]]
 
 // -----
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
+
 #map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d1, d4)>
 #map1 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d1, d4)>
 #map2 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>
 #map3 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 module {
-  func.func @_main_dispatch_15_generic_512x4x42x42x64_f32() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
+  func.func @_main_dispatch_15_generic_512x4x42x42x64_f32() {
     %cst = arith.constant 1.250000e-01 : f32
     %cst_0 = arith.constant 0.000000e+00 : f32
     %0 = hal.interface.constant.load[0] : i32
@@ -631,14 +618,14 @@ module {
 //  CHECK-SAME:      lowering_config = #[[CONFIG]]
 
 // -----
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
+
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (d0)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map3 = affine_map<(d0, d1, d2) -> (d1, d2)>
 #map4 = affine_map<(d0, d1, d2) -> (d0, d1)>
 module {
-  func.func @i4_dequant_matvec() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
+  func.func @i4_dequant_matvec() {
     %c32_i64 = arith.constant 32 : i64
     %cst = arith.constant 0.000000e+00 : f32
     %0 = hal.interface.constant.load[0] : i32

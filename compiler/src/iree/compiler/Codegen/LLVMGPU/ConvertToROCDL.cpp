@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/LLVMGPU/ConvertToLLVM.h"
 #include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
@@ -76,8 +77,9 @@ static void populateConvertGPUToAMDGPUPatterns(RewritePatternSet &patterns) {
 /// code.
 struct ConvertToROCDLPass : public ConvertToROCDLBase<ConvertToROCDLPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<LLVM::LLVMDialect, ROCDL::ROCDLDialect,
-                    amdgpu::AMDGPUDialect, gpu::GPUDialect>();
+    registry
+        .insert<IREE::GPU::IREEGPUDialect, LLVM::LLVMDialect,
+                ROCDL::ROCDLDialect, amdgpu::AMDGPUDialect, gpu::GPUDialect>();
   }
   void runOnOperation() override {
     ModuleOp m = getOperation();

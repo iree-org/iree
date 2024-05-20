@@ -1,5 +1,7 @@
-// RUN: iree-opt --split-input-file --iree-codegen-llvmgpu-use-vector-distribution --iree-llvmgpu-enable-prefetch=true \
+// RUN: iree-opt --split-input-file --iree-codegen-test-target=gfx940 --iree-codegen-llvmgpu-use-vector-distribution --iree-llvmgpu-enable-prefetch=true \
 // RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-llvmgpu-select-lowering-strategy, func.func(iree-llvmgpu-lower-executable-target)))))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-codegen-test-target=gfx1100 --iree-codegen-llvmgpu-use-vector-distribution --iree-llvmgpu-enable-prefetch=true \
+// RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-llvmgpu-select-lowering-strategy, func.func(iree-llvmgpu-lower-executable-target)))))" %s | FileCheck %s --check-prefix=CDNA3
 
 // TODO: This test is still using the legacy LLVMGPU kernel config. This needs
 // to be migrated to the rocdl heuristics, but for now is just physically
@@ -12,9 +14,7 @@
   ]>
 ]>
 hal.executable @matmul_256x256x256_f16_f32 {
-hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
-      iree.gpu.target = #iree_gpu.alias_target<"gfx940">
-  }>) {
+hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
   hal.executable.export @matmul_256x256x256_f16_f32 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
@@ -63,9 +63,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
   ]>
 ]>
 hal.executable @matmul_256x256x256_f16_f16 {
-hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
-      iree.gpu.target = #iree_gpu.alias_target<"gfx940">
-  }>) {
+hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
   hal.executable.export @matmul_256x256x256_f16_f16 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
@@ -112,9 +110,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
   ]>
 ]>
 hal.executable @expanded_matmul_transpose_b_executable {
-hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
-      iree.gpu.target = #iree_gpu.alias_target<"gfx940">
-  }>) {
+hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
   hal.executable.export @expanded_matmul_transpose_b layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device):
       %x, %y, %z = flow.dispatch.workgroup_count_from_slice
@@ -181,9 +177,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
   ]>
 ]>
 hal.executable @conv_nhwc_dispatch_0 {
-hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
-      iree.gpu.target = #iree_gpu.alias_target<"gfx940">
-  }>) {
+hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
   hal.executable.export @conv_nhwc layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device):
       %x, %y, %z = flow.dispatch.workgroup_count_from_slice
@@ -217,10 +211,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 
 // -----
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {
-  iree.gpu.target = #iree_gpu.alias_target<"gfx942">,
-  ukernels = "none"
-}>
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb">
 #map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d4)>
 #map1 = affine_map<(d0, d1, d2, d3, d4) -> (d2, d3, d4)>
 #map2 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>
@@ -302,9 +293,7 @@ hal.executable public @main_dispatch_expanded_matmul {
   ]>
 ]>
 hal.executable @matmul_256x256x256_f16_f32 {
-hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
-      iree.gpu.target = #iree_gpu.alias_target<"gfx1100">
-  }>) {
+hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
   hal.executable.export @matmul_256x256x256_f16_f32 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
@@ -329,22 +318,22 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
 }
 }
 
-//       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [64, 2, 1] subgroup_size = 32
-//  CHECK-SAME:   mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>,
-//  CHECK-SAME:     subgroup_m_count = 2, subgroup_n_count = 2>
+//       CDNA3: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [64, 2, 1] subgroup_size = 32
+//  CDNA3-SAME:   mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>,
+//  CDNA3-SAME:     subgroup_m_count = 2, subgroup_n_count = 2>
 
 
-//    CHECK-LABEL: func.func @matmul_256x256x256_f16_f32
-//     CHECK-SAME:    translation_info = #[[$TRANSLATION]]
-//          CHECK:   scf.for {{.*}} = %c0 to %c256 step %c128 iter_args({{.*}}) -> (vector<2x2x8x1x1x1xf32>)
+//    CDNA3-LABEL: func.func @matmul_256x256x256_f16_f32
+//     CDNA3-SAME:    translation_info = #[[$TRANSLATION]]
+//          CDNA3:   scf.for {{.*}} = %c0 to %c256 step %c128 iter_args({{.*}}) -> (vector<2x2x8x1x1x1xf32>)
 // Each subgroup handles 2 * 2 tiles, and for each tile we accumulate 8 times
 // along the K dimension. So in total 32 wmma ops.
-// CHECK-COUNT-32:     amdgpu.wmma {{.*}} : vector<16xf16>, vector<16xf16>, vector<8xf32>
-//          CHECK:     scf.yield %{{.+}} : vector<2x2x8x1x1x1xf32>
+// CDNA3-COUNT-32:     amdgpu.wmma {{.*}} : vector<16xf16>, vector<16xf16>, vector<8xf32>
+//          CDNA3:     scf.yield %{{.+}} : vector<2x2x8x1x1x1xf32>
 //  Since each subgroup handles 2 * 2 tiles, and for each tile, each lane holds 4 values.
 //  we will have 32 writes. We cannot do contiguous writes since the outputs columns has interleaved
 //  thread ids.
-//  CHECK-COUNT-32:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<1x1xf32>, memref<256x256xf32, #hal.descriptor_type<storage_buffer>>
+//  CDNA3-COUNT-32:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<1x1xf32>, memref<256x256xf32, #hal.descriptor_type<storage_buffer>>
 
 // -----
 
@@ -355,7 +344,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {
   ]>
 ]>
 hal.executable @unaligned_mk_batch_matmul_64x978x1281x1281_f16_f16 {
-hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.alias_target<"gfx940">}>) {
+hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
   hal.executable.export @unaligned_mk_batch_matmul_64x978x1281x1281_f16_f16 layout(#pipeline_layout) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2

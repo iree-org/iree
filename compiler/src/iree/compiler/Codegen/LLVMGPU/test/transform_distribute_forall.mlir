@@ -1,6 +1,6 @@
 // RUN: iree-opt %s --pass-pipeline="builtin.module(iree-codegen-lower-executable-using-transform-dialect)" | FileCheck %s
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #translation = #iree_codegen.translation_info<TransformDialectCodegen, { config_test = "config_test" }>
 module {
   func.func @distribute() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation} {

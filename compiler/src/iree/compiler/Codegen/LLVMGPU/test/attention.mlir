@@ -1,10 +1,9 @@
 // RUN: iree-opt %s --pass-pipeline='builtin.module(iree-transform-dialect-interpreter)' \
-// RUN:   --iree-codegen-transform-dialect-library=%p/attention_transform_spec.mlir| \
+// RUN:   --iree-codegen-test-target=sm_60 --iree-codegen-transform-dialect-library=%p/attention_transform_spec.mlir| \
 // RUN: FileCheck --check-prefix=CHECK %s
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 module {
-  func.func @_attention_dispatch_0() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
+  func.func @_attention_dispatch_0() {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 1.250000e-01 : f16
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<192x1024x64xf16>>

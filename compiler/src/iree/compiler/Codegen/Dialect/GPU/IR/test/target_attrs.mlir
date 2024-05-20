@@ -68,15 +68,3 @@ func.func @test_target() attributes {
     chip = <wgp_count = 304>
   >
 } { return }
-
-// CHECK-LABEL: func.func @test_alias_target_cuda()
-func.func @test_alias_target_cuda() attributes {
-  // CHECK: #iree_gpu.alias_target<"sm_80">
-  target = #iree_gpu.alias_target<"sm_80">
-} { return }
-
-// CHECK-LABEL: func.func @test_alias_target_hip()
-func.func @test_alias_target_hip() attributes {
-  // CHECK: #iree_gpu.alias_target<"mi300x">
-  target = #iree_gpu.alias_target<"mi300x">
-} { return }

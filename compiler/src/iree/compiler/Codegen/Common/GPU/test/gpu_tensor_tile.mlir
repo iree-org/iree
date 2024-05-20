@@ -1,12 +1,11 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-tensor-tile, cse))" %s | FileCheck %s
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 256]]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #map = affine_map<()[s0] -> (s0 * 256)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
 #translation = #iree_codegen.translation_info<LLVMGPUVectorize workgroup_size = [64, 1, 1]>
 module {
-  func.func @add_tensor() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation} {
+  func.func @add_tensor() attributes {translation_info = #translation} {
     %c0 = arith.constant 0 : index
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<233x1024xf32>>
     %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<233x1024xf32>>
@@ -53,13 +52,12 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 4]]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #map = affine_map<()[s0] -> (s0 * 64)>
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
 #map2 = affine_map<(d0, d1) -> (d0)>
 #translation = #iree_codegen.translation_info<LLVMGPUVectorize workgroup_size = [64, 1, 1]>
 module {
-  func.func @reduction() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation} {
+  func.func @reduction() attributes {translation_info = #translation} {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f32
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<128x384xf32>>
@@ -106,13 +104,12 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 64, 4, 4]]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
 #map = affine_map<()[s0] -> (s0 * 64)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
 #translation = #iree_codegen.translation_info<LLVMGPUVectorize workgroup_size = [64, 1, 1]>
 module {
-  func.func @reduction_broadcast() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation} {
+  func.func @reduction_broadcast() attributes {translation_info = #translation} {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f32
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<2x32x10x4096xf32>>

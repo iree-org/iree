@@ -412,22 +412,4 @@ def IREEGPU_TargetAttr : AttrDef<IREEGPU_Dialect, "Target"> {
   }];
 }
 
-def IREEGPU_AliasTargetAttr : AttrDef<IREEGPU_Dialect, "AliasTarget"> {
-  let summary = "Abbreviate GPU target attribute";
-  let description = [{
-    This attributes is a shorthand of the full GPU target attribute. It contains
-    the target arch/chip/product, which must be known to the compiler.
-    This attribute is primarily meant for making IR tests easier.
-  }];
-
-  let mnemonic = "alias_target";
-  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
-
-  let parameters = (ins
-    StringRefParameter<"target architecture/chip/product">:$chip
-  );
-
-  let assemblyFormat = "`<` $chip `>`";
-}
-
 #endif // IREE_COMPILER_CODEGEN_DIALECT_GPU_IREEGPUATTRS

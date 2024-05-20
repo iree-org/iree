@@ -1,8 +1,8 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-decompose-softmax), iree-llvmgpu-select-lowering-strategy,  func.func(iree-llvmgpu-lower-executable-target))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-codegen-test-target=gfx1100 --pass-pipeline="builtin.module(func.func(iree-codegen-decompose-softmax), iree-llvmgpu-select-lowering-strategy,  func.func(iree-llvmgpu-lower-executable-target))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-codegen-test-target=gfx940 --pass-pipeline="builtin.module(func.func(iree-codegen-decompose-softmax), iree-llvmgpu-select-lowering-strategy,  func.func(iree-llvmgpu-lower-executable-target))" %s | FileCheck %s --check-prefix=CDNA3
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.alias_target<"gfx1100">}>
 module {
-  func.func @softmax() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
+  func.func @softmax() {
     %c0 = arith.constant 0 : index
     %cst = arith.constant -3.40282347E+38 : f32
     %cst_0 = arith.constant 0.000000e+00 : f32
@@ -24,9 +24,8 @@ module {
 
 // -----
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.alias_target<"gfx940">}>
 module {
-  func.func @softmax() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
+  func.func @softmax() {
     %c0 = arith.constant 0 : index
     %cst = arith.constant -3.40282347E+38 : f32
     %cst_0 = arith.constant 0.000000e+00 : f32
@@ -43,16 +42,15 @@ module {
 
 // On CDNA, we prefer wave64 with subgroup size 64.
 
-//          CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUWarpReduction workgroup_size = [1024, 1, 1] subgroup_size = 64>
-//          CHECK: func.func @softmax
-//     CHECK-SAME:      translation_info = #[[$TRANSLATION]]
-// CHECK-COUNT-20:   gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}}
+//          CDNA3: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUWarpReduction workgroup_size = [1024, 1, 1] subgroup_size = 64>
+//          CDNA3: func.func @softmax
+//     CDNA3-SAME:      translation_info = #[[$TRANSLATION]]
+// CDNA3-COUNT-20:   gpu.shuffle  xor{{.*}}{{[[:space:]].*}}{{.*}}
 
 // -----
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.alias_target<"gfx1100">}>
 module {
-  func.func @dynamic_softmax() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
+  func.func @dynamic_softmax() {
     %c32_i64 = arith.constant 32 : i64
     %c0 = arith.constant 0 : index
     %0 = hal.interface.constant.load[0] : i32

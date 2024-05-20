@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/LLVMGPU/ConvertToLLVM.h"
 #include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
@@ -43,7 +44,8 @@ namespace {
 /// code.
 struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<gpu::GPUDialect, LLVM::LLVMDialect, NVVM::NVVMDialect>();
+    registry.insert<gpu::GPUDialect, IREE::GPU::IREEGPUDialect,
+                    LLVM::LLVMDialect, NVVM::NVVMDialect>();
   }
   void runOnOperation() override {
     ModuleOp m = getOperation();

@@ -1,6 +1,6 @@
 // RUN: iree-opt %s -iree-transform-dialect-interpreter -transform-dialect-drop-schedule | FileCheck %s
 
-#executable_target = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_60">}>
+#executable_target = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #map1 = affine_map<(d0, d1) -> (d0, d1)>
 #translation_info = #iree_codegen.translation_info<None workgroup_size = [32, 4, 1]>
 module attributes {transform.with_named_sequence} {

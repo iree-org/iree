@@ -1,9 +1,10 @@
 // RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" \
-// RUN:   --iree-codegen-llvmgpu-enable-transform-dialect-aligned-matmul | FileCheck %s
+// RUN:   --iree-codegen-test-target=sm_80 --iree-codegen-llvmgpu-enable-transform-dialect-aligned-matmul | FileCheck %s
 
 // Check that setting the command line options affect the transform
 // strategy as expected.
 // RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" \
+// RUN: --iree-codegen-test-target=sm_80 \
 // RUN: -td-matmul-strategy-blk-sizes=256,64,1 \
 // RUN: -td-matmul-strategy-reduc-size=8 \
 // RUN: -td-matmul-strategy-num-threads=32,4,1 \
@@ -15,6 +16,7 @@
 
 // Check that various more exotic strategies apply properly e2e but without otherwise checking their content.
 // RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" \
+// RUN: --iree-codegen-test-target=sm_80 \
 // RUN: --iree-codegen-llvmgpu-enable-transform-dialect-aligned-matmul \
 // RUN: -td-matmul-strategy-blk-sizes=16,16,1 \
 // RUN: -td-matmul-strategy-reduc-size=16 \
@@ -27,6 +29,7 @@
 
 // Check that various more exotic strategies apply properly e2e but without otherwise checking their content.
 // RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" \
+// RUN: --iree-codegen-test-target=sm_80 \
 // RUN: --iree-codegen-llvmgpu-enable-transform-dialect-aligned-matmul \
 // RUN: -td-matmul-strategy-blk-sizes=128,64,1 \
 // RUN: -td-matmul-strategy-reduc-size=16 \
@@ -38,11 +41,10 @@
 // RUN: | FileCheck --check-prefix=WITH_OPTIONS_3 %s
 
 // RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" \
-// RUN:   --iree-codegen-llvmgpu-enable-transform-dialect-small-matmul | FileCheck --check-prefix=SMALL %s
+// RUN:   --iree-codegen-test-target=sm_80 --iree-codegen-llvmgpu-enable-transform-dialect-small-matmul | FileCheck --check-prefix=SMALL %s
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_80">}>
 module {
-  func.func @matmul_1() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
+  func.func @matmul_1() {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f32
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2052x2556xf32>>
@@ -198,9 +200,8 @@ module {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_80">}>
 module {
-  func.func @matmul_2() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
+  func.func @matmul_2() {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f32
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2051x2555xf32>>
@@ -244,9 +245,8 @@ module {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_80">}>
 module {
-  func.func @matmul_3() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
+  func.func @matmul_3() {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f32
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2048x2556xf32>>
@@ -272,9 +272,8 @@ module {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_80">}>
 module {
-  func.func @matmul_4_partially_unaligned() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
+  func.func @matmul_4_partially_unaligned() {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f32
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2048x2044xf32>>
@@ -336,9 +335,8 @@ module {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_80">}>
 module {
-  func.func @aligned_matmul() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
+  func.func @aligned_matmul() {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f32
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2048x2048xf32>>
@@ -399,9 +397,8 @@ module {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_80">}>
 module {
-  func.func @matmul_5_small() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
+  func.func @matmul_5_small() {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f32
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2x2044xf32>>
@@ -434,9 +431,8 @@ module {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_80">}>
 module {
-  func.func @f16_matmul() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
+  func.func @f16_matmul() {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f16
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2052x2556xf16>>
@@ -463,9 +459,8 @@ module {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {iree.gpu.target = #iree_gpu.alias_target<"sm_80">}>
 module {
-  func.func @int8_matmul() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
+  func.func @int8_matmul() {
     %c0 = arith.constant 0 : index
     %c0_i8 = arith.constant 0 : i8
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<4x2556xi8>>

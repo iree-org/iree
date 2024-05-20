@@ -1,10 +1,9 @@
 // RUN: iree-opt %s --pass-pipeline='builtin.module(iree-transform-dialect-interpreter)' \
-// RUN:   --iree-codegen-transform-dialect-library=%p/attention_mfma_transform_spec.mlir | \
+// RUN:   --iree-codegen-test-target=gfx908 --iree-codegen-transform-dialect-library=%p/attention_mfma_transform_spec.mlir | \
 // RUN: FileCheck --check-prefix=CHECK %s
 
-#executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #iree_gpu.alias_target<"gfx908">}>
 module {
-  func.func @attention_dispatch_0_attention_16x16384x128xf16() attributes {hal.executable.target = #executable_target} {
+  func.func @attention_dispatch_0_attention_16x16384x128xf16() {
     %c0 = arith.constant 0 : index
     %scale = arith.constant 0.08838834764 : f16
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<16x16384x128xf16>>
