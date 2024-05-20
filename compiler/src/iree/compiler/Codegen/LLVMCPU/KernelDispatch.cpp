@@ -308,7 +308,7 @@ static int64_t getVectorSize(mlir::FunctionOpInterface entryPointFn,
 /// transposition:
 ///   1. The op has a single input and a single output.
 ///   2. One of the indexing_map is identity and the other is a permutation.
-static bool x86TransposeLoweringPrecondition(linalg::GenericOp genericOp) {
+static bool transposeLoweringPrecondition(linalg::GenericOp genericOp) {
   // Check that the op has at least 2 dimensions.
   if (genericOp.getNumLoops() < 2) {
     return false;
@@ -396,7 +396,7 @@ getMinTilingSizesForEachDim(mlir::FunctionOpInterface entryPointFn,
 
   auto genericOp = dyn_cast<linalg::GenericOp>(op.getOperation());
   if (linalgOpInfo.isTranspose() && genericOp &&
-      x86TransposeLoweringPrecondition(genericOp)) {
+      transposeLoweringPrecondition(genericOp)) {
     // Limit unrolling on transpose operations.
     // TODO(dcaballe): Consider input and output transposes.
     limitUnrollFactor(targetMLTransInfo.defaultMaxTransposeUnrollFactor);
@@ -1983,43 +1983,58 @@ setTransposeLikeOpRootConfig(mlir::FunctionOpInterface entryPointFn,
   LLVM_DEBUG(KD_DBGS() << "Setting transpose-like op root configuration\n");
 
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
-  if (!hasAVX2Feature(targetAttr) ||
-      !x86TransposeLoweringPrecondition(genericOp)) {
+  bool targetIsAArch64SME = isAArch64(targetAttr) &&
+                            clEnableScalableVectorization &&
+                            hasSMEFeature(targetAttr);
+  if ((!hasAVX2Feature(targetAttr) && !targetIsAArch64SME) ||
+      !transposeLoweringPrecondition(genericOp))
     return failure();
-  }
 
   DistributionHeuristicConfig distConfig;
-  distConfig.minTileSizes = getMinTilingSizesForEachDim(
-      entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo);
-  if (llvm::count_if(distConfig.minTileSizes,
-                     [](int64_t tileSize) { return tileSize > 1; }) != 2) {
-    // Transpose patterns are not applicable if vectorizing more or less than
-    // two dims.
-    return failure();
-  }
+  if (hasAVX2Feature(targetAttr)) {
+    distConfig.minTileSizes = getMinTilingSizesForEachDim(
+        entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo);
+    if (llvm::count_if(distConfig.minTileSizes,
+                       [](int64_t tileSize) { return tileSize > 1; }) != 2) {
+      // Transpose patterns are not applicable if vectorizing more or less than
+      // two dims.
+      return failure();
+    }
 
-  // Make sure that the original tile sizes are greater than or equal to the
-  // tile sizes to be used for the transpose op (e.g., 8x8, 16x16, etc).
-  int64_t targetVectorSize = 8;
-  if (llvm::any_of(distConfig.minTileSizes, [&](int64_t tileSize) {
-        return tileSize > 1 && tileSize < targetVectorSize;
-      })) {
-    return failure();
-  }
+    // Make sure that the original tile sizes are greater than or equal to the
+    // tile sizes to be used for the transpose op (e.g., 8x8, 16x16, etc).
+    int64_t targetVectorSize = 8;
+    if (llvm::any_of(distConfig.minTileSizes, [&](int64_t tileSize) {
+          return tileSize > 1 && tileSize < targetVectorSize;
+        })) {
+      return failure();
+    }
 
-  // Target 16x16 tile sizes if there are AVX512 features and all the tile sizes
-  // are greater than or equal to 16.
-  if (hasAVX512fFeature(targetAttr) &&
-      llvm::all_of(distConfig.minTileSizes, [](int64_t tileSize) {
-        return tileSize == 1 || tileSize >= 16;
-      })) {
-    targetVectorSize = 16;
-  }
+    // Target 16x16 tile sizes if there are AVX512 features and all the tile
+    // sizes are greater than or equal to 16.
+    if (hasAVX512fFeature(targetAttr) &&
+        llvm::all_of(distConfig.minTileSizes, [](int64_t tileSize) {
+          return tileSize == 1 || tileSize >= 16;
+        })) {
+      targetVectorSize = 16;
+    }
 
-  // Replace dims to be vectorized with the new tile sizes.
-  std::replace_if(
-      distConfig.minTileSizes.begin(), distConfig.minTileSizes.end(),
-      [](int64_t tileSize) { return tileSize > 1; }, targetVectorSize);
+    // Replace dims to be vectorized with the new tile sizes.
+    std::replace_if(
+        distConfig.minTileSizes.begin(), distConfig.minTileSizes.end(),
+        [](int64_t tileSize) { return tileSize > 1; }, targetVectorSize);
+  } else if (targetIsAArch64SME) {
+    auto elementType = nonWideningLinalgElementType(genericOp);
+    if (failed(elementType))
+      return failure();
+
+    if (elementType->isF32())
+      distConfig.minTileSizes = {4, 4};
+    else if (elementType->isF64())
+      distConfig.minTileSizes = {2, 2};
+    else
+      return failure();
+  }
 
   auto vecPreProcStrategy = getVectorPreProcStrategy(genericOp);
   LLVM_DEBUG(KD_DBGS() << "Vectorization pre-processing strategy "
@@ -2037,13 +2052,20 @@ setTransposeLikeOpRootConfig(mlir::FunctionOpInterface entryPointFn,
   tileSizes.emplace_back(numTilingDims, 0);
   tileSizes.emplace_back(numTilingDims, 0);
 
+  ScalableTileFlagsListType scalableTileFlags;
+  scalableTileFlags.emplace_back(numTilingDims, false);
+  SmallVector<bool> parallelScalableFlags(numTilingDims, false);
+  if (targetIsAArch64SME)
+    parallelScalableFlags = {true, true};
+  scalableTileFlags.emplace_back(parallelScalableFlags);
+
   // For non-tensor based ops use the Buffer ops pipeline.
   auto passPipeline =
       genericOp.hasPureTensorSemantics()
           ? DispatchLoweringPassPipeline::CPUDoubleTilingExpert
           : DispatchLoweringPassPipeline::CPUBufferOpsTileAndVectorize;
-  return setOpConfigAndEntryPointFnTranslation(entryPointFn, genericOp,
-                                               tileSizes, passPipeline);
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, genericOp, tileSizes, scalableTileFlags, passPipeline);
 }
 
 /// Sets elementwise dispatches to use peeling approach. It scales the number of
