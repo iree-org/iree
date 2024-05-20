@@ -34,7 +34,7 @@ iree_td_library(
     ),
     deps = [
         "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
-        "@llvm-project//mlir:DialectUtilsIncGen",
+        "@llvm-project//mlir:DialectUtilsTdFiles",
         "@llvm-project//mlir:OpBaseTdFiles",
         "@llvm-project//mlir:SideEffectInterfacesTdFiles",
     ],
