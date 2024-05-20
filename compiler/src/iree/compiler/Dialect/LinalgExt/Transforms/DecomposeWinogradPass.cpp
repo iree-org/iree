@@ -58,8 +58,9 @@ struct FoldWinogradOpUnitDims : public OpRewritePattern<TransformOp> {
     SmallVector<int64_t> newOriginalShape = llvm::map_to_vector(
         hwDims, [&](int64_t dim) { return originalShape[dim]; });
     auto newOriginalType = originalType.clone(newOriginalShape);
-    SmallVector<int64_t> newTransformedShape(transformedShape.begin(),
-                                             transformedShape.begin() + 2);
+    SmallVector<int64_t> newTransformedShape =
+        llvm::map_to_vector(transformOp.getInputTileDimensions(),
+                            [&](int64_t dim) { return transformedShape[dim]; });
     auto newTransformedType = transformedType.clone(newTransformedShape);
     RankedTensorType newInputType = newOriginalType;
     RankedTensorType newOutputType = newTransformedType;

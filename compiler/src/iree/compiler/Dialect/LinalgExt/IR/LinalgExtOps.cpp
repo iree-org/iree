@@ -5,13 +5,16 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include <cstdint>
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/Sequence.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
@@ -22,6 +25,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/AffineMap.h"
@@ -974,8 +978,31 @@ LogicalResult UnPackOp::verify() {
 }
 
 //===----------------------------------------------------------------------===//
+// Winograd op utilities
+//===----------------------------------------------------------------------===//
+
+template <typename WinogradOp>
+static SmallVector<int64_t> getNonInputTileDims(WinogradOp op) {
+  static_assert(llvm::is_one_of<WinogradOp, WinogradInputTransformOp,
+                                WinogradFilterTransformOp,
+                                WinogradOutputTransformOp>::value,
+                "applies to only winograd transform operations");
+  SetVector<int64_t> inputTileDims(op.getInputTileDimensions().begin(),
+                                   op.getInputTileDimensions().end());
+  SmallVector<int64_t> dims = llvm::to_vector(
+      llvm::seq<int64_t>(op.getTransformedOperandType().getRank()));
+  SetVector<int64_t> dimSet(dims.begin(), dims.end());
+  dimSet.set_subtract(inputTileDims);
+  return dimSet.takeVector();
+}
+
+//===----------------------------------------------------------------------===//
 // WinogradInputTransformOp
 //===----------------------------------------------------------------------===//
+
+SmallVector<int64_t> WinogradInputTransformOp::getNonInputTileDims() {
+  return LinalgExt::getNonInputTileDims(*this);
+}
 
 LogicalResult WinogradInputTransformOp::verify() {
   Operation *op = getOperation();
@@ -1053,7 +1080,10 @@ LogicalResult WinogradInputTransformOp::verify() {
   if (isNchw()) {
     permute<Permutation::TTNCHW_TO_TTNHWC>(expectedOutputShape);
   }
-  ArrayRef<int64_t> outputShape = outputType.getShape();
+  SmallVector<int64_t> outputShape(outputType.getShape());
+  SmallVector<int64_t> perm(getInputTileDimensions());
+  perm.append(getNonInputTileDims());
+  applyPermutationToVector(outputShape, perm);
   if (failed(verifyCompatibleShape(expectedOutputShape, outputShape))) {
     return op->emitOpError("incompatible output shape");
   }
@@ -1074,6 +1104,10 @@ LogicalResult WinogradInputTransformOp::reifyResultShapes(
 //===----------------------------------------------------------------------===//
 // WinogradFilterTransformOp
 //===----------------------------------------------------------------------===//
+
+SmallVector<int64_t> WinogradFilterTransformOp::getNonInputTileDims() {
+  return LinalgExt::getNonInputTileDims(*this);
+}
 
 LogicalResult WinogradFilterTransformOp::verify() {
   Operation *op = getOperation();
@@ -1146,7 +1180,10 @@ LogicalResult WinogradFilterTransformOp::verify() {
   if (isFchw()) {
     permute<Permutation::TTFC_TO_TTCF>(expectedOutputShape);
   }
-  ArrayRef<int64_t> outputShape = outputType.getShape();
+  SmallVector<int64_t> outputShape(outputType.getShape());
+  SmallVector<int64_t> perm(getInputTileDimensions());
+  perm.append(getNonInputTileDims());
+  applyPermutationToVector(outputShape, perm);
   if (failed(verifyCompatibleShape(expectedOutputShape, outputShape))) {
     return op->emitOpError("incompatible output shape");
   }
@@ -1167,6 +1204,10 @@ LogicalResult WinogradFilterTransformOp::reifyResultShapes(
 //===----------------------------------------------------------------------===//
 // WinogradOutputTransformOp
 //===----------------------------------------------------------------------===//
+
+SmallVector<int64_t> WinogradOutputTransformOp::getNonInputTileDims() {
+  return LinalgExt::getNonInputTileDims(*this);
+}
 
 LogicalResult WinogradOutputTransformOp::verify() {
   Operation *op = getOperation();
@@ -1204,7 +1245,6 @@ LogicalResult WinogradOutputTransformOp::verify() {
     }
     return success();
   }
-  ArrayRef<int64_t> outputShape = outputType.getShape();
   if (outputType.getElementType() != inputType.getElementType()) {
     return op->emitOpError(
         "expected input/output element types to be identical");
@@ -1224,6 +1264,9 @@ LogicalResult WinogradOutputTransformOp::verify() {
         "expect image dimensions to be either [1, 2] or [2, 3]");
   }
   SmallVector<int64_t> inputShape(inputType.getShape());
+  SmallVector<int64_t> perm(getInputTileDimensions());
+  perm.append(getNonInputTileDims());
+  applyPermutationToVector(inputShape, perm);
   if (isNchw()) {
     permute<Permutation::TTNHWC_TO_TTNCHW>(inputShape);
   }
@@ -1241,7 +1284,8 @@ LogicalResult WinogradOutputTransformOp::verify() {
       expectedOutputShape[outputIndex] = getOutputTileSize() * inputShape[i];
     }
   }
-  if (failed(verifyCompatibleShape(expectedOutputShape, outputShape))) {
+  if (failed(
+          verifyCompatibleShape(expectedOutputShape, outputType.getShape()))) {
     return op->emitOpError("incompatible output shape");
   }
   return success();

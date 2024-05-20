@@ -1017,13 +1017,15 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
                        Variadic<AnyShaped>:$outputs,
                        I64Attr:$output_tile_size,
                        I64Attr:$kernel_size,
-                       DenseI64ArrayAttr:$image_dimensions
+                       DenseI64ArrayAttr:$image_dimensions,
+                       DenseI64ArrayAttr:$input_tile_dimensions
   );
 
   let builders = [
     OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$outputs,
       CArg<"int64_t", "8">:$output_tile_size, CArg<"int64_t", "3">:$kernel_size,
-      CArg<"ArrayRef<int64_t>", "{1, 2}">:$image_dimensions)>
+      CArg<"ArrayRef<int64_t>", "{1, 2}">:$image_dimensions,
+      CArg<"ArrayRef<int64_t>", "{0, 1}">:$input_tile_dimensions)>
   ];
 
   let results = (outs Variadic<AnyRankedTensor>:$result);
@@ -1033,6 +1035,7 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
     `output_tile_size` `(` $output_tile_size `)`
     `kernel_size` `(` $kernel_size `)`
     `image_dimensions` `(` $image_dimensions `)`
+    `input_tile_dimensions` `(` $input_tile_dimensions `)`
     `ins` `(` $inputs `:` type($inputs) `)`
     `outs` `(` $outputs `:` type($outputs) `)`
     (`->` type($result)^)?
@@ -1092,6 +1095,8 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
     int getChannelDim() {
       return isNhwc() ? 3 : 1;
     }
+    // Utility for mapping non input tile dims to the actual result dims
+    SmallVector<int64_t> getNonInputTileDims();
     int64_t getIterationDomainRank() {
       return getOutputRank();
     }
@@ -1129,13 +1134,15 @@ def IREELinalgExt_WinogradFilterTransformOp : IREELinalgExt_Op<"winograd.filter_
                        Variadic<AnyShaped>:$outputs,
                        I64Attr:$output_tile_size,
                        I64Attr:$kernel_size,
-                       DenseI64ArrayAttr:$kernel_dimensions
+                       DenseI64ArrayAttr:$kernel_dimensions,
+                       DenseI64ArrayAttr:$input_tile_dimensions
   );
 
   let builders = [
     OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$outputs,
       CArg<"int64_t", "8">:$output_tile_size, CArg<"int64_t", "3">:$kernel_size,
-      CArg<"ArrayRef<int64_t>", "{0, 1}">:$kernel_dimensions)>
+      CArg<"ArrayRef<int64_t>", "{0, 1}">:$kernel_dimensions,
+      CArg<"ArrayRef<int64_t>", "{0, 1}">:$input_tile_dimensions)>
   ];
 
   let results = (outs Variadic<AnyRankedTensor>:$result);
@@ -1145,6 +1152,7 @@ def IREELinalgExt_WinogradFilterTransformOp : IREELinalgExt_Op<"winograd.filter_
     `output_tile_size` `(` $output_tile_size `)`
     `kernel_size` `(` $kernel_size `)`
     `kernel_dimensions` `(` $kernel_dimensions `)`
+    `input_tile_dimensions` `(` $input_tile_dimensions `)`
     `ins` `(` $inputs `:` type($inputs) `)`
     `outs` `(` $outputs `:` type($outputs) `)`
     (`->` type($result)^)?
@@ -1209,6 +1217,8 @@ def IREELinalgExt_WinogradFilterTransformOp : IREELinalgExt_Op<"winograd.filter_
     int getFilterDim() {
       return isHwcf() ? 3 : 0;
     }
+    // Utility for mapping non input tile dims to the actual result dims
+    SmallVector<int64_t> getNonInputTileDims();
     int64_t getIterationDomainRank() {
       return getOutputRank();
     }
@@ -1249,13 +1259,15 @@ def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_
                        Variadic<AnyShaped>:$outputs,
                        I64Attr:$output_tile_size,
                        I64Attr:$kernel_size,
-                       DenseI64ArrayAttr:$image_dimensions
+                       DenseI64ArrayAttr:$image_dimensions,
+                       DenseI64ArrayAttr:$input_tile_dimensions
   );
 
   let builders = [
     OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$outputs,
       CArg<"int64_t", "8">:$output_tile_size, CArg<"int64_t", "3">:$kernel_size,
-      CArg<"ArrayRef<int64_t>", "{1, 2}">:$image_dimensions)>
+      CArg<"ArrayRef<int64_t>", "{1, 2}">:$image_dimensions,
+      CArg<"ArrayRef<int64_t>", "{0, 1}">:$input_tile_dimensions)>
   ];
 
   let results = (outs Variadic<AnyRankedTensor>:$result);
@@ -1265,6 +1277,7 @@ def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_
     `output_tile_size` `(` $output_tile_size `)`
     `kernel_size` `(` $kernel_size `)`
     `image_dimensions` `(` $image_dimensions `)`
+    `input_tile_dimensions` `(` $input_tile_dimensions `)`
     `ins` `(` $inputs `:` type($inputs) `)`
     `outs` `(` $outputs `:` type($outputs) `)`
     (`->` type($result)^)?
@@ -1321,6 +1334,8 @@ def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_
     int64_t getOutputRank() {
       return getOutputType().getRank();
     }
+    // Utility for mapping non input tile dims to the actual result dims
+    SmallVector<int64_t> getNonInputTileDims();
     int64_t getIterationDomainRank() {
       return getInputRank();
     }
