@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-hal-transformation-pipeline --iree-codegen-test-target=gfx90a %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-hal-transformation-pipeline --iree-gpu-test-target=gfx90a %s | FileCheck %s
 
 module attributes {
   hal.device.targets = [

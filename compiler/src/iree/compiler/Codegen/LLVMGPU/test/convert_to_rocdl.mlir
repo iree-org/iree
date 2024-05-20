@@ -1,5 +1,5 @@
-// RUN: iree-opt --split-input-file --iree-codegen-test-target=gfx908 --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-convert-to-rocdl))))" %s | FileCheck %s
-// RUN: iree-opt --split-input-file --iree-codegen-test-target=gfx908 --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-convert-to-rocdl))))" --iree-rocm-index-bits=32 %s | FileCheck %s --check-prefix=INDEX32
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx908 --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-convert-to-rocdl))))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx908 --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-convert-to-rocdl))))" --iree-rocm-index-bits=32 %s | FileCheck %s --check-prefix=INDEX32
 
 // Test that that standard and GPU ops are converted to LLVM and NVVM.
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [

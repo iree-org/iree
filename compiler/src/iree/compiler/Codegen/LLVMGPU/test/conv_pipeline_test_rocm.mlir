@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-codegen-test-target=gfx1100 \
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx1100 \
 // RUN:   --pass-pipeline='builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-llvmgpu-select-lowering-strategy, func.func(iree-llvmgpu-lower-executable-target,canonicalize)))))' \
 // RUN:   %s | FileCheck %s
 

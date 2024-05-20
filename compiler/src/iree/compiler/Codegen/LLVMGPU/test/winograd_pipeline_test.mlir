@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-codegen-test-target=gfx1100 --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy, func.func(iree-llvmgpu-lower-executable-target))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx1100 --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy, func.func(iree-llvmgpu-lower-executable-target))" %s | FileCheck %s
 
 module {
   func.func @winograd_filter_transform() {

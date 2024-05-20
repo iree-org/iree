@@ -1,7 +1,7 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(iree-codegen-llvmgpu-configuration-pipeline)" --iree-codegen-test-target=gfx940 \
+// RUN: iree-opt --pass-pipeline="builtin.module(iree-codegen-llvmgpu-configuration-pipeline)" --iree-gpu-test-target=gfx940 \
 // RUN:   --split-input-file %s | FileCheck %s
 
-// RUN: iree-opt --pass-pipeline="builtin.module(iree-codegen-rocdl-configuration-pipeline)" --iree-codegen-test-target=gfx940 \
+// RUN: iree-opt --pass-pipeline="builtin.module(iree-codegen-rocdl-configuration-pipeline)" --iree-gpu-test-target=gfx940 \
 // RUN:   --split-input-file %s | FileCheck %s
 
 // Make sure that the GPU configuration pipelines generalize named ops, e.g., linalg.matmul_transpose_b to linalg.generic.

@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-codegen-test-target=sm_60 --pass-pipeline="builtin.module(func.func(iree-llvmgpu-tile-and-distribute))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=sm_60 --pass-pipeline="builtin.module(func.func(iree-llvmgpu-tile-and-distribute))" %s | FileCheck %s
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[2, 256, 4]]>
 #map = affine_map<()[s0] -> (s0 * 2)>

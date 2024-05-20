@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-codegen-test-target=sm_80 \
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=sm_80 \
 // RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-llvmgpu-select-lowering-strategy, func.func(iree-llvmgpu-lower-executable-target, fold-memref-alias-ops, canonicalize, cse)))))" %s | FileCheck %s
 
 #executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">

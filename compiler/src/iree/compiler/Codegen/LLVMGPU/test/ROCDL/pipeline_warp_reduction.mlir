@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-codegen-test-target=gfx940 --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-rocdl-configuration-pipeline), iree-codegen-linalg-to-rocdl-pipeline2)))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx940 --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-rocdl-configuration-pipeline), iree-codegen-linalg-to-rocdl-pipeline2)))" %s | FileCheck %s
 
 hal.executable private @warp_reduction {
   hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {

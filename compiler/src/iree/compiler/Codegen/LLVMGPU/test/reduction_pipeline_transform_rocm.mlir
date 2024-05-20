@@ -1,7 +1,7 @@
-// RUN: iree-opt --split-input-file --iree-codegen-test-target=gfx940 \
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx940 \
 // RUN:  --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-llvmgpu-select-lowering-strategy, func.func(iree-llvmgpu-lower-executable-target)))))" \
 // RUN:  %s | FileCheck %s
-// RUN: iree-opt --split-input-file --iree-codegen-test-target=gfx1100 \
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx1100 \
 // RUN:  --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-llvmgpu-select-lowering-strategy, func.func(iree-llvmgpu-lower-executable-target)))))" \
 // RUN:  %s | FileCheck %s --check-prefix=CDNA3
 

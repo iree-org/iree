@@ -36,7 +36,7 @@
 static constexpr unsigned kShuffleBitWidth = 32;
 
 static llvm::cl::opt<std::string> clTestTarget(
-    "iree-codegen-test-target",
+    "iree-gpu-test-target",
     llvm::cl::desc(
         "The target for IR LIT tests; the interpretation depends on the target "
         "API. e.g., \"gfx942\" for HIP, \"sm_80\" for CUDA"),

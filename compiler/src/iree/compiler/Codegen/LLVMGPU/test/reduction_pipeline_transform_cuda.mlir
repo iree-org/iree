@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-codegen-test-target=sm_60 --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-llvmgpu-select-lowering-strategy, iree-codegen-lower-executable-using-transform-dialect, func.func(iree-llvmgpu-lower-executable-target)))))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=sm_60 --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-llvmgpu-select-lowering-strategy, iree-codegen-lower-executable-using-transform-dialect, func.func(iree-llvmgpu-lower-executable-target)))))" %s | FileCheck %s
 
 hal.executable @small_reduction {
 hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb">) {

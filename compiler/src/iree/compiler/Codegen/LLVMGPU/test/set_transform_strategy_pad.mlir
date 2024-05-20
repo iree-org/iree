@@ -1,6 +1,6 @@
 // RUN: iree-opt %s --split-input-file \
 // RUN:   --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" \
-// RUN:   --iree-codegen-test-target=sm_80 \
+// RUN:   --iree-gpu-test-target=sm_80 \
 // RUN:   --iree-codegen-llvmgpu-enable-transform-dialect-pad-strategy \
 // RUN: | FileCheck %s
 
@@ -8,7 +8,7 @@
 // strategy as expected.
 // RUN: iree-opt %s --split-input-file \
 // RUN:   --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" \
-// RUN:   --iree-codegen-test-target=sm_80 \
+// RUN:   --iree-gpu-test-target=sm_80 \
 // RUN:   --iree-codegen-llvmgpu-enable-transform-dialect-pad-strategy \
 // RUN:   --td-pad-strategy-blk-sizes=16,32,1 \
 // RUN:   --td-pad-strategy-num-threads=8,4,1 \

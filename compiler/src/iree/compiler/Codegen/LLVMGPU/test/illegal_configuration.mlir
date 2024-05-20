@@ -1,4 +1,4 @@
-// RUN: iree-opt --iree-codegen-test-target=sm_60 --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" --verify-diagnostics --split-input-file %s
+// RUN: iree-opt --iree-gpu-test-target=sm_60 --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" --verify-diagnostics --split-input-file %s
 
 #config = #iree_codegen.lowering_config<tile_sizes = []>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt workgroup_size = [32, 8, 8], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>

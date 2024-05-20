@@ -1,5 +1,5 @@
-// RUN: iree-opt --split-input-file --iree-hal-transformation-pipeline --iree-codegen-test-target=sm_60 %s | FileCheck %s
-// RUN: iree-opt --split-input-file --iree-hal-transformation-pipeline --iree-codegen-test-target=sm_60 --iree-hal-cuda-dump-ptx %s 2>&1 | FileCheck %s --check-prefix=PTX
+// RUN: iree-opt --split-input-file --iree-hal-transformation-pipeline --iree-gpu-test-target=sm_60 %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-hal-transformation-pipeline --iree-gpu-test-target=sm_60 --iree-hal-cuda-dump-ptx %s 2>&1 | FileCheck %s --check-prefix=PTX
 
 #map = affine_map<(d0) -> (d0)>
 

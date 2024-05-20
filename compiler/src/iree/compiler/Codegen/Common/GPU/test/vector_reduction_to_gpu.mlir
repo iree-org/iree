@@ -1,5 +1,5 @@
-// RUN: iree-opt --split-input-file --iree-codegen-test-target=sm_60 --pass-pipeline='builtin.module(func.func(iree-codegen-vector-reduction-to-gpu, cse))' %s | FileCheck %s
-// RUN: iree-opt --split-input-file --iree-codegen-test-target=gfx940 --pass-pipeline='builtin.module(func.func(iree-codegen-vector-reduction-to-gpu, cse))' %s | FileCheck %s --check-prefix=CDNA3
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=sm_60 --pass-pipeline='builtin.module(func.func(iree-codegen-vector-reduction-to-gpu, cse))' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx940 --pass-pipeline='builtin.module(func.func(iree-codegen-vector-reduction-to-gpu, cse))' %s | FileCheck %s --check-prefix=CDNA3
 
 #map = affine_map<()[s0, s1] -> (s1 * 2 + s0 floordiv 32)>
 #translation_info = #iree_codegen.translation_info<None workgroup_size = [32, 1, 1]>

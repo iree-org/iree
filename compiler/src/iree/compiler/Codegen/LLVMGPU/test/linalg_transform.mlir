@@ -1,11 +1,11 @@
 // RUN: iree-opt %s  --pass-pipeline="builtin.module(iree-codegen-llvmgpu-configuration-pipeline, func.func(iree-llvmgpu-lower-executable-target))" \
-// RUN:     --iree-codegen-test-target=sm_60 \
+// RUN:     --iree-gpu-test-target=sm_60 \
 // RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
 // RUN:     --iree-codegen-transform-dialect-library=%p/transform_dialect_codegen_bufferize_spec.mlir@__transform_main | \
 // RUN: FileCheck %s
 
 // RUN: iree-opt %s  --pass-pipeline="builtin.module(iree-codegen-llvmgpu-configuration-pipeline, func.func(iree-llvmgpu-lower-executable-target))" \
-// RUN:     --iree-codegen-test-target=sm_60 \
+// RUN:     --iree-gpu-test-target=sm_60 \
 // RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=false \
 // RUN:     --iree-codegen-transform-dialect-library=%p/transform_dialect_codegen_foreach_to_gpu_spec.mlir@__transform_main | \
 // RUN: FileCheck %s --check-prefix=FOREACH-TO-GPU

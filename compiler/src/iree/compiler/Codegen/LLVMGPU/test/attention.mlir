@@ -1,5 +1,5 @@
 // RUN: iree-opt %s --pass-pipeline='builtin.module(iree-transform-dialect-interpreter)' \
-// RUN:   --iree-codegen-test-target=sm_60 --iree-codegen-transform-dialect-library=%p/attention_transform_spec.mlir| \
+// RUN:   --iree-gpu-test-target=sm_60 --iree-codegen-transform-dialect-library=%p/attention_transform_spec.mlir| \
 // RUN: FileCheck --check-prefix=CHECK %s
 
 module {
