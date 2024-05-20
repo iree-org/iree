@@ -1768,14 +1768,24 @@ setWinogradRootConfig(mlir::FunctionOpInterface entryPointFn,
   assert(!getLoweringConfig(winogradOp) &&
          "expected lowering_config is not set");
   auto iterationRank = winogradOp.getIterationDomainRank();
-  SmallVector<int64_t> vecSizeHints(iterationRank, 1);
   DistributionHeuristicConfig distConfig;
+  SmallVector<int64_t> maxTileSizes(iterationRank, clDefaultDistTileSize);
+  maxTileSizes[0] = maxTileSizes[1] = 0;
+  SmallVector<int64_t> minTileSizes(iterationRank, 1);
+  minTileSizes[0] = minTileSizes[1] = 0;
+  SmallVector<int64_t> vecSizeHints(iterationRank, 1);
+  vecSizeHints[0] = vecSizeHints[1] = winogradOp.getInputTileSize();
   distConfig.vectorSizeHints = vecSizeHints;
+  distConfig.minTileSizes = minTileSizes;
+  distConfig.maxTileSizes = maxTileSizes;
   SmallVector<int64_t> distTileSizes =
       getDefaultDistributedLevelTileSizes(winogradOp, distConfig);
   TileSizesListType tileSizes;
   tileSizes.push_back(distTileSizes);
+  assert(distTileSizes[0] == 0 && distTileSizes[1] == 0 &&
+         "expected outer 2 distTileSizes to be 0");
   SmallVector<int64_t> vecTileSizes(iterationRank, 1);
+  vecTileSizes[0] = vecTileSizes[1] = winogradOp.getInputTileSize();
   tileSizes.push_back(vecTileSizes);
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, winogradOp, tileSizes,
