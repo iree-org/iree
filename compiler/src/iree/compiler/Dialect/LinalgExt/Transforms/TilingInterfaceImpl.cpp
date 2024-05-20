@@ -1244,15 +1244,11 @@ WinogradInputTransformOp::getIterationDomain(OpBuilder &builder) {
   Location loc = getLoc();
   Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
   Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
-  Value dest = getOutput();
   SmallVector<Range> loopBounds(getIterationDomainRank());
-  int count = 0;
-  for (auto dim :
-       llvm::seq<int64_t>(getImageDimensions().size(), getOutputRank())) {
-    loopBounds[count].offset = zero;
-    loopBounds[count].size = getDimValue(builder, loc, dest, dim);
-    loopBounds[count].stride = one;
-    count++;
+  for (int dim = 0; dim < getOutputRank(); ++dim) {
+    loopBounds[dim].offset = zero;
+    loopBounds[dim].size = getDimValue(builder, loc, getOutput(), dim);
+    loopBounds[dim].stride = one;
   }
   return loopBounds;
 }
@@ -1269,44 +1265,32 @@ WinogradInputTransformOp::getTiledImplementation(OpBuilder &builder,
                                                  ArrayRef<OpFoldResult> offsets,
                                                  ArrayRef<OpFoldResult> sizes) {
   Location loc = getLoc();
-  auto one = builder.getIndexAttr(1);
   auto zero = builder.getIndexAttr(0);
   const int cDim = getChannelDim();
 
-  assert(offsets.size() == 4);
+  assert(offsets.size() == 6);
   SmallVector<OpFoldResult> inputOffsets(getInputRank(), zero);
-  SmallVector<OpFoldResult> outputOffsets(getOutputRank(), zero);
   const auto hDim = getImageDimensions()[0];
   const auto wDim = getImageDimensions()[1];
-  outputOffsets[2] = inputOffsets[0] = offsets[0];
-  outputOffsets[3] = offsets[1];
-  outputOffsets[4] = offsets[2];
-  outputOffsets[5] = inputOffsets[cDim] = offsets[3];
+  inputOffsets[0] = offsets[2];
+  inputOffsets[cDim] = offsets[5];
 
-  SmallVector<OpFoldResult> inputStrides(getInputRank(), one);
-  SmallVector<OpFoldResult> outputStrides(getOutputRank(), one);
-  ReifiedRankedShapedTypeDims reifiedResultShapes, reifiedInputShapes;
-  if (failed(reifyResultShapes(builder, reifiedResultShapes))) {
-    return failure();
-  }
-  SmallVector<OpFoldResult> outputSizes = reifiedResultShapes[0];
+  ReifiedRankedShapedTypeDims reifiedInputShapes;
   if (failed(getStaticOrReifiedInputDims(builder, loc, getInput(),
                                          reifiedInputShapes))) {
     return failure();
   }
   SmallVector<OpFoldResult> inputSizes = reifiedInputShapes[0];
 
-  assert(sizes.size() == 4);
-  outputSizes[2] = inputSizes[0] = sizes[0];
-  outputSizes[3] = sizes[1];
-  outputSizes[4] = sizes[2];
-  outputSizes[5] = inputSizes[cDim] = sizes[3];
+  assert(sizes.size() == 6);
+  inputSizes[0] = sizes[2];
+  inputSizes[cDim] = sizes[5];
 
   auto hSizeAndOffset = getScaledSizeAndOffset(
-      builder, loc, sizes[1], offsets[1], inputSizes[hDim], getOutputTileSize(),
+      builder, loc, sizes[3], offsets[3], inputSizes[hDim], getOutputTileSize(),
       getInputTileSize());
   auto wSizeAndOffset = getScaledSizeAndOffset(
-      builder, loc, sizes[2], offsets[2], inputSizes[wDim], getOutputTileSize(),
+      builder, loc, sizes[4], offsets[4], inputSizes[wDim], getOutputTileSize(),
       getInputTileSize());
 
   inputSizes[hDim] = hSizeAndOffset.first;
@@ -1315,10 +1299,13 @@ WinogradInputTransformOp::getTiledImplementation(OpBuilder &builder,
   inputOffsets[wDim] = wSizeAndOffset.second;
 
   SmallVector<Value> tiledOperands;
+  auto one = builder.getIndexAttr(1);
+  SmallVector<OpFoldResult> inputStrides(getInputRank(), one);
   tiledOperands.emplace_back(getSlice(builder, loc, getInput(), inputOffsets,
                                       inputSizes, inputStrides));
-  tiledOperands.emplace_back(getSlice(builder, loc, getOutput(), outputOffsets,
-                                      outputSizes, outputStrides));
+  SmallVector<OpFoldResult> outputStrides(getOutputRank(), one);
+  tiledOperands.emplace_back(
+      getSlice(builder, loc, getOutput(), offsets, sizes, outputStrides));
 
   SmallVector<Type, 4> resultTypes;
   if (hasPureTensorSemantics()) {
@@ -1336,21 +1323,19 @@ LogicalResult WinogradInputTransformOp::getResultTilePosition(
     ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
     SmallVector<OpFoldResult> &resultSizes) {
   if (resultNumber == 0) {
-    auto resultShape = cast<ShapedType>(getOutput().getType()).getShape();
-    resultSizes = getAsOpFoldResult(builder.getIndexArrayAttr(resultShape));
-    resultOffsets =
-        SmallVector<OpFoldResult>(getOutputRank(), builder.getIndexAttr(0));
-    resultOffsets[2] = offsets[0];
-    resultOffsets[3] = offsets[1];
-    resultOffsets[4] = offsets[2];
-    resultOffsets[5] = offsets[3];
-    resultSizes[2] = sizes[0];
-    resultSizes[3] = sizes[1];
-    resultSizes[4] = sizes[2];
-    resultSizes[5] = sizes[3];
+    resultSizes = SmallVector<OpFoldResult>(sizes);
+    resultOffsets = SmallVector<OpFoldResult>(offsets);
     return success();
   }
   return failure();
+}
+
+FailureOr<TilingResult> WinogradInputTransformOp::generateResultTileValue(
+    OpBuilder &b, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes) {
+  int64_t numLoops = getIterationDomainRank();
+  return getTiledImplementation(b, offsets.take_front(numLoops),
+                                sizes.take_front(numLoops));
 }
 
 //===----------------------------------------------------------------------===//
@@ -1362,15 +1347,11 @@ WinogradFilterTransformOp::getIterationDomain(OpBuilder &builder) {
   Location loc = getLoc();
   OpFoldResult zero = builder.getIndexAttr(0);
   OpFoldResult one = builder.getIndexAttr(1);
-  Value source = getOutput();
-  int64_t numKernelDims = getKernelDimensions().size();
-  auto outRank = getOutputRank();
-  SmallVector<Range> loopBounds(outRank - numKernelDims);
-  for (auto dim : llvm::seq<int64_t>(numKernelDims, outRank)) {
-    int64_t loopDim = dim - numKernelDims;
-    loopBounds[loopDim].offset = zero;
-    loopBounds[loopDim].size = getDimValue(builder, loc, source, dim);
-    loopBounds[loopDim].stride = one;
+  SmallVector<Range> loopBounds(getOutputRank());
+  for (int dim = 0; dim < getOutputRank(); ++dim) {
+    loopBounds[dim].offset = zero;
+    loopBounds[dim].size = getDimValue(builder, loc, getOutput(), dim);
+    loopBounds[dim].stride = one;
   }
   return loopBounds;
 }
@@ -1391,30 +1372,25 @@ FailureOr<TilingResult> WinogradFilterTransformOp::getTiledImplementation(
   const int cDim = getChannelDim();
   const int fDim = getFilterDim();
 
-  assert(offsets.size() == 2);
+  assert(offsets.size() == 4);
   SmallVector<OpFoldResult> inputOffsets(getInputRank(), zero);
-  SmallVector<OpFoldResult> outputOffsets(getOutputRank(), zero);
-  outputOffsets[2] = inputOffsets[cDim] = offsets[0];
-  outputOffsets[3] = inputOffsets[fDim] = offsets[1];
+  inputOffsets[cDim] = offsets[2];
+  inputOffsets[fDim] = offsets[3];
 
-  SmallVector<OpFoldResult> inputStrides(getInputRank(), one);
-  SmallVector<OpFoldResult> outputStrides(getOutputRank(), one);
-
-  assert(sizes.size() == 2);
+  assert(sizes.size() == 4);
   ArrayRef<int64_t> inputShape = getInputType().getShape();
-  ArrayRef<int64_t> outputShape = getOutputType().getShape();
   SmallVector<OpFoldResult> inputSizes =
       getAsOpFoldResult(builder.getIndexArrayAttr(inputShape));
-  SmallVector<OpFoldResult> outputSizes =
-      getAsOpFoldResult(builder.getIndexArrayAttr(outputShape));
-  outputSizes[2] = inputSizes[cDim] = sizes[0];
-  outputSizes[3] = inputSizes[fDim] = sizes[1];
+  inputSizes[cDim] = sizes[2];
+  inputSizes[fDim] = sizes[3];
 
   SmallVector<Value> tiledOperands;
+  SmallVector<OpFoldResult> inputStrides(getInputRank(), one);
   tiledOperands.emplace_back(getSlice(builder, loc, getInput(), inputOffsets,
                                       inputSizes, inputStrides));
-  tiledOperands.emplace_back(getSlice(builder, loc, getOutput(), outputOffsets,
-                                      outputSizes, outputStrides));
+  SmallVector<OpFoldResult> outputStrides(getOutputRank(), one);
+  tiledOperands.emplace_back(
+      getSlice(builder, loc, getOutput(), offsets, sizes, outputStrides));
 
   SmallVector<Type> resultTypes;
   if (hasPureTensorSemantics()) {
@@ -1434,15 +1410,17 @@ LogicalResult WinogradFilterTransformOp::getResultTilePosition(
   if (resultNumber != 0) {
     return failure();
   }
-  ArrayRef<int64_t> resultShape = getOutputType().getShape();
-  resultSizes = getAsOpFoldResult(builder.getIndexArrayAttr(resultShape));
-  resultOffsets =
-      SmallVector<OpFoldResult>(getOutputRank(), builder.getIndexAttr(0));
-  resultOffsets[2] = offsets[0];
-  resultOffsets[3] = offsets[1];
-  resultSizes[2] = sizes[0];
-  resultSizes[3] = sizes[1];
+  resultSizes = SmallVector<OpFoldResult>(sizes);
+  resultOffsets = SmallVector<OpFoldResult>(offsets);
   return success();
+}
+
+FailureOr<TilingResult> WinogradFilterTransformOp::generateResultTileValue(
+    OpBuilder &b, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes) {
+  int64_t numLoops = getIterationDomainRank();
+  return getTiledImplementation(b, offsets.take_front(numLoops),
+                                sizes.take_front(numLoops));
 }
 
 //===----------------------------------------------------------------------===//
@@ -1454,15 +1432,11 @@ WinogradOutputTransformOp::getIterationDomain(OpBuilder &builder) {
   Location loc = getLoc();
   Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
   Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
-  Value source = getInput();
   SmallVector<Range> loopBounds(getIterationDomainRank());
-  int count = 0;
-  for (auto dim :
-       llvm::seq<int64_t>(getImageDimensions().size(), getInputRank())) {
-    loopBounds[count].offset = zero;
-    loopBounds[count].size = getDimValue(builder, loc, source, dim);
-    loopBounds[count].stride = one;
-    count++;
+  for (int dim = 0; dim < getInputRank(); ++dim) {
+    loopBounds[dim].offset = zero;
+    loopBounds[dim].size = getDimValue(builder, loc, getInput(), dim);
+    loopBounds[dim].stride = one;
   }
   return loopBounds;
 }
@@ -1482,45 +1456,29 @@ FailureOr<TilingResult> WinogradOutputTransformOp::getTiledImplementation(
   auto zero = builder.getIndexAttr(0);
   const int cDim = getChannelDim();
 
-  assert(offsets.size() == 4);
+  assert(offsets.size() == 6);
   const auto hDim = getImageDimensions()[0];
   const auto wDim = getImageDimensions()[1];
-  SmallVector<OpFoldResult> inputOffsets(getInputRank(), zero);
   SmallVector<OpFoldResult> outputOffsets(getOutputRank(), zero);
 
-  inputOffsets[2] = outputOffsets[0] = offsets[0];
-  inputOffsets[3] = offsets[1];
-  inputOffsets[4] = offsets[2];
-  inputOffsets[5] = outputOffsets[cDim] = offsets[3];
+  outputOffsets[0] = offsets[2];
+  outputOffsets[cDim] = offsets[5];
 
-  SmallVector<OpFoldResult> inputStrides(getInputRank(), one);
-  SmallVector<OpFoldResult> outputStrides(getOutputRank(), one);
-
-  ReifiedRankedShapedTypeDims reifiedResultShapes, reifiedInputShapes;
+  ReifiedRankedShapedTypeDims reifiedResultShapes;
   if (failed(reifyResultShapes(builder, reifiedResultShapes))) {
     return failure();
   }
   SmallVector<OpFoldResult> outputSizes = reifiedResultShapes[0];
-  if (failed(getStaticOrReifiedInputDims(builder, loc, getInput(),
-                                         reifiedInputShapes))) {
-    return failure();
-  }
-  SmallVector<OpFoldResult> inputSizes = reifiedInputShapes[0];
 
-  inputSizes[2] = outputSizes[0] = sizes[0];
-  inputSizes[5] = outputSizes[cDim] = sizes[3];
-
-  assert(sizes.size() == 4);
-  inputSizes[2] = outputSizes[0] = sizes[0];
-  inputSizes[3] = sizes[1];
-  inputSizes[4] = sizes[2];
-  inputSizes[5] = outputSizes[cDim] = sizes[3];
+  assert(sizes.size() == 6);
+  outputSizes[0] = sizes[2];
+  outputSizes[cDim] = sizes[5];
 
   auto hSizeAndOffset = getScaledSizeAndOffset(
-      builder, loc, sizes[1], offsets[1], outputSizes[hDim],
+      builder, loc, sizes[3], offsets[3], outputSizes[hDim],
       getOutputTileSize(), getOutputTileSize());
   auto wSizeAndOffset = getScaledSizeAndOffset(
-      builder, loc, sizes[2], offsets[2], outputSizes[wDim],
+      builder, loc, sizes[4], offsets[4], outputSizes[wDim],
       getOutputTileSize(), getOutputTileSize());
 
   outputSizes[hDim] = hSizeAndOffset.first;
@@ -1528,6 +1486,7 @@ FailureOr<TilingResult> WinogradOutputTransformOp::getTiledImplementation(
   outputOffsets[hDim] = hSizeAndOffset.second;
   outputOffsets[wDim] = wSizeAndOffset.second;
 
+  SmallVector<OpFoldResult> outputStrides(getOutputRank(), one);
   Value outputSlice = getSlice(builder, loc, getOutput(), outputOffsets,
                                outputSizes, outputStrides);
   // The image dims of the winograd.output_transform result will always be a
@@ -1535,11 +1494,11 @@ FailureOr<TilingResult> WinogradOutputTransformOp::getTiledImplementation(
   // maintain more static information in the IR.
   auto outSliceType = cast<ShapedType>(outputSlice.getType());
   SmallVector<int64_t> staticOutShape(outSliceType.getShape());
-  auto constSizeH = getConstantIntValue(sizes[1]);
+  auto constSizeH = getConstantIntValue(sizes[3]);
   if (constSizeH.has_value()) {
     staticOutShape[hDim] = constSizeH.value() * getOutputTileSize();
   }
-  auto constSizeW = getConstantIntValue(sizes[2]);
+  auto constSizeW = getConstantIntValue(sizes[4]);
   if (constSizeW.has_value()) {
     staticOutShape[wDim] = constSizeW.value() * getOutputTileSize();
   }
@@ -1547,8 +1506,9 @@ FailureOr<TilingResult> WinogradOutputTransformOp::getTiledImplementation(
       castValue(builder, loc, outputSlice, outSliceType.clone(staticOutShape));
 
   SmallVector<Value> tiledOperands;
-  tiledOperands.emplace_back(getSlice(builder, loc, getInput(), inputOffsets,
-                                      inputSizes, inputStrides));
+  SmallVector<OpFoldResult> inputStrides(getInputRank(), one);
+  tiledOperands.emplace_back(
+      getSlice(builder, loc, getInput(), offsets, sizes, inputStrides));
   tiledOperands.emplace_back(staticOutputSlice);
 
   SmallVector<Type, 4> resultTypes;
@@ -1579,19 +1539,19 @@ LogicalResult WinogradOutputTransformOp::getResultTilePosition(
     const auto hDim = getImageDimensions()[0];
     const auto wDim = getImageDimensions()[1];
     auto loc = getLoc();
-    resultOffsets[0] = offsets[0];
-    resultOffsets[cDim] = offsets[3];
-    resultSizes[0] = sizes[0];
-    resultSizes[cDim] = sizes[3];
+    resultOffsets[0] = offsets[2];
+    resultOffsets[cDim] = offsets[5];
+    resultSizes[0] = sizes[2];
+    resultSizes[cDim] = sizes[5];
     SmallVector<SmallVector<OpFoldResult>> reifiedResultShapes;
     if (failed(reifyResultShapes(builder, reifiedResultShapes))) {
       return failure();
     }
     auto hSizeAndOffset = getScaledSizeAndOffset(
-        builder, loc, sizes[1], offsets[1], reifiedResultShapes[0][hDim],
+        builder, loc, sizes[3], offsets[3], reifiedResultShapes[0][hDim],
         getOutputTileSize(), getOutputTileSize());
     auto wSizeAndOffset = getScaledSizeAndOffset(
-        builder, loc, sizes[2], offsets[2], reifiedResultShapes[0][wDim],
+        builder, loc, sizes[4], offsets[4], reifiedResultShapes[0][wDim],
         getOutputTileSize(), getOutputTileSize());
 
     resultSizes[hDim] = hSizeAndOffset.first;

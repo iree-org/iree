@@ -601,8 +601,8 @@ void addCPULinalgExtTileAndVectorizePipeline(
     OpPassManager &funcPassManager, TilingConfig &tilingConfig,
     LLVMCPUPipelineOptions &pipelineOpt) {
   addTileAndDistributePasses(funcPassManager);
-  funcPassManager.addPass(
-      createLLVMCPUTilePass(tilingConfig.getVectorCommonParallelLevel()));
+  funcPassManager.addPass(createLLVMCPUTileAndFusePass(
+      tilingConfig.getVectorCommonParallelLevel()));
   // TODO: Should only apply decomposition here?
   funcPassManager.addPass(
       IREE::LinalgExt::createTileAndDecomposeAttentionPass());

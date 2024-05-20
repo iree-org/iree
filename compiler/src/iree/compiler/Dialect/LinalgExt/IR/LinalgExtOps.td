@@ -966,7 +966,8 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
       ["getIterationDomain",
        "getLoopIteratorTypes",
        "getResultTilePosition",
-       "getTiledImplementation"]>]> {
+       "getTiledImplementation",
+       "generateResultTileValue"]>]> {
   let summary = "Winograd Input Transform operator";
   let description = [{
     This operator is part of the first step in converting a convolution to
@@ -1061,7 +1062,7 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
       return isNhwc() ? 3 : 1;
     }
     int64_t getIterationDomainRank() {
-      return getOutputRank() - getImageDimensions().size();
+      return getOutputRank();
     }
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
@@ -1077,7 +1078,8 @@ def IREELinalgExt_WinogradFilterTransformOp : IREELinalgExt_Op<"winograd.filter_
       ["getIterationDomain",
        "getLoopIteratorTypes",
        "getResultTilePosition",
-       "getTiledImplementation"]>]> {
+       "getTiledImplementation",
+       "generateResultTileValue"]>]> {
   let summary = "Winograd Filter Transform operator";
   let description = [{
     This operator is part of the first step in converting a convolution to
@@ -1177,7 +1179,7 @@ def IREELinalgExt_WinogradFilterTransformOp : IREELinalgExt_Op<"winograd.filter_
       return isHwcf() ? 3 : 0;
     }
     int64_t getIterationDomainRank() {
-      return getInputRank() - getKernelDimensions().size();
+      return getOutputRank();
     }
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
@@ -1289,7 +1291,7 @@ def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_
       return getOutputType().getRank();
     }
     int64_t getIterationDomainRank() {
-      return getInputRank() - getImageDimensions().size();
+      return getInputRank();
     }
     int64_t getInputTileSize() {
       return getOutputTileSize() + getKernelSize() - 1;
