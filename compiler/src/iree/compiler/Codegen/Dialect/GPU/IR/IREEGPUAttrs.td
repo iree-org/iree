@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_DIALECT_GPU_IREEGPUATTRS
 #define IREE_COMPILER_CODEGEN_DIALECT_GPU_IREEGPUATTRS
 
+include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.td"
 include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.td"
 include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.td"
 include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.td"
@@ -26,6 +27,37 @@ def IREEGPU_IteratorTypeEnum
 def IREEGPU_IteratorTypeArrayAttr
     : TypedArrayAttrBase<IREEGPU_IteratorTypeEnum,
                          "Iterator type should be an enum.">;
+
+//===----------------------------------------------------------------------===//
+// GPU Specific Lowering Config Attribute
+//===----------------------------------------------------------------------===//
+
+def IREEGPU_LoweringConfigAttr :
+    AttrDef<IREEGPU_Dialect, "LoweringConfig", [
+      DeclareAttrInterfaceMethods<IREECodegen_LoweringConfigAttrInterface, [
+        "getWorkgroupTileSizes",
+        "getStaticTilingLevelSizes",
+        "getTilingLevelSizes",
+      ]>
+    ]> {
+  let mnemonic = "lowering_config";
+  let summary = [{drive lowering of an operation for gpu compilation.}];
+  let description = [{
+    GPU specific implementation of a lowering config. This carries just a
+    dictionary attribute to store any relevant fields. This is the simplest
+    form of a lowering config, offering flexibility at the cost of structure.
+  }];
+
+  let assemblyFormat = [{ `<` $attributes `>` }];
+
+  let parameters = (ins
+    AttrParameter<"DictionaryAttr",
+        "The configured fields, including tiling levels">:$attributes
+  );
+  let extraClassDeclaration = [{
+    SmallVector<int64_t> getThreadTileSizes() const;
+  }];
+}
 
 //===----------------------------------------------------------------------===//
 // GPU Workgroup Processor (WGP) Level Feature/Limit Attributes
@@ -62,6 +94,7 @@ def IREEGPU_DotProductOpsAttr : EnumAttr<
 
 //===----------------------------------------------------------------------===//
 // Base MMA vector layout
+//===----------------------------------------------------------------------===//
 
 class IREEGPU_MmaVectorLayoutAttr<string attrname, string mmaintrinsic> :
     AttrDef<IREEGPU_Dialect, attrname, [

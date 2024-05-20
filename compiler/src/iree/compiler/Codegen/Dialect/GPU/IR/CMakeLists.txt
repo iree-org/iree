@@ -52,6 +52,7 @@ iree_cc_library(
     MLIRSupport
     MLIRTensorDialect
     MLIRVectorDialect
+    iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Utils::VectorOpUtils
   PUBLIC
 )

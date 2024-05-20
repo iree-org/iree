@@ -109,4 +109,24 @@ def IREEGPU_MMAIntrinsic : IREEGPU_I32MmaEnumAttr<"MMAIntrinsic",
       WMMA_F16_16x16x16_F32
     ]>;
 
+//===----------------------------------------------------------------------===//
+// Tiling levels
+
+def Workgroup : I32EnumAttrCase<"Workgroup", 0>;
+def Reduction : I32EnumAttrCase<"Reduction", 1>;
+def PartialReduction : I32EnumAttrCase<"PartialReduction", 2>;
+def Thread : I32EnumAttrCase<"Thread", 3>;
+def Subgroup : I32EnumAttrCase<"Subgroup", 4>;
+def Lane : I32EnumAttrCase<"Lane", 5>;
+
+def IREEGPU_TilingLevel : IREEGPU_I32MmaEnumAttr<"TilingLevel",
+    "Descriptor for tiling levels for GPU lowering configs", [
+      Workgroup,
+      Reduction,
+      PartialReduction,
+      Thread,
+      Subgroup,
+      Lane
+    ]>;
+
 #endif // IREE_COMPILER_CODEGEN_DIALECT_GPU_IREEGPUENUMS

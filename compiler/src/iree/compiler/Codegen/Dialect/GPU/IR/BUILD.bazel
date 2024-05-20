@@ -33,6 +33,7 @@ iree_td_library(
         include = ["*.td"],
     ),
     deps = [
+        "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR:td_files",
         "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
         "@llvm-project//mlir:DialectUtilsTdFiles",
         "@llvm-project//mlir:OpBaseTdFiles",
@@ -73,6 +74,7 @@ iree_compiler_cc_library(
         ":IREEGPUEnums",
         ":IREEGPUInterfaces",
         ":IREEGPUOpsGen",
+        "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR:IREECodegenDialect",
         "//compiler/src/iree/compiler/Codegen/Utils:VectorOpUtils",
         "//llvm-external-projects/iree-dialects:IREEVectorExtDialect",
         "@llvm-project//llvm:Support",

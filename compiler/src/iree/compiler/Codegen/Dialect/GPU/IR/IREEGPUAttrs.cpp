@@ -8,6 +8,7 @@
 #include <numeric>
 
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Utils/VectorOpUtils.h"
 #include "llvm/ADT/STLExtras.h"
@@ -19,8 +20,10 @@
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/DialectImplementation.h"
+#include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/TypeUtilities.h"
 
 #define DEBUG_TYPE "iree-gpu-attrs"
@@ -1027,6 +1030,78 @@ bool TargetAttr::supportsSyncMMAOps() const {
   if (auto cc = getCUDAComputeCapability())
     return cc >= 80;
   return false;
+}
+
+//===----------------------------------------------------------------------===//
+// Lowering Config Attributes
+//===----------------------------------------------------------------------===//
+
+static constexpr char kWorkgroupLevelName[] = "workgroup";
+static constexpr char kPartialReductionLevelName[] = "partial_reduction";
+static constexpr char kReductionLevelName[] = "reduction";
+static constexpr char kThreadLevelName[] = "thread";
+static constexpr char kSubgroupLevelName[] = "subgroup";
+static constexpr char kLaneLevelName[] = "lane";
+
+static StringRef getTilingLevelName(GPU::TilingLevel level) {
+  switch (level) {
+  case GPU::TilingLevel::Workgroup:
+    return kWorkgroupLevelName;
+  case GPU::TilingLevel::PartialReduction:
+    return kPartialReductionLevelName;
+  case GPU::TilingLevel::Reduction:
+    return kReductionLevelName;
+  case GPU::TilingLevel::Thread:
+    return kThreadLevelName;
+  case GPU::TilingLevel::Subgroup:
+    return kSubgroupLevelName;
+  case GPU::TilingLevel::Lane:
+    return kLaneLevelName;
+  }
+  assert(false && "Unknown tiling level");
+  return StringAttr();
+}
+
+static SmallVector<int64_t> getTileSizes(DictionaryAttr config,
+                                         GPU::TilingLevel level) {
+  auto sizes = config.getAs<ArrayAttr>(getTilingLevelName(level));
+  if (!sizes) {
+    return {};
+  }
+  SmallVector<int64_t> sizeList;
+  for (auto maybeSize : sizes.getValue()) {
+    auto size = dyn_cast<IntegerAttr>(maybeSize);
+    if (!size) {
+      return {};
+    }
+    sizeList.push_back(size.getInt());
+  }
+  return sizeList;
+}
+
+SmallVector<int64_t> LoweringConfigAttr::getWorkgroupTileSizes() const {
+  return getTileSizes(getAttributes(), GPU::TilingLevel::Workgroup);
+}
+
+SmallVector<int64_t>
+LoweringConfigAttr::getStaticTilingLevelSizes(unsigned level,
+                                              Operation *op) const {
+  if (level > static_cast<unsigned>(GPU::TilingLevel::Lane)) {
+    return {};
+  }
+  return getTileSizes(getAttributes(), static_cast<GPU::TilingLevel>(level));
+}
+
+SmallVector<OpFoldResult>
+LoweringConfigAttr::getTilingLevelSizes(OpBuilder &b, unsigned level,
+                                        Operation *op) const {
+  if (level > static_cast<unsigned>(GPU::TilingLevel::Lane)) {
+    return {};
+  }
+  SmallVector<int64_t> sizes =
+      getTileSizes(getAttributes(), static_cast<GPU::TilingLevel>(level));
+  return llvm::map_to_vector(
+      sizes, [&](int64_t s) -> OpFoldResult { return b.getIndexAttr(s); });
 }
 
 //===----------------------------------------------------------------------===//
