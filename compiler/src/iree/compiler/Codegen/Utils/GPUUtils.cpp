@@ -971,7 +971,7 @@ IREE::GPU::TargetAttr getGPUTargetAttr(IREE::HAL::ExecutableTargetAttr target) {
 
 IREE::GPU::TargetAttr getGPUTargetAttr(Operation *op) {
   if (auto target = IREE::HAL::ExecutableTargetAttr::lookup(op)) {
-    return getGPUTargetAttr(IREE::HAL::ExecutableTargetAttr::lookup(op));
+    return getGPUTargetAttr(target);
   }
   if (!clTestTarget.empty()) {
     // Guess what the target API is based on common scheme. This does not work
