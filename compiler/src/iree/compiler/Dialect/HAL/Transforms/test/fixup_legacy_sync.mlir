@@ -3,7 +3,7 @@
 // TODO(multi-device): remove once device globals are used. This is a fallback
 // path during the transition.
 module attributes {hal.device.targets = [
-  #hal.device.target<"vulkan", {legacy_sync}>
+  #hal.device.target<"vulkan", {legacy_sync}> : !hal.device
 ]} {
 // CHECK-LABEL: @default_device_targets
 // CHECK-SAME: (%[[DEVICE:.+]]: !hal.device)

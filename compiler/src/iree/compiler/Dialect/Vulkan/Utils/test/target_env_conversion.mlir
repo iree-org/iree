@@ -1,13 +1,13 @@
-// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetBackends=vulkan-spirv},iree-hal-transformation-pipeline{serialize-executables=false})' %s | FileCheck %s --check-prefix=DEFAULT
-// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetBackends=vulkan-spirv},iree-hal-transformation-pipeline{serialize-executables=false})' --iree-vulkan-target-triple=adreno-a650-android30 %s | FileCheck %s --check-prefix=ADRENO
-// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetBackends=vulkan-spirv},iree-hal-transformation-pipeline{serialize-executables=false})' --iree-vulkan-target-triple=valhall-unknown-android31 %s | FileCheck %s --check-prefix=VALHALL
-// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetBackends=vulkan-spirv},iree-hal-transformation-pipeline{serialize-executables=false})' --iree-vulkan-target-triple=turing-t4-linux %s | FileCheck %s --check-prefix=TURING
-// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetBackends=vulkan-spirv},iree-hal-transformation-pipeline{serialize-executables=false})' --iree-vulkan-target-triple=rdna1-5700xt-windows %s | FileCheck %s --check-prefix=RDNA1
-// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetBackends=vulkan-spirv},iree-hal-transformation-pipeline{serialize-executables=false})' --iree-vulkan-target-triple=rdna3-6900xtx-windows %s | FileCheck %s --check-prefix=RDNA3
-// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetBackends=vulkan-spirv},iree-hal-transformation-pipeline{serialize-executables=false})' --iree-vulkan-target-triple=m1-moltenvk-macos %s | FileCheck %s --check-prefix=M1
-// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetBackends=vulkan-spirv},iree-hal-transformation-pipeline{serialize-executables=false})' --iree-vulkan-target-triple=arc-770-windows %s | FileCheck %s --check-prefix=ARC
-// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetBackends=vulkan-spirv},iree-hal-transformation-pipeline{serialize-executables=false})' --iree-vulkan-target-triple=pascal-1080-windows %s | FileCheck %s --check-prefix=PASCAL
-// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-assign-target-devices{targetBackends=vulkan-spirv},iree-hal-transformation-pipeline{serialize-executables=false})' --iree-vulkan-target-env="#vk.target_env<v1.1, r(120), [VK_KHR_spirv_1_4, VK_KHR_storage_buffer_storage_class], AMD:DiscreteGPU, #vk.caps<maxComputeSharedMemorySize = 16384, maxComputeWorkGroupInvocations = 1024, maxComputeWorkGroupSize = dense<[128, 8, 4]>: vector<3xi32>, subgroupFeatures = 63 : i32, subgroupSize = 4 >>" %s | FileCheck %s --check-prefix=ENV
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-device-assignment-pipeline{target-devices=vulkan},iree-hal-transformation-pipeline)' %s | FileCheck %s --check-prefix=DEFAULT
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-device-assignment-pipeline{target-devices=vulkan},iree-hal-transformation-pipeline)' --iree-vulkan-target-triple=adreno-a650-android30 %s | FileCheck %s --check-prefix=ADRENO
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-device-assignment-pipeline{target-devices=vulkan},iree-hal-transformation-pipeline)' --iree-vulkan-target-triple=valhall-unknown-android31 %s | FileCheck %s --check-prefix=VALHALL
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-device-assignment-pipeline{target-devices=vulkan},iree-hal-transformation-pipeline)' --iree-vulkan-target-triple=turing-t4-linux %s | FileCheck %s --check-prefix=TURING
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-device-assignment-pipeline{target-devices=vulkan},iree-hal-transformation-pipeline)' --iree-vulkan-target-triple=rdna1-5700xt-windows %s | FileCheck %s --check-prefix=RDNA1
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-device-assignment-pipeline{target-devices=vulkan},iree-hal-transformation-pipeline)' --iree-vulkan-target-triple=rdna3-6900xtx-windows %s | FileCheck %s --check-prefix=RDNA3
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-device-assignment-pipeline{target-devices=vulkan},iree-hal-transformation-pipeline)' --iree-vulkan-target-triple=m1-moltenvk-macos %s | FileCheck %s --check-prefix=M1
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-device-assignment-pipeline{target-devices=vulkan},iree-hal-transformation-pipeline)' --iree-vulkan-target-triple=arc-770-windows %s | FileCheck %s --check-prefix=ARC
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-device-assignment-pipeline{target-devices=vulkan},iree-hal-transformation-pipeline)' --iree-vulkan-target-triple=pascal-1080-windows %s | FileCheck %s --check-prefix=PASCAL
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-device-assignment-pipeline{target-devices=vulkan},iree-hal-transformation-pipeline)' --iree-vulkan-target-env="#vk.target_env<v1.1, r(120), [VK_KHR_spirv_1_4, VK_KHR_storage_buffer_storage_class], AMD:DiscreteGPU, #vk.caps<maxComputeSharedMemorySize = 16384, maxComputeWorkGroupInvocations = 1024, maxComputeWorkGroupSize = dense<[128, 8, 4]>: vector<3xi32>, subgroupFeatures = 63 : i32, subgroupSize = 4 >>" %s | FileCheck %s --check-prefix=ENV
 
 // TODO(antiagainst): Passing in lenghty strings as command-line options is not
 // optimal. We should consider creating a dedicated test pass to pick up
@@ -62,25 +62,6 @@
 // ENV-SAME: [SPV_KHR_storage_buffer_storage_class]>,
 // ENV-SAME: api=Vulkan, AMD:DiscreteGPU, #spirv.resource_limits<max_compute_workgroup_invocations = 1024, max_compute_workgroup_size = [128, 8, 4], subgroup_size = 4, cooperative_matrix_properties_khr = []>>
 
-stream.executable public @reduce_dispatch {
-  stream.executable.export @reduce_dispatch workgroups(%arg0: index) -> (index, index, index) {
-    %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg0
-    stream.return %x, %y, %z : index, index, index
-  }
-  builtin.module {
-    func.func @reduce_dispatch(%arg0_binding: !stream.binding, %arg1_binding: !stream.binding) {
-      %c0 = arith.constant 0 : index
-      %arg0 = stream.binding.subspan %arg0_binding[%c0] : !stream.binding -> !flow.dispatch.tensor<readonly:tensor<16xf32>>
-      %arg1 = stream.binding.subspan %arg1_binding[%c0] : !stream.binding -> !flow.dispatch.tensor<writeonly:tensor<f32>>
-      %0 = tensor.empty() : tensor<f32>
-      %1 = flow.dispatch.tensor.load %arg0, offsets=[0], sizes=[16], strides=[1] : !flow.dispatch.tensor<readonly:tensor<16xf32>> -> tensor<16xf32>
-      %3 = linalg.generic {indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> ()>], iterator_types = ["reduction"]} ins(%1 : tensor<16xf32>) outs(%0 : tensor<f32>) {
-      ^bb0(%arg2: f32, %arg3: f32):
-        %4 = arith.addf %arg2, %arg3 : f32
-        linalg.yield %4 : f32
-      } -> tensor<f32>
-      flow.dispatch.tensor.store %3, %arg1, offsets=[], sizes=[], strides=[] : tensor<f32> -> !flow.dispatch.tensor<writeonly:tensor<f32>>
-      return
-    }
-  }
+util.func @func() {
+  util.return
 }

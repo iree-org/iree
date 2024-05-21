@@ -7,4 +7,5 @@ func.func @test(%arg0 : tensor<10x20xf32>, %arg1 : tensor<20x30xf32>, %arg2 : te
 }
 
 // Just check that we have the right target and executable targets.
-// CHECK: module attributes {hal.device.targets = [#hal.device.target<"local", [#hal.executable.target<"vmvx"
+// CHECK: module
+// CHECK-SAME: hal.device.targets = [#hal.device.target<"local", [#hal.executable.target<"vmvx"

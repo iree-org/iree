@@ -33,7 +33,7 @@ module attributes {
       #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
         spirv.target_env = #target_env
       }>
-    ]>
+    ]> : !hal.device
   ]
 } {
   hal.executable private @example_module_dispatch_0 {
