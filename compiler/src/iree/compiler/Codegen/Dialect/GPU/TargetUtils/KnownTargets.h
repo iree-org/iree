@@ -14,8 +14,8 @@ namespace mlir::iree_compiler::IREE::GPU {
 
 // Returns a TargetAttr to describe the details of the given |target|, which can
 // be a product name like "rx7900xtx", an microarchitecture name like "rdna3",
-// or a compiler target like "gfx1100". |features| is a list of comma-separated
-// target features. Returns a null TargetAttr if the given |target| is not
+// or a compiler target like "gfx1100", with a list of comma-separated
+// target |features|. Returns a null TargetAttr if the given |target| is not
 // recognized.
 TargetAttr getHIPTargetDetails(llvm::StringRef target, llvm::StringRef features,
                                MLIRContext *context);
@@ -27,8 +27,8 @@ StringRef normalizeHIPTarget(StringRef target);
 
 // Returns a TargetAttr to describe the details of the given |target|, which can
 // be a product name like "rtx3090", an microarchitecture name like "ampere", or
-// a compute capability like "sm_80". |features| is a list of comma-separated
-// target features. TargetAttr if the given |target| is not recognized.
+// a compute capability like "sm_80", with a list of comma-separated target
+// |features|. TargetAttr if the given |target| is not recognized.
 TargetAttr getCUDATargetDetails(llvm::StringRef target,
                                 llvm::StringRef features, MLIRContext *context);
 
@@ -38,7 +38,7 @@ TargetAttr getCUDATargetDetails(llvm::StringRef target,
 StringRef normalizeCUDATarget(StringRef target);
 
 // Returns the full target of the given |aliasTarget| with a list of
-// comma-separated target|features|. Returns null target if unknown.
+// comma-separated target |features|. Returns null target if unknown.
 TargetAttr getFullTarget(StringRef targetAPI, StringRef aliasTarget,
                          llvm::StringRef features, MLIRContext *context);
 

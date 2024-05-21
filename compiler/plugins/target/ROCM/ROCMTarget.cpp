@@ -89,8 +89,7 @@ struct ROCmOptions {
     SmallVector<StringRef> features;
     llvm::SplitString(targetFeatures, features, ",");
     for (StringRef f : features) {
-      if (f.ends_with("+") || f.ends_with("-") ||
-          !(f.starts_with("+") || f.starts_with("-"))) {
+      if (!(f.starts_with("+") || f.starts_with("-"))) {
         return emitError(builder.getUnknownLoc(),
                          "ROCm target feature must be prefixed with '+' or "
                          "'-'; but seen '")
