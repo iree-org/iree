@@ -36,6 +36,7 @@ iree_td_library(
         "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
         "@llvm-project//mlir:DialectUtilsTdFiles",
         "@llvm-project//mlir:OpBaseTdFiles",
+        "@llvm-project//mlir:SCFTdFiles",
         "@llvm-project//mlir:SideEffectInterfacesTdFiles",
     ],
 )
@@ -81,6 +82,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:IR",
         "@llvm-project//mlir:LinalgDialect",
         "@llvm-project//mlir:Parser",
+        "@llvm-project//mlir:SCFDialect",
         "@llvm-project//mlir:SideEffectInterfaces",
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",
@@ -136,7 +138,10 @@ iree_gentbl_cc_library(
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "IREEGPUAttrs.td",
-    deps = [":td_files"],
+    deps = [
+        ":td_files",
+        "@llvm-project//mlir:SCFDeviceMappingInterfacesIncGen",
+    ],
 )
 
 iree_gentbl_cc_library(
