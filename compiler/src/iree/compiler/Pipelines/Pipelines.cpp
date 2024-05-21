@@ -77,16 +77,9 @@ void buildIREEPrecompileTransformPassPipeline(
     PreprocessingOptions preprocessingOptions,
     GlobalOptimizationOptions globalOptimizationOptions,
     SchedulingOptions schedulingOptions,
-    IREE::HAL::TargetOptions executableOptions, IREEVMPipelineHooks &hooks,
+    IREE::HAL::TargetOptions halTargetOptions, IREEVMPipelineHooks &hooks,
     OpPassManager &passManager, IREEVMPipelinePhase compileFrom,
     IREEVMPipelinePhase compileTo) {
-  // If the user specified a set of target devices we attach them to the module
-  // IR so that they are available for all passes that may want to use this
-  // information. If trying to compile in a generic mode the user should omit
-  // specifying targets.
-  IREE::HAL::buildHALDeviceAssignmentPassPipeline(passManager, targetRegistry,
-                                                  executableOptions);
-
   // Input pipelines can result in changes to the exported functions and types
   // and must run before generating bindings.
   // After input processing, there should only be IREE legal types in
@@ -142,6 +135,18 @@ void buildIREEPrecompileTransformPassPipeline(
   }
   if (compileTo == IREEVMPipelinePhase::Input)
     return; // early-exit
+
+  // If the user specified a set of target devices we attach them to the module
+  // IR so that they are available for all passes that may want to use this
+  // information. If trying to compile in a generic mode the user should omit
+  // specifying targets.
+  IREE::HAL::AssignmentOptions halAssignmentOptions;
+  halAssignmentOptions.legacyTargetBackends =
+      halTargetOptions.legacyTargetBackends;
+  halAssignmentOptions.targetDevices = halTargetOptions.targetDevices;
+  halAssignmentOptions.defaultDevice = halTargetOptions.defaultDevice;
+  IREE::HAL::buildHALDeviceAssignmentPassPipeline(passManager, targetRegistry,
+                                                  halAssignmentOptions);
 
   // Now that inputs are legalized, generate wrapper for entry functions.
   if (compileFrom < IREEVMPipelinePhase::ABI) { // late-entry
@@ -242,13 +247,13 @@ void buildIREEVMTransformPassPipeline(
     PreprocessingOptions preprocessingOptions,
     GlobalOptimizationOptions globalOptimizationOptions,
     SchedulingOptions schedulingOptions,
-    IREE::HAL::TargetOptions executableOptions,
-    IREE::VM::TargetOptions targetOptions, IREEVMPipelineHooks &hooks,
+    IREE::HAL::TargetOptions halTargetOptions,
+    IREE::VM::TargetOptions vmTargetOptions, IREEVMPipelineHooks &hooks,
     OpPassManager &passManager, IREEVMPipelinePhase compileFrom,
     IREEVMPipelinePhase compileTo) {
   buildIREEPrecompileTransformPassPipeline(
       targetRegistry, bindingOptions, inputOptions, preprocessingOptions,
-      globalOptimizationOptions, schedulingOptions, executableOptions, hooks,
+      globalOptimizationOptions, schedulingOptions, halTargetOptions, hooks,
       passManager, compileFrom, compileTo);
 
   if (compileTo <= IREEVMPipelinePhase::GlobalOptimization)
@@ -311,16 +316,16 @@ void buildIREEVMTransformPassPipeline(
     case SchedulingOptions::ExecutionModel::AsyncInternal:
     case SchedulingOptions::ExecutionModel::AsyncExternal:
       IREE::HAL::buildHALTransformPassPipeline(passManager, targetRegistry,
-                                               executableOptions, hooks,
+                                               halTargetOptions, hooks,
                                                halCompileFrom, halCompileTo);
       break;
     case SchedulingOptions::ExecutionModel::InlineStatic:
       IREE::HAL::Inline::buildHALInlineStaticTransformPassPipeline(
-          passManager, targetRegistry, executableOptions);
+          passManager, targetRegistry, halTargetOptions);
       break;
     case SchedulingOptions::ExecutionModel::InlineDynamic:
       IREE::HAL::Loader::buildHALInlineDynamicTransformPassPipeline(
-          passManager, targetRegistry, executableOptions);
+          passManager, targetRegistry, halTargetOptions);
       break;
     }
     if (hooks.afterPhase)
@@ -336,7 +341,7 @@ void buildIREEVMTransformPassPipeline(
     IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "VM");
     if (hooks.beforePhase)
       hooks.beforePhase(IREEVMPipelinePhase::VM, passManager);
-    IREE::VM::buildVMTransformPassPipeline(passManager, targetOptions);
+    IREE::VM::buildVMTransformPassPipeline(passManager, vmTargetOptions);
     passManager.addPass(IREE::Util::createDropCompilerHintsPass());
     if (hooks.afterPhase)
       hooks.afterPhase(IREEVMPipelinePhase::VM, passManager);
