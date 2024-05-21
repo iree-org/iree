@@ -1767,7 +1767,11 @@ setWinogradRootConfig(mlir::FunctionOpInterface entryPointFn,
       "op expected to be a winograd op");
   assert(!getLoweringConfig(winogradOp) &&
          "expected lowering_config is not set");
+  SmallVector<int64_t> inputTileDims(winogradOp.getInputTileDimensions());
   auto iterationRank = winogradOp.getIterationDomainRank();
+  SmallVector<int64_t> perm(inputTileDims);
+  perm.append(winogradOp.getNonInputTileDims());
+  perm = invertPermutationVector(perm);
   DistributionHeuristicConfig distConfig;
   SmallVector<int64_t> maxTileSizes(iterationRank, clDefaultDistTileSize);
   maxTileSizes[0] = maxTileSizes[1] = 0;
@@ -1775,17 +1779,19 @@ setWinogradRootConfig(mlir::FunctionOpInterface entryPointFn,
   minTileSizes[0] = minTileSizes[1] = 0;
   SmallVector<int64_t> vecSizeHints(iterationRank, 1);
   vecSizeHints[0] = vecSizeHints[1] = winogradOp.getInputTileSize();
-  distConfig.vectorSizeHints = vecSizeHints;
-  distConfig.minTileSizes = minTileSizes;
-  distConfig.maxTileSizes = maxTileSizes;
+  distConfig.vectorSizeHints = applyPermutation(vecSizeHints, perm);
+  distConfig.minTileSizes = applyPermutation(minTileSizes, perm);
+  distConfig.maxTileSizes = applyPermutation(maxTileSizes, perm);
   SmallVector<int64_t> distTileSizes =
       getDefaultDistributedLevelTileSizes(winogradOp, distConfig);
   TileSizesListType tileSizes;
   tileSizes.push_back(distTileSizes);
-  assert(distTileSizes[0] == 0 && distTileSizes[1] == 0 &&
-         "expected outer 2 distTileSizes to be 0");
+  assert(distTileSizes[inputTileDims[0]] == 0 &&
+         distTileSizes[inputTileDims[1]] == 0 &&
+         "expected distTileSizes to be 0 for input tile");
   SmallVector<int64_t> vecTileSizes(iterationRank, 1);
-  vecTileSizes[0] = vecTileSizes[1] = winogradOp.getInputTileSize();
+  vecTileSizes[inputTileDims[0]] = vecTileSizes[inputTileDims[1]] =
+      winogradOp.getInputTileSize();
   tileSizes.push_back(vecTileSizes);
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, winogradOp, tileSizes,
