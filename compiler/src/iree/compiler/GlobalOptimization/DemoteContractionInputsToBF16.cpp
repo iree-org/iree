@@ -40,12 +40,64 @@ struct DemoteContractionInputsToBF16Pattern
       return failure();
     }
 
-    if (!llvm::all_of(linalgOp->getOperands(), [&](auto operand) {
-          auto operandType = dyn_cast<RankedTensorType>(operand.getType());
-          return operandType &&
-                 operandType.getElementType() == rewriter.getF32Type();
-        })) {
+    if (!linalg::isaContractionOpInterface(linalgOp) &&
+        !isa<linalg::ConvolutionOpInterface>(linalgOp.getOperation())) {
       return failure();
+    }
+    Type F32Type = rewriter.getF32Type();
+    for (auto operand : linalgOp->getOperands()) {
+      auto operandType = dyn_cast<RankedTensorType>(operand.getType());
+      if (!operandType || operandType.getElementType() != F32Type) {
+        return failure();
+      }
+    }
+    Location loc = linalgOp.getLoc();
+    SmallVector<Value> demotedInputs;
+    for (auto inputOperand : linalgOp.getDpsInputOperands()) {
+      auto input = inputOperand->get();
+      auto inputType = cast<RankedTensorType>(input.getType());
+      auto demotedInputType =
+          RankedTensorType::get(inputType.getShape(), rewriter.getBF16Type(),
+                                inputType.getEncoding());
+      SmallVector<AffineMap> maps(
+          2, rewriter.getMultiDimIdentityMap(inputType.getRank()));
+      SmallVector<utils::IteratorType> iteratorTypes(
+          inputType.getRank(), utils::IteratorType::parallel);
+      SmallVector<OpFoldResult> mixedSizes =
+          tensor::getMixedSizes(rewriter, loc, input);
+      Value empty = rewriter.create<tensor::EmptyOp>(loc, mixedSizes,
+                                                     rewriter.getBF16Type());
+      demotedInputs.push_back(
+          rewriter
+              .create<linalg::GenericOp>(
+                  loc, TypeRange{demotedInputType}, ValueRange{input},
+                  ValueRange{empty}, maps, iteratorTypes,
+                  [&](OpBuilder &b, Location loc, ValueRange args) {
+                    Value result = b.create<arith::TruncFOp>(
+                        loc, rewriter.getBF16Type(), args[0]);
+                    b.create<linalg::YieldOp>(loc, result);
+                  })
+              ->getResults()[0]);
+    }
+
+    if (auto genericOp = dyn_cast<linalg::GenericOp>(linalgOp.getOperation())) {
+      rewriter.replaceOpWithNewOp<linalg::GenericOp>(
+          linalgOp, linalgOp->getResultTypes(),
+          /*inputs=*/demotedInputs, /*outputs=*/linalgOp.getDpsInits(),
+          linalgOp.getIndexingMapsArray(), linalgOp.getIteratorTypesArray(),
+          [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange args) {
+            Value lhsPromoted = nestedBuilder.create<arith::ExtFOp>(
+                nestedLoc, F32Type, args[0]);
+            Value rhsPromoted = nestedBuilder.create<arith::ExtFOp>(
+                nestedLoc, F32Type, args[1]);
+            Value mul = nestedBuilder.create<arith::MulFOp>(
+                nestedLoc, lhsPromoted, rhsPromoted);
+            Value add =
+                nestedBuilder.create<arith::AddFOp>(nestedLoc, mul, args[2]);
+            nestedBuilder.create<linalg::YieldOp>(nestedLoc, add);
+          },
+          linalg::getPrunedAttributeList(genericOp));
+      return success();
     }
 
     auto replaceOpInputs = [&](auto *typePtr) {
