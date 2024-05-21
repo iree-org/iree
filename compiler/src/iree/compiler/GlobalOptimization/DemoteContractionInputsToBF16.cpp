@@ -27,14 +27,14 @@ struct DemoteContractionInputsToBF16Pattern
   using OpInterfaceRewritePattern::OpInterfaceRewritePattern;
   LogicalResult matchAndRewrite(linalg::LinalgOp linalgOp,
                                 PatternRewriter &rewriter) const override {
-    if (!isa<linalg::ContractionOpInterface, linalg::ConvolutionOpInterface>(
-            linalgOp.getOperation())) {
+    if (!linalg::isaContractionOpInterface(linalgOp) &&
+        !isa<linalg::ConvolutionOpInterface>(linalgOp.getOperation())) {
       return failure();
     }
+    Type F32Type = rewriter.getF32Type();
     for (auto operand : linalgOp->getOperands()) {
       auto operandType = dyn_cast<RankedTensorType>(operand.getType());
-      if (!operandType ||
-          operandType.getElementType() != rewriter.getF32Type()) {
+      if (!operandType || operandType.getElementType() != F32Type) {
         return failure();
       }
     }
@@ -65,6 +65,26 @@ struct DemoteContractionInputsToBF16Pattern
                     b.create<linalg::YieldOp>(loc, result);
                   })
               ->getResults()[0]);
+    }
+
+    if (auto genericOp = dyn_cast<linalg::GenericOp>(linalgOp.getOperation())) {
+      rewriter.replaceOpWithNewOp<linalg::GenericOp>(
+          linalgOp, linalgOp->getResultTypes(),
+          /*inputs=*/demotedInputs, /*outputs=*/linalgOp.getDpsInits(),
+          linalgOp.getIndexingMapsArray(), linalgOp.getIteratorTypesArray(),
+          [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange args) {
+            Value lhsPromoted = nestedBuilder.create<arith::ExtFOp>(
+                nestedLoc, F32Type, args[0]);
+            Value rhsPromoted = nestedBuilder.create<arith::ExtFOp>(
+                nestedLoc, F32Type, args[1]);
+            Value mul = nestedBuilder.create<arith::MulFOp>(
+                nestedLoc, lhsPromoted, rhsPromoted);
+            Value add =
+                nestedBuilder.create<arith::AddFOp>(nestedLoc, mul, args[2]);
+            nestedBuilder.create<linalg::YieldOp>(nestedLoc, add);
+          },
+          linalg::getPrunedAttributeList(genericOp));
+      return success();
     }
 
     auto replaceOpInputs = [&](auto *typePtr) {
