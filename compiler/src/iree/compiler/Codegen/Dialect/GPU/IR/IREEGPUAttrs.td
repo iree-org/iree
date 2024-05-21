@@ -11,9 +11,10 @@ include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.td"
 include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.td"
 include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.td"
 include "mlir/Dialect/Utils/StructuredOpsUtils.td"
-include "mlir/IR/OpBase.td"
+include "mlir/Dialect/SCF/IR/DeviceMappingInterface.td"
 include "mlir/IR/AttrTypeBase.td"
 include "mlir/IR/EnumAttr.td"
+include "mlir/IR/OpBase.td"
 
 /// TODO: Iterator type arrays are duplicated across dialects upstream and here.
 /// These should be unified somewhere as a common iterator type array attr.
@@ -329,6 +330,24 @@ def IREEGPU_TargetAttr : AttrDef<IREEGPU_Dialect, "Target"> {
     bool supportsTF32InputMMAOps() const;
     // Returns true if this target supports TensorCore synchronized MMA ops.
     bool supportsSyncMMAOps() const;
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// GPU Lane ID
+//===----------------------------------------------------------------------===//
+
+def IREEGPU_LaneIdAttr : AttrDef<IREEGPU_Dialect, "LaneId", [
+      DeclareAttrInterfaceMethods<DeviceMappingAttrInterface>
+  ]> {
+  let mnemonic = "lane_id";
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+  let parameters = (ins
+    "int64_t":$dim
+  );
+  let assemblyFormat = "`<` $dim `>`";
+  let description = [{
+    An attribute for mapping scf.forall ops to subgroup lanes.
   }];
 }
 

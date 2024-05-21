@@ -1030,6 +1030,16 @@ bool TargetAttr::supportsSyncMMAOps() const {
 }
 
 //===----------------------------------------------------------------------===//
+// LaneIdAttr
+//===----------------------------------------------------------------------===//
+
+int64_t LaneIdAttr::getMappingId() const { return getDim(); }
+
+bool LaneIdAttr::isLinearMapping() const { return true; }
+
+int64_t LaneIdAttr::getRelativeIndex() const { return getDim(); }
+
+//===----------------------------------------------------------------------===//
 // Attribute Registration
 //===----------------------------------------------------------------------===//
 
