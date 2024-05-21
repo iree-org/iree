@@ -428,8 +428,8 @@ jobs:
           IREE_HIP_DISABLE: 0
         run: |
           ./build_tools/cmake/ctest_all.sh ${BUILD_DIR}
-  
-  # tests failed: 54 - iree/hal/drivers/hip/dynamic_symbols_test (Failed)
+
+  # TODO(saienduri): re-enable when iree/hal/drivers/hip/dynamic_symbols_test is fixed
   # test_amd_w7900:
   #   needs: [setup, build_all]
   #   if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_amd_w7900')
