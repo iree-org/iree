@@ -298,8 +298,11 @@ public:
     ModuleOp innerModuleOp = variantOp.getInnerModule();
     auto targetAttr = variantOp.getTargetAttr();
     StringRef targetArch = options.targetChip;
-    if (auto attr = getGPUTargetAttr(targetAttr))
+    StringRef targetFeatures = options.targetFeatures;
+    if (auto attr = getGPUTargetAttr(targetAttr)) {
       targetArch = attr.getArch();
+      targetFeatures = attr.getFeatures();
+    }
 
     // We name our files after the executable name so that they are easy to
     // track both during compilation (logs/artifacts/etc), as outputs (final
@@ -445,6 +448,9 @@ public:
             features = "+wavefrontsize32";
           if (subgroupSize == 64)
             features = "+wavefrontsize64";
+        }
+        if (!targetFeatures.empty()) {
+          features += (features.empty() ? "" : ",") + targetFeatures.str();
         }
 
         targetMachine.reset(target->createTargetMachine(
