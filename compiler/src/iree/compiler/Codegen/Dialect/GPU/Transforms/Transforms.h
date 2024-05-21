@@ -18,10 +18,6 @@
 
 namespace mlir::iree_compiler::IREE::GPU {
 
-// Helper to vectorize a static multi-mma op.
-LogicalResult vectorizeStaticMultiMmaOp(RewriterBase &rewriter,
-                                        IREE::GPU::MultiMmaOp mmaOp);
-
 void populateIREEGPUVectorizationPatterns(RewritePatternSet &patterns);
 
 } // namespace mlir::iree_compiler::IREE::GPU

@@ -17,8 +17,8 @@
 
 namespace mlir::iree_compiler::IREE::GPU {
 
-LogicalResult vectorizeStaticMultiMmaOp(RewriterBase &rewriter,
-                                        IREE::GPU::MultiMmaOp mmaOp) {
+static LogicalResult vectorizeStaticMultiMmaOp(RewriterBase &rewriter,
+                                               IREE::GPU::MultiMmaOp mmaOp) {
   if (!mmaOp.hasTensorSemantics()) {
     return failure();
   }
@@ -69,8 +69,8 @@ LogicalResult vectorizeStaticMultiMmaOp(RewriterBase &rewriter,
 }
 
 namespace {
-struct VectorizeStaticMultiMmaOpPattern
-    : public OpRewritePattern<IREE::GPU::MultiMmaOp> {
+struct VectorizeStaticMultiMmaOpPattern final
+    : OpRewritePattern<IREE::GPU::MultiMmaOp> {
   using OpRewritePattern<IREE::GPU::MultiMmaOp>::OpRewritePattern;
   LogicalResult matchAndRewrite(IREE::GPU::MultiMmaOp mmaOp,
                                 PatternRewriter &rewriter) const override {
