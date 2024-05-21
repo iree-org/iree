@@ -18,6 +18,7 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
+#include "mlir/IR/OpDefinition.h"
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
 
@@ -1252,9 +1253,7 @@ WinogradInputTransformOp::getIterationDomain(OpBuilder &builder) {
     loopBounds[dim].size = getDimValue(builder, loc, getOutput(), dim);
     loopBounds[dim].stride = one;
   }
-  SmallVector<int64_t> perm(getInputTileDimensions());
-  perm.append(getNonInputTileDims());
-  return applyPermutation(loopBounds, perm);
+  return loopBounds;
 }
 
 SmallVector<utils::IteratorType>
@@ -1273,11 +1272,15 @@ WinogradInputTransformOp::getTiledImplementation(OpBuilder &builder,
   const int cDim = getChannelDim();
 
   assert(offsets.size() == 6);
+  SmallVector<int64_t> perm(getInputTileDimensions());
+  perm.append(getNonInputTileDims());
+  SmallVector<OpFoldResult> offsetsPermuted = applyPermutation(offsets, perm);
+  SmallVector<OpFoldResult> sizesPermuted = applyPermutation(sizes, perm);
   SmallVector<OpFoldResult> inputOffsets(getInputRank(), zero);
   const auto hDim = getImageDimensions()[0];
   const auto wDim = getImageDimensions()[1];
-  inputOffsets[0] = offsets[2];
-  inputOffsets[cDim] = offsets[5];
+  inputOffsets[0] = offsetsPermuted[2];
+  inputOffsets[cDim] = offsetsPermuted[5];
 
   ReifiedRankedShapedTypeDims reifiedInputShapes;
   if (failed(getStaticOrReifiedInputDims(builder, loc, getInput(),
@@ -1287,15 +1290,15 @@ WinogradInputTransformOp::getTiledImplementation(OpBuilder &builder,
   SmallVector<OpFoldResult> inputSizes = reifiedInputShapes[0];
 
   assert(sizes.size() == 6);
-  inputSizes[0] = sizes[2];
-  inputSizes[cDim] = sizes[5];
+  inputSizes[0] = sizesPermuted[2];
+  inputSizes[cDim] = sizesPermuted[5];
 
   auto hSizeAndOffset = getScaledSizeAndOffset(
-      builder, loc, sizes[3], offsets[3], inputSizes[hDim], getOutputTileSize(),
-      getInputTileSize());
+      builder, loc, sizesPermuted[3], offsetsPermuted[3], inputSizes[hDim],
+      getOutputTileSize(), getInputTileSize());
   auto wSizeAndOffset = getScaledSizeAndOffset(
-      builder, loc, sizes[4], offsets[4], inputSizes[wDim], getOutputTileSize(),
-      getInputTileSize());
+      builder, loc, sizesPermuted[4], offsetsPermuted[4], inputSizes[wDim],
+      getOutputTileSize(), getInputTileSize());
 
   inputSizes[hDim] = hSizeAndOffset.first;
   inputSizes[wDim] = wSizeAndOffset.first;
@@ -1308,13 +1311,8 @@ WinogradInputTransformOp::getTiledImplementation(OpBuilder &builder,
   tiledOperands.emplace_back(getSlice(builder, loc, getInput(), inputOffsets,
                                       inputSizes, inputStrides));
   SmallVector<OpFoldResult> outputStrides(getOutputRank(), one);
-  SmallVector<int64_t> perm(getInputTileDimensions());
-  perm.append(getNonInputTileDims());
-  perm = invertPermutationVector(perm);
-  SmallVector<OpFoldResult> outputSizes = applyPermutation(sizes, perm);
-  SmallVector<OpFoldResult> outputOffsets = applyPermutation(offsets, perm);
-  tiledOperands.emplace_back(getSlice(builder, loc, getOutput(), outputOffsets,
-                                      outputSizes, outputStrides));
+  tiledOperands.emplace_back(
+      getSlice(builder, loc, getOutput(), offsets, sizes, outputStrides));
 
   SmallVector<Type, 4> resultTypes;
   if (hasPureTensorSemantics()) {
@@ -1332,11 +1330,8 @@ LogicalResult WinogradInputTransformOp::getResultTilePosition(
     ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
     SmallVector<OpFoldResult> &resultSizes) {
   if (resultNumber == 0) {
-    SmallVector<int64_t> perm(getInputTileDimensions());
-    perm.append(getNonInputTileDims());
-    perm = invertPermutationVector(perm);
-    resultSizes = applyPermutation(sizes, perm);
-    resultOffsets = applyPermutation(offsets, perm);
+    resultSizes = SmallVector<OpFoldResult>(sizes);
+    resultOffsets = SmallVector<OpFoldResult>(offsets);
     return success();
   }
   return failure();
@@ -1346,11 +1341,8 @@ FailureOr<TilingResult> WinogradInputTransformOp::generateResultTileValue(
     OpBuilder &b, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
     ArrayRef<OpFoldResult> sizes) {
   int64_t numLoops = getIterationDomainRank();
-  SmallVector<int64_t> perm(getInputTileDimensions());
-  perm.append(getNonInputTileDims());
-  auto tileOffsets = applyPermutation(offsets.take_front(numLoops), perm);
-  auto tileSizes = applyPermutation(sizes.take_front(numLoops), perm);
-  return getTiledImplementation(b, tileOffsets, tileSizes);
+  return getTiledImplementation(b, offsets.take_front(numLoops),
+                                sizes.take_front(numLoops));
 }
 
 //===----------------------------------------------------------------------===//
@@ -1368,9 +1360,7 @@ WinogradFilterTransformOp::getIterationDomain(OpBuilder &builder) {
     loopBounds[dim].size = getDimValue(builder, loc, getOutput(), dim);
     loopBounds[dim].stride = one;
   }
-  SmallVector<int64_t> perm(getInputTileDimensions());
-  perm.append(getNonInputTileDims());
-  return applyPermutation(loopBounds, perm);
+  return loopBounds;
 }
 
 SmallVector<utils::IteratorType>
@@ -1390,29 +1380,28 @@ FailureOr<TilingResult> WinogradFilterTransformOp::getTiledImplementation(
   const int fDim = getFilterDim();
 
   assert(offsets.size() == 4);
+  SmallVector<int64_t> perm(getInputTileDimensions());
+  perm.append(getNonInputTileDims());
+  SmallVector<OpFoldResult> offsetsPermuted = applyPermutation(offsets, perm);
+  SmallVector<OpFoldResult> sizesPermuted = applyPermutation(sizes, perm);
   SmallVector<OpFoldResult> inputOffsets(getInputRank(), zero);
-  inputOffsets[cDim] = offsets[2];
-  inputOffsets[fDim] = offsets[3];
+  inputOffsets[cDim] = offsetsPermuted[2];
+  inputOffsets[fDim] = offsetsPermuted[3];
 
   assert(sizes.size() == 4);
   ArrayRef<int64_t> inputShape = getInputType().getShape();
   SmallVector<OpFoldResult> inputSizes =
       getAsOpFoldResult(builder.getIndexArrayAttr(inputShape));
-  inputSizes[cDim] = sizes[2];
-  inputSizes[fDim] = sizes[3];
+  inputSizes[cDim] = sizesPermuted[2];
+  inputSizes[fDim] = sizesPermuted[3];
 
   SmallVector<Value> tiledOperands;
   SmallVector<OpFoldResult> inputStrides(getInputRank(), one);
   tiledOperands.emplace_back(getSlice(builder, loc, getInput(), inputOffsets,
                                       inputSizes, inputStrides));
   SmallVector<OpFoldResult> outputStrides(getOutputRank(), one);
-  SmallVector<int64_t> perm(getInputTileDimensions());
-  perm.append(getNonInputTileDims());
-  perm = invertPermutationVector(perm);
-  SmallVector<OpFoldResult> outputSizes = applyPermutation(sizes, perm);
-  SmallVector<OpFoldResult> outputOffsets = applyPermutation(offsets, perm);
-  tiledOperands.emplace_back(getSlice(builder, loc, getOutput(), outputOffsets,
-                                      outputSizes, outputStrides));
+  tiledOperands.emplace_back(
+      getSlice(builder, loc, getOutput(), offsets, sizes, outputStrides));
 
   SmallVector<Type> resultTypes;
   if (hasPureTensorSemantics()) {
@@ -1432,11 +1421,8 @@ LogicalResult WinogradFilterTransformOp::getResultTilePosition(
   if (resultNumber != 0) {
     return failure();
   }
-  SmallVector<int64_t> perm(getInputTileDimensions());
-  perm.append(getNonInputTileDims());
-  perm = invertPermutationVector(perm);
-  resultSizes = applyPermutation(sizes, perm);
-  resultOffsets = applyPermutation(offsets, perm);
+  resultSizes = SmallVector<OpFoldResult>(sizes);
+  resultOffsets = SmallVector<OpFoldResult>(offsets);
   return success();
 }
 
@@ -1444,11 +1430,8 @@ FailureOr<TilingResult> WinogradFilterTransformOp::generateResultTileValue(
     OpBuilder &b, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
     ArrayRef<OpFoldResult> sizes) {
   int64_t numLoops = getIterationDomainRank();
-  SmallVector<int64_t> perm(getInputTileDimensions());
-  perm.append(getNonInputTileDims());
-  auto tileOffsets = applyPermutation(offsets.take_front(numLoops), perm);
-  auto tileSizes = applyPermutation(sizes.take_front(numLoops), perm);
-  return getTiledImplementation(b, tileOffsets, tileSizes);
+  return getTiledImplementation(b, offsets.take_front(numLoops),
+                                sizes.take_front(numLoops));
 }
 
 //===----------------------------------------------------------------------===//
@@ -1466,9 +1449,7 @@ WinogradOutputTransformOp::getIterationDomain(OpBuilder &builder) {
     loopBounds[dim].size = getDimValue(builder, loc, getInput(), dim);
     loopBounds[dim].stride = one;
   }
-  SmallVector<int64_t> perm(getInputTileDimensions());
-  perm.append(getNonInputTileDims());
-  return applyPermutation(loopBounds, perm);
+  return loopBounds;
 }
 
 SmallVector<utils::IteratorType>
@@ -1487,12 +1468,16 @@ FailureOr<TilingResult> WinogradOutputTransformOp::getTiledImplementation(
   const int cDim = getChannelDim();
 
   assert(offsets.size() == 6);
+  SmallVector<int64_t> perm(getInputTileDimensions());
+  perm.append(getNonInputTileDims());
+  SmallVector<OpFoldResult> sizesPermuted = applyPermutation(sizes, perm);
+  SmallVector<OpFoldResult> offsetsPermuted = applyPermutation(offsets, perm);
   const auto hDim = getImageDimensions()[0];
   const auto wDim = getImageDimensions()[1];
   SmallVector<OpFoldResult> outputOffsets(getOutputRank(), zero);
 
-  outputOffsets[0] = offsets[2];
-  outputOffsets[cDim] = offsets[5];
+  outputOffsets[0] = offsetsPermuted[2];
+  outputOffsets[cDim] = offsetsPermuted[5];
 
   ReifiedRankedShapedTypeDims reifiedResultShapes;
   if (failed(reifyResultShapes(builder, reifiedResultShapes))) {
@@ -1501,14 +1486,14 @@ FailureOr<TilingResult> WinogradOutputTransformOp::getTiledImplementation(
   SmallVector<OpFoldResult> outputSizes = reifiedResultShapes[0];
 
   assert(sizes.size() == 6);
-  outputSizes[0] = sizes[2];
-  outputSizes[cDim] = sizes[5];
+  outputSizes[0] = sizesPermuted[2];
+  outputSizes[cDim] = sizesPermuted[5];
 
   auto hSizeAndOffset = getScaledSizeAndOffset(
-      builder, loc, sizes[3], offsets[3], outputSizes[hDim],
+      builder, loc, sizesPermuted[3], offsetsPermuted[3], outputSizes[hDim],
       getOutputTileSize(), getOutputTileSize());
   auto wSizeAndOffset = getScaledSizeAndOffset(
-      builder, loc, sizes[4], offsets[4], outputSizes[wDim],
+      builder, loc, sizesPermuted[4], offsetsPermuted[4], outputSizes[wDim],
       getOutputTileSize(), getOutputTileSize());
 
   outputSizes[hDim] = hSizeAndOffset.first;
@@ -1524,11 +1509,11 @@ FailureOr<TilingResult> WinogradOutputTransformOp::getTiledImplementation(
   // maintain more static information in the IR.
   auto outSliceType = cast<ShapedType>(outputSlice.getType());
   SmallVector<int64_t> staticOutShape(outSliceType.getShape());
-  auto constSizeH = getConstantIntValue(sizes[3]);
+  auto constSizeH = getConstantIntValue(sizesPermuted[3]);
   if (constSizeH.has_value()) {
     staticOutShape[hDim] = constSizeH.value() * getOutputTileSize();
   }
-  auto constSizeW = getConstantIntValue(sizes[4]);
+  auto constSizeW = getConstantIntValue(sizesPermuted[4]);
   if (constSizeW.has_value()) {
     staticOutShape[wDim] = constSizeW.value() * getOutputTileSize();
   }
@@ -1537,13 +1522,8 @@ FailureOr<TilingResult> WinogradOutputTransformOp::getTiledImplementation(
 
   SmallVector<Value> tiledOperands;
   SmallVector<OpFoldResult> inputStrides(getInputRank(), one);
-  SmallVector<int64_t> perm(getInputTileDimensions());
-  perm.append(getNonInputTileDims());
-  perm = invertPermutationVector(perm);
-  SmallVector<OpFoldResult> inputSizes = applyPermutation(sizes, perm);
-  SmallVector<OpFoldResult> inputOffsets = applyPermutation(offsets, perm);
-  tiledOperands.emplace_back(getSlice(builder, loc, getInput(), inputOffsets,
-                                      inputSizes, inputStrides));
+  tiledOperands.emplace_back(
+      getSlice(builder, loc, getInput(), offsets, sizes, inputStrides));
   tiledOperands.emplace_back(staticOutputSlice);
 
   SmallVector<Type, 4> resultTypes;
@@ -1573,21 +1553,25 @@ LogicalResult WinogradOutputTransformOp::getResultTilePosition(
     const int cDim = getChannelDim();
     const auto hDim = getImageDimensions()[0];
     const auto wDim = getImageDimensions()[1];
+    SmallVector<int64_t> perm(getInputTileDimensions());
+    perm.append(getNonInputTileDims());
+    SmallVector<OpFoldResult> sizesPermuted = applyPermutation(sizes, perm);
+    SmallVector<OpFoldResult> offsetsPermuted = applyPermutation(offsets, perm);
     auto loc = getLoc();
-    resultOffsets[0] = offsets[2];
-    resultOffsets[cDim] = offsets[5];
-    resultSizes[0] = sizes[2];
-    resultSizes[cDim] = sizes[5];
+    resultOffsets[0] = offsetsPermuted[2];
+    resultOffsets[cDim] = offsetsPermuted[5];
+    resultSizes[0] = sizesPermuted[2];
+    resultSizes[cDim] = sizesPermuted[5];
     SmallVector<SmallVector<OpFoldResult>> reifiedResultShapes;
     if (failed(reifyResultShapes(builder, reifiedResultShapes))) {
       return failure();
     }
     auto hSizeAndOffset = getScaledSizeAndOffset(
-        builder, loc, sizes[3], offsets[3], reifiedResultShapes[0][hDim],
-        getOutputTileSize(), getOutputTileSize());
+        builder, loc, sizesPermuted[3], offsetsPermuted[3],
+        reifiedResultShapes[0][hDim], getOutputTileSize(), getOutputTileSize());
     auto wSizeAndOffset = getScaledSizeAndOffset(
-        builder, loc, sizes[4], offsets[4], reifiedResultShapes[0][wDim],
-        getOutputTileSize(), getOutputTileSize());
+        builder, loc, sizesPermuted[4], offsetsPermuted[4],
+        reifiedResultShapes[0][wDim], getOutputTileSize(), getOutputTileSize());
 
     resultSizes[hDim] = hSizeAndOffset.first;
     resultSizes[wDim] = wSizeAndOffset.first;
