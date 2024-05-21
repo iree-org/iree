@@ -22,9 +22,20 @@ void TargetOptions::bindOptions(OptionsBinder &binder) {
   // initialized, so targetBackendsFlags needs to be here to be initialized
   // first.
   binder.list<std::string>(
-      "iree-hal-target-backends", targets,
+      "iree-hal-target-backends", legacyTargetBackends,
       llvm::cl::desc("Target backends for executable compilation."),
       llvm::cl::ZeroOrMore, llvm::cl::cat(halTargetOptionsCategory));
+
+  binder.list<std::string>("iree-hal-target-device", targetDevices,
+                           llvm::cl::desc("Target device specifications."),
+                           llvm::cl::ZeroOrMore,
+                           llvm::cl::cat(halTargetOptionsCategory));
+  binder.opt<std::string>(
+      "iree-hal-default-device", defaultDevice,
+      llvm::cl::desc("Which device is considered the default when no device "
+                     "affinity is specified. Either the device name when names "
+                     "are specified or the numeric ordinal of the device."),
+      llvm::cl::cat(halTargetOptionsCategory));
 
   binder.opt<int>(
       "iree-hal-executable-debug-level", debugLevel,

@@ -28,7 +28,7 @@
 // hence we only support llvm-cpu here.
 #cpu_target = #hal.device.target<"llvm-cpu", [
   #x86_64_target
-]>
+]> : !hal.device
 
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (d0)>

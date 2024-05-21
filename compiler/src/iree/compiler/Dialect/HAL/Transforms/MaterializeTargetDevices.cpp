@@ -29,6 +29,153 @@ namespace {
 // --iree-hal-materialize-target-devices
 //===----------------------------------------------------------------------===//
 
+// Returns the canonical name for a device by ordinal:
+// device ordinal `N` -> `@__device_N`
+static FlatSymbolRefAttr makeDefaultDeviceOrdinalRef(MLIRContext *context,
+                                                     int64_t ordinal) {
+  return FlatSymbolRefAttr::get(
+      context, (StringRef("__device_") + std::to_string(ordinal)).str());
+}
+
+// Returns the canonical name for a device by name:
+// device name `NAME` -> `@NAME`
+static FlatSymbolRefAttr makeDefaultDeviceNameRef(MLIRContext *context,
+                                                  StringRef name) {
+  return FlatSymbolRefAttr::get(context, name);
+}
+
+// Returns a symbol ref constructed to reference the specified device.
+// Supports:
+//   integer attrs: device ordinal `N` -> `@__device_N`
+//   string attrs: device name `NAME` -> `@NAME`
+static FailureOr<FlatSymbolRefAttr>
+makeDefaultDeviceAttrRef(Attribute defaultDeviceAttr) {
+  if (auto stringAttr = dyn_cast<StringAttr>(defaultDeviceAttr)) {
+    return makeDefaultDeviceNameRef(stringAttr.getContext(), stringAttr);
+  } else if (auto integerAttr = dyn_cast<IntegerAttr>(defaultDeviceAttr)) {
+    return makeDefaultDeviceOrdinalRef(integerAttr.getContext(),
+                                       integerAttr.getInt());
+  }
+  return failure();
+}
+
+// Creates a named device global with the given attribute.
+static FailureOr<FlatSymbolRefAttr>
+createDeviceGlobal(Location loc, StringAttr name, Attribute targetAttr,
+                   OpBuilder &moduleBuilder) {
+  auto deviceType = moduleBuilder.getType<IREE::HAL::DeviceType>();
+  auto globalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
+      loc, name, /*isMutable=*/false, deviceType);
+  globalOp.setPrivate();
+
+  TypedAttr attrValue;
+  if (auto arrayAttr = dyn_cast<ArrayAttr>(targetAttr)) {
+    if (arrayAttr.size() == 1) {
+      auto typedAttr = dyn_cast<TypedAttr>(arrayAttr.getValue().front());
+      if (typedAttr && isa<IREE::HAL::DeviceType>(typedAttr.getType())) {
+        // Don't care exactly what the attribute is, only that it's a device.
+        attrValue = typedAttr;
+      }
+    } else {
+      // Expand arrays to selects.
+      attrValue = moduleBuilder.getAttr<IREE::HAL::DeviceSelectAttr>(deviceType,
+                                                                     arrayAttr);
+    }
+  } else if (auto typedAttr = dyn_cast<TypedAttr>(targetAttr)) {
+    if (isa<IREE::HAL::DeviceType>(typedAttr.getType())) {
+      // Don't care exactly what the attribute is, only that it's a device.
+      attrValue = typedAttr;
+    }
+  }
+  if (!attrValue) {
+    return mlir::emitError(loc)
+           << "module has invalid device targets specified; "
+              "expected hal.device.targets to be an array of !hal.device "
+              "initialization attributes or a dictionary with named values";
+  }
+
+  globalOp.setInitialValueAttr(attrValue);
+  return FlatSymbolRefAttr::get(globalOp);
+}
+
+// Creates one or more device globals based on the specified targets and returns
+// the "default" device (usually just the first one specified).
+static FailureOr<FlatSymbolRefAttr> createDeviceGlobals(mlir::ModuleOp moduleOp,
+                                                        Attribute targetsAttr) {
+  auto moduleBuilder = OpBuilder::atBlockBegin(moduleOp.getBody());
+
+  FlatSymbolRefAttr firstDeviceRef;
+  if (auto dictAttr = dyn_cast<DictionaryAttr>(targetsAttr)) {
+    for (auto namedTargetsAttr : dictAttr.getValue()) {
+      auto deviceRefOr =
+          createDeviceGlobal(moduleOp.getLoc(), namedTargetsAttr.getName(),
+                             namedTargetsAttr.getValue(), moduleBuilder);
+      if (failed(deviceRefOr)) {
+        return failure();
+      } else if (!firstDeviceRef) {
+        firstDeviceRef = *deviceRefOr;
+      }
+    }
+  } else if (auto arrayAttr = dyn_cast<ArrayAttr>(targetsAttr)) {
+    for (auto [i, ordinalTargetsAttr] : llvm::enumerate(arrayAttr.getValue())) {
+      auto deviceRefOr =
+          createDeviceGlobal(moduleOp.getLoc(),
+                             moduleBuilder.getStringAttr(
+                                 StringRef("__device_") + std::to_string(i)),
+                             ordinalTargetsAttr, moduleBuilder);
+      if (failed(deviceRefOr)) {
+        return failure();
+      } else if (!firstDeviceRef) {
+        firstDeviceRef = *deviceRefOr;
+      }
+    }
+  } else {
+    return moduleOp.emitError()
+           << "unexpected `hal.device.targets` attribute; must be a dictionary "
+              "of named devices or an array of devices to use by ordinal";
+  }
+
+  return firstDeviceRef;
+}
+
+// Assigns the default device affinity to all top level ops that don't already
+// have one set.
+static void assignDefaultDeviceAffinity(mlir::ModuleOp moduleOp,
+                                        FlatSymbolRefAttr defaultDeviceRef) {
+  Builder builder(moduleOp);
+  auto affinityName = builder.getStringAttr("stream.affinity");
+  auto affinityAttr = builder.getAttr<IREE::HAL::DeviceAffinityAttr>(
+      defaultDeviceRef, /*queue_mask=*/-1ll);
+
+  // TODO(benvanik): make this an interface that can be registered on types.
+  auto isAnnotatableType = [](Type type) {
+    return isa<TensorType>(type) || isa<IREE::Stream::ResourceType>(type);
+  };
+  for (auto &op : moduleOp.getOps()) {
+    bool shouldAnnotate = true;
+    if (auto globalOp = dyn_cast<IREE::Util::GlobalOpInterface>(op)) {
+      if (!isAnnotatableType(globalOp.getGlobalType())) {
+        shouldAnnotate = false;
+      }
+    } else if (op.hasTrait<OpTrait::SymbolTable>()) {
+      // Symbol table ops can't reference parent symbols properly.
+      shouldAnnotate = false;
+    }
+    if (!shouldAnnotate) {
+      continue; // skip op
+    }
+
+    if (auto affinityOp = dyn_cast<IREE::Stream::AffinityOpInterface>(op)) {
+      if (!affinityOp.getAffinity())
+        affinityOp.setAffinity(affinityAttr);
+    } else {
+      if (!op.hasAttr(affinityName)) {
+        op.setAttr(affinityName, affinityAttr);
+      }
+    }
+  }
+}
+
 struct MaterializeTargetDevicesPass
     : public IREE::HAL::impl::MaterializeTargetDevicesPassBase<
           MaterializeTargetDevicesPass> {
@@ -38,62 +185,49 @@ struct MaterializeTargetDevicesPass
   void runOnOperation() override {
     auto moduleOp = getOperation();
 
-    // Only run if there's a module-level attribute specified.
-    auto deviceTargetAttrs =
-        moduleOp->getAttrOfType<ArrayAttr>("hal.device.targets");
-    if (!deviceTargetAttrs || deviceTargetAttrs.empty())
-      return;
-    moduleOp->removeAttr("hal.device.targets");
+    // Only materialize devices if there's a module-level attribute specified.
+    FlatSymbolRefAttr defaultDeviceRef;
+    auto deviceTargetAttrs = moduleOp->getAttr("hal.device.targets");
+    if (deviceTargetAttrs) {
+      moduleOp->removeAttr("hal.device.targets");
 
-    // Create the default device global.
-    auto moduleBuilder = OpBuilder::atBlockBegin(moduleOp.getBody());
-    auto deviceType = moduleBuilder.getType<IREE::HAL::DeviceType>();
-    auto globalOp = moduleBuilder.create<IREE::Util::GlobalOp>(
-        moduleOp.getLoc(), "__device.0", /*isMutable=*/false, deviceType);
-    globalOp.setPrivate();
-    if (deviceTargetAttrs.size() == 1) {
-      auto typedAttr =
-          dyn_cast<TypedAttr>(deviceTargetAttrs.getValue().front());
-      if (typedAttr && isa<IREE::HAL::DeviceType>(typedAttr.getType())) {
-        globalOp.setInitialValueAttr(typedAttr);
-      } else {
-        moduleOp.emitOpError()
-            << "has invalid device targets specified; "
-               "expect hal.device.targets to be an "
-               "ArrayAttr of !hal.device initialization attributes";
+      // Create the globals and get the default device.
+      auto firstDeviceOr = createDeviceGlobals(moduleOp, deviceTargetAttrs);
+      if (failed(firstDeviceOr)) {
+        // Fails if invalid attributes.
         return signalPassFailure();
       }
-    } else {
-      globalOp.setInitialValueAttr(
-          moduleBuilder.getAttr<IREE::HAL::DeviceSelectAttr>(
-              deviceType, deviceTargetAttrs));
+      defaultDeviceRef = *firstDeviceOr;
+    }
+
+    // Select the default device from what the user specified or from the first
+    // created.
+    auto defaultDeviceAttr = moduleOp->getAttr("hal.device.default");
+    if (defaultDeviceAttr) {
+      // Always prefer the explicitly specified default device.
+      moduleOp->removeAttr("hal.device.default");
+      auto defaultDeviceRefOr = makeDefaultDeviceAttrRef(defaultDeviceAttr);
+      if (failed(defaultDeviceRefOr)) {
+        moduleOp.emitError() << "invalid `hal.device.default` value, must be "
+                                "an ordinal or a name";
+        return signalPassFailure();
+      }
+      defaultDeviceRef = *defaultDeviceRefOr;
+    } else if (!defaultDevice.empty()) {
+      // Fallback to the option specified, if any provided.
+      long long defaultDeviceOrdinal = 0;
+      if (!llvm::getAsSignedInteger(defaultDevice, 10, defaultDeviceOrdinal)) {
+        defaultDeviceRef =
+            makeDefaultDeviceOrdinalRef(&getContext(), defaultDeviceOrdinal);
+      } else {
+        defaultDeviceRef =
+            makeDefaultDeviceNameRef(&getContext(), defaultDevice);
+      }
     }
 
     // Assign affinities to all top level ops that don't already have one set.
-    auto affinityName = StringAttr::get(&getContext(), "stream.affinity");
-    auto affinityAttr = moduleBuilder.getAttr<IREE::HAL::DeviceAffinityAttr>(
-        FlatSymbolRefAttr::get(globalOp), /*queue_mask=*/-1ll);
-    auto isAnnotatableType = [](Type type) {
-      return isa<TensorType>(type) || isa<IREE::Stream::ResourceType>(type);
-    };
-    for (auto &op : moduleOp.getOps()) {
-      bool shouldAnnotate = true;
-      if (auto globalOp = dyn_cast<IREE::Util::GlobalOpInterface>(op)) {
-        if (!isAnnotatableType(globalOp.getGlobalType()))
-          shouldAnnotate = false;
-      } else if (op.hasTrait<OpTrait::SymbolTable>()) {
-        // Symbol table ops can't reference parent symbols properly.
-        shouldAnnotate = false;
-      }
-      if (!shouldAnnotate)
-        continue;
-      if (auto affinityOp = dyn_cast<IREE::Stream::AffinityOpInterface>(op)) {
-        if (!affinityOp.getAffinity())
-          affinityOp.setAffinity(affinityAttr);
-      } else {
-        if (!op.hasAttr(affinityName))
-          op.setAttr(affinityName, affinityAttr);
-      }
+    if (defaultDeviceRef) {
+      assignDefaultDeviceAffinity(moduleOp, defaultDeviceRef);
     }
   }
 };

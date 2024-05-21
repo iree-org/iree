@@ -2,7 +2,6 @@
 // RUN: iree-opt --split-input-file %s --iree-gpu-test-target=gfx1100 --pass-pipeline="builtin.module(func.func(iree-preprocessing-pad-to-intrinsics{pad-target-type=conv},canonicalize))" | FileCheck %s -check-prefix=CONVOLUTION
 // RUN: iree-opt --split-input-file %s --iree-gpu-test-target=gfx1100 --pass-pipeline="builtin.module(func.func(iree-preprocessing-pad-to-intrinsics{pad-target-type=contraction},canonicalize))" | FileCheck %s -check-prefix=CONTRACT
 
-
 //       CHECK: func.func @matmul_static(
 //  CHECK-SAME:    %[[ARG0:.+]]: tensor<10x20xf16>,
 //  CHECK-SAME:    %[[ARG1:.+]]: tensor<20x30xf16>,

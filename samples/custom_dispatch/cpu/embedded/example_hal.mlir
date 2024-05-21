@@ -43,7 +43,7 @@
 // compiled binary (CPU + Vulkan, etc).
 #cpu_target = #hal.device.target<"llvm-cpu", [
   #x86_64_target
-]>
+]> : !hal.device
 
 module @example attributes {hal.device.targets = [#cpu_target]} {
 
