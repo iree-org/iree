@@ -961,8 +961,9 @@ IREE::GPU::TargetAttr getGPUTargetAttr(IREE::HAL::ExecutableTargetAttr target) {
       return attr;
   }
   if (!clTestTarget.empty()) {
+    auto [arch, features] = StringRef(clTestTarget).split(':');
     // Use the target specified in the command line for testing purposes.
-    return IREE::GPU::getFullTarget(target.getBackend(), clTestTarget,
+    return IREE::GPU::getFullTarget(target.getBackend(), arch, features,
                                     target.getContext());
   }
 
@@ -984,8 +985,9 @@ IREE::GPU::TargetAttr getGPUTargetAttr(Operation *op) {
       backend = "cuda";
     else if (StringRef(clTestTarget).starts_with("gfx"))
       backend = "rocm";
+    auto [arch, features] = StringRef(clTestTarget).split(':');
     // Use the target specified in the command line for testing purposes.
-    return IREE::GPU::getFullTarget(backend, clTestTarget, op->getContext());
+    return IREE::GPU::getFullTarget(backend, arch, features, op->getContext());
   }
   return nullptr;
 }

@@ -14,9 +14,11 @@ namespace mlir::iree_compiler::IREE::GPU {
 
 // Returns a TargetAttr to describe the details of the given |target|, which can
 // be a product name like "rx7900xtx", an microarchitecture name like "rdna3",
-// or a compiler target like "gfx1100". Returns a null TargetAttr if the given
-// |target| is not recognized.
-TargetAttr getHIPTargetDetails(llvm::StringRef target, MLIRContext *context);
+// or a compiler target like "gfx1100". |features| is a list of comma-separated
+// target features. Returns a null TargetAttr if the given |target| is not
+// recognized.
+TargetAttr getHIPTargetDetails(llvm::StringRef target, llvm::StringRef features,
+                               MLIRContext *context);
 
 // Normalizes the given HIP |target| to the gfx target commonly used for
 // compiling towards HIP. For example, "gfx90a" for "cnda2", "gfx1100" for
@@ -25,19 +27,20 @@ StringRef normalizeHIPTarget(StringRef target);
 
 // Returns a TargetAttr to describe the details of the given |target|, which can
 // be a product name like "rtx3090", an microarchitecture name like "ampere", or
-// a compute capability like "sm_80". Returns a null TargetAttr if the given
-// |target| is not recognized.
-TargetAttr getCUDATargetDetails(llvm::StringRef target, MLIRContext *context);
+// a compute capability like "sm_80". |features| is a list of comma-separated
+// target features. TargetAttr if the given |target| is not recognized.
+TargetAttr getCUDATargetDetails(llvm::StringRef target,
+                                llvm::StringRef features, MLIRContext *context);
 
 // Normalizes the given CUDA |target| to the gfx target commonly used for
 // compiling towards CUDA. For example, "sm_80" for "a100", "sm_89" for "ada".
 // if the given |target| is not recognized.
 StringRef normalizeCUDATarget(StringRef target);
 
-// Returns the full target of the given |aliasTarget|. Returns null target if
-// unknown.
+// Returns the full target of the given |aliasTarget| with a list of
+// comma-separated target|features|. Returns null target if unknown.
 TargetAttr getFullTarget(StringRef targetAPI, StringRef aliasTarget,
-                         MLIRContext *context);
+                         llvm::StringRef features, MLIRContext *context);
 
 } // namespace mlir::iree_compiler::IREE::GPU
 

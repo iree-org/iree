@@ -425,7 +425,8 @@ public:
       configItems.emplace_back(b.getStringAttr(name), value);
     };
 
-    if (auto target = GPU::getCUDATargetDetails(options.clTargetChip, context))
+    if (auto target = GPU::getCUDATargetDetails(
+            options.clTargetChip, options.clTargetFeature, context))
       addConfig("iree.gpu.target", target);
 
     return b.getAttr<IREE::HAL::ExecutableTargetAttr>(

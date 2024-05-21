@@ -79,7 +79,7 @@ const DotProductOps allDotProductOps = DotProductOps::DP4xI8ToI32;
 
 // Creates the corresponding TargetAttr from the given target |details|.
 TargetAttr createTargetAttr(const TargetDetails &details, StringRef arch,
-                            MLIRContext *context) {
+                            StringRef features, MLIRContext *context) {
   const WgpDetails *wgp = details.wgp;
 
   SmallVector<MMAAttr, 8> mmaAttrs;
@@ -107,7 +107,7 @@ TargetAttr createTargetAttr(const TargetDetails &details, StringRef arch,
     targetChip =
         TargetChipAttr::get(context, details.chip->wgpCount, DictionaryAttr{});
 
-  return TargetAttr::get(context, arch, targetWgp, targetChip);
+  return TargetAttr::get(context, arch, features, targetWgp, targetChip);
 }
 
 //===----------------------------------------------------------------------===//
@@ -338,9 +338,11 @@ StringRef normalizeNVIDIAGPUTarget(StringRef target) {
 // Query functions
 //===----------------------------------------------------------------------===//
 
-TargetAttr getHIPTargetDetails(StringRef target, MLIRContext *context) {
+TargetAttr getHIPTargetDetails(StringRef target, StringRef features,
+                               MLIRContext *context) {
   if (auto details = getAMDGPUTargetDetails(target)) {
-    return createTargetAttr(*details, normalizeAMDGPUTarget(target), context);
+    return createTargetAttr(*details, normalizeAMDGPUTarget(target), features,
+                            context);
   }
   return nullptr;
 }
@@ -349,10 +351,11 @@ StringRef normalizeHIPTarget(StringRef target) {
   return normalizeAMDGPUTarget(target);
 }
 
-TargetAttr getCUDATargetDetails(StringRef target, MLIRContext *context) {
+TargetAttr getCUDATargetDetails(StringRef target, StringRef features,
+                                MLIRContext *context) {
   if (auto details = getNVIDIAGPUTargetDetails(target))
     return createTargetAttr(*details, normalizeNVIDIAGPUTarget(target),
-                            context);
+                            features, context);
   return nullptr;
 }
 
@@ -361,10 +364,10 @@ StringRef normalizeCUDATarget(StringRef target) {
 }
 
 TargetAttr getFullTarget(StringRef targetAPI, StringRef aliasTarget,
-                         MLIRContext *context) {
+                         StringRef features, MLIRContext *context) {
   return llvm::StringSwitch<TargetAttr>(targetAPI)
-      .Case("cuda", getCUDATargetDetails(aliasTarget, context))
-      .Case("rocm", getHIPTargetDetails(aliasTarget, context))
+      .Case("cuda", getCUDATargetDetails(aliasTarget, features, context))
+      .Case("rocm", getHIPTargetDetails(aliasTarget, features, context))
       .Default(nullptr);
 }
 

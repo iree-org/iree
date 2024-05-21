@@ -71,7 +71,7 @@ module {
 
 // -----
 
-#target = #iree_gpu.target<arch = "gfx940", wgp = <
+#target = #iree_gpu.target<arch = "gfx940", features = "", wgp = <
   compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
   subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
   mma = [],
