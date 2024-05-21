@@ -144,10 +144,15 @@ static SmallVector<GPUMatmulShapeType>
 getIntrinsics(linalg::LinalgOp linalgOp) {
   SmallVector<IREE::HAL::ExecutableTargetAttr, 4> executableTargets =
       IREE::HAL::DeviceTargetAttr::lookupExecutableTargets(linalgOp);
-  if (executableTargets.size() != 1)
-    return {};
-  auto targetAttr = executableTargets.front();
-  IREE::GPU::TargetAttr target = getGPUTargetAttr(targetAttr);
+
+  IREE::GPU::TargetAttr target;
+  if (executableTargets.size() == 1) {
+    auto targetAttr = executableTargets.front();
+    target = getGPUTargetAttr(targetAttr);
+  } else {
+    // For LIT testing, also directly search TargetAttr around the op.
+    target = getGPUTargetAttr(linalgOp);
+  }
   if (!target)
     return {};
 
