@@ -48,7 +48,7 @@
 #cpu_target = #hal.device.target<"llvm-cpu", [
   #arm_64_target,
   #x86_64_target
-]>
+]> : !hal.device
 
 module @example attributes {hal.device.targets = [#cpu_target]} {
 
