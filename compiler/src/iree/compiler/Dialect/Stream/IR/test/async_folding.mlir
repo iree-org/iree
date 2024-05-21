@@ -288,6 +288,19 @@ util.func private @FoldLocalAsyncUpdateOp(%arg0: !stream.resource<*>, %arg1: ind
 
 // -----
 
+// Tests that updates of a value into itself are no-oped.
+
+// CHECK-LABEL: @FoldNoOpAsyncUpdateOp
+util.func private @FoldNoOpAsyncUpdateOp(%arg0: !stream.resource<*>, %arg1: index) -> !stream.resource<*> {
+  %c0 = arith.constant 0 : index
+  // CHECK-NOT: stream.async.update
+  %0 = stream.async.update %arg0, %arg0[%c0 to %arg1] : !stream.resource<*>{%arg1} -> %arg0 as !stream.resource<*>{%arg1}
+  // CHECK: util.return %arg0
+  util.return %0 : !stream.resource<*>
+}
+
+// -----
+
 // CHECK-LABEL: @ElideInPlaceUpdateUpdate
 util.func private @ElideInPlaceUpdateUpdate(%arg0: !stream.resource<*>, %arg1: index, %arg2: !stream.resource<*>, %arg3: index) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
