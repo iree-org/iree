@@ -53,10 +53,13 @@ func.func @test_target_chip() attributes {
 // CHECK-LABEL: func.func @test_target()
 func.func @test_target() attributes {
   // CHECK: #iree_gpu.target<
+  // CHECK-SAME: arch = "gfx942"
+  // CHECK-SAME: features = "+sramecc,+xnack"
   // CHECK-SAME: wgp = <
   // CHECK-SAME: chip = <
   target = #iree_gpu.target<
     arch="gfx942",
+    features="+sramecc,+xnack",
     wgp = <
       compute = fp16|fp32|int8, storage = b16|b32,
       subgroup = shuffle|arithmetic, dot = dp4xi8toi32,

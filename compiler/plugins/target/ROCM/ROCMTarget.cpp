@@ -23,6 +23,7 @@
 #include "iree/compiler/Utils/ModuleUtils.h"
 #include "iree/compiler/Utils/ToolUtils.h"
 #include "iree/schemas/rocm_executable_def_builder.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
@@ -54,6 +55,7 @@ namespace {
 
 struct ROCmOptions {
   std::string targetChip = "gfx908";
+  std::string targetFeatures = "";
   std::string bitcodeDirectory = getDefaultBitcodeDirectory();
   int wavesPerEu = 0;
   std::string enableROCMUkernels = "none";
@@ -63,6 +65,9 @@ struct ROCmOptions {
     static cl::OptionCategory category("ROCm HAL Target");
     binder.opt<std::string>("iree-rocm-target-chip", targetChip,
                             cl::cat(category), cl::desc("ROCm target chip."));
+    binder.opt<std::string>(
+        "iree-rocm-target-features", targetFeatures, cl::cat(category),
+        cl::desc("ROCm target features; e.g., '+sramecc,+xnack'."));
     binder.opt<std::string>("iree-rocm-bc-dir", bitcodeDirectory,
                             cl::cat(category),
                             cl::desc("Directory of ROCm Bitcode."));
@@ -74,6 +79,33 @@ struct ROCmOptions {
         cl::desc("Enables microkernels in the rocm compiler backend. May be "
                  "`default`, `none`, `all`, or a comma-separated list of "
                  "specific unprefixed microkernels to enable, e.g. `mmt4d`."));
+  }
+
+  LogicalResult verify(mlir::Builder &builder) const {
+    if (GPU::normalizeHIPTarget(targetChip).empty()) {
+      return emitError(builder.getUnknownLoc(), "Unknown ROCm target '")
+             << targetChip << "'";
+    }
+    SmallVector<StringRef> features;
+    llvm::SplitString(targetFeatures, features, ",");
+    for (StringRef f : features) {
+      if (!(f.starts_with("+") || f.starts_with("-"))) {
+        return emitError(builder.getUnknownLoc(),
+                         "ROCm target feature must be prefixed with '+' or "
+                         "'-'; but seen '")
+               << f << "'";
+      }
+      StringRef feature = f.substr(1);
+      if (feature != "sramecc" && feature != "xnack") {
+        // We only support these two features to be set explicitly. Features
+        // like wavefrontsize is controlled and tuned by the compiler.
+        return emitError(builder.getUnknownLoc(),
+                         "ROCm target feature can only be 'sramecc' or "
+                         "'xnack'; but seen '")
+               << feature << "'";
+      }
+    }
+    return success();
   }
 
 private:
@@ -173,7 +205,8 @@ public:
       MLIRContext *context, StringRef deviceID, DictionaryAttr deviceConfigAttr,
       SmallVectorImpl<IREE::HAL::ExecutableTargetAttr> &executableTargetAttrs)
       const override {
-    executableTargetAttrs.push_back(getExecutableTarget(context));
+    if (auto target = getExecutableTarget(context))
+      executableTargetAttrs.push_back(target);
   }
 
   IREE::HAL::ExecutableTargetAttr
@@ -184,7 +217,11 @@ public:
       configItems.emplace_back(b.getStringAttr(name), value);
     };
 
-    if (auto target = GPU::getHIPTargetDetails(options.targetChip, context))
+    if (failed(options.verify(b)))
+      return nullptr;
+
+    if (auto target = GPU::getHIPTargetDetails(options.targetChip,
+                                               options.targetFeatures, context))
       addConfig("iree.gpu.target", target);
 
     addConfig("ukernels", b.getStringAttr(options.enableROCMUkernels));
@@ -260,8 +297,11 @@ public:
     ModuleOp innerModuleOp = variantOp.getInnerModule();
     auto targetAttr = variantOp.getTargetAttr();
     StringRef targetArch = options.targetChip;
-    if (auto attr = getGPUTargetAttr(targetAttr))
+    StringRef targetFeatures = options.targetFeatures;
+    if (auto attr = getGPUTargetAttr(targetAttr)) {
       targetArch = attr.getArch();
+      targetFeatures = attr.getFeatures();
+    }
 
     // We name our files after the executable name so that they are easy to
     // track both during compilation (logs/artifacts/etc), as outputs (final
@@ -401,14 +441,15 @@ public:
         opt.NoInfsFPMath = false;
         opt.NoNaNsFPMath = true;
         std::string features;
-        if (targetArch.starts_with("gfx9")) {
-          features = "+sramecc,-xnack";
-        } else {
-          // GFX 10 or 11.
+        if (targetArch.starts_with("gfx10") ||
+            targetArch.starts_with("gfx11")) {
           if (subgroupSize == 32)
             features = "+wavefrontsize32";
           if (subgroupSize == 64)
             features = "+wavefrontsize64";
+        }
+        if (!targetFeatures.empty()) {
+          features += (features.empty() ? "" : ",") + targetFeatures.str();
         }
 
         targetMachine.reset(target->createTargetMachine(

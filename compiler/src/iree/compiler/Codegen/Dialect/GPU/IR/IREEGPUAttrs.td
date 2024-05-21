@@ -308,6 +308,7 @@ def IREEGPU_TargetAttr : AttrDef<IREEGPU_Dialect, "Target"> {
 
   let parameters = (ins
     StringRefParameter<"target architecture">:$arch,
+    StringRefParameter<"target features">:$features,
     "TargetWgpAttr":$wgp,
     OptionalParameter<"TargetChipAttr">:$chip
   );

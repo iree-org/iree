@@ -103,6 +103,14 @@ struct CUDAOptions {
         llvm::cl::cat(category),
         llvm::cl::desc("Passes the given additional parameters to ptxas."));
   }
+
+  LogicalResult verify(mlir::Builder &builder) const {
+    if (GPU::normalizeCUDATarget(clTargetChip).empty()) {
+      return emitError(builder.getUnknownLoc(), "Unknown CUDA target '")
+             << clTargetChip << "'";
+    }
+    return success();
+  }
 };
 } // namespace
 
@@ -425,7 +433,11 @@ public:
       configItems.emplace_back(b.getStringAttr(name), value);
     };
 
-    if (auto target = GPU::getCUDATargetDetails(options.clTargetChip, context))
+    if (failed(options.verify(b)))
+      return nullptr;
+
+    if (auto target = GPU::getCUDATargetDetails(
+            options.clTargetChip, options.clTargetFeature, context))
       addConfig("iree.gpu.target", target);
 
     return b.getAttr<IREE::HAL::ExecutableTargetAttr>(
@@ -460,8 +472,11 @@ public:
                                     OpBuilder &executableBuilder) override {
     auto targetAttr = variantOp.getTargetAttr();
     StringRef targetArch = options.clTargetChip;
-    if (auto attr = getGPUTargetAttr(targetAttr))
+    StringRef targetFeatures = options.clTargetFeature;
+    if (auto attr = getGPUTargetAttr(targetAttr)) {
       targetArch = attr.getArch();
+      targetFeatures = attr.getFeatures();
+    }
 
     // Perform the translation in a separate context to avoid any
     // multi-threading issues.
@@ -584,7 +599,6 @@ public:
       std::unique_ptr<llvm::TargetMachine> targetMachine;
       {
         llvm::Triple triple("nvptx64-nvidia-cuda");
-        std::string features = options.clTargetFeature;
         std::string error;
         const llvm::Target *target =
             llvm::TargetRegistry::lookupTarget("", triple, error);
@@ -592,7 +606,7 @@ public:
           return variantOp.emitError() << "cannot initialize target triple";
         }
         targetMachine.reset(target->createTargetMachine(
-            triple.str(), targetArch, features, {}, {}));
+            triple.str(), targetArch, targetFeatures, {}, {}));
         if (targetMachine == nullptr) {
           return variantOp.emitError() << "cannot initialize target machine";
         }
