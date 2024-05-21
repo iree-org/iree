@@ -24,8 +24,6 @@ iree_cc_library(
     "IREEGPUDialect.cpp.inc"
     "IREEGPUDialect.h.inc"
     "IREEGPUEnums.cpp.inc"
-    "IREEGPUEnums.cpp.inc"
-    "IREEGPUEnums.h.inc"
     "IREEGPUEnums.h.inc"
     "IREEGPUInterfaces.cpp.inc"
     "IREEGPUInterfaces.h.inc"
