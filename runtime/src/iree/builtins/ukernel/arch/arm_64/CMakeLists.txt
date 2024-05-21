@@ -24,8 +24,12 @@ iree_bitcode_library(
     "common_arm_64.h"
     "mmt4d_arm_64_internal.h"
     "mmt4d_arm_64_tiles.inl"
+    "pack_arm_64_internal.h"
+    "unpack_arm_64_internal.h"
   SRCS
     "mmt4d_arm_64_entry_point.c"
+    "pack_arm_64_entry_point.c"
+    "unpack_arm_64_entry_point.c"
 )
 
 iree_bitcode_library(
@@ -39,8 +43,12 @@ iree_bitcode_library(
     "common_arm_64.h"
     "mmt4d_arm_64_internal.h"
     "mmt4d_arm_64_tiles.inl"
+    "pack_arm_64_internal.h"
+    "unpack_arm_64_internal.h"
   SRCS
     "mmt4d_arm_64_base.c"
+    "pack_arm_64_base.c"
+    "unpack_arm_64_base.c"
 )
 
 iree_bitcode_library(
@@ -54,6 +62,8 @@ iree_bitcode_library(
     "common_arm_64.h"
     "mmt4d_arm_64_internal.h"
     "mmt4d_arm_64_tiles.inl"
+    "pack_arm_64_internal.h"
+    "unpack_arm_64_internal.h"
   SRCS
     "mmt4d_arm_64_fullfp16.c"
   COPTS
@@ -71,6 +81,8 @@ iree_bitcode_library(
     "common_arm_64.h"
     "mmt4d_arm_64_internal.h"
     "mmt4d_arm_64_tiles.inl"
+    "pack_arm_64_internal.h"
+    "unpack_arm_64_internal.h"
   SRCS
     "mmt4d_arm_64_fp16fml.c"
   COPTS
@@ -88,6 +100,8 @@ iree_bitcode_library(
     "common_arm_64.h"
     "mmt4d_arm_64_internal.h"
     "mmt4d_arm_64_tiles.inl"
+    "pack_arm_64_internal.h"
+    "unpack_arm_64_internal.h"
   SRCS
     "mmt4d_arm_64_bf16.c"
   COPTS
@@ -105,6 +119,8 @@ iree_bitcode_library(
     "common_arm_64.h"
     "mmt4d_arm_64_internal.h"
     "mmt4d_arm_64_tiles.inl"
+    "pack_arm_64_internal.h"
+    "unpack_arm_64_internal.h"
   SRCS
     "mmt4d_arm_64_dotprod.c"
   COPTS
@@ -122,6 +138,8 @@ iree_bitcode_library(
     "common_arm_64.h"
     "mmt4d_arm_64_internal.h"
     "mmt4d_arm_64_tiles.inl"
+    "pack_arm_64_internal.h"
+    "unpack_arm_64_internal.h"
   SRCS
     "mmt4d_arm_64_i8mm.c"
   COPTS
