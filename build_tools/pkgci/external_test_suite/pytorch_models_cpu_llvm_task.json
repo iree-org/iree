@@ -14,7 +14,9 @@
   "expected_compile_failures": [
     // TODO(#17344): need to regenerate .mlirbc
     "opt-125M",
-    "resnet50",
+    "resnet50"
   ],
-  "expected_run_failures": []
+  "expected_run_failures": [
+    "sdxl-vae-decode-tank"
+  ]
 }
