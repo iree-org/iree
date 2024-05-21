@@ -53,6 +53,7 @@ iree_cc_library(
     iree::base::internal::flatcc::building
     iree::compiler::Codegen
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
+    iree::compiler::Codegen::Dialect::GPU::TargetUtils::KnownTargets
     iree::compiler::Codegen::LLVMGPU
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::HAL::Target

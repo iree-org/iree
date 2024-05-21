@@ -1001,6 +1001,35 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
 }
 
 //===----------------------------------------------------------------------===//
+// Target Attributes
+//===----------------------------------------------------------------------===//
+
+std::optional<int> TargetAttr::getCUDAComputeCapability() const {
+  StringRef arch = getArch();
+  if (!arch.starts_with("sm_"))
+    return false;
+  APInt version;
+  if (arch.substr(3).getAsInteger(10, version)) {
+    return false;
+  }
+  return version.getZExtValue();
+}
+
+bool TargetAttr::supportsTF32InputMMAOps() const {
+  // TODO: scan the list of MMA ops to decude after plumbing through support
+  // for NVIDIA TensorCore MMA ops.
+  if (auto cc = getCUDAComputeCapability())
+    return cc >= 80;
+  return false;
+}
+
+bool TargetAttr::supportsSyncMMAOps() const {
+  if (auto cc = getCUDAComputeCapability())
+    return cc >= 80;
+  return false;
+}
+
+//===----------------------------------------------------------------------===//
 // LaneIdAttr
 //===----------------------------------------------------------------------===//
 

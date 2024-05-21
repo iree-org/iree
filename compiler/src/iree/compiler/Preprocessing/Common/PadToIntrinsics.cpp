@@ -5,12 +5,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <cstdint>
-#include <limits>
 #include "iree/compiler/Codegen/Common/GPU/GPUHeuristics.h"
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
-#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Preprocessing/Common/Passes.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
@@ -20,9 +17,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
-#include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/IR/BuiltinAttributes.h"
-#include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler::Preprocessing {
 
@@ -147,24 +142,27 @@ expandMapsAndIterators(SmallVector<AffineMap> &expandedMaps,
 
 static SmallVector<GPUMatmulShapeType>
 getIntrinsics(linalg::LinalgOp linalgOp) {
-  ArrayAttr mmaKinds = nullptr;
-  auto executableTargets =
+  SmallVector<IREE::HAL::ExecutableTargetAttr, 4> executableTargets =
       IREE::HAL::DeviceTargetAttr::lookupExecutableTargets(linalgOp);
-  if (executableTargets.size() != 1)
-    return {};
-  auto targetAttr = executableTargets.front();
-  FailureOr<ArrayAttr> candidateMmaKinds =
-      getSupportedMmaTypes(targetAttr.getConfiguration());
-  if (failed(candidateMmaKinds))
-    return {};
-  mmaKinds = *candidateMmaKinds;
 
-  return llvm::map_to_vector(
-      mmaKinds.getAsRange<IREE::GPU::MMAAttr>(), [](IREE::GPU::MMAAttr mma) {
-        auto [mSize, nSize, kSize] = mma.getMNKShape();
-        auto [aType, bType, cType] = mma.getABCElementTypes();
-        return GPUMatmulShapeType{mSize, nSize, kSize, aType, bType, cType};
-      });
+  IREE::GPU::TargetAttr target;
+  if (executableTargets.size() == 1) {
+    auto targetAttr = executableTargets.front();
+    target = getGPUTargetAttr(targetAttr);
+  } else {
+    // For LIT testing, also directly search TargetAttr around the op.
+    target = getGPUTargetAttr(linalgOp);
+  }
+  if (!target)
+    return {};
+
+  IREE::GPU::MMAOpsArrayAttr mmaKinds = target.getWgp().getMma();
+
+  return llvm::map_to_vector(mmaKinds, [](IREE::GPU::MMAAttr mma) {
+    auto [mSize, nSize, kSize] = mma.getMNKShape();
+    auto [aType, bType, cType] = mma.getABCElementTypes();
+    return GPUMatmulShapeType{mSize, nSize, kSize, aType, bType, cType};
+  });
 }
 
 static void padConvOp(RewriterBase &rewriter, linalg::LinalgOp linalgOp) {

@@ -1,119 +1,13 @@
-// RUN: iree-opt --split-input-file %s --pass-pipeline="builtin.module(func.func(iree-preprocessing-pad-to-intrinsics,canonicalize))" | FileCheck %s
-// RUN: iree-opt --split-input-file %s --pass-pipeline="builtin.module(func.func(iree-preprocessing-pad-to-intrinsics{pad-target-type=conv},canonicalize))" | FileCheck %s -check-prefix=CONVOLUTION
-// RUN: iree-opt --split-input-file %s --pass-pipeline="builtin.module(func.func(iree-preprocessing-pad-to-intrinsics{pad-target-type=contraction},canonicalize))" | FileCheck %s -check-prefix=CONTRACT
+// RUN: iree-opt --split-input-file %s --iree-gpu-test-target=gfx1100 --pass-pipeline="builtin.module(func.func(iree-preprocessing-pad-to-intrinsics,canonicalize))" | FileCheck %s
+// RUN: iree-opt --split-input-file %s --iree-gpu-test-target=gfx1100 --pass-pipeline="builtin.module(func.func(iree-preprocessing-pad-to-intrinsics{pad-target-type=conv},canonicalize))" | FileCheck %s -check-prefix=CONVOLUTION
+// RUN: iree-opt --split-input-file %s --iree-gpu-test-target=gfx1100 --pass-pipeline="builtin.module(func.func(iree-preprocessing-pad-to-intrinsics{pad-target-type=contraction},canonicalize))" | FileCheck %s -check-prefix=CONTRACT
 
-
-#rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb",
-                             {mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
-                                                #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>],
-                              target_arch = "gfx942", ukernels = "none"}>
-
-// CHECK-LABEL: func.func @main0(
-// CHECK-SAME:    %[[ARG0:.+]]: tensor<2x130x130x4xf16>,
-// CHECK-SAME:    %[[ARG1:.+]]: tensor<3x3x4x320xf16>,
-// CHECK-SAME:    %[[ARG2:.+]]: tensor<2x128x128x320xf32>)
-func.func @main0(%arg0: tensor<2x130x130x4xf16>, %arg1: tensor<3x3x4x320xf16>, %arg2: tensor<2x128x128x320xf32>)
-    -> tensor<2x128x128x320xf32>
-    attributes {hal.device.targets = [#hal.device.target<"rocm", [#rocm_executable_target]>]} {
-  %conv0 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>}
-             ins(%arg0, %arg1 : tensor<2x130x130x4xf16>, tensor<3x3x4x320xf16>)
-             outs(%arg2 : tensor<2x128x128x320xf32>) -> tensor<2x128x128x320xf32>
-  return %conv0 : tensor<2x128x128x320xf32>
-}
-
-// CHECK:      %[[CST0:.+]] = arith.constant 0.0{{.*}} : f16
-// CHECK:      %[[PAD0:.+]] = tensor.pad %[[ARG0]] low[0, 0, 0, 0] high[0, 0, 0, 12]
-// CHECK:        tensor.yield %[[CST0]] : f16
-// CHECK-NEXT:   tensor<2x130x130x4xf16> to tensor<2x130x130x16xf16>
-// CHECK:      %[[PAD1:.+]] = tensor.pad %[[ARG1]] low[0, 0, 0, 0] high[0, 0, 12, 0]
-// CHECK:        tensor<3x3x4x320xf16> to tensor<3x3x16x320xf16>
-// CHECK:      %[[CONV:.+]] = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>}
-// CHECK-SAME:   ins(%[[PAD0]], %[[PAD1]] : tensor<2x130x130x16xf16>, tensor<3x3x16x320xf16>)
-// CHECK-SAME:   outs(%[[ARG2]] : tensor<2x128x128x320xf32>) -> tensor<2x128x128x320xf32>
-// CHECK:      return %[[CONV]] : tensor<2x128x128x320xf32>
-
-// CONVOLUTION:      tensor.pad {{.*}} low[0, 0, 0, 0] high[0, 0, 0, 12]
-// CONVOLUTION:      tensor.pad {{.*}} low[0, 0, 0, 0] high[0, 0, 12, 0]
-
-// CONTRACT-NOT:     tensor.pad {{.*}} low[0, 0, 0, 0] high[0, 0, 0, 12]
-// CONTRACT-NOT:     tensor.pad {{.*}} low[0, 0, 0, 0] high[0, 0, 12, 0]
-
-// -----
-
-#rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb",
-                             {mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
-                                                #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>],
-                              target_arch = "gfx942", ukernels = "none"}>
-
-// CHECK-LABEL: func.func @main1(
-// CHECK-SAME:    %[[ARG0:.+]]: tensor<2x130x130x320xf16>,
-// CHECK-SAME:    %[[ARG1:.+]]: tensor<3x3x320x4xf16>,
-// CHECK-SAME:    %[[ARG2:.+]]: tensor<2x128x128x4xf32>)
-func.func @main1(%arg0: tensor<2x130x130x320xf16>, %arg1: tensor<3x3x320x4xf16>, %arg2: tensor<2x128x128x4xf32>)
-    -> tensor<2x128x128x4xf32>
-    attributes {hal.device.targets = [#hal.device.target<"rocm", [#rocm_executable_target]>]} {
-  %conv0 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>}
-             ins(%arg0, %arg1 : tensor<2x130x130x320xf16>, tensor<3x3x320x4xf16>)
-             outs(%arg2 : tensor<2x128x128x4xf32>) -> tensor<2x128x128x4xf32>
-  return %conv0 : tensor<2x128x128x4xf32>
-}
-
-// CHECK:      %[[CST0:.+]] = arith.constant 0.0{{.*}} : f16
-// CHECK:      %[[PAD1:.+]] = tensor.pad %[[ARG1]] low[0, 0, 0, 0] high[0, 0, 0, 12]
-// CHECK:        tensor<3x3x320x4xf16> to tensor<3x3x320x16xf16>
-// CHECK:      %[[PAD2:.+]] = tensor.pad %[[ARG2]] low[0, 0, 0, 0] high[0, 0, 0, 12]
-// CHECK:        tensor<2x128x128x4xf32> to tensor<2x128x128x16xf32>
-// CHECK:      %[[CONV:.+]] = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>}
-// CHECK-SAME:   ins(%[[ARG0]], %[[PAD1]] : tensor<2x130x130x320xf16>, tensor<3x3x320x16xf16>)
-// CHECK-SAME:   outs(%[[PAD2]] : tensor<2x128x128x16xf32>) -> tensor<2x128x128x16xf32>
-// CHECK:      %[[RET:.+]] = tensor.extract_slice %[[CONV]][0, 0, 0, 0] [2, 128, 128, 4] [1, 1, 1, 1]
-// CHECK:      return %[[RET]] : tensor<2x128x128x4xf32>
-
-// CONVOLUTION:      tensor.pad {{.*}} low[0, 0, 0, 0] high[0, 0, 0, 12]
-
-// CONTRACT-NOT:     tensor.pad {{.*}} low[0, 0, 0, 0] high[0, 0, 0, 12]
-
-// -----
-
-#rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb",
-                             {mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>],
-                              target_arch = "gfx942", ukernels = "none"}>
-
-// CHECK-LABEL: func.func @main2(
-// CHECK-SAME:    %[[ARG0:.+]]: tensor<2x130x130x4xf16>,
-// CHECK-SAME:    %[[ARG1:.+]]: tensor<3x3x4x320xf16>,
-// CHECK-SAME:    %[[ARG2:.+]]: tensor<2x128x128x320xf32>)
-func.func @main2(%arg0: tensor<2x130x130x4xf16>, %arg1: tensor<3x3x4x320xf16>, %arg2: tensor<2x128x128x320xf32>)
-    -> tensor<2x128x128x320xf32>
-    attributes {hal.device.targets = [#hal.device.target<"rocm", [#rocm_executable_target]>]} {
-  %conv0 = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>}
-             ins(%arg0, %arg1 : tensor<2x130x130x4xf16>, tensor<3x3x4x320xf16>)
-             outs(%arg2 : tensor<2x128x128x320xf32>) -> tensor<2x128x128x320xf32>
-  return %conv0 : tensor<2x128x128x320xf32>
-}
-
-// CHECK:      %[[CST0:.+]] = arith.constant 0.0{{.*}} : f16
-// CHECK:      %[[PAD0:.+]] = tensor.pad %[[ARG0]] low[0, 0, 0, 0] high[0, 0, 0, 4]
-// CHECK:        tensor<2x130x130x4xf16> to tensor<2x130x130x8xf16>
-// CHECK:      %[[PAD1:.+]] = tensor.pad %[[ARG1]] low[0, 0, 0, 0] high[0, 0, 4, 0]
-// CHECK:        tensor<3x3x4x320xf16> to tensor<3x3x8x320xf16>
-// CHECK:      %[[CONV:.+]] = linalg.conv_2d_nhwc_hwcf {dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>}
-// CHECK-SAME:   ins(%[[PAD0]], %[[PAD1]] : tensor<2x130x130x8xf16>, tensor<3x3x8x320xf16>)
-// CHECK-SAME:   outs(%[[ARG2]] : tensor<2x128x128x320xf32>) -> tensor<2x128x128x320xf32>
-// CHECK:      return %[[CONV]] : tensor<2x128x128x320xf32>
-
-// -----
-
-#rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb",
-                                    {mma_intrinsics = [#iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>],
-                                      target_arch = "gfx1100", ukernels = "none"}>
 
 //       CHECK: func.func @matmul_static(
 //  CHECK-SAME:    %[[ARG0:.+]]: tensor<10x20xf16>,
 //  CHECK-SAME:    %[[ARG1:.+]]: tensor<20x30xf16>,
 //  CHECK-SAME:    %[[ARG2:.+]]: tensor<10x30xf16>)
-func.func @matmul_static(%arg0 : tensor<10x20xf16>, %arg1 : tensor<20x30xf16>, %arg2 : tensor<10x30xf16>) -> tensor<10x30xf16>
-    attributes {hal.device.targets = [#hal.device.target<"rocm", [#rocm_executable_target]>]} {
+func.func @matmul_static(%arg0 : tensor<10x20xf16>, %arg1 : tensor<20x30xf16>, %arg2 : tensor<10x30xf16>) -> tensor<10x30xf16> {
     %0 = linalg.matmul ins(%arg0, %arg1 : tensor<10x20xf16>, tensor<20x30xf16>)
         outs(%arg2 : tensor<10x30xf16>) -> tensor<10x30xf16>
     return %0 : tensor<10x30xf16>
@@ -141,10 +35,6 @@ func.func @matmul_static(%arg0 : tensor<10x20xf16>, %arg1 : tensor<20x30xf16>, %
 
 // Good test to ensure reassoc, new dims, and iterator types works on permuted operations.
 
-#rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb",
-                                    {mma_intrinsics = [#iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>],
-                                      target_arch = "gfx1100", ukernels = "none"}>
-
 //   CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (-s0 + (s0 ceildiv 16) * 16)>
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>
 //   CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d1, d2, d3, d4)>
@@ -153,8 +43,7 @@ func.func @matmul_static(%arg0 : tensor<10x20xf16>, %arg1 : tensor<20x30xf16>, %
 //  CHECK-SAME:    %[[ARG0:.+]]: tensor<10x?xf16>,
 //  CHECK-SAME:    %[[ARG1:.+]]: tensor<?x?xf16>,
 //  CHECK-SAME:    %[[ARG2:.+]]: tensor<10x?xf16>)
-func.func @mmtb_dynamic_k_n(%arg0 : tensor<10x?xf16>, %arg1 : tensor<?x?xf16>, %arg2 : tensor<10x?xf16>) -> tensor<10x?xf16>
-    attributes {hal.device.targets = [#hal.device.target<"rocm", [#rocm_executable_target]>]} {
+func.func @mmtb_dynamic_k_n(%arg0 : tensor<10x?xf16>, %arg1 : tensor<?x?xf16>, %arg2 : tensor<10x?xf16>) -> tensor<10x?xf16> {
     %0 = linalg.matmul_transpose_b ins(%arg0, %arg1 : tensor<10x?xf16>, tensor<?x?xf16>)
         outs(%arg2 : tensor<10x?xf16>) -> tensor<10x?xf16>
     return %0 : tensor<10x?xf16>
@@ -183,10 +72,6 @@ func.func @mmtb_dynamic_k_n(%arg0 : tensor<10x?xf16>, %arg1 : tensor<?x?xf16>, %
 
 // -----
 
-#rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb",
-                                    {mma_intrinsics = [#iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>],
-                                      target_arch = "gfx1100", ukernels = "none"}>
-
 //   CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (-s0 + (s0 ceildiv 16) * 16)>
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1] -> (-s0 + s1 + (s0 ceildiv 16) * 16)>
 //   CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d1, d2, d4, d5)>
@@ -195,8 +80,7 @@ func.func @mmtb_dynamic_k_n(%arg0 : tensor<10x?xf16>, %arg1 : tensor<?x?xf16>, %
 //       CHECK: func.func @bmm_dynamic_m_k(
 //  CHECK-SAME:    %[[ARG0:.+]]: tensor<32x?x?xf16>,
 //  CHECK-SAME:    %[[ARG1:.+]]: tensor<32x?x128xf16>)
-func.func @bmm_dynamic_m_k(%arg0: tensor<32x?x?xf16>, %arg1: tensor<32x?x128xf16>) -> tensor<32x?x128xf16>
-        attributes {hal.device.targets = [#hal.device.target<"rocm", [#rocm_executable_target]>]} {
+func.func @bmm_dynamic_m_k(%arg0: tensor<32x?x?xf16>, %arg1: tensor<32x?x128xf16>) -> tensor<32x?x128xf16> {
   %cst = arith.constant 0.000000e+00 : f16
   %c1 = arith.constant 1 : index
   %dim = tensor.dim %arg0, %c1 : tensor<32x?x?xf16>
@@ -231,10 +115,6 @@ func.func @bmm_dynamic_m_k(%arg0: tensor<32x?x?xf16>, %arg1: tensor<32x?x128xf16
 
 // -----
 
-#rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb",
-                                    {mma_intrinsics = [#iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>],
-                                      target_arch = "gfx1100", ukernels = "none"}>
-
 //   CHECK-DAG: #[[MAP:.+]] = affine_map<()[s0] -> (-s0 + (s0 ceildiv 16) * 16)>
 //   CHECK-DAG: #[[MAP0:.+]] = affine_map<()[s0, s1] -> (-s0 + s1 + (s0 ceildiv 16) * 16)>
 //   CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3, d4)>
@@ -244,8 +124,7 @@ func.func @bmm_dynamic_m_k(%arg0: tensor<32x?x?xf16>, %arg1: tensor<32x?x128xf16
 //  CHECK-SAME:    %[[ARG0:.+]]: tensor<4096x32x128xi4>,
 //  CHECK-SAME:    %[[ARG1:.+]]: tensor<4096x32xf16>, %[[ARG2:.+]]: tensor<4096x32xf16>,
 //  CHECK-SAME:    %[[ARG3:.+]]: tensor<?x32x128xf16>)
-func.func @dequant_gemm_dynamic_m(%arg0: tensor<4096x32x128xi4>, %arg1: tensor<4096x32xf16>, %arg2: tensor<4096x32xf16>, %arg3: tensor<?x32x128xf16>) -> tensor<?x4096xf16>
-  attributes {hal.device.targets = [#hal.device.target<"rocm", [#rocm_executable_target]>]} {
+func.func @dequant_gemm_dynamic_m(%arg0: tensor<4096x32x128xi4>, %arg1: tensor<4096x32xf16>, %arg2: tensor<4096x32xf16>, %arg3: tensor<?x32x128xf16>) -> tensor<?x4096xf16> {
   %c0 = arith.constant 0 : index
   %cst = arith.constant 0.000000e+00 : f16
   %dim = tensor.dim %arg3, %c0 : tensor<?x32x128xf16>
@@ -293,45 +172,3 @@ func.func @dequant_gemm_dynamic_m(%arg0: tensor<4096x32x128xi4>, %arg1: tensor<4
 
 // CONTRACT:        tensor.pad {{.*}} low[0, 0, 0]
 // CONTRACT:        tensor.expand_shape {{.*}} {{\[}}[0, 1], [2], [3]] output_shape {{.*}} : tensor<?x32x128xf16> into tensor<?x16x32x128xf16>
-
-// -----
-
-// We want to skip padding skinny matmul cases, since warpReduction is more performant for it.
-
-#rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb",
-                                    {mma_intrinsics = [#iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>],
-                                      target_arch = "gfx1100", ukernels = "none"}>
-
-//       CHECK: func.func @skip_skinny_m_matmul(
-//  CHECK-SAME:    %[[ARG0:.+]]: tensor<2x20xf16>,
-//  CHECK-SAME:    %[[ARG1:.+]]: tensor<20x30xf16>,
-//  CHECK-SAME:    %[[ARG2:.+]]: tensor<2x30xf16>)
-func.func @skip_skinny_m_matmul(%arg0 : tensor<2x20xf16>, %arg1 : tensor<20x30xf16>, %arg2 : tensor<2x30xf16>) -> tensor<2x30xf16>
-    attributes {hal.device.targets = [#hal.device.target<"rocm", [#rocm_executable_target]>]} {
-    %0 = linalg.matmul ins(%arg0, %arg1 : tensor<2x20xf16>, tensor<20x30xf16>)
-        outs(%arg2 : tensor<2x30xf16>) -> tensor<2x30xf16>
-    return %0 : tensor<2x30xf16>
-}
-
-// CHECK-NOT:  tensor.pad
-
-// -----
-
-// We want to skip padding skinny matmul cases, since warpReduction is more performant for it.
-
-#rocm_executable_target = #hal.executable.target<"rocm", "rocm-hsaco-fb",
-                                    {mma_intrinsics = [#iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>],
-                                      target_arch = "gfx1100", ukernels = "none"}>
-
-//       CHECK: func.func @skip_skinny_n_mmtb(
-//  CHECK-SAME:    %[[ARG0:.+]]: tensor<10x20xf16>,
-//  CHECK-SAME:    %[[ARG1:.+]]: tensor<4x20xf16>,
-//  CHECK-SAME:    %[[ARG2:.+]]: tensor<10x4xf16>)
-func.func @skip_skinny_n_mmtb(%arg0 : tensor<10x20xf16>, %arg1 : tensor<4x20xf16>, %arg2 : tensor<10x4xf16>) -> tensor<10x4xf16>
-    attributes {hal.device.targets = [#hal.device.target<"rocm", [#rocm_executable_target]>]} {
-    %0 = linalg.matmul_transpose_b ins(%arg0, %arg1 : tensor<10x20xf16>, tensor<4x20xf16>)
-        outs(%arg2 : tensor<10x4xf16>) -> tensor<10x4xf16>
-    return %0 : tensor<10x4xf16>
-}
-
-// CHECK-NOT:  tensor.pad

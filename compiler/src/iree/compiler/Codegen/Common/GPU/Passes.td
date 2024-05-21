@@ -58,7 +58,10 @@ def GPUGeneralizeNamedOpsPass :
 def GPULowerToUKernelsPass :
     Pass<"iree-codegen-gpu-lower-to-ukernels", ""> {
   let summary = "Separate out parts of the IR that lower to a micro-kernel";
-  let dependentDialects = ["::mlir::iree_compiler::IREE::Codegen::IREECodegenDialect"];
+  let dependentDialects = [
+    "::mlir::iree_compiler::IREE::Codegen::IREECodegenDialect",
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
+  ];
 }
 
 def GPUMultiBufferingPass :

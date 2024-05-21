@@ -1,10 +1,8 @@
-// RUN: iree-opt --split-input-file --iree-hal-transformation-pipeline %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-hal-transformation-pipeline --iree-gpu-test-target=gfx90a %s | FileCheck %s
 
 module attributes {
   hal.device.targets = [
-    #hal.device.target<"rocm", [
-      #hal.executable.target<"rocm", "rocm-hsaco-fb">
-    ]>
+    #hal.device.target<"rocm", [#hal.executable.target<"rocm", "rocm-hsaco-fb">]>
   ]
 } {
 
@@ -46,9 +44,7 @@ stream.executable public @add_dispatch_0 {
 #loc = loc(unknown)
 module attributes {
   hal.device.targets = [
-    #hal.device.target<"rocm", [
-      #hal.executable.target<"rocm", "rocm-hsaco-fb">
-    ]>
+    #hal.device.target<"rocm", [#hal.executable.target<"rocm", "rocm-hsaco-fb">]>
   ]
 } {
 

@@ -28,8 +28,40 @@ def IREEGPU_IteratorTypeArrayAttr
                          "Iterator type should be an enum.">;
 
 //===----------------------------------------------------------------------===//
-// Base MMA Vector Layout Attributes
+// GPU Workgroup Processor (WGP) Level Feature/Limit Attributes
 //===----------------------------------------------------------------------===//
+
+// This section lists hardware features/limits at a single GPU workgroup
+// processor level. Here a GPU workgroup processor means the basic hardware
+// functionality unit where a software workgroup is scheduled onto; that is,
+// a compute unit for AMD GPUs or a streaming multiprocessor for NVIDIA GPUs.
+
+def IREEGPU_ComputeBitwidthsAttr : EnumAttr<
+  IREEGPU_Dialect, IREEGPU_ComputeBitwidths, "compute_bitwidths"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+  let assemblyFormat = "$value";
+}
+
+def IREEGPU_StorageBitwidthsAttr : EnumAttr<
+  IREEGPU_Dialect, IREEGPU_StorageBitwidths, "storage_bitwidths"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+  let assemblyFormat = "$value";
+}
+
+def IREEGPU_SubgroupOpsAttr : EnumAttr<
+  IREEGPU_Dialect, IREEGPU_SubgroupOps, "subgroup_ops"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+  let assemblyFormat = "$value";
+}
+
+def IREEGPU_DotProductOpsAttr : EnumAttr<
+  IREEGPU_Dialect, IREEGPU_DotProductOps, "dotproduct_ops"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+  let assemblyFormat = "$value";
+}
+
+//===----------------------------------------------------------------------===//
+// Base MMA vector layout
 
 class IREEGPU_MmaVectorLayoutAttr<string attrname, string mmaintrinsic> :
     AttrDef<IREEGPU_Dialect, attrname, [
@@ -79,8 +111,7 @@ class IREEGPU_MmaVectorLayoutAttr<string attrname, string mmaintrinsic> :
 }
 
 //===----------------------------------------------------------------------===//
-// MMA Attributes
-//===----------------------------------------------------------------------===//
+// MMA intrinsic
 
 class IREEGPU_MmaEnumAttr<EnumAttrInfo enumInfo, string name = "">
   : EnumAttr<IREEGPU_Dialect, enumInfo, name>;
@@ -145,9 +176,13 @@ def IREEGPU_MMAAttr : IREEGPU_MmaVectorLayoutAttr<"MMA", "MMAIntrinsicAttr"> {
   }];
 }
 
+def IREEGPU_MMAOpsArrayAttr : ArrayOfAttr<
+  IREEGPU_Dialect, "MMAOpsArray", "mma_ops", "MMAAttr"> {
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+}
+
 //===----------------------------------------------------------------------===//
-// MMA schedule Attributes
-//===----------------------------------------------------------------------===//
+// MMA schedule
 
 def IREEGPU_MmaScheduleAttr : AttrDef<IREEGPU_Dialect, "MMASchedule"> {
   let mnemonic = "mma_schedule";
@@ -176,7 +211,130 @@ def IREEGPU_MmaScheduleAttr : AttrDef<IREEGPU_Dialect, "MMASchedule"> {
 }
 
 //===----------------------------------------------------------------------===//
-// Lane ID
+// Workgroup processor level description
+
+def IREEGPU_TargetWgpAttr : AttrDef<IREEGPU_Dialect, "TargetWgp"> {
+  let summary = "Workgroup processor level target description";
+  let description = [{
+    This attribute contains hardware features/limits at a single GPU workgroup
+    processor (WGP) level. Here a GPU workgroup processor means the basic
+    hardware functionality unit where a software workgroup is scheduled onto;
+    that is, a compute unit for AMD GPUs or a streaming multiprocessor for
+    NVIDIA GPUs.
+  }];
+
+  let mnemonic = "target_wgp";
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+
+  let parameters = (ins
+    // Features
+    "ComputeBitwidthsAttr":$compute,
+    "StorageBitwidthsAttr":$storage,
+    "SubgroupOpsAttr":$subgroup,
+    "DotProductOpsAttr":$dot,
+    "MMAOpsArrayAttr":$mma,
+
+    // Limits
+    // Supported subgroup size choices.
+    "DenseI32ArrayAttr":$subgroup_size_choices,
+    // The maximal number of threads per X/Y/Z dimension in one workgroup.
+    "DenseI32ArrayAttr":$max_workgroup_sizes,
+    // The maximal number of threads we can have in one workgroup.
+    "uint32_t":$max_thread_count_per_workgroup,
+    // The maximal number of shared memory bytes we can allocate per workgroup.
+    "uint32_t":$max_workgroup_memory_bytes,
+
+    // An optional extra dict
+    // This field allows to inject more features/limits not supported in the
+    // above list for better flexibility.
+    OptionalParameter<"DictionaryAttr">:$extra
+  );
+
+  let assemblyFormat = "`<` struct(params) `>`";
+}
+
+//===----------------------------------------------------------------------===//
+// GPU Chip Level Feature/Limit Attributes
+//===----------------------------------------------------------------------===//
+
+// This section lists hardware features/limits at a single GPU chip level.
+// Here a GPU chip means the hardware functionality scope where the whole
+// software compute grid is scheduled onto. A chip typically contains many
+// AMD compute units or NVIDIA streaming multiprocessors; it's the final SKU.
+
+def IREEGPU_TargetChipAttr : AttrDef<IREEGPU_Dialect, "TargetChip"> {
+  let summary = "Chip level target description";
+  let description = [{
+    This attribute contains hardware features/limits at a single GPU chip level.
+    Here a GPU chip means the hardware functionality scope where the whole
+    software compute grid is scheduled onto. A chip typically contains many
+    AMD compute units or NVIDIA streaming multiprocessors; it's the final SKU.
+  }];
+
+  let mnemonic = "target_chip";
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+
+  let parameters = (ins
+    "uint32_t":$wgp_count,
+
+    // An optional extra dict
+    // This field allows to inject more features/limits not supported in the
+    // above list for better flexibility.
+    OptionalParameter<"DictionaryAttr">:$extra
+  );
+
+  let assemblyFormat = "`<` struct(params) `>`";
+}
+
+//===----------------------------------------------------------------------===//
+// GPU Target Attributes
+//===----------------------------------------------------------------------===//
+
+def IREEGPU_TargetAttr : AttrDef<IREEGPU_Dialect, "Target"> {
+  let summary = "Full GPU target attribute";
+  let description = [{
+    This attributes describes a full GPU target. It contains a few fields:
+    * The canonical target architecture for compilation, e.g., sm_80 for
+      cuda, gfx942 for hip
+    * A TargetWgpAttr describing the GPU features and limits in a single
+      GPU workgroup processor (WGP), that is, AMD compute unit or NVIDIA
+      streaming multiprocessor
+    * An optional TargetChipAttr describing GPU features for the final chip
+      or product, e.g., wgp count
+  }];
+
+  let mnemonic = "target";
+  let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
+
+  let parameters = (ins
+    StringRefParameter<"target architecture">:$arch,
+    "TargetWgpAttr":$wgp,
+    OptionalParameter<"TargetChipAttr">:$chip
+  );
+
+  let assemblyFormat = "`<` struct(params) `>`";
+
+  let extraClassDeclaration = [{
+    int getPreferredSubgroupSize() const {
+      return getWgp().getSubgroupSizeChoices().asArrayRef().front();
+    }
+
+    bool supportsSubgroupShuffle() const {
+      return bitEnumContainsAll(getWgp().getSubgroup().getValue(),
+                                SubgroupOps::Shuffle);
+    }
+
+    std::optional<int> getCUDAComputeCapability() const;
+    // Returns true if this target supports TensoreCore MMA ops with TF32
+    // input types.
+    bool supportsTF32InputMMAOps() const;
+    // Returns true if this target supports TensorCore synchronized MMA ops.
+    bool supportsSyncMMAOps() const;
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// GPU Lane ID
 //===----------------------------------------------------------------------===//
 
 def IREEGPU_LaneIdAttr : AttrDef<IREEGPU_Dialect, "LaneId", [

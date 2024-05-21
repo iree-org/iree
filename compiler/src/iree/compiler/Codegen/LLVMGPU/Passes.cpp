@@ -12,12 +12,12 @@
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
-#include "iree/compiler/Codegen/LLVMGPU/KernelConfig.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/ROCDLPasses.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
 #include "llvm/ADT/STLForwardCompat.h"
@@ -848,9 +848,9 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
   // Run checks on shared memory usage.
   funcPassManager
       .addPass([&]() {
-        // TODO: query this from the target.
         auto getSharedMemoryLimit = [](mlir::FunctionOpInterface entryPoint) {
-          return getTargetSharedMemoryLimitInBytes(entryPoint);
+          IREE::GPU::TargetAttr target = getGPUTargetAttr(entryPoint);
+          return target.getWgp().getMaxWorkgroupMemoryBytes();
         };
         auto getIndexBitwidth = [](mlir::FunctionOpInterface) { return 64; };
         return createGPUCheckResourceUsagePass(getSharedMemoryLimit,
@@ -889,9 +889,6 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
     modulePassManager.addPass(createConvertToNVVMPass());
   }
 }
-
-extern llvm::cl::opt<std::string> clGPUCodegenTransformDialectDebugPayloadTag;
-extern llvm::cl::opt<std::string> clGPUCodegenTransformDialectDebugTransformTag;
 
 void addGPUTransformDialectPasses(OpPassManager &funcPassManager,
                                   StringRef entryPoint) {

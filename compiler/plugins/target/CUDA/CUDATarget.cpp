@@ -6,7 +6,9 @@
 
 #include "./SetBlockIdsRangePass.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/HAL/Utils/LLVMLinkerUtils.h"
 #include "iree/compiler/PluginAPI/Client.h"
@@ -219,6 +221,7 @@ static FailureOr<std::string> compileWithPtxas(StringRef ptxasCompiler,
 // for some reason return and pack the generated PtxImage code in the
 // executable, let the runtime compile.
 static std::string produceGpuImage(const CUDAOptions &options,
+                                   StringRef targetArch,
                                    std::string &ptxImage) {
   if (!options.clUsePtxas)
     return ptxImage;
@@ -228,7 +231,7 @@ static std::string produceGpuImage(const CUDAOptions &options,
 
   if (succeeded(ptxasCompiler)) {
     FailureOr<std::string> maybeCubinImage =
-        compileWithPtxas(ptxasCompiler.value(), options.clTargetChip,
+        compileWithPtxas(ptxasCompiler.value(), targetArch,
                          options.clUsePtxasParams, ptxImage, &message);
     if (succeeded(maybeCubinImage))
       return maybeCubinImage.value();
@@ -422,7 +425,8 @@ public:
       configItems.emplace_back(b.getStringAttr(name), value);
     };
 
-    addConfig("target_arch", b.getStringAttr(options.clTargetChip));
+    if (auto target = GPU::getCUDATargetDetails(options.clTargetChip, context))
+      addConfig("iree.gpu.target", target);
 
     return b.getAttr<IREE::HAL::ExecutableTargetAttr>(
         b.getStringAttr("cuda"), b.getStringAttr("cuda-nvptx-fb"),
@@ -454,6 +458,11 @@ public:
   LogicalResult serializeExecutable(const SerializationOptions &serOptions,
                                     IREE::HAL::ExecutableVariantOp variantOp,
                                     OpBuilder &executableBuilder) override {
+    auto targetAttr = variantOp.getTargetAttr();
+    StringRef targetArch = options.clTargetChip;
+    if (auto attr = getGPUTargetAttr(targetAttr))
+      targetArch = attr.getArch();
+
     // Perform the translation in a separate context to avoid any
     // multi-threading issues.
     llvm::LLVMContext context;
@@ -575,7 +584,6 @@ public:
       std::unique_ptr<llvm::TargetMachine> targetMachine;
       {
         llvm::Triple triple("nvptx64-nvidia-cuda");
-        std::string targetChip = options.clTargetChip;
         std::string features = options.clTargetFeature;
         std::string error;
         const llvm::Target *target =
@@ -584,7 +592,7 @@ public:
           return variantOp.emitError() << "cannot initialize target triple";
         }
         targetMachine.reset(target->createTargetMachine(
-            triple.str(), targetChip, features, {}, {}));
+            triple.str(), targetArch, features, {}, {}));
         if (targetMachine == nullptr) {
           return variantOp.emitError() << "cannot initialize target machine";
         }
@@ -640,7 +648,7 @@ public:
                      variantOp.getName(), ".ptx", ptxImage);
     }
 
-    std::string gpuImage = produceGpuImage(options, ptxImage);
+    std::string gpuImage = produceGpuImage(options, targetArch, ptxImage);
     auto gpuImageRef =
         flatbuffers_string_create(builder, gpuImage.c_str(), gpuImage.size());
     iree_hal_cuda_BlockSizeDef_vec_start(builder);

@@ -7,14 +7,9 @@
 #ifndef IREE_COMPILER_CODEGEN_LLVMGPU_KERNELCONFIG_H_
 #define IREE_COMPILER_CODEGEN_LLVMGPU_KERNELCONFIG_H_
 
-#include "mlir/IR/BuiltinOps.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 
 namespace mlir::iree_compiler {
-
-// TODO: Ideally, we should be setting the resource limits as an attribute in
-// the lowering configuration.
-int64_t getTargetSharedMemoryLimitInBytes(FunctionOpInterface entryPoint);
 
 LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp);
 

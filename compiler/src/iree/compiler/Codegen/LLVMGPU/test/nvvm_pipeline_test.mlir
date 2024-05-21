@@ -1,4 +1,5 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-llvmgpu-configuration-pipeline), iree-codegen-linalg-to-nvvm-pipeline)))" -iree-codegen-llvmgpu-use-wmma %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=sm_60 --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-llvmgpu-configuration-pipeline), iree-codegen-linalg-to-nvvm-pipeline)))" -iree-codegen-llvmgpu-use-wmma %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=sm_80 --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-codegen-llvmgpu-configuration-pipeline), iree-codegen-linalg-to-nvvm-pipeline)))" -iree-codegen-llvmgpu-use-wmma %s | FileCheck %s --check-prefix=SM80
 
 // Verify that a simple element wise op gets lowered succefully all the way to
 // nvvm/llvm dialect.
@@ -413,7 +414,7 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
   ]>
 ]>
 hal.executable @mma_fused {
-  hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>) {
+  hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb">) {
   hal.executable.export public @_large_aligned_dispatch_0 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>, #hal.descriptor_set.binding<1, storage_buffer>, #hal.descriptor_set.binding<2, storage_buffer>]>]>) {
   ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
     %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
@@ -456,33 +457,33 @@ hal.executable @mma_fused {
 }
 
 // case with larger pipeline depth
-//     CHECK-LABEL: hal.executable public @mma_fused
-//           CHECK:   hal.executable.variant public @cuda
-//       CHECK-NOT:   llvm.store
-//   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
-//           CHECK:   nvvm.cp.async.commit.group
-//   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
-//           CHECK:   nvvm.cp.async.commit.group
-//   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
-//           CHECK:   nvvm.cp.async.commit.group
-//   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
-//           CHECK:   nvvm.cp.async.commit.group
-//           CHECK:   llvm.br
-//           CHECK:   nvvm.cp.async.wait.group 3
-//   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<3>) -> !llvm.struct<(i32, i32, i32, i32)
-//   CHECK-COUNT-2:   nvvm.wmma.mma
-//   CHECK-COUNT-2:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<3>, !llvm.ptr<1>, i32, i32) -> ()
-//           CHECK:   nvvm.cp.async.commit.group
-//           CHECK:   llvm.br
-//       CHECK-NOT:   nvvm.wmma.mma
-//   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<3>, f32, f32, f32, f32, f32, f32, f32, f32
-//           CHECK:   vvm.barrier0
-//           CHECK:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<4xf32>
-//           CHECK:   llvm.fadd {{.*}} : vector<4xf32>
-//           CHECK:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr<1>
-//           CHECK:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<4xf32>
-//           CHECK:   llvm.fadd {{.*}} : vector<4xf32>
-//           CHECK:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr<1>
+//     SM80-LABEL: hal.executable public @mma_fused
+//           SM80:   hal.executable.variant public @cuda
+//       SM80-NOT:   llvm.store
+//   SM80-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           SM80:   nvvm.cp.async.commit.group
+//   SM80-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           SM80:   nvvm.cp.async.commit.group
+//   SM80-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           SM80:   nvvm.cp.async.commit.group
+//   SM80-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           SM80:   nvvm.cp.async.commit.group
+//           SM80:   llvm.br
+//           SM80:   nvvm.cp.async.wait.group 3
+//   SM80-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<3>) -> !llvm.struct<(i32, i32, i32, i32)
+//   SM80-COUNT-2:   nvvm.wmma.mma
+//   SM80-COUNT-2:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<3>, !llvm.ptr<1>, i32, i32) -> ()
+//           SM80:   nvvm.cp.async.commit.group
+//           SM80:   llvm.br
+//       SM80-NOT:   nvvm.wmma.mma
+//   SM80-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<3>, f32, f32, f32, f32, f32, f32, f32, f32
+//           SM80:   vvm.barrier0
+//           SM80:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<4xf32>
+//           SM80:   llvm.fadd {{.*}} : vector<4xf32>
+//           SM80:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr<1>
+//           SM80:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<4xf32>
+//           SM80:   llvm.fadd {{.*}} : vector<4xf32>
+//           SM80:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr<1>
 
 
 
@@ -496,7 +497,7 @@ hal.executable @mma_fused {
   ]>
 ]>
 hal.executable @mma_fused_fp16 {
-  hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>) {
+  hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb">) {
   hal.executable.export public @_large_aligned_dispatch_0 ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [#hal.descriptor_set.layout<0, bindings = [#hal.descriptor_set.binding<0, storage_buffer>, #hal.descriptor_set.binding<1, storage_buffer>, #hal.descriptor_set.binding<2, storage_buffer>]>]>) {
   ^bb0(%arg0: !hal.device, %arg1: index, %arg2 : index):
     %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2
@@ -539,31 +540,31 @@ hal.executable @mma_fused_fp16 {
 }
 
 // case with larger pipeline depth
-//     CHECK-LABEL: hal.executable public @mma_fused_fp16
-//           CHECK:   hal.executable.variant public @cuda
-//       CHECK-NOT:   llvm.store
-//   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
-//           CHECK:   nvvm.cp.async.commit.group
-//   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
-//           CHECK:   nvvm.cp.async.commit.group
-//   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
-//           CHECK:   nvvm.cp.async.commit.group
-//   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
-//           CHECK:   nvvm.cp.async.commit.group
-//           CHECK:   llvm.br
-//           CHECK:   nvvm.cp.async.wait.group 3
-//   CHECK-COUNT-2:   nvvm.wmma.load{{.*}} : (!llvm.ptr<3>) -> !llvm.struct<(vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>)
-//   CHECK-COUNT-1:   nvvm.wmma.mma
-//   CHECK-COUNT-2:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<3>, !llvm.ptr<1>, i32, i32) -> ()
-//           CHECK:   nvvm.cp.async.commit.group
-//           CHECK:   llvm.br
-//       CHECK-NOT:   nvvm.wmma.mma
-//   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<3>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>
-//           CHECK:   vvm.barrier0
-//           CHECK:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<8xf16>
-//           CHECK:   llvm.fadd {{.*}} : vector<8xf16>
-//           CHECK:   llvm.store {{.*}} : vector<8xf16>, !llvm.ptr<1>
-//           CHECK:   vvm.barrier0
+//     SM80-LABEL: hal.executable public @mma_fused_fp16
+//           SM80:   hal.executable.variant public @cuda
+//       SM80-NOT:   llvm.store
+//   SM80-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           SM80:   nvvm.cp.async.commit.group
+//   SM80-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           SM80:   nvvm.cp.async.commit.group
+//   SM80-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           SM80:   nvvm.cp.async.commit.group
+//   SM80-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           SM80:   nvvm.cp.async.commit.group
+//           SM80:   llvm.br
+//           SM80:   nvvm.cp.async.wait.group 3
+//   SM80-COUNT-2:   nvvm.wmma.load{{.*}} : (!llvm.ptr<3>) -> !llvm.struct<(vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>)
+//   SM80-COUNT-1:   nvvm.wmma.mma
+//   SM80-COUNT-2:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<3>, !llvm.ptr<1>, i32, i32) -> ()
+//           SM80:   nvvm.cp.async.commit.group
+//           SM80:   llvm.br
+//       SM80-NOT:   nvvm.wmma.mma
+//   SM80-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<3>, vector<2xf16>, vector<2xf16>, vector<2xf16>, vector<2xf16>
+//           SM80:   vvm.barrier0
+//           SM80:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<8xf16>
+//           SM80:   llvm.fadd {{.*}} : vector<8xf16>
+//           SM80:   llvm.store {{.*}} : vector<8xf16>, !llvm.ptr<1>
+//           SM80:   vvm.barrier0
 
 // -----
 
@@ -574,7 +575,7 @@ hal.executable @mma_fused_fp16 {
     #hal.descriptor_set.binding<2, storage_buffer>
   ]>
 ]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #map0 = affine_map<()[s0, s1] -> (s0 * s1)>
 #map1 = affine_map<(d0)[s0] -> (s0, -d0 + 4)>
 #map2 = affine_map<(d0)[s0] -> (s0, -d0 + 32)>
@@ -619,31 +620,31 @@ hal.executable @mma_fused_fp16 {
   }
 
 // case with larger pipeline depth
-//     CHECK-LABEL: hal.executable public @large_dot_general_dispatch_0
-//           CHECK:   hal.executable.variant public @cuda
-//       CHECK-NOT:   llvm.store
-//   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
-//           CHECK:   nvvm.cp.async.commit.group
-//   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
-//           CHECK:   nvvm.cp.async.commit.group
-//   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
-//           CHECK:   nvvm.cp.async.commit.group
-//   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
-//           CHECK:   nvvm.cp.async.commit.group
-//           CHECK:   llvm.br
-//           CHECK:   nvvm.cp.async.wait.group 3
-//   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<3>) -> !llvm.struct<(i32, i32, i32, i32)
-//   CHECK-COUNT-2:   nvvm.wmma.mma
-//   CHECK-COUNT-2:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<3>, !llvm.ptr<1>, i32, i32) -> ()
-//           CHECK:   nvvm.cp.async.commit.group
-//           CHECK:   llvm.br
-//       CHECK-NOT:   nvvm.wmma.mma
-//   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<3>, f32, f32, f32, f32, f32, f32, f32, f32
-//           CHECK:   vvm.barrier0
-//           CHECK:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<4xf32>
-//           CHECK:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr<1>
-//           CHECK:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<4xf32>
-//           CHECK:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr<1>
+//     SM80-LABEL: hal.executable public @large_dot_general_dispatch_0
+//           SM80:   hal.executable.variant public @cuda
+//       SM80-NOT:   llvm.store
+//   SM80-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           SM80:   nvvm.cp.async.commit.group
+//   SM80-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           SM80:   nvvm.cp.async.commit.group
+//   SM80-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           SM80:   nvvm.cp.async.commit.group
+//   SM80-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           SM80:   nvvm.cp.async.commit.group
+//           SM80:   llvm.br
+//           SM80:   nvvm.cp.async.wait.group 3
+//   SM80-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<3>) -> !llvm.struct<(i32, i32, i32, i32)
+//   SM80-COUNT-2:   nvvm.wmma.mma
+//   SM80-COUNT-2:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<3>, !llvm.ptr<1>, i32, i32) -> ()
+//           SM80:   nvvm.cp.async.commit.group
+//           SM80:   llvm.br
+//       SM80-NOT:   nvvm.wmma.mma
+//   SM80-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<3>, f32, f32, f32, f32, f32, f32, f32, f32
+//           SM80:   vvm.barrier0
+//           SM80:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<4xf32>
+//           SM80:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr<1>
+//           SM80:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<4xf32>
+//           SM80:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr<1>
 
 // -----
 
@@ -654,7 +655,7 @@ hal.executable @mma_fused_fp16 {
     #hal.descriptor_set.binding<2, storage_buffer>
   ]>
 ]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #map0 = affine_map<(d0, d1, d2, d3) -> (d1, d0, d3)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
@@ -695,25 +696,25 @@ hal.executable @mma_fused_fp16 {
       }
     }
   }
-//     CHECK-LABEL: hal.executable public @split_k_gemm
-//           CHECK:   hal.executable.variant public @cuda
-//       CHECK-NOT:   llvm.store
-//   CHECK-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
-//           CHECK:   nvvm.cp.async.commit.group
-//           CHECK:   llvm.br
-//           CHECK:   nvvm.cp.async.wait.group 3
-//   CHECK-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<3>) -> !llvm.struct<(i32, i32, i32, i32)
-//   CHECK-COUNT-2:   nvvm.wmma.mma
-//           CHECK:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<3>, !llvm.ptr<1>, i32, i32) -> ()
-//           CHECK:   nvvm.cp.async.commit.group
-//           CHECK:   llvm.br
-//       CHECK-NOT:   nvvm.wmma.mma
-//   CHECK-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<3>, f32, f32, f32, f32, f32, f32, f32, f32
-//           CHECK:   vvm.barrier0
-//           CHECK:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<4xf32>
-//           CHECK:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr<1>
-//           CHECK:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<4xf32>
-//           CHECK:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr<1>
+//     SM80-LABEL: hal.executable public @split_k_gemm
+//           SM80:   hal.executable.variant public @cuda
+//       SM80-NOT:   llvm.store
+//   SM80-COUNT-2:   nvvm.cp.async.shared.global {{.*}}, {{.*}}, 16
+//           SM80:   nvvm.cp.async.commit.group
+//           SM80:   llvm.br
+//           SM80:   nvvm.cp.async.wait.group 3
+//   SM80-COUNT-4:   nvvm.wmma.load{{.*}} : (!llvm.ptr<3>) -> !llvm.struct<(i32, i32, i32, i32)
+//   SM80-COUNT-2:   nvvm.wmma.mma
+//           SM80:   llvm.inline_asm has_side_effects asm_dialect = att "cp.async.cg.shared.global [$0], [$1], $2, $3;\0A", "r,l,n,r" {{.*}}, {{.*}}, {{.*}}, {{.*}} : (!llvm.ptr<3>, !llvm.ptr<1>, i32, i32) -> ()
+//           SM80:   nvvm.cp.async.commit.group
+//           SM80:   llvm.br
+//       SM80-NOT:   nvvm.wmma.mma
+//   SM80-COUNT-1:   nvvm.wmma.store {{.*}} : !llvm.ptr<3>, f32, f32, f32, f32, f32, f32, f32, f32
+//           SM80:   vvm.barrier0
+//           SM80:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<4xf32>
+//           SM80:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr<1>
+//           SM80:   llvm.load {{.*}} : !llvm.ptr<3> -> vector<4xf32>
+//           SM80:   llvm.store {{.*}} : vector<4xf32>, !llvm.ptr<1>
 
 // -----
 
@@ -724,7 +725,7 @@ hal.executable @mma_fused_fp16 {
     #hal.descriptor_set.binding<2, storage_buffer>
   ]>
 ]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
   hal.executable public @pooling_dynamic {
     hal.executable.variant public @cuda_nvptx_fb target(#executable_target_cuda_nvptx_fb) {
       hal.executable.export public @pooling_dynamic ordinal(0) layout(#pipeline_layout) {
@@ -754,8 +755,8 @@ hal.executable @mma_fused_fp16 {
   }
 
 // Just check that compilation succeed.
-//     CHECK-LABEL: hal.executable public @pooling_dynamic
-//           CHECK:   hal.executable.variant public @cuda
+//     SM80-LABEL: hal.executable public @pooling_dynamic
+//           SM80:   hal.executable.variant public @cuda
 
 // -----
 
@@ -885,7 +886,7 @@ hal.executable.variant @cuda target(<"cuda", "cuda-nvptx-fb">) {
   ]>
 ]>
 hal.executable private @shared_mem_alloc {
-  hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb", {target_arch = "sm_60"}>) {
+  hal.executable.variant public @cuda_nvptx_fb target(<"cuda", "cuda-nvptx-fb">) {
     hal.executable.export public @shared_mem_alloc ordinal(0) layout(#hal.pipeline.layout<push_constants = 0, sets = [<0, bindings = [<0, storage_buffer>, <1, storage_buffer>]>]>) {
     ^bb0(%arg0: !hal.device, %arg1: index, %arg2: index, %arg3: index, %arg4: index, %arg5: index):
       %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg1, %arg2, %arg3, %arg4, %arg5
@@ -926,7 +927,7 @@ hal.executable private @shared_mem_alloc {
 
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[32,32]]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
+#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -962,9 +963,9 @@ hal.executable private @shared_mem_transpose  {
 
 // Check that bufferization is emitting correct code for the temp shared
 // memory alloc.
-//   CHECK-LABEL: hal.executable private @shared_mem_transpose
-//         CHECK:   hal.executable.variant public @cuda
-//         CHECK:     nvvm.barrier0
-//         CHECK:     llvm.load %{{.*}} {alignment = 4 : i64} : !llvm.ptr<1> -> vector<4xf32>
-//         CHECK:     llvm.store %{{.*}}, %{{.*}} {alignment = 4 : i64} : vector<4xf32>, !llvm.ptr<3>
-//         CHECK:     nvvm.barrier0
+//   SM80-LABEL: hal.executable private @shared_mem_transpose
+//         SM80:   hal.executable.variant public @cuda
+//         SM80:     nvvm.barrier0
+//         SM80:     llvm.load %{{.*}} {alignment = 4 : i64} : !llvm.ptr<1> -> vector<4xf32>
+//         SM80:     llvm.store %{{.*}}, %{{.*}} {alignment = 4 : i64} : vector<4xf32>, !llvm.ptr<3>
+//         SM80:     nvvm.barrier0

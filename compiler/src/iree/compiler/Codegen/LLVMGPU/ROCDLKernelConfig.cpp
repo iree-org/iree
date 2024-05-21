@@ -7,10 +7,11 @@
 #include "iree/compiler/Codegen/LLVMGPU/ROCDLKernelConfig.h"
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
-#include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Analysis/SliceAnalysis.h"
@@ -23,51 +24,6 @@ namespace mlir::iree_compiler {
 namespace {
 
 using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
-
-//===----------------------------------------------------------------------===//
-// Target Information
-//===----------------------------------------------------------------------===//
-
-struct TargetInfo {
-  bool hasWarpShuffle = false;
-  // These are listed in the order of preference, not necessarily monotonically.
-  SmallVector<int64_t, 2> supportedSubgroupSizes = {32};
-};
-
-static StringRef getTargetArch(mlir::FunctionOpInterface entryPoint) {
-  if (auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPoint)) {
-    if (auto config = targetAttr.getConfiguration()) {
-      if (auto attr = config.getAs<StringAttr>("target_arch")) {
-        return attr.getValue();
-      }
-    }
-  }
-  return "";
-}
-
-static TargetInfo getRocmTargetInfo(mlir::FunctionOpInterface entryPoint) {
-  TargetInfo info;
-  StringRef targetName = getTargetArch(entryPoint);
-  // If no target name is set assume all the features are off.
-  if (targetName.empty())
-    return info;
-
-  if (!targetName.starts_with("gfx")) {
-    entryPoint.emitError("unknown target name ") << targetName;
-    return info;
-  }
-
-  // Assumes all gfx versions have warp shuffle.
-  info.hasWarpShuffle = true;
-
-  // RDNA supports wave32 and wave64, GCN and CDNA only wave64.
-  if (targetName.starts_with("gfx10") || targetName.starts_with("gfx11"))
-    info.supportedSubgroupSizes = {32, 64};
-  else
-    info.supportedSubgroupSizes = {64};
-
-  return info;
-}
 
 //===----------------------------------------------------------------------===//
 // Warp Reduction Configuration
@@ -105,9 +61,10 @@ static bool isMatvecLike(linalg::LinalgOp linalgOp) {
 }
 
 static LogicalResult
-setWarpReductionConfig(mlir::FunctionOpInterface entryPoint,
-                       linalg::LinalgOp op, const TargetInfo &targetInfo) {
-  if (!targetInfo.hasWarpShuffle)
+setWarpReductionConfig(IREE::GPU::TargetAttr target,
+                       mlir::FunctionOpInterface entryPoint,
+                       linalg::LinalgOp op) {
+  if (!target.supportsSubgroupShuffle())
     return failure();
 
   SmallVector<unsigned> parallelDims;
@@ -175,7 +132,7 @@ setWarpReductionConfig(mlir::FunctionOpInterface entryPoint,
   // get peak performance. For now, just use the warp size.
   if (numDynamicReductionDims) {
     SmallVector<int64_t> reductionTileSizes(op.getNumLoops(), 0);
-    int64_t preferredSubgroupSize = targetInfo.supportedSubgroupSizes.front();
+    int64_t preferredSubgroupSize = target.getPreferredSubgroupSize();
     reductionTileSizes[reductionDims[0]] = preferredSubgroupSize;
     TileSizesListType tileSizes;
     tileSizes.emplace_back(std::move(workgroupTileSizes)); // Workgroup level
@@ -193,13 +150,15 @@ setWarpReductionConfig(mlir::FunctionOpInterface entryPoint,
   for (int64_t dim : reductionDims)
     reductionSize *= bounds[dim];
 
-  auto selectedSubgroupSizeIt = llvm::find_if(
-      targetInfo.supportedSubgroupSizes, [reductionSize](int64_t subgroupSize) {
-        return reductionSize % subgroupSize == 0;
-      });
-  if (selectedSubgroupSizeIt == targetInfo.supportedSubgroupSizes.end())
+  int64_t subgroupSize = 0;
+  for (int s : target.getWgp().getSubgroupSizeChoices().asArrayRef()) {
+    if (reductionSize % s == 0) {
+      subgroupSize = s;
+      break;
+    }
+  }
+  if (subgroupSize == 0)
     return failure();
-  int64_t subgroupSize = *selectedSubgroupSizeIt;
 
   const Type elementType =
       cast<ShapedType>(op.getDpsInitOperand(0)->get().getType())
@@ -309,11 +268,11 @@ setWarpReductionConfig(mlir::FunctionOpInterface entryPoint,
 // Root Configuration
 //===----------------------------------------------------------------------===//
 
-static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
+static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
+                                   mlir::FunctionOpInterface entryPointFn,
                                    Operation *computeOp) {
-  TargetInfo targetInfo = getRocmTargetInfo(entryPointFn);
   if (auto linalgOp = dyn_cast<linalg::LinalgOp>(computeOp)) {
-    if (succeeded(setWarpReductionConfig(entryPointFn, linalgOp, targetInfo))) {
+    if (succeeded(setWarpReductionConfig(target, entryPointFn, linalgOp))) {
       return success();
     }
   }
@@ -339,6 +298,9 @@ static void propagateLoweringConfig(Operation *rootOp,
 //===----------------------------------------------------------------------===//
 
 LogicalResult initROCDLLaunchConfig(FunctionOpInterface funcOp) {
+  IREE::GPU::TargetAttr target = getGPUTargetAttr(funcOp);
+  if (!target)
+    return funcOp.emitError("missing GPU target in #hal.executable.target");
 
   // First check whether we already have workgroup count set--it's a
   // "contract" to indicate that we should bypass all tiling and
@@ -410,7 +372,7 @@ LogicalResult initROCDLLaunchConfig(FunctionOpInterface funcOp) {
     return success();
   }
 
-  if (failed(setRootConfig(funcOp, rootOp)))
+  if (failed(setRootConfig(target, funcOp, rootOp)))
     return failure();
 
   propagateLoweringConfig(rootOp, computeOps);

@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-codegen-llvmgpu-use-vector-distribution \
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx942 --iree-codegen-llvmgpu-use-vector-distribution \
 // RUN:   --iree-codegen-reorder-workgroups-strategy=transpose \
 // RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-llvmgpu-select-lowering-strategy, func.func(iree-llvmgpu-lower-executable-target)))))" %s | FileCheck %s
 
@@ -14,11 +14,7 @@
   ]>
 ]>
 hal.executable public @main_0_dispatch_0 {
-  hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb", {
-        mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>],
-        target_arch = "gfx942",
-        ukernels = "none"
-      }>) {
+  hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
     hal.executable.export public @main_0_dispatch_0_matmul_transpose_b_2048x10240x1280_f16xf16xf32 ordinal(0) layout(#pipeline_layout)
     attributes {hal.interface.bindings = [#hal.interface.binding<0, 0>, #hal.interface.binding<0, 1>, #hal.interface.binding<0, 2>]} {
     ^bb0(%arg0: !hal.device):
@@ -83,11 +79,7 @@ hal.executable public @main_0_dispatch_0 {
   ]>
 ]>
 hal.executable public @main_0_dispatch_0 {
-  hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb", {
-        mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>],
-        target_arch = "gfx942",
-        ukernels = "none"
-      }>) {
+  hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
     hal.executable.export public @main_0_dispatch_0_matmul_transpose_b_2048x10240x1280_f16xf16xf32 ordinal(0) layout(#pipeline_layout)
     attributes {hal.interface.bindings = [#hal.interface.binding<0, 0>, #hal.interface.binding<0, 1>, #hal.interface.binding<0, 2>]} {
     ^bb0(%arg0: !hal.device):

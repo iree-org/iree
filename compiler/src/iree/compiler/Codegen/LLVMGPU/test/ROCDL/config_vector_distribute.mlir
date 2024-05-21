@@ -1,5 +1,7 @@
-// RUN: iree-opt --split-input-file --iree-codegen-llvmgpu-use-vector-distribution \
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx940 --iree-codegen-llvmgpu-use-vector-distribution \
 // RUN:   --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx1100 --iree-codegen-llvmgpu-use-vector-distribution \
+// RUN:   --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" %s | FileCheck %s --check-prefix=WMMA
 
 // TODO: This test is still using the legacy LLVMGPU kernel config. This needs
 // to be migrated to the rocdl heuristics, but for now is just physically
@@ -11,12 +13,11 @@
 // CHECK-SAME:   intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
 // CHECK-SAME:   subgroup_m_count = 1, subgroup_n_count = 4
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>], target_arch = "gfx940"}>
 #map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d4)>
 #map1 = affine_map<(d0, d1, d2, d3, d4) -> (d1, d3, d4)>
 #map2 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3)>
 module {
-  func.func @expanded_matmul_transpose_b() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
+  func.func @expanded_matmul_transpose_b() {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f16
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<2x64x2048xf16>>
@@ -48,9 +49,8 @@ module {
 // CHECK-SAME:   intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
 // CHECK-SAME:   subgroup_m_count = 2, subgroup_n_count = 2
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>], target_arch = "gfx940"}>
 module {
-  func.func @conv_nhwc() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
+  func.func @conv_nhwc() {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f32
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<2x258x514x768xf16>>
@@ -71,7 +71,13 @@ module {
 
 // -----
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {mma_intrinsics = [], target_arch = "gfx940"}>
+#target = #iree_gpu.target<arch = "gfx940", wgp = <
+  compute = fp64|fp32|fp16|int64|int32|int16|int8, storage = b64|b32|b16|b8,
+  subgroup = shuffle|arithmetic, dot = dp4xi8toi32,
+  mma = [],
+  subgroup_size_choices = [64], max_workgroup_sizes = [1024, 1024, 1024],
+  max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536>>
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {iree.gpu.target = #target}>
 module {
   func.func @matmul_256x256x256() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
     %cst = arith.constant 0.000000e+00 : f32
@@ -101,9 +107,8 @@ module {
 // CHECK-SAME:   intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
 // CHECK-SAME:   subgroup_m_count = 2, subgroup_n_count = 2
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>], target_arch = "gfx940"}>
 module {
-  func.func @mfma_matmul_1024x1024x1024() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
+  func.func @mfma_matmul_1024x1024x1024() {
     %cst = arith.constant 0.000000e+00 : f32
     %c0 = arith.constant 0 : index
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1024x1024xf16>>
@@ -131,13 +136,12 @@ module {
 // CHECK-SAME:   subgroup_m_count = 2, subgroup_n_count = 2
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[1, 1, 1, 32, 0, 1, 1, 1, 0]]>
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>], target_arch = "gfx940"}>
 #map = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d5, d2 + d6, d3 + d7, d8)>
 #map1 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d1, d5, d6, d7, d4, d8)>
 #map2 = affine_map<(d0, d1, d2, d3, d4, d5, d6, d7, d8) -> (d0, d1, d2, d3, d4)>
 #map3 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
 module {
-  func.func @conv_nchwc() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
+  func.func @conv_nchwc() {
     %cst = arith.constant 0.000000e+00 : f32
     %c0 = arith.constant 0 : index
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2x20x34x34x64xf16>>
@@ -171,15 +175,14 @@ module {
 
 // -----
 
-// CHECK:      #[[$TILE_SIZES:.+]] = #iree_codegen.lowering_config<tile_sizes =  {{\[}}[64, 128, 64]{{\]}}
-// CHECK:      #iree_codegen.translation_info<LLVMGPUVectorDistribute
-// CHECK-SAME: mma_schedule = #iree_gpu.mma_schedule
-// CHECK-SAME:   intrinsic = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>
-// CHECK-SAME:   subgroup_m_count = 2, subgroup_n_count = 2
+// WMMA:      #[[$TILE_SIZES:.+]] = #iree_codegen.lowering_config<tile_sizes =  {{\[}}[64, 128, 64]{{\]}}
+// WMMA:      #iree_codegen.translation_info<LLVMGPUVectorDistribute
+// WMMA-SAME: mma_schedule = #iree_gpu.mma_schedule
+// WMMA-SAME:   intrinsic = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>
+// WMMA-SAME:   subgroup_m_count = 2, subgroup_n_count = 2
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {mma_intrinsics = [#iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>], target_arch = "gfx1100"}>
 module {
-  func.func @wmma_matmul_1024x1024x1024() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
+  func.func @wmma_matmul_1024x1024x1024() {
     %cst = arith.constant 0.000000e+00 : f32
     %c0 = arith.constant 0 : index
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1024x1024xf16>>
@@ -195,8 +198,8 @@ module {
   }
 }
 
-// CHECK-LABEL: func.func @wmma_matmul_1024x1024x1024()
-// CHECK: linalg.matmul {{.*}}lowering_config = #[[$TILE_SIZES]]
+// WMMA-LABEL: func.func @wmma_matmul_1024x1024x1024()
+// WMMA: linalg.matmul {{.*}}lowering_config = #[[$TILE_SIZES]]
 
 // -----
 
@@ -206,9 +209,8 @@ module {
 // CHECK-SAME:   intrinsic =  #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
 // CHECK-SAME:   subgroup_m_count = 1, subgroup_n_count = 1
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>], target_arch = "gfx940"}>
 module {
-  func.func @unaligned_mk_batch_matmul() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
+  func.func @unaligned_mk_batch_matmul() {
     %cst = arith.constant 0.000000e+00 : f16
     %c0 = arith.constant 0 : index
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<64x968x1281xf16>>
@@ -235,9 +237,8 @@ module {
 // CHECK-SAME:   intrinsic =  #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
 // CHECK-SAME:   subgroup_m_count = 1, subgroup_n_count = 4
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>], target_arch = "gfx940"}>
 module {
-  func.func @unaligned_m_batch_matmul_64x72x1280x1280() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
+  func.func @unaligned_m_batch_matmul_64x72x1280x1280() {
     %cst = arith.constant 0.000000e+00 : f16
     %c0 = arith.constant 0 : index
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<64x72x1280xf16>>
@@ -258,9 +259,8 @@ module {
 
 // -----
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>], target_arch = "gfx940"}>
 module {
-  func.func @narrow_n_batch_matmul_64x968x4x320_f16() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
+  func.func @narrow_n_batch_matmul_64x968x4x320_f16() {
     %cst = arith.constant 0.000000e+00 : f16
     %c0 = arith.constant 0 : index
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<64x968x320xf16>>
@@ -281,9 +281,8 @@ module {
 
 // -----
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {mma_intrinsics = [#iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>], target_arch = "gfx940"}>
 module {
-  func.func @matmul_dynamic_dim() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
+  func.func @matmul_dynamic_dim() {
           %c0 = arith.constant 0 : index
           %c32_i64 = arith.constant 32 : i64
           %cst = arith.constant 0.000000e+00 : f32

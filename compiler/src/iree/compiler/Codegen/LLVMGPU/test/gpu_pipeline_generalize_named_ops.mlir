@@ -1,7 +1,7 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(iree-codegen-llvmgpu-configuration-pipeline)" \
+// RUN: iree-opt --pass-pipeline="builtin.module(iree-codegen-llvmgpu-configuration-pipeline)" --iree-gpu-test-target=gfx940 \
 // RUN:   --split-input-file %s | FileCheck %s
 
-// RUN: iree-opt --pass-pipeline="builtin.module(iree-codegen-rocdl-configuration-pipeline)" \
+// RUN: iree-opt --pass-pipeline="builtin.module(iree-codegen-rocdl-configuration-pipeline)" --iree-gpu-test-target=gfx940 \
 // RUN:   --split-input-file %s | FileCheck %s
 
 // Make sure that the GPU configuration pipelines generalize named ops, e.g., linalg.matmul_transpose_b to linalg.generic.
@@ -10,9 +10,8 @@
 // CHECK-NEXT: linalg.generic
 // CHECK-NOT:  linalg.matmul_transpose_b
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {target_arch = "gfx902"}>
 module {
-  func.func @warp_reduction_large_vector() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
+  func.func @warp_reduction_large_vector() {
     %cst = arith.constant 0.000000e+00 : f32
     %c128 = arith.constant 128 : index
     %c0 = arith.constant 0 : index

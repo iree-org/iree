@@ -4,15 +4,13 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/LLVMGPU/ROCDLKernelConfig.h"
 #include "iree/compiler/Codegen/LLVMGPU/ROCDLPassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/ROCDLPasses.h"
-#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
 #include "mlir/Pass/Pass.h"
-#include "mlir/Pass/PassManager.h"
 
 namespace mlir::iree_compiler {
 
@@ -22,11 +20,9 @@ class ROCDLSelectLoweringStrategyPass
     : public ROCDLSelectLoweringStrategyBase<ROCDLSelectLoweringStrategyPass> {
 public:
   void getDependentDialects(DialectRegistry &registry) const override {
-    // clang-format off
     registry
-        .insert<IREE::Codegen::IREECodegenDialect,
+        .insert<IREE::Codegen::IREECodegenDialect, IREE::GPU::IREEGPUDialect,
                 bufferization::BufferizationDialect>();
-    // clang-format on
   }
 
   void runOnOperation() override {
