@@ -91,12 +91,12 @@ getLoweringConfigCarryingOp(ArrayRef<Operation *> computeOps) {
 }
 
 /// Returns the lowering configuration from the list of operations; returns
-/// nullptr if unable to find.
+/// failure if no operations is carrying a lowering config.
 ///
 /// This scans ops in top-down order and the first one carrying the attribute
 /// will be returned.
 template <typename ConfigTy = IREE::Codegen::LoweringConfigAttrInterface>
-FailureOr<ConfigTy> getLoweringConfig(ArrayRef<Operation *> computeOps) {
+FailureOr<ConfigTy> getFirstLoweringConfig(ArrayRef<Operation *> computeOps) {
   FailureOr<Operation *> op = getLoweringConfigCarryingOp<ConfigTy>(computeOps);
   if (failed(op))
     return failure();

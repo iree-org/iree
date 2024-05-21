@@ -53,8 +53,8 @@ void LLVMCPUTilePass::runOnOperation() {
   auto funcOp = getOperation();
 
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
-  auto rootLoweringConfig =
-      getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(computeOps);
+  FailureOr<IREE::Codegen::LoweringConfigAttr> rootLoweringConfig =
+      getFirstLoweringConfig<IREE::Codegen::LoweringConfigAttr>(computeOps);
   if (failed(rootLoweringConfig)) {
     LLVM_DEBUG(llvm::dbgs() << "can't find lowering_config, skip tiling\n");
     return;

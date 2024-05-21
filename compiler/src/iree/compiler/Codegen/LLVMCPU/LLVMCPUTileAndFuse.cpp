@@ -250,8 +250,8 @@ void LLVMCPUTileAndFusePass::runOnOperation() {
     tileSizes = loweringConfig.getTileSizeVals(tilingLevel);
     tileScalableFlags = loweringConfig.getScalableTileFlagVals(tilingLevel);
   } else {
-    auto maybeLoweringConfig =
-        getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(
+    FailureOr<IREE::Codegen::LoweringConfigAttr> maybeLoweringConfig =
+        getFirstLoweringConfig<IREE::Codegen::LoweringConfigAttr>(
             getComputeOps(funcOp));
     if (failed(maybeLoweringConfig)) {
       LLVM_DEBUG(llvm::dbgs()
