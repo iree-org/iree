@@ -21,6 +21,7 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -286,21 +287,26 @@ public:
     SmallVector<ReassociationIndices> reassociations = {{0, 1, 2}, {3}, {4, 5}};
     Value collapsedWinogradInput = createCollapse(
         winogradInput, loc, rewriter, collapsedShape, reassociations);
-    SmallVector<int64_t> perm = {2, 0, 1};
-    Value permutedWinogradInput =
-        createTranspose(rewriter, collapsedWinogradInput, perm);
-    Value permutedWinogradFilter =
-        createTranspose(rewriter, collapsedWinogradFilter, perm);
 
-    // Add BatchMatmulOp
+    // Add batch matmul (generalized because batch dimension is innermost).
+    MLIRContext *context = rewriter.getContext();
+    AffineExpr bDim, mDim, nDim, kDim;
+    bindDims(context, bDim, mDim, nDim, kDim);
+    auto lhsMap = AffineMap::get(4, 0, {mDim, kDim, bDim}, context);
+    auto rhsMap = AffineMap::get(4, 0, {kDim, nDim, bDim}, context);
+    auto resultMap = AffineMap::get(4, 0, {mDim, nDim, bDim}, context);
+    auto parallel = utils::IteratorType::parallel;
+    auto reduction = utils::IteratorType::reduction;
+    SmallVector<utils::IteratorType> genericIterators = {parallel, parallel,
+                                                         parallel, reduction};
     SmallVector<int64_t> bmmShape = {
-        resultShape[4] * resultShape[5],
-        resultShape[0] * resultShape[1] * resultShape[2], resultShape[3]};
+        resultShape[0] * resultShape[1] * resultShape[2], resultShape[3],
+        resultShape[4] * resultShape[5]};
     SmallVector<int64_t> outputShape(outputType.getShape());
     if (isNchwFchw) {
       permute<IREE::LinalgExt::Permutation::NCHW_TO_NHWC>(outputShape);
     }
-    bmmShape[2] = outputShape[3];
+    bmmShape[1] = outputShape[3];
     auto bmmOutputType = RankedTensorType::get(bmmShape, outElemType);
     Value bmmInit =
         rewriter.create<tensor::EmptyOp>(loc, bmmShape, outElemType);
@@ -308,21 +314,33 @@ public:
         loc, rewriter.getZeroAttr(outElemType));
     auto fillOp = rewriter.create<linalg::FillOp>(loc, ValueRange{zero},
                                                   ValueRange{bmmInit});
-    auto bmmOp = rewriter.create<linalg::BatchMatmulOp>(
+    auto genericOp = rewriter.create<linalg::GenericOp>(
         loc, bmmOutputType,
-        ValueRange({permutedWinogradInput, permutedWinogradFilter}),
-        ValueRange({fillOp.result()}));
-    Value bmmResult = bmmOp.getResult(0);
-    SmallVector<int64_t> resultPerm = {1, 2, 0};
-    Value permutedBmmResult = createTranspose(rewriter, bmmResult, resultPerm);
+        /*inputs=*/ValueRange{collapsedWinogradInput, collapsedWinogradFilter},
+        /*outputs=*/ValueRange{fillOp.result()},
+        ArrayRef<AffineMap>{lhsMap, rhsMap, resultMap}, genericIterators,
+        [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange args) {
+          Value lhsPromoted =
+              convertScalarToDtype(nestedBuilder, loc, args[0],
+                                   args[2].getType(), /*isUnsignedCast=*/false);
+          Value rhsPromoted =
+              convertScalarToDtype(nestedBuilder, loc, args[1],
+                                   args[2].getType(), /*isUnsignedCast=*/false);
+          Value mul = nestedBuilder.create<arith::MulFOp>(
+              nestedLoc, lhsPromoted, rhsPromoted);
+          Value add =
+              nestedBuilder.create<arith::AddFOp>(nestedLoc, mul, args[2]);
+          nestedBuilder.create<linalg::YieldOp>(nestedLoc, add);
+        });
+    Value bmmResult = genericOp.getResults().front();
 
     // Add expand shape
     SmallVector<int64_t> expandedShape = {resultShape[0], resultShape[1],
                                           resultShape[2], outputShape[3],
                                           resultShape[4], resultShape[5]};
     reassociations = {{0, 1, 2}, {3}, {4, 5}};
-    Value expandedBmmResult = createExpand(permutedBmmResult, loc, rewriter,
-                                           expandedShape, reassociations);
+    Value expandedBmmResult =
+        createExpand(bmmResult, loc, rewriter, expandedShape, reassociations);
 
     // Convert back into original domain
     SmallVector<int64_t> paddedResultShape(outputShape.size(), 0);
@@ -352,7 +370,7 @@ public:
     SmallVector<OpFoldResult> strides(outputShape.size(),
                                       rewriter.getIndexAttr(1));
     SmallVector<OpFoldResult> sizes =
-        getAsIndexOpFoldResult(rewriter.getContext(), outputType.getShape());
+        getAsIndexOpFoldResult(context, outputType.getShape());
     auto winogradOutput = rewriter.create<tensor::ExtractSliceOp>(
         loc, outputType, paddedOutput, offsets, sizes, strides);
 
