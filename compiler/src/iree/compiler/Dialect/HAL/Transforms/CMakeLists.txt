@@ -16,6 +16,7 @@ iree_cc_library(
   HDRS
     "Passes.h"
   SRCS
+    "AssignLegacyTargetDevices.cpp"
     "AssignTargetDevices.cpp"
     "CaptureExecutableSources.cpp"
     "ConfigureExecutables.cpp"
@@ -50,6 +51,7 @@ iree_cc_library(
     MLIRAffineToStandard
     MLIRAffineTransforms
     MLIRArithDialect
+    MLIRAsmParser
     MLIRBufferizationDialect
     MLIRControlFlowDialect
     MLIRFuncDialect
