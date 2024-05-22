@@ -49,6 +49,6 @@ struct GPUMMASchedule {
 FailureOr<GPUMMASchedule> deduceMMASchedule(
     const GPUMatmulShapeType &problem, ArrayRef<GPUMatmulShapeType> intrinsics,
     const GPUMMAHeuristicSeeds &seeds, int64_t sharedMemLimitInBytes,
-    bool canUpcastAcc = false, bool mustBeAligned = true);
+    int64_t subgroupSize, bool canUpcastAcc = false, bool mustBeAligned = true);
 
 } // namespace mlir::iree_compiler

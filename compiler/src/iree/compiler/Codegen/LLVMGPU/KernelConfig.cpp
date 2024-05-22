@@ -299,13 +299,13 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
 
   // First try to find a schedule with an exactly matching intrinsic.
-  FailureOr<GPUMMASchedule> schedule =
-      deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes);
+  FailureOr<GPUMMASchedule> schedule = deduceMMASchedule(
+      problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize);
   if (failed(schedule)) {
     // Then try again by allowing upcasting accumulator.
-    schedule =
-        deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
-                          /*canUpcastAcc=*/true);
+    schedule = deduceMMASchedule(problem, intrinsics, seeds,
+                                 maxSharedMemoryBytes, targetSubgroupSize,
+                                 /*canUpcastAcc=*/true);
   }
   if (failed(schedule)) {
     return failure();
@@ -467,13 +467,13 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   // First try to find a schedule with an exactly matching intrinsic.
   auto pipeline = CodeGenPipeline::LLVMGPUVectorDistribute;
-  std::optional<GPUMMASchedule> schedule =
-      deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes);
+  std::optional<GPUMMASchedule> schedule = deduceMMASchedule(
+      problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize);
   if (!schedule) {
     // Then try again by allowing upcasting accumulator.
-    schedule =
-        deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
-                          /*canUpcastAcc=*/true);
+    schedule = deduceMMASchedule(problem, intrinsics, seeds,
+                                 maxSharedMemoryBytes, targetSubgroupSize,
+                                 /*canUpcastAcc=*/true);
   }
 
   // Only batch_matmul is supported in the LLVMGPUPadAndVectorDistribute
@@ -483,14 +483,14 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
     LDBG("Matmul Pad and Vector Distribute");
     pipeline = CodeGenPipeline::LLVMGPUPadAndVectorDistribute;
     bool mustBeAligned = false;
-    schedule =
-        deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
-                          /*canUpcastAcc=*/false, mustBeAligned);
+    schedule = deduceMMASchedule(problem, intrinsics, seeds,
+                                 maxSharedMemoryBytes, targetSubgroupSize,
+                                 /*canUpcastAcc=*/false, mustBeAligned);
     if (!schedule) {
       // Then try again by allowing upcasting accumulator.
-      schedule =
-          deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
-                            /*canUpcastAcc=*/true, mustBeAligned);
+      schedule = deduceMMASchedule(problem, intrinsics, seeds,
+                                   maxSharedMemoryBytes, targetSubgroupSize,
+                                   /*canUpcastAcc=*/true, mustBeAligned);
     }
   }
   if (!schedule) {
