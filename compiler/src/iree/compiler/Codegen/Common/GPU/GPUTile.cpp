@@ -65,7 +65,8 @@ collectComputeOps(mlir::FunctionOpInterface funcOp,
   if (ifOps.empty()) {
     computeOps = getComputeOps(funcOp);
     for (Operation *op : computeOps) {
-      if (auto config = getLoweringConfig(op))
+      if (auto config =
+              getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(op))
         configs.push_back(config);
     }
     if (computeOps.size() > 1) {
@@ -80,7 +81,8 @@ collectComputeOps(mlir::FunctionOpInterface funcOp,
 
     ifOps.front()->walk([&configs](Operation *op) {
       if (isa<linalg::LinalgOp, TilingInterface>(op)) {
-        if (auto config = getLoweringConfig(op))
+        if (auto config =
+                getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(op))
           configs.push_back(config);
       }
     });

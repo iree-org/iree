@@ -169,7 +169,8 @@ const char *getGPUDistributeAttrName() { return "iree.gpu.distribute_dim"; }
 FailureOr<SmallVector<int64_t>> getGPUTileSize(mlir::FunctionOpInterface funcOp,
                                                int tilingLevel) {
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
-  auto config = getLoweringConfig(computeOps);
+  FailureOr<IREE::Codegen::LoweringConfigAttr> config =
+      getFirstLoweringConfig<IREE::Codegen::LoweringConfigAttr>(computeOps);
   if (failed(config)) {
     return funcOp.emitOpError("failed to get lowering configuration");
   }

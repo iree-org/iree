@@ -283,7 +283,8 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
 // Propagates the configuration to the other ops.
 static void propagateLoweringConfig(Operation *rootOp,
                                     ArrayRef<Operation *> computeOps) {
-  if (IREE::Codegen::LoweringConfigAttr config = getLoweringConfig(rootOp)) {
+  if (IREE::Codegen::LoweringConfigAttrInterface config =
+          getLoweringConfig(rootOp)) {
     for (auto op : computeOps) {
       if (op != rootOp)
         setLoweringConfig(op, config);

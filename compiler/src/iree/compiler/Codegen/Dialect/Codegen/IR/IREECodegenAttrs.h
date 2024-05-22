@@ -10,6 +10,7 @@
 #ifndef IREE_COMPILER_CODEGEN_DIALECT_LOWERINGCONFIG_H_
 #define IREE_COMPILER_CODEGEN_DIALECT_LOWERINGCONFIG_H_
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -64,38 +65,51 @@ void eraseTranslationInfo(mlir::FunctionOpInterface funcOp);
 // operations.
 //===----------------------------------------------------------------------===//
 
+static const char kConfigAttrName[] = "lowering_config";
+
+/// Returns the lowering configuration set for an operation. Returns `nullptr`
+/// if no value is set.  It expects that the attribute is stored using the
+/// identifier `lowering_config`.
+template <typename ConfigTy = IREE::Codegen::LoweringConfigAttrInterface>
+ConfigTy getLoweringConfig(Operation *op) {
+  return op->getAttrOfType<ConfigTy>(kConfigAttrName);
+}
+
 /// Returns the op that carries the `lowering_config` attribute; returns nullptr
 /// if none is carrying the attribute.
 ///
 /// This scans ops in top-down order and the first one carrying the attribute
 /// will be returned.
+template <typename ConfigTy = IREE::Codegen::LoweringConfigAttrInterface>
 FailureOr<Operation *>
-getLoweringConfigCarryingOp(ArrayRef<Operation *> computeOps);
-
-/// Returns the lowering configuration set for an operation. Returns `nullptr`
-/// if no value is set.  It expects that the attribute is stored using the
-/// identifier `lowering_config`.
-IREE::Codegen::LoweringConfigAttr getLoweringConfig(Operation *op);
+getLoweringConfigCarryingOp(ArrayRef<Operation *> computeOps) {
+  for (Operation *op : computeOps) {
+    if (getLoweringConfig<ConfigTy>(op))
+      return op;
+  }
+  return failure();
+}
 
 /// Returns the lowering configuration from the list of operations; returns
-/// nullptr if unable to find.
+/// failure if no operations is carrying a lowering config.
 ///
 /// This scans ops in top-down order and the first one carrying the attribute
 /// will be returned.
-FailureOr<IREE::Codegen::LoweringConfigAttr>
-getLoweringConfig(ArrayRef<Operation *> computeOps);
+template <typename ConfigTy = IREE::Codegen::LoweringConfigAttrInterface>
+FailureOr<ConfigTy> getFirstLoweringConfig(ArrayRef<Operation *> computeOps) {
+  FailureOr<Operation *> op = getLoweringConfigCarryingOp<ConfigTy>(computeOps);
+  if (failed(op))
+    return failure();
+  return getLoweringConfig<ConfigTy>(*op);
+}
 
 /// Returns the tile sizes for a particular operation if the
 /// `iree_codegen.lowering_config` attribute is set on it.
 SmallVector<int64_t> getTileSizes(Operation *op, unsigned level);
 SmallVector<Value> getTileSizes(OpBuilder &b, Operation *op, unsigned level);
 
-/// Returns the number of tiling levels defined in the
-/// `iree_codegen.lowering_config` of this operation.
-unsigned getNumTileLevels(Operation *op);
-
 /// Sets the lowering configuration, overwriting existing attribute values.
-void setLoweringConfig(Operation *op, IREE::Codegen::LoweringConfigAttr config);
+void setLoweringConfig(Operation *op, Attribute config);
 
 /// Convenience function that sets the lowering configuration on the operation
 /// and translation info on the entry point op for the common case of specifying

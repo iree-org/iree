@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
 
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/LLVMCPU/TargetMLTransformInfo.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
@@ -2455,7 +2456,8 @@ adjustTileSizesForUnPackOp(mlir::FunctionOpInterface entryPointFn,
   if (!linalgOp)
     return success();
 
-  auto loweringConfig = getLoweringConfig(linalgOp);
+  auto loweringConfig =
+      getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(linalgOp);
   TileSizesListType tileSizesList = loweringConfig.getTileSizeVals();
 
   bool foundUnPackOp = false;
@@ -2626,7 +2628,8 @@ setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
   }
 
   auto ctx = entryPointFn.getContext();
-  auto rootLoweringConfig = getLoweringConfig(rootOperation);
+  auto rootLoweringConfig =
+      getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(rootOperation);
   TilingConfig tilingConfig(rootLoweringConfig);
   SmallVector<int64_t> distTileSizes, parallelVecTileSizes;
   SmallVector<bool> distScalableTileSizes, parallelVecScalableTileSizes;

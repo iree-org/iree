@@ -76,7 +76,7 @@ computeDecomposedLoweringConfig(ArrayRef<Operation *> computeOps,
 
   // 2. Get the current lowering config attached to the Conv Op.
   FailureOr<IREE::Codegen::LoweringConfigAttr> loweringConfigAttr =
-      getLoweringConfig(computeOps);
+      getFirstLoweringConfig<IREE::Codegen::LoweringConfigAttr>(computeOps);
   if (failed(loweringConfigAttr))
     return failure();
 

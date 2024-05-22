@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
@@ -53,7 +54,7 @@ void LLVMCPUTilePass::runOnOperation() {
 
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
   FailureOr<IREE::Codegen::LoweringConfigAttr> rootLoweringConfig =
-      getLoweringConfig(computeOps);
+      getFirstLoweringConfig<IREE::Codegen::LoweringConfigAttr>(computeOps);
   if (failed(rootLoweringConfig)) {
     LLVM_DEBUG(llvm::dbgs() << "can't find lowering_config, skip tiling\n");
     return;
@@ -74,7 +75,8 @@ void LLVMCPUTilePass::runOnOperation() {
     LLVM_DEBUG(llvm::dbgs() << "candidate: " << op << "\n");
     SmallVector<int64_t> tileSizes;
     SmallVector<bool> tileScalableFlags;
-    if (auto loweringConfig = getLoweringConfig(op)) {
+    if (auto loweringConfig =
+            getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(op)) {
       tileSizes = loweringConfig.getTileSizeVals(tilingLevel);
       tileScalableFlags = loweringConfig.getScalableTileFlagVals(tilingLevel);
     } else {

@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
@@ -188,14 +189,14 @@ void LLVMCPUSplitReductionPass::runOnOperation() {
       continue;
     }
 
-    FailureOr<IREE::Codegen::LoweringConfigAttr> maybeLoweringConfig =
-        getLoweringConfig(genericOp);
-    if (failed(maybeLoweringConfig)) {
+    auto maybeLoweringConfig =
+        getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(genericOp);
+    if (!maybeLoweringConfig) {
       LLVM_DEBUG(llvm::dbgs()
                  << "can't find lowering_config, skip SplitReduction");
       continue;
     }
-    TilingConfig tilingConfig(maybeLoweringConfig.value());
+    TilingConfig tilingConfig(maybeLoweringConfig);
     auto [reductionSizes, scalableDims] =
         tilingConfig.getVectorReductionSizes();
     if (scalableDims.back()) {

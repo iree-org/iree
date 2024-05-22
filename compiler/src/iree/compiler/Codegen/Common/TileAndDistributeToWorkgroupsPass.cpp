@@ -91,14 +91,15 @@ getTileAndDistributeConfig(ArrayRef<Operation *> computeOps,
 
   partitionableLoops =
       partitionableLoopInterface.getPartitionableLoops(std::nullopt);
-  IREE::Codegen::LoweringConfigAttr rootOpConfig = getLoweringConfig(rootOp);
+  IREE::Codegen::LoweringConfigAttrInterface rootOpConfig =
+      getLoweringConfig(rootOp);
   if (!rootOpConfig) {
     return rootOp->emitOpError(
         "unable to find configuration of root op to define workgroup count "
         "region");
   }
-  tileSizes.assign(rootOpConfig.getTileSizeVals(0));
-  interchange.assign(rootOpConfig.getTileInterchangeVals(0));
+  tileSizes.assign(rootOpConfig.getWorkgroupTileSizes());
+  interchange.assign(rootOpConfig.getWorkgroupInterchange());
 
   // Set tile sizes of non-partitioned loops to 0.
   llvm::SmallDenseSet<unsigned> partitionableLoopsSet;
