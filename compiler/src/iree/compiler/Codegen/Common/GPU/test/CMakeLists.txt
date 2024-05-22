@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "gpu_apply_tiling_level.mlir"
     "gpu_check_resource_usage.mlir"
     "gpu_create_fast_slow_path.mlir"
     "gpu_distribute.mlir"
