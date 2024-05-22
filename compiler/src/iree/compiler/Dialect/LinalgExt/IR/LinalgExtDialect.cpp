@@ -12,11 +12,13 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/SourceMgr.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
+#include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OpImplementation.h"
+#include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/InliningUtils.h"
 
 using namespace mlir;
@@ -56,6 +58,25 @@ struct LinalgFusionOpInterfaceAdapter
     : public LinalgFusionOpInterface::ExternalModel<
           LinalgFusionOpInterfaceAdapter<ConcreteType>, ConcreteType> {
 public:
+  SmallVector<std::optional<AffineMap>>
+  getIndexingMapsForOperands(mlir::Operation *op) const {
+    auto maps = llvm::cast<ConcreteType>(op)
+                    .getIndexingMaps()
+                    .template getAsValueRange<AffineMapAttr>();
+    return SmallVector<std::optional<AffineMap>>(
+        maps.begin(),
+        maps.end() - llvm::cast<ConcreteType>(op).getNumResults());
+  }
+
+  SmallVector<std::optional<AffineMap>>
+  getIndexingMapsForResults(mlir::Operation *op) const {
+    auto maps = llvm::cast<ConcreteType>(op)
+                    .getIndexingMaps()
+                    .template getAsValueRange<AffineMapAttr>();
+    return SmallVector<std::optional<AffineMap>>(
+        maps.end() - llvm::cast<ConcreteType>(op).getNumResults(), maps.end());
+  }
+
   // Forward all the interface methods to the corresponding linalg op.
   unsigned getNumParallelLoops(mlir::Operation *op) const {
     return (llvm::cast<ConcreteType>(op).getNumParallelLoops());
@@ -79,8 +100,14 @@ public:
     return (llvm::cast<ConcreteType>(op).getMatchingIndexingMap(operand));
   }
 
-  ArrayAttr getIndexingMaps(mlir::Operation *op) const {
-    return (llvm::cast<ConcreteType>(op).getIndexingMaps());
+  SmallVector<std::optional<AffineMap>>
+  getIndexingMaps(mlir::Operation *op) const {
+    // Note: this is different from linalg's implementation
+    // of `getIndexingMaps`. Call interface methods to get
+    // the vector of indexing maps for operands and results.
+    auto inputMaps = getIndexingMapsForOperands(op);
+    llvm::append_range(inputMaps, getIndexingMapsForResults(op));
+    return inputMaps;
   }
 };
 } // namespace

@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include <cstdint>
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
@@ -41,6 +40,9 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Support/MathExtras.h"
+
+#include <cstdint>
+#include <optional>
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
 
@@ -251,12 +253,15 @@ ScatterOp::reifyResultShapes(OpBuilder &b,
       .reifyResultShapes(b, reifiedReturnShapes);
 }
 
-ArrayAttr ScatterOp::getIndexingMaps() {
+SmallVector<std::optional<AffineMap>> ScatterOp::getIndexingMapsForOperands() {
   Builder builder(getContext());
-  return builder.getAffineMapArrayAttr(
-      {builder.getEmptyAffineMap(),
-       builder.getMultiDimIdentityMap(getIndicesType().getRank()),
-       builder.getMultiDimIdentityMap(getOriginalType().getRank())});
+  return {builder.getMultiDimIdentityMap(getUpdateType().getRank()),
+          builder.getMultiDimIdentityMap(getIndicesType().getRank())};
+}
+
+SmallVector<std::optional<AffineMap>> ScatterOp::getIndexingMapsForResults() {
+  Builder builder(getContext());
+  return {std::nullopt};
 }
 
 //===----------------------------------------------------------------------===//
@@ -492,11 +497,13 @@ ReverseOp::reifyResultShapes(OpBuilder &b,
       .reifyResultShapes(b, reifiedReturnShapes);
 }
 
-ArrayAttr ReverseOp::getIndexingMaps() {
+SmallVector<std::optional<AffineMap>> ReverseOp::getIndexingMapsForOperands() {
   Builder builder(getContext());
-  return builder.getAffineMapArrayAttr(
-      {builder.getMultiDimIdentityMap(getOperandRank()),
-       builder.getEmptyAffineMap()});
+  return {builder.getMultiDimIdentityMap(getOperandRank())};
+}
+
+SmallVector<std::optional<AffineMap>> ReverseOp::getIndexingMapsForResults() {
+  return {std::nullopt};
 }
 
 //===----------------------------------------------------------------------===//

@@ -16,7 +16,6 @@ util.func public @linalgext_scatter_fusion() -> tensor<8192x16x8x128xf32> {
     linalg.yield %10 : i32
   } -> tensor<4x1xi32>
 
-  // dont fuse with this
   %7 = linalg.generic {indexing_maps = [#map1, #map1], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]} ins(%2 : tensor<4x1x16x8x128xf32>) outs(%3 : tensor<4x1x16x8x128xf32>) {
   ^bb0(%in: f32, %out: f32):
     %10 = arith.addf %in, %out : f32
@@ -27,6 +26,8 @@ util.func public @linalgext_scatter_fusion() -> tensor<8192x16x8x128xf32> {
   ^bb0(%arg0: f32, %arg1: f32):
     iree_linalg_ext.yield %arg0 : f32
   } -> tensor<8192x16x8x128xf32>
+
+  // Dont fuse with scatter's consumer
   %9 = linalg.generic {indexing_maps = [#map2, #map2], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%8 : tensor<8192x16x8x128xf32>) outs(%5 : tensor<8192x16x8x128xf32>) {
   ^bb0(%in: f32, %out: f32):
     %10 = arith.addf %in, %out : f32
@@ -36,14 +37,14 @@ util.func public @linalgext_scatter_fusion() -> tensor<8192x16x8x128xf32> {
 }
 
 // CHECK:     util.func public @linalgext_scatter_fusion
-// CHECK:       flow.dispatch.workgroups
-// CHECK:         %[[GEN:.+]] = linalg.generic
 // CHECK:       %[[RESULT:.+]] = flow.dispatch.workgroups
-// CHECK:         %[[EXPANDED:.+]] = linalg.generic
+// CHECK:         %[[INDICES:.+]] = linalg.generic
+// CHECK:         %[[UPDATE:.+]] = linalg.generic
 // CHECK:         %[[SCATTER_RESULT:.+]] = iree_linalg_ext.scatter
-// CHECK-SAME:      ins(%[[UPDATE_TENSOR:.+]], %[[GEN:.+]] : tensor<4x1x16x8x128xf32>, tensor<4x1xi32>)
-// CHECK:         %[[GEN:.+]] = linalg.generic
-// CHECK-SAME:      ins(%[[SCATTER_RESULT]] : tensor<8192x16x8x128xf32>)
+// CHECK-SAME:      ins(%[[UPDATE]], %[[INDICES]] : tensor<4x1x16x8x128xf32>, tensor<4x1xi32>)
+// CHECK:       flow.dispatch.workgroups
+// CHECK:         %[[GEN2:.+]] = linalg.generic
+// CHECK-SAME:      ins(%[[INPUT:.+]] : tensor<8192x16x8x128xf32>)
 
 
 

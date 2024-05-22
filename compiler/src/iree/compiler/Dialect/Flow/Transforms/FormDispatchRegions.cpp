@@ -405,12 +405,16 @@ static bool hasCompatibleOuterParallelLoops(
       llvm::cast<OpResult>(operand.get()));
   auto consumerIndexingMap = consumer.getMatchingIndexingMap(&operand);
 
+  if (!producerIndexingMap || !consumerIndexingMap) {
+    return false;
+  }
+
   return hasCompatibleOuterParallelLoops(
              cast<TilingInterface>(producer.getOperation()),
-             producerIndexingMap, rootOuterParallelLoops) &&
+             *producerIndexingMap, rootOuterParallelLoops) &&
          hasCompatibleOuterParallelLoops(
              cast<TilingInterface>(consumer.getOperation()),
-             consumerIndexingMap, rootOuterParallelLoops);
+             *consumerIndexingMap, rootOuterParallelLoops);
 }
 
 /// For all uses of an operation, finds the use that dominates all other uses.

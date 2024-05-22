@@ -46,9 +46,43 @@ def LinalgFusionInterface : OpInterface<"LinalgFusionOpInterface", [DestinationS
   let methods = [
     //===------------------------------------------------------------------===//
     // Interface methods for fusion. 
-    // For linalg ops, these methods are already implemented
     //===------------------------------------------------------------------===//
-      InterfaceMethod<
+    InterfaceMethod<
+      /*desc=*/[{
+        Return an AffineMap for each operand or `std::nullopt` if the operand
+        does not have an indexing map representation.
+      }],
+      /*retTy=*/"SmallVector<std::optional<AffineMap>>",
+      /*methodName=*/"getIndexingMapsForOperands",
+      /*args=*/(ins),
+      /*methodBody=*/""
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Return an AffineMap for each result or `std::nullopt` if the result
+        does not have an indexing map representation.
+      }],
+      /*retTy=*/"SmallVector<std::optional<AffineMap>>",
+      /*methodName=*/"getIndexingMapsForResults",
+      /*args=*/(ins),
+      /*methodBody=*/""
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Return all indexing maps, or `std::nullopt` if an operand or result
+        does not have an indexing map representation.
+      }],
+      /*retTy=*/"SmallVector<std::optional<AffineMap>>",
+      /*methodName=*/"getIndexingMaps",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        auto inputMaps = $_op.getIndexingMapsForOperands();
+        llvm::append_range(inputMaps, $_op.getIndexingMapsForResults());
+        return inputMaps;
+      }]
+    >,
+    InterfaceMethod<
       /*desc=*/[{
         Return the number of parallel loops.
       }],
@@ -60,7 +94,6 @@ def LinalgFusionInterface : OpInterface<"LinalgFusionOpInterface", [DestinationS
         return llvm::count($_op.getLoopIteratorTypes(), utils::IteratorType::parallel);
       }]
     >,
-
     InterfaceMethod<
       /*desc=*/[{
         Return the total number of loops.
@@ -95,42 +128,29 @@ def LinalgFusionInterface : OpInterface<"LinalgFusionOpInterface", [DestinationS
       /*desc=*/[{
         Return the indexing map for an op's `result`.
       }],
-      /*retTy=*/"AffineMap",
+      /*retTy=*/"std::optional<AffineMap>",
       /*methodName=*/"getIndexingMapMatchingResult",
       /*args=*/(ins "OpResult":$result),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
         assert(result.getOwner() == $_op);
-        auto indexingMaps =
-          $_op.getIndexingMaps().template getAsValueRange<AffineMapAttr>();
-        return *(indexingMaps.begin() + $_op.getNumDpsInputs() +
-                 result.getResultNumber());
+        return $_op.getIndexingMapsForResults()[result.getResultNumber()];
       }]
     >,
     InterfaceMethod<
       /*desc=*/[{
         Return the input or output indexing map for `opOperand`.
       }],
-      /*retTy=*/"AffineMap",
+      /*retTy=*/"std::optional<AffineMap>",
       /*methodName=*/"getMatchingIndexingMap",
       /*args=*/(ins "OpOperand*":$opOperand),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
         assert(opOperand->getOwner() == $_op);
-        auto indexingMaps =
-          $_op.getIndexingMaps().template getAsValueRange<AffineMapAttr>();
-        return *(indexingMaps.begin() + opOperand->getOperandNumber());
+        return $_op.getIndexingMapsForOperands()[opOperand->getOperandNumber()];
       }]
     >,
-    InterfaceMethod<
-      /*desc=*/[{
-        Return the indexing maps for this op.
-      }],
-      /*retTy=*/"ArrayAttr",
-      /*methodName=*/"getIndexingMaps",
-      /*args=*/(ins),
-      /*methodBody=*/""
-    >,
+
  
   ];
 }
