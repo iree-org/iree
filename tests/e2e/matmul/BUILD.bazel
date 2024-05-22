@@ -106,8 +106,7 @@ PREPROCESSING_PEEL = "--iree-llvmcpu-vector-pproc-strategy=peel"
     True,
     False,
 ] for peel in [
-    # TODO(macdue): Enable peeling tests after next LLVM integration.
-    # True,
+    True,
     False,
 ]]
 

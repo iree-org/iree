@@ -12,6 +12,34 @@ iree_add_all_subdirs()
 
 iree_generated_e2e_runner_test(
   NAME
+    e2e_matmul_cpu_arm_sme_nondt_f32_small_transpose_lhs_peel
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f32"
+    "--acc_type=f32"
+    "--shapes=small"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-opt-data-tiling=false"
+    "--iree-llvmcpu-enable-scalable-vectorization"
+    "--iree-preprocessing-pass-pipeline=builtin.module\(util.func\(iree-preprocessing-transpose-matmul-pass{input=lhs}\)\)"
+    "--iree-llvmcpu-vector-pproc-strategy=peel"
+  LABELS
+    "requires-arm-sme"
+  TARGET_CPU_FEATURES_VARIANTS
+    "arm_64:sme:+sve,+sme"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
     e2e_matmul_cpu_arm_sme_nondt_f32_small_transpose_lhs
   TEST_TYPE
     matmul
@@ -31,6 +59,33 @@ iree_generated_e2e_runner_test(
     "--iree-opt-data-tiling=false"
     "--iree-llvmcpu-enable-scalable-vectorization"
     "--iree-preprocessing-pass-pipeline=builtin.module\(util.func\(iree-preprocessing-transpose-matmul-pass{input=lhs}\)\)"
+  LABELS
+    "requires-arm-sme"
+  TARGET_CPU_FEATURES_VARIANTS
+    "arm_64:sme:+sve,+sme"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_matmul_cpu_arm_sme_nondt_f32_small_peel
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f32"
+    "--acc_type=f32"
+    "--shapes=small"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-opt-data-tiling=false"
+    "--iree-llvmcpu-enable-scalable-vectorization"
+    "--iree-llvmcpu-vector-pproc-strategy=peel"
   LABELS
     "requires-arm-sme"
   TARGET_CPU_FEATURES_VARIANTS
@@ -65,6 +120,34 @@ iree_generated_e2e_runner_test(
 
 iree_generated_e2e_runner_test(
   NAME
+    e2e_matmul_cpu_arm_sme_nondt_f32_large_transpose_lhs_peel
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f32"
+    "--acc_type=f32"
+    "--shapes=large"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-opt-data-tiling=false"
+    "--iree-llvmcpu-enable-scalable-vectorization"
+    "--iree-preprocessing-pass-pipeline=builtin.module\(util.func\(iree-preprocessing-transpose-matmul-pass{input=lhs}\)\)"
+    "--iree-llvmcpu-vector-pproc-strategy=peel"
+  LABELS
+    "requires-arm-sme"
+  TARGET_CPU_FEATURES_VARIANTS
+    "arm_64:sme:+sve,+sme"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
     e2e_matmul_cpu_arm_sme_nondt_f32_large_transpose_lhs
   TEST_TYPE
     matmul
@@ -84,6 +167,33 @@ iree_generated_e2e_runner_test(
     "--iree-opt-data-tiling=false"
     "--iree-llvmcpu-enable-scalable-vectorization"
     "--iree-preprocessing-pass-pipeline=builtin.module\(util.func\(iree-preprocessing-transpose-matmul-pass{input=lhs}\)\)"
+  LABELS
+    "requires-arm-sme"
+  TARGET_CPU_FEATURES_VARIANTS
+    "arm_64:sme:+sve,+sme"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_matmul_cpu_arm_sme_nondt_f32_large_peel
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f32"
+    "--acc_type=f32"
+    "--shapes=large"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-opt-data-tiling=false"
+    "--iree-llvmcpu-enable-scalable-vectorization"
+    "--iree-llvmcpu-vector-pproc-strategy=peel"
   LABELS
     "requires-arm-sme"
   TARGET_CPU_FEATURES_VARIANTS
