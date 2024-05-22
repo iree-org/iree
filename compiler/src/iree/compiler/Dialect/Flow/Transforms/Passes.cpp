@@ -8,6 +8,7 @@
 
 #include <memory>
 
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
@@ -187,38 +188,8 @@ void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
       .addPass(mlir::createCSEPass);
 }
 
-void addDispatchRegionCreationPasses(OpPassManager &passManager,
-                                     const TransformOptions &transformOptions) {
+static void addDispatchRegionMaterializationPasses(OpPassManager &passManager) {
   FunctionLikeNest(passManager)
-      // Preprocess the input to a form more amenable for fusion.
-      .addPass(IREE::Flow::createFusionPreprocessingPass)
-      .addPass(mlir::createCanonicalizerPass)
-      .addPass(mlir::createCSEPass);
-
-  addDispatchRegionCreationPreprocessingPasses(passManager);
-
-  FunctionLikeNest(passManager)
-      .addPass([]() {
-        return IREE::Flow::createFusionOfTensorOpsPass(
-            FusionOfTensorOpsPassOptions{
-                clEnableFuseMultiUse, clEnableElementWiseFuseMultiReduction});
-      })
-      .addPredicatedPass(clDetensoring,
-                         [&]() { return mlir::createLinalgDetensorizePass(); })
-      .addPass(mlir::createCanonicalizerPass)
-      .addPass(mlir::createCSEPass)
-      .addPredicatedPass(clCollapseReductionDims,
-                         IREE::Flow::createCollapseReductionDimensionsPass)
-      // Split reduction operations into parallel and reduction.
-      .addPass(IREE::Flow::createSplitReductionPass)
-      // SplitReductionPass may create reduction dimension that are not the last
-      // dimension.
-      .addPass(IREE::Flow::createFusionPreprocessingPass)
-      // Normalize the input indexing map to make the input indexing map
-      // identity. This helps fusing named linalg op with a generic op with
-      // transpose.
-      .addPass(IREE::Flow::createInterchangeTransposeGenericOpsPass)
-
       // Only want use the transform dialect for some dispatch regions and let
       // the FormDispatchRegions handle the rest. This only moves the root
       // compute op into the dispatch region, so that we can run additional
@@ -251,8 +222,43 @@ void addDispatchRegionCreationPasses(OpPassManager &passManager,
       .addPass(IREE::Flow::createDispatchRegionsToWorkgroupsPass)
       // Convert tensor operations to flow.tensor ops.
       .addPass(IREE::Flow::createDispatchTensorPass)
-      // Apply canonicalization patterns to the dispatch workgroups
-      .addPass(IREE::Flow::createDispatchWorkgroupsCanonicalizationPass);
+      .addPass(mlir::createCanonicalizerPass)
+      .addPass(IREE::Flow::createMaterializeDefaultWorkgroupCountRegion);
+}
+
+void addDispatchRegionCreationPasses(OpPassManager &passManager,
+                                     const TransformOptions &transformOptions) {
+  FunctionLikeNest(passManager)
+      // Preprocess the input to a form more amenable for fusion.
+      .addPass(IREE::Flow::createFusionPreprocessingPass)
+      .addPass(mlir::createCanonicalizerPass)
+      .addPass(mlir::createCSEPass);
+
+  addDispatchRegionCreationPreprocessingPasses(passManager);
+
+  FunctionLikeNest(passManager)
+      .addPass([]() {
+        return IREE::Flow::createFusionOfTensorOpsPass(
+            FusionOfTensorOpsPassOptions{
+                clEnableFuseMultiUse, clEnableElementWiseFuseMultiReduction});
+      })
+      .addPredicatedPass(clDetensoring,
+                         [&]() { return mlir::createLinalgDetensorizePass(); })
+      .addPass(mlir::createCanonicalizerPass)
+      .addPass(mlir::createCSEPass)
+      .addPredicatedPass(clCollapseReductionDims,
+                         IREE::Flow::createCollapseReductionDimensionsPass)
+      // Split reduction operations into parallel and reduction.
+      .addPass(IREE::Flow::createSplitReductionPass)
+      // SplitReductionPass may create reduction dimension that are not the last
+      // dimension.
+      .addPass(IREE::Flow::createFusionPreprocessingPass)
+      // Normalize the input indexing map to make the input indexing map
+      // identity. This helps fusing named linalg op with a generic op with
+      // transpose.
+      .addPass(IREE::Flow::createInterchangeTransposeGenericOpsPass);
+
+  addDispatchRegionMaterializationPasses(passManager);
 }
 
 void buildFlowTransformPassPipeline(OpPassManager &passManager,

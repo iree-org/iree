@@ -27,11 +27,11 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-flow-dispatch-workgroups-canonicalization"
+#define DEBUG_TYPE "iree-flow-materialize-default-workgroup-count-region"
 
 namespace mlir::iree_compiler::IREE::Flow {
 
-#define GEN_PASS_DEF_DISPATCHWORKGROUPSCANONICALIZATIONPASS
+#define GEN_PASS_DEF_MATERIALIZEDEFAULTWORKGROUPCOUNTREGION
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
 
 /// Creates the workgroup count region where the materialized computation
@@ -102,33 +102,21 @@ static void createDefaultWorkgroupCountRegion(
 }
 
 namespace {
-struct DispatchWorkgroupsCanonicalizationPass
-    : public IREE::Flow::impl::DispatchWorkgroupsCanonicalizationPassBase<
-          DispatchWorkgroupsCanonicalizationPass> {
-  using IREE::Flow::impl::DispatchWorkgroupsCanonicalizationPassBase<
-      DispatchWorkgroupsCanonicalizationPass>::
-      DispatchWorkgroupsCanonicalizationPassBase;
+struct MaterializeDefaultWorkgroupCountRegion
+    : public IREE::Flow::impl::MaterializeDefaultWorkgroupCountRegionBase<
+          MaterializeDefaultWorkgroupCountRegion> {
+  using IREE::Flow::impl::MaterializeDefaultWorkgroupCountRegionBase<
+      MaterializeDefaultWorkgroupCountRegion>::
+      MaterializeDefaultWorkgroupCountRegionBase;
   void runOnOperation() override;
 };
 } // namespace
 
 // Performs canonicalization of `flow.dispatch.workgroups` and
 // populates the workgroup count region.
-void DispatchWorkgroupsCanonicalizationPass::runOnOperation() {
+void MaterializeDefaultWorkgroupCountRegion::runOnOperation() {
   mlir::FunctionOpInterface funcOp = getOperation();
-  MLIRContext *context = &getContext();
   mlir::TensorDimTrackingRewriter rewriter(funcOp);
-
-  // Canonicalize the `flow.dispatch.workgroups` operation to common out common
-  // arguments.
-  RewritePatternSet patterns(context);
-  IREE::Flow::DispatchWorkgroupsOp::getCanonicalizationPatterns(patterns,
-                                                                context);
-  if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
-    funcOp.emitOpError(
-        "failed in flow.dispatch.workgroups op canonicalization");
-    return signalPassFailure();
-  }
 
   // Populate the workgroup_count region of flow.dispatch.workgroups operation
   // that dont already have a region

@@ -187,7 +187,7 @@ def DispatchRegionsToWorkgroupsPass :
 }
 
 def DispatchTensorPass :
-    InterfacePass<"iree-flow-dispatch-tensor", "mlir::FunctionOpInterface"> {
+    InterfacePass<"iree-flow-tensor-to-flow", "mlir::FunctionOpInterface"> {
     let summary = "Convert tensor operations to flow";
     let description = [{
       Pass to convert tensor operations to flow.tensor.* operations.
@@ -202,8 +202,8 @@ def DispatchTensorPass :
     ];
 }
 
-def DispatchWorkgroupsCanonicalizationPass:
-    InterfacePass<"iree-flow-dispatch-workgroups-canonicalization", "mlir::FunctionOpInterface"> {
+def MaterializeDefaultWorkgroupCountRegion:
+    InterfacePass<"iree-flow-materialize-default-workgroup-count-region", "mlir::FunctionOpInterface"> {
       let summary = "Canonicalize dispatch workgroups ops.";
       let description = [{
         Apply dispatch workgroups canonicalization patterns.

@@ -28,7 +28,7 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-flow-dispatch-tensor"
+#define DEBUG_TYPE "iree-flow-tensor-to-flow"
 
 namespace mlir::iree_compiler::IREE::Flow {
 
