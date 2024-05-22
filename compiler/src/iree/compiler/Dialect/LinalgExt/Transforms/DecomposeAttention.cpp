@@ -21,9 +21,9 @@ namespace {
 // Computes a reduction along the rows of a 2d tensor of shape MxN
 // to produce a tensor of shape M
 template <typename T>
-static Value computeRowwiseReduction(Value a, Value output, Location loc,
-                                     OpBuilder &builder,
-                                     SmallVectorImpl<Operation *> &ops) {
+Value computeRowwiseReduction(Value a, Value output, Location loc,
+                              OpBuilder &builder,
+                              SmallVectorImpl<Operation *> &ops) {
   SmallVector<utils::IteratorType> iteratorTypes{
       utils::IteratorType::parallel, utils::IteratorType::reduction};
   AffineMap id = AffineMap::getMultiDimIdentityMap(2, builder.getContext());
@@ -42,9 +42,9 @@ static Value computeRowwiseReduction(Value a, Value output, Location loc,
   return genericOp.getResult(0);
 }
 
-static Value computePartialSoftmax(Value qkTranspose, Value currentMax,
-                                   Location loc, OpBuilder &builder,
-                                   SmallVectorImpl<Operation *> &ops) {
+Value computePartialSoftmax(Value qkTranspose, Value currentMax, Location loc,
+                            OpBuilder &builder,
+                            SmallVectorImpl<Operation *> &ops) {
   AffineMap identityMap =
       AffineMap::getMultiDimIdentityMap(2, builder.getContext());
   AffineExpr d0, d1;
@@ -68,9 +68,9 @@ static Value computePartialSoftmax(Value qkTranspose, Value currentMax,
 
 /// Return the scale factor for the new softmax maximum and add the generic to
 /// the provided list of operations.
-static Value computeScaleFactor(Value oldMax, Value newMax, Location loc,
-                                OpBuilder &builder,
-                                SmallVectorImpl<Operation *> &ops) {
+Value computeScaleFactor(Value oldMax, Value newMax, Location loc,
+                         OpBuilder &builder,
+                         SmallVectorImpl<Operation *> &ops) {
   SmallVector<utils::IteratorType> iteratorTypes(1,
                                                  utils::IteratorType::parallel);
   auto identityMap = AffineMap::getMultiDimIdentityMap(1, builder.getContext());
@@ -86,9 +86,8 @@ static Value computeScaleFactor(Value oldMax, Value newMax, Location loc,
   return genericOp.getResult(0);
 }
 
-static Value updateAndScale(Value scaleFactor, Value oldSum, Location loc,
-                            OpBuilder &builder,
-                            SmallVectorImpl<Operation *> &ops) {
+Value updateAndScale(Value scaleFactor, Value oldSum, Location loc,
+                     OpBuilder &builder, SmallVectorImpl<Operation *> &ops) {
   SmallVector<utils::IteratorType> iteratorTypes(1,
                                                  utils::IteratorType::parallel);
   auto identityMap = AffineMap::getMultiDimIdentityMap(1, builder.getContext());
@@ -103,9 +102,9 @@ static Value updateAndScale(Value scaleFactor, Value oldSum, Location loc,
   return genericOp.getResult(0);
 }
 
-static Value scalePartialSoftmax(Value softmax, Value inverseNewSum,
-                                 Location loc, OpBuilder &builder,
-                                 SmallVectorImpl<Operation *> &ops) {
+Value scalePartialSoftmax(Value softmax, Value inverseNewSum, Location loc,
+                          OpBuilder &builder,
+                          SmallVectorImpl<Operation *> &ops) {
   AffineMap identityMap =
       AffineMap::getMultiDimIdentityMap(2, builder.getContext());
   AffineExpr d0, d1;
@@ -147,9 +146,9 @@ static Value scaleAccumulator(Value accumulator, Value scaleFactor,
   return genericOp.getResult(0);
 }
 
-static Value computeQKTranspose(Value query, Value key, Value output,
-                                Value zero, Location loc, OpBuilder &builder,
-                                SmallVectorImpl<Operation *> &ops) {
+Value computeQKTranspose(Value query, Value key, Value output, Value zero,
+                         Location loc, OpBuilder &builder,
+                         SmallVectorImpl<Operation *> &ops) {
   auto fillOp = builder.create<linalg::FillOp>(loc, ValueRange{zero}, output);
   ops.push_back(fillOp);
   Value acc = fillOp.result();
@@ -177,7 +176,7 @@ static Value truncateToF16(Value input, Value output,
   return genericOp.getResult(0);
 }
 
-static std::tuple<Value, Value, Value>
+std::tuple<Value, Value, Value>
 createAttentionBody(Value keySlice, Value valueSlice, Value querySlice,
                     Value outputSlice, Value maxSlice, Value sumSlice,
                     OpFoldResult sequenceTileLength,
