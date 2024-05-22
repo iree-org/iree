@@ -21,6 +21,9 @@ on:
       write-caches:
         required: true
         type: string
+      run-tests:
+        required: true
+        type: boolean
     outputs:
       install-dir:
         description: Local install directory path.
@@ -39,11 +42,11 @@ permissions:
   contents: read
 
 env:
-  # This duplicates the variable from ci.yml. The variable needs to be in env
-  # instead of the outputs of setup because it contains the run attempt and we
-  # want that to be the current attempt, not whatever attempt the setup step
-  # last ran in. It therefore can't be passed in via inputs because the env
-  # context isn't available there.
+  # This duplicates the variables from other workflows. The variables need to be
+  # in env instead of the outputs of setup because it contains the run attempt
+  # and we want that to be the current attempt, not whatever attempt the setup
+  # step last ran in. They therefore can't be passed in via inputs because the
+  # env context isn't available there.
   GCS_DIR: gs://iree-github-actions-${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}-artifacts/${{ github.run_id }}/${{ github.run_attempt }}
   GCS_URL: https://storage.googleapis.com/iree-github-actions-${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}-artifacts/${{ github.run_id }}/${{ github.run_attempt }}
 
@@ -87,11 +90,13 @@ jobs:
       # TODO(scotttodd): trim build/tests to exclude integration tests (tests/ folder, check tests)
       #                  that coverage should move to a test_cpu job (matrix with test_gpu?)
       - name: "Testing IREE"
+        if: inputs.run-tests
         run: |
           ./build_tools/github_actions/docker_run.sh \
             gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
             ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
       - name: "Testing iree-dialects"
+        if: inputs.run-tests
         run: |
           ./build_tools/github_actions/docker_run.sh \
             gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
