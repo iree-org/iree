@@ -15,9 +15,11 @@ package(
 iree_compiler_cc_library(
     name = "Utils",
     srcs = [
+        "IndexingUtils.cpp",
         "Utils.cpp",
     ],
     hdrs = [
+        "IndexingUtils.h",
         "Utils.h",
         "WinogradConstants.h",
     ],
