@@ -1653,7 +1653,7 @@ SmallVector<utils::IteratorType> AttentionOp::getLoopIteratorTypes() {
   SmallVector<utils::IteratorType> iteratorTypes(getIterationDomainRank(),
                                                  utils::IteratorType::parallel);
 
-  for (int dim :
+  for (auto dim :
        llvm::concat<const int64_t>(opInfo.getK1Dims(), opInfo.getK2Dims())) {
     iteratorTypes[dim] = utils::IteratorType::reduction;
   }
@@ -1680,9 +1680,9 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
     SmallVector<OpFoldResult> outputSizes;
     SmallVector<OpFoldResult> outputStrides(indexingMap.getNumResults(), one);
     for (AffineExpr dimExpr : indexingMap.getResults()) {
-      auto dim = cast<AffineDimExpr>(dimExpr);
-      outputOffsets.push_back(offsets[dim.getPosition()]);
-      outputSizes.push_back(sizes[dim.getPosition()]);
+      int dim = cast<AffineDimExpr>(dimExpr).getPosition();
+      outputOffsets.push_back(offsets[dim]);
+      outputSizes.push_back(sizes[dim]);
     }
     return {outputOffsets, outputSizes, outputStrides};
   };
@@ -1764,10 +1764,9 @@ LogicalResult AttentionOp::getResultTilePosition(
   }
 
   for (AffineExpr dimExpr : resultIndexingMap.getResults()) {
-    AffineDimExpr dim = cast<AffineDimExpr>(dimExpr);
-    int64_t pos = dim.getPosition();
-    resultOffsets.push_back(offsets[pos]);
-    resultSizes.push_back(sizes[pos]);
+    int dim = cast<AffineDimExpr>(dimExpr).getPosition();
+    resultOffsets.push_back(offsets[dim]);
+    resultSizes.push_back(sizes[dim]);
   }
   return success();
 }

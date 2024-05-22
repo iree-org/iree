@@ -1275,10 +1275,11 @@ LogicalResult AttentionOp::verify() {
   }
 
   // Check shape compatibility based on indexing maps.
-  SmallVector<int64_t> shape(getIterationDomainRank(), -1);
-  auto checkShape = [&shape, &op](StringRef operandName,
-                                  ArrayRef<int64_t> valShape,
-                                  AffineMap indexingMap) -> LogicalResult {
+  SmallVector<int64_t> shape(getIterationDomainRank());
+  SmallVector<bool> foundDims(getIterationDomainRank(), false);
+  auto checkShape = [&shape, &foundDims,
+                     &op](StringRef operandName, ArrayRef<int64_t> valShape,
+                          AffineMap indexingMap) -> LogicalResult {
     if (indexingMap.getNumResults() != valShape.size()) {
       return op->emitError("Rank Mismatch for ")
              << operandName << ". Expected: " << indexingMap.getNumResults()
@@ -1287,10 +1288,8 @@ LogicalResult AttentionOp::verify() {
     for (auto [i, dimExpr] : llvm::enumerate(indexingMap.getResults())) {
       AffineDimExpr dim = cast<AffineDimExpr>(dimExpr);
       int64_t pos = dim.getPosition();
-      if (valShape[i] == ShapedType::kDynamic) {
-        continue;
-      }
-      if (shape[pos] == -1) {
+      if (!foundDims[pos]) {
+        foundDims[pos] = true;
         shape[pos] = valShape[i];
       }
       if (shape[pos] != valShape[i]) {

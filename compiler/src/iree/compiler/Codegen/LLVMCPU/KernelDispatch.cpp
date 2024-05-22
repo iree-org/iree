@@ -1748,18 +1748,11 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   // pointed out by the original author). We should explore if we should tile N
   // and K1 dimensions on CPU and if it has any gains. On GPUs, we don't tile
   // these dimensions as subgroups can hold much larger register sizes.
-  TileSizesListType tileSizes;
 
   // Batch, M and N (parallel dimensions) are distributed on workgroups.
   DistributionHeuristicConfig config;
   SmallVector<int64_t> distTileSizes = getDefaultDistributedLevelTileSizes(
       attnOp, DistributionHeuristicConfig{});
-  // TODO (Groverkss): Due to a bug in TileAndDecomposeAttention, N dimension
-  // cannot be tiled. Remove this once fixed.
-  for (int64_t i : opInfo.getNDims()) {
-    distTileSizes[i] = 0;
-  }
-  tileSizes.push_back(distTileSizes);
 
   // Batch, M and N (parallel dimensions) are distributed on workgroups.
   SmallVector<int64_t> vecTileSizes(attnOp.getIterationDomainRank(), 1);
@@ -1779,14 +1772,17 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
     vecTileSizes[i] = getMaxVectorTileSize(
         /*numElem=*/tileSize, vectorSize, vectorSize);
   }
-  // TODO (Groverkss): Due to a bug in TileAndDecomposeAttention, N dimension
+
+  // TODO (17467): Due to a bug in TileAndDecomposeAttention, N dimension
   // cannot be tiled. Remove this once fixed.
   for (int64_t i : opInfo.getNDims()) {
+    distTileSizes[i] = 0;
     vecTileSizes[i] = 0;
   }
-  tileSizes.push_back(vecTileSizes);
 
-  // TODO (Groverkss): Tile K2 here using reduction tiling interface once we
+  TileSizesListType tileSizes = {distTileSizes, vecTileSizes};
+
+  // TODO: (Groverkss): Tile K2 here using reduction tiling interface once we
   // have it. TileAndDecomposeAttention pass only tiles K2. I think it should
   // be possible to tile K1 also, but need to explore it more.
 
