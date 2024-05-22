@@ -394,9 +394,23 @@ sudo sh -c "ulimit -n <bigNum> && <myTracyInstrumentedProgram>"
 
 ### Building Tracy from source
 
-#### Install dependencies
+First, refer to the upstream build instructions at either the
+<https://github.com/wolfpld/tracy/> repository itself or the
+[Tracy PDF manual](#the-tracy-manual).
 
-##### Do you need capstone-next?
+For example, to build the profiler GUI from an IREE checkout:
+
+```bash
+# Build using CMake:
+cd third_party/tracy
+cmake -B profiler/build -S profiler -DCMAKE_BUILD_TYPE=Release
+cmake --build profiler/build --parallel --config Release
+
+# Now launch the profiler:
+./profiler/build/tracy-profiler
+```
+
+#### Additional Capstone dependencies for CPU code disassembly
 
 You can skip this section if you don't need disassembly of CPU code.
 
@@ -450,49 +464,6 @@ Install other dependencies:
 
 ```shell
 brew install pkg-config glfw freetype tbb zstd
-```
-
-#### Build the Tracy tools
-
-A CMake-based build system for Tracy is maintained as part of IREE. In your IREE
-host build directory, set the following CMake option:
-
-```shell
-cmake -DIREE_BUILD_TRACY=ON -DIREE_ENABLE_LLD=ON .
-```
-
-That enables building the Tracy server tools, `iree-tracy-profiler` and
-`iree-tracy-capture`, introduced above. It also enables building the tool
-`iree-tracy-csvexport` which can be used to export a captured trace as a
-CSV file (see Section 6 "Exporting zone statistics to CSV" in the Tracy manual).
-
-!!! note "TODO - switch to using upstream CMake project"
-
-    Tracy now has an upstream CMake build for each of its components. We may
-    be able to use this directly.
-
-If profiling on Android/ARM, you might need the patch discussed in the next
-paragraph.
-
-Consider building **without** assertions (`cmake -DIREE_ENABLE_ASSERTIONS=OFF`).
-At least `iree-tracy-profiler` has some
-[faulty assertions](https://github.com/wolfpld/tracy/pull/382) that can cause
-the profiler UI to crash during normal usage.
-
-Rebuild, either everything or just these specific targets:
-
-```shell
-cmake --build . --target iree-tracy-profiler iree-tracy-capture iree-tracy-csvexport
-```
-
-This should have created the `iree-tracy-profiler`, `iree-tracy-capture`, and
-`iree-tracy-csvexport` binaries:
-
-```shell
-$ find . -name iree-tracy-*
-./tracy/iree-tracy-profiler
-./tracy/iree-tracy-capture
-./tracy/iree-tracy-csvexport
 ```
 
 ### Android system settings required for Sampling and SysTrace

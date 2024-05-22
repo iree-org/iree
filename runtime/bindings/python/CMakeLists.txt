@@ -26,7 +26,7 @@ set(_TRACY_ENABLED OFF)
 if(IREE_BUILD_TRACY)
   message(STATUS "Bundling Tracy CLI tools with Python API")
   set(_TRACY_ENABLED ON)
-  list(APPEND _EXTRA_INSTALL_TOOL_TARGETS "IREETracyCaptureServer")
+  list(APPEND _EXTRA_INSTALL_TOOL_TARGETS "tracy-capture")
 endif()
 
 ################################################################################
@@ -205,7 +205,7 @@ iree_symlink_tool(
 if(_TRACY_ENABLED)
   iree_symlink_tool(
     TARGET runtime
-    FROM_TOOL_TARGET IREETracyCaptureServer
+    FROM_TOOL_TARGET tracy-capture
     TO_EXE_NAME iree/_runtime_libs/iree-tracy-capture
   )
 endif()
