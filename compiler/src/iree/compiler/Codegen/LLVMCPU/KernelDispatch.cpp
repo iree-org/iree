@@ -1694,6 +1694,7 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   // Fixup for making distTileSizes be multiple of inner_tile_sizes.
   SmallVector<int64_t> innerTiles = op.getStaticTiles();
   ArrayRef<int64_t> dimPos = op.getInnerDimsPos();
+  ArrayRef<int64_t> outerDimsPerm = op.getOuterDimsPerm();
   for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
     if (distTileSizes[pos] == 0 || ShapedType::isDynamic(size))
       continue;
@@ -1703,6 +1704,11 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   SmallVector<int64_t> tileSizes(op.getDestRank(), 1);
   for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
     tileSizes[pos] = ShapedType::isDynamic(size) ? 1 : size;
+  }
+
+  // Adjust tile sizes for the outer dimensions permutation.
+  for (const auto &[index, pos] : llvm::enumerate(outerDimsPerm)) {
+    tileSizes[index] = std::max(tileSizes[pos], tileSizes[index]);
   }
 
   TileSizesListType tileSizesList = {distTileSizes, tileSizes};
