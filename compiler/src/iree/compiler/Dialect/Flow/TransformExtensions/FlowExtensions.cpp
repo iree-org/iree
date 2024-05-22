@@ -10,13 +10,13 @@
 #include "iree/compiler/Dialect/Flow/Transforms/ConvertRegionToWorkgroups.h"
 #include "iree/compiler/Dialect/Flow/Transforms/FormDispatchRegions.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
+#include "mlir/Analysis/TopologicalSortUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/Transforms/RegionUtils.h"
-#include "mlir/Transforms/TopologicalSortUtils.h"
 
 namespace mlir::iree_compiler {
 

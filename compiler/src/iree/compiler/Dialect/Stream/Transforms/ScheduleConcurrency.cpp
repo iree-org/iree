@@ -14,6 +14,7 @@
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Analysis/TopologicalSortUtils.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -21,7 +22,6 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Pass/Pass.h"
-#include "mlir/Transforms/TopologicalSortUtils.h"
 
 #define DEBUG_TYPE "iree-stream-schedule-concurrency"
 

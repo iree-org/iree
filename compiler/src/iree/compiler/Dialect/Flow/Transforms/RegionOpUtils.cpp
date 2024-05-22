@@ -13,6 +13,7 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Analysis/SliceAnalysis.h"
+#include "mlir/Analysis/TopologicalSortUtils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
@@ -29,7 +30,6 @@
 #include "mlir/IR/Value.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/RegionUtils.h"
-#include "mlir/Transforms/TopologicalSortUtils.h"
 
 #define DEBUG_TYPE "iree-flow-region-op-utils"
 
@@ -80,8 +80,9 @@ getLoopRangesImpl(ReifyRankedShapedTypeOpInterface shapedOp, Location loc,
   LogicalResult status = shapedOp.reifyResultShapes(builder, resultDims);
   (void)status;
   assert(succeeded(status) && "reifyResultShapes failed");
-  return llvm::map_to_vector(
-      resultDims[0], [&](OpFoldResult v) { return Range{zero, v, one}; });
+  return llvm::map_to_vector(resultDims[0], [&](OpFoldResult v) {
+    return Range{zero, v, one};
+  });
 }
 
 /// For a given operation returns the loop ranges needed to compute the op.
