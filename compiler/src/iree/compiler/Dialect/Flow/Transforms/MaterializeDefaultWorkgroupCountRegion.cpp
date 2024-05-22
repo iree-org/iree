@@ -112,7 +112,6 @@ struct MaterializeDefaultWorkgroupCountRegion
 };
 } // namespace
 
-// Performs canonicalization of `flow.dispatch.workgroups` and
 // populates the workgroup count region.
 void MaterializeDefaultWorkgroupCountRegion::runOnOperation() {
   mlir::FunctionOpInterface funcOp = getOperation();
