@@ -80,9 +80,8 @@ getLoopRangesImpl(ReifyRankedShapedTypeOpInterface shapedOp, Location loc,
   LogicalResult status = shapedOp.reifyResultShapes(builder, resultDims);
   (void)status;
   assert(succeeded(status) && "reifyResultShapes failed");
-  return llvm::map_to_vector(resultDims[0], [&](OpFoldResult v) {
-    return Range{zero, v, one};
-  });
+  return llvm::map_to_vector(
+      resultDims[0], [&](OpFoldResult v) { return Range{zero, v, one}; });
 }
 
 /// For a given operation returns the loop ranges needed to compute the op.
