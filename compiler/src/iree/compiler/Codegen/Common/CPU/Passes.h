@@ -53,6 +53,10 @@ void addCPUBufferizePasses(OpPassManager &funcPassManager);
 std::unique_ptr<OperationPass<>>
 createCPULowerToUKernelsPass(bool skipIntermediateRoundings = true);
 
+/// Pass to decompose batch_mmt4d/pack/etc to fit ukernel requirements.
+std::unique_ptr<InterfacePass<FunctionOpInterface>>
+createCPUUkernelPreparationPass();
+
 void registerCodegenCommonCPUPasses();
 
 } // namespace mlir::iree_compiler

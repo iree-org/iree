@@ -494,7 +494,7 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &funcPassManager,
   addTileAndDistributePasses(funcPassManager);
 
   if (pipelineOpt.enableUkernels) {
-    funcPassManager.addPass(createDecomposeBatchMmt4DOpsPass());
+    funcPassManager.addPass(createCPUUkernelPreparationPass());
     funcPassManager.addPass(
         createCPULowerToUKernelsPass(clSkipIntermediateRoundings));
   }

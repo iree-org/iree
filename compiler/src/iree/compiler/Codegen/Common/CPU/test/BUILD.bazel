@@ -21,6 +21,7 @@ iree_lit_test_suite(
         [
             "llvmcpu_materialize_encoding.mlir",
             "lower_to_ukernel_ops.mlir",
+            "ukernel_preparation.mlir",
             "vmvx_materialize_encoding.mlir",
         ],
         include = ["*.mlir"],

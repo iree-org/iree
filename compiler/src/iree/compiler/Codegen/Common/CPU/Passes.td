@@ -38,4 +38,12 @@ def CPULowerToUKernels :
   ];
 }
 
+def CPUUkernelPreparation :
+    InterfacePass<"iree-codegen-cpu-ukernel-preparation", "mlir::FunctionOpInterface"> {
+  let summary = "Rank reduce operations to fit existing ukernels requirements."
+                "For example, batch_mmt4d ops are decomposed to mmt4d ops";
+  let constructor =
+      "mlir::iree_compiler::createCPUUkernelPreparationPass()";
+}
+
 #endif  // IREE_CODEGEN_COMMON_CPU_PASSES

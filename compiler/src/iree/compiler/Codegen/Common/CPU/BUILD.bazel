@@ -47,6 +47,7 @@ iree_compiler_cc_library(
     srcs = [
         "CPULowerToUKernels.cpp",
         "CPUMaterializeEncodingPass.cpp",
+        "CPUUkernelPreparation.cpp",
         "Passes.cpp",
     ],
     hdrs = [
