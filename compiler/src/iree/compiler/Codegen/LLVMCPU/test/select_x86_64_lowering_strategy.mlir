@@ -1285,6 +1285,30 @@ module {
 // -----
 
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-none-elf"}>
+module {
+  func.func @unpack_outer_dims_perm_static() attributes {hal.executable.target = #executable_target_embedded_elf_x86_64_} {
+    %c41943040 = arith.constant 41943040 : index
+    %c0 = arith.constant 0 : index
+    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c41943040) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<64x64x256x16x16xf32>>
+    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<1024x4096x64xf32>>
+    %2 = flow.dispatch.tensor.load %0, offsets = [0, 0, 0, 0, 0], sizes = [64, 64, 256, 16, 16], strides = [1, 1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<64x64x256x16x16xf32>> -> tensor<64x64x256x16x16xf32>
+    %3 = tensor.empty() : tensor<1024x4096x64xf32>
+    %unpack = tensor.unpack %2 outer_dims_perm = [2, 0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 16] into %3 : tensor<64x64x256x16x16xf32> -> tensor<1024x4096x64xf32>
+    flow.dispatch.tensor.store %unpack, %1, offsets = [0, 0, 0], sizes = [1024, 4096, 64], strides = [1, 1, 1] : tensor<1024x4096x64xf32> -> !flow.dispatch.tensor<writeonly:tensor<1024x4096x64xf32>>
+    return
+  }
+}
+
+//  CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 64], [16, 16, 16]]>
+//  CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDataTiling>
+//      CHECK: func.func @unpack_outer_dims_perm_static()
+// CHECK-SAME:     translation_info = #[[TRANSLATION]]
+//      CHECK:   tensor.unpack
+// CHECK-SAME:       lowering_config = #[[CONFIG]]
+
+// -----
+
+#executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {cpu_features = "", data_layout = "e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128", native_vector_size = 16 : index, target_triple = "x86_64-none-elf"}>
 #map = affine_map<(d0, d1) -> (d0)>
 #map1 = affine_map<(d0, d1) -> (d1, d0)>
 #map2 = affine_map<(d0, d1) -> (d0, d1)>
