@@ -38,4 +38,40 @@ def ApplyVectorizeMultiMmaOp : Op<Transform_Dialect,
   let assemblyFormat = "attr-dict";
 }
 
+def FuseForallOp : Op<Transform_Dialect, "iree.fuse_forall",
+    [FunctionalStyleTransformOpTrait,
+     DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     DeclareOpInterfaceMethods<TransformOpInterface>,
+     ReportTrackingListenerFailuresOpTrait]> {
+  let description = [{
+    Fuses a producer-consumer pair of scf.forall ops that share the same
+    iterator mapping types and trip counts. An allocation is created to
+    bridge the `parallel.insert_slice` of the producer with the per-thread
+    `extract_slice` of the consumer. If specified, uses |address_space| for
+    the intermediate allocation.
+
+    NOTE: This pattern implicitly REQUIRES that the resulting scf.forall
+    is capable of synchronizing all threads at the point of fusion (i.e.
+    inserting a barrier). This invalidates certain kinds of lowerings of
+    scf.forall ops such as lowering it to loops.
+
+    #### Return modes
+    Emits a definite failure if either the producer or consumer are not
+    scf.forall ops.
+  }];
+
+  let arguments = (
+      ins TransformHandleTypeInterface:$producer,
+          TransformHandleTypeInterface:$consumer,
+          OptionalAttr<AnyAttr>:$address_space
+  );
+  let results = (outs TransformHandleTypeInterface:$result);
+
+  let assemblyFormat = [{
+    $producer `into` $consumer attr-dict
+    `:` functional-type(operands, results)
+  }];
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+}
+
 #endif // IREE_COMPILER_CODEGEN_DIALECT_GPU_TRANSFORMEXTENSIONS_IREEGPUEXTENSIONS

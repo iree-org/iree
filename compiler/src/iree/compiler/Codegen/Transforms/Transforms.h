@@ -86,6 +86,10 @@ void hoistStaticallyBoundAllocationsInFunc(
 /// are divisible by N.
 void populateAffineMinSCFCanonicalizationPattern(RewritePatternSet &patterns);
 
+/// Populate patterns that hoist perfectly nested scf.forall ops from parent
+/// scf.for ops.
+void populateForallLoopHoistingPattern(RewritePatternSet &patterns);
+
 using GetMinMaxExprFn =
     std::function<std::optional<std::pair<AffineExpr, AffineExpr>>(
         Value value, SmallVectorImpl<Value> &dims,
