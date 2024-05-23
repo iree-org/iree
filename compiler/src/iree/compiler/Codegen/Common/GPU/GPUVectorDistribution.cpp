@@ -9,7 +9,9 @@
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtOps.h"
 #include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Verifier.h"
@@ -259,33 +261,87 @@ struct DecomposeLayoutConflictResolutions final
         !currentLayout.hasLaneConflictWith(targetLayout))
       return failure();
 
-    // Create shared memory to store the intermediate from src layout.
+    // Compute Warp and Subgroup Related information
+    auto funcOp = resolutionOp->getParentOfType<func::FuncOp>();
+    if (!funcOp)
+      return failure();
+    std::optional<SmallVector<int64_t>> workgroupSize =
+        getWorkgroupSize(funcOp);
+    std::optional<int64_t> subgroupSize = getSubgroupSize(funcOp);
+    if (!workgroupSize.has_value() || !subgroupSize.has_value()) {
+      return failure();
+    }
+    int64_t flatThreadSize = ShapedType::getNumElements(workgroupSize.value());
+    if (flatThreadSize % subgroupSize.value() != 0)
+      return failure();
+    int64_t numSubgroups = flatThreadSize / subgroupSize.value();
+
+    // Define shapes and types needed to be roundtripped to shared-memory.
     auto resolutionType =
         llvm::dyn_cast_or_null<VectorType>(resolutionOp.getResult().getType());
     if (!resolutionType)
       return failure();
     if (!resolutionType.hasStaticShape())
       return failure();
-    ArrayRef<int64_t> resolutionShape = resolutionType.getShape();
+    auto paddedShape = SmallVector<int64_t>(resolutionType.getShape());
+    int64_t vectorRank = resolutionType.getRank();
+    paddedShape[vectorRank - 1] *= numSubgroups;
+
+    // Modification for subgroup offseting. Stack subgroup data on the fastest
+    // dimension. auto subgroupId = rewriter.create<gpu::SubgroupIdOp>(loc);
+    AffineExpr d0, d1, d2, s0;
+    bindDims(rewriter.getContext(), d0, d1, d2);
+    bindSymbols(rewriter.getContext(), s0);
+    auto indexType = rewriter.getIndexType();
+    Value threadX =
+        rewriter.create<gpu::ThreadIdOp>(loc, indexType, gpu::Dimension::x);
+    Value threadY =
+        rewriter.create<gpu::ThreadIdOp>(loc, indexType, gpu::Dimension::y);
+    Value threadZ =
+        rewriter.create<gpu::ThreadIdOp>(loc, indexType, gpu::Dimension::z);
+    Value flatThreadId = affine::makeComposedAffineApply(
+        rewriter, loc,
+        (d0 + workgroupSize.value()[0] * d1 +
+         (workgroupSize.value()[0] * workgroupSize.value()[1]) * d2),
+        {threadX, threadY, threadZ});
+    Value subgroupOffset = affine::makeComposedAffineApply(
+        rewriter, loc,
+        s0.floorDiv(subgroupSize.value()) *
+            resolutionType.getShape()[vectorRank - 1],
+        {flatThreadId});
+
+    // Create shared memory to store the intermediate from src layout.
     auto workgroupMemoryAddressSpace = Attribute(gpu::AddressSpaceAttr::get(
         rewriter.getContext(), gpu::AddressSpace::Workgroup));
     MemRefType allocType =
-        MemRefType::get(resolutionShape, resolutionType.getElementType(),
+        MemRefType::get(paddedShape, resolutionType.getElementType(),
                         AffineMap(), workgroupMemoryAddressSpace);
     auto alloc = rewriter.create<memref::AllocOp>(loc, allocType);
+
+    SmallVector<OpFoldResult> offsets(vectorRank, rewriter.getIndexAttr(0));
+    SmallVector<OpFoldResult> strides(vectorRank, rewriter.getIndexAttr(1));
+    SmallVector<OpFoldResult> shapes = llvm::to_vector(
+        llvm::map_range(resolutionType.getShape(), [&](int64_t dim) {
+          return OpFoldResult(rewriter.getIndexAttr(dim));
+        }));
+    offsets[vectorRank - 1] = subgroupOffset;
+    auto subview = rewriter.create<memref::SubViewOp>(loc, alloc, offsets,
+                                                      shapes, strides);
 
     // Creating write/trip to shared memory using src layout.
     Value c0 = rewriter.create<arith::ConstantIndexOp>(loc, 0);
     SmallVector<Value> indices(resolutionType.getRank(), c0);
-    SmallVector<bool> inBounds(resolutionType.getRank(), true);
-    auto write = rewriter.create<vector::TransferWriteOp>(loc, vector, alloc,
+    SmallVector<bool> inBounds(vectorRank, true);
+    auto write = rewriter.create<vector::TransferWriteOp>(loc, vector, subview,
                                                           indices, inBounds);
     // Insert gpu.barrier
     rewriter.create<gpu::BarrierOp>(write.getLoc());
 
     // Creating read from shared memory using dst layout.
-    auto read = rewriter.create<vector::TransferReadOp>(
-        loc, resolutionType, alloc, indices, inBounds);
+    // Read with offset starting from the warpIdx * OG fastest dim.
+    indices[vectorRank - 1] = subgroupOffset;
+    auto read = rewriter.create<vector::TransferReadOp>(loc, resolutionType,
+                                                        alloc, indices);
 
     // Set layouts to read and write.
     auto unitAttr = UnitAttr::get(rewriter.getContext());
