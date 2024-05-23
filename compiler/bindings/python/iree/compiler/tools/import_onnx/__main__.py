@@ -142,7 +142,7 @@ def load_onnx_model(args: argparse.Namespace) -> onnx.ModelProto:
 
 
 def parse_arguments(argv=None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Torch-mlir ONNX import tool")
+    parser = argparse.ArgumentParser(description="IREE ONNX import tool")
     parser.add_argument("input_file", help="ONNX protobuf input", type=Path)
     parser.add_argument(
         "-o", dest="output_file", help="Output path (or '-' for stdout)"
