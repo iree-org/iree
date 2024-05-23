@@ -130,3 +130,14 @@ func.func @single_multi_mma(%lhs: vector<4xf16>, %rhs: vector<4xf16>, %acc: vect
 //  CHECK-SAME:       iterator_types = []
 //  CHECK-SAME:       kind = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
 //  CHECK-SAME:     : vector<4xf16>, vector<4xf16> into vector<4xf32>
+
+// -----
+
+func.func @tensor_barrier(%input: tensor<?xf16>) -> tensor<?xf16> {
+  %out = iree_gpu.tensor_barrier %input : tensor<?xf16>
+  return %out : tensor<?xf16>
+}
+
+// CHECK-LABEL: func @tensor_barrier
+//  CHECK-SAME:   %[[INPUT:[A-Za-z0-9]+]]: tensor<?xf16>
+//       CHECK:   iree_gpu.tensor_barrier %[[INPUT]] : tensor<?xf16>

@@ -2571,3 +2571,46 @@ func.func @sub_byte_bufferize_with_offset() {
 //       CHECK:   %[[C64:.+]] = arith.constant 64 : index
 //       CHECK:   hal.interface.binding.subspan set(0) binding(0)
 //  CHECK-SAME:       memref<64xi4, strided<[1], offset: 128>
+
+// -----
+
+func.func @tensor_barrier() -> vector<2xf32> {
+  %cst = arith.constant dense<0.0> : vector<2xf32>
+  %cst0 = arith.constant 0.0 : f32
+  %c0 = arith.constant 0 : index
+  %alloc = bufferization.alloc_tensor() : tensor<2xf32>
+  %tmp = vector.transfer_write %cst, %alloc[%c0] {in_bounds = [true]} : vector<2xf32>, tensor<2xf32>
+  %barrier = iree_gpu.tensor_barrier %tmp : tensor<2xf32>
+  %res = vector.transfer_read %barrier[%c0], %cst0 {in_bounds = [true]} : tensor<2xf32>, vector<2xf32>
+  return %res : vector<2xf32>
+}
+// CHECK-LABEL: func @tensor_barrier()
+//       CHECK:   %[[ALLOC:.+]] = memref.alloc() : memref<2xf32>
+//       CHECK:   vector.transfer_write %{{.*}}, %[[ALLOC]]
+//  CHECK-NEXT:   gpu.barrier
+//  CHECK-NEXT:   vector.transfer_read %[[ALLOC]]
+
+// -----
+
+func.func @tensor_barrier_in_loop() -> vector<2xf32> {
+  %cst = arith.constant dense<0.0> : vector<2xf32>
+  %cst0 = arith.constant 0.0 : f32
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c10 = arith.constant 10 : index
+  %alloc = bufferization.alloc_tensor() : tensor<2xf32>
+  %loop = scf.for %arg0 = %c0 to %c10 step %c1 iter_args(%init = %alloc) -> tensor<2xf32> {
+    %tmp = vector.transfer_write %cst, %init[%c0] {in_bounds = [true]} : vector<2xf32>, tensor<2xf32>
+    %barrier = iree_gpu.tensor_barrier %tmp : tensor<2xf32>
+    scf.yield %barrier : tensor<2xf32>
+  }
+  %res = vector.transfer_read %loop[%c0], %cst0 {in_bounds = [true]} : tensor<2xf32>, vector<2xf32>
+  return %res : vector<2xf32>
+}
+// CHECK-LABEL: func @tensor_barrier_in_loop()
+//       CHECK:   %[[ALLOC:.+]] = memref.alloc() : memref<2xf32>
+//       CHECK:   scf.for
+//  CHECK-NEXT:     vector.transfer_write %{{.*}}, %[[ALLOC]]
+//  CHECK-NEXT:     gpu.barrier
+//  CHECK-NEXT:   }
+//       CHECK:   vector.transfer_read %[[ALLOC]]

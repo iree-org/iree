@@ -11,6 +11,7 @@ include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.td"
 include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.td"
 include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
+include "mlir/Interfaces/DestinationStyleOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpAsmInterface.td"
 include "mlir/IR/OpBase.td"
@@ -325,6 +326,41 @@ def IREEGPU_ShuffleTensorOp : Op<IREEGPU_Dialect, "shuffle_tensor", [
 
   let hasVerifier = 1;
   let hasRegionVerifier = 1;
+}
+
+//===----------------------------------------------------------------------===//
+// TensorBarrierOp
+//===----------------------------------------------------------------------===//
+
+def IREEGPU_TensorBarrierOp : Op<IREEGPU_Dialect, "tensor_barrier", [
+    Pure,
+    DeclareOpInterfaceMethods<DestinationStyleOpInterface>,
+    AllTypesMatch<["input", "result"]>,
+    ]> {
+  let summary = "Shuffles a private tensor across a shared allocation";
+  let description = [{
+    This operation acts as a barrier on a tensor value. It takes a single
+    tensor operand and produces an equivalent tensor. This does not have copy
+    and/or data movement semantics and simply represents a barrier on all writes
+    to the input tensor.
+
+    This operation is a no-op when not present in a parallel context. This
+    operation is pure as it only requires synchronization for the value it
+    produces.
+  }];
+
+  let arguments = (ins AnyRankedTensor:$input);
+  let results = (outs AnyRankedTensor:$result);
+
+  let assemblyFormat = [{
+    $input attr-dict `:` type($result)
+  }];
+
+  let extraClassDeclaration = [{
+    RankedTensorType getInputType() {
+      return getInput().getType();
+    }
+  }];
 }
 
 //===----------------------------------------------------------------------===//

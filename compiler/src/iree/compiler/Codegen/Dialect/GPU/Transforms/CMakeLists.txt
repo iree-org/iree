@@ -12,6 +12,24 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
+    BufferizationInterfaces
+  HDRS
+    "BufferizationInterfaces.h"
+  SRCS
+    "BufferizationInterfaces.cpp"
+  DEPS
+    MLIRBufferizationDialect
+    MLIRBufferizationTransforms
+    MLIRGPUDialect
+    MLIRIR
+    MLIRMemRefDialect
+    MLIRSupport
+    iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     GPUTransforms
   HDRS
     "Transforms.h"
@@ -21,6 +39,7 @@ iree_cc_library(
     LLVMSupport
     MLIRArithDialect
     MLIRFuncDialect
+    MLIRGPUDialect
     MLIRIR
     MLIRTransformUtils
     MLIRTransforms

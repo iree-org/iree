@@ -14,7 +14,6 @@
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/BuiltinTypes.h"
-#include "mlir/IR/OpImplementation.h"
 #include "mlir/Support/LLVM.h"
 
 // clang-format off
@@ -230,6 +229,14 @@ LogicalResult ShuffleTensorOp::verifyRegions() {
   }
 
   return success();
+}
+
+//===----------------------------------------------------------------------===//
+// TensorBarrierOp
+//===----------------------------------------------------------------------===//
+
+MutableOperandRange TensorBarrierOp::getDpsInitsMutable() {
+  return getInputMutable();
 }
 
 } // namespace mlir::iree_compiler::IREE::GPU
