@@ -62,17 +62,6 @@ def main(args: argparse.Namespace):
 
 
 def load_onnx_model(args: argparse.Namespace) -> onnx.ModelProto:
-    # Do shape inference two ways.  First, attempt in-memory to avoid redundant
-    # loading and the need for writing a temporary file somewhere.  If that
-    # fails, typically because of the 2 GB protobuf size limit, try again via
-    # files.  See
-    # https://onnx.ai/onnx/repo-docs/PythonAPIOverview.html#shape-inference-a-large-onnx-model-2gb
-    # for details about the file-based technique.
-
-    # Make a temp dir for all the temp files we'll be generating as a side
-    # effect of infering shapes.  For now, the only file is a new .onnx holding
-    # the revised model with shapes.
-
     input_dir = os.path.dirname(os.path.abspath(args.input_file))
 
     # Load the model, with possible external data coming from the default
@@ -83,6 +72,13 @@ def load_onnx_model(args: argparse.Namespace) -> onnx.ModelProto:
         raw_model = onnx.load(args.input_file, load_external_data=False)
         onnx.load_external_data_for_model(raw_model, args.data_dir)
 
+    # Do shape inference two ways.  First, attempt in-memory to avoid redundant
+    # loading and the need for writing a temporary file somewhere.  If that
+    # fails, typically because of the 2 GB protobuf size limit, try again via
+    # files.  See
+    # https://onnx.ai/onnx/repo-docs/PythonAPIOverview.html#shape-inference-a-large-onnx-model-2gb
+    # for details about the file-based technique.
+    
     # Run the checker to test whether the file is above the threshold for
     # in-memory shape inference.  If not, go ahead and do the shape inference.
     try:
@@ -96,6 +92,9 @@ def load_onnx_model(args: argparse.Namespace) -> onnx.ModelProto:
 
     # Model is too big for in-memory inference: do file-based shape inference
     # to a temp file.
+    # Make a temp dir for all the temp files we'll be generating as a side
+    # effect of infering shapes. For now, the only file is a new .onnx holding
+    # the revised model with shapes.
     with tempfile.TemporaryDirectory(dir=input_dir) as temp_dir_name:
         temp_dir_path = Path(temp_dir_name)
         temp_inferred_file = temp_dir_path / "temp-inferred.onnx"
