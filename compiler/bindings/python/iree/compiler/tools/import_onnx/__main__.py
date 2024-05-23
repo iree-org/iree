@@ -17,7 +17,6 @@ Or from Python:
 import argparse
 import os
 from pathlib import Path
-import shutil
 import sys
 import tempfile
 
