@@ -131,3 +131,43 @@ func.func @batch_mmt4d_with_lowering_config(%arg0: tensor<12x4x64x8x1xf16>, %arg
 // CHECK:      func.func @batch_mmt4d_with_lowering_config
 // CHECK:        linalg.fill {lowering_config = #[[CONFIG1]]}
 // CHECK:        linalg.mmt4d {lowering_config = #[[CONFIG2]]}
+
+// -----
+
+func.func @pack_without_outer_dims_perm(%arg0: tensor<1x16384x512xbf16>, %arg1: tensor<1x1024x256x16x2xbf16>) -> tensor<1x1024x256x16x2xbf16> {
+  %cst = arith.constant 0.000000e+00 : bf16
+  %pack = tensor.pack %arg0 inner_dims_pos = [1, 2] inner_tiles = [16, 2] into %arg1 : tensor<1x16384x512xbf16> -> tensor<1x1024x256x16x2xbf16>
+  return %pack : tensor<1x1024x256x16x2xbf16>
+}
+// CHECK:      func.func @pack_without_outer_dims_perm
+// CHECK-SAME:   %[[SRC:[0-9a-zA-Z]+]]
+// CHECK-SAME:   %[[DEST:[0-9a-zA-Z]+]]
+// CHECK:        %[[SRC_SLICE:.+]] = tensor.extract_slice %[[SRC]]
+// CHECK-SAME:     tensor<1x16384x512xbf16> to tensor<16384x512xbf16>
+// CHECK:        %[[DEST_SLICE:.+]] = tensor.extract_slice %[[DEST]]
+// CHECK-SAME:      tensor<1x1024x256x16x2xbf16> to tensor<1024x256x16x2xbf16>
+// CHECK:        %[[PACK:.+]] = tensor.pack %[[SRC_SLICE]]
+// CHECK-SAME:     inner_dims_pos = [0, 1] inner_tiles = [16, 2]
+// CHECK-SAME:     into %[[DEST_SLICE]]
+
+// -----
+
+func.func @pack_with_outer_dims_perm(%arg0: tensor<484x16x64xbf16>, %arg1: tensor<64x31x8x16x2xbf16>) -> tensor<64x31x8x16x2xbf16> {
+  %cst = arith.constant 0.000000e+00 : bf16
+  %pack = tensor.pack %arg0 padding_value(%cst : bf16) outer_dims_perm = [2, 0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 2] into %arg1 : tensor<484x16x64xbf16> -> tensor<64x31x8x16x2xbf16>
+  return %pack : tensor<64x31x8x16x2xbf16>
+}
+// CHECK:      func.func @pack_with_outer_dims_perm
+// CHECK-SAME:   %[[SRC:[0-9a-zA-Z]+]]
+// CHECK-SAME:   %[[DEST:[0-9a-zA-Z]+]]
+// CHECK-DAG:    %[[PAD_VAL:.+]] = arith.constant 0.000000e+00 : bf16
+// CHECK:        %[[RES:.+]] = scf.for {{.+}} iter_args(%[[ITER:.+]] = %[[DEST]]) -> (tensor<64x31x8x16x2xbf16>)
+// CHECK:          %[[SRC_SLICE:.+]] = tensor.extract_slice %[[SRC]]
+// CHECK-SAME:       tensor<484x16x64xbf16> to tensor<484x16xbf16>
+// CHECK:          %[[DEST_SLICE:.+]] = tensor.extract_slice %[[ITER]]
+// CHECK-SAME:       tensor<64x31x8x16x2xbf16> to tensor<31x8x16x2xbf16>
+// CHECK:          %[[PACK:.+]] = tensor.pack %[[SRC_SLICE]]
+// CHECK-SAME:       padding_value(%[[PAD_VAL]] : bf16)
+// CHECK-SAME:       outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 2]
+// CHECK-SAME:       into %[[DEST_SLICE]]
+// CHECK:        return %[[RES]]
