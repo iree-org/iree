@@ -49,7 +49,7 @@ def LinalgFusionInterface : OpInterface<"LinalgFusionOpInterface"> {
     //===------------------------------------------------------------------===//
     InterfaceMethod<
       /*desc=*/[{
-        Return an AffineMap for each operand or `std::nullopt` if the operand
+        Return an AffineMap for each operand or nullptr if the operand
         does not have an indexing map representation.
       }],
       /*retTy=*/"SmallVector<AffineMap>",
@@ -59,7 +59,7 @@ def LinalgFusionInterface : OpInterface<"LinalgFusionOpInterface"> {
     >,
     InterfaceMethod<
       /*desc=*/[{
-        Return an AffineMap for each result or `std::nullopt` if the result
+        Return an AffineMap for each result or nullptr if the result
         does not have an indexing map representation.
       }],
       /*retTy=*/"SmallVector<AffineMap>",
@@ -69,8 +69,8 @@ def LinalgFusionInterface : OpInterface<"LinalgFusionOpInterface"> {
     >,
     InterfaceMethod<
       /*desc=*/[{
-        Return all indexing maps, or `std::nullopt` if an operand or result
-        does not have an indexing map representation.
+        For each operand/result return indexing map or nullptr if an
+        operand or result does not have an indexing map representation.
       }],
       /*retTy=*/"SmallVector<AffineMap>",
       /*methodName=*/"getIndexingMaps",
@@ -126,7 +126,8 @@ def LinalgFusionInterface : OpInterface<"LinalgFusionOpInterface"> {
     >,
     InterfaceMethod<
       /*desc=*/[{
-        Return the indexing map for an op's `result`.
+        Return the indexing map for an op's `result` or nullptr if
+        the indexing map is not representable.
       }],
       /*retTy=*/"AffineMap",
       /*methodName=*/"getIndexingMapMatchingResult",
@@ -139,7 +140,8 @@ def LinalgFusionInterface : OpInterface<"LinalgFusionOpInterface"> {
     >,
     InterfaceMethod<
       /*desc=*/[{
-        Return the input or output indexing map for `opOperand`.
+        Return the indexing map for `opOperand` or nullptr if
+        the indexing map is not representable.
       }],
       /*retTy=*/"AffineMap",
       /*methodName=*/"getMatchingIndexingMap",
