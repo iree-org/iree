@@ -4,8 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
-#include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Common/CPU/PassDetail.h"
+#include "iree/compiler/Codegen/Common/CPU/Passes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
@@ -99,8 +100,8 @@ struct ConvertBatchMmt4DtoMmt4DPattern
                                       ValueRange{newInit})
               .result();
 
-      IREE::Codegen::LoweringConfigAttr loweringConfig =
-          getLoweringConfig(oldFillOp);
+      auto loweringConfig =
+          getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(oldFillOp);
       if (loweringConfig) {
         auto config = dropBatchTileSize(loweringConfig);
         setLoweringConfig(reducedOut.getDefiningOp(), config);
@@ -135,7 +136,8 @@ struct ConvertBatchMmt4DtoMmt4DPattern
         loc, reducedOut.getType(), ValueRange{reducedLhs, reducedRhs},
         ValueRange{reducedOut});
 
-    IREE::Codegen::LoweringConfigAttr loweringConfig = getLoweringConfig(op);
+    auto loweringConfig =
+        getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(op);
     if (loweringConfig) {
       auto config = dropBatchTileSize(loweringConfig);
       setLoweringConfig(mmt4DOp, config);
@@ -148,8 +150,8 @@ struct ConvertBatchMmt4DtoMmt4DPattern
   }
 };
 
-struct DecomposeBatchMmt4DOpsPass
-    : public DecomposeBatchMmt4DOpsBase<DecomposeBatchMmt4DOpsPass> {
+struct CPUPrepareUkernelsPass
+    : public CPUPrepareUkernelsBase<CPUPrepareUkernelsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, arith::ArithDialect,
                     tensor::TensorDialect, scf::SCFDialect>();
@@ -160,7 +162,7 @@ struct DecomposeBatchMmt4DOpsPass
 
 } // namespace
 
-void DecomposeBatchMmt4DOpsPass::runOnOperation() {
+void CPUPrepareUkernelsPass::runOnOperation() {
   MLIRContext *ctx = &getContext();
   auto funcOp = getOperation();
   Operation *errorOp = nullptr;
@@ -212,8 +214,8 @@ void DecomposeBatchMmt4DOpsPass::runOnOperation() {
 }
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createDecomposeBatchMmt4DOpsPass() {
-  return std::make_unique<DecomposeBatchMmt4DOpsPass>();
+createCPUPrepareUkernelsPass() {
+  return std::make_unique<CPUPrepareUkernelsPass>();
 }
 
 } // namespace mlir::iree_compiler

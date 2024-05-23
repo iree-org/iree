@@ -12,4 +12,5 @@ set -euo pipefail
 # (https://docs.docker.com/develop/develop-images/multistage-build/) but it
 # turns out that Dockerfile is a thoroughly non-composable awful format and that
 # doesn't actually work that well. These deps are pretty small.
-apt-get update && apt-get install -y git unzip wget curl gnupg2 lsb-release
+apt-get update && apt-get install -y git unzip wget curl gnupg2 lsb-release sudo
+echo "ALL ALL=NOPASSWD: ALL" > "/etc/sudoers.d/iree"

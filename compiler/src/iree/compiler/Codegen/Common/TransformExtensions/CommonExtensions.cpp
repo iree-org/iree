@@ -14,6 +14,7 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
@@ -27,6 +28,7 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Casting.h"
 #include "mlir/Analysis/SliceAnalysis.h"
+#include "mlir/Analysis/TopologicalSortUtils.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
@@ -408,35 +410,30 @@ struct LowerShuffleTensor
                                 PatternRewriter &rewriter) const final {
     Location loc = shuffleOp.getLoc();
 
-    MemRefType allocType = shuffleOp.getSharedAllocType();
-    auto tensorType =
-        RankedTensorType::get(allocType.getShape(), allocType.getElementType());
-    Value tensorAlloc = rewriter.create<bufferization::ToTensorOp>(
-        loc, tensorType, shuffleOp.getSharedAlloc(), /*restrict=*/true,
-        /*writeable=*/true);
-
     // Step 1. Insert the source slice into the intermediate tensor.
-    SmallVector<OpFoldResult, 4> sourceOffsets =
-        shuffleOp.getMixedSourceOffsets();
-    SmallVector<OpFoldResult, 4> sourceSizes = shuffleOp.getMixedSourceSizes();
-    SmallVector<OpFoldResult, 4> sourceStrides =
-        shuffleOp.getMixedSourceStrides();
+    SmallVector<OpFoldResult, 4> sourceOffsets = shuffleOp.getMixedOffsets();
+    SmallVector<OpFoldResult, 4> sourceSizes = shuffleOp.getMixedSizes();
+    SmallVector<OpFoldResult, 4> sourceStrides = shuffleOp.getMixedStrides();
     Value insertedSlice = rewriter.create<tensor::InsertSliceOp>(
-        loc, shuffleOp.getSource(), tensorAlloc, sourceOffsets, sourceSizes,
-        sourceStrides);
+        loc, shuffleOp.getSource(), shuffleOp.getDest(), sourceOffsets,
+        sourceSizes, sourceStrides);
 
     // Step 2. Synchronize the workers.
     rewriter.create<gpu::BarrierOp>(loc);
 
-    // Step 3. Extract the result slice.
-    SmallVector<OpFoldResult, 4> resultOffsets =
-        shuffleOp.getMixedResultOffsets();
-    SmallVector<OpFoldResult, 4> resultSizes = shuffleOp.getMixedResultSizes();
-    SmallVector<OpFoldResult, 4> resultStrides =
-        shuffleOp.getMixedResultStrides();
-    rewriter.replaceOpWithNewOp<tensor::ExtractSliceOp>(
-        shuffleOp, shuffleOp.getType(), insertedSlice, resultOffsets,
-        resultSizes, resultStrides);
+    auto terminator = shuffleOp.getBody()->getTerminator();
+    Value replacement = terminator->getOperand(0);
+    rewriter.inlineBlockBefore(shuffleOp.getBody(), shuffleOp, {insertedSlice});
+    rewriter.replaceAllUsesWith(shuffleOp.getResult(), replacement);
+    rewriter.setInsertionPointAfterValue(replacement);
+
+    // Step 2. Synchronize the workers again after reading the shuffled values.
+    // TODO: This barrier is an approximation for what we expect bufferization +
+    // vectorization to produce. There is no guarantee that this barrier is
+    // adhered to, but the way that bufferization and vectorization works
+    // is unfriendly towards barrier-like constructs.
+    rewriter.create<gpu::BarrierOp>(loc);
+    rewriter.eraseOp(terminator);
     return success();
   }
 };
@@ -701,11 +698,81 @@ void transform_dialect::FlattenForallMappingOp::getEffects(
 }
 
 //===---------------------------------------------------------------------===//
+// ForallToLanesOp
+//===---------------------------------------------------------------------===//
+
+static bool isLaneMappableForall(scf::ForallOp forallOp) {
+  if (forallOp.getNumResults() > 0)
+    return false;
+  if (forallOp.getRank() != 1)
+    return false;
+  if (!forallOp.getMapping().has_value())
+    return false;
+  Attribute mapping = *forallOp.getMapping()->getValue().begin();
+  if (mapping != IREE::GPU::LaneIdAttr::get(forallOp.getContext(), 0)) {
+    return false;
+  }
+  return true;
+}
+
+static void rewriteForallToLanes(RewriterBase &rewriter,
+                                 scf::ForallOp forallOp) {
+  Location loc = forallOp->getLoc();
+  assert(isLaneMappableForall(forallOp) &&
+         "mapping non-lane mappable forall op");
+
+  Value laneId = rewriter.create<gpu::LaneIdOp>(loc);
+
+  // Step 4. Predicate omitted given unique topLevel scf::ForallOp.
+
+  // Step 5. Move the body of forallOp.
+  // Erase the terminator first, it will not be used since we are on buffers.
+  rewriter.eraseOp(forallOp.getTerminator());
+  rewriter.setInsertionPoint(forallOp);
+  rewriter.inlineBlockBefore(forallOp.getBody(), forallOp, {laneId});
+  rewriter.create<gpu::BarrierOp>(loc);
+
+  // Step 7. Erase old op.
+  rewriter.eraseOp(forallOp);
+}
+
+DiagnosedSilenceableFailure transform_dialect::ForallToLanesOp::applyToOne(
+    transform::TransformRewriter &rewriter, mlir::FunctionOpInterface target,
+    transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+
+  SmallVector<scf::ForallOp> foralls;
+  target->walk([&](scf::ForallOp forallOp) {
+    if (isLaneMappableForall(forallOp)) {
+      foralls.push_back(forallOp);
+    }
+  });
+
+  if (foralls.empty()) {
+    return mlir::emitSilenceableFailure(
+        target, "could not find a lane mappable scf.forall");
+  }
+
+  for (auto forall : foralls) {
+    rewriter.setInsertionPoint(forall);
+    rewriteForallToLanes(rewriter, forall);
+  }
+
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::ForallToLanesOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::modifiesPayload(effects);
+}
+
+//===---------------------------------------------------------------------===//
 // ForallToWorkgroupOp
 //===---------------------------------------------------------------------===//
 
-LogicalResult rewriteForallToWorkgroup(RewriterBase &rewriter,
-                                       scf::ForallOp forallOp) {
+static LogicalResult rewriteForallToWorkgroup(RewriterBase &rewriter,
+                                              scf::ForallOp forallOp) {
   // Step 0. Target-specific verifications. There is no good place to anchor
   // those right now: the ForallOp is target-independent and the
   // transform op does not apply to individual ForallOp.
@@ -836,7 +903,7 @@ void transform_dialect::ForallToWorkgroupOp::getEffects(
 // FuseForallOp
 //===---------------------------------------------------------------------===//
 
-FailureOr<int64_t> getTripCount(scf::ForallOp loop) {
+static FailureOr<int64_t> getTripCount(scf::ForallOp loop) {
   ArrayRef<int64_t> lbs = loop.getStaticLowerBound();
   ArrayRef<int64_t> ubs = loop.getStaticUpperBound();
   ArrayRef<int64_t> steps = loop.getStaticStep();
@@ -853,8 +920,8 @@ FailureOr<int64_t> getTripCount(scf::ForallOp loop) {
   return tripCount;
 }
 
-LogicalResult compareWorkerCountsAndTypes(scf::ForallOp producer,
-                                          scf::ForallOp consumer) {
+static LogicalResult compareWorkerCountsAndTypes(scf::ForallOp producer,
+                                                 scf::ForallOp consumer) {
   FailureOr<int64_t> producerTripCount = getTripCount(producer);
   FailureOr<int64_t> consumerTripCount = getTripCount(consumer);
   if (failed(producerTripCount) || failed(consumerTripCount) ||
@@ -877,35 +944,27 @@ LogicalResult compareWorkerCountsAndTypes(scf::ForallOp producer,
   return success();
 }
 
-Value getReplacementSlice(RewriterBase &rewriter, Location loc,
-                          tensor::ParallelInsertSliceOp parallelInsert,
-                          tensor::ExtractSliceOp extractSlice,
-                          std::optional<Attribute> addressSpace) {
-  RankedTensorType destTensorType = parallelInsert.getDestType();
-  MemRefType allocType =
-      addressSpace ? MemRefType::get(destTensorType.getShape(),
-                                     destTensorType.getElementType(),
-                                     MemRefLayoutAttrInterface{}, *addressSpace)
-                   : MemRefType::get(destTensorType.getShape(),
-                                     destTensorType.getElementType());
-  Value dest = Value();
-  if (auto empty = parallelInsert.getDest().getDefiningOp<tensor::EmptyOp>()) {
-    OpBuilder::InsertionGuard g(rewriter);
-    rewriter.setInsertionPoint(empty);
-    dest = rewriter.create<memref::AllocOp>(loc, allocType,
-                                            empty.getDynamicSizes());
-  } else {
-    dest = rewriter.create<bufferization::ToMemrefOp>(loc, allocType,
-                                                      parallelInsert.getDest());
-  }
-  return rewriter.create<IREE::GPU::ShuffleTensorOp>(
+static void replaceExtractSlice(RewriterBase &rewriter, Location loc,
+                                tensor::ParallelInsertSliceOp parallelInsert,
+                                tensor::ExtractSliceOp extractSlice) {
+  OpBuilder::InsertionGuard g(rewriter);
+  auto shuffleOp = rewriter.create<IREE::GPU::ShuffleTensorOp>(
       loc, extractSlice.getType(), parallelInsert.getSource(),
       parallelInsert.getOffsets(), parallelInsert.getSizes(),
       parallelInsert.getStrides(), parallelInsert.getStaticOffsets(),
-      parallelInsert.getStaticSizes(), parallelInsert.getStaticStrides(), dest,
-      extractSlice.getOffsets(), extractSlice.getSizes(),
-      extractSlice.getStrides(), extractSlice.getStaticOffsets(),
-      extractSlice.getStaticSizes(), extractSlice.getStaticStrides());
+      parallelInsert.getStaticSizes(), parallelInsert.getStaticStrides(),
+      parallelInsert.getDest());
+  Region *region = &shuffleOp.getRegion();
+  rewriter.createBlock(region, region->end(),
+                       ArrayRef<Type>{parallelInsert.getDestType()},
+                       ArrayRef<Location>{loc});
+  rewriter.setInsertionPointToStart(shuffleOp.getBody());
+  auto terminator =
+      rewriter.create<IREE::GPU::YieldOp>(loc, extractSlice.getResult());
+  rewriter.moveOpBefore(extractSlice, terminator);
+  extractSlice.getSourceMutable().assign(shuffleOp.getBody()->getArgument(0));
+  rewriter.replaceAllUsesExcept(extractSlice.getResult(), shuffleOp,
+                                terminator);
 }
 
 LogicalResult fuseForallIntoSlice(RewriterBase &rewriter,
@@ -975,12 +1034,9 @@ LogicalResult fuseForallIntoSlice(RewriterBase &rewriter,
   auto parallelInsert =
       cast<tensor::ParallelInsertSliceOp>(*terminator.getYieldingOps().begin());
 
-  Value replacementSlice =
-      getReplacementSlice(rewriter, loc, parallelInsert, slice, addressSpace);
-  rewriter.replaceAllUsesWith(slice, replacementSlice);
+  replaceExtractSlice(rewriter, loc, parallelInsert, slice);
 
   rewriter.eraseOp(parallelInsert);
-  rewriter.eraseOp(slice);
   rewriter.eraseOp(terminator);
   rewriter.eraseOp(producer);
   return success();

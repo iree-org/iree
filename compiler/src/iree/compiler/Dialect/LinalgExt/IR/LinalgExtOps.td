@@ -591,6 +591,7 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
         return std::nullopt;
       return getDpsInitOperand(2)->get();
     }
+
     ShapedType getQueryType() {
       return cast<ShapedType>(getQuery().getType());
     }
@@ -616,6 +617,7 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
       if (!sumVal) return std::nullopt;
       return cast<ShapedType>(sumVal->getType());
     }
+
     int64_t getQueryRank() {
       return getQueryType().getRank();
     }
@@ -638,13 +640,40 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
       if (!sumType) return std::nullopt;
       return sumType->getRank();
     }
-    int64_t getIterationDomainRank() {
-      return 2;
-    };
+
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
     MutableOperandRange getDpsInitsMutable() {
       return getOutputsMutable();
+    }
+
+    SmallVector<AffineMap> getIndexingMapsArray();
+
+    AffineMap getQueryMap() {
+      return cast<AffineMap>(getIndexingMapsArray()[0]);
+    }
+    AffineMap getKeyMap() {
+      return cast<AffineMap>(getIndexingMapsArray()[1]);
+    }
+    AffineMap getValueMap() {
+      return cast<AffineMap>(getIndexingMapsArray()[2]);
+    }
+    AffineMap getOutputMap() {
+      return cast<AffineMap>(getIndexingMapsArray()[3]);
+    }
+    std::optional<AffineMap> getMaxMap() {
+      if (getNumResults() < 2)
+        return std::nullopt;
+      return cast<AffineMap>(getIndexingMapsArray()[4]);
+    }
+    std::optional<AffineMap> getSumMap() {
+      if (getNumResults() < 3)
+        return std::nullopt;
+      return cast<AffineMap>(getIndexingMapsArray()[5]);
+    }
+
+    int64_t getIterationDomainRank() {
+      return getQueryMap().getNumDims();
     }
   }];
 }

@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_LLVMGPU_ROCDLPASSDETAIL_H_
 #define IREE_COMPILER_CODEGEN_LLVMGPU_ROCDLPASSDETAIL_H_
 
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Pass/Pass.h"
 

@@ -96,6 +96,10 @@ class TargetConverter:
                 "@nccl//:headers": [
                     "nccl::headers",
                 ],
+                # RCCL
+                "@rccl//:headers": [
+                    "rccl::headers",
+                ],
                 # Tracy.
                 "@tracy_client//:runtime": ["tracy_client::runtime"],
                 # Vulkan

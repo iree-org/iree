@@ -494,7 +494,7 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &funcPassManager,
   addTileAndDistributePasses(funcPassManager);
 
   if (pipelineOpt.enableUkernels) {
-    funcPassManager.addPass(createDecomposeBatchMmt4DOpsPass());
+    funcPassManager.addPass(createCPUPrepareUkernelsPass());
     funcPassManager.addPass(
         createCPULowerToUKernelsPass(clSkipIntermediateRoundings));
   }
@@ -563,6 +563,12 @@ void addCPUDataTilingPipeline(OpPassManager &funcPassManager,
                               TilingConfig &tilingConfig,
                               LLVMCPUPipelineOptions &pipelineOpt) {
   addTileAndDistributePasses(funcPassManager);
+
+  if (pipelineOpt.enableUkernels) {
+    funcPassManager.addPass(
+        createCPULowerToUKernelsPass(clSkipIntermediateRoundings));
+  }
+
   funcPassManager.addPass(
       createLLVMCPUTilePass(tilingConfig.getVectorCommonParallelLevel()));
   if (pipelineOpt.decomposePackUnPackOps) {

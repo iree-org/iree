@@ -7,6 +7,7 @@
 #include "compiler/plugins/input/StableHLO/Conversion/Passes.h"
 #include "iree/compiler/PluginAPI/Client.h"
 #include "mlir/Conversion/Passes.h"
+#include "mlir/Dialect/Shape/IR/Shape.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/PassManager.h"
 #include "stablehlo/dialect/ChloOps.h"
@@ -63,6 +64,7 @@ struct StableHLOSession
   }
 
   void onRegisterDialects(DialectRegistry &registry) override {
+    registry.insert<mlir::shape::ShapeDialect>();
     registry.insert<mlir::chlo::ChloDialect>();
     registry.insert<mlir::stablehlo::StablehloDialect>();
     registry.insert<mlir::vhlo::VhloDialect>();

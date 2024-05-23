@@ -27,8 +27,7 @@ TEST(DynamicSymbolsTest, CreateFromSystemLoader) {
   iree_status_t status = iree_hal_rocm_dynamic_symbols_initialize(
       iree_allocator_system(), &symbols);
   if (!iree_status_is_ok(status)) {
-    std::cerr << "Symbols cannot be loaded, skipping test.";
-    GTEST_SKIP();
+    GTEST_SKIP() << "Symbols cannot be loaded, skipping test.";
   }
 
   int device_count = 0;

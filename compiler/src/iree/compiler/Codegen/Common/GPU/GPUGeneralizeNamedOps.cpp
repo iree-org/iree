@@ -31,7 +31,8 @@ generalizeCandidates(MLIRContext *context,
   for (auto linalgOp : namedOpCandidates) {
     // Pass down lowering configuration. It can exist due to user set
     // configuration from the input.
-    auto config = getLoweringConfig(linalgOp);
+    IREE::Codegen::LoweringConfigAttrInterface config =
+        getLoweringConfig(linalgOp);
     rewriter.setInsertionPoint(linalgOp);
     FailureOr<linalg::GenericOp> generalizedOp =
         linalg::generalizeNamedOp(rewriter, linalgOp);

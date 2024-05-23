@@ -28,6 +28,11 @@ typedef enum iree_hal_hip_command_buffer_mode_e {
   IREE_HAL_HIP_COMMAND_BUFFER_MODE_STREAM = 1,
 } iree_hal_hip_command_buffer_mode_t;
 
+// ncclUniqueId exposed without exporting the RCCL headers.
+typedef struct {
+  char data[128];
+} iree_hal_hip_nccl_id_t;
+
 // Parameters defining a hipMemPool_t.
 typedef struct iree_hal_hip_memory_pool_params_t {
   // Minimum number of bytes to keep in the pool when trimming with

@@ -227,6 +227,7 @@ int main(int argc, char** argv) {
   iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_F32F32, 8, 8, "avx2_fma");
   iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_I32I32, 8, 8, "avx2_fma");
   iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_F32F32, 16, 1, "avx512_base");
+  iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_BF16BF16, 16, 2, "avx512_base");
   iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_I8I8, 16, 2, "avx512_base");
   iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_F32F32, 16, 16, "avx512_base");
   iree_uk_test_pack(IREE_UK_FLAG_PACK_TYPE_I32I32, 16, 16, "avx512_base");

@@ -1,13 +1,11 @@
-// RUN: iree-opt --split-input-file --iree-hal-transformation-pipeline %s | FileCheck %s
-// RUN: iree-opt --split-input-file --iree-hal-transformation-pipeline --iree-hal-cuda-dump-ptx %s 2>&1 | FileCheck %s --check-prefix=PTX
+// RUN: iree-opt --split-input-file --iree-hal-transformation-pipeline --iree-gpu-test-target=sm_60 %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-hal-transformation-pipeline --iree-gpu-test-target=sm_60 --iree-hal-cuda-dump-ptx %s 2>&1 | FileCheck %s --check-prefix=PTX
 
 #map = affine_map<(d0) -> (d0)>
 
 module attributes {
   hal.device.targets = [
-    #hal.device.target<"cuda", [
-      #hal.executable.target<"cuda", "cuda-nvptx-fb">
-    ]>
+    #hal.device.target<"cuda", [#hal.executable.target<"cuda", "cuda-nvptx-fb">]>
   ]
 } {
 

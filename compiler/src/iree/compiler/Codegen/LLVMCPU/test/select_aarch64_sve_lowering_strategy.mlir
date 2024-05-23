@@ -108,7 +108,7 @@ module {
 //       SSVE-WITHOUT-SME: linalg.matmul
 //  SSVE-WITHOUT-SME-SAME:     lowering_config = #[[CONFIG]]
 
-//   WITH-SME-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], {{\[}}[4], [4], 0], [0, 0, 1], [0, 0, 0]]>
+//   WITH-SME-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[64, 64, 0], {{\[}}[8], [8], 0], [0, 0, 1], [0, 0, 0]]>
 //   WITH-SME-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUDoubleTilingExpert>
 //       WITH-SME: func.func @matmul_tensors()
 //  WITH-SME-SAME:     translation_info = #[[TRANSLATION]]
@@ -187,7 +187,7 @@ module {
   }
 }
 
-// CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 7, 7, 72, 0, 0], [1, 1, 1, [4], 0, 0], [0, 0, 0, 0, 1, 3], [0, 0, 0, 0, 0, 0]]>
+// CHECK-DAG: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 28, 28, 8, 0, 0], [1, 1, 4, [4], 0, 0], [0, 0, 0, 0, 1, 3], [0, 0, 0, 0, 0, 0]]>
 // CHECK-DAG: #[[TRANSLATION:.+]] = #iree_codegen.translation_info<CPUConvTileAndDecomposeExpert>
 // CHECK:      func.func @depthwise_conv
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]

@@ -84,6 +84,7 @@ def PadToIntrinsics :
   let summary = "Pad linalg ops such that we can use target's intrinsics.";
   let dependentDialects = [
     "mlir::linalg::LinalgDialect",
+    "mlir::iree_compiler::IREE::GPU::IREEGPUDialect",
   ];
   let options = [
       Option<"padTargetType", "pad-target-type", "Preprocessing::PadTargetType",

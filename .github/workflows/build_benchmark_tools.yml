@@ -3,7 +3,7 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-#
+
 # Workflow for building benchmark tools.
 # It is designed to be called from a parent workflow.
 # The concurrency of this workflow is controlled by the caller's job.
@@ -38,7 +38,7 @@ permissions:
   contents: read
 
 env:
-  # This duplicates the variable from ci.yml. The variable needs to be in env
+  # This duplicates the variable from benchmark.yml. The variable needs to be in env
   # instead of the outputs of setup because it contains the run attempt and we
   # want that to be the current attempt, not whatever attempt the setup step
   # last ran in. It therefore can't be passed in via inputs because the env
