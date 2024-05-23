@@ -1022,6 +1022,7 @@ if(IREE_BUILD_TRACY)
   # the submodule directly.
   message(STATUS "Configuring third_party/tracy/capture for IREE_BUILD_TRACY")
   list(APPEND CMAKE_MESSAGE_INDENT "  ")
+  iree_set_tracy_cmake_options()
   add_subdirectory(third_party/tracy/capture ${CMAKE_CURRENT_BINARY_DIR}/tracy/capture)
   list(POP_BACK CMAKE_MESSAGE_INDENT)
 endif()
