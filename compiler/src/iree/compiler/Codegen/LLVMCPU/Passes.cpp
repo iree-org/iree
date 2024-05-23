@@ -95,6 +95,12 @@ static llvm::cl::opt<bool> clEnableVectorContractCustomKernels(
                    "LLVMCPUMmt4dVectorLowering pass."),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clDecomposePackUnpack(
+    "iree-llvmcpu-decompose-pack-unpack",
+    llvm::cl::desc(
+        "Enables decomposition for tensor.pack and tensor.unpack ops."),
+    llvm::cl::init(false));
+
 static void addTileAndDistributePasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createTileAndDistributeToWorkgroupsPass());
   funcPassManager.addPass(createConvertToDestinationPassingStylePass());
@@ -391,7 +397,7 @@ void addMultiTilingExpertPassPipeline(OpPassManager &funcPassManager,
 
   {
     funcPassManager.addPass(createVectorizePadPass());
-    if (pipelineOpt.decomposePackUnPackOps) {
+    if (clDecomposePackUnpack) {
       funcPassManager.addPass(createDecomposePackUnPackOpsPass());
       funcPassManager.addPass(createCanonicalizerPass());
       funcPassManager.addPass(createCSEPass());
@@ -571,7 +577,7 @@ void addCPUDataTilingPipeline(OpPassManager &funcPassManager,
 
   funcPassManager.addPass(
       createLLVMCPUTilePass(tilingConfig.getVectorCommonParallelLevel()));
-  if (pipelineOpt.decomposePackUnPackOps) {
+  if (clDecomposePackUnpack) {
     funcPassManager.addPass(createDecomposePackUnPackOpsPass());
   }
 

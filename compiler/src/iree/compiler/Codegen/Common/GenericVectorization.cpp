@@ -319,13 +319,10 @@ void GenericVectorizationPass::runOnOperation() {
   IRRewriter rewriter(context);
   SmallVector<Operation *> candidates;
   funcOp.walk([&](Operation *op) {
-    if (isa<linalg::LinalgOp>(op)) {
+    if (isa<linalg::LinalgOp, tensor::PackOp, tensor::UnPackOp>(op)) {
       candidates.push_back(op);
     } else if (vectorizePadding && enableVectorMasking &&
                isa<tensor::PadOp>(op)) {
-      candidates.push_back(op);
-    } else if (enableVectorMasking &&
-               isa<tensor::PackOp, tensor::UnPackOp>(op)) {
       candidates.push_back(op);
     }
   });

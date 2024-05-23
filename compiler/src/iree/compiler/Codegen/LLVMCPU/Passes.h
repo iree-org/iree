@@ -138,7 +138,6 @@ void populateVectorContractCustomKernelsPatterns(
 //----------------------------------------------------------------------------//
 
 struct LLVMCPUPipelineOptions {
-  bool decomposePackUnPackOps = true;
   bool useConfiguredVectorSizes = true;
   bool enablePeeling = false;
   bool enableVectorMasking = false;
