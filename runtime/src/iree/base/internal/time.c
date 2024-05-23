@@ -10,7 +10,7 @@
 
 #include "iree/base/target_platform.h"
 
-IREE_API_EXPORT iree_time_t iree_time_now_impl(void) {
+int64_t iree_time_now_ns(void) {
 #if defined(IREE_TIME_NOW_FN)
   IREE_TIME_NOW_FN
 #elif defined(IREE_PLATFORM_WINDOWS)

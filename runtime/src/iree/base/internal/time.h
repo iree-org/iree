@@ -7,14 +7,14 @@
 #ifndef IREE_BASE_INTERNAL_TIME_H_
 #define IREE_BASE_INTERNAL_TIME_H_
 
-#include "iree/base/time.h"
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif  // __cplusplus
 
 // Implementation of iree_time_now(), available to avoid circular dependencies.
-iree_time_t iree_time_now_impl(void);
+int64_t iree_time_now_ns(void);
 
 #ifdef __cplusplus
 }  // extern "C"

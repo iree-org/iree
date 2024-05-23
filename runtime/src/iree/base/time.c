@@ -15,7 +15,7 @@
 #include "iree/base/target_platform.h"
 #include "iree/base/tracing.h"
 
-IREE_API_EXPORT iree_time_t iree_time_now(void) { return iree_time_now_impl(); }
+IREE_API_EXPORT iree_time_t iree_time_now(void) { return iree_time_now_ns(); }
 
 IREE_API_EXPORT iree_time_t
 iree_relative_timeout_to_deadline_ns(iree_duration_t timeout_ns) {
