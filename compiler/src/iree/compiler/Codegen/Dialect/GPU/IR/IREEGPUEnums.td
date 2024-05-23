@@ -119,6 +119,10 @@ def Thread : I32EnumAttrCase<"Thread", 3>;
 def Subgroup : I32EnumAttrCase<"Subgroup", 4>;
 def Lane : I32EnumAttrCase<"Lane", 5>;
 
+/// Enum descriptor for the set of tiling levels for GPU pass pipelines.
+/// Note that `Thread` tiling is mutually exclusive with `Subgroup` and
+/// `Lane` tiling, and `Lane` tiling is only legal if the same operation
+/// is also tiled or fused to subgroups.
 def IREEGPU_TilingLevel : IREEGPU_I32MmaEnumAttr<"TilingLevel",
     "Descriptor for tiling levels for GPU lowering configs", [
       Workgroup,
