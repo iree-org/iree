@@ -9,7 +9,7 @@
 #include <string.h>
 
 #include "iree/base/alignment.h"
-#include "iree/base/time.h"
+#include "iree/base/internal/time.h"
 #include "iree/base/tracing.h"
 
 // NOTE: threading support is optional.
@@ -48,35 +48,6 @@
 #endif  // IREE_SYNCHRONIZATION_DISABLE_UNSAFE
 
 #if IREE_TRACING_FEATURES
-
-// Inlined iree_time_now() implementation to avoid a circular dependency
-// between iree::base::base and iree::base::tracing::provider.
-#include <time.h>
-iree_time_t iree_time_now_for_console(void) {
-#if defined(IREE_TIME_NOW_FN)
-  IREE_TIME_NOW_FN
-#elif defined(IREE_PLATFORM_WINDOWS)
-  // GetSystemTimePreciseAsFileTime requires Windows 8, add a fallback
-  // (such as using std::chrono) if older support is needed.
-  FILETIME system_time;
-  GetSystemTimePreciseAsFileTime(&system_time);
-  const int64_t kUnixEpochStartTicks = 116444736000000000i64;
-  const int64_t kFtToNanoSec = 100;
-  LARGE_INTEGER li;
-  li.LowPart = system_time.dwLowDateTime;
-  li.HighPart = system_time.dwHighDateTime;
-  li.QuadPart -= kUnixEpochStartTicks;
-  li.QuadPart *= kFtToNanoSec;
-  return li.QuadPart;
-#elif defined(IREE_PLATFORM_ANDROID) || defined(IREE_PLATFORM_APPLE) || \
-    defined(IREE_PLATFORM_LINUX) || defined(IREE_PLATFORM_EMSCRIPTEN)
-  struct timespec clock_time;
-  clock_gettime(CLOCK_REALTIME, &clock_time);
-  return clock_time.tv_sec * 1000000000ull + clock_time.tv_nsec;
-#else
-#error "IREE system clock needs to be set up for your platform"
-#endif  // IREE_PLATFORM_*
-}
 
 typedef struct iree_tracing_console_t {
   // The file that all tracing output is routed to.
@@ -171,7 +142,7 @@ static iree_zone_id_t iree_tracing_zone_begin(
   iree_trace_zone_t* zone = &_thread.stack[zone_id];
   zone->name_length = iree_min(name_length, IREE_ARRAYSIZE(zone->name));
   memcpy(zone->name, name, name_length);
-  zone->start_timestamp_ns = iree_time_now_for_console();
+  zone->start_timestamp_ns = iree_time_now_impl();
 #endif  // IREE_TRACING_CONSOLE_TIMING
 
   return zone_id;
@@ -204,7 +175,7 @@ void iree_tracing_zone_end(iree_zone_id_t zone_id) {
 
 #if IREE_TRACING_CONSOLE_TIMING
   // Capture timestamp first so that we don't measure too much of ourselves.
-  uint64_t end_timestamp_ns = iree_time_now_for_console();
+  uint64_t end_timestamp_ns = iree_time_now_impl();
   iree_trace_zone_t* zone = &_thread.stack[zone_id];
   uint64_t duration_ns = end_timestamp_ns - zone->start_timestamp_ns;
   fprintf(_console.file,
