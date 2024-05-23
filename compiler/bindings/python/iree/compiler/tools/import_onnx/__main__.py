@@ -66,19 +66,14 @@ def load_onnx_model(args: argparse.Namespace) -> onnx.ModelProto:
     # loading and the need for writing a temporary file somewhere.  If that
     # fails, typically because of the 2 GB protobuf size limit, try again via
     # files.  See
-    # https://github.com/onnx/onnx/blob/main/docs/PythonAPIOverview.md#shape-inference-a-large-onnx-model-2gb
+    # https://onnx.ai/onnx/repo-docs/PythonAPIOverview.html#shape-inference-a-large-onnx-model-2gb
     # for details about the file-based technique.
 
     # Make a temp dir for all the temp files we'll be generating as a side
     # effect of infering shapes.  For now, the only file is a new .onnx holding
     # the revised model with shapes.
-    #
-    # TODO: If the program temp_dir is None, we should be using an ephemeral
-    # temp directory instead of a hard-coded path in order to avoid data races
-    # by default.
+
     input_dir = os.path.dirname(os.path.abspath(args.input_file))
-    temp_dir = tempfile.TemporaryDirectory(dir=input_dir)
-    temp_dir_path = Path(temp_dir.name)
 
     # Load the model, with possible external data coming from the default
     # location, or the location specified on the command line.
@@ -101,21 +96,19 @@ def load_onnx_model(args: argparse.Namespace) -> onnx.ModelProto:
 
     # Model is too big for in-memory inference: do file-based shape inference
     # to a temp file.
-    temp_inferred_file = temp_dir_path / "temp-inferred.onnx"
-    onnx.shape_inference.infer_shapes_path(
-        args.input_file, temp_inferred_file, data_prop=args.data_prop
-    )
+    with tempfile.TemporaryDirectory(dir=input_dir) as temp_dir_name:
+        temp_dir_path = Path(temp_dir_name)
+        temp_inferred_file = temp_dir_path / "temp-inferred.onnx"
+        onnx.shape_inference.infer_shapes_path(
+            args.input_file, temp_inferred_file, data_prop=args.data_prop
+        )
 
-    # Load the temp file and the external data.
-    inferred_model = onnx.load(temp_inferred_file, load_external_data=False)
-    data_dir = Path(input_dir if args.temp_dir is None else args.data_dir)
-    onnx.load_external_data_for_model(inferred_model, data_dir)
+        # Load the temp file and the external data.
+        inferred_model = onnx.load(temp_inferred_file, load_external_data=False)
+        data_dir = Path(input_dir if args.temp_dir is None else args.data_dir)
+        onnx.load_external_data_for_model(inferred_model, data_dir)
 
-    # Remove the inferred shape file unless asked to keep it
-    if not args.keep_temps:
-        temp_dir.cleanup()
-
-    return inferred_model
+        return inferred_model
 
 
 def parse_arguments(argv=None) -> argparse.Namespace:
@@ -131,13 +124,9 @@ def parse_arguments(argv=None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--data-prop",
-        dest="data_prop",
         default=True,
         action=argparse.BooleanOptionalAction,
         help="Toggle data propogation for onnx shape inference",
-    )
-    parser.add_argument(
-        "--keep-temps", action="store_true", help="Keep intermediate files"
     )
     parser.add_argument(
         "--temp-dir",
