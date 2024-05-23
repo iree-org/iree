@@ -70,11 +70,9 @@ Value createValueFrom2DConstant(const float *val, int64_t rows, int64_t cols,
 SmallVector<int64_t> asShapeWithAnyValueAsDynamic(ArrayRef<OpFoldResult> ofrs);
 
 enum class Permutation {
-  NCHW_TO_NHWC,
-  NHWC_TO_NCHW,
   FCHW_TO_HWCF,
-  TTNHWC_TO_TTNCHW,
-  TTNCHW_TO_TTNHWC,
+  HWC_TO_CHW,
+  CHW_TO_HWC,
   TTFC_TO_TTCF,
 };
 
@@ -82,21 +80,15 @@ enum class Permutation {
 template <Permutation P, typename T>
 static void permute(SmallVectorImpl<T> &vector) {
   switch (P) {
-  case Permutation::NCHW_TO_NHWC:
-    std::rotate(vector.begin() + 1, vector.begin() + 2, vector.end());
-    break;
-  case Permutation::NHWC_TO_NCHW:
-    std::rotate(vector.rbegin(), vector.rbegin() + 1, vector.rend() - 1);
-    break;
   case Permutation::FCHW_TO_HWCF:
     std::rotate(vector.begin(), vector.begin() + 2, vector.end()); // to HWFC
     std::rotate(vector.rbegin(), vector.rbegin() + 1, vector.rend() - 2);
     break;
-  case Permutation::TTNCHW_TO_TTNHWC:
-    std::rotate(vector.begin() + 3, vector.begin() + 4, vector.end());
+  case Permutation::CHW_TO_HWC:
+    std::rotate(vector.rbegin(), vector.rbegin() + 2, vector.rbegin() + 3);
     break;
-  case Permutation::TTNHWC_TO_TTNCHW:
-    std::rotate(vector.rbegin(), vector.rbegin() + 1, vector.rend() - 3);
+  case Permutation::HWC_TO_CHW:
+    std::rotate(vector.rbegin(), vector.rbegin() + 1, vector.rbegin() + 3);
     break;
   case Permutation::TTFC_TO_TTCF:
     std::rotate(vector.rbegin(), vector.rbegin() + 1, vector.rend() - 2);

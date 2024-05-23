@@ -1072,6 +1072,11 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
     int64_t getOutputRank() {
       return getOutputType().getRank();
     }
+    bool hasBatch() {
+      int batchRank = getImageDimensions().size() +
+                      getInputTileDimensions().size() + 2;
+      return getOutputRank() == batchRank;
+    }
     int64_t getInputTileSize() {
       return getOutputTileSize() + getKernelSize() - 1;
     }
@@ -1079,10 +1084,14 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
       return getImageDimensions();
     }
     std::array<int64_t, 2> nhwcImageDimensions() {
-      return {1, 2};
+      std::array<int64_t, 2> batched = {1, 2};
+      std::array<int64_t, 2> unbatched = {0, 1};
+      return hasBatch() ? batched : unbatched;
     }
     std::array<int64_t, 2> nchwImageDimensions() {
-      return {2, 3};
+      std::array<int64_t, 2> batched = {2, 3};
+      std::array<int64_t, 2> unbatched = {1, 2};
+      return hasBatch() ? batched : unbatched;
     }
     bool isNhwc() {
       std::array<int64_t, 2> nhwcImageDims = nhwcImageDimensions();
@@ -1093,7 +1102,10 @@ def IREELinalgExt_WinogradInputTransformOp : IREELinalgExt_Op<"winograd.input_tr
       return getImageDimensions() == ArrayRef<int64_t>(nchwImageDims);
     }
     int getChannelDim() {
-      return isNhwc() ? 3 : 1;
+      int cDim = isNhwc() ? 3 : 1;
+      if (!hasBatch())
+        cDim--;
+      return cDim;
     }
     // Utility for mapping non input tile dims to the actual result dims
     SmallVector<int64_t> getNonInputTileDims();
@@ -1296,6 +1308,17 @@ def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_
     ShapedType getOutputType() {
       return cast<ShapedType>(getOutput().getType());
     }
+    int64_t getInputRank() {
+      return getInputType().getRank();
+    }
+    int64_t getOutputRank() {
+      return getOutputType().getRank();
+    }
+    bool hasBatch() {
+      int batchRank = getImageDimensions().size() +
+                      getInputTileDimensions().size() + 2;
+      return getInputRank() == batchRank;
+    }
     Value getOriginalOperand() {
       return getOutput();
     }
@@ -1312,10 +1335,14 @@ def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_
       return getImageDimensions();
     }
     std::array<int64_t, 2> nhwcImageDimensions() {
-      return {1, 2};
+      std::array<int64_t, 2> batched = {1, 2};
+      std::array<int64_t, 2> unbatched = {0, 1};
+      return hasBatch() ? batched : unbatched;
     }
     std::array<int64_t, 2> nchwImageDimensions() {
-      return {2, 3};
+      std::array<int64_t, 2> batched = {2, 3};
+      std::array<int64_t, 2> unbatched = {1, 2};
+      return hasBatch() ? batched : unbatched;
     }
     bool isNhwc() {
       std::array<int64_t, 2> nhwcImageDims = nhwcImageDimensions();
@@ -1326,13 +1353,10 @@ def IREELinalgExt_WinogradOutputTransformOp : IREELinalgExt_Op<"winograd.output_
       return getImageDimensions() == ArrayRef<int64_t>(nchwImageDims);
     }
     int getChannelDim() {
-      return isNhwc() ? 3 : 1;
-    }
-    int64_t getInputRank() {
-      return getInputType().getRank();
-    }
-    int64_t getOutputRank() {
-      return getOutputType().getRank();
+      int cDim = isNhwc() ? 3 : 1;
+      if (!hasBatch())
+        cDim--;
+      return cDim;
     }
     // Utility for mapping non input tile dims to the actual result dims
     SmallVector<int64_t> getNonInputTileDims();

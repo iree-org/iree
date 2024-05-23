@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include <cstdint>
+#include <string>
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
@@ -16,6 +17,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
@@ -26,6 +28,7 @@
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
+#include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/AffineMap.h"
@@ -1021,8 +1024,10 @@ LogicalResult WinogradInputTransformOp::verify() {
   unsigned inputRank = inputType.getRank();
   unsigned outputRank = outputType.getRank();
 
-  if (inputRank != 2 && inputRank != 4) {
-    return op->emitOpError("expected input operand to have rank either 2 or 4");
+  int expectedInputRank = hasBatch() ? 4 : 3;
+  if (inputRank != 2 && inputRank != expectedInputRank) {
+    return op->emitOpError("expected input operand to have rank either 2 or " +
+                           std::to_string(expectedInputRank));
   }
 
   if (inputRank == 2) {
@@ -1057,8 +1062,12 @@ LogicalResult WinogradInputTransformOp::verify() {
     return op->emitOpError("expected only 2 image dimensions");
   }
   if (!isNchw() && !isNhwc()) {
+    if (hasBatch()) {
+      return op->emitOpError(
+          "expect image dimensions to be either [1, 2] or [2, 3]");
+    }
     return op->emitOpError(
-        "expect image dimensions to be either [1, 2] or [2, 3]");
+        "expect image dimensions to be either [0, 1] or [1, 2]");
   }
   SmallVector<int64_t> expectedOutputShape(getOutputRank(), getInputTileSize());
   int outputIndex;
@@ -1078,7 +1087,7 @@ LogicalResult WinogradInputTransformOp::verify() {
     }
   }
   if (isNchw()) {
-    permute<Permutation::TTNCHW_TO_TTNHWC>(expectedOutputShape);
+    permute<Permutation::CHW_TO_HWC>(expectedOutputShape);
   }
   SmallVector<int64_t> outputShape(outputType.getShape());
   SmallVector<int64_t> perm(getInputTileDimensions());
@@ -1222,8 +1231,10 @@ LogicalResult WinogradOutputTransformOp::verify() {
   unsigned inputRank = inputType.getRank();
   unsigned outputRank = outputType.getRank();
 
-  if (inputRank != 2 && inputRank != 6) {
-    return op->emitOpError("expected input operand to have rank either 2 or 6");
+  int expectedInputRank = hasBatch() ? 6 : 5;
+  if (inputRank != 2 && inputRank != expectedInputRank) {
+    return op->emitOpError("expected input operand to have rank either 2 or " +
+                           std::to_string(expectedInputRank));
   }
 
   if (inputRank == 2) {
@@ -1260,15 +1271,19 @@ LogicalResult WinogradOutputTransformOp::verify() {
     return op->emitOpError("expected only 2 image dimensions");
   }
   if (!isNchw() && !isNhwc()) {
+    if (hasBatch()) {
+      return op->emitOpError(
+          "expect image dimensions to be either [1, 2] or [2, 3]");
+    }
     return op->emitOpError(
-        "expect image dimensions to be either [1, 2] or [2, 3]");
+        "expect image dimensions to be either [0, 1] or [1, 2]");
   }
   SmallVector<int64_t> inputShape(inputType.getShape());
   SmallVector<int64_t> perm(getInputTileDimensions());
   perm.append(getNonInputTileDims());
   applyPermutationToVector(inputShape, perm);
   if (isNchw()) {
-    permute<Permutation::TTNHWC_TO_TTNCHW>(inputShape);
+    permute<Permutation::HWC_TO_CHW>(inputShape);
   }
   SmallVector<int64_t> expectedOutputShape(getOutputRank(), 1);
   int outputIndex;

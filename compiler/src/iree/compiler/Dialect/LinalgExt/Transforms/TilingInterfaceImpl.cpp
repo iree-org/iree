@@ -1271,7 +1271,7 @@ WinogradInputTransformOp::getTiledImplementation(OpBuilder &builder,
   auto zero = builder.getIndexAttr(0);
   const int cDim = getChannelDim();
 
-  assert(offsets.size() == 6);
+  assert(offsets.size() == getOutputRank());
   SmallVector<int64_t> perm(getInputTileDimensions());
   perm.append(getNonInputTileDims());
   SmallVector<OpFoldResult> offsetsPermuted = applyPermutation(offsets, perm);
@@ -1279,8 +1279,10 @@ WinogradInputTransformOp::getTiledImplementation(OpBuilder &builder,
   SmallVector<OpFoldResult> inputOffsets(getInputRank(), zero);
   const auto hDim = getImageDimensions()[0];
   const auto wDim = getImageDimensions()[1];
-  inputOffsets[0] = offsetsPermuted[2];
-  inputOffsets[cDim] = offsetsPermuted[5];
+  if (hasBatch()) {
+    inputOffsets[0] = offsetsPermuted[2];
+  }
+  inputOffsets[cDim] = offsetsPermuted.back();
 
   ReifiedRankedShapedTypeDims reifiedInputShapes;
   if (failed(getStaticOrReifiedInputDims(builder, loc, getInput(),
@@ -1289,16 +1291,20 @@ WinogradInputTransformOp::getTiledImplementation(OpBuilder &builder,
   }
   SmallVector<OpFoldResult> inputSizes = reifiedInputShapes[0];
 
-  assert(sizes.size() == 6);
-  inputSizes[0] = sizesPermuted[2];
-  inputSizes[cDim] = sizesPermuted[5];
+  assert(sizes.size() == getOutputRank());
+  if (hasBatch()) {
+    inputSizes[0] = sizesPermuted[2];
+  }
+  inputSizes[cDim] = sizesPermuted.back();
 
+  const int sizesHDim = hasBatch() ? 3 : 2;
+  const int sizesWDim = hasBatch() ? 4 : 3;
   auto hSizeAndOffset = getScaledSizeAndOffset(
-      builder, loc, sizesPermuted[3], offsetsPermuted[3], inputSizes[hDim],
-      getOutputTileSize(), getInputTileSize());
+      builder, loc, sizesPermuted[sizesHDim], offsetsPermuted[sizesHDim],
+      inputSizes[hDim], getOutputTileSize(), getInputTileSize());
   auto wSizeAndOffset = getScaledSizeAndOffset(
-      builder, loc, sizesPermuted[4], offsetsPermuted[4], inputSizes[wDim],
-      getOutputTileSize(), getInputTileSize());
+      builder, loc, sizesPermuted[sizesWDim], offsetsPermuted[sizesWDim],
+      inputSizes[wDim], getOutputTileSize(), getInputTileSize());
 
   inputSizes[hDim] = hSizeAndOffset.first;
   inputSizes[wDim] = wSizeAndOffset.first;
@@ -1467,7 +1473,7 @@ FailureOr<TilingResult> WinogradOutputTransformOp::getTiledImplementation(
   auto zero = builder.getIndexAttr(0);
   const int cDim = getChannelDim();
 
-  assert(offsets.size() == 6);
+  assert(offsets.size() == getInputRank());
   SmallVector<int64_t> perm(getInputTileDimensions());
   perm.append(getNonInputTileDims());
   SmallVector<OpFoldResult> sizesPermuted = applyPermutation(sizes, perm);
@@ -1476,8 +1482,10 @@ FailureOr<TilingResult> WinogradOutputTransformOp::getTiledImplementation(
   const auto wDim = getImageDimensions()[1];
   SmallVector<OpFoldResult> outputOffsets(getOutputRank(), zero);
 
-  outputOffsets[0] = offsetsPermuted[2];
-  outputOffsets[cDim] = offsetsPermuted[5];
+  if (hasBatch()) {
+    outputOffsets[0] = offsetsPermuted[2];
+  }
+  outputOffsets[cDim] = offsetsPermuted.back();
 
   ReifiedRankedShapedTypeDims reifiedResultShapes;
   if (failed(reifyResultShapes(builder, reifiedResultShapes))) {
@@ -1485,16 +1493,20 @@ FailureOr<TilingResult> WinogradOutputTransformOp::getTiledImplementation(
   }
   SmallVector<OpFoldResult> outputSizes = reifiedResultShapes[0];
 
-  assert(sizes.size() == 6);
-  outputSizes[0] = sizesPermuted[2];
-  outputSizes[cDim] = sizesPermuted[5];
+  assert(sizes.size() == getInputRank());
+  if (hasBatch()) {
+    outputSizes[0] = sizesPermuted[2];
+  }
+  outputSizes[cDim] = sizesPermuted.back();
 
+  const int sizesHDim = hasBatch() ? 3 : 2;
+  const int sizesWDim = hasBatch() ? 4 : 3;
   auto hSizeAndOffset = getScaledSizeAndOffset(
-      builder, loc, sizesPermuted[3], offsetsPermuted[3], outputSizes[hDim],
-      getOutputTileSize(), getOutputTileSize());
+      builder, loc, sizesPermuted[sizesHDim], offsetsPermuted[sizesHDim],
+      outputSizes[hDim], getOutputTileSize(), getOutputTileSize());
   auto wSizeAndOffset = getScaledSizeAndOffset(
-      builder, loc, sizesPermuted[4], offsetsPermuted[4], outputSizes[wDim],
-      getOutputTileSize(), getOutputTileSize());
+      builder, loc, sizesPermuted[sizesWDim], offsetsPermuted[sizesWDim],
+      outputSizes[wDim], getOutputTileSize(), getOutputTileSize());
 
   outputSizes[hDim] = hSizeAndOffset.first;
   outputSizes[wDim] = wSizeAndOffset.first;
@@ -1509,11 +1521,11 @@ FailureOr<TilingResult> WinogradOutputTransformOp::getTiledImplementation(
   // maintain more static information in the IR.
   auto outSliceType = cast<ShapedType>(outputSlice.getType());
   SmallVector<int64_t> staticOutShape(outSliceType.getShape());
-  auto constSizeH = getConstantIntValue(sizesPermuted[3]);
+  auto constSizeH = getConstantIntValue(sizesPermuted[sizesHDim]);
   if (constSizeH.has_value()) {
     staticOutShape[hDim] = constSizeH.value() * getOutputTileSize();
   }
-  auto constSizeW = getConstantIntValue(sizesPermuted[4]);
+  auto constSizeW = getConstantIntValue(sizesPermuted[sizesWDim]);
   if (constSizeW.has_value()) {
     staticOutShape[wDim] = constSizeW.value() * getOutputTileSize();
   }
@@ -1558,19 +1570,23 @@ LogicalResult WinogradOutputTransformOp::getResultTilePosition(
     SmallVector<OpFoldResult> sizesPermuted = applyPermutation(sizes, perm);
     SmallVector<OpFoldResult> offsetsPermuted = applyPermutation(offsets, perm);
     auto loc = getLoc();
-    resultOffsets[0] = offsetsPermuted[2];
-    resultOffsets[cDim] = offsetsPermuted[5];
-    resultSizes[0] = sizesPermuted[2];
-    resultSizes[cDim] = sizesPermuted[5];
+    if (hasBatch()) {
+      resultOffsets[0] = offsetsPermuted[2];
+      resultSizes[0] = sizesPermuted[2];
+    }
+    resultOffsets[cDim] = offsetsPermuted.back();
+    resultSizes[cDim] = sizesPermuted.back();
     SmallVector<SmallVector<OpFoldResult>> reifiedResultShapes;
     if (failed(reifyResultShapes(builder, reifiedResultShapes))) {
       return failure();
     }
+    const int sizesHDim = hasBatch() ? 3 : 2;
+    const int sizesWDim = hasBatch() ? 4 : 3;
     auto hSizeAndOffset = getScaledSizeAndOffset(
-        builder, loc, sizesPermuted[3], offsetsPermuted[3],
+        builder, loc, sizesPermuted[sizesHDim], offsetsPermuted[sizesHDim],
         reifiedResultShapes[0][hDim], getOutputTileSize(), getOutputTileSize());
     auto wSizeAndOffset = getScaledSizeAndOffset(
-        builder, loc, sizesPermuted[4], offsetsPermuted[4],
+        builder, loc, sizesPermuted[sizesWDim], offsetsPermuted[sizesWDim],
         reifiedResultShapes[0][wDim], getOutputTileSize(), getOutputTileSize());
 
     resultSizes[hDim] = hSizeAndOffset.first;

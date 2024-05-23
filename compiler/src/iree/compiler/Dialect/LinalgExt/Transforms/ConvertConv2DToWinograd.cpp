@@ -250,22 +250,49 @@ public:
       return rewriter.notifyMatchFailure(convOp, "Input shape is not static");
     }
     assert(inputShape.size() == 4);
-    if (isNchwFchw) {
-      permute<IREE::LinalgExt::Permutation::NCHW_TO_NHWC>(inputShape);
+    bool hasBatch = inputShape[0] != 1;
+    Value inputFolded = input;
+    Value outputFolded = output;
+    SmallVector<int64_t> foldedInputShape = inputShape;
+    SmallVector<int64_t> outputShape(outputType.getShape());
+    SmallVector<int64_t> foldedOutputShape = outputShape;
+    if (!hasBatch) {
+      foldedInputShape =
+          SmallVector<int64_t>(inputShape.begin() + 1, inputShape.end());
+      SmallVector<ReassociationIndices> reInds = {{0, 1}, {2}, {3}};
+      inputFolded =
+          createCollapse(input, loc, rewriter, foldedInputShape, reInds);
+      foldedOutputShape =
+          SmallVector<int64_t>(outputShape.begin() + 1, outputShape.end());
+      outputFolded =
+          createCollapse(output, loc, rewriter, foldedOutputShape, reInds);
     }
 
-    const std::array<int64_t, 2> inputTileDimsImage = {4, 5};
-    const std::array<int64_t, 2> nhwcImageDims = {1, 2};
-    const std::array<int64_t, 2> nchwImageDims = {2, 3};
-    SmallVector<int64_t> resultShape(6, inputTileSize);
+    if (isNchwFchw) {
+      permute<IREE::LinalgExt::Permutation::CHW_TO_HWC>(foldedInputShape);
+    }
+
+    std::array<int64_t, 2> inputTileDimsImage = {4, 5};
+    std::array<int64_t, 2> nhwcImageDims = {1, 2};
+    std::array<int64_t, 2> nchwImageDims = {2, 3};
+    if (!hasBatch) {
+      inputTileDimsImage[0]--;
+      inputTileDimsImage[1]--;
+      nhwcImageDims[0]--;
+      nhwcImageDims[1]--;
+      nchwImageDims[0]--;
+      nchwImageDims[1]--;
+    }
+    SmallVector<int64_t> resultShape(foldedInputShape.size() + 2,
+                                     inputTileSize);
     llvm::SmallSetVector<int64_t, 2> imageDimsSet(nhwcImageDims.begin(),
                                                   nhwcImageDims.end());
-    for (int i = 0; i < inputShape.size(); i++) {
+    for (int i = 0; i < foldedInputShape.size(); i++) {
       if (!imageDimsSet.contains(i)) {
-        resultShape[i] = inputShape[i];
+        resultShape[i] = foldedInputShape[i];
       } else {
-        resultShape[i] =
-            std::ceil((float)(inputShape[i] - kernelSize + 1) / outputTileSize);
+        resultShape[i] = std::ceil(
+            (float)(foldedInputShape[i] - kernelSize + 1) / outputTileSize);
       }
     }
     Value inputTfInit =
@@ -275,16 +302,23 @@ public:
     Value winogradInput =
         rewriter
             .create<IREE::LinalgExt::WinogradInputTransformOp>(
-                loc, inputTfInit.getType(), ValueRange{input},
+                loc, inputTfInit.getType(), ValueRange{inputFolded},
                 ValueRange{inputTfInit}, outputTileSize, kernelSize, imageDims,
                 inputTileDimsImage)
             .getResults()[0];
 
     // Add collapse shape
-    SmallVector<int64_t> collapsedShape = {
-        resultShape[0] * resultShape[1] * resultShape[2], resultShape[3],
-        resultShape[4] * resultShape[5]};
+    int64_t m = resultShape[0] * resultShape[1];
+    int64_t k = resultShape[resultShape.size() - 3];
+    int64_t b = resultShape.back() * resultShape[resultShape.size() - 2];
+    if (hasBatch) {
+      m *= resultShape[2];
+    }
+    SmallVector<int64_t> collapsedShape = {m, k, b};
     SmallVector<ReassociationIndices> reassociations = {{0, 1, 2}, {3}, {4, 5}};
+    if (!hasBatch) {
+      reassociations = {{0, 1}, {2}, {3, 4}};
+    }
     Value collapsedWinogradInput = createCollapse(
         winogradInput, loc, rewriter, collapsedShape, reassociations);
 
@@ -299,14 +333,11 @@ public:
     auto reduction = utils::IteratorType::reduction;
     SmallVector<utils::IteratorType> genericIterators = {parallel, parallel,
                                                          parallel, reduction};
-    SmallVector<int64_t> bmmShape = {
-        resultShape[0] * resultShape[1] * resultShape[2], resultShape[3],
-        resultShape[4] * resultShape[5]};
-    SmallVector<int64_t> outputShape(outputType.getShape());
+    SmallVector<int64_t> bmmShape(collapsedShape);
     if (isNchwFchw) {
-      permute<IREE::LinalgExt::Permutation::NCHW_TO_NHWC>(outputShape);
+      permute<IREE::LinalgExt::Permutation::CHW_TO_HWC>(foldedOutputShape);
     }
-    bmmShape[1] = outputShape[3];
+    bmmShape[1] = foldedOutputShape.back();
     auto bmmOutputType = RankedTensorType::get(bmmShape, outElemType);
     Value bmmInit =
         rewriter.create<tensor::EmptyOp>(loc, bmmShape, outElemType);
@@ -335,24 +366,26 @@ public:
     Value bmmResult = genericOp.getResults().front();
 
     // Add expand shape
-    SmallVector<int64_t> expandedShape = {resultShape[0], resultShape[1],
-                                          resultShape[2], outputShape[3],
-                                          resultShape[4], resultShape[5]};
+    SmallVector<int64_t> expandedShape = resultShape;
+    expandedShape[expandedShape.size() - 3] = foldedOutputShape.back();
     reassociations = {{0, 1, 2}, {3}, {4, 5}};
+    if (!hasBatch) {
+      reassociations = {{0, 1}, {2}, {3, 4}};
+    }
     Value expandedBmmResult =
         createExpand(bmmResult, loc, rewriter, expandedShape, reassociations);
 
     // Convert back into original domain
-    SmallVector<int64_t> paddedResultShape(outputShape.size(), 0);
-    for (int i = 0; i < outputShape.size(); i++) {
+    SmallVector<int64_t> paddedResultShape(foldedOutputShape.size(), 0);
+    for (int i = 0; i < foldedOutputShape.size(); i++) {
       if (!imageDimsSet.contains(i)) {
-        paddedResultShape[i] = outputShape[i];
+        paddedResultShape[i] = foldedOutputShape[i];
       } else {
         paddedResultShape[i] = resultShape[i] * outputTileSize;
       }
     }
     if (isNchwFchw) {
-      permute<IREE::LinalgExt::Permutation::NHWC_TO_NCHW>(paddedResultShape);
+      permute<IREE::LinalgExt::Permutation::HWC_TO_CHW>(paddedResultShape);
     }
     Value outputTfInit =
         rewriter.create<tensor::EmptyOp>(loc, paddedResultShape, outElemType);
@@ -365,14 +398,21 @@ public:
             .getResults()[0];
 
     // Extract slice
-    SmallVector<OpFoldResult> offsets(outputShape.size(),
+    SmallVector<OpFoldResult> offsets(foldedOutputShape.size(),
                                       rewriter.getIndexAttr(0));
-    SmallVector<OpFoldResult> strides(outputShape.size(),
+    SmallVector<OpFoldResult> strides(foldedOutputShape.size(),
                                       rewriter.getIndexAttr(1));
+    auto foldedOutputType = cast<RankedTensorType>(outputFolded.getType());
     SmallVector<OpFoldResult> sizes =
-        getAsIndexOpFoldResult(context, outputType.getShape());
-    auto winogradOutput = rewriter.create<tensor::ExtractSliceOp>(
-        loc, outputType, paddedOutput, offsets, sizes, strides);
+        getAsIndexOpFoldResult(context, foldedOutputType.getShape());
+    Value winogradOutput = rewriter.create<tensor::ExtractSliceOp>(
+        loc, foldedOutputType, paddedOutput, offsets, sizes, strides);
+
+    if (!hasBatch) {
+      SmallVector<ReassociationIndices> reInds = {{0, 1}, {2}, {3}};
+      winogradOutput =
+          createExpand(winogradOutput, loc, rewriter, outputShape, reInds);
+    }
 
     rewriter.replaceOp(convOp, winogradOutput);
     return success();
