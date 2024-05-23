@@ -887,7 +887,6 @@ include(flatbuffer_c_library)
 
 add_subdirectory(build_tools/third_party/llvm-project EXCLUDE_FROM_ALL)
 
-
 if((IREE_ENABLE_RUNTIME_TRACING OR IREE_ENABLE_COMPILER_TRACING) AND
     IREE_TRACING_PROVIDER STREQUAL "tracy")
   message(STATUS "Configuring third_party/tracy")
