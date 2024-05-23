@@ -1,10 +1,9 @@
-// Copyright 2022 The IREE Authors
+// Copyright 2024 The IREE Authors
 //
 // Licensed under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <vector>
 #include "iree/compiler/Dialect/Flow/Conversion/TensorToFlow/Patterns.h"
 #include "iree/compiler/Dialect/Flow/Conversion/TensorToFlow/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
@@ -13,13 +12,10 @@
 #include "iree/compiler/Dialect/Flow/Transforms/FormDispatchRegions.h"
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/MLIRContext.h"
@@ -45,7 +41,7 @@ static bool isInDispatchRegion(Operation *op) {
 /// Wrap a single op in a DispatchWorkgroupsOp.
 static FailureOr<IREE::Flow::DispatchWorkgroupsOp>
 wrapInWorkgroupsOp(mlir::TensorDimTrackingRewriter &rewriter, Operation *op) {
-  // Simplify tensor::DimOps.
+
   SmallVector<tensor::DimOp> dimOps = rewriter.getTensorDimOps();
   if (failed(iree_compiler::IREE::Flow::simplifyDimOps(
           rewriter, rewriter.getTensorDimOps())))
@@ -79,26 +75,9 @@ wrapInWorkgroupsOp(mlir::TensorDimTrackingRewriter &rewriter,
   return result;
 }
 
-/// Wrap all ops of the given types that are direct children of the given op
-/// in DispatchWorkgroupsOps.
-template <typename... OpTys>
-static FailureOr<SmallVector<IREE::Flow::DispatchWorkgroupsOp>>
-wrapInWorkgroupsOp(mlir::TensorDimTrackingRewriter &rewriter, Operation *op) {
-  // Find ops of type OpTys.
-  SmallVector<Operation *> rootOps;
-  for (Region &r : op->getRegions())
-    for (Block &b : r.getBlocks())
-      for (Operation &op : b)
-        if (isa<OpTys...>(&op))
-          rootOps.push_back(&op);
-
-  // Wrap ops in DispatchWorkgroupsOps.
-  return wrapInWorkgroupsOp(rewriter, rootOps);
-}
-
 /// Rewrite top-level InsertSliceOps to FlowUpdateOps or wrap them in a
 /// dispatch region.
-LogicalResult convertInsertSliceOps(
+static LogicalResult convertInsertSliceOps(
     mlir::TensorDimTrackingRewriter &rewriter, mlir::FunctionOpInterface funcOp,
     SmallVector<IREE::Flow::DispatchWorkgroupsOp> &workgroupsOps) {
   // Find eligible InsertSliceOps.
@@ -128,7 +107,7 @@ LogicalResult convertInsertSliceOps(
 
 /// Rewrite top-level ExtractSliceOps to FlowSliceOps or wrap them in a
 /// dispatch region.
-LogicalResult convertExtractSliceOps(
+static LogicalResult convertExtractSliceOps(
     mlir::TensorDimTrackingRewriter &rewriter, mlir::FunctionOpInterface funcOp,
     SmallVector<IREE::Flow::DispatchWorkgroupsOp> &workgroupsOps) {
   // Find eligible ExtractSliceOps.

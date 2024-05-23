@@ -196,7 +196,6 @@ def TensorToFlowPass :
       "mlir::affine::AffineDialect",
       "mlir::arith::ArithDialect",
       "mlir::linalg::LinalgDialect",
-      "mlir::scf::SCFDialect",
       "mlir::tensor::TensorDialect",
       "IREE::Flow::FlowDialect",
     ];
