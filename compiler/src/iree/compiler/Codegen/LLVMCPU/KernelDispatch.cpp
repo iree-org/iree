@@ -308,7 +308,7 @@ static int64_t getVectorSize(mlir::FunctionOpInterface entryPointFn,
 /// transposition:
 ///   1. The op has a single input and a single output.
 ///   2. One of the indexing_map is identity and the other is a permutation.
-static bool transposeLoweringPrecondition(linalg::GenericOp genericOp) {
+static bool x86TransposeLoweringPrecondition(linalg::GenericOp genericOp) {
   // Check that the op has at least 2 dimensions.
   if (genericOp.getNumLoops() < 2) {
     return false;
@@ -332,6 +332,31 @@ static bool transposeLoweringPrecondition(linalg::GenericOp genericOp) {
            indexingMaps[1].isPermutation()) ||
           (!indexingMaps[0].isIdentity() && indexingMaps[0].isPermutation() &&
            indexingMaps[1].isIdentity()));
+}
+
+/// Returns true if the `genericOp` implementing a transposition is supported by
+/// AArch64 SME, i.e. all of the following are true:
+///
+///   1. The op has 2 dimensions.
+///   2. The op has a single input and a single output.
+///   3. One of the `indexing_maps` is a permutation and the other an identity.
+static bool
+transposeLoweringPreconditionAArch64SME(linalg::GenericOp genericOp) {
+  // Check op has 2 dimensions.
+  if (genericOp.getNumLoops() != 2)
+    return false;
+
+  // Check op has single input and output.
+  if ((genericOp.getNumDpsInputs() != 1) || (genericOp.getNumDpsInits() != 1))
+    return false;
+
+  // Check all iterators are parallel.
+  if (genericOp.getNumParallelLoops() != genericOp.getNumLoops())
+    return false;
+
+  // Check that the two indexing maps are a permutation of each other.
+  SmallVector<AffineMap> indexingMaps = genericOp.getIndexingMapsArray();
+  return indexingMaps[0].isPermutation() && indexingMaps[1].isIdentity();
 }
 
 /// Returns minimum tiling sizes for each dimension. One dimension is possible
@@ -396,7 +421,7 @@ getMinTilingSizesForEachDim(mlir::FunctionOpInterface entryPointFn,
 
   auto genericOp = dyn_cast<linalg::GenericOp>(op.getOperation());
   if (linalgOpInfo.isTranspose() && genericOp &&
-      transposeLoweringPrecondition(genericOp)) {
+      x86TransposeLoweringPrecondition(genericOp)) {
     // Limit unrolling on transpose operations.
     // TODO(dcaballe): Consider input and output transposes.
     limitUnrollFactor(targetMLTransInfo.defaultMaxTransposeUnrollFactor);
@@ -1980,18 +2005,20 @@ setTransposeLikeOpRootConfig(mlir::FunctionOpInterface entryPointFn,
   assert(!getLoweringConfig(genericOp) &&
          "expected lowering_config is not set");
 
-  LLVM_DEBUG(KD_DBGS() << "Setting transpose-like op root configuration\n");
-
-  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
-  bool targetIsAArch64SME = isAArch64(targetAttr) &&
-                            clEnableScalableVectorization &&
-                            hasSMEFeature(targetAttr);
-  if ((!hasAVX2Feature(targetAttr) && !targetIsAArch64SME) ||
-      !transposeLoweringPrecondition(genericOp))
+  if (!linalgOpInfo.isTranspose())
     return failure();
 
+  LLVM_DEBUG(KD_DBGS() << "Setting transpose-like op root configuration\n");
+
   DistributionHeuristicConfig distConfig;
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
+  bool targetIsAArch64SME = isAArch64(targetAttr) &&
+                            hasSMEFeature(targetAttr) &&
+                            clEnableScalableVectorization;
   if (hasAVX2Feature(targetAttr)) {
+    if (!x86TransposeLoweringPrecondition(genericOp))
+      return failure();
+
     distConfig.minTileSizes = getMinTilingSizesForEachDim(
         entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo);
     if (llvm::count_if(distConfig.minTileSizes,
@@ -2024,6 +2051,8 @@ setTransposeLikeOpRootConfig(mlir::FunctionOpInterface entryPointFn,
         distConfig.minTileSizes.begin(), distConfig.minTileSizes.end(),
         [](int64_t tileSize) { return tileSize > 1; }, targetVectorSize);
   } else if (targetIsAArch64SME) {
+    if (!transposeLoweringPreconditionAArch64SME(genericOp))
+      return failure();
     auto elementType = nonWideningLinalgElementType(genericOp);
     if (failed(elementType))
       return failure();
