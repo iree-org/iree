@@ -3,7 +3,7 @@ requires = [
     "setuptools>=42",
     "wheel",
     "cmake",
-    "nanobind>=1.9.2",
+    "nanobind==1.9.2",
     "ninja",
     "numpy>=2.0.0b1",
     "packaging",

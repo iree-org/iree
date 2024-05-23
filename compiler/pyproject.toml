@@ -6,7 +6,7 @@ requires = [
     # Note that the compiler wheel does not presently need nanobind, but
     # it's build is enabled by the same flag which enables the runtime
     # configuration, which does.
-    "nanobind>=1.9.2",
+    "nanobind==1.9.2",
     "ninja",
     # MLIR build depends.
     "numpy",
