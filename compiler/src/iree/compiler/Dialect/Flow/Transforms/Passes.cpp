@@ -188,7 +188,7 @@ void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
       .addPass(mlir::createCSEPass);
 }
 
-static void addDispatchRegionMaterializationPasses(OpPassManager &passManager) {
+static void addDispatchRegionCreationPasses(OpPassManager &passManager) {
   FunctionLikeNest(passManager)
       // Only want use the transform dialect for some dispatch regions and let
       // the FormDispatchRegions handle the rest. This only moves the root
@@ -221,7 +221,7 @@ static void addDispatchRegionMaterializationPasses(OpPassManager &passManager) {
       // Convert dispatch regions into dispatch workgroups by capturing values.
       .addPass(IREE::Flow::createDispatchRegionsToWorkgroupsPass)
       // Convert tensor operations to flow.tensor ops.
-      .addPass(IREE::Flow::createDispatchTensorPass)
+      .addPass(IREE::Flow::createTensorToFlowPass)
       .addPass(mlir::createCanonicalizerPass)
       .addPass(IREE::Flow::createMaterializeDefaultWorkgroupCountRegion);
 }
@@ -258,7 +258,7 @@ void addDispatchRegionCreationPasses(OpPassManager &passManager,
       // transpose.
       .addPass(IREE::Flow::createInterchangeTransposeGenericOpsPass);
 
-  addDispatchRegionMaterializationPasses(passManager);
+  addDispatchRegionCreationPasses(passManager);
 }
 
 void buildFlowTransformPassPipeline(OpPassManager &passManager,
@@ -439,6 +439,17 @@ void registerFlowTransformPassPipeline() {
         addDispatchRegionCreationPreprocessingPasses(passManager);
         LLVM_DEBUG({
           llvm::dbgs() << "Dispatch preprocessing pass pipeline : ";
+          passManager.dump();
+        });
+      });
+
+  PassPipelineRegistration<> flowDispatchRegionCreationPipeline(
+      "iree-flow-dispatch-region-creation-pipeline",
+      "Flag used to run passes that form dispatch regions",
+      [](OpPassManager &passManager) {
+        addDispatchRegionCreationPasses(passManager);
+        LLVM_DEBUG({
+          llvm::dbgs() << "Dispatch region creation pass pipeline : ";
           passManager.dump();
         });
       });

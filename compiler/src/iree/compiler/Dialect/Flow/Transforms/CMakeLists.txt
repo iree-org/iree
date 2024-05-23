@@ -42,7 +42,6 @@ iree_cc_library(
     "ConvertToFlow.cpp"
     "DeduplicateExecutables.cpp"
     "DispatchRegionsToWorkgroupsPass.cpp"
-    "DispatchTensorPass.cpp"
     "DispatchWithTransformDialect.cpp"
     "DumpDispatchGraph.cpp"
     "ElementwiseOpFusion.cpp"
@@ -67,6 +66,7 @@ iree_cc_library(
     "SinkReshapes.cpp"
     "SplitReduction.cpp"
     "TensorPadToTensorInsertSlice.cpp"
+    "TensorToFlowPass.cpp"
     "TopLevelSCFToCFG.cpp"
     "VerifyInputLegality.cpp"
   DEPS

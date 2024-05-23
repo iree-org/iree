@@ -186,7 +186,7 @@ def DispatchRegionsToWorkgroupsPass :
   ];
 }
 
-def DispatchTensorPass :
+def TensorToFlowPass :
     InterfacePass<"iree-flow-tensor-to-flow", "mlir::FunctionOpInterface"> {
     let summary = "Convert tensor operations to flow";
     let description = [{

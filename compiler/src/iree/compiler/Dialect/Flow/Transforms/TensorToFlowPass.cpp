@@ -32,7 +32,7 @@
 
 namespace mlir::iree_compiler::IREE::Flow {
 
-#define GEN_PASS_DEF_DISPATCHTENSORPASS
+#define GEN_PASS_DEF_TENSORTOFLOWPASS
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
 
 /// Return `true` if the given op is contained in DispatchWorkgroupsOp or in a
@@ -157,15 +157,15 @@ LogicalResult convertExtractSliceOps(
 }
 
 namespace {
-struct DispatchTensorPass
-    : public IREE::Flow::impl::DispatchTensorPassBase<DispatchTensorPass> {
-  using IREE::Flow::impl::DispatchTensorPassBase<
-      DispatchTensorPass>::DispatchTensorPassBase;
+struct TensorToFlowPass
+    : public IREE::Flow::impl::TensorToFlowPassBase<TensorToFlowPass> {
+  using IREE::Flow::impl::TensorToFlowPassBase<
+      TensorToFlowPass>::TensorToFlowPassBase;
   void runOnOperation() override;
 };
 } // namespace
 
-void DispatchTensorPass::runOnOperation() {
+void TensorToFlowPass::runOnOperation() {
   mlir::FunctionOpInterface funcOp = getOperation();
   mlir::TensorDimTrackingRewriter rewriter(funcOp);
   mlir::MLIRContext *context = &getContext();
