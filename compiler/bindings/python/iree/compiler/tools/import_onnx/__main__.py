@@ -78,7 +78,7 @@ def load_onnx_model(args: argparse.Namespace) -> onnx.ModelProto:
     # files.  See
     # https://onnx.ai/onnx/repo-docs/PythonAPIOverview.html#shape-inference-a-large-onnx-model-2gb
     # for details about the file-based technique.
-    
+
     # Run the checker to test whether the file is above the threshold for
     # in-memory shape inference.  If not, go ahead and do the shape inference.
     try:
