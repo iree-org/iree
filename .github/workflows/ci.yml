@@ -738,7 +738,7 @@ jobs:
   tracing:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'tracing')
-    runs-on: ubuntu-20.04-64core
+    runs-on: ubuntu-20.04
     env:
       BUILD_DIR: build-tracing
     steps:
