@@ -87,7 +87,6 @@ iree_cc_library(
     "ConvertBf16ToUInt16Buffers.cpp"
     "ConvertToDestinationPassingStylePass.cpp"
     "DecomposeAffineOpsPass.cpp"
-    "DecomposeBatchMmt4DOps.cpp"
     "DecomposeConvolutionToLowerDimOps.cpp"
     "DecomposeLinalgGeneric.cpp"
     "DecomposePackUnPackOps.cpp"
