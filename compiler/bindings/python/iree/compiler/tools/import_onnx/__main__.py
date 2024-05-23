@@ -104,7 +104,7 @@ def load_onnx_model(args: argparse.Namespace) -> onnx.ModelProto:
 
         # Load the temp file and the external data.
         inferred_model = onnx.load(temp_inferred_file, load_external_data=False)
-        data_dir = Path(input_dir if args.temp_dir is None else args.data_dir)
+        data_dir = Path(input_dir if args.data_dir is None else args.data_dir)
         onnx.load_external_data_for_model(inferred_model, data_dir)
 
         return inferred_model
@@ -126,14 +126,6 @@ def parse_arguments(argv=None) -> argparse.Namespace:
         default=True,
         action=argparse.BooleanOptionalAction,
         help="Toggle data propogation for onnx shape inference",
-    )
-    parser.add_argument(
-        "--temp-dir",
-        help="Pre-existing directory in which to create temporary files."
-        ' For example, to place temporaries under the directory "foo/bar",'
-        ' specify --temp-dir=foo/bar.  "foo/bar" must already exist.'
-        " Defaults to the directory of the input file.",
-        type=Path,
     )
     parser.add_argument(
         "--data-dir",
