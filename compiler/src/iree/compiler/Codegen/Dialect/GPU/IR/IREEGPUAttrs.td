@@ -41,14 +41,14 @@ def IREEGPU_LoweringConfigAttr :
       ]>
     ]> {
   let mnemonic = "lowering_config";
-  let summary = [{drive lowering of an operation for gpu compilation.}];
+  let summary = "drive lowering of an operation for gpu compilation.";
   let description = [{
     GPU specific implementation of a lowering config. This carries just a
     dictionary attribute to store any relevant fields. This is the simplest
     form of a lowering config, offering flexibility at the cost of structure.
   }];
 
-  let assemblyFormat = [{ `<` $attributes `>` }];
+  let assemblyFormat = "`<` $attributes `>`";
 
   let parameters = (ins
     AttrParameter<"DictionaryAttr",

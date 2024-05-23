@@ -12,8 +12,10 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Utils/VectorOpUtils.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/STLForwardCompat.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/ADT/iterator_range.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
@@ -1036,12 +1038,12 @@ bool TargetAttr::supportsSyncMMAOps() const {
 // Lowering Config Attributes
 //===----------------------------------------------------------------------===//
 
-static constexpr char kWorkgroupLevelName[] = "workgroup";
-static constexpr char kPartialReductionLevelName[] = "partial_reduction";
-static constexpr char kReductionLevelName[] = "reduction";
-static constexpr char kThreadLevelName[] = "thread";
-static constexpr char kSubgroupLevelName[] = "subgroup";
-static constexpr char kLaneLevelName[] = "lane";
+constexpr StringLiteral kWorkgroupLevelName = "workgroup";
+constexpr StringLiteral kPartialReductionLevelName = "partial_reduction";
+constexpr StringLiteral kReductionLevelName = "reduction";
+constexpr StringLiteral kThreadLevelName = "thread";
+constexpr StringLiteral kSubgroupLevelName = "subgroup";
+constexpr StringLiteral kLaneLevelName = "lane";
 
 static StringRef getTilingLevelName(GPU::TilingLevel level) {
   switch (level) {
@@ -1065,18 +1067,12 @@ static StringRef getTilingLevelName(GPU::TilingLevel level) {
 static SmallVector<int64_t> getTileSizes(DictionaryAttr config,
                                          GPU::TilingLevel level) {
   auto sizes = config.getAs<ArrayAttr>(getTilingLevelName(level));
-  if (!sizes) {
+  if (!sizes || !llvm::all_of(sizes.getValue(), llvm::IsaPred<IntegerAttr>)) {
     return {};
   }
-  SmallVector<int64_t> sizeList;
-  for (auto maybeSize : sizes.getValue()) {
-    auto size = dyn_cast<IntegerAttr>(maybeSize);
-    if (!size) {
-      return {};
-    }
-    sizeList.push_back(size.getInt());
-  }
-  return sizeList;
+  return llvm::map_to_vector(sizes.getValue(), [](Attribute s) -> int64_t {
+    return cast<IntegerAttr>(s).getInt();
+  });
 }
 
 SmallVector<int64_t> LoweringConfigAttr::getWorkgroupTileSizes() const {
@@ -1086,7 +1082,7 @@ SmallVector<int64_t> LoweringConfigAttr::getWorkgroupTileSizes() const {
 SmallVector<int64_t>
 LoweringConfigAttr::getStaticTilingLevelSizes(unsigned level,
                                               Operation *op) const {
-  if (level > static_cast<unsigned>(GPU::TilingLevel::Lane)) {
+  if (level > llvm::to_underlying(GPU::TilingLevel::Lane)) {
     return {};
   }
   return getTileSizes(getAttributes(), static_cast<GPU::TilingLevel>(level));
@@ -1095,7 +1091,7 @@ LoweringConfigAttr::getStaticTilingLevelSizes(unsigned level,
 SmallVector<OpFoldResult>
 LoweringConfigAttr::getTilingLevelSizes(OpBuilder &b, unsigned level,
                                         Operation *op) const {
-  if (level > static_cast<unsigned>(GPU::TilingLevel::Lane)) {
+  if (level > llvm::to_underlying(GPU::TilingLevel::Lane)) {
     return {};
   }
   SmallVector<int64_t> sizes =
