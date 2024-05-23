@@ -19,6 +19,7 @@ if(${IREE_TRACING_PROVIDER} STREQUAL "console")
       "console.c"
     DEPS
       iree::base::core_headers
+      iree::base::internal::time
     DEFINES
       "IREE_TRACING_PROVIDER_H=\"iree/base/tracing/console.h\""
       "IREE_TRACING_MODE=${IREE_TRACING_MODE}"
