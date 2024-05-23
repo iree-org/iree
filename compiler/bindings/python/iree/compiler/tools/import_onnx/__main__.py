@@ -19,6 +19,7 @@ import os
 from pathlib import Path
 import shutil
 import sys
+import tempfile
 
 try:
     import onnx
@@ -76,15 +77,11 @@ def load_onnx_model(args: argparse.Namespace) -> onnx.ModelProto:
     # temp directory instead of a hard-coded path in order to avoid data races
     # by default.
     input_dir = os.path.dirname(os.path.abspath(args.input_file))
-    temp_dir = (
-        Path(input_dir if args.temp_dir is None else args.temp_dir)
-        / "onnx-importer-temp"
-    )
-    shutil.rmtree(temp_dir, ignore_errors=True)
-    temp_dir.mkdir(exist_ok=True)
+    temp_dir = tempfile.TemporaryDirectory(dir=input_dir)
+    temp_dir_path = Path(temp_dir.name)
 
     # Load the model, with possible external data coming from the default
-    # location, or the location specified on the conmand line.
+    # location, or the location specified on the command line.
     if args.data_dir is None:
         raw_model = onnx.load(args.input_file)
     else:
@@ -102,32 +99,12 @@ def load_onnx_model(args: argparse.Namespace) -> onnx.ModelProto:
     except ValueError:
         pass
 
-    # The following code was an attempt to work around the bug where models
-    # with external data produce invalid output shapes after infer_shapes_path.
-    # It works with small models but threw an error for llama seeming to
-    # indicate that the protobuf is corrupt.
-    #
-    # temp_raw_file = temp_dir / "raw.onnx"
-    # onnx.save(raw_model, temp_raw_file, save_as_external_data=False)
-    # onnx.shape_inference.infer_shapes_path(temp_raw_file, temp_inferred_file)
-    # inferred_model = onnx.load(temp_inferred_file)
-
     # Model is too big for in-memory inference: do file-based shape inference
     # to a temp file.
-    temp_inferred_file = temp_dir / "inferred.onnx"
+    temp_inferred_file = temp_dir_path / "temp-inferred.onnx"
     onnx.shape_inference.infer_shapes_path(
         args.input_file, temp_inferred_file, data_prop=args.data_prop
     )
-
-    # Sanity check the shape-inferred model to be sure we have a good model
-    # for the importer.  This call uses the file-based method, as the
-    # in-memory method (passing the loaded model) fails due to the 2 GB limit.
-    #
-    # TODO: this call throws an exception because it can't find the external
-    # data files, and there doesn't appear to be a way to let the checker know
-    # where to find them.
-    #
-    # onnx.checker.check_model(temp_inferred_file)
 
     # Load the temp file and the external data.
     inferred_model = onnx.load(temp_inferred_file, load_external_data=False)
@@ -136,7 +113,7 @@ def load_onnx_model(args: argparse.Namespace) -> onnx.ModelProto:
 
     # Remove the inferred shape file unless asked to keep it
     if not args.keep_temps:
-        shutil.rmtree(temp_dir)
+        temp_dir.cleanup()
 
     return inferred_model
 
@@ -172,11 +149,7 @@ def parse_arguments(argv=None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--data-dir",
-        help="Path between CWD and the base directory of the data,"
-        " excluding the directories given in the 'location' argument of "
-        " convert_model_to_external_data.  For example, if 'location' was"
-        ' "data/data.bin" and the relative path from CWD to that .bin file is'
-        ' a/b/data/data.bin, then set data-dir to "a/b".'
+        help="Path to the base directory of the data."
         " Defaults to the directory of the input file.",
         type=Path,
     )
