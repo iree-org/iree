@@ -2063,6 +2063,8 @@ setTransposeLikeOpRootConfig(mlir::FunctionOpInterface entryPointFn,
       distConfig.minTileSizes = {2, 2};
     else
       return failure();
+  } else {
+    return failure();
   }
 
   auto vecPreProcStrategy = getVectorPreProcStrategy(genericOp);
