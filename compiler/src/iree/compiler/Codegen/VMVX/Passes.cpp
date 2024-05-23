@@ -54,7 +54,7 @@ void addVMVXDefaultPassPipeline(OpPassManager &funcPassManager,
   addTileAndDistributePasses(funcPassManager);
 
   if (enableUKernels) {
-    funcPassManager.addPass(createCPUUkernelPreparationPass());
+    funcPassManager.addPass(createCPUPrepareUkernelsPass());
     funcPassManager.addPass(
         createCPULowerToUKernelsPass(clSkipIntermediateRoundings));
   }

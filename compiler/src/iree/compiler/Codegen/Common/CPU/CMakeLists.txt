@@ -44,7 +44,7 @@ iree_cc_library(
   SRCS
     "CPULowerToUKernels.cpp"
     "CPUMaterializeEncodingPass.cpp"
-    "CPUUkernelPreparation.cpp"
+    "CPUPrepareUkernels.cpp"
     "Passes.cpp"
   DEPS
     ::PassHeaders

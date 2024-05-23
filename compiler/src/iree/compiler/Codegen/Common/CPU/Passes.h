@@ -55,7 +55,7 @@ createCPULowerToUKernelsPass(bool skipIntermediateRoundings = true);
 
 /// Pass to decompose batch_mmt4d/pack/etc to fit ukernel requirements.
 std::unique_ptr<InterfacePass<FunctionOpInterface>>
-createCPUUkernelPreparationPass();
+createCPUPrepareUkernelsPass();
 
 void registerCodegenCommonCPUPasses();
 

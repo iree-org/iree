@@ -150,8 +150,8 @@ struct ConvertBatchMmt4DtoMmt4DPattern
   }
 };
 
-struct CPUUkernelPreparationPass
-    : public CPUUkernelPreparationBase<CPUUkernelPreparationPass> {
+struct CPUPrepareUkernelsPass
+    : public CPUPrepareUkernelsBase<CPUPrepareUkernelsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, arith::ArithDialect,
                     tensor::TensorDialect, scf::SCFDialect>();
@@ -162,7 +162,7 @@ struct CPUUkernelPreparationPass
 
 } // namespace
 
-void CPUUkernelPreparationPass::runOnOperation() {
+void CPUPrepareUkernelsPass::runOnOperation() {
   MLIRContext *ctx = &getContext();
   auto funcOp = getOperation();
   Operation *errorOp = nullptr;
@@ -214,8 +214,8 @@ void CPUUkernelPreparationPass::runOnOperation() {
 }
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createCPUUkernelPreparationPass() {
-  return std::make_unique<CPUUkernelPreparationPass>();
+createCPUPrepareUkernelsPass() {
+  return std::make_unique<CPUPrepareUkernelsPass>();
 }
 
 } // namespace mlir::iree_compiler
