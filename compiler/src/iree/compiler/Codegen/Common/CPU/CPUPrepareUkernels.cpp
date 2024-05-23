@@ -28,11 +28,10 @@ static void tileBatchDimsForBatchMmt4dOp(RewriterBase &rewriter,
     if (outType.getShape()[0] <= 1) {
       return;
     }
-    SmallVector<int64_t> tileSizes = {1};
+    SmallVector<OpFoldResult> tileSizes = {rewriter.getIndexAttr(1)};
     auto tilingInterfaceOp = cast<TilingInterface>(batchMmt4DOp.getOperation());
     auto options = scf::SCFTileAndFuseOptions().setTilingOptions(
-        scf::SCFTilingOptions().setTileSizes(
-            getAsIndexOpFoldResult(rewriter.getContext(), tileSizes)));
+        scf::SCFTilingOptions().setTileSizes(tileSizes));
     FailureOr<scf::SCFTileAndFuseResult> tileAndFuseResult =
         scf::tileConsumerAndFuseProducersUsingSCF(rewriter, tilingInterfaceOp,
                                                   options);
@@ -50,9 +49,11 @@ static void tileNonPackedDimsFor3DPackOps(RewriterBase &rewriter,
       return;
     }
 
-    SmallVector<int64_t> tileSizes(packOp.getSourceRank(), 1);
+    OpFoldResult zero = rewriter.getIndexAttr(0);
+    OpFoldResult one = rewriter.getIndexAttr(1);
+    SmallVector<OpFoldResult> tileSizes(packOp.getSourceRank(), one);
     for (auto dim : packOp.getInnerDimsPos()) {
-      tileSizes[dim] = 0;
+      tileSizes[dim] = zero;
     }
 
     // Skip the tiling if the size is already 1.
@@ -68,8 +69,7 @@ static void tileNonPackedDimsFor3DPackOps(RewriterBase &rewriter,
     }
 
     auto tilingInterfaceOp = cast<TilingInterface>(packOp.getOperation());
-    auto options = scf::SCFTilingOptions().setTileSizes(
-        getAsIndexOpFoldResult(rewriter.getContext(), tileSizes));
+    auto options = scf::SCFTilingOptions().setTileSizes(tileSizes);
     FailureOr<scf::SCFTilingResult> tilingResult =
         scf::tileUsingSCF(rewriter, tilingInterfaceOp, options);
     assert(succeeded(tilingResult));
