@@ -19,19 +19,8 @@ ARG APT_KEY_DONT_WARN_ON_DANGEROUS_USAGE=1
 
 ######## Basic stuff ########
 WORKDIR /install-basics
-# Useful utilities for building child images. Best practices would tell us to
-# use multi-stage builds
-# (https://docs.docker.com/develop/develop-images/multistage-build/) but it
-# turns out that Dockerfile is a thoroughly non-composable awful format and that
-# doesn't actually work that well. These deps are pretty small.
-RUN apt-get update \
-  && apt-get install -y \
-    git \
-    unzip \
-    wget \
-    curl \
-    gnupg2 \
-    lsb-release
+COPY build_tools/docker/context/install_basics.sh ./
+RUN ./install_basics.sh && rm -rf /install-basics
 
 # Install the latest supported compiler tools
 ARG LLVM_VERSION=19
