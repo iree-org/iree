@@ -43,7 +43,8 @@ macro(iree_set_spirv_cross_cmake_options)
 endmacro()
 
 macro(iree_set_tracy_cmake_options)
+  # Just building the tracy-capture CLI tool, so minimally make that work.
   set(DOWNLOAD_GLFW ON CACHE BOOL "" FORCE)
   set(DOWNLOAD_FREETYPE ON CACHE BOOL "" FORCE)
-  set(GTK_FILESELECTOR ON CACHE BOOL "" FORCE)
+  set(NO_FILESELECTOR ON CACHE BOOL "" FORCE)
 endmacro()
