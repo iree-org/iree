@@ -41,10 +41,3 @@ macro(iree_set_spirv_cross_cmake_options)
   set(SPIRV_CROSS_ENABLE_C_API OFF CACHE BOOL "" FORCE)
   set(SPIRV_CROSS_ENABLE_UTIL OFF CACHE BOOL "" FORCE)
 endmacro()
-
-macro(iree_set_tracy_cmake_options)
-  # Just building the tracy-capture CLI tool, so minimally make that work.
-  set(DOWNLOAD_GLFW ON CACHE BOOL "" FORCE)
-  set(DOWNLOAD_FREETYPE ON CACHE BOOL "" FORCE)
-  set(NO_FILESELECTOR ON CACHE BOOL "" FORCE)
-endmacro()

@@ -78,7 +78,7 @@ option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
 option(IREE_BUILD_DOCS "Builds IREE documentation files." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
-option(IREE_BUILD_TRACY "Enables building the 'tracy-capture' CLI tool and includes it in runtime Python bindings." OFF)
+option(IREE_BUILD_TRACY "Enables building the 'iree-tracy-capture' CLI tool and includes it in runtime Python bindings." OFF)
 option(IREE_BUILD_BUNDLED_LLVM "Builds the bundled llvm-project (vs using installed)" ON)
 
 # Properties controlling version and naming of release artifacts.
@@ -1014,17 +1014,13 @@ if(IREE_ENABLE_CLANG_TIDY)
 endif()
 
 if(IREE_BUILD_TRACY)
-  # Tracy's upstream CMake build has separate projects with overlapping target
-  # names for tracy/capture, tracy/profiler, and tracy/csvexport. We bundle
-  # the 'tracy-capture' CLI tool as 'iree-tracy-capture' in our runtime Python
-  # bindings, so just include the 'capture' project. Developers wanting to build
-  # the 'profiler' GUI should refer to the upstream instructions and build from
-  # the submodule directly.
-  message(STATUS "Configuring third_party/tracy/capture for IREE_BUILD_TRACY")
-  list(APPEND CMAKE_MESSAGE_INDENT "  ")
-  iree_set_tracy_cmake_options()
-  add_subdirectory(third_party/tracy/capture ${CMAKE_CURRENT_BINARY_DIR}/tracy/capture)
-  list(POP_BACK CMAKE_MESSAGE_INDENT)
+  if(NOT CMAKE_SYSTEM_NAME MATCHES "Darwin|Linux")
+    message(WARNING "Building Tracy (IREE_BUILD_TRACY) on non-Darwin/Linux is unsupported and may fail below.")
+  endif()
+  add_subdirectory(build_tools/third_party/tracy ${CMAKE_CURRENT_BINARY_DIR}/tracy)
+  if(NOT TARGET IREETracyCaptureServer)
+    message(SEND_ERROR "Could not build Tracy. Either unset IREE_BUILD_TRACY or look for missing dependencies above and install them.")
+  endif()
 endif()
 
 # Order constraint: The python bindings install tools targets from tools/
