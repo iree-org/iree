@@ -42,7 +42,7 @@ def LinalgExtInterface : OpInterface<"LinalgExtOp"> {
 }
 
 // Interface that allows for fusion of both LinalgExt and Linalg ops.
-def LinalgFusionInterface : OpInterface<"LinalgFusionOpInterface", [DestinationStyleOpInterface]> {
+def LinalgFusionInterface : OpInterface<"LinalgFusionOpInterface"> {
   let methods = [
     //===------------------------------------------------------------------===//
     // Interface methods for fusion. 
@@ -52,7 +52,7 @@ def LinalgFusionInterface : OpInterface<"LinalgFusionOpInterface", [DestinationS
         Return an AffineMap for each operand or `std::nullopt` if the operand
         does not have an indexing map representation.
       }],
-      /*retTy=*/"SmallVector<std::optional<AffineMap>>",
+      /*retTy=*/"SmallVector<AffineMap>",
       /*methodName=*/"getIndexingMapsForOperands",
       /*args=*/(ins),
       /*methodBody=*/""
@@ -62,7 +62,7 @@ def LinalgFusionInterface : OpInterface<"LinalgFusionOpInterface", [DestinationS
         Return an AffineMap for each result or `std::nullopt` if the result
         does not have an indexing map representation.
       }],
-      /*retTy=*/"SmallVector<std::optional<AffineMap>>",
+      /*retTy=*/"SmallVector<AffineMap>",
       /*methodName=*/"getIndexingMapsForResults",
       /*args=*/(ins),
       /*methodBody=*/""
@@ -72,7 +72,7 @@ def LinalgFusionInterface : OpInterface<"LinalgFusionOpInterface", [DestinationS
         Return all indexing maps, or `std::nullopt` if an operand or result
         does not have an indexing map representation.
       }],
-      /*retTy=*/"SmallVector<std::optional<AffineMap>>",
+      /*retTy=*/"SmallVector<AffineMap>",
       /*methodName=*/"getIndexingMaps",
       /*args=*/(ins),
       /*methodBody=*/"",
@@ -128,7 +128,7 @@ def LinalgFusionInterface : OpInterface<"LinalgFusionOpInterface", [DestinationS
       /*desc=*/[{
         Return the indexing map for an op's `result`.
       }],
-      /*retTy=*/"std::optional<AffineMap>",
+      /*retTy=*/"AffineMap",
       /*methodName=*/"getIndexingMapMatchingResult",
       /*args=*/(ins "OpResult":$result),
       /*methodBody=*/"",
@@ -141,7 +141,7 @@ def LinalgFusionInterface : OpInterface<"LinalgFusionOpInterface", [DestinationS
       /*desc=*/[{
         Return the input or output indexing map for `opOperand`.
       }],
-      /*retTy=*/"std::optional<AffineMap>",
+      /*retTy=*/"AffineMap",
       /*methodName=*/"getMatchingIndexingMap",
       /*args=*/(ins "OpOperand*":$opOperand),
       /*methodBody=*/"",

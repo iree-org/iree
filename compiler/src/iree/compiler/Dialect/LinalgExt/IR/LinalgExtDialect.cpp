@@ -58,23 +58,20 @@ struct LinalgFusionOpInterfaceAdapter
     : public LinalgFusionOpInterface::ExternalModel<
           LinalgFusionOpInterfaceAdapter<ConcreteType>, ConcreteType> {
 public:
-  SmallVector<std::optional<AffineMap>>
-  getIndexingMapsForOperands(mlir::Operation *op) const {
+  SmallVector<AffineMap> getIndexingMapsForOperands(mlir::Operation *op) const {
     auto maps = llvm::cast<ConcreteType>(op)
                     .getIndexingMaps()
                     .template getAsValueRange<AffineMapAttr>();
-    return SmallVector<std::optional<AffineMap>>(
-        maps.begin(),
-        maps.end() - llvm::cast<ConcreteType>(op).getNumResults());
+    return {maps.begin(),
+            maps.end() - llvm::cast<ConcreteType>(op).getNumResults()};
   }
 
-  SmallVector<std::optional<AffineMap>>
-  getIndexingMapsForResults(mlir::Operation *op) const {
+  SmallVector<AffineMap> getIndexingMapsForResults(mlir::Operation *op) const {
     auto maps = llvm::cast<ConcreteType>(op)
                     .getIndexingMaps()
                     .template getAsValueRange<AffineMapAttr>();
-    return SmallVector<std::optional<AffineMap>>(
-        maps.end() - llvm::cast<ConcreteType>(op).getNumResults(), maps.end());
+    return {maps.end() - llvm::cast<ConcreteType>(op).getNumResults(),
+            maps.end()};
   }
 
   // Forward all the interface methods to the corresponding linalg op.
@@ -100,8 +97,7 @@ public:
     return (llvm::cast<ConcreteType>(op).getMatchingIndexingMap(operand));
   }
 
-  SmallVector<std::optional<AffineMap>>
-  getIndexingMaps(mlir::Operation *op) const {
+  SmallVector<AffineMap> getIndexingMaps(mlir::Operation *op) const {
     // Note: this is different from linalg's implementation
     // of `getIndexingMaps`. Call interface methods to get
     // the vector of indexing maps for operands and results.

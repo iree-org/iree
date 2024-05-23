@@ -33,6 +33,7 @@
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Operation.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/Interfaces/DestinationStyleOpInterface.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Interfaces/TilingInterface.h"
 #include "mlir/Pass/Pass.h"
@@ -411,10 +412,10 @@ static bool hasCompatibleOuterParallelLoops(
 
   return hasCompatibleOuterParallelLoops(
              cast<TilingInterface>(producer.getOperation()),
-             *producerIndexingMap, rootOuterParallelLoops) &&
+             producerIndexingMap, rootOuterParallelLoops) &&
          hasCompatibleOuterParallelLoops(
              cast<TilingInterface>(consumer.getOperation()),
-             *consumerIndexingMap, rootOuterParallelLoops);
+             consumerIndexingMap, rootOuterParallelLoops);
 }
 
 /// For all uses of an operation, finds the use that dominates all other uses.
@@ -652,12 +653,18 @@ isFusableWithConsumer(OpOperand &fusedOperand,
   // While fusing with consumer, the result of the root might not be the final
   // result of the dispatch. To avoid a stack allocation we have to ensure that
   // all operations can bufferize without needing additional memory.
-  for (OpOperand *inputOperand : consumerFusionOp.getDpsInputOperands()) {
+  auto consumerDstOp =
+      dyn_cast<DestinationStyleOpInterface>(consumerFusionOp.getOperation());
+  if (!consumerDstOp) {
+    return true;
+  }
+
+  for (OpOperand *inputOperand : consumerDstOp.getDpsInputOperands()) {
     if (inputOperand->get().getDefiningOp() != producer)
       continue;
     if (isa<linalg::ConvolutionOpInterface>(producer) &&
         !llvm::any_of(
-            consumerFusionOp.getDpsInitsMutable(), [&](OpOperand &initOperand) {
+            consumerDstOp.getDpsInitsMutable(), [&](OpOperand &initOperand) {
               return canUseInOperandAsInitOperand(inputOperand, &initOperand);
             })) {
       return false;
@@ -762,8 +769,8 @@ isFusableWithProducer(OpOperand &operand,
   }
 
   if (!options.aggressiveFusion) {
-    auto consumerFusionOp = cast<LinalgExt::LinalgFusionOpInterface>(consumer);
-    if (!consumerFusionOp.isDpsInit(&operand)) {
+    auto consumerFusionOp = dyn_cast<DestinationStyleOpInterface>(consumer);
+    if (consumerFusionOp && !consumerFusionOp.isDpsInit(&operand)) {
       return false;
     }
   }

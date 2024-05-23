@@ -253,15 +253,14 @@ ScatterOp::reifyResultShapes(OpBuilder &b,
       .reifyResultShapes(b, reifiedReturnShapes);
 }
 
-SmallVector<std::optional<AffineMap>> ScatterOp::getIndexingMapsForOperands() {
+SmallVector<AffineMap> ScatterOp::getIndexingMapsForOperands() {
   Builder builder(getContext());
   return {builder.getMultiDimIdentityMap(getUpdateType().getRank()),
           builder.getMultiDimIdentityMap(getIndicesType().getRank())};
 }
 
-SmallVector<std::optional<AffineMap>> ScatterOp::getIndexingMapsForResults() {
-  Builder builder(getContext());
-  return {std::nullopt};
+SmallVector<AffineMap> ScatterOp::getIndexingMapsForResults() {
+  return {AffineMap(nullptr)};
 }
 
 //===----------------------------------------------------------------------===//
@@ -497,13 +496,13 @@ ReverseOp::reifyResultShapes(OpBuilder &b,
       .reifyResultShapes(b, reifiedReturnShapes);
 }
 
-SmallVector<std::optional<AffineMap>> ReverseOp::getIndexingMapsForOperands() {
+SmallVector<AffineMap> ReverseOp::getIndexingMapsForOperands() {
   Builder builder(getContext());
   return {builder.getMultiDimIdentityMap(getOperandRank())};
 }
 
-SmallVector<std::optional<AffineMap>> ReverseOp::getIndexingMapsForResults() {
-  return {std::nullopt};
+SmallVector<AffineMap> ReverseOp::getIndexingMapsForResults() {
+  return {AffineMap(nullptr)};
 }
 
 //===----------------------------------------------------------------------===//
