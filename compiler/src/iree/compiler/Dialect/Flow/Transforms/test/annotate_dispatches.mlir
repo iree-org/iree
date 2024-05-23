@@ -483,3 +483,29 @@ flow.executable private @ex {
     }
   }
 }
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3, d4, d5) -> (d0, d2, d1, d4, d3, d5)>
+flow.executable private @ex {
+  // CHECK: flow.executable.export private @dispatch_winograd_input_transform_1xDxDx1xf16_generic
+  flow.executable.export private @dispatch
+    builtin.module {
+      func.func @dispatch(%arg0: !flow.dispatch.tensor<readonly:tensor<1x?x?x1xf16>>, %arg1: !flow.dispatch.tensor<readwrite:tensor<8x8x1x1x1x1xf16>>, %arg2: index, %arg3: index) {
+        %0 = flow.dispatch.workload.ordinal %arg2, 0 : index
+        %1 = flow.dispatch.workload.ordinal %arg3, 1 : index
+        %2 = flow.dispatch.tie_shape %arg0 : !flow.dispatch.tensor<readonly:tensor<1x?x?x1xf16>>{%0, %1}
+        %3 = flow.dispatch.tensor.load %2, offsets = [0, 0, 0, 0], sizes = [1, %0, %1, 1], strides = [1, 1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<1x?x?x1xf16>>{%0, %1} -> tensor<1x?x?x1xf16>
+        %4 = flow.dispatch.tensor.load %arg1, offsets = [0, 0, 0, 0, 0, 0], sizes = [8, 8, 1, 1, 1, 1], strides = [1, 1, 1, 1, 1, 1] : !flow.dispatch.tensor<readwrite:tensor<8x8x1x1x1x1xf16>> -> tensor<8x8x1x1x1x1xf16>
+        %5 = iree_linalg_ext.winograd.input_transform output_tile_size(6) kernel_size(3) image_dimensions([1, 2]) ins(%3 : tensor<1x?x?x1xf16>) outs(%4 : tensor<8x8x1x1x1x1xf16>) -> tensor<8x8x1x1x1x1xf16>
+        %6 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel", "parallel"]}
+          ins(%5 : tensor<8x8x1x1x1x1xf16>) outs(%4 : tensor<8x8x1x1x1x1xf16>) {
+            ^bb0(%in: f16, %out: f16):
+              %7 = arith.negf %in : f16
+              linalg.yield %7 : f16
+          } -> tensor<8x8x1x1x1x1xf16>
+        flow.dispatch.tensor.store %6, %arg1, offsets = [0, 0, 0, 0, 0, 0], sizes = [8, 8, 1, 1, 1, 1], strides = [1, 1, 1, 1, 1, 1] : tensor<8x8x1x1x1x1xf16> -> !flow.dispatch.tensor<readwrite:tensor<8x8x1x1x1x1xf16>>
+        return
+      }
+    }
+}

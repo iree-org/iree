@@ -28,17 +28,20 @@ namespace mlir::iree_compiler::IREE::Flow {
 #define GEN_PASS_DEF_ANNOTATEDISPATCHESPASS
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
 
+static constexpr int64_t kMaxCost = INT64_MAX;
+
 namespace {
 
 static int64_t costOfDomain(ArrayRef<int64_t> domain) {
   int64_t product = 1;
   for (int64_t size : domain) {
-    if (ShapedType::isDynamic(size))
-      return INT64_MAX;
+    if (ShapedType::isDynamic(size)) {
+      return kMaxCost;
+    }
     product *= size;
   }
   return product;
-};
+}
 
 // Estimates the evaluation cost of a linalg op using a heuristic cost model.
 static int64_t estimateLinalgOpCost(linalg::LinalgOp op) {
@@ -80,7 +83,9 @@ static int64_t estimateLinalgExtOpCost(Operation *op) {
   // This is something like the extra log(N) factor for a sort or FFT, or
   // the amount of work done by a softmax vs a cheap elementwise on a tensor
   // of the same shape.
-  cost *= 10;
+  if (cost < kMaxCost / 10) {
+    cost *= 10;
+  }
   LLVM_DEBUG(llvm::dbgs() << "// " << op->getName() << " cost: " << cost
                           << "\n");
   return cost;
@@ -267,6 +272,19 @@ static std::string summarizeLinalgExtOp(Operation *op) {
     mainTensor.getElementType().print(sstream);
     sstream.flush();
   }
+
+  // append fused consumer (`linalg` or `linalg_ext`)
+  // e.g ..._1xDxDx1xf16_linalg_generic
+  auto users = op->getUsers();
+  if (!users.empty() && std::next(users.begin()) == users.end()) {
+    auto user = *users.begin();
+    auto userOpName = user->getName().getStringRef();
+    auto pos = userOpName.find('.');
+    assert(pos != StringRef::npos && "expected dialect name");
+    suffix += "_";
+    suffix.insert(suffix.end(), userOpName.begin() + pos + 1, userOpName.end());
+  }
+
   return opName.str() + suffix;
 }
 
