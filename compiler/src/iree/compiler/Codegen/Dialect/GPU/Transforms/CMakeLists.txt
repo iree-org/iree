@@ -28,14 +28,28 @@ iree_cc_library(
   PUBLIC
 )
 
+iree_tablegen_library(
+  NAME
+    PassesIncGen
+  TD_FILE
+    "Passes.td"
+  OUTS
+    --gen-pass-decls Passes.h.inc
+)
+
 iree_cc_library(
   NAME
     GPUTransforms
   HDRS
+    "Passes.h"
+    "Passes.h.inc"
     "Transforms.h"
   SRCS
+    "FuseAndHoistParallelLoops.cpp"
+    "Passes.cpp"
     "Transforms.cpp"
   DEPS
+    ::PassesIncGen
     LLVMSupport
     MLIRAffineDialect
     MLIRAffineUtils
