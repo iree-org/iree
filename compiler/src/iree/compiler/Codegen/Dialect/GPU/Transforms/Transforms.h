@@ -14,10 +14,17 @@
 #define IREE_COMPILER_CODEGEN_DIALECT_GPU_TRANSFORMS_TRANSFORMS_H_
 
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
+#include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/IR/PatternMatch.h"
+
+namespace mlir::vector {
+struct UnrollVectorOptions;
+}
 
 namespace mlir::iree_compiler::IREE::GPU {
 
+void populateIREEGPUVectorUnrollPatterns(
+    RewritePatternSet &patterns, const vector::UnrollVectorOptions &options);
 void populateIREEGPUVectorizationPatterns(RewritePatternSet &patterns);
 
 } // namespace mlir::iree_compiler::IREE::GPU

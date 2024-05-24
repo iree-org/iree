@@ -14,6 +14,18 @@ include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpBase.td"
 
+def ApplyUnrollMultiMmaOp : Op<Transform_Dialect,
+    "apply_patterns.iree.unroll_multi_mma",
+    [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,
+     ReportTrackingListenerFailuresOpTrait]> {
+  let description = [{
+    Populate patterns to unroll iree_gpu.multi_mma ops to a single intrinsic.
+  }];
+
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+  let assemblyFormat = "attr-dict";
+}
+
 def ApplyVectorizeMultiMmaOp : Op<Transform_Dialect,
     "apply_patterns.iree.vectorize_multi_mma",
     [DeclareOpInterfaceMethods<PatternDescriptorOpInterface>,
