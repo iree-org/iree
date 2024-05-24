@@ -1165,8 +1165,25 @@ void SetupHalBindings(nanobind::module_ m) {
         return self & other;
       });
 
-  py::enum_<enum iree_hal_element_types_t>(m, "HalElementType")
-      .value("NONE", IREE_HAL_ELEMENT_TYPE_NONE)
+  // Use compatibility type to enable def_static.
+  // See: https://github.com/wjakob/nanobind/issues/597
+  auto hal_element_type = nanobind1_compat_enum_<enum iree_hal_element_types_t>(
+      m, "HalElementType");
+  hal_element_type
+      .def_static("map_to_dtype",
+                  [](iree_hal_element_type_t element_type) {
+                    int typenum = numpy::ConvertHalElementTypeToNumPyTypeNum(
+                        element_type);
+                    return numpy::DescrNewFromType(typenum);
+                  })
+      .def_static("is_byte_aligned",
+                  [](iree_hal_element_type_t element_type) {
+                    return iree_hal_element_is_byte_aligned(element_type);
+                  })
+      .def_static("dense_byte_count", [](iree_hal_element_type_t element_type) {
+        return iree_hal_element_dense_byte_count(element_type);
+      });
+  hal_element_type.value("NONE", IREE_HAL_ELEMENT_TYPE_NONE)
       .value("OPAQUE_8", IREE_HAL_ELEMENT_TYPE_OPAQUE_8)
       .value("OPAQUE_16", IREE_HAL_ELEMENT_TYPE_OPAQUE_16)
       .value("OPAQUE_32", IREE_HAL_ELEMENT_TYPE_OPAQUE_32)
@@ -1193,20 +1210,7 @@ void SetupHalBindings(nanobind::module_ m) {
       .value("BFLOAT_16", IREE_HAL_ELEMENT_TYPE_BFLOAT_16)
       .value("COMPLEX_64", IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_64)
       .value("COMPLEX_128", IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_128)
-      .export_values()
-      .def_static("map_to_dtype",
-                  [](iree_hal_element_type_t element_type) {
-                    int typenum = numpy::ConvertHalElementTypeToNumPyTypeNum(
-                        element_type);
-                    return numpy::DescrNewFromType(typenum);
-                  })
-      .def_static("is_byte_aligned",
-                  [](iree_hal_element_type_t element_type) {
-                    return iree_hal_element_is_byte_aligned(element_type);
-                  })
-      .def_static("dense_byte_count", [](iree_hal_element_type_t element_type) {
-        return iree_hal_element_dense_byte_count(element_type);
-      });
+      .export_values();
 
   py::class_<HalDevice>(m, "HalDevice")
       .def_prop_ro(

@@ -161,6 +161,34 @@ void BindBufferProtocol(py::handle clazz) {
   heap_type->as_buffer = buffer_procs;
 }
 
+// Nanobind 2.0 had a backwards compatibility bug where it left out the
+// def_static helper. For cases that use this, we patch it here. Note that
+// any def_static must be called directly on the subclassed enum as the existing
+// helpers do not chain to this subclass.
+// See: https://github.com/wjakob/nanobind/issues/597
+// It is likely that this is fixed in the next minor version, at which time,
+// this check should be changed to select only the affected versions for
+// special treatment.
+#if NB_VERSION_MAJOR >= 2
+template <typename T>
+struct nanobind1_compat_enum_ : nanobind::enum_<T> {
+  using py::enum_<T>::enum_;
+  template <typename Func, typename... Extra>
+  nanobind1_compat_enum_& def_static(const char* name_, Func&& f,
+                                     const Extra&... extra) {
+    static_assert(
+        !std::is_member_function_pointer_v<Func>,
+        "def_static(...) called with a non-static member function pointer");
+    cpp_function_def((::nanobind::detail::forward_t<Func>)f,
+                     nanobind::scope(*this), nanobind::name(name_), extra...);
+    return *this;
+  }
+};
+#else
+template <typename T>
+using nanobind1_compat_enum_ = nanobind::enum_<T>;
+#endif
+
 }  // namespace python
 }  // namespace iree
 
