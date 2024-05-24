@@ -156,15 +156,14 @@ struct UnrollMultiMmaPattern : public OpRewritePattern<GPU::MultiMmaOp> {
       auto targetType = VectorType::get(dstShape, dstVecType.getElementType());
 
       // Clone the mma op with the new operands and result type.
-      Operation *newOp =
-          rewriter.create(loc, mmaOp->getName().getIdentifier(), slicesOperands,
-                          targetType, mmaOp->getAttrs());
+      IREE::GPU::MultiMmaOp newOp =
+          mlir::clone(rewriter, mmaOp, targetType, slicesOperands);
 
       SmallVector<int64_t> dstOffets =
           applyPermutationMap(accPermutationMap, ArrayRef<int64_t>(offsets));
       // Save the accumulated value until all the loops are unrolled since
       // reduction loop keep updating the accumulator.
-      accCache[dstOffets] = newOp->getResult(0);
+      accCache[dstOffets] = newOp.getResult();
     }
     // Assemble back the accumulator into a single vector.
     Value result = rewriter.create<arith::ConstantOp>(
