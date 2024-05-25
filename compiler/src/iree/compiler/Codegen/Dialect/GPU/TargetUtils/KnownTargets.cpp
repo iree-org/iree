@@ -213,7 +213,7 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
       .Case("rx7800xt", TargetDetails{rdna3Wgp, &rx7800xtChip})
       // https://www.techpowerup.com/gpu-specs/radeon-rx-7700-xt.c3911
       .Case("rx7700xt", TargetDetails{rdna3Wgp, &rx7700xtChip})
-      .Cases("rdna3", "gfx1100", "gfx1101", "gfx1102", "gfx1103",
+      .Cases("rdna3", "gfx1100", "gfx1101", "gfx1102", "gfx1103", "gfx1150",
              TargetDetails{rdna3Wgp, nullptr})
       .Default(std::nullopt);
 }
