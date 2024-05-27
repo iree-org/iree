@@ -8,16 +8,163 @@
 
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "llvm/ADT/STLExtras.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/Dialect/Vector/Utils/VectorUtils.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/Support/MathExtras.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-transforms"
 
 namespace mlir::iree_compiler::IREE::GPU {
+
+//===---------------------------------------------------------------------===//
+// Forall Fusion
+//===---------------------------------------------------------------------===//
+
+static FailureOr<int64_t> getTripCount(scf::ForallOp loop) {
+  ArrayRef<int64_t> lbs = loop.getStaticLowerBound();
+  ArrayRef<int64_t> ubs = loop.getStaticUpperBound();
+  ArrayRef<int64_t> steps = loop.getStaticStep();
+
+  if (ShapedType::isDynamicShape(lbs) || ShapedType::isDynamicShape(ubs) ||
+      ShapedType::isDynamicShape(steps)) {
+    return failure();
+  }
+
+  int64_t tripCount = 1;
+  for (auto [lb, ub, step] : llvm::zip_equal(lbs, ubs, steps)) {
+    tripCount *= mlir::ceilDiv((ub - lb), step);
+  }
+  return tripCount;
+}
+
+static LogicalResult compareWorkerCountsAndTypes(scf::ForallOp producer,
+                                                 scf::ForallOp consumer) {
+  FailureOr<int64_t> producerTripCount = getTripCount(producer);
+  FailureOr<int64_t> consumerTripCount = getTripCount(consumer);
+  if (failed(producerTripCount) || failed(consumerTripCount) ||
+      *producerTripCount != *consumerTripCount) {
+    return failure();
+  }
+
+  auto checkMappingTypes = [&](ArrayAttr array) {
+    return llvm::all_of(array.getValue(),
+                        llvm::IsaPred<gpu::GPUThreadMappingAttr>) ||
+           llvm::all_of(array.getValue(),
+                        llvm::IsaPred<gpu::GPUWarpMappingAttr>);
+  };
+
+  if (producer.getMappingAttr() != consumer.getMappingAttr() ||
+      !checkMappingTypes(producer.getMappingAttr()) ||
+      !checkMappingTypes(consumer.getMappingAttr())) {
+    return failure();
+  }
+  return success();
+}
+
+static void replaceExtractSlice(RewriterBase &rewriter, Location loc,
+                                tensor::ParallelInsertSliceOp parallelInsert,
+                                tensor::ExtractSliceOp extractSlice) {
+  OpBuilder::InsertionGuard g(rewriter);
+  auto shuffleOp = rewriter.create<IREE::GPU::ShuffleTensorOp>(
+      loc, extractSlice.getType(), parallelInsert.getSource(),
+      parallelInsert.getOffsets(), parallelInsert.getSizes(),
+      parallelInsert.getStrides(), parallelInsert.getStaticOffsets(),
+      parallelInsert.getStaticSizes(), parallelInsert.getStaticStrides(),
+      parallelInsert.getDest());
+  Region *region = &shuffleOp.getRegion();
+  rewriter.createBlock(region, region->end(),
+                       ArrayRef<Type>{parallelInsert.getDestType()},
+                       ArrayRef<Location>{loc});
+  rewriter.setInsertionPointToStart(shuffleOp.getBody());
+  auto terminator =
+      rewriter.create<IREE::GPU::YieldOp>(loc, extractSlice.getResult());
+  rewriter.moveOpBefore(extractSlice, terminator);
+  extractSlice.getSourceMutable().assign(shuffleOp.getBody()->getArgument(0));
+  rewriter.replaceAllUsesExcept(extractSlice.getResult(), shuffleOp,
+                                terminator);
+}
+
+LogicalResult fuseForallIntoSlice(RewriterBase &rewriter,
+                                  scf::ForallOp producer,
+                                  scf::ForallOp consumer,
+                                  tensor::ExtractSliceOp slice) {
+  if (producer->getNumResults() != 1) {
+    return failure();
+  }
+
+  if (failed(compareWorkerCountsAndTypes(producer, consumer))) {
+    return failure();
+  }
+
+  auto isAll = [](ArrayRef<OpFoldResult> array, int64_t cmp) {
+    return llvm::all_of(array, [cmp](OpFoldResult val) {
+      return isConstantIntValue(val, cmp);
+    });
+  };
+
+  if (!isAll(producer.getMixedStep(), 1) ||
+      !isAll(producer.getMixedLowerBound(), 0) ||
+      !isAll(consumer.getMixedStep(), 1) ||
+      !isAll(consumer.getMixedLowerBound(), 0)) {
+    return failure();
+  }
+
+  rewriter.setInsertionPoint(slice);
+
+  // Step 1. Compute the producer IDs in terms of the consumer IDs.
+
+  MLIRContext *context = rewriter.getContext();
+  Location loc = producer.getLoc();
+
+  AffineExpr d0, d1, d2;
+  bindDims(context, d0, d1, d2);
+  AffineExpr mulAdd = d0 * d1 + d2;
+  OpFoldResult linearId = rewriter.getIndexAttr(0);
+  for (auto [inductionVar, workerCount] :
+       llvm::zip_equal(getAsOpFoldResult(consumer.getInductionVars()),
+                       consumer.getMixedUpperBound())) {
+    linearId = affine::makeComposedFoldedAffineApply(
+        rewriter, loc, mulAdd, {linearId, workerCount, inductionVar});
+  }
+
+  Value linearThreadIdVal =
+      getValueOrCreateConstantIndexOp(rewriter, loc, linearId);
+  SmallVector<Value> ranges;
+  for (auto workerCount : producer.getStaticUpperBound()) {
+    ranges.push_back(rewriter.create<arith::ConstantIndexOp>(loc, workerCount));
+  }
+  ValueRange newIds = rewriter
+                          .create<affine::AffineDelinearizeIndexOp>(
+                              loc, linearThreadIdVal, ranges)
+                          .getResults();
+
+  // Step 2. Inline the region of the producer.
+  SmallVector<Value> bbArgReplacements(newIds);
+  bbArgReplacements.append(producer.getOutputs().begin(),
+                           producer.getOutputs().end());
+
+  scf::InParallelOp terminator = producer.getTerminator();
+  rewriter.inlineBlockBefore(producer.getBody(), slice, bbArgReplacements);
+
+  rewriter.setInsertionPointAfter(terminator);
+  auto parallelInsert =
+      cast<tensor::ParallelInsertSliceOp>(*terminator.getYieldingOps().begin());
+
+  replaceExtractSlice(rewriter, loc, parallelInsert, slice);
+
+  rewriter.eraseOp(parallelInsert);
+  rewriter.eraseOp(terminator);
+  rewriter.eraseOp(producer);
+  return success();
+}
 
 //===----------------------------------------------------------------------===//
 // MultiMmaOp Unrolling
@@ -189,9 +336,9 @@ void populateIREEGPUVectorUnrollPatterns(
   patterns.add<UnrollMultiMmaPattern>(patterns.getContext(), options);
 }
 
-//===----------------------------------------------------------------------===//
+//===---------------------------------------------------------------------===//
 // MultiMmaOp Vectorization
-//===----------------------------------------------------------------------===//
+//===---------------------------------------------------------------------===//
 
 static LogicalResult vectorizeStaticMultiMmaOp(RewriterBase &rewriter,
                                                IREE::GPU::MultiMmaOp mmaOp) {

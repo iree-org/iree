@@ -37,10 +37,15 @@ iree_cc_library(
     "Transforms.cpp"
   DEPS
     LLVMSupport
+    MLIRAffineDialect
+    MLIRAffineUtils
     MLIRArithDialect
     MLIRFuncDialect
     MLIRGPUDialect
     MLIRIR
+    MLIRSCFDialect
+    MLIRSupport
+    MLIRTensorDialect
     MLIRTransformUtils
     MLIRTransforms
     MLIRVectorDialect

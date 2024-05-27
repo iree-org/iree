@@ -33,6 +33,8 @@ iree_cc_library(
     ::IREEGPUExtensionsOpGen
     LLVMSupport
     MLIRIR
+    MLIRSCFDialect
+    MLIRTensorDialect
     MLIRTransformDialect
     MLIRTransformDialectInterfaces
     MLIRVectorTransforms

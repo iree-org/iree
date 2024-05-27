@@ -8,6 +8,8 @@
 
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Transforms.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Transform/IR/TransformTypes.h"
 #include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
@@ -94,6 +96,62 @@ void transform_dialect::ApplyUnrollMultiMmaOp::populatePatterns(
 void transform_dialect::ApplyVectorizeMultiMmaOp::populatePatterns(
     RewritePatternSet &patterns) {
   IREE::GPU::populateIREEGPUVectorizationPatterns(patterns);
+}
+
+//===---------------------------------------------------------------------===//
+// FuseForallOp
+//===---------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure
+transform_dialect::FuseForallOp::apply(transform::TransformRewriter &rewriter,
+                                       transform::TransformResults &results,
+                                       transform::TransformState &state) {
+  auto producers = state.getPayloadOps(getProducer());
+  auto consumers = state.getPayloadOps(getConsumer());
+
+  int64_t numProducers = llvm::range_size(producers);
+  int64_t numConsumers = llvm::range_size(consumers);
+  if (numProducers != 1 || numConsumers != 1) {
+    return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                     "More than one producer or consumer");
+  }
+
+  auto producer = dyn_cast<scf::ForallOp>(*producers.begin());
+  auto consumer = dyn_cast<scf::ForallOp>(*consumers.begin());
+  if (!producer || !consumer) {
+    return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                     "Non-forall producer or consumer");
+  }
+
+  if (!producer->hasOneUse()) {
+    return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                     "non-single use producer");
+  }
+
+  auto sliceConsumer =
+      dyn_cast<tensor::ExtractSliceOp>(*producer->user_begin());
+  if (!sliceConsumer || sliceConsumer->getParentOp() != consumer) {
+    return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                     "producer loop sole consumer is not an "
+                                     "extracted slice from the consumer loop");
+  }
+
+  if (failed(GPU::fuseForallIntoSlice(rewriter, producer, consumer,
+                                      sliceConsumer))) {
+    return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                     "failed to fuse forall ops");
+  }
+
+  results.set(getOperation()->getOpResult(0), {consumer});
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::FuseForallOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::consumesHandle(getProducer(), effects);
+  transform::consumesHandle(getConsumer(), effects);
+  transform::producesHandle(getResult(), effects);
+  transform::modifiesPayload(effects);
 }
 
 } // namespace mlir::iree_compiler::IREE

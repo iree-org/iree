@@ -880,4 +880,223 @@ distributeLinalgOpsWithFilter(mlir::FunctionOpInterface funcOp,
   return success();
 }
 
+//===--------------------------------------------------------------------====//
+// Loop hoisting pattern
+//===--------------------------------------------------------------------====//
+
+namespace {
+struct HoistForallFromFor : public OpRewritePattern<scf::ForOp> {
+  using OpRewritePattern<scf::ForOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(scf::ForOp loop,
+                                PatternRewriter &rewriter) const final {
+    if (loop.getBody()->getOperations().size() != 2) {
+      return rewriter.notifyMatchFailure(
+          loop, "Body of the loop contains more than one op");
+    }
+
+    // TODO(qedawkins): It should be fine to hoist as long as there is a single
+    // forall op such that any operation within the block of the parent scf.for
+    // is independent of the destination of the forall.
+    auto forallOp =
+        dyn_cast<scf::ForallOp>(loop.getBody()->without_terminator().begin());
+    if (!forallOp) {
+      return rewriter.notifyMatchFailure(
+          loop, "Loop single contained op is not scf.forall op");
+    }
+
+    if (forallOp.getNumResults() != 1 || loop.getNumResults() != 1) {
+      return rewriter.notifyMatchFailure(
+          loop, "unimplemented: multi-result hoisting");
+    }
+
+    if (loop.getBody()->getTerminator()->getOperand(0).getDefiningOp() !=
+        forallOp) {
+      return rewriter.notifyMatchFailure(
+          loop, "Single for loop return is not forall result");
+    }
+
+    // Step 1. Collect the set of tensor.parallel_insert_slice ops in the
+    // terminator and their paired extract_slice ops from the for loop iter arg.
+    SmallVector<Operation *> sliceOperandProducers;
+
+    BackwardSliceOptions backwardOptions;
+    backwardOptions.inclusive = true;
+    backwardOptions.filter = [&](Operation *op) -> bool {
+      return forallOp->isProperAncestor(op);
+    };
+    SetVector<Operation *> slice;
+
+    scf::InParallelOp parallelTerminator = forallOp.getTerminator();
+    SmallVector<tensor::ParallelInsertSliceOp> terminators(
+        forallOp.getNumResults());
+    SmallVector<tensor::ExtractSliceOp> pairedSlices(forallOp.getNumResults());
+    int64_t numInductionVars = forallOp.getInductionVars().size();
+    for (auto &yieldingOp : parallelTerminator.getYieldingOps()) {
+      auto parallelInsert = cast<tensor::ParallelInsertSliceOp>(&yieldingOp);
+      BlockArgument destBbArg =
+          llvm::cast<BlockArgument>(parallelInsert.getDest());
+      tensor::ExtractSliceOp destSlice;
+      for (auto user : destBbArg.getUsers()) {
+        if (user == parallelInsert)
+          continue;
+        auto maybeSlice = dyn_cast<tensor::ExtractSliceOp>(user);
+        // Fail if the destination has more users than a direct insert and
+        // extract slice.
+        if (!maybeSlice) {
+          return failure();
+        }
+        // Require a single extract per destination.
+        if (destSlice) {
+          return failure();
+        }
+        destSlice = maybeSlice;
+      }
+      // Verify they operate on equivalent subsets, ensuring the slices are
+      // hoistable. It is still possible to hoist the loop if this is not true,
+      // however in such cases we likely formed the loops in the wrong order.
+      if (!cast<SubsetOpInterface>(*destSlice)
+               .operatesOnEquivalentSubset(
+                   cast<SubsetOpInterface>(*parallelInsert),
+                   [](Value v1, Value v2) { return v1 == v2; })) {
+        return failure();
+      }
+      terminators[destBbArg.getArgNumber() - numInductionVars] = parallelInsert;
+      pairedSlices[destBbArg.getArgNumber() - numInductionVars] = destSlice;
+
+      // Collect all of the offset/size/stride operands for both slices and
+      // compute a backwards slice of the program from them. Fail if any of
+      // them depend on the serial loop iterator.
+      llvm::SmallDenseSet<Value> sliceOperands;
+      sliceOperands.insert(
+          parallelInsert.getOperands().begin() +
+              parallelInsert.getOffsetSizeAndStrideStartOperandIndex(),
+          parallelInsert.getOperands().end());
+      sliceOperands.insert(
+          destSlice.getOperands().begin() +
+              destSlice.getOffsetSizeAndStrideStartOperandIndex(),
+          destSlice.getOperands().end());
+      for (Value operand : sliceOperands) {
+        if (auto bbArg = dyn_cast<BlockArgument>(operand)) {
+          if (bbArg.getOwner()->getParentOp() == loop) {
+            return rewriter.notifyMatchFailure(
+                loop, "Slice operand producers depend on loop");
+          }
+        }
+        SetVector<Operation *> tmpBackwardSlice;
+        getBackwardSlice(operand, &tmpBackwardSlice, backwardOptions);
+        slice.set_union(tmpBackwardSlice);
+      }
+    }
+
+    // An operation is safe to hoist if it is speculatable and none of its
+    // operands depend on the serial loop.
+    auto isSafeToHoist = [&](Operation *op) {
+      return op->getBlock() == forallOp.getBody() && isMemoryEffectFree(op) &&
+             isSpeculatable(op) &&
+             llvm::none_of(op->getOperands(), [&](Value operand) {
+               if (auto blockArg = dyn_cast<BlockArgument>(operand)) {
+                 return blockArg.getOwner() == loop.getBody();
+               }
+               return false;
+             });
+    };
+
+    if (!llvm::all_of(slice, isSafeToHoist)) {
+      return rewriter.notifyMatchFailure(
+          loop, "Slice operand producers not safe to hoist out of loop");
+    }
+
+    // Sort the backwards slice of the producers for the insertion/extraction
+    // indices by the block order in the scf.forall body. This ensures that we
+    // hoist operations in the same order they started. Any topological ordering
+    // would work too because the operations are speculatable.
+    slice = mlir::topologicalSort(slice);
+
+    // Step 2. Create the ForallOp.
+    Location loc = forallOp.getLoc();
+    scf::ForallOp newForallOp = rewriter.create<scf::ForallOp>(
+        loc, forallOp.getMixedLowerBound(), forallOp.getMixedUpperBound(),
+        forallOp.getMixedStep(), loop.getInitArgs(), forallOp.getMappingAttr());
+
+    {
+      // RAII guard, inserting within forallOp, before terminator.
+      OpBuilder::InsertionGuard g(rewriter);
+      rewriter.setInsertionPoint(newForallOp.getTerminator());
+      SmallVector<Value> newInits;
+      for (auto slice : pairedSlices) {
+        newInits.push_back(slice.getResult());
+      }
+      // Step 3. Create a new for loop with new inits for the result of the
+      // extracted slices.
+      auto newLoop = rewriter.create<scf::ForOp>(
+          loop.getLoc(), loop.getLowerBound(), loop.getUpperBound(),
+          loop.getStep(), newInits,
+          [](OpBuilder &, Location, Value, ValueRange) {});
+
+      {
+        // Step 4. Inline the body of the original forall into the new for loop.
+        OpBuilder::InsertionGuard g2(rewriter);
+        SmallVector<Value> argReplacements(newForallOp.getInductionVars());
+        argReplacements.append(newForallOp.getRegionIterArgs().begin(),
+                               newForallOp.getRegionIterArgs().end());
+        rewriter.mergeBlocks(forallOp.getBody(), newLoop.getBody(),
+                             argReplacements);
+        rewriter.replaceAllUsesWith(loop.getInductionVar(),
+                                    newLoop.getInductionVar());
+        // Replace the users of the to-be-hoisted slices with the loop iter
+        // args.
+        for (auto [hoistedSlice, iterArg] :
+             llvm::zip_equal(pairedSlices, newLoop.getRegionIterArgs())) {
+          rewriter.replaceAllUsesExcept(hoistedSlice, iterArg, newLoop);
+        }
+
+        // Create the terminator for the new loop using the sources of the
+        // parallel inserts.
+        SmallVector<Value> newYields;
+        for (auto parallelSlice : terminators) {
+          newYields.push_back(parallelSlice.getSource());
+        }
+        rewriter.setInsertionPointToEnd(newLoop.getBody());
+        rewriter.create<scf::YieldOp>(loop.getLoc(), newYields);
+      }
+
+      // Move all producers for the indices of the slices outside of the body
+      // of the loop (and the extract_slice ops themselves).
+      for (auto sliceOperandProducer : slice) {
+        rewriter.moveOpBefore(sliceOperandProducer, newLoop);
+      }
+      for (auto slice : pairedSlices) {
+        rewriter.moveOpBefore(slice, newLoop);
+      }
+
+      // Create the new terminator for the hoisted forall loop using the results
+      // of the new for loop.
+      rewriter.setInsertionPointToEnd(newForallOp.getTerminator().getBody());
+      for (auto [parallelSlice, source, dest] :
+           llvm::zip_equal(terminators, newLoop.getResults(),
+                           newForallOp.getRegionIterArgs())) {
+        rewriter.create<tensor::ParallelInsertSliceOp>(
+            parallelSlice.getLoc(), source, dest, parallelSlice.getOffsets(),
+            parallelSlice.getSizes(), parallelSlice.getStrides(),
+            parallelSlice.getStaticOffsets(), parallelSlice.getStaticSizes(),
+            parallelSlice.getStaticStrides());
+      }
+    }
+
+    // Step 5. Erase the original terminator and replace the loop with
+    // the hoisted loop.
+    for (auto parallelSlice : terminators) {
+      rewriter.eraseOp(parallelSlice);
+    }
+    rewriter.eraseOp(parallelTerminator);
+    rewriter.replaceOp(loop, newForallOp);
+    return success();
+  }
+};
+} // namespace
+
+void populateForallLoopHoistingPattern(RewritePatternSet &patterns) {
+  patterns.insert<HoistForallFromFor>(patterns.getContext());
+}
+
 } // namespace mlir::iree_compiler
