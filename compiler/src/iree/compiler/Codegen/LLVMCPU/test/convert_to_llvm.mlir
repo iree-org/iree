@@ -62,7 +62,7 @@ module {
     %6 = arith.shli %5, %cst : vector<4x2xi8>
     %7 = arith.shrsi %6, %cst : vector<4x2xi8>
     %8 = arith.shrsi %5, %cst : vector<4x2xi8>
-    %9 = vector.interleave %7, %8 : vector<4x2xi8>
+    %9 = vector.interleave %7, %8 : vector<4x2xi8> -> vector<4x4xi8>
     %10 = vector.extract %9[0] : vector<4xi8> from vector<4x4xi8>
     %11 = vector.extract %9[1] : vector<4xi8> from vector<4x4xi8>
     %12 = vector.extract %9[2] : vector<4xi8> from vector<4x4xi8>
