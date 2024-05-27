@@ -134,10 +134,21 @@ func.func @single_multi_mma(%lhs: vector<4xf16>, %rhs: vector<4xf16>, %acc: vect
 // -----
 
 func.func @tensor_barrier(%input: tensor<?xf16>) -> tensor<?xf16> {
-  %out = iree_gpu.tensor_barrier %input : tensor<?xf16>
+  %out = iree_gpu.value_barrier %input : tensor<?xf16>
   return %out : tensor<?xf16>
 }
 
 // CHECK-LABEL: func @tensor_barrier
 //  CHECK-SAME:   %[[INPUT:[A-Za-z0-9]+]]: tensor<?xf16>
-//       CHECK:   iree_gpu.tensor_barrier %[[INPUT]] : tensor<?xf16>
+//       CHECK:   iree_gpu.value_barrier %[[INPUT]] : tensor<?xf16>
+
+// -----
+
+func.func @vector_barrier(%input: vector<8xf16>) -> vector<8xf16> {
+  %out = iree_gpu.value_barrier %input : vector<8xf16>
+  return %out : vector<8xf16>
+}
+
+// CHECK-LABEL: func @vector_barrier
+//  CHECK-SAME:   %[[INPUT:[A-Za-z0-9]+]]: vector<8xf16>
+//       CHECK:   iree_gpu.value_barrier %[[INPUT]] : vector<8xf16>

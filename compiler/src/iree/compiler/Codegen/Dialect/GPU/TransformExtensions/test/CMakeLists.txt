@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "lower_vector_barrier.mlir"
     "transform_fuse_forall.mlir"
     "unroll_multi_mma.mlir"
     "vectorize_multi_mma.mlir"
