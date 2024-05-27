@@ -165,11 +165,29 @@ const WgpDetails *getRDNA3WgpDetails() {
   return &rdna3Wgp;
 }
 
+const WgpDetails *getRDNA2WgpDetails() {
+  static const WgpDetails rdna2Wgp = {
+      allComputeBits, allStorageBits,     allSubgroupOps, allDotProductOps,
+      /*mmaCount=*/0, /*mmaOps=*/nullptr, {32, 64},       {1024, 1024, 1024},
+      1024,           64 * 1024};
+  return &rdna2Wgp;
+}
+
+const WgpDetails *getRDNA1WgpDetails() {
+  static const WgpDetails rdna1Wgp = {
+      allComputeBits, allStorageBits,     allSubgroupOps, DotProductOps::None,
+      /*mmaCount=*/0, /*mmaOps=*/nullptr, {32, 64},       {1024, 1024, 1024},
+      1024,           64 * 1024};
+  return &rdna1Wgp;
+}
+
 std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
   const WgpDetails *cdna3Wgp = getCDNA3WgpDetails();
   const WgpDetails *cdna2Wgp = getCDNA2WgpDetails();
   const WgpDetails *cdna1Wgp = getCDNA1WgpDetails();
   const WgpDetails *rdna3Wgp = getRDNA3WgpDetails();
+  const WgpDetails *rdna2Wgp = getRDNA2WgpDetails();
+  const WgpDetails *rdna1Wgp = getRDNA1WgpDetails();
 
   // "AMD Instinct MI300 Series Product Offerings" in Page 23 of
   // https://www.amd.com/content/dam/amd/en/documents/instinct-tech-docs/white-papers/amd-cdna-3-white-paper.pdf
@@ -215,6 +233,10 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
       .Case("rx7700xt", TargetDetails{rdna3Wgp, &rx7700xtChip})
       .Cases("rdna3", "gfx1100", "gfx1101", "gfx1102", "gfx1103", "gfx1150",
              "gfx1151", TargetDetails{rdna3Wgp, nullptr})
+      .Cases("rdna2", "gfx1030", "gfx1031", "gfx1032", "gfx1033", "gfx1034",
+             "gfx1035", "gfx1036", TargetDetails{rdna2Wgp, nullptr})
+      .Cases("rdna1", "gfx1010", "gfx1011", "gfx1012", "gfx1013",
+             TargetDetails{rdna1Wgp, nullptr})
       .Default(std::nullopt);
 }
 
@@ -228,6 +250,58 @@ StringRef normalizeAMDGPUTarget(StringRef target) {
       .Cases("mi250x", "mi250", "mi210", "cdna2", "gfx90a")
       .Cases("rx7900xtx", "rx7900xt", "gfx1100")
       .Cases("rx7800xt", "rx7700xt", "gfx1101")
+      .Default(StringRef());
+}
+
+//===----------------------------------------------------------------------===//
+// Known ARM target details
+//===----------------------------------------------------------------------===//
+
+const WgpDetails *getValhallWgpDetails() {
+  ComputeBitwidths computeBitwdiths =
+      allIntComputeBits | ComputeBitwidths::FP32 | ComputeBitwidths::FP16;
+  // clang-format off
+  static const WgpDetails valhallWgp = {
+      computeBitwdiths,   allStorageBits,     allSubgroupOps,  allDotProductOps,
+      /*mmaCount=*/0,     /*mmaOps=*/nullptr, {16},            {512, 512, 512},
+      512,                32 * 1024};
+  // clang-format on
+  return &valhallWgp;
+}
+
+std::optional<TargetDetails> getARMGPUTargetDetails(StringRef target) {
+  const WgpDetails *valhallWgp = getValhallWgpDetails();
+
+  // Note that the underlying GPU may have certain capabilities but the Android
+  // version and driver stack may not expose them. So the following is just and
+  // will always be approximate.
+
+  return llvm::StringSwitch<std::optional<TargetDetails>>(target.lower())
+      // Mali-G715: https://vulkan.gpuinfo.org/displayreport.php?id=29754
+      .Cases("mali-g715", "mali-g615", "valhall4",
+             TargetDetails{valhallWgp, nullptr})
+      // Mali-G710: https://vulkan.gpuinfo.org/displayreport.php?id=30471
+      .Cases("mali-g710", "mali-g510", "mali-g310", "valhall3",
+             TargetDetails{valhallWgp, nullptr})
+      // Mali-G78: https://vulkan.gpuinfo.org/displayreport.php?id=29994
+      .Cases("mali-g78", "valhall2", TargetDetails{valhallWgp, nullptr})
+      // Mali-G57: https://vulkan.gpuinfo.org/displayreport.php?id=24636
+      .Cases("mali-g77", "mali-g57", "valhall1", "valhall",
+             TargetDetails{valhallWgp, nullptr})
+      .Default(std::nullopt);
+}
+
+StringRef normalizeARMGPUTarget(StringRef target) {
+  if (target == "valhall")
+    return "valhall1";
+  if (target.starts_with("valhall"))
+    return target;
+
+  return llvm::StringSwitch<StringRef>(target.lower())
+      .Cases("mali-g715", "mali-g615", "valhall4")
+      .Cases("mali-g710", "mali-g510", "mali-g310", "valhall3")
+      .Case("mali-78", "valhall2")
+      .Cases("mali-g77", "mali-g57", "valhall1")
       .Default(StringRef());
 }
 
@@ -332,6 +406,65 @@ StringRef normalizeNVIDIAGPUTarget(StringRef target) {
       .Default(StringRef());
 }
 
+//===----------------------------------------------------------------------===//
+// Known Qualcomm target details
+//===----------------------------------------------------------------------===//
+
+const WgpDetails *getAdrenoWgpDetails() {
+  auto computeBitwdiths = ComputeBitwidths::Int32 | ComputeBitwidths::Int16 |
+                          ComputeBitwidths::Int8 | ComputeBitwidths::FP32 |
+                          ComputeBitwidths::FP16;
+  auto storageBitwidths =
+      StorageBitwidths::B64 | StorageBitwidths::B32 | StorageBitwidths::B16;
+  // clang-format off
+  static const WgpDetails adrenoWgp = {
+      computeBitwdiths,   storageBitwidths,   allSubgroupOps,
+      allDotProductOps,   /*mmaCount=*/0,     /*mmaOps=*/nullptr,
+      {64},               {1024, 1024, 1024}, 1024,
+      32 * 1024};
+  // clang-format on
+  return &adrenoWgp;
+}
+
+std::optional<TargetDetails> getQualcommGPUTargetDetails(StringRef target) {
+  const WgpDetails *adrenoWgp = getAdrenoWgpDetails();
+
+  // Note that the underlying GPU may have certain capabilities but the Android
+  // version and driver stack may not expose them. So the following is just and
+  // will always be approximate.
+
+  // Adreno GPUs are quite opaque regarding their generational information.
+
+  return llvm::StringSwitch<std::optional<TargetDetails>>(target.lower())
+      // Adreno-750: https://vulkan.gpuinfo.org/displayreport.php?id=27414
+      // Adreno-740: https://vulkan.gpuinfo.org/displayreport.php?id=19218
+      // Adreno-730: https://vulkan.gpuinfo.org/displayreport.php?id=19382
+      .Cases("adreno-750", "adreno-740", "adreno-730", "adreno",
+             TargetDetails{adrenoWgp, nullptr})
+      .Default(std::nullopt);
+}
+
+StringRef normalizeQualcommGPUTarget(StringRef target) {
+  if (target == "adreno")
+    return target;
+
+  StringRef t = target;
+  if (!t.consume_front("adreno-"))
+    return "";
+
+  // The can exist an optional L at the end.
+  if (t.ends_with("l"))
+    t = t.drop_back();
+
+  // Check whether we have a product number
+  unsigned number = 0;
+  // StringRef::consumeInteger() returns true to signify errors.
+  if (t.size() != 3 || t.consumeInteger(10, number))
+    return "";
+
+  return target;
+}
+
 } // namespace
 
 //===----------------------------------------------------------------------===//
@@ -361,6 +494,31 @@ TargetAttr getCUDATargetDetails(StringRef target, StringRef features,
 
 StringRef normalizeCUDATarget(StringRef target) {
   return normalizeNVIDIAGPUTarget(target);
+}
+
+TargetAttr getVulkanTargetDetails(llvm::StringRef target,
+                                  MLIRContext *context) {
+  // Go through each vendor's target details. This assumes we won't have
+  // duplicated product or microarchitecture names among vendors, which should
+  // be the case.
+
+  if (auto details = getAMDGPUTargetDetails(target)) {
+    return createTargetAttr(*details, normalizeAMDGPUTarget(target),
+                            /*features=*/"", context);
+  }
+  if (auto details = getARMGPUTargetDetails(target)) {
+    return createTargetAttr(*details, normalizeARMGPUTarget(target),
+                            /*features=*/"", context);
+  }
+  if (auto details = getNVIDIAGPUTargetDetails(target)) {
+    return createTargetAttr(*details, normalizeNVIDIAGPUTarget(target),
+                            /*features=*/"", context);
+  }
+  if (auto details = getQualcommGPUTargetDetails(target)) {
+    return createTargetAttr(*details, normalizeQualcommGPUTarget(target),
+                            /*features=*/"", context);
+  }
+  return nullptr;
 }
 
 TargetAttr getFullTarget(StringRef targetAPI, StringRef aliasTarget,
