@@ -23,7 +23,6 @@ LLVM_SRCS = enforce_glob(
     [
         "conv2d.mlir",
         "fp_to_subbyte.mlir",
-        "narrow_n_matmuls.mlir",
         "subbyte_to_fp.mlir",
     ],
     include = ["*.mlir"],
@@ -46,7 +45,6 @@ iree_check_single_backend_test_suite(
 VMVX_SRCS = enforce_glob(
     [
         "conv2d.mlir",
-        "narrow_n_matmuls.mlir",
     ],
     include = ["*.mlir"],
     exclude = [
@@ -67,7 +65,6 @@ VULKAN_SRCS = enforce_glob(
     [
         "conv2d.mlir",
         "subbyte_to_fp.mlir",
-        "narrow_n_matmuls.mlir",
     ],
     include = ["*.mlir"],
     exclude = [
@@ -115,7 +112,6 @@ CUDA_SRCS = enforce_glob(
         "subbyte_to_fp.mlir",
         # currently only enabled on cuda as it can be slow on other backends.
         "large_linalg_matmul.mlir",
-        "narrow_n_matmuls.mlir",
     ],
     include = ["*.mlir"],
     exclude = [

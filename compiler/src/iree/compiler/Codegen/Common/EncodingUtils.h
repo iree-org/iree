@@ -99,10 +99,6 @@ void populateMaterializeEncodingIntoPackUnPackPatterns(
 void populateMaterializeUpperBoundTileSizePatterns(
     RewritePatternSet &patterns, MaterializeEncodingFn materializeEncodingFn);
 
-// Returns true if `encoding` represents a narrow-N matmul RESULT, e.g. the
-// result of a matvec.
-bool isNarrowNResult(IREE::Encoding::EncodingAttr encoding);
-
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_SRC_IREE_COMPILER_CODEGEN_COMMON_ENCODINGUTILS_H_
