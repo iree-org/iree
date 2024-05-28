@@ -321,7 +321,7 @@ def IREEGPU_ShuffleTensorOp : Op<IREEGPU_Dialect, "shuffle_tensor", [
     AnyRankedTensor:$dest
   );
   let regions = (region SizedRegion<1>:$region);
-  let results = (outs AnyRankedTensor:$result);
+  let results = (outs AnyRankedTensorOrVector:$result);
 
   let assemblyFormat = [{
     $source ``
@@ -331,6 +331,12 @@ def IREEGPU_ShuffleTensorOp : Op<IREEGPU_Dialect, "shuffle_tensor", [
     `to` $dest $region attr-dict
     `:` type($source) `->` type($dest) `->` type($result)
   }];
+
+  let builders = [
+    OpBuilder<(ins "Type":$result_type, "Value":$source, "Value":$dest,
+      "ArrayRef<OpFoldResult>":$offsets, "ArrayRef<OpFoldResult>":$sizes,
+      "ArrayRef<OpFoldResult>":$strides)>
+  ];
 
   let extraClassDeclaration = [{
     RankedTensorType getSourceType() {
@@ -390,6 +396,10 @@ def IREEGPU_ValueBarrierOp : Op<IREEGPU_Dialect, "value_barrier", [
   let assemblyFormat = [{
     $input attr-dict `:` type($result)
   }];
+
+  let builders = [
+    OpBuilder<(ins "Value":$input)>
+  ];
 
   let extraClassDeclaration = [{
     bool hasTensorSemantics() {
