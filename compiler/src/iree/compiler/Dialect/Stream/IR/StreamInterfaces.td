@@ -145,9 +145,10 @@ def Stream_AffinityOp : OpInterface<"AffinityOpInterface"> {
         Returns the stream affinity for the op, indicating where it should run.
       }],
       /*retTy=*/"IREE::Stream::AffinityAttr",
-      /*methodName=*/"getAffinity",
+      /*methodName=*/"getAffinityAttr",
       /*args=*/(ins),
-      /*methodBody=*/[{
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
         return dyn_cast_or_null<IREE::Stream::AffinityAttr>($_self->getAttr("affinity"));
       }]
     >,
@@ -156,9 +157,10 @@ def Stream_AffinityOp : OpInterface<"AffinityOpInterface"> {
         Sets the stream affinity for the op, indicating where it should run.
       }],
       /*retTy=*/"void",
-      /*methodName=*/"setAffinity",
+      /*methodName=*/"setAffinityAttr",
       /*args=*/(ins "IREE::Stream::AffinityAttr":$value),
-      /*methodBody=*/[{
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
         if (value) $_self->setAttr("affinity", value);
         else $_self->removeAttr("affinity");
       }]

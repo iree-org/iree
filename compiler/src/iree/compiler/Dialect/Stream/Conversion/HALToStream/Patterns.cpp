@@ -49,11 +49,7 @@ struct ConvertTensorImportOp
       }
     }
 
-    auto affinityAttr =
-        dyn_cast_if_present<IREE::Stream::AffinityAttr>(op.getAffinityAttr());
-    if (!affinityAttr) {
-      affinityAttr = IREE::Stream::AffinityAttr::lookup(op);
-    }
+    auto affinityAttr = IREE::Stream::AffinityAttr::lookup(op);
 
     // Import (buffer view to stream resource).
     auto resultType = rewriter.getType<IREE::Stream::ResourceType>(
@@ -138,11 +134,7 @@ struct ConvertTensorExportOp
       return rewriter.notifyMatchFailure(op, "unsupported HAL cast conversion");
     }
 
-    auto affinityAttr =
-        dyn_cast_if_present<IREE::Stream::AffinityAttr>(op.getAffinityAttr());
-    if (!affinityAttr) {
-      affinityAttr = IREE::Stream::AffinityAttr::lookup(op);
-    }
+    auto affinityAttr = IREE::Stream::AffinityAttr::lookup(op);
     auto source =
         consumeTensorOperand(op.getLoc(), adaptor.getSource(), rewriter);
 
