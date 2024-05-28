@@ -274,7 +274,7 @@ ResourceConfigAttr ResourceConfigAttr::lookup(Operation *op) {
       return attr;
     // See if the affinity specified provides a resource configuration.
     if (auto affinityOp = llvm::dyn_cast<AffinityOpInterface>(op)) {
-      auto affinityAttr = affinityOp.getAffinity();
+      auto affinityAttr = affinityOp.getAffinityAttr();
       if (affinityAttr) {
         auto attr = affinityAttr.getResourceConfigAttr();
         if (attr)
@@ -339,7 +339,7 @@ AffinityAttr AffinityAttr::lookup(Operation *op) {
   auto attrId = StringAttr::get(op->getContext(), "stream.affinity");
   while (op) {
     if (auto affinityOp = llvm::dyn_cast<AffinityOpInterface>(op)) {
-      auto affinity = affinityOp.getAffinity();
+      auto affinity = affinityOp.getAffinityAttr();
       if (affinity)
         return affinity;
     }

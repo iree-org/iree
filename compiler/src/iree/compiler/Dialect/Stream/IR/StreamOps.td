@@ -86,10 +86,7 @@ def OpGroupResourceOps : OpDocGroup {
 let opDocGroup = OpGroupResourceOps in {
 
 def Stream_ResourceAllocOp : Stream_Op<"resource.alloc", [
-  DeclareOpInterfaceMethods<Stream_AffinityOp, [
-    "getAffinity",
-    "setAffinity",
-  ]>,
+  Stream_AffinityOp,
   Util_SizeAwareOp,
   AlwaysSpeculatable,
   MemoryEffects<[MemAlloc]>,
@@ -148,10 +145,7 @@ def Stream_ResourceAllocOp : Stream_Op<"resource.alloc", [
 }
 
 def Stream_ResourceAllocaOp : Stream_Op<"resource.alloca", [
-  DeclareOpInterfaceMethods<Stream_AffinityOp, [
-    "getAffinity",
-    "setAffinity",
-  ]>,
+  Stream_AffinityOp,
   Stream_TimelineOp,
   Util_SizeAwareOp,
   AlwaysSpeculatable,
@@ -209,10 +203,7 @@ def Stream_ResourceAllocaOp : Stream_Op<"resource.alloca", [
 }
 
 def Stream_ResourceDeallocaOp : Stream_Op<"resource.dealloca", [
-  DeclareOpInterfaceMethods<Stream_AffinityOp, [
-    "getAffinity",
-    "setAffinity",
-  ]>,
+  Stream_AffinityOp,
   Stream_TimelineOp,
   Util_SizeAwareOp,
   MemoryEffects<[MemFree]>,
@@ -645,10 +636,7 @@ let opDocGroup = OpGroupParameterOps in {
 def Stream_ParameterLoadOp : Stream_PureOp<"parameter.load", [
   AttrSizedOperandSegments,
   AllTypesMatch<["results"]>,
-  DeclareOpInterfaceMethods<Stream_AffinityOp, [
-    "getAffinity",
-    "setAffinity",
-  ]>,
+  Stream_AffinityOp,
   Stream_CmdPhaseOp,
   Stream_TimelineOp,
   Util_SizeAwareOp,
@@ -702,10 +690,7 @@ def Stream_ParameterLoadOp : Stream_PureOp<"parameter.load", [
 }
 
 def Stream_ParameterReadOp : Stream_Op<"parameter.read", [
-  DeclareOpInterfaceMethods<Stream_AffinityOp, [
-    "getAffinity",
-    "setAffinity",
-  ]>,
+  Stream_AffinityOp,
   Stream_CmdPhaseOp,
   Stream_TimelineOp,
   Util_SizeAwareOp,
@@ -757,10 +742,7 @@ def Stream_ParameterReadOp : Stream_Op<"parameter.read", [
 }
 
 def Stream_ParameterWriteOp : Stream_Op<"parameter.write", [
-  DeclareOpInterfaceMethods<Stream_AffinityOp, [
-    "getAffinity",
-    "setAffinity",
-  ]>,
+  Stream_AffinityOp,
   Stream_CmdPhaseOp,
   Stream_TimelineOp,
   Util_SizeAwareOp,
@@ -813,10 +795,7 @@ def Stream_ParameterWriteOp : Stream_Op<"parameter.write", [
 
 def Stream_ParameterGatherOp : Stream_Op<"parameter.gather", [
   AttrSizedOperandSegments,
-  DeclareOpInterfaceMethods<Stream_AffinityOp, [
-    "getAffinity",
-    "setAffinity",
-  ]>,
+  Stream_AffinityOp,
   Stream_CmdPhaseOp,
   Stream_TimelineOp,
   Util_SizeAwareOp,
@@ -872,10 +851,7 @@ def Stream_ParameterGatherOp : Stream_Op<"parameter.gather", [
 
 def Stream_ParameterScatterOp : Stream_Op<"parameter.scatter", [
   AttrSizedOperandSegments,
-  DeclareOpInterfaceMethods<Stream_AffinityOp, [
-    "getAffinity",
-    "setAffinity",
-  ]>,
+  Stream_AffinityOp,
   Stream_CmdPhaseOp,
   Stream_TimelineOp,
   Util_SizeAwareOp,
@@ -982,10 +958,7 @@ def Stream_FileConstantOp : Stream_PureOp<"file.constant", [
 }
 
 def Stream_FileReadOp : Stream_Op<"file.read", [
-  DeclareOpInterfaceMethods<Stream_AffinityOp, [
-    "getAffinity",
-    "setAffinity",
-  ]>,
+  Stream_AffinityOp,
   Stream_CmdPhaseOp,
   Stream_TimelineOp,
   Util_SizeAwareOp,
@@ -1040,10 +1013,7 @@ def Stream_FileReadOp : Stream_Op<"file.read", [
 }
 
 def Stream_FileWriteOp : Stream_Op<"file.write", [
-  DeclareOpInterfaceMethods<Stream_AffinityOp, [
-    "getAffinity",
-    "setAffinity",
-  ]>,
+  Stream_AffinityOp,
   Stream_CmdPhaseOp,
   Stream_TimelineOp,
   Util_SizeAwareOp,
@@ -1783,10 +1753,7 @@ def OpGroupAsyncOps : OpDocGroup {
 let opDocGroup = OpGroupAsyncOps in {
 
 def Stream_AsyncAllocaOp : Stream_Op<"async.alloca", [
-  DeclareOpInterfaceMethods<Stream_AffinityOp, [
-    "getAffinity",
-    "setAffinity",
-  ]>,
+  Stream_AffinityOp,
   Stream_AsyncPhaseOp,
   DeclareOpInterfaceMethods<Stream_StreamableOp, [
     "isMetadata",
@@ -2250,7 +2217,10 @@ def Stream_AsyncCollectiveOp : Stream_Op<"async.collective", [
 }
 
 def Stream_AsyncTransferOp : Stream_Op<"async.transfer", [
-  Stream_AffinityOp,
+  DeclareOpInterfaceMethods<Stream_AffinityOp, [
+    "getAffinityAttr",
+    "setAffinityAttr",
+  ]>,
   Stream_AsyncPhaseOp,
   Stream_StreamableOp,
   DeclareOpInterfaceMethods<Stream_AsyncAccessOp, [
