@@ -192,7 +192,7 @@ std::optional<SmallVector<int64_t, 4>> MultiMmaOp::getShapeForUnroll() {
 // ShuffleTensorOp
 //===----------------------------------------------------------------------===//
 
-// Build a InsertSliceOp with mixed static and dynamic entries and an empty
+// Build a ShuffleTensorOp with mixed static and dynamic entries and an empty
 // body.
 void ShuffleTensorOp::build(OpBuilder &b, OperationState &result,
                             Type resultType, Value source, Value dest,

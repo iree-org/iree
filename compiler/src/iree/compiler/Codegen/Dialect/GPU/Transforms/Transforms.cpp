@@ -551,12 +551,9 @@ struct VectorizeStaticMultiMmaOpPattern final
 static LogicalResult
 vectorizeStaticShuffleTensorResult(RewriterBase &rewriter,
                                    IREE::GPU::ShuffleTensorOp shuffle) {
-  if (isa<VectorType>(shuffle.getResult().getType())) {
-    return failure();
-  }
-
-  auto tensorResultType = cast<RankedTensorType>(shuffle.getResult().getType());
-  if (!tensorResultType.hasStaticShape()) {
+  auto tensorResultType =
+      dyn_cast<RankedTensorType>(shuffle.getResult().getType());
+  if (!tensorResultType || !tensorResultType.hasStaticShape()) {
     return failure();
   }
 
