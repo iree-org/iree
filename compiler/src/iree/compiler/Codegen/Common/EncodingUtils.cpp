@@ -9,8 +9,6 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 
-#include <numeric>
-
 namespace mlir::iree_compiler {
 
 using IREE::Encoding::EncodingAttr;
@@ -18,98 +16,23 @@ using IREE::Encoding::EncodingRole;
 using IREE::Encoding::getEncodingAttr;
 using IREE::Encoding::getEncodingContractionDims;
 
-// If tensorType has the encoding of a matmul RESULT with narrow N, returns
-// the transposed type. Otherwise, just returns tensorType.
-static RankedTensorType transposeIfNarrowNResult(RankedTensorType tensorType) {
-  auto encoding =
-      llvm::dyn_cast_or_null<EncodingAttr>(tensorType.getEncoding());
-  if (!encoding) {
-    return tensorType;
-  }
-  if (!isNarrowNResult(encoding)) {
-    return tensorType;
-  }
-  auto newRole = encoding.getRole().getValue();
-  TypeAttr originalTypeAttr = encoding.getOriginalType();
-  RankedTensorType originalType = tensorType;
-  if (originalTypeAttr) {
-    originalType =
-        llvm::dyn_cast<RankedTensorType>(originalTypeAttr.getValue());
-  }
-  SmallVector<int64_t> newOriginalShape(originalType.getShape());
-  auto userIndexingMaps = encoding.getUserIndexingMaps();
-  SmallVector<AffineMap> maps;
-  for (auto a : userIndexingMaps) {
-    maps.push_back(cast<AffineMapAttr>(a).getAffineMap());
-  }
-  auto cDims = linalg::inferContractionDims(maps);
-  SmallVector<int64_t> newShape(tensorType.getShape());
-  SmallVector<int64_t> permIndices(maps[0].getNumDims());
-  std::iota(std::begin(permIndices), std::end(permIndices), 0);
-  // Matrix case: there are both M and N dimensions. Transposing means swapping
-  // them.
-  if (cDims->m.size() == 1 && cDims->n.size() == 1) {
-    int m = cDims->m[0];
-    int n = cDims->n[0];
-    std::swap(permIndices[m], permIndices[n]);
-    int mDim = encoding.mapDimToRoleIndex(m);
-    int nDim = encoding.mapDimToRoleIndex(n);
-    std::swap(newShape[mDim], newShape[nDim]);
-    std::swap(newOriginalShape[mDim], newOriginalShape[nDim]);
-  }
-  // Vector case: there is no N dimension to swap the M dimension with. We
-  // swap the maps themselves.
-  if (cDims->n.empty()) {
-    std::swap(maps[0], maps[1]);
-  }
-
-  // auto newRoundDimsTo = encoding.getRoundDimsToArray();
-  SmallVector<int64_t> newRoundDimsTo(encoding.getRoundDimsToArray());
-  assert(newRoundDimsTo.size() == 0 || newRoundDimsTo.size() == 3);
-  if (newRoundDimsTo.size() != 0)
-    std::swap(newRoundDimsTo[0], newRoundDimsTo[1]);
-
-  auto context = tensorType.getContext();
-  AffineMap permutation = AffineMap::getPermutationMap(permIndices, context);
-  for (auto &map : maps) {
-    map = map.compose(permutation);
-  }
-  SmallVector<Attribute> newMaps;
-  for (auto map : maps) {
-    newMaps.push_back(AffineMapAttr::get(map));
-  }
-  ArrayAttr newIndexingMaps = ArrayAttr::get(context, newMaps);
-  auto elemType = tensorType.getElementType();
-  OpBuilder builder(context);
-
-  auto newEncoding = IREE::Encoding::EncodingAttr::get(
-      context, IREE::Encoding::EncodingRoleAttr::get(context, newRole),
-      encoding.getElementTypes(),
-      TypeAttr::get(RankedTensorType::get(newOriginalShape, elemType)),
-      encoding.getMatmulNarrow_N(), encoding.getMatmulNarrow_M(),
-      newIndexingMaps, DenseI64ArrayAttr::get(context, newRoundDimsTo));
-  return RankedTensorType::get(newShape, elemType, newEncoding);
-}
-
 /// For a given tensor type with an encoding, return the materialized
 /// type to use for it. If no encoding is set, then return the tensor type
 /// itself.
 static RankedTensorType
 getMaterializedType(RankedTensorType tensorType,
                     MaterializeEncodingFn materializeEncodingFn) {
-  RankedTensorType maybeTransposedTensorType =
-      transposeIfNarrowNResult(tensorType);
   FailureOr<MaterializeEncodingInfo> materializeEncodingInfo =
-      materializeEncodingFn(maybeTransposedTensorType);
+      materializeEncodingFn(tensorType);
   if (failed(materializeEncodingInfo)) {
     return dropEncoding(tensorType);
   }
-  return cast<RankedTensorType>(tensor::PackOp::inferPackedType(
-      getOriginalTypeWithEncoding(maybeTransposedTensorType)
-          .clone(tensorType.getElementType()),
-      materializeEncodingInfo->innerTileSizes,
-      materializeEncodingInfo->innerDimsPos,
-      materializeEncodingInfo->outerDimsPerm));
+  return cast<RankedTensorType>(
+      tensor::PackOp::inferPackedType(getOriginalTypeWithEncoding(tensorType)
+                                          .clone(tensorType.getElementType()),
+                                      materializeEncodingInfo->innerTileSizes,
+                                      materializeEncodingInfo->innerDimsPos,
+                                      materializeEncodingInfo->outerDimsPerm));
 }
 
 MaterializeEncodingTypeConverter::MaterializeEncodingTypeConverter(
@@ -119,9 +42,10 @@ MaterializeEncodingTypeConverter::MaterializeEncodingTypeConverter(
   addConversion([](IndexType indexType) { return indexType; });
   addConversion([](FloatType floatType) { return floatType; });
   addConversion([](MemRefType memrefType) { return memrefType; });
-  addConversion([=](RankedTensorType t) -> RankedTensorType {
-    return getMaterializedType(t, materializeEncodingFn);
-  });
+  addConversion(
+      [materializeEncodingFn](RankedTensorType t) -> RankedTensorType {
+        return getMaterializedType(t, materializeEncodingFn);
+      });
 }
 
 MaterializeEncodingConversionTarget::MaterializeEncodingConversionTarget(
@@ -201,15 +125,6 @@ MaterializeEncodingInfo getEncodingInfoForMatmul(EncodingAttr encoding,
     encodingInfo.innerTileSizes.push_back(tileMxNxK.K);
   }
   return encodingInfo;
-}
-
-bool isNarrowNResult(EncodingAttr encoding) {
-  if (encoding.getRole().getValue() != EncodingRole::RESULT) {
-    return false;
-  }
-  IntegerAttr narrowM = encoding.getMatmulNarrow_M();
-  IntegerAttr narrowN = encoding.getMatmulNarrow_N();
-  return narrowN && (!narrowM || narrowM.getInt() > narrowN.getInt());
 }
 
 } // namespace mlir::iree_compiler
