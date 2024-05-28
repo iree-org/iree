@@ -746,14 +746,31 @@ jobs:
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
-      - name: "Building IREE runtime with tracing enabled"
+      - name: "Building IREE runtime with tracing - Tracy"
         run: |
           ./build_tools/github_actions/docker_run.sh \
-            --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
-            --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
-            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446" \
+            --env "TRACING_PROVIDER=tracy" \
             gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
-            ./build_tools/cmake/build_tracing.sh \
+            ./build_tools/cmake/build_runtime_tracing.sh \
+            "${BUILD_DIR}"
+      - name: "Testing runtime with tracing - Tracy"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
+            ./build_tools/cmake/ctest_all.sh \
+            "${BUILD_DIR}"
+      - name: "Building IREE runtime with tracing - console"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env "TRACING_PROVIDER=console" \
+            gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
+            ./build_tools/cmake/build_runtime_tracing.sh \
+            "${BUILD_DIR}"
+      - name: "Testing runtime with tracing - console"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
+            ./build_tools/cmake/ctest_all.sh \
             "${BUILD_DIR}"
 
   debug:
