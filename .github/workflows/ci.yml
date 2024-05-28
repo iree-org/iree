@@ -469,92 +469,78 @@ jobs:
   #       run: |
   #         ./build_tools/cmake/ctest_all.sh ${BUILD_DIR}
 
-  ################################## Subsets ###################################
-  # Jobs that build some subset of IREE
-  ##############################################################################
-  build_test_runtime:
-    needs: setup
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_test_runtime')
-    runs-on: ubuntu-20.04
-    env:
-      BUILD_DIR: build-runtime
-    steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-      - name: "Checking out runtime submodules"
-        run: ./build_tools/scripts/git/update_runtime_submodules.sh
-      - name: "Building runtime"
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-            --env "BUILD_PRESET=test" \
-            gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
-            ./build_tools/cmake/build_runtime.sh \
-            "${BUILD_DIR}"
-      - name: "Testing runtime"
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
-            ./build_tools/cmake/ctest_all.sh \
-            "${BUILD_DIR}"
-
-  build_test_runtime_arm64:
-    needs: setup
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_test_runtime_arm64')
-    runs-on:
-      - self-hosted # must come first
-      - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.runner-env }}
-      - arm64
-      - os-family=Linux
-    env:
-      BUILD_DIR: build-runtime-arm64
-    steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-      - name: "Checking out runtime submodules"
-        run: ./build_tools/scripts/git/update_runtime_submodules.sh
-      - name: "Building runtime"
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-            --env "BUILD_PRESET=test" \
-            gcr.io/iree-oss/base-arm64@sha256:9daa1cdbbf12da8527319ece76a64d06219e04ecb99a4cff6e6364235ddf6c59 \
-            ./build_tools/cmake/build_runtime.sh \
-            "${BUILD_DIR}"
-      - name: "Testing runtime"
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/base-arm64@sha256:9daa1cdbbf12da8527319ece76a64d06219e04ecb99a4cff6e6364235ddf6c59 \
-            ./build_tools/cmake/ctest_all.sh \
-            "${BUILD_DIR}"
-
-  build_test_runtime_windows:
-    needs: setup
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_test_runtime_windows')
-    runs-on: windows-2022
-    defaults:
-      run:
-        shell: bash
-    env:
-      BUILD_DIR: build-runtime-windows
-    steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-      - name: "Checking out runtime submodules"
-        run: ./build_tools/scripts/git/update_runtime_submodules.sh
-      - name: "Configuring MSVC"
-        uses: ilammy/msvc-dev-cmd@7315a94840631165970262a99c72cfb48a65d25d # v1.12.0
-      - name: "Installing Python requirements"
-        run: pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
-      - name: "Building runtime"
-        env:
-          BUILD_PRESET: "test"
-        run: ./build_tools/cmake/build_runtime.sh "${BUILD_DIR}"
-      - name: "Testing runtime"
-        run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
-
   ############################### Configurations ###############################
   # Jobs that build IREE in some non-default configuration
   ##############################################################################
+
+  build_test_runtime:
+    needs: setup
+    name: "build_test_runtime :: ${{ matrix.name }}"
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_test_runtime')
+    runs-on: ${{ matrix.runs-on }}
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: ubuntu-20.04
+            runs-on: ubuntu-20.04
+            container: gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446
+          - name: windows-2022
+            runs-on: windows-2022
+            # No container, (unnecessary, and Windows https://github.com/actions/runner/issues/904).
+          - name: arm64
+            runs-on:
+              - self-hosted # must come first
+              - runner-group=${{ needs.setup.outputs.runner-group }}
+              - environment=${{ needs.setup.outputs.runner-env }}
+              - arm64
+              - os-family=Linux
+            container: gcr.io/iree-oss/base-arm64@sha256:9daa1cdbbf12da8527319ece76a64d06219e04ecb99a4cff6e6364235ddf6c59
+    env:
+      BUILD_DIR: build-runtime
+      BUILD_PRESET: test
+      CONTAINER: ${{ matrix.container }}
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+      - name: "Checking out runtime submodules"
+        run: ./build_tools/scripts/git/update_runtime_submodules.sh
+
+      - name: "Configuring MSVC"
+        if: contains(matrix.name, 'windows')
+        uses: ilammy/msvc-dev-cmd@7315a94840631165970262a99c72cfb48a65d25d # v1.12.0
+
+      # Simple case of no Docker container: install deps -> build -> test.
+      - name: "Installing Python requirements"
+        if: ${{ env.CONTAINER == '' }}
+        run: pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
+      - name: "Building runtime"
+        if: ${{ env.CONTAINER == '' }}
+        run: ./build_tools/cmake/build_runtime.sh "${BUILD_DIR}"
+      - name: "Testing runtime"
+        if: ${{ env.CONTAINER == '' }}
+        run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
+
+      # With a Docker container: build under Docker -> test under Docker.
+      - name: "Building runtime (Docker)"
+        if: ${{ env.CONTAINER != '' }}
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env "BUILD_PRESET=test" \
+            ${CONTAINER} \
+            ./build_tools/cmake/build_runtime.sh \
+            "${BUILD_DIR}"
+      - name: "Testing runtime (Docker)"
+        if: ${{ env.CONTAINER != '' }}
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            ${CONTAINER} \
+            ./build_tools/cmake/ctest_all.sh \
+            "${BUILD_DIR}"
+
   python_release_packages:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'python_release_packages')
@@ -951,12 +937,8 @@ jobs:
       - test_amd_mi250
       # - test_amd_w7900
 
-      # Subsets
-      - build_test_runtime
-      - build_test_runtime_arm64
-      - build_test_runtime_windows
-
       # Configurations
+      - build_test_runtime
       - python_release_packages
       - asan
       - tsan
