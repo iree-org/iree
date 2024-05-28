@@ -2019,6 +2019,17 @@ LogicalResult AsyncTransferOp::verify() {
   return success();
 }
 
+IREE::Stream::AffinityAttr AsyncTransferOp::getAffinityAttr() {
+  return getResultAffinityAttr();
+}
+
+void AsyncTransferOp::setAffinityAttr(IREE::Stream::AffinityAttr value) {
+  if (value)
+    setResultAffinityAttr(value);
+  else
+    removeResultAffinityAttr();
+}
+
 void AsyncTransferOp::getAsyncAccessRanges(
     SmallVectorImpl<AsyncAccessRange> &ranges) {
   ranges.push_back({ResourceAccessBitfield::Read, getSource(), Value{},

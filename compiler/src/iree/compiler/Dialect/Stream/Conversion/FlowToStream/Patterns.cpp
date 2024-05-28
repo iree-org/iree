@@ -25,13 +25,13 @@ namespace {
 // size of operands must be queried from the input resource.
 static Value buildResultSizeOf(Location loc, Value tensorValue,
                                ValueRange dynamicDims,
+                               IREE::Stream::AffinityAttr affinityAttr,
                                ConversionPatternRewriter &rewriter) {
   // TODO(benvanik): see if we can stash this on the side to avoid expensive
   // materialization of a bunch of redundant IR.
   return rewriter.create<IREE::Stream::TensorSizeOfOp>(
       loc, rewriter.getIndexType(), TypeAttr::get(tensorValue.getType()),
-      dynamicDims,
-      IREE::Stream::AffinityAttr::lookup(tensorValue.getDefiningOp()));
+      dynamicDims, affinityAttr);
 }
 
 struct ConvertTensorConstantOp
@@ -123,13 +123,14 @@ struct ConvertTensorCastLikeOp : public OpConversionPattern<CastOpTy> {
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
     auto source =
         consumeTensorOperand(op.getLoc(), adaptor.getSource(), rewriter);
-    auto resultSize = buildResultSizeOf(op.getLoc(), op.getResult(),
-                                        op.getResultDims(), rewriter);
+    auto affinityAttr = IREE::Stream::AffinityAttr::lookup(op);
+    auto resultSize =
+        buildResultSizeOf(op.getLoc(), op.getResult(), op.getResultDims(),
+                          affinityAttr, rewriter);
     rewriter.replaceOpWithNewOp<IREE::Stream::TensorCloneOp>(
         op, unknownType, source.resource, op.getSource().getType(),
         op.getSourceDims(), source.resourceSize, op.getResult().getType(),
-        adaptor.getResultDims(), resultSize,
-        IREE::Stream::AffinityAttr::lookup(op));
+        adaptor.getResultDims(), resultSize, affinityAttr);
     return success();
   }
 };
@@ -141,10 +142,12 @@ struct ConvertTensorAllocaOp
   matchAndRewrite(IREE::Flow::TensorAllocaOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     Type unknownType = IREE::Stream::ResourceType::get(getContext());
-    auto resultSize = buildResultSizeOf(op.getLoc(), op.getResult(),
-                                        op.getResultDims(), rewriter);
+    auto affinityAttr = IREE::Stream::AffinityAttr::lookup(op);
+    auto resultSize =
+        buildResultSizeOf(op.getLoc(), op.getResult(), op.getResultDims(),
+                          affinityAttr, rewriter);
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncAllocaOp>(
-        op, unknownType, resultSize, IREE::Stream::AffinityAttr::lookup(op));
+        op, unknownType, resultSize, affinityAttr);
     return success();
   }
 };
@@ -156,11 +159,13 @@ struct ConvertTensorEmptyOp
   matchAndRewrite(IREE::Flow::TensorEmptyOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     Type unknownType = IREE::Stream::ResourceType::get(getContext());
-    auto resultSize = buildResultSizeOf(op.getLoc(), op.getResult(),
-                                        op.getResultDims(), rewriter);
+    auto affinityAttr = IREE::Stream::AffinityAttr::lookup(op);
+    auto resultSize =
+        buildResultSizeOf(op.getLoc(), op.getResult(), op.getResultDims(),
+                          affinityAttr, rewriter);
     rewriter.replaceOpWithNewOp<IREE::Stream::TensorEmptyOp>(
         op, unknownType, op.getResult().getType(), adaptor.getResultDims(),
-        resultSize, IREE::Stream::AffinityAttr::lookup(op));
+        resultSize, affinityAttr);
     return success();
   }
 };
@@ -172,12 +177,13 @@ struct ConvertTensorSplatOp
   matchAndRewrite(IREE::Flow::TensorSplatOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
-    auto resultSize = buildResultSizeOf(op.getLoc(), op.getResult(),
-                                        op.getResultDims(), rewriter);
+    auto affinityAttr = IREE::Stream::AffinityAttr::lookup(op);
+    auto resultSize =
+        buildResultSizeOf(op.getLoc(), op.getResult(), op.getResultDims(),
+                          affinityAttr, rewriter);
     rewriter.replaceOpWithNewOp<IREE::Stream::TensorSplatOp>(
         op, unknownType, adaptor.getValue(), op.getResult().getType(),
-        adaptor.getResultDims(), resultSize,
-        IREE::Stream::AffinityAttr::lookup(op));
+        adaptor.getResultDims(), resultSize, affinityAttr);
     return success();
   }
 };
@@ -230,13 +236,15 @@ struct ConvertTensorSliceOp
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
     auto source =
         consumeTensorOperand(op.getLoc(), adaptor.getSource(), rewriter);
-    auto resultSize = buildResultSizeOf(op.getLoc(), op.getResult(),
-                                        op.getResultDims(), rewriter);
+    auto affinityAttr = IREE::Stream::AffinityAttr::lookup(op);
+    auto resultSize =
+        buildResultSizeOf(op.getLoc(), op.getResult(), op.getResultDims(),
+                          affinityAttr, rewriter);
     rewriter.replaceOpWithNewOp<IREE::Stream::TensorSliceOp>(
         op, unknownType, source.resource, op.getSource().getType(),
         op.getSourceDims(), source.resourceSize, adaptor.getStartIndices(),
         adaptor.getLengths(), op.getResult().getType(), adaptor.getResultDims(),
-        resultSize, IREE::Stream::AffinityAttr::lookup(op));
+        resultSize, affinityAttr);
     return success();
   }
 };
@@ -676,6 +684,8 @@ struct ConvertDispatchOp : public OpConversionPattern<IREE::Flow::DispatchOp> {
   LogicalResult
   matchAndRewrite(IREE::Flow::DispatchOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
+    auto affinityAttr = IREE::Stream::AffinityAttr::lookup(op);
+
     // Zero is going to be used for each operand to start.
     auto zeroOffset = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
 
@@ -723,7 +733,8 @@ struct ConvertDispatchOp : public OpConversionPattern<IREE::Flow::DispatchOp> {
         auto resultDynamicDims = IREE::Util::buildDynamicDimsForValue(
             op.getLoc(), result.value(), rewriter);
         resultSizes.push_back(buildResultSizeOf(op.getLoc(), result.value(),
-                                                resultDynamicDims, rewriter));
+                                                resultDynamicDims, affinityAttr,
+                                                rewriter));
         resultTypes.push_back(unknownType);
       }
     }
@@ -732,7 +743,7 @@ struct ConvertDispatchOp : public OpConversionPattern<IREE::Flow::DispatchOp> {
         op, resultTypes, adaptor.getWorkload(), adaptor.getEntryPointsAttr(),
         dispatchOperands, dispatchOperandSizes, dispatchOperandOffsets,
         dispatchOperandEnds, dispatchOperandLengths, resultSizes,
-        adaptor.getTiedOperandsAttr(), IREE::Stream::AffinityAttr::lookup(op));
+        adaptor.getTiedOperandsAttr(), affinityAttr);
     newOp->setDialectAttrs(op->getDialectAttrs());
     return success();
   }
@@ -778,6 +789,8 @@ struct ConvertCallOp : public OpConversionPattern<IREE::Flow::CallOp> {
   LogicalResult
   matchAndRewrite(IREE::Flow::CallOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
+    auto affinityAttr = IREE::Stream::AffinityAttr::lookup(op);
+
     // Zero is going to be used for each operand to start.
     auto zeroOffset = rewriter.create<arith::ConstantIndexOp>(op.getLoc(), 0);
 
@@ -825,7 +838,8 @@ struct ConvertCallOp : public OpConversionPattern<IREE::Flow::CallOp> {
         auto resultDynamicDims = IREE::Util::buildDynamicDimsForValue(
             op.getLoc(), result.value(), rewriter);
         resultSizes.push_back(buildResultSizeOf(op.getLoc(), result.value(),
-                                                resultDynamicDims, rewriter));
+                                                resultDynamicDims, affinityAttr,
+                                                rewriter));
         resultTypes.push_back(unknownType);
       }
     }
@@ -834,7 +848,7 @@ struct ConvertCallOp : public OpConversionPattern<IREE::Flow::CallOp> {
         op, resultTypes, adaptor.getCalleeAttr(), callOperands,
         callOperandSizes, callOperandOffsets, callOperandEnds,
         callOperandLengths, resultSizes, adaptor.getTiedOperandsAttr(),
-        IREE::Stream::AffinityAttr::lookup(op));
+        affinityAttr);
     newOp->setDialectAttrs(op->getDialectAttrs());
     return success();
   }

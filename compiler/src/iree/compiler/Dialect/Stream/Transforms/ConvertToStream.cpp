@@ -46,6 +46,7 @@ namespace {
 static Value buildTensorImportOp(Location loc, Value sourceTensor,
                                  Type targetType,
                                  SmallPtrSetImpl<Operation *> &consumingOps,
+                                 IREE::Stream::AffinityAttr affinityAttr,
                                  OpBuilder &builder) {
   // Gather dynamic dimensions from the input value.
   auto dynamicDims =
@@ -56,8 +57,7 @@ static Value buildTensorImportOp(Location loc, Value sourceTensor,
   // a transfer operation that may need to reformat the tensor.
   auto encodingAttr = TypeAttr::get(sourceTensor.getType());
   Value resultSize = builder.create<IREE::Stream::TensorSizeOfOp>(
-      loc, builder.getIndexType(), encodingAttr, dynamicDims,
-      /*affinity=*/nullptr);
+      loc, builder.getIndexType(), encodingAttr, dynamicDims, affinityAttr);
 
   // Associate the external SSA value, encoding, and shape information with the
   // stream resource. When lowering we'll then have all the metadata required
@@ -66,7 +66,7 @@ static Value buildTensorImportOp(Location loc, Value sourceTensor,
       IREE::Stream::Lifetime::External);
   auto importOp = builder.create<IREE::Stream::TensorImportOp>(
       loc, externalType, sourceTensor, encodingAttr, dynamicDims, resultSize,
-      /*affinity=*/nullptr);
+      affinityAttr);
   consumingOps.insert(importOp);
 
   // If needed insert a transfer to the target lifetime.
@@ -75,8 +75,8 @@ static Value buildTensorImportOp(Location loc, Value sourceTensor,
     result = builder
                  .create<IREE::Stream::AsyncTransferOp>(
                      loc, targetType, result, resultSize, resultSize,
-                     /*source_affinity=*/nullptr,
-                     /*result_affinity=*/nullptr)
+                     /*source_affinity=*/affinityAttr,
+                     /*result_affinity=*/affinityAttr)
                  .getResult();
   }
 
@@ -90,6 +90,7 @@ static Value buildTensorImportOp(Location loc, Value sourceTensor,
 // external tensor value.
 static Value buildTensorExportOp(Location loc, Value sourceValue,
                                  TensorType targetType, ValueRange dynamicDims,
+                                 IREE::Stream::AffinityAttr affinityAttr,
                                  OpBuilder &builder) {
   auto source = consumeTensorOperand(loc, sourceValue, builder);
 
@@ -101,14 +102,13 @@ static Value buildTensorExportOp(Location loc, Value sourceValue,
         loc, externalType, source.resource, source.resourceSize,
         source.resourceSize,
         /*source_affinity=*/nullptr,
-        /*result_affinity=*/nullptr);
+        /*result_affinity=*/affinityAttr);
   }
 
   // Associate the stream resource and external encoding and shape information.
   auto newOp = builder.create<IREE::Stream::TensorExportOp>(
       loc, targetType, source.resource, TypeAttr::get(targetType), dynamicDims,
-      source.resourceSize,
-      /*affinity=*/nullptr);
+      source.resourceSize, affinityAttr);
   return newOp.getResult();
 }
 
@@ -141,6 +141,8 @@ struct GenericResourcePattern : public ConversionPattern {
     if (!doesOperationNeedWrapping(op))
       return failure();
 
+    auto affinityAttr = IREE::Stream::AffinityAttr::lookup(op);
+
     // Export resources into tensor operands for the op to consume.
     SmallVector<Value> newOperands;
     newOperands.reserve(op->getNumOperands());
@@ -156,8 +158,9 @@ struct GenericResourcePattern : public ConversionPattern {
 
       auto dynamicDims = IREE::Util::buildDynamicDimsForValue(
           op->getLoc(), oldOperand, rewriter);
-      newOperands.push_back(buildTensorExportOp(
-          op->getLoc(), newOperand, tensorType, dynamicDims, rewriter));
+      newOperands.push_back(buildTensorExportOp(op->getLoc(), newOperand,
+                                                tensorType, dynamicDims,
+                                                affinityAttr, rewriter));
     }
     rewriter.modifyOpInPlace(op, [&]() { op->setOperands(newOperands); });
 
@@ -173,7 +176,7 @@ struct GenericResourcePattern : public ConversionPattern {
       SmallPtrSet<Operation *, 4> consumingOps;
       auto importedValue = buildTensorImportOp(
           op->getLoc(), result, rewriter.getType<IREE::Stream::ResourceType>(),
-          consumingOps, rewriter);
+          consumingOps, affinityAttr, rewriter);
       result.replaceAllUsesExcept(importedValue, consumingOps);
     }
 

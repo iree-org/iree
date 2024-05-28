@@ -166,8 +166,9 @@ static void assignDefaultDeviceAffinity(mlir::ModuleOp moduleOp,
     }
 
     if (auto affinityOp = dyn_cast<IREE::Stream::AffinityOpInterface>(op)) {
-      if (!affinityOp.getAffinity())
-        affinityOp.setAffinity(affinityAttr);
+      if (!affinityOp.getAffinityAttr()) {
+        affinityOp.setAffinityAttr(affinityAttr);
+      }
     } else {
       if (!op.hasAttr(affinityName)) {
         op.setAttr(affinityName, affinityAttr);
