@@ -75,7 +75,6 @@ util.func public @partitioningWithAffinities(%arg0: !stream.resource<external>) 
   // CHECK-NEXT: } => !stream.timepoint
 
   // CHECK-NEXT: %[[READY:.+]] = stream.timepoint.await
-  // CHECK-SAME:   on(#hal.device.affinity<@device_b>)
   // CHECK-SAME:   %[[TIMEPOINT1]] => %[[RESULT]] : !stream.resource<external>{%c20}
   // CHECK-NEXT: util.return %[[READY]]
   util.return %dispatch2 : !stream.resource<external>
@@ -133,7 +132,6 @@ util.func public @partitioningWithConcurrentAffinities(%arg0: !stream.resource<e
   // CHECK-NEXT: } => !stream.timepoint
 
   // CHECK-NEXT: %[[READY:.+]] = stream.timepoint.await
-  // CHECK-SAME:   on(#hal.device.affinity<@device_c>)
   // CHECK-SAME:   %[[TIMEPOINT2]] => %[[RESULT]] : !stream.resource<external>{%c20}
   // CHECK-NEXT: util.return %[[READY]]
   util.return %dispatch2 : !stream.resource<external>

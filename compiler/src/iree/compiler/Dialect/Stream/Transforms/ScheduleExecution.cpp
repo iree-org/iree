@@ -275,9 +275,6 @@ LogicalResult processRegion(Location loc, MLIRContext *context, Region &region,
         auto awaitOp = builder.create<IREE::Stream::TimepointAwaitOp>(
             executeOp.getLoc(), newResult, newResultSize,
             executeOp.getResultTimepoint());
-        if (executeOp.getAffinity().has_value()) {
-          awaitOp.setAffinityAttr(executeOp.getAffinityAttr());
-        }
 
         // Explicitly copy the Value since it is marked as const.
         Value toBeDeleted = oldResult;
