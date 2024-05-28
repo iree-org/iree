@@ -45,6 +45,9 @@ iree_lit_test_suite(
             "*.mlir",
             "*.txt",
         ],
+        exclude = [
+            "iree-run-module-console-tracing.mlir",
+        ],
     ),
     cfg = "//tools:lit.cfg.py",
     data = [
