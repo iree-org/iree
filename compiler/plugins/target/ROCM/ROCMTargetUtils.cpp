@@ -173,7 +173,7 @@ LogicalResult setHIPGlobals(Location loc, llvm::Module *module,
   if (chipArch < 6000)
     return failure();
   // Latest GFX arch supported is gfx115x.
-  if (chipArch > 11000)
+  if (chipArch > 11500)
     return failure();
   // Get chip code from suffix. i.e gfx1103 -> `3`.
   // gfx90a -> `a` == `10`.
