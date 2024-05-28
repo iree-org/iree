@@ -261,6 +261,17 @@ struct ConvertTensorUpdateOp
   }
 };
 
+static bool isScalarTensor(RankedTensorType type) {
+  if (type.getRank() == 0)
+    return true; // tensor<i32>
+  if (!type.hasStaticShape())
+    return false; // tensor<...?...xi32>
+  int64_t elementCount = 1;
+  for (int64_t dim : type.getShape())
+    elementCount *= dim;
+  return elementCount == 1; // tensor<1xi32> or tensor<1x1x1xi32>
+}
+
 struct ConvertTensorLoadOp
     : public OpConversionPattern<IREE::Flow::TensorLoadOp> {
   using OpConversionPattern::OpConversionPattern;
@@ -271,20 +282,71 @@ struct ConvertTensorLoadOp
     auto source =
         consumeTensorOperand(op.getLoc(), adaptor.getSource(), rewriter);
 
+    // If the source is not a staging resource then we need to transfer it to
+    // a staging resource. We slice out just what is being loaded so that we
+    // don't transfer the entire tensor. If loading multiple values from the
+    // same tensor we'll either want to have batched that before this point
+    // by loading an entire buffer or after by coalescing the slices.
+    //
+    // If already a staging resource then we can fast-path load the value.
     auto stagingType = rewriter.getType<IREE::Stream::ResourceType>(
         IREE::Stream::Lifetime::Staging);
-    auto loadSource = source.resource;
-    if (source.resource.getType() != stagingType) {
-      loadSource = rewriter.createOrFold<IREE::Stream::AsyncTransferOp>(
+    if (source.resource.getType() == stagingType) {
+      rewriter.replaceOpWithNewOp<IREE::Stream::TensorLoadOp>(
+          op, resultType, source.resource, op.getSource().getType(),
+          adaptor.getSourceDims(), source.resourceSize, adaptor.getIndices());
+      return success();
+    }
+
+    auto affinityAttr = IREE::Stream::AffinityAttr::lookup(op);
+
+    // Scalar tensors get transferred without slicing.
+    auto sourceEncoding = op.getSource().getType();
+    if (isScalarTensor(sourceEncoding)) {
+      auto transferOp = rewriter.create<IREE::Stream::AsyncTransferOp>(
           op.getLoc(), stagingType, source.resource, source.resourceSize,
           source.resourceSize,
           /*source_affinity=*/IREE::Stream::AffinityAttr::lookup(op),
-          /*result_affinity=*/nullptr);
+          /*result_affinity=*/IREE::Stream::AffinityAttr::lookup(op));
+      rewriter.replaceOpWithNewOp<IREE::Stream::TensorLoadOp>(
+          op, resultType, transferOp.getResult(), sourceEncoding,
+          adaptor.getSourceDims(), transferOp.getResultSize(),
+          adaptor.getIndices());
+      return success();
     }
 
+    // Slice out the individual element value.
+    IndexSet indexSet(op.getLoc(), rewriter);
+    indexSet.populate(adaptor.getIndices());
+    SmallVector<Value> sliceIndices;
+    SmallVector<Value> sliceLengths;
+    SmallVector<Value> loadIndices;
+    SmallVector<int64_t> resultDims;
+    for (auto index : adaptor.getIndices()) {
+      // TODO(benvanik): support larger buffer slices.
+      sliceIndices.push_back(index);
+      sliceLengths.push_back(indexSet.get(1));
+      loadIndices.push_back(indexSet.get(0));
+      resultDims.push_back(1);
+    }
+    auto resultEncoding =
+        RankedTensorType::get(resultDims, sourceEncoding.getElementType(),
+                              sourceEncoding.getEncoding());
+    Value resultSize = rewriter.create<IREE::Stream::TensorSizeOfOp>(
+        op.getLoc(), resultEncoding, ValueRange{}, affinityAttr);
+    auto sliceOp = rewriter.create<IREE::Stream::TensorSliceOp>(
+        op.getLoc(), source.resource.getType(), source.resource, sourceEncoding,
+        adaptor.getSourceDims(), source.resourceSize, sliceIndices,
+        sliceLengths, resultEncoding, ValueRange{}, resultSize, affinityAttr);
+    auto transferOp = rewriter.create<IREE::Stream::AsyncTransferOp>(
+        op.getLoc(), stagingType, sliceOp.getResult(), sliceOp.getResultSize(),
+        sliceOp.getResultSize(),
+        /*source_affinity=*/IREE::Stream::AffinityAttr::lookup(op),
+        /*result_affinity=*/IREE::Stream::AffinityAttr::lookup(op));
     rewriter.replaceOpWithNewOp<IREE::Stream::TensorLoadOp>(
-        op, resultType, loadSource, op.getSource().getType(),
-        op.getSourceDims(), source.resourceSize, adaptor.getIndices());
+        op, resultType, transferOp.getResult(), sliceOp.getResultEncoding(),
+        sliceOp.getResultEncodingDims(), transferOp.getResultSize(),
+        loadIndices);
     return success();
   }
 };
@@ -298,32 +360,39 @@ struct ConvertTensorStoreOp
     auto target =
         consumeTensorOperand(op.getLoc(), adaptor.getTarget(), rewriter);
 
+    // If the target is a staging resource then we can directly store into it
+    // with a fast-path. Otherwise we need to stage an upload.
     auto stagingType = rewriter.getType<IREE::Stream::ResourceType>(
         IREE::Stream::Lifetime::Staging);
-    auto storeTarget = target.resource;
-    if (target.resource.getType() != stagingType) {
-      storeTarget = rewriter.createOrFold<IREE::Stream::AsyncTransferOp>(
-          op.getLoc(), stagingType, storeTarget, target.resourceSize,
-          target.resourceSize,
-          /*source_affinity=*/IREE::Stream::AffinityAttr::lookup(op),
-          /*result_affinity=*/nullptr);
+    if (target.resource.getType() == stagingType) {
+      rewriter.replaceOpWithNewOp<IREE::Stream::TensorStoreOp>(
+          op, target.resource.getType(), target.resource,
+          op.getTarget().getType(), adaptor.getTargetDims(),
+          target.resourceSize, adaptor.getIndices(), adaptor.getValue());
+      return success();
     }
 
-    auto newOp = rewriter.create<IREE::Stream::TensorStoreOp>(
-        op.getLoc(), storeTarget.getType(), storeTarget,
-        op.getTarget().getType(), adaptor.getTargetDims(), target.resourceSize,
-        adaptor.getIndices(), adaptor.getValue());
-
-    Value newResult = newOp.getResult();
-    if (target.resource.getType() != stagingType) {
-      newResult = rewriter.createOrFold<IREE::Stream::AsyncTransferOp>(
-          op.getLoc(), target.resource.getType(), newResult,
-          target.resourceSize, target.resourceSize,
-          /*source_affinity=*/nullptr,
-          /*result_affinity=*/IREE::Stream::AffinityAttr::lookup(op));
+    // Scalar tensors disconnect from the original target.
+    auto targetEncoding = op.getTarget().getType();
+    if (isScalarTensor(targetEncoding)) {
+      rewriter.replaceOpWithNewOp<IREE::Stream::TensorSplatOp>(
+          op, target.resource.getType(), adaptor.getValue(), targetEncoding,
+          adaptor.getTargetDims(), target.resourceSize,
+          IREE::Stream::AffinityAttr::lookup(op));
+      return success();
     }
-    rewriter.replaceOp(op, {newResult});
 
+    // Use fill to store the value.
+    // TODO(benvanik): support larger buffer slices (stage + update).
+    IndexSet indexSet(op.getLoc(), rewriter);
+    indexSet.populate(adaptor.getIndices());
+    SmallVector<Value> lengths;
+    for (auto index : adaptor.getIndices())
+      lengths.push_back(indexSet.get(1));
+    rewriter.replaceOpWithNewOp<IREE::Stream::TensorFillOp>(
+        op, target.resource, targetEncoding, adaptor.getTargetDims(),
+        target.resourceSize, adaptor.getIndices(), lengths, adaptor.getValue(),
+        IREE::Stream::AffinityAttr::lookup(op));
     return success();
   }
 };
