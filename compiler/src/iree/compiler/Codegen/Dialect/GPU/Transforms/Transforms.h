@@ -35,6 +35,7 @@ LogicalResult fuseForallIntoSlice(RewriterBase &rewriter,
                                   tensor::ExtractSliceOp slice);
 
 void populateIREEGPUDropUnitDimsPatterns(RewritePatternSet &patterns);
+void populateIREEGPULowerMultiMmaPatterns(RewritePatternSet &patterns);
 void populateIREEGPULowerValueBarrierPatterns(RewritePatternSet &patterns);
 void populateIREEGPUVectorUnrollPatterns(
     RewritePatternSet &patterns, const vector::UnrollVectorOptions &options);

@@ -165,6 +165,59 @@ LogicalResult fuseForallIntoSlice(RewriterBase &rewriter,
 }
 
 //===----------------------------------------------------------------------===//
+// MultiMmaOp Lowering
+//===----------------------------------------------------------------------===//
+
+namespace {
+struct LowerMultiMmaPattern : public OpRewritePattern<IREE::GPU::MultiMmaOp> {
+  using OpRewritePattern<IREE::GPU::MultiMmaOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::GPU::MultiMmaOp mmaOp,
+                                PatternRewriter &rewriter) const override {
+    if (mmaOp.hasTensorSemantics()) {
+      return rewriter.notifyMatchFailure(
+          mmaOp, "lowering to concrete op requires vector semantics");
+    }
+    SmallVector<int64_t> bounds;
+    mmaOp.getIterationBounds(bounds);
+    if (!bounds.empty()) {
+      return rewriter.notifyMatchFailure(mmaOp,
+                                         "must be a single mma operation");
+    }
+
+    auto [lhsVectorType, rhsVectorType, accVectorType] =
+        mmaOp.getKind().getABCVectorTypes();
+
+    Value aCast = mmaOp.getLhs();
+    Value bCast = mmaOp.getRhs();
+    Value cCast = mmaOp.getAcc();
+    if (aCast.getType() != lhsVectorType) {
+      aCast = rewriter.create<vector::ShapeCastOp>(mmaOp.getLoc(),
+                                                   lhsVectorType, aCast);
+    }
+    if (bCast.getType() != rhsVectorType) {
+      bCast = rewriter.create<vector::ShapeCastOp>(mmaOp.getLoc(),
+                                                   rhsVectorType, bCast);
+    }
+    if (cCast.getType() != accVectorType) {
+      cCast = rewriter.create<vector::ShapeCastOp>(mmaOp.getLoc(),
+                                                   accVectorType, cCast);
+    }
+
+    FailureOr<Value> concreteMmaOp = mmaOp.getKind().buildMmaOperation(
+        rewriter, mmaOp.getLoc(), cCast.getType(), aCast, bCast, cCast);
+    assert(succeeded(concreteMmaOp) && "Failed to create mma op");
+    rewriter.replaceOpWithNewOp<vector::ShapeCastOp>(
+        mmaOp, mmaOp.getAcc().getType(), *concreteMmaOp);
+    return success();
+  }
+};
+} // namespace
+
+void populateIREEGPULowerMultiMmaPatterns(RewritePatternSet &patterns) {
+  patterns.add<LowerMultiMmaPattern>(patterns.getContext());
+}
+
+//===----------------------------------------------------------------------===//
 // MultiMmaOp Unit Dim Folding
 //===----------------------------------------------------------------------===//
 

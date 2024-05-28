@@ -19,6 +19,7 @@ iree_lit_test_suite(
     srcs = enforce_glob(
         [
             "drop_multi_mma_unit_dims.mlir",
+            "lower_multi_mma.mlir",
             "lower_vector_barrier.mlir",
             "transform_fuse_forall.mlir",
             "vectorize_multi_mma.mlir",
