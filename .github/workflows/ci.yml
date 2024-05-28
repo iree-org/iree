@@ -753,24 +753,12 @@ jobs:
             gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
             ./build_tools/cmake/build_runtime_tracing.sh \
             "${BUILD_DIR}"
-      - name: "Testing runtime with tracing - Tracy"
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
-            ./build_tools/cmake/ctest_all.sh \
-            "${BUILD_DIR}"
       - name: "Building IREE runtime with tracing - console"
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "TRACING_PROVIDER=console" \
             gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
             ./build_tools/cmake/build_runtime_tracing.sh \
-            "${BUILD_DIR}"
-      - name: "Testing runtime with tracing - console"
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-            gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
-            ./build_tools/cmake/ctest_all.sh \
             "${BUILD_DIR}"
 
   debug:

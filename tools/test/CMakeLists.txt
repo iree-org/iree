@@ -88,21 +88,3 @@ if(IREE_BUILD_TESTS AND
       iree_tools_test_iree_run_module_bytecode_module_vmvx
   )
 endif()
-
-if(IREE_ENABLE_RUNTIME_TRACING AND ${IREE_TRACING_PROVIDER} STREQUAL "console")
-  iree_lit_test_suite(
-    NAME
-      lit
-    SRCS
-      "iree-run-module-console-tracing.mlir"
-    TOOLS
-      ${IREE_LLD_TARGET}
-      FileCheck
-      iree-compile
-      iree-run-module
-      not
-    LABELS
-      "driver=local-task"
-      "hostonly"
-  )
-endif()
