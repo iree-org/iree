@@ -19,7 +19,7 @@
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Interfaces/TilingInterface.h"
 
-#define DEBUG_TYPE "iree-codegen-gpu-tensor-tile"
+#define DEBUG_TYPE "iree-codegen-gpu-apply-tiling-level"
 
 namespace mlir::iree_compiler {
 
@@ -34,6 +34,10 @@ struct GPUApplyTilingLevelPass final
 };
 } // namespace
 
+/// This collects the set of operations to tile + fuse starting from the given
+/// root |op| and walking up to its producers. Stops at operations given by
+/// |exclude| which are expected to receive their own independent tiling for the
+/// given level.
 static llvm::SmallDenseSet<Operation *>
 collectTiledAndFusedOps(Operation *op,
                         llvm::SmallDenseSet<TilingInterface> exclude) {
