@@ -181,12 +181,10 @@ struct GenericResourcePattern : public ConversionPattern {
   }
 };
 
-namespace {
 struct OptimizationBarrierOpConversion
     : public OpConversionPattern<IREE::Util::OptimizationBarrierOp> {
   using OpConversionPattern<
       IREE::Util::OptimizationBarrierOp>::OpConversionPattern;
-
   LogicalResult
   matchAndRewrite(IREE::Util::OptimizationBarrierOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -204,7 +202,14 @@ struct OptimizationBarrierOpConversion
     return success();
   }
 };
-} // namespace
+
+static void stripAffinityAttrs(ModuleOp moduleOp) {
+  moduleOp->removeAttr("stream.affinity.default");
+  auto affinityName = StringAttr::get(moduleOp.getContext(), "stream.affinity");
+  for (auto &op : moduleOp.getOps()) {
+    op.removeDiscardableAttr(affinityName);
+  }
+}
 
 //===----------------------------------------------------------------------===//
 // --iree-stream-conversion
@@ -290,6 +295,9 @@ struct ConvertToStreamPass final
                                       std::move(patterns)))) {
       return signalPassFailure();
     }
+
+    // Strip affinity ops as they are no longer required.
+    stripAffinityAttrs(getOperation());
   }
 };
 
