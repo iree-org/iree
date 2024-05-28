@@ -181,6 +181,14 @@ struct GenericResourcePattern : public ConversionPattern {
   }
 };
 
+static void stripAffinityAttrs(ModuleOp moduleOp) {
+  auto affinityName = StringAttr::get(moduleOp.getContext(), "stream.affinity");
+  moduleOp->removeAttr(affinityName);
+  for (auto &op : moduleOp.getOps()) {
+    op.removeDiscardableAttr(affinityName);
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // --iree-stream-conversion
 //===----------------------------------------------------------------------===//
@@ -260,6 +268,9 @@ struct ConvertToStreamPass final
                                       std::move(patterns)))) {
       return signalPassFailure();
     }
+
+    // Strip affinity ops as they are no longer required.
+    stripAffinityAttrs(getOperation());
   }
 };
 
