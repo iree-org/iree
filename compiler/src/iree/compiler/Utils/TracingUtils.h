@@ -41,6 +41,9 @@ enum {
   IREE_TRACING_COMPILER_MESSAGE_LEVEL_DEBUG = 0x00FF00u,
 };
 
+// Fork of IREE_TRACE_SCOPE.
+#define IREE_COMPILER_TRACE_SCOPE() ZoneScoped
+
 // Fork of IREE_TRACE_MESSAGE_DYNAMIC, taking std::string (or llvm::StringRef).
 #define IREE_COMPILER_TRACE_MESSAGE_DYNAMIC(level, value_string)               \
   ___tracy_emit_messageC(value_string.data(), value_string.size(),             \
@@ -66,6 +69,7 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>>
 createTraceFrameMarkEndPass(llvm::StringRef name = "");
 
 #else
+#define IREE_COMPILER_TRACE_SCOPE()
 #define IREE_COMPILER_TRACE_MESSAGE_DYNAMIC(level, value_string)
 #define IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, frameName)
 #define IREE_TRACE_ADD_END_FRAME_PASS(passManager, frameName)
