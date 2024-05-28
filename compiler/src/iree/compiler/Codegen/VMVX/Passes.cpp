@@ -43,8 +43,8 @@ static void addTileAndDistributePasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createFuseTensorPadWithConsumerPass());
   funcPassManager.addPass(createConcretizePadResultShapePass());
-  funcPassManager.addPass(
-      IREE::LinalgExt::createTileAndDecomposeAttentionPass());
+  funcPassManager.addPass(IREE::LinalgExt::createTileAttentionPass());
+  funcPassManager.addPass(IREE::LinalgExt::createDecomposeAttentionPass());
   funcPassManager.addPass(
       IREE::LinalgExt::createDecomposeWinogradTransformPass());
 }

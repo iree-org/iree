@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-linalg-ext-tile-and-decompose-attention{onlyTile}),cse)" %s | FileCheck %s --check-prefix=CHECK
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-linalg-ext-tile-attention),cse)" %s | FileCheck %s --check-prefix=CHECK
 
 // TODO: These tests should be moved to tiling.mlir when PartialReductionOpInterface is implemented for attention op.
 
