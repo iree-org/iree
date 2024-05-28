@@ -50,6 +50,7 @@ iree_compiler_cc_library(
     name = "CommonGPUPasses",
     srcs = [
         "AMDGPUDistributeContract.cpp",
+        "GPUApplyTilingLevel.cpp",
         "GPUCheckResourceUsage.cpp",
         "GPUCreateFastSlowPath.cpp",
         "GPUDistribute.cpp",
@@ -126,6 +127,7 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:Support",
         "@llvm-project//mlir:TensorDialect",
         "@llvm-project//mlir:TensorTransforms",
+        "@llvm-project//mlir:TilingInterface",
         "@llvm-project//mlir:TransformUtils",
         "@llvm-project//mlir:Transforms",
         "@llvm-project//mlir:VectorDialect",
