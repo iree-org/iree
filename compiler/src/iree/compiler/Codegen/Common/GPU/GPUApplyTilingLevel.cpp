@@ -134,8 +134,9 @@ applyTileAndFuseToEachRoot(RewriterBase &rewriter,
     FailureOr<scf::SCFTileAndFuseResult> tiledResults =
         scf::tileConsumerAndFuseProducersUsingSCF(rewriter, tilingInterfaceOp,
                                                   tileAndFuseOptions);
-    if (failed(tiledResults))
+    if (failed(tiledResults)) {
       return failure();
+    }
 
     // Perform the replacement of tiled and fused values.
     SmallVector<Operation *> opsToReplace{tilingInterfaceOp};
