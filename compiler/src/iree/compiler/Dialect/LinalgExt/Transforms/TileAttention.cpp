@@ -11,18 +11,14 @@
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
-#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Pass/Pass.h"
 
-namespace mlir {
-namespace iree_compiler {
-namespace IREE {
-namespace LinalgExt {
+namespace mlir::iree_compiler::IREE::LinalgExt {
 
 namespace {
 
-Value truncateToF16(Value input, Value output,
+static Value truncateToF16(Value input, Value output,
                     SmallVectorImpl<Operation *> &ops, OpBuilder &builder,
                     Location loc) {
   AffineMap identityMap =
@@ -40,7 +36,7 @@ Value truncateToF16(Value input, Value output,
   return genericOp.getResult(0);
 }
 
-Value applyFinalScaling(Value result, Value newSum, Location loc,
+static Value applyFinalScaling(Value result, Value newSum, Location loc,
                         OpBuilder &builder, SmallVectorImpl<Operation *> &ops) {
   AffineMap identityMap =
       AffineMap::getMultiDimIdentityMap(2, builder.getContext());
@@ -64,7 +60,7 @@ Value applyFinalScaling(Value result, Value newSum, Location loc,
   return genericOp.getResult(0);
 }
 
-scf::LoopNest createLoopNest(SmallVectorImpl<Value> &ivs, Value lb, Value step,
+static scf::LoopNest createLoopNest(SmallVectorImpl<Value> &ivs, Value lb, Value step,
                              Value ub, ValueRange args, Location loc,
                              OpBuilder &builder) {
   SmallVector<Value> lbs{lb};
@@ -80,7 +76,7 @@ scf::LoopNest createLoopNest(SmallVectorImpl<Value> &ivs, Value lb, Value step,
   return loopNest;
 }
 
-Value extractSlice(Value key, ArrayRef<int64_t> keyShape, ArrayRef<Value> ivs,
+static Value extractSlice(Value key, ArrayRef<int64_t> keyShape, ArrayRef<Value> ivs,
                    OpFoldResult keyValueTileLength, OpFoldResult headDimension,
                    Type elementType, Location loc, OpBuilder &builder,
                    bool swapLastTwoDims = false) {
@@ -106,7 +102,7 @@ Value extractSlice(Value key, ArrayRef<int64_t> keyShape, ArrayRef<Value> ivs,
   return keySlice;
 }
 
-Value extractOrInsertOutputSlice(Value src, Value dst,
+static Value extractOrInsertOutputSlice(Value src, Value dst,
                                  ArrayRef<int64_t> queryShape,
                                  OpFoldResult sequenceTileLength,
                                  OpFoldResult headDimension, Location loc,
@@ -130,7 +126,7 @@ Value extractOrInsertOutputSlice(Value src, Value dst,
   return slice;
 }
 
-Value extractOutputSlice(Value src, ArrayRef<int64_t> queryShape,
+static Value extractOutputSlice(Value src, ArrayRef<int64_t> queryShape,
                          OpFoldResult sequenceTileLength,
                          OpFoldResult headDimension, Location loc,
                          OpBuilder &builder) {
@@ -138,7 +134,7 @@ Value extractOutputSlice(Value src, ArrayRef<int64_t> queryShape,
                                     headDimension, loc, builder);
 }
 
-Value insertOutputSlice(Value src, Value dst, OpFoldResult sequenceTileLength,
+static Value insertOutputSlice(Value src, Value dst, OpFoldResult sequenceTileLength,
                         OpFoldResult headDimension, Location loc,
                         OpBuilder &builder) {
   return extractOrInsertOutputSlice(src, dst, {}, sequenceTileLength,
@@ -310,7 +306,4 @@ std::unique_ptr<Pass> createTileAttentionPass() {
   return std::make_unique<TileAttentionPass>();
 }
 
-} // namespace LinalgExt
-} // namespace IREE
-} // namespace iree_compiler
-} // namespace mlir
+} // namespace mlir::iree_compiler::IREE::LinalgExt

@@ -604,6 +604,8 @@ void addCPULinalgExtTileAndVectorizePipeline(
   addTileAndDistributePasses(funcPassManager);
   funcPassManager.addPass(
       createLLVMCPUTilePass(tilingConfig.getVectorCommonParallelLevel()));
+  // TODO: Remove the pass once we have PartialReductionOpInterface implemented
+  // for AttentionOp.
   funcPassManager.addPass(IREE::LinalgExt::createTileAttentionPass());
   funcPassManager.addPass(IREE::LinalgExt::createDecomposeAttentionPass());
   funcPassManager.addPass(
