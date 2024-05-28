@@ -19,8 +19,8 @@ namespace mlir::iree_compiler::IREE::LinalgExt {
 namespace {
 
 static Value truncateToF16(Value input, Value output,
-                    SmallVectorImpl<Operation *> &ops, OpBuilder &builder,
-                    Location loc) {
+                           SmallVectorImpl<Operation *> &ops,
+                           OpBuilder &builder, Location loc) {
   AffineMap identityMap =
       AffineMap::getMultiDimIdentityMap(2, builder.getContext());
   SmallVector<AffineMap> indexingMaps{identityMap, identityMap};
@@ -37,7 +37,8 @@ static Value truncateToF16(Value input, Value output,
 }
 
 static Value applyFinalScaling(Value result, Value newSum, Location loc,
-                        OpBuilder &builder, SmallVectorImpl<Operation *> &ops) {
+                               OpBuilder &builder,
+                               SmallVectorImpl<Operation *> &ops) {
   AffineMap identityMap =
       AffineMap::getMultiDimIdentityMap(2, builder.getContext());
   AffineExpr d0, d1;
@@ -60,9 +61,9 @@ static Value applyFinalScaling(Value result, Value newSum, Location loc,
   return genericOp.getResult(0);
 }
 
-static scf::LoopNest createLoopNest(SmallVectorImpl<Value> &ivs, Value lb, Value step,
-                             Value ub, ValueRange args, Location loc,
-                             OpBuilder &builder) {
+static scf::LoopNest createLoopNest(SmallVectorImpl<Value> &ivs, Value lb,
+                                    Value step, Value ub, ValueRange args,
+                                    Location loc, OpBuilder &builder) {
   SmallVector<Value> lbs{lb};
   SmallVector<Value> steps{step};
   SmallVector<Value> ubs{ub};
@@ -76,10 +77,11 @@ static scf::LoopNest createLoopNest(SmallVectorImpl<Value> &ivs, Value lb, Value
   return loopNest;
 }
 
-static Value extractSlice(Value key, ArrayRef<int64_t> keyShape, ArrayRef<Value> ivs,
-                   OpFoldResult keyValueTileLength, OpFoldResult headDimension,
-                   Type elementType, Location loc, OpBuilder &builder,
-                   bool swapLastTwoDims = false) {
+static Value extractSlice(Value key, ArrayRef<int64_t> keyShape,
+                          ArrayRef<Value> ivs, OpFoldResult keyValueTileLength,
+                          OpFoldResult headDimension, Type elementType,
+                          Location loc, OpBuilder &builder,
+                          bool swapLastTwoDims = false) {
   auto one = builder.getIndexAttr(1);
   auto zero = builder.getIndexAttr(0);
   SmallVector<OpFoldResult> strides(keyShape.size(), one);
@@ -103,10 +105,10 @@ static Value extractSlice(Value key, ArrayRef<int64_t> keyShape, ArrayRef<Value>
 }
 
 static Value extractOrInsertOutputSlice(Value src, Value dst,
-                                 ArrayRef<int64_t> queryShape,
-                                 OpFoldResult sequenceTileLength,
-                                 OpFoldResult headDimension, Location loc,
-                                 OpBuilder &builder) {
+                                        ArrayRef<int64_t> queryShape,
+                                        OpFoldResult sequenceTileLength,
+                                        OpFoldResult headDimension,
+                                        Location loc, OpBuilder &builder) {
   auto one = builder.getIndexAttr(1);
   auto zero = builder.getIndexAttr(0);
   SmallVector<OpFoldResult> strides(3, one);
@@ -127,16 +129,17 @@ static Value extractOrInsertOutputSlice(Value src, Value dst,
 }
 
 static Value extractOutputSlice(Value src, ArrayRef<int64_t> queryShape,
-                         OpFoldResult sequenceTileLength,
-                         OpFoldResult headDimension, Location loc,
-                         OpBuilder &builder) {
+                                OpFoldResult sequenceTileLength,
+                                OpFoldResult headDimension, Location loc,
+                                OpBuilder &builder) {
   return extractOrInsertOutputSlice(src, {}, queryShape, sequenceTileLength,
                                     headDimension, loc, builder);
 }
 
-static Value insertOutputSlice(Value src, Value dst, OpFoldResult sequenceTileLength,
-                        OpFoldResult headDimension, Location loc,
-                        OpBuilder &builder) {
+static Value insertOutputSlice(Value src, Value dst,
+                               OpFoldResult sequenceTileLength,
+                               OpFoldResult headDimension, Location loc,
+                               OpBuilder &builder) {
   return extractOrInsertOutputSlice(src, dst, {}, sequenceTileLength,
                                     headDimension, loc, builder);
 }
