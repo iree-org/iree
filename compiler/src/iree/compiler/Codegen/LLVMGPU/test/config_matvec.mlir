@@ -1,8 +1,8 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-llvmgpu-select-lowering-strategy)' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx940 --pass-pipeline='builtin.module(iree-llvmgpu-select-lowering-strategy)' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx1100 --pass-pipeline='builtin.module(iree-llvmgpu-select-lowering-strategy)' %s | FileCheck %s --check-prefix=CDNA3
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {target_arch = "gfx1100"}>
 module {
-  func.func @dynamic_batch_matvec() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
+  func.func @dynamic_batch_matvec() {
     %c32_i64 = arith.constant 32 : i64
     %cst = arith.constant 0.000000e+00 : f16
     %0 = hal.interface.constant.load[0] : i32
@@ -30,21 +30,22 @@ module {
   }
 }
 
-//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1, 1], [0, 0, 0, 32]{{\]}}>
-//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUWarpReduction workgroup_size = [32, 1, 1]>
-//       CHECK: func.func @dynamic_batch_matvec()
-//  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
-//       CHECK:   linalg.batch_matmul
-//  CHECK-SAME:       lowering_config = #[[$CONFIG]]
+//   CDNA3-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1, 1], [0, 0, 0, 32]{{\]}}>
+//   CDNA3-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUWarpReduction workgroup_size = [32, 1, 1]>
+// CDNA3-LABEL: func.func @dynamic_batch_matvec()
+//  CDNA3-SAME:     translation_info = #[[$TRANSLATION]]
+//       CDNA3:   linalg.batch_matmul
+//  CDNA3-SAME:       lowering_config = #[[$CONFIG]]
 
 // -----
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {target_arch = "gfx940"}>
+// This test uses special heuristics that needs to check the backend in the #hal.executable.target.
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb">
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 module {
-  func.func @vmt() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
+  func.func @vmt1() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f16
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1x4096xf16>>
@@ -67,19 +68,20 @@ module {
 
 //   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 8], [0, 0, 512]{{\]}}>
 //   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 64>
-//       CHECK: func.func @vmt()
+// CHECK-LABEL: func.func @vmt1()
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
 //  CHECK-SAME:       lowering_config = #[[$CONFIG]]
 
 // -----
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {target_arch = "gfx1100"}>
+// This test uses special heuristics that needs to check the backend in the #hal.executable.target.
+#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb">
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 module {
-  func.func @vmt() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
+  func.func @vmt2() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f16
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<1x4096xf16>>
@@ -100,22 +102,21 @@ module {
   }
 }
 
-//   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 8], [0, 0, 512]{{\]}}>
-//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 32>
-//       CHECK: func.func @vmt()
-//  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
-//       CHECK:   linalg.generic
-//  CHECK-SAME:       lowering_config = #[[$CONFIG]]
+//   CDNA3-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 8], [0, 0, 512]{{\]}}>
+//   CDNA3-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUWarpReduction workgroup_size = [64, 1, 1] subgroup_size = 32>
+// CDNA3-LABEL: func.func @vmt2()
+//  CDNA3-SAME:     translation_info = #[[$TRANSLATION]]
+//       CDNA3:   linalg.generic
+//  CDNA3-SAME:       lowering_config = #[[$CONFIG]]
 
 // -----
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {target_arch = "gfx940"}>
 #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d1, d2)>
 #map3 = affine_map<(d0, d1, d2) -> (d0)>
 module {
-  func.func @i4_dequant_matvec() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
+  func.func @i4_dequant_matvec() {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f16
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<4096x32x128xi4>>
@@ -162,9 +163,8 @@ module {
 
 // Send 2xNxK mmt to the warp reduction pipeline.
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {target_arch = "gfx940"}>
 module {
-  func.func @skinny_mmt() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
+  func.func @skinny_mmt() {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f16
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2x4096xf16>>
@@ -191,9 +191,8 @@ module {
 
 // Send Mx2xK mmt to the warp reduction pipeline.
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {target_arch = "gfx940"}>
 module {
-  func.func @skinny_mmt() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
+  func.func @skinny_mmt() {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f16
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2x4096xf16>>
@@ -218,12 +217,11 @@ module {
 
 // -----
 
-#executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb", {target_arch = "gfx940"}>
 #map = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d1)>
 module {
-  func.func @not_vmt() attributes {hal.executable.target = #executable_target_rocm_hsaco_fb} {
+  func.func @not_vmt() {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f16
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<5x4096xf16>>

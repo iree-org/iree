@@ -5,7 +5,7 @@
 
 pip>=21.3
 setuptools>=62.4.0
-nanobind>=1.9.2
+nanobind==2.0
 numpy>=2.0.0b1
 requests>=2.28.0
 wheel>=0.36.2

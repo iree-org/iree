@@ -1,10 +1,9 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" --verify-diagnostics --split-input-file %s
+// RUN: iree-opt --iree-gpu-test-target=sm_60 --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" --verify-diagnostics --split-input-file %s
 
 #config = #iree_codegen.lowering_config<tile_sizes = []>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt workgroup_size = [32, 8, 8], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 module {
-  func.func @illegal() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation} {
+  func.func @illegal() attributes {translation_info = #translation} {
     %c0 = arith.constant 0 : index
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<4x8xf32>
     %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<8x16xf32>
@@ -18,10 +17,9 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = []>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulSimt workgroup_size = [32, 8, 2], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 module {
-  func.func @illegal() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation} {
+  func.func @illegal() attributes {translation_info = #translation} {
     %c0 = arith.constant 0 : index
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<4x8xf32>
     %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<8x16xf32>
@@ -35,10 +33,9 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 32, 16]]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore workgroup_size = [64, 2, 10], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 module {
-  func.func @illegal() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation} {
+  func.func @illegal() attributes {translation_info = #translation} {
     %c0 = arith.constant 0 : index
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<32x16xf32>
     %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x32xf32>
@@ -52,10 +49,9 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 32, 16]]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore workgroup_size = [48, 2, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 module {
-  func.func @illegal() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation} {
+  func.func @illegal() attributes {translation_info = #translation} {
     %c0 = arith.constant 0 : index
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<32x16xf32>
     %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x32xf32>
@@ -69,10 +65,9 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 32, 16]]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore workgroup_size = [64, 2, 2], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 module {
-  func.func @illegal() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation} {
+  func.func @illegal() attributes {translation_info = #translation} {
     %c0 = arith.constant 0 : index
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<32x16xf32>
     %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x32xf32>
@@ -86,10 +81,9 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 32, 20]]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore workgroup_size = [64, 2, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 module {
-  func.func @illegal() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation} {
+  func.func @illegal() attributes {translation_info = #translation} {
     %c0 = arith.constant 0 : index
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<32x16xf32>
     %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x32xf32>
@@ -103,10 +97,9 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 32, 16]]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore workgroup_size = [128, 1, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 module {
-  func.func @illegal() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation} {
+  func.func @illegal() attributes {translation_info = #translation} {
     %c0 = arith.constant 0 : index
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<1024x512xf32>
     %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<512x256xf32>
@@ -120,10 +113,9 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 32, 16]]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore workgroup_size = [64, 2, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 module {
-  func.func @illegal() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation} {
+  func.func @illegal() attributes {translation_info = #translation} {
     %c0 = arith.constant 0 : index
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<48x16xf32>
     %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x32xf32>
@@ -137,10 +129,9 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[32, 32, 16]]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore workgroup_size = [64, 2, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 module {
-  func.func @illegal() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation} {
+  func.func @illegal() attributes {translation_info = #translation} {
     %c0 = arith.constant 0 : index
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<32x16xf32>
     %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<16x48xf32>
@@ -154,7 +145,6 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[2, 32, 32, 16]]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #map = affine_map<()[s0] -> (s0 * 8)>
 #map1 = affine_map<()[s0] -> (s0 * 32)>
 #map2 = affine_map<(d0, d1, d2)[s0] -> (d0 * 32768 + s0 + d1 * 1024 + d2)>
@@ -162,7 +152,7 @@ module {
 #map4 = affine_map<(d0, d1, d2)[s0] -> (d0 * 2048 + s0 + d1 * 64 + d2)>
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCore workgroup_size = [64, 2, 1], {pipeline_depth = 0 : i64, store_stage = 1 : i64}>
 module {
-  func.func @illegal() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation} {
+  func.func @illegal() attributes {translation_info = #translation} {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f32
     %c4 = arith.constant 4 : index
@@ -203,10 +193,9 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 32, 48]]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCoreMmaSync workgroup_size = [128, 1, 1], {pipeline_depth = 4 : i64, store_stage = 1 : i64}>
 module {
-  func.func @illegal() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation} {
+  func.func @illegal() attributes {translation_info = #translation} {
     %c0 = arith.constant 0 : index
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<1024x512xf32>
     %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<512x256xf32>
@@ -220,10 +209,9 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 32, 4]]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCoreMmaSync workgroup_size = [128, 1, 1], {pipeline_depth = 4 : i64, store_stage = 1 : i64}>
 module {
-  func.func @illegal() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation} {
+  func.func @illegal() attributes {translation_info = #translation} {
     %c0 = arith.constant 0 : index
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<1024x512xf32>
     %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<512x256xf32>
@@ -237,10 +225,9 @@ module {
 // -----
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 64]]>
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb">
 #translation = #iree_codegen.translation_info<LLVMGPUMatmulTensorCoreMmaSync workgroup_size = [128, 1, 1], {pipeline_depth = 4 : i64, store_stage = 1 : i64}>
 module {
-  func.func @illegal() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb, translation_info = #translation} {
+  func.func @illegal() attributes {translation_info = #translation} {
     %c0 = arith.constant 0 : index
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : memref<1024x512xi8>
     %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : memref<512x256xi8>

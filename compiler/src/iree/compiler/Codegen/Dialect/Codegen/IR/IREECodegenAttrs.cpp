@@ -7,9 +7,12 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Transform/IR/TransformOps.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/DialectImplementation.h"
 
 #define GET_ATTRDEF_CLASSES
@@ -248,14 +251,14 @@ LoweringConfigAttr LoweringConfigAttr::get(MLIRContext *context,
   return get(context, tileSizes, {}, tileInterchange, nativeVectorSize);
 }
 
-TileSizesListType LoweringConfigAttr::getTileSizeVals() {
+TileSizesListType LoweringConfigAttr::getTileSizeVals() const {
   TileSizesListType tileSizes;
   for (auto &level : getTilingLevels())
     tileSizes.push_back(SmallVector<int64_t>(level.getSizes()));
   return tileSizes;
 }
 
-SmallVector<int64_t> LoweringConfigAttr::getTileSizeVals(unsigned level) {
+SmallVector<int64_t> LoweringConfigAttr::getTileSizeVals(unsigned level) const {
   auto levels = getTilingLevels();
   if (level >= levels.size())
     return {};
@@ -280,7 +283,7 @@ SmallVector<bool> LoweringConfigAttr::getScalableTileFlagVals(unsigned level) {
 }
 
 SmallVector<int64_t>
-LoweringConfigAttr::getTileInterchangeVals(unsigned level) {
+LoweringConfigAttr::getTileInterchangeVals(unsigned level) const {
   auto levels = getTilingLevels();
   if (level >= levels.size())
     return {};
@@ -291,6 +294,28 @@ bool LoweringConfigAttr::isInterchangeEmpty() {
   return llvm::none_of(getTilingLevels(), [](auto level) {
     return !level.getInterchange().empty();
   });
+}
+
+SmallVector<int64_t> LoweringConfigAttr::getWorkgroupTileSizes() const {
+  return getTileSizeVals(0);
+}
+
+SmallVector<int64_t> LoweringConfigAttr::getWorkgroupInterchange() const {
+  return getTileInterchangeVals(0);
+}
+
+SmallVector<int64_t>
+LoweringConfigAttr::getStaticTilingLevelSizes(unsigned level,
+                                              Operation *) const {
+  return getTileSizeVals(level);
+}
+
+SmallVector<OpFoldResult>
+LoweringConfigAttr::getTilingLevelSizes(OpBuilder &builder, unsigned level,
+                                        Operation *op) const {
+  return llvm::map_to_vector(
+      getStaticTilingLevelSizes(level, op),
+      [&](int64_t t) -> OpFoldResult { return builder.getIndexAttr(t); });
 }
 
 LogicalResult
@@ -398,48 +423,24 @@ void eraseTranslationInfo(FunctionOpInterface funcOp) {
 // operations.
 // ===----------------------------------------------------------------------===//
 
-FailureOr<Operation *>
-getLoweringConfigCarryingOp(ArrayRef<Operation *> computeOps) {
-  for (Operation *op : computeOps) {
-    if (getLoweringConfig(op))
-      return op;
-  }
-  return failure();
-}
-
-IREE::Codegen::LoweringConfigAttr getLoweringConfig(Operation *op) {
-  return op->getAttrOfType<IREE::Codegen::LoweringConfigAttr>(kConfigAttrName);
-}
-
-FailureOr<IREE::Codegen::LoweringConfigAttr>
-getLoweringConfig(ArrayRef<Operation *> computeOps) {
-  FailureOr<Operation *> op = getLoweringConfigCarryingOp(computeOps);
-  if (failed(op))
-    return failure();
-  return getLoweringConfig(*op);
-}
-
 SmallVector<int64_t> getTileSizes(Operation *op, unsigned level) {
-  IREE::Codegen::LoweringConfigAttr configAttr = getLoweringConfig(op);
+  IREE::Codegen::LoweringConfigAttrInterface configAttr = getLoweringConfig(op);
   if (!configAttr)
     return {};
-  return configAttr.getTileSizeVals(level);
+  return configAttr.getStaticTilingLevelSizes(level, op);
 }
 SmallVector<Value> getTileSizes(OpBuilder &b, Operation *op, unsigned level) {
-  return llvm::map_to_vector(getTileSizes(op, level), [&](int64_t t) -> Value {
-    return b.create<arith::ConstantIndexOp>(op->getLoc(), t);
-  });
-}
-
-unsigned getNumTileLevels(Operation *op) {
-  IREE::Codegen::LoweringConfigAttr configAttr = getLoweringConfig(op);
+  IREE::Codegen::LoweringConfigAttrInterface configAttr = getLoweringConfig(op);
   if (!configAttr)
-    return 0;
-  return configAttr.getTilingLevels().size();
+    return {};
+  return llvm::map_to_vector(configAttr.getTilingLevelSizes(b, level, op),
+                             [&](OpFoldResult s) -> Value {
+                               return getValueOrCreateConstantIndexOp(
+                                   b, op->getLoc(), s);
+                             });
 }
 
-void setLoweringConfig(Operation *op,
-                       IREE::Codegen::LoweringConfigAttr config) {
+void setLoweringConfig(Operation *op, Attribute config) {
   op->setAttr(kConfigAttrName, config);
 }
 

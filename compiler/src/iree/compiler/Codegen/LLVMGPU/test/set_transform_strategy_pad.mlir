@@ -1,5 +1,6 @@
 // RUN: iree-opt %s --split-input-file \
 // RUN:   --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" \
+// RUN:   --iree-gpu-test-target=sm_80 \
 // RUN:   --iree-codegen-llvmgpu-enable-transform-dialect-pad-strategy \
 // RUN: | FileCheck %s
 
@@ -7,6 +8,7 @@
 // strategy as expected.
 // RUN: iree-opt %s --split-input-file \
 // RUN:   --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" \
+// RUN:   --iree-gpu-test-target=sm_80 \
 // RUN:   --iree-codegen-llvmgpu-enable-transform-dialect-pad-strategy \
 // RUN:   --td-pad-strategy-blk-sizes=16,32,1 \
 // RUN:   --td-pad-strategy-num-threads=8,4,1 \
@@ -14,9 +16,8 @@
 // RUN:   --td-pad-strategy-use-async-copies=false \
 // RUN: | FileCheck --check-prefix=WITH_OPTIONS %s
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
 module {
-  func.func @pad() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
+  func.func @pad() {
     %c0 = arith.constant 0 : index
     %c56 = arith.constant 56 : index
     %cst = arith.constant 0.000000e+00 : f32
@@ -93,9 +94,8 @@ module {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
 module {
-  func.func @pad_low() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
+  func.func @pad_low() {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f32
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<123x456xf32>>
@@ -119,9 +119,8 @@ module {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
 module {
-  func.func @pad_local() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
+  func.func @pad_local() {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f32
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<123x456xf32>>

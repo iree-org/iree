@@ -1740,6 +1740,10 @@ OpFoldResult AsyncUpdateOp::fold(FoldAdaptor operands) {
       getUpdate().getType() == getType() && hasValueSemantics(getTarget())) {
     return getUpdate();
   }
+  // If copying to self then elide the copy.
+  if (getUpdate() == getTarget() && getUpdateSize() == getTargetSize()) {
+    return getTarget();
+  }
   return {};
 }
 

@@ -8,7 +8,9 @@ name: Post benchmark comment
 
 on:
   workflow_run:
-    workflows: ["CI"]
+    # TODO(#17001): switch to just "Benchmark" after finishing refactor and
+    #               pending PRs have been rebased
+    workflows: ["CI", "Benchmark"]
     types: [completed]
 
 env:

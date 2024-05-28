@@ -160,4 +160,166 @@ iree_generated_e2e_runner_test(
     "default"
 )
 
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_winograd_conv2d_cpu_f32_f32_f32_small
+  TEST_TYPE
+    conv2d
+  GENERATOR
+    "generate_e2e_conv2d_tests.py"
+  GENERATOR_ARGS
+    "--input_type=f32"
+    "--kernel_type=f32"
+    "--acc_type=f32"
+    "--shapes=small"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-conv2d-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-preprocessing-pass-pipeline=builtin.module\(func.func\(iree-linalg-ext-convert-conv2d-to-winograd{replace-all-convs=true}\)\)"
+  LABELS
+    "hostonly"
+    "local"
+  TARGET_CPU_FEATURES_VARIANTS
+    "default"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_winograd_conv2d_cpu_f32_f32_f32_medium
+  TEST_TYPE
+    conv2d
+  GENERATOR
+    "generate_e2e_conv2d_tests.py"
+  GENERATOR_ARGS
+    "--input_type=f32"
+    "--kernel_type=f32"
+    "--acc_type=f32"
+    "--shapes=medium"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-conv2d-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-preprocessing-pass-pipeline=builtin.module\(func.func\(iree-linalg-ext-convert-conv2d-to-winograd{replace-all-convs=true}\)\)"
+  LABELS
+    "hostonly"
+    "local"
+  TARGET_CPU_FEATURES_VARIANTS
+    "default"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_winograd_conv2d_cpu_f32_f32_f32_large
+  TEST_TYPE
+    conv2d
+  GENERATOR
+    "generate_e2e_conv2d_tests.py"
+  GENERATOR_ARGS
+    "--input_type=f32"
+    "--kernel_type=f32"
+    "--acc_type=f32"
+    "--shapes=large"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-conv2d-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-preprocessing-pass-pipeline=builtin.module\(func.func\(iree-linalg-ext-convert-conv2d-to-winograd{replace-all-convs=true}\)\)"
+  LABELS
+    "hostonly"
+    "local"
+  TARGET_CPU_FEATURES_VARIANTS
+    "default"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_winograd_conv2d_cpu_f16_f16_f16_small
+  TEST_TYPE
+    conv2d
+  GENERATOR
+    "generate_e2e_conv2d_tests.py"
+  GENERATOR_ARGS
+    "--input_type=f16"
+    "--kernel_type=f16"
+    "--acc_type=f16"
+    "--shapes=small"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-conv2d-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-preprocessing-pass-pipeline=builtin.module\(func.func\(iree-linalg-ext-convert-conv2d-to-winograd{replace-all-convs=true}\)\)"
+  LABELS
+    "hostonly"
+    "local"
+  TARGET_CPU_FEATURES_VARIANTS
+    "default"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_winograd_conv2d_cpu_f16_f16_f16_medium
+  TEST_TYPE
+    conv2d
+  GENERATOR
+    "generate_e2e_conv2d_tests.py"
+  GENERATOR_ARGS
+    "--input_type=f16"
+    "--kernel_type=f16"
+    "--acc_type=f16"
+    "--shapes=medium"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-conv2d-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-preprocessing-pass-pipeline=builtin.module\(func.func\(iree-linalg-ext-convert-conv2d-to-winograd{replace-all-convs=true}\)\)"
+  LABELS
+    "hostonly"
+    "local"
+  TARGET_CPU_FEATURES_VARIANTS
+    "default"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_winograd_conv2d_cpu_f16_f16_f16_large
+  TEST_TYPE
+    conv2d
+  GENERATOR
+    "generate_e2e_conv2d_tests.py"
+  GENERATOR_ARGS
+    "--input_type=f16"
+    "--kernel_type=f16"
+    "--acc_type=f16"
+    "--shapes=large"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-conv2d-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-preprocessing-pass-pipeline=builtin.module\(func.func\(iree-linalg-ext-convert-conv2d-to-winograd{replace-all-convs=true}\)\)"
+  LABELS
+    "hostonly"
+    "local"
+  TARGET_CPU_FEATURES_VARIANTS
+    "default"
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

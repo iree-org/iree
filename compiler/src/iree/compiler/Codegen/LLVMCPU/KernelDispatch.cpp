@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/LLVMCPU/KernelDispatch.h"
 
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/LLVMCPU/TargetMLTransformInfo.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
@@ -16,6 +17,7 @@
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -513,7 +515,8 @@ getDefaultDistributionTileSizes(ArrayRef<int64_t> lbs, ArrayRef<int64_t> ubs,
     assert(lbs[i] <= ubs[i]);
     workload[i] = ubs[i] - lbs[i];
     int64_t candidateTileSize = 1;
-    int64_t targetSize = std::min(workload[i] / 2, maxTileSizes[i]);
+    int64_t targetSize =
+        std::min(workload[i] / clNumberOfRuntimeThreads, maxTileSizes[i]);
     int64_t vectorSize = vectorSizeHints[i];
     if (vectorSize > 1) {
       // Pick the factor of dim which is closest to the target tile size and
@@ -1650,25 +1653,24 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
                                    tensor::PackOp op) {
   assert(!getLoweringConfig(op) && "expected lowering_config is not set");
 
+  int srcRank = op.getSourceRank();
+  SmallVector<int64_t> innerTiles = op.getStaticTiles();
+  ArrayRef<int64_t> dimPos = op.getInnerDimsPos();
   int64_t vectorSize = getVectorSize(entryPointFn, op.getSourceType());
+
   DistributionHeuristicConfig distConfig;
+  distConfig.maxTileSizes.resize(srcRank, clDefaultDistTileSize);
   distConfig.allowIncompleteTile = true;
-  distConfig.vectorSizeHints.resize(op.getSourceRank(), 1);
-  for (auto dim : op.getInnerDimsPos()) {
-    distConfig.vectorSizeHints[dim] = vectorSize;
+  distConfig.vectorSizeHints.resize(srcRank, 1);
+  for (auto pos : dimPos) {
+    distConfig.vectorSizeHints[pos] = vectorSize;
   }
   SmallVector<int64_t> distTileSizes =
       getDefaultDistributedLevelTileSizes(op, distConfig);
-  SmallVector<int64_t> workload(op.getSourceType().getShape());
-  reduceDistributionWorkgroups(workload, distTileSizes,
-                               /*maxTileSizes=*/std::nullopt,
-                               distConfig.vectorSizeHints);
 
   // The default function aims to returns the number of workload per workgroup,
   // but it does not know that it is working on packed domain. We need to take
   // inner tile sizes into account and adjust the distribution tile sizes.
-  SmallVector<int64_t> innerTiles = op.getStaticTiles();
-  ArrayRef<int64_t> dimPos = op.getInnerDimsPos();
   for (auto [pos, size] : llvm::zip_equal(dimPos, innerTiles)) {
     if (distTileSizes[pos] == 0 || ShapedType::isDynamic(size))
       continue;
@@ -1685,10 +1687,10 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
 
 static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
                                    tensor::UnPackOp op) {
+  DistributionHeuristicConfig distConfig;
+  distConfig.maxTileSizes.resize(op.getDestRank(), clDefaultDistTileSize);
   SmallVector<int64_t> distTileSizes =
-      getDefaultDistributedLevelTileSizes(op, DistributionHeuristicConfig{});
-  SmallVector<int64_t> workload(op.getDestType().getShape());
-  reduceDistributionWorkgroups(workload, distTileSizes);
+      getDefaultDistributedLevelTileSizes(op, distConfig);
 
   // Fixup for making distTileSizes be multiple of inner_tile_sizes.
   SmallVector<int64_t> innerTiles = op.getStaticTiles();
@@ -1712,14 +1714,78 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
 
 static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
                                    IREE::LinalgExt::AttentionOp attnOp) {
+  FailureOr<IREE::LinalgExt::AttentionOpDetail> maybeOpInfo =
+      IREE::LinalgExt::AttentionOpDetail::get(attnOp.getIndexingMapsArray());
+  assert(succeeded(maybeOpInfo) && "failed to infer attention dims");
+  auto opInfo = maybeOpInfo.value();
+
+  SmallVector<int64_t> lbs, ubs;
+  getRangeBounds(attnOp, lbs, ubs);
+
+  LLVM_DEBUG({
+    KD_DBGS() << "Attention Detail:\n";
+    KD_DBGS() << "Batch: [";
+    llvm::interleaveComma(opInfo.getBatchDims(), llvm::dbgs());
+    llvm::dbgs() << "]\n";
+    KD_DBGS() << "M: [";
+    llvm::interleaveComma(opInfo.getMDims(), llvm::dbgs());
+    llvm::dbgs() << "]\n";
+    KD_DBGS() << "K1: [";
+    llvm::interleaveComma(opInfo.getK1Dims(), llvm::dbgs());
+    llvm::dbgs() << "]\n";
+    KD_DBGS() << "K2: [";
+    llvm::interleaveComma(opInfo.getK2Dims(), llvm::dbgs());
+    llvm::dbgs() << "]\n";
+    KD_DBGS() << "N: [";
+    llvm::interleaveComma(opInfo.getNDims(), llvm::dbgs());
+    llvm::dbgs() << "]\n";
+  });
+
+  // TODO (Groverkss): Flash Attention 2 (current algorithm we use for
+  // attention) was originally designed for GPUs. N, K1 are the head dimension
+  // and are usually very small (64, 128, See AttentionOpDetail docs for more
+  // detail). For larger sizes, fusing attention doesn't have many gains (as
+  // pointed out by the original author). We should explore if we should tile N
+  // and K1 dimensions on CPU and if it has any gains. On GPUs, we don't tile
+  // these dimensions as subgroups can hold much larger register sizes.
+
+  // Batch, M and N (parallel dimensions) are distributed on workgroups.
+  DistributionHeuristicConfig config;
   SmallVector<int64_t> distTileSizes = getDefaultDistributedLevelTileSizes(
       attnOp, DistributionHeuristicConfig{});
-  int64_t iterationDomainRank = attnOp.getIterationDomainRank();
-  SmallVector<int64_t> vecTileSizes(iterationDomainRank, 1);
+
+  // Batch, M and N (parallel dimensions) are distributed on workgroups.
+  SmallVector<int64_t> vecTileSizes(attnOp.getIterationDomainRank(), 1);
+  // Mark reduction dimensions not to distribute.
+  for (int64_t i :
+       llvm::concat<const int64_t>(opInfo.getK1Dims(), opInfo.getK2Dims())) {
+    vecTileSizes[i] = 0;
+  }
   int64_t vectorSize = getVectorSize(entryPointFn, attnOp.getOutputType());
-  vecTileSizes.back() = getMaxVectorTileSize(
-      /*numElem=*/distTileSizes.back(), vectorSize, vectorSize);
+  for (auto i : llvm::seq<unsigned>(0, vecTileSizes.size())) {
+    // Do not tile reduction dimensions.
+    if (vecTileSizes[i] == 0) {
+      continue;
+    }
+    auto tileSize = distTileSizes[i] ? distTileSizes[i] : ubs[i];
+    // TODO: Use native tile size here once bufferization is fixed for scf.
+    vecTileSizes[i] = getMaxVectorTileSize(
+        /*numElem=*/tileSize, vectorSize, vectorSize);
+  }
+
+  // TODO (17467): Due to a bug in TileAndDecomposeAttention, N dimension
+  // cannot be tiled. Remove this once fixed.
+  for (int64_t i : opInfo.getNDims()) {
+    distTileSizes[i] = 0;
+    vecTileSizes[i] = 0;
+  }
+
   TileSizesListType tileSizes = {distTileSizes, vecTileSizes};
+
+  // TODO: (Groverkss): Tile K2 here using reduction tiling interface once we
+  // have it. TileAndDecomposeAttention pass only tiles K2. I think it should
+  // be possible to tile K1 also, but need to explore it more.
+
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, attnOp, tileSizes,
       DispatchLoweringPassPipeline::CPULinalgExtTileAndVectorize);
@@ -1826,8 +1892,6 @@ setDefaultGenericOpRootConfig(mlir::FunctionOpInterface entryPointFn,
   }
 
   DistributionHeuristicConfig distConfig;
-  distConfig.minTileSizes = getMinTilingSizesForEachDim(
-      entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo);
   // For generic ops we'll use the default divided by 2 to control the stack
   // allocation limit See #9469 for example.
   distConfig.maxTileSizes.append(numLoops, clDefaultDistTileSize / 2);
@@ -1844,7 +1908,10 @@ setDefaultGenericOpRootConfig(mlir::FunctionOpInterface entryPointFn,
 
   // Set the next level tile sizes.
   SmallVector<int64_t> vecTileSizes;
-  setVectorTileSizes(genericOp, distTileSizes, distConfig.minTileSizes,
+  setVectorTileSizes(genericOp, distTileSizes,
+                     getMinTilingSizesForEachDim(entryPointFn, genericOp,
+                                                 linalgOpInfo,
+                                                 targetMLTransInfo),
                      distConfig.maxTileSizes, vecPreProcStrategy, vecTileSizes);
   limitVectorTileSizes(genericOp, vecTileSizes);
   SmallVector<int64_t> parallelTileSizes = vecTileSizes;
@@ -2454,7 +2521,8 @@ adjustTileSizesForUnPackOp(mlir::FunctionOpInterface entryPointFn,
   if (!linalgOp)
     return success();
 
-  auto loweringConfig = getLoweringConfig(linalgOp);
+  auto loweringConfig =
+      getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(linalgOp);
   TileSizesListType tileSizesList = loweringConfig.getTileSizeVals();
 
   bool foundUnPackOp = false;
@@ -2625,7 +2693,8 @@ setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
   }
 
   auto ctx = entryPointFn.getContext();
-  auto rootLoweringConfig = getLoweringConfig(rootOperation);
+  auto rootLoweringConfig =
+      getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(rootOperation);
   TilingConfig tilingConfig(rootLoweringConfig);
   SmallVector<int64_t> distTileSizes, parallelVecTileSizes;
   SmallVector<bool> distScalableTileSizes, parallelVecScalableTileSizes;

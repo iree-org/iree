@@ -8,6 +8,7 @@
 #define IREE_COMPILER_CODEGEN_DIALECT_IREECODEGENATTRS
 
 include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.td"
+include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.td"
 include "mlir/IR/EnumAttr.td"
 
 // List of pre-existing pipelines for translating executables.
@@ -201,14 +202,20 @@ def IREECodegen_LoweringConfigTilingLevelsAttr :
 }
 
 def IREECodegen_LoweringConfigAttr :
-    AttrDef<IREECodegen_Dialect, "LoweringConfig", []> {
+    AttrDef<IREECodegen_Dialect, "LoweringConfig", [
+      DeclareAttrInterfaceMethods<IREECodegen_LoweringConfigAttrInterface, [
+        "getWorkgroupTileSizes",
+        "getWorkgroupInterchange",
+        "getStaticTilingLevelSizes",
+        "getTilingLevelSizes",
+      ]>
+    ]> {
   let mnemonic = "lowering_config";
   let summary = [{drive lowering of an operation within dispatch region}];
   let description = [{
-    Specifies the information that is used by backend compiler to
-    translate an operation to scalar code. The way the information is
-    used is specific to each backend (indeed specific to the pass
-    pipeline used) to compile that operation.
+    Default implementation of a lowering configuration attribute. It includes
+    only tiling and optionally vectorization information. The interpretation of
+    the tiles sizes are backend dependent.
 
     TODO: Currently there is no verification that the configuration
     specifies everything needed for a pass-pipeline. The values to set
@@ -240,10 +247,10 @@ def IREECodegen_LoweringConfigAttr :
   ];
   let extraClassDeclaration = [{
     // Returns the tile sizes for all levels set for the op.
-    TileSizesListType getTileSizeVals();
+    TileSizesListType getTileSizeVals() const;
 
     // Returns the tile sizes for a level set for the op.
-    SmallVector<int64_t> getTileSizeVals(unsigned level);
+    SmallVector<int64_t> getTileSizeVals(unsigned level) const;
 
     // Returns the scalable tile flags for all levels set for the op.
     ScalableTileFlagsListType getScalableTileFlagVals();
@@ -252,7 +259,7 @@ def IREECodegen_LoweringConfigAttr :
     SmallVector<bool> getScalableTileFlagVals(unsigned level);
 
     // Returns the tile interchange for a level set for the op.
-    SmallVector<int64_t> getTileInterchangeVals(unsigned level);
+    SmallVector<int64_t> getTileInterchangeVals(unsigned level) const;
 
     // Returns true if there are no tile interchange values (this means that
     // interchange can be ignored).

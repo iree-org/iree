@@ -3,7 +3,7 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-#
+
 # Workflow for building benchmark tools.
 # It is designed to be called from a parent workflow.
 # The concurrency of this workflow is controlled by the caller's job.
@@ -38,7 +38,7 @@ permissions:
   contents: read
 
 env:
-  # This duplicates the variable from ci.yml. The variable needs to be in env
+  # This duplicates the variable from benchmark.yml. The variable needs to be in env
   # instead of the outputs of setup because it contains the run attempt and we
   # want that to be the current attempt, not whatever attempt the setup step
   # last ran in. It therefore can't be passed in via inputs because the env
@@ -114,19 +114,6 @@ jobs:
             --env "IREE_HOST_BIN_DIR=${INSTALL_DIR}/bin" \
             "${DOCKER_IMAGE}" "${BUILD_SCRIPT}" "${BUILD_TOOLS_DIR}/build-traced"
       - name: "Creating the benchmark tools archive"
-        # Here we pack a tracy-capture binary (~7MB) into each benchmark tools
-        # archive. This could be wasteful because multiple benchmark tools
-        # archives might pack the same tracy-capture binary. But it simplifies
-        # the process to fetch required tools to run benchmarks and we only have
-        # a few versions of the benchmark tools archives.
-        # Detailed reason: The generated benchmark matrix fetches the benchmark
-        # tools archive based on the target device. However, there is a scenario
-        # that the tracy-capture is running on a different host. E.g. Mobile
-        # benchmarks have the benchmark tool forwarding the data from the phones
-        # to the tracy-capture running on Linux host. Embedding the host of
-        # tracy-capture will overloads the benchmark matrix and puts too much
-        # unrelated machine setup in it. So we simply pack everything needed
-        # into each benchmark tools archive.
         id: archive
         env:
           BENCHMARK_TOOLS_ARCHIVE: ${{ env.PLATFORM }}-${{ env.ARCH }}-benchmark-tools.tar

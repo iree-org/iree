@@ -411,7 +411,7 @@ mlir::iree_compiler::buildTileReductionUsingScfForeach(
       /*tileSizes=*/tileSizes,
       /*threadDimMapping=*/b.getArrayAttr(mappingAttr));
   Value blockParallelForallOp = tileReduction.getForallOp();
-  Value blockParallelFillH = tileReduction.getFillOp();
+  Value blockParallelFillH = tileReduction.getFillOp().front();
   Value blockCombinerOpH = tileReduction.getCombiningLinalgOp();
   // Fuse the fill and elementwise to privatize them.
   blockParallelFillH =

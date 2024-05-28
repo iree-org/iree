@@ -33,19 +33,6 @@ else()
   pkg_check_modules(TRACY_CAPSTONE_DEPS
     capstone
   )
-  if(APPLE)
-    pkg_check_modules(TRACY_GUI_DEPS
-      freetype2
-      glfw3
-    )
-  else()
-    pkg_check_modules(TRACY_GUI_DEPS
-      freetype2
-      glfw3
-      gtk+-3.0
-      dbus-1
-    )
-  endif()
 
   if(NOT TRACY_DEPS_FOUND)
     message(STATUS "Could not find Tracy dependencies (Tracy server will not be built).")
@@ -61,12 +48,6 @@ else()
     message(STATUS "  Ubuntu/Debian: `apt install libcapstone-dev`")
     message(STATUS "  MacOS: `brew install capstone`")
     return()
-  endif()
-
-  if(NOT TRACY_GUI_DEPS_FOUND)
-    message(STATUS "Could not find deps required to build graphical programs (Tracy graphical profiler will not be built).")
-    message(STATUS "  Ubuntu/Debian: `apt install libglfw3-dev libfreetype-dev libgtk-3-dev libdbus-1-dev`")
-    message(STATUS "  MacOS: `brew install glfw freetype`")
   endif()
 endif()
 
@@ -103,25 +84,6 @@ function(setup_cxx_options name)
     PRIVATE
       ${TRACY_DEPS_LIBRARY_DIRS}
       ${TRACY_CAPSTONE_DEPS_LIBRARY_DIRS}
-  )
-endfunction()
-
-function(setup_graphics_deps name)
-  target_compile_definitions(${name}
-    PRIVATE
-      DISPLAY_SERVER_X11
-  )
-  target_include_directories(${name}
-    PUBLIC
-      ${TRACY_GUI_DEPS_INCLUDE_DIRS}
-  )
-  target_link_libraries(${name}
-    PRIVATE
-      ${TRACY_GUI_DEPS_LIBRARIES}
-  )
-  target_link_directories(${name}
-    PRIVATE
-      ${TRACY_GUI_DEPS_LIBRARY_DIRS}
   )
 endfunction()
 
@@ -166,89 +128,3 @@ target_link_libraries(IREETracyCaptureServer
     IREETracyCommon
     IREETracyServer
 )
-
-#-------------------------------------------------------------------------------
-# CSV Export Tool
-#-------------------------------------------------------------------------------
-
-add_executable(IREETracyCSVExport
-  ${TRACY_SOURCE_DIR}/csvexport/src/csvexport.cpp
-)
-set_target_properties(IREETracyCSVExport
-  PROPERTIES
-    OUTPUT_NAME "iree-tracy-csvexport"
-)
-setup_cxx_options(IREETracyCSVExport)
-target_link_libraries(IREETracyCSVExport
-  PRIVATE
-    IREETracyCommon
-    IREETracyServer
-)
-
-#-------------------------------------------------------------------------------
-# Graphical frontends
-#-------------------------------------------------------------------------------
-
-if(TRACY_GUI_DEPS_FOUND)
-  #-----------------------------------------------------------------------------
-  # IMGUI library
-  #-----------------------------------------------------------------------------
-
-  file(GLOB IMGUI_SOURCES
-    ${TRACY_SOURCE_DIR}/imgui/*.cpp
-    ${TRACY_SOURCE_DIR}/profiler/src/imgui/*.cpp
-  )
-  add_library(IREETracyIMGUI
-    ${IMGUI_SOURCES}
-  )
-  setup_cxx_options(IREETracyIMGUI)
-  setup_graphics_deps(IREETracyIMGUI)
-
-  #-----------------------------------------------------------------------------
-  # NFD library
-  #-----------------------------------------------------------------------------
-
-  if(APPLE)
-    set(NFD_SOURCES ${TRACY_SOURCE_DIR}/nfd/nfd_cocoa.m)
-  else()
-    set(NFD_SOURCES ${TRACY_SOURCE_DIR}/nfd/nfd_portal.cpp)
-  endif()
-  add_library(IREETracyNFD ${NFD_SOURCES})
-  setup_cxx_options(IREETracyNFD)
-  setup_graphics_deps(IREETracyNFD)
-
-  #-----------------------------------------------------------------------------
-  # Profiler
-  #-----------------------------------------------------------------------------
-
-  file(GLOB PROFILER_SRCS
-       ${TRACY_SOURCE_DIR}/profiler/src/*.c
-       ${TRACY_SOURCE_DIR}/profiler/src/*.cpp
-  )
-  # Remove the source files for Wayland backend; right now we just use GLFW.
-  list(REMOVE_ITEM PROFILER_SRCS
-       "${TRACY_SOURCE_DIR}/profiler/src/BackendWayland.cpp")
-  add_executable(IREETracyProfiler ${PROFILER_SRCS})
-  set_target_properties(IREETracyProfiler
-    PROPERTIES
-      OUTPUT_NAME "iree-tracy-profiler"
-  )
-  setup_cxx_options(IREETracyProfiler)
-  setup_graphics_deps(IREETracyProfiler)
-  target_link_libraries(IREETracyProfiler
-    PRIVATE
-      IREETracyIMGUI
-      IREETracyCommon
-      IREETracyNFD
-      IREETracyServer
-      ${CMAKE_THREAD_LIBS_INIT}
-  )
-  if(APPLE)
-    target_link_libraries(IREETracyProfiler
-      PRIVATE
-        "-framework Foundation"
-        "-framework AppKit"
-        "-framework UniformTypeIdentifiers"
-    )
-  endif()
-endif()

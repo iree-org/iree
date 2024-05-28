@@ -1,7 +1,9 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-lower-to-ukernels,cse,canonicalize))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx1100 --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-lower-to-ukernels,cse,canonicalize))" %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx90a --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-lower-to-ukernels,cse,canonicalize))" %s | FileCheck %s --check-prefix=CDNA2
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx908 --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-lower-to-ukernels,cse,canonicalize))" %s | FileCheck %s --check-prefix=CDNA1
 
 func.func @argmax_2d_f32i64(%arg0 : tensor<1x?xf32>) -> tensor<1xi64> attributes {
-  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {target_arch = "gfx1100", ukernels = "all"}>
+  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {ukernels = "all"}>
 } {
   %c0_i64 = arith.constant 0 : i64
   %cst = arith.constant 0xFF800000 : f32
@@ -21,7 +23,7 @@ func.func @argmax_2d_f32i64(%arg0 : tensor<1x?xf32>) -> tensor<1xi64> attributes
   return %4#1 : tensor<1xi64>
 }
 
-//      CHECK: func @argmax_2d_f32i64(
+//CHECK-LABEL: func @argmax_2d_f32i64(
 // CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<1x?xf32>
 //  CHECK-DAG:   %[[C1_index:.+]] = arith.constant 1 : index
 //  CHECK-DAG:   %[[C0_i64:.+]] = arith.constant 0
@@ -34,7 +36,7 @@ func.func @argmax_2d_f32i64(%arg0 : tensor<1x?xf32>) -> tensor<1xi64> attributes
 // -----
 
 func.func @argmax_4d_unit_parallel_f32i64(%arg0 : tensor<1x1x1x?xf32>) -> tensor<1x1x1xi64> attributes {
-  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {target_arch = "gfx1100", ukernels = "all"}>
+  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {ukernels = "all"}>
 } {
   %c0_i64 = arith.constant 0 : i64
   %cst = arith.constant 0xFF800000 : f32
@@ -54,14 +56,14 @@ func.func @argmax_4d_unit_parallel_f32i64(%arg0 : tensor<1x1x1x?xf32>) -> tensor
   return %4#1 : tensor<1x1x1xi64>
 }
 
-//      CHECK: func @argmax_4d_unit_parallel_f32i64(
+//      CHECK-LABEL: func @argmax_4d_unit_parallel_f32i64(
 //      CHECK: iree_codegen.ukernel.generic
 //      CHECK-NOT: linalg.generic
 
 // -----
 
 func.func @argmax_2d_non_unit_parallel_f32i64(%arg0 : tensor<4x?xf32>) -> tensor<4xi64> attributes {
-  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {target_arch = "gfx1100", ukernels = "all"}>
+  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {ukernels = "all"}>
 } {
   %c0_i64 = arith.constant 0 : i64
   %cst = arith.constant 0xFF800000 : f32
@@ -81,14 +83,14 @@ func.func @argmax_2d_non_unit_parallel_f32i64(%arg0 : tensor<4x?xf32>) -> tensor
   return %4#1 : tensor<4xi64>
 }
 
-//      CHECK: func @argmax_2d_non_unit_parallel_f32i64(
+//      CHECK-LABEL: func @argmax_2d_non_unit_parallel_f32i64(
 //      CHECK-NOT: iree_codegen.ukernel.generic
 //      CHECK: linalg.generic
 
 // -----
 
 func.func @argmax_2d_dyn_parallel_f32i64(%arg0 : tensor<?x?xf32>) -> tensor<?xi64> attributes {
-  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {target_arch = "gfx1100", ukernels = "all"}>
+  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {ukernels = "all"}>
 } {
   %c0 = arith.constant 0 : index
   %c0_i64 = arith.constant 0 : i64
@@ -110,14 +112,14 @@ func.func @argmax_2d_dyn_parallel_f32i64(%arg0 : tensor<?x?xf32>) -> tensor<?xi6
   return %4#1 : tensor<?xi64>
 }
 
-//      CHECK: func @argmax_2d_dyn_parallel_f32i64(
+//      CHECK-LABEL: func @argmax_2d_dyn_parallel_f32i64(
 //      CHECK-NOT: iree_codegen.ukernel.generic
 //      CHECK: linalg.generic
 
 // -----
 
 func.func @argmax_none_ukernel_enabled(%arg0 : tensor<1x?xf32>) -> tensor<1xi64> attributes {
-  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {target_arch = "gfx1100", ukernels = "none"}>
+  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {ukernels = "none"}>
 } {
   %c0_i64 = arith.constant 0 : i64
   %cst = arith.constant 0xFF800000 : f32
@@ -137,14 +139,14 @@ func.func @argmax_none_ukernel_enabled(%arg0 : tensor<1x?xf32>) -> tensor<1xi64>
   return %4#1 : tensor<1xi64>
 }
 
-//      CHECK: func @argmax_none_ukernel_enabled(
+//      CHECK-LABEL: func @argmax_none_ukernel_enabled(
 //      CHECK-NOT: iree_codegen.ukernel.generic
 //      CHECK: linalg.generic
 
 // -----
 
 func.func @argmax_only_argmax_ukernel_enabled(%arg0 : tensor<1x?xf32>) -> tensor<1xi64> attributes {
-  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {target_arch = "gfx90a", ukernels = "argmax"}>
+  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {ukernels = "argmax"}>
 } {
   %c0_i64 = arith.constant 0 : i64
   %cst = arith.constant 0xFF800000 : f32
@@ -164,14 +166,14 @@ func.func @argmax_only_argmax_ukernel_enabled(%arg0 : tensor<1x?xf32>) -> tensor
   return %4#1 : tensor<1xi64>
 }
 
-//      CHECK: func @argmax_only_argmax_ukernel_enabled(
-//      CHECK: iree_codegen.ukernel.generic
-//      CHECK-NOT: linalg.generic
+//      CDNA2-LABEL: func @argmax_only_argmax_ukernel_enabled(
+//      CDNA2: iree_codegen.ukernel.generic
+//      CDNA2-NOT: linalg.generic
 
 // -----
 
 func.func @argmax_only_foo_argmax_bar_ukernel_enabled(%arg0 : tensor<1x?xf32>) -> tensor<1xi64> attributes {
-  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {target_arch = "gfx1100", ukernels = "foo,argmax,bar"}>
+  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {ukernels = "foo,argmax,bar"}>
 } {
   %c0_i64 = arith.constant 0 : i64
   %cst = arith.constant 0xFF800000 : f32
@@ -191,14 +193,16 @@ func.func @argmax_only_foo_argmax_bar_ukernel_enabled(%arg0 : tensor<1x?xf32>) -
   return %4#1 : tensor<1xi64>
 }
 
-//      CHECK: func @argmax_only_foo_argmax_bar_ukernel_enabled(
+//      CHECK-LABEL: func @argmax_only_foo_argmax_bar_ukernel_enabled(
 //      CHECK: iree_codegen.ukernel.generic
 //      CHECK-NOT: linalg.generic
+
+//      CDNA2-LABEL: func @argmax_only_foo_argmax_bar_ukernel_enabled(
 
 // -----
 
 func.func @argmax_only_foo_ukernel_enabled(%arg0 : tensor<1x?xf32>) -> tensor<1xi64> attributes {
-  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {target_arch = "gfx1100", ukernels = "foo"}>
+  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {ukernels = "foo"}>
 } {
   %c0_i64 = arith.constant 0 : i64
   %cst = arith.constant 0xFF800000 : f32
@@ -218,7 +222,7 @@ func.func @argmax_only_foo_ukernel_enabled(%arg0 : tensor<1x?xf32>) -> tensor<1x
   return %4#1 : tensor<1xi64>
 }
 
-//      CHECK: func @argmax_only_foo_ukernel_enabled(
+//      CHECK-LABEL: func @argmax_only_foo_ukernel_enabled(
 //      CHECK-NOT: iree_codegen.ukernel.generic
 //      CHECK: linalg.generic
 
@@ -226,7 +230,7 @@ func.func @argmax_only_foo_ukernel_enabled(%arg0 : tensor<1x?xf32>) -> tensor<1x
 
 // Currently we do only handle -Inf case as initial values.
 func.func @argmax_2d_f32i64_not_neg_inf_init(%arg0 : tensor<1x?xf32>) -> tensor<1xi64> attributes {
-  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {target_arch = "gfx1100", ukernels = "all"}>
+  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {ukernels = "all"}>
 } {
   %c0_i64 = arith.constant 0 : i64
   %cst = arith.constant 0.0 : f32
@@ -246,7 +250,7 @@ func.func @argmax_2d_f32i64_not_neg_inf_init(%arg0 : tensor<1x?xf32>) -> tensor<
   return %4#1 : tensor<1xi64>
 }
 
-//      CHECK: func @argmax_2d_f32i64_not_neg_inf_init(
+//      CHECK-LABEL: func @argmax_2d_f32i64_not_neg_inf_init(
 //      CHECK-NOT: iree_codegen.ukernel.generic
 //      CHECK: linalg.generic
 
@@ -257,7 +261,7 @@ func.func @argmax_2d_f32i64_not_neg_inf_init(%arg0 : tensor<1x?xf32>) -> tensor<
 //       to minimize compile time and space.
 
 func.func @argmax_ukernel_unsupported_arch(%arg0 : tensor<1x?xf32>) -> tensor<1xi64> attributes {
-  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {target_arch = "gfx800", ukernels = "all"}>
+  hal.executable.target = #hal.executable.target<"rocm", "rocm-hsaco-fb", {ukernels = "all"}>
 } {
   %c0_i64 = arith.constant 0 : i64
   %cst = arith.constant 0xFF800000 : f32
@@ -277,6 +281,6 @@ func.func @argmax_ukernel_unsupported_arch(%arg0 : tensor<1x?xf32>) -> tensor<1x
   return %4#1 : tensor<1xi64>
 }
 
-//      CHECK: func @argmax_ukernel_unsupported_arch(
-//      CHECK-NOT: iree_codegen.ukernel.generic
-//      CHECK: linalg.generic
+//      CDNA1-LABEL: func @argmax_ukernel_unsupported_arch(
+//      CDNA1-NOT: iree_codegen.ukernel.generic
+//      CDNA1: linalg.generic

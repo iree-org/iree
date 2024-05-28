@@ -6,11 +6,11 @@
 
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/LLVMGPU/ConvertToLLVM.h"
 #include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
-#include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/Util/IR/UtilOps.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "mlir/Conversion/ArithToLLVM/ArithToLLVM.h"
 #include "mlir/Conversion/ComplexToLLVM/ComplexToLLVM.h"
 #include "mlir/Conversion/ControlFlowToLLVM/ControlFlowToLLVM.h"
@@ -32,34 +32,10 @@
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "mlir/Transforms/Passes.h"
 
 namespace mlir::iree_compiler {
 
 namespace {
-
-int kDefaultCUDACapability = 80;
-
-/// Return the CUDA capability of the gpu. Assumes CUDA capability is 80 (sm_80)
-/// if not specified.
-static std::optional<int> getCUDACapbility(Operation *op) {
-  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
-  if (!targetAttr) {
-    return std::nullopt;
-  }
-
-  if (auto config = targetAttr.getConfiguration()) {
-    if (auto attr = config.getAs<StringAttr>("target_arch")) {
-      StringRef targetName = attr.getValue();
-      APInt version;
-      if (targetName.starts_with("sm_") &&
-          !targetName.substr(3).getAsInteger(10, version)) {
-        return version.getZExtValue();
-      }
-    }
-  }
-  return kDefaultCUDACapability;
-}
 
 /// A pass that replaces all occurrences of GPU device operations with their
 /// corresponding NVVM equivalent.
@@ -68,7 +44,8 @@ static std::optional<int> getCUDACapbility(Operation *op) {
 /// code.
 struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<gpu::GPUDialect, LLVM::LLVMDialect, NVVM::NVVMDialect>();
+    registry.insert<gpu::GPUDialect, IREE::GPU::IREEGPUDialect,
+                    LLVM::LLVMDialect, NVVM::NVVMDialect>();
   }
   void runOnOperation() override {
     ModuleOp m = getOperation();
@@ -143,8 +120,8 @@ struct ConvertToNVVMPass : public ConvertToNVVMBase<ConvertToNVVMPass> {
       // is faulty for them.
       // TODO: Remove this once the lowering in LLVM is fixed
       // (https://github.com/llvm/llvm-project/issues/64606).
-      std::optional<int> cudaCapability = getCUDACapbility(m);
-      if (!cudaCapability || cudaCapability.value() < 80) {
+      std::optional<int> cc = getGPUTargetAttr(m).getCUDAComputeCapability();
+      if (!cc || cc.value() < 80) {
         RewritePatternSet patterns(&getContext());
         populateReplaceSlowMinMaxOpsPatterns(patterns);
         if (failed(applyPatternsAndFoldGreedily(m, std::move(patterns)))) {

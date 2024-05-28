@@ -7,7 +7,7 @@
 name: Benchmark Trigger
 
 # Trigger benchmark CI workflows when benchmark PR labels are added.
-# When a benchmark label is added, this cancels and then re-runs the CI
+# When a benchmark label is added, this cancels and then re-runs the Benchmark
 # workflow. When the workflow is re-run, it will pick up the latest PR
 # description and labels. See
 # https://github.com/iree-org/iree/issues/10042#issuecomment-1449250094 for
@@ -24,7 +24,7 @@ env:
   PR_NUMBER: ${{ github.event.pull_request.number }}
   HEAD_SHA: ${{ github.event.pull_request.head.sha }}
   # Target workflow that runs the benchmarks.
-  WORKFLOW_NAME: CI
+  WORKFLOW_NAME: Benchmark
   BENCHMARK_LABEL_PREFIX: 'benchmarks:'
 
 jobs:

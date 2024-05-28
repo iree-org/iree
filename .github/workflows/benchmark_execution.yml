@@ -3,10 +3,10 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-#
-# Workflow for execution-benchmark-related jobs. It is designed to be called
-# from the main workflow ci.yml. The concurrency of this workflow is controlled
-# by the caller's job.
+
+# Workflow for running execution benchmarks.
+# It is designed to be called from a parent workflow.
+# The concurrency of this workflow is controlled by the caller's job.
 
 name: Benchmark execution
 
@@ -44,7 +44,7 @@ permissions:
   contents: read
 
 env:
-  # This duplicates the variable from ci.yml. The variable needs to be in env
+  # This duplicates the variable from benchmark.yml. The variable needs to be in env
   # instead of the outputs of setup because it contains the run attempt and we
   # want that to be the current attempt, not whatever attempt the setup step
   # last ran in. It therefore can't be passed in via inputs because the env
@@ -142,8 +142,7 @@ jobs:
       - name: "Downloading benchmark tools"
         id: download-tools
         env:
-          # See `build_benchmark_tools` step in ci.yml for the name format of
-          # benchmark tools artifacts.
+          # See `build_benchmark_tools` step for the name format of benchmark tools artifacts.
           BENCHMARK_TOOLS_ARCHIVE: ${{ env.PLATFORM_ARCH }}-benchmark-tools.tar
           BENCHMARK_TOOLS_GCS_ARTIFACT: ${{ inputs.benchmark-tools-gcs-artifact-dir }}/${{ env.PLATFORM_ARCH }}-benchmark-tools.tar
         run: |
@@ -158,8 +157,7 @@ jobs:
         id: unpack-tools
         env:
           BENCHMARK_TOOLS_ARCHIVE: ${{ steps.download-tools.outputs.benchmark-tools-archive }}
-          # See `build_benchmark_tools` step in ci.yml for the name format of
-          # benchmark tools directory.
+          # See `build_benchmark_tools` step for the name format of benchmark tools directory.
           BENCHMARK_TOOLS_DIR: ${{ env.PLATFORM_ARCH }}-benchmark-tools-dir
         run: |
           tar -xf ${BENCHMARK_TOOLS_ARCHIVE}

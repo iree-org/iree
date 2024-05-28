@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 
+#include "iree/compiler/Codegen/Dialect/GPU/Transforms/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
@@ -604,6 +605,7 @@ void registerBufferizationInterfaces(DialectRegistry &registry) {
   vector::registerBufferizableOpInterfaceExternalModels(registry);
 
   // Register IREE operations.
+  registerIREEGPUBufferizationInterfaces(registry);
   registry.addExtension(
       +[](MLIRContext *ctx, IREE::Flow::FlowDialect *dialect) {
         // DispatchTensorLoadOp

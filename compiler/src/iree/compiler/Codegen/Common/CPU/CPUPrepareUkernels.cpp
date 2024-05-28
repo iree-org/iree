@@ -4,8 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/PassDetail.h"
-#include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Common/CPU/PassDetail.h"
+#include "iree/compiler/Codegen/Common/CPU/Passes.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
@@ -17,6 +18,64 @@ namespace mlir::iree_compiler {
 namespace {
 
 using IREE::Codegen::LoweringConfigAttr;
+
+static void tileBatchDimsForBatchMmt4dOp(RewriterBase &rewriter,
+                                         FunctionOpInterface funcOp) {
+  funcOp.walk([&](linalg::BatchMmt4DOp batchMmt4DOp) {
+    auto out = batchMmt4DOp.getDpsInitOperand(0)->get();
+    auto outType = cast<RankedTensorType>(out.getType());
+    // Tile only non unit batch dimensions with tile size equals to 1.
+    if (outType.getShape()[0] <= 1) {
+      return;
+    }
+    SmallVector<OpFoldResult> tileSizes = {rewriter.getIndexAttr(1)};
+    auto tilingInterfaceOp = cast<TilingInterface>(batchMmt4DOp.getOperation());
+    auto options = scf::SCFTileAndFuseOptions().setTilingOptions(
+        scf::SCFTilingOptions().setTileSizes(tileSizes));
+    FailureOr<scf::SCFTileAndFuseResult> tileAndFuseResult =
+        scf::tileConsumerAndFuseProducersUsingSCF(rewriter, tilingInterfaceOp,
+                                                  options);
+    assert(succeeded(tileAndFuseResult));
+    rewriter.replaceOp(
+        batchMmt4DOp,
+        tileAndFuseResult->replacements[batchMmt4DOp.getResult(0)]);
+  });
+}
+
+static void tileNonPackedDimsFor3DPackOps(RewriterBase &rewriter,
+                                          FunctionOpInterface funcOp) {
+  funcOp.walk([&](tensor::PackOp packOp) {
+    if (packOp.getSourceRank() != 3 || packOp.getDestRank() != 5) {
+      return;
+    }
+
+    OpFoldResult zero = rewriter.getIndexAttr(0);
+    OpFoldResult one = rewriter.getIndexAttr(1);
+    SmallVector<OpFoldResult> tileSizes(packOp.getSourceRank(), one);
+    for (auto dim : packOp.getInnerDimsPos()) {
+      tileSizes[dim] = zero;
+    }
+
+    // Skip the tiling if the size is already 1.
+    RankedTensorType srcType = packOp.getSourceType();
+    for (auto [idx, val] : llvm::enumerate(tileSizes)) {
+      if (val && srcType.getDimSize(idx) == 1)
+        return;
+    }
+
+    auto outerDimsPerm = packOp.getOuterDimsPerm();
+    if (!outerDimsPerm.empty()) {
+      applyPermutationToVector(tileSizes, outerDimsPerm);
+    }
+
+    auto tilingInterfaceOp = cast<TilingInterface>(packOp.getOperation());
+    auto options = scf::SCFTilingOptions().setTileSizes(tileSizes);
+    FailureOr<scf::SCFTilingResult> tilingResult =
+        scf::tileUsingSCF(rewriter, tilingInterfaceOp, options);
+    assert(succeeded(tilingResult));
+    rewriter.replaceOp(packOp, tilingResult->replacements);
+  });
+}
 
 /// Returns true if:
 ///    1. `genericOp` is element-wise with all identity indexing maps
@@ -99,8 +158,8 @@ struct ConvertBatchMmt4DtoMmt4DPattern
                                       ValueRange{newInit})
               .result();
 
-      IREE::Codegen::LoweringConfigAttr loweringConfig =
-          getLoweringConfig(oldFillOp);
+      auto loweringConfig =
+          getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(oldFillOp);
       if (loweringConfig) {
         auto config = dropBatchTileSize(loweringConfig);
         setLoweringConfig(reducedOut.getDefiningOp(), config);
@@ -135,7 +194,8 @@ struct ConvertBatchMmt4DtoMmt4DPattern
         loc, reducedOut.getType(), ValueRange{reducedLhs, reducedRhs},
         ValueRange{reducedOut});
 
-    IREE::Codegen::LoweringConfigAttr loweringConfig = getLoweringConfig(op);
+    auto loweringConfig =
+        getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(op);
     if (loweringConfig) {
       auto config = dropBatchTileSize(loweringConfig);
       setLoweringConfig(mmt4DOp, config);
@@ -148,8 +208,77 @@ struct ConvertBatchMmt4DtoMmt4DPattern
   }
 };
 
-struct DecomposeBatchMmt4DOpsPass
-    : public DecomposeBatchMmt4DOpsBase<DecomposeBatchMmt4DOpsPass> {
+struct Convert3DPackto2DPackPattern : public OpRewritePattern<tensor::PackOp> {
+  using OpRewritePattern<tensor::PackOp>::OpRewritePattern;
+
+  LogicalResult matchAndRewrite(tensor::PackOp packOp,
+                                PatternRewriter &rewriter) const override {
+    if (packOp.getSourceRank() != 3 || packOp.getDestRank() != 5) {
+      return failure();
+    }
+
+    int64_t srcPos = 0;
+    llvm::SmallDenseSet<int64_t> s;
+    s.insert(packOp.getInnerDimsPos().begin(), packOp.getInnerDimsPos().end());
+    for (auto dim : llvm::seq<int64_t>(0, packOp.getSourceRank())) {
+      if (s.contains(dim))
+        continue;
+      srcPos = dim;
+      break;
+    }
+
+    int destPos = srcPos;
+    for (auto [idx, val] : llvm::enumerate(packOp.getOuterDimsPerm())) {
+      if (val == srcPos)
+        destPos = idx;
+    }
+
+    if (packOp.getSourceType().getDimSize(srcPos) != 1) {
+      return rewriter.notifyMatchFailure(packOp, "srcPos != 1");
+    }
+    if (packOp.getDestType().getDimSize(destPos) != 1) {
+      return rewriter.notifyMatchFailure(packOp, "destPos != 1");
+    }
+
+    SmallVector<int64_t> newInnerDimsPos(packOp.getInnerDimsPos());
+    for (auto &val : newInnerDimsPos) {
+      assert(val != srcPos);
+      if (val > srcPos)
+        val--;
+    }
+    SmallVector<int64_t> newOuterDimsPerm(packOp.getOuterDimsPerm());
+    if (!newOuterDimsPerm.empty()) {
+      newOuterDimsPerm.erase(newOuterDimsPerm.begin() + destPos);
+      for (auto &val : newOuterDimsPerm) {
+        if (val > srcPos)
+          val--;
+      }
+    }
+
+    Location loc = packOp.getLoc();
+    auto reducedSrcType =
+        RankedTensorType::Builder(packOp.getSourceType()).dropDim(srcPos);
+    auto reducedSrc = tensor::createCanonicalRankReducingExtractSliceOp(
+        rewriter, loc, packOp.getSource(), reducedSrcType);
+
+    auto reducedDestType =
+        RankedTensorType::Builder(packOp.getDestType()).dropDim(destPos);
+    auto reducedDest = tensor::createCanonicalRankReducingExtractSliceOp(
+        rewriter, loc, packOp.getDest(), reducedDestType);
+
+    auto newPackOp = rewriter.create<tensor::PackOp>(
+        loc, reducedSrc, reducedDest, newInnerDimsPos, packOp.getMixedTiles(),
+        packOp.getPaddingValue(), newOuterDimsPerm);
+
+    auto insertSliceOp = tensor::createCanonicalRankReducingInsertSliceOp(
+        rewriter, loc, newPackOp.getResult(), packOp.getDest());
+    rewriter.replaceOp(packOp, insertSliceOp);
+    return success();
+  }
+};
+
+struct CPUPrepareUkernelsPass
+    : public CPUPrepareUkernelsBase<CPUPrepareUkernelsPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<linalg::LinalgDialect, arith::ArithDialect,
                     tensor::TensorDialect, scf::SCFDialect>();
@@ -160,51 +289,25 @@ struct DecomposeBatchMmt4DOpsPass
 
 } // namespace
 
-void DecomposeBatchMmt4DOpsPass::runOnOperation() {
+void CPUPrepareUkernelsPass::runOnOperation() {
   MLIRContext *ctx = &getContext();
   auto funcOp = getOperation();
-  Operation *errorOp = nullptr;
   IRRewriter rewriter(ctx);
-
-  WalkResult result =
-      funcOp.walk([&](linalg::BatchMmt4DOp batchMmt4DOp) -> WalkResult {
-        auto out = batchMmt4DOp.getDpsInitOperand(0)->get();
-        auto outType = cast<RankedTensorType>(out.getType());
-        // Tile only non unit batch dimensions with tile size equals to 1.
-        if (outType.getShape()[0] <= 1) {
-          return WalkResult::advance();
-        }
-        SmallVector<int64_t> tileSizes = {1};
-        auto tilingInterfaceOp =
-            cast<TilingInterface>(batchMmt4DOp.getOperation());
-        auto options = scf::SCFTileAndFuseOptions().setTilingOptions(
-            scf::SCFTilingOptions().setTileSizes(
-                getAsIndexOpFoldResult(ctx, tileSizes)));
-        FailureOr<scf::SCFTileAndFuseResult> tileAndFuseResult =
-            scf::tileConsumerAndFuseProducersUsingSCF(
-                rewriter, tilingInterfaceOp, options);
-        if (failed(tileAndFuseResult)) {
-          errorOp = batchMmt4DOp;
-          return WalkResult::interrupt();
-        }
-        rewriter.replaceOp(
-            batchMmt4DOp,
-            tileAndFuseResult->replacements[batchMmt4DOp.getResult(0)]);
-        return WalkResult::advance();
-      });
-  if (result.wasInterrupted()) {
-    errorOp->emitOpError("failed to tile the batch dimension");
-    return signalPassFailure();
-  }
+  tileBatchDimsForBatchMmt4dOp(rewriter, funcOp);
+  tileNonPackedDimsFor3DPackOps(rewriter, funcOp);
 
   // Convert linalg.batch_mmt4d with batch dim = 1 into linalg.mmt4d.
   RewritePatternSet patterns(ctx);
-  patterns.add<ConvertBatchMmt4DtoMmt4DPattern>(ctx);
+  patterns.add<ConvertBatchMmt4DtoMmt4DPattern, Convert3DPackto2DPackPattern>(
+      ctx);
   // Canonicalize extract and insert slice ops created during the conversion.
   tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
+  tensor::populateFoldTensorSubsetOpPatterns(patterns);
   tensor::InsertSliceOp::getCanonicalizationPatterns(patterns, ctx);
   tensor::ExtractSliceOp::getCanonicalizationPatterns(patterns, ctx);
   tensor::EmptyOp::getCanonicalizationPatterns(patterns, ctx);
+  tensor::PackOp::getCanonicalizationPatterns(patterns, ctx);
+  tensor::CastOp::getCanonicalizationPatterns(patterns, ctx);
   tensor::populateFoldTensorEmptyPatterns(patterns);
   if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
     return signalPassFailure();
@@ -212,8 +315,8 @@ void DecomposeBatchMmt4DOpsPass::runOnOperation() {
 }
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createDecomposeBatchMmt4DOpsPass() {
-  return std::make_unique<DecomposeBatchMmt4DOpsPass>();
+createCPUPrepareUkernelsPass() {
+  return std::make_unique<CPUPrepareUkernelsPass>();
 }
 
 } // namespace mlir::iree_compiler

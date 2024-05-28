@@ -1,8 +1,8 @@
-// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" --iree-codegen-llvmgpu-enable-transform-dialect-implicit-gemm-strategy | FileCheck %s
+// RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" \
+// RUN:  --iree-gpu-test-target=sm_80 --iree-codegen-llvmgpu-enable-transform-dialect-implicit-gemm-strategy | FileCheck %s
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
 module {
-  func.func @nchw_convolution() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
+  func.func @nchw_convolution() {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f32
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<8x128x258x258xf32>>
@@ -62,9 +62,8 @@ module {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
 module {
-  func.func @nhwc_convolution() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
+  func.func @nhwc_convolution() {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f32
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<8x258x258x128xf32>>
@@ -98,9 +97,8 @@ module {
 
 // -----
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
 module {
-  func.func @unaligned_convolution() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
+  func.func @unaligned_convolution() {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f32
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<8x258x258x132xf32>>

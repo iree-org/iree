@@ -1235,19 +1235,6 @@ LogicalResult WinogradOutputTransformOp::reifyResultShapes(
 // AttentionOp
 //===----------------------------------------------------------------------===//
 
-/// Utility function to check whether a given ShapedType has the expected rank.
-static LogicalResult checkShapeRank(Operation *op, StringRef operandName,
-                                    ShapedType shapedType,
-                                    int64_t rankToCompareWith) {
-  int64_t opRank = shapedType.getRank();
-  if (opRank != rankToCompareWith) {
-    return op->emitOpError("expected ")
-           << operandName << " to have rank " << rankToCompareWith
-           << " but found " << opRank;
-  }
-  return success();
-}
-
 LogicalResult AttentionOp::verify() {
   Operation *op = getOperation();
 
@@ -1265,13 +1252,6 @@ LogicalResult AttentionOp::verify() {
   }
 
   bool isTiled = numOutputs == 3;
-
-  int64_t rankToCompareWith;
-  if (isTiled) {
-    rankToCompareWith = 2;
-  } else {
-    rankToCompareWith = 3;
-  }
 
   if (!llvm::all_of(llvm::drop_end(getDpsInputs()), [](Value input) {
         return isa<ShapedType>(input.getType());
@@ -1294,33 +1274,39 @@ LogicalResult AttentionOp::verify() {
     return op->emitOpError("expected scale to be of floating point type");
   }
 
-  if (failed(checkShapeRank(op, "query", queryType, rankToCompareWith))) {
+  // Check shape compatibility based on indexing maps.
+  SmallVector<int64_t> shape(getIterationDomainRank());
+  SmallVector<bool> foundDims(getIterationDomainRank(), false);
+  auto checkShape = [&shape, &foundDims,
+                     &op](StringRef operandName, ArrayRef<int64_t> valShape,
+                          AffineMap indexingMap) -> LogicalResult {
+    if (indexingMap.getNumResults() != valShape.size()) {
+      return op->emitError("Rank Mismatch for ")
+             << operandName << ". Expected: " << indexingMap.getNumResults()
+             << " Got: " << valShape.size();
+    }
+    for (auto [i, dimExpr] : llvm::enumerate(indexingMap.getResults())) {
+      AffineDimExpr dim = cast<AffineDimExpr>(dimExpr);
+      int64_t pos = dim.getPosition();
+      if (!foundDims[pos]) {
+        foundDims[pos] = true;
+        shape[pos] = valShape[i];
+      }
+      if (shape[pos] != valShape[i]) {
+        return op->emitError("Shape Mismatch for ")
+               << operandName << ". Expected: " << shape[pos]
+               << " Got: " << valShape[i];
+      }
+    }
+    return success();
+  };
+
+  if (failed(checkShape("Query", getQueryType().getShape(), getQueryMap())) ||
+      failed(checkShape("Key", getKeyType().getShape(), getKeyMap())) ||
+      failed(checkShape("Value", getValueType().getShape(), getValueMap()))) {
     return failure();
   }
-  if (failed(checkShapeRank(op, "key", keyType, rankToCompareWith))) {
-    return failure();
-  }
-  if (failed(checkShapeRank(op, "value", valueType, rankToCompareWith))) {
-    return failure();
-  }
-  if (failed(checkShapeRank(op, "output", outputType, rankToCompareWith))) {
-    return failure();
-  }
-  ArrayRef<int64_t> queryShape = queryType.getShape();
-  ArrayRef<int64_t> keyShape = keyType.getShape();
-  ArrayRef<int64_t> outputShape = outputType.getShape();
-  SmallVector<int64_t> valueShape(valueType.getShape());
-  bool transposeV = getTransposeV();
-  if (transposeV) {
-    size_t lastIdx = valueShape.size() - 1;
-    std::swap(valueShape[lastIdx - 1], valueShape[lastIdx]);
-  }
-  if (failed(verifyCompatibleShape(keyShape, valueShape))) {
-    return op->emitOpError("incompatible value shape");
-  }
-  if (failed(verifyCompatibleShape(queryShape, outputShape))) {
-    return op->emitOpError("incompatible output shape");
-  }
+
   if (queryElementType != keyElementType ||
       queryElementType != valueElementType ||
       queryElementType != scaleElementType) {
@@ -1335,34 +1321,20 @@ LogicalResult AttentionOp::verify() {
              << queryElementType << "but found " << outputElementType
              << " instead";
     }
-    if (keyShape[2] != queryShape[2]) {
-      return op->emitOpError("query and key head dimension mismatch");
-    }
   }
   if (isTiled) {
     // Tiled/Flash attention.
-    ShapedType maxType = *getMaxType();
-    ShapedType sumType = *getSumType();
-    if (failed(checkShapeRank(op, "max", maxType, 1))) {
-      return failure();
-    }
-    if (failed(checkShapeRank(op, "sum", sumType, 1))) {
-      return failure();
-    }
-    Type maxElementType = maxType.getElementType();
-    Type sumElementType = sumType.getElementType();
-    ArrayRef<int64_t> maxShape = maxType.getShape();
-    ArrayRef<int64_t> sumShape = sumType.getShape();
+    Type maxElementType = getMaxType()->getElementType();
+    Type sumElementType = getSumType()->getElementType();
     if (outputElementType != maxElementType ||
         maxElementType != sumElementType) {
       return op->emitOpError(
           "element types of tiled output, max and sum should be same");
     }
-    if (failed(verifyCompatibleShape(maxShape, sumShape))) {
-      return op->emitOpError("incompatible sum shape");
-    }
-    if (maxShape[0] != queryShape[0]) {
-      return op->emitOpError("Query and max dimension-0 mismatch");
+
+    if (failed(checkShape("Max", getMaxType()->getShape(), *getMaxMap())) ||
+        failed(checkShape("Sum", getSumType()->getShape(), *getSumMap()))) {
+      return failure();
     }
   }
 
@@ -1377,6 +1349,55 @@ LogicalResult AttentionOp::reifyResultShapes(
     OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
   return cast<LinalgExtOp>(getOperation())
       .reifyResultShapes(b, reifiedReturnShapes);
+}
+
+SmallVector<AffineMap> AttentionOp::getIndexingMapsArray() {
+  MLIRContext *ctx = getContext();
+
+  AffineExpr batch, m, k1, k2, n;
+  bindDims(ctx, batch, m, k1, k2, n);
+
+  AffineMap qMap =
+      AffineMap::get(/*dimCount=*/5, /*symbolCount=*/0, {batch, m, k1}, ctx);
+  AffineMap kMap =
+      AffineMap::get(/*dimCount=*/5, /*symbolCount=*/0, {batch, k2, k1}, ctx);
+
+  AffineMap vMap;
+  if (getTransposeV()) {
+    vMap =
+        AffineMap::get(/*dimCount=*/5, /*symbolCount=*/0, {batch, n, k2}, ctx);
+  } else {
+    vMap =
+        AffineMap::get(/*dimCount=*/5, /*symbolCount=*/0, {batch, k2, n}, ctx);
+  }
+
+  AffineMap resMap =
+      AffineMap::get(/*dimCount=*/5, /*symbolCount=*/0, {batch, m, n}, ctx);
+
+  SmallVector<AffineMap> results = {qMap, kMap, vMap, resMap};
+
+  if (getMax()) {
+    AffineMap maxMap =
+        AffineMap::get(/*dimCount=*/5, /*symbolCount=*/0, {batch, m}, ctx);
+    results.push_back(maxMap);
+  }
+
+  if (getSum()) {
+    AffineMap sumMap =
+        AffineMap::get(/*dimCount=*/5, /*symbolCount=*/0, {batch, m}, ctx);
+    results.push_back(sumMap);
+  }
+
+  // Remove batch dim for tiled operands.
+  // TODO: This is a weird expectation from TileAndDecomposeAttention.
+  bool isTiled = getNumResults() == 3;
+  if (isTiled) {
+    for (AffineMap &map : results) {
+      map = map.dropResult(0);
+    }
+  }
+
+  return results;
 }
 
 #define DEFINE_OP_GET_EFFECTS(OP_NAME)                                         \
