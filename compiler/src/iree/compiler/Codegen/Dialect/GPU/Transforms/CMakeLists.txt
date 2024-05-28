@@ -55,8 +55,10 @@ iree_cc_library(
     MLIRAffineUtils
     MLIRArithDialect
     MLIRFuncDialect
+    MLIRFunctionInterfaces
     MLIRGPUDialect
     MLIRIR
+    MLIRPass
     MLIRSCFDialect
     MLIRSupport
     MLIRTensorDialect
@@ -66,6 +68,7 @@ iree_cc_library(
     MLIRVectorTransforms
     MLIRVectorUtils
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
+    iree::compiler::Codegen::Transforms
   PUBLIC
 )
 
