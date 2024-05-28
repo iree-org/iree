@@ -208,6 +208,18 @@ def IREEGPU_MultiMmaOp : Op<IREEGPU_Dialect, "multi_mma", [
         accType.getRank() - getIndexingMapsArray()[2].getNumResults();
       return accType.getShape().take_back(accInnerDimRank);
     }
+
+    int64_t getLhsOuterRank() {
+      return getIndexingMapsArray()[0].getNumResults();
+    }
+
+    int64_t getRhsOuterRank() {
+      return getIndexingMapsArray()[1].getNumResults();
+    }
+
+    int64_t getAccOuterRank() {
+      return getIndexingMapsArray()[2].getNumResults();
+    }
   }];
 
   let hasVerifier = 1;

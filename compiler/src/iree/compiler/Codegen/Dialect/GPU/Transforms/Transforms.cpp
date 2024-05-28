@@ -165,6 +165,65 @@ LogicalResult fuseForallIntoSlice(RewriterBase &rewriter,
 }
 
 //===----------------------------------------------------------------------===//
+// MultiMmaOp Unit Dim Folding
+//===----------------------------------------------------------------------===//
+
+namespace {
+struct DropMultiMmaUnitDimsPattern
+    : public OpRewritePattern<IREE::GPU::MultiMmaOp> {
+  using OpRewritePattern<IREE::GPU::MultiMmaOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::GPU::MultiMmaOp mmaOp,
+                                PatternRewriter &rewriter) const override {
+    if (mmaOp.hasTensorSemantics()) {
+      return rewriter.notifyMatchFailure(
+          mmaOp, "unimplemented: unit dim dropping for tensor mma ops");
+    }
+    SmallVector<int64_t> bounds;
+    mmaOp.getIterationBounds(bounds);
+    if (bounds.empty()) {
+      return rewriter.notifyMatchFailure(mmaOp, "no dimensions to fold");
+    }
+
+    // TODO: Generalize to allow only some iteration bounds to be unit. This
+    // pattern currently only supports the most common case of unrolling to the
+    // intrinsic shape.
+    if (!llvm::all_of(bounds, [](int64_t b) { return b == 1; })) {
+      return rewriter.notifyMatchFailure(mmaOp,
+                                         "not all iteration bounds are unit");
+    }
+
+    Location loc = mmaOp.getLoc();
+    auto dropLeadUnitDims = [&](Value operand, int64_t numDims) -> Value {
+      if (numDims == 0) {
+        return operand;
+      }
+      SmallVector<int64_t> droppedDimIndices(numDims, 0);
+      return rewriter.create<vector::ExtractOp>(loc, operand,
+                                                droppedDimIndices);
+    };
+
+    Value newLhs = dropLeadUnitDims(mmaOp.getLhs(), mmaOp.getLhsOuterRank());
+    Value newRhs = dropLeadUnitDims(mmaOp.getRhs(), mmaOp.getRhsOuterRank());
+    Value newAcc = dropLeadUnitDims(mmaOp.getAcc(), mmaOp.getAccOuterRank());
+
+    AffineMap empty = AffineMap::get(rewriter.getContext());
+    auto newMmaOp = rewriter.create<IREE::GPU::MultiMmaOp>(
+        loc, newLhs, newRhs, newAcc,
+        rewriter.getAffineMapArrayAttr({empty, empty, empty}),
+        rewriter.getArrayAttr({}), mmaOp.getKind());
+
+    rewriter.replaceOpWithNewOp<vector::BroadcastOp>(
+        mmaOp, mmaOp.getResultType(), newMmaOp);
+    return success();
+  }
+};
+} // namespace
+
+void populateIREEGPUDropUnitDimsPatterns(RewritePatternSet &patterns) {
+  patterns.add<DropMultiMmaUnitDimsPattern>(patterns.getContext());
+}
+
+//===----------------------------------------------------------------------===//
 // MultiMmaOp Unrolling
 //===----------------------------------------------------------------------===//
 

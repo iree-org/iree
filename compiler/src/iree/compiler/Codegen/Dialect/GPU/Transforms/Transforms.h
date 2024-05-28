@@ -34,12 +34,11 @@ LogicalResult fuseForallIntoSlice(RewriterBase &rewriter,
                                   scf::ForallOp consumer,
                                   tensor::ExtractSliceOp slice);
 
+void populateIREEGPUDropUnitDimsPatterns(RewritePatternSet &patterns);
+void populateIREEGPULowerValueBarrierPatterns(RewritePatternSet &patterns);
 void populateIREEGPUVectorUnrollPatterns(
     RewritePatternSet &patterns, const vector::UnrollVectorOptions &options);
-
 void populateIREEGPUVectorizationPatterns(RewritePatternSet &patterns);
-
-void populateIREEGPULowerValueBarrierPatterns(RewritePatternSet &patterns);
 
 } // namespace mlir::iree_compiler::IREE::GPU
 
