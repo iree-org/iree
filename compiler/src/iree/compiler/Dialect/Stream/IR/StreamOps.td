@@ -3753,7 +3753,6 @@ def Stream_TimepointBarrierOp : Stream_PureOp<"timepoint.barrier", [
 
 def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
   AttrSizedOperandSegments,
-  Stream_AffinityOp,
   Stream_TimelineOp,
   Util_SizeAwareOp,
   DeclareOpInterfaceMethods<Util_TiedOpInterface, [
@@ -3777,8 +3776,7 @@ def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
       Stream_StagingResource,
     ]>>:$resource_operands,
     Variadic<Stream_Size>:$resource_operand_sizes,
-    Stream_Timepoint:$await_timepoint,
-    OptionalAttr<Stream_AffinityAttr>:$affinity
+    Stream_Timepoint:$await_timepoint
   );
   let results = (outs
     Variadic<AnyTypeOf<[
@@ -3788,7 +3786,6 @@ def Stream_TimepointAwaitOp : Stream_PureOp<"timepoint.await", [
   );
 
   let assemblyFormat = [{
-    (`on` `(` $affinity^ `)`)?
     $await_timepoint `=` `` `>`
     $resource_operands `:`
     custom<ShapedTypeList>(type($resource_operands),

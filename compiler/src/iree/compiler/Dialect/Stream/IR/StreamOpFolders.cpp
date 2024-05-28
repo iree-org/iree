@@ -3262,16 +3262,8 @@ struct GroupAwaitsByTimepoint : public OpRewritePattern<TimepointAwaitOp> {
       if (dominanceInfo.dominates(use.getOwner(), op))
         continue;
       auto awaitOp = dyn_cast<TimepointAwaitOp>(use.getOwner());
-      if (!awaitOp ||
-          !AffinityAttr::areCompatible(
-              llvm::dyn_cast_if_present<AffinityAttr>(op.getAffinityAttr()),
-              llvm::dyn_cast_if_present<AffinityAttr>(
-                  awaitOp.getAffinityAttr()))) {
-        // Can't combine if the affinities differ as the wait semantics are
-        // load-bearing. Probably. They really shouldn't be.
-        // TODO(benvanik): remove affinity from stream.timepoint.await.
+      if (!awaitOp)
         continue;
-      }
       // Ensure all dependencies of the await op are available.
       if (!areAllOperandsDefinedBy(awaitOp, op, dominanceInfo)) {
         // One or more operands is defined after op so we can't merge.
@@ -3298,9 +3290,6 @@ struct GroupAwaitsByTimepoint : public OpRewritePattern<TimepointAwaitOp> {
     }
     auto newOp = rewriter.create<TimepointAwaitOp>(
         op.getLoc(), newOperands, newOperandSizes, op.getAwaitTimepoint());
-    if (op.getAffinity().has_value()) {
-      newOp.setAffinityAttr(op.getAffinityAttr());
-    }
 
     // Replace covered ops with the new results.
     unsigned resultIdx = 0;
@@ -3348,9 +3337,6 @@ struct FoldDuplicateAwaitResources : public OpRewritePattern<TimepointAwaitOp> {
     // Create replacement op with deduped operands/results.
     auto newOp = rewriter.create<IREE::Stream::TimepointAwaitOp>(
         op.getLoc(), newOperands, newOperandSizes, op.getAwaitTimepoint());
-    if (op.getAffinity().has_value()) {
-      newOp.setAffinityAttr(op.getAffinityAttr());
-    }
 
     // Replace all duplicate results with the base results.
     for (auto &replacement : replacements) {
