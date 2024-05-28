@@ -678,6 +678,82 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
   }];
 }
 
+//===----------------------------------------------------------------------===//
+// OnlineAttention
+//===----------------------------------------------------------------------===//
+
+def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_Op<"online_attention",
+    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>]> {
+  let summary = "Attention operator";
+  let description = [{}];
+
+  let arguments = (ins Variadic<AnyShaped>:$inputs,
+                       Variadic<AnyShaped>:$outputs,
+                       AnyFloat:$scale,
+                       AffineMapArrayAttr:$indexing_maps
+  );
+
+  let results = (outs Variadic<AnyRankedTensor>:$results);
+  let assemblyFormat = [{
+    attr-dict
+    `ins` `(` $inputs `,` $scale `:` type($inputs) `,` type($scale) `)`
+    `outs` `(` $outputs `:` type($outputs) `)`
+    (`->` type($results)^)?
+  }];
+
+  let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
+    TypedValue<ShapedType> getQuery() {
+      return cast<TypedValue<ShapedType>>(getInputs()[0]);
+    }
+    TypedValue<ShapedType> getKey() {
+      return cast<TypedValue<ShapedType>>(getInputs()[1]);
+    }
+    TypedValue<ShapedType> getValue() {
+      return cast<TypedValue<ShapedType>>(getInputs()[2]);
+    }
+    TypedValue<ShapedType> getOutput() {
+      return cast<TypedValue<ShapedType>>(getOutputs()[0]);
+    }
+    TypedValue<ShapedType> getMax() {
+      return cast<TypedValue<ShapedType>>(getOutputs()[1]);
+    }
+    TypedValue<ShapedType> getSum() {
+      return cast<TypedValue<ShapedType>>(getOutputs()[2]);
+    }
+
+    // Method to implement for specifying output range for
+    // DestinationStyleOpInterface
+    MutableOperandRange getDpsInitsMutable() {
+      return getOutputsMutable();
+    }
+
+    SmallVector<AffineMap> getIndexingMapsArray();
+
+    AffineMap getQueryMap() {
+      return getIndexingMapsArray()[0];
+    }
+    AffineMap getKeyMap() {
+      return getIndexingMapsArray()[1];
+    }
+    AffineMap getValueMap() {
+      return getIndexingMapsArray()[2];
+    }
+    AffineMap getOutputMap() {
+      return getIndexingMapsArray()[3];
+    }
+    std::optional<AffineMap> getMaxMap() {
+      return getIndexingMapsArray()[4];
+    }
+    std::optional<AffineMap> getSumMap() {
+      return getIndexingMapsArray()[5];
+    }
+
+    int64_t getIterationDomainRank() {
+      return getQueryMap().getNumDims();
+    }
+  }];
+}
+
 } // OpGroupNonStructuredOps
 
 //===----------------------------------------------------------------------===//

@@ -1427,6 +1427,22 @@ SmallVector<AffineMap> AttentionOp::getIndexingMapsArray() {
   return results;
 }
 
+//===----------------------------------------------------------------------===//
+// OnlineAttentionOp
+//===----------------------------------------------------------------------===//
+
+LogicalResult OnlineAttentionOp::verify() { return success(); }
+
+LogicalResult OnlineAttentionOp::reifyResultShapes(
+    OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
+  return cast<LinalgExtOp>(getOperation())
+      .reifyResultShapes(b, reifiedReturnShapes);
+}
+
+SmallVector<AffineMap> OnlineAttentionOp::getIndexingMapsArray() {
+  return getIndexingMaps().getAsValueRange<AffineMapAttr>();
+}
+
 #define DEFINE_OP_GET_EFFECTS(OP_NAME)                                         \
   void OP_NAME::getEffects(                                                    \
       SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>      \
@@ -1446,6 +1462,7 @@ DEFINE_OP_GET_EFFECTS(WinogradInputTransformOp)
 DEFINE_OP_GET_EFFECTS(WinogradFilterTransformOp)
 DEFINE_OP_GET_EFFECTS(WinogradOutputTransformOp)
 DEFINE_OP_GET_EFFECTS(AttentionOp)
+DEFINE_OP_GET_EFFECTS(OnlineAttentionOp)
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt
 
