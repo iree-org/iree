@@ -210,7 +210,7 @@ jobs:
             --config-files=${MODELS_CONFIG_FILE_PATH}
 
       - name: Run external tests - models with real weights and additional flags
-        if: ${{ !cancelled() }} && ${{ env.MODELS_EXTRA_FLAGS_CONFIG_FILE_PATH != '' }}
+        if: ${{ !cancelled() }} && ${{ matrix.models-extra-flags-config-file != '' }}
         run: |
           source ${VENV_DIR}/bin/activate
           pytest SHARK-TestSuite/iree_tests/pytorch/models \
@@ -224,7 +224,7 @@ jobs:
             --config-files=${MODELS_EXTRA_FLAGS_CONFIG_FILE_PATH}
 
       - name: "Run external tests - SDXL scheduled unet"
-        if: ${{ !cancelled() }} && ${{ env.SDXL_CONFIG_FILE_PATH != '' }}
+        if: ${{ !cancelled() }} && ${{ matrix.sdxl-config-file != '' }}
         run: |
           source ${VENV_DIR}/bin/activate
           pytest SHARK-TestSuite/iree_tests/pytorch/models/sdxl-scheduled-unet-3-tank \
