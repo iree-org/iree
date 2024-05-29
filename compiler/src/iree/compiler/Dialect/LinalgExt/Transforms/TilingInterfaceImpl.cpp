@@ -1605,16 +1605,16 @@ LogicalResult WinogradOutputTransformOp::getResultTilePosition(
 }
 
 //===----------------------------------------------------------------------===//
-// AttentionOp
+// Attention Helpers
 //===----------------------------------------------------------------------===//
 
-SmallVector<Range> AttentionOp::getIterationDomain(OpBuilder &builder) {
-  int64_t domainRank = getIterationDomainRank();
-
+static SmallVector<Range>
+getAttentionIterationDomain(Location loc, OpBuilder &b, int64_t domainRank,
+                            ArrayRef<Value> values,
+                            ArrayRef<AffineMap> indexingMaps) {
   SmallVector<Range> loopBounds(domainRank);
-  Location loc = getLoc();
-  Value zero = builder.create<arith::ConstantIndexOp>(loc, 0);
-  Value one = builder.create<arith::ConstantIndexOp>(loc, 1);
+  Value zero = b.create<arith::ConstantIndexOp>(loc, 0);
+  Value one = b.create<arith::ConstantIndexOp>(loc, 1);
 
   for (auto dim : llvm::seq<int64_t>(0, domainRank)) {
     loopBounds[dim].offset = zero;
@@ -1631,26 +1631,27 @@ SmallVector<Range> AttentionOp::getIterationDomain(OpBuilder &builder) {
         continue;
       }
       dimsFound[pos] = true;
-      loopBounds[pos].size = getDimValue(builder, loc, val, idx);
+      loopBounds[pos].size = getDimValue(b, loc, val, idx);
     }
   };
 
-  // Sizes can be found from Q, K, V alone.
-  fillSizes(getQuery(), getQueryMap());
-  fillSizes(getKey(), getKeyMap());
-  fillSizes(getValue(), getValueMap());
+  for (auto [val, indexingMap] : llvm::zip_equal(values, indexingMaps)) {
+    fillSizes(val, indexingMap);
+  }
 
   return loopBounds;
 }
 
-SmallVector<utils::IteratorType> AttentionOp::getLoopIteratorTypes() {
+static SmallVector<utils::IteratorType>
+getAttentionIteratorTypes(int64_t domainRank,
+                          ArrayRef<AffineMap> indexingMaps) {
   FailureOr<AttentionOpDetail> maybeOpInfo =
-      AttentionOpDetail::get(getIndexingMapsArray());
+      AttentionOpDetail::get(indexingMaps);
   assert(succeeded(maybeOpInfo) && "Failed to infer attention op details");
   AttentionOpDetail opInfo = maybeOpInfo.value();
 
   // All dimensions other than k1 and k2 are parallel.
-  SmallVector<utils::IteratorType> iteratorTypes(getIterationDomainRank(),
+  SmallVector<utils::IteratorType> iteratorTypes(domainRank,
                                                  utils::IteratorType::parallel);
 
   for (auto dim :
@@ -1659,6 +1660,24 @@ SmallVector<utils::IteratorType> AttentionOp::getLoopIteratorTypes() {
   }
 
   return iteratorTypes;
+}
+
+//===----------------------------------------------------------------------===//
+// AttentionOp
+//===----------------------------------------------------------------------===//
+
+SmallVector<Range> AttentionOp::getIterationDomain(OpBuilder &b) {
+  // Attention shape can be determined from Q, K, V alone.
+  SmallVector<Value> shapedValues = {getQuery(), getKey(), getValue()};
+  SmallVector<AffineMap> indexingMaps = {getQueryMap(), getKeyMap(),
+                                         getValueMap()};
+  return getAttentionIterationDomain(getLoc(), b, getIterationDomainRank(),
+                                     shapedValues, indexingMaps);
+}
+
+SmallVector<utils::IteratorType> AttentionOp::getLoopIteratorTypes() {
+  return getAttentionIteratorTypes(getIterationDomainRank(),
+                                   getIndexingMapsArray());
 }
 
 FailureOr<TilingResult>
@@ -1758,6 +1777,118 @@ LogicalResult AttentionOp::getResultTilePosition(
     break;
   case 2:
     resultIndexingMap = *getSumMap();
+    break;
+  default:
+    return failure();
+  }
+
+  for (AffineExpr dimExpr : resultIndexingMap.getResults()) {
+    int dim = cast<AffineDimExpr>(dimExpr).getPosition();
+    resultOffsets.push_back(offsets[dim]);
+    resultSizes.push_back(sizes[dim]);
+  }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// OnlineAttentionOp
+//===----------------------------------------------------------------------===//
+
+SmallVector<Range> OnlineAttentionOp::getIterationDomain(OpBuilder &b) {
+  // Attention shape can be determined from Q, K, V alone.
+  SmallVector<Value> shapedValues = {getQuery(), getKey(), getValue()};
+  SmallVector<AffineMap> indexingMaps = {getQueryMap(), getKeyMap(),
+                                         getValueMap()};
+  return getAttentionIterationDomain(getLoc(), b, getIterationDomainRank(),
+                                     shapedValues, indexingMaps);
+}
+
+SmallVector<utils::IteratorType> OnlineAttentionOp::getLoopIteratorTypes() {
+  return getAttentionIteratorTypes(getIterationDomainRank(),
+                                   getIndexingMapsArray());
+}
+
+FailureOr<TilingResult>
+OnlineAttentionOp::getTiledImplementation(OpBuilder &builder,
+                                          ArrayRef<OpFoldResult> offsets,
+                                          ArrayRef<OpFoldResult> sizes) {
+  assert(offsets.size() == getIterationDomainRank());
+  assert(sizes.size() == getIterationDomainRank());
+
+  Location loc = getLoc();
+  auto one = builder.getIndexAttr(1);
+
+  auto tileValue = [&](Value val, AffineMap indexingMap)
+      -> std::tuple<SmallVector<OpFoldResult>, SmallVector<OpFoldResult>,
+                    SmallVector<OpFoldResult>> {
+    assert(indexingMap.isProjectedPermutation() &&
+           "Indexing map should be a projected permutation");
+    SmallVector<OpFoldResult> outputOffsets;
+    SmallVector<OpFoldResult> outputSizes;
+    SmallVector<OpFoldResult> outputStrides(indexingMap.getNumResults(), one);
+    for (AffineExpr dimExpr : indexingMap.getResults()) {
+      int dim = cast<AffineDimExpr>(dimExpr).getPosition();
+      outputOffsets.push_back(offsets[dim]);
+      outputSizes.push_back(sizes[dim]);
+    }
+    return {outputOffsets, outputSizes, outputStrides};
+  };
+
+  auto [queryOffsets, querySizes, queryStrides] =
+      tileValue(getQuery(), getQueryMap());
+  auto [keyOffsets, keySizes, keyStrides] = tileValue(getKey(), getKeyMap());
+  auto [valueOffsets, valueSizes, valueStrides] =
+      tileValue(getValue(), getValueMap());
+  auto [outputOffsets, outputSizes, outputStrides] =
+      tileValue(getOutput(), getOutputMap());
+  auto [maxOffsets, maxSizes, maxStrides] = tileValue(getMax(), getMaxMap());
+  auto [sumOffsets, sumSizes, sumStrides] = tileValue(getSum(), getSumMap());
+
+  Value scale = getScale();
+
+  SmallVector<Value> tiledOperands;
+  tiledOperands.emplace_back(getSlice(builder, loc, getQuery(), queryOffsets,
+                                      querySizes, queryStrides));
+  tiledOperands.emplace_back(
+      getSlice(builder, loc, getKey(), keyOffsets, keySizes, keyStrides));
+  tiledOperands.emplace_back(getSlice(builder, loc, getValue(), valueOffsets,
+                                      valueSizes, valueStrides));
+  tiledOperands.emplace_back(scale);
+  tiledOperands.emplace_back(getSlice(builder, loc, getOutput(), outputOffsets,
+                                      outputSizes, outputStrides));
+  tiledOperands.emplace_back(
+      getSlice(builder, loc, getMax(), maxOffsets, maxSizes, maxStrides));
+  tiledOperands.emplace_back(
+      getSlice(builder, loc, getSum(), sumOffsets, sumSizes, sumStrides));
+
+  SmallVector<Type> resultTypes;
+  resultTypes.push_back(tiledOperands[4].getType());
+  resultTypes.push_back(tiledOperands[5].getType());
+  resultTypes.push_back(tiledOperands[6].getType());
+
+  Operation *tiledOp =
+      mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
+
+  return TilingResult{{tiledOp}, SmallVector<Value>(tiledOp->getResults())};
+}
+
+LogicalResult OnlineAttentionOp::getResultTilePosition(
+    OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
+    SmallVector<OpFoldResult> &resultSizes) {
+  resultOffsets.clear();
+  resultSizes.clear();
+
+  AffineMap resultIndexingMap;
+  switch (resultNumber) {
+  case 0:
+    resultIndexingMap = getOutputMap();
+    break;
+  case 1:
+    resultIndexingMap = getMaxMap();
+    break;
+  case 2:
+    resultIndexingMap = getSumMap();
     break;
   default:
     return failure();

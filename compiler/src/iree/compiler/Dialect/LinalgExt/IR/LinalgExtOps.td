@@ -687,8 +687,12 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
     [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
      DestinationStyleOpInterface, LinalgExtInterface,
      DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
-     DeclareOpInterfaceMethods<AggregatedOpInterface, ["decomposeOperation"]>
-     ]> {
+     DeclareOpInterfaceMethods<AggregatedOpInterface, ["decomposeOperation"]>,
+     DeclareOpInterfaceMethods<TilingInterface,
+      ["getIterationDomain",
+       "getLoopIteratorTypes",
+       "getResultTilePosition",
+       "getTiledImplementation"]>]> {
   let summary = "Online Attention operator";
   let description = [{}];
 
