@@ -87,7 +87,7 @@ jobs:
           ref: c9b3337e1f754c83d178568be1339aaef5f08045
           path: SHARK-TestSuite
           submodules: false
-          lfs: true
+          lfs: false
       - name: Install external TestSuite Python requirements
         run: |
           source ${VENV_DIR}/bin/activate
@@ -97,7 +97,7 @@ jobs:
         run: |
           source ${VENV_DIR}/bin/activate
           pytest SHARK-TestSuite/iree_tests/onnx/ \
-              -n auto -rpfE --timeout=30 --durations=20 \
+              -n 4 -rpfE --timeout=30 --durations=20 \
               --no-skip-tests-missing-files \
               --config-files=${CONFIG_FILE_PATH} \
               --report-log=${LOG_FILE_PATH}
