@@ -19,7 +19,7 @@ on:
 
 jobs:
   test_onnx:
-    name: "test_onnx :: ${{ matrix.name }} :: ${{ matrix.runs-on }}"
+    name: "test_onnx :: ${{ matrix.name }}"
     runs-on: ${{ matrix.runs-on }}
     strategy:
       fail-fast: false
@@ -117,7 +117,7 @@ jobs:
           path: "${CONFIG_FILE_PATH}"
 
   test_models:
-    name: "test_models :: ${{ matrix.name }} :: ${{ matrix.runs-on }}"
+    name: "test_models :: ${{ matrix.name }}"
     runs-on: ${{ matrix.runs-on }}
     strategy:
       fail-fast: false
