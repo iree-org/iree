@@ -80,6 +80,7 @@ iree_cc_library(
     MLIRArithDialect
     MLIRArithUtils
     MLIRComplexDialect
+    MLIRDestinationStyleOpInterface
     MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRIR

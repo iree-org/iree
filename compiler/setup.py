@@ -467,7 +467,7 @@ setup(
     ],
     extras_require={
         "onnx": [
-            "onnx>=1.15.0",
+            "onnx>=1.16.0",
         ],
     },
 )

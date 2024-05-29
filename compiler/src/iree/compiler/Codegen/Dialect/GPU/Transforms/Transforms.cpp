@@ -8,16 +8,273 @@
 
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "llvm/ADT/STLExtras.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
 #include "mlir/Dialect/Vector/Utils/VectorUtils.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
+#include "mlir/Support/MathExtras.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-transforms"
 
 namespace mlir::iree_compiler::IREE::GPU {
+
+//===---------------------------------------------------------------------===//
+// Forall Fusion
+//===---------------------------------------------------------------------===//
+
+static FailureOr<int64_t> getTripCount(scf::ForallOp loop) {
+  ArrayRef<int64_t> lbs = loop.getStaticLowerBound();
+  ArrayRef<int64_t> ubs = loop.getStaticUpperBound();
+  ArrayRef<int64_t> steps = loop.getStaticStep();
+
+  if (ShapedType::isDynamicShape(lbs) || ShapedType::isDynamicShape(ubs) ||
+      ShapedType::isDynamicShape(steps)) {
+    return failure();
+  }
+
+  int64_t tripCount = 1;
+  for (auto [lb, ub, step] : llvm::zip_equal(lbs, ubs, steps)) {
+    tripCount *= mlir::ceilDiv((ub - lb), step);
+  }
+  return tripCount;
+}
+
+static LogicalResult compareWorkerCountsAndTypes(scf::ForallOp producer,
+                                                 scf::ForallOp consumer) {
+  FailureOr<int64_t> producerTripCount = getTripCount(producer);
+  FailureOr<int64_t> consumerTripCount = getTripCount(consumer);
+  if (failed(producerTripCount) || failed(consumerTripCount) ||
+      *producerTripCount != *consumerTripCount) {
+    return failure();
+  }
+
+  auto checkMappingTypes = [&](ArrayAttr array) {
+    return llvm::all_of(array.getValue(),
+                        llvm::IsaPred<gpu::GPUThreadMappingAttr>) ||
+           llvm::all_of(array.getValue(),
+                        llvm::IsaPred<gpu::GPUWarpMappingAttr>);
+  };
+
+  if (producer.getMappingAttr() != consumer.getMappingAttr() ||
+      !checkMappingTypes(producer.getMappingAttr()) ||
+      !checkMappingTypes(consumer.getMappingAttr())) {
+    return failure();
+  }
+  return success();
+}
+
+static void replaceExtractSlice(RewriterBase &rewriter, Location loc,
+                                tensor::ParallelInsertSliceOp parallelInsert,
+                                tensor::ExtractSliceOp extractSlice) {
+  OpBuilder::InsertionGuard g(rewriter);
+  auto shuffleOp = rewriter.create<IREE::GPU::ShuffleTensorOp>(
+      loc, extractSlice.getType(), parallelInsert.getSource(),
+      parallelInsert.getOffsets(), parallelInsert.getSizes(),
+      parallelInsert.getStrides(), parallelInsert.getStaticOffsets(),
+      parallelInsert.getStaticSizes(), parallelInsert.getStaticStrides(),
+      parallelInsert.getDest());
+  Region *region = &shuffleOp.getRegion();
+  rewriter.createBlock(region, region->end(),
+                       ArrayRef<Type>{parallelInsert.getDestType()},
+                       ArrayRef<Location>{loc});
+  rewriter.setInsertionPointToStart(shuffleOp.getBody());
+  auto terminator =
+      rewriter.create<IREE::GPU::YieldOp>(loc, extractSlice.getResult());
+  rewriter.moveOpBefore(extractSlice, terminator);
+  extractSlice.getSourceMutable().assign(shuffleOp.getBody()->getArgument(0));
+  rewriter.replaceAllUsesExcept(extractSlice.getResult(), shuffleOp,
+                                terminator);
+}
+
+LogicalResult fuseForallIntoSlice(RewriterBase &rewriter,
+                                  scf::ForallOp producer,
+                                  scf::ForallOp consumer,
+                                  tensor::ExtractSliceOp slice) {
+  if (producer->getNumResults() != 1) {
+    return failure();
+  }
+
+  if (failed(compareWorkerCountsAndTypes(producer, consumer))) {
+    return failure();
+  }
+
+  auto isAll = [](ArrayRef<OpFoldResult> array, int64_t cmp) {
+    return llvm::all_of(array, [cmp](OpFoldResult val) {
+      return isConstantIntValue(val, cmp);
+    });
+  };
+
+  if (!isAll(producer.getMixedStep(), 1) ||
+      !isAll(producer.getMixedLowerBound(), 0) ||
+      !isAll(consumer.getMixedStep(), 1) ||
+      !isAll(consumer.getMixedLowerBound(), 0)) {
+    return failure();
+  }
+
+  rewriter.setInsertionPoint(slice);
+
+  // Step 1. Compute the producer IDs in terms of the consumer IDs.
+
+  MLIRContext *context = rewriter.getContext();
+  Location loc = producer.getLoc();
+
+  AffineExpr d0, d1, d2;
+  bindDims(context, d0, d1, d2);
+  AffineExpr mulAdd = d0 * d1 + d2;
+  OpFoldResult linearId = rewriter.getIndexAttr(0);
+  for (auto [inductionVar, workerCount] :
+       llvm::zip_equal(getAsOpFoldResult(consumer.getInductionVars()),
+                       consumer.getMixedUpperBound())) {
+    linearId = affine::makeComposedFoldedAffineApply(
+        rewriter, loc, mulAdd, {linearId, workerCount, inductionVar});
+  }
+
+  Value linearThreadIdVal =
+      getValueOrCreateConstantIndexOp(rewriter, loc, linearId);
+  SmallVector<Value> ranges;
+  for (auto workerCount : producer.getStaticUpperBound()) {
+    ranges.push_back(rewriter.create<arith::ConstantIndexOp>(loc, workerCount));
+  }
+  ValueRange newIds = rewriter
+                          .create<affine::AffineDelinearizeIndexOp>(
+                              loc, linearThreadIdVal, ranges)
+                          .getResults();
+
+  // Step 2. Inline the region of the producer.
+  SmallVector<Value> bbArgReplacements(newIds);
+  bbArgReplacements.append(producer.getOutputs().begin(),
+                           producer.getOutputs().end());
+
+  scf::InParallelOp terminator = producer.getTerminator();
+  rewriter.inlineBlockBefore(producer.getBody(), slice, bbArgReplacements);
+
+  rewriter.setInsertionPointAfter(terminator);
+  auto parallelInsert =
+      cast<tensor::ParallelInsertSliceOp>(*terminator.getYieldingOps().begin());
+
+  replaceExtractSlice(rewriter, loc, parallelInsert, slice);
+
+  rewriter.eraseOp(parallelInsert);
+  rewriter.eraseOp(terminator);
+  rewriter.eraseOp(producer);
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// MultiMmaOp Lowering
+//===----------------------------------------------------------------------===//
+
+namespace {
+struct LowerMultiMmaPattern : public OpRewritePattern<IREE::GPU::MultiMmaOp> {
+  using OpRewritePattern<IREE::GPU::MultiMmaOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::GPU::MultiMmaOp mmaOp,
+                                PatternRewriter &rewriter) const override {
+    if (mmaOp.hasTensorSemantics()) {
+      return rewriter.notifyMatchFailure(
+          mmaOp, "lowering to concrete op requires vector semantics");
+    }
+    SmallVector<int64_t> bounds;
+    mmaOp.getIterationBounds(bounds);
+    if (!bounds.empty()) {
+      return rewriter.notifyMatchFailure(mmaOp,
+                                         "must be a single mma operation");
+    }
+
+    auto [lhsVectorType, rhsVectorType, accVectorType] =
+        mmaOp.getKind().getABCVectorTypes();
+
+    Value aCast = mmaOp.getLhs();
+    Value bCast = mmaOp.getRhs();
+    Value cCast = mmaOp.getAcc();
+    if (aCast.getType() != lhsVectorType) {
+      aCast = rewriter.create<vector::ShapeCastOp>(mmaOp.getLoc(),
+                                                   lhsVectorType, aCast);
+    }
+    if (bCast.getType() != rhsVectorType) {
+      bCast = rewriter.create<vector::ShapeCastOp>(mmaOp.getLoc(),
+                                                   rhsVectorType, bCast);
+    }
+    if (cCast.getType() != accVectorType) {
+      cCast = rewriter.create<vector::ShapeCastOp>(mmaOp.getLoc(),
+                                                   accVectorType, cCast);
+    }
+
+    FailureOr<Value> concreteMmaOp = mmaOp.getKind().buildMmaOperation(
+        rewriter, mmaOp.getLoc(), cCast.getType(), aCast, bCast, cCast);
+    assert(succeeded(concreteMmaOp) && "Failed to create mma op");
+    rewriter.replaceOpWithNewOp<vector::ShapeCastOp>(
+        mmaOp, mmaOp.getAcc().getType(), *concreteMmaOp);
+    return success();
+  }
+};
+} // namespace
+
+void populateIREEGPULowerMultiMmaPatterns(RewritePatternSet &patterns) {
+  patterns.add<LowerMultiMmaPattern>(patterns.getContext());
+}
+
+//===----------------------------------------------------------------------===//
+// MultiMmaOp Unit Dim Folding
+//===----------------------------------------------------------------------===//
+
+namespace {
+struct DropMultiMmaUnitDimsPattern
+    : public OpRewritePattern<IREE::GPU::MultiMmaOp> {
+  using OpRewritePattern<IREE::GPU::MultiMmaOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::GPU::MultiMmaOp mmaOp,
+                                PatternRewriter &rewriter) const override {
+    if (mmaOp.hasTensorSemantics()) {
+      return rewriter.notifyMatchFailure(
+          mmaOp, "unimplemented: unit dim dropping for tensor mma ops");
+    }
+    SmallVector<int64_t> bounds;
+    mmaOp.getIterationBounds(bounds);
+    if (bounds.empty()) {
+      return rewriter.notifyMatchFailure(mmaOp, "no dimensions to fold");
+    }
+
+    // TODO: Generalize to allow only some iteration bounds to be unit. This
+    // pattern currently only supports the most common case of unrolling to the
+    // intrinsic shape.
+    if (!llvm::all_of(bounds, [](int64_t b) { return b == 1; })) {
+      return rewriter.notifyMatchFailure(mmaOp,
+                                         "not all iteration bounds are unit");
+    }
+
+    Location loc = mmaOp.getLoc();
+    auto dropLeadUnitDims = [&](Value operand, int64_t numDims) -> Value {
+      if (numDims == 0) {
+        return operand;
+      }
+      SmallVector<int64_t> droppedDimIndices(numDims, 0);
+      return rewriter.create<vector::ExtractOp>(loc, operand,
+                                                droppedDimIndices);
+    };
+
+    Value newLhs = dropLeadUnitDims(mmaOp.getLhs(), mmaOp.getLhsOuterRank());
+    Value newRhs = dropLeadUnitDims(mmaOp.getRhs(), mmaOp.getRhsOuterRank());
+    Value newAcc = dropLeadUnitDims(mmaOp.getAcc(), mmaOp.getAccOuterRank());
+
+    AffineMap empty = AffineMap::get(rewriter.getContext());
+    auto newMmaOp = rewriter.create<IREE::GPU::MultiMmaOp>(
+        loc, newLhs, newRhs, newAcc,
+        rewriter.getAffineMapArrayAttr({empty, empty, empty}),
+        rewriter.getArrayAttr({}), mmaOp.getKind());
+
+    rewriter.replaceOpWithNewOp<vector::BroadcastOp>(
+        mmaOp, mmaOp.getResultType(), newMmaOp);
+    return success();
+  }
+};
+} // namespace
+
+void populateIREEGPUDropUnitDimsPatterns(RewritePatternSet &patterns) {
+  patterns.add<DropMultiMmaUnitDimsPattern>(patterns.getContext());
+}
 
 //===----------------------------------------------------------------------===//
 // MultiMmaOp Unrolling
@@ -189,9 +446,9 @@ void populateIREEGPUVectorUnrollPatterns(
   patterns.add<UnrollMultiMmaPattern>(patterns.getContext(), options);
 }
 
-//===----------------------------------------------------------------------===//
+//===---------------------------------------------------------------------===//
 // MultiMmaOp Vectorization
-//===----------------------------------------------------------------------===//
+//===---------------------------------------------------------------------===//
 
 static LogicalResult vectorizeStaticMultiMmaOp(RewriterBase &rewriter,
                                                IREE::GPU::MultiMmaOp mmaOp) {
@@ -257,6 +514,30 @@ struct VectorizeStaticMultiMmaOpPattern final
 
 void populateIREEGPUVectorizationPatterns(RewritePatternSet &patterns) {
   patterns.add<VectorizeStaticMultiMmaOpPattern>(patterns.getContext());
+}
+
+//===----------------------------------------------------------------------===//
+// VectorBarrierOp Lowering
+//===----------------------------------------------------------------------===//
+
+namespace {
+struct LowerValueBarrierPattern
+    : public OpRewritePattern<IREE::GPU::ValueBarrierOp> {
+  using OpRewritePattern<IREE::GPU::ValueBarrierOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(IREE::GPU::ValueBarrierOp barrier,
+                                PatternRewriter &rewriter) const override {
+    if (barrier.hasTensorSemantics()) {
+      return failure();
+    }
+    rewriter.create<gpu::BarrierOp>(barrier.getLoc());
+    rewriter.replaceOp(barrier, barrier.getInput());
+    return success();
+  }
+};
+} // namespace
+
+void populateIREEGPULowerValueBarrierPatterns(RewritePatternSet &patterns) {
+  patterns.add<LowerValueBarrierPattern>(patterns.getContext());
 }
 
 } // namespace mlir::iree_compiler::IREE::GPU

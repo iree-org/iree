@@ -50,6 +50,7 @@ iree_cc_library(
     MLIRIR
     MLIRInferTypeOpInterface
     MLIRLinalgDialect
+    MLIRLinalgStructuredOpsIncGenLib
     MLIRLinalgUtils
     MLIRMathDialect
     MLIRMemRefDialect

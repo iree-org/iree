@@ -13,6 +13,7 @@
 #include "iree/compiler/Codegen/Common/CPU/Passes.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "iree/compiler/Codegen/Dialect/GPU/Transforms/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/ROCDLPasses.h"
@@ -33,6 +34,7 @@ void registerCodegenPasses() {
   registerCodegenSPIRVPasses();
   registerCodegenVMVXPasses();
   registerCodegenWGSLPasses();
+  registerIREEGPUPasses();
 }
 
 } // namespace mlir::iree_compiler

@@ -621,7 +621,7 @@ jobs:
           pip install --upgrade pip
           # Pre-fetch optional deps that iree-compiler needs (but we constrain that
           # to not consult a package index).
-          pip install onnx>=1.15.0
+          pip install onnx>=1.16.0
           pip install --no-index -f $PWD -v iree-compiler[onnx]
           echo "Testing default compiler:"
           python -m iree.compiler._package_test
@@ -738,30 +738,27 @@ jobs:
   tracing:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'tracing')
-    runs-on:
-      - self-hosted # must come first
-      - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.runner-env }}
-      - cpu
-      - os-family=Linux
+    runs-on: ubuntu-20.04
     env:
       BUILD_DIR: build-tracing
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-        with:
-          submodules: true
-      - name: "Building IREE with tracing enabled"
-        env:
-          IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
+      - name: "Checking out runtime submodules"
+        run: ./build_tools/scripts/git/update_runtime_submodules.sh
+      - name: "Building IREE runtime with tracing - Tracy"
         run: |
-          # TODO(#11394): Enable Web GPU
           ./build_tools/github_actions/docker_run.sh \
-            --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
-            --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
-            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446" \
+            --env "TRACING_PROVIDER=tracy" \
             gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
-            ./build_tools/cmake/build_tracing.sh \
+            ./build_tools/cmake/build_runtime_tracing.sh \
+            "${BUILD_DIR}"
+      - name: "Building IREE runtime with tracing - console"
+        run: |
+          ./build_tools/github_actions/docker_run.sh \
+            --env "TRACING_PROVIDER=console" \
+            gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
+            ./build_tools/cmake/build_runtime_tracing.sh \
             "${BUILD_DIR}"
 
   debug:

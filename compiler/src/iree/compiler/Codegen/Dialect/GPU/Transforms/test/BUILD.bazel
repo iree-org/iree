@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Tests for common transforms.
+# Tests for iree_gpu transforms.
 
 load("//build_tools/bazel:iree_lit_test.bzl", "iree_lit_test_suite")
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
@@ -18,12 +18,7 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
-            "drop_multi_mma_unit_dims.mlir",
-            "lower_multi_mma.mlir",
-            "lower_vector_barrier.mlir",
-            "transform_fuse_forall.mlir",
-            "vectorize_multi_mma.mlir",
-            "unroll_multi_mma.mlir",
+            "fuse_and_hoist_forall.mlir",
         ],
         include = ["*.mlir"],
     ),

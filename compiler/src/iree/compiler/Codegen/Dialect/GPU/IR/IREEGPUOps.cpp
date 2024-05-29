@@ -237,12 +237,4 @@ LogicalResult ShuffleTensorOp::verifyRegions() {
   return success();
 }
 
-//===----------------------------------------------------------------------===//
-// TensorBarrierOp
-//===----------------------------------------------------------------------===//
-
-MutableOperandRange TensorBarrierOp::getDpsInitsMutable() {
-  return getInputMutable();
-}
-
 } // namespace mlir::iree_compiler::IREE::GPU
