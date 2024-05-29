@@ -440,6 +440,9 @@ dense math into HAL command buffers that are dispatched to hardware backends.
       }
     ```
 
+For more detailed information about the design of the VM, see
+[this design doc](../../developers/design-docs/vm.md).
+
 #### HAL
 
 <!-- TODO(scotttodd): command buffer construction -> dispatch diagram -->
