@@ -28,19 +28,23 @@ jobs:
           # CPU
           - name: cpu_llvm_sync
             config-file: onnx_cpu_llvm_sync.json
+            numprocesses: auto
             runs-on: ubuntu-20.04
 
           # AMD GPU
           - name: amdgpu_rocm_rdna3
+            numprocesses: 1
             config-file: onnx_gpu_rocm_rdna3.json
             runs-on: nodai-amdgpu-w7900-x86-64
           - name: amdgpu_vulkan
+            numprocesses: 4
             config-file: onnx_gpu_vulkan.json
             runs-on: nodai-amdgpu-w7900-x86-64
 
           # NVIDIA GPU
           - name: nvidiagpu_cuda
             config-file: onnx_gpu_cuda.json
+            numprocesses: 4
             runs-on:
               - self-hosted # must come first
               - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
@@ -49,6 +53,7 @@ jobs:
               - os-family=Linux
           - name: nvidiagpu_vulkan
             config-file: onnx_gpu_vulkan.json
+            numprocesses: 4
             runs-on:
               - self-hosted # must come first
               - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
@@ -59,6 +64,7 @@ jobs:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       IREERS_ARTIFACT_DIR: ${{ github.workspace }}/artifacts
       CONFIG_FILE_PATH: build_tools/pkgci/external_test_suite/${{ matrix.config-file }}
+      NUMPROCESSES: ${{ matrix.numprocesses }}
       LOG_FILE_PATH: /tmp/iree_tests_onnx_${{ matrix.name }}_logs.json
       VENV_DIR: ${{ github.workspace }}/venv
     steps:
@@ -97,7 +103,10 @@ jobs:
         run: |
           source ${VENV_DIR}/bin/activate
           pytest SHARK-TestSuite/iree_tests/onnx/ \
-              -n 4 -rpfE --timeout=30 --durations=20 \
+              -rpfE \
+              --numprocesses ${NUMPROCESSES} \
+              --timeout=30 \
+              --durations=20 \
               --no-skip-tests-missing-files \
               --config-files=${CONFIG_FILE_PATH} \
               --report-log=${LOG_FILE_PATH}
