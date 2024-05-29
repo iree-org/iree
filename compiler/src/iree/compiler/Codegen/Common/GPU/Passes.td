@@ -96,6 +96,17 @@ def GPUPipeliningPass :
   ];
 }
 
+def GPUPromoteMatmulOperandsPass :
+    InterfacePass<"iree-codegen-gpu-promote-matmul-operands",
+                  "mlir::FunctionOpInterface"> {
+  let summary = "Pass to insert copies with a different thread configuration "
+                "on matmul operands";
+  let dependentDialects = [
+    "::mlir::linalg::LinalgDialect",
+    "::mlir::iree_compiler::IREE::GPU::IREEGPUDialect"
+  ];
+}
+
 def GPUReduceBankConflictsPass :
     InterfacePass<"iree-codegen-gpu-reduce-bank-conflicts", "mlir::FunctionOpInterface"> {
   let summary = "Pass to try to reduce the number of bank conflicts by padding memref.alloc ops.";

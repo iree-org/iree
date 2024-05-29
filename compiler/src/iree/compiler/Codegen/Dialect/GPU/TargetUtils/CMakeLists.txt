@@ -12,6 +12,23 @@ iree_add_all_subdirs()
 
 iree_cc_library(
   NAME
+    ConfigUtils
+  HDRS
+    "ConfigUtils.h"
+  SRCS
+    "ConfigUtils.cpp"
+  DEPS
+    LLVMSupport
+    MLIRFunctionInterfaces
+    MLIRIR
+    MLIRLinalgDialect
+    MLIRSupport
+    iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     KnownTargets
   HDRS
     "KnownTargets.h"
