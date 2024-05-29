@@ -1,8 +1,23 @@
 // RUN: iree-opt --split-input-file --iree-hal-verify-devices %s --mlir-print-local-scope --verify-diagnostics | FileCheck %s
 
-// expected-error@+1 {{no HAL devices defined in the module}}
+// Tests that modules without tensors don't need devices.
+
 module @module {
+  // CHECK: util.func private @func
   util.func private @func() -> ()
+}
+
+// -----
+
+// TODO(multi-device): find a way to verify that devices exist if they need to.
+// Currently the check is disabled as it's difficult to tell if a device will be
+// needed by the time we get to the HAL layer: plugins may absorb things, etc.
+// NO-expected-errorx@+1 {{no HAL devices defined in the module}}
+module @module {
+  util.func private @func() -> () {
+    arith.constant dense<1.0> : tensor<4xf32>
+    util.return
+  }
 }
 
 // -----

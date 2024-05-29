@@ -754,6 +754,8 @@ def HAL_DeviceTargetAttr : AttrDef<HAL_Dialect, "DeviceTarget", [
     // Returns true if there's an attribute with the given name in the
     // configuration dictionary.
     bool hasConfigurationAttr(StringRef name);
+    // Returns the configuration attribute with the given name if found.
+    Attribute getConfigurationAttr(StringRef name);
 
     // Returns zero or more executable targets that this device supports.
     void getExecutableTargets(
@@ -916,7 +918,7 @@ def HAL_DeviceAffinityAttr : AttrDef<HAL_Dialect, "DeviceAffinity", [
   }];
 
   let parameters = (ins
-    AttrParameter<"FlatSymbolRefAttr", "">:$device,
+    AttrParameter<"SymbolRefAttr", "">:$device,
     AttrParameter<"int64_t", "">:$queue_mask
   );
 

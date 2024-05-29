@@ -127,13 +127,38 @@ struct VerifyDevicesPass
       return signalPassFailure();
     }
 
-    // Must have at least one device specified.
-    if (deviceAnalysis.getDeviceGlobals().empty()) {
+    // Devices are only required if we have dialects we may lower into device
+    // code. For now checking for tensor types is probably sufficient though we
+    // may want a pluggable way to decide this (e.g. dialect/type/op
+    // interfaces).
+    auto isTensor = [](Type type) { return isa<TensorType>(type); };
+    bool anyTensors = false;
+    for (auto &op : moduleOp.getOps()) {
+      if (op.hasTrait<OpTrait::IREE::Util::ObjectLike>()) {
+        continue; // ignore executables
+      }
+      op.walk([&](Operation *childOp) {
+        if (llvm::any_of(childOp->getOperandTypes(), isTensor) ||
+            llvm::any_of(childOp->getResultTypes(), isTensor)) {
+          anyTensors = true;
+          return WalkResult::interrupt();
+        }
+        return WalkResult::advance();
+      });
+    }
+    // TODO(multi-device): the logic above is insufficient; we only need devices
+    // if the program will end up requiring them but we don't know that here.
+    // We have to wait until we've lowered to the point where we do require a
+    // device _and_ we actually want one (aren't compiling a non-HAL program).
+    // We could probably have an op interface, better output from the pass that
+    // requires the devices, etc. For now we error out in HAL conversion when we
+    // try to resolve devices.
+    if (false && anyTensors && deviceAnalysis.getDeviceGlobals().empty()) {
       auto diagnostic = moduleOp.emitError();
       diagnostic
           << "no HAL devices defined in the module; use the module-level "
              "hal.device.targets attribute, the --iree-hal-target-device= "
-             "flags, or provide inputs with global !hal.devices defined; ";
+             "flag, or provide inputs with global !hal.devices defined; ";
       printAvailable(diagnostic, *targetRegistry.value);
       return signalPassFailure();
     }

@@ -136,18 +136,6 @@ void buildIREEPrecompileTransformPassPipeline(
   if (compileTo == IREEVMPipelinePhase::Input)
     return; // early-exit
 
-  // If the user specified a set of target devices we attach them to the module
-  // IR so that they are available for all passes that may want to use this
-  // information. If trying to compile in a generic mode the user should omit
-  // specifying targets.
-  IREE::HAL::AssignmentOptions halAssignmentOptions;
-  halAssignmentOptions.legacyTargetBackends =
-      halTargetOptions.legacyTargetBackends;
-  halAssignmentOptions.targetDevices = halTargetOptions.targetDevices;
-  halAssignmentOptions.defaultDevice = halTargetOptions.defaultDevice;
-  IREE::HAL::buildHALDeviceAssignmentPassPipeline(passManager, targetRegistry,
-                                                  halAssignmentOptions);
-
   // Now that inputs are legalized, generate wrapper for entry functions.
   if (compileFrom < IREEVMPipelinePhase::ABI) { // late-entry
     IREE_TRACE_ADD_BEGIN_FRAME_PASS(passManager, "ABI");
@@ -171,6 +159,18 @@ void buildIREEPrecompileTransformPassPipeline(
   }
   if (compileTo == IREEVMPipelinePhase::ABI)
     return; // early-exit
+
+  // If the user specified a set of target devices we attach them to the module
+  // IR so that they are available for all passes that may want to use this
+  // information. If trying to compile in a generic mode the user should omit
+  // specifying targets.
+  IREE::HAL::AssignmentOptions halAssignmentOptions;
+  halAssignmentOptions.legacyTargetBackends =
+      halTargetOptions.legacyTargetBackends;
+  halAssignmentOptions.targetDevices = halTargetOptions.targetDevices;
+  halAssignmentOptions.defaultDevice = halTargetOptions.defaultDevice;
+  IREE::HAL::buildHALDeviceAssignmentPassPipeline(passManager, targetRegistry,
+                                                  halAssignmentOptions);
 
   GlobalOptimization::TransformOptions globalTransformOptions;
   globalTransformOptions.options = globalOptimizationOptions;

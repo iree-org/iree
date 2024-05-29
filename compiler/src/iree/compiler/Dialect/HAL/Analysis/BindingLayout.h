@@ -59,6 +59,9 @@ class BindingLayoutAnalysis {
 public:
   explicit BindingLayoutAnalysis(Operation *rootOp, SymbolTable &symbolTable);
 
+  // Whether there are any dispatches in the program.
+  bool hasDispatches() const;
+
   // Returns all of the dispatches to the given executable export.
   ArrayRef<IREE::Stream::CmdDispatchOp>
   getExportDispatches(IREE::Stream::ExecutableExportOp exportOp) const {

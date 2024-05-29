@@ -600,6 +600,18 @@ struct MaterializeInterfacesPass
       return signalPassFailure();
     }
 
+    // If no devices were defined and there are dispatches in the program then
+    // error out. This provides a better error message than if we were to allow
+    // this pass to no-op and then fail during conversion later on.
+    if (layoutAnalysis.hasDispatches() &&
+        deviceAnalysis.getDeviceGlobals().empty()) {
+      mlir::emitError(moduleOp.getLoc())
+          << "no HAL devices defined in the module; use the module-level "
+             "hal.device.targets attribute, the --iree-hal-target-device= "
+             "flag, or provide inputs with global !hal.devices defined";
+      return signalPassFailure();
+    }
+
     // Gather the required executable targets per executable and dispatch site.
     auto requiredExecutableTargets = buildRequiredExecutableTargetsMap(
         moduleOp, deviceAnalysis, layoutAnalysis);

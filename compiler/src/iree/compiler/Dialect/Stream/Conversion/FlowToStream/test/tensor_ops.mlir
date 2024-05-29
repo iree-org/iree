@@ -231,9 +231,9 @@ util.func public @tensorStore(%target : tensor<2x3xi32>) -> tensor<2x3xi32> {
 util.func public @tensorStoreScalar(%target : tensor<i32>) -> tensor<i32> {
   // CHECK: %[[VALUE:.+]] = arith.constant 9
   %value = arith.constant 9 : i32
-  // CHECK: %[[SPLAT:.+]] = stream.tensor.splat %[[VALUE]] : i32 -> tensor<i32> in !stream.resource<*>{%[[TARGET_SIZE]]}
+  // CHECK: %[[FILL:.+]] = stream.tensor.fill %[[VALUE]], %[[TARGET]] : i32 -> tensor<i32> in %[[TARGET]] as !stream.resource<*>{%[[TARGET_SIZE]]}
   %0 = flow.tensor.store %value, %target : tensor<i32>
-  // CHECK: util.return %[[SPLAT]]
+  // CHECK: util.return %[[FILL]]
   util.return %0 : tensor<i32>
 }
 
