@@ -145,6 +145,7 @@ jobs:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       IREERS_ARTIFACT_DIR: ${{ github.workspace }}/artifacts
       IREE_TEST_FILES: ~/iree_tests_cache
+      IREE_TEST_PATH_EXTENSION: ${{ github.workspace }}/build_tools/pkgci/external_test_suite
       MODELS_CONFIG_FILE_PATH: build_tools/pkgci/external_test_suite/${{ matrix.models-config-file }}
       MODELS_EXTRA_FLAGS_CONFIG_FILE_PATH: build_tools/pkgci/external_test_suite/${{ matrix.models-extra-flags-config-file }}
       SDXL_CONFIG_FILE_PATH: build_tools/pkgci/external_test_suite/${{ matrix.sdxl-config-file }}
