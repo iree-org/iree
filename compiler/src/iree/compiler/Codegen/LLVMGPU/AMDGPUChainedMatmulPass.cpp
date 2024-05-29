@@ -201,16 +201,16 @@ struct AMDGPUPrepareForChainedMatmulPass
 
     IRRewriter rewriter(funcOp.getContext());
     for (vector::ContractionOp candidate : matmulCandidates) {
-      FailureOr<vector::ContractionOp> maybeChainedParent =
-          getTransitiveMatmulParent(candidate);
-      if (failed(maybeChainedParent)) {
-        continue;
-      }
-      auto chainParent = maybeChainedParent.value();
-      swapOperandsAndTranspose(rewriter, chainParent);
+      // FailureOr<vector::ContractionOp> maybeChainedParent =
+      //     getTransitiveMatmulParent(candidate);
+      // if (failed(maybeChainedParent)) {
+      //   continue;
+      // }
+      // auto chainParent = maybeChainedParent.value();
+      // swapOperandsAndTranspose(rewriter, chainParent);
 
-      // TODO: We should be only transposing the second matrix if the
-      // result of the first matmul is used by the second matmul transitively.
+      // // TODO: We should be only transposing the second matrix if the
+      // // result of the first matmul is used by the second matmul transitively.
       swapOperandsAndTranspose(rewriter, candidate);
     }
   }

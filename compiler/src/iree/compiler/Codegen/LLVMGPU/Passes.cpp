@@ -646,6 +646,7 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createHoistStaticallyBoundAllocationsPass());
 
   // Vector SIMD -> Vector SIMT
+  funcPassManager.addPass(createAMDGPUPrepareForChainedMatmulPass());
   funcPassManager.addPass(createLLVMGPUCastTypeToFitMMAPass());
   funcPassManager.addPass(createLLVMGPUVectorDistribute());
   funcPassManager.addPass(createCanonicalizerPass());
