@@ -448,28 +448,34 @@ Attribute DeviceTargetAttr::parse(AsmParser &p, Type type) {
       // `[targets, ...]` (optional)
       do {
         IREE::HAL::ExecutableTargetAttr executableTargetAttr;
-        if (failed(p.parseAttribute(executableTargetAttr)))
+        if (failed(p.parseAttribute(executableTargetAttr))) {
           return {};
+        }
         executableTargetAttrs.push_back(executableTargetAttr);
       } while (succeeded(p.parseOptionalComma()));
-      if (failed(p.parseRSquare()))
+      if (failed(p.parseRSquare())) {
         return {};
+      }
     } else {
       // `{config dict}` (optional)
-      if (failed(p.parseAttribute(configAttr)))
+      if (failed(p.parseAttribute(configAttr))) {
         return {};
+      }
       // `, [targets, ...]` (optional)
       if (succeeded(p.parseOptionalComma())) {
-        if (failed(p.parseLSquare()))
+        if (failed(p.parseLSquare())) {
           return {};
+        }
         do {
           IREE::HAL::ExecutableTargetAttr executableTargetAttr;
-          if (failed(p.parseAttribute(executableTargetAttr)))
+          if (failed(p.parseAttribute(executableTargetAttr))) {
             return {};
+          }
           executableTargetAttrs.push_back(executableTargetAttr);
         } while (succeeded(p.parseOptionalComma()));
-        if (failed(p.parseRSquare()))
+        if (failed(p.parseRSquare())) {
           return {};
+        }
       }
     }
   }
@@ -502,12 +508,26 @@ void DeviceTargetAttr::print(AsmPrinter &p) const {
 }
 
 std::string DeviceTargetAttr::getSymbolNameFragment() {
-  return sanitizeSymbolName(getDeviceID().getValue().lower());
+  std::string name = getDeviceID().getValue().lower();
+  if (auto ordinalAttr =
+          dyn_cast_if_present<IntegerAttr>(getConfigurationAttr("ordinal"))) {
+    name += "_";
+    name += std::to_string(ordinalAttr.getInt());
+    name += "_"; // can't have trailing numbers
+  }
+  return sanitizeSymbolName(name);
 }
 
 bool DeviceTargetAttr::hasConfigurationAttr(StringRef name) {
   auto configAttr = getConfiguration();
   return configAttr && configAttr.get(name);
+}
+
+Attribute DeviceTargetAttr::getConfigurationAttr(StringRef name) {
+  if (auto configAttr = getConfiguration()) {
+    return configAttr.get(name);
+  }
+  return {};
 }
 
 void DeviceTargetAttr::getExecutableTargets(

@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "device_ops.mlir"
     "pseudo_ops.mlir"
   TOOLS
     FileCheck

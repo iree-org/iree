@@ -49,6 +49,7 @@ struct ConvertToHALPass
     : public IREE::HAL::impl::ConvertToHALPassBase<ConvertToHALPass> {
   void runOnOperation() override {
     auto *context = &getContext();
+    auto moduleOp = getOperation();
 
     // Gather all interfaces from registered dialects.
     // These will perform the tensor->buffer mapping for their ops.
@@ -64,8 +65,7 @@ struct ConvertToHALPass
     HALTypeConverter typeConverter(conversionInterfaces);
     HALConversionTarget conversionTarget(context, typeConverter);
 
-    RewritePatternSet patterns(&getContext());
-
+    RewritePatternSet patterns(context);
     populateHALToHALPatterns(context, conversionTarget, typeConverter,
                              patterns);
     populateUtilToHALPatterns(context, conversionTarget, typeConverter,
@@ -84,13 +84,14 @@ struct ConvertToHALPass
 
     // NOTE: we allow ops that we don't know about to allow custom dialects
     // that don't need anything HAL-specific to pass through.
-    if (failed(applyPartialConversion(getOperation(), conversionTarget,
+    if (failed(applyPartialConversion(moduleOp, conversionTarget,
                                       std::move(patterns)))) {
       return signalPassFailure();
     }
 
     // Cleanup conversion attributes used for spooky action at a distance.
-    for (auto executableOp : getOperation().getOps<IREE::HAL::ExecutableOp>()) {
+    moduleOp->removeAttr("stream.affinity.default");
+    for (auto executableOp : moduleOp.getOps<IREE::HAL::ExecutableOp>()) {
       for (auto variantOp :
            executableOp.getOps<IREE::HAL::ExecutableVariantOp>()) {
         for (auto exportOp :
