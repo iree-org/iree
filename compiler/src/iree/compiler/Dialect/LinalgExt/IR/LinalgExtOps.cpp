@@ -1435,21 +1435,7 @@ SmallVector<AffineMap> AttentionOp::getIndexingMapsArray() {
 LogicalResult OnlineAttentionOp::verify() {
   OnlineAttentionOp attnOp = *this;
 
-  int numInputs = getNumDpsInputs();
-  int numInits = getNumDpsInits();
   SmallVector<AffineMap> indexingMaps = attnOp.getIndexingMapsArray();
-
-  if (numInputs != 3) {
-    return attnOp->emitOpError()
-           << "expected 3 input operands: Query, Key and Value. Got: "
-           << numInputs;
-  }
-
-  if (numInits != 3) {
-    return attnOp->emitOpError()
-           << "expected 3 init operands: Output, Max and Sum. Got: "
-           << numInits;
-  }
 
   // Check if indexing maps can represent attention.
   FailureOr<AttentionOpDetail> maybeOpInfo =
@@ -1488,13 +1474,17 @@ LogicalResult OnlineAttentionOp::verify() {
       failed(checkShape("Value", getValue().getType().getShape(),
                         getValueMap())) ||
       failed(checkShape("Output", getOutput().getType().getShape(),
-                        getValueMap())) ||
-      failed(checkShape("Max", getMax().getType().getShape(), getValueMap())) ||
-      failed(checkShape("Sum", getSum().getType().getShape(), getValueMap()))) {
+                        getOutputMap())) ||
+      failed(checkShape("Max", getMax().getType().getShape(), getMaxMap())) ||
+      failed(checkShape("Sum", getSum().getType().getShape(), getSumMap()))) {
     return failure();
   }
 
   return success();
+}
+
+MutableOperandRange OnlineAttentionOp::getDpsInitsMutable() {
+  return MutableOperandRange(*this, /*numInputs=*/4, /*numInits=*/3);
 }
 
 LogicalResult OnlineAttentionOp::reifyResultShapes(
@@ -1507,6 +1497,9 @@ SmallVector<AffineMap> OnlineAttentionOp::getIndexingMapsArray() {
   return SmallVector<AffineMap>(
       getIndexingMaps().getAsValueRange<AffineMapAttr>());
 }
+
+FailureOr<SmallVector<Value>>
+OnlineAttentionOp::decomposeOperation(OpBuilder &b) {}
 
 #define DEFINE_OP_GET_EFFECTS(OP_NAME)                                         \
   void OP_NAME::getEffects(                                                    \
