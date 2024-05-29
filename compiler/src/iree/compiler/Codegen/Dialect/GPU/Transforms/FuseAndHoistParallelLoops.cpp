@@ -51,6 +51,46 @@ struct FuseForalls final : OpRewritePattern<tensor::ExtractSliceOp> {
   }
 };
 
+struct FuseTileableDestinationProducers final
+    : OpRewritePattern<scf::ForallOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(scf::ForallOp forallOp,
+                                PatternRewriter &rewriter) const override {
+    TilingInterface tileableProducer;
+    tensor::ExtractSliceOp sliceOp;
+    for (auto iterArg : forallOp.getRegionIterArgs()) {
+      for (auto user : iterArg.getUsers()) {
+        sliceOp = dyn_cast<tensor::ExtractSliceOp>(user);
+        if (sliceOp) {
+          break;
+        }
+      }
+      if (!sliceOp) {
+        continue;
+      }
+      tileableProducer = forallOp.getTiedLoopInit(iterArg)
+                             ->get()
+                             .getDefiningOp<TilingInterface>();
+      if (tileableProducer) {
+        break;
+      }
+    }
+    if (!tileableProducer) {
+      return failure();
+    }
+
+    SmallVector<LoopLikeOpInterface> loops = {forallOp};
+    rewriter.startOpModification(forallOp);
+    std::optional<scf::SCFFuseProducerOfSliceResult> fusionResult =
+        mlir::scf::tileAndFuseProducerOfSlice(rewriter, sliceOp, loops);
+    if (!fusionResult) {
+      return failure();
+    }
+    rewriter.finalizeOpModification(forallOp);
+    return success();
+  }
+};
+
 void FuseAndHoistParallelLoopsPass::runOnOperation() {
   MLIRContext *context = &getContext();
   RewritePatternSet patterns(context);
@@ -58,6 +98,7 @@ void FuseAndHoistParallelLoopsPass::runOnOperation() {
   // These two patterns are run to a fixed point, allowing fusion within
   // potentially nested loops, hoisting from said loops, and continued fusion.
   patterns.add<FuseForalls>(context);
+  patterns.add<FuseTileableDestinationProducers>(context);
   populateForallLoopHoistingPattern(patterns);
   if (failed(
           applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
