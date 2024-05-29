@@ -1662,6 +1662,24 @@ getAttentionIteratorTypes(int64_t domainRank,
   return iteratorTypes;
 }
 
+std::tuple<SmallVector<OpFoldResult>, SmallVector<OpFoldResult>,
+           SmallVector<OpFoldResult>>
+getTiledSlice(OpBuilder &builder, Value val, AffineMap indexingMap,
+              ArrayRef<OpFoldResult> offsets, ArrayRef<OpFoldResult> sizes) {
+  auto one = builder.getIndexAttr(1);
+  assert(indexingMap.isProjectedPermutation() &&
+         "Indexing map should be a projected permutation");
+  SmallVector<OpFoldResult> outputOffsets;
+  SmallVector<OpFoldResult> outputSizes;
+  SmallVector<OpFoldResult> outputStrides(indexingMap.getNumResults(), one);
+  for (AffineExpr dimExpr : indexingMap.getResults()) {
+    int dim = cast<AffineDimExpr>(dimExpr).getPosition();
+    outputOffsets.push_back(offsets[dim]);
+    outputSizes.push_back(sizes[dim]);
+  }
+  return {outputOffsets, outputSizes, outputStrides};
+}
+
 //===----------------------------------------------------------------------===//
 // AttentionOp
 //===----------------------------------------------------------------------===//
@@ -1688,31 +1706,15 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
   assert(sizes.size() == getIterationDomainRank());
 
   Location loc = getLoc();
-  auto one = builder.getIndexAttr(1);
-
-  auto tileValue = [&](Value val, AffineMap indexingMap)
-      -> std::tuple<SmallVector<OpFoldResult>, SmallVector<OpFoldResult>,
-                    SmallVector<OpFoldResult>> {
-    assert(indexingMap.isProjectedPermutation() &&
-           "Indexing map should be a projected permutation");
-    SmallVector<OpFoldResult> outputOffsets;
-    SmallVector<OpFoldResult> outputSizes;
-    SmallVector<OpFoldResult> outputStrides(indexingMap.getNumResults(), one);
-    for (AffineExpr dimExpr : indexingMap.getResults()) {
-      int dim = cast<AffineDimExpr>(dimExpr).getPosition();
-      outputOffsets.push_back(offsets[dim]);
-      outputSizes.push_back(sizes[dim]);
-    }
-    return {outputOffsets, outputSizes, outputStrides};
-  };
 
   auto [queryOffsets, querySizes, queryStrides] =
-      tileValue(getQuery(), getQueryMap());
-  auto [keyOffsets, keySizes, keyStrides] = tileValue(getKey(), getKeyMap());
+      getTiledSlice(builder, getQuery(), getQueryMap(), offsets, sizes);
+  auto [keyOffsets, keySizes, keyStrides] =
+      getTiledSlice(builder, getKey(), getKeyMap(), offsets, sizes);
   auto [valueOffsets, valueSizes, valueStrides] =
-      tileValue(getValue(), getValueMap());
+      getTiledSlice(builder, getValue(), getValueMap(), offsets, sizes);
   auto [outputOffsets, outputSizes, outputStrides] =
-      tileValue(getOutput(), getOutputMap());
+      getTiledSlice(builder, getOutput(), getOutputMap(), offsets, sizes);
 
   Value scale = getScale();
 
@@ -1730,7 +1732,7 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
   std::optional<Value> max = getMax();
   if (max) {
     auto [maxOffsets, maxSizes, maxStrides] =
-        tileValue(max.value(), *getMaxMap());
+        getTiledSlice(builder, max.value(), *getMaxMap(), offsets, sizes);
     tiledOperands.emplace_back(
         getSlice(builder, loc, max.value(), maxOffsets, maxSizes, maxStrides));
   }
@@ -1738,7 +1740,7 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
   std::optional<Value> sum = getMax();
   if (sum) {
     auto [sumOffsets, sumSizes, sumStrides] =
-        tileValue(sum.value(), *getSumMap());
+        getTiledSlice(builder, sum.value(), *getSumMap(), offsets, sizes);
     tiledOperands.emplace_back(
         getSlice(builder, loc, sum.value(), sumOffsets, sumSizes, sumStrides));
   }
@@ -1816,33 +1818,19 @@ OnlineAttentionOp::getTiledImplementation(OpBuilder &builder,
   assert(sizes.size() == getIterationDomainRank());
 
   Location loc = getLoc();
-  auto one = builder.getIndexAttr(1);
-
-  auto tileValue = [&](Value val, AffineMap indexingMap)
-      -> std::tuple<SmallVector<OpFoldResult>, SmallVector<OpFoldResult>,
-                    SmallVector<OpFoldResult>> {
-    assert(indexingMap.isProjectedPermutation() &&
-           "Indexing map should be a projected permutation");
-    SmallVector<OpFoldResult> outputOffsets;
-    SmallVector<OpFoldResult> outputSizes;
-    SmallVector<OpFoldResult> outputStrides(indexingMap.getNumResults(), one);
-    for (AffineExpr dimExpr : indexingMap.getResults()) {
-      int dim = cast<AffineDimExpr>(dimExpr).getPosition();
-      outputOffsets.push_back(offsets[dim]);
-      outputSizes.push_back(sizes[dim]);
-    }
-    return {outputOffsets, outputSizes, outputStrides};
-  };
 
   auto [queryOffsets, querySizes, queryStrides] =
-      tileValue(getQuery(), getQueryMap());
-  auto [keyOffsets, keySizes, keyStrides] = tileValue(getKey(), getKeyMap());
+      getTiledSlice(builder, getQuery(), getQueryMap(), offsets, sizes);
+  auto [keyOffsets, keySizes, keyStrides] =
+      getTiledSlice(builder, getKey(), getKeyMap(), offsets, sizes);
   auto [valueOffsets, valueSizes, valueStrides] =
-      tileValue(getValue(), getValueMap());
+      getTiledSlice(builder, getValue(), getValueMap(), offsets, sizes);
   auto [outputOffsets, outputSizes, outputStrides] =
-      tileValue(getOutput(), getOutputMap());
-  auto [maxOffsets, maxSizes, maxStrides] = tileValue(getMax(), getMaxMap());
-  auto [sumOffsets, sumSizes, sumStrides] = tileValue(getSum(), getSumMap());
+      getTiledSlice(builder, getOutput(), getOutputMap(), offsets, sizes);
+  auto [maxOffsets, maxSizes, maxStrides] =
+      getTiledSlice(builder, getMax(), getMaxMap(), offsets, sizes);
+  auto [sumOffsets, sumSizes, sumStrides] =
+      getTiledSlice(builder, getSum(), getSumMap(), offsets, sizes);
 
   Value scale = getScale();
 
