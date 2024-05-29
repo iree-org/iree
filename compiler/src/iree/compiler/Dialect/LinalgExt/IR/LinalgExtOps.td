@@ -9,6 +9,7 @@
 
 include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtBase.td"
 include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.td"
+include "mlir/Dialect/Linalg/IR/LinalgInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/DestinationStyleOpInterface.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
@@ -682,57 +683,39 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
 // OnlineAttention
 //===----------------------------------------------------------------------===//
 
-def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_Op<"online_attention",
-    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>]> {
-  let summary = "Attention operator";
+def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     DestinationStyleOpInterface, LinalgExtInterface,
+     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+     DeclareOpInterfaceMethods<AggregatedOpInterface, ["decomposeOperation"]>
+     ]> {
+  let summary = "Online Attention operator";
   let description = [{}];
 
-  let arguments = (ins Variadic<AnyShaped>:$inputs,
-                       Variadic<AnyShaped>:$outputs,
+  let arguments = (ins AnyShaped:$query,
+                       AnyShaped:$key,
+                       AnyShaped:$value,
                        AnyFloat:$scale,
+                       AnyShaped:$output,
+                       AnyShaped:$max,
+                       AnyShaped:$sum,
                        AffineMapArrayAttr:$indexing_maps
   );
 
   let results = (outs Variadic<AnyRankedTensor>:$results);
+  let hasVerifier = 1;
+  let hasCustomAssemblyFormat = 1;
   let assemblyFormat = [{
     attr-dict
-    `ins` `(` $inputs `:` type($inputs) `)`
-    `outs` `(` $outputs `:` type($outputs) `)`
-    `(` $scale `:` type($scale) `)`
+    `ins` `(` $query `,` $key `,` $value `,` $scale `:` type($query) `,` type($key) `,` type($value) `,` type($scale) `)`
+    `outs` `(` $output `,` $max `,` $sum `:` type($output) `,` type($max) `,` type($sum) `)`
     (`->` type($results)^)?
   }];
 
-  let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
-    TypedValue<ShapedType> getQuery() {
-      return cast<TypedValue<ShapedType>>(getInputs()[0]);
-    }
-    TypedValue<ShapedType> getKey() {
-      return cast<TypedValue<ShapedType>>(getInputs()[1]);
-    }
-    TypedValue<ShapedType> getValue() {
-      return cast<TypedValue<ShapedType>>(getInputs()[2]);
-    }
-    TypedValue<ShapedType> getOutput() {
-      return cast<TypedValue<ShapedType>>(getOutputs()[0]);
-    }
-    TypedValue<ShapedType> getMax() {
-      return cast<TypedValue<ShapedType>>(getOutputs()[1]);
-    }
-    TypedValue<ShapedType> getSum() {
-      return cast<TypedValue<ShapedType>>(getOutputs()[2]);
-    }
-
-    // Method to implement for specifying input range for
-    // DestinationStyleOpInterface
-    MutableOperandRange getDpsInputsMutable() {
-      return getInputsMutable();
-    }
-
+  let extraClassDeclaration = [{
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
-    MutableOperandRange getDpsInitsMutable() {
-      return getOutputsMutable();
-    }
+    MutableOperandRange getDpsInitsMutable();
 
     SmallVector<AffineMap> getIndexingMapsArray();
 
@@ -748,10 +731,10 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_Op<"online_attention",
     AffineMap getOutputMap() {
       return getIndexingMapsArray()[3];
     }
-    std::optional<AffineMap> getMaxMap() {
+    AffineMap getMaxMap() {
       return getIndexingMapsArray()[4];
     }
-    std::optional<AffineMap> getSumMap() {
+    AffineMap getSumMap() {
       return getIndexingMapsArray()[5];
     }
 

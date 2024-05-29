@@ -27,7 +27,7 @@ findPermutationsIndexingOperand(AffineMap indexingMap) {
 
 void AttentionOpDetail::inferFromIndexingMaps(
     ArrayRef<AffineMap> indexingMaps) {
-  assert(indexingMaps.size() == 4);
+  assert(indexingMaps.size() >= 4);
   AffineMap qMap = indexingMaps[0];
   AffineMap kMap = indexingMaps[1];
   AffineMap vMap = indexingMaps[2];
