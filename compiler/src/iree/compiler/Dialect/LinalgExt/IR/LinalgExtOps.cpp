@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
+#include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
@@ -1431,7 +1432,70 @@ SmallVector<AffineMap> AttentionOp::getIndexingMapsArray() {
 // OnlineAttentionOp
 //===----------------------------------------------------------------------===//
 
-LogicalResult OnlineAttentionOp::verify() { return success(); }
+LogicalResult OnlineAttentionOp::verify() {
+  OnlineAttentionOp attnOp = *this;
+
+  int numInputs = getNumDpsInputs();
+  int numInits = getNumDpsInits();
+  SmallVector<AffineMap> indexingMaps = attnOp.getIndexingMapsArray();
+
+  if (numInputs != 3) {
+    return attnOp->emitOpError()
+           << "expected 3 input operands: Query, Key and Value. Got: "
+           << numInputs;
+  }
+
+  if (numInits != 3) {
+    return attnOp->emitOpError()
+           << "expected 3 init operands: Output, Max and Sum. Got: "
+           << numInits;
+  }
+
+  // Check if indexing maps can represent attention.
+  FailureOr<AttentionOpDetail> maybeOpInfo =
+      AttentionOpDetail::get(indexingMaps);
+
+  // Check shape compatibility based on indexing maps.
+  SmallVector<int64_t> shape(getIterationDomainRank());
+  SmallVector<bool> foundDims(getIterationDomainRank(), false);
+  auto checkShape = [&shape, &foundDims,
+                     &attnOp](StringRef operandName, ArrayRef<int64_t> valShape,
+                              AffineMap indexingMap) -> LogicalResult {
+    if (indexingMap.getNumResults() != valShape.size()) {
+      return attnOp->emitError("Rank Mismatch for ")
+             << operandName << ". Expected: " << indexingMap.getNumResults()
+             << " Got: " << valShape.size();
+    }
+    for (auto [i, dimExpr] : llvm::enumerate(indexingMap.getResults())) {
+      AffineDimExpr dim = cast<AffineDimExpr>(dimExpr);
+      int64_t pos = dim.getPosition();
+      if (!foundDims[pos]) {
+        foundDims[pos] = true;
+        shape[pos] = valShape[i];
+      }
+      if (shape[pos] != valShape[i]) {
+        return attnOp->emitError("Shape Mismatch for ")
+               << operandName << ". Expected: " << shape[pos]
+               << " Got: " << valShape[i];
+      }
+    }
+    return success();
+  };
+
+  if (failed(checkShape("Query", getQuery().getType().getShape(),
+                        getQueryMap())) ||
+      failed(checkShape("Key", getKey().getType().getShape(), getKeyMap())) ||
+      failed(checkShape("Value", getValue().getType().getShape(),
+                        getValueMap())) ||
+      failed(checkShape("Output", getOutput().getType().getShape(),
+                        getValueMap())) ||
+      failed(checkShape("Max", getMax().getType().getShape(), getValueMap())) ||
+      failed(checkShape("Sum", getSum().getType().getShape(), getValueMap()))) {
+    return failure();
+  }
+
+  return success();
+}
 
 LogicalResult OnlineAttentionOp::reifyResultShapes(
     OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
@@ -1440,7 +1504,8 @@ LogicalResult OnlineAttentionOp::reifyResultShapes(
 }
 
 SmallVector<AffineMap> OnlineAttentionOp::getIndexingMapsArray() {
-  return getIndexingMaps().getAsValueRange<AffineMapAttr>();
+  return SmallVector<AffineMap>(
+      getIndexingMaps().getAsValueRange<AffineMapAttr>());
 }
 
 #define DEFINE_OP_GET_EFFECTS(OP_NAME)                                         \
