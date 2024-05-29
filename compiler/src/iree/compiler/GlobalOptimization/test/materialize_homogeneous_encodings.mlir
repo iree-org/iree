@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-global-opt-materialize-homogeneous-encodings %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-hal-device-assignment-pipeline --iree-global-opt-materialize-homogeneous-encodings %s | FileCheck %s
 
 #executable_target_embedded_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "embedded-elf-x86_64", {target_triple = "x86_64-none-elf", cpu_features = "+avx512f"}>
 #map = affine_map<()[s0, s1] -> (-s1 + (s1 ceildiv s0) * s0)>
@@ -57,7 +57,7 @@ module attributes {hal.device.targets = [#device_target_vulkan]} {
   }
 }
 
-// vulkan uses default materialization patterns which unsets the encodings.
+// Vulkan uses default materialization patterns which unsets the encodings.
 // CHECK-LABEL: util.func public @lhs_encoding
 // CHECK-SAME:    %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK:         util.return %[[ARG0]]

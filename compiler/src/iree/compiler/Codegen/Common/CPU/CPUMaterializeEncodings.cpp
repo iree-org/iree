@@ -13,6 +13,7 @@
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
+#include "iree/compiler/Dialect/Stream/Analysis/Affinity.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/MathExtras.h"
@@ -547,6 +548,35 @@ static LogicalResult materializeFuncOpEncodings(
   return success();
 }
 
+// Returns the executable targets used within |funcOp|.
+//
+// TODO(multi-device): delete this pass and rely on tensor-based analysis to
+// materialize encodings based on where tensors are used. This pass is not able
+// to handle that.
+static std::optional<SetVector<IREE::HAL::ExecutableTargetAttr>>
+getFuncExecutableTargetAttrs(FunctionOpInterface funcOp,
+                             IREE::Stream::AffinityAnalysis &affinityAnalysis,
+                             IREE::HAL::DeviceAnalysis &deviceAnalysis) {
+  // Get a set of all unique affinities used by resources within the function.
+  SetVector<IREE::Stream::AffinityAttr> uniqueAffinityAttrs;
+  SmallVector<IREE::Stream::AffinityAttr> lookupAffinityAttrs;
+  funcOp.walk([&](Operation *op) {
+    if (affinityAnalysis.tryLookupExecutionAffinity(op, lookupAffinityAttrs)) {
+      uniqueAffinityAttrs.insert(lookupAffinityAttrs.begin(),
+                                 lookupAffinityAttrs.end());
+    }
+    lookupAffinityAttrs.clear();
+  });
+
+  // Resolve affinities to executable targets.
+  SetVector<IREE::HAL::ExecutableTargetAttr> executableTargetAttrs;
+  for (auto affinityAttr : uniqueAffinityAttrs) {
+    deviceAnalysis.gatherRequiredExecutableTargets(affinityAttr, funcOp,
+                                                   executableTargetAttrs);
+  }
+  return executableTargetAttrs;
+}
+
 struct CPUMaterializeHostEncodingPass
     : public CPUMaterializeHostEncodingBase<CPUMaterializeHostEncodingPass> {
   CPUMaterializeHostEncodingPass() = default;
@@ -560,23 +590,36 @@ struct CPUMaterializeHostEncodingPass
     auto moduleOp = getOperation();
 
     // Run required analysis passes.
-    IREE::HAL::DeviceAnalysis deviceAnalysis(moduleOp);
-    if (failed(deviceAnalysis.run()))
+    IREE::Stream::AffinityAnalysis affinityAnalysis(moduleOp);
+    if (failed(affinityAnalysis.run())) {
       return signalPassFailure();
+    }
+    IREE::HAL::DeviceAnalysis deviceAnalysis(moduleOp);
+    if (failed(deviceAnalysis.run())) {
+      return signalPassFailure();
+    }
 
     for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
       // Gather the required executable targets for the function. Note that it's
       // possible there are more required for ops nested within the function but
       // this pass is a hack and can't handle that :shrug:.
-      SetVector<IREE::HAL::ExecutableTargetAttr> executableTargets;
-      deviceAnalysis.gatherRequiredExecutableTargets(funcOp, executableTargets);
+      auto executableTargets = getFuncExecutableTargetAttrs(
+          funcOp, affinityAnalysis, deviceAnalysis);
+      if (!executableTargets) {
+        funcOp.emitOpError()
+            << "could not determine executable targets for the function";
+        return signalPassFailure();
+      } else if (executableTargets->empty()) {
+        // Probably no tensors.
+        continue;
+      }
 
       // HACK: this pass is run on the host _but shouldn't be_. Because it's
       // run on the host and IREE is a compiler capable of multi-targeting there
       // may be multiple executable targets at any point in the host program.
       // This pass can't handle that and assumes it's been checked earlier by
       // spooky action at a distance. This needs to be fixed.
-      if (executableTargets.size() != 1) {
+      if (executableTargets->size() != 1) {
         funcOp.emitOpError() << "has multiple executable targets and CPU data "
                                 "tiling isn't built to support that";
         return signalPassFailure();
@@ -584,7 +627,7 @@ struct CPUMaterializeHostEncodingPass
 
       // Materialize encodings within the function.
       if (failed(
-              materializeFuncOpEncodings(funcOp, executableTargets.front()))) {
+              materializeFuncOpEncodings(funcOp, executableTargets->front()))) {
         return signalPassFailure();
       }
     }
@@ -636,22 +679,35 @@ struct CPUMaterializeUpperBoundTileSizePass
     auto moduleOp = getOperation();
 
     // Run required analysis passes.
-    IREE::HAL::DeviceAnalysis deviceAnalysis(moduleOp);
-    if (failed(deviceAnalysis.run()))
+    IREE::Stream::AffinityAnalysis affinityAnalysis(moduleOp);
+    if (failed(affinityAnalysis.run())) {
       return signalPassFailure();
+    }
+    IREE::HAL::DeviceAnalysis deviceAnalysis(moduleOp);
+    if (failed(deviceAnalysis.run())) {
+      return signalPassFailure();
+    }
 
     for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
       // Gather the required executable targets for the function. Note that it's
       // possible there are more required for ops nested within the function but
       // this pass is a hack and can't handle that :shrug:.
-      SetVector<IREE::HAL::ExecutableTargetAttr> executableTargets;
-      deviceAnalysis.gatherRequiredExecutableTargets(funcOp, executableTargets);
+      auto executableTargets = getFuncExecutableTargetAttrs(
+          funcOp, affinityAnalysis, deviceAnalysis);
+      if (!executableTargets) {
+        funcOp.emitOpError()
+            << "could not determine executable targets for the function";
+        return signalPassFailure();
+      } else if (executableTargets->empty()) {
+        // Probably no tensors.
+        continue;
+      }
 
       // Get patterns specialized for the executable targets used by the
       // function.
       RewritePatternSet patterns(&getContext());
       MaterializeEncodingFn materializeEncodingFn =
-          getUpperBoundMaterializeEncodingFn(executableTargets.getArrayRef());
+          getUpperBoundMaterializeEncodingFn(executableTargets->getArrayRef());
       if (!materializeEncodingFn)
         return signalPassFailure();
       populateMaterializeUpperBoundTileSizePatterns(patterns,

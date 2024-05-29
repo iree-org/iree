@@ -90,14 +90,16 @@ struct DeduplicateTensorBarrierSources
     for (auto source : op.getSources()) {
       auto it =
           uniqueSources.insert(std::make_pair(source, orderedSources.size()));
-      if (it.second)
+      if (it.second) {
         orderedSources.push_back(source);
+      }
       resultMapping.push_back(it.first->second);
     }
-    if (orderedSources.size() == op.getSources().size())
+    if (orderedSources.size() == op.getSources().size()) {
       return failure();
-    auto newOp = rewriter.create<TensorBarrierOp>(
-        op.getLoc(), orderedSources, op.getSignalFence(), op.getAffinityAttr());
+    }
+    auto newOp = rewriter.create<TensorBarrierOp>(op.getLoc(), orderedSources,
+                                                  op.getSignalFence());
     SmallVector<Value> newResults;
     newResults.reserve(newOp.getNumResults());
     for (unsigned newIndex : resultMapping) {

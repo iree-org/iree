@@ -43,16 +43,22 @@ static Type mapToABIType(Type type) {
   return type;
 }
 
+// Returns true if the given |attr| is a known ABI attribute that is only used
+// by this pass.
+static bool isABIAttr(NamedAttribute attr) {
+  return attr.getName() == "iree.abi.affinity" ||
+         attr.getName() == "iree.abi.encoding" ||
+         attr.getName() == "iree.abi.model" ||
+         attr.getName() == "iree.abi.output";
+}
+
 // Removes all ABI attrs handled by this pass from all dictionaries.
 static void stripABIAttrs(SmallVectorImpl<DictionaryAttr> &allAttrs) {
   for (auto &attrDict : allAttrs) {
     SmallVector<NamedAttribute> attrs;
     attrs.reserve(attrDict.size());
     for (auto attr : attrDict) {
-      // TODO(benvanik): faster lookup.
-      if (attr.getName() != "iree.abi.output" &&
-          attr.getName() != "iree.abi.encoding" &&
-          attr.getName() != "iree.abi.affinity") {
+      if (!isABIAttr(attr)) {
         attrs.push_back(attr);
       }
     }
@@ -60,7 +66,16 @@ static void stripABIAttrs(SmallVectorImpl<DictionaryAttr> &allAttrs) {
   }
 }
 
+// Removes all ABI attrs from the |op| and its args/results.
 static void stripABIAttrs(FunctionOpInterface op) {
+  NamedAttrList attrs;
+  for (auto attr : op->getAttrs()) {
+    if (!isABIAttr(attr)) {
+      attrs.push_back(attr);
+    }
+  }
+  op->setAttrs(attrs);
+
   SmallVector<DictionaryAttr> argAttrs;
   op.getAllArgAttrs(argAttrs);
   stripABIAttrs(argAttrs);
@@ -69,6 +84,11 @@ static void stripABIAttrs(FunctionOpInterface op) {
   op.getAllResultAttrs(resultAttrs);
   stripABIAttrs(resultAttrs);
   op.setAllResultAttrs(resultAttrs);
+}
+
+template <typename T>
+static T fallback(T optionalValue, T defaultValue) {
+  return optionalValue ? optionalValue : defaultValue;
 }
 
 // Creates the corresponding wrapper function for the given import function.
@@ -101,12 +121,7 @@ createImportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
     argAttrDict.push_back(nullptr); // signal
     break;
   }
-
-  // Update the import type and propagate back the attributes we may have
-  // modified above.
   importOp.setType(newImportType);
-  importOp.setAllArgAttrs(argAttrDict);
-  importOp.setAllResultAttrs(resultAttrDict);
 
   auto *entryBlock = wrapperOp.addEntryBlock();
   auto entryBuilder = OpBuilder::atBlockBegin(entryBlock);
@@ -129,6 +144,12 @@ createImportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
   // users mark their functions 'nosideeffects' to avoid the host wait.
   const bool hasSideEffects = !importOp->hasAttr("nosideeffects");
 
+  // Fetch and normalize any explicitly assigned affinity.
+  auto defaultAffinityAttr = importOp->getAttr("iree.abi.affinity");
+  if (defaultAffinityAttr) {
+    importOp->setAttr("stream.affinity", defaultAffinityAttr);
+  }
+
   // When running async we insert a barrier on tensor arguments and attach that
   // to the fence we pass to the import for waiting. We'll also allocate the
   // signal fence that the import must signal when the returned tensors are
@@ -141,15 +162,24 @@ createImportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
     // No fences.
     break;
   case IREE::ABI::InvocationModel::CoarseFences: {
-    // HACK: this is relying on the fact that there's only one HAL device.
-    // We should instead have a way of creating fences on the device that
-    // is used to produce the tensors we're wrapping.
-    //
-    // TODO(multi-device): emit get with derived ordinal or lookup with attr. We
-    // could always say device 0 for now but could instead look for an
-    // iree.abi.affinity/iree.abi.device/etc.
-    Value device =
-        IREE::HAL::DeviceType::resolveAny(importOp.getLoc(), entryBuilder);
+    Value device;
+    // TODO(benvanik): support other affinity types.
+    if (auto deviceAffinityAttr =
+            dyn_cast_if_present<IREE::HAL::DeviceAffinityAttr>(
+                defaultAffinityAttr)) {
+      device = entryBuilder
+                   .create<IREE::HAL::DeviceResolveOp>(
+                       importOp.getLoc(),
+                       entryBuilder.getType<IREE::HAL::DeviceType>(),
+                       deviceAffinityAttr)
+                   .getResult(0);
+    } else {
+      // HACK: if no devices are available we get the first one available at
+      // runtime. This is suboptimal but we expect most usage to have affinities
+      // assigned prior to ABI conversion.
+      device =
+          IREE::HAL::DeviceType::resolveAny(importOp.getLoc(), entryBuilder);
+    }
 
     // When exporting a fence we need to put a barrier between the rest of the
     // program and the tensors consumed by the import.
@@ -162,7 +192,7 @@ createImportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
           importOp.getLoc(), entryBuilder.getType<IREE::HAL::FenceType>(),
           device, IREE::HAL::FenceFlagBitfield::None);
       auto barrierOp = entryBuilder.create<IREE::HAL::TensorBarrierOp>(
-          importOp.getLoc(), tensorArgs, waitFence, /*affinity=*/nullptr);
+          importOp.getLoc(), tensorArgs, waitFence);
       for (auto [argIndex, readyArg] :
            llvm::zip_equal(tensorArgIndices, barrierOp.getResults())) {
         entryArgs[argIndex] = readyArg;
@@ -203,9 +233,10 @@ createImportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
           importOp.getArgAttrOfType<TypeAttr>(argIndex, "iree.abi.encoding");
       auto tensorExportOp = entryBuilder.create<IREE::HAL::TensorExportOp>(
           arg.getLoc(), newType, arg,
-          encodingAttr ? encodingAttr : TypeAttr::get(oldType),
+          fallback(encodingAttr, TypeAttr::get(oldType)),
           /*name=*/nullptr,
-          /*affinity=*/nullptr);
+          fallback(importOp.getArgAttr(argIndex, "iree.abi.affinity"),
+                   defaultAffinityAttr));
       arguments.push_back(tensorExportOp.getTarget());
     } else {
       arguments.push_back(arg);
@@ -245,9 +276,10 @@ createImportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
           resultIndex, "iree.abi.encoding");
       auto tensorImportOp = entryBuilder.create<IREE::HAL::TensorImportOp>(
           importOp.getLoc(), oldType, result,
-          encodingAttr ? encodingAttr : TypeAttr::get(oldType), signalFence,
+          fallback(encodingAttr, TypeAttr::get(oldType)), signalFence,
           /*name=*/nullptr,
-          /*affinity=*/nullptr);
+          fallback(importOp.getResultAttr(resultIndex, "iree.abi.affinity"),
+                   defaultAffinityAttr));
       results.push_back(tensorImportOp);
     } else {
       results.push_back(result);
@@ -255,6 +287,9 @@ createImportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
   }
 
   entryBuilder.create<IREE::Util::ReturnOp>(importOp.getLoc(), results);
+
+  stripABIAttrs(importOp);
+
   return wrapperOp;
 }
 
@@ -518,8 +553,11 @@ createExportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
   // Populate the reflection attrs based on the original types.
   populateReflectionAttrs(invocationModel, exportOp, wrapperOp);
   exportOp->removeAttr("iree.reflection");
-  if (auto affinityAttr = exportOp->getAttr("stream.affinity")) {
-    wrapperOp->setAttr("stream.affinity", affinityAttr);
+
+  // Fetch and normalize any explicitly assigned affinity.
+  auto defaultAffinityAttr = exportOp->getAttr("iree.abi.affinity");
+  if (defaultAffinityAttr) {
+    exportOp->setAttr("stream.affinity", defaultAffinityAttr);
   }
 
   auto *entryBlock = wrapperOp.addEntryBlock();
@@ -572,12 +610,13 @@ createExportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
     if (llvm::isa<TensorType>(oldType)) {
       auto encodingAttr =
           exportOp.getArgAttrOfType<TypeAttr>(argIndex, "iree.abi.encoding");
+      auto argName = inferArgumentName(entryBuilder.getContext(), argIndex,
+                                       exportOp.getArgAttrDict(argIndex));
       auto tensorImportOp = entryBuilder.create<IREE::HAL::TensorImportOp>(
           arg.getLoc(), oldType, arg,
-          encodingAttr ? encodingAttr : TypeAttr::get(oldType), waitFence,
-          inferArgumentName(entryBuilder.getContext(), argIndex,
-                            exportOp.getArgAttrDict(argIndex)),
-          exportOp.getArgAttr(argIndex, "iree.abi.affinity"));
+          fallback(encodingAttr, TypeAttr::get(oldType)), waitFence, argName,
+          fallback(exportOp.getArgAttr(argIndex, "iree.abi.affinity"),
+                   defaultAffinityAttr));
       arguments.push_back(tensorImportOp.getTarget());
     } else {
       arguments.push_back(arg);
@@ -601,7 +640,8 @@ createExportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
     auto aliasOp = entryBuilder.create<IREE::HAL::TensorAliasOp>(
         exportOp.getLoc(), source.getType(), source, sourceDims,
         resultStorages[resultIndex], waitFence,
-        exportOp.getResultAttr(resultIndex, "iree.abi.affinity"));
+        fallback(exportOp.getResultAttr(resultIndex, "iree.abi.affinity"),
+                 defaultAffinityAttr));
     asyncResults[resultIndex] = cast<OpResult>(aliasOp.getResult());
   }
 
@@ -622,7 +662,7 @@ createExportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
                                                     signalFence);
     } else {
       auto barrierOp = entryBuilder.create<IREE::HAL::TensorBarrierOp>(
-          exportOp.getLoc(), asyncTensors, signalFence, /*affinity=*/nullptr);
+          exportOp.getLoc(), asyncTensors, signalFence);
       asyncResults = llvm::to_vector(barrierOp.getResults());
     }
   }
@@ -635,15 +675,17 @@ createExportWrapperFunc(IREE::ABI::InvocationModel invocationModel,
     if (llvm::isa<TensorType>(oldType)) {
       auto encodingAttr = exportOp.getResultAttrOfType<TypeAttr>(
           resultIndex, "iree.abi.encoding");
+      auto resultName =
+          inferResultName(entryBuilder.getContext(), resultIndex,
+                          exportOp.getResultAttrDict(resultIndex));
       auto dynamicDims = IREE::Util::buildDynamicDimsForValue(
           result.getLoc(), result, entryBuilder);
       auto tensorExportOp = entryBuilder.create<IREE::HAL::TensorExportOp>(
           result.getLoc(), newType, result,
-          encodingAttr ? encodingAttr : TypeAttr::get(result.getType()),
-          dynamicDims,
-          inferResultName(entryBuilder.getContext(), resultIndex,
-                          exportOp.getResultAttrDict(resultIndex)),
-          exportOp.getResultAttr(resultIndex, "iree.abi.affinity"));
+          fallback(encodingAttr, TypeAttr::get(result.getType())), dynamicDims,
+          resultName,
+          fallback(exportOp.getResultAttr(resultIndex, "iree.abi.affinity"),
+                   defaultAffinityAttr));
       results.push_back(tensorExportOp);
     } else {
       results.push_back(result);
@@ -731,12 +773,15 @@ public:
         exportOps.push_back(funcOp);
       }
     }
+    if (importOps.empty() && exportOps.empty()) {
+      return; // no-op
+    }
 
     SymbolTable symbolTable(moduleOp);
 
     // Create a wrapper function for each imported function.
-    // This will preserve the internal types (tensors/etc) but change the import
-    // to taking the ABI types and rewrite calls.
+    // This will preserve the internal types (tensors/etc) but change the
+    // import to taking the ABI types and rewrite calls.
     for (auto importOp : importOps) {
       if (failed(wrapImportFunc(getInvocationModel(importOp, invocationModel),
                                 moduleOp, importOp, symbolTable))) {

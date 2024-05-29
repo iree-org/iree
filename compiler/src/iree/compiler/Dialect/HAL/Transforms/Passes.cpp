@@ -198,11 +198,17 @@ void buildHALDeviceAssignmentPassPipeline(
     passManager.addPass(IREE::HAL::createAssignTargetDevicesPass(
         {assignmentOptions.targetDevices}));
   }
+
+  // Create globals for each device (if needed).
   passManager.addPass(IREE::HAL::createMaterializeTargetDevicesPass(
       {assignmentOptions.defaultDevice}));
+
+  // Resolve #hal.device.promise and #hal.device.alias attributes.
   passManager.addPass(IREE::HAL::createResolveDevicePromisesPass());
   passManager.addPass(
       IREE::HAL::createResolveDeviceAliasesPass({&targetRegistry}));
+
+  // Verify devices are valid.
   passManager.addPass(IREE::HAL::createVerifyDevicesPass({&targetRegistry}));
 }
 
@@ -221,6 +227,9 @@ void buildHALConfigurationPassPipeline(OpPassManager &passManager,
   // Perform cleanup upon entry so that our IR is in a good state for assignment
   // and initial interface analysis (we rely on CSE and such having been run).
   addCleanupPatterns(passManager);
+
+  // Verify devices are valid.
+  passManager.addPass(IREE::HAL::createVerifyDevicesPass({&targetRegistry}));
 
   //----------------------------------------------------------------------------
   // Device-specific interface materialization

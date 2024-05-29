@@ -33,6 +33,7 @@ module @module {
 
 // CHECK: module @module
 // CHECK-NOT: hal.device.targets
+// CHECK-SAME: stream.affinity.default = #hal.device.affinity<@__device_0>
 module @module attributes {
   hal.device.targets = [
     #hal.device.select<[#device_a, #device_b]> : !hal.device
@@ -42,18 +43,6 @@ module @module attributes {
   // CHECK-SAME:   #[[DEVICE_A]],
   // CHECK-SAME:   #[[DEVICE_B]]
   // CHECK-SAME: ]> : !hal.device
-
-  // CHECK: util.global private @tensor_global
-  // CHECK-SAME: stream.affinity = #hal.device.affinity<@__device_0>
-  util.global private @tensor_global : tensor<4xf32>
-
-  // CHECK: util.global private @primitive_global
-  // CHECK-NOT: stream.affinity
-  util.global private @primitive_global : i32
-
-  // CHECK: util.func private @func
-  // CHECK-SAME: stream.affinity = #hal.device.affinity<@__device_0>
-  util.func private @func() -> ()
 }
 
 // -----
@@ -69,6 +58,7 @@ module @module attributes {
 
 // CHECK: module @module
 // CHECK-NOT: hal.device.targets
+// CHECK-SAME: stream.affinity.default = #hal.device.affinity<@device_a>
 module @module attributes {
   hal.device.targets = {
     device_a = #device_a,
@@ -77,10 +67,6 @@ module @module attributes {
 } {
   // CHECK: util.global private @device_a = #[[DEVICE_A]]
   // CHECK: util.global private @device_bc = #hal.device.select<[#[[DEVICE_B]], #[[DEVICE_C]]]>
-
-  // CHECK: util.global private @tensor_global
-  // CHECK-SAME: stream.affinity = #hal.device.affinity<@device_a>
-  util.global private @tensor_global : tensor<4xf32>
 }
 
 // -----
@@ -94,6 +80,7 @@ module @module attributes {
 
 // CHECK: module @module
 // CHECK-NOT: hal.device.targets
+// CHECK-SAME: stream.affinity.default = #hal.device.affinity<@device_b>
 module @module attributes {
   hal.device.targets = {
     device_a = #device_a,
@@ -103,10 +90,6 @@ module @module attributes {
 } {
   // CHECK: util.global private @device_a
   // CHECK: util.global private @device_b
-
-  // CHECK: util.global private @tensor_global
-  // CHECK-SAME: stream.affinity = #hal.device.affinity<@device_b>
-  util.global private @tensor_global : tensor<4xf32>
 }
 
 // -----
@@ -120,6 +103,7 @@ module @module attributes {
 
 // CHECK: module @module
 // CHECK-NOT: hal.device.targets
+// CHECK-SAME: stream.affinity.default = #hal.device.affinity<@__device_1>
 module @module attributes {
   hal.device.targets = [
     #device_a,
@@ -129,9 +113,4 @@ module @module attributes {
 } {
   // CHECK: util.global private @__device_0
   // CHECK: util.global private @__device_1
-
-  // CHECK: util.global private @tensor_global
-  // CHECK-SAME: stream.affinity = #hal.device.affinity<@__device_1>
-  util.global private @tensor_global : tensor<4xf32>
 }
-

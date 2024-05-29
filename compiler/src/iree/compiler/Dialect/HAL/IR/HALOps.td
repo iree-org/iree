@@ -98,11 +98,6 @@ let opDocGroup = OpGroupPseudoOps in {
 
 def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
   AttrSizedOperandSegments,
-  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
-    "getTiedResult",
-    "getTiedResultOperandIndex",
-    "getTiedResultOperandIndices",
-  ]>,
   Util_ShapeAwareOp,
 ]> {
   let summary = [{imports a tensor from a HAL buffer view}];
@@ -171,11 +166,6 @@ def HAL_TensorImportOp : HAL_PureOp<"tensor.import", [
 }
 
 def HAL_TensorExportOp : HAL_PureOp<"tensor.export", [
-  DeclareOpInterfaceMethods<Util_TiedOpInterface, [
-    "getTiedResult",
-    "getTiedResultOperandIndex",
-    "getTiedResultOperandIndices",
-  ]>,
   Util_ShapeAwareOp,
 ]> {
   let summary = [{exports a tensor to a HAL buffer view}];
@@ -320,15 +310,13 @@ def HAL_TensorBarrierOp : HAL_Op<"tensor.barrier", [
 
   let arguments = (ins
     Variadic<AnyTensor>:$sources,
-    HAL_Fence:$signal_fence,
-    OptionalAttr<AnyAttr>:$affinity
+    HAL_Fence:$signal_fence
   );
   let results = (outs
     Variadic<AnyTensor>:$results
   );
 
   let assemblyFormat = [{
-    (`on` `(` $affinity^ `)`)?
     `join` `` `(` $sources `:` type($sources) `)`
     `=` `` `>`
     $signal_fence `:` type($signal_fence)
@@ -338,8 +326,7 @@ def HAL_TensorBarrierOp : HAL_Op<"tensor.barrier", [
   let builders = [
     OpBuilder<(ins
       "ValueRange":$sources,
-      "Value":$signalFence,
-      "Attribute":$affinity
+      "Value":$signalFence
     )>,
   ];
 
@@ -1567,6 +1554,41 @@ def OpGroupDeviceOps : OpDocGroup {
 }
 
 let opDocGroup = OpGroupDeviceOps in {
+
+def HAL_DeviceResolveOp : HAL_PureOp<"device.resolve", [
+  DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
+]> {
+  let summary = [{resolves device handles based on affinity}];
+  let description = [{
+    Examples:
+    ```
+    // Returns a HAL device.
+    = hal.device.resolve on(#something) : !hal.device
+    // Returns a HAL device, allocator, and (optional) queue affinity.
+    = hal.device.resolve on(#something) : !hal.device, !hal.allocator, i64
+    // Returns a HAL allocator and (optional) queue affinity.
+    = hal.device.resolve on(#something) : !hal.allocator, i64
+    // Returns "any" device. Should only be used as a fallback.
+    = hal.device.resolve : !hal.device
+    ```
+  }];
+
+  let arguments = (ins
+    OptionalAttr<HAL_DeviceAffinityAttr>:$affinity
+  );
+  let results = (outs
+    Variadic<AnyTypeOf<[
+      HAL_Device,
+      HAL_Allocator,
+      I64,
+    ]>>:$results
+  );
+
+  let assemblyFormat = [{
+    (`on` `(` $affinity^ `)`)?
+    attr-dict `:` type($results)
+  }];
+}
 
 def HAL_DeviceAllocatorOp : HAL_PureOp<"device.allocator", [
   DeclareOpInterfaceMethods<OpAsmOpInterface, ["getAsmResultNames"]>,
