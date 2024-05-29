@@ -141,6 +141,15 @@ jobs:
           - name: amdgpu_vulkan
             models-config-file: pytorch_models_gpu_vulkan.json
             runs-on: nodai-amdgpu-w7900-x86-64
+
+          # NVIDIA GPU
+          # None at the moment. Could maybe use the persistent a100 runners:
+          #   - self-hosted # must come first
+          #   - runner-group=${{ needs.setup.outputs.runner-group }}
+          #   - environment=${{ needs.setup.outputs.runner-env }}
+          #   - a100
+          #   - os-family=Linux
+          # (note: would need to plumb the presubmit/postsubmit runner-group through to here too)
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       IREERS_ARTIFACT_DIR: ${{ github.workspace }}/artifacts
