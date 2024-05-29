@@ -1499,7 +1499,9 @@ SmallVector<AffineMap> OnlineAttentionOp::getIndexingMapsArray() {
 }
 
 FailureOr<SmallVector<Value>>
-OnlineAttentionOp::decomposeOperation(OpBuilder &b) {}
+OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
+  return failure();
+}
 
 #define DEFINE_OP_GET_EFFECTS(OP_NAME)                                         \
   void OP_NAME::getEffects(                                                    \
