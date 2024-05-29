@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-name: PkgCI Regression Test (CPU)
+name: PkgCI Regression Test
 on:
   workflow_call:
     inputs:
@@ -18,12 +18,48 @@ on:
         default: ""
 
 jobs:
-  linux_x86_64:
-    name: Linux (x86_64)
-    runs-on: ubuntu-20.04
+  test_onnx:
+    name: "test_onnx :: ${{ matrix.name }} :: ${{ matrix.runs-on }}"
+    runs-on: ${{ matrix.runs-on }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # CPU
+          - name: cpu_llvm_sync
+            config-file: onnx_cpu_llvm_sync.json
+            runs-on: ubuntu-20.04
+
+          # AMD GPU
+          - name: amdgpu_rocm_rdna3
+            config-file: onnx_gpu_rocm_rdna3.json
+            runs-on: nodai-amdgpu-w7900-x86-64
+          - name: amdgpu_vulkan
+            config-file: onnx_gpu_vulkan.json
+            runs-on: nodai-amdgpu-w7900-x86-64
+
+          # NVIDIA GPU
+          - name: nvidiagpu_cuda
+            config-file: onnx_gpu_cuda.json
+            runs-on:
+              - self-hosted # must come first
+              - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+              - environment=prod
+              - gpu  # TODO(scotttodd): qualify further with vendor/model
+              - os-family=Linux
+          - name: nvidiagpu_vulkan
+            config-file: onnx_gpu_vulkan.json
+            runs-on:
+              - self-hosted # must come first
+              - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
+              - environment=prod
+              - gpu  # TODO(scotttodd): qualify further with vendor/model
+              - os-family=Linux
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       IREERS_ARTIFACT_DIR: ${{ github.workspace }}/artifacts
+      CONFIG_FILE_PATH: build_tools/pkgci/external_test_suite/${{ matrix.config-file }}
+      LOG_FILE_PATH: /tmp/iree_tests_onnx_${{ matrix.name }}_logs.json
       VENV_DIR: ${{ github.workspace }}/venv
     steps:
       - name: Checking out IREE repository
@@ -43,6 +79,7 @@ jobs:
           ./build_tools/pkgci/setup_venv.py ${VENV_DIR} \
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
+
       - name: Check out external TestSuite repository
         uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
         with:
@@ -55,39 +92,63 @@ jobs:
         run: |
           source ${VENV_DIR}/bin/activate
           python -m pip install -r SHARK-TestSuite/iree_tests/requirements.txt
+
       - name: Run external tests - ONNX test suite
         run: |
           source ${VENV_DIR}/bin/activate
           pytest SHARK-TestSuite/iree_tests/onnx/ \
               -n auto -rpfE --timeout=30 --durations=20 \
-              --config-files=build_tools/pkgci/external_test_suite/onnx_cpu_llvm_sync.json \
               --no-skip-tests-missing-files \
-              --report-log=/tmp/iree_tests_onnx_cpu_llvm_sync_logs.json
+              --config-files=${CONFIG_FILE_PATH} \
+              --report-log=${LOG_FILE_PATH}
       - name: "Updating config file with latest XFAIL lists"
         if: failure()
         run: |
           source ${VENV_DIR}/bin/activate
           python SHARK-TestSuite/iree_tests/update_config_xfails.py \
-            --log-file=/tmp/iree_tests_onnx_cpu_llvm_sync_logs.json \
-            --config-file=build_tools/pkgci/external_test_suite/onnx_cpu_llvm_sync.json
-          cat build_tools/pkgci/external_test_suite/onnx_cpu_llvm_sync.json
+            --log-file=${LOG_FILE_PATH} \
+            --config-file=${CONFIG_FILE_PATH}
+          cat ${CONFIG_FILE_PATH}
       - name: "Uploading new config file"
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: "onnx_cpu_llvm_sync.json"
-          path: "build_tools/pkgci/external_test_suite/onnx_cpu_llvm_sync.json"
+          name: "${{ matrix.config-file }}"
+          path: "${CONFIG_FILE_PATH}"
 
-  # Note: this is a persistent runner with a local cache. Downloading all input
-  # files (50GB+) without a cache can take 20+ minutes.
-  linux_x86_64_models:
-    name: Linux (x86_64) Model Testing
-    runs-on: nodai-amdgpu-w7900-x86-64
+  test_models:
+    name: "test_models :: ${{ matrix.name }} :: ${{ matrix.runs-on }}"
+    runs-on: ${{ matrix.runs-on }}
+    strategy:
+      fail-fast: false
+
+      # Note: these jobs should use persistent runners with local caches.
+      # Downloading test files (50GB+) without a cache can take 20+ minutes.
+      matrix:
+        include:
+          # CPU
+          - name: cpu_llvm_task
+            models-config-file: pytorch_models_cpu_llvm_task.json
+            sdxl-config-file: sdxl_scheduled_unet_cpu_llvm_task.json
+            runs-on: nodai-amdgpu-w7900-x86-64
+
+          # AMD GPU
+          - name: amdgpu_rocm_gfx90a
+            models-config-file: pytorch_models_gpu_rocm_gfx90a.json
+            models-extra-flags-config-file: pytorch_models_gpu_rocm_gfx90a_additional_flags.json
+            sdxl-config-file: sdxl_scheduled_unet_gpu_rocm_gfx90a.json
+            runs-on: nodai-amdgpu-mi250-x86-64
+          - name: amdgpu_vulkan
+            models-config-file: pytorch_models_gpu_vulkan.json
+            runs-on: nodai-amdgpu-w7900-x86-64
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
       IREERS_ARTIFACT_DIR: ${{ github.workspace }}/artifacts
-      VENV_DIR: ${{ github.workspace }}/venv
       IREE_TEST_FILES: ~/iree_tests_cache
+      MODELS_CONFIG_FILE_PATH: build_tools/pkgci/external_test_suite/${{ matrix.models-config-file }}
+      MODELS_EXTRA_FLAGS_CONFIG_FILE_PATH: build_tools/pkgci/external_test_suite/${{ matrix.models-extra-flags-config-file }}
+      SDXL_CONFIG_FILE_PATH: build_tools/pkgci/external_test_suite/${{ matrix.sdxl-config-file }}
+      VENV_DIR: ${{ github.workspace }}/venv
     steps:
       - name: Checking out IREE repository
         uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
@@ -107,7 +168,7 @@ jobs:
             --artifact-path=${PACKAGE_DOWNLOAD_DIR} \
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
 
-      # TODO(#17344): regenerate .mlirbc files
+      # TODO(#17344): regenerate .mlirbc files, test plat_rdna3_rocm on rocm
       # # In-tree tests
       # - name: Run experimental/regression_suite tests
       #   run: |
@@ -133,7 +194,9 @@ jobs:
         run: |
           source ${VENV_DIR}/bin/activate
           python SHARK-TestSuite/iree_tests/download_remote_files.py --root-dir pytorch/models
-      - name: Run external tests - Models with real weights
+
+      - name: Run external tests - models with real weights
+        if: ${{ !cancelled() }} && ${{ env.MODELS_CONFIG_FILE_PATH != '' }}
         run: |
           source ${VENV_DIR}/bin/activate
           pytest SHARK-TestSuite/iree_tests/pytorch/models \
@@ -143,11 +206,25 @@ jobs:
             --capture=no \
             --log-cli-level=info \
             --timeout=1200 \
-            --retries 2 \
-            --retry-delay 5 \
             --durations=0 \
-            --config-files=build_tools/pkgci/external_test_suite/pytorch_models_cpu_llvm_task.json
-      - name: "Running real weight model tests scheduled unet cpu"
+            --config-files=${MODELS_CONFIG_FILE_PATH}
+
+      - name: Run external tests - models with real weights and additional flags
+        if: ${{ !cancelled() }} && ${{ env.MODELS_EXTRA_FLAGS_CONFIG_FILE_PATH != '' }}
+        run: |
+          source ${VENV_DIR}/bin/activate
+          pytest SHARK-TestSuite/iree_tests/pytorch/models \
+            -rpfE \
+            -k real_weights \
+            --no-skip-tests-missing-files \
+            --capture=no \
+            --log-cli-level=info \
+            --timeout=1200 \
+            --durations=0 \
+            --config-files=${MODELS_EXTRA_FLAGS_CONFIG_FILE_PATH}
+
+      - name: "Run external tests - SDXL scheduled unet"
+        if: ${{ !cancelled() }} && ${{ env.SDXL_CONFIG_FILE_PATH != '' }}
         run: |
           source ${VENV_DIR}/bin/activate
           pytest SHARK-TestSuite/iree_tests/pytorch/models/sdxl-scheduled-unet-3-tank \
@@ -157,7 +234,11 @@ jobs:
             --capture=no \
             --log-cli-level=info \
             --timeout=1200 \
-            --retries 2 \
-            --retry-delay 5 \
             --durations=0 \
-            --config-files=build_tools/pkgci/external_test_suite/sdxl_scheduled_unet_cpu_llvm_task.json
+            --config-files=${SDXL_CONFIG_FILE_PATH}
+
+      - name: "Running SDXL rocm pipeline benchmark"
+        if: contains(matrix.name, 'rocm')
+        run: |
+          source ${VENV_DIR}/bin/activate
+          bash SHARK-TestSuite/iree_tests/benchmarks/benchmark_sdxl_rocm.sh
