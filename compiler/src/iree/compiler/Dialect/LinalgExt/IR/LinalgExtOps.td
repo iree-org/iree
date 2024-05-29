@@ -696,8 +696,9 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_Op<"online_attention",
   let results = (outs Variadic<AnyRankedTensor>:$results);
   let assemblyFormat = [{
     attr-dict
-    `ins` `(` $inputs `,` $scale `:` type($inputs) `,` type($scale) `)`
+    `ins` `(` $inputs `:` type($inputs) `)`
     `outs` `(` $outputs `:` type($outputs) `)`
+    `(` $scale `:` type($scale) `)`
     (`->` type($results)^)?
   }];
 
@@ -719,6 +720,12 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_Op<"online_attention",
     }
     TypedValue<ShapedType> getSum() {
       return cast<TypedValue<ShapedType>>(getOutputs()[2]);
+    }
+
+    // Method to implement for specifying input range for
+    // DestinationStyleOpInterface
+    MutableOperandRange getDpsInputsMutable() {
+      return getInputsMutable();
     }
 
     // Method to implement for specifying output range for
