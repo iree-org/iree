@@ -117,9 +117,17 @@ enum class TypeDisposition {
   FENCE,
 };
 
+struct BarrierResult {
+  BlockArgument storage;
+  Type torchType;
+  int returnIndex = -1;
+};
+
 struct ConvertedAsyncFunctionInfo {
   IREE::Util::FuncOp funcOp;
   SmallVector<IREE::Util::ReturnOp> returnOps;
+  SmallVector<DictionaryAttr> torchArgAttrs;
+  SmallVector<DictionaryAttr> torchResultAttrs;
   SmallVector<Type> torchInputTypes;
   SmallVector<Type> torchResultTypes;
   SmallVector<TypeDisposition> inputDispositions;
@@ -129,7 +137,7 @@ struct ConvertedAsyncFunctionInfo {
   // Values that must be captured in the coarse barrier.
   SmallVector<Value> barrierInputs;
   // Meta data per barrier input: storage, torchType, returnIndex (or -1)
-  SmallVector<std::tuple<Value, Type, int>> barrierResultMeta;
+  SmallVector<BarrierResult> barrierResultMeta;
 
   LogicalResult postProcess();
   LogicalResult convertImmutableTensorArg(BlockArgument argValue,
@@ -137,10 +145,25 @@ struct ConvertedAsyncFunctionInfo {
   LogicalResult convertMutableTensorArg(BlockArgument argValue, Type torchType,
                                         OpBuilder &builder);
 
-  void addBarrierInput(Value inputTensor, Value storage, Type torchType,
+  void addBarrierInput(Value inputTensor, BlockArgument storage, Type torchType,
                        int returnIndex) {
     barrierInputs.push_back(inputTensor);
-    barrierResultMeta.emplace_back(storage, torchType, returnIndex);
+    barrierResultMeta.emplace_back(BarrierResult{
+        storage,
+        torchType,
+        returnIndex,
+    });
+  }
+
+  Attribute getTorchArgAttr(BlockArgument argValue, StringRef attrName) {
+    return torchArgAttrs.empty()
+               ? Attribute{}
+               : torchArgAttrs[argValue.getArgNumber()].get(attrName);
+  }
+  Attribute getTorchResultAttr(int returnIndex, StringRef attrName) {
+    return torchResultAttrs.empty()
+               ? Attribute{}
+               : torchResultAttrs[returnIndex].get(attrName);
   }
 };
 
@@ -225,7 +248,8 @@ LogicalResult ConvertedAsyncFunctionInfo::postProcess() {
       }
       if (needsBarrier) {
         Value source = convertToBuiltinTensor(postambleBuilder, returnValue);
-        addBarrierInput(source, /*storage=*/Value{}, torchType, returnIndex);
+        addBarrierInput(source, /*storage=*/BlockArgument{}, torchType,
+                        returnIndex);
       }
       break;
     }
@@ -269,15 +293,13 @@ LogicalResult ConvertedAsyncFunctionInfo::postProcess() {
     SmallVector<Value> aliasedResults;
     for (auto [barrierInput, meta] :
          llvm::zip_equal(barrierInputs, barrierResultMeta)) {
-      Value exportStorage;
-      Type torchType;
-      int returnIndex;
-      std::tie(exportStorage, torchType, returnIndex) = meta;
-      if (exportStorage) {
+      if (meta.storage) {
         // Use the wait fence indicating when the storage is available for
         // mutation. We need to ensure that no writes are made to the storage
         // until it indicates it's safe to do so.
-        auto waitSignalFences = getEnclosingWaitSignalFences(exportStorage);
+        auto storageAffinityAttr =
+            getTorchArgAttr(meta.storage, "iree.abi.affinity");
+        auto waitSignalFences = getEnclosingWaitSignalFences(meta.storage);
         assert(waitSignalFences && "async function missing fences");
         Value waitFence = waitSignalFences->first;
         auto barrierInputDims = IREE::Util::buildDynamicDimsForValue(
@@ -285,28 +307,30 @@ LogicalResult ConvertedAsyncFunctionInfo::postProcess() {
         aliasedResults.push_back(
             postambleBuilder.create<IREE::HAL::TensorAliasOp>(
                 barrierInput.getLoc(), barrierInput.getType(), barrierInput,
-                barrierInputDims, exportStorage, waitFence,
-                /*affinity=*/nullptr));
+                barrierInputDims, meta.storage, waitFence,
+                storageAffinityAttr));
       } else {
         aliasedResults.push_back(barrierInput);
       }
     }
     auto barrierOp = postambleBuilder.create<IREE::HAL::TensorBarrierOp>(
-        funcOp.getLoc(), aliasedResults, coarseSignalFence,
-        /*affinity=*/nullptr);
+        funcOp.getLoc(), aliasedResults, coarseSignalFence);
     for (auto [barrierResult, meta] :
          llvm::zip_equal(barrierOp.getResults(), barrierResultMeta)) {
-      Value exportStorage;
-      Type torchType;
-      int returnIndex;
-      std::tie(exportStorage, torchType, returnIndex) = meta;
+      Attribute exportAffinityAttr;
+      if (meta.storage) {
+        exportAffinityAttr = getTorchArgAttr(meta.storage, "iree.abi.affinity");
+      } else if (meta.returnIndex >= 0) {
+        exportAffinityAttr =
+            getTorchResultAttr(meta.returnIndex, "iree.abi.affinity");
+      }
       Value exportedValue = postambleBuilder.create<IREE::HAL::TensorExportOp>(
           funcOp.getLoc(),
           postambleBuilder.getType<IREE::HAL::BufferViewType>(), barrierResult,
           TypeAttr::get(barrierResult.getType()), /*name=*/nullptr,
-          /*affinity=*/nullptr);
-      if (returnIndex >= 0) {
-        newReturnOperands[returnIndex] = exportedValue;
+          exportAffinityAttr);
+      if (meta.returnIndex >= 0) {
+        newReturnOperands[meta.returnIndex] = exportedValue;
       }
     }
   }
@@ -365,14 +389,16 @@ LogicalResult ConvertedAsyncFunctionInfo::convertImmutableTensorArg(
                           << torchType;
   }
 
+  // Propagate explicit affinities to the read.
+  auto affinityAttr = getTorchArgAttr(argValue, "iree.abi.affinity");
+
   auto waitSignalFences = getEnclosingWaitSignalFences(argValue);
   assert(waitSignalFences && "async function missing fences");
   Value waitFence = waitSignalFences->first;
   Value importedTensor = builder.create<IREE::HAL::TensorImportOp>(
       loc, builtinTensorType, argValue, TypeAttr::get(builtinTensorType),
       waitFence,
-      /*name=*/nullptr,
-      /*affinity=*/nullptr);
+      /*name=*/nullptr, affinityAttr);
   if (builtinTensorType != torchType) {
     importedTensor = builder.create<TorchConversion::FromBuiltinTensorOp>(
         loc, torchType, importedTensor);
@@ -396,6 +422,9 @@ LogicalResult ConvertedAsyncFunctionInfo::convertMutableTensorArg(
                             .toBuiltinTensor();
   }
 
+  // Propagate explicit affinities to the read and write.
+  auto affinityAttr = getTorchArgAttr(argValue, "iree.abi.affinity");
+
   // There are only a small set of possible users of a mutable tensor.
   // Handle them by operation here.
   SmallVector<Operation *> users(argValue.getUsers());
@@ -407,8 +436,7 @@ LogicalResult ConvertedAsyncFunctionInfo::convertMutableTensorArg(
           loc, builtinTensorType, argValue,
           /*target_encoding=*/TypeAttr::get(builtinTensorType),
           /*wait_fence*/ fences->first,
-          /*name=*/nullptr,
-          /*affinity=*/nullptr);
+          /*name=*/nullptr, affinityAttr);
       rewriter.replaceOpWithNewOp<TorchConversion::FromBuiltinTensorOp>(
           userOp, copyToVtOp.getResult().getType(), imported);
     } else if (auto overwriteOp =
@@ -432,7 +460,6 @@ void retainFunctionAttributes(Operation *srcOp, IREE::Util::FuncOp destOp) {
   // Allowlist of function attributes to retain when importing funcs.
   constexpr const char *kRetainedAttributes[] = {
       "iree.reflection",
-      "stream.affinity",
   };
   auto retainedAttributes = ArrayRef<const char *>(
       kRetainedAttributes,
@@ -464,6 +491,9 @@ void createCoarseFencesSyncWrapper(StringRef syncFunctionName,
   syncFuncOp.setSymVisibilityAttr(asyncFuncOp.getSymVisibilityAttr());
   retainFunctionAttributes(asyncFuncOp, syncFuncOp);
   syncFuncOp->setAttr("iree.abi.stub", rewriter.getUnitAttr());
+  if (auto affinityAttr = asyncFuncOp->getAttr("iree.abi.affinity")) {
+    syncFuncOp->setAttr("iree.abi.affinity", affinityAttr);
+  }
   Block *entryBlock = syncFuncOp.addEntryBlock();
   OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPointToEnd(entryBlock);
@@ -572,6 +602,10 @@ struct FuncConversionPass : public FuncConversionBase<FuncConversionPass> {
       asyncFunctionName.append("$async");
     }
 
+    // Stash arg/result attrs so they can be referenced during conversion.
+    torchFunc.getAllArgAttrs(convertedFuncInfo.torchArgAttrs);
+    torchFunc.getAllResultAttrs(convertedFuncInfo.torchResultAttrs);
+
     // Convert function signature.
     Type fenceType = rewriter.getType<IREE::HAL::FenceType>();
     FunctionType torchFuncType = torchFunc.getFunctionType();
@@ -632,6 +666,9 @@ struct FuncConversionPass : public FuncConversionBase<FuncConversionPass> {
     asyncFuncOp->setAttr("iree.abi.stub", rewriter.getUnitAttr());
     asyncFuncOp->setAttr("iree.abi.model",
                          rewriter.getStringAttr("coarse-fences"));
+    if (auto affinityAttr = torchFunc->getAttr("iree.abi.affinity")) {
+      asyncFuncOp->setAttr("iree.abi.affinity", affinityAttr);
+    }
     rewriter.inlineRegionBefore(
         torchFunc.getBody(), asyncFuncOp.getFunctionBody(), asyncFuncOp.end());
 

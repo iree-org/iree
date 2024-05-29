@@ -142,36 +142,25 @@ static FailureOr<FlatSymbolRefAttr> createDeviceGlobals(mlir::ModuleOp moduleOp,
 // have one set.
 static void assignDefaultDeviceAffinity(mlir::ModuleOp moduleOp,
                                         FlatSymbolRefAttr defaultDeviceRef) {
-  Builder builder(moduleOp);
-  auto affinityName = builder.getStringAttr("stream.affinity");
-  auto affinityAttr = builder.getAttr<IREE::HAL::DeviceAffinityAttr>(
-      defaultDeviceRef, /*queue_mask=*/-1ll);
-
-  // TODO(benvanik): make this an interface that can be registered on types.
-  auto isAnnotatableType = [](Type type) {
-    return isa<TensorType>(type) || isa<IREE::Stream::ResourceType>(type);
-  };
-  for (auto &op : moduleOp.getOps()) {
-    bool shouldAnnotate = true;
-    if (auto globalOp = dyn_cast<IREE::Util::GlobalOpInterface>(op)) {
-      if (!isAnnotatableType(globalOp.getGlobalType())) {
-        shouldAnnotate = false;
+  auto affinityName =
+      StringAttr::get(moduleOp.getContext(), "iree.abi.affinity");
+  auto affinityAttr = IREE::HAL::DeviceAffinityAttr::get(
+      moduleOp.getContext(), defaultDeviceRef, /*queue_mask=*/-1ll);
+  for (auto funcOp : moduleOp.getOps<FunctionOpInterface>()) {
+    if (funcOp.isPublic()) {
+      for (auto arg : funcOp.getArguments()) {
+        if (isa<IREE::Stream::AffinityTypeInterface>(arg.getType())) {
+          if (!funcOp.getArgAttr(arg.getArgNumber(), affinityName)) {
+            funcOp.setArgAttr(arg.getArgNumber(), affinityName, affinityAttr);
+          }
+        }
       }
-    } else if (op.hasTrait<OpTrait::SymbolTable>()) {
-      // Symbol table ops can't reference parent symbols properly.
-      shouldAnnotate = false;
-    }
-    if (!shouldAnnotate) {
-      continue; // skip op
-    }
-
-    if (auto affinityOp = dyn_cast<IREE::Stream::AffinityOpInterface>(op)) {
-      if (!affinityOp.getAffinityAttr()) {
-        affinityOp.setAffinityAttr(affinityAttr);
-      }
-    } else {
-      if (!op.hasAttr(affinityName)) {
-        op.setAttr(affinityName, affinityAttr);
+      for (auto result : llvm::enumerate(funcOp.getResultTypes())) {
+        if (isa<IREE::Stream::AffinityTypeInterface>(result.value())) {
+          if (!funcOp.getResultAttr(result.index(), affinityName)) {
+            funcOp.setArgAttr(result.index(), affinityName, affinityAttr);
+          }
+        }
       }
     }
   }

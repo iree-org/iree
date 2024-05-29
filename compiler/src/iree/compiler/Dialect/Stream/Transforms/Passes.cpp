@@ -16,6 +16,12 @@
 #include "mlir/Pass/PassRegistry.h"
 #include "mlir/Transforms/Passes.h"
 
+static llvm::cl::opt<bool> clAnnotateInputAffinities(
+    "iree-stream-annotate-input-affinities",
+    llvm::cl::desc("Annotates all tensor/resource affinities on the input to "
+                   "the pipeline for debugging."),
+    llvm::cl::init(false));
+
 namespace mlir::iree_compiler::IREE::Stream {
 
 using FunctionLikeNest =
@@ -68,6 +74,13 @@ void buildStreamTensorPassPipeline(OpPassManager &passManager,
   // Conversion
   //----------------------------------------------------------------------------
 
+  // Annotate all ops/resources with the analyzed affinities.
+  // This should have no behavioral changes during conversion but allows for
+  // debugging of analysis errors in end-user tooling.
+  if (clAnnotateInputAffinities) {
+    passManager.addPass(IREE::Stream::createAnnotateAffinitiesPass());
+  }
+
   // Converts from all input dialects into various levels of the stream dialect.
   // Tensor-like things go to stream.tensor.* ops while lower level buffer-like
   // things will go to stream.async.* ops.
@@ -80,6 +93,9 @@ void buildStreamTensorPassPipeline(OpPassManager &passManager,
   //----------------------------------------------------------------------------
   // Constant/variable optimization
   //----------------------------------------------------------------------------
+
+  // Run inlining after having baked out affinities.
+  passManager.addPass(mlir::createInlinerPass());
 
   // Cleanup globals that were created during conversion.
   addCleanupPatterns(passManager);

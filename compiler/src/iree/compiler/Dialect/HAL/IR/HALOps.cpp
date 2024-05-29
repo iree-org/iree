@@ -401,19 +401,6 @@ void TensorImportOp::build(OpBuilder &builder, OperationState &result,
         waitFence, name, affinity);
 }
 
-Value TensorImportOp::getTiedResult(unsigned resultIndex) {
-  return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
-}
-
-::std::optional<unsigned>
-TensorImportOp::getTiedResultOperandIndex(unsigned resultIndex) {
-  return {0}; // source
-}
-
-SmallVector<int64_t> TensorImportOp::getTiedResultOperandIndices() {
-  return {0}; // source
-}
-
 static LogicalResult verifyTypeStorageCompatibility(Operation *op,
                                                     Type encodingType,
                                                     Type storageType) {
@@ -482,19 +469,6 @@ void TensorExportOp::build(OpBuilder &builder, OperationState &result,
         affinity);
 }
 
-Value TensorExportOp::getTiedResult(unsigned resultIndex) {
-  return IREE::Util::TiedOpInterface::findTiedBaseValue(getSource());
-}
-
-::std::optional<unsigned>
-TensorExportOp::getTiedResultOperandIndex(unsigned resultIndex) {
-  return {0}; // source
-}
-
-SmallVector<int64_t> TensorExportOp::getTiedResultOperandIndices() {
-  return {0}; // source
-}
-
 LogicalResult TensorExportOp::verify() {
   TensorExportOp op = *this;
   auto sourceType = llvm::cast<TensorType>(op.getSource().getType());
@@ -538,11 +512,10 @@ LogicalResult TensorAliasOp::verify() {
 //===----------------------------------------------------------------------===//
 
 void TensorBarrierOp::build(OpBuilder &builder, OperationState &result,
-                            ValueRange sources, Value signalFence,
-                            Attribute affinity) {
+                            ValueRange sources, Value signalFence) {
   auto resultTypes = llvm::map_to_vector(
       sources, [](Value source) { return source.getType(); });
-  build(builder, result, resultTypes, sources, signalFence, affinity);
+  build(builder, result, resultTypes, sources, signalFence);
 }
 
 Value TensorBarrierOp::getTiedResult(unsigned resultIndex) {
@@ -977,6 +950,23 @@ void CommandBufferPushDescriptorSetOp::build(
 void DescriptorSetLayoutCreateOp::getAsmResultNames(
     function_ref<void(Value, StringRef)> setNameFn) {
   setNameFn(getResult(), "descriptor_set_layout");
+}
+
+//===----------------------------------------------------------------------===//
+// hal.device.resolve
+//===----------------------------------------------------------------------===//
+
+void DeviceResolveOp::getAsmResultNames(
+    function_ref<void(Value, StringRef)> setNameFn) {
+  for (auto result : getResults()) {
+    if (isa<IREE::HAL::DeviceType>(result.getType())) {
+      setNameFn(result, "device");
+    } else if (isa<IREE::HAL::AllocatorType>(result.getType())) {
+      setNameFn(result, "allocator");
+    } else if (isa<IntegerType>(result.getType())) {
+      setNameFn(result, "queue_affinity");
+    }
+  }
 }
 
 //===----------------------------------------------------------------------===//

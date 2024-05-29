@@ -7,6 +7,7 @@
 #include "iree/compiler/Dialect/Stream/Conversion/PatternUtils.h"
 
 #include "iree/compiler/Dialect/Flow/IR/FlowTypes.h"
+#include "iree/compiler/Dialect/Stream/Analysis/Affinity.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamOps.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamTypes.h"
 
@@ -23,13 +24,59 @@ TypedAttr convertAttributeToStream(TypedAttr attr) {
   return attr;
 }
 
+IREE::Stream::AffinityAttr
+tryLookupGlobalAffinity(Operation *op,
+                        IREE::Stream::AffinityAnalysis *affinityAnalysis) {
+  return affinityAnalysis->lookupGlobalAffinity(op);
+}
+
+IREE::Stream::AffinityAttr
+tryLookupExecutionAffinity(Operation *op,
+                           IREE::Stream::AffinityAnalysis *affinityAnalysis) {
+  assert(llvm::isa<IREE::Stream::AffinityOpInterface>(op) &&
+         "must be an affinity op");
+  return affinityAnalysis->lookupExecutionAffinity(op);
+}
+
+IREE::Stream::AffinityAttr
+tryLookupResultAffinity(Value value,
+                        IREE::Stream::AffinityAnalysis *affinityAnalysis) {
+  return affinityAnalysis->lookupResourceAffinity(value);
+}
+
+static std::pair<Value, Value>
+resolveTensorOperand(Location loc, Value convertedOperand, OpBuilder &builder) {
+  auto operandType = convertedOperand.getType();
+  if (llvm::isa<IREE::Stream::ResourceType>(operandType)) {
+    // Prior to https://reviews.llvm.org/D111620 this is the path we'd take;
+    // the tensor operands would be remapped into their new resource types.
+    // This is still possible during rewriting if we ourselves produce a new
+    // resource type, but the automatic materialization will go down the
+    // unrealized_conversion_cast path below.
+    return std::make_pair(convertedOperand,
+                          builder.createOrFold<IREE::Stream::ResourceSizeOp>(
+                              loc, builder.getIndexType(), convertedOperand));
+  } else if (auto castOp =
+                 convertedOperand
+                     .getDefiningOp<mlir::UnrealizedConversionCastOp>()) {
+    // We only have a single tensor type conversion and it expands to (resource,
+    // size) so that's all we look for here.
+    assert(castOp.getNumOperands() == 2 && "expected (resource, size)");
+    return std::make_pair(castOp.getOperand(0), castOp.getOperand(1));
+  }
+  assert(false &&
+         "unexpected operand; expected either a IREE::Stream::ResourceType or "
+         "the result of a mlir::UnrealizedConversionCastOp");
+  return std::make_pair(Value{}, Value{});
+}
+
 void expandResourceOperand(Location loc, Value operand,
                            SmallVectorImpl<Value> &newOperands,
                            OpBuilder &builder) {
   if (llvm::isa<TensorType>(operand.getType())) {
-    auto value = consumeTensorOperand(loc, operand, builder);
-    newOperands.push_back(value.resource);
-    newOperands.push_back(value.resourceSize);
+    auto [resource, resourceSize] = resolveTensorOperand(loc, operand, builder);
+    newOperands.push_back(resource);
+    newOperands.push_back(resourceSize);
   } else if (llvm::isa<IREE::Stream::ResourceType>(operand.getType())) {
     newOperands.push_back(operand);
     newOperands.push_back(
@@ -43,40 +90,33 @@ SmallVector<Value> expandResourceOperands(Location loc, ValueRange operands,
                                           ConversionPatternRewriter &rewriter) {
   SmallVector<Value> expandedOperands;
   expandedOperands.reserve(operands.size());
-  for (auto operand : operands) {
+  for (auto operand : operands)
     expandResourceOperand(loc, operand, expandedOperands, rewriter);
-  }
   return expandedOperands;
 }
 
-ConvertedTensor consumeTensorOperand(Location loc, Value operand,
-                                     OpBuilder &builder) {
-  auto operandType = operand.getType();
-  if (llvm::isa<IREE::Stream::ResourceType>(operandType)) {
-    // Prior to https://reviews.llvm.org/D111620 this is the path we'd take;
-    // the tensor operands would be remapped into their new resource types.
-    // This is still possible during rewriting if we ourselves produce a new
-    // resource type, but the automatic materialization will go down the
-    // unrealized_conversion_cast path below.
-    return {
-        operand,
-        builder.createOrFold<IREE::Stream::ResourceSizeOp>(
-            loc, builder.getIndexType(), operand),
-    };
-  } else if (auto castOp =
-                 operand.getDefiningOp<mlir::UnrealizedConversionCastOp>()) {
-    // We only have a single tensor type conversion and it expands to (resource,
-    // size) so that's all we look for here.
-    assert(castOp.getNumOperands() == 2 && "expected (resource, size)");
-    return {
-        castOp.getOperand(0),
-        castOp.getOperand(1),
-    };
+ConvertedTensor resolveTensorOperand(
+    Location loc, Value originalOperand, Value convertedOperand,
+    IREE::Stream::AffinityAnalysis *affinityAnalysis, OpBuilder &builder) {
+  auto [resource, resourceSize] =
+      resolveTensorOperand(loc, convertedOperand, builder);
+  auto affinityAttr = affinityAnalysis->lookupResourceAffinity(originalOperand);
+  return {affinityAttr, resource, resourceSize};
+}
+
+ConvertedTensor transferTensorOperand(
+    Location loc, Value originalOperand, Value convertedOperand,
+    IREE::Stream::AffinityAttr requiredAffinityAttr,
+    IREE::Stream::AffinityAnalysis *affinityAnalysis, OpBuilder &builder) {
+  auto [resource, resourceSize] =
+      resolveTensorOperand(loc, convertedOperand, builder);
+  auto affinityAttr = affinityAnalysis->lookupResourceAffinity(originalOperand);
+  if (affinityAttr != requiredAffinityAttr) {
+    resource = builder.create<IREE::Stream::AsyncTransferOp>(
+        loc, resource.getType(), resource, resourceSize, resourceSize,
+        affinityAttr, requiredAffinityAttr);
   }
-  assert(false &&
-         "unexpected operand; expected either a IREE::Stream::ResourceType or "
-         "the result of a mlir::UnrealizedConversionCastOp");
-  return ConvertedTensor();
+  return {requiredAffinityAttr, resource, resourceSize};
 }
 
 } // namespace mlir::iree_compiler

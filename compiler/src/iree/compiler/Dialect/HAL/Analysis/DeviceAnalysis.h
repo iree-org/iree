@@ -79,6 +79,14 @@ public:
   void gatherRequiredExecutableTargets(
       Operation *forOp, SetVector<IREE::HAL::ExecutableTargetAttr> &resultSet);
 
+  // Gathers all executable targets that may be required for the given affinity.
+  // This should be called on the most narrowly scoped op possible as multiple
+  // devices may be used within the same function-like op and have different
+  // requirements. This may return a set with more targets than expected.
+  void gatherRequiredExecutableTargets(
+      IREE::Stream::AffinityAttr affinityAttr, Operation *fromOp,
+      SetVector<IREE::HAL::ExecutableTargetAttr> &resultSet);
+
 private:
   // Recursively resolves the referenced device into targets.
   void gatherDeviceTargets(Attribute rootAttr, Operation *fromOp,

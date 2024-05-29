@@ -21,10 +21,11 @@ namespace {
 // %1 = stream.tensor.import %0 : !hal.buffer_view ->
 //                                tensor<4xf32> in !stream.resource<*>
 struct ConvertTensorImportOp
-    : public OpConversionPattern<IREE::HAL::TensorImportOp> {
-  using OpConversionPattern::OpConversionPattern;
+    : public AffinityOpConversionPattern<IREE::HAL::TensorImportOp> {
+  using AffinityOpConversionPattern::AffinityOpConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::HAL::TensorImportOp op, OpAdaptor adaptor,
+                  IREE::Stream::AffinityAttr executionAffinityAttr,
                   ConversionPatternRewriter &rewriter) const override {
     auto sourceType = op.getSource().getType();
     auto targetType = op.getTargetEncoding();
@@ -49,25 +50,23 @@ struct ConvertTensorImportOp
       }
     }
 
-    auto affinityAttr = IREE::Stream::AffinityAttr::lookup(op);
-
     // Import (buffer view to stream resource).
     auto resultType = rewriter.getType<IREE::Stream::ResourceType>(
         IREE::Stream::Lifetime::External);
     Value resultSize = rewriter.create<IREE::Stream::TensorSizeOfOp>(
         op.getLoc(), rewriter.getIndexType(),
         TypeAttr::get(op.getTarget().getType()), adaptor.getTargetDims(),
-        affinityAttr);
+        executionAffinityAttr);
     Value resource = rewriter.create<IREE::Stream::TensorImportOp>(
         op.getLoc(), resultType, adaptor.getSource(), TypeAttr::get(targetType),
-        adaptor.getTargetDims(), resultSize, affinityAttr);
+        adaptor.getTargetDims(), resultSize, executionAffinityAttr);
 
     // Await the fence, if needed. When not specified the resource is assumed to
     // be immediately available.
     if (auto waitFence = op.getWaitFence()) {
       Value waitTimepoint = rewriter.create<IREE::Stream::TimepointImportOp>(
           op.getLoc(), rewriter.getType<IREE::Stream::TimepointType>(),
-          ValueRange{waitFence}, affinityAttr);
+          ValueRange{waitFence}, executionAffinityAttr);
       resource = rewriter
                      .create<IREE::Stream::TimepointAwaitOp>(
                          op.getLoc(), ValueRange{resource},
@@ -77,8 +76,9 @@ struct ConvertTensorImportOp
 
     auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncTransferOp>(
-        op, unknownType, resource, resultSize, resultSize, affinityAttr,
-        /*target_affinity=*/IREE::Stream::AffinityAttr{});
+        op, unknownType, resource, resultSize, resultSize,
+        /*source_affinity=*/executionAffinityAttr,
+        /*target_affinity=*/executionAffinityAttr);
     return success();
   }
 
@@ -122,10 +122,11 @@ struct ConvertTensorImportOp
 // %1 = stream.tensor.export %0 : tensor<4xf32> in !stream.resource<*> ->
 //                                !hal.buffer_view
 struct ConvertTensorExportOp
-    : public OpConversionPattern<IREE::HAL::TensorExportOp> {
-  using OpConversionPattern::OpConversionPattern;
+    : public AffinityOpConversionPattern<IREE::HAL::TensorExportOp> {
+  using AffinityOpConversionPattern::AffinityOpConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::HAL::TensorExportOp op, OpAdaptor adaptor,
+                  IREE::Stream::AffinityAttr executionAffinityAttr,
                   ConversionPatternRewriter &rewriter) const override {
     auto sourceType = op.getSourceEncoding();
     auto targetType = op.getTarget().getType();
@@ -134,9 +135,9 @@ struct ConvertTensorExportOp
       return rewriter.notifyMatchFailure(op, "unsupported HAL cast conversion");
     }
 
-    auto affinityAttr = IREE::Stream::AffinityAttr::lookup(op);
     auto source =
-        consumeTensorOperand(op.getLoc(), adaptor.getSource(), rewriter);
+        transferTensorOperand(op.getLoc(), op.getSource(), adaptor.getSource(),
+                              executionAffinityAttr, rewriter);
 
     // Exporting a produced value - transfer our source value to an externally
     // usable resource and directly export it. This will cause an allocation.
@@ -146,14 +147,14 @@ struct ConvertTensorExportOp
     if (source.resource.getType() != externalType) {
       exportSource = rewriter.create<IREE::Stream::AsyncTransferOp>(
           op.getLoc(), externalType, source.resource, source.resourceSize,
-          source.resourceSize, /*source_affinity=*/IREE::Stream::AffinityAttr{},
-          affinityAttr);
+          source.resourceSize, /*source_affinity=*/source.affinity,
+          /*target_affinity=*/executionAffinityAttr);
     }
 
     // Export (stream resource to buffer view).
     rewriter.replaceOpWithNewOp<IREE::Stream::TensorExportOp>(
         op, targetType, exportSource, TypeAttr::get(sourceType),
-        adaptor.getSourceDims(), source.resourceSize, affinityAttr);
+        adaptor.getSourceDims(), source.resourceSize, executionAffinityAttr);
     return success();
   }
 };
@@ -170,29 +171,23 @@ struct ConvertTensorExportOp
 //   %update = stream.async.update %0, %storage[...]
 //   %2 = stream.async.slice %update[...]
 struct ConvertTensorAliasOp
-    : public OpConversionPattern<IREE::HAL::TensorAliasOp> {
-  using OpConversionPattern::OpConversionPattern;
+    : public AffinityOpConversionPattern<IREE::HAL::TensorAliasOp> {
+  using AffinityOpConversionPattern::AffinityOpConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::HAL::TensorAliasOp op, OpAdaptor adaptor,
+                  IREE::Stream::AffinityAttr executionAffinityAttr,
                   ConversionPatternRewriter &rewriter) const override {
     auto sourceType = op.getSource().getType();
     auto source =
-        consumeTensorOperand(op.getLoc(), adaptor.getSource(), rewriter);
-
-    // All operations (if any) will happen on the device specified by the alias
-    // as that indicates the affinity of the storage.
-    auto affinityAttr =
-        dyn_cast_if_present<IREE::Stream::AffinityAttr>(op.getAffinityAttr());
-    if (!affinityAttr) {
-      affinityAttr = IREE::Stream::AffinityAttr::lookup(op);
-    }
+        transferTensorOperand(op.getLoc(), op.getSource(), adaptor.getSource(),
+                              executionAffinityAttr, rewriter);
 
     // Query the target storage buffer length; we will only populate up to
     // what is required for the output.
     Value storageSize = rewriter.create<IREE::Stream::TensorSizeOfOp>(
         op.getLoc(), rewriter.getIndexType(),
         TypeAttr::get(op.getSource().getType()), adaptor.getSourceDims(),
-        affinityAttr);
+        executionAffinityAttr);
 
     // Import the target storage as a resource that we can use as an update
     // target. We overwrite the contents and just cast the storage to the
@@ -202,7 +197,7 @@ struct ConvertTensorAliasOp
     auto importOp = rewriter.create<IREE::Stream::TensorImportOp>(
         op.getLoc(), externalType, adaptor.getStorage(),
         TypeAttr::get(sourceType), adaptor.getSourceDims(), storageSize,
-        affinityAttr);
+        executionAffinityAttr);
 
     // Await the fence, if needed. When not specified the storage is assumed to
     // be immediately available.
@@ -210,7 +205,7 @@ struct ConvertTensorAliasOp
     if (auto waitFence = op.getWaitFence()) {
       Value waitTimepoint = rewriter.create<IREE::Stream::TimepointImportOp>(
           op.getLoc(), rewriter.getType<IREE::Stream::TimepointType>(),
-          ValueRange{waitFence}, affinityAttr);
+          ValueRange{waitFence}, executionAffinityAttr);
       storage = rewriter
                     .create<IREE::Stream::TimepointAwaitOp>(
                         op.getLoc(), ValueRange{storage},
@@ -223,7 +218,7 @@ struct ConvertTensorAliasOp
     auto updateOp = rewriter.create<IREE::Stream::AsyncUpdateOp>(
         op.getLoc(), externalType, storage, storageSize, zeroOffset,
         source.resourceSize, source.resource, source.resourceSize,
-        affinityAttr);
+        executionAffinityAttr);
 
     // Slice out the value from the updated tensor.
     // This preserves the use-def chain but is almost always elided by aliasing
@@ -231,14 +226,14 @@ struct ConvertTensorAliasOp
     auto sliceOp = rewriter.create<IREE::Stream::AsyncSliceOp>(
         op.getLoc(), externalType, updateOp.getResult(),
         updateOp.getTargetSize(), zeroOffset, source.resourceSize,
-        source.resourceSize, affinityAttr);
+        source.resourceSize, executionAffinityAttr);
 
     // Transfer to match original lifetime (if needed).
     Value result = sliceOp.getResult();
     if (source.resource.getType() != result.getType()) {
       result = rewriter.create<IREE::Stream::AsyncTransferOp>(
           op.getLoc(), source.resource.getType(), result, source.resourceSize,
-          source.resourceSize, affinityAttr, affinityAttr);
+          source.resourceSize, executionAffinityAttr, executionAffinityAttr);
     }
     rewriter.replaceOp(op, result);
 
@@ -256,28 +251,38 @@ struct ConvertTensorAliasOp
 // %t01 = stream.timepoint.join max(%t0, %t1)
 // stream.timepoint.export %t01 => %fence
 struct ConvertTensorBarrierOp
-    : public OpConversionPattern<IREE::HAL::TensorBarrierOp> {
-  using OpConversionPattern::OpConversionPattern;
+    : public AffinityAwareConversionPattern<IREE::HAL::TensorBarrierOp> {
+  using AffinityAwareConversionPattern::AffinityAwareConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::HAL::TensorBarrierOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
-    auto affinityAttr = IREE::Stream::AffinityAttr::lookup(op);
     auto timepointType = rewriter.getType<IREE::Stream::TimepointType>();
+    IREE::Stream::AffinityAttr anyAffinityAttr;
     SmallVector<Value> signaledResources;
     SmallVector<Value> signaledTimepoints;
-    for (auto sourceResource : adaptor.getSources()) {
-      auto source = consumeTensorOperand(op.getLoc(), sourceResource, rewriter);
+    for (auto [sourceTensor, sourceResource] :
+         llvm::zip_equal(op.getSources(), adaptor.getSources())) {
+      auto source = resolveTensorOperand(op.getLoc(), sourceTensor,
+                                         sourceResource, rewriter);
       auto barrierOp = rewriter.create<IREE::Stream::TimepointBarrierOp>(
           sourceResource.getLoc(), source.resource.getType(), timepointType,
-          source.resource, source.resourceSize, affinityAttr);
+          source.resource, source.resourceSize, source.affinity);
       signaledResources.push_back(barrierOp.getResult());
       signaledTimepoints.push_back(barrierOp.getResultTimepoint());
+
+      // When joining from multiple affinities we need to pick one to perform
+      // the chain. For now we do the affinity of the last tensor with the hope
+      // that we can perform the final signal on the affinity that is running.
+      // We should instead probably change this to be set after timepoint
+      // propagation such that we ensure it happens on the final signal when not
+      // acting as a join.
+      anyAffinityAttr = source.affinity;
     }
     Value joinedTimepoint = IREE::Stream::TimepointJoinOp::join(
         op.getLoc(), signaledTimepoints, rewriter);
     rewriter.create<IREE::Stream::TimepointChainExternalOp>(
         op.getLoc(), joinedTimepoint, ValueRange{adaptor.getSignalFence()},
-        affinityAttr);
+        anyAffinityAttr);
     rewriter.replaceOp(op, signaledResources);
     return success();
   }
@@ -285,21 +290,27 @@ struct ConvertTensorBarrierOp
 
 } // namespace
 
-void populateHALToStreamConversionPatterns(MLIRContext *context,
-                                           TypeConverter &typeConverter,
-                                           RewritePatternSet &patterns) {
+void populateHALToStreamConversionPatterns(
+    MLIRContext *context, TypeConverter &typeConverter,
+    IREE::Stream::AffinityAnalysis *affinityAnalysis,
+    RewritePatternSet &patterns) {
   typeConverter.addConversion(
       [](IREE::HAL::BufferViewType type) { return type; });
-  patterns.insert<ConvertTensorImportOp>(typeConverter, context);
-  patterns.insert<ConvertTensorExportOp>(typeConverter, context);
-  patterns.insert<ConvertTensorAliasOp>(typeConverter, context);
-  patterns.insert<ConvertTensorBarrierOp>(typeConverter, context);
+  patterns.insert<ConvertTensorImportOp>(typeConverter, context,
+                                         affinityAnalysis);
+  patterns.insert<ConvertTensorExportOp>(typeConverter, context,
+                                         affinityAnalysis);
+  patterns.insert<ConvertTensorAliasOp>(typeConverter, context,
+                                        affinityAnalysis);
+  patterns.insert<ConvertTensorBarrierOp>(typeConverter, context,
+                                          affinityAnalysis);
 }
 
-void populateHALToStreamConversionPatterns(MLIRContext *context,
-                                           ConversionTarget &conversionTarget,
-                                           TypeConverter &typeConverter,
-                                           RewritePatternSet &patterns) {
+void populateHALToStreamConversionPatterns(
+    MLIRContext *context, ConversionTarget &conversionTarget,
+    TypeConverter &typeConverter,
+    IREE::Stream::AffinityAnalysis *affinityAnalysis,
+    RewritePatternSet &patterns) {
   // Allow executables through without modification.
   conversionTarget.addLegalOp<IREE::HAL::ExecutableOp>();
   conversionTarget.markOpRecursivelyLegal<IREE::HAL::ExecutableOp>();
@@ -315,7 +326,8 @@ void populateHALToStreamConversionPatterns(MLIRContext *context,
                typeConverter.isLegal(op.getTarget().getType());
       });
 
-  populateHALToStreamConversionPatterns(context, typeConverter, patterns);
+  populateHALToStreamConversionPatterns(context, typeConverter,
+                                        affinityAnalysis, patterns);
 }
 
 } // namespace mlir::iree_compiler

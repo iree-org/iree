@@ -221,4 +221,14 @@ void DeviceAnalysis::gatherRequiredExecutableTargets(
   }
 }
 
+void DeviceAnalysis::gatherRequiredExecutableTargets(
+    IREE::Stream::AffinityAttr affinityAttr, Operation *fromOp,
+    SetVector<IREE::HAL::ExecutableTargetAttr> &resultSet) {
+  SetVector<IREE::HAL::DeviceTargetAttr> deviceTargetAttrs;
+  gatherDeviceAffinityTargets(affinityAttr, fromOp, deviceTargetAttrs);
+  for (auto deviceTargetAttr : deviceTargetAttrs) {
+    deviceTargetAttr.getExecutableTargets(resultSet);
+  }
+}
+
 } // namespace mlir::iree_compiler::IREE::HAL

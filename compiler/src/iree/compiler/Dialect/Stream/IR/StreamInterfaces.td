@@ -116,6 +116,16 @@ def Stream_AffinityAttr : AttrInterface<"AffinityAttr"> {
 }
 
 //===----------------------------------------------------------------------===//
+// IREE::Stream::AffinityTypeInterface
+//===----------------------------------------------------------------------===//
+
+def Stream_AffinityType : TypeInterface<"AffinityTypeInterface"> {
+  let description = [{
+    Indicates a type represents a resource that has its affinity tracked.
+  }];
+}
+
+//===----------------------------------------------------------------------===//
 // IREE::Stream::AffinityOpInterface
 //===----------------------------------------------------------------------===//
 
@@ -142,6 +152,19 @@ def Stream_AffinityOp : OpInterface<"AffinityOpInterface"> {
     >,
     InterfaceMethod<
       /*desc=*/[{
+        Returns true if the operands and results should be pinned to the
+        affinity of the op. This overrides all automatic placement logic.
+      }],
+      /*retTy=*/"bool",
+      /*methodName=*/"pinsValueAffinity",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return false;
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
         Returns the stream affinity for the op, indicating where it should run.
       }],
       /*retTy=*/"IREE::Stream::AffinityAttr",
@@ -149,7 +172,7 @@ def Stream_AffinityOp : OpInterface<"AffinityOpInterface"> {
       /*args=*/(ins),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
-        return dyn_cast_or_null<IREE::Stream::AffinityAttr>($_self->getAttr("affinity"));
+        return dyn_cast_or_null<IREE::Stream::AffinityAttr>($_op->getAttr("affinity"));
       }]
     >,
     InterfaceMethod<
@@ -161,8 +184,8 @@ def Stream_AffinityOp : OpInterface<"AffinityOpInterface"> {
       /*args=*/(ins "IREE::Stream::AffinityAttr":$value),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
-        if (value) $_self->setAttr("affinity", value);
-        else $_self->removeAttr("affinity");
+        if (value) $_op->setAttr("affinity", value);
+        else $_op->removeAttr("affinity");
       }]
     >,
   ];

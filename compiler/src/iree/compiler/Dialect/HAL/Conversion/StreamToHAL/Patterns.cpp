@@ -42,51 +42,17 @@ struct ContextResolveOpPattern
     // one way to specify device globals. Users may want to provide devices as
     // arguments to their functions or are stored dynamically after
     // initialization time.
-    auto deviceAffinityAttr =
-        dyn_cast_if_present<IREE::HAL::DeviceAffinityAttr>(affinityAttr);
-    if (!deviceAffinityAttr) {
-      resolveOp.emitOpError() << "failed to resolve affinity: only HAL device "
-                                 "affinities are supported";
-      return rewriter.notifyMatchFailure(
-          resolveOp, "only HAL device affinities are supported");
+    if (auto deviceAffinityAttr =
+            dyn_cast_if_present<IREE::HAL::DeviceAffinityAttr>(affinityAttr)) {
+      rewriter.replaceOpWithNewOp<IREE::HAL::DeviceResolveOp>(
+          resolveOp, resolveOp.getResultTypes(), deviceAffinityAttr);
+      return success();
     }
 
-    // Get the device handle and queue.
-    //
-    // TODO(multi-device): specialized types; may need analysis we don't have
-    // or at least a symbol lookup. An alternative would be an optional type
-    // on the affinity in cases where we've evaluated it early but for now
-    // we assume all device types are unspecialized.
-    auto deviceType = rewriter.getType<IREE::HAL::DeviceType>();
-    Value device = rewriter.create<IREE::Util::GlobalLoadOp>(
-        resolveOp.getLoc(), deviceType,
-        deviceAffinityAttr.getDevice().getValue(),
-        /*is_immutable=*/true);
-    int64_t queueMask = deviceAffinityAttr.getQueueMask();
-
-    SmallVector<Value> results;
-    if (isa<IREE::HAL::DeviceType>(resultTypes[0])) {
-      results.push_back(device);
-    } else if (isa<IREE::HAL::AllocatorType>(resultTypes[0])) {
-      results.push_back(rewriter.create<IREE::HAL::DeviceAllocatorOp>(
-          resolveOp.getLoc(), device));
-    } else {
-      return rewriter.notifyMatchFailure(
-          resolveOp, "unrecognized context resolve types for a HAL target");
-    }
-    if (resultTypes.size() > 1) {
-      if (isa<IntegerType>(resultTypes[1])) {
-        results.push_back(rewriter.create<arith::ConstantIntOp>(
-            resolveOp.getLoc(), queueMask, 64));
-      } else {
-        return rewriter.notifyMatchFailure(
-            resolveOp,
-            "unrecognized context resolve types for a HAL target (extended)");
-      }
-    }
-
-    rewriter.replaceOp(resolveOp, results);
-    return success();
+    resolveOp.emitOpError() << "failed to resolve affinity: only HAL device "
+                               "affinities are supported";
+    return rewriter.notifyMatchFailure(
+        resolveOp, "only HAL device affinities are supported");
   }
 };
 

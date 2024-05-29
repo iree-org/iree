@@ -133,7 +133,7 @@ struct VerifyDevicesPass
       diagnostic
           << "no HAL devices defined in the module; use the module-level "
              "hal.device.targets attribute, the --iree-hal-target-device= "
-             "flags, or provide inputs with global !hal.devices defined; ";
+             "flag, or provide inputs with global !hal.devices defined; ";
       printAvailable(diagnostic, *targetRegistry.value);
       return signalPassFailure();
     }
