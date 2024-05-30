@@ -12,6 +12,20 @@
 #endif  // defined(IREE_PTR_SIZE_32)
 
 #define __HIP_PLATFORM_AMD__
-#include "hip/hip_runtime.h"  // IWYU pragma: export
+
+// Order matters here--hip_deprecated.h depends on hip_runtime_api.h. So turn
+// off clang-format.
+//
+// We need to pull in this hip_deprecated.h for the old hipDeviceProp_t struct
+// definition, hipDeviceProp_tR0000. HIP 6.0 release changes the struct in the
+// middle. The hipDeviceProp_t struct would need to use the matching
+// hipGetDevicePropertiesR0600() API to query it. We want to also support HIP
+// 5.x versions so use the old hipGetDeviceProperties() API with its matching
+// struct.
+
+// clang-format off
+#include "hip/hip_runtime.h"     // IWYU pragma: export
+#include "hip/hip_deprecated.h"  // IWYU pragma: export
+// clang-format on
 
 #endif  // IREE_HAL_ROCM_ROCM_HEADERS_H_
