@@ -106,3 +106,39 @@ module {
 //       CHECK:   scf.for %{{.*}} = %c0 to %c64 step %c8
 //       CHECK:     %[[ELEMWISE:.+]] = linalg.generic {{.*}} ins(%{{.*}} : tensor<64x8xf32>)
 //       CHECK:     %[[MM:.+]] = linalg.matmul {{.*}} ins(%[[ELEMWISE]], {{.*}} : tensor<64x8xf32>, tensor<8x64xf32>)
+
+// -----
+
+#config = #iree_gpu.lowering_config<{thread = [8, 8]}>
+module {
+  func.func @matmul_cleanup() {
+    %c8 = arith.constant 8 : index
+    %c64 = arith.constant 64 : index
+    %c0 = arith.constant 0 : index
+    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<64x64xf32>>
+    %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<readonly:tensor<64x64xf32>>
+    %2 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) : !flow.dispatch.tensor<writeonly:tensor<64x64xf32>>
+    %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [64, 64], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<64x64xf32>> -> tensor<64x64xf32>
+    %4 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [64, 64], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<64x64xf32>> -> tensor<64x64xf32>
+    %5 = flow.dispatch.tensor.load %2, offsets = [0, 0], sizes = [64, 64], strides = [1, 1] : !flow.dispatch.tensor<writeonly:tensor<64x64xf32>> -> tensor<64x64xf32>
+    %6 = scf.for %arg0 = %c0 to %c64 step %c8 iter_args(%arg1 = %5) -> (tensor<64x64xf32>) {
+      %extracted_slice = tensor.extract_slice %3[0, %arg0] [64, 8] [1, 1] : tensor<64x64xf32> to tensor<64x8xf32>
+      %extracted_slice_0 = tensor.extract_slice %4[%arg0, 0] [8, 64] [1, 1] : tensor<64x64xf32> to tensor<8x64xf32>
+      %7 = linalg.matmul {lowering_config = #config} ins(%extracted_slice, %extracted_slice_0 : tensor<64x8xf32>, tensor<8x64xf32>) outs(%arg1 : tensor<64x64xf32>) -> tensor<64x64xf32>
+      scf.yield %7 : tensor<64x64xf32>
+    }
+    flow.dispatch.tensor.store %6, %2, offsets = [0, 0], sizes = [64, 64], strides = [1, 1] : tensor<64x64xf32> -> !flow.dispatch.tensor<writeonly:tensor<64x64xf32>>
+    return
+  }
+}
+
+// THREAD-LABEL: func.func @matmul_cleanup
+//       THREAD:   %[[B0:.+]] = hal.interface.binding.subspan set(0) binding(0)
+//       THREAD:   %[[B1:.+]] = hal.interface.binding.subspan set(0) binding(1)
+//       THREAD:   %[[A:.+]] = flow.dispatch.tensor.load %[[B0]]
+//       THREAD:   %[[B:.+]] = flow.dispatch.tensor.load %[[B1]]
+//       THREAD:   scf.for %{{.*}} = %c0 to %c64 step %c8
+//       THREAD:     scf.forall
+//   THREAD-DAG:       %[[LHS:.+]] = tensor.extract_slice %[[A]]
+//   THREAD-DAG:       %[[RHS:.+]] = tensor.extract_slice %[[B]]
+//       THREAD:       %[[MM:.+]] = linalg.matmul {{.*}} ins(%[[LHS]], %[[RHS]] : tensor<8x8xf32>, tensor<8x8xf32>)

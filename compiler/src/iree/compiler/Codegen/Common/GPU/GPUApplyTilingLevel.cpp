@@ -18,6 +18,7 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Interfaces/TilingInterface.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-apply-tiling-level"
 
@@ -201,6 +202,23 @@ void GPUApplyTilingLevelPass::runOnOperation() {
     funcOp.emitError() << "tiling of level "
                        << IREE::GPU::stringifyEnum(tilingLevel) << " failed\n";
     return signalPassFailure();
+  }
+
+  MLIRContext *context = &getContext();
+
+  // Apply cleanup patterns.
+  {
+    RewritePatternSet patterns(context);
+    // Merge consecutive insert/extract slice ops to simplify later loop
+    // hoisting patterns.
+    tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
+    tensor::InsertSliceOp::getCanonicalizationPatterns(patterns, context);
+    tensor::ExtractSliceOp::getCanonicalizationPatterns(patterns, context);
+    scf::ForOp::getCanonicalizationPatterns(patterns, context);
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      funcOp.emitError() << "tiling cleanup failed\n";
+      return signalPassFailure();
+    }
   }
 }
 
