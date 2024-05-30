@@ -260,4 +260,12 @@ void addIREEComprehensiveBufferizePasses(
   addIREEPostBufferizationPasses(funcPassManager);
 }
 
+void addConstantBufferizePasses(OpPassManager &funcPassManager) {
+  OneShotBufferizationOptions options;
+  options.copyBeforeWrite = true;
+  options.enforceAliasingInvariants = false;
+  options.opFilter.allowOperation(arith::ConstantOp::getOperationName());
+  funcPassManager.addPass(bufferization::createOneShotBufferizePass(options));
+}
+
 } // namespace mlir::iree_compiler
