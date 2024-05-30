@@ -102,4 +102,3 @@ builtin.module @globals_extern {
 // CHECK:  %[[VAL_7:.*]] = arith.constant 3 : index
 // CHECK:  %[[VAL_8:.*]] = util.list.get %[[VAL_0]]{{\[}}%[[VAL_7]]] : !util.list<?> -> i32
 // CHECK:  util.global.store %[[VAL_8]], @global_pub : i32
-

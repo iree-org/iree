@@ -4,4 +4,3 @@ func.func @tensor() {
   check.expect_almost_eq_const(%result, dense<[-1.0, -1.0, 0.0, 0.0, 0.0, 1.0, 1.0]> : tensor<7xf32>) : tensor<7xf32>
   return
 }
-

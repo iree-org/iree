@@ -56,5 +56,3 @@ func.func @multi_block() {
   "dialect.memref_consumer"(%1) : (memref<?x8xf32, #hal.descriptor_type<uniform_buffer>>) -> ()
   return
 }
-
-

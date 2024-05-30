@@ -31,4 +31,3 @@ def ROCDLSelectLoweringStrategy :
 
 
 #endif // IREE_CODEGEN_LLVMGPU_ROCDLPASSES
-

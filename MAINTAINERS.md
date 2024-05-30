@@ -53,4 +53,3 @@ uncovered components, questions of project direction, etc.
 
 * Python Releases: Stella Laurenzo (@stellaraccident)
 * Other packages, nightlies, and infra: Maintainer Needed
-

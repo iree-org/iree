@@ -80,4 +80,3 @@ func.func @scatter_dynamic(%arg0 : tensor<?x?x?xf32>, %arg1 : tensor<?x?xi32>, %
   // CHECK: return %[[SCATTER]]
   return %0 : tensor<?x?x?xf32>
 }
-
