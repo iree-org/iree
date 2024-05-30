@@ -1847,7 +1847,7 @@ setWinogradRootConfig(mlir::FunctionOpInterface entryPointFn,
   perm.append(winogradOp.getNonInputTileDims());
   perm = invertPermutationVector(perm);
   DistributionHeuristicConfig distConfig;
-  SmallVector<int64_t> maxTileSizes(iterationRank, clDefaultDistTileSize / 4);
+  SmallVector<int64_t> maxTileSizes(iterationRank, clDefaultDistTileSize / 6);
   maxTileSizes[0] = maxTileSizes[1] = 0;
   SmallVector<int64_t> minTileSizes(iterationRank, 1);
   minTileSizes[0] = minTileSizes[1] = 0;
