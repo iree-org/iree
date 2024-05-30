@@ -654,7 +654,7 @@ function(iree_validate_required_arguments
   endforeach()
 endfunction()
 
-# iree_compile_flags_for_patform
+# iree_compile_flags_for_platform
 #
 # Helper function to add necessary compile flags based on platform-specific
 # configurations. Note the flags are added for cpu backends only.
