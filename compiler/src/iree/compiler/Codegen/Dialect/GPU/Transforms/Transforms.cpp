@@ -43,14 +43,9 @@ static FailureOr<int64_t> getTripCount(scf::ForallOp loop) {
   return tripCount;
 }
 
-static LogicalResult compareWorkerCountsAndTypes(scf::ForallOp producer,
-                                                 scf::ForallOp consumer) {
-  FailureOr<int64_t> producerTripCount = getTripCount(producer);
-  FailureOr<int64_t> consumerTripCount = getTripCount(consumer);
-  if (failed(producerTripCount) || failed(consumerTripCount) ||
-      *producerTripCount != *consumerTripCount) {
-    return failure();
-  }
+static FailureOr<SmallVector<scf::ForallOp>>
+getEquivalentMappingConsumerLoopNest(scf::ForallOp producer,
+                                     scf::ForallOp consumer) {
 
   auto checkMappingTypes = [&](ArrayAttr array) {
     return llvm::all_of(array.getValue(),
@@ -59,9 +54,44 @@ static LogicalResult compareWorkerCountsAndTypes(scf::ForallOp producer,
                         llvm::IsaPred<gpu::GPUWarpMappingAttr>);
   };
 
-  if (producer.getMappingAttr() != consumer.getMappingAttr() ||
-      !checkMappingTypes(producer.getMappingAttr()) ||
-      !checkMappingTypes(consumer.getMappingAttr())) {
+  ArrayAttr producerMapping = producer.getMappingAttr();
+  ArrayAttr consumerMapping = consumer.getMappingAttr();
+
+  if (producerMapping == consumerMapping &&
+      checkMappingTypes(producerMapping) &&
+      checkMappingTypes(consumerMapping)) {
+    return SmallVector<scf::ForallOp>({consumer});
+  }
+
+  if (!llvm::all_of(producerMapping.getValue(),
+                    llvm::IsaPred<gpu::GPUThreadMappingAttr>) ||
+      !llvm::all_of(consumerMapping.getValue(),
+                    llvm::IsaPred<IREE::GPU::LaneIdAttr>)) {
+    return failure();
+  }
+  auto outerWarpLoop = consumer->getParentOfType<scf::ForallOp>();
+  if (!outerWarpLoop || !llvm::all_of(outerWarpLoop.getMappingAttr().getValue(),
+                                      llvm::IsaPred<gpu::GPUWarpMappingAttr>)) {
+    return failure();
+  }
+  return SmallVector<scf::ForallOp>({outerWarpLoop, consumer});
+}
+
+static LogicalResult compareWorkerCounts(scf::ForallOp producer,
+                                         ArrayRef<scf::ForallOp> consumers) {
+  FailureOr<int64_t> producerTripCount = getTripCount(producer);
+  if (failed(producerTripCount)) {
+    return failure();
+  }
+  int64_t consumerTotal = 1;
+  for (auto consumer : consumers) {
+    FailureOr<int64_t> consumerTripCount = getTripCount(consumer);
+    if (failed(consumerTripCount)) {
+      return failure();
+    }
+    consumerTotal *= *consumerTripCount;
+  }
+  if (*producerTripCount != consumerTotal) {
     return failure();
   }
   return success();
@@ -106,7 +136,9 @@ LogicalResult fuseForallIntoSlice(RewriterBase &rewriter,
     return failure();
   }
 
-  if (failed(compareWorkerCountsAndTypes(producer, consumer))) {
+  FailureOr<SmallVector<scf::ForallOp>> consumerLoopNest =
+      getEquivalentMappingConsumerLoopNest(producer, consumer);
+  if (failed(consumerLoopNest)) {
     return failure();
   }
 
@@ -117,10 +149,15 @@ LogicalResult fuseForallIntoSlice(RewriterBase &rewriter,
   };
 
   if (!isAll(producer.getMixedStep(), 1) ||
-      !isAll(producer.getMixedLowerBound(), 0) ||
-      !isAll(consumer.getMixedStep(), 1) ||
-      !isAll(consumer.getMixedLowerBound(), 0)) {
+      !isAll(producer.getMixedLowerBound(), 0)) {
     return failure();
+  }
+
+  for (auto loop : *consumerLoopNest) {
+    if (!isAll(loop.getMixedStep(), 1) ||
+        !isAll(loop.getMixedLowerBound(), 0)) {
+      return failure();
+    }
   }
 
   rewriter.setInsertionPoint(slice);
@@ -134,11 +171,13 @@ LogicalResult fuseForallIntoSlice(RewriterBase &rewriter,
   bindDims(context, d0, d1, d2);
   AffineExpr mulAdd = d0 * d1 + d2;
   OpFoldResult linearId = rewriter.getIndexAttr(0);
-  for (auto [inductionVar, workerCount] :
-       llvm::zip_equal(getAsOpFoldResult(consumer.getInductionVars()),
-                       consumer.getMixedUpperBound())) {
-    linearId = affine::makeComposedFoldedAffineApply(
-        rewriter, loc, mulAdd, {linearId, workerCount, inductionVar});
+  for (auto loop : *consumerLoopNest) {
+    for (auto [inductionVar, workerCount] :
+         llvm::zip_equal(getAsOpFoldResult(loop.getInductionVars()),
+                         loop.getMixedUpperBound())) {
+      linearId = affine::makeComposedFoldedAffineApply(
+          rewriter, loc, mulAdd, {linearId, workerCount, inductionVar});
+    }
   }
 
   Value linearThreadIdVal =
