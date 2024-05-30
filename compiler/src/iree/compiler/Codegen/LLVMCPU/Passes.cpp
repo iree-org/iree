@@ -54,15 +54,6 @@ static llvm::cl::opt<bool> clUseFastMinMaxOps(
         "Use `arith.minf/maxf` instead of `arith.minimumf/maximumf` ops"),
     llvm::cl::init(false));
 
-// TODO(#10820): Delete the flag. This should be a nop pass to default pipeline
-// while tensor.pad op is lowered to fill + insert_slice before Codegen.
-// However, it causes regressions in terms of compilation time. Skip the passes
-// for now.
-static llvm::cl::opt<bool> clEnablePadConsumerFusion(
-    "iree-llvmcpu-enable-pad-consumer-fusion",
-    llvm::cl::desc("Flag to enable the fusion for pad + consumer"),
-    llvm::cl::init(false));
-
 static llvm::cl::opt<bool> clEnableReassociateFpReductions(
     "iree-llvmcpu-reassociate-fp-reductions",
     llvm::cl::desc("Enables reassociation for FP reductions"),
