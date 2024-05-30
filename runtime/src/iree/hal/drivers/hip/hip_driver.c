@@ -15,7 +15,6 @@
 #include "iree/hal/drivers/hip/dynamic_symbols.h"
 #include "iree/hal/drivers/hip/hip_device.h"
 #include "iree/hal/drivers/hip/rccl_dynamic_symbols.h"
-#include "iree/hal/drivers/hip/rccl_status_util.h"
 #include "iree/hal/drivers/hip/status_util.h"
 
 // Maximum device name length supported by the HIP HAL driver.
@@ -260,20 +259,12 @@ static iree_status_t iree_hal_hip_driver_dump_device_info(
     IREE_RETURN_IF_ERROR(status);
   }
 
-  // Report driver properties.
-  if (!driver->hip_symbols.hipGetDevicePropertiesR0600) {
-    // ROCm 6.0 release changes the hipDeviceProp_t struct and would need to use
-    // the matching hipGetDevicePropertiesR0600() API to query it. This symbol
-    // is not available in earlier versions.
-    return iree_ok_status();
-  }
-
   hipDevice_t device = IREE_DEVICE_ID_TO_HIPDEVICE(device_id);
 
-  hipDeviceProp_t prop;
+  hipDeviceProp_tR0000 prop;
   IREE_HIP_RETURN_IF_ERROR(&driver->hip_symbols,
-                           hipGetDevicePropertiesR0600(&prop, device),
-                           "hipGetDevicePropertiesR0600");
+                           hipGetDeviceProperties(&prop, device),
+                           "hipGetDeviceProperties");
 
   // GPU capabilities and architecture.
   IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
