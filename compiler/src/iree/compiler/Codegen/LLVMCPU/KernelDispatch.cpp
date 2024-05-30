@@ -18,6 +18,7 @@
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -31,6 +32,7 @@
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Matchers.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
+#include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #include <numeric>
@@ -2738,6 +2740,37 @@ adjustTileSizesForGenericOp(mlir::FunctionOpInterface entryPointFn,
   return success();
 }
 
+static LogicalResult adjustTileSizesForWinogradInput(
+    IREE::LinalgExt::WinogradInputTransformOp winogradOp, Operation *op,
+    SmallVector<int64_t> &tileSizes) {
+  mlir::DominanceInfo dominanceInfo(winogradOp);
+  // Only adjust for preceding ops, since the winograd tile sizes are based on
+  // the result shape.
+  if (dominanceInfo.properlyDominates(winogradOp, op)) {
+    return success();
+  }
+  if (tileSizes.size() != winogradOp.getOutputRank()) {
+    return failure();
+  }
+  ArrayRef<int64_t> inputTileDims = winogradOp.getInputTileDimensions();
+  ArrayRef<int64_t> imageDims = winogradOp.getImageDimensions();
+  SmallVector<int64_t> perm(inputTileDims);
+  perm.append(winogradOp.getNonInputTileDims());
+  SmallVector<int64_t> tileSizesPermuted = applyPermutation(tileSizes, perm);
+  SmallVector<int64_t> newTileSizes(tileSizes);
+  if (winogradOp.hasBatch()) {
+    newTileSizes.front() = tileSizesPermuted.front();
+  }
+  for (int idx = 0; idx < imageDims.size(); ++idx) {
+    int tileSizesPermIdx = winogradOp.hasBatch() ? idx + 3 : idx + 2;
+    newTileSizes[imageDims[idx]] =
+        tileSizesPermuted[tileSizesPermIdx] * tileSizes[inputTileDims[idx]];
+  }
+  newTileSizes[winogradOp.getChannelDim()] = tileSizesPermuted.back();
+  tileSizes = newTileSizes;
+  return success();
+}
+
 /// Set the lowering configs for all the compute ops. The lowering config is
 /// already set on `rootOperation`. We will duplicate the tile sizes of
 /// distribution and common parallel dims to other compute ops (so they have
@@ -2924,7 +2957,21 @@ setLoweringConfigForComputeOps(mlir::FunctionOpInterface entryPointFn,
       }
     } else {
       // Build 4-level lowering configs for other ops.
-      tileSizesList = {distTileSizes, commonVecTileSizes};
+      SmallVector<int64_t> adjDistTileSizes(distTileSizes.begin(),
+                                            distTileSizes.end());
+      SmallVector<int64_t> adjCommonVecTileSizes(commonVecTileSizes.begin(),
+                                                 commonVecTileSizes.end());
+      if (auto winogradOp = dyn_cast<IREE::LinalgExt::WinogradInputTransformOp>(
+              rootOperation)) {
+        if (failed(adjustTileSizesForWinogradInput(winogradOp, op,
+                                                   adjDistTileSizes)) ||
+            failed(adjustTileSizesForWinogradInput(winogradOp, op,
+                                                   adjCommonVecTileSizes))) {
+          return failure();
+        }
+      }
+      tileSizesList = {adjDistTileSizes, adjCommonVecTileSizes};
+      // tileSizesList = {distTileSizes, commonVecTileSizes};
       SmallVector<int64_t> zeros(numLoops, 0);
       SmallVector<bool> falseVec(numLoops, 0);
       // No scalable tiling for the distribution

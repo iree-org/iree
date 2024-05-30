@@ -588,6 +588,13 @@ isFusableWithConsumer(OpOperand &fusedOperand,
         .Default([](Operation *) { return false; });
   }
 
+  if (auto winogradOp =
+          dyn_cast<IREE::LinalgExt::WinogradInputTransformOp>(consumer)) {
+    return TypeSwitch<Operation *, bool>(producer)
+        .Case<tensor::PadOp>([&](auto padOp) { return true; })
+        .Default([](Operation *) { return false; });
+  }
+
   // By default, padding should be fused with producers. It is hard to square
   // this with fusion of pad with consumer. So for now split the difference.
   // Either fuse pad with producer or with consumer.
@@ -762,6 +769,13 @@ isFusableWithProducer(OpOperand &operand,
               cast<TilingInterface>(linalgOp.getOperation()),
               producerIndexingMap, rootOuterParallelLoops);
         })
+        .Default([](Operation *) { return false; });
+  }
+
+  if (auto winogradOp =
+          dyn_cast<IREE::LinalgExt::WinogradInputTransformOp>(consumer)) {
+    return TypeSwitch<Operation *, bool>(producer)
+        .Case<tensor::PadOp>([&](auto padOp) { return true; })
         .Default([](Operation *) { return false; });
   }
 
