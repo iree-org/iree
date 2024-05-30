@@ -10,6 +10,7 @@
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "iree/compiler/Codegen/Utils/VectorOpUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/STLForwardCompat.h"
@@ -596,7 +597,7 @@ static LogicalResult populateCanonicalOffsetsSizesAndStrides(
   SmallVector<int64_t> threadDimSizes =
       applyPermutation(counts.thread, orders.thread);
   SmallVector<Value> basis;
-  for (auto dimSize : threadDimSizes) {
+  for (int64_t dimSize : threadDimSizes) {
     basis.push_back(builder.create<arith::ConstantIndexOp>(loc, dimSize));
   }
   SmallVector<Value> threadIds =
@@ -619,67 +620,40 @@ static LogicalResult populateCanonicalOffsetsSizesAndStrides(
   return success();
 }
 
-LogicalResult MMAAttr::populateLhsOffsetsSizesStrides(
-    OpBuilder &builder, Location loc, Value laneId,
-    ArrayRef<int64_t> permutation, SmallVector<OpFoldResult> &offsets,
-    SmallVector<OpFoldResult> &sizes,
+LogicalResult MMAAttr::populateOperandOffsetsSizesStrides(
+    OpBuilder &builder, Location loc, IREE::GPU::MMAFragment fragment,
+    Value laneId, ArrayRef<int64_t> permutation,
+    SmallVector<OpFoldResult> &offsets, SmallVector<OpFoldResult> &sizes,
     SmallVector<OpFoldResult> &strides) const {
   if (getIntrinsic().getValue() != MMAIntrinsic::MFMA_F16_16x16x16_F32) {
     return failure();
   }
 
-  SmallVector<OpFoldResult> canonicalOffsets;
-  SmallVector<OpFoldResult> canonicalSizes;
-  if (failed(populateCanonicalOffsetsSizesAndStrides(
-          builder, loc, laneId, permutation, getASingleSubgroupLayoutCount(),
-          getASingleSubgroupLayoutOrder(), canonicalOffsets, canonicalSizes,
-          strides))) {
-    return failure();
+  MMAAttr::SingleSubgroupLayout counts;
+  MMAAttr::SingleSubgroupLayout orders;
+  switch (fragment) {
+  case IREE::GPU::MMAFragment::Lhs: {
+    counts = getASingleSubgroupLayoutCount();
+    orders = getASingleSubgroupLayoutOrder();
+    break;
   }
-  offsets.append(canonicalOffsets);
-  sizes.append(canonicalSizes);
-
-  return success();
-}
-
-LogicalResult MMAAttr::populateRhsOffsetsSizesStrides(
-    OpBuilder &builder, Location loc, Value laneId,
-    ArrayRef<int64_t> permutation, SmallVector<OpFoldResult> &offsets,
-    SmallVector<OpFoldResult> &sizes,
-    SmallVector<OpFoldResult> &strides) const {
-  if (getIntrinsic().getValue() != MMAIntrinsic::MFMA_F16_16x16x16_F32) {
-    return failure();
+  case IREE::GPU::MMAFragment::Rhs: {
+    counts = getBSingleSubgroupLayoutCount();
+    orders = getBSingleSubgroupLayoutOrder();
+    break;
+  }
+  case IREE::GPU::MMAFragment::Acc: {
+    counts = getCSingleSubgroupLayoutCount();
+    orders = getCSingleSubgroupLayoutOrder();
+    break;
+  }
   }
 
   SmallVector<OpFoldResult> canonicalOffsets;
   SmallVector<OpFoldResult> canonicalSizes;
   if (failed(populateCanonicalOffsetsSizesAndStrides(
-          builder, loc, laneId, permutation, getBSingleSubgroupLayoutCount(),
-          getBSingleSubgroupLayoutOrder(), canonicalOffsets, canonicalSizes,
-          strides))) {
-    return failure();
-  }
-  offsets.append(canonicalOffsets);
-  sizes.append(canonicalSizes);
-
-  return success();
-}
-
-LogicalResult MMAAttr::populateAccOffsetsSizesStrides(
-    OpBuilder &builder, Location loc, Value laneId,
-    ArrayRef<int64_t> permutation, SmallVector<OpFoldResult> &offsets,
-    SmallVector<OpFoldResult> &sizes,
-    SmallVector<OpFoldResult> &strides) const {
-  if (getIntrinsic().getValue() != MMAIntrinsic::MFMA_F16_16x16x16_F32) {
-    return failure();
-  }
-
-  SmallVector<OpFoldResult> canonicalOffsets;
-  SmallVector<OpFoldResult> canonicalSizes;
-  if (failed(populateCanonicalOffsetsSizesAndStrides(
-          builder, loc, laneId, permutation, getCSingleSubgroupLayoutCount(),
-          getCSingleSubgroupLayoutOrder(), canonicalOffsets, canonicalSizes,
-          strides))) {
+          builder, loc, laneId, permutation, counts, orders, canonicalOffsets,
+          canonicalSizes, strides))) {
     return failure();
   }
   offsets.append(canonicalOffsets);

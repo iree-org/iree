@@ -222,20 +222,14 @@ LogicalResult MultiMmaOp::verify() {
     }
   }
 
-  if (getLhsPermutation()) {
-    if (!isPermutationVector(*getLhsPermutation())) {
-      return emitOpError("invalid lhs permutation");
-    }
+  if (getLhsPermutation() && !isPermutationVector(*getLhsPermutation())) {
+    return emitOpError("invalid lhs permutation");
   }
-  if (getRhsPermutation()) {
-    if (!isPermutationVector(*getRhsPermutation())) {
-      return emitOpError("invalid rhs permutation");
-    }
+  if (getRhsPermutation() && !isPermutationVector(*getRhsPermutation())) {
+    return emitOpError("invalid rhs permutation");
   }
-  if (getAccPermutation()) {
-    if (!isPermutationVector(*getAccPermutation())) {
-      return emitOpError("invalid accumulator permutation");
-    }
+  if (getAccPermutation() && !isPermutationVector(*getAccPermutation())) {
+    return emitOpError("invalid accumulator permutation");
   }
 
   return success();

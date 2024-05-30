@@ -54,6 +54,7 @@ iree_compiler_cc_library(
     hdrs = [
         "IREEGPUAttrs.h",
         "IREEGPUDialect.h",
+        "IREEGPUEnums.h",
         "IREEGPUInterfaces.h",
         "IREEGPUOps.h",
     ],
