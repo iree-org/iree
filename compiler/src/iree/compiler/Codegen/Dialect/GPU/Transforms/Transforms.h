@@ -32,7 +32,7 @@ namespace mlir::iree_compiler::IREE::GPU {
 LogicalResult fuseForallIntoSlice(RewriterBase &rewriter,
                                   scf::ForallOp producer,
                                   scf::ForallOp consumer,
-                                  tensor::ExtractSliceOp slice);
+                                  SmallVector<Operation *> consumerChain);
 
 void populateIREEGPUDropUnitDimsPatterns(RewritePatternSet &patterns);
 void populateIREEGPULowerMultiMmaPatterns(RewritePatternSet &patterns);

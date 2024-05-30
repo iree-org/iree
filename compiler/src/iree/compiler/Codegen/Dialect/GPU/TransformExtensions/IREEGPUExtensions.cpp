@@ -159,21 +159,32 @@ transform_dialect::FuseForallOp::apply(transform::TransformRewriter &rewriter,
                                      "Non-forall producer or consumer");
   }
 
-  if (!producer->hasOneUse()) {
-    return mlir::emitDefiniteFailure(state.getTopLevel(),
-                                     "non-single use producer");
+  tensor::ExtractSliceOp sliceConsumer;
+  Operation *currProducer = producer;
+
+  SmallVector<Operation *> consumerChain;
+  while (currProducer->hasOneUse()) {
+    Operation *nextConsumer = *currProducer->user_begin();
+    if (auto maybeSlice = dyn_cast<tensor::ExtractSliceOp>(nextConsumer)) {
+      sliceConsumer = maybeSlice;
+      consumerChain.push_back(sliceConsumer);
+      break;
+    }
+    if (isa<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(nextConsumer)) {
+      consumerChain.push_back(nextConsumer);
+      currProducer = nextConsumer;
+      continue;
+    }
   }
 
-  auto sliceConsumer =
-      dyn_cast<tensor::ExtractSliceOp>(*producer->user_begin());
   if (!sliceConsumer || sliceConsumer->getParentOp() != consumer) {
     return mlir::emitDefiniteFailure(state.getTopLevel(),
-                                     "producer loop sole consumer is not an "
+                                     "producer loop not consumed by single "
                                      "extracted slice from the consumer loop");
   }
 
   if (failed(GPU::fuseForallIntoSlice(rewriter, producer, consumer,
-                                      sliceConsumer))) {
+                                      consumerChain))) {
     return mlir::emitDefiniteFailure(state.getTopLevel(),
                                      "failed to fuse forall ops");
   }

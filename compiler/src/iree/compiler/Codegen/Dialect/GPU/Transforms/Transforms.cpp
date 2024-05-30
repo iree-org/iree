@@ -67,9 +67,11 @@ static LogicalResult compareWorkerCountsAndTypes(scf::ForallOp producer,
   return success();
 }
 
-static void replaceExtractSlice(RewriterBase &rewriter, Location loc,
-                                tensor::ParallelInsertSliceOp parallelInsert,
-                                tensor::ExtractSliceOp extractSlice) {
+static void replaceConsumerChain(RewriterBase &rewriter, Location loc,
+                                 Value source,
+                                 tensor::ParallelInsertSliceOp parallelInsert,
+                                 SmallVector<Operation *> consumerChain) {
+  auto extractSlice = cast<tensor::ExtractSliceOp>(consumerChain.back());
   OpBuilder::InsertionGuard g(rewriter);
   auto shuffleOp = rewriter.create<IREE::GPU::ShuffleTensorOp>(
       loc, extractSlice.getType(), parallelInsert.getSource(),
@@ -78,8 +80,11 @@ static void replaceExtractSlice(RewriterBase &rewriter, Location loc,
   rewriter.setInsertionPointToStart(shuffleOp.getBody());
   auto terminator =
       rewriter.create<IREE::GPU::YieldOp>(loc, extractSlice.getResult());
-  rewriter.moveOpBefore(extractSlice, terminator);
-  extractSlice.getSourceMutable().assign(shuffleOp.getBody()->getArgument(0));
+  for (auto consumer : consumerChain) {
+    rewriter.moveOpBefore(consumer, terminator);
+  }
+  (*consumerChain.begin())
+      ->replaceUsesOfWith(source, shuffleOp.getBody()->getArgument(0));
   rewriter.replaceAllUsesExcept(extractSlice.getResult(), shuffleOp,
                                 terminator);
 }
@@ -87,7 +92,16 @@ static void replaceExtractSlice(RewriterBase &rewriter, Location loc,
 LogicalResult fuseForallIntoSlice(RewriterBase &rewriter,
                                   scf::ForallOp producer,
                                   scf::ForallOp consumer,
-                                  tensor::ExtractSliceOp slice) {
+                                  SmallVector<Operation *> consumerChain) {
+  if (consumerChain.empty()) {
+    return failure();
+  }
+
+  auto slice = dyn_cast<tensor::ExtractSliceOp>(consumerChain.back());
+  if (!slice) {
+    return failure();
+  }
+
   if (producer->getNumResults() != 1) {
     return failure();
   }
@@ -150,7 +164,8 @@ LogicalResult fuseForallIntoSlice(RewriterBase &rewriter,
   auto parallelInsert =
       cast<tensor::ParallelInsertSliceOp>(*terminator.getYieldingOps().begin());
 
-  replaceExtractSlice(rewriter, loc, parallelInsert, slice);
+  replaceConsumerChain(rewriter, loc, producer.getResult(0), parallelInsert,
+                       consumerChain);
 
   rewriter.eraseOp(parallelInsert);
   rewriter.eraseOp(terminator);
