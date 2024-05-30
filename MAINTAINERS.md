@@ -8,7 +8,7 @@ skills, responsibility and insights for certain components. See also
 [CODEOWNERS](.github/CODEOWNERS) for path-based reviewers for various
 components. If in doubt and there is a specific CODEOWNER for the path you
 are working on, consider that to be a more authoritative source than this file.
-This file attempts to outline long term responsibility for questions of 
+This file attempts to outline long term responsibility for questions of
 evolution, health, and design.
 
 This file is kept in the `iree` core repository but can refer to other

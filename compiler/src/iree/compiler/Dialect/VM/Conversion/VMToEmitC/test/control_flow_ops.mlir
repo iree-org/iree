@@ -703,7 +703,7 @@ vm.module @my_module {
   // Define structs for arguments and results
   //      CHECK: emitc.verbatim "struct my_module_fn_args_t {int32_t arg0;};"
   // CHECK-NEXT: emitc.verbatim "struct my_module_fn_result_t {int32_t res0;};"
-  
+
   // Create a new function to export with the adapted signature.
   // CHECK:      emitc.func private @my_module_fn_export_shim(%arg0: !emitc.ptr<!emitc.opaque<"iree_vm_stack_t">>, %arg1: !emitc.opaque<"uint32_t">, %arg2: !emitc.opaque<"iree_byte_span_t">, %arg3: !emitc.opaque<"iree_byte_span_t">,
   // CHECK-SAME:                                %arg4: !emitc.ptr<!emitc.opaque<"void">>, %arg5: !emitc.ptr<!emitc.opaque<"void">>)

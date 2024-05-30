@@ -150,7 +150,7 @@ function(iree_compiler_targeting_iree_arch DST_VAR SRC_ARCH)
     set(${DST_VAR} OFF PARENT_SCOPE)
     return()
   endif()
-  
+
   iree_arch_to_llvm_target(_LLVM_TARGET "${SRC_ARCH}")
   # WebAssembly is unconditionally enabled, and not enumerated in LLVM_TARGETS_TO_BUILD.
   if (_LLVM_TARGET IN_LIST LLVM_TARGETS_TO_BUILD OR _LLVM_TARGET STREQUAL "WebAssembly")
@@ -196,7 +196,7 @@ endfunction()
 # variables to drive default behavior, and this sets those up in a consolidated
 # way.
 # Arguments:
-# DEFAULT_EXPORT_SET: 
+# DEFAULT_EXPORT_SET:
 #   The export set to use by default. If linking any static libraries
 #   that are to be installed as dev libraries, then this is mandatory
 #   (or each target must specify it). Typically this must be set in

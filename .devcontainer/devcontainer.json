@@ -10,7 +10,7 @@
     "workspaceFolder": "/workspaces/iree",
     "customizations": {
         "vscode": {
-            "extensions": [             
+            "extensions": [
                 // LLVM & MLIR
                 "llvm-vs-code-extensions.vscode-clangd",
                 "llvm-vs-code-extensions.vscode-mlir",

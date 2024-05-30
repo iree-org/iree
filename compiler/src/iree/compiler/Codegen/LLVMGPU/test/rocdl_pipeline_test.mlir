@@ -134,10 +134,10 @@ hal.executable @ext_fp8_dispatch {
                              ins(%3, %4 : tensor<4096xf8E4M3FNUZ>, tensor<4096xf8E5M2FNUZ>)
                              outs(%5 : tensor<4096xf32>) {
         ^bb0(%in0: f8E4M3FNUZ, %in1: f8E5M2FNUZ, %out: f32):
-          %7 = arith.extf %in0 : f8E4M3FNUZ to f32 
-          %8 = arith.extf %in1 : f8E5M2FNUZ to f32 
+          %7 = arith.extf %in0 : f8E4M3FNUZ to f32
+          %8 = arith.extf %in1 : f8E5M2FNUZ to f32
           %9 = arith.addf %7, %8 : f32
-          linalg.yield %9 : f32 
+          linalg.yield %9 : f32
         } -> tensor<4096xf32>
         flow.dispatch.tensor.store %6, %2, offsets = [0], sizes = [4096], strides = [1] : tensor<4096xf32> -> !flow.dispatch.tensor<writeonly:tensor<4096xf32>>
         return

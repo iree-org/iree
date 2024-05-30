@@ -23,7 +23,7 @@ module {
   }
 }
 
-// CHECK: func.func @dispatch() 
+// CHECK: func.func @dispatch()
 // CHECK-SAME: arm_locally_streaming
 
 // -----
@@ -44,7 +44,7 @@ module {
   }
 }
 
-// CHECK: func.func @dispatch() 
+// CHECK: func.func @dispatch()
 // CHECK-SAME: arm_locally_streaming
 
 // -----
@@ -65,7 +65,7 @@ module {
   }
 }
 
-// CHECK: func.func @dispatch() 
+// CHECK: func.func @dispatch()
 // CHECK-SAME: arm_locally_streaming
 
 // -----
@@ -86,5 +86,5 @@ module {
   }
 }
 
-// CHECK: func.func @dispatch() 
+// CHECK: func.func @dispatch()
 // CHECK-NOT: arm_locally_streaming

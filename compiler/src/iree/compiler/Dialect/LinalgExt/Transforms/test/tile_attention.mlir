@@ -29,15 +29,15 @@ func.func @attention(%query: tensor<1x1024x64xf32>, %key: tensor<1x1024x64xf32>,
 // CHECK:          %[[K_S:.+]] = tensor.extract_slice %[[KEY]][0, %[[ARG3]], 0] [1, 1024, 64] [1, 1, 1]
 // CHECK:          %[[V_S:.+]] = tensor.extract_slice %[[VALUE]][0, %[[ARG3]], 0] [1, 1024, 64] [1, 1, 1]
 // CHECK:          %[[Q_S:.+]] = tensor.extract_slice %[[QUERY]][0, 0, 0] [1, 1024, 64] [1, 1, 1]
-// CHECK:          %[[ATT:.+]]:3 = iree_linalg_ext.attention 
+// CHECK:          %[[ATT:.+]]:3 = iree_linalg_ext.attention
 // CHECK-SAME:                                           ins(%[[Q_S]], %[[K_S]], %[[V_S]], %[[CST_1]]
 // CHECK-SAME:                                           outs(%[[ARG4]], %[[ARG5]], %[[ARG6]]
 // CHECK:          scf.yield %[[ATT]]#0, %[[ATT]]#1, %[[ATT]]#2
 // CHECK:        }
-// CHECK:        %[[D7:.+]] = linalg.generic 
-// CHECK-SAME:                {indexing_maps = [#[[$MAP1]], #[[$MAP]]], 
-// CHECK-SAME:                 iterator_types = ["parallel", "parallel"]} 
-// CHECK-SAME:               ins(%[[D6]]#2 : tensor<1024xf32>) 
+// CHECK:        %[[D7:.+]] = linalg.generic
+// CHECK-SAME:                {indexing_maps = [#[[$MAP1]], #[[$MAP]]],
+// CHECK-SAME:                 iterator_types = ["parallel", "parallel"]}
+// CHECK-SAME:               ins(%[[D6]]#2 : tensor<1024xf32>)
 // CHECK-SAME:               outs(%[[D6]]#0 : tensor<1024x64xf32>) {
 // CHECK:        ^bb0(%[[IN:.+]]: f32, %[[OUT:.+]]: f32):
 // CHECK-DAG:      %[[CST_1:.+]] = arith.constant 1.000000e+00
@@ -138,4 +138,4 @@ func.func @attention_transpose_v(%query: tensor<1x1024x64xf16>, %key: tensor<1x1
 // CHECK-LABEL:  func.func @attention_transpose_v
 // CHECK:          scf.for
 // CHECK:            iree_linalg_ext.attention {transpose_v = true}
-// CHECK:          scf.yield 
+// CHECK:          scf.yield
