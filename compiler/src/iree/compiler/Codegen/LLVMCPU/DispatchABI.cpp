@@ -154,7 +154,9 @@ ExecutableLibraryDI::getArrayOf(LLVM::DITypeAttr typeAttr, int64_t count) {
               builder.getContext(), builder.getI64IntegerAttr(count),
               /*lowerBound=*/nullptr, /*upperBound=*/nullptr,
               /*stride=*/nullptr),
-      });
+      },
+      /*dataLocation=*/nullptr, /*rank=*/nullptr, /*allocated=*/nullptr,
+      /*associated=*/nullptr);
 }
 
 LLVM::DIDerivedTypeAttr
@@ -226,7 +228,9 @@ LLVM::DICompositeTypeAttr ExecutableLibraryDI::getProcessorV0T() {
       /*alignInBits=*/0,
       {
           getMemberOf("data", getArrayOf(getUint64T(), 8), &offsetInBits),
-      });
+      },
+      /*dataLocation=*/nullptr, /*rank=*/nullptr, /*allocated=*/nullptr,
+      /*associated=*/nullptr);
 }
 
 LLVM::DIDerivedTypeAttr ExecutableLibraryDI::getEnvironmentV0T() {
@@ -252,7 +256,10 @@ LLVM::DIDerivedTypeAttr ExecutableLibraryDI::getEnvironmentV0T() {
                           getPtrOf(getPtrOf(getConstOf(getVoidPtr()))),
                           &offsetInBits),
               getMemberOf("processor", getProcessorV0T(), &offsetInBits),
-          }));
+          },
+          /*dataLocation=*/nullptr,
+          /*rank=*/nullptr, /*allocated=*/nullptr,
+          /*associated=*/nullptr));
 }
 
 LLVM::DIDerivedTypeAttr ExecutableLibraryDI::getDispatchStateV0T() {
@@ -286,7 +293,9 @@ LLVM::DIDerivedTypeAttr ExecutableLibraryDI::getDispatchStateV0T() {
               getMemberOf("binding_lengths",
                           getPtrOf(getConstOf(getArrayOf(getSizeT(), 64))),
                           &offsetInBits),
-          }));
+          },
+          /*dataLocation=*/nullptr, /*rank=*/nullptr, /*allocated=*/nullptr,
+          /*associated=*/nullptr));
 }
 
 LLVM::DIDerivedTypeAttr ExecutableLibraryDI::getWorkgroupStateV0T() {
@@ -308,7 +317,9 @@ LLVM::DIDerivedTypeAttr ExecutableLibraryDI::getWorkgroupStateV0T() {
               getMemberOf("processor_id", getUint32T(), &offsetInBits),
               getMemberOf("local_memory", getVoidPtr(), &offsetInBits),
               getMemberOf("local_memory_size", getUint32T(), &offsetInBits),
-          }));
+          },
+          /*dataLocation=*/nullptr, /*rank=*/nullptr, /*allocated=*/nullptr,
+          /*associated=*/nullptr));
 }
 
 //------------------------------------------------------------------------------
