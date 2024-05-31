@@ -151,8 +151,7 @@ applyTileAndFuseToEachRoot(RewriterBase &rewriter,
           Operation *replacementOp = replacement.getDefiningOp();
           rewriter.replaceUsesWithIf(res, replacement, [&](OpOperand &use) {
             Operation *user = use.getOwner();
-            return dominanceInfo.properlyDominates(replacementOp, user) &&
-                   user->getParentOp() == replacementOp->getParentOp();
+            return dominanceInfo.properlyDominates(replacementOp, user);
           });
         }
 
