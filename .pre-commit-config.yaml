@@ -18,11 +18,13 @@ repos:
         #   resulting in errors like `expected a single document in the stream`
         exclude: "mkdocs.yml|.clang-format"
 
-    -   id: end-of-file-fixer
-        exclude_types: ["image", "jupyter"]
+    # TODO(scotttodd): enable once enough contributors are familiar with pre-commit
+    # -   id: end-of-file-fixer
+    #     exclude_types: ["image", "jupyter"]
 
-    -   id: trailing-whitespace
-        exclude_types: ["image", "jupyter"]
+    # TODO(scotttodd): enable once enough contributors are familiar with pre-commit
+    # -   id: trailing-whitespace
+    #     exclude_types: ["image", "jupyter"]
 
 -   repo: https://github.com/psf/black
     rev: 23.3.0
