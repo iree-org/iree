@@ -54,4 +54,3 @@ void main() {
   uint upper32bits = 0;
   if (laneID == lsb) Output.data = uvec2(laneResult, upper32bits);
 }
-

@@ -72,4 +72,3 @@ func.func @pipeline() {
   flow.dispatch.tensor.store %8, %2, offsets = [0, 0], sizes = [1024, 1024], strides = [1, 1] : tensor<1024x1024xf32> -> !flow.dispatch.tensor<readwrite:tensor<1024x1024xf32>>
   return
 }
-

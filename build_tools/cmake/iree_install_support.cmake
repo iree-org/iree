@@ -24,8 +24,8 @@ function(iree_install_targets)
   )
 
   # Determine install component. It can be explicit on the target or implicit
-  # from the CMake variable IREE_INSTALL_LIBRARY_TARGETS_DEFAULT_COMPONENT 
-  # (usually set at the directory level). Note that truthy evaluation is 
+  # from the CMake variable IREE_INSTALL_LIBRARY_TARGETS_DEFAULT_COMPONENT
+  # (usually set at the directory level). Note that truthy evaluation is
   # intended: Installation can be suppressed by setting "COMPONENT OFF".
   set(_INSTALL_COMPONENT "${_RULE_COMPONENT}")
   if(NOT _INSTALL_COMPONENT AND IREE_INSTALL_LIBRARY_TARGETS_DEFAULT_COMPONENT)
@@ -101,13 +101,13 @@ endfunction()
 # export set.
 # This will export any targets added to iree_install_targets above with the
 # same export set name (either explicit or at the directory level).
-# 
+#
 # This function must be called at a location after which all targets that are
 # part of the export set have been added (typically at the top-level).
 # Exports will not be generated if no targets were added for that export set
 # name.
 #
-# If a COMPONENT is specified, the exports will be installed with that 
+# If a COMPONENT is specified, the exports will be installed with that
 # component. Defaults to IREECMakeExports.
 function(iree_generate_export_targets)
   cmake_parse_arguments(

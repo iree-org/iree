@@ -18,4 +18,3 @@ func.func @tensor_crossrank() {
   check.expect_eq_const(%result, dense<[[1, 2], [3, 4], [5, 6]]> : tensor<3x2xi32>) : tensor<3x2xi32>
   return
 }
-

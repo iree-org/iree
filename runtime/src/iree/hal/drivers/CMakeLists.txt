@@ -37,7 +37,7 @@ set(IREE_EXTERNAL_HAL_DRIVERS_USED)
 get_property(IREE_EXTERNAL_HAL_DRIVERS_AVAILABLE GLOBAL PROPERTY IREE_EXTERNAL_HAL_DRIVERS_AVAILABLE)
 foreach(_DRIVER_NAME ${IREE_EXTERNAL_HAL_DRIVERS})
   if(NOT _DRIVER_NAME IN_LIST IREE_EXTERNAL_HAL_DRIVERS_AVAILABLE)
-    message(SEND_ERROR 
+    message(SEND_ERROR
       "Driver passed to -DIREE_EXTERNAL_HAL_DRIVERS=${_DRIVER_NAME} is not found. Available: "
       "${IREE_EXTERNAL_HAL_DRIVERS_AVAILABLE}")
   endif()
@@ -101,7 +101,7 @@ if(IREE_EXTERNAL_HAL_DRIVERS_USED)
     list(APPEND _INIT_EXTERNAL_DEPS ${_DRIVER_TARGET})
 
     if(NOT _DRIVER_TARGET OR NOT _DRIVER_REGISTER)
-      message(SEND_ERROR 
+      message(SEND_ERROR
         "Bad configuration for external HAL driver ${_DRIVER_VAR}: "
         "Missing ${_DRIVER_VAR}_TARGET or ${_DRIVER_VAR}_REGISTER vars. "
         "This usually indicates that the project was not included in the "

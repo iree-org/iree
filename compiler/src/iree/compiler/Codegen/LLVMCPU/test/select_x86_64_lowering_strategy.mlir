@@ -1654,4 +1654,3 @@ module {
 // CHECK-SAME:     translation_info = #[[TRANSLATION]]
 //     CHECK:    linalg.generic
 // CHECK-SAME:     {lowering_config = #[[CONFIG]]}
-

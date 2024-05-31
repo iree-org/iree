@@ -6,4 +6,3 @@ ENTRY testbuilder.5 {
   broadcast.3 = f32[1]{0} broadcast(constant.2), dimensions={}
   ROOT add.4 = f32[1]{0} add(parameter.1, broadcast.3)
 }
-

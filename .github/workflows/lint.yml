@@ -19,10 +19,8 @@ jobs:
     steps:
       - name: Checking out repository
         uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
-      - name: Running bazel_to_cmake for IREE core
+      - name: Running bazel_to_cmake
         run: ./build_tools/bazel_to_cmake/bazel_to_cmake.py --verbosity=2
-      - name: Running bazel_to_cmake for IREE TF Integration Tests
-        run: ./build_tools/bazel_to_cmake/bazel_to_cmake.py --root_dir=integrations/tensorflow/e2e --verbosity=2
       - name: Checking Diff
         run: |
           # Make sure to pick up new files that have been added.
@@ -140,7 +138,7 @@ jobs:
       - name: Checking out repository
         uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
       - name: Downloading markdownlint
-        run: npm install -g markdownlint-cli@0.38.0
+        run: npm install -g markdownlint-cli@0.41.0
       - name: Running markdownlint
         run: ./build_tools/scripts/run_markdownlint.sh
 

@@ -2710,4 +2710,3 @@ func.func @generic_batch_vecmat_transposed_i16u4i32(%arg0: tensor<32x128xi16>, %
 //       CHECK:   %[[COLLAPSE:.+]] = tensor.collapse_shape %[[BATCH_MMT4D]] {{.*}} : tensor<32x1x128x1x32xi32> into tensor<32x128x32xi32>
 //   CHECK-DAG:   %[[UNPACK_DEST:.+]] = tensor.empty() : tensor<4096x32xi32>
 //       CHECK:   %[[UNPACK:.+]] = tensor.unpack %[[COLLAPSE]] outer_dims_perm = [1, 0] inner_dims_pos = [0] inner_tiles = [32] into %[[UNPACK_DEST]] : tensor<32x128x32xi32> -> tensor<4096x32xi32>
-

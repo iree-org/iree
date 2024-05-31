@@ -117,7 +117,7 @@ module {
 // -----
 
 module {
-  /// translation info workgroup_size values needs to have non-negative values.  
+  /// translation info workgroup_size values needs to have non-negative values.
   func.func @subgroup_size_neg_err() attributes {
     // expected-error @+1 {{subgroup size value cannot be negative}}
     translation_info = #iree_codegen.translation_info<None subgroup_size = -1> {

@@ -46,7 +46,6 @@ fi
 
 echo "***** Bazel -> CMake *****"
 ./build_tools/bazel_to_cmake/bazel_to_cmake.py
-./build_tools/bazel_to_cmake/bazel_to_cmake.py --root_dir=integrations/tensorflow/e2e
 git add -A
 git diff HEAD --exit-code
 
