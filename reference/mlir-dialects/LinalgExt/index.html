@@ -4260,7 +4260,7 @@ context, they will be the second and third inputs.</p>
 tile and distribute them.
 }</p>
 <p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
-<p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>LinalgExtOp</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
+<p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>LinalgExtOp</code>, <code>LinalgFusionOpInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
 <h5 id="attributes_3">Attributes:<a class="headerlink" href="#attributes_3" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
@@ -4394,7 +4394,7 @@ marked as reduction.</p>
 batch dims to be 1D. See more information in
   https://www.tensorflow.org/api_docs/python/tf/tensor_scatter_nd_update</p>
 <p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
-<p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
+<p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>LinalgFusionOpInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
 <h5 id="attributes_5">Attributes:<a class="headerlink" href="#attributes_5" title="Permanent link">link</a></h5>
 <table>
 <tr><th>Attribute</th><th>MLIR Type</th><th>Description</th></tr>
