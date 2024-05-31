@@ -334,31 +334,6 @@ static bool x86TransposeLoweringPrecondition(linalg::GenericOp genericOp) {
            indexingMaps[1].isIdentity()));
 }
 
-/// Returns true if the `genericOp` implementing a transposition is supported by
-/// AArch64 SME, i.e. all of the following are true:
-///
-///   1. The op has 2 dimensions.
-///   2. The op has a single input and a single output.
-///   3. One of the `indexing_maps` is a permutation and the other an identity.
-static bool
-transposeLoweringPreconditionAArch64SME(linalg::GenericOp genericOp) {
-  // Check op has 2 dimensions.
-  if (genericOp.getNumLoops() != 2)
-    return false;
-
-  // Check op has single input and output.
-  if ((genericOp.getNumDpsInputs() != 1) || (genericOp.getNumDpsInits() != 1))
-    return false;
-
-  // Check all iterators are parallel.
-  if (genericOp.getNumParallelLoops() != genericOp.getNumLoops())
-    return false;
-
-  // Check that the two indexing maps are a permutation of each other.
-  SmallVector<AffineMap> indexingMaps = genericOp.getIndexingMapsArray();
-  return indexingMaps[0].isPermutation() && indexingMaps[1].isIdentity();
-}
-
 /// Returns minimum tiling sizes for each dimension. One dimension is possible
 /// to access at different element types. It determines the tiling sizes by
 /// looking into all the operands.

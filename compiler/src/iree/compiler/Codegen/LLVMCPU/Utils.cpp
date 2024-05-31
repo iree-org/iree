@@ -58,4 +58,44 @@ bool hasI8mmFeature(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return hasFeature(targetAttr, "+i8mm");
 }
 
+bool transposeLoweringPreconditionAArch64SME(linalg::GenericOp genericOp) {
+  // Check op has 2 dimensions.
+  if (genericOp.getNumLoops() != 2)
+    return false;
+
+  // Check op has single input and output.
+  if ((genericOp.getNumDpsInputs() != 1) || (genericOp.getNumDpsInits() != 1))
+    return false;
+
+  // Check all iterators are parallel.
+  if (genericOp.getNumParallelLoops() != genericOp.getNumLoops())
+    return false;
+
+  // Check that the two indexing maps are a permutation of each other.
+  SmallVector<AffineMap> indexingMaps = genericOp.getIndexingMapsArray();
+  bool isTranspose =
+      indexingMaps[0].isPermutation() && indexingMaps[1].isIdentity();
+  if (!isTranspose)
+    return false;
+
+  // Make sure the region only contains a yield op.
+  Block &body = genericOp.getRegion().front();
+  if (!llvm::hasSingleElement(body))
+    return false;
+  auto yieldOp = dyn_cast<linalg::YieldOp>(body.getTerminator());
+  if (!yieldOp)
+    return false;
+
+  // The yield op should return the block argument corresponds to the input.
+  for (Value yieldVal : yieldOp.getValues()) {
+    auto yieldArg = dyn_cast<BlockArgument>(yieldVal);
+    if (!yieldArg || yieldArg.getOwner() != &body)
+      return false;
+    if (yieldArg.getArgNumber() != 0)
+      return false;
+  }
+
+  return true;
+}
+
 } // namespace mlir::iree_compiler

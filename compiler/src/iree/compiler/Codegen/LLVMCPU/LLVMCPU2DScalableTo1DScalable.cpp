@@ -89,7 +89,8 @@ public:
 
 static bool opKnownToSupport2DScalableVectorizationWithArmSME(Operation *op) {
   if (auto genericOp = dyn_cast<linalg::GenericOp>(op))
-    return LinalgOpInfo(genericOp).isTranspose();
+    return LinalgOpInfo(genericOp).isTranspose() &&
+           transposeLoweringPreconditionAArch64SME(genericOp);
   return isa<linalg::MatmulOp, linalg::MatmulTransposeAOp, linalg::FillOp>(op);
 }
 
