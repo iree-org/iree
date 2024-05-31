@@ -30,6 +30,11 @@ namespace mlir::iree_compiler::Preprocessing {
 #define GEN_PASS_DEF_CONVERTCONVTOCHANNELSLASTPASS
 #include "iree/compiler/Preprocessing/Common/Passes.h.inc" // IWYU pragma: export
 
+static llvm::cl::opt<bool>
+    clEnableFHWCFitler("iree-preprocessing-enable-fhwc-filter-layout",
+                       llvm::cl::desc("Enable FHWC Filter Transpose."),
+                       llvm::cl::init(false));
+                       
 using ConvBuilderFn = std::function<Value(
     OpBuilder &b, Location loc, linalg::LinalgOp srcConv, Value input,
     Value filter, Value output, AffineMap inputMap, AffineMap filterMap,
@@ -455,26 +460,31 @@ namespace {
 
 struct ConvertLinalgConvNchwFchw : OpRewritePattern<linalg::Conv2DNchwFchwOp> {
   using OpRewritePattern::OpRewritePattern;
-  ConvertLinalgConvNchwFchw(MLIRContext *context, bool enableFHWC=false, PatternBenefit benefit = 2)
-      : OpRewritePattern<linalg::Conv2DNchwFchwOp>(context, benefit), 
-        enableFHWCFilter(enableFHWC)
-       {}
+  ConvertLinalgConvNchwFchw(MLIRContext *context, bool enableFHWC = false,
+                            PatternBenefit benefit = 2)
+      : OpRewritePattern<linalg::Conv2DNchwFchwOp>(context, benefit),
+        enableFHWCFilter(enableFHWC) {}
 
   LogicalResult matchAndRewrite(linalg::Conv2DNchwFchwOp convOp,
                                 PatternRewriter &rewriter) const override {
-    if (enableFHWCFilter)
+    auto strides = convOp.getStrides();
+    bool hasAllOneStrides =
+        strides.isSplat() && strides.getSplatValue<int64_t>() == 1;
+    // Only enable this new filter layout when all strides are 1.
+    if (enableFHWCFilter && hasAllOneStrides)
       return transposeConvLikeLinalgOp(
           rewriter, convOp, /*tilingFactor=*/-1, enableFHWCFilter,
           namedConvBuilderFn<linalg::Conv2DNchwFchwOp,
                              linalg::Conv2DNhwcFhwcOp>);
     else
       return transposeConvLikeLinalgOp(
-          rewriter, convOp, /*tilingFactor=*/-1, enableFHWCFilter,
+          rewriter, convOp, /*tilingFactor=*/-1, false,
           namedConvBuilderFn<linalg::Conv2DNchwFchwOp,
                              linalg::Conv2DNhwcHwcfOp>);
   }
+
 private:
-  bool enableFHWCFilter;  
+  bool enableFHWCFilter;
 };
 
 // Default convolution-like transposing pattern for any linalg op to a generic.
