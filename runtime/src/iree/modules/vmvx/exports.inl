@@ -56,5 +56,4 @@ EXPORT_FN("sub.2d.i32", iree_uk_x32b_subi_2d, ukernel_x32b_2d, rIIIrIIIrIIIII, v
 EXPORT_FN("unpack", iree_vmvx_unpack, unpack, rIIrIIIIIIIIi, v)
 EXPORT_FN("xor.2d.i32", iree_uk_x32b_xori_2d, ukernel_x32b_2d, rIIIrIIIrIIIII, v)
 
-
 // clang-format on

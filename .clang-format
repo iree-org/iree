@@ -7,3 +7,7 @@
 # IREE's runtime follows Google style while its compiler follows the
 # LLVM/MLIR variable naming and formatting style.
 BasedOnStyle: Google
+
+---
+Language: Json
+DisableFormat: true

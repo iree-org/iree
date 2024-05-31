@@ -126,8 +126,8 @@ class OpenXLAPartitionerJob : public CompilerJob {
   //           absl::StrCat(
   //               "--openxla-partitioner-gspmd-allow-spmd-"
   //               "sharding-propagation-to-output=",
-  //               absl::StrJoin(allow_spmd_sharding_propagation_to_output, ","))
-  //               .c_str())) {
+  //               absl::StrJoin(allow_spmd_sharding_propagation_to_output,
+  //               ",")) .c_str())) {
   //     return false;
   //   }
   //   return true;

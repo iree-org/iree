@@ -11,7 +11,7 @@
 
 struct BroadcastTestData {
   BroadcastTestData(std::vector<int64_t> ishape, std::vector<int64_t> bshape,
-           std::vector<int64_t> perms, int64_t esize = 4) {
+                    std::vector<int64_t> perms, int64_t esize = 4) {
     assert(ishape.size() == bshape.size());
     assert(ishape.size() == perms.size());
 
