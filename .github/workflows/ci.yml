@@ -611,23 +611,34 @@ jobs:
           pip install --no-index -f $PWD -v iree-compiler[onnx]
           echo "Testing default compiler:"
           python -m iree.compiler._package_test
-  asan:
+
+  sanitizers:
     needs: setup
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'asan')
+    name: "sanitizers :: ${{ matrix.name }}"
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'sanitizers')
     runs-on:
       - self-hosted # must come first
       - runner-group=${{ needs.setup.outputs.runner-group }}
       - environment=${{ needs.setup.outputs.runner-env }}
       - cpu
       - os-family=Linux
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: asan
+            script: ./build_tools/cmake/build_and_test_asan.sh
+          - name: tsan
+            script: ./build_tools/cmake/build_and_test_tsan.sh
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
         with:
           submodules: true
-      - name: "Building and testing with AddressSanitizer"
+      - name: "Building and testing"
         env:
           IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
+          SCRIPT: ${{ matrix.script }}
         run: |
           # Note that this uses the latest version of the clang compiler, etc.
           # This gives us access to the latest features and validates that IREE
@@ -637,32 +648,7 @@ jobs:
             --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
             --env "CCACHE_NAMESPACE=base-bleeding-edge@sha256:14200dacca3a0f3a66f8aa87c6f64729b83a2eeb403b689c24204074ad157418" \
             gcr.io/iree-oss/base-bleeding-edge@sha256:c5f28883e6c570c20128fb37d7af3a00a25df3ce4e2b3a24c3a8dcd183182a27 \
-            ./build_tools/cmake/build_and_test_asan.sh
-
-  tsan:
-    needs: setup
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'tsan')
-    runs-on:
-      - self-hosted # must come first
-      - runner-group=${{ needs.setup.outputs.runner-group }}
-      - environment=${{ needs.setup.outputs.runner-env }}
-      - cpu
-      - os-family=Linux
-    steps:
-      - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-        with:
-          submodules: true
-      - name: "Building and testing with ThreadSanitizer"
-        env:
-          IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
-        run: |
-          ./build_tools/github_actions/docker_run.sh \
-            --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
-            --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
-            --env "CCACHE_NAMESPACE=gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446" \
-            gcr.io/iree-oss/base@sha256:dc314b4fe30fc1315742512891357bffed4d1b62ffcb46258b1e0761c737b446 \
-            ./build_tools/cmake/build_and_test_tsan.sh
+            ${SCRIPT}
 
   small_runtime:
     needs: setup
@@ -940,8 +926,7 @@ jobs:
       # Configurations
       - build_test_runtime
       - python_release_packages
-      - asan
-      - tsan
+      - sanitizers
       - small_runtime
       - gcc
       - tracing
