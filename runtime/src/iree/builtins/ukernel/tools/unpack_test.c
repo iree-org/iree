@@ -42,8 +42,9 @@ static void iree_unpack_reference(const iree_uk_unpack_params_t* params) {
           iree_uk_index_t i0 = outer_i0 * tile_size0 + tile_i0;
           iree_uk_index_t i1 = outer_i1 * tile_size1 + tile_i1;
           if (!(i0 >= params->out_size0 || i1 >= params->out_size1)) {
-            iree_uk_index_t out_offset =
-                params->out_offset + i1 + i0 * params->out_stride0;
+            iree_uk_index_t out_offset = params->out_offset +
+                                         i1 * params->out_stride1 +
+                                         i0 * params->out_stride0;
             const char* in_ptr =
                 ((char*)params->in_buffer) + in_offset * elem_size;
             char* out_ptr =
@@ -63,8 +64,11 @@ static void iree_uk_test_unpack_for_shape_params(
   // Populate strides first - we need them below to compute buffer lengths.
   // Randomly make strides either tight or not to exercise all cases.
   iree_uk_random_engine_t* engine = iree_uk_test_random_engine(test);
-  params.out_stride0 = params.out_size1 + iree_uk_random_engine_get_0_1(engine);
-  params.in_stride0 = params.in_size1 * params.in_size2 * params.in_size3 +
+  params.out_stride1 = 1 + iree_uk_random_engine_get_0_1(engine);
+  params.out_stride0 = params.out_size1 * params.out_stride1 +
+                       iree_uk_random_engine_get_0_1(engine);
+  params.in_stride1 = params.in_size2 * params.in_size3;
+  params.in_stride0 = params.in_size1 * params.in_stride1 +
                       iree_uk_random_engine_get_0_1(engine);
   iree_uk_unpack_type_t unpack_type = iree_uk_unpack_type(params.flags);
   iree_uk_type_t in_type = iree_uk_unpack_in_type(unpack_type);
@@ -102,7 +106,7 @@ static void iree_uk_test_unpack_for_shape_params(
 
   if (!iree_uk_2d_buffers_equal(actual_out_buffer, reference_out_buffer,
                                 out_type, params.out_size0, params.out_size1,
-                                params.out_stride0)) {
+                                params.out_stride0, params.out_stride1)) {
     IREE_UK_TEST_FAIL(test);
   }
 
