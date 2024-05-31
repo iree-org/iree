@@ -1520,23 +1520,24 @@ FailureOr<TilingResult> WinogradOutputTransformOp::getTiledImplementation(
   // multiple of the static output_tile_size, so insert a tensor.cast op to
   // maintain more static information in the IR.
   auto outSliceType = cast<ShapedType>(outputSlice.getType());
-  SmallVector<int64_t> staticOutShape(outSliceType.getShape());
-  auto constSizeH = getConstantIntValue(sizesPermuted[sizesHDim]);
-  if (constSizeH.has_value()) {
-    staticOutShape[hDim] = constSizeH.value() * getOutputTileSize();
-  }
-  auto constSizeW = getConstantIntValue(sizesPermuted[sizesWDim]);
-  if (constSizeW.has_value()) {
-    staticOutShape[wDim] = constSizeW.value() * getOutputTileSize();
-  }
-  Value staticOutputSlice =
-      castValue(builder, loc, outputSlice, outSliceType.clone(staticOutShape));
+  // SmallVector<int64_t> staticOutShape(outSliceType.getShape());
+  // auto constSizeH = getConstantIntValue(sizesPermuted[sizesHDim]);
+  // if (constSizeH.has_value()) {
+  //   staticOutShape[hDim] = constSizeH.value() * getOutputTileSize();
+  // }
+  // auto constSizeW = getConstantIntValue(sizesPermuted[sizesWDim]);
+  // if (constSizeW.has_value()) {
+  //   staticOutShape[wDim] = constSizeW.value() * getOutputTileSize();
+  // }
+  // Value staticOutputSlice =
+  //     castValue(builder, loc, outputSlice,
+  //     outSliceType.clone(staticOutShape));
 
   SmallVector<Value> tiledOperands;
   SmallVector<OpFoldResult> inputStrides(getInputRank(), one);
   tiledOperands.emplace_back(
       getSlice(builder, loc, getInput(), offsets, sizes, inputStrides));
-  tiledOperands.emplace_back(staticOutputSlice);
+  tiledOperands.emplace_back(outputSlice);
 
   SmallVector<Type, 4> resultTypes;
   if (hasPureTensorSemantics()) {

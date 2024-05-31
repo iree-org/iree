@@ -375,21 +375,22 @@ public:
     Value expandedBmmResult =
         createExpand(bmmResult, loc, rewriter, expandedShape, reassociations);
 
-    // Convert back into original domain
-    SmallVector<int64_t> paddedResultShape(foldedOutputShape.size(), 0);
-    for (int i = 0; i < foldedOutputShape.size(); i++) {
-      if (!imageDimsSet.contains(i)) {
-        paddedResultShape[i] = foldedOutputShape[i];
-      } else {
-        paddedResultShape[i] = resultShape[i] * outputTileSize;
-      }
-    }
-    if (isNchwFchw) {
-      permute<IREE::LinalgExt::Permutation::HWC_TO_CHW>(paddedResultShape);
-    }
-    Value outputTfInit =
-        rewriter.create<tensor::EmptyOp>(loc, paddedResultShape, outElemType);
-    Value paddedOutput =
+    // // Convert back into original domain
+    // SmallVector<int64_t> paddedResultShape(foldedOutputShape.size(), 0);
+    // for (int i = 0; i < foldedOutputShape.size(); i++) {
+    //   if (!imageDimsSet.contains(i)) {
+    //     paddedResultShape[i] = foldedOutputShape[i];
+    //   } else {
+    //     paddedResultShape[i] = resultShape[i] * outputTileSize;
+    //   }
+    // }
+    // if (isNchwFchw) {
+    //   permute<IREE::LinalgExt::Permutation::HWC_TO_CHW>(paddedResultShape);
+    // }
+    auto foldedOutputType = cast<RankedTensorType>(outputFolded.getType());
+    Value outputTfInit = rewriter.create<tensor::EmptyOp>(
+        loc, foldedOutputType.getShape(), outElemType);
+    Value winogradOutput =
         rewriter
             .create<IREE::LinalgExt::WinogradOutputTransformOp>(
                 loc, outputTfInit.getType(), ValueRange{expandedBmmResult},
@@ -397,16 +398,15 @@ public:
                 inputTileDimsImage)
             .getResults()[0];
 
-    // Extract slice
-    SmallVector<OpFoldResult> offsets(foldedOutputShape.size(),
-                                      rewriter.getIndexAttr(0));
-    SmallVector<OpFoldResult> strides(foldedOutputShape.size(),
-                                      rewriter.getIndexAttr(1));
-    auto foldedOutputType = cast<RankedTensorType>(outputFolded.getType());
-    SmallVector<OpFoldResult> sizes =
-        getAsIndexOpFoldResult(context, foldedOutputType.getShape());
-    Value winogradOutput = rewriter.create<tensor::ExtractSliceOp>(
-        loc, foldedOutputType, paddedOutput, offsets, sizes, strides);
+    // // Extract slice
+    // SmallVector<OpFoldResult> offsets(foldedOutputShape.size(),
+    //                                   rewriter.getIndexAttr(0));
+    // SmallVector<OpFoldResult> strides(foldedOutputShape.size(),
+    //                                   rewriter.getIndexAttr(1));
+    // SmallVector<OpFoldResult> sizes =
+    //     getAsIndexOpFoldResult(context, foldedOutputType.getShape());
+    // Value winogradOutput = rewriter.create<tensor::ExtractSliceOp>(
+    //     loc, foldedOutputType, paddedOutput, offsets, sizes, strides);
 
     if (!hasBatch) {
       SmallVector<ReassociationIndices> reInds = {{0, 1}, {2}, {3}};

@@ -17,8 +17,11 @@
 #include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/OpDefinition.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -284,7 +287,6 @@ struct DecomposeWinogradOutputTransform
                                 PatternRewriter &rewriter) const override {
     Location loc = transformOp.getLoc();
     Value inputSlice = transformOp.getInput();
-    Value outputSlice = transformOp.getOutput();
     if (transformOp.getInputRank() != 2 || transformOp.getOutputRank() != 2) {
       return rewriter.notifyMatchFailure(transformOp, "Winograd op not tiled");
     }
@@ -304,15 +306,18 @@ struct DecomposeWinogradOutputTransform
     Value zeroF32 = rewriter.create<arith::ConstantOp>(
         loc, rewriter.getZeroAttr(elementType));
     SmallVector<int64_t> scratchShape = {inputTileSize, outputTileSize};
+    SmallVector<int64_t> scratch2Shape = {outputTileSize, outputTileSize};
     Value scratch =
         rewriter.create<tensor::EmptyOp>(loc, scratchShape, elementType);
+    Value scratch2 =
+        rewriter.create<tensor::EmptyOp>(loc, scratch2Shape, elementType);
     // Create computation
     Value result, AMatrix, BMatrix;
     linalg::MatmulOp matmulOp;
     linalg::FillOp fillOp;
     Value tmp;
     for (int i = 0; i < 2; i++) {
-      tmp = i == 0 ? scratch : outputSlice;
+      tmp = i == 0 ? scratch : scratch2;
       fillOp = rewriter.create<linalg::FillOp>(loc, ValueRange{zeroF32},
                                                ValueRange{tmp});
       if (i == 0) {
@@ -326,7 +331,17 @@ struct DecomposeWinogradOutputTransform
           loc, tmp.getType(), ValueRange{AMatrix, BMatrix}, fillOp.result());
       result = matmulOp.getResult(0);
     }
-    rewriter.replaceOp(transformOp, result);
+    Value outputSlice = transformOp.getOutput();
+    auto outputSizes = tensor::getMixedSizes(rewriter, loc, outputSlice);
+    SmallVector<OpFoldResult> outputOffsets(
+        outputSizes.size(), getAsIndexOpFoldResult(rewriter.getContext(), 0));
+    SmallVector<OpFoldResult> outputStrides(
+        outputSizes.size(), getAsIndexOpFoldResult(rewriter.getContext(), 1));
+    auto outputTensorType =
+        cast<RankedTensorType>(transformOp->getResultTypes()[0]);
+    rewriter.replaceOpWithNewOp<tensor::ExtractSliceOp>(
+        transformOp, outputTensorType, result, outputOffsets, outputSizes,
+        outputStrides);
     return success();
   }
 };
