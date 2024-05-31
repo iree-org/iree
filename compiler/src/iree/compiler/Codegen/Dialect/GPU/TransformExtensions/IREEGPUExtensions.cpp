@@ -8,6 +8,7 @@
 
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Dialect/GPU/Transforms/Transforms.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Transform/IR/TransformTypes.h"
@@ -132,6 +133,59 @@ void transform_dialect::ApplyUnrollMultiMmaOp::populatePatterns(
 void transform_dialect::ApplyVectorizeIREEGPUOp::populatePatterns(
     RewritePatternSet &patterns) {
   IREE::GPU::populateIREEGPUVectorizationPatterns(patterns);
+}
+
+//===---------------------------------------------------------------------===//
+// ConvertToMultiMmaOp
+//===---------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure transform_dialect::ConvertToMultiMmaOp::applyToOne(
+    transform::TransformRewriter &rewriter, linalg::LinalgOp target,
+    transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  rewriter.setInsertionPoint(target);
+  auto multiMmaOp =
+      GPU::convertContractionToMultiMma(rewriter, target, getIntrinsicKind());
+  if (failed(multiMmaOp)) {
+    return mlir::emitDefiniteFailure(target, "conversion to multi_mma failed");
+  }
+  results.push_back(*multiMmaOp);
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::ConvertToMultiMmaOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::producesHandle(getResult(), effects);
+  transform::modifiesPayload(effects);
+}
+
+//===---------------------------------------------------------------------===//
+// DistributeMultiMmaOp
+//===---------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure transform_dialect::DistributeMultiMmaOp::applyToOne(
+    transform::TransformRewriter &rewriter, Operation *target,
+    transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  auto mmaOp = dyn_cast<IREE::GPU::MultiMmaOp>(target);
+  if (!mmaOp) {
+    return mlir::emitDefiniteFailure(target, "target is not a multi_mma op");
+  }
+  rewriter.setInsertionPoint(mmaOp);
+  auto maybeForall = IREE::GPU::distributeMultiMmaOp(rewriter, mmaOp);
+  if (failed(maybeForall)) {
+    return mlir::emitDefiniteFailure(mmaOp, "multi_mma distribution failed");
+  }
+  results.push_back(*maybeForall);
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::DistributeMultiMmaOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::producesHandle(getResult(), effects);
+  transform::modifiesPayload(effects);
 }
 
 //===---------------------------------------------------------------------===//

@@ -109,6 +109,17 @@ def IREEGPU_MMAIntrinsic : IREEGPU_I32MmaEnumAttr<"MMAIntrinsic",
       WMMA_F16_16x16x16_F32
     ]>;
 
+def MMA_LHS : I32EnumAttrCase<"Lhs", 0>;
+def MMA_RHS : I32EnumAttrCase<"Rhs", 1>;
+def MMA_ACC : I32EnumAttrCase<"Acc", 2>;
+
+def IREEGPU_MMAFragment : IREEGPU_I32MmaEnumAttr<"MMAFragment",
+    "Descriptor for a particular fragment of an MMA operation", [
+      MMA_LHS,
+      MMA_RHS,
+      MMA_ACC
+    ]>;
+
 //===----------------------------------------------------------------------===//
 // Tiling levels
 
