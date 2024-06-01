@@ -265,7 +265,7 @@ int main(int argc, char** argv) {
             "        --iree-hal-target-backends=llvm-cpu \\n"
             "        --iree-hal-instrument-dispatches=16mib \\n"
             "        --iree-llvmcpu-instrument-memory-accesses=false \\n"
-            "        runtime/src/iree/runtime/testdata/simple_mul.mlir \\n"
+            "        runtime/src/iree/runtime/demo/simple_mul.mlir \\n"
             "        -o=simple_mul_instr.vmfb\n"
             "  $ iree-run-module \\n"
             "        --device=local-sync \\n"
