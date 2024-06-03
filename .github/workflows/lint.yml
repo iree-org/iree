@@ -25,10 +25,16 @@ jobs:
         uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
 
       # Run these hooks manually until they work as expected on all platforms.
+      - name: Downloading Buildifier
+        run: |
+          mkdir -p "${HOME?}/bin"
+          wget https://github.com/bazelbuild/buildtools/releases/download/4.0.1/buildifier -O "${HOME?}/bin/buildifier"
+          chmod +x "${HOME?}/bin/buildifier"
+          echo "${HOME?}/bin" >> $GITHUB_PATH
       - name: Running pre-commit - bazel-buildifier
         uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
         with:
-          extra_args: --hook-stage manual bazel-buildifier
+          extra_args: --hook-stage manual --all-files bazel-buildifier
       - name: Running pre-commit - generate_cmake_e2e_test_artifacts_suite
         uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
         with:
