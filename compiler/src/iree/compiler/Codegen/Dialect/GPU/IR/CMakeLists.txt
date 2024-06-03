@@ -16,6 +16,7 @@ iree_cc_library(
   HDRS
     "IREEGPUAttrs.h"
     "IREEGPUDialect.h"
+    "IREEGPUEnums.h"
     "IREEGPUInterfaces.h"
     "IREEGPUOps.h"
   TEXTUAL_HDRS
@@ -43,6 +44,8 @@ iree_cc_library(
     IREEVectorExtDialect
     LLVMSupport
     MLIRAMDGPUDialect
+    MLIRAffineDialect
+    MLIRArithDialect
     MLIRControlFlowInterfaces
     MLIRIR
     MLIRLinalgDialect
@@ -52,6 +55,7 @@ iree_cc_library(
     MLIRSupport
     MLIRTensorDialect
     MLIRVectorDialect
+    MLIRVectorInterfaces
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Utils::VectorOpUtils
   PUBLIC

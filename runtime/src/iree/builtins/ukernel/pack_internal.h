@@ -13,9 +13,11 @@ typedef struct iree_uk_pack_params_t {
   const void* in_buffer;
   iree_uk_index_t in_offset;
   iree_uk_index_t in_stride0;
+  iree_uk_index_t in_stride1;
   void* out_buffer;
   iree_uk_index_t out_offset;
   iree_uk_index_t out_stride0;
+  iree_uk_index_t out_stride1;
   iree_uk_index_t in_size0;
   iree_uk_index_t in_size1;
   iree_uk_index_t out_size0;

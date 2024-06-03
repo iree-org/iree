@@ -18,7 +18,15 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
-            "vectorize_multi_mma.mlir",
+            "convert_to_multi_mma.mlir",
+            "distribute_multi_mma.mlir",
+            "drop_multi_mma_unit_dims.mlir",
+            "lower_multi_mma.mlir",
+            "lower_vector_barrier.mlir",
+            "transform_fuse_forall.mlir",
+            "transform_lower_shuffle.mlir",
+            "vectorize_iree_gpu_ops.mlir",
+            "unroll_multi_mma.mlir",
         ],
         include = ["*.mlir"],
     ),

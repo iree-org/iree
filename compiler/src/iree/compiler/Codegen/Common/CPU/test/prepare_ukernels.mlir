@@ -1,6 +1,8 @@
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-cpu-prepare-ukernels))" --split-input-file %s | FileCheck %s
 
-func.func @batch_mmt4d_with_fill(%arg0: tensor<1x10x32x8x1xf32>, %arg1: tensor<1x80x32x4x1xf32>, %arg2: tensor<1x10x80x8x4xf32>) -> tensor<1x10x80x8x4xf32> {
+func.func @batch_mmt4d_with_fill(%arg0: tensor<1x10x32x8x1xf32>, %arg1: tensor<1x80x32x4x1xf32>, %arg2: tensor<1x10x80x8x4xf32>) -> tensor<1x10x80x8x4xf32> attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {ukernels = "mmt4d", target_triple="x86_64-xyz-xyz", cpu_features=""}>
+} {
   %cst = arith.constant 0.000000e+00 : f32
   %0 = linalg.fill ins(%cst : f32) outs(%arg2 : tensor<1x10x80x8x4xf32>) -> tensor<1x10x80x8x4xf32>
   %1 = linalg.batch_mmt4d ins(%arg0, %arg1 : tensor<1x10x32x8x1xf32>, tensor<1x80x32x4x1xf32>) outs(%0 : tensor<1x10x80x8x4xf32>) -> tensor<1x10x80x8x4xf32>
@@ -22,7 +24,9 @@ func.func @batch_mmt4d_with_fill(%arg0: tensor<1x10x32x8x1xf32>, %arg1: tensor<1
 
 // -----
 
-func.func @batch_mmt4d_with_no_fill(%arg0: tensor<1x10x32x8x1xf32>, %arg1: tensor<1x80x32x4x1xf32>, %arg2: tensor<1x10x80x8x4xf32>) -> tensor<1x10x80x8x4xf32> {
+func.func @batch_mmt4d_with_no_fill(%arg0: tensor<1x10x32x8x1xf32>, %arg1: tensor<1x80x32x4x1xf32>, %arg2: tensor<1x10x80x8x4xf32>) -> tensor<1x10x80x8x4xf32> attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {ukernels = "mmt4d", target_triple="x86_64-xyz-xyz", cpu_features=""}>
+} {
   %1 = linalg.batch_mmt4d ins(%arg0, %arg1 : tensor<1x10x32x8x1xf32>, tensor<1x80x32x4x1xf32>) outs(%arg2 : tensor<1x10x80x8x4xf32>) -> tensor<1x10x80x8x4xf32>
   return %1 : tensor<1x10x80x8x4xf32>
 }
@@ -40,7 +44,20 @@ func.func @batch_mmt4d_with_no_fill(%arg0: tensor<1x10x32x8x1xf32>, %arg1: tenso
 
 // -----
 
-func.func @batch_mmt4d_with_extened_inputs(%arg0: tensor<1x10x32x8x1xi8>, %arg1: tensor<1x80x32x4x1xi8>, %arg2: tensor<1x10x80x8x4xi32>) -> tensor<1x10x80x8x4xi32> {
+func.func @do_not_decompose_batch_mmt4d(%arg0: tensor<1x10x32x8x1xf32>, %arg1: tensor<1x80x32x4x1xf32>, %arg2: tensor<1x10x80x8x4xf32>) -> tensor<1x10x80x8x4xf32> attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {ukernels = "", target_triple="x86_64-xyz-xyz", cpu_features=""}>
+} {
+  %1 = linalg.batch_mmt4d ins(%arg0, %arg1 : tensor<1x10x32x8x1xf32>, tensor<1x80x32x4x1xf32>) outs(%arg2 : tensor<1x10x80x8x4xf32>) -> tensor<1x10x80x8x4xf32>
+  return %1 : tensor<1x10x80x8x4xf32>
+}
+// CHECK-LABEL: func.func @do_not_decompose_batch_mmt4d
+// CHECK:         batch_mmt4d
+
+// -----
+
+func.func @batch_mmt4d_with_extened_inputs(%arg0: tensor<1x10x32x8x1xi8>, %arg1: tensor<1x80x32x4x1xi8>, %arg2: tensor<1x10x80x8x4xi32>) -> tensor<1x10x80x8x4xi32> attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {ukernels = "mmt4d", target_triple="x86_64-xyz-xyz", cpu_features=""}>
+} {
   %c0_i32 = arith.constant 0 : i32
   %0 = tensor.empty() : tensor<1x10x32x8x1xi32>
   %1 = linalg.generic {indexing_maps = [affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>,
@@ -91,7 +108,9 @@ func.func @batch_mmt4d_with_extened_inputs(%arg0: tensor<1x10x32x8x1xi8>, %arg1:
 
 // -----
 
-func.func @batch_mmt4d_with_fill_batch_dim(%arg0: tensor<12x10x32x8x1xf32>, %arg1: tensor<12x80x32x4x1xf32>, %arg2: tensor<12x10x80x8x4xf32>) -> tensor<12x10x80x8x4xf32> {
+func.func @batch_mmt4d_with_fill_batch_dim(%arg0: tensor<12x10x32x8x1xf32>, %arg1: tensor<12x80x32x4x1xf32>, %arg2: tensor<12x10x80x8x4xf32>) -> tensor<12x10x80x8x4xf32> attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {ukernels = "mmt4d", target_triple="x86_64-xyz-xyz", cpu_features=""}>
+} {
   %cst = arith.constant 0.000000e+00 : f32
   %0 = linalg.fill ins(%cst : f32) outs(%arg2 : tensor<12x10x80x8x4xf32>) -> tensor<12x10x80x8x4xf32>
   %1 = linalg.batch_mmt4d ins(%arg0, %arg1 : tensor<12x10x32x8x1xf32>, tensor<12x80x32x4x1xf32>) outs(%0 : tensor<12x10x80x8x4xf32>) -> tensor<12x10x80x8x4xf32>
@@ -120,7 +139,9 @@ func.func @batch_mmt4d_with_fill_batch_dim(%arg0: tensor<12x10x32x8x1xf32>, %arg
 
 // -----
 
-func.func @batch_mmt4d_with_lowering_config(%arg0: tensor<12x4x64x8x1xf16>, %arg1: tensor<12x4x64x8x1xf16>, %arg2: tensor<12x4x4x8x8xf16>) -> tensor<12x4x4x8x8xf16> {
+func.func @batch_mmt4d_with_lowering_config(%arg0: tensor<12x4x64x8x1xf16>, %arg1: tensor<12x4x64x8x1xf16>, %arg2: tensor<12x4x4x8x8xf16>) -> tensor<12x4x4x8x8xf16> attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {ukernels = "mmt4d", target_triple="x86_64-xyz-xyz", cpu_features=""}>
+} {
   %cst = arith.constant 0.000000e+00 : f16
   %0 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 4, 4, 0, 0], [1, 1, 1, 0, 8], [0, 0, 0, 0, 0], [0, 0, 0, 0, 0]]>} ins(%cst : f16) outs(%arg2 : tensor<12x4x4x8x8xf16>) -> tensor<12x4x4x8x8xf16>
   %1 = linalg.batch_mmt4d {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[1, 4, 4, 0, 0, 0, 0], [1, 1, 1, 0, 8, 8, 0], [0, 0, 0, 1, 0, 0, 1]]>} ins(%arg0, %arg1 : tensor<12x4x64x8x1xf16>, tensor<12x4x64x8x1xf16>) outs(%0 : tensor<12x4x4x8x8xf16>) -> tensor<12x4x4x8x8xf16>
@@ -131,3 +152,59 @@ func.func @batch_mmt4d_with_lowering_config(%arg0: tensor<12x4x64x8x1xf16>, %arg
 // CHECK:      func.func @batch_mmt4d_with_lowering_config
 // CHECK:        linalg.fill {lowering_config = #[[CONFIG1]]}
 // CHECK:        linalg.mmt4d {lowering_config = #[[CONFIG2]]}
+
+// -----
+
+func.func @pack_without_outer_dims_perm(%arg0: tensor<1x16384x512xbf16>, %arg1: tensor<1x1024x256x16x2xbf16>) -> tensor<1x1024x256x16x2xbf16> attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {ukernels = "pack", target_triple="x86_64-xyz-xyz", cpu_features=""}>
+} {
+  %cst = arith.constant 0.000000e+00 : bf16
+  %pack = tensor.pack %arg0 inner_dims_pos = [1, 2] inner_tiles = [16, 2] into %arg1 : tensor<1x16384x512xbf16> -> tensor<1x1024x256x16x2xbf16>
+  return %pack : tensor<1x1024x256x16x2xbf16>
+}
+// CHECK:      func.func @pack_without_outer_dims_perm
+// CHECK-SAME:   %[[SRC:[0-9a-zA-Z]+]]
+// CHECK-SAME:   %[[DEST:[0-9a-zA-Z]+]]
+// CHECK:        %[[SRC_SLICE:.+]] = tensor.extract_slice %[[SRC]]
+// CHECK-SAME:     tensor<1x16384x512xbf16> to tensor<16384x512xbf16>
+// CHECK:        %[[DEST_SLICE:.+]] = tensor.extract_slice %[[DEST]]
+// CHECK-SAME:      tensor<1x1024x256x16x2xbf16> to tensor<1024x256x16x2xbf16>
+// CHECK:        %[[PACK:.+]] = tensor.pack %[[SRC_SLICE]]
+// CHECK-SAME:     inner_dims_pos = [0, 1] inner_tiles = [16, 2]
+// CHECK-SAME:     into %[[DEST_SLICE]]
+
+// -----
+
+func.func @pack_with_outer_dims_perm(%arg0: tensor<484x16x64xbf16>, %arg1: tensor<64x31x8x16x2xbf16>) -> tensor<64x31x8x16x2xbf16> attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {ukernels = "pack", target_triple="x86_64-xyz-xyz", cpu_features=""}>
+} {
+  %cst = arith.constant 0.000000e+00 : bf16
+  %pack = tensor.pack %arg0 padding_value(%cst : bf16) outer_dims_perm = [2, 0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 2] into %arg1 : tensor<484x16x64xbf16> -> tensor<64x31x8x16x2xbf16>
+  return %pack : tensor<64x31x8x16x2xbf16>
+}
+// CHECK:      func.func @pack_with_outer_dims_perm
+// CHECK-SAME:   %[[SRC:[0-9a-zA-Z]+]]
+// CHECK-SAME:   %[[DEST:[0-9a-zA-Z]+]]
+// CHECK-DAG:    %[[PAD_VAL:.+]] = arith.constant 0.000000e+00 : bf16
+// CHECK:        %[[RES:.+]] = scf.for {{.+}} iter_args(%[[ITER:.+]] = %[[DEST]]) -> (tensor<64x31x8x16x2xbf16>)
+// CHECK:          %[[SRC_SLICE:.+]] = tensor.extract_slice %[[SRC]]
+// CHECK-SAME:       tensor<484x16x64xbf16> to tensor<484x16xbf16>
+// CHECK:          %[[DEST_SLICE:.+]] = tensor.extract_slice %[[ITER]]
+// CHECK-SAME:       tensor<64x31x8x16x2xbf16> to tensor<31x8x16x2xbf16>
+// CHECK:          %[[PACK:.+]] = tensor.pack %[[SRC_SLICE]]
+// CHECK-SAME:       padding_value(%[[PAD_VAL]] : bf16)
+// CHECK-SAME:       outer_dims_perm = [0, 1] inner_dims_pos = [0, 1] inner_tiles = [16, 2]
+// CHECK-SAME:       into %[[DEST_SLICE]]
+// CHECK:        return %[[RES]]
+
+// -----
+
+func.func @do_not_decompose_pack(%arg0: tensor<1x16384x512xbf16>, %arg1: tensor<1x1024x256x16x2xbf16>) -> tensor<1x1024x256x16x2xbf16> attributes {
+  hal.executable.target = #hal.executable.target<"llvm-cpu", "xyz", {ukernels = "", target_triple="x86_64-xyz-xyz", cpu_features=""}>
+} {
+  %cst = arith.constant 0.000000e+00 : bf16
+  %pack = tensor.pack %arg0 inner_dims_pos = [1, 2] inner_tiles = [16, 2] into %arg1 : tensor<1x16384x512xbf16> -> tensor<1x1024x256x16x2xbf16>
+  return %pack : tensor<1x1024x256x16x2xbf16>
+}
+// CHECK-LABEL: func.func @do_not_decompose_pack
+// CHECK:         tensor.pack {{.+}} : tensor<1x16384x512xbf16> -> tensor<1x1024x256x16x2xbf16>

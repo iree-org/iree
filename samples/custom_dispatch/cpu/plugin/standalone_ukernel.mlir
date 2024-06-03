@@ -29,14 +29,14 @@ func.func @ukernel_example(%arg0 : tensor<?xf32>, %arg1 : tensor<?xf32>) -> tens
   %0 = flow.dispatch.region[%c2] -> (tensor<?xf32>{%d0}) {
     %id = flow.dispatch.workgroup.id[0] : index
     %count = flow.dispatch.workgroup.count[0] : index
-    
+
     // Each thread has to perform a slice of the computation.
     %tilesize = affine.apply affine_map<()[s0, s1] -> (s0 ceildiv s1)>()[%d0, %count]
-    
+
     // Compute the offset and size of the slice
     %offset = affine.apply affine_map<()[s0, s1] -> (s0 * s1)>()[%id, %tilesize]
     %size = affine.min affine_map<(d0)[s0, s1] -> (s1 - d0, s0)>(%offset)[%tilesize, %d0]
-    
+
     // Extract slices of the inputs and outputs.
     %1 = tensor.extract_slice %arg0[%offset] [%size] [1] : tensor<?xf32> to tensor<?xf32>
     %2 = tensor.extract_slice %arg1[%offset] [%size] [1] : tensor<?xf32> to tensor<?xf32>
@@ -46,7 +46,7 @@ func.func @ukernel_example(%arg0 : tensor<?xf32>, %arg1 : tensor<?xf32>) -> tens
     %4 = iree_codegen.ukernel.generic "simple_mul_workgroup"
       ins(%1, %2 : tensor<?xf32>, tensor<?xf32>)
       outs(%3 : tensor<?xf32>)
-      (%size, %id : index, index) 
+      (%size, %id : index, index)
       // We can include some additional fields on the parameters struct as
       // needed. Here we request which processor is executing the call and
       // its data fields as defined by runtime/src/iree/schemas/cpu_data.h.

@@ -78,4 +78,3 @@ module attributes { transform.with_named_sequence } {
 // CHECK:   nvgpu.device_async_copy
 // CHECK:   nvgpu.device_async_copy
 // CHECK:   nvgpu.device_async_create_group
-

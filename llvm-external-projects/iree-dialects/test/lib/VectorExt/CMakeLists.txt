@@ -10,4 +10,3 @@ add_mlir_library(IREEVectorExtTestPasses
   IREEVectorExtDialect
   MLIRPass
   )
-

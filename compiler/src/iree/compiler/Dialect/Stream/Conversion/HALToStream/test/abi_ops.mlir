@@ -112,4 +112,3 @@ util.func public @tensorBarrier(%tensor0: tensor<3xf32>, %tensor1: tensor<?xf32>
   // CHECK: util.return %[[TENSOR0_AFTER]], %[[SIZE0]], %[[TENSOR1_AFTER]], %[[SIZE1]]
   util.return %0#0, %0#1 : tensor<3xf32>, tensor<?xf32>
 }
-

@@ -17,4 +17,3 @@ func.func @constant_values() {
 llvm.func @sink(%arg0: i64) {
   llvm.return
 }
-

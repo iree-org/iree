@@ -30,9 +30,9 @@ macro(iree_setup_toolchain)
   # were not compatible for general LTO use, and they were further not
   # compatible amongst themselves.
   # As an aid to CIs, we provide an option which will force toolchain specific
-  # binutils and linkers only if running on Linux. This lets us use the same 
-  # runtime build scripts across platforms without further shenanigans. 
-  # This is a hack and should be rolled back once 2020 era systems are not in 
+  # binutils and linkers only if running on Linux. This lets us use the same
+  # runtime build scripts across platforms without further shenanigans.
+  # This is a hack and should be rolled back once 2020 era systems are not in
   # use.
   # Users should not use this. If they have such an old system, configure CMake
   # to use toolchain specific tools.
@@ -44,7 +44,7 @@ macro(iree_setup_toolchain)
       find_program(IREE_CMAKE_LTO_AR llvm-ar REQUIRED)
       find_program(IREE_CMAKE_LTO_RANLIB llvm-ranlib REQUIRED)
       find_program(IREE_CMAKE_LTO_NM llvm-nm REQUIRED)
-      set(IREE_USE_LINKER "lld")  
+      set(IREE_USE_LINKER "lld")
     elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
       message(STATUS "Running on an old Linux with -DIREE_FORCE_LTO_COMPAT_BINUTILS_ON_LINUX: Forcing gcc-ar, gcc-nm, gcc-ranlib, and ld.gold")
       find_program(IREE_CMAKE_LTO_AR gcc-ar REQUIRED)

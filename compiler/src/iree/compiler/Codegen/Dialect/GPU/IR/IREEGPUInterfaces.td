@@ -8,6 +8,7 @@
 #define IREE_COMPILER_CODEGEN_DIALECT_GPU_IREEGPUINTERFACES
 
 include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.td"
+include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.td"
 include "mlir/IR/EnumAttr.td"
 
 def IREEGPU_MmaInterfaceAttr : AttrInterface<"MmaInterfaceAttr"> {
@@ -98,6 +99,28 @@ def IREEGPU_MmaInterfaceAttr : AttrInterface<"MmaInterfaceAttr"> {
         "::mlir::Value":$lhs,
         "::mlir::Value":$rhs,
         "::mlir::Value":$acc
+      ),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return failure();
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Constructs the offsets/sizes/strides for extracting the per-thread
+        slice of the given operand fragment.
+      }],
+      /*retTy=*/"::mlir::LogicalResult",
+      /*methodName=*/"populateOperandOffsetsSizesStrides",
+      /*args=*/(ins
+        "::mlir::OpBuilder&":$builder,
+        "::mlir::Location":$loc,
+        "::mlir::iree_compiler::IREE::GPU::MMAFragment":$fragment,
+        "::mlir::Value":$lane_id,
+        "::llvm::ArrayRef<int64_t>":$permutation,
+        "::llvm::SmallVector<::mlir::OpFoldResult>&":$offsets,
+        "::llvm::SmallVector<::mlir::OpFoldResult>&":$sizes,
+        "::llvm::SmallVector<::mlir::OpFoldResult>&":$strides
       ),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{

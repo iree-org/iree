@@ -195,4 +195,3 @@ func.func @depthwise_conv() {
         : tensor<1x1x4x16xf32>) : tensor<1x1x4x16xf32>
    return
 }
-

@@ -29,4 +29,3 @@ elif [[ "${ARCH}" == "aarch64" ]]; then
   ninja
   cp ccache /usr/bin/
 fi
-

@@ -44,4 +44,3 @@ table DispatchInstrumentDef {
 }
 
 root_type DispatchInstrumentDef;
-

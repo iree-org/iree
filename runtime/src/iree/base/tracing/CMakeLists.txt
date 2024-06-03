@@ -35,7 +35,7 @@ elseif(${IREE_TRACING_PROVIDER} STREQUAL "tracy")
       "tracy.cc"
     DEPS
       iree::base::core_headers
-      tracy_client::runtime
+      Tracy::TracyClient
     DEFINES
       "IREE_TRACING_PROVIDER_H=\"iree/base/tracing/tracy.h\""
       "IREE_TRACING_MODE=${IREE_TRACING_MODE}"

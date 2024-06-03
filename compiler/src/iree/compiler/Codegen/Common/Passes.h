@@ -45,6 +45,8 @@ void addIREEComprehensiveBufferizePasses(
         std::nullopt,
     std::optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt);
 
+void addConstantBufferizePasses(OpPassManager &funcPassManager);
+
 std::unique_ptr<OperationPass<LLVM::LLVMFuncOp>> createAddFastMathFlagsPass();
 
 /// Pass to bubble up ordinal operations to allow workgroup count computation

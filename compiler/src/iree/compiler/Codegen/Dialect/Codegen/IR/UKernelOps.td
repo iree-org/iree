@@ -12,13 +12,13 @@ include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.td"
 include "mlir/Interfaces/DestinationStyleOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
-class IREECodegen_UKernelOp<string mnemonic, list<Trait> traits = []> : 
+class IREECodegen_UKernelOp<string mnemonic, list<Trait> traits = []> :
   Op<IREECodegen_Dialect, mnemonic, !listconcat(traits,
     [DeclareOpInterfaceMethods<UKernelOpInterface,
         ["lowerToFunctionCall"]>,
      DeclareOpInterfaceMethods<DestinationStyleOpInterface>,
      DeclareOpInterfaceMethods<MemoryEffectsOpInterface>])> {}
-  
+
 def IREECodegen_UKernelGenericOp :
     IREECodegen_UKernelOp<"ukernel.generic", [
       AttrSizedOperandSegments]> {
@@ -37,7 +37,7 @@ def IREECodegen_UKernelGenericOp :
     a memref type. At the memref-level, the operands are expected to
     match directly into a function call with the arguments to the
     function call being the `ins`, `outs` and `other_operands`.
-    
+
     The operands of `memref` type are expected to lower to this sequence of
     function arguments:
       `base_pointer, offset, stride0, stride1, stride2, ...`

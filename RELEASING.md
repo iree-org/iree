@@ -8,21 +8,21 @@ to do so here.
 ## Nightly Core Releases
 
 IREE development is primarily driven via automated nightly release snapshots.
-These are scheduled automatically each day by the 
+These are scheduled automatically each day by the
 `schedule_candidate_release.yml` workflow, which selects a green commit from
 main (for non optional CI tasks), created a tag of the format
 `candidate-{YYYYMMDD}.{BUILDNUM}` and schedules automation to populate the
 release.
 
 The `build_package.yml` workflow then runs jobs to do builds for all
-platforms and packages, finally triggering the 
+platforms and packages, finally triggering the
 `validate_and_publish_release.yml` workflow.
 
 Release artifacts are uploaded as a GitHub
 [pre release](https://github.com/iree-org/iree/releases) and an index of files
 is updated by periodic automation at https://iree.dev/pip-release-links.html.
 
-Some debugging notes for this process are available here: 
+Some debugging notes for this process are available here:
 https://iree.dev/developers/debugging/releases/
 
 ### Nightly Release Packages
@@ -38,7 +38,7 @@ A number of packages are produced automatically:
 
 #### Linux Builds
 
-Binary Linux packages are built using a custom `manylinux` based Docker 
+Binary Linux packages are built using a custom `manylinux` based Docker
 image hosted here: https://github.com/nod-ai/base-docker-images/pkgs/container/manylinux_x86_64
 (TODO: this repository of Docker images should be moved into `iree-org`) using
 isolated self-hosted runners (only used for building checked in code) of
@@ -61,8 +61,8 @@ is fixed forward for the next snapshot.
 #### MacOS Builds
 
 MacOS builds are performed using self hosted MacOS runners in a dedicated
-post-submit pool. Due to the cost, the project aims to target the most recent 
-version of Python only while building version N-1 for the first year of the 
+post-submit pool. Due to the cost, the project aims to target the most recent
+version of Python only while building version N-1 for the first year of the
 lifecycle of the next version.
 
 Only the Python `iree-compiler` and `iree-runtime` packages are built for
@@ -102,11 +102,11 @@ Deprecated projects no longer updated:
 
 There are presently two build promotion processes documented:
 
-* Old one focused purely on releasing IREE core packages: 
+* Old one focused purely on releasing IREE core packages:
 https://iree.dev/developers/general/release-management/
 * New one driven by the Torch frontend and documented below.
 
-The versioning scheme for 
+The versioning scheme for
 [iree-turbine](https://github.com/iree-org/iree-turbine) is rooted on the
 then-current PyTorch released version, with optional date-based dev/pre-release
 suffixes (i.e. `rcYYYYMMDD` or `devYYYYMMDD`) or intra PyTorch releases

@@ -24,9 +24,9 @@ namespace {
 
 /// Bufferization of iree_gpu.tensor_barrier. Always just bufferizes in place
 /// and replaces with a barrier.
-struct TensorBarrierOpBufferizationInterface
+struct ValueBarrierOpBufferizationInterface
     : public BufferizableOpInterface::ExternalModel<
-          TensorBarrierOpBufferizationInterface, IREE::GPU::TensorBarrierOp> {
+          ValueBarrierOpBufferizationInterface, IREE::GPU::ValueBarrierOp> {
   bool bufferizesToMemoryRead(Operation *op, OpOperand &opOperand,
                               const AnalysisState &state) const {
     // This op never needs to bufferize to a copy.
@@ -47,8 +47,11 @@ struct TensorBarrierOpBufferizationInterface
   FailureOr<BaseMemRefType>
   getBufferType(Operation *op, Value value, const BufferizationOptions &options,
                 SmallVector<Value> &invocationStack) const {
-    auto barrierOp = cast<IREE::GPU::TensorBarrierOp>(op);
+    auto barrierOp = cast<IREE::GPU::ValueBarrierOp>(op);
     assert(value == barrierOp.getResult() && "invalid value");
+    if (!barrierOp.hasTensorSemantics()) {
+      return failure();
+    }
     auto srcMemrefType = bufferization::getBufferType(barrierOp.getInput(),
                                                       options, invocationStack);
     if (failed(srcMemrefType))
@@ -58,7 +61,10 @@ struct TensorBarrierOpBufferizationInterface
 
   LogicalResult bufferize(Operation *op, RewriterBase &rewriter,
                           const BufferizationOptions &options) const {
-    auto barrierOp = cast<IREE::GPU::TensorBarrierOp>(op);
+    auto barrierOp = cast<IREE::GPU::ValueBarrierOp>(op);
+    if (!barrierOp.hasTensorSemantics()) {
+      return failure();
+    }
     FailureOr<Value> buffer =
         getBuffer(rewriter, barrierOp.getInput(), options);
     if (failed(buffer)) {
@@ -78,8 +84,8 @@ struct TensorBarrierOpBufferizationInterface
 void registerIREEGPUBufferizationInterfaces(DialectRegistry &registry) {
   registry.addExtension(
       +[](MLIRContext *context, IREE::GPU::IREEGPUDialect *dialect) {
-        IREE::GPU::TensorBarrierOp::attachInterface<
-            TensorBarrierOpBufferizationInterface>(*context);
+        IREE::GPU::ValueBarrierOp::attachInterface<
+            ValueBarrierOpBufferizationInterface>(*context);
       });
 }
 

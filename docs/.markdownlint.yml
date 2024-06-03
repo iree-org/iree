@@ -95,3 +95,10 @@ link-fragments: false
 # Allow weird formatting inside them.
 # https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax#alerts
 no-blanks-blockquote: false
+
+# Allow tables to omit leading and trailing pipes
+table-pipe-style: false
+
+# Allow table rows to have irregular numbers of columns
+# (markdownlint has false positives for `|` characters in code blocks)
+table-column-count: false

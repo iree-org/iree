@@ -54,15 +54,6 @@ static llvm::cl::opt<bool> clUseFastMinMaxOps(
         "Use `arith.minf/maxf` instead of `arith.minimumf/maximumf` ops"),
     llvm::cl::init(false));
 
-// TODO(#10820): Delete the flag. This should be a nop pass to default pipeline
-// while tensor.pad op is lowered to fill + insert_slice before Codegen.
-// However, it causes regressions in terms of compilation time. Skip the passes
-// for now.
-static llvm::cl::opt<bool> clEnablePadConsumerFusion(
-    "iree-llvmcpu-enable-pad-consumer-fusion",
-    llvm::cl::desc("Flag to enable the fusion for pad + consumer"),
-    llvm::cl::init(false));
-
 static llvm::cl::opt<bool> clEnableReassociateFpReductions(
     "iree-llvmcpu-reassociate-fp-reductions",
     llvm::cl::desc("Enables reassociation for FP reductions"),
@@ -565,6 +556,7 @@ void addCPUDataTilingPipeline(OpPassManager &funcPassManager,
   addTileAndDistributePasses(funcPassManager);
 
   if (pipelineOpt.enableUkernels) {
+    funcPassManager.addPass(createCPUPrepareUkernelsPass());
     funcPassManager.addPass(
         createCPULowerToUKernelsPass(clSkipIntermediateRoundings));
   }
@@ -603,9 +595,10 @@ void addCPULinalgExtTileAndVectorizePipeline(
   addTileAndDistributePasses(funcPassManager);
   funcPassManager.addPass(
       createLLVMCPUTilePass(tilingConfig.getVectorCommonParallelLevel()));
-  // TODO: Should only apply decomposition here?
-  funcPassManager.addPass(
-      IREE::LinalgExt::createTileAndDecomposeAttentionPass());
+  // TODO: Remove the pass once we have PartialReductionOpInterface implemented
+  // for AttentionOp.
+  funcPassManager.addPass(IREE::LinalgExt::createTileAttentionPass());
+  funcPassManager.addPass(IREE::LinalgExt::createDecomposeAttentionPass());
   funcPassManager.addPass(
       IREE::LinalgExt::createDecomposeWinogradTransformPass());
 
@@ -659,7 +652,7 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
       .addPass(createCSEPass);
 
   // Handled tensor-type constants.
-  modulePassManager.addPass(arith::createConstantBufferizePass());
+  addConstantBufferizePasses(modulePassManager);
 
   FunctionLikeNest(modulePassManager)
       .addPass(createFoldTensorExtractOpPass)

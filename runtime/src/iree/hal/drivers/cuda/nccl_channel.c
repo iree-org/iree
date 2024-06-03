@@ -562,7 +562,7 @@ iree_status_t iree_hal_cuda_nccl_submit_batch(
         __FUNCTION__, strlen(__FUNCTION__), collective_str.data,
         collective_str.size);
   }
-#endif  // IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
 
   // Issue all collective operations in the batch as part of a group.
   // NCCL may be able to fuse or reduce overheads by issuing like this.
@@ -573,13 +573,13 @@ iree_status_t iree_hal_cuda_nccl_submit_batch(
   }
   IREE_NCCL_RETURN_IF_ERROR(symbols, ncclGroupEnd(), "ncclGroupEnd");
 
+#if IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
   // End all zones we began above - note that these are just simply nested so
   // order doesn't matter so long as we end the right number of zones.
-  IREE_TRACE({
-    for (iree_host_size_t i = 0; i < batch->count; ++i) {
-      IREE_CUDA_STREAM_TRACE_ZONE_END(tracing_context, stream);
-    }
-  });
+  for (iree_host_size_t i = 0; i < batch->count; ++i) {
+    IREE_CUDA_STREAM_TRACE_ZONE_END(tracing_context, stream);
+  }
+#endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
 
   return iree_ok_status();
 }

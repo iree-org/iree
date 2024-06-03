@@ -18,7 +18,7 @@ endif()
 
 # system-library plugin mechanism using the system dynamic library loader.
 if(IREE_HAL_EXECUTABLE_PLUGIN_SYSTEM_LIBRARY)
-  
+
 add_library(iree_samples_custom_dispatch_cpu_mlp_plugin SHARED
   mlp_plugin.c
 )

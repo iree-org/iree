@@ -23,7 +23,6 @@ iree_cc_library(
   NAME
     PassHeaders
   HDRS
-    "PassDetail.h"
     "Passes.h"
     "Passes.h.inc"
   DEPS
@@ -49,6 +48,7 @@ iree_cc_library(
     "Passes.h"
   SRCS
     "AMDGPUDistributeContract.cpp"
+    "GPUApplyTilingLevel.cpp"
     "GPUCheckResourceUsage.cpp"
     "GPUCreateFastSlowPath.cpp"
     "GPUDistribute.cpp"
@@ -109,6 +109,7 @@ iree_cc_library(
     MLIRSupport
     MLIRTensorDialect
     MLIRTensorTransforms
+    MLIRTilingInterface
     MLIRTransformUtils
     MLIRTransforms
     MLIRVectorDialect

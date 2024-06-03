@@ -323,4 +323,3 @@ func.func @gather_non_static(%operand : tensor<?x?xi32>, %start_indices : tensor
 // CHECK:             %[[Y:.+]] = tensor.extract %[[OPERAND]][%[[IN0]], %[[IDX1]]] : tensor<?x?xi32>
 // CHECK:             linalg.yield %[[Y]] : i32
 // CHECK:           return %[[RES]]
-

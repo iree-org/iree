@@ -6,7 +6,7 @@
 /// operation by just one step
 
 func.func @do_not_sink_across_already_fusable_ops(
-    %arg0 : tensor<?x?xf16>, %arg1 : tensor<?x?xf16>, 
+    %arg0 : tensor<?x?xf16>, %arg1 : tensor<?x?xf16>,
     %arg2 : tensor<?xf16>, %arg3 : tensor<2x?x?xf32>) -> tensor<2x?x?xf16> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index

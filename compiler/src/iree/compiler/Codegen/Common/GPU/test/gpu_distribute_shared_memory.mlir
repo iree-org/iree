@@ -211,4 +211,3 @@ module {
 //       CHECK:   %[[EXT1:.+]] = arith.sitofp %[[SUB1]] : vector<1x1x8xi32> to vector<1x1x8xf32>
 //       CHECK:   %[[MUL1:.+]] = arith.mulf %[[EXT1]], %{{.+}} : vector<1x1x8xf32>
 //       CHECK:   vector.transfer_write %[[MUL1]], %[[SM]]
-

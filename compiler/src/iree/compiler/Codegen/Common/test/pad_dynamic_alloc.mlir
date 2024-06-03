@@ -26,4 +26,3 @@ func.func @dynamic_alloc_max_0(%id : index) {
   vector.store %cst, %0[%c0, %c0, %c0] : memref<1x?x32xf32, 3>, vector<4xf32>
   return
 }
-
