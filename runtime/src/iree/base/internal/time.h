@@ -13,8 +13,9 @@
 extern "C" {
 #endif  // __cplusplus
 
-// Implementation of iree_time_now(), available to avoid circular dependencies.
-int64_t iree_time_now_ns(void);
+// Implementation for the public iree_time_now() function.
+// Also available to other libraries under base/ to avoid circular dependencies.
+int64_t iree_platform_time_now(void);
 
 #ifdef __cplusplus
 }  // extern "C"

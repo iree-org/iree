@@ -10,7 +10,7 @@
 
 #include "iree/base/target_platform.h"
 
-int64_t iree_time_now_ns(void) {
+int64_t iree_platform_time_now(void) {
 #if defined(IREE_TIME_NOW_FN)
   IREE_TIME_NOW_FN
 #elif defined(IREE_PLATFORM_WINDOWS)
