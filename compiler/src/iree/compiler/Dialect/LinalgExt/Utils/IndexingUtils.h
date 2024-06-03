@@ -53,10 +53,6 @@ public:
 
   AffineMap getSMap() const;
 
-  std::tuple<AffineMap, AffineMap, AffineMap> getQKMatmulCompressedMaps() const;
-
-  std::tuple<AffineMap, AffineMap, AffineMap> getSVMatmulCompressedMaps() const;
-
 private:
   void inferFromIndexingMaps(ArrayRef<AffineMap> indexingMaps);
 
