@@ -62,7 +62,7 @@ emitNormalizedLoopBounds(RewriterBase &rewriter, Location loc, Block *body,
     OpFoldResult newUb = emitNormalizedUpperBound(rewriter, loc, lb, ub, step);
     newUbs.push_back(newUb);
 
-    // Compute and replate the denormalized loop iterator argument in the loop
+    // Compute and replace the denormalized loop iterator argument in the loop
     // body with an insertion guard.
     {
       OpBuilder::InsertionGuard g(rewriter);
