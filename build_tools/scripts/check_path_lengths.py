@@ -67,6 +67,9 @@ def main(args):
         # object files or binaries that could trip up the build system.
         if not args.include_tests and "test" in dirnames:
             dirnames.remove("test")
+        # Skip build directories (should really anything be covered by .gitignore).
+        if "build" in dirnames:
+            dirnames.remove("build")
 
         path = pathlib.Path(dirpath).relative_to(repo_root).as_posix()
         if len(path) > args.limit:
