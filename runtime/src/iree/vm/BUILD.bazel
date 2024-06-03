@@ -37,8 +37,8 @@ iree_runtime_cc_library(
     ],
     deps = [
         ":vm",
-        "//runtime/src/iree/base",
         "//runtime/src/iree/base/internal:span",
+        "//runtime/src/iree/base",
     ],
 )
 
