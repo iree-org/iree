@@ -62,10 +62,11 @@ repos:
     hooks:
       # TODO(scotttodd): Download as needed
       #   https://github.com/jlebar/pre-commit-hooks/issues/3
-      # TODO(scotttodd): enable when this works on Windows
+      # TODO(scotttodd): enable by default when this works on Windows
       #   https://github.com/bazelbuild/buildtools/issues/914
       #   could try `git add . --renormalize`
-      # -   id: bazel-buildifier
+      -   id: bazel-buildifier
+          stages: [manual]
 
       -   id: do-not-submit
 
@@ -94,23 +95,23 @@ repos:
         language: fail
         files: "BUILD$"
 
-    # TODO(scotttodd): enable these checks when they work on Windows
-    #   the generator scripts use \ on Windows instead of /
-
-    # -   id: generate_cmake_e2e_test_artifacts_suite
-    #     name: Run generate_cmake_e2e_test_artifacts_suite.py
-    #     language: python
-    #     entry: ./build_tools/testing/generate_cmake_e2e_test_artifacts_suite.py
-    #     args: ["--output_dir", "./tests/e2e/test_artifacts"]
-    #     # TODO(scotttodd): run only on relevant files
-    #     always_run: true
-    #     pass_filenames: false
-
-    # -   id: generate_cmake_e2e_model_tests
-    #     name: Run generate_cmake_e2e_model_tests.py
-    #     language: python
-    #     entry: ./build_tools/testing/generate_cmake_e2e_model_tests.py
-    #     args: ["--output", "./tests/e2e/stablehlo_models/generated_e2e_model_tests.cmake"]
-    #     # TODO(scotttodd): run only on relevant files
-    #     always_run: true
-    #     pass_filenames: false
+    # TODO(scotttodd): enable these by default (remove `stages: [manual]`) when
+    #   they work on Windows (the scripts generate \ on Windows instead of /)
+    -   id: generate_cmake_e2e_test_artifacts_suite
+        name: Run generate_cmake_e2e_test_artifacts_suite.py
+        stages: [manual]
+        language: python
+        entry: ./build_tools/testing/generate_cmake_e2e_test_artifacts_suite.py
+        args: ["--output_dir", "./tests/e2e/test_artifacts"]
+        # TODO(scotttodd): run only on relevant files
+        always_run: true
+        pass_filenames: false
+    -   id: generate_cmake_e2e_model_tests
+        name: Run generate_cmake_e2e_model_tests.py
+        stages: [manual]
+        language: python
+        entry: ./build_tools/testing/generate_cmake_e2e_model_tests.py
+        args: ["--output", "./tests/e2e/stablehlo_models/generated_e2e_model_tests.cmake"]
+        # TODO(scotttodd): run only on relevant files
+        always_run: true
+        pass_filenames: false
