@@ -21,6 +21,9 @@ include(CMakeParseArguments)
 # LABELS: Additional labels to apply to the test. The package path is added
 #     automatically.
 function(iree_lit_test)
+  if(NOT IREE_BUILD_TESTS)
+    return()
+  endif()
   cmake_parse_arguments(
     _RULE
     ""
