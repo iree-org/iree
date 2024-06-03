@@ -245,4 +245,3 @@ util.func public @run() -> tensor<2x2xi64> {
 util.func private @f(%arg0: tensor<2x2xi64>) -> tensor<2x2xi64> {
   util.return %arg0 : tensor<2x2xi64>
 }
-

@@ -152,7 +152,7 @@ This is a flow for authoring custom dispatches externally alongside match and
 replace logic that can be fed directly into a pre-built version of the compiler.
 
 In addition to the above steps, when compiling the module, pass in both the
-target module and the transform library implementing the matcher + kernel.  
+target module and the transform library implementing the matcher + kernel.
 
     ```
     iree-compile \

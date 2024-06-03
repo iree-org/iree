@@ -37,7 +37,7 @@ module attributes {transform.with_named_sequence} {
   transform.named_sequence @__transform_main(%top_level: !transform.any_op) {
       %func = transform.structured.match ops{["func.func"]} in %top_level : (!transform.any_op) -> !transform.any_op
       transform.iree.gpu_distribute_shared_memory_copy %func : (!transform.any_op) -> ()
-      transform.apply_patterns to %func { 
+      transform.apply_patterns to %func {
         transform.apply_patterns.memref.fold_memref_alias_ops
         transform.apply_patterns.canonicalization
         transform.apply_patterns.linalg.tiling_canonicalization

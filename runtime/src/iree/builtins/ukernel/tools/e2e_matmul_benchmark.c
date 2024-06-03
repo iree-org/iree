@@ -229,7 +229,9 @@ static iree_status_t iree_uk_benchmark_e2e_matmul(
       .out_size2 = M0,
       .out_size3 = K0,
       .in_stride0 = params->K,
+      .in_stride1 = 1,
       .out_stride0 = mmt4d_params.lhs_stride0,
+      .out_stride1 = M0 * K0,
       .padding_value = 0,
   };
 
@@ -245,7 +247,9 @@ static iree_status_t iree_uk_benchmark_e2e_matmul(
       .out_size2 = N0,
       .out_size3 = K0,
       .in_stride0 = params->N,
+      .in_stride1 = 1,
       .out_stride0 = mmt4d_params.rhs_stride0,
+      .out_stride1 = N0 * K0,
       .padding_value = 0,
   };
 
@@ -259,7 +263,9 @@ static iree_status_t iree_uk_benchmark_e2e_matmul(
       .out_size2 = M0,
       .out_size3 = N0,
       .in_stride0 = params->N,
+      .in_stride1 = 1,
       .out_stride0 = mmt4d_params.out_stride0,
+      .out_stride1 = M0 * N0,
       .padding_value = 0,
   };
 
@@ -273,7 +279,9 @@ static iree_status_t iree_uk_benchmark_e2e_matmul(
       .in_size2 = M0,
       .in_size3 = N0,
       .out_stride0 = params->N,
+      .out_stride1 = 1,
       .in_stride0 = mmt4d_params.out_stride0,
+      .in_stride1 = M0 * N0,
   };
 
   iree_uk_index_t rowmajor_lhs_buffer_size =

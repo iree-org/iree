@@ -83,4 +83,3 @@ def IREEVectorExt_ToSIMTOp : IREEVectorExt_PureOp<"to_simt",
 }
 
 #endif  // IREE_DIALECT_VECTOREXT_OPS
-

@@ -836,7 +836,7 @@ static void addLowerToLLVMGPUPasses(OpPassManager &modulePassManager,
       .addPass(createCSEPass);
 
   // Handled tensor constants.
-  modulePassManager.addPass(arith::createConstantBufferizePass());
+  addConstantBufferizePasses(modulePassManager);
 
   FunctionLikeNest funcPassManager(modulePassManager);
   funcPassManager.addPass(createFoldTensorExtractOpPass)

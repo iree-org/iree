@@ -154,6 +154,8 @@ DEFAULT_BENCHMARK_PRESET_GROUP = [
     for preset in benchmark_presets.DEFAULT_PRESETS
     # RISC-V benchmarks haven't been supported in CI workflow.
     if preset not in [benchmark_presets.RISCV]
+    # CUDA benchmarks on CI depend on unreliable a100 runners.
+    and preset not in [benchmark_presets.CUDA]
 ] + ["comp-stats"]
 DEFAULT_BENCHMARK_PRESET = "default"
 LARGE_BENCHMARK_PRESET_GROUP = benchmark_presets.LARGE_PRESETS

@@ -91,7 +91,7 @@ func.func @depthwise_conv_hwc_114x16x3(%input: tensor<1x114x114x16xf32>, %filter
 //      CHECK: %[[OUTPUT_T_R:.+]] = tensor.collapse_shape %[[OUTPUT_T]]
 // CHECK-SAME:    tensor<1x16x112x112xf32> into tensor<16x12544xf32>
 //      CHECK: %[[BMV_RESULT:.+]] = linalg.batch_matvec ins(%[[COL_TENSOR_R]], %[[FILTER_T_R]] : tensor<16x12544x9xf32>, tensor<16x9xf32>) outs(%[[OUTPUT_T_R]] : tensor<16x12544xf32>) -> tensor<16x12544xf32>
-//      CHECK: %[[RESULT_R:.+]] = tensor.expand_shape %[[BMV_RESULT]] 
+//      CHECK: %[[RESULT_R:.+]] = tensor.expand_shape %[[BMV_RESULT]]
 // CHECK-SAME:    tensor<16x12544xf32> into tensor<1x16x112x112xf32>
 //      CHECK: %[[RESULT_INIT:.+]] = tensor.empty() : tensor<1x112x112x16xf32>
 //      CHECK: %[[RESULT:.+]] = linalg.generic

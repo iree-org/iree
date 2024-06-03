@@ -112,7 +112,7 @@ computeTransposeInfo(LinalgOp linalgOp,
 }
 
 static bool computeReductionInfo(LinalgOp linalgOp) {
-  return linalgOp.getNumReductionLoops() > 1;
+  return linalgOp.getNumReductionLoops() >= 1;
 }
 
 static bool computeDynamicInfo(LinalgOp linalgOp) {

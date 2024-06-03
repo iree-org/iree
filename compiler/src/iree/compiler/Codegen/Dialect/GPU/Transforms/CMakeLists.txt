@@ -58,6 +58,7 @@ iree_cc_library(
     MLIRFunctionInterfaces
     MLIRGPUDialect
     MLIRIR
+    MLIRLinalgDialect
     MLIRPass
     MLIRSCFDialect
     MLIRSupport

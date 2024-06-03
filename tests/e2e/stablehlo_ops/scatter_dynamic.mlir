@@ -25,4 +25,3 @@ func.func @scatter_add_slice_2D_dynamic_num_updates() {
                                    [1, 1, 1]]> : tensor<6x3xi32>) : tensor<6x3xi32>
   return
 }
-

@@ -397,12 +397,12 @@ getMinTilingSizesForEachDim(mlir::FunctionOpInterface entryPointFn,
   auto genericOp = dyn_cast<linalg::GenericOp>(op.getOperation());
   if (linalgOpInfo.isTranspose() && genericOp &&
       x86TransposeLoweringPrecondition(genericOp)) {
-    // Limit unrolling on transpose operations.
     // TODO(dcaballe): Consider input and output transposes.
     limitUnrollFactor(targetMLTransInfo.defaultMaxTransposeUnrollFactor);
+  } else if (linalgOpInfo.isReduction()) {
+    limitUnrollFactor(targetMLTransInfo.defaultMaxReductionUnrollFactor);
   } else {
-    // Limit unrolling to the default target maximum.
-    limitUnrollFactor(targetMLTransInfo.defaultMaxUnrollFactor);
+    limitUnrollFactor(targetMLTransInfo.defaultMaxElementwiseUnrollFactor);
   }
 
   return minTileSizes;
@@ -2936,6 +2936,8 @@ setTranslationInfoAndRootConfig(mlir::FunctionOpInterface entryPointFn,
   if (failed(rootOp))
     return failure();
   Operation *rootOperation = rootOp.value();
+
+  LLVM_DEBUG(KD_DBGS() << "Root op: " << *rootOperation << "\n");
 
   // Handle the case with no known root operation.
   if (!rootOperation) {

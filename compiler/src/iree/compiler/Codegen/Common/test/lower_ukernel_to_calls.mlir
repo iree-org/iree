@@ -176,4 +176,3 @@ func.func @ukernel_generic_test_fndef_attrs(%arg0 : memref<?xf32, strided<[1], o
 }
 //      CHECK: func.func private @test1d(memref<f32>, index, index)
 // CHECK-SAME:     hal.import.fields = ["processor_id", "processor_data"]
-

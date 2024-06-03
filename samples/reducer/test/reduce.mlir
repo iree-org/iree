@@ -5,7 +5,7 @@
 // when the file is lowered to VM dialect, it produces the operation "vm.add",
 // which is assumed to have a bug. The interesting.py script simply greps for
 // "vm.add" in the output of the compilation.
-// 
+//
 // The expected reduced test case output can be seen in output.mlir file.
 
 !tmp_tensor_t = tensor<16x128xf32>

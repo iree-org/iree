@@ -128,4 +128,3 @@ func.func @unaligned_partial_loop() {
 // CHECK:       } else {
 // CHECK:         linalg.matmul
 // CHECK-SAME:                  ins(%{{.+}}, %{{.+}} : tensor<2x768xf32>, tensor<768x?xf32>) outs(%{{.+}} : tensor<2x?xf32>)
-

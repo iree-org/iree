@@ -45,7 +45,7 @@ EXPORT_FN("mul.2d.f32", iree_uk_x32b_mulf_2d, ukernel_x32b_2d, rIIIrIIIrIIIII, v
 EXPORT_FN("mul.2d.i32", iree_uk_x32b_muli_2d, ukernel_x32b_2d, rIIIrIIIrIIIII, v)
 EXPORT_FN("neg.2d.f32", iree_uk_x32u_negf_2d, ukernel_x32u_2d, rIIIrIIIII, v)
 EXPORT_FN("or.2d.i32", iree_uk_x32b_ori_2d, ukernel_x32b_2d, rIIIrIIIrIIIII, v)
-EXPORT_FN("pack", iree_vmvx_pack, pack, rIIrIIIIIIIIIi, v)
+EXPORT_FN("pack", iree_vmvx_pack, pack, rIIIrIIIIIIIIIIi, v)
 EXPORT_FN("query_tile_sizes.2d", iree_vmvx_query_tile_sizes_2d, query_tile_sizes_2d, IIi, II)
 EXPORT_FN("rsqrt.2d.f32", iree_uk_x32u_rsqrtf_2d, ukernel_x32u_2d, rIIIrIIIII, v)
 EXPORT_FN("shl.2d.i32", iree_uk_x32b_shli_2d, ukernel_x32b_2d, rIIIrIIIrIIIII, v)
@@ -53,8 +53,7 @@ EXPORT_FN("shrs.2d.i32", iree_uk_x32b_shrsi_2d, ukernel_x32b_2d, rIIIrIIIrIIIII,
 EXPORT_FN("shru.2d.i32", iree_uk_x32b_shrui_2d, ukernel_x32b_2d, rIIIrIIIrIIIII, v)
 EXPORT_FN("sub.2d.f32", iree_uk_x32b_subf_2d, ukernel_x32b_2d, rIIIrIIIrIIIII, v)
 EXPORT_FN("sub.2d.i32", iree_uk_x32b_subi_2d, ukernel_x32b_2d, rIIIrIIIrIIIII, v)
-EXPORT_FN("unpack", iree_vmvx_unpack, unpack, rIIrIIIIIIIIi, v)
+EXPORT_FN("unpack", iree_vmvx_unpack, unpack, rIIIrIIIIIIIIIi, v)
 EXPORT_FN("xor.2d.i32", iree_uk_x32b_xori_2d, ukernel_x32b_2d, rIIIrIIIrIIIII, v)
-
 
 // clang-format on

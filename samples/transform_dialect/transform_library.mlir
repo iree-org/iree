@@ -95,7 +95,7 @@ module attributes { transform.with_named_sequence } {
       %c2 = transform.param.constant 2 : i64 -> !transform.param<i64>
       %rank = transform.match.structured.rank %arg1 : (!transform.any_op) -> !transform.param<i64>
       transform.match.param.cmpi eq %rank, %c2 : !transform.param<i64>
-  
+
       transform.match.structured.dim %arg1[-1] {reduction} : !transform.any_op
       transform.match.structured.yield %arg1 : !transform.any_op
     }
