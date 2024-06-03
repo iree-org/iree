@@ -150,9 +150,17 @@ static LogicalResult normalizeLoopBounds(RewriterBase &rewriter,
   if (failed(newLoopParams)) {
     return failure();
   }
-  forallOp.setMixedLowerBounds(rewriter, newLoopParams->lowerBounds);
-  forallOp.setMixedUpperBounds(rewriter, newLoopParams->upperBounds);
-  forallOp.setMixedSteps(rewriter, newLoopParams->steps);
+
+  rewriter.setInsertionPointAfter(forallOp);
+  auto newLoop = rewriter.create<scf::ForallOp>(
+      rewriter.getUnknownLoc(), newLoopParams->lowerBounds,
+      newLoopParams->upperBounds, newLoopParams->steps, forallOp.getOutputs(),
+      forallOp.getMapping());
+  rewriter.eraseOp(newLoop.getTerminator());
+  rewriter.mergeBlocks(forallOp.getBody(), newLoop.getBody(),
+                       newLoop.getBody()->getArguments());
+  rewriter.replaceOp(forallOp, newLoop);
+
   return success();
 }
 
