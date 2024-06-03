@@ -1316,6 +1316,9 @@ LogicalResult AttentionOp::verify() {
     for (auto [i, dimExpr] : llvm::enumerate(indexingMap.getResults())) {
       AffineDimExpr dim = cast<AffineDimExpr>(dimExpr);
       int64_t pos = dim.getPosition();
+      if (valShape[i] == ShapedType::kDynamic) {
+        continue;
+      }
       if (!foundDims[pos]) {
         foundDims[pos] = true;
         shape[pos] = valShape[i];
@@ -1455,6 +1458,9 @@ LogicalResult OnlineAttentionOp::verify() {
     for (auto [i, dimExpr] : llvm::enumerate(indexingMap.getResults())) {
       AffineDimExpr dim = cast<AffineDimExpr>(dimExpr);
       int64_t pos = dim.getPosition();
+      if (valShape[i] == ShapedType::kDynamic) {
+        continue;
+      }
       if (!foundDims[pos]) {
         foundDims[pos] = true;
         shape[pos] = valShape[i];
@@ -1515,7 +1521,10 @@ static ShapedValue scaleValueInPlace(OpBuilder &builder, Location loc,
       loc, value.getType(), scale, value,
       SmallVector<AffineMap>{scaleMap, inputMap}, iteratorTypes,
       [&](OpBuilder &b, Location loc, ValueRange args) {
-        Value result = b.create<arith::MulFOp>(loc, args[0], args[1]);
+        // Convert scale to the same datatype as input.
+        Value scale = convertScalarToDtype(b, loc, args[0], args[1].getType(),
+                                        /*isUnsignedCast=*/false);
+        Value result = b.create<arith::MulFOp>(loc, scale, args[1]);
         b.create<linalg::YieldOp>(loc, result);
       });
   return cast<ShapedValue>(genericOp.getResult(0));
@@ -1542,7 +1551,10 @@ static ShapedValue reduce(OpBuilder &builder, Location loc, AffineMap inputMap,
       loc, output.getType(), input, output,
       SmallVector<AffineMap>{inputMap, outputMap}, iteratorTypes,
       [&](OpBuilder &b, Location loc, ValueRange args) {
-        Value result = b.create<T>(loc, args[0], args[1]);
+        // Convert input to the same datatype as acc.
+        Value in = convertScalarToDtype(b, loc, args[0], args[1].getType(),
+                                        /*isUnsignedCast=*/false);
+        Value result = b.create<T>(loc, in, args[1]);
         b.create<linalg::YieldOp>(loc, result);
       });
 
@@ -1596,7 +1608,10 @@ static ShapedValue computeSubAndExp2(OpBuilder &builder, Location loc,
       loc, output.getType(), input, output,
       SmallVector<AffineMap>{inputMap, outputMap}, iteratorTypes,
       [&](OpBuilder &b, Location loc, ValueRange args) {
-        Value diff = b.create<arith::SubFOp>(loc, args[1], args[0]);
+        // Convert input to the same datatype as output.
+        Value in = convertScalarToDtype(b, loc, args[0], args[1].getType(),
+                                        /*isUnsignedCast=*/false);
+        Value diff = b.create<arith::SubFOp>(loc, args[1], in);
         Value weight = b.create<math::Exp2Op>(loc, diff);
         b.create<linalg::YieldOp>(loc, weight);
       });
