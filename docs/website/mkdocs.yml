@@ -206,6 +206,7 @@ nav:
           - "developers/design-docs/cuda-hal-driver.md"
           - "developers/design-docs/hip-hal-driver.md"
           - "developers/design-docs/metal-hal-driver.md"
+          - "developers/design-docs/vm.md"
       - "Other topics":
           - "developers/usage-best-practices.md"
           - "developers/vulkan-environment-setup.md"
