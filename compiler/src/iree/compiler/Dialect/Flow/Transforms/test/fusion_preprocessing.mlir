@@ -138,3 +138,53 @@ util.func public @fuse_generic_gather2(
 // CHECK-NEXT:    %[[RES3:[a-zA-Z0-9]+]] = arith.mulf %[[RES]], %[[RES]] : f32
 // CHECK-NEXT:    %[[RES4:[a-zA-Z0-9]+]] = arith.addf %[[RES2]], %[[RES3]] : f32
 // CHECK-NEXT:    linalg.yield %[[RES4]] : f32
+
+
+//-----
+
+#map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
+#map1 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+module {
+  util.func public @extract_slice_conversion(%arg0: tensor<1024x7x7x2xi8>) -> tensor<1024x7x7xi8> {
+    %0 = tensor.empty() : tensor<1024x7x7x2xf32>
+    %cst = arith.constant 5.000000e-01 : f32
+    %1 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel", "parallel", "parallel"]} ins(%arg0 : tensor<1024x7x7x2xi8>) outs(%0 : tensor<1024x7x7x2xf32>) {
+    ^bb0(%in: i8, %out: f32):
+      %4 = arith.extsi %in : i8 to i32
+      %5 = arith.sitofp %4 : i32 to f32
+      %6 = arith.mulf %5, %cst : f32
+      linalg.yield %6 : f32
+    } -> tensor<1024x7x7x2xf32>
+    %extracted = tensor.extract_slice %1[0, 0, 0, 1] [1024, 7, 7, 1] [1, 1, 1, 1] : tensor<1024x7x7x2xf32> to tensor<1024x7x7xf32>
+    %2 = tensor.empty() : tensor<1024x7x7xi8>
+    %cst_0 = arith.constant 0.000000e+00 : f32
+    %cst_1 = arith.constant -1.280000e+02 : f32
+    %cst_2 = arith.constant 1.270000e+02 : f32
+    %3 = linalg.generic {indexing_maps = [#map1, #map1], iterator_types = ["parallel", "parallel", "parallel"]} ins(%extracted : tensor<1024x7x7xf32>) outs(%2 : tensor<1024x7x7xi8>) {
+    ^bb0(%in: f32, %out: i8):
+      %4 = arith.divf %in, %cst : f32
+      %5 = math.round %4 : f32
+      %6 = arith.addf %5, %cst_0 : f32
+      %7 = arith.cmpf ult, %6, %cst_1 : f32
+      %8 = arith.cmpf ugt, %6, %cst_2 : f32
+      %9 = arith.select %7, %cst_1, %6 : f32
+      %10 = arith.select %8, %cst_2, %9 : f32
+      %11 = arith.fptosi %10 : f32 to i8
+      linalg.yield %11 : i8
+    } -> tensor<1024x7x7xi8>
+    util.return %3 : tensor<1024x7x7xi8>
+  }
+}
+
+
+// CHECK:      util.func public @extract_slice_conversion(%[[INPUT:[a-zA-Z0-9]+]]: tensor<1024x7x7x2xi8>)
+// CHECK:       %[[RES1:[a-zA-Z0-9]+]] = linalg.generic
+// CHECK-SAME:     ins(%[[INPUT]] : tensor<1024x7x7x2xi8>)
+// CHECK:       %[[RES2:[a-zA-Z0-9]+]] = linalg.generic
+// CHECK-SAME:     ins(%[[RES1]] : tensor<1024x7x7x2xf32>)
+// CHECK:       %[[RES3:[a-zA-Z0-9_]+]] = tensor.extract_slice %[[RES2]]
+// CHECK-SAME:     tensor<1024x7x7x2xi8> to tensor<1024x7x7xi8>
+// CHECK:       %[[RES4:[a-zA-Z0-9]+]] = linalg.generic
+// CHECK-SAME:     ins(%[[RES3]] : tensor<1024x7x7xi8>)
+// CHECK:       %[[RES5:[a-zA-Z0-9]+]] = linalg.generic
+// CHECK-SAME:     ins(%[[RES4]] : tensor<1024x7x7xf32>)

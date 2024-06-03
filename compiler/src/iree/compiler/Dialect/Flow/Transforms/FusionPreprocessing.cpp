@@ -18,6 +18,7 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Arith/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -150,7 +151,6 @@ struct FoldSuccessiveTensorInsertSliceOps
 /// ```
 /// %0 = linalg.generic i8 -> f32
 /// %1 = tensor.extract_slice
-/// %2 = linalg.generic f32 -> i8
 /// ```
 ///
 /// to
@@ -160,7 +160,6 @@ struct FoldSuccessiveTensorInsertSliceOps
 /// %new1 = linalg.generic f32 -> i8
 /// %1 = tensor.extract_slice i8
 /// %new2 = linalg.generic i8 -> f32
-/// %2 = linalg.generic f32 -> i8
 /// ```
 struct ExtractAtSmallBitwidth
     : public OpRewritePattern<tensor::ExtractSliceOp> {
@@ -176,41 +175,41 @@ struct ExtractAtSmallBitwidth
     }
 
     auto sourceResult = sourceGenericOp.getResult(0);
-    auto sourceNarrowType = dyn_cast<RankedTensorType>(sourceResult.getType());
-    auto sourceWideType = cast<RankedTensorType>(
+    auto sourceWideType = dyn_cast<RankedTensorType>(sourceResult.getType());
+    auto sourceNarrowType = cast<RankedTensorType>(
         sourceGenericOp.getDpsInputs().front().getType());
-    auto extractedNarrowType = RankedTensorType::get(
-        sliceOp.getResultType().getShape(), sourceNarrowType.getElementType());
+    auto extractedWideType = RankedTensorType::get(
+        sliceOp.getResultType().getShape(), sourceWideType.getElementType());
 
-    // if (!sourceWideType.getElementType().isF32() ||
-    //     !sourceNarrowType.getElementType().isInteger() ||
-    //     sourceNarrowType.getElementType().getIntOrFloatBitWidth() >=
-    //         sourceWideType.getElementType().getIntOrFloatBitWidth()) {
-    //   return rewriter.notifyMatchFailure(
-    //       sliceOp, "expected int to float conversion with widening
-    //       bitwidth");
-    // }
+    if (!sourceWideType.getElementType().isIntOrFloat() ||
+        !sourceNarrowType.getElementType().isIntOrFloat() ||
+        sourceWideType.getElementType().getIntOrFloatBitWidth() <=
+            sourceNarrowType.getElementType().getIntOrFloatBitWidth()) {
+      return rewriter.notifyMatchFailure(
+          sliceOp, "expected conversion with widening bitwidth");
+    }
 
     // Create a `linalg.generic` to narrow the element bitwidth back to the
     // original size
     Value emptyOp = rewriter.create<tensor::EmptyOp>(
-        sliceOp.getLoc(), sourceWideType.getShape(),
-        sourceWideType.getElementType());
+        sliceOp.getLoc(), sourceNarrowType.getShape(),
+        sourceNarrowType.getElementType());
 
     auto newGeneric = rewriter.create<linalg::GenericOp>(
-        sliceOp.getLoc(), sourceWideType, sourceGenericOp.getResults(), emptyOp,
-        sourceGenericOp.getIndexingMapsArray(),
+        sliceOp.getLoc(), sourceNarrowType, sourceGenericOp.getResults(),
+        emptyOp, sourceGenericOp.getIndexingMapsArray(),
         sourceGenericOp.getIteratorTypesArray(),
         [&](OpBuilder &nestedBuilder, Location loc, ValueRange args) {
           // Custom region for f32 -> i8 conversion
-          auto castOp = nestedBuilder.create<arith::FPToSIOp>(
-              loc, sourceWideType.getElementType(), args[0]);
-          nestedBuilder.create<linalg::YieldOp>(loc, castOp.getResult());
+          auto castOp = convertScalarToDtype(
+              rewriter, loc, args[0], sourceNarrowType.getElementType(),
+              sourceNarrowType.getElementType().isSignlessInteger());
+          nestedBuilder.create<linalg::YieldOp>(loc, castOp);
         });
 
     // Create a new slice that slices at the lower bitwidth
-    auto newSliceType = RankedTensorType::get(sliceOp.getType().getShape(),
-                                              sourceWideType.getElementType());
+    auto newSliceType = RankedTensorType::get(
+        sliceOp.getType().getShape(), sourceNarrowType.getElementType());
     auto newSliceOp = rewriter.create<tensor::ExtractSliceOp>(
         sliceOp.getLoc(), newSliceType, newGeneric.getResult(0),
         sliceOp.getMixedOffsets(), sliceOp.getMixedSizes(),
@@ -227,12 +226,13 @@ struct ExtractAtSmallBitwidth
         sliceOp.getLoc(), sliceOp.getResultType().getShape(),
         sliceOp.getResultType().getElementType());
     auto castBackOp = rewriter.create<linalg::GenericOp>(
-        sliceOp.getLoc(), extractedNarrowType, newSliceOp.getResult(), emptyTwo,
+        sliceOp.getLoc(), extractedWideType, newSliceOp.getResult(), emptyTwo,
         indexingMapsTwo, iteratorTypesTwo,
         [&](OpBuilder &nestedBuilder, Location loc, ValueRange args) {
-          auto castOp = nestedBuilder.create<arith::SIToFPOp>(
-              loc, sourceNarrowType.getElementType(), args[0]);
-          nestedBuilder.create<linalg::YieldOp>(loc, castOp.getResult());
+          auto castOp = convertScalarToDtype(
+              rewriter, loc, args[0], sourceWideType.getElementType(),
+              sourceWideType.getElementType().isSignlessInteger());
+          nestedBuilder.create<linalg::YieldOp>(loc, castOp);
         });
 
     rewriter.replaceOp(sliceOp, castBackOp);
