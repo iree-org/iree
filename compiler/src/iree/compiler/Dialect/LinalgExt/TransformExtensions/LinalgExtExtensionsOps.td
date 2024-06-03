@@ -86,4 +86,36 @@ def DecomposeTiledAttentionOp : Op<Transform_Dialect, "iree.decompose_tiled_atte
   }];
 }
 
+def ConvertToOnlineAttention : Op<Transform_Dialect, "iree.convert_to_online_attention",
+    [FunctionalStyleTransformOpTrait,
+     MemoryEffectsOpInterface,
+     TransformOpInterface,
+     TransformEachOpTrait,
+     ReportTrackingListenerFailuresOpTrait]> {
+  let description = [{
+    Target iree_linalg_ext.attention ops and decompose them.
+    This transform consumes the target handle and produces a result handle.
+  }];
+
+  let arguments = (
+      ins TransformHandleTypeInterface:$target
+  );
+  let results = (outs Variadic<TransformHandleTypeInterface>:$result);
+
+  let assemblyFormat = "attr-dict $target `:` functional-type(operands, results)";
+  let cppNamespace = "mlir::iree_compiler::IREE::LinalgExt";
+
+  let assemblyFormat = [{
+    $target attr-dict `:` functional-type(operands, results)
+  }];
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::transform::TransformRewriter &rewriter,
+        ::mlir::iree_compiler::IREE::LinalgExt::AttentionOp target,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
 #endif // IREE_DIALECT_LINALGEXT_TRANSFORMOPS
