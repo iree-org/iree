@@ -47,17 +47,8 @@ fi
 echo "***** pre-commit *****"
 pre-commit run
 
-echo "***** buildifier *****"
-${scripts_dir}/run_buildifier.sh
-git diff --exit-code
-
 echo "***** pytype *****"
 ./build_tools/pytype/check_diff.sh
-
-echo "***** Generates CMake files *****"
-./build_tools/scripts/generate_cmake_files.sh
-git add -A
-git diff HEAD --exit-code
 
 if (( "${FINAL_RET}" != 0 )); then
   echo "Encountered failures when running: '${FAILING_CMD}'. Check error" \

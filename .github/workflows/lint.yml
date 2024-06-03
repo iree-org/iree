@@ -24,28 +24,19 @@ jobs:
       - name: Running pre-commit
         uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
 
-  buildifier:
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Checking out repository
-        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
-      - name: Fetching Base Branch
-        # We have to explicitly fetch the base branch as well
-        run: git fetch --no-tags --prune --depth=1 origin "${GITHUB_BASE_REF?}:${GITHUB_BASE_REF?}"
-      - name: Downloading Buildifier
-        run: |
-          mkdir -p "${HOME?}/bin"
-          wget https://github.com/bazelbuild/buildtools/releases/download/4.0.1/buildifier -O "${HOME?}/bin/buildifier"
-          chmod +x "${HOME?}/bin/buildifier"
-          echo "${HOME?}/bin" >> $GITHUB_PATH
-      - name: Running buildifier on changed files
-        run: |
-          # Fail if the script fails (unfixable lint warnings) or it creates a
-          # diff (fixable lint warnings or formatting).
-          EXIT_CODE=0
-          ./build_tools/scripts/run_buildifier.sh "${GITHUB_BASE_REF?}" || EXIT_CODE=1
-          git diff --exit-code
-          exit "${EXIT_CODE?}"
+      # Run these hooks manually until they work as expected on all platforms.
+      - name: Running pre-commit - bazel-buildifier
+        uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
+        with:
+          extra_args: --hook-stage manual bazel-buildifier
+      - name: Running pre-commit - generate_cmake_e2e_test_artifacts_suite
+        uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
+        with:
+          extra_args: --hook-stage manual generate_cmake_e2e_test_artifacts_suite
+      - name: Running pre-commit - generate_cmake_e2e_model_tests
+        uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
+        with:
+          extra_args: --hook-stage manual generate_cmake_e2e_model_tests
 
   pytype:
     runs-on: ubuntu-20.04
@@ -61,18 +52,3 @@ jobs:
         run: python3 -m pip install pytype
       - name: Run pytype on changed files
         run: ./build_tools/pytype/check_diff.sh "${GITHUB_BASE_REF?}"
-
-  generated_cmake_files:
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Checking out repository
-        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
-      - name: Generating CMake files
-        run: |
-          ./build_tools/scripts/generate_cmake_files.sh
-      - name: Checking Diff
-        run: |
-          # Make sure to run build_tools/scripts/generate_cmake_files.sh and
-          # pick up new files that have been added.
-          git add -A
-          git diff HEAD --exit-code
