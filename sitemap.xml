@@ -161,6 +161,11 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://iree.dev/developers/design-docs/vm/</loc>
+         <lastmod>2024-06-03</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://iree.dev/developers/general/contributing/</loc>
          <lastmod>2024-06-03</lastmod>
          <changefreq>daily</changefreq>
