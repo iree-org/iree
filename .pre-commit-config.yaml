@@ -94,6 +94,8 @@ repos:
         language: fail
         files: "BUILD$"
 
+    # TODO(scotttodd): mypy type checking for Python (https://mypy-lang.org/)
+
     # TODO(scotttodd): enable these checks when they work on Windows
     #   the generator scripts use \ on Windows instead of /
 
