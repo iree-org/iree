@@ -122,8 +122,8 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: "${{ matrix.config-file }}"
-          path: "${CONFIG_FILE_PATH}"
+          name: ${{ matrix.config-file }}
+          path: ${{ env.CONFIG_FILE_PATH }}
 
   test_models:
     name: "test_models :: ${{ matrix.name }}"
