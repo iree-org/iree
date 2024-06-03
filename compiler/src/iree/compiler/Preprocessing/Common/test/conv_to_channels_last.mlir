@@ -2,6 +2,8 @@
 // RUN:   FileCheck %s
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-preprocessing-convert-conv-to-channels-last{tiling-factor=16}))" %s | \
 // RUN:   FileCheck %s --check-prefix=TILE16
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(util.func(iree-preprocessing-convert-conv-to-channels-last{enable-fhwc-filter}))" %s | \
+// RUN:   FileCheck %s --check-prefix=FHWC
 
 util.func @conv_nhwc_hwcf_no_transpose(%arg0: tensor<1x16x16x256xf32>, %arg1: tensor<3x3x256x128xf32>, %arg2: tensor<1x14x14x128xf32>) -> tensor<1x14x14x128xf32> {
     %0 = linalg.conv_2d_nhwc_hwcf
@@ -15,6 +17,9 @@ util.func @conv_nhwc_hwcf_no_transpose(%arg0: tensor<1x16x16x256xf32>, %arg1: te
 
 // TILE16-LABEL: @conv_nhwc_hwcf_no_transpose
 // TILE16: linalg.conv_2d_nhwc_hwcf
+
+// FHWC-LABEL: @conv_nhwc_hwcf_no_transpose
+// FHWC: linalg.conv_2d_nhwc_hwcf
 
 // -----
 
@@ -62,6 +67,19 @@ util.func @conv_nchw_nhwc(%arg0: tensor<8x256x16x16xf32>, %arg1: tensor<16x256x3
 // TILE16:      %[[RES_COLLAPSE:.+]] = tensor.collapse_shape %[[TILED_CONV:.+]]
 // TILE16:      linalg.transpose ins(%[[RES_COLLAPSE]] : tensor<8x14x14x16xf32>)
 // TILE16-SAME:   outs(%{{.*}} : tensor<8x16x14x14xf32>) permutation = [0, 3, 1, 2]
+
+// FHWC-LABEL: util.func public @conv_nchw_nhwc
+
+// FHWC:        %[[IMG:.+]] = linalg.transpose ins(%{{.*}} : tensor<8x256x16x16xf32>)
+// FHWC-SAME:     outs(%{{.*}} : tensor<8x16x16x256xf32>) permutation = [0, 2, 3, 1]
+// FHWC:        %[[FILTER:.+]] = linalg.transpose ins(%{{.*}} : tensor<16x256x3x3xf32>)
+// FHWC-SAME:     outs(%{{.*}} : tensor<16x3x3x256xf32>) permutation = [0, 2, 3, 1]
+// FHWC:        %[[OUT:.+]] = linalg.transpose ins(%{{.*}} : tensor<8x16x14x14xf32>)
+// FHWC-SAME:     outs(%{{.*}} : tensor<8x14x14x16xf32>) permutation = [0, 2, 3, 1]
+
+// FHWC:        %[[CONV:.+]] = linalg.conv_2d_nhwc_fhwc {dilations = dense<1> : tensor<2xi64>, strides = dense<1> : tensor<2xi64>}
+// FHWC-SAME:     ins(%[[IMG]], %[[FILTER]] : tensor<8x16x16x256xf32>, tensor<16x3x3x256xf32>) outs(%[[OUT]] : tensor<8x14x14x16xf32>) -> tensor<8x14x14x16xf32>
+// FHWC:        linalg.transpose ins(%[[CONV]] : tensor<8x14x14x16xf32>) outs(%{{.*}} : tensor<8x16x14x14xf32>) permutation = [0, 3, 1, 2]
 
 // -----
 
@@ -117,6 +135,24 @@ module {
 // TILE16:      tensor.unpack %[[TILED_CONV]] inner_dims_pos = [1] inner_tiles = [16]
 // TILE16-SAME:   tensor<8x4x14x14x16xf32> -> tensor<8x64x14x14xf32>
 
+// FHWC: #[[$MAP:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1 + d4, d2 + d5, d6)>
+// FHWC: #[[$MAP1:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d3, d4, d5, d6)>
+// FHWC: #[[$MAP2:.+]] = affine_map<(d0, d1, d2, d3, d4, d5, d6) -> (d0, d1, d2, d3)>
+
+
+// FHWC-LABEL: @generic_conv_nchw
+
+// FHWC:      %[[IMG:.+]] = linalg.transpose ins(%{{.*}} : tensor<8x256x16x16xf32>) outs(%{{.*}} : tensor<8x16x16x256xf32>) permutation = [0, 2, 3, 1]
+// FHWC:      %[[FILTER:.+]] = linalg.transpose ins(%{{.*}} : tensor<64x256x3x3xf32>) outs(%{{.*}} : tensor<64x3x3x256xf32>) permutation = [0, 2, 3, 1]
+// FHWC:      %[[OUT:.+]] = linalg.transpose ins(%{{.*}} : tensor<8x64x14x14xf32>) outs(%{{.*}} : tensor<8x14x14x64xf32>) permutation = [0, 2, 3, 1]
+// FHWC:      %[[CONV:.+]] = linalg.generic
+// FHWC-SAME:   indexing_maps = [#[[$MAP]], #[[$MAP1]], #[[$MAP2]]],
+// FHWC-SAME:   iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction", "reduction", "reduction"]}
+// FHWC-SAME:   ins(%[[IMG]], %[[FILTER]] : tensor<8x16x16x256xf32>, tensor<64x3x3x256xf32>)
+// FHWC-SAME:   outs(%[[OUT]] : tensor<8x14x14x64xf32>)
+// FHWC:      linalg.transpose ins(%[[CONV]] : tensor<8x14x14x64xf32>) outs(%{{.*}} : tensor<8x64x14x14xf32>)
+
+
 // -----
 
 // Not a convolution, should not be transposed.
@@ -137,3 +173,7 @@ util.func @mmt_no_transpose(%arg0: tensor<2048x1280xf16>, %arg1: tensor<1280x128
 // TILE16-LABEL: @mmt_no_transpose
 // TILE16-NOT:     linalg.generic
 // TILE16:         linalg.matmul_transpose_b
+
+// FHWC-LABEL: @mmt_no_transpose
+// FHWC-NOT:     linalg.generic
+// FHWC:         linalg.matmul_transpose_b

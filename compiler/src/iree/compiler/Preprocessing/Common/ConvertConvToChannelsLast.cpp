@@ -29,12 +29,7 @@ namespace mlir::iree_compiler::Preprocessing {
 
 #define GEN_PASS_DEF_CONVERTCONVTOCHANNELSLASTPASS
 #include "iree/compiler/Preprocessing/Common/Passes.h.inc" // IWYU pragma: export
-
-static llvm::cl::opt<bool>
-    clEnableFHWCFitler("iree-preprocessing-enable-fhwc-filter-layout",
-                       llvm::cl::desc("Enable FHWC Filter Transpose."),
-                       llvm::cl::init(false));
-                       
+             
 using ConvBuilderFn = std::function<Value(
     OpBuilder &b, Location loc, linalg::LinalgOp srcConv, Value input,
     Value filter, Value output, AffineMap inputMap, AffineMap filterMap,
@@ -385,10 +380,20 @@ transposeConvLikeLinalgOp(PatternRewriter &rewriter, linalg::LinalgOp convOp,
     return failure();
   }
 
-  if (enableFHWCFilter)
-    // enable FHWC Filter Layout
+  // Default Option: FCHW => HWCF, requires both input and output channel
+  // indices (C and F) as the innermost dimensions for filter tensor transpose.
+  // enableFHWCFilter Option: FCHW => FWHC, requires only input channel indices
+  // (F) as the innermost dimensions for filter tensor transpose.
+  if (enableFHWCFilter) {
     filterIndices =
         collectChannelInnerDimsIndices(filterMap, convDims.inputChannel);
+    // If the tensor dimensions are already in the correct FHWC order, no
+    // further action is required.
+    if (isInnerIdentityIndices(inputIndices, inputMap.getNumResults()) &&
+        isInnerIdentityIndices(filterIndices, filterMap.getNumResults()) &&
+        isInnerIdentityIndices(outputIndices, outputMap.getNumResults()))
+      return failure();
+  }
 
   int nDims = outputMap.getNumDims();
   llvm::DenseMap<int64_t, int64_t> innerDimsToDomainDims;
@@ -471,16 +476,17 @@ struct ConvertLinalgConvNchwFchw : OpRewritePattern<linalg::Conv2DNchwFchwOp> {
     bool hasAllOneStrides =
         strides.isSplat() && strides.getSplatValue<int64_t>() == 1;
     // Only enable this new filter layout when all strides are 1.
-    if (enableFHWCFilter && hasAllOneStrides)
+    if (enableFHWCFilter && hasAllOneStrides) {
       return transposeConvLikeLinalgOp(
           rewriter, convOp, /*tilingFactor=*/-1, enableFHWCFilter,
           namedConvBuilderFn<linalg::Conv2DNchwFchwOp,
                              linalg::Conv2DNhwcFhwcOp>);
-    else
+    } else {
       return transposeConvLikeLinalgOp(
           rewriter, convOp, /*tilingFactor=*/-1, false,
           namedConvBuilderFn<linalg::Conv2DNchwFchwOp,
                              linalg::Conv2DNhwcHwcfOp>);
+    }
   }
 
 private:
