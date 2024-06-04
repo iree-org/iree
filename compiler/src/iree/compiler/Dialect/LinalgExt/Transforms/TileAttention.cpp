@@ -159,6 +159,17 @@ struct TileAttentionPass : public TileAttentionBase<TileAttentionPass> {
   void runOnOperation() override;
 };
 
+struct ConvertAttentionToOnlineAttentionPass
+    : public ConvertAttentionToOnlineAttentionBase<
+          ConvertAttentionToOnlineAttentionPass> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry
+        .insert<affine::AffineDialect, IREE::LinalgExt::IREELinalgExtDialect,
+                linalg::LinalgDialect, tensor::TensorDialect>();
+  }
+  void runOnOperation() override;
+};
+
 } // namespace
 
 /// Tile iree_linalg_ext.attention.
@@ -296,6 +307,8 @@ IREE::LinalgExt::AttentionOp tileAttention(IREE::LinalgExt::AttentionOp attnOp,
 void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
                               SmallVectorImpl<Operation *> &ops,
                               RewriterBase &rewriter) {
+  rewriter.setInsertionPoint(attnOp);
+
   Location loc = attnOp.getLoc();
   MLIRContext *ctx = attnOp.getContext();
 
@@ -355,6 +368,7 @@ void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
       loc, TypeRange{accFill.getType(), maxFill.getType(), sumFill.getType()},
       attnOp.getQuery(), attnOp.getKey(), attnOp.getValue(), attnOp.getScale(),
       accFill, maxFill, sumFill, rewriter.getAffineMapArrayAttr(indexingMaps));
+  onlineAttn->setDiscardableAttrs(attnOp->getDiscardableAttrDictionary());
   ops.push_back(onlineAttn);
 
   Value x = onlineAttn.getResult(0);
@@ -400,8 +414,21 @@ void TileAttentionPass::runOnOperation() {
   });
 }
 
+void ConvertAttentionToOnlineAttentionPass::runOnOperation() {
+  MLIRContext *context = &getContext();
+  IRRewriter rewriter(context);
+  getOperation().walk([&](AttentionOp attnOp) {
+    SmallVector<Operation *> ops;
+    convertToOnlineAttention(attnOp, ops, rewriter);
+  });
+}
+
 std::unique_ptr<Pass> createTileAttentionPass() {
   return std::make_unique<TileAttentionPass>();
+}
+
+std::unique_ptr<Pass> createConvertAttentionToOnlineAttentionPass() {
+  return std::make_unique<ConvertAttentionToOnlineAttentionPass>();
 }
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt
