@@ -4750,7 +4750,7 @@ their state.</p>
 <span class="normal">129</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="cp">#include</span><span class="w"> </span><span class="cpf">&lt;stdio.h&gt;</span>
 
 <span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/runtime/api.h&quot;</span>
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/runtime/testdata/simple_mul_module_c.h&quot;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/runtime/demo/simple_mul_module_c.h&quot;</span>
 
 <span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">iree_runtime_demo_run_session</span><span class="p">(</span><span class="n">iree_runtime_instance_t</span><span class="o">*</span><span class="w"> </span><span class="n">instance</span><span class="p">);</span>
 <span class="k">static</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">iree_runtime_demo_perform_mul</span><span class="p">(</span><span class="n">iree_runtime_session_t</span><span class="o">*</span><span class="w"> </span><span class="n">session</span><span class="p">);</span>
@@ -4796,7 +4796,7 @@ their state.</p>
 
 <span class="w">  </span><span class="c1">// Load your user module into the session (from memory, from file, etc).</span>
 <span class="w">  </span><span class="k">const</span><span class="w"> </span><span class="n">iree_file_toc_t</span><span class="o">*</span><span class="w"> </span><span class="n">module_file</span><span class="w"> </span><span class="o">=</span>
-<span class="w">      </span><span class="n">iree_runtime_testdata_simple_mul_module_create</span><span class="p">();</span>
+<span class="w">      </span><span class="n">iree_runtime_demo_simple_mul_module_create</span><span class="p">();</span>
 <span class="w">  </span><span class="n">IREE_CHECK_OK</span><span class="p">(</span><span class="n">iree_runtime_session_append_bytecode_module_from_memory</span><span class="p">(</span>
 <span class="w">      </span><span class="n">session</span><span class="p">,</span><span class="w"> </span><span class="n">iree_make_const_byte_span</span><span class="p">(</span><span class="n">module_file</span><span class="o">-&gt;</span><span class="n">data</span><span class="p">,</span><span class="w"> </span><span class="n">module_file</span><span class="o">-&gt;</span><span class="n">size</span><span class="p">),</span>
 <span class="w">      </span><span class="n">iree_allocator_null</span><span class="p">()));</span>
@@ -5181,7 +5181,7 @@ their state.</p>
 
 <span class="cp">#elif defined(IREE_RUNTIME_DEMO_LOAD_FILE_FROM_EMBEDDED_DATA)</span>
 
-<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/runtime/testdata/simple_mul_module_c.h&quot;</span>
+<span class="cp">#include</span><span class="w"> </span><span class="cpf">&quot;iree/runtime/demo/simple_mul_module_c.h&quot;</span>
 
 <span class="kt">int</span><span class="w"> </span><span class="nf">main</span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">argc</span><span class="p">,</span><span class="w"> </span><span class="kt">char</span><span class="o">**</span><span class="w"> </span><span class="n">argv</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="k">return</span><span class="w"> </span><span class="n">iree_runtime_demo_main</span><span class="p">();</span><span class="w"> </span><span class="p">}</span>
 
@@ -5197,7 +5197,7 @@ their state.</p>
 <span class="k">static</span><span class="w"> </span><span class="n">iree_status_t</span><span class="w"> </span><span class="nf">iree_runtime_demo_load_module</span><span class="p">(</span>
 <span class="w">    </span><span class="n">iree_runtime_session_t</span><span class="o">*</span><span class="w"> </span><span class="n">session</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
 <span class="w">  </span><span class="k">const</span><span class="w"> </span><span class="n">iree_file_toc_t</span><span class="o">*</span><span class="w"> </span><span class="n">module_file</span><span class="w"> </span><span class="o">=</span>
-<span class="w">      </span><span class="n">iree_runtime_testdata_simple_mul_module_create</span><span class="p">();</span>
+<span class="w">      </span><span class="n">iree_runtime_demo_simple_mul_module_create</span><span class="p">();</span>
 <span class="w">  </span><span class="k">return</span><span class="w"> </span><span class="n">iree_runtime_session_append_bytecode_module_from_memory</span><span class="p">(</span>
 <span class="w">      </span><span class="n">session</span><span class="p">,</span><span class="w"> </span><span class="n">iree_make_const_byte_span</span><span class="p">(</span><span class="n">module_file</span><span class="o">-&gt;</span><span class="n">data</span><span class="p">,</span><span class="w"> </span><span class="n">module_file</span><span class="o">-&gt;</span><span class="n">size</span><span class="p">),</span>
 <span class="w">      </span><span class="n">iree_allocator_null</span><span class="p">());</span>
