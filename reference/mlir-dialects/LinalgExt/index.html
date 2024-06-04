@@ -4231,7 +4231,7 @@ Thus, the bit reversal is assumed applied on the input. The op carries an
 input -- stage, which indicates the level of reduction loop in the
 algorithm. It represents the computation body. For more details, see
 "Data reordering, bit reversal, and in-place algorithms" section in
-https://en.wikipedia.org/wiki/Cooley%E2%80%93Tukey_FFT_algorithm</p>
+<a href="https://en.wikipedia.org/wiki/Cooley%E2%80%93Tukey_FFT_algorithm">https://en.wikipedia.org/wiki/Cooley%E2%80%93Tukey_FFT_algorithm</a></p>
 <p>The size of innermost dim is expected to be a power of 2.</p>
 <p>It is optional to carry coefficient tensors/buffers as inputs. In this
 context, they will be the second and third inputs.</p>
@@ -4415,7 +4415,7 @@ are unique. If there are repeated indices, the first iteration loop will be
 marked as reduction.</p>
 <p>The shapes definition follows tensorflow operations execept that it force
 batch dims to be 1D. See more information in
-  https://www.tensorflow.org/api_docs/python/tf/tensor_scatter_nd_update</p>
+  <a href="https://www.tensorflow.org/api_docs/python/tf/tensor_scatter_nd_update">https://www.tensorflow.org/api_docs/python/tf/tensor_scatter_nd_update</a></p>
 <p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
 <p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>LinalgFusionOpInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
 <h5 id="attributes_5">Attributes:<a class="headerlink" href="#attributes_5" title="Permanent link">link</a></h5>
@@ -4470,7 +4470,7 @@ batch dims to be 1D. See more information in
 </code></pre></div>
 <p>Based on XLA operation semantics, sorts the given <code>operands</code> at the given
 <code>dimension</code> with the given <code>comparator</code>.</p>
-<p>See https://www.tensorflow.org/xla/operation_semantics#sort.</p>
+<p>See <a href="https://www.tensorflow.org/xla/operation_semantics#sort">https://www.tensorflow.org/xla/operation_semantics#sort</a>.</p>
 <p>Traits: <code>AttrSizedOperandSegments</code>, <code>SingleBlockImplicitTerminator&lt;::mlir::iree_compiler::IREE::LinalgExt::YieldOp&gt;</code>, <code>SingleBlock</code></p>
 <p>Interfaces: <code>DestinationStyleOpInterface</code>, <code>LinalgExtInterface</code>, <code>MemoryEffectOpInterface</code>, <code>ReifyRankedShapedTypeOpInterface</code>, <code>TilingInterface</code></p>
 <h5 id="attributes_6">Attributes:<a class="headerlink" href="#attributes_6" title="Permanent link">link</a></h5>

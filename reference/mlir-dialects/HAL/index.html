@@ -7908,7 +7908,7 @@ Returns a status indicating whether the pair was recognized/available and if
 it was the value converted to the specified type. Queries must return the
 same value for the lifetime of the module though may vary from run to run.</p>
 <p>This is roughly equivalent to the <code>sysconf</code> linux syscall
-(https://man7.org/linux/man-pages/man3/sysconf.3.html) in that the exact
+(<a href="https://man7.org/linux/man-pages/man3/sysconf.3.html">https://man7.org/linux/man-pages/man3/sysconf.3.html</a>) in that the exact
 set of keys available and their interpretation is target-dependent.</p>
 <p>Users of the op must check the <code>ok</code> result before using the value as what
 set of keys is available may change over time. If in doubt: don't use this.

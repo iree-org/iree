@@ -3887,10 +3887,6 @@ example:</p>
 <span class="w">  </span>iree-benchmark-module
 <span class="nb">export</span><span class="w"> </span><span class="nv">E2E_TEST_ARTIFACTS_DIR</span><span class="o">=</span><span class="s2">&quot;</span><span class="si">${</span><span class="nv">IREE_BUILD_DIR</span><span class="p">?</span><span class="si">}</span><span class="s2">/e2e_test_artifacts&quot;</span>
 </code></pre></div>
-<blockquote>
-<p>TODO(#13683): Each preset should have its own target to further reduce
-unnecessary builds</p>
-</blockquote>
 <h3 id="run-benchmarks">Run benchmarks<a class="headerlink" href="#run-benchmarks" title="Permanent link">link</a></h3>
 <p>Export the execution benchmark config:</p>
 <div class="highlight"><pre><span></span><code>build_tools/benchmarks/export_benchmark_config.py<span class="w"> </span>execution<span class="w"> </span><span class="se">\</span>
