@@ -59,11 +59,11 @@ pdl.pattern @mlp : benefit(1) {
   %result_type = pdl.type
   %relu_val = pdl.result 0 of %relu
   %cast = pdl.operation "torch_c.to_builtin_tensor"(%relu_val : !pdl.value) -> (%result_type : !pdl.type)
-  
+
   pdl.rewrite %matmul {
     // The pattern above matched `%result`, `%lhs`, `%rhs` needed for the
     // external function call. The values of `%M`, `%N` and `%K` need to
-    // be generated. 
+    // be generated.
     %zero_val = pdl.attribute = 0 : index
     %one_val = pdl.attribute = 1 : index
     %index_type = pdl.type : index
@@ -120,4 +120,3 @@ pdl.pattern @mlp : benefit(1) {
         : !pdl.operation, !pdl.attribute, !pdl.range<value>, !pdl.range<value>, !pdl.range<value>, !pdl.range<value>)
   }
 }
-

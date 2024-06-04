@@ -15,7 +15,7 @@ include "mlir/Interfaces/ViewLikeInterface.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
 
 def TensorTypeAttr : TypeAttrBase<"TensorType", "Tensor type attribute">;
-  
+
 def IREECodegen_QueryTileSizesOp :
     Op<IREECodegen_Dialect, "query_tile_sizes", [Pure]> {
   let summary = "Query tile sizes";
@@ -45,7 +45,7 @@ def IREECodegen_ExtractStridedMetadataOp : Op<IREECodegen_Dialect, "extract_stri
   let description = [{
     This op is implemented similarly to the upstream MemRef::ExtractStridedMetadataOp
     with the following differences.
-    
+
     1. It does not fold away static offset/stride information.
     Hence unlike the upstream Op the link between the memref and consumers of the
     metadata is not broken when later passes change this information. A common
@@ -54,8 +54,8 @@ def IREECodegen_ExtractStridedMetadataOp : Op<IREECodegen_Dialect, "extract_stri
     2. Helper functions getConstifiedMixed{Offset|Strides|Sizes} are not implemented
     as the expectation is you should lower to the upstream op before using those
     functions if you need them.
-    
-    Copy of MemRef::ExtractStridedMetadataOp description for reference below. 
+
+    Copy of MemRef::ExtractStridedMetadataOp description for reference below.
     Extracts a base buffer, offset and strides. This op allows additional layers
     of transformations and foldings to be added as lowering progresses from
     higher-level dialect to lower-level dialects such as the LLVM dialect.

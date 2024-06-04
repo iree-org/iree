@@ -14,20 +14,15 @@ permissions:
   contents: read
 
 jobs:
-  bazel_to_cmake:
+  pre-commit:
     runs-on: ubuntu-20.04
     steps:
       - name: Checking out repository
         uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
-      - name: Running bazel_to_cmake for IREE core
-        run: ./build_tools/bazel_to_cmake/bazel_to_cmake.py --verbosity=2
-      - name: Running bazel_to_cmake for IREE TF Integration Tests
-        run: ./build_tools/bazel_to_cmake/bazel_to_cmake.py --root_dir=integrations/tensorflow/e2e --verbosity=2
-      - name: Checking Diff
-        run: |
-          # Make sure to pick up new files that have been added.
-          git add -A
-          git diff HEAD --exit-code
+      - name: Setting up python
+        uses: actions/setup-python@d27e3f3d7c64b4bbf8e4abfb9b63b83e846e0435 # v4.5.0
+      - name: Running pre-commit
+        uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
 
   buildifier:
     runs-on: ubuntu-20.04
@@ -52,31 +47,6 @@ jobs:
           git diff --exit-code
           exit "${EXIT_CODE?}"
 
-  black:
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Checking out repository
-        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
-      - name: Setting up python
-        uses: actions/setup-python@d27e3f3d7c64b4bbf8e4abfb9b63b83e846e0435 # v4.5.0
-      - name: Fetching Base Branch
-        # We have to explicitly fetch the base branch as well
-        run: git fetch --no-tags --prune --depth=1 origin "${GITHUB_BASE_REF?}:${GITHUB_BASE_REF?}"
-      - name: Install black
-        run: |
-          python3 -m pip install black==23.3
-      - name: Check if modified files are formatted
-        run: |
-          # The filter lowercase `d` means to exclude deleted files.
-          git diff "${GITHUB_BASE_REF?}" --name-only --diff-filter=d \
-            -- '*.py' ':!third_party' \
-            | xargs --no-run-if-empty black --check --diff --verbose
-      - name: Instructions for fixing the above linting errors
-        if: failure()
-        run: |
-          printf "You can fix formatting by running 'black' on the modified python files:\n"
-          printf "  git diff ${GITHUB_BASE_REF?} --name-only -- '*.py' ':!third_party' | xargs black\n"
-
   pytype:
     runs-on: ubuntu-20.04
     steps:
@@ -92,66 +62,6 @@ jobs:
       - name: Run pytype on changed files
         run: ./build_tools/pytype/check_diff.sh "${GITHUB_BASE_REF?}"
 
-  clang-format:
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Installing dependencies
-        run: |
-          wget https://raw.githubusercontent.com/llvm/llvm-project/main/clang/tools/clang-format/git-clang-format -O /tmp/git-clang-format
-          chmod +x /tmp/git-clang-format
-      - name: Checking out repository
-        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
-      - name: Fetching Base Branch
-        # We have to explicitly fetch the base branch as well
-        run: git fetch --no-tags --prune --depth=1 origin "${GITHUB_BASE_REF?}:${GITHUB_BASE_REF?}"
-      # See which versions are available for the GitHub-hosted runner here:
-      # https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md#language-and-runtime
-      - name: Running clang-format on changed source files
-        run: |
-          clang-format-18 --version
-          /tmp/git-clang-format "${GITHUB_BASE_REF?}" --binary=clang-format-18 --style=file || true
-          git diff --exit-code
-
-  tabs:
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Checking out repository
-        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
-      - name: Fetching Base Branch
-        # We have to explicitly fetch the base branch as well
-        run: git fetch --no-tags --prune --depth=1 origin "${GITHUB_BASE_REF?}:${GITHUB_BASE_REF?}"
-      - name: Checking tabs
-        run: ./build_tools/scripts/check_tabs.sh "${GITHUB_BASE_REF?}"
-
-  yamllint:
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Checking out repository
-        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
-      - name: Fetching Base Branch
-        # We have to explicitly fetch the base branch as well
-        run: git fetch --no-tags --prune --depth=1 origin "${GITHUB_BASE_REF?}:${GITHUB_BASE_REF?}"
-      - name: yamllint
-        run: ./build_tools/scripts/run_yamllint.sh "${GITHUB_BASE_REF?}"
-
-  markdownlint:
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Checking out repository
-        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
-      - name: Downloading markdownlint
-        run: npm install -g markdownlint-cli@0.38.0
-      - name: Running markdownlint
-        run: ./build_tools/scripts/run_markdownlint.sh
-
-  path_lengths:
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Checking out repository
-        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
-      - name: Running check_path_lengths
-        run: ./build_tools/scripts/check_path_lengths.py
-
   generated_cmake_files:
     runs-on: ubuntu-20.04
     steps:
@@ -166,16 +76,3 @@ jobs:
           # pick up new files that have been added.
           git add -A
           git diff HEAD --exit-code
-
-  build_file_names:
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Checking out repository
-        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
-      - name: Check BUILD files are not named BUILD (prefer BUILD.bazel)
-        run: exit $(git ls-files '**/BUILD' | wc -l)
-      - name: Instructions for fixing the above linting error
-        if: failure()
-        run: |
-          echo "failure: found files named BUILD. Please rename the following files to BUILD.bazel:"
-          git ls-files '**/BUILD'

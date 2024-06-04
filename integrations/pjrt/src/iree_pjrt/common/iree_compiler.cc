@@ -104,13 +104,15 @@ class IREECompilerJob : public CompilerJob {
   //       override_string = *override_val;
   //     } else if (auto override_val = std::get_if<bool>(&option_override)) {
   //       override_string = *override_val ? "true" : "false";
-  //     } else if (auto override_val = std::get_if<int64_t>(&option_override)) {
+  //     } else if (auto override_val = std::get_if<int64_t>(&option_override))
+  //     {
   //       override_string = std::to_string(*override_val);
   //     } else {
   //       assert(false &&
   //              "option value should be of type string, bool, or int64");
   //     }
-  //     if (!SetFlag(absl::StrCat("--", option, "=", override_string).c_str())) {
+  //     if (!SetFlag(absl::StrCat("--", option, "=", override_string).c_str()))
+  //     {
   //       return false;
   //     }
   //   }

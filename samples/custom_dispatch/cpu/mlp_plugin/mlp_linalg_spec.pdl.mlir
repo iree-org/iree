@@ -60,11 +60,11 @@ pdl.pattern @mlp : benefit(1) {
   %zero_f32_op = pdl.operation "arith.constant" {"value" = %zero_val_f32} -> (%f32_type : !pdl.type)
   %zero_f32 = pdl.result 0 of %zero_f32_op
 
-  
+
   %fill_op = pdl.operation "linalg.fill" (%zero_f32, %empty : !pdl.value, !pdl.value) -> (%matmul_type : !pdl.type)
   %fill = pdl.result 0 of %fill_op
   %matmul = pdl.operation "linalg.matmul" (%lhs, %rhs, %fill : !pdl.value, !pdl.value, !pdl.value) -> (%matmul_type : !pdl.type)
-  
+
   pdl.rewrite %matmul {
     // The pattern above matched `%result`, `%lhs`, `%rhs` needed for the
     // external function call. The values of `%M`, `%N` and `%K` need to
@@ -80,7 +80,7 @@ pdl.pattern @mlp : benefit(1) {
     %m_op = pdl.operation "tensor.dim"(%lhs, %zero : !pdl.value, !pdl.value) -> (%index_type : !pdl.type)
     %m = pdl.result 0 of %m_op
     %n_op = pdl.operation "tensor.dim"(%rhs, %one : !pdl.value, !pdl.value) -> (%index_type : !pdl.type)
-    %n = pdl.result 0 of %n_op 
+    %n = pdl.result 0 of %n_op
     %k_op = pdl.operation "tensor.dim"(%lhs, %one : !pdl.value, !pdl.value)
     %k = pdl.result 0 of %k_op
     %m_i32_op = pdl.operation "arith.index_cast"(%m : !pdl.value) -> (%i32_type : !pdl.type)

@@ -391,6 +391,22 @@ def MemrefCopyToLinalgPass :
       "mlir::iree_compiler::createMemrefCopyToLinalgPass()";
 }
 
+def NormalizeLoopBoundsPass :
+    Pass<"iree-codegen-normalize-loop-bounds", ""> {
+  let summary = "Normalize the loop bounds of `scf.for` and `scf.forall`";
+  let constructor = "mlir::iree_compiler::createNormalizeLoopBoundsPass()";
+  let options = [
+    Option<"normalizeFor", "normalize-for", "bool", "true",
+           "Enable normalization for `scf.for` loops">,
+    Option<"normalizeForall", "normalize-forall", "bool", "true",
+           "Enable normalization for `scf.forall` loops">,
+  ];
+  let dependentDialects = [
+      "affine::AffineDialect",
+      "arith::ArithDialect"
+  ];
+}
+
 def OptimizeVectorTransfer :
     InterfacePass<"iree-codegen-optimize-vector-transfer", "mlir::FunctionOpInterface"> {
   let summary =

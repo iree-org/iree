@@ -20,4 +20,3 @@ iree-ir-tool copy --emit-bytecode -o "$mlirbc_file" "$input_file"
 
 echo "Stripping $mlirbc_file -> $stripped_file"
 iree-ir-tool strip-data -o "$stripped_file" "$mlirbc_file"
-

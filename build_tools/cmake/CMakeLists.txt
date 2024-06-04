@@ -29,7 +29,7 @@ if(IREE_BUILD_COMPILER)
     ${CMAKE_CURRENT_BINARY_DIR}/IREECompilerConfig.cmake
     DESTINATION ${_cmake_installdir}
     COMPONENT IREECMakeExports
-  )  
+  )
 endif()
 
 configure_file(

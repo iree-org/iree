@@ -3,7 +3,7 @@
 // CHECK-LABEL: @scatter_static
 func.func @scatter_static(%arg0 : tensor<1x4x5xf32>, %arg1 : tensor<1x2xi32>, %arg2 : tensor<1x2x5xf32>) ->  tensor<1x4x5xf32> {
   // CHECK: %[[EXPANDIDX:.+]] = tensor.expand_shape %arg1
-  // CHECK-SAME{literal}: [[0], [1, 2]] 
+  // CHECK-SAME{literal}: [[0], [1, 2]]
   // CHECK-DAG: %[[EMPTY:.+]] = tensor.empty() : tensor<1x2x1xi32>
   // CHECK-DAG: %[[C0:.+]] = arith.constant 0 : i32
   // CHECK-DAG: %[[FILL:.+]] = linalg.fill ins(%[[C0]] : i32) outs(%[[EMPTY]] : tensor<1x2x1xi32>)
@@ -29,7 +29,7 @@ func.func @scatter_static(%arg0 : tensor<1x4x5xf32>, %arg1 : tensor<1x2xi32>, %a
 // CHECK-LABEL: @scatter_static_batched
 func.func @scatter_static_batched(%arg0 : tensor<2x4x5xf32>, %arg1 : tensor<2x2xi32>, %arg2 : tensor<2x2x5xf32>) ->  tensor<2x4x5xf32> {
   // CHECK: %[[EXPANDIDX:.+]] = tensor.expand_shape %arg1
-  // CHECK-SAME{literal}: [[0], [1, 2]] 
+  // CHECK-SAME{literal}: [[0], [1, 2]]
   // CHECK: %[[EMPTY:.+]] = tensor.empty() : tensor<2x2x1xi32>
   // CHECK: %[[GENERIC:.+]] = linalg.generic
   // CHECK-SAME: indexing_maps = [#map, #map]
@@ -80,4 +80,3 @@ func.func @scatter_dynamic(%arg0 : tensor<?x?x?xf32>, %arg1 : tensor<?x?xi32>, %
   // CHECK: return %[[SCATTER]]
   return %0 : tensor<?x?x?xf32>
 }
-

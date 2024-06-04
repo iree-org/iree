@@ -60,6 +60,3 @@ module attributes { transform.with_named_sequence } {
 //          CHECK: %[[S12:.*]] = arith.andi %[[S10]], %[[S11]] : i1
 //          CHECK: %[[S13:.*]] = arith.select %[[S12]], %[[WORKGROUPIDX]], %[[S6]] : index
 //          CHECK: %[[S14:.*]] = arith.select %[[S12]], %[[WORKGROUPIDY]], %[[S7]] : index
-
-
-

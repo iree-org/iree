@@ -37,35 +37,11 @@ jobs:
     with:
       package_version: 0.dev1
 
-  regression_test_cpu:
-    name: Regression Test CPU
+  regression_test:
+    name: Regression Test
     needs: [setup, build_packages]
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'regression_test_cpu')
-    uses: ./.github/workflows/pkgci_regression_test_cpu.yml
-
-  regression_test_amdgpu_vulkan:
-    name: Regression Test AMDGPU-Vulkan
-    needs: [setup, build_packages]
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'regression_test_amdgpu_vulkan')
-    uses: ./.github/workflows/pkgci_regression_test_amdgpu_vulkan.yml
-
-  regression_test_amdgpu_rocm:
-    name: Regression Test AMDGPU-ROCm
-    needs: [setup, build_packages]
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'regression_test_amdgpu_rocm')
-    uses: ./.github/workflows/pkgci_regression_test_amdgpu_rocm.yml
-
-  regression_test_nvidiagpu_vulkan:
-    name: Regression Test NVIDIAGPU-Vulkan
-    needs: [setup, build_packages]
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'regression_test_nvidiagpu_vulkan')
-    uses: ./.github/workflows/pkgci_regression_test_nvidiagpu_vulkan.yml
-
-  regression_test_nvidiagpu_cuda:
-    name: Regression Test NVIDIAGPU-CUDA
-    needs: [setup, build_packages]
-    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'regression_test_nvidiagpu_cuda')
-    uses: ./.github/workflows/pkgci_regression_test_nvidiagpu_cuda.yml
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'regression_test')
+    uses: ./.github/workflows/pkgci_regression_test.yml
 
   test_tensorflow_cpu:
     name: Test TensorFlow CPU

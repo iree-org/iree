@@ -198,7 +198,7 @@ function(external_cc_library)
   iree_install_targets(
     TARGETS ${_NAME}
     HDRS ${_RULE_HDRS}
-  )    
+  )
 
   iree_add_alias_library(${_RULE_PACKAGE}::${_RULE_NAME} ${_NAME})
   # If the library name matches the final component of the package then treat it

@@ -66,11 +66,11 @@ pdl.pattern @mlp : benefit(1) {
       "min_int" = %min_int, "max_int" = %max_int,
       "min_fp" = %min_fp, "max_fp" = %max_fp}
       -> (%relu_type : !pdl.type)
-  
+
   pdl.rewrite %matmul {
     // The pattern above matched `%result`, `%lhs`, `%rhs` needed for the
     // external function call. The values of `%M`, `%N` and `%K` need to
-    // be generated. 
+    // be generated.
     %one_val = pdl.attribute = 1 : index
     %two_val = pdl.attribute = 2 : index
     %index_type = pdl.type : index
@@ -127,4 +127,3 @@ pdl.pattern @mlp : benefit(1) {
         : !pdl.operation, !pdl.attribute, !pdl.range<value>, !pdl.range<value>, !pdl.range<value>, !pdl.range<value>)
   }
 }
-

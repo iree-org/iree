@@ -157,21 +157,62 @@ settings can improve compile and link times substantially.
 
 ### :octicons-gear-16: Optional components
 
+Enabled components and other configurations can be changed via
+[CMake options](../developers/building/cmake-options.md), listed in the root
+[`CMakeLists.txt`](https://github.com/iree-org/iree/blob/main/CMakeLists.txt).
+We also maintain a few
+[CMake presets](https://cmake.org/cmake/help/latest/manual/cmake-presets.7.html)
+at
+[`build_tools/cmake/presets`](https://github.com/iree-org/iree/tree/main/build_tools/cmake/presets)
+for common configurations.
+
 By default, the CMake build includes:
 
-* All compiler targets (`llvm-cpu`, `cuda`, `vulkan-spirv`, etc.)
-* All runtime HAL drivers (`local-task`, `cuda`, `vulkan`, etc.)
-* All compiler input formats (StableHLO, TOSA, etc.)
+* All [compiler targets](../developers/building/cmake-options.md#iree_target_backend_)
+  (`llvm-cpu`, `cuda`, `vulkan-spirv`, etc.)
+* All [runtime HAL drivers](../developers/building/cmake-options.md#iree_hal_driver_)
+  (`local-task`, `cuda`, `vulkan`, etc.)
+* All [compiler input formats](../developers/building/cmake-options.md#iree_input_)
+  (PyTorch, StableHLO, TOSA, etc.)
 * All compiler output formats (VM bytecode, C)
 
 The default build does _not_ include:
 
-* Compiler or runtime bindings (Python, TFLite, etc.)
+* Python and other language bindings for the compiler or runtime
 * Advanced features like AddressSanitizer or tracing instrumentation
 * Experimental components
 
-These can be changed via the `IREE_` CMake options listed in the root
-[`CMakeLists.txt`](https://github.com/iree-org/iree/blob/main/CMakeLists.txt).
+!!! example "Configuration examples"
+
+    === "Disable all backends except CPU"
+
+        This configure command will
+
+        * Disable all compiler target backends then enable just `llvm-cpu`
+        * Disable all runtime HAL drivers then enable just the CPU "local" runtime
+          HAL drivers
+
+        ``` shell
+        cmake -G Ninja -B ../iree-build/ -S . \
+            -DIREE_TARGET_BACKEND_DEFAULTS=OFF \
+            -DIREE_TARGET_BACKEND_LLVM_CPU=ON \
+            -DIREE_HAL_DRIVER_DEFAULTS=OFF \
+            -DIREE_HAL_DRIVER_LOCAL_SYNC=ON \
+            -DIREE_HAL_DRIVER_LOCAL_TASK=ON
+        ```
+
+    === "Disable just CUDA"
+
+        This configure command will
+
+        * Disable just the CUDA compiler target backend
+        * Disable just the CUDA runtime HAL driver
+
+        ``` shell
+        cmake -G Ninja -B ../iree-build/ -S . \
+            -DIREE_TARGET_BACKEND_CUDA=OFF \
+            -DIREE_HAL_DRIVER_CUDA=OFF
+        ```
 
 ### Extensions and integrations
 

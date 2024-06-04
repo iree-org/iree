@@ -530,8 +530,6 @@
     "test_slice_start_out_of_bounds",
     "test_softsign",
     "test_softsign_example",
-    "test_spacetodepth",
-    "test_spacetodepth_example",
     "test_split_equal_parts_1d_opset13",
     "test_split_equal_parts_default_axis_opset13",
     "test_split_variable_parts_1d_opset13",

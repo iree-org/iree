@@ -48,4 +48,3 @@ func.func @powf(%arg0: tensor<4xf16>, %arg1: tensor<4xf16>, %arg2: tensor<4xf16>
 // CHECK:           %[[TRUNC:.*]] = arith.truncf %[[POWF]] : f32 to f16
 // CHECK:           linalg.yield %[[TRUNC:.*]] : f16
 // CHECK:         return %[[GEN:.*]] : tensor<4xf16>
-

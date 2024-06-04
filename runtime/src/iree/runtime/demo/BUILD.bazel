@@ -5,6 +5,7 @@
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 load("//build_tools/bazel:build_defs.oss.bzl", "iree_cmake_extra_content", "iree_runtime_cc_binary")
+load("//build_tools/bazel:iree_bytecode_module.bzl", "iree_bytecode_module")
 load("//build_tools/bazel:native_binary.bzl", "native_test")
 
 package(
@@ -50,8 +51,8 @@ iree_runtime_cc_binary(
         "IREE_RUNTIME_DEMO_LOAD_FILE_FROM_EMBEDDED_DATA",
     ],
     deps = [
+        ":simple_mul_module_c",
         "//runtime/src/iree/runtime",
-        "//runtime/src/iree/runtime/testdata:simple_mul_module_c",
     ],
 )
 
@@ -64,12 +65,21 @@ iree_runtime_cc_binary(
     name = "hello_world_terse",
     srcs = ["hello_world_terse.c"],
     deps = [
+        ":simple_mul_module_c",
         "//runtime/src/iree/runtime",
-        "//runtime/src/iree/runtime/testdata:simple_mul_module_c",
     ],
 )
 
 native_test(
     name = "hello_world_terse_test",
     src = ":hello_world_terse",
+)
+
+iree_bytecode_module(
+    name = "simple_mul_module",
+    src = "simple_mul.mlir",
+    c_identifier = "iree_runtime_demo_simple_mul_module",
+    flags = [
+        "--iree-hal-target-backends=vmvx",
+    ],
 )

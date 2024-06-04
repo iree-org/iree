@@ -64,5 +64,3 @@ hal.executable private @interface_binding {
 //  CHECK-NEXT:   spirv.Load "PhysicalStorageBuffer" %[[loc1]]
 //       CHECK:   %[[loc2:.+]] = spirv.AccessChain %[[ptr2]]
 //  CHECK-NEXT:   spirv.Load "PhysicalStorageBuffer" %[[loc2]]
-
-

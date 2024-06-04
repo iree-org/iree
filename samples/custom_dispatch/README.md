@@ -262,7 +262,7 @@ sufficient for most workloads not involving other libraries.
 **Overview**: user defines functions with MLIR dialects IREE is able to ingest
 paired with a matcher and replacement pattern. The matcher runs as preprocessing
 and calls into the replacement pattern for all successful matches. The
-replacement pattern imports a function from the externally 
+replacement pattern imports a function from the externally
 ABI, wires them up and links them in their runtime binary, declares the
 externally available functions in IR, and emits calls to the functions in IR
 interleaved with other IR.

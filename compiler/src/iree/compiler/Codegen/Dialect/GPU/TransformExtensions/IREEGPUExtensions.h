@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_CODEGEN_DIALECT_GPU_TRANSFORMEXTENSIONS_IREEGPUEXTENSIONS_H_
 #define IREE_COMPILER_CODEGEN_DIALECT_GPU_TRANSFORMEXTENSIONS_IREEGPUEXTENSIONS_H_
 
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "mlir/Dialect/Transform/IR/TransformDialect.h"
 #include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.h"
 
@@ -17,6 +18,10 @@ class DialectRegistry;
 namespace func {
 class FuncOp;
 } // namespace func
+
+namespace linalg {
+class LinalgOp;
+} // namespace linalg
 
 namespace transform {
 // Types needed for builders.

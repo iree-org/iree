@@ -9,7 +9,7 @@
 #include <string.h>
 
 #include "iree/base/alignment.h"
-#include "iree/base/time.h"
+#include "iree/base/internal/time.h"
 #include "iree/base/tracing.h"
 
 // NOTE: threading support is optional.
@@ -142,7 +142,7 @@ static iree_zone_id_t iree_tracing_zone_begin(
   iree_trace_zone_t* zone = &_thread.stack[zone_id];
   zone->name_length = iree_min(name_length, IREE_ARRAYSIZE(zone->name));
   memcpy(zone->name, name, name_length);
-  zone->start_timestamp_ns = iree_time_now();
+  zone->start_timestamp_ns = iree_platform_time_now();
 #endif  // IREE_TRACING_CONSOLE_TIMING
 
   return zone_id;
@@ -175,7 +175,7 @@ void iree_tracing_zone_end(iree_zone_id_t zone_id) {
 
 #if IREE_TRACING_CONSOLE_TIMING
   // Capture timestamp first so that we don't measure too much of ourselves.
-  uint64_t end_timestamp_ns = iree_time_now();
+  uint64_t end_timestamp_ns = iree_platform_time_now();
   iree_trace_zone_t* zone = &_thread.stack[zone_id];
   uint64_t duration_ns = end_timestamp_ns - zone->start_timestamp_ns;
   fprintf(_console.file,

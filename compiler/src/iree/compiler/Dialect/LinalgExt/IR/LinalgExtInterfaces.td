@@ -45,7 +45,7 @@ def LinalgExtInterface : OpInterface<"LinalgExtOp"> {
 def LinalgFusionInterface : OpInterface<"LinalgFusionOpInterface"> {
   let methods = [
     //===------------------------------------------------------------------===//
-    // Interface methods for fusion. 
+    // Interface methods for fusion.
     //===------------------------------------------------------------------===//
     InterfaceMethod<
       /*desc=*/[{
@@ -103,7 +103,7 @@ def LinalgFusionInterface : OpInterface<"LinalgFusionOpInterface"> {
       /*args=*/(ins),
       /*methodBody=*/"",
       /*defaultImplementation=*/[{
-        return $_op.getLoopIteratorTypes().size(); 
+        return $_op.getLoopIteratorTypes().size();
       }]
     >,
     InterfaceMethod<
@@ -153,7 +153,7 @@ def LinalgFusionInterface : OpInterface<"LinalgFusionOpInterface"> {
       }]
     >,
 
- 
+
   ];
 }
 

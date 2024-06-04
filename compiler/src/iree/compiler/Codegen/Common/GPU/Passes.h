@@ -9,6 +9,7 @@
 #define IREE_COMPILER_CODEGEN_COMMON_GPU_PASSES_H_
 
 #include <cstdint>
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"

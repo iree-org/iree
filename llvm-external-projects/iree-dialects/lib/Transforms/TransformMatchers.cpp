@@ -152,9 +152,8 @@ template <typename Matcher, typename Object = typename llvm::function_traits<
                                 typename Matcher::match>::template args<0>>
 static bool recursiveMatch(Matcher &matcher, Object &object,
                            StringRef extraMessage = "") {
-  LLVM_DEBUG(llvm::dbgs() << "\n[" DEBUG_TYPE "] "
-                          << "start recursive match (" << extraMessage
-                          << ") {\n");
+  LLVM_DEBUG(llvm::dbgs() << "\n[" DEBUG_TYPE "] " << "start recursive match ("
+                          << extraMessage << ") {\n");
   bool result = matcher.match(object);
   LLVM_DEBUG(DBGS() << "} end recursive match");
   return result;

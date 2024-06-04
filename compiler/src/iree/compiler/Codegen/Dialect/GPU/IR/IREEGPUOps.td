@@ -105,6 +105,35 @@ def IREEGPU_MultiMmaOp : Op<IREEGPU_Dialect, "multi_mma", [
       : vector<4xf16>, vector<4xf16> into vector<4xf32>
     ```
 
+    This operation can represent an intrinsic both in subgroup/warp and
+    distributed (thread) abstractions through the intrinsic attribute interface.
+    It does so semi-opaquely by including optional permutations of each MMA
+    fragment with respect to the "canonical" MNK row major matrix multiply.
+
+    Since the canonical dimensionality of the inner dimensions are somewhat
+    intrinsic specific, verification of this op requires only that element
+    counts of the inner dimensions match the intrinsic.
+
+    For example, an MMT product of inner dimensions with warp semantics can be
+    represented with the following. Permutations are only allowed for ops with
+    subgroup semantics and must be resolved before distribution.
+
+    ```mlir
+    #contraction_accesses = [
+     affine_map<(i, j, k) -> (i, k)>,
+     affine_map<(i, j, k) -> (k, j)>,
+     affine_map<(i, j, k) -> (i, j)>
+    ]
+    #contraction_trait = {
+      indexing_maps = #contraction_accesses,
+      iterator_types = ["parallel", "parallel", "reduction"],
+      kind = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+      rhs_permutation = [1, 0]
+    }
+    %7 = iree_gpu.multi_mma %4, %5, %6 #contraction_trait
+      : tensor<?x?x16x16xf16>, tensor<?x?x16x16xf16> into tensor<?x?x16x16xf32>
+    ```
+
     ## Motivation, Design Choices, and Pitfalls
 
     The idea behind this operation is to decouple the layout setting/tiling
@@ -128,7 +157,10 @@ def IREEGPU_MultiMmaOp : Op<IREEGPU_Dialect, "multi_mma", [
     AnyRankedTensorOrVector:$acc,
     ArrayAttr:$indexing_maps,
     IREEGPU_IteratorTypeArrayAttr:$iterator_types,
-    IREEGPU_AnyMmaAttr:$kind
+    IREEGPU_AnyMmaAttr:$kind,
+    OptionalAttr<DenseI64ArrayAttr>:$lhs_permutation,
+    OptionalAttr<DenseI64ArrayAttr>:$rhs_permutation,
+    OptionalAttr<DenseI64ArrayAttr>:$acc_permutation
   );
   let results = (outs
     AnyRankedTensorOrVector:$result
@@ -142,11 +174,24 @@ def IREEGPU_MultiMmaOp : Op<IREEGPU_Dialect, "multi_mma", [
   let builders = [
     OpBuilder<(ins "Value":$lhs, "Value":$rhs, "Value":$acc,
       "ArrayAttr":$indexingMaps, "ArrayAttr":$iteratorTypes,
-      "MmaInterfaceAttr":$intrinsic)>,
+      "MmaInterfaceAttr":$intrinsic,
+      CArg<"std::optional<DenseI64ArrayAttr>", "std::nullopt">:$lhsPerm,
+      CArg<"std::optional<DenseI64ArrayAttr>", "std::nullopt">:$rhsPerm,
+      CArg<"std::optional<DenseI64ArrayAttr>", "std::nullopt">:$accPerm)>,
     OpBuilder<(ins "Value":$lhs, "Value":$rhs, "Value":$acc,
       "ArrayRef<ArrayRef<AffineExpr>>":$indexingExprs,
       "ArrayRef<utils::IteratorType>":$iteratorTypes,
-      "MmaInterfaceAttr":$intrinsic)>
+      "MmaInterfaceAttr":$intrinsic,
+      CArg<"std::optional<SmallVector<int64_t>>", "std::nullopt">:$lhsPerm,
+      CArg<"std::optional<SmallVector<int64_t>>", "std::nullopt">:$rhsPerm,
+      CArg<"std::optional<SmallVector<int64_t>>", "std::nullopt">:$accPerm)>,
+    OpBuilder<(ins "Value":$lhs, "Value":$rhs, "Value":$acc,
+      "ArrayRef<AffineMap>":$indexingMaps,
+      "ArrayRef<utils::IteratorType>":$iteratorTypes,
+      "MmaInterfaceAttr":$intrinsic,
+      CArg<"std::optional<SmallVector<int64_t>>", "std::nullopt">:$lhsPerm,
+      CArg<"std::optional<SmallVector<int64_t>>", "std::nullopt">:$rhsPerm,
+      CArg<"std::optional<SmallVector<int64_t>>", "std::nullopt">:$accPerm)>
   ];
   let extraClassDeclaration = [{
     ::mlir::ShapedType getLhsType() {
@@ -165,6 +210,8 @@ def IREEGPU_MultiMmaOp : Op<IREEGPU_Dialect, "multi_mma", [
     bool hasTensorSemantics() {
       return isa<RankedTensorType>(getResultType());
     }
+
+    bool hasThreadSemantics();
 
     llvm::SmallVector<::mlir::AffineMap, 4> getIndexingMapsArray() {
       return llvm::to_vector<4>(getIndexingMaps().getAsValueRange<::mlir::AffineMapAttr>());
@@ -321,7 +368,7 @@ def IREEGPU_ShuffleTensorOp : Op<IREEGPU_Dialect, "shuffle_tensor", [
     AnyRankedTensor:$dest
   );
   let regions = (region SizedRegion<1>:$region);
-  let results = (outs AnyRankedTensor:$result);
+  let results = (outs AnyRankedTensorOrVector:$result);
 
   let assemblyFormat = [{
     $source ``
@@ -331,6 +378,12 @@ def IREEGPU_ShuffleTensorOp : Op<IREEGPU_Dialect, "shuffle_tensor", [
     `to` $dest $region attr-dict
     `:` type($source) `->` type($dest) `->` type($result)
   }];
+
+  let builders = [
+    OpBuilder<(ins "Type":$result_type, "Value":$source, "Value":$dest,
+      "ArrayRef<OpFoldResult>":$offsets, "ArrayRef<OpFoldResult>":$sizes,
+      "ArrayRef<OpFoldResult>":$strides)>
+  ];
 
   let extraClassDeclaration = [{
     RankedTensorType getSourceType() {
@@ -390,6 +443,10 @@ def IREEGPU_ValueBarrierOp : Op<IREEGPU_Dialect, "value_barrier", [
   let assemblyFormat = [{
     $input attr-dict `:` type($result)
   }];
+
+  let builders = [
+    OpBuilder<(ins "Value":$input)>
+  ];
 
   let extraClassDeclaration = [{
     bool hasTensorSemantics() {

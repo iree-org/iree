@@ -51,4 +51,3 @@ class IREEVectorExt_EnumAttr<EnumAttrInfo enumInfo, string name = "">
   : EnumAttr<IREEVectorExt_Dialect, enumInfo, name>;
 
 #endif // IREE_DIALECT_VECTOREXT_BASE
-

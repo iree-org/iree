@@ -45,6 +45,8 @@ void addIREEComprehensiveBufferizePasses(
         std::nullopt,
     std::optional<BufferizationOptions::MemCpyFn> memCpyFn = std::nullopt);
 
+void addConstantBufferizePasses(OpPassManager &funcPassManager);
+
 std::unique_ptr<OperationPass<LLVM::LLVMFuncOp>> createAddFastMathFlagsPass();
 
 /// Pass to bubble up ordinal operations to allow workgroup count computation
@@ -223,6 +225,12 @@ createMemrefCopyToLinalgPass();
 
 /// Extracts lowering configs and translation info from user configs.
 std::unique_ptr<OperationPass<ModuleOp>> createMaterializeUserConfigsPass();
+
+/// Normalizes the iteration range of `scf.for` and `scf.forall` loops to
+/// [0, ub) += 1.
+std::unique_ptr<Pass>
+createNormalizeLoopBoundsPass(bool normalizeFor = true,
+                              bool normalizeForall = true);
 
 /// Pass to optimize vector transfer_read and transfer_write.
 std::unique_ptr<InterfacePass<FunctionOpInterface>>
