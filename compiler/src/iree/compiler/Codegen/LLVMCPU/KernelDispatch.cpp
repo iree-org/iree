@@ -1974,7 +1974,7 @@ setTransformStrategyRootConfig(mlir::FunctionOpInterface entryPointFn,
 /// return indicates failure.
 static void getTransposeX86VectorSizes(
     linalg::GenericOp genericOp, IREE::HAL::ExecutableTargetAttr targetAttr,
-    SmallVectorImpl<int64_t> &minTileSizes, SmallVectorImpl<int64_t> &sizes) {
+    ArrayRef<int64_t> minTileSizes, SmallVectorImpl<int64_t> &sizes) {
   if (!hasAVX2Feature(targetAttr) ||
       !x86TransposeLoweringPrecondition(genericOp))
     return;
@@ -2005,11 +2005,10 @@ static void getTransposeX86VectorSizes(
   }
 
   // Replace dims to be vectorized with the new tile sizes.
+  sizes.assign(minTileSizes.begin(), minTileSizes.end());
   std::replace_if(
-      minTileSizes.begin(), minTileSizes.end(),
+      sizes.begin(), sizes.end(),
       [](int64_t tileSize) { return tileSize > 1; }, targetVectorSize);
-
-  sizes = minTileSizes;
 }
 
 /// Utility to return the transpose vector `sizes` for AArch64. Empty `sizes` on
