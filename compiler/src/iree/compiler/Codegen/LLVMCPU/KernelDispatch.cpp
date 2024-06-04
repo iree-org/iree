@@ -2014,6 +2014,7 @@ static void getTransposeX86VectorSizes(
 
 /// Utility to return the transpose vector `sizes` for AArch64. Empty `sizes` on
 /// return indicates failure.
+/// NOTE: only SME is currently supported.
 static void getTransposeAArch64VectorSizes(
     linalg::GenericOp genericOp, IREE::HAL::ExecutableTargetAttr targetAttr,
     SmallVectorImpl<int64_t> &sizes, SmallVectorImpl<bool> &scalableFlags) {

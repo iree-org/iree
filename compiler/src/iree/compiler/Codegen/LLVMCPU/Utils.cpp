@@ -85,7 +85,7 @@ bool isLinalgGeneric2DTranspose(linalg::GenericOp genericOp) {
 
   auto yieldOp = cast<linalg::YieldOp>(body.getTerminator());
 
-  // The yield op should return the block argument corresponds to the input.
+  // The yield op should return the block argument corresponding to the input.
   auto yieldArg = dyn_cast<BlockArgument>(yieldOp.getValues()[0]);
   if (!yieldArg || yieldArg.getArgNumber() != 0 || yieldArg.getOwner() != &body)
     return false;
