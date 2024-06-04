@@ -1970,17 +1970,15 @@ setTransformStrategyRootConfig(mlir::FunctionOpInterface entryPointFn,
   return success();
 }
 
-/// Utility to compute the transpose vector sizes for X86.
+/// Utility to return the transpose vector `sizes` for X86. Empty `sizes` on
+/// return indicates failure.
 static void getTransposeX86VectorSizes(
-    mlir::FunctionOpInterface entryPointFn, linalg::GenericOp genericOp,
-    const LinalgOpInfo &linalgOpInfo,
-    const TargetMLTransformInfo &targetMLTransInfo,
-    SmallVectorImpl<int64_t> &sizes, SmallVectorImpl<bool> &scalableSizeFlags) {
-  if (!x86TransposeLoweringPrecondition(genericOp))
+    linalg::GenericOp genericOp, IREE::HAL::ExecutableTargetAttr targetAttr,
+    SmallVectorImpl<int64_t> &minTileSizes, SmallVectorImpl<int64_t> &sizes) {
+  if (!hasAVX2Feature(targetAttr) ||
+      !x86TransposeLoweringPrecondition(genericOp))
     return;
 
-  SmallVector<int64_t> minTileSizes = getMinTilingSizesForEachDim(
-      entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo);
   if (llvm::count_if(minTileSizes,
                      [](int64_t tileSize) { return tileSize > 1; }) != 2) {
     // Transpose patterns are not applicable if vectorizing more or less than
@@ -1997,9 +1995,8 @@ static void getTransposeX86VectorSizes(
     return;
   }
 
-  // Target 16x16 tile sizes if there are AVX512 features and all the tile
-  // sizes are greater than or equal to 16.
-  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
+  // Target 16x16 tile sizes if there are AVX512 features and all the tile sizes
+  // are greater than or equal to 16.
   if (hasAVX512fFeature(targetAttr) &&
       llvm::all_of(minTileSizes, [](int64_t tileSize) {
         return tileSize == 1 || tileSize >= 16;
@@ -2013,32 +2010,29 @@ static void getTransposeX86VectorSizes(
       [](int64_t tileSize) { return tileSize > 1; }, targetVectorSize);
 
   sizes = minTileSizes;
-  scalableSizeFlags = SmallVector<bool>(sizes.size(), false);
 }
 
-/// Utility to compute the tile sizes of transposes for AArch64 SME. Unlike
-/// other targets, the tile sizes picked here must exactly match multiples of
-/// the SME hardware virtual tiles, as there is currently no support for
-/// lowering non-standard shapes.
-static void
-getTransposeAArch64SMEVectorSizes(linalg::GenericOp genericOp,
-                                  SmallVectorImpl<int64_t> &sizes,
-                                  SmallVectorImpl<bool> &scalableSizeFlags) {
-  if (!transposeLoweringPreconditionAArch64SME(genericOp))
+/// Utility to return the transpose vector `sizes` for AArch64. Empty `sizes` on
+/// return indicates failure.
+static void getTransposeAArch64VectorSizes(
+    linalg::GenericOp genericOp, IREE::HAL::ExecutableTargetAttr targetAttr,
+    SmallVectorImpl<int64_t> &sizes, SmallVectorImpl<bool> &scalableFlags) {
+  if (!isLinalgGeneric2DTranspose(genericOp))
     return;
 
   auto elementType = nonWideningLinalgElementType(genericOp);
   if (failed(elementType))
     return;
 
-  if (elementType->isF32()) {
-    sizes.append({4, 4});
-    scalableSizeFlags.append({true, true});
-  }
-
-  if (elementType->isF64()) {
-    sizes.append({2, 2});
-    scalableSizeFlags.append({true, true});
+  if (hasSMEFeature(targetAttr) && clEnableScalableVectorization) {
+    if (elementType->isF32()) {
+      sizes.append({4, 4});
+    } else if (elementType->isF64()) {
+      sizes.append({2, 2});
+    } else {
+      return;
+    }
+    scalableFlags.append({true, true});
   }
 }
 
@@ -2051,15 +2045,21 @@ getTransposeVectorSizes(mlir::FunctionOpInterface entryPointFn,
   SmallVector<int64_t> tileSizes;
   SmallVector<bool> scalableFlags;
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
-  if (hasAVX2Feature(targetAttr))
-    getTransposeX86VectorSizes(entryPointFn, genericOp, linalgOpInfo,
-                               targetMLTransInfo, tileSizes, scalableFlags);
-  else if (isAArch64(targetAttr) && hasSMEFeature(targetAttr) &&
-           clEnableScalableVectorization)
-    getTransposeAArch64SMEVectorSizes(genericOp, tileSizes, scalableFlags);
+  if (isX86(targetAttr)) {
+    SmallVector<int64_t> minTileSizes = getMinTilingSizesForEachDim(
+        entryPointFn, genericOp, linalgOpInfo, targetMLTransInfo);
+    getTransposeX86VectorSizes(genericOp, targetAttr, minTileSizes, tileSizes);
+  } else if (isAArch64(targetAttr)) {
+    getTransposeAArch64VectorSizes(genericOp, targetAttr, tileSizes,
+                                   scalableFlags);
+  }
 
   if (tileSizes.empty())
     return std::nullopt;
+
+  // If scalable flags are empty, assume target doesn't care about scalability.
+  if (scalableFlags.empty())
+    scalableFlags = SmallVector<bool>(tileSizes.size(), false);
 
   LLVM_DEBUG(KD_DBGS() << "Transpose vector sizes: " << tileSizes << "\n");
   LLVM_DEBUG(KD_DBGS() << "Transpose vector scalable flags: " << scalableFlags

@@ -58,13 +58,13 @@ bool hasI8mmFeature(IREE::HAL::ExecutableTargetAttr targetAttr) {
   return hasFeature(targetAttr, "+i8mm");
 }
 
-bool transposeLoweringPreconditionAArch64SME(linalg::GenericOp genericOp) {
+bool isLinalgGeneric2DTranspose(linalg::GenericOp genericOp) {
   // Check op has 2 dimensions.
   if (genericOp.getNumLoops() != 2)
     return false;
 
   // Check op has single input and output.
-  if ((genericOp.getNumDpsInputs() != 1) || (genericOp.getNumDpsInits() != 1))
+  if (genericOp.getNumDpsInputs() != 1 || genericOp.getNumDpsInits() != 1)
     return false;
 
   // Check all iterators are parallel.
@@ -82,18 +82,13 @@ bool transposeLoweringPreconditionAArch64SME(linalg::GenericOp genericOp) {
   Block &body = genericOp.getRegion().front();
   if (!llvm::hasSingleElement(body))
     return false;
-  auto yieldOp = dyn_cast<linalg::YieldOp>(body.getTerminator());
-  if (!yieldOp)
-    return false;
+
+  auto yieldOp = cast<linalg::YieldOp>(body.getTerminator());
 
   // The yield op should return the block argument corresponds to the input.
-  for (Value yieldVal : yieldOp.getValues()) {
-    auto yieldArg = dyn_cast<BlockArgument>(yieldVal);
-    if (!yieldArg || yieldArg.getOwner() != &body)
-      return false;
-    if (yieldArg.getArgNumber() != 0)
-      return false;
-  }
+  auto yieldArg = dyn_cast<BlockArgument>(yieldOp.getValues()[0]);
+  if (!yieldArg || yieldArg.getArgNumber() != 0 || yieldArg.getOwner() != &body)
+    return false;
 
   return true;
 }
