@@ -90,6 +90,9 @@ markdown_extensions:
       options:
         custom_icons:
           - overrides/.icons
+  # Support for bare URLs, see https://github.com/mkdocs/mkdocs/issues/1711.
+  # https://facelessuser.github.io/pymdown-extensions/extensions/magiclink/
+  - pymdownx.magiclink
   # Support for embedding external files (e.g. source code samples) via snippets
   # https://squidfunk.github.io/mkdocs-material/reference/code-blocks/#embedding-external-files
   - pymdownx.snippets:
