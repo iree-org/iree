@@ -83,7 +83,9 @@ static int64_t estimateLinalgExtOpCost(Operation *op) {
   // This is something like the extra log(N) factor for a sort or FFT, or
   // the amount of work done by a softmax vs a cheap elementwise on a tensor
   // of the same shape.
-  if (cost < kMaxCost / 10) {
+  if (cost >= kMaxCost / 10) {
+    cost = kMaxCost;
+  } else {
     cost *= 10;
   }
   LLVM_DEBUG(llvm::dbgs() << "// " << op->getName() << " cost: " << cost
@@ -276,13 +278,9 @@ static std::string summarizeLinalgExtOp(Operation *op) {
   // append fused consumer (`linalg` or `linalg_ext`)
   // e.g ..._1xDxDx1xf16_linalg_generic
   auto users = op->getUsers();
-  if (!users.empty() && std::next(users.begin()) == users.end()) {
+  if (op->hasOneUse()) {
     auto user = *users.begin();
-    auto userOpName = user->getName().getStringRef();
-    auto pos = userOpName.find('.');
-    assert(pos != StringRef::npos && "expected dialect name");
-    suffix += "_";
-    suffix.insert(suffix.end(), userOpName.begin() + pos + 1, userOpName.end());
+    suffix += "_" + getOpNameWithoutDialectName(user);
   }
 
   return opName.str() + suffix;
