@@ -200,3 +200,49 @@ module {
 //       CHECK:   scf.forall.in_parallel
 //  CHECK-NEXT:     tensor.parallel_insert_slice %[[LOOP]]
 //       CHECK:   flow.dispatch.tensor.store %[[OUTER_PARALLEL]]
+
+// -----
+
+module {
+  func.func @multi_hoist_and_fuse_trailing_stuff() {
+    %c4 = arith.constant 4 : index
+    %c128 = arith.constant 128 : index
+    %c0 = arith.constant 0 : index
+    %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<128x128xf16>>
+    %1 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readwrite:tensor<128x128xf16>>
+    %2 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [128, 128], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<128x128xf16>> -> tensor<128x128xf16>
+    %empty = tensor.empty() : tensor<128x128xf16>
+    %8 = scf.for %arg0 = %c0 to %c128 step %c4 iter_args(%arg1 = %empty) -> (tensor<128x128xf16>) {
+      %9 = scf.forall (%arg2, %arg3) in (2, 2) shared_outs(%arg4 = %arg1) -> (tensor<128x128xf16>) {
+        %extracted_slice = tensor.extract_slice %arg4[%arg2, %arg3] [64, 64] [1, 1] : tensor<128x128xf16> to tensor<64x64xf16>
+        %10 = scf.forall (%arg5, %arg6) in (32, 16) shared_outs(%arg7 = %extracted_slice) -> (tensor<64x64xf16>) {
+          %extracted_slice_1 = tensor.extract_slice %2[%arg5, %arg6] [2, 4] [1, 1] : tensor<128x128xf16> to tensor<2x4xf16>
+          %extracted_slice_2 = tensor.extract_slice %arg7[%arg5, %arg6] [2, 4] [1, 1] : tensor<64x64xf16> to tensor<2x4xf16>
+          %16 = linalg.copy ins(%extracted_slice_1 : tensor<2x4xf16>) outs(%extracted_slice_2 : tensor<2x4xf16>) -> tensor<2x4xf16>
+          scf.forall.in_parallel {
+            tensor.parallel_insert_slice %16 into %arg7[%arg5, %arg6] [2, 4] [1, 1] : tensor<2x4xf16> into tensor<64x64xf16>
+          }
+        } {mapping = [#gpu.thread<linear_dim_0>, #gpu.thread<linear_dim_1>]}
+        scf.forall.in_parallel {
+          tensor.parallel_insert_slice %10 into %arg4[%arg2, %arg3] [64, 64] [1, 1] : tensor<64x64xf16> into tensor<128x128xf16>
+        }
+      } {mapping = [#gpu.warp<linear_dim_0>, #gpu.warp<linear_dim_1>]}
+      scf.yield %9 : tensor<128x128xf16>
+    }
+    %transpose = linalg.transpose ins(%8: tensor<128x128xf16>) outs(%empty: tensor<128x128xf16>) permutation = [1, 0]
+    %ceil = linalg.ceil ins(%transpose: tensor<128x128xf16>) outs(%empty: tensor<128x128xf16>) -> tensor<128x128xf16>
+    flow.dispatch.tensor.store %ceil, %1, offsets = [0, 0], sizes = [128, 128], strides = [1, 1] : tensor<128x128xf16> -> !flow.dispatch.tensor<readwrite:tensor<128x128xf16>>
+    return
+  }
+}
+
+// CHECK-LABEL: func @multi_hoist_and_fuse_trailing_stuff
+//       CHECK:   scf.forall
+//       CHECK:     scf.forall
+//       CHECK:       %[[LOOP:.+]] = scf.for {{.*}} -> (tensor<2x4xf16>)
+//       CHECK:         linalg.copy
+//       CHECK:       %[[T:.+]] = linalg.transpose ins(%[[LOOP]] : tensor<2x4xf16>)
+//       CHECK:       linalg.ceil ins(%[[T]] : tensor<4x2xf16>) {{.*}} -> tensor<4x2xf16>
+//       CHECK:     scf.forall.in_parallel
+//       CHECK:   scf.forall.in_parallel
+//       CHECK:   flow.dispatch.tensor.store

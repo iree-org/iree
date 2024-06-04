@@ -1,7 +1,8 @@
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level, canonicalize, cse))" %s | FileCheck %s
 // RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level{tiling-level=thread}, canonicalize, cse))" %s | FileCheck %s --check-prefix=THREAD
+// RUN: iree-opt --split-input-file --pass-pipeline="builtin.module(func.func(iree-codegen-gpu-apply-tiling-level{tiling-level=subgroup}, canonicalize, cse))" %s | FileCheck %s --check-prefix=SUBGROUP
 
-#config = #iree_gpu.lowering_config<{thread = [2, 16]}>
+#config = #iree_gpu.lowering_config<{thread = [2, 16], subgroup = [2, 16]}>
 #map = affine_map<(d0, d1) -> (d0, d1)>
 module {
   func.func @add_tensor() {
@@ -34,6 +35,12 @@ module {
 //       THREAD:     linalg.generic {{.*}} ins(%{{.*}}: tensor<2x16xf32>, tensor<2x16xf32>)
 //       THREAD:     scf.forall.in_parallel
 //       THREAD:   mapping = [#gpu.thread<linear_dim_0>, #gpu.thread<linear_dim_1>]
+
+// SUBGROUP-LABEL: func.func @add_tensor
+//       SUBGROUP:   scf.forall ({{.*}}) = (0, 0) to (64, 256) step (2, 16)
+//       SUBGROUP:     linalg.generic {{.*}} ins(%{{.*}}: tensor<2x16xf32>, tensor<2x16xf32>)
+//       SUBGROUP:     scf.forall.in_parallel
+//       SUBGROUP:   mapping = [#gpu.warp<linear_dim_0>, #gpu.warp<linear_dim_1>]
 
 // -----
 

@@ -293,11 +293,13 @@ void addGPUVectorizationPassPipeline(OpPassManager &funcPassManager) {
 //===---------------------------------------------------------------------===//
 
 void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager) {
+
+  funcPassManager.addPass(createGPUPromoteMatmulOperandsPass());
+  funcPassManager.addPass(IREE::GPU::createPackToIntrinsicsPass());
+
   tileAndDistributeToWorkgroup(funcPassManager);
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
-
-  funcPassManager.addPass(createGPUPromoteMatmulOperandsPass());
 
   // Step 1. Tile and fuse tileable ops to reduction loops.
   {
@@ -308,7 +310,17 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager) {
     funcPassManager.addPass(createCSEPass());
   }
 
-  // Step 2. Tile and fuse tileable ops to threads.
+  // Decompose pack and unpack ops and propagte the resulting reshapes.
+  funcPassManager.addPass(
+      createDecomposePackUnPackOpsPass(/*tileOuterToOne=*/false));
+  funcPassManager.addPass(createPropagateReshapesByExpansionPass());
+  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createCSEPass());
+  funcPassManager.addPass(createCleanupBufferAllocViewPass());
+  funcPassManager.addPass(createConvertToDestinationPassingStylePass(
+      /*useWARForCooperativeMatrixCodegen=*/false));
+
+  // Step 2. Tile and fuse tileable ops to subgroups/threads.
   {
     GPUApplyTilingLevelPassOptions options;
     options.tilingLevel = IREE::GPU::TilingLevel::Thread;
@@ -316,6 +328,12 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager) {
     funcPassManager.addPass(createCanonicalizerPass());
     funcPassManager.addPass(createCSEPass());
   }
+  {
+    GPUApplyTilingLevelPassOptions options;
+    options.tilingLevel = IREE::GPU::TilingLevel::Subgroup;
+    funcPassManager.addPass(createGPUApplyTilingLevelPass(options));
+  }
+  funcPassManager.addPass(IREE::GPU::createDistributeMmaToLanesPass());
 
   // Normalize loop bounds for later lowerings.
   funcPassManager.addPass(iree_compiler::createNormalizeLoopBoundsPass(
@@ -334,6 +352,7 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager) {
   // Step 4. Lower special ops and vectorize.
   funcPassManager.addPass(IREE::GPU::createVectorizeIREEGPUOpsPass());
   addGPUVectorizationPasses(funcPassManager);
+  funcPassManager.addPass(createCleanupBufferAllocViewPass());
 
   // Step 5. Bufferize.
   // TODO: This is a workaround for a bug in the lowering of

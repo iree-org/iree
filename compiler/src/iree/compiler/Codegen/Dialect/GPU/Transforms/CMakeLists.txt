@@ -45,8 +45,10 @@ iree_cc_library(
     "Passes.h.inc"
     "Transforms.h"
   SRCS
+    "DistributeMmaToLanes.cpp"
     "FuseAndHoistParallelLoops.cpp"
     "LowerIREEGPUOps.cpp"
+    "PackToIntrinsics.cpp"
     "Passes.cpp"
     "Transforms.cpp"
     "VectorizeIREEGPUOps.cpp"

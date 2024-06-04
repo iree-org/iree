@@ -51,8 +51,10 @@ iree_gentbl_cc_library(
 iree_compiler_cc_library(
     name = "GPUTransforms",
     srcs = [
+        "DistributeMmaToLanes.cpp",
         "FuseAndHoistParallelLoops.cpp",
         "LowerIREEGPUOps.cpp",
+        "PackToIntrinsics.cpp",
         "Passes.cpp",
         "Transforms.cpp",
         "VectorizeIREEGPUOps.cpp",

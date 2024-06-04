@@ -777,6 +777,54 @@ void populateIREEGPUVectorUnrollPatterns(
 }
 
 //===---------------------------------------------------------------------===//
+// Resolving lane mapped forall ops
+//===---------------------------------------------------------------------===//
+
+static bool isLaneMappableForall(scf::ForallOp forallOp) {
+  if (forallOp.getNumResults() > 0)
+    return false;
+  if (forallOp.getRank() != 1)
+    return false;
+  if (!forallOp.getMapping().has_value())
+    return false;
+  Attribute mapping = *forallOp.getMapping()->getValue().begin();
+  if (mapping != IREE::GPU::LaneIdAttr::get(forallOp.getContext(), 0)) {
+    return false;
+  }
+  return true;
+}
+
+static void rewriteForallToLanes(RewriterBase &rewriter, scf::ForallOp forallOp,
+                                 bool insertBarrier) {
+  Location loc = forallOp->getLoc();
+  assert(isLaneMappableForall(forallOp) && "mapping non-lane forall op");
+
+  Value laneId = rewriter.create<gpu::LaneIdOp>(loc);
+  rewriter.eraseOp(forallOp.getTerminator());
+  rewriter.setInsertionPoint(forallOp);
+  rewriter.inlineBlockBefore(forallOp.getBody(), forallOp, {laneId});
+  if (insertBarrier) {
+    rewriter.create<gpu::BarrierOp>(loc);
+  }
+  rewriter.eraseOp(forallOp);
+}
+
+void mapLaneForalls(RewriterBase &rewriter, Operation *funcOp,
+                    bool insertBarrier) {
+  SmallVector<scf::ForallOp> foralls;
+  OpBuilder::InsertionGuard g(rewriter);
+  funcOp->walk([&](scf::ForallOp forallOp) {
+    if (isLaneMappableForall(forallOp)) {
+      foralls.push_back(forallOp);
+    }
+  });
+  for (auto forall : foralls) {
+    rewriter.setInsertionPoint(forall);
+    rewriteForallToLanes(rewriter, forall, insertBarrier);
+  }
+}
+
+//===---------------------------------------------------------------------===//
 // ShuffleTensor Lowering
 //===---------------------------------------------------------------------===//
 

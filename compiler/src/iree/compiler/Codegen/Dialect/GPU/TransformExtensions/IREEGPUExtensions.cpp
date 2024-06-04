@@ -189,6 +189,24 @@ void transform_dialect::DistributeMultiMmaOp::getEffects(
 }
 
 //===---------------------------------------------------------------------===//
+// ForallToLanesOp
+//===---------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure transform_dialect::ForallToLanesOp::applyToOne(
+    transform::TransformRewriter &rewriter, Operation *target,
+    transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  IREE::GPU::mapLaneForalls(rewriter, target, /*insertBarrier=*/true);
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::ForallToLanesOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::modifiesPayload(effects);
+}
+
+//===---------------------------------------------------------------------===//
 // FuseForallOp
 //===---------------------------------------------------------------------===//
 

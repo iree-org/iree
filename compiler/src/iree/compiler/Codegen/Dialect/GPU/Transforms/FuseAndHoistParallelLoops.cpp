@@ -14,7 +14,9 @@
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Interfaces/DestinationStyleOpInterface.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
+#include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler::IREE::GPU {
@@ -73,8 +75,7 @@ struct FuseForalls final : OpRewritePattern<tensor::ExtractSliceOp> {
   }
 };
 
-struct FuseTileableDestinationProducers final
-    : OpRewritePattern<scf::ForallOp> {
+struct FuseTilableDestinationProducers final : OpRewritePattern<scf::ForallOp> {
   using OpRewritePattern::OpRewritePattern;
   LogicalResult matchAndRewrite(scf::ForallOp forallOp,
                                 PatternRewriter &rewriter) const override {
@@ -113,6 +114,52 @@ struct FuseTileableDestinationProducers final
   }
 };
 
+struct FuseTilableForallConsumers final
+    : OpInterfaceRewritePattern<TilingInterface> {
+  using OpInterfaceRewritePattern::OpInterfaceRewritePattern;
+  LogicalResult matchAndRewrite(TilingInterface tilableOp,
+                                PatternRewriter &rewriter) const override {
+    // Currently consumer fusion requires DPS, and we don't want to fuse through
+    // inits anyway.
+    auto dpsOp = dyn_cast<DestinationStyleOpInterface>(*tilableOp);
+    if (!dpsOp) {
+      return failure();
+    }
+
+    tensor::ParallelInsertSliceOp producerSlice;
+    for (auto operand : dpsOp.getDpsInputs()) {
+      auto forallProducer = operand.getDefiningOp<scf::ForallOp>();
+      if (!forallProducer) {
+        continue;
+      }
+      Value iterArg = forallProducer.getTiedBlockArgument(
+          forallProducer.getTiedOpOperand(cast<OpResult>(operand)));
+
+      for (auto user : iterArg.getUsers()) {
+        auto sliceOp = dyn_cast<tensor::ParallelInsertSliceOp>(user);
+        if (sliceOp && sliceOp.getDest() == iterArg) {
+          producerSlice = sliceOp;
+          break;
+        }
+      }
+      if (producerSlice) {
+        break;
+      }
+    }
+
+    if (!producerSlice) {
+      return failure();
+    }
+
+    FailureOr<scf::SCFFuseConsumerOfSliceResult> fuseConsumerResults =
+        scf::tileAndFuseConsumerOfSlice(rewriter, producerSlice);
+    if (failed(fuseConsumerResults)) {
+      return failure();
+    }
+    return success();
+  }
+};
+
 void FuseAndHoistParallelLoopsPass::runOnOperation() {
   MLIRContext *context = &getContext();
   RewritePatternSet patterns(context);
@@ -120,8 +167,10 @@ void FuseAndHoistParallelLoopsPass::runOnOperation() {
   // These two patterns are run to a fixed point, allowing fusion within
   // potentially nested loops, hoisting from said loops, and continued fusion.
   patterns.add<FuseForalls>(context);
-  patterns.add<FuseTileableDestinationProducers>(context);
+  patterns.add<FuseTilableDestinationProducers>(context);
+  patterns.add<FuseTilableForallConsumers>(context);
   tensor::populateFoldTensorEmptyPatterns(patterns);
+  scf::ForallOp::getCanonicalizationPatterns(patterns, context);
   populateForallLoopHoistingPattern(patterns);
   if (failed(
           applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
