@@ -89,8 +89,7 @@ public:
 
 static bool opKnownToSupport2DScalableVectorizationWithArmSME(Operation *op) {
   if (auto genericOp = dyn_cast<linalg::GenericOp>(op))
-    return LinalgOpInfo(genericOp).isTranspose() &&
-           isLinalgGeneric2DTranspose(genericOp);
+    return isLinalgGeneric2DTranspose(genericOp);
   return isa<linalg::MatmulOp, linalg::MatmulTransposeAOp, linalg::FillOp>(op);
 }
 
