@@ -79,7 +79,7 @@ public:
 
     // Cast to the builtin tensor type.
     auto builtinCast =
-        rewriter.create<torch::TorchConversion::ToBuiltinTensorOp>(loc, rhs);
+        rewriter.create<torch::TorchConversion::ToBuiltinTensorOp>(loc, rhsType.toBuiltinTensor(), rhs);
 
     // No dynamic dims because we are bitcasting a constant.
     auto flowBitcast = rewriter.create<IREE::Flow::TensorBitCastOp>(
