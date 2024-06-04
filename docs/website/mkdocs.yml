@@ -92,7 +92,10 @@ markdown_extensions:
           - overrides/.icons
   # Support for bare URLs, see https://github.com/mkdocs/mkdocs/issues/1711.
   # https://facelessuser.github.io/pymdown-extensions/extensions/magiclink/
-  - pymdownx.magiclink
+  - pymdownx.magiclink:
+      user: iree-org
+      repo: iree
+      repo_url_shorthand: true
   # Support for embedding external files (e.g. source code samples) via snippets
   # https://squidfunk.github.io/mkdocs-material/reference/code-blocks/#embedding-external-files
   - pymdownx.snippets:

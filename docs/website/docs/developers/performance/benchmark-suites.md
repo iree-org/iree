@@ -93,9 +93,6 @@ cmake --build "${IREE_BUILD_DIR?}" --target \
 export E2E_TEST_ARTIFACTS_DIR="${IREE_BUILD_DIR?}/e2e_test_artifacts"
 ```
 
-> TODO(#13683): Each preset should have its own target to further reduce
-> unnecessary builds
-
 ### Run benchmarks
 
 Export the execution benchmark config:
