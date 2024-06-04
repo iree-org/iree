@@ -695,8 +695,8 @@ static void matchAndRewriteInnerExtractSlice(RewriterBase &rewriter,
   SmallVector<int64_t> oldInputShape(oldInputType.getShape());
   ArrayRef<int64_t> oldOutputShape = sliceOp.getResult().getType().getShape();
 
-  if (llvm::is_contained(oldOutputShape, ShapedType::kDynamic) ||
-      llvm::is_contained(oldInputShape, ShapedType::kDynamic)) {
+  if (llvm::is_contained(oldInputShape, ShapedType::kDynamic) ||
+      llvm::is_contained(oldOutputShape, ShapedType::kDynamic)) {
     return;
   }
 
@@ -704,19 +704,20 @@ static void matchAndRewriteInnerExtractSlice(RewriterBase &rewriter,
   SmallVector<int64_t> sizes(sliceOp.getStaticSizes());
   SmallVector<int64_t> strides(sliceOp.getStaticStrides());
 
-  // Match extract extraction of full n-1 tensor
-  if (oldInputShape.size() != oldOutputShape.size() + 1 ||
-      sizes.back() == oldOutputShape.back()) {
+  // Match extract extraction of full tensor of shape n-1
+  if (oldInputShape.size() < 2 ||
+      oldInputShape.size() != oldOutputShape.size() + 1 || sizes.back() != 1) {
     return;
   }
 
-  // All dims of output (smaller) match input
+  // All dims of input match output except for extracted innermost dim
   for (auto [in, out] : llvm::zip(oldInputShape, oldOutputShape)) {
     if (in != out) {
       return;
     }
   }
 
+  OpBuilder::InsertionGuard guard(rewriter);
   rewriter.setInsertionPoint(sliceOp);
 
   SmallVector<int64_t> permutation =
@@ -887,7 +888,6 @@ struct RaiseSpecialOpsPass : public RaiseSpecialOpsBase<RaiseSpecialOpsPass> {
     });
 
     getOperation()->walk([&](tensor::ExtractSliceOp sliceOp) {
-      OpBuilder::InsertionGuard guard(rewriter);
       matchAndRewriteInnerExtractSlice(rewriter, sliceOp);
     });
 
