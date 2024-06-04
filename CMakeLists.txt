@@ -215,7 +215,7 @@ else()
   # We can download the SDK in build_tools/third_party/cuda/CMakeLists.txt, if
   # on a supported platform/arch.
   if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
-    if(CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "(x86_64)|(AMD64|amd64)")
+    if(CMAKE_HOST_SYSTEM_PROCESSOR MATCHES "(x86_64)|(AMD64|amd64)|(AArch64|aarch64)")
       set(IREE_CUDA_AVAILABLE ON)
     endif()
   endif()
