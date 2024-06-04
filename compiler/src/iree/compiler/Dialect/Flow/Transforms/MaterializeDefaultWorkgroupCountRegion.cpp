@@ -27,7 +27,7 @@
 
 namespace mlir::iree_compiler::IREE::Flow {
 
-#define GEN_PASS_DEF_MATERIALIZEDEFAULTWORKGROUPCOUNTREGION
+#define GEN_PASS_DEF_MATERIALIZEDEFAULTWORKGROUPCOUNTREGIONPASS
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
 
 /// Creates the workgroup count region where the materialized computation
@@ -98,20 +98,20 @@ static void createDefaultWorkgroupCountRegion(
 }
 
 namespace {
-struct MaterializeDefaultWorkgroupCountRegion
-    : public IREE::Flow::impl::MaterializeDefaultWorkgroupCountRegionBase<
-          MaterializeDefaultWorkgroupCountRegion> {
-  using IREE::Flow::impl::MaterializeDefaultWorkgroupCountRegionBase<
-      MaterializeDefaultWorkgroupCountRegion>::
-      MaterializeDefaultWorkgroupCountRegionBase;
+struct MaterializeDefaultWorkgroupCountRegionPass
+    : public IREE::Flow::impl::MaterializeDefaultWorkgroupCountRegionPassBase<
+          MaterializeDefaultWorkgroupCountRegionPass> {
+  using IREE::Flow::impl::MaterializeDefaultWorkgroupCountRegionPassBase<
+      MaterializeDefaultWorkgroupCountRegionPass>::
+      MaterializeDefaultWorkgroupCountRegionPassBase;
   void runOnOperation() override;
 };
 } // namespace
 
 // populates the workgroup count region.
-void MaterializeDefaultWorkgroupCountRegion::runOnOperation() {
-  mlir::FunctionOpInterface funcOp = getOperation();
-  mlir::TensorDimTrackingRewriter rewriter(funcOp);
+void MaterializeDefaultWorkgroupCountRegionPass::runOnOperation() {
+  FunctionOpInterface funcOp = getOperation();
+  TensorDimTrackingRewriter rewriter(funcOp);
 
   // Populate the workgroup_count region of flow.dispatch.workgroups operation
   // that dont already have a region

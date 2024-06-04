@@ -19,27 +19,28 @@
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
 
-#define DEBUG_TYPE "iree-flow-dispatch-regions-to-workgroups"
+#define DEBUG_TYPE "iree-flow-convert-dispatch-regions-to-workgroups"
 
 namespace mlir::iree_compiler::IREE::Flow {
 
-#define GEN_PASS_DEF_DISPATCHREGIONSTOWORKGROUPSPASS
+#define GEN_PASS_DEF_CONVERTDISPATCHREGIONSTOWORKGROUPSPASS
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
 
 namespace {
-struct DispatchRegionsToWorkgroupsPass
-    : public IREE::Flow::impl::DispatchRegionsToWorkgroupsPassBase<
-          DispatchRegionsToWorkgroupsPass> {
-  using IREE::Flow::impl::DispatchRegionsToWorkgroupsPassBase<
-      DispatchRegionsToWorkgroupsPass>::DispatchRegionsToWorkgroupsPassBase;
+struct ConvertDispatchRegionsToWorkgroupsPass
+    : public IREE::Flow::impl::ConvertDispatchRegionsToWorkgroupsPassBase<
+          ConvertDispatchRegionsToWorkgroupsPass> {
+  using IREE::Flow::impl::ConvertDispatchRegionsToWorkgroupsPassBase<
+      ConvertDispatchRegionsToWorkgroupsPass>::
+      ConvertDispatchRegionsToWorkgroupsPassBase;
   void runOnOperation() override;
 };
 } // namespace
 
 // Creates a DispatchWorkgroupsOp for every DispatchRegionOp.
-void DispatchRegionsToWorkgroupsPass::runOnOperation() {
-  mlir::FunctionOpInterface funcOp = getOperation();
-  mlir::TensorDimTrackingRewriter rewriter(funcOp);
+void ConvertDispatchRegionsToWorkgroupsPass::runOnOperation() {
+  FunctionOpInterface funcOp = getOperation();
+  TensorDimTrackingRewriter rewriter(funcOp);
 
   SmallVector<IREE::Flow::DispatchRegionOp> regionOps;
   funcOp.walk([&](Flow::DispatchRegionOp op) { regionOps.push_back(op); });

@@ -219,11 +219,11 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager) {
       // Collapse dimensions of linalg Ops.
       .addPass(IREE::Flow::createCollapseDimensionsPass)
       // Convert dispatch regions into dispatch workgroups by capturing values.
-      .addPass(IREE::Flow::createDispatchRegionsToWorkgroupsPass)
+      .addPass(IREE::Flow::createConvertDispatchRegionsToWorkgroupsPass)
       // Convert tensor operations to flow.tensor ops.
-      .addPass(IREE::Flow::createTensorToFlowPass)
+      .addPass(IREE::Flow::createConvertTensorToFlowPass)
       .addPass(mlir::createCanonicalizerPass)
-      .addPass(IREE::Flow::createMaterializeDefaultWorkgroupCountRegion);
+      .addPass(IREE::Flow::createMaterializeDefaultWorkgroupCountRegionPass);
 }
 
 void addDispatchRegionCreationPasses(OpPassManager &passManager,
