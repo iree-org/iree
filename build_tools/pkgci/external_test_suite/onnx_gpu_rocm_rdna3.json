@@ -36,7 +36,6 @@
     "test_averagepool_2d_precomputed_same_upper",
     "test_averagepool_2d_same_lower",
     "test_averagepool_2d_same_upper",
-    "test_averagepool_3d_default",
     "test_averagepool_3d_dilations_large_count_include_pad_is_0_ceil_mode_is_False",
     "test_averagepool_3d_dilations_large_count_include_pad_is_0_ceil_mode_is_True",
     "test_averagepool_3d_dilations_large_count_include_pad_is_1_ceil_mode_is_False",
