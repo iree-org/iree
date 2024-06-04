@@ -890,7 +890,7 @@ getDefaultDistributedLevelTileSizes(Operation *op,
 /// Splits the tile sizes in `parallelSizes` into `reductionSizes` for the
 /// reduction loops.
 static void splitParallelAndReductionTiles(
-    linalg::LinalgOp op, SmallVectorImpl<int64_t> &parallelSizes,
+    Operation *op, SmallVectorImpl<int64_t> &parallelSizes,
     SmallVectorImpl<int64_t> &reductionSizes,
     SmallVectorImpl<bool> *parallelScalableFlags = nullptr,
     SmallVectorImpl<bool> *reductionScalableFlags = nullptr) {
@@ -900,8 +900,9 @@ static void splitParallelAndReductionTiles(
     reductionScalableFlags->assign(parallelScalableFlags->begin(),
                                    parallelScalableFlags->end());
   }
+  TilingInterface tilingOp = cast<TilingInterface>(op);
   for (auto [index, iteratorType] :
-       llvm::enumerate(op.getIteratorTypesArray())) {
+       llvm::enumerate(tilingOp.getLoopIteratorTypes())) {
     if (iteratorType == utils::IteratorType::parallel) {
       reductionSizes[index] = 0;
       if (reductionScalableFlags)
@@ -1121,9 +1122,9 @@ setMatmulRootConfig(mlir::FunctionOpInterface entryPointFn,
   SmallVector<int64_t> parallelTileSizes = vecTileSizes;
   SmallVector<int64_t> reductionTileSizes;
   SmallVector<bool> reductionScalableFlags;
-  splitParallelAndReductionTiles(
-      cast<linalg::LinalgOp>(op.getOperation()), parallelTileSizes,
-      reductionTileSizes, &parallelScalableFlags, &reductionScalableFlags);
+  splitParallelAndReductionTiles(op.getOperation(), parallelTileSizes,
+                                 reductionTileSizes, &parallelScalableFlags,
+                                 &reductionScalableFlags);
 
   if (vecPreProcStrategy == VectorPreProcStrategy::None) {
     setVectorSizesForDynamicShapes(cast<linalg::LinalgOp>(op.getOperation()),
@@ -1586,7 +1587,8 @@ static TileSizesListType getMmt4dTileSizes(linalg::LinalgOp op) {
   limitVectorTileSizes(op, vecTileSizes);
   SmallVector<int64_t> parallelTileSizes = vecTileSizes;
   SmallVector<int64_t> reductionTileSizes;
-  splitParallelAndReductionTiles(op, parallelTileSizes, reductionTileSizes);
+  splitParallelAndReductionTiles(op.getOperation(), parallelTileSizes,
+                                 reductionTileSizes);
 
   SmallVector<int64_t> vectorInnerParallelTileSizes(numLoops, 0);
   return {distTileSizes,           cacheParallelTileSizes,
@@ -1751,14 +1753,20 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
 
   // Batch, M and N (parallel dimensions) are distributed on workgroups.
   DistributionHeuristicConfig config;
-  SmallVector<int64_t> distTileSizes = getDefaultDistributedLevelTileSizes(
-      attnOp, DistributionHeuristicConfig{});
+  // // Force batch dimension tile size 1.
+  // config.minTileSizes.resize(attnOp.getIterationDomainRank(), 0);
+  // config.maxTileSizes.resize(attnOp.getIterationDomainRank(), 0);
+  // for (int dim : opInfo.getBatchDims()) {
+  //   config.minTileSizes[dim] = 1;
+  //   config.maxTileSizes[dim] = 1;
+  // }
+  SmallVector<int64_t> distTileSizes =
+      getDefaultDistributedLevelTileSizes(attnOp, config);
 
   // Batch, M and N (parallel dimensions) are distributed on workgroups.
   SmallVector<int64_t> vecTileSizes(attnOp.getIterationDomainRank(), 1);
-  // Mark reduction dimensions not to distribute.
-  for (int64_t i :
-       llvm::concat<const int64_t>(opInfo.getK1Dims(), opInfo.getK2Dims())) {
+  // Mark k1 reduction dimensions not to distribute.
+  for (int i : opInfo.getK1Dims()) {
     vecTileSizes[i] = 0;
   }
   int64_t vectorSize = getVectorSize(entryPointFn, attnOp.getOutputType());
@@ -1773,14 +1781,24 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
         /*numElem=*/tileSize, vectorSize, vectorSize);
   }
 
-  // TODO (17467): Due to a bug in TileAndDecomposeAttention, N dimension
-  // cannot be tiled. Remove this once fixed.
-  for (int64_t i : opInfo.getNDims()) {
-    distTileSizes[i] = 0;
-    vecTileSizes[i] = 0;
-  }
+  // // TODO (17467): Due to a bug in TileAndDecomposeAttention, N dimension
+  // // cannot be tiled. Remove this once fixed.
+  // for (int64_t i : opInfo.getNDims()) {
+  //   distTileSizes[i] = 0;
+  //   vecTileSizes[i] = 0;
+  // }
 
-  TileSizesListType tileSizes = {distTileSizes, vecTileSizes};
+  SmallVector<int64_t> parallelTileSizes = vecTileSizes;
+  SmallVector<int64_t> reductionTileSizes;
+  splitParallelAndReductionTiles(attnOp, parallelTileSizes, reductionTileSizes);
+
+  LLVM_DEBUG(KD_DBGS() << "Vectorization/unrolling tile sizes (parallel): "
+                       << parallelTileSizes << "\n");
+  LLVM_DEBUG(KD_DBGS() << "Vectorization/unrolling tile sizes (reduction): "
+                       << reductionTileSizes << "\n");
+
+  TileSizesListType tileSizes = {distTileSizes, parallelTileSizes,
+                                 reductionTileSizes};
 
   // TODO: (Groverkss): Tile K2 here using reduction tiling interface once we
   // have it. TileAndDecomposeAttention pass only tiles K2. I think it should
@@ -2318,7 +2336,8 @@ setConvRootConfig(mlir::FunctionOpInterface entryPointFn,
   limitVectorTileSizes(convOp, vecTileSizes);
   SmallVector<int64_t> parallelTileSizes = vecTileSizes;
   SmallVector<int64_t> reductionTileSizes;
-  splitParallelAndReductionTiles(convOp, parallelTileSizes, reductionTileSizes);
+  splitParallelAndReductionTiles(convOp.getOperation(), parallelTileSizes,
+                                 reductionTileSizes);
   setAlwaysVectorizeSizes(convOp, parallelTileSizes, reductionTileSizes);
 
   TileSizesListType tileSizes = {distTileSizes, parallelTileSizes,
@@ -2701,8 +2720,8 @@ adjustTileSizesForGenericOp(mlir::FunctionOpInterface entryPointFn,
                       vecPreProcStrategy == VectorPreProcStrategy::Masking);
   }
   limitVectorTileSizes(genericOp, vecTileSizes);
-  splitParallelAndReductionTiles(genericOp, vecTileSizes, reductionTileSizes,
-                                 &parallelScalableFlags,
+  splitParallelAndReductionTiles(genericOp.getOperation(), vecTileSizes,
+                                 reductionTileSizes, &parallelScalableFlags,
                                  &reductionScalableFlags);
   setVectorSizesForDynamicShapes(genericOp, vecPreProcStrategy, vecTileSizes,
                                  reductionTileSizes);

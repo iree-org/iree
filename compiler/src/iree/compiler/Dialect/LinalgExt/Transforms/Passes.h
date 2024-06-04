@@ -66,6 +66,8 @@ std::unique_ptr<Pass> createTileAttentionPass();
 // Creates a pass to convert the attention op into a sequence of linalg ops.
 std::unique_ptr<Pass> createDecomposeAttentionPass();
 
+std::unique_ptr<Pass> createConvertAttentionToOnlineAttentionPass();
+
 //===---------------------------------------------------------------------===//
 // Codegen Strategy passes that are moved into IREE.
 //===---------------------------------------------------------------------===//
