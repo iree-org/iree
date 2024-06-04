@@ -1753,13 +1753,6 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
 
   // Batch, M and N (parallel dimensions) are distributed on workgroups.
   DistributionHeuristicConfig config;
-  // // Force batch dimension tile size 1.
-  // config.minTileSizes.resize(attnOp.getIterationDomainRank(), 0);
-  // config.maxTileSizes.resize(attnOp.getIterationDomainRank(), 0);
-  // for (int dim : opInfo.getBatchDims()) {
-  //   config.minTileSizes[dim] = 1;
-  //   config.maxTileSizes[dim] = 1;
-  // }
   SmallVector<int64_t> distTileSizes =
       getDefaultDistributedLevelTileSizes(attnOp, config);
 
@@ -1780,13 +1773,6 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
     vecTileSizes[i] = getMaxVectorTileSize(
         /*numElem=*/tileSize, vectorSize, vectorSize);
   }
-
-  // // TODO (17467): Due to a bug in TileAndDecomposeAttention, N dimension
-  // // cannot be tiled. Remove this once fixed.
-  // for (int64_t i : opInfo.getNDims()) {
-  //   distTileSizes[i] = 0;
-  //   vecTileSizes[i] = 0;
-  // }
 
   SmallVector<int64_t> parallelTileSizes = vecTileSizes;
   SmallVector<int64_t> reductionTileSizes;
