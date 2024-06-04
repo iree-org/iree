@@ -2466,15 +2466,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#iree_build_experimental_remoting" class="md-nav__link">
-    <span class="md-ellipsis">
-      IREE_BUILD_EXPERIMENTAL_REMOTING
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#iree_hal_driver_defaults" class="md-nav__link">
     <span class="md-ellipsis">
       IREE_HAL_DRIVER_DEFAULTS
@@ -3918,15 +3909,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#iree_build_experimental_remoting" class="md-nav__link">
-    <span class="md-ellipsis">
-      IREE_BUILD_EXPERIMENTAL_REMOTING
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#iree_hal_driver_defaults" class="md-nav__link">
     <span class="md-ellipsis">
       IREE_HAL_DRIVER_DEFAULTS
@@ -4135,11 +4117,6 @@ rather <code>clang++</code>. Once set, these variables can not be changed.</p>
 </ul>
 <p>Builds the IREE TFLite Java bindings with the C API compatibility shim.
 Defaults to <code>ON</code>.</p>
-<h3 id="iree_build_experimental_remoting"><code>IREE_BUILD_EXPERIMENTAL_REMOTING</code><a class="headerlink" href="#iree_build_experimental_remoting" title="Permanent link">link</a></h3>
-<ul>
-<li>type: BOOL</li>
-</ul>
-<p>Builds experimental remoting component. Defaults to <code>OFF</code>.</p>
 <h3 id="iree_hal_driver_defaults"><code>IREE_HAL_DRIVER_DEFAULTS</code><a class="headerlink" href="#iree_hal_driver_defaults" title="Permanent link">link</a></h3>
 <ul>
 <li>type: BOOL</li>
@@ -4149,7 +4126,15 @@ Defaults to <code>ON</code>.</p>
 <ul>
 <li>type: BOOL</li>
 </ul>
-<p>Individual options enabling the build for each runtime HAL driver.</p>
+<p>Individual options enabling the build for each runtime HAL driver:</p>
+<ul>
+<li><code>IREE_HAL_DRIVER_CUDA</code></li>
+<li><code>IREE_HAL_DRIVER_HIP</code></li>
+<li><code>IREE_HAL_DRIVER_LOCAL_SYNC</code></li>
+<li><code>IREE_HAL_DRIVER_LOCAL_TASK</code></li>
+<li><code>IREE_HAL_DRIVER_VULKAN</code></li>
+<li><code>IREE_HAL_DRIVER_METAL</code></li>
+</ul>
 <h3 id="iree_target_backend_defaults"><code>IREE_TARGET_BACKEND_DEFAULTS</code><a class="headerlink" href="#iree_target_backend_defaults" title="Permanent link">link</a></h3>
 <ul>
 <li>type: BOOL</li>
@@ -4159,12 +4144,25 @@ Defaults to <code>ON</code>.</p>
 <ul>
 <li>type: BOOL</li>
 </ul>
-<p>Individual options enabling the build for each compiler target backend.</p>
+<p>Individual options enabling the build for each compiler target backend:</p>
+<ul>
+<li><code>IREE_TARGET_BACKEND_VMVX</code></li>
+<li><code>IREE_TARGET_BACKEND_LLVM_CPU</code></li>
+<li><code>IREE_TARGET_BACKEND_LLVM_CPU_WASM</code></li>
+<li><code>IREE_TARGET_BACKEND_METAL_SPIRV</code></li>
+<li><code>IREE_TARGET_BACKEND_VULKAN_SPIRV</code></li>
+<li><code>IREE_TARGET_BACKEND_ROCM</code></li>
+</ul>
 <h3 id="iree_input_"><code>IREE_INPUT_*</code><a class="headerlink" href="#iree_input_" title="Permanent link">link</a></h3>
 <ul>
 <li>type: BOOL</li>
 </ul>
-<p>Individual options enabling each set of input dialects.</p>
+<p>Individual options enabling each set of input dialects:</p>
+<ul>
+<li><code>IREE_INPUT_STABLEHLO</code></li>
+<li><code>IREE_INPUT_TORCH</code></li>
+<li><code>IREE_INPUT_TOSA</code></li>
+</ul>
 <h3 id="iree_output_format_c"><code>IREE_OUTPUT_FORMAT_C</code><a class="headerlink" href="#iree_output_format_c" title="Permanent link">link</a></h3>
 <ul>
 <li>type: BOOL</li>
