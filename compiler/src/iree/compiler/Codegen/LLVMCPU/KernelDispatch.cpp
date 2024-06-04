@@ -2007,8 +2007,8 @@ static void getTransposeX86VectorSizes(
   // Replace dims to be vectorized with the new tile sizes.
   sizes.assign(minTileSizes.begin(), minTileSizes.end());
   std::replace_if(
-      sizes.begin(), sizes.end(),
-      [](int64_t tileSize) { return tileSize > 1; }, targetVectorSize);
+      sizes.begin(), sizes.end(), [](int64_t tileSize) { return tileSize > 1; },
+      targetVectorSize);
 }
 
 /// Utility to return the transpose vector `sizes` for AArch64. Empty `sizes` on
