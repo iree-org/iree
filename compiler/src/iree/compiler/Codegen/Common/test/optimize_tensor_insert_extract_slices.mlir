@@ -19,6 +19,50 @@ func.func @fold_extract_slice_consumer_into_xfer_write(%arg0: vector<1x64x128xf1
 
 // -----
 
+// Test the case where we write out of bounds because large index 
+func.func @fold_extract_slice_consumer_into_xfer_write_2(%arg0: vector<1x64x128xf16>, %arg1: index) -> tensor<1x?x128xf16> {
+  %c0 = arith.constant 0 : index
+  %c127 = arith.constant 127 : index
+  %0 = tensor.empty() : tensor<1x64x128xf16>
+  %1 = vector.transfer_write %arg0, %0[%c0, %c0, %c127] {in_bounds = [true, true, true]} : vector<1x64x128xf16>, tensor<1x64x128xf16>
+  %extracted_slice = tensor.extract_slice %1[0, 0, 0] [1, %arg1, 128] [1, 1, 1] : tensor<1x64x128xf16> to tensor<1x?x128xf16>
+  return %extracted_slice : tensor<1x?x128xf16>
+}
+
+// CHECK-LABEL: func.func @fold_extract_slice_consumer_into_xfer_write_2
+// CHECK-SAME:    %[[VEC2:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[SZ2:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:     %[[C127:.+]] = arith.constant 127 : index
+// CHECK:         %[[INIT2:.+]] = tensor.empty(%[[SZ2]]) : tensor<1x?x128xf16>
+// CHECK:         %[[WRITE2:.+]] = vector.transfer_write %[[VEC2]], %[[INIT2]]
+// CHECK-SAME:      [%[[C0]], %[[C0]], %[[C127]]] {in_bounds = [true, false, false]}
+// CHECK-SAME:      : vector<1x64x128xf16>, tensor<1x?x128xf16>
+// CHECK:         return %[[WRITE2]]
+
+// -----
+
+// Test the case where we conservatively set in_bounds attribute
+func.func @fold_extract_slice_consumer_into_xfer_write_3(%arg0: vector<1x64x128xf16>, %arg1: index, %arg2: index) -> tensor<1x?x?xf16> {
+  %c0 = arith.constant 0 : index
+  %0 = tensor.empty() : tensor<1x64x128xf16>
+  %1 = vector.transfer_write %arg0, %0[%c0, %c0, %c0] {in_bounds = [true, true, true]} : vector<1x64x128xf16>, tensor<1x64x128xf16>
+  %extracted_slice = tensor.extract_slice %1[0, 0, 0] [1, %arg1, %arg2] [1, 1, 1] : tensor<1x64x128xf16> to tensor<1x?x?xf16>
+  return %extracted_slice : tensor<1x?x?xf16>
+}
+
+// CHECK-LABEL: func.func @fold_extract_slice_consumer_into_xfer_write_3
+// CHECK-SAME:    %[[VEC2:[a-zA-Z0-9]+]]
+// CHECK-SAME:    %[[SZ2:[a-zA-Z0-9]+]]
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
+// CHECK:         %[[INIT2:.+]] = tensor.empty(%arg1, %arg2) : tensor<1x?x?xf16>
+// CHECK:         %[[WRITE2:.+]] = vector.transfer_write %[[VEC2]], %[[INIT2]]
+// CHECK-SAME:      [%[[C0]], %[[C0]], %[[C0]]] {in_bounds = [true, false, false]}
+// CHECK-SAME:      : vector<1x64x128xf16>, tensor<1x?x?xf16>
+// CHECK:         return %[[WRITE2]]
+
+// -----
+
 #map = affine_map<()[s0] -> (s0 * 64)>
 #map1 = affine_map<()[s0] -> (s0 * 128)>
 #map2 = affine_map<()[s0] -> (s0 * -64 + 968, 64)>
