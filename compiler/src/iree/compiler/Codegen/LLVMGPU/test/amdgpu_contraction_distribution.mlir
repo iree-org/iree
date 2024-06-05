@@ -4,6 +4,8 @@
 // layoutC means and how these layouts are assigned based on the instruction
 // type.
 
+#layout = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
+
 #map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map3 = affine_map<(d0, d1, d2) -> (d1, d0)>
@@ -42,6 +44,10 @@ builtin.module attributes { transform.with_named_sequence } {
     return %output : vector<16x16xf32>
   }
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %contract = transform.structured.match ops{["vector.contract"]} in %variant_op :  (!transform.any_op) -> !transform.any_op
+    %layout16x16x16 = transform.param.constant #layout -> !transform.any_param
+    transform.iree.set_contraction_layout_attributes %contract, %layout16x16x16 : !transform.any_op, !transform.any_param
+
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     transform.iree.amdgpu_distribute_vectors %top_level_func test_conversion : (!transform.any_op) -> !transform.any_op
     transform.yield
@@ -49,6 +55,8 @@ builtin.module attributes { transform.with_named_sequence } {
 }
 
 // -----
+
+#layout = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>
 
 #map1 = affine_map<(d0, d1, d2) -> (d1, d2)>
 #map2 = affine_map<(d0, d1, d2) -> (d0, d2)>
@@ -83,6 +91,10 @@ builtin.module attributes { transform.with_named_sequence } {
     return %output : vector<32x64xf32>
   }
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %contract = transform.structured.match ops{["vector.contract"]} in %variant_op :  (!transform.any_op) -> !transform.any_op
+    %layout16x16x16 = transform.param.constant #layout -> !transform.any_param
+    transform.iree.set_contraction_layout_attributes %contract, %layout16x16x16 : !transform.any_op, !transform.any_param
+
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     transform.iree.amdgpu_distribute_vectors %top_level_func test_conversion : (!transform.any_op) -> !transform.any_op
     transform.yield
@@ -90,6 +102,8 @@ builtin.module attributes { transform.with_named_sequence } {
 }
 
 // -----
+
+#layout = #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>
 
 #map1 = affine_map<(d0, d1, d2) -> (d0, d2)>
 #map2 = affine_map<(d0, d1, d2) -> (d2, d1)>
@@ -131,6 +145,10 @@ builtin.module attributes { transform.with_named_sequence } {
     return %output : vector<32x32xf32>
   }
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %contract = transform.structured.match ops{["vector.contract"]} in %variant_op :  (!transform.any_op) -> !transform.any_op
+    %layout32x32x8 = transform.param.constant #layout -> !transform.any_param
+    transform.iree.set_contraction_layout_attributes %contract, %layout32x32x8 : !transform.any_op, !transform.any_param
+
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     transform.iree.amdgpu_distribute_vectors %top_level_func test_conversion : (!transform.any_op) -> !transform.any_op
     transform.yield
@@ -138,6 +156,8 @@ builtin.module attributes { transform.with_named_sequence } {
 }
 
 // -----
+
+#layout = #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>
 
 #map1 = affine_map<(d0, d1, d2) -> (d2, d0)>
 #map2 = affine_map<(d0, d1, d2) -> (d2, d1)>
@@ -178,6 +198,10 @@ builtin.module attributes { transform.with_named_sequence } {
     return %output : vector<64x32xf32>
   }
   transform.named_sequence @__transform_main(%variant_op: !transform.any_op {transform.readonly}) {
+    %contract = transform.structured.match ops{["vector.contract"]} in %variant_op :  (!transform.any_op) -> !transform.any_op
+    %layout32x32x8 = transform.param.constant #layout -> !transform.any_param
+    transform.iree.set_contraction_layout_attributes %contract, %layout32x32x8 : !transform.any_op, !transform.any_param
+
     %top_level_func = transform.structured.match ops{["func.func"]} in %variant_op : (!transform.any_op) -> !transform.any_op
     transform.iree.amdgpu_distribute_vectors %top_level_func test_conversion : (!transform.any_op) -> !transform.any_op
     transform.yield
