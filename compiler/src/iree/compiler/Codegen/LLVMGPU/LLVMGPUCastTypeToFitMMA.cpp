@@ -23,11 +23,8 @@ namespace mlir::iree_compiler {
 
 namespace {
 
-struct UpcastContractOutput : OpRewritePattern<vector::ContractionOp> {
-  UpcastContractOutput(MLIRContext *context,
-                       IREE::GPU::MmaInterfaceAttr intrinsic,
-                       PatternBenefit benefit = 1)
-      : OpRewritePattern(context, benefit), intrinsic(intrinsic) {}
+struct UpcastContractOutput final : OpRewritePattern<vector::ContractionOp> {
+  using OpRewritePattern::OpRewritePattern;
 
   LogicalResult matchAndRewrite(vector::ContractionOp contractOp,
                                 PatternRewriter &rewriter) const override {
@@ -40,6 +37,12 @@ struct UpcastContractOutput : OpRewritePattern<vector::ContractionOp> {
     auto srcAType = contractOp.getLhsType();
     auto srcBType = contractOp.getRhsType();
 
+    auto intrinsic = contractOp->getAttrOfType<IREE::GPU::MmaInterfaceAttr>(
+        "iree.amdgpu.mma");
+    if (!intrinsic) {
+      return rewriter.notifyMatchFailure(
+          contractOp, "could not find iree.amdgpu.mma attribute on contract");
+    }
     auto [dstAElemType, dstBElemType, dstCElemType] =
         intrinsic.getABCElementTypes();
 
@@ -67,9 +70,6 @@ struct UpcastContractOutput : OpRewritePattern<vector::ContractionOp> {
                                                  newContractOp);
     return success();
   }
-
-private:
-  IREE::GPU::MmaInterfaceAttr intrinsic;
 };
 
 struct LLVMGPUCastTypeToFitMMAPass
@@ -89,17 +89,21 @@ public:
         func->getAttrOfType<IREE::GPU::MMAScheduleAttr>(scheduleAttrName);
     if (!scheduleAttr) {
       DictionaryAttr configDict = getTranslationInfo(func).getConfiguration();
-      scheduleAttr = dyn_cast_or_null<IREE::GPU::MMAScheduleAttr>(
-          configDict.get(scheduleAttrName));
+      if (configDict) {
+        scheduleAttr = dyn_cast_or_null<IREE::GPU::MMAScheduleAttr>(
+            configDict.get(scheduleAttrName));
+      }
     }
-    if (!scheduleAttr) {
-      func.emitError() << "missing mma_schedule\n";
-      return signalPassFailure();
+
+    if (scheduleAttr) {
+      func.walk([&](vector::ContractionOp contract) {
+        contract->setAttr("iree.amdgpu.mma", scheduleAttr.getIntrinsic());
+      });
     }
 
     MLIRContext *context = &getContext();
     RewritePatternSet patterns(context);
-    patterns.add<UpcastContractOutput>(context, scheduleAttr.getIntrinsic());
+    patterns.add<UpcastContractOutput>(context);
 
     if (failed(applyPatternsAndFoldGreedily(func, std::move(patterns)))) {
       return signalPassFailure();
