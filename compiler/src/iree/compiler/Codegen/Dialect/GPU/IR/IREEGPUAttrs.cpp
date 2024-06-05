@@ -832,10 +832,6 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
     llvm::errs() << "Getting mma layouts for:\n" << contractOp << "\n";
     llvm::errs() << "For schedule: " << *this << "\n";
   });
-  if (opInfo.getOpKind() == VectorContractOpInfo::OpKind::UNKNOWN) {
-    LLVM_DEBUG({ llvm::errs() << "Unknown contraction kind\n"; });
-    return failure();
-  }
 
   auto mmaAttr = llvm::cast<MMAAttr>(getIntrinsic());
   MLIRContext *context = getContext();
