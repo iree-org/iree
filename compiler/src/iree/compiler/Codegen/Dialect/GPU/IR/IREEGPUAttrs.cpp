@@ -532,13 +532,11 @@ FailureOr<Value> MMAAttr::buildMmaOperation(OpBuilder &builder, Location loc,
   auto [aType, bType, cType] = getABCVectorTypes();
   if (aType != lhs.getType() || bType != rhs.getType() ||
       cType != acc.getType()) {
-    llvm::errs() << "mismatched type\n";
     return failure();
   }
   // Fail if the result type does not match with the expected return type of
   // the intrinsic. We expect the caller to handle type conversions externally.
   if (cType != resultType) {
-    llvm::errs() << "mismatched result type\n";
     return failure();
   }
   switch (getIntrinsic().getValue()) {
