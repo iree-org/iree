@@ -1584,8 +1584,12 @@ static ShapedValue computeMatmul(OpBuilder &builder, Location loc,
       loc, acc.getType(), SmallVector<Value>{lhs, rhs}, acc,
       SmallVector<AffineMap>{lhsMap, rhsMap, accMap}, iteratorTypes,
       [&](OpBuilder &b, Location loc, ValueRange args) {
-        // TODO: Add sign extend/trunc depending on input to match them.
-        Value mul = b.create<arith::MulFOp>(loc, args[0], args[1]);
+        // Cast inputs to match output datatype.
+        Value lhs = convertScalarToDtype(b, loc, args[0], args[2].getType(),
+                                         /*isUnsignedCast=*/false);
+        Value rhs = convertScalarToDtype(b, loc, args[1], args[2].getType(),
+                                         /*isUnsignedCast=*/false);
+        Value mul = b.create<arith::MulFOp>(loc, lhs, rhs);
         Value add = b.create<arith::AddFOp>(loc, mul, args[2]);
         b.create<linalg::YieldOp>(loc, add);
       });
