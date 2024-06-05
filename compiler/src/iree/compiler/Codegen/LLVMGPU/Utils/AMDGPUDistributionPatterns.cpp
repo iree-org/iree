@@ -72,6 +72,7 @@ struct DistributeContractions final
 
     std::optional<int64_t> kBatch = layouts[LHS].getBatchDim(lhsK);
     if (!kBatch) {
+      llvm::errs() << "Could not find row batch\n";
       return failure();
     }
 
