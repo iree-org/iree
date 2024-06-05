@@ -1523,7 +1523,7 @@ static ShapedValue scaleValueInPlace(OpBuilder &builder, Location loc,
       [&](OpBuilder &b, Location loc, ValueRange args) {
         // Convert scale to the same datatype as input.
         Value scale = convertScalarToDtype(b, loc, args[0], args[1].getType(),
-                                        /*isUnsignedCast=*/false);
+                                           /*isUnsignedCast=*/false);
         Value result = b.create<arith::MulFOp>(loc, scale, args[1]);
         b.create<linalg::YieldOp>(loc, result);
       });
