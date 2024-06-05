@@ -159,7 +159,7 @@ py::str HalAllocator::FormattedStatistics() {
 
 py::object HalAllocator::AllocateBufferCopy(
     int memory_type, int allowed_usage, HalDevice& device, py::object buffer,
-    std::optional<iree_hal_element_types_t> element_type) {
+    std::optional<uint64_t> raw_element_type) {
   IREE_TRACE_SCOPE_NAMED("HalAllocator::AllocateBufferCopy");
   // Request a view of the buffer (use the raw python C API to avoid
   // some allocation and copying at the pybind level).
@@ -196,13 +196,15 @@ py::object HalAllocator::AllocateBufferCopy(
   }
   CheckApiStatus(status, "Failed to allocate device visible buffer");
 
-  if (!element_type) {
+  if (!raw_element_type) {
     return py::cast(HalBuffer::StealFromRawPtr(hal_buffer),
                     py::rv_policy::move);
   }
 
   // Create the buffer_view. (note that numpy shape is ssize_t, so we need to
   // copy).
+  iree_hal_element_types_t element_type =
+      (iree_hal_element_types_t)*raw_element_type;
   iree_hal_encoding_type_t encoding_type =
       IREE_HAL_ENCODING_TYPE_DENSE_ROW_MAJOR;
   std::vector<iree_hal_dim_t> dims(py_view.ndim);
@@ -210,7 +212,7 @@ py::object HalAllocator::AllocateBufferCopy(
   iree_hal_buffer_view_t* hal_buffer_view;
   CheckApiStatus(
       iree_hal_buffer_view_create(
-          hal_buffer, dims.size(), dims.data(), *element_type, encoding_type,
+          hal_buffer, dims.size(), dims.data(), element_type, encoding_type,
           iree_hal_allocator_host_allocator(raw_ptr()), &hal_buffer_view),
       "Error allocating buffer_view");
   iree_hal_buffer_release(hal_buffer);
@@ -1082,12 +1084,12 @@ void SetupHalBindings(nanobind::module_ m) {
       .value("DEVICE_VISIBLE", IREE_HAL_MEMORY_TYPE_DEVICE_VISIBLE)
       .value("DEVICE_LOCAL", IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL)
       .export_values()
-      .def("__or__",
-           [](enum iree_hal_memory_type_bits_t self,
-              enum iree_hal_memory_type_bits_t other) { return self | other; })
+      .def("__or__", [](uint64_t self, uint64_t other) { return self | other; })
       .def("__and__",
-           [](enum iree_hal_memory_type_bits_t self,
-              enum iree_hal_memory_type_bits_t other) { return self & other; });
+           [](uint64_t self, uint64_t other) { return self & other; })
+      .def("__int__", [](enum iree_hal_memory_type_bits_t self) {
+        return (uint64_t)self;
+      });
 
   py::enum_<enum iree_hal_buffer_compatibility_bits_t>(m, "BufferCompatibility")
       .value("NONE", IREE_HAL_BUFFER_COMPATIBILITY_NONE)
@@ -1097,14 +1099,11 @@ void SetupHalBindings(nanobind::module_ m) {
       .value("QUEUE_TRANSFER", IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_TRANSFER)
       .value("QUEUE_DISPATCH", IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH)
       .export_values()
-      .def("__or__",
-           [](enum iree_hal_buffer_compatibility_bits_t self,
-              enum iree_hal_buffer_compatibility_bits_t other) {
-             return self | other;
-           })
-      .def("__and__", [](enum iree_hal_buffer_compatibility_bits_t self,
-                         enum iree_hal_buffer_compatibility_bits_t other) {
-        return self & other;
+      .def("__or__", [](uint64_t self, uint64_t other) { return self | other; })
+      .def("__and__",
+           [](uint64_t self, uint64_t other) { return self & other; })
+      .def("__int__", [](enum iree_hal_buffer_compatibility_bits_t self) {
+        return (uint64_t)self;
       });
 
   py::enum_<enum iree_hal_buffer_usage_bits_t>(m, "BufferUsage")
@@ -1138,14 +1137,12 @@ void SetupHalBindings(nanobind::module_ m) {
       .value("MAPPING", IREE_HAL_BUFFER_USAGE_MAPPING)
       .value("DEFAULT", IREE_HAL_BUFFER_USAGE_DEFAULT)
       .export_values()
-      .def("__or__",
-           [](enum iree_hal_buffer_usage_bits_t self,
-              enum iree_hal_buffer_usage_bits_t other) {
-             return (enum iree_hal_buffer_usage_bits_t)(self | other);
-           })
+      .def("__or__", [](enum iree_hal_buffer_usage_bits_t self,
+                        uint64_t other) { return self | other; })
       .def("__and__", [](enum iree_hal_buffer_usage_bits_t self,
-                         enum iree_hal_buffer_usage_bits_t other) {
-        return (enum iree_hal_buffer_usage_bits_t)(self & other);
+                         uint64_t other) { return self & other; })
+      .def("__int__", [](enum iree_hal_buffer_usage_bits_t self) {
+        return (uint64_t)self;
       });
 
   py::enum_<enum iree_hal_memory_access_bits_t>(m, "MemoryAccess")
@@ -1156,17 +1153,32 @@ void SetupHalBindings(nanobind::module_ m) {
       .value("DISCARD_WRITE", IREE_HAL_MEMORY_ACCESS_DISCARD_WRITE)
       .value("ALL", IREE_HAL_MEMORY_ACCESS_ALL)
       .export_values()
-      .def(
-          "__or__",
-          [](enum iree_hal_memory_access_bits_t self,
-             enum iree_hal_memory_access_bits_t other) { return self | other; })
-      .def("__and__", [](enum iree_hal_memory_access_bits_t self,
-                         enum iree_hal_memory_access_bits_t other) {
-        return self & other;
+      .def("__or__", [](uint64_t self, uint64_t other) { return self | other; })
+      .def("__and__",
+           [](uint64_t self, uint64_t other) { return self & other; })
+      .def("__int__", [](enum iree_hal_memory_access_bits_t self) {
+        return (uint64_t)self;
       });
 
-  py::enum_<enum iree_hal_element_types_t>(m, "HalElementType")
-      .value("NONE", IREE_HAL_ELEMENT_TYPE_NONE)
+  // Use compatibility type to enable def_static.
+  // See: https://github.com/wjakob/nanobind/issues/597
+  auto hal_element_type = nanobind1_compat_enum_<enum iree_hal_element_types_t>(
+      m, "HalElementType");
+  hal_element_type
+      .def_static("map_to_dtype",
+                  [](iree_hal_element_type_t element_type) {
+                    int typenum = numpy::ConvertHalElementTypeToNumPyTypeNum(
+                        element_type);
+                    return numpy::DescrNewFromType(typenum);
+                  })
+      .def_static("is_byte_aligned",
+                  [](iree_hal_element_type_t element_type) {
+                    return iree_hal_element_is_byte_aligned(element_type);
+                  })
+      .def_static("dense_byte_count", [](iree_hal_element_type_t element_type) {
+        return iree_hal_element_dense_byte_count(element_type);
+      });
+  hal_element_type.value("NONE", IREE_HAL_ELEMENT_TYPE_NONE)
       .value("OPAQUE_8", IREE_HAL_ELEMENT_TYPE_OPAQUE_8)
       .value("OPAQUE_16", IREE_HAL_ELEMENT_TYPE_OPAQUE_16)
       .value("OPAQUE_32", IREE_HAL_ELEMENT_TYPE_OPAQUE_32)
@@ -1194,19 +1206,8 @@ void SetupHalBindings(nanobind::module_ m) {
       .value("COMPLEX_64", IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_64)
       .value("COMPLEX_128", IREE_HAL_ELEMENT_TYPE_COMPLEX_FLOAT_128)
       .export_values()
-      .def_static("map_to_dtype",
-                  [](iree_hal_element_type_t element_type) {
-                    int typenum = numpy::ConvertHalElementTypeToNumPyTypeNum(
-                        element_type);
-                    return numpy::DescrNewFromType(typenum);
-                  })
-      .def_static("is_byte_aligned",
-                  [](iree_hal_element_type_t element_type) {
-                    return iree_hal_element_is_byte_aligned(element_type);
-                  })
-      .def_static("dense_byte_count", [](iree_hal_element_type_t element_type) {
-        return iree_hal_element_dense_byte_count(element_type);
-      });
+      .def("__int__",
+           [](enum iree_hal_element_types_t self) { return (uint64_t)self; });
 
   py::class_<HalDevice>(m, "HalDevice")
       .def_prop_ro(

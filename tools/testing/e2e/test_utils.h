@@ -17,19 +17,11 @@
 extern "C" {
 #endif  // __cplusplus
 
-IREE_FLAG(bool, require_exact_results, true,
-          "Requires floating point result elements to match exactly.");
-IREE_FLAG(
-    float, acceptable_fp_delta, 1e-5f,
-    "Maximum absolute difference allowed with inexact floating point results.");
-IREE_FLAG(
-    int32_t, max_elements_to_check, 10000,
-    "Maximum number of tensor elements to check for the given test. For larger "
-    "buffers, only every n-th element will be checked for some n chosed to "
-    "stay just under that threshold and to avoid being a divisor of the inner "
-    "dimension size to avoid special patterns. As the check uses a slow "
-    "reference implementation, this is a trade-off between test latency and "
-    "coverage. The value 0 means check all elements.");
+bool iree_test_utils_require_exact_results(void);
+
+float iree_test_utils_acceptable_fb_delta(void);
+
+int32_t iree_test_utils_max_elements_to_check(void);
 
 const char* iree_test_utils_emoji(bool good);
 

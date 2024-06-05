@@ -14,6 +14,7 @@
 #include "iree/hal/drivers/hip/api.h"
 #include "iree/hal/drivers/hip/dynamic_symbols.h"
 #include "iree/hal/drivers/hip/hip_device.h"
+#include "iree/hal/drivers/hip/rccl_dynamic_symbols.h"
 #include "iree/hal/drivers/hip/status_util.h"
 
 // Maximum device name length supported by the HIP HAL driver.
@@ -21,7 +22,7 @@
 
 // Utility macros to convert between hipDevice_t and iree_hal_device_id_t.
 #define IREE_HIPDEVICE_TO_DEVICE_ID(device) (iree_hal_device_id_t)((device) + 1)
-#define IREE_DEVICE_ID_TO_HIPDEVICE(device_id) (hipDevice_t)((device_id)-1)
+#define IREE_DEVICE_ID_TO_HIPDEVICE(device_id) (hipDevice_t)((device_id) - 1)
 
 typedef struct iree_hal_hip_driver_t {
   // Abstract resource used for injecting reference counting and vtable;
@@ -34,6 +35,8 @@ typedef struct iree_hal_hip_driver_t {
   iree_string_view_t identifier;
   // HIP driver API dynamic symbols to interact with the HIP system.
   iree_hal_hip_dynamic_symbols_t hip_symbols;
+  // NCCL API dynamic symbols to use collectives (multi-gpu/multi-node).
+  iree_hal_hip_nccl_dynamic_symbols_t nccl_symbols;
 
   // The default parameters for creating devices using this driver.
   iree_hal_hip_device_params_t device_params;
@@ -77,6 +80,15 @@ static iree_status_t iree_hal_hip_driver_create_internal(
       host_allocator, options->hip_lib_search_path_count,
       options->hip_lib_search_paths, &driver->hip_symbols);
 
+  if (iree_status_is_ok(status)) {
+    // Try to dynamically load NCCL. This will fail if NCCL is unavailable or
+    // incompatible. We only fail on unavailability when the user tries to
+    // create a channel and otherwise defer reporting.
+    status = iree_hal_hip_nccl_dynamic_symbols_initialize(
+        host_allocator, &driver->hip_symbols, &driver->nccl_symbols);
+    if (iree_status_is_unavailable(status)) status = iree_status_ignore(status);
+  }
+
   memcpy(&driver->device_params, device_params, sizeof(driver->device_params));
 
   if (iree_status_is_ok(status)) {
@@ -110,6 +122,7 @@ static void iree_hal_hip_driver_destroy(iree_hal_driver_t* base_driver) {
   iree_allocator_t host_allocator = driver->host_allocator;
   IREE_TRACE_ZONE_BEGIN(z0);
 
+  iree_hal_hip_nccl_dynamic_symbols_deinitialize(&driver->nccl_symbols);
   iree_hal_hip_dynamic_symbols_deinitialize(&driver->hip_symbols);
   iree_allocator_free(host_allocator, driver);
 
@@ -246,20 +259,12 @@ static iree_status_t iree_hal_hip_driver_dump_device_info(
     IREE_RETURN_IF_ERROR(status);
   }
 
-  // Report driver properties.
-  if (!driver->hip_symbols.hipGetDevicePropertiesR0600) {
-    // ROCm 6.0 release changes the hipDeviceProp_t struct and would need to use
-    // the matching hipGetDevicePropertiesR0600() API to query it. This symbol
-    // is not available in earlier versions.
-    return iree_ok_status();
-  }
-
   hipDevice_t device = IREE_DEVICE_ID_TO_HIPDEVICE(device_id);
 
-  hipDeviceProp_t prop;
+  hipDeviceProp_tR0000 prop;
   IREE_HIP_RETURN_IF_ERROR(&driver->hip_symbols,
-                           hipGetDevicePropertiesR0600(&prop, device),
-                           "hipGetDevicePropertiesR0600");
+                           hipGetDeviceProperties(&prop, device),
+                           "hipGetDeviceProperties");
 
   // GPU capabilities and architecture.
   IREE_RETURN_IF_ERROR(iree_string_builder_append_format(
@@ -371,7 +376,7 @@ static iree_status_t iree_hal_hip_driver_create_device_by_id(
   // Attempt to create the device now.
   iree_status_t status = iree_hal_hip_device_create(
       base_driver, device_name, &driver->device_params, &driver->hip_symbols,
-      device, host_allocator, out_device);
+      &driver->nccl_symbols, device, host_allocator, out_device);
 
   IREE_TRACE_ZONE_END(z0);
   return status;

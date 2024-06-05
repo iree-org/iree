@@ -24,6 +24,7 @@
 #include "mlir/Dialect/Bufferization/Transforms/Passes.h"
 #include "mlir/Dialect/Bufferization/Transforms/Transforms.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
@@ -72,6 +73,7 @@ public:
                 arith::ArithDialect,
                 bufferization::BufferizationDialect,
                 func::FuncDialect,
+                gpu::GPUDialect,
                 IREE::Flow::FlowDialect,
                 IREE::LinalgExt::IREELinalgExtDialect,
                 IREE::Util::UtilDialect,
@@ -256,6 +258,14 @@ void addIREEComprehensiveBufferizePasses(
   funcPassManager.addPass(
       createIREEComprehensiveBufferizePass(allocationFn, memCpyFn));
   addIREEPostBufferizationPasses(funcPassManager);
+}
+
+void addConstantBufferizePasses(OpPassManager &funcPassManager) {
+  OneShotBufferizationOptions options;
+  options.copyBeforeWrite = true;
+  options.enforceAliasingInvariants = false;
+  options.opFilter.allowOperation(arith::ConstantOp::getOperationName());
+  funcPassManager.addPass(bufferization::createOneShotBufferizePass(options));
 }
 
 } // namespace mlir::iree_compiler

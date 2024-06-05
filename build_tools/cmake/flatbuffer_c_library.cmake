@@ -130,7 +130,7 @@ function(flatbuffer_c_library)
   iree_install_targets(
     TARGETS ${_NAME}
   )
-  
+
   # Alias the iree_package_name library to iree::package::name.
   # This lets us more clearly map to Bazel and makes it possible to
   # disambiguate the underscores in paths vs. the separators.

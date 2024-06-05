@@ -611,7 +611,7 @@ module {
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<12xi32>>
     %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:tensor<3x4xi32>>
     %2 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [12], strides = [1] : !flow.dispatch.tensor<readonly:tensor<12xi32>> -> tensor<12xi32>
-    %3 = tensor.expand_shape %2 [[0, 1]] : tensor<12xi32> into tensor<3x4xi32>
+    %3 = tensor.expand_shape %2 [[0, 1]] output_shape [3, 4] : tensor<12xi32> into tensor<3x4xi32>
     flow.dispatch.tensor.store %3, %1, offsets = [0, 0], sizes = [3, 4], strides = [1, 1] : tensor<3x4xi32> -> !flow.dispatch.tensor<writeonly:tensor<3x4xi32>>
     return
   }
@@ -631,7 +631,7 @@ module {
     %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:tensor<3x4xi32>>
     %2 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [3, 4], strides = [1, 1] : !flow.dispatch.tensor<writeonly:tensor<3x4xi32>> -> tensor<3x4xi32>
     %3 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [12], strides = [1] : !flow.dispatch.tensor<readonly:tensor<12xi32>> -> tensor<12xi32>
-    %4 = tensor.expand_shape %3 [[0, 1]] : tensor<12xi32> into tensor<3x4xi32>
+    %4 = tensor.expand_shape %3 [[0, 1]] output_shape [3, 4] : tensor<12xi32> into tensor<3x4xi32>
     %5 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%4 : tensor<3x4xi32>) outs(%2 : tensor<3x4xi32>) {
     ^bb0(%arg0: i32, %arg1: i32):
       %6 = arith.addi %arg0, %arg0 : i32
@@ -659,7 +659,7 @@ module {
     %2 = flow.dispatch.tensor.load %1, offsets = [0, 0], sizes = [3, 4], strides = [1, 1] : !flow.dispatch.tensor<writeonly:tensor<3x4xi32>> -> tensor<3x4xi32>
     %3 = hal.interface.binding.subspan set(0) binding(2) type(storage_buffer) : !flow.dispatch.tensor<writeonly:tensor<3x4xi32>>
     %4 = flow.dispatch.tensor.load %0, offsets = [0], sizes = [12], strides = [1] : !flow.dispatch.tensor<readonly:tensor<12xi32>> -> tensor<12xi32>
-    %5 = tensor.expand_shape %4 [[0, 1]] : tensor<12xi32> into tensor<3x4xi32>
+    %5 = tensor.expand_shape %4 [[0, 1]] output_shape [3, 4] : tensor<12xi32> into tensor<3x4xi32>
     %6 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%5 : tensor<3x4xi32>) outs(%2 : tensor<3x4xi32>) {
     ^bb0(%arg0: i32, %arg1: i32):
       %7 = arith.addi %arg0, %arg0 : i32
@@ -688,7 +688,7 @@ module {
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<3x4xi32>>
     %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<writeonly:tensor<12xi32>>
     %2 = flow.dispatch.tensor.load %1, offsets = [0], sizes = [12], strides = [1] : !flow.dispatch.tensor<writeonly:tensor<12xi32>> -> tensor<12xi32>
-    %3 = tensor.expand_shape %2 [[0, 1]] : tensor<12xi32> into tensor<3x4xi32>
+    %3 = tensor.expand_shape %2 [[0, 1]] output_shape [3, 4] : tensor<12xi32> into tensor<3x4xi32>
     %4 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [3, 4], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<3x4xi32>> -> tensor<3x4xi32>
     %5 = linalg.generic {indexing_maps = [#map, #map], iterator_types = ["parallel", "parallel"]} ins(%4 : tensor<3x4xi32>) outs(%3 : tensor<3x4xi32>) {
     ^bb0(%arg0: i32, %arg1: i32):
@@ -2571,3 +2571,66 @@ func.func @sub_byte_bufferize_with_offset() {
 //       CHECK:   %[[C64:.+]] = arith.constant 64 : index
 //       CHECK:   hal.interface.binding.subspan set(0) binding(0)
 //  CHECK-SAME:       memref<64xi4, strided<[1], offset: 128>
+
+// -----
+
+func.func @tensor_barrier() -> vector<2xf32> {
+  %cst = arith.constant dense<0.0> : vector<2xf32>
+  %cst0 = arith.constant 0.0 : f32
+  %c0 = arith.constant 0 : index
+  %alloc = bufferization.alloc_tensor() : tensor<2xf32>
+  %tmp = vector.transfer_write %cst, %alloc[%c0] {in_bounds = [true]} : vector<2xf32>, tensor<2xf32>
+  %barrier = iree_gpu.value_barrier %tmp : tensor<2xf32>
+  %res = vector.transfer_read %barrier[%c0], %cst0 {in_bounds = [true]} : tensor<2xf32>, vector<2xf32>
+  return %res : vector<2xf32>
+}
+// CHECK-LABEL: func @tensor_barrier()
+//       CHECK:   %[[ALLOC:.+]] = memref.alloc() : memref<2xf32>
+//       CHECK:   vector.transfer_write %{{.*}}, %[[ALLOC]]
+//  CHECK-NEXT:   gpu.barrier
+//  CHECK-NEXT:   vector.transfer_read %[[ALLOC]]
+
+// -----
+
+func.func @tensor_barrier_in_loop() -> vector<2xf32> {
+  %cst = arith.constant dense<0.0> : vector<2xf32>
+  %cst0 = arith.constant 0.0 : f32
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c10 = arith.constant 10 : index
+  %alloc = bufferization.alloc_tensor() : tensor<2xf32>
+  %loop = scf.for %arg0 = %c0 to %c10 step %c1 iter_args(%init = %alloc) -> tensor<2xf32> {
+    %tmp = vector.transfer_write %cst, %init[%c0] {in_bounds = [true]} : vector<2xf32>, tensor<2xf32>
+    %barrier = iree_gpu.value_barrier %tmp : tensor<2xf32>
+    scf.yield %barrier : tensor<2xf32>
+  }
+  %res = vector.transfer_read %loop[%c0], %cst0 {in_bounds = [true]} : tensor<2xf32>, vector<2xf32>
+  return %res : vector<2xf32>
+}
+// CHECK-LABEL: func @tensor_barrier_in_loop()
+//       CHECK:   %[[ALLOC:.+]] = memref.alloc() : memref<2xf32>
+//       CHECK:   scf.for
+//  CHECK-NEXT:     vector.transfer_write %{{.*}}, %[[ALLOC]]
+//  CHECK-NEXT:     gpu.barrier
+//  CHECK-NEXT:   }
+//       CHECK:   vector.transfer_read %[[ALLOC]]
+
+// -----
+
+func.func @vector_barrier() -> vector<2xf32> {
+  %cst = arith.constant dense<0.0> : vector<2xf32>
+  %cst0 = arith.constant 0.0 : f32
+  %c0 = arith.constant 0 : index
+  %alloc = bufferization.alloc_tensor() : tensor<2xf32>
+  %tmp = vector.transfer_write %cst, %alloc[%c0] {in_bounds = [true]} : vector<2xf32>, tensor<2xf32>
+  %read = vector.transfer_read %tmp[%c0], %cst0 {in_bounds = [true]} : tensor<2xf32>, vector<2xf32>
+  %barrier = iree_gpu.value_barrier %read : vector<2xf32>
+  return %barrier : vector<2xf32>
+}
+
+// Verify that the dual-modes of `value_barrier` are adhered to.
+// CHECK-LABEL: func @vector_barrier()
+//       CHECK:   %[[ALLOC:.+]] = memref.alloc() : memref<2xf32>
+//       CHECK:   vector.transfer_write %{{.*}}, %[[ALLOC]]
+//  CHECK-NEXT:   %[[RD:.+]] = vector.transfer_read %[[ALLOC]]
+//  CHECK-NEXT:   iree_gpu.value_barrier %[[RD]]

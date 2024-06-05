@@ -7,7 +7,7 @@ export INSTALL_DIR_URL="${INSTALL_DIR_GCS_ARTIFACT}"
 export E2E_TEST_ARTIFACTS_DIR_URL="${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}"
 # Directory of benchmark tool binaries:
 export BENCHMARK_TOOLS_DIR_URL="${BENCHMARK_TOOLS_GCS_ARTIFACT_DIR}"
-# Directory of execution benchmark results and traces:
+# Directory of execution benchmark results:
 export EXECUTION_BENCHMARK_RESULTS_DIR_URL="${EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR}"
 # Compilation benchmark results:
 export COMPILATION_BENCHMARK_RESULTS_URL="${COMPILATION_BENCHMARK_RESULTS_GCS_ARTIFACT}"
@@ -37,7 +37,7 @@ gcloud storage cp -r "${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR}/*" /tmp/iree_e2e_te
 ```
 
 ```sh
-# Download execution benchmark results and traces
+# Download execution benchmark results
 mkdir /tmp/iree_benchmark_results
 gcloud storage cp -r "${EXECUTION_BENCHMARK_RESULTS_GCS_ARTIFACT_DIR}/*" /tmp/iree_benchmark_results
 ```

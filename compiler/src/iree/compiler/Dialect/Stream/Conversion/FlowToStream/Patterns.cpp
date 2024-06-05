@@ -46,7 +46,8 @@ public:
         getContext(), IREE::Stream::Lifetime::Constant);
     auto affinityAttr = IREE::Stream::AffinityAttr::lookup(constantOp);
     auto newOp = rewriter.create<IREE::Stream::TensorConstantOp>(
-        constantOp.getLoc(), constantType, constantOp.getValue(),
+        constantOp.getLoc(), constantType,
+        convertAttributeToStream(constantOp.getValue()),
         TypeAttr::get(constantOp.getType()), ValueRange{}, affinityAttr);
 
     // Transfer to unknown lifetime.
@@ -94,7 +95,8 @@ public:
         getContext(), IREE::Stream::Lifetime::Constant);
     auto affinityAttr = IREE::Stream::AffinityAttr::lookup(constantOp);
     auto newOp = rewriter.create<IREE::Stream::TensorConstantOp>(
-        constantOp.getLoc(), constantType, constantOp.getValue(),
+        constantOp.getLoc(), constantType,
+        convertAttributeToStream(constantOp.getValue()),
         TypeAttr::get(resultType), dynamicDims, affinityAttr);
 
     // Transfer to unknown lifetime.

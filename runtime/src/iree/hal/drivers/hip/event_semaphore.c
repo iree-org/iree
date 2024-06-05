@@ -255,9 +255,13 @@ bool iree_hal_hip_semaphore_acquire_event_host_wait(
   return *out_event != NULL;
 }
 
-static iree_status_t iree_hal_hip_semaphore_wait(
+// Checks if the semaphore has to wait to reach `value`.
+// If it has to wait, then acquires a wait timepoint and returns it.
+// If we don't need to wait, then *out_timepoint is set to NULL.
+static iree_status_t iree_hal_hip_semaphore_try_wait_or_acquire_wait_timepoint(
     iree_hal_semaphore_t* base_semaphore, uint64_t value,
-    iree_timeout_t timeout) {
+    iree_timeout_t timeout, iree_hal_hip_timepoint_t** out_timepoint) {
+  *out_timepoint = NULL;
   iree_hal_hip_semaphore_t* semaphore =
       iree_hal_hip_semaphore_cast(base_semaphore);
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -285,22 +289,39 @@ static iree_status_t iree_hal_hip_semaphore_wait(
   // Slow path: acquire a timepoint. This should happen inside of the lock too.
   // If not locked the semaphore may be signal before acquiring a timepoint.
   // Then we would miss the signal.
-  iree_hal_hip_timepoint_t* timepoint = NULL;
   iree_status_t status = iree_hal_hip_semaphore_acquire_timepoint_host_wait(
-      semaphore, value, timeout, &timepoint);
-  if (IREE_UNLIKELY(!iree_status_is_ok(status))) {
-    iree_slim_mutex_unlock(&semaphore->mutex);
-    IREE_TRACE_ZONE_END(z0);
-    return status;
-  }
+      semaphore, value, timeout, out_timepoint);
 
   iree_slim_mutex_unlock(&semaphore->mutex);
+
+  IREE_TRACE_ZONE_END(z0);
+  return status;
+}
+
+static iree_status_t iree_hal_hip_semaphore_wait(
+    iree_hal_semaphore_t* base_semaphore, uint64_t value,
+    iree_timeout_t timeout) {
+  iree_hal_hip_semaphore_t* semaphore =
+      iree_hal_hip_semaphore_cast(base_semaphore);
+  IREE_TRACE_ZONE_BEGIN(z0);
+
+  iree_hal_hip_timepoint_t* timepoint;
+  IREE_RETURN_AND_END_ZONE_IF_ERROR(
+      z0, iree_hal_hip_semaphore_try_wait_or_acquire_wait_timepoint(
+              base_semaphore, value, timeout, &timepoint));
+  if (!timepoint) {
+    // We don't need to wait on a timepoint.
+    // The wait condition is satisfied.
+    IREE_TRACE_ZONE_END(z0);
+    return iree_ok_status();
+  }
 
   // Wait until the timepoint resolves.
   // If satisfied the timepoint is automatically cleaned up and we are done. If
   // the deadline is reached before satisfied then we have to clean it up.
   iree_time_t deadline_ns = iree_timeout_as_deadline_ns(timeout);
-  status = iree_wait_one(&timepoint->timepoint.host_wait, deadline_ns);
+  iree_status_t status =
+      iree_wait_one(&timepoint->timepoint.host_wait, deadline_ns);
   if (!iree_status_is_ok(status)) {
     iree_hal_semaphore_cancel_timepoint(&semaphore->base, &timepoint->base);
   }
@@ -343,35 +364,24 @@ iree_status_t iree_hal_hip_semaphore_multi_wait(
   if (iree_status_is_ok(status)) {
     memset(timepoints, 0, total_timepoint_size);
     for (iree_host_size_t i = 0; i < semaphore_list.count && needs_wait; ++i) {
-      uint64_t current_value = 0;
-      status = iree_hal_hip_semaphore_query(semaphore_list.semaphores[i],
-                                            &current_value);
+      iree_hal_hip_timepoint_t* timepoint;
+      status = iree_hal_hip_semaphore_try_wait_or_acquire_wait_timepoint(
+          semaphore_list.semaphores[i], semaphore_list.payload_values[i],
+          timeout, &timepoint);
       if (!iree_status_is_ok(status)) break;
-
-      if (current_value >= semaphore_list.payload_values[i]) {
-        // Fast path: already satisfied.
-        // If in ANY wait mode, this is sufficient and we don't actually need
-        // to wait. This also skips acquiring timepoints for any remaining
-        // semaphores. We still exit normally otherwise so as to cleanup
-        // any timepoints already acquired.
-        if (wait_mode == IREE_HAL_WAIT_MODE_ANY) needs_wait = false;
-      } else {
-        iree_hal_hip_semaphore_t* semaphore =
-            iree_hal_hip_semaphore_cast(semaphore_list.semaphores[i]);
-
-        // Slow path: get a native host wait handle for the timepoint. This
-        // should happen outside of the lock given that acquiring has its own
-        // internal locks.
-        iree_hal_hip_timepoint_t* timepoint = NULL;
-        status = iree_hal_hip_semaphore_acquire_timepoint_host_wait(
-            semaphore, semaphore_list.payload_values[i], timeout, &timepoint);
-        if (iree_status_is_ok(status)) {
-          timepoints[timepoint_count++] = timepoint;
-          status =
-              iree_wait_set_insert(wait_set, timepoint->timepoint.host_wait);
+      if (!timepoint) {
+        // We don't need to wait on a timepoint.
+        // The wait condition is satisfied.
+        if (wait_mode == IREE_HAL_WAIT_MODE_ANY) {
+          needs_wait = false;
+          break;
         }
-        if (!iree_status_is_ok(status)) break;
+        continue;
       }
+
+      timepoints[timepoint_count++] = timepoint;
+      status = iree_wait_set_insert(wait_set, timepoint->timepoint.host_wait);
+      if (!iree_status_is_ok(status)) break;
     }
   }
 

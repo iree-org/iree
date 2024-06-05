@@ -16,7 +16,7 @@ module @hoist_simple_const_expr {
     %1 = arith.constant 1 : i32
     // CHECK-NOT: arith.constant
     // CHECK-NOT: iree_unregistered.const_expr
-    // CHECK: %[[VAL:.*]] = util.global.load @[[HOISTED_SYM]] : i32
+    // CHECK: %[[VAL:.*]] = util.global.load immutable @[[HOISTED_SYM]] : i32
     // CHECK: util.return %[[VAL]]
     %2 = "iree_unregistered.const_expr"(%0, %1) : (i32, i32) -> i32
     util.return %2 : i32
@@ -141,8 +141,8 @@ module @hoist_tree_const_expr {
 
   // CHECK: util.func public @main
   util.func public @main() -> (i32, i32, i32) {
-    // CHECK-DAG: %[[LOAD_HOISTED_0:.*]] = util.global.load @[[HOISTED_0]] : i32
-    // CHECK-DAG: %[[LOAD_HOISTED_1:.*]] = util.global.load @[[HOISTED_1]] : i32
+    // CHECK-DAG: %[[LOAD_HOISTED_0:.*]] = util.global.load immutable @[[HOISTED_0]] : i32
+    // CHECK-DAG: %[[LOAD_HOISTED_1:.*]] = util.global.load immutable @[[HOISTED_1]] : i32
     // CHECK-DAG: %[[RESULT:.*]] = "iree_unregistered.var_expr"(%[[LOAD_HOISTED_1]])
     // CHECK: util.return %[[LOAD_HOISTED_0]], %[[LOAD_HOISTED_1]], %[[RESULT]]
     %0 = arith.constant 0 : i32
@@ -171,7 +171,7 @@ module @hoist_const_expr_with_ineligible_consumer {
   // CHECK: }
   // CHECK: util.func public @main
   util.func public @main() -> i32 {
-    // CHECK-DAG: %[[LOAD_HOISTED_0:.*]] = util.global.load @[[HOISTED_0]] : i32
+    // CHECK-DAG: %[[LOAD_HOISTED_0:.*]] = util.global.load immutable @[[HOISTED_0]] : i32
     // CHECK-DAG: %[[RESULT:.*]] = "iree_unregistered.var_expr"(%[[LOAD_HOISTED_0]])
     // CHECK: util.return %[[RESULT]]
     %0 = arith.constant 0 : i32
@@ -201,8 +201,8 @@ module @hoist_non_leaf_const_expr {
   // CHECK: }
   // CHECK: util.func public @main
   util.func public @main() -> (i32) {
-    // CHECK: %[[LOAD_HOISTED:.*]] = util.global.load @[[HOISTED]] : i32
-    // CHECK: %[[RESULT:.*]] = "iree_unregistered.non_leaf_const_expr"(%hoisted)
+    // CHECK: %[[LOAD_HOISTED:.*]] = util.global.load immutable @[[HOISTED]] : i32
+    // CHECK: %[[RESULT:.*]] = "iree_unregistered.non_leaf_const_expr"(%[[LOAD_HOISTED]])
     // CHECK: util.return %[[RESULT]]
     %0 = arith.constant 0 : i32
     %1 = arith.constant 1 : i32
@@ -236,7 +236,7 @@ module @hoist_implicit_capture {
     %1 = arith.constant 1 : i32
     // CHECK-NOT: arith.constant
     // CHECK-NOT: iree_unregistered.const_expr
-    // CHECK: %[[VAL:.*]] = util.global.load @[[HOISTED_SYM]] : i32
+    // CHECK: %[[VAL:.*]] = util.global.load immutable @[[HOISTED_SYM]] : i32
     // CHECK: util.return %[[VAL]]
     %2 = "iree_unregistered.const_expr"(%0) ({
     ^bb0(%inner0 : i32):
@@ -290,7 +290,7 @@ module @do_not_hoist_uses_within_dispatches {
   util.func public @main() -> tensor<2x2xi32> {
     %0 = arith.constant dense<[1, 2, 3, 4]> : tensor<4xi32>
     %1 = arith.constant dense<[[6, 7], [8,9]]> : tensor<2x2xi32>
-    %expanded = tensor.expand_shape %0[[0, 1]] : tensor<4xi32> into tensor<2x2xi32>
+    %expanded = tensor.expand_shape %0[[0, 1]] output_shape [2, 2] : tensor<4xi32> into tensor<2x2xi32>
     %2 = tensor.empty() : tensor<2x2xi32>
     // CHECK: flow.dispatch.region
     %3 = flow.dispatch.region -> (tensor<2x2xi32>) {

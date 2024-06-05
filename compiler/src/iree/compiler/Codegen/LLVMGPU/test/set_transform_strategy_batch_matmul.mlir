@@ -1,9 +1,9 @@
 // RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" \
-// RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=1 --iree-codegen-llvmgpu-enable-transform-dialect-batch-matmul-strategy |\
+// RUN:     --iree-gpu-test-target=sm_80 --iree-codegen-llvmgpu-enable-transform-dialect-jit=1 --iree-codegen-llvmgpu-enable-transform-dialect-batch-matmul-strategy |\
 // RUN:   FileCheck %s --check-prefixes=CHECK,DEFAULT
 
 // RUN: iree-opt %s --split-input-file --pass-pipeline="builtin.module(iree-llvmgpu-select-lowering-strategy)" \
-// RUN:     --iree-codegen-llvmgpu-enable-transform-dialect-jit=1 --iree-codegen-llvmgpu-enable-transform-dialect-batch-matmul-strategy \
+// RUN:     --iree-gpu-test-target=sm_80 --iree-codegen-llvmgpu-enable-transform-dialect-jit=1 --iree-codegen-llvmgpu-enable-transform-dialect-batch-matmul-strategy \
 // RUN: -td-matmul-strategy-blk-sizes=128,64,32,2 \
 // RUN: -td-matmul-strategy-reduc-size=8 \
 // RUN: -td-matmul-strategy-num-threads=32,4,1 \
@@ -14,12 +14,11 @@
 // RUN: -td-matmul-strategy-use-fma=true \
 // RUN:   | FileCheck %s --check-prefixes=CHECK,OPTIONS
 
-#executable_target_cuda_nvptx_fb = #hal.executable.target<"cuda", "cuda-nvptx-fb", {target_arch = "sm_80"}>
 #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 module {
-  func.func @batch_matmul_dispatch_0_generic_128x80x320x32_f32() attributes {hal.executable.target = #executable_target_cuda_nvptx_fb} {
+  func.func @batch_matmul_dispatch_0_generic_128x80x320x32_f32() {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f32
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<128x80x32xf32>>
@@ -54,8 +53,8 @@ module {
 // CHECK:   %[[TILED_LINALG:.+]], %[[LOOPS:.+]] = transform.structured.tile_using_for %tiled_op
 // DEFAULT:   [0, 0, 0, 16]
 // OPTIONS:   [0, 0, 0, 8]
-// CHECK:   %[[PADDED:.+]], %{{.*}}, %{{.+}} = transform.structured.pad %tiled_linalg_op
-// CHECK:     pack_paddings = [1, 1, 1, 1], pad_to_multiple_of = [1, 1, 1, 1], padding_dimensions = [0, 1, 2, 3]
+// CHECK:   %[[PADDED:.+]], %{{.*}}, %{{.+}} = transform.structured.pad %tiled_linalg_op pad_to_multiple_of [1, 1, 1, 1]
+// CHECK:     pack_paddings = [1, 1, 1, 1], padding_dimensions = [0, 1, 2, 3]
 // CHECK:     padding_values = [0.000000e+00 : f32, 0.000000e+00 : f32, 0.000000e+00 : f32]}
 // CHECK:   %[[V3:.+]] = transform.get_producer_of_operand %[[PADDED]][2]
 // CHECK:   transform.structured.hoist_pad %{{.*}} by 1 loops

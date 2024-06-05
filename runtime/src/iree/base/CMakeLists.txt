@@ -35,6 +35,7 @@ iree_cc_library(
     "wait_source.h"
   DEPS
     ::core_headers
+    iree::base::internal::time
     iree::base::tracing::provider
   PUBLIC
 )

@@ -316,7 +316,7 @@ iree_status_t iree_hal_hip_native_executable_entry_point_kernel_info(
   if (entry_point >= executable->entry_point_count) {
     return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
                             "entry point ordinal %d out of range; executable "
-                            "only contains %ld entry points",
+                            "only contains %" PRIhsz " entry points",
                             entry_point, executable->entry_point_count);
   }
   memcpy(out_info, &executable->entry_points[entry_point], sizeof(*out_info));

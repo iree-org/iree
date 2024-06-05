@@ -21,6 +21,8 @@ IREE_FLAG(
 IREE_FLAG(
     int32_t, padding_size, 0,
     "Padding size (same value used for both dimensions, 0 means no padding)");
+IREE_FLAG(int32_t, inner_stride, 1,
+          "Inner stride of the pack input buffers. Default 1 means unstrided.");
 
 static iree_status_t iree_uk_benchmark_pack(
     const iree_benchmark_def_t* benchmark_def,
@@ -62,8 +64,10 @@ static iree_status_t iree_uk_benchmark_pack(
   }
   params.in_size0 = iree_max(0, out_size0 * out_size2 - FLAG_padding_size);
   params.in_size1 = iree_max(0, out_size1 * out_size3 - FLAG_padding_size);
-  params.in_stride0 = params.in_size1;
-  params.out_stride0 = params.out_size1 * params.out_size2 * params.out_size3;
+  params.in_stride1 = FLAG_inner_stride;
+  params.in_stride0 = params.in_size1 * params.in_stride1;
+  params.out_stride1 = params.out_size2 * params.out_size3;
+  params.out_stride0 = params.out_size1 * params.out_stride1;
   iree_uk_index_t in_buffer_size =
       iree_uk_2d_buffer_length(in_type, params.in_size0, params.in_stride0);
   iree_uk_index_t out_buffer_size =
@@ -151,6 +155,8 @@ int main(int argc, char** argv) {
   iree_uk_benchmark_register_pack(IREE_UK_FLAG_PACK_TYPE_F32F32, 8, 1,
                                   "avx2_fma");
   iree_uk_benchmark_register_pack(IREE_UK_FLAG_PACK_TYPE_F32F32, 16, 1,
+                                  "avx512_base");
+  iree_uk_benchmark_register_pack(IREE_UK_FLAG_PACK_TYPE_BF16BF16, 16, 2,
                                   "avx512_base");
   iree_uk_benchmark_register_pack(IREE_UK_FLAG_PACK_TYPE_F32F32, 8, 8,
                                   "avx2_fma");

@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "iree/compiler/Codegen/Common/GPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
@@ -29,12 +28,17 @@
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/IR/Matchers.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-tile"
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_GPUTILEPASS
+#include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
+
+namespace {
 //===----------------------------------------------------------------------===//
 // Tiling and fusion utilities
 //===----------------------------------------------------------------------===//
@@ -61,7 +65,8 @@ collectComputeOps(mlir::FunctionOpInterface funcOp,
   if (ifOps.empty()) {
     computeOps = getComputeOps(funcOp);
     for (Operation *op : computeOps) {
-      if (auto config = getLoweringConfig(op))
+      if (auto config =
+              getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(op))
         configs.push_back(config);
     }
     if (computeOps.size() > 1) {
@@ -76,7 +81,8 @@ collectComputeOps(mlir::FunctionOpInterface funcOp,
 
     ifOps.front()->walk([&configs](Operation *op) {
       if (isa<linalg::LinalgOp, TilingInterface>(op)) {
-        if (auto config = getLoweringConfig(op))
+        if (auto config =
+                getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(op))
           configs.push_back(config);
       }
     });
@@ -252,16 +258,10 @@ static LogicalResult tileAndUnrollConvWindow(mlir::FunctionOpInterface funcOp,
 // Main pass
 //===----------------------------------------------------------------------===//
 
-namespace {
-
-class GPUTilePass final : public GPUTileBase<GPUTilePass> {
-public:
-  GPUTilePass() = default;
-  GPUTilePass(const GPUTilePass &pass) = default;
-
+struct GPUTilePass final : impl::GPUTilePassBase<GPUTilePass> {
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    auto funcOp = getOperation();
+    FunctionOpInterface funcOp = getOperation();
 
     // Try to find computation ops which we will use as anchor to tile and fuse.
     SmallVector<Operation *> computeOps;
@@ -328,10 +328,6 @@ public:
     }
   }
 };
+
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>> createGPUTilePass() {
-  return std::make_unique<GPUTilePass>();
-}
-
 } // namespace mlir::iree_compiler

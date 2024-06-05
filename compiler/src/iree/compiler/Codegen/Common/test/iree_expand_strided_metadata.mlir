@@ -166,3 +166,18 @@ func.func @resolve_global_memref() -> (memref<f32>, index, index, index, index, 
 // CHECK-DAG:   %[[GET_GLOBAL:.+]] = memref.get_global @[[CONSTANT]]
 //     CHECK:   %[[CAST:.+]] = memref.reinterpret_cast %[[GET_GLOBAL]] to offset: [0], sizes: [], strides: []
 //     CHECK:   return %[[CAST]], %[[C0]], %[[C512]], %[[C384]], %[[C384]], %[[C1]]
+
+// -----
+
+// Test for the part of the pass that converts iree_codegen to memref
+func.func @external_func_entry_point() -> (memref<bf16>, index) {
+  %0 = hal.interface.constant.load[0] : i32
+  %1 = arith.index_castui %0 : i32 to index
+  %2 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%1) flags(ReadOnly) : memref<1x8x768xbf16, strided<[6144, 768, 1], offset: ?>>
+  %base_buffer, %offset, %sizes:3, %strides:3 = iree_codegen.extract_strided_metadata %2 : memref<1x8x768xbf16, strided<[6144, 768, 1], offset: ?>> -> memref<bf16>, index, index, index, index, index, index, index
+  return %base_buffer, %offset : memref<bf16>, index
+}
+
+// CHECK-LABEL: func.func @external_func_entry_point()
+//       CHECK:   %[[SUBSPAN:.+]] = hal.interface.binding.subspan
+//       CHECK:   %{{.+}} = memref.reinterpret_cast %[[SUBSPAN]]

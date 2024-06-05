@@ -97,3 +97,18 @@ util.func public @static_tensor_reshape(%arg0: tensor<2x4xf32>, %arg1: tensor<2x
   %1 = tensor.reshape %arg0(%0)
              : (tensor<?x4xf32>, tensor<2xindex>) -> tensor<?x1xf32>
   util.return %1 : tensor<?x1xf32> }
+
+  // -----
+  util.func public @from_elements_test_reshape_int(%arg0: tensor<?x?xf32>, %arg1: i32, %arg2: i32) -> tensor<?x?xf32> {
+  // CHECK-DAG: %[[C0:.*]] = arith.constant 0 : index
+  // CHECK-DAG: %[[C1:.*]] = arith.constant 1 : index
+  // CHECK-DAG: %[[D0:.*]] = tensor.dim %arg0, %[[C0:.*]] : tensor<?x?xf32>
+  // CHECK-DAG: %[[D1:.*]] = tensor.dim %arg0, %[[C1:.*]] : tensor<?x?xf32>
+  // CHECK-DAG: %[[E0:.*]] = arith.index_cast %arg1 : i32 to index
+  // CHECK-DAG: %[[E1:.*]] = arith.index_cast %arg2 : i32 to index
+  // CHECK-DAG: %[[RESULT:.*]] = flow.tensor.reshape %arg0 : tensor<?x?xf32>{%[[D0]], %[[D1]]} -> tensor<?x?xf32>{%[[E0]], %[[E1]]}
+  // CHECK: util.return %[[RESULT]]
+  %0 = tensor.from_elements %arg1, %arg2 : tensor<2xi32>
+  %1 = tensor.reshape %arg0(%0)
+             : (tensor<?x?xf32>, tensor<2xi32>) -> tensor<?x?xf32>
+  util.return %1 : tensor<?x?xf32> }

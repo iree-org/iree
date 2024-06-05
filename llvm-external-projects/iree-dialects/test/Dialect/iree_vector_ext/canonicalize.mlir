@@ -7,7 +7,7 @@ func.func @to_simt_to_simd_fold(%simd: vector<64x64xf32>) -> vector<64x64xf32> {
   // CHECK-NOT: iree_vector_ext.to_simt
   %simt = iree_vector_ext.to_simt %simd : vector<64x64xf32> -> vector<4x4x4xf32>
   // CHECK-NOT: iree_vector_ext.to_simd
-  %simd_out = iree_vector_ext.to_simd %simt : vector<4x4x4xf32> -> vector<64x64xf32> 
+  %simd_out = iree_vector_ext.to_simd %simt : vector<4x4x4xf32> -> vector<64x64xf32>
   // CHECK: return %[[SIMD]]
   func.return %simd_out : vector<64x64xf32>
 }
@@ -21,7 +21,7 @@ func.func @to_simd_to_simt_fold(%simt: vector<4x4x4xf32>) -> vector<4x4x4xf32> {
   // CHECK-NOT: iree_vector_ext.to_simt
   %simd = iree_vector_ext.to_simd %simt : vector<4x4x4xf32> -> vector<64x64xf32>
   // CHECK-NOT: iree_vector_ext.to_simd
-  %simt_out = iree_vector_ext.to_simt %simd : vector<64x64xf32> -> vector<4x4x4xf32> 
+  %simt_out = iree_vector_ext.to_simt %simd : vector<64x64xf32> -> vector<4x4x4xf32>
   // CHECK: return %[[SIMT]]
   func.return %simt_out : vector<4x4x4xf32>
 }
@@ -36,7 +36,7 @@ func.func @to_simd_to_simt_multi_use(%simt: vector<4x4x4xf32>) -> (vector<4x4x4x
   %simd = iree_vector_ext.to_simd %simt : vector<4x4x4xf32> -> vector<64x64xf32>
   // The to_simt operation should be dce-ed after folding.
   // CHECK-NOT: iree_vector_ext.to_simt
-  %simt_out = iree_vector_ext.to_simt %simd : vector<64x64xf32> -> vector<4x4x4xf32> 
+  %simt_out = iree_vector_ext.to_simt %simd : vector<64x64xf32> -> vector<4x4x4xf32>
 
   // Check if the folding happened correctly.
   // CHECK: %[[TRUNCED:.*]] = arith.truncf %[[SIMT]]

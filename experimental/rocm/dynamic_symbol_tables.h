@@ -10,7 +10,7 @@ IREE_HAL_ROCM_REQUIRED_PFN_DECL(hipCtxDestroy, hipCtx_t)
 IREE_HAL_ROCM_REQUIRED_PFN_DECL(hipDeviceGet, hipDevice_t *,
                                 int)  // No direct, need to modify
 IREE_HAL_ROCM_REQUIRED_PFN_DECL(hipGetDeviceCount, int *)
-IREE_HAL_ROCM_OPTIONAL_PFN_DECL(hipGetDevicePropertiesR0600, hipDeviceProp_t *,
+IREE_HAL_ROCM_REQUIRED_PFN_DECL(hipGetDeviceProperties, hipDeviceProp_tR0000 *,
                                 int)
 IREE_HAL_ROCM_REQUIRED_PFN_DECL(hipDeviceGetName, char *, int,
                                 hipDevice_t)  // No direct, need to modify

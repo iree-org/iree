@@ -17,7 +17,7 @@ iree_enable_optimization_options(
     "-DIREE_VM_BACKTRACE_ENABLE=0"
     "-DIREE_VM_BYTECODE_VERIFICATION_ENABLE=0"
     "-DIREE_VM_EXT_F32_ENABLE=0"
-    "-DIREE_VM_EXT_F64_ENABLE=0"  
+    "-DIREE_VM_EXT_F64_ENABLE=0"
 )
 
 # Must include runtime plugins before processing the runtime sources so that

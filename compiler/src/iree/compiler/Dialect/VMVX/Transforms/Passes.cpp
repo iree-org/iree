@@ -90,7 +90,7 @@ buildVectorVMVXTransformPassPipeline(OpPassManager &variantPassManager) {
       .addPass(memref::createExpandOpsPass);
 
   // Handle tensor-type constants.
-  modulePassManager.addPass(arith::createConstantBufferizePass());
+  addConstantBufferizePasses(modulePassManager);
   FunctionLikeNest(modulePassManager)
       .addPass(createFoldTensorExtractOpPass)
 

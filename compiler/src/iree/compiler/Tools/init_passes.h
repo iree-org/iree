@@ -12,7 +12,6 @@
 #include <cstdlib>
 
 #include "iree/compiler/Codegen/Passes.h"
-#include "iree/compiler/Dialect/HAL/Conversion/Passes.h"
 #include "iree/compiler/Tools/init_iree_passes.h"
 #include "iree/compiler/Tools/init_mlir_passes.h"
 
@@ -23,7 +22,6 @@ inline void registerAllPasses() {
   registerAllIreePasses();
   registerCodegenPasses();
   registerMlirPasses();
-  registerHALConversionPasses();
 }
 
 } // namespace mlir::iree_compiler

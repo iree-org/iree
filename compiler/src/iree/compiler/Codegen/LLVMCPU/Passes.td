@@ -180,6 +180,9 @@ def LLVMCPUVirtualVectorLowering :
           "\tlinalg-copy: use linalg.fill + linalg.generic for the slow path\n"
           "\tvector-transfers: use extra small unmasked vector.transfers for"
           " the slow path\n}]>,
+    Option<"enableArmI8mm", "enable-arm-i8mm", "bool",
+      /*default=*/ "false",
+      "Enables arm i8mm lowering patterns">,
   ];
   let constructor =
       "mlir::iree_compiler::createLLVMCPUVirtualVectorLoweringPass()";

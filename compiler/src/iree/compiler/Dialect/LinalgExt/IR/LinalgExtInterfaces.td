@@ -8,6 +8,7 @@
 #define IREE_DIALECT_LINALGEXT_INTERFACES
 
 include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtBase.td"
+include "mlir/Interfaces/DestinationStyleOpInterface.td"
 
 // The interface is a subset of LinalgStructuredInterface.
 def LinalgExtInterface : OpInterface<"LinalgExtOp"> {
@@ -38,6 +39,122 @@ def LinalgExtInterface : OpInterface<"LinalgExtOp"> {
   }];
 
   let verify = [{ return detail::verifyLinalgExtOpInterface($_op); }];
+}
+
+// Interface that allows for fusion of both LinalgExt and Linalg ops.
+def LinalgFusionInterface : OpInterface<"LinalgFusionOpInterface"> {
+  let methods = [
+    //===------------------------------------------------------------------===//
+    // Interface methods for fusion.
+    //===------------------------------------------------------------------===//
+    InterfaceMethod<
+      /*desc=*/[{
+        Return an AffineMap for each operand or nullptr if the operand
+        does not have an indexing map representation.
+      }],
+      /*retTy=*/"SmallVector<AffineMap>",
+      /*methodName=*/"getIndexingMapsForOperands",
+      /*args=*/(ins),
+      /*methodBody=*/""
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Return an AffineMap for each result or nullptr if the result
+        does not have an indexing map representation.
+      }],
+      /*retTy=*/"SmallVector<AffineMap>",
+      /*methodName=*/"getIndexingMapsForResults",
+      /*args=*/(ins),
+      /*methodBody=*/""
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        For each operand/result return indexing map or nullptr if an
+        operand or result does not have an indexing map representation.
+      }],
+      /*retTy=*/"SmallVector<AffineMap>",
+      /*methodName=*/"getIndexingMaps",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        auto inputMaps = $_op.getIndexingMapsForOperands();
+        llvm::append_range(inputMaps, $_op.getIndexingMapsForResults());
+        return inputMaps;
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Return the number of parallel loops.
+      }],
+      /*retTy=*/"unsigned",
+      /*methodName=*/"getNumParallelLoops",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return llvm::count($_op.getLoopIteratorTypes(), utils::IteratorType::parallel);
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Return the total number of loops.
+      }],
+      /*retTy=*/"unsigned",
+      /*methodName=*/"getNumLoops",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        return $_op.getLoopIteratorTypes().size();
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Return the static loop ranges.
+      }],
+      /*retTy=*/"SmallVector<int64_t, 4>",
+      /*methodName=*/"getStaticLoopRanges",
+      /*args=*/(ins),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+          SmallVector<int64_t, 4> loopRanges;
+          llvm::for_each($_op.getOperands(), [&](Value operand) {
+          if (auto shapedType = dyn_cast<ShapedType>(operand.getType())) {
+            llvm::append_range(loopRanges, shapedType.getShape());
+            }
+          });
+          return loopRanges;
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Return the indexing map for an op's `result` or nullptr if
+        the indexing map is not representable.
+      }],
+      /*retTy=*/"AffineMap",
+      /*methodName=*/"getIndexingMapMatchingResult",
+      /*args=*/(ins "OpResult":$result),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        assert(result.getOwner() == $_op);
+        return $_op.getIndexingMapsForResults()[result.getResultNumber()];
+      }]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Return the indexing map for `opOperand` or nullptr if
+        the indexing map is not representable.
+      }],
+      /*retTy=*/"AffineMap",
+      /*methodName=*/"getMatchingIndexingMap",
+      /*args=*/(ins "OpOperand*":$opOperand),
+      /*methodBody=*/"",
+      /*defaultImplementation=*/[{
+        assert(opOperand->getOwner() == $_op);
+        return $_op.getIndexingMapsForOperands()[opOperand->getOperandNumber()];
+      }]
+    >,
+
+
+  ];
 }
 
 #endif  // IREE_DIALECT_LINALGEXT_INTERFACES

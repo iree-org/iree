@@ -14,6 +14,7 @@
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -243,7 +244,7 @@ struct IREEExpandStridedMetadataPass
     : public IREEExpandStridedMetadataBase<IREEExpandStridedMetadataPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<affine::AffineDialect, arith::ArithDialect,
-                    IREE::Codegen::IREECodegenDialect>();
+                    IREE::Codegen::IREECodegenDialect, memref::MemRefDialect>();
   }
 
   void runOnOperation() override;

@@ -14,7 +14,9 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "mma_attrs.mlir"
+    "iree_gpu_attrs.mlir"
+    "iree_gpu_ops.mlir"
+    "target_attrs.mlir"
   TOOLS
     FileCheck
     iree-opt

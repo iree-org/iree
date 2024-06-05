@@ -173,7 +173,7 @@ func.func @softmax() {
   %3 = flow.dispatch.tensor.load %0, offsets = [0, 0], sizes = [1, 10], strides = [1, 1] : !flow.dispatch.tensor<readonly:tensor<1x10xf32>> -> tensor<1x10xf32>
   %4 = tensor.empty() : tensor<1xf32>
   %5 = linalg.fill {lowering_config = #iree_codegen.lowering_config<tile_sizes = [[0], [0], [0], [0]]>} ins(%cst_1 : f32) outs(%4 : tensor<1xf32>) -> tensor<1xf32>
-  %expanded = tensor.expand_shape %3 [[0], [1, 2]] : tensor<1x10xf32> into tensor<1x5x2xf32>
+  %expanded = tensor.expand_shape %3 [[0], [1, 2]] output_shape [1, 5, 2] : tensor<1x10xf32> into tensor<1x5x2xf32>
   %6 = tensor.empty() : tensor<1x2xf32>
   %7 = linalg.fill ins(%cst : f32) outs(%6 : tensor<1x2xf32>) -> tensor<1x2xf32>
   %8 = scf.for %arg0 = %c0 to %c5 step %c1 iter_args(%arg1 = %7) -> (tensor<1x2xf32>) {

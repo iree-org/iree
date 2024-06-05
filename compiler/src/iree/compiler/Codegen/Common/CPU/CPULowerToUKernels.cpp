@@ -12,7 +12,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenOps.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
@@ -154,6 +154,19 @@ static Type getElementTypeForUKernel(Value input) {
   return castOpSrcType;
 }
 
+static SmallVector<Type>
+getUKernelGenericReturnTypes(IREE::HAL::ExecutableTargetAttr targetAttr,
+                             Type outType) {
+  SmallVector<Type> returnTypes{outType};
+  if (!isVMVXBackend(targetAttr)) {
+    // Hack to avoid issues with void-returning functions in llvm-cpu.
+    // Note that the first return value, of tensor type, disappears in
+    // bufferization.
+    returnTypes.push_back(IntegerType::get(outType.getContext(), 32));
+  }
+  return returnTypes;
+}
+
 /// Matches an (linalg.fill -> )? linalg.mmt4d operation sequence and converts
 /// it into a iree_codegen.ukernel.mmt4d operation, that is later lowered
 /// into a call to the microkernel.
@@ -250,13 +263,8 @@ matchDAGForUKernel(RewriterBase &rewriter, linalg::Mmt4DOp op,
   Value flagsVal = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getI32IntegerAttr(flags));
   auto fn = getFnNameAndDefAttrs(ukernelName, rewriter, targetAttr);
-  SmallVector<Type> returnTypes{outType};
-  if (!isVMVXBackend(targetAttr)) {
-    // Hack to avoid issues with void-returning functions in llvm-cpu.
-    // Note that the first return value, of tensor type, disappears in
-    // bufferization.
-    returnTypes.push_back(rewriter.getI32Type());
-  }
+  SmallVector<Type> returnTypes =
+      getUKernelGenericReturnTypes(targetAttr, outType);
   auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
       loc, returnTypes, fn.name, ValueRange{lhs, rhs}, out,
       ValueRange{m, n, k, m0, n0, k0, flagsVal},
@@ -377,12 +385,14 @@ matchDAGForUKernel(RewriterBase &rewriter, tensor::PackOp op,
   Value flagsVal = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getI32IntegerAttr(flags));
   auto fn = getFnNameAndDefAttrs(ukernelName, rewriter, targetAttr);
+  SmallVector<Type> returnTypes =
+      getUKernelGenericReturnTypes(targetAttr, outType);
   auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
-      loc, outType, fn.name, in, out,
+      loc, returnTypes, fn.name, in, out,
       ValueRange{in_size0, in_size1, out_size0, out_size1, out_size2, out_size3,
                  paddingVal, flagsVal},
       /*fn_def_attrs=*/rewriter.getDictionaryAttr(fn.defAttrs),
-      /*strided_outer_dims=*/rewriter.getIndexAttr(1));
+      /*strided_outer_dims=*/rewriter.getIndexAttr(2));
   return cast<IREE::Codegen::UKernelOpInterface>(
       genericMicroKernelOp.getOperation());
 }
@@ -463,22 +473,24 @@ matchDAGForUKernel(RewriterBase &rewriter, tensor::UnPackOp op,
   Value flagsVal = rewriter.create<arith::ConstantOp>(
       loc, rewriter.getI32IntegerAttr(flags));
   auto fn = getFnNameAndDefAttrs(ukernelName, rewriter, targetAttr);
+  SmallVector<Type> returnTypes =
+      getUKernelGenericReturnTypes(targetAttr, outType);
   auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
-      loc, outType, fn.name, in, out,
+      loc, returnTypes, fn.name, in, out,
       ValueRange{in_size0, in_size1, in_size2, in_size3, out_size0, out_size1,
                  flagsVal},
       /*fn_def_attrs=*/rewriter.getDictionaryAttr(fn.defAttrs),
-      /*strided_outer_dims=*/rewriter.getIndexAttr(1));
+      /*strided_outer_dims=*/rewriter.getIndexAttr(2));
   return cast<IREE::Codegen::UKernelOpInterface>(
       genericMicroKernelOp.getOperation());
 }
 
 static uint32_t
-getFlagForUserAndOperandTypes(IREE::LinalgExt::EncodingAttr encoding,
+getFlagForUserAndOperandTypes(IREE::Encoding::EncodingAttr encoding,
                               ArrayRef<Attribute> operandTypes) {
   // There are currently no batch_mmt4d ukernels, so check for no batch
   // dimension.
-  auto cDims = IREE::LinalgExt::getEncodingContractionDims(encoding);
+  auto cDims = IREE::Encoding::getEncodingContractionDims(encoding);
   if (failed(cDims) || !cDims->batch.empty() || operandTypes.size() != 3) {
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERATION_NONE;
   }
@@ -505,13 +517,13 @@ getFlagForUserAndOperandTypes(IREE::LinalgExt::EncodingAttr encoding,
   }
 }
 
-static uint32_t getFlagForRole(IREE::LinalgExt::EncodingRole role) {
+static uint32_t getFlagForRole(IREE::Encoding::EncodingRole role) {
   switch (role) {
-  case IREE::LinalgExt::EncodingRole::LHS:
+  case IREE::Encoding::EncodingRole::LHS:
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_LHS;
-  case IREE::LinalgExt::EncodingRole::RHS:
+  case IREE::Encoding::EncodingRole::RHS:
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RHS;
-  case IREE::LinalgExt::EncodingRole::RESULT:
+  case IREE::Encoding::EncodingRole::RESULT:
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RESULT;
   default:
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_NONE;
@@ -534,8 +546,8 @@ matchDAGForUKernel(RewriterBase &rewriter, IREE::Codegen::QueryTileSizesOp op,
   if (tensorType.getRank() != 2) {
     return rewriter.notifyMatchFailure(op, "only the 2D case is implemented");
   }
-  auto encoding = tensorType.getEncoding()
-                      .dyn_cast_or_null<IREE::LinalgExt::EncodingAttr>();
+  auto encoding =
+      dyn_cast_or_null<IREE::Encoding::EncodingAttr>(tensorType.getEncoding());
   if (!encoding) {
     return rewriter.notifyMatchFailure(op, "no encoding attribute");
   }
@@ -614,20 +626,10 @@ void CPULowerToUKernelsPass::runOnOperation() {
   // performance, and that consideration overrides the benefit of fusions for
   // these ops.
   auto allTargets = [](auto target) { return true; };
-  patterns.insert<LowerToUKernelPattern<linalg::Mmt4DOp>>(
+  patterns.insert<LowerToUKernelPattern<linalg::Mmt4DOp>,
+                  LowerToUKernelPattern<tensor::PackOp>,
+                  LowerToUKernelPattern<tensor::UnPackOp>>(
       context, allTargets, skipIntermediateRoundings);
-  // These patterns could in principle be used on LLVMCPU, not just VMVX, but
-  // we choose not to, for two reasons:
-  // 1. Codegen for these ops is thought to be good enough, that we do not
-  //    really need microkernels.
-  // 2. Fusions matter particularly for pack/unpack ops due to the memcpy-like
-  //    nature of these ops and the typical patterns ML workload offering
-  //    fusions opportunities there. The combinatorics of what could get fused
-  //    there seem unbounded, so any attempt to add microkernels for fusions
-  //    would have difficulty scaling.
-  patterns.insert<LowerToUKernelPattern<tensor::PackOp>,
-                  LowerToUKernelPattern<tensor::UnPackOp>>(context,
-                                                           isVMVXBackend);
   // These patterns are inherently specific to the VMVX backend.
   patterns.insert<LowerToUKernelPattern<IREE::Codegen::QueryTileSizesOp>>(
       context, isVMVXBackend);

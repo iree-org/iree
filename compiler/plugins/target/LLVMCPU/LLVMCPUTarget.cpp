@@ -53,14 +53,26 @@ namespace mlir::iree_compiler::IREE::HAL {
 static constexpr char kQueryFunctionName[] =
     "iree_hal_executable_library_query";
 
-static void dumpBitcodeToPath(StringRef path, StringRef baseName,
-                              StringRef suffix, StringRef extension,
-                              llvm::Module &module) {
-  llvm::SmallVector<char, 0> data;
-  llvm::raw_svector_ostream ostream(data);
-  llvm::WriteBitcodeToFile(module, ostream);
-  dumpDataToPath(path, baseName, suffix, extension,
-                 StringRef(data.data(), data.size()));
+static void dumpLLVMModuleToPath(StringRef path, StringRef baseName,
+                                 StringRef suffix, StringRef extPrefix,
+                                 llvm::Module &module) {
+  // Dump disassembly to path.
+  llvm::SmallVector<char> textData;
+  llvm::raw_svector_ostream textOstream(textData);
+
+  module.print(textOstream, nullptr);
+  std::string textExtension = extPrefix.str() + ".ll";
+  dumpDataToPath(path, baseName, suffix, textExtension,
+                 StringRef(textData.data(), textData.size()));
+
+  // Dump bitcode to path.
+  llvm::SmallVector<char> binaryData;
+  llvm::raw_svector_ostream binaryOstream(binaryData);
+  // Write the specified module to the specified output stream.
+  llvm::WriteBitcodeToFile(module, binaryOstream);
+  std::string binaryExtension = extPrefix.str() + ".bc";
+  dumpDataToPath(path, baseName, suffix, binaryExtension,
+                 StringRef(binaryData.data(), binaryData.size()));
 }
 
 static void fixupVisibility(llvm::Module &module,
@@ -212,15 +224,15 @@ public:
     // clang-format on
   }
 
-  void buildConfigurationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
-                                      OpPassManager &passManager) override {
+  void
+  buildConfigurationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
+                                 OpPassManager &passManager) override {
     buildLLVMCPUCodegenConfigurationPassPipeline(passManager);
   }
 
-  void buildTranslationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
+  void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                     OpPassManager &passManager) override {
-    auto target = variantOp.getTarget();
-    bool enableAArch64SME = isAArch64(target) && hasSMEFeature(target);
+    bool enableAArch64SME = isAArch64(targetAttr) && hasSMEFeature(targetAttr);
     buildLLVMCPUCodegenPassPipeline(passManager, enableAArch64SME);
   }
 
@@ -467,8 +479,8 @@ public:
 
     // Dump just the codegen bitcode before linking and optimization.
     if (!options.dumpIntermediatesPath.empty()) {
-      dumpBitcodeToPath(options.dumpIntermediatesPath, options.dumpBaseName,
-                        variantOp.getName(), ".codegen.bc", *llvmModule);
+      dumpLLVMModuleToPath(options.dumpIntermediatesPath, options.dumpBaseName,
+                           variantOp.getName(), ".codegen", *llvmModule);
     }
 
     // Statically link libraries into our module prior to LLVM optimizations.
@@ -555,8 +567,8 @@ public:
 
     // Dump all linked bitcode prior to optimization.
     if (!options.dumpIntermediatesPath.empty()) {
-      dumpBitcodeToPath(options.dumpIntermediatesPath, options.dumpBaseName,
-                        variantOp.getName(), ".linked.bc", *llvmModule);
+      dumpLLVMModuleToPath(options.dumpIntermediatesPath, options.dumpBaseName,
+                           variantOp.getName(), ".linked", *llvmModule);
     }
 
     // LLVM opt passes that perform code generation optimizations/transformation
@@ -580,8 +592,8 @@ public:
 
     // Dump bitcode post-linking and optimization.
     if (!options.dumpIntermediatesPath.empty()) {
-      dumpBitcodeToPath(options.dumpIntermediatesPath, options.dumpBaseName,
-                        variantOp.getName(), ".optimized.bc", *llvmModule);
+      dumpLLVMModuleToPath(options.dumpIntermediatesPath, options.dumpBaseName,
+                           variantOp.getName(), ".optimized", *llvmModule);
     }
 
     SmallVector<Artifact> objectFiles;

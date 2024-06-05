@@ -70,8 +70,8 @@ iree_hal_mpi_dynamic_symbols_t LibmpiTest::symbols = {0};
 
 // An MPI "hello world" program to test library loading.
 TEST_F(LibmpiTest, HelloWorld) {
-  std::cout << "Hello world! "
-            << "I'm " << rank << " of " << world_size << std::endl;
+  std::cout << "Hello world! " << "I'm " << rank << " of " << world_size
+            << std::endl;
 }
 
 TEST_F(LibmpiTest, MPIErrorToIREEStatus) {

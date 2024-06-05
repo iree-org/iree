@@ -36,11 +36,11 @@ util.func public @tensorExportDynamic(%arg0: tensor<?x3xi32>, %arg1: index) -> !
 
 // -----
 
-// CHECK-LABEL: @tensorExportInPlace
-util.func public @tensorExportInPlace(%arg0: tensor<?x3xi32>, %arg1: index, %arg2: !hal.buffer) -> !hal.buffer_view {
-  // CHECK: hal.tensor.export %arg0 into(%arg2 : !hal.buffer) : tensor<?x3xf32> as tensor<?x3xi32>{%arg1} -> !hal.buffer_view
-  %0 = hal.tensor.export %arg0 into(%arg2 : !hal.buffer) : tensor<?x3xf32> as tensor<?x3xi32>{%arg1} -> !hal.buffer_view
-  util.return %0 : !hal.buffer_view
+// CHECK-LABEL: @tensorAlias
+util.func public @tensorAlias(%arg0: tensor<?x4xf32>, %arg1: index, %arg2: !hal.buffer, %arg3: !hal.fence) -> tensor<?x4xf32> {
+  // CHECK: hal.tensor.alias wait(%arg3) => %arg0 : tensor<?x4xf32>{%arg1} to %arg2 : !hal.buffer
+  %0 = hal.tensor.alias wait(%arg3) => %arg0 : tensor<?x4xf32>{%arg1} to %arg2 : !hal.buffer
+  util.return %0 : tensor<?x4xf32>
 }
 
 // -----

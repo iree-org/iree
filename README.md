@@ -1,5 +1,7 @@
 # IREE: Intermediate Representation Execution Environment
 
+<p><img src="docs/website/docs/assets/images/IREE_Logo_Icon_Color.svg" width="48px"></p>
+
 IREE (**I**ntermediate **R**epresentation **E**xecution **E**nvironment,
 pronounced as "eerie") is an [MLIR](https://mlir.llvm.org/)-based end-to-end
 compiler and runtime that lowers Machine Learning (ML) models to a unified IR
@@ -46,7 +48,8 @@ See [our website](https://iree.dev/) for more information.
 
 ## Presentations and Talks
 
-*   Community meeting recordings: [IREE YouTube channel](https://www.youtube.com/@iree4356)
+Community meeting recordings: [IREE YouTube channel](https://www.youtube.com/@iree4356)
+
 *   2021-06-09: IREE Runtime Design Tech Talk ([recording](https://drive.google.com/file/d/1p0DcysaIg8rC7ErKYEgutQkOJGPFCU3s/view) and [slides](https://drive.google.com/file/d/1ikgOdZxnMz1ExqwrAiuTY9exbe3yMWbB/view?usp=sharing))
 *   2020-08-20: IREE CodeGen: MLIR Open Design Meeting Presentation
     ([recording](https://drive.google.com/file/d/1325zKXnNIXGw3cdWrDWJ1-bp952wvC6W/view?usp=sharing)

@@ -16,7 +16,8 @@ namespace mlir::iree_compiler {
 /// Holds target specific information to specialize ML transformations.
 // TODO(dcaballe): Move to a Concept-Model implementation when it's worth it.
 struct TargetMLTransformInfo {
-  unsigned defaultMaxUnrollFactor = 8;
+  unsigned defaultMaxReductionUnrollFactor = 8;
+  unsigned defaultMaxElementwiseUnrollFactor = 1;
   unsigned defaultMaxTransposeUnrollFactor =
       std::numeric_limits<unsigned>::max();
 

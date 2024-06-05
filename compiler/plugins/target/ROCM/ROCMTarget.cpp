@@ -4,16 +4,17 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "ROCMTargetFeatures.h"
 #include "ROCMTargetUtils.h"
 
 #include <cstdint>
 
-#include "compiler/plugins/target/ROCM/ROCMTargetFeatures.h"
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
+#include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
+#include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
 #include "iree/compiler/Dialect/HAL/Utils/LLVMLinkerUtils.h"
@@ -22,6 +23,7 @@
 #include "iree/compiler/Utils/ModuleUtils.h"
 #include "iree/compiler/Utils/ToolUtils.h"
 #include "iree/schemas/rocm_executable_def_builder.h"
+#include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Analysis/TargetTransformInfo.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
@@ -53,6 +55,7 @@ namespace {
 
 struct ROCmOptions {
   std::string targetChip = "gfx908";
+  std::string targetFeatures = "";
   std::string bitcodeDirectory = getDefaultBitcodeDirectory();
   int wavesPerEu = 0;
   std::string enableROCMUkernels = "none";
@@ -62,6 +65,9 @@ struct ROCmOptions {
     static cl::OptionCategory category("ROCm HAL Target");
     binder.opt<std::string>("iree-rocm-target-chip", targetChip,
                             cl::cat(category), cl::desc("ROCm target chip."));
+    binder.opt<std::string>(
+        "iree-rocm-target-features", targetFeatures, cl::cat(category),
+        cl::desc("ROCm target features; e.g., '+sramecc,+xnack'."));
     binder.opt<std::string>("iree-rocm-bc-dir", bitcodeDirectory,
                             cl::cat(category),
                             cl::desc("Directory of ROCm Bitcode."));
@@ -73,6 +79,33 @@ struct ROCmOptions {
         cl::desc("Enables microkernels in the rocm compiler backend. May be "
                  "`default`, `none`, `all`, or a comma-separated list of "
                  "specific unprefixed microkernels to enable, e.g. `mmt4d`."));
+  }
+
+  LogicalResult verify(mlir::Builder &builder) const {
+    if (GPU::normalizeHIPTarget(targetChip).empty()) {
+      return emitError(builder.getUnknownLoc(), "Unknown ROCm target '")
+             << targetChip << "'";
+    }
+    SmallVector<StringRef> features;
+    llvm::SplitString(targetFeatures, features, ",");
+    for (StringRef f : features) {
+      if (!(f.starts_with("+") || f.starts_with("-"))) {
+        return emitError(builder.getUnknownLoc(),
+                         "ROCm target feature must be prefixed with '+' or "
+                         "'-'; but seen '")
+               << f << "'";
+      }
+      StringRef feature = f.substr(1);
+      if (feature != "sramecc" && feature != "xnack") {
+        // We only support these two features to be set explicitly. Features
+        // like wavefrontsize is controlled and tuned by the compiler.
+        return emitError(builder.getUnknownLoc(),
+                         "ROCm target feature can only be 'sramecc' or "
+                         "'xnack'; but seen '")
+               << feature << "'";
+      }
+    }
+    return success();
   }
 
 private:
@@ -172,7 +205,8 @@ public:
       MLIRContext *context, StringRef deviceID, DictionaryAttr deviceConfigAttr,
       SmallVectorImpl<IREE::HAL::ExecutableTargetAttr> &executableTargetAttrs)
       const override {
-    executableTargetAttrs.push_back(getExecutableTarget(context));
+    if (auto target = getExecutableTarget(context))
+      executableTargetAttrs.push_back(target);
   }
 
   IREE::HAL::ExecutableTargetAttr
@@ -183,14 +217,16 @@ public:
       configItems.emplace_back(b.getStringAttr(name), value);
     };
 
-    addConfig("target_arch", b.getStringAttr(options.targetChip));
+    if (failed(options.verify(b)))
+      return nullptr;
+
+    if (auto target = GPU::getHIPTargetDetails(options.targetChip,
+                                               options.targetFeatures, context))
+      addConfig("iree.gpu.target", target);
+
     addConfig("ukernels", b.getStringAttr(options.enableROCMUkernels));
     if (options.wavesPerEu > 0)
       addConfig("waves_per_eu", b.getI64IntegerAttr(options.wavesPerEu));
-
-    ArrayAttr mmaAttrs = getROCMSupportedMmaAttrs(context, options.targetChip);
-    if (mmaAttrs)
-      addConfig("mma_intrinsics", mmaAttrs);
 
     return b.getAttr<IREE::HAL::ExecutableTargetAttr>(
         b.getStringAttr("rocm"), b.getStringAttr("rocm-hsaco-fb"),
@@ -207,24 +243,14 @@ public:
     registry.insert<amdgpu::AMDGPUDialect>();
   }
 
-  void buildConfigurationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
-                                      OpPassManager &passManager) override {
-    // For now we disable configuration if the variant has external object
-    // files.
-    if (variantOp.isExternal())
-      return;
-
+  void
+  buildConfigurationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
+                                 OpPassManager &passManager) override {
     buildLLVMGPUCodegenConfigurationPassPipeline(passManager);
   }
 
-  void buildTranslationPassPipeline(IREE::HAL::ExecutableVariantOp variantOp,
+  void buildTranslationPassPipeline(IREE::HAL::ExecutableTargetAttr targetAttr,
                                     OpPassManager &passManager) override {
-    // For now we disable translation if the variant has external object files.
-    // We could instead perform linking with those objects (if they're bitcode
-    // ala libdevice.bc, etc).
-    if (variantOp.isExternal())
-      return;
-
     buildLLVMGPUCodegenPassPipeline(passManager, true);
   }
 
@@ -271,8 +297,11 @@ public:
     ModuleOp innerModuleOp = variantOp.getInnerModule();
     auto targetAttr = variantOp.getTargetAttr();
     StringRef targetArch = options.targetChip;
-    if (auto attr = getConfigStringAttr(targetAttr, "target_arch"))
-      targetArch = attr->getValue();
+    StringRef targetFeatures = options.targetFeatures;
+    if (auto attr = getGPUTargetAttr(targetAttr)) {
+      targetArch = attr.getArch();
+      targetFeatures = attr.getFeatures();
+    }
 
     // We name our files after the executable name so that they are easy to
     // track both during compilation (logs/artifacts/etc), as outputs (final
@@ -362,19 +391,6 @@ public:
           }
         }
 
-        // Try to get waves-per-eu from the export-specific translation info in
-        // cases where codegen decides to override the value.
-        // Otherwise, fallback to the default option.
-        int64_t wavesPerEu = 0;
-        if (auto attr = func->getAttrOfType<IntegerAttr>("waves_per_eu")) {
-          wavesPerEu = attr.getValue().getSExtValue();
-        }
-        if (wavesPerEu == 0) {
-          if (std::optional<IntegerAttr> attr =
-                  getConfigIntegerAttr(targetAttr, "waves_per_eu"))
-            wavesPerEu = attr->getValue().getSExtValue();
-        }
-
         // For GPU kernels,
         // 1. Insert AMDGPU_KERNEL calling convention.
         // 2. Insert amdgpu-flat-workgroup-size(1, 256) attribute.
@@ -384,12 +400,30 @@ public:
         llvmFunc->addFnAttr(
             "amdgpu-flat-work-group-size",
             (llvm::Twine("1, ") + llvm::Twine(flatWgSize)).str());
-        if (wavesPerEu > 0) {
-          llvmFunc->addFnAttr("amdgpu-waves-per-eu",
-                              std::to_string(wavesPerEu));
-        }
         if (targetArch.starts_with("gfx9"))
           addPreloadKernArgHint(llvmFunc);
+
+        // Set the amdgpu-waves-per-eu flag from config if given.
+        if (std::optional<IntegerAttr> attr =
+                getConfigIntegerAttr(targetAttr, "waves_per_eu")) {
+          llvmFunc->addFnAttr("amdgpu-waves-per-eu",
+                              std::to_string(attr->getValue().getSExtValue()));
+        }
+
+        // Override flags as given by target func attrs.
+        if (auto funcAttrs =
+                func->getAttrOfType<DictionaryAttr>("llvm_func_attrs")) {
+          for (NamedAttribute funcAttr : funcAttrs) {
+            auto value = dyn_cast<StringAttr>(funcAttr.getValue());
+            if (!value) {
+              return variantOp->emitError("llvm_func_attrs attribute must be "
+                                          "adictionary of strings. Attribute " +
+                                          llvm::Twine(funcAttr.getName()) +
+                                          " is not a StringAttr.");
+            }
+            llvmFunc->addFnAttr(funcAttr.getName(), value.getValue());
+          }
+        }
       }
 
       std::unique_ptr<llvm::TargetMachine> targetMachine;
@@ -407,14 +441,15 @@ public:
         opt.NoInfsFPMath = false;
         opt.NoNaNsFPMath = true;
         std::string features;
-        if (targetArch.starts_with("gfx9")) {
-          features = "+sramecc,-xnack";
-        } else {
-          // GFX 10 or 11.
+        if (targetArch.starts_with("gfx10") ||
+            targetArch.starts_with("gfx11")) {
           if (subgroupSize == 32)
             features = "+wavefrontsize32";
           if (subgroupSize == 64)
             features = "+wavefrontsize64";
+        }
+        if (!targetFeatures.empty()) {
+          features += (features.empty() ? "" : ",") + targetFeatures.str();
         }
 
         targetMachine.reset(target->createTargetMachine(

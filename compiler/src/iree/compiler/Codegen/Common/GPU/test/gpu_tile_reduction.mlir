@@ -196,4 +196,3 @@ func.func @warp_reduction_multi_reduction() {
 //  CHECK-SAME:    iterator_types = ["parallel", "reduction", "reduction"]
 //  CHECK-SAME:    ins(%[[LN]] : tensor<1x2x64xf32>)
 //  CHECK-SAME:    outs(%{{.+}} : tensor<1xf32>)
-

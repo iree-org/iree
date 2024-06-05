@@ -14,11 +14,10 @@ iree_cc_library(
   NAME
     MeshToFlow
   HDRS
-    "MeshToFlow.h"
+    "Patterns.h"
   SRCS
-    "MeshToFlow.cpp"
+    "Patterns.cpp"
   DEPS
-    ::PassesIncGen
     LLVMSupport
     MLIRAffineDialect
     MLIRArithUtils
@@ -27,24 +26,13 @@ iree_cc_library(
     MLIRLinalgUtils
     MLIRMeshDialect
     MLIRMeshTransforms
-    MLIRPass
     MLIRSupport
     MLIRTensorDialect
     MLIRTransformUtils
-    MLIRTransforms
     iree::compiler::Dialect::Flow::IR
     iree::compiler::Dialect::Util::IR
     iree::compiler::Utils
   PUBLIC
-)
-
-iree_tablegen_library(
-  NAME
-    PassesIncGen
-  TD_FILE
-    "Passes.td"
-  OUTS
-    --gen-pass-decls Passes.h.inc
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

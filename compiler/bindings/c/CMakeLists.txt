@@ -90,6 +90,6 @@ foreach(_d ${MLIR_INCLUDE_DIRS})
       DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
       COMPONENT IREEDevLibraries-Compiler
       EXCLUDE_FROM_ALL
-    )  
+    )
   endif()
 endforeach()

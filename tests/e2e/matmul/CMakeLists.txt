@@ -12,6 +12,88 @@ iree_add_all_subdirs()
 
 iree_generated_e2e_runner_test(
   NAME
+    e2e_matmul_cpu_arm_sme_nondt_f32_small_transpose_lhs_peel
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f32"
+    "--acc_type=f32"
+    "--shapes=small"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-opt-data-tiling=false"
+    "--iree-llvmcpu-enable-scalable-vectorization"
+    "--iree-preprocessing-pass-pipeline=builtin.module\(util.func\(iree-preprocessing-transpose-matmul-pass{input=lhs}\)\)"
+    "--iree-llvmcpu-vector-pproc-strategy=peel"
+  LABELS
+    "requires-arm-sme"
+  TARGET_CPU_FEATURES_VARIANTS
+    "arm_64:sme:+sve,+sme"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_matmul_cpu_arm_sme_nondt_f32_small_transpose_lhs
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f32"
+    "--acc_type=f32"
+    "--shapes=small"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-opt-data-tiling=false"
+    "--iree-llvmcpu-enable-scalable-vectorization"
+    "--iree-preprocessing-pass-pipeline=builtin.module\(util.func\(iree-preprocessing-transpose-matmul-pass{input=lhs}\)\)"
+  LABELS
+    "requires-arm-sme"
+  TARGET_CPU_FEATURES_VARIANTS
+    "arm_64:sme:+sve,+sme"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_matmul_cpu_arm_sme_nondt_f32_small_peel
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f32"
+    "--acc_type=f32"
+    "--shapes=small"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-opt-data-tiling=false"
+    "--iree-llvmcpu-enable-scalable-vectorization"
+    "--iree-llvmcpu-vector-pproc-strategy=peel"
+  LABELS
+    "requires-arm-sme"
+  TARGET_CPU_FEATURES_VARIANTS
+    "arm_64:sme:+sve,+sme"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
     e2e_matmul_cpu_arm_sme_nondt_f32_small
   TEST_TYPE
     matmul
@@ -30,6 +112,88 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     "--iree-opt-data-tiling=false"
     "--iree-llvmcpu-enable-scalable-vectorization"
+  LABELS
+    "requires-arm-sme"
+  TARGET_CPU_FEATURES_VARIANTS
+    "arm_64:sme:+sve,+sme"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_matmul_cpu_arm_sme_nondt_f32_large_transpose_lhs_peel
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f32"
+    "--acc_type=f32"
+    "--shapes=large"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-opt-data-tiling=false"
+    "--iree-llvmcpu-enable-scalable-vectorization"
+    "--iree-preprocessing-pass-pipeline=builtin.module\(util.func\(iree-preprocessing-transpose-matmul-pass{input=lhs}\)\)"
+    "--iree-llvmcpu-vector-pproc-strategy=peel"
+  LABELS
+    "requires-arm-sme"
+  TARGET_CPU_FEATURES_VARIANTS
+    "arm_64:sme:+sve,+sme"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_matmul_cpu_arm_sme_nondt_f32_large_transpose_lhs
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f32"
+    "--acc_type=f32"
+    "--shapes=large"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-opt-data-tiling=false"
+    "--iree-llvmcpu-enable-scalable-vectorization"
+    "--iree-preprocessing-pass-pipeline=builtin.module\(util.func\(iree-preprocessing-transpose-matmul-pass{input=lhs}\)\)"
+  LABELS
+    "requires-arm-sme"
+  TARGET_CPU_FEATURES_VARIANTS
+    "arm_64:sme:+sve,+sme"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_matmul_cpu_arm_sme_nondt_f32_large_peel
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f32"
+    "--acc_type=f32"
+    "--shapes=large"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "llvm-cpu"
+  DRIVERS
+    "local-task"
+  COMPILER_FLAGS
+    "--iree-opt-data-tiling=false"
+    "--iree-llvmcpu-enable-scalable-vectorization"
+    "--iree-llvmcpu-vector-pproc-strategy=peel"
   LABELS
     "requires-arm-sme"
   TARGET_CPU_FEATURES_VARIANTS
@@ -1814,63 +1978,6 @@ iree_generated_e2e_runner_test(
 
 iree_generated_e2e_runner_test(
   NAME
-    e2e_matmul_rocm_f16_large_cdna3_mfma
-  TEST_TYPE
-    matmul
-  GENERATOR
-    "generate_e2e_matmul_tests.py"
-  GENERATOR_ARGS
-    "--lhs_rhs_type=f16"
-    "--acc_type=f32"
-    "--shapes=gpu_large_aligned"
-    "--compilation_info=LLVMGPUVectorDistribute"
-  TEST_RUNNER
-    iree_tools_testing_e2e_iree-e2e-matmul-test
-  TARGET_BACKENDS
-    "rocm"
-  DRIVERS
-    "rocm"
-  COMPILER_FLAGS
-    "--iree-rocm-target-chip=gfx942"
-  LABELS
-    "noasan"
-    "nomsan"
-    "notsan"
-    "noubsan"
-    "requires-gpu-cdna3"
-)
-
-iree_generated_e2e_runner_test(
-  NAME
-    e2e_matmul_rocm_f16_large_cdna3_mfma_tb
-  TEST_TYPE
-    matmul
-  GENERATOR
-    "generate_e2e_matmul_tests.py"
-  GENERATOR_ARGS
-    "--lhs_rhs_type=f16"
-    "--acc_type=f32"
-    "--transpose_rhs"
-    "--shapes=gpu_large_aligned"
-    "--compilation_info=LLVMGPUVectorDistribute"
-  TEST_RUNNER
-    iree_tools_testing_e2e_iree-e2e-matmul-test
-  TARGET_BACKENDS
-    "rocm"
-  DRIVERS
-    "rocm"
-  COMPILER_FLAGS
-    "--iree-rocm-target-chip=gfx942"
-  LABELS
-    "noasan"
-    "nomsan"
-    "notsan"
-    "noubsan"
-    "requires-gpu-cdna3"
-)
-
-iree_generated_e2e_runner_test(
-  NAME
     e2e_matmul_vulkan_i8_large_valhall
   TEST_TYPE
     matmul
@@ -2041,3 +2148,139 @@ iree_generated_e2e_runner_test(
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
+
+# To distinguish between CDNA(gfx9) and RDNA3(gfx11)
+if(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx9")
+
+unset(IREE_HIP_TEST_COMPILER_FLAGS)
+list(APPEND IREE_HIP_TEST_COMPILER_FLAGS
+  "--iree-rocm-target-chip=${IREE_HIP_TEST_TARGET_CHIP}"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_matmul_rocm_f16_large_cdna3_mfma
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f16"
+    "--acc_type=f32"
+    "--shapes=gpu_large_aligned"
+    "--compilation_info=LLVMGPUVectorDistributeMFMA"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "rocm"
+  DRIVERS
+    "hip"
+  COMPILER_FLAGS
+    ${IREE_HIP_TEST_COMPILER_FLAGS}
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-cdna3"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_matmul_rocm_f16_large_cdna3_mfma_tb
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f16"
+    "--acc_type=f32"
+    "--transpose_rhs"
+    "--shapes=gpu_large_aligned"
+    "--compilation_info=LLVMGPUVectorDistributeMFMA"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "rocm"
+  DRIVERS
+    "hip"
+  COMPILER_FLAGS
+    ${IREE_HIP_TEST_COMPILER_FLAGS}
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-cdna3"
+)
+
+elseif(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx11")
+
+unset(IREE_HIP_TEST_COMPILER_FLAGS)
+list(APPEND IREE_HIP_TEST_COMPILER_FLAGS
+  "--iree-rocm-target-chip=${IREE_HIP_TEST_TARGET_CHIP}"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_matmul_rocm_f16_large_rdna3_wmma
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f16"
+    "--acc_type=f32"
+    "--shapes=gpu_large_aligned"
+    "--compilation_info=LLVMGPUVectorDistributeWMMA"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "rocm"
+  DRIVERS
+    "hip"
+  COMPILER_FLAGS
+    ${IREE_HIP_TEST_COMPILER_FLAGS}
+  RUNNER_ARGS
+    "--require_exact_results=false"
+    "--acceptable_fp_delta=1e-04"
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-rdna3"
+)
+
+iree_generated_e2e_runner_test(
+  NAME
+    e2e_matmul_rocm_f16_large_rdna3_wmma_tb
+  TEST_TYPE
+    matmul
+  GENERATOR
+    "generate_e2e_matmul_tests.py"
+  GENERATOR_ARGS
+    "--lhs_rhs_type=f16"
+    "--acc_type=f32"
+    "--transpose_rhs"
+    "--shapes=gpu_large_aligned"
+    "--compilation_info=LLVMGPUVectorDistributeWMMA"
+  TEST_RUNNER
+    iree_tools_testing_e2e_iree-e2e-matmul-test
+  TARGET_BACKENDS
+    "rocm"
+  DRIVERS
+    "hip"
+  COMPILER_FLAGS
+    ${IREE_HIP_TEST_COMPILER_FLAGS}
+  RUNNER_ARGS
+    "--require_exact_results=false"
+    "--acceptable_fp_delta=1e-04"
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-rdna3"
+)
+endif()

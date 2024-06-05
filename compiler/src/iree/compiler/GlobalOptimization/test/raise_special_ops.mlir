@@ -342,7 +342,7 @@ util.func public @test_slice_negate_cat_peephole(%arg0: tensor<1x32x1x128xf16>) 
 // CHECK-LABEL: util.func public @test_slice_negate_cat_peephole
 //  CHECK-SAME:     %[[ARG0:.+]]: tensor<1x32x1x128xf16>
 //       CHECK:   %[[C1:.+]] = arith.constant 1 : index
-//       CHECK:   %[[EXPIN:.+]] = tensor.expand_shape %[[ARG0]] {{\[\[}}0], [1], [2], [3, 4]] : tensor<1x32x1x128xf16> into tensor<1x32x1x2x64xf16>
+//       CHECK:   %[[EXPIN:.+]] = tensor.expand_shape %[[ARG0]] {{\[\[}}0], [1], [2], [3, 4]] output_shape [1, 32, 1, 2, 64] : tensor<1x32x1x128xf16> into tensor<1x32x1x2x64xf16>
 //       CHECK:   %[[NREV:.+]] = linalg.generic
 //  CHECK-SAME:       iterator_types = ["parallel", "parallel", "parallel", "parallel", "parallel"]
 

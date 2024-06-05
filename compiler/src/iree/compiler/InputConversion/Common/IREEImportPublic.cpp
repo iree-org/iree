@@ -23,7 +23,7 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/DialectConversion.h"
 
-namespace mlir::iree_compiler {
+namespace mlir::iree_compiler::InputConversion {
 
 namespace {
 
@@ -60,7 +60,7 @@ static ArrayAttr convertArrayAttribute(ArrayAttr src, Converter fn) {
     if (auto arr = dyn_cast<ArrayAttr>(attr)) {
       result.push_back(convertArrayAttribute<To, From, Converter>(arr, fn));
     } else {
-      result.push_back(fn(attr.template cast<From>()));
+      result.push_back(fn(cast<From>(attr)));
     }
   }
   return ArrayAttr::get(src.getContext(), result);
@@ -244,7 +244,7 @@ class TensorExportPattern
       rewriter.replaceOpWithNewOp<IREE::HAL::TensorExportOp>(
           srcOp, resultType, adaptor.getSource(),
           TypeAttr::get(adaptor.getSource().getType()), adaptor.getSourceDims(),
-          /*target_storage=*/nullptr, /*name=*/nullptr);
+          /*name=*/nullptr);
     }
     return success();
   }
@@ -600,4 +600,4 @@ std::unique_ptr<OperationPass<ModuleOp>> createIREEImportPublicPass() {
   return std::make_unique<IREEImportPublicPass>();
 }
 
-} // namespace mlir::iree_compiler
+} // namespace mlir::iree_compiler::InputConversion

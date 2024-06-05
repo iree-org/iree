@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Interfaces/Interfaces.h"
 
+#include "iree/compiler/Codegen/Dialect/GPU/TransformExtensions/IREEGPUExtensions.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/Interfaces/ProcessorOpInterfaces.h"
@@ -51,6 +52,7 @@ void registerCodegenInterfaces(DialectRegistry &registry) {
                          transform_ext::StructuredTransformOpsExtension>();
   registerPartitionableLoopsInterfaceModels(registry);
   registerTransformDialectCommonExtension(registry);
+  registerTransformDialectIREEGPUExtension(registry);
   registerTransformDialectFlowExtension(registry);
   registerTransformDialectLLVMCPUExtension(registry);
   registerTransformDialectLLVMGPUExtension(registry);

@@ -4,8 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "benchmark/benchmark.h"
 #include "iree/base/api.h"
+#include "iree/testing/benchmark.h"
 #include "iree/vm/module.h"
 #include "iree/vm/native_module.h"
 #include "iree/vm/native_module_test.h"

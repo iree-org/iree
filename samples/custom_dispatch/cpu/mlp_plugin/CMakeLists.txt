@@ -18,7 +18,7 @@ endif()
 
 # system-library plugin mechanism using the system dynamic library loader.
 if(IREE_HAL_EXECUTABLE_PLUGIN_SYSTEM_LIBRARY)
-  
+
 add_library(iree_samples_custom_dispatch_cpu_mlp_plugin SHARED
   mlp_plugin.c
 )
@@ -103,6 +103,7 @@ iree_lit_test_suite(
     iree_samples_custom_dispatch_cpu_mlp_plugin
   DATA
     "mlp_linalg_spec.pdl.mlir"
+    "mlp_spec_matmul.mlir"
   LABELS
     "driver=local-sync"
     "hostonly"

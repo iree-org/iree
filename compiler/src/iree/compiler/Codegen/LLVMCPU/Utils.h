@@ -39,6 +39,18 @@ bool hasAnySVEFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
 /// Returns true if the 'targetAttr' contains '+sme' in its cpu features.
 bool hasSMEFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
 
+/// Returns true if the 'targetAttr' contains '+i8mm' in its cpu features.
+bool hasI8mmFeature(IREE::HAL::ExecutableTargetAttr targetAttr);
+
+/// Returns true if the `genericOp` is a simple 2D transpose, i.e.,
+///
+///   1. The op has 2 dimensions.
+///   2. The op has a single input and a single output.
+///   3. One of the `indexing_maps` is a permutation and the other an identity.
+///   4. The body of the generic has a single yield op returning the block
+///   argument corresponding to the input.
+bool isLinalgGeneric2DTranspose(linalg::GenericOp genericOp);
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_LLVMCPU_UTILS_H_

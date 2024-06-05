@@ -1,7 +1,9 @@
-# Tracy server build support
+# Tracy capture build support
 
-This directory contains build support for building tracy server binaries
-on supported platforms.
+This directory contains support for building the `tracy-capture` binary on
+supported platforms so IREE can bundle the capture tool in its own releases.
 
-For the client, see the sibling directory tracy_client, which is platform
-neutral.
+Upstream CMake projects also exist for `tracy-capture`, `tracy-profiler`, and
+other tools and most developers should use those instead.
+
+For the client libraries, see the sibling directory tracy_client.

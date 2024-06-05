@@ -592,9 +592,11 @@ IREE_VMVX_ABI_FIXED_STRUCT(pack, rIIIrIIIIIIIIIi, {
   iree_vm_ref_t in_ref;
   int64_t in_offset;
   int64_t in_stride0;
+  int64_t in_stride1;
   iree_vm_ref_t out_ref;
   int64_t out_offset;
   int64_t out_stride0;
+  int64_t out_stride1;
   int64_t in_size0;
   int64_t in_size1;
   int64_t out_size0;
@@ -626,7 +628,7 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_pack, pack, v) {
                            /*buffer_ref=*/args->in_ref,
                            /*offset=*/args->in_offset,
                            /*stride0=*/args->in_stride0,
-                           /*stride1=*/1,
+                           /*stride1=*/args->in_stride1,
                            /*size0=*/args->in_size0,
                            /*size1=*/args->in_size1);
   MAP_BUFFER_2D_UNTYPED_RW(out, /*dtype_size=*/elem_size,
@@ -636,8 +638,9 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_pack, pack, v) {
                            /*stride1=*/1,
                            /*size0=*/args->out_size0,
                            /*size1=*/args->out_size1 * out_tile_size);
-  iree_uk_pack(in, 0, args->in_stride0, out, 0, args->out_stride0,
-               args->in_size0, args->in_size1, args->out_size0, args->out_size1,
+  iree_uk_pack(in, 0, args->in_stride0, args->in_stride1, out, 0,
+               args->out_stride0, args->out_stride1, args->in_size0,
+               args->in_size1, args->out_size0, args->out_size1,
                args->out_size2, args->out_size3, args->padding_value,
                args->flags, (const iree_uk_uint64_t*)iree_cpu_data_fields());
   IREE_TRACE_ZONE_END(z0);
@@ -652,9 +655,11 @@ IREE_VMVX_ABI_FIXED_STRUCT(unpack, rIIIrIIIIIIIIi, {
   iree_vm_ref_t in_ref;
   int64_t in_offset;
   int64_t in_stride0;
+  int64_t in_stride1;
   iree_vm_ref_t out_ref;
   int64_t out_offset;
   int64_t out_stride0;
+  int64_t out_stride1;
   int64_t in_size0;
   int64_t in_size1;
   int64_t in_size2;
@@ -689,11 +694,12 @@ IREE_VMVX_ABI_EXPORT(iree_vmvx_unpack, unpack, v) {
                            /*buffer_ref=*/args->out_ref,
                            /*offset=*/args->out_offset,
                            /*stride0=*/args->out_stride0,
-                           /*stride1=*/1,
+                           /*stride1=*/args->out_stride1,
                            /*size0=*/args->out_size0,
                            /*size1=*/args->out_size1);
-  iree_uk_unpack(in, 0, args->in_stride0, out, 0, args->out_stride0,
-                 args->in_size0, args->in_size1, args->in_size2, args->in_size3,
+  iree_uk_unpack(in, 0, args->in_stride0, args->in_stride1, out, 0,
+                 args->out_stride0, args->out_stride1, args->in_size0,
+                 args->in_size1, args->in_size2, args->in_size3,
                  args->out_size0, args->out_size1, args->flags,
                  (const iree_uk_uint64_t*)iree_cpu_data_fields());
   IREE_TRACE_ZONE_END(z0);

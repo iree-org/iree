@@ -1,8 +1,8 @@
 // RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(func.func(iree-llvmgpu-vector-distribute{test-layout}, canonicalize, cse))' %s | FileCheck %s
 
-#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute 
+#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute
                                               workgroup_size = [64, 1, 1]
-                                              subgroup_size = 64, 
+                                              subgroup_size = 64,
       {mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>, subgroup_m_count = 1, subgroup_n_count = 1>}>
 
 func.func @mfma_matmul_96x64x16_mm(%lhs: vector<96x16xf16>, %rhs: vector<16x64xf16>, %init: vector<96x64xf32>) -> vector<96x64xf32> attributes { translation_info = #translation } {
@@ -26,9 +26,9 @@ func.func @mfma_matmul_96x64x16_mm(%lhs: vector<96x16xf16>, %rhs: vector<16x64xf
 
 // -----
 
-#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute 
+#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute
                                               workgroup_size = [64, 1, 1]
-                                              subgroup_size = 64, 
+                                              subgroup_size = 64,
       {mma_schedule = #iree_gpu.mma_schedule< intrinsic = #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>, subgroup_m_count = 1, subgroup_n_count = 1>}>
 
 func.func @mfma_matmul_96x64x16_mmt(%lhs: vector<96x16xf16>, %rhs: vector<64x16xf16>, %init: vector<96x64xf32>) -> vector<96x64xf32> attributes { translation_info = #translation } {
@@ -53,9 +53,9 @@ func.func @mfma_matmul_96x64x16_mmt(%lhs: vector<96x16xf16>, %rhs: vector<64x16x
 
 // -----
 
-#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute 
+#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute
                                               workgroup_size = [64, 2, 1]
-                                              subgroup_size = 64, 
+                                              subgroup_size = 64,
       {mma_schedule = #iree_gpu.mma_schedule< intrinsic = #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>, subgroup_m_count = 2, subgroup_n_count = 1>}>
 
 func.func @matmul_192x64x16_mmt_multisubgroup(%lhs: vector<192x16xf16>, %rhs: vector<16x64xf16>, %init: vector<192x64xf32>) -> vector<192x64xf32> attributes { translation_info = #translation } {
@@ -72,9 +72,9 @@ func.func @matmul_192x64x16_mmt_multisubgroup(%lhs: vector<192x16xf16>, %rhs: ve
 
 // -----
 
-#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute 
+#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute
                                               workgroup_size = [64, 1, 1]
-                                              subgroup_size = 64, 
+                                              subgroup_size = 64,
       {mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, subgroup_m_count = 1, subgroup_n_count = 1>}>
 
 func.func @matmul_16x16x256_read(%lhs: memref<16x256xf16, strided<[256, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>,
@@ -130,9 +130,9 @@ func.func @matmul_16x16x256_read(%lhs: memref<16x256xf16, strided<[256, 1], offs
 
 // -----
 
-#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute 
+#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute
                                               workgroup_size = [64, 1, 1]
-                                              subgroup_size = 64, 
+                                              subgroup_size = 64,
       {mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, subgroup_m_count = 1, subgroup_n_count = 1>}>
 
 
@@ -192,9 +192,9 @@ func.func @matmul_16x16x256_read_permute(%lhs: memref<16x256xf16, strided<[256, 
 
 // -----
 
-#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute 
+#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute
                                               workgroup_size = [64, 1, 1]
-                                              subgroup_size = 64, 
+                                              subgroup_size = 64,
       {mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, subgroup_m_count = 1, subgroup_n_count = 1>}>
 
 func.func @matmul_16x16x256_fused(%lhs: memref<16x32xf16>,
@@ -232,9 +232,9 @@ func.func @matmul_16x16x256_fused(%lhs: memref<16x32xf16>,
 
 // -----
 
-#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute 
+#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute
                                               workgroup_size = [32, 1, 1]
-                                              subgroup_size = 32, 
+                                              subgroup_size = 32,
       {mma_schedule = #iree_gpu.mma_schedule< intrinsic = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>, subgroup_m_count = 1, subgroup_n_count = 1>}>
 
 func.func @wmma_matmul_48x32x32_mm(%lhs: vector<48x32xf16>, %rhs: vector<32x32xf16>, %init: vector<48x32xf32>) -> vector<48x32xf32> attributes { translation_info = #translation } {
@@ -258,9 +258,9 @@ func.func @wmma_matmul_48x32x32_mm(%lhs: vector<48x32xf16>, %rhs: vector<32x32xf
 
 // -----
 
-#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute 
+#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute
                                               workgroup_size = [32, 1, 1]
-                                              subgroup_size = 32, 
+                                              subgroup_size = 32,
       {mma_schedule = #iree_gpu.mma_schedule< intrinsic = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>, subgroup_m_count = 1, subgroup_n_count = 1>}>
 
 func.func @wmma_matmul_48x32x32_mmt(%lhs: vector<48x32xf16>, %rhs: vector<32x32xf16>, %init: vector<48x32xf32>) -> vector<48x32xf32> attributes { translation_info = #translation } {
@@ -285,9 +285,9 @@ func.func @wmma_matmul_48x32x32_mmt(%lhs: vector<48x32xf16>, %rhs: vector<32x32x
 
 // -----
 
-#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute 
+#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute
                                               workgroup_size = [64, 2, 1]
-                                              subgroup_size = 64, 
+                                              subgroup_size = 64,
       {mma_schedule = #iree_gpu.mma_schedule< intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, subgroup_m_count = 2, subgroup_n_count = 1>}>
 
 
@@ -331,9 +331,9 @@ func.func @matmul_192x64x16_mmt_multi_m(%lhs: vector<2x64x16xf16>, %rhs: vector<
 
 // -----
 
-#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute 
+#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute
                                               workgroup_size = [64, 2, 1]
-                                              subgroup_size = 64, 
+                                              subgroup_size = 64,
       {mma_schedule = #iree_gpu.mma_schedule< intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, subgroup_m_count = 4, subgroup_n_count = 1>}>
 
 func.func @matmul_192x64x16_mmt_multi_split_m(%lhs: vector<2x64x16xf16>, %rhs: vector<16x64xf16>, %init: vector<2x64x64xf32>) -> vector<2x64x64xf32> attributes { translation_info = #translation } {
@@ -357,9 +357,9 @@ func.func @matmul_192x64x16_mmt_multi_split_m(%lhs: vector<2x64x16xf16>, %rhs: v
 
 // -----
 
-#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute 
+#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute
                                               workgroup_size = [128, 2, 1]
-                                              subgroup_size = 64, 
+                                              subgroup_size = 64,
       {mma_schedule = #iree_gpu.mma_schedule< intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, subgroup_m_count = 2, subgroup_n_count = 2>, workgroup_size = [128, 2, 1]}>
 
 func.func @matmul_192x64x16_mmt_multi_m_and_n(%lhs: vector<4x64x16xf16>, %rhs: vector<2x16x64xf16>, %init: vector<4x2x64x64xf32>) -> vector<4x2x64x64xf32> attributes { translation_info = #translation } {
@@ -388,9 +388,9 @@ func.func @matmul_192x64x16_mmt_multi_m_and_n(%lhs: vector<4x64x16xf16>, %rhs: v
 
 // -----
 
-#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute 
+#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute
                                               workgroup_size = [32, 4, 1]
-                                              subgroup_size = 32, 
+                                              subgroup_size = 32,
       {mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>, subgroup_m_count = 1, subgroup_n_count = 4>}>
 
 func.func @dequant_anchors_on_quant_only(%quant: memref<128x128xi4, strided<[4096, 1], offset: ?>, #hal.descriptor_type<storage_buffer>>,
@@ -421,3 +421,50 @@ func.func @dequant_anchors_on_quant_only(%quant: memref<128x128xi4, strided<[409
 //      CHECK: transfer '{{.+}} memref<128x128xi4{{.+}}<storage_buffer>>, vector<128x128xi4>' vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [4, 1], outers_per_batch = [1, 1], threads_per_outer = [32, 4], elements_per_thread = [1, 32], subgroup_basis = [1, 1], thread_basis = [32, 4]>
 //  CHECK-NOT: transfer '{{.+}} memref<128xf16{{.+}}<storage_buffer>>, vector<128xf16>' vector layout
+
+// -----
+
+#map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d3)>
+#map1 = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
+#map2 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
+#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute
+                                              workgroup_size = [128, 2, 1]
+                                              subgroup_size = 64,
+      {mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, subgroup_m_count = 2, subgroup_n_count = 2>}>
+func.func @batch_matmul_unit_batch(%arg0: vector<1x64x64xf16>, %arg1: vector<1x64x128xf16>, %arg2: vector<1x64x128xf32>) -> vector<1x64x128xf32> attributes {translation_info = #translation} {
+  %0 = vector.contract {
+      indexing_maps = [#map, #map1, #map2],
+      iterator_types = ["parallel", "parallel", "parallel", "reduction"],
+      kind = #vector.kind<add>}
+      %arg0, %arg1, %arg2 : vector<1x64x64xf16>, vector<1x64x128xf16> into vector<1x64x128xf32>
+  return %0 : vector<1x64x128xf32>
+}
+//      CHECK: contract A vector layout: #iree_vector_ext.nested_layout<
+// CHECK-SAME:   subgroups_per_workgroup = [1, 2, 1],
+// CHECK-SAME:   batches_per_subgroup = [1, 2, 4],
+// CHECK-SAME:   outers_per_batch = [1, 1, 1]
+// CHECK-SAME:   threads_per_outer = [1, 16, 4]
+// CHECK-SAME:   elements_per_thread = [1, 1, 4]
+// CHECK-SAME:   thread_order = [0, 2, 1]
+// CHECK-SAME:   subgroup_basis = [1, 2, 2, 1]
+// CHECK-SAME:   subgroup_active_ids = [true, true, false, true]
+// CHECK-SAME:   thread_basis = [1, 4, 16]
+//      CHECK: contract B vector layout: #iree_vector_ext.nested_layout<
+// CHECK-SAME:   subgroups_per_workgroup = [1, 1, 2]
+// CHECK-SAME:   batches_per_subgroup = [1, 4, 4]
+// CHECK-SAME:   outers_per_batch = [1, 1, 1]
+// CHECK-SAME:   threads_per_outer = [1, 4, 16]
+// CHECK-SAME:   elements_per_thread = [1, 4, 1]
+// CHECK-SAME:   subgroup_order = [0, 2, 1]
+// CHECK-SAME:   subgroup_basis = [1, 2, 2, 1]
+// CHECK-SAME:   subgroup_active_ids = [true, false, true, true]
+// CHECK-SAME:   thread_basis = [1, 4, 16]
+//      CHECK: contract C vector layout: #iree_vector_ext.nested_layout<
+// CHECK-SAME:   subgroups_per_workgroup = [1, 2, 2]
+// CHECK-SAME:   batches_per_subgroup = [1, 2, 4]
+// CHECK-SAME:   outers_per_batch = [1, 1, 1]
+// CHECK-SAME:   threads_per_outer = [1, 4, 16]
+// CHECK-SAME:   elements_per_thread = [1, 4, 1]
+// CHECK-SAME:   subgroup_basis = [1, 2, 2, 1]
+// CHECK-SAME:   subgroup_active_ids = [true, true, true, false]
+// CHECK-SAME:   thread_basis = [1, 4, 16]

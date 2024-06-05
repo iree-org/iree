@@ -7,9 +7,7 @@
 #include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
-#include "llvm/Support/Debug.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -17,7 +15,7 @@
 
 namespace mlir::iree_compiler {
 
-using namespace IREE::LinalgExt;
+using namespace IREE::Encoding;
 
 namespace {
 struct MaterializeEncodingIntoNopPass

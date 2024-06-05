@@ -96,8 +96,8 @@ static iree_status_t module_a_sub_1(iree_vm_stack_t* stack, module_a_t* module,
 }
 
 static const iree_vm_native_export_descriptor_t module_a_exports_[] = {
-    {iree_make_cstring_view("add_1"), iree_make_cstring_view("0i_i"), 0, NULL},
-    {iree_make_cstring_view("sub_1"), iree_make_cstring_view("0i_i"), 0, NULL},
+    {IREE_SV("add_1"), IREE_SV("0i_i"), 0, NULL},
+    {IREE_SV("sub_1"), IREE_SV("0i_i"), 0, NULL},
 };
 static const iree_vm_native_function_ptr_t module_a_funcs_[] = {
     {(iree_vm_native_function_shim_t)call_shim_i32_i32,
@@ -109,7 +109,7 @@ static_assert(IREE_ARRAYSIZE(module_a_funcs_) ==
                   IREE_ARRAYSIZE(module_a_exports_),
               "function pointer table must be 1:1 with exports");
 static const iree_vm_native_module_descriptor_t module_a_descriptor_ = {
-    /*name=*/iree_make_cstring_view("module_a"),
+    /*name=*/IREE_SV("module_a"),
     /*version=*/0,
     /*attr_count=*/0,
     /*attrs=*/NULL,
@@ -244,24 +244,24 @@ static const iree_vm_native_function_ptr_t module_b_funcs_[] = {
 };
 
 static const iree_vm_native_import_descriptor_t module_b_imports_[] = {
-    {IREE_VM_NATIVE_IMPORT_REQUIRED, iree_make_cstring_view("module_a.add_1")},
-    {IREE_VM_NATIVE_IMPORT_REQUIRED, iree_make_cstring_view("module_a.sub_1")},
+    {IREE_VM_NATIVE_IMPORT_REQUIRED, IREE_SV("module_a.add_1")},
+    {IREE_VM_NATIVE_IMPORT_REQUIRED, IREE_SV("module_a.sub_1")},
 };
-static_assert(IREE_ARRAYSIZE(module_b_state_t::imports) ==
+static_assert(IREE_ARRAYSIZE(((module_b_state_t*)NULL)->imports) ==
                   IREE_ARRAYSIZE(module_b_imports_),
               "import storage must be able to hold all imports");
 static const iree_string_pair_t module_b_entry_attrs_[] = {
-    {iree_make_cstring_view("key1"), iree_make_cstring_view("value1")},
+    {IREE_SV("key1"), IREE_SV("value1")},
 };
 static const iree_vm_native_export_descriptor_t module_b_exports_[] = {
-    {iree_make_cstring_view("entry"), iree_make_cstring_view("0i_i"),
-     IREE_ARRAYSIZE(module_b_entry_attrs_), module_b_entry_attrs_},
+    {IREE_SV("entry"), IREE_SV("0i_i"), IREE_ARRAYSIZE(module_b_entry_attrs_),
+     module_b_entry_attrs_},
 };
 static_assert(IREE_ARRAYSIZE(module_b_funcs_) ==
                   IREE_ARRAYSIZE(module_b_exports_),
               "function pointer table must be 1:1 with exports");
 static const iree_vm_native_module_descriptor_t module_b_descriptor_ = {
-    /*name=*/iree_make_cstring_view("module_b"),
+    /*name=*/IREE_SV("module_b"),
     /*version=*/0,
     /*attr_count=*/0,
     /*attrs=*/NULL,

@@ -66,8 +66,7 @@ static bool isInDispatchRegion(Operation *op) {
          op->getParentOfType<IREE::Flow::DispatchRegionOp>();
 }
 
-/// Wrap a single op in a DispatchWorkgroupsOp. When generateWorkloadRegion is
-/// true, `workload_count` region is generated for dispatch.region
+/// Wrap a single op in a DispatchWorkgroupsOp.
 static FailureOr<IREE::Flow::DispatchWorkgroupsOp>
 wrapInWorkgroupsOp(mlir::TensorDimTrackingRewriter &rewriter, Operation *op) {
   // Simplify tensor::DimOps.

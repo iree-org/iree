@@ -1,5 +1,5 @@
 add_mlir_library(IREELinalgTransformDialectPasses
-  TransformInterpreter.cpp
+  DropSchedulePass.cpp
 
   DEPENDS
   mlir-headers

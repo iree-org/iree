@@ -1,0 +1,131 @@
+// Copyright 2024 The IREE Authors
+//
+// Licensed under the Apache License v2.0 with LLVM Exceptions.
+// See https://llvm.org/LICENSE.txt for license information.
+// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
+#include "iree/compiler/Codegen/Dialect/GPU/Transforms/Passes.h"
+#include "iree/compiler/Codegen/Dialect/GPU/Transforms/Transforms.h"
+#include "iree/compiler/Codegen/Transforms/Transforms.h"
+#include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Casting.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
+#include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
+namespace mlir::iree_compiler::IREE::GPU {
+
+#define GEN_PASS_DEF_FUSEANDHOISTPARALLELLOOPSPASS
+#include "iree/compiler/Codegen/Dialect/GPU/Transforms/Passes.h.inc"
+
+namespace {
+struct FuseAndHoistParallelLoopsPass final
+    : impl::FuseAndHoistParallelLoopsPassBase<FuseAndHoistParallelLoopsPass> {
+  void runOnOperation() override;
+};
+} // namespace
+
+struct FuseForalls final : OpRewritePattern<tensor::ExtractSliceOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(tensor::ExtractSliceOp sliceOp,
+                                PatternRewriter &rewriter) const override {
+    auto sliceParent = sliceOp->getParentOfType<scf::ForallOp>();
+    if (!sliceParent) {
+      return failure();
+    }
+
+    SmallVector<Operation *> consumerChain = {sliceOp};
+    Operation *currProducer = sliceOp.getSource().getDefiningOp();
+    while (currProducer && !llvm::isa<scf::ForallOp>(currProducer) &&
+           currProducer->hasOneUse()) {
+      consumerChain.insert(consumerChain.begin(), currProducer);
+      currProducer =
+          llvm::TypeSwitch<Operation *, Operation *>(currProducer)
+              .Case<tensor::ExpandShapeOp>([](tensor::ExpandShapeOp expand) {
+                return expand.getSrc().getDefiningOp();
+              })
+              .Case<tensor::CollapseShapeOp>(
+                  [](tensor::CollapseShapeOp collapse) {
+                    return collapse.getSrc().getDefiningOp();
+                  })
+              .Default([](Operation *) { return nullptr; });
+    }
+
+    auto producerForall =
+        llvm::dyn_cast_if_present<scf::ForallOp>(currProducer);
+    if (!producerForall) {
+      return failure();
+    }
+
+    // TODO: Allow extracting multiple uses within the same consumer loop. Still
+    // single producer single consumer loop, but multiple uses within the
+    // consumer.
+    if (!producerForall->hasOneUse()) {
+      return failure();
+    }
+
+    return fuseForallIntoSlice(rewriter, producerForall, sliceParent,
+                               consumerChain);
+  }
+};
+
+struct FuseTileableDestinationProducers final
+    : OpRewritePattern<scf::ForallOp> {
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(scf::ForallOp forallOp,
+                                PatternRewriter &rewriter) const override {
+    TilingInterface tileableProducer;
+    tensor::ExtractSliceOp sliceOp;
+    for (auto iterArg : forallOp.getRegionIterArgs()) {
+      for (auto user : iterArg.getUsers()) {
+        sliceOp = dyn_cast<tensor::ExtractSliceOp>(user);
+        if (sliceOp) {
+          break;
+        }
+      }
+      if (!sliceOp) {
+        continue;
+      }
+      tileableProducer = forallOp.getTiedLoopInit(iterArg)
+                             ->get()
+                             .getDefiningOp<TilingInterface>();
+      if (tileableProducer) {
+        break;
+      }
+    }
+    if (!tileableProducer) {
+      return failure();
+    }
+
+    SmallVector<LoopLikeOpInterface> loops = {forallOp};
+    rewriter.startOpModification(forallOp);
+    std::optional<scf::SCFFuseProducerOfSliceResult> fusionResult =
+        mlir::scf::tileAndFuseProducerOfSlice(rewriter, sliceOp, loops);
+    if (!fusionResult) {
+      return failure();
+    }
+    rewriter.finalizeOpModification(forallOp);
+    return success();
+  }
+};
+
+void FuseAndHoistParallelLoopsPass::runOnOperation() {
+  MLIRContext *context = &getContext();
+  RewritePatternSet patterns(context);
+
+  // These two patterns are run to a fixed point, allowing fusion within
+  // potentially nested loops, hoisting from said loops, and continued fusion.
+  patterns.add<FuseForalls>(context);
+  patterns.add<FuseTileableDestinationProducers>(context);
+  populateForallLoopHoistingPattern(patterns);
+  if (failed(
+          applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+    return signalPassFailure();
+  }
+}
+
+} // namespace mlir::iree_compiler::IREE::GPU

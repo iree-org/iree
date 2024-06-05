@@ -62,4 +62,3 @@ hal.executable private @predict_dispatch_1 {
     }
   }
 }
-

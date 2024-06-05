@@ -160,9 +160,9 @@ class HalAllocator : public ApiRefCounted<HalAllocator, iree_hal_allocator_t> {
   py::dict QueryStatistics();
   py::str FormattedStatistics();
 
-  py::object AllocateBufferCopy(
-      int memory_type, int allowed_usage, HalDevice& device, py::object buffer,
-      std::optional<iree_hal_element_types_t> element_type);
+  py::object AllocateBufferCopy(int memory_type, int allowed_usage,
+                                HalDevice& device, py::object buffer,
+                                std::optional<uint64_t> element_type);
   HalBuffer AllocateHostStagingBufferCopy(HalDevice& device, py::handle buffer);
 };
 

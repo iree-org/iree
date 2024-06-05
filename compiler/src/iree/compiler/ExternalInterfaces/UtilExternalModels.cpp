@@ -6,6 +6,8 @@
 
 #include "iree/compiler/ExternalInterfaces/UtilExternalModels.h"
 
+#include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
@@ -331,12 +333,12 @@ void registerUtilExternalModels(DialectRegistry &registry) {
   // Hoistable Op Interface registration.
 
   // Register hoistable type interfaces for LinalgExt ops.
-  registry.addExtension(+[](MLIRContext *context,
-                            IREE::LinalgExt::IREELinalgExtDialect *dialect) {
-    UnhoistableOpInterfaceHelper<
-        IREE::LinalgExt::SetEncodingOp,
-        IREE::LinalgExt::UpperBoundTileSizeOp>::registerOpInterface(context);
-  });
+  registry.addExtension(
+      +[](MLIRContext *context, IREE::Encoding::IREEEncodingDialect *dialect) {
+        UnhoistableOpInterfaceHelper<
+            IREE::Encoding::SetEncodingOp,
+            IREE::Encoding::UpperBoundTileSizeOp>::registerOpInterface(context);
+      });
   // Register hoistable type interfaces for linalg ops.
   // We have a specific allow-list for Linalg ops because we want to consider
   // new additions carefully.

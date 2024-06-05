@@ -17,6 +17,7 @@ iree_c_embed_data(
     "empty.gguf"
     "multiple.gguf"
     "single.gguf"
+    "single_v2.gguf"
   C_FILE_OUTPUT
     "gguf_files.c"
   H_FILE_OUTPUT

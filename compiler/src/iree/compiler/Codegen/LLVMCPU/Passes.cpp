@@ -54,15 +54,6 @@ static llvm::cl::opt<bool> clUseFastMinMaxOps(
         "Use `arith.minf/maxf` instead of `arith.minimumf/maximumf` ops"),
     llvm::cl::init(false));
 
-// TODO(#10820): Delete the flag. This should be a nop pass to default pipeline
-// while tensor.pad op is lowered to fill + insert_slice before Codegen.
-// However, it causes regressions in terms of compilation time. Skip the passes
-// for now.
-static llvm::cl::opt<bool> clEnablePadConsumerFusion(
-    "iree-llvmcpu-enable-pad-consumer-fusion",
-    llvm::cl::desc("Flag to enable the fusion for pad + consumer"),
-    llvm::cl::init(false));
-
 static llvm::cl::opt<bool> clEnableReassociateFpReductions(
     "iree-llvmcpu-reassociate-fp-reductions",
     llvm::cl::desc("Enables reassociation for FP reductions"),
@@ -93,7 +84,7 @@ static llvm::cl::opt<bool> clEnableVectorContractCustomKernels(
     "iree-llvmcpu-enable-vector-contract-custom-kernels",
     llvm::cl::desc("Enables vector contract custom kernels for "
                    "LLVMCPUMmt4dVectorLowering pass."),
-    llvm::cl::init(true));
+    llvm::cl::init(false));
 
 static void addTileAndDistributePasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createTileAndDistributeToWorkgroupsPass());
@@ -288,8 +279,8 @@ void buildLLVMCPUVectorLoweringPipeline(
     OpPassManager &funcPassManager,
     const LLVMCPUVectorLoweringPassOptions &options) {
   funcPassManager.addPass(createLLVMCPUDropVectorUnitDimsPass());
-  funcPassManager.addPass(
-      createLLVMCPUVirtualVectorLoweringPass(options.splitVectorTransfersTo));
+  funcPassManager.addPass(createLLVMCPUVirtualVectorLoweringPass(
+      options.splitVectorTransfersTo, options.enableArmI8mm));
 
   // Make sure we remove redundant vector ops (e.g., vector tranposes) before we
   // lower them and can't be optimized away anymore.
@@ -338,6 +329,7 @@ void addCPUBufferOpsTileAndVectorizePipeline(
     LLVMCPUVectorLoweringPassOptions options;
     options.lowerVectorTransposeToAVX2 = pipelineOpt.lowerToAVX2;
     options.splitVectorTransfersTo = "linalg-copy";
+    options.enableArmI8mm = pipelineOpt.enableAArch64I8mm;
     buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
   }
 
@@ -390,9 +382,11 @@ void addMultiTilingExpertPassPipeline(OpPassManager &funcPassManager,
 
   {
     funcPassManager.addPass(createVectorizePadPass());
-    funcPassManager.addPass(createDecomposePackUnPackOpsPass());
-    funcPassManager.addPass(createCanonicalizerPass());
-    funcPassManager.addPass(createCSEPass());
+    if (pipelineOpt.decomposePackUnPackOps) {
+      funcPassManager.addPass(createDecomposePackUnPackOpsPass());
+      funcPassManager.addPass(createCanonicalizerPass());
+      funcPassManager.addPass(createCSEPass());
+    }
 
     GenericVectorizationPassOptions options;
     options.useConfiguredVectorSizes = pipelineOpt.useConfiguredVectorSizes;
@@ -414,6 +408,7 @@ void addMultiTilingExpertPassPipeline(OpPassManager &funcPassManager,
     LLVMCPUVectorLoweringPassOptions options;
     options.lowerVectorTransposeToAVX2 = pipelineOpt.lowerToAVX2;
     options.splitVectorTransfersTo = "linalg-copy";
+    options.enableArmI8mm = pipelineOpt.enableAArch64I8mm;
     buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
   }
 
@@ -446,6 +441,10 @@ void addConvTileAndDecomposeExpertPassPipeline(
   funcPassManager.addPass(createFuseTensorPadWithConsumerPass());
   funcPassManager.addPass(createConcretizePadResultShapePass());
 
+  if (pipelineOpt.enablePeeling) {
+    funcPassManager.addPass(createLLVMCPUPeelPass());
+  }
+
   {
     funcPassManager.addPass(createVectorizePadPass());
     GenericVectorizationPassOptions options;
@@ -471,6 +470,7 @@ void addConvTileAndDecomposeExpertPassPipeline(
     LLVMCPUVectorLoweringPassOptions options;
     options.lowerVectorTransposeToAVX2 = pipelineOpt.lowerToAVX2;
     options.splitVectorTransfersTo = "shuffle";
+    options.enableArmI8mm = pipelineOpt.enableAArch64I8mm;
     buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
   }
 
@@ -485,7 +485,7 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &funcPassManager,
   addTileAndDistributePasses(funcPassManager);
 
   if (pipelineOpt.enableUkernels) {
-    funcPassManager.addPass(createDecomposeBatchMmt4DOpsPass());
+    funcPassManager.addPass(createCPUPrepareUkernelsPass());
     funcPassManager.addPass(
         createCPULowerToUKernelsPass(clSkipIntermediateRoundings));
   }
@@ -546,6 +546,7 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &funcPassManager,
   LLVMCPUVectorLoweringPassOptions options;
   options.lowerVectorTransposeToAVX2 = pipelineOpt.lowerToAVX2;
   options.splitVectorTransfersTo = "linalg-copy";
+  options.enableArmI8mm = pipelineOpt.enableAArch64I8mm;
   buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
 }
 
@@ -553,9 +554,18 @@ void addCPUDataTilingPipeline(OpPassManager &funcPassManager,
                               TilingConfig &tilingConfig,
                               LLVMCPUPipelineOptions &pipelineOpt) {
   addTileAndDistributePasses(funcPassManager);
+
+  if (pipelineOpt.enableUkernels) {
+    funcPassManager.addPass(createCPUPrepareUkernelsPass());
+    funcPassManager.addPass(
+        createCPULowerToUKernelsPass(clSkipIntermediateRoundings));
+  }
+
   funcPassManager.addPass(
       createLLVMCPUTilePass(tilingConfig.getVectorCommonParallelLevel()));
-  funcPassManager.addPass(createDecomposePackUnPackOpsPass());
+  if (pipelineOpt.decomposePackUnPackOps) {
+    funcPassManager.addPass(createDecomposePackUnPackOpsPass());
+  }
 
   {
     GenericVectorizationPassOptions options;
@@ -574,6 +584,7 @@ void addCPUDataTilingPipeline(OpPassManager &funcPassManager,
     LLVMCPUVectorLoweringPassOptions options;
     options.lowerVectorTransposeToAVX2 = pipelineOpt.lowerToAVX2;
     options.splitVectorTransfersTo = "linalg-copy";
+    options.enableArmI8mm = pipelineOpt.enableAArch64I8mm;
     buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
   }
 }
@@ -584,9 +595,10 @@ void addCPULinalgExtTileAndVectorizePipeline(
   addTileAndDistributePasses(funcPassManager);
   funcPassManager.addPass(
       createLLVMCPUTilePass(tilingConfig.getVectorCommonParallelLevel()));
-  // TODO: Should only apply decomposition here?
-  funcPassManager.addPass(
-      IREE::LinalgExt::createTileAndDecomposeAttentionPass());
+  // TODO: Remove the pass once we have PartialReductionOpInterface implemented
+  // for AttentionOp.
+  funcPassManager.addPass(IREE::LinalgExt::createTileAttentionPass());
+  funcPassManager.addPass(IREE::LinalgExt::createDecomposeAttentionPass());
   funcPassManager.addPass(
       IREE::LinalgExt::createDecomposeWinogradTransformPass());
 
@@ -606,6 +618,7 @@ void addCPULinalgExtTileAndVectorizePipeline(
     LLVMCPUVectorLoweringPassOptions options;
     options.lowerVectorTransposeToAVX2 = pipelineOpt.lowerToAVX2;
     options.splitVectorTransfersTo = "linalg-copy";
+    options.enableArmI8mm = pipelineOpt.enableAArch64I8mm;
     buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
   }
 }
@@ -639,7 +652,7 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
       .addPass(createCSEPass);
 
   // Handled tensor-type constants.
-  modulePassManager.addPass(arith::createConstantBufferizePass());
+  addConstantBufferizePasses(modulePassManager);
 
   FunctionLikeNest(modulePassManager)
       .addPass(createFoldTensorExtractOpPass)
@@ -658,7 +671,6 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
         .addPass(createCSEPass)
         .addPass(mlir::createArithToArmSMEConversionPass)
         .addPass(mlir::createConvertVectorToArmSMEPass)
-        .addPass(mlir::arm_sme::createTileAllocationPass)
         .addPass([]() {
           return mlir::arm_sme::createEnableArmStreamingPass(
               mlir::arm_sme::ArmStreamingMode::StreamingLocally,
@@ -693,7 +705,9 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
                          createInstrumentMemoryAccessesPass);
 
   if (enableAArch64SME) {
-    modulePassManager.addPass(createConvertArmSMEToLLVMPass());
+    FunctionLikeNest(modulePassManager).addPass([&] {
+      return createConvertArmSMEToLLVMPass();
+    });
   }
   modulePassManager.addPass(
       createConvertToLLVMPass(clEnableReassociateFpReductions));

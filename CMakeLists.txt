@@ -78,7 +78,7 @@ option(IREE_BUILD_TESTS "Builds IREE unit tests." ON)
 option(IREE_BUILD_DOCS "Builds IREE documentation files." OFF)
 option(IREE_BUILD_SAMPLES "Builds IREE sample projects." ON)
 option(IREE_BUILD_PYTHON_BINDINGS "Builds the IREE python bindings" OFF)
-option(IREE_BUILD_TRACY "Builds tracy server tools." OFF)
+option(IREE_BUILD_TRACY "Enables building the 'iree-tracy-capture' CLI tool and includes it in runtime Python bindings." OFF)
 option(IREE_BUILD_BUNDLED_LLVM "Builds the bundled llvm-project (vs using installed)" ON)
 
 # Properties controlling version and naming of release artifacts.
@@ -886,7 +886,19 @@ include(external_cc_library)
 include(flatbuffer_c_library)
 
 add_subdirectory(build_tools/third_party/llvm-project EXCLUDE_FROM_ALL)
-add_subdirectory(build_tools/third_party/tracy_client EXCLUDE_FROM_ALL)
+
+if((IREE_ENABLE_RUNTIME_TRACING OR IREE_ENABLE_COMPILER_TRACING) AND
+    IREE_TRACING_PROVIDER STREQUAL "tracy")
+  message(STATUS "Configuring third_party/tracy")
+  list(APPEND CMAKE_MESSAGE_INDENT "  ")
+  add_subdirectory(third_party/tracy EXCLUDE_FROM_ALL)
+  list(POP_BACK CMAKE_MESSAGE_INDENT)
+  iree_install_targets(
+    TARGETS TracyClient
+    COMPONENT IREEBundledLibraries
+    EXPORT_SET Runtime
+  )
+endif()
 
 iree_set_googletest_cmake_options()
 add_subdirectory(third_party/googletest EXCLUDE_FROM_ALL)
@@ -917,6 +929,10 @@ add_subdirectory(build_tools/third_party/flatcc)
 
 if(IREE_HAL_DRIVER_CUDA)
   add_subdirectory(build_tools/third_party/nccl EXCLUDE_FROM_ALL)
+endif()
+
+if(IREE_HAL_DRIVER_HIP)
+  add_subdirectory(build_tools/third_party/rccl EXCLUDE_FROM_ALL)
 endif()
 
 if(IREE_HAL_DRIVER_VULKAN)

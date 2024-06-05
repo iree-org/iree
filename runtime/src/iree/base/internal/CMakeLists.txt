@@ -206,8 +206,8 @@ iree_cc_binary_benchmark(
     "fpu_state_benchmark.cc"
   DEPS
     ::fpu_state
-    benchmark
     iree::base
+    iree::testing::benchmark
     iree::testing::benchmark_main
   TESTONLY
 )
@@ -331,6 +331,18 @@ iree_cc_test(
     ::synchronization
     iree::testing::gtest
     iree::testing::gtest_main
+)
+
+iree_cc_library(
+  NAME
+    time
+  HDRS
+    "time.h"
+  SRCS
+    "time.c"
+  DEPS
+    iree::base::core_headers
+  PUBLIC
 )
 
 iree_cc_library(

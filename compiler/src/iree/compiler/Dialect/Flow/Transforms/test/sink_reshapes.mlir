@@ -6,7 +6,7 @@
 /// operation by just one step
 
 func.func @do_not_sink_across_already_fusable_ops(
-    %arg0 : tensor<?x?xf16>, %arg1 : tensor<?x?xf16>, 
+    %arg0 : tensor<?x?xf16>, %arg1 : tensor<?x?xf16>,
     %arg2 : tensor<?xf16>, %arg3 : tensor<2x?x?xf32>) -> tensor<2x?x?xf16> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
@@ -19,7 +19,7 @@ func.func @do_not_sink_across_already_fusable_ops(
   %1 = linalg.fill ins(%cst : f32) outs(%0 : tensor<?x?xf32>) -> tensor<?x?xf32>
   %2 = linalg.matmul_transpose_b ins(%arg0, %arg1 : tensor<?x?xf16>, tensor<?x?xf16>)
       outs(%1 : tensor<?x?xf32>) -> tensor<?x?xf32>
-  %3 = tensor.expand_shape %2 [[0, 1], [2]] : tensor<?x?xf32> into tensor<2x?x?xf32>
+  %3 = tensor.expand_shape %2 [[0, 1], [2]] output_shape [2, %m, %n]: tensor<?x?xf32> into tensor<2x?x?xf32>
   %4 = tensor.empty(%m_by_2, %n) : tensor<2x?x?xf16>
   %5 = linalg.generic {
       indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
@@ -94,7 +94,7 @@ func.func @do_not_sink_across_dequantize_ops(%arg0: tensor<?x?xf32>) -> tensor<2
       linalg.yield %0 : f32
   } -> tensor<?xf32>
   %m_by_2 = arith.divsi %m, %c2 : index
-  %expand = tensor.expand_shape %reduce [[0, 1]] : tensor<?xf32> into tensor<2x?xf32>
+  %expand = tensor.expand_shape %reduce [[0, 1]] output_shape [2, %m] : tensor<?xf32> into tensor<2x?xf32>
   %empty1 = tensor.empty(%m_by_2) : tensor<2x?xf16>
   %generic = linalg.generic {
       indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,

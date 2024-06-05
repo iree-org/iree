@@ -7,6 +7,7 @@
 #include "compiler/plugins/input/StableHLO/Conversion/Passes.h"
 #include "iree/compiler/PluginAPI/Client.h"
 #include "mlir/Conversion/Passes.h"
+#include "mlir/Dialect/Shape/IR/Shape.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Pass/PassManager.h"
 #include "stablehlo/dialect/ChloOps.h"
@@ -18,34 +19,7 @@ namespace mlir::iree_compiler::stablehlo {
 namespace {
 
 struct StableHLOOptions {
-  bool demoteI64ToI32 = true;
-  bool demoteF64ToF32 = false;
-  bool promoteBF16ToF32 = false;
-
-  void bindOptions(OptionsBinder &binder) {
-    static llvm::cl::OptionCategory category("StableHLO Input");
-
-    // TODO(#8745): Find a better place for these options / rename them
-    //     * Could rename to 'iree-stablehlo-*', but would want to update users
-    //     * Could make generic, if they can be used with other dialects
-    binder.opt<bool>(
-        "iree-input-demote-i64-to-i32", demoteI64ToI32,
-        llvm::cl::desc(
-            "Converts all i64 ops and values into i32 counterparts."),
-        llvm::cl::cat(category));
-
-    binder.opt<bool>(
-        "iree-input-demote-f64-to-f32", demoteF64ToF32,
-        llvm::cl::desc(
-            "Converts all f64 ops and values into f32 counterparts."),
-        llvm::cl::cat(category));
-
-    binder.opt<bool>(
-        "iree-input-promote-bf16-to-f32", promoteBF16ToF32,
-        llvm::cl::desc(
-            "Converts all bf16 ops and values into f32 counterparts."),
-        llvm::cl::cat(category));
-  }
+  void bindOptions(OptionsBinder &binder) {}
 };
 
 static bool checkOpForTuples(Operation *op) {
@@ -90,6 +64,7 @@ struct StableHLOSession
   }
 
   void onRegisterDialects(DialectRegistry &registry) override {
+    registry.insert<mlir::shape::ShapeDialect>();
     registry.insert<mlir::chlo::ChloDialect>();
     registry.insert<mlir::stablehlo::StablehloDialect>();
     registry.insert<mlir::vhlo::VhloDialect>();
@@ -98,9 +73,6 @@ struct StableHLOSession
   bool extendCustomInputConversionPassPipeline(
       OpPassManager &passManager, std::string_view typeMnemonic) override {
     StableHloOptions stableHloOptions;
-    stableHloOptions.demoteI64ToI32 = options.demoteI64ToI32;
-    stableHloOptions.demoteF64ToF32 = options.demoteF64ToF32;
-    stableHloOptions.promoteBF16ToF32 = options.promoteBF16ToF32;
 
     // VHLO is converted to StableHLO. The conversion function is called
     // automatically, and if the input is fully stablehlo the function

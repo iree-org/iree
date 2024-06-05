@@ -38,7 +38,7 @@ function(iree_compiler_register_plugin)
   set_property(GLOBAL APPEND PROPERTY IREE_COMPILER_LINKED_PLUGIN_LIBS "${_RULE_TARGET}")
 endfunction()
 
-# Registers a hal plugin that can be activated with 
+# Registers a hal plugin that can be activated with
 # -DIREE_EXTERNAL_HAL_DRIVERS=NAME.
 #
 # This is usually either done at the top-level CMakeLists for IREE or
@@ -71,7 +71,7 @@ function(iree_register_external_hal_driver)
   if(NOT _RULE_BINARY_DIR)
     set(_RULE_BINARY_DIR "${_RULE_NAME}")
   endif()
-  cmake_path(ABSOLUTE_PATH _RULE_BINARY_DIR 
+  cmake_path(ABSOLUTE_PATH _RULE_BINARY_DIR
     BASE_DIRECTORY "${IREE_BINARY_DIR}/runtime/plugins/hal/drivers")
 
   string(TOUPPER "${_RULE_NAME}" _NAME_SPEC)

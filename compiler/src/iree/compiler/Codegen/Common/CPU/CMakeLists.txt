@@ -44,6 +44,7 @@ iree_cc_library(
   SRCS
     "CPULowerToUKernels.cpp"
     "CPUMaterializeEncodingPass.cpp"
+    "CPUPrepareUkernels.cpp"
     "Passes.cpp"
   DEPS
     ::PassHeaders
@@ -59,6 +60,7 @@ iree_cc_library(
     MLIRFunctionInterfaces
     MLIRIR
     MLIRLinalgDialect
+    MLIRLinalgTransforms
     MLIRLinalgUtils
     MLIRMemRefDialect
     MLIRMemRefTransforms
@@ -81,8 +83,8 @@ iree_cc_library(
     iree::compiler::Codegen::Interfaces::UKernelOpInterface
     iree::compiler::Codegen::Transforms
     iree::compiler::Codegen::Utils
+    iree::compiler::Dialect::Encoding::IR
     iree::compiler::Dialect::HAL::IR
-    iree::compiler::Dialect::LinalgExt::IR
   PUBLIC
 )
 

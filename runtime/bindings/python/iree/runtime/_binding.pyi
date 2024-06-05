@@ -62,7 +62,6 @@ class FileHandle:
         Requires is_host_allocation.
         """
         ...
-
     @property
     def is_host_allocation(self) -> bool: ...
 
@@ -203,7 +202,6 @@ class HalDevice:
         and placed appropriate synchronization guards.
         """
         ...
-
     def from_dlpack_capsule(self, capsule: Any) -> HalBufferView:
         """Imports a DLPack tensor capsule and returns a corresponding buffer
         view.
@@ -361,7 +359,6 @@ class ParameterIndexEntry:
         Only valid if is_file. Returns the backing FileHandle and offset.
         """
         ...
-
     @property
     def file_view(self) -> memoryview:
         """Accesses a memoryview of the file contents.
@@ -369,7 +366,6 @@ class ParameterIndexEntry:
         Only valid if is_file and the file has host accessible storage.
         """
         ...
-
     @property
     def splat_pattern(self) -> bytes:
         """Accesses the splat pattern (if is_splat)."""

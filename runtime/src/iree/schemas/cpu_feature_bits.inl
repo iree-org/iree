@@ -27,7 +27,8 @@
 // Where:
 //   - `arch` is the CPU architecture that this CPU feature applies to, in
 //     IREE's uppercase convention (e.g. ARM_64, X86_64; see IREE_ARCH_*).
-//   - `field_index` is the index into the array returned by `iree_cpu_data_fields()`.
+//   - `field_index` is the index into the array returned by
+//   `iree_cpu_data_fields()`.
 //     Allowed values range from 0 to (IREE_CPU_DATA_FIELD_COUNT-1).
 //   - `bit_pos` is the position of the feature bit within that cpu data field.
 //     As these fields are uint64_t, the range of `bit_pos` is 0..63.
@@ -50,7 +51,7 @@
 // General features and high-level switches.
 // FP_ARMV8: whether FP and NEON are enabled. Armv8 spec says they must agree.
 IREE_CPU_FEATURE_BIT(ARM_64, 0, 0, FP_ARMV8, "fp-armv8")
-IREE_CPU_FEATURE_BIT(ARM_64, 0, 1, LSE, "lse")  // Armv8.1 atomics
+IREE_CPU_FEATURE_BIT(ARM_64, 0, 1, LSE, "lse")        // Armv8.1 atomics
 IREE_CPU_FEATURE_BIT(ARM_64, 0, 2, LSE128, "lse128")  // Armv8.1 atomics
 
 // SIMD features, not SVE-specific.

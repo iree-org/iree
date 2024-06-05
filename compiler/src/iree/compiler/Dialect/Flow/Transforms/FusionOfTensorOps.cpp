@@ -17,6 +17,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+#include "mlir/Analysis/TopologicalSortUtils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
@@ -27,7 +28,6 @@
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/Iterators.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
-#include "mlir/Transforms/TopologicalSortUtils.h"
 
 #define DEBUG_TYPE "iree-flow-fusion-of-tensor-ops"
 
@@ -195,7 +195,7 @@ static FailureOr<unsigned> fuseMultiUseProducers(Operation *funcOp,
           }
 
           // 7. Skip dequantization-like `producer` ops as we would rather fuse
-          // by cloning the producer instead of multi-use fusion.
+          //    by cloning the producer instead of multi-use fusion.
           if (isDequantizationLikeOp(producer)) {
             return;
           }

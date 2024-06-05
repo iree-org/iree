@@ -102,6 +102,26 @@ util.func public @tensorResultOnly() -> tensor<4xf32> {
 
 // -----
 
+// CHECK-LABEL: util.func public @outputStorage
+//  CHECK-SAME: (%[[ARG0:.+]]: !hal.buffer_view, %[[ARG1:.+]]: !hal.buffer_view, %[[RET0:.+]]: !hal.buffer, %[[RET1:.+]]: !hal.buffer,
+//  CHECK-SAME:  %[[WAIT:.+]]: !hal.fence, %[[SIGNAL:.+]]: !hal.fence)
+//       CHECK: %[[RESULT_TENSORS:.+]]:2 = util.call @_outputStorage
+//   CHECK-DAG: %[[RESULT_ALIAS0:.+]] = hal.tensor.alias wait(%[[WAIT]]) => %[[RESULT_TENSORS]]#0 : tensor<4xf32> to %[[RET0]] : !hal.buffer
+//   CHECK-DAG: %[[RESULT_ALIAS1:.+]] = hal.tensor.alias wait(%[[WAIT]]) => %[[RESULT_TENSORS]]#1 : tensor<4xf32> to %[[RET1]] : !hal.buffer
+//   CHECK-DAG: %[[READY_RESULTS:.+]]:2 = hal.tensor.barrier join(%[[RESULT_ALIAS0]], %[[RESULT_ALIAS1]] : tensor<4xf32>, tensor<4xf32>) => %[[SIGNAL]] : !hal.fence
+//   CHECK-DAG: %[[EXPORT0:.+]] = hal.tensor.export %[[READY_RESULTS]]#0 "output0"
+//   CHECK-DAG: %[[EXPORT1:.+]] = hal.tensor.export %[[READY_RESULTS]]#1 "output1"
+//  CHECK-NEXT: util.return %[[EXPORT0]], %[[EXPORT1]]
+
+// CHECK-LABEL: util.func private @_outputStorage(
+util.func public @outputStorage(%arg0: tensor<4xf32>, %arg1: tensor<4xf32>, %ret0: !hal.buffer {iree.abi.output = 0 : index}, %ret1: !hal.buffer {iree.abi.output = 1 : index}) -> (tensor<4xf32>, tensor<4xf32>) {
+  %0 = arith.addf %arg0, %arg1 : tensor<4xf32>
+  %1 = arith.addf %0, %arg0 : tensor<4xf32>
+  util.return %0, %1 : tensor<4xf32>, tensor<4xf32>
+}
+
+// -----
+
 // Tests that imported functions with the coarse-fences execution model
 // specified get wrapped with fences. Note that unlike exports controlled by
 // compiler flags imports only get the fences when explicitly specified so as

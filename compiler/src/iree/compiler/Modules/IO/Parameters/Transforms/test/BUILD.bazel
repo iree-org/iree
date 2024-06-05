@@ -18,6 +18,7 @@ iree_lit_test_suite(
         [
             "export_parameters.mlir",
             "generate_splat_parameter_archive.mlir",
+            "import_parameters.mlir",
         ],
         include = ["*.mlir"],
     ),

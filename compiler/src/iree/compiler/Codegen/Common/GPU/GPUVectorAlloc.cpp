@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/GPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
@@ -16,14 +15,18 @@
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Transforms/Passes.h"
-
-#define DEBUG_TYPE "iree-codegen-gpu-vector-alloc"
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_GPUVECTORALLOCPASS
+#include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
+
+namespace {
+
 // For optimal performance we always want to copy 128 bits.
-static constexpr int copyVectorNumBits = 128;
+constexpr int copyVectorNumBits = 128;
 
 /// Filter to decide which contraction ops need allocations.
 static bool contractOpFilter(Operation *op) {
@@ -96,16 +99,10 @@ static Value readVectorFromTensor(OpBuilder &b, VectorType vectorType,
       .getResult();
 }
 
-namespace {
-
-struct GPUVectorAllocPass : public GPUVectorAllocBase<GPUVectorAllocPass> {
-public:
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<bufferization::BufferizationDialect>();
-    registry.insert<gpu::GPUDialect>();
-  }
+struct GPUVectorAllocPass final
+    : impl::GPUVectorAllocPassBase<GPUVectorAllocPass> {
   void runOnOperation() override {
-    auto funcOp = getOperation();
+    FunctionOpInterface funcOp = getOperation();
 
     SmallVector<vector::ContractionOp> opsToPromote;
     funcOp.walk([&](vector::ContractionOp op) {
@@ -150,11 +147,6 @@ public:
     }
   }
 };
+
 } // namespace
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createGPUVectorAlloc() {
-  return std::make_unique<GPUVectorAllocPass>();
-}
-
 } // namespace mlir::iree_compiler

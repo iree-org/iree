@@ -43,14 +43,8 @@ createDecomposeWinogradTransformPass();
 // Creates a pass to convert linalg convolution ops into a sequence of
 // linalg_ext.winograd.* ops and linalg.batch_matmul ops using the winograd
 // tranformation.
-std::unique_ptr<Pass> createConvertConv2DToWinogradPass();
-
-// Transform dialect version of tile and decompose attention wrapper.
-// The optional tile size specifies the step for the innermost for loop.
-void tileAndDecomposeAttention(IREE::LinalgExt::AttentionOp attnOp,
-                               SmallVectorImpl<Operation *> &ops,
-                               RewriterBase &rewriter, bool onlyTile = false,
-                               std::optional<uint64_t> tileSize = std::nullopt);
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createConvertConv2DToWinogradPass();
 
 IREE::LinalgExt::AttentionOp
 tileAttention(IREE::LinalgExt::AttentionOp attnOp,
@@ -62,9 +56,11 @@ void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
                              RewriterBase &rewriter,
                              std::optional<uint64_t> tileSize = std::nullopt);
 
-// Creates a pass to convert the attention op into a sequence of
-// linalg ops.
-std::unique_ptr<Pass> createTileAndDecomposeAttentionPass();
+// Creates a pass to tile the attention op along the reduction dim.
+std::unique_ptr<Pass> createTileAttentionPass();
+
+// Creates a pass to convert the attention op into a sequence of linalg ops.
+std::unique_ptr<Pass> createDecomposeAttentionPass();
 
 //===---------------------------------------------------------------------===//
 // Codegen Strategy passes that are moved into IREE.

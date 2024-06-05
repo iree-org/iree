@@ -9,6 +9,7 @@
 #include <iostream>
 
 #include "iree/base/api.h"
+#include "iree/hal/drivers/hip/rccl_dynamic_symbols.h"
 #include "iree/testing/gtest.h"
 
 namespace iree {
@@ -30,8 +31,7 @@ TEST(DynamicSymbolsTest, CreateFromSystemLoader) {
   if (!iree_status_is_ok(status)) {
     iree_status_fprint(stderr, status);
     iree_status_ignore(status);
-    std::cerr << "Symbols cannot be loaded, skipping test.";
-    GTEST_SKIP();
+    GTEST_SKIP() << "Symbols cannot be loaded, skipping test.";
   }
 
   int device_count = 0;
@@ -59,6 +59,39 @@ TEST(DynamicSymbolsTest, SearchPathsFail) {
       non_existing_search_paths, &symbols);
 
   ASSERT_TRUE(iree_status_is_unavailable(status));
+}
+
+#define NCCL_CHECK_ERRORS(expr)     \
+  {                                 \
+    ncclResult_t status = expr;     \
+    ASSERT_EQ(ncclSuccess, status); \
+  }
+
+TEST(NCCLDynamicSymbolsTest, CreateFromSystemLoader) {
+  iree_hal_hip_dynamic_symbols_t hip_symbols;
+  iree_status_t status = iree_hal_hip_dynamic_symbols_initialize(
+      iree_allocator_system(), /*hip_lib_search_path_count=*/0,
+      /*hip_lib_search_paths=*/NULL, &hip_symbols);
+  if (!iree_status_is_ok(status)) {
+    iree_status_fprint(stderr, status);
+    iree_status_ignore(status);
+    GTEST_SKIP() << "HIP symbols cannot be loaded, skipping test.";
+  }
+
+  iree_hal_hip_nccl_dynamic_symbols_t nccl_symbols;
+  status = iree_hal_hip_nccl_dynamic_symbols_initialize(
+      iree_allocator_system(), &hip_symbols, &nccl_symbols);
+  if (!iree_status_is_ok(status)) {
+    iree_status_fprint(stderr, status);
+    iree_status_ignore(status);
+    GTEST_SKIP() << "HIP RCCL symbols cannot be loaded, skipping test.";
+  }
+
+  int nccl_version = 0;
+  NCCL_CHECK_ERRORS(nccl_symbols.ncclGetVersion(&nccl_version));
+  ASSERT_EQ(NCCL_VERSION_CODE, nccl_version);
+  iree_hal_hip_nccl_dynamic_symbols_deinitialize(&nccl_symbols);
+  iree_hal_hip_dynamic_symbols_deinitialize(&hip_symbols);
 }
 
 }  // namespace

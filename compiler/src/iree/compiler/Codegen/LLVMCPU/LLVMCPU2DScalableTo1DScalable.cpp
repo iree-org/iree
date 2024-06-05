@@ -5,9 +5,11 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Common/TileSizeSelection.h"
+#include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
+#include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Pass/Pass.h"
@@ -86,6 +88,8 @@ public:
 };
 
 static bool opKnownToSupport2DScalableVectorizationWithArmSME(Operation *op) {
+  if (auto genericOp = dyn_cast<linalg::GenericOp>(op))
+    return isLinalgGeneric2DTranspose(genericOp);
   return isa<linalg::MatmulOp, linalg::MatmulTransposeAOp, linalg::FillOp>(op);
 }
 
@@ -111,7 +115,8 @@ dropScalabilityFromUnsupportedOperations(mlir::FunctionOpInterface funcOp,
   });
 
   for (TilingInterface tilingOp : computeOps) {
-    auto loweringConfigAttr = getLoweringConfig(tilingOp);
+    auto loweringConfigAttr =
+        getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(tilingOp);
     if (!loweringConfigAttr)
       continue;
 

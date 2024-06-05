@@ -41,6 +41,7 @@ public:
     // clang-format off
     registry
         .insert<IREE::Codegen::IREECodegenDialect,
+                IREE::GPU::IREEGPUDialect,
                 IREE::HAL::HALDialect,
                 IREE::LinalgExt::IREELinalgExtDialect,
                 linalg::LinalgDialect,
@@ -57,7 +58,7 @@ public:
 
   LLVMGPUSelectLoweringStrategyPass() = default;
   LLVMGPUSelectLoweringStrategyPass(
-      const LLVMGPUSelectLoweringStrategyPass &pass){};
+      const LLVMGPUSelectLoweringStrategyPass &pass) {}
 
   void runOnOperation() override;
 };
@@ -71,7 +72,8 @@ verifyLoweringConfiguration(FunctionOpInterface funcOp,
                             IREE::Codegen::TranslationInfoAttr translationInfo,
                             ArrayRef<int64_t> workgroupSize, F verificationFn) {
   auto walkResult = funcOp.walk([&](Operation *op) -> WalkResult {
-    IREE::Codegen::LoweringConfigAttr loweringConfig = getLoweringConfig(op);
+    auto loweringConfig =
+        getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(op);
     if (!loweringConfig)
       return WalkResult::advance();
     return verificationFn(op, loweringConfig, translationInfo, workgroupSize);

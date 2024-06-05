@@ -24,6 +24,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--target_backend", type=str, default="llvm-cpu")
     parser.add_argument("--driver", type=str, default="local-task")
+    parser.add_argument("--iree_compiler_args", type=str, default="")
     return parser.parse_known_args()
 
 
@@ -104,7 +105,8 @@ def run_test(
             output_file=module_filepath,
             target_backends=[args.target_backend],
             input_type=mlir_input_type,
-            extra_args=["--iree-hal-cuda-llvm-target-arch", "sm_53"],
+            # TODO: do a proper split with " handling.
+            extra_args=args.iree_compiler_args.split(),
         )
 
         num_ranks = len(inputs)

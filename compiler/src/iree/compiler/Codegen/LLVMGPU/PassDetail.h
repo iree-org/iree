@@ -7,6 +7,8 @@
 #ifndef IREE_COMPILER_CODEGEN_LLVMGPU_PASS_DETAIL_H_
 #define IREE_COMPILER_CODEGEN_LLVMGPU_PASS_DETAIL_H_
 
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
+#include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"

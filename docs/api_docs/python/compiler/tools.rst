@@ -53,4 +53,3 @@ is installed via the appropriate PIP package.
 
 .. autoclass:: iree.compiler.tools.tf.ImportOptions
 .. autoenum:: iree.compiler.tools.tf.ImportType
-

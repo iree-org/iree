@@ -436,7 +436,7 @@ setup(
         # it also needs to be enabled on the build side.
         # CMakeExtension("iree.compiler._mlir_libs._mlirHlo"),
         CMakeExtension("iree.compiler._mlir_libs._mlirLinalgPasses"),
-        CMakeExtension("iree.compiler._mlir_libs._mlirGpuPasses"),
+        CMakeExtension("iree.compiler._mlir_libs._mlirGPUPasses"),
         CMakeExtension("iree.compiler._mlir_libs._site_initialize_0"),
     ],
     cmdclass={
@@ -467,7 +467,7 @@ setup(
     ],
     extras_require={
         "onnx": [
-            "onnx>=1.15.0",
+            "onnx>=1.16.0",
         ],
     },
 )

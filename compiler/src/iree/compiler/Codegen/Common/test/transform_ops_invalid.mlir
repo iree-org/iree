@@ -67,4 +67,3 @@ module attributes { transform.with_named_sequence, test.iree_transform_do_not_ma
     transform.yield
   } // @__transform_main
 } // module
-

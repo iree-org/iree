@@ -130,6 +130,9 @@ DEFAULT_POSTSUBMIT_ONLY_JOBS = frozenset(
         "build_test_all_macos_x86_64",
         # Due to the outstock of A100, only run this test in postsubmit.
         "test_nvidia_a100",
+        # Due to the instability issues at the current runner,
+        # only run this test in postsubmit.
+        "test_amd_w7900",
     ]
 )
 
@@ -167,9 +170,9 @@ PR_DESCRIPTION_TEMPLATE = string.Template("${title}\n\n${body}")
 # intended to be merged and should exclude test/draft PRs as well as
 # PRs that include temporary patches to the submodule during review.
 # See also: https://github.com/iree-org/iree/issues/12268
-LLVM_INTEGRATE_TITLE_PATTERN = re.compile("^integrate.+llvm", re.IGNORECASE)
+LLVM_INTEGRATE_TITLE_PATTERN = re.compile("^integrate|bump.+llvm", re.IGNORECASE)
 LLVM_INTEGRATE_BRANCH_PATTERN = re.compile(
-    "bump-llvm|llvm-bump|integrate-llvm", re.IGNORECASE
+    "integrates/llvm|bump-llvm|llvm-bump|integrate-llvm", re.IGNORECASE
 )
 LLVM_INTEGRATE_LABEL = "llvm-integrate"
 

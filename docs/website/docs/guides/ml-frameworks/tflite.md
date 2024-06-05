@@ -47,7 +47,7 @@ graph LR
     [official documentation](https://www.tensorflow.org/install):
 
     ```shell
-    python -m pip install tf-nightly
+    python -m pip install tensorflow
     ```
 
 2. Install IREE packages, either by

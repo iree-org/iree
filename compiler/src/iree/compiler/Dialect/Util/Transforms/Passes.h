@@ -30,7 +30,6 @@ createFixedPointIteratorPass(OpPassManager pipeline);
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createFoldGlobalsPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createFuseGlobalsPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createIPOPass();
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createOutlineConstantsPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createPropagateSubrangesPass();
 std::unique_ptr<OperationPass<void>> createSimplifyGlobalAccessesPass();
 std::unique_ptr<OperationPass<mlir::ModuleOp>>
@@ -55,13 +54,6 @@ std::unique_ptr<OperationPass<mlir::ModuleOp>> createHoistIntoGlobalsPass();
 
 // Resource Management.
 std::unique_ptr<OperationPass<void>> createImportResourcesPass();
-
-// Type conversion.
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createDemoteI64ToI32Pass();
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createDemoteF32ToF16Pass();
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createDemoteF64ToF32Pass();
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createPromoteF16ToF32Pass();
-std::unique_ptr<OperationPass<mlir::ModuleOp>> createPromoteBF16ToF32Pass();
 
 // Debug/test passes.
 std::unique_ptr<OperationPass<mlir::ModuleOp>> createAnnotateOpOrdinalsPass();

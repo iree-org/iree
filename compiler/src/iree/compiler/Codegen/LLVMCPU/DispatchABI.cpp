@@ -125,7 +125,8 @@ ExecutableLibraryDI::getConstOf(LLVM::DITypeAttr typeAttr) {
   return LLVM::DIDerivedTypeAttr::get(
       builder.getContext(), llvm::dwarf::DW_TAG_const_type,
       /*name=*/nullptr, typeAttr, /*sizeInBits=*/0, /*alignInBits=*/0,
-      /*offsetInBits=*/0, /*extraData=*/nullptr);
+      /*offsetInBits=*/0, /*dwarfAddressSpace=*/std::nullopt,
+      /*extraData=*/nullptr);
 }
 
 LLVM::DIDerivedTypeAttr
@@ -135,6 +136,7 @@ ExecutableLibraryDI::getPtrOf(LLVM::DITypeAttr typeAttr) {
       /*name=*/nullptr, typeAttr, /*sizeInBits=*/ptrBitwidth,
       /*alignInBits=*/0,
       /*offsetInBits=*/0,
+      /*dwarfAddressSpace=*/std::nullopt,
       /*extraData=*/nullptr);
 }
 
@@ -152,7 +154,9 @@ ExecutableLibraryDI::getArrayOf(LLVM::DITypeAttr typeAttr, int64_t count) {
               builder.getContext(), builder.getI64IntegerAttr(count),
               /*lowerBound=*/nullptr, /*upperBound=*/nullptr,
               /*stride=*/nullptr),
-      });
+      },
+      /*dataLocation=*/nullptr, /*rank=*/nullptr, /*allocated=*/nullptr,
+      /*associated=*/nullptr);
 }
 
 LLVM::DIDerivedTypeAttr
@@ -160,7 +164,8 @@ ExecutableLibraryDI::getTypedefOf(StringRef name, LLVM::DITypeAttr typeAttr) {
   return LLVM::DIDerivedTypeAttr::get(
       builder.getContext(), llvm::dwarf::DW_TAG_typedef,
       builder.getStringAttr(name), typeAttr, /*sizeInBits=*/0,
-      /*alignInBits=*/0, /*offsetInBits=*/0, /*extraData=*/nullptr);
+      /*alignInBits=*/0, /*offsetInBits=*/0, /*dwarfAddressSpace=*/std::nullopt,
+      /*extraData=*/nullptr);
 }
 
 LLVM::DIDerivedTypeAttr
@@ -173,7 +178,8 @@ ExecutableLibraryDI::getMemberOf(StringRef name, LLVM::DITypeAttr typeAttr,
       builder.getContext(), llvm::dwarf::DW_TAG_member,
       builder.getStringAttr(name), typeAttr,
       /*sizeInBits=*/memberSizeInBits, /*alignInBits=*/0,
-      /*offsetInBits=*/memberOffsetInBits, /*extraData=*/nullptr);
+      /*offsetInBits=*/memberOffsetInBits, /*dwarfAddressSpace=*/std::nullopt,
+      /*extraData=*/nullptr);
 }
 
 LLVM::DITypeAttr ExecutableLibraryDI::getBasicType(Type type) {
@@ -222,7 +228,9 @@ LLVM::DICompositeTypeAttr ExecutableLibraryDI::getProcessorV0T() {
       /*alignInBits=*/0,
       {
           getMemberOf("data", getArrayOf(getUint64T(), 8), &offsetInBits),
-      });
+      },
+      /*dataLocation=*/nullptr, /*rank=*/nullptr, /*allocated=*/nullptr,
+      /*associated=*/nullptr);
 }
 
 LLVM::DIDerivedTypeAttr ExecutableLibraryDI::getEnvironmentV0T() {
@@ -248,7 +256,10 @@ LLVM::DIDerivedTypeAttr ExecutableLibraryDI::getEnvironmentV0T() {
                           getPtrOf(getPtrOf(getConstOf(getVoidPtr()))),
                           &offsetInBits),
               getMemberOf("processor", getProcessorV0T(), &offsetInBits),
-          }));
+          },
+          /*dataLocation=*/nullptr,
+          /*rank=*/nullptr, /*allocated=*/nullptr,
+          /*associated=*/nullptr));
 }
 
 LLVM::DIDerivedTypeAttr ExecutableLibraryDI::getDispatchStateV0T() {
@@ -282,7 +293,9 @@ LLVM::DIDerivedTypeAttr ExecutableLibraryDI::getDispatchStateV0T() {
               getMemberOf("binding_lengths",
                           getPtrOf(getConstOf(getArrayOf(getSizeT(), 64))),
                           &offsetInBits),
-          }));
+          },
+          /*dataLocation=*/nullptr, /*rank=*/nullptr, /*allocated=*/nullptr,
+          /*associated=*/nullptr));
 }
 
 LLVM::DIDerivedTypeAttr ExecutableLibraryDI::getWorkgroupStateV0T() {
@@ -304,7 +317,9 @@ LLVM::DIDerivedTypeAttr ExecutableLibraryDI::getWorkgroupStateV0T() {
               getMemberOf("processor_id", getUint32T(), &offsetInBits),
               getMemberOf("local_memory", getVoidPtr(), &offsetInBits),
               getMemberOf("local_memory_size", getUint32T(), &offsetInBits),
-          }));
+          },
+          /*dataLocation=*/nullptr, /*rank=*/nullptr, /*allocated=*/nullptr,
+          /*associated=*/nullptr));
 }
 
 //------------------------------------------------------------------------------

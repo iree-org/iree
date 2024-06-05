@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/GPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
@@ -15,6 +14,7 @@
 #include "mlir/Dialect/SCF/Transforms/Patterns.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -28,9 +28,13 @@
 
 namespace mlir::iree_compiler {
 
-static const StringLiteral kPipeliningLoopMarker = "__pipelining_K_loop__";
-static const StringLiteral kPipeliningFirstStage = "__pipelining_first_stage__";
-static const StringLiteral kPipeliningExtraBarrier =
+#define GEN_PASS_DEF_GPUPIPELININGPASS
+#include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
+
+namespace {
+constexpr StringLiteral kPipeliningLoopMarker = "__pipelining_K_loop__";
+constexpr StringLiteral kPipeliningFirstStage = "__pipelining_first_stage__";
+constexpr StringLiteral kPipeliningExtraBarrier =
     "__pipelining_extra_barrier__";
 
 /// Returns true if the given `memrefType` has the default numeric address space
@@ -660,29 +664,20 @@ applyPipelining(scf::ForOp forOp, int64_t depth, bool epiloguePeeling,
   rewriter.setInsertionPoint(forOp);
   return pipelineForLoop(rewriter, forOp, options);
 }
-namespace {
-struct GPUPipeliningPass : public GPUPipeliningBase<GPUPipeliningPass> {
-  GPUPipeliningPass(bool epiloguePeeling, int64_t depth,
-                    PipeliningSchedulingStrategy schedule)
-      : depth(depth), schedule(schedule), epiloguePeeling(epiloguePeeling) {}
-  void initOptions() {
-    if (GPUPipeliningBase::depth.hasValue())
-      depth = GPUPipeliningBase::depth.getValue();
-    if (GPUPipeliningBase::epiloguePeeling.hasValue())
-      epiloguePeeling = GPUPipeliningBase::epiloguePeeling.getValue();
-    if (GPUPipeliningBase::scheduleIndex.hasValue())
-      schedule = (PipeliningSchedulingStrategy)
-                     GPUPipeliningBase::scheduleIndex.getValue();
-  }
+
+struct GPUPipeliningPass final
+    : impl::GPUPipeliningPassBase<GPUPipeliningPass> {
+  using GPUPipeliningPassBase::GPUPipeliningPassBase;
 
   void runOnOperation() override {
-    initOptions();
-    auto funcOp = getOperation();
+    FunctionOpInterface funcOp = getOperation();
     SmallVector<scf::ForOp> forOps;
     // Mark the loop with shared memory copy for pipelining.
     funcOp.walk([&forOps](scf::ForOp forOp) { forOps.push_back(forOp); });
     for (scf::ForOp forOp : forOps) {
-      (void)applyPipelining(forOp, depth, epiloguePeeling, schedule);
+      (void)applyPipelining(
+          forOp, depth, epiloguePeeling,
+          static_cast<PipeliningSchedulingStrategy>(scheduleIndex.getValue()));
     }
     // Remove extra barriers from the prologue assuming appropriate
     // multi-buffering.
@@ -691,11 +686,6 @@ struct GPUPipeliningPass : public GPUPipeliningBase<GPUPipeliningPass> {
         barrierOp->erase();
     });
   }
-
-private:
-  int64_t depth;
-  PipeliningSchedulingStrategy schedule;
-  bool epiloguePeeling;
 };
 } // namespace
 
@@ -704,17 +694,6 @@ pipelineSharedMemoryCopy(RewriterBase &rewriter, scf::ForOp forOp,
                          PipeliningSchedulingStrategy strategy,
                          bool peelEpilogue, int64_t depth) {
   return applyPipelining(forOp, depth, peelEpilogue, strategy);
-}
-
-/// Pass options
-/// epiloguePeeling - try enable/disable epilogue peeling.
-/// true  : Peel epilogue (no additional checks required)
-/// false : Try and use unpeeled epilogue (check if predication is supported
-/// is avialable)
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createGPUPipeliningPass(bool epiloguePeeling, unsigned depth,
-                        PipeliningSchedulingStrategy schedule) {
-  return std::make_unique<GPUPipeliningPass>(epiloguePeeling, depth, schedule);
 }
 
 } // namespace mlir::iree_compiler

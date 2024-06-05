@@ -18,18 +18,43 @@
 namespace mlir::iree_compiler {
 
 //===----------------------------------------------------------------------===//
+// Pass Pipeline Options
+//===----------------------------------------------------------------------===//
+
+/// Named attributes used in the `translation_info`'s config dictionary
+/// attribute. These are used to override default pass heuristics at the
+/// function granularity.
+namespace LLVMGPUAttrNames {
+inline constexpr StringLiteral kNoReorderWorkgroups = "no_reorder_workgroups";
+inline constexpr StringLiteral kNoReduceSharedMemoryBankConflicts =
+    "no_reduce_shared_memory_bank_conflicts";
+} //  namespace LLVMGPUAttrNames
+
+struct LLVMGPUPipelineOptions {
+  bool enableReduceSharedMemoryBankConflicts = true;
+  bool enableReorderWorkgroups = true;
+  bool enableUkernels = false;
+};
+
+llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
+                              const LLVMGPUPipelineOptions &options);
+
+//===----------------------------------------------------------------------===//
 // Passes
 //===----------------------------------------------------------------------===//
 
 /// Lowering using SIMT CUDA core operations.
-void addGPUMatmulSimtPassPipeline(OpPassManager &funcPassManager);
+void addGPUMatmulSimtPassPipeline(OpPassManager &funcPassManager,
+                                  const LLVMGPUPipelineOptions &options);
 
 /// Lowering using mma.sync Tensor Core operations.
-void addGPUMatmulTensorCoreMmaSyncPassPipeline(OpPassManager &funcPassManager,
-                                               unsigned pipelineDepth);
+void addGPUMatmulTensorCoreMmaSyncPassPipeline(
+    OpPassManager &funcPassManager, const LLVMGPUPipelineOptions &options,
+    unsigned pipelineDepth);
 
 /// Lowering using wmma Tensor Core operations.
 void addGPUMatmulTensorCorePassPipeline(OpPassManager &funcPassManager,
+                                        const LLVMGPUPipelineOptions &options,
                                         unsigned pipelineDepth);
 
 void addGPUPackUnPackPasses(OpPassManager &funcPassManager);
@@ -44,21 +69,28 @@ void addGPUTransformDialectPasses(OpPassManager &funcPassManager,
                                   StringRef entryPoint);
 
 /// Lowering transpose using shared memory.
-void addGPUTransposePassPipeline(OpPassManager &funcPassManager);
+void addGPUTransposePassPipeline(OpPassManager &funcPassManager,
+                                 const LLVMGPUPipelineOptions &options);
 
 /// Lowering calling vectorization patterns. Expects pass manager to be a
 /// module-level pass manager.
 void addGPUVectorizationPassPipeline(OpPassManager &funcPassManager);
 
+/// Lowering for winograd transform ops. Follows `VectorizationPassPipeline`
+/// with different tiling and distribution passes.
+void addGPUWinogradVectorizePassPipeline(OpPassManager &funcPassManager);
+
 /// Lowering based on vector distribution patterns.
-void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager);
+void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
+                                        const LLVMGPUPipelineOptions &options,
+                                        bool usePadToModelSharedMemcpy);
 
 /// Lowering reductions to warp reductions.
 void addGPUWarpReductionPassPipeline(OpPassManager &funcPassManager);
 
 /// Default pass pipeline on GPU, currently used only for the ukernel path.
 void addGPUDefaultPassPipeline(OpPassManager &funcPassManager,
-                               bool enableMicrokernels);
+                               const LLVMGPUPipelineOptions &options);
 
 /// Pass pipeline to lower IREE HAL executables without tiling and distribution.
 void addGPUBaseLoweringPassPipeline(OpPassManager &pm);
@@ -106,6 +138,12 @@ createLLVMGPUPackSharedMemoryAlloc();
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMGPUPrefetchSharedMemoryPass();
+
+/// Pass to pad operations on tensors in top-down order.
+enum class LLVMGPUMatmulPadOption { ParallelDims, ReductionDims };
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createLLVMGPUPromoteMatmulToFitMMAPass(
+    LLVMGPUMatmulPadOption option = LLVMGPUMatmulPadOption::ParallelDims);
 
 enum class GPUTensorCoreType {
   WMMA = 0,

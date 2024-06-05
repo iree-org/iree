@@ -18,7 +18,9 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
-            "mma_attrs.mlir",
+            "iree_gpu_attrs.mlir",
+            "iree_gpu_ops.mlir",
+            "target_attrs.mlir",
         ],
         include = ["*.mlir"],
     ),

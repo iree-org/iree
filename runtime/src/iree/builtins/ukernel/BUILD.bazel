@@ -113,6 +113,10 @@ bitcode_specific_archs = [
     srcs = [
         "mmt4d.c",
         "mmt4d_tile_generic.c",
+        "pack.c",
+        "pack_tile.c",
+        "unpack.c",
+        "unpack_tile.c",
     ] + ([] if arch in bitcode_specific_archs else ["fallback.c"]),
     arch = arch,
     internal_hdrs = [

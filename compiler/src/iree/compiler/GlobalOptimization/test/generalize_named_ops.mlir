@@ -34,4 +34,3 @@ util.func public @no_generalize_op_within_dispatch(%arg0 : tensor<?x?xf32>, %arg
 //       CHECK:     %[[ADD:.+]] = linalg.add
 //       CHECK:     flow.return %[[ADD]]
 //       CHECK:   util.return %[[DISPATCH]]
-

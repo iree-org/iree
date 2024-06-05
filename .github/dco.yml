@@ -1,0 +1,4 @@
+# Developer Certificate of Origin configuration
+# https://github.com/dcoapp/app
+require:
+  members: false

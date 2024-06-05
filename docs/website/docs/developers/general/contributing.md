@@ -21,7 +21,115 @@ We'd love to accept your patches and contributions to this project.
 This project follows the
 [OpenXLA Code of Conduct](https://github.com/openxla/community/blob/main/CODE-OF-CONDUCT.md).
 
+### :octicons-law-16: Developer Certificate of Origin
+
+Contributors must certify that they wrote or otherwise have the right to submit
+the code they are contributing to the project.
+
+??? quote "Expand to read the full DCO agreement text"
+
+    By making a contribution to this project, I certify that:
+
+    1. The contribution was created in whole or in part by me and I have the
+      right to submit it under the open source license indicated in the file; or
+
+    2. The contribution is based upon previous work that, to the best of my
+      knowledge, is covered under an appropriate open source license and I have
+      the right under that license to submit that work with modifications, whether
+      created in whole or in part by me, under the same open source license
+      (unless I am permitted to submit under a different license), as indicated
+      in the file; or
+
+    3. The contribution was provided directly to me by some other person who
+      certified 1., 2. or 3. and I have not modified it.
+
+    4. I understand and agree that this project and the contribution are public
+      and that a record of the contribution (including all personal information
+      I submit with it, including my sign-off) is maintained indefinitely and
+      may be redistributed consistent with this project or the open source
+      license(s) involved.
+
+Signing is enforced by the [DCO GitHub App](https://github.com/apps/dco) (see
+also the [dcoapp/app](https://github.com/dcoapp/app) repository).
+
+The DCO check requires that all commits included in pull requests _either_
+are cryptographically signed by a member of the repository's organization _or_
+include a `Signed-off-by` message as a git trailer.
+
+#### Crypographically signing commits
+
+_This is the recommended approach for frequent contributors!_
+
+For members of the repository's organization
+(see [obtaining commit access](#obtaining-commit-access)), commits that are
+signed do not require the `Signed-off-by` text. See these references:
+
+* [Signing commits](https://docs.github.com/en/authentication/managing-commit-signature-verification/signing-commits)
+    (generate key, add to <https://github.com/settings/keys>, `git commit -S`)
+* [SSH commit signature verification](https://docs.github.com/en/authentication/managing-commit-signature-verification/about-commit-signature-verification#ssh-commit-signature-verification)
+    (recommended if you already use SSH keys with GitHub) and
+    [Signing Git Commits with SSH Keys](https://blog.dbrgn.ch/2021/11/16/git-ssh-signatures/)
+    (streamlined version of the previous page).
+
+    SSH keys can be added at <https://github.com/settings/ssh/new>
+    (Note that even if you have added your SSH key as an authorized key, you
+    need to add it again as a signing key).
+
+    Then,
+
+    ```bash
+    # Sign commits automatically
+    git config --global commit.gpgsign true
+    git config --global tag.gpgsign true
+
+    # Sign using SSH, not GPG
+    git config --global user.signingkey ~/.ssh/id_rsa.pub
+    git config --global gpg.format ssh
+
+    # Create an "allowed_signers" file
+    echo your@email `cat ~/.ssh/id_rsa.pub` > ~/.ssh/allowed_signers
+    git config --global gpg.ssh.allowedSignersFile ~/.ssh/allowed_signers
+    ```
+
+* [Generating GPG keys](https://docs.github.com/en/authentication/managing-commit-signature-verification/generating-a-new-gpg-key)
+    (alternative to using SSH keys)
+
+    GPG keys can be added at <https://github.com/settings/gpg/new>, then:
+
+    ```bash
+    # Sign commits automatically
+    git config --global commit.gpgsign true
+    git config --global tag.gpgsign true
+    ```
+
+#### Adding `Signed-off-by` to commits
+
+_This requires less setup and is suitable for first time contributors._
+
+Contributors _sign-off_ their agreement by adding a `Signed-off-by` line to
+commit messages:
+
+```text
+This is my commit message
+
+Signed-off-by: Random J Developer <random@developer.example.org>
+```
+
+* Git will automatically append this message if you use the `-s` option:
+
+    ```bash
+    git commit -s -m 'This is my commit message'
+    ```
+
+* Users of [Visual Studio Code](https://code.visualstudio.com/) can add
+  `"git.alwaysSignOff": true,` in their settings
+
+* See `.git/hooks/prepare-commit-msg.sample` for how to automatically
+  add this using a [git hook](https://git-scm.com/docs/githooks)
+
 ### :octicons-law-16: Contributor License Agreement
+
+!!! info - "CLA is being replaced with DCO. Both are enabled while we migrate."
 
 Contributions to this project must be accompanied by a Contributor License
 Agreement (CLA). Head over to <https://cla.developers.google.com/> to see
@@ -33,6 +141,29 @@ your current agreements on file or to sign a new one.
 * You generally only need to submit a CLA once, so if you've already submitted
   one (even if it was for a different project), you probably don't need to do it
   again.
+
+### :octicons-people-16: AUTHORS, CODEOWNERS, and MAINTAINERS
+
+The [`AUTHORS` file](https://github.com/iree-org/iree/blob/main/AUTHORS) keeps
+track of those who have made significant contributions to the project.
+
+* If you would like additional recognition for your contributions, you may add
+  yourself or your organization (please add the entity who owns the copyright
+  for your contributions).
+* The source control history remains the most accurate source for individual
+  contributions.
+
+The
+[`.github/CODEOWNERS` file](https://github.com/iree-org/iree/blob/main/.github/CODEOWNERS)
+lets maintainers opt in to PR reviews modifying certain paths.
+
+* Review is not required from a code owner, though it is recommended.
+
+The
+[`MAINTAINERS.md` file](https://github.com/iree-org/iree/blob/main/MAINTAINERS.md)
+documents official maintainers for project components.
+
+## :octicons-code-16: Coding policies
 
 ### :octicons-pencil-16: Coding style guidelines
 
@@ -58,6 +189,16 @@ they are applied consistently across the project.
     [`build_tools/scripts/lint.sh`](https://github.com/iree-org/iree/blob/main/build_tools/scripts/lint.sh)
     can also be used to run the full suite of lint checks.
 
+### :material-test-tube: Testing policy
+
+With few exceptions, features should be accompanied by automated tests.
+
+We use a mix of in-tree and out-of-tree unit and integration tests. For more
+information about the types of tests used across the project, refer to the
+[testing guide](./testing-guide.md).
+
+## :simple-github: GitHub policies
+
 ### :octicons-code-review-16: Code reviews
 
 All submissions, including submissions by maintainers, require review. We
@@ -72,14 +213,6 @@ information on using pull requests.
   working for a certain situation, please ask as we bias towards pragmatism for
   cases that require it.
 
-### :material-test-tube: Testing policy
-
-With few exceptions, features should be accompanied by automated tests.
-
-We use a mix of in-tree and out-of-tree unit and integration tests. For more
-information about the types of tests used across the project, refer to the
-[testing guide](./testing-guide.md).
-
 ### :material-check-all: GitHub Actions workflows
 
 We use [GitHub Actions](https://docs.github.com/en/actions) to automatically
@@ -88,8 +221,9 @@ build and test various parts of the project.
 * Most presubmit workflows will only run automatically on PRs if you are a
   project collaborator. Otherwise a maintainer must
   [approve workflow runs](https://docs.github.com/en/actions/managing-workflow-runs/approving-workflow-runs-from-public-forks).
-  If you are sending code changes to the project, please ask to be added as a
-  collaborator, so that these can run automatically.
+  If you are sending code changes to the project, please
+  [request commit access](#obtaining-commit-access), so that these can run
+  automatically.
 * It is generally expected that PRs will only be merged when all checks are
   passing. In some cases, pre-existing failures may be bypassed by a maintainer.
 
@@ -98,9 +232,6 @@ build and test various parts of the project.
     Some workflows only run on commits after they are merged. See the
     [CI behavior manipulation](#ci-behavior-manipulation) section below to
     learn how to customize this behavior.
-
-<!-- TODO(scotttodd): link to infrastructure / CI docs when they exist -->
-<!-- TODO(scotttodd): link to "obtaining commit access" -->
 
 ### :octicons-git-pull-request-16: Merging approved changes
 
@@ -140,18 +271,22 @@ join any of the teams on <https://github.com/orgs/iree-org/teams>.
     [shark-infra](https://github.com/shark-infra/). Reach out to a project
     member if you would also like access to repositories in those organizations.
 
-### :octicons-people-16: Credits in the AUTHORS file
+### :octicons-git-branch-16: Branch naming
 
-If you would like additional recognition for your contributions, you may add
-yourself or your organization to the
-[AUTHORS file](https://github.com/iree-org/iree/blob/main/AUTHORS) that keeps
-track of those who have made significant contributions to the project.
+Most work should be done on
+[repository forks](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/working-with-forks/about-forks).
+For developers with write access, when creating a branch in the common
+[iree-org/iree repository](https://github.com/iree-org/iree), please follow
+these naming guidelines:
 
-* Please add the entity who owns the copyright for your contribution.
-* The source control history remains the most accurate source for individual
-  contributions.
+Branch type | Naming scheme | Example
+-- | -- | --
+Single user | `users/[username]/*` | `users/cooldeveloper/my-awesome-feature`
+Shared feature branch | `shared/*` | `shared/pytorch-performance-sprint`
+Dependency updates | `integrates/*` | `integrates/llvm-20240501`
 
-<!-- TODO(scotttodd): merge the sections below into "developer overview"? -->
+Branches that do not meet these guidelines may be deleted, especially if
+they [appear to be stale](https://github.com/iree-org/iree/branches/stale).
 
 ## Tips for contributors
 
@@ -190,12 +325,6 @@ to run many of its workflow jobs. These enable access to additional compute and
 custom configurations such as accelerators. Configuration scripting is checked
 in to this repository (see the
 [README for that directory](https://github.com/iree-org/iree/blob/main/build_tools/github_actions/runner/README.md)).
-
-#### Custom managed runners
-
-In addition to our self-hosted runners, we use GitHub's
-[large managed runners](https://docs.github.com/en/actions/using-github-hosted-runners/about-larger-runners)
-for some platforms.
 
 #### CI behavior manipulation
 
@@ -323,107 +452,3 @@ For example, this PR opted in to running the `build_test_all_windows` job:
 The enabled jobs can be viewed from the Summary page of an action run:
 
 ![ci_enabled_jobs](./contributing-ci-enabled-jobs.png)
-
-### Git workflows
-
-We tend to use the "triangular" or "forking" workflow. Develop primarily on a
-clone of the repository on your development machine. Any local branches named
-the same as persistent branches from the
-[main repository](https://github.com/iree-org/iree) are pristine (though
-potentially stale) copies. You only fastforward these to match upstream and
-otherwise do development on other branches. When sending PRs, you push to a
-different branch on your public fork and create the PR from there.
-
-<!-- TODO(scotttodd): screenshots / diagrams here
-  (https://mermaid.js.org/syntax/gitgraph.html?) -->
-
-#### Setup
-
-1. Create a fork of the main repository.
-
-2. Create a local git repository with remotes `upstream` (the main repository)
-    and `origin` (your personal fork). To list your current remotes
-    `git remote -v`.
-
-    a. If you already cloned from the main repository (e.g. by following the
-    getting started guide):
-
-      ```shell
-      # From your existing git repo
-      $ git remote rename origin upstream
-      $ git remote add origin https://github.com/<github_username>/iree.git
-      ```
-
-    b. If you haven't already cloned:
-
-      ```shell
-      # From whatever directory under which you want to nest your repo
-      $ git clone https://github.com/<github_username>/iree.git
-      $ cd iree
-      $ git remote add upstream https://github.com/iree-org/iree.git
-      ```
-
-    This is especially important for maintainers who have write access (so can
-    push directly to the main repository) and admins who have elevated
-    privileges (so can push directly to protected branches).
-
-    These names are just suggestions, but you might find some scripts where the
-    defaults are for remotes named like this.
-
-    For extra safety, you can make it difficult to push directly to upstream by
-    setting the push url to something invalid:
-    `git remote set-url --push upstream DISABLE`, which requires re-enabling the
-    push URL explicitly before pushing. You can wrap this behavior in a custom
-    git command like
-    [git-sudo](https://gist.github.com/GMNGeoffrey/42dd9a9792390094a43bdb69659320c0).
-
-3. Use a script like
-    [git_update.sh](https://github.com/iree-org/iree/blob/main/build_tools/scripts/git/git_update.sh)
-    to easily synchronize `main` with `upstream`. Submodules make this is a
-    little trickier than it should be. You can also turn this into a git command
-    by adding it to your path as `git-update`.
-
-#### Git config
-
-These are some additional options you could put in your top-level `.gitconfig`
-or repository-specific `.git/config` files that are conducive the recommended
-workflow
-
-<!-- TODO(scotttodd): move to auto-collapsed tip -->
-
-```ini
-[push]
-  default = current
-[alias]
-  # Delete branches that you pushed and have been deleted upstream, e.g. because
-  # the PR was merged.
-  gone = ! "git fetch -p  && git for-each-ref --format '%(refname:short) %(upstream:track)' | awk '$2 == \"[gone]\" {print $1}' | xargs -r git branch -D"
-  # Update from upstream (custom command) and delete obsolete local branches.
-  sync = ! (git update main && git gone)
-  # Create a new branch based off of main (requires a clean working directory).
-  new = "!f(){ \\\ngit checkout main && git switch -c $1; \\\n}; f"
-  # Display branches in a useful "latest last" format
-  br = for-each-ref --sort=committerdate refs/heads/ --format='%(HEAD) %(color:yellow)%(refname:short)%(color:reset) - %(color:red)%(objectname:short)%(color:reset) - %(contents:subject) (%(color:green)%(committerdate:relative)%(color:reset))'
-  # `git git foo` -> `git foo` typo fixer
-  git = "!f(){ \\\n git \"$@\"; \\\n}; f"
-  # Get the git root directory
-  root = rev-parse --show-toplevel
-  # checkout, but also sync submodules
-  ch = "!f() { \\\n git checkout \"$@\"; git submodule sync && git submodule update --init; \\\n}; f"
-  # See the diff for a PR branch vs the main branch
-  diffmain = diff --merge-base main
-  # See only the files that differ vs the main branch
-  whatsout = diffmain --name-only
-[checkout]
-  # If the checkout command
-  defaultRemote = origin
-[pull]
-  # When pulling, only complete the pull if its a clean fast forward.
-  ff = only
-[remote]
-  # Push to your fork (origin) by default
-  pushDefault = origin
-[url "ssh://git@github.com/"]
-  # Pull with https (so no auth required), but push with ssh.
-  pushInsteadOf = https://github.com/
-```

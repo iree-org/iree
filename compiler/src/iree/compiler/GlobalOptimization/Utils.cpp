@@ -77,7 +77,7 @@ std::optional<Type> getCastElemType(Value input) {
 Value createGenericElementwiseCastOp(
     OpBuilder &builder, Location loc, Value input, CastOpInterface castOp,
     ArrayRef<NamedAttribute> attrs,
-    std::optional<IREE::LinalgExt::EncodingAttr> encoding) {
+    std::optional<IREE::Encoding::EncodingAttr> encoding) {
   auto inputType = cast<RankedTensorType>(input.getType());
   SmallVector<AffineMap> maps(
       2, AffineMap::getMultiDimIdentityMap(inputType.getRank(),

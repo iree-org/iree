@@ -83,8 +83,7 @@ struct FuncAnalysis {
 
   void print(llvm::raw_ostream &os, AsmState &asmState) {
     os << "FuncAnalysis: " << (isIncomplete ? "INCOMPLETE! " : "") << "@"
-       << funcOp.getName() << funcOp.getFunctionType() << " "
-       << "\n";
+       << funcOp.getName() << funcOp.getFunctionType() << " " << "\n";
     auto argTypes = funcOp.getArgumentTypes();
     os << "  args: " << argTypes.size() << "\n";
     for (unsigned i = 0; i < argTypes.size(); ++i) {

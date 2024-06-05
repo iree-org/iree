@@ -50,7 +50,6 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
         self,
         benchmark_case: BenchmarkCase,
         benchmark_results_filename: Optional[pathlib.Path],
-        capture_filename: Optional[pathlib.Path],
     ) -> None:
         module_dir = benchmark_case.module_dir
         local_module_dir = module_dir.get_local_path()
@@ -91,14 +90,14 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
                 external_params.append(param_arg)
 
         if benchmark_results_filename:
-            if self.config.normal_benchmark_tool_dir is None:
-                raise ValueError("normal_benchmark_tool_dir can't be None.")
+            if self.config.benchmark_tool_dir is None:
+                raise ValueError("benchmark_tool_dir can't be None.")
 
             if self.config.verify and expected_output_dir:
                 if not inputs_dir:
                     raise ValueError(f"Input data is missing for {benchmark_case}.")
                 self.__run_verify(
-                    tool_dir=self.config.normal_benchmark_tool_dir,
+                    tool_dir=self.config.benchmark_tool_dir,
                     benchmark_case=benchmark_case,
                     module_path=module_path,
                     inputs_dir=inputs_dir,
@@ -107,18 +106,10 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
                 )
 
             self.__run_benchmark(
-                tool_dir=self.config.normal_benchmark_tool_dir,
+                tool_dir=self.config.benchmark_tool_dir,
                 benchmark_case=benchmark_case,
                 module_path=module_path,
                 results_filename=benchmark_results_filename,
-                external_params=external_params,
-            )
-
-        if capture_filename:
-            self.__run_capture(
-                benchmark_case=benchmark_case,
-                module_path=module_path,
-                capture_filename=capture_filename,
                 external_params=external_params,
             )
 
@@ -227,45 +218,6 @@ class LinuxBenchmarkDriver(BenchmarkDriver):
             print(benchmark_metrics)
         results_filename.write_text(json.dumps(benchmark_metrics.to_json_object()))
 
-    def __run_capture(
-        self,
-        benchmark_case: BenchmarkCase,
-        module_path: pathlib.Path,
-        capture_filename: pathlib.Path,
-        external_params: Sequence[str] = (),
-    ):
-        capture_config = self.config.trace_capture_config
-        if capture_config is None:
-            raise ValueError("capture_config can't be None.")
-
-        tool_name = benchmark_case.benchmark_tool_name
-        cmd = self.__build_tool_cmds(
-            benchmark_case=benchmark_case,
-            tool_path=capture_config.traced_benchmark_tool_dir / tool_name,
-            module_path=module_path,
-            external_params=external_params,
-        )
-
-        if tool_name == "iree-benchmark-module":
-            cmd.extend(
-                get_iree_benchmark_module_arguments(
-                    driver_info=benchmark_case.driver_info,
-                    benchmark_min_time=self.config.benchmark_min_time,
-                    dump_results=False,
-                    capture_mode=True,
-                )
-            )
-
-        process = subprocess.Popen(
-            cmd, env={"TRACY_NO_EXIT": "1"}, stdout=subprocess.PIPE, text=True
-        )
-
-        wait_for_iree_benchmark_module_start(process, self.verbose)
-
-        capture_cmd = [capture_config.trace_capture_tool, "-f", "-o", capture_filename]
-        stdout_redirect = None if self.verbose else subprocess.DEVNULL
-        execute_cmd(capture_cmd, verbose=self.verbose, stdout=stdout_redirect)
-
 
 def main(args):
     device_info = get_linux_device_info(
@@ -312,13 +264,6 @@ def main(args):
     if args.verbose:
         print(benchmark_results.commit)
         print(benchmark_results.benchmarks)
-
-    trace_capture_config = benchmark_config.trace_capture_config
-    if trace_capture_config:
-        # Put all captures in a tarball and remove the original files.
-        with tarfile.open(trace_capture_config.capture_tarball, "w:gz") as tar:
-            for capture_filename in benchmark_driver.get_capture_filenames():
-                tar.add(capture_filename)
 
     benchmark_errors = benchmark_driver.get_benchmark_errors()
     if benchmark_errors:

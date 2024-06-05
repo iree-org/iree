@@ -41,17 +41,29 @@ iree_uk_index_t iree_uk_2d_buffer_length(iree_uk_type_t type,
 
 bool iree_uk_2d_buffers_equal(const void* buf1, const void* buf2,
                               iree_uk_type_t type, iree_uk_index_t size0,
-                              iree_uk_index_t size1, iree_uk_index_t stride0) {
-  // Sizes don't have to be multiples of 8 bits.
-  iree_uk_index_t size1_bytes = iree_uk_bits_to_bytes_rounding_up(
-      size1 << iree_uk_type_bit_count_log2(type));
+                              iree_uk_index_t size1, iree_uk_index_t stride0,
+                              iree_uk_index_t stride1) {
   // Strides are required to be multiples of 8 bits.
   iree_uk_index_t stride0_bytes =
       iree_uk_bits_to_bytes_exact(stride0 << iree_uk_type_bit_count_log2(type));
   const char* buf1_ptr = buf1;
   const char* buf2_ptr = buf2;
+  // Compare individual elements, but rounded up to whole enclosing bytes
+  // in case of sub-byte-size elements. The assumption here is that
+  // sub-byte-types aren't used with inner strides. Guard that assumption with
+  // this assertion:
+  IREE_UK_ASSERT(stride1 == 1 || iree_uk_type_bit_count(type) >= 8);
+  const iree_uk_index_t elem_bytes_rounded_up =
+      iree_uk_index_max(1, iree_uk_type_bit_count(type) / 8);
   for (iree_uk_index_t i0 = 0; i0 < size0; ++i0) {
-    if (memcmp(buf1_ptr, buf2_ptr, size1_bytes)) return false;
+    for (iree_uk_index_t i1 = 0; i1 < size1; ++i1) {
+      iree_uk_index_t byte_offset = iree_uk_bits_to_bytes_exact(
+          (i1 * stride1) << iree_uk_type_bit_count_log2(type));
+      if (memcmp(buf1_ptr + byte_offset, buf2_ptr + byte_offset,
+                 elem_bytes_rounded_up)) {
+        return false;
+      }
+    }
     buf1_ptr += stride0_bytes;
     buf2_ptr += stride0_bytes;
   }

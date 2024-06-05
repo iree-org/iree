@@ -3,10 +3,10 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-#
-# Workflow for execution-benchmark-related jobs. It is designed to be called
-# from the main workflow ci.yml. The concurrency of this workflow is controlled
-# by the caller's job.
+
+# Workflow for running execution benchmarks.
+# It is designed to be called from a parent workflow.
+# The concurrency of this workflow is controlled by the caller's job.
 
 name: Benchmark execution
 
@@ -44,7 +44,7 @@ permissions:
   contents: read
 
 env:
-  # This duplicates the variable from ci.yml. The variable needs to be in env
+  # This duplicates the variable from benchmark.yml. The variable needs to be in env
   # instead of the outputs of setup because it contains the run attempt and we
   # want that to be the current attempt, not whatever attempt the setup step
   # last ran in. It therefore can't be passed in via inputs because the env
@@ -142,8 +142,7 @@ jobs:
       - name: "Downloading benchmark tools"
         id: download-tools
         env:
-          # See `build_benchmark_tools` step in ci.yml for the name format of
-          # benchmark tools artifacts.
+          # See `build_benchmark_tools` step for the name format of benchmark tools artifacts.
           BENCHMARK_TOOLS_ARCHIVE: ${{ env.PLATFORM_ARCH }}-benchmark-tools.tar
           BENCHMARK_TOOLS_GCS_ARTIFACT: ${{ inputs.benchmark-tools-gcs-artifact-dir }}/${{ env.PLATFORM_ARCH }}-benchmark-tools.tar
         run: |
@@ -158,14 +157,11 @@ jobs:
         id: unpack-tools
         env:
           BENCHMARK_TOOLS_ARCHIVE: ${{ steps.download-tools.outputs.benchmark-tools-archive }}
-          # See `build_benchmark_tools` step in ci.yml for the name format of
-          # benchmark tools directory.
+          # See `build_benchmark_tools` step for the name format of benchmark tools directory.
           BENCHMARK_TOOLS_DIR: ${{ env.PLATFORM_ARCH }}-benchmark-tools-dir
         run: |
           tar -xf ${BENCHMARK_TOOLS_ARCHIVE}
-          echo "normal-benchmark-tools-dir=${BENCHMARK_TOOLS_DIR}/build/tools" >> "${GITHUB_OUTPUT}"
-          echo "traced-benchmark-tools-dir=${BENCHMARK_TOOLS_DIR}/build-traced/tools" >> "${GITHUB_OUTPUT}"
-          echo "tracy-capture-tool=${BENCHMARK_TOOLS_DIR}/build-traced/tracy-capture" >> "${GITHUB_OUTPUT}"
+          echo "benchmark-tools-dir=${BENCHMARK_TOOLS_DIR}/build/tools" >> "${GITHUB_OUTPUT}"
       - name: "Determine Shard Suffix"
         id: sharding
         run: |
@@ -178,13 +174,10 @@ jobs:
         env:
           IREE_EXECUTION_BENCHMARK_CONFIG: ${{ steps.download-assets.outputs.benchmark-config }}
           IREE_DOCKER_WRAPPER: ./build_tools/github_actions/docker_run.sh
-          IREE_NORMAL_BENCHMARK_TOOLS_DIR: ${{ steps.unpack-tools.outputs.normal-benchmark-tools-dir }}
-          IREE_TRACED_BENCHMARK_TOOLS_DIR: ${{ steps.unpack-tools.outputs.traced-benchmark-tools-dir }}
-          IREE_TRACY_CAPTURE_TOOL: ${{ steps.unpack-tools.outputs.tracy-capture-tool }}
+          IREE_BENCHMARK_TOOLS_DIR: ${{ steps.unpack-tools.outputs.benchmark-tools-dir }}
           IREE_TARGET_DEVICE_NAME: ${{ env.DEVICE_NAME }}
           IREE_SHARD_INDEX: ${{ matrix.benchmark.shard.index }}
           IREE_BENCHMARK_RESULTS: ${{ env.BENCHMARK_RESULTS_DIR }}/benchmark-results-${{ matrix.benchmark.device_name }}${{ steps.sharding.outputs.suffix }}.json
-          IREE_BENCHMARK_TRACES: ${{ env.BENCHMARK_RESULTS_DIR }}/benchmark-traces-${{ matrix.benchmark.device_name }}${{ steps.sharding.outputs.suffix }}.tar.gz
         run: |
           mkdir -p ${BENCHMARK_RESULTS_DIR}
           export IREE_E2E_TEST_ARTIFACTS_DIR="${E2E_TEST_ARTIFACTS_GCS_ARTIFACT_DIR/gs:\/\//https://storage.googleapis.com/}"

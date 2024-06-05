@@ -267,7 +267,7 @@ endif()
 # against the project level library, so this is just cosmetic, but it does
 # have the side effect of making the Python build tree relocatable and making
 # logic that expects to find the compiler libraries in a consistent place
-# simple. Since a symlink is used on Unix and it is not the versioned dylib, 
+# simple. Since a symlink is used on Unix and it is not the versioned dylib,
 # the realpath will still be the build-tree wide shared library. This also means
 # that any tools or files that must be colocated with the dylib will come from
 # the project-wide location.

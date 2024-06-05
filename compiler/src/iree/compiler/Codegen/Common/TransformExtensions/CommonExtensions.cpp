@@ -14,6 +14,8 @@
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "iree/compiler/Codegen/Interfaces/BufferizationInterfaces.h"
 #include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -24,6 +26,9 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/Casting.h"
+#include "mlir/Analysis/SliceAnalysis.h"
+#include "mlir/Analysis/TopologicalSortUtils.h"
 #include "mlir/Conversion/VectorToGPU/VectorToGPU.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/LoopUtils.h"
@@ -36,7 +41,9 @@
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
@@ -47,8 +54,14 @@
 #include "mlir/Dialect/Vector/Transforms/LoweringPatterns.h"
 #include "mlir/Dialect/Vector/Transforms/Passes.h"
 #include "mlir/Dialect/Vector/Transforms/VectorRewritePatterns.h"
+#include "mlir/IR/BuiltinAttributeInterfaces.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Diagnostics.h"
+#include "mlir/IR/OpDefinition.h"
+#include "mlir/IR/PatternMatch.h"
+#include "mlir/IR/Value.h"
+#include "mlir/Interfaces/SubsetOpInterface.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/CSE.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -166,6 +179,15 @@ void transform_dialect::ApplyFoldFillIntoPadPatternsOp::populatePatterns(
 }
 
 //===---------------------------------------------------------------------===//
+// ApplyHoistForallFromForPatternsOp
+//===---------------------------------------------------------------------===//
+
+void transform_dialect::ApplyHoistForallFromForPatternsOp::populatePatterns(
+    RewritePatternSet &patterns) {
+  iree_compiler::populateForallLoopHoistingPattern(patterns);
+}
+
+//===---------------------------------------------------------------------===//
 // ApplyUnrollVectorsGpuMmaSyncPatternsOp
 //===---------------------------------------------------------------------===//
 
@@ -248,12 +270,252 @@ void transform_dialect::ApplyPrepareVectorToMMAPatternsOp::populatePatterns(
   populatePrepareVectorToMMAPatterns(patterns, getUseNvGpu());
 }
 
+//===----------------------------------------------------------------------===//
+// CopyTensorOperandOp
+//===----------------------------------------------------------------------===//
+
+DiagnosedSilenceableFailure transform_dialect::CopyTensorOperandOp::applyToOne(
+    transform::TransformRewriter &rewriter, Operation *target,
+    transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+  int64_t operandIndex = getOperandIndex();
+  if (operandIndex > target->getNumOperands()) {
+    return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                     "Operand index out of range");
+  }
+  Value operand = target->getOperand(operandIndex);
+  auto tensorType = dyn_cast<RankedTensorType>(operand.getType());
+  if (!tensorType) {
+    return mlir::emitDefiniteFailure(state.getTopLevel(),
+                                     "Non tensor type operand to copy");
+  }
+  rewriter.setInsertionPoint(target);
+  Value empty = rewriter.create<tensor::EmptyOp>(
+      target->getLoc(),
+      tensor::getMixedSizes(rewriter, target->getLoc(), operand),
+      tensorType.getElementType());
+  Operation *copy =
+      rewriter.create<linalg::CopyOp>(target->getLoc(), operand, empty);
+  target->setOperand(operandIndex, copy->getResult(0));
+  results.push_back(copy);
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::CopyTensorOperandOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::producesHandle(getResult(), effects);
+  transform::modifiesPayload(effects);
+}
+
+//===---------------------------------------------------------------------===//
+// FlattenForallOp
+//===---------------------------------------------------------------------===//
+
+template <typename MappingTy>
+static bool isAscendingRelativeMapping(ArrayRef<Attribute> mapping) {
+  auto start = cast<MappingTy>(*mapping.begin());
+  if (start.getMappingId() !=
+      static_cast<int64_t>(gpu::MappingId::LinearDim0)) {
+    return false;
+  }
+  int64_t prev = start.getMappingId();
+  for (auto id : llvm::drop_begin(mapping)) {
+    int64_t nextId = cast<MappingTy>(id).getMappingId();
+    if (nextId != prev + 1) {
+      return false;
+    }
+    prev = nextId;
+  }
+  return true;
+}
+
+static FailureOr<scf::ForallOp> flattenForallOp(RewriterBase &rewriter,
+                                                scf::ForallOp forallOp) {
+  if (!forallOp.getMapping().has_value())
+    return forallOp->emitError("mapping must be present");
+  SmallVector<Attribute> mapping =
+      llvm::to_vector(forallOp.getMapping()->getValue());
+  if (!(llvm::all_of(mapping, llvm::IsaPred<gpu::GPUThreadMappingAttr>) ||
+        llvm::all_of(mapping, llvm::IsaPred<gpu::GPUWarpMappingAttr>))) {
+    return forallOp->emitError("mapping must be #gpu.thread or #gpu.warp");
+  }
+
+  if (forallOp.getRank() == 1) {
+    return forallOp;
+  }
+
+  bool isThreadMapping = isa<gpu::GPUThreadMappingAttr>(*mapping.begin());
+
+  if (isThreadMapping &&
+      !isAscendingRelativeMapping<gpu::GPUThreadMappingAttr>(mapping)) {
+    return forallOp->emitError("mapping must be ascending linear thread ids");
+  }
+  if (!isThreadMapping &&
+      !isAscendingRelativeMapping<gpu::GPUWarpMappingAttr>(mapping)) {
+    return forallOp->emitError("mapping must be ascending linear warp ids");
+  }
+
+  auto isAll = [](ArrayRef<int64_t> array, int64_t cmp) {
+    return llvm::all_of(array, [cmp](int64_t x) { return x == cmp; });
+  };
+
+  if (!isAll(forallOp.getStaticStep(), 1) ||
+      !isAll(forallOp.getStaticLowerBound(), 0)) {
+    return forallOp->emitError(
+        "unimplemented: trying to flatten non-normalized forall op");
+  }
+
+  MLIRContext *context = rewriter.getContext();
+  Location loc = forallOp.getLoc();
+
+  // Step 1. Construct the new mapping attribute as a single linear dim of the
+  // original type.
+  Attribute flatMapping;
+  if (isThreadMapping) {
+    flatMapping =
+        gpu::GPUThreadMappingAttr::get(context, gpu::MappingId::LinearDim0);
+  } else {
+    flatMapping =
+        gpu::GPUWarpMappingAttr::get(context, gpu::MappingId::LinearDim0);
+  }
+
+  // Step 2. Compute the flat lower bound/upper bound/step.
+  AffineExpr d0, d1;
+  bindDims(context, d0, d1);
+  AffineExpr mulExpr = d0 * d1;
+  SmallVector<OpFoldResult> upperBounds = forallOp.getMixedUpperBound();
+  OpFoldResult newUpperBound = upperBounds.front();
+  for (OpFoldResult ub : llvm::drop_begin(upperBounds)) {
+    newUpperBound = affine::makeComposedFoldedAffineApply(
+        rewriter, loc, mulExpr, {newUpperBound, ub});
+  }
+
+  OpFoldResult zero = rewriter.getIndexAttr(0);
+  OpFoldResult one = rewriter.getIndexAttr(1);
+
+  // Step 3. Create a new parallel loop with a single mapping id.
+  auto newForallOp = rewriter.create<scf::ForallOp>(
+      loc, ArrayRef<OpFoldResult>{zero}, ArrayRef<OpFoldResult>{newUpperBound},
+      ArrayRef<OpFoldResult>{one}, forallOp.getOutputs(),
+      rewriter.getArrayAttr({flatMapping}));
+
+  rewriter.setInsertionPointToStart(newForallOp.getBody());
+  Value linearId = newForallOp.getInductionVar(0);
+
+  // Step 4. Delinearize the flat ID to the original basis.
+  auto ids = rewriter.create<affine::AffineDelinearizeIndexOp>(
+      loc, linearId, forallOp.getMixedUpperBound());
+
+  // Step 5. Inline the region of the original forall op.
+  SmallVector<Value> newArgs(ids.getResults());
+  newArgs.append(newForallOp.getRegionIterArgs().begin(),
+                 newForallOp.getRegionIterArgs().end());
+  rewriter.eraseOp(newForallOp.getTerminator());
+  rewriter.mergeBlocks(forallOp.getBody(), newForallOp.getBody(), newArgs);
+  rewriter.replaceOp(forallOp, newForallOp);
+  return newForallOp;
+}
+
+DiagnosedSilenceableFailure
+transform_dialect::FlattenForallMappingOp::applyToOne(
+    transform::TransformRewriter &rewriter, mlir::scf::ForallOp target,
+    transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+
+  rewriter.setInsertionPoint(target);
+  auto newForallOp = flattenForallOp(rewriter, target);
+  if (failed(newForallOp)) {
+    return mlir::emitDefiniteFailure(target, "flattenForallOp failed");
+  }
+
+  results.push_back(*newForallOp);
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::FlattenForallMappingOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::producesHandle(getResult(), effects);
+  transform::modifiesPayload(effects);
+}
+
+//===---------------------------------------------------------------------===//
+// ForallToLanesOp
+//===---------------------------------------------------------------------===//
+
+static bool isLaneMappableForall(scf::ForallOp forallOp) {
+  if (forallOp.getNumResults() > 0)
+    return false;
+  if (forallOp.getRank() != 1)
+    return false;
+  if (!forallOp.getMapping().has_value())
+    return false;
+  Attribute mapping = *forallOp.getMapping()->getValue().begin();
+  if (mapping != IREE::GPU::LaneIdAttr::get(forallOp.getContext(), 0)) {
+    return false;
+  }
+  return true;
+}
+
+static void rewriteForallToLanes(RewriterBase &rewriter,
+                                 scf::ForallOp forallOp) {
+  Location loc = forallOp->getLoc();
+  assert(isLaneMappableForall(forallOp) &&
+         "mapping non-lane mappable forall op");
+
+  Value laneId = rewriter.create<gpu::LaneIdOp>(loc);
+
+  // Step 4. Predicate omitted given unique topLevel scf::ForallOp.
+
+  // Step 5. Move the body of forallOp.
+  // Erase the terminator first, it will not be used since we are on buffers.
+  rewriter.eraseOp(forallOp.getTerminator());
+  rewriter.setInsertionPoint(forallOp);
+  rewriter.inlineBlockBefore(forallOp.getBody(), forallOp, {laneId});
+  rewriter.create<gpu::BarrierOp>(loc);
+
+  // Step 7. Erase old op.
+  rewriter.eraseOp(forallOp);
+}
+
+DiagnosedSilenceableFailure transform_dialect::ForallToLanesOp::applyToOne(
+    transform::TransformRewriter &rewriter, mlir::FunctionOpInterface target,
+    transform::ApplyToEachResultList &results,
+    transform::TransformState &state) {
+
+  SmallVector<scf::ForallOp> foralls;
+  target->walk([&](scf::ForallOp forallOp) {
+    if (isLaneMappableForall(forallOp)) {
+      foralls.push_back(forallOp);
+    }
+  });
+
+  if (foralls.empty()) {
+    return mlir::emitSilenceableFailure(
+        target, "could not find a lane mappable scf.forall");
+  }
+
+  for (auto forall : foralls) {
+    rewriter.setInsertionPoint(forall);
+    rewriteForallToLanes(rewriter, forall);
+  }
+
+  return DiagnosedSilenceableFailure::success();
+}
+
+void transform_dialect::ForallToLanesOp::getEffects(
+    SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
+  transform::onlyReadsHandle(getTarget(), effects);
+  transform::modifiesPayload(effects);
+}
+
 //===---------------------------------------------------------------------===//
 // ForallToWorkgroupOp
 //===---------------------------------------------------------------------===//
 
-LogicalResult rewriteForallToWorkgroup(RewriterBase &rewriter,
-                                       scf::ForallOp forallOp) {
+static LogicalResult rewriteForallToWorkgroup(RewriterBase &rewriter,
+                                              scf::ForallOp forallOp) {
   // Step 0. Target-specific verifications. There is no good place to anchor
   // those right now: the ForallOp is target-independent and the
   // transform op does not apply to individual ForallOp.

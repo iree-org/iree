@@ -8,16 +8,17 @@
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
+#include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
 #include "iree/compiler/Codegen/Utils/MarkerUtils.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
-#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Matchers.h"
@@ -33,6 +34,13 @@
 #define LDBG(X) LLVM_DEBUG(DBGS() << X << "\n")
 
 static constexpr unsigned kShuffleBitWidth = 32;
+
+static llvm::cl::opt<std::string> clTestTarget(
+    "iree-gpu-test-target",
+    llvm::cl::desc(
+        "The target for IR LIT tests; the interpretation depends on the target "
+        "API. e.g., \"gfx942\" for HIP, \"sm_80\" for CUDA"),
+    llvm::cl::init(""));
 
 namespace mlir::iree_compiler {
 
@@ -161,7 +169,8 @@ const char *getGPUDistributeAttrName() { return "iree.gpu.distribute_dim"; }
 FailureOr<SmallVector<int64_t>> getGPUTileSize(mlir::FunctionOpInterface funcOp,
                                                int tilingLevel) {
   SmallVector<Operation *> computeOps = getComputeOps(funcOp);
-  auto config = getLoweringConfig(computeOps);
+  FailureOr<IREE::Codegen::LoweringConfigAttr> config =
+      getFirstLoweringConfig<IREE::Codegen::LoweringConfigAttr>(computeOps);
   if (failed(config)) {
     return funcOp.emitOpError("failed to get lowering configuration");
   }
@@ -928,12 +937,10 @@ bool hasUkernelSupportedRocmArch(StringRef targetChip) {
 }
 
 bool hasUkernelSupportedRocmArch(IREE::HAL::ExecutableTargetAttr targetAttr) {
-  auto targetArch = getConfigStringAttr(targetAttr, "target_arch");
-  if (!targetArch) {
+  auto targetArch = getGPUTargetAttr(targetAttr).getArch();
+  if (targetArch.empty())
     return false;
-  }
-  StringRef targetArchStr = targetArch->getValue();
-  return hasUkernelSupportedRocmArch(targetArchStr);
+  return hasUkernelSupportedRocmArch(targetArch);
 }
 
 /// Checks if target GPU has UKernel support.
@@ -949,25 +956,41 @@ bool hasUkernelSupportedGpuArch(IREE::HAL::ExecutableTargetAttr targetAttr) {
 // GPU Target Information
 //===----------------------------------------------------------------------===//
 
-static constexpr char mmaTypeListName[] = "mma_intrinsics";
-FailureOr<ArrayAttr> getSupportedMmaTypes(DictionaryAttr config) {
-  if (!config) {
-    return failure();
+IREE::GPU::TargetAttr getGPUTargetAttr(IREE::HAL::ExecutableTargetAttr target) {
+  if (auto config = target.getConfiguration()) {
+    if (auto attr = config.getAs<IREE::GPU::TargetAttr>("iree.gpu.target"))
+      return attr;
   }
-  ArrayAttr types = dyn_cast_or_null<ArrayAttr>(config.get(mmaTypeListName));
-  if (!types) {
-    return failure();
+  if (!clTestTarget.empty()) {
+    auto [arch, features] = StringRef(clTestTarget).split(':');
+    // Use the target specified in the command line for testing purposes.
+    return IREE::GPU::getFullTarget(target.getBackend(), arch, features,
+                                    target.getContext());
   }
-  return types;
+
+  return nullptr;
 }
 
-FailureOr<ArrayAttr>
-getSupportedMmaTypes(mlir::FunctionOpInterface entryPoint) {
-  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPoint);
-  if (!targetAttr) {
-    return failure();
+IREE::GPU::TargetAttr getGPUTargetAttr(Operation *op) {
+  if (auto target = IREE::HAL::ExecutableTargetAttr::lookup(op)) {
+    return getGPUTargetAttr(target);
   }
-  return getSupportedMmaTypes(targetAttr.getConfiguration());
+  if (!clTestTarget.empty()) {
+    // Guess what the target API is based on common scheme. This does not work
+    // for cases like "ampere" which can be accepted by both CUDA and Vulkan.
+    // So it's very limited. However, it makes writing tests simpler. Maybe we
+    // should consider making it explicit in the clTestTarget what API we are
+    // targeting.
+    StringRef backend;
+    if (StringRef(clTestTarget).starts_with("sm_"))
+      backend = "cuda";
+    else if (StringRef(clTestTarget).starts_with("gfx"))
+      backend = "rocm";
+    auto [arch, features] = StringRef(clTestTarget).split(':');
+    // Use the target specified in the command line for testing purposes.
+    return IREE::GPU::getFullTarget(backend, arch, features, op->getContext());
+  }
+  return nullptr;
 }
 
 } // namespace mlir::iree_compiler

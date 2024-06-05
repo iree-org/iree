@@ -64,4 +64,3 @@ func.func @concat_dimension_size(%arg0: tensor<?x?xf32>) -> (tensor<2xi32>) {
 // CHECK-DAG: %[[IDX:.+]] = arith.index_cast %[[DIM]]
 // CHECK-DAG: %[[RES:.+]] = tensor.from_elements %[[IDX]], %[[C2]]
 // CHECK: return %[[RES]]
-

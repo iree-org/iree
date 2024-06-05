@@ -357,3 +357,85 @@ module @eval_op_with_no_inputs_currently_broken {
     util.return
   }
 }
+
+// -----
+
+// Tests that dispatches to inlined dispatch regions are JITed.
+// This calculates 42 + 4 + 4 to ensure we can handle primitive and tensor arg
+// constants.
+
+// CHECK-LABEL: @dispatch_inline
+module @dispatch_inline {
+  // CHECK: util.global private @hoisted = dense<50> : tensor<4xi8>
+  util.global private @hoisted : tensor<4xi8>
+  // CHECK-NOT: util.initializer
+  util.initializer {
+    %cst0 = arith.constant 42 : i8
+    %cst1 = arith.constant dense<4> : tensor<4xi8>
+    %c0 = arith.constant 0 : index
+    %x = tensor.dim %cst1, %c0 : tensor<4xi8>
+    %0 = flow.dispatch.workgroups[%x](%cst0, %cst1) : (i8, tensor<4xi8>) -> tensor<4xi8> =
+        (%arg0: i8, %arg1: !flow.dispatch.tensor<readonly:tensor<4xi8>>, %arg2: !flow.dispatch.tensor<writeonly:tensor<4xi8>>) {
+      %empty = tensor.empty() : tensor<4xi8>
+      %input = flow.dispatch.tensor.load %arg1, offsets=[0], sizes=[4], strides=[1] : !flow.dispatch.tensor<readonly:tensor<4xi8>> -> tensor<4xi8>
+      %output = linalg.generic {
+        indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
+        iterator_types = ["parallel"]
+      } ins(%input, %input : tensor<4xi8>, tensor<4xi8>) outs(%empty : tensor<4xi8>) {
+      ^bb0(%arg3: i8, %arg4: i8, %arg5: i8):
+        %addi_x2 = arith.addi %arg3, %arg4 : i8
+        %result = arith.addi %addi_x2, %arg0 : i8
+        linalg.yield %result : i8
+      } -> tensor<4xi8>
+      flow.dispatch.tensor.store %output, %arg2, offsets=[0], sizes=[4], strides=[1] : tensor<4xi8> -> !flow.dispatch.tensor<writeonly:tensor<4xi8>>
+      flow.return
+    }
+    util.global.store %0, @hoisted : tensor<4xi8>
+    util.return
+  }
+}
+
+// -----
+
+// Tests that dispatches to executable functions are JITed by cloning referenced
+// executables to the JIT module. This calculates 42 + 4 + 4 to ensure we can
+// handle primitive and tensor arg constants.
+
+// CHECK-LABEL: @dispatch_executable
+module @dispatch_executable {
+  flow.executable private @exe {
+    flow.executable.export public @dispatch_fn workgroups(%arg0: index) -> (index, index, index) {
+      %x, %y, %z = flow.dispatch.workgroup_count_from_dag_root %arg0
+      flow.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func public @dispatch_fn(%arg0: i8, %arg1: !flow.dispatch.tensor<readonly:tensor<4xi8>>, %arg2: !flow.dispatch.tensor<writeonly:tensor<4xi8>>) {
+        %empty = tensor.empty() : tensor<4xi8>
+        %input = flow.dispatch.tensor.load %arg1, offsets=[0], sizes=[4], strides=[1] : !flow.dispatch.tensor<readonly:tensor<4xi8>> -> tensor<4xi8>
+        %output = linalg.generic {
+          indexing_maps = [affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>, affine_map<(d0) -> (d0)>],
+          iterator_types = ["parallel"]
+        } ins(%input, %input : tensor<4xi8>, tensor<4xi8>) outs(%empty : tensor<4xi8>) {
+        ^bb0(%arg3: i8, %arg4: i8, %arg5: i8):
+          %addi_x2 = arith.addi %arg3, %arg4 : i8
+          %result = arith.addi %addi_x2, %arg0 : i8
+          linalg.yield %result : i8
+        } -> tensor<4xi8>
+        flow.dispatch.tensor.store %output, %arg2, offsets=[0], sizes=[4], strides=[1] : tensor<4xi8> -> !flow.dispatch.tensor<writeonly:tensor<4xi8>>
+        return
+      }
+    }
+  }
+  // CHECK: util.global private @hoisted = dense<50> : tensor<4xi8>
+  util.global private @hoisted : tensor<4xi8>
+  // CHECK-NOT: util.initializer
+  util.initializer {
+    %cst0 = arith.constant 42 : i8
+    %cst1 = arith.constant dense<4> : tensor<4xi8>
+    %c0 = arith.constant 0 : index
+    %x = tensor.dim %cst1, %c0 : tensor<4xi8>
+    %0 = flow.dispatch @exe::@dispatch_fn[%x](%cst0, %cst1) : (i8, tensor<4xi8>) -> tensor<4xi8>
+    util.global.store %0, @hoisted : tensor<4xi8>
+    util.return
+  }
+}

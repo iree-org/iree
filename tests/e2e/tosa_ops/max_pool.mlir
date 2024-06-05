@@ -25,4 +25,3 @@ func.func @tensor_f32() {
   check.expect_eq_const(%result, dense<[[[[6.], [7.], [8.]]]]> : tensor<1x1x3x1xf32>) : tensor<1x1x3x1xf32>
   return
 }
-

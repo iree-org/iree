@@ -66,7 +66,6 @@ iree_cc_library(
     iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::Stream::IR
     iree::compiler::Dialect::Util::IR
-    iree::compiler::Pipelines::Options
   PUBLIC
 )
 

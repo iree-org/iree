@@ -119,13 +119,6 @@ def DecomposeAffineOps: Pass<"decompose-affine-ops"> {
   ];
 }
 
-def DecomposeBatchMmt4DOps
-    : InterfacePass<"iree-codegen-decompose-batch-mmt4d-ops", "mlir::FunctionOpInterface"> {
-  let summary = "Decompose batch_mmt4d ops into mmt4d ops";
-  let constructor =
-      "mlir::iree_compiler::createDecomposeBatchMmt4DOpsPass()";
-}
-
 def DecomposeConvolutionToLowerDimOps :
     Pass<"iree-codegen-decompose-convolution-to-lower-dim-ops", ""> {
   let summary = "Decomposes linalg convolution ops to lower dim ops";
@@ -396,6 +389,22 @@ def MemrefCopyToLinalgPass :
   let summary = "Convert memref.copy to linalg op";
   let constructor =
       "mlir::iree_compiler::createMemrefCopyToLinalgPass()";
+}
+
+def NormalizeLoopBoundsPass :
+    Pass<"iree-codegen-normalize-loop-bounds", ""> {
+  let summary = "Normalize the loop bounds of `scf.for` and `scf.forall`";
+  let constructor = "mlir::iree_compiler::createNormalizeLoopBoundsPass()";
+  let options = [
+    Option<"normalizeFor", "normalize-for", "bool", "true",
+           "Enable normalization for `scf.for` loops">,
+    Option<"normalizeForall", "normalize-forall", "bool", "true",
+           "Enable normalization for `scf.forall` loops">,
+  ];
+  let dependentDialects = [
+      "affine::AffineDialect",
+      "arith::ArithDialect"
+  ];
 }
 
 def OptimizeVectorTransfer :

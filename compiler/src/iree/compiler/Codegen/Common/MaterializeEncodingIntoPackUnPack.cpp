@@ -12,10 +12,9 @@
 #include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/SmallVectorExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -28,9 +27,9 @@
 
 namespace mlir::iree_compiler {
 
-using namespace IREE::LinalgExt;
+using namespace IREE::Encoding;
+using IREE::Encoding::getEncodingAttr;
 using IREE::HAL::ExecutableTargetAttr;
-using IREE::LinalgExt::getEncodingAttr;
 
 //===---------------------------------------------------------------------===//
 // Utility methods
@@ -322,11 +321,11 @@ lowerContractionOpWithEncoding(RewriterBase &rewriter,
   }
 
   if (lhsEncoding.getRole().getValue() !=
-          mlir::iree_compiler::IREE::LinalgExt::EncodingRole::LHS ||
+          mlir::iree_compiler::IREE::Encoding::EncodingRole::LHS ||
       rhsEncoding.getRole().getValue() !=
-          mlir::iree_compiler::IREE::LinalgExt::EncodingRole::RHS ||
+          mlir::iree_compiler::IREE::Encoding::EncodingRole::RHS ||
       resultEncoding.getRole().getValue() !=
-          mlir::iree_compiler::IREE::LinalgExt::EncodingRole::RESULT) {
+          mlir::iree_compiler::IREE::Encoding::EncodingRole::RESULT) {
     return failure();
   }
 
@@ -356,7 +355,7 @@ lowerContractionOpWithEncoding(RewriterBase &rewriter,
 
     Type newResultType = newResult.getType();
 
-    auto cDims = IREE::LinalgExt::getEncodingContractionDims(lhsEncoding);
+    auto cDims = IREE::Encoding::getEncodingContractionDims(lhsEncoding);
     if (cDims->batch.empty()) {
       result = rewriter.create<linalg::Mmt4DOp>(
           linalgOp.getLoc(), newResultType, ValueRange{newLhs, newRhs},
@@ -402,10 +401,10 @@ lowerOpWithEncoding(RewriterBase &rewriter, tensor::EmptyOp emptyOp,
   }
   SmallVector<OpFoldResult> sourceDims = emptyOp.getMixedSizes();
   (void)foldDynamicIndexList(sourceDims);
-  SmallVector<OpFoldResult> newShape =
-      PackOp::getResultShape(rewriter, loc, sourceDims, *innerTileSizesOfr,
-                             materializeEncodingInfo->innerDimsPos,
-                             materializeEncodingInfo->outerDimsPerm);
+  SmallVector<OpFoldResult> newShape = tensor::PackOp::getResultShape(
+      rewriter, loc, sourceDims, *innerTileSizesOfr,
+      materializeEncodingInfo->innerDimsPos,
+      materializeEncodingInfo->outerDimsPerm);
   Operation *newEmptyOp = rewriter.create<tensor::EmptyOp>(
       loc, newShape, resultType.getElementType());
 

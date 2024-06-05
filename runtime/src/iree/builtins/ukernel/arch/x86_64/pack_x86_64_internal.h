@@ -23,5 +23,9 @@ IREE_UK_PACK_TILE_FUNC_DECL(iree_uk_pack_tile_8x2_x8_x86_64_avx2_fma_transpose)
 IREE_UK_PACK_TILE_FUNC_DECL(iree_uk_pack_tile_16x2_x8_x86_64_avx512_base_direct)
 IREE_UK_PACK_TILE_FUNC_DECL(
     iree_uk_pack_tile_16x2_x8_x86_64_avx512_base_transpose)
+IREE_UK_PACK_TILE_FUNC_DECL(
+    iree_uk_pack_tile_16x2_x16_x86_64_avx512_base_direct)
+IREE_UK_PACK_TILE_FUNC_DECL(
+    iree_uk_pack_tile_16x2_x16_x86_64_avx512_base_transpose)
 
 #endif  // foIREE_BUILTINS_UKERNEL_ARCH_X86_64_PACK_X86_64_INTERNAL_H_

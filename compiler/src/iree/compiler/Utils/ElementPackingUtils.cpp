@@ -6,7 +6,7 @@
 
 #include "iree/compiler/Utils/ElementPackingUtils.h"
 
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
+#include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/MathExtras.h"
@@ -66,11 +66,11 @@ Value calculateStorageElementCountInBytes(Location loc,
   // computation an be much simpler.
   SmallVector<int64_t> paddedShape(shapedType.getShape());
   SmallVector<Value> paddedDynamicDims(dynamicDims.begin(), dynamicDims.end());
-  auto encoding = IREE::LinalgExt::getEncodingAttr(shapedType);
+  auto encoding = IREE::Encoding::getEncodingAttr(shapedType);
   if (encoding && !encoding.getRoundDimsToArray().empty()) {
     auto roundDimsTo = encoding.getRoundDimsToArray();
     FailureOr<linalg::ContractionDimensions> cDims =
-        IREE::LinalgExt::getEncodingContractionDims(encoding);
+        IREE::Encoding::getEncodingContractionDims(encoding);
     auto indexingMap = encoding.getMapForRole();
     auto pad = [&](int dim, int value) {
       std::optional<unsigned> maybeMappedDim =

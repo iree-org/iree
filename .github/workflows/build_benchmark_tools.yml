@@ -3,7 +3,7 @@
 # Licensed under the Apache License v2.0 with LLVM Exceptions.
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-#
+
 # Workflow for building benchmark tools.
 # It is designed to be called from a parent workflow.
 # The concurrency of this workflow is controlled by the caller's job.
@@ -38,7 +38,7 @@ permissions:
   contents: read
 
 env:
-  # This duplicates the variable from ci.yml. The variable needs to be in env
+  # This duplicates the variable from benchmark.yml. The variable needs to be in env
   # instead of the outputs of setup because it contains the run attempt and we
   # want that to be the current attempt, not whatever attempt the setup step
   # last ran in. It therefore can't be passed in via inputs because the env
@@ -69,17 +69,14 @@ jobs:
             docker_image: "gcr.io/iree-oss/base-bleeding-edge@sha256:c5f28883e6c570c20128fb37d7af3a00a25df3ce4e2b3a24c3a8dcd183182a27"
             # Builds tools on the host and assumes the builder is Linux x86_64.
             build_script: "./build_tools/cmake/build_runtime.sh"
-            tracy_capture: "gs://iree-shared-files/tracy-capture-linux-x86_64-af73dba7"
           - platform: "linux"
             arch: "riscv_64"
             docker_image: "gcr.io/iree-oss/riscv@sha256:62e87bad3405d691ddba6f9be0ef44eeb60461a467c8d86f0842c81a1f97da79"
             build_script: "./build_tools/cmake/build_riscv.sh"
-            tracy_capture: "gs://iree-shared-files/tracy-capture-linux-x86_64-af73dba7"
           - platform: "android"
             arch: "armv8.2-a"
             docker_image: "gcr.io/iree-oss/android@sha256:66b92a1c920588a73d03316f26025407ea754bab93e8f9bfe40dbf6ed5fe6c7e"
             build_script: "./build_tools/cmake/build_android.sh"
-            tracy_capture: "gs://iree-shared-files/tracy-capture-linux-arm_64-af73dba7"
     env:
       PLATFORM: ${{ matrix.target.platform }}
       ARCH: ${{ matrix.target.arch }}
@@ -116,38 +113,14 @@ jobs:
             --env "BUILD_PRESET=benchmark-with-tracing" \
             --env "IREE_HOST_BIN_DIR=${INSTALL_DIR}/bin" \
             "${DOCKER_IMAGE}" "${BUILD_SCRIPT}" "${BUILD_TOOLS_DIR}/build-traced"
-      - name: "Downloading pre-built tracy capture tool"
-        id: download-tracy-capture
-        env:
-          TRACY_CAPTURE_GCS_ARTIFACT: ${{ matrix.target.tracy_capture }}
-          TRACY_CAPTURE: ${{ env.BUILD_TOOLS_DIR }}/build-traced/tracy-capture
-        run: |
-          gcloud storage cp "${TRACY_CAPTURE_GCS_ARTIFACT}" "${TRACY_CAPTURE}"
-          chmod +x "${TRACY_CAPTURE}"
-          echo "tracy-capture=${TRACY_CAPTURE}" >> "${GITHUB_OUTPUT}"
       - name: "Creating the benchmark tools archive"
-        # Here we pack a tracy-capture binary (~7MB) into each benchmark tools
-        # archive. This could be wasteful because multiple benchmark tools
-        # archives might pack the same tracy-capture binary. But it simplifies
-        # the process to fetch required tools to run benchmarks and we only have
-        # a few versions of the benchmark tools archives.
-        # Detailed reason: The generated benchmark matrix fetches the benchmark
-        # tools archive based on the target device. However, there is a scenario
-        # that the tracy-capture is running on a different host. E.g. Mobile
-        # benchmarks have the benchmark tool forwarding the data from the phones
-        # to the tracy-capture running on Linux host. Embedding the host of
-        # tracy-capture will overloads the benchmark matrix and puts too much
-        # unrelated machine setup in it. So we simply pack everything needed
-        # into each benchmark tools archive.
         id: archive
         env:
-          TRACY_CAPTURE: ${{ steps.download-tracy-capture.outputs.tracy-capture }}
           BENCHMARK_TOOLS_ARCHIVE: ${{ env.PLATFORM }}-${{ env.ARCH }}-benchmark-tools.tar
         run: |
           tar -cf "${BENCHMARK_TOOLS_ARCHIVE}" \
             "${BUILD_TOOLS_DIR}"/*/tools/iree-benchmark-module \
-            "${BUILD_TOOLS_DIR}"/*/tools/build_config.txt \
-            "${TRACY_CAPTURE}"
+            "${BUILD_TOOLS_DIR}"/*/tools/build_config.txt
           echo "benchmark-tools-archive=${BENCHMARK_TOOLS_ARCHIVE}" >> "${GITHUB_OUTPUT}"
       - name: "Uploading the benchmark tools archive"
         id: upload

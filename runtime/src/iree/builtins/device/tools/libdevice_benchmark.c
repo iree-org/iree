@@ -18,8 +18,7 @@ static iree_status_t iree_h2f_ieee_benchmark(
   while (iree_benchmark_keep_running(benchmark_state,
                                      /*batch_count=*/FLAG_batch_count)) {
     for (int i = 0; i < FLAG_batch_count; ++i) {
-      // TODO(benvanik): iree_do_not_optimize barrier.
-      iree_h2f_ieee(0x3400 + i);
+      iree_optimization_barrier(iree_h2f_ieee(0x3400 + i));
     }
   }
   return iree_ok_status();
@@ -31,8 +30,7 @@ static iree_status_t iree_f2h_ieee_benchmark(
   while (iree_benchmark_keep_running(benchmark_state,
                                      /*batch_count=*/FLAG_batch_count)) {
     for (int i = 0; i < FLAG_batch_count; ++i) {
-      // TODO(benvanik): iree_do_not_optimize barrier.
-      iree_f2h_ieee(0.25f + i);
+      iree_optimization_barrier(iree_f2h_ieee(0.25f + i));
     }
   }
   return iree_ok_status();

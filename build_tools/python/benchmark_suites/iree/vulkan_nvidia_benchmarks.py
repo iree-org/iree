@@ -16,17 +16,15 @@ from e2e_test_framework.models import model_groups
 
 def _get_compile_flag():
     preprocess_passes = [
-        "iree-flow-detach-elementwise-from-named-ops",
+        "iree-global-opt-detach-elementwise-from-named-ops",
         "iree-preprocessing-convert-conv2d-to-img2col",
-        "iree-flow-convert-1x1-filter-conv2d-to-matmul",
+        "iree-global-opt-convert-1x1-filter-conv2d-to-matmul",
         "iree-preprocessing-pad-linalg-ops{pad-size=32}",
     ]
     preprocess_flag_template = (
         "--iree-preprocessing-pass-pipeline=builtin.module(func.func({}))"
     )
     return [
-        "--iree-stream-resource-index-bits=64",
-        "--iree-vm-target-index-bits=64",
         preprocess_flag_template.format(",".join(preprocess_passes)),
     ]
 

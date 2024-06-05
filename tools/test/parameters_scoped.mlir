@@ -14,10 +14,10 @@
 // provide content for a single scope but not to have a single file provide
 // content for multiple scopes. Since parameter keys only need to be unique
 // within a scope this test could use the same name for both scopes if needed.
-util.global private @a0 = #stream.parameter.named<"a"::"a0"> : tensor<4xi64>
-util.global private @a1 = #stream.parameter.named<"a"::"a1"> : tensor<4xi64>
-util.global private @b0 = #stream.parameter.named<"b"::"b0"> : tensor<8xi64>
-util.global private @b1 = #stream.parameter.named<"b"::"b1"> : tensor<8xi64>
+util.global private @a0 = #flow.parameter.named<"a"::"a0"> : tensor<4xi64>
+util.global private @a1 = #flow.parameter.named<"a"::"a1"> : tensor<4xi64>
+util.global private @b0 = #flow.parameter.named<"b"::"b0"> : tensor<8xi64>
+util.global private @b1 = #flow.parameter.named<"b"::"b1"> : tensor<8xi64>
 func.func @echo() -> (tensor<4xi64>, tensor<4xi64>, tensor<8xi64>, tensor<8xi64>) {
   %a0 = util.global.load @a0 : tensor<4xi64>
   %a1 = util.global.load @a1 : tensor<4xi64>

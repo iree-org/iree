@@ -4,7 +4,6 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Pipelines/Options.h"
 #include "iree/compiler/Preprocessing/Common/Passes.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
@@ -22,11 +21,7 @@ struct TransposeMatmulPass
       TransposeMatmulPass>::TransposeMatmulPassBase;
 
   void runOnOperation() override {
-    if (input == PreprocessingOptions::TransposeMatmulInput::None)
-      return;
-
-    bool transposeLHS =
-        input == PreprocessingOptions::TransposeMatmulInput::Lhs;
+    bool transposeLHS = input == Preprocessing::TransposeMatmulInput::Lhs;
 
     RewritePatternSet patterns(&getContext());
     linalg::populateTransposeMatmulPatterns(patterns, transposeLHS);

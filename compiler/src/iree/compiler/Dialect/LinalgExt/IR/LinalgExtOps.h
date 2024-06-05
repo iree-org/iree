@@ -30,19 +30,4 @@
 
 // clang-format on
 
-//===---------------------------------------------------------------------===//
-// LinalgExt Dialect Helpers
-//===---------------------------------------------------------------------===//
-
-namespace mlir::iree_compiler::IREE::LinalgExt {
-
-/// Returns the encoding attribute from the type if there is an encoding.
-/// Otherwise, returns null.
-EncodingAttr getEncodingAttr(RankedTensorType type);
-
-/// Returns the ContractionDimensions for the encoding user_indexing_maps.
-FailureOr<linalg::ContractionDimensions>
-getEncodingContractionDims(EncodingAttr encoding);
-} // namespace mlir::iree_compiler::IREE::LinalgExt
-
 #endif // IREE_COMPILER_DIALECT_LINALGEXT_IR_LINALGEXTOPS_H_

@@ -4,34 +4,20 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Codegen/Common/GPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Conversion/LLVMCommon/LoweringOptions.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir::iree_compiler {
 
+#define GEN_PASS_DEF_GPUCHECKRESOURCEUSAGEPASS
+#include "iree/compiler/Codegen/Common/GPU/Passes.h.inc"
+
 namespace {
-class GPUCheckResourceUsagePass final
-    : public GPUCheckResourceUsageBase<GPUCheckResourceUsagePass> {
-public:
-  explicit GPUCheckResourceUsagePass(
-      std::function<unsigned(mlir::FunctionOpInterface)> getSharedMemoryLimit,
-      std::function<unsigned(mlir::FunctionOpInterface)> getIndexBitwidth)
-      : getSharedMemoryLimit(getSharedMemoryLimit),
-        getIndexBitwidth(getIndexBitwidth) {}
-
-  void runOnOperation() override;
-
-private:
-  std::function<unsigned(mlir::FunctionOpInterface)> getSharedMemoryLimit;
-  std::function<unsigned(mlir::FunctionOpInterface)> getIndexBitwidth;
-};
-} // namespace
-
 static unsigned getDatalayoutIndexBitwidth(mlir::FunctionOpInterface func) {
   auto mod = func->getParentOfType<ModuleOp>();
   LowerToLLVMOptions options(mod.getContext(), DataLayout(mod));
@@ -103,18 +89,33 @@ static LogicalResult checkGPUAllocationSize(
   return success();
 }
 
-void GPUCheckResourceUsagePass::runOnOperation() {
-  auto funcOp = getOperation();
-  unsigned limit = this->getSharedMemoryLimit
-                       ? this->getSharedMemoryLimit(funcOp)
-                       : 64 * 1024;
-  if (failed(checkGPUAllocationSize(funcOp, limit,
-                                    this->getIndexBitwidth
-                                        ? this->getIndexBitwidth
-                                        : getDatalayoutIndexBitwidth))) {
-    return signalPassFailure();
+class GPUCheckResourceUsagePass final
+    : public impl::GPUCheckResourceUsagePassBase<GPUCheckResourceUsagePass> {
+public:
+  explicit GPUCheckResourceUsagePass(
+      std::function<unsigned(mlir::FunctionOpInterface)> getSharedMemoryLimit,
+      std::function<unsigned(mlir::FunctionOpInterface)> getIndexBitwidth)
+      : getSharedMemoryLimit(getSharedMemoryLimit),
+        getIndexBitwidth(getIndexBitwidth) {}
+
+  void runOnOperation() override {
+    FunctionOpInterface funcOp = getOperation();
+    unsigned limit =
+        getSharedMemoryLimit ? getSharedMemoryLimit(funcOp) : 64 * 1024;
+    if (failed(checkGPUAllocationSize(funcOp, limit,
+                                      getIndexBitwidth
+                                          ? getIndexBitwidth
+                                          : getDatalayoutIndexBitwidth))) {
+      return signalPassFailure();
+    }
   }
-}
+
+private:
+  std::function<unsigned(mlir::FunctionOpInterface)> getSharedMemoryLimit;
+  std::function<unsigned(mlir::FunctionOpInterface)> getIndexBitwidth;
+};
+
+} // namespace
 
 std::unique_ptr<InterfacePass<FunctionOpInterface>>
 createGPUCheckResourceUsagePass(
