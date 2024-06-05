@@ -290,8 +290,9 @@ static ConcreteMmaLayout getConcreteMFMALayout(MLIRContext *context,
     auto aKLayout = inner;
     auto bKLayout = inner;
     auto bNLayout = outer;
-    auto cMLayout = PerDimLayoutAttr::get(context, {laneY, vectorX}, {8, 2});
-    auto cNLayout = outer;
+    auto cMLayout =
+        PerDimLayoutAttr::get(context, {vectorY, laneY, vectorX}, {8, 2, 1});
+    auto cNLayout = PerDimLayoutAttr::get(context, {laneX}, {16});
     return ConcreteMmaLayout{opaqueLayout, aMLayout, aKLayout, bKLayout,
                              bNLayout,     cMLayout, cNLayout};
   }
