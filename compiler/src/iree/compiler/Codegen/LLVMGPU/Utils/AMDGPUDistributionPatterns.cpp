@@ -9,7 +9,7 @@
 #include "iree/compiler/Codegen/Common/VectorLayoutAnalysis.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/LLVMGPU/Utils/LLVMGPUUtils.h"
-#include "mlir/Dialect/AMDGPU/IR/AMDGPUDialect.h"
+#include "iree/compiler/Codegen/Utils/VectorOpUtils.h"
 
 namespace mlir::iree_compiler {
 
@@ -53,14 +53,6 @@ struct DistributeContractions final
         (matrixType == ContractMatrixType::B))
       return swappedIndices;
     return originalIndices;
-  }
-
-  int64_t getReductionDimensionShape(int64_t rowBatch, int64_t colBatch,
-                                     ContractType contractType) const {
-    if (isOperandATransposed(contractType)) {
-      return rowBatch;
-    }
-    return colBatch;
   }
 
   ContractType inferContractType(MLIRContext *ctx,
@@ -114,8 +106,10 @@ struct DistributeContractions final
     }
 
     LayoutAttr resultLayout = dyn_cast<LayoutAttr>(signature[result]);
-    if (!resultLayout)
+    if (!resultLayout) {
+      llvm::errs() << "Could not find LayoutAttr\n";
       return failure();
+    }
 
     Type elementType =
         llvm::cast<ShapedType>(operands[ACC].getType()).getElementType();
@@ -125,11 +119,6 @@ struct DistributeContractions final
     Value vector = rewriter.create<arith::ConstantOp>(
         loc, vectorType, rewriter.getZeroAttr(vectorType));
 
-    ContractType contractType = inferContractType(
-        contractOp.getContext(), contractOp.getIndexingMapsArray());
-    if (contractType == ContractType::UNSUPPORTED)
-      return failure();
-
     auto mmaAttr =
         contractOp->getAttrOfType<IREE::GPU::MMAAttr>("iree.amdgpu.mma");
     if (!mmaAttr) {
@@ -137,27 +126,38 @@ struct DistributeContractions final
           contractOp, "missing iree.amdgpu.mma intrinsic attribute");
     }
 
-    std::optional<int64_t> rowBatch = layouts[LHS].getBatchDim(0);
-    if (!rowBatch)
-      return failure();
-    std::optional<int64_t> colBatch = layouts[LHS].getBatchDim(1);
-    if (!colBatch)
-      return failure();
+    VectorContractOpInfo opInfo(contractOp);
+    auto [lhsK, rhsK] = opInfo.getOperandKIndex();
 
-    int K = getReductionDimensionShape(rowBatch.value(), colBatch.value(),
-                                       contractType);
+    std::optional<int64_t> kBatch = layouts[LHS].getBatchDim(lhsK);
+    if (!kBatch) {
+      llvm::errs() << "Could not find row batch\n";
+      return failure();
+    }
 
     auto contractFn = [&](const LayoutIterator::State &state) {
+      auto [lhsM, rhsN] = opInfo.getOperandMNIndex();
+      auto [lhsK, rhsK] = opInfo.getOperandKIndex();
       SmallVector<int64_t> indices = state.computeIteratorProjectedSIMTIndex();
       Value dMatrix = rewriter.create<vector::ExtractOp>(
           loc, getDistributed(rewriter, operands[ACC], layouts[ACC]), indices);
-      for (int k = 0; k < K; k++) {
+      for (int k = 0; k < kBatch; k++) {
+
+        SmallVector<int64_t> lhsIndices(2);
+        SmallVector<int64_t> rhsIndices(2);
+        lhsIndices[lhsM] = indices[0];
+        lhsIndices[lhsK] = k;
+        rhsIndices[rhsN] = indices[1];
+        rhsIndices[rhsK] = k;
+
         Value aMatrix = rewriter.create<vector::ExtractOp>(
             loc, getDistributed(rewriter, operands[LHS], layouts[LHS]),
-            getIndices(contractType, ContractMatrixType::A, indices[0], k));
+            lhsIndices);
+
         Value bMatrix = rewriter.create<vector::ExtractOp>(
             loc, getDistributed(rewriter, operands[RHS], layouts[RHS]),
-            getIndices(contractType, ContractMatrixType::B, k, indices[1]));
+            rhsIndices);
+
         dMatrix = mmaAttr
                       .buildMmaOperation(rewriter, loc, dMatrix.getType(),
                                          aMatrix, bMatrix, dMatrix)
