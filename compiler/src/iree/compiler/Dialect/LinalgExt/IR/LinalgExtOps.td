@@ -694,7 +694,28 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
        "getResultTilePosition",
        "getTiledImplementation"]>]> {
   let summary = "Online Attention operator";
-  let description = [{}];
+  let description = [{
+    Traditional scaled dot product attention computes:
+
+    attention(Q, K, V, scale) = softmax(Q @ K.T * scale) @ V
+
+    Online Attention on the other hand, uses an online normalizer instead of
+    softmax:
+
+    online_attention(Q, K, V, scale, running_max, running_sum) 
+      = online_normalizer(Q @ K.T * scale, running_max, running_sum) @ V
+
+    The advantage of this online_normalizer is that it can be tiled along
+    it's reduction dimension, making the online_attention operator:
+      - Tilable along softmax reduction dimension
+      - Associative along softmax reduction dimension
+      - Commutative along softmax associative dimension
+
+    Note: The results of online_attention need to be combined after computing
+    it over the entire softmax reduction dimension by:
+      x, _, sum : results
+      x = (1 / sum) * x
+  }];
 
   let arguments = (ins AnyShaped:$query,
                        AnyShaped:$key,
