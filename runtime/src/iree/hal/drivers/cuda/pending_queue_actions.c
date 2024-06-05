@@ -742,6 +742,10 @@ static iree_status_t iree_hal_cuda_pending_queue_actions_issue_execution(
           z0, iree_hal_deferred_command_buffer_apply(
                   command_buffer, stream_command_buffer,
                   iree_hal_buffer_binding_table_empty()));
+      // The stream_command_buffer is going to be retained by
+      // the action->resource_set and deleted after the action
+      // completes.
+      iree_hal_resource_release(stream_command_buffer);
     }
   }
   IREE_TRACE_ZONE_END(dispatch_command_buffers);
