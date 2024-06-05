@@ -29,7 +29,7 @@ namespace mlir::iree_compiler::Preprocessing {
 
 #define GEN_PASS_DEF_CONVERTCONVTOCHANNELSLASTPASS
 #include "iree/compiler/Preprocessing/Common/Passes.h.inc" // IWYU pragma: export
-             
+
 using ConvBuilderFn = std::function<Value(
     OpBuilder &b, Location loc, linalg::LinalgOp srcConv, Value input,
     Value filter, Value output, AffineMap inputMap, AffineMap filterMap,
@@ -372,11 +372,17 @@ transposeConvLikeLinalgOp(PatternRewriter &rewriter, linalg::LinalgOp convOp,
   SmallVector<int64_t> outputIndices =
       collectChannelInnerDimsIndices(outputMap, convDims.outputChannel);
 
+  bool inputIndicesInnerMost =
+      isInnerIdentityIndices(inputIndices, inputMap.getNumResults());
+  bool filterIndicesInnerMost =
+      isInnerIdentityIndices(filterIndices, filterMap.getNumResults());
+  bool outputIndicesInnerMost =
+      isInnerIdentityIndices(filterIndices, filterMap.getNumResults());
+
   // If the dimensions to transpose/pack are already in the correct order and
   // inner most, nothing to do.
-  if (isInnerIdentityIndices(inputIndices, inputMap.getNumResults()) &&
-      isInnerIdentityIndices(filterIndices, filterMap.getNumResults()) &&
-      isInnerIdentityIndices(outputIndices, outputMap.getNumResults())) {
+  if (inputIndicesInnerMost && filterIndicesInnerMost &&
+      outputIndicesInnerMost) {
     return failure();
   }
 
@@ -387,6 +393,11 @@ transposeConvLikeLinalgOp(PatternRewriter &rewriter, linalg::LinalgOp convOp,
   if (enableFHWCFilter) {
     filterIndices =
         collectChannelInnerDimsIndices(filterMap, convDims.inputChannel);
+    // If the dimensions are in the correct order based on the updated filter
+    // indices.
+    filterIndicesInnerMost =
+        isInnerIdentityIndices(filterIndices, filterMap.getNumResults());
+
     // If the tensor dimensions are already in the correct FHWC order, no
     // further action is required.
     if (isInnerIdentityIndices(inputIndices, inputMap.getNumResults()) &&
