@@ -1786,10 +1786,6 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   TileSizesListType tileSizes = {distTileSizes, parallelTileSizes,
                                  reductionTileSizes};
 
-  // TODO: (Groverkss): Tile K2 here using reduction tiling interface once we
-  // have it. TileAndDecomposeAttention pass only tiles K2. I think it should
-  // be possible to tile K1 also, but need to explore it more.
-
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, attnOp, tileSizes,
       DispatchLoweringPassPipeline::CPULinalgExtTileAndVectorize);
