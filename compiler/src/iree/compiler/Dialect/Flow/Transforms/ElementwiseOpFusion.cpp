@@ -82,28 +82,6 @@ void ElementwiseOpFusionPass::runOnOperation() {
     getOperation()->emitOpError("Failed to perform elementwise operations");
     return signalPassFailure();
   }
-
-  IRRewriter rewriter(context);
-  getOperation()->walk([&](linalg::GenericOp op) {
-    if (!linalg::isElementwise(op) || op.getNumResults() != 1)
-      return WalkResult::advance();
-
-    AffineMap indexingMap = op.getIndexingMapsArray().back();
-    if (indexingMap.isIdentity())
-      return WalkResult::advance();
-
-    ArrayRef<AffineExpr> exprs = indexingMap.getResults();
-    auto perm = llvm::map_to_vector(exprs, [](AffineExpr e) -> unsigned {
-      return cast<AffineDimExpr>(e).getPosition();
-    });
-    FailureOr<linalg::GenericOp> newOp =
-        linalg::interchangeGenericOp(rewriter, op, perm);
-    // This should always succeed.
-    assert(succeeded(newOp));
-    (void)newOp;
-
-    return WalkResult::advance();
-  });
 }
 
 } // namespace mlir::iree_compiler::IREE::Flow

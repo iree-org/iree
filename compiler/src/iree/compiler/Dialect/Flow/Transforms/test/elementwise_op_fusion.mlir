@@ -1,4 +1,4 @@
-// RUN: iree-opt --split-input-file --iree-flow-elementwise-op-fusion %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-flow-fusion-preprocessing %s | FileCheck %s
 
 #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d3, d1, d2)>
