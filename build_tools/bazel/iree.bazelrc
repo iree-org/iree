@@ -90,6 +90,9 @@ build:generic_clang --per_file_copt=external/.*@-w
 # Would need to then make all the --copt below duplicated with --host_copt.
 build:generic_clang --host_copt=-w
 
+# This is currently flagging the status macros (https://github.com/iree-org/iree/issues/16946)
+build:generic_clang --copt=-Wno-c++20-extensions --host_copt=-Wno-c++20-extensions
+
 # Set clang diagnostics. These largely match the set of warnings used within
 # Google. They have not been audited super carefully by the IREE team but are
 # generally thought to be a good set and consistency with those used internally
