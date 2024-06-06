@@ -69,7 +69,7 @@ def load_onnx_model(args: argparse.Namespace) -> onnx.ModelProto:
         raw_model = onnx.load(args.input_file)
     else:
         raw_model = onnx.load(args.input_file, load_external_data=False)
-        onnx.load_external_data_for_model(raw_model, args.data_dir)
+        onnx.load_external_data_for_model(raw_model, str(args.data_dir))
 
     # Do shape inference two ways.  First, attempt in-memory to avoid redundant
     # loading and the need for writing a temporary file somewhere.  If that
@@ -104,7 +104,7 @@ def load_onnx_model(args: argparse.Namespace) -> onnx.ModelProto:
         # Load the temp file and the external data.
         inferred_model = onnx.load(temp_inferred_file, load_external_data=False)
         data_dir = Path(input_dir if args.data_dir is None else args.data_dir)
-        onnx.load_external_data_for_model(inferred_model, data_dir)
+        onnx.load_external_data_for_model(inferred_model, str(data_dir))
 
         return inferred_model
 

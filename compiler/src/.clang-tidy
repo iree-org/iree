@@ -10,4 +10,3 @@ Checks: >
         -llvm-else-after-return,
         -llvm-include-order,
         -llvm-qualified-auto
-

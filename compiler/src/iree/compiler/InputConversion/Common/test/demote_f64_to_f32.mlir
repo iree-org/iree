@@ -81,4 +81,3 @@ util.func public @complexTypesF64(%arg0 : complex<f64>) -> complex<f64> {
   // CHECK-NEXT: util.return %arg0 : complex<f32>
   util.return %arg0 : complex<f64>
 }
-

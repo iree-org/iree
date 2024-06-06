@@ -16,6 +16,7 @@ iree_cc_library(
   HDRS
     "IREEGPUAttrs.h"
     "IREEGPUDialect.h"
+    "IREEGPUEnums.h"
     "IREEGPUInterfaces.h"
     "IREEGPUOps.h"
   TEXTUAL_HDRS
@@ -43,6 +44,8 @@ iree_cc_library(
     IREEVectorExtDialect
     LLVMSupport
     MLIRAMDGPUDialect
+    MLIRAffineDialect
+    MLIRArithDialect
     MLIRControlFlowInterfaces
     MLIRIR
     MLIRLinalgDialect

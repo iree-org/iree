@@ -13,4 +13,3 @@ func.func @i4_transpose(%a: vector<8x16xi4>) -> vector<16x8xi4> {
 //       CHECK:   arith.extsi %{{.*}} : vector<8x16xi4> to vector<8x16xi8>
 //       CHECK:   vector.shuffle
 //       CHECK:   arith.trunci %{{.*}} : vector<16x8xi8> to vector<16x8xi4>
-

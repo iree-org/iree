@@ -42,6 +42,7 @@ def main(args: argparse.Namespace):
     output = GENERATED_E2E_MODEL_TESTS_CMAKE_TEMPLATE.substitute(
         __TEST_RULES="\n".join(cmake_rules)
     )
+    output = output.rstrip() + "\n"  # Trim any extra newlines.
     with open(args.output, "w") as output_file:
         output_file.write(output)
 

@@ -268,25 +268,23 @@ public:
     auto init = rewriter.create<tensor::EmptyOp>(
         loc, mixedSizes, extractSliceOp.getType().getElementType());
 
-    SmallVector<bool> inBounds;
-    inBounds.resize(mixedSizes.size());
-    for (auto [idx, vecSize, destSize] :
-         llvm::zip_equal(llvm::seq<int64_t>(0, inBounds.size()),
-                         xferOp.getVectorType().getShape(), mixedSizes)) {
-      auto maybeCst = getConstantIntValue(destSize);
-      if (!maybeCst) {
-        inBounds[idx] = false;
+    auto indices = xferOp.getIndices();
+
+    SmallVector<bool> inBounds(mixedSizes.size(), false);
+    for (auto [idx, vecSize, destSize, index] : llvm::zip_equal(
+             llvm::seq<int64_t>(0, inBounds.size()),
+             xferOp.getVectorType().getShape(), mixedSizes, indices)) {
+      auto maybeIndex = getConstantIntValue(index);
+      auto maybeDestSize = getConstantIntValue(destSize);
+      if (!maybeDestSize || !maybeIndex) {
         continue;
       }
-      if (*maybeCst >= vecSize) {
-        inBounds[idx] = false;
-      } else {
+      if (vecSize + *maybeIndex <= *maybeDestSize)
         inBounds[idx] = true;
-      }
     }
 
     rewriter.replaceOpWithNewOp<vector::TransferWriteOp>(
-        extractSliceOp, xferOp.getVector(), init, xferOp.getIndices(),
+        extractSliceOp, xferOp.getVector(), init, indices,
         xferOp.getPermutationMap(), inBounds);
 
     return success();

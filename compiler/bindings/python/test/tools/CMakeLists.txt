@@ -44,4 +44,3 @@ iree_py_test(
   SRCS
     "compiler_tflite_test.py"
 )
-

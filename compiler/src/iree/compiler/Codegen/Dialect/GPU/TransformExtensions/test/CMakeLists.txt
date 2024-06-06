@@ -14,6 +14,8 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "convert_to_multi_mma.mlir"
+    "distribute_multi_mma.mlir"
     "drop_multi_mma_unit_dims.mlir"
     "lower_multi_mma.mlir"
     "lower_vector_barrier.mlir"

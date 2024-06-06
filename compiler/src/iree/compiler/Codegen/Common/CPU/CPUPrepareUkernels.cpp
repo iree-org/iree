@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Common/CPU/PassDetail.h"
 #include "iree/compiler/Codegen/Common/CPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
@@ -291,15 +292,20 @@ struct CPUPrepareUkernelsPass
 
 void CPUPrepareUkernelsPass::runOnOperation() {
   MLIRContext *ctx = &getContext();
+  RewritePatternSet patterns(ctx);
   auto funcOp = getOperation();
   IRRewriter rewriter(ctx);
-  tileBatchDimsForBatchMmt4dOp(rewriter, funcOp);
-  tileNonPackedDimsFor3DPackOps(rewriter, funcOp);
+  auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
 
-  // Convert linalg.batch_mmt4d with batch dim = 1 into linalg.mmt4d.
-  RewritePatternSet patterns(ctx);
-  patterns.add<ConvertBatchMmt4DtoMmt4DPattern, Convert3DPackto2DPackPattern>(
-      ctx);
+  if (hasUkernel(targetAttr, "mmt4d")) {
+    tileBatchDimsForBatchMmt4dOp(rewriter, funcOp);
+    patterns.add<ConvertBatchMmt4DtoMmt4DPattern>(ctx);
+  }
+  if (hasUkernel(targetAttr, "pack")) {
+    tileNonPackedDimsFor3DPackOps(rewriter, funcOp);
+    patterns.add<Convert3DPackto2DPackPattern>(ctx);
+  }
+
   // Canonicalize extract and insert slice ops created during the conversion.
   tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
   tensor::populateFoldTensorSubsetOpPatterns(patterns);

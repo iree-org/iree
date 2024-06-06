@@ -21,6 +21,6 @@ module {
 }
 
 //   CHECK: #[[CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 0, 0, 0], [1, 1, 4, 0], [0, 0, 0, 4], [0, 0, 0, 0]]>
-//   CHECK:    linalg.depthwise_conv_1d_nwc_wc 
+//   CHECK:    linalg.depthwise_conv_1d_nwc_wc
 //   CHECK-SAME: lowering_config = #[[CONFIG]]
 //   CHECK-SAME: ins({{.*}}, {{.*}} : tensor<1x4x4xf32>, tensor<4x4xf32>) outs({{.*}} : tensor<1x1x4xf32>) -> tensor<1x1x4xf32>

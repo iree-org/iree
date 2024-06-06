@@ -7,6 +7,7 @@
 #ifndef IREE_COMPILER_GLOBALOPTIMIZATION_PASSDETAIL_H_
 #define IREE_COMPILER_GLOBALOPTIMIZATION_PASSDETAIL_H_
 
+#include "iree/compiler/GlobalOptimization/Passes.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"

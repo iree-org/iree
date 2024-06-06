@@ -113,6 +113,7 @@ iree_cc_library(
     "MaterializeEncodingIntoNop.cpp"
     "MaterializeEncodingIntoPackUnPack.cpp"
     "MemrefCopyToLinalg.cpp"
+    "NormalizeLoopBounds.cpp"
     "OptimizeTensorInsertExtractSlices.cpp"
     "OptimizeVectorTransferPass.cpp"
     "PadDynamicAlloc.cpp"

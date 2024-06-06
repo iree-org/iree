@@ -50,4 +50,3 @@ hal.executable private @pad_matmul_static_dispatch_0  {
     } // @__transform_main
   } // module
 }
-

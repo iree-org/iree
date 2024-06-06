@@ -1,0 +1,11 @@
+# See https://github.com/bazelbuild/buildtools/issues/914.
+# The buildifier tool used to format Bazel files decided that, despite claiming
+# to support Windows, it should convert line endings from \r\n to \n.
+# This conflicts with the `git config core.autocrlf` setting so unfortunate
+# users such as us are thus forced to either:
+#   * get trivial line ending diffs on every change to a file
+#   * constantly run `git add . --renormalize`
+#   * override the git setting here
+*.bazel text eol=lf
+*.bzl text eol=lf
+WORKSPACE text eol=lf

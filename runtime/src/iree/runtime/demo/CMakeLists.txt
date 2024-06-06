@@ -25,7 +25,7 @@ iree_cc_binary(
     "IREE_RUNTIME_DEMO_LOAD_FILE_FROM_EMBEDDED_DATA"
   DEPS
     iree::runtime::unified
-    iree::runtime::testdata::simple_mul_module_c
+    ::simple_mul_module_c
 )
 
 iree_native_test(
@@ -42,7 +42,7 @@ iree_cc_binary(
     "hello_world_terse.c"
   DEPS
     iree::runtime::unified
-    iree::runtime::testdata::simple_mul_module_c
+    ::simple_mul_module_c
 )
 
 iree_native_test(
@@ -50,4 +50,16 @@ iree_native_test(
     "hello_world_terse_test"
   SRC
     ::hello_world_terse
+)
+
+iree_bytecode_module(
+  NAME
+    simple_mul_module
+  SRC
+    "simple_mul.mlir"
+  C_IDENTIFIER
+    "iree_runtime_demo_simple_mul_module"
+  FLAGS
+    "--iree-hal-target-backends=vmvx"
+  PUBLIC
 )

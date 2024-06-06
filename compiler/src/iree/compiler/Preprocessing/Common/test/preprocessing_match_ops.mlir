@@ -56,7 +56,7 @@ module attributes {transform.with_named_sequence} {
   }
 
   transform.named_sequence @__transform_main(%module: !transform.any_op) {
-    %func = transform.structured.match ops{["func.func"]} in %module : (!transform.any_op) -> !transform.any_op   
+    %func = transform.structured.match ops{["func.func"]} in %module : (!transform.any_op) -> !transform.any_op
     transform.foreach_match in %module
         @match -> @annotate
       : (!transform.any_op) -> (!transform.any_op)

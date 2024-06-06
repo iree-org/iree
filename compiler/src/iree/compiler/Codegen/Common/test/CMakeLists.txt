@@ -47,6 +47,7 @@ iree_lit_test_suite(
     "lower_ukernel_to_calls.mlir"
     "materialize_encoding_into_nop.mlir"
     "materialize_user_configs.mlir"
+    "normalize_loop_bounds.mlir"
     "optimize_tensor_insert_extract_slices.mlir"
     "pad_dynamic_alloc.mlir"
     "polynomial_approximation.mlir"

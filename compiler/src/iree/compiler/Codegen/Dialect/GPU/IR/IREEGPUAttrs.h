@@ -9,6 +9,7 @@
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "mlir/Dialect/SCF/IR/DeviceMappingInterface.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
@@ -18,7 +19,6 @@
 #include "mlir/IR/BuiltinTypes.h"
 
 // clang-format off
-#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h.inc"
 #define GET_ATTRDEF_CLASSES
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h.inc"
 #undef GET_ATTRDEF_CLASSES

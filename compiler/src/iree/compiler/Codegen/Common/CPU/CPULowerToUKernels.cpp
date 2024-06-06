@@ -392,7 +392,7 @@ matchDAGForUKernel(RewriterBase &rewriter, tensor::PackOp op,
       ValueRange{in_size0, in_size1, out_size0, out_size1, out_size2, out_size3,
                  paddingVal, flagsVal},
       /*fn_def_attrs=*/rewriter.getDictionaryAttr(fn.defAttrs),
-      /*strided_outer_dims=*/rewriter.getIndexAttr(1));
+      /*strided_outer_dims=*/rewriter.getIndexAttr(2));
   return cast<IREE::Codegen::UKernelOpInterface>(
       genericMicroKernelOp.getOperation());
 }
@@ -480,7 +480,7 @@ matchDAGForUKernel(RewriterBase &rewriter, tensor::UnPackOp op,
       ValueRange{in_size0, in_size1, in_size2, in_size3, out_size0, out_size1,
                  flagsVal},
       /*fn_def_attrs=*/rewriter.getDictionaryAttr(fn.defAttrs),
-      /*strided_outer_dims=*/rewriter.getIndexAttr(1));
+      /*strided_outer_dims=*/rewriter.getIndexAttr(2));
   return cast<IREE::Codegen::UKernelOpInterface>(
       genericMicroKernelOp.getOperation());
 }

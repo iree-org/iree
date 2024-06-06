@@ -21,4 +21,3 @@ iree_cc_library(
     "IREE_HAVE_HAL_METAL_DRIVER_MODULE=1"
   PUBLIC
 )
-

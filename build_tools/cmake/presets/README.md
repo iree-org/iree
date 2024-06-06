@@ -40,7 +40,7 @@ for your operating system. One of "linux", "macos", "windows".
 
 * `cmake --preset new-{os}-dev`: Start a new dev build with CMake defaults for
   all project features.
-* `cmake --preset new-{os}-minimal`: Start a new dev build with all optional 
+* `cmake --preset new-{os}-minimal`: Start a new dev build with all optional
   project features disabled. While not particularly useful, this lets selected
   features be enabled as needed.
 * `cmake --preset new-{os}-turbine`: Start a new dev build with all optional

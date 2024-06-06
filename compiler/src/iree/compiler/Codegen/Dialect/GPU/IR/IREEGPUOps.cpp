@@ -5,13 +5,17 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
+#include <functional>
+#include <numeric>
 
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/Support/LLVM.h"
@@ -28,16 +32,16 @@ namespace mlir::iree_compiler::IREE::GPU {
 //===----------------------------------------------------------------------===//
 
 void MultiMmaOp::build(OpBuilder &builder, OperationState &result, Value lhs,
-                       Value rhs, Value acc,
-                       ArrayRef<ArrayRef<AffineExpr>> indexingExprs,
+                       Value rhs, Value acc, ArrayRef<AffineMap> indexingMaps,
                        ArrayRef<utils::IteratorType> iteratorTypes,
-                       MmaInterfaceAttr kind) {
+                       MmaInterfaceAttr kind,
+                       std::optional<SmallVector<int64_t>> lhsPermutation,
+                       std::optional<SmallVector<int64_t>> rhsPermutation,
+                       std::optional<SmallVector<int64_t>> accPermutation) {
   result.addOperands({lhs, rhs, acc});
   result.addTypes(acc.getType());
-  result.addAttribute(
-      getIndexingMapsAttrName(result.name),
-      builder.getAffineMapArrayAttr(
-          AffineMap::inferFromExprList(indexingExprs, builder.getContext())));
+  result.addAttribute(getIndexingMapsAttrName(result.name),
+                      builder.getAffineMapArrayAttr(indexingMaps));
   result.addAttribute(
       getIteratorTypesAttrName(result.name),
       builder.getArrayAttr(llvm::to_vector(llvm::map_range(
@@ -45,16 +49,61 @@ void MultiMmaOp::build(OpBuilder &builder, OperationState &result, Value lhs,
             return IteratorTypeAttr::get(builder.getContext(), t);
           }))));
   result.addAttribute(getKindAttrName(result.name), kind);
+  if (lhsPermutation) {
+    result.addAttribute(getLhsPermutationAttrName(result.name),
+                        builder.getDenseI64ArrayAttr(*lhsPermutation));
+  }
+  if (rhsPermutation) {
+    result.addAttribute(getRhsPermutationAttrName(result.name),
+                        builder.getDenseI64ArrayAttr(*rhsPermutation));
+  }
+  if (accPermutation) {
+    result.addAttribute(getAccPermutationAttrName(result.name),
+                        builder.getDenseI64ArrayAttr(*accPermutation));
+  }
+}
+
+void MultiMmaOp::build(OpBuilder &builder, OperationState &result, Value lhs,
+                       Value rhs, Value acc,
+                       ArrayRef<ArrayRef<AffineExpr>> indexingExprs,
+                       ArrayRef<utils::IteratorType> iteratorTypes,
+                       MmaInterfaceAttr kind,
+                       std::optional<SmallVector<int64_t>> lhsPermutation,
+                       std::optional<SmallVector<int64_t>> rhsPermutation,
+                       std::optional<SmallVector<int64_t>> accPermutation) {
+  build(builder, result, lhs, rhs, acc,
+        AffineMap::inferFromExprList(indexingExprs, builder.getContext()),
+        iteratorTypes, kind, lhsPermutation, rhsPermutation, accPermutation);
 }
 
 void MultiMmaOp::build(OpBuilder &builder, OperationState &result, Value lhs,
                        Value rhs, Value acc, ArrayAttr indexingMaps,
-                       ArrayAttr iteratorTypes, MmaInterfaceAttr kind) {
+                       ArrayAttr iteratorTypes, MmaInterfaceAttr kind,
+                       std::optional<DenseI64ArrayAttr> lhsPermutation,
+                       std::optional<DenseI64ArrayAttr> rhsPermutation,
+                       std::optional<DenseI64ArrayAttr> accPermutation) {
   result.addOperands({lhs, rhs, acc});
   result.addTypes(acc.getType());
   result.addAttribute(getIndexingMapsAttrName(result.name), indexingMaps);
   result.addAttribute(getIteratorTypesAttrName(result.name), iteratorTypes);
   result.addAttribute(getKindAttrName(result.name), kind);
+  if (lhsPermutation) {
+    result.addAttribute(getLhsPermutationAttrName(result.name),
+                        *lhsPermutation);
+  }
+  if (rhsPermutation) {
+    result.addAttribute(getRhsPermutationAttrName(result.name),
+                        *rhsPermutation);
+  }
+  if (accPermutation) {
+    result.addAttribute(getAccPermutationAttrName(result.name),
+                        *accPermutation);
+  }
+}
+
+static int64_t multiplyAcc(ArrayRef<int64_t> shape) {
+  return std::accumulate(shape.begin(), shape.end(), 1,
+                         std::multiplies<int64_t>());
 }
 
 LogicalResult MultiMmaOp::verify() {
@@ -149,7 +198,52 @@ LogicalResult MultiMmaOp::verify() {
            << " for intrinsic";
   }
 
+  int64_t lhsInnerElementCount = multiplyAcc(getLhsInnerShape());
+  int64_t rhsInnerElementCount = multiplyAcc(getRhsInnerShape());
+  int64_t accInnerElementCount = multiplyAcc(getAccInnerShape());
+
+  auto [m, n, k] = getKind().getMNKShape();
+  if (m * k != lhsInnerElementCount || n * k != rhsInnerElementCount ||
+      m * n != accInnerElementCount) {
+    auto [lhsThreadType, rhsThreadType, accThreadType] =
+        getKind().getABCVectorTypes();
+    int64_t lhsThreadElementCount = multiplyAcc(lhsThreadType.getShape());
+    int64_t rhsThreadElementCount = multiplyAcc(rhsThreadType.getShape());
+    int64_t accThreadElementCount = multiplyAcc(accThreadType.getShape());
+    if (lhsInnerElementCount != lhsThreadElementCount ||
+        rhsInnerElementCount != rhsThreadElementCount ||
+        accInnerElementCount != accThreadElementCount) {
+      return emitOpError("operation parallel semantics can't be inferred as "
+                         "either thread or subgroup");
+    }
+
+    if (getLhsPermutation() || getRhsPermutation() || getAccPermutation()) {
+      return emitOpError("permutations require subgroup semantics");
+    }
+  }
+
+  if (getLhsPermutation() && !isPermutationVector(*getLhsPermutation())) {
+    return emitOpError("invalid lhs permutation");
+  }
+  if (getRhsPermutation() && !isPermutationVector(*getRhsPermutation())) {
+    return emitOpError("invalid rhs permutation");
+  }
+  if (getAccPermutation() && !isPermutationVector(*getAccPermutation())) {
+    return emitOpError("invalid accumulator permutation");
+  }
+
   return success();
+}
+
+bool MultiMmaOp::hasThreadSemantics() {
+  int64_t lhsInnerElementCount = multiplyAcc(getLhsInnerShape());
+  int64_t rhsInnerElementCount = multiplyAcc(getRhsInnerShape());
+  int64_t accInnerElementCount = multiplyAcc(getAccInnerShape());
+
+  // If it does not have subgroup semantics, then it must have thread semantics.
+  auto [m, n, k] = getKind().getMNKShape();
+  return m * k != lhsInnerElementCount || n * k != rhsInnerElementCount ||
+         m * n != accInnerElementCount;
 }
 
 static int64_t getResultIndex(AffineMap map, AffineExpr targetExpr) {
