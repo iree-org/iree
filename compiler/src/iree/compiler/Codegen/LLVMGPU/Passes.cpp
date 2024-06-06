@@ -734,10 +734,7 @@ void addGPUPackUnPackPasses(OpPassManager &funcPassManager) {
 
   addBufferizePasses(funcPassManager);
 
-  // distribute foreach threads
   funcPassManager.addPass(createGPUDistributePass());
-
-  funcPassManager.addPass(createSplitFullPartialTransferPass("linalg-copy"));
 }
 
 void addGPUSimpleDistributePassPipeline(OpPassManager &funcPassManager) {
