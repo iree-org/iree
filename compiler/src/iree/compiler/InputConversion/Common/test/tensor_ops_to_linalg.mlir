@@ -199,7 +199,6 @@ func.func @gather_1x3_dim_1_2(%arg0: tensor<1x2xi64>, %arg1: tensor<3x3x3xf32>) 
 return %gather : tensor<1x3xf32>
 }
 
-
 // CHECK: #[[MAP0:.*]] = affine_map<(d0, d1) -> (d0, 0)>
 // CHECK: #[[MAP1:.*]] = affine_map<(d0, d1) -> (d0, 1)>
 // CHECK: #[[MAP2:.*]] = affine_map<(d0, d1) -> (d0, d1)>
@@ -216,7 +215,6 @@ return %gather : tensor<1x3xf32>
 // CHECK: return %[[RES]]
 
 // -----
-
 
 func.func @source_1(%arg0: tensor<1x2xi64>, %arg1: tensor<1x1x1xf32>) -> tensor<1x1xf32> {
 %gather = tensor.gather %arg1[%arg0] gather_dims([1, 2]) : (tensor<1x1x1xf32>, tensor<1x2xi64>) -> tensor<1x1xf32>
