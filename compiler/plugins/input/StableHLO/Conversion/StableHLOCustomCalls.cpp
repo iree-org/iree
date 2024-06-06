@@ -10,6 +10,8 @@
 #include "compiler/plugins/input/StableHLO/Conversion/Passes.h"
 #include "compiler/plugins/input/StableHLO/Conversion/Preprocessing/Rewriters.h"
 #include "compiler/plugins/input/StableHLO/Conversion/Rewriters.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -221,6 +223,37 @@ struct HouseholderReflectorRewriter final
   }
 };
 
+struct AttentionRewriter final
+    : OpRewritePattern<mlir::stablehlo::CustomCallOp> {
+  using OpRewritePattern<mlir::stablehlo::CustomCallOp>::OpRewritePattern;
+  using OpAdaptor = mlir::stablehlo::CustomCallOp::Adaptor;
+
+  LogicalResult matchAndRewrite(mlir::stablehlo::CustomCallOp op,
+                                PatternRewriter &rewriter) const final {
+    if (op.getCallTargetName() != "iree_attention") {
+      return rewriter.notifyMatchFailure(op, "not iree_attention");
+    }
+
+    auto inputs = op.getOperands();
+    auto scale_tensor = inputs[3];
+    if (dyn_cast<RankedTensorType>(scale_tensor.getType()).getRank() != 0) {
+      return rewriter.notifyMatchFailure(op,
+                                         "scale must be an unranked tensor");
+    }
+    Location loc = op.getLoc();
+
+    Value scale = rewriter.create<tensor::ExtractOp>(loc, scale_tensor);
+    auto out_ty = dyn_cast<RankedTensorType>(op.getResult(0).getType());
+    Value emptyTensor = rewriter.create<tensor::EmptyOp>(
+        loc, out_ty.getShape(), out_ty.getElementType());
+
+    rewriter.replaceOpWithNewOp<IREE::LinalgExt::AttentionOp>(
+        op, out_ty, ValueRange{inputs[0], inputs[1], inputs[2], scale},
+        emptyTensor, mlir::cast<BoolAttr>(op->getAttr("transpose_v")));
+    return success();
+  }
+};
+
 //===----------------------------------------------------------------------===//
 // Pass Definition.
 //===----------------------------------------------------------------------===//
@@ -228,8 +261,10 @@ struct HouseholderReflectorRewriter final
 struct LegalizeStableHLOCustomCalls final
     : impl::LegalizeStableHLOCustomCallsBase<LegalizeStableHLOCustomCalls> {
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<arith::ArithDialect, linalg::LinalgDialect, scf::SCFDialect,
-                    mlir::stablehlo::StablehloDialect, tensor::TensorDialect>();
+    registry
+        .insert<arith::ArithDialect, linalg::LinalgDialect, scf::SCFDialect,
+                mlir::stablehlo::StablehloDialect,
+                IREE::LinalgExt::IREELinalgExtDialect, tensor::TensorDialect>();
   }
 
   void runOnOperation() override {
@@ -237,7 +272,7 @@ struct LegalizeStableHLOCustomCalls final
     MLIRContext *ctx = f.getContext();
 
     RewritePatternSet patterns(ctx);
-    patterns.add<HouseholderReflectorRewriter>(ctx);
+    patterns.add<HouseholderReflectorRewriter, AttentionRewriter>(ctx);
     if (failed(applyPatternsAndFoldGreedily(f, std::move(patterns)))) {
       signalPassFailure();
     }
