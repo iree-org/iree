@@ -60,17 +60,29 @@ repos:
 -   repo: https://github.com/jlebar/pre-commit-hooks.git
     rev: f2d115a052860b09b2888b4f104be614bf3b4779
     hooks:
-      # TODO(scotttodd): Download as needed
-      #   https://github.com/jlebar/pre-commit-hooks/issues/3
-      # TODO(scotttodd): enable when this works on Windows
-      #   https://github.com/bazelbuild/buildtools/issues/914
-      #   could try `git add . --renormalize`
-      # -   id: bazel-buildifier
-
       -   id: do-not-submit
 
 -   repo: local
     hooks:
+    -   id: buildifier
+        name: Run buildifier
+        entry: buildifier
+        language: golang
+        # Pinned to v7.1.2, but of course we can't use a tag because semver
+        # and "go install" just don't work together???
+        # This makes absolutely no sense and the maintainers have no intention
+        # of improving it or at least explaining it as hundreds of developers
+        # search for basic support: https://github.com/golang/go/issues/35732.
+        # Docs are technically at https://go.dev/ref/mod#go-install ¯\_(ツ)_/¯
+        additional_dependencies: ["github.com/bazelbuild/buildtools/buildifier@1429e15ae755a6762d0edf9198062dc6ed04408d"]
+        files: '^(.*/)?(BUILD\.bazel|BUILD|WORKSPACE|WORKSPACE\.bazel|WORKSPACE\.bzlmod|MODULE\.bazel)$|\.BUILD$|\.bzl$'
+        # Pin the language version so other system version are _not_ used.
+        # Older go versions used different syntax for "go install" (which is
+        # apparently different from "go get" and "go build"), so for this to
+        # work reliably at all we need to ensure at least some minimum. Syntax
+        # probably changed again in a future version, whatever.
+        language_version: "1.16"
+
     -   id: bazel_to_cmake
         name: Run bazel_to_cmake.py
         language: python
@@ -93,25 +105,6 @@ repos:
         entry: Files should be named BUILD.bazel instead of BUILD
         language: fail
         files: "BUILD$"
-
-    -   id: buildifier
-        name: Run buildifier
-        entry: buildifier
-        language: golang
-        # Pinned to v7.1.2, but of course we can't use a tag because semver
-        # and "go install" just don't work together???
-        # This makes absolutely no sense and the maintainers have no intention
-        # of improving it or at least explaining it as hundreds of developers
-        # search for basic support: https://github.com/golang/go/issues/35732.
-        # Docs are technically at https://go.dev/ref/mod#go-install ¯\_(ツ)_/¯
-        additional_dependencies: ["github.com/bazelbuild/buildtools/buildifier@1429e15ae755a6762d0edf9198062dc6ed04408d"]
-        files: '^(.*/)?(BUILD\.bazel|BUILD|WORKSPACE|WORKSPACE\.bazel|WORKSPACE\.bzlmod|MODULE\.bazel)$|\.BUILD$|\.bzl$'
-        # Pin the language version so other system version are _not_ used.
-        # Older go versions used different syntax for "go install" (which is
-        # apparently different from "go get" and "go build"), so for this to
-        # work reliably at all we need to ensure at least some minimum. Syntax
-        # probably changed again in a future version, whatever.
-        language_version: "1.16"
 
     # TODO(scotttodd): enable these checks when they work on Windows
     #   the generator scripts use \ on Windows instead of /
