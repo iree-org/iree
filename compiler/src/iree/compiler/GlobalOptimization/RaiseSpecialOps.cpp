@@ -686,7 +686,7 @@ static Value rewriteCatNegateAndSlice(RewriterBase &rewriter,
 // %extracted_slice = tensor.extract_slice
 //   %1[0, 0, 0, 1] [1024, 7, 7, 1] [1, 1, 1, 1]
 //   : tensor<1024x7x7x2xf32> to tensor<1024x7x7xf32>
-// Rewrite by adding a transpose that makes dim N the innermost and slice along
+// Rewrite by adding a transpose that makes dim N the outermost and slice along
 // that dim
 static void matchAndRewriteInnerExtractSlice(RewriterBase &rewriter,
                                              tensor::ExtractSliceOp sliceOp) {
@@ -700,9 +700,7 @@ static void matchAndRewriteInnerExtractSlice(RewriterBase &rewriter,
     return;
   }
 
-  SmallVector<int64_t> offsets(sliceOp.getStaticOffsets());
   SmallVector<int64_t> sizes(sliceOp.getStaticSizes());
-  SmallVector<int64_t> strides(sliceOp.getStaticStrides());
 
   // Match extract extraction of full tensor of shape n-1
   if (oldInputShape.size() < 2 ||
@@ -732,15 +730,13 @@ static void matchAndRewriteInnerExtractSlice(RewriterBase &rewriter,
   auto transposeOp = rewriter.create<linalg::TransposeOp>(
       sliceOp.getLoc(), sliceOp.getSource(), emptyOp, permutation);
 
-  auto newOffsets = sliceOp.getMixedOffsets();
+  SmallVector<OpFoldResult> newOffsets = sliceOp.getMixedOffsets();
   newOffsets.insert(newOffsets.begin(), newOffsets.back());
   newOffsets.pop_back();
 
-  auto newSizes = sliceOp.getMixedSizes();
+  SmallVector<OpFoldResult> newSizes = sliceOp.getMixedSizes();
   newSizes.insert(newSizes.begin(), newSizes.back());
   newSizes.pop_back();
-
-  oldInputShape.pop_back();
 
   auto newSliceOp = rewriter.create<tensor::ExtractSliceOp>(
       sliceOp.getLoc(),
