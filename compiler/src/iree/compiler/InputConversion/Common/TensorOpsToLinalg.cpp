@@ -112,7 +112,6 @@ struct GatherToLinalg : public OpRewritePattern<tensor::GatherOp> {
           // pair<sourceDim, dimSize>
           llvm::SmallVector<std::pair<int64_t, int64_t>> dimsFromSource;
           for (int i = 0; i < indicesForSource.size(); i++) {
-            indicesForSource[i].dump();
             if (!indicesForSource[i])
               dimsFromSource.emplace_back(
                   i, op.getSource().getType().getShape()[i]);
