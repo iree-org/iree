@@ -234,10 +234,10 @@ struct FusionPreprocessingPass
           FusionPreprocessingPass> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
-    patterns
-        .add<FoldSuccessiveTensorInsertSliceOps, GenericOpInterchangePattern,
-             ElementwiseOpInterchangePattern, GatherFusionPattern>(
-            &getContext());
+    patterns.add<ElementwiseOpInterchangePattern,
+                 FoldSuccessiveTensorInsertSliceOps,
+                 GenericOpInterchangePattern, GatherFusionPattern>(
+        &getContext());
 
     // Fold away `tensor.dim` operations that can be resolved in terms of its
     // operand shapes.
