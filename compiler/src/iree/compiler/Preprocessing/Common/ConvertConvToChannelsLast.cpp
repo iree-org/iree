@@ -483,7 +483,7 @@ struct ConvertLinalgConvNchwFchw : OpRewritePattern<linalg::Conv2DNchwFchwOp> {
 
   LogicalResult matchAndRewrite(linalg::Conv2DNchwFchwOp convOp,
                                 PatternRewriter &rewriter) const override {
-    auto strides = convOp.getStrides();
+    DenseIntElementsAttr strides = convOp.getStrides();
     bool hasAllOneStrides =
         strides.isSplat() && strides.getSplatValue<int64_t>() == 1;
     // Only enable this new filter layout when all strides are 1.
@@ -492,12 +492,11 @@ struct ConvertLinalgConvNchwFchw : OpRewritePattern<linalg::Conv2DNchwFchwOp> {
           rewriter, convOp, /*tilingFactor=*/-1, enableFHWCFilter,
           namedConvBuilderFn<linalg::Conv2DNchwFchwOp,
                              linalg::Conv2DNhwcFhwcOp>);
-    } else {
-      return transposeConvLikeLinalgOp(
-          rewriter, convOp, /*tilingFactor=*/-1, false,
-          namedConvBuilderFn<linalg::Conv2DNchwFchwOp,
-                             linalg::Conv2DNhwcHwcfOp>);
     }
+
+    return transposeConvLikeLinalgOp(
+        rewriter, convOp, /*tilingFactor=*/-1, false,
+        namedConvBuilderFn<linalg::Conv2DNchwFchwOp, linalg::Conv2DNhwcHwcfOp>);
   }
 
 private:
