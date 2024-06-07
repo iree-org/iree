@@ -277,22 +277,18 @@ enumerateMatmulTileX86_64(TypeRange elementTypes, ExecutableTargetAttr target) {
 }
 
 /// Returns the best TileMxNxK from `enumeratedTiles` pool. If the
-/// `hostDefinedUpperBound` is not empty, the chosen tile sizes can not be
+/// `maxPadding` is not empty, the chosen tile sizes can not be
 /// greater than the values.
-/// TODO(#16933): Remove `hostDefinedUpperBound` once we can propagate such
+/// TODO(#16933): Remove `paxPadding` once we can propagate such
 /// information to host. For now, they are defined by host.
-static TileMxNxK
-chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles, int64_t matmulNarrowM,
-                 int64_t matmulNarrowN,
-                 ArrayRef<int64_t> hostDefinedUpperBound = {}) {
-  assert((hostDefinedUpperBound.empty() || hostDefinedUpperBound.size() >= 3) &&
-         "expected hostDefinedUpperBound is empty or has upper bound for {M, "
-         "N, K}");
+static TileMxNxK chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles,
+                                  int64_t matmulNarrowM, int64_t matmulNarrowN,
+                                  IntegerAttr maxPadding) {
   // Handle narrow-N by transposing to reduce to narrow-M. Note: the
   // enumeratedTiles currently only enumerate narrow-M cases.
   if (matmulNarrowN && (!matmulNarrowM || matmulNarrowN < matmulNarrowM)) {
-    TileMxNxK tile = chooseMatmulTile(enumeratedTiles, matmulNarrowN, 0,
-                                      hostDefinedUpperBound);
+    TileMxNxK tile =
+        chooseMatmulTile(enumeratedTiles, matmulNarrowN, 0, maxPadding);
     std::swap(tile.M, tile.N);
     return tile;
   }
@@ -323,23 +319,27 @@ chooseMatmulTile(ArrayRef<TileMxNxK> enumeratedTiles, int64_t matmulNarrowM,
   SmallVector<RatedTileMxNxK> ratedTiles;
   ratedTiles.reserve(enumeratedTiles.size());
   int64_t bestPaddingPenalty = INT64_MAX;
-  int64_t mUB = INT64_MAX;
-  int64_t nUB = INT64_MAX;
-  int64_t kUB = INT64_MAX;
-  if (!hostDefinedUpperBound.empty()) {
-    mUB = hostDefinedUpperBound[0];
-    nUB = hostDefinedUpperBound[1];
-    kUB = hostDefinedUpperBound[2];
+
+  int64_t paddedM = INT64_MAX;
+  int64_t paddedN = INT64_MAX;
+  int64_t paddedK = INT64_MAX;
+  if (maxPadding) {
+    paddedM =
+        matmulNarrowM ? llvm::PowerOf2Ceil(matmulNarrowM) : maxPadding.getInt();
+    paddedN =
+        matmulNarrowN ? llvm::PowerOf2Ceil(matmulNarrowN) : maxPadding.getInt();
+    paddedK = maxPadding.getInt();
   }
   for (auto tile : enumeratedTiles) {
-    if (tile.M > mUB || tile.N > nUB || tile.K > kUB) {
+    if (tile.M > paddedM || tile.N > paddedN || tile.K > paddedK) {
       LLVM_DEBUG(llvm::dbgs() << "[" << DEBUG_TYPE << "]: tile (";
                  llvm::interleaveComma(
                      ArrayRef<int64_t>{tile.M, tile.N, tile.K}, llvm::dbgs());
                  llvm::dbgs()
                  << ") is skipped because it is not valid for upper_bound (";
-                 llvm::interleaveComma(ArrayRef<int64_t>{mUB, nUB, kUB},
-                                       llvm::dbgs());
+                 llvm::interleaveComma(
+                     ArrayRef<int64_t>{paddedM, paddedN, paddedK},
+                     llvm::dbgs());
                  llvm::dbgs() << ")\n");
       continue;
     }
@@ -455,7 +455,7 @@ materializeEncodingForTarget(RankedTensorType tensorType,
   // taking narrow dimensions into account.
   TileMxNxK chosenTileMxNxK =
       chooseMatmulTile(enumeratedTileMxNxK, matmulNarrowM, matmulNarrowN,
-                       encoding.getRoundDimsToArray());
+                       encoding.getMaxPadding());
 
   // Map the matmul TileMxNxK to an actual tile shape for the tensor at hand,
   // based on its role in the matmul.

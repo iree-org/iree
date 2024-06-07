@@ -67,8 +67,8 @@ Value calculateStorageElementCountInBytes(Location loc,
   SmallVector<int64_t> paddedShape(shapedType.getShape());
   SmallVector<Value> paddedDynamicDims(dynamicDims.begin(), dynamicDims.end());
   auto encoding = IREE::Encoding::getEncodingAttr(shapedType);
-  if (encoding && !encoding.getRoundDimsToArray().empty()) {
-    auto roundDimsTo = encoding.getRoundDimsToArray();
+  if (encoding && encoding.getMaxPadding()) {
+    auto roundDimsTo = encoding.getMaxPadding().getInt();
     FailureOr<linalg::ContractionDimensions> cDims =
         IREE::Encoding::getEncodingContractionDims(encoding);
     auto indexingMap = encoding.getMapForRole();
@@ -90,13 +90,13 @@ Value calculateStorageElementCountInBytes(Location loc,
       }
     };
     for (auto m : cDims->m) {
-      pad(m, roundDimsTo[0]);
+      pad(m, roundDimsTo);
     }
     for (auto n : cDims->n) {
-      pad(n, roundDimsTo[1]);
+      pad(n, roundDimsTo);
     }
     for (auto k : cDims->k) {
-      pad(k, roundDimsTo[2]);
+      pad(k, roundDimsTo);
     }
   }
 

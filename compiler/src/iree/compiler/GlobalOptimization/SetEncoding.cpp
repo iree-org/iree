@@ -99,7 +99,8 @@ struct MatmulNarrowSizes {
 // Returns the minimum of static sizes of the M/N-dimensions in the types of the
 // Ouput.
 static MatmulNarrowSizes getMatmulNarrowSizes(ShapedType outType,
-                                              linalg::LinalgOp linalgOp) {
+                                              linalg::LinalgOp linalgOp,
+                                              int64_t padFactor) {
   linalg::ContractionDimensions cDims =
       linalg::inferContractionDims(linalgOp).value();
   auto map = linalgOp.getIndexingMapsArray().back();
@@ -121,7 +122,7 @@ static MatmulNarrowSizes getMatmulNarrowSizes(ShapedType outType,
   // opportunities to select optimized narrow tiles for narrow matmuls.
   // If it is larger, everything will work fine, but the IR will be a bit more
   // verbose as more narrow_matmul_{M,N} optional parameters will be specified.
-  const int64_t kNarrowThreshold = 16;
+  const int64_t kNarrowThreshold = padFactor ? padFactor : 32;
   if (!ShapedType::isDynamic(M) && M < kNarrowThreshold) {
     narrow.M = M;
   }
@@ -330,8 +331,8 @@ public:
     }
     SmallVector<Type> elemTypes = {lhsElemType, rhsElemType, outElemType};
 
-    MatmulNarrowSizes narrowSizes =
-        getMatmulNarrowSizes(cast<ShapedType>(out.getType()), linalgOp);
+    MatmulNarrowSizes narrowSizes = getMatmulNarrowSizes(
+        cast<ShapedType>(out.getType()), linalgOp, padFactor);
 
     Location loc = linalgOp.getLoc();
     SmallVector<AffineMap> maps = linalgOp.getIndexingMapsArray();
@@ -346,10 +347,9 @@ public:
                                      elemTypes, narrowSizes, maps);
     } else {
       auto setEncodingWrapper = [&](Value src, EncodingRole role) -> Value {
-        SmallVector<int64_t> roundDimsTo(linalgOp.getNumLoops(), padFactor);
         auto encoding = EncodingAttr::get(
             linalgOp.getContext(), role, elemTypes, src.getType(),
-            narrowSizes.M, narrowSizes.N, maps, roundDimsTo);
+            narrowSizes.M, narrowSizes.N, maps, padFactor);
         return setEncoding(rewriter, loc, src, encoding);
       };
       encodedLhs = setEncodingWrapper(lhs, EncodingRole::LHS);

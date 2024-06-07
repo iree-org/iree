@@ -63,13 +63,6 @@ static RankedTensorType transposeIfNarrowNResult(RankedTensorType tensorType) {
     std::swap(maps[0], maps[1]);
   }
 
-  // auto newRoundDimsTo = encoding.getRoundDimsToArray();
-  SmallVector<int64_t> newRoundDimsTo(encoding.getRoundDimsToArray());
-  assert(newRoundDimsTo.size() == 0 || newRoundDimsTo.size() >= 3);
-  if (newRoundDimsTo.size() != 0) {
-    std::swap(newRoundDimsTo[newRoundDimsTo.size() - 3],
-              newRoundDimsTo[newRoundDimsTo.size() - 2]);
-  }
   auto context = tensorType.getContext();
   AffineMap permutation = AffineMap::getPermutationMap(permIndices, context);
   for (auto &map : maps) {
@@ -88,7 +81,7 @@ static RankedTensorType transposeIfNarrowNResult(RankedTensorType tensorType) {
       encoding.getElementTypes(),
       TypeAttr::get(RankedTensorType::get(newOriginalShape, elemType)),
       encoding.getMatmulNarrow_N(), encoding.getMatmulNarrow_M(),
-      newIndexingMaps, DenseI64ArrayAttr::get(context, newRoundDimsTo));
+      newIndexingMaps, encoding.getMaxPadding());
   return RankedTensorType::get(newShape, elemType, newEncoding);
 }
 
