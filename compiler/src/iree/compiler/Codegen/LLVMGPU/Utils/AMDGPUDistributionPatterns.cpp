@@ -81,8 +81,7 @@ struct DistributeContractions final
       SmallVector<int64_t> indices = state.computeIteratorProjectedSIMTIndex();
       Value dMatrix = rewriter.create<vector::ExtractOp>(
           loc, getDistributed(rewriter, operands[ACC], layouts[ACC]), indices);
-      for (int k = 0; k < kBatch; k++) {
-
+      for (int k = 0; k < kBatch; ++k) {
         SmallVector<int64_t> lhsIndices(2);
         SmallVector<int64_t> rhsIndices(2);
         lhsIndices[lhsM] = indices[0];
