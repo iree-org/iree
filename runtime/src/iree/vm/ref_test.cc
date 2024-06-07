@@ -166,6 +166,33 @@ TEST(VMRefTest, WrappingReleasesExisting) {
   iree_vm_ref_release(&ref);
 }
 
+// Tests that wrapping releases any existing ref in out_ref.
+TEST(VMRefTest, WrappingRetainExisting) {
+  auto instance = MakeInstance();
+  RegisterTypeC(instance);
+  iree_vm_ref_t ref = {0};
+  iree_vm_ref_wrap_retain(new ref_object_c_t(), ref_object_c_registration,
+                          &ref);
+  EXPECT_EQ(2, ReadCounter(&ref));
+  iree_vm_ref_t ref_t = ref;
+  iree_vm_ref_release(&ref);
+  iree_vm_ref_release(&ref_t);
+}
+
+// Tests that wrapping with the existing ref in out_ref being the same does not
+// change the counter (as wrap_retain is a retain+release).
+TEST(VMRefTest, WrappingRetainExistingSame) {
+  auto instance = MakeInstance();
+  RegisterTypeC(instance);
+  iree_vm_ref_t ref = {0};
+  iree_vm_ref_wrap_assign(new ref_object_c_t(), ref_object_c_registration,
+                          &ref);
+  EXPECT_EQ(1, ReadCounter(&ref));
+  iree_vm_ref_wrap_retain(ref.ptr, ref_object_c_registration, &ref);
+  EXPECT_EQ(1, ReadCounter(&ref));
+  iree_vm_ref_release(&ref);
+}
+
 // Checking null refs is fine.
 TEST(VMRefTest, CheckNull) {
   iree_vm_ref_t null_ref = {0};
