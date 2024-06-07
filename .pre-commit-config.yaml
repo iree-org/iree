@@ -98,8 +98,8 @@ repos:
         name: Run check_path_lengths.py
         language: python
         entry: ./build_tools/scripts/check_path_lengths.py
-        always_run: true
         pass_filenames: false
+        files: '^compiler/(.*/)$'
 
     -   id: build_file_names
         name: Check Bazel file names
