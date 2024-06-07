@@ -1122,8 +1122,8 @@ setMatmulRootConfig(mlir::FunctionOpInterface entryPointFn,
   SmallVector<int64_t> parallelTileSizes = vecTileSizes;
   SmallVector<int64_t> reductionTileSizes;
   SmallVector<bool> reductionScalableFlags;
-  splitParallelAndReductionTiles(op.getOperation(), parallelTileSizes,
-                                 reductionTileSizes, &parallelScalableFlags,
+  splitParallelAndReductionTiles(op, parallelTileSizes, reductionTileSizes,
+                                 &parallelScalableFlags,
                                  &reductionScalableFlags);
 
   if (vecPreProcStrategy == VectorPreProcStrategy::None) {
@@ -1587,8 +1587,7 @@ static TileSizesListType getMmt4dTileSizes(linalg::LinalgOp op) {
   limitVectorTileSizes(op, vecTileSizes);
   SmallVector<int64_t> parallelTileSizes = vecTileSizes;
   SmallVector<int64_t> reductionTileSizes;
-  splitParallelAndReductionTiles(op.getOperation(), parallelTileSizes,
-                                 reductionTileSizes);
+  splitParallelAndReductionTiles(op, parallelTileSizes, reductionTileSizes);
 
   SmallVector<int64_t> vectorInnerParallelTileSizes(numLoops, 0);
   return {distTileSizes,           cacheParallelTileSizes,
@@ -2318,8 +2317,7 @@ setConvRootConfig(mlir::FunctionOpInterface entryPointFn,
   limitVectorTileSizes(convOp, vecTileSizes);
   SmallVector<int64_t> parallelTileSizes = vecTileSizes;
   SmallVector<int64_t> reductionTileSizes;
-  splitParallelAndReductionTiles(convOp.getOperation(), parallelTileSizes,
-                                 reductionTileSizes);
+  splitParallelAndReductionTiles(convOp, parallelTileSizes, reductionTileSizes);
   setAlwaysVectorizeSizes(convOp, parallelTileSizes, reductionTileSizes);
 
   TileSizesListType tileSizes = {distTileSizes, parallelTileSizes,
@@ -2702,8 +2700,8 @@ adjustTileSizesForGenericOp(mlir::FunctionOpInterface entryPointFn,
                       vecPreProcStrategy == VectorPreProcStrategy::Masking);
   }
   limitVectorTileSizes(genericOp, vecTileSizes);
-  splitParallelAndReductionTiles(genericOp.getOperation(), vecTileSizes,
-                                 reductionTileSizes, &parallelScalableFlags,
+  splitParallelAndReductionTiles(genericOp, vecTileSizes, reductionTileSizes,
+                                 &parallelScalableFlags,
                                  &reductionScalableFlags);
   setVectorSizesForDynamicShapes(genericOp, vecPreProcStrategy, vecTileSizes,
                                  reductionTileSizes);
