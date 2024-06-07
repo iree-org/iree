@@ -16,6 +16,12 @@
 
 namespace mlir::iree_compiler {
 
+constexpr StringLiteral kVectorLayoutFetcherStorageAttrName =
+    "__vector_layout_fetcher_storage";
+
+constexpr StringLiteral kVectorLayoutRedistributeAttrName =
+    "__vector_layout_redistribute";
+
 /// A signature describing the layout for each value of vector type which is
 /// an operand or result of this operation.
 ///
@@ -40,6 +46,31 @@ struct DistributionPattern : RewritePattern {
 
   /// Get the signature for the given operation.
   std::optional<DistributionSignature> getOpSignature(Operation *op) const;
+};
+
+/// A rewriter for the pattern rewriting driver.
+struct VectorDistributionRewriter : public PatternRewriter,
+                                    public RewriterBase::Listener {
+  VectorDistributionRewriter(MLIRContext *ctx) : PatternRewriter(ctx) {
+    setListener(this);
+  }
+
+  bool hasEmptyWorklist() { return localWorklist.empty(); }
+
+  void clearWorklist() { return localWorklist.clear(); }
+
+  const std::deque<Operation *> &getWorklist() const { return localWorklist; }
+
+protected:
+  void notifyOperationModified(Operation *op) override {
+    if (op->hasAttr(kVectorLayoutRedistributeAttrName) &&
+        op->hasAttrOfType<ArrayAttr>(kVectorLayoutFetcherStorageAttrName)) {
+      localWorklist.push_back(op);
+    }
+  }
+
+private:
+  std::deque<Operation *> localWorklist;
 };
 
 template <typename SourceOp>

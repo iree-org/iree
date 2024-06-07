@@ -28,9 +28,6 @@ namespace mlir::iree_compiler {
 
 using VectorValue = TypedValue<VectorType>;
 
-constexpr StringLiteral kVectorLayoutFetcherStorageAttrName =
-    "__vector_layout_fetcher_storage";
-
 static void setOpSignature(Operation *op, VectorLayoutAnalysis &analysis) {
   SmallVector<Attribute> operands;
   SmallVector<Attribute> results;
@@ -156,7 +153,7 @@ DistributionPattern::getOpSignature(Operation *op) const {
 }
 
 static void
-debugPrintUniqueOperationNames(SmallVectorImpl<Operation *> &worklist) {
+debugPrintUniqueOperationNames(const std::deque<Operation *> &worklist) {
   DenseSet<StringRef> uniqueNames;
   for (Operation *op : worklist) {
     uniqueNames.insert(op->getName().getStringRef());
@@ -168,21 +165,15 @@ debugPrintUniqueOperationNames(SmallVectorImpl<Operation *> &worklist) {
   LLVM_DEBUG(llvm::dbgs() << "\n");
 }
 
-/// A rewriter for the pattern rewriting driver.
-struct VectorDistributionRewriter : PatternRewriter {
-  VectorDistributionRewriter(MLIRContext *ctx) : PatternRewriter(ctx) {}
-};
-
 static void applyVectorDistribution(Operation *root,
                                     const FrozenRewritePatternSet &patterns) {
-
-  SmallVector<Operation *> worklist;
 
   VectorDistributionRewriter rewriter(root->getContext());
   PatternApplicator applicator(patterns);
   applicator.applyDefaultCostModel();
 
   // Collect all the operations to be distributed.
+  std::deque<Operation *> worklist;
   LLVM_DEBUG(llvm::dbgs() << "Collecting operations to be distributed\n");
   root->walk([&](Operation *op) {
     if (hasOpSignature(op)) {
@@ -195,14 +186,32 @@ static void applyVectorDistribution(Operation *root,
   // Note that the pattern application here never runs on a newly created
   // operation. It always runs on an existing operation. This ensures that no
   // invalidated state of the analysis is ever used.
-  for (Operation *op : worklist) {
+  while (!worklist.empty()) {
+    Operation *op = worklist.front();
+    worklist.pop_front();
+    if (op == nullptr)
+      continue;
+
     LLVM_DEBUG(llvm::dbgs() << "Distributing: ");
     LLVM_DEBUG(op->print(llvm::dbgs(), OpPrintingFlags().skipRegions()));
     LLVM_DEBUG(llvm::dbgs() << "\n");
+
     if (failed(applicator.matchAndRewrite(op, rewriter))) {
       LLVM_DEBUG(llvm::dbgs().indent(2)
                  << ": Failed to distribute operation:\n");
       continue;
+    }
+
+    // Move recently emitted operations that needs to be distributed
+    // from the local/rewriter worklist into the "global" worklist.
+    if (!rewriter.hasEmptyWorklist()) {
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Recently emitted operations to be distributed:\n");
+      LLVM_DEBUG(debugPrintUniqueOperationNames(rewriter.getWorklist()));
+
+      worklist.insert(worklist.end(), rewriter.getWorklist().begin(),
+                      rewriter.getWorklist().end());
+      rewriter.clearWorklist();
     }
 
     LLVM_DEBUG(llvm::dbgs().indent(2)
@@ -224,150 +233,6 @@ static bool canDistribute(Operation *op, VectorLayoutAnalysis &analysis) {
     return !vectorValue || analysis.getLayout<Attribute>(vectorValue);
   });
 }
-
-// When there exist a layout conflict, we'll try to write back to shared memory
-// and read back to register with correct layout.
-struct DecomposeLayoutConflictResolutions final
-    : OpDistributionPattern<IREE::VectorExt::LayoutConflictResolutionOp> {
-  using OpDistributionPattern::OpDistributionPattern;
-
-  LogicalResult
-  matchAndRewrite(IREE::VectorExt::LayoutConflictResolutionOp resolutionOp,
-                  DistributionSignature &signature,
-                  PatternRewriter &rewriter) const override {
-    auto loc = resolutionOp.getLoc();
-    VectorValue vector = resolutionOp.getInput();
-    VectorValue result = resolutionOp.getOutput();
-    LayoutAttr currentLayout = dyn_cast<LayoutAttr>(signature[vector]);
-    if (!currentLayout)
-      return failure();
-    LayoutAttr targetLayout = dyn_cast<LayoutAttr>(signature[result]);
-    if (!targetLayout)
-      return failure();
-
-    SmallVector<int64_t> currentVecShape = currentLayout.getDistributedShape();
-    SmallVector<int64_t> targetVecShape = targetLayout.getDistributedShape();
-    if (currentVecShape.size() != targetVecShape.size())
-      return failure();
-
-    // If the conditions suffice, we can skip the trip to shared memory
-    // and just use the default/more efficient layout conflict resolution
-    // distribution.
-    auto numElements = [](ArrayRef<int64_t> vector) {
-      return std::accumulate(vector.begin(), vector.end(), 1,
-                             std::multiplies<int64_t>());
-    };
-    if (numElements(currentVecShape) == numElements(targetVecShape) &&
-        !currentLayout.hasLaneConflictWith(targetLayout))
-      return failure();
-
-    // Compute Warp and Subgroup Related information
-    auto funcOp = resolutionOp->getParentOfType<func::FuncOp>();
-    if (!funcOp)
-      return failure();
-    std::optional<SmallVector<int64_t>> workgroupSize =
-        getWorkgroupSize(funcOp);
-    std::optional<int64_t> subgroupSize = getSubgroupSize(funcOp);
-    if (!workgroupSize.has_value() || !subgroupSize.has_value()) {
-      return failure();
-    }
-    int64_t flatThreadSize = ShapedType::getNumElements(workgroupSize.value());
-    if (flatThreadSize % subgroupSize.value() != 0)
-      return failure();
-    int64_t numSubgroups = flatThreadSize / subgroupSize.value();
-
-    // Define shapes and types needed to be roundtripped to shared-memory.
-    auto resolutionType =
-        llvm::dyn_cast_or_null<VectorType>(resolutionOp.getResult().getType());
-    if (!resolutionType)
-      return failure();
-    if (!resolutionType.hasStaticShape())
-      return failure();
-    auto paddedShape = SmallVector<int64_t>(resolutionType.getShape());
-    int64_t vectorRank = resolutionType.getRank();
-    paddedShape[vectorRank - 1] *= numSubgroups;
-
-    // Modification for subgroup offseting. Stack subgroup data on the fastest
-    // dimension. auto subgroupId = rewriter.create<gpu::SubgroupIdOp>(loc);
-    AffineExpr d0, d1, d2, s0;
-    bindDims(rewriter.getContext(), d0, d1, d2);
-    bindSymbols(rewriter.getContext(), s0);
-    auto indexType = rewriter.getIndexType();
-    Value threadX =
-        rewriter.create<gpu::ThreadIdOp>(loc, indexType, gpu::Dimension::x);
-    Value threadY =
-        rewriter.create<gpu::ThreadIdOp>(loc, indexType, gpu::Dimension::y);
-    Value threadZ =
-        rewriter.create<gpu::ThreadIdOp>(loc, indexType, gpu::Dimension::z);
-    Value flatThreadId = affine::makeComposedAffineApply(
-        rewriter, loc,
-        (d0 + workgroupSize.value()[0] * d1 +
-         (workgroupSize.value()[0] * workgroupSize.value()[1]) * d2),
-        {threadX, threadY, threadZ});
-    Value subgroupOffset = affine::makeComposedAffineApply(
-        rewriter, loc,
-        s0.floorDiv(subgroupSize.value()) *
-            resolutionType.getShape()[vectorRank - 1],
-        {flatThreadId});
-
-    // Create shared memory to store the intermediate from src layout.
-    auto workgroupMemoryAddressSpace = Attribute(gpu::AddressSpaceAttr::get(
-        rewriter.getContext(), gpu::AddressSpace::Workgroup));
-    MemRefType allocType =
-        MemRefType::get(paddedShape, resolutionType.getElementType(),
-                        AffineMap(), workgroupMemoryAddressSpace);
-    auto alloc = rewriter.create<memref::AllocOp>(loc, allocType);
-
-    SmallVector<OpFoldResult> offsets(vectorRank, rewriter.getIndexAttr(0));
-    SmallVector<OpFoldResult> strides(vectorRank, rewriter.getIndexAttr(1));
-    SmallVector<OpFoldResult> shapes = llvm::to_vector(
-        llvm::map_range(resolutionType.getShape(), [&](int64_t dim) {
-          return OpFoldResult(rewriter.getIndexAttr(dim));
-        }));
-    offsets[vectorRank - 1] = subgroupOffset;
-    auto subview = rewriter.create<memref::SubViewOp>(loc, alloc, offsets,
-                                                      shapes, strides);
-
-    // Creating write/trip to shared memory using src layout.
-    Value c0 = rewriter.create<arith::ConstantIndexOp>(loc, 0);
-    SmallVector<Value> indices(resolutionType.getRank(), c0);
-    SmallVector<bool> inBounds(vectorRank, true);
-    auto write = rewriter.create<vector::TransferWriteOp>(loc, vector, subview,
-                                                          indices, inBounds);
-    // Insert gpu.barrier
-    rewriter.create<gpu::BarrierOp>(write.getLoc());
-
-    // Creating read from shared memory using dst layout.
-    // Read with offset starting from the warpIdx * OG fastest dim.
-    indices[vectorRank - 1] = subgroupOffset;
-    auto read = rewriter.create<vector::TransferReadOp>(loc, resolutionType,
-                                                        alloc, indices);
-
-    // Set layouts to read and write.
-    auto unitAttr = UnitAttr::get(rewriter.getContext());
-    auto writeAttrs = SmallVector<Attribute>(write->getNumOperands(), unitAttr);
-    writeAttrs[0] =
-        currentLayout; // 1st operand is src which requires currentLayout.
-    ArrayAttr writeOperandsAttr =
-        ArrayAttr::get(rewriter.getContext(), writeAttrs);
-    ArrayAttr writeResultsAttr = ArrayAttr::get(rewriter.getContext(), {});
-    Attribute writeSignature[] = {writeOperandsAttr, writeResultsAttr};
-    write->setAttr(kVectorLayoutFetcherStorageAttrName,
-                   ArrayAttr::get(rewriter.getContext(), writeSignature));
-
-    ArrayAttr readOperandsAttr = ArrayAttr::get(
-        rewriter.getContext(),
-        SmallVector<Attribute>(read->getNumOperands(), unitAttr));
-    ArrayAttr readResultsAttr =
-        ArrayAttr::get(rewriter.getContext(), {targetLayout});
-    Attribute readSignature[] = {readOperandsAttr, readResultsAttr};
-    read->setAttr(kVectorLayoutFetcherStorageAttrName,
-                  ArrayAttr::get(rewriter.getContext(), readSignature));
-
-    rewriter.replaceOp(resolutionOp, read.getResult());
-    return success();
-  }
-};
 
 LogicalResult distributeVectorOps(Operation *root,
                                   RewritePatternSet &distributionPatterns,
@@ -393,19 +258,6 @@ LogicalResult distributeVectorOps(Operation *root,
   LLVM_DEBUG(llvm::dbgs() << "Distribution signatures set\n");
   LLVM_DEBUG(root->print(llvm::dbgs()));
   LLVM_DEBUG(llvm::dbgs() << "\n\n");
-
-  {
-    RewritePatternSet preprocessPatterns(root->getContext());
-    preprocessPatterns.add<DecomposeLayoutConflictResolutions>(
-        preprocessPatterns.getContext());
-    FrozenRewritePatternSet frozenPreprocessPatterns(
-        std::move(preprocessPatterns));
-    applyVectorDistribution(root, frozenPreprocessPatterns);
-
-    LLVM_DEBUG(llvm::dbgs() << "After Decomposition of Layout Conflicts\n");
-    LLVM_DEBUG(root->print(llvm::dbgs()));
-    LLVM_DEBUG(llvm::dbgs() << "\n\n");
-  }
 
   FrozenRewritePatternSet frozenPatterns(std::move(distributionPatterns));
   applyVectorDistribution(root, frozenPatterns);
