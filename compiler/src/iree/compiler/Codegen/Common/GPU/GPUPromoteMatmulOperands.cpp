@@ -25,6 +25,21 @@ namespace mlir::iree_compiler {
 
 namespace {
 
+/// Inserts a `linalg.copy` directly before the given operation on the
+/// specified operand, for example with operand index = 1:
+///
+///   linalg.matmul ins(%0, %1)
+///
+/// becomes
+///
+///   %empty = tensor.empty()
+///   %copy = linalg.copy %1 to %empty {
+///     lowering_config = #iree_gpu.derived_thread_config}
+///   linalg.matmul ins(%0, %copy)
+///
+/// If the producer is already a tilable op, the producer is just annotated with
+/// #iree_gpu.derived_thread_config to indicate that it should be distributed
+/// to threads independently of the matmul.
 void promoteOperand(OpBuilder &builder, Operation *op, unsigned index) {
   Value operand = op->getOperand(index);
 
