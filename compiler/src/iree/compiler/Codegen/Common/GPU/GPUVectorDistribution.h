@@ -48,29 +48,25 @@ struct DistributionPattern : RewritePattern {
   std::optional<DistributionSignature> getOpSignature(Operation *op) const;
 };
 
-/// A rewriter for the pattern rewriting driver.
-struct VectorDistributionRewriter : public PatternRewriter,
-                                    public RewriterBase::Listener {
-  VectorDistributionRewriter(MLIRContext *ctx) : PatternRewriter(ctx) {
-    setListener(this);
+/// Custom listener to store emitted ops that needs to be distributed.
+struct VectorDistributionListener : public RewriterBase::Listener {
+  bool hasOpsToBeDistributed() { return !toBeDistributed.empty(); }
+
+  void clearOpsToBeDistributed() { return toBeDistributed.clear(); }
+
+  const std::deque<Operation *> &getOpsToBeDistributed() const {
+    return toBeDistributed;
   }
 
-  bool hasEmptyWorklist() { return localWorklist.empty(); }
-
-  void clearWorklist() { return localWorklist.clear(); }
-
-  const std::deque<Operation *> &getWorklist() const { return localWorklist; }
-
-protected:
   void notifyOperationModified(Operation *op) override {
     if (op->hasAttr(kVectorLayoutRedistributeAttrName) &&
         op->hasAttrOfType<ArrayAttr>(kVectorLayoutFetcherStorageAttrName)) {
-      localWorklist.push_back(op);
+      toBeDistributed.push_back(op);
     }
   }
 
 private:
-  std::deque<Operation *> localWorklist;
+  std::deque<Operation *> toBeDistributed;
 };
 
 template <typename SourceOp>

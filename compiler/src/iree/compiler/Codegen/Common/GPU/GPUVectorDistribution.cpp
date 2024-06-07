@@ -162,10 +162,17 @@ debugPrintUniqueOperationNames(const std::deque<Operation *> &worklist) {
   LLVM_DEBUG(llvm::dbgs() << "\n");
 }
 
+/// A rewriter for the pattern rewriting driver.
+struct VectorDistributionRewriter : PatternRewriter {
+  VectorDistributionRewriter(MLIRContext *ctx) : PatternRewriter(ctx) {}
+};
+
 static void applyVectorDistribution(Operation *root,
                                     const FrozenRewritePatternSet &patterns) {
 
   VectorDistributionRewriter rewriter(root->getContext());
+  VectorDistributionListener listener;
+  rewriter.setListener(&listener);
   PatternApplicator applicator(patterns);
   applicator.applyDefaultCostModel();
 
@@ -201,14 +208,16 @@ static void applyVectorDistribution(Operation *root,
 
     // Move recently emitted operations that needs to be distributed
     // from the local/rewriter worklist into the "global" worklist.
-    if (!rewriter.hasEmptyWorklist()) {
+    if (listener.hasOpsToBeDistributed()) {
+      auto OpstoBeDistributed = listener.getOpsToBeDistributed();
+
       LLVM_DEBUG(llvm::dbgs()
                  << "Recently emitted operations to be distributed:\n");
-      LLVM_DEBUG(debugPrintUniqueOperationNames(rewriter.getWorklist()));
+      LLVM_DEBUG(debugPrintUniqueOperationNames(OpstoBeDistributed));
 
-      worklist.insert(worklist.end(), rewriter.getWorklist().begin(),
-                      rewriter.getWorklist().end());
-      rewriter.clearWorklist();
+      worklist.insert(worklist.end(), OpstoBeDistributed.begin(),
+                      OpstoBeDistributed.end());
+      listener.clearOpsToBeDistributed();
     }
 
     LLVM_DEBUG(llvm::dbgs().indent(2)
