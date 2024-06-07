@@ -74,18 +74,18 @@ class IreeRuleBuilder(object):
             cmake_rules = [
                 cmake_builder.rules.build_iree_import_tflite_model(
                     target_path=self.build_target_path(target_name),
-                    source=str(source_model_rule.file_path),
+                    source=str(source_model_rule.file_path.as_posix()),
                     import_flags=import_flags,
-                    output_mlir_file=str(output_file_path),
+                    output_mlir_file=str(output_file_path.as_posix()),
                 )
             ]
         elif import_config.tool == iree_definitions.ImportTool.TF_IMPORTER:
             cmake_rules = [
                 cmake_builder.rules.build_iree_import_tf_model(
                     target_path=self.build_target_path(target_name),
-                    source=str(source_model_rule.file_path),
+                    source=str(source_model_rule.file_path.as_posix()),
                     import_flags=import_flags,
-                    output_mlir_file=str(output_file_path),
+                    output_mlir_file=str(output_file_path.as_posix()),
                 )
             ]
         else:
@@ -117,8 +117,8 @@ class IreeRuleBuilder(object):
         cmake_rules = [
             cmake_builder.rules.build_iree_bytecode_module(
                 target_name=target_name,
-                src=str(model_import_rule.output_file_path),
-                module_name=str(output_file_path),
+                src=str(model_import_rule.output_file_path.as_posix()),
+                module_name=str(output_file_path.as_posix()),
                 flags=compile_flags,
                 friendly_name=str(module_generation_config),
             )

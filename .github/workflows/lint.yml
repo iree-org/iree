@@ -23,18 +23,3 @@ jobs:
         uses: actions/setup-python@d27e3f3d7c64b4bbf8e4abfb9b63b83e846e0435 # v4.5.0
       - name: Running pre-commit
         uses: pre-commit/action@2c7b3805fd2a0fd8c1884dcaebf91fc102a13ecd # v3.0.1
-
-  generated_cmake_files:
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Checking out repository
-        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
-      - name: Generating CMake files
-        run: |
-          ./build_tools/scripts/generate_cmake_files.sh
-      - name: Checking Diff
-        run: |
-          # Make sure to run build_tools/scripts/generate_cmake_files.sh and
-          # pick up new files that have been added.
-          git add -A
-          git diff HEAD --exit-code

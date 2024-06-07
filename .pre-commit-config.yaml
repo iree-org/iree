@@ -109,23 +109,18 @@ repos:
 
     # TODO(scotttodd): mypy type checking for Python (https://mypy-lang.org/)
 
-    # TODO(scotttodd): enable these checks when they work on Windows
-    #   the generator scripts use \ on Windows instead of /
+    -   id: generate_cmake_e2e_test_artifacts_suite
+        name: Run generate_cmake_e2e_test_artifacts_suite.py
+        language: python
+        entry: ./build_tools/testing/generate_cmake_e2e_test_artifacts_suite.py
+        args: ["--output_dir", "./tests/e2e/test_artifacts"]
+        files: '^(build_tools/python|build_tools/testing|tests/e2e/test_artifacts)/.*'
+        pass_filenames: false
 
-    # -   id: generate_cmake_e2e_test_artifacts_suite
-    #     name: Run generate_cmake_e2e_test_artifacts_suite.py
-    #     language: python
-    #     entry: ./build_tools/testing/generate_cmake_e2e_test_artifacts_suite.py
-    #     args: ["--output_dir", "./tests/e2e/test_artifacts"]
-    #     # TODO(scotttodd): run only on relevant files
-    #     always_run: true
-    #     pass_filenames: false
-
-    # -   id: generate_cmake_e2e_model_tests
-    #     name: Run generate_cmake_e2e_model_tests.py
-    #     language: python
-    #     entry: ./build_tools/testing/generate_cmake_e2e_model_tests.py
-    #     args: ["--output", "./tests/e2e/stablehlo_models/generated_e2e_model_tests.cmake"]
-    #     # TODO(scotttodd): run only on relevant files
-    #     always_run: true
-    #     pass_filenames: false
+    -   id: generate_cmake_e2e_model_tests
+        name: Run generate_cmake_e2e_model_tests.py
+        language: python
+        entry: ./build_tools/testing/generate_cmake_e2e_model_tests.py
+        args: ["--output", "./tests/e2e/stablehlo_models/generated_e2e_model_tests.cmake"]
+        files: '^(build_tools/python|build_tools/testing|tests/e2e/stablehlo_models)/.*'
+        pass_filenames: false

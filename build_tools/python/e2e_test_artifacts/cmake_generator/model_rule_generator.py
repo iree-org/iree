@@ -39,7 +39,7 @@ def generate_model_rule_map(
                 cmake_builder.rules.build_iree_fetch_artifact(
                     target_name=target_name,
                     source_url=model.source_url,
-                    output=str(model_path),
+                    output=str(model_path.as_posix()),
                     unpack=True,
                 )
             ]
