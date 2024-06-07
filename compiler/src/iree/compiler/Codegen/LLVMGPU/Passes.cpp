@@ -238,13 +238,15 @@ static void tileAndBufferize(OpPassManager &funcPassManager) {
   addBufferizePasses(funcPassManager);
 }
 
-static void addGPUVectorizationPasses(OpPassManager &funcPassManager) {
+static void addGPUVectorizationPasses(OpPassManager &funcPassManager,
+                                      bool earlySubsetTransferFolding = true) {
   funcPassManager.addPass(createDecomposeConvolutionToLowerDimOpsPass());
   GenericVectorizationPassOptions options;
   options.vectorizePadding = true;
   options.vectorizeGatherAccesses = true;
   options.enableCleanup = false;
   options.foldCastIntoContract = true;
+  options.earlySubsetTransferFolding = earlySubsetTransferFolding;
   funcPassManager.addPass(createGenericVectorizationPass(options));
   funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
   funcPassManager.addPass(createCanonicalizerPass());
@@ -762,7 +764,8 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
 
   // Linalg -> Vector
-  addGPUVectorizationPasses(funcPassManager);
+  addGPUVectorizationPasses(funcPassManager,
+                            /*earlySubsetTransferFolding=*/false);
 
   // Allocate tensors for copies to shared memory.
   funcPassManager.addPass(createGPUVectorAllocPass());
