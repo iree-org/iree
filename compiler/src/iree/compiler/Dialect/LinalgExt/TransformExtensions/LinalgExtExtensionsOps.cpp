@@ -57,9 +57,7 @@ DiagnosedSilenceableFailure LinalgExt::ConvertToOnlineAttention::applyToOne(
     transform::TransformState &state) {
   SmallVector<Operation *> ops;
   LinalgExt::convertToOnlineAttention(attentionOp, ops, rewriter);
-  for (auto op : ops) {
-    results.push_back(op);
-  }
+  llvm::append_range(results, ops);
   return DiagnosedSilenceableFailure::success();
 }
 

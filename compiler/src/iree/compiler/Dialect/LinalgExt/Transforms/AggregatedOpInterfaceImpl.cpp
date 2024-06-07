@@ -143,7 +143,7 @@ AffineMap dropResultsContainingDims(AffineMap map, ArrayRef<int64_t> dims) {
     }
   }
 
-  // Iterate in reverse to preserve indexes to drop.
+  // Iterate in reverse to preserve indices to drop.
   for (int result : llvm::reverse(resultsToDrop)) {
     map = map.dropResult(result);
   }

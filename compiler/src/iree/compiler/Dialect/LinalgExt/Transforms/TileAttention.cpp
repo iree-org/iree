@@ -159,8 +159,8 @@ struct TileAttentionPass : public TileAttentionBase<TileAttentionPass> {
   void runOnOperation() override;
 };
 
-struct ConvertAttentionToOnlineAttentionPass
-    : public ConvertAttentionToOnlineAttentionBase<
+struct ConvertAttentionToOnlineAttentionPass final
+    : ConvertAttentionToOnlineAttentionBase<
           ConvertAttentionToOnlineAttentionPass> {
   void getDependentDialects(DialectRegistry &registry) const override {
     registry
