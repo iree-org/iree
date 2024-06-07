@@ -71,6 +71,7 @@ iree_lit_test_suite(
     "type_propagation.mlir"
     "type_propagation_packing.mlir"
     "vector_layout_analysis.mlir"
+    "vectorize_memref_copy.mlir"
     "vectorize_tensor_pad.mlir"
     "workgroup_specialization.mlir"
   TOOLS

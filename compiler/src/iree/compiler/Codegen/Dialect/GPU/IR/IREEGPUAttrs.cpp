@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
+#include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
 #include "iree/compiler/Codegen/Utils/VectorOpUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/STLForwardCompat.h"
@@ -1207,6 +1208,30 @@ LoweringConfigAttr::getTilingLevelSizes(OpBuilder &b, unsigned level,
   }
   SmallVector<int64_t> sizes =
       getTileSizes(getAttributes(), static_cast<GPU::TilingLevel>(level));
+  return llvm::map_to_vector(
+      sizes, [&](int64_t s) -> OpFoldResult { return b.getIndexAttr(s); });
+}
+
+//===----------------------------------------------------------------------===//
+// DerivedThreadConfigAttr
+//===----------------------------------------------------------------------===//
+
+SmallVector<int64_t>
+DerivedThreadConfigAttr::getStaticTilingLevelSizes(unsigned level,
+                                                   Operation *op) const {
+  if (level != llvm::to_underlying(GPU::TilingLevel::Thread)) {
+    return {};
+  }
+  return deriveThreadTileSizes(op);
+}
+
+SmallVector<OpFoldResult>
+DerivedThreadConfigAttr::getTilingLevelSizes(OpBuilder &b, unsigned level,
+                                             Operation *op) const {
+  if (level > llvm::to_underlying(GPU::TilingLevel::Thread)) {
+    return {};
+  }
+  SmallVector<int64_t> sizes = deriveThreadTileSizes(op);
   return llvm::map_to_vector(
       sizes, [&](int64_t s) -> OpFoldResult { return b.getIndexAttr(s); });
 }

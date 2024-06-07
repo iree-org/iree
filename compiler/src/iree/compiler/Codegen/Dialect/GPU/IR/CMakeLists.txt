@@ -57,6 +57,7 @@ iree_cc_library(
     MLIRVectorDialect
     MLIRVectorInterfaces
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
+    iree::compiler::Codegen::Dialect::GPU::TargetUtils::ConfigUtils
     iree::compiler::Codegen::Utils::VectorOpUtils
   PUBLIC
 )

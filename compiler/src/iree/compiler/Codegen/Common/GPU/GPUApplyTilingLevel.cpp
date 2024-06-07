@@ -210,6 +210,7 @@ void GPUApplyTilingLevelPass::runOnOperation() {
     RewritePatternSet patterns(context);
     // Merge consecutive insert/extract slice ops to simplify later loop
     // hoisting patterns.
+    tensor::populateFoldTensorEmptyPatterns(patterns);
     tensor::populateMergeConsecutiveInsertExtractSlicePatterns(patterns);
     tensor::InsertSliceOp::getCanonicalizationPatterns(patterns, context);
     tensor::ExtractSliceOp::getCanonicalizationPatterns(patterns, context);

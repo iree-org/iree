@@ -524,4 +524,10 @@ def TypePropagation :
   let constructor = "mlir::iree_compiler::createTypePropagationPass()";
 }
 
+def VectorizeMemrefCopyPass :
+    Pass<"iree-codegen-vectorize-memref-copy", ""> {
+  let summary = "Vectorizes memref copy operations.";
+  let constructor = "mlir::iree_compiler::createVectorizeMemrefCopyPass()";
+}
+
 #endif // IREE_CODEGEN_COMMON_PASSES
