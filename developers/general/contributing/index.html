@@ -4181,23 +4181,26 @@ documents official maintainers for project components.</p>
 <h3 id="coding-style-guidelines"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16"><path d="M11.013 1.427a1.75 1.75 0 0 1 2.474 0l1.086 1.086a1.75 1.75 0 0 1 0 2.474l-8.61 8.61c-.21.21-.47.364-.756.445l-3.251.93a.75.75 0 0 1-.927-.928l.929-3.25c.081-.286.235-.547.445-.758l8.61-8.61Zm.176 4.823L9.75 4.81l-6.286 6.287a.253.253 0 0 0-.064.108l-.558 1.953 1.953-.558a.253.253 0 0 0 .108-.064Zm1.238-3.763a.25.25 0 0 0-.354 0L10.811 3.75l1.439 1.44 1.263-1.263a.25.25 0 0 0 0-.354Z"/></svg></span> Coding style guidelines<a class="headerlink" href="#coding-style-guidelines" title="Permanent link">link</a></h3>
 <p>Most of the code style is derived from the
 <a href="http://google.github.io/styleguide/">Google Style Guides</a> for the appropriate
-language and is generally not something we accept changes on (as clang-format
-and other linters set that for us). The C++ compiler portion of the project
-follows the
+language. The C++ compiler portion of the project follows the
 <a href="https://mlir.llvm.org/getting_started/DeveloperGuide/#style-guide">MLIR/LLVM style guide</a>.</p>
-<p>Improvements to code structure and clarity are welcome but please file issues
-to track such work first. Pure style changes are unlikely to be accepted unless
-they are applied consistently across the project.</p>
-<details class="tip -">
-<summary>Tip - code formatters and lint scripts</summary>
-<p>Formatters like
-<a href="https://clang.llvm.org/docs/ClangFormat.html"><code>clang-format</code></a> (C/C++) and
-<a href="https://black.readthedocs.io/en/stable/"><em>Black</em></a> (Python) can be set to
-run automatically in your editor of choice.</p>
-<p>The script at
-<a href="https://github.com/iree-org/iree/blob/main/build_tools/scripts/lint.sh"><code>build_tools/scripts/lint.sh</code></a>
-can also be used to run the full suite of lint checks.</p>
-</details>
+<p>We use <a href="https://pre-commit.com/">pre-commit</a> to run assorted formatters and lint
+checks. The configuration file at
+<a href="https://github.com/iree-org/iree/blob/main/.pre-commit-config.yaml"><code>.pre-commit-config.yaml</code></a>
+defines which "hooks" run.</p>
+<ul>
+<li>To run these hooks on your local commits, follow the
+  <a href="https://pre-commit.com/#installation">pre-commit installation instructions</a>.</li>
+<li>Individual formatters like
+  <a href="https://clang.llvm.org/docs/ClangFormat.html"><code>clang-format</code></a> (C/C++) and
+  <a href="https://black.readthedocs.io/en/stable/"><em>Black</em></a> (Python) can also be set to
+  run automatically in your editor of choice.</li>
+</ul>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Improvements to code structure and clarity are welcome but please file
+issues to track such work first. Pure style changes are unlikely to be
+accepted unless they are applied consistently across the project.</p>
+</div>
 <h3 id="testing-policy"><span class="twemoji"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M7 2v2h1v14a4 4 0 0 0 4 4 4 4 0 0 0 4-4V4h1V2H7m4 14c-.6 0-1-.4-1-1s.4-1 1-1 1 .4 1 1-.4 1-1 1m2-4c-.6 0-1-.4-1-1s.4-1 1-1 1 .4 1 1-.4 1-1 1m1-5h-4V4h4v3Z"/></svg></span> Testing policy<a class="headerlink" href="#testing-policy" title="Permanent link">link</a></h3>
 <p>With few exceptions, features should be accompanied by automated tests.</p>
 <p>We use a mix of in-tree and out-of-tree unit and integration tests. For more
