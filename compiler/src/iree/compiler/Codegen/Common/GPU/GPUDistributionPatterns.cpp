@@ -840,22 +840,6 @@ struct DistributeLayoutConflictToSharedMemory final
     : OpDistributionPattern<IREE::VectorExt::LayoutConflictResolutionOp> {
   using OpDistributionPattern::OpDistributionPattern;
 
-  // Sets new layout/signature for op, and mark it for redistribution.
-  // When "vector layout storage" and "vector layout redistribution"
-  // is defined, VectorDistributionRewriter would add it to worklist
-  // of operations to be distributed.
-  void setSignatureForRedistribution(PatternRewriter &rewriter, Operation *op,
-                                     Attribute inputLayoutsAttr,
-                                     Attribute outputLayoutsAttr) const {
-    Attribute signature[] = {inputLayoutsAttr, outputLayoutsAttr};
-    auto unitAttr = UnitAttr::get(rewriter.getContext());
-    rewriter.modifyOpInPlace(op, [&]() {
-      op->setAttr(kVectorLayoutFetcherStorageAttrName,
-                  ArrayAttr::get(rewriter.getContext(), signature));
-      op->setAttr(kVectorLayoutRedistributeAttrName, unitAttr);
-    });
-  }
-
   LogicalResult
   matchAndRewrite(IREE::VectorExt::LayoutConflictResolutionOp resolutionOp,
                   DistributionSignature &signature,
@@ -996,6 +980,23 @@ struct DistributeLayoutConflictToSharedMemory final
 
     rewriter.replaceOp(resolutionOp, read.getResult());
     return success();
+  }
+
+private:
+  // Sets new layout/signature for op, and mark it for redistribution.
+  // When "vector layout storage" and "vector layout redistribution"
+  // is defined, VectorDistributionRewriter would add it to worklist
+  // of operations to be distributed.
+  void setSignatureForRedistribution(PatternRewriter &rewriter, Operation *op,
+                                     Attribute inputLayoutsAttr,
+                                     Attribute outputLayoutsAttr) const {
+    Attribute signature[] = {inputLayoutsAttr, outputLayoutsAttr};
+    auto unitAttr = UnitAttr::get(rewriter.getContext());
+    rewriter.modifyOpInPlace(op, [&]() {
+      op->setAttr(kVectorLayoutFetcherStorageAttrName,
+                  ArrayAttr::get(rewriter.getContext(), signature));
+      op->setAttr(kVectorLayoutRedistributeAttrName, unitAttr);
+    });
   }
 };
 
