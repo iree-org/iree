@@ -22,6 +22,7 @@
 #include "iree/hal/drivers/cuda/event_pool.h"
 #include "iree/hal/drivers/cuda/event_semaphore.h"
 #include "iree/hal/drivers/cuda/graph_command_buffer.h"
+#include "iree/hal/drivers/cuda/stream_command_buffer.h"
 #include "iree/hal/drivers/utils/semaphore.h"
 #include "iree/hal/utils/deferred_command_buffer.h"
 #include "iree/hal/utils/resource_set.h"
@@ -729,12 +730,19 @@ static iree_status_t iree_hal_cuda_pending_queue_actions_issue_execution(
         action->payload.execution.binding_tables
             ? action->payload.execution.binding_tables[i]
             : iree_hal_buffer_binding_table_empty();
-    if (iree_hal_cuda_graph_command_buffer_isa(command_buffer)) {
+    if (iree_hal_cuda_stream_command_buffer_isa(command_buffer)) {
+      // Notify that the commands were "submitted" so we can
+      // make sure to clean up our trace events.
+      iree_hal_cuda_stream_notify_submitted_commands(
+          action->payload.command_buffers.ptr[i]);
+    } else if (iree_hal_cuda_graph_command_buffer_isa(command_buffer)) {
       CUgraphExec exec =
           iree_hal_cuda_graph_command_buffer_handle(command_buffer);
       IREE_CUDA_RETURN_AND_END_ZONE_IF_ERROR(
           z0, symbols, cuGraphLaunch(exec, action->dispatch_cu_stream),
           "cuGraphLaunch");
+      iree_hal_cuda_graph_notify_submitted_commands(
+          action->payload.command_buffers.ptr[i]);
     } else {
       iree_hal_command_buffer_t* stream_command_buffer = NULL;
       iree_hal_command_buffer_mode_t mode =
@@ -753,6 +761,10 @@ static iree_status_t iree_hal_cuda_pending_queue_actions_issue_execution(
       IREE_RETURN_AND_END_ZONE_IF_ERROR(
           z0, iree_hal_deferred_command_buffer_apply(
                   command_buffer, stream_command_buffer, binding_table));
+      iree_hal_cuda_stream_notify_submitted_commands(stream_command_buffer);
+      // The stream_command_buffer is going to be retained by
+      // the action->resource_set and deleted after the action
+      // completes.
       iree_hal_resource_release(stream_command_buffer);
     }
   }

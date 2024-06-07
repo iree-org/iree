@@ -542,6 +542,8 @@ static iree_status_t iree_hal_cuda_nccl_submit_batch_entry(
 iree_status_t iree_hal_cuda_nccl_submit_batch(
     const iree_hal_cuda_nccl_dynamic_symbols_t* symbols,
     iree_hal_cuda_tracing_context_t* tracing_context,
+    iree_hal_cuda_tracing_context_event_t** tracing_event_begin,
+    iree_hal_cuda_tracing_context_event_t** tracing_event_end,
     const iree_hal_collective_batch_t* batch, CUstream stream) {
   IREE_ASSERT_ARGUMENT(symbols);
   IREE_ASSERT_ARGUMENT(batch);
@@ -558,9 +560,9 @@ iree_status_t iree_hal_cuda_nccl_submit_batch(
     iree_string_view_t collective_str =
         iree_hal_collective_op_format(&entry->op, &string_temp);
     IREE_CUDA_STREAM_TRACE_ZONE_BEGIN_EXTERNAL(
-        tracing_context, stream, __FILE__, strlen(__FILE__), (uint32_t)__LINE__,
-        __FUNCTION__, strlen(__FUNCTION__), collective_str.data,
-        collective_str.size);
+        tracing_context, tracing_event_begin, tracing_event_end, stream,
+        __FILE__, strlen(__FILE__), (uint32_t)__LINE__, __FUNCTION__,
+        strlen(__FUNCTION__), collective_str.data, collective_str.size);
   }
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
 
@@ -577,7 +579,8 @@ iree_status_t iree_hal_cuda_nccl_submit_batch(
   // End all zones we began above - note that these are just simply nested so
   // order doesn't matter so long as we end the right number of zones.
   for (iree_host_size_t i = 0; i < batch->count; ++i) {
-    IREE_CUDA_STREAM_TRACE_ZONE_END(tracing_context, stream);
+    IREE_CUDA_STREAM_TRACE_ZONE_END(tracing_context, tracing_event_begin,
+                                    tracing_event_end, stream);
   }
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
 

@@ -42,6 +42,10 @@ bool iree_hal_cuda_graph_command_buffer_isa(
 CUgraphExec iree_hal_cuda_graph_command_buffer_handle(
     iree_hal_command_buffer_t* command_buffer);
 
+// Updates the tracing system that this command buffer was submitted.
+void iree_hal_cuda_graph_notify_submitted_commands(
+    iree_hal_command_buffer_t* command_buffer);
+
 #ifdef __cplusplus
 }  // extern "C"
 #endif  // __cplusplus

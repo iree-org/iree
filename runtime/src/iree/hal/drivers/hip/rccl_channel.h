@@ -49,6 +49,8 @@ iree_status_t iree_hal_hip_nccl_channel_create(
 iree_status_t iree_hal_hip_nccl_submit_batch(
     const iree_hal_hip_nccl_dynamic_symbols_t* nccl_symbols,
     iree_hal_hip_tracing_context_t* tracing_context,
+    iree_hal_hip_tracing_context_event_t** tracing_event_begin,
+    iree_hal_hip_tracing_context_event_t** tracing_event_end,
     const iree_hal_collective_batch_t* batch, hipStream_t stream);
 
 #ifdef __cplusplus
