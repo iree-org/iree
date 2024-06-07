@@ -79,6 +79,9 @@ createLLVMCPUTilePass(int64_t tilingLevel = -1);
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUUnfuseFMAOpsPass();
 
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createLLVMCPUVerifyVectorSizeLegalityPass(int64_t ratio = 512);
+
 //------------------------------------------------------------------------------
 // Passes to lower Vector ops before conversion to LLVM.
 //------------------------------------------------------------------------------
