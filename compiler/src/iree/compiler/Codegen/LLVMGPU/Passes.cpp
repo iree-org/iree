@@ -246,6 +246,7 @@ static void tileAndBufferize(OpPassManager &funcPassManager) {
 
 static void addGPUVectorizationPasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createDecomposeConvolutionToLowerDimOpsPass());
+  funcPassManager.addPass(IREE::LinalgExt::createDecomposeIm2colPass());
   // Vectorize.
   GenericVectorizationPassOptions options;
   options.vectorizePadding = true;
