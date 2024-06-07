@@ -79,8 +79,7 @@ static llvm::cl::opt<bool> clLLVMGPUEnablePrefetch(
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const LLVMGPUPipelineOptions &options) {
-  return os << "{"
-            << "enableReduceSharedMemoryBankConflicts = "
+  return os << "{" << "enableReduceSharedMemoryBankConflicts = "
             << options.enableReduceSharedMemoryBankConflicts
             << ", enableReorderWorkgroups = " << options.enableReorderWorkgroups
             << ", enableUkernels = " << options.enableUkernels << "}";
