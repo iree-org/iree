@@ -155,7 +155,7 @@ turbine_output = opt_linear_module(args)
 | Code samples |  |
 | -- | -- |
 JIT compilation notebook | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iree-org/iree/blob/main/samples/colab/pytorch_jit.ipynb)
-Simple MLP eager | [`core/examples/eager_mlp/mlp_eager_simple.py`](https://github.com/nod-ai/SHARK-Turbine/blob/main/core/examples/eager_mlp/mlp_eager_simple.py)
+Simple MLP eager | [`core/examples/eager_mlp/mlp_eager_simple.py`](https://github.com/iree-org/iree-turbine/tree/main/examples/eager_mlp/mlp_eager_simple.py)
 
 ## :octicons-package-dependents-16: Ahead-of-time (AOT) export
 
@@ -232,7 +232,7 @@ print(result.to_host())
 | -- | -- |
 Simple AOT export notebook | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iree-org/iree/blob/main/samples/colab/pytorch_aot_simple.ipynb)
 Import [Whisper](https://huggingface.co/openai/whisper-small) from [:hugging: Hugging Face](https://huggingface.co/) notebook | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iree-org/iree/blob/main/samples/colab/pytorch_huggingface_whisper.ipynb)
-Simple MLP export | [`core/examples/aot_mlp/mlp_export_simple.py`](https://github.com/nod-ai/SHARK-Turbine/blob/main/core/examples/aot_mlp/mlp_export_simple.py)
+Simple MLP export | [`core/examples/aot_mlp/mlp_export_simple.py`](https://github.com/iree-org/iree-turbine/tree/main/examples/aot_mlp/mlp_export_simple.py)
 
 ### :octicons-tools-16: Advanced API
 
@@ -264,7 +264,7 @@ graph LR
 ```
 
 Advanced export workflows can use the
-[`aot.CompiledModule`](https://github.com/nod-ai/SHARK-Turbine/blob/main/core/shark_turbine/aot/compiled_module.py)
+[`aot.CompiledModule`](https://github.com/iree-org/iree-turbine/tree/main/shark_turbine/aot/compiled_module.py)
 class to define and constrain the structure of a program prior to compiling it.
 
 <!-- TODO(scotttodd): API reference pages for aot.CompiledModule etc.?
@@ -412,6 +412,6 @@ their values independently at runtime.
 | -- | -- |
 Advanced AOT export notebook | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iree-org/iree/blob/main/samples/colab/pytorch_aot_advanced.ipynb)
 PyTorch dynamic shapes notebook | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/iree-org/iree/blob/main/samples/dynamic_shapes/pytorch_dynamic_shapes.ipynb)
-AOT unit tests | [`core/tests/aot/`](https://github.com/nod-ai/SHARK-Turbine/tree/main/core/tests/aot)
-Dynamic MLP export | [`core/examples/aot_mlp/mlp_export_dynamic.py`](https://github.com/nod-ai/SHARK-Turbine/blob/main/core/examples/aot_mlp/mlp_export_dynamic.py)
+AOT unit tests | [`tests/aot/`](https://github.com/iree-org/iree-turbine/tree/main/tests/aot)
+Dynamic MLP export | [`core/examples/aot_mlp/mlp_export_dynamic.py`](https://github.com/iree-org/iree-turbine/tree/main/examples/aot_mlp/mlp_export_dynamic.py)
 stateless llama2 | [`models/turbine_models/custom_models/stateless_llama.py`](https://github.com/nod-ai/SHARK-Turbine/blob/main/models/turbine_models/custom_models/stateless_llama.py)

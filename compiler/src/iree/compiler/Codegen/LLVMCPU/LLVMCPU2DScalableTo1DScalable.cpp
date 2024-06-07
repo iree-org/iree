@@ -9,6 +9,7 @@
 #include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMCPU/Utils.h"
+#include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/SCF/Utils/Utils.h"
 #include "mlir/Pass/Pass.h"
@@ -87,6 +88,8 @@ public:
 };
 
 static bool opKnownToSupport2DScalableVectorizationWithArmSME(Operation *op) {
+  if (auto genericOp = dyn_cast<linalg::GenericOp>(op))
+    return isLinalgGeneric2DTranspose(genericOp);
   return isa<linalg::MatmulOp, linalg::MatmulTransposeAOp, linalg::FillOp>(op);
 }
 

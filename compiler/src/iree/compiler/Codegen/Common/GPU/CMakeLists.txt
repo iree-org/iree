@@ -61,6 +61,7 @@ iree_cc_library(
     "GPUNestedLayoutDistributionPatterns.cpp"
     "GPUPatterns.cpp"
     "GPUPipelining.cpp"
+    "GPUPromoteMatmulOperands.cpp"
     "GPUReduceBankConflicts.cpp"
     "GPUTensorAlloc.cpp"
     "GPUTensorTile.cpp"
