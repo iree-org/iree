@@ -4,11 +4,9 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
-#include "llvm/ADT/TypeSwitch.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -16,7 +14,7 @@
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
-#include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
 
@@ -1662,22 +1660,22 @@ getAttentionIteratorTypes(int64_t domainRank,
   return iteratorTypes;
 }
 
-std::tuple<SmallVector<OpFoldResult>, SmallVector<OpFoldResult>,
-           SmallVector<OpFoldResult>>
-getTiledSlice(OpBuilder &builder, Value val, AffineMap indexingMap,
-              ArrayRef<OpFoldResult> offsets, ArrayRef<OpFoldResult> sizes) {
-  auto one = builder.getIndexAttr(1);
-  assert(indexingMap.isProjectedPermutation() &&
+static SmallVector<Range> getPermutedSlice(AffineMap permutation,
+                                           ArrayRef<OpFoldResult> offsets,
+                                           ArrayRef<OpFoldResult> sizes) {
+  auto one = IntegerAttr::get(IndexType::get(permutation.getContext()), 1);
+  assert(permutation.isProjectedPermutation() &&
          "Indexing map should be a projected permutation");
-  SmallVector<OpFoldResult> outputOffsets;
-  SmallVector<OpFoldResult> outputSizes;
-  SmallVector<OpFoldResult> outputStrides(indexingMap.getNumResults(), one);
-  for (AffineExpr dimExpr : indexingMap.getResults()) {
+  SmallVector<Range> output;
+  for (AffineExpr dimExpr : permutation.getResults()) {
     int dim = cast<AffineDimExpr>(dimExpr).getPosition();
-    outputOffsets.push_back(offsets[dim]);
-    outputSizes.push_back(sizes[dim]);
+    Range dimRange;
+    dimRange.offset = offsets[dim];
+    dimRange.size = sizes[dim];
+    dimRange.stride = one;
+    output.push_back(dimRange);
   }
-  return {outputOffsets, outputSizes, outputStrides};
+  return output;
 }
 
 //===----------------------------------------------------------------------===//
@@ -1707,42 +1705,35 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
 
   Location loc = getLoc();
 
-  auto [queryOffsets, querySizes, queryStrides] =
-      getTiledSlice(builder, getQuery(), getQueryMap(), offsets, sizes);
-  auto [keyOffsets, keySizes, keyStrides] =
-      getTiledSlice(builder, getKey(), getKeyMap(), offsets, sizes);
-  auto [valueOffsets, valueSizes, valueStrides] =
-      getTiledSlice(builder, getValue(), getValueMap(), offsets, sizes);
-  auto [outputOffsets, outputSizes, outputStrides] =
-      getTiledSlice(builder, getOutput(), getOutputMap(), offsets, sizes);
+  SmallVector<Range> querySlice =
+      getPermutedSlice(getQueryMap(), offsets, sizes);
+  SmallVector<Range> keySlice = getPermutedSlice(getKeyMap(), offsets, sizes);
+  SmallVector<Range> valueSlice =
+      getPermutedSlice(getValueMap(), offsets, sizes);
+  SmallVector<Range> outputSlice =
+      getPermutedSlice(getOutputMap(), offsets, sizes);
 
   Value scale = getScale();
 
   SmallVector<Value> tiledOperands;
-  tiledOperands.emplace_back(getSlice(builder, loc, getQuery(), queryOffsets,
-                                      querySizes, queryStrides));
-  tiledOperands.emplace_back(
-      getSlice(builder, loc, getKey(), keyOffsets, keySizes, keyStrides));
-  tiledOperands.emplace_back(getSlice(builder, loc, getValue(), valueOffsets,
-                                      valueSizes, valueStrides));
+  tiledOperands.emplace_back(getSlice(builder, loc, getQuery(), querySlice));
+  tiledOperands.emplace_back(getSlice(builder, loc, getKey(), keySlice));
+  tiledOperands.emplace_back(getSlice(builder, loc, getValue(), valueSlice));
   tiledOperands.emplace_back(scale);
-  tiledOperands.emplace_back(getSlice(builder, loc, getOutput(), outputOffsets,
-                                      outputSizes, outputStrides));
+  tiledOperands.emplace_back(getSlice(builder, loc, getOutput(), outputSlice));
 
   std::optional<Value> max = getMax();
   if (max) {
-    auto [maxOffsets, maxSizes, maxStrides] =
-        getTiledSlice(builder, max.value(), *getMaxMap(), offsets, sizes);
-    tiledOperands.emplace_back(
-        getSlice(builder, loc, max.value(), maxOffsets, maxSizes, maxStrides));
+    SmallVector<Range> maxSlice =
+        getPermutedSlice(*getMaxMap(), offsets, sizes);
+    tiledOperands.emplace_back(getSlice(builder, loc, max.value(), maxSlice));
   }
 
   std::optional<Value> sum = getMax();
   if (sum) {
-    auto [sumOffsets, sumSizes, sumStrides] =
-        getTiledSlice(builder, sum.value(), *getSumMap(), offsets, sizes);
-    tiledOperands.emplace_back(
-        getSlice(builder, loc, sum.value(), sumOffsets, sumSizes, sumStrides));
+    SmallVector<Range> sumSlice =
+        getPermutedSlice(*getSumMap(), offsets, sizes);
+    tiledOperands.emplace_back(getSlice(builder, loc, sum.value(), sumSlice));
   }
 
   SmallVector<Type> resultTypes;
@@ -1819,35 +1810,26 @@ OnlineAttentionOp::getTiledImplementation(OpBuilder &builder,
 
   Location loc = getLoc();
 
-  auto [queryOffsets, querySizes, queryStrides] =
-      getTiledSlice(builder, getQuery(), getQueryMap(), offsets, sizes);
-  auto [keyOffsets, keySizes, keyStrides] =
-      getTiledSlice(builder, getKey(), getKeyMap(), offsets, sizes);
-  auto [valueOffsets, valueSizes, valueStrides] =
-      getTiledSlice(builder, getValue(), getValueMap(), offsets, sizes);
-  auto [outputOffsets, outputSizes, outputStrides] =
-      getTiledSlice(builder, getOutput(), getOutputMap(), offsets, sizes);
-  auto [maxOffsets, maxSizes, maxStrides] =
-      getTiledSlice(builder, getMax(), getMaxMap(), offsets, sizes);
-  auto [sumOffsets, sumSizes, sumStrides] =
-      getTiledSlice(builder, getSum(), getSumMap(), offsets, sizes);
+  SmallVector<Range> querySlice =
+      getPermutedSlice(getQueryMap(), offsets, sizes);
+  SmallVector<Range> keySlice = getPermutedSlice(getKeyMap(), offsets, sizes);
+  SmallVector<Range> valueSlice =
+      getPermutedSlice(getValueMap(), offsets, sizes);
+  SmallVector<Range> outputSlice =
+      getPermutedSlice(getOutputMap(), offsets, sizes);
+  SmallVector<Range> maxSlice = getPermutedSlice(getMaxMap(), offsets, sizes);
+  SmallVector<Range> sumSlice = getPermutedSlice(getSumMap(), offsets, sizes);
 
   Value scale = getScale();
 
   SmallVector<Value> tiledOperands;
-  tiledOperands.emplace_back(getSlice(builder, loc, getQuery(), queryOffsets,
-                                      querySizes, queryStrides));
-  tiledOperands.emplace_back(
-      getSlice(builder, loc, getKey(), keyOffsets, keySizes, keyStrides));
-  tiledOperands.emplace_back(getSlice(builder, loc, getValue(), valueOffsets,
-                                      valueSizes, valueStrides));
+  tiledOperands.emplace_back(getSlice(builder, loc, getQuery(), querySlice));
+  tiledOperands.emplace_back(getSlice(builder, loc, getKey(), keySlice));
+  tiledOperands.emplace_back(getSlice(builder, loc, getValue(), valueSlice));
   tiledOperands.emplace_back(scale);
-  tiledOperands.emplace_back(getSlice(builder, loc, getOutput(), outputOffsets,
-                                      outputSizes, outputStrides));
-  tiledOperands.emplace_back(
-      getSlice(builder, loc, getMax(), maxOffsets, maxSizes, maxStrides));
-  tiledOperands.emplace_back(
-      getSlice(builder, loc, getSum(), sumOffsets, sumSizes, sumStrides));
+  tiledOperands.emplace_back(getSlice(builder, loc, getOutput(), outputSlice));
+  tiledOperands.emplace_back(getSlice(builder, loc, getMax(), maxSlice));
+  tiledOperands.emplace_back(getSlice(builder, loc, getSum(), sumSlice));
 
   SmallVector<Type> resultTypes;
   resultTypes.push_back(tiledOperands[4].getType());

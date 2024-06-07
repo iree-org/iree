@@ -1316,7 +1316,7 @@ LogicalResult AttentionOp::verify() {
     for (auto [i, dimExpr] : llvm::enumerate(indexingMap.getResults())) {
       AffineDimExpr dim = cast<AffineDimExpr>(dimExpr);
       int64_t pos = dim.getPosition();
-      if (valShape[i] == ShapedType::kDynamic) {
+      if (ShapedType::isDynamic(valShape[i])) {
         continue;
       }
       if (!foundDims[pos]) {
@@ -1458,7 +1458,7 @@ LogicalResult OnlineAttentionOp::verify() {
     for (auto [i, dimExpr] : llvm::enumerate(indexingMap.getResults())) {
       AffineDimExpr dim = cast<AffineDimExpr>(dimExpr);
       int64_t pos = dim.getPosition();
-      if (valShape[i] == ShapedType::kDynamic) {
+      if (ShapedType::isDynamic(valShape[i])) {
         continue;
       }
       if (!foundDims[pos]) {
@@ -1504,11 +1504,9 @@ SmallVector<AffineMap> OnlineAttentionOp::getIndexingMapsArray() {
       getIndexingMaps().getAsValueRange<AffineMapAttr>());
 }
 
-using ShapedValue = TypedValue<ShapedType>;
-
-static ShapedValue scaleValueInPlace(OpBuilder &builder, Location loc,
-                                     AffineMap inputMap, AffineMap scaleMap,
-                                     ShapedValue value, Value scale) {
+static Value scaleValueInPlace(OpBuilder &builder, Location loc,
+                               AffineMap inputMap, AffineMap scaleMap,
+                               Value value, Value scale) {
   SmallVector<AffineMap> compressedMaps =
       compressUnusedDims(SmallVector<AffineMap>{inputMap, scaleMap});
   inputMap = compressedMaps[0];
@@ -1527,13 +1525,12 @@ static ShapedValue scaleValueInPlace(OpBuilder &builder, Location loc,
         Value result = b.create<arith::MulFOp>(loc, scale, args[1]);
         b.create<linalg::YieldOp>(loc, result);
       });
-  return cast<ShapedValue>(genericOp.getResult(0));
+  return genericOp.getResult(0);
 }
 
 template <typename T>
-static ShapedValue reduce(OpBuilder &builder, Location loc, AffineMap inputMap,
-                          AffineMap outputMap, ShapedValue input,
-                          Value output) {
+static Value reduce(OpBuilder &builder, Location loc, AffineMap inputMap,
+                    AffineMap outputMap, Value input, Value output) {
   SmallVector<AffineMap> compressedMaps =
       compressUnusedDims(SmallVector<AffineMap>{inputMap, outputMap});
   inputMap = compressedMaps[0];
@@ -1558,13 +1555,12 @@ static ShapedValue reduce(OpBuilder &builder, Location loc, AffineMap inputMap,
         b.create<linalg::YieldOp>(loc, result);
       });
 
-  return cast<ShapedValue>(genericOp.getResult(0));
+  return genericOp.getResult(0);
 }
 
-static ShapedValue computeMatmul(OpBuilder &builder, Location loc,
-                                 AffineMap lhsMap, AffineMap rhsMap,
-                                 AffineMap accMap, ShapedValue lhs,
-                                 ShapedValue rhs, ShapedValue acc) {
+static Value computeMatmul(OpBuilder &builder, Location loc, AffineMap lhsMap,
+                           AffineMap rhsMap, AffineMap accMap, Value lhs,
+                           Value rhs, Value acc) {
 
   SmallVector<AffineMap> compressedMaps =
       compressUnusedDims(SmallVector<AffineMap>{lhsMap, rhsMap, accMap});
@@ -1594,13 +1590,13 @@ static ShapedValue computeMatmul(OpBuilder &builder, Location loc,
         b.create<linalg::YieldOp>(loc, add);
       });
 
-  return cast<ShapedValue>(genericOp.getResult(0));
+  return genericOp.getResult(0);
 }
 
 // Compute output = exp2(output - input)
-static ShapedValue computeSubAndExp2(OpBuilder &builder, Location loc,
-                                     AffineMap inputMap, AffineMap outputMap,
-                                     ShapedValue input, ShapedValue output) {
+static Value computeSubAndExp2(OpBuilder &builder, Location loc,
+                               AffineMap inputMap, AffineMap outputMap,
+                               Value input, Value output) {
   SmallVector<AffineMap> compressedMaps =
       compressUnusedDims(SmallVector<AffineMap>{inputMap, outputMap});
   inputMap = compressedMaps[0];
@@ -1619,7 +1615,7 @@ static ShapedValue computeSubAndExp2(OpBuilder &builder, Location loc,
         Value weight = b.create<math::Exp2Op>(loc, diff);
         b.create<linalg::YieldOp>(loc, weight);
       });
-  return cast<ShapedValue>(genericOp.getResult(0));
+  return genericOp.getResult(0);
 }
 
 AffineMap dropResultsContainingDims(AffineMap map, ArrayRef<int64_t> dims) {
@@ -1643,12 +1639,12 @@ AffineMap dropResultsContainingDims(AffineMap map, ArrayRef<int64_t> dims) {
 FailureOr<SmallVector<Value>>
 OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   Location loc = getLoc();
-  ShapedValue query = getQuery();
-  ShapedValue key = getKey();
-  ShapedValue value = getValue();
-  ShapedValue oldAcc = getOutput();
-  ShapedValue oldMax = getMax();
-  ShapedValue oldSum = getSum();
+  Value query = getQuery();
+  Value key = getKey();
+  Value value = getValue();
+  Value oldAcc = getOutput();
+  Value oldMax = getMax();
+  Value oldSum = getSum();
   Type elementType = getQuery().getType().getElementType();
 
   FailureOr<AttentionOpDetail> maybeOpInfo =
@@ -1692,8 +1688,7 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   // SMap = QMap @ KMap
   Value emptyS = b.create<tensor::EmptyOp>(loc, sSizes, elementType);
   Value sZero = b.create<arith::ConstantOp>(loc, b.getZeroAttr(elementType));
-  ShapedValue s = cast<ShapedValue>(
-      b.create<linalg::FillOp>(loc, sZero, emptyS).getResult(0));
+  Value s = b.create<linalg::FillOp>(loc, sZero, emptyS).getResult(0);
   s = computeMatmul(b, loc, getQueryMap(), getKeyMap(), sMap, query, key, s);
 
   // TODO: This decomposition should be in a seperate op called
@@ -1702,30 +1697,28 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
 
   // newMax = max(oldMax, rowMax(S))
   AffineMap maxMap = getMaxMap();
-  ShapedValue newMax =
-      reduce<arith::MaximumFOp>(b, loc, sMap, maxMap, s, oldMax);
+  Value newMax = reduce<arith::MaximumFOp>(b, loc, sMap, maxMap, s, oldMax);
 
   // P = exp2(S - newMax)
   // PMap = SMap
   AffineMap pMap = sMap;
-  ShapedValue p = computeSubAndExp2(b, loc, maxMap, sMap, newMax, s);
+  Value p = computeSubAndExp2(b, loc, maxMap, sMap, newMax, s);
 
   // norm = exp2(oldMax - newMax)
   // normMap = maxMap
   AffineMap normMap = getMaxMap();
-  ShapedValue norm = computeSubAndExp2(b, loc, maxMap, normMap, newMax, oldMax);
+  Value norm = computeSubAndExp2(b, loc, maxMap, normMap, newMax, oldMax);
 
   // normSum = norm * oldSum
   AffineMap sumMap = getSumMap();
-  ShapedValue normSum =
-      scaleValueInPlace(b, loc, sumMap, normMap, oldSum, norm);
+  Value normSum = scaleValueInPlace(b, loc, sumMap, normMap, oldSum, norm);
 
   // newSum = normSum + rowMax(P)
-  ShapedValue newSum = reduce<arith::AddFOp>(b, loc, pMap, sumMap, p, normSum);
+  Value newSum = reduce<arith::AddFOp>(b, loc, pMap, sumMap, p, normSum);
 
   // newAcc = norm * oldAcc
   AffineMap accMap = getOutputMap();
-  ShapedValue newAcc = scaleValueInPlace(b, loc, accMap, normMap, oldAcc, norm);
+  Value newAcc = scaleValueInPlace(b, loc, accMap, normMap, oldAcc, norm);
 
   // ---- Matmul 2 ----
 
