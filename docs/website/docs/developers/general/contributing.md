@@ -265,12 +265,6 @@ All access tiers first require joining the
 Once you are a member of the iree-org GitHub organization, you can request to
 join any of the teams on <https://github.com/orgs/iree-org/teams>.
 
-!!! note - "Note: other GitHub organizations"
-
-    Work on IREE sometimes spans other GitHub organizations like
-    [shark-infra](https://github.com/shark-infra/). Reach out to a project
-    member if you would also like access to repositories in those organizations.
-
 ### :octicons-git-branch-16: Branch naming
 
 Most work should be done on

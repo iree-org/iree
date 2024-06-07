@@ -4,7 +4,7 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Automatically bumps the torch-mlir submodule to match shark-infra/torch-mlir:main.
+# Automatically bumps the torch-mlir submodule to match iree-org/torch-mlir:main.
 # Manually triggered for now, but can be scheduled in the future.
 # This typically takes ~90s to run.
 # Will succeed without creating a PR if there is no newer version for torch-mlir.
