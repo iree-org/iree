@@ -45,17 +45,10 @@ SmallVector<OpFoldResult> getDims(OpBuilder &builder, Location loc,
 }
 
 Value getSlice(OpBuilder &b, Location loc, Value src, ArrayRef<Range> slice) {
-  return TypeSwitch<Type, Value>(src.getType())
-      .Case<RankedTensorType>([&](RankedTensorType t) -> Value {
-        return b.create<tensor::ExtractSliceOp>(loc, src, slice);
-      })
-      .Case<MemRefType>([&](MemRefType type) -> Value {
-        return b.create<memref::SubViewOp>(loc, src, slice);
-      })
-      .Default([&](Type t) {
-        assert(false && "invalid type");
-        return nullptr;
-      });
+  return getSlice(b, loc, src,
+                  llvm::map_to_vector(slice, [](Range x) { return x.offset; }),
+                  llvm::map_to_vector(slice, [](Range x) { return x.size; }),
+                  llvm::map_to_vector(slice, [](Range x) { return x.stride; }));
 }
 
 Value getSlice(OpBuilder &b, Location loc, Value src,
