@@ -57,7 +57,7 @@ struct GatherToLinalg : public OpRewritePattern<tensor::GatherOp> {
     auto sourceRank = op.getSourceType().getRank();
 
     // not sure if this is necessary
-    assert(op.getIndices().getType().getShape().back() == gatherDims.size() &&
+    assert(indicesShape.back() == gatherDims.size() &&
            "Last dimension of result type must match number of gather dims");
 
     Value outTensor;
@@ -174,7 +174,6 @@ struct GatherToLinalg : public OpRewritePattern<tensor::GatherOp> {
           nestedBuilder.create<linalg::YieldOp>(nestedLoc, extracted);
         });
 
-    // linalgOp.dump();
     rewriter.replaceAllUsesWith(op.getResult(), linalgOp.getResult(0));
     rewriter.eraseOp(op.getOperation());
     return success();
