@@ -47,6 +47,7 @@ iree_lit_test_suite(
     "lower_ukernel_to_calls.mlir"
     "materialize_encoding_into_nop.mlir"
     "materialize_user_configs.mlir"
+    "normalize_loop_bounds.mlir"
     "optimize_tensor_insert_extract_slices.mlir"
     "pad_dynamic_alloc.mlir"
     "polynomial_approximation.mlir"
@@ -70,6 +71,7 @@ iree_lit_test_suite(
     "type_propagation.mlir"
     "type_propagation_packing.mlir"
     "vector_layout_analysis.mlir"
+    "vectorize_memref_copy.mlir"
     "vectorize_tensor_pad.mlir"
     "workgroup_specialization.mlir"
   TOOLS

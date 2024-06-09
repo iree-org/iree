@@ -44,50 +44,17 @@ if [[ $? -ne 0 ]]; then
   exit 1
 fi
 
-echo "***** Bazel -> CMake *****"
-./build_tools/bazel_to_cmake/bazel_to_cmake.py
-git add -A
-git diff HEAD --exit-code
+echo "***** pre-commit *****"
+pre-commit run
 
 echo "***** buildifier *****"
 ${scripts_dir}/run_buildifier.sh
 git diff --exit-code
 
-echo "***** black *****"
-# The filter lowercase `d` means to exclude deleted files.
-git diff main --name-only --diff-filter=d -- '*.py' ':!third_party' \
-  | xargs -r black
-
-echo "***** pytype *****"
-./build_tools/pytype/check_diff.sh
-
-echo "***** clang-format *****"
-git-clang-format --style=file main
-git diff --exit-code
-
-echo "***** tabs *****"
-"${scripts_dir}/check_tabs.sh"
-
-echo "***** yamllint *****"
-"${scripts_dir}/run_yamllint.sh"
-
-echo "***** markdownlint *****"
-"${scripts_dir}/run_markdownlint.sh"
-
-echo "***** Path Lengths *****"
-./build_tools/scripts/check_path_lengths.py
-
 echo "***** Generates CMake files *****"
 ./build_tools/scripts/generate_cmake_files.sh
 git add -A
 git diff HEAD --exit-code
-
-echo "***** Check BUILD files are not named BUILD (prefer BUILD.bazel) *****"
-if [[ $(git ls-files '**/BUILD') ]]; then
-  echo "failure: found files named BUILD. Please rename the following files to BUILD.bazel:"
-  git ls-files '**/BUILD'
-  (exit 1)
-fi
 
 if (( "${FINAL_RET}" != 0 )); then
   echo "Encountered failures when running: '${FAILING_CMD}'. Check error" \

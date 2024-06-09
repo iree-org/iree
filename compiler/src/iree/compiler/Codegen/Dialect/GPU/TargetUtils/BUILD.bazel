@@ -13,6 +13,24 @@ package(
 )
 
 iree_compiler_cc_library(
+    name = "ConfigUtils",
+    srcs = [
+        "ConfigUtils.cpp",
+    ],
+    hdrs = [
+        "ConfigUtils.h",
+    ],
+    deps = [
+        "//compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR:IREECodegenDialect",
+        "@llvm-project//llvm:Support",
+        "@llvm-project//mlir:FunctionInterfaces",
+        "@llvm-project//mlir:IR",
+        "@llvm-project//mlir:LinalgDialect",
+        "@llvm-project//mlir:Support",
+    ],
+)
+
+iree_compiler_cc_library(
     name = "KnownTargets",
     srcs = [
         "KnownTargets.cpp",

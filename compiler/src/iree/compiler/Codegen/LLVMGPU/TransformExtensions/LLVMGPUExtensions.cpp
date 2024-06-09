@@ -1647,6 +1647,7 @@ transform_dialect::SetContractionLayoutAttributes::apply(
              << "invalid opaque mma layout for annotation " << mmaType;
     }
 
+    contract->setAttr("iree.amdgpu.mma", mmaType);
     auto [aLayout, bLayout, cLayout] = *maybeLayouts;
     contract->setAttr("__vector_layout_test_anchor_operand_0", aLayout);
     contract->setAttr("__vector_layout_test_anchor_operand_1", bLayout);

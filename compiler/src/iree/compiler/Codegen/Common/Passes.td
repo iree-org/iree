@@ -391,6 +391,22 @@ def MemrefCopyToLinalgPass :
       "mlir::iree_compiler::createMemrefCopyToLinalgPass()";
 }
 
+def NormalizeLoopBoundsPass :
+    Pass<"iree-codegen-normalize-loop-bounds", ""> {
+  let summary = "Normalize the loop bounds of `scf.for` and `scf.forall`";
+  let constructor = "mlir::iree_compiler::createNormalizeLoopBoundsPass()";
+  let options = [
+    Option<"normalizeFor", "normalize-for", "bool", "true",
+           "Enable normalization for `scf.for` loops">,
+    Option<"normalizeForall", "normalize-forall", "bool", "true",
+           "Enable normalization for `scf.forall` loops">,
+  ];
+  let dependentDialects = [
+      "affine::AffineDialect",
+      "arith::ArithDialect"
+  ];
+}
+
 def OptimizeVectorTransfer :
     InterfacePass<"iree-codegen-optimize-vector-transfer", "mlir::FunctionOpInterface"> {
   let summary =
@@ -506,6 +522,12 @@ def TypePropagation :
     InterfacePass<"iree-codegen-type-propagation", "mlir::FunctionOpInterface"> {
   let summary = "Propogate the type of tensor to avoid load/stores of illegal bit widths";
   let constructor = "mlir::iree_compiler::createTypePropagationPass()";
+}
+
+def VectorizeMemrefCopyPass :
+    Pass<"iree-codegen-vectorize-memref-copy", ""> {
+  let summary = "Vectorizes memref copy operations.";
+  let constructor = "mlir::iree_compiler::createVectorizeMemrefCopyPass()";
 }
 
 #endif // IREE_CODEGEN_COMMON_PASSES

@@ -335,6 +335,18 @@ iree_cc_test(
 
 iree_cc_library(
   NAME
+    time
+  HDRS
+    "time.h"
+  SRCS
+    "time.c"
+  DEPS
+    iree::base::core_headers
+  PUBLIC
+)
+
+iree_cc_library(
+  NAME
     wait_handle
   HDRS
     "wait_handle.h"

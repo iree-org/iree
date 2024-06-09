@@ -90,6 +90,12 @@ markdown_extensions:
       options:
         custom_icons:
           - overrides/.icons
+  # Support for bare URLs, see https://github.com/mkdocs/mkdocs/issues/1711.
+  # https://facelessuser.github.io/pymdown-extensions/extensions/magiclink/
+  - pymdownx.magiclink:
+      user: iree-org
+      repo: iree
+      repo_url_shorthand: true
   # Support for embedding external files (e.g. source code samples) via snippets
   # https://squidfunk.github.io/mkdocs-material/reference/code-blocks/#embedding-external-files
   - pymdownx.snippets:
@@ -206,6 +212,7 @@ nav:
           - "developers/design-docs/cuda-hal-driver.md"
           - "developers/design-docs/hip-hal-driver.md"
           - "developers/design-docs/metal-hal-driver.md"
+          - "developers/design-docs/vm.md"
       - "Other topics":
           - "developers/usage-best-practices.md"
           - "developers/vulkan-environment-setup.md"

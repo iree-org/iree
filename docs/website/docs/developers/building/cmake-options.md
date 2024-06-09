@@ -81,12 +81,6 @@ Builds the IREE TFLite C API compatibility shim. Defaults to `ON`.
 Builds the IREE TFLite Java bindings with the C API compatibility shim.
 Defaults to `ON`.
 
-### `IREE_BUILD_EXPERIMENTAL_REMOTING`
-
-* type: BOOL
-
-Builds experimental remoting component. Defaults to `OFF`.
-
 ### `IREE_HAL_DRIVER_DEFAULTS`
 
 * type: BOOL
@@ -97,7 +91,14 @@ Default setting for each `IREE_HAL_DRIVER_*` option.
 
 * type: BOOL
 
-Individual options enabling the build for each runtime HAL driver.
+Individual options enabling the build for each runtime HAL driver:
+
+* `IREE_HAL_DRIVER_CUDA`
+* `IREE_HAL_DRIVER_HIP`
+* `IREE_HAL_DRIVER_LOCAL_SYNC`
+* `IREE_HAL_DRIVER_LOCAL_TASK`
+* `IREE_HAL_DRIVER_VULKAN`
+* `IREE_HAL_DRIVER_METAL`
 
 ### `IREE_TARGET_BACKEND_DEFAULTS`
 
@@ -109,13 +110,24 @@ Default setting for each `IREE_TARGET_BACKEND_*` option.
 
 * type: BOOL
 
-Individual options enabling the build for each compiler target backend.
+Individual options enabling the build for each compiler target backend:
+
+* `IREE_TARGET_BACKEND_VMVX`
+* `IREE_TARGET_BACKEND_LLVM_CPU`
+* `IREE_TARGET_BACKEND_LLVM_CPU_WASM`
+* `IREE_TARGET_BACKEND_METAL_SPIRV`
+* `IREE_TARGET_BACKEND_VULKAN_SPIRV`
+* `IREE_TARGET_BACKEND_ROCM`
 
 ### `IREE_INPUT_*`
 
 * type: BOOL
 
-Individual options enabling each set of input dialects.
+Individual options enabling each set of input dialects:
+
+* `IREE_INPUT_STABLEHLO`
+* `IREE_INPUT_TORCH`
+* `IREE_INPUT_TOSA`
 
 ### `IREE_OUTPUT_FORMAT_C`
 

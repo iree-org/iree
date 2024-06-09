@@ -51,8 +51,13 @@ std::unique_ptr<Pass> createConvert1X1FilterConv2DToMatmulPass();
 std::unique_ptr<Pass>
 createDecomposeConcatPass(bool enableConcatTransposition = false);
 
+// Used by the demoteContractionInputsToBF16 pass to determine which op inputs
+// to demote.
+enum class DemotionOption { All, Conv, Matmul, None };
+
 /// Demotes inputs (LHS, RHS) of linalg matmul-like ops from f32 to bf16.
-std::unique_ptr<Pass> createDemoteContractionInputsToBF16Pass();
+std::unique_ptr<Pass> createDemoteContractionInputsToBF16Pass(
+    DemotionOption option = DemotionOption::None);
 
 /// Detaches elementwise ops from named Linalg ops.
 std::unique_ptr<Pass> createDetachElementwiseFromNamedOpsPass();

@@ -46,6 +46,7 @@ iree_runtime_cc_library(
     hdrs = ["api.h"],
     deps = [
         ":core_headers",
+        "//runtime/src/iree/base/internal:time",
         "//runtime/src/iree/base/tracing:provider",
     ],
 )

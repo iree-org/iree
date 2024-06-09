@@ -311,6 +311,19 @@ iree_runtime_cc_test(
 )
 
 iree_runtime_cc_library(
+    name = "time",
+    srcs = [
+        "time.c",
+    ],
+    hdrs = [
+        "time.h",
+    ],
+    deps = [
+        "//runtime/src/iree/base:core_headers",
+    ],
+)
+
+iree_runtime_cc_library(
     name = "wait_handle",
     srcs = [
         "wait_handle.c",
