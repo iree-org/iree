@@ -309,28 +309,48 @@ StringRef normalizeARMGPUTarget(StringRef target) {
 // Known NVIDIA target details
 //===----------------------------------------------------------------------===//
 
+// FIXME: In the following query functions, we are using AMD WMMA intrinsics
+// that have different layout from NVIDIA WMMA intrinsics. This is fine given
+// right now we only use this to indicate target features for Vulkan, where all
+// cooperative matrix layouts are opaque. We need to create NVIDIA specific WMMA
+// intrinsics if we need to have explicit layout analysis and register mapping.
+
 const WgpDetails *getAmpereWgpDetails() {
+  static const MMAIntrinsic mmaOps[] = {
+      MMAIntrinsic::WMMA_F16_16x16x16_F32,
+      MMAIntrinsic::WMMA_F16_16x16x16_F16,
+  };
   static const WgpDetails ampereWgp = {
-      allComputeBits, allStorageBits,     allSubgroupOps, allDotProductOps, 0,
-      nullptr, // TODO: Add tensor core operations
-      {32, 32},       {1024, 1024, 1024}, 1024,           163 * 1024};
+      allComputeBits,   allStorageBits,     allSubgroupOps,
+      allDotProductOps, ARRAY_SIZE(mmaOps), mmaOps,
+      {32, 32},         {1024, 1024, 1024}, 1024,
+      163 * 1024};
   return &ampereWgp;
 }
 
 const WgpDetails *getTuringWgpDetails() {
+  static const MMAIntrinsic mmaOps[] = {
+      MMAIntrinsic::WMMA_F16_16x16x16_F32,
+      MMAIntrinsic::WMMA_F16_16x16x16_F16,
+  };
   static const WgpDetails turingWgp = {
-      allComputeBits, allStorageBits,     allSubgroupOps, allDotProductOps, 0,
-      nullptr, // TODO: Add tensor core operations
-      {32, 32},       {1024, 1024, 1024}, 1024,           64 * 1024};
+      allComputeBits,   allStorageBits,     allSubgroupOps,
+      allDotProductOps, ARRAY_SIZE(mmaOps), mmaOps,
+      {32, 32},         {1024, 1024, 1024}, 1024,
+      64 * 1024};
   return &turingWgp;
 }
 
 const WgpDetails *getVoltaWgpDetails() {
+  static const MMAIntrinsic mmaOps[] = {
+      MMAIntrinsic::WMMA_F16_16x16x16_F32,
+      MMAIntrinsic::WMMA_F16_16x16x16_F16,
+  };
   // clang-format off
   static const WgpDetails voltaWgp = {
-      allComputeBits, allStorageBits, allSubgroupOps, DotProductOps::None,
-      0, nullptr, // TODO: Add tensor core operations
-      {32, 32}, {1024, 1024, 1024}, 1024, 96 * 1024};
+      allComputeBits,     allStorageBits, allSubgroupOps, DotProductOps::None,
+      ARRAY_SIZE(mmaOps), mmaOps,         {32, 32},       {1024, 1024, 1024},
+      1024,               96 * 1024};
   // clang-format on
   return &voltaWgp;
 }
