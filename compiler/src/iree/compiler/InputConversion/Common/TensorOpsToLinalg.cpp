@@ -60,7 +60,6 @@ struct GatherToLinalg : public OpRewritePattern<tensor::GatherOp> {
     assert(indicesShape.back() == gatherDims.size() &&
            "Last dimension of result type must match number of gather dims");
 
-    Value outTensor;
 
     // collect dims which are are not copied from the source tensor
     // its used later for matching dynamic dims and assigning linalg indices
@@ -79,6 +78,7 @@ struct GatherToLinalg : public OpRewritePattern<tensor::GatherOp> {
 
       // if the shape is not static we have to find the dynamic dimensions from
       // the indices and source tensor
+    Value outTensor;
     if (!resultType.hasStaticShape()) {
       // find dynamic dims from the indices tensor
       llvm::SmallVector<Value> dynamicDims;
