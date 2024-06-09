@@ -446,31 +446,13 @@ const WgpDetails *getAdrenoWgpDetails() {
   return &adrenoWgp;
 }
 
-std::optional<TargetDetails> getQualcommGPUTargetDetails(StringRef target) {
-  const WgpDetails *adrenoWgp = getAdrenoWgpDetails();
-
-  // Note that the underlying GPU may have certain capabilities but the Android
-  // version and driver stack may not expose them. So the following is just and
-  // will always be approximate.
-
-  // Adreno GPUs are quite opaque regarding their generational information.
-
-  return llvm::StringSwitch<std::optional<TargetDetails>>(target.lower())
-      // Adreno-750: https://vulkan.gpuinfo.org/displayreport.php?id=27414
-      // Adreno-740: https://vulkan.gpuinfo.org/displayreport.php?id=19218
-      // Adreno-730: https://vulkan.gpuinfo.org/displayreport.php?id=19382
-      .Cases("adreno-750", "adreno-740", "adreno-730", "adreno",
-             TargetDetails{adrenoWgp, nullptr})
-      .Default(std::nullopt);
-}
-
-StringRef normalizeQualcommGPUTarget(StringRef target) {
+bool verifyQualcommGPUTarget(StringRef target) {
   if (target == "adreno")
-    return target;
+    return true;
 
   StringRef t = target;
   if (!t.consume_front("adreno-"))
-    return "";
+    return false;
 
   // The can exist an optional L at the end.
   if (t.ends_with("l"))
@@ -480,9 +462,29 @@ StringRef normalizeQualcommGPUTarget(StringRef target) {
   unsigned number = 0;
   // StringRef::consumeInteger() returns true to signify errors.
   if (t.size() != 3 || t.consumeInteger(10, number))
-    return "";
+    return false;
 
-  return target;
+  return true;
+}
+
+std::optional<TargetDetails> getQualcommGPUTargetDetails(StringRef target) {
+  const WgpDetails *adrenoWgp = getAdrenoWgpDetails();
+
+  // Note that the underlying GPU may have certain capabilities but the Android
+  // version and driver stack may not expose them. So the following is just and
+  // will always be approximate.
+
+  // Adreno GPUs are quite opaque regarding their generational information.
+  // So right now we only have one target description for all cases.
+  //
+  // Though some example Adreno GPUs:
+  // Adreno-750: https://vulkan.gpuinfo.org/displayreport.php?id=27414
+  // Adreno-740: https://vulkan.gpuinfo.org/displayreport.php?id=19218
+  // Adreno-730: https://vulkan.gpuinfo.org/displayreport.php?id=19382
+  if (verifyQualcommGPUTarget(target))
+    return TargetDetails{adrenoWgp, nullptr};
+
+  return std::nullopt;
 }
 
 } // namespace
@@ -535,8 +537,7 @@ TargetAttr getVulkanTargetDetails(llvm::StringRef target,
                             /*features=*/"", context);
   }
   if (auto details = getQualcommGPUTargetDetails(target)) {
-    return createTargetAttr(*details, normalizeQualcommGPUTarget(target),
-                            /*features=*/"", context);
+    return createTargetAttr(*details, target, /*features=*/"", context);
   }
   return nullptr;
 }
