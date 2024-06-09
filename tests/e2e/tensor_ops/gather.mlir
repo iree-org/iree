@@ -22,3 +22,13 @@ func.func @scalar_3() {
   check.expect_eq_const(%result, dense<[0, 15]> : tensor<2xi32>) : tensor<2xi32>
   return
 }
+
+func.func @dyn() {
+  %source= flow.tensor.dynamic_constant dense<[[0, 1, 2, 3], [4, 5, 6, 7], [8, 9, 10, 11], [12, 13, 14, 15]]> : tensor<4x4xi32>-> tensor<?x?xi32>
+  %indices= flow.tensor.dynamic_constant dense<[[0], [2]]> : tensor<2x1xi32> -> tensor<?x1xi32>
+  %dres = tensor.gather %source[%indices] gather_dims([1]) : (tensor<?x?xi32>, tensor<?x1xi32>) -> tensor<?x?xi32>
+  %dshape = util.optimization_barrier %dres : tensor<?x?xi32>
+  %result = tensor.cast %dshape : tensor<?x?xi32> to tensor<2x4xi32>
+  check.expect_eq_const(%result, dense<[[0, 4, 8, 12], [2, 6, 10, 14]]> : tensor<2x4xi32>) : tensor<2x4xi32>
+  return
+}

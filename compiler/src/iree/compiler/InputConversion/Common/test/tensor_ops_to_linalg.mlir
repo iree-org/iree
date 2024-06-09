@@ -23,15 +23,16 @@ func.func @basic(%arg0: tensor<2x1xi64>, %arg1: tensor<16x4xf32>) -> tensor<2x1x
 
 // -----
 
-func.func @dyn_shape(%arg0: tensor<?x1xi64>, %arg1: tensor<16x4xf32>) -> tensor<?x1x4xf32> {
+func.func @dyn_idx(%arg0: tensor<?x1xi64>, %arg1: tensor<16x4xf32>) -> tensor<?x1x4xf32> {
 %gather = tensor.gather %arg1[%arg0] gather_dims([0]) : (tensor<16x4xf32>, tensor<?x1xi64>) -> tensor<?x1x4xf32>
 return %gather : tensor<?x1x4xf32>
 }
 
 // CHECK: #[[MAP0:.*]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-// CHECK: func.func @dyn_shape
+// CHECK: func.func @dyn_idx
 // CHECK-NOT: tensor.gather
 // CHECK: %[[C0:.*]] = arith.constant 0
+// CHECK: tensor.dim %arg0, %[[C0]]
 // CHECK: tensor.empty
 // CHECK: %[[RES:.+]] = linalg.generic
 // CHECK-SAME: indexing_maps = [#[[MAP0]]]
@@ -40,6 +41,30 @@ return %gather : tensor<?x1x4xf32>
 // CHECK: %[[INDICES_IDX0:.*]] = tensor.extract %arg0[%[[LINALG_IDX0]], %[[C0]]]
 // CHECK: %[[CASTED_IDX0:.*]] = arith.index_cast %[[INDICES_IDX0]]
 // CHECK: tensor.extract %arg1[%[[CASTED_IDX0]], %[[LINALG_IDX2]]
+// CHECK: linalg.yield
+// CHECK: return %[[RES]]
+
+// -----
+
+func.func @dyn_all(%arg0: tensor<?x1xi64>, %arg1: tensor<?x?xf32>) -> tensor<?x?x1xf32> {
+%gather = tensor.gather %arg1[%arg0] gather_dims([1]) : (tensor<?x?xf32>, tensor<?x1xi64>) -> tensor<?x?x1xf32>
+return %gather : tensor<?x?x1xf32>
+}
+
+// CHECK: #[[MAP0:.*]] = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+// CHECK: func.func @dyn_all
+// CHECK-NOT: tensor.gather
+// CHECK: %[[C0:.*]] = arith.constant 0
+// CHECK: tensor.dim %arg0, %[[C0]]
+// CHECK: tensor.dim %arg1, %[[C0]]
+// CHECK: tensor.empty
+// CHECK: %[[RES:.+]] = linalg.generic
+// CHECK-SAME: indexing_maps = [#[[MAP0]]]
+// CHECK: %[[LINALG_IDX0:.*]] = linalg.index 0
+// CHECK: %[[LINALG_IDX1:.*]] = linalg.index 1
+// CHECK: %[[INDICES_IDX0:.*]] = tensor.extract %arg0[%[[LINALG_IDX0]], %[[C0]]]
+// CHECK: %[[CASTED_IDX0:.*]] = arith.index_cast %[[INDICES_IDX0]]
+// CHECK: tensor.extract %arg1[%[[LINALG_IDX1]], %[[CASTED_IDX0]]
 // CHECK: linalg.yield
 // CHECK: return %[[RES]]
 
