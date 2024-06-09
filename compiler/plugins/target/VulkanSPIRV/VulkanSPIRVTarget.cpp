@@ -5,11 +5,9 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
-#include "iree/compiler/Dialect/Vulkan/IR/VulkanAttributes.h"
-#include "iree/compiler/Dialect/Vulkan/IR/VulkanDialect.h"
-#include "iree/compiler/Dialect/Vulkan/Utils/TargetEnvironment.h"
 #include "iree/compiler/PluginAPI/Client.h"
 #include "iree/compiler/Utils/FlatbufferUtils.h"
 #include "iree/compiler/Utils/ModuleUtils.h"
@@ -34,12 +32,16 @@ namespace mlir::iree_compiler::IREE::HAL {
 
 namespace {
 struct VulkanSPIRVTargetOptions {
-  std::string targetTriple = "";
+  // Use vp_android_baseline_2022 profile as the default target--it's a good
+  // lowest common denominator to guarantee the generated SPIR-V is widely
+  // accepted.
+  std::string targetTriple = "vp_android_baseline_2022";
   bool indirectBindings = false;
 
   void bindOptions(OptionsBinder &binder) {
     static llvm::cl::OptionCategory category("VulkanSPIRV HAL Target");
     binder.opt<std::string>(
+        // TODO: Rename this as target given it's not a triple anymore.
         "iree-vulkan-target-triple", targetTriple,
         llvm::cl::desc(
             "Vulkan target triple controlling the SPIR-V environment."));
@@ -50,31 +52,6 @@ struct VulkanSPIRVTargetOptions {
   }
 };
 } // namespace
-
-// Returns the Vulkan target environment for conversion.
-static spirv::TargetEnvAttr
-getSPIRVTargetEnv(const std::string &vulkanTargetTripleOrEnv,
-                  MLIRContext *context) {
-  if (!vulkanTargetTripleOrEnv.empty()) {
-    if (vulkanTargetTripleOrEnv[0] != '#') {
-      // Parse target triple.
-      return convertTargetEnv(
-          Vulkan::getTargetEnvForTriple(context, vulkanTargetTripleOrEnv));
-    }
-
-    // Parse `#vk.target_env<...` attribute assembly.
-    if (auto attr = parseAttribute(vulkanTargetTripleOrEnv, context)) {
-      if (auto vkTargetEnv = llvm::dyn_cast<Vulkan::TargetEnvAttr>(attr)) {
-        return convertTargetEnv(vkTargetEnv);
-      }
-    }
-    emitError(Builder(context).getUnknownLoc())
-        << "cannot parse vulkan target environment as #vk.target_env "
-           "attribute: '"
-        << vulkanTargetTripleOrEnv << "'";
-  }
-  return {};
-}
 
 // TODO: VulkanOptions for choosing the Vulkan version and extensions/features.
 class VulkanTargetDevice : public TargetDevice {
@@ -114,30 +91,29 @@ public:
       MLIRContext *context, StringRef deviceID, DictionaryAttr deviceConfigAttr,
       SmallVectorImpl<IREE::HAL::ExecutableTargetAttr> &executableTargetAttrs)
       const override {
-    std::string targetTripleOrEnv;
-    if (!options_.targetTriple.empty()) {
-      targetTripleOrEnv = options_.targetTriple;
-    } else {
-      targetTripleOrEnv = "unknown-unknown-unknown";
-    }
-
-    executableTargetAttrs.push_back(getExecutableTarget(
-        context, getSPIRVTargetEnv(targetTripleOrEnv, context),
-        options_.indirectBindings));
+    executableTargetAttrs.push_back(
+        getExecutableTarget(context, options_.indirectBindings));
   }
 
   IREE::HAL::ExecutableTargetAttr
-  getExecutableTarget(MLIRContext *context, spirv::TargetEnvAttr targetEnv,
-                      bool indirectBindings) const {
+  getExecutableTarget(MLIRContext *context, bool indirectBindings) const {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
     auto addConfig = [&](StringRef name, Attribute value) {
       configItems.emplace_back(b.getStringAttr(name), value);
     };
 
-    addConfig(spirv::getTargetEnvAttrName(), targetEnv);
     if (indirectBindings) {
       addConfig("hal.bindings.indirect", b.getUnitAttr());
+    }
+
+    StringRef arch = StringRef(options_.targetTriple).split("-").first;
+    if (auto target = GPU::getVulkanTargetDetails(arch, context)) {
+      addConfig("iree.gpu.target", target);
+    } else {
+      emitError(b.getUnknownLoc(), "Unknown Vulkan target '")
+          << options_.targetTriple << "'";
+      return nullptr;
     }
 
     return IREE::HAL::ExecutableTargetAttr::get(
@@ -148,8 +124,8 @@ public:
   }
 
   void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<IREE::Codegen::IREECodegenDialect, Vulkan::VulkanDialect,
-                    spirv::SPIRVDialect, gpu::GPUDialect>();
+    registry.insert<IREE::Codegen::IREECodegenDialect, spirv::SPIRVDialect,
+                    gpu::GPUDialect>();
   }
 
   void
