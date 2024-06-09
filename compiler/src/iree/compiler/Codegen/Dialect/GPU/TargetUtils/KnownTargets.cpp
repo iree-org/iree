@@ -245,10 +245,16 @@ StringRef normalizeAMDGPUTarget(StringRef target) {
   if (target.starts_with("gfx"))
     return target;
 
+  // We cannot accept rdnaN as a target for LLVM AMDGPU backend; so the
+  // following is only meant for Vulkan but not HIP.
+  if (target.starts_with("rdna"))
+    return target;
+
   return llvm::StringSwitch<StringRef>(target.lower())
       .Case("mi300x", "gfx942")
       .Case("mi300a", "gfx940")
       .Cases("mi250x", "mi250", "mi210", "cdna2", "gfx90a")
+      .Case("cdna1", "gfx908")
       .Cases("rx7900xtx", "rx7900xt", "gfx1100")
       .Cases("rx7800xt", "rx7700xt", "gfx1101")
       .Default(StringRef());
@@ -561,26 +567,26 @@ TargetAttr getVulkanTargetDetails(llvm::StringRef target,
 
   if (auto details = getAMDGPUTargetDetails(target)) {
     return createTargetAttr(*details, normalizeAMDGPUTarget(target),
-                            /*features=*/"spirv:v1.6", context);
+                            /*features=*/"spirv:v1.6,cap:Shader", context);
   }
   if (auto details = getARMGPUTargetDetails(target)) {
     return createTargetAttr(*details, normalizeARMGPUTarget(target),
-                            /*features=*/"spirv:v1.4", context);
+                            /*features=*/"spirv:v1.4,cap:Shader", context);
   }
   if (auto details = getNVIDIAGPUTargetDetails(target)) {
     return createTargetAttr(*details, normalizeNVIDIAGPUTarget(target),
-                            /*features=*/"spirv:v1.6", context);
+                            /*features=*/"spirv:v1.6,cap:Shader", context);
   }
   if (auto details = getQualcommGPUTargetDetails(target)) {
-    return createTargetAttr(*details, target, /*features=*/"spirv:v1.4",
-                            context);
+    return createTargetAttr(*details, target,
+                            /*features=*/"spirv:v1.4,cap:Shader", context);
   }
 
   // Go through common profiles if not hit in the above.
 
   if (auto details = getAndroidProfileDetails(target)) {
-    return createTargetAttr(*details, target, /*features=*/"spirv:v1.3",
-                            context);
+    return createTargetAttr(*details, target,
+                            /*features=*/"spirv:v1.3,cap:Shader", context);
   }
   return nullptr;
 }
