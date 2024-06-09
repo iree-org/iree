@@ -12,18 +12,7 @@
 
 namespace mlir::iree_compiler::IREE::GPU {
 
-// Returns a TargetAttr to describe the details of the given |target|, which can
-// be a product name like "rx7900xtx", an microarchitecture name like "rdna3",
-// or a compiler target like "gfx1100", with a list of comma-separated
-// target |features|. Returns a null TargetAttr if the given |target| is not
-// recognized.
-TargetAttr getHIPTargetDetails(llvm::StringRef target, llvm::StringRef features,
-                               MLIRContext *context);
-
-// Normalizes the given HIP |target| to the gfx target commonly used for
-// compiling towards HIP. For example, "gfx90a" for "cnda2", "gfx1100" for
-// "rx7900xtx". Returns empty StringRef if the given |target| is not recognized.
-StringRef normalizeHIPTarget(StringRef target);
+TargetAttr getMetalTargetDetails(MLIRContext *context);
 
 // Returns a TargetAttr to describe the details of the given |target|, which can
 // be a product name like "rtx3090", an microarchitecture name like "ampere", or
@@ -37,6 +26,19 @@ TargetAttr getCUDATargetDetails(llvm::StringRef target,
 // compiling towards CUDA. For example, "sm_80" for "a100", "sm_89" for "ada".
 // if the given |target| is not recognized.
 StringRef normalizeCUDATarget(StringRef target);
+
+// Returns a TargetAttr to describe the details of the given |target|, which can
+// be a product name like "rx7900xtx", an microarchitecture name like "rdna3",
+// or a compiler target like "gfx1100", with a list of comma-separated
+// target |features|. Returns a null TargetAttr if the given |target| is not
+// recognized.
+TargetAttr getHIPTargetDetails(llvm::StringRef target, llvm::StringRef features,
+                               MLIRContext *context);
+
+// Normalizes the given HIP |target| to the gfx target commonly used for
+// compiling towards HIP. For example, "gfx90a" for "cnda2", "gfx1100" for
+// "rx7900xtx". Returns empty StringRef if the given |target| is not recognized.
+StringRef normalizeHIPTarget(StringRef target);
 
 // Returns a TargetAttr to describe the details of the given |target|, which can
 // be a product name like "rtx3090"/"mali-g710"/"adreno" or an microarchitecture

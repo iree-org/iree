@@ -261,6 +261,23 @@ StringRef normalizeAMDGPUTarget(StringRef target) {
 }
 
 //===----------------------------------------------------------------------===//
+// Known Apple target details
+//===----------------------------------------------------------------------===//
+
+std::optional<TargetDetails> getAppleTargetDetails() {
+  ComputeBitwidths computeBitwdiths =
+      allIntComputeBits | ComputeBitwidths::FP32 | ComputeBitwidths::FP16;
+  // clang-format off
+  static const WgpDetails wgp = {
+      computeBitwdiths,   allStorageBits,     allSubgroupOps,  allDotProductOps,
+      /*mmaCount=*/0,     /*mmaOps=*/nullptr, {32, 32},
+      {1024, 1024, 1024}, 1024,               32 * 1024};
+  // clang-format on
+
+  return TargetDetails{&wgp, nullptr};
+}
+
+//===----------------------------------------------------------------------===//
 // Known ARM target details
 //===----------------------------------------------------------------------===//
 
@@ -532,17 +549,9 @@ std::optional<TargetDetails> getAndroidProfileDetails(StringRef target) {
 // Query functions
 //===----------------------------------------------------------------------===//
 
-TargetAttr getHIPTargetDetails(StringRef target, StringRef features,
-                               MLIRContext *context) {
-  if (auto details = getAMDGPUTargetDetails(target)) {
-    return createTargetAttr(*details, normalizeAMDGPUTarget(target), features,
-                            context);
-  }
-  return nullptr;
-}
-
-StringRef normalizeHIPTarget(StringRef target) {
-  return normalizeAMDGPUTarget(target);
+TargetAttr getMetalTargetDetails(MLIRContext *context) {
+  return createTargetAttr(*getAppleTargetDetails(), /*arch=*/"",
+                          /*features=*/"spirv:v1.3,cap:Shader", context);
 }
 
 TargetAttr getCUDATargetDetails(StringRef target, StringRef features,
@@ -555,6 +564,19 @@ TargetAttr getCUDATargetDetails(StringRef target, StringRef features,
 
 StringRef normalizeCUDATarget(StringRef target) {
   return normalizeNVIDIAGPUTarget(target);
+}
+
+TargetAttr getHIPTargetDetails(StringRef target, StringRef features,
+                               MLIRContext *context) {
+  if (auto details = getAMDGPUTargetDetails(target)) {
+    return createTargetAttr(*details, normalizeAMDGPUTarget(target), features,
+                            context);
+  }
+  return nullptr;
+}
+
+StringRef normalizeHIPTarget(StringRef target) {
+  return normalizeAMDGPUTarget(target);
 }
 
 TargetAttr getVulkanTargetDetails(llvm::StringRef target,
