@@ -49,6 +49,7 @@ std::optional<Version> deduceVersion(ArrayRef<StringRef> features) {
           .Case("3", Version::V_1_3)
           .Case("2", Version::V_1_2)
           .Case("1", Version::V_1_1)
+          .Case("0", Version::V_1_0)
           .Default(std::nullopt);
     }
   }
