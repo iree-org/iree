@@ -111,10 +111,13 @@ void addStorageFeatures(StorageBitwidths storage,
 void addSubgroupFeatures(SubgroupOps subgroup,
                          SmallVectorImpl<Capability> &caps,
                          SmallVectorImpl<Extension> &exts) {
-  if (bitEnumContainsAny(subgroup, SubgroupOps::Shuffle))
+  if (bitEnumContainsAny(subgroup, SubgroupOps::Shuffle)) {
     caps.push_back(Capability::GroupNonUniformShuffle);
-  if (bitEnumContainsAny(subgroup, SubgroupOps::Arithmetic))
+    caps.push_back(Capability::GroupNonUniformShuffleRelative);
+  }
+  if (bitEnumContainsAny(subgroup, SubgroupOps::Arithmetic)) {
     caps.push_back(Capability::GroupNonUniformArithmetic);
+  }
 }
 
 void addDotProductFeatures(ComputeBitwidths compute, DotProductOps dotProduct,

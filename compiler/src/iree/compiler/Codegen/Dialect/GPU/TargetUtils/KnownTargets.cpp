@@ -8,6 +8,7 @@
 
 #include <optional>
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "mlir/IR/BuiltinAttributes.h"
 
@@ -487,6 +488,35 @@ std::optional<TargetDetails> getQualcommGPUTargetDetails(StringRef target) {
   return std::nullopt;
 }
 
+//===----------------------------------------------------------------------===//
+// Vulkan profile details
+//===----------------------------------------------------------------------===//
+
+const WgpDetails *getAndroidBaseline2022WgpDetails() {
+  // The following details are from
+  // https://github.com/KhronosGroup/Vulkan-Profiles/blob/main/profiles/VP_ANDROID_baseline_2022.json
+  // subgroupSize is not specified; we are using the largest in various vendors.
+
+  auto computeBitwdiths = ComputeBitwidths::Int32 | ComputeBitwidths::Int16 |
+                          ComputeBitwidths::FP32;
+  auto storageBitwidths = StorageBitwidths::B64 | StorageBitwidths::B32;
+  // clang-format off
+  static const WgpDetails androidWgp = {
+      computeBitwdiths, storageBitwidths,   allSubgroupOps, DotProductOps::None,
+      /*mmaCount=*/0,   /*mmaOps=*/nullptr, {64},           {128, 128, 64},
+      128,              16 * 1024};
+  // clang-format on
+  return &androidWgp;
+}
+
+std::optional<TargetDetails> getAndroidProfileDetails(StringRef target) {
+  const WgpDetails *baseline2022Wgp = getAndroidBaseline2022WgpDetails();
+
+  return llvm::StringSwitch<std::optional<TargetDetails>>(target.lower())
+      .Case("vp_android_baseline_2022", TargetDetails{baseline2022Wgp, nullptr})
+      .Default(std::nullopt);
+}
+
 } // namespace
 
 //===----------------------------------------------------------------------===//
@@ -524,20 +554,33 @@ TargetAttr getVulkanTargetDetails(llvm::StringRef target,
   // duplicated product or microarchitecture names among vendors, which should
   // be the case.
 
+  // For mobile GPUs we target Vulkan 1.1, which accepts SPIR-V 1.3 as the
+  // maximum. But the VK_KHR_spirv_1_4 extension is commonly available so we use
+  // SPIR-V 1.4. For non-mobile GPUs we target Vulkan 1.3, which accepts
+  // SPIR-V 1.6 as the maximum.
+
   if (auto details = getAMDGPUTargetDetails(target)) {
     return createTargetAttr(*details, normalizeAMDGPUTarget(target),
-                            /*features=*/"", context);
+                            /*features=*/"spirv:v1.6", context);
   }
   if (auto details = getARMGPUTargetDetails(target)) {
     return createTargetAttr(*details, normalizeARMGPUTarget(target),
-                            /*features=*/"", context);
+                            /*features=*/"spirv:v1.4", context);
   }
   if (auto details = getNVIDIAGPUTargetDetails(target)) {
     return createTargetAttr(*details, normalizeNVIDIAGPUTarget(target),
-                            /*features=*/"", context);
+                            /*features=*/"spirv:v1.6", context);
   }
   if (auto details = getQualcommGPUTargetDetails(target)) {
-    return createTargetAttr(*details, target, /*features=*/"", context);
+    return createTargetAttr(*details, target, /*features=*/"spirv:v1.4",
+                            context);
+  }
+
+  // Go through common profiles if not hit in the above.
+
+  if (auto details = getAndroidProfileDetails(target)) {
+    return createTargetAttr(*details, target, /*features=*/"spirv:v1.3",
+                            context);
   }
   return nullptr;
 }
