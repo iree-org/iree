@@ -35,7 +35,6 @@ namespace mlir::iree_compiler::IREE::HAL {
 namespace {
 struct VulkanSPIRVTargetOptions {
   std::string targetTriple = "";
-  std::string targetEnv = "";
   bool indirectBindings = false;
 
   void bindOptions(OptionsBinder &binder) {
@@ -44,10 +43,6 @@ struct VulkanSPIRVTargetOptions {
         "iree-vulkan-target-triple", targetTriple,
         llvm::cl::desc(
             "Vulkan target triple controlling the SPIR-V environment."));
-    binder.opt<std::string>(
-        "iree-vulkan-target-env", targetEnv,
-        llvm::cl::desc(
-            "Vulkan target environment as #vk.target_env attribute assembly."));
     binder.opt<bool>(
         "iree-vulkan-experimental-indirect-bindings", indirectBindings,
         llvm::cl::desc(
@@ -120,10 +115,7 @@ public:
       SmallVectorImpl<IREE::HAL::ExecutableTargetAttr> &executableTargetAttrs)
       const override {
     std::string targetTripleOrEnv;
-    if (!options_.targetEnv.empty()) {
-      // TODO(scotttodd): assert if triple is set too? (mutually exclusive)
-      targetTripleOrEnv = options_.targetEnv;
-    } else if (!options_.targetTriple.empty()) {
+    if (!options_.targetTriple.empty()) {
       targetTripleOrEnv = options_.targetTriple;
     } else {
       targetTripleOrEnv = "unknown-unknown-unknown";
