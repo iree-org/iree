@@ -616,6 +616,25 @@ TargetAttr getVulkanTargetDetails(llvm::StringRef target,
   return nullptr;
 }
 
+TargetAttr getWebGPUTargetDetails(MLIRContext *context) {
+  // TODO(scotttodd): find list of SPIR-V capabilities and extensions supported
+  // by WebGPU/WGSL.
+  auto computeBitwdiths = ComputeBitwidths::Int32 | ComputeBitwidths::FP32;
+  auto storageBitwidths = StorageBitwidths::B32;
+  // clang-format off
+  static const WgpDetails wgp = {
+      computeBitwdiths,    storageBitwidths,   SubgroupOps::None,
+      DotProductOps::None, /*mmaCount=*/0,     /*mmaOps=*/nullptr,
+      {32, 32},            {128, 128, 64},     128,
+      16 * 1024};
+  // clang-format on
+
+  return createTargetAttr(
+      {&wgp, nullptr}, /*arch=*/"",
+      "spirv:v1.0,cap:Shader,ext:SPV_KHR_storage_buffer_storage_class",
+      context);
+}
+
 TargetAttr getFullTarget(StringRef targetAPI, StringRef aliasTarget,
                          StringRef features, MLIRContext *context) {
   return llvm::StringSwitch<TargetAttr>(targetAPI)
