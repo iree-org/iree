@@ -28,7 +28,6 @@
 #include "iree/compiler/Dialect/Util/TransformOps/UtilTransformOps.h"
 #include "iree/compiler/Dialect/VM/IR/VMDialect.h"
 #include "iree/compiler/Dialect/VMVX/IR/VMVXDialect.h"
-#include "iree/compiler/Dialect/Vulkan/IR/VulkanDialect.h"
 #include "iree/compiler/ExternalInterfaces/Interfaces.h"
 #include "iree/compiler/GlobalOptimization/Interfaces/Interfaces.h"
 #include "iree/compiler/Modules/HAL/Inline/IR/HALInlineDialect.h"
@@ -56,8 +55,7 @@ inline void registerIreeDialects(DialectRegistry &registry) {
                   IREE::Util::UtilDialect,
                   IREE::VM::VMDialect,
                   IREE::VMVX::VMVXDialect,
-                  IREE::VectorExt::IREEVectorExtDialect,
-                  IREE::Vulkan::VulkanDialect>();
+                  IREE::VectorExt::IREEVectorExtDialect>();
   // clang-format on
 
   // External models.

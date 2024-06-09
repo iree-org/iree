@@ -36,8 +36,6 @@ iree_cc_library(
     iree::compiler::Codegen::SPIRV
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::HAL::Target
-    iree::compiler::Dialect::Vulkan::IR
-    iree::compiler::Dialect::Vulkan::Utils
     iree::compiler::PluginAPI
     iree::compiler::Utils
     iree::schemas::spirv_executable_def_c_fbs
