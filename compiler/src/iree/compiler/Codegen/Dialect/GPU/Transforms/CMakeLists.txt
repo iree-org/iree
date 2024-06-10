@@ -51,6 +51,7 @@ iree_cc_library(
     "PackToIntrinsics.cpp"
     "Passes.cpp"
     "Transforms.cpp"
+    "UnrollToIntrinsics.cpp"
     "VectorizeIREEGPUOps.cpp"
   DEPS
     ::PassesIncGen

@@ -369,6 +369,11 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager) {
   // Vectorize copies that came out of vectorization.
   funcPassManager.addPass(createVectorizeMemrefCopyPass());
 
+  // Step 7. Unroll operations to native intrinsic widths.
+  funcPassManager.addPass(IREE::GPU::createUnrollToIntrinsicsPass());
+  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createCSEPass());
+
   // Step 8. Remaining post-bufferization optimizations/lowerings.
   funcPassManager.addPass(IREE::GPU::createLowerIREEGPUOpsPass());
   funcPassManager.addPass(createLoopInvariantCodeMotionPass());
