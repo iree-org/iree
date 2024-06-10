@@ -21,7 +21,9 @@ namespace mlir::iree_compiler {
 namespace {
 struct LLVMCPUVerifyVectorSizeLegalityPass
     : LLVMCPUVerifyVectorSizeLegalityBase<LLVMCPUVerifyVectorSizeLegalityPass> {
-  LLVMCPUVerifyVectorSizeLegalityPass(int64_t ratio) { this->ratio = ratio; }
+  LLVMCPUVerifyVectorSizeLegalityPass(int64_t maxAllowedNumberOfNativeVectors) {
+    this->maxAllowedNumberOfNativeVectors = maxAllowedNumberOfNativeVectors;
+  }
 
   void runOnOperation() override;
 };
@@ -35,10 +37,10 @@ static int64_t getTotalSizeInBytes(Type elemType, ArrayRef<int64_t> shape) {
   if (elemType.isIntOrFloat()) {
     elemBitWidth = elemType.getIntOrFloatBitWidth();
   }
-  int64_t size = std::accumulate(shape.begin(), shape.end(), 1LL,
+  int64_t size = std::accumulate(shape.begin(), shape.end(), elemBitWidth,
                                  std::multiplies<int64_t>{});
-  size *= elemBitWidth;
-  size = llvm::divideCeil(size, 8);
+  constexpr int64_t kBitsInByte = 8;
+  size = llvm::divideCeil(size, kBitsInByte);
   return size;
 }
 
@@ -56,11 +58,13 @@ void LLVMCPUVerifyVectorSizeLegalityPass::runOnOperation() {
     }
   }
   constexpr int64_t kInt64Max = std::numeric_limits<int64_t>::max();
-  if (maxVectorSizeInBytes <= kInt64Max / this->ratio) {
-    maxVectorSizeInBytes *= this->ratio;
-  } else {
-    maxVectorSizeInBytes = kInt64Max;
+  if (maxVectorSizeInBytes >
+      kInt64Max / this->maxAllowedNumberOfNativeVectors) {
+    funcOp.emitError("The value of maxAllowedNumberOfNativeVectors is too "
+                     "large, which causes integer overflow. Is it a bug?");
+    return signalPassFailure();
   }
+  maxVectorSizeInBytes *= this->maxAllowedNumberOfNativeVectors;
 
   auto checkFn = [&](Type t) {
     auto vectorType = dyn_cast<VectorType>(t);

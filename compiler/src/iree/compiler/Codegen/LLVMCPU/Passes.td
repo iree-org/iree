@@ -146,9 +146,13 @@ def LLVMCPUVerifyVectorSizeLegality :
     InterfacePass<"iree-llvmcpu-verify-vector-size-legality", "mlir::FunctionOpInterface"> {
   let summary =
       "Signals errors when there are large vectors in the IR. I.e., one of"
-      "vector sizes is greater than ratio * native_vector_size";
+      "the vector sizes is greater than"
+      "maxAllowedNumberOfNativeVectors * native_vector_size. For scalable"
+      "vectors, it assumes that the vscale value is always 1. It may be an"
+      "underestimate if the runtime larger than 1, but it should still catch"
+      "unreasonable vector sizes.";
   let options = [
-    Option<"ratio", "ratio", "int64_t", /*default=*/"512",
+    Option<"maxAllowedNumberOfNativeVectors", "max-allowed-number-of-native-vectors", "int64_t", /*default=*/"512",
            "The ratio used in the computation of max vector size.">
   ];
   let constructor = "mlir::iree_compiler::createLLVMCPUVerifyVectorSizeLegalityPass()";
