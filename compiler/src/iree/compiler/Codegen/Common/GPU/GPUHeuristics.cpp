@@ -55,7 +55,9 @@ bool isValidSchedule(const GPUMatmulShapeType &problem,
   // TODO: Add constraint on M-dim and K-dim if it pops up in another
   // model/example. Currently we are being conservative to preserve performance
   // as much as we can.
-  int64_t elemsPerThread = 128 / problem.bType.getIntOrFloatBitWidth();
+  const int64_t kMaxVectorLoadBitWidth = 128;
+  int64_t elemsPerThread =
+      kMaxVectorLoadBitWidth / problem.bType.getIntOrFloatBitWidth();
   int64_t wgThreads = schedule.mWarpCount * schedule.nWarpCount * subgroupSize;
   int64_t nTileSize =
       schedule.nSize * schedule.nTileCount * schedule.nWarpCount;
