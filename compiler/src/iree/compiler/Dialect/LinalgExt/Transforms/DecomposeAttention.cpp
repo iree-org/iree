@@ -69,7 +69,7 @@ void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
   // TODO: Acc should not need a fill. The attention op should get a filled
   // input instead of an empty input.
   Value zeroAcc = rewriter.create<arith::ConstantOp>(
-      loc, rewriter.getZeroAttr(attnOp.getOutputType().getElementType()));
+      loc, rewriter.getZeroAttr(attnOp.getOutput().getType().getElementType()));
   Value accFill =
       rewriter
           .create<linalg::FillOp>(loc, ValueRange{zeroAcc}, attnOp.getOutput())

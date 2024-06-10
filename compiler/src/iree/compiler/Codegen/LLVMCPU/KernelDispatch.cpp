@@ -1761,7 +1761,8 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
   for (int i : opInfo.getK1Dims()) {
     vecTileSizes[i] = 0;
   }
-  int64_t vectorSize = getVectorSize(entryPointFn, attnOp.getOutputType());
+  int64_t vectorSize =
+      getVectorSize(entryPointFn, attnOp.getOutput().getType());
   for (auto i : llvm::seq<unsigned>(0, vecTileSizes.size())) {
     // Do not tile reduction dimensions.
     if (vecTileSizes[i] == 0) {
