@@ -64,6 +64,10 @@ void addGPUPackUnPackPasses(OpPassManager &funcPassManager);
 /// module-level pass manager.
 void addGPUSimpleDistributePassPipeline(OpPassManager &funcPassManager);
 
+/// Lowering config driven pipeline that uses greedy tile + fuse to distribute
+/// to threads.
+void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager);
+
 /// Transform dialect-based path.
 void addGPUTransformDialectPasses(OpPassManager &funcPassManager,
                                   StringRef entryPoint);

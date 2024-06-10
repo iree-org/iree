@@ -52,8 +52,10 @@ iree_compiler_cc_library(
     name = "GPUTransforms",
     srcs = [
         "FuseAndHoistParallelLoops.cpp",
+        "LowerIREEGPUOps.cpp",
         "Passes.cpp",
         "Transforms.cpp",
+        "VectorizeIREEGPUOps.cpp",
     ],
     hdrs = [
         "Passes.h",

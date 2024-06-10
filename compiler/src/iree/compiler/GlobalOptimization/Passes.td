@@ -32,9 +32,33 @@ def DecomposeConcat :
   ];
 }
 
-def DemoteContractionInputsToBF16 : Pass<"iree-global-opt-demote-contraction-inputs-to-bf16", ""> {
-  let summary = "Demotes inputs (LHS, RHS) of linalg matmul-like ops from f32 to bf16.";
-  let constructor = "mlir::iree_compiler::GlobalOptimization::createDemoteContractionInputsToBF16Pass()";
+def DemoteContractionInputsToBF16
+    : Pass<"iree-global-opt-demote-contraction-inputs-to-bf16", ""> {
+  let summary =
+      "Demotes inputs (LHS, RHS) of linalg matmul-like ops from f32 to bf16.";
+  let constructor = "mlir::iree_compiler::GlobalOptimization::"
+                    "createDemoteContractionInputsToBF16Pass()";
+  let options =
+      [Option<"demoteOnly", "demote-only",
+              "mlir::iree_compiler::GlobalOptimization::DemotionOption",
+              /*default=*/
+              "mlir::iree_compiler::GlobalOptimization::DemotionOption::All",
+              "Select the type of contraction ops to demote.",
+              [{::llvm::cl::values(
+            clEnumValN(mlir::iree_compiler::GlobalOptimization::DemotionOption::All,
+                       "all",
+                      "demote all contraction ops."),
+            clEnumValN(mlir::iree_compiler::GlobalOptimization::DemotionOption::Conv,
+                       "conv",
+                       "Only demote convolution ops."),
+            clEnumValN(mlir::iree_compiler::GlobalOptimization::DemotionOption::Matmul,
+                       "matmul",
+                       "Only demote matmul ops."),
+            clEnumValN(mlir::iree_compiler::GlobalOptimization::DemotionOption::None,
+                       "none",
+                      "demote no contraction ops.")
+        )}]>,
+  ];
 }
 
 def DetachElementwiseFromNamedOps :

@@ -14,8 +14,21 @@ Generated CMake files will be similar in structure to their source BUILD
 files by using the functions in build_tools/cmake/ that imitate corresponding
 Bazel rules (e.g. cc_library -> iree_cc_library.cmake).
 
-For usage, see:
-  python3 build_tools/bazel_to_cmake/bazel_to_cmake.py --help
+Common usage:
+  Run across all default paths in the project (in .bazel_to_cmake.cfg.py):
+      $ python build_tools/bazel_to_cmake/bazel_to_cmake.py
+
+  Run on an individual file:
+      $ python build_tools/bazel_to_cmake/bazel_to_cmake.py runtime/src/iree/base/BUILD.bazel
+
+  Run on multiple files (e.g. as part of a pre-commit hook):
+      $ python build_tools/bazel_to_cmake/bazel_to_cmake.py runtime/src/iree/base/BUILD.bazel runtime/src/iree/vm/BUILD.bazel
+
+  Run on a single directory:
+      $ python build_tools/bazel_to_cmake/bazel_to_cmake.py --dir runtime/src/iree/base/
+
+  Run on all files under a root directory:
+      $ python build_tools/bazel_to_cmake/bazel_to_cmake.py --root-dir runtime/src/iree/
 
 Configuration
 -------------
@@ -43,15 +56,14 @@ The file is evaluated as a module and can have the following customizations:
 # pylint: disable=missing-docstring
 
 import argparse
-import datetime
 import importlib
 import importlib.util
 import os
 import re
 import sys
 import textwrap
-import types
 from enum import Enum
+from pathlib import Path
 
 import bazel_to_cmake_converter
 
@@ -105,6 +117,9 @@ def parse_arguments():
     # Specify only one of these (defaults to --root_dir=<main source dirs>).
     group = parser.add_mutually_exclusive_group()
     group.add_argument(
+        "files", nargs="*", help="Converts (or generates) the given files", default=[]
+    )
+    group.add_argument(
         "--dir", help="Converts the BUILD file in the given directory", default=None
     )
     default_root_dirs = (
@@ -119,9 +134,9 @@ def parse_arguments():
 
     args = parser.parse_args()
 
-    # --dir takes precedence over --root_dir.
+    # 'files' and '--dir' take precedence over '--root_dir'.
     # They are mutually exclusive, but the default value is still set.
-    if args.dir:
+    if args.files or args.dir:
         args.root_dir = None
 
     return args
@@ -338,7 +353,14 @@ def main(args):
 
     write_files = not args.preview
 
-    if args.root_dir:
+    if args.files:
+        convert_directories(
+            [Path(file).parent for file in args.files],
+            write_files=write_files,
+            allow_partial_conversion=args.allow_partial_conversion,
+            verbosity=args.verbosity,
+        )
+    elif args.root_dir:
         for root_dir in args.root_dir:
             root_directory_path = os.path.join(repo_root, root_dir)
             log(f"Converting directory tree rooted at: {root_directory_path}")
@@ -357,8 +379,9 @@ def main(args):
         )
     else:
         log(
-            f"ERROR: None of --root-dir, --dir arguments or DEFAULT_ROOT_DIRS in "
-            f".bazel_to_cmake.cfg.py: No conversion will be done"
+            f"ERROR: None of (positional) 'file', '--root-dir', or '--dir' "
+            f"arguments or DEFAULT_ROOT_DIRS in .bazel_to_cmake.cfg.py: No "
+            f"conversion will be done"
         )
         sys.exit(1)
 

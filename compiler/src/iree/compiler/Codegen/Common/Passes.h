@@ -288,6 +288,9 @@ createTransformDialectInterpreterPass(StringRef transformSequenceName = "");
 /// Pass to propagate type to avoid generating load/stores of illegal types.
 std::unique_ptr<InterfacePass<FunctionOpInterface>> createTypePropagationPass();
 
+/// Pass to vectorize memref.copy ops.
+std::unique_ptr<OperationPass<void>> createVectorizeMemrefCopyPass();
+
 /// Creates a pass to vectorize a very specific form of tensor.pad ops with
 /// control flows.
 std::unique_ptr<InterfacePass<FunctionOpInterface>> createVectorizePadPass();
