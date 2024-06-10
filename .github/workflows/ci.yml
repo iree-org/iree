@@ -191,7 +191,7 @@ jobs:
   build_test_all_macos_x86_64:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_test_all_macos_x86_64')
-    runs-on: macos-13-xl
+    runs-on: macos-13
     env:
       BUILD_DIR: build-macos
     defaults:
