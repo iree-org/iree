@@ -47,6 +47,7 @@
 # llvm-external-projects
 /llvm-external-projects/ @stellaraccident
 /llvm-external-projects/iree-dialects/ @MaheshRavishankar
+/llvm-external-projects/iree-dialects/**/VectorExt/* @Groverkss
 
 # Other Top-Level Directories
 /docs/ @ScottTodd
@@ -60,7 +61,7 @@
 /compiler/src/iree/compiler/Codegen/Common/GPU @antiagainst @qedawkins
 /compiler/src/iree/compiler/Codegen/Dialect/GPU @antiagainst @qedawkins
 /compiler/src/iree/compiler/Codegen/LLVMCPU/ @dcaballe @hanhanW @MaheshRavishankar
-/compiler/src/iree/compiler/Codegen/LLVMGPU/ @MaheshRavishankar @qedawkins @kuhar
+/compiler/src/iree/compiler/Codegen/LLVMGPU/ @MaheshRavishankar @qedawkins @kuhar @Groverkss
 /compiler/src/iree/compiler/Codegen/SPIRV/ @antiagainst @MaheshRavishankar @kuhar
 /compiler/src/iree/compiler/Codegen/TransformStrategies/ @qedawkins @MaheshRavishankar
 /compiler/src/iree/compiler/ConstEval/ @hanhanW @stellaraccident
