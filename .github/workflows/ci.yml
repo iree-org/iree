@@ -259,7 +259,7 @@ jobs:
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "IREE_WRITE_REMOTE_BAZEL_CACHE=${IREE_WRITE_REMOTE_BAZEL_CACHE}" \
-            gcr.io/iree-oss/base-bleeding-edge@sha256:c5f28883e6c570c20128fb37d7af3a00a25df3ce4e2b3a24c3a8dcd183182a27 \
+            gcr.io/iree-oss/base-bleeding-edge@sha256:cf2e78194e64fd0166f4141317366261d7a62432b72e9a324cb8c2ff4e1a515a \
             ./build_tools/bazel/build_test_all.sh
 
   test_nvidia_gpu:
@@ -647,7 +647,7 @@ jobs:
             --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
             --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
             --env "CCACHE_NAMESPACE=base-bleeding-edge@sha256:14200dacca3a0f3a66f8aa87c6f64729b83a2eeb403b689c24204074ad157418" \
-            gcr.io/iree-oss/base-bleeding-edge@sha256:c5f28883e6c570c20128fb37d7af3a00a25df3ce4e2b3a24c3a8dcd183182a27 \
+            gcr.io/iree-oss/base-bleeding-edge@sha256:cf2e78194e64fd0166f4141317366261d7a62432b72e9a324cb8c2ff4e1a515a \
             ${SCRIPT}
 
   small_runtime:
