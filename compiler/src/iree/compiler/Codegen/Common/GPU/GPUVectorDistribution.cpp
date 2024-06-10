@@ -149,6 +149,18 @@ DistributionPattern::getOpSignature(Operation *op) const {
   return ::mlir::iree_compiler::getOpSignature(op);
 }
 
+void DistributionPattern::setSignatureForRedistribution(
+    PatternRewriter &rewriter, Operation *op, Attribute inputLayoutsAttr,
+    Attribute outputLayoutsAttr) const {
+  Attribute signature[] = {inputLayoutsAttr, outputLayoutsAttr};
+  auto unitAttr = UnitAttr::get(rewriter.getContext());
+  rewriter.modifyOpInPlace(op, [&]() {
+    op->setAttr(kVectorLayoutFetcherStorageAttrName,
+                ArrayAttr::get(rewriter.getContext(), signature));
+    op->setAttr(kVectorLayoutRedistributeAttrName, unitAttr);
+  });
+}
+
 static void
 debugPrintUniqueOperationNames(const std::deque<Operation *> &worklist) {
   DenseSet<StringRef> uniqueNames;
@@ -209,14 +221,14 @@ static void applyVectorDistribution(Operation *root,
     // Move recently emitted operations that needs to be distributed
     // from the local/rewriter worklist into the "global" worklist.
     if (listener.hasOpsToBeDistributed()) {
-      auto OpstoBeDistributed = listener.getOpsToBeDistributed();
+      auto opstoBeDistributed = listener.getOpsToBeDistributed();
 
       LLVM_DEBUG(llvm::dbgs()
                  << "Recently emitted operations to be distributed:\n");
-      LLVM_DEBUG(debugPrintUniqueOperationNames(OpstoBeDistributed));
+      LLVM_DEBUG(debugPrintUniqueOperationNames(opstoBeDistributed));
 
-      worklist.insert(worklist.end(), OpstoBeDistributed.begin(),
-                      OpstoBeDistributed.end());
+      worklist.insert(worklist.end(), opstoBeDistributed.begin(),
+                      opstoBeDistributed.end());
       listener.clearOpsToBeDistributed();
     }
 

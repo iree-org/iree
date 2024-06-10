@@ -46,6 +46,15 @@ struct DistributionPattern : RewritePattern {
 
   /// Get the signature for the given operation.
   std::optional<DistributionSignature> getOpSignature(Operation *op) const;
+
+protected:
+  // Sets new layout/signature for op, and mark it for redistribution.
+  // When "vector layout storage" and "vector layout redistribution"
+  // is defined, VectorDistributionRewriter would add it to worklist
+  // of operations to be distributed.
+  void setSignatureForRedistribution(PatternRewriter &rewriter, Operation *op,
+                                     Attribute inputLayoutsAttr,
+                                     Attribute outputLayoutsAttr) const;
 };
 
 /// Custom listener to store emitted ops that needs to be distributed.

@@ -848,37 +848,53 @@ struct DistributeLayoutConflictToSharedMemory final
     VectorValue vector = resolutionOp.getInput();
     VectorValue result = resolutionOp.getOutput();
     LayoutAttr currentLayout = dyn_cast<LayoutAttr>(signature[vector]);
-    if (!currentLayout)
-      return failure();
+    if (!currentLayout) {
+      return rewriter.notifyMatchFailure(resolutionOp,
+                                         "Source layout must be LayoutAttr.");
+    }
     LayoutAttr targetLayout = dyn_cast<LayoutAttr>(signature[result]);
-    if (!targetLayout)
-      return failure();
+    if (!targetLayout) {
+      return rewriter.notifyMatchFailure(resolutionOp,
+                                         "Target layout must be LayoutAttr.");
+    }
 
     SmallVector<int64_t> currentVecShape = currentLayout.getDistributedShape();
     SmallVector<int64_t> targetVecShape = targetLayout.getDistributedShape();
-    if (currentVecShape.size() != targetVecShape.size())
-      return failure();
+    if (currentVecShape.size() != targetVecShape.size()) {
+      return rewriter.notifyMatchFailure(
+          resolutionOp,
+          "Target's and source's distributed rank needs to match.");
+    }
 
-    // If the conditions suffice, we can skip the trip to shared memory
-    // and just use the default/more efficient layout conflict resolution
-    // distribution.
     auto numElements = [](ArrayRef<int64_t> vector) {
       return std::accumulate(vector.begin(), vector.end(), 1,
                              std::multiplies<int64_t>());
     };
+
     if (numElements(currentVecShape) == numElements(targetVecShape) &&
-        !currentLayout.hasLaneConflictWith(targetLayout))
-      return failure();
+        !currentLayout.hasLaneConflictWith(targetLayout)) {
+      // If the conditions suffice, we can skip the trip to shared memory
+      // and just use the default/more efficient layout conflict resolution
+      // distribution.
+      return rewriter.notifyMatchFailure(resolutionOp,
+                                         "Failing because condition suffice to "
+                                         "use better conflict resolutions.");
+    }
 
     // Compute Subgroup and Workgroup related information and offsets.
     auto funcOp = resolutionOp->getParentOfType<func::FuncOp>();
-    if (!funcOp)
-      return failure();
+    if (!funcOp) {
+      return rewriter.notifyMatchFailure(
+          resolutionOp, "Expects a parent of type funcOp S.T we can compute "
+                        "subgroup and workgroup related information.");
+    }
     std::optional<SmallVector<int64_t>> workgroupSize =
         getWorkgroupSize(funcOp);
     std::optional<int64_t> subgroupSize = getSubgroupSize(funcOp);
     if (!workgroupSize.has_value() || !subgroupSize.has_value()) {
-      return failure();
+      return rewriter.notifyMatchFailure(
+          resolutionOp, "Expects workgroup/subgroup information to be "
+                        "available to resolve conflict.");
     }
     int64_t flatThreadSize = ShapedType::getNumElements(workgroupSize.value());
     if (flatThreadSize % subgroupSize.value() != 0)
@@ -892,10 +908,15 @@ struct DistributeLayoutConflictToSharedMemory final
 
     auto resolutionType =
         llvm::dyn_cast_or_null<VectorType>(resolutionOp.getResult().getType());
-    if (!resolutionType)
-      return failure();
-    if (!resolutionType.hasStaticShape())
-      return failure();
+    if (!resolutionType) {
+      return rewriter.notifyMatchFailure(
+          resolutionOp,
+          "Expects resolutionOp result to be of type vectorType.");
+    }
+    if (!resolutionType.hasStaticShape()) {
+      return rewriter.notifyMatchFailure(
+          resolutionOp, "Expects resolutionOp result to have static shape.");
+    }
     auto paddedShape = SmallVector<int64_t>(resolutionType.getShape());
     int64_t vectorRank = resolutionType.getRank();
     paddedShape[vectorRank - 1] *= numSubgroups;
@@ -980,23 +1001,6 @@ struct DistributeLayoutConflictToSharedMemory final
 
     rewriter.replaceOp(resolutionOp, read.getResult());
     return success();
-  }
-
-private:
-  // Sets new layout/signature for op, and mark it for redistribution.
-  // When "vector layout storage" and "vector layout redistribution"
-  // is defined, VectorDistributionRewriter would add it to worklist
-  // of operations to be distributed.
-  void setSignatureForRedistribution(PatternRewriter &rewriter, Operation *op,
-                                     Attribute inputLayoutsAttr,
-                                     Attribute outputLayoutsAttr) const {
-    Attribute signature[] = {inputLayoutsAttr, outputLayoutsAttr};
-    auto unitAttr = UnitAttr::get(rewriter.getContext());
-    rewriter.modifyOpInPlace(op, [&]() {
-      op->setAttr(kVectorLayoutFetcherStorageAttrName,
-                  ArrayAttr::get(rewriter.getContext(), signature));
-      op->setAttr(kVectorLayoutRedistributeAttrName, unitAttr);
-    });
   }
 };
 
