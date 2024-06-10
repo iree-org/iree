@@ -1741,7 +1741,8 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
 
   // Batch, M and N (parallel dimensions) are distributed on workgroups.
   DistributionHeuristicConfig config;
-  int64_t vectorSize = getVectorSize(entryPointFn, attnOp.getOutputType());
+  int64_t vectorSize =
+      getVectorSize(entryPointFn, attnOp.getOutput().getType());
   config.maxTileSizes.resize(opInfo.getDomainRank(), clDefaultDistTileSize);
   config.vectorSizeHints.resize(opInfo.getDomainRank(), vectorSize);
   // Distribute batch dimensions completely on workgroups (tile_size = 1).

@@ -511,8 +511,10 @@ def IREELinalgExt_TopkOp : IREELinalgExt_Op<"topk",[
 // Attention
 //===----------------------------------------------------------------------===//
 
-def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
-    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     DestinationStyleOpInterface, LinalgExtInterface,
+     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
      DeclareOpInterfaceMethods<TilingInterface,
       ["getIterationDomain",
        "getLoopIteratorTypes",
@@ -539,114 +541,31 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
     FlashAttention 2 and optionally results in the current `max` and `sum`
     statistics while processing the current tile.
 
-    If transpose_v is speciifed, the V tensor passed as input is assumed to
-    be transposed:
-
     attention(Q, K, V, scale) = softmax(Q @ K.T * scale) @ V.T
-
-    TODO: We should be moving to using a indexing map like approach so we
-    can generalize which tensor is transposed and which is not.
   }];
 
-  let arguments = (ins Variadic<AnyType>:$inputs,
-                       Variadic<AnyShaped>:$outputs,
-                       DefaultValuedOptionalAttr<BoolAttr, "false">:$transpose_v
+  let arguments = (ins AnyShaped:$query,
+                       AnyShaped:$key,
+                       AnyShaped:$value,
+                       AnyFloat:$scale,
+                       AnyShaped:$output,
+                       AffineMapArrayAttr:$indexing_maps
   );
 
-  let builders = [
-    OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$outputs)>,
-  ];
-
   let results = (outs Variadic<AnyRankedTensor>:$results);
-  let hasFolder = 1;
+  let hasVerifier = 1;
+  let hasCustomAssemblyFormat = 1;
   let assemblyFormat = [{
     attr-dict
-    `ins` `(` $inputs `:` type($inputs) `)`
-    `outs` `(` $outputs `:` type($outputs) `)`
+    `ins` `(` $query `,` $key `,` $value `,` $scale `:` type($query) `,` type($key) `,` type($value) `,` type($scale) `)`
+    `outs` `(` $output `:` type($output)`)`
     (`->` type($results)^)?
   }];
 
-  let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
-    Value getQuery() {
-      return getDpsInputOperand(0)->get();
-    }
-    Value getKey() {
-      return getDpsInputOperand(1)->get();
-    }
-    Value getValue() {
-      return getDpsInputOperand(2)->get();
-    }
-    Value getScale() {
-      return getDpsInputOperand(3)->get();
-    }
-    Value getOutput() {
-      return getDpsInitOperand(0)->get();
-    }
-    std::optional<Value> getMax() {
-      if (getNumResults() < 2)
-        return std::nullopt;
-      return getDpsInitOperand(1)->get();
-    }
-    std::optional<Value> getSum() {
-      if (getNumResults() < 3)
-        return std::nullopt;
-      return getDpsInitOperand(2)->get();
-    }
-
-    ShapedType getQueryType() {
-      return cast<ShapedType>(getQuery().getType());
-    }
-    ShapedType getKeyType() {
-      return cast<ShapedType>(getKey().getType());
-    }
-    ShapedType getValueType() {
-      return cast<ShapedType>(getValue().getType());
-    }
-    FloatType getScaleType() {
-      return cast<FloatType>(cast<ShapedType>(getScale().getType()));
-    }
-    ShapedType getOutputType() {
-      return cast<ShapedType>(getOutput().getType());
-    }
-    std::optional<ShapedType> getMaxType() {
-      std::optional<Value> maxVal = getMax();
-      if (!maxVal) return std::nullopt;
-      return cast<ShapedType>(maxVal->getType());
-    }
-    std::optional<ShapedType> getSumType() {
-      std::optional<Value> sumVal = getSum();
-      if (!sumVal) return std::nullopt;
-      return cast<ShapedType>(sumVal->getType());
-    }
-
-    int64_t getQueryRank() {
-      return getQueryType().getRank();
-    }
-    int64_t getKeyRank() {
-      return getKeyType().getRank();
-    }
-    int64_t getValueRank() {
-      return getValueType().getRank();
-    }
-    int64_t getOutputRank() {
-      return getOutputType().getRank();
-    }
-    std::optional<int64_t> getMaxRank() {
-      std::optional<ShapedType> maxType = getMaxType();
-      if (!maxType) return std::nullopt;
-      return maxType->getRank();
-    }
-    std::optional<int64_t> getSumRank() {
-      std::optional<ShapedType> sumType = getSumType();
-      if (!sumType) return std::nullopt;
-      return sumType->getRank();
-    }
-
+  let extraClassDeclaration = [{
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
-    MutableOperandRange getDpsInitsMutable() {
-      return getOutputsMutable();
-    }
+    MutableOperandRange getDpsInitsMutable();
 
     SmallVector<AffineMap> getIndexingMapsArray();
 
@@ -661,16 +580,6 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
     }
     AffineMap getOutputMap() {
       return cast<AffineMap>(getIndexingMapsArray()[3]);
-    }
-    std::optional<AffineMap> getMaxMap() {
-      if (getNumResults() < 2)
-        return std::nullopt;
-      return cast<AffineMap>(getIndexingMapsArray()[4]);
-    }
-    std::optional<AffineMap> getSumMap() {
-      if (getNumResults() < 3)
-        return std::nullopt;
-      return cast<AffineMap>(getIndexingMapsArray()[5]);
     }
 
     int64_t getIterationDomainRank() {
