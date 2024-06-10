@@ -113,8 +113,6 @@ iree_check_single_backend_test_suite(
     "hip"
   COMPILER_FLAGS
     ${IREE_HIP_TEST_COMPILER_FLAGS}
-  INPUT_TYPE
-    "stablehlo"
   RUNNER_ARGS
     "--hip_use_streams=true"
   LABELS
