@@ -109,10 +109,24 @@ public:
                                             affinityAnalysis, benefit) {}
 
 protected:
+#if defined(__GNUC__)
+#pragma GCC diagnostic push
+// Disable this error as we exactly want to overload virtual functions from
+// base.
+// We can't solve the problem by bringing the `matchAndRewrite` from base
+// classes into this with
+// using AffinityAwareConversionPattern<OpT>::matchAndRewrite;
+// as some of them are private.
+// We probably also don't want to turn off these errors in general.
+#pragma GCC diagnostic ignored "-Woverloaded-virtual"
+#endif // __GNUC__
   virtual LogicalResult
   matchAndRewrite(OpT op, typename OpConversionPattern<OpT>::OpAdaptor adaptor,
                   IREE::Stream::AffinityAttr executionAffinityAttr,
                   ConversionPatternRewriter &rewriter) const = 0;
+#if defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif // __GNUC__
 
 private:
   LogicalResult
