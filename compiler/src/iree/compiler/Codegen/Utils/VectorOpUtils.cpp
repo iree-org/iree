@@ -26,33 +26,11 @@ std::pair<int, int> VectorContractOpInfo::getResultMNIndex() const {
   return std::make_pair(outMDims.back(), outNDims.back());
 }
 
-VectorContractOpInfo::OpKind
-VectorContractOpInfo::inferOpKind(MLIRContext *ctx,
-                                  SmallVector<AffineMap> maps) {
-  if (contractionDims.k.size() != 1) {
-    return OpKind::UNKNOWN;
-  }
-  if (!contractionDims.batch.empty()) {
-    if (contractionDims.batch.size() > 1 || contractionDims.batch[0] != 0) {
-      return OpKind::UNKNOWN;
-    }
-    if (*maps[0].getResultPosition(getAffineDimExpr(0, ctx)) != 0 ||
-        *maps[1].getResultPosition(getAffineDimExpr(0, ctx)) != 0 ||
-        *maps[2].getResultPosition(getAffineDimExpr(0, ctx)) != 0) {
-      return OpKind::UNKNOWN;
-    }
-  }
+VectorContractOpInfo::VectorContractOpInfo(vector::ContractionOp op) {
+  contractionDims = *linalg::inferContractionDims(op.getIndexingMapsArray());
 
-  int64_t innerM = contractionDims.m.back();
-  int64_t innerN = contractionDims.n.back();
-  int64_t k = contractionDims.k.back();
-
-  int64_t lhsM = *maps[0].getResultPosition(getAffineDimExpr(innerM, ctx));
-  lhsKDim = *maps[0].getResultPosition(getAffineDimExpr(k, ctx));
-  int64_t rhsN = *maps[1].getResultPosition(getAffineDimExpr(innerN, ctx));
-  rhsKDim = *maps[1].getResultPosition(getAffineDimExpr(k, ctx));
-  int64_t outM = *maps[2].getResultPosition(getAffineDimExpr(innerM, ctx));
-  int64_t outN = *maps[2].getResultPosition(getAffineDimExpr(innerN, ctx));
+  SmallVector<AffineMap> maps = op.getIndexingMapsArray();
+  MLIRContext *ctx = op.getContext();
 
   for (auto m : contractionDims.m) {
     lhsMDims.push_back(*maps[0].getResultPosition(getAffineDimExpr(m, ctx)));
@@ -63,15 +41,9 @@ VectorContractOpInfo::inferOpKind(MLIRContext *ctx,
     outNDims.push_back(*maps[2].getResultPosition(getAffineDimExpr(n, ctx)));
   }
 
-  if (outM < outN) {
-    if (lhsM < lhsKDim) {
-      if (rhsN < rhsKDim) {
-        return OpKind::MK_NK_MN;
-      }
-      return OpKind::MK_KN_MN;
-    }
-  }
-  return OpKind::UNKNOWN;
+  int64_t k = contractionDims.k.back();
+  lhsKDim = *maps[0].getResultPosition(getAffineDimExpr(k, ctx));
+  rhsKDim = *maps[1].getResultPosition(getAffineDimExpr(k, ctx));
 }
 
 } // namespace mlir::iree_compiler
