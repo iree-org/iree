@@ -24,6 +24,7 @@ struct iree_hal_hip_tracing_context_event_t {
 
 struct iree_hal_hip_tracing_context_t {
   const iree_hal_hip_dynamic_symbols_t* symbols;
+  iree_slim_mutex_t event_mutex;
 
   hipStream_t stream;
   iree_arena_block_pool_t* block_pool;
@@ -103,6 +104,7 @@ iree_status_t iree_hal_hip_tracing_context_allocate(
     context->query_capacity = IREE_ARRAYSIZE(context->event_pool);
     context->event_submitted_list_head = NULL;
     context->event_submitted_list_tail = NULL;
+    iree_slim_mutex_initialize(&context->event_mutex);
   }
 
   // Pre-allocate all events in the event pool.
@@ -184,6 +186,8 @@ void iree_hal_hip_tracing_context_free(
                           hipEventDestroy(context->base_event));
   }
 
+  iree_slim_mutex_deinitialize(&context->event_mutex);
+
   iree_allocator_t host_allocator = context->host_allocator;
   iree_allocator_free(host_allocator, context);
 
@@ -193,8 +197,10 @@ void iree_hal_hip_tracing_context_free(
 void iree_hal_hip_tracing_context_collect(
     iree_hal_hip_tracing_context_t* context) {
   if (!context) return;
+  iree_slim_mutex_lock(&context->event_mutex);
   // No outstanding queries
   if (!context->event_submitted_list_head) {
+    iree_slim_mutex_unlock(&context->event_mutex);
     return;
   }
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -213,6 +219,7 @@ void iree_hal_hip_tracing_context_collect(
       if (result != hipSuccess) {
         break;
       }
+
       // Calculate context-relative time and notify tracy.
       float relative_millis = 0.0f;
       IREE_HIP_IGNORE_ERROR(
@@ -233,6 +240,7 @@ void iree_hal_hip_tracing_context_collect(
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)read_query_count);
 
   IREE_TRACE_ZONE_END(z0);
+  iree_slim_mutex_unlock(&context->event_mutex);
 }
 
 void iree_hal_hip_tracing_notify_submitted(
@@ -240,11 +248,12 @@ void iree_hal_hip_tracing_notify_submitted(
     iree_hal_hip_tracing_context_event_t** event_list_begin,
     iree_hal_hip_tracing_context_event_t** event_list_end) {
   if (!context) return;
-
+  iree_slim_mutex_lock(&context->event_mutex);
   IREE_ASSERT_ARGUMENT(event_list_begin);
   IREE_ASSERT_ARGUMENT(event_list_end);
 
   if (!*event_list_begin) {
+    iree_slim_mutex_unlock(&context->event_mutex);
     return;
   }
 
@@ -256,11 +265,13 @@ void iree_hal_hip_tracing_notify_submitted(
   if (!context->event_submitted_list_head) {
     context->event_submitted_list_head = *event_list_begin;
     context->event_submitted_list_tail = *event_list_begin;
+    iree_slim_mutex_unlock(&context->event_mutex);
     return;
   }
 
   context->event_submitted_list_tail->next_submission = *event_list_begin;
   context->event_submitted_list_tail = *event_list_begin;
+  iree_slim_mutex_unlock(&context->event_mutex);
 }
 
 void iree_hal_hip_tracing_free(
@@ -268,11 +279,12 @@ void iree_hal_hip_tracing_free(
     iree_hal_hip_tracing_context_event_t** event_list_begin,
     iree_hal_hip_tracing_context_event_t** event_list_end) {
   if (!context) return;
-
+  iree_slim_mutex_lock(&context->event_mutex);
   IREE_ASSERT_ARGUMENT(event_list_begin);
   IREE_ASSERT_ARGUMENT(event_list_end);
 
   if (!*event_list_begin) {
+    iree_slim_mutex_unlock(&context->event_mutex);
     return;
   }
 
@@ -290,6 +302,7 @@ void iree_hal_hip_tracing_free(
 
   if (!context->event_freelist_head) {
     context->event_freelist_head = *event_list_begin;
+    iree_slim_mutex_unlock(&context->event_mutex);
     return;
   }
   (*event_list_begin)->next_submission = NULL;
@@ -298,12 +311,14 @@ void iree_hal_hip_tracing_free(
 
   *event_list_begin = NULL;
   *event_list_end = NULL;
+  iree_slim_mutex_unlock(&context->event_mutex);
 }
 
 static uint16_t iree_hal_hip_stream_tracing_context_insert_query(
     iree_hal_hip_tracing_context_t* context,
     iree_hal_hip_tracing_context_event_t** event_list_begin,
     iree_hal_hip_tracing_context_event_t** event_list_end, hipStream_t stream) {
+  iree_slim_mutex_lock(&context->event_mutex);
   IREE_ASSERT_ARGUMENT(event_list_begin);
   IREE_ASSERT_ARGUMENT(event_list_end);
   // Allocate an event from the pool for use by the query.
@@ -325,6 +340,7 @@ static uint16_t iree_hal_hip_stream_tracing_context_insert_query(
     *event_list_end = event;
   }
 
+  iree_slim_mutex_unlock(&context->event_mutex);
   return query_id;
 }
 
@@ -336,6 +352,7 @@ static uint16_t iree_hal_hip_graph_tracing_context_insert_query(
     hipGraphNode_t* dependency_nodes, size_t dependency_nodes_count) {
   IREE_ASSERT_ARGUMENT(event_list_begin);
   IREE_ASSERT_ARGUMENT(event_list_end);
+  iree_slim_mutex_lock(&context->event_mutex);
   // Allocate an event from the pool for use by the query.
   // TODO: If we have run out of our freelist, then we
   //   need to try and recover or allocate more
@@ -359,7 +376,7 @@ static uint16_t iree_hal_hip_graph_tracing_context_insert_query(
     (*event_list_end)->next_in_cb = event;
     *event_list_end = event;
   }
-
+  iree_slim_mutex_unlock(&context->event_mutex);
   return query_id;
 }
 

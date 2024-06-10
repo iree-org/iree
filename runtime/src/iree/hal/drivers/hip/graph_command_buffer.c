@@ -347,7 +347,11 @@ static iree_status_t iree_hal_hip_graph_command_buffer_begin(
       hipGraphCreate(&command_buffer->hip_graph, /*flags=*/0),
       "hipGraphCreate");
 
-  IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_BEGIN(command_buffer);
+  IREE_HIP_GRAPH_COMMAND_BUFFER_TRACE_ZONE_BEGIN_EXTERNAL(
+      command_buffer,
+      /*file_name=*/NULL, 0, /*line=*/0, "iree_hal_hip_graph_command_buffer",
+      strlen("iree_hal_hip_graph_command_buffer"),
+      /*name=*/NULL, 0);
 
   return iree_ok_status();
 }
