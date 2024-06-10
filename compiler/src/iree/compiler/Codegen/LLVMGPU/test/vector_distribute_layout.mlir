@@ -54,6 +54,34 @@ func.func @mfma_matmul_96x64x16_mmt(%lhs: vector<96x16xf16>, %rhs: vector<64x16x
 // -----
 
 #translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute
+                                              workgroup_size = [64, 1, 1]
+                                              subgroup_size = 64,
+      {mma_schedule = #iree_gpu.mma_schedule< intrinsic = #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>, subgroup_m_count = 1, subgroup_n_count = 1>}>
+
+func.func @mfma_matmul_96x64x16_mmtt(%lhs: vector<96x16xf16>, %rhs: vector<64x16xf16>, %init: vector<64x96xf32>) -> vector<64x96xf32> attributes { translation_info = #translation } {
+    %0 = vector.contract {
+      indexing_maps = [affine_map<(m, n, k) -> (m, k)>, affine_map<(m, n, k) -> (n, k)>, affine_map<(m, n, k) -> (n, m)>],
+      iterator_types = ["parallel", "parallel", "reduction"], kind = #vector.kind<add>}
+      %lhs, %rhs, %init : vector<96x16xf16>, vector<64x16xf16> into vector<64x96xf32>
+  return %0 : vector<64x96xf32>
+}
+
+//      CHECK: contract A vector layout: #iree_vector_ext.nested_layout<
+// CHECK-SAME: subgroups_per_workgroup = [1, 1], batches_per_subgroup = [3, 2], outers_per_batch = [1, 1], threads_per_outer = [32, 2], elements_per_thread = [1, 4], 
+// CHECK-SAME: thread_order = [1, 0], 
+// CHECK-SAME: subgroup_basis = [1, 1, 1], subgroup_active_ids = [true, false, true], thread_basis = [2, 32]>
+//      CHECK: contract B vector layout: #iree_vector_ext.nested_layout<
+// CHECK-SAME: subgroups_per_workgroup = [1, 1], batches_per_subgroup = [2, 2], outers_per_batch = [1, 1], threads_per_outer = [32, 2], elements_per_thread = [1, 4], 
+// CHECK-SAME: thread_order = [1, 0], 
+// CHECK-SAME: subgroup_basis = [1, 1, 1], subgroup_active_ids = [false, true, true], thread_basis = [2, 32]>
+//      CHECK: contract C vector layout: #iree_vector_ext.nested_layout<
+// CHECK-SAME: subgroups_per_workgroup = [1, 1], batches_per_subgroup = [2, 3], outers_per_batch = [1, 4], threads_per_outer = [32, 2], elements_per_thread = [1, 4], 
+// CHECK-SAME: subgroup_order = [1, 0], thread_order = [1, 0], 
+// CHECK-SAME: subgroup_basis = [1, 1, 1], subgroup_active_ids = [true, true, false], thread_basis = [2, 32]>
+
+// -----
+
+#translation = #iree_codegen.translation_info<LLVMGPUVectorDistribute
                                               workgroup_size = [64, 2, 1]
                                               subgroup_size = 64,
       {mma_schedule = #iree_gpu.mma_schedule< intrinsic = #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>, subgroup_m_count = 2, subgroup_n_count = 1>}>
