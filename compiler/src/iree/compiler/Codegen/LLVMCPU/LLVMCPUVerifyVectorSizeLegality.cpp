@@ -68,8 +68,7 @@ void LLVMCPUVerifyVectorSizeLegalityPass::runOnOperation() {
 
   auto checkFn = [&](Type t) {
     auto vectorType = dyn_cast<VectorType>(t);
-    // TODO: Add support for verifying scalable vectors.
-    if (!vectorType || vectorType.isScalable()) {
+    if (!vectorType) {
       return false;
     }
     int64_t size =
@@ -77,11 +76,6 @@ void LLVMCPUVerifyVectorSizeLegalityPass::runOnOperation() {
     return size >= maxVectorSizeInBytes;
   };
   auto isLargeVectorContract = [&](vector::ContractionOp op) {
-    // TODO: Add support for verifying scalable vectors.
-    if (op.getLhsType().isScalable() || op.getRhsType().isScalable()) {
-      return false;
-    }
-
     SmallVector<int64_t> iterationBounds;
     op.getIterationBounds(iterationBounds);
     int64_t size = getTotalSizeInBytes(getElementTypeOrSelf(op.getAccType()),
