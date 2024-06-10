@@ -115,7 +115,7 @@ void buildGlobalOptimizationPassPipeline(
       // unit extent dims because this allows decoupling unit dims in the
       // concatenation from the transposes that are introduced.
       .addPass([&]() {
-        return createDecomposeConcatPass(
+        return createDecomposeTensorOpsPass(
             transformOptions.options.outerDimConcat);
       })
       // We generalize certain named ops immediately before folding unit extent

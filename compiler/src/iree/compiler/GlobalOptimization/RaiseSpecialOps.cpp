@@ -679,75 +679,6 @@ static Value rewriteCatNegateAndSlice(RewriterBase &rewriter,
   return createCatNegateAndSlice(rewriter, outTensor, source);
 }
 
-// Match an extract slice that has a shape of size N and an output shape of size
-// N-1, where the extraction happened along only the innermost dimension.
-//
-// e.g.
-// %extracted_slice = tensor.extract_slice
-//   %1[0, 0, 0, 1] [1024, 7, 7, 1] [1, 1, 1, 1]
-//   : tensor<1024x7x7x2xf32> to tensor<1024x7x7xf32>
-// Rewrite by adding a transpose that makes dim N the outermost and slice along
-// that dim
-static void matchAndRewriteInnerExtractSlice(RewriterBase &rewriter,
-                                             tensor::ExtractSliceOp sliceOp) {
-
-  RankedTensorType oldInputType = sliceOp.getSource().getType();
-  SmallVector<int64_t> oldInputShape(oldInputType.getShape());
-  ArrayRef<int64_t> oldOutputShape = sliceOp.getResult().getType().getShape();
-
-  if (llvm::is_contained(oldInputShape, ShapedType::kDynamic) ||
-      llvm::is_contained(oldOutputShape, ShapedType::kDynamic)) {
-    return;
-  }
-
-  SmallVector<int64_t> sizes(sliceOp.getStaticSizes());
-
-  // Match extract extraction of full tensor of shape n-1
-  if (oldInputShape.size() < 2 ||
-      oldInputShape.size() != oldOutputShape.size() + 1 || sizes.back() != 1) {
-    return;
-  }
-
-  // All dims of input match output except for extracted innermost dim
-  for (auto [in, out] : llvm::zip(oldInputShape, oldOutputShape)) {
-    if (in != out) {
-      return;
-    }
-  }
-
-  OpBuilder::InsertionGuard guard(rewriter);
-  rewriter.setInsertionPoint(sliceOp);
-
-  SmallVector<int64_t> permutation =
-      llvm::to_vector(llvm::seq<int64_t>(-1, oldInputShape.size() - 1));
-  permutation[0] = oldInputShape.size() - 1;
-  SmallVector<int64_t> transposedDims;
-  transposedDims.push_back(oldInputShape.back());
-  transposedDims.append(oldInputShape.begin(), oldInputShape.end() - 1);
-
-  auto emptyOp = rewriter.create<tensor::EmptyOp>(
-      sliceOp->getLoc(), transposedDims, oldInputType.getElementType());
-  auto transposeOp = rewriter.create<linalg::TransposeOp>(
-      sliceOp.getLoc(), sliceOp.getSource(), emptyOp, permutation);
-
-  SmallVector<OpFoldResult> newOffsets = sliceOp.getMixedOffsets();
-  newOffsets.insert(newOffsets.begin(), newOffsets.back());
-  newOffsets.pop_back();
-
-  SmallVector<OpFoldResult> newSizes = sliceOp.getMixedSizes();
-  newSizes.insert(newSizes.begin(), newSizes.back());
-  newSizes.pop_back();
-
-  auto newSliceOp = rewriter.create<tensor::ExtractSliceOp>(
-      sliceOp.getLoc(),
-      RankedTensorType::get(oldOutputShape,
-                            sliceOp.getResultType().getElementType()),
-      transposeOp->getResult(0), newOffsets, newSizes,
-      sliceOp.getMixedStrides());
-
-  rewriter.replaceOp(sliceOp, newSliceOp);
-};
-
 //===----------------------------------------------------------------------===//
 // Named GEMM-like extensions
 //===----------------------------------------------------------------------===//
@@ -881,10 +812,6 @@ struct RaiseSpecialOpsPass : public RaiseSpecialOpsBase<RaiseSpecialOpsPass> {
       if (succeeded(maybeRaisedView)) {
         rewriter.replaceOp(op, *maybeRaisedView);
       }
-    });
-
-    getOperation()->walk([&](tensor::ExtractSliceOp sliceOp) {
-      matchAndRewriteInnerExtractSlice(rewriter, sliceOp);
     });
 
     SmallVector<std::pair<linalg::LinalgOp, Value>> softmaxRoots;

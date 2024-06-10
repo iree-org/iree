@@ -49,7 +49,7 @@ std::unique_ptr<Pass> createConvert1X1FilterConv2DToMatmulPass();
 
 /// Fuses dequantization and matmul linalg.generic ops
 std::unique_ptr<Pass>
-createDecomposeConcatPass(bool enableConcatTransposition = false);
+createDecomposeTensorOpsPass(bool enableTransposition = false);
 
 // Used by the demoteContractionInputsToBF16 pass to determine which op inputs
 // to demote.
