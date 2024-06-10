@@ -834,7 +834,7 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
     llvm::errs() << "For schedule: " << *this << "\n";
   });
   if (opInfo.getKDims().size() != 1) {
-    return contractOp->emitError("NYI: > 1 k dims");
+    return contractOp->emitError("Unimplemented: > 1 k dims");
   }
 
   auto mmaAttr = llvm::cast<MMAAttr>(getIntrinsic());
