@@ -25,6 +25,12 @@ namespace mlir::iree_compiler {
 
 using VectorValue = TypedValue<VectorType>;
 
+constexpr StringLiteral kVectorLayoutFetcherStorageAttrName =
+    "__vector_layout_fetcher_storage";
+
+constexpr StringLiteral kVectorLayoutRedistributeAttrName =
+    "__vector_layout_redistribute";
+
 static void setOpSignature(Operation *op, VectorLayoutAnalysis &analysis) {
   SmallVector<Attribute> operands;
   SmallVector<Attribute> results;
@@ -177,6 +183,27 @@ debugPrintUniqueOperationNames(const std::deque<Operation *> &worklist) {
 /// A rewriter for the pattern rewriting driver.
 struct VectorDistributionRewriter : PatternRewriter {
   VectorDistributionRewriter(MLIRContext *ctx) : PatternRewriter(ctx) {}
+};
+
+/// Custom listener to store emitted ops that needs to be distributed.
+struct VectorDistributionListener : public RewriterBase::Listener {
+  bool hasOpsToBeDistributed() { return !toBeDistributed.empty(); }
+
+  void clearOpsToBeDistributed() { return toBeDistributed.clear(); }
+
+  const std::deque<Operation *> &getOpsToBeDistributed() const {
+    return toBeDistributed;
+  }
+
+  void notifyOperationModified(Operation *op) override {
+    if (op->hasAttr(kVectorLayoutRedistributeAttrName) &&
+        op->hasAttrOfType<ArrayAttr>(kVectorLayoutFetcherStorageAttrName)) {
+      toBeDistributed.push_back(op);
+    }
+  }
+
+private:
+  std::deque<Operation *> toBeDistributed;
 };
 
 static void applyVectorDistribution(Operation *root,
