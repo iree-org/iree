@@ -23,30 +23,19 @@ LinalgExt::LinalgExtTransformOpsExtension::LinalgExtTransformOpsExtension() {
 
 void LinalgExt::LinalgExtTransformOpsExtension::init() {}
 
-//===---------------------------------------------------------------------===//
-// TileAndDecomposeAttention
-//===---------------------------------------------------------------------===//
-
-DiagnosedSilenceableFailure LinalgExt::TileAttentionOp::applyToOne(
-    transform::TransformRewriter &rewriter, LinalgExt::AttentionOp attentionOp,
+DiagnosedSilenceableFailure LinalgExt::DecomposeOnlineAttention::applyToOne(
+    transform::TransformRewriter &rewriter,
+    LinalgExt::OnlineAttentionOp attentionOp,
     transform::ApplyToEachResultList &results,
     transform::TransformState &state) {
-  SmallVector<Operation *> ops;
-  LinalgExt::tileAttention(attentionOp, ops, rewriter, getTileSize());
-  for (auto op : ops) {
-    results.push_back(op);
+  FailureOr<SmallVector<Value>> replacements =
+      attentionOp.decomposeOperation(rewriter);
+  if (failed(replacements)) {
+    attentionOp->emitError("could not decompose online_attention op");
+    return DiagnosedSilenceableFailure::definiteFailure();
   }
-  return DiagnosedSilenceableFailure::success();
-}
-
-DiagnosedSilenceableFailure LinalgExt::DecomposeTiledAttentionOp::applyToOne(
-    transform::TransformRewriter &rewriter, LinalgExt::AttentionOp attentionOp,
-    transform::ApplyToEachResultList &results,
-    transform::TransformState &state) {
-  SmallVector<Operation *> ops;
-  LinalgExt::decomposeTiledAttention(attentionOp, ops, rewriter, getTileSize());
-  for (auto op : ops) {
-    results.push_back(op);
+  for (Value val : replacements.value()) {
+    results.push_back(val.getDefiningOp());
   }
   return DiagnosedSilenceableFailure::success();
 }
