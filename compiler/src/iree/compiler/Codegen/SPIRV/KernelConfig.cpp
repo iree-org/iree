@@ -921,8 +921,25 @@ LogicalResult setCooperativeMatrixConfig(
       subgroupSize = *minSize;
   }
 
-  FailureOr<GPUMMASchedule> schedule = deduceMMASchedule(
-      problem, intrinsics, seeds, sharedMemoryLimitInBytes, *subgroupSize);
+  // Infer if lhs or rhs is transposed to help generate better schedule.
+  auto maps = op.getIndexingMapsArray();
+  OpBuilder b(op);
+  auto lhsMDim = maps[0].getResultPosition(b.getAffineDimExpr(mIndex));
+  auto lhsKDim = maps[0].getResultPosition(b.getAffineDimExpr(kIndex));
+  if (!lhsMDim.has_value() || !lhsKDim.has_value()) {
+    return op.emitError("mDim or kDim not found in LHS indexing map.");
+  }
+  auto rhsKDim = maps[1].getResultPosition(b.getAffineDimExpr(kIndex));
+  auto rhsNDim = maps[1].getResultPosition(b.getAffineDimExpr(nIndex));
+  if (!rhsKDim.has_value() || !rhsNDim.has_value()) {
+    return op.emitError("kDim or nDim not found in RHS indexing map.");
+  }
+  bool transposedLhs = lhsMDim.value() > lhsKDim.value();
+  bool transposedRhs = rhsKDim.value() > rhsNDim.value();
+
+  FailureOr<GPUMMASchedule> schedule =
+      deduceMMASchedule(problem, intrinsics, seeds, sharedMemoryLimitInBytes,
+                        *subgroupSize, transposedLhs, transposedRhs);
   if (failed(schedule))
     return failure();
 

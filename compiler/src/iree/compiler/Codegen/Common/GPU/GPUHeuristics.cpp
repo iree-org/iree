@@ -31,7 +31,8 @@ static int64_t calculateSharedMemoryUsedInBytes(const GPUMMASchedule &schedule,
 
 bool isValidSchedule(const GPUMatmulShapeType &problem,
                      const GPUMMASchedule &schedule, const bool mustBeAligned,
-                     const int64_t subgroupSize) {
+                     const int64_t subgroupSize, const bool transposedLhs,
+                     const bool transposedRhs) {
   auto alignedMSize =
       mustBeAligned
           ? problem.mSize
@@ -59,24 +60,36 @@ bool isValidSchedule(const GPUMatmulShapeType &problem,
   int64_t elemsPerThread =
       kMaxVectorLoadBitWidth / problem.bType.getIntOrFloatBitWidth();
   int64_t wgThreads = schedule.mWarpCount * schedule.nWarpCount * subgroupSize;
-  int64_t nTileSize =
-      schedule.nSize * schedule.nTileCount * schedule.nWarpCount;
-  bool isDistributableN = (nTileSize / elemsPerThread) % wgThreads == 0 ||
-                          wgThreads % (nTileSize / elemsPerThread) == 0;
 
-  return isValidN && isValidM && isValidK && isDistributableN;
+  int64_t mWgSize = schedule.mSize * schedule.mTileCount * schedule.mWarpCount;
+  int64_t nWgSize = schedule.nSize * schedule.nTileCount * schedule.nWarpCount;
+  int64_t kWgSize = schedule.kSize * schedule.kTileCount;
+  int64_t innerLhsDimSize = transposedLhs ? mWgSize : kWgSize;
+  int64_t innerRhsDimSize = transposedRhs ? kWgSize : nWgSize;
+
+  bool isDistributableLhs =
+      (innerLhsDimSize / elemsPerThread) % wgThreads == 0 ||
+      wgThreads % (innerLhsDimSize / elemsPerThread) == 0;
+  bool isDistributableRhs =
+      (innerRhsDimSize / elemsPerThread) % wgThreads == 0 ||
+      wgThreads % (innerRhsDimSize / elemsPerThread) == 0;
+
+  return isValidN && isValidM && isValidK && isDistributableLhs &&
+         isDistributableRhs;
 }
 
 FailureOr<GPUMMASchedule> fitScheduleInSharedMemory(
     const GPUMatmulShapeType &problem, ArrayRef<GPUMatmulShapeType> intrinsics,
     GPUMMASchedule schedule, int64_t sharedMemLimitInBytes,
-    int64_t subgroupSize, bool mustBeAligned) {
+    int64_t subgroupSize, bool transposedLhs, bool transposedRhs,
+    bool mustBeAligned) {
   int64_t lhsBitwidth =
       intrinsics[schedule.index].aType.getIntOrFloatBitWidth();
   int64_t rhsBitwidth =
       intrinsics[schedule.index].bType.getIntOrFloatBitWidth();
 
-  while (!isValidSchedule(problem, schedule, mustBeAligned, subgroupSize) ||
+  while (!isValidSchedule(problem, schedule, mustBeAligned, subgroupSize,
+                          transposedLhs, transposedRhs) ||
          calculateSharedMemoryUsedInBytes(schedule, lhsBitwidth, rhsBitwidth) >
              sharedMemLimitInBytes) {
     LLVM_DEBUG({
@@ -128,7 +141,8 @@ FailureOr<GPUMMASchedule> fitScheduleInSharedMemory(
 FailureOr<GPUMMASchedule> deduceMMASchedule(
     const GPUMatmulShapeType &problem, ArrayRef<GPUMatmulShapeType> intrinsics,
     const GPUMMAHeuristicSeeds &seeds, int64_t sharedMemLimitInBytes,
-    int64_t subgroupSize, bool canUpcastAcc, bool mustBeAligned) {
+    int64_t subgroupSize, bool transposedLhs, bool transposedRhs,
+    bool canUpcastAcc, bool mustBeAligned) {
   for (auto [index, intrinsic] : llvm::enumerate(intrinsics)) {
     if (problem.aType != intrinsic.aType || problem.bType != intrinsic.bType) {
       continue; // Cannot use this intrinsic for mismatched types
@@ -234,7 +248,8 @@ FailureOr<GPUMMASchedule> deduceMMASchedule(
         GPUMMASchedule{index, intrinsic.mSize, intrinsic.nSize, intrinsic.kSize,
                        mWarpCount, nWarpCount, mTileCount, nTileCount,
                        kTileCount},
-        sharedMemLimitInBytes, subgroupSize, mustBeAligned);
+        sharedMemLimitInBytes, subgroupSize, transposedLhs, transposedRhs,
+        mustBeAligned);
   }
   return failure();
 }

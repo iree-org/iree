@@ -303,9 +303,10 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
       problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize);
   if (failed(schedule)) {
     // Then try again by allowing upcasting accumulator.
-    schedule = deduceMMASchedule(problem, intrinsics, seeds,
-                                 maxSharedMemoryBytes, targetSubgroupSize,
-                                 /*canUpcastAcc=*/true);
+    schedule = deduceMMASchedule(
+        problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize,
+        /*transposedLhs*/ false, /*transposedRhs*/ false,
+        /*canUpcastAcc=*/true);
   }
   if (failed(schedule)) {
     return failure();
@@ -465,15 +466,33 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   LDBG("Matmul Vector Distribution Config");
 
-  // First try to find a schedule with an exactly matching intrinsic.
   auto pipeline = CodeGenPipeline::LLVMGPUVectorDistribute;
+
+  // Infer if lhs or rhs is transposed to help generate better schedule.
+  auto maps = op.getIndexingMapsArray();
+  OpBuilder b(op);
+  auto lhsMDim = maps[0].getResultPosition(b.getAffineDimExpr(mDim));
+  auto lhsKDim = maps[0].getResultPosition(b.getAffineDimExpr(kDim));
+  if (!lhsMDim.has_value() || !lhsKDim.has_value()) {
+    return op.emitError("mDim or kDim not found in LHS indexing map.");
+  }
+  auto rhsKDim = maps[1].getResultPosition(b.getAffineDimExpr(kDim));
+  auto rhsNDim = maps[1].getResultPosition(b.getAffineDimExpr(nDim));
+  if (!rhsKDim.has_value() || !rhsNDim.has_value()) {
+    return op.emitError("kDim or nDim not found in RHS indexing map.");
+  }
+  bool transposedLhs = lhsMDim.value() > lhsKDim.value();
+  bool transposedRhs = rhsKDim.value() > rhsNDim.value();
+
+  // First try to find a schedule with an exactly matching intrinsic.
   std::optional<GPUMMASchedule> schedule = deduceMMASchedule(
       problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize);
   if (!schedule) {
     // Then try again by allowing upcasting accumulator.
-    schedule = deduceMMASchedule(problem, intrinsics, seeds,
-                                 maxSharedMemoryBytes, targetSubgroupSize,
-                                 /*canUpcastAcc=*/true);
+    schedule =
+        deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
+                          targetSubgroupSize, transposedLhs, transposedRhs,
+                          /*canUpcastAcc=*/true);
   }
 
   // Only batch_matmul is supported in the LLVMGPUPadAndVectorDistribute
@@ -483,14 +502,16 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
     LDBG("Matmul Pad and Vector Distribute");
     pipeline = CodeGenPipeline::LLVMGPUPadAndVectorDistribute;
     bool mustBeAligned = false;
-    schedule = deduceMMASchedule(problem, intrinsics, seeds,
-                                 maxSharedMemoryBytes, targetSubgroupSize,
-                                 /*canUpcastAcc=*/false, mustBeAligned);
+    schedule =
+        deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
+                          targetSubgroupSize, transposedLhs, transposedRhs,
+                          /*canUpcastAcc=*/false, mustBeAligned);
     if (!schedule) {
       // Then try again by allowing upcasting accumulator.
-      schedule = deduceMMASchedule(problem, intrinsics, seeds,
-                                   maxSharedMemoryBytes, targetSubgroupSize,
-                                   /*canUpcastAcc=*/true, mustBeAligned);
+      schedule =
+          deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
+                            targetSubgroupSize, transposedLhs, transposedRhs,
+                            /*canUpcastAcc=*/true, mustBeAligned);
     }
   }
   if (!schedule) {
