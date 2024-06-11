@@ -418,8 +418,6 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 
 // NOTE: This test is not exhaustive of all possible ways the above condition is breaking,
 //       but rather is an example of a matmul shape from a model that broke our compilation heuristic.
-//       Current fix introduced is conservative, if similar issues pops up,
-//       we should add more constraints to our heuristic.
 
 #pipeline_layout = #hal.pipeline.layout<
   push_constants = 3,

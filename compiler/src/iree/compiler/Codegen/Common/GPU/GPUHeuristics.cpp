@@ -53,9 +53,6 @@ bool isValidSchedule(const GPUMatmulShapeType &problem,
 
   // Constraint to ensure wgTileSize is distributable by wgSize.
   // such that we can distribute to it's corresponding vector.transfer_read.
-  // TODO: Add constraint on M-dim and K-dim if it pops up in another
-  // model/example. Currently we are being conservative to preserve performance
-  // as much as we can.
   const int64_t kMaxVectorLoadBitWidth = 128;
   int64_t elemsPerThread =
       kMaxVectorLoadBitWidth / problem.bType.getIntOrFloatBitWidth();
