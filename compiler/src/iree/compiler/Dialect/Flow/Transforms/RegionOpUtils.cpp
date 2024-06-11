@@ -7,9 +7,11 @@
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
+#include "iree/compiler/Dialect/Flow/Conversion/TensorToFlow/Utils.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/FormDispatchRegions.h"
 #include "iree/compiler/Dialect/Util/IR/UtilTypes.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/CommandLine.h"
 #include "mlir/Analysis/SliceAnalysis.h"
@@ -25,6 +27,7 @@
 #include "mlir/Dialect/Tensor/Utils/Utils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/Block.h"
+#include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Dominance.h"
 #include "mlir/IR/Value.h"
@@ -593,6 +596,52 @@ bool isDequantizationLikeOp(Operation *op) {
 // Utilities to make a dispatch region isolated from above
 //===---------------------------------------------------------------------===//
 
+static bool isClonableIntoDispatchOp(tensor::ExtractSliceOp sliceOp) {
+  SmallVector<OpFoldResult> offsets = sliceOp.getMixedOffsets();
+  SmallVector<OpFoldResult> sizes = sliceOp.getMixedSizes();
+  SmallVector<OpFoldResult> strides = sliceOp.getMixedStrides();
+  ArrayRef<int64_t> sourceShape = sliceOp.getSourceType().getShape();
+
+  if (offsets.size() != sourceShape.size()) {
+    // Unhanded rank-reducing case.
+    return false;
+  }
+  auto getVal = [](OpFoldResult valueOrAttr, int64_t dynamicVal) -> int64_t {
+    auto attr = dyn_cast<Attribute>(valueOrAttr);
+    return attr ? llvm::cast<IntegerAttr>(attr).getInt() : dynamicVal;
+  };
+  /// To ensure contiguity, start from the least significant dimension. As long
+  /// as the inner slices are "full slices", the current slice can be any offset
+  /// and size. If the inner slices are not "full slices", the current slice
+  /// must be of size 1. All strides must be one.
+
+  bool fullSlices = true;
+  for (size_t dim = offsets.size(); dim > 0; dim--) {
+    OpFoldResult offset = offsets[dim - 1];
+    OpFoldResult size = sizes[dim - 1];
+    OpFoldResult stride = strides[dim - 1];
+
+    int64_t staticOffset = getVal(offset, ShapedType::kDynamic);
+    int64_t staticSize = getVal(size, ShapedType::kDynamic);
+    int64_t staticStride = getVal(stride, ShapedType::kDynamic);
+
+    if (staticStride != 1)
+      return false;
+
+    if (fullSlices == false) {
+      if (staticSize != 1)
+        return false;
+    } else {
+      if (staticOffset != 0 || ShapedType::isDynamic(staticSize) ||
+          ShapedType::isDynamic(sourceShape[dim - 1]) ||
+          staticSize != sourceShape[dim - 1]) {
+        fullSlices = false;
+      }
+    }
+  }
+  return true;
+}
+
 /// Operations that are cloned into dispatch regions formed with other
 /// operations as roots.
 bool isClonableIntoDispatchOp(Operation *op) {
@@ -601,8 +650,11 @@ bool isClonableIntoDispatchOp(Operation *op) {
   // with bufferization. Make them clonable when fixed.
   if (isa<affine::AffineApplyOp, arith::IndexCastOp, linalg::FillOp,
           tensor::EmptyOp, tensor::CastOp, tensor::ExtractOp,
-          tensor::ExtractSliceOp, complex::CreateOp>(op)) {
+          complex::CreateOp>(op)) {
     return true;
+  }
+  if (auto sliceOp = dyn_cast<tensor::ExtractSliceOp>(op)) {
+    return isClonableIntoDispatchOp(sliceOp);
   }
   if (isDequantizationLikeOp(op)) {
     return true;
