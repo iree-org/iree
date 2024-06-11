@@ -70,6 +70,31 @@ struct GenericOpInterchangePattern
 };
 
 //===----------------------------------------------------------------------===//
+// ElementwiseOpInterchangePattern
+//===----------------------------------------------------------------------===//
+
+struct ElementwiseOpInterchangePattern
+    : public OpRewritePattern<linalg::GenericOp> {
+  using OpRewritePattern<linalg::GenericOp>::OpRewritePattern;
+  LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
+                                PatternRewriter &rewriter) const override {
+    if (!linalg::isElementwise(genericOp) || genericOp.getNumResults() != 1)
+      return failure();
+
+    AffineMap indexingMap = genericOp.getIndexingMapsArray().back();
+    if (indexingMap.isIdentity())
+      return failure();
+
+    ArrayRef<AffineExpr> exprs = indexingMap.getResults();
+    auto perm = llvm::map_to_vector(exprs, [](AffineExpr e) -> unsigned {
+      return cast<AffineDimExpr>(e).getPosition();
+    });
+
+    return linalg::interchangeGenericOp(rewriter, genericOp, perm);
+  }
+};
+
+//===----------------------------------------------------------------------===//
 // FoldSuccessiveTensorInsertSliceOps
 //===----------------------------------------------------------------------===//
 
@@ -209,7 +234,8 @@ struct FusionPreprocessingPass
           FusionPreprocessingPass> {
   void runOnOperation() override {
     RewritePatternSet patterns(&getContext());
-    patterns.add<FoldSuccessiveTensorInsertSliceOps,
+    patterns.add<ElementwiseOpInterchangePattern,
+                 FoldSuccessiveTensorInsertSliceOps,
                  GenericOpInterchangePattern, GatherFusionPattern>(
         &getContext());
 
