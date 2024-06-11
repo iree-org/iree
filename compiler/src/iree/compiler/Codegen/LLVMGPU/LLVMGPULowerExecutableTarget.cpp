@@ -86,8 +86,26 @@ getPipelineOptions(FunctionOpInterface funcOp,
   if (DictionaryAttr config = translationInfo.getConfiguration()) {
     if (config.contains(LLVMGPUAttrNames::kNoReduceSharedMemoryBankConflicts))
       pipelineOptions.enableReduceSharedMemoryBankConflicts = false;
-    if (config.contains(LLVMGPUAttrNames::kNoReorderWorkgroups))
-      pipelineOptions.enableReorderWorkgroups = false;
+    if (config.contains(LLVMGPUAttrNames::kReorderWorkgroups)) {
+      pipelineOptions.enableReorderWorkgroups = true;
+      // Get the workgroups reorder config and enable the workgroup reordering
+      Attribute reorderGroupOption =
+          config.get(LLVMGPUAttrNames::kReorderWorkgroups);
+      assert(mlir::isa<mlir::StringAttr>(reorderGroupOption) &&
+             "reorder strategy should be a StringAttr");
+      StringRef reorderStr =
+          llvm::cast<StringAttr>(reorderGroupOption).getValue();
+      if (reorderStr == "transpose" || reorderStr == "Transpose") {
+        pipelineOptions.reorderOption =
+            LLVMGPUPipelineOptions::reorderWorkGroupOption::Transpose;
+      } else if (reorderStr == "swizzle" || reorderStr == "Swizzle") {
+        pipelineOptions.reorderOption =
+            LLVMGPUPipelineOptions::reorderWorkGroupOption::Swizzle;
+      } else {
+        pipelineOptions.reorderOption =
+            LLVMGPUPipelineOptions::reorderWorkGroupOption::None;
+      }
+    }
   }
 
   pipelineOptions.enableUkernels = targetAttr && hasUkernel(targetAttr);

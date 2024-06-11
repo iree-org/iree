@@ -25,15 +25,19 @@ namespace mlir::iree_compiler {
 /// attribute. These are used to override default pass heuristics at the
 /// function granularity.
 namespace LLVMGPUAttrNames {
-inline constexpr StringLiteral kNoReorderWorkgroups = "no_reorder_workgroups";
+inline constexpr StringLiteral kReorderWorkgroups = "reorder_workgroups";
 inline constexpr StringLiteral kNoReduceSharedMemoryBankConflicts =
     "no_reduce_shared_memory_bank_conflicts";
 } //  namespace LLVMGPUAttrNames
 
 struct LLVMGPUPipelineOptions {
+  enum reorderWorkGroupOption { None, Transpose, Swizzle };
+
   bool enableReduceSharedMemoryBankConflicts = true;
-  bool enableReorderWorkgroups = true;
+  bool enableReorderWorkgroups = false;
   bool enableUkernels = false;
+
+  reorderWorkGroupOption reorderOption = None;
 };
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
