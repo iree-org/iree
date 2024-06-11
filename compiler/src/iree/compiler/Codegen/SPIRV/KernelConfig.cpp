@@ -1312,8 +1312,8 @@ static LogicalResult setDefaultOpConfig(IREE::GPU::TargetAttr target,
     // single thread to run everything.
     auto pipeline = CodeGenPipeline::SPIRVBaseDistribute;
     std::array<int64_t, 3> workgroupSize = {1, 1, 1};
-    return setOpConfigAndEntryPointFnTranslation(funcOp, op, {}, pipeline,
-                                                 workgroupSize);
+    return setOpConfigAndEntryPointFnTranslation(
+        funcOp, op, TileSizesListType{}, pipeline, workgroupSize);
   }
 
   int subgroupSize = target.getPreferredSubgroupSize(/*pickLargest=*/true);

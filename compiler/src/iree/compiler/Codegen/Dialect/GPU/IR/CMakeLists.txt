@@ -14,6 +14,7 @@ iree_cc_library(
   NAME
     IREEGPUDialect
   HDRS
+    "DerivedConfigUtils.h"
     "IREEGPUAttrs.h"
     "IREEGPUDialect.h"
     "IREEGPUEnums.h"
@@ -31,6 +32,7 @@ iree_cc_library(
     "IREEGPUOps.cpp.inc"
     "IREEGPUOps.h.inc"
   SRCS
+    "DerivedConfigUtils.cpp"
     "IREEGPUAttrs.cpp"
     "IREEGPUDialect.cpp"
     "IREEGPUInterfaces.cpp"
@@ -56,9 +58,9 @@ iree_cc_library(
     MLIRVectorDialect
     MLIRVectorInterfaces
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
-    iree::compiler::Codegen::Dialect::GPU::TargetUtils::ConfigUtils
     iree::compiler::Codegen::Dialect::VectorExt::IR::IREEVectorExtDialect
     iree::compiler::Codegen::Utils::VectorOpUtils
+    iree::compiler::Dialect::LinalgExt::IR
   PUBLIC
 )
 
