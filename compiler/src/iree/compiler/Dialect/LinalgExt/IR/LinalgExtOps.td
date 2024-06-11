@@ -702,7 +702,7 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
     Online Attention on the other hand, uses an online normalizer instead of
     softmax:
 
-    online_attention(Q, K, V, scale, running_max, running_sum) 
+    online_attention(Q, K, V, scale, running_max, running_sum)
       = online_normalizer(Q @ K.T * scale, running_max, running_sum) @ V
 
     The advantage of this online_normalizer is that it can be tiled along

@@ -6,19 +6,19 @@
 #mapO = affine_map<(batch, m, k1, k2, n) -> (batch, m, n)>
 #mapR = affine_map<(batch, m, k1, k2, n) -> (batch, m)>
 
-func.func @attention_f16(%query: tensor<192x1024x64xf16>, 
-                         %key: tensor<192x1024x64xf16>, 
+func.func @attention_f16(%query: tensor<192x1024x64xf16>,
+                         %key: tensor<192x1024x64xf16>,
                          %value: tensor<192x1024x64xf16>,
                          %output: tensor<192x1024x64xf32>,
                          %max: tensor<192x1024xf32>,
-                         %sum: tensor<192x1024xf32>) 
+                         %sum: tensor<192x1024xf32>)
                          -> tensor<192x1024x64xf32> {
   %scale = arith.constant 1.0 : f16
 
-  %out:3 = iree_linalg_ext.online_attention 
+  %out:3 = iree_linalg_ext.online_attention
         { indexing_maps = [#mapQ, #mapK, #mapV, #mapO, #mapR, #mapR] }
-        ins(%query, %key, %value, %scale : tensor<192x1024x64xf16>, tensor<192x1024x64xf16>, tensor<192x1024x64xf16>, f16) 
-        outs(%output, %max, %sum : tensor<192x1024x64xf32>, tensor<192x1024xf32>, tensor<192x1024xf32>) 
+        ins(%query, %key, %value, %scale : tensor<192x1024x64xf16>, tensor<192x1024x64xf16>, tensor<192x1024x64xf16>, f16)
+        outs(%output, %max, %sum : tensor<192x1024x64xf32>, tensor<192x1024xf32>, tensor<192x1024xf32>)
         -> tensor<192x1024x64xf32>, tensor<192x1024xf32>, tensor<192x1024xf32>
 
   return %out#0 : tensor<192x1024x64xf32>
@@ -31,7 +31,7 @@ func.func @attention_f16(%query: tensor<192x1024x64xf16>,
 // CHECK:   arith.mulf
 // CHECK:   arith.addf
 // CHECK:   linalg.yield
-// newMax = max(oldMax, rowMax(S)) 
+// newMax = max(oldMax, rowMax(S))
 // CHECK: linalg.generic
 // CHECK:   arith.maximumf
 // CHECK:   linalg.yield
