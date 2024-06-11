@@ -20,6 +20,12 @@ LogicalResult setMatmulLoweringConfig(IREE::GPU::TargetAttr target,
                                       mlir::FunctionOpInterface entryPoint,
                                       Operation *op);
 
+/// Helper for setting up a default tile and fuse config for targeting
+/// simple thread distribution. Currently restricted to linalg ops.
+LogicalResult setTileAndFuseLoweringConfig(IREE::GPU::TargetAttr target,
+                                           mlir::FunctionOpInterface entryPoint,
+                                           Operation *op);
+
 } // namespace mlir::iree_compiler::IREE::GPU
 
 #endif // IREE_COMPILER_CODEGEN_DIALECT_GPU_TARGETUTILS_CONFIGUTILS_H_
