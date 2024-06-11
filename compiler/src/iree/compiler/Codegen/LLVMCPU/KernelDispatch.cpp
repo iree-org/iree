@@ -1842,6 +1842,9 @@ setWinogradRootConfig(mlir::FunctionOpInterface entryPointFn,
   tileSizes.push_back(distTileSizes);
   SmallVector<int64_t> vecTileSizes(iterationRank, 1);
   tileSizes.push_back(vecTileSizes);
+  // Dummy tiling config for reduction level.
+  SmallVector<int64_t> reductionTileSizes(iterationRank, 0);
+  tileSizes.push_back(reductionTileSizes);
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, winogradOp, tileSizes,
       DispatchLoweringPassPipeline::CPULinalgExtTileAndVectorize);
