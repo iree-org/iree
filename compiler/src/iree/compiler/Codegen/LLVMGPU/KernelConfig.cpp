@@ -51,6 +51,12 @@ llvm::cl::opt<bool> clGPUEnableTileAndFuse(
     llvm::cl::desc("enable the usage of the tile and fuse pipeline"),
     llvm::cl::init(false));
 
+llvm::cl::opt<bool> clGPUTestTileAndFuse(
+    "iree-codegen-llvmgpu-test-tile-and-fuse",
+    llvm::cl::desc(
+        "test the tile and fuse pipeline for all supported operations"),
+    llvm::cl::init(false));
+
 llvm::cl::opt<bool> clGPUEnableVectorDistribution(
     "iree-codegen-llvmgpu-use-vector-distribution",
     llvm::cl::desc("enable the usage of the vector distribution pipeline"),
@@ -1946,10 +1952,19 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
     LDBG("Transform Dialect Config");
     return success();
   }
-  if (clGPUEnableTileAndFuse && succeeded(IREE::GPU::setMatmulLoweringConfig(
-                                    target, entryPointFn, computeOp))) {
-    LDBG("Tile and fuse matmul config");
-    return success();
+  if (clGPUEnableTileAndFuse) {
+    if (succeeded(IREE::GPU::setMatmulLoweringConfig(target, entryPointFn,
+                                                     computeOp))) {
+      LDBG("Tile and fuse matmul config");
+      return success();
+    }
+    if (clGPUTestTileAndFuse) {
+      if (succeeded(IREE::GPU::setTileAndFuseLoweringConfig(
+              target, entryPointFn, computeOp))) {
+        LDBG("Tile and fuse default config");
+        return success();
+      }
+    }
   }
   if (succeeded(setVectorDistributionConfig(target, entryPointFn, computeOp))) {
     return success();
@@ -2002,6 +2017,14 @@ static LogicalResult setRootConfig(IREE::GPU::TargetAttr target,
         return setUKernelConfig(entryPointFn, ukernelOp);
       })
       .Default([&](auto op) {
+        if (clGPUEnableTileAndFuse) {
+          // Default lowering config using tile and fuse instead.
+          if (succeeded(IREE::GPU::setTileAndFuseLoweringConfig(
+                  target, entryPointFn, computeOp))) {
+            LDBG("Tile and fuse default config");
+            return success();
+          }
+        }
         LDBG("Default Config");
         return setRootDefaultConfig(target, entryPointFn, computeOp);
       });
@@ -2070,6 +2093,7 @@ LogicalResult initGPULaunchConfig(FunctionOpInterface funcOp) {
         }
       }
     }
+    // Translation info (lowering pipeline) is already set.
     return success();
   }
 
