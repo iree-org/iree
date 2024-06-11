@@ -285,6 +285,15 @@ void TileAndDistributeToWorkgroupsPass::runOnOperation() {
 
   auto funcOp = getOperation();
 
+  {
+    RewritePatternSet patterns(context);
+    populateReshapeToInterfaceTensorPatterns(patterns);
+    if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+      funcOp.emitOpError("reshape to interface tensor patterns failed");
+      return signalPassFailure();
+    }
+  }
+
   // TODO(MaheshRavishankar): The logic of lowering workgroup count
   // needs to be moved out of this pass. Once this is moved to
   // use scf.forall, this logic can be moved to the scf.forall
