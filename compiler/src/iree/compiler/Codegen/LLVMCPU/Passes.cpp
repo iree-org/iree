@@ -91,6 +91,13 @@ static llvm::cl::opt<bool> clEnableVectorContractCustomKernels(
                    "LLVMCPUMmt4dVectorLowering pass."),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clForceArmStreaming(
+    "iree-llvmcpu-force-arm-streaming",
+    llvm::cl::desc(
+        "Enables Armv9-A streaming SVE mode for any dispatch region that "
+        "contains scalable vectors. Requires the +sme feature flag."),
+    llvm::cl::init(false));
+
 static void addTileAndDistributePasses(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createTileAndDistributeToWorkgroupsPass());
   funcPassManager.addPass(createConvertToDestinationPassingStylePass());
@@ -340,10 +347,6 @@ void addCPUBufferOpsTileAndVectorizePipeline(
     options.enableArmI8mm = pipelineOpt.enableAArch64I8mm;
     buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
   }
-
-  if (pipelineOpt.enableAArch64SSVE)
-    funcPassManager.addPass(mlir::arm_sme::createEnableArmStreamingPass(
-        mlir::arm_sme::ArmStreamingMode::StreamingLocally));
 }
 
 void addMultiTilingExpertPassPipeline(OpPassManager &funcPassManager,
@@ -422,10 +425,6 @@ void addMultiTilingExpertPassPipeline(OpPassManager &funcPassManager,
     options.enableArmI8mm = pipelineOpt.enableAArch64I8mm;
     buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
   }
-
-  if (pipelineOpt.enableAArch64SSVE)
-    funcPassManager.addPass(mlir::arm_sme::createEnableArmStreamingPass(
-        mlir::arm_sme::ArmStreamingMode::StreamingLocally));
 }
 
 void addConvTileAndDecomposeExpertPassPipeline(
@@ -487,10 +486,6 @@ void addConvTileAndDecomposeExpertPassPipeline(
     options.enableArmI8mm = pipelineOpt.enableAArch64I8mm;
     buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
   }
-
-  if (pipelineOpt.enableAArch64SSVE)
-    funcPassManager.addPass(mlir::arm_sme::createEnableArmStreamingPass(
-        mlir::arm_sme::ArmStreamingMode::StreamingLocally));
 }
 
 void addMmt4dTilingExpertPassPipeline(OpPassManager &funcPassManager,
@@ -693,15 +688,28 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
   if (enableAArch64SME) {
     modulePassManager.addPass(mlir::arm_sme::createVectorLegalizationPass());
     FunctionLikeNest(modulePassManager)
+        .addPredicatedPass(
+            clForceArmStreaming,
+            [] {
+              // Scalable dispatches forced to use streaming mode may not need
+              // ZA (so that is enabled separately for dispatch regions that
+              // need it below).
+              return mlir::arm_sme::createEnableArmStreamingPass(
+                  mlir::arm_sme::ArmStreamingMode::StreamingLocally,
+                  mlir::arm_sme::ArmZaMode::Disabled,
+                  /*ifRequiredByOps=*/false,
+                  /*ifContainsScalableVectors=*/true);
+            })
         .addPass(createCanonicalizerPass)
         .addPass(createCSEPass)
         .addPass(mlir::createArithToArmSMEConversionPass)
         .addPass(mlir::createConvertVectorToArmSMEPass)
-        .addPass([]() {
+        .addPass([] {
+          // ArmSME dispatches need to have both streaming mode + ZA enabled.
           return mlir::arm_sme::createEnableArmStreamingPass(
               mlir::arm_sme::ArmStreamingMode::StreamingLocally,
               mlir::arm_sme::ArmZaMode::NewZA,
-              /*onlyIfRequiredByOps=*/true);
+              /*ifRequiredByOps=*/true);
         })
         .addPass(mlir::createConvertArmSMEToSCFPass);
   }
@@ -850,12 +858,22 @@ void registerCodegenLLVMCPUPasses() {
         buildLLVMCPUVectorLoweringPipeline(funcPassManager, options);
       });
 
-  static PassPipelineRegistration<> LinalgLLVMPipeline(
-      "iree-codegen-linalg-to-llvm-pipeline",
-      "Runs the progressive lowering pipeline from Linalg to LLVM",
-      [](OpPassManager &variantPassManager) {
-        buildLLVMCPUCodegenPassPipeline(variantPassManager);
-      });
+  struct LinalgToLLVMPipelineOptions
+      : public PassPipelineOptions<LinalgToLLVMPipelineOptions> {
+    Option<bool> enableArmSMELoweringPipeline{
+        *this, "enable-arm-sme-lowering-pipeline",
+        llvm::cl::desc("Enable the ArmSME lowering pipeline.")};
+  };
+
+  static PassPipelineRegistration<LinalgToLLVMPipelineOptions>
+      LinalgLLVMPipeline(
+          "iree-codegen-linalg-to-llvm-pipeline",
+          "Runs the progressive lowering pipeline from Linalg to LLVM",
+          [](OpPassManager &variantPassManager,
+             LinalgToLLVMPipelineOptions const &options) {
+            buildLLVMCPUCodegenPassPipeline(
+                variantPassManager, options.enableArmSMELoweringPipeline);
+          });
 
   static PassPipelineRegistration<> LLVMCPULinkingPipeline(
       "iree-codegen-llvmcpu-linking-pipeline",
