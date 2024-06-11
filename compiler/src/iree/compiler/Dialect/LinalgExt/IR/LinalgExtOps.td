@@ -768,6 +768,116 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
     }
   }];
 }
+//===----------------------------------------------------------------------===//
+// Im2col
+//===----------------------------------------------------------------------===//
+
+def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
+    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>]> {
+  let summary = "Im2col operation for convolutions";
+  let description = [{
+    Im2col op for convolutions. The operation performs a transformation on the
+    input to convert it from a convolution input to an equivalent gemm input.
+    The op is defined by its input, output, some conv metadata, and some
+    indexing metadata. The `strides`, `dilations`, and `kernel_size` are taken
+    from the convolution from which this op is generated, and they define how
+    the input operand is indexed when the operation is decomposed. The shape of
+    the output should be `tensor<BxMxK>`, and the `m_pos`, `k_pos`, and
+    `batch_pos` indicate which input dimensions map to which output dimensions.
+    The `k_offset` is an offset within the output K dimension from which the
+    iteration space of the operation begins. This is used for tiling, since the
+    tiled implementation must leave the output K dimension untiled. Similarly,
+    `m_offset` is the offset within the output M dimension from which the
+    iteration space of the operation begins.
+  }];
+
+  let arguments = (ins Variadic<AnyShaped>:$inputs,
+                       Variadic<AnyShaped>:$outputs,
+                       Variadic<Index>:$strides,
+                       DenseI64ArrayAttr:$static_strides,
+                       Variadic<Index>:$dilations,
+                       DenseI64ArrayAttr:$static_dilations,
+                       Variadic<Index>:$kernel_size,
+                       DenseI64ArrayAttr:$static_kernel_size,
+                       Variadic<Index>:$m_offset,
+                       DenseI64ArrayAttr:$static_m_offset,
+                       Variadic<Index>:$k_offset,
+                       DenseI64ArrayAttr:$static_k_offset,
+                       DenseI64ArrayAttr:$batch_pos,
+                       DenseI64ArrayAttr:$m_pos,
+                       DenseI64ArrayAttr:$k_pos);
+
+  let results = (outs Variadic<AnyShaped>:$results);
+  let hasFolder = 1;
+  let assemblyFormat = [{
+    attr-dict
+    `strides` `=`
+    custom<DynamicIndexList>($strides, $static_strides)
+    `dilations` `=`
+    custom<DynamicIndexList>($dilations, $static_dilations)
+    `kernel_size` `=`
+    custom<DynamicIndexList>($kernel_size, $static_kernel_size)
+    `m_offset` `=`
+    custom<DynamicIndexList>($m_offset, $static_m_offset)
+    `k_offset` `=`
+    custom<DynamicIndexList>($k_offset, $static_k_offset)
+    `batch_pos` `=` $batch_pos
+    `m_pos` `=` $m_pos
+    `k_pos` `=` $k_pos
+    `ins` `(` $inputs `:` type($inputs) `)`
+    `outs` `(` $outputs `:` type($outputs) `)`
+    (`->` type($results)^)?
+  }];
+
+  let builders = [
+    OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$outputs,
+      "ArrayRef<OpFoldResult>":$strides,
+      "ArrayRef<OpFoldResult>":$dilations,
+      "ArrayRef<OpFoldResult>":$kernel_size,
+      "ArrayRef<OpFoldResult>":$m_offset,
+      "ArrayRef<OpFoldResult>":$k_offset,
+      "ArrayRef<int64_t>":$batch_dimensions,
+      "ArrayRef<int64_t>":$m_dimensions,
+      "ArrayRef<int64_t>":$k_dimensions)>
+  ];
+
+  let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
+    Value getInput() {
+      return getDpsInputOperand(0)->get();
+    }
+    Value getOutput() {
+      return getDpsInitOperand(0)->get();
+    }
+    ShapedType getInputType() {
+      return cast<ShapedType>(getInput().getType());
+    }
+    ShapedType getOutputType() {
+      return cast<ShapedType>(getOutput().getType());
+    }
+    int64_t getInputRank() {
+      return getInputType().getRank();
+    }
+    int64_t getOutputRank() {
+      return getOutputType().getRank();
+    }
+    // Return op metadata.
+    SmallVector<OpFoldResult> getMixedStrides();
+    SmallVector<OpFoldResult> getMixedDilations();
+    SmallVector<OpFoldResult> getMixedKernelSize();
+    SmallVector<OpFoldResult> getMixedMOffset();
+    SmallVector<OpFoldResult> getMixedKOffset();
+
+    // Set op metadata.
+    void setMixedKOffset(SmallVector<OpFoldResult> kOffset);
+    void setMixedMOffset(SmallVector<OpFoldResult> mOffset);
+
+    // Method to implement for specifying output range for
+    // DestinationStyleOpInterface
+    MutableOperandRange getDpsInitsMutable() {
+      return getOutputsMutable();
+    }
+  }];
+}
 
 } // OpGroupNonStructuredOps
 
