@@ -3,7 +3,9 @@
   "iree_compile_flags": [
     "--iree-hal-target-backends=llvm-cpu",
     "--iree-llvmcpu-target-cpu-features=host",
-    "--iree-input-demote-f64-to-f32"
+    "--iree-input-demote-f64-to-f32",
+    // TODO(#17467): Remove the workaround once we have better support for attention op codegen.
+    "--iree-llvmcpu-fail-on-large-vector=false"
   ],
   "iree_run_module_flags": [
     "--device=local-task",
@@ -14,9 +16,7 @@
     "--input=2x1280xf16=@inference_input.2.bin",
     "--input=1xf16=@inference_input.3.bin",
     "--expected_output=1x4x128x128xf16=@inference_output.0.bin",
-    "--expected_f16_threshold=0.8f",
-    // TODO(#17467): Remove the workaround once we have better support for attention op codegen.
-    "iree-llvmcpu-fail-on-large-vector=false"
+    "--expected_f16_threshold=0.8f"
   ],
   "skip_compile_tests": [],
   "skip_run_tests": [],
