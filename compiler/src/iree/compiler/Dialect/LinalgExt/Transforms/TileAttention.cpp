@@ -337,7 +337,7 @@ void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
   Value accFill =
       rewriter
           .create<linalg::FillOp>(loc, ValueRange{zeroAcc}, attnOp.getOutput())
-          .getResult(0);
+          .result();
 
   SmallVector<OpFoldResult> rowRedSize =
       llvm::map_to_vector(sizes, [](Range x) { return x.size; });

@@ -132,24 +132,6 @@ static Value computeSubAndExp2(OpBuilder &builder, Location loc,
   return genericOp.getResult(0);
 }
 
-AffineMap dropResultsContainingDims(AffineMap map, ArrayRef<int64_t> dims) {
-  SmallVector<int> resultsToDrop;
-  for (auto [idx, result] : llvm::enumerate(map.getResults())) {
-    for (int dim : dims) {
-      if (result.isFunctionOfDim(dim)) {
-        resultsToDrop.push_back(idx);
-        break;
-      }
-    }
-  }
-
-  // Iterate in reverse to preserve indices to drop.
-  for (int result : llvm::reverse(resultsToDrop)) {
-    map = map.dropResult(result);
-  }
-  return map;
-}
-
 FailureOr<SmallVector<Value>>
 OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   Location loc = getLoc();
@@ -170,8 +152,9 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
       getIterationDomain(b), [](Range x) { return x.size; });
 
   // Since we use exp2 for attention instead of the original exp, we have to
-  // multiply the scale by log2(e). We use exp2 instead of exp as most GPUs
-  // have better support for exp2.
+  // multiply the scale by log2(e). We use exp2 instead of exp as most platforms
+  // have better support for exp2 (we verified that we gain some speedup on
+  // some GPUs).
   Value scale = getScale();
   Value log2e =
       b.create<arith::ConstantOp>(loc, b.getFloatAttr(elementType, M_LOG2E));

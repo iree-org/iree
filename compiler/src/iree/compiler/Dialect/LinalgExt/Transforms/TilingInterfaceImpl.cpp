@@ -1611,8 +1611,8 @@ getAttentionIterationDomain(Location loc, OpBuilder &b, int64_t domainRank,
                             ArrayRef<Value> values,
                             ArrayRef<AffineMap> indexingMaps) {
   SmallVector<Range> loopBounds(domainRank);
-  Value zero = b.create<arith::ConstantIndexOp>(loc, 0);
-  Value one = b.create<arith::ConstantIndexOp>(loc, 1);
+  OpFoldResult zero = b.getIndexAttr(0);
+  OpFoldResult one = b.getIndexAttr(1);
 
   for (auto dim : llvm::seq<int64_t>(0, domainRank)) {
     loopBounds[dim].offset = zero;
