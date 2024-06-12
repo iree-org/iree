@@ -259,7 +259,7 @@ jobs:
             --timeout=1200 \
             --durations=0 \
             --config-files=${SDXL_UNET_CONFIG_FILE_PATH}
-      
+
       - name: "Run external tests - SDXL prompt encoder"
         if: "matrix.sdxl-clip-config-file != '' && !cancelled()"
         run: |
@@ -273,7 +273,7 @@ jobs:
             --timeout=1200 \
             --durations=0 \
             --config-files=${SDXL_CLIP_CONFIG_FILE_PATH}
-      
+
       - name: "Run external tests - SDXL vae decode"
         if: "matrix.sdxl-vae-config-file != '' && !cancelled()"
         run: |
