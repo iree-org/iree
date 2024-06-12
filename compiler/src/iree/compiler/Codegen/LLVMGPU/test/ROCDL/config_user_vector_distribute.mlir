@@ -188,7 +188,7 @@ hal.executable public @main_0_dispatch_0 {
       func.func @main_0_dispatch_0_matmul_transpose_b_2048x10240x1280_f16xf16xf32()
         attributes {translation_info = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [128, 2, 1] subgroup_size = 64, {
           mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, subgroup_m_count = 2, subgroup_n_count = 2>,
-          reorder_workgroups = "none"  // disable the 'reorderWorkgroups' pass.
+          reorder_workgroups = "none"  // Disable the 'reorderWorkgroups' pass.
         }>} {
         %cst = arith.constant 0.000000e+00 : f16
         %c0 = arith.constant 0 : index

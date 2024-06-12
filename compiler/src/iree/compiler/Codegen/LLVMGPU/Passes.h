@@ -34,7 +34,6 @@ inline constexpr StringLiteral kNoReduceSharedMemoryBankConflicts =
 struct LLVMGPUPipelineOptions {
   bool enableReduceSharedMemoryBankConflicts = true;
   bool enableUkernels = false;
-
   std::optional<ReorderWorkgroupsStrategy> reorderStrategy;
 };
 

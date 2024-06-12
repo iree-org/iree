@@ -185,10 +185,8 @@ static LogicalResult canReorderWorkgroups(FunctionOpInterface funcOp) {
 
 // Reconciles workgroup reordering strategy based on the pipeline `option` and
 // the CLI flag.
-static ReorderWorkgroupsStrategy getWorkgroupsReoderStrategy(
+static ReorderWorkgroupsStrategy getReorderWorkgroupsStrategy(
     const std::optional<ReorderWorkgroupsStrategy> &option) {
-  if (option)
-    return *option;
   return option.value_or(clReorderWorkgroupsStrategy);
 }
 
@@ -344,7 +342,7 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &funcPassManager,
   }
 
   ReorderWorkgroupsStrategy reorderStrategy =
-      getWorkgroupsReoderStrategy(options.reorderStrategy);
+      getReorderWorkgroupsStrategy(options.reorderStrategy);
   funcPassManager.addPass(createReorderWorkgroups(
       reorderStrategy, clReorderWorkgroupsLogSwizzleTile,
       canReorderWorkgroups));
@@ -393,7 +391,7 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createRemoveSingleIterationLoopPass());
 
   ReorderWorkgroupsStrategy reorderStrategy =
-      getWorkgroupsReoderStrategy(options.reorderStrategy);
+      getReorderWorkgroupsStrategy(options.reorderStrategy);
   funcPassManager.addPass(createReorderWorkgroups(
       reorderStrategy, clReorderWorkgroupsLogSwizzleTile,
       canReorderWorkgroups));
@@ -461,7 +459,7 @@ void addGPUMatmulTensorCoreMmaSyncPassPipeline(
   funcPassManager.addPass(createRemoveSingleIterationLoopPass());
 
   ReorderWorkgroupsStrategy reorderStrategy =
-      getWorkgroupsReoderStrategy(options.reorderStrategy);
+      getReorderWorkgroupsStrategy(options.reorderStrategy);
   funcPassManager.addPass(createReorderWorkgroups(
       reorderStrategy, clReorderWorkgroupsLogSwizzleTile,
       canReorderWorkgroups));
@@ -620,7 +618,7 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
   tileAndDistributeToWorkgroup(funcPassManager);
 
   ReorderWorkgroupsStrategy reorderStrategy =
-      getWorkgroupsReoderStrategy(options.reorderStrategy);
+      getReorderWorkgroupsStrategy(options.reorderStrategy);
   funcPassManager.addPass(createReorderWorkgroups(
       reorderStrategy, clReorderWorkgroupsLogSwizzleTile,
       canReorderWorkgroups));
