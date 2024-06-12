@@ -32,12 +32,9 @@ inline constexpr StringLiteral kNoReduceSharedMemoryBankConflicts =
 } //  namespace LLVMGPUAttrNames
 
 struct LLVMGPUPipelineOptions {
-  //   enum reorderWorkGroupsOption { None, Transpose, Swizzle };
-
   bool enableReduceSharedMemoryBankConflicts = true;
   bool enableUkernels = false;
 
-  //   reorderWorkGroupOption reorderOption = None;
   std::optional<ReorderWorkgrupsStrategy> reorderStrategy;
 };
 

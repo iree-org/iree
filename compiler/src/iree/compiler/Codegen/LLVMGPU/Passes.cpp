@@ -77,28 +77,22 @@ static llvm::cl::opt<bool> clLLVMGPUEnablePrefetch(
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const LLVMGPUPipelineOptions &options) {
+  StringRef reorderStr = "< not set >";
   if (options.reorderStrategy) {
-    StringRef reorderStr;
-    if (options.reorderStrategy.value() == ReorderWorkgrupsStrategy::Transpose)
+    if (options.reorderStrategy == ReorderWorkgrupsStrategy::Transpose) {
       reorderStr = "transpose";
-    else if (options.reorderStrategy.value() ==
-             ReorderWorkgrupsStrategy::Swizzle)
+    } else if (options.reorderStrategy == ReorderWorkgrupsStrategy::Swizzle) {
       reorderStr = "swizzle";
-    else {
-      assert(options.reorderStrategy.value() ==
-                 ReorderWorkgrupsStrategy::None &&
+    } else {
+      assert(options.reorderStrategy == ReorderWorkgrupsStrategy::None &&
              "Unhandled reorder option");
       reorderStr = "none";
     }
-
-    return os << "{" << "enableReduceSharedMemoryBankConflicts = "
-              << options.enableReduceSharedMemoryBankConflicts
-              << ", ReorderWorkgroupsStrategy = " << reorderStr
-              << ", enableUkernels = " << options.enableUkernels << "}";
   }
 
   return os << "{" << "enableReduceSharedMemoryBankConflicts = "
             << options.enableReduceSharedMemoryBankConflicts
+            << ", ReorderWorkgroupsStrategy = " << reorderStr
             << ", enableUkernels = " << options.enableUkernels << "}";
 }
 
