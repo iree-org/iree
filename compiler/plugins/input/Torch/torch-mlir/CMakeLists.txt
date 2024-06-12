@@ -85,10 +85,10 @@ iree_tablegen_library(
   TD_FILE
     "${TORCH_MLIR_ROOT_DIR}/include/torch-mlir/Dialect/Torch/IR/TorchOps.td"
   OUTS
-    -gen-dialect-decls Dialect/Torch/IR/TorchDialect.h.inc
-    -gen-dialect-defs Dialect/Torch/IR/TorchDialect.cpp.inc
-    -gen-op-decls Dialect/Torch/IR/TorchOps.h.inc
-    -gen-op-defs Dialect/Torch/IR/TorchOps.cpp.inc
+    -gen-dialect-decls -dialect=torch Dialect/Torch/IR/TorchDialect.h.inc
+    -gen-dialect-defs -dialect=torch Dialect/Torch/IR/TorchDialect.cpp.inc
+    -gen-op-decls -dialect=torch Dialect/Torch/IR/TorchOps.h.inc
+    -gen-op-defs -dialect=torch Dialect/Torch/IR/TorchOps.cpp.inc
 )
 
 iree_tablegen_library(
