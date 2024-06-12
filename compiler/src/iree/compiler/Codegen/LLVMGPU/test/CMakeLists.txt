@@ -16,6 +16,7 @@ iree_lit_test_suite(
   SRCS
     "amdgpu_chained_matmul.mlir"
     "amdgpu_contraction_distribution.mlir"
+    "amdgpu_set_anchor_layouts.mlir"
     "attention.mlir"
     "attention_mfma.mlir"
     "cast_address_space_function.mlir"

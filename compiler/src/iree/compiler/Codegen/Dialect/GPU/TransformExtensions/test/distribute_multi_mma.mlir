@@ -47,4 +47,3 @@ module attributes { transform.with_named_sequence } {
 //       CHECK:       tensor.parallel_insert_slice %[[MMA]] into %[[ITER_ARG]][0, 0, %[[IDS]]#0, %[[IDS]]#1]
 //  CHECK-SAME:         [2, 2, 4, 1] [1, 1, 1, 1] : tensor<2x2x4x1xf32> into tensor<2x2x16x16xf32>
 //       CHECK:   mapping = [#iree_gpu.lane_id<0>]
-

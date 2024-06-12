@@ -11,6 +11,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
+#include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
 #include "iree/compiler/Codegen/Utils/VectorOpUtils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/STLForwardCompat.h"
@@ -290,8 +291,9 @@ static ConcreteMmaLayout getConcreteMFMALayout(MLIRContext *context,
     auto aKLayout = inner;
     auto bKLayout = inner;
     auto bNLayout = outer;
-    auto cMLayout = PerDimLayoutAttr::get(context, {laneY, vectorX}, {8, 2});
-    auto cNLayout = outer;
+    auto cMLayout =
+        PerDimLayoutAttr::get(context, {vectorY, laneY, vectorX}, {8, 2, 1});
+    auto cNLayout = PerDimLayoutAttr::get(context, {laneX}, {16});
     return ConcreteMmaLayout{opaqueLayout, aMLayout, aKLayout, bKLayout,
                              bNLayout,     cMLayout, cNLayout};
   }
@@ -831,9 +833,8 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
     llvm::errs() << "Getting mma layouts for:\n" << contractOp << "\n";
     llvm::errs() << "For schedule: " << *this << "\n";
   });
-  if (opInfo.getOpKind() == VectorContractOpInfo::OpKind::UNKNOWN) {
-    LLVM_DEBUG({ llvm::errs() << "Unknown contraction kind\n"; });
-    return failure();
+  if (opInfo.getKDims().size() != 1) {
+    return contractOp->emitError("Unimplemented: > 1 k dims");
   }
 
   auto mmaAttr = llvm::cast<MMAAttr>(getIntrinsic());
@@ -1206,6 +1207,30 @@ LoweringConfigAttr::getTilingLevelSizes(OpBuilder &b, unsigned level,
   }
   SmallVector<int64_t> sizes =
       getTileSizes(getAttributes(), static_cast<GPU::TilingLevel>(level));
+  return llvm::map_to_vector(
+      sizes, [&](int64_t s) -> OpFoldResult { return b.getIndexAttr(s); });
+}
+
+//===----------------------------------------------------------------------===//
+// DerivedThreadConfigAttr
+//===----------------------------------------------------------------------===//
+
+SmallVector<int64_t>
+DerivedThreadConfigAttr::getStaticTilingLevelSizes(unsigned level,
+                                                   Operation *op) const {
+  if (level != llvm::to_underlying(GPU::TilingLevel::Thread)) {
+    return {};
+  }
+  return deriveThreadTileSizes(op);
+}
+
+SmallVector<OpFoldResult>
+DerivedThreadConfigAttr::getTilingLevelSizes(OpBuilder &b, unsigned level,
+                                             Operation *op) const {
+  if (level > llvm::to_underlying(GPU::TilingLevel::Thread)) {
+    return {};
+  }
+  SmallVector<int64_t> sizes = deriveThreadTileSizes(op);
   return llvm::map_to_vector(
       sizes, [&](int64_t s) -> OpFoldResult { return b.getIndexAttr(s); });
 }

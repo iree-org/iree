@@ -913,13 +913,6 @@ LogicalResult setCooperativeMatrixConfig(
   int64_t sharedMemoryLimitInBytes =
       targetEnv.getResourceLimits().getMaxComputeSharedMemorySize();
 
-  FailureOr<GPUMMASchedule> schedule =
-      deduceMMASchedule(problem, intrinsics, seeds, sharedMemoryLimitInBytes);
-  if (failed(schedule))
-    return failure();
-
-  auto pipeline = CodeGenPipeline::SPIRVCooperativeMatrixVectorize;
-
   std::optional<int64_t> subgroupSize = limits.getSubgroupSize();
   // AMD RDNA architectures supports both wave32 and wave64 modes. Prefer to use
   // wave32 mode for better performance.
@@ -927,6 +920,23 @@ LogicalResult setCooperativeMatrixConfig(
     if (std::optional<int> minSize = limits.getMinSubgroupSize())
       subgroupSize = *minSize;
   }
+
+  // Infer if lhs or rhs is transposed to help generate better schedule.
+  SmallVector<AffineMap> maps = op.getIndexingMapsArray();
+  bool transposedLhs =
+      kIndex !=
+      llvm::cast<AffineDimExpr>(maps[0].getResults().back()).getPosition();
+  bool transposedRhs =
+      nIndex !=
+      llvm::cast<AffineDimExpr>(maps[1].getResults().back()).getPosition();
+
+  FailureOr<GPUMMASchedule> schedule =
+      deduceMMASchedule(problem, intrinsics, seeds, sharedMemoryLimitInBytes,
+                        *subgroupSize, transposedLhs, transposedRhs);
+  if (failed(schedule))
+    return failure();
+
+  auto pipeline = CodeGenPipeline::SPIRVCooperativeMatrixVectorize;
 
   std::array<int64_t, 3> workgroupSize{schedule->nWarpCount * *subgroupSize,
                                        schedule->mWarpCount, 1};

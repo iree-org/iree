@@ -117,13 +117,25 @@ IREE_API_EXPORT iree_status_t iree_vm_ref_wrap_retain(void* ptr,
   IREE_VM_REF_ASSERT(ptr);
   IREE_VM_REF_ASSERT(type);
   IREE_VM_REF_ASSERT(out_ref);
-  IREE_RETURN_IF_ERROR(iree_vm_ref_wrap_assign(ptr, type, out_ref));
+  IREE_VM_REF_ASSERT(iree_vm_ref_type_descriptor(type));
+
+  if (out_ref->ptr == ptr) {
+    // No-op - effectively a retain+release of the same value.
+    return iree_ok_status();
+  } else if (out_ref->ptr != NULL) {
+    // Release existing value.
+    iree_vm_ref_release(out_ref);
+  }
+
+  out_ref->ptr = ptr;
+  out_ref->type = type;
   if (out_ref->ptr) {
     volatile iree_atomic_ref_count_t* counter =
         iree_vm_get_ref_counter_ptr(out_ref);
     iree_atomic_ref_count_inc(counter);
     iree_vm_ref_trace("WRAP RETAIN", out_ref);
   }
+
   return iree_ok_status();
 }
 

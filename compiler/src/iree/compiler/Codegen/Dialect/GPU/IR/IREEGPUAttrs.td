@@ -29,7 +29,7 @@ def IREEGPU_IteratorTypeArrayAttr
                          "Iterator type should be an enum.">;
 
 //===----------------------------------------------------------------------===//
-// GPU Specific Lowering Config Attribute
+// GPU Specific Lowering Config Attributes
 //===----------------------------------------------------------------------===//
 
 def IREEGPU_LoweringConfigAttr :
@@ -57,6 +57,28 @@ def IREEGPU_LoweringConfigAttr :
   let extraClassDeclaration = [{
     SmallVector<int64_t> getThreadTileSizes() const;
   }];
+}
+
+def IREEGPU_DerivedThreadConfig :
+    AttrDef<IREEGPU_Dialect, "DerivedThreadConfig", [
+      DeclareAttrInterfaceMethods<IREECodegen_LoweringConfigAttrInterface, [
+        "getStaticTilingLevelSizes",
+        "getTilingLevelSizes",
+      ]>
+    ]> {
+  let mnemonic = "derived_thread_config";
+  let summary = [{
+    drive lowering of an operation by deriving thread distribution when needed.
+  }];
+  let description = [{
+    Lowering config for a single thread tiling level that is inferred after
+    previous (often reduction) levels of tile + fuse. This is intended for
+    fused operations where it is much easier to compute the tile sizes to use
+    after previous levels of tile + fuse, rather than trying to pre-propagate
+    tiling configs.
+  }];
+  let assemblyFormat = "";
+  let parameters = (ins);
 }
 
 //===----------------------------------------------------------------------===//

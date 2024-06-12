@@ -8,6 +8,7 @@
 
 #include <time.h>
 
+#include "iree/base/config.h"
 #include "iree/base/target_platform.h"
 
 int64_t iree_platform_time_now(void) {

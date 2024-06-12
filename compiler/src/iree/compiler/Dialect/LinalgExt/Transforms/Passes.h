@@ -56,11 +56,17 @@ void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
                              RewriterBase &rewriter,
                              std::optional<uint64_t> tileSize = std::nullopt);
 
+void convertToOnlineAttention(IREE::LinalgExt::AttentionOp attnOp,
+                              SmallVectorImpl<Operation *> &ops,
+                              RewriterBase &rewriter);
+
 // Creates a pass to tile the attention op along the reduction dim.
 std::unique_ptr<Pass> createTileAttentionPass();
 
 // Creates a pass to convert the attention op into a sequence of linalg ops.
 std::unique_ptr<Pass> createDecomposeAttentionPass();
+
+std::unique_ptr<Pass> createConvertAttentionToOnlineAttentionPass();
 
 //===---------------------------------------------------------------------===//
 // Codegen Strategy passes that are moved into IREE.
