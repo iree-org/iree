@@ -890,7 +890,7 @@ getDefaultDistributedLevelTileSizes(Operation *op,
 /// Splits the tile sizes in `parallelSizes` into `reductionSizes` for the
 /// reduction loops.
 static void splitParallelAndReductionTiles(
-    Operation *op, SmallVectorImpl<int64_t> &parallelSizes,
+    linalg::LinalgOp op, SmallVectorImpl<int64_t> &parallelSizes,
     SmallVectorImpl<int64_t> &reductionSizes,
     SmallVectorImpl<bool> *parallelScalableFlags = nullptr,
     SmallVectorImpl<bool> *reductionScalableFlags = nullptr) {
@@ -900,9 +900,8 @@ static void splitParallelAndReductionTiles(
     reductionScalableFlags->assign(parallelScalableFlags->begin(),
                                    parallelScalableFlags->end());
   }
-  TilingInterface tilingOp = cast<TilingInterface>(op);
   for (auto [index, iteratorType] :
-       llvm::enumerate(tilingOp.getLoopIteratorTypes())) {
+       llvm::enumerate(op.getIteratorTypesArray())) {
     if (iteratorType == utils::IteratorType::parallel) {
       reductionSizes[index] = 0;
       if (reductionScalableFlags)
@@ -1122,9 +1121,9 @@ setMatmulRootConfig(mlir::FunctionOpInterface entryPointFn,
   SmallVector<int64_t> parallelTileSizes = vecTileSizes;
   SmallVector<int64_t> reductionTileSizes;
   SmallVector<bool> reductionScalableFlags;
-  splitParallelAndReductionTiles(op, parallelTileSizes, reductionTileSizes,
-                                 &parallelScalableFlags,
-                                 &reductionScalableFlags);
+  splitParallelAndReductionTiles(
+      cast<linalg::LinalgOp>(op.getOperation()), parallelTileSizes,
+      reductionTileSizes, &parallelScalableFlags, &reductionScalableFlags);
 
   if (vecPreProcStrategy == VectorPreProcStrategy::None) {
     setVectorSizesForDynamicShapes(cast<linalg::LinalgOp>(op.getOperation()),
@@ -1752,13 +1751,14 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
 
   // Batch, M and N (parallel dimensions) are distributed on workgroups.
   DistributionHeuristicConfig config;
-  SmallVector<int64_t> distTileSizes =
-      getDefaultDistributedLevelTileSizes(attnOp, config);
+  SmallVector<int64_t> distTileSizes = getDefaultDistributedLevelTileSizes(
+      attnOp, DistributionHeuristicConfig{});
 
   // Batch, M and N (parallel dimensions) are distributed on workgroups.
   SmallVector<int64_t> vecTileSizes(attnOp.getIterationDomainRank(), 1);
-  // Mark k1 reduction dimensions not to distribute.
-  for (int i : opInfo.getK1Dims()) {
+  // Mark reduction dimensions not to distribute.
+  for (int64_t i :
+       llvm::concat<const int64_t>(opInfo.getK1Dims(), opInfo.getK2Dims())) {
     vecTileSizes[i] = 0;
   }
   int64_t vectorSize = getVectorSize(entryPointFn, attnOp.getOutputType());
@@ -1773,17 +1773,18 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
         /*numElem=*/tileSize, vectorSize, vectorSize);
   }
 
-  SmallVector<int64_t> parallelTileSizes = vecTileSizes;
-  SmallVector<int64_t> reductionTileSizes;
-  splitParallelAndReductionTiles(attnOp, parallelTileSizes, reductionTileSizes);
+  // TODO (17467): Due to a bug in TileAndDecomposeAttention, N dimension
+  // cannot be tiled. Remove this once fixed.
+  for (int64_t i : opInfo.getNDims()) {
+    distTileSizes[i] = 0;
+    vecTileSizes[i] = 0;
+  }
 
-  LLVM_DEBUG(KD_DBGS() << "Vectorization/unrolling tile sizes (parallel): "
-                       << parallelTileSizes << "\n");
-  LLVM_DEBUG(KD_DBGS() << "Vectorization/unrolling tile sizes (reduction): "
-                       << reductionTileSizes << "\n");
+  TileSizesListType tileSizes = {distTileSizes, vecTileSizes};
 
-  TileSizesListType tileSizes = {distTileSizes, parallelTileSizes,
-                                 reductionTileSizes};
+  // TODO: (Groverkss): Tile K2 here using reduction tiling interface once we
+  // have it. TileAndDecomposeAttention pass only tiles K2. I think it should
+  // be possible to tile K1 also, but need to explore it more.
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, attnOp, tileSizes,
@@ -1842,9 +1843,6 @@ setWinogradRootConfig(mlir::FunctionOpInterface entryPointFn,
   tileSizes.push_back(distTileSizes);
   SmallVector<int64_t> vecTileSizes(iterationRank, 1);
   tileSizes.push_back(vecTileSizes);
-  // Dummy tiling config for reduction level.
-  SmallVector<int64_t> reductionTileSizes(iterationRank, 0);
-  tileSizes.push_back(reductionTileSizes);
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, winogradOp, tileSizes,
       DispatchLoweringPassPipeline::CPULinalgExtTileAndVectorize);

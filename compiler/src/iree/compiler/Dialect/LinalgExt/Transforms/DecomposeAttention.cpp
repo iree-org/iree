@@ -366,16 +366,6 @@ void DecomposeAttentionPass::runOnOperation() {
     SmallVector<Operation *> ops;
     decomposeTiledAttention(attnOp, ops, rewriter, optionalTileSize);
   });
-  getOperation().walk([&](OnlineAttentionOp onlineAtt) {
-    rewriter.setInsertionPoint(onlineAtt);
-    FailureOr<SmallVector<Value>> results =
-        onlineAtt.decomposeOperation(rewriter);
-    if (failed(results)) {
-      onlineAtt->emitOpError("Could not decompose online attention");
-      return signalPassFailure();
-    }
-    rewriter.replaceOp(onlineAtt, results.value());
-  });
 }
 
 std::unique_ptr<Pass> createDecomposeAttentionPass() {
