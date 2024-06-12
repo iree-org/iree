@@ -90,7 +90,7 @@ jobs:
         uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
         with:
           repository: nod-ai/SHARK-TestSuite
-          ref: c9b3337e1f754c83d178568be1339aaef5f08045
+          ref: bb7ed3e264f9bad68aabfa8be4298bf8a0ce2b63
           path: SHARK-TestSuite
           submodules: false
           lfs: false
@@ -138,14 +138,16 @@ jobs:
           # CPU
           - name: cpu_llvm_task
             models-config-file: pytorch_models_cpu_llvm_task.json
-            sdxl-config-file: sdxl_scheduled_unet_cpu_llvm_task.json
+            sdxl-unet-config-file: sdxl_scheduled_unet_cpu_llvm_task.json
             runs-on: nodai-amdgpu-w7900-x86-64
 
           # AMD GPU
           - name: amdgpu_rocm_gfx90a
             models-config-file: pytorch_models_gpu_rocm_gfx90a.json
             models-extra-flags-config-file: pytorch_models_gpu_rocm_gfx90a_additional_flags.json
-            sdxl-config-file: sdxl_scheduled_unet_gpu_rocm_gfx90a.json
+            sdxl-unet-config-file: sdxl_scheduled_unet_gpu_rocm_gfx90a.json
+            sdxl-vae-config-file: sdxl_vae_decode_gpu_rocm_gfx90a.json
+            sdxl-clip-config-file: sdxl_prompt_encoder_gpu_rocm_gfx90a.json
             runs-on: nodai-amdgpu-mi250-x86-64
           - name: amdgpu_vulkan
             models-config-file: pytorch_models_gpu_vulkan.json
@@ -166,7 +168,9 @@ jobs:
       IREE_TEST_PATH_EXTENSION: ${{ github.workspace }}/build_tools/pkgci/external_test_suite
       MODELS_CONFIG_FILE_PATH: build_tools/pkgci/external_test_suite/${{ matrix.models-config-file }}
       MODELS_EXTRA_FLAGS_CONFIG_FILE_PATH: build_tools/pkgci/external_test_suite/${{ matrix.models-extra-flags-config-file }}
-      SDXL_CONFIG_FILE_PATH: build_tools/pkgci/external_test_suite/${{ matrix.sdxl-config-file }}
+      SDXL_UNET_CONFIG_FILE_PATH: build_tools/pkgci/external_test_suite/${{ matrix.sdxl-unet-config-file }}
+      SDXL_CLIP_CONFIG_FILE_PATH: build_tools/pkgci/external_test_suite/${{ matrix.sdxl-clip-config-file }}
+      SDXL_VAE_CONFIG_FILE_PATH: build_tools/pkgci/external_test_suite/${{ matrix.sdxl-vae-config-file }}
       VENV_DIR: ${{ github.workspace }}/venv
     steps:
       - name: Checking out IREE repository
@@ -201,7 +205,7 @@ jobs:
         uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
         with:
           repository: nod-ai/SHARK-TestSuite
-          ref: c9b3337e1f754c83d178568be1339aaef5f08045
+          ref: bb7ed3e264f9bad68aabfa8be4298bf8a0ce2b63
           path: SHARK-TestSuite
           submodules: false
           lfs: true
@@ -254,10 +258,49 @@ jobs:
             --log-cli-level=info \
             --timeout=1200 \
             --durations=0 \
-            --config-files=${SDXL_CONFIG_FILE_PATH}
+            --config-files=${SDXL_UNET_CONFIG_FILE_PATH}
+      
+      - name: "Run external tests - SDXL prompt encoder"
+        if: "matrix.sdxl-config-file != '' && !cancelled()"
+        run: |
+          source ${VENV_DIR}/bin/activate
+          pytest SHARK-TestSuite/iree_tests/pytorch/models/sdxl-prompt-encoder-tank \
+            -rpfE \
+            -k real_weights \
+            --no-skip-tests-missing-files \
+            --capture=no \
+            --log-cli-level=info \
+            --timeout=1200 \
+            --durations=0 \
+            --config-files=${SDXL_CLIP_CONFIG_FILE_PATH}
+      
+      - name: "Run external tests - SDXL vae decode"
+        if: "matrix.sdxl-config-file != '' && !cancelled()"
+        run: |
+          source ${VENV_DIR}/bin/activate
+          pytest SHARK-TestSuite/iree_tests/pytorch/models/sdxl-vae-decode-tank \
+            -rpfE \
+            -k real_weights \
+            --no-skip-tests-missing-files \
+            --capture=no \
+            --log-cli-level=info \
+            --timeout=1200 \
+            --durations=0 \
+            --config-files=${SDXL_VAE_CONFIG_FILE_PATH}
 
       - name: "Running SDXL rocm pipeline benchmark"
         if: contains(matrix.name, 'rocm')
         run: |
           source ${VENV_DIR}/bin/activate
-          bash SHARK-TestSuite/iree_tests/benchmarks/benchmark_sdxl_rocm.sh
+          pytest SHARK-TestSuite/iree_tests/benchmarks/benchmark_sdxl_rocm.py \
+            --goldentime-rocm-e2e-ms 1661.5 \
+            --goldentime-rocm-unet-ms 450.5 \
+            --goldentime-rocm-clip-ms 19 \
+            --goldentime-rocm-vae-ms 288.5 \
+            --gpu-number 6 \
+            --rocm-chip gfx90a \
+            --log-cli-level=info \
+            --retries 3
+          echo "### SDXL Benchmark Summary:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY # this is a blank line
+          echo "$(<job_summary.txt )" >> $GITHUB_STEP_SUMMARY
