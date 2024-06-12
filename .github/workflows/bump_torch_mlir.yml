@@ -48,13 +48,13 @@ jobs:
         id: bump_submodule
         run: |
           cd third_party/torch-mlir
-          bump_target=${{ github.event.inputs.bump_target }}
-          git fetch ${bump_target//\// }
           if [ "workflow_dispatch" == "workflow_dispatch" ]; then
-            git checkout ${{ github.event.inputs.bump_target }} || { echo "Checkout failed. Available remotes:"; git remote -v; exit 1; }
+            bump_target=${{ github.event.inputs.bump_target }}
           else
-            git checkout origin/main
+            bump_target=origin/main
           fi
+          git fetch ${bump_target//\// }
+          git checkout FETCH_HEAD
           TORCH_MLIR_COMMIT=$(git rev-parse HEAD)
           cd ../..
           git add third_party/torch-mlir
