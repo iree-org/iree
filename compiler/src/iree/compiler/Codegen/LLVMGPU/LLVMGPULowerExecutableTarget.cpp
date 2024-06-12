@@ -87,20 +87,22 @@ getPipelineOptions(FunctionOpInterface funcOp,
     if (config.contains(LLVMGPUAttrNames::kNoReduceSharedMemoryBankConflicts))
       pipelineOptions.enableReduceSharedMemoryBankConflicts = false;
     if (config.contains(LLVMGPUAttrNames::kReorderWorkgroups)) {
-      // Get the workgroups reorder config and enable the workgroup reordering
-      Attribute reorderGroupOption =
+      // Get the workgroups reorder config and enable the workgroup reordering.
+      Attribute reorderWorkgroupOption =
           config.get(LLVMGPUAttrNames::kReorderWorkgroups);
-      assert(isa<StringAttr>(reorderGroupOption) &&
-             "reorder strategy should be a StringAttr");
-      StringRef reorderStr =
-          llvm::cast<StringAttr>(reorderGroupOption).getValue();
+      if (!isa<StringAttr>(reorderWorkgroupOption))
+        funcOp.emitOpError() << "'" << LLVMGPUAttrNames::kReorderWorkgroups
+                             << "' is expected to be a string attribute";
+      StringRef reorderStr = llvm::cast<StringAttr>(reorderWorkgroupOption);
       if (reorderStr == "transpose") {
         pipelineOptions.reorderStrategy = ReorderWorkgrupsStrategy::Transpose;
       } else if (reorderStr == "swizzle") {
         pipelineOptions.reorderStrategy = ReorderWorkgrupsStrategy::Swizzle;
       } else {
         if (reorderStr != "none")
-          funcOp.emitOpError("Unhandled reorder option");
+          funcOp.emitOpError()
+              << "Unknown " << LLVMGPUAttrNames::kReorderWorkgroups
+              << "value: " << reorderWorkgroupOption;
         else
           pipelineOptions.reorderStrategy = ReorderWorkgrupsStrategy::None;
       }

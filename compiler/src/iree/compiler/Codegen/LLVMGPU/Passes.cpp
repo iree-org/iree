@@ -77,7 +77,7 @@ static llvm::cl::opt<bool> clLLVMGPUEnablePrefetch(
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const LLVMGPUPipelineOptions &options) {
-  StringRef reorderStr = "< not set >";
+  StringRef reorderStr = "<not set>";
   if (options.reorderStrategy) {
     if (options.reorderStrategy == ReorderWorkgrupsStrategy::Transpose) {
       reorderStr = "transpose";
@@ -92,7 +92,7 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 
   return os << "{" << "enableReduceSharedMemoryBankConflicts = "
             << options.enableReduceSharedMemoryBankConflicts
-            << ", ReorderWorkgroupsStrategy = " << reorderStr
+            << ", reorderWorkgroupsStrategy = " << reorderStr
             << ", enableUkernels = " << options.enableUkernels << "}";
 }
 
@@ -181,6 +181,13 @@ static LogicalResult canReorderWorkgroups(FunctionOpInterface funcOp) {
   // This is further restricted to 2D+ grids as we reorder along the X and Y
   // workgroup IDs.
   return success(workgroupCounts.size() >= 2);
+}
+
+static ReorderWorkgrupsStrategy getWorkgroupsReoderStrategy(
+    const std::optional<ReorderWorkgrupsStrategy> &option) {
+  if (option)
+    return *option;
+  return clReorderWorkgroupsStrategy;
 }
 
 //===----------------------------------------------------------------------===//
@@ -334,15 +341,11 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &funcPassManager,
     funcPassManager.addPass(createGPUReduceBankConflictsPass());
   }
 
-  if (options.reorderStrategy) {
-    funcPassManager.addPass(createReorderWorkgroups(
-        options.reorderStrategy.value(), clReorderWorkgroupsLogSwizzleTile,
-        canReorderWorkgroups));
-  } else if (clReorderWorkgroupsStrategy != ReorderWorkgrupsStrategy::None) {
-    funcPassManager.addPass(createReorderWorkgroups(
-        clReorderWorkgroupsStrategy, clReorderWorkgroupsLogSwizzleTile,
-        canReorderWorkgroups));
-  }
+  ReorderWorkgrupsStrategy reorderStrategy =
+      getWorkgroupsReoderStrategy(options.reorderStrategy);
+  funcPassManager.addPass(createReorderWorkgroups(
+      reorderStrategy, clReorderWorkgroupsLogSwizzleTile,
+      canReorderWorkgroups));
 
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
@@ -386,15 +389,12 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createCSEPass());
 
   funcPassManager.addPass(createRemoveSingleIterationLoopPass());
-  if (options.reorderStrategy) {
-    funcPassManager.addPass(createReorderWorkgroups(
-        options.reorderStrategy.value(), clReorderWorkgroupsLogSwizzleTile,
-        canReorderWorkgroups));
-  } else if (clReorderWorkgroupsStrategy != ReorderWorkgrupsStrategy::None) {
-    funcPassManager.addPass(createReorderWorkgroups(
-        clReorderWorkgroupsStrategy, clReorderWorkgroupsLogSwizzleTile,
-        canReorderWorkgroups));
-  }
+
+  ReorderWorkgrupsStrategy reorderStrategy =
+      getWorkgroupsReoderStrategy(options.reorderStrategy);
+  funcPassManager.addPass(createReorderWorkgroups(
+      reorderStrategy, clReorderWorkgroupsLogSwizzleTile,
+      canReorderWorkgroups));
 
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
@@ -457,15 +457,12 @@ void addGPUMatmulTensorCoreMmaSyncPassPipeline(
   funcPassManager.addPass(createCSEPass());
 
   funcPassManager.addPass(createRemoveSingleIterationLoopPass());
-  if (options.reorderStrategy) {
-    funcPassManager.addPass(createReorderWorkgroups(
-        options.reorderStrategy.value(), clReorderWorkgroupsLogSwizzleTile,
-        canReorderWorkgroups));
-  } else if (clReorderWorkgroupsStrategy != ReorderWorkgrupsStrategy::None) {
-    funcPassManager.addPass(createReorderWorkgroups(
-        clReorderWorkgroupsStrategy, clReorderWorkgroupsLogSwizzleTile,
-        canReorderWorkgroups));
-  }
+
+  ReorderWorkgrupsStrategy reorderStrategy =
+      getWorkgroupsReoderStrategy(options.reorderStrategy);
+  funcPassManager.addPass(createReorderWorkgroups(
+      reorderStrategy, clReorderWorkgroupsLogSwizzleTile,
+      canReorderWorkgroups));
 
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
@@ -619,15 +616,12 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
                                         const LLVMGPUPipelineOptions &options,
                                         bool usePadToModelSharedMemcpy) {
   tileAndDistributeToWorkgroup(funcPassManager);
-  if (options.reorderStrategy) {
-    funcPassManager.addPass(createReorderWorkgroups(
-        options.reorderStrategy.value(), clReorderWorkgroupsLogSwizzleTile,
-        canReorderWorkgroups));
-  } else if (clReorderWorkgroupsStrategy != ReorderWorkgrupsStrategy::None) {
-    funcPassManager.addPass(createReorderWorkgroups(
-        clReorderWorkgroupsStrategy, clReorderWorkgroupsLogSwizzleTile,
-        canReorderWorkgroups));
-  }
+
+  ReorderWorkgrupsStrategy reorderStrategy =
+      getWorkgroupsReoderStrategy(options.reorderStrategy);
+  funcPassManager.addPass(createReorderWorkgroups(
+      reorderStrategy, clReorderWorkgroupsLogSwizzleTile,
+      canReorderWorkgroups));
 
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
