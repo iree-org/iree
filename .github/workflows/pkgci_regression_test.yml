@@ -247,7 +247,7 @@ jobs:
             --config-files=${MODELS_EXTRA_FLAGS_CONFIG_FILE_PATH}
 
       - name: "Run external tests - SDXL scheduled unet"
-        if: "matrix.sdxl-config-file != '' && !cancelled()"
+        if: "matrix.sdxl-unet-config-file != '' && !cancelled()"
         run: |
           source ${VENV_DIR}/bin/activate
           pytest SHARK-TestSuite/iree_tests/pytorch/models/sdxl-scheduled-unet-3-tank \
@@ -261,7 +261,7 @@ jobs:
             --config-files=${SDXL_UNET_CONFIG_FILE_PATH}
       
       - name: "Run external tests - SDXL prompt encoder"
-        if: "matrix.sdxl-config-file != '' && !cancelled()"
+        if: "matrix.sdxl-clip-config-file != '' && !cancelled()"
         run: |
           source ${VENV_DIR}/bin/activate
           pytest SHARK-TestSuite/iree_tests/pytorch/models/sdxl-prompt-encoder-tank \
@@ -275,7 +275,7 @@ jobs:
             --config-files=${SDXL_CLIP_CONFIG_FILE_PATH}
       
       - name: "Run external tests - SDXL vae decode"
-        if: "matrix.sdxl-config-file != '' && !cancelled()"
+        if: "matrix.sdxl-vae-config-file != '' && !cancelled()"
         run: |
           source ${VENV_DIR}/bin/activate
           pytest SHARK-TestSuite/iree_tests/pytorch/models/sdxl-vae-decode-tank \
