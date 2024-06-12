@@ -29,7 +29,6 @@ iree_td_library(
         "@llvm-project//mlir:ControlFlowInterfacesTdFiles",
         "@llvm-project//mlir:DestinationStyleOpInterfaceTdFiles",
         "@llvm-project//mlir:InferTypeOpInterfaceTdFiles",
-        "@llvm-project//mlir:LinalgOpsTdFiles",
         "@llvm-project//mlir:OpBaseTdFiles",
         "@llvm-project//mlir:PDLDialectTdFiles",
         "@llvm-project//mlir:SideEffectInterfacesTdFiles",
@@ -160,9 +159,7 @@ iree_gentbl_cc_library(
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "LinalgExtOps.td",
-    deps = [
-        ":td_files",
-    ],
+    deps = [":td_files"],
 )
 
 iree_gentbl_cc_library(
@@ -215,7 +212,5 @@ iree_tablegen_doc(
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "LinalgExtOps.td",
-    deps = [
-        ":td_files",
-    ],
+    deps = [":td_files"],
 )
