@@ -16,6 +16,13 @@
 #include "iree/base/internal/flags.h"
 #include "iree/hal/drivers/init.h"
 
+namespace {
+// Stable storage for flag processing.  Flag handling uses string views,
+// expecting the caller to keep the original strings around for as long
+// as the flags are in use.
+std::vector<std::string> alloced_flags;
+}  // namespace
+
 namespace iree {
 namespace python {
 
@@ -35,7 +42,7 @@ NB_MODULE(_runtime, m) {
   SetupVmBindings(m);
 
   m.def("parse_flags", [](py::args py_flags) {
-    std::vector<std::string> alloced_flags;
+    alloced_flags.clear();
     alloced_flags.push_back("python");
     for (py::handle py_flag : py_flags) {
       alloced_flags.push_back(py::cast<std::string>(py_flag));
