@@ -523,7 +523,7 @@ module attributes { transform.with_named_sequence } {
         {mma_schedule = #iree_gpu.mma_schedule<
            intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
            subgroup_m_count = 1, subgroup_n_count = 2>
-         , llvm_func_attrs = {"amdgpu-waves-per-eu" = "1"}}>
+         , no_reorder_workgroups, llvm_func_attrs = {"amdgpu-waves-per-eu" = "1"}}>
       > -> !transform.any_param
     transform.yield %matmul, %config : !transform.any_op, !transform.any_param
   }
@@ -541,7 +541,7 @@ module attributes { transform.with_named_sequence } {
         {mma_schedule = #iree_gpu.mma_schedule<
            intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
            subgroup_m_count = 2, subgroup_n_count = 1>
-         , llvm_func_attrs = {"amdgpu-waves-per-eu" = "1"}}>
+         , no_reorder_workgroups, llvm_func_attrs = {"amdgpu-waves-per-eu" = "1"}}>
       > -> !transform.any_param
     transform.yield %matmul, %config : !transform.any_op, !transform.any_param
   }
@@ -613,7 +613,7 @@ module attributes { transform.with_named_sequence } {
         {mma_schedule = #iree_gpu.mma_schedule<
            intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
            subgroup_m_count = 4, subgroup_n_count = 1>
-         , llvm_func_attrs = {"amdgpu-waves-per-eu" = "1"}}>
+         , no_reorder_workgroups, llvm_func_attrs = {"amdgpu-waves-per-eu" = "1"}}>
       > -> !transform.any_param
     transform.yield %matmul, %config : !transform.any_op, !transform.any_param
   }
@@ -637,7 +637,7 @@ module attributes { transform.with_named_sequence } {
           {mma_schedule = #iree_gpu.mma_schedule<
               intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
               subgroup_m_count = 1, subgroup_n_count = 5>
-           , reorder_workgroups = "transpose"}>
+          }>
       > -> !transform.any_param
     transform.yield %conv, %config : !transform.any_op, !transform.any_param
   }
@@ -657,7 +657,7 @@ module attributes { transform.with_named_sequence } {
           {mma_schedule = #iree_gpu.mma_schedule<
               intrinsic = #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>,
               subgroup_m_count = 1, subgroup_n_count = 4>
-           , reorder_workgroups = "transpose", llvm_func_attrs = {"amdgpu-waves-per-eu" = "1"}}>
+          , llvm_func_attrs = {"amdgpu-waves-per-eu" = "1"}}>
       > -> !transform.any_param
     transform.yield %conv, %config : !transform.any_op, !transform.any_param
   }
@@ -677,7 +677,7 @@ module attributes { transform.with_named_sequence } {
           {mma_schedule = #iree_gpu.mma_schedule<
               intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
               subgroup_m_count = 1, subgroup_n_count = 5>
-           , reorder_workgroups = "transpose"}>
+          , no_reorder_workgroups}>
       > -> !transform.any_param
     transform.yield %conv, %config : !transform.any_op, !transform.any_param
   }
@@ -697,7 +697,7 @@ module attributes { transform.with_named_sequence } {
           {mma_schedule = #iree_gpu.mma_schedule<
               intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
               subgroup_m_count = 1, subgroup_n_count = 5>
-           , reorder_workgroups = "transpose"}>
+          }>
       > -> !transform.any_param
     transform.yield %conv, %config : !transform.any_op, !transform.any_param
   }
@@ -717,7 +717,7 @@ module attributes { transform.with_named_sequence } {
           {mma_schedule = #iree_gpu.mma_schedule<
               intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
               subgroup_m_count = 4, subgroup_n_count = 2>
-           , reorder_workgroups = "transpose", llvm_func_attrs = {"amdgpu-waves-per-eu" = "1"}}>
+          , llvm_func_attrs = {"amdgpu-waves-per-eu" = "1"}}>
       > -> !transform.any_param
     transform.yield %conv, %config : !transform.any_op, !transform.any_param
   }
@@ -737,7 +737,7 @@ module attributes { transform.with_named_sequence } {
           {mma_schedule = #iree_gpu.mma_schedule<
               intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
               subgroup_m_count = 1, subgroup_n_count = 5>
-           , reorder_workgroups = "transpose"}>
+          , no_reorder_workgroups}>
       > -> !transform.any_param
     transform.yield %conv, %config : !transform.any_op, !transform.any_param
   }
@@ -781,7 +781,7 @@ module attributes { transform.with_named_sequence } {
           {mma_schedule = #iree_gpu.mma_schedule<
               intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
               subgroup_m_count = 4, subgroup_n_count = 1>
-          }>
+          , no_reorder_workgroups}>
       > -> !transform.any_param
     transform.yield %batch_matmul, %config : !transform.any_op, !transform.any_param
   }
@@ -801,7 +801,7 @@ module attributes { transform.with_named_sequence } {
           {mma_schedule = #iree_gpu.mma_schedule<
               intrinsic = #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>,
               subgroup_m_count = 4, subgroup_n_count = 1>
-           , llvm_func_attrs = {"amdgpu-waves-per-eu" = "4"}}>
+          , no_reorder_workgroups, llvm_func_attrs = {"amdgpu-waves-per-eu" = "4"}}>
       > -> !transform.any_param
     transform.yield %batch_matmul, %config : !transform.any_op, !transform.any_param
   }
@@ -821,7 +821,7 @@ module attributes { transform.with_named_sequence } {
           {mma_schedule = #iree_gpu.mma_schedule<
               intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
               subgroup_m_count = 2, subgroup_n_count = 2>
-           , llvm_func_attrs = {"amdgpu-waves-per-eu" = "1"}}>
+          , llvm_func_attrs = {"amdgpu-waves-per-eu" = "1"}}>
       > -> !transform.any_param
     transform.yield %batch_matmul, %config : !transform.any_op, !transform.any_param
   }
@@ -841,7 +841,7 @@ module attributes { transform.with_named_sequence } {
           {mma_schedule = #iree_gpu.mma_schedule<
               intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
               subgroup_m_count = 2, subgroup_n_count = 2>
-          }>
+          , no_reorder_workgroups}>
       > -> !transform.any_param
     transform.yield %batch_matmul, %config : !transform.any_op, !transform.any_param
   }
@@ -861,7 +861,7 @@ module attributes { transform.with_named_sequence } {
           {mma_schedule = #iree_gpu.mma_schedule<
               intrinsic = #iree_gpu.mma_layout<MFMA_F16_32x32x8_F32>,
               subgroup_m_count = 2, subgroup_n_count = 2>
-          }>
+          , no_reorder_workgroups}>
       > -> !transform.any_param
     transform.yield %batch_matmul, %config : !transform.any_op, !transform.any_param
   }
