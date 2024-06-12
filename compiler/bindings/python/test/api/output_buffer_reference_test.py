@@ -21,6 +21,7 @@ from iree.runtime import (
     VmContext,
     VmInstance,
     VmModule,
+    load_vm_module,
 )
 
 
@@ -59,7 +60,7 @@ def run_mmap_free_before_context_test():
     output.write(vmfb_contents)
     mapped_memory = output.map_memory()
     module = VmModule.wrap_buffer(instance, mapped_memory)
-    context = VmContext(instance, modules=[module])
+    loaded_module = load_vm_module(module)
     # Shutdown in the most egregious way possible.
     # Note that during context destruction, the context needs some final
     # access to the mapped memory to run destructors. It is easy for the
