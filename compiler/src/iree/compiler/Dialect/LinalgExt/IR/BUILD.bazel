@@ -159,7 +159,10 @@ iree_gentbl_cc_library(
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "LinalgExtOps.td",
-    deps = [":td_files"],
+    deps = [
+        "mlir:LinalgOpsTdFiles",
+        ":td_files",
+    ],
 )
 
 iree_gentbl_cc_library(
@@ -212,5 +215,8 @@ iree_tablegen_doc(
     ],
     tblgen = "@llvm-project//mlir:mlir-tblgen",
     td_file = "LinalgExtOps.td",
-    deps = [":td_files"],
+    deps = [
+        "mlir:LinalgOpsTdFiles",
+        ":td_files",
+    ],
 )
