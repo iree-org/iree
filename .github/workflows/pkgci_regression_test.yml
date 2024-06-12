@@ -139,6 +139,8 @@ jobs:
           - name: cpu_llvm_task
             models-config-file: pytorch_models_cpu_llvm_task.json
             sdxl-unet-config-file: sdxl_scheduled_unet_cpu_llvm_task.json
+            sdxl-vae-config-file: sdxl_vae_decode_cpu_llvm_task.json
+            sdxl-clip-config-file: sdxl_prompt_encoder_cpu_llvm_task.json
             runs-on: nodai-amdgpu-w7900-x86-64
 
           # AMD GPU
