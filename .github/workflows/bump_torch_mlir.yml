@@ -65,7 +65,6 @@ jobs:
         uses: peter-evans/create-pull-request@v6.0.5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          base: main
           branch: integrates/torch-mlir
           delete-branch: true # automatically supercedes the previous bump
           title: 'Bump torch-mlir submodule to ${{ steps.bump_submodule.outputs.TORCH_MLIR_COMMIT }}'
