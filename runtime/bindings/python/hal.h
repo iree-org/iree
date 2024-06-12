@@ -145,7 +145,7 @@ class HalDriver : public ApiRefCounted<HalDriver, iree_hal_driver_t> {
  public:
   static std::vector<std::string> Query();
   static py::object Create(const std::string& device_uri,
-                           py::dict& driver_cache);
+                           py::dict& driver_cache, std::optional<bool> clean);
 
   py::list QueryAvailableDevices();
   HalDevice CreateDefaultDevice(std::optional<py::list> allocators);

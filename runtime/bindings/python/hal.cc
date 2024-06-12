@@ -906,16 +906,19 @@ std::vector<std::string> HalDriver::Query() {
 }
 
 py::object HalDriver::Create(const std::string& device_uri,
-                             py::dict& driver_cache) {
+                             py::dict& driver_cache,
+                             std::optional<bool> clean) {
   iree_string_view_t driver_name, device_path, params_str;
   iree_string_view_t device_uri_sv{
       device_uri.data(), static_cast<iree_host_size_t>(device_uri.size())};
   iree_uri_split(device_uri_sv, &driver_name, &device_path, &params_str);
 
-  // Check cache.
+  // Check cache.  Use the cached value if present and there is no request
+  // to clean out the old value.
   py::str cache_key(driver_name.data, driver_name.size);
   py::object cached = driver_cache.attr("get")(cache_key);
-  if (!cached.is_none()) {
+  bool clean_requested = clean.has_value() && clean.value();
+  if (!clean_requested && !cached.is_none()) {
     return cached;
   }
 
@@ -1026,7 +1029,8 @@ HalDevice HalDriver::CreateDevice(iree_hal_device_id_t device_id,
   std::vector<iree_string_pair_t> params;
   iree_hal_device_t* device;
   CheckApiStatus(iree_hal_driver_create_device_by_id(
-                     raw_ptr(), device_id, params.size(), &params.front(),
+                     raw_ptr(), device_id, params.size(),
+                     (params.empty() ? nullptr : &params.front()),
                      iree_allocator_system(), &device),
                  "Error creating default device");
   CheckApiStatus(ConfigureDevice(device, allocators),
@@ -1283,11 +1287,11 @@ void SetupHalBindings(nanobind::module_ m) {
 
   m.def(
       "get_cached_hal_driver",
-      [driver_cache](std::string device_uri) {
+      [driver_cache](std::string device_uri, std::optional<bool> clean) {
         return HalDriver::Create(device_uri,
-                                 const_cast<py::dict&>(driver_cache));
+                                 const_cast<py::dict&>(driver_cache), clean);
       },
-      py::arg("device_uri"));
+      py::arg("device_uri"), py::arg("clean") = py::none());
 
   py::class_<HalAllocator>(m, "HalAllocator")
       .def("trim",
