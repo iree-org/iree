@@ -12,6 +12,7 @@
 #ifndef IREE_COMPILER_CODEGEN_LLVMGPU_PASSES_H_
 #define IREE_COMPILER_CODEGEN_LLVMGPU_PASSES_H_
 
+#include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "mlir/Pass/Pass.h"
 
@@ -31,13 +32,13 @@ inline constexpr StringLiteral kNoReduceSharedMemoryBankConflicts =
 } //  namespace LLVMGPUAttrNames
 
 struct LLVMGPUPipelineOptions {
-  enum reorderWorkGroupOption { None, Transpose, Swizzle };
+  //   enum reorderWorkGroupsOption { None, Transpose, Swizzle };
 
   bool enableReduceSharedMemoryBankConflicts = true;
-  bool enableReorderWorkgroups = false;
   bool enableUkernels = false;
 
-  reorderWorkGroupOption reorderOption = None;
+  //   reorderWorkGroupOption reorderOption = None;
+  std::optional<ReorderWorkgrupsStrategy> reorderStrategy;
 };
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,

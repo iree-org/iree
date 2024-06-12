@@ -2,11 +2,20 @@
 // RUN:   --iree-codegen-reorder-workgroups-strategy=transpose \
 // RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-llvmgpu-select-lowering-strategy, func.func(iree-llvmgpu-lower-executable-target)))))" %s | FileCheck %s
 
+// A new test that disables the global CLI flag (--iree-codegen-reorder-workgroups-strategy) and checks that applying reorder_workgroups = "transpose" enables workgroup reordering.
+
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx942 --iree-codegen-llvmgpu-use-vector-distribution \
+// RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-llvmgpu-select-lowering-strategy, func.func(iree-llvmgpu-lower-executable-target)))))" %s | FileCheck %s --check-prefix=RWP
+
 // Check that applying the `no_reduce_shared_memory_bank_conflicts` unit attribute disables shared memory padding.
 
 // CHECK:       #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [128, 2, 1] subgroup_size = 64
 // CHECK-SAME:    mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
 // CHECK-SAME:    no_reduce_shared_memory_bank_conflicts
+
+// RWP:       #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [128, 2, 1] subgroup_size = 64
+// RWP-SAME:    mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+// RWP-SAME:    no_reduce_shared_memory_bank_conflicts
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -30,6 +39,13 @@ hal.executable public @main_0_dispatch_0 {
       // CHECK-DAG:     arith.muli %[[WG_Y]], %{{.+}} : index
       // CHECK-DAG:     arith.addi %{{.+}}, %[[WG_X]] : index
       // CHECK:         scf.for
+
+      // RWP-LABEL: func.func @main_0_dispatch_0_matmul_transpose_b
+      // RWP:         memref.alloc() : memref<128x32xf16, #gpu.address_space<workgroup>>
+      // RWP:         memref.alloc() : memref<128x32xf16, #gpu.address_space<workgroup>>
+      // RWP-DAG:     %[[WG_Y:.+]] = hal.interface.workgroup.id[1] : index
+      // RWP-DAG:     %[[WG_X:.+]] = hal.interface.workgroup.id[0] : index
+      // RWP:         scf.for
 
       func.func @main_0_dispatch_0_matmul_transpose_b_2048x10240x1280_f16xf16xf32()
         attributes {translation_info = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [128, 2, 1] subgroup_size = 64, {
@@ -72,6 +88,10 @@ hal.executable public @main_0_dispatch_0 {
 // CHECK:       #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [128, 2, 1] subgroup_size = 64
 // CHECK-SAME:    mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
 // CHECK-SAME:    reorder_workgroups = "transpose"
+
+// RWP:       #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [128, 2, 1] subgroup_size = 64
+// RWP-SAME:    mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+// RWP-SAME:    reorder_workgroups = "transpose"
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
     #hal.descriptor_set.binding<0, storage_buffer>,
@@ -95,7 +115,15 @@ hal.executable public @main_0_dispatch_0 {
       // CHECK-DAG:     arith.muli %[[WG_Y]], %{{.+}} : index
       // CHECK-DAG:     arith.addi %{{.+}}, %[[WG_X]] : index
       // CHECK:         scf.for
-      
+
+      // RWP-LABEL: func.func @main_0_dispatch_0_matmul_transpose_b
+      // RWP:         memref.alloc() : memref<128x36xf16, #gpu.address_space<workgroup>>
+      // RWP:         memref.alloc() : memref<128x36xf16, #gpu.address_space<workgroup>>
+      // RWP-DAG:     %[[WG_Y:.+]] = hal.interface.workgroup.id[1] : index
+      // RWP-DAG:     %[[WG_X:.+]] = hal.interface.workgroup.id[0] : index
+      // RWP-DAG:     arith.muli %[[WG_Y]], %{{.+}} : index
+      // RWP-DAG:     arith.addi %{{.+}}, %[[WG_X]] : index
+      // RWP:         scf.for  
       func.func @main_0_dispatch_0_matmul_transpose_b_2048x10240x1280_f16xf16xf32()
         attributes {translation_info = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [128, 2, 1] subgroup_size = 64, {
           mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, subgroup_m_count = 2, subgroup_n_count = 2>,
