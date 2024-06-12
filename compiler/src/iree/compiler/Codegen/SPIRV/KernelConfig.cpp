@@ -922,7 +922,7 @@ LogicalResult setCooperativeMatrixConfig(
   }
 
   // Infer if lhs or rhs is transposed to help generate better schedule.
-  auto maps = op.getIndexingMapsArray();
+  SmallVector<AffineMap> maps = op.getIndexingMapsArray();
   bool transposedLhs =
       kIndex !=
       llvm::cast<AffineDimExpr>(maps[0].getResults().back()).getPosition();

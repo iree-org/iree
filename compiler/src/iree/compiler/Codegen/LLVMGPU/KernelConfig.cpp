@@ -469,7 +469,7 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   auto pipeline = CodeGenPipeline::LLVMGPUVectorDistribute;
 
   // Infer if lhs or rhs is transposed to help generate better schedule.
-  auto maps = op.getIndexingMapsArray();
+  SmallVector<AffineMap> maps = op.getIndexingMapsArray();
   bool transposedLhs =
       kDim !=
       llvm::cast<AffineDimExpr>(maps[0].getResults().back()).getPosition();
