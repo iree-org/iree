@@ -123,7 +123,7 @@ hal.executable public @main_0_dispatch_0 {
       // OPT-IN-DAG:     %[[WG_X:.+]] = hal.interface.workgroup.id[0] : index
       // OPT-IN-DAG:     arith.muli %[[WG_Y]], %{{.+}} : index
       // OPT-IN-DAG:     arith.addi %{{.+}}, %[[WG_X]] : index
-      // OPT-IN:         scf.for  
+      // OPT-IN:         scf.for
       func.func @main_0_dispatch_0_matmul_transpose_b_2048x10240x1280_f16xf16xf32()
         attributes {translation_info = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [128, 2, 1] subgroup_size = 64, {
           mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>, subgroup_m_count = 2, subgroup_n_count = 2>,

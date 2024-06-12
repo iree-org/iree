@@ -111,9 +111,9 @@ getWorkgroupCountsXY(OpBuilder &builder, FunctionOpInterface funcOp) {
 }
 
 static LogicalResult reorderWorkgroupsInFunc(FunctionOpInterface funcOp,
-                                             ReorderWorkgrupsStrategy strategy,
+                                             ReorderWorkgroupsStrategy strategy,
                                              unsigned swizzleLogTile) {
-  assert(strategy != ReorderWorkgrupsStrategy::None &&
+  assert(strategy != ReorderWorkgroupsStrategy::None &&
          "Expected a concrete strategy");
 
   unsigned swizzleTile = 1u << swizzleLogTile;
@@ -150,12 +150,12 @@ static LogicalResult reorderWorkgroupsInFunc(FunctionOpInterface funcOp,
   auto [workgroupCntX, workgroupCntY] = getWorkgroupCountsXY(builder, funcOp);
   Value newWorkgroupIdX;
   Value newWorkgroupIdY;
-  if (strategy == ReorderWorkgrupsStrategy::Swizzle) {
+  if (strategy == ReorderWorkgroupsStrategy::Swizzle) {
     std::tie(newWorkgroupIdX, newWorkgroupIdY) =
         makeSwizzledIds(funcOp.getLoc(), builder, workgroupIdX, workgroupIdY,
                         workgroupCntX, workgroupCntY, swizzleTile);
   } else {
-    assert(strategy == ReorderWorkgrupsStrategy::Transpose &&
+    assert(strategy == ReorderWorkgroupsStrategy::Transpose &&
            "Unhandled strategy");
     std::tie(newWorkgroupIdX, newWorkgroupIdY) =
         makeTransposedIds(funcOp.getLoc(), builder, workgroupIdX, workgroupIdY,
@@ -178,7 +178,7 @@ LogicalResult swizzleWorkgroupsInFunc(FunctionOpInterface funcOp,
   if (swizzleLogTile == 0)
     return success();
 
-  return reorderWorkgroupsInFunc(funcOp, ReorderWorkgrupsStrategy::Swizzle,
+  return reorderWorkgroupsInFunc(funcOp, ReorderWorkgroupsStrategy::Swizzle,
                                  swizzleLogTile);
 }
 
@@ -186,7 +186,7 @@ namespace {
 struct ReorderWorkgroupsPass final
     : impl::ReorderWorkgroupsPassBase<ReorderWorkgroupsPass> {
   ReorderWorkgroupsPass(
-      ReorderWorkgrupsStrategy strategy, unsigned logSwizzleTile,
+      ReorderWorkgroupsStrategy strategy, unsigned logSwizzleTile,
       std::function<LogicalResult(mlir::FunctionOpInterface)> filterFn)
       : reorderingStrategy(strategy), logSwizzleTile(logSwizzleTile),
         filterFn(std::move(filterFn)) {}
@@ -199,10 +199,10 @@ struct ReorderWorkgroupsPass final
     }
     logSwizzleTile = logTile;
     auto selectedStrategy =
-        llvm::StringSwitch<FailureOr<ReorderWorkgrupsStrategy>>(strategy)
-            .Case("", ReorderWorkgrupsStrategy::None)
-            .Case("swizzle", ReorderWorkgrupsStrategy::Swizzle)
-            .Case("transpose", ReorderWorkgrupsStrategy::Transpose)
+        llvm::StringSwitch<FailureOr<ReorderWorkgroupsStrategy>>(strategy)
+            .Case("", ReorderWorkgroupsStrategy::None)
+            .Case("swizzle", ReorderWorkgroupsStrategy::Swizzle)
+            .Case("transpose", ReorderWorkgroupsStrategy::Transpose)
             .Default(failure());
     if (failed(selectedStrategy))
       return failure();
@@ -212,10 +212,10 @@ struct ReorderWorkgroupsPass final
   }
 
   void runOnOperation() override {
-    if (reorderingStrategy == ReorderWorkgrupsStrategy::None)
+    if (reorderingStrategy == ReorderWorkgroupsStrategy::None)
       return;
 
-    if (reorderingStrategy == ReorderWorkgrupsStrategy::Swizzle &&
+    if (reorderingStrategy == ReorderWorkgroupsStrategy::Swizzle &&
         logSwizzleTile == 0)
       return;
 
@@ -242,7 +242,8 @@ struct ReorderWorkgroupsPass final
   }
 
 private:
-  ReorderWorkgrupsStrategy reorderingStrategy = ReorderWorkgrupsStrategy::None;
+  ReorderWorkgroupsStrategy reorderingStrategy =
+      ReorderWorkgroupsStrategy::None;
   unsigned logSwizzleTile = 0;
   std::function<LogicalResult(mlir::FunctionOpInterface)> filterFn;
 };
@@ -250,7 +251,7 @@ private:
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createReorderWorkgroups(
-    ReorderWorkgrupsStrategy strategy, unsigned swizzleLogTile,
+    ReorderWorkgroupsStrategy strategy, unsigned swizzleLogTile,
     std::function<LogicalResult(mlir::FunctionOpInterface)> filterFn) {
   return std::make_unique<ReorderWorkgroupsPass>(strategy, swizzleLogTile,
                                                  filterFn);

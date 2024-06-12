@@ -95,16 +95,16 @@ getPipelineOptions(FunctionOpInterface funcOp,
                              << "' is expected to be a string attribute";
       StringRef reorderStr = llvm::cast<StringAttr>(reorderWorkgroupOption);
       if (reorderStr == "transpose") {
-        pipelineOptions.reorderStrategy = ReorderWorkgrupsStrategy::Transpose;
+        pipelineOptions.reorderStrategy = ReorderWorkgroupsStrategy::Transpose;
       } else if (reorderStr == "swizzle") {
-        pipelineOptions.reorderStrategy = ReorderWorkgrupsStrategy::Swizzle;
+        pipelineOptions.reorderStrategy = ReorderWorkgroupsStrategy::Swizzle;
       } else {
         if (reorderStr != "none")
           funcOp.emitOpError()
               << "Unknown " << LLVMGPUAttrNames::kReorderWorkgroups
               << "value: " << reorderWorkgroupOption;
         else
-          pipelineOptions.reorderStrategy = ReorderWorkgrupsStrategy::None;
+          pipelineOptions.reorderStrategy = ReorderWorkgroupsStrategy::None;
       }
     }
   }

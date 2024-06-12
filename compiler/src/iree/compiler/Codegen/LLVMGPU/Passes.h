@@ -35,7 +35,7 @@ struct LLVMGPUPipelineOptions {
   bool enableReduceSharedMemoryBankConflicts = true;
   bool enableUkernels = false;
 
-  std::optional<ReorderWorkgrupsStrategy> reorderStrategy;
+  std::optional<ReorderWorkgroupsStrategy> reorderStrategy;
 };
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
