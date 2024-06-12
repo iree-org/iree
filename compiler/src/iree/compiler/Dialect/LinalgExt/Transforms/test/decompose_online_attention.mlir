@@ -12,7 +12,7 @@ func.func @attention_f16(%query: tensor<192x1024x64xf16>,
                          %output: tensor<192x1024x64xf32>,
                          %max: tensor<192x1024xf32>,
                          %sum: tensor<192x1024xf32>)
-                         -> tensor<192x1024x64xf32> {
+                         -> (tensor<192x1024x64xf32>, tensor<192x1024xf32>) {
   %scale = arith.constant 1.0 : f16
 
   %out:3 = iree_linalg_ext.online_attention
@@ -21,7 +21,7 @@ func.func @attention_f16(%query: tensor<192x1024x64xf16>,
         outs(%output, %max, %sum : tensor<192x1024x64xf32>, tensor<192x1024xf32>, tensor<192x1024xf32>)
         -> tensor<192x1024x64xf32>, tensor<192x1024xf32>, tensor<192x1024xf32>
 
-  return %out#0 : tensor<192x1024x64xf32>
+  return %out#0, %out#2 : tensor<192x1024x64xf32>, tensor<192x1024xf32>
 }
 
 // We just want to check if we are using the correct algorithm.
