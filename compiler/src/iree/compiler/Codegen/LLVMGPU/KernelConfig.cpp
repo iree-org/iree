@@ -470,19 +470,12 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   // Infer if lhs or rhs is transposed to help generate better schedule.
   auto maps = op.getIndexingMapsArray();
-  OpBuilder b(op);
-  auto lhsMDim = maps[0].getResultPosition(b.getAffineDimExpr(mDim));
-  auto lhsKDim = maps[0].getResultPosition(b.getAffineDimExpr(kDim));
-  if (!lhsMDim.has_value() || !lhsKDim.has_value()) {
-    return op.emitError("mDim or kDim not found in LHS indexing map.");
-  }
-  auto rhsKDim = maps[1].getResultPosition(b.getAffineDimExpr(kDim));
-  auto rhsNDim = maps[1].getResultPosition(b.getAffineDimExpr(nDim));
-  if (!rhsKDim.has_value() || !rhsNDim.has_value()) {
-    return op.emitError("kDim or nDim not found in RHS indexing map.");
-  }
-  bool transposedLhs = lhsMDim.value() > lhsKDim.value();
-  bool transposedRhs = rhsKDim.value() > rhsNDim.value();
+  bool transposedLhs =
+      kDim ==
+      llvm::cast<AffineDimExpr>(maps[0].getResults().back()).getPosition();
+  bool transposedRhs =
+      nDim ==
+      llvm::cast<AffineDimExpr>(maps[1].getResults().back()).getPosition();
 
   // First try to find a schedule with an exactly matching intrinsic.
   std::optional<GPUMMASchedule> schedule = deduceMMASchedule(
