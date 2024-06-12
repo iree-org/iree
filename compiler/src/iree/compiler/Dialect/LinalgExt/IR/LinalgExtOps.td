@@ -9,6 +9,7 @@
 
 include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtBase.td"
 include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.td"
+include "mlir/Dialect/Linalg/IR/LinalgInterfaces.td"
 include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/DestinationStyleOpInterface.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
@@ -670,6 +671,96 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
       if (getNumResults() < 3)
         return std::nullopt;
       return cast<AffineMap>(getIndexingMapsArray()[5]);
+    }
+
+    int64_t getIterationDomainRank() {
+      return getQueryMap().getNumDims();
+    }
+  }];
+}
+
+//===----------------------------------------------------------------------===//
+// OnlineAttention
+//===----------------------------------------------------------------------===//
+
+def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     DestinationStyleOpInterface, LinalgExtInterface,
+     DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+     DeclareOpInterfaceMethods<AggregatedOpInterface, ["decomposeOperation"]>,
+     DeclareOpInterfaceMethods<TilingInterface,
+      ["getIterationDomain",
+       "getLoopIteratorTypes",
+       "getResultTilePosition",
+       "getTiledImplementation"]>]> {
+  let summary = "Online Attention operator";
+  let description = [{
+    Traditional scaled dot product attention computes:
+
+    attention(Q, K, V, scale) = softmax(Q @ K.T * scale) @ V
+
+    Online Attention on the other hand, uses an online normalizer instead of
+    softmax:
+
+    online_attention(Q, K, V, scale, running_max, running_sum)
+      = online_normalizer(Q @ K.T * scale, running_max, running_sum) @ V
+
+    The advantage of this online_normalizer is that it can be tiled along
+    it's reduction dimension, making the online_attention operator:
+      - Tilable along softmax reduction dimension
+      - Associative along softmax reduction dimension
+      - Commutative along softmax associative dimension
+
+    Note: The results of online_attention need to be combined after computing
+    it over the entire softmax reduction dimension by:
+      x, _, sum : results
+      x = (1 / sum) * x
+  }];
+
+  let arguments = (ins AnyShaped:$query,
+                       AnyShaped:$key,
+                       AnyShaped:$value,
+                       AnyFloat:$scale,
+                       AnyShaped:$output,
+                       AnyShaped:$max,
+                       AnyShaped:$sum,
+                       AffineMapArrayAttr:$indexing_maps
+  );
+
+  let results = (outs Variadic<AnyRankedTensor>:$results);
+  let hasVerifier = 1;
+  let hasCustomAssemblyFormat = 1;
+  let assemblyFormat = [{
+    attr-dict
+    `ins` `(` $query `,` $key `,` $value `,` $scale `:` type($query) `,` type($key) `,` type($value) `,` type($scale) `)`
+    `outs` `(` $output `,` $max `,` $sum `:` type($output) `,` type($max) `,` type($sum) `)`
+    (`->` type($results)^)?
+  }];
+
+  let extraClassDeclaration = [{
+    // Method to implement for specifying output range for
+    // DestinationStyleOpInterface
+    MutableOperandRange getDpsInitsMutable();
+
+    SmallVector<AffineMap> getIndexingMapsArray();
+
+    AffineMap getQueryMap() {
+      return getIndexingMapsArray()[0];
+    }
+    AffineMap getKeyMap() {
+      return getIndexingMapsArray()[1];
+    }
+    AffineMap getValueMap() {
+      return getIndexingMapsArray()[2];
+    }
+    AffineMap getOutputMap() {
+      return getIndexingMapsArray()[3];
+    }
+    AffineMap getMaxMap() {
+      return getIndexingMapsArray()[4];
+    }
+    AffineMap getSumMap() {
+      return getIndexingMapsArray()[5];
     }
 
     int64_t getIterationDomainRank() {
