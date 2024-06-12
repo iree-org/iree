@@ -437,10 +437,6 @@ void registerFlowTransformPassPipeline() {
       "region formation. Used only for testing",
       [](OpPassManager &passManager) {
         addDispatchRegionCreationPreprocessingPasses(passManager);
-        LLVM_DEBUG({
-          llvm::dbgs() << "Dispatch preprocessing pass pipeline : ";
-          passManager.dump();
-        });
       });
 
   PassPipelineRegistration<> flowDispatchRegionCreationPipeline(
@@ -448,10 +444,6 @@ void registerFlowTransformPassPipeline() {
       "Flag used to run passes that form dispatch regions",
       [](OpPassManager &passManager) {
         addDispatchRegionCreationPasses(passManager);
-        LLVM_DEBUG({
-          llvm::dbgs() << "Dispatch region creation pass pipeline : ";
-          passManager.dump();
-        });
       });
 }
 
