@@ -4,12 +4,16 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <numeric>
 #include "iree/compiler/Codegen/LLVMGPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
+#include "iree/compiler/Codegen/Utils/VectorOpUtils.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 
 namespace mlir::iree_compiler {
+
+using VectorValue = TypedValue<VectorType>;
 
 namespace {
 
@@ -62,6 +66,15 @@ struct AMDGPUPrepareForChainedMatmulPass
     registry.insert<vector::VectorDialect>();
   }
 
+  VectorValue swapDims(RewriterBase &rewriter, VectorValue val, int64_t dimA,
+                       int64_t dimB) const {
+    ArrayRef<int64_t> shape = val.getType().getShape();
+    SmallVector<int64_t> perm(shape.size());
+    std::iota(perm.begin(), perm.end(), 0);
+    std::swap(perm[dimA], perm[dimB]);
+    return rewriter.create<vector::TransposeOp>(val.getLoc(), val, perm);
+  }
+
   /// Given a vector contract of the form
   /// %output = vector.contract %lhs, %rhs, %acc
   /// this function swaps the operands (%rhs, %lhs),
@@ -86,29 +99,42 @@ struct AMDGPUPrepareForChainedMatmulPass
   /// simply swap the operands without transposing them.
   void swapOperandsAndTranspose(RewriterBase &rewriter,
                                 vector::ContractionOp contractOp) const {
-    Value lhs = contractOp.getLhs();
-    Value rhs = contractOp.getRhs();
-    Value acc = contractOp.getAcc();
+    VectorContractOpInfo opInfo(contractOp);
+    auto [lhsM, rhsN] = opInfo.getOperandMNIndex();
+    auto [lhsK, rhsK] = opInfo.getOperandKIndex();
+    auto [accM, accN] = opInfo.getResultMNIndex();
+    VectorValue lhs = contractOp.getLhs();
+    VectorValue rhs = contractOp.getRhs();
+    VectorValue acc = cast<VectorValue>(contractOp.getAcc());
     rewriter.setInsertionPoint(contractOp);
-    acc = rewriter.create<vector::TransposeOp>(contractOp.getLoc(), acc,
-                                               SmallVector<int64_t>{1, 0});
+
+    SmallVector<AffineMap> maps = contractOp.getIndexingMapsArray();
+    AffineMap lhsMap = maps[0];
+    AffineMap rhsMap = maps[1];
+    AffineMap accMap = maps[2];
+
+    acc = swapDims(rewriter, acc, accN, accM);
 
     if (!isOperandSwapInvariant(contractOp)) {
-      lhs = rewriter.create<vector::TransposeOp>(contractOp.getLoc(), lhs,
-                                                 SmallVector<int64_t>{1, 0});
-      rhs = rewriter.create<vector::TransposeOp>(contractOp.getLoc(), rhs,
-                                                 SmallVector<int64_t>{1, 0});
+      lhs = swapDims(rewriter, lhs, lhsK, lhsM);
+      rhs = swapDims(rewriter, rhs, rhsK, rhsN);
     }
 
-    vector::ContractionOp swappedOp = rewriter.create<vector::ContractionOp>(
-        contractOp.getLoc(), rhs, lhs, acc, contractOp.getIndexingMaps(),
+    auto swappedOp = rewriter.create<vector::ContractionOp>(
+        contractOp.getLoc(), rhs, lhs, acc,
+        rewriter.getAffineMapArrayAttr({lhsMap, rhsMap, accMap}),
         contractOp.getIteratorTypesAttr());
-    rewriter.replaceOpWithNewOp<vector::TransposeOp>(
-        contractOp, swappedOp.getResult(), SmallVector<int64_t>{1, 0});
+
+    acc = cast<VectorValue>(swappedOp.getResult());
+    acc = swapDims(rewriter, acc, accN, accM);
+
+    rewriter.replaceOp(contractOp, acc);
   }
 
-  /// For a matmul_transpose_b, this transformation boils down to an operand
-  /// swap and result transpose:
+  /// If one of the operands is transposed, while the other isn't, the
+  /// transformation boils down to an operand swap and result transpose. This
+  /// happens because transposing and swapping both operands, preserves the
+  /// structure of the contraction. For example:
   ///
   /// def matmul_transpose_b(A, B):
   ///   B.T = transpose(B)
@@ -124,7 +150,7 @@ struct AMDGPUPrepareForChainedMatmulPass
   /// matmul_transpose_b(B, A) = matmul_transpose_b_swapped(B, A).T
   ///
   /// For the sake of completeness, we also show that this does not hold
-  /// for normal matmul:
+  /// when no operands are transposed, or both operands are transposed:
   ///
   /// def matmul(A, B):
   ///   C = A @ B
@@ -135,18 +161,15 @@ struct AMDGPUPrepareForChainedMatmulPass
   ///  B.T = transpose(B)
   ///  C.T = B.T @ A.T
   ///  C   = transpose(C.T)
-  ///
-  /// TODO: This check applies more generally when one of the operands in the
-  /// function is transposed compared to what "@" expects.
   bool isOperandSwapInvariant(vector::ContractionOp contractOp) const {
-    AffineExpr m, n, k;
-    bindDims(contractOp.getContext(), m, n, k);
-    using MapList = ArrayRef<ArrayRef<AffineExpr>>;
-    auto infer = [&](MapList m) {
-      return AffineMap::inferFromExprList(m, contractOp.getContext());
-    };
-    SmallVector<AffineMap> newIndexingMaps = infer({{m, k}, {n, k}, {m, n}});
-    return newIndexingMaps == contractOp.getIndexingMapsArray();
+    // Check if the innermost m, n, k dimensions are in the order:
+    // lhs: (m, k), rhs: (n, k)
+    VectorContractOpInfo opInfo(contractOp);
+    auto [lhsM, rhsN] = opInfo.getOperandMNIndex();
+    auto [lhsK, rhsK] = opInfo.getOperandKIndex();
+    bool isLhsTransposed = lhsM > lhsK;
+    bool isRhsTransposed = rhsN > rhsK;
+    return isLhsTransposed != isRhsTransposed;
   }
 
   /// Returns a vector.contract operation that this value was transitively
