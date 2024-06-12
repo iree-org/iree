@@ -924,10 +924,10 @@ LogicalResult setCooperativeMatrixConfig(
   // Infer if lhs or rhs is transposed to help generate better schedule.
   auto maps = op.getIndexingMapsArray();
   bool transposedLhs =
-      kIndex ==
+      kIndex !=
       llvm::cast<AffineDimExpr>(maps[0].getResults().back()).getPosition();
   bool transposedRhs =
-      nIndex ==
+      nIndex !=
       llvm::cast<AffineDimExpr>(maps[1].getResults().back()).getPosition();
 
   FailureOr<GPUMMASchedule> schedule =

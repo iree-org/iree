@@ -471,10 +471,10 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // Infer if lhs or rhs is transposed to help generate better schedule.
   auto maps = op.getIndexingMapsArray();
   bool transposedLhs =
-      kDim ==
+      kDim !=
       llvm::cast<AffineDimExpr>(maps[0].getResults().back()).getPosition();
   bool transposedRhs =
-      nDim ==
+      nDim !=
       llvm::cast<AffineDimExpr>(maps[1].getResults().back()).getPosition();
 
   // First try to find a schedule with an exactly matching intrinsic.
