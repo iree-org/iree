@@ -141,3 +141,30 @@ builtin.module {
     func.return %result2 : vector<32x8xf16>
   }
 }
+
+// -----
+
+#accesses0 = [
+  affine_map<(m, n, k) -> (m, k)>,
+  affine_map<(m, n, k) -> (n, k)>,
+  affine_map<(m, n, k) -> (m, n)>
+]
+
+#trait0 = {
+  indexing_maps = #accesses0,
+  iterator_types = ["parallel", "parallel", "reduction"]
+}
+
+builtin.module {
+  // CHECK-DAG: #[[MAP:.*]] = affine_map<(d0, d1, d2) -> (d0, d2)>
+  // CHECK-DAG: #[[MAP1:.*]] = affine_map<(d0, d1, d2) -> (d1, d2)>
+  // CHECK-DAG: #[[MAP2:.*]] = affine_map<(d0, d1, d2) -> (d0, d1)>
+  func.func @chained_matmul(%lhs : vector<32x8xf16>, %rhs : vector<16x8xf16>, %acc : vector<32x16xf16>,
+    %rhs2 : vector<8x16xf16>, %acc2 : vector<32x8xf16>) -> vector<32x8xf16> {
+    %result = vector.contract #trait0 %lhs, %rhs, %acc
+      : vector<32x8xf16>, vector<16x8xf16> into vector<32x16xf16>
+    %result2 = vector.contract #trait0 %result, %rhs2, %acc2
+      : vector<32x16xf16>, vector<8x16xf16> into vector<32x8xf16>
+    func.return %result2 : vector<32x8xf16>
+  }
+}

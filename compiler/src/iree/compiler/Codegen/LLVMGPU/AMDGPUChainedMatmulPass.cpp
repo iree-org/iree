@@ -168,7 +168,7 @@ struct AMDGPUPrepareForChainedMatmulPass
     auto [lhsM, rhsN] = opInfo.getOperandMNIndex();
     auto [lhsK, rhsK] = opInfo.getOperandKIndex();
     bool isLhsTransposed = lhsM > lhsK;
-    bool isRhsTransposed = rhsN > rhsK;
+    bool isRhsTransposed = rhsN < rhsK;
     return isLhsTransposed != isRhsTransposed;
   }
 
@@ -185,7 +185,9 @@ struct AMDGPUPrepareForChainedMatmulPass
   FailureOr<vector::ContractionOp>
   getTransitiveMatmulParent(vector::ContractionOp contractOp) const {
     SetVector<Operation *> backwardSlice;
-    getBackwardSlice(contractOp.getLhs(), &backwardSlice);
+    BackwardSliceOptions options;
+    options.inclusive = true;
+    getBackwardSlice(contractOp.getLhs(), &backwardSlice, options);
     vector::ContractionOp result;
     for (Operation *sliceOp : backwardSlice) {
       auto chainParent = dyn_cast<vector::ContractionOp>(sliceOp);
