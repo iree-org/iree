@@ -137,3 +137,20 @@ util.func @mmt_no_transpose(%arg0: tensor<2048x1280xf16>, %arg1: tensor<1280x128
 // TILE16-LABEL: @mmt_no_transpose
 // TILE16-NOT:     linalg.generic
 // TILE16:         linalg.matmul_transpose_b
+
+
+// -----
+
+util.func @test_unit_dims_pack(%arg0: tensor<10x20x5xf32>) -> tensor<1x1x5x20x10xf32> {
+  %dst = tensor.empty() : tensor<1x1x5x20x10xf32>
+  %packed = tensor.pack %arg0 inner_dims_pos = [1, 0] inner_tiles = [20, 10]
+    into %dst : tensor<10x20x5xf32> -> tensor<1x1x5x20x10xf32>
+
+  util.return %packed : tensor<1x1x5x20x10xf32>
+}
+
+// CHECK-LABEL: @test_unit_dims_pack
+// CHECK:       %[[TRANSPOSED:.+]] = linalg.transpose ins(%[[ARG0:.+]] : tensor<10x20x5xf32>)
+// CHECK-SAME:    outs(%[[DST:.+]] : tensor<5x20x10xf32>) permutation = [2, 1, 0]
+// CHECK:       %[[EXPANDED:.+]] = tensor.expand_shape
+// CHECK-SAME:    [0, 1, 2], [3], [4]
