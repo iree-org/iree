@@ -1,5 +1,5 @@
-// RUN: iree-opt --iree-codegen-linalg-to-llvm-pipeline=enable-arm-sme-lowering-pipeline --split-input-file %s | FileCheck %s
-// RUN: iree-opt --iree-codegen-linalg-to-llvm-pipeline=enable-arm-sme-lowering-pipeline --iree-llvmcpu-force-arm-streaming --split-input-file %s | FileCheck %s -check-prefixes=FORCE-ARM-STREAMING
+// RUN: iree-opt --iree-codegen-linalg-to-llvm-pipeline=enable-arm-sme --split-input-file %s | FileCheck %s
+// RUN: iree-opt --iree-codegen-linalg-to-llvm-pipeline=enable-arm-sme --iree-llvmcpu-force-arm-streaming --split-input-file %s | FileCheck %s -check-prefixes=FORCE-ARM-STREAMING
 
 module {
 module {
@@ -24,9 +24,11 @@ module {
 
 // CHECK: @fixed_size_dispatch
 // CHECK-NOT: arm_locally_streaming
+// CHECK-NOT: arm_new_za
 
 // FORCE-ARM-STREAMING: @fixed_size_dispatch
 // FORCE-ARM-STREAMING-NOT: arm_locally_streaming
+// FORCE-ARM-STREAMING-NOT: arm_new_za
 
 // -----
 
@@ -54,8 +56,10 @@ module {
 
 // CHECK: @scalable_dispatch
 // CHECK-NOT: arm_locally_streaming
+// CHECK-NOT: arm_new_za
 
 // FORCE-ARM-STREAMING: @scalable_dispatch
+// FORCE-ARM-STREAMING-NOT: arm_new_za
 // FORCE-ARM-STREAMING-SAME: arm_locally_streaming
 
 // -----

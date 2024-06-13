@@ -92,6 +92,12 @@ static llvm::cl::opt<bool> clEnableScalableVectorization(
                    "target (e.g., +sve, +sve2 and/or +sme feature flags)"),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clDisableArmSMETiling(
+    "iree-llvmcpu-disable-arm-sme-tiling",
+    llvm::cl::desc("Disables tiling for SME even if it is supported by the "
+                   "target (i.e., when the +sme feature flag is present)"),
+    llvm::cl::init(false));
+
 // Non-static options are used in other places.
 llvm::cl::opt<bool> clEnableTransformDialectJit(
     "iree-llvmcpu-enable-transform-dialect-jit",
@@ -113,12 +119,6 @@ enum class VectorPreProcStrategy {
   // Do not apply any vectorization pre-processing transformation.
   None
 };
-
-static llvm::cl::opt<bool> clDisableArmSMETiling(
-    "iree-llvmcpu-disable-arm-sme-tiling",
-    llvm::cl::desc("Disables tiling for SME even if it is supported by the "
-                   "target (i.e., when the +sme feature flag is present)"),
-    llvm::cl::init(false));
 
 // Use this flag to override IREE's heuristics for selecting the pre-processing
 // strategy.

@@ -860,8 +860,8 @@ void registerCodegenLLVMCPUPasses() {
 
   struct LinalgToLLVMPipelineOptions
       : public PassPipelineOptions<LinalgToLLVMPipelineOptions> {
-    Option<bool> enableArmSMELoweringPipeline{
-        *this, "enable-arm-sme-lowering-pipeline",
+    Option<bool> enableArmSME{
+        *this, "enable-arm-sme",
         llvm::cl::desc("Enable the ArmSME lowering pipeline.")};
   };
 
@@ -871,8 +871,8 @@ void registerCodegenLLVMCPUPasses() {
           "Runs the progressive lowering pipeline from Linalg to LLVM",
           [](OpPassManager &variantPassManager,
              LinalgToLLVMPipelineOptions const &options) {
-            buildLLVMCPUCodegenPassPipeline(
-                variantPassManager, options.enableArmSMELoweringPipeline);
+            buildLLVMCPUCodegenPassPipeline(variantPassManager,
+                                            options.enableArmSME);
           });
 
   static PassPipelineRegistration<> LLVMCPULinkingPipeline(
