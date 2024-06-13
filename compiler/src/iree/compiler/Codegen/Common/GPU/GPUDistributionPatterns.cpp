@@ -161,6 +161,10 @@ struct DistributeElementwise final
     if (Attribute attr = op->getAttr(fastmathAttrName)) {
       distributedOp->setAttr(fastmathAttrName, attr);
     }
+    if (Attribute attr = op->getAttr("predicate")) {
+      op->dump();
+      distributedOp->setAttr("predicate", attr);
+    }
 
     DistributionPattern::replaceOpWithDistributedValues(
         rewriter, op, distributedOp->getResults());
