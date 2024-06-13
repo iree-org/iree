@@ -42,6 +42,8 @@ iree_cc_library(
     MLIRArmNeonDialect
     MLIRArmSMEDialect
     MLIRArmSMEToLLVMIRTranslation
+    MLIRArmSVEDialect
+    MLIRArmSVEToLLVMIRTranslation
     MLIRBuiltinToLLVMIRTranslation
     MLIRIR
     MLIRLLVMDialect

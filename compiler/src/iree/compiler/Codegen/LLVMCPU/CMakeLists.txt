@@ -102,6 +102,8 @@ iree_cc_library(
     MLIRArmSMEToLLVMIRTranslation
     MLIRArmSMEToSCF
     MLIRArmSMETransforms
+    MLIRArmSVEDialect
+    MLIRArmSVETransforms
     MLIRBufferizationDialect
     MLIRComplexToLLVM
     MLIRComplexToStandard
