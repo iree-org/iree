@@ -773,7 +773,13 @@ def IREELinalgExt_OnlineAttentionOp : IREELinalgExt_PureOp<"online_attention",
 //===----------------------------------------------------------------------===//
 
 def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
-    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>]> {
+    [DeclareOpInterfaceMethods<ReifyRankedShapedTypeOpInterface>,
+     DeclareOpInterfaceMethods<TilingInterface,
+      ["getIterationDomain",
+       "getLoopIteratorTypes",
+       "getResultTilePosition",
+       "getTiledImplementation",
+       "generateResultTileValue"]>]> {
   let summary = "Im2col operation for convolutions";
   let description = [{
     Im2col op for convolutions. The operation performs a transformation on the

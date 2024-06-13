@@ -15,6 +15,7 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
+#include "mlir/IR/OpDefinition.h"
 
 namespace mlir::iree_compiler::IREE::LinalgExt {
 
@@ -1232,6 +1233,99 @@ LogicalResult UnPackOp::generateScalarImplementation(OpBuilder &builder,
 
 SmallVector<Range> UnPackOp::getIterationDomain(OpBuilder &builder) {
   return LinalgExt::getIterationDomain(*this, builder);
+}
+
+//===----------------------------------------------------------------------===//
+// Im2colOp
+//===----------------------------------------------------------------------===//
+
+SmallVector<Range> Im2colOp::getIterationDomain(OpBuilder &builder) {
+  Location loc = getLoc();
+  OpFoldResult zero = builder.getIndexAttr(0);
+  OpFoldResult one = builder.getIndexAttr(1);
+  Value dest = getOutput();
+  SmallVector<Range> loopBounds(getOutputRank());
+  for (int dim = 0; dim < getOutputRank(); ++dim) {
+    loopBounds[dim].offset = zero;
+    loopBounds[dim].size = getDimValue(builder, loc, dest, dim);
+    loopBounds[dim].stride = one;
+  }
+  return loopBounds;
+}
+
+SmallVector<utils::IteratorType> Im2colOp::getLoopIteratorTypes() {
+  SmallVector<utils::IteratorType> iteratorTypes(getOutputRank(),
+                                                 utils::IteratorType::parallel);
+  return iteratorTypes;
+}
+
+FailureOr<TilingResult>
+Im2colOp::getTiledImplementation(OpBuilder &builder,
+                                 ArrayRef<OpFoldResult> offsets,
+                                 ArrayRef<OpFoldResult> sizes) {
+  Location loc = getLoc();
+  OpFoldResult one = builder.getIndexAttr(1);
+  OpFoldResult zero = builder.getIndexAttr(0);
+
+  ReifiedRankedShapedTypeDims reifiedInputShapes;
+  SmallVector<OpFoldResult> inputOffsets(getInputRank(), zero);
+  SmallVector<OpFoldResult> inputSizes = getDims(builder, loc, getInput());
+
+  // Set batch offsets and sizes for input
+  for (auto [idx, dim] : llvm::enumerate(getBatchPos())) {
+    inputOffsets[dim] = offsets[idx];
+    inputSizes[dim] = sizes[idx];
+  }
+
+  SmallVector<OpFoldResult> inputStrides(getInputRank(), one);
+  Value inputSlice = getSlice(builder, loc, getInput(), inputOffsets,
+                              inputSizes, inputStrides);
+  SmallVector<OpFoldResult> outputStrides(getOutputRank(), one);
+  Value outputSlice =
+      getSlice(builder, loc, getOutput(), offsets, sizes, outputStrides);
+
+  SmallVector<Type, 4> resultTypes;
+  if (hasPureTensorSemantics()) {
+    resultTypes.push_back(outputSlice.getType());
+  }
+
+  AffineExpr d0, d1;
+  bindDims(getContext(), d0, d1);
+  auto map = AffineMap::get(2, 0, {d0 + d1}, getContext());
+  OpFoldResult kTileOffset = offsets.back();
+  OpFoldResult kOpOffset = getMixedKOffset()[0];
+  OpFoldResult kOffset = affine::makeComposedFoldedAffineApply(
+      builder, loc, map, {kTileOffset, kOpOffset});
+  OpFoldResult mTileOffset = offsets[offsets.size() - 2];
+  OpFoldResult mOpOffset = getMixedMOffset()[0];
+  OpFoldResult mOffset = affine::makeComposedFoldedAffineApply(
+      builder, loc, map, {mTileOffset, mOpOffset});
+
+  SmallVector<Value> operands = {inputSlice, outputSlice};
+  operands.append(getOperation()->getOperands().begin() + 2,
+                  getOperation()->getOperands().end());
+  Im2colOp tiledOp = mlir::clone(builder, *this,
+      TypeRange{outputSlice.getType()}, operands);
+  tiledOp.setMixedKOffset({kOffset});
+  tiledOp.setMixedMOffset({mOffset});
+
+  return TilingResult{{tiledOp}, SmallVector<Value>(tiledOp->getResults())};
+}
+
+FailureOr<TilingResult>
+Im2colOp::generateResultTileValue(OpBuilder &builder, unsigned resultNumber,
+                                  ArrayRef<OpFoldResult> offsets,
+                                  ArrayRef<OpFoldResult> sizes) {
+  return getTiledImplementation(builder, offsets, sizes);
+}
+
+LogicalResult Im2colOp::getResultTilePosition(
+    OpBuilder &builder, unsigned resultNumber, ArrayRef<OpFoldResult> offsets,
+    ArrayRef<OpFoldResult> sizes, SmallVector<OpFoldResult> &resultOffsets,
+    SmallVector<OpFoldResult> &resultSizes) {
+  resultOffsets = SmallVector<OpFoldResult>(offsets);
+  resultSizes = SmallVector<OpFoldResult>(sizes);
+  return success();
 }
 
 //===----------------------------------------------------------------------===//
