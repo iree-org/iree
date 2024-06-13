@@ -319,7 +319,7 @@ public:
       signatureConverter.addInputs(index, arg.getType());
     }
     // Creates a new function with the update signature.
-    rewriter.applySignatureConversion(&funcOp.getFunctionBody(),
+    rewriter.applySignatureConversion(&funcOp.getFunctionBody().front(),
                                       signatureConverter);
 
     // Creates a new function with the update signature.

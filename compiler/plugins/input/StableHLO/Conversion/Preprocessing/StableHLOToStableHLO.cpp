@@ -601,7 +601,8 @@ struct ScatterImplicitBatch final
 
     auto newDimNumbers = mlir::stablehlo::ScatterDimensionNumbersAttr::get(
         op.getContext(), newUpdateWindowDims,
-        dimNumbers.getInsertedWindowDims(),
+        dimNumbers.getInsertedWindowDims(), dimNumbers.getInputBatchingDims(),
+        dimNumbers.getScatterIndicesBatchingDims(),
         dimNumbers.getScatterDimsToOperandDims(),
         dimNumbers.getIndexVectorDim() + 1);
 
@@ -700,7 +701,8 @@ struct ScatterCollapseBatch final
 
     auto newDimNumbers = mlir::stablehlo::ScatterDimensionNumbersAttr::get(
         op.getContext(), newUpdatedWindowDims,
-        dimNumbers.getInsertedWindowDims(),
+        dimNumbers.getInsertedWindowDims(), dimNumbers.getInputBatchingDims(),
+        dimNumbers.getScatterIndicesBatchingDims(),
         dimNumbers.getScatterDimsToOperandDims(),
         /*indexVectorDim=*/1);
 
@@ -801,7 +803,8 @@ struct ScatterBatchFirst final : OpRewritePattern<mlir::stablehlo::ScatterOp> {
 
     auto newDimNumbers = mlir::stablehlo::ScatterDimensionNumbersAttr::get(
         op.getContext(), newUpdatedWindowDims,
-        dimNumbers.getInsertedWindowDims(),
+        dimNumbers.getInsertedWindowDims(), dimNumbers.getInputBatchingDims(),
+        dimNumbers.getScatterIndicesBatchingDims(),
         dimNumbers.getScatterDimsToOperandDims(),
         /*indexVectorDim=*/indexVectorDim);
 
@@ -939,6 +942,8 @@ struct ScatterMaterializeInsertedDim final
 
     auto newDimNumbers = mlir::stablehlo::ScatterDimensionNumbersAttr::get(
         op.getContext(), newUpdatedWindowDims, newInsertedWindowDims,
+        dimNumbers.getInputBatchingDims(),
+        dimNumbers.getScatterIndicesBatchingDims(),
         dimNumbers.getScatterDimsToOperandDims(),
         /*indexVectorDim=*/1);
 
