@@ -123,21 +123,6 @@ if [[ "${OSTYPE}" =~ ^msys ]]; then
     "iree/tests/e2e/tensor_ops/check_vmvx_ukernel_local-task_unpack.mlir"
     # TODO(#11070): Fix argument/result signature mismatch
     "iree/tests/e2e/tosa_ops/check_vmvx_local-sync_microkernels_fully_connected.mlir"
-
-    # These are failing on GitHub's windows-2022 standard runners, version
-    # 20240603.1.0 see https://github.com/actions/runner-images/issues/10004.
-    "iree/base/internal/fpu_state_benchmark_test"
-    "iree/base/internal/synchronization_benchmark_test"
-    "iree/builtins/device/tools/libdevice_benchmark_test"
-    "iree/builtins/ukernel/tools/mmt4d_benchmark_test"
-    "iree/builtins/ukernel/tools/pack_benchmark_test"
-    "iree/builtins/ukernel/tools/unpack_benchmark_test"
-    "iree/builtins/ukernel/tools/e2e_matmul_benchmark_test"
-    "iree/hal/local/executable_library_benchmark_test"
-    "iree/hal/utils/libmpi_test"
-    "iree/hal/utils/resource_set_benchmark_test"
-    "iree/modules/check/check_test"
-    "iree/vm/native_module_benchmark_test"
   )
 elif [[ "${OSTYPE}" =~ ^darwin ]]; then
   excluded_tests+=(
