@@ -2,7 +2,7 @@
 
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert, {enable_loop_peeling = true}>
-#executable_target_system_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "system-elf-x86_64">
+#executable_target_system_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "system-elf-x86_64", {native_vector_size = 64}>
 module {
   func.func @no_peel_static_matmul() attributes {hal.executable.target = #executable_target_system_elf_x86_64_, translation_info = #translation} {
     %cst = arith.constant 0.000000e+00 : f32
@@ -30,7 +30,7 @@ module {
 // -----
 #config = #iree_codegen.lowering_config<tile_sizes = [[65, 65, 0], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert, {enable_loop_peeling = true}>
-#executable_target_system_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "system-elf-x86_64">
+#executable_target_system_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "system-elf-x86_64", {native_vector_size = 64}>
 module {
   func.func @peel_static_matmul() attributes {hal.executable.target = #executable_target_system_elf_x86_64_, translation_info = #translation} {
     %cst = arith.constant 0.000000e+00 : f32
@@ -70,7 +70,7 @@ module {
 // -----
 #config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0], [8, 32, 0], [0, 0, 16], [0, 0, 0]]>
 #translation = #iree_codegen.translation_info<CPUDoubleTilingExpert, {enable_loop_peeling = true}>
-#executable_target_system_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "system-elf-x86_64">
+#executable_target_system_elf_x86_64_ = #hal.executable.target<"llvm-cpu", "system-elf-x86_64", {native_vector_size = 64}>
 module {
   func.func @peel_dynamic_matmul() attributes {hal.executable.target = #executable_target_system_elf_x86_64_, translation_info = #translation} {
     %cst = arith.constant 0.000000e+00 : f32

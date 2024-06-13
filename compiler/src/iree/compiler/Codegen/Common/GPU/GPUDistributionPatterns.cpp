@@ -832,6 +832,178 @@ struct DistributeLayoutConflictResolutions final
   }
 };
 
+/// Pattern that allows us to write to shared memory
+/// and read back to register with correct layouts.
+/// especially used when we don't have an optimized way
+/// to resolve the conflict.
+struct DistributeLayoutConflictToSharedMemory final
+    : OpDistributionPattern<IREE::VectorExt::LayoutConflictResolutionOp> {
+  using OpDistributionPattern::OpDistributionPattern;
+
+  LogicalResult
+  matchAndRewrite(IREE::VectorExt::LayoutConflictResolutionOp resolutionOp,
+                  DistributionSignature &signature,
+                  PatternRewriter &rewriter) const override {
+    auto loc = resolutionOp.getLoc();
+    VectorValue vector = resolutionOp.getInput();
+    VectorValue result = resolutionOp.getOutput();
+    LayoutAttr currentLayout = dyn_cast<LayoutAttr>(signature[vector]);
+    if (!currentLayout) {
+      return rewriter.notifyMatchFailure(resolutionOp,
+                                         "Source layout must be LayoutAttr.");
+    }
+    LayoutAttr targetLayout = dyn_cast<LayoutAttr>(signature[result]);
+    if (!targetLayout) {
+      return rewriter.notifyMatchFailure(resolutionOp,
+                                         "Target layout must be LayoutAttr.");
+    }
+
+    SmallVector<int64_t> currentVecShape = currentLayout.getDistributedShape();
+    SmallVector<int64_t> targetVecShape = targetLayout.getDistributedShape();
+    if (currentVecShape.size() != targetVecShape.size()) {
+      return rewriter.notifyMatchFailure(
+          resolutionOp,
+          "Target's and source's distributed rank needs to match.");
+    }
+
+    auto numElements = [](ArrayRef<int64_t> vector) {
+      return std::accumulate(vector.begin(), vector.end(), 1,
+                             std::multiplies<int64_t>());
+    };
+
+    if (numElements(currentVecShape) == numElements(targetVecShape) &&
+        !currentLayout.hasLaneConflictWith(targetLayout)) {
+      // If the conditions suffice, we can skip the trip to shared memory
+      // and just use the default/more efficient layout conflict resolution
+      // distribution.
+      return rewriter.notifyMatchFailure(resolutionOp,
+                                         "Failing because condition suffice to "
+                                         "use better conflict resolutions.");
+    }
+
+    // Compute Subgroup and Workgroup related information and offsets.
+    auto funcOp = resolutionOp->getParentOfType<func::FuncOp>();
+    if (!funcOp) {
+      return rewriter.notifyMatchFailure(
+          resolutionOp, "Expects a parent of type funcOp S.T we can compute "
+                        "subgroup and workgroup related information.");
+    }
+    std::optional<SmallVector<int64_t>> workgroupSize =
+        getWorkgroupSize(funcOp);
+    std::optional<int64_t> subgroupSize = getSubgroupSize(funcOp);
+    if (!workgroupSize.has_value() || !subgroupSize.has_value()) {
+      return rewriter.notifyMatchFailure(
+          resolutionOp, "Expects workgroup/subgroup information to be "
+                        "available to resolve conflict.");
+    }
+    int64_t flatThreadSize = ShapedType::getNumElements(workgroupSize.value());
+    if (flatThreadSize % subgroupSize.value() != 0)
+      return failure();
+    int64_t numSubgroups = flatThreadSize / subgroupSize.value();
+
+    // Define shapes and types needed to be roundtripped to shared-memory.
+    // The allocated shared-memory will stack subgroup data
+    // on fastest dimension. Hence, shape will be:
+    // [dim0, dim1, ..., subgroupCount * dimN]
+
+    auto resolutionType =
+        llvm::dyn_cast_or_null<VectorType>(resolutionOp.getResult().getType());
+    if (!resolutionType) {
+      return rewriter.notifyMatchFailure(
+          resolutionOp,
+          "Expects resolutionOp result to be of type vectorType.");
+    }
+    if (!resolutionType.hasStaticShape()) {
+      return rewriter.notifyMatchFailure(
+          resolutionOp, "Expects resolutionOp result to have static shape.");
+    }
+    auto paddedShape = SmallVector<int64_t>(resolutionType.getShape());
+    int64_t vectorRank = resolutionType.getRank();
+    paddedShape[vectorRank - 1] *= numSubgroups;
+
+    // Offset and indexing computation such that subgroups can
+    // write and read to shared memory correctly and without conflicts.
+    AffineExpr d0, d1, d2, s0;
+    bindDims(rewriter.getContext(), d0, d1, d2);
+    bindSymbols(rewriter.getContext(), s0);
+    auto indexType = rewriter.getIndexType();
+    Value threadX =
+        rewriter.create<gpu::ThreadIdOp>(loc, indexType, gpu::Dimension::x);
+    Value threadY =
+        rewriter.create<gpu::ThreadIdOp>(loc, indexType, gpu::Dimension::y);
+    Value threadZ =
+        rewriter.create<gpu::ThreadIdOp>(loc, indexType, gpu::Dimension::z);
+    Value flatThreadId = affine::makeComposedAffineApply(
+        rewriter, loc,
+        (d0 + workgroupSize.value()[0] * d1 +
+         (workgroupSize.value()[0] * workgroupSize.value()[1]) * d2),
+        {threadX, threadY, threadZ});
+    Value subgroupOffset = affine::makeComposedAffineApply(
+        rewriter, loc,
+        s0.floorDiv(subgroupSize.value()) *
+            resolutionType.getShape()[vectorRank - 1],
+        {flatThreadId});
+
+    // Create shared memory to store the intermediate from src layout.
+    auto workgroupMemoryAddressSpace = Attribute(gpu::AddressSpaceAttr::get(
+        rewriter.getContext(), gpu::AddressSpace::Workgroup));
+    MemRefType allocType =
+        MemRefType::get(paddedShape, resolutionType.getElementType(),
+                        AffineMap(), workgroupMemoryAddressSpace);
+    auto alloc = rewriter.create<memref::AllocOp>(loc, allocType);
+
+    SmallVector<OpFoldResult> offsets(vectorRank, rewriter.getIndexAttr(0));
+    SmallVector<OpFoldResult> strides(vectorRank, rewriter.getIndexAttr(1));
+    SmallVector<OpFoldResult> shapes = llvm::to_vector(
+        llvm::map_range(resolutionType.getShape(), [&](int64_t dim) {
+          return OpFoldResult(rewriter.getIndexAttr(dim));
+        }));
+    offsets[vectorRank - 1] = subgroupOffset;
+    auto subview = rewriter.create<memref::SubViewOp>(loc, alloc, offsets,
+                                                      shapes, strides);
+
+    // Creating write/trip to shared memory using src layout.
+    Value c0 = rewriter.create<arith::ConstantIndexOp>(loc, 0);
+    SmallVector<Value> indices(resolutionType.getRank(), c0);
+    SmallVector<bool> inBounds(vectorRank, true);
+    auto write = rewriter.create<vector::TransferWriteOp>(loc, vector, subview,
+                                                          indices, inBounds);
+    // Insert gpu.barrier
+    rewriter.create<gpu::BarrierOp>(write.getLoc());
+
+    // Creating read from shared memory using dst layout.
+    // Read with offset starting from the warpIdx * OG fastest dim.
+    indices[vectorRank - 1] = subgroupOffset;
+    auto read = rewriter.create<vector::TransferReadOp>(loc, resolutionType,
+                                                        alloc, indices);
+
+    // Set layouts signature for write.
+    // We need to set the layout on the srcVector/first operand.
+    auto unitAttr = UnitAttr::get(rewriter.getContext());
+    auto writeAttrs = SmallVector<Attribute>(write->getNumOperands(), unitAttr);
+    writeAttrs[0] =
+        currentLayout; // 1st operand is src which requires currentLayout.
+    ArrayAttr writeOperandsAttr =
+        ArrayAttr::get(rewriter.getContext(), writeAttrs);
+    ArrayAttr writeResultsAttr = ArrayAttr::get(rewriter.getContext(), {});
+    setSignatureForRedistribution(rewriter, write.getOperation(),
+                                  writeOperandsAttr, writeResultsAttr);
+
+    // Set layouts signature for read.
+    // We only need to set the layout on output.
+    ArrayAttr readOperandsAttr = ArrayAttr::get(
+        rewriter.getContext(),
+        SmallVector<Attribute>(read->getNumOperands(), unitAttr));
+    ArrayAttr readResultsAttr =
+        ArrayAttr::get(rewriter.getContext(), {targetLayout});
+    setSignatureForRedistribution(rewriter, read.getOperation(),
+                                  readOperandsAttr, readResultsAttr);
+
+    rewriter.replaceOp(resolutionOp, read.getResult());
+    return success();
+  }
+};
+
 } // namespace
 
 void populateGPUReductionDistributionPatterns(RewritePatternSet &patterns,
@@ -857,7 +1029,8 @@ void populateGPUDistributionLayoutAttrPatterns(Value laneId,
 // TODO: Need a new op/analysis to determine when this pattern is safe to use.
 void populateGPULayoutResolutionDistributionPatterns(
     RewritePatternSet &patterns) {
-  patterns.add<DistributeLayoutConflictResolutions>(patterns.getContext());
+  patterns.add<DistributeLayoutConflictResolutions,
+               DistributeLayoutConflictToSharedMemory>(patterns.getContext());
 }
 
 }; // namespace mlir::iree_compiler

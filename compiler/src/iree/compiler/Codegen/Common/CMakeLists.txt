@@ -132,6 +132,7 @@ iree_cc_library(
     "TileSizeSelection.cpp"
     "TypePropagationPass.cpp"
     "UserConfig.cpp"
+    "VectorizeMemrefCopy.cpp"
     "VectorizePad.cpp"
   DEPS
     ::PassHeaders

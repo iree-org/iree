@@ -42,6 +42,11 @@ static llvm::cl::opt<bool> clFailOnOutOfBoundsStackAllocation(
                    "be solved"),
     llvm::cl::init(true));
 
+static llvm::cl::opt<bool> clFailOnLargeVector(
+    "iree-llvmcpu-fail-on-large-vector",
+    llvm::cl::desc("fail if there are operations with large vectors"),
+    llvm::cl::init(true));
+
 static llvm::cl::opt<bool> clCheckLinalgVectorization(
     "iree-llvmcpu-check-linalg-vectorization",
     llvm::cl::desc(
@@ -320,6 +325,9 @@ void addCPUBufferOpsTileAndVectorizePipeline(
     funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
     funcPassManager.addPass(createCanonicalizerPass());
     funcPassManager.addPass(createCSEPass());
+    if (clFailOnLargeVector) {
+      funcPassManager.addPass(createLLVMCPUVerifyVectorSizeLegalityPass());
+    }
   }
 
   // Run IREE specific passes before vector lowering expert.
@@ -397,6 +405,9 @@ void addMultiTilingExpertPassPipeline(OpPassManager &funcPassManager,
     funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
     funcPassManager.addPass(createCanonicalizerPass());
     funcPassManager.addPass(createCSEPass());
+    if (clFailOnLargeVector) {
+      funcPassManager.addPass(createLLVMCPUVerifyVectorSizeLegalityPass());
+    }
   }
 
   addCPUBufferizePasses(funcPassManager);
@@ -456,6 +467,9 @@ void addConvTileAndDecomposeExpertPassPipeline(
     funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
     funcPassManager.addPass(createCanonicalizerPass());
     funcPassManager.addPass(createCSEPass());
+    if (clFailOnLargeVector) {
+      funcPassManager.addPass(createLLVMCPUVerifyVectorSizeLegalityPass());
+    }
   }
 
   // Eliminate redundant transfer_read/write to avoid stack allocations.
@@ -531,6 +545,9 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &funcPassManager,
     funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
     funcPassManager.addPass(createCanonicalizerPass());
     funcPassManager.addPass(createCSEPass());
+    if (clFailOnLargeVector) {
+      funcPassManager.addPass(createLLVMCPUVerifyVectorSizeLegalityPass());
+    }
   }
 
   funcPassManager.addPass(createCanonicalizerPass());
@@ -576,6 +593,9 @@ void addCPUDataTilingPipeline(OpPassManager &funcPassManager,
     funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
     funcPassManager.addPass(createCanonicalizerPass());
     funcPassManager.addPass(createCSEPass());
+    if (clFailOnLargeVector) {
+      funcPassManager.addPass(createLLVMCPUVerifyVectorSizeLegalityPass());
+    }
   }
 
   addCPUBufferizePasses(funcPassManager);
@@ -610,6 +630,9 @@ void addCPULinalgExtTileAndVectorizePipeline(
     funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
     funcPassManager.addPass(createCanonicalizerPass());
     funcPassManager.addPass(createCSEPass());
+    if (clFailOnLargeVector) {
+      funcPassManager.addPass(createLLVMCPUVerifyVectorSizeLegalityPass());
+    }
   }
 
   addCPUBufferizePasses(funcPassManager);

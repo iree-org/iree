@@ -121,6 +121,7 @@ void FuseAndHoistParallelLoopsPass::runOnOperation() {
   // potentially nested loops, hoisting from said loops, and continued fusion.
   patterns.add<FuseForalls>(context);
   patterns.add<FuseTileableDestinationProducers>(context);
+  tensor::populateFoldTensorEmptyPatterns(patterns);
   populateForallLoopHoistingPattern(patterns);
   if (failed(
           applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {

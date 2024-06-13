@@ -32,9 +32,6 @@ struct UpcastContractOutput : OpRewritePattern<vector::ContractionOp> {
   LogicalResult matchAndRewrite(vector::ContractionOp contractOp,
                                 PatternRewriter &rewriter) const override {
     VectorContractOpInfo opInfo(contractOp);
-    if (opInfo.getOpKind() == VectorContractOpInfo::OpKind::UNKNOWN) {
-      return rewriter.notifyMatchFailure(contractOp, "unhandled contract kind");
-    }
 
     auto srcCType = dyn_cast<VectorType>(contractOp.getAccType());
     if (!srcCType) {

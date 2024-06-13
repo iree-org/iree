@@ -1,7 +1,7 @@
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx940 --iree-codegen-llvmgpu-use-vector-distribution --iree-llvmgpu-enable-prefetch=true \
 // RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-llvmgpu-select-lowering-strategy, func.func(iree-llvmgpu-lower-executable-target)))))" %s | FileCheck %s
 // RUN: iree-opt --split-input-file --iree-gpu-test-target=gfx1100 --iree-codegen-llvmgpu-use-vector-distribution --iree-llvmgpu-enable-prefetch=true \
-// RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-llvmgpu-select-lowering-strategy, func.func(iree-llvmgpu-lower-executable-target)))))" %s | FileCheck %s --check-prefix=CDNA3
+// RUN:   --pass-pipeline="builtin.module(hal.executable(hal.executable.variant(builtin.module(iree-llvmgpu-select-lowering-strategy, func.func(iree-llvmgpu-lower-executable-target)))))" %s | FileCheck %s --check-prefix=RDNA3
 
 // TODO: This test is still using the legacy LLVMGPU kernel config. This needs
 // to be migrated to the rocdl heuristics, but for now is just physically
@@ -318,22 +318,22 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 }
 }
 
-//       CDNA3: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [64, 2, 1] subgroup_size = 32
-//  CDNA3-SAME:   mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>,
-//  CDNA3-SAME:     subgroup_m_count = 2, subgroup_n_count = 2>
+//       RDNA3: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [64, 2, 1] subgroup_size = 32
+//  RDNA3-SAME:   mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<WMMA_F16_16x16x16_F32>,
+//  RDNA3-SAME:     subgroup_m_count = 2, subgroup_n_count = 2>
 
 
-//    CDNA3-LABEL: func.func @matmul_256x256x256_f16_f32
-//     CDNA3-SAME:    translation_info = #[[$TRANSLATION]]
-//          CDNA3:   scf.for {{.*}} = %c0 to %c256 step %c128 iter_args({{.*}}) -> (vector<2x2x8x1x1x1xf32>)
+//    RDNA3-LABEL: func.func @matmul_256x256x256_f16_f32
+//     RDNA3-SAME:    translation_info = #[[$TRANSLATION]]
+//          RDNA3:   scf.for {{.*}} = %c0 to %c256 step %c128 iter_args({{.*}}) -> (vector<2x2x8x1x1x1xf32>)
 // Each subgroup handles 2 * 2 tiles, and for each tile we accumulate 8 times
 // along the K dimension. So in total 32 wmma ops.
-// CDNA3-COUNT-32:     amdgpu.wmma {{.*}} : vector<16xf16>, vector<16xf16>, vector<8xf32>
-//          CDNA3:     scf.yield %{{.+}} : vector<2x2x8x1x1x1xf32>
+// RDNA3-COUNT-32:     amdgpu.wmma {{.*}} : vector<16xf16>, vector<16xf16>, vector<8xf32>
+//          RDNA3:     scf.yield %{{.+}} : vector<2x2x8x1x1x1xf32>
 //  Since each subgroup handles 2 * 2 tiles, and for each tile, each lane holds 4 values.
 //  we will have 32 writes. We cannot do contiguous writes since the outputs columns has interleaved
 //  thread ids.
-//  CDNA3-COUNT-32:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<1x1xf32>, memref<256x256xf32, #hal.descriptor_type<storage_buffer>>
+//  RDNA3-COUNT-32:   vector.transfer_write {{.+}} {in_bounds = [true, true]} : vector<1x1xf32>, memref<256x256xf32, #hal.descriptor_type<storage_buffer>>
 
 // -----
 
@@ -408,3 +408,68 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 // CHECK:         amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
 // CHECK:         %[[OUT_GLOBAL_SUB:.+]] = memref.subview %[[OUT_GLOBAL]]
 // CHECK:         vector.transfer_write %{{.+}}, %[[OUT_GLOBAL_SUB]]
+
+// -----
+
+// This test ensures that we are generating contraction schedules does not only work on contraction,
+// but also will be compatible with transfer_read layouts anchors.
+// Currently the transfer_read layout anchors expects WorkgroupSize % (WgTileSize / numelPerThread) == 0.
+// this test ensure that this constraint is satisfied.
+
+// NOTE: This test is not exhaustive of all possible ways the above condition is breaking,
+//       but rather is an example of a matmul shape from a model that broke our compilation heuristic.
+
+#pipeline_layout = #hal.pipeline.layout<
+  push_constants = 3,
+  sets = [
+    <0, bindings = [
+      <0, storage_buffer, ReadOnly>,
+      <1, storage_buffer>
+      ]>
+  ]>
+hal.executable public @contract_schedule_considering_read_layout {
+  hal.executable.variant public @rocm_hsaco_fb target(<"rocm", "rocm-hsaco-fb">) {
+    hal.executable.export public @contract_schedule_considering_read_layout ordinal(0) layout(#pipeline_layout) {
+    ^bb0(%arg0: !hal.device):
+      %x, %y, %z = flow.dispatch.workgroup_count_from_slice
+      hal.return %x, %y, %z : index, index, index
+    }
+    builtin.module {
+      func.func @contract_schedule_considering_read_layout() {
+        %cst = arith.constant 0.000000e+00 : f16
+        %0 = hal.interface.constant.load[0] : i32
+        %1 = hal.interface.constant.load[1] : i32
+        %2 = hal.interface.constant.load[2] : i32
+        %3 = arith.index_castui %0 : i32 to index
+        %4 = arith.index_castui %1 : i32 to index
+        %5 = arith.index_castui %2 : i32 to index
+        %6 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%3) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2x160x1536xf16>>
+        %7 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%4) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<2x1536x1536xf16>>
+        %8 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) alignment(64) offset(%5) : !flow.dispatch.tensor<writeonly:tensor<2x160x1536xf16>>
+        %9 = flow.dispatch.tensor.load %6, offsets = [0, 0, 0], sizes = [2, 160, 1536], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<2x160x1536xf16>> -> tensor<2x160x1536xf16>
+        %10 = flow.dispatch.tensor.load %7, offsets = [0, 0, 0], sizes = [2, 1536, 1536], strides = [1, 1, 1] : !flow.dispatch.tensor<readonly:tensor<2x1536x1536xf16>> -> tensor<2x1536x1536xf16>
+        %11 = tensor.empty() : tensor<2x160x1536xf16>
+        %12 = linalg.fill ins(%cst : f16) outs(%11 : tensor<2x160x1536xf16>) -> tensor<2x160x1536xf16>
+        %13 = linalg.batch_matmul ins(%9, %10 : tensor<2x160x1536xf16>, tensor<2x1536x1536xf16>) outs(%12 : tensor<2x160x1536xf16>) -> tensor<2x160x1536xf16>
+        flow.dispatch.tensor.store %13, %8, offsets = [0, 0, 0], sizes = [2, 160, 1536], strides = [1, 1, 1] : tensor<2x160x1536xf16> -> !flow.dispatch.tensor<writeonly:tensor<2x160x1536xf16>>
+        return
+      }
+    }
+  }
+}
+// Basic pipeline test to make sure it generates the instructions we expect.
+
+// CHECK:       #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [256, 1, 1] subgroup_size = 64
+// CHECK-SAME:    mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F16_16x16x16_F32>,
+// CHECK-SAME:    subgroup_m_count = 1, subgroup_n_count = 4>
+
+// CHECK-LABEL: func.func @contract_schedule_considering_read_layout()
+// CHECK-SAME:    translation_info = #[[$TRANSLATION]]
+// CHECK-DAG:     %[[RHS_SHARED:.+]] = memref.alloc() : memref<128x132xf16, #gpu.address_space<workgroup>>
+// CHECK-DAG:     %[[RHS_SHARED_SUB:.+]] =  memref.subview %[[RHS_SHARED]][0, 0] [128, 128] [1, 1]
+// CHECK-DAG:     %[[LHS_SHARED:.+]] = memref.alloc() : memref<16x132xf16, #gpu.address_space<workgroup>>
+// CHECK-DAG:     %[[LHS_SHARED_SUB:.+]] =  memref.subview %[[LHS_SHARED]][0, 0] [16, 128] [1, 1]
+// CHECK:   scf.for {{.*}} = %c0 to %c11 step %c1 iter_args(%[[ARG:.+]] = {{.*}}) -> (vector<1x2x1x1x4x1xf16>)
+// CHECK-COUNT-16:     amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
+// CHECK:     scf.yield
+// CHECK-COUNT-16:   amdgpu.mfma

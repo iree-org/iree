@@ -12,6 +12,8 @@
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
+#include "iree/compiler/Codegen/Dialect/GPU/Transforms/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/LLVMGPU/ROCDLPasses.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
@@ -140,6 +142,20 @@ static FailureOr<Value> gpuAllocationFn(OpBuilder &builder, Location loc,
       .getResult();
 }
 
+static FailureOr<Value> gpuWorkgroupAllocationFn(OpBuilder &builder,
+                                                 Location loc,
+                                                 MemRefType memRefType,
+                                                 ValueRange dynamicSizes,
+                                                 unsigned alignment) {
+  gpu::AddressSpaceAttr addressSpace = gpu::AddressSpaceAttr::get(
+      builder.getContext(), gpu::GPUDialect::getWorkgroupAddressSpace());
+  MemRefType allocType =
+      MemRefType::get(memRefType.getShape(), memRefType.getElementType(),
+                      AffineMap(), addressSpace);
+  return builder.create<memref::AllocOp>(loc, allocType, dynamicSizes)
+      .getResult();
+}
+
 // Barriers are only needed when copying to/from workgroup memory. The only
 // other kind of memory that can be allocated is function memory, which is local
 // to a thread.
@@ -194,8 +210,10 @@ static ReorderWorkgroupsStrategy getReorderWorkgroupsStrategy(
 // Common Pass Recipes
 //===----------------------------------------------------------------------===//
 
-static void addBufferizePasses(OpPassManager &funcPassManager) {
-  BufferizationOptions::AllocationFn allocationFn = gpuAllocationFn;
+static void addBufferizePasses(OpPassManager &funcPassManager,
+                               bool allowPrivateAllocations = true) {
+  BufferizationOptions::AllocationFn allocationFn =
+      allowPrivateAllocations ? gpuAllocationFn : gpuWorkgroupAllocationFn;
   BufferizationOptions::MemCpyFn memcpyFn = gpuCopyFn;
   addIREEComprehensiveBufferizePasses(funcPassManager, allocationFn, memcpyFn);
   funcPassManager.addPass(createCanonicalizerPass());
@@ -268,6 +286,78 @@ void addGPUVectorizationPassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createOptimizeVectorTransferPass());
   funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
+}
+
+//===---------------------------------------------------------------------===//
+// Tile and Fuse
+//===---------------------------------------------------------------------===//
+
+void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager) {
+  tileAndDistributeToWorkgroup(funcPassManager);
+  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createCSEPass());
+
+  funcPassManager.addPass(createGPUPromoteMatmulOperandsPass());
+
+  // Step 1. Tile and fuse tileable ops to reduction loops.
+  {
+    GPUApplyTilingLevelPassOptions options;
+    options.tilingLevel = IREE::GPU::TilingLevel::Reduction;
+    funcPassManager.addPass(createGPUApplyTilingLevelPass(options));
+    funcPassManager.addPass(createCanonicalizerPass());
+    funcPassManager.addPass(createCSEPass());
+  }
+
+  // Step 2. Tile and fuse tileable ops to threads.
+  {
+    GPUApplyTilingLevelPassOptions options;
+    options.tilingLevel = IREE::GPU::TilingLevel::Thread;
+    funcPassManager.addPass(createGPUApplyTilingLevelPass(options));
+    funcPassManager.addPass(createCanonicalizerPass());
+    funcPassManager.addPass(createCSEPass());
+  }
+
+  // Normalize loop bounds for later lowerings.
+  funcPassManager.addPass(iree_compiler::createNormalizeLoopBoundsPass(
+      /*normalizeFor=*/false, /*normalizeForall=*/true));
+  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createCSEPass());
+  funcPassManager.addPass(createLoopInvariantCodeMotionPass());
+
+  // Step 3. Greedily fuse parallel loops and hoist from serial loops.
+  // TODO: Tileable consumer fusion needs to happen here as well.
+  funcPassManager.addPass(IREE::GPU::createFuseAndHoistParallelLoopsPass());
+  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createCSEPass());
+  funcPassManager.addPass(createLoopInvariantCodeMotionPass());
+
+  // Step 4. Lower special ops and vectorize.
+  funcPassManager.addPass(IREE::GPU::createVectorizeIREEGPUOpsPass());
+  addGPUVectorizationPasses(funcPassManager);
+
+  // Step 5. Bufferize.
+  // TODO: This is a workaround for a bug in the lowering of
+  // `iree_gpu.shuffle_tensor` which does not properly represent the concurrent
+  // nature of the write to the intermediate tensor.
+  addBufferizePasses(funcPassManager, /*allowPrivateAllocations=*/false);
+
+  // Step 6. Resolve remaining parallel loops.
+  funcPassManager.addPass(createGPUDistributePass());
+
+  // Vectorize copies that came out of vectorization.
+  funcPassManager.addPass(createVectorizeMemrefCopyPass());
+
+  // Step 7. Remaining post-bufferization optimizations/lowerings.
+  funcPassManager.addPass(IREE::GPU::createLowerIREEGPUOpsPass());
+  funcPassManager.addPass(createLoopInvariantCodeMotionPass());
+  funcPassManager.addPass(memref::createFoldMemRefAliasOpsPass());
+  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createCSEPass());
+  funcPassManager.addPass(createOptimizeVectorTransferPass());
+  funcPassManager.addPass(createOptimizeTensorInsertExtractSlicesPass());
+  funcPassManager.addPass(createHoistStaticallyBoundAllocationsPass());
+  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createCSEPass());
 }
 
 //===---------------------------------------------------------------------===//
@@ -748,23 +838,22 @@ void addGPUWarpReductionPassPipeline(OpPassManager &funcPassManager) {
 
 void addGPUPackUnPackPasses(OpPassManager &funcPassManager) {
   tileAndDistributeToWorkgroup(funcPassManager);
-
-  funcPassManager.addPass(createCanonicalizerPass());
-  funcPassManager.addPass(createWorkgroupSpecializationPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
   funcPassManager.addPass(createGPUTensorTilePass());
+  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createCSEPass());
+
   funcPassManager.addPass(
       createDecomposePackUnPackOpsPass(/*tileOuterToOne=*/true));
+  funcPassManager.addPass(createCanonicalizerPass());
+  funcPassManager.addPass(createCSEPass());
   addGPUVectorizationPasses(funcPassManager);
 
   addBufferizePasses(funcPassManager);
 
-  // distribute foreach threads
   funcPassManager.addPass(createGPUDistributePass());
-
-  funcPassManager.addPass(createSplitFullPartialTransferPass("linalg-copy"));
 }
 
 void addGPUSimpleDistributePassPipeline(OpPassManager &funcPassManager) {

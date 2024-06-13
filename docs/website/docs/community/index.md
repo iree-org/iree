@@ -2,12 +2,17 @@
 
 Projects built by community members:
 
-* The [SHARK](https://github.com/nod-ai/SHARK) and
-  [SRT](https://github.com/nod-ai/SRT) projects offer highly tuned performance
-  and user interfaces for running a large corpus of machine learning programs.
+* The [SHARK](https://github.com/nod-ai/SHARK) project offers user interfaces
+  for running a large corpus of machine learning programs.
 
-* The [SHARK-Turbine](https://github.com/nod-ai/SHARK-Turbine) project provides
-  tools for bridging between PyTorch and IREE.
+* The [sharktank](https://github.com/nod-ai/sharktank) project contains
+  modeling and serving libraries for popular genai applications.
+
+* The [SHARK-Turbine](https://github.com/nod-ai/SHARK-Turbine) project is an
+  integration repository for various model bringup activities. Several parts
+  of SHARK-Turbine graduated to
+  [iree-turbine](https://github.com/iree-org/iree-turbine) and
+  [sharktank](https://github.com/nod-ai/sharktank).
 
 * The [IREE Bare-Metal Arm Sample](https://github.com/iml130/iree-bare-metal-arm)
   shows how to build IREE with the
@@ -20,6 +25,9 @@ Projects built by community members:
   shows one way to integrate IREE's runtime into a project with CMake.
 
 Official repositories:
+
+* [iree-turbine](https://github.com/iree-org/iree-turbine) is home to IREE's
+  [PyTorch](https://pytorch.org/) frontend.
 
 * [iree-jax](https://github.com/iree-org/iree-jax) is home to
   IREE's AOT support for [JAX](https://github.com/google/jax) programs.
