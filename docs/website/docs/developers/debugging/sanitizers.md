@@ -95,7 +95,47 @@ ASAN_SYMBOLIZER_PATH=/usr/lib/llvm-12/bin/llvm-symbolizer \
   cmake --build ...
 ```
 
-!!! tip
+!!! tip "Tip - ASan stack traces from Python"
+
+    When properly configured, you should see stack trace symbols from ASan
+    reports, even when running Python code.
+
+    If you see stack traces pointing at `site-packages`, you are using an
+    installed package from pip and _not_ your source build with ASan!
+
+    ```
+    #0 0x7fbffd1712d8  (/.venv/lib/python3.11/site-packages/iree/_runtime_libs/_runtime.cpython-311-x86_64-linux-gnu.so+0xae2d8) (BuildId: 32e87a22f20d0241)
+    #1 0x7fbffd1e5d78  (/.venv/lib/python3.11/site-packages/iree/_runtime_libs/_runtime.cpython-311-x86_64-linux-gnu.so+0x122d78) (BuildId: 32e87a22f20d0241)
+    #2 0x7fbffd1e5b86  (/.venv/lib/python3.11/site-packages/iree/_runtime_libs/_runtime.cpython-311-x86_64-linux-gnu.so+0x122b86) (BuildId: 32e87a22f20d0241)
+    #3 0x7fbffd11882d  (/.venv/lib/python3.11/site-packages/iree/_runtime_libs/_runtime.cpython-311-x86_64-linux-gnu.so+0x5582d) (BuildId: 32e87a22f20d0241)
+    #4 0x5af471  (/usr/bin/python3.11+0x5af471) (BuildId: ead95fcf0410547669743f801bc8c549efbdf7ce)
+    ```
+
+    To fix this, uninstall the packages and ensure that you have your
+    `PYTHONPATH` pointing at your build directory:
+
+    ```shell hl_lines="14-18"
+    python -m pip uninstall iree-runtime
+    python -m pip uninstall iree-compiler
+    source iree-build/.env && export PYTHONPATH
+
+    LD_PRELOAD=/usr/lib/llvm-12/lib/clang/12.0.0/lib/linux/libclang_rt.asan-x86_64.so \
+    ASAN_SYMBOLIZER_PATH=/usr/lib/llvm-12/bin/llvm-symbolizer \
+    ASAN_OPTIONS="detect_leaks=0" \
+      python ...
+
+    AddressSanitizer:DEADLYSIGNAL
+    =================================================================
+    ==229852==ERROR: AddressSanitizer: SEGV on unknown address 0x7f66510ff050 (pc 0x7f66efa5f25e bp 0x7fff9db6e9d0 sp 0x7fff9db6e950 T0)
+    ==229852==The signal is caused by a READ memory access.
+        #0 0x7f66efa5f25e in __flatbuffers_soffset_read iree/third_party/flatcc/include/flatcc/flatcc_endian.h:89:2
+        #1 0x7f66efa5f25e in __flatbuffers_soffset_read_from_pe iree/third_party/flatcc/include/flatcc/flatcc_endian.h:89:2
+        #2 0x7f66efa5f25e in iree_vm_BytecodeModuleDef_exported_functions iree-build/runtime/src/iree/schemas/bytecode_module_def_reader.h:693:1
+        #3 0x7f66efa5f25e in iree_vm_bytecode_module_lookup_function iree/runtime/src/iree/vm/bytecode/module.c:292:9
+        #4 0x7f66efb5b497 in iree_vm_context_run_function iree/runtime/src/iree/vm/context.c:77:26
+    ```
+
+!!! tip "Tip - Using the CUDA driver with ASan from Python"
 
     If you want to run the IREE CUDA runtime driver it is likely you would
     need.
