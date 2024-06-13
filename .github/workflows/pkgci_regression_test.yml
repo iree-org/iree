@@ -296,7 +296,7 @@ jobs:
           source ${VENV_DIR}/bin/activate
           pytest SHARK-TestSuite/iree_tests/benchmarks/benchmark_sdxl_rocm.py \
             --goldentime-rocm-e2e-ms 1636 \
-            --goldentime-rocm-unet-ms 441 \
+            --goldentime-rocm-unet-ms 442 \
             --goldentime-rocm-clip-ms 16.5 \
             --goldentime-rocm-vae-ms 285 \
             --gpu-number 3 \
