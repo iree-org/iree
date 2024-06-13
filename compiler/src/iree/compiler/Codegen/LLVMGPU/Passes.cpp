@@ -294,14 +294,13 @@ void addGPUVectorizationPassPipeline(OpPassManager &funcPassManager) {
 
 void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager) {
 
+  // Step 1. Promote matmul operands and pack to intrinsic shapes.
   funcPassManager.addPass(createGPUPromoteMatmulOperandsPass());
   funcPassManager.addPass(IREE::GPU::createPackToIntrinsicsPass());
 
   tileAndDistributeToWorkgroup(funcPassManager);
-  funcPassManager.addPass(createCanonicalizerPass());
-  funcPassManager.addPass(createCSEPass());
 
-  // Step 1. Tile and fuse tileable ops to reduction loops.
+  // Step 2. Tile and fuse tileable ops to reduction loops.
   {
     GPUApplyTilingLevelPassOptions options;
     options.tilingLevel = IREE::GPU::TilingLevel::Reduction;
@@ -316,11 +315,10 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createPropagateReshapesByExpansionPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
-  funcPassManager.addPass(createCleanupBufferAllocViewPass());
   funcPassManager.addPass(createConvertToDestinationPassingStylePass(
       /*useWARForCooperativeMatrixCodegen=*/false));
 
-  // Step 2. Tile and fuse tileable ops to subgroups/threads.
+  // Step 3. Tile and fuse tileable ops to subgroups/threads.
   {
     GPUApplyTilingLevelPassOptions options;
     options.tilingLevel = IREE::GPU::TilingLevel::Thread;
@@ -342,31 +340,30 @@ void addGPUTileAndFusePassPipeline(OpPassManager &funcPassManager) {
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createLoopInvariantCodeMotionPass());
 
-  // Step 3. Greedily fuse parallel loops and hoist from serial loops.
-  // TODO: Tileable consumer fusion needs to happen here as well.
+  // Step 4. Greedily fuse parallel loops and hoist from serial loops.
   funcPassManager.addPass(IREE::GPU::createFuseAndHoistParallelLoopsPass());
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
   funcPassManager.addPass(createLoopInvariantCodeMotionPass());
 
-  // Step 4. Lower special ops and vectorize.
+  // Step 5. Lower special ops and vectorize.
   funcPassManager.addPass(IREE::GPU::createVectorizeIREEGPUOpsPass());
   addGPUVectorizationPasses(funcPassManager);
   funcPassManager.addPass(createCleanupBufferAllocViewPass());
 
-  // Step 5. Bufferize.
+  // Step 6. Bufferize.
   // TODO: This is a workaround for a bug in the lowering of
   // `iree_gpu.shuffle_tensor` which does not properly represent the concurrent
   // nature of the write to the intermediate tensor.
   addBufferizePasses(funcPassManager, /*allowPrivateAllocations=*/false);
 
-  // Step 6. Resolve remaining parallel loops.
+  // Step 7. Resolve remaining parallel loops.
   funcPassManager.addPass(createGPUDistributePass());
 
   // Vectorize copies that came out of vectorization.
   funcPassManager.addPass(createVectorizeMemrefCopyPass());
 
-  // Step 7. Remaining post-bufferization optimizations/lowerings.
+  // Step 8. Remaining post-bufferization optimizations/lowerings.
   funcPassManager.addPass(IREE::GPU::createLowerIREEGPUOpsPass());
   funcPassManager.addPass(createLoopInvariantCodeMotionPass());
   funcPassManager.addPass(memref::createFoldMemRefAliasOpsPass());

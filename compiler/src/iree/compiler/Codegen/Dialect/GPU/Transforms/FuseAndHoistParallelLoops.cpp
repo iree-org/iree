@@ -162,19 +162,35 @@ struct FuseTilableForallConsumers final
 
 void FuseAndHoistParallelLoopsPass::runOnOperation() {
   MLIRContext *context = &getContext();
-  RewritePatternSet patterns(context);
 
-  // These two patterns are run to a fixed point, allowing fusion within
-  // potentially nested loops, hoisting from said loops, and continued fusion.
-  patterns.add<FuseForalls>(context);
-  patterns.add<FuseTilableDestinationProducers>(context);
-  patterns.add<FuseTilableForallConsumers>(context);
-  tensor::populateFoldTensorEmptyPatterns(patterns);
-  scf::ForallOp::getCanonicalizationPatterns(patterns, context);
-  populateForallLoopHoistingPattern(patterns);
-  if (failed(
-          applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
-    return signalPassFailure();
+  // First run the hoisting and fusion patterns.
+  {
+    RewritePatternSet patterns(context);
+    // These two patterns are run to a fixed point, allowing fusion within
+    // potentially nested loops, hoisting from said loops, and continued fusion.
+    patterns.add<FuseForalls>(context);
+    patterns.add<FuseTilableForallConsumers>(context);
+    populateForallLoopHoistingPattern(patterns);
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(patterns)))) {
+      return signalPassFailure();
+    }
+  }
+
+  // After hoisting parallel loops, try to fuse in any newly revealed consumers
+  // and destinations.
+  // TODO: Move the consumer fusion pattern to an explicit worklist rather than
+  // using the GreedyPatternRewriter.
+  {
+    RewritePatternSet patterns(context);
+    patterns.add<FuseTilableDestinationProducers>(context);
+    patterns.add<FuseTilableForallConsumers>(context);
+    tensor::populateFoldTensorEmptyPatterns(patterns);
+    scf::ForallOp::getCanonicalizationPatterns(patterns, context);
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(patterns)))) {
+      return signalPassFailure();
+    }
   }
 }
 

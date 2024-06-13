@@ -695,6 +695,23 @@ struct FoldStaticCollapsIntoInterfaceTensorStore
 
     ArrayRef<int64_t> reshapeSrcShape = collapseShape.getSrcType().getShape();
 
+    // Verify the subspan shape against the shape of the slice being inserted.
+    for (auto [size, group] : llvm::zip_equal(
+             subspanType.getShape(), collapseShape.getReassociationIndices())) {
+      if (group.size() == 1) {
+        continue;
+      }
+
+      int64_t innerDimSize = 1;
+      for (auto i : llvm::drop_begin(group)) {
+        innerDimSize *= reshapeSrcShape[i];
+      }
+      if (size % innerDimSize != 0) {
+        return rewriter.notifyMatchFailure(
+            storeOp, "Subspan type indivisible by expanded shape");
+      }
+    }
+
     AffineExpr d0, d1;
     bindDims(rewriter.getContext(), d0, d1);
     AffineExpr div = d0.ceilDiv(d1);
@@ -723,7 +740,7 @@ struct FoldStaticCollapsIntoInterfaceTensorStore
       OpFoldResult innerDimSizeAttr = rewriter.getIndexAttr(innerDimSize);
       expandedOffsets.push_back(affine::makeComposedFoldedAffineApply(
           rewriter, loc, div, {offset, innerDimSizeAttr}));
-      assert(size % innerDimSize == 0 && "Invalid dispatch tensor store");
+      assert(size % innerDimSize == 0);
       expandedSubspanShape.push_back(size / innerDimSize);
       for (auto i : llvm::drop_begin(group)) {
         expandedOffsets.push_back(zero);

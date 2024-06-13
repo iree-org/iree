@@ -17,6 +17,7 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
+#include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler::IREE::GPU {
@@ -35,27 +36,22 @@ LogicalResult packToIntrinsic(linalg::LinalgOp linalgOp,
                               RewriterBase &rewriter) {
   auto loweringConfig =
       getLoweringConfig<IREE::GPU::LoweringConfigAttr>(linalgOp);
-  if (!loweringConfig) {
-    return success();
-  }
+  assert(loweringConfig && "Packing unconfigured op");
 
   IREE::GPU::MmaInterfaceAttr kind = loweringConfig.getMmaKind();
-  if (!kind) {
-    return success();
-  }
-
-  // At this point fail compilation if packing fails because the operation
-  // is expected to be packed to the intrinsic shape.
+  assert(kind && "Packing op without mma kind");
 
   FailureOr<linalg::ContractionDimensions> contractionDims =
       linalg::inferContractionDims(linalgOp);
   if (failed(contractionDims)) {
-    return failure();
+    return rewriter.notifyMatchFailure(linalgOp,
+                                       "failed to infer contraction dims");
   }
 
   if (contractionDims->m.empty() || contractionDims->n.empty() ||
       contractionDims->k.empty()) {
-    return failure();
+    return rewriter.notifyMatchFailure(
+        linalgOp, "contraction like operation missing critical dimension");
   }
 
   auto zero = rewriter.getIndexAttr(0);
@@ -68,7 +64,7 @@ LogicalResult packToIntrinsic(linalg::LinalgOp linalgOp,
   FailureOr<linalg::PackResult> maybeResult =
       linalg::pack(rewriter, linalgOp, packedSizes);
   if (failed(maybeResult)) {
-    return failure();
+    return rewriter.notifyMatchFailure(linalgOp, "packing failed");
   }
   setLoweringConfig(maybeResult->packedLinalgOp, loweringConfig);
   return success();
@@ -76,11 +72,18 @@ LogicalResult packToIntrinsic(linalg::LinalgOp linalgOp,
 
 void PackToIntrinsicsPass::runOnOperation() {
   MLIRContext *context = &getContext();
-  RewritePatternSet patterns(context);
   auto funcOp = getOperation();
   IRRewriter rewriter(funcOp);
   SmallVector<linalg::LinalgOp> packingCandidates;
   funcOp->walk([&](linalg::LinalgOp linalgOp) {
+    auto loweringConfig =
+        getLoweringConfig<IREE::GPU::LoweringConfigAttr>(linalgOp);
+    if (!loweringConfig) {
+      return;
+    }
+    if (!loweringConfig.getMmaKind()) {
+      return;
+    }
     packingCandidates.push_back(linalgOp);
   });
 
@@ -90,6 +93,18 @@ void PackToIntrinsicsPass::runOnOperation() {
       funcOp.emitError() << "failed to pack operation marked with intrinsic\n";
       return signalPassFailure();
     }
+  }
+
+  // Run layout propagation patterns to pull in adjacent un-configured ops.
+  RewritePatternSet patterns(context);
+  linalg::ControlPropagationFn control = [](Operation *op) -> bool {
+    return !getLoweringConfig(op);
+  };
+
+  linalg::populateDataLayoutPropagationPatterns(patterns, control);
+  if (failed(
+          applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
+    return signalPassFailure();
   }
 }
 

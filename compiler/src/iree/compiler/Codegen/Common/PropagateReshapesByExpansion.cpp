@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -23,6 +24,17 @@ struct PropagateReshapesByExpansionPass
 
 void PropagateReshapesByExpansionPass::runOnOperation() {
   MLIRContext *context = &getContext();
+
+  {
+    RewritePatternSet patterns(context);
+    // Preemptively attempt to fold any reshapes into interface bindings if
+    // possible to simplify subsequent reshape propagation.
+    populateReshapeToInterfaceTensorPatterns(patterns);
+    if (failed(applyPatternsAndFoldGreedily(getOperation(),
+                                            std::move(patterns)))) {
+      return signalPassFailure();
+    }
+  }
 
   RewritePatternSet bubbleExpandShapePatterns(context);
   linalg::ControlFusionFn bubbleUpExpansionControlFn =
@@ -42,6 +54,15 @@ void PropagateReshapesByExpansionPass::runOnOperation() {
   // Add patterns to do some additional cleanup (on top of canonicalizations
   // that can be done later) of reshape ops.
   tensor::populateFoldTensorEmptyPatterns(bubbleExpandShapePatterns);
+  linalg::FillOp::getCanonicalizationPatterns(bubbleExpandShapePatterns,
+                                              context);
+  tensor::CollapseShapeOp::getCanonicalizationPatterns(
+      bubbleExpandShapePatterns, context);
+  tensor::EmptyOp::getCanonicalizationPatterns(bubbleExpandShapePatterns,
+                                               context);
+  tensor::ExpandShapeOp::getCanonicalizationPatterns(bubbleExpandShapePatterns,
+                                                     context);
+  populateReshapeToInterfaceTensorPatterns(bubbleExpandShapePatterns);
 
   if (failed(applyPatternsAndFoldGreedily(
           getOperation(), std::move(bubbleExpandShapePatterns)))) {
