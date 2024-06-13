@@ -150,7 +150,7 @@ jobs:
             sdxl-unet-config-file: sdxl_scheduled_unet_gpu_rocm_gfx90a.json
             sdxl-vae-config-file: sdxl_vae_decode_gpu_rocm_gfx90a.json
             sdxl-clip-config-file: sdxl_prompt_encoder_gpu_rocm_gfx90a.json
-            runs-on: nodai-amdgpu-mi250-x86-64
+            runs-on: nodai-amdgpu-mi210-x86-64
           - name: amdgpu_vulkan
             models-config-file: pytorch_models_gpu_vulkan.json
             runs-on: nodai-amdgpu-w7900-x86-64
@@ -295,11 +295,11 @@ jobs:
         run: |
           source ${VENV_DIR}/bin/activate
           pytest SHARK-TestSuite/iree_tests/benchmarks/benchmark_sdxl_rocm.py \
-            --goldentime-rocm-e2e-ms 1661.5 \
-            --goldentime-rocm-unet-ms 450.5 \
-            --goldentime-rocm-clip-ms 19 \
-            --goldentime-rocm-vae-ms 288.5 \
-            --gpu-number 6 \
+            --goldentime-rocm-e2e-ms 1637 \
+            --goldentime-rocm-unet-ms 442.5 \
+            --goldentime-rocm-clip-ms 17 \
+            --goldentime-rocm-vae-ms 285.5 \
+            --gpu-number 3 \
             --rocm-chip gfx90a \
             --log-cli-level=info \
             --retries 3
