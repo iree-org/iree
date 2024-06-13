@@ -180,30 +180,13 @@ func.func @CKck_to_KC(%arg0: tensor<32x4x32x8xf32>, %arg1: tensor<128x256xf32>) 
   %0 = tensor.unpack %arg0 outer_dims_perm = [1, 0] inner_dims_pos = [0, 1] inner_tiles = [32, 8] into %arg1 : tensor<32x4x32x8xf32> -> tensor<128x256xf32>
   return %0 : tensor<128x256xf32>
 }
-// CHECK-DAG:  #[[MAP0:.+]] = affine_map<(d0) -> (d0 floordiv 32)>
-// CHECK-DAG:  #[[MAP1:.+]] = affine_map<(d0) -> (d0 floordiv 8)>
 // CHECK:      func.func @CKck_to_KC
 // CHECK-SAME:   %[[IN:[A-Za-z0-9]+]]:
 // CHECK-SAME:   %[[OUT:[A-Za-z0-9]+]]:
-// CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
-// CHECK-DAG:    %[[C8:.+]] = arith.constant 8 : index
-// CHECK-DAG:    %[[C32:.+]] = arith.constant 32 : index
-// CHECK-DAG:    %[[C128:.+]] = arith.constant 128 : index
-// CHECK-DAG:    %[[C256:.+]] = arith.constant 256 : index
-// CHECK:        %[[RES0:.+]] = scf.for %[[K:.+]] = %[[C0]] to %[[C128]] step %[[C32]]
-// CHECK-SAME:     iter_args(%[[ITER0:.+]] = %[[OUT]])
-// CHECK:          %[[RES1:.+]] = scf.for %[[C:.+]] = %[[C0]] to %[[C256]] step %[[C8]]
-// CHECK-SAME:       iter_args(%[[ITER1:.+]] = %[[ITER0]])
-// CHECK-DAG:        %[[IN_K:.+]] = affine.apply #[[MAP0]](%[[K]])
-// CHECK-DAG:        %[[IN_C:.+]] = affine.apply #[[MAP1]](%[[C]])
-// CHECK:            %[[IN_SLICE:.+]] = tensor.extract_slice %[[IN]][%[[IN_C]], %[[IN_K]], 0, 0] [1, 1, 32, 8] [1, 1, 1, 1]
-// CHECK:            %[[TILE:.+]] = tensor.extract_slice %[[IN_SLICE]][0, 0, 0, 0] [1, 1, 32, 8] [1, 1, 1, 1] : tensor<1x1x32x8xf32> to tensor<32x8xf32>
-// CHECK:            %[[INSERT:.+]] = tensor.insert_slice %[[TILE]] into %[[ITER1]][%[[K]], %[[C]]] [32, 8] [1, 1]
-// CHECK:            scf.yield %[[INSERT]]
-// CHECK:          }
-// CHECK:          scf.yield %[[RES1]]
-// CHECK:        }
-// CHECK:        return %[[RES0]]
+// CHECK:        %[[TRANSP:.+]] = linalg.transpose ins(%[[IN]]
+// CHECK:        %[[COLLAPSED:.+]] = tensor.collapse_shape %[[TRANSP]] {{.+}} : tensor<4x32x32x8xf32> into tensor<128x256xf32>
+// CHECK:        %[[RES:.+]] = linalg.copy ins(%[[COLLAPSED]]
+// CHECK:        return %[[RES]]
 
 // -----
 
