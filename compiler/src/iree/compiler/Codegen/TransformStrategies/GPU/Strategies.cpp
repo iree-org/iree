@@ -23,6 +23,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/TransformOps/MemRefTransformOps.h"
@@ -38,7 +39,6 @@
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/ImplicitLocOpBuilder.h"
 #include "mlir/IR/TypeUtilities.h"
-#include "mlir/Support/MathExtras.h"
 
 using namespace mlir;
 
@@ -321,7 +321,7 @@ static void failSafeOverrides(MatmulStrategy &strategy,
   // the future.
   if (strategy.pipelineDepth * strategy.reductionTileSize > strategy.k()) {
     strategy.pipelineDepth =
-        mlir::floorDiv(strategy.k(), strategy.reductionTileSize);
+        llvm::divideFloorSigned(strategy.k(), strategy.reductionTileSize);
   }
 }
 
@@ -572,7 +572,7 @@ static void failSafeOverrides(ImplicitGemmStrategy &strategy,
   // the future.
   if (strategy.pipelineDepth * strategy.reductionTileSize > strategy.k()) {
     strategy.pipelineDepth =
-        mlir::floorDiv(strategy.k(), strategy.reductionTileSize);
+        llvm::divideFloorSigned(strategy.k(), strategy.reductionTileSize);
   }
 }
 

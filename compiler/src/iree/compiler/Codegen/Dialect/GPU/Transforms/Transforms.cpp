@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -26,7 +27,6 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/Support/MathExtras.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-transforms"
 
@@ -48,7 +48,7 @@ static FailureOr<int64_t> getTripCount(scf::ForallOp loop) {
 
   int64_t tripCount = 1;
   for (auto [lb, ub, step] : llvm::zip_equal(lbs, ubs, steps)) {
-    tripCount *= mlir::ceilDiv((ub - lb), step);
+    tripCount *= llvm::divideCeil((ub - lb), step);
   }
   return tripCount;
 }

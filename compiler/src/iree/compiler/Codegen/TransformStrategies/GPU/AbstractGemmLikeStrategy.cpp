@@ -11,8 +11,8 @@
 #include "iree/compiler/Codegen/TransformStrategies/GPU/Common.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
-#include "mlir/Support/MathExtras.h"
 
 using namespace mlir;
 
@@ -134,7 +134,7 @@ void AbstractGemmLikeStrategy::initDefaultValues(const GPUModel &gpuModel) {
     numWarps = SmallVector<int64_t>(clNumWarps.begin(), clNumWarps.end());
   } else {
     numWarps = numThreads;
-    numWarps[0] = mlir::ceilDiv(numWarps[0], getSubgroupSize());
+    numWarps[0] = llvm::divideCeil(numWarps[0], getSubgroupSize());
   }
   if (clUseAsyncCopies.getNumOccurrences())
     useAsyncCopies = clUseAsyncCopies;
