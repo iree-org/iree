@@ -86,6 +86,18 @@ def TileAttention :
   ];
 }
 
+def PadAttention :
+    InterfacePass<"iree-linalg-ext-pad-attention", "mlir::FunctionOpInterface"> {
+  let summary =
+      "Tile the attention op along the reduction dimension";
+  let constructor = "mlir::iree_compiler::IREE::LinalgExt::"
+                    "createPadAttentionPass()";
+  let options = [
+    ListOption<"padToMultipleOf", "pad-to-multiple-of", "int64_t",
+                  "Array to represent the number to pad to multiple of for attention dims.">,
+  ];
+}
+
 def DecomposeAttention :
     InterfacePass<"iree-linalg-ext-decompose-attention", "mlir::FunctionOpInterface"> {
   let summary =
