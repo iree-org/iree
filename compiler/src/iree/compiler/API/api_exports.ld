@@ -151,6 +151,7 @@ VER_0 {
     mlirAttributeIsAElements;
     mlirAttributeIsAFlatSymbolRef;
     mlirAttributeIsAFloat;
+    mlirAttributeIsAGPUObjectAttr;
     mlirAttributeIsAInteger;
     mlirAttributeIsAIntegerSet;
     mlirAttributeIsALocation;
@@ -174,6 +175,7 @@ VER_0 {
     mlirBlockDestroy;
     mlirBlockDetach;
     mlirBlockEqual;
+    mlirBlockEraseArgument;
     mlirBlockGetArgument;
     mlirBlockGetFirstOperation;
     mlirBlockGetNextInRegion;
@@ -348,6 +350,12 @@ VER_0 {
     mlirFunctionTypeGetNumResults;
     mlirFunctionTypeGetResult;
     mlirFunctionTypeGetTypeID;
+    mlirGPUObjectAttrGet;
+    mlirGPUObjectAttrGetFormat;
+    mlirGPUObjectAttrGetObject;
+    mlirGPUObjectAttrGetProperties;
+    mlirGPUObjectAttrGetTarget;
+    mlirGPUObjectAttrHasProperties;
     mlirGetDialectHandle__iree_input__;
     mlirGetDialectHandle__transform__;
     mlirIREELinalgTransformRegisterPasses;
@@ -392,6 +400,7 @@ VER_0 {
     mlirIntegerTypeIsUnsigned;
     mlirIntegerTypeSignedGet;
     mlirIntegerTypeUnsignedGet;
+    mlirIsCurrentDebugType;
     mlirIsGlobalDebugEnabled;
     mlirLinalgFillBuiltinNamedOpRegion;
     mlirLlvmThreadPoolCreate;
@@ -415,6 +424,7 @@ VER_0 {
     mlirMemRefTypeGetMemorySpace;
     mlirMemRefTypeGetStridesAndOffset;
     mlirMemRefTypeGetTypeID;
+    mlirMergeSymbolsIntoFromClone;
     mlirModuleCreateEmpty;
     mlirModuleCreateParse;
     mlirModuleDestroy;
@@ -540,6 +550,8 @@ VER_0 {
     mlirRegionTakeBody;
     mlirRegisterGPUPasses;
     mlirRegisterLinalgPasses;
+    mlirSetGlobalDebugType;
+    mlirSetGlobalDebugTypes;
     mlirShapedTypeGetDimSize;
     mlirShapedTypeGetDynamicSize;
     mlirShapedTypeGetDynamicStrideOrOffset;

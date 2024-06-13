@@ -150,6 +150,7 @@ EXPORTS
   mlirAttributeIsAElements
   mlirAttributeIsAFlatSymbolRef
   mlirAttributeIsAFloat
+  mlirAttributeIsAGPUObjectAttr
   mlirAttributeIsAInteger
   mlirAttributeIsAIntegerSet
   mlirAttributeIsALocation
@@ -173,6 +174,7 @@ EXPORTS
   mlirBlockDestroy
   mlirBlockDetach
   mlirBlockEqual
+  mlirBlockEraseArgument
   mlirBlockGetArgument
   mlirBlockGetFirstOperation
   mlirBlockGetNextInRegion
@@ -347,6 +349,12 @@ EXPORTS
   mlirFunctionTypeGetNumResults
   mlirFunctionTypeGetResult
   mlirFunctionTypeGetTypeID
+  mlirGPUObjectAttrGet
+  mlirGPUObjectAttrGetFormat
+  mlirGPUObjectAttrGetObject
+  mlirGPUObjectAttrGetProperties
+  mlirGPUObjectAttrGetTarget
+  mlirGPUObjectAttrHasProperties
   mlirGetDialectHandle__iree_input__
   mlirGetDialectHandle__transform__
   mlirIREELinalgTransformRegisterPasses
@@ -391,6 +399,7 @@ EXPORTS
   mlirIntegerTypeIsUnsigned
   mlirIntegerTypeSignedGet
   mlirIntegerTypeUnsignedGet
+  mlirIsCurrentDebugType
   mlirIsGlobalDebugEnabled
   mlirLinalgFillBuiltinNamedOpRegion
   mlirLlvmThreadPoolCreate
@@ -414,6 +423,7 @@ EXPORTS
   mlirMemRefTypeGetMemorySpace
   mlirMemRefTypeGetStridesAndOffset
   mlirMemRefTypeGetTypeID
+  mlirMergeSymbolsIntoFromClone
   mlirModuleCreateEmpty
   mlirModuleCreateParse
   mlirModuleDestroy
@@ -539,6 +549,8 @@ EXPORTS
   mlirRegionTakeBody
   mlirRegisterGPUPasses
   mlirRegisterLinalgPasses
+  mlirSetGlobalDebugType
+  mlirSetGlobalDebugTypes
   mlirShapedTypeGetDimSize
   mlirShapedTypeGetDynamicSize
   mlirShapedTypeGetDynamicStrideOrOffset
