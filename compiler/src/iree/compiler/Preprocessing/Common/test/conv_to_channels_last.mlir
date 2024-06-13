@@ -154,3 +154,5 @@ util.func @test_unit_dims_pack(%arg0: tensor<10x20x5xf32>) -> tensor<1x1x5x20x10
 // CHECK-SAME:    outs(%[[DST:.+]] : tensor<5x20x10xf32>) permutation = [2, 1, 0]
 // CHECK:       %[[EXPANDED:.+]] = tensor.expand_shape
 // CHECK-SAME:    [0, 1, 2], [3], [4]
+// CHECK-SAME:    tensor<5x20x10xf32> into tensor<1x1x5x20x10xf32>
+// CHECK:       util.return %[[EXPANDED]] : tensor<1x1x5x20x10xf32>
