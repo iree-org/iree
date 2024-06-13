@@ -20,6 +20,7 @@
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/AffineMap.h"
@@ -627,17 +628,8 @@ areNotFullTiles(ArrayRef<int64_t> inputShape,
 static SmallVector<OpFoldResult> getMixedValues(MLIRContext *context,
                                                 ArrayRef<int64_t> staticValues,
                                                 OperandRange dynamicValues) {
-  SmallVector<OpFoldResult> mixedValues;
-  unsigned dynamicValIndex = 0;
   OpBuilder b(context);
-  for (int64_t val : staticValues) {
-    if (!ShapedType::isDynamic(val)) {
-      mixedValues.push_back(b.getIndexAttr(val));
-    } else {
-      mixedValues.push_back(dynamicValues[dynamicValIndex++]);
-    }
-  }
-  return mixedValues;
+  return mlir::getMixedValues(staticValues, dynamicValues, b);
 }
 
 static SmallVector<int64_t>

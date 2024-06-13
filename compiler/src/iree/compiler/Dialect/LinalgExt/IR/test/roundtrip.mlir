@@ -913,18 +913,20 @@ func.func @im2col(%arg0: tensor<2x34x34x640xf32>) -> tensor<2x1024x5760xf32> {
 
 // -----
 
-func.func @im2col_dynamic(%arg0: tensor<?x?x?x?xf32>, %s0: index, %s1: index, %s2: index) -> tensor<?x?x?xf32> {
+func.func @im2col_dynamic(%arg0: tensor<?x?x?x?xf32>, %s0: index, %s1: index, %s2: index,
+                          %mOffset: index, %kOffset: index) -> tensor<?x?x?xf32> {
   %0 = tensor.empty(%s0, %s1, %s2) : tensor<?x?x?xf32>
   %1 = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-           m_offset = [0] k_offset = [0] batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+           m_offset = [%mOffset] k_offset = [%kOffset] batch_pos = [0] m_pos = [1, 2] k_pos = [3]
            ins(%arg0 : tensor<?x?x?x?xf32>)
            outs(%0 : tensor<?x?x?xf32>) -> tensor<?x?x?xf32>
   return %1 : tensor<?x?x?xf32>
 }
-// CHECK:      func.func @im2col_dynamic(%[[ARG0:[a-zA-Z0-9_]+]]: tensor<?x?x?x?xf32>, {{.+}}) -> tensor<?x?x?xf32>
+// CHECK:      func.func @im2col_dynamic(%[[ARG0:[a-zA-Z0-9_]+]]: tensor<?x?x?x?xf32>,
+// CHECK-SAME:   %{{.+}}: index, %{{.+}}: index, %{{.+}}: index, %[[MOFFSET:.+]]: index, %[[KOFFSET:.+]]: index
 // CHECK:        %[[D0:.+]] = tensor.empty({{.+}}) : tensor<?x?x?xf32>
 // CHECK:        %[[D1:.+]] = iree_linalg_ext.im2col strides = [1, 1] dilations = [1, 1] kernel_size = [3, 3]
-// CHECK-SAME:     m_offset = [0] k_offset = [0] batch_pos = [0] m_pos = [1, 2] k_pos = [3]
+// CHECK-SAME:     m_offset = [%[[MOFFSET]]] k_offset = [%[[KOFFSET]]] batch_pos = [0] m_pos = [1, 2] k_pos = [3]
 // CHECK-SAME:     ins(%[[ARG0]] : tensor<?x?x?x?xf32>)
 // CHECK-SAME:     outs(%[[D0]] : tensor<?x?x?xf32>) -> tensor<?x?x?xf32>
 // CHECK:        return %[[D1]] : tensor<?x?x?xf32>
