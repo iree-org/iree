@@ -464,6 +464,7 @@ FailureOr<Operation *> distributeMultiMmaOp(RewriterBase &rewriter,
     }
     return llvm::to_vector(llvm::seq(static_cast<int64_t>(0), rank));
   };
+  Value laneId = newForallOp.getInductionVar(0);
 
   // LHS slice offsets.
   int64_t lhsOuterRank = mmaOp.getLhsOuterRank();
@@ -476,9 +477,8 @@ FailureOr<Operation *> distributeMultiMmaOp(RewriterBase &rewriter,
   SmallVector<int64_t> lhsPermutation = getOrInferPermutationOfRank(
       mmaOp.getLhsPermutation(), mmaOp.getLhsInnerShape().size());
   if (failed(mmaOp.getKind().populateOperandOffsetsSizesStrides(
-          rewriter, loc, IREE::GPU::MMAFragment::Lhs,
-          *newForallOp.getSingleInductionVar(), lhsPermutation, lhsOffsets,
-          lhsSizes, lhsStrides))) {
+          rewriter, loc, IREE::GPU::MMAFragment::Lhs, laneId, lhsPermutation,
+          lhsOffsets, lhsSizes, lhsStrides))) {
     return failure();
   }
   // Extract the rank-reduced slice of the lhs based on the expected inner
@@ -497,9 +497,8 @@ FailureOr<Operation *> distributeMultiMmaOp(RewriterBase &rewriter,
   SmallVector<int64_t> rhsPermutation = getOrInferPermutationOfRank(
       mmaOp.getRhsPermutation(), mmaOp.getRhsInnerShape().size());
   if (failed(mmaOp.getKind().populateOperandOffsetsSizesStrides(
-          rewriter, loc, IREE::GPU::MMAFragment::Rhs,
-          *newForallOp.getSingleInductionVar(), rhsPermutation, rhsOffsets,
-          rhsSizes, rhsStrides))) {
+          rewriter, loc, IREE::GPU::MMAFragment::Rhs, laneId, rhsPermutation,
+          rhsOffsets, rhsSizes, rhsStrides))) {
     return failure();
   }
   // Extract the rank-reduced slice of the rhs based on the expected inner
@@ -518,9 +517,8 @@ FailureOr<Operation *> distributeMultiMmaOp(RewriterBase &rewriter,
   SmallVector<int64_t> accPermutation = getOrInferPermutationOfRank(
       mmaOp.getAccPermutation(), mmaOp.getAccInnerShape().size());
   if (failed(mmaOp.getKind().populateOperandOffsetsSizesStrides(
-          rewriter, loc, IREE::GPU::MMAFragment::Acc,
-          *newForallOp.getSingleInductionVar(), accPermutation, accOffsets,
-          accSizes, accStrides))) {
+          rewriter, loc, IREE::GPU::MMAFragment::Acc, laneId, accPermutation,
+          accOffsets, accSizes, accStrides))) {
     return failure();
   }
   // Extract the rank-reduced slice of the accumulator based on the expected
