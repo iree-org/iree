@@ -12,6 +12,7 @@
 #include "./binding.h"
 #include "./status_utils.h"
 #include "./vm.h"
+#include "iree/base/string_view.h"
 #include "iree/hal/api.h"
 
 namespace iree {
@@ -142,10 +143,29 @@ class HalDevice : public ApiRefCounted<HalDevice, iree_hal_device_t> {
 };
 
 class HalDriver : public ApiRefCounted<HalDriver, iree_hal_driver_t> {
+  // Object that holds the components of a device URI string.
+  struct DeviceUri {
+    iree_string_view_t driver_name;
+    iree_string_view_t device_path;
+    iree_string_view_t params_str;
+
+    DeviceUri(const std::string& device_uri);
+  };
+
+  // Create a stand-alone driver (not residing in a cache) given the name,
+  // path, and params components of a device URI.
+  static py::object Create(const DeviceUri& device_uri);
+
  public:
   static std::vector<std::string> Query();
+
+  // Create a stand-alone driver (not residing in a cache) given a device URI.
+  static py::object Create(const std::string& device_uri);
+
+  // Returns a driver from the given cache, creating it and placing it in
+  // the cache if not already found there.
   static py::object Create(const std::string& device_uri,
-                           py::dict& driver_cache, std::optional<bool> clean);
+                           py::dict& driver_cache);
 
   py::list QueryAvailableDevices();
   HalDevice CreateDefaultDevice(std::optional<py::list> allocators);

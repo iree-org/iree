@@ -905,32 +905,40 @@ std::vector<std::string> HalDriver::Query() {
   return driver_names;
 }
 
-py::object HalDriver::Create(const std::string& device_uri,
-                             py::dict& driver_cache,
-                             std::optional<bool> clean) {
-  iree_string_view_t driver_name, device_path, params_str;
+HalDriver::DeviceUri::DeviceUri(const std::string& device_uri) {
   iree_string_view_t device_uri_sv{
       device_uri.data(), static_cast<iree_host_size_t>(device_uri.size())};
   iree_uri_split(device_uri_sv, &driver_name, &device_path, &params_str);
+}
 
-  // Check cache.  Use the cached value if present and there is no request
-  // to clean out the old value.
-  py::str cache_key(driver_name.data, driver_name.size);
-  py::object cached = driver_cache.attr("get")(cache_key);
-  bool clean_requested = clean.has_value() && clean.value();
-  if (!clean_requested && !cached.is_none()) {
-    return cached;
-  }
-
-  // Create.
+py::object HalDriver::Create(const DeviceUri& device_uri) {
   iree_hal_driver_t* driver;
   CheckApiStatus(iree_hal_driver_registry_try_create(
-                     iree_hal_driver_registry_default(), driver_name,
+                     iree_hal_driver_registry_default(), device_uri.driver_name,
                      iree_allocator_system(), &driver),
                  "Error creating driver");
 
-  // Cache.
   py::object driver_obj = py::cast(HalDriver::StealFromRawPtr(driver));
+  return driver_obj;
+}
+
+py::object HalDriver::Create(const std::string& device_uri) {
+  DeviceUri parsed_uri(device_uri);
+  return HalDriver::Create(parsed_uri);
+}
+
+py::object HalDriver::Create(const std::string& device_uri,
+                             py::dict& driver_cache) {
+  // Look up the driver by driver name in the cache, and return it if found.
+  DeviceUri parsed_uri(device_uri);
+  py::str cache_key(parsed_uri.driver_name.data, parsed_uri.driver_name.size);
+  py::object cached = driver_cache.attr("get")(cache_key);
+  if (!cached.is_none()) {
+    return cached;
+  }
+
+  // Create a new driver and put it in the cache.
+  py::object driver_obj = HalDriver::Create(parsed_uri);
   driver_cache[cache_key] = driver_obj;
   return driver_obj;
 }
@@ -1287,11 +1295,19 @@ void SetupHalBindings(nanobind::module_ m) {
 
   m.def(
       "get_cached_hal_driver",
-      [driver_cache](std::string device_uri, std::optional<bool> clean) {
+      [driver_cache](std::string device_uri) {
         return HalDriver::Create(device_uri,
-                                 const_cast<py::dict&>(driver_cache), clean);
+                                 const_cast<py::dict&>(driver_cache));
       },
-      py::arg("device_uri"), py::arg("clean") = py::none());
+      py::arg("device_uri"));
+
+  m.def(
+      "create_hal_driver",
+      [](std::string device_uri) { return HalDriver::Create(device_uri); },
+      py::arg("device_uri"));
+
+  m.def("clear_hal_driver_cache",
+        [driver_cache]() { const_cast<py::dict&>(driver_cache).clear(); });
 
   py::class_<HalAllocator>(m, "HalAllocator")
       .def("trim",

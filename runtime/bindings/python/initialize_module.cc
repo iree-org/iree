@@ -19,8 +19,9 @@
 namespace {
 // Stable storage for flag processing.  Flag handling uses string views,
 // expecting the caller to keep the original strings around for as long
-// as the flags are in use.
-std::vector<std::string> alloced_flags;
+// as the flags are in use.  This object holds one set of flag strings
+// for each invocation of parse_flags.
+std::vector<std::vector<std::string>> alloced_flag_cache;
 }  // namespace
 
 namespace iree {
@@ -41,19 +42,31 @@ NB_MODULE(_runtime, m) {
   SetupPyModuleBindings(m);
   SetupVmBindings(m);
 
+  // Adds the given set of strings to the global flags.  These new flags
+  // take effect upon the next creation of a driver.  They do not affect
+  // drivers already created.
   m.def("parse_flags", [](py::args py_flags) {
-    alloced_flags.clear();
+    // Make a new set of strings at the back of the cache
+    alloced_flag_cache.emplace_back(std::vector<std::string>());
+    std::vector<std::string> &alloced_flags = alloced_flag_cache.back();
+
+    // Add the given python strings to the std::string set.
     alloced_flags.push_back("python");
     for (py::handle py_flag : py_flags) {
       alloced_flags.push_back(py::cast<std::string>(py_flag));
     }
 
-    // Must build pointer vector after filling so pointers are stable.
+    // As the flags-processing mechanism of the C API requires long-lived
+    // char * strings, create a set of char * strings from the std::strings,
+    // with the std::strings responsible for maintaining the storage.
+    // Must build pointer vector after filling std::strings so pointers are
+    // stable.
     std::vector<char *> flag_ptrs;
     for (auto &alloced_flag : alloced_flags) {
       flag_ptrs.push_back(const_cast<char *>(alloced_flag.c_str()));
     }
 
+    // Send the flags to the C API
     char **argv = &flag_ptrs[0];
     int argc = flag_ptrs.size();
     CheckApiStatus(iree_flags_parse(IREE_FLAGS_PARSE_MODE_CONTINUE_AFTER_HELP,
