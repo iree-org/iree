@@ -23,6 +23,7 @@ iree_lit_test_suite(
     "pad_contraction_to_block_size.mlir"
     "split_reduction.mlir"
     "tile_attention.mlir"
+    "pad_attention.mlir"
     "tiling.mlir"
   TOOLS
     FileCheck

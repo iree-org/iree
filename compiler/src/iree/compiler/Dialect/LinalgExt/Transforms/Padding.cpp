@@ -83,6 +83,11 @@ IREE::LinalgExt::AttentionOp padAttention(IREE::LinalgExt::AttentionOp attnOp,
   assert(padToMultipleOf.size() == domainRank &&
          "Expected pad_to_multiple_of to have same rank as dimensions of "
          "attention.");
+
+  bool hasValidPadding = llvm::none_of(
+      padToMultipleOf, [](int64_t padMultiple) { return padMultiple < 0; });
+  assert(hasValidPadding && "pad-multiple-of cannot be a negative value.");
+
   SmallVector<Range> bounds = attnOp.getIterationDomain(rewriter);
 
   int64_t batchIdx = opInfo.getBatchDims().back();
@@ -90,6 +95,13 @@ IREE::LinalgExt::AttentionOp padAttention(IREE::LinalgExt::AttentionOp attnOp,
   int64_t k1Idx = opInfo.getK1Dims().back();
   int64_t k2Idx = opInfo.getK2Dims().back();
   int64_t nIdx = opInfo.getNDims().back();
+
+  // Padding in K2 dimension requires to fill those K2 dimensions as -Inf during
+  // softmax(Q.KT), preemptively padding it with -Inf may cause NaNs during
+  // matmul of Q.KT.
+  assert(padToMultipleOf[k2Idx] <= 1 &&
+         "Padding in K2 dimension is unsupported until attention mask is "
+         "supported.");
 
   SmallVector<OpFoldResult> padValues(domainRank, rewriter.getIndexAttr(0));
   for (auto [idx, bound] : enumerate(bounds)) {
@@ -116,15 +128,6 @@ IREE::LinalgExt::AttentionOp padAttention(IREE::LinalgExt::AttentionOp attnOp,
         {padValues[batchIdx], padValues[mIdx], padValues[k1Idx]});
   }
 
-  // Pad K1-dim of K-tensor by a large negative S.T when used by softmax it will
-  // generate the correct numerics.
-  if (!isConstantIntValue(padValues[k2Idx], 0)) {
-    Type keyElType = attnOp.getKeyType().getElementType();
-    auto largeNeg = rewriter.getFloatAttr(keyElType, 0.0);
-    paddedKey = getPaddedValue(rewriter, loc, paddedKey,
-                               {zero, padValues[k2Idx], zero}, largeNeg);
-  }
-
   // Pad K-tensor if any non-K1 dims needs padding.
   if (!isConstantIntValue(padValues[batchIdx], 0) ||
       !isConstantIntValue(padValues[k1Idx], 0)) {
@@ -134,11 +137,9 @@ IREE::LinalgExt::AttentionOp padAttention(IREE::LinalgExt::AttentionOp attnOp,
 
   // Pad V-tensor if any of its' dims needs padding.
   if (!isConstantIntValue(padValues[batchIdx], 0) ||
-      !isConstantIntValue(padValues[k2Idx], 0) ||
       !isConstantIntValue(padValues[nIdx], 0)) {
-    paddedValue = getPaddedValue(
-        rewriter, loc, paddedValue,
-        {padValues[batchIdx], padValues[k2Idx], padValues[nIdx]});
+    paddedValue = getPaddedValue(rewriter, loc, paddedValue,
+                                 {padValues[batchIdx], zero, padValues[nIdx]});
   }
 
   // Pad Acc-tensor if any of its' dims needs padding.
