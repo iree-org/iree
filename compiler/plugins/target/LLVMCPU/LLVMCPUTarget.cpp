@@ -34,6 +34,7 @@
 #include "llvm/Support/TargetSelect.h"
 #include "mlir/Dialect/ArmNeon/ArmNeonDialect.h"
 #include "mlir/Dialect/ArmSME/IR/ArmSME.h"
+#include "mlir/Dialect/ArmSVE/IR/ArmSVEDialect.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/PDL/IR/PDL.h"
 #include "mlir/Dialect/PDLInterp/IR/PDLInterp.h"
@@ -41,6 +42,7 @@
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/DialectResourceBlobManager.h"
 #include "mlir/Target/LLVMIR/Dialect/ArmSME/ArmSMEToLLVMIRTranslation.h"
+#include "mlir/Target/LLVMIR/Dialect/ArmSVE/ArmSVEToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Dialect/Builtin/BuiltinToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Dialect/LLVMIR/LLVMToLLVMIRTranslation.h"
 #include "mlir/Target/LLVMIR/Export.h"
@@ -212,6 +214,7 @@ public:
     mlir::registerBuiltinDialectTranslation(registry);
     mlir::registerLLVMDialectTranslation(registry);
     mlir::registerArmSMEDialectTranslation(registry);
+    mlir::registerArmSVEDialectTranslation(registry);
     // TODO: make inclusion of ArmNeon conditional?
     // clang-format off
     registry.insert<IREE::Codegen::IREECodegenDialect,
@@ -220,7 +223,8 @@ public:
                     pdl::PDLDialect,
                     pdl_interp::PDLInterpDialect,
                     arm_neon::ArmNeonDialect,
-                    arm_sme::ArmSMEDialect>();
+                    arm_sme::ArmSMEDialect,
+                    arm_sve::ArmSVEDialect>();
     // clang-format on
   }
 

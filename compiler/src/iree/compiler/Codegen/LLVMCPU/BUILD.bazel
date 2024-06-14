@@ -128,6 +128,8 @@ iree_compiler_cc_library(
         "@llvm-project//mlir:ArmSMEToLLVMIRTranslation",
         "@llvm-project//mlir:ArmSMEToSCF",
         "@llvm-project//mlir:ArmSMETransforms",
+        "@llvm-project//mlir:ArmSVEDialect",
+        "@llvm-project//mlir:ArmSVETransforms",
         "@llvm-project//mlir:BufferizationDialect",
         "@llvm-project//mlir:ComplexToLLVM",
         "@llvm-project//mlir:ComplexToStandard",
