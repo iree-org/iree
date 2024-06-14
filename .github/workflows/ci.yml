@@ -191,7 +191,7 @@ jobs:
   build_test_all_macos_x86_64:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_test_all_macos_x86_64')
-    runs-on: macos-13-xl
+    runs-on: macos-13
     env:
       BUILD_DIR: build-macos
     defaults:
@@ -234,7 +234,7 @@ jobs:
         env:
           IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
           IREE_CCACHE_GCP_TOKEN: ${{ steps.gcp-auth.outputs.access_token }}
-          CCACHE_NAMESPACE: github-macos-12-xl
+          CCACHE_NAMESPACE: github-macos-13
         run: bash ./build_tools/cmake/build_all.sh "${BUILD_DIR}"
       - name: "Testing IREE"
         run: bash ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
@@ -259,7 +259,7 @@ jobs:
         run: |
           ./build_tools/github_actions/docker_run.sh \
             --env "IREE_WRITE_REMOTE_BAZEL_CACHE=${IREE_WRITE_REMOTE_BAZEL_CACHE}" \
-            gcr.io/iree-oss/base-bleeding-edge@sha256:c5f28883e6c570c20128fb37d7af3a00a25df3ce4e2b3a24c3a8dcd183182a27 \
+            gcr.io/iree-oss/base-bleeding-edge@sha256:cf2e78194e64fd0166f4141317366261d7a62432b72e9a324cb8c2ff4e1a515a \
             ./build_tools/bazel/build_test_all.sh
 
   test_nvidia_gpu:
@@ -300,7 +300,7 @@ jobs:
               --env IREE_VULKAN_DISABLE \
               --env IREE_CUDA_DISABLE \
               --env IREE_HIP_DISABLE \
-              gcr.io/iree-oss/nvidia@sha256:82fa00b5cdda1b35634796cd0f88cb5d6d22d80328b94bfb51e5f2820598ba23 \
+              gcr.io/iree-oss/nvidia@sha256:433e072f075f90fdf07471673626b17091d8d8e2395626f1e6ac6c98803c8807 \
               ./build_tools/pkgci/build_tests_using_package.sh ${INSTALL_DIR}
       - name: "Running GPU tests"
         env:
@@ -320,7 +320,7 @@ jobs:
               --env CTEST_PARALLEL_LEVEL=2 \
               --env NVIDIA_DRIVER_CAPABILITIES=all \
               --gpus all \
-              gcr.io/iree-oss/nvidia@sha256:82fa00b5cdda1b35634796cd0f88cb5d6d22d80328b94bfb51e5f2820598ba23 \
+              gcr.io/iree-oss/nvidia@sha256:433e072f075f90fdf07471673626b17091d8d8e2395626f1e6ac6c98803c8807 \
               bash -euo pipefail -c \
                 "./build_tools/scripts/check_cuda.sh
                 ./build_tools/scripts/check_vulkan.sh
@@ -364,7 +364,7 @@ jobs:
               --env IREE_VULKAN_DISABLE \
               --env IREE_CUDA_DISABLE \
               --env IREE_HIP_DISABLE \
-              gcr.io/iree-oss/nvidia@sha256:82fa00b5cdda1b35634796cd0f88cb5d6d22d80328b94bfb51e5f2820598ba23 \
+              gcr.io/iree-oss/nvidia@sha256:433e072f075f90fdf07471673626b17091d8d8e2395626f1e6ac6c98803c8807 \
               ./build_tools/pkgci/build_tests_using_package.sh ${INSTALL_DIR}
       - name: "Running GPU tests"
         env:
@@ -384,7 +384,7 @@ jobs:
               --env CTEST_PARALLEL_LEVEL=4 \
               --env NVIDIA_DRIVER_CAPABILITIES=all \
               --gpus all \
-              gcr.io/iree-oss/nvidia@sha256:82fa00b5cdda1b35634796cd0f88cb5d6d22d80328b94bfb51e5f2820598ba23 \
+              gcr.io/iree-oss/nvidia@sha256:433e072f075f90fdf07471673626b17091d8d8e2395626f1e6ac6c98803c8807 \
               bash -euo pipefail -c \
                 "./build_tools/scripts/check_cuda.sh
                 ./build_tools/scripts/check_vulkan.sh
@@ -647,7 +647,7 @@ jobs:
             --env "IREE_CCACHE_GCP_TOKEN=$(gcloud auth application-default print-access-token)" \
             --env "IREE_WRITE_REMOTE_CCACHE=${IREE_WRITE_REMOTE_CCACHE}" \
             --env "CCACHE_NAMESPACE=base-bleeding-edge@sha256:14200dacca3a0f3a66f8aa87c6f64729b83a2eeb403b689c24204074ad157418" \
-            gcr.io/iree-oss/base-bleeding-edge@sha256:c5f28883e6c570c20128fb37d7af3a00a25df3ce4e2b3a24c3a8dcd183182a27 \
+            gcr.io/iree-oss/base-bleeding-edge@sha256:cf2e78194e64fd0166f4141317366261d7a62432b72e9a324cb8c2ff4e1a515a \
             ${SCRIPT}
 
   small_runtime:

@@ -79,6 +79,11 @@ createLLVMCPUTilePass(int64_t tilingLevel = -1);
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUUnfuseFMAOpsPass();
 
+/// Signals errors when there are large vectors in the IR.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createLLVMCPUVerifyVectorSizeLegalityPass(
+    int64_t maxAllowedNumberOfNativeVectors = 512);
+
 //------------------------------------------------------------------------------
 // Passes to lower Vector ops before conversion to LLVM.
 //------------------------------------------------------------------------------

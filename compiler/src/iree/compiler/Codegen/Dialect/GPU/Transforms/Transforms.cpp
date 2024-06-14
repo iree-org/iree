@@ -56,27 +56,27 @@ static FailureOr<int64_t> getTripCount(scf::ForallOp loop) {
 static FailureOr<SmallVector<scf::ForallOp>>
 getEquivalentMappingConsumerLoopNest(scf::ForallOp producer,
                                      scf::ForallOp consumer) {
-
-  auto checkMappingTypes = [&](ArrayAttr array) {
-    return llvm::all_of(array.getValue(),
-                        llvm::IsaPred<gpu::GPUThreadMappingAttr>) ||
-           llvm::all_of(array.getValue(),
-                        llvm::IsaPred<gpu::GPUWarpMappingAttr>);
+  auto checkMappingTypes = [&](ArrayRef<Attribute> array) {
+    return llvm::all_of(array, llvm::IsaPred<gpu::GPUThreadMappingAttr>) ||
+           llvm::all_of(array, llvm::IsaPred<gpu::GPUWarpMappingAttr>);
   };
 
-  ArrayAttr producerMapping = producer.getMappingAttr();
-  ArrayAttr consumerMapping = consumer.getMappingAttr();
+  ArrayRef<Attribute> producerMapping = producer.getMappingAttr().getValue();
+  ArrayRef<Attribute> consumerMapping = consumer.getMappingAttr().getValue();
 
-  if (producerMapping == consumerMapping &&
+  if (producerMapping.empty() || consumerMapping.empty()) {
+    return failure();
+  }
+
+  if (producerMapping.front() == consumerMapping.front() &&
       checkMappingTypes(producerMapping) &&
       checkMappingTypes(consumerMapping)) {
     return SmallVector<scf::ForallOp>({consumer});
   }
 
-  if (!llvm::all_of(producerMapping.getValue(),
+  if (!llvm::all_of(producerMapping,
                     llvm::IsaPred<gpu::GPUThreadMappingAttr>) ||
-      !llvm::all_of(consumerMapping.getValue(),
-                    llvm::IsaPred<IREE::GPU::LaneIdAttr>)) {
+      !llvm::all_of(consumerMapping, llvm::IsaPred<IREE::GPU::LaneIdAttr>)) {
     return failure();
   }
   auto outerWarpLoop = consumer->getParentOfType<scf::ForallOp>();

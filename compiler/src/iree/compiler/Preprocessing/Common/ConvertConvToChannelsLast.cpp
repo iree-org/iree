@@ -5,6 +5,7 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include "iree/compiler/Preprocessing/Common/Passes.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/Debug.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -491,10 +492,10 @@ private:
 // map = [[0], [1, 2], [3], [4, 5]]
 template <typename SetTy>
 static SmallVector<ReassociationIndices>
-getTilingReassociationMap(int64_t rank, SetTy innerDims) {
+getTilingReassociationMap(const int64_t rank, SetTy innerDims) {
   SmallVector<ReassociationIndices> map;
   int64_t nTiled = 0;
-  for (int64_t i = 0, e = rank; i < e; i++) {
+  for (int64_t i = 0; i < rank; i++) {
     if (innerDims.contains(i)) {
       map.push_back({i + nTiled++, i + nTiled});
       continue;
@@ -570,10 +571,18 @@ public:
         rewriter
             .create<linalg::TransposeOp>(loc, packOp.getSource(), empty, perm)
             .getResult()[0];
+
     // Expand the unit dimensions for the result of the pack.
+    SmallVector<ReassociationIndices> reassocationIndices;
+    int64_t nTiled = 0;
+    for (int64_t srcIdx = 0; srcIdx < srcRank; srcIdx++) {
+      reassocationIndices.push_back({srcIdx + nTiled});
+      while (innerDims.contains(srcIdx + nTiled))
+        reassocationIndices.back().push_back(srcIdx + ++nTiled);
+    }
+
     rewriter.replaceOpWithNewOp<tensor::ExpandShapeOp>(
-        packOp, destType, transposed,
-        getTilingReassociationMap(srcRank, innerDims));
+        packOp, destType, transposed, reassocationIndices);
     return success();
   }
 };
@@ -638,11 +647,8 @@ public:
     auto collapse = rewriter.create<tensor::CollapseShapeOp>(
         loc, collapsedType, unpackOp.getSource(),
         getTilingReassociationMap(destType.getRank(), innerDims));
-    rewriter
-        .replaceOpWithNewOp<linalg::TransposeOp>(unpackOp, collapse,
-                                                 unpackOp.getDest(),
-                                                 invertPermutationVector(perm))
-        .getResult()[0];
+    rewriter.replaceOpWithNewOp<linalg::TransposeOp>(
+        unpackOp, collapse, unpackOp.getDest(), invertPermutationVector(perm));
     return success();
   }
 };
@@ -677,9 +683,12 @@ public:
     // padding.
     {
       RewritePatternSet patterns(context);
+      GreedyRewriteConfig config;
+      config.maxIterations = GreedyRewriteConfig::kNoLimit;
       linalg::populateDataLayoutPropagationPatterns(
           patterns, [](Operation *op) { return true; });
-      if (failed(applyPatternsAndFoldGreedily(op, std::move(patterns)))) {
+      if (failed(
+              applyPatternsAndFoldGreedily(op, std::move(patterns), config))) {
         return signalPassFailure();
       }
     }

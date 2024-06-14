@@ -8,6 +8,7 @@ import logging
 import unittest
 
 from iree.runtime import system_setup as ss
+from iree.runtime._binding import create_hal_driver, clear_hal_driver_cache
 
 
 class DeviceSetupTest(unittest.TestCase):
@@ -64,6 +65,29 @@ class DeviceSetupTest(unittest.TestCase):
         device2 = driver.create_device(
             infos[0]["device_id"], allocators=["caching", "debug"]
         )
+
+    def testDriverCacheInternals(self):
+        # Two drivers created with the same URI using the caching get_driver
+        # should return the same driver
+        driver1 = ss.get_driver("local-sync")
+        driver2 = ss.get_driver("local-sync")
+        self.assertIs(driver1, driver2)
+
+        # A driver created using the non-caching create_hal_driver should be
+        # unique from cached drivers of the same URI
+        driver3 = create_hal_driver("local-sync")
+        self.assertIsNot(driver3, driver1)
+
+        # Drivers created with create_hal_driver should all be unique from
+        # one another
+        driver4 = create_hal_driver("local-sync")
+        self.assertIsNot(driver4, driver3)
+
+        # Clearing the cache should make any new driver unique from previously
+        # cached ones
+        clear_hal_driver_cache()
+        driver5 = ss.get_driver("local-sync")
+        self.assertIsNot(driver5, driver1)
 
 
 if __name__ == "__main__":

@@ -17,16 +17,16 @@ func.func @set_encoding_with_padding_semantics_bf16_x86_64_avx512f() attributes 
 //   2. The inner tile sizes are less than or equal to values in round_dims_to.
 //      We could choose 128 when it is a narrow matrix.
 // CHECK-LABEL: func.func @set_encoding_with_padding_semantics_bf16_x86_64_avx512f
-// CHECK-DAG:     %[[PAD:.+]] = arith.constant 0.000000e+00 : bf16
+// CHECK-DAG:     %[[C0:.+]] = arith.constant 0 : index
 // CHECK-DAG:     %[[IN_BINDING:.+]] = hal.interface.binding.subspan {{.+}} : !flow.dispatch.tensor<readonly:tensor<1x1000xbf16>>
-// CHECK-DAG:     %[[OUT_BINDING:.+]] = hal.interface.binding.subspan {{.+}} : !flow.dispatch.tensor<writeonly:tensor<1x1000x16x1xbf16>>
+// CHECK-DAG:     %[[OUT_BINDING:.+]] = hal.interface.binding.subspan {{.+}} : !flow.dispatch.tensor<writeonly:tensor<1x1000x1x1xbf16>>
 // CHECK:         %[[SRC:.+]] = flow.dispatch.tensor.load %[[IN_BINDING]]
-// CHECK-DAG:     %[[INIT:.+]] = tensor.empty() : tensor<1x1000x16x1xbf16>
-// CHECK:         %[[PACK:.+]] = tensor.pack %[[SRC]] padding_value(%[[PAD]] : bf16)
+// CHECK-DAG:     %[[INIT:.+]] = tensor.empty() : tensor<1x1000x1x1xbf16>
+// CHECK:         %[[PACK:.+]] = tensor.pack %[[SRC]]
 // CHECK-SAME:      outer_dims_perm = [0, 1]
 // CHECK-SAME:      inner_dims_pos = [0, 1]
-// CHECK-SAME:      inner_tiles = [16, 1]
-// CHECK-SAME:      into %[[INIT]] : tensor<1x1000xbf16> -> tensor<1x1000x16x1xbf16>
+// CHECK-SAME:      inner_tiles = [1, 1]
+// CHECK-SAME:      into %[[INIT]] : tensor<1x1000xbf16> -> tensor<1x1000x1x1xbf16>
 // CHECK:         flow.dispatch.tensor.store %[[PACK]], %[[OUT_BINDING]]
 
 // -----

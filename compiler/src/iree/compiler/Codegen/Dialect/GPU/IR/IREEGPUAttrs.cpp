@@ -847,9 +847,8 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
     llvm::errs() << "Getting mma layouts for:\n" << contractOp << "\n";
     llvm::errs() << "For schedule: " << *this << "\n";
   });
-  if (opInfo.getOpKind() == VectorContractOpInfo::OpKind::UNKNOWN) {
-    LLVM_DEBUG({ llvm::errs() << "Unknown contraction kind\n"; });
-    return failure();
+  if (opInfo.getKDims().size() != 1) {
+    return contractOp->emitError("Unimplemented: > 1 k dims");
   }
 
   auto mmaAttr = llvm::cast<MMAAttr>(getIntrinsic());
