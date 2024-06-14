@@ -8,6 +8,7 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/AffineExpr.h"
 #include "mlir/IR/BuiltinTypeInterfaces.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -60,7 +61,6 @@ struct GatherToLinalg : public OpRewritePattern<tensor::GatherOp> {
     assert(indicesShape.back() == gatherDims.size() &&
            "Last dimension of result type must match number of gather dims");
 
-
     // collect dims which are are not copied from the source tensor
     // its used later for matching dynamic dims and assigning linalg indices
     // in the inner loop
@@ -76,8 +76,8 @@ struct GatherToLinalg : public OpRewritePattern<tensor::GatherOp> {
       dimsFromSource.push_back({i, op.getSourceType().getShape()[i]});
     }
 
-      // if the shape is not static we have to find the dynamic dimensions from
-      // the indices and source tensor
+    // if the shape is not static we have to find the dynamic dimensions
+    // dimsFromSource the indices and source tensor
     Value outTensor;
     if (!resultType.hasStaticShape()) {
       // find dynamic dims from the indices tensor
@@ -92,10 +92,11 @@ struct GatherToLinalg : public OpRewritePattern<tensor::GatherOp> {
       // find dynamic dims from the source tensor
       matchDims(indicesRank - 1, resultShape, dimsFromSource,
                 [&](int64_t resIdx, int64_t sourceIdx) {
-        if (ShapedType::isDynamic(resultShape[resIdx])) {
-          dynamicDims.push_back(rewriter.create<tensor::DimOp>(loc, op.getSource(), sourceIdx));
-        }
-      });
+                  if (ShapedType::isDynamic(resultShape[resIdx])) {
+                    dynamicDims.push_back(rewriter.create<tensor::DimOp>(
+                        loc, op.getSource(), sourceIdx));
+                  }
+                });
 
       outTensor = rewriter.create<tensor::EmptyOp>(
           loc, resultType.getShape(), resultType.getElementType(), dynamicDims);
@@ -104,30 +105,41 @@ struct GatherToLinalg : public OpRewritePattern<tensor::GatherOp> {
                                                    resultType.getElementType());
     }
 
-    SmallVector<Value> constants;
-    for (int64_t i = 0; i < gatherDims.size(); i++) {
-      constants.push_back(rewriter.create<arith::ConstantIndexOp>(loc, i));
+    // create affine map for indices
+    // we want to loop over all diminesions but the least significant one
+    // since this is the dimension that contains the indices
+    // so we create a index map for every "gather_dim", the index maps will be
+    // used to access the indices at the given dimension
+    llvm::SmallVector<mlir::AffineMap, 3> indexingMaps;
+
+    for (int i = 0; i < gatherDims.size(); i++) {
+      llvm::SmallVector<AffineExpr, 3> exprs;
+      for (int i = 0; i < op.getIndicesType().getRank() - 1; i++) {
+        exprs.push_back(rewriter.getAffineDimExpr(i));
+      }
+      exprs.push_back(getAffineConstantExpr(i, rewriter.getContext()));
+      indexingMaps.push_back(mlir::AffineMap::get(
+          resultType.getRank(), 0, exprs, rewriter.getContext()));
     }
 
-    SmallVector<AffineMap, 1> indexingMaps = {
-        rewriter.getMultiDimIdentityMap(resultRank)};
+    // output map
+    indexingMaps.push_back(rewriter.getMultiDimIdentityMap(resultRank));
+
     llvm::SmallVector<mlir::utils::IteratorType, 3> iteratorTypes;
-    for (int64_t i = 0; i < resultRank; i++) {
+    for (int i = 0; i < resultRank; i++) {
       iteratorTypes.push_back(mlir::utils::IteratorType::parallel);
     }
 
-    auto linalgOp = rewriter.create<linalg::GenericOp>(
-        op.getLoc(), resultType, ValueRange{}, outTensor, indexingMaps,
-        iteratorTypes,
-        [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange args) {
-          // assume sources will be a tensor of rank x and indices will
-          // be a tensor of rank y, so the resulting tensor will be of
-          // of rank  y - 1 + (num dimensions not gathered)
-          // so the first y - 1 loop nests will be responsible for looping over
-          // the indices while the remaining x will be either loaded(gathered)
-          // by the indices tensor which makes their dimension 1 (or can be
-          // omitted) or they will be copied from the source tensor
+    // duplicate the indices for every index map we have created
+    // since each one will reference a different constant
+    llvm::SmallVector<Value, 3> ins;
+    for (int i = 0; i < gatherDims.size(); i++) {
+      ins.push_back(op.getIndices());
+    }
 
+    auto linalgOp = rewriter.create<linalg::GenericOp>(
+        op.getLoc(), resultType, ins, outTensor, indexingMaps, iteratorTypes,
+        [&](OpBuilder &nestedBuilder, Location nestedLoc, ValueRange args) {
           // create linalg indices here to avoid duplicates, might create some
           // indices that are not used
           SmallVector<Value> linalgIndices;
@@ -135,37 +147,21 @@ struct GatherToLinalg : public OpRewritePattern<tensor::GatherOp> {
             linalgIndices.push_back(
                 rewriter.create<linalg::IndexOp>(nestedLoc, i));
           }
-          // create one extract op for every gather dim that loads the index
-          // from the indices tensor
-          SmallVector<Value> extractedIndices;
-          for (int64_t i = 0; i < gatherDims.size(); i++) {
-            // the first indicesRank - 1 linalg.index operation correspond to
-            // the batch dimension of the indices tensor
-            SmallVector<Value> indicesForIndices;
-            for (int64_t j = 0; j < indicesRank - 1; j++) {
-              indicesForIndices.push_back(linalgIndices[j]);
-            }
-            indicesForIndices.push_back(constants[i]);
-            Value extractedIndex = nestedBuilder.create<tensor::ExtractOp>(
-                nestedLoc, indicesType.getElementType(), op.getIndices(),
-                indicesForIndices);
-            Value castedIndex = nestedBuilder.create<arith::IndexCastOp>(
-                nestedLoc, nestedBuilder.getIndexType(), extractedIndex);
-            extractedIndices.push_back(castedIndex);
-          }
 
           // set the loaded indices to the corresponding gatherDims
           SmallVector<Value> indicesForSource(sourceRank);
-          for (int64_t i = 0; i < extractedIndices.size(); i++) {
-            indicesForSource[gatherDims[i]] = extractedIndices[i];
+          for (int64_t i = 0; i < gatherDims.size(); i++) {
+            Value idx = nestedBuilder.create<arith::IndexCastOp>(
+                nestedLoc, rewriter.getIndexType(), args[i]);
+            indicesForSource[gatherDims[i]] = idx;
           }
 
           // pick the correct linalg.index from where to copy the dims
           if (!dimsFromSource.empty()) {
             matchDims(indicesRank - 1, resultShape, dimsFromSource,
                       [&](int64_t resIdx, int64_t sourceIdx) {
-              indicesForSource[sourceIdx] = linalgIndices[resIdx];
-            });
+                        indicesForSource[sourceIdx] = linalgIndices[resIdx];
+                      });
           }
 
           Value extracted = nestedBuilder.create<tensor::ExtractOp>(
