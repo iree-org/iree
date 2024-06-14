@@ -70,6 +70,7 @@ set(_EXPORT_OBJECT_LIBS
   obj.MLIRCAPIGPU
   obj.MLIRCAPILinalg
   obj.MLIRCAPIPDL
+  obj.MLIRCAPITransforms
   obj.MLIRCAPITransformDialect
   obj.MLIRCAPITransformDialectTransforms
   iree_compiler_API_Internal_CompilerDriver.objects

@@ -119,6 +119,7 @@ VER_0 {
     mlirAffineMulExprGet;
     mlirAffineSymbolExprGet;
     mlirAffineSymbolExprGetPosition;
+    mlirApplyPatternsAndFoldGreedily;
     mlirArrayAttrGet;
     mlirArrayAttrGetElement;
     mlirArrayAttrGetNumElements;
@@ -344,6 +345,8 @@ VER_0 {
     mlirFloatAttrGetValueDouble;
     mlirFloatTF32TypeGetTypeID;
     mlirFloatTypeGetWidth;
+    mlirFreezeRewritePattern;
+    mlirFrozenRewritePatternSetDestroy;
     mlirFunctionTypeGet;
     mlirFunctionTypeGetInput;
     mlirFunctionTypeGetNumInputs;
@@ -519,6 +522,8 @@ VER_0 {
     mlirOperationWriteBytecodeWithConfig;
     mlirPDLAttributeTypeGet;
     mlirPDLOperationTypeGet;
+    mlirPDLPatternModuleDestroy;
+    mlirPDLPatternModuleFromModule;
     mlirPDLRangeTypeGet;
     mlirPDLRangeTypeGetElementType;
     mlirPDLTypeTypeGet;
@@ -550,6 +555,7 @@ VER_0 {
     mlirRegionTakeBody;
     mlirRegisterGPUPasses;
     mlirRegisterLinalgPasses;
+    mlirRewritePatternSetFromPDLPatternModule;
     mlirSetGlobalDebugType;
     mlirSetGlobalDebugTypes;
     mlirShapedTypeGetDimSize;

@@ -117,6 +117,7 @@ _mlirAffineModExprGet
 _mlirAffineMulExprGet
 _mlirAffineSymbolExprGet
 _mlirAffineSymbolExprGetPosition
+_mlirApplyPatternsAndFoldGreedily
 _mlirArrayAttrGet
 _mlirArrayAttrGetElement
 _mlirArrayAttrGetNumElements
@@ -342,6 +343,8 @@ _mlirFloatAttrGetTypeID
 _mlirFloatAttrGetValueDouble
 _mlirFloatTF32TypeGetTypeID
 _mlirFloatTypeGetWidth
+_mlirFreezeRewritePattern
+_mlirFrozenRewritePatternSetDestroy
 _mlirFunctionTypeGet
 _mlirFunctionTypeGetInput
 _mlirFunctionTypeGetNumInputs
@@ -517,6 +520,8 @@ _mlirOperationWriteBytecode
 _mlirOperationWriteBytecodeWithConfig
 _mlirPDLAttributeTypeGet
 _mlirPDLOperationTypeGet
+_mlirPDLPatternModuleDestroy
+_mlirPDLPatternModuleFromModule
 _mlirPDLRangeTypeGet
 _mlirPDLRangeTypeGetElementType
 _mlirPDLTypeTypeGet
@@ -548,6 +553,7 @@ _mlirRegionInsertOwnedBlockBefore
 _mlirRegionTakeBody
 _mlirRegisterGPUPasses
 _mlirRegisterLinalgPasses
+_mlirRewritePatternSetFromPDLPatternModule
 _mlirSetGlobalDebugType
 _mlirSetGlobalDebugTypes
 _mlirShapedTypeGetDimSize

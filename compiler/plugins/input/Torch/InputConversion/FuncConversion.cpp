@@ -103,8 +103,16 @@ Value convertToBuiltinTensor(OpBuilder &builder, Value possibleTorchTensor) {
   if (isa<TensorType>(ty))
     return possibleTorchTensor;
 
+  if (auto defining = dyn_cast_or_null<TorchConversion::FromBuiltinTensorOp>(possibleTorchTensor.getDefiningOp())) {
+    return defining.getOperand();
+  }
+
   Torch::ValueTensorType vtensorType = cast<Torch::ValueTensorType>(ty);
   TensorType builtinTy = vtensorType.toBuiltinTensor();
+  if (auto intTy = dyn_cast<IntegerType>(builtinTy.getElementType())) {
+    builtinTy = builtinTy.clone(builder.getIntegerType(intTy.getIntOrFloatBitWidth()));
+  }
+
   return builder.create<TorchConversion::ToBuiltinTensorOp>(
       possibleTorchTensor.getLoc(), builtinTy, possibleTorchTensor);
 }
@@ -357,6 +365,9 @@ LogicalResult ConvertedAsyncFunctionInfo::convertImmutableTensorArg(
     builtinTensorType = tType;
   } else if (auto vtType = dyn_cast<Torch::ValueTensorType>(torchType)) {
     builtinTensorType = vtType.toBuiltinTensor();
+    if (auto intTy = dyn_cast<IntegerType>(builtinTensorType.getElementType())) {
+      builtinTensorType = builtinTensorType.clone(builder.getIntegerType(intTy.getIntOrFloatBitWidth()));
+    }
   } else {
     return emitError(loc) << "unsupported immutable tensor argument: "
                           << torchType;
