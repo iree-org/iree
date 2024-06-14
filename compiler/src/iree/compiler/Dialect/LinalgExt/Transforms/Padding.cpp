@@ -65,28 +65,37 @@ struct PadAttentionPass : public PadAttentionBase<PadAttentionPass> {
 } // namespace
 
 /// Pads iree_linalg_ext.attention.
-IREE::LinalgExt::AttentionOp padAttention(IREE::LinalgExt::AttentionOp attnOp,
-                                          SmallVectorImpl<Operation *> &ops,
-                                          RewriterBase &rewriter,
-                                          ArrayRef<int64_t> padToMultipleOf) {
+LogicalResult padAttention(IREE::LinalgExt::AttentionOp attnOp,
+                           SmallVectorImpl<Operation *> &ops,
+                           RewriterBase &rewriter,
+                           ArrayRef<int64_t> padToMultipleOf) {
   SmallVector<AffineMap> maps = attnOp.getIndexingMapsArray();
   FailureOr<IREE::LinalgExt::AttentionOpDetail> maybeOpInfo =
       IREE::LinalgExt::AttentionOpDetail::get(maps);
-  assert(succeeded(maybeOpInfo) && "failed to infer attention dims");
+  if (failed(maybeOpInfo)) {
+    // failed to infer attention dims
+    return failure();
+  }
   auto opInfo = maybeOpInfo.value();
   Location loc = attnOp.getLoc();
   rewriter.setInsertionPoint(attnOp);
 
   int64_t domainRank = maps[0].getNumDims();
-  assert(domainRank == 5 &&
-         "Currently only support base-case of attention dims.");
-  assert(padToMultipleOf.size() == domainRank &&
-         "Expected pad_to_multiple_of to have same rank as dimensions of "
-         "attention.");
+  if (domainRank != 5) {
+    // Currently only support base-case of attention dims.
+    return failure();
+  }
+  if (padToMultipleOf.size() != domainRank) {
+    // Expects pad_to_multiple to have same rank as dimensions of attention.
+    return failure();
+  }
 
   bool hasValidPadding = llvm::none_of(
       padToMultipleOf, [](int64_t padMultiple) { return padMultiple < 0; });
-  assert(hasValidPadding && "pad-multiple-of cannot be a negative value.");
+  if (!hasValidPadding) {
+    // pad-multiple-of cannot be a negative value.
+    return failure();
+  }
 
   SmallVector<Range> bounds = attnOp.getIterationDomain(rewriter);
 
@@ -99,9 +108,9 @@ IREE::LinalgExt::AttentionOp padAttention(IREE::LinalgExt::AttentionOp attnOp,
   // Padding in K2 dimension requires to fill those K2 dimensions as -Inf during
   // softmax(Q.KT), preemptively padding it with -Inf may cause NaNs during
   // matmul of Q.KT.
-  assert(padToMultipleOf[k2Idx] <= 1 &&
-         "Padding in K2 dimension is unsupported until attention mask is "
-         "supported.");
+  if (padToMultipleOf[k2Idx] > 1) {
+    return failure();
+  }
 
   SmallVector<OpFoldResult> padValues(domainRank, rewriter.getIndexAttr(0));
   for (auto [idx, bound] : enumerate(bounds)) {
@@ -182,7 +191,7 @@ IREE::LinalgExt::AttentionOp padAttention(IREE::LinalgExt::AttentionOp attnOp,
 
   rewriter.replaceOp(attnOp, extracted);
 
-  return paddedAttnOp;
+  return success();
 }
 
 void PadAttentionPass::runOnOperation() {
@@ -190,7 +199,7 @@ void PadAttentionPass::runOnOperation() {
   IRRewriter rewriter(context);
   getOperation().walk([&](AttentionOp attnOp) {
     SmallVector<Operation *> ops;
-    padAttention(attnOp, ops, rewriter, padToMultipleOf);
+    (void)padAttention(attnOp, ops, rewriter, padToMultipleOf);
   });
 }
 

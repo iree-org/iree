@@ -72,7 +72,11 @@ LinalgExt::PadAttentionOp::applyToOne(transform::TransformRewriter &rewriter,
       extractFromIntegerArrayAttr<int64_t>(getPadToMultipleOf());
 
   SmallVector<Operation *> ops;
-  LinalgExt::padAttention(attentionOp, ops, rewriter, padToMultipleOf);
+  if (failed(LinalgExt::padAttention(attentionOp, ops, rewriter,
+                                     padToMultipleOf))) {
+    return emitSilenceableFailure(this->getOperation(),
+                                  "Failed to pad attentionOp.");
+  }
   for (auto op : ops) {
     results.push_back(op);
   }

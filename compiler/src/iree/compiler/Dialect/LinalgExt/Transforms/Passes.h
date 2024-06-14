@@ -51,10 +51,10 @@ tileAttention(IREE::LinalgExt::AttentionOp attnOp,
               SmallVectorImpl<Operation *> &ops, RewriterBase &rewriter,
               std::optional<uint64_t> tileSize = std::nullopt);
 
-IREE::LinalgExt::AttentionOp padAttention(IREE::LinalgExt::AttentionOp attnOp,
-                                          SmallVectorImpl<Operation *> &ops,
-                                          RewriterBase &rewriter,
-                                          ArrayRef<int64_t> padToMultipleOf);
+LogicalResult padAttention(IREE::LinalgExt::AttentionOp attnOp,
+                           SmallVectorImpl<Operation *> &ops,
+                           RewriterBase &rewriter,
+                           ArrayRef<int64_t> padToMultipleOf);
 
 void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
                              SmallVectorImpl<Operation *> &ops,
