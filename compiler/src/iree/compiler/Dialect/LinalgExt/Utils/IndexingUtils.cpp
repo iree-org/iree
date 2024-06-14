@@ -27,7 +27,7 @@ findPermutationsIndexingOperand(AffineMap indexingMap) {
 
 void AttentionOpDetail::inferFromIndexingMaps(
     ArrayRef<AffineMap> indexingMaps) {
-  assert(indexingMaps.size() >= 4);
+  assert(indexingMaps.size() == 4);
   AffineMap qMap = indexingMaps[0];
   AffineMap kMap = indexingMaps[1];
   AffineMap vMap = indexingMaps[2];
@@ -82,23 +82,7 @@ AttentionOpDetail::get(ArrayRef<AffineMap> indexingMaps) {
 
   AttentionOpDetail opInfo;
   opInfo.inferFromIndexingMaps(indexingMaps);
-  opInfo.maps = SmallVector<AffineMap>(indexingMaps);
   return opInfo;
-}
-
-AffineMap AttentionOpDetail::getSMap() const {
-  // We need to create an indexing map for the intermediate result of first
-  // matmul. There could be other options, but we choose to create a standard
-  // indexing map:
-  //   SMap = (batch, m, k1, k2, n) -> (batch, m, k2)
-  AffineMap sMap = AffineMap::get(/*dimCount=*/getDomainRank(),
-                                  /*symbolCount=*/0, getContext());
-  for (auto dim :
-       llvm::concat<const int64_t>(getBatchDims(), getMDims(), getK2Dims())) {
-    AffineExpr dimExpr = getAffineDimExpr(dim, getContext());
-    sMap = sMap.insertResult(dimExpr, sMap.getNumResults());
-  }
-  return sMap;
 }
 
 }; // namespace mlir::iree_compiler::IREE::LinalgExt

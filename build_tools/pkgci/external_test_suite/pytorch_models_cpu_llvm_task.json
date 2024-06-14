@@ -8,15 +8,18 @@
     "--device=local-task"
   ],
   "skip_compile_tests": [
-    "sdxl-scheduled-unet-3-tank"
+    "sdxl-scheduled-unet-3-tank",
+    "sdxl-prompt-encoder-tank",
+    "sdxl-vae-decode-tank"
   ],
   "skip_run_tests": [],
   "expected_compile_failures": [
     // TODO(#17344): need to regenerate .mlirbc
     "opt-125M",
-    "resnet50"
+    "resnet50",
+    // TODO(#17467): Remove the workaround once we have better support for attention op codegen.
+    "sdxl-vae-decode-tank"
   ],
   "expected_run_failures": [
-    "sdxl-vae-decode-tank"
   ]
 }

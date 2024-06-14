@@ -44,13 +44,6 @@ SmallVector<OpFoldResult> getDims(OpBuilder &builder, Location loc,
       [&](int64_t dim) { return getDim(builder, loc, shapedTypeValue, dim); });
 }
 
-Value getSlice(OpBuilder &b, Location loc, Value src, ArrayRef<Range> slice) {
-  return getSlice(b, loc, src,
-                  llvm::map_to_vector(slice, [](Range x) { return x.offset; }),
-                  llvm::map_to_vector(slice, [](Range x) { return x.size; }),
-                  llvm::map_to_vector(slice, [](Range x) { return x.stride; }));
-}
-
 Value getSlice(OpBuilder &b, Location loc, Value src,
                ArrayRef<OpFoldResult> offsets, ArrayRef<OpFoldResult> sizes,
                ArrayRef<OpFoldResult> strides) {

@@ -31,6 +31,7 @@ py_binary(
         "--iree-opt-data-tiling=false",
         "--iree-llvmcpu-enable-ukernels=none",
         "--iree-llvmcpu-enable-scalable-vectorization",
+        "--iree-llvmcpu-target-triple=aarch64-unknown-unknown",
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
@@ -79,6 +80,7 @@ PREPROCESSING_PEEL = "--iree-llvmcpu-vector-pproc-strategy=peel"
     compiler_flags = [
                          "--iree-opt-data-tiling=false",
                          "--iree-llvmcpu-enable-scalable-vectorization",
+                         "--iree-llvmcpu-target-triple=aarch64-unknown-unknown",
                      ] + ([PREPROCESSING_TRANSPOSE_LHS] if transpose_lhs else []) +
                      ([PREPROCESSING_PEEL] if peel else []),
     generator = ":generate_e2e_matmul_tests",
