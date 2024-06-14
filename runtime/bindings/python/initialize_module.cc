@@ -4,6 +4,8 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include <memory>
+
 #include "./binding.h"
 #include "./hal.h"
 #include "./invoke.h"
@@ -21,7 +23,7 @@ namespace {
 // expecting the caller to keep the original strings around for as long
 // as the flags are in use.  This object holds one set of flag strings
 // for each invocation of parse_flags.
-std::vector<std::vector<std::string>> alloced_flag_cache;
+std::vector<std::unique_ptr<std::vector<std::string>>> alloced_flag_cache;
 }  // namespace
 
 namespace iree {
@@ -47,8 +49,9 @@ NB_MODULE(_runtime, m) {
   // drivers already created.
   m.def("parse_flags", [](py::args py_flags) {
     // Make a new set of strings at the back of the cache
-    alloced_flag_cache.emplace_back(std::vector<std::string>());
-    std::vector<std::string> &alloced_flags = alloced_flag_cache.back();
+    alloced_flag_cache.emplace_back(
+        std::make_unique<std::vector<std::string>>(std::vector<std::string>()));
+    auto &alloced_flags = *alloced_flag_cache.back();
 
     // Add the given python strings to the std::string set.
     alloced_flags.push_back("python");
