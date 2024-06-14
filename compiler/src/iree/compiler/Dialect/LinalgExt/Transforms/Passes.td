@@ -98,12 +98,4 @@ def DecomposeAttention :
   ];
 }
 
-def ConvertAttentionToOnlineAttention :
-    InterfacePass<"iree-linalg-ext-convert-attention-to-online-attention",
-    "mlir::FunctionOpInterface"> {
-  let summary = "";
-  let constructor = "mlir::iree_compiler::IREE::LinalgExt::"
-                    "createConvertAttentionToOnlineAttentionPass()";
-}
-
 #endif  // IREE_DIALECT_LINALGEXT_PASSES

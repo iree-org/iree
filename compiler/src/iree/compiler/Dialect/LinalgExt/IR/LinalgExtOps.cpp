@@ -7,7 +7,6 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
-#include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
@@ -1312,9 +1311,6 @@ LogicalResult AttentionOp::verify() {
     for (auto [i, dimExpr] : llvm::enumerate(indexingMap.getResults())) {
       AffineDimExpr dim = cast<AffineDimExpr>(dimExpr);
       int64_t pos = dim.getPosition();
-      if (ShapedType::isDynamic(valShape[i])) {
-        continue;
-      }
       if (!foundDims[pos]) {
         foundDims[pos] = true;
         shape[pos] = valShape[i];
@@ -1427,79 +1423,6 @@ SmallVector<AffineMap> AttentionOp::getIndexingMapsArray() {
   return results;
 }
 
-//===----------------------------------------------------------------------===//
-// OnlineAttentionOp
-//===----------------------------------------------------------------------===//
-
-LogicalResult OnlineAttentionOp::verify() {
-  OnlineAttentionOp attnOp = *this;
-
-  SmallVector<AffineMap> indexingMaps = attnOp.getIndexingMapsArray();
-
-  // Check if indexing maps can represent attention.
-  FailureOr<AttentionOpDetail> maybeOpInfo =
-      AttentionOpDetail::get(indexingMaps);
-
-  // Check shape compatibility based on indexing maps.
-  SmallVector<int64_t> shape(getIterationDomainRank());
-  SmallVector<bool> foundDims(getIterationDomainRank(), false);
-  auto checkShape = [&shape, &foundDims,
-                     &attnOp](StringRef operandName, ArrayRef<int64_t> valShape,
-                              AffineMap indexingMap) -> LogicalResult {
-    if (indexingMap.getNumResults() != valShape.size()) {
-      return attnOp->emitError("Rank Mismatch for ")
-             << operandName << ". Expected: " << indexingMap.getNumResults()
-             << " Got: " << valShape.size();
-    }
-    for (auto [i, dimExpr] : llvm::enumerate(indexingMap.getResults())) {
-      AffineDimExpr dim = cast<AffineDimExpr>(dimExpr);
-      int64_t pos = dim.getPosition();
-      if (ShapedType::isDynamic(valShape[i])) {
-        continue;
-      }
-      if (!foundDims[pos]) {
-        foundDims[pos] = true;
-        shape[pos] = valShape[i];
-      }
-      if (shape[pos] != valShape[i]) {
-        return attnOp->emitError("Shape Mismatch for ")
-               << operandName << ". Expected: " << shape[pos]
-               << " Got: " << valShape[i];
-      }
-    }
-    return success();
-  };
-
-  if (failed(checkShape("Query", getQuery().getType().getShape(),
-                        getQueryMap())) ||
-      failed(checkShape("Key", getKey().getType().getShape(), getKeyMap())) ||
-      failed(checkShape("Value", getValue().getType().getShape(),
-                        getValueMap())) ||
-      failed(checkShape("Output", getOutput().getType().getShape(),
-                        getOutputMap())) ||
-      failed(checkShape("Max", getMax().getType().getShape(), getMaxMap())) ||
-      failed(checkShape("Sum", getSum().getType().getShape(), getSumMap()))) {
-    return failure();
-  }
-
-  return success();
-}
-
-MutableOperandRange OnlineAttentionOp::getDpsInitsMutable() {
-  return MutableOperandRange(*this, /*numInputs=*/4, /*numInits=*/3);
-}
-
-LogicalResult OnlineAttentionOp::reifyResultShapes(
-    OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
-  return cast<LinalgExtOp>(getOperation())
-      .reifyResultShapes(b, reifiedReturnShapes);
-}
-
-SmallVector<AffineMap> OnlineAttentionOp::getIndexingMapsArray() {
-  return SmallVector<AffineMap>(
-      getIndexingMaps().getAsValueRange<AffineMapAttr>());
-}
-
 #define DEFINE_OP_GET_EFFECTS(OP_NAME)                                         \
   void OP_NAME::getEffects(                                                    \
       SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>      \
@@ -1519,7 +1442,6 @@ DEFINE_OP_GET_EFFECTS(WinogradInputTransformOp)
 DEFINE_OP_GET_EFFECTS(WinogradFilterTransformOp)
 DEFINE_OP_GET_EFFECTS(WinogradOutputTransformOp)
 DEFINE_OP_GET_EFFECTS(AttentionOp)
-DEFINE_OP_GET_EFFECTS(OnlineAttentionOp)
 
 } // namespace mlir::iree_compiler::IREE::LinalgExt
 

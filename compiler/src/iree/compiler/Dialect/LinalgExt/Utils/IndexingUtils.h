@@ -42,29 +42,20 @@ class AttentionOpDetail {
 public:
   static FailureOr<AttentionOpDetail> get(ArrayRef<AffineMap> indexingMaps);
 
-  int64_t getDomainRank() const { return maps[0].getNumDims(); }
   ArrayRef<int64_t> getBatchDims() const { return batch; }
   ArrayRef<int64_t> getMDims() const { return m; }
   ArrayRef<int64_t> getK1Dims() const { return k1; }
   ArrayRef<int64_t> getK2Dims() const { return k2; }
   ArrayRef<int64_t> getNDims() const { return n; }
 
-  ArrayRef<AffineMap> getIndexingMaps() const { return maps; }
-
-  AffineMap getSMap() const;
-
 private:
   void inferFromIndexingMaps(ArrayRef<AffineMap> indexingMaps);
-
-  MLIRContext *getContext() const { return maps[0].getContext(); }
 
   SmallVector<int64_t> batch;
   SmallVector<int64_t> m;
   SmallVector<int64_t> k1;
   SmallVector<int64_t> k2;
   SmallVector<int64_t> n;
-
-  SmallVector<AffineMap> maps;
 };
 
 }; // namespace mlir::iree_compiler::IREE::LinalgExt

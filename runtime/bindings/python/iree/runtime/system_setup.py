@@ -26,7 +26,12 @@ def query_available_drivers() -> Collection[str]:
 
 
 def get_driver(device_uri: str) -> HalDriver:
-    """Returns a HAL driver by device_uri (or driver name)."""
+    """Returns a HAL driver by device_uri (or driver name).
+
+    Args:
+      device_uri: The URI of the device, either just a driver name for the
+        default or a fully qualified "driver://path?params".
+    """
     return get_cached_hal_driver(device_uri)
 
 

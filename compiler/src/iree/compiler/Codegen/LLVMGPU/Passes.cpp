@@ -50,16 +50,16 @@ namespace mlir::iree_compiler {
 
 constexpr int64_t kDefaultSubgroupSize = 32;
 
-static llvm::cl::opt<ReorderWorkgrupsStrategy> clReorderWorkgroupsStrategy(
+static llvm::cl::opt<ReorderWorkgroupsStrategy> clReorderWorkgroupsStrategy(
     "iree-codegen-reorder-workgroups-strategy",
     llvm::cl::desc("Reorder workgroup IDs using the selected strategy"),
-    llvm::cl::values(clEnumValN(ReorderWorkgrupsStrategy::None, "none",
+    llvm::cl::values(clEnumValN(ReorderWorkgroupsStrategy::None, "none",
                                 "No workgroup reordering"),
-                     clEnumValN(ReorderWorkgrupsStrategy::Swizzle, "swizzle",
+                     clEnumValN(ReorderWorkgroupsStrategy::Swizzle, "swizzle",
                                 "Swizzle"),
-                     clEnumValN(ReorderWorkgrupsStrategy::Transpose,
+                     clEnumValN(ReorderWorkgroupsStrategy::Transpose,
                                 "transpose", "Transpose")),
-    llvm::cl::init(ReorderWorkgrupsStrategy::None));
+    llvm::cl::init(ReorderWorkgroupsStrategy::None));
 
 static llvm::cl::opt<unsigned> clReorderWorkgroupsLogSwizzleTile(
     "iree-codegen-reorder-workgroups-log-swizzle-tile",
@@ -79,9 +79,22 @@ static llvm::cl::opt<bool> clLLVMGPUEnablePrefetch(
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const LLVMGPUPipelineOptions &options) {
+  StringRef reorderStr = "<not set>";
+  if (options.reorderStrategy) {
+    if (options.reorderStrategy == ReorderWorkgroupsStrategy::Transpose) {
+      reorderStr = "transpose";
+    } else if (options.reorderStrategy == ReorderWorkgroupsStrategy::Swizzle) {
+      reorderStr = "swizzle";
+    } else {
+      assert(options.reorderStrategy == ReorderWorkgroupsStrategy::None &&
+             "Unhandled reorder option");
+      reorderStr = "none";
+    }
+  }
+
   return os << "{" << "enableReduceSharedMemoryBankConflicts = "
             << options.enableReduceSharedMemoryBankConflicts
-            << ", enableReorderWorkgroups = " << options.enableReorderWorkgroups
+            << ", reorderWorkgroupsStrategy = " << reorderStr
             << ", enableUkernels = " << options.enableUkernels << "}";
 }
 
@@ -184,6 +197,13 @@ static LogicalResult canReorderWorkgroups(FunctionOpInterface funcOp) {
   // This is further restricted to 2D+ grids as we reorder along the X and Y
   // workgroup IDs.
   return success(workgroupCounts.size() >= 2);
+}
+
+// Reconciles workgroup reordering strategy based on the pipeline `option` and
+// the CLI flag.
+static ReorderWorkgroupsStrategy getReorderWorkgroupsStrategy(
+    const std::optional<ReorderWorkgroupsStrategy> &option) {
+  return option.value_or(clReorderWorkgroupsStrategy);
 }
 
 //===----------------------------------------------------------------------===//
@@ -411,11 +431,12 @@ void addGPUMatmulSimtPassPipeline(OpPassManager &funcPassManager,
     funcPassManager.addPass(createGPUReduceBankConflictsPass());
   }
 
-  if (options.enableReorderWorkgroups) {
-    funcPassManager.addPass(createReorderWorkgroups(
-        clReorderWorkgroupsStrategy, clReorderWorkgroupsLogSwizzleTile,
-        canReorderWorkgroups));
-  }
+  ReorderWorkgroupsStrategy reorderStrategy =
+      getReorderWorkgroupsStrategy(options.reorderStrategy);
+  funcPassManager.addPass(createReorderWorkgroups(
+      reorderStrategy, clReorderWorkgroupsLogSwizzleTile,
+      canReorderWorkgroups));
+
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
@@ -458,11 +479,13 @@ void addGPUMatmulTensorCorePassPipeline(OpPassManager &funcPassManager,
   funcPassManager.addPass(createCSEPass());
 
   funcPassManager.addPass(createRemoveSingleIterationLoopPass());
-  if (options.enableReorderWorkgroups) {
-    funcPassManager.addPass(createReorderWorkgroups(
-        clReorderWorkgroupsStrategy, clReorderWorkgroupsLogSwizzleTile,
-        canReorderWorkgroups));
-  }
+
+  ReorderWorkgroupsStrategy reorderStrategy =
+      getReorderWorkgroupsStrategy(options.reorderStrategy);
+  funcPassManager.addPass(createReorderWorkgroups(
+      reorderStrategy, clReorderWorkgroupsLogSwizzleTile,
+      canReorderWorkgroups));
+
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
@@ -524,11 +547,13 @@ void addGPUMatmulTensorCoreMmaSyncPassPipeline(
   funcPassManager.addPass(createCSEPass());
 
   funcPassManager.addPass(createRemoveSingleIterationLoopPass());
-  if (options.enableReorderWorkgroups) {
-    funcPassManager.addPass(createReorderWorkgroups(
-        clReorderWorkgroupsStrategy, clReorderWorkgroupsLogSwizzleTile,
-        canReorderWorkgroups));
-  }
+
+  ReorderWorkgroupsStrategy reorderStrategy =
+      getReorderWorkgroupsStrategy(options.reorderStrategy);
+  funcPassManager.addPass(createReorderWorkgroups(
+      reorderStrategy, clReorderWorkgroupsLogSwizzleTile,
+      canReorderWorkgroups));
+
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 
@@ -681,11 +706,13 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
                                         const LLVMGPUPipelineOptions &options,
                                         bool usePadToModelSharedMemcpy) {
   tileAndDistributeToWorkgroup(funcPassManager);
-  if (options.enableReorderWorkgroups) {
-    funcPassManager.addPass(createReorderWorkgroups(
-        clReorderWorkgroupsStrategy, clReorderWorkgroupsLogSwizzleTile,
-        canReorderWorkgroups));
-  }
+
+  ReorderWorkgroupsStrategy reorderStrategy =
+      getReorderWorkgroupsStrategy(options.reorderStrategy);
+  funcPassManager.addPass(createReorderWorkgroups(
+      reorderStrategy, clReorderWorkgroupsLogSwizzleTile,
+      canReorderWorkgroups));
+
   funcPassManager.addPass(createCanonicalizerPass());
   funcPassManager.addPass(createCSEPass());
 

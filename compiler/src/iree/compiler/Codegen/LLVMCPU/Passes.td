@@ -142,6 +142,22 @@ def LLVMCPUTileAndFuse :
   ];
 }
 
+def LLVMCPUVerifyVectorSizeLegality :
+    InterfacePass<"iree-llvmcpu-verify-vector-size-legality", "mlir::FunctionOpInterface"> {
+  let summary =
+      "Signals errors when there are large vectors in the IR. I.e., one of"
+      "the vector sizes is greater than"
+      "maxAllowedNumberOfNativeVectors * native_vector_size. For scalable"
+      "vectors, it assumes that the vscale value is always 1. It may be an"
+      "underestimate if the runtime larger than 1, but it should still catch"
+      "unreasonable vector sizes.";
+  let options = [
+    Option<"maxAllowedNumberOfNativeVectors", "max-allowed-number-of-native-vectors", "int64_t", /*default=*/"512",
+           "The ratio used in the computation of max vector size.">
+  ];
+  let constructor = "mlir::iree_compiler::createLLVMCPUVerifyVectorSizeLegalityPass()";
+}
+
 // Note: This pass is currently only required when targeting Arm SME (which is
 // the only target that currently has some concept of 2D scalability).
 def LLVMCPU2DScalableTo1DScalable :
