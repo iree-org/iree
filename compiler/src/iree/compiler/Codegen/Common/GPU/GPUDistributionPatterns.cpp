@@ -162,7 +162,6 @@ struct DistributeElementwise final
       distributedOp->setAttr(fastmathAttrName, attr);
     }
     if (Attribute attr = op->getAttr("predicate")) {
-      op->dump();
       distributedOp->setAttr("predicate", attr);
     }
 
