@@ -18,7 +18,7 @@
 
 struct iree_hal_cuda_tracing_context_event_t {
   CUevent event;
-  iree_hal_cuda_tracing_context_event_t* next_in_cb;
+  iree_hal_cuda_tracing_context_event_t* next_in_command_buffer;
   iree_hal_cuda_tracing_context_event_t* next_submission;
 };
 
@@ -43,8 +43,7 @@ struct iree_hal_cuda_tracing_context_t {
   iree_hal_cuda_tracing_context_event_t* event_freelist_head;
 
   // Submitted events
-  iree_hal_cuda_tracing_context_event_t* event_submitted_list_head;
-  iree_hal_cuda_tracing_context_event_t* event_submitted_list_tail;
+  iree_hal_cuda_tracing_context_event_list_t submitted_event_list;
 
   uint32_t query_capacity;
 
@@ -101,8 +100,8 @@ iree_status_t iree_hal_cuda_tracing_context_allocate(
     context->block_pool = block_pool;
     context->host_allocator = host_allocator;
     context->query_capacity = IREE_ARRAYSIZE(context->event_pool);
-    context->event_submitted_list_head = NULL;
-    context->event_submitted_list_tail = NULL;
+    context->submitted_event_list.head = NULL;
+    context->submitted_event_list.tail = NULL;
     iree_slim_mutex_initialize(&context->event_mutex);
   }
 
@@ -119,11 +118,11 @@ iree_status_t iree_hal_cuda_tracing_context_allocate(
           cuEventCreate(&context->event_pool[i].event, CU_EVENT_DEFAULT));
       if (!iree_status_is_ok(status)) break;
       if (i > 0) {
-        context->event_pool[i - 1].next_in_cb = &context->event_pool[i];
+        context->event_pool[i - 1].next_in_command_buffer = &context->event_pool[i];
       }
       context->event_pool[i].next_submission = NULL;
       if (i + 1 == context->query_capacity) {
-        context->event_pool[i].next_in_cb = NULL;
+        context->event_pool[i].next_in_command_buffer = NULL;
       }
     }
     IREE_TRACE_ZONE_END(z_event_pool);
@@ -198,14 +197,14 @@ void iree_hal_cuda_tracing_context_collect(
   iree_slim_mutex_lock(&context->event_mutex);
 
   // No outstanding queries
-  if (!context->event_submitted_list_head) {
+  if (!context->submitted_event_list.head) {
     iree_slim_mutex_unlock(&context->event_mutex);
     return;
   }
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_cuda_tracing_context_event_t* events =
-      context->event_submitted_list_head;
+      context->submitted_event_list.head;
   uint32_t read_query_count = 0;
   while (events) {
     iree_hal_cuda_tracing_context_event_t* event = events;
@@ -228,12 +227,12 @@ void iree_hal_cuda_tracing_context_collect(
       iree_tracing_gpu_zone_notify(context->id, query_id, gpu_timestamp);
 
       read_query_count += 1;
-      event = event->next_in_cb;
+      event = event->next_in_command_buffer;
     }
     iree_hal_cuda_tracing_context_event_t* next = events->next_submission;
     events->next_submission = events;
     events = next;
-    context->event_submitted_list_head = events;
+    context->submitted_event_list.head = events;
   }
   IREE_TRACE_ZONE_APPEND_VALUE_I64(z0, (int64_t)read_query_count);
   IREE_TRACE_ZONE_END(z0);
@@ -242,47 +241,38 @@ void iree_hal_cuda_tracing_context_collect(
 
 void iree_hal_cuda_tracing_notify_submitted(
     iree_hal_cuda_tracing_context_t* context,
-    iree_hal_cuda_tracing_context_event_t** event_list_begin,
-    iree_hal_cuda_tracing_context_event_t** event_list_end) {
+    iree_hal_cuda_tracing_context_event_list_t* event_list) {
   if (!context) return;
   iree_slim_mutex_lock(&context->event_mutex);
 
-  IREE_ASSERT_ARGUMENT(event_list_begin);
-  IREE_ASSERT_ARGUMENT(event_list_end);
+  IREE_ASSERT_ARGUMENT(event_list);
 
-  if (!*event_list_begin) {
+  if (!event_list->head) {
     iree_slim_mutex_unlock(&context->event_mutex);
     return;
   }
 
-  iree_hal_cuda_tracing_context_event_t* evt = *event_list_begin;
-  while (evt) {
-    evt = evt->next_in_cb;
-  }
-
-  if (!context->event_submitted_list_head) {
-    context->event_submitted_list_head = *event_list_begin;
-    context->event_submitted_list_tail = *event_list_begin;
+  if (!context->submitted_event_list.head) {
+    context->submitted_event_list.head = event_list->head;
+    context->submitted_event_list.tail = event_list->head;
     iree_slim_mutex_unlock(&context->event_mutex);
     return;
   }
 
-  context->event_submitted_list_tail->next_submission = *event_list_begin;
-  context->event_submitted_list_tail = *event_list_begin;
+  context->submitted_event_list.tail->next_submission = event_list->head;
+  context->submitted_event_list.tail = event_list->head;
   iree_slim_mutex_unlock(&context->event_mutex);
 }
 
 void iree_hal_cuda_tracing_free(
     iree_hal_cuda_tracing_context_t* context,
-    iree_hal_cuda_tracing_context_event_t** event_list_begin,
-    iree_hal_cuda_tracing_context_event_t** event_list_end) {
+    iree_hal_cuda_tracing_context_event_list_t* event_list) {
   if (!context) return;
   iree_slim_mutex_lock(&context->event_mutex);
 
-  IREE_ASSERT_ARGUMENT(event_list_begin);
-  IREE_ASSERT_ARGUMENT(event_list_end);
+  IREE_ASSERT_ARGUMENT(event_list);
 
-  if (!*event_list_begin) {
+  if (!event_list->head) {
     iree_slim_mutex_unlock(&context->event_mutex);
     return;
   }
@@ -290,53 +280,52 @@ void iree_hal_cuda_tracing_free(
   // If this event list has never been submitted,
   // we still need to add values to the timeline,
   // otherwise tracy will not behave correctly.
-  if ((!(*event_list_begin)->next_submission)) {
-    iree_hal_cuda_tracing_context_event_t* event = *event_list_begin;
+  if (!event_list->head->next_submission) {
+    iree_hal_cuda_tracing_context_event_t* event = event_list->head;
     while (event) {
       uint32_t query_id = (uint32_t)(event - &context->event_pool[0]);
       iree_tracing_gpu_zone_notify(context->id, query_id, 0);
-      event = event->next_in_cb;
+      event = event->next_in_command_buffer;
     }
   }
 
   if (!context->event_freelist_head) {
-    context->event_freelist_head = *event_list_begin;
+    context->event_freelist_head = event_list->head;
     iree_slim_mutex_unlock(&context->event_mutex);
     return;
   }
-  (*event_list_begin)->next_submission = NULL;
-  (*event_list_end)->next_in_cb = context->event_freelist_head;
-  context->event_freelist_head = *event_list_begin;
+  event_list->head->next_submission = NULL;
+  event_list->tail->next_in_command_buffer = context->event_freelist_head;
+  context->event_freelist_head = event_list->head;
 
-  *event_list_begin = NULL;
-  *event_list_end = NULL;
+  event_list->head = NULL;
+  event_list->tail = NULL;
   iree_slim_mutex_unlock(&context->event_mutex);
 }
 
 static uint16_t iree_hal_cuda_stream_tracing_context_insert_query(
     iree_hal_cuda_tracing_context_t* context,
-    iree_hal_cuda_tracing_context_event_t** event_list_begin,
-    iree_hal_cuda_tracing_context_event_t** event_list_end, CUstream stream) {
+    iree_hal_cuda_tracing_context_event_list_t* event_list, CUstream stream) {
   iree_slim_mutex_lock(&context->event_mutex);
-  IREE_ASSERT_ARGUMENT(event_list_begin);
-  IREE_ASSERT_ARGUMENT(event_list_end);
+  IREE_ASSERT_ARGUMENT(event_list);
+
   // Allocate an event from the pool for use by the query.
   // TODO: If we have run out of our freelist, then we
   //   need to try and recover allocate events.
   iree_hal_cuda_tracing_context_event_t* event = context->event_freelist_head;
-  context->event_freelist_head = event->next_in_cb;
+  context->event_freelist_head = event->next_in_command_buffer;
   uint32_t query_id = event - &context->event_pool[0];
-  IREE_ASSERT(event->next_in_cb != NULL);
-  event->next_in_cb = NULL;
+  IREE_ASSERT(event->next_in_command_buffer != NULL);
+  event->next_in_command_buffer = NULL;
 
   IREE_CUDA_IGNORE_ERROR(context->symbols, cuEventRecord(event->event, stream));
 
-  if (!*event_list_begin) {
-    *event_list_begin = event;
-    *event_list_end = event;
+  if (!event_list->head) {
+    event_list->head = event;
+    event_list->tail = event;
   } else {
-    (*event_list_end)->next_in_cb = event;
-    *event_list_end = event;
+    event_list->tail->next_in_command_buffer = event;
+    event_list->tail = event;
   }
 
   iree_slim_mutex_unlock(&context->event_mutex);
@@ -345,12 +334,10 @@ static uint16_t iree_hal_cuda_stream_tracing_context_insert_query(
 
 static uint16_t iree_hal_cuda_graph_tracing_context_insert_query(
     iree_hal_cuda_tracing_context_t* context,
-    iree_hal_cuda_tracing_context_event_t** event_list_begin,
-    iree_hal_cuda_tracing_context_event_t** event_list_end,
+    iree_hal_cuda_tracing_context_event_list_t* event_list,
     CUgraphNode* out_node, CUgraph graph, CUgraphNode* dependency_nodes,
     size_t dependency_nodes_count) {
-  IREE_ASSERT_ARGUMENT(event_list_begin);
-  IREE_ASSERT_ARGUMENT(event_list_end);
+  IREE_ASSERT_ARGUMENT(event_list);
   iree_slim_mutex_lock(&context->event_mutex);
 
   // Allocate an event from the pool for use by the query.
@@ -358,10 +345,10 @@ static uint16_t iree_hal_cuda_graph_tracing_context_insert_query(
   //   need to try and recover or allocate more
   //   events.
   iree_hal_cuda_tracing_context_event_t* event = context->event_freelist_head;
-  context->event_freelist_head = event->next_in_cb;
+  context->event_freelist_head = event->next_in_command_buffer;
   uint32_t query_id = event - &context->event_pool[0];
-  IREE_ASSERT(event->next_in_cb != NULL);
-  event->next_in_cb = NULL;
+  IREE_ASSERT(event->next_in_command_buffer != NULL);
+  event->next_in_command_buffer = NULL;
 
   iree_status_t status = IREE_CURESULT_TO_STATUS(
       context->symbols,
@@ -369,12 +356,12 @@ static uint16_t iree_hal_cuda_graph_tracing_context_insert_query(
                                 dependency_nodes_count, event->event));
   IREE_ASSERT(iree_status_is_ok(status));
 
-  if (!*event_list_begin) {
-    *event_list_begin = event;
-    *event_list_end = event;
+  if (!event_list->head) {
+    event_list->head = event;
+    event_list->tail = event;
   } else {
-    (*event_list_end)->next_in_cb = event;
-    *event_list_end = event;
+    event_list->tail->next_in_command_buffer = event;
+    event_list->tail = event;
   }
   iree_slim_mutex_unlock(&context->event_mutex);
   return query_id;
@@ -387,25 +374,23 @@ static uint16_t iree_hal_cuda_graph_tracing_context_insert_query(
 
 void iree_hal_cuda_stream_tracing_zone_begin_impl(
     iree_hal_cuda_tracing_context_t* context,
-    iree_hal_cuda_tracing_context_event_t** event_list_begin,
-    iree_hal_cuda_tracing_context_event_t** event_list_end, CUstream stream,
+    iree_hal_cuda_tracing_context_event_list_t* event_list, CUstream stream,
     const iree_tracing_location_t* src_loc) {
   IREE_ASSERT_ARGUMENT(context);
   uint16_t query_id = iree_hal_cuda_stream_tracing_context_insert_query(
-      context, event_list_begin, event_list_end, stream);
+      context, event_list, stream);
   iree_tracing_gpu_zone_begin(context->id, query_id, src_loc);
 }
 
 void iree_hal_cuda_stream_tracing_zone_begin_external_impl(
     iree_hal_cuda_tracing_context_t* context,
-    iree_hal_cuda_tracing_context_event_t** event_list_begin,
-    iree_hal_cuda_tracing_context_event_t** event_list_end, CUstream stream,
+    iree_hal_cuda_tracing_context_event_list_t* event_list, CUstream stream,
     const char* file_name, size_t file_name_length, uint32_t line,
     const char* function_name, size_t function_name_length, const char* name,
     size_t name_length) {
   IREE_ASSERT_ARGUMENT(context);
   uint16_t query_id = iree_hal_cuda_stream_tracing_context_insert_query(
-      context, event_list_begin, event_list_end, stream);
+      context, event_list, stream);
   iree_tracing_gpu_zone_begin_external(context->id, query_id, file_name,
                                        file_name_length, line, function_name,
                                        function_name_length, name, name_length);
@@ -413,15 +398,14 @@ void iree_hal_cuda_stream_tracing_zone_begin_external_impl(
 
 void iree_hal_cuda_graph_tracing_zone_begin_external_impl(
     iree_hal_cuda_tracing_context_t* context,
-    iree_hal_cuda_tracing_context_event_t** event_list_begin,
-    iree_hal_cuda_tracing_context_event_t** event_list_end,
+    iree_hal_cuda_tracing_context_event_list_t* event_list,
     CUgraphNode* out_node, CUgraph graph, CUgraphNode* dependency_nodes,
     size_t dependency_nodes_count, const char* file_name,
     size_t file_name_length, uint32_t line, const char* function_name,
     size_t function_name_length, const char* name, size_t name_length) {
   if (!context) return;
   uint16_t query_id = iree_hal_cuda_graph_tracing_context_insert_query(
-      context, event_list_begin, event_list_end, out_node, graph,
+      context, event_list, out_node, graph,
       dependency_nodes, dependency_nodes_count);
   iree_tracing_gpu_zone_begin_external(context->id, query_id, file_name,
                                        file_name_length, line, function_name,
@@ -430,23 +414,21 @@ void iree_hal_cuda_graph_tracing_zone_begin_external_impl(
 
 void iree_hal_cuda_stream_tracing_zone_end_impl(
     iree_hal_cuda_tracing_context_t* context,
-    iree_hal_cuda_tracing_context_event_t** event_list_begin,
-    iree_hal_cuda_tracing_context_event_t** event_list_end, CUstream stream) {
+    iree_hal_cuda_tracing_context_event_list_t* event_list, CUstream stream) {
   if (!context) return;
   uint16_t query_id = iree_hal_cuda_stream_tracing_context_insert_query(
-      context, event_list_begin, event_list_end, stream);
+      context, event_list, stream);
   iree_tracing_gpu_zone_end(context->id, query_id);
 }
 
 void iree_hal_cuda_graph_tracing_zone_end_impl(
     iree_hal_cuda_tracing_context_t* context,
-    iree_hal_cuda_tracing_context_event_t** event_list_begin,
-    iree_hal_cuda_tracing_context_event_t** event_list_end,
+    iree_hal_cuda_tracing_context_event_list_t* event_list,
     CUgraphNode* out_node, CUgraph graph, CUgraphNode* dependency_nodes,
     size_t dependency_nodes_count) {
   if (!context) return;
   uint16_t query_id = iree_hal_cuda_graph_tracing_context_insert_query(
-      context, event_list_begin, event_list_end, out_node, graph,
+      context, event_list, out_node, graph,
       dependency_nodes, dependency_nodes_count);
   iree_tracing_gpu_zone_end(context->id, query_id);
 }
@@ -470,12 +452,10 @@ void iree_hal_cuda_tracing_context_collect(
 
 void iree_hal_cuda_tracing_notify_submitted(
     iree_hal_cuda_tracing_context_t* context,
-    iree_hal_cuda_tracing_context_event_t** event_list_begin,
-    iree_hal_cuda_tracing_context_event_t** event_list_end) {}
+    iree_hal_cuda_tracing_context_event_list_t* event_list) {}
 
 void iree_hal_cuda_tracing_free(
     iree_hal_cuda_tracing_context_t* context,
-    iree_hal_cuda_tracing_context_event_t** event_list_begin,
-    iree_hal_cuda_tracing_context_event_t** event_list_end) {}
+    iree_hal_cuda_tracing_context_event_list_t* event_list) {}
 
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE

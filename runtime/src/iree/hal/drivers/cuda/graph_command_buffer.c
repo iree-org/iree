@@ -33,8 +33,7 @@ typedef struct iree_hal_cuda_graph_command_buffer_t {
 
   // Per-stream CUDA tracing context.
   iree_hal_cuda_tracing_context_t* tracing_context;
-  iree_hal_cuda_tracing_context_event_t* tracing_event_list_begin;
-  iree_hal_cuda_tracing_context_event_t* tracing_event_list_end;
+  iree_hal_cuda_tracing_context_event_list_t tracing_event_list;
 
   // A resource set to maintain references to all resources used within the
   // command buffer.
@@ -99,8 +98,7 @@ static void iree_cuda_graph_command_buffer_trace_zone_begin_external(
   size_t dependency_count = command_buffer->cu_barrier_node ? 1 : 0;
   IREE_CUDA_GRAPH_TRACE_ZONE_BEGIN_EXTERNAL(
       command_buffer->tracing_context,
-      &command_buffer->tracing_event_list_begin,
-      &command_buffer->tracing_event_list_end, tracing_event_node,
+      &command_buffer->tracing_event_list, tracing_event_node,
       command_buffer->cu_graph, &command_buffer->cu_barrier_node,
       dependency_count, file_name, file_name_length, line, function_name,
       function_name_length, name, name_length);
@@ -126,8 +124,7 @@ static void iree_cuda_graph_command_buffer_trace_zone_end(
   IREE_ASSERT_GT(dependency_count, 0,
                  "ending a zone should at least depend on the beginning");
   IREE_CUDA_GRAPH_TRACE_ZONE_END(command_buffer->tracing_context,
-                                 &command_buffer->tracing_event_list_begin,
-                                 &command_buffer->tracing_event_list_end,
+                                 &command_buffer->tracing_event_list,
                                  tracing_event_node, command_buffer->cu_graph,
                                  &command_buffer->cu_barrier_node,
                                  dependency_count);
@@ -197,8 +194,8 @@ iree_status_t iree_hal_cuda_graph_command_buffer_create(
   command_buffer->host_allocator = host_allocator;
   command_buffer->symbols = cuda_symbols;
   command_buffer->tracing_context = tracing_context;
-  command_buffer->tracing_event_list_begin = NULL;
-  command_buffer->tracing_event_list_end = NULL;
+  command_buffer->tracing_event_list.head = NULL;
+  command_buffer->tracing_event_list.tail = NULL;
   iree_arena_initialize(block_pool, &command_buffer->arena);
   command_buffer->cu_context = context;
   command_buffer->cu_graph = NULL;
@@ -233,8 +230,7 @@ static void iree_hal_cuda_graph_command_buffer_destroy(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_cuda_tracing_free(command_buffer->tracing_context,
-                             &command_buffer->tracing_event_list_begin,
-                             &command_buffer->tracing_event_list_end);
+                             &command_buffer->tracing_event_list);
 
   // Drop any pending collective batches before we tear things down.
   iree_hal_collective_batch_clear(&command_buffer->collective_batch);
@@ -283,8 +279,7 @@ void iree_hal_cuda_graph_notify_submitted_commands(
 
   iree_hal_cuda_tracing_notify_submitted(
       command_buffer->tracing_context,
-      &command_buffer->tracing_event_list_begin,
-      &command_buffer->tracing_event_list_end);
+      &command_buffer->tracing_event_list);
 }
 
 // Flushes any pending batched collective operations.
