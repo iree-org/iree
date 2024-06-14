@@ -17,9 +17,9 @@ func.func @distribute_elementwise_f16(%a: vector<16x16xf16>, %b: vector<16x16xf1
   // CHECK-DAG: %[[A:.*]] = iree_vector_ext.to_simt %{{.*}} : vector<16x16xf16> -> vector<16xf16>
   // CHECK-DAG: %[[D:.*]] = arith.addf %[[DIVD]], %[[A]] fastmath<reassoc,nnan> : vector<16xf16>
   %d = arith.addf %divd, %a fastmath<reassoc,nnan> : vector<16x16xf16>
-  // CHECK-DAG: %[[CMP:.*]] = arith.cmpf ult, %[[D]], %[[ROOT]] : vector<16xf16>
-  %r = "arith.cmpf"(%d, %root) {predicate = 11 : i64} : (vector<16x16xf16>, vector<16x16xf16>) -> vector<16x16xi1>
-  // CHECK: iree_vector_ext.to_simd %[[CMP]] : vector<16xi1> -> vector<16x16xi1>
+  // CHECK-DAG: %[[R:.*]] = arith.cmpf ult, %[[D]], %[[ROOT]] : vector<16xf16>
+  %r = arith.cmpf ult, %d, %root : vector<16x16xf16>
+  // CHECK: iree_vector_ext.to_simd %[[R]] : vector<16xi1> -> vector<16x16xi1>
   return %r : vector<16x16xi1>
 }
 
