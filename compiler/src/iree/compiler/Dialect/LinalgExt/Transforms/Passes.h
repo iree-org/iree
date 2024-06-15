@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
+#include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 
@@ -51,10 +52,11 @@ tileAttention(IREE::LinalgExt::AttentionOp attnOp,
               SmallVectorImpl<Operation *> &ops, RewriterBase &rewriter,
               std::optional<uint64_t> tileSize = std::nullopt);
 
-LogicalResult padAttention(IREE::LinalgExt::AttentionOp attnOp,
-                           SmallVectorImpl<Operation *> &ops,
-                           RewriterBase &rewriter,
-                           ArrayRef<int64_t> padToMultipleOf);
+DiagnosedSilenceableFailure
+padAttention(IREE::LinalgExt::AttentionOp attnOp,
+             SmallVectorImpl<Operation *> &ops, RewriterBase &rewriter,
+             std::optional<transform::TransformOpInterface> transformOp,
+             ArrayRef<int64_t> padToMultipleOf);
 
 void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
                              SmallVectorImpl<Operation *> &ops,
