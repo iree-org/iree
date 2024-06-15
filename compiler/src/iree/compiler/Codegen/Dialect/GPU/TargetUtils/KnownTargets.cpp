@@ -530,7 +530,7 @@ const WgpDetails *getAndroidBaseline2022WgpDetails() {
   // clang-format off
   static const WgpDetails androidWgp = {
       computeBitwdiths, storageBitwidths,   allSubgroupOps, DotProductOps::None,
-      /*mmaCount=*/0,   /*mmaOps=*/nullptr, {32, 32},       {128, 128, 64},
+      /*mmaCount=*/0,   /*mmaOps=*/nullptr, {64, 64},       {128, 128, 64},
       128,              16 * 1024};
   // clang-format on
   return &androidWgp;
