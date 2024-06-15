@@ -179,7 +179,8 @@ void addMatrixFeatures(IREE::GPU::MMAOpsArrayAttr mmaOps,
   }
 }
 
-spirv::ResourceLimitsAttr convertLimits(IREE::GPU::TargetWgpAttr wgp) {
+spirv::ResourceLimitsAttr convertLimits(StringRef arch,
+                                        IREE::GPU::TargetWgpAttr wgp) {
   MLIRContext *context = wgp.getContext();
   Builder b(context);
 
@@ -194,14 +195,18 @@ spirv::ResourceLimitsAttr convertLimits(IREE::GPU::TargetWgpAttr wgp) {
   }
 
   ArrayRef<int> subgroupSizes = wgp.getSubgroupSizeChoices().asArrayRef();
+  const int minSubgroupSize = *llvm::min_element(subgroupSizes);
+  const int maxSubgroupSize = *llvm::max_element(subgroupSizes);
+  // This is mostly to match RDNA behavior on Vulkan--RDNA supports either 32 or
+  // 64 as subgroup sizes; the default subgroup size is 64.
+  const int preferredSubgroupSize = maxSubgroupSize;
 
   return spirv::ResourceLimitsAttr::get(
       context, wgp.getMaxWorkgroupMemoryBytes(),
       wgp.getMaxThreadCountPerWorkgroup(),
       b.getI32ArrayAttr(wgp.getMaxWorkgroupSizes().asArrayRef()),
-      subgroupSizes.front(), *llvm::min_element(subgroupSizes),
-      *llvm::max_element(subgroupSizes), ArrayAttr::get(context, coopMatAttrs),
-      ArrayAttr{});
+      preferredSubgroupSize, minSubgroupSize, maxSubgroupSize,
+      ArrayAttr::get(context, coopMatAttrs), ArrayAttr{});
 }
 
 //===----------------------------------------------------------------------===//
@@ -239,9 +244,9 @@ convertGPUTarget(IREE::HAL::ExecutableVariantOp variant) {
   auto triple = spirv::VerCapExtAttr::get(
       *version, caps.getArrayRef(), exts.getArrayRef(), variant.getContext());
   return spirv::TargetEnvAttr::get(
-      triple, convertLimits(wgp), deduceClientAPI(target.getBackend()),
-      deduceVendor(gpuTarget.getArch()), spirv::DeviceType::Unknown,
-      spirv::TargetEnvAttr::kUnknownDeviceID);
+      triple, convertLimits(gpuTarget.getArch(), wgp),
+      deduceClientAPI(target.getBackend()), deduceVendor(gpuTarget.getArch()),
+      spirv::DeviceType::Unknown, spirv::TargetEnvAttr::kUnknownDeviceID);
 }
 
 struct SPIRVConvertGPUTargetPass final

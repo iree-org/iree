@@ -157,6 +157,7 @@ const WgpDetails *getCDNA1WgpDetails() {
 const WgpDetails *getRDNA3WgpDetails() {
   static const MMAIntrinsic rdna3MMAOps[] = {
       MMAIntrinsic::WMMA_F16_16x16x16_F32,
+      MMAIntrinsic::WMMA_F16_16x16x16_F16,
   };
   static const WgpDetails rdna3Wgp = {
       allComputeBits,   allStorageBits,          allSubgroupOps,
