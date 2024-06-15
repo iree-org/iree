@@ -163,9 +163,10 @@ void addDotProductFeatures(ComputeBitwidths compute, DotProductOps dotProduct,
                            SetVector<Extension> &exts) {
   if (bitEnumContainsAny(dotProduct, DotProductOps::DP4xI8ToI32)) {
     caps.insert(Capability::DotProduct);
-    caps.insert(Capability::DotProductInput4x8BitPacked);
+    caps.insert(Capability::DotProductInput4x8BitPacked); // Use i32 input
+    caps.insert(Capability::DotProductInputAll);          // Use vector<*> input
     if (bitEnumContainsAny(compute, ComputeBitwidths::Int8)) {
-      caps.insert(Capability::DotProductInput4x8Bit);
+      caps.insert(Capability::DotProductInput4x8Bit); // Use vector<4xi8> input
     }
     exts.insert(Extension::SPV_KHR_integer_dot_product);
   }
