@@ -12,6 +12,7 @@
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVEnums.h"
 #include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/IR/Builders.h"
@@ -251,6 +252,10 @@ convertGPUTarget(IREE::HAL::ExecutableVariantOp variant) {
 
 struct SPIRVConvertGPUTargetPass final
     : SPIRVConvertGPUTargetBase<SPIRVConvertGPUTargetPass> {
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry.insert<spirv::SPIRVDialect>();
+  }
+
   void runOnOperation() override {
     IREE::HAL::ExecutableVariantOp variant = getOperation();
     IREE::HAL::ExecutableTargetAttr target = variant.getTarget();
