@@ -67,6 +67,7 @@ iree_cc_library(
     MLIRTensorUtils
     MLIRTilingInterface
     MLIRTransformDialect
+    MLIRTransformDialectInterfaces
     MLIRTransformUtils
     MLIRTransforms
     iree::compiler::Dialect::LinalgExt::IR
