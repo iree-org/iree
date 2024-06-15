@@ -20,14 +20,17 @@ hal.executable.variant public @vulkan_spirv_fb target(<"vulkan-spirv", "vulkan-s
 
 //      CHECK: spirv.target_env = #spirv.target_env<#spirv.vce<v1.6,
 // CHECK-SAME:   [Shader, Float64, Float16, Int64, Int16, Int8,
-// CHECK-SAME:    StorageBuffer16BitAccess, StorageUniform16, StoragePushConstant16, StorageBuffer8BitAccess, UniformAndStorageBuffer8BitAccess, StoragePushConstant8,
+// CHECK-SAME:    StorageBuffer16BitAccess, StorageUniform16, StoragePushConstant16,
+// CHECK-SMAE:    StorageBuffer8BitAccess, UniformAndStorageBuffer8BitAccess, StoragePushConstant8,
 // CHECK-SAME:    GroupNonUniformShuffle, GroupNonUniformShuffleRelative, GroupNonUniformArithmetic,
-// CHECK-SAME:    DotProduct, DotProductInput4x8BitPacked, DotProductInput4x8Bit,
+// CHECK-SAME:    DotProduct, DotProductInput4x8BitPacked, DotProductInputAll, DotProductInput4x8Bit,
 // CHECK-SAME:    CooperativeMatrixKHR],
 // CHECK-SAME:   [SPV_KHR_16bit_storage, SPV_KHR_8bit_storage, SPV_KHR_integer_dot_product, SPV_KHR_cooperative_matrix]>,
-// CHECK-SAME:   AMD, #spirv.resource_limits<max_compute_shared_memory_size = 65536,
-// CHECK-SAME:   max_compute_workgroup_invocations = 1024, max_compute_workgroup_size = [1024 : i32, 1024 : i32, 1024 : i32],
-// CHECK-SAME:   subgroup_size = 64, min_subgroup_size = 32, max_subgroup_size = 64,
-// CHECK-SAME:   cooperative_matrix_properties_khr = [
-// CHECK-SAME:    #spirv.coop_matrix_props_khr<m_size = 16, n_size = 16, k_size = 16, a_type = f16, b_type = f16, c_type = f32, result_type = f32, acc_sat = false, scope = <Subgroup>>,
-// CHECK-SAME:    #spirv.coop_matrix_props_khr<m_size = 16, n_size = 16, k_size = 16, a_type = f16, b_type = f16, c_type = f16, result_type = f16, acc_sat = false, scope = <Subgroup>>]>>
+// CHECK-SAME:   AMD,
+// CHECK-SAME:   #spirv.resource_limits<max_compute_shared_memory_size = 65536,
+// CHECK-SAME:     max_compute_workgroup_invocations = 1024, max_compute_workgroup_size = [1024 : i32, 1024 : i32, 1024 : i32],
+// CHECK-SAME:     subgroup_size = 64, min_subgroup_size = 32, max_subgroup_size = 64,
+// CHECK-SAME:     cooperative_matrix_properties_khr = [
+// CHECK-SAME:       #spirv.coop_matrix_props_khr<m_size = 16, n_size = 16, k_size = 16, a_type = f16, b_type = f16, c_type = f32, result_type = f32, acc_sat = false, scope = <Subgroup>>,
+// CHECK-SAME:       #spirv.coop_matrix_props_khr<m_size = 16, n_size = 16, k_size = 16, a_type = f16, b_type = f16, c_type = f16, result_type = f16, acc_sat = false, scope = <Subgroup>>
+// CHECK-SAME: ]>>
