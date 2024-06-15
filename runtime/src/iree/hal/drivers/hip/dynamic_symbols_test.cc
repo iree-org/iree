@@ -87,9 +87,11 @@ TEST(NCCLDynamicSymbolsTest, CreateFromSystemLoader) {
     GTEST_SKIP() << "HIP RCCL symbols cannot be loaded, skipping test.";
   }
 
+  // Check that the loaded version is at least the version we compiled for.
   int nccl_version = 0;
   NCCL_CHECK_ERRORS(nccl_symbols.ncclGetVersion(&nccl_version));
-  ASSERT_EQ(NCCL_VERSION_CODE, nccl_version);
+  ASSERT_GE(nccl_version, NCCL_VERSION_CODE);
+
   iree_hal_hip_nccl_dynamic_symbols_deinitialize(&nccl_symbols);
   iree_hal_hip_dynamic_symbols_deinitialize(&hip_symbols);
 }
