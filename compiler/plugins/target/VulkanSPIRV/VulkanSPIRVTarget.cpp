@@ -34,7 +34,7 @@ namespace {
 struct VulkanSPIRVTargetOptions {
   // Use vp_android_baseline_2022 profile as the default target--it's a good
   // lowest common denominator to guarantee the generated SPIR-V is widely
-  // accepted.
+  // accepted for now. Eventually we want to use a list for multi-targeting.
   std::string targetTriple = "vp_android_baseline_2022";
   bool indirectBindings = false;
 
