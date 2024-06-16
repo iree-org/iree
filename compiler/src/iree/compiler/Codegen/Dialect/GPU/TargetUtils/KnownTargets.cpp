@@ -526,12 +526,14 @@ const WgpDetails *getAndroidBaseline2022WgpDetails() {
   // FIXME: We cannot have a fixed subgroup size to target a profile; need to
   // have different targets for different subgroup sizes, or change CodeGen to
   // use symbolic subgroup size values, which can be hard for reduction.
+  // It's kinda fine now given we don't allow any subgroup ops anyway here..
 
   // clang-format off
   static const WgpDetails androidWgp = {
-      computeBitwdiths, storageBitwidths,   allSubgroupOps, DotProductOps::None,
-      /*mmaCount=*/0,   /*mmaOps=*/nullptr, {64, 64},       {128, 128, 64},
-      128,              16 * 1024};
+      computeBitwdiths,    storageBitwidths,   SubgroupOps::None,
+      DotProductOps::None, /*mmaCount=*/0,     /*mmaOps=*/nullptr,
+      {64, 64},            {128, 128, 64},     128,
+      16 * 1024};
   // clang-format on
   return &androidWgp;
 }
