@@ -520,9 +520,8 @@ const WgpDetails *getAndroidBaseline2022WgpDetails() {
   // The following details are from
   // https://github.com/KhronosGroup/Vulkan-Profiles/blob/main/profiles/VP_ANDROID_baseline_2022.json
 
-  auto computeBitwdiths = ComputeBitwidths::Int32 | ComputeBitwidths::Int16 |
-                          ComputeBitwidths::FP32;
-  auto storageBitwidths = StorageBitwidths::B64 | StorageBitwidths::B32;
+  auto computeBitwdiths = ComputeBitwidths::Int32 | ComputeBitwidths::FP32;
+  auto storageBitwidths = StorageBitwidths::B32;
   // FIXME: We cannot have a fixed subgroup size to target a profile; need to
   // have different targets for different subgroup sizes, or change CodeGen to
   // use symbolic subgroup size values, which can be hard for reduction.
