@@ -34,6 +34,7 @@ iree_cc_library(
     "PadLinalgOps.cpp"
     "PadToIntrinsics.cpp"
     "Passes.cpp"
+    "TransposeExtractConcat.cpp"
     "TransposeMatmul.cpp"
   DEPS
     ::PassesIncGen
@@ -45,6 +46,7 @@ iree_cc_library(
     MLIRIR
     MLIRLinalgDialect
     MLIRLinalgTransforms
+    MLIRLinalgUtils
     MLIRMemRefDialect
     MLIRPDLDialect
     MLIRPDLInterpDialect

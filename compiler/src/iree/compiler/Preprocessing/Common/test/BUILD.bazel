@@ -26,6 +26,7 @@ iree_lit_test_suite(
             "preprocessing_match_ops.mlir",
             "transform_symbol_importing.mlir",
             "transpose_matmul.mlir",
+            "transpose_extract_concat.mlir",
         ],
         include = ["*.mlir"],
         exclude = [

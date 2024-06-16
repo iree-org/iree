@@ -76,6 +76,8 @@ void buildPreprocessingPassPipeline(
     pipelineExtensions->extendPreprocessingPassPipeline(passManager);
   }
 
+  passManager.addPass(Preprocessing::createTransposeExtractConcatPass());
+
   if (!preprocessingOptions.preprocessingTransformSpecFilename.empty()) {
     Preprocessing::InterpreterPassOptions interpreterOptions;
     interpreterOptions.transformSpecPath =

@@ -132,4 +132,12 @@ def TransposeMatmulPass : Pass<"iree-preprocessing-transpose-matmul-pass"> {
   ];
 }
 
+def TransposeExtractConcatPass : Pass<"iree-preprocessing-transpose-extract-concat-pass"> {
+  let summary = "Convert pattern of extract -> ... -> concat to occur on inner dimensions";
+  let dependentDialects = [
+    "mlir::linalg::LinalgDialect",
+    "mlir::tensor::TensorDialect",
+  ];
+}
+
 #endif  // IREE_PREPROCESSING_COMMON_PASSES
