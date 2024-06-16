@@ -1050,7 +1050,6 @@ void ConvertToLLVMPass::runOnOperation() {
   populateVectorToLLVMMatrixConversionPatterns(typeConverter, patterns);
   populateVectorToLLVMConversionPatterns(
       typeConverter, patterns, targetReassociateFpReductions.getValue());
-  populateReconcileUnrealizedCastsPatterns(patterns);
 
   if (isAArch64(targetAttr) &&
       (hasAnySVEFeature(targetAttr) || hasSMEFeature(targetAttr))) {
