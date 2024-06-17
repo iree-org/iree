@@ -208,6 +208,9 @@ struct AMDGPUPrepareForChainedMatmulPass
       // For now, we only support transpose invariant matmuls. This is because
       // transposing the inputs may have a non-trivial cost which we need
       // to think about.
+      // TODO: We should probably enable it always. Currently, this is
+      // only useful in Flash Attention, where the first matmul is generally
+      // a transpose.
       if (!isOperandSwapInvariant(chainParent)) {
         continue;
       }
