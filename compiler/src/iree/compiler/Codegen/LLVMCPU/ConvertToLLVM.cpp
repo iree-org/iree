@@ -15,6 +15,8 @@
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilOps.h"
 #include "iree/schemas/instruments/dispatch.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Mutex.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/TargetParser/Triple.h"
@@ -49,6 +51,7 @@
 #include "mlir/Dialect/LLVMIR/LLVMTypes.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/Math/Transforms/Passes.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tosa/IR/TosaOps.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
@@ -59,9 +62,12 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Location.h"
 #include "mlir/IR/TypeUtilities.h"
+#include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
+
+#define DEBUG_TYPE "iree-convert-to-llvm"
 
 namespace mlir::iree_compiler {
 
@@ -913,6 +919,123 @@ public:
   }
 };
 
+/// Drives analysis to find memref.allocas and assign workgroup memory location
+/// with it.
+class AllocaAnalysisWrapper {
+public:
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(AllocaAnalysisWrapper)
+
+  // map: memref::alloca instruction to offset of workgroup memory
+  using Alloca2MemMap = llvm::DenseMap<LLVM::AllocaOp, size_t>;
+
+  AllocaAnalysisWrapper(mlir::Operation *op) : allocaOffset(0) {}
+
+  // returns nullptr if analysis failed
+  const Alloca2MemMap *getAlloca2MemMap(mlir::ModuleOp &module) {
+    if (mlir::failed(analyzeModule(module))) {
+      return nullptr;
+    }
+    return &alloca2MemMap;
+  }
+
+private:
+  // memref::AllocaOp to Workgroup Memory offset
+  Alloca2MemMap alloca2MemMap;
+  // Next allocatable memory offset
+  size_t allocaOffset;
+
+  mlir::LogicalResult analyzeModule(mlir::ModuleOp &module) {
+    module.walk([this](FunctionOpInterface func) {
+      func.walk(
+          [&](LLVM::AllocaOp alloca) { this->analyzeSingleAlloca(alloca); });
+    });
+    return checkTotalAllocaSize();
+  }
+
+  // Function to get the allocated size from LLVM::AllocaOp
+  size_t getAllocatedSize(mlir::LLVM::AllocaOp allocaOp) const {
+    // Get the type of the allocated memory (should be a pointer type)
+    DataLayout layout = DataLayout::closest(allocaOp);
+    return layout.getTypeSizeInBits(allocaOp.getType()) / 8;
+  }
+
+  void analyzeSingleAlloca(LLVM::AllocaOp &alloca) {
+    size_t allocaSize = getAllocatedSize(alloca);
+    size_t currentAllocaAddress = allocaOffset;
+    if (auto alignment = alloca.getAlignment()) {
+      // here we assume the region of the workgroup memory is aligned,
+      // so we just need to make sure the sub region this alloca get is aligned
+      // to the requirements
+      currentAllocaAddress =
+          (currentAllocaAddress + *alignment - 1) & ~(*alignment - 1);
+    }
+    alloca2MemMap.insert({alloca, currentAllocaAddress});
+    allocaOffset = currentAllocaAddress + allocaSize;
+  }
+
+  // TODO: workgroup local memory size is a runtime argument, should move the
+  // check to runtime. But for now, simply check statically.
+  LogicalResult checkTotalAllocaSize() const {
+    // unless otherwise specified, worker local memory size is 128kb
+    if (allocaOffset > 128 * 1024) {
+      LLVM_DEBUG(llvm::dbgs() << "Allocation size exceeds 64kb limit");
+      return mlir::failure();
+    }
+    return mlir::success();
+  }
+};
+
+class ConvertAllocaToWorkgroupMemOp : public OpRewritePattern<LLVM::AllocaOp> {
+public:
+  ConvertAllocaToWorkgroupMemOp(
+      HALDispatchABI &abi, LLVMTypeConverter &typeConverter,
+      const AllocaAnalysisWrapper::Alloca2MemMap *_a2mMap)
+      : OpRewritePattern(&typeConverter.getContext()), abi(abi),
+        typeConverter(typeConverter), a2mMap(_a2mMap) {
+    assert(a2mMap != nullptr && "Cannot take nullptr for analysis results.");
+  }
+
+  LogicalResult matchAndRewrite(LLVM::AllocaOp allocaOp,
+                                PatternRewriter &rewriter) const override {
+    std::optional<size_t> allocaOffset;
+    for (auto &entry : *a2mMap) {
+      auto allocaEntry = entry.getFirst();
+      if (allocaEntry == allocaOp) {
+        allocaOffset = entry.getSecond();
+        break;
+      }
+    }
+    assert(allocaOffset && "analysis did not find alloca op");
+    Value pointer = getMemorySlot(*allocaOffset, allocaOp, rewriter);
+    rewriter.replaceOp(allocaOp, pointer);
+    return mlir::success();
+  }
+
+  Value getMemorySlot(size_t memOffset, LLVM::AllocaOp alloca,
+                      OpBuilder builder) const {
+    auto loc = alloca->getLoc();
+    Type allocaType = alloca.getType();
+
+    // Get pointer of memHeadPtr[memOffset], with the type of alloca
+    Value memHeadPtr = abi.loadWorkgroupLocalMemoryPtr(alloca, builder);
+
+    if (memOffset == 0)
+      return memHeadPtr;
+
+    // return memHeadPtr[memOffset]
+    Value ptr2Int =
+        builder.create<LLVM::PtrToIntOp>(loc, builder.getI64Type(), memHeadPtr);
+    Value offset =
+        builder.create<LLVM::ConstantOp>(loc, builder.getI64Type(), memOffset);
+    Value add = builder.create<LLVM::AddOp>(loc, ptr2Int, offset);
+    return builder.create<LLVM::IntToPtrOp>(loc, allocaType, add);
+  }
+
+  HALDispatchABI &abi;
+  LLVMTypeConverter &typeConverter;
+  const AllocaAnalysisWrapper::Alloca2MemMap *a2mMap;
+};
+
 class ConvertToLLVMPass : public ConvertToLLVMBase<ConvertToLLVMPass> {
 public:
   ConvertToLLVMPass(bool reassociateFpReductions) {
@@ -1044,6 +1167,7 @@ void ConvertToLLVMPass::runOnOperation() {
   populateComplexToLLVMConversionPatterns(typeConverter, patterns);
   populateMathToLLVMConversionPatterns(typeConverter, patterns);
   memref::populateExpandStridedMetadataPatterns(patterns);
+
   populateFinalizeMemRefToLLVMConversionPatterns(typeConverter, patterns);
   populateFuncToLLVMConversionPatterns(typeConverter, patterns);
   arith::populateArithToLLVMConversionPatterns(typeConverter, patterns);
@@ -1093,6 +1217,18 @@ void ConvertToLLVMPass::runOnOperation() {
   FunctionLikeNest(passManager).addPass(createReconcileUnrealizedCastsPass);
   if (failed(runPipeline(passManager, module))) {
     return signalPassFailure();
+  }
+
+  // convert LLVM::AllocaOp to Workgroup memory loads
+  {
+    RewritePatternSet patterns(&getContext());
+    auto &aa = getAnalysis<AllocaAnalysisWrapper>();
+    const AllocaAnalysisWrapper::Alloca2MemMap *a2mMap =
+        aa.getAlloca2MemMap(module);
+    assert(a2mMap != nullptr && "Alloca analysis failed");
+    patterns.insert<ConvertAllocaToWorkgroupMemOp>(abi, typeConverter, a2mMap);
+    if (failed(applyPatternsAndFoldGreedily(module, std::move(patterns))))
+      return signalPassFailure();
   }
 
   // Rewrite any extern calls emitted to dynamic library imports.

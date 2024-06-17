@@ -34,12 +34,13 @@ module {
 //      CHECK: llvm.func @bar
 //  CHECK-DAG:   %[[Ci32:.+]] = llvm.mlir.constant(42 : i32) : i32
 //  CHECK-DAG:   %[[Cf64:.+]] = llvm.mlir.constant(4.200000e+01 : f64) : f64
-//  CHECK-DAG:   %[[ALLOCA:.+]] = llvm.alloca
+//  CHECK-DAG:   %[[STATUS:.+]] = llvm.load
+//  CHECK-DAG:   %[[MEM:.+]] = llvm.extractvalue %[[STATUS]]
 //  CHECK-DAG:   %[[DATA:.+]] = llvm.getelementptr inbounds %arg0[4]
 //  CHECK-DAG:   %[[PROCESSOR_INFO:.+]] = llvm.load %arg2
 //      CHECK:   %[[PROCESSOR_ID:.+]] = llvm.extractvalue %[[PROCESSOR_INFO]][4]
 //      CHECK: %[[VAL:.+]] = llvm.call @default_cconv_with_extra_fields
-// CHECK-SAME:     (%[[ALLOCA]], %[[Ci32]], %[[Cf64]], %[[DATA]], %[[PROCESSOR_ID]])
+// CHECK-SAME:     (%[[MEM]], %[[Ci32]], %[[Cf64]], %[[DATA]], %[[PROCESSOR_ID]])
 
 // -----
 
