@@ -12,9 +12,9 @@
 }
 
 builtin.module {
-  // CHECK-DAG: #[[MAP:.*]] = affine_map<(d0, d1, d2) -> (d0, d2)>
-  // CHECK-DAG: #[[MAP1:.*]] = affine_map<(d0, d1, d2) -> (d1, d2)>
-  // CHECK-DAG: #[[MAP2:.*]] = affine_map<(d0, d1, d2) -> (d0, d1)>
+  // CHECK-DAG: #[[MAP:.*]] = affine_map<(d0, d1, d2) -> (d1, d2)>
+  // CHECK-DAG: #[[MAP1:.*]] = affine_map<(d0, d1, d2) -> (d0, d2)>
+  // CHECK-DAG: #[[MAP2:.*]] = affine_map<(d0, d1, d2) -> (d1, d0)>
   func.func @chained_matmul(%lhs : vector<32x8xf16>, %rhs : vector<16x8xf16>, %acc : vector<32x16xf16>,
     // CHECK: func.func @chained_matmul(%[[LHS:.*]]: vector<32x8xf16>, %[[RHS:.*]]: vector<16x8xf16>, %[[ACC:.*]]: vector<32x16xf16>
     // CHECK-SAME: %[[RHS2:.*]]: vector<8x16xf16>, %[[ACC2:.*]]: vector<32x8xf16>
@@ -115,10 +115,10 @@ builtin.module {
 
 builtin.module {
   func.func @chained_matmul_mmt_mm(%lhs : vector<32x8xf16>, %rhs : vector<16x8xf16>, %acc : vector<32x16xf16>,
-    // CHECK-DAG: #[[MAP:.*]]  = affine_map<(d0, d1, d2) -> (d0, d2)>
-    // CHECK-DAG: #[[MAP1:.*]] = affine_map<(d0, d1, d2) -> (d1, d2)>
-    // CHECK-DAG: #[[MAP2:.*]] = affine_map<(d0, d1, d2) -> (d0, d1)>
-    // CHECK-DAG: #[[MAP3:.*]] = affine_map<(d0, d1, d2) -> (d2, d1)>
+    // CHECK-DAG: #[[MAP:.*]]  = affine_map<(d0, d1, d2) -> (d1, d2)>
+    // CHECK-DAG: #[[MAP1:.*]] = affine_map<(d0, d1, d2) -> (d0, d2)>
+    // CHECK-DAG: #[[MAP2:.*]] = affine_map<(d0, d1, d2) -> (d1, d0)>
+    // CHECK-DAG: #[[MAP3:.*]] = affine_map<(d0, d1, d2) -> (d2, d0)>
     // CHECK: func.func @chained_matmul_mmt_mm(%[[LHS:.*]]: vector<32x8xf16>, %[[RHS:.*]]: vector<16x8xf16>, %[[ACC:.*]]: vector<32x16xf16>
     // CHECK-SAME: %[[RHS2:.*]]: vector<16x8xf16>, %[[ACC2:.*]]: vector<32x8xf16>
     %rhs2 : vector<16x8xf16>, %acc2 : vector<32x8xf16>) -> vector<32x8xf16> {
@@ -145,26 +145,45 @@ builtin.module {
 // -----
 
 #accesses0 = [
-  affine_map<(m, n, k) -> (m, k)>,
-  affine_map<(m, n, k) -> (n, k)>,
-  affine_map<(m, n, k) -> (m, n)>
+  affine_map<(b, m1, m2, n, k) -> (b, m2, m1, k)>,
+  affine_map<(b, m1, m2, n, k) -> (b, n, k)>,
+  affine_map<(b, m1, m2, n, k) -> (b, m2, m1, n)>
 ]
 
 #trait0 = {
   indexing_maps = #accesses0,
-  iterator_types = ["parallel", "parallel", "reduction"]
+  iterator_types = ["parallel", "parallel", "parallel", "parallel", "reduction"]
 }
 
 builtin.module {
-  // CHECK-DAG: #[[MAP:.*]] = affine_map<(d0, d1, d2) -> (d0, d2)>
-  // CHECK-DAG: #[[MAP1:.*]] = affine_map<(d0, d1, d2) -> (d1, d2)>
-  // CHECK-DAG: #[[MAP2:.*]] = affine_map<(d0, d1, d2) -> (d0, d1)>
-  func.func @chained_matmul(%lhs : vector<32x8xf16>, %rhs : vector<16x8xf16>, %acc : vector<32x16xf16>,
-    %rhs2 : vector<8x16xf16>, %acc2 : vector<32x8xf16>) -> vector<32x8xf16> {
+  // CHECK-DAG: #[[MAP:.*]]  = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d4)>
+  // CHECK-DAG: #[[MAP1:.*]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d1, d4)>
+  // CHECK-DAG: #[[MAP2:.*]] = affine_map<(d0, d1, d2, d3, d4) -> (d0, d3, d1, d2)>
+  func.func @chained_matmul(%lhs  : vector<17x64x32x8xf16>,
+                            %rhs  : vector<17x16x8xf16>,
+                            %acc  : vector<17x64x32x16xf16>,
+                            %rhs2 : vector<17x8x16xf16>,
+                            %acc2 : vector<17x64x32x8xf16>) -> vector<17x64x32x8xf16> {
+
+    // CHECK: vector.transpose
+    // CHECK-NOT: vector.transpose
+    // CHECK: vector.contract
+    // CHECK-SAME: indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
     %result = vector.contract #trait0 %lhs, %rhs, %acc
-      : vector<32x8xf16>, vector<16x8xf16> into vector<32x16xf16>
+      : vector<17x64x32x8xf16>, vector<17x16x8xf16> into vector<17x64x32x16xf16>
+
+    // transpose from result will fold with transpose of the acc of the next
+    // contract
+
+    // CHECK: vector.transpose
+    // CHECK: vector.transpose
+    // CHECK-NOT: vector.transpose
+    // CHECK: vector.contract
+    // CHECK-SAME: indexing_maps = [#[[MAP]], #[[MAP1]], #[[MAP2]]]
     %result2 = vector.contract #trait0 %result, %rhs2, %acc2
-      : vector<32x16xf16>, vector<8x16xf16> into vector<32x8xf16>
-    func.return %result2 : vector<32x8xf16>
+      : vector<17x64x32x16xf16>, vector<17x8x16xf16> into vector<17x64x32x8xf16>
+    // CHECK: vector.transpose
+
+    func.return %result2 : vector<17x64x32x8xf16>
   }
 }
