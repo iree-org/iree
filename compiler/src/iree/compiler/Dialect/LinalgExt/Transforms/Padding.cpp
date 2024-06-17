@@ -90,7 +90,7 @@ padAttention(IREE::LinalgExt::AttentionOp attnOp,
   Location loc = attnOp.getLoc();
   rewriter.setInsertionPoint(attnOp);
 
-  int64_t domainRank = maps[0].getNumDims();
+  int64_t domainRank = opInfo.getDomainRank();
   if (domainRank != 5) {
     return definiteFailureHelper(
         transformOp, attnOp,
