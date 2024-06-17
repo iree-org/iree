@@ -75,6 +75,13 @@ struct AMDGPUPrepareForChainedMatmulPass
     return rewriter.create<vector::TransposeOp>(val.getLoc(), val, perm);
   }
 
+  AffineMap swapDimsInMap(AffineMap map, int64_t dimA, int64_t dimB) const {
+    SmallVector<AffineExpr> results(map.getResults());
+    std::swap(results[dimA], results[dimB]);
+    return AffineMap::get(map.getNumDims(), map.getNumSymbols(), results,
+                          map.getContext());
+  }
+
   /// Given a vector contract of the form
   /// %output = vector.contract %lhs, %rhs, %acc
   /// this function swaps the operands (%rhs, %lhs),
@@ -114,15 +121,18 @@ struct AMDGPUPrepareForChainedMatmulPass
     AffineMap accMap = maps[2];
 
     acc = swapDims(rewriter, acc, accN, accM);
+    accMap = swapDimsInMap(accMap, accN, accM);
 
     if (!isOperandSwapInvariant(contractOp)) {
       lhs = swapDims(rewriter, lhs, lhsK, lhsM);
       rhs = swapDims(rewriter, rhs, rhsK, rhsN);
+      lhsMap = swapDimsInMap(lhsMap, lhsK, lhsM);
+      rhsMap = swapDimsInMap(rhsMap, rhsK, rhsN);
     }
 
     auto swappedOp = rewriter.create<vector::ContractionOp>(
         contractOp.getLoc(), rhs, lhs, acc,
-        rewriter.getAffineMapArrayAttr({lhsMap, rhsMap, accMap}),
+        rewriter.getAffineMapArrayAttr({rhsMap, lhsMap, accMap}),
         contractOp.getIteratorTypesAttr());
 
     acc = cast<VectorValue>(swappedOp.getResult());
