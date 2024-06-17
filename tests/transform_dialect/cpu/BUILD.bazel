@@ -14,7 +14,6 @@ package(
 iree_lit_test_suite(
     name = "lit",
     srcs = [
-        "attention.mlir",
         "contraction-packing.mlir",
         "contraction-packing-and-dispatch.mlir",
         # DISABLED: incorrectly assuming default flag values.
@@ -28,7 +27,6 @@ iree_lit_test_suite(
     # transform dialect spec files are MLIR files that specify a transformation,
     # they need to be included as data.
     data = [
-        "attention_codegen_spec.mlir",
         "matmul_codegen_default_spec.mlir",
         "transform_library.mlir",
     ],
