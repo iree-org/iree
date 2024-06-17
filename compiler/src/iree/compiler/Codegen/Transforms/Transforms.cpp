@@ -557,16 +557,14 @@ struct FoldReshapeIntoInterfaceTensorLoad : OpRewritePattern<TensorReshapeOp> {
   }
 };
 
-/// Folds tensor.expand/collapse_shape into the source
-/// hal.interface.binding.subspan.
+/// Folds tensor.expand into the source hal.interface.binding.subspan.
 ///
 /// For example, this matches the following pattern:
 ///
 ///   %subspan = hal.interface.binding.subspan ... :
 ///       !flow.dispatch.tensor<writeonly:tensor<3x3x1x96xf32>>
-///   %0 = linalg.tensor_reshape %tensor [
-///         affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
-///       ] : tensor<864xf32> into tensor<3x3x1x96xf32>
+///   %0 = tensor.expand_shape %tensor [[0, 1, 2, 3]]
+///       : tensor<864xf32> into tensor<3x3x1x96xf32>
 ///   %tensor = flow.dispatch.tensor.store %0, %subspan :
 ///       !flow.dispatch.tensor<writeonly:tensor<3x3x1x96xf32>> ->
 ///       tensor<3x3x1x96xf32>
@@ -577,7 +575,7 @@ struct FoldReshapeIntoInterfaceTensorLoad : OpRewritePattern<TensorReshapeOp> {
 ///       !flow.dispatch.tensor<writeonly:tensor<864xf32>>
 ///   %0 = flow.dispatch.tensor.store %tensor, %subspan :
 ///       !flow.dispatch.tensor<writeonly:tensor<864xf32>> -> tensor<864xf32>
-struct FoldReshapeIntoInterfaceTensorStore
+struct FoldExpandShapeIntoInterfaceTensorStore
     : OpRewritePattern<IREE::Flow::DispatchTensorStoreOp> {
   using OpRewritePattern<IREE::Flow::DispatchTensorStoreOp>::OpRewritePattern;
 
@@ -589,17 +587,14 @@ struct FoldReshapeIntoInterfaceTensorStore
         !storeOp.strides().empty())
       return failure();
 
-    auto reshapeOp = storeOp.getValue().getDefiningOp();
-    if (!isa<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(reshapeOp))
+    auto reshapeOp = storeOp.getValue().getDefiningOp<tensor::ExpandShapeOp>();
+    if (!reshapeOp) {
       return failure();
+    }
 
     // Dynamic shapes are currently unsupported.
     std::optional<Value> reshapeSrc =
-        isa<tensor::CollapseShapeOp>(reshapeOp)
-            ? getStaticReshapeOpSrc<tensor::CollapseShapeOp>(
-                  cast<tensor::CollapseShapeOp>(reshapeOp))
-            : getStaticReshapeOpSrc<tensor::ExpandShapeOp>(
-                  cast<tensor::ExpandShapeOp>(reshapeOp));
+        getStaticReshapeOpSrc<tensor::ExpandShapeOp>(reshapeOp);
     if (!reshapeSrc)
       return failure();
 
@@ -657,7 +652,7 @@ struct FoldReshapeIntoInterfaceTensorStore
 ///       offsets = [%x * 286, 0, 0, 0], sizes = [3, 3, 1, 96]
 ///       strides = [1, 1, 1, 1] : tensor<3x3x1x96xf32> ->
 ///       !flow.dispatch.tensor<writeonly:tensor<9x3x1x96xf32>>
-struct FoldStaticCollapsIntoInterfaceTensorStore
+struct FoldCollapseShapeIntoInterfaceTensorStore
     : OpRewritePattern<IREE::Flow::DispatchTensorStoreOp> {
   using OpRewritePattern<IREE::Flow::DispatchTensorStoreOp>::OpRewritePattern;
 
@@ -687,11 +682,6 @@ struct FoldStaticCollapsIntoInterfaceTensorStore
 
     auto subspanType =
         llvm::cast<IREE::Flow::DispatchTensorType>(subspanOp.getType());
-
-    // This pattern only applies to storing partial slices.
-    if (subspanType.getBoundType() == collapseShape.getResultType()) {
-      return failure();
-    }
 
     ArrayRef<int64_t> reshapeSrcShape = collapseShape.getSrcType().getShape();
 
@@ -723,7 +713,7 @@ struct FoldStaticCollapsIntoInterfaceTensorStore
     OpFoldResult zero = rewriter.getIndexAttr(0);
     for (auto [size, group, offset] : llvm::zip_equal(
              subspanType.getShape(), collapseShape.getReassociationIndices(),
-             storeOp.getOffsets())) {
+             storeOp.getMixedOffsets())) {
       expandedSizes.push_back(rewriter.getIndexAttr(reshapeSrcShape[group[0]]));
 
       // Special case for 1 to avoid going through arith folders.
@@ -783,8 +773,9 @@ void populateReshapeToInterfaceTensorPatterns(RewritePatternSet &patterns) {
   patterns.insert<FoldReshapeIntoInterfaceTensorLoad<tensor::CollapseShapeOp>,
                   FoldReshapeIntoInterfaceTensorLoad<tensor::ExpandShapeOp>>(
       patterns.getContext());
-  patterns.insert<FoldReshapeIntoInterfaceTensorStore>(patterns.getContext());
-  patterns.insert<FoldStaticCollapsIntoInterfaceTensorStore>(
+  patterns.insert<FoldExpandShapeIntoInterfaceTensorStore>(
+      patterns.getContext());
+  patterns.insert<FoldCollapseShapeIntoInterfaceTensorStore>(
       patterns.getContext());
 }
 
