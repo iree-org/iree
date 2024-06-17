@@ -1713,13 +1713,6 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
       DispatchLoweringPassPipeline::CPUDataTiling);
 }
 
-static void
-limitAttentionVectorTileSizes(IREE::LinalgExt::AttentionOpDetail &opInfo,
-                              SmallVector<int64_t> &vecTileSizes) {
-  // Limit the sizes of the two contractions inside the attention op.
-  linalg::ContractionDimensions dims;
-}
-
 static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
                                    IREE::LinalgExt::AttentionOp attnOp) {
   FailureOr<IREE::LinalgExt::AttentionOpDetail> maybeOpInfo =
