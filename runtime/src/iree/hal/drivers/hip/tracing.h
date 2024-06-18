@@ -45,6 +45,9 @@ typedef struct iree_hal_hip_tracing_context_t iree_hal_hip_tracing_context_t;
 typedef struct iree_hal_hip_tracing_context_event_t
     iree_hal_hip_tracing_context_event_t;
 
+// This is used when tracing is enabled. Calls to dispatch
+// and event related functions will update the pointers to
+// keep the list up to date.
 typedef struct iree_hal_hip_tracing_context_event_list_t {
   iree_hal_hip_tracing_context_event_t* head;
   iree_hal_hip_tracing_context_event_t* tail;
@@ -69,12 +72,12 @@ void iree_hal_hip_tracing_context_free(iree_hal_hip_tracing_context_t* context);
 void iree_hal_hip_tracing_context_collect(
     iree_hal_hip_tracing_context_t* context);
 
-// Notify that the given command buffer has been submitted
+// Notifies that the given list of events has been dispached on to the gpu.
 void iree_hal_hip_tracing_notify_submitted(
     iree_hal_hip_tracing_context_t* context,
     iree_hal_hip_tracing_context_event_list_t* event_list);
 
-// Free the events and allow them back into the tracing context
+// Frees the events and allow them back into the tracing context.
 void iree_hal_hip_tracing_free(
     iree_hal_hip_tracing_context_t* context,
     iree_hal_hip_tracing_context_event_list_t* event_list);
@@ -163,8 +166,7 @@ void iree_hal_hip_graph_tracing_zone_end_impl(
     context, event_list, out_node, graph,                                  \
     dependency_nodes, dependency_nodes_count, file_name, file_name_length, \
     line, function_name, function_name_length, name, name_length)
-#define IREE_HIP_STREAM_TRACE_ZONE_END(context, event_list_begin, \
-                                       event_list_end, stream)
+#define IREE_HIP_STREAM_TRACE_ZONE_END(context, evnet_list, stream)
 #define IREE_HIP_GRAPH_TRACE_ZONE_END(                          \
     context, event_list, out_node, graph,                       \
     dependency_nodes, dependency_nodes_count)

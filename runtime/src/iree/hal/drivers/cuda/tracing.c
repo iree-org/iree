@@ -16,6 +16,24 @@
 // To prevent spilling pages we leave some room for the context structure.
 #define IREE_HAL_CUDA_TRACING_DEFAULT_QUERY_CAPACITY (16 * 1024 - 256)
 
+// iree_hal_cuda_tracing_context_event_t contains a hipEvent that is used to
+// record timestamps. This event also belongs to 2 linked list.
+//
+// --------------------->---Submissions--->----------
+// \                     \                    \
+//  \                     \                    \
+// command_buffer        command_buffer          command_buffer
+//
+// The higher level list is owned by the tracing context and
+// elements are inserted and removed as commmand_buffers are
+// submitted and when they complete. This is a list of the head
+// elements for each command buffer.
+// The second list is the list of events within a command_buffer
+// they are contained in the command buffer itself.
+//
+// After a command buffer is destroyed, all contained
+// iree_hal_cuda_tracing_context_event_t are returned to the tracing context
+// and added to the front of the freelist to be re-used.
 struct iree_hal_cuda_tracing_context_event_t {
   CUevent event;
   iree_hal_cuda_tracing_context_event_t* next_in_command_buffer;
@@ -39,15 +57,29 @@ struct iree_hal_cuda_tracing_context_t {
   // between events and we need a stable base event.
   CUevent base_event;
 
-  // Unallocated events
+  // Unallocated events.
   iree_hal_cuda_tracing_context_event_t* event_freelist_head;
 
-  // Submitted events
+  // Submitted events.
   iree_hal_cuda_tracing_context_event_list_t submitted_event_list;
 
   uint32_t query_capacity;
 
   // Event pool reused to capture tracing timestamps.
+  // The lifetime of the Events are as follows.
+  // 1) All events are allocated when the tracing context is created.
+  // 2) When a command_buffer inserts a query via:
+  //     iree_hal_cuda_**_tracing_context_insert_query
+  //    an event is pulled from the event freelist and added to the
+  //    command buffer.
+  // 3) When a command buffer is dispatched and
+  //      iree_hal_cuda_tracing_notify_submittedis called, the events
+  //      for that command buffer are added to the submitted_event_list.
+  // 4) When the command buffer completes iree_hal_cuda_tracing_context_collect
+  //      is called, and the events are removed from submitted_event_list as
+  //      we collect their values.
+  // 5) When the command buffer is destroyed, all events are put at the front
+  //      of event_freelist.
   iree_hal_cuda_tracing_context_event_t
       event_pool[IREE_HAL_CUDA_TRACING_DEFAULT_QUERY_CAPACITY];
 };
@@ -202,19 +234,24 @@ void iree_hal_cuda_tracing_context_collect(
     return;
   }
   IREE_TRACE_ZONE_BEGIN(z0);
+  // submitted_event_list is a list of the head elements for each
+  // command_buffer that has been submitted. Here we loop over
+  // all of the events, wait for them to complete and gather the results
+  // with cuEventQuery.
 
   iree_hal_cuda_tracing_context_event_t* events =
       context->submitted_event_list.head;
   uint32_t read_query_count = 0;
+  // Outer per-command_buffer loop.
   while (events) {
     iree_hal_cuda_tracing_context_event_t* event = events;
+    // Inner per-event loop.
     while (event) {
       uint32_t query_id = (uint32_t)(event - &context->event_pool[0]);
 
-      CUresult result = context->symbols->cuEventQuery(event->event);
-      while (result == CUDA_ERROR_NOT_READY) {
-        result = context->symbols->cuEventQuery(event->event);
-      }
+      CUresult result = context->symbols->cuEventSynchronize(event->event);
+      if (result != CUDA_SUCCESS) break;
+      result = context->symbols->cuEventQuery(event->event);
       if (result != CUDA_SUCCESS) break;
 
       // Calculate context-relative time and notify tracy.
@@ -255,12 +292,11 @@ void iree_hal_cuda_tracing_notify_submitted(
   if (!context->submitted_event_list.head) {
     context->submitted_event_list.head = event_list->head;
     context->submitted_event_list.tail = event_list->head;
-    iree_slim_mutex_unlock(&context->event_mutex);
-    return;
+  } else {
+    context->submitted_event_list.tail->next_submission = event_list->head;
+    context->submitted_event_list.tail = event_list->head;
   }
 
-  context->submitted_event_list.tail->next_submission = event_list->head;
-  context->submitted_event_list.tail = event_list->head;
   iree_slim_mutex_unlock(&context->event_mutex);
 }
 
@@ -277,9 +313,12 @@ void iree_hal_cuda_tracing_free(
     return;
   }
 
-  // If this event list has never been submitted,
-  // we still need to add values to the timeline,
-  // otherwise tracy will not behave correctly.
+  // Free an event list that was previously created. There is some book-keeping
+  // to keep tracy happy, and then we remove the elements from the
+  // passed in event_list and add them to the front of the free-list.
+
+  // If this event list has never been submitted we still need to add values to
+  // the timeline otherwise tracy will not behave correctly.
   if (!event_list->head->next_submission) {
     iree_hal_cuda_tracing_context_event_t* event = event_list->head;
     while (event) {
@@ -303,6 +342,9 @@ void iree_hal_cuda_tracing_free(
   iree_slim_mutex_unlock(&context->event_mutex);
 }
 
+// Grabs the next available query out of the freelist and adds it to
+// the event_list that was passed in. Also starts the recording of the
+// event.
 static uint16_t iree_hal_cuda_stream_tracing_context_insert_query(
     iree_hal_cuda_tracing_context_t* context,
     iree_hal_cuda_tracing_context_event_list_t* event_list, CUstream stream) {
@@ -310,8 +352,8 @@ static uint16_t iree_hal_cuda_stream_tracing_context_insert_query(
   IREE_ASSERT_ARGUMENT(event_list);
 
   // Allocate an event from the pool for use by the query.
-  // TODO: If we have run out of our freelist, then we
-  //   need to try and recover allocate events.
+  // TODO: If we have run out of our freelist, then we need to try and recover
+  // allocate events.
   iree_hal_cuda_tracing_context_event_t* event = context->event_freelist_head;
   context->event_freelist_head = event->next_in_command_buffer;
   uint32_t query_id = event - &context->event_pool[0];
@@ -332,6 +374,10 @@ static uint16_t iree_hal_cuda_stream_tracing_context_insert_query(
   return query_id;
 }
 
+// Grabs the next available query out of the freelist and adds it to
+// the event_list that was passed in. Also inserts the event record
+// node into the passed in graph. It returns the index of the
+// event.
 static uint16_t iree_hal_cuda_graph_tracing_context_insert_query(
     iree_hal_cuda_tracing_context_t* context,
     iree_hal_cuda_tracing_context_event_list_t* event_list,
@@ -341,9 +387,8 @@ static uint16_t iree_hal_cuda_graph_tracing_context_insert_query(
   iree_slim_mutex_lock(&context->event_mutex);
 
   // Allocate an event from the pool for use by the query.
-  // TODO: If we have run out of our freelist, then we
-  //   need to try and recover or allocate more
-  //   events.
+  // TODO: If we have run out of our freelist, then we need to try and recover
+  // or allocate more events.
   iree_hal_cuda_tracing_context_event_t* event = context->event_freelist_head;
   context->event_freelist_head = event->next_in_command_buffer;
   uint32_t query_id = event - &context->event_pool[0];
