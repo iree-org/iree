@@ -13,6 +13,10 @@
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
 
+namespace mlir {
+struct Range;
+}; // namespace mlir
+
 namespace mlir::iree_compiler::IREE::LinalgExt {
 
 /// Returns a `memref.dim` or `tensor.dim` operation to get the shape of `v` at
@@ -26,6 +30,7 @@ SmallVector<OpFoldResult> getDims(OpBuilder &builder, Location loc, Value v);
 
 /// Returns a `memref.subview` or a `tensor.extract_slice` based on the type of
 /// `src`.
+Value getSlice(OpBuilder &b, Location loc, Value src, ArrayRef<Range> slice);
 Value getSlice(OpBuilder &b, Location loc, Value src,
                ArrayRef<OpFoldResult> offsets, ArrayRef<OpFoldResult> sizes,
                ArrayRef<OpFoldResult> strides);

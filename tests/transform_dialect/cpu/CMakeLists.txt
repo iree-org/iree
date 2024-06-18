@@ -14,7 +14,6 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
-    "attention.mlir"
     "contraction-packing-and-dispatch.mlir"
     "contraction-packing.mlir"
     "fold_tensor_slice_into_transfer.mlir"
@@ -27,7 +26,6 @@ iree_lit_test_suite(
     iree-opt
     iree-run-module
   DATA
-    attention_codegen_spec.mlir
     matmul_codegen_default_spec.mlir
     transform_library.mlir
   LABELS

@@ -890,7 +890,7 @@ getDefaultDistributedLevelTileSizes(Operation *op,
 /// Splits the tile sizes in `parallelSizes` into `reductionSizes` for the
 /// reduction loops.
 static void splitParallelAndReductionTiles(
-    linalg::LinalgOp op, SmallVectorImpl<int64_t> &parallelSizes,
+    Operation *op, SmallVectorImpl<int64_t> &parallelSizes,
     SmallVectorImpl<int64_t> &reductionSizes,
     SmallVectorImpl<bool> *parallelScalableFlags = nullptr,
     SmallVectorImpl<bool> *reductionScalableFlags = nullptr) {
@@ -900,8 +900,9 @@ static void splitParallelAndReductionTiles(
     reductionScalableFlags->assign(parallelScalableFlags->begin(),
                                    parallelScalableFlags->end());
   }
+  TilingInterface tilingOp = cast<TilingInterface>(op);
   for (auto [index, iteratorType] :
-       llvm::enumerate(op.getIteratorTypesArray())) {
+       llvm::enumerate(tilingOp.getLoopIteratorTypes())) {
     if (iteratorType == utils::IteratorType::parallel) {
       reductionSizes[index] = 0;
       if (reductionScalableFlags)
@@ -1121,9 +1122,9 @@ setMatmulRootConfig(mlir::FunctionOpInterface entryPointFn,
   SmallVector<int64_t> parallelTileSizes = vecTileSizes;
   SmallVector<int64_t> reductionTileSizes;
   SmallVector<bool> reductionScalableFlags;
-  splitParallelAndReductionTiles(
-      cast<linalg::LinalgOp>(op.getOperation()), parallelTileSizes,
-      reductionTileSizes, &parallelScalableFlags, &reductionScalableFlags);
+  splitParallelAndReductionTiles(op, parallelTileSizes, reductionTileSizes,
+                                 &parallelScalableFlags,
+                                 &reductionScalableFlags);
 
   if (vecPreProcStrategy == VectorPreProcStrategy::None) {
     setVectorSizesForDynamicShapes(cast<linalg::LinalgOp>(op.getOperation()),
@@ -1741,27 +1742,26 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
     llvm::dbgs() << "]\n";
   });
 
-  // TODO (Groverkss): Flash Attention 2 (current algorithm we use for
-  // attention) was originally designed for GPUs. N, K1 are the head dimension
-  // and are usually very small (64, 128, See AttentionOpDetail docs for more
-  // detail). For larger sizes, fusing attention doesn't have many gains (as
-  // pointed out by the original author). We should explore if we should tile N
-  // and K1 dimensions on CPU and if it has any gains. On GPUs, we don't tile
-  // these dimensions as subgroups can hold much larger register sizes.
-
   // Batch, M and N (parallel dimensions) are distributed on workgroups.
   DistributionHeuristicConfig config;
-  SmallVector<int64_t> distTileSizes = getDefaultDistributedLevelTileSizes(
-      attnOp, DistributionHeuristicConfig{});
+  int64_t vectorSize = getVectorSize(entryPointFn, attnOp.getOutputType());
+  config.maxTileSizes.resize(opInfo.getDomainRank(), clDefaultDistTileSize);
+  config.vectorSizeHints.resize(opInfo.getDomainRank(), vectorSize);
+  // Distribute batch dimensions completely on workgroups (tile_size = 1).
+  for (int batch : opInfo.getBatchDims()) {
+    config.maxTileSizes[batch] = 1;
+    config.vectorSizeHints[batch] = 1;
+  }
+  SmallVector<int64_t> distTileSizes =
+      getDefaultDistributedLevelTileSizes(attnOp, config);
 
   // Batch, M and N (parallel dimensions) are distributed on workgroups.
   SmallVector<int64_t> vecTileSizes(attnOp.getIterationDomainRank(), 1);
-  // Mark reduction dimensions not to distribute.
-  for (int64_t i :
-       llvm::concat<const int64_t>(opInfo.getK1Dims(), opInfo.getK2Dims())) {
+  // Due to the way attention works, K1 dimensions cannot be tiled. Mark k1
+  // reduction dimensions not to distribute.
+  for (int i : opInfo.getK1Dims()) {
     vecTileSizes[i] = 0;
   }
-  int64_t vectorSize = getVectorSize(entryPointFn, attnOp.getOutputType());
   for (auto i : llvm::seq<unsigned>(0, vecTileSizes.size())) {
     // Do not tile reduction dimensions.
     if (vecTileSizes[i] == 0) {
@@ -1773,18 +1773,29 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
         /*numElem=*/tileSize, vectorSize, vectorSize);
   }
 
-  // TODO (17467): Due to a bug in TileAndDecomposeAttention, N dimension
-  // cannot be tiled. Remove this once fixed.
-  for (int64_t i : opInfo.getNDims()) {
-    distTileSizes[i] = 0;
-    vecTileSizes[i] = 0;
+  // Tile the M dimension completely.
+  // TODO: This is a hack to prevent too large vector sizes. The largest vector
+  // generally produced is the Q vector, which is of shape: BATCH x M x K1.
+  // Since K1 cannot be tiled, the heuristics don't properly account for tiling
+  // M such that Q doesn't grow too large.
+  // Ideally, we should use something like limitVectorTileSizes, to fixup tile
+  // sizes. Currently, limitVectorTileSizes ignores static dimensions which are
+  // not tiled, which is why it's not currently used here.
+  for (int i : opInfo.getMDims()) {
+    vecTileSizes[i] = 1;
   }
 
-  TileSizesListType tileSizes = {distTileSizes, vecTileSizes};
+  SmallVector<int64_t> parallelTileSizes = vecTileSizes;
+  SmallVector<int64_t> reductionTileSizes;
+  splitParallelAndReductionTiles(attnOp, parallelTileSizes, reductionTileSizes);
 
-  // TODO: (Groverkss): Tile K2 here using reduction tiling interface once we
-  // have it. TileAndDecomposeAttention pass only tiles K2. I think it should
-  // be possible to tile K1 also, but need to explore it more.
+  LLVM_DEBUG(KD_DBGS() << "Vectorization/unrolling tile sizes (parallel): "
+                       << parallelTileSizes << "\n");
+  LLVM_DEBUG(KD_DBGS() << "Vectorization/unrolling tile sizes (reduction): "
+                       << reductionTileSizes << "\n");
+
+  TileSizesListType tileSizes = {distTileSizes, parallelTileSizes,
+                                 reductionTileSizes};
 
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, attnOp, tileSizes,
@@ -1843,6 +1854,9 @@ setWinogradRootConfig(mlir::FunctionOpInterface entryPointFn,
   tileSizes.push_back(distTileSizes);
   SmallVector<int64_t> vecTileSizes(iterationRank, 1);
   tileSizes.push_back(vecTileSizes);
+  // Dummy tiling config for reduction level.
+  SmallVector<int64_t> reductionTileSizes(iterationRank, 0);
+  tileSizes.push_back(reductionTileSizes);
   return setOpConfigAndEntryPointFnTranslation(
       entryPointFn, winogradOp, tileSizes,
       DispatchLoweringPassPipeline::CPULinalgExtTileAndVectorize);
