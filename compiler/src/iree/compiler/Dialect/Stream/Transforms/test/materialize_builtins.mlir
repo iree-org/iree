@@ -40,7 +40,7 @@ util.func public @builtinSplatI64(%arg0: index, %arg1: i64) -> !stream.resource<
 // CHECK-SAME: (%[[RES:.+]]: !stream.resource<*>, %[[SIZE:.+]]: index, %[[VALUE:.+]]: i64, %[[BYTE_OFFSET:.+]]: index, %[[BYTE_END:.+]]: index, %[[BYTE_LENGTH:.+]]: index)
 util.func public @builtinFillI64(%res: !stream.resource<*>, %size: index, %value: i64, %byte_offset: index, %byte_end: index, %byte_length: index) -> !stream.resource<*> {
   // CHECK: %[[COUNT:.+]] = arith.divui %[[BYTE_LENGTH]], %c8
-  // CHECK: %[[RET:.+]] = stream.async.dispatch @__builtin_fill_i64::@__builtin_fill_i64[%[[COUNT]]](%[[RES]][%[[BYTE_OFFSET]] to %[[BYTE_END]] for %[[BYTE_LENGTH]]], %[[VALUE]], %[[BYTE_OFFSET]], %[[COUNT]]) : (!stream.resource<*>{%[[SIZE]]}, i64, index, index) -> %[[RES]]{%[[SIZE]]}
+  // CHECK: %[[RET:.+]] = stream.async.dispatch @__builtin_fill_i64::@__builtin_fill_i64[%[[COUNT]]](%[[RES]][%[[BYTE_OFFSET]] to %[[BYTE_END]] for %[[BYTE_LENGTH]]], %[[VALUE]], %[[COUNT]]) : (!stream.resource<*>{%[[SIZE]]}, i64, index) -> %[[RES]]{%[[SIZE]]}
   %0 = stream.async.fill %value, %res[%byte_offset to %byte_end for %byte_length] : i64 -> %arg0 as !stream.resource<*>{%size}
   // CHECK: util.return %[[RET]]
   util.return %0 : !stream.resource<*>
