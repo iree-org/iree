@@ -4,7 +4,9 @@ module attributes {
   hal.device.targets = [
     #hal.device.target<"vulkan", [
       #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {
-        spirv.target_env = #spirv.target_env<#spirv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]>, #spirv.resource_limits<>>
+        iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.3,cap:Shader", wgp = <
+          compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [], subgroup_size_choices = [32, 32],
+          max_workgroup_sizes = [128, 128, 64], max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384>>
       }>
     ]>
   ]
