@@ -128,6 +128,16 @@ static MatmulNarrowSizes getMatmulNarrowSizes(ShapedType outType,
   if (!ShapedType::isDynamic(N) && N < kNarrowThreshold) {
     narrow.N = N;
   }
+
+  // Only pick 1 if both are present
+  if (narrow.M && narrow.N) {
+    if (*narrow.M <= *narrow.N) {
+      narrow.N.reset();
+    } else {
+      narrow.M.reset();
+    }
+  }
+
   return narrow;
 }
 
