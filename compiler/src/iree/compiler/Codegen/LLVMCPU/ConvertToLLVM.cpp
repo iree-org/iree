@@ -40,6 +40,8 @@
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Arith/Transforms/Passes.h"
 #include "mlir/Dialect/ArmNeon/ArmNeonDialect.h"
+#include "mlir/Dialect/ArmSVE/IR/ArmSVEDialect.h"
+#include "mlir/Dialect/ArmSVE/Transforms/Transforms.h"
 #include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/Func/Transforms/Passes.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
@@ -1049,6 +1051,12 @@ void ConvertToLLVMPass::runOnOperation() {
   populateVectorToLLVMConversionPatterns(
       typeConverter, patterns, targetReassociateFpReductions.getValue());
   populateReconcileUnrealizedCastsPatterns(patterns);
+
+  if (isAArch64(targetAttr) &&
+      (hasAnySVEFeature(targetAttr) || hasSMEFeature(targetAttr))) {
+    populateArmSVELegalizeForLLVMExportPatterns(typeConverter, patterns);
+    configureArmSVELegalizeForExportTarget(target);
+  }
 
   HALDispatchABI abi(&typeConverter);
   // clang-format off

@@ -1742,26 +1742,26 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
     llvm::dbgs() << "]\n";
   });
 
-  // TODO (Groverkss): Flash Attention 2 (current algorithm we use for
-  // attention) was originally designed for GPUs. N, K1 are the head dimension
-  // and are usually very small (64, 128, See AttentionOpDetail docs for more
-  // detail). For larger sizes, fusing attention doesn't have many gains (as
-  // pointed out by the original author). We should explore if we should tile N
-  // and K1 dimensions on CPU and if it has any gains. On GPUs, we don't tile
-  // these dimensions as subgroups can hold much larger register sizes.
-
   // Batch, M and N (parallel dimensions) are distributed on workgroups.
   DistributionHeuristicConfig config;
+  int64_t vectorSize = getVectorSize(entryPointFn, attnOp.getOutputType());
+  config.maxTileSizes.resize(opInfo.getDomainRank(), clDefaultDistTileSize);
+  config.vectorSizeHints.resize(opInfo.getDomainRank(), vectorSize);
+  // Distribute batch dimensions completely on workgroups (tile_size = 1).
+  for (int batch : opInfo.getBatchDims()) {
+    config.maxTileSizes[batch] = 1;
+    config.vectorSizeHints[batch] = 1;
+  }
   SmallVector<int64_t> distTileSizes =
       getDefaultDistributedLevelTileSizes(attnOp, config);
 
   // Batch, M and N (parallel dimensions) are distributed on workgroups.
   SmallVector<int64_t> vecTileSizes(attnOp.getIterationDomainRank(), 1);
-  // Mark k1 reduction dimensions not to distribute.
+  // Due to the way attention works, K1 dimensions cannot be tiled. Mark k1
+  // reduction dimensions not to distribute.
   for (int i : opInfo.getK1Dims()) {
     vecTileSizes[i] = 0;
   }
-  int64_t vectorSize = getVectorSize(entryPointFn, attnOp.getOutputType());
   for (auto i : llvm::seq<unsigned>(0, vecTileSizes.size())) {
     // Do not tile reduction dimensions.
     if (vecTileSizes[i] == 0) {
@@ -1771,6 +1771,18 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
     // TODO: Use native tile size here once bufferization is fixed for scf.
     vecTileSizes[i] = getMaxVectorTileSize(
         /*numElem=*/tileSize, vectorSize, vectorSize);
+  }
+
+  // Tile the M dimension completely.
+  // TODO: This is a hack to prevent too large vector sizes. The largest vector
+  // generally produced is the Q vector, which is of shape: BATCH x M x K1.
+  // Since K1 cannot be tiled, the heuristics don't properly account for tiling
+  // M such that Q doesn't grow too large.
+  // Ideally, we should use something like limitVectorTileSizes, to fixup tile
+  // sizes. Currently, limitVectorTileSizes ignores static dimensions which are
+  // not tiled, which is why it's not currently used here.
+  for (int i : opInfo.getMDims()) {
+    vecTileSizes[i] = 1;
   }
 
   SmallVector<int64_t> parallelTileSizes = vecTileSizes;

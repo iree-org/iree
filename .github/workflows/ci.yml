@@ -300,7 +300,7 @@ jobs:
               --env IREE_VULKAN_DISABLE \
               --env IREE_CUDA_DISABLE \
               --env IREE_HIP_DISABLE \
-              gcr.io/iree-oss/nvidia@sha256:82fa00b5cdda1b35634796cd0f88cb5d6d22d80328b94bfb51e5f2820598ba23 \
+              gcr.io/iree-oss/nvidia@sha256:433e072f075f90fdf07471673626b17091d8d8e2395626f1e6ac6c98803c8807 \
               ./build_tools/pkgci/build_tests_using_package.sh ${INSTALL_DIR}
       - name: "Running GPU tests"
         env:
@@ -320,7 +320,7 @@ jobs:
               --env CTEST_PARALLEL_LEVEL=2 \
               --env NVIDIA_DRIVER_CAPABILITIES=all \
               --gpus all \
-              gcr.io/iree-oss/nvidia@sha256:82fa00b5cdda1b35634796cd0f88cb5d6d22d80328b94bfb51e5f2820598ba23 \
+              gcr.io/iree-oss/nvidia@sha256:433e072f075f90fdf07471673626b17091d8d8e2395626f1e6ac6c98803c8807 \
               bash -euo pipefail -c \
                 "./build_tools/scripts/check_cuda.sh
                 ./build_tools/scripts/check_vulkan.sh
@@ -364,7 +364,7 @@ jobs:
               --env IREE_VULKAN_DISABLE \
               --env IREE_CUDA_DISABLE \
               --env IREE_HIP_DISABLE \
-              gcr.io/iree-oss/nvidia@sha256:82fa00b5cdda1b35634796cd0f88cb5d6d22d80328b94bfb51e5f2820598ba23 \
+              gcr.io/iree-oss/nvidia@sha256:433e072f075f90fdf07471673626b17091d8d8e2395626f1e6ac6c98803c8807 \
               ./build_tools/pkgci/build_tests_using_package.sh ${INSTALL_DIR}
       - name: "Running GPU tests"
         env:
@@ -384,7 +384,7 @@ jobs:
               --env CTEST_PARALLEL_LEVEL=4 \
               --env NVIDIA_DRIVER_CAPABILITIES=all \
               --gpus all \
-              gcr.io/iree-oss/nvidia@sha256:82fa00b5cdda1b35634796cd0f88cb5d6d22d80328b94bfb51e5f2820598ba23 \
+              gcr.io/iree-oss/nvidia@sha256:433e072f075f90fdf07471673626b17091d8d8e2395626f1e6ac6c98803c8807 \
               bash -euo pipefail -c \
                 "./build_tools/scripts/check_cuda.sh
                 ./build_tools/scripts/check_vulkan.sh
@@ -429,45 +429,45 @@ jobs:
         run: |
           ./build_tools/cmake/ctest_all.sh ${BUILD_DIR}
 
-  # TODO(saienduri): re-enable when iree/hal/drivers/hip/dynamic_symbols_test is fixed
-  # test_amd_w7900:
-  #   needs: [setup, build_all]
-  #   if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_amd_w7900')
-  #   env:
-  #     BUILD_DIR: build-tests
-  #     INSTALL_DIR: ${{ needs.build_all.outputs.install-dir }}
-  #     INSTALL_DIR_ARCHIVE: ${{ needs.build_all.outputs.install-dir-archive }}
-  #     INSTALL_DIR_GCS_URL: ${{ needs.build_all.outputs.install-dir-gcs-url }}
-  #     IREE_CPU_DISABLE: 1
-  #     IREE_VULKAN_DISABLE: 0
-  #     IREE_CUDA_DISABLE: 1
-  #     IREE_HIP_DISABLE: 0
-  #     IREE_HIP_TEST_TARGET_CHIP: "gfx1100"
-  #   runs-on: nodai-amdgpu-w7900-x86-64
-  #   steps:
-  #     - name: "Checking out repository"
-  #       uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
-  #     - name: "Checking out runtime submodules"
-  #       run: ./build_tools/scripts/git/update_runtime_submodules.sh
-  #     - name: "Downloading install dir archive"
-  #       run: wget "${INSTALL_DIR_GCS_URL}" -O "${INSTALL_DIR_ARCHIVE}"
-  #     - name: "Extracting install directory"
-  #       run: tar -xf "${INSTALL_DIR_ARCHIVE}"
-  #     - name: "Building tests"
-  #       run: |
-  #         ./build_tools/pkgci/build_tests_using_package.sh ${INSTALL_DIR}
-  #     - name: "Running GPU tests"
-  #       env:
-  #         IREE_CTEST_LABEL_REGEX: ^requires-gpu|^driver=vulkan$|^driver=hip$
-  #         IREE_AMD_RDNA3_TESTS_DISABLE: 0
-  #         IREE_NVIDIA_GPU_TESTS_DISABLE: 0
-  #         IREE_NVIDIA_SM80_TESTS_DISABLE: 1
-  #         IREE_MULTI_DEVICE_TESTS_DISABLE: 0
-  #         IREE_CUDA_DISABLE: 1
-  #         IREE_CPU_DISABLE: 1
-  #         IREE_HIP_DISABLE: 0
-  #       run: |
-  #         ./build_tools/cmake/ctest_all.sh ${BUILD_DIR}
+  test_amd_w7900:
+    needs: [setup, build_all]
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_amd_w7900')
+    env:
+      BUILD_DIR: build-tests
+      INSTALL_DIR: ${{ needs.build_all.outputs.install-dir }}
+      INSTALL_DIR_ARCHIVE: ${{ needs.build_all.outputs.install-dir-archive }}
+      INSTALL_DIR_GCS_URL: ${{ needs.build_all.outputs.install-dir-gcs-url }}
+      IREE_CPU_DISABLE: 1
+      IREE_VULKAN_DISABLE: 0
+      IREE_CUDA_DISABLE: 1
+      IREE_HIP_DISABLE: 0
+      IREE_HIP_TEST_TARGET_CHIP: "gfx1100"
+    runs-on: nodai-amdgpu-w7900-x86-64
+    steps:
+      - name: "Checking out repository"
+        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+      - name: "Checking out runtime submodules"
+        run: ./build_tools/scripts/git/update_runtime_submodules.sh
+      - name: "Downloading install dir archive"
+        run: wget "${INSTALL_DIR_GCS_URL}" -O "${INSTALL_DIR_ARCHIVE}"
+      - name: "Extracting install directory"
+        run: tar -xf "${INSTALL_DIR_ARCHIVE}"
+      - name: "Building tests"
+        run: |
+          ./build_tools/pkgci/build_tests_using_package.sh ${INSTALL_DIR}
+      - name: "Running GPU tests"
+        env:
+          CTEST_PARALLEL_LEVEL: 1
+          IREE_CTEST_LABEL_REGEX: ^requires-gpu|^driver=vulkan$|^driver=hip$
+          IREE_AMD_RDNA3_TESTS_DISABLE: 0
+          IREE_NVIDIA_GPU_TESTS_DISABLE: 0
+          IREE_NVIDIA_SM80_TESTS_DISABLE: 1
+          IREE_MULTI_DEVICE_TESTS_DISABLE: 0
+          IREE_CUDA_DISABLE: 1
+          IREE_CPU_DISABLE: 1
+          IREE_HIP_DISABLE: 0
+        run: |
+          ./build_tools/cmake/ctest_all.sh ${BUILD_DIR}
 
   ############################### Configurations ###############################
   # Jobs that build IREE in some non-default configuration
@@ -921,7 +921,7 @@ jobs:
       - test_nvidia_gpu
       - test_nvidia_a100
       - test_amd_mi250
-      # - test_amd_w7900
+      - test_amd_w7900
 
       # Configurations
       - build_test_runtime
