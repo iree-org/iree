@@ -327,7 +327,7 @@ StringRef normalizeARMGPUTarget(StringRef target) {
       .Cases("mali-g710", "mali-g510", "mali-g310", "valhall3")
       .Case("mali-78", "valhall2")
       .Cases("mali-g77", "mali-g57", "valhall1")
-      .Default(StringRef());
+      .Default("");
 }
 
 //===----------------------------------------------------------------------===//
@@ -558,7 +558,7 @@ TargetAttr getMetalTargetDetails(MLIRContext *context) {
 
 TargetAttr getCUDATargetDetails(StringRef target, StringRef features,
                                 MLIRContext *context) {
-  if (auto details = getNVIDIAGPUTargetDetails(target))
+  if (std::optional<TargetDetails> details = getNVIDIAGPUTargetDetails(target))
     return createTargetAttr(*details, normalizeNVIDIAGPUTarget(target),
                             features, context);
   return nullptr;
@@ -570,7 +570,7 @@ StringRef normalizeCUDATarget(StringRef target) {
 
 TargetAttr getHIPTargetDetails(StringRef target, StringRef features,
                                MLIRContext *context) {
-  if (auto details = getAMDGPUTargetDetails(target)) {
+  if (std::optional<TargetDetails> details = getAMDGPUTargetDetails(target)) {
     return createTargetAttr(*details, normalizeAMDGPUTarget(target), features,
                             context);
   }
@@ -592,26 +592,28 @@ TargetAttr getVulkanTargetDetails(llvm::StringRef target,
   // SPIR-V 1.4. For non-mobile GPUs we target Vulkan 1.3, which accepts
   // SPIR-V 1.6 as the maximum.
 
-  if (auto details = getAMDGPUTargetDetails(target)) {
+  if (std::optional<TargetDetails> details = getAMDGPUTargetDetails(target)) {
     return createTargetAttr(*details, normalizeAMDGPUTarget(target),
                             /*features=*/"spirv:v1.6,cap:Shader", context);
   }
-  if (auto details = getARMGPUTargetDetails(target)) {
+  if (std::optional<TargetDetails> details = getARMGPUTargetDetails(target)) {
     return createTargetAttr(*details, normalizeARMGPUTarget(target),
                             /*features=*/"spirv:v1.4,cap:Shader", context);
   }
-  if (auto details = getNVIDIAGPUTargetDetails(target)) {
+  if (std::optional<TargetDetails> details =
+          getNVIDIAGPUTargetDetails(target)) {
     return createTargetAttr(*details, normalizeNVIDIAGPUTarget(target),
                             /*features=*/"spirv:v1.6,cap:Shader", context);
   }
-  if (auto details = getQualcommGPUTargetDetails(target)) {
+  if (std::optional<TargetDetails> details =
+          getQualcommGPUTargetDetails(target)) {
     return createTargetAttr(*details, target,
                             /*features=*/"spirv:v1.4,cap:Shader", context);
   }
 
   // Go through common profiles if not hit in the above.
 
-  if (auto details = getAndroidProfileDetails(target)) {
+  if (std::optional<TargetDetails> details = getAndroidProfileDetails(target)) {
     return createTargetAttr(*details, target,
                             /*features=*/"spirv:v1.3,cap:Shader", context);
   }
