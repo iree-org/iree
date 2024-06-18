@@ -225,9 +225,9 @@ private:
         ShapedType::getNumElements(transfer.getVectorType().getShape());
     int64_t flatNumThreads = ShapedType::getNumElements(workgroupSize);
     if (flatNumElements % flatNumThreads != 0) {
-      transfer->emitOpError(
-          "Anchoring on transfer_read with unsupported number of elements (not "
-          "divisible by workgroup size)");
+      transfer->emitOpError() << "Anchoring on transfer_read with unsupported number of elements (not divisible by workgroup size)"
+                              << ", number of elements: " << flatNumElements
+                              << ", workgroup size: " << flatNumThreads;
       return failure();
     }
     numElementsPerThread =
