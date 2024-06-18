@@ -326,3 +326,76 @@ func.func @attention_transpose_v(%query: tensor<1x1024x64xf16>, %key: tensor<1x1
 // CHECK: linalg.matmul_transpose_b
 // CHECK-NOT: linalg.matmul
 // CHECK: linalg.matmul_transpose_b
+
+// -----
+
+// This test checks that a elementwise-mask operation is inserted
+// after QK.T and before the softmax.
+
+func.func @masked_i1_attention(%query: tensor<1x1024x64xf16>, %key: tensor<1x1024x64xf16>, %value: tensor<1x1024x64xf16>, %mask: tensor<1x1024x1024xi1>) -> tensor<1x1024x64xf16> {
+  %0 = tensor.empty() : tensor<1x1024x64xf16>
+  %scale = arith.constant 0.05 : f16
+  %1 = iree_linalg_ext.attention ins(%query, %key, %value, %scale, %mask : tensor<1x1024x64xf16>, tensor<1x1024x64xf16>, tensor<1x1024x64xf16>, f16, tensor<1x1024x1024xi1>) outs(%0 : tensor<1x1024x64xf16>) -> tensor<1x1024x64xf16>
+  return %1 : tensor<1x1024x64xf16>
+}
+
+// CHECK-DAG:  #[[$MAP:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK-DAG:  #[[$MAP1:.+]] = affine_map<(d0, d1) -> (d0)>
+// CHECK-LABEL:  func.func @masked_i1_attention
+// CHECK-SAME: (%[[QUERY:.+]]: tensor<1x1024x64xf16>, %[[KEY:.+]]: tensor<1x1024x64xf16>, %[[VALUE:.+]]: tensor<1x1024x64xf16>, %[[MASK:.+]]: tensor<1x1024x1024xi1>)
+//CHECK-DAG:     %[[CST_0:.+]] = arith.constant 0.000000e+00 : f32
+// CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:    %[[C32:.+]] = arith.constant 32 : index
+// CHECK-DAG:    %[[C1024:.+]] = arith.constant 1024 : index
+// CHECK:        scf.for %[[IV:.+]] = %[[C0]] to %[[C1024]] step %[[C32]]
+// CHECK:          %[[K_S:.+]] = tensor.extract_slice %[[KEY]][0, %[[IV]], 0] [1, 32, 64] [1, 1, 1]
+// CHECK:          %[[V_S:.+]] = tensor.extract_slice %[[VALUE]][0, %[[IV]], 0] [1, 32, 64] [1, 1, 1]
+// CHECK:          %[[Q_S:.+]] = tensor.extract_slice %[[QUERY]][0, 0, 0] [1, 1024, 64] [1, 1, 1]
+// CHECK:          %[[M_S:.+]] = tensor.extract_slice %[[MASK]][0, 0, %[[IV]]] [1, 1024, 32] [1, 1, 1]
+// CHECK:          %[[SCALED_Q:.+]] = linalg.generic {indexing_maps = [#[[$MAP]], #[[$MAP]]], iterator_types = ["parallel", "parallel"]}
+// CHECK-SAME:                          ins(%[[Q_S]] : tensor<1024x64xf16>)
+// CHECK:          %[[QK:.+]] = linalg.matmul_transpose_b ins(%[[SCALED_Q]], %[[K_S]]
+// CHECK-DAG:      %[[CST_1:.+]] = arith.constant -1.000000e+06 : f32
+// CHECK:          %[[MASK_QK:.+]] = linalg.generic {indexing_maps = [#[[$MAP]], #[[$MAP]], #[[$MAP]]], iterator_types = ["parallel", "parallel"]}
+// CHECK-SAME:                        ins(%[[QK]], %[[M_S]] : tensor<1024x32xf32>, tensor<1024x32xi1>)
+// CHECK:                              ^bb0(%[[IN:.+]]: f32, %[[IN0:.+]]: i1, %[[OUT:.+]]: f32):
+// CHECK:                                %[[D0:.+]] = arith.select %[[IN0]], %[[CST_0]], %[[CST_1]] : f32
+// CHECK:                                %[[D1:.+]] = arith.addf %[[IN]], %[[D0]] : f32
+// CHECK:                                linalg.yield %[[D1]] : f32
+// CHECK:                              } -> tensor<1024x32xf32>
+// CHECK:           %[[MAX:.+]] linalg.generic {indexing_maps = [#[[$MAP]], #[[$MAP1]]], iterator_types = ["parallel", "reduction"]}
+// CHECK-SAME:                   ins(%[[MASK_QK]] : tensor<1024x32xf32>)
+// CHECK:                       ^bb0(%[[IN:.+]]: f32, %[[OUT:.+]]: f32):
+// CHECK:                         %[[D2:.+]] = arith.maximumf %[[IN]], %[[OUT]] : f32
+// CHECK:                         linalg.yield %[[D2:.+]] : f32
+// CHECK:                       } -> tensor<1024xf32>
+
+// -----
+
+// This test checks for non i1 mask since after codegen pipeline we may emit i8 masks.
+
+func.func @masked_i8_attention(%query: tensor<1x1024x64xf16>, %key: tensor<1x1024x64xf16>, %value: tensor<1x1024x64xf16>, %mask: tensor<1x1024x1024xi8>) -> tensor<1x1024x64xf16> {
+  %0 = tensor.empty() : tensor<1x1024x64xf16>
+  %scale = arith.constant 0.05 : f16
+  %1 = iree_linalg_ext.attention ins(%query, %key, %value, %scale, %mask : tensor<1x1024x64xf16>, tensor<1x1024x64xf16>, tensor<1x1024x64xf16>, f16, tensor<1x1024x1024xi8>) outs(%0 : tensor<1x1024x64xf16>) -> tensor<1x1024x64xf16>
+  return %1 : tensor<1x1024x64xf16>
+}
+
+// CHECK-DAG:  #[[$MAP:.+]] = affine_map<(d0, d1) -> (d0, d1)>
+// CHECK-LABEL:  func.func @masked_i8_attention
+// CHECK-SAME: (%[[QUERY:.+]]: tensor<1x1024x64xf16>, %[[KEY:.+]]: tensor<1x1024x64xf16>, %[[VALUE:.+]]: tensor<1x1024x64xf16>, %[[MASK:.+]]: tensor<1x1024x1024xi8>)
+//CHECK-DAG:     %[[CST_0:.+]] = arith.constant 0.000000e+00 : f32
+// CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:    %[[C32:.+]] = arith.constant 32 : index
+// CHECK-DAG:    %[[C1024:.+]] = arith.constant 1024 : index
+// CHECK:        scf.for %[[IV:.+]] = %[[C0]] to %[[C1024]] step %[[C32]]
+// CHECK:          %[[M_S:.+]] = tensor.extract_slice %[[MASK]][0, 0, %[[IV]]] [1, 1024, 32] [1, 1, 1]
+// CHECK-DAG:      %[[CST_1:.+]] = arith.constant -1.000000e+06 : f32
+// CHECK:          %[[MASK_QK:.+]] = linalg.generic {indexing_maps = [#[[$MAP]], #[[$MAP]], #[[$MAP]]], iterator_types = ["parallel", "parallel"]}
+// CHECK-SAME:                        ins(%{{.+}}, %[[M_S]] : tensor<1024x32xf32>, tensor<1024x32xi8>)
+// CHECK:                              ^bb0(%[[IN:.+]]: f32, %[[IN0:.+]]: i8, %[[OUT:.+]]: f32):
+// CHECK:                                %[[D0:.+]] = arith.trunci %[[IN0]] : i8 to i1
+// CHECK:                                %[[D1:.+]] = arith.select %[[D0]], %[[CST_0]], %[[CST_1]] : f32
+// CHECK:                                %[[D2:.+]] = arith.addf %[[IN]], %[[D1]] : f32
+// CHECK:                                linalg.yield %[[D2]] : f32
+// CHECK:                              } -> tensor<1024x32xf32>

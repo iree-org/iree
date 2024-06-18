@@ -1720,6 +1720,14 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
   tiledOperands.emplace_back(getSlice(builder, loc, getKey(), keySlice));
   tiledOperands.emplace_back(getSlice(builder, loc, getValue(), valueSlice));
   tiledOperands.emplace_back(scale);
+
+  std::optional<Value> mask = getMask();
+  if (mask) {
+    SmallVector<Range> maskSlice =
+        getPermutedSlice(*getMaskMap(), offsets, sizes);
+    tiledOperands.emplace_back(getSlice(builder, loc, mask.value(), maskSlice));
+  }
+
   tiledOperands.emplace_back(getSlice(builder, loc, getOutput(), outputSlice));
 
   std::optional<Value> max = getMax();
@@ -1737,13 +1745,14 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
   }
 
   SmallVector<Type> resultTypes;
+  int64_t resultIndex = getNumDpsInputs();
   if (hasPureTensorSemantics()) {
-    resultTypes.push_back(tiledOperands[4].getType());
+    resultTypes.push_back(tiledOperands[resultIndex].getType());
     if (max) {
-      resultTypes.push_back(tiledOperands[5].getType());
+      resultTypes.push_back(tiledOperands[resultIndex + 1].getType());
     }
     if (sum) {
-      resultTypes.push_back(tiledOperands[6].getType());
+      resultTypes.push_back(tiledOperands[resultIndex + 2].getType());
     }
   }
 

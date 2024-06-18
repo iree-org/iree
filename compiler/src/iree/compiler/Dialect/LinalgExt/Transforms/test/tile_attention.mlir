@@ -139,3 +139,23 @@ func.func @attention_transpose_v(%query: tensor<1x1024x64xf16>, %key: tensor<1x1
 // CHECK:          scf.for
 // CHECK:            iree_linalg_ext.attention {transpose_v = true}
 // CHECK:          scf.yield
+
+// -----
+
+func.func @masked_attention(%query: tensor<1x1024x64xf16>, %key: tensor<1x1024x64xf16>, %value: tensor<1x1024x64xf16>, %mask: tensor<1x1024x1024xi1>) -> tensor<1x1024x64xf16> {
+  %0 = tensor.empty() : tensor<1x1024x64xf16>
+  %scale = arith.constant 0.05 : f16
+  %1 = iree_linalg_ext.attention ins(%query, %key, %value, %scale, %mask : tensor<1x1024x64xf16>, tensor<1x1024x64xf16>, tensor<1x1024x64xf16>, f16, tensor<1x1024x1024xi1>) outs(%0 : tensor<1x1024x64xf16>) -> tensor<1x1024x64xf16>
+  return %1 : tensor<1x1024x64xf16>
+}
+// CHECK-LABEL:  func.func @masked_attention
+// CHECK-SAME: (%[[QUERY:.+]]: tensor<1x1024x64xf16>, %[[KEY:.+]]: tensor<1x1024x64xf16>, %[[VALUE:.+]]: tensor<1x1024x64xf16>, %[[MASK:.+]]: tensor<1x1024x1024xi1>)
+// CHECK-DAG:    %[[C0:.+]] = arith.constant 0 : index
+// CHECK-DAG:    %[[C1024:.+]] = arith.constant 1024 : index
+// CHECK:        scf.for %[[IV:.+]] = %[[C0]] to %[[C1024]] step %[[C1024]]
+// CHECK:          %[[K_S:.+]] = tensor.extract_slice %[[KEY]][0, %[[IV]], 0] [1, 1024, 64] [1, 1, 1]
+// CHECK:          %[[V_S:.+]] = tensor.extract_slice %[[VALUE]][0, %[[IV]], 0] [1, 1024, 64] [1, 1, 1]
+// CHECK:          %[[Q_S:.+]] = tensor.extract_slice %[[QUERY]][0, 0, 0] [1, 1024, 64] [1, 1, 1]
+// CHECK:          %[[M_S:.+]] = tensor.extract_slice %[[MASK]][0, 0, %[[IV]]] [1, 1024, 1024] [1, 1, 1]
+// CHECK:          %[[ATT:.+]]:3 = iree_linalg_ext.attention ins(%[[Q_S]], %[[K_S]], %[[V_S]], %{{[a-z0-1]+}}, %[[M_S]]
+// CHECK:          scf.yield

@@ -177,9 +177,50 @@ static Value truncateToF16(Value input, Value output,
   return genericOp.getResult(0);
 }
 
+static Value applyMasking(Value qkSlice, Value mask, OpBuilder &builder) {
+  ShapedType qkType = cast<ShapedType>(qkSlice.getType());
+  Location loc = qkSlice.getLoc();
+
+  // Create a fill op for scale.
+  SmallVector<OpFoldResult> qkDims =
+      tensor::getMixedSizes(builder, loc, qkSlice);
+
+  // Attention_mask is 1.0 for positions we want to attend and 0.0 for
+  // masked positions. this operation will create a tensor which is 0.0 for
+  // positions we want to attend and -10000.0 for masked positions
+  Value c0 = builder.create<arith::ConstantOp>(
+      loc, builder.getZeroAttr(qkType.getElementType()));
+
+  Value cLargeNeg = builder.create<arith::ConstantOp>(
+      loc, builder.getFloatAttr(qkType.getElementType(), -1e6));
+
+  Value empty =
+      builder.create<tensor::EmptyOp>(loc, qkDims, qkType.getElementType());
+  // Create a generic op to multiply the query by the scale.
+  SmallVector<utils::IteratorType> iteratorTypes(2,
+                                                 utils::IteratorType::parallel);
+  auto identityMap = AffineMap::getMultiDimIdentityMap(2, builder.getContext());
+  SmallVector<AffineMap> indexingMaps(3, identityMap);
+  auto applyMaskOp = builder.create<linalg::GenericOp>(
+      loc, TypeRange{empty.getType()}, ValueRange{qkSlice, mask},
+      ValueRange{empty}, indexingMaps, iteratorTypes,
+      [&](OpBuilder &b, Location loc, ValueRange args) {
+        Value boolMask = args[1];
+        if (!boolMask.getType().isInteger(1)) {
+          boolMask =
+              b.create<arith::TruncIOp>(loc, builder.getI1Type(), args[1]);
+        }
+        Value masking = b.create<arith::SelectOp>(loc, boolMask, c0, cLargeNeg);
+        Value result = b.create<arith::AddFOp>(loc, args[0], masking);
+        b.create<linalg::YieldOp>(loc, result);
+      });
+  return applyMaskOp.getResult(0);
+}
+
 static std::tuple<Value, Value, Value>
 createAttentionBody(Value keySlice, Value valueSlice, Value querySlice,
-                    Value outputSlice, Value maxSlice, Value sumSlice,
+                    std::optional<Value> maskSlice, Value outputSlice,
+                    Value maxSlice, Value sumSlice,
                     OpFoldResult sequenceTileLength,
                     OpFoldResult keyValueTileLength, OpFoldResult headDimension,
                     Type elementType, SmallVectorImpl<Operation *> &ops,
@@ -194,6 +235,11 @@ createAttentionBody(Value keySlice, Value valueSlice, Value querySlice,
       builder.create<tensor::EmptyOp>(loc, resultShape, f32Type);
   Value qkTranspose = computeQKTranspose(querySlice, keySlice, emptySquare,
                                          zero, loc, builder, ops);
+
+  // Apply masking if mask is specified.
+  if (maskSlice.has_value()) {
+    qkTranspose = applyMasking(qkTranspose, maskSlice.value(), builder);
+  }
 
   // Compute current statistics
   Value newMax = computeRowwiseReduction<arith::MaximumFOp>(
@@ -327,9 +373,9 @@ void decomposeTiledAttention(IREE::LinalgExt::AttentionOp tiledAttnOp,
   // iteration of the loop.
   querySlice = scaleQuery(querySlice, scale, rewriter);
   ops.push_back(querySlice.getDefiningOp());
-
+  std::optional<Value> maybeMask = tiledAttnOp.getMask();
   auto [result, newMax, newSum] = createAttentionBody(
-      keySlice, valueSlice, querySlice, tiledResult, max, sum,
+      keySlice, valueSlice, querySlice, maybeMask, tiledResult, max, sum,
       sequenceTileLength, keyValueTileLength, headDimension, elementType, ops,
       tiledAttnOp.getTransposeV(), loc, rewriter);
 

@@ -31,7 +31,6 @@ void AttentionOpDetail::inferFromIndexingMaps(
   AffineMap qMap = indexingMaps[0];
   AffineMap kMap = indexingMaps[1];
   AffineMap vMap = indexingMaps[2];
-  AffineMap resMap = indexingMaps[3];
 
   // Q   = B x M x K1
   // K   = B x K2 x K1
@@ -40,7 +39,6 @@ void AttentionOpDetail::inferFromIndexingMaps(
   llvm::SmallDenseSet<int64_t> qSet = findPermutationsIndexingOperand(qMap);
   llvm::SmallDenseSet<int64_t> vSet = findPermutationsIndexingOperand(vMap);
   llvm::SmallDenseSet<int64_t> kSet = findPermutationsIndexingOperand(kMap);
-  llvm::SmallDenseSet<int64_t> resSet = findPermutationsIndexingOperand(resMap);
 
   // B = Q & K & V
   llvm::SmallDenseSet<int64_t> bSet = qSet;
@@ -76,7 +74,7 @@ void AttentionOpDetail::inferFromIndexingMaps(
 
 FailureOr<AttentionOpDetail>
 AttentionOpDetail::get(ArrayRef<AffineMap> indexingMaps) {
-  if (indexingMaps.size() != 4 && indexingMaps.size() != 6) {
+  if (indexingMaps.size() < 4 || indexingMaps.size() > 7) {
     return failure();
   }
 
