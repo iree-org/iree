@@ -33,13 +33,6 @@ def SPIRVBreakDownLargeVector : InterfacePass<"iree-spirv-breakdown-large-vector
   let constructor = "mlir::iree_compiler::createSPIRVBreakDownLargeVectorPass()";
 }
 
-def SPIRVConvertGPUTarget :
-    Pass<"iree-spirv-convert-gpu-target",
-         "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
-  let summary = "Convert #iree_gpu.target into #spirv.target_env";
-  let constructor = "mlir::iree_compiler::createSPIRVConvertGPUTargetPass()";
-}
-
 def SPIRVEmulateI64 :
     InterfacePass<"iree-spirv-emulate-i64", "mlir::FunctionOpInterface"> {
   let summary = "Emulate 64-bit integer ops with 32-bit integer ops";
