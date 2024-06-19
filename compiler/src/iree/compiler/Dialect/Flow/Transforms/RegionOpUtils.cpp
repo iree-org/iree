@@ -543,40 +543,40 @@ bool isDequantizationLikeOp(Operation *op) {
     return false;
   }
 
-  // Check that only one input has an identity map, and the rest are projected
-  // permutations and not full permutations
-  OpOperand *identityInput = nullptr;
+  // Check that all operands that have the highest rank have bit width
+  // less than the output bit-width.
+  DenseMap<int64_t, SmallVector<RankedTensorType>> rankBuckets;
+  int64_t maxRank = 0;
   for (OpOperand *input : genericOp.getDpsInputOperands()) {
-    auto inputMap = genericOp.getMatchingIndexingMap(input);
-    if (inputMap.isIdentity()) {
-      if (identityInput) {
-        return false;
-      }
-      identityInput = input;
-    } else if (!inputMap.isProjectedPermutation(true) ||
-               inputMap.isPermutation()) {
+    auto inputType = dyn_cast<RankedTensorType>(input->get().getType());
+    if (!inputType) {
+      continue;
+    }
+    int64_t currRank = inputType.getRank();
+    maxRank = std::max(currRank, maxRank);
+    rankBuckets[currRank].push_back(inputType);
+  }
+  if (rankBuckets[maxRank].empty()) {
+    return false;
+  }
+
+  unsigned int maxInputElementBitWidth = 0;
+  for (auto t : rankBuckets[maxRank]) {
+    Type elementType = t.getElementType();
+    if (!elementType.isIntOrFloat()) {
       return false;
     }
-  }
-
-  if (!identityInput) {
-    return false;
-  }
-
-  auto indexingMaps = genericOp.getIndexingMapsArray();
-  if (!indexingMaps.back().isIdentity()) {
-    return false;
+    maxInputElementBitWidth = std::max(
+        maxInputElementBitWidth, t.getElementType().getIntOrFloatBitWidth());
   }
 
   // Check that the identity input element bitwidth is smaller than the output
   // element bitwidth.
-  Type inputElementType = getElementTypeOrSelf(identityInput->get().getType());
   Type outputElementType = getElementTypeOrSelf(genericOp->getResultTypes()[0]);
-  if (!inputElementType.isIntOrFloat() || !outputElementType.isIntOrFloat()) {
+  if (!outputElementType.isIntOrFloat()) {
     return false;
   }
-  if (inputElementType.getIntOrFloatBitWidth() >=
-      outputElementType.getIntOrFloatBitWidth()) {
+  if (maxInputElementBitWidth >= outputElementType.getIntOrFloatBitWidth()) {
     return false;
   }
 
