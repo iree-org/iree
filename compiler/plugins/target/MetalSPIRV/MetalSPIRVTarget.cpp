@@ -8,7 +8,6 @@
 #include "compiler/plugins/target/MetalSPIRV/MetalTargetPlatform.h"
 #include "compiler/plugins/target/MetalSPIRV/SPIRVToMSL.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
-#include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/KnownTargets.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/HAL/Target/TargetRegistry.h"
@@ -20,7 +19,9 @@
 #include "llvm/TargetParser/Triple.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVDialect.h"
+#include "mlir/Dialect/SPIRV/IR/SPIRVEnums.h"
 #include "mlir/Dialect/SPIRV/IR/SPIRVOps.h"
+#include "mlir/Dialect/SPIRV/IR/TargetAndABI.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/Target/SPIRV/Serialization.h"
 
@@ -50,6 +51,60 @@ struct MetalSPIRVOptions {
   }
 };
 } // namespace
+
+static spirv::TargetEnvAttr getMetalTargetEnv(MLIRContext *context) {
+  using spirv::Capability;
+  using spirv::Extension;
+
+  // Capabilities and limits according to Metal 3 devices.
+  const std::array<Extension, 4> extensions = {
+      Extension::SPV_KHR_16bit_storage,
+      Extension::SPV_KHR_8bit_storage,
+      Extension::SPV_KHR_storage_buffer_storage_class,
+      Extension::SPV_KHR_variable_pointers,
+  };
+  const std::array<Capability, 21> capabilities = {
+      Capability::Shader,
+      Capability::Int8,
+      Capability::Int16,
+      Capability::Int64,
+      Capability::Float16,
+      Capability::UniformAndStorageBuffer8BitAccess,
+      Capability::StorageBuffer8BitAccess,
+      Capability::StoragePushConstant8,
+      Capability::StorageUniform16,
+      Capability::StorageBuffer16BitAccess,
+      Capability::StoragePushConstant16,
+      Capability::GroupNonUniform,
+      Capability::GroupNonUniformVote,
+      Capability::GroupNonUniformArithmetic,
+      Capability::GroupNonUniformBallot,
+      Capability::GroupNonUniformShuffle,
+      Capability::GroupNonUniformShuffleRelative,
+      Capability::GroupNonUniformQuad,
+      Capability::StoragePushConstant16,
+      Capability::VariablePointers,
+      Capability::VariablePointersStorageBuffer,
+  };
+  auto limits = spirv::ResourceLimitsAttr::get(
+      context,
+      /*max_compute_shared_memory_size=*/32768,
+      /*max_compute_workgroup_invocations=*/1024,
+      /*max_compute_workgroup_size=*/
+      Builder(context).getI32ArrayAttr({1024, 1024, 1024}),
+      /*subgroup_size=*/32,
+      /*min_subgroup_size=*/std::nullopt,
+      /*max_subgroup_size=*/std::nullopt,
+      /*cooperative_matrix_properties_khr=*/ArrayAttr{},
+      /*cooperative_matrix_properties_nv=*/ArrayAttr{});
+
+  auto triple = spirv::VerCapExtAttr::get(spirv::Version::V_1_3, capabilities,
+                                          extensions, context);
+  // Further assuming Apple GPUs.
+  return spirv::TargetEnvAttr::get(
+      triple, limits, spirv::ClientAPI::Metal, spirv::Vendor::Apple,
+      spirv::DeviceType::IntegratedGPU, spirv::TargetEnvAttr::kUnknownDeviceID);
+}
 
 // TODO: MetalOptions for choosing the Metal version.
 class MetalTargetDevice : public TargetDevice {
@@ -90,20 +145,20 @@ public:
       MLIRContext *context, StringRef deviceID, DictionaryAttr deviceConfigAttr,
       SmallVectorImpl<IREE::HAL::ExecutableTargetAttr> &executableTargetAttrs)
       const override {
-    executableTargetAttrs.push_back(getExecutableTarget(context));
+    executableTargetAttrs.push_back(
+        getExecutableTarget(context, getMetalTargetEnv(context)));
   }
 
   IREE::HAL::ExecutableTargetAttr
-  getExecutableTarget(MLIRContext *context) const {
+  getExecutableTarget(MLIRContext *context,
+                      spirv::TargetEnvAttr targetEnv) const {
     Builder b(context);
     SmallVector<NamedAttribute> configItems;
     auto addConfig = [&](StringRef name, Attribute value) {
       configItems.emplace_back(b.getStringAttr(name), value);
     };
 
-    if (auto target = GPU::getMetalTargetDetails(context)) {
-      addConfig("iree.gpu.target", target);
-    }
+    addConfig(spirv::getTargetEnvAttrName(), targetEnv);
 
     return b.getAttr<IREE::HAL::ExecutableTargetAttr>(
         b.getStringAttr("metal-spirv"), b.getStringAttr("metal-msl-fb"),

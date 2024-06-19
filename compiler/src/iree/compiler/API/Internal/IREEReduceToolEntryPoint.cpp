@@ -8,13 +8,13 @@
 #include "iree/compiler/tool_entry_points_api.h"
 
 #include "iree/compiler/Tools/init_dialects.h"
-#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "mlir/Bytecode/BytecodeWriter.h"
 #include "mlir/IR/AsmState.h"
+#include "mlir/IR/Dialect.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/Parser/Parser.h"
 #include "mlir/Pass/PassManager.h"
@@ -50,11 +50,11 @@ static OwningOpRef<Operation *> loadModule(MLIRContext &context,
 static LogicalResult ireeReduceMainFromCL(int argc, char **argv,
                                           MLIRContext &registry) {
 
-  cl::OptionCategory ireeReduceCategory("iree-reduce options");
+  llvm::cl::OptionCategory ireeReduceCategory("iree-reduce options");
 
-  cl::opt<std::string> testScript(cl::Positional, cl::Required,
-                                  cl::desc("<test script>"),
-                                  cl::cat(ireeReduceCategory));
+  llvm::cl::opt<std::string> testScript(cl::Positional, cl::Required,
+                                        cl::desc("<test script>"),
+                                        cl::cat(ireeReduceCategory));
 
   cl::opt<std::string> inputFilename(cl::Positional, cl::desc("<input file>"),
                                      cl::init("-"),
@@ -74,11 +74,12 @@ static LogicalResult ireeReduceMainFromCL(int argc, char **argv,
       "output-bytecode", cl::desc("Output the final output as bytecode."),
       cl::init(false), llvm::cl::cat(ireeReduceCategory));
 
-  cl::HideUnrelatedOptions(ireeReduceCategory);
+  llvm::cl::HideUnrelatedOptions(ireeReduceCategory);
 
   InitLLVM y(argc, argv);
 
-  cl::ParseCommandLineOptions(argc, argv, "IREE test case reduction tool.\n");
+  llvm::cl::ParseCommandLineOptions(argc, argv,
+                                    "IREE test case reduction tool.\n");
 
   // When reading from stdin and the input is a tty, it is often a user mistake
   // and the process "appears to be stuck". Print a message to let the user know
