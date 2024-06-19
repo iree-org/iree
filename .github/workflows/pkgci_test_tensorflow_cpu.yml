@@ -35,7 +35,7 @@ jobs:
         with:
           # Must match the subset of versions built in pkgci_build_packages.
           python-version: "3.11"
-      - uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3.0.2
+      - uses: actions/download-artifact@v4.1.7
         with:
           name: linux_x86_64_release_packages
           path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
