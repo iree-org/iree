@@ -285,7 +285,6 @@ static LogicalResult replaceBuiltinFillOp(IREE::Stream::AsyncFillOp fillOp,
   SmallVector<Value> operands = {
       fillOp.getTarget(),
       pattern,
-      fillOp.getTargetOffset(),
       elementCount,
   };
   SmallVector<Value> operandSizes = {
