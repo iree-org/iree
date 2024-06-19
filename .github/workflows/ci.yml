@@ -129,7 +129,7 @@ jobs:
   #         credentials_json: "${{ secrets.IREE_OSS_GITHUB_RUNNER_BASIC_TRUST_SERVICE_ACCOUNT_KEY }}"
   #         create_credentials_file: false
   #     - name: "Setting up Python"
-  #       uses: actions/setup-python@d27e3f3d7c64b4bbf8e4abfb9b63b83e846e0435 # v4.5.0
+  #       uses: actions/setup-python@v5.1.0
   #       with:
   #         python-version: "3.10" # Needs pybind >= 2.10.1 for Python >= 3.11
   #     - name: "Installing Python packages"
@@ -218,7 +218,7 @@ jobs:
           xcrun metal --version
           xcrun metallib --version
       - name: "Setting up Python"
-        uses: actions/setup-python@d27e3f3d7c64b4bbf8e4abfb9b63b83e846e0435 # v4.5.0
+        uses: actions/setup-python@v5.1.0
         with:
           python-version: "3.10"
           cache: "pip"
@@ -559,7 +559,7 @@ jobs:
         with:
           submodules: true
       - name: "Setting up Python"
-        uses: actions/setup-python@d27e3f3d7c64b4bbf8e4abfb9b63b83e846e0435 # v4.5.0
+        uses: actions/setup-python@v5.1.0
         with:
           python-version: "3.9"
       - name: Wait for docker pull

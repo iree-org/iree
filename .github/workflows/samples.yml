@@ -33,7 +33,7 @@ jobs:
       - name: "Checking out repository"
         uses: actions/checkout@v4.1.7
       - name: "Setting up Python"
-        uses: actions/setup-python@61a6322f88396a6271a6ee3565807d608ecaddd1 # v4.7.0
+        uses: actions/setup-python@v5.1.0
         with:
           python-version: "3.11"
       - name: "Testing Colab Notebooks"
@@ -53,7 +53,7 @@ jobs:
           export CC=clang
           export CXX=clang++
       - name: "Setting up Python"
-        uses: actions/setup-python@61a6322f88396a6271a6ee3565807d608ecaddd1 # v4.7.0
+        uses: actions/setup-python@v5.1.0
         with:
           python-version: "3.11"
       - name: "Testing Samples"

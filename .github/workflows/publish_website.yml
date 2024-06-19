@@ -40,7 +40,7 @@ jobs:
         # We have to explicitly fetch the gh-pages branch as well to preserve history
         run: git fetch --no-tags --prune --depth=1 origin "gh-pages:gh-pages"
       - name: Setting up Python
-        uses: actions/setup-python@d27e3f3d7c64b4bbf8e4abfb9b63b83e846e0435 # v4.5.0
+        uses: actions/setup-python@v5.1.0
         with:
           python-version: 3.x
           cache: "pip"
