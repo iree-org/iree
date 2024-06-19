@@ -78,7 +78,7 @@ jobs:
       BUILD_DIR: build-arm64
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        uses: actions/checkout@v4.1.7
         with:
           submodules: true
       - name: "Building IREE"
@@ -117,7 +117,7 @@ jobs:
   #     BUILD_DIR: build-windows
   #   steps:
   #     - name: "Checking out repository"
-  #       uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+  #       uses: actions/checkout@v4.1.7
   #       with:
   #         submodules: true
   #     - id: "gcp-auth"
@@ -162,7 +162,7 @@ jobs:
       BUILD_DIR: build-macos
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        uses: actions/checkout@v4.1.7
       - name: "Updating git submodules"
         run: git submodule update --init --jobs 8 --depth 1
       - name: "Installing Python packages"
@@ -199,7 +199,7 @@ jobs:
         shell: bash
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        uses: actions/checkout@v4.1.7
       - id: "gcp-auth"
         name: "Authenticating to Google Cloud"
         if: needs.setup.outputs.write-caches == 1
@@ -250,7 +250,7 @@ jobs:
       - os-family=Linux
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        uses: actions/checkout@v4.1.7
         with:
           submodules: true
       - name: "Building with Bazel"
@@ -282,7 +282,7 @@ jobs:
       - os-family=Linux
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        uses: actions/checkout@v4.1.7
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: Querying GPU information
@@ -346,7 +346,7 @@ jobs:
       - os-family=Linux
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        uses: actions/checkout@v4.1.7
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: Querying GPU information
@@ -406,7 +406,7 @@ jobs:
     runs-on: nodai-amdgpu-mi250-x86-64
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        uses: actions/checkout@v4.1.7
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: "Downloading install dir archive"
@@ -445,7 +445,7 @@ jobs:
     runs-on: nodai-amdgpu-w7900-x86-64
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        uses: actions/checkout@v4.1.7
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: "Downloading install dir archive"
@@ -505,7 +505,7 @@ jobs:
       CONTAINER: ${{ matrix.container }}
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        uses: actions/checkout@v4.1.7
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
 
@@ -555,7 +555,7 @@ jobs:
         run: |
           docker pull ghcr.io/nod-ai/manylinux_x86_64:main &
       - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        uses: actions/checkout@v4.1.7
         with:
           submodules: true
       - name: "Setting up Python"
@@ -632,7 +632,7 @@ jobs:
             script: ./build_tools/cmake/build_and_test_tsan.sh
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        uses: actions/checkout@v4.1.7
         with:
           submodules: true
       - name: "Building and testing"
@@ -658,7 +658,7 @@ jobs:
       BUILD_DIR: build-runtime
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        uses: actions/checkout@v4.1.7
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: "Building size-optimized runtime"
@@ -687,7 +687,7 @@ jobs:
       BUILD_DIR: build-gcc
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        uses: actions/checkout@v4.1.7
         with:
           submodules: true
       - name: "Building IREE with gcc"
@@ -715,7 +715,7 @@ jobs:
       BUILD_DIR: build-tracing
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        uses: actions/checkout@v4.1.7
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: "Building IREE runtime with tracing - Tracy"
@@ -746,7 +746,7 @@ jobs:
       BUILD_DIR: build-debug
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        uses: actions/checkout@v4.1.7
         with:
           submodules: true
       - name: "Building IREE in Debug configuration"
@@ -774,7 +774,7 @@ jobs:
       - os-family=Linux
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        uses: actions/checkout@v4.1.7
         with:
           submodules: true
       - name: "Building and testing with bring-your-own-LLVM"
@@ -843,7 +843,7 @@ jobs:
       IREE_WRITE_REMOTE_CCACHE: ${{ needs.setup.outputs.write-caches }}
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        uses: actions/checkout@v4.1.7
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
       - name: "Downloading install dir archive"
@@ -938,7 +938,7 @@ jobs:
       - build_and_test_android
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        uses: actions/checkout@v4.1.7
       - name: Getting failed jobs
         id: failed_jobs
         run: |
