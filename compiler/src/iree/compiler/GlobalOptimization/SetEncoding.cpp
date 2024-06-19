@@ -145,14 +145,15 @@ static Value padAndSetEncoding(OpBuilder &builder, Location loc, Value source,
                                int64_t operandIndex,
                                ArrayRef<Type> operandElemTypes,
                                MatmulNarrowSizes narrow,
-                               ArrayRef<AffineMap> indexingMaps) {
+                               ArrayRef<AffineMap> indexingMaps,
+                               IREE::Encoding::EncodingOpType opType) {
   MLIRContext *ctx = builder.getContext();
   // No need to specify original_type in the encoding poadded to pad(), because
   // the operand there is the `source` tensor, so it will default to reading its
   // original shape.
-  auto encodingForPad = EncodingAttr::get(ctx, operandIndex, operandElemTypes,
-                                          /*originalType=*/Type{}, narrow.M,
-                                          narrow.N, indexingMaps);
+  auto encodingForPad = EncodingAttr::get(
+      ctx, operandIndex, opType, operandElemTypes,
+      /*originalType=*/Type{}, narrow.M, narrow.N, indexingMaps);
   Value padded = pad(builder, loc, source, encodingForPad);
   // For setEncoding() below, we potentially need to specify an encoding with an
   // explicit original_type, because the operand there is the padded tensor
@@ -163,7 +164,7 @@ static Value padAndSetEncoding(OpBuilder &builder, Location loc, Value source,
   auto encodingForSetEncoding = encodingForPad;
   if (padded.getType() != source.getType()) {
     encodingForSetEncoding = EncodingAttr::get(
-        ctx, operandIndex, operandElemTypes,
+        ctx, operandIndex, opType, operandElemTypes,
         /*originalType=*/source.getType(), narrow.M, narrow.N, indexingMaps);
   }
   return setEncoding(builder, loc, padded, encodingForSetEncoding);
@@ -337,22 +338,23 @@ public:
     SmallVector<AffineMap> maps = linalgOp.getIndexingMapsArray();
     Value encodedLhs, encodedRhs, encodedOut;
 
+    auto opType = IREE::Encoding::EncodingOpType::matmul;
     if (!padFactor) {
       encodedLhs =
           padAndSetEncoding(rewriter, loc, lhs, IREE::Encoding::MATMUL_LHS,
-                            elemTypes, narrowSizes, maps);
+                            elemTypes, narrowSizes, maps, opType);
       encodedRhs =
           padAndSetEncoding(rewriter, loc, rhs, IREE::Encoding::MATMUL_RHS,
-                            elemTypes, narrowSizes, maps);
+                            elemTypes, narrowSizes, maps, opType);
       encodedOut =
           padAndSetEncoding(rewriter, loc, out, IREE::Encoding::MATMUL_RESULT,
-                            elemTypes, narrowSizes, maps);
+                            elemTypes, narrowSizes, maps, opType);
     } else {
       auto setEncodingWrapper = [&](Value src, int64_t operandIndex) -> Value {
         SmallVector<int64_t> roundDimsTo(linalgOp.getNumLoops(), padFactor);
         auto encoding = EncodingAttr::get(
-            linalgOp.getContext(), operandIndex, elemTypes, src.getType(),
-            narrowSizes.M, narrowSizes.N, maps, roundDimsTo);
+            linalgOp.getContext(), operandIndex, opType, elemTypes,
+            src.getType(), narrowSizes.M, narrowSizes.N, maps, roundDimsTo);
         return setEncoding(rewriter, loc, src, encoding);
       };
       encodedLhs = setEncodingWrapper(lhs, IREE::Encoding::MATMUL_LHS);
