@@ -99,7 +99,7 @@ ClientAPI deduceClientAPI(StringRef backend) {
 Vendor deduceVendor(StringRef arch) {
   if (arch.starts_with("gfx") || arch.starts_with("rdna"))
     return Vendor::AMD;
-  if (arch.starts_with("mali"))
+  if (arch.starts_with("valhall"))
     return Vendor::ARM;
   if (arch.starts_with("sm_"))
     return Vendor::NVIDIA;

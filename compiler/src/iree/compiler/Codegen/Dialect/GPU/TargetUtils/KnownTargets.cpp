@@ -39,6 +39,8 @@ struct WgpDetails {
   uint32_t mmaCount;
   const MMAIntrinsic *mmaOps;
 
+  // We support two static values here mostly due to AMD RDNA GPUs have two
+  // modes. Use duplicated values if the GPU only have one subgroup size.
   std::array<int32_t, 2> subgroupSizeChoices;
   std::array<int32_t, 3> maxWorkgroupSizes;
   uint32_t maxThreadSize;
@@ -89,9 +91,12 @@ TargetAttr createTargetAttr(const TargetDetails &details, StringRef arch,
     mmaAttrs.push_back(MMAAttr::get(context, wgp->mmaOps[i]));
 
   SmallVector<int32_t, 2> subgroupSizes;
+  assert(wgp->subgroupSizeChoices.front() != 0);
+  assert(wgp->subgroupSizeChoices.back() != 0);
   subgroupSizes.push_back(wgp->subgroupSizeChoices.front());
-  if (wgp->subgroupSizeChoices.back() != wgp->subgroupSizeChoices.front())
+  if (wgp->subgroupSizeChoices.back() != wgp->subgroupSizeChoices.front()) {
     subgroupSizes.push_back(wgp->subgroupSizeChoices.back());
+  }
 
   auto targetWgp = TargetWgpAttr::get(
       context, ComputeBitwidthsAttr::get(context, details.wgp->compute),
@@ -258,7 +263,7 @@ StringRef normalizeAMDGPUTarget(StringRef target) {
       .Case("cdna1", "gfx908")
       .Cases("rx7900xtx", "rx7900xt", "gfx1100")
       .Cases("rx7800xt", "rx7700xt", "gfx1101")
-      .Default(StringRef());
+      .Default("");
 }
 
 //===----------------------------------------------------------------------===//
@@ -284,11 +289,12 @@ std::optional<TargetDetails> getAppleTargetDetails() {
 
 const WgpDetails *getValhallWgpDetails() {
   ComputeBitwidths computeBitwdiths =
-      allIntComputeBits | ComputeBitwidths::FP32 | ComputeBitwidths::FP16;
+      ComputeBitwidths::Int32 | ComputeBitwidths::Int16 |
+      ComputeBitwidths::Int8 | ComputeBitwidths::FP32 | ComputeBitwidths::FP16;
   // clang-format off
   static const WgpDetails valhallWgp = {
       computeBitwdiths,   allStorageBits,     allSubgroupOps,  allDotProductOps,
-      /*mmaCount=*/0,     /*mmaOps=*/nullptr, {16},            {512, 512, 512},
+      /*mmaCount=*/0,     /*mmaOps=*/nullptr, {16, 16},        {512, 512, 512},
       512,                32 * 1024};
   // clang-format on
   return &valhallWgp;
@@ -448,7 +454,7 @@ StringRef normalizeNVIDIAGPUTarget(StringRef target) {
       .Case("turing", "sm_75")
       .Case("volta", "sm_70")  // Or sm_72; use smaller version
       .Case("pascal", "sm_60") // Or sm_61/62; use smaller version
-      .Default(StringRef());
+      .Default("");
 }
 
 //===----------------------------------------------------------------------===//
@@ -465,7 +471,7 @@ const WgpDetails *getAdrenoWgpDetails() {
   static const WgpDetails adrenoWgp = {
       computeBitwdiths,   storageBitwidths,   allSubgroupOps,
       allDotProductOps,   /*mmaCount=*/0,     /*mmaOps=*/nullptr,
-      {64},               {1024, 1024, 1024}, 1024,
+      {64, 64},           {1024, 1024, 1024}, 1024,
       32 * 1024};
   // clang-format on
   return &adrenoWgp;
