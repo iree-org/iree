@@ -140,7 +140,7 @@ jobs:
   #     - name: "Installing requirements"
   #       run: choco install ccache --yes
   #     - name: "Configuring MSVC"
-  #       uses: ilammy/msvc-dev-cmd@7315a94840631165970262a99c72cfb48a65d25d # v1.12.0
+  #       uses: ilammy/msvc-dev-cmd@v1.13.0
   #     # Finally: build and run tests.
   #     - name: "Building IREE"
   #       env:
@@ -511,7 +511,7 @@ jobs:
 
       - name: "Configuring MSVC"
         if: contains(matrix.name, 'windows')
-        uses: ilammy/msvc-dev-cmd@7315a94840631165970262a99c72cfb48a65d25d # v1.12.0
+        uses: ilammy/msvc-dev-cmd@v1.13.0
 
       # Simple case of no Docker container: install deps -> build -> test.
       - name: "Installing Python requirements"
