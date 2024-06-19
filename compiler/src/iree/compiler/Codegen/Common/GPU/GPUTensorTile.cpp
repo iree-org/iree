@@ -51,12 +51,16 @@ public:
     // Make sure we have a PartitionableLoopInterface op here and query the tile
     // sizes from the partitionable loops.
     auto plOp = dyn_cast<PartitionableLoopsInterface>(*op);
-    if (!plOp)
-      return failure();
+    if (!plOp) {
+      return rewriter.notifyMatchFailure(
+          op, "Op does not implement PartitionableLoopsInterface");
+    }
     auto partitionedLoops = plOp.getPartitionableLoops(kNumMaxParallelDims);
     SmallVector<int64_t> tileSizes = getTileSizes(op, 0);
-    if (tileSizes.empty())
-      return failure();
+    if (tileSizes.empty()) {
+      return rewriter.notifyMatchFailure(
+          op, "Op does not have configuration to get tile_sizes from");
+    }
     // Mask out non reduction dimensions.
     for (unsigned depth : partitionedLoops) {
       if (depth < tileSizes.size())
@@ -73,7 +77,7 @@ public:
     tileSizes.resize(op.getLoopIteratorTypes().size(), 0);
 
     if (llvm::all_of(tileSizes, [](int64_t s) { return s == 0; })) {
-      return failure();
+      return rewriter.notifyMatchFailure(op, "No dimensions are tiled");
     }
 
     // Tile the current op and fuse its immediate input operands.
@@ -137,14 +141,14 @@ private:
       auto sliceOp = operand->get().getDefiningOp<tensor::ExtractSliceOp>();
       if (!sliceOp)
         continue;
-      auto linalgOp = sliceOp.getSource().getDefiningOp<linalg::LinalgOp>();
-      if (!linalgOp)
+      auto tilingOp = sliceOp.getSource().getDefiningOp<TilingInterface>();
+      if (!tilingOp)
         continue;
-      // Restrict to fully parallel linalg ops for now for simplicity.
+      // Restrict to fully parallel ops for now for simplicity.
       auto isParallel = [](utils::IteratorType it) {
         return linalg::isParallelIterator(it);
       };
-      if (llvm::all_of(linalgOp.getIteratorTypesArray(), isParallel)) {
+      if (llvm::all_of(tilingOp.getLoopIteratorTypes(), isParallel)) {
         candidates.push_back(sliceOp);
       }
     }
