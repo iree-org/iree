@@ -288,6 +288,9 @@ std::optional<TargetDetails> getAppleTargetDetails() {
 //===----------------------------------------------------------------------===//
 
 const WgpDetails *getValhallWgpDetails() {
+  // Recent drivers report support for shaderInt64. Aside from not widely
+  // applicable, we don't know whether that's emulated and how performant it is.
+  // So exclude that for now.
   ComputeBitwidths computeBitwdiths =
       ComputeBitwidths::Int32 | ComputeBitwidths::Int16 |
       ComputeBitwidths::Int8 | ComputeBitwidths::FP32 | ComputeBitwidths::FP16;
