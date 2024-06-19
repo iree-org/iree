@@ -258,7 +258,7 @@ SmallVector<AffineMap> ScatterOp::getIndexingMapsForOperands() {
   Builder builder(getContext());
   return {builder.getMultiDimIdentityMap(getUpdateType().getRank()),
           builder.getMultiDimIdentityMap(getIndicesType().getRank()),
-          /*output*/ AffineMap(nullptr)};
+          /*output=*/AffineMap(nullptr)};
 }
 
 SmallVector<AffineMap> ScatterOp::getIndexingMapsForResults() {
@@ -501,7 +501,7 @@ ReverseOp::reifyResultShapes(OpBuilder &b,
 SmallVector<AffineMap> ReverseOp::getIndexingMapsForOperands() {
   Builder builder(getContext());
   return {builder.getMultiDimIdentityMap(getOperandRank()),
-          /*output*/ AffineMap(nullptr)};
+          /*output=*/AffineMap(nullptr)};
 }
 
 SmallVector<AffineMap> ReverseOp::getIndexingMapsForResults() {
