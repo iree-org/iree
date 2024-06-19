@@ -127,3 +127,87 @@ func.func @do_not_sink_across_dequantize_ops(%arg0: tensor<?x?xf32>) -> tensor<2
 //       CHECK:   %[[DEQUANT:.+]] = linalg.generic
 //  CHECK-SAME:       ins(%[[EXPAND]] :
 //       CHECK:   return %[[DEQUANT]]
+
+// -----
+
+// Check that reshape sinks based with better estimate of what producers
+// -> consumer are fusable.
+func.func @better_producer_estimate(%lhs : tensor<2x4096x640xi32>, %rhs : tensor<2x640x640xi32>,
+    %fill0 : tensor<2x4096x640xi32>, %fill1 : tensor<2x4096xi32>) -> tensor<2x4096x640x1xf16> {
+  %bmm = linalg.batch_matmul_transpose_b ins(%lhs, %rhs : tensor<2x4096x640xi32>, tensor<2x640x640xi32>)
+      outs(%fill0 : tensor<2x4096x640xi32>) -> tensor<2x4096x640xi32>
+  %reduction = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, affine_map<(d0, d1, d2) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel", "reduction"]}
+      ins(%lhs : tensor<2x4096x640xi32>) outs(%fill1 : tensor<2x4096xi32>) {
+    ^bb0(%in: i32, %out: i32):
+      %12 = arith.addi %in, %out : i32
+      linalg.yield %12 : i32
+    } -> tensor<2x4096xi32>
+  %expanded = tensor.expand_shape %bmm [[0], [1], [2, 3]] output_shape [2, 4096, 640, 1]
+      : tensor<2x4096x640xi32> into tensor<2x4096x640x1xi32>
+  %empty = tensor.empty() : tensor<2x4096x640x1xf16>
+  %quant = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1)>,
+                       affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%expanded, %reduction : tensor<2x4096x640x1xi32>, tensor<2x4096xi32>)
+      outs(%empty : tensor<2x4096x640x1xf16>) {
+    ^bb0(%in: i32, %in_3: i32, %out: f16):
+      %14 = arith.subi %in, %in_3 : i32
+      %16 = arith.sitofp %14 : i32 to f32
+      %18 = arith.truncf %16 : f32 to f16
+      linalg.yield %18 : f16
+    } -> tensor<2x4096x640x1xf16>
+  return %quant : tensor<2x4096x640x1xf16>
+}
+// CHECK-LABEL: func @better_producer_estimate(
+//       CHECK:   %[[BMM:.+]] = linalg.batch_matmul_transpose_b
+//       CHECK:   %[[REDUCTION:.+]] = linalg.generic
+//  CHECK-SAME:       iterator_types = ["parallel", "parallel", "reduction"]
+//       CHECK:   %[[GENERIC:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%[[BMM]], %[[REDUCTION]] :
+//       CHECK:   %[[COLLAPSE:.+]] = tensor.expand_shape %[[GENERIC]]
+//       CHECK:   return %[[COLLAPSE]]
+
+// -----
+
+func.func @reduce_broadcast(%arg0: tensor<4x768xf32>, %arg1: tensor<4xf32>,
+    %arg2: tensor<4xf32>, %arg3: tensor<1x4x768xf32>) -> tensor<1x4x768xf32> {
+  %cst = arith.constant 9.000000e+00 : f32
+  %cst_0 = arith.constant 8.000000e+00 : f32
+  %0 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>,
+                       affine_map<(d0, d1) -> (d0)>,
+                       affine_map<(d0, d1) -> (d0)>],
+      iterator_types = ["parallel", "reduction"]}
+      ins(%arg0, %arg1 : tensor<4x768xf32>, tensor<4xf32>)
+      outs(%arg2 : tensor<4xf32>) {
+  ^bb0(%in: f32, %in_2: f32, %out: f32):
+    %3 = arith.subf %in, %in_2 : f32
+    %4 = arith.mulf %3, %3 : f32
+    %5 = arith.addf %out, %4 : f32
+    linalg.yield %5 : f32
+  } -> tensor<4xf32>
+  %expanded = tensor.expand_shape %0 [[0, 1]] output_shape [1, 4]
+      : tensor<4xf32> into tensor<1x4xf32>
+  %1 = tensor.empty() : tensor<1x4x768xf32>
+  %2 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, 
+                       affine_map<(d0, d1, d2) -> (d0, d1)>,
+                       affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+      iterator_types = ["parallel", "parallel", "parallel"]}
+      ins(%arg3, %expanded : tensor<1x4x768xf32>, tensor<1x4xf32>)
+      outs(%1 : tensor<1x4x768xf32>) {
+  ^bb0(%in: f32, %in_2: f32, %out: f32):
+    %9 = arith.mulf %in, %in_2 : f32
+    linalg.yield %9 : f32
+  } -> tensor<1x4x768xf32>
+  return %2 : tensor<1x4x768xf32>
+}
+// CHECK-LABEL: func @reduce_broadcast(
+//       CHECK:   %[[GENERIC1:.+]] = linalg.generic
+//       CHECK:   %[[GENERIC2:.+]] = linalg.generic
+//  CHECK-SAME:       ins(%{{.+}}, %[[GENERIC1]] :
+//       CHECK:   tensor.expand_shape %[[GENERIC2]]
