@@ -8,13 +8,13 @@
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/IndexingUtils.h"
+#include "mlir/IR/BuiltinAttributes.h"
 
 #include <numeric>
 
 namespace mlir::iree_compiler {
 
 using IREE::Encoding::EncodingAttr;
-using IREE::Encoding::EncodingRole;
 using IREE::Encoding::getEncodingAttr;
 using IREE::Encoding::getEncodingContractionDims;
 
@@ -29,7 +29,7 @@ static RankedTensorType transposeIfNarrowNResult(RankedTensorType tensorType) {
   if (!isNarrowNResult(encoding)) {
     return tensorType;
   }
-  auto newRole = encoding.getRole().getValue();
+  auto newIndex = encoding.getOperandIndex();
   TypeAttr originalTypeAttr = encoding.getOriginalType();
   RankedTensorType originalType = tensorType;
   if (originalTypeAttr) {
@@ -52,8 +52,8 @@ static RankedTensorType transposeIfNarrowNResult(RankedTensorType tensorType) {
     int m = cDims->m[0];
     int n = cDims->n[0];
     std::swap(permIndices[m], permIndices[n]);
-    int mDim = encoding.mapDimToRoleIndex(m);
-    int nDim = encoding.mapDimToRoleIndex(n);
+    int mDim = encoding.mapDimToOperandIndex(m);
+    int nDim = encoding.mapDimToOperandIndex(n);
     std::swap(newShape[mDim], newShape[nDim]);
     std::swap(newOriginalShape[mDim], newOriginalShape[nDim]);
   }
@@ -84,8 +84,7 @@ static RankedTensorType transposeIfNarrowNResult(RankedTensorType tensorType) {
   OpBuilder builder(context);
 
   auto newEncoding = IREE::Encoding::EncodingAttr::get(
-      context, IREE::Encoding::EncodingRoleAttr::get(context, newRole),
-      encoding.getElementTypes(),
+      context, newIndex, encoding.getElementTypes(),
       TypeAttr::get(RankedTensorType::get(newOriginalShape, elemType)),
       encoding.getMatmulNarrow_N(), encoding.getMatmulNarrow_M(),
       newIndexingMaps, DenseI64ArrayAttr::get(context, newRoundDimsTo));
@@ -169,7 +168,7 @@ int64_t getIntOrZero(IntegerAttr a) {
 MaterializeEncodingInfo getEncodingInfoForMatmul(EncodingAttr encoding,
                                                  int64_t rank,
                                                  TileMxNxK tileMxNxK) {
-  EncodingRole role = encoding.getRole().getValue();
+  auto index = encoding.getOperandIndex().getValue();
   MaterializeEncodingInfo encodingInfo;
   auto cDims = getEncodingContractionDims(encoding);
   // The following expects M, N, K, and Batch sizes of at most 1 for now
@@ -178,34 +177,34 @@ MaterializeEncodingInfo getEncodingInfoForMatmul(EncodingAttr encoding,
          "Expected at most one M, N, K, and Batch dimension");
   if (!cDims->batch.empty()) {
     encodingInfo.outerDimsPerm.push_back(
-        encoding.mapDimToRoleIndex(cDims->batch[0]));
+        encoding.mapDimToOperandIndex(cDims->batch[0]));
   }
-  if (role != EncodingRole::RHS && !cDims->m.empty()) {
+  if (index != IREE::Encoding::MATMUL_RHS && !cDims->m.empty()) {
     encodingInfo.outerDimsPerm.push_back(
-        encoding.mapDimToRoleIndex(cDims->m[0]));
+        encoding.mapDimToOperandIndex(cDims->m[0]));
     encodingInfo.innerDimsPos.push_back(
-        encoding.mapDimToRoleIndex(cDims->m[0]));
+        encoding.mapDimToOperandIndex(cDims->m[0]));
     encodingInfo.innerTileSizes.push_back(tileMxNxK.M);
   }
-  if (role != EncodingRole::LHS && !cDims->n.empty()) {
+  if (index != IREE::Encoding::MATMUL_LHS && !cDims->n.empty()) {
     encodingInfo.outerDimsPerm.push_back(
-        encoding.mapDimToRoleIndex(cDims->n[0]));
+        encoding.mapDimToOperandIndex(cDims->n[0]));
     encodingInfo.innerDimsPos.push_back(
-        encoding.mapDimToRoleIndex(cDims->n[0]));
+        encoding.mapDimToOperandIndex(cDims->n[0]));
     encodingInfo.innerTileSizes.push_back(tileMxNxK.N);
   }
-  if (role != EncodingRole::RESULT) {
+  if (index != IREE::Encoding::MATMUL_RESULT) {
     encodingInfo.outerDimsPerm.push_back(
-        encoding.mapDimToRoleIndex(cDims->k[0]));
+        encoding.mapDimToOperandIndex(cDims->k[0]));
     encodingInfo.innerDimsPos.push_back(
-        encoding.mapDimToRoleIndex(cDims->k[0]));
+        encoding.mapDimToOperandIndex(cDims->k[0]));
     encodingInfo.innerTileSizes.push_back(tileMxNxK.K);
   }
   return encodingInfo;
 }
 
 bool isNarrowNResult(EncodingAttr encoding) {
-  if (encoding.getRole().getValue() != EncodingRole::RESULT) {
+  if (encoding.getOperandIndex().getValue() != IREE::Encoding::MATMUL_RESULT) {
     return false;
   }
   IntegerAttr narrowM = encoding.getMatmulNarrow_M();

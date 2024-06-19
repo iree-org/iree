@@ -42,6 +42,14 @@ EncodingAttr getEncodingAttr(RankedTensorType type);
 /// Returns the ContractionDimensions for the encoding user_indexing_maps.
 FailureOr<linalg::ContractionDimensions>
 getEncodingContractionDims(EncodingAttr encoding);
+
+// Assign a name to operand indices for clarity
+const int64_t MATMUL_LHS = 0;
+const int64_t MATMUL_RHS = 1;
+const int64_t MATMUL_RESULT = 2;
+/// Convert operand index to strings for printing
+std::string stringifyOperandIndex(IntegerAttr);
+
 } // namespace mlir::iree_compiler::IREE::Encoding
 
 #endif // IREE_COMPILER_DIALECT_ENCODING_IR_ENCODINGOPS_H_

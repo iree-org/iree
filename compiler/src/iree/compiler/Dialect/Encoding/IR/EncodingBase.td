@@ -44,20 +44,6 @@ class IREEEncoding_I32EnumAttr<string name, string summary, list<I32EnumAttrCase
 class IREEEncoding_EnumAttr<EnumAttrInfo enumInfo, string name = "">
   : EnumAttr<IREEEncoding_Dialect, enumInfo, name>;
 
-def LHS : I32EnumAttrCase<"LHS", 0>;
-def RHS : I32EnumAttrCase<"RHS", 1>;
-def RESULT : I32EnumAttrCase<"RESULT", 2>;
-
-def EncodingRole : IREEEncoding_I32EnumAttr<"EncodingRole",
-    "Describes the role of the tensor as an operand or a result of an operation.", [
-      LHS,
-      RHS,
-      RESULT,
-    ]>;
-
-def EncodingRoleAttr :
-  IREEEncoding_EnumAttr<EncodingRole, "role">;
-
 def EncodingAttr :
     IREEEncoding_Attr<"Encoding"> {
   let mnemonic = "encoding";
@@ -76,7 +62,7 @@ def EncodingAttr :
   let assemblyFormat = "`<` struct(params) `>`";
 
   let parameters = (ins
-    AttrParameter<"EncodingRoleAttr", "role of this tensor as an operand">:$role,
+    AttrParameter<"IntegerAttr", "this tensor operand's index in the parameter list">:$operand_index,
     AttrParameter<"ArrayAttr", "element types of the user's operands">:$element_types,
     OptionalParameter<"TypeAttr", "type of the original tensor type before padding">:$original_type,
     // TODO(#15466): generalize matmul_narrow_{M,N} into a list?
@@ -88,7 +74,7 @@ def EncodingAttr :
   );
 
   let builders = [
-    AttrBuilder<(ins "EncodingRole":$role,
+    AttrBuilder<(ins "int64_t":$operandIndex,
         "ArrayRef<Type>":$elemTypes, "Type":$origType,
         CArg<"std::optional<int64_t>", "{}">:$matmulNarrowM,
         CArg<"std::optional<int64_t>", "{}">:$matmulNarrowN,
@@ -97,12 +83,12 @@ def EncodingAttr :
   ];
 
   let extraClassDeclaration = [{
-    /// Returns the indexing map used by the role in the encoding.
-    AffineMap getMapForRole();
+    /// Returns the indexing map used by the operand index in the encoding.
+    AffineMap getMapForOperandIndex();
 
     /// Given the dim position of the encoding `user_indexing_maps`, returns the
     /// matching index of the given encoding's tensor.
-    unsigned mapDimToRoleIndex(int64_t dimPos);
+    unsigned mapDimToOperandIndex(int64_t dimPos);
 
     /// Returns an integer array with values in `round_dims_to`.
     ArrayRef<int64_t> getRoundDimsToArray();

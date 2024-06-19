@@ -347,12 +347,9 @@ lowerContractionOpWithEncoding(RewriterBase &rewriter,
     return failure();
   }
 
-  if (lhsEncoding.getRole().getValue() !=
-          mlir::iree_compiler::IREE::Encoding::EncodingRole::LHS ||
-      rhsEncoding.getRole().getValue() !=
-          mlir::iree_compiler::IREE::Encoding::EncodingRole::RHS ||
-      resultEncoding.getRole().getValue() !=
-          mlir::iree_compiler::IREE::Encoding::EncodingRole::RESULT) {
+  if (lhsEncoding.getOperandIndex().getValue() != MATMUL_LHS ||
+      rhsEncoding.getOperandIndex().getValue() != MATMUL_RHS ||
+      resultEncoding.getOperandIndex().getValue() != MATMUL_RESULT) {
     return failure();
   }
 
