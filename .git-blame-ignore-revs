@@ -12,7 +12,3 @@ be24f0258a520a48555c9baec9d2f737ba1c2ca0
 
 # Switch compiler to LLVM/MLIR formatting style (#14181)
 3b652d46e86cd82cc81922a964327b12dc914428
-
-# Land and revert using #iree_gpu.target for SPIR-V (#17623, #17698)
-7b9fb121ea1127a6d199904a0f2b0409573bc52d
-d792d2483a9d5d875a0f03b57c9d4f98e072c300
