@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - name: Checkout out repository
-        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
+        uses: actions/checkout@v4.1.7
         with:
           submodules: true
           token: ${{ secrets.WRITE_ACCESS_TOKEN }}
@@ -40,10 +40,10 @@ jobs:
         # We have to explicitly fetch the gh-pages branch as well to preserve history
         run: git fetch --no-tags --prune --depth=1 origin "gh-pages:gh-pages"
       - name: Setting up Python
-        uses: actions/setup-python@d27e3f3d7c64b4bbf8e4abfb9b63b83e846e0435  # v4.5.0
+        uses: actions/setup-python@d27e3f3d7c64b4bbf8e4abfb9b63b83e846e0435 # v4.5.0
         with:
           python-version: 3.x
-          cache: 'pip'
+          cache: "pip"
       - id: "gcp-auth"
         name: "Authenticating to Google Cloud"
         uses: "google-github-actions/auth@v1"

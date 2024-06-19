@@ -70,7 +70,7 @@ jobs:
       compile-stats-results-gcs-artifact: ${{ steps.upload.outputs.compile-stats-results-gcs-artifact }}
     steps:
       - name: "Checking out repository"
-        uses: actions/checkout@ac593985615ec2ede58e132d2e21d2b1cbd6127c # v3.3.0
+        uses: actions/checkout@v4.1.7
       - name: "Downloading assets"
         id: "download-assets"
         env:
