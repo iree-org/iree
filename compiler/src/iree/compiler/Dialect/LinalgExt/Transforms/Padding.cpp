@@ -101,6 +101,12 @@ padAttention(IREE::LinalgExt::AttentionOp attnOp,
                                  "Expects pad_to_multiple to have same rank as "
                                  "dimensions of attention.");
   }
+  if (attnOp.getMax().has_value() || attnOp.getSum().has_value()) {
+    return definiteFailureHelper(
+        transformOp, attnOp,
+        "Expects padAttention to run before tile-and-decompose(FA). Hence "
+        "currently do not handle max or sum(FA parameters).");
+  }
 
   bool hasValidPadding = llvm::none_of(
       padToMultipleOf, [](int64_t padMultiple) { return padMultiple < 0; });
