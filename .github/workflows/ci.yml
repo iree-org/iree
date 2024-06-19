@@ -953,7 +953,7 @@ jobs:
             exit 1
           fi
       - name: Posting to Discord
-        uses: sarisia/actions-status-discord@61114b793b460ee85fe38ad3fccc78c7ead38d55 # v1.11.1
+        uses: sarisia/actions-status-discord@v1.14.3
         if: failure() && github.ref_name == 'main'
         with:
           webhook: ${{ secrets.DISCORD_WEBHOOK }}
