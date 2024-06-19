@@ -158,7 +158,7 @@ padAttention(IREE::LinalgExt::AttentionOp attnOp,
         {padValues[batchIdx], padValues[mIdx], padValues[k1Idx]});
   }
 
-  // Pad K-tensor if any non-K1 dims needs padding.
+  // Pad K-tensor if any non-K2 dims needs padding.
   if (!isConstantIntValue(padValues[batchIdx], 0) ||
       !isConstantIntValue(padValues[k1Idx], 0)) {
     paddedKey = getPaddedValue(rewriter, loc, paddedKey,
