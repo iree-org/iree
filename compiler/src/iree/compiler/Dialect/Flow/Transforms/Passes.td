@@ -171,13 +171,12 @@ def FormDispatchRegionsPass :
   ];
 }
 
-def FormDispatchWorkgroupsPass :
-    InterfacePass<"iree-flow-form-dispatch-workgroups", "mlir::FunctionOpInterface"> {
-  let summary = "Form Dispatch Workgroup Ops from Dispatch Region Ops that contain Linalg on tensor ops by tiling and distribution.";
+def ConvertDispatchRegionsToWorkgroupsPass :
+    InterfacePass<"iree-flow-convert-dispatch-regions-to-workgroups", "mlir::FunctionOpInterface"> {
+  let summary = "Convert dispatch regions to dispatch workgroups.";
   let description = [{
-    Pass to perform dispatch of dispatch.region ops that contain Linalg on tensor
-    ops by tiling and distribution. A dispatch region is created for each tiled
-    loop nest.
+    Pass to convert dispatch regions to dispatch workgroups. This pass is
+    intended to be used after dispatch regions have been formed.
   }];
   let dependentDialects = [
     "mlir::affine::AffineDialect",
@@ -186,6 +185,36 @@ def FormDispatchWorkgroupsPass :
     "mlir::tensor::TensorDialect",
     "IREE::Flow::FlowDialect",
   ];
+}
+
+def ConvertTensorToFlowPass :
+    InterfacePass<"iree-flow-convert-tensor-to-flow", "mlir::FunctionOpInterface"> {
+    let summary = "Convert tensor operations to flow";
+    let description = [{
+      Pass to convert tensor operations to flow.tensor.* operations.
+    }];
+    let dependentDialects = [
+      "mlir::affine::AffineDialect",
+      "mlir::arith::ArithDialect",
+      "mlir::linalg::LinalgDialect",
+      "mlir::tensor::TensorDialect",
+      "IREE::Flow::FlowDialect",
+    ];
+}
+
+def MaterializeDefaultWorkgroupCountRegionPass:
+    InterfacePass<"iree-flow-materialize-default-workgroup-count-region", "mlir::FunctionOpInterface"> {
+      let summary = "Canonicalize dispatch workgroups ops.";
+      let description = [{
+        Apply dispatch workgroups canonicalization patterns.
+      }];
+      let dependentDialects = [
+        "mlir::affine::AffineDialect",
+        "mlir::arith::ArithDialect",
+        "mlir::linalg::LinalgDialect",
+        "mlir::scf::SCFDialect",
+        "IREE::Flow::FlowDialect",
+      ];
 }
 
 def FormScalarDispatchesPass :
