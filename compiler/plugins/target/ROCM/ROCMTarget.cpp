@@ -56,7 +56,7 @@ namespace mlir::iree_compiler::IREE::HAL {
 namespace {
 
 struct ROCmOptions {
-  std::string targetChip = "gfx908";
+  std::string target = "gfx908";
   std::string targetFeatures = "";
   std::string bitcodeDirectory = getDefaultBitcodeDirectory();
   int wavesPerEu = 0;
@@ -66,11 +66,11 @@ struct ROCmOptions {
   void bindOptions(OptionsBinder &binder) {
     using namespace llvm;
     static cl::OptionCategory category("ROCm HAL Target");
-    binder.opt<std::string>("iree-rocm-target-chip", targetChip,
-                            cl::cat(category), cl::desc("ROCm target chip."));
+    binder.opt<std::string>("iree-hip-target", target, cl::cat(category),
+                            cl::desc("HIP target."));
     binder.opt<std::string>(
-        "iree-rocm-target-features", targetFeatures, cl::cat(category),
-        cl::desc("ROCm target features; e.g., '+sramecc,+xnack'."));
+        "iree-hip-target-features", targetFeatures, cl::cat(category),
+        cl::desc("HIP target features; e.g., '+sramecc,+xnack'."));
     binder.opt<std::string>("iree-rocm-bc-dir", bitcodeDirectory,
                             cl::cat(category),
                             cl::desc("Directory of ROCm Bitcode."));
@@ -88,16 +88,16 @@ struct ROCmOptions {
   }
 
   LogicalResult verify(mlir::Builder &builder) const {
-    if (GPU::normalizeHIPTarget(targetChip).empty()) {
-      return emitError(builder.getUnknownLoc(), "Unknown ROCm target '")
-             << targetChip << "'";
+    if (GPU::normalizeHIPTarget(target).empty()) {
+      return emitError(builder.getUnknownLoc(), "Unknown HIP target '")
+             << target << "'";
     }
     SmallVector<StringRef> features;
     llvm::SplitString(targetFeatures, features, ",");
     for (StringRef f : features) {
       if (!(f.starts_with("+") || f.starts_with("-"))) {
         return emitError(builder.getUnknownLoc(),
-                         "ROCm target feature must be prefixed with '+' or "
+                         "HIP target feature must be prefixed with '+' or "
                          "'-'; but seen '")
                << f << "'";
       }
@@ -106,7 +106,7 @@ struct ROCmOptions {
         // We only support these two features to be set explicitly. Features
         // like wavefrontsize is controlled and tuned by the compiler.
         return emitError(builder.getUnknownLoc(),
-                         "ROCm target feature can only be 'sramecc' or "
+                         "HIP target feature can only be 'sramecc' or "
                          "'xnack'; but seen '")
                << feature << "'";
       }
@@ -259,7 +259,7 @@ public:
     if (failed(options.verify(b)))
       return nullptr;
 
-    if (auto target = GPU::getHIPTargetDetails(options.targetChip,
+    if (auto target = GPU::getHIPTargetDetails(options.target,
                                                options.targetFeatures, context))
       addConfig("iree.gpu.target", target);
 
@@ -336,7 +336,7 @@ public:
                                     OpBuilder &executableBuilder) override {
     ModuleOp innerModuleOp = variantOp.getInnerModule();
     auto targetAttr = variantOp.getTargetAttr();
-    StringRef targetArch = options.targetChip;
+    StringRef targetArch = options.target;
     StringRef targetFeatures = options.targetFeatures;
     if (auto attr = getGPUTargetAttr(targetAttr)) {
       targetArch = attr.getArch();

@@ -2258,7 +2258,7 @@ if(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx9")
 
 unset(IREE_HIP_TEST_COMPILER_FLAGS)
 list(APPEND IREE_HIP_TEST_COMPILER_FLAGS
-  "--iree-rocm-target-chip=${IREE_HIP_TEST_TARGET_CHIP}"
+  "--iree-hip-target=${IREE_HIP_TEST_TARGET_CHIP}"
 )
 
 iree_generated_e2e_runner_test(
@@ -2442,7 +2442,7 @@ elseif(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx11")
 
 unset(IREE_HIP_TEST_COMPILER_FLAGS)
 list(APPEND IREE_HIP_TEST_COMPILER_FLAGS
-  "--iree-rocm-target-chip=${IREE_HIP_TEST_TARGET_CHIP}"
+  "--iree-hip-target=${IREE_HIP_TEST_TARGET_CHIP}"
 )
 
 iree_generated_e2e_runner_test(

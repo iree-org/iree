@@ -10,7 +10,7 @@ endif()
 
 unset(IREE_HIP_TEST_COMPILER_FLAGS)
 list(APPEND IREE_HIP_TEST_COMPILER_FLAGS
-  "--iree-rocm-target-chip=${IREE_HIP_TEST_TARGET_CHIP}"
+  "--iree-hip-target=${IREE_HIP_TEST_TARGET_CHIP}"
 )
 
 iree_hal_cts_test_suite(

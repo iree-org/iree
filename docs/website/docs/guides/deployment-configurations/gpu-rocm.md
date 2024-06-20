@@ -76,7 +76,7 @@ following commands to compile:
 ```shell hl_lines="2-5"
 iree-compile \
     --iree-hal-target-backends=rocm \
-    --iree-rocm-target-chip=<...> \
+    --iree-hip-target=<...> \
     mobilenet_iree_input.mlir -o mobilenet_rocm.vmfb
 ```
 
@@ -87,7 +87,7 @@ different chips, users can use this flag to point to an explicit directory.
 For example, in ROCm installations on Linux, this is often found under
 `/opt/rocm/amdgcn/bitcode`.
 
-Note that a ROCm target chip (`iree-rocm-target-chip`) of the form
+Note that a ROCm target chip (`iree-hip-target`) of the form
 `gfx<arch_number>` is needed to compile towards each GPU architecture. If
 no architecture is specified then we will default to `gfx908`.
 
