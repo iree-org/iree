@@ -1911,7 +1911,7 @@ iree_generated_e2e_runner_test(
   DRIVERS
     "cuda"
   COMPILER_FLAGS
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-cuda-target=sm_80"
   LABELS
     "noasan"
     "nomsan"
@@ -1937,7 +1937,7 @@ iree_generated_e2e_runner_test(
   DRIVERS
     "cuda"
   COMPILER_FLAGS
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-cuda-target=sm_80"
   LABELS
     "noasan"
     "nomsan"
@@ -1963,7 +1963,7 @@ iree_generated_e2e_runner_test(
   DRIVERS
     "cuda"
   COMPILER_FLAGS
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-cuda-target=sm_80"
   LABELS
     "noasan"
     "nomsan"
@@ -1990,7 +1990,7 @@ iree_generated_e2e_runner_test(
   DRIVERS
     "cuda"
   COMPILER_FLAGS
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-cuda-target=sm_80"
   LABELS
     "noasan"
     "nomsan"
@@ -2017,7 +2017,7 @@ iree_generated_e2e_runner_test(
   DRIVERS
     "cuda"
   COMPILER_FLAGS
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-cuda-target=sm_80"
   LABELS
     "noasan"
     "nomsan"
@@ -2044,7 +2044,7 @@ iree_generated_e2e_runner_test(
   DRIVERS
     "cuda"
   COMPILER_FLAGS
-    "--iree-hal-cuda-llvm-target-arch=sm_80"
+    "--iree-cuda-target=sm_80"
   LABELS
     "noasan"
     "nomsan"

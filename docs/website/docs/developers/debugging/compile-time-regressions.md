@@ -102,7 +102,7 @@ TMP_DIR="../iree-tmp"
 declare -a COMPILER_FLAGS=(
   "--iree-input-type=stablehlo"
   "--iree-hal-target-backends=cuda"
-  "--iree-hal-cuda-llvm-target-arch=sm_80"
+  "--iree-cuda-target=sm_80"
 )
 
 TIMEOUT_SECONDS_FOR_COMPILING_EACH_SOURCE=10

@@ -107,11 +107,11 @@ following commands to compile:
 ```shell hl_lines="2-3"
 iree-compile \
     --iree-hal-target-backends=cuda \
-    --iree-hal-cuda-llvm-target-arch=<...> \
+    --iree-cuda-target=<...> \
     mobilenet_iree_input.mlir -o mobilenet_cuda.vmfb
 ```
 
-Note that a cuda target architecture (`iree-hal-cuda-llvm-target-arch`) of
+Note that a cuda target architecture (`iree-cuda-target`) of
 the form `sm_<arch_number>` is needed to compile towards each GPU
 architecture. If no architecture is specified then we will default to
 `sm_35`.

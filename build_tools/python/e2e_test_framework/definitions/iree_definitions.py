@@ -510,7 +510,7 @@ def _generate_compile_target_flags(target: CompileTarget) -> List[str]:
                 f"Unsupported target ABI for CUDA backend: `{target.target_abi}`"
             )
         flags = [
-            f"--iree-hal-cuda-llvm-target-arch={arch_info.microarchitecture}",
+            f"--iree-cuda-target={arch_info.microarchitecture}",
         ]
     elif arch_info.architecture == "vmvx":
         flags = []
