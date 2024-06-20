@@ -35,16 +35,14 @@ struct VulkanSPIRVTargetOptions {
   // Use vp_android_baseline_2022 profile as the default target--it's a good
   // lowest common denominator to guarantee the generated SPIR-V is widely
   // accepted for now. Eventually we want to use a list for multi-targeting.
-  std::string targetTriple = "vp_android_baseline_2022";
+  std::string target = "vp_android_baseline_2022";
   bool indirectBindings = false;
 
   void bindOptions(OptionsBinder &binder) {
     static llvm::cl::OptionCategory category("VulkanSPIRV HAL Target");
     binder.opt<std::string>(
-        // TODO: Rename this as target given it's not a triple anymore.
-        "iree-vulkan-target-triple", targetTriple,
-        llvm::cl::desc(
-            "Vulkan target triple controlling the SPIR-V environment."));
+        "iree-vulkan-target", target,
+        llvm::cl::desc("Vulkan target controlling the SPIR-V environment."));
     binder.opt<bool>(
         "iree-vulkan-experimental-indirect-bindings", indirectBindings,
         llvm::cl::desc(
@@ -108,12 +106,12 @@ public:
     }
 
     // We only care about the architecture right now.
-    StringRef arch = StringRef(options_.targetTriple).split("-").first;
+    StringRef arch = StringRef(options_.target).split("-").first;
     if (auto target = GPU::getVulkanTargetDetails(arch, context)) {
       addConfig("iree.gpu.target", target);
     } else {
       emitError(b.getUnknownLoc(), "Unknown Vulkan target '")
-          << options_.targetTriple << "'";
+          << options_.target << "'";
       return nullptr;
     }
 

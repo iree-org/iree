@@ -186,7 +186,7 @@ command to compile with the `vulkan-spirv` target:
 ``` shell hl_lines="2 3"
 iree-compile \
     --iree-hal-target-backends=vulkan-spirv \
-    --iree-vulkan-target-triple=<...> \
+    --iree-vulkan-target=<...> \
     mobilenet_iree_input.mlir -o mobilenet_vulkan.vmfb
 ```
 

@@ -475,7 +475,7 @@ def _generate_compile_target_flags(target: CompileTarget) -> List[str]:
             else arch_info.architecture
         )
         return [
-            f"--iree-vulkan-target-triple={gpu_arch}-unknown-{target.target_abi.value}",
+            f"--iree-vulkan-target={gpu_arch}"
         ]
 
     if arch_info.architecture == "x86_64":

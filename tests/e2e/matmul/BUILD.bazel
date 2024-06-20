@@ -627,7 +627,7 @@ iree_generated_e2e_runner_test(
 [iree_generated_e2e_runner_test(
     name = "e2e_matmul_vulkan_{0}_large_valhall".format(lhs_rhs_type),
     compiler_flags = [
-        "--iree-vulkan-target-triple=valhall-unknown-android31",
+        "--iree-vulkan-target=valhall"
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
@@ -654,7 +654,7 @@ iree_generated_e2e_runner_test(
 [iree_generated_e2e_runner_test(
     name = "e2e_matmul_vulkan_{0}_large_ampere".format(lhs_rhs_type),
     compiler_flags = [
-        "--iree-vulkan-target-triple=ampere-unknown-linux",
+        "--iree-vulkan-target=ampere"
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
@@ -680,7 +680,7 @@ iree_generated_e2e_runner_test(
 iree_generated_e2e_runner_test(
     name = "e2e_matmul_vulkan_f16_large_rdna3",
     compiler_flags = [
-        "--iree-vulkan-target-triple=rdna3-unknown-linux",
+        "--iree-vulkan-target=rdna3"
     ],
     generator = ":generate_e2e_matmul_tests",
     generator_args = [
