@@ -498,12 +498,6 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &funcPassManager,
                                       LLVMCPUPipelineOptions &pipelineOpt) {
   addTileAndDistributePasses(funcPassManager);
 
-  if (pipelineOpt.enableUkernels) {
-    funcPassManager.addPass(createCPUPrepareUkernelsPass());
-    funcPassManager.addPass(
-        createCPULowerToUKernelsPass(clSkipIntermediateRoundings));
-  }
-
   // We still run codegen pipeline because we want a better fallback when
   // ukernels are not available. They are nop if the mmt4d op is convereted to
   // ukernels. If ukernels are not implemented, the lowering config is still
@@ -531,10 +525,13 @@ void addMmt4dTilingExpertPassPipeline(OpPassManager &funcPassManager,
         funcPassManager.addPass(createLLVMCPUTilePass(i));
         continue;
       }
-
       funcPassManager.addPass(createLLVMCPUTilePass(i));
     }
   }
+
+  funcPassManager.addPass(createCPUPrepareUkernelsPass());
+  funcPassManager.addPass(
+    createCPULowerToUKernelsPass(clSkipIntermediateRoundings));
 
   {
     GenericVectorizationPassOptions options;
