@@ -53,6 +53,14 @@ def TopkSplitReduction:
   ];
 }
 
+def DecomposeIm2col :
+    InterfacePass<"iree-linalg-ext-decompose-im2col", "mlir::FunctionOpInterface"> {
+  let summary =
+      "Decomposes im2col ops into insert and extract slice ops";
+  let constructor = "mlir::iree_compiler::IREE::LinalgExt::"
+                    "createDecomposeIm2colPass()";
+}
+
 def DecomposeWinogradTransform :
     InterfacePass<"iree-linalg-ext-decompose-winograd", "mlir::FunctionOpInterface"> {
   let summary =
