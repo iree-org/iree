@@ -34,6 +34,7 @@ iree_lit_test_suite(
     "config_nvidia_matmul.mlir"
     "config_nvidia_matmul_cooperative_ops.mlir"
     "config_user.mlir"
+    "convert_gpu_target.mlir"
     "convert_to_spirv.mlir"
     "emulate_i64.mlir"
     "erase_storage_buffer_static_shape.mlir"
