@@ -105,9 +105,7 @@ public:
       addConfig("hal.bindings.indirect", b.getUnitAttr());
     }
 
-    // We only care about the architecture right now.
-    StringRef arch = StringRef(options_.target).split("-").first;
-    if (auto target = GPU::getVulkanTargetDetails(arch, context)) {
+    if (auto target = GPU::getVulkanTargetDetails(options_.target, context)) {
       addConfig("iree.gpu.target", target);
     } else {
       emitError(b.getUnknownLoc(), "Unknown Vulkan target '")

@@ -67,7 +67,7 @@ struct ROCmOptions {
     using namespace llvm;
     static cl::OptionCategory category("ROCm HAL Target");
     binder.opt<std::string>("iree-hip-target", target, cl::cat(category),
-                            cl::desc("HIP target."));
+                            cl::desc("HIP LLVM target."));
     binder.opt<std::string>(
         "iree-hip-target-features", targetFeatures, cl::cat(category),
         cl::desc("HIP target features; e.g., '+sramecc,+xnack'."));
