@@ -38,6 +38,7 @@ def IREEGPU_LoweringConfigAttr :
         "getWorkgroupTileSizes",
         "getStaticTilingLevelSizes",
         "getTilingLevelSizes",
+        "hasTilingLevel",
       ]>
     ]> {
   let mnemonic = "lowering_config";
@@ -55,7 +56,8 @@ def IREEGPU_LoweringConfigAttr :
         "The configured fields, including tiling levels">:$attributes
   );
   let extraClassDeclaration = [{
-    SmallVector<int64_t> getThreadTileSizes() const;
+    /// Helper to retrieve a target mma intrinsic if present.
+    ::mlir::iree_compiler::IREE::GPU::MmaInterfaceAttr getMmaKind() const;
   }];
 }
 
@@ -64,6 +66,7 @@ def IREEGPU_DerivedThreadConfig :
       DeclareAttrInterfaceMethods<IREECodegen_LoweringConfigAttrInterface, [
         "getStaticTilingLevelSizes",
         "getTilingLevelSizes",
+        "hasTilingLevel",
       ]>
     ]> {
   let mnemonic = "derived_thread_config";

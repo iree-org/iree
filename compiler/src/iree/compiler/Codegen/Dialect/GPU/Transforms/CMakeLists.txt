@@ -45,8 +45,10 @@ iree_cc_library(
     "Passes.h.inc"
     "Transforms.h"
   SRCS
+    "DistributeMmaToLanes.cpp"
     "FuseAndHoistParallelLoops.cpp"
     "LowerIREEGPUOps.cpp"
+    "PackToIntrinsics.cpp"
     "Passes.cpp"
     "Transforms.cpp"
     "VectorizeIREEGPUOps.cpp"
@@ -56,13 +58,17 @@ iree_cc_library(
     MLIRAffineDialect
     MLIRAffineUtils
     MLIRArithDialect
+    MLIRDestinationStyleOpInterface
     MLIRFuncDialect
     MLIRFunctionInterfaces
     MLIRGPUDialect
     MLIRIR
     MLIRLinalgDialect
+    MLIRLinalgTransforms
+    MLIRLoopLikeInterface
     MLIRPass
     MLIRSCFDialect
+    MLIRSCFTransforms
     MLIRSupport
     MLIRTensorDialect
     MLIRTransformUtils
@@ -70,6 +76,7 @@ iree_cc_library(
     MLIRVectorDialect
     MLIRVectorTransforms
     MLIRVectorUtils
+    iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
     iree::compiler::Codegen::Dialect::GPU::IR::IREEGPUDialect
     iree::compiler::Codegen::Transforms
   PUBLIC

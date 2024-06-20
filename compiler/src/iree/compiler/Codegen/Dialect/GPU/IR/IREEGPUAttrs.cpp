@@ -10,6 +10,7 @@
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUEnums.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUInterfaces.h"
 #include "iree/compiler/Codegen/Dialect/GPU/TargetUtils/ConfigUtils.h"
 #include "iree/compiler/Codegen/Utils/VectorOpUtils.h"
 #include "llvm/ADT/STLExtras.h"
@@ -1225,6 +1226,20 @@ LoweringConfigAttr::getTilingLevelSizes(OpBuilder &b, unsigned level,
       sizes, [&](int64_t s) -> OpFoldResult { return b.getIndexAttr(s); });
 }
 
+bool LoweringConfigAttr::hasTilingLevel(unsigned level) const {
+  if (level > llvm::to_underlying(GPU::TilingLevel::Lane)) {
+    return false;
+  }
+  return !getTileSizes(getAttributes(), static_cast<GPU::TilingLevel>(level))
+              .empty();
+}
+
+constexpr StringLiteral kMmaKindName = "mma_kind";
+
+IREE::GPU::MmaInterfaceAttr LoweringConfigAttr::getMmaKind() const {
+  return getAttributes().getAs<IREE::GPU::MmaInterfaceAttr>(kMmaKindName);
+}
+
 //===----------------------------------------------------------------------===//
 // DerivedThreadConfigAttr
 //===----------------------------------------------------------------------===//
@@ -1247,6 +1262,10 @@ DerivedThreadConfigAttr::getTilingLevelSizes(OpBuilder &b, unsigned level,
   SmallVector<int64_t> sizes = deriveThreadTileSizes(op);
   return llvm::map_to_vector(
       sizes, [&](int64_t s) -> OpFoldResult { return b.getIndexAttr(s); });
+}
+
+bool DerivedThreadConfigAttr::hasTilingLevel(unsigned level) const {
+  return level == llvm::to_underlying(GPU::TilingLevel::Thread);
 }
 
 //===----------------------------------------------------------------------===//

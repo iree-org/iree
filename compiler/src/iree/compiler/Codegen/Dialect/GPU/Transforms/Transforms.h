@@ -52,6 +52,10 @@ convertContractionToMultiMma(RewriterBase &rewriter, linalg::LinalgOp linalgOp,
 FailureOr<Operation *> distributeMultiMmaOp(RewriterBase &rewriter,
                                             IREE::GPU::MultiMmaOp mmaOp);
 
+// Helper to map all scf.forall ops on lanes.
+void mapLaneForalls(RewriterBase &rewriter, Operation *funcOp,
+                    bool insertBarrier);
+
 // Various populate pattern methods.
 void populateIREEGPUDropUnitDimsPatterns(RewritePatternSet &patterns);
 void populateIREEGPULowerMultiMmaPatterns(RewritePatternSet &patterns);
