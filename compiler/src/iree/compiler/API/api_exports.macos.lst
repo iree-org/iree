@@ -117,6 +117,7 @@ _mlirAffineModExprGet
 _mlirAffineMulExprGet
 _mlirAffineSymbolExprGet
 _mlirAffineSymbolExprGetPosition
+_mlirApplyPatternsAndFoldGreedily
 _mlirArrayAttrGet
 _mlirArrayAttrGetElement
 _mlirArrayAttrGetNumElements
@@ -149,6 +150,7 @@ _mlirAttributeIsADictionary
 _mlirAttributeIsAElements
 _mlirAttributeIsAFlatSymbolRef
 _mlirAttributeIsAFloat
+_mlirAttributeIsAGPUObjectAttr
 _mlirAttributeIsAInteger
 _mlirAttributeIsAIntegerSet
 _mlirAttributeIsALocation
@@ -172,6 +174,7 @@ _mlirBlockCreate
 _mlirBlockDestroy
 _mlirBlockDetach
 _mlirBlockEqual
+_mlirBlockEraseArgument
 _mlirBlockGetArgument
 _mlirBlockGetFirstOperation
 _mlirBlockGetNextInRegion
@@ -340,12 +343,20 @@ _mlirFloatAttrGetTypeID
 _mlirFloatAttrGetValueDouble
 _mlirFloatTF32TypeGetTypeID
 _mlirFloatTypeGetWidth
+_mlirFreezeRewritePattern
+_mlirFrozenRewritePatternSetDestroy
 _mlirFunctionTypeGet
 _mlirFunctionTypeGetInput
 _mlirFunctionTypeGetNumInputs
 _mlirFunctionTypeGetNumResults
 _mlirFunctionTypeGetResult
 _mlirFunctionTypeGetTypeID
+_mlirGPUObjectAttrGet
+_mlirGPUObjectAttrGetFormat
+_mlirGPUObjectAttrGetObject
+_mlirGPUObjectAttrGetProperties
+_mlirGPUObjectAttrGetTarget
+_mlirGPUObjectAttrHasProperties
 _mlirGetDialectHandle__iree_input__
 _mlirGetDialectHandle__transform__
 _mlirIREELinalgTransformRegisterPasses
@@ -390,6 +401,7 @@ _mlirIntegerTypeIsSignless
 _mlirIntegerTypeIsUnsigned
 _mlirIntegerTypeSignedGet
 _mlirIntegerTypeUnsignedGet
+_mlirIsCurrentDebugType
 _mlirIsGlobalDebugEnabled
 _mlirLinalgFillBuiltinNamedOpRegion
 _mlirLlvmThreadPoolCreate
@@ -413,6 +425,7 @@ _mlirMemRefTypeGetLayout
 _mlirMemRefTypeGetMemorySpace
 _mlirMemRefTypeGetStridesAndOffset
 _mlirMemRefTypeGetTypeID
+_mlirMergeSymbolsIntoFromClone
 _mlirModuleCreateEmpty
 _mlirModuleCreateParse
 _mlirModuleDestroy
@@ -507,6 +520,8 @@ _mlirOperationWriteBytecode
 _mlirOperationWriteBytecodeWithConfig
 _mlirPDLAttributeTypeGet
 _mlirPDLOperationTypeGet
+_mlirPDLPatternModuleDestroy
+_mlirPDLPatternModuleFromModule
 _mlirPDLRangeTypeGet
 _mlirPDLRangeTypeGetElementType
 _mlirPDLTypeTypeGet
@@ -538,6 +553,9 @@ _mlirRegionInsertOwnedBlockBefore
 _mlirRegionTakeBody
 _mlirRegisterGPUPasses
 _mlirRegisterLinalgPasses
+_mlirRewritePatternSetFromPDLPatternModule
+_mlirSetGlobalDebugType
+_mlirSetGlobalDebugTypes
 _mlirShapedTypeGetDimSize
 _mlirShapedTypeGetDynamicSize
 _mlirShapedTypeGetDynamicStrideOrOffset

@@ -4,18 +4,15 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-#include <numeric>
-
 #include "iree/compiler/Codegen/Common/PassDetail.h"
 #include "iree/compiler/Codegen/Common/Passes.h"
+#include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Vector/IR/VectorOps.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/IRMapping.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/Pass/PassRegistry.h"
-#include "mlir/Support/MathExtras.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler {
@@ -208,7 +205,7 @@ struct PackForOpInductionVarVector final : public OpRewritePattern<scf::ForOp> {
             VectorType::get({numElements}, iterType.getElementType());
         castTypes.push_back(shapeCastType);
         auto targetType =
-            VectorType::get({mlir::ceilDiv(totalBits, 32)},
+            VectorType::get({llvm::divideCeilSigned(totalBits, 32)},
                             rewriter.getIntegerType(
                                 std::min(static_cast<int64_t>(32), totalBits)));
         targetTypes.push_back(targetType);

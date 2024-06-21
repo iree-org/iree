@@ -118,6 +118,7 @@ EXPORTS
   mlirAffineMulExprGet
   mlirAffineSymbolExprGet
   mlirAffineSymbolExprGetPosition
+  mlirApplyPatternsAndFoldGreedily
   mlirArrayAttrGet
   mlirArrayAttrGetElement
   mlirArrayAttrGetNumElements
@@ -150,6 +151,7 @@ EXPORTS
   mlirAttributeIsAElements
   mlirAttributeIsAFlatSymbolRef
   mlirAttributeIsAFloat
+  mlirAttributeIsAGPUObjectAttr
   mlirAttributeIsAInteger
   mlirAttributeIsAIntegerSet
   mlirAttributeIsALocation
@@ -173,6 +175,7 @@ EXPORTS
   mlirBlockDestroy
   mlirBlockDetach
   mlirBlockEqual
+  mlirBlockEraseArgument
   mlirBlockGetArgument
   mlirBlockGetFirstOperation
   mlirBlockGetNextInRegion
@@ -341,12 +344,20 @@ EXPORTS
   mlirFloatAttrGetValueDouble
   mlirFloatTF32TypeGetTypeID
   mlirFloatTypeGetWidth
+  mlirFreezeRewritePattern
+  mlirFrozenRewritePatternSetDestroy
   mlirFunctionTypeGet
   mlirFunctionTypeGetInput
   mlirFunctionTypeGetNumInputs
   mlirFunctionTypeGetNumResults
   mlirFunctionTypeGetResult
   mlirFunctionTypeGetTypeID
+  mlirGPUObjectAttrGet
+  mlirGPUObjectAttrGetFormat
+  mlirGPUObjectAttrGetObject
+  mlirGPUObjectAttrGetProperties
+  mlirGPUObjectAttrGetTarget
+  mlirGPUObjectAttrHasProperties
   mlirGetDialectHandle__iree_input__
   mlirGetDialectHandle__transform__
   mlirIREELinalgTransformRegisterPasses
@@ -391,6 +402,7 @@ EXPORTS
   mlirIntegerTypeIsUnsigned
   mlirIntegerTypeSignedGet
   mlirIntegerTypeUnsignedGet
+  mlirIsCurrentDebugType
   mlirIsGlobalDebugEnabled
   mlirLinalgFillBuiltinNamedOpRegion
   mlirLlvmThreadPoolCreate
@@ -414,6 +426,7 @@ EXPORTS
   mlirMemRefTypeGetMemorySpace
   mlirMemRefTypeGetStridesAndOffset
   mlirMemRefTypeGetTypeID
+  mlirMergeSymbolsIntoFromClone
   mlirModuleCreateEmpty
   mlirModuleCreateParse
   mlirModuleDestroy
@@ -508,6 +521,8 @@ EXPORTS
   mlirOperationWriteBytecodeWithConfig
   mlirPDLAttributeTypeGet
   mlirPDLOperationTypeGet
+  mlirPDLPatternModuleDestroy
+  mlirPDLPatternModuleFromModule
   mlirPDLRangeTypeGet
   mlirPDLRangeTypeGetElementType
   mlirPDLTypeTypeGet
@@ -539,6 +554,9 @@ EXPORTS
   mlirRegionTakeBody
   mlirRegisterGPUPasses
   mlirRegisterLinalgPasses
+  mlirRewritePatternSetFromPDLPatternModule
+  mlirSetGlobalDebugType
+  mlirSetGlobalDebugTypes
   mlirShapedTypeGetDimSize
   mlirShapedTypeGetDynamicSize
   mlirShapedTypeGetDynamicStrideOrOffset

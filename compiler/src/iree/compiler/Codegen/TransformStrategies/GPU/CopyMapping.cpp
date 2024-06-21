@@ -10,8 +10,8 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/MathExtras.h"
 #include "llvm/Support/raw_ostream.h"
-#include "mlir/Support/MathExtras.h"
 
 using namespace mlir;
 
@@ -126,7 +126,7 @@ iree_compiler::gpu::MappingInfo iree_compiler::gpu::CopyMapping::getMappingInfo(
       llvm::zip(copySizes, maybeCopyMapping->numThreads), [](auto &&pair) {
         int64_t size, numThreads;
         std::tie(size, numThreads) = pair;
-        return mlir::ceilDiv(size, numThreads);
+        return llvm::divideCeilSigned(size, numThreads);
       }));
   SmallVector<Attribute> allThreadMappings{linearId2(ctx), linearId1(ctx),
                                            linearId0(ctx)};

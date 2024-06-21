@@ -13,9 +13,7 @@
 #include "iree/compiler/Codegen/TransformStrategies/GPU/Common.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/CopyMapping.h"
 #include "llvm/Support/raw_ostream.h"
-#include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Support/LogicalResult.h"
-#include "mlir/Support/MathExtras.h"
 
 namespace mlir::iree_compiler::gpu {
 

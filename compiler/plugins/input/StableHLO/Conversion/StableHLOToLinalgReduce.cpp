@@ -201,7 +201,7 @@ struct ReduceOpToGenericConverter final
               cast<ShapedType>(val.getType()).getElementType()));
     }
 
-    rewriter.applySignatureConversion(&region, signatureConverter,
+    rewriter.applySignatureConversion(&region.front(), signatureConverter,
                                       getTypeConverter());
     rewriter.replaceOp(op, linalgOp.getResults());
     return success();
@@ -301,7 +301,7 @@ struct ReduceOpToReduceConverter final
           // type for new operand number 'idx' + linalgOp.getNumInputs()
           typeConverter->convertType(val.getElementType()));
     }
-    rewriter.applySignatureConversion(&region, signatureConverter,
+    rewriter.applySignatureConversion(&region.front(), signatureConverter,
                                       getTypeConverter());
 
     // Cast the result to the correct type.
@@ -470,7 +470,7 @@ struct ReduceWindowOpOnTensorsGenericConversion final
           i, cast<ShapedType>(input.getType()).getElementType());
     }
 
-    rewriter.applySignatureConversion(&region, signatureConverter,
+    rewriter.applySignatureConversion(&region.front(), signatureConverter,
                                       getTypeConverter());
     rewriter.replaceOp(op, linalgOp.getResults());
     return success();

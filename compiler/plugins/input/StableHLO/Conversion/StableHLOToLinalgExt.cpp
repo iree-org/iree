@@ -189,7 +189,7 @@ struct SortOpConversion final : OpConversionPattern<mlir::stablehlo::SortOp> {
           idx, getTypeConverter()->convertType(
                    getElementTypeOrSelf(argument.getType())));
     }
-    rewriter.applySignatureConversion(&region, signature_converter);
+    rewriter.applySignatureConversion(&region.front(), signature_converter);
 
     rewriter.replaceOp(op, sortOp->getResults());
     return success();
@@ -281,7 +281,7 @@ struct ScatterOpConversion final
     // where output[O] maps to block args #1 in linalg_ext.scatter ops.
     signatureConverter.addInputs(1, argType);
     signatureConverter.addInputs(0, argType);
-    rewriter.applySignatureConversion(&region, signatureConverter);
+    rewriter.applySignatureConversion(&region.front(), signatureConverter);
 
     rewriter.replaceOp(op, scatterOp->getResults());
     return success();
@@ -598,7 +598,8 @@ struct ScanOpConversion final
     TypeConverter::SignatureConversion signatureConverter(2);
     signatureConverter.addInputs(0, input0Ty.getElementType());
     signatureConverter.addInputs(1, init0Ty.getElementType());
-    rewriter.applySignatureConversion(&scanOp.getRegion(), signatureConverter);
+    rewriter.applySignatureConversion(&scanOp.getRegion().front(),
+                                      signatureConverter);
 
     rewriter.replaceOp(op, scanOp.getResult(0));
     return success();
