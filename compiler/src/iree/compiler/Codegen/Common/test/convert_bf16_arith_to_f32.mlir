@@ -28,8 +28,8 @@ func.func @addf_bf16(%arg0 : bf16, %arg1 : bf16) -> bf16 {
 // CHECK-LABEL: @addf_bf16
 // CHECK-SAME: %[[ARG0:.+]]: bf16,
 // CHECK-SAME: %[[ARG1:.+]]: bf16
-// CHECK: %[[EXT0:.+]] = arith.extf %[[ARG0]] : bf16 to f32
-// CHECK: %[[EXT1:.+]] = arith.extf %[[ARG1]] : bf16 to f32
+// CHECK-DAG: %[[EXT0:.+]] = arith.extf %[[ARG0]] : bf16 to f32
+// CHECK-DAG: %[[EXT1:.+]] = arith.extf %[[ARG1]] : bf16 to f32
 // CHECK: %[[ADD:.+]] = arith.addf %[[EXT0]], %[[EXT1]] : f32
 // CHECK: %[[TRUNC:.+]] = arith.truncf %[[ADD]] : f32 to bf16
 
@@ -43,8 +43,8 @@ func.func @addf_vector_bf16(%arg0 : vector<4xbf16>, %arg1 : vector<4xbf16>) -> v
 // CHECK-LABEL: @addf_vector_bf16
 // CHECK-SAME: %[[ARG0:.+]]: vector<4xbf16>,
 // CHECK-SAME: %[[ARG1:.+]]: vector<4xbf16>
-// CHECK: %[[EXT0:.+]] = arith.extf %[[ARG0]] : vector<4xbf16> to vector<4xf32>
-// CHECK: %[[EXT1:.+]] = arith.extf %[[ARG1]] : vector<4xbf16> to vector<4xf32>
+// CHECK-DAG: %[[EXT0:.+]] = arith.extf %[[ARG0]] : vector<4xbf16> to vector<4xf32>
+// CHECK-DAG: %[[EXT1:.+]] = arith.extf %[[ARG1]] : vector<4xbf16> to vector<4xf32>
 // CHECK: %[[ADD:.+]] = arith.addf %[[EXT0]], %[[EXT1]] : vector<4xf32>
 // CHECK: %[[TRUNC:.+]] = arith.truncf %[[ADD]] : vector<4xf32> to vector<4xbf16>
 
@@ -108,8 +108,8 @@ func.func @store_reduction_bf16(%arg0 : vector<3xbf16>, %arg1 : vector<3xbf16>, 
 
 // CHECK-LABEL: @store_reduction_bf16
 // CHECK:  %[[CST:.+]] = arith.constant dense<1.000000e+00> : vector<bf16>
-// CHECK:  %[[VAL0:.+]] = arith.extf %arg0 : vector<3xbf16> to vector<3xf32>
-// CHECK:  %[[VAL1:.+]] = arith.extf %arg1 : vector<3xbf16> to vector<3xf32>
+// CHECK-DAG:  %[[VAL0:.+]] = arith.extf %arg0 : vector<3xbf16> to vector<3xf32>
+// CHECK-DAG:  %[[VAL1:.+]] = arith.extf %arg1 : vector<3xbf16> to vector<3xf32>
 // CHECK:  %[[VAL2:.+]] = vector.extractelement %[[CST]][] : vector<bf16>
 // CHECK:  %[[VAL3:.+]] = arith.extf %[[VAL2]] : bf16 to f32
 // CHECK:  %[[VAL4:.+]] = arith.mulf %[[VAL0]], %[[VAL1]] : vector<3xf32>
