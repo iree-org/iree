@@ -222,7 +222,8 @@ TransferBuffersToHost(
       semaphore.get(), 1ull, iree_hal_device_host_allocator(device), &fence));
   IREE_RETURN_IF_ERROR(iree_hal_device_queue_execute(
       device, IREE_HAL_QUEUE_AFFINITY_ANY, iree_hal_semaphore_list_empty(),
-      iree_hal_fence_semaphore_list(fence.get()), 1, &command_buffer));
+      iree_hal_fence_semaphore_list(fence.get()), 1, &command_buffer,
+      /*binding_tables=*/NULL));
   IREE_RETURN_IF_ERROR(
       iree_hal_fence_wait(fence.get(), iree_infinite_timeout()));
   return std::move(target_views);

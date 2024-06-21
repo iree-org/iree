@@ -589,7 +589,8 @@ static iree_status_t iree_io_parameter_op_batch_flush(
     if (iree_status_is_ok(status)) {
       status = iree_hal_device_queue_execute(
           batch->device, batch->queue_affinity, step.wait_semaphore_list,
-          step.signal_semaphore_list, 1, &batch->transfer_command_buffer);
+          step.signal_semaphore_list, 1, &batch->transfer_command_buffer,
+          /*binding_tables=*/NULL);
     }
     IREE_TRACE_ZONE_END(z_transfer);
   }

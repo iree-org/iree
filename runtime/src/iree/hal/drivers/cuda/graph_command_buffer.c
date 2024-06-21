@@ -843,19 +843,6 @@ static iree_status_t iree_hal_cuda_graph_command_buffer_dispatch_indirect(
                           "indirect dispatch not yet implemented");
 }
 
-static iree_status_t iree_hal_cuda_graph_command_buffer_execute_commands(
-    iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_command_buffer_t* base_commands,
-    iree_hal_buffer_binding_table_t binding_table) {
-  // TODO(#10144): support indirect command buffers by adding subgraph nodes and
-  // tracking the binding table for future cuGraphExecKernelNodeSetParams usage.
-  // Need to look into how to update the params of the subgraph nodes - is the
-  // graph exec the outer one and if so will it allow node handles from the
-  // subgraphs?
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "indirect command buffers not yet implemented");
-}
-
 static const iree_hal_command_buffer_vtable_t
     iree_hal_cuda_graph_command_buffer_vtable = {
         .destroy = iree_hal_cuda_graph_command_buffer_destroy,
@@ -880,5 +867,4 @@ static const iree_hal_command_buffer_vtable_t
         .dispatch = iree_hal_cuda_graph_command_buffer_dispatch,
         .dispatch_indirect =
             iree_hal_cuda_graph_command_buffer_dispatch_indirect,
-        .execute_commands = iree_hal_cuda_graph_command_buffer_execute_commands,
 };

@@ -115,6 +115,61 @@ private:
   mutable IREE::VM::ImportOp importOp;
 };
 
+class DeviceQueueExecuteIndirectOpConversion
+    : public OpConversionPattern<IREE::HAL::DeviceQueueExecuteIndirectOp> {
+public:
+  DeviceQueueExecuteIndirectOpConversion(MLIRContext *context,
+                                         SymbolTable &importSymbols,
+                                         TypeConverter &typeConverter,
+                                         StringRef importName)
+      : OpConversionPattern(context) {
+    importOp = importSymbols.lookup<IREE::VM::ImportOp>(importName);
+    assert(importOp);
+  }
+
+  LogicalResult
+  matchAndRewrite(IREE::HAL::DeviceQueueExecuteIndirectOp op, OpAdaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    auto importType = importOp.getFunctionType();
+    auto i64Type = rewriter.getI64Type();
+
+    SmallVector<Value, 8> callOperands = {
+        adaptor.getDevice(),
+        castToImportType(adaptor.getQueueAffinity(), i64Type, rewriter),
+        adaptor.getWaitFence(),
+        adaptor.getSignalFence(),
+        adaptor.getCommandBuffer(),
+    };
+    SmallVector<int16_t, 5> segmentSizes = {
+        /*device=*/-1,
+        /*queue_affinity=*/-1,
+        /*wait_fence=*/-1,
+        /*signal_fence=*/-1,
+        /*command_buffer=*/-1,
+        /*bindings=*/
+        static_cast<int16_t>(adaptor.getBindingBuffers().size()),
+    };
+    for (auto [bindingBuffer, bindingOffset, bindingLength] : llvm::zip_equal(
+             adaptor.getBindingBuffers(), adaptor.getBindingOffsets(),
+             adaptor.getBindingLengths())) {
+      callOperands.push_back(bindingBuffer);
+      callOperands.push_back(
+          castToImportType(bindingOffset, i64Type, rewriter));
+      callOperands.push_back(
+          castToImportType(bindingLength, i64Type, rewriter));
+    }
+
+    auto callOp = rewriter.replaceOpWithNewOp<IREE::VM::CallVariadicOp>(
+        op, SymbolRefAttr::get(importOp), importType.getResults(), segmentSizes,
+        importType.getInputs(), callOperands);
+    copyImportAttrs(importOp, callOp);
+    return success();
+  }
+
+private:
+  mutable IREE::VM::ImportOp importOp;
+};
+
 void populateHALDeviceToVMPatterns(MLIRContext *context,
                                    SymbolTable &importSymbols,
                                    TypeConverter &typeConverter,
@@ -136,6 +191,9 @@ void populateHALDeviceToVMPatterns(MLIRContext *context,
       context, importSymbols, typeConverter, "hal.device.queue.write");
   patterns.insert<VMImportOpConversion<IREE::HAL::DeviceQueueExecuteOp>>(
       context, importSymbols, typeConverter, "hal.device.queue.execute");
+  patterns.insert<DeviceQueueExecuteIndirectOpConversion>(
+      context, importSymbols, typeConverter,
+      "hal.device.queue.execute.indirect");
   patterns.insert<VMImportOpConversion<IREE::HAL::DeviceQueueFlushOp>>(
       context, importSymbols, typeConverter, "hal.device.queue.flush");
 }

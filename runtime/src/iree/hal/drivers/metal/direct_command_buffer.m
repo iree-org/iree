@@ -342,7 +342,6 @@ iree_status_t iree_hal_metal_direct_command_buffer_create(
   IREE_ASSERT_ARGUMENT(device);
   IREE_ASSERT_ARGUMENT(out_command_buffer);
   IREE_ASSERT_TRUE(iree_all_bits_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT));
-  IREE_ASSERT_TRUE(!iree_any_bit_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_NESTED));
   *out_command_buffer = NULL;
 
   if (binding_capacity > 0) {
@@ -1101,12 +1100,6 @@ static iree_status_t iree_hal_metal_command_buffer_prepare_dispatch_indirect(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_metal_command_buffer_execute_commands(
-    iree_hal_command_buffer_t* base_command_buffer, iree_hal_command_buffer_t* base_commands,
-    iree_hal_buffer_binding_table_t binding_table) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "secondary command buffer not yet supported");
-}
-
 static iree_status_t iree_hal_metal_command_segment_record(
     iree_hal_metal_command_buffer_t* command_buffer) {
   IREE_ASSERT_ARGUMENT(command_buffer);
@@ -1182,5 +1175,4 @@ static const iree_hal_command_buffer_vtable_t iree_hal_metal_command_buffer_vtab
     .push_descriptor_set = iree_hal_metal_command_buffer_push_descriptor_set,
     .dispatch = iree_hal_metal_command_buffer_prepare_dispatch,
     .dispatch_indirect = iree_hal_metal_command_buffer_prepare_dispatch_indirect,
-    .execute_commands = iree_hal_metal_command_buffer_execute_commands,
 };

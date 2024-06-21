@@ -395,6 +395,11 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_write(
 // placed on to the same queue. Note that the exact hashing function is
 // implementation dependent.
 //
+// A list of binding tables matching the list of command buffers must be
+// provided if any command buffer has indirect bindings and may otherwise be
+// NULL. The binding table contents will be captured during the call and need
+// not persist after the call returns.
+//
 // The submission behavior matches Vulkan's vkQueueSubmit, with each submission
 // executing its command buffers in the order they are defined but allowing the
 // command buffers to complete out-of-order. See:
@@ -404,7 +409,8 @@ IREE_API_EXPORT iree_status_t iree_hal_device_queue_execute(
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_host_size_t command_buffer_count,
-    iree_hal_command_buffer_t* const* command_buffers);
+    iree_hal_command_buffer_t* const* command_buffers,
+    iree_hal_buffer_binding_table_t const* binding_tables);
 
 // Enqueues a barrier waiting for |wait_semaphore_list| and signaling
 // |signal_semaphore_list| when reached.
@@ -611,7 +617,8 @@ typedef struct iree_hal_device_vtable_t {
       const iree_hal_semaphore_list_t wait_semaphore_list,
       const iree_hal_semaphore_list_t signal_semaphore_list,
       iree_host_size_t command_buffer_count,
-      iree_hal_command_buffer_t* const* command_buffers);
+      iree_hal_command_buffer_t* const* command_buffers,
+      iree_hal_buffer_binding_table_t const* binding_tables);
 
   iree_status_t(IREE_API_PTR* queue_flush)(
       iree_hal_device_t* device, iree_hal_queue_affinity_t queue_affinity);

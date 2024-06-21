@@ -27,7 +27,6 @@ typedef enum iree_hal_command_type_e {
   IREE_HAL_CMD_PUSH_DESCRIPTOR_SET,
   IREE_HAL_CMD_DISPATCH,
   IREE_HAL_CMD_DISPATCH_INDIRECT,
-  IREE_HAL_CMD_EXECUTE_COMMANDS,
 } iree_hal_cmd_type_t;
 
 // Header prefixed to all commands, forming a linked-list.
@@ -821,56 +820,6 @@ static iree_status_t iree_hal_deferred_command_buffer_apply_dispatch_indirect(
 }
 
 //===----------------------------------------------------------------------===//
-// IREE_HAL_CMD_EXECUTE_COMMANDS
-//===----------------------------------------------------------------------===//
-
-typedef struct iree_hal_cmd_execute_commands_t {
-  iree_hal_cmd_header_t header;
-  iree_hal_command_buffer_t* commands;
-  iree_host_size_t binding_count;
-  iree_hal_buffer_binding_t bindings[];
-} iree_hal_cmd_execute_commands_t;
-
-static iree_status_t iree_hal_deferred_command_buffer_execute_commands(
-    iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_command_buffer_t* commands,
-    iree_hal_buffer_binding_table_t binding_table) {
-  iree_hal_deferred_command_buffer_t* command_buffer =
-      iree_hal_deferred_command_buffer_cast(base_command_buffer);
-  iree_hal_cmd_list_t* cmd_list = &command_buffer->cmd_list;
-  IREE_RETURN_IF_ERROR(
-      iree_hal_resource_set_insert(command_buffer->resource_set, 1, &commands));
-  iree_hal_cmd_execute_commands_t* cmd = NULL;
-  IREE_RETURN_IF_ERROR(iree_hal_cmd_list_append_command(
-      cmd_list, IREE_HAL_CMD_EXECUTE_COMMANDS,
-      sizeof(*cmd) + sizeof(cmd->bindings[0]) * binding_table.count,
-      (void**)&cmd));
-  cmd->commands = commands;
-  cmd->binding_count = binding_table.count;
-  for (iree_host_size_t i = 0; i < binding_table.count; ++i) {
-    const iree_hal_buffer_binding_t binding = binding_table.bindings[i];
-    cmd->bindings[i] = binding;
-    if (binding.buffer) {
-      IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
-          command_buffer->resource_set, 1, &binding.buffer));
-    }
-  }
-  return iree_ok_status();
-}
-
-static iree_status_t iree_hal_deferred_command_buffer_apply_execute_commands(
-    iree_hal_command_buffer_t* target_command_buffer,
-    iree_hal_buffer_binding_table_t binding_table,
-    const iree_hal_cmd_execute_commands_t* cmd) {
-  const iree_hal_buffer_binding_table_t child_binding_table = {
-      .count = cmd->binding_count,
-      .bindings = cmd->bindings,
-  };
-  return iree_hal_command_buffer_execute_commands(
-      target_command_buffer, cmd->commands, child_binding_table);
-}
-
-//===----------------------------------------------------------------------===//
 // Dynamic replay dispatch
 //===----------------------------------------------------------------------===//
 
@@ -901,8 +850,6 @@ static const iree_hal_cmd_apply_fn_t iree_hal_cmd_apply_table[] = {
         iree_hal_deferred_command_buffer_apply_dispatch,
     [IREE_HAL_CMD_DISPATCH_INDIRECT] = (iree_hal_cmd_apply_fn_t)
         iree_hal_deferred_command_buffer_apply_dispatch_indirect,
-    [IREE_HAL_CMD_EXECUTE_COMMANDS] = (iree_hal_cmd_apply_fn_t)
-        iree_hal_deferred_command_buffer_apply_execute_commands,
 };
 
 IREE_API_EXPORT iree_status_t iree_hal_deferred_command_buffer_apply(
@@ -961,5 +908,4 @@ static const iree_hal_command_buffer_vtable_t
             iree_hal_deferred_command_buffer_push_descriptor_set,
         .dispatch = iree_hal_deferred_command_buffer_dispatch,
         .dispatch_indirect = iree_hal_deferred_command_buffer_dispatch_indirect,
-        .execute_commands = iree_hal_deferred_command_buffer_execute_commands,
 };
