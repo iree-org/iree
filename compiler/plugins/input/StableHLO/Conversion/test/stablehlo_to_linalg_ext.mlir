@@ -377,8 +377,8 @@ func.func @scatter_ui32(%arg0: tensor<1xui32>, %arg1: tensor<1x1xi32>, %arg2: te
 // CHECK:         %[[ARG0:[a-zA-Z0-9]+]]
 // CHECK:         %[[ARG1:[a-zA-Z0-9]+]]
 // CHECK:         %[[ARG2:[a-zA-Z0-9]+]]
-// CHECK:         %[[BITCAST0:.+]] = builtin.unrealized_conversion_cast %[[ARG0]] : tensor<1xui32> to tensor<1xi32>
-// CHECK:         %[[BITCAST2:.+]] = builtin.unrealized_conversion_cast %[[ARG2]] : tensor<1xui32> to tensor<1xi32>
+// CHECK-DAG:     %[[BITCAST0:.+]] = builtin.unrealized_conversion_cast %[[ARG0]] : tensor<1xui32> to tensor<1xi32>
+// CHECK-DAG:     %[[BITCAST2:.+]] = builtin.unrealized_conversion_cast %[[ARG2]] : tensor<1xui32> to tensor<1xi32>
 // CHECK:         %[[SCATTER:.+]] = iree_linalg_ext.scatter
 // CHECK-SAME:      unique_indices(true)
 // CHECK-SAME:      ins(%[[BITCAST2]], %[[ARG1]] : tensor<1xi32>, tensor<1x1xi32>)
