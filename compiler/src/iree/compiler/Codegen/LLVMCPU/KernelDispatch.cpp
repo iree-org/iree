@@ -30,6 +30,7 @@
 #include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/Dialect/Utils/StaticValueUtils.h"
 #include "mlir/IR/Matchers.h"
+#include "mlir/IR/TypeUtilities.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
@@ -1184,7 +1185,11 @@ getDefaultMatmulVectorSizes(linalg::LinalgOp op, int64_t vectorSize,
                             SmallVectorImpl<bool> &scalableSizeFlags) {
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(op);
   if (isX86(targetAttr)) {
-    sizes.append({8, 32, 16});
+    if (hasAVX512fFeature(targetAttr)) {
+      sizes.append({8, 32, 16});
+    } else {
+      sizes.append({1, 1, vectorSize});
+    }
     return;
   }
 
