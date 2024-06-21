@@ -14,6 +14,9 @@ iree_check_single_backend_test_suite(
   NAME
     check_llvm-cpu_local-task
   SRCS
+    "collapse_shape.mlir"
+    "concat.mlir"
+    "expand_shape.mlir"
     "extract_slice.mlir"
     "pack.mlir"
     "pack_dynamic_inner_tiles.mlir"
@@ -31,6 +34,9 @@ iree_check_single_backend_test_suite(
   NAME
     check_vmvx_local-task
   SRCS
+    "collapse_shape.mlir"
+    "concat.mlir"
+    "expand_shape.mlir"
     "extract_slice.mlir"
     "pack.mlir"
     "pack_dynamic_inner_tiles.mlir"
@@ -64,6 +70,9 @@ iree_check_single_backend_test_suite(
   NAME
     check_cuda
   SRCS
+    "collapse_shape.mlir"
+    "concat.mlir"
+    "expand_shape.mlir"
     "extract_slice.mlir"
     "pack.mlir"
     "tensor_insert_slice.mlir"
@@ -83,6 +92,9 @@ iree_check_single_backend_test_suite(
   NAME
     check_vulkan-spirv_vulkan
   SRCS
+    "collapse_shape.mlir"
+    "concat.mlir"
+    "expand_shape.mlir"
     "extract_slice.mlir"
     "tensor_cast.mlir"
     "tensor_insert_slice.mlir"
