@@ -35,10 +35,7 @@ def llama2_7b_f16qi4_stripped_rdna3_vulkan_vmfb(llama2_7b_f16qi4_stripped_source
         llama2_7b_f16qi4_stripped_source,
         "rdna3_vulkan",
         flags=COMMON_FLAGS
-        + [
-            "--iree-hal-target-backends=vulkan-spirv",
-            "--iree-vulkan-target=rdna3"
-        ],
+        + ["--iree-hal-target-backends=vulkan-spirv", "--iree-vulkan-target=rdna3"],
     )
 
 
@@ -74,10 +71,7 @@ def llama2_7b_f16qi4_a100_vulkan_vmfb(llama2_7b_f16qi4_stripped_source):
         llama2_7b_f16qi4_stripped_source,
         "a100_vulkan",
         flags=COMMON_FLAGS
-        + [
-            "--iree-hal-target-backends=vulkan-spirv",
-            f"--iree-vulkan-target=ampere"
-        ],
+        + ["--iree-hal-target-backends=vulkan-spirv", f"--iree-vulkan-target=ampere"],
     )
 
 

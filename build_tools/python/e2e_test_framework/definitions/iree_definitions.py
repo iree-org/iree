@@ -474,9 +474,7 @@ def _generate_compile_target_flags(target: CompileTarget) -> List[str]:
             if len(arch_info.microarchitecture) != 0
             else arch_info.architecture
         )
-        return [
-            f"--iree-vulkan-target={gpu_arch}"
-        ]
+        return [f"--iree-vulkan-target={gpu_arch}"]
 
     if arch_info.architecture == "x86_64":
         flags = [
