@@ -91,11 +91,17 @@ static llvm::cl::opt<bool> clEnableVectorContractCustomKernels(
                    "LLVMCPUMmt4dVectorLowering pass."),
     llvm::cl::init(false));
 
+// By default, IREE does not enable the Armv9-A streaming SVE mode in the
+// presence of scalable vectors (even when using `+sme`), as currently there's
+// no cost model of when it could be beneficial. This flag will effectively make
+// IREE/LLVM switch from SVE to SSVE in dispatch regions with supported
+// scalable vector operations.
 static llvm::cl::opt<bool> clForceArmStreaming(
     "iree-llvmcpu-force-arm-streaming",
     llvm::cl::desc(
         "Enables Armv9-A streaming SVE mode for any dispatch region that "
-        "contains scalable vectors. Requires the +sme feature flag."),
+        "contains supported scalable vector operations (i.e., use SSVE rather "
+        "than SVE). Requires the +sme feature flag."),
     llvm::cl::init(false));
 
 static void addTileAndDistributePasses(OpPassManager &funcPassManager) {
@@ -691,9 +697,9 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
         .addPredicatedPass(
             clForceArmStreaming,
             [] {
-              // Scalable dispatches forced to use streaming mode may not need
-              // ZA (so that is enabled separately for dispatch regions that
-              // need it below).
+              // 1. Enable Armv9-A streaming mode without ZA (i.e., SSVE) for
+              // dispatch regions that contain scalable vectors when forced via
+              // the --iree-llvmcpu-force-arm-streaming flag.
               return mlir::arm_sme::createEnableArmStreamingPass(
                   mlir::arm_sme::ArmStreamingMode::StreamingLocally,
                   mlir::arm_sme::ArmZaMode::Disabled,
@@ -705,7 +711,8 @@ static void addLowerToLLVMPasses(OpPassManager &modulePassManager,
         .addPass(mlir::createArithToArmSMEConversionPass)
         .addPass(mlir::createConvertVectorToArmSMEPass)
         .addPass([] {
-          // ArmSME dispatches need to have both streaming mode + ZA enabled.
+          // 2. Enable ZA for dispatch regions that contain ArmSME ops (which
+          // all make use of the ZA state).
           return mlir::arm_sme::createEnableArmStreamingPass(
               mlir::arm_sme::ArmStreamingMode::StreamingLocally,
               mlir::arm_sme::ArmZaMode::NewZA,
