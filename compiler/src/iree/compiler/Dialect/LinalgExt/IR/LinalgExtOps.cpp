@@ -1510,18 +1510,6 @@ SmallVector<AffineMap> OnlineAttentionOp::getIndexingMapsArray() {
 // Im2colOp
 //===----------------------------------------------------------------------===//
 
-/// Return all static and dynamic strides as OpFoldResults.
-SmallVector<OpFoldResult> Im2colOp::getMixedStrides() {
-  return LinalgExt::getMixedValues(getContext(), getStaticStrides(),
-                                   getStrides());
-}
-
-/// Return all static and dynamic dilations as OpFoldResults.
-SmallVector<OpFoldResult> Im2colOp::getMixedDilations() {
-  return LinalgExt::getMixedValues(getContext(), getStaticDilations(),
-                                   getDilations());
-}
-
 /// Return all static and dynamic kernel_size as OpFoldResults.
 SmallVector<OpFoldResult> Im2colOp::getMixedKernelSize() {
   return LinalgExt::getMixedValues(getContext(), getStaticKernelSize(),
@@ -1557,10 +1545,9 @@ void Im2colOp::setMixedMOffset(SmallVector<OpFoldResult> mOffset) {
 }
 
 /// Custom builder methods for im2col op.
-void Im2colOp::build(OpBuilder &builder, OperationState &state,
-                     ValueRange inputs, ValueRange outputs,
-                     ArrayRef<OpFoldResult> strides,
-                     ArrayRef<OpFoldResult> dilations,
+void Im2colOp::build(OpBuilder &builder, OperationState &state, Value input,
+                     Value output, ArrayRef<int64_t> strides,
+                     ArrayRef<int64_t> dilations,
                      ArrayRef<OpFoldResult> kernelSize,
                      ArrayRef<OpFoldResult> kOffset,
                      ArrayRef<OpFoldResult> mOffset, ArrayRef<int64_t> batchPos,
@@ -1569,23 +1556,19 @@ void Im2colOp::build(OpBuilder &builder, OperationState &state,
          dilations.size() == kernelSize.size() &&
          mPos.size() == kernelSize.size() &&
          "strides, dilations, m_pos, and kernel expected to be the same rank");
-  SmallVector<int64_t> staticStrides, staticDilations, staticKernelSize,
-      staticMOffset, staticKOffset;
-  SmallVector<Value> dynamicStrides, dynamicDilations, dynamicKernelSize,
-      dynamicMOffset, dynamicKOffset;
-  dispatchIndexOpFoldResults(strides, dynamicStrides, staticStrides);
-  dispatchIndexOpFoldResults(dilations, dynamicDilations, staticDilations);
+  SmallVector<int64_t> staticKernelSize, staticMOffset, staticKOffset;
+  SmallVector<Value> dynamicKernelSize, dynamicMOffset, dynamicKOffset;
   dispatchIndexOpFoldResults(kernelSize, dynamicKernelSize, staticKernelSize);
   dispatchIndexOpFoldResults(mOffset, dynamicMOffset, staticMOffset);
   dispatchIndexOpFoldResults(kOffset, dynamicKOffset, staticKOffset);
   SmallVector<Type> resultType;
-  auto outputType = outputs[0].getType();
+  auto outputType = output.getType();
   if (isa<RankedTensorType>(outputType)) {
     resultType.push_back(outputType);
   }
-  build(builder, state, resultType, inputs, outputs, dynamicStrides,
-        builder.getDenseI64ArrayAttr(staticStrides), dynamicDilations,
-        builder.getDenseI64ArrayAttr(staticDilations), dynamicKernelSize,
+  build(builder, state, resultType, input, output,
+        builder.getDenseI64ArrayAttr(strides),
+        builder.getDenseI64ArrayAttr(dilations), dynamicKernelSize,
         builder.getDenseI64ArrayAttr(staticKernelSize), dynamicKOffset,
         builder.getDenseI64ArrayAttr(staticKOffset), dynamicMOffset,
         builder.getDenseI64ArrayAttr(staticMOffset),
@@ -1603,6 +1586,12 @@ LogicalResult Im2colOp::verify() {
   if (getNumDpsInits() != 1) {
     return op->emitOpError("expected one output operand");
   }
+  if (getMixedMOffset().size() != 1) {
+    return op->emitOpError("expected one m_offset");
+  }
+  if (getMixedKOffset().size() != 1) {
+    return op->emitOpError("expected one k_offset");
+  }
   auto inputType = getInputType();
   unsigned inputRank = inputType.getRank();
   ArrayRef<int64_t> batchPos = getBatchPos();
@@ -1612,8 +1601,8 @@ LogicalResult Im2colOp::verify() {
     return op->emitOpError(
         "expected input rank to be the sum of batch, m, and k ranks");
   }
-  SmallVector<OpFoldResult> strides = getMixedStrides();
-  SmallVector<OpFoldResult> dilations = getMixedDilations();
+  ArrayRef<int64_t> strides = getStrides();
+  ArrayRef<int64_t> dilations = getDilations();
   SmallVector<OpFoldResult> kernelSize = getMixedKernelSize();
   if (kernelSize.size() != mPos.size()) {
     return op->emitOpError(

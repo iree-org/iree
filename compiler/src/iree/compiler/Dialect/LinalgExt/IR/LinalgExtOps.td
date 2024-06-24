@@ -822,12 +822,9 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
     `M = m + m_offset` and `K = k + K_offset`.
   }];
 
-  let arguments = (ins Variadic<AnyShaped>:$inputs,
-                       Variadic<AnyShaped>:$outputs,
-                       Variadic<Index>:$strides,
-                       DenseI64ArrayAttr:$static_strides,
-                       Variadic<Index>:$dilations,
-                       DenseI64ArrayAttr:$static_dilations,
+  let arguments = (ins AnyShaped:$input, AnyShaped:$output,
+                       DenseI64ArrayAttr:$strides,
+                       DenseI64ArrayAttr:$dilations,
                        Variadic<Index>:$kernel_size,
                        DenseI64ArrayAttr:$static_kernel_size,
                        Variadic<Index>:$m_offset,
@@ -842,10 +839,8 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
   let hasFolder = 1;
   let assemblyFormat = [{
     attr-dict
-    `strides` `=`
-    custom<DynamicIndexList>($strides, $static_strides)
-    `dilations` `=`
-    custom<DynamicIndexList>($dilations, $static_dilations)
+    `strides` `=` $strides
+    `dilations` `=` $dilations
     `kernel_size` `=`
     custom<DynamicIndexList>($kernel_size, $static_kernel_size)
     `m_offset` `=`
@@ -855,15 +850,15 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
     `batch_pos` `=` $batch_pos
     `m_pos` `=` $m_pos
     `k_pos` `=` $k_pos
-    `ins` `(` $inputs `:` type($inputs) `)`
-    `outs` `(` $outputs `:` type($outputs) `)`
+    `ins` `(` $input `:` type($input) `)`
+    `outs` `(` $output `:` type($output) `)`
     (`->` type($results)^)?
   }];
 
   let builders = [
-    OpBuilder<(ins "ValueRange":$inputs, "ValueRange":$outputs,
-      "ArrayRef<OpFoldResult>":$strides,
-      "ArrayRef<OpFoldResult>":$dilations,
+    OpBuilder<(ins "Value":$input, "Value":$output,
+      "ArrayRef<int64_t>":$strides,
+      "ArrayRef<int64_t>":$dilations,
       "ArrayRef<OpFoldResult>":$kernel_size,
       "ArrayRef<OpFoldResult>":$m_offset,
       "ArrayRef<OpFoldResult>":$k_offset,
@@ -873,12 +868,6 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
   ];
 
   let extraClassDeclaration = extraLinalgExtOpClassDeclaration # [{
-    Value getInput() {
-      return getDpsInputOperand(0)->get();
-    }
-    Value getOutput() {
-      return getDpsInitOperand(0)->get();
-    }
     ShapedType getInputType() {
       return cast<ShapedType>(getInput().getType());
     }
@@ -892,8 +881,6 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
       return getOutputType().getRank();
     }
     // Return op metadata.
-    SmallVector<OpFoldResult> getMixedStrides();
-    SmallVector<OpFoldResult> getMixedDilations();
     SmallVector<OpFoldResult> getMixedKernelSize();
     SmallVector<OpFoldResult> getMixedMOffset();
     SmallVector<OpFoldResult> getMixedKOffset();
@@ -905,7 +892,7 @@ def IREELinalgExt_Im2colOp : IREELinalgExt_Op<"im2col",
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
     MutableOperandRange getDpsInitsMutable() {
-      return getOutputsMutable();
+      return getOutputMutable();
     }
   }];
 }
