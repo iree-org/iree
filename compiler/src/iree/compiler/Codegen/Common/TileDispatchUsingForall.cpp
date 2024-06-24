@@ -9,9 +9,11 @@
 #include "iree/compiler/Codegen/Common/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
+#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
 #include "mlir/Dialect/Tensor/Transforms/Transforms.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
@@ -24,7 +26,13 @@ struct TileAndDistributeToWorkgroupsUsingForallOpPass
     : public TileAndDistributeToWorkgroupsUsingForallOpBase<
           TileAndDistributeToWorkgroupsUsingForallOpPass> {
 
-  void runOnOperation();
+  void getDependentDialects(DialectRegistry &registry) const override {
+    registry
+        .insert<affine::AffineDialect, IREE::LinalgExt::IREELinalgExtDialect,
+                scf::SCFDialect, tensor::TensorDialect>();
+  }
+
+  void runOnOperation() override;
 };
 
 } // namespace
@@ -62,7 +70,7 @@ getTiledAndDistributionInfo(RewriterBase &rewriter,
                                   "define workgroup count region");
   }
   auto tileSizes = llvm::map_to_vector(
-      tilableOpConfig.getWorkgroupInterchange(),
+      tilableOpConfig.getWorkgroupTileSizes(),
       [&](int64_t t) -> OpFoldResult { return rewriter.getIndexAttr(t); });
   SmallVector<int64_t> interchange = tilableOpConfig.getWorkgroupInterchange();
 
@@ -129,6 +137,9 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
     funcOp.emitOpError("tile and fuse greedily failed");
     return signalPassFailure();
   }
+  for (auto [origValue, replacement] : tileAndFuseResult->replacements) {
+    rewriter.replaceAllUsesWith(origValue, replacement);
+  }
 
   // Cleanup patterns for tile and distribute
   {
@@ -140,7 +151,6 @@ void TileAndDistributeToWorkgroupsUsingForallOpPass::runOnOperation() {
       staticNumIters = getStaticNumWorkgroups(rewriter, forallLoop);
     }
     RewritePatternSet patterns(context);
-    populateTileAndDistributeToWorkgroupsCleanupPatterns(patterns);
     linalg::populateLinalgTilingCanonicalizationPatterns(patterns);
     tensor::populateFoldTensorEmptyPatterns(patterns);
     populateFoldAffineMinInDistributedLoopsPatterns(patterns, staticNumIters);
