@@ -31,7 +31,7 @@ theme:
     - navigation.tabs # Show primary sections in tabs below the header
     - navigation.tabs.sticky # Keep tabs visible at the top when scrolled
     - navigation.top # "Back to top" button
-    - navigation.indexes  # Section names can link to index.md pages
+    - navigation.indexes # Section names can link to index.md pages
 
     - toc.follow # Scroll the TOC panel to follow the reader
 
@@ -99,7 +99,7 @@ markdown_extensions:
   # Support for embedding external files (e.g. source code samples) via snippets
   # https://squidfunk.github.io/mkdocs-material/reference/code-blocks/#embedding-external-files
   - pymdownx.snippets:
-      base_path: ["../../"]  # Use paths relative to the repository root
+      base_path: ["../../"] # Use paths relative to the repository root
       check_paths: true
   # Diagram support, see
   #   https://squidfunk.github.io/mkdocs-material/reference/diagrams/
@@ -115,8 +115,8 @@ markdown_extensions:
   - pymdownx.tasklist:
       custom_checkbox: true
   - tables
-  - toc:  # Table of Contents
-      permalink: 'link'  # Use Material font's "link" icon; see iree.css
+  - toc: # Table of Contents
+      permalink: "link" # Use Material font's "link" icon; see iree.css
       toc_depth: 4
 
 # Navigation with explicit ordering and nesting.
@@ -196,6 +196,7 @@ nav:
           - "developers/debugging/compile-time-regressions.md"
           - "developers/debugging/gpu.md"
           - "developers/debugging/integration-tests.md"
+          - "developers/debugging/model-development.md"
           - "developers/debugging/releases.md"
           - "developers/debugging/sanitizers.md"
       - "Performance":
@@ -243,7 +244,7 @@ plugins:
 
   # https://github.com/mkdocs/mkdocs-redirects
   - redirects:
-      redirect_maps:  # old -> new
+      redirect_maps: # old -> new
         "extensions/index.md": "reference/extensions.md"
 
         # "getting-started/" moved under "guides/ml-frameworks/"
