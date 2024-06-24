@@ -1,3 +1,23 @@
+func.func @concat_i8_static_dim0() {
+  %cst_1 = arith.constant dense<1> : tensor<1xi8>
+  %cst_2 = arith.constant dense<2> : tensor<1xi8>
+  %1 = util.optimization_barrier %cst_1 : tensor<1xi8>
+  %2 = util.optimization_barrier %cst_2 : tensor<1xi8>
+  %concat = tensor.concat dim(0) %1, %2 : (tensor<1xi8>, tensor<1xi8>) -> tensor<2xi8>
+  check.expect_eq_const(%concat, dense<[1,2]> : tensor<2xi8>) : tensor<2xi8>
+  return
+}
+
+func.func @concat_i16_static_dim0() {
+  %cst_1 = arith.constant dense<1> : tensor<1xi16>
+  %cst_2 = arith.constant dense<2> : tensor<1xi16>
+  %1 = util.optimization_barrier %cst_1 : tensor<1xi16>
+  %2 = util.optimization_barrier %cst_2 : tensor<1xi16>
+  %concat = tensor.concat dim(0) %1, %2 : (tensor<1xi16>, tensor<1xi16>) -> tensor<2xi16>
+  check.expect_eq_const(%concat, dense<[1,2]> : tensor<2xi16>) : tensor<2xi16>
+  return
+}
+
 func.func @concat_i32_static_dim0() {
   %cst_1 = arith.constant dense<1> : tensor<1xi32>
   %cst_2 = arith.constant dense<2> : tensor<1xi32>
