@@ -1304,8 +1304,8 @@ Im2colOp::getTiledImplementation(OpBuilder &builder,
   SmallVector<Value> operands = {inputSlice, outputSlice};
   operands.append(getOperation()->getOperands().begin() + 2,
                   getOperation()->getOperands().end());
-  Im2colOp tiledOp = mlir::clone(builder, *this,
-      TypeRange{outputSlice.getType()}, operands);
+  Im2colOp tiledOp =
+      mlir::clone(builder, *this, TypeRange{outputSlice.getType()}, operands);
   tiledOp.setMixedKOffset({kOffset});
   tiledOp.setMixedMOffset({mOffset});
 
