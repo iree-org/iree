@@ -271,9 +271,7 @@ class ModuleGenerationConfig(object):
         """Materialize flags with dependent values."""
 
         def _replace_module_dir_placeholder(value: str) -> str:
-            """Replaces ${MODULE_DIR} in a POSIX path and returns the
-            platform-dependent path string.
-            """
+            """Replaces ${MODULE_DIR} in a POSIX path and returns the new path."""
             parts = pathlib.PurePosixPath(value).parts
             if MODULE_DIR_VARIABLE not in parts:
                 return value
@@ -282,8 +280,7 @@ class ModuleGenerationConfig(object):
                     f"'{MODULE_DIR_VARIABLE}' needs to be the head of flag value"
                     f" if present, but got '{value}'."
                 )
-            # Properly construct the platform-dependent path.
-            return str(module_dir_path.joinpath(*parts[1:]))
+            return str(module_dir_path.joinpath(*parts[1:]).as_posix())
 
         return utils.transform_flags(
             flags=self.compile_flags, map_funcs=[_replace_module_dir_placeholder]

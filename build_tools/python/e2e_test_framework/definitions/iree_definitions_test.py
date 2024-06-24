@@ -192,7 +192,7 @@ class ModuleGenerationConfigTest(unittest.TestCase):
             module_dir_path=pathlib.Path("abc")
         )
 
-        expected_path = pathlib.Path("abc", "test.json")
+        expected_path = pathlib.Path("abc", "test.json").as_posix()
         self.assertIn(f"--test={expected_path}", flags)
 
     def test_materialize_compile_flags_invalid_module_dir_position(self):
