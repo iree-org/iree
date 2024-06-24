@@ -1627,10 +1627,12 @@ static bool isPackMatmulLHS(tensor::PackOp op) {
 static SmallVector<int64_t>
 getPackVectorTileSizes(mlir::FunctionOpInterface entryPointFn,
                        tensor::PackOp op) {
+  SmallVector<int64_t> innerTiles = op.getStaticTiles();
   SmallVector<int64_t> tileSizes(op.getSourceRank(), 1);
   auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPointFn);
   int64_t vectorSize = getVectorSize(entryPointFn, op.getSourceType());
-  if (!hasAVX512fFeature(targetAttr) || !isPackMatmulLHS(op)) {
+  if (!hasAVX512fFeature(targetAttr) || !isPackMatmulLHS(op) ||
+      innerTiles.back() != 1) {
     return tileSizes;
   }
   if (op.getSourceType().getElementType().isF32()) {
