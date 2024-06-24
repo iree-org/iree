@@ -114,8 +114,8 @@ enumerateMatmulTileArm64(TypeRange elementTypes, ExecutableTargetAttr target) {
     }
   }
 
-  if (hasUkernel(target) && lhs.isSignlessInteger(8) &&
-      rhs.isSignlessInteger(8) && out.isSignlessInteger(32)) {
+  if (lhs.isSignlessInteger(8) && rhs.isSignlessInteger(8) &&
+      out.isSignlessInteger(32)) {
     if (hasFeature(target, "+i8mm")) {
       return {
           TileMxNxK{8, 8, 8}, // Aim to use SMMLA.
@@ -134,8 +134,8 @@ enumerateMatmulTileArm64(TypeRange elementTypes, ExecutableTargetAttr target) {
     }
   }
 
-  if (hasUkernel(target) && lhs.isSignlessInteger(8) &&
-      rhs.isSignlessInteger(4) && out.isSignlessInteger(32)) {
+  if (lhs.isSignlessInteger(8) && rhs.isSignlessInteger(4) &&
+      out.isSignlessInteger(32)) {
     if (hasFeature(target, "+i8mm")) {
       return {
           TileMxNxK{4, 8, 16},
@@ -156,45 +156,6 @@ enumerateMatmulTileArm64(TypeRange elementTypes, ExecutableTargetAttr target) {
         TileMxNxK{2, 16, 2},
         TileMxNxK{1, 16, 2},
     };
-  }
-
-  if (!hasUkernel(target)) {
-    if (lhs.isSignlessInteger(8) && rhs.isSignlessInteger(8) &&
-        (out.isSignlessInteger(32) || out.isF32())) {
-      if (out.isSignlessInteger(32) && hasFeature(target, "+i8mm")) {
-        return {
-            TileMxNxK{8, 8, 8}, // Aim to use SMMLA.
-            TileMxNxK{4, 8, 8}, // Truncation of the above.
-            TileMxNxK{2, 8, 8}, // Truncation of the above.
-            TileMxNxK{1, 8, 8}, // Truncation of the above.
-        };
-      }
-
-      // Default.
-      return {
-          TileMxNxK{8, 8, 1}, // Aim to use SMLAL.
-          TileMxNxK{4, 8, 1}, // Truncation of the above.
-          TileMxNxK{2, 8, 1}, // Truncation of the above.
-          TileMxNxK{1, 8, 1}, // Truncation of the above.
-      };
-    }
-    if (lhs.isSignlessInteger(8) && rhs.isSignlessInteger(4) &&
-        (out.isSignlessInteger(32) || out.isF32())) {
-      if (out.isSignlessInteger(32) && hasFeature(target, "+i8mm")) {
-        return {
-            TileMxNxK{4, 8, 32},
-            TileMxNxK{2, 8, 32},
-            TileMxNxK{1, 8, 32},
-        };
-      }
-
-      // Default.
-      return {
-          TileMxNxK{4, 16, 1}, // Aim to use SMLAL.
-          TileMxNxK{2, 32, 1}, // Truncation of the above.
-          TileMxNxK{1, 64, 1}, // Truncation of the above.
-      };
-    }
   }
 
   // Fallback - no architecture-optimized tile size for this case.
@@ -230,23 +191,13 @@ enumerateMatmulTileX86_64(TypeRange elementTypes, ExecutableTargetAttr target) {
       // reconsider when taking advantage of native f16/bf16 arithmetic when the
       // accumulator itself is f16/bf16.
       if (hasFeature(target, "+avx512f")) {
-        if (hasUkernel(target)) {
-          return {
-              TileMxNxK{16, 16, 1}, // Aim to use VFMADD* (zmm).
-              TileMxNxK{8, 16, 1},  // Truncation of the above.
-              TileMxNxK{4, 16, 1},  // Truncation of the above.
-              TileMxNxK{2, 16, 1},  // Truncation of the above.
-              TileMxNxK{1, 16, 1},  // Truncation of the above.
-          };
-        } else {
-          return {
-              TileMxNxK{16, 16, 1}, // Aim to use VFMADD* (zmm).
-              TileMxNxK{8, 32, 1},  // Use same number of accumulators.
-              TileMxNxK{4, 64, 1},  // Use same number of accumulators.
-              TileMxNxK{2, 64, 1},  // Use half the number of accumulators.
-              TileMxNxK{1, 128, 1}, // Use half the number of accumulators.
-          };
-        }
+        return {
+            TileMxNxK{16, 16, 1}, // Aim to use VFMADD* (zmm).
+            TileMxNxK{8, 16, 1},  // Truncation of the above.
+            TileMxNxK{4, 16, 1},  // Truncation of the above.
+            TileMxNxK{2, 16, 1},  // Truncation of the above.
+            TileMxNxK{1, 16, 1},  // Truncation of the above.
+        };
       }
       if (hasFeature(target, "+avx")) {
         // Note: for good performance, most +avx users will also want to add

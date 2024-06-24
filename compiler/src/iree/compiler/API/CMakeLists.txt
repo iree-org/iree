@@ -23,6 +23,7 @@ iree_cc_library(
     MLIRCAPIPDL
     MLIRCAPITransformDialect
     MLIRCAPITransformDialectTransforms
+    MLIRCAPITransforms
     iree::compiler::API::Internal::CompilerDriver
     iree::compiler::API::Internal::IREECompileToolEntryPoint
     iree::compiler::API::Internal::IREEMLIRLSPServerToolEntryPoint
@@ -70,6 +71,7 @@ set(_EXPORT_OBJECT_LIBS
   obj.MLIRCAPIGPU
   obj.MLIRCAPILinalg
   obj.MLIRCAPIPDL
+  obj.MLIRCAPITransforms
   obj.MLIRCAPITransformDialect
   obj.MLIRCAPITransformDialectTransforms
   iree_compiler_API_Internal_CompilerDriver.objects

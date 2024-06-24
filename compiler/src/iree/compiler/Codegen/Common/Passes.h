@@ -242,6 +242,10 @@ std::unique_ptr<InterfacePass<FunctionOpInterface>> createPadDynamicAlloc();
 /// Pass to convert math operations to their polynomial approximation.
 std::unique_ptr<OperationPass<>> createPolynomialApproximationPass();
 
+/// Pass to propagate reshapes by expansion through all ops without explicit
+/// lowering configurations.
+std::unique_ptr<OperationPass<>> createPropagateReshapesByExpansionPass();
+
 /// Pass to reconcile TranslationInfo across multiple functions in a dispatch
 /// and set the appropriate values on the surrounding HAL ops.
 std::unique_ptr<OperationPass<IREE::HAL::ExecutableVariantOp>>

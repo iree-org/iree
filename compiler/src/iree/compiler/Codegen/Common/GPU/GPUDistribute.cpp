@@ -6,6 +6,7 @@
 
 #include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
+#include "iree/compiler/Codegen/Dialect/GPU/Transforms/Transforms.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/GPU/TransformOps/GPUTransformOps.h"
@@ -23,6 +24,10 @@ struct GPUDistributePass final
     : impl::GPUDistributePassBase<GPUDistributePass> {
   void runOnOperation() override {
     auto funcOp = getOperation();
+    IRRewriter rewriter(funcOp->getContext());
+
+    // First map all lane level forall loops to lanes.
+    IREE::GPU::mapLaneForalls(rewriter, funcOp, /*insertBarrier=*/false);
 
     std::optional<SmallVector<int64_t>> workgroupSize =
         getWorkgroupSize(funcOp);
@@ -35,7 +40,6 @@ struct GPUDistributePass final
     // TODO: Don't hard code kCudaWarpSize here.
     int64_t subgroupSize = maybeSubgroupSize.value_or(kCudaWarpSize);
 
-    IRRewriter rewriter(funcOp->getContext());
     rewriter.setInsertionPointToStart(&funcOp.front());
     DiagnosedSilenceableFailure result =
         mlir::transform::gpu::mapNestedForallToThreadsImpl(

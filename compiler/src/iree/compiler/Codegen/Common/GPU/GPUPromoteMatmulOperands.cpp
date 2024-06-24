@@ -64,6 +64,34 @@ void promoteOperand(OpBuilder &builder, Operation *op, unsigned index) {
   op->setOperand(index, copy.getResult(0));
 }
 
+bool isNonMatvecContraction(linalg::LinalgOp linalgOp) {
+  SmallVector<int64_t, 4> bounds = linalgOp.getStaticLoopRanges();
+  FailureOr<mlir::linalg::ContractionDimensions> contractionDims =
+      mlir::linalg::inferContractionDims(linalgOp);
+  if (failed(contractionDims)) {
+    return false;
+  }
+
+  if (contractionDims->k.size() < 1 || contractionDims->m.size() < 1 ||
+      contractionDims->n.size() < 1) {
+    return false;
+  }
+
+  auto getElementCount = [&](ArrayRef<unsigned> dims) {
+    int64_t acc = 1;
+    for (auto mDim : dims) {
+      int64_t size = bounds[mDim];
+      if (ShapedType::isDynamic(size)) {
+        return size;
+      }
+      acc *= size;
+    }
+    return acc;
+  };
+  return getElementCount(contractionDims->m) != 1 &&
+         getElementCount(contractionDims->n) != 1;
+}
+
 struct GPUPromoteMatmulOperandsPass final
     : impl::GPUPromoteMatmulOperandsPassBase<GPUPromoteMatmulOperandsPass> {
   void runOnOperation() override {
@@ -71,7 +99,7 @@ struct GPUPromoteMatmulOperandsPass final
 
     OpBuilder builder(funcOp);
     funcOp.walk([&](linalg::LinalgOp linalgOp) {
-      if (!isMatmulOrBatchMatmul(linalgOp)) {
+      if (!isNonMatvecContraction(linalgOp)) {
         return;
       }
       builder.setInsertionPoint(linalgOp);

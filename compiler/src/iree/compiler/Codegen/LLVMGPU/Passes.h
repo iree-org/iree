@@ -12,6 +12,7 @@
 #ifndef IREE_COMPILER_CODEGEN_LLVMGPU_PASSES_H_
 #define IREE_COMPILER_CODEGEN_LLVMGPU_PASSES_H_
 
+#include "iree/compiler/Codegen/Common/GPU/Passes.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "mlir/Pass/Pass.h"
 
@@ -25,15 +26,15 @@ namespace mlir::iree_compiler {
 /// attribute. These are used to override default pass heuristics at the
 /// function granularity.
 namespace LLVMGPUAttrNames {
-inline constexpr StringLiteral kNoReorderWorkgroups = "no_reorder_workgroups";
+inline constexpr StringLiteral kReorderWorkgroups = "reorder_workgroups";
 inline constexpr StringLiteral kNoReduceSharedMemoryBankConflicts =
     "no_reduce_shared_memory_bank_conflicts";
 } //  namespace LLVMGPUAttrNames
 
 struct LLVMGPUPipelineOptions {
   bool enableReduceSharedMemoryBankConflicts = true;
-  bool enableReorderWorkgroups = true;
   bool enableUkernels = false;
+  std::optional<ReorderWorkgroupsStrategy> reorderStrategy;
 };
 
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,

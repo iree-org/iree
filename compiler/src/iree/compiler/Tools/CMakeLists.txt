@@ -53,7 +53,6 @@ iree_cc_library(
     iree::compiler::Dialect::VM::Transforms
     iree::compiler::Dialect::VMVX::IR::VMVXDialect
     iree::compiler::Dialect::VMVX::Transforms
-    iree::compiler::Dialect::Vulkan::IR
     iree::compiler::ExternalInterfaces::ExternalModels
     iree::compiler::GlobalOptimization::Interfaces::Interfaces
     iree::compiler::InputConversion::Common

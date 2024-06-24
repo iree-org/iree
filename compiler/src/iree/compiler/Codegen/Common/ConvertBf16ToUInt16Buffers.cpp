@@ -172,7 +172,8 @@ struct GenericTypeConversionPattern : public ConversionPattern {
                                            "argument type conversion failed");
       }
 
-      rewriter.applySignatureConversion(newRegion, result, typeConverter);
+      rewriter.applySignatureConversion(&newRegion->front(), result,
+                                        typeConverter);
     }
 
     Operation *newOp = rewriter.create(state);

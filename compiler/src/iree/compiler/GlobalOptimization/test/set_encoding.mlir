@@ -1021,9 +1021,9 @@ util.func public @batch_matmul_f32f32f32_narrow_MN(%arg0 : tensor<64x4x250xf32>,
 //  CHECK-DAG: #[[MAP1:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d3, d2)>
 //  CHECK-DAG: #[[MAP2:.+]] = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2)>
 //      CHECK: util.func public @batch_matmul_f32f32f32_narrow_MN(
-//      CHECK:   iree_encoding.upper_bound_tile_size tensor<64x4x250xf32, #iree_encoding.encoding<role =  LHS, element_types = [f32, f32, f32], matmul_narrow_M = 4 : index, matmul_narrow_N = 2 : index, user_indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]]>>
-//      CHECK:   iree_encoding.upper_bound_tile_size tensor<64x250x2xf32, #iree_encoding.encoding<role =  RHS, element_types = [f32, f32, f32], matmul_narrow_M = 4 : index, matmul_narrow_N = 2 : index, user_indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]]>>
-//      CHECK:   iree_encoding.upper_bound_tile_size tensor<64x4x2xf32, #iree_encoding.encoding<role =  RESULT, element_types = [f32, f32, f32], matmul_narrow_M = 4 : index, matmul_narrow_N = 2 : index, user_indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]]>>
+//      CHECK:   iree_encoding.upper_bound_tile_size tensor<64x4x250xf32, #iree_encoding.encoding<role =  LHS, element_types = [f32, f32, f32], matmul_narrow_N = 2 : index, user_indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]]>>
+//      CHECK:   iree_encoding.upper_bound_tile_size tensor<64x250x2xf32, #iree_encoding.encoding<role =  RHS, element_types = [f32, f32, f32], matmul_narrow_N = 2 : index, user_indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]]>>
+//      CHECK:   iree_encoding.upper_bound_tile_size tensor<64x4x2xf32, #iree_encoding.encoding<role =  RESULT, element_types = [f32, f32, f32], matmul_narrow_N = 2 : index, user_indexing_maps = [#[[MAP0]], #[[MAP1]], #[[MAP2]]]>>
 //      CHECK:   linalg.batch_matmul
 
 // -----

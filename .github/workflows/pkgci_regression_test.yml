@@ -49,7 +49,7 @@ jobs:
               - self-hosted # must come first
               - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
               - environment=prod
-              - gpu  # TODO(scotttodd): qualify further with vendor/model
+              - gpu # TODO(scotttodd): qualify further with vendor/model
               - os-family=Linux
           - name: nvidiagpu_vulkan
             config-file: onnx_gpu_vulkan.json
@@ -58,7 +58,7 @@ jobs:
               - self-hosted # must come first
               - runner-group=${{ github.event_name == 'pull_request' && 'presubmit' || 'postsubmit' }}
               - environment=prod
-              - gpu  # TODO(scotttodd): qualify further with vendor/model
+              - gpu # TODO(scotttodd): qualify further with vendor/model
               - os-family=Linux
     env:
       PACKAGE_DOWNLOAD_DIR: ${{ github.workspace }}/.packages
@@ -69,14 +69,14 @@ jobs:
       VENV_DIR: ${{ github.workspace }}/venv
     steps:
       - name: Checking out IREE repository
-        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
+        uses: actions/checkout@v4.1.7
         with:
           submodules: false
-      - uses: actions/setup-python@61a6322f88396a6271a6ee3565807d608ecaddd1  # v4.7.0
+      - uses: actions/setup-python@61a6322f88396a6271a6ee3565807d608ecaddd1 # v4.7.0
         with:
           # Must match the subset of versions built in pkgci_build_packages.
-          python-version: '3.11'
-      - uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a  # v3.0.2
+          python-version: "3.11"
+      - uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3.0.2
         with:
           name: linux_x86_64_release_packages
           path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
@@ -87,10 +87,10 @@ jobs:
             --fetch-gh-workflow=${{ inputs.artifact_run_id }}
 
       - name: Check out external TestSuite repository
-        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
+        uses: actions/checkout@v4.1.7
         with:
           repository: nod-ai/SHARK-TestSuite
-          ref: c9b3337e1f754c83d178568be1339aaef5f08045
+          ref: ab932cc54f1e460ccd9b4a4f1efa07d0ee069eb5
           path: SHARK-TestSuite
           submodules: false
           lfs: false
@@ -138,15 +138,19 @@ jobs:
           # CPU
           - name: cpu_llvm_task
             models-config-file: pytorch_models_cpu_llvm_task.json
-            sdxl-config-file: sdxl_scheduled_unet_cpu_llvm_task.json
+            sdxl-unet-config-file: sdxl_scheduled_unet_cpu_llvm_task.json
+            sdxl-vae-config-file: sdxl_vae_decode_cpu_llvm_task.json
+            sdxl-clip-config-file: sdxl_prompt_encoder_cpu_llvm_task.json
             runs-on: nodai-amdgpu-w7900-x86-64
 
           # AMD GPU
           - name: amdgpu_rocm_gfx90a
             models-config-file: pytorch_models_gpu_rocm_gfx90a.json
             models-extra-flags-config-file: pytorch_models_gpu_rocm_gfx90a_additional_flags.json
-            sdxl-config-file: sdxl_scheduled_unet_gpu_rocm_gfx90a.json
-            runs-on: nodai-amdgpu-mi250-x86-64
+            sdxl-unet-config-file: sdxl_scheduled_unet_gpu_rocm_gfx90a.json
+            sdxl-vae-config-file: sdxl_vae_decode_gpu_rocm_gfx90a.json
+            sdxl-clip-config-file: sdxl_prompt_encoder_gpu_rocm_gfx90a.json
+            runs-on: nodai-amdgpu-mi210-x86-64
           - name: amdgpu_vulkan
             models-config-file: pytorch_models_gpu_vulkan.json
             runs-on: nodai-amdgpu-w7900-x86-64
@@ -166,18 +170,20 @@ jobs:
       IREE_TEST_PATH_EXTENSION: ${{ github.workspace }}/build_tools/pkgci/external_test_suite
       MODELS_CONFIG_FILE_PATH: build_tools/pkgci/external_test_suite/${{ matrix.models-config-file }}
       MODELS_EXTRA_FLAGS_CONFIG_FILE_PATH: build_tools/pkgci/external_test_suite/${{ matrix.models-extra-flags-config-file }}
-      SDXL_CONFIG_FILE_PATH: build_tools/pkgci/external_test_suite/${{ matrix.sdxl-config-file }}
+      SDXL_UNET_CONFIG_FILE_PATH: build_tools/pkgci/external_test_suite/${{ matrix.sdxl-unet-config-file }}
+      SDXL_CLIP_CONFIG_FILE_PATH: build_tools/pkgci/external_test_suite/${{ matrix.sdxl-clip-config-file }}
+      SDXL_VAE_CONFIG_FILE_PATH: build_tools/pkgci/external_test_suite/${{ matrix.sdxl-vae-config-file }}
       VENV_DIR: ${{ github.workspace }}/venv
     steps:
       - name: Checking out IREE repository
-        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
+        uses: actions/checkout@v4.1.7
         with:
           submodules: false
-      - uses: actions/setup-python@61a6322f88396a6271a6ee3565807d608ecaddd1  # v4.7.0
+      - uses: actions/setup-python@61a6322f88396a6271a6ee3565807d608ecaddd1 # v4.7.0
         with:
           # Must match the subset of versions built in pkgci_build_packages.
-          python-version: '3.11'
-      - uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a  # v3.0.2
+          python-version: "3.11"
+      - uses: actions/download-artifact@9bc31d5ccc31df68ecc42ccf4149144866c47d8a # v3.0.2
         with:
           name: linux_x86_64_release_packages
           path: ${{ env.PACKAGE_DOWNLOAD_DIR }}
@@ -198,10 +204,10 @@ jobs:
 
       # Out of tree tests
       - name: Check out external TestSuite repository
-        uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
+        uses: actions/checkout@v4.1.7
         with:
           repository: nod-ai/SHARK-TestSuite
-          ref: c9b3337e1f754c83d178568be1339aaef5f08045
+          ref: ab932cc54f1e460ccd9b4a4f1efa07d0ee069eb5
           path: SHARK-TestSuite
           submodules: false
           lfs: true
@@ -243,7 +249,7 @@ jobs:
             --config-files=${MODELS_EXTRA_FLAGS_CONFIG_FILE_PATH}
 
       - name: "Run external tests - SDXL scheduled unet"
-        if: "matrix.sdxl-config-file != '' && !cancelled()"
+        if: "matrix.sdxl-unet-config-file != '' && !cancelled()"
         run: |
           source ${VENV_DIR}/bin/activate
           pytest SHARK-TestSuite/iree_tests/pytorch/models/sdxl-scheduled-unet-3-tank \
@@ -254,10 +260,49 @@ jobs:
             --log-cli-level=info \
             --timeout=1200 \
             --durations=0 \
-            --config-files=${SDXL_CONFIG_FILE_PATH}
+            --config-files=${SDXL_UNET_CONFIG_FILE_PATH}
+
+      - name: "Run external tests - SDXL prompt encoder"
+        if: "matrix.sdxl-clip-config-file != '' && !cancelled()"
+        run: |
+          source ${VENV_DIR}/bin/activate
+          pytest SHARK-TestSuite/iree_tests/pytorch/models/sdxl-prompt-encoder-tank \
+            -rpfE \
+            -k real_weights \
+            --no-skip-tests-missing-files \
+            --capture=no \
+            --log-cli-level=info \
+            --timeout=1200 \
+            --durations=0 \
+            --config-files=${SDXL_CLIP_CONFIG_FILE_PATH}
+
+      - name: "Run external tests - SDXL vae decode"
+        if: "matrix.sdxl-vae-config-file != '' && !cancelled()"
+        run: |
+          source ${VENV_DIR}/bin/activate
+          pytest SHARK-TestSuite/iree_tests/pytorch/models/sdxl-vae-decode-tank \
+            -rpfE \
+            -k real_weights \
+            --no-skip-tests-missing-files \
+            --capture=no \
+            --log-cli-level=info \
+            --timeout=1200 \
+            --durations=0 \
+            --config-files=${SDXL_VAE_CONFIG_FILE_PATH}
 
       - name: "Running SDXL rocm pipeline benchmark"
         if: contains(matrix.name, 'rocm')
         run: |
           source ${VENV_DIR}/bin/activate
-          bash SHARK-TestSuite/iree_tests/benchmarks/benchmark_sdxl_rocm.sh
+          pytest SHARK-TestSuite/iree_tests/benchmarks/benchmark_sdxl_rocm.py \
+            --goldentime-rocm-e2e-ms 1636 \
+            --goldentime-rocm-unet-ms 442 \
+            --goldentime-rocm-clip-ms 16.5 \
+            --goldentime-rocm-vae-ms 285 \
+            --gpu-number 3 \
+            --rocm-chip gfx90a \
+            --log-cli-level=info \
+            --retries 7
+          echo "### SDXL Benchmark Summary:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY # this is a blank line
+          echo "$(<job_summary.txt )" >> $GITHUB_STEP_SUMMARY

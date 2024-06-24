@@ -211,6 +211,7 @@ def IREECodegen_LoweringConfigAttr :
         "getWorkgroupInterchange",
         "getStaticTilingLevelSizes",
         "getTilingLevelSizes",
+        "hasTilingLevel",
       ]>
     ]> {
   let mnemonic = "lowering_config";

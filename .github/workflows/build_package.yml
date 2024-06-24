@@ -43,7 +43,8 @@ jobs:
             build-family: linux-x86_64
             build-package: main-dist-linux
             experimental: false
-          - runs-on: [self-hosted, arm64, os-family=Linux, runner-group=postsubmit]
+          - runs-on:
+              [self-hosted, arm64, os-family=Linux, runner-group=postsubmit]
             build-family: linux-aarch64
             build-package: main-dist-linux
             experimental: true
@@ -51,7 +52,8 @@ jobs:
             build-family: linux-x86_64
             build-package: py-compiler-pkg
             experimental: false
-          - runs-on: [self-hosted, arm64, os-family=Linux, runner-group=postsubmit]
+          - runs-on:
+              [self-hosted, arm64, os-family=Linux, runner-group=postsubmit]
             build-family: linux-aarch64
             build-package: py-compiler-pkg
             experimental: true
@@ -59,7 +61,8 @@ jobs:
             build-family: linux-x86_64
             build-package: py-runtime-pkg
             experimental: false
-          - runs-on: [self-hosted, arm64, os-family=Linux, runner-group=postsubmit]
+          - runs-on:
+              [self-hosted, arm64, os-family=Linux, runner-group=postsubmit]
             build-family: linux-aarch64
             build-package: py-runtime-pkg
             experimental: true
@@ -103,9 +106,9 @@ jobs:
       MANYLINUX_AARCH64_IMAGE: quay.io/pypa/manylinux_2_28_aarch64
 
     steps:
-      - uses: actions/checkout@8f4b7f84864484a7bf31766abe9204da3cbe65b3 # v3.5.0
+      - uses: actions/checkout@v4.1.7
         with:
-          path: "c"  # Windows can hit path length limits, so use a short path.
+          path: "c" # Windows can hit path length limits, so use a short path.
           submodules: true
           ref: ${{ github.event.inputs.commit }}
 

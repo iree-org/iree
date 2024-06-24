@@ -469,12 +469,13 @@ static LogicalResult serializeGenericResourceElementData(
              << " for type " << resourceElementsAttr.getType();
     }
   } else if (auto floatType = llvm::dyn_cast<FloatType>(elementType)) {
-    // TODO(saienduri): implement float64 support (not necessary now)
     unsigned bitWidth = floatType.getIntOrFloatBitWidth();
     switch (bitWidth) {
     case 16:
       return serializeResourceRawData(loc, resourceElementsAttr, os);
     case 32:
+      return serializeResourceRawData(loc, resourceElementsAttr, os);
+    case 64:
       return serializeResourceRawData(loc, resourceElementsAttr, os);
     default:
       return emitError(loc) << "unhandled float element bit width " << bitWidth

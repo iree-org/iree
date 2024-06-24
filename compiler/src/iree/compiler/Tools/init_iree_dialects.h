@@ -22,20 +22,17 @@
 #include "iree/compiler/Dialect/Flow/IR/FlowDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
-#include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Stream/IR/StreamDialect.h"
 #include "iree/compiler/Dialect/Util/IR/UtilDialect.h"
 #include "iree/compiler/Dialect/Util/TransformOps/UtilTransformOps.h"
 #include "iree/compiler/Dialect/VM/IR/VMDialect.h"
 #include "iree/compiler/Dialect/VMVX/IR/VMVXDialect.h"
-#include "iree/compiler/Dialect/Vulkan/IR/VulkanDialect.h"
 #include "iree/compiler/ExternalInterfaces/Interfaces.h"
 #include "iree/compiler/GlobalOptimization/Interfaces/Interfaces.h"
 #include "iree/compiler/Modules/HAL/Inline/IR/HALInlineDialect.h"
 #include "iree/compiler/Modules/HAL/Loader/IR/HALLoaderDialect.h"
 #include "iree/compiler/Modules/IO/Parameters/IR/IOParametersDialect.h"
 #include "iree/compiler/Preprocessing/TransformExtensions/PreprocessingExtensions.h"
-#include "mlir/IR/Dialect.h"
 
 namespace mlir::iree_compiler {
 
@@ -56,8 +53,7 @@ inline void registerIreeDialects(DialectRegistry &registry) {
                   IREE::Util::UtilDialect,
                   IREE::VM::VMDialect,
                   IREE::VMVX::VMVXDialect,
-                  IREE::VectorExt::IREEVectorExtDialect,
-                  IREE::Vulkan::VulkanDialect>();
+                  IREE::VectorExt::IREEVectorExtDialect>();
   // clang-format on
 
   // External models.

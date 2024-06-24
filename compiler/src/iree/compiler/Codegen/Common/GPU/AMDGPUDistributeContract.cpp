@@ -67,9 +67,6 @@ struct DistributeContract final : OpDistributionPattern<vector::ContractionOp> {
 
     // Infer the contract kind so that we know know to correlate M/N/K dims.
     VectorContractOpInfo opDetail(contractOp);
-    if (opDetail.getOpKind() == VectorContractOpInfo::OpKind::UNKNOWN) {
-      return rewriter.notifyMatchFailure(contractOp, "unknown contract kind");
-    }
 
     SmallVector<int64_t> distShape = resultLayout.getDistributedShape();
     LLVM_DEBUG({

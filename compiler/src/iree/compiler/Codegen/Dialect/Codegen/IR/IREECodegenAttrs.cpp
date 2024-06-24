@@ -318,6 +318,10 @@ LoweringConfigAttr::getTilingLevelSizes(OpBuilder &builder, unsigned level,
       [&](int64_t t) -> OpFoldResult { return builder.getIndexAttr(t); });
 }
 
+bool LoweringConfigAttr::hasTilingLevel(unsigned level) const {
+  return !getTileSizeVals(level).empty();
+}
+
 LogicalResult
 LoweringConfigAttr::verify(function_ref<InFlightDiagnostic()> emitError,
                            LoweringConfigTilingLevelsAttr levels,

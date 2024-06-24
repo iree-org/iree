@@ -157,6 +157,35 @@ def DistributeMultiMmaOp : Op<Transform_Dialect, "iree.distribute_multi_mma",
   }];
 }
 
+def ForallToLanesOp : Op<Transform_Dialect,
+    "iree.forall_to_lanes",
+    [DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,
+     TransformEachOpTrait,
+     TransformOpInterface,
+     ReportTrackingListenerFailuresOpTrait]> {
+  let description = [{
+    Collect all of the scf.forall ops in the target that are distributed to
+    lanes.
+
+    Only scf.forall distributed to exactly a single lane id are currently
+    supported.
+  }];
+
+  let arguments = (ins TransformHandleTypeInterface:$target);
+  let results = (outs);
+
+  let assemblyFormat = "$target attr-dict `:` functional-type($target, results)";
+  let cppNamespace = "mlir::iree_compiler::IREE::transform_dialect";
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::transform::TransformRewriter &rewriter,
+        ::mlir::Operation *target,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
 def FuseForallOp : Op<Transform_Dialect, "iree.fuse_forall",
     [FunctionalStyleTransformOpTrait,
      DeclareOpInterfaceMethods<MemoryEffectsOpInterface>,

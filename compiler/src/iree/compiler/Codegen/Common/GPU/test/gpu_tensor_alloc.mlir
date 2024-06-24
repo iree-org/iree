@@ -221,3 +221,37 @@ func.func @conv() attributes {translation_info = #iree_codegen.translation_info<
 //     COALESCE_LOOPS:   scf.for
 // COALESCE_LOOPS-NOT:   scf.for
 //     COALESCE_LOOPS:   return
+
+#mapQ = affine_map<(batch, m, k1, k2, n) -> (batch, m, k1)>
+#mapK = affine_map<(batch, m, k1, k2, n) -> (batch, k2, k1)>
+#mapV = affine_map<(batch, m, k1, k2, n) -> (batch, k2, n)>
+#mapO = affine_map<(batch, m, k1, k2, n) -> (batch, m, n)>
+#mapR = affine_map<(batch, m, k1, k2, n) -> (batch, m)>
+
+#config = #iree_codegen.lowering_config<tile_sizes = [[64, 0, 0, 32, 0]]>
+
+func.func @online_attention(%query: tensor<192x1024x64xf16>,
+                         %key: tensor<192x1024x64xf16>,
+                         %value: tensor<192x1024x64xf16>,
+                         %output: tensor<192x1024x64xf32>,
+                         %max: tensor<192x1024xf32>,
+                         %sum: tensor<192x1024xf32>)
+                         -> (tensor<192x1024x64xf32>, tensor<192x1024xf32>) {
+  %scale = arith.constant 1.0 : f16
+
+  %out:3 = iree_linalg_ext.online_attention
+        { indexing_maps = [#mapQ, #mapK, #mapV, #mapO, #mapR, #mapR],
+          lowering_config = #config }
+        ins(%query, %key, %value, %scale : tensor<192x1024x64xf16>, tensor<192x1024x64xf16>, tensor<192x1024x64xf16>, f16)
+        outs(%output, %max, %sum : tensor<192x1024x64xf32>, tensor<192x1024xf32>, tensor<192x1024xf32>)
+        -> tensor<192x1024x64xf32>, tensor<192x1024xf32>, tensor<192x1024xf32>
+
+  return %out#0, %out#2 : tensor<192x1024x64xf32>, tensor<192x1024xf32>
+}
+
+// Just check if the operation gets tiled. The actual tiling verification tests
+// are in online_attention tiling interface tests.
+// CHECK-LABEL: func.func @online_attention
+// CHECK: scf.for
+// CHECK:   iree_linalg_ext.online_attention
+// CHECK: scf.yield

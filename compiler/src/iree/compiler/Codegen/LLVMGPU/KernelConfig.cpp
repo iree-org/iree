@@ -74,9 +74,6 @@ namespace {
 
 using CodeGenPipeline = IREE::Codegen::DispatchLoweringPassPipeline;
 
-constexpr StringLiteral kCudaTarget = "cuda";
-constexpr StringLiteral kRocmTarget = "rocm";
-
 // Threshold used to determine whether a matmul dimension is 'very skinny'.
 constexpr int64_t kVerySkinnyDimThreshold = 4;
 
@@ -91,6 +88,10 @@ struct TileWorkgroupSizePair {
 constexpr unsigned softwarePipelineDepthSimt = 0;
 
 } // namespace
+
+bool isROCmBackend(IREE::GPU::TargetAttr target) {
+  return target.getArch().starts_with("gfx");
+}
 
 //====---------------------------------------------------------------------===//
 // Matmul Configuration Helpers
@@ -299,13 +300,14 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   int64_t maxSharedMemoryBytes = target.getWgp().getMaxWorkgroupMemoryBytes();
 
   // First try to find a schedule with an exactly matching intrinsic.
-  FailureOr<GPUMMASchedule> schedule =
-      deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes);
+  FailureOr<GPUMMASchedule> schedule = deduceMMASchedule(
+      problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize);
   if (failed(schedule)) {
     // Then try again by allowing upcasting accumulator.
-    schedule =
-        deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
-                          /*canUpcastAcc=*/true);
+    schedule = deduceMMASchedule(
+        problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize,
+        /*transposedLhs*/ false, /*transposedRhs*/ false,
+        /*canUpcastAcc=*/true);
   }
   if (failed(schedule)) {
     return failure();
@@ -465,14 +467,25 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   LDBG("Matmul Vector Distribution Config");
 
-  // First try to find a schedule with an exactly matching intrinsic.
   auto pipeline = CodeGenPipeline::LLVMGPUVectorDistribute;
-  std::optional<GPUMMASchedule> schedule =
-      deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes);
+
+  // Infer if lhs or rhs is transposed to help generate better schedule.
+  SmallVector<AffineMap> maps = op.getIndexingMapsArray();
+  bool transposedLhs =
+      kDim !=
+      llvm::cast<AffineDimExpr>(maps[0].getResults().back()).getPosition();
+  bool transposedRhs =
+      nDim !=
+      llvm::cast<AffineDimExpr>(maps[1].getResults().back()).getPosition();
+
+  // First try to find a schedule with an exactly matching intrinsic.
+  std::optional<GPUMMASchedule> schedule = deduceMMASchedule(
+      problem, intrinsics, seeds, maxSharedMemoryBytes, targetSubgroupSize);
   if (!schedule) {
     // Then try again by allowing upcasting accumulator.
     schedule =
         deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
+                          targetSubgroupSize, transposedLhs, transposedRhs,
                           /*canUpcastAcc=*/true);
   }
 
@@ -485,11 +498,13 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
     bool mustBeAligned = false;
     schedule =
         deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
+                          targetSubgroupSize, transposedLhs, transposedRhs,
                           /*canUpcastAcc=*/false, mustBeAligned);
     if (!schedule) {
       // Then try again by allowing upcasting accumulator.
       schedule =
           deduceMMASchedule(problem, intrinsics, seeds, maxSharedMemoryBytes,
+                            targetSubgroupSize, transposedLhs, transposedRhs,
                             /*canUpcastAcc=*/true, mustBeAligned);
     }
   }
@@ -562,6 +577,10 @@ static LogicalResult
 setVectorDistributionConfig(IREE::GPU::TargetAttr target,
                             mlir::FunctionOpInterface entryPoint,
                             Operation *computeOp) {
+  // We haven't properly plumbed through MMA op layouts and conversions for CUDA
+  // to target NVIDIA GPUs. So disable the vector distribution pass for it.
+  if (!isROCmBackend(target))
+    return failure();
 
   if (!clGPUEnableVectorDistribution) {
     LDBG("Vector Distribution not enabled, skipping...");
@@ -1174,15 +1193,6 @@ static bool isMatvecLike(linalg::LinalgOp linalgOp) {
 // Warp Reduction Pipeline Configuration
 //====---------------------------------------------------------------------===//
 
-bool isROCmBackend(mlir::FunctionOpInterface entryPoint) {
-  if (auto targetAttr = IREE::HAL::ExecutableTargetAttr::lookup(entryPoint)) {
-    if (auto backend = targetAttr.getBackend()) {
-      return backend.getValue() == "rocm";
-    }
-  }
-  return false;
-}
-
 /// Set the configuration for reductions that can be mapped to warp reductions.
 static LogicalResult
 setWarpReductionConfig(IREE::GPU::TargetAttr target,
@@ -1353,8 +1363,8 @@ setWarpReductionConfig(IREE::GPU::TargetAttr target,
   //
   // TODO: This is enabled for matvec on ROCm for now. We should
   // validate this strategy and extend to more linalg generics and to CUDA.
-  if (isROCmBackend(entryPoint) &&
-      llvm::none_of(bounds, ShapedType::isDynamic) && isMatvecLike(op)) {
+  if (isROCmBackend(target) && llvm::none_of(bounds, ShapedType::isDynamic) &&
+      isMatvecLike(op)) {
     int64_t lastParallelBound = bounds[parallelDims.back()];
     int64_t numParallelReductions = 1;
     const int64_t maxParallelFactor = groupSize / 4;

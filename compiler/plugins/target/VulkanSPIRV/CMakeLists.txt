@@ -33,11 +33,10 @@ iree_cc_library(
     MLIRSupport
     iree::compiler::Codegen::Common
     iree::compiler::Codegen::Dialect::Codegen::IR::IREECodegenDialect
+    iree::compiler::Codegen::Dialect::GPU::TargetUtils::KnownTargets
     iree::compiler::Codegen::SPIRV
     iree::compiler::Codegen::Utils
     iree::compiler::Dialect::HAL::Target
-    iree::compiler::Dialect::Vulkan::IR
-    iree::compiler::Dialect::Vulkan::Utils
     iree::compiler::PluginAPI
     iree::compiler::Utils
     iree::schemas::spirv_executable_def_c_fbs

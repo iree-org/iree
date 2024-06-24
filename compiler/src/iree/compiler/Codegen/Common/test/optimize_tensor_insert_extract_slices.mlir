@@ -19,7 +19,7 @@ func.func @fold_extract_slice_consumer_into_xfer_write(%arg0: vector<1x64x128xf1
 
 // -----
 
-// Test the case where we write out of bounds because large index 
+// Test the case where we write out of bounds because large index
 func.func @fold_extract_slice_consumer_into_xfer_write_2(%arg0: vector<1x64x128xf16>, %arg1: index) -> tensor<1x?x128xf16> {
   %c0 = arith.constant 0 : index
   %c127 = arith.constant 127 : index

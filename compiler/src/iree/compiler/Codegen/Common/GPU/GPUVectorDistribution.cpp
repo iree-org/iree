@@ -28,6 +28,9 @@ using VectorValue = TypedValue<VectorType>;
 constexpr StringLiteral kVectorLayoutFetcherStorageAttrName =
     "__vector_layout_fetcher_storage";
 
+constexpr StringLiteral kVectorLayoutRedistributeAttrName =
+    "__vector_layout_redistribute";
+
 static void setOpSignature(Operation *op, VectorLayoutAnalysis &analysis) {
   SmallVector<Attribute> operands;
   SmallVector<Attribute> results;
@@ -152,8 +155,20 @@ DistributionPattern::getOpSignature(Operation *op) const {
   return ::mlir::iree_compiler::getOpSignature(op);
 }
 
+void DistributionPattern::setSignatureForRedistribution(
+    PatternRewriter &rewriter, Operation *op, Attribute inputLayoutsAttr,
+    Attribute outputLayoutsAttr) const {
+  Attribute signature[] = {inputLayoutsAttr, outputLayoutsAttr};
+  auto unitAttr = UnitAttr::get(rewriter.getContext());
+  rewriter.modifyOpInPlace(op, [&]() {
+    op->setAttr(kVectorLayoutFetcherStorageAttrName,
+                ArrayAttr::get(rewriter.getContext(), signature));
+    op->setAttr(kVectorLayoutRedistributeAttrName, unitAttr);
+  });
+}
+
 static void
-debugPrintUniqueOperationNames(SmallVectorImpl<Operation *> &worklist) {
+debugPrintUniqueOperationNames(const std::deque<Operation *> &worklist) {
   DenseSet<StringRef> uniqueNames;
   for (Operation *op : worklist) {
     uniqueNames.insert(op->getName().getStringRef());
@@ -170,16 +185,38 @@ struct VectorDistributionRewriter : PatternRewriter {
   VectorDistributionRewriter(MLIRContext *ctx) : PatternRewriter(ctx) {}
 };
 
+/// Custom listener to store emitted ops that needs to be distributed.
+struct VectorDistributionListener : public RewriterBase::Listener {
+  bool hasOpsToBeDistributed() { return !toBeDistributed.empty(); }
+
+  void clearOpsToBeDistributed() { return toBeDistributed.clear(); }
+
+  const std::deque<Operation *> &getOpsToBeDistributed() const {
+    return toBeDistributed;
+  }
+
+  void notifyOperationModified(Operation *op) override {
+    if (op->hasAttr(kVectorLayoutRedistributeAttrName) &&
+        op->hasAttrOfType<ArrayAttr>(kVectorLayoutFetcherStorageAttrName)) {
+      toBeDistributed.push_back(op);
+    }
+  }
+
+private:
+  std::deque<Operation *> toBeDistributed;
+};
+
 static void applyVectorDistribution(Operation *root,
                                     const FrozenRewritePatternSet &patterns) {
 
-  SmallVector<Operation *> worklist;
-
   VectorDistributionRewriter rewriter(root->getContext());
+  VectorDistributionListener listener;
+  rewriter.setListener(&listener);
   PatternApplicator applicator(patterns);
   applicator.applyDefaultCostModel();
 
   // Collect all the operations to be distributed.
+  std::deque<Operation *> worklist;
   LLVM_DEBUG(llvm::dbgs() << "Collecting operations to be distributed\n");
   root->walk([&](Operation *op) {
     if (hasOpSignature(op)) {
@@ -192,14 +229,34 @@ static void applyVectorDistribution(Operation *root,
   // Note that the pattern application here never runs on a newly created
   // operation. It always runs on an existing operation. This ensures that no
   // invalidated state of the analysis is ever used.
-  for (Operation *op : worklist) {
+  while (!worklist.empty()) {
+    Operation *op = worklist.front();
+    worklist.pop_front();
+    if (op == nullptr)
+      continue;
+
     LLVM_DEBUG(llvm::dbgs() << "Distributing: ");
     LLVM_DEBUG(op->print(llvm::dbgs(), OpPrintingFlags().skipRegions()));
     LLVM_DEBUG(llvm::dbgs() << "\n");
+
     if (failed(applicator.matchAndRewrite(op, rewriter))) {
       LLVM_DEBUG(llvm::dbgs().indent(2)
                  << ": Failed to distribute operation:\n");
       continue;
+    }
+
+    // Move recently emitted operations that needs to be distributed
+    // from the local/rewriter worklist into the "global" worklist.
+    if (listener.hasOpsToBeDistributed()) {
+      auto opstoBeDistributed = listener.getOpsToBeDistributed();
+
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Recently emitted operations to be distributed:\n");
+      LLVM_DEBUG(debugPrintUniqueOperationNames(opstoBeDistributed));
+
+      worklist.insert(worklist.end(), opstoBeDistributed.begin(),
+                      opstoBeDistributed.end());
+      listener.clearOpsToBeDistributed();
     }
 
     LLVM_DEBUG(llvm::dbgs().indent(2)

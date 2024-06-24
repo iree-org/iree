@@ -30,6 +30,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     "--iree-opt-data-tiling=false"
     "--iree-llvmcpu-enable-scalable-vectorization"
+    "--iree-llvmcpu-target-triple=aarch64-unknown-unknown"
     "--iree-preprocessing-pass-pipeline=builtin.module\(util.func\(iree-preprocessing-transpose-matmul-pass{input=lhs}\)\)"
     "--iree-llvmcpu-vector-pproc-strategy=peel"
   LABELS
@@ -58,6 +59,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     "--iree-opt-data-tiling=false"
     "--iree-llvmcpu-enable-scalable-vectorization"
+    "--iree-llvmcpu-target-triple=aarch64-unknown-unknown"
     "--iree-preprocessing-pass-pipeline=builtin.module\(util.func\(iree-preprocessing-transpose-matmul-pass{input=lhs}\)\)"
   LABELS
     "requires-arm-sme"
@@ -85,6 +87,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     "--iree-opt-data-tiling=false"
     "--iree-llvmcpu-enable-scalable-vectorization"
+    "--iree-llvmcpu-target-triple=aarch64-unknown-unknown"
     "--iree-llvmcpu-vector-pproc-strategy=peel"
   LABELS
     "requires-arm-sme"
@@ -112,6 +115,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     "--iree-opt-data-tiling=false"
     "--iree-llvmcpu-enable-scalable-vectorization"
+    "--iree-llvmcpu-target-triple=aarch64-unknown-unknown"
   LABELS
     "requires-arm-sme"
   TARGET_CPU_FEATURES_VARIANTS
@@ -138,6 +142,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     "--iree-opt-data-tiling=false"
     "--iree-llvmcpu-enable-scalable-vectorization"
+    "--iree-llvmcpu-target-triple=aarch64-unknown-unknown"
     "--iree-preprocessing-pass-pipeline=builtin.module\(util.func\(iree-preprocessing-transpose-matmul-pass{input=lhs}\)\)"
     "--iree-llvmcpu-vector-pproc-strategy=peel"
   LABELS
@@ -166,6 +171,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     "--iree-opt-data-tiling=false"
     "--iree-llvmcpu-enable-scalable-vectorization"
+    "--iree-llvmcpu-target-triple=aarch64-unknown-unknown"
     "--iree-preprocessing-pass-pipeline=builtin.module\(util.func\(iree-preprocessing-transpose-matmul-pass{input=lhs}\)\)"
   LABELS
     "requires-arm-sme"
@@ -193,6 +199,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     "--iree-opt-data-tiling=false"
     "--iree-llvmcpu-enable-scalable-vectorization"
+    "--iree-llvmcpu-target-triple=aarch64-unknown-unknown"
     "--iree-llvmcpu-vector-pproc-strategy=peel"
   LABELS
     "requires-arm-sme"
@@ -220,6 +227,7 @@ iree_generated_e2e_runner_test(
   COMPILER_FLAGS
     "--iree-opt-data-tiling=false"
     "--iree-llvmcpu-enable-scalable-vectorization"
+    "--iree-llvmcpu-target-triple=aarch64-unknown-unknown"
   LABELS
     "requires-arm-sme"
   TARGET_CPU_FEATURES_VARIANTS
