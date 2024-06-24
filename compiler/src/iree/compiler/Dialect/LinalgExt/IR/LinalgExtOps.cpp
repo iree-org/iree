@@ -6,7 +6,6 @@
 
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 
-#include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtInterfaces.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/IndexingUtils.h"
 #include "iree/compiler/Dialect/LinalgExt/Utils/Utils.h"
@@ -14,14 +13,12 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TypeSwitch.h"
+#include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Affine/Utils.h"
 #include "mlir/Dialect/Arith/Utils/Utils.h"
-#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
-#include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
-#include "mlir/Dialect/SCF/IR/SCF.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/Dialect/Utils/StructuredOpsUtils.h"
 #include "mlir/IR/AffineExpr.h"
@@ -33,14 +30,12 @@
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/OperationSupport.h"
-#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/IR/Value.h"
 #include "mlir/IR/ValueRange.h"
 #include "mlir/Interfaces/InferTypeOpInterface.h"
 #include "mlir/Support/LLVM.h"
 #include "mlir/Support/LogicalResult.h"
-#include "mlir/Support/MathExtras.h"
 
 #include <cstdint>
 #include <optional>
@@ -257,7 +252,8 @@ ScatterOp::reifyResultShapes(OpBuilder &b,
 SmallVector<AffineMap> ScatterOp::getIndexingMapsForOperands() {
   Builder builder(getContext());
   return {builder.getMultiDimIdentityMap(getUpdateType().getRank()),
-          builder.getMultiDimIdentityMap(getIndicesType().getRank())};
+          builder.getMultiDimIdentityMap(getIndicesType().getRank()),
+          /*output=*/AffineMap(nullptr)};
 }
 
 SmallVector<AffineMap> ScatterOp::getIndexingMapsForResults() {
@@ -499,7 +495,8 @@ ReverseOp::reifyResultShapes(OpBuilder &b,
 
 SmallVector<AffineMap> ReverseOp::getIndexingMapsForOperands() {
   Builder builder(getContext());
-  return {builder.getMultiDimIdentityMap(getOperandRank())};
+  return {builder.getMultiDimIdentityMap(getOperandRank()),
+          /*output=*/AffineMap(nullptr)};
 }
 
 SmallVector<AffineMap> ReverseOp::getIndexingMapsForResults() {
@@ -838,7 +835,8 @@ static SmallVector<int64_t> getPackOpResultTypeShape(
       resultShape[tiledDim] = ShapedType::kDynamic;
       continue;
     }
-    resultShape[tiledDim] = ceilDiv(resultShape[tiledDim], innerTileSizes[idx]);
+    resultShape[tiledDim] =
+        llvm::divideCeil(resultShape[tiledDim], innerTileSizes[idx]);
   }
 
   // Swap tile loops if outer_dims_perm is available.

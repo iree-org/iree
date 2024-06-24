@@ -25,7 +25,7 @@ def generate_rules(
         module_path = (
             iree_artifacts.get_module_dir_path(gen_config)
             / iree_artifacts.MODULE_FILENAME
-        )
+        ).as_posix()
         all_module_path_map[
             (gen_config.imported_model.composite_id, gen_config.compile_config.id)
         ] = module_path

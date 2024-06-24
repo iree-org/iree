@@ -8,6 +8,7 @@
 
 #include <memory>
 
+#include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/LinalgExt/Transforms/Passes.h"
 #include "iree/compiler/Dialect/Util/Transforms/Passes.h"
 #include "iree/compiler/Utils/PassUtils.h"
@@ -187,6 +188,65 @@ void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
       .addPass(mlir::createCSEPass);
 }
 
+// Pipeline to first create `flow.dispatch.region` ops and then lower to
+// `flow.dispatch.workgroup` ops.
+static void addDispatchRegionCreationPasses(OpPassManager &passManager) {
+  FunctionLikeNest(passManager)
+      // Only want use the transform dialect for some dispatch regions and let
+      // the FormDispatchRegions handle the rest. This only moves the root
+      // compute op into the dispatch region, so that we can run additional
+      // transformations afterwards with a simple region and without bothering
+      // producers.
+      .addPredicatedPass(
+          !clDispatchTransformFileName.empty(),
+          [&]() {
+            DispatchWithTransformDialectPassOptions options;
+            options.transformSpecPath = clDispatchTransformFileName;
+            return createDispatchWithTransformDialectPass(options);
+          })
+      // Create dispatches for scalar operations as roots
+      .addPass(IREE::Flow::createFormScalarDispatchesPass)
+      // Create `flow.dispatch.region` centered around a root and fuse with
+      // producers
+      .addPass([&]() {
+        return IREE::Flow::createFormDispatchRegionsPass(
+            FormDispatchRegionsPassOptions{
+                clEnableAggressiveFusion,
+                clEnableFusePaddingIntoLinalgConsumerOps,
+                clEnableFusePaddingIntoLinalgProducerOps});
+      })
+      // Clone all producers into the dispatch region to perpare for being
+      // isolated from above. This enables running additional transformations
+      // afterwards that would need the full dispatch content but don't want to
+      // handle explicit captures as materialized as dispatch workgroup operands
+      // and block arguments.
+      .addPass(IREE::Flow::createCloneProducersIntoDispatchRegionsPass)
+      // Collapse dimensions of linalg Ops.
+      .addPass(IREE::Flow::createCollapseDimensionsPass)
+      // Convert dispatch regions into dispatch workgroups by capturing values
+      // and making the new workgroups isolated from above.
+      .addPass(IREE::Flow::createConvertDispatchRegionsToWorkgroupsPass)
+      // Convert tensor operations to flow.tensor ops.
+      // - Convert extract/insert slice to flow update ops when the tensor op
+      // acts as a contiguous view of the tensor
+      // - Apply tensor -> flow patterns
+      .addPass(IREE::Flow::createConvertTensorToFlowPass)
+      .addPass(mlir::createCanonicalizerPass)
+      /// Creates the workgroup count region where the materialized computation
+      /// is derived as a program slice of the body of the dispatch. This method
+      /// - Computes the `workload` to use for the `workgroupsOp`, which are
+      ///   derived from the values captured by the `workgroupsOp`.
+      /// - Populates the workgroup count region for this with the placeholder
+      ///   op `flow.dispatch.workgroups_count_from_body_slice`. This op is
+      ///   resolved in the backends into the actual workgroup count
+      ///   computation.
+      /// - To correlate back to the captured workload,
+      /// `flow.dispatch.workload.ordinal`
+      ///   to map the captured operand to the position in the workload list.
+      .addPass(IREE::Flow::createMaterializeDefaultWorkgroupCountRegionPass);
+}
+
+// Apply preprocessing and form dispatch regions
 void addDispatchRegionCreationPasses(OpPassManager &passManager,
                                      const TransformOptions &transformOptions) {
   FunctionLikeNest(passManager)
@@ -217,38 +277,9 @@ void addDispatchRegionCreationPasses(OpPassManager &passManager,
       // Normalize the input indexing map to make the input indexing map
       // identity. This helps fusing named linalg op with a generic op with
       // transpose.
-      .addPass(IREE::Flow::createInterchangeTransposeGenericOpsPass)
+      .addPass(IREE::Flow::createInterchangeTransposeGenericOpsPass);
 
-      // Only want use the transform dialect for some dispatch regions and let
-      // the FormDispatchRegions handle the rest. This only moves the root
-      // compute op into the dispatch region, so that we can run additional
-      // transformations afterwards with a simple region and without bothering
-      // producers.
-      .addPredicatedPass(
-          !clDispatchTransformFileName.empty(),
-          [&]() {
-            DispatchWithTransformDialectPassOptions options;
-            options.transformSpecPath = clDispatchTransformFileName;
-            return createDispatchWithTransformDialectPass(options);
-          })
-      .addPass(IREE::Flow::createFormScalarDispatchesPass)
-      .addPass([&]() {
-        return IREE::Flow::createFormDispatchRegionsPass(
-            FormDispatchRegionsPassOptions{
-                clEnableAggressiveFusion,
-                clEnableFusePaddingIntoLinalgConsumerOps,
-                clEnableFusePaddingIntoLinalgProducerOps});
-      })
-      // Clone all producers into the dispatch region to perpare for being
-      // isolated from above. This enables running additional transformations
-      // afterwards that would need the full dispatch content but don't want to
-      // handle explicit captures as materialized as dispatch workgroup operands
-      // and block arguments.
-      .addPass(IREE::Flow::createCloneProducersIntoDispatchRegionsPass)
-      // Collapse dimensions of linalg Ops.
-      .addPass(IREE::Flow::createCollapseDimensionsPass)
-      // Convert dispatch regions into dispatch workgroups by capturing values.
-      .addPass(IREE::Flow::createFormDispatchWorkgroupsPass);
+  addDispatchRegionCreationPasses(passManager);
 }
 
 void buildFlowTransformPassPipeline(OpPassManager &passManager,
@@ -427,10 +458,13 @@ void registerFlowTransformPassPipeline() {
       "region formation. Used only for testing",
       [](OpPassManager &passManager) {
         addDispatchRegionCreationPreprocessingPasses(passManager);
-        LLVM_DEBUG({
-          llvm::dbgs() << "Dispatch preprocessing pass pipeline : ";
-          passManager.dump();
-        });
+      });
+
+  PassPipelineRegistration<> flowDispatchRegionCreationPipeline(
+      "iree-flow-dispatch-region-creation-pipeline",
+      "Flag used to run passes that form dispatch regions",
+      [](OpPassManager &passManager) {
+        addDispatchRegionCreationPasses(passManager);
       });
 }
 

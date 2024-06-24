@@ -1608,7 +1608,7 @@ class FuncOpConversion : public EmitCConversionPattern<mlir::emitc::FuncOp> {
       signatureConverter.addInputs(arg.index(), convertedType);
     }
 
-    rewriter.applySignatureConversion(&funcOp.getFunctionBody(),
+    rewriter.applySignatureConversion(&funcOp.getFunctionBody().front(),
                                       signatureConverter);
 
     // Creates a new function with the updated signature.

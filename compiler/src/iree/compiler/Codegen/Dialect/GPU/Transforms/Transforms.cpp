@@ -10,6 +10,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUOps.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/MathExtras.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
@@ -26,7 +27,6 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/OpDefinition.h"
 #include "mlir/IR/PatternMatch.h"
-#include "mlir/Support/MathExtras.h"
 
 #define DEBUG_TYPE "iree-codegen-gpu-transforms"
 
@@ -48,7 +48,7 @@ static FailureOr<int64_t> getTripCount(scf::ForallOp loop) {
 
   int64_t tripCount = 1;
   for (auto [lb, ub, step] : llvm::zip_equal(lbs, ubs, steps)) {
-    tripCount *= mlir::ceilDiv((ub - lb), step);
+    tripCount *= llvm::divideCeil((ub - lb), step);
   }
   return tripCount;
 }
@@ -464,6 +464,7 @@ FailureOr<Operation *> distributeMultiMmaOp(RewriterBase &rewriter,
     }
     return llvm::to_vector(llvm::seq(static_cast<int64_t>(0), rank));
   };
+  Value laneId = newForallOp.getInductionVar(0);
 
   // LHS slice offsets.
   int64_t lhsOuterRank = mmaOp.getLhsOuterRank();
@@ -476,9 +477,8 @@ FailureOr<Operation *> distributeMultiMmaOp(RewriterBase &rewriter,
   SmallVector<int64_t> lhsPermutation = getOrInferPermutationOfRank(
       mmaOp.getLhsPermutation(), mmaOp.getLhsInnerShape().size());
   if (failed(mmaOp.getKind().populateOperandOffsetsSizesStrides(
-          rewriter, loc, IREE::GPU::MMAFragment::Lhs,
-          *newForallOp.getSingleInductionVar(), lhsPermutation, lhsOffsets,
-          lhsSizes, lhsStrides))) {
+          rewriter, loc, IREE::GPU::MMAFragment::Lhs, laneId, lhsPermutation,
+          lhsOffsets, lhsSizes, lhsStrides))) {
     return failure();
   }
   // Extract the rank-reduced slice of the lhs based on the expected inner
@@ -497,9 +497,8 @@ FailureOr<Operation *> distributeMultiMmaOp(RewriterBase &rewriter,
   SmallVector<int64_t> rhsPermutation = getOrInferPermutationOfRank(
       mmaOp.getRhsPermutation(), mmaOp.getRhsInnerShape().size());
   if (failed(mmaOp.getKind().populateOperandOffsetsSizesStrides(
-          rewriter, loc, IREE::GPU::MMAFragment::Rhs,
-          *newForallOp.getSingleInductionVar(), rhsPermutation, rhsOffsets,
-          rhsSizes, rhsStrides))) {
+          rewriter, loc, IREE::GPU::MMAFragment::Rhs, laneId, rhsPermutation,
+          rhsOffsets, rhsSizes, rhsStrides))) {
     return failure();
   }
   // Extract the rank-reduced slice of the rhs based on the expected inner
@@ -518,9 +517,8 @@ FailureOr<Operation *> distributeMultiMmaOp(RewriterBase &rewriter,
   SmallVector<int64_t> accPermutation = getOrInferPermutationOfRank(
       mmaOp.getAccPermutation(), mmaOp.getAccInnerShape().size());
   if (failed(mmaOp.getKind().populateOperandOffsetsSizesStrides(
-          rewriter, loc, IREE::GPU::MMAFragment::Acc,
-          *newForallOp.getSingleInductionVar(), accPermutation, accOffsets,
-          accSizes, accStrides))) {
+          rewriter, loc, IREE::GPU::MMAFragment::Acc, laneId, accPermutation,
+          accOffsets, accSizes, accStrides))) {
     return failure();
   }
   // Extract the rank-reduced slice of the accumulator based on the expected
@@ -774,6 +772,54 @@ private:
 void populateIREEGPUVectorUnrollPatterns(
     RewritePatternSet &patterns, const vector::UnrollVectorOptions &options) {
   patterns.add<UnrollMultiMmaPattern>(patterns.getContext(), options);
+}
+
+//===---------------------------------------------------------------------===//
+// Resolving lane mapped forall ops
+//===---------------------------------------------------------------------===//
+
+static bool isLaneMappableForall(scf::ForallOp forallOp) {
+  if (forallOp.getNumResults() > 0)
+    return false;
+  if (forallOp.getRank() != 1)
+    return false;
+  if (!forallOp.getMapping().has_value())
+    return false;
+  Attribute mapping = *forallOp.getMapping()->getValue().begin();
+  if (mapping != IREE::GPU::LaneIdAttr::get(forallOp.getContext(), 0)) {
+    return false;
+  }
+  return true;
+}
+
+static void rewriteForallToLanes(RewriterBase &rewriter, scf::ForallOp forallOp,
+                                 bool insertBarrier) {
+  Location loc = forallOp->getLoc();
+  assert(isLaneMappableForall(forallOp) && "mapping non-lane forall op");
+
+  Value laneId = rewriter.create<gpu::LaneIdOp>(loc, /*upperBound=*/nullptr);
+  rewriter.eraseOp(forallOp.getTerminator());
+  rewriter.setInsertionPoint(forallOp);
+  rewriter.inlineBlockBefore(forallOp.getBody(), forallOp, {laneId});
+  if (insertBarrier) {
+    rewriter.create<gpu::BarrierOp>(loc);
+  }
+  rewriter.eraseOp(forallOp);
+}
+
+void mapLaneForalls(RewriterBase &rewriter, Operation *funcOp,
+                    bool insertBarrier) {
+  SmallVector<scf::ForallOp> foralls;
+  OpBuilder::InsertionGuard g(rewriter);
+  funcOp->walk([&](scf::ForallOp forallOp) {
+    if (isLaneMappableForall(forallOp)) {
+      foralls.push_back(forallOp);
+    }
+  });
+  for (auto forall : foralls) {
+    rewriter.setInsertionPoint(forall);
+    rewriteForallToLanes(rewriter, forall, insertBarrier);
+  }
 }
 
 //===---------------------------------------------------------------------===//

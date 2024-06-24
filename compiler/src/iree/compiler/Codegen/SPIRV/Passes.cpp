@@ -631,6 +631,8 @@ static void buildSPIRVCodegenConfigurationPassPipelineImpl(
 
 void buildSPIRVCodegenConfigurationPassPipeline(
     OpPassManager &variantPassManager) {
+  // TODO: move the following pass to be immediately before ConvertToSPIRVPass.
+  variantPassManager.addPass(createSPIRVConvertGPUTargetPass());
   OpPassManager &modulePassManager = variantPassManager.nest<ModuleOp>();
   buildSPIRVCodegenConfigurationPassPipelineImpl(modulePassManager);
 }

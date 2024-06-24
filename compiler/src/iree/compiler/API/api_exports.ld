@@ -119,6 +119,7 @@ VER_0 {
     mlirAffineMulExprGet;
     mlirAffineSymbolExprGet;
     mlirAffineSymbolExprGetPosition;
+    mlirApplyPatternsAndFoldGreedily;
     mlirArrayAttrGet;
     mlirArrayAttrGetElement;
     mlirArrayAttrGetNumElements;
@@ -151,6 +152,7 @@ VER_0 {
     mlirAttributeIsAElements;
     mlirAttributeIsAFlatSymbolRef;
     mlirAttributeIsAFloat;
+    mlirAttributeIsAGPUObjectAttr;
     mlirAttributeIsAInteger;
     mlirAttributeIsAIntegerSet;
     mlirAttributeIsALocation;
@@ -174,6 +176,7 @@ VER_0 {
     mlirBlockDestroy;
     mlirBlockDetach;
     mlirBlockEqual;
+    mlirBlockEraseArgument;
     mlirBlockGetArgument;
     mlirBlockGetFirstOperation;
     mlirBlockGetNextInRegion;
@@ -342,12 +345,20 @@ VER_0 {
     mlirFloatAttrGetValueDouble;
     mlirFloatTF32TypeGetTypeID;
     mlirFloatTypeGetWidth;
+    mlirFreezeRewritePattern;
+    mlirFrozenRewritePatternSetDestroy;
     mlirFunctionTypeGet;
     mlirFunctionTypeGetInput;
     mlirFunctionTypeGetNumInputs;
     mlirFunctionTypeGetNumResults;
     mlirFunctionTypeGetResult;
     mlirFunctionTypeGetTypeID;
+    mlirGPUObjectAttrGet;
+    mlirGPUObjectAttrGetFormat;
+    mlirGPUObjectAttrGetObject;
+    mlirGPUObjectAttrGetProperties;
+    mlirGPUObjectAttrGetTarget;
+    mlirGPUObjectAttrHasProperties;
     mlirGetDialectHandle__iree_input__;
     mlirGetDialectHandle__transform__;
     mlirIREELinalgTransformRegisterPasses;
@@ -392,6 +403,7 @@ VER_0 {
     mlirIntegerTypeIsUnsigned;
     mlirIntegerTypeSignedGet;
     mlirIntegerTypeUnsignedGet;
+    mlirIsCurrentDebugType;
     mlirIsGlobalDebugEnabled;
     mlirLinalgFillBuiltinNamedOpRegion;
     mlirLlvmThreadPoolCreate;
@@ -415,6 +427,7 @@ VER_0 {
     mlirMemRefTypeGetMemorySpace;
     mlirMemRefTypeGetStridesAndOffset;
     mlirMemRefTypeGetTypeID;
+    mlirMergeSymbolsIntoFromClone;
     mlirModuleCreateEmpty;
     mlirModuleCreateParse;
     mlirModuleDestroy;
@@ -509,6 +522,8 @@ VER_0 {
     mlirOperationWriteBytecodeWithConfig;
     mlirPDLAttributeTypeGet;
     mlirPDLOperationTypeGet;
+    mlirPDLPatternModuleDestroy;
+    mlirPDLPatternModuleFromModule;
     mlirPDLRangeTypeGet;
     mlirPDLRangeTypeGetElementType;
     mlirPDLTypeTypeGet;
@@ -540,6 +555,9 @@ VER_0 {
     mlirRegionTakeBody;
     mlirRegisterGPUPasses;
     mlirRegisterLinalgPasses;
+    mlirRewritePatternSetFromPDLPatternModule;
+    mlirSetGlobalDebugType;
+    mlirSetGlobalDebugTypes;
     mlirShapedTypeGetDimSize;
     mlirShapedTypeGetDynamicSize;
     mlirShapedTypeGetDynamicStrideOrOffset;

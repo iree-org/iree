@@ -434,6 +434,12 @@ def PolynomialApproximationPass :
       "mlir::iree_compiler::createPolynomialApproximationPass()";
 }
 
+def PropagateReshapesByExpansionPass :
+    Pass<"iree-codegen-propagate-reshapes-by-expansion", ""> {
+  let summary = "Propagates reshaping operations by expansion.";
+  let constructor = "mlir::iree_compiler::createPropagateReshapesByExpansionPass()";
+}
+
 def RematerializeParallelOps :
     InterfacePass<"iree-codegen-rematerialize-parallel-ops", "mlir::FunctionOpInterface"> {
   let summary = "Pass to rematerialize and merge parallel ops into consumers.";

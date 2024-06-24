@@ -18,7 +18,9 @@ iree_lit_test_suite(
     name = "lit",
     srcs = enforce_glob(
         [
+            "distribute_mma_to_lanes.mlir",
             "fuse_and_hoist_forall.mlir",
+            "pack_to_intrinsics.mlir",
         ],
         include = ["*.mlir"],
     ),
