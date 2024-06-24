@@ -1586,6 +1586,9 @@ LogicalResult Im2colOp::verify() {
   if (getNumDpsInits() != 1) {
     return op->emitOpError("expected one output operand");
   }
+
+  // TODO(Max191): Support cases with more than 1 m or k dimension, and remove
+  // the check for a single m_offset and k_offset.
   if (getMixedMOffset().size() != 1) {
     return op->emitOpError("expected one m_offset");
   }
