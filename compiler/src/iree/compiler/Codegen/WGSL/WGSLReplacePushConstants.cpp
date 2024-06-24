@@ -53,9 +53,9 @@ static Value convertOpTypeFromI32(IREE::HAL::InterfaceConstantLoadOp loadOp,
   // AnyFloat
   Value resizedValue = extractElementOp.getResult();
   if (sourceBitWidth > destBitWidth) {
-    return builder.create<arith::TruncFOp>(loc, opType, extractElementOp);
+    return builder.create<arith::TruncFOp>(loc, opType, resizedValue);
   } else if (sourceBitWidth < destBitWidth) {
-    return builder.create<arith::ExtFOp>(loc, opType, extractElementOp);
+    return builder.create<arith::ExtFOp>(loc, opType, resizedValue);
   }
   return builder.create<arith::BitcastOp>(loc, opType, resizedValue);
 }

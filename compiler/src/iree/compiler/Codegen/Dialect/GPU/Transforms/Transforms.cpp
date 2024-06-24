@@ -797,7 +797,7 @@ static void rewriteForallToLanes(RewriterBase &rewriter, scf::ForallOp forallOp,
   Location loc = forallOp->getLoc();
   assert(isLaneMappableForall(forallOp) && "mapping non-lane forall op");
 
-  Value laneId = rewriter.create<gpu::LaneIdOp>(loc);
+  Value laneId = rewriter.create<gpu::LaneIdOp>(loc, /*upperBound=*/nullptr);
   rewriter.eraseOp(forallOp.getTerminator());
   rewriter.setInsertionPoint(forallOp);
   rewriter.inlineBlockBefore(forallOp.getBody(), forallOp, {laneId});
