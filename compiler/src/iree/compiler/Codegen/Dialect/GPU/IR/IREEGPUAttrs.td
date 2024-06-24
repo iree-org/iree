@@ -362,14 +362,44 @@ def IREEGPU_TargetAttr : AttrDef<IREEGPU_Dialect, "Target"> {
   let assemblyFormat = "`<` struct(params) `>`";
 
   let extraClassDeclaration = [{
-    int getPreferredSubgroupSize() const {
-      return getWgp().getSubgroupSizeChoices().asArrayRef().front();
+    // Subgroup size related APIs
+
+    int getMinSubgroupSize() const {
+      return *llvm::min_element(getWgp().getSubgroupSizeChoices().asArrayRef());
     }
+    int getMaxSubgroupSize() const {
+      return *llvm::max_element(getWgp().getSubgroupSizeChoices().asArrayRef());
+    }
+    // Returns the preferred subgroup size. If the target supports multiple
+    // subgroup sizes, pickLargest controls whether to return the largest one.
+    //
+    // AMD RDNA GPUs supports multiple subgroup sizes and the preferred one
+    // differ given the API--HIP prefers 32 while Vulkan prefers 64.
+    // TODO: We should be able to force Vulkan side to use 32 consistently
+    // too with subgroup size control; it might have perf implications though.
+    int getPreferredSubgroupSize(bool pickLargest=false) const {
+      if (pickLargest) return getMaxSubgroupSize();
+      return getMinSubgroupSize();
+    }
+
+    // Hardware feature related APIs
 
     bool supportsSubgroupShuffle() const {
       return bitEnumContainsAll(getWgp().getSubgroup().getValue(),
                                 SubgroupOps::Shuffle);
     }
+
+    // Vendor querying APIs
+
+    bool isAMD() const {
+      return getArch().starts_with("gfx") || getArch().starts_with("rdna");
+    }
+    bool isApple() const { return getArch().starts_with("apple"); }
+    bool isARM() const { return getArch().starts_with("valhall"); }
+    bool isNVIDIA() const { return getArch().starts_with("sm_"); }
+    bool isQualcomm() const { return getArch().starts_with("adreno"); }
+
+    // CUDA specific querying APIs
 
     std::optional<int> getCUDAComputeCapability() const;
     // Returns true if this target supports TensoreCore MMA ops with TF32

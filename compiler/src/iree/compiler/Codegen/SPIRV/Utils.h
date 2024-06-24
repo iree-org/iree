@@ -17,7 +17,6 @@
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/SCF/Transforms/TileUsingInterface.h"
-#include "mlir/Dialect/SPIRV/IR/SPIRVAttributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinAttributes.h"
 
@@ -32,16 +31,8 @@ const char *getSPIRVDistributeAttrName();
 /// Given an operation, returns the HAL target config attribute.
 DictionaryAttr getTargetConfigAttr(Operation *op);
 
-/// Given an operation, returns the `spirv.target_env` attribute.
-spirv::TargetEnvAttr getSPIRVTargetEnvAttr(Operation *op);
-
 /// Given an operation, returns the `hal.bindings.indirect` attribute.
 UnitAttr getIndirectBindingsAttr(Operation *op);
-
-/// Given a FuncOp, returns the subgroup size to use for CodeGen, by first
-/// querying the hal.executable.export op, and then the SPIR-V target
-/// environment. Returns std::nullopt on failures.
-std::optional<int> getSPIRVSubgroupSize(mlir::FunctionOpInterface funcOp);
 
 /// Returns the tile sizes at the given `tilingLevel` for compute ops in
 /// `funcOp`.

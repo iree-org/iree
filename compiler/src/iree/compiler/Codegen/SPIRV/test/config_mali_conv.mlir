@@ -1,10 +1,9 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-spirv-select-lowering-strategy-pass)' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=valhall1 --pass-pipeline='builtin.module(iree-spirv-select-lowering-strategy-pass)' %s | FileCheck %s
 
 // Conv - large OC - distribute to only one workgroup dimension.
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, #spirv.resource_limits<max_compute_shared_memory_size = 32768, max_compute_workgroup_invocations = 512, max_compute_workgroup_size = [512, 512, 512], subgroup_size = 16>>}>
 module {
-  func.func @conv_112x112x512() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  func.func @conv_112x112x512() {
     %c0 = arith.constant 0 : index
     %c512 = arith.constant 512 : index
     %c112 = arith.constant 112 : index
@@ -33,9 +32,8 @@ module {
 
 // Conv - medium OC/OW/OH - distribute to two workgroup dimensions.
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, #spirv.resource_limits<max_compute_shared_memory_size = 32768, max_compute_workgroup_invocations = 512, max_compute_workgroup_size = [512, 512, 512], subgroup_size = 16>>}>
 module {
-  func.func @conv_112x112x32() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  func.func @conv_112x112x32() {
     %c0 = arith.constant 0 : index
     %c32 = arith.constant 32 : index
     %c112 = arith.constant 112 : index
@@ -64,9 +62,8 @@ module {
 
 // Conv - small OC/OW/OH - distribute to all three workgroup dimensions.
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, #spirv.resource_limits<max_compute_shared_memory_size = 32768, max_compute_workgroup_invocations = 512, max_compute_workgroup_size = [512, 512, 512], subgroup_size = 16>>}>
 module {
-  func.func @conv_16x16x16() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  func.func @conv_16x16x16() {
     %c0 = arith.constant 0 : index
     %c16 = arith.constant 16 : index
     %cst = arith.constant 0.000000e+00 : f32
@@ -94,9 +91,8 @@ module {
 
 // Depthwise conv - small OC/OW/OH - distribute to all three workgroup dimensions.
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, #spirv.resource_limits<max_compute_shared_memory_size = 32768, max_compute_workgroup_invocations = 512, max_compute_workgroup_size = [512, 512, 512], subgroup_size = 16>>}>
 module {
-  func.func @dwconv_28x28x144() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  func.func @dwconv_28x28x144() {
     %c0 = arith.constant 0 : index
     %c144 = arith.constant 144 : index
     %c28 = arith.constant 28 : index
@@ -125,9 +121,8 @@ module {
 
 // Depthwise conv - tiny OC/OW/OH - starving the GPU.
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader], []>, ARM:IntegratedGPU, #spirv.resource_limits<max_compute_shared_memory_size = 32768, max_compute_workgroup_invocations = 512, max_compute_workgroup_size = [512, 512, 512], subgroup_size = 16>>}>
 module {
-  func.func @dwconv_1x2x8() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  func.func @dwconv_1x2x8() {
     %c0 = arith.constant 0 : index
     %c8 = arith.constant 8 : index
     %c2 = arith.constant 2 : index

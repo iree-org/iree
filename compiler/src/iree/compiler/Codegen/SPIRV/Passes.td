@@ -33,9 +33,7 @@ def SPIRVBreakDownLargeVector : InterfacePass<"iree-spirv-breakdown-large-vector
   let constructor = "mlir::iree_compiler::createSPIRVBreakDownLargeVectorPass()";
 }
 
-def SPIRVConvertGPUTarget :
-    Pass<"iree-spirv-convert-gpu-target",
-         "mlir::iree_compiler::IREE::HAL::ExecutableVariantOp"> {
+def SPIRVConvertGPUTarget : Pass<"iree-spirv-convert-gpu-target", "mlir::ModuleOp"> {
   let summary = "Convert #iree_gpu.target into #spirv.target_env";
   let constructor = "mlir::iree_compiler::createSPIRVConvertGPUTargetPass()";
 }

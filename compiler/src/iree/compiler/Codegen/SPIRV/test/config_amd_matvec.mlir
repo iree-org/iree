@@ -1,12 +1,11 @@
-// RUN: iree-opt --split-input-file --pass-pipeline='builtin.module(iree-spirv-select-lowering-strategy-pass)' %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-gpu-test-target=cdna2@vulkan --pass-pipeline='builtin.module(iree-spirv-select-lowering-strategy-pass)' %s | FileCheck %s
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader, GroupNonUniform, GroupNonUniformShuffle], []>, #spirv.resource_limits<max_compute_shared_memory_size = 32768, max_compute_workgroup_invocations = 512, max_compute_workgroup_size = [512, 512, 512], subgroup_size = 64>>}>
 #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
 #map2 = affine_map<(d0, d1, d2) -> (d1, d2)>
 #map3 = affine_map<(d0, d1, d2) -> (d0)>
 module {
-  func.func @i4_dequant_matvec_f32() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  func.func @i4_dequant_matvec_f32() {
     %cst = arith.constant 0.000000e+00 : f32
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<4096x86x128xi4>>
     %1 = hal.interface.binding.subspan set(0) binding(1) type(storage_buffer) : !flow.dispatch.tensor<readonly:tensor<4096x86xf32>>
@@ -48,14 +47,13 @@ module {
 
 // -----
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader, GroupNonUniform, GroupNonUniformShuffle], []>, #spirv.resource_limits<max_compute_shared_memory_size = 32768, max_compute_workgroup_invocations = 1024, max_compute_workgroup_size = [1024, 1024, 1024], subgroup_size = 64>>}>
 #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d1, 0)>
 #map2 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3, d4)>
 #map3 = affine_map<(d0, d1, d2, d3, d4) -> (d2, d3, d4)>
 #map4 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
 module {
-  func.func @i4_dequant_matvec_f32() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  func.func @i4_dequant_matvec_f32() {
     %c32_i64 = arith.constant 32 : i64
     %cst = arith.constant 0.000000e+00 : f32
     %c4294967296_i64 = arith.constant 4294967296 : i64
@@ -99,14 +97,13 @@ module {
 
 // -----
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader, GroupNonUniform, GroupNonUniformShuffle], []>, #spirv.resource_limits<max_compute_shared_memory_size = 32768, max_compute_workgroup_invocations = 1024, max_compute_workgroup_size = [1024, 1024, 1024], subgroup_size = 64>>}>
 #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
 #map3 = affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>
 #map4 = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
 module {
-  func.func @i4_dequant_matvec_f32() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  func.func @i4_dequant_matvec_f32() {
     %c32_i64 = arith.constant 32 : i64
     %cst = arith.constant 0.000000e+00 : f32
     %0 = hal.interface.constant.load[0] : i32
@@ -177,14 +174,13 @@ module {
 
 // -----
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader, Float16, StorageBuffer16BitAccess, GroupNonUniform, GroupNonUniformShuffle], [SPV_KHR_16bit_storage]>, #spirv.resource_limits<max_compute_shared_memory_size = 32768, max_compute_workgroup_invocations = 1024, max_compute_workgroup_size = [1024, 1024, 64]>>}>
 #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d1, 0)>
 #map2 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d3, d4)>
 #map3 = affine_map<(d0, d1, d2, d3, d4) -> (d2, d3, d4)>
 #map4 = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2)>
 module {
-  func.func @i4_dequant_matvec_f16() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  func.func @i4_dequant_matvec_f16() {
     %c0 = arith.constant 0 : index
     %cst = arith.constant 0.000000e+00 : f16
     %0 = hal.interface.binding.subspan set(0) binding(0) type(storage_buffer) alignment(64) offset(%c0) flags(ReadOnly) : !flow.dispatch.tensor<readonly:tensor<4096x86x128xi4>>
@@ -219,7 +215,7 @@ module {
 }
 
 //   CHECK-DAG: #[[$CONFIG:.+]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[1, 1, 1], [0, 0, 0, 2, 128]{{\]}}>
-//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVSubgroupReduce workgroup_size = [32, 1, 1]>
+//   CHECK-DAG: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<SPIRVSubgroupReduce workgroup_size = [64, 1, 1]>
 //       CHECK: func.func @i4_dequant_matvec_f16()
 //  CHECK-SAME:     translation_info = #[[$TRANSLATION]]
 //       CHECK:   linalg.generic
@@ -227,14 +223,13 @@ module {
 
 // -----
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader, GroupNonUniform, GroupNonUniformShuffle], []>, #spirv.resource_limits<max_compute_shared_memory_size = 32768, max_compute_workgroup_invocations = 1024, max_compute_workgroup_size = [1024, 1024, 1024], subgroup_size = 64>>}>
 #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
 #map3 = affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>
 #map4 = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
 module {
-  func.func @i4_dequant_matvec() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  func.func @i4_dequant_matvec() {
     %c32_i64 = arith.constant 32 : i64
     %cst = arith.constant 0.000000e+00 : f32
     %0 = hal.interface.constant.load[0] : i32
@@ -305,14 +300,13 @@ module {
 
 // -----
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader, GroupNonUniform, GroupNonUniformShuffle], []>, #spirv.resource_limits<max_compute_shared_memory_size = 32768, max_compute_workgroup_invocations = 1024, max_compute_workgroup_size = [1024, 1024, 1024], subgroup_size = 64>>}>
 #map = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
 #map2 = affine_map<(d0, d1, d2, d3) -> (d0, d2, d3)>
 #map3 = affine_map<(d0, d1, d2, d3) -> (d1, d2, d3)>
 #map4 = affine_map<(d0, d1, d2, d3) -> (d0, d1)>
 module {
-  func.func @i4_dequant_matvec() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  func.func @i4_dequant_matvec() {
     %c32_i64 = arith.constant 32 : i64
     %cst = arith.constant 0.000000e+00 : f16
     %c0 = arith.constant 0 : index
@@ -377,9 +371,8 @@ module {
 
 // -----
 
-#executable_target_vulkan_spirv_fb = #hal.executable.target<"vulkan-spirv", "vulkan-spirv-fb", {spirv.target_env = #spirv.target_env<#spirv.vce<v1.4, [Shader, GroupNonUniform, GroupNonUniformShuffle], []>, #spirv.resource_limits<max_compute_shared_memory_size = 32768, max_compute_workgroup_invocations = 1024, max_compute_workgroup_size = [1024, 1024, 1024], subgroup_size = 64>>}>
 module {
-  func.func @dynamic_batch_matvec() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
+  func.func @dynamic_batch_matvec() {
     %c32_i64 = arith.constant 32 : i64
     %cst = arith.constant 0.000000e+00 : f16
     %0 = hal.interface.constant.load[0] : i32

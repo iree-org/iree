@@ -6,11 +6,11 @@
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
+#include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUDialect.h"
 #include "iree/compiler/Codegen/SPIRV/KernelConfig.h"
 #include "iree/compiler/Codegen/SPIRV/PassDetail.h"
 #include "iree/compiler/Codegen/SPIRV/Passes.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
-#include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtDialect.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Bufferization/IR/Bufferization.h"
@@ -42,12 +42,12 @@ public:
     // TODO(qedawkins): Once TransformStrategies is deprecated, drop the
     // unnecessary dialect registrations.
     registry
-        .insert<IREE::Codegen::IREECodegenDialect, affine::AffineDialect,
-                gpu::GPUDialect, IREE::HAL::HALDialect, linalg::LinalgDialect,
-                IREE::LinalgExt::IREELinalgExtDialect, memref::MemRefDialect,
-                bufferization::BufferizationDialect, scf::SCFDialect,
-                spirv::SPIRVDialect, transform::TransformDialect,
-                vector::VectorDialect>();
+        .insert<IREE::Codegen::IREECodegenDialect, IREE::GPU::IREEGPUDialect,
+                affine::AffineDialect, gpu::GPUDialect, IREE::HAL::HALDialect,
+                linalg::LinalgDialect, IREE::LinalgExt::IREELinalgExtDialect,
+                memref::MemRefDialect, bufferization::BufferizationDialect,
+                scf::SCFDialect, spirv::SPIRVDialect,
+                transform::TransformDialect, vector::VectorDialect>();
   }
 
   void runOnOperation() override;
