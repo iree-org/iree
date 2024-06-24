@@ -251,7 +251,8 @@ module {
 // Checks scf.for for distribution loops.
 //       CHECK:   scf.for
 //       CHECK:     scf.for
-//   CHECK-NOT:       scf.for
+//       CHECK:       scf.for
+//       CHECK:         scf.for
 //       CHECK:   iree_codegen.ukernel.generic "iree_uk_mmt4d"
 
 // -----
