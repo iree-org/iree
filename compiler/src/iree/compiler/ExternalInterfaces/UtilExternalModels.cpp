@@ -326,6 +326,8 @@ void registerUtilExternalModels(DialectRegistry &registry) {
     IREE::LinalgExt::WinogradOutputTransformOp::attachInterface<
         LinalgOpTiedOpInterface<IREE::LinalgExt::WinogradOutputTransformOp>>(
         *context);
+    IREE::LinalgExt::Im2colOp::attachInterface<
+        LinalgOpTiedOpInterface<IREE::LinalgExt::Im2colOp>>(*context);
     IREE::LinalgExt::AttentionOp::attachInterface<
         LinalgOpTiedOpInterface<IREE::LinalgExt::AttentionOp>>(*context);
   });
