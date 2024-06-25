@@ -253,7 +253,7 @@ void transform_dialect::ApplyBubbleExpandPatternsOp::populatePatterns(
 void transform_dialect::ApplyBubblePackUnpackPatternsOp::populatePatterns(
     RewritePatternSet &patterns) {
   linalg::populateDataLayoutPropagationPatterns(
-      patterns, [](Operation *op) { return true; });
+      patterns, [](Operation *producer, Operation *consumer) { return true; });
 }
 
 void transform_dialect::ApplyFoldReshapeIntoTensorHalInterfacePatternsOp::

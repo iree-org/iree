@@ -97,8 +97,9 @@ void PackToIntrinsicsPass::runOnOperation() {
 
   // Run layout propagation patterns to pull in adjacent un-configured ops.
   RewritePatternSet patterns(context);
-  linalg::ControlPropagationFn control = [](Operation *op) -> bool {
-    return !getLoweringConfig(op);
+  linalg::ControlPropagationFn control = [](Operation *producer,
+                                            Operation *consumer) -> bool {
+    return !getLoweringConfig(producer) || !getLoweringConfig(consumer);
   };
 
   linalg::populateDataLayoutPropagationPatterns(patterns, control);
