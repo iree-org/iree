@@ -517,13 +517,13 @@ getFlagForUserAndOperandTypes(IREE::Encoding::EncodingAttr encoding,
   }
 }
 
-static uint32_t getFlagForRole(IREE::Encoding::EncodingRole role) {
-  switch (role) {
-  case IREE::Encoding::EncodingRole::LHS:
+static uint32_t getFlagForIndex(int64_t operandIndex) {
+  switch (operandIndex) {
+  case IREE::Encoding::MATMUL_LHS:
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_LHS;
-  case IREE::Encoding::EncodingRole::RHS:
+  case IREE::Encoding::MATMUL_RHS:
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RHS;
-  case IREE::Encoding::EncodingRole::RESULT:
+  case IREE::Encoding::MATMUL_RESULT:
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_RESULT;
   default:
     return IREE_UK_FLAG_QUERY_TILE_SIZES_OPERAND_ROLE_NONE;
@@ -559,12 +559,13 @@ matchDAGForUKernel(RewriterBase &rewriter, IREE::Codegen::QueryTileSizesOp op,
   }
   uint32_t flagForUserAndOperandTypes = getFlagForUserAndOperandTypes(
       encoding, encoding.getElementTypes().getValue());
-  uint32_t flagForRole = getFlagForRole(encoding.getRole().getValue());
-  if (!flagForUserAndOperandTypes || !flagForRole) {
+  uint32_t flagForIndex =
+      getFlagForIndex(encoding.getOperandIndex().getValue().getZExtValue());
+  if (!flagForUserAndOperandTypes || !flagForIndex) {
     return rewriter.notifyMatchFailure(op, "unhandled encoding");
   }
   inputValues.push_back(rewriter.create<arith::ConstantIntOp>(
-      loc, flagForUserAndOperandTypes | flagForRole, 32));
+      loc, flagForUserAndOperandTypes | flagForIndex, 32));
   auto fn = getFnNameAndDefAttrs(ukernelName, rewriter, targetAttr);
   auto genericMicroKernelOp = rewriter.create<IREE::Codegen::UKernelGenericOp>(
       loc, resultTypes, fn.name, inputValues, /*outs=*/ValueRange{},

@@ -458,7 +458,7 @@ materializeEncodingForTarget(RankedTensorType tensorType,
                        encoding.getRoundDimsToArray());
 
   // Map the matmul TileMxNxK to an actual tile shape for the tensor at hand,
-  // based on its role in the matmul.
+  // based on its operand index in the matmul.
   auto rank = tensorType.getRank();
   return getEncodingInfoForMatmul(encoding, rank, chosenTileMxNxK);
 }

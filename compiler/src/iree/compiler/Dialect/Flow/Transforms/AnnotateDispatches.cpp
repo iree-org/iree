@@ -387,20 +387,20 @@ static std::string summarizeDispatchRegion(Region &region) {
         auto opName = getOpNameWithoutDialectName(op);
         auto encoding = cast<IREE::Encoding::EncodingAttr>(
             op.getResultType().getEncoding());
-        auto role = stringifyEnum(encoding.getRole().getValue());
+        auto index =
+            IREE::Encoding::stringifyOperandIndex(encoding.getOperandIndex());
         ArrayRef<int64_t> shape = op.getSourceType().getShape();
-        bestSummary =
-            opName + "_" + role.str() + "_" + loopRangesToString(shape);
+        bestSummary = opName + "_" + index + "_" + loopRangesToString(shape);
         ;
       })
       .Case<IREE::Encoding::UnsetEncodingOp>([&](auto op) {
         auto opName = getOpNameWithoutDialectName(op);
         auto encoding = cast<IREE::Encoding::EncodingAttr>(
             op.getSourceType().getEncoding());
-        auto role = stringifyEnum(encoding.getRole().getValue());
+        auto index =
+            IREE::Encoding::stringifyOperandIndex(encoding.getOperandIndex());
         ArrayRef<int64_t> shape = op.getResultType().getShape();
-        bestSummary =
-            opName + "_" + role.str() + "_" + loopRangesToString(shape);
+        bestSummary = opName + "_" + index + "_" + loopRangesToString(shape);
       })
       .Case<IREE::LinalgExt::LinalgExtOp>(
           [&](auto op) { bestSummary = summarizeLinalgExtOp(op); })

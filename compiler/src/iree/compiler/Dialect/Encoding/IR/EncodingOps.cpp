@@ -96,7 +96,7 @@ LogicalResult UnsetEncodingOp::reifyResultShapes(
 // encoding.encoding
 //===----------------------------------------------------------------------===//
 
-EncodingAttr EncodingAttr::get(MLIRContext *ctx, EncodingRole role,
+EncodingAttr EncodingAttr::get(MLIRContext *ctx, int64_t operandIndex,
                                ArrayRef<Type> elemTypes, Type origType,
                                std::optional<int64_t> matmulNarrowM,
                                std::optional<int64_t> matmulNarrowN,
@@ -106,32 +106,31 @@ EncodingAttr EncodingAttr::get(MLIRContext *ctx, EncodingRole role,
   auto optionalToAttr = [&](std::optional<int64_t> x) {
     return x ? b.getIndexAttr(*x) : IntegerAttr();
   };
-  auto roleAttr = EncodingRoleAttr::get(ctx, role);
   auto origTypeAttr = origType ? TypeAttr::get(origType) : TypeAttr();
   auto roundDimsToAttr = roundDimsTo.empty()
                              ? DenseI64ArrayAttr()
                              : b.getDenseI64ArrayAttr(roundDimsTo);
-  return get(ctx, roleAttr, b.getTypeArrayAttr(elemTypes), origTypeAttr,
-             optionalToAttr(matmulNarrowM), optionalToAttr(matmulNarrowN),
-             b.getAffineMapArrayAttr(maps), roundDimsToAttr);
+  return get(ctx, b.getIndexAttr(operandIndex), b.getTypeArrayAttr(elemTypes),
+             origTypeAttr, optionalToAttr(matmulNarrowM),
+             optionalToAttr(matmulNarrowN), b.getAffineMapArrayAttr(maps),
+             roundDimsToAttr);
 }
 
-AffineMap EncodingAttr::getMapForRole() {
-  EncodingRole role = getRole().getValue();
-  switch (role) {
-  case EncodingRole::LHS:
-    return llvm::cast<AffineMapAttr>(getUserIndexingMaps()[0]).getAffineMap();
-  case EncodingRole::RHS:
-    return llvm::cast<AffineMapAttr>(getUserIndexingMaps()[1]).getAffineMap();
-  case EncodingRole::RESULT:
-    return llvm::cast<AffineMapAttr>(getUserIndexingMaps()[2]).getAffineMap();
+AffineMap EncodingAttr::getMapForOperandIndex() {
+  auto index = getOperandIndex().getValue().getZExtValue();
+  switch (index) {
+  case MATMUL_LHS:
+  case MATMUL_RHS:
+  case MATMUL_RESULT:
+    return llvm::cast<AffineMapAttr>(getUserIndexingMaps()[index])
+        .getAffineMap();
   default:
     return AffineMap();
   }
 }
 
-unsigned EncodingAttr::mapDimToRoleIndex(int64_t dimPos) {
-  AffineMap map = getMapForRole();
+unsigned EncodingAttr::mapDimToOperandIndex(int64_t dimPos) {
+  AffineMap map = getMapForOperandIndex();
   auto idx = map.getResultPosition(getAffineDimExpr(dimPos, getContext()));
   assert(idx.has_value());
   return idx.value();
@@ -161,6 +160,21 @@ getEncodingContractionDims(EncodingAttr encoding) {
         return cast<AffineMapAttr>(m).getAffineMap();
       });
   return linalg::inferContractionDims(indexingMaps);
+}
+
+std::string stringifyOperandIndex(IntegerAttr valueAttr) {
+  auto value = valueAttr.getValue().getZExtValue();
+  switch (value) {
+  case MATMUL_LHS:
+    return "LHS";
+  case MATMUL_RHS:
+    return "RHS";
+  case MATMUL_RESULT:
+    return "RESULT";
+  default:
+    assert(false && "invalid index");
+    return "";
+  }
 }
 
 } // namespace mlir::iree_compiler::IREE::Encoding

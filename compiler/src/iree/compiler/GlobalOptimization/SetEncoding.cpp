@@ -9,6 +9,7 @@
 // operations in tiled layouts.
 //===---------------------------------------------------------------------===//
 
+#include "iree/compiler/Codegen/Common/EncodingUtils.h"
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenAttrs.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingDialect.h"
 #include "iree/compiler/Dialect/Encoding/IR/EncodingOps.h"
@@ -44,7 +45,6 @@
 namespace mlir::iree_compiler::GlobalOptimization {
 
 using IREE::Encoding::EncodingAttr;
-using IREE::Encoding::EncodingRole;
 
 //===---------------------------------------------------------------------===//
 // Utility functions
@@ -142,7 +142,7 @@ static MatmulNarrowSizes getMatmulNarrowSizes(ShapedType outType,
 }
 
 static Value padAndSetEncoding(OpBuilder &builder, Location loc, Value source,
-                               EncodingRole role,
+                               int64_t operandIndex,
                                ArrayRef<Type> operandElemTypes,
                                MatmulNarrowSizes narrow,
                                ArrayRef<AffineMap> indexingMaps) {
@@ -150,7 +150,7 @@ static Value padAndSetEncoding(OpBuilder &builder, Location loc, Value source,
   // No need to specify original_type in the encoding poadded to pad(), because
   // the operand there is the `source` tensor, so it will default to reading its
   // original shape.
-  auto encodingForPad = EncodingAttr::get(ctx, role, operandElemTypes,
+  auto encodingForPad = EncodingAttr::get(ctx, operandIndex, operandElemTypes,
                                           /*originalType=*/Type{}, narrow.M,
                                           narrow.N, indexingMaps);
   Value padded = pad(builder, loc, source, encodingForPad);
@@ -163,7 +163,7 @@ static Value padAndSetEncoding(OpBuilder &builder, Location loc, Value source,
   auto encodingForSetEncoding = encodingForPad;
   if (padded.getType() != source.getType()) {
     encodingForSetEncoding = EncodingAttr::get(
-        ctx, role, operandElemTypes,
+        ctx, operandIndex, operandElemTypes,
         /*originalType=*/source.getType(), narrow.M, narrow.N, indexingMaps);
   }
   return setEncoding(builder, loc, padded, encodingForSetEncoding);
@@ -338,23 +338,26 @@ public:
     Value encodedLhs, encodedRhs, encodedOut;
 
     if (!padFactor) {
-      encodedLhs = padAndSetEncoding(rewriter, loc, lhs, EncodingRole::LHS,
-                                     elemTypes, narrowSizes, maps);
-      encodedRhs = padAndSetEncoding(rewriter, loc, rhs, EncodingRole::RHS,
-                                     elemTypes, narrowSizes, maps);
-      encodedOut = padAndSetEncoding(rewriter, loc, out, EncodingRole::RESULT,
-                                     elemTypes, narrowSizes, maps);
+      encodedLhs =
+          padAndSetEncoding(rewriter, loc, lhs, IREE::Encoding::MATMUL_LHS,
+                            elemTypes, narrowSizes, maps);
+      encodedRhs =
+          padAndSetEncoding(rewriter, loc, rhs, IREE::Encoding::MATMUL_RHS,
+                            elemTypes, narrowSizes, maps);
+      encodedOut =
+          padAndSetEncoding(rewriter, loc, out, IREE::Encoding::MATMUL_RESULT,
+                            elemTypes, narrowSizes, maps);
     } else {
-      auto setEncodingWrapper = [&](Value src, EncodingRole role) -> Value {
+      auto setEncodingWrapper = [&](Value src, int64_t operandIndex) -> Value {
         SmallVector<int64_t> roundDimsTo(linalgOp.getNumLoops(), padFactor);
         auto encoding = EncodingAttr::get(
-            linalgOp.getContext(), role, elemTypes, src.getType(),
+            linalgOp.getContext(), operandIndex, elemTypes, src.getType(),
             narrowSizes.M, narrowSizes.N, maps, roundDimsTo);
         return setEncoding(rewriter, loc, src, encoding);
       };
-      encodedLhs = setEncodingWrapper(lhs, EncodingRole::LHS);
-      encodedRhs = setEncodingWrapper(rhs, EncodingRole::RHS);
-      encodedOut = setEncodingWrapper(out, EncodingRole::RESULT);
+      encodedLhs = setEncodingWrapper(lhs, IREE::Encoding::MATMUL_LHS);
+      encodedRhs = setEncodingWrapper(rhs, IREE::Encoding::MATMUL_RHS);
+      encodedOut = setEncodingWrapper(out, IREE::Encoding::MATMUL_RESULT);
     }
     Value opTiled = clone(rewriter, linalgOp, encodedOut.getType(),
                           ValueRange{encodedLhs, encodedRhs, encodedOut})
