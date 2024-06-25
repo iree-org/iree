@@ -35,7 +35,7 @@ jobs:
           ls -R
       - name: Set up python
         id: set_up_python
-        uses: actions/setup-python@d27e3f3d7c64b4bbf8e4abfb9b63b83e846e0435 # v4.5.0
+        uses: actions/setup-python@v5.1.0
         with:
           python-version: "3.9"
       - name: Install python packages
@@ -128,7 +128,7 @@ jobs:
           fetch-depth: 0
 
       - name: Updating latest-snapshot branch
-        uses: ad-m/github-push-action@40bf560936a8022e68a3c00e7d2abefaf01305a6 # v0.6.0
+        uses: ad-m/github-push-action@v0.8.0
         with:
           github_token: ${{ secrets.WRITE_ACCESS_TOKEN }}
           branch: latest-snapshot

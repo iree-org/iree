@@ -122,7 +122,7 @@ jobs:
         run: ./c/build_tools/python_deploy/install_windows_deps.ps1
       - name: "Configure MSVC (Windows)"
         if: "matrix.build-family == 'windows'"
-        uses: ilammy/msvc-dev-cmd@7315a94840631165970262a99c72cfb48a65d25d # v1.12.0
+        uses: ilammy/msvc-dev-cmd@v1.13.0
 
       ##########################################################################
       # Write version_info.json
@@ -286,7 +286,7 @@ jobs:
             "${MANYLINUX_X86_64_IMAGE}" \
             bash -c 'export PATH=/opt/python/cp39-cp39/bin:$PATH; python ./c/build_tools/github_actions/build_dist.py py-tf-compiler-tools-pkg'
 
-      - uses: actions/upload-artifact@0b7f8abb1508181956e8e162db84b466c27e18ce # v3.1.2
+      - uses: actions/upload-artifact@v4.3.3
         with:
           # We upload all wheels (which includes deps so that subsequent
           # steps can run without further fetching).
