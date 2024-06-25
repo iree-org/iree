@@ -450,7 +450,7 @@ public:
     // `LLVMGPULowerExecutableTargetPass`.
     registry.insert<gpu::GPUDialect, nvgpu::NVGPUDialect,
                     IREE::Codegen::IREECodegenDialect,
-                    transform::TransformDialect>();
+                    transform::TransformDialect, IREE::GPU::IREEGPUDialect>();
     mlir::registerBuiltinDialectTranslation(registry);
     mlir::registerLLVMDialectTranslation(registry);
     mlir::registerNVVMDialectTranslation(registry);

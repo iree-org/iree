@@ -106,7 +106,8 @@ public:
   //     pipeline created by buildTranslationPassPipeline)
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Codegen::IREECodegenDialect, IREE::Flow::FlowDialect,
-                    spirv::SPIRVDialect, gpu::GPUDialect>();
+                    spirv::SPIRVDialect, gpu::GPUDialect,
+                    IREE::GPU::IREEGPUDialect>();
   }
 
   void

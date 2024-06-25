@@ -126,7 +126,7 @@ public:
 
   void getDependentDialects(DialectRegistry &registry) const override {
     registry.insert<IREE::Codegen::IREECodegenDialect, spirv::SPIRVDialect,
-                    gpu::GPUDialect>();
+                    gpu::GPUDialect, IREE::GPU::IREEGPUDialect>();
   }
 
   void
