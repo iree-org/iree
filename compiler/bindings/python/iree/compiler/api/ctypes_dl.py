@@ -186,7 +186,7 @@ def _is_null_terminated(view: memoryview):
 def _is_mlir_bytecode(view: memoryview):
     """Compares the first 4 bytes of the view against the magic number 4d4cef52.
     See https://mlir.llvm.org/docs/BytecodeFormat/#magic-number for more info."""
-    return view[:4].hex() == "4d4cef52"
+    return len(view) >= 4 and view[:4].hex() == "4d4cef52"
 
 
 class Session:
