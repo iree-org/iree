@@ -257,26 +257,15 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
 
   let parameters = (ins
     ArrayRefParameter<"int64_t", "subgroups_per_workgroup">:$subgroupsPerWorkgroup,
-    ArrayRefParameter<"int64_t", "subgroup_order">:$subgroupOrder,
-
     ArrayRefParameter<"int64_t", "batches_per_subgroup">:$batchesPerSubgroup,
-
     ArrayRefParameter<"int64_t", "outers_per_batch">:$outersPerBatch,
-
     ArrayRefParameter<"int64_t", "threads_per_outer">:$threadsPerOuter,
-    ArrayRefParameter<"int64_t", "thread_order">:$threadOrder,
-
     ArrayRefParameter<"int64_t", "elements_per_thread">:$elementsPerThread,
 
-    ArrayRefParameter<"int64_t", "subgroup_basis">:$subgroupBasis,
-    ArrayRefParameter<"bool", "subgroup_active_ids">:$subgroupActiveIds,
-
-    ArrayRefParameter<"int64_t", "thread_basis">:$threadBasis,
-    ArrayRefParameter<"bool", "thread_active_ids">:$threadActiveIds
+    ArrayRefParameter<"int64_t", "subgroup_strides">:$subgroupStrides,
+    ArrayRefParameter<"int64_t", "thread_strides">:$threadStrides
   );
 
-  // By default, identity orderings are elided when parsing/printing.
-  // TODO: Improve custom parsing/printing for sizes/basis elements.
   let assemblyFormat = [{
     `<` `subgroups_per_workgroup` `=` `[` $subgroupsPerWorkgroup `]` `,`
         `batches_per_subgroup`    `=` `[` $batchesPerSubgroup `]` `,`
@@ -284,18 +273,26 @@ def NestedLayoutAttr : IREEVectorExt_Attr<"NestedLayout",
         `threads_per_outer`       `=` `[` $threadsPerOuter `]` `,`
         `elements_per_thread`     `=` `[` $elementsPerThread `]` `,`
 
-        custom<Permutation>("\"subgroup_order\"", ref($subgroupsPerWorkgroup), "true", $subgroupOrder) ``
-        custom<Permutation>("\"thread_order\"", ref($threadsPerOuter), "true", $threadOrder) ``
-
-        custom<Basis>("\"subgroup_basis\"", "\"subgroup_active_ids\"", "true", $subgroupBasis, $subgroupActiveIds) ``
-        custom<Basis>("\"thread_basis\"", "\"thread_active_ids\"", "false", $threadBasis, $threadActiveIds) ``
+        `subgroup_strides`        `=` `[` $subgroupStrides `]` `,`
+        `thread_strides`          `=` `[` $threadStrides `]`
     `>`
   }];
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    AttrBuilder<(ins "ArrayRef<int64_t>":$subgroupsPerWorkgroup,
+                     "ArrayRef<int64_t>":$batchesPerSubgroup,
+                     "ArrayRef<int64_t>":$outersPerBatch,
+                     "ArrayRef<int64_t>":$threadsPerOuter,
+                     "ArrayRef<int64_t>":$elementsPerThread,
+                     "ArrayRef<int64_t>":$subgroupStrides,
+                     "ArrayRef<int64_t>":$threadStrides)>
+  ];
 
   let extraClassDeclaration = [{
     // Returns the subgroup/lane ids delinearized from a single linearized
     // thread ID.
-    SmallVector<Value> computeThreadIds(Value threadId, RewriterBase &rewriter) const;
+    SmallVector<Value> computeThreadIds(Value threadId, int64_t subgroupSize, RewriterBase &rewriter) const;
   }];
 
   let genVerifyDecl = 1;

@@ -296,6 +296,10 @@ private:
     SmallVector<int64_t> threadCounts(transferRank, 1);
     SmallVector<int64_t> elementSizes(transferRank, 1);
 
+    SmallVector<int64_t> subgroupStrides(transferRank, 1);
+    SmallVector<int64_t> threadStrides(transferRank, 1);
+
+    int64_t currStrides = 1;
     for (auto dim : llvm::reverse(order)) {
       int64_t vectorSize = vectorShape[dim];
       // Set the element count for the innermost vector dimension.
@@ -311,27 +315,23 @@ private:
       if (residualThreads <= vectorSize) {
         vectorSize /= residualThreads;
         threadCounts[dim] = residualThreads;
+        threadStrides[dim] = currStrides;
+        currStrides *= residualThreads;
         residualThreads = 1;
       } else {
         residualThreads /= vectorSize;
         threadCounts[dim] = vectorSize;
+        threadStrides[dim] = currStrides;
+        currStrides *= vectorSize;
         vectorSize = 1;
       }
 
       batchSizes[dim] = vectorSize;
     }
 
-    // Note that the layout setting logic here necessarily uses all threads in
-    // the workgroup to perform the read. As a result we can always directly
-    // use the counts as the basis for computing the subgroup/thread indices.
-    SmallVector<int64_t> subgroupBasis = subgroupCounts;
-    SmallVector<int64_t> threadBasis = threadCounts;
-
     auto layout = IREE::VectorExt::NestedLayoutAttr::get(
-        context, subgroupCounts, order, batchSizes, outerSizes, threadCounts,
-        order, elementSizes, subgroupBasis,
-        SmallVector<bool>(subgroupBasis.size(), true), threadBasis,
-        SmallVector<bool>(threadBasis.size(), true));
+        context, subgroupCounts, batchSizes, outerSizes, threadCounts,
+        elementSizes, subgroupStrides, threadStrides);
     if (analysis.setAnchor(transfer.getResult(), layout).failed()) {
       return failure();
     }

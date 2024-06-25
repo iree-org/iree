@@ -420,120 +420,58 @@ int64_t MMAAttr::getSubgroupSize() const {
   return 0;
 }
 
-SmallVector<int64_t> MMAAttr::getADataDuplicate() const {
-  switch (getIntrinsic().getValue()) {
-  case MMAIntrinsic::MFMA_F16_16x16x16_F32:
-  case MMAIntrinsic::MFMA_F16_32x32x8_F32: {
-    break;
-  }
-  case MMAIntrinsic::WMMA_F16_16x16x16_F32:
-  case MMAIntrinsic::WMMA_F16_16x16x16_F16: {
-    return {2, 1};
-  }
-  }
-  // Defaults to no data duplication.
-  return {1, 1};
-}
-
-SmallVector<int64_t> MMAAttr::getBDataDuplicate() const {
-  switch (getIntrinsic().getValue()) {
-  case MMAIntrinsic::MFMA_F16_16x16x16_F32:
-  case MMAIntrinsic::MFMA_F16_32x32x8_F32: {
-    break;
-  }
-  case MMAIntrinsic::WMMA_F16_16x16x16_F32:
-  case MMAIntrinsic::WMMA_F16_16x16x16_F16: {
-    return {1, 2};
-  }
-  }
-  // Defaults to no data duplication.
-  return {1, 1};
-}
-
-SmallVector<int64_t> MMAAttr::getCDataDuplicate() const {
-  // Currently no C-layout need data duplication yet.
-  return {1, 1};
-}
-
-MMAAttr::SingleSubgroupLayout MMAAttr::getASingleSubgroupLayoutCount() const {
+MMAAttr::SingleSubgroupLayout MMAAttr::getASingleSubgroupLayout() const {
   switch (getIntrinsic().getValue()) {
   case MMAIntrinsic::MFMA_F16_16x16x16_F32: {
-    return {/*outer=*/{1, 1}, /*thread=*/{16, 4}, /*element=*/{1, 4}};
+    return {/*outer=*/{1, 1}, /*thread=*/{16, 4}, /*strides=*/{1, 16},
+            /*element=*/{1, 4}};
   }
   case MMAIntrinsic::MFMA_F16_32x32x8_F32: {
-    return {/*outer=*/{1, 1}, /*thread=*/{32, 2}, /*element=*/{1, 4}};
+    return {/*outer=*/{1, 1}, /*thread=*/{32, 2}, /*strides=*/{1, 32},
+            /*element=*/{1, 4}};
   }
   case MMAIntrinsic::WMMA_F16_16x16x16_F32:
   case MMAIntrinsic::WMMA_F16_16x16x16_F16: {
-    return {/*outer=*/{1, 1}, /*thread=*/{16, 1}, /*element=*/{1, 16}};
+    return {/*outer=*/{1, 1}, /*thread=*/{16, 1}, /*strides=*/{1, 16},
+            /*element=*/{1, 16}};
   }
   }
   return {};
 }
 
-MMAAttr::SingleSubgroupLayout MMAAttr::getBSingleSubgroupLayoutCount() const {
+MMAAttr::SingleSubgroupLayout MMAAttr::getBSingleSubgroupLayout() const {
   switch (getIntrinsic().getValue()) {
   case MMAIntrinsic::MFMA_F16_16x16x16_F32: {
-    return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*element=*/{4, 1}};
+    return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*strides=*/{16, 1},
+            /*element=*/{4, 1}};
   }
   case MMAIntrinsic::MFMA_F16_32x32x8_F32: {
-    return {/*outer=*/{1, 1}, /*thread=*/{2, 32}, /*element=*/{4, 1}};
+    return {/*outer=*/{1, 1}, /*thread=*/{2, 32}, /*strides=*/{32, 1},
+            /*element=*/{4, 1}};
   }
   case MMAIntrinsic::WMMA_F16_16x16x16_F32:
   case MMAIntrinsic::WMMA_F16_16x16x16_F16: {
-    return {/*outer=*/{1, 1}, /*thread=*/{1, 16}, /*element=*/{16, 1}};
+    return {/*outer=*/{1, 1}, /*thread=*/{1, 16}, /*strides=*/{16, 1},
+            /*element=*/{16, 1}};
   }
   }
   return {};
 }
 
-MMAAttr::SingleSubgroupLayout MMAAttr::getCSingleSubgroupLayoutCount() const {
+MMAAttr::SingleSubgroupLayout MMAAttr::getCSingleSubgroupLayout() const {
   switch (getIntrinsic().getValue()) {
   case MMAIntrinsic::MFMA_F16_16x16x16_F32: {
-    return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*element=*/{4, 1}};
+    return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*strides=*/{16, 1},
+            /*element=*/{4, 1}};
   }
   case MMAIntrinsic::MFMA_F16_32x32x8_F32: {
-    return {/*outer=*/{4, 1}, /*thread=*/{2, 32}, /*element=*/{4, 1}};
+    return {/*outer=*/{4, 1}, /*thread=*/{2, 32}, /*strides=*/{32, 1},
+            /*element=*/{4, 1}};
   }
   case MMAIntrinsic::WMMA_F16_16x16x16_F32:
   case MMAIntrinsic::WMMA_F16_16x16x16_F16: {
-    return {/*outer=*/{8, 1}, /*thread=*/{2, 16}, /*element=*/{1, 1}};
-  }
-  }
-  return {};
-}
-
-MMAAttr::SingleSubgroupLayout MMAAttr::getASingleSubgroupLayoutOrder() const {
-  switch (getIntrinsic().getValue()) {
-  case MMAIntrinsic::MFMA_F16_16x16x16_F32:
-  case MMAIntrinsic::MFMA_F16_32x32x8_F32:
-  case MMAIntrinsic::WMMA_F16_16x16x16_F32:
-  case MMAIntrinsic::WMMA_F16_16x16x16_F16: {
-    return {/*outer=*/{0, 1}, /*thread=*/{1, 0}, /*element=*/{0, 1}};
-  }
-  }
-  return {};
-}
-
-MMAAttr::SingleSubgroupLayout MMAAttr::getBSingleSubgroupLayoutOrder() const {
-  switch (getIntrinsic().getValue()) {
-  case MMAIntrinsic::MFMA_F16_16x16x16_F32:
-  case MMAIntrinsic::MFMA_F16_32x32x8_F32:
-  case MMAIntrinsic::WMMA_F16_16x16x16_F32:
-  case MMAIntrinsic::WMMA_F16_16x16x16_F16: {
-    return {/*outer=*/{0, 1}, /*thread=*/{0, 1}, /*element=*/{1, 0}};
-  }
-  }
-  return {};
-}
-
-MMAAttr::SingleSubgroupLayout MMAAttr::getCSingleSubgroupLayoutOrder() const {
-  switch (getIntrinsic().getValue()) {
-  case MMAIntrinsic::MFMA_F16_16x16x16_F32:
-  case MMAIntrinsic::MFMA_F16_32x32x8_F32:
-  case MMAIntrinsic::WMMA_F16_16x16x16_F32:
-  case MMAIntrinsic::WMMA_F16_16x16x16_F16: {
-    return {/*outer=*/{0, 1}, /*thread=*/{0, 1}, /*element=*/{1, 0}};
+    return {/*outer=*/{8, 1}, /*thread=*/{2, 16}, /*strides=*/{16, 1},
+            /*element=*/{1, 1}};
   }
   }
   return {};
@@ -572,33 +510,20 @@ FailureOr<Value> MMAAttr::buildMmaOperation(OpBuilder &builder, Location loc,
   return failure();
 }
 
-static SmallVector<int64_t>
-getRankReducedSingleSubgroupShape(const MMAAttr::SingleSubgroupLayout &counts) {
-  SmallVector<int64_t> rankReducedShape;
-  for (auto [outer, thread, element] :
-       llvm::zip_equal(counts.outer, counts.thread, counts.element)) {
-    if (outer != 1) {
-      rankReducedShape.push_back(outer);
-    }
-    rankReducedShape.push_back(thread * element);
-  }
-  return rankReducedShape;
-}
-
-// Generates amdgpu.mfma/wmma operation on the given inputs for this attribute
-// type.
 static LogicalResult populateCanonicalOffsetsSizesAndStrides(
     OpBuilder &builder, Location loc, Value laneId,
-    ArrayRef<int64_t> permutation, MMAAttr::SingleSubgroupLayout counts,
-    MMAAttr::SingleSubgroupLayout orders,
+    ArrayRef<int64_t> permutation, MMAAttr::SingleSubgroupLayout subgroupLayout,
     SmallVector<OpFoldResult> &canonicalOffsets,
     SmallVector<OpFoldResult> &canonicalSizes,
     SmallVector<OpFoldResult> &canonicalStrides) {
   SmallVector<int64_t> rankReducedShape;
   for (auto [outer, thread, element] :
-       llvm::zip_equal(counts.outer, counts.thread, counts.element)) {
+       llvm::zip_equal(subgroupLayout.outer, subgroupLayout.thread,
+                       subgroupLayout.element)) {
     if (outer != 1) {
-      rankReducedShape.push_back(outer);
+      // TODO: Support this case. Might need a reshape since this makes the
+      // slice non-contigious.
+      return failure();
     }
     rankReducedShape.push_back(thread * element);
   }
@@ -611,26 +536,29 @@ static LogicalResult populateCanonicalOffsetsSizesAndStrides(
   OpFoldResult one = builder.getIndexAttr(1);
   canonicalStrides.append(rankReducedShape.size(), one);
 
-  SmallVector<int64_t> threadDimSizes =
-      applyPermutation(counts.thread, orders.thread);
-  SmallVector<Value> basis;
-  for (int64_t dimSize : threadDimSizes) {
-    basis.push_back(builder.create<arith::ConstantIndexOp>(loc, dimSize));
+  // vtid: virtual thread id
+  // tid: lane id
+  // vtid = (tid floordiv stride_i) mod size_i.
+  SmallVector<OpFoldResult> vtids;
+  for (auto [dimSize, dimStride] :
+       llvm::zip_equal(subgroupLayout.thread, subgroupLayout.tstrides)) {
+    if (dimSize == 1) {
+      vtids.push_back(zero);
+    }
+
+    // (tid floordiv stride) mod size
+    AffineExpr tidExpr = builder.getAffineDimExpr(0);
+    AffineMap vtidMap = AffineMap::get(
+        /*dims=*/1, /*syms=*/0, tidExpr.floorDiv(dimStride) % dimSize);
+    Value vtid = builder.create<affine::AffineApplyOp>(loc, vtidMap, laneId);
+    vtids.push_back(vtid);
   }
-  SmallVector<Value> threadIds =
-      builder.create<affine::AffineDelinearizeIndexOp>(loc, laneId, basis)
-          .getResults();
-  applyPermutationToVector(threadIds, orders.thread);
 
   int64_t idx = 0;
-  for (auto [outer, thread, element] :
-       llvm::zip_equal(counts.outer, counts.thread, counts.element)) {
-    if (outer != 1) {
-      canonicalSizes.push_back(builder.getIndexAttr(outer));
-      canonicalOffsets.push_back(zero);
-    }
+  for (auto [thread, element] :
+       llvm::zip_equal(subgroupLayout.thread, subgroupLayout.element)) {
     canonicalSizes.push_back(builder.getIndexAttr(element));
-    canonicalOffsets.push_back(threadIds[idx++]);
+    canonicalOffsets.push_back(vtids[idx++]);
   }
   applyPermutationToVector(canonicalOffsets, permutation);
   applyPermutationToVector(canonicalSizes, permutation);
@@ -646,22 +574,18 @@ LogicalResult MMAAttr::populateOperandOffsetsSizesStrides(
     return failure();
   }
 
-  MMAAttr::SingleSubgroupLayout counts;
-  MMAAttr::SingleSubgroupLayout orders;
+  MMAAttr::SingleSubgroupLayout subgroupLayout;
   switch (fragment) {
   case IREE::GPU::MMAFragment::Lhs: {
-    counts = getASingleSubgroupLayoutCount();
-    orders = getASingleSubgroupLayoutOrder();
+    subgroupLayout = getASingleSubgroupLayout();
     break;
   }
   case IREE::GPU::MMAFragment::Rhs: {
-    counts = getBSingleSubgroupLayoutCount();
-    orders = getBSingleSubgroupLayoutOrder();
+    subgroupLayout = getBSingleSubgroupLayout();
     break;
   }
   case IREE::GPU::MMAFragment::Acc: {
-    counts = getCSingleSubgroupLayoutCount();
-    orders = getCSingleSubgroupLayoutOrder();
+    subgroupLayout = getCSingleSubgroupLayout();
     break;
   }
   }
@@ -669,7 +593,7 @@ LogicalResult MMAAttr::populateOperandOffsetsSizesStrides(
   SmallVector<OpFoldResult> canonicalOffsets;
   SmallVector<OpFoldResult> canonicalSizes;
   if (failed(populateCanonicalOffsetsSizesAndStrides(
-          builder, loc, laneId, permutation, counts, orders, canonicalOffsets,
+          builder, loc, laneId, permutation, subgroupLayout, canonicalOffsets,
           canonicalSizes, strides))) {
     return failure();
   }
@@ -759,83 +683,46 @@ SmallVector<int64_t> getIdentityPermWithSwap(int64_t rank,
 /// And here inner most is referential to the iteration order, not the order
 /// they appear per fragment (because there is no relationship between the
 /// dimension order of M in A and in C, for example).
-NestedLayoutAttr permuteAndCreateNestedLayout(
-    MLIRContext *context, int64_t rank, int64_t outerDim, int64_t innerDim,
-    SmallVector<int64_t> subgroupCount, SmallVector<int64_t> subgroupOrder,
-    SmallVector<int64_t> batchCount, MMAAttr::SingleSubgroupLayout counts,
-    MMAAttr::SingleSubgroupLayout orders, ArrayRef<int64_t> dataDuplicate,
-    ArrayRef<int64_t> subgroupBasis, ArrayRef<bool> subgroupActiveIds) {
+NestedLayoutAttr createNestedLayout(MLIRContext *context, int64_t rank,
+                                    int64_t outerDim, int64_t innerDim,
+                                    SmallVector<int64_t> subgroupSizes,
+                                    SmallVector<int64_t> subgroupStrides,
+                                    SmallVector<int64_t> batchCount,
+                                    MMAAttr::SingleSubgroupLayout counts) {
 
   LLVM_DEBUG({
-    llvm::errs() << "Given:";
+    llvm::errs() << "Creating Nested Layout for::";
     llvm::errs() << "\n    outerDim = " << outerDim;
     llvm::errs() << "\n    innerDim = " << innerDim;
-    llvm::errs() << "\n    subgroupCount: ";
-    llvm::interleaveComma(subgroupCount, llvm::errs());
-    llvm::errs() << "\n    subgroupOrder: ";
-    llvm::interleaveComma(subgroupOrder, llvm::errs());
+    llvm::errs() << "\n    subgroupSizes: ";
+    llvm::interleaveComma(subgroupSizes, llvm::errs());
+    llvm::errs() << "\n    subgroupStrides: ";
+    llvm::interleaveComma(subgroupStrides, llvm::errs());
     llvm::errs() << "\n    batchCount: ";
     llvm::interleaveComma(batchCount, llvm::errs());
     llvm::errs() << "\n    counts.outer: ";
     llvm::interleaveComma(counts.outer, llvm::errs());
     llvm::errs() << "\n    counts.thread: ";
     llvm::interleaveComma(counts.thread, llvm::errs());
-    llvm::errs() << "\n    orders.thread: ";
-    llvm::interleaveComma(orders.thread, llvm::errs());
     llvm::errs() << "\n    counts.element: ";
     llvm::interleaveComma(counts.element, llvm::errs());
-    llvm::errs() << "\n    subgroupBasis: ";
-    llvm::interleaveComma(subgroupBasis, llvm::errs());
-    llvm::errs() << "\n    subgroupActiveIds: ";
-    llvm::interleaveComma(subgroupActiveIds, llvm::errs());
+    llvm::errs() << "\n    counts.tstrides: ";
+    llvm::interleaveComma(counts.tstrides, llvm::errs());
     llvm::errs() << "\n";
   });
-
-  SmallVector<int64_t> threadOrder =
-      getIdentityPermWithSwap(rank, orders.thread, outerDim, innerDim);
-
-  SmallVector<int64_t> threadBasis =
-      getUnitOfRankWithDims(rank, counts.thread, outerDim, innerDim);
-  threadBasis[outerDim] *= dataDuplicate[0];
-  threadBasis[innerDim] *= dataDuplicate[1];
-  applyPermutationToVector(threadBasis, threadOrder);
 
   SmallVector<int64_t> outerCount =
       getUnitOfRankWithDims(rank, counts.outer, outerDim, innerDim);
   SmallVector<int64_t> threadCount =
       getUnitOfRankWithDims(rank, counts.thread, outerDim, innerDim);
+  SmallVector<int64_t> threadStrides =
+      getUnitOfRankWithDims(rank, counts.tstrides, outerDim, innerDim);
   SmallVector<int64_t> elementCount =
       getUnitOfRankWithDims(rank, counts.element, outerDim, innerDim);
 
-  LLVM_DEBUG({
-    llvm::errs() << "\nNew layout attr:";
-    llvm::errs() << "\n    subgroupCount: ";
-    llvm::interleaveComma(subgroupCount, llvm::errs());
-    llvm::errs() << "\n    subgroupOrder: ";
-    llvm::interleaveComma(subgroupOrder, llvm::errs());
-    llvm::errs() << "\n    batchCount: ";
-    llvm::interleaveComma(batchCount, llvm::errs());
-    llvm::errs() << "\n    outerCount: ";
-    llvm::interleaveComma(outerCount, llvm::errs());
-    llvm::errs() << "\n    threadCount: ";
-    llvm::interleaveComma(threadCount, llvm::errs());
-    llvm::errs() << "\n    threadOrder: ";
-    llvm::interleaveComma(threadOrder, llvm::errs());
-    llvm::errs() << "\n    elementCount: ";
-    llvm::interleaveComma(elementCount, llvm::errs());
-    llvm::errs() << "\n    subgroupBasis: ";
-    llvm::interleaveComma(subgroupBasis, llvm::errs());
-    llvm::errs() << "\n    subgroupActiveIds: ";
-    llvm::interleaveComma(subgroupActiveIds, llvm::errs());
-    llvm::errs() << "\n    threadBasis: ";
-    llvm::interleaveComma(threadBasis, llvm::errs());
-    llvm::errs() << "\n";
-  });
-
-  auto layoutAttr = NestedLayoutAttr::get(
-      context, subgroupCount, subgroupOrder, batchCount, outerCount,
-      threadCount, threadOrder, elementCount, subgroupBasis, subgroupActiveIds,
-      threadBasis, SmallVector<bool>(threadBasis.size(), true));
+  auto layoutAttr = NestedLayoutAttr::get(context, subgroupSizes, batchCount,
+                                          outerCount, threadCount, elementCount,
+                                          subgroupStrides, threadStrides);
   return layoutAttr;
 }
 
@@ -852,6 +739,7 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
     return contractOp->emitError("Unimplemented: > 1 k dims");
   }
 
+  int64_t rank = contractOp.getIteratorTypesArray().size();
   auto mmaAttr = llvm::cast<MMAAttr>(getIntrinsic());
   MLIRContext *context = getContext();
 
@@ -870,13 +758,13 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
   // So here we need to permute/transpose the canonical layout to match with
   // the concrete contract op.
 
-  // Note that no matter how we permute/transpose the input contraction problem,
-  // the way we view the hardware warps remain the same--that is, from the
-  // hardware's perspective, a single warp has the same warp ID no matter what
-  // part of the contraction it works on. Similarly here, we are delinearizing
-  // the linearized GPU hardware lane ID into a n-D concatenated logical
-  // warp+thread using the subgroup/thread basis, so the subgroup basis should
-  // remain the same for all A/B/C matrix.
+  // Note that no matter how we permute/transpose the input contraction
+  // problem, the way we view the hardware warps remain the same--that is,
+  // from the hardware's perspective, a single warp has the same warp ID no
+  // matter what part of the contraction it works on. Similarly here, we are
+  // delinearizing the linearized GPU hardware lane ID into a n-D concatenated
+  // logical warp+thread using the subgroup/thread basis, so the subgroup
+  // basis should remain the same for all A/B/C matrix.
 
   auto [intrinsicM, intrinsicN, intrinsicK] = mmaAttr.getMNKShape();
 
@@ -894,11 +782,11 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
   };
 
   // Greedily break up the M subgroup and batch counts along the "M" iteration
-  // bounds. We distribute as many residual subgroups as possible per M dim, and
-  // then divide the remaining along batch dims. The inner most M dim is always
-  // the one used for the intrinsic, meaning for a valid schedule, the computed
-  // batch counts and subgroup basis will satisfy
-  // totalMSize / intrinsicM = product(batchMSizes) * product(subgroupMBasis)
+  // bounds. We distribute as many residual subgroups as possible per M dim,
+  // and then divide the remaining along batch dims. The inner most M dim is
+  // always the one used for the intrinsic, meaning for a valid schedule, the
+  // computed batch counts and subgroup basis will satisfy totalMSize /
+  // intrinsicM = product(batchMSizes) * product(subgroupMBasis)
   for (auto dim : opInfo.getMDims()) {
     // Get the number of subgroups and batches used for this dimension based
     // on the intrinsic size and the bound size.
@@ -938,73 +826,39 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
     currNCount /= subgroupsUsed;
   }
 
-  SmallVector<int64_t> subgroupBasis;
-  if (batchCount == 1) {
-    subgroupBasis.push_back(1);
-  }
+  SmallVector<int64_t> subgroupMStrides(subgroupMBasis.size());
+  SmallVector<int64_t> subgroupNStrides(subgroupNBasis.size());
+
   auto mDimVec = opInfo.getMDims();
   llvm::SmallDenseSet<int64_t> mDims(mDimVec.begin(), mDimVec.end());
   auto nDimVec = opInfo.getNDims();
   llvm::SmallDenseSet<int64_t> nDims(nDimVec.begin(), nDimVec.end());
-
-  int64_t currM = 0;
-  int64_t currN = 0;
-  // Because we currently require all batch dimensions to be unit, the subgroup
-  // basis can be constructed from the M and N bases. To keep things simple,
-  // the current heuristic is to distribute all M dims followed by all N dims.
-  for (auto dim : llvm::seq(static_cast<int64_t>(0), opInfo.getCRank())) {
+  // Because we currently require all batch dimensions to be unit, the
+  // subgroup basis can be constructed from the M and N bases. To keep things
+  // simple, the current heuristic is to distribute the loop dimensions from
+  // outer to inner.
+  int64_t currStride = 1;
+  int64_t currM = subgroupMStrides.size() - 1;
+  int64_t currN = subgroupNStrides.size() - 1;
+  for (int64_t dim : llvm::reverse(llvm::seq<int64_t>(rank))) {
     if (mDims.contains(dim)) {
-      subgroupBasis.push_back(subgroupMBasis[currM]);
-      // Construct mDimVec such that it contains the order in which the M dims
-      // appear in the C matrix.
-      mDimVec[currM] = dim;
-      currM++;
+      subgroupMStrides[currM] = currStride;
+      currStride *= subgroupMBasis[currM];
+      currM--;
+      continue;
     }
+
     if (nDims.contains(dim)) {
-      subgroupBasis.push_back(subgroupNBasis[currN]);
-      // Construct nDimVec such that it contains the order in which the N dims
-      // appear in the C matrix.
-      nDimVec[currN] = dim;
-      currN++;
+      subgroupNStrides[currN] = currStride;
+      currStride *= subgroupNBasis[currN];
+      currN--;
+      continue;
     }
   }
 
-  // For threads though, we also need to make sure the basis is consistent
-  // across A, B, and C matrix. Though here we need to additionally think it
-  // from the matching of how the MMA intrinsics expect the treads organize and
-  // how we distribute the large input contraction problem to the threads.
-  // The intrinsics expect a certain 2-D (x, y) thread layout, where it's not
-  // guaranteed that y is always the fastest moving dimension. But when we
-  // distribute the large input contraction problem, we always associate the
-  // fastest moving dimension to the innermost thread ID dimension. Therefore,
-  // we need to "adjust" the intrinsic thread shape to from the slowest moving
-  // dimension to the fastest one. That is, to apply the corresponding order
-  // permutation vector. Because how the intrinsics are designed, the end result
-  // is actually we are basically guaranteed to see the same thread basis for A,
-  // B, and C matrix. But still..
-
   // C matrix layout
-  MMAAttr::SingleSubgroupLayout cCounts =
-      mmaAttr.getCSingleSubgroupLayoutCount();
-  MMAAttr::SingleSubgroupLayout cOrders =
-      mmaAttr.getCSingleSubgroupLayoutOrder();
-
   auto [m, n] = opInfo.getResultMNIndex();
   int64_t cRank = opInfo.getCRank();
-  LLVM_DEBUG({
-    llvm::errs() << "Subgroup M Basis: ";
-    llvm::interleaveComma(subgroupMBasis, llvm::errs());
-    llvm::errs() << "\n";
-    llvm::errs() << "Subgroup N Basis: ";
-    llvm::interleaveComma(subgroupNBasis, llvm::errs());
-    llvm::errs() << "\n";
-    llvm::errs() << "Batch M Sizes: ";
-    llvm::interleaveComma(batchMSizes, llvm::errs());
-    llvm::errs() << "\n";
-    llvm::errs() << "Batch N Sizes: ";
-    llvm::interleaveComma(batchNSizes, llvm::errs());
-    llvm::errs() << "\n";
-  });
 
   // Get the M and N dims w.r.t. the dimensions of the C matrix. cMDims and
   // cNDims are the M and N dimensions of the C matrix in the order they are
@@ -1013,39 +867,26 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
   SmallVector<int64_t> cNDims = opInfo.outNDims;
   SmallVector<int64_t> cBatchSizes(cRank, 1);
   SmallVector<int64_t> cSubgroupSizes(cRank, 1);
-  SmallVector<int64_t> cOverallOrder = getIdentityPerm(cRank);
+  SmallVector<int64_t> cSubgroupStrides(cRank, 0);
   for (auto [i, dim] : llvm::enumerate(cMDims)) {
     cBatchSizes[dim] = batchMSizes[i];
     cSubgroupSizes[dim] = subgroupMBasis[i];
-    cOverallOrder[dim] = mDimVec[i];
+    cSubgroupStrides[dim] = subgroupMStrides[i];
   }
   for (auto [i, dim] : llvm::enumerate(cNDims)) {
     cBatchSizes[dim] = batchNSizes[i];
     cSubgroupSizes[dim] = subgroupNBasis[i];
-    cOverallOrder[dim] = nDimVec[i];
+    cSubgroupStrides[dim] = subgroupNStrides[i];
   }
 
-  // Dummy 1 for the k dimension.
-  subgroupBasis.push_back(1);
-
-  SmallVector<bool> cActiveSubgroups(cRank + 1, true);
-  cActiveSubgroups.back() = false;
-
-  auto cLayout = permuteAndCreateNestedLayout(
-      context, cRank, m, n,
-      /*subgroupCount=*/cSubgroupSizes,
-      /*subgroupOrder=*/cOverallOrder,
-      /*batchCount=*/cBatchSizes, cCounts, cOrders,
-      /*dataDuplicate=*/mmaAttr.getCDataDuplicate(), subgroupBasis,
-      cActiveSubgroups);
+  auto cLayout = createNestedLayout(context, cRank, m, n,
+                                    /*subgroupCount=*/cSubgroupSizes,
+                                    /*subgroupStrides=*/cSubgroupStrides,
+                                    /*batchCount=*/cBatchSizes,
+                                    mmaAttr.getCSingleSubgroupLayout());
   LLVM_DEBUG({ llvm::errs() << "C layout: " << cLayout << "\n"; });
 
   // A matrix layout
-  MMAAttr::SingleSubgroupLayout aCounts =
-      mmaAttr.getASingleSubgroupLayoutCount();
-  MMAAttr::SingleSubgroupLayout aOrders =
-      mmaAttr.getASingleSubgroupLayoutOrder();
-
   auto [afm, bfn] = opInfo.getOperandMNIndex();
   auto [afk, bfk] = opInfo.getOperandKIndex();
 
@@ -1054,75 +895,39 @@ MMAScheduleAttr::getContractionLayout(vector::ContractionOp contractOp) const {
   SmallVector<int64_t> aMDims = opInfo.lhsMDims;
   SmallVector<int64_t> aBatchSizes(aRank, 1);
   SmallVector<int64_t> aSubgroupSizes(aRank, 1);
-  SmallVector<int64_t> aSubgroupOrder = getIdentityPerm(aRank);
-  SmallVector<int64_t> aBatchOrder = getIdentityPerm(aRank);
+  SmallVector<int64_t> aSubgroupStrides(aRank, 0);
   for (auto [i, dim] : llvm::enumerate(aMDims)) {
     aBatchSizes[dim] = batchMSizes[i];
     aSubgroupSizes[dim] = subgroupMBasis[i];
-    int64_t j = i + batchCount;
-    aSubgroupOrder[dim] = j;
-    aBatchOrder[dim] = j >= afk ? j + 1 : j;
+    aSubgroupStrides[dim] = subgroupMStrides[i];
   }
-  aSubgroupOrder[afk] = aRank - 1;
   aBatchSizes[afk] = bounds[opInfo.getKDims().back()] / intrinsicK;
 
-  SmallVector<bool> aActiveSubgroups(subgroupBasis.size(), false);
-  for (auto mDim : mDims) {
-    aActiveSubgroups[mDim] = true;
-  }
-  aActiveSubgroups.back() = true;
-  if (batchCount == 1) {
-    aActiveSubgroups[0] = true;
-  }
-
-  auto aLayout = permuteAndCreateNestedLayout(
-      context, aRank, afm, afk,
-      /*subgroupCount=*/aSubgroupSizes,
-      /*subgroupOrder=*/aSubgroupOrder,
-      /*batchCount=*/aBatchSizes, aCounts, aOrders,
-      /*dataDuplicate=*/mmaAttr.getADataDuplicate(), subgroupBasis,
-      aActiveSubgroups);
+  auto aLayout = createNestedLayout(context, aRank, afm, afk,
+                                    /*subgroupCount=*/aSubgroupSizes,
+                                    /*subgroupStrides=*/aSubgroupStrides,
+                                    /*batchCount=*/aBatchSizes,
+                                    mmaAttr.getASingleSubgroupLayout());
   LLVM_DEBUG({ llvm::errs() << "A layout: " << aLayout << "\n"; });
-
-  // B matrix layout
-  MMAAttr::SingleSubgroupLayout bCounts =
-      mmaAttr.getBSingleSubgroupLayoutCount();
-  MMAAttr::SingleSubgroupLayout bOrders =
-      mmaAttr.getBSingleSubgroupLayoutOrder();
 
   int64_t bRank = opInfo.getBRank();
 
   SmallVector<int64_t> bNDims = opInfo.rhsNDims;
   SmallVector<int64_t> bBatchSizes(bRank, 1);
   SmallVector<int64_t> bSubgroupSizes(bRank, 1);
-  SmallVector<int64_t> bSubgroupOrder = getIdentityPerm(bRank);
-  SmallVector<int64_t> bBatchOrder = getIdentityPerm(bRank);
+  SmallVector<int64_t> bSubgroupStrides(bRank, 0);
   for (auto [i, dim] : llvm::enumerate(bNDims)) {
     bBatchSizes[dim] = batchNSizes[i];
     bSubgroupSizes[dim] = subgroupNBasis[i];
-    int64_t j = i + batchCount;
-    bSubgroupOrder[dim] = j;
-    bBatchOrder[dim] = j >= bfk ? j + 1 : j;
+    bSubgroupStrides[dim] = subgroupNStrides[i];
   }
-  bSubgroupOrder[bfk] = bRank - 1;
   bBatchSizes[bfk] = bounds[opInfo.getKDims().back()] / intrinsicK;
 
-  SmallVector<bool> bActiveSubgroups(subgroupBasis.size(), false);
-  for (auto nDim : nDims) {
-    bActiveSubgroups[nDim] = true;
-  }
-  if (batchCount == 1) {
-    bActiveSubgroups[0] = true;
-  }
-  bActiveSubgroups.back() = true;
-
-  auto bLayout = permuteAndCreateNestedLayout(
-      context, bRank, bfk, bfn,
-      /*subgroupCount=*/bSubgroupSizes,
-      /*subgroupOrder=*/bSubgroupOrder,
-      /*batchCount=*/bBatchSizes, bCounts, bOrders,
-      /*dataDuplicate=*/mmaAttr.getBDataDuplicate(), subgroupBasis,
-      bActiveSubgroups);
+  auto bLayout = createNestedLayout(context, bRank, bfk, bfn,
+                                    /*subgroupCount=*/bSubgroupSizes,
+                                    /*subgroupStrides=*/bSubgroupStrides,
+                                    /*batchCount=*/bBatchSizes,
+                                    mmaAttr.getBSingleSubgroupLayout());
   LLVM_DEBUG({ llvm::errs() << "B layout: " << bLayout << "\n"; });
 
   std::tuple<VectorLayoutInterface, VectorLayoutInterface,

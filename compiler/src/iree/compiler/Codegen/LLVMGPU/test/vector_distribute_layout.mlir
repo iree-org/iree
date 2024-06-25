@@ -15,14 +15,13 @@ func.func @mfma_matmul_96x64x16_mm(%lhs: vector<96x16xf16>, %rhs: vector<16x64xf
 
 //      CHECK: contract A vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [3, 2], outers_per_batch = [1, 1], threads_per_outer = [32, 2], elements_per_thread = [1, 4],
-// CHECK-SAME:   thread_order = [1, 0]
-// CHECK-SAME:   subgroup_basis = [1, 1, 1], subgroup_active_ids = [true, false, true], thread_basis = [2, 32]>
+// CHECK-SAME:   subgroup_strides = [0, 0], thread_strides = [1, 32]>
 //      CHECK: contract B vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [2, 2], outers_per_batch = [1, 1], threads_per_outer = [2, 32], elements_per_thread = [4, 1],
-// CHECK-SAME:   subgroup_basis = [1, 1, 1], subgroup_active_ids = [false, true, true], thread_basis = [2, 32]>
+// CHECK-SAME:   subgroup_strides = [0, 0], thread_strides = [32, 1]>
 //      CHECK: contract C vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [3, 2], outers_per_batch = [4, 1], threads_per_outer = [2, 32], elements_per_thread = [4, 1],
-// CHECK-SAME:   subgroup_basis = [1, 1, 1], subgroup_active_ids = [true, true, false], thread_basis = [2, 32]>
+// CHECK-SAME:   subgroup_strides = [0, 0], thread_strides = [32, 1]>
 
 // -----
 
@@ -41,15 +40,13 @@ func.func @mfma_matmul_96x64x16_mmt(%lhs: vector<96x16xf16>, %rhs: vector<64x16x
 
 //      CHECK: contract A vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [3, 2], outers_per_batch = [1, 1], threads_per_outer = [32, 2], elements_per_thread = [1, 4],
-// CHECK-SAME:   thread_order = [1, 0]
-// CHECK-SAME:   subgroup_basis = [1, 1, 1], subgroup_active_ids = [true, false, true], thread_basis = [2, 32]>
+// CHECK-SAME:   subgroup_strides = [0, 0], thread_strides = [1, 32]>
 //      CHECK: contract B vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [2, 2], outers_per_batch = [1, 1], threads_per_outer = [32, 2], elements_per_thread = [1, 4],
-// CHECK-SAME:   thread_order = [1, 0]
-// CHECK-SAME:   subgroup_basis = [1, 1, 1], subgroup_active_ids = [false, true, true], thread_basis = [2, 32]>
+// CHECK-SAME:   subgroup_strides = [0, 0], thread_strides = [1, 32]>
 //      CHECK: contract C vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [3, 2], outers_per_batch = [4, 1], threads_per_outer = [2, 32], elements_per_thread = [4, 1],
-// CHECK-SAME:   subgroup_basis = [1, 1, 1], subgroup_active_ids = [true, true, false], thread_basis = [2, 32]>
+// CHECK-SAME:   subgroup_strides = [0, 0], thread_strides = [32, 1]>
 
 // -----
 
@@ -68,16 +65,13 @@ func.func @mfma_matmul_96x64x16_mmtt(%lhs: vector<96x16xf16>, %rhs: vector<64x16
 
 //      CHECK: contract A vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME: subgroups_per_workgroup = [1, 1], batches_per_subgroup = [3, 2], outers_per_batch = [1, 1], threads_per_outer = [32, 2], elements_per_thread = [1, 4],
-// CHECK-SAME: thread_order = [1, 0],
-// CHECK-SAME: subgroup_basis = [1, 1, 1], subgroup_active_ids = [true, false, true], thread_basis = [2, 32]>
+// CHECK-SAME: subgroup_strides = [0, 0], thread_strides = [1, 32]
 //      CHECK: contract B vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME: subgroups_per_workgroup = [1, 1], batches_per_subgroup = [2, 2], outers_per_batch = [1, 1], threads_per_outer = [32, 2], elements_per_thread = [1, 4],
-// CHECK-SAME: thread_order = [1, 0],
-// CHECK-SAME: subgroup_basis = [1, 1, 1], subgroup_active_ids = [false, true, true], thread_basis = [2, 32]>
+// CHECK-SAME: subgroup_strides = [0, 0], thread_strides = [1, 32]
 //      CHECK: contract C vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME: subgroups_per_workgroup = [1, 1], batches_per_subgroup = [2, 3], outers_per_batch = [1, 4], threads_per_outer = [32, 2], elements_per_thread = [1, 4],
-// CHECK-SAME: subgroup_order = [1, 0], thread_order = [1, 0],
-// CHECK-SAME: subgroup_basis = [1, 1, 1], subgroup_active_ids = [true, true, false], thread_basis = [2, 32]>
+// CHECK-SAME: subgroup_strides = [0, 0], thread_strides = [1, 32]
 
 // -----
 
@@ -139,22 +133,20 @@ func.func @matmul_16x16x256_read(%lhs: memref<16x256xf16, strided<[256, 1], offs
 
 //      CHECK: transfer '{{.+}} memref<16x256xf16{{.+}}<storage_buffer>>, vector<16x32xf16>' vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [1, 1], outers_per_batch = [1, 1], threads_per_outer = [16, 4], elements_per_thread = [1, 8],
-// CHECK-SAME:   subgroup_basis = [1, 1], thread_basis = [16, 4]>
+// CHECK-SAME:   subgroup_strides = [0, 0], thread_strides = [4, 1]>
 //      CHECK: transfer '{{.+}} memref<256x16xf16{{.+}}<storage_buffer>>, vector<32x16xf16>' vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [1, 1], outers_per_batch = [1, 1], threads_per_outer = [32, 2], elements_per_thread = [1, 8],
-// CHECK-SAME:   subgroup_basis = [1, 1], thread_basis = [32, 2]>
+// CHECK-SAME:   subgroup_strides = [0, 0], thread_strides = [2, 1]>
 
 //      CHECK: contract A vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [1, 2], outers_per_batch = [1, 1], threads_per_outer = [16, 4], elements_per_thread = [1, 4],
-// CHECK-SAME:   thread_order = [1, 0]
-// CHECK-SAME:   subgroup_active_ids = [true, false, true], thread_basis = [4, 16]>
+// CHECK-SAME:   subgroup_strides = [0, 0], thread_strides = [1, 16]>
 //      CHECK: contract B vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [2, 1], outers_per_batch = [1, 1], threads_per_outer = [4, 16], elements_per_thread = [4, 1],
-// CHECK-SAME:   subgroup_order = [1, 0]
-// CHECK-SAME:   subgroup_basis = [1, 1, 1], subgroup_active_ids = [false, true, true], thread_basis = [4, 16]>
+// CHECK-SAME:   subgroup_strides = [0, 0], thread_strides = [16, 1]>
 //      CHECK: contract C vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [1, 1], outers_per_batch = [1, 1], threads_per_outer = [4, 16], elements_per_thread = [4, 1],
-// CHECK-SAME:   subgroup_basis = [1, 1, 1], subgroup_active_ids = [true, true, false], thread_basis = [4, 16]>
+// CHECK-SAME:   subgroup_strides = [0, 0], thread_strides = [16, 1]>
 
 // -----
 
@@ -201,22 +193,20 @@ func.func @matmul_16x16x256_read_permute(%lhs: memref<16x256xf16, strided<[256, 
 //  CHECK-NOT: transfer '{{.+}} memref<16x16xf16{{.+}}<storage_buffer>>, vector<16x16xf16>' vector layout
 //      CHECK: transfer '{{.+}} memref<16x256xf16{{.+}}<storage_buffer>>, vector<16x32xf16>' vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [1, 1], outers_per_batch = [1, 1], threads_per_outer = [16, 4], elements_per_thread = [1, 8],
-// CHECK-SAME:   subgroup_basis = [1, 1], thread_basis = [16, 4]>
+// CHECK-SAME:   subgroup_strides = [0, 0], thread_strides = [4, 1]>
 //      CHECK: transfer '{{.+}} memref<16x256xf16{{.+}}storage_buffer>>, vector<32x16xf16>' vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [1, 1], outers_per_batch = [1, 1], threads_per_outer = [4, 16], elements_per_thread = [8, 1],
-// CHECK-SAME:   subgroup_order = [1, 0], thread_order = [1, 0],
-// CHECK-SAME:   subgroup_basis = [1, 1], thread_basis = [4, 16]>
+// CHECK-SAME:   subgroup_strides = [0, 0], thread_strides = [1, 4]>
 
 //      CHECK: contract A vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [1, 2], outers_per_batch = [1, 1], threads_per_outer = [16, 4], elements_per_thread = [1, 4],
-// CHECK-SAME:   thread_order = [1, 0]
-// CHECK-SAME:   subgroup_basis = [1, 1, 1], subgroup_active_ids = [true, false, true], thread_basis = [4, 16]>
+// CHECK-SAME:   subgroup_strides = [0, 0], thread_strides = [1, 16]>
 //      CHECK: contract B vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [2, 1], outers_per_batch = [1, 1], threads_per_outer = [4, 16], elements_per_thread = [4, 1],
-// CHECK-SAME:   subgroup_basis = [1, 1, 1], subgroup_active_ids = [false, true, true], thread_basis = [4, 16]>
+// CHECK-SAME:   subgroup_strides = [0, 0], thread_strides = [16, 1]>
 //      CHECK: contract C vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [1, 1], outers_per_batch = [1, 1], threads_per_outer = [4, 16], elements_per_thread = [4, 1],
-// CHECK-SAME:   subgroup_basis = [1, 1, 1], subgroup_active_ids = [true, true, false], thread_basis = [4, 16]>
+// CHECK-SAME:   subgroup_strides = [0, 0], thread_strides = [16, 1]>
 
 // -----
 
@@ -275,14 +265,13 @@ func.func @wmma_matmul_48x32x32_mm(%lhs: vector<48x32xf16>, %rhs: vector<32x32xf
 
 //      CHECK: contract A vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [3, 2], outers_per_batch = [1, 1], threads_per_outer = [16, 1], elements_per_thread = [1, 16],
-// CHECK-SAME:   thread_order = [1, 0]
-// CHECK-SAME:   subgroup_basis = [1, 1, 1], subgroup_active_ids = [true, false, true], thread_basis = [1, 32]>
+// CHECK-SAME:   subgroup_strides = [0, 0], thread_strides = [1, 0]>
 //      CHECK: contract B vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [2, 2], outers_per_batch = [1, 1], threads_per_outer = [1, 16], elements_per_thread = [16, 1],
-// CHECK-SAME:   subgroup_basis = [1, 1, 1], subgroup_active_ids = [false, true, true], thread_basis = [1, 32]>
+// CHECK-SAME:   subgroup_strides = [0, 0], thread_strides = [0, 1]>
 //      CHECK: contract C vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [3, 2], outers_per_batch = [8, 1], threads_per_outer = [2, 16], elements_per_thread = [1, 1],
-// CHECK-SAME:   subgroup_basis = [1, 1, 1], subgroup_active_ids = [true, true, false], thread_basis = [2, 16]>
+// CHECK-SAME:   subgroup_strides = [0, 0], thread_strides = [16, 1]>
 
 // -----
 
@@ -301,15 +290,13 @@ func.func @wmma_matmul_48x32x32_mmt(%lhs: vector<48x32xf16>, %rhs: vector<32x32x
 
 //      CHECK: contract A vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [3, 2], outers_per_batch = [1, 1], threads_per_outer = [16, 1], elements_per_thread = [1, 16],
-// CHECK-SAME:   thread_order = [1, 0]
-// CHECK-SAME:   subgroup_basis = [1, 1, 1], subgroup_active_ids = [true, false, true], thread_basis = [1, 32]>
+// CHECK-SAME:   subgroup_strides = [0, 0], thread_strides = [1, 0]>
 //      CHECK: contract B vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [2, 2], outers_per_batch = [1, 1], threads_per_outer = [16, 1], elements_per_thread = [1, 16],
-// CHECK-SAME:   thread_order = [1, 0],
-// CHECK-SAME:   subgroup_basis = [1, 1, 1], subgroup_active_ids = [false, true, true], thread_basis = [1, 32]>
+// CHECK-SAME:   subgroup_strides = [0, 0], thread_strides = [1, 0]>
 //      CHECK: contract C vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [3, 2], outers_per_batch = [8, 1], threads_per_outer = [2, 16], elements_per_thread = [1, 1],
-// CHECK-SAME:   subgroup_basis = [1, 1, 1], subgroup_active_ids = [true, true, false], thread_basis = [2, 16]>
+// CHECK-SAME:   subgroup_strides = [0, 0], thread_strides = [16, 1]>
 
 // -----
 
@@ -333,29 +320,24 @@ func.func @matmul_192x64x16_mmt_multi_m(%lhs: vector<2x64x16xf16>, %rhs: vector<
 // CHECK-SAME:   outers_per_batch = [1, 1, 1],
 // CHECK-SAME:   threads_per_outer = [1, 16, 4],
 // CHECK-SAME:   elements_per_thread = [1, 1, 4],
-// CHECK-SAME:   thread_order = [0, 2, 1],
-// CHECK-SAME:   subgroup_basis = [2, 1, 1, 1],
-// CHECK-SAME:   subgroup_active_ids = [true, true, false, true],
-// CHECK-SAME:   thread_basis = [1, 4, 16]>
+// CHECK-SAME:   subgroup_strides = [1, 0, 0],
+// CHECK-SAME:   thread_strides = [0, 1, 16]>
 //      CHECK: contract B vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1],
 // CHECK-SAME:   batches_per_subgroup = [1, 4],
 // CHECK-SAME:   outers_per_batch = [1, 1],
 // CHECK-SAME:   threads_per_outer = [4, 16],
 // CHECK-SAME:   elements_per_thread = [4, 1],
-// CHECK-SAME:   subgroup_order = [1, 0],
-// CHECK-SAME:   subgroup_basis = [2, 1, 1, 1],
-// CHECK-SAME:   subgroup_active_ids = [false, false, true, true],
-// CHECK-SAME:   thread_basis = [4, 16]>
+// CHECK-SAME:   subgroup_strides = [0, 0],
+// CHECK-SAME:   thread_strides = [16, 1]>
 //      CHECK: contract C vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [2, 1, 1],
 // CHECK-SAME:   batches_per_subgroup = [1, 4, 4],
 // CHECK-SAME:   outers_per_batch = [1, 1, 1],
 // CHECK-SAME:   threads_per_outer = [1, 4, 16],
 // CHECK-SAME:   elements_per_thread = [1, 4, 1],
-// CHECK-SAME:   subgroup_basis = [2, 1, 1, 1],
-// CHECK-SAME:   subgroup_active_ids = [true, true, true, false],
-// CHECK-SAME:   thread_basis = [1, 4, 16]>
+// CHECK-SAME:   subgroup_strides = [1, 0, 0],
+// CHECK-SAME:   thread_strides = [0, 16, 1]>
 
 // -----
 
@@ -375,13 +357,11 @@ func.func @matmul_192x64x16_mmt_multi_split_m(%lhs: vector<2x64x16xf16>, %rhs: v
 //      CHECK: contract A vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [2, 2, 1],
 // CHECK-SAME:   batches_per_subgroup = [1, 2, 1],
-// CHECK-SAME:   subgroup_basis = [2, 2, 1, 1],
-// CHECK-SAME:   subgroup_active_ids = [true, true, false, true]
+// CHECK-SAME:   subgroup_strides = [2, 1, 0],
 //      CHECK: contract C vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [2, 2, 1],
 // CHECK-SAME:   batches_per_subgroup = [1, 2, 4],
-// CHECK-SAME:   subgroup_basis = [2, 2, 1, 1],
-// CHECK-SAME:   subgroup_active_ids = [true, true, true, false]
+// CHECK-SAME:   subgroup_strides = [2, 1, 0],
 
 // -----
 
@@ -401,18 +381,15 @@ func.func @matmul_192x64x16_mmt_multi_m_and_n(%lhs: vector<4x64x16xf16>, %rhs: v
 //      CHECK: contract A vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [2, 1, 1],
 // CHECK-SAME:   batches_per_subgroup = [2, 4, 1],
-// CHECK-SAME:   subgroup_basis = [2, 2, 1, 1, 1],
-// CHECK-SAME:   subgroup_active_ids = [true, false, true, false, true]
+// CHECK-SAME:   subgroup_strides = [2, 0, 0],
 //      CHECK: contract B vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [2, 1, 1],
 // CHECK-SAME:   batches_per_subgroup = [1, 1, 4],
-// CHECK-SAME:   subgroup_basis = [2, 2, 1, 1, 1],
-// CHECK-SAME:   subgroup_active_ids = [false, true, false, true, true]
+// CHECK-SAME:   subgroup_strides = [1, 0, 0],
 //      CHECK: contract C vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [2, 2, 1, 1],
 // CHECK-SAME:   batches_per_subgroup = [2, 1, 4, 4],
-// CHECK-SAME:   subgroup_basis = [2, 2, 1, 1, 1],
-// CHECK-SAME:   subgroup_active_ids = [true, true, true, true, false]
+// CHECK-SAME:   subgroup_strides = [2, 1, 0, 0],
 
 // -----
 
@@ -447,7 +424,7 @@ func.func @dequant_anchors_on_quant_only(%quant: memref<128x128xi4, strided<[409
   return
 }
 //      CHECK: transfer '{{.+}} memref<128x128xi4{{.+}}<storage_buffer>>, vector<128x128xi4>' vector layout: #iree_vector_ext.nested_layout<
-// CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [4, 1], outers_per_batch = [1, 1], threads_per_outer = [32, 4], elements_per_thread = [1, 32], subgroup_basis = [1, 1], thread_basis = [32, 4]>
+// CHECK-SAME:   subgroups_per_workgroup = [1, 1], batches_per_subgroup = [4, 1], outers_per_batch = [1, 1], threads_per_outer = [32, 4], elements_per_thread = [1, 32], subgroup_strides = [0, 0], thread_strides = [4, 1]>
 //  CHECK-NOT: transfer '{{.+}} memref<128xf16{{.+}}<storage_buffer>>, vector<128xf16>' vector layout
 
 // -----
@@ -473,26 +450,21 @@ func.func @batch_matmul_unit_batch(%arg0: vector<1x64x64xf16>, %arg1: vector<1x6
 // CHECK-SAME:   outers_per_batch = [1, 1, 1]
 // CHECK-SAME:   threads_per_outer = [1, 16, 4]
 // CHECK-SAME:   elements_per_thread = [1, 1, 4]
-// CHECK-SAME:   thread_order = [0, 2, 1]
-// CHECK-SAME:   subgroup_basis = [1, 2, 2, 1]
-// CHECK-SAME:   subgroup_active_ids = [true, true, false, true]
-// CHECK-SAME:   thread_basis = [1, 4, 16]
+// CHECK-SAME:   subgroup_strides = [0, 2, 0],
+// CHECK-SAME:   thread_strides = [0, 1, 16]>
 //      CHECK: contract B vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 1, 2]
 // CHECK-SAME:   batches_per_subgroup = [1, 4, 4]
 // CHECK-SAME:   outers_per_batch = [1, 1, 1]
 // CHECK-SAME:   threads_per_outer = [1, 4, 16]
 // CHECK-SAME:   elements_per_thread = [1, 4, 1]
-// CHECK-SAME:   subgroup_order = [0, 2, 1]
-// CHECK-SAME:   subgroup_basis = [1, 2, 2, 1]
-// CHECK-SAME:   subgroup_active_ids = [true, false, true, true]
-// CHECK-SAME:   thread_basis = [1, 4, 16]
+// CHECK-SAME:   subgroup_strides = [0, 0, 1],
+// CHECK-SAME:   thread_strides = [0, 16, 1]>
 //      CHECK: contract C vector layout: #iree_vector_ext.nested_layout<
 // CHECK-SAME:   subgroups_per_workgroup = [1, 2, 2]
 // CHECK-SAME:   batches_per_subgroup = [1, 2, 4]
 // CHECK-SAME:   outers_per_batch = [1, 1, 1]
 // CHECK-SAME:   threads_per_outer = [1, 4, 16]
 // CHECK-SAME:   elements_per_thread = [1, 4, 1]
-// CHECK-SAME:   subgroup_basis = [1, 2, 2, 1]
-// CHECK-SAME:   subgroup_active_ids = [true, true, true, false]
-// CHECK-SAME:   thread_basis = [1, 4, 16]
+// CHECK-SAME:   subgroup_strides = [0, 2, 1],
+// CHECK-SAME:   thread_strides = [0, 16, 1]>
