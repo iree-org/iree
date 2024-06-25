@@ -355,8 +355,8 @@ LogicalResult NestedLayoutAttr::isValidLayout(VectorValue vector) const {
   return success();
 }
 NestedLayoutAttr NestedLayoutAttr::getChecked(
-    ::llvm::function_ref<::mlir::InFlightDiagnostic()> emitError,
-    ::mlir::MLIRContext *context, ArrayRef<int64_t> subgroupsPerWorkgroup,
+    llvm::function_ref<InFlightDiagnostic()> emitError, MLIRContext *context,
+    ArrayRef<int64_t> subgroupsPerWorkgroup,
     ArrayRef<int64_t> batchesPerSubgroup, ArrayRef<int64_t> outersPerBatch,
     ArrayRef<int64_t> threadsPerOuter, ArrayRef<int64_t> elementsPerThread,
     ArrayRef<int64_t> subgroupStrides, ArrayRef<int64_t> threadStrides) {
@@ -439,7 +439,7 @@ LogicalResult NestedLayoutAttr::verify(
 SmallVector<Value>
 NestedLayoutAttr::computeThreadIds(Value threadId, int64_t subgroupSize,
                                    RewriterBase &rewriter) const {
-  SmallVector<Value> vtids;
+  SmallVector<Value> virtualTids;
 
   Location loc = threadId.getLoc();
 
@@ -456,10 +456,10 @@ NestedLayoutAttr::computeThreadIds(Value threadId, int64_t subgroupSize,
       /*dims=*/1, /*syms=*/2, tidExpr.floorDiv(stride * subgroupSize) % size);
 
   for (auto [dimSize, dimStride] :
-       llvm::zip(getSubgroupsPerWorkgroup(), getSubgroupStrides())) {
+       llvm::zip_equal(getSubgroupsPerWorkgroup(), getSubgroupStrides())) {
     // Dimension is not distributed.
     if (dimStride == 0) {
-      vtids.push_back(rewriter.create<arith::ConstantOp>(
+      virtualTids.push_back(rewriter.create<arith::ConstantOp>(
           loc, rewriter.getIndexAttr(dimStride)));
       continue;
     }
@@ -468,15 +468,15 @@ NestedLayoutAttr::computeThreadIds(Value threadId, int64_t subgroupSize,
         rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(dimSize));
     auto strideVal = rewriter.create<arith::ConstantOp>(
         loc, rewriter.getIndexAttr(dimStride));
-    vtids.push_back(rewriter.create<affine::AffineApplyOp>(
+    virtualTids.push_back(rewriter.create<affine::AffineApplyOp>(
         loc, subgroupTidMap, ValueRange{threadId, sizeVal, strideVal}));
   }
 
   for (auto [dimSize, dimStride] :
-       llvm::zip(getThreadsPerOuter(), getThreadStrides())) {
+       llvm::zip_equal(getThreadsPerOuter(), getThreadStrides())) {
     // Dimension is not distributed.
     if (dimStride == 0) {
-      vtids.push_back(rewriter.create<arith::ConstantOp>(
+      virtualTids.push_back(rewriter.create<arith::ConstantOp>(
           loc, rewriter.getIndexAttr(dimStride)));
       continue;
     }
@@ -485,11 +485,11 @@ NestedLayoutAttr::computeThreadIds(Value threadId, int64_t subgroupSize,
         rewriter.create<arith::ConstantOp>(loc, rewriter.getIndexAttr(dimSize));
     auto strideVal = rewriter.create<arith::ConstantOp>(
         loc, rewriter.getIndexAttr(dimStride));
-    vtids.push_back(rewriter.create<affine::AffineApplyOp>(
+    virtualTids.push_back(rewriter.create<affine::AffineApplyOp>(
         loc, threadTidMap, ValueRange{threadId, sizeVal, strideVal}));
   }
 
-  return vtids;
+  return virtualTids;
 }
 
 } // namespace mlir::iree_compiler::IREE::VectorExt

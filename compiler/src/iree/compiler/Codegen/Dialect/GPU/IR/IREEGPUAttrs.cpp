@@ -541,7 +541,7 @@ static LogicalResult populateCanonicalOffsetsSizesAndStrides(
   // vtid = (tid floordiv stride_i) mod size_i.
   SmallVector<OpFoldResult> vtids;
   for (auto [dimSize, dimStride] :
-       llvm::zip(subgroupLayout.thread, subgroupLayout.tstrides)) {
+       llvm::zip_equal(subgroupLayout.thread, subgroupLayout.tstrides)) {
     if (dimSize == 1) {
       vtids.push_back(zero);
     }
