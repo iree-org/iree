@@ -3555,15 +3555,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#encodingroleattr" class="md-nav__link">
-    <span class="md-ellipsis">
-      EncodingRoleAttr
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -3608,7 +3599,6 @@ implement data-tiling.</p>
 </li>
 <li><a href="#attributes_1">Attributes</a><ul>
 <li><a href="#encodingattr">EncodingAttr</a></li>
-<li><a href="#encodingroleattr">EncodingRoleAttr</a></li>
 </ul>
 </li>
 </ul>
@@ -3738,7 +3728,7 @@ MaterializeUpperBoundTileSize pass.</p>
 <p>information to decide how to data-tile a tensor</p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#iree_encoding.encoding&lt;
-  EncodingRoleAttr,   # role
+  IntegerAttr,   # operand_index
   ArrayAttr,   # element_types
   TypeAttr,   # original_type
   IntegerAttr,   # matmul_narrow_M
@@ -3766,9 +3756,9 @@ through operations like pack/unpack.</p>
 </thead>
 <tbody>
 <tr>
-<td style="text-align: center;">role</td>
-<td style="text-align: center;"><code>EncodingRoleAttr</code></td>
-<td>role of this tensor as an operand</td>
+<td style="text-align: center;">operand_index</td>
+<td style="text-align: center;"><code>IntegerAttr</code></td>
+<td>this tensor operand's index in the parameter list</td>
 </tr>
 <tr>
 <td style="text-align: center;">element_types</td>
@@ -3799,34 +3789,6 @@ through operations like pack/unpack.</p>
 <td style="text-align: center;">round_dims_to</td>
 <td style="text-align: center;"><code>DenseArrayAttr</code></td>
 <td>Values for padding M,N,K dimensions</td>
-</tr>
-</tbody>
-</table>
-<h3 id="encodingroleattr">EncodingRoleAttr<a class="headerlink" href="#encodingroleattr" title="Permanent link">link</a></h3>
-<p>Describes the role of the tensor as an operand or a result of an operation.</p>
-<p>Syntax:</p>
-<div class="highlight"><pre><span></span><code>#iree_encoding.role&lt;
-  ::mlir::iree_compiler::IREE::Encoding::EncodingRole   # value
-&gt;
-</code></pre></div>
-<p>Enum cases:
-* LHS (<code>LHS</code>)
-* RHS (<code>RHS</code>)
-* RESULT (<code>RESULT</code>)</p>
-<h5 id="parameters_1">Parameters:<a class="headerlink" href="#parameters_1" title="Permanent link">link</a></h5>
-<table>
-<thead>
-<tr>
-<th style="text-align: center;">Parameter</th>
-<th style="text-align: center;">C++ type</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: center;">value</td>
-<td style="text-align: center;"><code>::mlir::iree_compiler::IREE::Encoding::EncodingRole</code></td>
-<td>an enum of type EncodingRole</td>
 </tr>
 </tbody>
 </table>
