@@ -45,30 +45,16 @@ static Value createTransposeOp(OpBuilder &builder, Value source,
 }
 
 // Constructs a transpose of the given tensor and permutation.
-static Value createTransposedInit(OpBuilder &builder, Value source,
-                                  ArrayRef<int64_t> perm) {
+static Value createPermutedInit(OpBuilder &builder, Value oldInit,
+                                ArrayRef<int64_t> permutation) {
   SmallVector<OpFoldResult> mixedSizes =
-      tensor::getMixedSizes(builder, source.getLoc(), source);
-  applyPermutationToVector(mixedSizes, perm);
-  Type elemType = cast<RankedTensorType>(source.getType()).getElementType();
+      tensor::getMixedSizes(builder, oldInit.getLoc(), oldInit);
+  applyPermutationToVector(mixedSizes, permutation);
+  Type elemType = cast<RankedTensorType>(oldInit.getType()).getElementType();
   Value empty =
-      builder.create<tensor::EmptyOp>(source.getLoc(), mixedSizes, elemType)
+      builder.create<tensor::EmptyOp>(oldInit.getLoc(), mixedSizes, elemType)
           .getResult();
   return empty;
-}
-
-static FailureOr<tensor::ExtractSliceOp>
-matchOuterExtract(tensor::ExtractSliceOp sliceOp) {
-  auto sizes = sliceOp.getStaticSizes();
-  auto sourceShape = sliceOp.getResultType().getShape();
-  int64_t numReducedDims = 0;
-  for (auto [size, length] : llvm::zip(sizes, sourceShape)) {
-    numReducedDims += (size != length);
-    if (numReducedDims > 1) {
-      return failure();
-    }
-  }
-  return sliceOp;
 }
 
 // Get the operand the operand representing the next op to follow.
@@ -125,6 +111,7 @@ static void transposeExtractChain(PatternRewriter &rewriter,
                                   SmallVector<int64_t> &perm, Value &transpose,
                                   tensor::ExtractSliceOp &sliceOp) {
   // Transpose the extract
+  OpBuilder::InsertionGuard g(rewriter);
   rewriter.setInsertionPoint(sliceOp);
   auto resultType = RankedTensorType::get(
       applyPermutation(sliceOp.getResultType().getShape(), perm),
@@ -138,11 +125,12 @@ static void transposeExtractChain(PatternRewriter &rewriter,
   // Transpose from extract until the concat
   Operation *currOp = *newSliceOp.getResult().getUsers().begin();
   while (!isa<tensor::ConcatOp>(currOp)) {
+    OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPointAfter(currOp);
 
     linalg::GenericOp genericOp = llvm::cast<linalg::GenericOp>(currOp);
 
-    Value newInit = createTransposedInit(
+    Value newInit = createPermutedInit(
         rewriter, genericOp.getDpsInitOperand(0)->get(), perm);
     SmallVector<Value> newOperands(genericOp.getOperands());
     newOperands.back() = newInit;
@@ -193,13 +181,17 @@ public:
     SmallVector<int64_t> perm =
         computePermutationVector(outerShape.getRank(), {dim}, {0});
 
-    rewriter.setInsertionPointAfterValue(source);
-    auto transpose = createTransposeOp(rewriter, source, perm);
+    {
+      OpBuilder::InsertionGuard g(rewriter);
+      rewriter.setInsertionPointAfterValue(source);
+      auto transpose = createTransposeOp(rewriter, source, perm);
 
-    for (auto sliceOp : sliceOps) {
-      transposeExtractChain(rewriter, perm, transpose, sliceOp);
+      for (auto sliceOp : sliceOps) {
+        transposeExtractChain(rewriter, perm, transpose, sliceOp);
+      }
     }
 
+    OpBuilder::InsertionGuard g(rewriter);
     rewriter.setInsertionPoint(concatOp);
     SmallVector<int64_t> newConcatShape =
         applyPermutation(concatOp.getResultType().getShape(), perm);
