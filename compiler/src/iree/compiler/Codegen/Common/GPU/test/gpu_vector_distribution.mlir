@@ -46,11 +46,8 @@ func.func @distribute_elementwise_i32(%a: vector<16x16xi32>, %b: vector<16x16xi3
   threads_per_outer       = [8, 2, 4],
   elements_per_thread     = [1, 8, 2],
 
-  subgroup_order          = [0, 1, 2],
-  thread_order            = [0, 1, 2],
-
-  subgroup_basis          = [2, 1, 1],
-  thread_basis            = [8, 2, 4]
+  subgroup_strides        = [1, 1, 1],
+  thread_strides          = [1, 8, 16]
 >
 
 // CHECK-LABEL: @distribute_elementwise_nested_layout_f16

@@ -5,7 +5,6 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
 #include <cstdint>
-#include <numeric>
 #include "iree-dialects/Dialect/VectorExt/IR/VectorExtDialect.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUPatterns.h"
 #include "iree/compiler/Codegen/Common/GPU/GPUVectorDistribution.h"
@@ -123,36 +122,18 @@ getElementVectorTileShape(NestedLayoutAttr vectorLayout) {
 /// Computes the warp and thread indices for the given vector layout from a
 /// single linearized thread ID.
 static void populateWarpAndThreadIndices(RewriterBase &rewriter, Value threadId,
+                                         int64_t subgroupSize,
                                          NestedLayoutAttr vectorLayout,
                                          SmallVector<Value> &warpIndices,
                                          SmallVector<Value> &threadIndices) {
-  int64_t subgroupRank = vectorLayout.getSubgroupBasis().size();
   // The delinearized thread IDs are returned from outer most to inner most,
   // i.e. before applying the layout described dimensions ordering.
+  int64_t rank = vectorLayout.getRank();
   SmallVector<Value> threadIds =
-      vectorLayout.computeThreadIds(threadId, rewriter);
-
-  SmallVector<Value> filteredSubgroupIds;
-  for (auto [id, active] :
-       llvm::zip(threadIds, vectorLayout.getSubgroupActiveIds())) {
-    if (active)
-      filteredSubgroupIds.push_back(id);
-  }
-  SmallVector<Value> filteredThreadIds;
-  for (auto [id, active] : llvm::zip(llvm::drop_begin(threadIds, subgroupRank),
-                                     vectorLayout.getThreadActiveIds())) {
-    if (active)
-      filteredThreadIds.push_back(id);
-  }
-
-  // Subgroup and thread (lane) indices normalized to the order in which
-  // they are used by each dimension.
-  warpIndices = llvm::to_vector(
-      llvm::map_range(invertPermutationVector(vectorLayout.getSubgroupOrder()),
-                      [&](int64_t i) { return filteredSubgroupIds[i]; }));
-  threadIndices = llvm::to_vector(
-      llvm::map_range(invertPermutationVector(vectorLayout.getThreadOrder()),
-                      [&](int64_t i) { return filteredThreadIds[i]; }));
+      vectorLayout.computeThreadIds(threadId, subgroupSize, rewriter);
+  warpIndices = SmallVector<Value>(threadIds.begin(), threadIds.begin() + rank);
+  threadIndices = SmallVector<Value>(threadIds.begin() + rank,
+                                     threadIds.begin() + 2 * rank);
 }
 
 namespace {
@@ -162,8 +143,10 @@ struct DistributeTransferRead final
     : OpDistributionPattern<vector::TransferReadOp> {
   using OpDistributionPattern::OpDistributionPattern;
 
-  DistributeTransferRead(MLIRContext *context, Value threadId)
-      : OpDistributionPattern(context), threadId(threadId) {}
+  DistributeTransferRead(MLIRContext *context, Value threadId,
+                         int64_t subgroupSize)
+      : OpDistributionPattern(context), threadId(threadId),
+        subgroupSize(subgroupSize) {}
 
   LogicalResult matchAndRewrite(vector::TransferReadOp readOp,
                                 DistributionSignature &signature,
@@ -204,8 +187,8 @@ struct DistributeTransferRead final
     VectorValue acc = cast<VectorValue>(zero);
 
     SmallVector<Value> warpIndices, threadIndices;
-    populateWarpAndThreadIndices(rewriter, threadId, vectorLayout, warpIndices,
-                                 threadIndices);
+    populateWarpAndThreadIndices(rewriter, threadId, subgroupSize, vectorLayout,
+                                 warpIndices, threadIndices);
 
     ValueRange indices = readOp.getIndices();
     SmallVector<int64_t> strides(rank, 1);
@@ -229,6 +212,7 @@ struct DistributeTransferRead final
   }
 
   Value threadId;
+  int64_t subgroupSize;
 };
 
 /// Pattern to distribute `vector.transfer_write` ops with nested layouts.
@@ -236,8 +220,10 @@ struct DistributeTransferWrite final
     : OpDistributionPattern<vector::TransferWriteOp> {
   using OpDistributionPattern::OpDistributionPattern;
 
-  DistributeTransferWrite(MLIRContext *context, Value threadId)
-      : OpDistributionPattern(context), threadId(threadId) {}
+  DistributeTransferWrite(MLIRContext *context, Value threadId,
+                          int64_t subgroupSize)
+      : OpDistributionPattern(context), threadId(threadId),
+        subgroupSize(subgroupSize) {}
 
   LogicalResult matchAndRewrite(vector::TransferWriteOp writeOp,
                                 DistributionSignature &signature,
@@ -264,8 +250,8 @@ struct DistributeTransferWrite final
     int64_t rank = vectorLayout.getRank();
 
     SmallVector<Value> warpIndices, threadIndices;
-    populateWarpAndThreadIndices(rewriter, threadId, vectorLayout, warpIndices,
-                                 threadIndices);
+    populateWarpAndThreadIndices(rewriter, threadId, subgroupSize, vectorLayout,
+                                 warpIndices, threadIndices);
 
     Value distributedVector =
         getDistributed(rewriter, writeOp.getVector(), vectorLayout);
@@ -295,6 +281,7 @@ struct DistributeTransferWrite final
   }
 
   Value threadId;
+  int64_t subgroupSize;
 };
 
 struct DistributeBroadcast final : OpDistributionPattern<vector::BroadcastOp> {
@@ -395,21 +382,7 @@ struct DistributeBroadcast final : OpDistributionPattern<vector::BroadcastOp> {
 };
 
 static int64_t getShuffleOffset(NestedLayoutAttr layout, int64_t dim) {
-  // Get strides for dimensions based on layouts.
-  SmallVector<int64_t> threadBasis(layout.getThreadBasis());
-  SmallVector<int64_t> basisStrides(threadBasis.size());
-  // Take prefix sum to get strides.
-  std::exclusive_scan(threadBasis.rbegin(), threadBasis.rend(),
-                      basisStrides.rbegin(), 1, std::multiplies<>{});
-  // Remove non-active thread ids.
-  SmallVector<int64_t> activeThreadStrides;
-  for (auto [i, stride] : llvm::enumerate(basisStrides)) {
-    if (layout.getThreadActiveIds()[i]) {
-      activeThreadStrides.push_back(stride);
-    }
-  }
-  // TODO: Do we need to do inversion or not?
-  return activeThreadStrides[layout.getThreadOrder()[dim]];
+  return layout.getThreadStrides()[dim];
 }
 
 static int64_t getShuffleWidth(NestedLayoutAttr layout, int64_t dim) {
@@ -623,7 +596,7 @@ void populateGPUDistributeNestedLayoutAttrPatterns(RewritePatternSet &patterns,
                                                    int64_t subgroupSize,
                                                    int64_t maxBitsPerShuffle) {
   patterns.add<DistributeTransferRead, DistributeTransferWrite>(
-      patterns.getContext(), threadId);
+      patterns.getContext(), threadId, subgroupSize);
   patterns.add<DistributeBroadcast, DistributeTranspose>(patterns.getContext());
   patterns.add<DistributeMultiReduction>(patterns.getContext(), subgroupSize,
                                          maxBitsPerShuffle);
