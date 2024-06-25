@@ -126,18 +126,18 @@ util.func public @use_in_dispatch_count(%arg0: tensor<1xi32>, %arg1: tensor<1xi3
 
 // -----
 
-util.func public @clone_dequantization(%arg0: tensor<4096x32x128xi8>, %arg1: tensor<1x1x32x128xf32>, %arg2: tensor<4096x32x1xf32>, %arg3: tensor<4096x32x1xf32>) -> tensor<1x1x4096xf32> {
+util.func public @clone_dequantization(%arg0: tensor<4096x32x128xi8>, %arg1: tensor<1x1x32x128xf32>, %arg2: tensor<4096x32xf32>, %arg3: tensor<4096x32xf32>) -> tensor<1x1x4096xf32> {
   %cst = arith.constant 0.000000e+00 : f32
   %0 = tensor.empty() : tensor<1x1x4096xf32>
   %1 = tensor.empty() : tensor<4096x32x128xf32>
   %2 = linalg.fill ins(%cst : f32) outs(%0 : tensor<1x1x4096xf32>) -> tensor<1x1x4096xf32>
   %3 = linalg.generic {
       indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
-                        affine_map<(d0, d1, d2) -> (d0, d1, 0)>,
-                        affine_map<(d0, d1, d2) -> (d0, d1, 0)>,
+                        affine_map<(d0, d1, d2) -> (d0, d1)>,
+                        affine_map<(d0, d1, d2) -> (d0, d1)>,
                         affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
       iterator_types = ["parallel", "parallel", "parallel"]}
-      ins(%arg0, %arg2, %arg3 : tensor<4096x32x128xi8>, tensor<4096x32x1xf32>, tensor<4096x32x1xf32>) outs(%1 : tensor<4096x32x128xf32>) {
+      ins(%arg0, %arg2, %arg3 : tensor<4096x32x128xi8>, tensor<4096x32xf32>, tensor<4096x32xf32>) outs(%1 : tensor<4096x32x128xf32>) {
   ^bb0(%in: i8, %in_0: f32, %in_1: f32, %out: f32):
     %5 = arith.extui %in : i8 to i32
     %6 = arith.uitofp %5 : i32 to f32
@@ -164,8 +164,8 @@ util.func public @clone_dequantization(%arg0: tensor<4096x32x128xi8>, %arg1: ten
 //       CHECK: util.func public @clone_dequantization
 //  CHECK-SAME:   %[[ARG0:[a-zA-Z0-9_]+]]: tensor<4096x32x128xi8>
 //  CHECK-SAME:   %[[ARG1:[a-zA-Z0-9_]+]]: tensor<1x1x32x128xf32>
-//  CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: tensor<4096x32x1xf32>
-//  CHECK-SAME:   %[[ARG3:[a-zA-Z0-9_]+]]: tensor<4096x32x1xf32>
+//  CHECK-SAME:   %[[ARG2:[a-zA-Z0-9_]+]]: tensor<4096x32xf32>
+//  CHECK-SAME:   %[[ARG3:[a-zA-Z0-9_]+]]: tensor<4096x32xf32>
 //       CHECK:   %[[DISP:.+]] = flow.dispatch.region -> (tensor<1x1x4096xf32>)
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0.000000e+00 : f32
 //   CHECK-DAG:   %[[INIT1:.+]] = tensor.empty() : tensor<1x1x4096xf32>
@@ -287,3 +287,42 @@ util.func public @clone_elementwise_op_empty() -> tensor<1280xf32> {
 // CHECK-SAME:         outs(%[[EMPTY]] :
 //      CHECK:     flow.return %[[GENERIC]]
 //      CHECK:   util.return %[[RETURN]]
+
+// -----
+
+util.func public @clone_broadcast_dequant_op(
+    %arg0 : tensor<10x20xi8>, %arg1 : tensor<2x10xi32>) -> tensor<2x10xi32> {
+  %0 = tensor.empty() : tensor<2x10x20xi32>
+  %1 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2) -> (d1, d2)>,
+                       affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
+      iterator_types = ["parallel", "parallel", "parallel"]}
+      ins(%arg0 : tensor<10x20xi8>) outs(%0 : tensor<2x10x20xi32>) {
+    ^bb0(%b0 : i8, %b1 : i32):
+      %2 = arith.extsi %b0 : i8 to i32
+      linalg.yield %2 : i32
+  } -> tensor<2x10x20xi32>
+  %2 = flow.dispatch.region -> (tensor<2x10xi32>) {
+    %3 = linalg.generic {
+        indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
+                         affine_map<(d0, d1, d2) -> (d0, d1)>],
+        iterator_types = ["parallel", "parallel", "reduction"]}
+        ins(%1 : tensor<2x10x20xi32>) outs(%arg1 : tensor<2x10xi32>) {
+      ^bb0(%b0: i32, %b1 : i32) :
+        %4 = arith.addi %b0, %b1 : i32
+        linalg.yield %4 : i32
+    } -> tensor<2x10xi32>
+    flow.return %3 : tensor<2x10xi32>
+  }
+  util.return %2 : tensor<2x10xi32>
+}
+// CHECK-LABEL: func public @clone_broadcast_dequant_op(
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<10x20xi8>,
+//  CHECK-SAME:     %[[ARG1:.+]]: tensor<2x10xi32>)
+//       CHECK:   %[[RETURN:.+]] = flow.dispatch.region
+//       CHECK:     %[[DEQUANT:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[ARG0]] :
+//       CHECK:     %[[REDUCE:.+]] = linalg.generic
+//  CHECK-SAME:         ins(%[[DEQUANT]] :
+//       CHECK:     flow.return %[[REDUCE]]
+//       CHECK:   return %[[RETURN]]
