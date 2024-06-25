@@ -26,7 +26,10 @@ struct DataLayoutPropagationPass
     linalg::populateDataLayoutPropagationPatterns(patterns, [](Operation *op) {
       // Currently only bubble up/push down pack/unpack through collapse/expand
       // shape ops.
-      return isa<tensor::CollapseShapeOp, tensor::ExpandShapeOp>(op);
+      // TODO(#17734): The propagation through expand_shape ops is broken.
+      // Enable the propagation once we find it useful and the upstream issue is
+      // fixed.
+      return isa<tensor::CollapseShapeOp>(op);
     });
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       funcOp.emitOpError("folding patterns failed");
