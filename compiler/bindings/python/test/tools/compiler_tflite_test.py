@@ -35,9 +35,9 @@ def mlir_bytecode_to_text(bytecode):
     inv.parse_source(source)
     out = Output.open_membuffer()
     inv.output_ir(out)
-    mem = out.map_memory()
+    text_ir = str(bytes(out.map_memory()))
     out.close()
-    return str(bytes(mem))
+    return text_ir
 
 
 class CompilerTest(unittest.TestCase):
