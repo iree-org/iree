@@ -17,7 +17,11 @@ else:
     import tempfile
     import unittest
 
-    from iree.compiler.api import *
+    from iree.compiler.api import (
+        Session,
+        Source,
+        Output,
+    )
     from iree.compiler import ir
 
     class DlFlagsTest(unittest.TestCase):
@@ -80,6 +84,69 @@ else:
             mem = out.map_memory()
             self.assertIn(b"module", bytes(mem))
             out.close()
+
+        def testInputBytecode(self):
+            this_dir = os.path.dirname(__file__)
+            with open(
+                os.path.join(this_dir, "testdata", "bytecode_testfile.bc"), "rb"
+            ) as f:
+                bytecode = f.read()
+            session = Session()
+            inv = session.invocation()
+            source = Source.wrap_buffer(session, bytecode)
+            inv.parse_source(source)
+            out = Output.open_membuffer()
+            inv.output_ir(out)
+            mem = out.map_memory()
+            self.assertIn(b"module", bytes(mem))
+            out.close()
+
+        def testInputZeroTerminatedBytecode(self):
+            this_dir = os.path.dirname(__file__)
+            with open(
+                os.path.join(
+                    this_dir, "testdata", "bytecode_zero_terminated_testfile.bc"
+                ),
+                "rb",
+            ) as f:
+                bytecode = f.read()
+            session = Session()
+            inv = session.invocation()
+            source = Source.wrap_buffer(session, bytecode)
+            inv.parse_source(source)
+            out = Output.open_membuffer()
+            inv.output_ir(out)
+            mem = out.map_memory()
+            self.assertIn(b"module", bytes(mem))
+            out.close()
+
+        def testInputRoundtrip(self):
+            test_ir = b"builtin.module {}"
+            session = Session()
+            inv = session.invocation()
+            source = Source.wrap_buffer(
+                session,
+                bytes(test_ir),
+            )
+            inv.parse_source(source)
+            out = Output.open_membuffer()
+            inv.output_ir_bytecode(out)
+            mem = out.map_memory()
+            bytecode = bytes(mem)
+            out.close()
+            session = Session()
+            inv = session.invocation()
+            source = Source.wrap_buffer(
+                session,
+                bytecode,
+            )
+            inv.parse_source(source)
+            out = Output.open_membuffer()
+            inv.output_ir(out)
+            mem = out.map_memory()
+            text_out = bytes(mem)
+            out.close()
+            self.assertIn(b"module", text_out)
 
         def testOutputBytecode(self):
             session = Session()
