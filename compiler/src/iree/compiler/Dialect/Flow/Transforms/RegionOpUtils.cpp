@@ -566,8 +566,8 @@ bool isDequantizationLikeOp(Operation *op) {
     if (!elementType.isIntOrFloat()) {
       return false;
     }
-    maxInputElementBitWidth = std::max(
-        maxInputElementBitWidth, t.getElementType().getIntOrFloatBitWidth());
+    maxInputElementBitWidth =
+        std::max(maxInputElementBitWidth, elementType.getIntOrFloatBitWidth());
   }
 
   // Check that the identity input element bitwidth is smaller than the output
