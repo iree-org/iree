@@ -538,7 +538,8 @@ struct ConvertDispatchWorkgroupInfoPattern final
   LogicalResult matchAndRewrite(SrcOp op,
                                 PatternRewriter &rewriter) const override {
     rewriter.replaceOpWithNewOp<DstOp>(op, op.getResult().getType(),
-                                       op.getDimensionAttr());
+                                       op.getDimensionAttr(),
+                                       /*upper_bound=*/nullptr);
     return success();
   }
 };

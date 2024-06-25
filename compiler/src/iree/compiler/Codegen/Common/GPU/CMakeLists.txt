@@ -62,6 +62,7 @@ iree_cc_library(
     "GPUPatterns.cpp"
     "GPUPipelining.cpp"
     "GPUPromoteMatmulOperands.cpp"
+    "GPUPropagateDispatchSizeBounds.cpp"
     "GPUReduceBankConflicts.cpp"
     "GPUTensorAlloc.cpp"
     "GPUTensorTile.cpp"
