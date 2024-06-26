@@ -37,14 +37,13 @@ public:
   void runOnOperation() override;
 };
 
-/// Checks whether the given op can be hoisted by checking that
-/// - the op and none of its contained operations depend on values inside of the
-///   loop (by means of calling definedOutside).
-/// - the op has no side-effects.
-static bool canBeHoisted(Operation *op,
-                         function_ref<bool(OpOperand &)> condition) {
+// Check if this insertion is loop invariant except it's source.
+// We would also be okay as long as the destination is loop invariant,
+// but we would have to do some cloning, so we don't do it here.
+static bool canBeHoisted(LoopLikeOpInterface loopLike,
+                         SubsetInsertionOpInterface insertion) {
   // Do not move terminators.
-  if (op->hasTrait<OpTrait::IsTerminator>())
+  if (insertion->hasTrait<OpTrait::IsTerminator>())
     return false;
 
   // Walk the nested operations and check that all used values are either
@@ -53,14 +52,16 @@ static bool canBeHoisted(Operation *op,
   auto walkFn = [&](Operation *child) {
     for (OpOperand &operand : child->getOpOperands()) {
       // Ignore values defined in a nested region.
-      if (op->isAncestor(operand.get().getParentRegion()->getParentOp()))
+      if (insertion->isAncestor(operand.get().getParentRegion()->getParentOp()))
         continue;
-      if (!condition(operand))
+      if (!loopLike.isDefinedOutsideOfLoop(operand.get()) &&
+          &operand != &insertion.getSourceOperand()) {
         return WalkResult::interrupt();
+      }
     }
     return WalkResult::advance();
   };
-  return !op->walk(walkFn).wasInterrupted();
+  return !insertion->walk(walkFn).wasInterrupted();
 }
 
 /// Return the newly created loop op (that has extra iter_args) or the original
@@ -74,13 +75,7 @@ hoistLoopInvariantSubsetAtIterArg(RewriterBase &rewriter,
   if (!insertion) {
     return loopLike;
   }
-  // Check if this insertion is loop invariant except it's source.
-  // We would also be okay as long as the destination is loop invariant,
-  // but we would have to do some cloning, so we don't do it here.
-  if (!canBeHoisted(insertion, [&](OpOperand &operand) {
-        return loopLike.isDefinedOutsideOfLoop(operand.get()) ||
-               &operand == &insertion.getSourceOperand();
-      })) {
+  if (!canBeHoisted(loopLike, insertion)) {
     return loopLike;
   }
 
