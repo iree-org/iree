@@ -360,6 +360,7 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   }
 
   // Step 2: Compute indices into the input tensor for extract_slice.
+  OpBuilder::InsertionGuard guard(b);
   b.setInsertionPoint(loopNest.loops.front());
   SetVector<int64_t> mPosSet(getMPos().begin(), getMPos().end());
 
@@ -430,11 +431,7 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   // of m_offset and the offset from the tiled loop, using the mBasis. This
   // will give an index into the delinearized output space of the convolution.
   Value mArg = tileK ? ivs[ivs.size() - 2] : ivs.back();
-  AffineExpr d0, d1;
-  bindDims(b.getContext(), d0, d1);
-  auto addMap = AffineMap::get(2, 0, {d0 + d1});
-  OpFoldResult linearMOffset = affine::makeComposedFoldedAffineApply(
-      b, nestedLoc, addMap, {mArg, mOffset[0]});
+  OpFoldResult linearMOffset = addOfrs(b, nestedLoc, mArg, mOffset.front());
   FailureOr<SmallVector<Value>> maybeDelinMOffset = affine::delinearizeIndex(
       b, nestedLoc,
       getValueOrCreateConstantIndexOp(b, nestedLoc, linearMOffset), mBasis);
@@ -444,23 +441,22 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   SmallVector<Value> delinMOffset = maybeDelinMOffset.value();
 
   // Compute the final offsets into the input tensor.
-  SmallVector<OpFoldResult> sliceOffsets(
-      getInputRank(), getAsIndexOpFoldResult(b.getContext(), 0));
-  SmallVector<OpFoldResult> sliceStrides(
-      getInputRank(), getAsIndexOpFoldResult(b.getContext(), 1));
-  SmallVector<OpFoldResult> sliceSizes(
-      getInputRank(), getAsIndexOpFoldResult(b.getContext(), 1));
+  OpFoldResult zero = b.getIndexAttr(0);
+  OpFoldResult one = b.getIndexAttr(1);
+  SmallVector<OpFoldResult> sliceOffsets(getInputRank(), zero);
+  SmallVector<OpFoldResult> sliceStrides(getInputRank(), one);
+  SmallVector<OpFoldResult> sliceSizes(getInputRank(), one);
   // Add the offset into the convolution window, and account for strides and
   // dilations.
+  AffineExpr mOff, wOff;
+  bindDims(b.getContext(), mOff, wOff);
   for (auto [idx, mPos] : llvm::enumerate(getMPos())) {
-    AffineExpr mOff, wOff;
-    bindDims(b.getContext(), mOff, wOff);
     auto map =
         AffineMap::get(2, 0, {mOff * strides[idx] + wOff * dilations[idx]});
     OpFoldResult offset = affine::makeComposedFoldedAffineApply(
         b, nestedLoc, map, {delinMOffset[idx], windowOffset[idx]});
     sliceOffsets[mPos] = offset;
-    sliceSizes[mPos] = getAsIndexOpFoldResult(b.getContext(), 1);
+    sliceSizes[mPos] = one;
   }
   // Set the K offset and size for the input tensor.
   const int64_t kPos = getKPos().front();
@@ -491,12 +487,9 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
                                        sliceOffsets, sliceSizes, sliceStrides);
 
   // Insert the slice into the destination tensor.
-  sliceOffsets = SmallVector<OpFoldResult>(
-      getOutputRank(), getAsIndexOpFoldResult(b.getContext(), 0));
-  sliceSizes = SmallVector<OpFoldResult>(
-      getOutputRank(), getAsIndexOpFoldResult(b.getContext(), 1));
-  sliceStrides = SmallVector<OpFoldResult>(
-      getOutputRank(), getAsIndexOpFoldResult(b.getContext(), 1));
+  sliceOffsets = SmallVector<OpFoldResult>(getOutputRank(), zero);
+  sliceSizes = SmallVector<OpFoldResult>(getOutputRank(), one);
+  sliceStrides = SmallVector<OpFoldResult>(getOutputRank(), one);
   sliceSizes.back() = kTileSize;
   for (auto [idx, iv] : llvm::enumerate(ivs)) {
     sliceOffsets[idx] = iv;
@@ -517,8 +510,9 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
                                       sliceOffsets, sliceSizes, sliceStrides);
   auto yieldOp =
       cast<scf::YieldOp>(loopNest.loops.back().getBody()->getTerminator());
-  b.create<scf::YieldOp>(yieldOp->getLoc(), insert.getResult());
-  yieldOp.erase();
+  yieldOp->getOpOperands().front().assign(insert.getResult());
+  // b.create<scf::YieldOp>(yieldOp->getLoc(), insert.getResult());
+  // yieldOp.erase();
   return SmallVector<Value>({loopNest.results[0]});
 }
 
