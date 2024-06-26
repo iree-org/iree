@@ -112,4 +112,13 @@ iree_tablegen_library(
     --gen-op-defs IREEGPUOps.cpp.inc
 )
 
+iree_tablegen_doc(
+  NAME
+    IREEGPUDialectDocGen
+  TD_FILE
+    "IREEGPUOps.td"
+  OUTS
+    --gen-dialect-doc --dialect=iree_gpu IREEGPUDialect.md
+)
+
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

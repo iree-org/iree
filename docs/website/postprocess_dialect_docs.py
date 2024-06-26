@@ -70,10 +70,13 @@ def main(args):
     dialect_sources_map = {
         "Check.md": "compiler/src/iree/compiler/Modules/Check/IR",
         "Flow.md": "compiler/src/iree/compiler/Dialect/Flow/IR",
+        "Encoding.md": "compiler/src/iree/compiler/Dialect/Encoding/IR",
         "HAL.md": "compiler/src/iree/compiler/Dialect/HAL/IR",
         "HALInline.md": "compiler/src/iree/compiler/Modules/HAL/Inline/IR",
         "HALLoader.md": "compiler/src/iree/compiler/Modules/HAL/Loader/IR",
         "IOParameters.md": "compiler/src/iree/compiler/Modules/IO/Parameters/IR",
+        "IREECodegen.md": "compiler/src/iree/compiler/Codegen/Dialect/Codegen/IR",
+        "IREEGPU.md": "compiler/src/iree/compiler/Codegen/Dialect/GPU/IR",
         "IREEInput.md": "llvm-external-projects/iree-dialects/include/iree-dialects/Dialect/Input",
         "IREEVectorExt.md": "llvm-external-projects/iree-dialects/include/iree-dialects/Dialect/VectorExt/IR",
         "LinalgExt.md": "compiler/src/iree/compiler/Dialect/LinalgExt/IR",
