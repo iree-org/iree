@@ -151,7 +151,8 @@ static bool willBeContiguousSlice(OpFoldResult inputSize, OpFoldResult tileSize,
     return true;
   }
   auto affineOp = cast<Value>(offset).getDefiningOp<affine::AffineApplyOp>();
-  return affineOp.getMap().getResult(0).isMultipleOf(constTileSize.value());
+  return affineOp &&
+         affineOp.getMap().getResult(0).isMultipleOf(constTileSize.value());
 }
 
 // Helper method to add 2 OpFoldResult inputs with affine.apply.
@@ -447,7 +448,8 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
       getInputRank(), getAsIndexOpFoldResult(b.getContext(), 0));
   SmallVector<OpFoldResult> sliceStrides(
       getInputRank(), getAsIndexOpFoldResult(b.getContext(), 1));
-  SmallVector<OpFoldResult> sliceSizes(inputSizes);
+  SmallVector<OpFoldResult> sliceSizes(
+      getInputRank(), getAsIndexOpFoldResult(b.getContext(), 1));
   // Add the offset into the convolution window, and account for strides and
   // dilations.
   for (auto [idx, mPos] : llvm::enumerate(getMPos())) {
