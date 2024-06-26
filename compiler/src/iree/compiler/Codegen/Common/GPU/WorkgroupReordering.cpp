@@ -68,6 +68,88 @@ makeSwizzledIds(Location loc, OpBuilder b, Value workgroupIdX,
   return {swizzledIdX, swizzledIdY};
 }
 
+static Value chipletAwareWorkgroupReordering(Location loc, OpBuilder b,
+                                             Value linearizedId,
+                                             Value workgroupCountX,
+                                             Value workgroupCountY,
+                                             int64_t numChipletsPerGroup) {
+  Value numChipletsVal =
+      b.createOrFold<arith::ConstantIndexOp>(loc, numChipletsPerGroup);
+  Value workgroupCount =
+      b.create<arith::MulIOp>(loc, workgroupCountX, workgroupCountY);
+  Value workgroupCountPerChiplet =
+      b.create<arith::DivUIOp>(loc, workgroupCount, numChipletsVal);
+  Value chipletId = b.create<arith::RemUIOp>(loc, linearizedId, numChipletsVal);
+  Value wgIdWithinChiplet =
+      b.create<arith::DivUIOp>(loc, linearizedId, numChipletsVal);
+  Value reorderedId = b.create<arith::AddIOp>(
+      loc, wgIdWithinChiplet,
+      b.create<arith::MulIOp>(loc, chipletId, workgroupCountPerChiplet));
+
+  // The following code is used to handle the remainder part
+
+  Value constOne = b.createOrFold<arith::ConstantIndexOp>(loc, 1);
+  Value lastWorkgroupId =
+      b.create<arith::SubIOp>(loc, workgroupCount, constOne);
+  Value modulatedLastWorkgroupId = b.create<arith::SubIOp>(
+      loc, lastWorkgroupId,
+      b.create<arith::RemUIOp>(loc, workgroupCount, numChipletsVal));
+  Value isGreaterThanFinalWorkgroupId = b.create<arith::CmpIOp>(
+      loc, arith::CmpIPredicate::ugt, linearizedId, modulatedLastWorkgroupId);
+  linearizedId = b.create<arith::SelectOp>(loc, isGreaterThanFinalWorkgroupId,
+                                           linearizedId, reorderedId);
+
+  return linearizedId;
+}
+// Detailed explaination about the idea behind this implementation:
+// the L2 Cache Optimizations subsection in
+// https://triton-lang.org/main/getting-started/tutorials/03-matrix-multiplication.html#
+static std::pair<Value, Value> makeChipletGroupedIds(Location loc, OpBuilder b,
+                                                     Value workgroupIdX,
+                                                     Value workgroupIdY,
+                                                     Value workgroupCountX,
+                                                     Value workgroupCountY) {
+  // Create one dimension ID for workgroup
+  Value linearized =
+      b.create<arith::MulIOp>(loc, workgroupIdY, workgroupCountX);
+  linearized = b.create<arith::AddIOp>(loc, linearized, workgroupIdX);
+
+  // This value is for cdna3(mi300x)
+  int64_t numXCUs = 8;
+  // Map chiplets to perform a spatially local tile operation.
+  // Reorder the linearized ID such that every consecutive group of chiplets
+  // is the slowest-changing dimension in the grid.
+  // Emphircally found that two chiplets as a group has better locality
+  // throughout.
+  linearized = chipletAwareWorkgroupReordering(
+      loc, b, linearized, workgroupCountX, workgroupCountY, numXCUs / 2);
+  // Emphircally, found 64 for mi300x achieves good performance
+  int64_t rowGroupSize = 64;
+  Value rowGroupSizeVal =
+      b.createOrFold<arith::ConstantIndexOp>(loc, rowGroupSize);
+  // group every 16 workgroups along Y dimension
+  // Number of workgroups in the group
+  Value numWorkGroupsPerRowBlock =
+      b.create<arith::MulIOp>(loc, rowGroupSizeVal, workgroupCountX);
+
+  Value groupId =
+      b.create<arith::DivUIOp>(loc, linearized, numWorkGroupsPerRowBlock);
+  Value firstRowID = b.create<arith::MulIOp>(loc, groupId, rowGroupSizeVal);
+
+  Value currentRowGroupSize = b.create<arith::MinUIOp>(
+      loc, b.create<arith::SubIOp>(loc, workgroupCountY, firstRowID),
+      rowGroupSizeVal);
+
+  Value newY = b.create<arith::AddIOp>(
+      loc, firstRowID,
+      b.create<arith::RemUIOp>(loc, linearized, currentRowGroupSize));
+
+  Value newX = b.create<arith::DivUIOp>(
+      loc, b.create<arith::RemUIOp>(loc, linearized, numWorkGroupsPerRowBlock),
+      currentRowGroupSize);
+  return {newX, newY};
+}
+
 /// Transpose IDs, i.e., changes the traversal order from left -> right then
 /// top -> bottom to top -> bottom then left -> right.
 static std::pair<Value, Value> makeTransposedIds(Location loc, OpBuilder b,
@@ -148,12 +230,19 @@ static LogicalResult reorderWorkgroupsInFunc(FunctionOpInterface funcOp,
   Value workgroupIdY =
       builder.create<IREE::HAL::InterfaceWorkgroupIDOp>(funcOp.getLoc(), 1);
   auto [workgroupCntX, workgroupCntY] = getWorkgroupCountsXY(builder, funcOp);
+  // llvm::dbgs() << "X = " << workgroupCntX << "\t Y = " << workgroupCntY <<
+  // "\n";
   Value newWorkgroupIdX;
   Value newWorkgroupIdY;
   if (strategy == ReorderWorkgroupsStrategy::Swizzle) {
     std::tie(newWorkgroupIdX, newWorkgroupIdY) =
         makeSwizzledIds(funcOp.getLoc(), builder, workgroupIdX, workgroupIdY,
                         workgroupCntX, workgroupCntY, swizzleTile);
+  } else if (strategy == ReorderWorkgroupsStrategy::ChipletGroup) {
+    // llvm::dbgs() << "Here is Bangtian's New Implementation \n";
+    std::tie(newWorkgroupIdX, newWorkgroupIdY) =
+        makeChipletGroupedIds(funcOp.getLoc(), builder, workgroupIdX,
+                              workgroupIdY, workgroupCntX, workgroupCntY);
   } else {
     assert(strategy == ReorderWorkgroupsStrategy::Transpose &&
            "Unhandled strategy");
@@ -201,6 +290,7 @@ struct ReorderWorkgroupsPass final
     auto selectedStrategy =
         llvm::StringSwitch<FailureOr<ReorderWorkgroupsStrategy>>(strategy)
             .Case("", ReorderWorkgroupsStrategy::None)
+            .Case("chipletgroup", ReorderWorkgroupsStrategy::ChipletGroup)
             .Case("swizzle", ReorderWorkgroupsStrategy::Swizzle)
             .Case("transpose", ReorderWorkgroupsStrategy::Transpose)
             .Default(failure());

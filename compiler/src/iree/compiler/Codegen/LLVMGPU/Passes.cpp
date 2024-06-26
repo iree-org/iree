@@ -57,6 +57,8 @@ static llvm::cl::opt<ReorderWorkgroupsStrategy> clReorderWorkgroupsStrategy(
                                 "No workgroup reordering"),
                      clEnumValN(ReorderWorkgroupsStrategy::Swizzle, "swizzle",
                                 "Swizzle"),
+                     clEnumValN(ReorderWorkgroupsStrategy::ChipletGroup,
+                                "chipletgroup", "ChipletGroup"),
                      clEnumValN(ReorderWorkgroupsStrategy::Transpose,
                                 "transpose", "Transpose")),
     llvm::cl::init(ReorderWorkgroupsStrategy::None));
@@ -85,6 +87,9 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
       reorderStr = "transpose";
     } else if (options.reorderStrategy == ReorderWorkgroupsStrategy::Swizzle) {
       reorderStr = "swizzle";
+    } else if (options.reorderStrategy ==
+               ReorderWorkgroupsStrategy::ChipletGroup) {
+      reorderStr = "chilpletgroup";
     } else {
       assert(options.reorderStrategy == ReorderWorkgroupsStrategy::None &&
              "Unhandled reorder option");
@@ -92,7 +97,8 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
     }
   }
 
-  return os << "{" << "enableReduceSharedMemoryBankConflicts = "
+  return os << "{"
+            << "enableReduceSharedMemoryBankConflicts = "
             << options.enableReduceSharedMemoryBankConflicts
             << ", reorderWorkgroupsStrategy = " << reorderStr
             << ", enableUkernels = " << options.enableUkernels << "}";

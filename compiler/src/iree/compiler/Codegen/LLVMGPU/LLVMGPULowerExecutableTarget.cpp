@@ -100,6 +100,9 @@ getPipelineOptions(FunctionOpInterface funcOp,
         pipelineOptions.reorderStrategy = ReorderWorkgroupsStrategy::Transpose;
       } else if (reorderStr == "swizzle") {
         pipelineOptions.reorderStrategy = ReorderWorkgroupsStrategy::Swizzle;
+      } else if (reorderStr == "chipletgroup") {
+        pipelineOptions.reorderStrategy =
+            ReorderWorkgroupsStrategy::ChipletGroup;
       } else {
         if (reorderStr != "none")
           funcOp.emitOpError()
