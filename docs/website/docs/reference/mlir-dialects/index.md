@@ -25,8 +25,8 @@ Dialect                     | Description
 [HAL/Inline](./HALInline.md) | Inline HAL interop runtime module dialect
 [HAL/Loader](./HALLoader.md) | HAL inline executable loader runtime module dialect
 [IO/Parameters](./IOParameters.md) | External parameter resource management APIs
-[IREECodegen](./IREECodegen.md) | Attributes used by IREE code generation
-[IREEGPU](./IREEGPU.md) | Attributes used by GPU focused IREE code generation
+[IREECodegen](./IREECodegen.md) | Common functionality used by IREE code generation
+[IREEGPU](./IREEGPU.md) | Common functionality used by GPU focused IREE code generation
 [LinalgExt](./LinalgExt.md) | Extensions to the Linalg dialect for specific operations
 [Stream](./Stream.md)       | Model execution partitioning and scheduling
 [Util](./Util.md)           | Types and ops common across IREE subdialects
