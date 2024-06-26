@@ -15,6 +15,7 @@
 #include "iree/compiler/Codegen/Dialect/GPU/IR/IREEGPUAttrs.h"
 #include "iree/compiler/Codegen/Interfaces/PartitionableLoopsInterface.h"
 #include "iree/compiler/Codegen/Interfaces/UKernelOpInterface.h"
+#include "iree/compiler/Codegen/LLVMGPU/Passes.h"
 #include "iree/compiler/Codegen/TransformStrategies/GPU/Strategies.h"
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
@@ -69,6 +70,11 @@ llvm::cl::opt<int> clGPUMatmulCThreshold(
                    "as small vs. large when deciding MMA schedule"),
     // TODO: We should get this value from the target's parallelism.
     llvm::cl::init(512 * 512));
+
+static llvm::cl::opt<bool> clLLVMGPUEnablePrefetch(
+    "iree-llvmgpu-enable-prefetch",
+    llvm::cl::desc("Enable prefetch in the vector distribute pipeline"),
+    llvm::cl::init(false));
 
 namespace {
 
@@ -356,6 +362,14 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
       schedule->nWarpCount);
   SmallVector<NamedAttribute, 1> attrs;
   attrs.emplace_back(StringAttr::get(context, "mma_schedule"), scheduleAttr);
+
+  // Prefetch shared memory if requested.
+  if (clLLVMGPUEnablePrefetch) {
+    attrs.emplace_back(
+        StringAttr::get(context, LLVMGPUAttrNames::kPrefetchSharedMemory),
+        UnitAttr::get(context));
+  }
+
   auto configDict = DictionaryAttr::get(context, attrs);
 
   return setOpConfigAndEntryPointFnTranslation(
@@ -566,6 +580,14 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
       schedule->nWarpCount);
   SmallVector<NamedAttribute, 1> attrs;
   attrs.emplace_back(StringAttr::get(context, "mma_schedule"), scheduleAttr);
+
+  // Prefetch shared memory if requested.
+  if (clLLVMGPUEnablePrefetch) {
+    attrs.emplace_back(
+        StringAttr::get(context, LLVMGPUAttrNames::kPrefetchSharedMemory),
+        UnitAttr::get(context));
+  }
+
   auto configDict = DictionaryAttr::get(context, attrs);
 
   return setOpConfigAndEntryPointFnTranslation(entryPoint, op, tileSizes,

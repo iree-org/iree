@@ -72,11 +72,6 @@ static llvm::cl::opt<int64_t> clLLVMGPUSharedMemoryLimit(
                    "allocated for the given target"),
     llvm::cl::init(163 * 1024));
 
-static llvm::cl::opt<bool> clLLVMGPUEnablePrefetch(
-    "iree-llvmgpu-enable-prefetch",
-    llvm::cl::desc("Enable prefetch in the vector distribute pipeline"),
-    llvm::cl::init(false));
-
 llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
                               const LLVMGPUPipelineOptions &options) {
   StringRef reorderStr = "<not set>";
@@ -93,7 +88,8 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
   }
 
   return os << "{" << "enableReduceSharedMemoryBankConflicts = "
-            << options.enableReduceSharedMemoryBankConflicts
+            << options.enableReduceSharedMemoryBankConflicts << ", "
+            << ", prefetchSharedMemory = " << options.prefetchSharedMemory
             << ", reorderWorkgroupsStrategy = " << reorderStr
             << ", enableUkernels = " << options.enableUkernels << "}";
 }
@@ -790,7 +786,7 @@ void addGPUVectorDistributePassPipeline(OpPassManager &funcPassManager,
     funcPassManager.addPass(createGPUReduceBankConflictsPass(options));
   }
 
-  if (clLLVMGPUEnablePrefetch) {
+  if (options.prefetchSharedMemory) {
     funcPassManager.addPass(createLLVMGPUPrefetchSharedMemoryPass());
   }
   funcPassManager.addPass(memref::createFoldMemRefAliasOpsPass());
