@@ -1589,10 +1589,7 @@ static TileSizesListType getMmt4dTileSizes(linalg::LinalgOp op) {
   SmallVector<int64_t> reductionTileSizes;
   splitParallelAndReductionTiles(op, parallelTileSizes, reductionTileSizes);
 
-  SmallVector<int64_t> vectorInnerParallelTileSizes(numLoops, 0);
-  return {distTileSizes,           cacheParallelTileSizes,
-          cacheReductionTileSizes, parallelTileSizes,
-          reductionTileSizes,      vectorInnerParallelTileSizes};
+  return {distTileSizes, parallelTileSizes, reductionTileSizes};
 }
 
 /// Sets the lowering configuration for dispatch region for linalg.mmt4d
