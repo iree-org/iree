@@ -187,3 +187,19 @@ iree_gentbl_cc_library(
         ":td_files",
     ],
 )
+
+iree_tablegen_doc(
+    name = "IREEGPUDialectDocGen",
+    tbl_outs = [
+        (
+            [
+                "--gen-dialect-doc",
+                "--dialect=iree_gpu",
+            ],
+            "IREEGPUDialect.md",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "IREEGPUOps.td",
+    deps = [":td_files"],
+)

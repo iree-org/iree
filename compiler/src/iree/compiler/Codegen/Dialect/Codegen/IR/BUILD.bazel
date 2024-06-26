@@ -199,3 +199,19 @@ iree_gentbl_cc_library(
         "//compiler/src/iree/compiler/Codegen/Interfaces:td_files",
     ],
 )
+
+iree_tablegen_doc(
+    name = "IREECodegenDialectDocGen",
+    tbl_outs = [
+        (
+            [
+                "--gen-dialect-doc",
+                "--dialect=iree_codegen",
+            ],
+            "IREECodegenDialect.md",
+        ),
+    ],
+    tblgen = "@llvm-project//mlir:mlir-tblgen",
+    td_file = "IREECodegenOps.td",
+    deps = [":td_files"],
+)
