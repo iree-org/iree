@@ -288,6 +288,7 @@ jobs:
 
       - uses: actions/upload-artifact@v4.3.3
         with:
+          name: wheels-${{ matrix.build-family }}-${{ matrix.build-package }}
           # We upload all wheels (which includes deps so that subsequent
           # steps can run without further fetching).
           path: ./bindist/*
