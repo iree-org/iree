@@ -80,8 +80,9 @@ getLoopRangesImpl(ReifyRankedShapedTypeOpInterface shapedOp, Location loc,
   LogicalResult status = shapedOp.reifyResultShapes(builder, resultDims);
   (void)status;
   assert(succeeded(status) && "reifyResultShapes failed");
-  return llvm::map_to_vector(
-      resultDims[0], [&](OpFoldResult v) { return Range{zero, v, one}; });
+  return llvm::map_to_vector(resultDims[0], [&](OpFoldResult v) {
+    return Range{zero, v, one};
+  });
 }
 
 /// For a given operation returns the loop ranges needed to compute the op.
@@ -527,66 +528,104 @@ wrapOpInDispatchRegion(RewriterBase &rewriter, Operation *op) {
   return newRegionOp;
 }
 
-bool isDequantizationLikeOp(Operation *op) {
+//===---------------------------------------------------------------------===//
+// Classification of ops that change bit-widths
+//===---------------------------------------------------------------------===//
+
+Type BitWidthChangeInfo::getInputElementType() const {
+  return cast<RankedTensorType>(inputOperand->get().getType()).getElementType();
+}
+
+std::optional<BitWidthChangeInfo> isBitExtendOrTruncateOp(Operation *op) {
   auto genericOp = dyn_cast<linalg::GenericOp>(op);
   if (!genericOp) {
-    return false;
+    return std::nullopt;
   }
   if (genericOp.getNumDpsInits() != 1) {
-    return false;
+    return std::nullopt;
   }
 
   // Check that the all loops are parallel
   unsigned numLoops = genericOp.getNumLoops();
   unsigned numParallelLoops = genericOp.getNumParallelLoops();
   if (numLoops != numParallelLoops) {
-    return false;
+    return std::nullopt;
   }
 
   // Check that all operands that have the highest rank have bit width
   // less than the output bit-width.
-  DenseMap<int64_t, SmallVector<RankedTensorType>> rankBuckets;
-  int64_t maxRank = 0;
+  DenseMap<int64_t, SmallVector<OpOperand *>> rankBuckets;
+  int64_t maxOperandRank = 0;
   for (OpOperand *input : genericOp.getDpsInputOperands()) {
     auto inputType = dyn_cast<RankedTensorType>(input->get().getType());
     if (!inputType) {
       continue;
     }
     int64_t currRank = inputType.getRank();
-    maxRank = std::max(currRank, maxRank);
-    rankBuckets[currRank].push_back(inputType);
+    maxOperandRank = std::max(currRank, maxOperandRank);
+    rankBuckets[currRank].push_back(input);
   }
-  if (rankBuckets[maxRank].empty()) {
-    return false;
+  if (maxOperandRank == 0 || rankBuckets[maxOperandRank].empty()) {
+    return std::nullopt;
   }
 
   unsigned int maxInputElementBitWidth = 0;
-  for (auto t : rankBuckets[maxRank]) {
-    Type elementType = t.getElementType();
+  OpOperand *inputOperand;
+  for (OpOperand *operand : rankBuckets[maxOperandRank]) {
+    RankedTensorType tensorType =
+        cast<RankedTensorType>(operand->get().getType());
+    Type elementType = tensorType.getElementType();
     if (!elementType.isIntOrFloat()) {
-      return false;
+      return std::nullopt;
     }
-    maxInputElementBitWidth =
-        std::max(maxInputElementBitWidth, elementType.getIntOrFloatBitWidth());
+    if (elementType.getIntOrFloatBitWidth() > maxInputElementBitWidth) {
+      maxInputElementBitWidth = elementType.getIntOrFloatBitWidth();
+      inputOperand = operand;
+    }
   }
+  if (!inputOperand) {
+    return std::nullopt;
+  }
+  Type inputElementType =
+      cast<RankedTensorType>(inputOperand->get().getType()).getElementType();
 
   // Check that the identity input element bitwidth is smaller than the output
   // element bitwidth.
-  Type outputElementType = getElementTypeOrSelf(genericOp->getResultTypes()[0]);
-  if (!outputElementType.isIntOrFloat()) {
-    return false;
+  RankedTensorType outputType =
+      dyn_cast<RankedTensorType>(genericOp->getResultTypes()[0]);
+  if (!outputType) {
+    return std::nullopt;
   }
-  if (maxInputElementBitWidth >= outputElementType.getIntOrFloatBitWidth()) {
-    return false;
+  Type outputElementType = outputType.getElementType();
+  if (!outputElementType.isIntOrFloat()) {
+    return std::nullopt;
   }
 
-  // Check if there are any operations from math dialect.
-  for (Operation &op : *genericOp.getBody()) {
-    if (op.getDialect() == op.getContext()->getLoadedDialect("math")) {
-      return false;
+  unsigned inputBitWidth = inputElementType.getIntOrFloatBitWidth();
+  unsigned outputBitWidth = outputElementType.getIntOrFloatBitWidth();
+  if (inputBitWidth == outputBitWidth) {
+    return std::nullopt;
+  }
+
+  // Checks specific to bit extend operations.
+  if (inputBitWidth < outputBitWidth) {
+    // Since these are cloned into dispatches, avoid expensive operations.
+    for (Operation &op : *genericOp.getBody()) {
+      if (op.getDialect() == op.getContext()->getLoadedDialect("math")) {
+        return std::nullopt;
+      }
     }
   }
-  return true;
+
+  // Checks specific to bit truncate operations.
+  if (outputBitWidth < inputBitWidth) {
+    // For now enforce that the input and output ranks match for truncates.
+    if (maxOperandRank != outputType.getRank()) {
+      return std::nullopt;
+    }
+  }
+
+  return BitWidthChangeInfo{inputOperand, outputElementType};
 }
 
 //===---------------------------------------------------------------------===//
@@ -604,7 +643,7 @@ bool isClonableIntoDispatchOp(Operation *op) {
           tensor::ExtractSliceOp, complex::CreateOp>(op)) {
     return true;
   }
-  if (isDequantizationLikeOp(op)) {
+  if (isBitExtendOp(op)) {
     return true;
   }
   if (isa<arith::ConstantOp>(op) || isa<complex::ConstantOp>(op)) {

@@ -56,18 +56,38 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
   if (!producerOp->hasOneUse())
     return false;
 
-  // Do no fuse dequantization-like operations with producers. The
-  // dequantization ops are cloned into all their use dispatches. So fusing
-  // producer with consumer here would then result in producer also getting
-  // cloned into many dispatches which is against the thumb rule of fusion to
-  // not introduce additional computation (except for dequant ops). If the
-  // consumer has only one use, then this fusion is fine since cloning wont
-  // result in redundant computation of the producer. (Also note that the
-  // producer is always an elementwise operation).
-  if (isDequantizationLikeOp(consumerOp) && !consumerOp->hasOneUse()) {
+  std::optional<BitWidthChangeInfo> consumerBitwidthChangeInfo =
+      isBitExtendOrTruncateOp(consumerOp);
+  // Do no fuse bitextend-like operations with producers. Such ops are cloned
+  // into all their use dispatches. So fusing producer with consumer here would
+  // then result in producer also getting cloned into many dispatches which is
+  // against the thumb rule of fusion to not introduce additional computation
+  // (except for dequant ops). If the consumer has only one use, then this
+  // fusion is fine since cloning wont result in redundant computation of the
+  // producer. (Also note that the producer is always an elementwise operation).
+  if (consumerBitwidthChangeInfo &&
+      consumerBitwidthChangeInfo->isExtensionOp() && !consumerOp->hasOneUse()) {
     return false;
   }
 
+  // Do not fuse if the producer is a bit-width truncation op and consumer is a
+  // bit width extension op. In such cases, prefer to fuse with the producer
+  // with its producer.
+  std::optional<BitWidthChangeInfo> bitWidthChangeInfo =
+      isBitExtendOrTruncateOp(producerOp);
+  if (bitWidthChangeInfo && bitWidthChangeInfo->isTruncationOp()) {
+    // Do not fuse with consumer if it is an bit-width extension op.
+    if (consumerBitwidthChangeInfo &&
+        consumerBitwidthChangeInfo->isExtensionOp() &&
+        consumerBitwidthChangeInfo->inputOperand == fusedOperand) {
+      return false;
+    }
+  }
+
+  auto linalgConsumerOp = dyn_cast<linalg::LinalgOp>(consumerOp);
+  if (!linalgConsumerOp) {
+    return false;
+  }
   // If the producer has a single use (this op), only fuse if
   // - 1) The consumer op is all parallel loops. The parallelism of the consumer
   //      can be used as a way to amortize cost of redundant computation
@@ -75,12 +95,8 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
   //      consumer for the producer result is a permutation. If it is a
   //      broadcast this ends up redundantly computing operations without more
   //      parallelism.
-  if (auto linalgConsumerOp = dyn_cast<linalg::LinalgOp>(consumerOp)) {
-
-    if (linalgConsumerOp.getNumParallelLoops() ==
-        linalgConsumerOp.getNumLoops()) {
-      return true;
-    }
+  if (linalgConsumerOp.getNumParallelLoops() !=
+      linalgConsumerOp.getNumLoops()) {
     if (!linalgConsumerOp.getMatchingIndexingMap(fusedOperand)
              .isPermutation()) {
       return false;
@@ -92,11 +108,8 @@ bool areFusableAsElementwiseOps(MLIRContext *context, OpOperand *fusedOperand,
         linalg::isaConvolutionOpInterface(linalgConsumerOp)) {
       return false;
     }
-    return true;
   }
-
-  // All other cases dont fuse.
-  return false;
+  return true;
 }
 
 } // namespace mlir::iree_compiler::IREE::Flow

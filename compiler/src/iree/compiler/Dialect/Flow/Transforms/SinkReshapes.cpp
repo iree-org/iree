@@ -67,7 +67,7 @@ static bool shouldSinkExpandShapeOp(OpOperand *opOperand) {
 
   // Do not sink reshapes across dequantize operations since they are
   // cloned into their producers.
-  if (isDequantizationLikeOp(consumer)) {
+  if (isBitExtendOp(consumer)) {
     return false;
   }
 

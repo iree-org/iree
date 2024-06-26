@@ -156,7 +156,7 @@ static FailureOr<unsigned> fuseMultiUseProducers(Operation *funcOp,
 
         // Dequantization-like operations should be fused with consumers to keep
         // the smaller bit width on the dispatch boundary.
-        if (isDequantizationLikeOp(genericOp)) {
+        if (isBitExtendOp(genericOp)) {
           return;
         }
 
@@ -196,7 +196,7 @@ static FailureOr<unsigned> fuseMultiUseProducers(Operation *funcOp,
 
           // 7. Skip dequantization-like `producer` ops as we would rather fuse
           //    by cloning the producer instead of multi-use fusion.
-          if (isDequantizationLikeOp(producer)) {
+          if (isBitExtendOp(producer)) {
             return;
           }
 
