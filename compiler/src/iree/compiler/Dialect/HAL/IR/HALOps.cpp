@@ -845,6 +845,7 @@ std::optional<int32_t> ElementTypeOp::getTypeValue(Type type) {
     return makeElementTypeValue(numericalType, intType.getWidth());
   } else if (auto floatType = llvm::dyn_cast_if_present<FloatType>(type)) {
     switch (APFloat::SemanticsToEnum(floatType.getFloatSemantics())) {
+    case APFloat::S_Float8E4M3FNUZ:
     case APFloat::S_IEEEhalf:
     case APFloat::S_IEEEsingle:
     case APFloat::S_IEEEdouble:
