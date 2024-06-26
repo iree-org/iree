@@ -138,3 +138,53 @@ func.func @_batch_matmul_narrow_n_2_dispatch_4_unpack_i32() attributes {translat
 // CHECK: %[[EMPTY:[a-zA-Z0-9]+]] = tensor.empty() : tensor<3x2xi32>
 // CHECK: %[[TRANS:[a-zA-Z0-9]+]] = vector.transpose %5, [1, 0] : vector<2x8xi32> to vector<8x2xi32>
 // CHECK: vector.transfer_write %[[TRANS]], %[[EMPTY]][%c0, %c0] {in_bounds = [false, true]} : vector<8x2xi32>, tensor<3x2xi32>
+
+// -----
+
+func.func @subset_hoisting_invariant_tensor(%init: tensor<64x64xf32>, %t: tensor<64x64xf32>) -> tensor<64x64xf32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c8 = arith.constant 8 : index
+  %empty = tensor.empty() : tensor<8x1xf32>
+  %loop = scf.for %i = %c0 to %c8 step %c1 iter_args(%arg1 = %init) -> tensor<64x64xf32> {
+    %slice1 = tensor.extract_slice %arg1[1, 0][8, 1][1, 1] : tensor<64x64xf32> to tensor<8x1xf32>
+    %slice2 = tensor.extract_slice %init[0, %i][8, 1][1, 1] : tensor<64x64xf32> to tensor<8x1xf32>
+    %out = linalg.add ins(%slice1, %slice2 : tensor<8x1xf32>, tensor<8x1xf32>) outs(%empty: tensor<8x1xf32>) -> tensor<8x1xf32>
+    %td = tensor.insert_slice %out into %t[1, 0][8, 1][1, 1] : tensor<8x1xf32> into tensor<64x64xf32>
+    scf.yield %td : tensor<64x64xf32>
+  }
+  return %loop : tensor<64x64xf32>
+}
+
+// CHECK-LABEL: @subset_hoisting_invariant_tensor
+// CHECK:   tensor.extract_slice
+// CHECK:   scf.for
+// CHECK:     tensor.extract_slice
+// CHECK-NOT: tensor.extract_slice
+// CHECK:   scf.yield
+// CHECK:   tensor.insert_slice
+
+// -----
+
+func.func @subset_hoisting_invariant_tensor_nonequivalent_subset(%init: tensor<64x64xf32>, %t: tensor<64x64xf32>) -> tensor<64x64xf32> {
+  %c0 = arith.constant 0 : index
+  %c1 = arith.constant 1 : index
+  %c8 = arith.constant 8 : index
+  %empty = tensor.empty() : tensor<8x1xf32>
+  %loop = scf.for %i = %c0 to %c8 step %c1 iter_args(%arg1 = %init) -> tensor<64x64xf32> {
+    %slice1 = tensor.extract_slice %arg1[1, 0][8, 1][1, 1] : tensor<64x64xf32> to tensor<8x1xf32>
+    %slice2 = tensor.extract_slice %init[0, %i][8, 1][1, 1] : tensor<64x64xf32> to tensor<8x1xf32>
+    %out = linalg.add ins(%slice1, %slice2 : tensor<8x1xf32>, tensor<8x1xf32>) outs(%empty: tensor<8x1xf32>) -> tensor<8x1xf32>
+    %td = tensor.insert_slice %out into %t[0, 0][8, 1][1, 1] : tensor<8x1xf32> into tensor<64x64xf32>
+    scf.yield %td : tensor<64x64xf32>
+  }
+  return %loop : tensor<64x64xf32>
+}
+
+// CHECK-LABEL: @subset_hoisting_invariant_tensor_nonequivalent_subset
+// CHECK:     scf.for
+// CHECK:       tensor.extract_slice
+// CHECK:       tensor.extract_slice
+// CHECK:       tensor.insert_slice
+// CHECK:       scf.yield
+// CHECK-NOT: tensor.insert_slice
