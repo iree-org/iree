@@ -74,28 +74,12 @@ def ConvertConv2DToWinograd :
   ];
 }
 
-def TileAttention :
-    InterfacePass<"iree-linalg-ext-tile-attention", "mlir::FunctionOpInterface"> {
-  let summary =
-      "Tile the attention op along the reduction dimension";
-  let constructor = "mlir::iree_compiler::IREE::LinalgExt::"
-                    "createTileAttentionPass()";
-  let options = [
-    Option<"tileSize", "tileSize", "uint64_t", /*default=*/"",
-           "Tile size for sequential for loop in attention">,
-  ];
-}
-
 def DecomposeAttention :
     InterfacePass<"iree-linalg-ext-decompose-attention", "mlir::FunctionOpInterface"> {
   let summary =
-      "Decomposes attention op into a sequence of linalg ops";
+      "Decomposes online_attention op into a sequence of linalg ops";
   let constructor = "mlir::iree_compiler::IREE::LinalgExt::"
                     "createDecomposeAttentionPass()";
-  let options = [
-    Option<"tileSize", "tileSize", "uint64_t", /*default=*/"",
-           "Tile size for sequential for loop in attention">,
-  ];
 }
 
 def ConvertAttentionToOnlineAttention :

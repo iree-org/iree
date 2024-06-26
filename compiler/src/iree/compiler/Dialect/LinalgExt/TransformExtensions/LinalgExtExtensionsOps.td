@@ -12,29 +12,26 @@ include "mlir/Dialect/Transform/Interfaces/TransformInterfaces.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/IR/OpBase.td"
 
-def TileAttentionOp : Op<Transform_Dialect, "iree.tile_attention",
+def DecomposeOnlineAttention : Op<Transform_Dialect, "iree.decompose_online_attention",
     [FunctionalStyleTransformOpTrait,
      MemoryEffectsOpInterface,
      TransformOpInterface,
      TransformEachOpTrait,
      ReportTrackingListenerFailuresOpTrait]> {
   let description = [{
-    Target iree_linalg_ext.attention ops and tile them.
+    Target iree_linalg_ext.online_attention ops and decompose them.
     This transform consumes the target handle and produces a result handle.
+
+    # TODO: This op should be replaced by upstream
+    transform.structured.decompose_interface, which does not support multiple
+    results for now.
   }];
 
-  let arguments = (
-      ins TransformHandleTypeInterface:$target,
-          OptionalAttr<I64Attr>:$tile_size
-  );
+  let arguments = ( ins TransformHandleTypeInterface:$target);
   let results = (outs Variadic<TransformHandleTypeInterface>:$result);
 
   let assemblyFormat = "attr-dict $target `:` functional-type(operands, results)";
   let cppNamespace = "mlir::iree_compiler::IREE::LinalgExt";
-
-  let builders = [
-    OpBuilder<(ins "Value":$target)>
-  ];
 
   let assemblyFormat = [{
     $target attr-dict `:` functional-type(operands, results)
@@ -43,44 +40,7 @@ def TileAttentionOp : Op<Transform_Dialect, "iree.tile_attention",
   let extraClassDeclaration = [{
     ::mlir::DiagnosedSilenceableFailure applyToOne(
         ::mlir::transform::TransformRewriter &rewriter,
-        ::mlir::iree_compiler::IREE::LinalgExt::AttentionOp target,
-        ::mlir::transform::ApplyToEachResultList &results,
-        ::mlir::transform::TransformState &state);
-  }];
-}
-
-def DecomposeTiledAttentionOp : Op<Transform_Dialect, "iree.decompose_tiled_attention",
-    [FunctionalStyleTransformOpTrait,
-     MemoryEffectsOpInterface,
-     TransformOpInterface,
-     TransformEachOpTrait,
-     ReportTrackingListenerFailuresOpTrait]> {
-  let description = [{
-    Target iree_linalg_ext.attention ops and decompose them.
-    This transform consumes the target handle and produces a result handle.
-  }];
-
-  let arguments = (
-      ins TransformHandleTypeInterface:$target,
-          OptionalAttr<I64Attr>:$tile_size
-  );
-  let results = (outs Variadic<TransformHandleTypeInterface>:$result);
-
-  let assemblyFormat = "attr-dict $target `:` functional-type(operands, results)";
-  let cppNamespace = "mlir::iree_compiler::IREE::LinalgExt";
-
-  let builders = [
-    OpBuilder<(ins "Value":$target)>
-  ];
-
-  let assemblyFormat = [{
-    $target attr-dict `:` functional-type(operands, results)
-  }];
-
-  let extraClassDeclaration = [{
-    ::mlir::DiagnosedSilenceableFailure applyToOne(
-        ::mlir::transform::TransformRewriter &rewriter,
-        ::mlir::iree_compiler::IREE::LinalgExt::AttentionOp target,
+        ::mlir::iree_compiler::IREE::LinalgExt::OnlineAttentionOp target,
         ::mlir::transform::ApplyToEachResultList &results,
         ::mlir::transform::TransformState &state);
   }];
