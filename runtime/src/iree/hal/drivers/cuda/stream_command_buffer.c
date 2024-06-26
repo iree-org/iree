@@ -150,9 +150,8 @@ void iree_hal_cuda_stream_notify_submitted_commands(
     return;
   }
 
-  iree_hal_cuda_tracing_notify_submitted(
-      command_buffer->tracing_context,
-      &command_buffer->tracing_event_list);
+  iree_hal_cuda_tracing_notify_submitted(command_buffer->tracing_context,
+                                         &command_buffer->tracing_event_list);
 }
 
 // Flushes any pending batched collective operations.
@@ -170,8 +169,8 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_flush_collectives(
   IREE_TRACE_ZONE_BEGIN(z0);
   iree_status_t status = iree_hal_cuda_nccl_submit_batch(
       command_buffer->nccl_symbols, command_buffer->tracing_context,
-      &command_buffer->tracing_event_list,
-      &command_buffer->collective_batch, command_buffer->cu_stream);
+      &command_buffer->tracing_event_list, &command_buffer->collective_batch,
+      command_buffer->cu_stream);
   iree_hal_collective_batch_clear(&command_buffer->collective_batch);
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -184,8 +183,8 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_begin(
   (void)command_buffer;
 
   IREE_CUDA_STREAM_TRACE_ZONE_BEGIN_EXTERNAL(
-      command_buffer->tracing_context,
-      &command_buffer->tracing_event_list, command_buffer->cu_stream,
+      command_buffer->tracing_context, &command_buffer->tracing_event_list,
+      command_buffer->cu_stream,
       /*file_name=*/NULL, 0, /*line=*/0, "iree_hal_cuda_stream_command_buffer",
       strlen("iree_hal_cuda_stream_command_buffer"), /*name=*/NULL, 0);
 
@@ -237,11 +236,10 @@ static void iree_hal_cuda_stream_command_buffer_begin_debug_group(
   (void)command_buffer;
 
   IREE_CUDA_STREAM_TRACE_ZONE_BEGIN_EXTERNAL(
-      command_buffer->tracing_context,
-      &command_buffer->tracing_event_list, command_buffer->cu_stream,
-      location ? location->file.data : NULL, location ? location->file.size : 0,
-      location ? location->line : 0, /*func_name=*/NULL, 0, label.data,
-      label.size);
+      command_buffer->tracing_context, &command_buffer->tracing_event_list,
+      command_buffer->cu_stream, location ? location->file.data : NULL,
+      location ? location->file.size : 0, location ? location->line : 0,
+      /*func_name=*/NULL, 0, label.data, label.size);
 
   // TODO: pass along to CUPTI if available.
 }
@@ -552,11 +550,10 @@ static iree_status_t iree_hal_cuda_stream_command_buffer_dispatch(
               executable, entry_point, &kernel_info));
 
   IREE_CUDA_STREAM_TRACE_ZONE_BEGIN_EXTERNAL(
-      command_buffer->tracing_context,
-      &command_buffer->tracing_event_list, command_buffer->cu_stream,
-      kernel_info.source_filename.data, kernel_info.source_filename.size,
-      kernel_info.source_line, kernel_info.function_name.data,
-      kernel_info.function_name.size,
+      command_buffer->tracing_context, &command_buffer->tracing_event_list,
+      command_buffer->cu_stream, kernel_info.source_filename.data,
+      kernel_info.source_filename.size, kernel_info.source_line,
+      kernel_info.function_name.data, kernel_info.function_name.size,
       /*name=*/NULL, 0);
 
   IREE_RETURN_AND_END_ZONE_IF_ERROR(

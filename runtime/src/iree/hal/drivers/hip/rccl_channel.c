@@ -593,9 +593,9 @@ iree_status_t iree_hal_hip_nccl_submit_batch(
     iree_string_view_t collective_str =
         iree_hal_collective_op_format(&entry->op, &string_temp);
     IREE_HIP_STREAM_TRACE_ZONE_BEGIN_EXTERNAL(
-        tracing_context, tracing_event_list, stream,
-        __FILE__, strlen(__FILE__), (uint32_t)__LINE__, __FUNCTION__,
-        strlen(__FUNCTION__), collective_str.data, collective_str.size);
+        tracing_context, tracing_event_list, stream, __FILE__, strlen(__FILE__),
+        (uint32_t)__LINE__, __FUNCTION__, strlen(__FUNCTION__),
+        collective_str.data, collective_str.size);
   }
 #endif  // IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
 
@@ -612,7 +612,8 @@ iree_status_t iree_hal_hip_nccl_submit_batch(
   // order doesn't matter so long as we end the right number of zones.
   IREE_TRACE({
     for (iree_host_size_t i = 0; i < batch->count; ++i) {
-      IREE_HIP_STREAM_TRACE_ZONE_END(tracing_context, tracing_event_list, stream);
+      IREE_HIP_STREAM_TRACE_ZONE_END(tracing_context, tracing_event_list,
+                                     stream);
     }
   });
 

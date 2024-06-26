@@ -98,11 +98,11 @@ static void iree_hip_graph_command_buffer_trace_zone_begin_external(
       &command_buffer->hip_graph_nodes[command_buffer->graph_node_count++];
   size_t dependency_count = command_buffer->hip_barrier_node ? 1 : 0;
   IREE_HIP_GRAPH_TRACE_ZONE_BEGIN_EXTERNAL(
-      command_buffer->tracing_context,
-      &command_buffer->tracing_event_list, tracing_event_node,
-      command_buffer->hip_graph, &command_buffer->hip_barrier_node,
-      dependency_count, file_name, file_name_length, line, function_name,
-      function_name_length, name, name_length);
+      command_buffer->tracing_context, &command_buffer->tracing_event_list,
+      tracing_event_node, command_buffer->hip_graph,
+      &command_buffer->hip_barrier_node, dependency_count, file_name,
+      file_name_length, line, function_name, function_name_length, name,
+      name_length);
 
   // Move the barrier forward to make sure that the tracing event is recorded
   // before work starts.
@@ -124,11 +124,10 @@ static void iree_hip_graph_command_buffer_trace_zone_end(
   size_t dependency_count = command_buffer->hip_barrier_node ? 1 : 0;
   IREE_ASSERT_GT(dependency_count, 0,
                  "ending a zone should at least depend on the beginning");
-  IREE_HIP_GRAPH_TRACE_ZONE_END(command_buffer->tracing_context,
-                                 &command_buffer->tracing_event_list,
-                                tracing_event_node, command_buffer->hip_graph,
-                                &command_buffer->hip_barrier_node,
-                                dependency_count);
+  IREE_HIP_GRAPH_TRACE_ZONE_END(
+      command_buffer->tracing_context, &command_buffer->tracing_event_list,
+      tracing_event_node, command_buffer->hip_graph,
+      &command_buffer->hip_barrier_node, dependency_count);
 
   // We need to wait on the tracing end before other work starts.
   // GPU tracing zones are first-in, last-out.
@@ -233,7 +232,7 @@ static void iree_hal_hip_graph_command_buffer_destroy(
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_hip_tracing_free(command_buffer->tracing_context,
-                             &command_buffer->tracing_event_list);
+                            &command_buffer->tracing_event_list);
 
   // Drop any pending collective batches before we tear things down.
   iree_hal_collective_batch_clear(&command_buffer->collective_batch);
@@ -280,9 +279,8 @@ void iree_hal_hip_graph_notify_submitted_commands(
     return;
   }
 
-  iree_hal_hip_tracing_notify_submitted(
-      command_buffer->tracing_context,
-      &command_buffer->tracing_event_list);
+  iree_hal_hip_tracing_notify_submitted(command_buffer->tracing_context,
+                                        &command_buffer->tracing_event_list);
 }
 
 // Flushes any pending batched collective operations.

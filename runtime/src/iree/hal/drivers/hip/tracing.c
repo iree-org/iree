@@ -151,7 +151,8 @@ iree_status_t iree_hal_hip_tracing_context_allocate(
                                            hipEventDefault));
       if (!iree_status_is_ok(status)) break;
       if (i > 0) {
-        context->event_pool[i - 1].next_in_command_buffer = &context->event_pool[i];
+        context->event_pool[i - 1].next_in_command_buffer =
+            &context->event_pool[i];
       }
       context->event_pool[i].next_submission = NULL;
       if (i + 1 == context->query_capacity) {
@@ -449,8 +450,8 @@ void iree_hal_hip_graph_tracing_zone_begin_external_impl(
     size_t name_length) {
   if (!context) return;
   uint16_t query_id = iree_hal_hip_graph_tracing_context_insert_query(
-      context, event_list, out_node, graph,
-      dependency_nodes, dependency_nodes_count);
+      context, event_list, out_node, graph, dependency_nodes,
+      dependency_nodes_count);
   iree_tracing_gpu_zone_begin_external(context->id, query_id, file_name,
                                        file_name_length, line, function_name,
                                        function_name_length, name, name_length);
@@ -472,8 +473,8 @@ void iree_hal_hip_graph_tracing_zone_end_impl(
     hipGraphNode_t* dependency_nodes, size_t dependency_nodes_count) {
   if (!context) return;
   uint16_t query_id = iree_hal_hip_graph_tracing_context_insert_query(
-      context, event_list, out_node, graph,
-      dependency_nodes, dependency_nodes_count);
+      context, event_list, out_node, graph, dependency_nodes,
+      dependency_nodes_count);
   iree_tracing_gpu_zone_end(context->id, query_id);
 }
 
