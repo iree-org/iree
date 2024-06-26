@@ -96,7 +96,10 @@ hoistLoopInvariantSubsetAtIterArg(RewriterBase &rewriter,
     // insertion.
     bool equivalent = extraction.operatesOnEquivalentSubset(
         insertion, [](Value v1, Value v2) {
-          // We don't care if they are operating on the same tensor.
+          // The callback to this method checks if the given two values are
+          // aliasing tensors/buffers from which the subset slice comes from.
+          // For our case, we only care if the slices are same, so we can always
+          // return true.
           return true;
         });
 
@@ -113,7 +116,7 @@ hoistLoopInvariantSubsetAtIterArg(RewriterBase &rewriter,
     FailureOr<LoopLikeOpInterface> newLoop =
         loopLike.replaceWithAdditionalYields(
             rewriter, extraction.getResult(),
-            /*replaceInitOperandUsesInLoop=*/true, newYieldValuesFn);
+            /*replaceInitOperandUsesInLoop=*/false, newYieldValuesFn);
     if (failed(newLoop))
       return loopLike;
     loopLike = *newLoop;
