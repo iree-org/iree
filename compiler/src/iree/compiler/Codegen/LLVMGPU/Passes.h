@@ -29,10 +29,12 @@ namespace LLVMGPUAttrNames {
 inline constexpr StringLiteral kReorderWorkgroups = "reorder_workgroups";
 inline constexpr StringLiteral kNoReduceSharedMemoryBankConflicts =
     "no_reduce_shared_memory_bank_conflicts";
+inline constexpr StringLiteral kPrefetchSharedMemory = "prefetch_shared_memory";
 } //  namespace LLVMGPUAttrNames
 
 struct LLVMGPUPipelineOptions {
   bool enableReduceSharedMemoryBankConflicts = true;
+  bool prefetchSharedMemory = false;
   bool enableUkernels = false;
   std::optional<ReorderWorkgroupsStrategy> reorderStrategy;
 };

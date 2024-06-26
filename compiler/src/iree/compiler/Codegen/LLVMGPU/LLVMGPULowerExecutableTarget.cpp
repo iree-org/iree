@@ -88,6 +88,8 @@ getPipelineOptions(FunctionOpInterface funcOp,
   if (DictionaryAttr config = translationInfo.getConfiguration()) {
     if (config.contains(LLVMGPUAttrNames::kNoReduceSharedMemoryBankConflicts))
       pipelineOptions.enableReduceSharedMemoryBankConflicts = false;
+    if (config.contains(LLVMGPUAttrNames::kPrefetchSharedMemory))
+      pipelineOptions.prefetchSharedMemory = true;
     if (config.contains(LLVMGPUAttrNames::kReorderWorkgroups)) {
       // Get the workgroups reorder config and enable the workgroup reordering.
       Attribute reorderWorkgroupOption =
