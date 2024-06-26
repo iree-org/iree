@@ -376,6 +376,16 @@
          <changefreq>daily</changefreq>
     </url>
     <url>
+         <loc>https://iree.dev/reference/mlir-dialects/IREECodegen/</loc>
+         <lastmod>2024-06-26</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
+         <loc>https://iree.dev/reference/mlir-dialects/IREEGPU/</loc>
+         <lastmod>2024-06-26</lastmod>
+         <changefreq>daily</changefreq>
+    </url>
+    <url>
          <loc>https://iree.dev/reference/mlir-dialects/IREEInput/</loc>
          <lastmod>2024-06-26</lastmod>
          <changefreq>daily</changefreq>
