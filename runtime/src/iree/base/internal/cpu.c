@@ -326,6 +326,12 @@ static void iree_cpu_initialize_from_platform_riscv_64(uint64_t* out_fields) {
                  IREE_HWCAP_ISA_V);
 }
 
+#else
+
+static void iree_cpu_initialize_from_platform_riscv_64(uint64_t* out_fields) {
+  // No implementation available. CPU data will be all zeros.
+}
+
 #endif  // IREE_PLATFORM_*
 #endif  // defined(IREE_ARCH_ARM_64)
 
