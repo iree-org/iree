@@ -86,3 +86,16 @@ T5_LARGE_FP32_JAX_512XI32_BATCHES = model_utils.generate_batch_models(
     ],
     batch_sizes=[1, 16, 24, 32, 48, 64, 512],
 )
+
+# Derived from https://huggingface.co/docs/transformers/model_doc/gemma#transformers.FlaxGemmaForCausalLM
+GEMMA_TAGS = ["gemma", "decoder-only", "pipeline", "generative"]
+
+GEMMA_2B_IT_GREEDY_FP32_JAX_1024XI32_256I32 = common_definitions.Model(
+    name="Gemma2bit_fp32",
+    id=unique_ids.MODEL_GEMMA_2B_IT_GREEDY_FP32_JAX_1024XI32_256I32,
+    tags=GEMMA_TAGS + ["fp32"],
+    source_type=common_definitions.ModelSourceType.EXPORTED_STABLEHLO_MLIR,
+    source_url="https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.25_1709787220/GEMMA2BIT_GREEDY_FP32_JAX_1X1024XI32_256XI32/stablehlo.mlirbc",
+    entry_function="main",
+    input_types=["1x1024xi32"],
+)

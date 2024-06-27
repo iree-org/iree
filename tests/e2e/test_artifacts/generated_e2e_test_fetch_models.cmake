@@ -216,6 +216,13 @@ iree_fetch_artifact(
 )
 
 iree_fetch_artifact(
+  NAME "model-Gemma2bit_fp32"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.25_1709787220/GEMMA2BIT_GREEDY_FP32_JAX_1X1024XI32_256XI32/stablehlo.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_Gemma2bit_fp32.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
   NAME "model-matmul_3456x1024x2048_f16t_tile_config_default"
   SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/microbenchmarks/matmul/20230410_1681181224/matmul_3456x1024x2048_f16t_f16t_f16t_tile_config_default.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_matmul_3456x1024x2048_f16t_tile_config_default.mlirbc"
