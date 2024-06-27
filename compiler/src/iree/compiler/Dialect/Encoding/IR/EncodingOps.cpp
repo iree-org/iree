@@ -110,10 +110,11 @@ EncodingAttr EncodingAttr::get(MLIRContext *ctx, int64_t operandIndex,
   auto roundDimsToAttr = roundDimsTo.empty()
                              ? DenseI64ArrayAttr()
                              : b.getDenseI64ArrayAttr(roundDimsTo);
+  auto bcastMap = b.getMultiDimIdentityMap(maps[operandIndex].getNumResults());
   return get(ctx, b.getIndexAttr(operandIndex), b.getTypeArrayAttr(elemTypes),
              origTypeAttr, optionalToAttr(matmulNarrowM),
              optionalToAttr(matmulNarrowN), b.getAffineMapArrayAttr(maps),
-             roundDimsToAttr);
+             AffineMapAttr::get(bcastMap), roundDimsToAttr);
 }
 
 AffineMap EncodingAttr::getMapForOperandIndex() {
