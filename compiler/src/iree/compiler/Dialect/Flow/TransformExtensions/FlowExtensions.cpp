@@ -476,8 +476,8 @@ IREE::transform_dialect::ForeachThreadToFlowDispatchWorkgroupsOp::applyToOne(
 
 void IREE::transform_dialect::ForeachThreadToFlowDispatchWorkgroupsOp::
     getEffects(SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::consumesHandle(getTarget(), effects);
-  transform::producesHandle(getTransformed(), effects);
+  transform::consumesHandle(getTargetMutable(), effects);
+  transform::producesHandle(getOperation()->getOpResults(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -495,8 +495,8 @@ IREE::transform_dialect::RegionToWorkgroupsOp::applyToOne(
 
 void IREE::transform_dialect::RegionToWorkgroupsOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::consumesHandle(getTarget(), effects);
-  transform::producesHandle(getTransformed(), effects);
+  transform::consumesHandle(getTargetMutable(), effects);
+  transform::producesHandle(getOperation()->getOpResults(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -547,9 +547,9 @@ IREE::transform_dialect::ClonePrecedingOpIntoDispatchRegionOp::apply(
 
 void IREE::transform_dialect::ClonePrecedingOpIntoDispatchRegionOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
-  transform::onlyReadsHandle(getDispatchRegion(), effects);
-  transform::producesHandle(getCloned(), effects);
+  transform::onlyReadsHandle(getTargetMutable(), effects);
+  transform::onlyReadsHandle(getDispatchRegionMutable(), effects);
+  transform::producesHandle(getOperation()->getOpResults(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -600,9 +600,9 @@ IREE::transform_dialect::MovePrecedingOpIntoDispatchRegionOp::apply(
 
 void IREE::transform_dialect::MovePrecedingOpIntoDispatchRegionOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::consumesHandle(getTarget(), effects);
-  transform::consumesHandle(getDispatchRegion(), effects);
-  transform::producesHandle(getTransformed(), effects);
+  transform::consumesHandle(getTargetMutable(), effects);
+  transform::consumesHandle(getDispatchRegionMutable(), effects);
+  transform::producesHandle(getOperation()->getOpResults(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -792,9 +792,9 @@ IREE::transform_dialect::CloneSucceedingOpIntoDispatchRegionOp::apply(
 
 void IREE::transform_dialect::CloneSucceedingOpIntoDispatchRegionOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
-  transform::onlyReadsHandle(getDispatchRegion(), effects);
-  transform::producesHandle(getCloned(), effects);
+  transform::onlyReadsHandle(getTargetMutable(), effects);
+  transform::onlyReadsHandle(getDispatchRegionMutable(), effects);
+  transform::producesHandle(getOperation()->getOpResults(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -835,9 +835,9 @@ IREE::transform_dialect::MoveSucceedingOpIntoDispatchRegionOp::apply(
 
 void IREE::transform_dialect::MoveSucceedingOpIntoDispatchRegionOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::consumesHandle(getTarget(), effects);
-  transform::consumesHandle(getDispatchRegion(), effects);
-  transform::producesHandle(getTransformed(), effects);
+  transform::consumesHandle(getTargetMutable(), effects);
+  transform::consumesHandle(getDispatchRegionMutable(), effects);
+  transform::producesHandle(getOperation()->getOpResults(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -856,8 +856,8 @@ IREE::transform_dialect::WrapInDispatchRegionOp::applyToOne(
 
 void IREE::transform_dialect::WrapInDispatchRegionOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::consumesHandle(getTarget(), effects);
-  transform::producesHandle(getTransformed(), effects);
+  transform::consumesHandle(getTargetMutable(), effects);
+  transform::producesHandle(getOperation()->getOpResults(), effects);
   transform::modifiesPayload(effects);
 }
 

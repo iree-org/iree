@@ -35,8 +35,8 @@ IREE::Util::transform_dialect::GetNearestSymbolTableOp::applyToOne(
 
 void IREE::Util::transform_dialect::GetNearestSymbolTableOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
-  transform::producesHandle(getResult(), effects);
+  transform::onlyReadsHandle(getTargetMutable(), effects);
+  transform::producesHandle(getOperation()->getOpResults(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -93,8 +93,8 @@ IREE::Util::transform_dialect::ImportSymbolOp::apply(
 
 void IREE::Util::transform_dialect::ImportSymbolOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getSymbolTable(), effects);
-  transform::producesHandle(getClonedSymbol(), effects);
+  transform::onlyReadsHandle(getSymbolTableMutable(), effects);
+  transform::producesHandle(getOperation()->getOpResults(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -288,14 +288,14 @@ LogicalResult IREE::Util::transform_dialect::CastAndCallOp::verify() {
 
 void IREE::Util::transform_dialect::CastAndCallOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getInsertionPoint(), effects);
+  transform::onlyReadsHandle(getInsertionPointMutable(), effects);
   if (getInputs())
-    transform::onlyReadsHandle(getInputs(), effects);
+    transform::onlyReadsHandle(getInputsMutable(), effects);
   if (getOutputs())
-    transform::onlyReadsHandle(getOutputs(), effects);
+    transform::onlyReadsHandle(getOutputsMutable(), effects);
   if (getFunction())
-    transform::onlyReadsHandle(getFunction(), effects);
-  transform::producesHandle(getResult(), effects);
+    transform::onlyReadsHandle(getFunctionMutable(), effects);
+  transform::producesHandle(getOperation()->getOpResults(), effects);
   transform::modifiesPayload(effects);
 }
 
