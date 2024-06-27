@@ -18,6 +18,7 @@
 #   * IREE_VULKAN_DISABLE
 #   * IREE_NVIDIA_GPU_TESTS_DISABLE
 #   * IREE_AMD_RDNA3_GPU_TESTS_DISABLE
+#   * IREE_ARM_SME_DISABLE
 #
 # Freeform filters can be appended using:
 #   * BUILD_TAG_FILTERS: Passed to bazel to filter targets to build:
@@ -55,6 +56,9 @@ if ! [[ -v IREE_NVIDIA_GPU_TESTS_DISABLE ]]; then
 fi
 if ! [[ -v IREE_AMD_RDNA3_GPU_TESTS_DISABLE ]]; then
   IREE_AMD_RDNA3_GPU_TESTS_DISABLE=1
+fi
+if ! [[ -v IREE_ARM_SME_DISABLE ]]; then
+  IREE_ARM_SME_DISABLE=1
 fi
 
 declare -a test_env_args=(
@@ -95,6 +99,9 @@ if (( IREE_NVIDIA_GPU_TESTS_DISABLE == 1 )); then
 fi
 if (( IREE_AMD_RDNA3_GPU_TESTS_DISABLE == 1 )); then
   default_test_tag_filters+=("-requires-gpu-rdna3")
+fi
+if (( IREE_ARM_SME_DISABLE == 1 )); then
+  default_test_tag_filters+=("-requires-arm-sme")
 fi
 
 # Use user-environment variables if set, otherwise use CI-friendly defaults.
