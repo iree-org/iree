@@ -1,7 +1,28 @@
 iree_fetch_artifact(
+  NAME "model-matmul_1x256x2048_i8_i4_i32_tile_config_default"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.30_1719457850/DOT_PRODUCT_JAX_1X256X2048XI8I4/linalg.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_matmul_1x256x2048_i8_i4_i32_tile_config_default.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
   NAME "model-matmul_256x256x2048_i8_i4_i32_tile_config_default"
-  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/linalg/jax_derived_0.4.25_1710887127/matmul_256x256x2048_i8_i4_i32_tile_config_default.mlirbc"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.30_1719457850/DOT_PRODUCT_JAX_256X256X2048XI8I4/linalg.mlirbc"
   OUTPUT "${ROOT_ARTIFACTS_DIR}/model_matmul_256x256x2048_i8_i4_i32_tile_config_default.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME "model-matmul_1x256x2048_i8_i8_i32_tile_config_default"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.30_1719457850/DOT_PRODUCT_JAX_1X256X2048XI8I8/linalg.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_matmul_1x256x2048_i8_i8_i32_tile_config_default.mlirbc"
+  UNPACK
+)
+
+iree_fetch_artifact(
+  NAME "model-matmul_256x256x2048_i8_i8_i32_tile_config_default"
+  SOURCE_URL "https://storage.googleapis.com/iree-model-artifacts/jax/jax_models_0.4.30_1719457850/DOT_PRODUCT_JAX_256X256X2048XI8I8/linalg.mlirbc"
+  OUTPUT "${ROOT_ARTIFACTS_DIR}/model_matmul_256x256x2048_i8_i8_i32_tile_config_default.mlirbc"
   UNPACK
 )
 

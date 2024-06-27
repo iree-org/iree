@@ -20,20 +20,18 @@ from e2e_test_framework.models import (
 # Note `0` represents sync execution.
 X86_64_BENCHMARK_CONFIG = [
     # Microbenchmarks.
-    # TODO(#17344): regenerate .mlirbc files
-    # common_definitions.CpuBenchmarkConfig(
-    #     model=matmul.MATMUL_1x256x2048_I8xI4_MLIR, threads=[0]
-    # ),
+    common_definitions.CpuBenchmarkConfig(
+        model=matmul.MATMUL_1x256x2048_I8xI4_MLIR, threads=[0]
+    ),
     common_definitions.CpuBenchmarkConfig(
         model=matmul.MATMUL_256x256x2048_I8xI4_MLIR, threads=[0]
     ),
-    # TODO(#17344): regenerate .mlirbc files
-    # common_definitions.CpuBenchmarkConfig(
-    #     model=matmul.MATMUL_1x256x2048_I8xI8_MLIR, threads=[0]
-    # ),
-    # common_definitions.CpuBenchmarkConfig(
-    #     model=matmul.MATMUL_256x256x2048_I8xI8_MLIR, threads=[0]
-    # ),
+    common_definitions.CpuBenchmarkConfig(
+        model=matmul.MATMUL_1x256x2048_I8xI8_MLIR, threads=[0]
+    ),
+    common_definitions.CpuBenchmarkConfig(
+        model=matmul.MATMUL_256x256x2048_I8xI8_MLIR, threads=[0]
+    ),
     # Tiny models.
     common_definitions.CpuBenchmarkConfig(
         model=tflite_models.PERSON_DETECT_INT8, threads=[0, 1]
