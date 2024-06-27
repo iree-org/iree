@@ -39,8 +39,11 @@ struct TransposeGenericOpPattern : public OpRewritePattern<linalg::GenericOp> {
     std::optional<AffineMap> mapForInterchange;
 
     for (auto operand : genericOp.getDpsInputOperands()) {
-      auto producer = operand->get().getDefiningOp<linalg::Conv2DNhwcHwcfOp>();
-      if (!producer || !llvm::hasSingleElement(producer->getUsers()))
+      // Check that the producer is a named op or a reduction op (i.e. not
+      // elementwise op) with a single use.
+      auto producer = operand->get().getDefiningOp<linalg::LinalgOp>();
+      if (!producer || !llvm::hasSingleElement(producer->getUsers()) ||
+          linalg::isElementwise(producer))
         continue;
 
       // check if the generic op has a non-identity map for the operand.
