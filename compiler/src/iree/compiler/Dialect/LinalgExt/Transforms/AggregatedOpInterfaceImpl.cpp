@@ -511,8 +511,6 @@ FailureOr<SmallVector<Value>> Im2colOp::decomposeOperation(OpBuilder &b) {
   auto yieldOp =
       cast<scf::YieldOp>(loopNest.loops.back().getBody()->getTerminator());
   yieldOp->getOpOperands().front().assign(insert.getResult());
-  // b.create<scf::YieldOp>(yieldOp->getLoc(), insert.getResult());
-  // yieldOp.erase();
   return SmallVector<Value>({loopNest.results[0]});
 }
 
