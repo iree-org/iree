@@ -36,6 +36,10 @@ splitReduction(RewriterBase &rewriter, LinalgExt::TopkOp topkOp,
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createTopkSplitReductionPass();
 
+/// Decompose im2col ops into a serial loop of insert and extract slice ops.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createDecomposeIm2colPass();
+
 /// Decompose the winograd transform ops into a sequence of linalg ops.
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createDecomposeWinogradTransformPass();
