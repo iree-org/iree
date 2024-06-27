@@ -7,7 +7,7 @@
 // Verify pipelining + multi-buffering.
 
 #compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[64, 64, 16]]>,
+    lowering_config  = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 16]]>,
     translation_info = <SPIRVMatmulPromoteVectorize workgroup_size = [16, 8, 1], {pipeline_depth = 2, store_stage = 1}>>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [
@@ -204,7 +204,7 @@ hal.executable @matmul_f32_128x256x64 {
 // Check that fused transposed consumer elementwise op does not cause extra workgroup memory allocations.
 
 #compilation = #iree_codegen.compilation_info<
-    lowering_config  = <tile_sizes = [[64, 256, 32]]>,
+    lowering_config  = #iree_codegen.lowering_config<tile_sizes = [[64, 256, 32]]>,
     translation_info = <SPIRVMatmulPromoteVectorize workgroup_size = [32, 8, 1], {pipeline_depth = 1, store_stage = 1}>>
 #pipeline_layout = #hal.pipeline.layout<push_constants = 0, sets = [
   #hal.descriptor_set.layout<0, bindings = [

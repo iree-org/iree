@@ -33,7 +33,7 @@ module {
 module {
   func.func @test() attributes {
      compilation_info = #iree_codegen.compilation_info<
-         lowering_config = <tile_sizes = []>,
+         lowering_config = #iree_codegen.lowering_config<tile_sizes = []>,
          translation_info = <CPUDefault>>} {
     return
   }
@@ -48,7 +48,7 @@ module {
 module {
   func.func @test() attributes {
      compilation_info = #iree_codegen.compilation_info<
-         lowering_config = <tile_sizes = []>,
+         lowering_config = #iree_codegen.lowering_config<tile_sizes = []>,
          translation_info = <CPUDefault workgroup_size = [16, 4, 1] subgroup_size = 32>>} {
     return
   }
