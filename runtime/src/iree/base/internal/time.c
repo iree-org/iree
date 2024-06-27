@@ -19,7 +19,7 @@ int64_t iree_platform_time_now(void) {
   // (such as using std::chrono) if older support is needed.
   FILETIME system_time;
   GetSystemTimePreciseAsFileTime(&system_time);
-  const int64_t kUnixEpochStartTicks = 116444736000000000i64;
+  const int64_t kUnixEpochStartTicks = 116444736000000000ll;
   const int64_t kFtToNanoSec = 100;
   LARGE_INTEGER li;
   li.LowPart = system_time.dwLowDateTime;
