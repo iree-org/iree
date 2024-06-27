@@ -453,6 +453,16 @@ def OutlineDispatchRegionsPass :
   ];
 }
 
+def SetEncodingPass :
+    InterfacePass<"iree-flow-set-encoding", "mlir::FunctionOpInterface"> {
+  let summary = "Introduces tensor encoding for flow dispatch regions.";
+  let dependentDialects = [
+    "mlir::linalg::LinalgDialect",
+    "IREE::Flow::FlowDialect",
+    "IREE::Encoding::IREEEncodingDialect",
+  ];
+}
+
 def SinkReshapesPass :
     Pass<"iree-flow-sink-reshapes", ""> {
   let summary = "Sink reshapes to allow for compute op -> consumer fusion.";

@@ -47,6 +47,7 @@ iree_lit_test_suite(
     "pad_fusion_with_consumer.mlir"
     "pad_fusion_with_producer.mlir"
     "pipeline_tests.mlir"
+    "set_encoding.mlir"
     "sink_reshapes.mlir"
     "split_reduction.mlir"
     "tensor_pad_to_tensor_insert_slice.mlir"

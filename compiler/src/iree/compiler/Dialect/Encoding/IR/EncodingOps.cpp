@@ -100,7 +100,7 @@ EncodingAttr EncodingAttr::get(MLIRContext *ctx, int64_t operandIndex,
                                ArrayRef<Type> elemTypes, Type origType,
                                std::optional<int64_t> matmulNarrowM,
                                std::optional<int64_t> matmulNarrowN,
-                               ArrayRef<AffineMap> maps,
+                               ArrayRef<AffineMap> maps, AffineMap bcastMap,
                                ArrayRef<int64_t> roundDimsTo) {
   Builder b(ctx);
   auto optionalToAttr = [&](std::optional<int64_t> x) {
@@ -110,11 +110,11 @@ EncodingAttr EncodingAttr::get(MLIRContext *ctx, int64_t operandIndex,
   auto roundDimsToAttr = roundDimsTo.empty()
                              ? DenseI64ArrayAttr()
                              : b.getDenseI64ArrayAttr(roundDimsTo);
-  auto bcastMap = b.getMultiDimIdentityMap(maps[operandIndex].getNumResults());
+  auto bcastMapAttr = bcastMap ? AffineMapAttr::get(bcastMap) : AffineMapAttr();
   return get(ctx, b.getIndexAttr(operandIndex), b.getTypeArrayAttr(elemTypes),
              origTypeAttr, optionalToAttr(matmulNarrowM),
              optionalToAttr(matmulNarrowN), b.getAffineMapArrayAttr(maps),
-             AffineMapAttr::get(bcastMap), roundDimsToAttr);
+             bcastMapAttr, roundDimsToAttr);
 }
 
 AffineMap EncodingAttr::getMapForOperandIndex() {

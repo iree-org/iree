@@ -350,9 +350,10 @@ public:
     } else {
       auto setEncodingWrapper = [&](Value src, int64_t operandIndex) -> Value {
         SmallVector<int64_t> roundDimsTo(linalgOp.getNumLoops(), padFactor);
-        auto encoding = EncodingAttr::get(
-            linalgOp.getContext(), operandIndex, elemTypes, src.getType(),
-            narrowSizes.M, narrowSizes.N, maps, roundDimsTo);
+        auto encoding =
+            EncodingAttr::get(linalgOp.getContext(), operandIndex, elemTypes,
+                              src.getType(), narrowSizes.M, narrowSizes.N, maps,
+                              /*bcastMap=*/AffineMap(), roundDimsTo);
         return setEncoding(rewriter, loc, src, encoding);
       };
       encodedLhs = setEncodingWrapper(lhs, IREE::Encoding::MATMUL_LHS);

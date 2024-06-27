@@ -80,6 +80,7 @@ def EncodingAttr :
         CArg<"std::optional<int64_t>", "{}">:$matmulNarrowM,
         CArg<"std::optional<int64_t>", "{}">:$matmulNarrowN,
         CArg<"ArrayRef<AffineMap>", "{}">:$maps,
+        CArg<"AffineMap", "{}">:$bcastMap,
         CArg<"ArrayRef<int64_t>", "{}">:$roundDimsTo)>
   ];
 
