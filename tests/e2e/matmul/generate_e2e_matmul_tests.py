@@ -297,7 +297,7 @@ def get_rocm_test_compilation_infos(
 
     infos = []
     for schedule in schedules:
-        # Ship schedules with an intrinsic whose element type does not
+        # Skip schedules with an intrinsic which element type does not
         # match the requested one.
         if lhs_rhs_type.value.upper() not in schedule.intrinsic:
             continue
