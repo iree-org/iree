@@ -30,7 +30,7 @@ jobs:
           run_id: ${{ github.event.inputs.build_run_id }}
       - name: Extract and display downloaded files
         run: |
-          tar -xf artifact/iree-dist-${{ github.event.inputs.package_version }}-linux-x86_64.tar.xz
+          tar -xf wheels-linux-x86_64-main-dist-linux/iree-dist-${{ github.event.inputs.package_version }}-linux-x86_64.tar.xz
           pwd
           ls -R
       - name: Set up python
@@ -41,7 +41,9 @@ jobs:
       - name: Install python packages
         id: install_python_packages
         run: |
-          python -m pip install -f file://$PWD/artifact/ iree-compiler[onnx] iree-runtime iree-tools-tflite iree-tools-tf
+          python -m pip install -f file://$PWD/wheels-linux-x86_64-py-compiler-pkg/ iree-compiler[onnx]
+          python -m pip install -f file://$PWD/wheels-linux-x86_64-py-runtime-pkg/ iree-runtime
+          python -m pip install -f file://$PWD/wheels-linux-x86_64-py-tf-compiler-tools-pkg/ iree-tools-tflite iree-tools-tf
       - name: Validate IREE Compiler Package
         id: validate_compiler_package
         run: |
