@@ -1,7 +1,7 @@
 // RUN: iree-opt --pass-pipeline='builtin.module(util.func(iree-flow-split-reduction-ops))' --iree-flow-split-matmul-reduction=4 %s | FileCheck %s
 
 #compilation = #iree_codegen.compilation_info<
-    lowering_config = <tile_sizes = [[64, 64, 0]]>,
+    lowering_config = #iree_codegen.lowering_config<tile_sizes = [[64, 64, 0]]>,
     translation_info  = <CPUDefault>>
 util.func public @matmul(%arg0: tensor<100x200xf32>, %arg1: tensor<200x300xf32>, %arg2: tensor<100x300xf32>) -> tensor<100x300xf32> {
   %0 = linalg.matmul {compilation_info = #compilation}

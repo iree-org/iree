@@ -338,15 +338,17 @@ LoweringConfigAttr::verify(function_ref<InFlightDiagnostic()> emitError,
 
 LogicalResult
 CompilationInfoAttr::verify(function_ref<InFlightDiagnostic()> emitError,
-                            LoweringConfigAttr loweringConfig,
+                            LoweringConfigAttrInterface loweringConfig,
                             TranslationInfoAttr translationInfo) {
   if (!loweringConfig) {
     return emitError() << "missing lowering config";
   }
-  if (failed(LoweringConfigAttr::verify(
-          emitError, loweringConfig.getTilingLevels(),
-          loweringConfig.getNativeVectorSize()))) {
-    return failure();
+  if (auto defaultConfig = llvm::dyn_cast<LoweringConfigAttr>(loweringConfig)) {
+    if (failed(LoweringConfigAttr::verify(
+            emitError, defaultConfig.getTilingLevels(),
+            defaultConfig.getNativeVectorSize()))) {
+      return failure();
+    }
   }
   if (!translationInfo) {
     return emitError() << "missing translation info";

@@ -569,7 +569,7 @@ def generate_function(
         compilation_info_string = (
             f"#compilation{generate_function.compilation_index} = "
             "#iree_codegen.compilation_info<\n"
-            f"  lowering_config = <tile_sizes = {compilation_info.tile_sizes}>,\n"
+            f"  lowering_config = #iree_codegen.lowering_config<tile_sizes = {compilation_info.tile_sizes}>,\n"
             f"  translation_info = <{compiler_pipeline} {compilation_info.workgroup_size_str()}\n"
             f"  {subgroup_size_str},\n"
             f"  {{ pipeline_depth = {compilation_info.software_pipeline_depth}, "
