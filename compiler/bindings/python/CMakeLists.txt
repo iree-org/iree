@@ -185,6 +185,7 @@ set(_SOURCE_COMPONENTS
   MLIRPythonSources.Dialects.func
   MLIRPythonSources.Dialects.gpu
   MLIRPythonSources.Dialects.linalg
+  MLIRPythonSources.Dialects.llvm
   MLIRPythonSources.Dialects.math
   MLIRPythonSources.Dialects.memref
   MLIRPythonSources.Dialects.pdl
