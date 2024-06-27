@@ -4,12 +4,6 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Tests of end-to-end IREE support for individual ops in the TOSA dialect.
-# Each test file should have a name matching the corresponding TOSA op and test only the
-# functionality of that op (though may make use of other ops where necessary). Tests should be
-# written using the IREE Check framework.
-# See https://iree.dev/developers/general/testing-guide/#iree-core-end-to-end-e2e-tests.
-
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
 
@@ -63,24 +57,46 @@ iree_check_single_backend_test_suite(
     target_backend = "vmvx",
 )
 
-VULKAN_SRCS = enforce_glob(
+GPU_SRCS = enforce_glob(
     [
         "conv2d.mlir",
+        "fp_to_subbyte.mlir",
+        "large_linalg_matmul.mlir",
         "subbyte_to_fp.mlir",
         "narrow_n_matmuls.mlir",
     ],
     include = ["*.mlir"],
-    exclude = [
-        "large_linalg_matmul.mlir",
-        "fp_to_subbyte.mlir",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_cuda",
+    srcs = GPU_SRCS,
+    driver = "cuda",
+    tags = [
+        # TODO(scotttodd): prune these tags? insert in the rule itself?
+        #   could then merge to iree_check_test_suite instead of iree_check_single_backend_test_suite
+        # CUDA cuInit fails with sanitizer on.
+        "noasan",
+        "nomsan",
+        "notsan",
+        "noubsan",
+        "requires-gpu-nvidia",
     ],
+    target_backend = "cuda",
 )
 
 iree_check_single_backend_test_suite(
     name = "check_vulkan-spirv_vulkan",
-    srcs = VULKAN_SRCS,
+    srcs = GPU_SRCS,
     driver = "vulkan",
     target_backend = "vulkan-spirv",
+)
+
+iree_check_single_backend_test_suite(
+    name = "check_rocm_hip",
+    srcs = GPU_SRCS,
+    driver = "hip",
+    target_backend = "rocm",
 )
 
 WINOGRAD_CONV_SRCS = [
@@ -107,41 +123,12 @@ iree_check_single_backend_test_suite(
     target_backend = "vulkan-spirv",
 )
 
-CUDA_SRCS = enforce_glob(
-    # keep sorted
-    [
-        "conv2d.mlir",
-        "fp_to_subbyte.mlir",
-        "subbyte_to_fp.mlir",
-        # currently only enabled on cuda as it can be slow on other backends.
-        "large_linalg_matmul.mlir",
-        "narrow_n_matmuls.mlir",
-    ],
-    include = ["*.mlir"],
-    exclude = [
-    ],
-)
-
-iree_check_single_backend_test_suite(
-    name = "check_large_linalg_matmul_cuda",
-    srcs = CUDA_SRCS,
-    driver = "cuda",
-    tags = [
-        # CUDA cuInit fails with sanitizer on.
-        "noasan",
-        "nomsan",
-        "notsan",
-        "noubsan",
-        "requires-gpu-nvidia",
-    ],
-    target_backend = "cuda",
-)
-
 test_suite(
     name = "check",
     tests = [
-        ":check_large_linalg_matmul_cuda",
+        ":check_cuda",
         ":check_llvm-cpu_local-task",
+        ":check_rocm_hip",
         ":check_vmvx_local-task",
         ":check_vulkan-spirv_vulkan",
         ":check_winograd_llvm-cpu_local-task",

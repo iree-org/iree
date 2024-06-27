@@ -9,7 +9,7 @@
 load("//build_tools/bazel:iree_bytecode_module.bzl", "iree_bytecode_module")
 load("//build_tools/bazel:native_binary.bzl", "native_test")
 
-ALL_TARGET_BACKENDS_AND_DRIVERS = [
+DEFAULT_TARGET_BACKENDS_AND_DRIVERS = [
     ("vmvx", "local-task"),
     ("vulkan-spirv", "vulkan"),
     ("llvm-cpu", "local-task"),
@@ -122,6 +122,14 @@ def iree_check_single_backend_test_suite(
           test suite.
     """
 
+    # Metal backend/driver not supported by Bazel build.
+    if target_backend == "metal-spirv" or driver == "metal":
+        continue
+
+    # ROCm/HIP backend/driver not supported by Bazel build.
+    if target_backend == "rocm" or driver == "hip":
+        continue
+
     # We haven't implemented this so far because we have been using target_cpu_features so far only
     # for aarch64 targets, for which we use the CMake build. To future people implementing this:
     # target_cpu_features should be a list, and here it should be joined into a comma-separated
@@ -162,7 +170,7 @@ def iree_check_single_backend_test_suite(
 def iree_check_test_suite(
         name,
         srcs,
-        target_backends_and_drivers = ALL_TARGET_BACKENDS_AND_DRIVERS,
+        target_backends_and_drivers = DEFAULT_TARGET_BACKENDS_AND_DRIVERS,
         compiler_flags = [],
         input_type = None,
         runner_args = [],
@@ -207,9 +215,6 @@ def iree_check_test_suite(
     # could just create a test suite. The latter seems simpler and more readable.
     tests = []
     for backend, driver in target_backends_and_drivers:
-        # CUDA backend/driver not supported by Bazel build.
-        if backend == "cuda" or driver == "cuda":
-            continue
         suite_name = "_".join([name, backend, driver])
         iree_check_single_backend_test_suite(
             name = suite_name,

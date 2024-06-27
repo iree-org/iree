@@ -75,7 +75,11 @@ iree_check_single_backend_test_suite(
     "expand_shape.mlir"
     "extract_slice.mlir"
     "pack.mlir"
+    "pack_dynamic_inner_tiles.mlir"
+    "pack_i8.mlir"
+    "tensor_cast.mlir"
     "tensor_insert_slice.mlir"
+    "unpack.mlir"
   TARGET_BACKEND
     "cuda"
   DRIVER
@@ -96,8 +100,12 @@ iree_check_single_backend_test_suite(
     "concat.mlir"
     "expand_shape.mlir"
     "extract_slice.mlir"
+    "pack.mlir"
+    "pack_dynamic_inner_tiles.mlir"
+    "pack_i8.mlir"
     "tensor_cast.mlir"
     "tensor_insert_slice.mlir"
+    "unpack.mlir"
   TARGET_BACKEND
     "vulkan-spirv"
   DRIVER
