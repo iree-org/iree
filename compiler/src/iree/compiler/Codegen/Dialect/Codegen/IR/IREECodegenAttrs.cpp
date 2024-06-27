@@ -347,7 +347,7 @@ CompilationInfoAttr::verify(function_ref<InFlightDiagnostic()> emitError,
     if (failed(LoweringConfigAttr::verify(
             emitError, defaultConfig.getTilingLevels(),
             defaultConfig.getNativeVectorSize()))) {
-      return emitError() << "invalid lowering config";
+      return emitError() << "invalid lowering config: " << defaultConfig;
     }
   }
   if (!translationInfo) {
@@ -358,7 +358,7 @@ CompilationInfoAttr::verify(function_ref<InFlightDiagnostic()> emitError,
           translationInfo.getCodegenSpec(), translationInfo.getWorkgroupSize(),
           translationInfo.getSubgroupSize(),
           translationInfo.getConfiguration()))) {
-    return emitError() << "invalid translation info";
+    return emitError() << "invalid translation info: " << translationInfo;
   }
   return success();
 }
