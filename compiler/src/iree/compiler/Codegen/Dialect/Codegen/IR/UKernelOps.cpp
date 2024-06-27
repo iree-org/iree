@@ -7,6 +7,7 @@
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/UKernelOps.h"
 
 #include "iree/compiler/Codegen/Dialect/Codegen/IR/IREECodegenDialect.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
@@ -184,22 +185,24 @@ UKernelGenericOp::lowerToFunctionCall(RewriterBase &rewriter) {
 void UKernelGenericOp::getEffects(
     SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
         &effects) {
-  SmallVector<Value> readOnlyOperands = getDpsInputs();
-  readOnlyOperands.append(getOtherOperands().begin(), getOtherOperands().end());
-  for (Value value : readOnlyOperands) {
-    if (!llvm::isa<MemRefType>(value.getType())) {
+  SmallVector<OpOperand *> readOnlyOperands = getDpsInputOperands();
+  for (OpOperand &operand : getOtherOperandsMutable()) {
+    readOnlyOperands.push_back(&operand);
+  }
+  for (OpOperand *operand : readOnlyOperands) {
+    if (!llvm::isa<MemRefType>(operand->get().getType())) {
       continue;
     }
-    effects.emplace_back(MemoryEffects::Read::get(), value,
+    effects.emplace_back(MemoryEffects::Read::get(), operand,
                          SideEffects::DefaultResource::get());
   }
-  for (Value value : getDpsInits()) {
-    if (!llvm::isa<MemRefType>(value.getType())) {
+  for (OpOperand &operand : getDpsInitsMutable()) {
+    if (!llvm::isa<MemRefType>(operand.get().getType())) {
       continue;
     }
-    effects.emplace_back(MemoryEffects::Read::get(), value,
+    effects.emplace_back(MemoryEffects::Read::get(), &operand,
                          SideEffects::DefaultResource::get());
-    effects.emplace_back(MemoryEffects::Write::get(), value,
+    effects.emplace_back(MemoryEffects::Write::get(), &operand,
                          SideEffects::DefaultResource::get());
   }
 }
