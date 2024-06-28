@@ -541,10 +541,7 @@ MMAAttr::SingleSubgroupLayout MMAAttr::getCSingleSubgroupLayout() const {
     return {/*outer=*/{1, 1}, /*thread=*/{4, 16}, /*strides=*/{16, 1},
             /*element=*/{4, 1}};
   }
-  case MMAIntrinsic::MFMA_F16_32x32x8_F32: {
-    return {/*outer=*/{4, 1}, /*thread=*/{2, 32}, /*strides=*/{32, 1},
-            /*element=*/{4, 1}};
-  }
+  case MMAIntrinsic::MFMA_F16_32x32x8_F32:
   case MMAIntrinsic::MFMA_I8_32x32x16_I32: {
     return {/*outer=*/{4, 1}, /*thread=*/{2, 32}, /*strides=*/{32, 1},
             /*element=*/{4, 1}};
