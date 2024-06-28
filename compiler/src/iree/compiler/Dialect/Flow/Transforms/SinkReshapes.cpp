@@ -127,8 +127,14 @@ static bool shouldSinkExpandShapeOp(OpOperand *opOperand) {
     // There is already a tile-and-fusable producer to fuse with. Still prefer
     // fusing with the producer whose parallel iteration space rank matches
     // the consumer parallel iteration space rank to avoid loss of parallelism.
-    if (isa<linalg::LinalgOp>(reshapeProducer) &&
-        isa<linalg::LinalgOp>(currProducer)) {
+    if (auto currLinalgProducer = dyn_cast<linalg::LinalgOp>(currProducer)) {
+      auto reshapeLinalgProducer = dyn_cast<linalg::LinalgOp>(reshapeProducer);
+      if (!reshapeLinalgProducer) {
+        // For now we will prefer to fold with Linalg op. So if the reshape
+        // producer is not a Linalg op, bail.
+        return false;
+      }
+
       unsigned currConsumerNumParallelLoops =
           consumerGenericOp.getNumParallelLoops();
       unsigned currProducerNumParallelLoops =

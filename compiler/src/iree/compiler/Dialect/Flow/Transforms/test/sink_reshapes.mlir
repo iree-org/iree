@@ -194,7 +194,7 @@ func.func @reduce_broadcast(%arg0: tensor<4x768xf32>, %arg1: tensor<4xf32>,
       : tensor<4xf32> into tensor<1x4xf32>
   %1 = tensor.empty() : tensor<1x4x768xf32>
   %2 = linalg.generic {
-      indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>, 
+      indexing_maps = [affine_map<(d0, d1, d2) -> (d0, d1, d2)>,
                        affine_map<(d0, d1, d2) -> (d0, d1)>,
                        affine_map<(d0, d1, d2) -> (d0, d1, d2)>],
       iterator_types = ["parallel", "parallel", "parallel"]}
