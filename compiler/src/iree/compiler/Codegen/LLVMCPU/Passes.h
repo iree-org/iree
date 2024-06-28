@@ -68,6 +68,10 @@ createLLVMCPUSynchronizeSymbolVisibilityPass();
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPUTileAndFusePass(int64_t tilingLevel = -1);
 
+// Pass to Tile the Root Op and Fuse Producer and Consumer.
+std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
+createLLVMCPUTileRootAndFuseProducerConsumer(int64_t tilingLevel = -1);
+
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createLLVMCPU2DScalableTo1DScalablePass();
 
