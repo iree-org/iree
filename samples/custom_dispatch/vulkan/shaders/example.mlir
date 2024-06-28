@@ -19,7 +19,8 @@
       compute = fp32|int32, storage = b32, subgroup = none,
       dot = none, mma = [], subgroup_size_choices = [64, 64],
       max_workgroup_sizes = [128, 128, 64], max_thread_count_per_workgroup = 128,
-      max_workgroup_memory_bytes = 16384>
+      max_workgroup_memory_bytes = 16384,
+      max_workgroup_counts = [65535, 65535, 65535]>
   >
 }>
 

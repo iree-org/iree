@@ -10,7 +10,8 @@
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
     compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
     subgroup_size_choices = [16], max_workgroup_sizes = [128, 128, 64],
-    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384>>
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
+    max_workgroup_counts = [65535, 65535, 65535]>>
 }>
 #map = affine_map<(d0, d1) -> (d0, d1)>
 func.func @copy_as_generic() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
@@ -44,7 +45,8 @@ func.func @copy_as_generic() attributes {hal.executable.target = #executable_tar
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
     compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
     subgroup_size_choices = [64], max_workgroup_sizes = [128, 128, 64],
-    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384>>
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
+    max_workgroup_counts = [65535, 65535, 65535]>>
 }>
 #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 func.func @copy() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
@@ -81,7 +83,8 @@ func.func @copy() attributes {hal.executable.target = #executable_target_vulkan_
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
     compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
     subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
-    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384>>
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
+    max_workgroup_counts = [65535, 65535, 65535]>>
 }>
 func.func @avg_pool() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
   %c0 = arith.constant 0 : index
@@ -118,7 +121,8 @@ func.func @avg_pool() attributes {hal.executable.target = #executable_target_vul
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
     compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
     subgroup_size_choices = [4], max_workgroup_sizes = [128, 128, 64],
-    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384>>
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
+    max_workgroup_counts = [65535, 65535, 65535]>>
 }>
 #map = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
 func.func @avg_pool() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
@@ -162,7 +166,8 @@ func.func @avg_pool() attributes {hal.executable.target = #executable_target_vul
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
     compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
     subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
-    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384>>
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
+    max_workgroup_counts = [65535, 65535, 65535]>>
 }>
 func.func @max_pool() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
   %cst = arith.constant 0xFF800000 : f32
@@ -203,7 +208,8 @@ func.func @max_pool() attributes {hal.executable.target = #executable_target_vul
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
     compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
     subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
-    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384>>
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
+    max_workgroup_counts = [65535, 65535, 65535]>>
 }>
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (d1)>
@@ -244,7 +250,8 @@ func.func @elementwise() attributes {hal.executable.target = #executable_target_
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
     compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
     subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
-    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384>>
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
+    max_workgroup_counts = [65535, 65535, 65535]>>
 }>
 #map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d1, d2, d3, d4)>
 func.func @dwconv_elementwise() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
@@ -292,7 +299,8 @@ func.func @dwconv_elementwise() attributes {hal.executable.target = #executable_
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
     compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
     subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
-    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384>>
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
+    max_workgroup_counts = [65535, 65535, 65535]>>
 }>
 #map = affine_map<(d0, d1, d2) -> (d2, d0, d1)>
 #map1 = affine_map<(d0, d1, d2) -> (d0, d1)>
@@ -332,7 +340,8 @@ func.func @outermost_reduction() attributes {hal.executable.target = #executable
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
     compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
     subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
-    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384>>
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
+    max_workgroup_counts = [65535, 65535, 65535]>>
 }>
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (d0)>
@@ -381,7 +390,8 @@ func.func @innermost_reduction() attributes {hal.executable.target = #executable
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
     compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
     subgroup_size_choices = [16], max_workgroup_sizes = [128, 128, 64],
-    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384>>
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
+    max_workgroup_counts = [65535, 65535, 65535]>>
 }>
 #map = affine_map<(d0, d1, d2, d3) -> (d0, d3, d1, d2)>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
@@ -418,7 +428,8 @@ func.func @four_dim_elementwise() attributes {hal.executable.target = #executabl
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
     compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
     subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
-    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384>>
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
+    max_workgroup_counts = [65535, 65535, 65535]>>
 }>
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (d0)>
@@ -465,7 +476,8 @@ func.func @odd_reduction_dimension_size_501() attributes {hal.executable.target 
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
     compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
     subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
-    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384>>
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
+    max_workgroup_counts = [65535, 65535, 65535]>>
 }>
 #map = affine_map<(d0, d1) -> (d0, d1)>
 #map1 = affine_map<(d0, d1) -> (d0)>
@@ -512,7 +524,8 @@ func.func @odd_reduction_dimension_size_2809() attributes {hal.executable.target
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
     compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
     subgroup_size_choices = [32], max_workgroup_sizes = [128, 128, 64],
-    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384>>
+    max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384,
+    max_workgroup_counts = [65535, 65535, 65535]>>
 }>
 #map = affine_map<(d0, d1, d2, d3) -> ()>
 #map1 = affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>
