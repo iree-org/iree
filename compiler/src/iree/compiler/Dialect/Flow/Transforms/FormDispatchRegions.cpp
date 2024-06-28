@@ -636,10 +636,12 @@ isFusableWithConsumer(OpOperand &fusedOperand,
   // Check if the iteration spaces of the producer and consumer are same.
   // TODO(#12664): This is unnecessary requirement, but we need a better config
   // to tile the consumer with a larger iteration space.
-  auto producerIterationSpace = producerFusionOp.getStaticLoopRanges();
-  auto consumerIterationSpace = consumerFusionOp.getStaticLoopRanges();
-  if (producerIterationSpace.size() < consumerIterationSpace.size()) {
-    return false;
+  if (!options.aggressiveFusion) {
+    auto producerIterationSpace = producerFusionOp.getStaticLoopRanges();
+    auto consumerIterationSpace = consumerFusionOp.getStaticLoopRanges();
+    if (producerIterationSpace.size() < consumerIterationSpace.size()) {
+      return false;
+    }
   }
 
   // Under aggressive fusion assume that the dispatches are vectorized. In which
