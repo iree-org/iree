@@ -219,6 +219,7 @@ jobs:
         run: |
           source ${VENV_DIR}/bin/activate
           python SHARK-TestSuite/iree_tests/download_remote_files.py --root-dir pytorch/models
+          python SHARK-TestSuite/iree_tests/download_remote_files.py --root-dir sharktank
 
       - name: Run external tests - models with real weights
         if: "matrix.models-config-file != '' && !cancelled()"
