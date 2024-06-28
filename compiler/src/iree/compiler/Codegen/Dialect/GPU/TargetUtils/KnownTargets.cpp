@@ -124,6 +124,8 @@ const WgpDetails *getCDNA3WgpDetails() {
   static const MMAIntrinsic cdna3MMAOps[] = {
       MMAIntrinsic::MFMA_F16_16x16x16_F32,
       MMAIntrinsic::MFMA_F16_32x32x8_F32,
+      MMAIntrinsic::MFMA_I8_16x16x32_I32,
+      MMAIntrinsic::MFMA_I8_32x32x16_I32,
   };
   static const WgpDetails cdna3Wgp = {
       allComputeBits,   allStorageBits,          allSubgroupOps,

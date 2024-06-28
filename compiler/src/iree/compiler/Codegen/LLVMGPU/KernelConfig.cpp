@@ -20,6 +20,7 @@
 #include "iree/compiler/Codegen/Utils/GPUUtils.h"
 #include "iree/compiler/Codegen/Utils/LinalgOpInfo.h"
 #include "iree/compiler/Codegen/Utils/Utils.h"
+#include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
 #include "iree/compiler/Dialect/HAL/IR/HALTypes.h"
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "llvm/ADT/STLExtras.h"
@@ -27,6 +28,7 @@
 #include "llvm/Support/Debug.h"
 #include "mlir/Analysis/SliceAnalysis.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
+#include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -443,6 +445,15 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   Type lhsElemType = getElementTypeOrSelf(lhs);
   Type rhsElemType = getElementTypeOrSelf(rhs);
   Type initElemType = getElementTypeOrSelf(init);
+
+  if (auto lhsOp = lhs.getDefiningOp<linalg::GenericOp>()) {
+    if (IREE::Flow::isDequantizationLikeOp(lhsOp))
+      lhsElemType = getElementTypeOrSelf(lhsOp.getDpsInputs()[0]);
+  }
+  if (auto rhsOp = rhs.getDefiningOp<linalg::GenericOp>()) {
+    if (IREE::Flow::isDequantizationLikeOp(rhsOp))
+      rhsElemType = getElementTypeOrSelf(rhsOp.getDpsInputs()[0]);
+  }
 
   GPUMatmulShapeType problem{bounds[mDim], bounds[nDim], bounds[kDim],
                              lhsElemType,  rhsElemType,  initElemType};

@@ -246,7 +246,9 @@ def get_all_spirv_tile_workgroup_size_pairs(t_tile_k):
     return tile_workgroup_size_pairs
 
 
-def get_rocm_test_compilation_infos(compilation_info_id: CompilationInfoId):
+def get_rocm_test_compilation_infos(
+    compilation_info_id: CompilationInfoId, lhs_rhs_type: MatrixElemTypeId
+):
     intrinsic = ""
     if compilation_info_id == CompilationInfoId.LLVMGPUVectorDistributeMFMA:
         intrinsic = "MFMA"
@@ -269,6 +271,14 @@ def get_rocm_test_compilation_infos(compilation_info_id: CompilationInfoId):
             MMASchedule("MFMA_F16_32x32x8_F32", 2, 2, 1, 1, 1),
             MMASchedule("MFMA_F16_32x32x8_F32", 1, 4, 2, 1, 2),
             MMASchedule("MFMA_F16_32x32x8_F32", 4, 2, 1, 2, 4),
+            MMASchedule("MFMA_I8_16x16x32_I32", 1, 1, 1, 1, 1),
+            MMASchedule("MFMA_I8_16x16x32_I32", 2, 2, 1, 1, 2),
+            MMASchedule("MFMA_I8_16x16x32_I32", 4, 1, 4, 1, 1),
+            MMASchedule("MFMA_I8_16x16x32_I32", 4, 2, 4, 2, 1),
+            MMASchedule("MFMA_I8_32x32x16_I32", 1, 1, 1, 1, 1),
+            MMASchedule("MFMA_I8_32x32x16_I32", 2, 2, 1, 1, 2),
+            MMASchedule("MFMA_I8_32x32x16_I32", 4, 1, 1, 2, 2),
+            MMASchedule("MFMA_I8_32x32x16_I32", 4, 2, 2, 2, 2),
         ]
     elif intrinsic == "WMMA":
         schedules = [
@@ -287,6 +297,11 @@ def get_rocm_test_compilation_infos(compilation_info_id: CompilationInfoId):
 
     infos = []
     for schedule in schedules:
+        # Skip schedules with an intrinsic which element type does not
+        # match the requested one.
+        if lhs_rhs_type.value.upper() not in schedule.intrinsic:
+            continue
+
         if schedule.intrinsic == "MFMA_F16_16x16x16_F32":
             wg_tile_m = schedule.m_count * schedule.m_tile_count * 16
             wg_tile_n = schedule.n_count * schedule.n_tile_count * 16
@@ -295,6 +310,14 @@ def get_rocm_test_compilation_infos(compilation_info_id: CompilationInfoId):
             wg_tile_m = schedule.m_count * schedule.m_tile_count * 32
             wg_tile_n = schedule.n_count * schedule.n_tile_count * 32
             wg_tile_k = schedule.k_tile_count * 8
+        elif schedule.intrinsic == "MFMA_I8_16x16x32_I32":
+            wg_tile_m = schedule.m_count * schedule.m_tile_count * 16
+            wg_tile_n = schedule.n_count * schedule.n_tile_count * 16
+            wg_tile_k = schedule.k_tile_count * 32
+        elif schedule.intrinsic == "MFMA_I8_32x32x16_I32":
+            wg_tile_m = schedule.m_count * schedule.m_tile_count * 32
+            wg_tile_n = schedule.n_count * schedule.n_tile_count * 32
+            wg_tile_k = schedule.k_tile_count * 16
         elif schedule.intrinsic == "WMMA_F16_16x16x16_F32":
             wg_tile_m = schedule.m_count * schedule.m_tile_count * 16
             wg_tile_n = schedule.n_count * schedule.n_tile_count * 16
@@ -328,7 +351,7 @@ def get_test_compilation_infos(
         CompilationInfoId.LLVMGPUVectorDistributeMFMA,
         CompilationInfoId.LLVMGPUVectorDistributeWMMA,
     ]:
-        return get_rocm_test_compilation_infos(compilation_info_id)
+        return get_rocm_test_compilation_infos(compilation_info_id, lhs_rhs_type)
 
     software_pipeline_depth = 0
     if compilation_info_id == CompilationInfoId.LLVMGPUMatmulSimt:
