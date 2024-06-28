@@ -90,7 +90,7 @@ jobs:
         uses: actions/checkout@v4.1.7
         with:
           repository: nod-ai/SHARK-TestSuite
-          ref: ab932cc54f1e460ccd9b4a4f1efa07d0ee069eb5
+          ref: 3603a453b3777fac9af4506a3dc0b3d87587fd47
           path: SHARK-TestSuite
           submodules: false
           lfs: false
@@ -137,7 +137,7 @@ jobs:
         include:
           # CPU
           - name: cpu_llvm_task
-            models-config-file: pytorch_models_cpu_llvm_task.json
+            models-config-file: models_cpu_llvm_task.json
             sdxl-unet-config-file: sdxl_scheduled_unet_cpu_llvm_task.json
             sdxl-vae-config-file: sdxl_vae_decode_cpu_llvm_task.json
             sdxl-clip-config-file: sdxl_prompt_encoder_cpu_llvm_task.json
@@ -145,14 +145,14 @@ jobs:
 
           # AMD GPU
           - name: amdgpu_rocm_gfx90a
-            models-config-file: pytorch_models_gpu_rocm_gfx90a.json
-            models-extra-flags-config-file: pytorch_models_gpu_rocm_gfx90a_additional_flags.json
+            models-config-file: models_gpu_rocm_gfx90a.json
+            models-extra-flags-config-file: models_gpu_rocm_gfx90a_additional_flags.json
             sdxl-unet-config-file: sdxl_scheduled_unet_gpu_rocm_gfx90a.json
             sdxl-vae-config-file: sdxl_vae_decode_gpu_rocm_gfx90a.json
             sdxl-clip-config-file: sdxl_prompt_encoder_gpu_rocm_gfx90a.json
             runs-on: nodai-amdgpu-mi250-x86-64
           - name: amdgpu_vulkan
-            models-config-file: pytorch_models_gpu_vulkan.json
+            models-config-file: models_gpu_vulkan.json
             runs-on: nodai-amdgpu-w7900-x86-64
 
           # NVIDIA GPU
@@ -207,7 +207,7 @@ jobs:
         uses: actions/checkout@v4.1.7
         with:
           repository: nod-ai/SHARK-TestSuite
-          ref: ab932cc54f1e460ccd9b4a4f1efa07d0ee069eb5
+          ref: 3603a453b3777fac9af4506a3dc0b3d87587fd47
           path: SHARK-TestSuite
           submodules: false
           lfs: true
@@ -224,7 +224,9 @@ jobs:
         if: "matrix.models-config-file != '' && !cancelled()"
         run: |
           source ${VENV_DIR}/bin/activate
-          pytest SHARK-TestSuite/iree_tests/pytorch/models \
+          pytest \
+            SHARK-TestSuite/iree_tests/pytorch/models \
+            SHARK-TestSuite/iree_tests/sharktank \
             -rpfE \
             -k real_weights \
             --no-skip-tests-missing-files \
