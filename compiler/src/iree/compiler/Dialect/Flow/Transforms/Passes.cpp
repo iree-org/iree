@@ -117,6 +117,13 @@ static llvm::cl::opt<bool> clZeroFillEmptyTensors(
         "Zero fill empty tensors instead of leaving them uninitialized."),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clEnableDataTiling(
+    "iree-flow-enable-data-tiling",
+    llvm::cl::desc("Enable data-tiling at flow level, i.e., it set encodings "
+                   "in dispatch regions, hoist them out of region, and enable "
+                   "fusion for the set_encodings."),
+    llvm::cl::init(false));
+
 namespace mlir::iree_compiler::IREE::Flow {
 
 using FunctionLikeNest =
@@ -221,6 +228,7 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager) {
       // handle explicit captures as materialized as dispatch workgroup operands
       // and block arguments.
       .addPass(IREE::Flow::createCloneProducersIntoDispatchRegionsPass)
+      .addPredicatedPass(clEnableDataTiling, IREE::Flow::createSetEncodingPass)
       // Collapse dimensions of linalg Ops.
       .addPass(IREE::Flow::createCollapseDimensionsPass)
       // Convert dispatch regions into dispatch workgroups by capturing values
