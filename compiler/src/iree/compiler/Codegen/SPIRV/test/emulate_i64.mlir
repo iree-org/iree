@@ -13,7 +13,8 @@
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
     compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
     subgroup_size_choices = [32], max_workgroup_sizes = [1024, 1024, 1024],
-    max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536>>
+    max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [65535, 65535, 65535]>>
 }>
 func.func @buffer_types() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
   %c0 = arith.constant 0 : index
@@ -50,7 +51,8 @@ func.func @buffer_types() attributes {hal.executable.target = #executable_target
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
     compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [],
     subgroup_size_choices = [32], max_workgroup_sizes = [1024, 1024, 1024],
-    max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536>>
+    max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [65535, 65535, 65535]>>
 }>
 func.func @emulate_1d_vector() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
   %c95232 = arith.constant 95232 : index
@@ -103,7 +105,8 @@ func.func @emulate_1d_vector() attributes {hal.executable.target = #executable_t
   iree.gpu.target = #iree_gpu.target<arch = "", features = "spirv:v1.6,cap:Shader", wgp = <
     compute = fp32|int64|int32, storage = b32, subgroup = none, dot = none, mma = [],
     subgroup_size_choices = [32], max_workgroup_sizes = [1024, 1024, 1024],
-    max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536>>
+    max_thread_count_per_workgroup = 1024, max_workgroup_memory_bytes = 65536,
+    max_workgroup_counts = [65535, 65535, 65535]>>
 }>
 func.func @no_emulation() attributes {hal.executable.target = #executable_target_vulkan_spirv_fb} {
   %c0 = arith.constant 0 : index
