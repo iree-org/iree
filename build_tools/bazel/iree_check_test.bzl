@@ -124,11 +124,11 @@ def iree_check_single_backend_test_suite(
 
     # Metal backend/driver not supported by Bazel build.
     if target_backend == "metal-spirv" or driver == "metal":
-        continue
+        return
 
     # ROCm/HIP backend/driver not supported by Bazel build.
     if target_backend == "rocm" or driver == "hip":
-        continue
+        return
 
     # We haven't implemented this so far because we have been using target_cpu_features so far only
     # for aarch64 targets, for which we use the CMake build. To future people implementing this:

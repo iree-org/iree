@@ -156,6 +156,7 @@ iree_check_single_backend_test_suite(
     "local-task"
   COMPILER_FLAGS
     "--iree-input-demote-f64-to-f32"
+    "--iree-input-promote-bf16-to-f32"
     "--iree-input-promote-f16-to-f32"
   INPUT_TYPE
     "stablehlo"
