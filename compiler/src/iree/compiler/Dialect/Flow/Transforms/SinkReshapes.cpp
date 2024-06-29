@@ -64,35 +64,98 @@ static bool shouldSinkExpandShapeOp(OpOperand *opOperand) {
   if (!isNonNullAndOutsideDispatch({reshapeOp, consumer})) {
     return false;
   }
+  auto consumerGenericOp = dyn_cast<linalg::GenericOp>(consumer);
+  if (!consumerGenericOp) {
+    return false;
+  }
+  // Only sink across parallel generic ops for now.
+  if (consumerGenericOp.getNumParallelLoops() !=
+      consumerGenericOp.getNumLoops()) {
+    return false;
+  }
 
   // Do not sink reshapes across dequantize operations since they are
-  // cloned into their producers.
+  // cloned into their consumers.
   if (isDequantizationLikeOp(consumer)) {
+    return false;
+  }
+
+  // First check that the expand_shape producer and consumer can be fused.
+  Operation *reshapeProducer = reshapeOp.getSrc().getDefiningOp();
+  if (!reshapeProducer) {
+    return false;
+  }
+  if (!isFusableUsingTileAndFuse(reshapeOp.getSrc().getDefiningOp(),
+                                 consumer)) {
     return false;
   }
 
   // If the op is already fusable with producer using tile and fuse,
   // do nothing.
-  if (llvm::any_of(consumer->getOpOperands(), [](OpOperand &opOperand) {
-        Operation *currProducer = opOperand.get().getDefiningOp();
-        Operation *currConsumer = opOperand.getOwner();
-        return isFusableUsingTileAndFuse(currProducer, currConsumer) &&
-               // The check for the producer having a single use is not fully
-               // worked out. Ideally we can fuse with a producer irrespective
-               // of number of uses, but is a good thumb rule in practice.
-               llvm::hasSingleElement(currProducer->getUses());
-      })) {
-    return false;
-  }
+  for (OpOperand &opOperand : consumer->getOpOperands()) {
+    Operation *currProducer = opOperand.get().getDefiningOp();
+    if (!currProducer) {
+      continue;
+    }
 
-  // Do not sink if consumer is a contraction/matmul like op.
-  if (auto linalgConsumerOp = dyn_cast<linalg::LinalgOp>(consumer)) {
-    if (linalg::isaContractionOpInterface(linalgConsumerOp))
-      return false;
-  }
+    // The check for the producer having a single use is not fully
+    // worked out. Ideally we can fuse with a producer irrespective
+    // of number of uses, but is a good thumb rule in practice.
+    if (!llvm::hasSingleElement(currProducer->getUses())) {
+      continue;
+    }
 
-  return isFusableUsingTileAndFuse(reshapeOp.getSrc().getDefiningOp(),
-                                   consumer);
+    // Check if a producer can already be tiled and fused with the consumer.
+    if (!isFusableUsingTileAndFuse(currProducer, consumer)) {
+      continue;
+    }
+
+    // There is already a tile-and-fusable producer to fuse with. Still prefer
+    // fusing with the producer whose parallel iteration space rank matches
+    // the consumer parallel iteration space rank to avoid loss of parallelism.
+    if (auto currLinalgProducer = dyn_cast<linalg::LinalgOp>(currProducer)) {
+      auto reshapeLinalgProducer = dyn_cast<linalg::LinalgOp>(reshapeProducer);
+      if (!reshapeLinalgProducer) {
+        // For now we will prefer to fold with Linalg op. So if the reshape
+        // producer is not a Linalg op, bail.
+        return false;
+      }
+
+      // Somehow this logic does not seem to work well when the reshape producer
+      // is an elementwise operation. For one, should never have a reshape
+      // "after" an elementwise operation, since bubble expand shape should
+      // already account for it, and fuse the elementwise producer of reshape
+      // and the consumer (which is also elementwise). Needs more investigation
+      // but removes regressions and lit test failures.
+      if (reshapeLinalgProducer.getNumLoops() ==
+              reshapeLinalgProducer.getNumParallelLoops() &&
+          currLinalgProducer.getNumLoops() !=
+              currLinalgProducer.getNumParallelLoops()) {
+        return false;
+      }
+
+      unsigned currConsumerNumParallelLoops =
+          consumerGenericOp.getNumParallelLoops();
+      unsigned currProducerNumParallelLoops =
+          currLinalgProducer.getNumParallelLoops();
+      if (currProducerNumParallelLoops == currConsumerNumParallelLoops) {
+        // If the producer has same number of parallel loops as consumer,
+        // then this is the operand to fuse along. So do nothing.
+        return false;
+      }
+      // If the producer has less number of parallel loops as the consumer,
+      // ignore this operand.
+      if (currProducerNumParallelLoops < currConsumerNumParallelLoops) {
+        continue;
+      }
+      unsigned reshapeProducerNumParallelLoops =
+          reshapeLinalgProducer.getNumParallelLoops();
+      if (currProducerNumParallelLoops < reshapeProducerNumParallelLoops) {
+        return false;
+      }
+    }
+  }
+  return true;
 }
 
 void SinkReshapesPass::runOnOperation() {
