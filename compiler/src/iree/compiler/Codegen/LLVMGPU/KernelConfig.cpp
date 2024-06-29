@@ -759,8 +759,6 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   // Follow the LLVMGPU convention of keeping all of the tile sizes in one list.
   workgroupTileSizes[k2Dim] = schedule->kTileCount * schedule->kSize;
-  // workgroupTileSizes[opInfo.getMDims().back()] = 64;
-  // workgroupTileSizes[opInfo.getK2Dims().back()] = 32;
 
   TileSizesListType tileSizes;
   tileSizes.push_back(workgroupTileSizes);
