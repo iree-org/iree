@@ -186,9 +186,8 @@ void UKernelGenericOp::getEffects(
     SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
         &effects) {
   SmallVector<OpOperand *> readOnlyOperands = getDpsInputOperands();
-  for (OpOperand &operand : getOtherOperandsMutable()) {
-    readOnlyOperands.push_back(&operand);
-  }
+  llvm::append_range(readOnlyOperands,
+                     llvm::make_pointer_range(getOtherOperandsMutable()));
   for (OpOperand *operand : readOnlyOperands) {
     if (!llvm::isa<MemRefType>(operand->get().getType())) {
       continue;
