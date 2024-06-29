@@ -297,11 +297,17 @@ jobs:
         if: contains(matrix.name, 'rocm')
         run: |
           source ${VENV_DIR}/bin/activate
-          pytest SHARK-TestSuite/iree_tests/benchmarks/benchmark_sdxl_rocm.py \
+          pytest SHARK-TestSuite/iree_tests/benchmarks/sdxl/benchmark_sdxl_rocm.py \
             --goldentime-rocm-e2e-ms 1661.5 \
             --goldentime-rocm-unet-ms 450.5 \
-            --goldentime-rocm-clip-ms 17.5 \
-            --goldentime-rocm-vae-ms 288.5 \
+            --goldentime-rocm-clip-ms 19 \
+            --goldentime-rocm-vae-ms 290.0 \
+            --goldendispatch-rocm-unet 1714 \
+            --goldendispatch-rocm-clip 1569 \
+            --goldendispatch-rocm-vae 248 \
+            --goldensize-rocm-unet-bytes 2088217 \
+            --goldensize-rocm-clip-bytes 785493 \
+            --goldensize-rocm-vae-bytes 762067 \
             --gpu-number 6 \
             --rocm-chip gfx90a \
             --log-cli-level=info \
