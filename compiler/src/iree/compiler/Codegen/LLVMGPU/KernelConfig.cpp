@@ -684,8 +684,8 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // TODO: Currently, we are forcing number of subgroups to be 1. This can be
   // fixed by teaching vector distribution chained matmul.
   GPUMMAHeuristicSeeds seeds = {/*bestSubgroupCountPerWorkgroup=*/1,
-                                /*bestMNTileCountPerSubgroup=*/8,
-                                /*bestKTileCountPerSubgroup=*/4};
+                                /*bestMNTileCountPerSubgroup=*/16,
+                                /*bestKTileCountPerSubgroup=*/2};
 
   LDBG("Attention Vector Distribution Config");
 
@@ -759,9 +759,8 @@ setAttentionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 
   // Follow the LLVMGPU convention of keeping all of the tile sizes in one list.
   workgroupTileSizes[k2Dim] = schedule->kTileCount * schedule->kSize;
-
-  workgroupTileSizes[opInfo.getMDims().back()] = 64;
-  workgroupTileSizes[opInfo.getK2Dims().back()] = 32;
+  // workgroupTileSizes[opInfo.getMDims().back()] = 64;
+  // workgroupTileSizes[opInfo.getK2Dims().back()] = 32;
 
   TileSizesListType tileSizes;
   tileSizes.push_back(workgroupTileSizes);
