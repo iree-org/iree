@@ -111,9 +111,9 @@ bool isOffsetSizeAndStrideMappableToFlow(ArrayRef<OpFoldResult> offsets,
     } else {
       // TODO: Use ValueBoundsAnalysis to check whether two dynamic values
       // are equal.
-      if (!(staticOffset == 0 && !ShapedType::isDynamic(staticSize) &&
-            !ShapedType::isDynamic(baseShape[dim - 1]) &&
-            staticSize == baseShape[dim - 1])) {
+      if (staticOffset != 0 || ShapedType::isDynamic(staticSize) ||
+          ShapedType::isDynamic(baseShape[dim - 1]) ||
+          staticSize != baseShape[dim - 1]) {
         fullSlices = false;
       }
     }
