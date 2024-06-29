@@ -121,10 +121,23 @@ static bool shouldSinkExpandShapeOp(OpOperand *opOperand) {
         return false;
       }
 
+      // Somehow this logic does not seem to work well when the reshape producer
+      // is an elementwise operation. For one, should never have a reshape
+      // "after" an elementwise operation, since bubble expand shape should
+      // already account for it, and fuse the elementwise producer of reshape
+      // and the consumer (which is also elementwise). Needs more investigation
+      // but removes regressions and lit test failures.
+      if (reshapeLinalgProducer.getNumLoops() ==
+              reshapeLinalgProducer.getNumParallelLoops() &&
+          currLinalgProducer.getNumLoops() !=
+              currLinalgProducer.getNumParallelLoops()) {
+        return false;
+      }
+
       unsigned currConsumerNumParallelLoops =
           consumerGenericOp.getNumParallelLoops();
       unsigned currProducerNumParallelLoops =
-          cast<linalg::LinalgOp>(currProducer).getNumParallelLoops();
+          currLinalgProducer.getNumParallelLoops();
       if (currProducerNumParallelLoops == currConsumerNumParallelLoops) {
         // If the producer has same number of parallel loops as consumer,
         // then this is the operand to fuse along. So do nothing.
@@ -136,7 +149,7 @@ static bool shouldSinkExpandShapeOp(OpOperand *opOperand) {
         continue;
       }
       unsigned reshapeProducerNumParallelLoops =
-          cast<linalg::LinalgOp>(reshapeProducer).getNumParallelLoops();
+          reshapeLinalgProducer.getNumParallelLoops();
       if (currProducerNumParallelLoops < reshapeProducerNumParallelLoops) {
         return false;
       }
