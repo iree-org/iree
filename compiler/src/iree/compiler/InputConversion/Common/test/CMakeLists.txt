@@ -24,6 +24,7 @@ iree_lit_test_suite(
     "promote_bf16_to_f32.mlir"
     "promote_f16_to_f32.mlir"
     "sanitize_module_names.mlir"
+    "tensor_ops_to_linalg.mlir"
   TOOLS
     FileCheck
     iree-opt

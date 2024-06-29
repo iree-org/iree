@@ -33,6 +33,12 @@ def LinalgQuantizedMatmulToMatmulPass
   let constructor = "mlir::iree_compiler::InputConversion::createLinalgQuantizedMatmulToMatmulPass()";
 }
 
+def TensorOpsToLinalgPass
+    : InterfacePass<"iree-tensor-ops-to-linalg", "mlir::FunctionOpInterface"> {
+  let summary = "Convert tensor ops to linalg ops";
+  let constructor = "mlir::iree_compiler::InputConversion::createTensorOpsToLinalgPass()";
+}
+
 def SanitizeModuleNames :
     Pass<"iree-sanitize-module-names", "ModuleOp"> {
   let summary = "Sanitizes module names for uniformity across target implementations.";
