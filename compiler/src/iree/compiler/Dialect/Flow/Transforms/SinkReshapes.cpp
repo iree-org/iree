@@ -47,22 +47,8 @@ public:
 /// we just approximate it (and try to be optimistic)
 static bool isFusableUsingTileAndFuse(Operation *producer,
                                       Operation *consumer) {
-  if (llvm::isa_and_nonnull<tensor::UnPackOp, Encoding::UnsetEncodingOp>(
-          producer)) {
-    return true;
-  }
-
-  // If the producer is a linalg op.
-  auto producerLinalgOp = dyn_cast_or_null<linalg::LinalgOp>(producer);
-  if (!producerLinalgOp) {
-    return false;
-  }
-  // Ignore elementwise linalg op producers.
-  if (producerLinalgOp.getNumLoops() ==
-      producerLinalgOp.getNumParallelLoops()) {
-    return false;
-  }
-  return true;
+  return llvm::isa_and_nonnull<linalg::LinalgOp, tensor::UnPackOp,
+                               Encoding::UnsetEncodingOp>(producer);
 }
 
 /// Control function to check if an `tensor.expand_shape` (which is producer of
@@ -89,7 +75,7 @@ static bool shouldSinkExpandShapeOp(OpOperand *opOperand) {
   }
 
   // Do not sink reshapes across dequantize operations since they are
-  // cloned into their producers.
+  // cloned into their consumers.
   if (isDequantizationLikeOp(consumer)) {
     return false;
   }
