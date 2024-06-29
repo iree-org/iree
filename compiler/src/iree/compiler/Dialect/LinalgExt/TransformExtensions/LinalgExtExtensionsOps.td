@@ -118,4 +118,45 @@ def ConvertToOnlineAttention : Op<Transform_Dialect, "iree.convert_to_online_att
   }];
 }
 
+
+def PadAttentionOp : Op<Transform_Dialect, "iree.pad_attention",
+    [FunctionalStyleTransformOpTrait,
+     MemoryEffectsOpInterface,
+     TransformOpInterface,
+     TransformEachOpTrait,
+     ReportTrackingListenerFailuresOpTrait]> {
+  let description = [{
+    Target iree_linalg_ext.attention ops and pad them.
+    This transform consumes the target handle and produces a result handle.
+    Outputs:
+      1.Padded Attention handle
+      2.Subtensor output (extractSlices)
+  }];
+
+  let arguments = (
+      ins TransformHandleTypeInterface:$target,
+          DefaultValuedAttr<I64ArrayAttr, "{}">: $pad_to_multiple_of
+  );
+  let results = (outs Variadic<TransformHandleTypeInterface>:$result);
+
+  let assemblyFormat = "attr-dict $target `:` functional-type(operands, results)";
+  let cppNamespace = "mlir::iree_compiler::IREE::LinalgExt";
+
+  let builders = [
+    OpBuilder<(ins "Value":$target)>
+  ];
+
+  let assemblyFormat = [{
+    $target attr-dict `:` functional-type(operands, results)
+  }];
+
+  let extraClassDeclaration = [{
+    ::mlir::DiagnosedSilenceableFailure applyToOne(
+        ::mlir::transform::TransformRewriter &rewriter,
+        ::mlir::iree_compiler::IREE::LinalgExt::AttentionOp target,
+        ::mlir::transform::ApplyToEachResultList &results,
+        ::mlir::transform::TransformState &state);
+  }];
+}
+
 #endif // IREE_DIALECT_LINALGEXT_TRANSFORMOPS

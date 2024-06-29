@@ -33,6 +33,7 @@ iree_cc_library(
     "DecomposeIm2col.cpp"
     "DecomposeWinogradPass.cpp"
     "PadContractionToBlockSize.cpp"
+    "Padding.cpp"
     "PassDetail.h"
     "Passes.cpp"
     "SplitReduction.cpp"
@@ -67,6 +68,7 @@ iree_cc_library(
     MLIRTensorUtils
     MLIRTilingInterface
     MLIRTransformDialect
+    MLIRTransformDialectInterfaces
     MLIRTransformUtils
     MLIRTransforms
     iree::compiler::Dialect::LinalgExt::IR
