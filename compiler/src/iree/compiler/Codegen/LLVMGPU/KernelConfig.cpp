@@ -283,6 +283,15 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
   Type rhsElemType = getElementTypeOrSelf(rhs);
   Type initElemType = getElementTypeOrSelf(init);
 
+  if (auto lhsOp = lhs.getDefiningOp<linalg::GenericOp>()) {
+    if (IREE::Flow::isDequantizationLikeOp(lhsOp))
+      lhsElemType = getElementTypeOrSelf(lhsOp.getDpsInputs()[0]);
+  }
+  if (auto rhsOp = rhs.getDefiningOp<linalg::GenericOp>()) {
+    if (IREE::Flow::isDequantizationLikeOp(rhsOp))
+      rhsElemType = getElementTypeOrSelf(rhsOp.getDpsInputs()[0]);
+  }
+
   GPUMatmulShapeType problem{bounds[mDim], bounds[nDim], bounds[kDim],
                              lhsElemType,  rhsElemType,  initElemType};
 
