@@ -18,6 +18,7 @@ iree_check_single_backend_test_suite(
     "scan.mlir"
     "scatter.mlir"
     "sort.mlir"
+    "top-k-vector.mlir"
     "top-k.mlir"
   TARGET_BACKEND
     "cuda"
@@ -35,6 +36,7 @@ iree_check_single_backend_test_suite(
   NAME
     check_cuda-topk-split-reduction
   SRCS
+    "top-k-vector.mlir"
     "top-k.mlir"
   TARGET_BACKEND
     "cuda"
@@ -54,6 +56,7 @@ iree_check_single_backend_test_suite(
   NAME
     check_cuda-topk-split-reduction-double
   SRCS
+    "top-k-vector.mlir"
     "top-k.mlir"
   TARGET_BACKEND
     "cuda"
@@ -81,6 +84,7 @@ iree_check_single_backend_test_suite(
     "scan.mlir"
     "scatter.mlir"
     "sort.mlir"
+    "top-k-vector.mlir"
     "top-k.mlir"
     "winograd_input.mlir"
     "winograd_output.mlir"

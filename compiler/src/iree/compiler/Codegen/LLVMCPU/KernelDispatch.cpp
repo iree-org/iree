@@ -105,6 +105,11 @@ llvm::cl::opt<bool> clEnableTransformDialectJit(
     llvm::cl::desc("enable the usage of the transform dialect JIT"),
     llvm::cl::init(false));
 
+llvm::cl::opt<bool>
+    clVectorizeTopk("iree-llvmcpu-vectorize-topk",
+                    llvm::cl::desc("Vectorizes TopK operations if appropriate"),
+                    llvm::cl::init(false));
+
 using IREE::Codegen::DispatchLoweringPassPipeline;
 
 // Encodes the pre-processing strategy to be applied on a Linalg operation
@@ -2487,6 +2492,21 @@ static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
       DispatchLoweringPassPipeline::CPUDoubleTilingExpert);
 }
 
+static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
+                                   IREE::LinalgExt::TopkOp topkOp) {
+  unsigned typeWidthInBytes = IREE::Util::getRoundedElementByteWidth(
+      topkOp.getInputType().getElementType());
+  int64_t typeVectorSize = getVectorSize(entryPointFn, typeWidthInBytes);
+  SmallVector<int64_t> vecTileSizes{0, typeVectorSize};
+  SmallVector<int64_t> distTileSizes = getDefaultDistributedLevelTileSizes(
+      topkOp, DistributionHeuristicConfig{});
+  distTileSizes = {1, 0};
+  TileSizesListType tileSizes = {distTileSizes, vecTileSizes};
+  return setOpConfigAndEntryPointFnTranslation(
+      entryPointFn, topkOp, tileSizes,
+      DispatchLoweringPassPipeline::CPULinalgExtTileAndVectorize);
+}
+
 /// Set the default configuration for operations that implement the
 /// `TiledOpInterface`.
 static LogicalResult setRootConfig(mlir::FunctionOpInterface entryPointFn,
@@ -2513,6 +2533,13 @@ setRootConfigImpl(mlir::FunctionOpInterface entryPointFn, Operation *op,
               tensor::PackOp, tensor::PadOp, tensor::UnPackOp, linalg::Mmt4DOp,
               linalg::BatchMmt4DOp>(
             [&](auto op) { return setRootConfig(entryPointFn, op); })
+        .Case<IREE::LinalgExt::TopkOp>([&](auto op) {
+          if (clVectorizeTopk)
+            return setRootConfig(entryPointFn, op);
+          else
+            return setRootConfig(entryPointFn,
+                                 static_cast<TilingInterface>(op));
+        })
         .Case<IREE::LinalgExt::WinogradFilterTransformOp,
               IREE::LinalgExt::WinogradInputTransformOp,
               IREE::LinalgExt::WinogradOutputTransformOp>(

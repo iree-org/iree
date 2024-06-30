@@ -23,10 +23,13 @@ iree_check_single_backend_test_suite(
             "scatter.mlir",
             "sort.mlir",
             "top-k.mlir",
+            "top-k-vector.mlir",
         ],
         include = ["*.mlir"],
         exclude = [
             "attention.mlir",
+            # Top-k-vector tests disabled due to an error for vector_call_topk_1x256.
+            # "top-k-vector.mlir",
             "winograd_input.mlir",
             "winograd_output.mlir",
         ],
@@ -47,6 +50,7 @@ iree_check_single_backend_test_suite(
     name = "check_cuda-topk-split-reduction",
     srcs = [
         "top-k.mlir",
+        "top-k-vector.mlir",
     ],
     compiler_flags = ["--iree-flow-topk-split-reduction=2"],
     driver = "cuda",
@@ -65,6 +69,7 @@ iree_check_single_backend_test_suite(
     name = "check_cuda-topk-split-reduction-double",
     srcs = [
         "top-k.mlir",
+        "top-k-vector.mlir",
     ],
     compiler_flags = ["--iree-flow-topk-split-reduction=3,2"],
     driver = "cuda",
@@ -98,6 +103,7 @@ iree_check_single_backend_test_suite(
             "scatter.mlir",
             "sort.mlir",
             "top-k.mlir",
+            "top-k-vector.mlir",
             "winograd_input.mlir",
             "winograd_output.mlir",
         ],
@@ -128,6 +134,7 @@ iree_check_single_backend_test_suite(
         include = ["*.mlir"],
         exclude = [
             "attention.mlir",
+            "top-k-vector.mlir",
             "winograd_input.mlir",
             "winograd_output.mlir",
         ],
@@ -144,6 +151,7 @@ iree_check_single_backend_test_suite(
             "scatter.mlir",
             # Top-k test disabled due to miscompile on vulkan.
             #    "top-k.mlir",
+            #    "top-k-vector.mlir",
             "sort.mlir",
             "winograd_input.mlir",
             "winograd_output.mlir",
@@ -155,6 +163,7 @@ iree_check_single_backend_test_suite(
             # TODO(antiagainst): scan fails on Adreno GPUs due to driver bug.
             # Re-enable this once we have new devices with up-to-date drivers.
             "top-k.mlir",
+            "top-k-vector.mlir",
             "scan.mlir",
         ],
     ),
