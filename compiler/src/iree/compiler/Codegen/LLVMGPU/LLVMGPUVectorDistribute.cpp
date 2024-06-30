@@ -205,6 +205,11 @@ private:
       return success();
     }
 
+    // Also if the broadcast has been folded into the read.
+    if (!transfer.getPermutationMap().isProjectedPermutation(false)) {
+      return success();
+    }
+
     // TODO: Support masking.
     if (transfer.getMask()) {
       transfer->emitOpError(
