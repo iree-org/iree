@@ -15,6 +15,6 @@
   "skip_run_tests": [],
   "expected_compile_failures": [],
   "expected_run_failures": [
-    "sdxl-vae-decode-tank"
+    "pytorch/models/sdxl-vae-decode-tank"
   ]
 }

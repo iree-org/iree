@@ -1,0 +1,24 @@
+{
+  "config_name": "gpu_vulkan",
+  "iree_compile_flags": [
+    "--iree-hal-target-backends=vulkan-spirv"
+  ],
+  "iree_run_module_flags": [
+    "--device=vulkan"
+  ],
+  "skip_compile_tests": [],
+  "skip_run_tests": [],
+  "expected_compile_failures": [
+    // TODO(#17344): need to regenerate .mlirbc
+    "pytorch/models/opt-125M",
+    "pytorch/models/resnet50",
+    "pytorch/models/sdxl-prompt-encoder-tank",
+    "pytorch/models/sdxl-scheduled-unet-3-tank",
+    "pytorch/models/sdxl-vae-decode-tank",
+
+    // error: 'builtin.module' op failed to run transform dialect passes
+    // (transform spec file is specific to SDXL?)
+    "sharktank/llama/open-llama-3b-v2-f16"
+  ],
+  "expected_run_failures": []
+}
