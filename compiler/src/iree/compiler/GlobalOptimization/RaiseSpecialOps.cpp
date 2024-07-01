@@ -12,8 +12,10 @@
 #include "iree/compiler/GlobalOptimization/PassDetail.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "llvm/ADT/STLExtras.h"
+#include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
+#include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/PatternMatch.h"
@@ -725,16 +727,26 @@ public:
                 producer.getBlock()->without_terminator())) {
           return false;
         }
-        // We only handle arith.extf here for two reasons:
-        //  1) This pattern is being applied to convolution/contraction
-        //     interfaces. Extension semantics for integers depend on the named
-        //     op and requires a slightly different pattern.
-        //  2) Truncating operations like `arith.truncf` should not be fused
-        //     with consumers; it would be preferred to fuse those with
-        //     producers (and the consumer fusion is arguably the less canonical
-        //     form).
-        if (!llvm::isa<arith::ExtFOp>(
-                *producer.getBlock()->without_terminator().begin())) {
+        // We only handle arith.extf/exti because truncating operations like
+        // `arith.truncf` should not be fused with consumers; it would be
+        // preferred to fuse those with producers (and the consumer fusion is
+        // arguably the less canonical form).
+        Operation &castOp = *producer.getBlock()->without_terminator().begin();
+        auto canFoldCast = [&]() {
+          if (llvm::isa<arith::ExtFOp>(castOp))
+            return true;
+          // Signed operations can only be folded with (implicitly) signed
+          // linalg named ops
+          if (llvm::isa<arith::ExtSIOp>(castOp)) {
+            return !llvm::isa<linalg::MatmulUnsignedOp,
+                              linalg::PoolingNhwcMaxUnsignedOp,
+                              linalg::PoolingNhwcMinUnsignedOp,
+                              linalg::PoolingNwcMaxUnsignedOp,
+                              linalg::PoolingNwcMinUnsignedOp>(namedOp);
+          }
+          return false;
+        };
+        if (!canFoldCast()) {
           return false;
         }
         Type producerElementType = getElementTypeOrSelf(
@@ -747,12 +759,13 @@ public:
         // correct type.
         Value blockArg = block->insertArgument(
             operandNumber, producerElementType, namedOp.getLoc());
-        // Create the extf.
-        auto ext = rewriter.create<arith::ExtFOp>(namedOp.getLoc(),
-                                                  outElementType, blockArg);
+        // Create the extf/extsi.
+        IRMapping mapping;
+        mapping.map(castOp.getOperand(0), blockArg);
+        Value ext = rewriter.clone(castOp, mapping)->getResult(0);
+
         // Replace uses of the old argument with the extended value.
-        rewriter.replaceAllUsesWith(block->getArgument(operandNumber + 1),
-                                    ext.getResult());
+        rewriter.replaceAllUsesWith(block->getArgument(operandNumber + 1), ext);
         // Erase the old argument.
         block->eraseArgument(operandNumber + 1);
         return true;

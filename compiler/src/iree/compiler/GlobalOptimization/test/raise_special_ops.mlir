@@ -538,3 +538,152 @@ util.func public @conv_nchw_extf_both(%arg0 : tensor<1x5x10x10xf16>,
 //  CHECK-SAME:     %[[ARG1:.+]]: tensor<5x5x3x3xf16>
 //       CHECK:   %[[RESULT:.+]] = linalg.conv_2d_nchw_fchw {{.*}} ins(%[[ARG0]], %[[ARG1]]
 //       CHECK:   util.return %[[RESULT]]
+
+// -----
+
+util.func public @matmul_extsi(%arg0 : tensor<10x20xi32>,
+                               %arg1 : tensor<20x40xi16>) -> tensor<10x40xi32> {
+  %0 = tensor.empty() : tensor<20x40xi32>
+  %1 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%arg1 : tensor<20x40xi16>) outs(%0 : tensor<20x40xi32>) {
+    ^bb0(%b0 : i16, %b1 : i32):
+      %e = arith.extsi %b0 : i16 to i32
+      linalg.yield %e : i32
+  } -> tensor<20x40xi32>
+  %2 = tensor.empty() : tensor<10x40xi32>
+  %3 = arith.constant 0 : i32
+  %4 = linalg.fill ins(%3 : i32) outs(%2 : tensor<10x40xi32>) -> tensor<10x40xi32>
+  %5 = linalg.matmul ins(%arg0, %1 : tensor<10x20xi32>, tensor<20x40xi32>)
+      outs(%4 : tensor<10x40xi32>) -> tensor<10x40xi32>
+  util.return %5 : tensor<10x40xi32>
+}
+// CHECK-LABEL: util.func public @matmul_extsi
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<10x20xi32>
+//  CHECK-SAME:     %[[ARG1:.+]]: tensor<20x40xi16>
+//       CHECK:   %[[RESULT:.+]] = linalg.matmul ins(%[[ARG0]], %[[ARG1]]
+//       CHECK:   util.return %[[RESULT]]
+// -----
+
+util.func public @matmul_extsi_a(%arg0 : tensor<10x20xi16>,
+                                 %arg1 : tensor<20x40xi32>) -> tensor<10x40xi32> {
+  %0 = tensor.empty() : tensor<10x20xi32>
+  %1 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%arg0 : tensor<10x20xi16>) outs(%0 : tensor<10x20xi32>) {
+    ^bb0(%b0 : i16, %b1 : i32):
+      %e = arith.extsi %b0 : i16 to i32
+      linalg.yield %e : i32
+  } -> tensor<10x20xi32>
+  %2 = tensor.empty() : tensor<10x40xi32>
+  %3 = arith.constant 0 : i32
+  %4 = linalg.fill ins(%3 : i32) outs(%2 : tensor<10x40xi32>) -> tensor<10x40xi32>
+  %5 = linalg.matmul ins(%1, %arg1 : tensor<10x20xi32>, tensor<20x40xi32>)
+      outs(%4 : tensor<10x40xi32>) -> tensor<10x40xi32>
+  util.return %5 : tensor<10x40xi32>
+}
+// CHECK-LABEL: util.func public @matmul_extsi_a
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<10x20xi16>
+//  CHECK-SAME:     %[[ARG1:.+]]: tensor<20x40xi32>
+//       CHECK:   %[[RESULT:.+]] = linalg.matmul ins(%[[ARG0]], %[[ARG1]]
+//       CHECK:   util.return %[[RESULT]]
+
+// -----
+
+util.func public @matmul_extsi_both(%arg0 : tensor<10x20xi16>,
+                                    %arg1 : tensor<20x40xi16>) -> tensor<10x40xi32> {
+  %0 = tensor.empty() : tensor<10x20xi32>
+  %1 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%arg0 : tensor<10x20xi16>) outs(%0 : tensor<10x20xi32>) {
+    ^bb0(%b0 : i16, %b1 : i32):
+      %e = arith.extsi %b0 : i16 to i32
+      linalg.yield %e : i32
+  } -> tensor<10x20xi32>
+  %2 = tensor.empty() : tensor<20x40xi32>
+  %3 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%arg1 : tensor<20x40xi16>) outs(%2 : tensor<20x40xi32>) {
+    ^bb0(%b2 : i16, %b3 : i32):
+      %e1 = arith.extsi %b2 : i16 to i32
+      linalg.yield %e1 : i32
+  } -> tensor<20x40xi32>
+  %4 = tensor.empty() : tensor<10x40xi32>
+  %5 = arith.constant 0 : i32
+  %6 = linalg.fill ins(%5 : i32) outs(%4 : tensor<10x40xi32>) -> tensor<10x40xi32>
+  %7 = linalg.matmul ins(%1, %3 : tensor<10x20xi32>, tensor<20x40xi32>)
+      outs(%6 : tensor<10x40xi32>) -> tensor<10x40xi32>
+  util.return %7 : tensor<10x40xi32>
+}
+// CHECK-LABEL: util.func public @matmul_extsi_both
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<10x20xi16>
+//  CHECK-SAME:     %[[ARG1:.+]]: tensor<20x40xi16>
+//       CHECK:   %[[RESULT:.+]] = linalg.matmul ins(%[[ARG0]], %[[ARG1]]
+//       CHECK:   util.return %[[RESULT]]
+
+// -----
+
+util.func public @conv_nchw_extsi_both(%arg0 : tensor<1x5x10x10xi16>,
+                                       %arg1 : tensor<5x5x3x3xi16>) -> tensor<1x5x8x8xi32> {
+  %0 = tensor.empty() : tensor<1x5x10x10xi32>
+  %1 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%arg0 : tensor<1x5x10x10xi16>) outs(%0 : tensor<1x5x10x10xi32>) {
+    ^bb0(%b0 : i16, %b1 : i32):
+      %e = arith.extsi %b0 : i16 to i32
+      linalg.yield %e : i32
+  } -> tensor<1x5x10x10xi32>
+  %2 = tensor.empty() : tensor<5x5x3x3xi32>
+  %3 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>, affine_map<(d0, d1, d2, d3) -> (d0, d1, d2, d3)>],
+      iterator_types = ["parallel", "parallel", "parallel", "parallel"]}
+      ins(%arg1 : tensor<5x5x3x3xi16>) outs(%2 : tensor<5x5x3x3xi32>) {
+    ^bb0(%b2 : i16, %b3 : i32):
+      %e1 = arith.extsi %b2 : i16 to i32
+      linalg.yield %e1 : i32
+  } -> tensor<5x5x3x3xi32>
+  %4 = tensor.empty() : tensor<1x5x8x8xi32>
+  %5 = arith.constant 0 : i32
+  %6 = linalg.fill ins(%5 : i32) outs(%4 : tensor<1x5x8x8xi32>) -> tensor<1x5x8x8xi32>
+  %7 = linalg.conv_2d_nchw_fchw {dilations = dense<1> : vector<2xi64>, strides = dense<1> : vector<2xi64>}
+      ins(%1, %3 : tensor<1x5x10x10xi32>, tensor<5x5x3x3xi32>)
+      outs(%6 : tensor<1x5x8x8xi32>) -> tensor<1x5x8x8xi32>
+  util.return %7 : tensor<1x5x8x8xi32>
+}
+// CHECK-LABEL: util.func public @conv_nchw_extsi_both
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<1x5x10x10xi16>
+//  CHECK-SAME:     %[[ARG1:.+]]: tensor<5x5x3x3xi16>
+//       CHECK:   %[[RESULT:.+]] = linalg.conv_2d_nchw_fchw {{.*}} ins(%[[ARG0]], %[[ARG1]]
+//       CHECK:   util.return %[[RESULT]]
+
+// -----
+
+// Can't fuse exti with unsigned ops because internally they use extui
+util.func public @unsigned_matmul_extsi(%arg0 : tensor<10x20xi32>,
+                               %arg1 : tensor<20x40xi16>) -> tensor<10x40xi32> {
+  %0 = tensor.empty() : tensor<20x40xi32>
+  %1 = linalg.generic {
+      indexing_maps = [affine_map<(d0, d1) -> (d0, d1)>, affine_map<(d0, d1) -> (d0, d1)>],
+      iterator_types = ["parallel", "parallel"]}
+      ins(%arg1 : tensor<20x40xi16>) outs(%0 : tensor<20x40xi32>) {
+    ^bb0(%b0 : i16, %b1 : i32):
+      %e = arith.extsi %b0 : i16 to i32
+      linalg.yield %e : i32
+  } -> tensor<20x40xi32>
+  %2 = tensor.empty() : tensor<10x40xi32>
+  %3 = arith.constant 0 : i32
+  %4 = linalg.fill ins(%3 : i32) outs(%2 : tensor<10x40xi32>) -> tensor<10x40xi32>
+  %5 = linalg.matmul_unsigned ins(%arg0, %1 : tensor<10x20xi32>, tensor<20x40xi32>)
+      outs(%4 : tensor<10x40xi32>) -> tensor<10x40xi32>
+  util.return %5 : tensor<10x40xi32>
+}
+// CHECK-LABEL: util.func public @unsigned_matmul_extsi
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<10x20xi32>
+//       CHECK:   %[[GEN:.+]] = linalg.generic
+//       CHECK:   %[[RESULT:.+]] = linalg.matmul_unsigned ins(%[[ARG0]], %[[GEN]]
+//       CHECK:   util.return %[[RESULT]]
