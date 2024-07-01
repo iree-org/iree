@@ -618,6 +618,7 @@ static iree_status_t iree_hal_cuda_allocator_export_buffer(
       switch (buffer_type) {
         case IREE_HAL_CUDA_BUFFER_TYPE_DEVICE:
         case IREE_HAL_CUDA_BUFFER_TYPE_EXTERNAL:
+        case IREE_HAL_CUDA_BUFFER_TYPE_ASYNC:
           out_external_buffer->flags = requested_flags;
           out_external_buffer->type = requested_type;
           out_external_buffer->handle.device_allocation.ptr =

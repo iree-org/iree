@@ -351,6 +351,12 @@ static iree_string_view_t iree_hal_cuda_device_id(
   return device->identifier;
 }
 
+static int32_t iree_hal_cuda_device_index(
+    iree_hal_device_t* base_device) {
+  iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
+  return device->cu_device;
+}
+
 static iree_allocator_t iree_hal_cuda_device_host_allocator(
     iree_hal_device_t* base_device) {
   iree_hal_cuda_device_t* device = iree_hal_cuda_device_cast(base_device);
@@ -819,6 +825,7 @@ static iree_status_t iree_hal_cuda_device_profiling_end(
 static const iree_hal_device_vtable_t iree_hal_cuda_device_vtable = {
     .destroy = iree_hal_cuda_device_destroy,
     .id = iree_hal_cuda_device_id,
+    .index = iree_hal_cuda_device_index,
     .host_allocator = iree_hal_cuda_device_host_allocator,
     .device_allocator = iree_hal_cuda_device_allocator,
     .replace_device_allocator = iree_hal_cuda_replace_device_allocator,
