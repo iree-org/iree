@@ -147,11 +147,11 @@ dropScalabilityFromUnsupportedOperations(mlir::FunctionOpInterface funcOp,
     // TODO: Remove once `vector.transpose` is supported
     bool nonIdentity = false;
     if (auto genericOp = dyn_cast<linalg::GenericOp>(&tilingOp)) {
-      for (auto map : ArrayRef<AffineMap>(genericOp->getIndexingMapsArray())
-                          .take_back(tilingOp->getResults().size())) {
-        if (!map.isIdentity())
-          nonIdentity = true;
-      }
+      auto indexingMaps = genericOp->getIndexingMapsArray();
+      nonIdentity =
+          llvm::any_of(ArrayRef<AffineMap>(indexingMaps)
+                           .take_back(tilingOp->getResults().size()),
+                       [](AffineMap map) { return !map.isIdentity(); });
     }
     if (nonIdentity) {
       newScalableFlags = SmallVector<bool>(newScalableFlags.size(), false);
