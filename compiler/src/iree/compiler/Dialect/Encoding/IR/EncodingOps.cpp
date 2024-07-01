@@ -126,7 +126,7 @@ AffineMap EncodingAttr::getMapForOperandIndex() {
     auto indexingMap =
         llvm::cast<AffineMapAttr>(getUserIndexingMaps()[index]).getAffineMap();
     if (auto bcastMap = getBcastMap()) {
-      indexingMap = bcastMap.getAffineMap();
+      indexingMap = bcastMap.getAffineMap().compose(indexingMap);
     }
     return indexingMap;
   }
