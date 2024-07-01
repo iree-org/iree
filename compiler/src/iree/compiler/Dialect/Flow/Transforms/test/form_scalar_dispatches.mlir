@@ -157,3 +157,25 @@ util.func public @interleaving(
 //  CHECK-SAME:         outs(%[[EMPTY1]] :
 //       CHECK:    flow.return %[[GENERIC3]], %[[GENERIC2]]
 //       CHECK:  util.return %[[DISPATCH1]]#0, %[[DISPATCH1]]#1
+
+// -----
+
+#map = affine_map<() -> ()>
+util.func public @nonRootInChain(%arg0: i32, %arg1: i1, %arg2: tensor<i32>, %arg7: i32) -> (tensor<i32>, tensor<i32>) {
+  %0 = linalg.generic {indexing_maps = [#map], iterator_types = []} outs(%arg2 : tensor<i32>) {
+  ^bb0(%out: i32):
+    %2 = arith.select %arg1, %arg7, %arg0 : i32
+    linalg.yield %2 : i32
+  } -> tensor<i32>
+  %extracted = tensor.extract %0[] : tensor<i32>
+  %1 = linalg.generic {indexing_maps = [#map], iterator_types = []} outs(%arg2 : tensor<i32>) {
+  ^bb0(%out: i32):
+    %2 = arith.select %arg1, %arg7, %extracted : i32
+    linalg.yield %2 : i32
+  } -> tensor<i32>
+  util.return %0, %1 : tensor<i32>, tensor<i32>
+}
+
+// CHECK-LABEL: util.func public @nonRootInChain(
+//       CHECK:   %[[DISPATCH0:.+]] = flow.dispatch.region
+//       CHECK:   %[[DISPATCH1:.+]] = flow.dispatch.region
