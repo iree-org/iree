@@ -206,6 +206,7 @@ void IREEComprehensiveBufferizePass::runOnOperation() {
   options.printConflicts = printConflicts;
   options.allocationFn = allocationFn;
   options.memCpyFn = memCpyFn;
+  options.checkParallelRegions = false;
 
   if (failed(runIREEOneShotBufferize(funcOp, options))) {
     return signalPassFailure();
