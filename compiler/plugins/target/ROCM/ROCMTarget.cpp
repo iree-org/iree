@@ -59,6 +59,7 @@ struct ROCmOptions {
   std::string bitcodeDirectory = getDefaultBitcodeDirectory();
   int wavesPerEu = 0;
   std::string enableROCMUkernels = "none";
+  bool legacySync = true;
 
   void bindOptions(OptionsBinder &binder) {
     using namespace llvm;
@@ -79,6 +80,9 @@ struct ROCmOptions {
         cl::desc("Enables microkernels in the rocm compiler backend. May be "
                  "`default`, `none`, `all`, or a comma-separated list of "
                  "specific unprefixed microkernels to enable, e.g. `mmt4d`."));
+    binder.opt<bool>("iree-rocm-legacy-sync", legacySync, cl::cat(category),
+                     cl::desc("Enables 'legacy-sync' mode, which is required "
+                              "for inline execution."));
   }
 
   LogicalResult verify(mlir::Builder &builder) const {
@@ -176,10 +180,14 @@ public:
   getDefaultDeviceTarget(MLIRContext *context,
                          const TargetRegistry &targetRegistry) const override {
     Builder b(context);
-    // Indicates that the runtime HAL driver operates only in the legacy
-    // synchronous mode.
-    DictionaryAttr configAttr = b.getDictionaryAttr(
-        NamedAttribute(b.getStringAttr("legacy_sync"), b.getUnitAttr()));
+    SmallVector<NamedAttribute> configAttrItems;
+    if (options.legacySync) {
+      // Indicates that the runtime HAL driver operates only in the legacy
+      // synchronous mode.
+      configAttrItems.emplace_back(b.getStringAttr("legacy_sync"),
+                                   b.getUnitAttr());
+    }
+    DictionaryAttr configAttr = b.getDictionaryAttr(configAttrItems);
 
     // If we had multiple target environments we would generate one target attr
     // per environment, with each setting its own environment attribute.
