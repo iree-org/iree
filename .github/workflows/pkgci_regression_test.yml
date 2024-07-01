@@ -312,6 +312,4 @@ jobs:
             --rocm-chip gfx90a \
             --log-cli-level=info \
             --retries 7
-          echo "### SDXL Benchmark Summary:" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY # this is a blank line
-          echo "$(<job_summary.txt )" >> $GITHUB_STEP_SUMMARY
+          echo "$(<job_summary.md )" >> $GITHUB_STEP_SUMMARY
