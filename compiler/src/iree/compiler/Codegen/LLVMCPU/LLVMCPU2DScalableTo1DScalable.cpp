@@ -115,6 +115,7 @@ dropScalabilityFromUnsupportedOperations(mlir::FunctionOpInterface funcOp,
   });
 
   for (TilingInterface tilingOp : computeOps) {
+    // 1. Compute a new set of scalable flags for tilingOp
     auto loweringConfigAttr =
         getLoweringConfig<IREE::Codegen::LoweringConfigAttr>(tilingOp);
     if (!loweringConfigAttr)
@@ -138,6 +139,23 @@ dropScalabilityFromUnsupportedOperations(mlir::FunctionOpInterface funcOp,
         loopTileSizes.push_back(0);
         newScalableFlags.push_back(flag);
       }
+    }
+
+    // Drop scalable flags if any of the output affine maps is not an identity.
+    // In practice this would normally correspond to transposition, and we
+    // don't really support that for SVE atm.
+    // TODO: Remove once `vector.transpose` is supported
+    bool nonIdentity = false;
+    if (auto genericOp = dyn_cast<linalg::GenericOp>(&tilingOp)) {
+      for (auto map : ArrayRef<AffineMap>(genericOp->getIndexingMapsArray())
+                          .take_back(tilingOp->getResults().size())) {
+        if (!map.isIdentity())
+          nonIdentity = true;
+      }
+    }
+    if (nonIdentity) {
+      newScalableFlags = SmallVector<bool>(newScalableFlags.size(), false);
+      loopTileSizes = vectorSizes;
     }
 
     IRRewriter rewriter(tilingOp->getContext());
