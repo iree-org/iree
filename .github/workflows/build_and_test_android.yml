@@ -109,7 +109,8 @@ jobs:
 
   test:
     # These physical devices are not scalable. Only run on postsubmit for now.
-    if: (! inputs.is-pr)
+    # Disabled while Android devices are offline.
+    if: (! inputs.is-pr && 0)
     needs: cross_compile
     strategy:
       matrix:

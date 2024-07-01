@@ -154,6 +154,13 @@ DEFAULT_BENCHMARK_PRESET_GROUP = [
     for preset in benchmark_presets.DEFAULT_PRESETS
     # RISC-V benchmarks haven't been supported in CI workflow.
     if preset not in [benchmark_presets.RISCV]
+    # Disabled while lab Android devices are offline.
+    and preset
+    not in [
+        benchmark_presets.ANDROID_CPU,
+        benchmark_presets.ANDROID_CPU_DT_ONLY,
+        benchmark_presets.ANDROID_GPU,
+    ]
 ] + ["comp-stats"]
 DEFAULT_BENCHMARK_PRESET = "default"
 LARGE_BENCHMARK_PRESET_GROUP = benchmark_presets.LARGE_PRESETS
