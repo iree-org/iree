@@ -34,14 +34,21 @@ public:
 void LLVMCPUVectorTransferLoweringPass::runOnOperation() {
   MLIRContext *ctx = &getContext();
   auto funcOp = getOperation();
+  {
+    RewritePatternSet patterns(&getContext());
+    mlir::vector::populateFlattenVectorTransferPatterns(patterns);
+    (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+  }
 
-  RewritePatternSet patterns(ctx);
-  vector::populateVectorTransferLoweringPatterns(patterns,
-                                                 /*maxTransferRank=*/1);
-  auto vectorTransferToSCFOptions =
-      VectorTransferToSCFOptions().enableFullUnroll();
-  populateVectorToSCFConversionPatterns(patterns, vectorTransferToSCFOptions);
-  (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+  {
+    RewritePatternSet patterns(ctx);
+    vector::populateVectorTransferLoweringPatterns(patterns,
+                                                   /*maxTransferRank=*/1);
+    auto vectorTransferToSCFOptions =
+        VectorTransferToSCFOptions().enableFullUnroll();
+    populateVectorToSCFConversionPatterns(patterns, vectorTransferToSCFOptions);
+    (void)applyPatternsAndFoldGreedily(funcOp, std::move(patterns));
+  }
 }
 } // namespace
 
