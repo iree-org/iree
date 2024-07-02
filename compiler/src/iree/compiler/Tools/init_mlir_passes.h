@@ -43,6 +43,7 @@ inline void registerMlirPasses() {
   registerLocationSnapshotPass();
   affine::registerLoopCoalescingPass();
   registerLoopInvariantCodeMotionPass();
+  registerLoopInvariantSubsetHoistingPass();
   affine::registerAffineScalarReplacementPass();
   registerPrintOpStatsPass();
   registerViewOpGraphPass();
