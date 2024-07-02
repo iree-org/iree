@@ -37,6 +37,7 @@ iree_lit_test_suite(
     "form_scalar_dispatches.mlir"
     "fuse_multiuse_elementwise_producer.mlir"
     "fusion_preprocessing.mlir"
+    "hoist_encoding_ops.mlir"
     "initialize_empty_tensors.mlir"
     "inject_dispatch_tracing.mlir"
     "inject_tensor_tracing.mlir"
