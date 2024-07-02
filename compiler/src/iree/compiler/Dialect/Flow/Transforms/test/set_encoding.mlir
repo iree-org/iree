@@ -40,19 +40,19 @@ util.func public @broadcasting_dequant_op(%arg0: !hal.buffer_view, %arg1: !hal.b
 // CHECK-SAME:      element_types = [i8, i32, i32]
 // CHECK-SAME:      original_type = tensor<?x?x?xi32>
 // CHECK-SAME:      user_indexing_maps = [#[[MAP2]], #[[MAP3]], #[[MAP4]]]
-// CHECK-SAME:      round_dims_to = array<i64: 16, 16, 16, 16>
+// CHECK-SAME:      round_dims_to = array<i64: 16, 16, 16>
 // CHECK:        %[[RHS:.+]] = iree_encoding.set_encoding %{{.+}} : tensor<?x?x?xi32>
 // CHECK-SAME:      operand_index = 1 : index
 // CHECK-SAME:      element_types = [i8, i32, i32]
 // CHECK-SAME:      original_type = tensor<?x?x?xi32>
 // CHECK-SAME:      user_indexing_maps = [#[[MAP2]], #[[MAP3]], #[[MAP4]]]
-// CHECK-SAME:      round_dims_to = array<i64: 16, 16, 16, 16>
+// CHECK-SAME:      round_dims_to = array<i64: 16, 16, 16>
 // CHECK:        %[[INIT:.+]] = tensor.empty({{.+}}) : tensor<?x?x?xi32, #iree_encoding.encoding
 // CHECK-SAME:      operand_index = 2 : index
 // CHECK-SAME:      element_types = [i8, i32, i32]
 // CHECK-SAME:      original_type = tensor<?x?x?xi32>
 // CHECK-SAME:      user_indexing_maps = [#[[MAP2]], #[[MAP3]], #[[MAP4]]]
-// CHECK-SAME:      round_dims_to = array<i64: 16, 16, 16, 16>
+// CHECK-SAME:      round_dims_to = array<i64: 16, 16, 16>
 // CHECK:        %[[FILL:.+]] = linalg.fill ins({{.+}}) outs(%[[INIT]]
 // CHECK:        %[[GEMM:.+]] = linalg.batch_matmul_transpose_b
 // CHECK-SAME:     ins(%[[LHS]], %[[RHS]]
