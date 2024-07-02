@@ -94,7 +94,7 @@ static void reference_matmul_f16_f16_f32_f32(
 }
 
 // Reference mamtul for the f8 input, f32 accumlation, and f32 result.
-// [f32 <= f16 * f16 + f32]
+// [f32 <= f8 * f8 + f32]
 static void reference_matmul_f8_f8_f32_f32(
     iree_hal_dim_t m_size, iree_hal_dim_t k_size, iree_hal_dim_t n_size,
     iree_hal_element_type_t lhs_type, iree_hal_element_type_t rhs_type,
@@ -104,8 +104,8 @@ static void reference_matmul_f8_f8_f32_f32(
   float acc = acc_data ? acc_data[n + m * n_size] : 0.f;
   for (iree_hal_dim_t k = 0; k < k_size; ++k) {
     int64_t rhs_index = transpose_rhs ? k + n * k_size : n + k * n_size;
-    acc += iree_math_f32_to_f8e4m3(lhs_data[k + m * k_size]) *
-           iree_math_f32_to_f8e4m3(rhs_data[rhs_index]);
+    acc += iree_math_f8e4m3_to_f32(lhs_data[k + m * k_size]) *
+           iree_math_f8e4m3_to_f32(rhs_data[rhs_index]);
   }
   result_data[n + m * n_size] = acc;
 }
