@@ -154,10 +154,7 @@ jobs:
   build_test_all_macos_arm64:
     needs: setup
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'build_test_all_macos_arm64')
-    runs-on:
-      - ${{ github.repository == 'iree-org/iree' && 'self-hosted' || 'macos-12' }} # must come first
-      - runner-group=postsubmit
-      - os-family=macOS
+    runs-on: macos-14
     env:
       BUILD_DIR: build-macos
     steps:
