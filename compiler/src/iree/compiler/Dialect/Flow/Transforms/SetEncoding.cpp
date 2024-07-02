@@ -252,7 +252,8 @@ static void setEncodingsOnContractions(RewriterBase &rewriter,
     SmallVector<AffineMap> maps = op.getIndexingMapsArray();
 
     auto setEncodingWrapper = [&](Value src, int64_t operandIndex) -> Value {
-      SmallVector<int64_t> roundDimsTo(op.getNumLoops(), kPadSize);
+      // Set pad size for M, N, and K dimensions.
+      SmallVector<int64_t> roundDimsTo(3, kPadSize);
       auto encodingAttr = Encoding::EncodingAttr::get(
           op.getContext(), operandIndex, elemTypes, src.getType(),
           narrowSizes.M, narrowSizes.N, maps,
