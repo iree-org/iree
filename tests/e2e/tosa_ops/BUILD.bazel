@@ -4,12 +4,6 @@
 # See https://llvm.org/LICENSE.txt for license information.
 # SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
-# Tests of end-to-end IREE support for individual ops in the TOSA dialect.
-# Each test file should have a name matching the corresponding TOSA op and test only the
-# functionality of that op (though may make use of other ops where necessary). Tests should be
-# written using the IREE Check framework.
-# See https://iree.dev/developers/general/testing-guide/#iree-core-end-to-end-e2e-tests.
-
 load("//build_tools/bazel:enforce_glob.bzl", "enforce_glob")
 load("//build_tools/bazel:iree_check_test.bzl", "iree_check_single_backend_test_suite")
 
@@ -18,7 +12,7 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
-LLVM_SRCS = enforce_glob(
+ALL_SRCS = enforce_glob(
     [
         "abs.mlir",
         "add.mlir",
@@ -67,119 +61,23 @@ LLVM_SRCS = enforce_glob(
 
 iree_check_single_backend_test_suite(
     name = "check_llvm-cpu_local-task",
-    srcs = LLVM_SRCS,
+    srcs = ALL_SRCS,
     driver = "local-task",
     input_type = "tosa",
     target_backend = "llvm-cpu",
 )
 
-VMVX_SRCS = enforce_glob(
-    [
-        "abs.mlir",
-        "add.mlir",
-        "arithmetic_right_shift.mlir",
-        "bitwise_and.mlir",
-        "bitwise_or.mlir",
-        "bitwise_xor.mlir",
-        "ceil.mlir",
-        "clamp.mlir",
-        "clz.mlir",
-        "const.mlir",
-        "equal.mlir",
-        "exp.mlir",
-        "floor.mlir",
-        "fully_connected.mlir",
-        "gather.mlir",
-        "greater.mlir",
-        "greater_equal.mlir",
-        "if.mlir",
-        "log.mlir",
-        "logical_left_shift.mlir",
-        "logical_right_shift.mlir",
-        "logical_right_shift_16.mlir",
-        "matmul.mlir",
-        "max_pool.mlir",
-        "maximum.mlir",
-        "minimum.mlir",
-        "mul.mlir",
-        "mul_shift.mlir",
-        "negate.mlir",
-        "pad.mlir",
-        "reciprocal.mlir",
-        "reshape.mlir",
-        "rsqrt.mlir",
-        "select.mlir",
-        "sigmoid.mlir",
-        "sub.mlir",
-        "table.mlir",
-        "tanh.mlir",
-        "transpose.mlir",
-        "while.mlir",
-    ],
-    include = ["*.mlir"],
-    exclude = [
-        "reduce.mlir",  # Currently flakey https://github.com/iree-org/iree/issues/5885
-    ],
-)
-
 iree_check_single_backend_test_suite(
     name = "check_vmvx_local-task",
-    srcs = VMVX_SRCS,
+    srcs = ALL_SRCS,
     driver = "local-task",
     input_type = "tosa",
     target_backend = "vmvx",
 )
 
-VMVX_MICROKERNELS_SRCS = enforce_glob(
-    [
-        "abs.mlir",
-        "add.mlir",
-        "arithmetic_right_shift.mlir",
-        "bitwise_and.mlir",
-        "bitwise_or.mlir",
-        "bitwise_xor.mlir",
-        "ceil.mlir",
-        "clamp.mlir",
-        "clz.mlir",
-        "const.mlir",
-        "equal.mlir",
-        "exp.mlir",
-        "floor.mlir",
-        "fully_connected.mlir",
-        "gather.mlir",
-        "greater.mlir",
-        "greater_equal.mlir",
-        "if.mlir",
-        "log.mlir",
-        "logical_left_shift.mlir",
-        "logical_right_shift.mlir",
-        "logical_right_shift_16.mlir",
-        "matmul.mlir",
-        "max_pool.mlir",
-        "maximum.mlir",
-        "minimum.mlir",
-        "mul.mlir",
-        "mul_shift.mlir",
-        "negate.mlir",
-        "pad.mlir",
-        "reciprocal.mlir",
-        "reduce.mlir",
-        "reshape.mlir",
-        "rsqrt.mlir",
-        "select.mlir",
-        "sigmoid.mlir",
-        "sub.mlir",
-        "table.mlir",
-        "tanh.mlir",
-        "transpose.mlir",
-        "while.mlir",
-    ],
-    include = ["*.mlir"],
-)
-
 iree_check_single_backend_test_suite(
     name = "check_vmvx_local-sync_microkernels",
-    srcs = VMVX_MICROKERNELS_SRCS,
+    srcs = ALL_SRCS,
     compiler_flags = [
         "--iree-vmvx-enable-microkernels",
     ],
@@ -240,64 +138,15 @@ VULKAN_SRCS = enforce_glob(
 
 iree_check_single_backend_test_suite(
     name = "check_vulkan-spirv_vulkan",
-    srcs = VULKAN_SRCS,
+    srcs = ALL_SRCS,
     driver = "vulkan",
     input_type = "tosa",
     target_backend = "vulkan-spirv",
 )
 
-CUDA_SRCS = enforce_glob(
-    [
-        "abs.mlir",
-        "add.mlir",
-        "arithmetic_right_shift.mlir",
-        "bitwise_and.mlir",
-        "bitwise_or.mlir",
-        "bitwise_xor.mlir",
-        "ceil.mlir",
-        "clamp.mlir",
-        "clz.mlir",
-        "const.mlir",
-        "equal.mlir",
-        "exp.mlir",
-        "floor.mlir",
-        "fully_connected.mlir",
-        "gather.mlir",
-        "greater.mlir",
-        "greater_equal.mlir",
-        "if.mlir",
-        "log.mlir",
-        "logical_left_shift.mlir",
-        "logical_right_shift.mlir",
-        "logical_right_shift_16.mlir",
-        "matmul.mlir",
-        "max_pool.mlir",
-        "maximum.mlir",
-        "minimum.mlir",
-        "mul.mlir",
-        "negate.mlir",
-        "pad.mlir",
-        "reciprocal.mlir",
-        "reduce.mlir",
-        "reshape.mlir",
-        "rsqrt.mlir",
-        "select.mlir",
-        "sigmoid.mlir",
-        "sub.mlir",
-        "table.mlir",
-        "tanh.mlir",
-        "transpose.mlir",
-        "while.mlir",
-    ],
-    include = ["*.mlir"],
-    exclude = [
-        "mul_shift.mlir",
-    ],
-)
-
 iree_check_single_backend_test_suite(
     name = "check_cuda_graph",
-    srcs = CUDA_SRCS,
+    srcs = ALL_SRCS,
     compiler_flags = [
         # TODO(#13984): memset emulation required for graphs.
         "--iree-stream-emulate-memset",
@@ -318,7 +167,7 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
     name = "check_cuda_stream",
-    srcs = CUDA_SRCS,
+    srcs = ALL_SRCS,
     driver = "cuda",
     input_type = "tosa",
     runner_args = ["--cuda_use_streams=true"],

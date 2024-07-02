@@ -14,11 +14,14 @@ iree_check_single_backend_test_suite(
   NAME
     check_cuda
   SRCS
+    "attention.mlir"
     "reverse.mlir"
     "scan.mlir"
     "scatter.mlir"
     "sort.mlir"
     "top-k.mlir"
+    "winograd_input.mlir"
+    "winograd_output.mlir"
   TARGET_BACKEND
     "cuda"
   DRIVER
@@ -96,11 +99,14 @@ iree_check_single_backend_test_suite(
   NAME
     check_vmvx_local-task
   SRCS
+    "attention.mlir"
     "reverse.mlir"
     "scan.mlir"
     "scatter.mlir"
     "sort.mlir"
     "top-k.mlir"
+    "winograd_input.mlir"
+    "winograd_output.mlir"
   TARGET_BACKEND
     "vmvx"
   DRIVER
@@ -109,10 +115,32 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
-    check_vulkan-spirv_vulkan
+    check_rocm_hip
   SRCS
+    "attention.mlir"
+    "reverse.mlir"
+    "scan.mlir"
     "scatter.mlir"
     "sort.mlir"
+    "top-k.mlir"
+    "winograd_input.mlir"
+    "winograd_output.mlir"
+  TARGET_BACKEND
+    "rocm"
+  DRIVER
+    "hip"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_vulkan-spirv_vulkan
+  SRCS
+    "attention.mlir"
+    "reverse.mlir"
+    "scan.mlir"
+    "scatter.mlir"
+    "sort.mlir"
+    "top-k.mlir"
     "winograd_input.mlir"
     "winograd_output.mlir"
   TARGET_BACKEND

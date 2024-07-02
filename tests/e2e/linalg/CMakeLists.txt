@@ -40,15 +40,53 @@ iree_check_single_backend_test_suite(
 
 iree_check_single_backend_test_suite(
   NAME
+    check_cuda
+  SRCS
+    "conv2d.mlir"
+    "fp_to_subbyte.mlir"
+    "large_linalg_matmul.mlir"
+    "narrow_n_matmuls.mlir"
+    "subbyte_to_fp.mlir"
+  TARGET_BACKEND
+    "cuda"
+  DRIVER
+    "cuda"
+  LABELS
+    "noasan"
+    "nomsan"
+    "notsan"
+    "noubsan"
+    "requires-gpu-nvidia"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
     check_vulkan-spirv_vulkan
   SRCS
     "conv2d.mlir"
+    "fp_to_subbyte.mlir"
+    "large_linalg_matmul.mlir"
     "narrow_n_matmuls.mlir"
     "subbyte_to_fp.mlir"
   TARGET_BACKEND
     "vulkan-spirv"
   DRIVER
     "vulkan"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_rocm_hip
+  SRCS
+    "conv2d.mlir"
+    "fp_to_subbyte.mlir"
+    "large_linalg_matmul.mlir"
+    "narrow_n_matmuls.mlir"
+    "subbyte_to_fp.mlir"
+  TARGET_BACKEND
+    "rocm"
+  DRIVER
+    "hip"
 )
 
 iree_check_single_backend_test_suite(
@@ -75,27 +113,6 @@ iree_check_single_backend_test_suite(
     "vulkan"
   COMPILER_FLAGS
     "--iree-preprocessing-pass-pipeline=builtin.module\(func.func\(iree-linalg-ext-convert-conv2d-to-winograd\)\)"
-)
-
-iree_check_single_backend_test_suite(
-  NAME
-    check_large_linalg_matmul_cuda
-  SRCS
-    "conv2d.mlir"
-    "fp_to_subbyte.mlir"
-    "large_linalg_matmul.mlir"
-    "narrow_n_matmuls.mlir"
-    "subbyte_to_fp.mlir"
-  TARGET_BACKEND
-    "cuda"
-  DRIVER
-    "cuda"
-  LABELS
-    "noasan"
-    "nomsan"
-    "notsan"
-    "noubsan"
-    "requires-gpu-nvidia"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###

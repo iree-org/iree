@@ -13,24 +13,24 @@ package(
     licenses = ["notice"],  # Apache 2.0
 )
 
+ALL_SRCS = enforce_glob(
+    # keep sorted
+    [
+        "attention.mlir",
+        "reverse.mlir",
+        "scan.mlir",
+        "scatter.mlir",
+        "sort.mlir",
+        "top-k.mlir",
+        "winograd_input.mlir",
+        "winograd_output.mlir",
+    ],
+    include = ["*.mlir"],
+)
+
 iree_check_single_backend_test_suite(
     name = "check_cuda",
-    srcs = enforce_glob(
-        # keep sorted
-        [
-            "reverse.mlir",
-            "scan.mlir",
-            "scatter.mlir",
-            "sort.mlir",
-            "top-k.mlir",
-        ],
-        include = ["*.mlir"],
-        exclude = [
-            "attention.mlir",
-            "winograd_input.mlir",
-            "winograd_output.mlir",
-        ],
-    ),
+    srcs = ALL_SRCS,
     driver = "cuda",
     tags = [
         # CUDA cuInit fails with sanitizer on.
@@ -89,20 +89,7 @@ if(NOT EMSCRIPTEN)
 
 iree_check_single_backend_test_suite(
     name = "check_llvm-cpu_local-task",
-    srcs = enforce_glob(
-        # keep sorted
-        [
-            "attention.mlir",
-            "reverse.mlir",
-            "scan.mlir",
-            "scatter.mlir",
-            "sort.mlir",
-            "top-k.mlir",
-            "winograd_input.mlir",
-            "winograd_output.mlir",
-        ],
-        include = ["*.mlir"],
-    ),
+    srcs = ALL_SRCS,
     driver = "local-task",
     target_backend = "llvm-cpu",
 )
@@ -116,48 +103,21 @@ endif()
 
 iree_check_single_backend_test_suite(
     name = "check_vmvx_local-task",
-    srcs = enforce_glob(
-        # keep sorted
-        [
-            "reverse.mlir",
-            "scan.mlir",
-            "scatter.mlir",
-            "sort.mlir",
-            "top-k.mlir",
-        ],
-        include = ["*.mlir"],
-        exclude = [
-            "attention.mlir",
-            "winograd_input.mlir",
-            "winograd_output.mlir",
-        ],
-    ),
+    srcs = ALL_SRCS,
     driver = "local-task",
     target_backend = "vmvx",
 )
 
 iree_check_single_backend_test_suite(
+    name = "check_rocm_hip",
+    srcs = ALL_SRCS,
+    driver = "hip",
+    target_backend = "rocm",
+)
+
+iree_check_single_backend_test_suite(
     name = "check_vulkan-spirv_vulkan",
-    srcs = enforce_glob(
-        # keep sorted
-        [
-            "scatter.mlir",
-            # Top-k test disabled due to miscompile on vulkan.
-            #    "top-k.mlir",
-            "sort.mlir",
-            "winograd_input.mlir",
-            "winograd_output.mlir",
-        ],
-        include = ["*.mlir"],
-        exclude = [
-            "attention.mlir",
-            "reverse.mlir",  #TODO(#12415): disabled due to miscompilation on Pixel 6.
-            # TODO(antiagainst): scan fails on Adreno GPUs due to driver bug.
-            # Re-enable this once we have new devices with up-to-date drivers.
-            "top-k.mlir",
-            "scan.mlir",
-        ],
-    ),
+    srcs = ALL_SRCS,
     driver = "vulkan",
     target_backend = "vulkan-spirv",
 )
@@ -166,7 +126,10 @@ test_suite(
     name = "check",
     tests = [
         ":check_cuda",
+        ":check_cuda-topk-split-reduction",
+        ":check_cuda-topk-split-reduction-double",
         ":check_llvm-cpu_local-task",
+        ":check_rocm_hip",
         ":check_vmvx_local-task",
         ":check_vulkan-spirv_vulkan",
     ],
