@@ -156,6 +156,10 @@ int iree_test_utils_snprintf_value(char* buf, size_t bufsize,
       return snprintf(buf, bufsize, "%" PRIi32, value.i32);
     case IREE_TEST_UTILS_VALUE_TYPE_I64:
       return snprintf(buf, bufsize, "%" PRIi64, value.i64);
+    case IREE_TEST_UTILS_VALUE_TYPE_F8:
+      return snprintf(buf, bufsize,
+                      precision == PRECISION_HIGH ? "%.5g" : "%.4g",
+                      iree_math_f8e4m3_to_f32(value.f16_u16));
     case IREE_TEST_UTILS_VALUE_TYPE_F16:
       return snprintf(buf, bufsize,
                       precision == PRECISION_HIGH ? "%.5g" : "%.4g",
@@ -201,6 +205,12 @@ bool iree_test_utils_result_elements_agree(iree_test_utils_e2e_value_t expected,
     // functional testing, we can test for bit-exactness on the actual and
     // expected values. Inexact results are only permitted when the
     // `require_exact_results` flag is set to `false`.
+    case IREE_TEST_UTILS_VALUE_TYPE_F8:
+      if (actual.f8_u8 == expected.f8_u8) return true;
+      if (iree_test_utils_max_elements_to_check()) return false;
+      return fabsf(iree_math_f8e4m3_to_f32(actual.f16_u16) -
+                   iree_math_f8e4m3_to_f32(expected.f16_u16)) <
+             acceptable_fp_delta;
     case IREE_TEST_UTILS_VALUE_TYPE_F16:
       if (actual.f16_u16 == expected.f16_u16) return true;
       if (iree_test_utils_max_elements_to_check()) return false;
