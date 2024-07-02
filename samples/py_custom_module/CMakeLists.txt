@@ -8,9 +8,8 @@ if(NOT IREE_BUILD_PYTHON_BINDINGS)
   return()
 endif()
 
-# These tests perform linking via the Compiler API, which is only supported
-# in bundled-LLVM builds at the moment (#14086).
-if(NOT IREE_BUILD_BUNDLED_LLVM)
+# These tests use compiler APIs as well as runtime APIs.
+if(NOT IREE_BUILD_COMPILER)
   return()
 endif()
 
