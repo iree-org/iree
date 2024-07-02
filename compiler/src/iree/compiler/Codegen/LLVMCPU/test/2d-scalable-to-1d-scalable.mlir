@@ -109,3 +109,47 @@ func.func @should_not_crash(%a: tensor<?x?xf32>, %b: tensor<?xf32>, %c: tensor<?
   } -> tensor<?x?xf32>
   return %0 : tensor<?x?xf32>
 }
+
+// -----
+
+// In this example, both scalable flags are dropped - the affine
+// map corresponding to the output is not an identity and that's currently not
+// supported. This is to prevent transpositions using scalable vectors, e.g.:
+//
+//    vector.transpose %47, [1, 0] : vector<4x[8]xf32> to vector<[8]x4xf32>
+//
+// ATM, we are unable to lower such Ops to SVE/SSVE. Note - this is quite
+// conservative as non-identity affine maps could also describe
+// non-transpisation (that we might be able to lower).
+
+#lowering_config_parallel_only = #iree_codegen.lowering_config<tile_sizes = [[0, 0], [[4], [4]]]>
+
+#map1 = affine_map<(d0, d1) -> (d1)>
+#map3 = affine_map<(d0, d1) -> (d0, d1)>
+#map4 = affine_map<(d0, d1) -> (d1, d0)>
+
+// CHECK: #[[GENERIC_CONFIG:.*]] = #iree_codegen.lowering_config<tile_sizes = {{\[}}[0, 0], [4, 4]]>
+///
+//      CHECK: func.func @generic_with_a_non_identity_out_map
+//      CHECK:   scf.for
+//      CHECK:      scf.for
+//      CHECK:         linalg.generic
+// CHECK-SAME:           lowering_config = #[[GENERIC_CONFIG]]
+
+func.func @generic_with_a_non_identity_out_map(
+    %arg0: tensor<?x?xf32>,
+    %arg1: tensor<?x?xf32>,
+    %cst_0: tensor<?xf32>,
+    %cst_1: tensor<?xf32>) -> tensor<?x?xf32> {
+  %6 = linalg.generic {
+    indexing_maps = [#map3, #map1, #map1, #map4],
+    iterator_types = ["parallel", "parallel"]}
+    ins(%arg0, %cst_0, %cst_1 : tensor<?x?xf32>, tensor<?xf32>, tensor<?xf32>)
+    outs(%arg1 : tensor<?x?xf32>)  attrs = {lowering_config = #lowering_config_parallel_only} {
+  ^bb0(%in: f32, %in_2: f32, %in_3: f32, %out: f32):
+    %7 = arith.mulf %in, %in_2 : f32
+    %8 = arith.addf %7, %in_3 : f32
+    linalg.yield %8 : f32
+  } -> tensor<?x?xf32>
+  return %6 : tensor<?x?xf32>
+}
