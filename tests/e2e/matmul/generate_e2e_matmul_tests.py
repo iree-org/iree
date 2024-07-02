@@ -27,7 +27,7 @@ class MatrixElemTypeId(enum.Enum):
     I32 = "i32"
     F32 = "f32"
     F16 = "f16"
-    F8 = "f8E4M3FNUZ"
+    F8E4M3FNUZ = "f8E4M3FNUZ"
     BF16 = "bf16"
 
 
@@ -272,10 +272,10 @@ def get_rocm_test_compilation_infos(
             MMASchedule("MFMA_F16_32x32x8_F32", 2, 2, 1, 1, 1),
             MMASchedule("MFMA_F16_32x32x8_F32", 1, 4, 2, 1, 2),
             MMASchedule("MFMA_F16_32x32x8_F32", 4, 2, 1, 2, 4),
-            MMASchedule("MFMA_F8_16x16x32_F32", 1, 1, 1, 1, 1),
-            MMASchedule("MFMA_F8_16x16x32_F32", 2, 2, 1, 1, 2),
-            MMASchedule("MFMA_F8_16x16x32_F32", 4, 1, 4, 1, 1),
-            MMASchedule("MFMA_F8_16x16x32_F32", 4, 2, 4, 2, 1),
+            MMASchedule("MFMA_F8E4M3FNUZ_16x16x32_F32", 1, 1, 1, 1, 1),
+            MMASchedule("MFMA_F8E4M3FNUZ_16x16x32_F32", 2, 2, 1, 1, 2),
+            MMASchedule("MFMA_F8E4M3FNUZ_16x16x32_F32", 4, 1, 4, 1, 1),
+            MMASchedule("MFMA_F8E4M3FNUZ_16x16x32_F32", 4, 2, 4, 2, 1),
             MMASchedule("MFMA_I8_16x16x32_I32", 1, 1, 1, 1, 1),
             MMASchedule("MFMA_I8_16x16x32_I32", 2, 2, 1, 1, 2),
             MMASchedule("MFMA_I8_16x16x32_I32", 4, 1, 4, 1, 1),
@@ -315,7 +315,7 @@ def get_rocm_test_compilation_infos(
             wg_tile_m = schedule.m_count * schedule.m_tile_count * 32
             wg_tile_n = schedule.n_count * schedule.n_tile_count * 32
             wg_tile_k = schedule.k_tile_count * 8
-        elif schedule.intrinsic == "MFMA_F8_16x16x32_F32":
+        elif schedule.intrinsic == "MFMA_F8E4M3FNUZ_16x16x32_F32":
             wg_tile_m = schedule.m_count * schedule.m_tile_count * 16
             wg_tile_n = schedule.n_count * schedule.n_tile_count * 16
             wg_tile_k = schedule.k_tile_count * 32
@@ -924,7 +924,7 @@ def write_calls_file(functions, calls, filename, requirements):
 def infer_acc_type(lhs_rhs_type: MatrixElemTypeId, acc_type: MatrixElemTypeId):
     if acc_type != MatrixElemTypeId.NONE:
         return acc_type
-    if lhs_rhs_type == MatrixElemTypeId.F8:
+    if lhs_rhs_type == MatrixElemTypeId.F8E4M3FNUZ:
         return MatrixElemTypeId.F32
     if lhs_rhs_type == MatrixElemTypeId.I8:
         return MatrixElemTypeId.I32

@@ -216,7 +216,7 @@ hal.executable.variant @rocm target(<"rocm", "rocm-hsaco-fb">) {
 // Make sure it generates the mfma instructions we expect for f8 inputs.
 
 //       CHECK: #[[$TRANSLATION:.+]] = #iree_codegen.translation_info<LLVMGPUVectorDistribute workgroup_size = [128, 2, 1] subgroup_size = 64
-//  CHECK-SAME:   mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F8_16x16x32_F32>,
+//  CHECK-SAME:   mma_schedule = #iree_gpu.mma_schedule<intrinsic = #iree_gpu.mma_layout<MFMA_F8E4M3FNUZ_16x16x32_F32>,
 //  CHECK-SAME:     subgroup_m_count = 2, subgroup_n_count = 2>
 //  CHECK-SAME:   prefetch_shared_memory
 
