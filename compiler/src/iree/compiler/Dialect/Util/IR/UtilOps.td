@@ -635,6 +635,8 @@ def Util_FuncOp : Util_Op<"func", [
     ArrayRef<Type> getArgumentTypes() { return getFunctionType().getInputs(); }
     ArrayRef<Type> getResultTypes() { return getFunctionType().getResults(); }
 
+    bool canDiscardOnUseEmpty();
+
     // Returns true if any operand is tied to a result.
     bool hasAnyTiedOperands();
 
@@ -827,6 +829,8 @@ def Util_GlobalOp : Util_Op<"global", [
   ];
 
   let extraClassDeclaration = [{
+    bool canDiscardOnUseEmpty();
+
     IREE::Util::GlobalLoadOpInterface createLoadOp(Location loc, OpBuilder &builder);
     IREE::Util::GlobalStoreOpInterface createStoreOp(Location loc, Value value, OpBuilder &builder);
   }];

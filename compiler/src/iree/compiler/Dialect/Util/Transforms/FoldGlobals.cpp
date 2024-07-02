@@ -43,6 +43,14 @@ struct Global {
   SmallVector<IREE::Util::GlobalStoreOpInterface> storeOps;
 
   bool isCandidate() { return !isIndirect && op.isGlobalPrivate(); }
+
+  // Returns true if the global can be DCEd if there are no loads.
+  // This is generally only the case for value types as reference types may be
+  // aliased or have side effects on creation.
+  bool canDCE() {
+    return isCandidate() &&
+           cast<SymbolOpInterface>(op.getOperation()).canDiscardOnUseEmpty();
+  }
 };
 
 enum class GlobalAction {
@@ -343,12 +351,13 @@ static bool inlineConstantGlobalLoads(GlobalTable &globalTable) {
 // are discarded.
 static bool eraseUnusedGlobals(GlobalTable &globalTable) {
   return globalTable.forEach([&](Global &global) {
-    if (!global.isCandidate())
-      return GlobalAction::PRESERVE;
-    if (global.loadOps.empty()) {
-      // No loads; remove entirely.
-      return GlobalAction::DELETE;
-    }
+    // DO NOT SUBMIT hal.device.resolve doesn't trigger this load
+    // if (!global.canDCE()) {
+    //   return GlobalAction::PRESERVE;
+    // } else if (global.loadOps.empty()) {
+    //   // No loads; remove entirely.
+    //   return GlobalAction::DELETE;
+    // }
     return GlobalAction::PRESERVE;
   });
 }

@@ -29,7 +29,7 @@
 // compiled binary.
 #vulkan_target = #hal.device.target<"vulkan", [
   #spirv_target
-]>
+]> : !hal.device
 
 module @example attributes {hal.device.targets = [#vulkan_target]} {
 

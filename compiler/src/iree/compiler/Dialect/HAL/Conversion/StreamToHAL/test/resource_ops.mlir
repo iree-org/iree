@@ -1,17 +1,21 @@
 // RUN: iree-opt --split-input-file --iree-hal-conversion %s | FileCheck %s
 
+util.global private @device : !hal.device
+
 // CHECK-LABEL: @resourceAlloc
 util.func public @resourceAlloc(%arg0: index) -> !stream.resource<transient> {
   // CHECK: %[[RET0:.+]] = hal.allocator.allocate
   // CHECK-SAME: type("DeviceVisible|DeviceLocal")
   // CHECK-SAME: usage("{{.+}}Transfer{{.+}}Dispatch{{.+}}")
   // CHECK-SAME: : !hal.buffer{%arg0}
-  %0 = stream.resource.alloc uninitialized : !stream.resource<transient>{%arg0}
+  %0 = stream.resource.alloc uninitialized on(#hal.device.affinity<@device>) : !stream.resource<transient>{%arg0}
   // CHECK: util.return %[[RET0]]
   util.return %0 : !stream.resource<transient>
 }
 
 // -----
+
+util.global private @device : !hal.device
 
 // CHECK-LABEL: @resourceAlloca
 // CHECK-SAME: (%[[SIZE:.+]]: index)
@@ -26,12 +30,14 @@ util.func public @resourceAlloca(%size: index) -> (!stream.resource<transient>, 
   // CHECK-SAME: type("DeviceVisible|DeviceLocal")
   // CHECK-SAME: usage("{{.+}}Transfer{{.+}}Dispatch{{.+}}")
   // CHECK-SAME: : !hal.buffer{%[[SIZE]]}
-  %0:2 = stream.resource.alloca uninitialized : !stream.resource<transient>{%size} => !stream.timepoint
+  %0:2 = stream.resource.alloca uninitialized on(#hal.device.affinity<@device>) : !stream.resource<transient>{%size} => !stream.timepoint
   // CHECK: util.return %[[RET0]], %[[SIGNAL_FENCE]]
   util.return %0#0, %0#1 : !stream.resource<transient>, !stream.timepoint
 }
 
 // -----
+
+util.global private @device : !hal.device
 
 // CHECK-LABEL: @resourceAllocaAwait
 // CHECK-SAME: (%[[SIZE:.+]]: index, %[[WAIT_FENCE:.+]]: !hal.fence)
@@ -45,12 +51,14 @@ util.func public @resourceAllocaAwait(%size: index, %await_timepoint: !stream.ti
   // CHECK-SAME: type("DeviceVisible|DeviceLocal")
   // CHECK-SAME: usage("{{.+}}Transfer{{.+}}Dispatch{{.+}}")
   // CHECK-SAME: : !hal.buffer{%[[SIZE]]}
-  %0:2 = stream.resource.alloca uninitialized await(%await_timepoint) => !stream.resource<transient>{%size} => !stream.timepoint
+  %0:2 = stream.resource.alloca uninitialized on(#hal.device.affinity<@device>) await(%await_timepoint) => !stream.resource<transient>{%size} => !stream.timepoint
   // CHECK: util.return %[[RET0]], %[[SIGNAL_FENCE]]
   util.return %0#0, %0#1 : !stream.resource<transient>, !stream.timepoint
 }
 
 // -----
+
+util.global private @device : !hal.device
 
 // CHECK-LABEL: @resourceDealloca
 // CHECK-SAME: (%[[SIZE:.+]]: index, %[[RESOURCE:.+]]: !hal.buffer)
@@ -62,14 +70,14 @@ util.func public @resourceDealloca(%size: index, %resource: !stream.resource<tra
   // CHECK-SAME: wait(%[[WAIT_FENCE]])
   // CHECK-SAME: signal(%[[SIGNAL_FENCE]])
   // CHECK-SAME: buffer(%[[RESOURCE]] : !hal.buffer)
-  %0 = stream.resource.dealloca %resource : !stream.resource<transient>{%size} => !stream.timepoint
+  %0 = stream.resource.dealloca on(#hal.device.affinity<@device>) %resource : !stream.resource<transient>{%size} => !stream.timepoint
   // CHECK: util.return %[[SIGNAL_FENCE]]
   util.return %0 : !stream.timepoint
 }
 
 // -----
 
-// TODO(#9572): implement stream ordered allocations.
+util.global private @device : !hal.device
 
 // CHECK-LABEL: @resourceDeallocaAwait
 // CHECK-SAME: (%[[SIZE:.+]]: index, %[[RESOURCE:.+]]: !hal.buffer, %[[WAIT_FENCE:.+]]: !hal.fence)
@@ -80,7 +88,7 @@ util.func public @resourceDeallocaAwait(%size: index, %resource: !stream.resourc
   // CHECK-SAME: wait(%[[WAIT_FENCE]])
   // CHECK-SAME: signal(%[[SIGNAL_FENCE]])
   // CHECK-SAME: buffer(%[[RESOURCE]] : !hal.buffer)
-  %0 = stream.resource.dealloca await(%await_timepoint) => %resource : !stream.resource<transient>{%size} => !stream.timepoint
+  %0 = stream.resource.dealloca on(#hal.device.affinity<@device>) await(%await_timepoint) => %resource : !stream.resource<transient>{%size} => !stream.timepoint
   // CHECK: util.return %[[SIGNAL_FENCE]]
   util.return %0 : !stream.timepoint
 }
@@ -97,6 +105,8 @@ util.func public @resourceSize(%arg0: !stream.resource<transient>) -> index {
 
 // -----
 
+util.global private @device : !hal.device
+
 // CHECK-LABEL: @resourceTryMap
 util.func public @resourceTryMap(%arg0: !util.buffer) -> (i1, !stream.resource<constant>) {
   %c0 = arith.constant 0 : index
@@ -105,7 +115,7 @@ util.func public @resourceTryMap(%arg0: !util.buffer) -> (i1, !stream.resource<c
   // CHECK-SAME: source(%arg0 : !util.buffer)[%c0, %c128]
   // CHECK-SAME: type("DeviceVisible|DeviceLocal")
   // CHECK-SAME: usage("{{.+}}Transfer{{.+}}Dispatch{{.+}}SharingImmutable") : i1, !hal.
-  %did_map, %mapping = stream.resource.try_map %arg0[%c0] : !util.buffer -> i1, !stream.resource<constant>{%c128}
+  %did_map, %mapping = stream.resource.try_map on(#hal.device.affinity<@device>) %arg0[%c0] : !util.buffer -> i1, !stream.resource<constant>{%c128}
   // CHECK: util.return %[[DID_IMPORT]], %[[IMPORTED]]
   util.return %did_map, %mapping : i1, !stream.resource<constant>
 }

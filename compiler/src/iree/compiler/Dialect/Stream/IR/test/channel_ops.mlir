@@ -1,10 +1,12 @@
 // RUN: iree-opt --split-input-file %s | iree-opt --split-input-file | FileCheck %s
 
+util.global private @device : !hal.device
+
 // CHECK-LABEL: @channel_create
 //  CHECK-SAME: (%[[RANK:.+]]: index, %[[COUNT:.+]]: index)
 util.func private @channel_create(%rank: index, %count: index) {
-  // CHECK: %channel = stream.channel.create on(#hal.affinity.queue<[0, 1]>) rank(%[[RANK]]) count(%[[COUNT]]) : !stream.channel
-  %channel = stream.channel.create on(#hal.affinity.queue<[0, 1]>) rank(%rank) count(%count) : !stream.channel
+  // CHECK: %channel = stream.channel.create on(#hal.device.affinity<@device>) rank(%[[RANK]]) count(%[[COUNT]]) : !stream.channel
+  %channel = stream.channel.create on(#hal.device.affinity<@device>) rank(%rank) count(%count) : !stream.channel
   util.return
 }
 

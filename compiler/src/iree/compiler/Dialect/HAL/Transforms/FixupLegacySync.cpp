@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Dialect/HAL/Analysis/DeviceAnalysis.h"
 #include "iree/compiler/Dialect/HAL/IR/HALDialect.h"
 #include "iree/compiler/Dialect/HAL/IR/HALOps.h"
 #include "iree/compiler/Dialect/HAL/Transforms/Passes.h"
@@ -149,12 +150,15 @@ struct FixupLegacySyncPass
   void runOnOperation() override {
     auto moduleOp = getOperation();
 
-    // See if any devices are marked as requiring the legacy_sync behavior.
-    // If any single device does we must uniformly apply the fixups.
-    if (!IREE::HAL::DeviceTargetAttr::lookupConfigAttrAny(moduleOp,
-                                                          "legacy_sync")) {
-      return;
-    }
+    // Analyze the module to determine which devices need the behavior.
+    DeviceAnalysis deviceAnalysis(moduleOp);
+    if (failed(deviceAnalysis.run()))
+      return signalPassFailure();
+    auto isLegacySync = [&](Value deviceValue) {
+      auto deviceSet = deviceAnalysis.lookupDeviceTargets(deviceValue);
+      return deviceSet.has_value() ? deviceSet->hasConfigAttrAny("legacy_sync")
+                                   : false;
+    };
 
     // This could use an interface but it'd be better to remove the need for
     // this pass instead.
@@ -162,19 +166,39 @@ struct FixupLegacySyncPass
       funcOp.walk([&](Operation *op) {
         TypeSwitch<Operation *, void>(op)
             .Case([&](IREE::HAL::CommandBufferCreateOp op) {
-              makeAllowInlineExecution(op);
+              if (isLegacySync(op.getDevice())) {
+                makeAllowInlineExecution(op);
+              }
             })
             .Case([&](IREE::HAL::DeviceQueueAllocaOp op) {
-              insertWaitIfNeeded(op, op.getWaitFenceMutable(),
-                                 op.getSignalFence());
+              if (isLegacySync(op.getDevice())) {
+                insertWaitIfNeeded(op, op.getWaitFenceMutable(),
+                                   op.getSignalFence());
+              }
             })
             .Case([&](IREE::HAL::DeviceQueueDeallocaOp op) {
-              insertWaitIfNeeded(op, op.getWaitFenceMutable(),
-                                 op.getSignalFence());
+              if (isLegacySync(op.getDevice())) {
+                insertWaitIfNeeded(op, op.getWaitFenceMutable(),
+                                   op.getSignalFence());
+              }
+            })
+            .Case([&](IREE::HAL::DeviceQueueReadOp op) {
+              if (isLegacySync(op.getDevice())) {
+                insertWaitIfNeeded(op, op.getWaitFenceMutable(),
+                                   op.getSignalFence());
+              }
+            })
+            .Case([&](IREE::HAL::DeviceQueueWriteOp op) {
+              if (isLegacySync(op.getDevice())) {
+                insertWaitIfNeeded(op, op.getWaitFenceMutable(),
+                                   op.getSignalFence());
+              }
             })
             .Case([&](IREE::HAL::DeviceQueueExecuteOp op) {
-              insertWaitIfNeeded(op, op.getWaitFenceMutable(),
-                                 op.getSignalFence());
+              if (isLegacySync(op.getDevice())) {
+                insertWaitIfNeeded(op, op.getWaitFenceMutable(),
+                                   op.getSignalFence());
+              }
             });
       });
     }

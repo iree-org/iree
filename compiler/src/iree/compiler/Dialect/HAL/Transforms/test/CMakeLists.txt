@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "assign_legacy_target_devices.mlir"
     "assign_target_devices.mlir"
     "capture_executable_sources.mlir"
     "convert_to_hal.mlir"
@@ -21,17 +22,21 @@ iree_lit_test_suite(
     "dump_executable_sources.mlir"
     "elide_redundant_commands.mlir"
     "fixup_legacy_sync.mlir"
+    "initialize_devices.mlir"
     "materialize_dispatch_instrumentation.mlir"
     "materialize_interfaces.mlir"
     "materialize_resource_caches.mlir"
+    "materialize_target_devices.mlir"
     "memoize_device_queries.mlir"
     "preprocess_executables.mlir"
     "prune_executables.mlir"
     "repeat_dispatches.mlir"
+    "resolve_device_aliases.mlir"
+    "resolve_device_promises.mlir"
     "resolve_export_ordinals.mlir"
     "strip_executable_contents.mlir"
     "substitute_executables.mlir"
-    "verify_target_environment.mlir"
+    "verify_devices.mlir"
   TOOLS
     FileCheck
     iree-opt

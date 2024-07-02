@@ -110,13 +110,15 @@ util.func public @multiUseTiedOperand(%size: index) -> (!stream.resource<*>, !st
 // TODO(#11249): support in-place collectives - when supported this will become
 // a negative test as we'd expect %send_recv to be used for both operands.
 
+util.global private @device : !hal.device
+
 // CHECK-LABEL: @tiedCollectivesTODO
 //  CHECK-SAME: (%[[CHANNEL:.+]]: !stream.channel, %[[SEND_RECV:.+]]: !stream.resource<*>, %[[SEND_SIZE:.+]]: index, %[[RECV_SIZE:.+]]: index, %[[COUNT:.+]]: index)
 util.func private @tiedCollectivesTODO(%channel: !stream.channel, %send_recv: !stream.resource<*>, %send_size: index, %recv_size: index, %count: index) -> !stream.resource<*> {
   %c0 = arith.constant 0 : index
-  // CHECK: %[[RECV_CLONE:.+]] = stream.async.clone on(#hal.affinity.queue<[0]>) %[[SEND_RECV]]
+  // CHECK: %[[RECV_CLONE:.+]] = stream.async.clone on(#hal.device.affinity<@device>) %[[SEND_RECV]]
   // CHECK: %[[ALL_GATHER:.+]] = stream.async.collective<all_gather : f32>[%[[COUNT]]]
-  %0 = stream.async.collective<all_gather : f32>[%count] on(#hal.affinity.queue<[0]>) channel(%channel)
+  %0 = stream.async.collective<all_gather : f32>[%count] on(#hal.device.affinity<@device>) channel(%channel)
       // CHECK-SAME: %[[SEND_RECV]][%c0 to %[[SEND_SIZE]] for %[[SEND_SIZE]]],
       %send_recv[%c0 to %send_size for %send_size],
       // CHECK-SAME: %[[RECV_CLONE]][%c0 to %[[RECV_SIZE]] for %[[RECV_SIZE]]] :

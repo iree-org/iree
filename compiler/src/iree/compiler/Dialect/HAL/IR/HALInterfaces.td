@@ -8,24 +8,53 @@
 #define IREE_DIALECT_HAL_INTERFACES
 
 include "iree/compiler/Dialect/Util/IR/UtilBase.td"
+include "mlir/IR/BuiltinAttributeInterfaces.td"
 
-def HAL_MatchAttrInterface :
-    AttrInterface<"MatchAttrInterface"> {
+//===----------------------------------------------------------------------===//
+// IREE::HAL::DeviceInitializationAttrInterface
+//===----------------------------------------------------------------------===//
+
+def HAL_DeviceInitializationAttrInterface :
+    AttrInterface<"DeviceInitializationAttrInterface", [
+      TypedAttrInterface,
+    ]> {
   let description = [{
-    An attribute that can be used in `hal.*.match.*` expressions.
-    Each attribute defines some subexpression that can be expanded to one or
-    more operations that performs the actual query and matching logic.
+    Interface for attributes controlling device initialization.
   }];
 
   let methods = [
     InterfaceMethod<
-      [{
-        Builds a set of operations that evaluate to a boolean (i1) value
-        indicating whether the expression tree represented by the match
-        attribute is true for the given value.
+      /*desc=*/[{
+        prints a string description of the initialization specification for
+        inclusion in error messages. May include internal newlines but no
+        newline is expected at the end.
       }],
-      "Value", "buildConditionExpression",
-      (ins "Location":$loc, "Value":$device, "OpBuilder":$builder)
+      /*retTy=*/"void",
+      /*methodName=*/"printStatusDescription",
+      /*args=*/(ins "llvm::raw_ostream &":$os),
+      /*methodBody=*/[{}]
+    >,
+    InterfaceMethod<
+      /*desc=*/[{
+        Builds a `util.initializer` body responsible for initializing a device
+        global. Returns the device value that should be stored into the global.
+        The name provided is an informal identifier that can be used to produce
+        user-level error messages that reference the device.
+
+        The provided `buildDeviceTargetMatch` function will be called with a
+        `!hal.device` SSA value and a device target specification and should
+        return an `i1` value indicating whether the given device matches the
+        specification. If the device always matches (rare!) a null value may
+        be returned.
+      }],
+      /*retTy=*/"Value",
+      /*methodName=*/"buildDeviceEnumeration",
+      /*args=*/(ins
+        "Location":$loc,
+        "IREE::HAL::BuildDeviceTargetMatchFn":$buildDeviceTargetMatch,
+        "OpBuilder &":$builder
+      ),
+      /*methodBody=*/[{}]
     >,
   ];
 }

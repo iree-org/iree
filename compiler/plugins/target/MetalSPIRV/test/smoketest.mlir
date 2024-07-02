@@ -8,7 +8,7 @@ module attributes {
           compute = fp32|int32, storage = b32, subgroup = none, dot = none, mma = [], subgroup_size_choices = [32],
           max_workgroup_sizes = [128, 128, 64], max_thread_count_per_workgroup = 128, max_workgroup_memory_bytes = 16384>>
       }>
-    ]>
+    ]> : !hal.device
   ]
 } {
 

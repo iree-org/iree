@@ -11,18 +11,24 @@
 #include "mlir/IR/OperationSupport.h"
 #include "mlir/Transforms/DialectConversion.h"
 
+namespace mlir::iree_compiler::IREE::Stream {
+class AffinityAnalysis;
+} // namespace mlir::iree_compiler::IREE::Stream
+
 namespace mlir::iree_compiler {
 
 // Populates conversion patterns that perform flow->stream conversion.
 // These patterns ensure that nested types are run through the provided
 // |typeConverter|.
-void populateFlowToStreamConversionPatterns(MLIRContext *context,
-                                            TypeConverter &typeConverter,
-                                            RewritePatternSet &patterns);
-void populateFlowToStreamConversionPatterns(MLIRContext *context,
-                                            ConversionTarget &conversionTarget,
-                                            TypeConverter &typeConverter,
-                                            RewritePatternSet &patterns);
+void populateFlowToStreamConversionPatterns(
+    MLIRContext *context, TypeConverter &typeConverter,
+    IREE::Stream::AffinityAnalysis *affinityAnalysis,
+    RewritePatternSet &patterns);
+void populateFlowToStreamConversionPatterns(
+    MLIRContext *context, ConversionTarget &conversionTarget,
+    TypeConverter &typeConverter,
+    IREE::Stream::AffinityAnalysis *affinityAnalysis,
+    RewritePatternSet &patterns);
 
 } // namespace mlir::iree_compiler
 

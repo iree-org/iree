@@ -33,7 +33,9 @@ namespace {
 // Emplacement
 //===----------------------------------------------------------------------===//
 
-static void replaceUsesAndTransfer(Value oldValue, Value newValue) {
+static void
+replaceUsesAndTransfer(Value oldValue, Value newValue,
+                       IREE::Stream::AffinityAttr usageAffinityAttr) {
   assert(isa<IREE::Stream::ResourceType>(oldValue.getType()));
   assert(isa<IREE::Stream::ResourceType>(newValue.getType()));
   if (oldValue.getType() == newValue.getType()) {
@@ -44,8 +46,8 @@ static void replaceUsesAndTransfer(Value oldValue, Value newValue) {
   builder.setInsertionPointAfterValue(newValue);
   Value newValueSize = IREE::Util::SizeAwareTypeInterface::queryValueSize(
       newValue.getLoc(), newValue, builder);
-  IREE::Stream::AffinityAttr sourceAffinity;
-  IREE::Stream::AffinityAttr resultAffinity;
+  IREE::Stream::AffinityAttr sourceAffinity = usageAffinityAttr;
+  IREE::Stream::AffinityAttr resultAffinity = usageAffinityAttr;
   Value transferValue = builder.create<IREE::Stream::AsyncTransferOp>(
       newValue.getLoc(), oldValue.getType(), newValue, newValueSize,
       newValueSize, sourceAffinity, resultAffinity);
@@ -74,7 +76,7 @@ static bool tryEmplaceDispatchOp(IREE::Stream::AsyncDispatchOp dispatchOp) {
       break;
     }
 
-    // Find potential.
+    // Find potential update to place the dispatch result into.
     Value targetResource;
     Value targetResourceSize;
     Value targetOffset;
@@ -82,12 +84,22 @@ static bool tryEmplaceDispatchOp(IREE::Stream::AsyncDispatchOp dispatchOp) {
     Value targetLength;
     Value targetResult;
     Value targetResultSize;
+    Attribute targetAffinityAttr;
     Operation *userOp = *result.user_begin();
     if (auto updateOp = dyn_cast<IREE::Stream::AsyncUpdateOp>(userOp)) {
       if (updateOp.getUpdate() != result) {
         // TODO(#14566): continue if sparse emplacement on multiple results.
         break;
       }
+
+      // Currently only allow exactly matching affinities.
+      // TODO(multi-device): memory compatibility - if compatible then allow.
+      if (updateOp.getAffinityAttr() != dispatchOp.getAffinityAttr()) {
+        continue;
+      }
+
+      // Try to move all SSA values required into the appropriate place.
+      // TODO(benvanik): undo this if there's a failure (or record/roll-back).
       if (!IREE::Util::tryMoveProducerBefore(updateOp.getUpdateSize(),
                                              dispatchOp) ||
           !IREE::Util::tryMoveProducerBefore(updateOp.getTargetSize(),
@@ -102,6 +114,7 @@ static bool tryEmplaceDispatchOp(IREE::Stream::AsyncDispatchOp dispatchOp) {
         // TODO(#14566): continue if sparse emplacement on multiple results.
         break;
       }
+
       targetResource = updateOp.getTarget();
       if (targetResource.getDefiningOp() == dispatchOp) {
         // NOTE: we may have already replaced the update target with one of our
@@ -115,6 +128,7 @@ static bool tryEmplaceDispatchOp(IREE::Stream::AsyncDispatchOp dispatchOp) {
       targetLength = updateOp.getUpdateSize();
       targetResult = updateOp.getResult();
       targetResultSize = updateOp.getTargetSize();
+      targetAffinityAttr = updateOp.getAffinityAttr();
     }
     if (!targetResource) {
       // TODO(#14566): continue if sparse emplacement on multiple results.
@@ -136,7 +150,7 @@ static bool tryEmplaceDispatchOp(IREE::Stream::AsyncDispatchOp dispatchOp) {
     dispatchOp.getResultSizesMutable().assign(resultSizes);
 
     // Replace users with the result of the dispatch op.
-    replaceUsesAndTransfer(targetResult, result);
+    replaceUsesAndTransfer(targetResult, result, dispatchOp.getAffinityAttr());
     userOp->erase();
 
     didChange = true;

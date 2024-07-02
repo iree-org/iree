@@ -34,6 +34,7 @@ iree_cc_library(
     MLIRValueBoundsOpInterface
     iree::compiler::Dialect::Encoding::IR
     iree::compiler::Dialect::Flow::IR
+    iree::compiler::Dialect::HAL::IR
     iree::compiler::Dialect::LinalgExt::IR
     iree::compiler::Dialect::Stream::IR
     iree::compiler::Dialect::Util::IR

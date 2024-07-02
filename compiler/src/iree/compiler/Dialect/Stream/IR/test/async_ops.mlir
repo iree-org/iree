@@ -82,6 +82,8 @@ util.func private @asyncCopy(%arg0: !stream.resource<*>, %arg1: index, %arg2: !s
 
 // This covers all_gather, all_reduce, and reduce_scatter variants.
 
+util.global private @device : !hal.device
+
 // CHECK-LABEL: @asyncCollectiveAllGather
 util.func private @asyncCollectiveAllGather(
     // CHECK-SAME: %[[CHANNEL:.+]]: !stream.channel,
@@ -95,8 +97,8 @@ util.func private @asyncCollectiveAllGather(
   %recv = stream.async.alloca : !stream.resource<*>{%recv_size}
   // CHECK: = stream.async.collective<all_gather : f32>[%[[COUNT]]]
   %0 = stream.async.collective<all_gather : f32>[%count]
-      // CHECK-SAME: on(#hal.affinity.queue<[0]>) channel(%[[CHANNEL]])
-      on(#hal.affinity.queue<[0]>) channel(%channel)
+      // CHECK-SAME: on(#hal.device.affinity<@device>) channel(%[[CHANNEL]])
+      on(#hal.device.affinity<@device>) channel(%channel)
       // CHECK-SAME: %[[SEND]][%c0 to %[[SEND_SIZE]] for %[[SEND_SIZE]]],
       %send[%c0 to %send_size for %send_size],
       // CHECK-SAME: %[[RECV]][%c0 to %[[RECV_SIZE]] for %[[RECV_SIZE]]] :
@@ -109,6 +111,8 @@ util.func private @asyncCollectiveAllGather(
 // -----
 
 // This covers broadcast and reduce variants.
+
+util.global private @device : !hal.device
 
 // CHECK-LABEL: @asyncCollectiveBroadcast
 util.func private @asyncCollectiveBroadcast(
@@ -125,8 +129,8 @@ util.func private @asyncCollectiveBroadcast(
   %recv = stream.async.alloca : !stream.resource<*>{%recv_size}
   // CHECK: = stream.async.collective<broadcast : f32>[%[[COUNT]]]
   %0 = stream.async.collective<broadcast : f32>[%count]
-      // CHECK-SAME: on(#hal.affinity.queue<[0]>) channel(%[[CHANNEL]]) source(%[[RANK]])
-      on(#hal.affinity.queue<[0]>) channel(%channel) source(%rank)
+      // CHECK-SAME: on(#hal.device.affinity<@device>) channel(%[[CHANNEL]]) source(%[[RANK]])
+      on(#hal.device.affinity<@device>) channel(%channel) source(%rank)
       // CHECK-SAME: %[[SEND]][%c0 to %[[SEND_SIZE]] for %[[SEND_SIZE]]],
       %send[%c0 to %send_size for %send_size],
       // CHECK-SAME: %[[RECV]][%c0 to %[[RECV_SIZE]] for %[[RECV_SIZE]]] :
@@ -147,10 +151,12 @@ util.func private @asyncTransfer(%arg0: !stream.resource<constant>, %arg1: index
 
 // -----
 
+util.global private @device : !hal.device
+
 // CHECK-LABEL: @asyncTransferAffinities
 util.func private @asyncTransferAffinities(%arg0: !stream.resource<constant>, %arg1: index) -> !stream.resource<constant> {
-  // CHECK: = stream.async.transfer %arg0 : !stream.resource<constant>{%arg1} from(#hal.affinity.queue<[0]>) -> to(#hal.affinity.queue<[1]>) !stream.resource<constant>{%arg1}
-  %0 = stream.async.transfer %arg0 : !stream.resource<constant>{%arg1} from(#hal.affinity.queue<[0]>) -> to(#hal.affinity.queue<[1]>) !stream.resource<constant>{%arg1}
+  // CHECK: = stream.async.transfer %arg0 : !stream.resource<constant>{%arg1} from(#hal.device.affinity<@device, [0]>) -> to(#hal.device.affinity<@device, [1]>) !stream.resource<constant>{%arg1}
+  %0 = stream.async.transfer %arg0 : !stream.resource<constant>{%arg1} from(#hal.device.affinity<@device, [0]>) -> to(#hal.device.affinity<@device, [1]>) !stream.resource<constant>{%arg1}
   util.return %0 : !stream.resource<constant>
 }
 

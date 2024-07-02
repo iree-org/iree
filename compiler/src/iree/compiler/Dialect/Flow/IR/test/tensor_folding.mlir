@@ -351,8 +351,8 @@ util.func public @splatDynamicZeroElements(%value: f32, %dim: index) -> tensor<0
 
 // -----
 
-// CHECK-LABEL: @cloneConst
-util.func public @cloneConst() -> tensor<4xi32> {
+// CHECK-LABEL: @cloneConstant
+util.func public @cloneConstant() -> tensor<4xi32> {
   // CHECK-NEXT: %[[C:.+]] = arith.constant dense<[0, 1, 2, 3]> : tensor<4xi32>
   %0 = arith.constant dense<[0, 1, 2, 3]> : tensor<4xi32>
   %1 = flow.tensor.clone %0 : tensor<4xi32>
@@ -362,8 +362,8 @@ util.func public @cloneConst() -> tensor<4xi32> {
 
 // -----
 
-// CHECK-LABEL: @cloneConstZeroElements
-util.func public @cloneConstZeroElements() -> tensor<0x2xi32> {
+// CHECK-LABEL: @cloneConstantZeroElements
+util.func public @cloneConstantZeroElements() -> tensor<0x2xi32> {
   // CHECK-NEXT: %[[C:.+]] = arith.constant dense<> : tensor<0x2xi32>
   %0 = arith.constant dense<> : tensor<0x2xi32>
   // CHECK-NOT: flow.tensor.clone
@@ -393,6 +393,21 @@ util.func public @cloneDynamicZeroElements(%arg0: tensor<0x?xf32>, %dim: index) 
   %0 = flow.tensor.clone %arg0 : tensor<0x?xf32>{%dim}
   // CHECK-NEXT: %[[RET]]
   util.return %0 : tensor<0x?xf32>
+}
+
+// -----
+
+// CHECK-LABEL: @ElideRedundantTransfer
+//  CHECK-SAME: (%[[OPERAND:.+]]: tensor<4x?xf32>, %[[DIM:.+]]: index)
+util.func public @ElideRedundantTransfer(%arg0: tensor<4x?xf32>, %dim: index) -> tensor<4x?xi32> {
+  // CHECK: %[[TRANSFER:.+]] = flow.tensor.transfer %arg0
+  %transfer = flow.tensor.transfer %arg0 : tensor<4x?xf32>{%dim} to "target"
+  // CHECK: %[[BITCAST:.+]] = flow.tensor.bitcast %[[TRANSFER]]
+  %bitcast = flow.tensor.bitcast %transfer : tensor<4x?xf32>{%dim} -> tensor<4x?xi32>{%dim}
+  // CHECK-NOT: flow.transfer
+  %redundant = flow.tensor.transfer %bitcast : tensor<4x?xi32>{%dim} to "target"
+  // CHECK-NEXT: %[[BITCAST]]
+  util.return %redundant : tensor<4x?xi32>
 }
 
 // -----

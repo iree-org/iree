@@ -40,6 +40,15 @@ public:
     }
   }
 
+  Value add(int64_t lhs, int64_t rhs) { return get(lhs + rhs); }
+  Value add(Value lhs, int64_t rhs) {
+    APInt lhsValue;
+    if (matchPattern(lhs, m_ConstantInt(&lhsValue))) {
+      return add(lhsValue.getSExtValue(), rhs);
+    }
+    return builder.create<arith::AddIOp>(loc, lhs, get(rhs));
+  }
+
 private:
   Location loc;
   OpBuilder builder;

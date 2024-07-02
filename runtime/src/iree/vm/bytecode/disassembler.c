@@ -1326,6 +1326,7 @@ iree_status_t iree_vm_bytecode_disassemble_op(
       IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, " : "));
       EMIT_REF_REG_NAME(false_value_reg);
       EMIT_OPTIONAL_VALUE_REF(&regs->ref[false_value_reg]);
+      IREE_RETURN_IF_ERROR(iree_string_builder_append_cstring(b, " -> !"));
       EMIT_TYPE_NAME(type_def);
       break;
     }

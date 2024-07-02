@@ -1,7 +1,8 @@
 // RUN: (iree-compile --iree-hal-target-backends=vmvx %p/module_a.mlir -o=%t.module_a.vmfb && \
 // RUN:  iree-compile --iree-hal-target-backends=vmvx %p/module_b.mlir -o=%t.module_b.vmfb && \
 // RUN:  iree-compile --iree-hal-target-backends=vmvx %s | \
-// RUN:  iree-run-module --device=local-sync \
+// RUN:  iree-run-module \
+// RUN:    --device=local-sync \
 // RUN:    --module=%t.module_a.vmfb \
 // RUN:    --module=%t.module_b.vmfb \
 // RUN:    --module=- --function=run \

@@ -9,8 +9,4 @@
 
 include "iree/compiler/Dialect/Util/IR/UtilBase.td"
 
-//===----------------------------------------------------------------------===//
-// IREE::Flow::StreamableOpInterface
-//===----------------------------------------------------------------------===//
-
 #endif  // IREE_DIALECT_FLOW_INTERFACES

@@ -170,6 +170,40 @@ util.func private @caller(%arg0: tensor<?x2xi32>, %arg1: tensor<?x3xi32>) -> (te
 
 // -----
 
+// Tests that explicit import affinity specification is carried through to
+// the marshaling ops.
+
+util.global private @dev_a : !hal.device
+util.global private @dev_b : !hal.device
+util.global private @dev_c : !hal.device
+
+// CHECK-LABEL: util.func private @pinnedImport(%arg0: !hal.buffer_view, %arg1: !hal.fence, %arg2: !hal.fence) -> !hal.buffer_view
+util.func private @pinnedImport(tensor<2xi32> {iree.abi.affinity = #hal.device.affinity<@dev_a>}) -> (tensor<2xi32> {iree.abi.affinity = #hal.device.affinity<@dev_b>}) attributes {
+  iree.abi.affinity = #hal.device.affinity<@dev_c>,
+  iree.abi.model = "coarse-fences",
+  nosideeffects
+}
+
+// CHECK: util.func private @_pinnedImport(%[[ARG_TENSOR:.+]]: tensor<2xi32>) -> tensor<2xi32> {
+// CHECK-DAG:   %[[DEVICE_C:.+]] = hal.device.resolve on(<@dev_c>) : !hal.device
+// CHECK-DAG:   %[[ARG_FENCE:.+]] = hal.fence.create device(%[[DEVICE_C]] : !hal.device) flags("None") : !hal.fence
+// CHECK-DAG:   %[[ARG_READY:.+]] = hal.tensor.barrier join(%[[ARG_TENSOR]] : tensor<2xi32>) => %[[ARG_FENCE]] : !hal.fence
+// CHECK-DAG:   %[[ARG_VIEW:.+]] = hal.tensor.export on(#hal.device.affinity<@dev_a>) %[[ARG_READY]] : tensor<2xi32> -> !hal.buffer_view
+// CHECK-DAG:   %[[RESULT_FENCE:.+]] = hal.fence.create device(%[[DEVICE_C]] : !hal.device) flags("None") : !hal.fence
+//     CHECK:   %[[RET_VIEW:.+]] = util.call @pinnedImport(%[[ARG_VIEW]], %[[ARG_FENCE]], %[[RESULT_FENCE]]) : (!hal.buffer_view, !hal.fence, !hal.fence) -> !hal.buffer_view
+//     CHECK:   %[[RET_TENSOR:.+]] = hal.tensor.import on(#hal.device.affinity<@dev_b>) wait(%[[RESULT_FENCE]]) => %[[RET_VIEW]] : !hal.buffer_view -> tensor<2xi32>
+//     CHECK:   util.return %[[RET_TENSOR]]
+//     CHECK: }
+
+// CHECK: util.func private @pinnedCaller(%arg0: tensor
+util.func private @pinnedCaller(%arg0: tensor<2xi32>) -> tensor<2xi32> {
+  // CHECK: util.call @_pinnedImport(%arg0) : (tensor<2xi32>) -> tensor<2xi32>
+  %0 = util.call @pinnedImport(%arg0) : (tensor<2xi32>) -> tensor<2xi32>
+  util.return %0 : tensor<2xi32>
+}
+
+// -----
+
 // Tests a side-effect-free import that doesn't take/return reference types.
 
 // CHECK-LABEL: util.func private @importI32(%arg0: i32, %arg1: !hal.fence, %arg2: !hal.fence) -> i32

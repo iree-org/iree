@@ -23,11 +23,6 @@ void populateHALToVMPatterns(MLIRContext *context, SymbolTable &importSymbols,
 Value createPackedConstantBuffer(Location loc, ValueRange constantValues,
                                  OpBuilder &builder);
 
-// Creates a vm.rodata containing the contents of a hal.executable.binary.
-IREE::VM::RodataOp
-createExecutableBinaryRodata(IREE::HAL::ExecutableBinaryOp binaryOp,
-                             OpBuilder &builder);
-
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_DIALECT_HAL_CONVERSION_HALTOVM_PATTERNS_H_

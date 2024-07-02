@@ -67,8 +67,9 @@ struct FuncOpSignatureConversion
   }
 };
 
-struct CallOpConversion : public OpConversionPattern<IREE::Util::CallOp> {
-  using OpConversionPattern::OpConversionPattern;
+struct CallOpConversion
+    : public AffinityAwareConversionPattern<IREE::Util::CallOp> {
+  using AffinityAwareConversionPattern::AffinityAwareConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Util::CallOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -122,8 +123,9 @@ struct CallOpConversion : public OpConversionPattern<IREE::Util::CallOp> {
   }
 };
 
-struct ReturnOpConversion : public OpConversionPattern<IREE::Util::ReturnOp> {
-  using OpConversionPattern::OpConversionPattern;
+struct ReturnOpConversion
+    : public AffinityAwareConversionPattern<IREE::Util::ReturnOp> {
+  using AffinityAwareConversionPattern::AffinityAwareConversionPattern;
   LogicalResult
   matchAndRewrite(IREE::Util::ReturnOp op, OpAdaptor adaptor,
                   ConversionPatternRewriter &rewriter) const override {
@@ -142,6 +144,7 @@ struct ReturnOpConversion : public OpConversionPattern<IREE::Util::ReturnOp> {
 struct ExpandedGlobalResource {
   IREE::Util::GlobalOp resourceOp;
   IREE::Util::GlobalOp resourceSizeOp;
+  IREE::Stream::AffinityAttr affinityAttr;
 };
 
 struct GlobalExpansionState {
@@ -163,13 +166,16 @@ class BaseGlobalConversionPattern : public OpConversionPattern<T> {
 public:
   BaseGlobalConversionPattern(
       std::shared_ptr<GlobalExpansionState> expansionState,
-      TypeConverter &typeConverter, MLIRContext *context,
+      TypeConverter &typeConverter,
+      IREE::Stream::AffinityAnalysis *affinityAnalysis, MLIRContext *context,
       PatternBenefit benefit = 1)
       : OpConversionPattern<T>(typeConverter, context, benefit),
-        expansionState(std::move(expansionState)) {}
+        expansionState(std::move(expansionState)),
+        affinityAnalysis(affinityAnalysis) {}
 
 protected:
   mutable std::shared_ptr<GlobalExpansionState> expansionState;
+  IREE::Stream::AffinityAnalysis *affinityAnalysis;
 };
 
 struct GlobalOpExpansion
@@ -230,9 +236,13 @@ struct GlobalOpExpansion
         globalOp.getIsMutable(), indexType, std::optional<TypedAttr>{});
     resourceSizeOp.setVisibility(globalOp.getVisibility());
 
+    // Resolve the affinity of the global.
+    // We require this to be a single value today that is usually chosen from
+    // consumers (we take the hit on transfer from producers if needed).
+    auto affinityAttr = tryLookupGlobalAffinity(globalOp, affinityAnalysis);
+
     // Materialize the initializer if we need to setup a tensor-like constant.
     if (tensorInitializerRequired) {
-      auto affinityAttr = IREE::Stream::AffinityAttr::lookup(globalOp);
       auto initializerOp =
           rewriter.create<IREE::Util::InitializerOp>(globalOp.getLoc());
       auto *entryBlock = rewriter.createBlock(&initializerOp.getBody());
@@ -265,6 +275,7 @@ struct GlobalOpExpansion
     expansionState->globalMap[globalOp.getSymName()] = ExpandedGlobalResource{
         resourceOp,
         resourceSizeOp,
+        affinityAttr,
     };
 
     return success();
@@ -289,7 +300,7 @@ struct GlobalLoadOpExpansion
     auto &expandedGlobal = expandedGlobalIt->getSecond();
 
     // Insert a load/transfer to the unknown resource lifetime.
-    auto unknownType = IREE::Stream::ResourceType::get(rewriter.getContext());
+    auto unknownType = rewriter.getType<IREE::Stream::ResourceType>();
     auto resource =
         rewriter
             .create<IREE::Util::GlobalLoadOp>(
@@ -303,8 +314,8 @@ struct GlobalLoadOpExpansion
                             .getResult();
     rewriter.replaceOpWithNewOp<IREE::Stream::AsyncTransferOp>(
         loadOp, unknownType, resource, resourceSize, resourceSize,
-        /*source_affinity=*/nullptr,
-        /*result_affinity=*/nullptr);
+        /*source_affinity=*/expandedGlobal.affinityAttr,
+        /*result_affinity=*/expandedGlobal.affinityAttr);
 
     return success();
   }
@@ -330,12 +341,14 @@ struct GlobalStoreOpExpansion
     // Insert a transfer/store to the global with unknown lifetime. Lifetime
     // refinement will make this go away if possible.
     auto value =
-        consumeTensorOperand(storeOp.getLoc(), adaptor.getValue(), rewriter);
+        resolveTensorOperand(storeOp.getLoc(), storeOp.getValue(),
+                             adaptor.getValue(), affinityAnalysis, rewriter);
     assert(expandedGlobal.resourceOp && "Missing resource op");
     auto transferOp = rewriter.create<IREE::Stream::AsyncTransferOp>(
         storeOp.getLoc(), expandedGlobal.resourceOp.getType(), value.resource,
-        value.resourceSize, value.resourceSize, /*source_affinity=*/nullptr,
-        /*result_affinity=*/nullptr);
+        value.resourceSize, value.resourceSize,
+        /*source_affinity=*/value.affinity,
+        /*result_affinity=*/expandedGlobal.affinityAttr);
     rewriter.replaceOpWithNewOp<IREE::Util::GlobalStoreOp>(
         storeOp, transferOp.getResult(),
         expandedGlobal.resourceOp.getSymName());
@@ -349,28 +362,30 @@ struct GlobalStoreOpExpansion
 
 } // namespace
 
-void populateUtilToStreamConversionPatterns(MLIRContext *context,
-                                            TypeConverter &typeConverter,
-                                            RewritePatternSet &patterns) {
-  patterns
-      .insert<FuncOpSignatureConversion, CallOpConversion, ReturnOpConversion>(
-          typeConverter, context);
+void populateUtilToStreamConversionPatterns(
+    MLIRContext *context, TypeConverter &typeConverter,
+    IREE::Stream::AffinityAnalysis *affinityAnalysis,
+    RewritePatternSet &patterns) {
+  patterns.insert<FuncOpSignatureConversion>(typeConverter, context);
+  patterns.insert<CallOpConversion, ReturnOpConversion>(typeConverter, context,
+                                                        affinityAnalysis);
 
   auto expansionState = std::make_shared<GlobalExpansionState>();
   // TODO(#7432): add indirect global expansion support to streams.
   patterns
       .insert<GlobalOpExpansion, GlobalLoadOpExpansion, GlobalStoreOpExpansion>(
-          expansionState, typeConverter, context);
+          expansionState, typeConverter, affinityAnalysis, context);
   patterns.add<GenericConvertTypesPattern<IREE::Util::GlobalOp>,
                GenericConvertTypesPattern<IREE::Util::GlobalLoadOp>,
                GenericConvertTypesPattern<IREE::Util::GlobalStoreOp>>(
       typeConverter, context);
 }
 
-void populateUtilToStreamConversionPatterns(MLIRContext *context,
-                                            ConversionTarget &conversionTarget,
-                                            TypeConverter &typeConverter,
-                                            RewritePatternSet &patterns) {
+void populateUtilToStreamConversionPatterns(
+    MLIRContext *context, ConversionTarget &conversionTarget,
+    TypeConverter &typeConverter,
+    IREE::Stream::AffinityAnalysis *affinityAnalysis,
+    RewritePatternSet &patterns) {
   typeConverter.addConversion([=](IREE::Util::PtrType type,
                                   SmallVectorImpl<Type> &resultTypes) {
     // Expand pointers to tensors to [resource, sizeof resource] pointers.
@@ -432,7 +447,8 @@ void populateUtilToStreamConversionPatterns(MLIRContext *context,
         return typeConverter.isLegal(op.getResultTypes());
       });
 
-  populateUtilToStreamConversionPatterns(context, typeConverter, patterns);
+  populateUtilToStreamConversionPatterns(context, typeConverter,
+                                         affinityAnalysis, patterns);
 }
 
 } // namespace mlir::iree_compiler

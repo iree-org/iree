@@ -211,6 +211,15 @@ BindingLayoutAnalysis::BindingLayoutAnalysis(Operation *rootOp,
   }
 }
 
+bool BindingLayoutAnalysis::hasDispatches() const {
+  for (auto &it : exportInfos) {
+    if (!it.second->dispatchOps.empty()) {
+      return true; // found at least one dispatch
+    }
+  }
+  return false;
+}
+
 ArrayRef<IREE::Stream::CmdDispatchOp>
 BindingLayoutAnalysis::getExportDispatches(Operation *exportOp) const {
   auto it = exportInfos.find(exportOp);

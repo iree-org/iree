@@ -81,7 +81,8 @@ createBufferLikeGlobalOp(std::string name, Location loc, Type globalType,
   // hal.tensor.export
   auto bufferExportOp = initializerBuilder.create<IREE::HAL::TensorExportOp>(
       loc, globalOp.getType(), splatOp.getResult(),
-      TypeAttr::get(splatOp.getType()), /*name=*/nullptr);
+      TypeAttr::get(splatOp.getType()), /*name=*/nullptr,
+      /*affinity=*/nullptr);
   // util.optimization_barrier (try to prevent optimizations across the export)
   auto barrierOp = initializerBuilder.create<IREE::Util::OptimizationBarrierOp>(
       loc, bufferExportOp.getTarget());

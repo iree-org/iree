@@ -16,8 +16,8 @@
 stream.executable private @rebaseBindingsEx {
   stream.executable.export public @dispatch attributes {stream.resources = #aliasConfig}
   builtin.module  {
-    // CHECK:  util.func public @dispatch(%[[BINDING_A:.+]]: !stream.binding, %[[BINDING_B:.+]]: !stream.binding,
-    // CHECK-SAME:           %[[OFFSET_A:.+]]: index, %[[OFFSET_B:.+]]: index, %[[OPERAND:.+]]: index)
+    // CHECK: util.func public @dispatch(%[[BINDING_A:.+]]: !stream.binding, %[[BINDING_B:.+]]: !stream.binding,
+    // CHECK-SAME: %[[OFFSET_A:.+]]: index, %[[OFFSET_B:.+]]: index, %[[OPERAND:.+]]: index)
      util.func public @dispatch(%binding_a: !stream.binding, %binding_b: !stream.binding, %operand: index) {
       %c0 = arith.constant 0 : index
       %c20 = arith.constant 20 : index
@@ -39,7 +39,7 @@ stream.executable private @rebaseBindingsEx {
     }
   }
 }
-// CHECK:  util.func public @rebaseBindings(%[[OPERAND:.+]]: index)
+// CHECK: util.func public @rebaseBindings(%[[OPERAND:.+]]: index)
 util.func public @rebaseBindings(%operand: index) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
@@ -97,8 +97,8 @@ util.func public @rebaseBindings(%operand: index) {
 stream.executable private @deduplicateBindingsEx {
   stream.executable.export public @dispatch attributes {stream.resources = #aliasConfig}
   builtin.module  {
-    // CHECK:  util.func public @dispatch(%[[BINDING_A:.+]]: !stream.binding, %[[BINDING_B:.+]]: !stream.binding,
-    // CHECK-SAME:           %[[OFFSET_A:.+]]: index, %[[OFFSET_C:.+]]: index, %[[OFFSET_B:.+]]: index, %[[OPERAND:.+]]: index)
+    // CHECK: util.func public @dispatch(%[[BINDING_A:.+]]: !stream.binding, %[[BINDING_B:.+]]: !stream.binding,
+    // CHECK-SAME: %[[OFFSET_A:.+]]: index, %[[OFFSET_C:.+]]: index, %[[OFFSET_B:.+]]: index, %[[OPERAND:.+]]: index)
      util.func public @dispatch(%binding_a: !stream.binding, %binding_b: !stream.binding, %binding_c: !stream.binding, %operand: index) {
       %c0 = arith.constant 0 : index
       %c20 = arith.constant 20 : index
@@ -127,7 +127,7 @@ stream.executable private @deduplicateBindingsEx {
     }
   }
 }
-// CHECK:  util.func public @deduplicateBindings(%[[OPERAND:.+]]: index)
+// CHECK: util.func public @deduplicateBindings(%[[OPERAND:.+]]: index)
 util.func public @deduplicateBindings(%operand: index) {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index

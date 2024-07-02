@@ -152,8 +152,8 @@ struct ExecutePartitionBuilder {
     // want to preserve those as long as possible.
     if (auto affinityOp =
             dyn_cast<IREE::Stream::AffinityOpInterface>(clonedOp)) {
-      if (affinityOp.getAffinity() == partition->affinity) {
-        affinityOp.setAffinity(nullptr);
+      if (affinityOp.getAffinityAttr() == partition->affinity) {
+        affinityOp.setAffinityAttr(nullptr);
       }
     }
 
@@ -275,9 +275,6 @@ LogicalResult processRegion(Location loc, MLIRContext *context, Region &region,
         auto awaitOp = builder.create<IREE::Stream::TimepointAwaitOp>(
             executeOp.getLoc(), newResult, newResultSize,
             executeOp.getResultTimepoint());
-        if (executeOp.getAffinity().has_value()) {
-          awaitOp.setAffinityAttr(executeOp.getAffinityAttr());
-        }
 
         // Explicitly copy the Value since it is marked as const.
         Value toBeDeleted = oldResult;

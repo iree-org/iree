@@ -181,6 +181,28 @@ util.func private @caller(%arg0: tensor<?x2xi32>) -> tensor<2x?xi32> {
 
 // -----
 
+// Tests that explicit import affinity specification is carried through to
+// the marshaling ops.
+
+// CHECK-LABEL: util.func private @pinnedImport(%arg0: !hal.buffer_view) -> !hal.buffer_view
+util.func private @pinnedImport(tensor<2xi32> {iree.abi.affinity = #hal.device.promise<@dev_a>}) -> (tensor<2xi32> {iree.abi.affinity = #hal.device.promise<@dev_b>})
+
+// CHECK: util.func private @_pinnedImport(%[[ARG_TENSOR:.+]]: tensor<2xi32>) -> tensor<2xi32> {
+// CHECK:   %[[ARG_VIEW:.+]] = hal.tensor.export on(#hal.device.promise<@dev_a>) %[[ARG_TENSOR]] : tensor<2xi32> -> !hal.buffer_view
+// CHECK:   %[[RET_VIEW:.+]] = util.call @pinnedImport(%[[ARG_VIEW]]) : (!hal.buffer_view) -> !hal.buffer_view
+// CHECK:   %[[RET_TENSOR:.+]] = hal.tensor.import on(#hal.device.promise<@dev_b>) %[[RET_VIEW]] : !hal.buffer_view -> tensor<2xi32>
+// CHECK:   util.return %[[RET_TENSOR]]
+// CHECK: }
+
+// CHECK: util.func private @pinnedCaller(%arg0: tensor
+util.func private @pinnedCaller(%arg0: tensor<2xi32>) -> tensor<2xi32> {
+  // CHECK: util.call @_pinnedImport(%arg0) : (tensor<2xi32>) -> tensor<2xi32>
+  %0 = util.call @pinnedImport(%arg0) : (tensor<2xi32>) -> tensor<2xi32>
+  util.return %0 : tensor<2xi32>
+}
+
+// -----
+
 // Tests that imports with encodings specified are propagated to the HAL ops.
 
 // CHECK-LABEL: util.func private @importEncodings(%arg0: !hal.buffer_view) -> !hal.buffer_view
@@ -188,10 +210,10 @@ util.func private @importEncodings(tensor<?x2xi32> {iree.abi.encoding = tensor<?
 
 // CHECK: util.func private @_importEncodings(%[[ARG_TENSOR:.+]]: tensor<?x2xi32>) -> tensor<2x?xi32> {
 // CHECK:   %[[ARG_DIM:.+]] = tensor.dim %[[ARG_TENSOR]], %c0
-// CHECK:   %[[ARG_VIEW:.+]] = hal.tensor.export %[[ARG_TENSOR]] : tensor<?x2xi32>{%[[ARG_DIM]]} -> !hal.buffer_view
+// CHECK:   %[[ARG_VIEW:.+]] = hal.tensor.export %[[ARG_TENSOR]] : tensor<?x2xf32> as tensor<?x2xi32>{%[[ARG_DIM]]} -> !hal.buffer_view
 // CHECK:   %[[RET_VIEW:.+]] = util.call @importEncodings(%[[ARG_VIEW]]) : (!hal.buffer_view) -> !hal.buffer_view
 // CHECK:   %[[RET_DIM:.+]] = hal.buffer_view.dim<%[[RET_VIEW]] : !hal.buffer_view>[1]
-// CHECK:   %[[RET_TENSOR:.+]] = hal.tensor.import %[[RET_VIEW]] : !hal.buffer_view -> tensor<2x?xi32>{%[[RET_DIM]]}
+// CHECK:   %[[RET_TENSOR:.+]] = hal.tensor.import %[[RET_VIEW]] : !hal.buffer_view -> tensor<2x?xf32> as tensor<2x?xi32>{%[[RET_DIM]]}
 // CHECK:   util.return %[[RET_TENSOR]]
 // CHECK: }
 

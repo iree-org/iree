@@ -95,6 +95,35 @@ static int64_t findTiedArgument(OpAsmParser::UnresolvedOperand tiedResult,
   return operandIndex;
 }
 
+// Returns true if any attribute in |attr| references |symbolNameAttr|.
+static bool hasAnyRefsToSymbol(DictionaryAttr attrs,
+                               StringAttr symbolNameAttr) {
+  bool anyRefs = false;
+  attrs.walk([&](FlatSymbolRefAttr attr) {
+    anyRefs = attr.getValue() == symbolNameAttr.getValue();
+    return anyRefs ? WalkResult::interrupt() : WalkResult::advance();
+  });
+  return anyRefs;
+}
+
+// Returns true if any attribute on any ancestor of |baseOp| references
+// |symbolNameAttr|.
+static bool anyAncestorHasAnyRefsToSymbol(Operation *baseOp,
+                                          StringAttr symbolNameAttr) {
+  Operation *parentOp = baseOp->getParentOp();
+  while (parentOp) {
+    // Check the op attributes for a reference.
+    if (hasAnyRefsToSymbol(parentOp->getAttrDictionary(), symbolNameAttr)) {
+      return true; // found a ref
+    }
+    if (parentOp->hasTrait<OpTrait::SymbolTable>()) {
+      break; // don't continue op past the first symbol table
+    }
+    parentOp = parentOp->getParentOp();
+  }
+  return false; // none found
+}
+
 //===----------------------------------------------------------------------===//
 // custom<SymbolVisibility>($sym_visibility)
 //===----------------------------------------------------------------------===//
@@ -1424,6 +1453,11 @@ void FuncOp::print(OpAsmPrinter &p) {
   }
 }
 
+bool IREE::Util::FuncOp::canDiscardOnUseEmpty() {
+  return getVisibility() != SymbolTable::Visibility::Public &&
+         !anyAncestorHasAnyRefsToSymbol(this->getOperation(), getSymNameAttr());
+}
+
 bool IREE::Util::FuncOp::hasAnyTiedOperands() {
   auto tiedOperandsAttr = getTiedOperandsAttr();
   if (!tiedOperandsAttr)
@@ -1648,6 +1682,26 @@ void GlobalOp::build(OpBuilder &builder, OperationState &result, StringRef name,
                      bool isMutable, Type type,
                      ArrayRef<NamedAttribute> attrs) {
   build(builder, result, name, isMutable, type, std::nullopt, attrs);
+}
+
+// This is a workaround for SymbolDCE not handling attribute references on
+// unnamed modules. This, for example, will fail and @foo will be DCEd:
+//   builtin.module attributes { some.attr = @foo } {
+//     util.global private @foo : i64
+//   }
+// While this succeeds:
+//   builtin.module @module attributes { some.attr = @module::@foo } {
+//     util.global private @foo : i64
+//   }
+// Since nearly all modules we see are anonymous we'll commonly end up with
+// attributes that need to reference nested symbols via anonymous modules.
+//
+// During DCE this is called and for each symbol we want to preserve we then
+// walk up to the module and see if it has any attributes referencing it to
+// prevent the DCE.
+bool GlobalOp::canDiscardOnUseEmpty() {
+  return getVisibility() != SymbolTable::Visibility::Public &&
+         !anyAncestorHasAnyRefsToSymbol(this->getOperation(), getSymNameAttr());
 }
 
 IREE::Util::GlobalLoadOpInterface GlobalOp::createLoadOp(Location loc,

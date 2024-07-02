@@ -668,7 +668,8 @@ static LogicalResult applyAsyncTransferOp(IREE::Stream::AsyncTransferOp asyncOp,
     return llvm::cast<IREE::Stream::ResourceType>(value.getType())
                .getLifetime() == IREE::Stream::Lifetime::Staging;
   };
-  auto currentAffinityAttr = IREE::Stream::AffinityAttr::lookup(asyncOp);
+  auto currentAffinityAttr =
+      IREE::Stream::AffinityAttr::lookupOrDefault(asyncOp);
   bool transferIn = asyncOp.getSourceAffinityAttr() != currentAffinityAttr ||
                     isStaging(asyncOp.getSource());
   bool transferOut = asyncOp.getResultAffinityAttr() != currentAffinityAttr ||

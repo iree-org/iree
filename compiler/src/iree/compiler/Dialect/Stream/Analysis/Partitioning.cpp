@@ -58,9 +58,9 @@ LogicalResult Partition::verify(Location loc) {
   for (auto *op : ops) {
     if (auto affinityOp = dyn_cast<IREE::Stream::AffinityOpInterface>(op)) {
       if (!IREE::Stream::AffinityAttr::areCompatible(
-              affinity, affinityOp.getAffinity())) {
+              affinity, affinityOp.getAffinityAttr())) {
         return op->emitError("op affinity ")
-               << affinityOp.getAffinity()
+               << affinityOp.getAffinityAttr()
                << " is not compatible with the partition affinity " << affinity;
       }
     }

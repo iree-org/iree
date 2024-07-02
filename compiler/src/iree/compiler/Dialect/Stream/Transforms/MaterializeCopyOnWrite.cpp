@@ -103,7 +103,7 @@ static bool materializeTiedOpCOW(IREE::Util::TiedOpInterface tiedOp) {
   IREE::Stream::AffinityAttr affinity;
   if (auto affinityOp =
           dyn_cast<IREE::Stream::AffinityOpInterface>(tiedOp.getOperation())) {
-    affinity = affinityOp.getAffinity();
+    affinity = affinityOp.getAffinityAttr();
   }
 
   // Clones each operand that is tied to a result and it may be required.

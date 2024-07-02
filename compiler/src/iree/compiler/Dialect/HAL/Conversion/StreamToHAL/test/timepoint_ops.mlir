@@ -42,12 +42,14 @@ util.func public @timepointExportFence(%arg0: !stream.timepoint) -> !hal.fence {
 
 // -----
 
+util.global private @device : !hal.device
+
 // CHECK-LABEL: @timepointChainExternal
 //  CHECK-SAME: (%[[TIMEPOINT:.+]]: !hal.fence, %[[SIGNAL:.+]]: !hal.fence)
 util.func public @timepointChainExternal(%timepoint: !stream.timepoint, %signal: !hal.fence) {
-  // CHECK: %[[DEVICE:.+]] = hal.devices.get %{{.+}}
+  // CHECK: %[[DEVICE:.+]] = util.global.load immutable @device
   // CHECK: hal.device.queue.execute<%[[DEVICE]] : !hal.device> affinity(%c-1_i64) wait(%[[TIMEPOINT]]) signal(%[[SIGNAL]])
-  stream.timepoint.chain_external %timepoint => (%signal : !hal.fence)
+  stream.timepoint.chain_external on(#hal.device.affinity<@device>) %timepoint => (%signal : !hal.fence)
   util.return
 }
 

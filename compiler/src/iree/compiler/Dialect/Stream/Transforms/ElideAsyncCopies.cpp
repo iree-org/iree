@@ -399,7 +399,8 @@ static bool isSafeToElideCloneOp(IREE::Stream::AsyncCloneOp cloneOp,
   if (sourceType != targetType &&
       sourceType.getLifetime() == IREE::Stream::Lifetime::Constant) {
     LLVM_DEBUG(llvm::dbgs()
-               << "  - clone source is a constant; cannot elide\n");
+               << "  - clone is a resource lifetime cast (" << sourceType
+               << " to " << targetType << "); cannot elide\n");
     return false;
   }
 

@@ -1,10 +1,10 @@
 // RUN: iree-opt --iree-common-input-transformation-pipeline %s | \
 // RUN: iree-opt --iree-abi-transformation-pipeline - | \
-// RUN: iree-opt --iree-common-input-transformation-pipeline - | \
+// RUN: iree-opt --pass-pipeline='builtin.module(iree-hal-device-assignment-pipeline{target-devices=local})' --iree-hal-local-target-device-backends=vmvx - | \
 // RUN: iree-opt --iree-global-optimization-transformation-pipeline - | \
 // RUN: iree-opt --iree-flow-transformation-pipeline - | \
 // RUN: iree-opt --iree-stream-transformation-pipeline - | \
-// RUN: iree-opt --iree-hal-transformation-pipeline --iree-hal-target-backends=vmvx - | \
+// RUN: iree-opt --iree-hal-transformation-pipeline - | \
 // RUN: iree-opt --iree-vm-transformation-pipeline - | \
 // RUN: FileCheck %s
 

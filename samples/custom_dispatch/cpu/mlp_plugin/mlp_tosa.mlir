@@ -41,7 +41,7 @@
 // hence we only support llvm-cpu here.
 #cpu_target = #hal.device.target<"llvm-cpu", [
   #x86_64_target
-]>
+]> : !hal.device
 
 module @example attributes {hal.device.targets = [#cpu_target]} {
   func.func @mlp_invocation(%lhs: tensor<2x4xf32>, %rhs : tensor<4x8xf32>) -> tensor<2x8xf32> {

@@ -78,6 +78,9 @@ util.func public @dispatchFnMuli(%arg0 : tensor<8x4xf32>) -> tensor<8x4xf32> {
 
 // -----
 
+util.global private @device_a : !hal.device
+util.global private @device_b : !hal.device
+
 // CHECK: flow.executable private @dispatchFn1_dispatch_0
 
 // CHECK-LABEL: util.func public @dispatchFn1
@@ -85,9 +88,9 @@ util.func public @dispatchFn1(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
   %x = arith.constant 100 : index
   %y = arith.constant 50 : index
   // CHECK: flow.dispatch @dispatchFn1_dispatch_0::@dispatchFn1_dispatch_0
-  // CHECK-SAME: stream.affinity = #hal.affinity.queue<[0]>
+  // CHECK-SAME: stream.affinity = #hal.device.affinity<@device_a>
   %0 = flow.dispatch.workgroups[%x, %y](%arg0) : (tensor<8x4xf32>) -> (tensor<4x8xf32>) attributes {
-     stream.affinity = #hal.affinity.queue<[0]>
+     stream.affinity = #hal.device.affinity<@device_a>
   } = (
     %arg: !flow.dispatch.tensor<readonly:tensor<8x4xf32>>, %ret: !flow.dispatch.tensor<writeonly:tensor<4x8xf32>>
   ) {
@@ -103,9 +106,9 @@ util.func public @dispatchFn2(%arg0 : tensor<8x4xf32>) -> tensor<4x8xf32> {
   %x = arith.constant 100 : index
   %y = arith.constant 50 : index
   // CHECK: flow.dispatch @dispatchFn2_dispatch_0::@dispatchFn2_dispatch_0
-  // CHECK-SAME: stream.affinity = #hal.affinity.queue<[1]>
+  // CHECK-SAME: stream.affinity = #hal.device.affinity<@device_b>
   %0 = flow.dispatch.workgroups[%x, %y](%arg0) : (tensor<8x4xf32>) -> (tensor<4x8xf32>) attributes {
-    stream.affinity = #hal.affinity.queue<[1]>
+    stream.affinity = #hal.device.affinity<@device_b>
   } = (
     %arg: !flow.dispatch.tensor<readonly:tensor<8x4xf32>>, %ret: !flow.dispatch.tensor<writeonly:tensor<4x8xf32>>
   ) {
