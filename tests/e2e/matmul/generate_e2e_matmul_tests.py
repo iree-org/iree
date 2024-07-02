@@ -315,11 +315,10 @@ def get_rocm_test_compilation_infos(
             wg_tile_m = schedule.m_count * schedule.m_tile_count * 32
             wg_tile_n = schedule.n_count * schedule.n_tile_count * 32
             wg_tile_k = schedule.k_tile_count * 8
-        elif schedule.intrinsic == "MFMA_F8E4M3FNUZ_16x16x32_F32":
-            wg_tile_m = schedule.m_count * schedule.m_tile_count * 16
-            wg_tile_n = schedule.n_count * schedule.n_tile_count * 16
-            wg_tile_k = schedule.k_tile_count * 32
-        elif schedule.intrinsic == "MFMA_I8_16x16x32_I32":
+        elif (
+            schedule.intrinsic == "MFMA_I8_16x16x32_I32"
+            or schedule.intrinsic == "MFMA_F8E4M3FNUZ_16x16x32_F32"
+        ):
             wg_tile_m = schedule.m_count * schedule.m_tile_count * 16
             wg_tile_n = schedule.n_count * schedule.n_tile_count * 16
             wg_tile_k = schedule.k_tile_count * 32
