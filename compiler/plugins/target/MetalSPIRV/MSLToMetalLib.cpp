@@ -21,8 +21,8 @@ namespace mlir::iree_compiler::IREE::HAL {
 
 /// Returns the command to compile the given MSL source file into Metal library.
 static std::string getMetalCompileCommand(MetalTargetPlatform platform,
-                                          StringRef mslFile,
-                                          StringRef libFile) {
+                                          llvm::StringRef mslFile,
+                                          llvm::StringRef libFile) {
   const char *sdk = "";
   switch (platform) {
   case MetalTargetPlatform::macOS:
@@ -51,7 +51,7 @@ static std::string getMetalCompileCommand(MetalTargetPlatform platform,
 }
 
 /// Returns the given command via system shell.
-static LogicalResult runSystemCommand(StringRef command) {
+static LogicalResult runSystemCommand(llvm::StringRef command) {
   LLVM_DEBUG(llvm::dbgs() << "Running system command: '" << command << "'\n");
   int exitCode = system(command.data());
   if (exitCode == 0)
@@ -62,9 +62,9 @@ static LogicalResult runSystemCommand(StringRef command) {
 }
 
 std::unique_ptr<llvm::MemoryBuffer>
-compileMSLToMetalLib(MetalTargetPlatform targetPlatform, StringRef mslCode,
-                     StringRef entryPoint) {
-  SmallString<32> mslFile, airFile, libFile;
+compileMSLToMetalLib(MetalTargetPlatform targetPlatform,
+                     llvm::StringRef mslCode, llvm::StringRef entryPoint) {
+  llvm::SmallString<32> mslFile, airFile, libFile;
   int mslFd = 0;
   llvm::sys::fs::createTemporaryFile(entryPoint, "metal", mslFd, mslFile);
   llvm::sys::fs::createTemporaryFile(entryPoint, "metallib", libFile);

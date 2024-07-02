@@ -129,7 +129,7 @@ private:
       -> decltype(static_cast<llvm::cl::generic_parser_base &>(parser),
                   static_cast<int>(*value), LocalOptionInfo::PrintCallback()) {
     return [optionName, &parser, value](llvm::raw_ostream &os) {
-      StringRef valueName("<unknown>");
+      llvm::StringRef valueName("<unknown>");
       for (unsigned i = 0; i < parser.getNumOptions(); ++i) {
         V cmpValue = static_cast<const llvm::cl::OptionValue<V> &>(
                          parser.getOptionValue(i))

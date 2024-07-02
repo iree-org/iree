@@ -102,14 +102,15 @@ public:
     }
   }
 
-  void populateCustomInputConversionTypes(StringSet<> &typeMnemonics) override {
+  void populateCustomInputConversionTypes(
+      llvm::StringSet<> &typeMnemonics) override {
     for (auto *s : initializedSessions) {
       s->populateCustomInputConversionTypes(typeMnemonics);
     }
   }
 
   void populateDetectedCustomInputConversionTypes(
-      ModuleOp &module, StringSet<> &typeMnemonics) override {
+      ModuleOp &module, llvm::StringSet<> &typeMnemonics) override {
     for (auto *s : initializedSessions) {
       s->populateDetectedCustomInputConversionTypes(module, typeMnemonics);
     }
