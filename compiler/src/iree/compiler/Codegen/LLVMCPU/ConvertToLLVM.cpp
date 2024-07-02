@@ -4,6 +4,7 @@
 // See https://llvm.org/LICENSE.txt for license information.
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 
+#include "iree/compiler/Codegen/Common/PassUtils.h"
 #include "iree/compiler/Codegen/LLVMCPU/DispatchABI.h"
 #include "iree/compiler/Codegen/LLVMCPU/PassDetail.h"
 #include "iree/compiler/Codegen/LLVMCPU/Passes.h"
@@ -59,6 +60,7 @@
 #include "mlir/IR/Location.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Pass/PassManager.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 namespace mlir::iree_compiler {
@@ -1050,7 +1052,6 @@ void ConvertToLLVMPass::runOnOperation() {
   populateVectorToLLVMMatrixConversionPatterns(typeConverter, patterns);
   populateVectorToLLVMConversionPatterns(
       typeConverter, patterns, targetReassociateFpReductions.getValue());
-  populateReconcileUnrealizedCastsPatterns(patterns);
 
   if (isAArch64(targetAttr) &&
       (hasAnySVEFeature(targetAttr) || hasSMEFeature(targetAttr))) {
@@ -1083,6 +1084,12 @@ void ConvertToLLVMPass::runOnOperation() {
   if (failed(applyPartialConversion(module, target, std::move(patterns)))) {
     signalPassFailure();
     return;
+  }
+
+  OpPassManager passManager(module.getOperationName());
+  FunctionLikeNest(passManager).addPass(createReconcileUnrealizedCastsPass);
+  if (failed(runPipeline(passManager, module))) {
+    return signalPassFailure();
   }
 
   // Rewrite any extern calls emitted to dynamic library imports.
