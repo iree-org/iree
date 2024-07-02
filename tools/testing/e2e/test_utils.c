@@ -159,7 +159,7 @@ int iree_test_utils_snprintf_value(char* buf, size_t bufsize,
     case IREE_TEST_UTILS_VALUE_TYPE_F8:
       return snprintf(buf, bufsize,
                       precision == PRECISION_HIGH ? "%.5g" : "%.4g",
-                      iree_math_f8e4m3_to_f32(value.f16_u16));
+                      iree_math_f8e4m3_to_f32(value.f8_u8));
     case IREE_TEST_UTILS_VALUE_TYPE_F16:
       return snprintf(buf, bufsize,
                       precision == PRECISION_HIGH ? "%.5g" : "%.4g",
@@ -208,8 +208,8 @@ bool iree_test_utils_result_elements_agree(iree_test_utils_e2e_value_t expected,
     case IREE_TEST_UTILS_VALUE_TYPE_F8:
       if (actual.f8_u8 == expected.f8_u8) return true;
       if (iree_test_utils_max_elements_to_check()) return false;
-      return fabsf(iree_math_f8e4m3_to_f32(actual.f16_u16) -
-                   iree_math_f8e4m3_to_f32(expected.f16_u16)) <
+      return fabsf(iree_math_f8e4m3_to_f32(actual.f8_u8) -
+                   iree_math_f8e4m3_to_f32(expected.f8_u8)) <
              acceptable_fp_delta;
     case IREE_TEST_UTILS_VALUE_TYPE_F16:
       if (actual.f16_u16 == expected.f16_u16) return true;
