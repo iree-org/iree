@@ -153,6 +153,13 @@ ArrayRef<int64_t> EncodingAttr::getRoundDimsToArray() {
   return llvm::cast<DenseI64ArrayAttr>(roundDimsTo).asArrayRef();
 }
 
+EncodingAttr EncodingAttr::clone(AffineMap bcastMap) {
+  return get(bcastMap.getContext(), getOperandIndex(), getOpType(),
+             getElementTypes(), getOriginalType(), getMatmulNarrow_M(),
+             getMatmulNarrow_N(), getUserIndexingMaps(),
+             AffineMapAttr::get(bcastMap), getRoundDimsTo());
+}
+
 //===---------------------------------------------------------------------===//
 // Encoding Dialect Helpers
 //===---------------------------------------------------------------------===//
