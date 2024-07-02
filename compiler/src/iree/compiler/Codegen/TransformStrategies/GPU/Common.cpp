@@ -212,8 +212,7 @@ void mlir::iree_compiler::gpu::
   if (splitPoint > 0) {
     auto anyOpType = transform::AnyOpType::get(b.getContext());
     auto split = b.create<transform::SplitOp>(
-        anyOpType, anyOpType, opH, b.getI64IntegerAttr(mostMinorDim), Value(),
-        b.getI64IntegerAttr(splitPoint));
+        anyOpType, anyOpType, opH, mostMinorDim, Value(), splitPoint);
     opH = split.getFirst();
     if (vectorSize > 1) {
       auto res = iree_compiler::buildTileFuseToScfFor(

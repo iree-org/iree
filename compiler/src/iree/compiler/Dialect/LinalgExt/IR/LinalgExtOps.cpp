@@ -57,21 +57,21 @@ static Type getComplexElementTypeOrSelf(Type ty) {
 static void getEffectsImpl(
     SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>
         &effects,
-    ValueRange inputOperands, ValueRange outputOperands) {
-  for (Value value : inputOperands) {
-    if (!llvm::isa<MemRefType>(value.getType())) {
+    ArrayRef<OpOperand *> inputOperands, MutableOperandRange outputOperands) {
+  for (OpOperand *operand : inputOperands) {
+    if (!llvm::isa<MemRefType>(operand->get().getType())) {
       continue;
     }
-    effects.emplace_back(MemoryEffects::Read::get(), value,
+    effects.emplace_back(MemoryEffects::Read::get(), operand,
                          SideEffects::DefaultResource::get());
   }
-  for (Value value : outputOperands) {
-    if (!llvm::isa<MemRefType>(value.getType())) {
+  for (OpOperand &operand : outputOperands) {
+    if (!llvm::isa<MemRefType>(operand.get().getType())) {
       continue;
     }
-    effects.emplace_back(MemoryEffects::Read::get(), value,
+    effects.emplace_back(MemoryEffects::Read::get(), &operand,
                          SideEffects::DefaultResource::get());
-    effects.emplace_back(MemoryEffects::Write::get(), value,
+    effects.emplace_back(MemoryEffects::Write::get(), &operand,
                          SideEffects::DefaultResource::get());
   }
 }
@@ -1652,7 +1652,7 @@ Im2colOp::reifyResultShapes(OpBuilder &b,
   void OP_NAME::getEffects(                                                    \
       SmallVectorImpl<SideEffects::EffectInstance<MemoryEffects::Effect>>      \
           &effects) {                                                          \
-    getEffectsImpl(effects, getDpsInputs(), getDpsInits());                    \
+    getEffectsImpl(effects, getDpsInputOperands(), getDpsInitsMutable());      \
   }
 
 DEFINE_OP_GET_EFFECTS(ScatterOp)

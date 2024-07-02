@@ -22,7 +22,6 @@ func.func @warp_reduction_dispatch() {
 }
 
 //   CHECK-DAG: #[[$MAP0:.+]] = affine_map<(d0, d1) -> (d0, d1)>
-//   CHECK-DAG: #[[$MAP1:.+]] = affine_map<(d0, d1) -> (d0)>
 // CHECK-LABEL: warp_reduction_dispatch()
 //   CHECK-DAG:   %[[C0:.+]] = arith.constant 0 : index
 //   CHECK-DAG:   %[[C2048:.+]] = arith.constant 2048 : index
@@ -37,9 +36,9 @@ func.func @warp_reduction_dispatch() {
 //       CHECK:     } -> tensor<1x2048xf32>
 //       CHECK:     scf.yield %[[A2]] : tensor<1x2048xf32>
 //       CHECK:   }
-//       CHECK:   %[[A3:.+]] = linalg.generic {indexing_maps = [#[[$MAP0]], #[[$MAP1]]], iterator_types = ["parallel", "reduction"]} ins(%[[A1]] : tensor<1x2048xf32>) outs(%[[F0]] : tensor<1xf32>) {
-//       CHECK:     arith.addf %in, %out : f32
-//       CHECK:   } -> tensor<1xf32>
+//       CHECK:   %[[A3:.+]] = linalg.reduce ins(%[[A1]] : tensor<1x2048xf32>) outs(%[[F0]] : tensor<1xf32>) dimensions = [1]
+//  CHECK-NEXT:     (%[[IN:.+]]: f32, %[[INIT:.+]]: f32) {
+//  CHECK-NEXT:     arith.addf %[[IN]], %[[INIT]] : f32
 //       CHECK:   flow.dispatch.tensor.store %[[A3]]
 
 // -----
@@ -74,9 +73,10 @@ func.func @warp_reduction_batch_matmul() {
 //  CHECK-SAME:         outs({{.*}} : tensor<1x1x1x64xf32>)
 //       CHECK:       arith.mulf
 //       CHECK:       arith.addf
-//       CHECK:   %[[FINAL:.+]] = linalg.generic
+//       CHECK:   %[[FINAL:.+]] = linalg.reduce
 //  CHECK-SAME:                   ins({{.*}} : tensor<1x1x1x64xf32>)
 //  CHECK-SAME:                   outs({{.*}} : tensor<1x1x1xf32>)
+//  CHECK-SAME:                   dimensions = [3]
 //       CHECK:     arith.addf
 //       CHECK:   flow.dispatch.tensor.store %[[FINAL]]
 
@@ -129,9 +129,9 @@ func.func @warp_reduction_broadcast_dispatch() {
 //       CHECK:     } -> tensor<1x2048xf32>
 //       CHECK:     scf.yield %[[A2]] : tensor<1x2048xf32>
 //       CHECK:   }
-//       CHECK:   %[[A3:.+]] = linalg.generic {indexing_maps = [#[[$MAP0]], #[[$MAP1]]], iterator_types = ["parallel", "reduction"]} ins(%[[A1]] : tensor<1x2048xf32>) outs(%[[F0]] : tensor<1xf32>) {
-//       CHECK:     arith.addf %in, %out : f32
-//       CHECK:   } -> tensor<1xf32>
+//       CHECK:   %[[A3:.+]] = linalg.reduce ins(%[[A1]] : tensor<1x2048xf32>) outs(%[[F0]] : tensor<1xf32>) dimensions = [1]
+//  CHECK-NEXT:     (%[[IN:.+]]: f32, %[[INIT:.+]]: f32) {
+//  CHECK-NEXT:     arith.addf %[[IN]], %[[INIT]] : f32
 //       CHECK:   %[[A4:.+]] = scf.for %[[IV2:.+]] = %[[C0]] to %[[C10240]] step %[[C2048]] iter_args(%[[INI:.+]] = %{{.*}}) -> (tensor<1x10240xf32>) {
 //       CHECK:     %[[S2:.+]] = tensor.extract_slice %[[INI]][0, %[[IV2]]] [1, 2048] [1, 1] : tensor<1x10240xf32> to tensor<1x2048xf32>
 //       CHECK:     %[[A5:.+]] = linalg.generic {indexing_maps = [#[[$MAP1]], #[[$MAP0]]], iterator_types = ["parallel", "parallel"]} ins(%[[A3]] : tensor<1xf32>) outs(%[[S2]] : tensor<1x2048xf32>)
@@ -192,7 +192,7 @@ func.func @warp_reduction_multi_reduction() {
 //       CHECK:      scf.yield %{{.+}} : tensor<1x2x64xf32>
 //       CHECK:    scf.yield %{{.+}} : tensor<1x2x64xf32>
 
-//       CHECK:  linalg.generic
-//  CHECK-SAME:    iterator_types = ["parallel", "reduction", "reduction"]
+//       CHECK:  linalg.reduce
 //  CHECK-SAME:    ins(%[[LN]] : tensor<1x2x64xf32>)
 //  CHECK-SAME:    outs(%{{.+}} : tensor<1xf32>)
+//  CHECK-SAME:    dimensions = [1, 2]

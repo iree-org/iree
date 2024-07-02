@@ -155,8 +155,8 @@ DiagnosedSilenceableFailure transform_dialect::ConvertToMultiMmaOp::applyToOne(
 
 void transform_dialect::ConvertToMultiMmaOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
-  transform::producesHandle(getResult(), effects);
+  transform::onlyReadsHandle(getTargetMutable(), effects);
+  transform::producesHandle(getOperation()->getOpResults(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -183,8 +183,8 @@ DiagnosedSilenceableFailure transform_dialect::DistributeMultiMmaOp::applyToOne(
 
 void transform_dialect::DistributeMultiMmaOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
-  transform::producesHandle(getResult(), effects);
+  transform::onlyReadsHandle(getTargetMutable(), effects);
+  transform::producesHandle(getOperation()->getOpResults(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -202,7 +202,7 @@ DiagnosedSilenceableFailure transform_dialect::ForallToLanesOp::applyToOne(
 
 void transform_dialect::ForallToLanesOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
+  transform::onlyReadsHandle(getTargetMutable(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -267,9 +267,9 @@ transform_dialect::FuseForallOp::apply(transform::TransformRewriter &rewriter,
 
 void transform_dialect::FuseForallOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::consumesHandle(getProducer(), effects);
-  transform::consumesHandle(getConsumer(), effects);
-  transform::producesHandle(getResult(), effects);
+  transform::consumesHandle(getProducerMutable(), effects);
+  transform::consumesHandle(getConsumerMutable(), effects);
+  transform::producesHandle(getOperation()->getOpResults(), effects);
   transform::modifiesPayload(effects);
 }
 

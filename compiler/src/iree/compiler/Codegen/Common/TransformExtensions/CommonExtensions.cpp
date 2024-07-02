@@ -304,8 +304,8 @@ DiagnosedSilenceableFailure transform_dialect::CopyTensorOperandOp::applyToOne(
 
 void transform_dialect::CopyTensorOperandOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
-  transform::producesHandle(getResult(), effects);
+  transform::onlyReadsHandle(getTargetMutable(), effects);
+  transform::producesHandle(getOperation()->getOpResults(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -436,8 +436,8 @@ transform_dialect::FlattenForallMappingOp::applyToOne(
 
 void transform_dialect::FlattenForallMappingOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
-  transform::producesHandle(getResult(), effects);
+  transform::onlyReadsHandle(getTargetMutable(), effects);
+  transform::producesHandle(getOperation()->getOpResults(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -569,7 +569,7 @@ DiagnosedSilenceableFailure transform_dialect::ForallToWorkgroupOp::applyToOne(
 
 void transform_dialect::ForallToWorkgroupOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
+  transform::onlyReadsHandle(getTargetMutable(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -623,7 +623,7 @@ transform_dialect::GpuDistributeSharedMemoryCopyOp::applyToOne(
 
 void transform_dialect::GpuDistributeSharedMemoryCopyOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
+  transform::onlyReadsHandle(getTargetMutable(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -642,7 +642,7 @@ DiagnosedSilenceableFailure transform_dialect::HoistStaticAllocOp::applyToOne(
 
 void transform_dialect::HoistStaticAllocOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
+  transform::onlyReadsHandle(getTargetMutable(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -652,7 +652,7 @@ void transform_dialect::HoistStaticAllocOp::getEffects(
 
 void transform_dialect::PopulateWorkgroupCountRegionUsingNumThreadsSliceOp::
     getEffects(SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getForAllOp(), effects);
+  transform::onlyReadsHandle(getForAllOpMutable(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -745,7 +745,7 @@ transform_dialect::IREEApplyLoopIndependentCodeMotionOp::applyToOne(
 
 void transform_dialect::IREEApplyLoopIndependentCodeMotionOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
+  transform::onlyReadsHandle(getTargetMutable(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -994,7 +994,7 @@ transform_dialect::IREEEliminateEmptyTensorsOp::applyToOne(
 
 void transform_dialect::IREEEliminateEmptyTensorsOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
+  transform::onlyReadsHandle(getTargetMutable(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -1016,7 +1016,7 @@ transform_dialect::ReduceSharedMemoryBankConflictsOp::applyToOne(
 
 void transform_dialect::ReduceSharedMemoryBankConflictsOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
+  transform::onlyReadsHandle(getTargetMutable(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -1140,7 +1140,7 @@ transform_dialect::TestGpuVectorDistribution::applyToOne(
 
 void transform_dialect::TestGpuVectorDistribution::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
+  transform::onlyReadsHandle(getTargetMutable(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -1189,7 +1189,7 @@ transform_dialect::TestVectorLayoutAnalysisOp::applyToOne(
 
 void transform_dialect::TestVectorLayoutAnalysisOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
+  transform::onlyReadsHandle(getTargetMutable(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -1207,7 +1207,7 @@ DiagnosedSilenceableFailure transform_dialect::WorkgroupSwizzleOp::applyToOne(
 
 void transform_dialect::WorkgroupSwizzleOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  transform::onlyReadsHandle(getTarget(), effects);
+  transform::onlyReadsHandle(getTargetMutable(), effects);
   transform::modifiesPayload(effects);
 }
 
@@ -1259,9 +1259,8 @@ DiagnosedSilenceableFailure transform_dialect::FuseConsumerOp::apply(
 
 void transform_dialect::FuseConsumerOp::getEffects(
     SmallVectorImpl<MemoryEffects::EffectInstance> &effects) {
-  consumesHandle(getTarget(), effects);
-  producesHandle(getConsumer(), effects);
-  producesHandle(getFusedConsumer(), effects);
+  transform::consumesHandle(getTargetMutable(), effects);
+  transform::producesHandle(getOperation()->getOpResults(), effects);
   transform::modifiesPayload(effects);
 }
 
