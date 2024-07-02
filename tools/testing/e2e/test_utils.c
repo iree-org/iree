@@ -240,6 +240,9 @@ void iree_test_utils_write_element(iree_hal_element_type_t element_type,
     WRITE_ELEMENT_CASE(UINT_32, uint32_t)
     WRITE_ELEMENT_CASE(UINT_64, uint64_t)
       // clang-format off
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_8:
+      *(uint8_t*)dst = iree_math_f32_to_f8e4m3((float)value);
+      break;
     case IREE_HAL_ELEMENT_TYPE_FLOAT_16:
       *(uint16_t*)dst = iree_math_f32_to_f16((float)value);
       break;
