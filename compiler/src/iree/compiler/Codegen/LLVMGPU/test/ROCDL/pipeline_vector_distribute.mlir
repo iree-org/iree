@@ -678,7 +678,7 @@ hal.executable private @attention_20x4096x64x4096x64 {
 // CHECK-LABEL: func.func @attention_20x4096x64x4096x64()
 // CHECK-SAME:    translation_info = #[[$TRANSLATION]]
 
-// CHECK: scf.for %{{.*}} = %c0 to %c4096 step %c32
-// CHECK-SAME: -> (vector<4x1x4xf32>, vector<4x4x1x1x4x1xf16>, vector<4x1x4xf32>)
-// CHECK-COUNT-64:  amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
+// CHECK: scf.for %{{.*}} = %c0 to %c4096 step %c64
+// CHECK-SAME: -> (vector<2x1x4xf32>, vector<2x4x1x1x4x1xf16>, vector<2x1x4xf32>)
+// CHECK-COUNT-32:  amdgpu.mfma {{.*}} {blocks = 1 : i32, k = 16 : i32, m = 16 : i32, n = 16 : i32} blgp =  none : vector<4xf16>, vector<4xf16>, vector<4xf32>
 // CHECK: scf.yield

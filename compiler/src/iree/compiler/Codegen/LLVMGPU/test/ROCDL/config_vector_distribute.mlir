@@ -311,7 +311,7 @@ module {
 
 // -----
 
-// CHECK:       #[[$TILE_SIZES:.+]] = #iree_codegen.lowering_config<tile_sizes =  {{\[}}[1, 64, 0, 32, 64]{{\]}}
+// CHECK:       #[[$TILE_SIZES:.+]] = #iree_codegen.lowering_config<tile_sizes =  {{\[}}[1, 32, 0, 64, 64]{{\]}}
 // CHECK:       #iree_codegen.translation_info<LLVMGPUVectorDistribute
 // CHECK-SAME:  subgroup_m_count = 1, subgroup_n_count = 1
 // CHECK-NOT:   prefetch_shared_memory
