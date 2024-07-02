@@ -1049,6 +1049,9 @@ void ConvertToLLVMPass::runOnOperation() {
   arith::populateArithToLLVMConversionPatterns(typeConverter, patterns);
   arith::populateExpandBFloat16Patterns(patterns);
   populateVectorToSCFConversionPatterns(patterns);
+  // Note - EmulateNarrowType might be a better place for these patterns.
+  // See #17780
+  vector::populateVectorBitCastLoweringPatterns(patterns);
   populateVectorToLLVMMatrixConversionPatterns(typeConverter, patterns);
   populateVectorToLLVMConversionPatterns(
       typeConverter, patterns, targetReassociateFpReductions.getValue());
