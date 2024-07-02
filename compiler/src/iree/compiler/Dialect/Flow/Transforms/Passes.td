@@ -132,7 +132,7 @@ def DeduplicateExecutablesPass :
 }
 
 def FoldUnitExtentDimsPass :
-    InterfacePass<"iree-flow-fold-unit-extent-dims", "mlir::FunctionOpInterface"> {
+    Pass<"iree-flow-fold-unit-extent-dims", "mlir::ModuleOp"> {
   let summary = "Fold unit extent dimension of operations.";
   let description = [{
     Imports upstream patterns to fold unit extent dims but with IREE control.
