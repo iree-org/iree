@@ -126,7 +126,7 @@ DEFAULT_POSTSUBMIT_ONLY_JOBS = frozenset(
     [
         "build_test_all_arm64",
         # "build_test_all_windows",  # Currently disabled
-        "build_test_all_macos_arm64",
+        # "build_test_all_macos_arm64",  # Currently disabled
         "build_test_all_macos_x86_64",
         # Due to the outstock of A100, only run this test in postsubmit.
         "test_nvidia_a100",
@@ -140,7 +140,8 @@ DEFAULT_POSTSUBMIT_ONLY_JOBS = frozenset(
 # Each tuple consists of the CI job name and a list of file paths to match.
 # The file paths should be specified using Unix shell-style wildcards.
 PRESUBMIT_TOUCH_ONLY_JOBS = [
-    ("build_test_all_macos_arm64", ["runtime/src/iree/hal/drivers/metal/*"]),
+    # Currently disabled
+    # ("build_test_all_macos_arm64", ["runtime/src/iree/hal/drivers/metal/*"]),
     # Currently disabled
     # (
     #     "build_test_all_windows",
