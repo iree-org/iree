@@ -53,6 +53,7 @@ iree_cc_library(
     "FusionOfTensorOps.cpp"
     "FusionPreprocessing.cpp"
     "FusionUtils.cpp"
+    "HoistEncodingOps.cpp"
     "InitializeEmptyTensors.cpp"
     "InjectDispatchTracing.cpp"
     "InjectTensorTracing.cpp"

@@ -94,6 +94,9 @@ def EncodingAttr :
 
     /// Returns an integer array with values in `round_dims_to`.
     ArrayRef<int64_t> getRoundDimsToArray();
+
+    /// Clones an encoding with a new bcast_map
+    EncodingAttr clone(AffineMap bcastMap);
   }];
 
   let genVerifyDecl = 0;

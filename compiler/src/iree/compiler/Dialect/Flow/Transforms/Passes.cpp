@@ -229,6 +229,8 @@ static void addDispatchRegionCreationPasses(OpPassManager &passManager) {
       // and block arguments.
       .addPass(IREE::Flow::createCloneProducersIntoDispatchRegionsPass)
       .addPredicatedPass(clEnableDataTiling, IREE::Flow::createSetEncodingPass)
+      .addPredicatedPass(clEnableDataTiling,
+                         IREE::Flow::createHoistEncodingOpsPass)
       // Collapse dimensions of linalg Ops.
       .addPass(IREE::Flow::createCollapseDimensionsPass)
       // Convert dispatch regions into dispatch workgroups by capturing values

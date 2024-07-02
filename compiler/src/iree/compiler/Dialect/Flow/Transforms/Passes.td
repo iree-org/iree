@@ -345,6 +345,16 @@ def FusionPreprocessingPass :
   ];
 }
 
+def HoistEncodingOpsPass :
+    InterfacePass<"hoist-encoding-ops", "mlir::FunctionOpInterface"> {
+  let summary = "Hoists tensor encoding ops out of flow dispatch regions.";
+  let dependentDialects = [
+    "mlir::linalg::LinalgDialect",
+    "IREE::Flow::FlowDialect",
+    "IREE::Encoding::IREEEncodingDialect",
+  ];
+}
+
 def InitializeEmptyTensorsPass :
     Pass<"iree-flow-initialize-empty-tensors", ""> {
   let summary = "Initialize empty tensors.";

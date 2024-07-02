@@ -527,6 +527,185 @@ wrapOpInDispatchRegion(RewriterBase &rewriter, Operation *op) {
   return newRegionOp;
 }
 
+FailureOr<Operation *> hoistOutOfDispatch(RewriterBase &rewriter,
+                                          Operation *op) {
+  assert(op && !isNonNullAndOutsideDispatch(op) &&
+         "op expected to be in a dispatch");
+  OpBuilder::InsertionGuard g(rewriter);
+  auto dispatchRegionOp = op->getParentOfType<DispatchRegionOp>();
+  // If all operands of the `op` come from outside the dispatch, then the op can
+  // be hoisted out before the dispatch region. Otherwise, the op can be hoisted
+  // out below the dispatch if the only users of the op are the dispatch return.
+  if (llvm::none_of(op->getOperands(), [&](Value operand) {
+        Operation *producer = operand.getDefiningOp();
+        return producer && producer->getParentOfType<DispatchRegionOp>();
+      })) {
+    rewriter.setInsertionPoint(dispatchRegionOp);
+  } else if (llvm::all_of(op->getUsers(), [&](Operation *user) {
+               return isa<IREE::Flow::ReturnOp>(user);
+             })) {
+    rewriter.setInsertionPointAfter(dispatchRegionOp);
+  } else {
+    return rewriter.notifyMatchFailure(
+        op, "op has both operands and users insided of its dispatch");
+  }
+  Operation *hoistedOp = rewriter.clone(*op);
+  rewriter.setInsertionPoint(dispatchRegionOp);
+
+  // Get the new dispatch region result types without the hoisted op results.
+  auto dispatchReturnOp = cast<IREE::Flow::ReturnOp>(
+      dispatchRegionOp.getBody().front().getTerminator());
+  SmallVector<Type> newResultTypes;
+  SmallVector<OpOperand *> newDispatchReturnOperands;
+  for (OpOperand &operand : dispatchReturnOp->getOpOperands()) {
+    if (operand.get().getDefiningOp() != op) {
+      newResultTypes.push_back(operand.get().getType());
+      newDispatchReturnOperands.push_back(&operand);
+    }
+  }
+
+  // Replace op uses inside and outside of the dispatch region with the hoisted
+  // results.
+  bool yieldsResults = false;
+  for (OpResult result : op->getResults()) {
+    Value hoistedResult = hoistedOp->getResult(result.getResultNumber());
+    // Replace all results yielded by the dispatch region with the hoisted
+    // op results.
+    for (OpOperand &use : result.getUses()) {
+      if (!isa<IREE::Flow::ReturnOp>(use.getOwner())) {
+        continue;
+      }
+      yieldsResults = true;
+      Value dispResult = dispatchRegionOp.getResults()[use.getOperandNumber()];
+      rewriter.replaceAllUsesWith(dispResult, hoistedResult);
+    }
+    // Replace uses inside the dispatch region.
+    rewriter.replaceAllUsesWith(result, hoistedResult);
+  }
+  // If no results were yielded from `op`, then nothing more to do.
+  if (!yieldsResults) {
+    return hoistedOp;
+  }
+
+  // Add the operands of the `op` to the new return values of the dispatch.
+  SmallVector<Value> newReturnedValues = llvm::map_to_vector(
+      newDispatchReturnOperands, [](OpOperand *val) { return val->get(); });
+  SetVector<Value> newReturnedValueSet(newReturnedValues.begin(),
+                                       newReturnedValues.end());
+  SmallVector<OpOperand *> yieldedOperands;
+  SmallVector<SmallVector<Value>> newResultsDynamicDims;
+  for (OpOperand &operand : op->getOpOperands()) {
+    // Only need to yield operands defined in the dispatch region.
+    if (operand.get().getParentRegion() != &dispatchRegionOp.getBody()) {
+      continue;
+    }
+    // Skip already yielded operands.
+    if (newReturnedValueSet.contains(operand.get())) {
+      continue;
+    }
+    // Save operand and dynamic dims to add to the dispatch region.
+    yieldedOperands.push_back(&operand);
+    OpBuilder::InsertionGuard guard(rewriter);
+    rewriter.setInsertionPointAfterValue(operand.get());
+    SmallVector<Value> &dims = newResultsDynamicDims.emplace_back();
+    if (failed(reifyDynamicResultDims(rewriter, operand.get(), dims))) {
+      return op->emitOpError(
+          "failed to reify dynamic dims of result to be yielded from "
+          "dispatch region");
+    }
+  }
+
+  // Get the new set of dynamic dims without the `op` result dims.
+  SetVector<Value> dynamicDims;
+  for (int64_t res = 0; res < dispatchRegionOp->getNumResults(); ++res) {
+    auto dims = dispatchRegionOp.getResultDynamicDims(res);
+    dynamicDims.insert(dims.begin(), dims.end());
+  }
+  // Create the new dispatch region op. The region does not yet yield the
+  // operands of the `op`.
+  auto newDispatchRegionOp = rewriter.create<IREE::Flow::DispatchRegionOp>(
+      dispatchRegionOp->getLoc(), newResultTypes, dynamicDims.takeVector(),
+      dispatchRegionOp.getWorkload());
+  rewriter.inlineRegionBefore(dispatchRegionOp.getBody(),
+                              newDispatchRegionOp.getBody(),
+                              newDispatchRegionOp.getBody().begin());
+  auto newDispatchReturnOp = cast<IREE::Flow::ReturnOp>(
+      newDispatchRegionOp.getBody().front().getTerminator());
+  {
+    OpBuilder::InsertionGuard returnGuard(rewriter);
+    rewriter.setInsertionPoint(newDispatchReturnOp);
+    rewriter.replaceOpWithNewOp<IREE::Flow::ReturnOp>(newDispatchReturnOp,
+                                                      newReturnedValues);
+  }
+
+  // Append newly yielded operands to the new dispatch results.
+  SmallVector<Value> newYieldedResults = llvm::map_to_vector(
+      yieldedOperands, [](OpOperand *operand) { return operand->get(); });
+  FailureOr<IREE::Flow::DispatchRegionOp> finalDispatchRegionOp =
+      appendDispatchRegionResults(rewriter, newDispatchRegionOp,
+                                  newYieldedResults, newResultsDynamicDims);
+  if (failed(finalDispatchRegionOp)) {
+    return failure();
+  }
+
+  // Replace operands of the `hoistedOp` with dispatch region results.
+  auto replaceHoistedOpOperand = [&](Value v, int operandIdx) {
+    rewriter.modifyOpInPlace(hoistedOp,
+                             [&]() { hoistedOp->setOperand(operandIdx, v); });
+  };
+  for (auto [resIdx, operand] : llvm::enumerate(yieldedOperands)) {
+    auto dispatchResIdx = resIdx + newReturnedValues.size();
+    Value dispatchResult = finalDispatchRegionOp->getResults()[dispatchResIdx];
+    replaceHoistedOpOperand(dispatchResult, operand->getOperandNumber());
+  }
+
+  // Replace the uses of the original dispatch region results with the final
+  // dispatch region results.
+  for (auto [idx, operand] : llvm::enumerate(newDispatchReturnOperands)) {
+    Value result = dispatchRegionOp.getResults()[operand->getOperandNumber()];
+    Value newResult = finalDispatchRegionOp->getResults()[idx];
+    rewriter.replaceAllUsesWith(result, newResult);
+  }
+
+  return hoistedOp;
+}
+
+bool isBroadcastingOp(Operation *op) {
+  if (isa<linalg::BroadcastOp>(op)) {
+    return true;
+  }
+  auto genericOp = dyn_cast<linalg::GenericOp>(op);
+  if (!genericOp) {
+    return false;
+  }
+
+  // Only allow a single input and init.
+  if (genericOp.getNumDpsInits() != 1 || genericOp.getNumDpsInputs() != 1) {
+    return false;
+  }
+
+  // Check that the all loops are parallel.
+  unsigned numLoops = genericOp.getNumLoops();
+  unsigned numParallelLoops = genericOp.getNumParallelLoops();
+  if (numLoops != numParallelLoops) {
+    return false;
+  }
+
+  // Check that indexing maps are broadcasting.
+  SmallVector<AffineMap> indexingMaps = genericOp.getIndexingMapsArray();
+  auto inMap =
+      genericOp.getMatchingIndexingMap(genericOp.getDpsInputOperand(0));
+  auto outMap =
+      genericOp.getMatchingIndexingMap(genericOp.getDpsInitOperand(0));
+  if (inMap.getNumResults() >= outMap.getNumResults()) {
+    return false;
+  }
+  if (!inMap.isProjectedPermutation() || outMap.isIdentity()) {
+    return false;
+  }
+  return true;
+}
+
 bool isDequantizationLikeOp(Operation *op) {
   auto genericOp = dyn_cast<linalg::GenericOp>(op);
   if (!genericOp) {

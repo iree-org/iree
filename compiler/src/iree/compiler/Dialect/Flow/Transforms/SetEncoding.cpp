@@ -14,6 +14,7 @@
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Support/LLVM.h"
@@ -252,13 +253,13 @@ static void setEncodingsOnContractions(RewriterBase &rewriter,
     SmallVector<AffineMap> maps = op.getIndexingMapsArray();
 
     auto setEncodingWrapper = [&](Value src, int64_t operandIndex) -> Value {
+      auto srcType = cast<RankedTensorType>(src.getType());
+      AffineMap bcastMap = rewriter.getMultiDimIdentityMap(srcType.getRank());
       // Set pad size for M, N, and K dimensions.
       SmallVector<int64_t> roundDimsTo(3, kPadSize);
       auto encodingAttr = Encoding::EncodingAttr::get(
-          op.getContext(), operandIndex, elemTypes, src.getType(),
-          narrowSizes.M, narrowSizes.N, maps,
-          /*bcastMap=*/AffineMap(), roundDimsTo);
-      auto srcType = cast<RankedTensorType>(src.getType());
+          op.getContext(), operandIndex, elemTypes, srcType, narrowSizes.M,
+          narrowSizes.N, maps, bcastMap, roundDimsTo);
       auto resType = RankedTensorType::get(
           srcType.getShape(), srcType.getElementType(), encodingAttr);
       return rewriter.create<IREE::Encoding::SetEncodingOp>(loc, resType, src);

@@ -104,6 +104,28 @@ FailureOr<Flow::DispatchRegionOp> wrapOpInDispatchRegion(RewriterBase &rewriter,
 /// into a dispatch region.
 bool isClonableIntoDispatchOp(Operation *op);
 
+/// Hoists an operation out of a dispatch region, as long as it does not have
+/// producers inside of the dispatch region, or all of its uses are part of
+/// the dispatch region op return. If these criteria are not met, then return
+/// failure.
+///
+/// If all producers are defined outside of the dispatch region, then the op
+/// will be hoisted above the dispatch region op. Otherwise, the op will be
+/// hoisted below the dispatch region op, and the operands of the hoisted op
+/// will be added to the yielded values of the dispatch region op.
+FailureOr<Operation *> hoistOutOfDispatch(RewriterBase &rewriter,
+                                          Operation *op);
+
+/// Returns true if the operation is a BroadcastOp or a GenericOp performing
+/// a broadcast.
+/// This function checks that the genericOp:
+///     1. Has a single input and output.
+///     2. Has all parallel loops.
+///     3. Has an identity output map.
+///     4. Has a projected permutation input map.
+///     5. The input map has fewer results than the output map.
+bool isBroadcastingOp(Operation *op);
+
 /// Returns true if the operation has dequantization-like properties.
 /// This function checks that the genericOp:
 ///     1. Has only one output, and the output has an identity indexing map
