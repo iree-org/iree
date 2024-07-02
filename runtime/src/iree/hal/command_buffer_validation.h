@@ -122,10 +122,4 @@ iree_status_t iree_hal_command_buffer_dispatch_indirect_validation(
     iree_hal_executable_t* executable, int32_t entry_point,
     iree_hal_buffer_t* workgroups_buffer, iree_device_size_t workgroups_offset);
 
-iree_status_t iree_hal_command_buffer_execute_commands_validation(
-    iree_hal_command_buffer_t* command_buffer,
-    iree_hal_command_buffer_validation_state_t* validation_state,
-    iree_hal_command_buffer_t* commands,
-    iree_hal_buffer_binding_table_t binding_table);
-
 #endif  // IREE_HAL_COMMAND_BUFFER_VALIDATION_H_

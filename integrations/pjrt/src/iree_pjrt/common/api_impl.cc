@@ -588,7 +588,7 @@ iree_status_t BufferInstance::CopyToHost(void* dst, iree_host_size_t dst_size,
       /*wait_semaphore_list=*/iree_hal_fence_semaphore_list(ready_fence_.get()),
       /*signal_semaphore_list=*/
       iree_hal_fence_semaphore_list(dst_buffer_ready_fence.get()),
-      /*command_buffer_count=*/1, &transfer_cb));
+      /*command_buffer_count=*/1, &transfer_cb, NULL));
 
   *out_done_event = copy_done_event;
   return iree_ok_status();
@@ -844,7 +844,7 @@ iree_status_t DeviceInstance::HostBufferToDeviceSplat(
       {1, &transfer_timeline_, &signal_alloca_complete},
       /*signal_semaphore_list=*/
       {1, &transfer_timeline_, &signal_copy_complete},
-      /*command_buffer_count=*/1, &transfer_cb));
+      /*command_buffer_count=*/1, &transfer_cb, NULL));
 
   // Wrap in a buffer view and return:
   iree::vm::ref<iree_hal_buffer_view_t> result_buffer_view;
@@ -1188,7 +1188,7 @@ iree_status_t DeviceInstance::HostBufferToDevice(
       {1, &transfer_timeline_, &signal_alloca_complete},
       /*signal_semaphore_list=*/
       {1, &transfer_timeline_, &signal_copy_complete},
-      /*command_buffer_count=*/1, &transfer_cb));
+      /*command_buffer_count=*/1, &transfer_cb, NULL));
 
   // Wrap in a buffer view and return.
   iree::vm::ref<iree_hal_buffer_view_t> result_buffer_view;

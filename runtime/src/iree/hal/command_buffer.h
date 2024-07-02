@@ -37,12 +37,6 @@ enum iree_hal_command_buffer_mode_bits_t {
   // If this bit is not set the command buffer may be submitted multiple times.
   IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT = 1u << 0,
 
-  // Command buffer is executed nested within a primary command buffer via
-  // iree_hal_command_buffer_execute_commands.
-  // May not be directly submitted to queues for execution and only one level
-  // of nested command buffers are allowed.
-  IREE_HAL_COMMAND_BUFFER_MODE_NESTED = 1u << 1,
-
   // Indicates that the command buffer execution is allowed to execute inline
   // with recording. The exact execution behavior is unspecified by the API and
   // intentionally unknowable and must always assume to happen entirely
@@ -59,8 +53,7 @@ enum iree_hal_command_buffer_mode_bits_t {
   // Remote backends can use this to flush the command buffer more aggressively
   // to begin early execution and overlap with continued recording.
   //
-  // Requires IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT and is not compatible with
-  // IREE_HAL_COMMAND_BUFFER_MODE_NESTED.
+  // Requires IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT.
   IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION = 1u << 4,
 
   // Disables additional command buffer validation (if present).
@@ -85,6 +78,52 @@ enum iree_hal_command_category_bits_t {
       IREE_HAL_COMMAND_CATEGORY_TRANSFER | IREE_HAL_COMMAND_CATEGORY_DISPATCH,
 };
 typedef uint32_t iree_hal_command_category_t;
+
+// Specifies a direct or indirect buffer binding.
+// The range specified by [offset, length) of either the specified buffer or
+// a buffer slot in the binding table will be used at the time the command is
+// executed.
+//
+// The IREE HAL buffer type may internally be offset; such offset is applied
+// here as if it were the base address of the buffer. Note that the offset will
+// be applied at the time the binding is recording into the command buffer.
+//
+// Roughly maps to VkDescriptorSetBinding.
+typedef struct iree_hal_buffer_ref_t {
+  // The binding number of this entry and corresponds to a resource of the
+  // same binding number in the executable interface. Only used by certain
+  // calls.
+  uint32_t ordinal : 8;
+  // Binding table slot the buffer will be sourced from if buffer is NULL.
+  // Only valid on command buffers that support indirect execution.
+  uint32_t buffer_slot : 24;
+  // Buffer bound to the binding number.
+  // If NULL then the buffer_slot will be used to resolve the buffer at command
+  // buffer execution time from the binding table.
+  iree_hal_buffer_t* buffer;
+  // Offset, in bytes, into the buffer that the binding starts at.
+  // When indirectly referencing a binding table buffer this will be added to
+  // the base offset of the bound buffer.
+  iree_device_size_t offset;
+  // Length, in bytes, of the buffer that is available to the executable.
+  // This can be IREE_WHOLE_BUFFER, however note that if the entire buffer
+  // contents are larger than supported by the device (~128MiB, usually) this
+  // will fail. If the descriptor type is dynamic this will be used for all
+  // ranges regardless of offset.
+  iree_device_size_t length;
+} iree_hal_buffer_ref_t;
+
+static inline iree_hal_buffer_ref_t iree_hal_make_buffer_ref(
+    iree_hal_buffer_t* buffer, iree_device_size_t offset,
+    iree_device_size_t length) {
+  return (iree_hal_buffer_ref_t){0, 0, buffer, offset, length};
+}
+
+static inline iree_hal_buffer_ref_t iree_hal_make_indirect_buffer_ref(
+    uint32_t buffer_slot, iree_device_size_t offset,
+    iree_device_size_t length) {
+  return (iree_hal_buffer_ref_t){0, buffer_slot, NULL, offset, length};
+}
 
 // Bitfield specifying which execution stage a barrier should start/end at.
 //
@@ -383,32 +422,6 @@ IREE_API_EXPORT iree_string_view_t iree_hal_collective_op_format(
 IREE_API_EXPORT iree_device_size_t iree_hal_collective_element_byte_count(
     iree_hal_collective_element_type_t element_type);
 
-// Describes a subrange of a buffer that can be bound to a binding slot.
-typedef struct iree_hal_buffer_binding_t {
-  // Buffer being bound to the slot, if any.
-  iree_hal_buffer_t* buffer;
-  // Offset, in bytes, into the buffer that the binding starts at.
-  // This will be added to the offset specified on each usage of the slot.
-  iree_device_size_t offset;
-  // Length, in bytes, of the buffer that is available to the executable.
-  // This can be IREE_WHOLE_BUFFER, however note that if the entire buffer
-  // contents are larger than supported by the device (~128MiB, usually) this
-  // will fail. If the descriptor type is dynamic this will be used for all
-  // ranges regardless of offset.
-  iree_device_size_t length;
-} iree_hal_buffer_binding_t;
-
-typedef struct iree_hal_buffer_binding_table_t {
-  iree_host_size_t count;
-  const iree_hal_buffer_binding_t* bindings;
-} iree_hal_buffer_binding_table_t;
-
-static inline iree_hal_buffer_binding_table_t
-iree_hal_buffer_binding_table_empty(void) {
-  iree_hal_buffer_binding_table_t table = {0, NULL};
-  return table;
-}
-
 // An RGBA color.
 typedef struct iree_hal_label_color_t {
   uint8_t r;
@@ -457,6 +470,36 @@ typedef struct iree_hal_command_buffer_validation_state_t {
 // targets as to not need too much command buffer memory.
 #define IREE_HAL_COMMAND_BUFFER_MAX_UPDATE_SIZE \
   ((iree_device_size_t)(64 * 1024))
+
+//===----------------------------------------------------------------------===//
+// iree_hal_buffer_binding_table_t
+//===----------------------------------------------------------------------===//
+
+// Describes a subrange of a buffer that can be bound to a binding slot.
+typedef struct iree_hal_buffer_binding_t {
+  // Buffer being bound to the slot, if any.
+  iree_hal_buffer_t* buffer;
+  // Offset, in bytes, into the buffer that the binding starts at.
+  // This will be added to the offset specified on each usage of the slot.
+  iree_device_size_t offset;
+  // Length, in bytes, of the buffer that is available to the executable.
+  // This can be IREE_WHOLE_BUFFER, however note that if the entire buffer
+  // contents are larger than supported by the device (~128MiB, usually) this
+  // will fail. If the descriptor type is dynamic this will be used for all
+  // ranges regardless of offset.
+  iree_device_size_t length;
+} iree_hal_buffer_binding_t;
+
+typedef struct iree_hal_buffer_binding_table_t {
+  iree_host_size_t count;
+  const iree_hal_buffer_binding_t* bindings;
+} iree_hal_buffer_binding_table_t;
+
+static inline iree_hal_buffer_binding_table_t
+iree_hal_buffer_binding_table_empty(void) {
+  iree_hal_buffer_binding_table_t table = {0, NULL};
+  return table;
+}
 
 //===----------------------------------------------------------------------===//
 // iree_hal_command_buffer_t
@@ -679,11 +722,6 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_push_constants(
 // The descriptor set will remain bound and valid so long as the executable
 // layouts used by dispatches are compatible (same descriptor layouts and push
 // constant sizes).
-//
-// When the command buffer is IREE_HAL_COMMAND_BUFFER_MODE_NESTED zero or more
-// bindings may omit their buffer reference and instead specify a slot within
-// the command buffer binding table that will contain the buffer when executed
-// via the iree_hal_command_buffer_execute_commands command.
 IREE_API_EXPORT iree_status_t iree_hal_command_buffer_push_descriptor_set(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_pipeline_layout_t* pipeline_layout, uint32_t set,
@@ -719,22 +757,17 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch_indirect(
     iree_hal_executable_t* executable, int32_t entry_point,
     iree_hal_buffer_t* workgroups_buffer, iree_device_size_t workgroups_offset);
 
-// Executes a secondary command buffer using the provided set of indirect
-// buffer bindings. The commands will be executed as if they were recorded
-// directly into the command buffer but push constant and descriptor state will
-// not be inherited.
-//
-// The |commands| buffer must have the IREE_HAL_COMMAND_BUFFER_MODE_NESTED flag.
-// Only valid to use on primary command buffers that are themselves not marked
-// nested.
-//
-// The |binding_table| provided will be available for indirect binding usage
-// within the nested command buffer but may not reference the parent command
-// buffer binding table. This restriction may be lifted in the future.
-IREE_API_EXPORT iree_status_t iree_hal_command_buffer_execute_commands(
+//===----------------------------------------------------------------------===//
+// Validation support
+//===----------------------------------------------------------------------===//
+
+// Validates that all bindings in the provided |binding_table| match the
+// requirements of |command_buffer| as recorded. If the command buffer does not
+// use any indirect bindings the table will be ignored. If more bindings than
+// are used by the command buffer are provided they will be ignored.
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_validate_binding_table(
     iree_hal_command_buffer_t* command_buffer,
-    iree_hal_command_buffer_t* commands,
-    iree_hal_buffer_binding_table_t binding_table);
+    const iree_hal_buffer_binding_table_t* binding_table);
 
 //===----------------------------------------------------------------------===//
 // Utilities for command buffer creation
@@ -890,11 +923,6 @@ typedef struct iree_hal_command_buffer_vtable_t {
       iree_hal_executable_t* executable, int32_t entry_point,
       iree_hal_buffer_t* workgroups_buffer,
       iree_device_size_t workgroups_offset);
-
-  iree_status_t(IREE_API_PTR* execute_commands)(
-      iree_hal_command_buffer_t* command_buffer,
-      iree_hal_command_buffer_t* commands,
-      iree_hal_buffer_binding_table_t binding_table);
 } iree_hal_command_buffer_vtable_t;
 IREE_HAL_ASSERT_VTABLE_LAYOUT(iree_hal_command_buffer_vtable_t);
 

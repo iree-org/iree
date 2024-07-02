@@ -247,8 +247,6 @@ static iree_status_t iree_hal_metal_device_create_command_buffer(
     iree_host_size_t binding_capacity, iree_hal_command_buffer_t** out_command_buffer) {
   iree_hal_metal_device_t* device = iree_hal_metal_device_cast(base_device);
 
-  if (iree_any_bit_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_NESTED))
-    return iree_make_status(IREE_STATUS_UNIMPLEMENTED, "nested command buffer not yet supported");
   if (!iree_all_bits_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT))
     return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
                             "multi-shot command buffer not yet supported");
@@ -392,7 +390,8 @@ static iree_status_t iree_hal_metal_device_queue_execute(
     iree_hal_device_t* base_device, iree_hal_queue_affinity_t queue_affinity,
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list, iree_host_size_t command_buffer_count,
-    iree_hal_command_buffer_t* const* command_buffers) {
+    iree_hal_command_buffer_t* const* command_buffers,
+    iree_hal_buffer_binding_table_t const* binding_tables) {
   iree_hal_metal_device_t* device = iree_hal_metal_device_cast(base_device);
   IREE_TRACE_ZONE_BEGIN(z0);
 

@@ -197,6 +197,38 @@ util.func public @device_queue_execute(
 
 // -----
 
+// CHECK-LABEL: @device_queue_execute_indirect
+util.func public @device_queue_execute_indirect(
+    // CHECK-SAME: (%[[DEVICE:.+]]: !vm.ref<!hal.device>, %[[AFFINITY:.+]]: i64,
+    %device: !hal.device, %affinity: i64,
+    // CHECK-SAME:  %[[WAIT_FENCE:.+]]: !vm.ref<!hal.fence>, %[[SIGNAL_FENCE:.+]]: !vm.ref<!hal.fence>,
+    %wait_fence: !hal.fence, %signal_fence: !hal.fence,
+    // CHECK-SAME:  %[[CMD:.+]]: !vm.ref<!hal.command_buffer>,
+    %cmd: !hal.command_buffer,
+    // CHECK-SAME:  %[[BUFFER0:.+]]: !vm.ref<!hal.buffer>, %[[BUFFER1:.+]]: !vm.ref<!hal.buffer>
+    %buffer0: !hal.buffer, %buffer1: !hal.buffer) {
+  %c100 = arith.constant 100 : index
+  %c200 = arith.constant 200 : index
+  %c1000 = arith.constant 1000 : index
+  %c2000 = arith.constant 2000 : index
+  // CHECK: vm.call.variadic @hal.device.queue.execute.indirect(
+  // CHECK-SAME: %[[DEVICE]], %[[AFFINITY]],
+  // CHECK-SAME: %[[WAIT_FENCE]], %[[SIGNAL_FENCE]],
+  // CHECK-SAME: %[[CMD]],
+  // CHECK-SAME: [(%[[BUFFER0]], %c100, %c1000), (%[[BUFFER1]], %c200, %c2000)])
+  hal.device.queue.execute.indirect<%device : !hal.device>
+      affinity(%affinity)
+      wait(%wait_fence) signal(%signal_fence)
+      commands(%cmd)
+      bindings([
+        (%buffer0 : !hal.buffer)[%c100, %c1000],
+        (%buffer1 : !hal.buffer)[%c200, %c2000]
+      ])
+  util.return
+}
+
+// -----
+
 // CHECK-LABEL: @device_queue_flush
 util.func public @device_queue_flush(
     // CHECK-SAME: (%[[DEVICE:.+]]: !vm.ref<!hal.device>, %[[AFFINITY:.+]]: i64)

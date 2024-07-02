@@ -136,13 +136,11 @@ def HAL_BufferUsageBitfieldAttr :
 
 def HAL_CommandBufferMode_None : I32BitEnumAttrCase<"None", 0x0000>;
 def HAL_CommandBufferMode_OneShot : I32BitEnumAttrCase<"OneShot", 0x0001>;
-def HAL_CommandBufferMode_Nested : I32BitEnumAttrCase<"Nested", 0x0002>;
 def HAL_CommandBufferMode_AllowInlineExecution : I32BitEnumAttrCase<"AllowInlineExecution", 0x0010>;
 def HAL_CommandBufferModeBitfieldAttr :
     I32BitEnumAttr<"CommandBufferModeBitfield", "valid CommandBufferMode", [
       HAL_CommandBufferMode_None,
       HAL_CommandBufferMode_OneShot,
-      HAL_CommandBufferMode_Nested,
       HAL_CommandBufferMode_AllowInlineExecution,
     ]> {
   let cppNamespace = "mlir::iree_compiler::IREE::HAL";

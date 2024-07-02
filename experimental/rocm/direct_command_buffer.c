@@ -466,14 +466,6 @@ static iree_status_t iree_hal_rocm_direct_command_buffer_dispatch_indirect(
                           "need rocm implementation");
 }
 
-static iree_status_t iree_hal_rocm_direct_command_buffer_execute_commands(
-    iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_command_buffer_t* base_commands,
-    iree_hal_buffer_binding_table_t binding_table) {
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "indirect command buffers not yet implemented");
-}
-
 static const iree_hal_command_buffer_vtable_t
     iree_hal_rocm_direct_command_buffer_vtable = {
         .destroy = iree_hal_rocm_direct_command_buffer_destroy,
@@ -498,6 +490,4 @@ static const iree_hal_command_buffer_vtable_t
         .dispatch = iree_hal_rocm_direct_command_buffer_dispatch,
         .dispatch_indirect =
             iree_hal_rocm_direct_command_buffer_dispatch_indirect,
-        .execute_commands =
-            iree_hal_rocm_direct_command_buffer_execute_commands,
 };

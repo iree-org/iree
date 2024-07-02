@@ -1023,26 +1023,6 @@ static iree_status_t iree_hal_task_command_buffer_dispatch_indirect(
 }
 
 //===----------------------------------------------------------------------===//
-// iree_hal_command_buffer_execute_commands
-//===----------------------------------------------------------------------===//
-
-static iree_status_t iree_hal_task_command_buffer_execute_commands(
-    iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_command_buffer_t* base_commands,
-    iree_hal_buffer_binding_table_t binding_table) {
-  // TODO(#10144): support indirect command buffers by using deferred command
-  // buffers or caching the task topology (probably not worth the tracking).
-  // If we could separate the topology that referenced the binding table we'd
-  // be able to reissue but not concurrently (as each task can only be in flight
-  // as a singleton) - which may be enough in many cases but adds complexity to
-  // tracking as we'd need to either enforce serialization of subsequent
-  // submissions or copy-on-write-style clone the topology for each additional
-  // concurrent submission.
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "indirect command buffers not yet implemented");
-}
-
-//===----------------------------------------------------------------------===//
 // iree_hal_command_buffer_vtable_t
 //===----------------------------------------------------------------------===//
 
@@ -1066,5 +1046,4 @@ static const iree_hal_command_buffer_vtable_t
         .push_descriptor_set = iree_hal_task_command_buffer_push_descriptor_set,
         .dispatch = iree_hal_task_command_buffer_dispatch,
         .dispatch_indirect = iree_hal_task_command_buffer_dispatch_indirect,
-        .execute_commands = iree_hal_task_command_buffer_execute_commands,
 };

@@ -394,7 +394,8 @@ static iree_status_t iree_hal_webgpu_device_queue_execute(
     const iree_hal_semaphore_list_t wait_semaphore_list,
     const iree_hal_semaphore_list_t signal_semaphore_list,
     iree_host_size_t command_buffer_count,
-    iree_hal_command_buffer_t* const* command_buffers) {
+    iree_hal_command_buffer_t* const* command_buffers,
+    iree_hal_buffer_binding_table_t const* binding_tables) {
   iree_hal_webgpu_device_t* device = iree_hal_webgpu_device_cast(base_device);
 
   // TODO(benvanik): this currently assumes we are synchronizing on semaphores

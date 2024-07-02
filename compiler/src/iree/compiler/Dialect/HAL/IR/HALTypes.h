@@ -177,6 +177,12 @@ struct DescriptorSetBindingValue {
   Value byteLength;
 };
 
+struct BindingTableValue {
+  Value buffer;
+  Value byteOffset;
+  Value byteLength;
+};
+
 template <typename T>
 struct StaticRange {
   T min;

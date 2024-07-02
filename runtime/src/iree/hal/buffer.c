@@ -399,7 +399,7 @@ IREE_API_EXPORT iree_status_t iree_hal_buffer_validate_range(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_buffer_calculate_range(
+IREE_API_EXPORT iree_status_t iree_hal_buffer_calculate_range(
     iree_device_size_t base_offset, iree_device_size_t max_length,
     iree_device_size_t offset, iree_device_size_t length,
     iree_device_size_t* out_adjusted_offset,

@@ -112,6 +112,63 @@ static void printDescriptorSetBindings(OpAsmPrinter &p, Operation *op,
 }
 
 //===----------------------------------------------------------------------===//
+// custom<BindingTable>($binding_buffers,
+//                      type($binding_buffers),
+//                      $binding_offsets,
+//                      $binding_lengths)
+//===----------------------------------------------------------------------===//
+
+static ParseResult parseBindingTable(
+    OpAsmParser &parser,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &buffers,
+    SmallVectorImpl<Type> &bufferTypes,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &bufferOffsets,
+    SmallVectorImpl<OpAsmParser::UnresolvedOperand> &bufferLengths) {
+  do {
+    OpAsmParser::UnresolvedOperand buffer;
+    Type bufferType;
+    OpAsmParser::UnresolvedOperand bufferOffset;
+    OpAsmParser::UnresolvedOperand bufferLength;
+    if (failed(parser.parseLParen()) || failed(parser.parseOperand(buffer)) ||
+        failed(parser.parseColonType(bufferType)) ||
+        failed(parser.parseRParen()) || failed(parser.parseLSquare()) ||
+        failed(parser.parseOperand(bufferOffset)) ||
+        failed(parser.parseComma()) ||
+        failed(parser.parseOperand(bufferLength)) ||
+        failed(parser.parseRSquare())) {
+      return failure();
+    }
+    buffers.push_back(buffer);
+    bufferTypes.push_back(bufferType);
+    bufferOffsets.push_back(bufferOffset);
+    bufferLengths.push_back(bufferLength);
+  } while (succeeded(parser.parseOptionalComma()));
+  return success();
+}
+
+static void printBindingTable(OpAsmPrinter &p, Operation *op,
+                              ValueRange buffers, TypeRange bufferTypes,
+                              ValueRange bufferOffsets,
+                              ValueRange bufferLengths) {
+  llvm::interleaveComma(
+      llvm::zip_equal(buffers, bufferTypes, bufferOffsets, bufferLengths), p,
+      [&](std::tuple<Value, Type, Value, Value> it) {
+        p.printNewline();
+        p << "  ";
+        p << "(";
+        p.printOperand(std::get<0>(it));
+        p << " : ";
+        p.printType(std::get<1>(it));
+        p << ")[";
+        p.printOperand(std::get<2>(it));
+        p << ", ";
+        p.printOperand(std::get<3>(it));
+        p << "]";
+      });
+  p.printNewline();
+}
+
+//===----------------------------------------------------------------------===//
 // custom<TargetConditionRegion>($body)
 //===----------------------------------------------------------------------===//
 
@@ -1056,6 +1113,30 @@ LogicalResult DeviceQueueExecuteOp::verify() {
   return verifyDeviceQueueFences(*this, getWaitFence(), getSignalFence());
 }
 
+void DeviceQueueExecuteIndirectOp::build(OpBuilder &builder,
+                                         OperationState &state, Value device,
+                                         Value queueAffinity, Value waitFence,
+                                         Value signalFence, Value commandBuffer,
+                                         ArrayRef<BindingTableValue> bindings) {
+  state.addOperands(
+      {device, queueAffinity, waitFence, signalFence, commandBuffer});
+  SmallVector<Value> bindingBuffers;
+  SmallVector<Value> bindingOffsets;
+  SmallVector<Value> bindingLengths;
+  for (auto binding : bindings) {
+    bindingBuffers.push_back(binding.buffer);
+    bindingOffsets.push_back(binding.byteOffset);
+    bindingLengths.push_back(binding.byteLength);
+  }
+  state.addOperands(bindingBuffers);
+  state.addOperands(bindingOffsets);
+  state.addOperands(bindingLengths);
+}
+
+LogicalResult DeviceQueueExecuteIndirectOp::verify() {
+  return verifyDeviceQueueFences(*this, getWaitFence(), getSignalFence());
+}
+
 //===----------------------------------------------------------------------===//
 // hal.devices.*
 //===----------------------------------------------------------------------===//
@@ -1650,6 +1731,7 @@ void ExecutableExportOrdinalOp::getAsmResultNames(
 //===----------------------------------------------------------------------===//
 // hal.interface.binding.subspan
 //===----------------------------------------------------------------------===//
+
 void InterfaceBindingSubspanOp::build(
     OpBuilder &builder, OperationState &result, Type resultType, APInt set,
     APInt binding, IREE::HAL::DescriptorType descriptor_type, Value byte_offset,
