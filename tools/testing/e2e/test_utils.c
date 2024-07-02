@@ -271,6 +271,7 @@ void iree_test_utils_get_min_max_for_element_type(
   switch (element_type) {
     case IREE_HAL_ELEMENT_TYPE_INT_8:
     case IREE_HAL_ELEMENT_TYPE_SINT_8:
+    case IREE_HAL_ELEMENT_TYPE_FLOAT_8:
       *min = -2;
       *max = +2;
       break;
