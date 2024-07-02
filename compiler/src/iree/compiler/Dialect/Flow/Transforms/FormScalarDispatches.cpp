@@ -197,7 +197,18 @@ void FormScalarDispatchesPass::runOnOperation() {
       }
 
       if (!isSliceRoot(scalarWorkloadLimit, prevOp)) {
-        if (isClonableIntoDispatchOp(prevOp)) {
+        // Keep looking for more roots to horizontally fuse if the `prevOp` has
+        // no dependencies. e.g. `tensor.empty()`
+        if (prevOp->getNumOperands() == 0 && prevOp->getNumRegions() == 0)
+          continue;
+
+        // If `prevOp` is clonable AND only used by the fused/cloned then it
+        // will get cloned before any possible roots that may define its
+        // operands. (if it is not used by the region it may not be cloned)
+        if (isClonableIntoDispatchOp(prevOp) &&
+            llvm::any_of(prevOp->getUsers(), [&](Operation *user) {
+              return user == op || opToRootMap.count(user);
+            })) {
           continue;
         }
         break;
