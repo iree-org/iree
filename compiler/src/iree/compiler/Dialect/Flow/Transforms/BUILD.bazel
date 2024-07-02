@@ -55,6 +55,7 @@ iree_compiler_cc_library(
         "FuseMultiUseElementwiseProducer.cpp",
         "FusionPreprocessing.cpp",
         "FusionUtils.cpp",
+        "HoistEncodingOps.cpp",
         "InitializeEmptyTensors.cpp",
         "InjectDispatchTracing.cpp",
         "InjectTensorTracing.cpp",
