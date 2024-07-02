@@ -93,6 +93,13 @@ iree_test_utils_e2e_value_t iree_test_utils_value_make_i32(int32_t value) {
   return result;
 }
 
+iree_test_utils_e2e_value_t iree_test_utils_value_make_f8(uint8_t value) {
+  iree_test_utils_e2e_value_t result;
+  result.type = IREE_TEST_UTILS_VALUE_TYPE_F8;
+  result.f8_u8 = value;
+  return result;
+}
+
 iree_test_utils_e2e_value_t iree_test_utils_value_make_f16(uint16_t value) {
   iree_test_utils_e2e_value_t result;
   result.type = IREE_TEST_UTILS_VALUE_TYPE_F16;
@@ -123,6 +130,8 @@ iree_test_utils_e2e_value_t iree_test_utils_read_buffer_element(
     return iree_test_utils_value_make_i16(((int16_t*)data)[index]);
   } else if (iree_hal_element_type_is_integer(result_type, 32)) {
     return iree_test_utils_value_make_i32(((int32_t*)data)[index]);
+  } else if (result_type == IREE_HAL_ELEMENT_TYPE_FLOAT_8) {
+    return iree_test_utils_value_make_f8(((uint8_t*)data)[index]);
   } else if (result_type == IREE_HAL_ELEMENT_TYPE_FLOAT_16) {
     return iree_test_utils_value_make_f16(((uint16_t*)data)[index]);
   } else if (result_type == IREE_HAL_ELEMENT_TYPE_BFLOAT_16) {
