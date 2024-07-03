@@ -61,14 +61,14 @@ public:
   // Adds input type mnemonics that this instance supports. At least one plugin
   // must advertise support for a custom input type in order for it to be
   // considered valid.
-  virtual void populateCustomInputConversionTypes(StringSet<> &typeMnemonics) {}
+  virtual void
+  populateCustomInputConversionTypes(llvm::StringSet<> &typeMnemonics) {}
 
   // Adds input type mnemonics that this instance supports, if those types are
   // detected in |module|.
   // Requires that |registerDialects| has been called first.
-  virtual void
-  populateDetectedCustomInputConversionTypes(ModuleOp &module,
-                                             StringSet<> &typeMnemonics) {}
+  virtual void populateDetectedCustomInputConversionTypes(
+      ModuleOp &module, llvm::StringSet<> &typeMnemonics) {}
 
   // Adds passes to the input preprocessing pipeline for the given
   // InputDialectOptions::Type::plugin type with the given mnemonic.
