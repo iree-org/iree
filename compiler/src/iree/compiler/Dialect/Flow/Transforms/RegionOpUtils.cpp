@@ -497,6 +497,73 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
   return newRegionOp.value();
 }
 
+// Move a `target` op that is following the given dispatch region op into the
+// dispatch region.
+FailureOr<IREE::Flow::DispatchRegionOp>
+moveFollowingOpIntoDispatchRegion(RewriterBase &rewriter, Operation *target,
+                                  IREE::Flow::DispatchRegionOp regionOp) {
+  // Values replaced by moving the `targets` into the dispatch region.
+  SmallVector<Value> replacedValues;
+
+  // List of dynamic dimensions for each new results added to the dispatch
+  // region.
+  SmallVector<SmallVector<Value>> dispatchOpNewResultsDynamicDims;
+
+  // New values that are yielded from dispatch.
+  SmallVector<Value> yieldedResults;
+
+  Block &body = regionOp.getBody().front();
+  // Clone op into dispatch region.
+  OpBuilder::InsertionGuard g(rewriter);
+  rewriter.setInsertionPoint(body.getTerminator());
+  Operation *clonedTarget = rewriter.clone(*target);
+
+  // Replace any operands returned by the `regionOp` with the results yielded
+  // inside of the `regionOp`.
+  for (OpOperand &operand : clonedTarget->getOpOperands()) {
+    if (operand.get().getDefiningOp() != regionOp) {
+      continue;
+    }
+    auto returnOp =
+        cast<IREE::Flow::ReturnOp>(regionOp.getBody().front().getTerminator());
+    auto opResult = cast<OpResult>(operand.get());
+    Value yieldedValue = returnOp->getOperand(opResult.getResultNumber());
+    rewriter.modifyOpInPlace(clonedTarget, [&]() {
+      clonedTarget->setOperand(operand.getOperandNumber(), yieldedValue);
+    });
+  }
+
+  // Gather all uses of `target`.
+  for (auto [index, result] : llvm::enumerate(target->getResults())) {
+    replacedValues.push_back(result);
+    yieldedResults.push_back(clonedTarget->getResult(index));
+    OpBuilder::InsertionGuard guard(rewriter);
+    rewriter.setInsertionPoint(target);
+    SmallVector<Value> &dims = dispatchOpNewResultsDynamicDims.emplace_back();
+    if (failed(reifyDynamicResultDims(rewriter, result, dims))) {
+      return target->emitOpError(
+          "failed to reify dynamic dims of result to be yielded from "
+          "dispatch region");
+    }
+  }
+
+  FailureOr<IREE::Flow::DispatchRegionOp> newRegionOp =
+      appendDispatchRegionResults(rewriter, regionOp, yieldedResults,
+                                  dispatchOpNewResultsDynamicDims);
+
+  if (failed(newRegionOp)) {
+    return regionOp->emitOpError("failed to append results to op");
+  }
+
+  ValueRange replacements =
+      newRegionOp->getResults().take_back(replacedValues.size());
+  for (auto [index, replacedVal] : llvm::enumerate(replacedValues)) {
+    rewriter.replaceAllUsesWith(replacedVal, replacements[index]);
+  }
+  rewriter.eraseOp(target);
+  return newRegionOp.value();
+}
+
 FailureOr<IREE::Flow::DispatchRegionOp>
 wrapOpInDispatchRegion(RewriterBase &rewriter, Operation *op) {
   OpBuilder::InsertionGuard g(rewriter);

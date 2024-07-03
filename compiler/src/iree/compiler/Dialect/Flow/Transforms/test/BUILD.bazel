@@ -37,6 +37,7 @@ iree_lit_test_suite(
             "form_dispatch_workgroups.mlir",
             "form_scalar_dispatches.mlir",
             "dispatch_linalg_ext_fusion.mlir",
+            "fuse_encoding_ops_into_dispatch_regions.mlir",
             "fuse_multiuse_elementwise_producer.mlir",
             "fusion_preprocessing.mlir",
             "hoist_encoding_ops.mlir",

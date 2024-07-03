@@ -93,6 +93,37 @@ movePrecedingOpsIntoDispatchRegion(RewriterBase &rewriter,
                                    ArrayRef<Operation *> targets,
                                    Flow::DispatchRegionOp regionOp);
 
+/// Move a `target` op that is following the given dispatch region op into the
+/// dispatch region.
+///
+/// Results of the `target` are appended to the yielded results of the dispatch
+/// region, and uses of each result are replaced with the corresponding newly
+/// yielded result. Operands of the `target` that are produced by the dispatch
+/// region are replaced in the cloned op with the corresponding result yielded
+/// inside of the dispatch region.
+///
+/// Example:
+///
+/// %r = flow.dispatch.region -> (tensor<?xf32>{%d0}) {
+///   %0 = "another_op"(%input) : (tensor<?xf32>) -> (tensor<?xf32>)
+///   flow.return %0 : tensor<?xf32>
+/// }
+/// %1 = "some_op"(%r) : () -> (tensor<?xf32>)
+/// %2 = "some_op_use"(%1) : (tensor<?xf32>) -> (tensor<?xf32>)
+///
+/// Becomes:
+///
+/// %r:2 = flow.dispatch.region -> (tensor<?xf32>{%d0}, tensor<?xf32>{%d1}) {
+///   %0 = "another_op"(%input) : (tensor<?xf32>) -> (tensor<?xf32>)
+///   %1 = "some_op"(%0) : (tensor<?xf32>) -> (tensor<?xf32>)
+///   flow.return %0, %1 : tensor<?xf32>, tensor<?xf32>
+/// }
+/// %2 = "some_op_use"(%r#1) : (tensor<?xf32>) -> (tensor<?xf32>)
+///
+FailureOr<IREE::Flow::DispatchRegionOp>
+moveFollowingOpIntoDispatchRegion(RewriterBase &rewriter, Operation *target,
+                                  IREE::Flow::DispatchRegionOp regionOp);
+
 /// Wrap the given op in a new dispatch region op.
 FailureOr<Flow::DispatchRegionOp> wrapOpInDispatchRegion(RewriterBase &rewriter,
                                                          Operation *op);

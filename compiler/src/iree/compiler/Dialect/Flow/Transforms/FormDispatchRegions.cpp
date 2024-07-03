@@ -292,9 +292,7 @@ static bool isPadUsedInSetEncoding(tensor::PadOp padOp) {
 // Heuristics for fusing dispatchble ops with root ops using tile + fuse.
 //===----------------------------------------------------------------------===//
 
-/// Returns a bit vector of size number of loops of the `interfaceOp` with
-/// the bits corresponding to outer parallel loops set to `true`.
-static llvm::SmallBitVector getOuterParallelLoops(Operation *op) {
+llvm::SmallBitVector getOuterParallelLoops(Operation *op) {
   if (auto setEncodingOp = dyn_cast<IREE::Encoding::SetEncodingOp>(op)) {
     return llvm::SmallBitVector(setEncodingOp.getResultType().getRank(), true);
   }
@@ -529,12 +527,9 @@ static bool isVectorizedAlways(Operation *producer) {
   return true;
 }
 
-/// Returns true if this is a fusable use, while fusing a root with its
-/// consumer.
-static bool
-isFusableWithConsumer(OpOperand &fusedOperand,
-                      const llvm::SmallBitVector &rootOuterParallelLoops,
-                      FormDispatchRegionsPassOptions const &options) {
+bool isFusableWithConsumer(OpOperand &fusedOperand,
+                           const llvm::SmallBitVector &rootOuterParallelLoops,
+                           FormDispatchRegionsPassOptions const &options) {
   Operation *producer = fusedOperand.get().getDefiningOp();
   Operation *consumer = fusedOperand.getOwner();
 
@@ -724,12 +719,18 @@ fuseRootsWithConsumers(MLIRContext *context, ArrayRef<Operation *> roots,
   }
 }
 
-/// Method to check if the consumer of a use can be fused with its producer.
-static bool
-isFusableWithProducer(OpOperand &operand,
-                      const llvm::SmallBitVector &rootOuterParallelLoops,
-                      FormDispatchRegionsPassOptions const &options) {
-  Operation *producer = operand.get().getDefiningOp();
+bool isFusableWithProducer(OpOperand &operand,
+                           const llvm::SmallBitVector &rootOuterParallelLoops,
+                           FormDispatchRegionsPassOptions const &options,
+                           std::optional<OpResult> overrideProducerResult) {
+  OpResult producerResult = dyn_cast<OpResult>(operand.get());
+  if (overrideProducerResult.has_value()) {
+    producerResult = overrideProducerResult.value();
+  }
+  if (!producerResult) {
+    return false;
+  }
+  Operation *producer = producerResult.getOwner();
   Operation *consumer = operand.getOwner();
 
   if (auto padOp = dyn_cast<tensor::PadOp>(consumer)) {
@@ -755,8 +756,8 @@ isFusableWithProducer(OpOperand &operand,
               return false;
             }
           }
-          auto producerIndexingMap = linalgOp.getIndexingMapMatchingResult(
-              llvm::cast<OpResult>(operand.get()));
+          auto producerIndexingMap =
+              linalgOp.getIndexingMapMatchingResult(producerResult);
           // Make sure the producer op has an identitiy result indexing map. As
           // CPU backend currently can't handle tranpose between fused ops.
           return hasCompatibleOuterParallelLoops(
