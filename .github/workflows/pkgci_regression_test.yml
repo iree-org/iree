@@ -97,7 +97,9 @@ jobs:
       - name: Install external TestSuite Python requirements
         run: |
           source ${VENV_DIR}/bin/activate
+          pip uninstall -y iree-regression-suite
           python -m pip install -r SHARK-TestSuite/iree_tests/requirements.txt
+          pip install --no-compile --pre --upgrade -e SHARK-TestSuite/common_tools
 
       - name: Run external tests - ONNX test suite
         run: |
@@ -261,7 +263,7 @@ jobs:
             --timeout=1200 \
             --durations=0
         env:
-          TEST_SUITE_REPO_ROOT: SHARK-TestSuite
+          TEST_SUITE_REPO_ROOT: ${{ github.workspace }}/SHARK-TestSuite
 
       - name: "Running SD3 special model tests"
         if: ${{ !cancelled() }}
@@ -275,7 +277,7 @@ jobs:
             --timeout=1200 \
             --durations=0
         env:
-          TEST_SUITE_REPO_ROOT: SHARK-TestSuite
+          TEST_SUITE_REPO_ROOT: ${{ github.workspace }}/SHARK-TestSuite
 
       - name: "Running SDXL rocm pipeline benchmark (mi250)"
         if: contains(matrix.name, 'rocm_mi250_gfx90a')
