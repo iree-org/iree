@@ -118,20 +118,32 @@ static Value reduce(OpBuilder &builder, Location loc, AffineMap inputMap,
 }
 
 static Value reduceAbsMax(OpBuilder &builder, Location loc, AffineMap inputMap,
-                          Value input) {
+                          Value input, Value intermediate) {
+  ShapedType inputTy = cast<ShapedType>(input.getType());
   FloatType fpTy = cast<FloatType>(getElementTypeOrSelf(input.getType()));
+
   AffineMap outputMap = AffineMap::get(inputMap.getNumDims(), /*symbolCount=*/0,
                                        {}, builder.getContext());
+  SmallVector<AffineMap> compressedMaps =
+      compressUnusedDims(SmallVector<AffineMap>{inputMap, outputMap});
+  inputMap = compressedMaps[0];
+  outputMap = compressedMaps[1];
+
+  SmallVector<utils::IteratorType> parallelIterators(
+    inputMap.getNumDims(), utils::IteratorType::parallel);
+  auto absGeneric = builder.create<linalg::GenericOp>(
+      loc, intermediate.getType(), input, intermediate,
+      SmallVector<AffineMap>{inputMap, inputMap}, parallelIterators,
+      [&](OpBuilder &b, Location loc, ValueRange args) {
+        Value abs = b.create<math::AbsFOp>(loc, args[0]);
+        b.create<linalg::YieldOp>(loc, abs);
+      }).getResult(0);
+
   Value output =
       builder.create<tensor::EmptyOp>(loc, ArrayRef<OpFoldResult>{}, fpTy);
   Value sEps =
       builder.create<arith::ConstantOp>(loc, builder.getFloatAttr(fpTy, 1e-9));
   output = builder.create<linalg::FillOp>(loc, sEps, output).getResult(0);
-
-  SmallVector<AffineMap> compressedMaps =
-      compressUnusedDims(SmallVector<AffineMap>{inputMap, outputMap});
-  inputMap = compressedMaps[0];
-  outputMap = compressedMaps[1];
 
   // Dims not present in outputMap are reductionDims.
   SmallVector<utils::IteratorType> iteratorTypes(
@@ -141,23 +153,10 @@ static Value reduceAbsMax(OpBuilder &builder, Location loc, AffineMap inputMap,
     iteratorTypes[pos] = utils::IteratorType::parallel;
   }
 
-  auto reduce =
-      builder
-          .create<linalg::GenericOp>(
-              loc, output.getType(), input, output,
-              SmallVector<AffineMap>{inputMap, outputMap}, iteratorTypes,
-              [&](OpBuilder &b, Location loc, ValueRange args) {
-                // Convert input to the same datatype as acc.
-                Value in = b.create<math::AbsFOp>(loc, args[0]);
-                Value cmp = b.create<arith::CmpFOp>(
-                    loc, arith::CmpFPredicate::OGT, in, args[1]);
-                Value sel = b.create<arith::SelectOp>(loc, cmp, in, args[1]);
-                b.create<linalg::YieldOp>(loc, sel);
-              })
-          .getResult(0);
+  Value reduced = reduce<arith::MaximumFOp>(builder, loc, inputMap, outputMap, absGeneric, output);
 
   auto extractOp = builder.create<tensor::ExtractOp>(
-      loc, getElementTypeOrSelf(reduce.getType()), reduce, ValueRange{});
+      loc, getElementTypeOrSelf(reduced.getType()), reduced, ValueRange{});
 
   return extractOp;
 }
@@ -358,8 +357,9 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   Value pScale;
   auto pETy = getElementTypeOrSelf(p.getType());
   if (pETy != vETy && isa<FloatType>(vETy)) {
+    Value abs = b.create<tensor::EmptyOp>(loc, sSizes, elementType);
     // We rescale `p` to use the full range and pass back the `pScale`.
-    Value absMax = reduceAbsMax(b, loc, pMap, p);
+    Value absMax = reduceAbsMax(b, loc, pMap, p, abs);
     auto fpTy = cast<FloatType>(vETy);
     double largestDbl =
         APFloat::getLargest(fpTy.getFloatSemantics(), /*Negative=*/false)
