@@ -90,7 +90,7 @@ jobs:
         uses: actions/checkout@v4.1.7
         with:
           repository: nod-ai/SHARK-TestSuite
-          ref: 3603a453b3777fac9af4506a3dc0b3d87587fd47
+          ref: a06e730ce325c12db40bb89b43e8e6e897052e96
           path: SHARK-TestSuite
           submodules: false
           lfs: false
@@ -138,18 +138,13 @@ jobs:
           # CPU
           - name: cpu_llvm_task
             models-config-file: models_cpu_llvm_task.json
-            sdxl-unet-config-file: sdxl_scheduled_unet_cpu_llvm_task.json
-            sdxl-vae-config-file: sdxl_vae_decode_cpu_llvm_task.json
-            sdxl-clip-config-file: sdxl_prompt_encoder_cpu_llvm_task.json
+            backend: cpu
             runs-on: nodai-amdgpu-w7900-x86-64
 
           # AMD GPU
           - name: amdgpu_rocm_mi250_gfx90a
             models-config-file: models_gpu_rocm_gfx90a.json
-            models-extra-flags-config-file: models_gpu_rocm_gfx90a_additional_flags.json
-            sdxl-unet-config-file: sdxl_scheduled_unet_gpu_rocm_gfx90a.json
-            sdxl-vae-config-file: sdxl_vae_decode_gpu_rocm_gfx90a.json
-            sdxl-clip-config-file: sdxl_prompt_encoder_gpu_rocm_gfx90a.json
+            backend: rocm
             runs-on: nodai-amdgpu-mi250-x86-64
           - name: amdgpu_rocm_mi300_gfx942
             models-config-file: models_gpu_rocm_gfx942.json
@@ -176,10 +171,7 @@ jobs:
       IREE_TEST_FILES: ~/iree_tests_cache
       IREE_TEST_PATH_EXTENSION: ${{ github.workspace }}/build_tools/pkgci/external_test_suite
       MODELS_CONFIG_FILE_PATH: build_tools/pkgci/external_test_suite/${{ matrix.models-config-file }}
-      MODELS_EXTRA_FLAGS_CONFIG_FILE_PATH: build_tools/pkgci/external_test_suite/${{ matrix.models-extra-flags-config-file }}
-      SDXL_UNET_CONFIG_FILE_PATH: build_tools/pkgci/external_test_suite/${{ matrix.sdxl-unet-config-file }}
-      SDXL_CLIP_CONFIG_FILE_PATH: build_tools/pkgci/external_test_suite/${{ matrix.sdxl-clip-config-file }}
-      SDXL_VAE_CONFIG_FILE_PATH: build_tools/pkgci/external_test_suite/${{ matrix.sdxl-vae-config-file }}
+      ROCM_CHIP: gfx90a
       VENV_DIR: ${{ github.workspace }}/venv
       LD_LIBRARY_PATH: /home/esaimana/Python-3.11.9
     steps:
@@ -221,7 +213,7 @@ jobs:
         uses: actions/checkout@v4.1.7
         with:
           repository: nod-ai/SHARK-TestSuite
-          ref: 3603a453b3777fac9af4506a3dc0b3d87587fd47
+          ref: a06e730ce325c12db40bb89b43e8e6e897052e96
           path: SHARK-TestSuite
           submodules: false
           lfs: true
@@ -229,11 +221,14 @@ jobs:
         run: |
           source ${VENV_DIR}/bin/activate
           python -m pip install -r SHARK-TestSuite/iree_tests/requirements.txt
+          python -m pip install -r SHARK-TestSuite/iree_special_models/requirements.txt
+          pip install --no-compile --pre --upgrade -e SHARK-TestSuite/common_tools
       - name: Download remote files for real weight model tests
         run: |
           source ${VENV_DIR}/bin/activate
-          python SHARK-TestSuite/iree_tests/download_remote_files.py --root-dir pytorch/models
-          python SHARK-TestSuite/iree_tests/download_remote_files.py --root-dir sharktank
+          python SHARK-TestSuite/iree_tests/download_remote_files.py --root-dir iree_special_models
+          python SHARK-TestSuite/iree_tests/download_remote_files.py --root-dir iree_tests/pytorch/models
+          python SHARK-TestSuite/iree_tests/download_remote_files.py --root-dir iree_tests/sharktank
 
       - name: Run external tests - models with real weights
         if: "matrix.models-config-file != '' && !cancelled()"
@@ -251,61 +246,33 @@ jobs:
             --durations=0 \
             --config-files=${MODELS_CONFIG_FILE_PATH}
 
-      - name: Run external tests - models with real weights and additional flags
-        if: "matrix.models-extra-flags-config-file != '' && !cancelled()"
+      - name: "Running SDXL special model tests"
+        if: ${{ !cancelled() }}
         run: |
           source ${VENV_DIR}/bin/activate
-          pytest SHARK-TestSuite/iree_tests/pytorch/models \
+          pytest ./experimental/regression_suite/shark-test-suite-models/sdxl \
+            -k ${{ matrix.backend }} \
             -rpfE \
-            -k real_weights \
-            --no-skip-tests-missing-files \
             --capture=no \
             --log-cli-level=info \
             --timeout=1200 \
-            --durations=0 \
-            --config-files=${MODELS_EXTRA_FLAGS_CONFIG_FILE_PATH}
-
-      - name: "Run external tests - SDXL scheduled unet"
-        if: "matrix.sdxl-unet-config-file != '' && !cancelled()"
+            --durations=0
+        env:
+          TEST_SUITE_REPO_ROOT: SHARK-TestSuite
+      
+      - name: "Running SD3 special model tests"
+        if: ${{ !cancelled() }}
         run: |
           source ${VENV_DIR}/bin/activate
-          pytest SHARK-TestSuite/iree_tests/pytorch/models/sdxl-scheduled-unet-3-tank \
+          pytest ./experimental/regression_suite/shark-test-suite-models/sd3 \
+            -k ${{ matrix.backend }} \
             -rpfE \
-            -k real_weights \
-            --no-skip-tests-missing-files \
             --capture=no \
             --log-cli-level=info \
             --timeout=1200 \
-            --durations=0 \
-            --config-files=${SDXL_UNET_CONFIG_FILE_PATH}
-
-      - name: "Run external tests - SDXL prompt encoder"
-        if: "matrix.sdxl-clip-config-file != '' && !cancelled()"
-        run: |
-          source ${VENV_DIR}/bin/activate
-          pytest SHARK-TestSuite/iree_tests/pytorch/models/sdxl-prompt-encoder-tank \
-            -rpfE \
-            -k real_weights \
-            --no-skip-tests-missing-files \
-            --capture=no \
-            --log-cli-level=info \
-            --timeout=1200 \
-            --durations=0 \
-            --config-files=${SDXL_CLIP_CONFIG_FILE_PATH}
-
-      - name: "Run external tests - SDXL vae decode"
-        if: "matrix.sdxl-vae-config-file != '' && !cancelled()"
-        run: |
-          source ${VENV_DIR}/bin/activate
-          pytest SHARK-TestSuite/iree_tests/pytorch/models/sdxl-vae-decode-tank \
-            -rpfE \
-            -k real_weights \
-            --no-skip-tests-missing-files \
-            --capture=no \
-            --log-cli-level=info \
-            --timeout=1200 \
-            --durations=0 \
-            --config-files=${SDXL_VAE_CONFIG_FILE_PATH}
+            --durations=0
+        env:
+          TEST_SUITE_REPO_ROOT: SHARK-TestSuite
 
       - name: "Running SDXL rocm pipeline benchmark (mi250)"
         if: contains(matrix.name, 'rocm_mi250_gfx90a')
