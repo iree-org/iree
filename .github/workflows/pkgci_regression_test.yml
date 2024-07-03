@@ -222,12 +222,10 @@ jobs:
       - name: Install external TestSuite Python requirements
         run: |
           source ${VENV_DIR}/bin/activate
-          pip freeze
           pip uninstall -y iree-regression-suite
           python -m pip install -r SHARK-TestSuite/iree_tests/requirements.txt
           python -m pip install -r SHARK-TestSuite/iree_special_models/requirements.txt
           pip install --no-compile --pre --upgrade -e SHARK-TestSuite/common_tools
-          pip freeze
       - name: Download remote files for real weight model tests
         run: |
           source ${VENV_DIR}/bin/activate
