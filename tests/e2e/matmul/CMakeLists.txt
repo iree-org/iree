@@ -2318,6 +2318,11 @@ iree_generated_e2e_runner_test(
     "requires-gpu-cdna3"
 )
 
+elseif(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx94")
+
+# I8 Intrinsics has different layout on CDNA3/gfx94x,
+# and only CDNA3/gfx94x has F8 intrinsics.
+
 iree_generated_e2e_runner_test(
   NAME
     e2e_matmul_rocm_f8_large_cdna3_mfma
