@@ -16,6 +16,7 @@ namespace mlir::iree_compiler::IREE::LinalgExt {
 
 Value getDimValue(OpBuilder &builder, Location loc, Value v, int64_t dim) {
   ShapedType type = cast<ShapedType>(v.getType());
+  assert(type.getRank() > dim && "Inquired dim needs to less than rank.");
   if (!type.isDynamicDim(dim)) {
     return builder.create<arith::ConstantIndexOp>(loc, type.getDimSize(dim));
   }
