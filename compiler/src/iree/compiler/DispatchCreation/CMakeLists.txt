@@ -30,6 +30,7 @@ iree_cc_library(
     "FormDispatchRegions.cpp"
     "FormScalarDispatches.cpp"
     "FuseHorizontalContractions.cpp"
+    "FuseEncodingOpsIntoDispatchRegions.cpp"
     "FuseMultiUseElementwiseProducer.cpp"
     "FusionPreprocessing.cpp"
     "FusionUtils.cpp"

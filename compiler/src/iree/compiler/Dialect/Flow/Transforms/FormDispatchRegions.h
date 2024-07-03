@@ -7,7 +7,9 @@
 #ifndef IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_FORMDISPATCHREGIONS_H_
 #define IREE_COMPILER_DIALECT_FLOW_TRANSFORMS_FORMDISPATCHREGIONS_H_
 
+#include <optional>
 #include "iree/compiler/Dialect/Flow/Transforms/ConvertRegionToWorkgroups.h"
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
 #include "mlir/IR/Dominance.h"
 
@@ -48,6 +50,22 @@ FailureOr<IREE::Flow::WorkloadBuilder> getWorkloadBuilder(OpBuilder &builder,
 ///   value.
 LogicalResult simplifyDimOps(RewriterBase &rewriter,
                              const SmallVector<tensor::DimOp> &dimOps);
+
+/// Returns true if this is a fusable use, while fusing a root with its
+/// consumer.
+bool isFusableWithConsumer(OpOperand &fusedOperand,
+                           const llvm::SmallBitVector &rootOuterParallelLoops,
+                           FormDispatchRegionsPassOptions const &options);
+
+/// Method to check if the consumer of a use can be fused with its producer.
+bool isFusableWithProducer(
+    OpOperand &operand, const llvm::SmallBitVector &rootOuterParallelLoops,
+    FormDispatchRegionsPassOptions const &options,
+    std::optional<OpResult> overrideProducerResult = std::nullopt);
+
+/// Returns a bit vector of size number of loops of the `interfaceOp` with
+/// the bits corresponding to outer parallel loops set to `true`.
+llvm::SmallBitVector getOuterParallelLoops(Operation *op);
 
 } // namespace mlir::iree_compiler::IREE::Flow
 
