@@ -44,6 +44,49 @@ static Value scaleValueInPlace(OpBuilder &builder, Location loc,
   return genericOp.getResult(0);
 }
 
+static Value truncateFloat(OpBuilder &builder, Location loc, AffineMap inputMap,
+                           AffineMap outputMap, Value value, Value output) {
+  SmallVector<AffineMap> compressedMaps =
+      compressUnusedDims(SmallVector<AffineMap>{inputMap, outputMap});
+  inputMap = compressedMaps[0];
+  outputMap = compressedMaps[1];
+
+  SmallVector<utils::IteratorType> iteratorTypes(inputMap.getNumDims(),
+                                                 utils::IteratorType::parallel);
+  auto genericOp = builder.create<linalg::GenericOp>(
+      loc, output.getType(), value, output,
+      SmallVector<AffineMap>{inputMap, outputMap}, iteratorTypes,
+      [&](OpBuilder &b, Location loc, ValueRange args) {
+        auto srcTy = cast<FloatType>(args[0].getType());
+        auto dstTy = cast<FloatType>(args[1].getType());
+
+        // We clamp to the min / max of the floating point representation
+        double mnDbl =
+            APFloat::getLargest(dstTy.getFloatSemantics(), /*Negative=*/true)
+                .convertToDouble();
+        double mxDbl =
+            APFloat::getLargest(dstTy.getFloatSemantics(), /*Negative=*/false)
+                .convertToDouble();
+
+        Value mn = builder.create<arith::ConstantOp>(
+            loc, builder.getFloatAttr(srcTy, mnDbl));
+        Value mx = builder.create<arith::ConstantOp>(
+            loc, builder.getFloatAttr(srcTy, mxDbl));
+        Value gt = b.create<arith::CmpFOp>(loc, arith::CmpFPredicate::OGT,
+                                           args[0], mx);
+        Value lt = b.create<arith::CmpFOp>(loc, arith::CmpFPredicate::OLT,
+                                           args[0], mn);
+        Value sel0 = b.create<arith::SelectOp>(loc, gt, mx, args[0]);
+        Value sel1 = b.create<arith::SelectOp>(loc, lt, mn, sel0);
+
+        // Convert scale to the same datatype as input.
+        Value trunc = convertScalarToDtype(b, loc, sel1, dstTy,
+                                           /*isUnsignedCast=*/false);
+        b.create<linalg::YieldOp>(loc, trunc);
+      });
+  return genericOp.getResult(0);
+}
+
 template <typename T>
 static Value reduce(OpBuilder &builder, Location loc, AffineMap inputMap,
                     AffineMap outputMap, Value input, Value output) {
@@ -72,6 +115,51 @@ static Value reduce(OpBuilder &builder, Location loc, AffineMap inputMap,
       });
 
   return genericOp.getResult(0);
+}
+
+static Value reduceAbsMax(OpBuilder &builder, Location loc, AffineMap inputMap,
+                          Value input) {
+  FloatType fpTy = cast<FloatType>(getElementTypeOrSelf(input.getType()));
+  AffineMap outputMap = AffineMap::get(inputMap.getNumDims(), /*symbolCount=*/0,
+                                       {}, builder.getContext());
+  Value output =
+      builder.create<tensor::EmptyOp>(loc, ArrayRef<OpFoldResult>{}, fpTy);
+  Value sEps =
+      builder.create<arith::ConstantOp>(loc, builder.getFloatAttr(fpTy, 1e-9));
+  output = builder.create<linalg::FillOp>(loc, sEps, output).getResult(0);
+
+  SmallVector<AffineMap> compressedMaps =
+      compressUnusedDims(SmallVector<AffineMap>{inputMap, outputMap});
+  inputMap = compressedMaps[0];
+  outputMap = compressedMaps[1];
+
+  // Dims not present in outputMap are reductionDims.
+  SmallVector<utils::IteratorType> iteratorTypes(
+      inputMap.getNumDims(), utils::IteratorType::reduction);
+  for (AffineExpr dim : outputMap.getResults()) {
+    int pos = cast<AffineDimExpr>(dim).getPosition();
+    iteratorTypes[pos] = utils::IteratorType::parallel;
+  }
+
+  auto reduce =
+      builder
+          .create<linalg::GenericOp>(
+              loc, output.getType(), input, output,
+              SmallVector<AffineMap>{inputMap, outputMap}, iteratorTypes,
+              [&](OpBuilder &b, Location loc, ValueRange args) {
+                // Convert input to the same datatype as acc.
+                Value in = b.create<math::AbsFOp>(loc, args[0]);
+                Value cmp = b.create<arith::CmpFOp>(
+                    loc, arith::CmpFPredicate::OGT, in, args[1]);
+                Value sel = b.create<arith::SelectOp>(loc, cmp, in, args[1]);
+                b.create<linalg::YieldOp>(loc, sel);
+              })
+          .getResult(0);
+
+  auto extractOp = builder.create<tensor::ExtractOp>(
+      loc, getElementTypeOrSelf(reduce.getType()), reduce, ValueRange{});
+
+  return extractOp;
 }
 
 static Value computeMatmul(OpBuilder &builder, Location loc, AffineMap lhsMap,
@@ -177,7 +265,7 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   Value oldAcc = getOutput();
   Value oldMax = getMax();
   Value oldSum = getSum();
-  Type elementType = getQuery().getType().getElementType();
+  Type elementType = getElementTypeOrSelf(getResult(0).getType());
 
   FailureOr<AttentionOpDetail> maybeOpInfo =
       AttentionOpDetail::get(getIndexingMapsArray());
@@ -192,20 +280,25 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   // have better support for exp2 (we verified that we gain some speedup on
   // some GPUs).
   Value scale = getScale();
-  Value log2e =
-      b.create<arith::ConstantOp>(loc, b.getFloatAttr(elementType, M_LOG2E));
+  Value log2e = b.create<arith::ConstantOp>(
+      loc, b.getFloatAttr(scale.getType(), M_LOG2E));
   scale = b.create<arith::MulFOp>(loc, scale, log2e);
+
+  auto qETy = getElementTypeOrSelf(query.getType());
+  auto vETy = getElementTypeOrSelf(value.getType());
 
   // In the original algorithm, the scaling is done after the softmax:
   //        softmax(Q @ K.T * scale) @ V
   //
   // But, it is mathematically equivalent to do it on Q first and then multiply
   // it by K.T. This just allows us to do the scaling once, instead of each
-  // iteration of the loop.
-  AffineMap qMap = getQueryMap();
-  AffineMap scaleMap = AffineMap::get(/*dimCount=*/qMap.getNumInputs(),
-                                      /*symbolCount=*/0, getContext());
-  query = scaleValueInPlace(b, loc, qMap, scaleMap, query, scale);
+  // iteration of the loop. This is only valid for f16 or f32 types.
+  if (qETy.getIntOrFloatBitWidth() > 8) {
+    AffineMap qMap = getQueryMap();
+    AffineMap scaleMap = AffineMap::get(/*dimCount=*/qMap.getNumInputs(),
+                                        /*symbolCount=*/0, getContext());
+    query = scaleValueInPlace(b, loc, qMap, scaleMap, query, scale);
+  }
 
   // ---- Matmul 1 ----
 
@@ -223,6 +316,15 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   Value sZero = b.create<arith::ConstantOp>(loc, b.getZeroAttr(elementType));
   Value s = b.create<linalg::FillOp>(loc, sZero, emptyS).getResult(0);
   s = computeMatmul(b, loc, getQueryMap(), getKeyMap(), sMap, query, key, s);
+
+  // Scaling is performed after the softmax as smaller bit depths are more
+  // sensitive to total range.
+  if (qETy.getIntOrFloatBitWidth() <= 8) {
+    AffineMap sMap = b.getMultiDimIdentityMap(sSizes.size());
+    AffineMap scaleMap = AffineMap::get(/*dimCount=*/sMap.getNumInputs(),
+                                        /*symbolCount=*/0, getContext());
+    s = scaleValueInPlace(b, loc, sMap, scaleMap, s, scale);
+  }
 
   // TODO: This decomposition should be in a seperate op called
   // "online softmax".
@@ -246,17 +348,50 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   AffineMap sumMap = getSumMap();
   Value normSum = scaleValueInPlace(b, loc, sumMap, normMap, oldSum, norm);
 
-  // newSum = normSum + rowMax(P)
+  // newSum = normSum + rowSum(P)
   Value newSum = reduce<arith::AddFOp>(b, loc, pMap, sumMap, p, normSum);
 
   // newAcc = norm * oldAcc
   AffineMap accMap = getOutputMap();
+
+  // ---- Scale and truncate LHS to match RHS ----
+  Value pScale;
+  auto pETy = getElementTypeOrSelf(p.getType());
+  if (pETy != vETy && isa<FloatType>(vETy)) {
+    // We rescale `p` to use the full range and pass back the `pScale`.
+    Value absMax = reduceAbsMax(b, loc, pMap, p);
+    auto fpTy = cast<FloatType>(vETy);
+    double largestDbl =
+        APFloat::getLargest(fpTy.getFloatSemantics(), /*Negative=*/false)
+            .convertToDouble();
+
+    Value largest = b.create<arith::ConstantOp>(
+        loc, b.getFloatAttr(absMax.getType(), largestDbl));
+    Value pScaleInv = b.create<arith::DivFOp>(loc, largest, absMax);
+    pScale = b.create<arith::DivFOp>(loc, absMax, largest);
+
+    AffineMap scaleMap = AffineMap::get(/*dimCount=*/pMap.getNumInputs(),
+                                        /*symbolCount=*/0, getContext());
+    p = scaleValueInPlace(b, loc, pMap, scaleMap, p, pScaleInv);
+    norm = scaleValueInPlace(b, loc, normMap, scaleMap, norm, pScaleInv);
+
+    Value convertP = b.create<tensor::EmptyOp>(loc, sSizes, vETy);
+    p = truncateFloat(b, loc, pMap, pMap, p, convertP);
+  }
+
   Value newAcc = scaleValueInPlace(b, loc, accMap, normMap, oldAcc, norm);
 
   // ---- Matmul 2 ----
 
   // newAcc = P @ V + newAcc
   newAcc = computeMatmul(b, loc, pMap, getValueMap(), accMap, p, value, newAcc);
+
+  // Update for for the FP8 dynamic scale:
+  if (pScale) {
+    AffineMap scaleMap = AffineMap::get(/*dimCount=*/pMap.getNumInputs(),
+                                        /*symbolCount=*/0, getContext());
+    newAcc = scaleValueInPlace(b, loc, accMap, scaleMap, newAcc, pScale);
+  }
 
   return SmallVector<Value>{newAcc, newMax, newSum};
 }
