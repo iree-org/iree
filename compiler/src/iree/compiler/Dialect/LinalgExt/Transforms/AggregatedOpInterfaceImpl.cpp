@@ -130,14 +130,17 @@ static Value reduceAbsMax(OpBuilder &builder, Location loc, AffineMap inputMap,
   outputMap = compressedMaps[1];
 
   SmallVector<utils::IteratorType> parallelIterators(
-    inputMap.getNumDims(), utils::IteratorType::parallel);
-  auto absGeneric = builder.create<linalg::GenericOp>(
-      loc, intermediate.getType(), input, intermediate,
-      SmallVector<AffineMap>{inputMap, inputMap}, parallelIterators,
-      [&](OpBuilder &b, Location loc, ValueRange args) {
-        Value abs = b.create<math::AbsFOp>(loc, args[0]);
-        b.create<linalg::YieldOp>(loc, abs);
-      }).getResult(0);
+      inputMap.getNumDims(), utils::IteratorType::parallel);
+  auto absGeneric =
+      builder
+          .create<linalg::GenericOp>(
+              loc, intermediate.getType(), input, intermediate,
+              SmallVector<AffineMap>{inputMap, inputMap}, parallelIterators,
+              [&](OpBuilder &b, Location loc, ValueRange args) {
+                Value abs = b.create<math::AbsFOp>(loc, args[0]);
+                b.create<linalg::YieldOp>(loc, abs);
+              })
+          .getResult(0);
 
   Value output =
       builder.create<tensor::EmptyOp>(loc, ArrayRef<OpFoldResult>{}, fpTy);
@@ -153,7 +156,8 @@ static Value reduceAbsMax(OpBuilder &builder, Location loc, AffineMap inputMap,
     iteratorTypes[pos] = utils::IteratorType::parallel;
   }
 
-  Value reduced = reduce<arith::MaximumFOp>(builder, loc, inputMap, outputMap, absGeneric, output);
+  Value reduced = reduce<arith::MaximumFOp>(builder, loc, inputMap, outputMap,
+                                            absGeneric, output);
 
   auto extractOp = builder.create<tensor::ExtractOp>(
       loc, getElementTypeOrSelf(reduced.getType()), reduced, ValueRange{});
