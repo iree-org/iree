@@ -24,7 +24,7 @@ CPU_COMPILE_FLAGS = [
     "--iree-llvmcpu-distribution-size=32",
     "--iree-opt-const-eval=false",
     "--iree-llvmcpu-enable-ukernels=all",
-    "--iree-global-opt-enable-quantized-matmul-reassociation"
+    "--iree-global-opt-enable-quantized-matmul-reassociation",
 ]
 
 COMMON_RUN_FLAGS = [
@@ -32,7 +32,7 @@ COMMON_RUN_FLAGS = [
     "--input=2x154x4096xf16=@inference_input.1.bin",
     "--input=2x2048xf16=@inference_input.2.bin",
     "--input=2xf16=@inference_input.3.bin",
-    "--expected_output=2x16x128x128xf32=@inference_output.0.bin"
+    "--expected_output=2x16x128x128xf32=@inference_output.0.bin",
 ]
 
 ROCM_COMPILE_FLAGS = [
@@ -52,7 +52,7 @@ ROCM_COMPILE_FLAGS = [
     "--iree-codegen-llvmgpu-use-vector-distribution",
     "--iree-rocm-waves-per-eu=2",
     "--iree-execution-model=async-external",
-    "--iree-preprocessing-pass-pipeline=builtin.module(iree-preprocessing-transpose-convolution-pipeline, util.func(iree-preprocessing-pad-to-intrinsics))"
+    "--iree-preprocessing-pass-pipeline=builtin.module(iree-preprocessing-transpose-convolution-pipeline, util.func(iree-preprocessing-pad-to-intrinsics))",
 ]
 
 mlir_path = current_dir + "/model.mlirbc"
@@ -63,35 +63,32 @@ compile_rocm_cmd = get_compile_cmd(mlir_path, "model_rocm.vmfb", ROCM_COMPILE_FL
 # CPU
 ###############################################################################
 
+
 def test_compile_mmdit_cpu():
-    iree_compile(
-        mlir_path,
-        "model_cpu.vmfb",
-        CPU_COMPILE_FLAGS,
-        current_dir
-    )
+    iree_compile(mlir_path, "model_cpu.vmfb", CPU_COMPILE_FLAGS, current_dir)
+
 
 @pytest.mark.xfail(
     raises=IreeRunException,
     strict=True,
     reason="Expected run to fail (remove xfail for test_run_mmdit_cpu)",
 )
-@pytest.mark.depends(on=['test_compile_mmdit_cpu'])
+@pytest.mark.depends(on=["test_compile_mmdit_cpu"])
 def test_run_mmdit_cpu():
     vmfb_path = current_dir + "/model_cpu.vmfb"
     return iree_run_module(
         vmfb_path,
-        [
-            "--device=local-task",
-            "--parameters=model=real_weights.irpa"
-        ] + COMMON_RUN_FLAGS,
+        ["--device=local-task", "--parameters=model=real_weights.irpa"]
+        + COMMON_RUN_FLAGS,
         current_dir,
-        compile_cpu_cmd
+        compile_cpu_cmd,
     )
+
 
 ###############################################################################
 # ROCM
 ###############################################################################
+
 
 @pytest.mark.xfail(
     raises=IreeCompileException,
@@ -99,22 +96,15 @@ def test_run_mmdit_cpu():
     reason="Expected compilation to fail (remove xfail for test_compile_mmdit_rocm)",
 )
 def test_compile_mmdit_rocm():
-    iree_compile(
-        mlir_path,
-        "model_rocm.vmfb",
-        ROCM_COMPILE_FLAGS,
-        current_dir
-    )
+    iree_compile(mlir_path, "model_rocm.vmfb", ROCM_COMPILE_FLAGS, current_dir)
 
-@pytest.mark.depends(on=['test_compile_mmdit_rocm'])
+
+@pytest.mark.depends(on=["test_compile_mmdit_rocm"])
 def test_run_mmdit_rocm():
     vmfb_path = current_dir + "/model_rocm.vmfb"
     return iree_run_module(
         vmfb_path,
-        [
-            "--device=hip",
-            "--parameters=model=real_weights.irpa"
-        ] + COMMON_RUN_FLAGS,
+        ["--device=hip", "--parameters=model=real_weights.irpa"] + COMMON_RUN_FLAGS,
         current_dir,
-        compile_rocm_cmd
+        compile_rocm_cmd,
     )
