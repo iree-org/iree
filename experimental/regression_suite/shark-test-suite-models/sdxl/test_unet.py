@@ -25,7 +25,7 @@ CPU_COMPILE_FLAGS = [
     "--iree-llvmcpu-distribution-size=32",
     "--iree-opt-const-eval=false",
     "--iree-llvmcpu-enable-ukernels=all",
-    "--iree-global-opt-enable-quantized-matmul-reassociation"
+    "--iree-global-opt-enable-quantized-matmul-reassociation",
 ]
 
 COMMON_RUN_FLAGS = [
@@ -33,7 +33,7 @@ COMMON_RUN_FLAGS = [
     "--input=2x64x2048xf16=@inference_input.1.bin",
     "--input=2x1280xf16=@inference_input.2.bin",
     "--input=1xf16=@inference_input.3.bin",
-    "--expected_output=1x4x128x128xf16=@inference_output.0.bin"
+    "--expected_output=1x4x128x128xf16=@inference_output.0.bin",
 ]
 
 ROCM_COMPILE_FLAGS = [
@@ -55,14 +55,14 @@ ROCM_COMPILE_FLAGS = [
     "--iree-execution-model=async-external",
     "--iree-preprocessing-pass-pipeline=builtin.module(iree-preprocessing-transpose-convolution-pipeline, util.func(iree-preprocessing-pad-to-intrinsics))",
     "--iree-scheduling-dump-statistics-format=json",
-    "--iree-scheduling-dump-statistics-file=compilation_info.json"
+    "--iree-scheduling-dump-statistics-file=compilation_info.json",
 ]
 
 ROCM_PIPELINE_COMPILE_FLAGS = [
     "--iree-hal-target-backends=rocm",
     f"--iree-rocm-target-chip={rocm_chip}",
     "--verify=false",
-    "--iree-opt-const-eval=false"
+    "--iree-opt-const-eval=false",
 ]
 
 mlir_path = current_dir + "/model.mlirbc"
@@ -73,23 +73,21 @@ compile_rocm_cmd = get_compile_cmd(mlir_path, "model_rocm.vmfb", ROCM_COMPILE_FL
 # CPU
 ###############################################################################
 
+
 def test_compile_unet_pipeline_cpu():
     iree_compile(
         "sdxl_unet_pipeline_bench_f16.mlir",
         "sdxl_scheduled_unet_pipeline_fp16_cpu.vmfb",
         CPU_COMPILE_FLAGS,
-        current_dir
+        current_dir,
     )
+
 
 def test_compile_unet_cpu():
-    iree_compile(
-        mlir_path,
-        "model_cpu.vmfb",
-        CPU_COMPILE_FLAGS,
-        current_dir
-    )
+    iree_compile(mlir_path, "model_cpu.vmfb", CPU_COMPILE_FLAGS, current_dir)
 
-@pytest.mark.depends(on=['test_compile_unet_pipeline_cpu', 'test_compile_unet_cpu'])
+
+@pytest.mark.depends(on=["test_compile_unet_pipeline_cpu", "test_compile_unet_cpu"])
 def test_run_unet_cpu():
     vmfb_path = current_dir + "/model_cpu.vmfb"
     return iree_run_module(
@@ -98,33 +96,33 @@ def test_run_unet_cpu():
             "--device=local-task",
             "--parameters=model=real_weights.irpa",
             "--module=sdxl_scheduled_unet_pipeline_fp16_cpu.vmfb",
-            "--expected_f16_threshold=0.8f"
-        ] + COMMON_RUN_FLAGS,
+            "--expected_f16_threshold=0.8f",
+        ]
+        + COMMON_RUN_FLAGS,
         current_dir,
-        compile_cpu_cmd
+        compile_cpu_cmd,
     )
+
 
 ###############################################################################
 # ROCM
 ###############################################################################
+
 
 def test_compile_unet_pipeline_rocm():
     iree_compile(
         "sdxl_unet_pipeline_bench_f16.mlir",
         "sdxl_scheduled_unet_pipeline_fp16_rocm.vmfb",
         ROCM_PIPELINE_COMPILE_FLAGS,
-        current_dir
+        current_dir,
     )
+
 
 def test_compile_unet_rocm():
-    iree_compile(
-        mlir_path,
-        "model_rocm.vmfb",
-        ROCM_COMPILE_FLAGS,
-        current_dir
-    )
+    iree_compile(mlir_path, "model_rocm.vmfb", ROCM_COMPILE_FLAGS, current_dir)
 
-@pytest.mark.depends(on=['test_compile_unet_pipeline_rocm', 'test_compile_unet_rocm'])
+
+@pytest.mark.depends(on=["test_compile_unet_pipeline_rocm", "test_compile_unet_rocm"])
 def test_run_unet_rocm():
     vmfb_path = current_dir + "/model_rocm.vmfb"
     return iree_run_module(
@@ -133,8 +131,9 @@ def test_run_unet_rocm():
             "--device=hip",
             "--parameters=model=real_weights.irpa",
             "--module=sdxl_scheduled_unet_pipeline_fp16_rocm.vmfb",
-            "--expected_f16_threshold=0.7f"
-        ] + COMMON_RUN_FLAGS,
+            "--expected_f16_threshold=0.7f",
+        ]
+        + COMMON_RUN_FLAGS,
         current_dir,
-        compile_rocm_cmd
+        compile_rocm_cmd,
     )

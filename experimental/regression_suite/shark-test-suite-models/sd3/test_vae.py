@@ -23,12 +23,12 @@ CPU_COMPILE_FLAGS = [
     "--iree-llvmcpu-distribution-size=32",
     "--iree-opt-const-eval=false",
     "--iree-llvmcpu-enable-ukernels=all",
-    "--iree-global-opt-enable-quantized-matmul-reassociation"
+    "--iree-global-opt-enable-quantized-matmul-reassociation",
 ]
 
 COMMON_RUN_FLAGS = [
     "--input=1x16x128x128xf16=@inference_input.0.bin",
-    "--expected_output=3x1024x1024xf32=@inference_output.0.bin"
+    "--expected_output=3x1024x1024xf32=@inference_output.0.bin",
 ]
 
 ROCM_COMPILE_FLAGS = [
@@ -42,7 +42,7 @@ ROCM_COMPILE_FLAGS = [
     "--iree-flow-enable-aggressive-fusion=true",
     "--iree-codegen-llvmgpu-use-vector-distribution=true",
     "--iree-execution-model=async-external",
-    "--iree-preprocessing-pass-pipeline=builtin.module(iree-preprocessing-transpose-convolution-pipeline, util.func(iree-preprocessing-pad-to-intrinsics))"
+    "--iree-preprocessing-pass-pipeline=builtin.module(iree-preprocessing-transpose-convolution-pipeline, util.func(iree-preprocessing-pad-to-intrinsics))",
 ]
 
 mlir_path = current_dir + "/model.mlirbc"
@@ -53,15 +53,12 @@ compile_rocm_cmd = get_compile_cmd(mlir_path, "model_rocm.vmfb", ROCM_COMPILE_FL
 # CPU
 ###############################################################################
 
-def test_compile_vae_cpu():
-    iree_compile(
-        mlir_path,
-        "model_cpu.vmfb",
-        CPU_COMPILE_FLAGS,
-        current_dir
-    )
 
-@pytest.mark.depends(on=['test_compile_vae_cpu'])
+def test_compile_vae_cpu():
+    iree_compile(mlir_path, "model_cpu.vmfb", CPU_COMPILE_FLAGS, current_dir)
+
+
+@pytest.mark.depends(on=["test_compile_vae_cpu"])
 def test_run_vae_cpu():
     vmfb_path = current_dir + "/model_cpu.vmfb"
     return iree_run_module(
@@ -69,25 +66,24 @@ def test_run_vae_cpu():
         [
             "--device=local-task",
             "--parameters=model=real_weights.irpa",
-            "--expected_f32_threshold=0.01f"
-        ] + COMMON_RUN_FLAGS,
+            "--expected_f32_threshold=0.01f",
+        ]
+        + COMMON_RUN_FLAGS,
         current_dir,
-        compile_cpu_cmd
+        compile_cpu_cmd,
     )
+
 
 ###############################################################################
 # ROCM
 ###############################################################################
 
-def test_compile_vae_rocm():
-    iree_compile(
-        mlir_path,
-        "model_rocm.vmfb",
-        ROCM_COMPILE_FLAGS,
-        current_dir
-    )
 
-@pytest.mark.depends(on=['test_compile_vae_rocm'])
+def test_compile_vae_rocm():
+    iree_compile(mlir_path, "model_rocm.vmfb", ROCM_COMPILE_FLAGS, current_dir)
+
+
+@pytest.mark.depends(on=["test_compile_vae_rocm"])
 def test_run_vae_rocm():
     vmfb_path = current_dir + "/model_rocm.vmfb"
     return iree_run_module(
@@ -95,8 +91,9 @@ def test_run_vae_rocm():
         [
             "--device=hip",
             "--parameters=model=real_weights.irpa",
-            "--expected_f32_threshold=0.7f"
-        ] + COMMON_RUN_FLAGS,
+            "--expected_f32_threshold=0.7f",
+        ]
+        + COMMON_RUN_FLAGS,
         current_dir,
-        compile_rocm_cmd
+        compile_rocm_cmd,
     )
