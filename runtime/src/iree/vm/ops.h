@@ -569,10 +569,18 @@ static inline float vm_round_f32_even(float operand) {
 #endif  // C23
 }
 static inline float vm_min_f32(float lhs, float rhs) {
-  return rhs < lhs ? rhs : lhs;
+  // If `lhs` is NaN, returns `rhs`.
+  if (lhs != lhs) return rhs;
+  // If `rhs` is NaN, returns `lhs`.
+  if (rhs != rhs) return lhs;
+  return lhs < rhs ? lhs : rhs;
 }
 static inline float vm_max_f32(float lhs, float rhs) {
-  return lhs < rhs ? rhs : lhs;
+  // If `lhs` is NaN, returns `rhs`.
+  if (lhs != lhs) return rhs;
+  // If `rhs` is NaN, returns `lhs`.
+  if (rhs != rhs) return lhs;
+  return lhs > rhs ? lhs : rhs;
 }
 
 static inline float vm_atan_f32(float operand) { return atanf(operand); }
@@ -753,10 +761,18 @@ static inline double vm_round_f64_even(double operand) {
 #endif  // C23
 }
 static inline double vm_min_f64(double lhs, double rhs) {
-  return rhs < lhs ? rhs : lhs;
+  // If `lhs` is NaN, returns `rhs`.
+  if (lhs != lhs) return rhs;
+  // If `rhs` is NaN, returns `lhs`.
+  if (rhs != rhs) return lhs;
+  return lhs < rhs ? lhs : rhs;
 }
 static inline double vm_max_f64(double lhs, double rhs) {
-  return lhs < rhs ? rhs : lhs;
+  // If `lhs` is NaN, returns `rhs`.
+  if (lhs != lhs) return rhs;
+  // If `rhs` is NaN, returns `lhs`.
+  if (rhs != rhs) return lhs;
+  return lhs > rhs ? lhs : rhs;
 }
 
 static inline double vm_atan_f64(double operand) { return atan(operand); }

@@ -728,7 +728,11 @@ void populateArithToVMPatterns(MLIRContext *context,
                                    IREE::VM::SubF64Op>,
       BinaryArithmeticOpConversion<arith::MinimumFOp, IREE::VM::MinF32Op,
                                    IREE::VM::MinF64Op>,
+      BinaryArithmeticOpConversion<arith::MinNumFOp, IREE::VM::MinF32Op,
+                                   IREE::VM::MinF64Op>,
       BinaryArithmeticOpConversion<arith::MaximumFOp, IREE::VM::MaxF32Op,
+                                   IREE::VM::MaxF64Op>,
+      BinaryArithmeticOpConversion<arith::MaxNumFOp, IREE::VM::MaxF32Op,
                                    IREE::VM::MaxF64Op>>(typeConverter, context);
 
   // Floating-point conversion ops.
