@@ -438,7 +438,7 @@ static bool matchInner2DTranspose(linalg::LinalgOp genericOp, unsigned rank) {
 
 // Method to match a linalg.matmul(a, linalg.transpose(b)). Returns `b` on
 // success.
-std::optional<Value> matchATransposeBMatmul(linalg::LinalgOp matmulOp) {
+static std::optional<Value> matchATransposeBMatmul(linalg::LinalgOp matmulOp) {
   if (!isa<linalg::MatmulOp>(matmulOp.getOperation())) {
     return std::nullopt;
   }
@@ -452,7 +452,8 @@ std::optional<Value> matchATransposeBMatmul(linalg::LinalgOp matmulOp) {
 
 // Method to match a linalg.batch_matmul(a, linalg.transpose(b)). Returns `b` on
 // success.
-std::optional<Value> matchATransposeBBatchMatmul(linalg::LinalgOp bmmOp) {
+static std::optional<Value>
+matchATransposeBBatchMatmul(linalg::LinalgOp bmmOp) {
   if (!isa<linalg::BatchMatmulOp>(bmmOp.getOperation())) {
     return std::nullopt;
   }
@@ -521,22 +522,21 @@ public:
 
 // Method to match a linalg.generic op representing a linalg.fill op. Returns
 // the fill value (input operand to linalg.fill) on success.
-std::optional<Value> matchGenericFill(linalg::LinalgOp linalgOp) {
+static std::optional<Value> matchGenericFill(linalg::LinalgOp linalgOp) {
   if (isa<linalg::GenericOp>(linalgOp.getOperation()) &&
       linalgOp.getNumDpsInputs() == 0 && linalgOp.getNumDpsInits() == 1 &&
       linalgOp.getNumParallelLoops() == linalgOp.getNumLoops() &&
       linalgOp.getIndexingMapsArray()[0].isIdentity()) {
     // Check that the op body is only a linalg.yield op.
-    Value yieldOperand;
-    for (Operation &bodyOp : linalgOp.getBlock()->getOperations()) {
-      if (isa<linalg::YieldOp>(bodyOp)) {
-        yieldOperand = bodyOp.getOperand(0);
-      } else {
-        return std::nullopt;
-      }
+    if (linalgOp.getBlock()->getOperations().size() != 1) {
+      return std::nullopt;
     }
+    Value yieldOperand =
+        cast<linalg::YieldOp>(linalgOp.getBlock()->getOperations().begin())
+            .getOperand(0);
+
     // Check that the operand of the linalg.yield op is not an argument of the
-    // linalg.generic basic block
+    // linalg.generic basic block.
     for (Value blockArg : linalgOp.getBlock()->getArguments()) {
       if (yieldOperand == blockArg) {
         return std::nullopt;
