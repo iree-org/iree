@@ -13,12 +13,14 @@
 #include "iree/compiler/GlobalOptimization/Passes.h"
 #include "iree/compiler/GlobalOptimization/Utils.h"
 #include "llvm/ADT/STLExtras.h"
+#include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/Linalg/Transforms/Transforms.h"
 #include "mlir/Dialect/Linalg/Utils/Utils.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/TypeUtilities.h"
 #include "mlir/Pass/Pass.h"
@@ -570,6 +572,64 @@ public:
 };
 
 //===----------------------------------------------------------------------===//
+// Insert Slice to Pad Raising
+//===----------------------------------------------------------------------===//
+
+class RaiseInsertSliceToPad : public OpRewritePattern<tensor::InsertSliceOp> {
+public:
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(tensor::InsertSliceOp sliceOp,
+                                PatternRewriter &rewriter) const override {
+    if (!IREE::Flow::isNonNullAndOutsideDispatch(sliceOp)) {
+      return failure();
+    }
+    if (sliceOp.getSourceType().getRank() !=
+        sliceOp.getResultType().getRank()) {
+      return rewriter.notifyMatchFailure(
+          sliceOp, "unimplemented: rank reducing slice raising");
+    }
+    if (!sliceOp.hasUnitStride()) {
+      return rewriter.notifyMatchFailure(sliceOp, "strided insert slice");
+    }
+
+    auto constantDest = sliceOp.getDest().getDefiningOp<arith::ConstantOp>();
+    if (!constantDest) {
+      return rewriter.notifyMatchFailure(sliceOp,
+                                         "Non constant slice destination");
+    }
+
+    auto denseAttr = dyn_cast<DenseElementsAttr>(constantDest.getValue());
+    if (!denseAttr || !denseAttr.isSplat()) {
+      return rewriter.notifyMatchFailure(
+          sliceOp, "Failed to match constant splat destination");
+    }
+
+    Location loc = sliceOp.getLoc();
+
+    AffineExpr d0, d1, d2;
+    bindDims(rewriter.getContext(), d0, d1, d2);
+
+    SmallVector<OpFoldResult> lowPadding = sliceOp.getMixedOffsets();
+    SmallVector<OpFoldResult> highPadding;
+    for (auto [dim, offset, size] :
+         llvm::zip_equal(denseAttr.getType().getShape(), lowPadding,
+                         sliceOp.getMixedSizes())) {
+      highPadding.push_back(affine::makeComposedFoldedAffineApply(
+          rewriter, loc, d0 - d1 - d2,
+          {rewriter.getIndexAttr(dim), size, offset}));
+    }
+
+    Value paddingValue = rewriter.create<arith::ConstantOp>(
+        constantDest.getLoc(), denseAttr.getElementType(),
+        denseAttr.getSplatValue<TypedAttr>());
+    rewriter.replaceOpWithNewOp<tensor::PadOp>(sliceOp, sliceOp.getResultType(),
+                                               sliceOp.getSource(), lowPadding,
+                                               highPadding, paddingValue);
+    return success();
+  }
+};
+
+//===----------------------------------------------------------------------===//
 // Concatenate Negate and Slice Raising Patterns
 //===----------------------------------------------------------------------===//
 
@@ -981,6 +1041,7 @@ struct RaiseSpecialOpsPass : public RaiseSpecialOpsBase<RaiseSpecialOpsPass> {
       patterns.insert<RaiseGenericFill>(context);
       patterns.insert<InsertSliceNegateAndSlicePattern>(context);
       patterns.insert<ConcatenateNegateAndSlicePattern>(context);
+      patterns.insert<RaiseInsertSliceToPad>(context);
       if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
         return signalPassFailure();
       }
