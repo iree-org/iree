@@ -68,6 +68,7 @@ makeSwizzledIds(Location loc, OpBuilder b, Value workgroupIdX,
   return {swizzledIdX, swizzledIdY};
 }
 
+// reoredering to make workgroup ids move slowly between chiplet groups
 static Value chipletAwareWorkgroupReordering(Location loc, OpBuilder b,
                                              Value linearizedId,
                                              Value workgroupCountX,
@@ -101,30 +102,36 @@ static Value chipletAwareWorkgroupReordering(Location loc, OpBuilder b,
 
   return linearizedId;
 }
-// Detailed explaination about the idea behind this implementation:
-// the L2 Cache Optimizations subsection in
-// https://triton-lang.org/main/getting-started/tutorials/03-matrix-multiplication.html#
-static std::pair<Value, Value> makeChipletGroupedIds(Location loc, OpBuilder b,
-                                                     Value workgroupIdX,
-                                                     Value workgroupIdY,
-                                                     Value workgroupCountX,
-                                                     Value workgroupCountY) {
+
+// Chiplet-aware workgroup reordering strategy: reordering + super-grouping.
+// Step 1: Reorder the workgroup grid to move slowly between
+// chiplet groups (Function: chipletAwareWorkgroupReordering).
+// Step 2: Implement 'super-grouping' of workgroups before switching to the next
+// column.
+static std::pair<Value, Value>
+makeChipletGroupedIds(Location loc, OpBuilder b, Value workgroupIdX,
+                      Value workgroupIdY, Value workgroupCountX,
+                      Value workgroupCountY, unsigned chipletGroupTile) {
   // Create one dimension ID for workgroup
   Value linearized =
       b.create<arith::MulIOp>(loc, workgroupIdY, workgroupCountX);
   linearized = b.create<arith::AddIOp>(loc, linearized, workgroupIdX);
 
-  // This value is for cdna3(mi300x)
-  int64_t numXCUs = 8;
+  // This value is hardcoded for cdna3(mi300x)
+  int64_t numXCDs = 8;
   // Map chiplets to perform a spatially local tile operation.
   // Reorder the linearized ID such that every consecutive group of chiplets
   // is the slowest-changing dimension in the grid.
   // Emphircally found that two chiplets as a group has better locality
   // throughout.
   linearized = chipletAwareWorkgroupReordering(
-      loc, b, linearized, workgroupCountX, workgroupCountY, numXCUs / 2);
-  // Emphircally, found 64 for mi300x achieves good performance
-  int64_t rowGroupSize = 64;
+      loc, b, linearized, workgroupCountX, workgroupCountY, numXCDs / 2);
+
+  // Detailed explaination about the idea behind the below implementation:
+  // the L2 Cache Optimizations subsection in
+  // https://triton-lang.org/main/getting-started/tutorials/03-matrix-multiplication.html#
+  // Emphircally, found rowGroupSize=16 for mi300x achieves good performance
+  unsigned rowGroupSize = chipletGroupTile;
   Value rowGroupSizeVal =
       b.createOrFold<arith::ConstantIndexOp>(loc, rowGroupSize);
   // group every 16 workgroups along Y dimension
@@ -194,11 +201,11 @@ getWorkgroupCountsXY(OpBuilder &builder, FunctionOpInterface funcOp) {
 
 static LogicalResult reorderWorkgroupsInFunc(FunctionOpInterface funcOp,
                                              ReorderWorkgroupsStrategy strategy,
-                                             unsigned swizzleLogTile) {
+                                             unsigned logTile) {
   assert(strategy != ReorderWorkgroupsStrategy::None &&
          "Expected a concrete strategy");
 
-  unsigned swizzleTile = 1u << swizzleLogTile;
+  unsigned reorderWgTileSize = 1u << logTile;
   IREE::HAL::InterfaceWorkgroupIDOp oldXId;
   IREE::HAL::InterfaceWorkgroupIDOp oldYId;
   unsigned numXIdOps = 0;
@@ -230,19 +237,16 @@ static LogicalResult reorderWorkgroupsInFunc(FunctionOpInterface funcOp,
   Value workgroupIdY =
       builder.create<IREE::HAL::InterfaceWorkgroupIDOp>(funcOp.getLoc(), 1);
   auto [workgroupCntX, workgroupCntY] = getWorkgroupCountsXY(builder, funcOp);
-  // llvm::dbgs() << "X = " << workgroupCntX << "\t Y = " << workgroupCntY <<
-  // "\n";
   Value newWorkgroupIdX;
   Value newWorkgroupIdY;
   if (strategy == ReorderWorkgroupsStrategy::Swizzle) {
     std::tie(newWorkgroupIdX, newWorkgroupIdY) =
         makeSwizzledIds(funcOp.getLoc(), builder, workgroupIdX, workgroupIdY,
-                        workgroupCntX, workgroupCntY, swizzleTile);
+                        workgroupCntX, workgroupCntY, reorderWgTileSize);
   } else if (strategy == ReorderWorkgroupsStrategy::ChipletGroup) {
-    // llvm::dbgs() << "Here is Bangtian's New Implementation \n";
-    std::tie(newWorkgroupIdX, newWorkgroupIdY) =
-        makeChipletGroupedIds(funcOp.getLoc(), builder, workgroupIdX,
-                              workgroupIdY, workgroupCntX, workgroupCntY);
+    std::tie(newWorkgroupIdX, newWorkgroupIdY) = makeChipletGroupedIds(
+        funcOp.getLoc(), builder, workgroupIdX, workgroupIdY, workgroupCntX,
+        workgroupCntY, reorderWgTileSize);
   } else {
     assert(strategy == ReorderWorkgroupsStrategy::Transpose &&
            "Unhandled strategy");
@@ -275,9 +279,9 @@ namespace {
 struct ReorderWorkgroupsPass final
     : impl::ReorderWorkgroupsPassBase<ReorderWorkgroupsPass> {
   ReorderWorkgroupsPass(
-      ReorderWorkgroupsStrategy strategy, unsigned logSwizzleTile,
+      ReorderWorkgroupsStrategy strategy, unsigned logTile,
       std::function<LogicalResult(mlir::FunctionOpInterface)> filterFn)
-      : reorderingStrategy(strategy), logSwizzleTile(logSwizzleTile),
+      : reorderingStrategy(strategy), reorderWgLogTileSize(logTile),
         filterFn(std::move(filterFn)) {}
 
   LogicalResult initializeOptions(
@@ -286,7 +290,7 @@ struct ReorderWorkgroupsPass final
     if (failed(Pass::initializeOptions(options, errorHandler))) {
       return failure();
     }
-    logSwizzleTile = logTile;
+    reorderWgLogTileSize = logTile;
     auto selectedStrategy =
         llvm::StringSwitch<FailureOr<ReorderWorkgroupsStrategy>>(strategy)
             .Case("", ReorderWorkgroupsStrategy::None)
@@ -306,7 +310,11 @@ struct ReorderWorkgroupsPass final
       return;
 
     if (reorderingStrategy == ReorderWorkgroupsStrategy::Swizzle &&
-        logSwizzleTile == 0)
+        reorderWgLogTileSize == 0)
+      return;
+
+    if (reorderingStrategy == ReorderWorkgroupsStrategy::ChipletGroup &&
+        reorderWgLogTileSize == 0)
       return;
 
     FunctionOpInterface funcOp = getOperation();
@@ -319,7 +327,8 @@ struct ReorderWorkgroupsPass final
       llvm::dbgs() << "\n\n";
     });
 
-    if (failed(reorderWorkgroupsInFunc(funcOp, reorderingStrategy, logTile))) {
+    if (failed(reorderWorkgroupsInFunc(funcOp, reorderingStrategy,
+                                       reorderWgLogTileSize))) {
       LLVM_DEBUG(llvm::dbgs() << "Failed to reorder workgroups\n");
       return;
     }
@@ -334,7 +343,7 @@ struct ReorderWorkgroupsPass final
 private:
   ReorderWorkgroupsStrategy reorderingStrategy =
       ReorderWorkgroupsStrategy::None;
-  unsigned logSwizzleTile = 0;
+  unsigned reorderWgLogTileSize = 0;
   std::function<LogicalResult(mlir::FunctionOpInterface)> filterFn;
 };
 } // namespace

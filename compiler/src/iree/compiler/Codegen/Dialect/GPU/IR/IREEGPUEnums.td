@@ -148,4 +148,20 @@ def IREEGPU_TilingLevel : IREEGPU_I32MmaEnumAttr<"TilingLevel",
       Lane
     ]>;
 
+//===----------------------------------------------------------------------===//
+// Workgroup reordering strategies
+
+def None : I32EnumAttrCase<"none", 0>;
+def Transpose :I32EnumAttrCase<"transpose", 1>;
+def Swizzle : I32EnumAttrCase<"swizzle", 2>;
+def Chipletgroup : I32EnumAttrCase<"chipletgroup", 3>;
+
+def IREEGPU_ReorderWorkgroupEnum : IREEGPU_I32MmaEnumAttr<"ReorderWorkgroupEnum",
+    "Descriptor for strategies of reordering workgroups on GPUs", [
+      None,
+      Transpose,
+      Swizzle,
+      Chipletgroup
+    ]>;
+
 #endif // IREE_COMPILER_CODEGEN_DIALECT_GPU_IREEGPUENUMS
