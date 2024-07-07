@@ -337,6 +337,9 @@ void populateVectorTransferTensorSliceTransforms(RewritePatternSet &patterns,
 /// Method to register all passes.
 void registerCodegenCommonPasses();
 
+/// Populate Encoding to Nop pass and canonicalizer pass to the pipeline
+void addEncodingToNopPasses(FunctionLikeNest &passManager);
+
 } // namespace mlir::iree_compiler
 
 #endif // IREE_COMPILER_CODEGEN_COMMON_PASSES_H_
