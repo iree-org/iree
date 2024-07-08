@@ -94,16 +94,15 @@ module @no_fold_public {
 
 // -----
 
-module @fold_stream_parameter{
-  util.global private mutable @glob1
-    = #stream.parameter.named<"module"::"glob1"> : tensor<1x1x10xf32>
-  util.func public @func() -> tensor<1x1x10xf32> {
-    %0 = util.global.load @glob1 : tensor<1x1x10xf32>
-    util.return %0 : tensor<1x1x10xf32>
+module @fold_stream_parameter {
+  util.global private mutable @global = #stream.parameter.named<"module"::"global"> : tensor<1x1x10xf32>
+  util.func public @fold_stream_parameter() -> tensor<1x1x10xf32> {
+    %global = util.global.load @global : tensor<1x1x10xf32>
+    util.return %global : tensor<1x1x10xf32>
   }
 }
 
 //      CHECK: module @fold_stream_parameter
-//      CHECK:   util.global private mutable @[[GLOBAL:.+]] = #stream.parameter.named<"module"::"glob1"> : tensor<10xf32>
-//      CHECK:   util.func public @func
+//      CHECK:   util.global private mutable @[[GLOBAL:.+]] = #stream.parameter.named<"module"::"global"> : tensor<10xf32>
+//      CHECK:   util.func public @fold_stream_parameter
 //      CHECK:     %[[LOAD:.+]] = util.global.load @[[GLOBAL]] : tensor<10xf32>
