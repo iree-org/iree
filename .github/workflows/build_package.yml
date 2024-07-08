@@ -39,7 +39,7 @@ jobs:
       matrix:
         include:
           # Ubuntu packages.
-          - runs-on: [managed-releaser, os-family=Linux, runner-group=releaser]
+          - runs-on: ubuntu-20.04
             build-family: linux-x86_64
             build-package: main-dist-linux
             experimental: false
@@ -48,7 +48,7 @@ jobs:
             build-family: linux-aarch64
             build-package: main-dist-linux
             experimental: true
-          - runs-on: [managed-releaser, os-family=Linux, runner-group=releaser]
+          - runs-on: ubuntu-20.04
             build-family: linux-x86_64
             build-package: py-compiler-pkg
             experimental: false
@@ -57,7 +57,7 @@ jobs:
             build-family: linux-aarch64
             build-package: py-compiler-pkg
             experimental: true
-          - runs-on: [managed-releaser, os-family=Linux, runner-group=releaser]
+          - runs-on: ubuntu-20.04
             build-family: linux-x86_64
             build-package: py-runtime-pkg
             experimental: false
@@ -66,7 +66,7 @@ jobs:
             build-family: linux-aarch64
             build-package: py-runtime-pkg
             experimental: true
-          - runs-on: [managed-releaser, os-family=Linux, runner-group=releaser]
+          - runs-on: ubuntu-20.04
             build-family: linux-x86_64
             build-package: py-tf-compiler-tools-pkg
             experimental: false
