@@ -11,6 +11,7 @@
 #include "iree/compiler/Dialect/LinalgExt/IR/LinalgExtOps.h"
 #include "iree/compiler/GlobalOptimization/PassDetail.h"
 #include "iree/compiler/GlobalOptimization/Passes.h"
+#include "iree/compiler/GlobalOptimization/Utils.h"
 #include "llvm/ADT/STLExtras.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
@@ -29,107 +30,6 @@ using transform_ext::StructuredOpMatcher;
 namespace mlir::iree_compiler::GlobalOptimization {
 
 namespace {
-
-//===----------------------------------------------------------------------===//
-// Generic to Named Op Conversions
-//===----------------------------------------------------------------------===//
-
-// Method to match a transpose operation on the two most minor dimensions of the
-// specified rank.
-static bool matchInner2DTranspose(linalg::LinalgOp genericOp, unsigned rank) {
-  // Only makes sense for minimum rank 2.
-  if (rank < 2) {
-    return false;
-  }
-  if (genericOp.getNumDpsInputs() != 1 || genericOp.getNumDpsInits() != 1) {
-    return false;
-  }
-  // Check only for ops of the specified rank.
-  if (genericOp.getNumLoops() != rank ||
-      genericOp.getNumLoops() != genericOp.getNumParallelLoops()) {
-    return false;
-  }
-  // Check for transpose map.
-  SmallVector<AffineExpr> exprList(rank);
-  MLIRContext *context = genericOp.getContext();
-  bindDimsList(context, MutableArrayRef{exprList});
-  SmallVector<AffineExpr> transposeExprList(exprList);
-  std::swap(transposeExprList[rank - 1], transposeExprList[rank - 2]);
-  SmallVector<AffineMap> expectedMaps = {
-      AffineMap::get(rank, 0, exprList, context),
-      AffineMap::get(rank, 0, transposeExprList, context)};
-  if (genericOp.getIndexingMapsArray() != expectedMaps) {
-    return false;
-  }
-
-  Block *body = genericOp.getBlock();
-  if (!llvm::hasSingleElement(*body)) {
-    return false;
-  }
-  auto yieldOp = cast<linalg::YieldOp>(body->getTerminator());
-  auto blockArg = dyn_cast<BlockArgument>(yieldOp.getOperand(0));
-  if (!blockArg || blockArg.getOwner() != body ||
-      blockArg.getArgNumber() != 0) {
-    return false;
-  }
-  return true;
-}
-
-// Method to match a linalg.matmul(a, linalg.transpose(b)). Returns `b` on
-// success.
-std::optional<Value> matchATransposeBMatmul(linalg::LinalgOp matmulOp) {
-  if (!isa<linalg::MatmulOp>(matmulOp.getOperation())) {
-    return std::nullopt;
-  }
-  auto rhs = matmulOp.getDpsInputOperand(1);
-  auto genericOp = rhs->get().getDefiningOp<linalg::GenericOp>();
-  if (genericOp && matchInner2DTranspose(genericOp, 2)) {
-    return genericOp.getDpsInputOperand(0)->get();
-  }
-  return std::nullopt;
-}
-
-// Method to match a linalg.batch_matmul(a, linalg.transpose(b)). Returns `b` on
-// success.
-std::optional<Value> matchATransposeBBatchMatmul(linalg::LinalgOp bmmOp) {
-  if (!isa<linalg::BatchMatmulOp>(bmmOp.getOperation())) {
-    return std::nullopt;
-  }
-  auto rhs = bmmOp.getDpsInputOperand(1);
-  auto genericOp = rhs->get().getDefiningOp<linalg::GenericOp>();
-  if (genericOp && matchInner2DTranspose(genericOp, 3)) {
-    return genericOp.getDpsInputOperand(0)->get();
-  }
-  return std::nullopt;
-}
-
-// Method to match a linalg.generic op representing a linalg.fill op. Returns
-// the fill value (input operand to linalg.fill) on success.
-std::optional<Value> matchGenericFill(linalg::LinalgOp linalgOp) {
-  if (isa<linalg::GenericOp>(linalgOp.getOperation()) &&
-      linalgOp.getNumDpsInputs() == 0 && linalgOp.getNumDpsInits() == 1 &&
-      linalgOp.getNumParallelLoops() == linalgOp.getNumLoops() &&
-      linalgOp.getIndexingMapsArray()[0].isIdentity()) {
-    // Check that the op body is only a linalg.yield op.
-    Value yieldOperand;
-    for (Operation &bodyOp : linalgOp.getBlock()->getOperations()) {
-      if (isa<linalg::YieldOp>(bodyOp)) {
-        yieldOperand = bodyOp.getOperand(0);
-      } else {
-        return std::nullopt;
-      }
-    }
-    // Check that the operand of the linalg.yield op is not an argument of the
-    // linalg.generic basic block
-    for (Value blockArg : linalgOp.getBlock()->getArguments()) {
-      if (yieldOperand == blockArg) {
-        return std::nullopt;
-      }
-    }
-    return yieldOperand;
-  }
-  return std::nullopt;
-}
 
 //===----------------------------------------------------------------------===//
 // Slice Raising
@@ -362,7 +262,315 @@ static FailureOr<Operation *> tryRaiseToView(linalg::GenericOp linalgOp,
 }
 
 //===----------------------------------------------------------------------===//
-// Partial negation and inner slice reverse
+// Named GEMM-like extensions
+//===----------------------------------------------------------------------===//
+
+template <typename OpTy>
+class NamedImplicitCastOpConversion : public OpInterfaceRewritePattern<OpTy> {
+public:
+  using OpInterfaceRewritePattern<OpTy>::OpInterfaceRewritePattern;
+  NamedImplicitCastOpConversion(MLIRContext *ctx, PatternBenefit b = 1)
+      : OpInterfaceRewritePattern<OpTy>(ctx, b) {}
+
+  LogicalResult matchAndRewrite(OpTy namedOp,
+                                PatternRewriter &rewriter) const override {
+    if (!IREE::Flow::isNonNullAndOutsideDispatch(namedOp)) {
+      return failure();
+    }
+
+    // Look for a producer of the given operand that does an elementwise extend
+    // and replace the operand with the source of the elementwise producer.
+    // Returns true if the operand was updated to inform the pattern rewriter
+    // of a change.
+    Type outElementType = getElementTypeOrSelf(namedOp->getResultTypes()[0]);
+    bool didChangeOperand = false;
+    {
+      OpBuilder::InsertionGuard guard(rewriter);
+      Block *block = &namedOp->getRegion(0).front();
+      rewriter.setInsertionPointToStart(block);
+      auto replaceOperandWithTypeCast = [&](OpOperand &operand) {
+        // If the op already has implicit casting semantics for this operand,
+        // do not fuse.
+        if (getElementTypeOrSelf(operand.get().getType()) != outElementType) {
+          return false;
+        }
+        auto producer = operand.get().getDefiningOp<linalg::GenericOp>();
+        if (!producer) {
+          return false;
+        }
+
+        std::optional<CastOpInterface> castOp =
+            getDefiningNonI1ExtendingCastOp(operand.get());
+        if (!castOp) {
+          return false;
+        }
+        // We only handle arith.extf/exti because truncating operations like
+        // `arith.truncf` should not be fused with consumers; it would be
+        // preferred to fuse those with producers (and the consumer fusion is
+        // arguably the less canonical form).
+        auto canFoldCast = [&]() {
+          if (llvm::isa<arith::ExtFOp>(*castOp))
+            return true;
+          // Signed operations can only be folded with (implicitly) signed
+          // linalg named ops
+          if (llvm::isa<arith::ExtSIOp>(*castOp)) {
+            return !llvm::isa<linalg::MatmulUnsignedOp,
+                              linalg::PoolingNhwcMaxUnsignedOp,
+                              linalg::PoolingNhwcMinUnsignedOp,
+                              linalg::PoolingNwcMaxUnsignedOp,
+                              linalg::PoolingNwcMinUnsignedOp>(namedOp);
+          }
+          return false;
+        };
+        if (!canFoldCast()) {
+          return false;
+        }
+        Type producerElementType = getElementTypeOrSelf(
+            producer.getDpsInputOperand(0)->get().getType());
+        int64_t operandNumber = operand.getOperandNumber();
+        // Set the operand to the linalg op to the smaller one.
+        namedOp->setOperand(operandNumber, producer->getOperand(0));
+
+        // Insert a new block argument into the body of the named op with the
+        // correct type.
+        Value blockArg = block->insertArgument(
+            operandNumber, producerElementType, namedOp.getLoc());
+        // Create the extf/extsi.
+        IRMapping mapping;
+        mapping.map(castOp.value()->getOperand(0), blockArg);
+        Value ext = rewriter.clone(*castOp.value(), mapping)->getResult(0);
+
+        // Replace uses of the old argument with the extended value.
+        rewriter.replaceAllUsesWith(block->getArgument(operandNumber + 1), ext);
+        // Erase the old argument.
+        block->eraseArgument(operandNumber + 1);
+        return true;
+      };
+
+      didChangeOperand = replaceOperandWithTypeCast(namedOp->getOpOperand(0));
+      didChangeOperand |= replaceOperandWithTypeCast(namedOp->getOpOperand(1));
+    }
+    return success(didChangeOperand);
+  }
+};
+
+//===----------------------------------------------------------------------===//
+// Softmax Raising
+//===----------------------------------------------------------------------===//
+
+class RaiseSoftmax : public OpInterfaceRewritePattern<linalg::LinalgOp> {
+public:
+  using OpInterfaceRewritePattern<linalg::LinalgOp>::OpInterfaceRewritePattern;
+  RaiseSoftmax(MLIRContext *ctx, PatternBenefit b = 1)
+      : OpInterfaceRewritePattern<linalg::LinalgOp>(ctx, b) {}
+
+  LogicalResult matchAndRewrite(linalg::LinalgOp linalgOp,
+                                PatternRewriter &rewriter) const override {
+    if (!IREE::Flow::isNonNullAndOutsideDispatch(linalgOp)) {
+      return failure();
+    }
+
+    transform_ext::MatcherContext matcherContext;
+    transform_ext::StructuredOpMatcher *maxReduction;
+    transform_ext::StructuredOpMatcher *softmaxroot;
+    makeSoftmaxMatcher(matcherContext, maxReduction, softmaxroot);
+    if (!matchPattern(linalgOp, *softmaxroot)) {
+      return rewriter.notifyMatchFailure(linalgOp,
+                                         "failed to match softmax root");
+    }
+
+    Value src = maxReduction->getCaptured()->getOperand(0);
+    rewriter.setInsertionPoint(linalgOp);
+    rewriter.replaceOpWithNewOp<linalg::SoftmaxOp>(
+        linalgOp, linalgOp->getResultTypes(), src,
+        linalgOp.getDpsInitOperand(0)->get(), linalgOp.getNumLoops() - 1);
+    return success();
+  }
+};
+
+//===----------------------------------------------------------------------===//
+// (Batch) Matmul Transpose Fusion
+//===----------------------------------------------------------------------===//
+
+// Method to match a transpose operation on the two most minor dimensions of the
+// specified rank.
+static bool matchInner2DTranspose(linalg::LinalgOp genericOp, unsigned rank) {
+  // Only makes sense for minimum rank 2.
+  if (rank < 2) {
+    return false;
+  }
+  if (genericOp.getNumDpsInputs() != 1 || genericOp.getNumDpsInits() != 1) {
+    return false;
+  }
+  // Check only for ops of the specified rank.
+  if (genericOp.getNumLoops() != rank ||
+      genericOp.getNumLoops() != genericOp.getNumParallelLoops()) {
+    return false;
+  }
+  // Check for transpose map.
+  SmallVector<AffineExpr> exprList(rank);
+  MLIRContext *context = genericOp.getContext();
+  bindDimsList(context, MutableArrayRef{exprList});
+  SmallVector<AffineExpr> transposeExprList(exprList);
+  std::swap(transposeExprList[rank - 1], transposeExprList[rank - 2]);
+  SmallVector<AffineMap> expectedMaps = {
+      AffineMap::get(rank, 0, exprList, context),
+      AffineMap::get(rank, 0, transposeExprList, context)};
+  if (genericOp.getIndexingMapsArray() != expectedMaps) {
+    return false;
+  }
+
+  Block *body = genericOp.getBlock();
+  if (!llvm::hasSingleElement(*body)) {
+    return false;
+  }
+  auto yieldOp = cast<linalg::YieldOp>(body->getTerminator());
+  auto blockArg = dyn_cast<BlockArgument>(yieldOp.getOperand(0));
+  if (!blockArg || blockArg.getOwner() != body ||
+      blockArg.getArgNumber() != 0) {
+    return false;
+  }
+  return true;
+}
+
+// Method to match a linalg.matmul(a, linalg.transpose(b)). Returns `b` on
+// success.
+static std::optional<Value> matchATransposeBMatmul(linalg::LinalgOp matmulOp) {
+  if (!isa<linalg::MatmulOp>(matmulOp.getOperation())) {
+    return std::nullopt;
+  }
+  auto rhs = matmulOp.getDpsInputOperand(1);
+  auto genericOp = rhs->get().getDefiningOp<linalg::GenericOp>();
+  if (genericOp && matchInner2DTranspose(genericOp, 2)) {
+    return genericOp.getDpsInputOperand(0)->get();
+  }
+  return std::nullopt;
+}
+
+// Method to match a linalg.batch_matmul(a, linalg.transpose(b)). Returns `b` on
+// success.
+static std::optional<Value>
+matchATransposeBBatchMatmul(linalg::LinalgOp bmmOp) {
+  if (!isa<linalg::BatchMatmulOp>(bmmOp.getOperation())) {
+    return std::nullopt;
+  }
+  auto rhs = bmmOp.getDpsInputOperand(1);
+  auto genericOp = rhs->get().getDefiningOp<linalg::GenericOp>();
+  if (genericOp && matchInner2DTranspose(genericOp, 3)) {
+    return genericOp.getDpsInputOperand(0)->get();
+  }
+  return std::nullopt;
+}
+
+class FuseMatmulTranspose : public OpRewritePattern<linalg::MatmulOp> {
+public:
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(linalg::MatmulOp matmulOp,
+                                PatternRewriter &rewriter) const override {
+    if (!IREE::Flow::isNonNullAndOutsideDispatch(matmulOp)) {
+      return failure();
+    }
+
+    std::optional<Value> newRhs = matchATransposeBMatmul(matmulOp);
+    if (!newRhs) {
+      return rewriter.notifyMatchFailure(matmulOp,
+                                         "Failed to match transpose on RHS");
+    }
+
+    Value lhs = matmulOp.getDpsInputOperand(0)->get();
+    Value init = matmulOp.getDpsInitOperand(0)->get();
+    rewriter.setInsertionPoint(matmulOp);
+    SmallVector<NamedAttribute> attrs = getPrunedAttributeList(matmulOp);
+    rewriter.replaceOpWithNewOp<linalg::MatmulTransposeBOp>(
+        matmulOp, ValueRange{lhs, *newRhs}, ValueRange{init}, attrs);
+    return success();
+  }
+};
+
+class FuseBatchMatmulTranspose
+    : public OpRewritePattern<linalg::BatchMatmulOp> {
+public:
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(linalg::BatchMatmulOp bmmOp,
+                                PatternRewriter &rewriter) const override {
+    if (!IREE::Flow::isNonNullAndOutsideDispatch(bmmOp)) {
+      return failure();
+    }
+
+    std::optional<Value> newRhs = matchATransposeBBatchMatmul(bmmOp);
+    if (!newRhs) {
+      return rewriter.notifyMatchFailure(bmmOp,
+                                         "Failed to match transpose on RHS");
+    }
+
+    Value lhs = bmmOp.getDpsInputOperand(0)->get();
+    Value init = bmmOp.getDpsInitOperand(0)->get();
+    rewriter.setInsertionPoint(bmmOp);
+    SmallVector<NamedAttribute> attrs = getPrunedAttributeList(bmmOp);
+    rewriter.replaceOpWithNewOp<linalg::BatchMatmulTransposeBOp>(
+        bmmOp, ValueRange{lhs, *newRhs}, ValueRange{init}, attrs);
+    return success();
+  }
+};
+
+//===----------------------------------------------------------------------===//
+// Fill Raising
+//===----------------------------------------------------------------------===//
+
+// Method to match a linalg.generic op representing a linalg.fill op. Returns
+// the fill value (input operand to linalg.fill) on success.
+static std::optional<Value> matchGenericFill(linalg::LinalgOp linalgOp) {
+  if (isa<linalg::GenericOp>(linalgOp.getOperation()) &&
+      linalgOp.getNumDpsInputs() == 0 && linalgOp.getNumDpsInits() == 1 &&
+      linalgOp.getNumParallelLoops() == linalgOp.getNumLoops() &&
+      linalgOp.getIndexingMapsArray()[0].isIdentity()) {
+    // Check that the op body is only a linalg.yield op.
+    if (linalgOp.getBlock()->getOperations().size() != 1) {
+      return std::nullopt;
+    }
+    Value yieldOperand =
+        cast<linalg::YieldOp>(linalgOp.getBlock()->getOperations().begin())
+            .getOperand(0);
+
+    // Check that the operand of the linalg.yield op is not an argument of the
+    // linalg.generic basic block.
+    for (Value blockArg : linalgOp.getBlock()->getArguments()) {
+      if (yieldOperand == blockArg) {
+        return std::nullopt;
+      }
+    }
+    return yieldOperand;
+  }
+  return std::nullopt;
+}
+
+class RaiseGenericFill : public OpRewritePattern<linalg::GenericOp> {
+public:
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(linalg::GenericOp genericOp,
+                                PatternRewriter &rewriter) const override {
+    if (!IREE::Flow::isNonNullAndOutsideDispatch(genericOp)) {
+      return failure();
+    }
+
+    std::optional<Value> fillInput = matchGenericFill(genericOp);
+    if (!fillInput) {
+      return rewriter.notifyMatchFailure(genericOp,
+                                         "failed to match as a fill");
+    }
+
+    Value init = genericOp.getDpsInitOperand(0)->get();
+    rewriter.setInsertionPoint(genericOp);
+    SmallVector<NamedAttribute> attrs = getPrunedAttributeList(genericOp);
+    rewriter.replaceOpWithNewOp<linalg::FillOp>(
+        genericOp, ValueRange{*fillInput}, ValueRange{init}, attrs);
+
+    return success();
+  }
+};
+
+//===----------------------------------------------------------------------===//
+// Concatenate Negate and Slice Raising Patterns
 //===----------------------------------------------------------------------===//
 
 static bool isUnaryNegate(linalg::GenericOp op) {
@@ -681,100 +889,44 @@ static Value rewriteCatNegateAndSlice(RewriterBase &rewriter,
   return createCatNegateAndSlice(rewriter, outTensor, source);
 }
 
-//===----------------------------------------------------------------------===//
-// Named GEMM-like extensions
-//===----------------------------------------------------------------------===//
-
-template <typename OpTy>
-class NamedImplicitCastOpConversion : public OpInterfaceRewritePattern<OpTy> {
+class InsertSliceNegateAndSlicePattern
+    : public OpRewritePattern<tensor::InsertSliceOp> {
 public:
-  using OpInterfaceRewritePattern<OpTy>::OpInterfaceRewritePattern;
-  NamedImplicitCastOpConversion(MLIRContext *ctx, PatternBenefit b = 1)
-      : OpInterfaceRewritePattern<OpTy>(ctx, b) {}
-
-  LogicalResult matchAndRewrite(OpTy namedOp,
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(tensor::InsertSliceOp sliceOp,
                                 PatternRewriter &rewriter) const override {
-    if (!IREE::Flow::isNonNullAndOutsideDispatch(namedOp)) {
+    if (!IREE::Flow::isNonNullAndOutsideDispatch(sliceOp)) {
       return failure();
     }
 
-    // Look for a producer of the given operand that does an elementwise extend
-    // and replace the operand with the source of the elementwise producer.
-    // Returns true if the operand was updated to inform the pattern rewriter
-    // of a change.
-    Type outElementType = getElementTypeOrSelf(namedOp->getResultTypes()[0]);
-    bool didChangeOperand = false;
-    {
-      OpBuilder::InsertionGuard guard(rewriter);
-      Block *block = &namedOp->getRegion(0).front();
-      rewriter.setInsertionPointToStart(block);
-      auto replaceOperandWithTypeCast = [&](OpOperand &operand) {
-        // If the op already has implicit casting semantics for this operand,
-        // do not fuse.
-        if (getElementTypeOrSelf(operand.get().getType()) != outElementType) {
-          return false;
-        }
-        auto producer = operand.get().getDefiningOp<linalg::GenericOp>();
-        if (!producer) {
-          return false;
-        }
-        if (!linalg::isElementwise(producer) ||
-            producer.getNumDpsInputs() != 1 || producer.getNumDpsInits() != 1) {
-          return false;
-        }
-
-        if (!llvm::hasSingleElement(
-                producer.getBlock()->without_terminator())) {
-          return false;
-        }
-        // We only handle arith.extf/exti because truncating operations like
-        // `arith.truncf` should not be fused with consumers; it would be
-        // preferred to fuse those with producers (and the consumer fusion is
-        // arguably the less canonical form).
-        Operation &castOp = *producer.getBlock()->without_terminator().begin();
-        auto canFoldCast = [&]() {
-          if (llvm::isa<arith::ExtFOp>(castOp))
-            return true;
-          // Signed operations can only be folded with (implicitly) signed
-          // linalg named ops
-          if (llvm::isa<arith::ExtSIOp>(castOp)) {
-            return !llvm::isa<linalg::MatmulUnsignedOp,
-                              linalg::PoolingNhwcMaxUnsignedOp,
-                              linalg::PoolingNhwcMinUnsignedOp,
-                              linalg::PoolingNwcMaxUnsignedOp,
-                              linalg::PoolingNwcMinUnsignedOp>(namedOp);
-          }
-          return false;
-        };
-        if (!canFoldCast()) {
-          return false;
-        }
-        Type producerElementType = getElementTypeOrSelf(
-            producer.getDpsInputOperand(0)->get().getType());
-        int64_t operandNumber = operand.getOperandNumber();
-        // Set the operand to the linalg op to the smaller one.
-        namedOp->setOperand(operandNumber, producer->getOperand(0));
-
-        // Insert a new block argument into the body of the named op with the
-        // correct type.
-        Value blockArg = block->insertArgument(
-            operandNumber, producerElementType, namedOp.getLoc());
-        // Create the extf/extsi.
-        IRMapping mapping;
-        mapping.map(castOp.getOperand(0), blockArg);
-        Value ext = rewriter.clone(castOp, mapping)->getResult(0);
-
-        // Replace uses of the old argument with the extended value.
-        rewriter.replaceAllUsesWith(block->getArgument(operandNumber + 1), ext);
-        // Erase the old argument.
-        block->eraseArgument(operandNumber + 1);
-        return true;
-      };
-
-      didChangeOperand = replaceOperandWithTypeCast(namedOp->getOpOperand(0));
-      didChangeOperand |= replaceOperandWithTypeCast(namedOp->getOpOperand(1));
+    std::optional<Value> dagRoot = matchCatNegateAndSlice(sliceOp);
+    if (!dagRoot) {
+      return rewriter.notifyMatchFailure(sliceOp, "failed to match target dag");
     }
-    return success(didChangeOperand);
+    Value res = rewriteCatNegateAndSlice(rewriter, sliceOp, *dagRoot);
+    rewriter.replaceOp(sliceOp, res);
+    return success();
+  }
+};
+
+class ConcatenateNegateAndSlicePattern
+    : public OpRewritePattern<tensor::ConcatOp> {
+public:
+  using OpRewritePattern::OpRewritePattern;
+  LogicalResult matchAndRewrite(tensor::ConcatOp concatOp,
+                                PatternRewriter &rewriter) const override {
+    if (!IREE::Flow::isNonNullAndOutsideDispatch(concatOp)) {
+      return failure();
+    }
+
+    std::optional<Value> dagRoot = matchCatNegateAndSlice(concatOp);
+    if (!dagRoot) {
+      return rewriter.notifyMatchFailure(concatOp,
+                                         "failed to match target dag");
+    }
+    Value res = rewriteCatNegateAndSlice(rewriter, concatOp, *dagRoot);
+    rewriter.replaceOp(concatOp, res);
+    return success();
   }
 };
 
@@ -788,23 +940,12 @@ struct RaiseSpecialOpsPass : public RaiseSpecialOpsBase<RaiseSpecialOpsPass> {
   }
 
   void runOnOperation() override {
+    Operation *funcOp = getOperation();
+    MLIRContext *context = &getContext();
 
-    // First fuse named gemm-like ops with adjacent elementwise conversions.
-    {
-      RewritePatternSet patterns(&getContext());
-      patterns.insert<
-          NamedImplicitCastOpConversion<linalg::ConvolutionOpInterface>,
-          NamedImplicitCastOpConversion<linalg::ContractionOpInterface>>(
-          &getContext());
-      if (failed(applyPatternsAndFoldGreedily(getOperation(),
-                                              std::move(patterns)))) {
-        return signalPassFailure();
-      }
-    }
-
-    IRRewriter rewriter(&getContext());
-
-    getOperation()->walk([&](linalg::GenericOp op) {
+    // First walk the IR and try to raise any slice-like generics to tensor.
+    IRRewriter rewriter(context);
+    funcOp->walk([&](linalg::GenericOp op) {
       linalg::GenericOp linalgOp = op;
 
       OpBuilder::InsertionGuard guard(rewriter);
@@ -827,91 +968,22 @@ struct RaiseSpecialOpsPass : public RaiseSpecialOpsBase<RaiseSpecialOpsPass> {
       }
     });
 
-    SmallVector<std::pair<linalg::LinalgOp, Value>> softmaxRoots;
-    SmallVector<std::pair<linalg::MatmulOp, Value>> transposeMatmulRoots;
-    SmallVector<std::pair<linalg::BatchMatmulOp, Value>>
-        transposeBatchMatmulRoots;
-    SmallVector<std::pair<linalg::GenericOp, Value>> genericFills;
-    getOperation()->walk([&](linalg::LinalgOp op) {
-      {
-        transform_ext::MatcherContext matcherContext;
-        transform_ext::StructuredOpMatcher *maxReduction;
-        transform_ext::StructuredOpMatcher *softmaxroot;
-        makeSoftmaxMatcher(matcherContext, maxReduction, softmaxroot);
-        if (matchPattern(op, *softmaxroot)) {
-          Value src = maxReduction->getCaptured()->getOperand(0);
-          softmaxRoots.push_back(std::make_pair(op, src));
-        }
-        if (std::optional<Value> newRhs = matchATransposeBMatmul(op)) {
-          transposeMatmulRoots.push_back(std::make_pair(
-              cast<linalg::MatmulOp>(op.getOperation()), newRhs.value()));
-        }
-        if (std::optional<Value> newRhs = matchATransposeBBatchMatmul(op)) {
-          transposeBatchMatmulRoots.push_back(std::make_pair(
-              cast<linalg::BatchMatmulOp>(op.getOperation()), newRhs.value()));
-        }
-        if (std::optional<Value> fillInput = matchGenericFill(op)) {
-          genericFills.push_back(
-              std::make_pair(cast<linalg::GenericOp>(op), fillInput.value()));
-        }
+    // Next run a variety of raising patterns.
+    {
+      RewritePatternSet patterns(context);
+      patterns.insert<
+          NamedImplicitCastOpConversion<linalg::ConvolutionOpInterface>,
+          NamedImplicitCastOpConversion<linalg::ContractionOpInterface>>(
+          context);
+      patterns.insert<RaiseSoftmax>(context);
+      patterns.insert<FuseMatmulTranspose>(context);
+      patterns.insert<FuseBatchMatmulTranspose>(context);
+      patterns.insert<RaiseGenericFill>(context);
+      patterns.insert<InsertSliceNegateAndSlicePattern>(context);
+      patterns.insert<ConcatenateNegateAndSlicePattern>(context);
+      if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
+        return signalPassFailure();
       }
-    });
-
-    SmallVector<std::pair<tensor::InsertSliceOp, Value>>
-        catAsInsertNegateAndSliceRoots;
-    getOperation()->walk([&](tensor::InsertSliceOp op) {
-      if (std::optional<Value> catAsInsertNegateAndSliceRoot =
-              matchCatNegateAndSlice(op)) {
-        catAsInsertNegateAndSliceRoots.push_back(
-            std::make_pair(op, catAsInsertNegateAndSliceRoot.value()));
-      }
-    });
-    SmallVector<std::pair<tensor::ConcatOp, Value>> catNegateAndSliceRoots;
-    getOperation()->walk([&](tensor::ConcatOp op) {
-      if (std::optional<Value> catNegateAndSliceRoot =
-              matchCatNegateAndSlice(op)) {
-        catNegateAndSliceRoots.push_back(
-            std::make_pair(op, catNegateAndSliceRoot.value()));
-      }
-    });
-
-    for (auto [softmaxOp, src] : softmaxRoots) {
-      rewriter.setInsertionPoint(softmaxOp);
-      rewriter.replaceOpWithNewOp<linalg::SoftmaxOp>(
-          softmaxOp, softmaxOp->getResultTypes(), src,
-          softmaxOp.getDpsInitOperand(0)->get(), softmaxOp.getNumLoops() - 1);
-    }
-
-    for (auto [matmulOp, newRhs] : transposeMatmulRoots) {
-      Value lhs = matmulOp.getDpsInputOperand(0)->get();
-      Value init = matmulOp.getDpsInitOperand(0)->get();
-      rewriter.setInsertionPoint(matmulOp);
-      SmallVector<NamedAttribute> attrs = getPrunedAttributeList(matmulOp);
-      rewriter.replaceOpWithNewOp<linalg::MatmulTransposeBOp>(
-          matmulOp, ValueRange{lhs, newRhs}, ValueRange{init}, attrs);
-    }
-    for (auto [bmmOp, newRhs] : transposeBatchMatmulRoots) {
-      Value lhs = bmmOp.getDpsInputOperand(0)->get();
-      Value init = bmmOp.getDpsInitOperand(0)->get();
-      rewriter.setInsertionPoint(bmmOp);
-      SmallVector<NamedAttribute> attrs = getPrunedAttributeList(bmmOp);
-      rewriter.replaceOpWithNewOp<linalg::BatchMatmulTransposeBOp>(
-          bmmOp, ValueRange{lhs, newRhs}, ValueRange{init}, attrs);
-    }
-    for (auto [genericOp, fillInput] : genericFills) {
-      Value init = genericOp.getDpsInitOperand(0)->get();
-      rewriter.setInsertionPoint(genericOp);
-      SmallVector<NamedAttribute> attrs = getPrunedAttributeList(genericOp);
-      rewriter.replaceOpWithNewOp<linalg::FillOp>(
-          genericOp, ValueRange{fillInput}, ValueRange{init}, attrs);
-    }
-    for (auto [sliceOp, input] : catAsInsertNegateAndSliceRoots) {
-      Value res = rewriteCatNegateAndSlice(rewriter, sliceOp, input);
-      rewriter.replaceOp(sliceOp, res);
-    }
-    for (auto [concatOp, input] : catNegateAndSliceRoots) {
-      Value res = rewriteCatNegateAndSlice(rewriter, concatOp, input);
-      rewriter.replaceOp(concatOp, res);
     }
   }
 };
