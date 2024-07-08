@@ -258,11 +258,7 @@ void addDispatchRegionCreationPasses(OpPassManager &passManager,
   addDispatchRegionCreationPreprocessingPasses(passManager);
 
   FunctionLikeNest(passManager)
-      .addPass([]() {
-        return IREE::Flow::createFusionOfTensorOpsPass(
-            FusionOfTensorOpsPassOptions{
-                clEnableFuseMultiUse, clEnableElementWiseFuseMultiReduction});
-      })
+      .addPass(IREE::Flow::createFuseMultiUseElementwiseProducerPass)
       .addPredicatedPass(clDetensoring,
                          [&]() { return mlir::createLinalgDetensorizePass(); })
       .addPass(mlir::createCanonicalizerPass)
