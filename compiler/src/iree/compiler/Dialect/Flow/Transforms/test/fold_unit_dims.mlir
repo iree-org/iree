@@ -91,3 +91,19 @@ module @no_fold_public {
 //      CHECK:   util.func public @no_fold_global_unit_dims
 //      CHECK:     %[[LOAD:.+]] = util.global.load @[[GLOBAL]] : tensor<1x32x1x1x64xf32>
 //      CHECK:     %[[COLLAPSE:.+]] = tensor.collapse_shape %[[LOAD]]
+
+// -----
+
+module @fold_stream_parameter{
+  util.global private mutable @glob1
+    = #stream.parameter.named<"module"::"glob1"> : tensor<1x1x10xf32>
+  util.func public @func() -> tensor<1x1x10xf32> {
+    %0 = util.global.load @glob1 : tensor<1x1x10xf32>
+    util.return %0 : tensor<1x1x10xf32>
+  }
+}
+
+//      CHECK: module @fold_stream_parameter
+//      CHECK:   util.global private mutable @[[GLOBAL:.+]] = #stream.parameter.named<"module"::"glob1"> : tensor<10xf32>
+//      CHECK:   util.func public @func
+//      CHECK:     %[[LOAD:.+]] = util.global.load @[[GLOBAL]] : tensor<10xf32>
