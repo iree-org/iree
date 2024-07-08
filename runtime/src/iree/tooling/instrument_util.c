@@ -94,7 +94,7 @@ iree_status_t iree_tooling_process_instrument_data(
       // Find the query function, if present.
       iree_vm_function_t query_func;
       iree_status_t lookup_status = iree_vm_module_lookup_function_by_name(
-          module, IREE_VM_FUNCTION_LINKAGE_EXPORT,
+          module, IREE_VM_FUNCTION_LINKAGE_EXPORT_OPTIONAL,
           IREE_SV("__query_instruments"), &query_func);
       if (!iree_status_is_ok(lookup_status)) {
         // Skip missing/invalid query function.
