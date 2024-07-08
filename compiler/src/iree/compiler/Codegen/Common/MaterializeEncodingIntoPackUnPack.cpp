@@ -22,9 +22,9 @@
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
 #include "mlir/Dialect/MemRef/Transforms/Transforms.h"
 #include "mlir/Dialect/Tensor/IR/Tensor.h"
+#include "mlir/Dialect/Utils/IndexingUtils.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Location.h"
-#include "mlir/Support/LLVM.h"
 
 namespace mlir::iree_compiler {
 
@@ -294,8 +294,8 @@ lowerContractionOpWithEncoding(RewriterBase &rewriter,
   }
 
   FailureOr<MaterializeEncodingInfo> materializeEncodingInfo =
-      materializeEncodingFn(getOriginalTypeWithEncoding(
-          cast<RankedTensorType>(linalgOp->getResultTypes()[0])));
+      materializeEncodingFn(
+          cast<RankedTensorType>(linalgOp->getResultTypes()[0]));
 
   Operation *result;
   if (failed(materializeEncodingInfo)) {
@@ -345,21 +345,19 @@ lowerOpWithEncoding(RewriterBase &rewriter, tensor::EmptyOp emptyOp,
                     MaterializeEncodingFn materializeEncodingFn,
                     MaterializeEncodingValueFn materializeEncodingValueFn) {
   auto emptyType = cast<RankedTensorType>(emptyOp->getResultTypes()[0]);
-  auto resultType =
-      getOriginalTypeWithEncoding(emptyType).clone(emptyType.getElementType());
   FailureOr<MaterializeEncodingInfo> materializeEncodingInfo =
-      materializeEncodingFn(resultType);
+      materializeEncodingFn(emptyType);
   Location loc = emptyOp.getLoc();
   if (failed(materializeEncodingInfo)) {
     Operation *newEmptyOp = rewriter.create<tensor::EmptyOp>(
-        loc, emptyOp.getMixedSizes(), resultType.getElementType());
+        loc, emptyOp.getMixedSizes(), emptyType.getElementType());
     return newEmptyOp;
   }
   if (isNarrowNResult(IREE::Encoding::getEncodingAttr(emptyType))) {
     transposeInPlace(*materializeEncodingInfo);
   }
   FailureOr<SmallVector<OpFoldResult>> innerTileSizesOfr =
-      getInnerTileSizesOfr(rewriter, loc, resultType, *materializeEncodingInfo,
+      getInnerTileSizesOfr(rewriter, loc, emptyType, *materializeEncodingInfo,
                            materializeEncodingValueFn);
   if (failed(innerTileSizesOfr)) {
     return rewriter.notifyMatchFailure(
@@ -372,8 +370,102 @@ lowerOpWithEncoding(RewriterBase &rewriter, tensor::EmptyOp emptyOp,
       materializeEncodingInfo->innerDimsPos,
       materializeEncodingInfo->outerDimsPerm);
   Operation *newEmptyOp = rewriter.create<tensor::EmptyOp>(
-      loc, newShape, resultType.getElementType());
+      loc, newShape, emptyType.getElementType());
   return newEmptyOp;
+}
+
+/// Converts a linalg::GenericOp with encoded inputs into the packed domain.
+/// The `genericOp` must have all parallel iterator types and a single output
+/// with an identity indexing map.
+static FailureOr<Operation *>
+lowerGenericOpWithEncoding(RewriterBase &rewriter, linalg::GenericOp genericOp,
+                           ValueRange convertedInputOperands,
+                           ValueRange convertedOutputOperands,
+                           MaterializeEncodingFn materializeEncodingFn) {
+  if (!genericOp.hasPureTensorSemantics()) {
+    return failure();
+  }
+  if (genericOp.getNumReductionLoops() != 0) {
+    return rewriter.notifyMatchFailure(genericOp, "Loops are not all parallel");
+  }
+  if (genericOp.getNumDpsInits() != 1) {
+    return rewriter.notifyMatchFailure(genericOp, "Not only 1 init operand");
+  }
+  OpOperand *outputOperand = genericOp.getDpsInitOperand(0);
+  AffineMap outputMap = genericOp.getMatchingIndexingMap(outputOperand);
+  if (!outputMap.isIdentity()) {
+    return rewriter.notifyMatchFailure(genericOp,
+                                       "Output indexing map is not identity");
+  }
+  FailureOr<MaterializeEncodingInfo> outMaterializeEncodingInfo =
+      materializeEncodingFn(
+          cast<RankedTensorType>(outputOperand->get().getType()));
+  if (failed(outMaterializeEncodingInfo)) {
+    return rewriter.notifyMatchFailure(
+        genericOp, "MaterializeEncodingInfo failed for output");
+  }
+
+  auto convertedResultType =
+      cast<RankedTensorType>(convertedOutputOperands[0].getType());
+  SmallVector<utils::IteratorType> iteratorTypes(convertedResultType.getRank(),
+                                                 utils::IteratorType::parallel);
+  // Compute the new indexing maps for the packed layout. This assumes that
+  // the output map is identity, and that all iterator types are parallel.
+  SmallVector<int64_t> outInnerDimsPos =
+      outMaterializeEncodingInfo->innerDimsPos;
+  SmallVector<int64_t> outInverseOuterDimsPerm =
+      invertPermutationVector(outMaterializeEncodingInfo->outerDimsPerm);
+  SmallVector<AffineMap> packedIndexingMaps;
+  for (OpOperand *inputOperand : genericOp.getDpsInputOperands()) {
+    FailureOr<MaterializeEncodingInfo> materializeEncodingInfo =
+        materializeEncodingFn(
+            cast<RankedTensorType>(inputOperand->get().getType()));
+    if (failed(materializeEncodingInfo)) {
+      return rewriter.notifyMatchFailure(
+          genericOp, "MaterializeEncodingInfo failed for input");
+    }
+    SmallVector<int64_t> innerDimsPos = materializeEncodingInfo->innerDimsPos;
+    SmallVector<int64_t> outerDimsPerm = materializeEncodingInfo->outerDimsPerm;
+    AffineMap inputMap = genericOp.getMatchingIndexingMap(inputOperand);
+    // Permute result dims to the input packed domain, and map dims to the
+    // output packed domain.
+    SmallVector<int64_t> packedResultDims = llvm::map_to_vector(
+        applyPermutation(inputMap.getResults(), outerDimsPerm),
+        [&](AffineExpr expr) {
+          auto dimExpr = cast<AffineDimExpr>(expr);
+          return outInverseOuterDimsPerm[dimExpr.getPosition()];
+        });
+    // Add new dims for the inner tiles, taking the dim position from the
+    // corresponding inner tile of the init operand.
+    for (auto [idx, pos] : llvm::enumerate(innerDimsPos)) {
+      auto dimPos = cast<AffineDimExpr>(inputMap.getResult(pos)).getPosition();
+      for (auto [tileIdx, outDim] : llvm::enumerate(outInnerDimsPos)) {
+        if (dimPos == outDim) {
+          packedResultDims.push_back(outputMap.getNumDims() + tileIdx);
+        }
+      }
+    }
+    // Create the packed indexing map.
+    SmallVector<AffineExpr> packedResultExprs =
+        llvm::map_to_vector(packedResultDims, [&](int64_t dim) {
+          return rewriter.getAffineDimExpr(dim);
+        });
+    auto packedInputMap = AffineMap::get(
+        /*dimCount=*/iteratorTypes.size(), /*symbolCount=*/0, packedResultExprs,
+        rewriter.getContext());
+    packedIndexingMaps.push_back(packedInputMap);
+  }
+  // Create the new packed identity map for the output.
+  packedIndexingMaps.push_back(AffineMap::getMultiDimIdentityMap(
+      convertedResultType.getRank(), rewriter.getContext()));
+  auto materializedGenericOp = rewriter.create<linalg::GenericOp>(
+      genericOp.getLoc(), convertedResultType, convertedInputOperands,
+      convertedOutputOperands, packedIndexingMaps, iteratorTypes,
+      /*bodyBuild=*/nullptr, linalg::getPrunedAttributeList(genericOp));
+  rewriter.inlineRegionBefore(genericOp.getRegion(),
+                              materializedGenericOp.getRegion(),
+                              materializedGenericOp.getRegion().begin());
+  return materializedGenericOp.getOperation();
 }
 
 /// Utility method to convert from a linalg::LinalgOp on `tensor` types with
@@ -381,7 +473,7 @@ lowerOpWithEncoding(RewriterBase &rewriter, tensor::EmptyOp emptyOp,
 /// supported op types are:
 ///  - linalg::LinalgOp that `isaContractionOpInterface`
 ///  - linalg::FillOp
-///  - element-wise linalg::GenericOp with single input and output
+///  - linalg::GenericOp with parallel iterators and a single output
 static FailureOr<Operation *> lowerOpWithEncoding(
     RewriterBase &rewriter, linalg::LinalgOp linalgOp,
     ValueRange convertedInputOperands, ValueRange convertedOutputOperands,
@@ -406,36 +498,12 @@ static FailureOr<Operation *> lowerOpWithEncoding(
                 convertedInputOperands, convertedOutputOperands);
             return materializedFillOp;
           })
-      .Case<linalg::GenericOp>([&](linalg::GenericOp genericOp)
-                                   -> FailureOr<Operation *> {
-        if (!genericOp.hasPureTensorSemantics() || !isElementwise(genericOp) ||
-            genericOp.getNumDpsInputs() != 1 ||
-            genericOp.getNumDpsInits() != 1) {
-          return rewriter.notifyMatchFailure(
-              genericOp, "linalg.generic op is not elementwise "
-                         "with single input and single output");
-        }
-        if (!llvm::all_of(genericOp.getIndexingMapsArray(),
-                          [](AffineMap m) { return m.isIdentity(); })) {
-          return rewriter.notifyMatchFailure(
-              genericOp, "indexing maps are not all identity maps");
-        }
-        auto convertedResultType =
-            cast<RankedTensorType>(convertedOutputOperands[0].getType());
-        SmallVector<AffineMap> maps(
-            2, AffineMap::getMultiDimIdentityMap(convertedResultType.getRank(),
-                                                 rewriter.getContext()));
-        SmallVector<utils::IteratorType> iteratorTypes(
-            convertedResultType.getRank(), utils::IteratorType::parallel);
-        auto materializedGenericOp = rewriter.create<linalg::GenericOp>(
-            genericOp.getLoc(), convertedResultType, convertedInputOperands,
-            convertedOutputOperands, maps, iteratorTypes,
-            /*bodyBuild=*/nullptr, linalg::getPrunedAttributeList(genericOp));
-        rewriter.inlineRegionBefore(genericOp.getRegion(),
-                                    materializedGenericOp.getRegion(),
-                                    materializedGenericOp.getRegion().begin());
-        return materializedGenericOp.getOperation();
-      })
+      .Case<linalg::GenericOp>(
+          [&](linalg::GenericOp genericOp) -> FailureOr<Operation *> {
+            return lowerGenericOpWithEncoding(
+                rewriter, genericOp, convertedInputOperands,
+                convertedOutputOperands, materializeEncodingFn);
+          })
       .Default([](Operation *op) { return failure(); });
 }
 
@@ -454,9 +522,6 @@ static FailureOr<SmallVector<OpFoldResult>> getPackedDimsForDispatchTensor(
     return failure();
   }
 
-  RankedTensorType originalTensorType =
-      getOriginalTypeWithEncoding(boundTensorType);
-
   MaterializeEncodingFn materializeEncodingFn =
       typeConverter.getMaterializeEncodingFn();
   FailureOr<MaterializeEncodingInfo> encodingInfo =
@@ -469,10 +534,9 @@ static FailureOr<SmallVector<OpFoldResult>> getPackedDimsForDispatchTensor(
   }
 
   SmallVector<OpFoldResult> targetShape =
-      getMixedValues(originalTensorType.getShape(), dynamicDims, builder);
-  auto innerTileSizes =
-      getInnerTileSizesOfr(builder, loc, originalTensorType, *encodingInfo,
-                           materializeEncodingValueFn);
+      getMixedValues(boundTensorType.getShape(), dynamicDims, builder);
+  auto innerTileSizes = getInnerTileSizesOfr(
+      builder, loc, boundTensorType, *encodingInfo, materializeEncodingValueFn);
   if (failed(innerTileSizes)) {
     return failure();
   }

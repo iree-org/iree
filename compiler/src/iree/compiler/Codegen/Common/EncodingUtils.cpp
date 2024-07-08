@@ -113,9 +113,7 @@ getMaterializedType(RankedTensorType tensorType,
     return dropEncoding(tensorType);
   }
   return cast<RankedTensorType>(tensor::PackOp::inferPackedType(
-      getOriginalTypeWithEncoding(maybeTransposedTensorType)
-          .clone(tensorType.getElementType()),
-      materializeEncodingInfo->innerTileSizes,
+      maybeTransposedTensorType, materializeEncodingInfo->innerTileSizes,
       materializeEncodingInfo->innerDimsPos,
       materializeEncodingInfo->outerDimsPerm));
 }
