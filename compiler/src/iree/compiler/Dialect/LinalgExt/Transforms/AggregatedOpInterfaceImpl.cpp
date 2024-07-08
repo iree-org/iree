@@ -119,7 +119,6 @@ static Value reduce(OpBuilder &builder, Location loc, AffineMap inputMap,
 
 static Value reduceAbsMax(OpBuilder &builder, Location loc, AffineMap inputMap,
                           Value input, Value intermediate) {
-  ShapedType inputTy = cast<ShapedType>(input.getType());
   FloatType fpTy = cast<FloatType>(getElementTypeOrSelf(input.getType()));
 
   AffineMap outputMap = AffineMap::get(inputMap.getNumDims(), /*symbolCount=*/0,
