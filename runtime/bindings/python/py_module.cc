@@ -86,7 +86,8 @@ class PyModuleInterface {
       iree_vm_function_t* out_function, iree_string_view_t* out_name,
       iree_vm_function_signature_t* out_signature) {
     auto self = AsSelf(vself);
-    if (IREE_LIKELY(linkage == IREE_VM_FUNCTION_LINKAGE_EXPORT)) {
+    if (IREE_LIKELY(linkage == IREE_VM_FUNCTION_LINKAGE_EXPORT ||
+                    linkage == IREE_VM_FUNCTION_LINKAGE_EXPORT_OPTIONAL)) {
       if (IREE_LIKELY(ordinal < self->export_functions_.size())) {
         std::unique_ptr<PyFunction>& f = self->export_functions_[ordinal];
         if (IREE_LIKELY(out_function)) {
@@ -114,7 +115,8 @@ class PyModuleInterface {
       iree_vm_function_t* out_function) {
     auto self = AsSelf(vself);
     std::string_view name_cpp(name.data, name.size);
-    if (linkage == IREE_VM_FUNCTION_LINKAGE_EXPORT) {
+    if (linkage == IREE_VM_FUNCTION_LINKAGE_EXPORT ||
+        linkage == IREE_VM_FUNCTION_LINKAGE_EXPORT_OPTIONAL) {
       auto found_it = self->export_name_to_ordinals_.find(name_cpp);
       if (found_it != self->export_name_to_ordinals_.end()) {
         out_function->linkage = linkage;

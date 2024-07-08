@@ -75,7 +75,8 @@ static iree_status_t iree_vm_context_run_function(
   iree_vm_function_call_t call;
   memset(&call, 0, sizeof(call));
   iree_status_t status = iree_vm_module_lookup_function_by_name(
-      module, IREE_VM_FUNCTION_LINKAGE_EXPORT, function_name, &call.function);
+      module, IREE_VM_FUNCTION_LINKAGE_EXPORT_OPTIONAL, function_name,
+      &call.function);
   if (iree_status_is_not_found(status)) {
     // Function doesn't exist; that's ok as this was an optional call.
     iree_status_ignore(status);
@@ -618,7 +619,7 @@ static iree_status_t iree_vm_context_call_module_notify(
 
   // Try to find the function. Modules are not required to export it.
   iree_status_t status = iree_vm_module_lookup_function_by_name(
-      module, IREE_VM_FUNCTION_LINKAGE_EXPORT,
+      module, IREE_VM_FUNCTION_LINKAGE_EXPORT_OPTIONAL,
       iree_make_cstring_view("__notify"), &call.function);
   if (iree_status_is_not_found(status)) {
     // Function doesn't exist; that's ok as this was an optional call.

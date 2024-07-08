@@ -819,6 +819,7 @@ void SetupVmBindings(nanobind::module_ m) {
       .value("IMPORT", IREE_VM_FUNCTION_LINKAGE_IMPORT)
       .value("IMPORT_OPTIONAL", IREE_VM_FUNCTION_LINKAGE_IMPORT_OPTIONAL)
       .value("EXPORT", IREE_VM_FUNCTION_LINKAGE_EXPORT)
+      .value("EXPORT_OPTIONAL", IREE_VM_FUNCTION_LINKAGE_EXPORT_OPTIONAL)
       .export_values();
 
   auto vm_buffer = py::class_<VmBuffer>(m, "VmBuffer");
