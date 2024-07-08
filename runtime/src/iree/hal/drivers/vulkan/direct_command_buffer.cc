@@ -792,38 +792,6 @@ static iree_status_t iree_hal_vulkan_direct_command_buffer_dispatch_indirect(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_vulkan_direct_command_buffer_execute_commands(
-    iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_command_buffer_t* base_commands,
-    iree_hal_buffer_binding_table_t binding_table) {
-  iree_hal_vulkan_direct_command_buffer_t* command_buffer =
-      iree_hal_vulkan_direct_command_buffer_cast(base_command_buffer);
-
-  if (binding_table.count > 0) {
-    // TODO(#10144): support indirect command buffers with binding tables.
-    // Since Vulkan doesn't natively support this we'd need to emulate things
-    // with an iree_hal_vulkan_indirect_command_buffer_t type that captured the
-    // command buffer using deferred command buffer and allowed replay with a
-    // binding table. If we wanted to actually reuse the command buffers we'd
-    // need to use update-after-bind (where supported), device pointers (where
-    // supported), or descriptor indexing and a big ringbuffer (make a 1024
-    // element descriptor array and cycle through it with each submission).
-    return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                            "indirect command buffers not yet implemented");
-  }
-
-  IREE_RETURN_IF_ERROR(iree_hal_resource_set_insert(
-      command_buffer->resource_set, 1, &base_commands));
-
-  iree_hal_vulkan_direct_command_buffer_t* commands =
-      iree_hal_vulkan_direct_command_buffer_cast(base_commands);
-
-  command_buffer->syms->vkCmdExecuteCommands(command_buffer->handle, 1,
-                                             &commands->handle);
-
-  return iree_ok_status();
-}
-
 namespace {
 const iree_hal_command_buffer_vtable_t
     iree_hal_vulkan_direct_command_buffer_vtable = {
@@ -855,7 +823,5 @@ const iree_hal_command_buffer_vtable_t
         /*.dispatch=*/iree_hal_vulkan_direct_command_buffer_dispatch,
         /*.dispatch_indirect=*/
         iree_hal_vulkan_direct_command_buffer_dispatch_indirect,
-        /*.execute_commands=*/
-        iree_hal_vulkan_direct_command_buffer_execute_commands,
 };
 }  // namespace

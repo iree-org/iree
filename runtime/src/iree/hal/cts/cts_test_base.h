@@ -120,7 +120,8 @@ class CtsTestBase : public ::testing::TestWithParam<std::string> {
 
     iree_status_t status = iree_hal_device_queue_execute(
         device_, IREE_HAL_QUEUE_AFFINITY_ANY, wait_semaphores,
-        signal_semaphores, command_buffer_count, command_buffers);
+        signal_semaphores, command_buffer_count, command_buffers,
+        /*binding_tables=*/NULL);
     if (iree_status_is_ok(status)) {
       status = iree_hal_semaphore_wait(signal_semaphore, target_payload_value,
                                        iree_infinite_timeout());

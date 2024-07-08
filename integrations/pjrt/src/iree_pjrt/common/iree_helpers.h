@@ -149,7 +149,7 @@ iree_status_t hal_device_queue_execute(
   return HandleStatus(__func__, iree_hal_device_queue_execute(
                                     device, queue_affinity, wait_semaphore_list,
                                     signal_semaphore_list, command_buffer_count,
-                                    command_buffers));
+                                    command_buffers, /*binding_tables=*/NULL));
 }
 
 iree_status_t hal_fence_create(iree_host_size_t capacity,

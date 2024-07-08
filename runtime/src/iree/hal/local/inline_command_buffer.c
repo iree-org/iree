@@ -572,22 +572,6 @@ static iree_status_t iree_hal_inline_command_buffer_dispatch_indirect(
 }
 
 //===----------------------------------------------------------------------===//
-// iree_hal_command_buffer_execute_commands
-//===----------------------------------------------------------------------===//
-
-static iree_status_t iree_hal_inline_command_buffer_execute_commands(
-    iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_command_buffer_t* base_commands,
-    iree_hal_buffer_binding_table_t binding_table) {
-  // TODO(#10144): decide how to execute the inline command buffer; it is
-  // definitely a deferred command buffer but we don't want to force that
-  // dependency here. We could allow injection of a function to call to execute
-  // command buffers so that the device can decide how it wants to handle them.
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "indirect command buffers not yet implemented");
-}
-
-//===----------------------------------------------------------------------===//
 // iree_hal_command_buffer_vtable_t
 //===----------------------------------------------------------------------===//
 
@@ -612,5 +596,4 @@ static const iree_hal_command_buffer_vtable_t
             iree_hal_inline_command_buffer_push_descriptor_set,
         .dispatch = iree_hal_inline_command_buffer_dispatch,
         .dispatch_indirect = iree_hal_inline_command_buffer_dispatch_indirect,
-        .execute_commands = iree_hal_inline_command_buffer_execute_commands,
 };

@@ -201,16 +201,7 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_create(
     if (!iree_all_bits_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT)) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "inline command buffers must be one-shot");
-    } else if (iree_all_bits_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_NESTED)) {
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "inline command buffers cannot be nested");
     }
-  }
-  if (binding_capacity > 0 &&
-      !iree_all_bits_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_NESTED)) {
-    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                            "command buffer bindings are only supported for "
-                            "nested command buffers (today)");
   }
 
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -607,24 +598,31 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch_indirect(
   return status;
 }
 
-IREE_API_EXPORT iree_status_t iree_hal_command_buffer_execute_commands(
+//===----------------------------------------------------------------------===//
+// Validation support
+//===----------------------------------------------------------------------===//
+
+IREE_API_EXPORT iree_status_t iree_hal_command_buffer_validate_binding_table(
     iree_hal_command_buffer_t* command_buffer,
-    iree_hal_command_buffer_t* commands,
-    iree_hal_buffer_binding_table_t binding_table) {
+    const iree_hal_buffer_binding_table_t* binding_table) {
   IREE_ASSERT_ARGUMENT(command_buffer);
-  IREE_ASSERT_ARGUMENT(commands);
-  IREE_ASSERT_ARGUMENT(!binding_table.count || binding_table.bindings);
-  IREE_TRACE_ZONE_BEGIN(z0);
   IF_VALIDATING(command_buffer, {
-    IREE_RETURN_AND_END_ZONE_IF_ERROR(
-        z0, iree_hal_command_buffer_execute_commands_validation(
-                command_buffer, VALIDATION_STATE(command_buffer), commands,
-                binding_table));
+    // Only check binding tables when one is required and otherwise ignore any
+    // bindings provided.
+    if (command_buffer->binding_capacity == 0) {
+      return iree_ok_status();
+    } else if (!binding_table ||
+               binding_table->count < command_buffer->binding_capacity) {
+      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                              "indirect command buffer requires at least %u "
+                              "bindings but only %" PRIhsz " were provided ",
+                              command_buffer->binding_capacity,
+                              binding_table ? binding_table->count : 0);
+    }
+    // TODO(benvanik): validate each binding against the requirements of the
+    // command buffer.
   });
-  iree_status_t status = _VTABLE_DISPATCH(command_buffer, execute_commands)(
-      command_buffer, commands, binding_table);
-  IREE_TRACE_ZONE_END(z0);
-  return status;
+  return iree_ok_status();
 }
 
 //===----------------------------------------------------------------------===//

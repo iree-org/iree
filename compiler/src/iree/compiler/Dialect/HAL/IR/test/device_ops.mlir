@@ -158,6 +158,40 @@ util.func public @device_queue_execute(
 
 // -----
 
+// CHECK-LABEL: @device_queue_execute_indirect
+util.func public @device_queue_execute_indirect(
+    // CHECK-SAME: (%[[DEVICE:.+]]: !hal.device, %[[AFFINITY:.+]]: i64,
+    %device: !hal.device, %affinity: i64,
+    // CHECK-SAME:  %[[WAIT_FENCE:.+]]: !hal.fence, %[[SIGNAL_FENCE:.+]]: !hal.fence,
+    %wait_fence: !hal.fence, %signal_fence: !hal.fence,
+    // CHECK-SAME:  %[[CMD:.+]]: !hal.command_buffer,
+    %cmd: !hal.command_buffer,
+    // CHECK-SAME:  %[[BUFFER0:.+]]: !hal.buffer, %[[BUFFER1:.+]]: !hal.buffer
+    %buffer0: !hal.buffer, %buffer1: !hal.buffer) {
+  %c100 = arith.constant 100 : index
+  %c200 = arith.constant 200 : index
+  %c1000 = arith.constant 1000 : index
+  %c2000 = arith.constant 2000 : index
+  // CHECK: hal.device.queue.execute.indirect<%[[DEVICE]] : !hal.device>
+  hal.device.queue.execute.indirect<%device : !hal.device>
+      // CHECK-SAME: affinity(%[[AFFINITY]])
+      affinity(%affinity)
+      // CHECK-SAME: wait(%[[WAIT_FENCE]]) signal(%[[SIGNAL_FENCE]])
+      wait(%wait_fence) signal(%signal_fence)
+      // CHECK-SAME: commands(%[[CMD]])
+      commands(%cmd)
+      // CHECK-SAME: bindings([
+      bindings([
+        // CHECK-NEXT: (%[[BUFFER0]] : !hal.buffer)[%c100, %c1000]
+        (%buffer0 : !hal.buffer)[%c100, %c1000],
+        // CHECK-NEXT: (%[[BUFFER1]] : !hal.buffer)[%c200, %c2000]
+        (%buffer1 : !hal.buffer)[%c200, %c2000]
+      ])
+  util.return
+}
+
+// -----
+
 // CHECK-LABEL: @device_queue_flush
 util.func public @device_queue_flush(
     // CHECK-SAME: (%[[DEVICE:.+]]: !hal.device, %[[AFFINITY:.+]]: i64)

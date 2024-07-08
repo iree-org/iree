@@ -912,18 +912,6 @@ static iree_status_t iree_hal_webgpu_command_buffer_dispatch_indirect(
   return iree_ok_status();
 }
 
-static iree_status_t iree_hal_webgpu_command_buffer_execute_commands(
-    iree_hal_command_buffer_t* base_command_buffer,
-    iree_hal_command_buffer_t* base_commands,
-    iree_hal_buffer_binding_table_t binding_table) {
-  // TODO(#10144): support indirect command buffers via deferred command buffers
-  // as WebGPU has no concept of reusable dispatch command encoders. One day
-  // hopefully there's an equivalent of GPURenderBundle but given WebGPU's other
-  // limitations it may not be useful.
-  return iree_make_status(IREE_STATUS_UNIMPLEMENTED,
-                          "indirect command buffers not yet implemented");
-}
-
 const iree_hal_command_buffer_vtable_t iree_hal_webgpu_command_buffer_vtable = {
     .destroy = iree_hal_webgpu_command_buffer_destroy,
     .begin = iree_hal_webgpu_command_buffer_begin,
@@ -942,5 +930,4 @@ const iree_hal_command_buffer_vtable_t iree_hal_webgpu_command_buffer_vtable = {
     .push_descriptor_set = iree_hal_webgpu_command_buffer_push_descriptor_set,
     .dispatch = iree_hal_webgpu_command_buffer_dispatch,
     .dispatch_indirect = iree_hal_webgpu_command_buffer_dispatch_indirect,
-    .execute_commands = iree_hal_webgpu_command_buffer_execute_commands,
 };

@@ -302,14 +302,6 @@ vm.import private @command_buffer.dispatch.indirect(
   %workgroups_offset : i64
 )
 
-// Executes a secondary command buffer with the given binding table.
-vm.import private @command_buffer.execute.commands(
-  %command_buffer : !vm.ref<!hal.command_buffer>,
-  %commands : !vm.ref<!hal.command_buffer>,
-  // <buffer, offset, length>
-  %bindings : tuple<!vm.ref<!hal.buffer>, i64, i64>...
-)
-
 //===----------------------------------------------------------------------===//
 // iree_hal_descriptor_set_layout_t
 //===----------------------------------------------------------------------===//
@@ -405,6 +397,19 @@ vm.import private @device.queue.execute(
   %wait_fence : !vm.ref<!hal.fence>,
   %signal_fence : !vm.ref<!hal.fence>,
   %command_buffers : !vm.ref<!hal.command_buffer>...
+)
+
+// Executes a command buffer on a device queue with the given binding table.
+// No commands will execute until the wait fence has been reached and the signal
+// fence will be signaled when all commands have completed.
+vm.import private @device.queue.execute.indirect(
+  %device : !vm.ref<!hal.device>,
+  %queue_affinity : i64,
+  %wait_fence : !vm.ref<!hal.fence>,
+  %signal_fence : !vm.ref<!hal.fence>,
+  %command_buffer : !vm.ref<!hal.command_buffer>,
+  // <buffer, offset, length>
+  %binding_table : tuple<!vm.ref<!hal.buffer>, i64, i64>...
 )
 
 // Flushes any locally-pending submissions in the queue.
