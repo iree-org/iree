@@ -23,14 +23,15 @@ struct DataLayoutPropagationPass
     FunctionOpInterface funcOp = getOperation();
 
     RewritePatternSet patterns(context);
-    linalg::populateDataLayoutPropagationPatterns(patterns, [](Operation *op) {
-      // Currently only bubble up/push down pack/unpack through collapse/expand
-      // shape ops.
-      // TODO(#17734): The propagation through expand_shape ops is broken.
-      // Enable the propagation once we find it useful and the upstream issue is
-      // fixed.
-      return isa<tensor::CollapseShapeOp>(op);
-    });
+    linalg::populateDataLayoutPropagationPatterns(
+        patterns, [](OpOperand *opOperand) {
+          // Currently only bubble up/push down pack/unpack through
+          // collapse/expand shape ops.
+          // TODO(#17734): The propagation through expand_shape ops is broken.
+          // Enable the propagation once we find it useful and the upstream
+          // issue is fixed.
+          return isa<tensor::CollapseShapeOp>(opOperand->get().getDefiningOp());
+        });
     if (failed(applyPatternsAndFoldGreedily(funcOp, std::move(patterns)))) {
       funcOp.emitOpError("folding patterns failed");
       return signalPassFailure();

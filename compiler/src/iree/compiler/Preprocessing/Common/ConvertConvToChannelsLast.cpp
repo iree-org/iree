@@ -686,7 +686,7 @@ public:
       GreedyRewriteConfig config;
       config.maxIterations = GreedyRewriteConfig::kNoLimit;
       linalg::populateDataLayoutPropagationPatterns(
-          patterns, [](Operation *op) { return true; });
+          patterns, [](OpOperand *opOperand) { return true; });
       if (failed(
               applyPatternsAndFoldGreedily(op, std::move(patterns), config))) {
         return signalPassFailure();
