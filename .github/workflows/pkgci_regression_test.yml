@@ -181,7 +181,7 @@ jobs:
       SDXL_CLIP_CONFIG_FILE_PATH: build_tools/pkgci/external_test_suite/${{ matrix.sdxl-clip-config-file }}
       SDXL_VAE_CONFIG_FILE_PATH: build_tools/pkgci/external_test_suite/${{ matrix.sdxl-vae-config-file }}
       VENV_DIR: ${{ github.workspace }}/venv
-      LD_LIBRARY_PATH: ~/Python-3.11.9
+      LD_LIBRARY_PATH: /home/esaimana/Python-3.11.9
     steps:
       - name: Pre Checkout MI300 Step
         if: contains(matrix.name, 'gfx942')
