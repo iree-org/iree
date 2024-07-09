@@ -28,11 +28,11 @@ jobs:
           submodules: false
       - name: Test MI300 machine
         run: |
+          sudo cat /etc/group
           echo $USER
           echo $LOGNAME
           groups
           rocm-smi
-          sudo chmod -R 777 /dev/kfd
           rocminfo
           python3 -m venv test_venv
           source test_venv/bin/activate
