@@ -596,12 +596,10 @@ bool isDequantizationLikeOp(Operation *op) {
 /// Operations that are cloned into dispatch regions formed with other
 /// operations as roots.
 bool isClonableIntoDispatchOp(Operation *op) {
-  // TODO(#8637): `tensor.collapse_shape` and `tensor.expand_shape` are
-  // trivially clonable too, but they cause problems
-  // with bufferization. Make them clonable when fixed.
   if (isa<affine::AffineApplyOp, arith::IndexCastOp, linalg::FillOp,
           tensor::EmptyOp, tensor::CastOp, tensor::ExtractOp,
-          tensor::ExtractSliceOp, complex::CreateOp>(op)) {
+          tensor::ExtractSliceOp, complex::CreateOp, tensor::CollapseShapeOp,
+          tensor::ExpandShapeOp>(op)) {
     return true;
   }
   if (isDequantizationLikeOp(op)) {
