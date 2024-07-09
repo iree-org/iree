@@ -183,6 +183,8 @@ jobs:
       VENV_DIR: ${{ github.workspace }}/venv
       LD_LIBRARY_PATH: /home/esaimana/Python-3.11.9
     steps:
+      # TODO(saienduri): Find alternative to this temporary step that manipulates permission of github actions
+      # directory to be able to clean after every PR
       - name: Pre Checkout MI300 Step
         if: contains(matrix.name, 'gfx942')
         run: |
