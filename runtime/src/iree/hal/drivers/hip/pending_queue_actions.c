@@ -494,12 +494,17 @@ iree_status_t iree_hal_hip_pending_queue_actions_enqueue_execution(
           sizeof(*signal_semaphore_list.payload_values);
   const iree_host_size_t command_buffers_size =
       command_buffer_count * sizeof(*action->payload.execution.command_buffers);
-  const iree_host_size_t binding_tables_size =
-      binding_tables ? command_buffer_count *
-                           sizeof(*action->payload.execution.binding_tables)
-                     : 0;
+  iree_host_size_t binding_tables_size = 0;
+  iree_host_size_t binding_table_elements_size = 0;
+  if (binding_tables) {
+    binding_tables_size = command_buffer_count * sizeof(*binding_tables);
+    for (iree_host_size_t i = 0; i < command_buffer_count; ++i) {
+      binding_table_elements_size +=
+          binding_tables[i].count * sizeof(*binding_tables[i].bindings);
+    }
+  }
   const iree_host_size_t payload_size =
-      command_buffers_size + binding_tables_size;
+      command_buffers_size + binding_tables_size + binding_table_elements_size;
   const iree_host_size_t total_action_size =
       sizeof(*action) + wait_semaphore_list_size + signal_semaphore_list_size +
       payload_size;
@@ -558,11 +563,6 @@ iree_status_t iree_hal_hip_pending_queue_actions_enqueue_execution(
   memcpy(action->payload.execution.command_buffers, command_buffers,
          command_buffers_size);
   action_ptr += command_buffers_size;
-  action->payload.execution.binding_tables =
-      (iree_hal_buffer_binding_table_t*)action_ptr;
-  memcpy(action->payload.execution.binding_tables, binding_tables,
-         binding_tables_size);
-  action_ptr += binding_tables_size;
 
   // Retain all command buffers and semaphores.
   iree_status_t status = iree_hal_resource_set_allocate(actions->block_pool,
@@ -581,7 +581,36 @@ iree_status_t iree_hal_hip_pending_queue_actions_enqueue_execution(
     status = iree_hal_resource_set_insert(
         action->resource_set, command_buffer_count, command_buffers);
   }
-  // TODO(indirect-cmd): clone binding table contents and add to resource set.
+
+  // Copy binding tables and retain all bindings.
+  if (iree_status_is_ok(status) && binding_table_elements_size > 0) {
+    action->payload.execution.binding_tables =
+        (iree_hal_buffer_binding_table_t*)action_ptr;
+    action_ptr += binding_tables_size;
+    iree_hal_buffer_binding_t* binding_element_ptr =
+        (iree_hal_buffer_binding_t*)action_ptr;
+    for (iree_host_size_t i = 0; i < command_buffer_count; ++i) {
+      iree_host_size_t element_count = binding_tables[i].count;
+      iree_hal_buffer_binding_table_t* target_table =
+          &action->payload.execution.binding_tables[i];
+      target_table->count = element_count;
+      target_table->bindings = binding_element_ptr;
+      memcpy((void*)target_table->bindings, binding_tables[i].bindings,
+             element_count * sizeof(*binding_element_ptr));
+      binding_element_ptr += element_count;
+
+      // Bulk insert all bindings into the resource set. This will keep the
+      // referenced buffers live until the action has completed. Note that if we
+      // fail here we need to clean up the resource set below before returning.
+      status = iree_hal_resource_set_insert_strided(
+          action->resource_set, element_count, target_table->bindings,
+          offsetof(iree_hal_buffer_binding_t, buffer),
+          sizeof(iree_hal_buffer_binding_t));
+      if (!iree_status_is_ok(status)) break;
+    }
+  } else {
+    action->payload.execution.binding_tables = NULL;
+  }
 
   if (iree_status_is_ok(status)) {
     // Retain the owning queue to make sure the action outlives it.
