@@ -522,16 +522,24 @@ jobs:
       - name: "Checking out runtime submodules"
         run: bash ./build_tools/scripts/git/update_runtime_submodules.sh
 
-      # Simple case of no Docker container: install deps -> build -> test.
-      - name: "(Without Docker) Building runtime"
-        if: ${{ env.CONTAINER == '' }}
+      # Windows/macOS (no Docker): install requirements -> build -> test.
+      #
+      # Note: Python is a mess across operating systems and GitHub runners so...
+      #   * On Windows just install at the system level
+      #   * On macOS install in a venv
+      - name: "(Windows) Installing Python requirements"
+        if: contains(matrix.name, 'windows')
+        run: pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
+      - name: "(Windows) Building runtime"
+        if: contains(matrix.name, 'windows')
+        run: bash ./build_tools/cmake/build_runtime.sh "${BUILD_DIR}"
+      - name: "(macOS) Building runtime"
+        if: contains(matrix.name, 'macos')
         env:
           IREE_BUILD_SETUP_PYTHON_VENV: build-runtime/.venv
         run: bash ./build_tools/cmake/build_runtime.sh "${BUILD_DIR}"
-      - name: "(Without Docker) Testing runtime"
-        if: ${{ env.CONTAINER == '' }}
-        env:
-          IREE_TEST_PYTHON_VENV: build-runtime/.venv
+      - name: "Testing runtime"
+        if: contains(matrix.name, 'windows') || contains(matrix.name, 'macos')
         run: bash ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
 
       # With a Docker container: build under Docker -> test under Docker.
