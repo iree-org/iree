@@ -20,7 +20,7 @@ on:
 jobs:
   test_mi300_ci:
     name: "test_mi300_ci"
-    runs-on: runs-on: nodai-amdgpu-mi300-x86-64
+    runs-on: nodai-amdgpu-mi300-x86-64
     env:
       LD_LIBRARY_PATH: /home/esaimana/Python-3.11.9
     steps:
