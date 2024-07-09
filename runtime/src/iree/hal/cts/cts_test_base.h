@@ -20,7 +20,11 @@ namespace iree {
 namespace hal {
 namespace cts {
 
-// Registers the driver that will be used with INSTANTIATE_TEST_SUITE_P.
+// Returns the name of the driver under test.
+// Leaf test binaries must implement this function.
+const char* get_test_driver_name();
+
+// Registers the driver referenced by get_test_driver_name.
 // Leaf test binaries must implement this function.
 iree_status_t register_test_driver(iree_hal_driver_registry_t* registry);
 
@@ -33,7 +37,8 @@ const char* get_test_executable_format();
 iree_const_byte_span_t get_test_executable_data(iree_string_view_t file_name);
 
 // Common setup for tests parameterized on driver names.
-class CtsTestBase : public ::testing::TestWithParam<std::string> {
+template <typename BaseType = ::testing::Test>
+class CTSTestBase : public BaseType {
  protected:
   static void SetUpTestSuite() {
     iree_status_t status =
@@ -45,7 +50,7 @@ class CtsTestBase : public ::testing::TestWithParam<std::string> {
   }
 
   virtual void SetUp() {
-    const std::string& driver_name = GetParam();
+    const std::string& driver_name = get_test_driver_name();
 
     // Get driver with the given name and create its default device.
     // Skip drivers that are (gracefully) unavailable, fail if creation fails.
@@ -184,16 +189,6 @@ class CtsTestBase : public ::testing::TestWithParam<std::string> {
       *out_driver = driver;
     }
     return status;
-  }
-};
-
-struct GenerateTestName {
-  template <class ParamType>
-  std::string operator()(
-      const ::testing::TestParamInfo<ParamType>& info) const {
-    std::string name = info.param;
-    std::replace(name.begin(), name.end(), '-', '_');
-    return name;
   }
 };
 

@@ -21,9 +21,9 @@ namespace iree {
 namespace hal {
 namespace cts {
 
-class semaphore_submission_test : public CtsTestBase {};
+class semaphore_submission_test : public CTSTestBase<> {};
 
-TEST_P(semaphore_submission_test, SubmitWithNoCommandBuffers) {
+TEST_F(semaphore_submission_test, SubmitWithNoCommandBuffers) {
   // No waits, one signal which we immediately wait on after submit.
   iree_hal_semaphore_t* signal_semaphore = CreateSemaphore();
   uint64_t signal_payload_values[] = {1};
@@ -43,7 +43,7 @@ TEST_P(semaphore_submission_test, SubmitWithNoCommandBuffers) {
   iree_hal_semaphore_release(signal_semaphore);
 }
 
-TEST_P(semaphore_submission_test, SubmitAndSignal) {
+TEST_F(semaphore_submission_test, SubmitAndSignal) {
   iree_hal_command_buffer_t* command_buffer = CreateEmptyCommandBuffer();
 
   // No waits, one signal which we immediately wait on after submit.
@@ -66,7 +66,7 @@ TEST_P(semaphore_submission_test, SubmitAndSignal) {
   iree_hal_semaphore_release(signal_semaphore);
 }
 
-TEST_P(semaphore_submission_test, SubmitWithWait) {
+TEST_F(semaphore_submission_test, SubmitWithWait) {
   // Empty command buffer.
   iree_hal_command_buffer_t* command_buffer = CreateEmptyCommandBuffer();
 
@@ -105,7 +105,7 @@ TEST_P(semaphore_submission_test, SubmitWithWait) {
   iree_hal_semaphore_release(signal_semaphore);
 }
 
-TEST_P(semaphore_submission_test, SubmitWithMultipleSemaphores) {
+TEST_F(semaphore_submission_test, SubmitWithMultipleSemaphores) {
   iree_hal_command_buffer_t* command_buffer = CreateEmptyCommandBuffer();
 
   iree_hal_semaphore_t* wait_semaphore_1 = CreateSemaphore();
@@ -154,7 +154,7 @@ TEST_P(semaphore_submission_test, SubmitWithMultipleSemaphores) {
 }
 
 // Tests we can wait on both host and device semaphore to singal.
-TEST_P(semaphore_submission_test, WaitAllHostAndDeviceSemaphores) {
+TEST_F(semaphore_submission_test, WaitAllHostAndDeviceSemaphores) {
   iree_hal_command_buffer_t* command_buffer = CreateEmptyCommandBuffer();
 
   // Create two semaphores, one for the host thread to wait on, and one for the
@@ -217,7 +217,7 @@ TEST_P(semaphore_submission_test, WaitAllHostAndDeviceSemaphores) {
 
 // Tests that we can wait on any host and device semaphore to singal,
 // and device signals.
-TEST_P(semaphore_submission_test,
+TEST_F(semaphore_submission_test,
        WaitAnyHostAndDeviceSemaphoresAndDeviceSignals) {
   iree_hal_command_buffer_t* command_buffer = CreateEmptyCommandBuffer();
 
@@ -286,7 +286,7 @@ TEST_P(semaphore_submission_test,
 
 // Tests we can wait on any host and device semaphore to singal,
 // and host signals.
-TEST_P(semaphore_submission_test,
+TEST_F(semaphore_submission_test,
        WaitAnyHostAndDeviceSemaphoresAndHostSignals) {
   iree_hal_command_buffer_t* command_buffer = CreateEmptyCommandBuffer();
 
@@ -359,7 +359,7 @@ TEST_P(semaphore_submission_test,
 
 // Test device -> device synchronization: submit two batches with a
 // semaphore signal -> wait dependency.
-TEST_P(semaphore_submission_test, IntermediateSemaphoreBetweenDeviceBatches) {
+TEST_F(semaphore_submission_test, IntermediateSemaphoreBetweenDeviceBatches) {
   // The signaling relationship is
   // command_buffer1 -> semaphore1 -> command_buffer2 -> semaphore2
 
@@ -419,7 +419,7 @@ TEST_P(semaphore_submission_test, IntermediateSemaphoreBetweenDeviceBatches) {
 
 // Test device -> device synchronization: submit multiple batches with
 // multiple later batches waiting on the same signaling from a former batch.
-TEST_P(semaphore_submission_test, TwoBatchesWaitingOn1FormerBatchAmongst2) {
+TEST_F(semaphore_submission_test, TwoBatchesWaitingOn1FormerBatchAmongst2) {
   // The signaling-wait relation is:
   //                  command_buffer11  command_buffer12
   //                         ↓
@@ -502,7 +502,7 @@ TEST_P(semaphore_submission_test, TwoBatchesWaitingOn1FormerBatchAmongst2) {
 // Test device -> device synchronization: submit multiple batches with
 // a former batch signaling a value greater than all other batches' (different)
 // wait values.
-TEST_P(semaphore_submission_test, TwoBatchesWaitingOnDifferentSemaphoreValues) {
+TEST_F(semaphore_submission_test, TwoBatchesWaitingOnDifferentSemaphoreValues) {
   // The signal-wait relation is
   //
   //          command_buffer11
@@ -590,7 +590,7 @@ TEST_P(semaphore_submission_test, TwoBatchesWaitingOnDifferentSemaphoreValues) {
 
 // Test host + device -> device synchronization: submit two batches
 // with a later batch waiting on both a host and device signal to proceed.
-TEST_P(semaphore_submission_test, BatchWaitingOnAnotherAndHostSignal) {
+TEST_F(semaphore_submission_test, BatchWaitingOnAnotherAndHostSignal) {
   // Signal/wait relation:
   //
   // command_buffer1
@@ -665,7 +665,7 @@ TEST_P(semaphore_submission_test, BatchWaitingOnAnotherAndHostSignal) {
 
 // Test device -> host + device synchronization: submit two batches
 // with a former batch signaling to enable both host and device to proceed.
-TEST_P(semaphore_submission_test, DeviceBatchSignalAnotherAndHost) {
+TEST_F(semaphore_submission_test, DeviceBatchSignalAnotherAndHost) {
   // Signal-wait relation:
   //
   //         command_buffer1
@@ -753,7 +753,7 @@ TEST_P(semaphore_submission_test, DeviceBatchSignalAnotherAndHost) {
 
 // Test signaling a larger value before enqueuing waiting a smaller
 // value to the device.
-TEST_P(semaphore_submission_test, BatchWaitingOnSmallerValueAfterSignaled) {
+TEST_F(semaphore_submission_test, BatchWaitingOnSmallerValueAfterSignaled) {
   // signal-wait relation:
   //
   //   signal value 2
@@ -797,7 +797,7 @@ TEST_P(semaphore_submission_test, BatchWaitingOnSmallerValueAfterSignaled) {
 
 // Test signaling a larger value after enqueuing waiting a smaller
 // value to the device.
-TEST_P(semaphore_submission_test, BatchWaitingOnSmallerValueBeforeSignaled) {
+TEST_F(semaphore_submission_test, BatchWaitingOnSmallerValueBeforeSignaled) {
   // signal-wait relation:
   //
   //   signal value 2

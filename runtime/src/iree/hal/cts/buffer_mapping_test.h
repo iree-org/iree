@@ -42,7 +42,7 @@ constexpr iree_device_size_t kDefaultAllocationSize = 1024;
 //   * write with an offset and length
 //   * write into a subspan of a buffer
 
-class buffer_mapping_test : public CtsTestBase {
+class buffer_mapping_test : public CTSTestBase<> {
  protected:
   void AllocateUninitializedBuffer(iree_device_size_t buffer_size,
                                    iree_hal_buffer_t** out_buffer) {
@@ -59,7 +59,7 @@ class buffer_mapping_test : public CtsTestBase {
   }
 };
 
-TEST_P(buffer_mapping_test, AllocatorSupportsBufferMapping) {
+TEST_F(buffer_mapping_test, AllocatorSupportsBufferMapping) {
   iree_hal_buffer_params_t params = {0};
   params.type = IREE_HAL_MEMORY_TYPE_HOST_VISIBLE;
   params.usage = IREE_HAL_BUFFER_USAGE_MAPPING;
@@ -83,7 +83,7 @@ TEST_P(buffer_mapping_test, AllocatorSupportsBufferMapping) {
   iree_hal_buffer_release(buffer);
 }
 
-TEST_P(buffer_mapping_test, ZeroWholeBuffer) {
+TEST_F(buffer_mapping_test, ZeroWholeBuffer) {
   iree_hal_buffer_t* buffer = NULL;
   AllocateUninitializedBuffer(kDefaultAllocationSize, &buffer);
 
@@ -102,7 +102,7 @@ TEST_P(buffer_mapping_test, ZeroWholeBuffer) {
   iree_hal_buffer_release(buffer);
 }
 
-TEST_P(buffer_mapping_test, ZeroWithOffset) {
+TEST_F(buffer_mapping_test, ZeroWithOffset) {
   iree_device_size_t buffer_size = 16;
   iree_hal_buffer_t* buffer = NULL;
   AllocateUninitializedBuffer(buffer_size, &buffer);
@@ -128,7 +128,7 @@ TEST_P(buffer_mapping_test, ZeroWithOffset) {
   iree_hal_buffer_release(buffer);
 }
 
-TEST_P(buffer_mapping_test, ZeroSubspan) {
+TEST_F(buffer_mapping_test, ZeroSubspan) {
   iree_device_size_t buffer_size = 16;
   iree_hal_buffer_t* buffer = NULL;
   AllocateUninitializedBuffer(buffer_size, &buffer);
@@ -171,7 +171,7 @@ TEST_P(buffer_mapping_test, ZeroSubspan) {
   iree_hal_buffer_release(buffer);
 }
 
-TEST_P(buffer_mapping_test, FillEmpty) {
+TEST_F(buffer_mapping_test, FillEmpty) {
   iree_hal_buffer_t* buffer = NULL;
   AllocateUninitializedBuffer(kDefaultAllocationSize, &buffer);
 
@@ -195,7 +195,7 @@ TEST_P(buffer_mapping_test, FillEmpty) {
   iree_hal_buffer_release(buffer);
 }
 
-TEST_P(buffer_mapping_test, FillWholeBuffer) {
+TEST_F(buffer_mapping_test, FillWholeBuffer) {
   iree_hal_buffer_t* buffer = NULL;
   AllocateUninitializedBuffer(kDefaultAllocationSize, &buffer);
 
@@ -217,7 +217,7 @@ TEST_P(buffer_mapping_test, FillWholeBuffer) {
   iree_hal_buffer_release(buffer);
 }
 
-TEST_P(buffer_mapping_test, FillWithOffset) {
+TEST_F(buffer_mapping_test, FillWithOffset) {
   iree_device_size_t buffer_size = 16;
   iree_hal_buffer_t* buffer = NULL;
   AllocateUninitializedBuffer(buffer_size, &buffer);
@@ -244,7 +244,7 @@ TEST_P(buffer_mapping_test, FillWithOffset) {
   iree_hal_buffer_release(buffer);
 }
 
-TEST_P(buffer_mapping_test, FillSubspan) {
+TEST_F(buffer_mapping_test, FillSubspan) {
   iree_device_size_t buffer_size = 16;
   iree_hal_buffer_t* buffer = NULL;
   AllocateUninitializedBuffer(buffer_size, &buffer);
@@ -288,7 +288,7 @@ TEST_P(buffer_mapping_test, FillSubspan) {
   iree_hal_buffer_release(buffer);
 }
 
-TEST_P(buffer_mapping_test, ReadData) {
+TEST_F(buffer_mapping_test, ReadData) {
   iree_device_size_t buffer_size = 16;
   iree_hal_buffer_t* buffer = NULL;
   AllocateUninitializedBuffer(buffer_size, &buffer);
@@ -325,7 +325,7 @@ TEST_P(buffer_mapping_test, ReadData) {
   iree_hal_buffer_release(buffer);
 }
 
-TEST_P(buffer_mapping_test, ReadDataSubspan) {
+TEST_F(buffer_mapping_test, ReadDataSubspan) {
   iree_device_size_t buffer_size = 16;
   iree_hal_buffer_t* buffer = NULL;
   AllocateUninitializedBuffer(buffer_size, &buffer);
@@ -368,7 +368,7 @@ TEST_P(buffer_mapping_test, ReadDataSubspan) {
   iree_hal_buffer_release(buffer);
 }
 
-TEST_P(buffer_mapping_test, WriteDataWholeBuffer) {
+TEST_F(buffer_mapping_test, WriteDataWholeBuffer) {
   iree_device_size_t buffer_size = 16;
   iree_hal_buffer_t* buffer = NULL;
   AllocateUninitializedBuffer(buffer_size, &buffer);
@@ -390,7 +390,7 @@ TEST_P(buffer_mapping_test, WriteDataWholeBuffer) {
   iree_hal_buffer_release(buffer);
 }
 
-TEST_P(buffer_mapping_test, WriteDataWithOffset) {
+TEST_F(buffer_mapping_test, WriteDataWithOffset) {
   iree_device_size_t buffer_size = 16;
   iree_hal_buffer_t* buffer = NULL;
   AllocateUninitializedBuffer(buffer_size, &buffer);
@@ -417,7 +417,7 @@ TEST_P(buffer_mapping_test, WriteDataWithOffset) {
   iree_hal_buffer_release(buffer);
 }
 
-TEST_P(buffer_mapping_test, WriteDataSubspan) {
+TEST_F(buffer_mapping_test, WriteDataSubspan) {
   iree_device_size_t buffer_size = 16;
   iree_hal_buffer_t* buffer = NULL;
   AllocateUninitializedBuffer(buffer_size, &buffer);
@@ -459,7 +459,7 @@ TEST_P(buffer_mapping_test, WriteDataSubspan) {
   iree_hal_buffer_release(buffer);
 }
 
-TEST_P(buffer_mapping_test, CopyData) {
+TEST_F(buffer_mapping_test, CopyData) {
   iree_hal_buffer_t* buffer_a = NULL;
   iree_hal_buffer_t* buffer_b = NULL;
   AllocateUninitializedBuffer(kDefaultAllocationSize, &buffer_a);
@@ -490,7 +490,7 @@ TEST_P(buffer_mapping_test, CopyData) {
 
 // Maps a buffer range for reading from device -> host.
 // This is roughly what iree_hal_buffer_map_read does internally.
-TEST_P(buffer_mapping_test, MapRangeRead) {
+TEST_F(buffer_mapping_test, MapRangeRead) {
   iree_device_size_t buffer_size = 16;
   iree_hal_buffer_t* buffer = NULL;
   AllocateUninitializedBuffer(buffer_size, &buffer);
@@ -520,7 +520,7 @@ TEST_P(buffer_mapping_test, MapRangeRead) {
 
 // Maps a buffer range for writing from host -> device.
 // This is roughly what iree_hal_buffer_map_write does internally.
-TEST_P(buffer_mapping_test, MapRangeWrite) {
+TEST_F(buffer_mapping_test, MapRangeWrite) {
   iree_device_size_t buffer_size = 16;
   iree_hal_buffer_t* buffer = NULL;
   AllocateUninitializedBuffer(buffer_size, &buffer);

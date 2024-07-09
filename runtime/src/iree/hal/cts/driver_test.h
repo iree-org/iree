@@ -20,7 +20,7 @@ namespace iree {
 namespace hal {
 namespace cts {
 
-class driver_test : public CtsTestBase {
+class driver_test : public CTSTestBase<> {
  protected:
   void CheckCreateDeviceViaPath(iree_string_view_t name,
                                 iree_string_view_t path) {
@@ -46,7 +46,7 @@ class driver_test : public CtsTestBase {
   }
 };
 
-TEST_P(driver_test, QueryAndCreateAvailableDevicesByID) {
+TEST_F(driver_test, QueryAndCreateAvailableDevicesByID) {
   iree_host_size_t device_info_count = 0;
   iree_hal_device_info_t* device_infos = NULL;
   IREE_ASSERT_OK(iree_hal_driver_query_available_devices(
@@ -71,7 +71,7 @@ TEST_P(driver_test, QueryAndCreateAvailableDevicesByID) {
   iree_allocator_free(iree_allocator_system(), device_infos);
 }
 
-TEST_P(driver_test, QueryAndCreateAvailableDevicesByOrdinal) {
+TEST_F(driver_test, QueryAndCreateAvailableDevicesByOrdinal) {
   iree_host_size_t device_info_count = 0;
   iree_hal_device_info_t* device_infos = NULL;
   IREE_ASSERT_OK(iree_hal_driver_query_available_devices(
@@ -96,7 +96,7 @@ TEST_P(driver_test, QueryAndCreateAvailableDevicesByOrdinal) {
   iree_allocator_free(iree_allocator_system(), device_infos);
 }
 
-TEST_P(driver_test, QueryAndCreateAvailableDevicesByPath) {
+TEST_F(driver_test, QueryAndCreateAvailableDevicesByPath) {
   iree_host_size_t device_info_count = 0;
   iree_hal_device_info_t* device_infos = NULL;
   IREE_ASSERT_OK(iree_hal_driver_query_available_devices(

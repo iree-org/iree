@@ -18,9 +18,9 @@ namespace iree {
 namespace hal {
 namespace cts {
 
-class executable_cache_test : public CtsTestBase {};
+class executable_cache_test : public CTSTestBase<> {};
 
-TEST_P(executable_cache_test, Create) {
+TEST_F(executable_cache_test, Create) {
   iree_status_t loop_status = iree_ok_status();
   iree_hal_executable_cache_t* executable_cache = NULL;
   IREE_ASSERT_OK(iree_hal_executable_cache_create(
@@ -31,7 +31,7 @@ TEST_P(executable_cache_test, Create) {
   IREE_ASSERT_OK(loop_status);
 }
 
-TEST_P(executable_cache_test, CantPrepareUnknownFormat) {
+TEST_F(executable_cache_test, CantPrepareUnknownFormat) {
   iree_status_t loop_status = iree_ok_status();
   iree_hal_executable_cache_t* executable_cache = NULL;
   IREE_ASSERT_OK(iree_hal_executable_cache_create(
@@ -45,7 +45,7 @@ TEST_P(executable_cache_test, CantPrepareUnknownFormat) {
   IREE_ASSERT_OK(loop_status);
 }
 
-TEST_P(executable_cache_test, PrepareExecutable) {
+TEST_F(executable_cache_test, PrepareExecutable) {
   iree_status_t loop_status = iree_ok_status();
   iree_hal_executable_cache_t* executable_cache = NULL;
   IREE_ASSERT_OK(iree_hal_executable_cache_create(
