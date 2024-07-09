@@ -540,7 +540,7 @@ static iree_status_t iree_hal_metal_command_segment_record_barrier(
         (id<MTLResource>*)iree_alloca(sizeof(id<MTLResource>) * segment->buffer_barrier_count);
     for (iree_host_size_t i = 0; i < segment->buffer_barrier_count; ++i) {
       resources[i] = iree_hal_metal_buffer_handle(
-          iree_hal_buffer_allocated_buffer(segment->buffer_barriers[i].buffer));
+          iree_hal_buffer_allocated_buffer(segment->buffer_barriers[i].buffer_ref.buffer));
     }
     [encoder memoryBarrierWithResources:resources count:segment->buffer_barrier_count];
   }
@@ -668,7 +668,7 @@ static iree_status_t iree_hal_metal_command_buffer_prepare_fill_buffer(
   segment->fill_buffer.pattern_length = pattern_length;
 
   iree_status_t status =
-      iree_hal_resource_set_insert(command_buffer->resource_set, 1, &target_buffer);
+      iree_hal_resource_set_insert(command_buffer->resource_set, 1, &target_ref.buffer);
 
   IREE_TRACE_ZONE_END(z0);
   return status;
@@ -1090,8 +1090,7 @@ static iree_status_t iree_hal_metal_command_buffer_prepare_dispatch(
 
 static iree_status_t iree_hal_metal_command_buffer_prepare_dispatch_indirect(
     iree_hal_command_buffer_t* base_command_buffer, iree_hal_executable_t* executable,
-    int32_t entry_point, iree_hal_buffer_ref_t workgroups_ref,
-    iree_device_size_t workgroups_offset) {
+    int32_t entry_point, iree_hal_buffer_ref_t workgroups_ref) {
   IREE_TRACE_ZONE_BEGIN(z0);
 
   iree_hal_metal_dispatch_segment_t* segment = NULL;
