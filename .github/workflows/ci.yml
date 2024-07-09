@@ -492,6 +492,9 @@ jobs:
           - name: windows-2022
             runs-on: windows-2022
             # No container, (unnecessary, and Windows https://github.com/actions/runner/issues/904).
+          - name: macos-14
+            runs-on: macos-14
+            # No container, just install what we need directly.
           - name: arm64
             runs-on:
               - self-hosted # must come first
@@ -510,23 +513,27 @@ jobs:
       - name: "Checking out runtime submodules"
         run: ./build_tools/scripts/git/update_runtime_submodules.sh
 
-      - name: "Configuring MSVC"
+      - name: "(Windows) Configuring MSVC"
         if: contains(matrix.name, 'windows')
         uses: ilammy/msvc-dev-cmd@v1.13.0
 
+      - name: "(macOS) Installing requirements"
+        if: contains(matrix.name, 'macos')
+        run: brew install ninja ccache coreutils bash
+
       # Simple case of no Docker container: install deps -> build -> test.
-      - name: "Installing Python requirements"
+      - name: "(No Docker) Installing Python requirements"
         if: ${{ env.CONTAINER == '' }}
         run: pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
-      - name: "Building runtime"
+      - name: "(No Docker) Building runtime"
         if: ${{ env.CONTAINER == '' }}
         run: ./build_tools/cmake/build_runtime.sh "${BUILD_DIR}"
-      - name: "Testing runtime"
+      - name: "(No Docker) Testing runtime"
         if: ${{ env.CONTAINER == '' }}
         run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
 
       # With a Docker container: build under Docker -> test under Docker.
-      - name: "Building runtime (Docker)"
+      - name: "(Docker) Building runtime"
         if: ${{ env.CONTAINER != '' }}
         run: |
           ./build_tools/github_actions/docker_run.sh \
@@ -534,7 +541,7 @@ jobs:
             ${CONTAINER} \
             ./build_tools/cmake/build_runtime.sh \
             "${BUILD_DIR}"
-      - name: "Testing runtime (Docker)"
+      - name: "(Docker) Testing runtime"
         if: ${{ env.CONTAINER != '' }}
         run: |
           ./build_tools/github_actions/docker_run.sh \
