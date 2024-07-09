@@ -1277,9 +1277,23 @@ LogicalResult AttentionOp::verify() {
 
   SmallVector<AffineMap> indexingMaps = attnOp.getIndexingMapsArray();
 
+<<<<<<< HEAD
   // Check if indexing maps can represent attention.
   FailureOr<AttentionOpDetail> maybeOpInfo =
       AttentionOpDetail::get(indexingMaps);
+=======
+  ShapedType queryType = getQueryType();
+  ShapedType keyType = getKeyType();
+  ShapedType outputType = getOutputType();
+  Type queryElementType = queryType.getElementType();
+  Type keyElementType = keyType.getElementType();
+  Type outputElementType = outputType.getElementType();
+
+  FloatType scaleElementType = dyn_cast<FloatType>(getScale().getType());
+  if (!scaleElementType) {
+    return op->emitOpError("expected scale to be of floating point type");
+  }
+>>>>>>> 6e37905473 (Add support for mixed types)
 
   // Check shape compatibility based on indexing maps.
   SmallVector<int64_t> shape(getIterationDomainRank());

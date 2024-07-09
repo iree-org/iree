@@ -360,23 +360,25 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
   Value pScale;
   auto pETy = getElementTypeOrSelf(p.getType());
   if (pETy != vETy && isa<FloatType>(vETy)) {
-    Value abs = b.create<tensor::EmptyOp>(loc, sSizes, elementType);
-    // We rescale `p` to use the full range and pass back the `pScale`.
-    Value absMax = reduceAbsMax(b, loc, pMap, p, abs);
-    auto fpTy = cast<FloatType>(vETy);
-    double largestDbl =
-        APFloat::getLargest(fpTy.getFloatSemantics(), /*Negative=*/false)
-            .convertToDouble();
+    if (vETy.getIntOrFloatBitWidth() <= 8) {
+      Value abs = b.create<tensor::EmptyOp>(loc, sSizes, elementType);
+      // We rescale `p` to use the full range and pass back the `pScale`.
+      Value absMax = reduceAbsMax(b, loc, pMap, p, abs);
+      auto fpTy = cast<FloatType>(vETy);
+      double largestDbl =
+          APFloat::getLargest(fpTy.getFloatSemantics(), /*Negative=*/false)
+              .convertToDouble();
 
-    Value largest = b.create<arith::ConstantOp>(
-        loc, b.getFloatAttr(absMax.getType(), largestDbl));
-    Value pScaleInv = b.create<arith::DivFOp>(loc, largest, absMax);
-    pScale = b.create<arith::DivFOp>(loc, absMax, largest);
+      Value largest = b.create<arith::ConstantOp>(
+          loc, b.getFloatAttr(absMax.getType(), largestDbl));
+      Value pScaleInv = b.create<arith::DivFOp>(loc, largest, absMax);
+      pScale = b.create<arith::DivFOp>(loc, absMax, largest);
 
-    AffineMap scaleMap = AffineMap::get(/*dimCount=*/pMap.getNumInputs(),
-                                        /*symbolCount=*/0, getContext());
-    p = scaleValueInPlace(b, loc, pMap, scaleMap, p, pScaleInv);
-    norm = scaleValueInPlace(b, loc, normMap, scaleMap, norm, pScaleInv);
+      AffineMap scaleMap = AffineMap::get(/*dimCount=*/pMap.getNumInputs(),
+                                          /*symbolCount=*/0, getContext());
+      p = scaleValueInPlace(b, loc, pMap, scaleMap, p, pScaleInv);
+      norm = scaleValueInPlace(b, loc, normMap, scaleMap, norm, pScaleInv);
+    }
 
     Value convertP = b.create<tensor::EmptyOp>(loc, sSizes, vETy);
     p = truncateFloat(b, loc, pMap, pMap, p, convertP);
