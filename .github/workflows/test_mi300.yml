@@ -28,6 +28,9 @@ jobs:
           submodules: false
       - name: Test MI300 machine
         run: |
+          sudo modprobe -r ast
+          sudo modprobe amdgpu smu_memory_pool_size=0x4 ip_block_mask=0x7f
+          rocm_agent_enumerator -t GPU
           sudo cat /etc/group
           echo $USER
           echo $LOGNAME
