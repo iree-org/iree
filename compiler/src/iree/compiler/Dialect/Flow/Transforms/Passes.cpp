@@ -74,6 +74,12 @@ static llvm::cl::opt<bool> clEnableFusePaddingIntoLinalgProducerOps(
     llvm::cl::desc("Enable fusing tensor.pad ops into Linalg consumer ops."),
     llvm::cl::init(false));
 
+static llvm::cl::opt<bool> clEnableFuseHorizontalContractions(
+    "iree-flow-enable-fuse-horizontal-contractions",
+    llvm::cl::desc(
+        "Enables horizontal fusion of contractions with one common operand"),
+    llvm::cl::init(false));
+
 static llvm::cl::opt<bool> clCollapseReductionDims(
     "iree-flow-collapse-reduction-dims",
     llvm::cl::desc("Enable collapsing of reduction dims"),
@@ -256,6 +262,13 @@ void addDispatchRegionCreationPasses(OpPassManager &passManager,
       .addPass(mlir::createCSEPass);
 
   addDispatchRegionCreationPreprocessingPasses(passManager);
+
+  if (clEnableFuseHorizontalContractions) {
+    FunctionLikeNest(passManager)
+        .addPass(createFuseHorizontalContractionsPass)
+        .addPass(mlir::createCanonicalizerPass)
+        .addPass(mlir::createCSEPass);
+  }
 
   FunctionLikeNest(passManager)
       .addPass(IREE::Flow::createFuseMultiUseElementwiseProducerPass)

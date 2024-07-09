@@ -35,6 +35,7 @@ iree_lit_test_suite(
     "form_dispatch_regions.mlir"
     "form_dispatch_workgroups.mlir"
     "form_scalar_dispatches.mlir"
+    "fuse_horizontal_contractions.mlir"
     "fuse_multiuse_elementwise_producer.mlir"
     "fusion_preprocessing.mlir"
     "initialize_empty_tensors.mlir"

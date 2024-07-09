@@ -180,6 +180,15 @@ def FormDispatchRegionsPass :
   ];
 }
 
+def FuseHorizontalContractionsPass:
+    InterfacePass<"iree-flow-fuse-horizontal-contractions", "mlir::FunctionOpInterface"> {
+  let summary = "Fuses horizontal contraction ops without fusions";
+  let dependentDialects = [
+    "mlir::arith::ArithDialect",
+    "mlir::tensor::TensorDialect",
+  ];
+}
+
 def ConvertDispatchRegionsToWorkgroupsPass :
     InterfacePass<"iree-flow-convert-dispatch-regions-to-workgroups", "mlir::FunctionOpInterface"> {
   let summary = "Convert dispatch regions to dispatch workgroups.";

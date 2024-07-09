@@ -30,19 +30,15 @@
 
 #define DEBUG_TYPE "iree-global-opt-fuse-horizontal-contraction"
 
-namespace mlir::iree_compiler::GlobalOptimization {
+namespace mlir::iree_compiler::IREE::Flow {
+
+#define GEN_PASS_DEF_FUSEHORIZONTALCONTRACTIONSPASS
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
 
 namespace {
 
 struct FuseHorizontalContractionsPass
-    : public FuseHorizontalContractionsBase<FuseHorizontalContractionsPass> {
-
-  void getDependentDialects(DialectRegistry &registry) const override {
-    registry.insert<arith::ArithDialect, tensor::TensorDialect>();
-  }
-  FuseHorizontalContractionsPass() {}
-  FuseHorizontalContractionsPass(const FuseHorizontalContractionsPass &pass)
-      : FuseHorizontalContractionsPass() {}
+    : public impl::FuseHorizontalContractionsPassBase<FuseHorizontalContractionsPass> {
 
   void runOnOperation() override;
 };
@@ -448,11 +444,6 @@ void FuseHorizontalContractionsPass::runOnOperation() {
           applyPatternsAndFoldGreedily(getOperation(), std::move(patterns)))) {
     return signalPassFailure();
   }
-}
-
-std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
-createFuseHorizontalContractionsPass() {
-  return std::make_unique<FuseHorizontalContractionsPass>();
 }
 
 } // namespace mlir::iree_compiler::GlobalOptimization

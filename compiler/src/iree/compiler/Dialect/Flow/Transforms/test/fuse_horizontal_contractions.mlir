@@ -1,4 +1,4 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-global-opt-fuse-horizontal-contractions))" --split-input-file %s | FileCheck %s
+// RUN: iree-opt --pass-pipeline="builtin.module(util.func(iree-flow-fuse-horizontal-contractions))" --split-input-file %s | FileCheck %s
 
 #map = affine_map<(d0, d1, d2, d3, d4) -> (d0, d2, d4)>
 #map1 = affine_map<(d0, d1, d2, d3, d4) -> (d1, d3, d4)>
