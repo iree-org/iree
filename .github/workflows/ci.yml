@@ -443,8 +443,13 @@ jobs:
       IREE_CUDA_DISABLE: 1
       IREE_HIP_DISABLE: 0
       IREE_HIP_TEST_TARGET_CHIP: "gfx942"
+      LD_LIBRARY_PATH: ~/Python-3.11.9
     runs-on: nodai-amdgpu-mi300-x86-64
     steps:
+      - name: Pre Checkout MI300 Step
+        if: contains(matrix.name, 'gfx942')
+        run: |
+          sudo chmod -R 777 ~/actions-runner/_work
       - name: "Checking out repository"
         uses: actions/checkout@v4.1.7
       - name: "Checking out runtime submodules"
