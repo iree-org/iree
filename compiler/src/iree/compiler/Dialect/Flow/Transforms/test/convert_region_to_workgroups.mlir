@@ -1,4 +1,4 @@
-// RUN: iree-opt %s --iree-flow-convert-region-to-workgroups -canonicalize -cse -split-input-file | FileCheck %s
+// RUN: iree-opt %s --iree-flow-convert-region-to-workgroups --iree-flow-canonicalize -cse -split-input-file | FileCheck %s
 
 // CHECK-LABEL: util.func public @foo(
 //       CHECK:   %[[argA:.*]]: tensor<?x?xf32>, %[[argB:.*]]: tensor<5x10xf32>, %[[argC:.*]]: tensor<10x11xf32>

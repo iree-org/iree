@@ -1,5 +1,5 @@
-// RUN: iree-opt --split-input-file --iree-flow-tensor-pad-to-tensor-insert-slice --canonicalize %s | FileCheck %s
-// RUN: iree-opt --split-input-file --iree-flow-tensor-pad-to-tensor-insert-slice=skip-one-linalg-use-case --canonicalize %s | FileCheck %s --check-prefix=SKIP
+// RUN: iree-opt --split-input-file --iree-flow-tensor-pad-to-tensor-insert-slice --iree-flow-canonicalize %s | FileCheck %s
+// RUN: iree-opt --split-input-file --iree-flow-tensor-pad-to-tensor-insert-slice=skip-one-linalg-use-case --iree-flow-canonicalize %s | FileCheck %s --check-prefix=SKIP
 
 util.func public @tensor_pad(%arg0 : tensor<?x?xf32>, %arg1 : tensor<f32>, %arg2 : index, %arg3 : index) -> tensor<?x?xf32> {
   %c0 = arith.constant 0 : index

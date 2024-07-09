@@ -22,6 +22,11 @@ def BubbleUpExpandShapesPass :
   ];
 }
 
+def CanonicalizerPass :
+    Pass<"iree-flow-canonicalize", ""> {
+  let summary = "Flow specific canonicalization pass";
+}
+
 def CaptureDynamicDimsPass :
     Pass<"iree-flow-capture-dynamic-dims", ""> {
   let summary = "Captures dynamic shape dimensions required by dispatch operands/results and control flow operations.";
