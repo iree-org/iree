@@ -19,6 +19,9 @@ jobs:
     env:
       LD_LIBRARY_PATH: /home/esaimana/Python-3.11.9
     steps:
+      - name: Pre Checkout MI300
+        run: |
+          sudo rm -rf ~/actions-runner/_work/iree/iree
       - name: Checking out IREE repository
         uses: actions/checkout@v4.1.7
         with:
