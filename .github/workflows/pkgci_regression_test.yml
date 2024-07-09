@@ -325,6 +325,7 @@ jobs:
             --log-cli-level=info \
             --retries 7
           echo "$(<job_summary.md )" >> $GITHUB_STEP_SUMMARY
+          rm job_summary.md
 
       # TODO(scotttodd): update these golden values, retry count, etc.
       - name: "Running SDXL rocm pipeline benchmark (mi300)"
