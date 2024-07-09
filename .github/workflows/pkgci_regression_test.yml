@@ -294,7 +294,7 @@ jobs:
             --goldensize-rocm-clip-bytes 780328 \
             --goldensize-rocm-vae-bytes 757933 \
             --gpu-number 6 \
-            --rocm-chip gfx90a \
+            --rocm-chip ${{ matrix.rocm-chip }} \
             --log-cli-level=info \
             --retries 7
           echo "$(<job_summary.md )" >> $GITHUB_STEP_SUMMARY
