@@ -36,6 +36,6 @@
   "skip_run_tests": [],
   "expected_compile_failures": [],
   "expected_run_failures": [
-    "pytorch/models/sdxl-scheduled-unet-tank",
+    "pytorch/models/sdxl-scheduled-unet-3-tank",
   ]
 }
