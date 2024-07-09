@@ -83,8 +83,10 @@ static RankedTensorType transposeIfNarrowNResult(RankedTensorType tensorType) {
   auto elemType = tensorType.getElementType();
   OpBuilder builder(context);
 
+  auto opTypeAttr = IREE::Encoding::EncodingOpTypeAttr::get(
+      context, IREE::Encoding::EncodingOpType::matmul);
   auto newEncoding = IREE::Encoding::EncodingAttr::get(
-      context, newIndex, encoding.getElementTypes(),
+      context, newIndex, opTypeAttr, encoding.getElementTypes(),
       TypeAttr::get(RankedTensorType::get(newOriginalShape, elemType)),
       encoding.getMatmulNarrow_N(), encoding.getMatmulNarrow_M(),
       newIndexingMaps, DenseI64ArrayAttr::get(context, newRoundDimsTo));

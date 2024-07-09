@@ -44,6 +44,19 @@ class IREEEncoding_I32EnumAttr<string name, string summary, list<I32EnumAttrCase
 class IREEEncoding_EnumAttr<EnumAttrInfo enumInfo, string name = "">
   : EnumAttr<IREEEncoding_Dialect, enumInfo, name>;
 
+// Enums for tagging operand operation in an EncodingAttr
+def MATMUL : I32EnumAttrCase<"matmul", 0>;
+def CONV   : I32EnumAttrCase<"conv", 1>;
+
+def EncodingOpType : IREEEncoding_I32EnumAttr<"EncodingOpType",
+    "Tracks the type of operation of the operand.", [
+      MATMUL,
+      CONV,
+    ]>;
+
+def EncodingOpTypeAttr:
+  IREEEncoding_EnumAttr<EncodingOpType, "optype">;
+
 def EncodingAttr :
     IREEEncoding_Attr<"Encoding"> {
   let mnemonic = "encoding";
@@ -63,6 +76,7 @@ def EncodingAttr :
 
   let parameters = (ins
     AttrParameter<"IntegerAttr", "this tensor operand's index in the parameter list">:$operand_index,
+    AttrParameter<"EncodingOpTypeAttr", "operand type">:$op_type,
     AttrParameter<"ArrayAttr", "element types of the user's operands">:$element_types,
     OptionalParameter<"TypeAttr", "type of the original tensor type before padding">:$original_type,
     // TODO(#15466): generalize matmul_narrow_{M,N} into a list?
@@ -75,6 +89,7 @@ def EncodingAttr :
 
   let builders = [
     AttrBuilder<(ins "int64_t":$operandIndex,
+        "EncodingOpType":$opType,
         "ArrayRef<Type>":$elemTypes, "Type":$origType,
         CArg<"std::optional<int64_t>", "{}">:$matmulNarrowM,
         CArg<"std::optional<int64_t>", "{}">:$matmulNarrowN,

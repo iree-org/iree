@@ -138,7 +138,7 @@ util.func public @tranpose_pack_fusion(%arg0: tensor<?x?xf32>) -> tensor<?x?x8x3
 // -----
 
 util.func public @set_encoding_fusion(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
-    %arg2 : index, %arg3 : index) -> tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, element_types = [f32, f32, f32]>> {
+    %arg2 : index, %arg3 : index) -> tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>> {
   %cst = arith.constant 0.0 : f32
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
@@ -168,8 +168,8 @@ util.func public @set_encoding_fusion(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x
       linalg.yield %6 : f32
   } -> tensor<?x?xf32>
   %6 = iree_encoding.set_encoding %5
-      : tensor<?x?xf32> -> tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, element_types = [f32, f32, f32]>>
-  util.return %6 : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, element_types = [f32, f32, f32]>>
+      : tensor<?x?xf32> -> tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>>
+  util.return %6 : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>>
 }
 // CHECK-LABEL: util.func public @set_encoding_fusion(
 //  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
@@ -188,15 +188,15 @@ util.func public @set_encoding_fusion(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x
 // -----
 
 util.func public @set_encoding_pad_fusion(%arg0 : tensor<?x?xf32>,
-    %arg1 : index, %arg2 : index) -> tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, element_types = [f32, f32, f32]>> {
+    %arg1 : index, %arg2 : index) -> tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>> {
   %cst = arith.constant 0.0 : f32
   %0 = tensor.pad %arg0 low[0, 0] high[%arg1, %arg2] {
     ^bb0(%b0: index, %b1 : index):
       tensor.yield %cst : f32
   } : tensor<?x?xf32> to tensor<?x?xf32>
   %1 = iree_encoding.set_encoding %0
-      : tensor<?x?xf32> -> tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, element_types = [f32, f32, f32]>>
-  util.return %1 : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, element_types = [f32, f32, f32]>>
+      : tensor<?x?xf32> -> tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>>
+  util.return %1 : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>>
 }
 // CHECK-LABEL: util.func public @set_encoding_pad_fusion(
 //  CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32>
@@ -209,7 +209,7 @@ util.func public @set_encoding_pad_fusion(%arg0 : tensor<?x?xf32>,
 // -----
 
 util.func public @set_encoding_pad_elementwise_fusion(%arg0 : tensor<?x?xf32>, %arg1 : tensor<?x?xf32>,
-    %arg2 : index, %arg3 : index) -> tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, element_types = [f32, f32, f32]>> {
+    %arg2 : index, %arg3 : index) -> tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>> {
   %cst = arith.constant 0.0 : f32
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
@@ -243,8 +243,8 @@ util.func public @set_encoding_pad_elementwise_fusion(%arg0 : tensor<?x?xf32>, %
       tensor.yield %cst : f32
   } : tensor<?x?xf32> to tensor<?x?xf32>
   %7 = iree_encoding.set_encoding %6
-      : tensor<?x?xf32> -> tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, element_types = [f32, f32, f32]>>
-  util.return %7 : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, element_types = [f32, f32, f32]>>
+      : tensor<?x?xf32> -> tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>>
+  util.return %7 : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>>
 }
 // CHECK-LABEL: util.func public @set_encoding_pad_elementwise_fusion(
 //  CHECK-SAME:     %[[ARG0:[a-zA-Z0-9]+]]: tensor<?x?xf32>
@@ -264,12 +264,12 @@ util.func public @set_encoding_pad_elementwise_fusion(%arg0 : tensor<?x?xf32>, %
 // -----
 
 util.func public @unset_encoding_elementwise_fusion(
-    %arg0: tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, element_types = [f32, f32, f32]>>,
+    %arg0: tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>>,
     %arg1: tensor<?xf32>) -> tensor<?x?xf32> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %0 = iree_encoding.unset_encoding %arg0
-      : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, element_types = [f32, f32, f32]>> -> tensor<?x?xf32>
+      : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>> -> tensor<?x?xf32>
   %1 = tensor.dim %0, %c0 : tensor<?x?xf32>
   %2 = tensor.dim %0, %c1 : tensor<?x?xf32>
   %3 = tensor.empty(%1, %2) : tensor<?x?xf32>
@@ -287,7 +287,7 @@ util.func public @unset_encoding_elementwise_fusion(
   util.return %4 : tensor<?x?xf32>
 }
 // CHECK-LABEL: util.func public @unset_encoding_elementwise_fusion(
-//  CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0 : i64, element_types = [f32, f32, f32]>>
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32]>>
 //  CHECK-SAME:     %[[ARG1:.+]]: tensor<?xf32>)
 //       CHECK:   %[[RESULT:.+]] = flow.dispatch.region
 //       CHECK:     %[[UNSET_ENCODING:.+]] = iree_encoding.unset_encoding %[[ARG0]]
@@ -299,12 +299,12 @@ util.func public @unset_encoding_elementwise_fusion(
 // -----
 
 util.func public @unset_encoding_slice_elementwise_fusion(
-    %arg0: tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, element_types = [f32, f32, f32]>>,
+    %arg0: tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0, op_type = matmul, element_types = [f32, f32, f32]>>,
     %arg1: tensor<?xf32>, %arg2 : index, %arg3 : index) -> tensor<?x?xf32> {
   %c0 = arith.constant 0 : index
   %c1 = arith.constant 1 : index
   %0 = iree_encoding.unset_encoding %arg0
-      : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0 : i64, element_types = [f32, f32, f32]>> -> tensor<?x?xf32>
+      : tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32]>> -> tensor<?x?xf32>
   %1 = tensor.extract_slice %0[0, 0] [%arg2, %arg3] [1, 1] : tensor<?x?xf32> to tensor<?x?xf32>
   %2 = tensor.dim %1, %c0 : tensor<?x?xf32>
   %3 = tensor.dim %1, %c1 : tensor<?x?xf32>
@@ -323,7 +323,7 @@ util.func public @unset_encoding_slice_elementwise_fusion(
   util.return %5 : tensor<?x?xf32>
 }
 // CHECK-LABEL: util.func public @unset_encoding_slice_elementwise_fusion(
-//  CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0 : i64, element_types = [f32, f32, f32]>>
+//  CHECK-SAME:     %[[ARG0:.+]]: tensor<?x?xf32, #iree_encoding.encoding<operand_index = 0 : i64, op_type = matmul, element_types = [f32, f32, f32]>>
 //  CHECK-SAME:     %[[ARG1:.+]]: tensor<?xf32>
 //       CHECK:   %[[RESULT0:.+]] = flow.dispatch.region
 //       CHECK:     %[[UNSET_ENCODING:.+]] = iree_encoding.unset_encoding %[[ARG0]]
