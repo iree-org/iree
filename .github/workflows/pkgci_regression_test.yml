@@ -145,11 +145,13 @@ jobs:
 
           # AMD GPU
           - name: amdgpu_rocm_mi250_gfx90a
+            rocm-chip: gfx90a
             models-config-file: models_gpu_rocm_gfx90a.json
             backend: rocm
             runs-on: nodai-amdgpu-mi250-x86-64
           - name: amdgpu_rocm_mi300_gfx942
-            models-config-file: models_gpu_rocm_gfx90a.json
+            rocm-chip: gfx942
+            models-config-file: models_gpu_rocm_gfx942.json
             backend: rocm
             runs-on: nodai-amdgpu-mi300-x86-64
           - name: amdgpu_vulkan
@@ -171,7 +173,6 @@ jobs:
       IREE_TEST_FILES: ~/iree_tests_cache
       IREE_TEST_PATH_EXTENSION: ${{ github.workspace }}/build_tools/pkgci/external_test_suite
       MODELS_CONFIG_FILE_PATH: build_tools/pkgci/external_test_suite/${{ matrix.models-config-file }}
-      ROCM_CHIP: gfx90a
       VENV_DIR: ${{ github.workspace }}/venv
       LD_LIBRARY_PATH: /home/esaimana/Python-3.11.9
     steps:
@@ -248,7 +249,7 @@ jobs:
             --config-files=${MODELS_CONFIG_FILE_PATH}
 
       - name: "Running SDXL special model tests"
-        if: ${{ !cancelled() }}
+        if: "matrix.backend != 'vulkan' && !cancelled()"
         run: |
           source ${VENV_DIR}/bin/activate
           pytest ./experimental/regression_suite/shark-test-suite-models/sdxl \
@@ -260,9 +261,10 @@ jobs:
             --durations=0
         env:
           TEST_SUITE_REPO_ROOT: ${{ github.workspace }}/SHARK-TestSuite
+          ROCM_CHIP: ${{ matrix.rocm-chip }}
 
       - name: "Running SD3 special model tests"
-        if: ${{ !cancelled() }}
+        if: "matrix.backend != 'vulkan' && !cancelled()"
         run: |
           source ${VENV_DIR}/bin/activate
           pytest ./experimental/regression_suite/shark-test-suite-models/sd3 \
@@ -274,6 +276,7 @@ jobs:
             --durations=0
         env:
           TEST_SUITE_REPO_ROOT: ${{ github.workspace }}/SHARK-TestSuite
+          ROCM_CHIP: ${{ matrix.rocm-chip }}
 
       - name: "Running SDXL rocm pipeline benchmark (mi250)"
         if: contains(matrix.name, 'rocm_mi250_gfx90a')
@@ -317,3 +320,5 @@ jobs:
             --log-cli-level=info \
             --retries 7
           echo "$(<job_summary.md )" >> $GITHUB_STEP_SUMMARY
+        env:
+          ROCM_CHIP: ${{ matrix.rocm-chip }}
