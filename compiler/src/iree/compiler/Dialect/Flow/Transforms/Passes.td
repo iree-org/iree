@@ -64,6 +64,15 @@ def FoldUnitExtentDimsPass :
   ];
 }
 
+def FuseHorizontalContractionsPass:
+    InterfacePass<"iree-flow-fuse-horizontal-contractions", "mlir::FunctionOpInterface"> {
+  let summary = "Fuses horizontal contraction ops without fusions";
+  let dependentDialects = [
+    "mlir::arith::ArithDialect",
+    "mlir::tensor::TensorDialect",
+  ];
+}
+
 def FuseMultiUseElementwiseProducerPass :
     InterfacePass<"iree-flow-fuse-multi-use-elementwise-producer",
                    "mlir::FunctionOpInterface"> {

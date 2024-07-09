@@ -6,8 +6,8 @@
 
 #include "iree/compiler/Dialect/Flow/IR/FlowOps.h"
 #include "iree/compiler/Dialect/Flow/Transforms/RegionOpUtils.h"
-#include "iree/compiler/GlobalOptimization/Passes.h"
-#include "iree/compiler/GlobalOptimization/Utils.h"
+#include "mlir/Analysis/SliceAnalysis.h"
+#include "mlir/Analysis/TopologicalSortUtils.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/Linalg/IR/Linalg.h"
 #include "mlir/Dialect/Linalg/IR/LinalgInterfaces.h"
@@ -26,9 +26,12 @@
 #include "mlir/Support/LogicalResult.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-#define DEBUG_TYPE "iree-global-opt-fuse-horizontal-contractions"
+#define DEBUG_TYPE "iree-flow-fuse-horizontal-contractions"
 
-namespace mlir::iree_compiler::GlobalOptimization {
+namespace mlir::iree_compiler::IREE::Flow {
+
+#define GEN_PASS_DEF_FUSEHORIZONTALCONTRACTIONSPASS
+#include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
 
 #define GEN_PASS_DEF_FUSEHORIZONTALCONTRACTIONSPASS
 #include "iree/compiler/GlobalOptimization/Passes.h.inc"
@@ -451,4 +454,4 @@ void FuseHorizontalContractionsPass::runOnOperation() {
     return signalPassFailure();
   }
 }
-} // namespace mlir::iree_compiler::GlobalOptimization
+} // namespace mlir::iree_compiler::Flow
