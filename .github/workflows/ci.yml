@@ -530,6 +530,8 @@ jobs:
         run: bash ./build_tools/cmake/build_runtime.sh "${BUILD_DIR}"
       - name: "(Without Docker) Testing runtime"
         if: ${{ env.CONTAINER == '' }}
+        env:
+          IREE_TEST_PYTHON_VENV: build-runtime/.venv
         run: bash ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
 
       # With a Docker container: build under Docker -> test under Docker.

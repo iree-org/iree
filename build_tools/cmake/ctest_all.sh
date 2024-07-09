@@ -15,6 +15,15 @@ set -euo pipefail
 
 BUILD_DIR="$1"
 
+if [[ ! -z "${IREE_TEST_PYTHON_VENV:-}" ]]; then
+  echo "Activating venv at $IREE_TEST_PYTHON_VENV"
+  if [[ "${OSTYPE}" =~ ^msys ]]; then
+    "$IREE_TEST_PYTHON_VENV"/Scripts/activate.bat
+  else
+    source "$IREE_TEST_PYTHON_VENV/bin/activate"
+  fi
+fi
+
 get_default_parallel_level() {
   if [[ "$(uname)" == "Darwin" ]]; then
     echo "$(sysctl -n hw.logicalcpu)"
