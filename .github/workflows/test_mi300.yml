@@ -25,7 +25,7 @@ jobs:
           submodules: false
       - name: Test MI300 machine
         run: |
-          sudo export LD_LIBRARY_PATH=/home/esaimana/Python-3.11.9
+          sudo -E bash -c 'echo $LD_LIBRARY_PATH'
           sudo echo $USER
           sudo rocm-smi
           sudo rocminfo
