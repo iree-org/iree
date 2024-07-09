@@ -28,6 +28,8 @@ jobs:
           submodules: false
       - name: Test MI300 machine
         run: |
+          sudo usermod -a -G render,video $LOGNAME
+          sudo reboot now
           sudo cat /etc/group
           echo $USER
           echo $LOGNAME
