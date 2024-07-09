@@ -190,6 +190,7 @@ void addDispatchRegionCreationPreprocessingPasses(OpPassManager &passManager) {
       // 2. Bubble up expand_shape ops (or sink collapse_shape ops) to get
       //    elementwise operation into higher dimensions for more fusion
       //    opportunities.
+      .addPass(IREE::Flow::createBubbleUpExtractSlicesPass)
       .addPass(IREE::Flow::createBubbleUpExpandShapesPass)
       .addPass(IREE::Flow::createCanonicalizerPass)
       .addPass(mlir::createCSEPass)

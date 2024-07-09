@@ -32,6 +32,7 @@ iree_cc_library(
   SRCS
     "AnnotateDispatches.cpp"
     "BubbleUpExpandShapes.cpp"
+    "BubbleUpExtractSlices.cpp"
     "Canonicalizer.cpp"
     "CaptureDynamicDims.cpp"
     "CleanupTensorShapes.cpp"

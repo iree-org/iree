@@ -30,6 +30,13 @@ def BubbleUpExpandShapesPass :
   ];
 }
 
+def BubbleUpExtractSlicesPass : Pass<"iree-flow-bubble-up-extract-slices"> {
+  let summary = "Bubble up `extract_slice` ops through Linalg-like ops";
+  let dependentDialects = [
+    "mlir::affine::AffineDialect",
+  ];
+}
+
 def CollapseReductionDimensionsPass :
     Pass<"iree-flow-collapse-reduction-dimensions", ""> {
   let summary = "Collapse reduction dimensions when possible.";
