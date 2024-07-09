@@ -129,6 +129,9 @@ createGlobalLoopInvariantCodeMotionPass();
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createDataLayoutPropagationPass();
 
+/// Bubble up `tensor.extract_slice` ops past dequantize-like operations.
+std::unique_ptr<Pass> createBubbleUpExtractThroughDequantizePass();
+
 void registerGlobalOptimizationPipeline();
 
 } // namespace mlir::iree_compiler::GlobalOptimization

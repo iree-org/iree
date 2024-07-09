@@ -14,6 +14,7 @@ iree_lit_test_suite(
   NAME
     lit
   SRCS
+    "bubble_up_extract_slice_through_dequantize.mlir"
     "cleanup_numeric_narrowing.mlir"
     "conv1x1_to_matmul.mlir"
     "data_layout_propagation.mlir"

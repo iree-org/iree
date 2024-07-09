@@ -175,4 +175,10 @@ def DataLayoutPropagation : InterfacePass<"iree-global-opt-data-layout-propagati
   let constructor = "mlir::iree_compiler::GlobalOptimization::createDataLayoutPropagationPass()";
 }
 
+def BubbleUpExtractThroughDequantize : Pass<"iree-global-opt-bubble-up-extract-through-dequantize"> {
+  let summary = "Bubble up `extract_slice` ops above dequantize-like ops.";
+  let constructor = "mlir::iree_compiler::GlobalOptimization::createBubbleUpExtractThroughDequantizePass()";
+}
+
+
 #endif // IREE_COMPILER_GLOBALOPTIMIZATION_PASSES

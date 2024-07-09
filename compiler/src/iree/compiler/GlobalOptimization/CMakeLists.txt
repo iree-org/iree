@@ -41,6 +41,7 @@ iree_cc_library(
     "Passes.h"
     "Utils.h"
   SRCS
+    "BubbleUpExtractThroughDequantize.cpp"
     "CleanupNumericNarrowing.cpp"
     "Convert1X1FilterConv2DToMatmul.cpp"
     "DataLayoutPropagation.cpp"
