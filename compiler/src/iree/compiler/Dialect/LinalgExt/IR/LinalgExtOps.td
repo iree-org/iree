@@ -522,10 +522,14 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
   let description = [{
     Computes the scaled dot product attention function:
 
-    attention(Q, K, V, scale) = softmax(Q @ K.T * scale) @ V
+    attention(Q, K, V, scale, mask) = softmax(mask(Q @ K.T * scale)) @ V
 
     Here Q, K, V are given tensors and scale is a scalar value specifying
     the scale to use.
+
+    `mask` is an optional boolean tensor that specifies which relations
+    in attn_weight that should be ignored. This is useful for
+    causal attention, padded attention, and some special SD use cases.
 
     For self-attention, all inputs and the result have the same shape BxNxd
     where B is the batch dimension, N is the sequence length and d is head
@@ -539,10 +543,10 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
     FlashAttention 2 and optionally results in the current `max` and `sum`
     statistics while processing the current tile.
 
-    If transpose_v is speciifed, the V tensor passed as input is assumed to
+    If transpose_v is specifed, the V tensor passed as input is assumed to
     be transposed:
 
-    attention(Q, K, V, scale) = softmax(Q @ K.T * scale) @ V.T
+    attention(Q, K, V, scale, mask) = softmax(mask(Q @ K.T * scale)) @ V.T
 
     TODO: We should be moving to using a indexing map like approach so we
     can generalize which tensor is transposed and which is not.
@@ -579,6 +583,11 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
     Value getScale() {
       return getDpsInputOperand(3)->get();
     }
+    std::optional<Value> getMask() {
+      if (getNumDpsInputs() < 5)
+        return std::nullopt;
+      return getDpsInputOperand(4)->get();
+    }
     Value getOutput() {
       return getDpsInitOperand(0)->get();
     }
@@ -604,6 +613,11 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
     }
     FloatType getScaleType() {
       return cast<FloatType>(cast<ShapedType>(getScale().getType()));
+    }
+    std::optional<ShapedType> getMaskType() {
+      std::optional<Value> maskVal = getMask();
+      if (!maskVal) return std::nullopt;
+      return cast<ShapedType>(maskVal->getType());
     }
     ShapedType getOutputType() {
       return cast<ShapedType>(getOutput().getType());
@@ -659,18 +673,26 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_Op<"attention",
     AffineMap getValueMap() {
       return cast<AffineMap>(getIndexingMapsArray()[2]);
     }
-    AffineMap getOutputMap() {
+    std::optional<AffineMap> getMaskMap() {
+      if (getNumDpsInputs() < 5)
+        return std::nullopt;
       return cast<AffineMap>(getIndexingMapsArray()[3]);
+    }
+    AffineMap getOutputMap() {
+      int64_t outputIndex = getNumDpsInputs() - 1;
+      return cast<AffineMap>(getIndexingMapsArray()[outputIndex]);
     }
     std::optional<AffineMap> getMaxMap() {
       if (getNumResults() < 2)
         return std::nullopt;
-      return cast<AffineMap>(getIndexingMapsArray()[4]);
+      int64_t maxIndex = getNumDpsInputs();
+      return cast<AffineMap>(getIndexingMapsArray()[maxIndex]);
     }
     std::optional<AffineMap> getSumMap() {
       if (getNumResults() < 3)
         return std::nullopt;
-      return cast<AffineMap>(getIndexingMapsArray()[5]);
+      int64_t sumIndex = getNumDpsInputs() + 1;
+      return cast<AffineMap>(getIndexingMapsArray()[sumIndex]);
     }
 
     int64_t getIterationDomainRank() {

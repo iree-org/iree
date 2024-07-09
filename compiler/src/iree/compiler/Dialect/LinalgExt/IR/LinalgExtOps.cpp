@@ -1271,9 +1271,9 @@ LogicalResult AttentionOp::verify() {
   int numInputs = getNumDpsInputs();
   int numOutputs = getNumDpsInits();
 
-  if (numInputs != 4) {
+  if (numInputs < 4 || numInputs > 5) {
     return op->emitOpError(
-        "expected 4 input operands: Query, Key, Value and Scale");
+        "expected 4 or 5 input operands: Query, Key, Value, Scale, and Mask");
   }
 
   if (numOutputs != 1 && numOutputs != 3) {
@@ -1282,8 +1282,9 @@ LogicalResult AttentionOp::verify() {
   }
 
   bool isTiled = numOutputs == 3;
-
-  if (!llvm::all_of(llvm::drop_end(getDpsInputs()), [](Value input) {
+  SmallVector<Value> dpsInputs = getDpsInputs();
+  ArrayRef<Value> qkvValues(dpsInputs.begin(), dpsInputs.begin() + 3);
+  if (!llvm::all_of(qkvValues, [](Value input) {
         return isa<ShapedType>(input.getType());
       })) {
     return op->emitOpError(
@@ -1338,6 +1339,15 @@ LogicalResult AttentionOp::verify() {
       failed(checkShape("Key", getKeyType().getShape(), getKeyMap())) ||
       failed(checkShape("Value", getValueType().getShape(), getValueMap()))) {
     return failure();
+  }
+
+  if (getMask().has_value()) {
+    if (failed(checkShape("Mask", getMaskType()->getShape(), *getMaskMap()))) {
+      return failure();
+    }
+    if (!getMaskType()->getElementType().isInteger()) {
+      return op->emitOpError("Expects attention_mask to be of integer type.");
+    }
   }
 
   if (queryElementType != keyElementType ||
@@ -1404,10 +1414,17 @@ SmallVector<AffineMap> AttentionOp::getIndexingMapsArray() {
         AffineMap::get(/*dimCount=*/5, /*symbolCount=*/0, {batch, k2, n}, ctx);
   }
 
+  SmallVector<AffineMap> results = {qMap, kMap, vMap};
+
+  if (getMask()) {
+    AffineMap maskMap =
+        AffineMap::get(/*dimCount=*/5, /*symbolCount=*/0, {batch, m, k2}, ctx);
+    results.push_back(maskMap);
+  }
+
   AffineMap resMap =
       AffineMap::get(/*dimCount=*/5, /*symbolCount=*/0, {batch, m, n}, ctx);
-
-  SmallVector<AffineMap> results = {qMap, kMap, vMap, resMap};
+  results.push_back(resMap);
 
   if (getMax()) {
     AffineMap maxMap =

@@ -79,7 +79,8 @@ static scf::LoopNest createLoopNest(SmallVectorImpl<Value> &ivs, Value lb,
 }
 
 static Value extractSlice(Value key, ArrayRef<int64_t> keyShape,
-                          ArrayRef<Value> ivs, OpFoldResult keyValueTileLength,
+                          ArrayRef<std::optional<Value>> ivs,
+                          OpFoldResult keyValueTileLength,
                           OpFoldResult headDimension, Type elementType,
                           Location loc, OpBuilder &builder,
                           bool swapLastTwoDims = false) {
@@ -90,8 +91,10 @@ static Value extractSlice(Value key, ArrayRef<int64_t> keyShape,
   SmallVector<OpFoldResult> offsets(keyShape.size(), zero);
   sizes[1] = keyValueTileLength;
   sizes[2] = headDimension;
-  if (!ivs.empty()) {
-    offsets[1] = ivs[0];
+  for (auto [idx, iv] : llvm::enumerate(ivs)) {
+    if (!iv.has_value())
+      continue;
+    offsets[idx] = iv.value();
   }
   SmallVector<int64_t> tensorShape{keyShape[1], keyShape[2]};
   if (swapLastTwoDims) {
@@ -253,21 +256,35 @@ IREE::LinalgExt::AttentionOp tileAttention(IREE::LinalgExt::AttentionOp attnOp,
   rewriter.setInsertionPointToStart(loopNest.loops.back().getBody());
 
   // Extract slices
-  Value keySlice = extractSlice(key, keyShape, ivs, keyValueTileLength,
+  SmallVector<std::optional<Value>> kvIvs(keyShape.size(), std::nullopt);
+  kvIvs[1] = ivs[0];
+  Value keySlice = extractSlice(key, keyShape, kvIvs, keyValueTileLength,
                                 headDimension, elementType, loc, rewriter);
   Value valueSlice =
-      extractSlice(value, keyShape, ivs, keyValueTileLength, headDimension,
+      extractSlice(value, keyShape, kvIvs, keyValueTileLength, headDimension,
                    elementType, loc, rewriter, attnOp.getTransposeV());
   Value querySlice = extractSlice(query, queryShape, {}, sequenceTileLength,
                                   headDimension, elementType, loc, rewriter);
 
   Value scale = attnOp.getScale();
+  SmallVector<Value> tiledInputs = {querySlice, keySlice, valueSlice, scale};
+
+  if (attnOp.getMask().has_value()) {
+    Value mask = attnOp.getMask().value();
+    auto maskElType = llvm::cast<ShapedType>(mask.getType()).getElementType();
+    SmallVector<std::optional<Value>> maskIvs(keyShape.size(), std::nullopt);
+    maskIvs[2] = ivs[0];
+    SmallVector<int64_t> maskShape{queryShape[0], queryShape[1], keyShape[1]};
+    Value maskSlice =
+        extractSlice(mask, maskShape, maskIvs, sequenceTileLength,
+                     keyValueTileLength, maskElType, loc, rewriter);
+    tiledInputs.push_back(maskSlice);
+  }
 
   auto tiledAttentionOp = rewriter.create<IREE::LinalgExt::AttentionOp>(
       attnOp.getLoc(),
       SmallVector<Type>{accumulatorF32.getType(), sum.getType(), max.getType()},
-      SmallVector<Value>{querySlice, keySlice, valueSlice, scale},
-      SmallVector<Value>{iterArgResult, iterArgMax, iterArgSum});
+      tiledInputs, SmallVector<Value>{iterArgResult, iterArgMax, iterArgSum});
 
   if (attnOp.getTransposeV())
     tiledAttentionOp.setTransposeVAttr(attnOp.getTransposeVAttr());
