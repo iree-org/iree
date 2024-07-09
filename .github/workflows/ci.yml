@@ -523,12 +523,12 @@ jobs:
         run: bash ./build_tools/scripts/git/update_runtime_submodules.sh
 
       # Simple case of no Docker container: install deps -> build -> test.
-      - name: "(No Docker) Building runtime"
+      - name: "(Without Docker) Building runtime"
         if: ${{ env.CONTAINER == '' }}
         env:
           IREE_BUILD_SETUP_PYTHON_VENV: build-runtime/.venv
         run: bash ./build_tools/cmake/build_runtime.sh "${BUILD_DIR}"
-      - name: "(No Docker) Testing runtime"
+      - name: "(Without Docker) Testing runtime"
         if: ${{ env.CONTAINER == '' }}
         run: bash ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
 
