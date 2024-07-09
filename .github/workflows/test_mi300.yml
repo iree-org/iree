@@ -6,16 +6,11 @@
 
 name: MI300 Testing
 on:
-  workflow_call:
-    inputs:
-      artifact_run_id:
-        type: string
-        default: ""
   workflow_dispatch:
-    inputs:
-      artifact_run_id:
-        type: string
-        default: ""
+  pull_request:
+  push:
+    branches:
+      - main
 
 jobs:
   test_mi300_ci:
