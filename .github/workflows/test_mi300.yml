@@ -25,12 +25,12 @@ jobs:
           submodules: false
       - name: Test MI300 machine
         run: |
-          echo $USER
-          rocm-smi
-          rocminfo
-          python3 -m venv test_venv
-          source test_venv/bin/activate
-          pip install --upgrade pip
-          pip install iree-compiler
-          pip install iree-runtime
-          iree-run-module --dump_devices=hip
+          sudo echo $USER
+          sudo rocm-smi
+          sudo rocminfo
+          sudo python3 -m venv test_venv
+          sudo source test_venv/bin/activate
+          sudo pip install --upgrade pip
+          sudo pip install iree-compiler
+          sudo pip install iree-runtime
+          sudo iree-run-module --dump_devices=hip
