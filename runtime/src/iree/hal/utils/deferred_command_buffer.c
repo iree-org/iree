@@ -464,8 +464,11 @@ static iree_status_t iree_hal_deferred_command_buffer_apply_discard_buffer(
     iree_hal_command_buffer_t* target_command_buffer,
     iree_hal_buffer_binding_table_t binding_table,
     const iree_hal_cmd_discard_buffer_t* cmd) {
+  iree_hal_buffer_ref_t buffer_ref;
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_binding_table_resolve_ref(
+      binding_table, cmd->buffer_ref, &buffer_ref));
   return iree_hal_command_buffer_discard_buffer(target_command_buffer,
-                                                cmd->buffer_ref);
+                                                buffer_ref);
 }
 
 //===----------------------------------------------------------------------===//
@@ -507,9 +510,12 @@ static iree_status_t iree_hal_deferred_command_buffer_apply_fill_buffer(
     iree_hal_command_buffer_t* target_command_buffer,
     iree_hal_buffer_binding_table_t binding_table,
     const iree_hal_cmd_fill_buffer_t* cmd) {
-  return iree_hal_command_buffer_fill_buffer(
-      target_command_buffer, cmd->target_ref, (void**)&cmd->pattern,
-      cmd->pattern_length);
+  iree_hal_buffer_ref_t target_ref;
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_binding_table_resolve_ref(
+      binding_table, cmd->target_ref, &target_ref));
+  return iree_hal_command_buffer_fill_buffer(target_command_buffer, target_ref,
+                                             (void**)&cmd->pattern,
+                                             cmd->pattern_length);
 }
 
 //===----------------------------------------------------------------------===//
@@ -547,8 +553,11 @@ static iree_status_t iree_hal_deferred_command_buffer_apply_update_buffer(
     iree_hal_command_buffer_t* target_command_buffer,
     iree_hal_buffer_binding_table_t binding_table,
     const iree_hal_cmd_update_buffer_t* cmd) {
+  iree_hal_buffer_ref_t target_ref;
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_binding_table_resolve_ref(
+      binding_table, cmd->target_ref, &target_ref));
   return iree_hal_command_buffer_update_buffer(
-      target_command_buffer, cmd->source_buffer, 0, cmd->target_ref);
+      target_command_buffer, cmd->source_buffer, 0, target_ref);
 }
 
 //===----------------------------------------------------------------------===//
@@ -591,8 +600,14 @@ static iree_status_t iree_hal_deferred_command_buffer_apply_copy_buffer(
     iree_hal_command_buffer_t* target_command_buffer,
     iree_hal_buffer_binding_table_t binding_table,
     const iree_hal_cmd_copy_buffer_t* cmd) {
-  return iree_hal_command_buffer_copy_buffer(target_command_buffer,
-                                             cmd->source_ref, cmd->target_ref);
+  iree_hal_buffer_ref_t source_ref;
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_binding_table_resolve_ref(
+      binding_table, cmd->source_ref, &source_ref));
+  iree_hal_buffer_ref_t target_ref;
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_binding_table_resolve_ref(
+      binding_table, cmd->target_ref, &target_ref));
+  return iree_hal_command_buffer_copy_buffer(target_command_buffer, source_ref,
+                                             target_ref);
 }
 
 //===----------------------------------------------------------------------===//
@@ -639,9 +654,15 @@ static iree_status_t iree_hal_deferred_command_buffer_apply_collective(
     iree_hal_command_buffer_t* target_command_buffer,
     iree_hal_buffer_binding_table_t binding_table,
     const iree_hal_cmd_collective_t* cmd) {
+  iree_hal_buffer_ref_t send_ref;
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_binding_table_resolve_ref(
+      binding_table, cmd->send_ref, &send_ref));
+  iree_hal_buffer_ref_t recv_ref;
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_binding_table_resolve_ref(
+      binding_table, cmd->recv_ref, &recv_ref));
   return iree_hal_command_buffer_collective(target_command_buffer, cmd->channel,
-                                            cmd->op, cmd->param, cmd->send_ref,
-                                            cmd->recv_ref, cmd->element_count);
+                                            cmd->op, cmd->param, send_ref,
+                                            recv_ref, cmd->element_count);
 }
 
 //===----------------------------------------------------------------------===//
@@ -728,9 +749,15 @@ static iree_status_t iree_hal_deferred_command_buffer_apply_push_descriptor_set(
     iree_hal_command_buffer_t* target_command_buffer,
     iree_hal_buffer_binding_table_t binding_table,
     const iree_hal_cmd_push_descriptor_set_t* cmd) {
+  iree_hal_buffer_ref_t* binding_refs = (iree_hal_buffer_ref_t*)iree_alloca(
+      cmd->binding_count * sizeof(iree_hal_buffer_ref_t));
+  for (iree_host_size_t i = 0; i < cmd->binding_count; ++i) {
+    IREE_RETURN_IF_ERROR(iree_hal_buffer_binding_table_resolve_ref(
+        binding_table, cmd->bindings[i], &binding_refs[i]));
+  }
   return iree_hal_command_buffer_push_descriptor_set(
       target_command_buffer, cmd->pipeline_layout, cmd->set, cmd->binding_count,
-      cmd->bindings);
+      binding_refs);
 }
 
 //===----------------------------------------------------------------------===//
@@ -814,9 +841,11 @@ static iree_status_t iree_hal_deferred_command_buffer_apply_dispatch_indirect(
     iree_hal_command_buffer_t* target_command_buffer,
     iree_hal_buffer_binding_table_t binding_table,
     const iree_hal_cmd_dispatch_indirect_t* cmd) {
+  iree_hal_buffer_ref_t workgroups_ref;
+  IREE_RETURN_IF_ERROR(iree_hal_buffer_binding_table_resolve_ref(
+      binding_table, cmd->workgroups_ref, &workgroups_ref));
   return iree_hal_command_buffer_dispatch_indirect(
-      target_command_buffer, cmd->executable, cmd->entry_point,
-      cmd->workgroups_ref);
+      target_command_buffer, cmd->executable, cmd->entry_point, workgroups_ref);
 }
 
 //===----------------------------------------------------------------------===//

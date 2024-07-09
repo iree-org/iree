@@ -451,6 +451,44 @@ iree_hal_buffer_binding_table_empty(void) {
   return table;
 }
 
+// Returns an unretained buffer specified in |buffer_ref| or from
+// |binding_table| with the slot specified if indirect. If the caller needs to
+// preserve the buffer for longer than the (known) lifetime of the binding table
+// then it must be retained or added to a resource set.
+static inline iree_status_t iree_hal_buffer_binding_table_resolve_ref(
+    iree_hal_buffer_binding_table_t binding_table,
+    iree_hal_buffer_ref_t buffer_ref, iree_hal_buffer_ref_t* out_resolved_ref) {
+  if (buffer_ref.buffer) {
+    // Direct buffer reference.
+    *out_resolved_ref = buffer_ref;
+    return iree_ok_status();
+  } else if (binding_table.count == 0) {
+    // NULL buffer reference.
+    memset(out_resolved_ref, 0, sizeof(*out_resolved_ref));
+    return iree_ok_status();
+  } else if (IREE_UNLIKELY(buffer_ref.buffer_slot >= binding_table.count)) {
+    // Out of bounds slot (validation should have caught). May be worth removing
+    // this case as this is a hot path.
+    // NOTE: this asserts that all incoming buffers must not be NULL. That may
+    // not be true.
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "buffer binding %u out of range of binding table "
+                            "with capacity %" PRIhsz,
+                            buffer_ref.buffer_slot, binding_table.count);
+  } else {
+    // Indirect buffer reference - need to combine the final range based on
+    // the binding table range and the range of the reference.
+    const iree_hal_buffer_binding_t* binding =
+        &binding_table.bindings[buffer_ref.buffer_slot];
+    out_resolved_ref->ordinal = buffer_ref.ordinal;
+    out_resolved_ref->buffer_slot = 0;
+    out_resolved_ref->buffer = binding->buffer;
+    return iree_hal_buffer_calculate_range(
+        binding->offset, binding->length, buffer_ref.offset, buffer_ref.length,
+        &out_resolved_ref->offset, &out_resolved_ref->length);
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // iree_hal_command_buffer_t
 //===----------------------------------------------------------------------===//
