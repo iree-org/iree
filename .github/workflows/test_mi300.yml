@@ -22,6 +22,7 @@ jobs:
       - name: Pre Checkout MI300
         run: |
           sudo rm -rf ~/actions-runner/_work/iree/iree
+          sudo mkdir ~/actions-runner/_work/iree/iree
       - name: Checking out IREE repository
         uses: actions/checkout@v4.1.7
         with:
