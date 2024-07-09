@@ -13,17 +13,13 @@
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
-namespace iree {
-namespace hal {
-namespace cts {
+namespace iree::hal::cts {
 
 namespace {
-
 constexpr iree_device_size_t kAllocationSize = 1024;
-
 }  // namespace
 
-class allocator_test : public CTSTestBase<> {};
+class AllocatorTest : public CTSTestBase<> {};
 
 // All allocators must support some baseline capabilities.
 //
@@ -31,7 +27,7 @@ class allocator_test : public CTSTestBase<> {};
 // driver implementations or target devices, such as:
 //   IREE_HAL_MEMORY_TYPE_HOST_LOCAL | IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL
 //   IREE_HAL_BUFFER_USAGE_MAPPING
-TEST_F(allocator_test, BaselineBufferCompatibility) {
+TEST_F(AllocatorTest, BaselineBufferCompatibility) {
   // Need at least one way to get data between the host and device.
   iree_hal_buffer_params_t host_local_params = {0};
   host_local_params.type =
@@ -80,7 +76,7 @@ TEST_F(allocator_test, BaselineBufferCompatibility) {
                             IREE_HAL_BUFFER_COMPATIBILITY_QUEUE_DISPATCH));
 }
 
-TEST_F(allocator_test, AllocateBuffer) {
+TEST_F(AllocatorTest, AllocateBuffer) {
   iree_hal_buffer_params_t params = {0};
   params.type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
   params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER;
@@ -102,7 +98,7 @@ TEST_F(allocator_test, AllocateBuffer) {
 
 // While empty allocations aren't particularly useful, they can occur in
 // practice so we should at least be able to create them without errors.
-TEST_F(allocator_test, AllocateEmptyBuffer) {
+TEST_F(AllocatorTest, AllocateEmptyBuffer) {
   iree_hal_buffer_params_t params = {0};
   params.type = IREE_HAL_MEMORY_TYPE_DEVICE_LOCAL;
   params.usage = IREE_HAL_BUFFER_USAGE_TRANSFER;
@@ -113,8 +109,6 @@ TEST_F(allocator_test, AllocateEmptyBuffer) {
   iree_hal_buffer_release(buffer);
 }
 
-}  // namespace cts
-}  // namespace hal
-}  // namespace iree
+}  // namespace iree::hal::cts
 
 #endif  // IREE_HAL_CTS_ALLOCATOR_TEST_H_

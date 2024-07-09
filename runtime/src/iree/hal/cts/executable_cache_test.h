@@ -14,13 +14,11 @@
 #include "iree/testing/gtest.h"
 #include "iree/testing/status_matchers.h"
 
-namespace iree {
-namespace hal {
-namespace cts {
+namespace iree::hal::cts {
 
-class executable_cache_test : public CTSTestBase<> {};
+class ExecutableCacheTest : public CTSTestBase<> {};
 
-TEST_F(executable_cache_test, Create) {
+TEST_F(ExecutableCacheTest, Create) {
   iree_status_t loop_status = iree_ok_status();
   iree_hal_executable_cache_t* executable_cache = NULL;
   IREE_ASSERT_OK(iree_hal_executable_cache_create(
@@ -31,7 +29,7 @@ TEST_F(executable_cache_test, Create) {
   IREE_ASSERT_OK(loop_status);
 }
 
-TEST_F(executable_cache_test, CantPrepareUnknownFormat) {
+TEST_F(ExecutableCacheTest, CantPrepareUnknownFormat) {
   iree_status_t loop_status = iree_ok_status();
   iree_hal_executable_cache_t* executable_cache = NULL;
   IREE_ASSERT_OK(iree_hal_executable_cache_create(
@@ -45,7 +43,7 @@ TEST_F(executable_cache_test, CantPrepareUnknownFormat) {
   IREE_ASSERT_OK(loop_status);
 }
 
-TEST_F(executable_cache_test, PrepareExecutable) {
+TEST_F(ExecutableCacheTest, PrepareExecutable) {
   iree_status_t loop_status = iree_ok_status();
   iree_hal_executable_cache_t* executable_cache = NULL;
   IREE_ASSERT_OK(iree_hal_executable_cache_create(
@@ -97,8 +95,6 @@ TEST_F(executable_cache_test, PrepareExecutable) {
   IREE_ASSERT_OK(loop_status);
 }
 
-}  // namespace cts
-}  // namespace hal
-}  // namespace iree
+}  // namespace iree::hal::cts
 
 #endif  // IREE_HAL_CTS_EXECUTABLE_CACHE_TEST_H_
