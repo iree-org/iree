@@ -25,13 +25,12 @@ jobs:
           submodules: false
       - name: Test MI300 machine
         run: |
-          sudo -E bash -c 'echo $LD_LIBRARY_PATH'
-          sudo echo $USER
-          sudo rocm-smi
-          sudo rocminfo
-          sudo python3 -m venv test_venv
-          sudo source test_venv/bin/activate
-          sudo pip install --upgrade pip
-          sudo pip install iree-compiler
-          sudo pip install iree-runtime
-          sudo iree-run-module --dump_devices=hip
+          sudo LD_LIBRARY_PATH=$LD_LIBRARY_PATH echo $USER
+          sudo LD_LIBRARY_PATH=$LD_LIBRARY_PATH rocm-smi
+          sudo LD_LIBRARY_PATH=$LD_LIBRARY_PATH rocminfo
+          sudo LD_LIBRARY_PATH=$LD_LIBRARY_PATH python3 -m venv test_venv
+          sudo LD_LIBRARY_PATH=$LD_LIBRARY_PATH source test_venv/bin/activate
+          sudo LD_LIBRARY_PATH=$LD_LIBRARY_PATH pip install --upgrade pip
+          sudo LD_LIBRARY_PATH=$LD_LIBRARY_PATH pip install iree-compiler
+          sudo LD_LIBRARY_PATH=$LD_LIBRARY_PATH pip install iree-runtime
+          sudo LD_LIBRARY_PATH=$LD_LIBRARY_PATH iree-run-module --dump_devices=hip
