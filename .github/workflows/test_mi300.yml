@@ -29,6 +29,7 @@ jobs:
       - name: Test MI300 machine
         run: |
           echo $USER
+          groups
           rocm-smi
           sudo chmod -R 777 /dev/kfd
           rocminfo
