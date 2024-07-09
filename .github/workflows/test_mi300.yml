@@ -22,7 +22,6 @@ jobs:
       - name: Pre Checkout MI300 Step
         run: |
           sudo chmod -R 777 ~/actions-runner/_work
-          sudo chmod -R 775 /dev/kfd
       - name: Checking out IREE repository
         uses: actions/checkout@v4.1.7
         with:
@@ -31,6 +30,7 @@ jobs:
         run: |
           echo $USER
           rocm-smi
+          sudo chmod -R 777 /dev/kfd
           rocminfo
           python3 -m venv test_venv
           source test_venv/bin/activate
