@@ -359,8 +359,8 @@ iree_status_t iree_hal_metal_direct_command_buffer_create(
                                                           mode, binding_capacity),
                             (void**)&command_buffer));
 
-  iree_hal_command_buffer_initialize(device, mode, command_categories, IREE_HAL_QUEUE_AFFINITY_ANY,
-                                     binding_capacity,
+  iree_hal_command_buffer_initialize(iree_hal_device_allocator(device), mode, command_categories,
+                                     IREE_HAL_QUEUE_AFFINITY_ANY, binding_capacity,
                                      (uint8_t*)command_buffer + sizeof(*command_buffer),
                                      &iree_hal_metal_command_buffer_vtable, &command_buffer->base);
   command_buffer->device = device;

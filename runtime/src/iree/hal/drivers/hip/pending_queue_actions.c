@@ -581,6 +581,8 @@ iree_status_t iree_hal_hip_pending_queue_actions_enqueue_execution(
     status = iree_hal_resource_set_insert(
         action->resource_set, command_buffer_count, command_buffers);
   }
+  // TODO(indirect-cmd): clone binding table contents and add to resource set.
+
   if (iree_status_is_ok(status)) {
     // Retain the owning queue to make sure the action outlives it.
     iree_hal_resource_retain(actions);

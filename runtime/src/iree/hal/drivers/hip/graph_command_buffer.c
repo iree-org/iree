@@ -156,7 +156,7 @@ static void iree_hip_graph_command_buffer_trace_zone_end(
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
 
 iree_status_t iree_hal_hip_graph_command_buffer_create(
-    iree_hal_device_t* device,
+    iree_hal_allocator_t* device_allocator,
     const iree_hal_hip_dynamic_symbols_t* hip_symbols,
     iree_hal_hip_tracing_context_t* tracing_context, hipCtx_t context,
     iree_hal_command_buffer_mode_t mode,
@@ -164,7 +164,7 @@ iree_status_t iree_hal_hip_graph_command_buffer_create(
     iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
     iree_arena_block_pool_t* block_pool, iree_allocator_t host_allocator,
     iree_hal_command_buffer_t** out_command_buffer) {
-  IREE_ASSERT_ARGUMENT(device);
+  IREE_ASSERT_ARGUMENT(device_allocator);
   IREE_ASSERT_ARGUMENT(hip_symbols);
   IREE_ASSERT_ARGUMENT(block_pool);
   IREE_ASSERT_ARGUMENT(out_command_buffer);
@@ -188,8 +188,8 @@ iree_status_t iree_hal_hip_graph_command_buffer_create(
                             (void**)&command_buffer));
 
   iree_hal_command_buffer_initialize(
-      device, mode, command_categories, queue_affinity, binding_capacity,
-      (uint8_t*)command_buffer + sizeof(*command_buffer),
+      device_allocator, mode, command_categories, queue_affinity,
+      binding_capacity, (uint8_t*)command_buffer + sizeof(*command_buffer),
       &iree_hal_hip_graph_command_buffer_vtable, &command_buffer->base);
   command_buffer->host_allocator = host_allocator;
   command_buffer->symbols = hip_symbols;

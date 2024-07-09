@@ -74,7 +74,7 @@ iree_hal_vulkan_direct_command_buffer_cast(
 }
 
 iree_status_t iree_hal_vulkan_direct_command_buffer_allocate(
-    iree_hal_device_t* device,
+    iree_hal_allocator_t* device_allocator,
     iree::hal::vulkan::VkDeviceHandle* logical_device,
     iree::hal::vulkan::VkCommandPoolHandle* command_pool,
     iree_hal_command_buffer_mode_t mode,
@@ -85,6 +85,7 @@ iree_status_t iree_hal_vulkan_direct_command_buffer_allocate(
     iree::hal::vulkan::BuiltinExecutables* builtin_executables,
     iree_arena_block_pool_t* block_pool,
     iree_hal_command_buffer_t** out_command_buffer) {
+  IREE_ASSERT_ARGUMENT(device_allocator);
   IREE_ASSERT_ARGUMENT(logical_device);
   IREE_ASSERT_ARGUMENT(command_pool);
   IREE_ASSERT_ARGUMENT(descriptor_pool_cache);
@@ -119,8 +120,8 @@ iree_status_t iree_hal_vulkan_direct_command_buffer_allocate(
       (void**)&command_buffer);
   if (iree_status_is_ok(status)) {
     iree_hal_command_buffer_initialize(
-        device, mode, command_categories, queue_affinity, binding_capacity,
-        (uint8_t*)command_buffer + sizeof(*command_buffer),
+        device_allocator, mode, command_categories, queue_affinity,
+        binding_capacity, (uint8_t*)command_buffer + sizeof(*command_buffer),
         &iree_hal_vulkan_direct_command_buffer_vtable, &command_buffer->base);
     command_buffer->logical_device = logical_device;
     command_buffer->tracing_context = tracing_context;

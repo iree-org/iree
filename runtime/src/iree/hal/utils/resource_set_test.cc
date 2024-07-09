@@ -148,6 +148,39 @@ TEST_F(ResourceSetTest, Insert5) {
   EXPECT_EQ(live_bitmap, 0u);
 }
 
+// Tests inserting multiple resources at a time from a user-defined struct.
+TEST_F(ResourceSetTest, InsertStrided5) {
+  auto resource_set = make_resource_set(&block_pool);
+
+  // Allocate 5 resources - this lets us test for special paths that may handle
+  // 4 at a time (to fit in SIMD registers) as well as the leftovers.
+  struct my_struct_t {
+    int ordinal;
+    iree_hal_resource_t* resource;
+  } structs[5];
+  memset(&structs, 0, sizeof(structs));
+  uint32_t live_bitmap = 0u;
+  for (iree_host_size_t i = 0; i < IREE_ARRAYSIZE(structs); ++i) {
+    structs[i].ordinal = i;
+    IREE_ASSERT_OK(iree_hal_test_resource_create(
+        i, &live_bitmap, host_allocator, &structs[i].resource));
+  }
+  EXPECT_EQ(live_bitmap, 0x1Fu);
+
+  // Transfer ownership of the resources to the set.
+  IREE_ASSERT_OK(iree_hal_resource_set_insert_strided(
+      resource_set.get(), IREE_ARRAYSIZE(structs), structs,
+      offsetof(my_struct_t, resource), sizeof(my_struct_t)));
+  for (iree_host_size_t i = 0; i < IREE_ARRAYSIZE(structs); ++i) {
+    iree_hal_resource_release(structs[i].resource);
+  }
+  EXPECT_EQ(live_bitmap, 0x1Fu);
+
+  // Ensure the set releases the resources.
+  resource_set.reset();
+  EXPECT_EQ(live_bitmap, 0u);
+}
+
 // Tests inserting enough resources to force set growth. This is ensured by
 // choosing a sufficiently small block size such that even 32 elements triggers
 // a growth. Of course, real usage should have at least ~4KB for the block size.

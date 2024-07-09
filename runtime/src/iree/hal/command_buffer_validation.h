@@ -27,7 +27,9 @@ typedef struct iree_hal_buffer_binding_requirements_t {
 // Storage for command buffer validation state.
 // Designed to be embedded in concrete implementations that want validation.
 typedef struct iree_hal_command_buffer_validation_state_t {
-  iree_hal_device_t* device;
+  // Allocator from the device the command buffer is targeting.
+  // Used to verify buffer compatibility.
+  iree_hal_allocator_t* device_allocator;
   // 1 when in a begin/end recording sequence.
   int32_t is_recording : 1;
   // Debug group depth for tracking proper begin/end pairing.
@@ -41,7 +43,8 @@ typedef struct iree_hal_command_buffer_validation_state_t {
 } iree_hal_command_buffer_validation_state_t;
 
 void iree_hal_command_buffer_initialize_validation(
-    iree_hal_device_t* device, iree_hal_command_buffer_t* command_buffer,
+    iree_hal_allocator_t* device_allocator,
+    iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* out_validation_state);
 
 iree_status_t iree_hal_command_buffer_begin_validation(

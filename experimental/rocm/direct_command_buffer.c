@@ -52,7 +52,8 @@ iree_hal_rocm_direct_command_buffer_cast(
 }
 
 iree_status_t iree_hal_rocm_direct_command_buffer_create(
-    iree_hal_device_t* device, iree_hal_rocm_context_wrapper_t* context,
+    iree_hal_allocator_t* device_allocator,
+    iree_hal_rocm_context_wrapper_t* context,
     iree_hal_rocm_tracing_context_t* tracing_context,
     iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
@@ -82,8 +83,8 @@ iree_status_t iree_hal_rocm_direct_command_buffer_create(
       (void**)&command_buffer);
   if (iree_status_is_ok(status)) {
     iree_hal_command_buffer_initialize(
-        device, mode, command_categories, queue_affinity, binding_capacity,
-        (uint8_t*)command_buffer + total_size,
+        device_allocator, mode, command_categories, queue_affinity,
+        binding_capacity, (uint8_t*)command_buffer + total_size,
         &iree_hal_rocm_direct_command_buffer_vtable, &command_buffer->base);
     command_buffer->context = context;
     command_buffer->tracing_context = tracing_context;

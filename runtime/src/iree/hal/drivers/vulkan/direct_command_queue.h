@@ -25,14 +25,16 @@ class DirectCommandQueue final : public CommandQueue {
                      VkQueue queue);
   ~DirectCommandQueue() override;
 
-  iree_status_t Submit(iree_host_size_t batch_count,
-                       const iree_hal_submission_batch_t* batches) override;
+  iree_status_t Submit(
+      iree_host_size_t batch_count,
+      const iree_hal_vulkan_submission_batch_t* batches) override;
 
   iree_status_t WaitIdle(iree_timeout_t timeout) override;
 
  private:
   iree_status_t TranslateBatchInfo(
-      const iree_hal_submission_batch_t* batch, VkSubmitInfo* submit_info,
+      const iree_hal_vulkan_submission_batch_t* batch,
+      VkSubmitInfo* submit_info,
       VkTimelineSemaphoreSubmitInfo* timeline_submit_info, Arena* arena);
 };
 

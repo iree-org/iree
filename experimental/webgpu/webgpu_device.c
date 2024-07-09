@@ -243,10 +243,11 @@ static iree_status_t iree_hal_webgpu_device_create_command_buffer(
     iree_hal_command_buffer_t** out_command_buffer) {
   iree_hal_webgpu_device_t* device = iree_hal_webgpu_device_cast(base_device);
   return iree_hal_webgpu_command_buffer_create(
-      (iree_hal_device_t*)device, device->handle, mode, command_categories,
-      queue_affinity, binding_capacity, &device->large_block_pool,
-      &device->staging_buffer, &device->bind_group_cache, &device->builtins,
-      device->host_allocator, out_command_buffer);
+      iree_hal_device_allocator(base_device), device->handle, mode,
+      command_categories, queue_affinity, binding_capacity,
+      &device->large_block_pool, &device->staging_buffer,
+      &device->bind_group_cache, &device->builtins, device->host_allocator,
+      out_command_buffer);
 }
 
 static iree_status_t iree_hal_webgpu_device_create_descriptor_set_layout(

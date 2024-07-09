@@ -1531,9 +1531,9 @@ static iree_status_t iree_hal_vulkan_device_create_command_buffer(
   // command buffer when submitted with bindings.
   if (binding_capacity > 0) {
     return iree_hal_deferred_command_buffer_create(
-        base_device, mode, command_categories, binding_capacity,
-        &device->block_pool, iree_hal_device_host_allocator(base_device),
-        out_command_buffer);
+        iree_hal_device_allocator(base_device), mode, command_categories,
+        binding_capacity, &device->block_pool,
+        iree_hal_device_host_allocator(base_device), out_command_buffer);
   }
 
   // TODO(scotttodd): revisit queue selection logic and remove this
@@ -1565,8 +1565,8 @@ static iree_status_t iree_hal_vulkan_device_create_command_buffer(
       device, command_categories, queue_affinity);
 
   return iree_hal_vulkan_direct_command_buffer_allocate(
-      base_device, device->logical_device, command_pool, mode,
-      command_categories, queue_affinity, binding_capacity,
+      iree_hal_device_allocator(base_device), device->logical_device,
+      command_pool, mode, command_categories, queue_affinity, binding_capacity,
       queue->tracing_context(), device->descriptor_pool_cache,
       device->builtin_executables, &device->block_pool, out_command_buffer);
 }
@@ -1763,7 +1763,7 @@ static iree_status_t iree_hal_vulkan_device_queue_execute(
   }
 
   if (iree_status_is_ok(status)) {
-    iree_hal_submission_batch_t batch = {
+    iree_hal_vulkan_submission_batch_t batch = {
         /*.wait_semaphores=*/wait_semaphore_list,
         /*.command_buffer_count=*/command_buffer_count,
         /*.command_buffers=*/translated_command_buffers,

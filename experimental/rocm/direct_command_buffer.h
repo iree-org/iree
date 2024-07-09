@@ -34,7 +34,8 @@ typedef struct {
 
 // Creates a rocm direct command buffer.
 iree_status_t iree_hal_rocm_direct_command_buffer_create(
-    iree_hal_device_t* device, iree_hal_rocm_context_wrapper_t* context,
+    iree_hal_allocator_t* device_allocator,
+    iree_hal_rocm_context_wrapper_t* context,
     iree_hal_rocm_tracing_context_t* tracing_context,
     iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,

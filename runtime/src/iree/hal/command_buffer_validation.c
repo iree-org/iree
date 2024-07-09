@@ -14,7 +14,6 @@
 #include "iree/hal/allocator.h"
 #include "iree/hal/buffer.h"
 #include "iree/hal/detail.h"
-#include "iree/hal/device.h"
 #include "iree/hal/event.h"
 #include "iree/hal/executable.h"
 #include "iree/hal/pipeline_layout.h"
@@ -60,7 +59,7 @@ static iree_status_t iree_hal_command_buffer_validate_buffer_compatibility(
     iree_hal_buffer_usage_t intended_usage) {
   iree_hal_buffer_compatibility_t allowed_compatibility =
       iree_hal_allocator_query_buffer_compatibility(
-          iree_hal_device_allocator(validation_state->device),
+          validation_state->device_allocator,
           (iree_hal_buffer_params_t){
               .type = iree_hal_buffer_memory_type(buffer),
               .usage = iree_hal_buffer_allowed_usage(buffer) & intended_usage,
@@ -208,9 +207,10 @@ static iree_status_t iree_hal_command_buffer_validate_dispatch_bindings(
 }
 
 void iree_hal_command_buffer_initialize_validation(
-    iree_hal_device_t* device, iree_hal_command_buffer_t* command_buffer,
+    iree_hal_allocator_t* device_allocator,
+    iree_hal_command_buffer_t* command_buffer,
     iree_hal_command_buffer_validation_state_t* out_validation_state) {
-  out_validation_state->device = device;
+  out_validation_state->device_allocator = device_allocator;
   out_validation_state->is_recording = false;
   out_validation_state->debug_group_depth = 0;
 }
