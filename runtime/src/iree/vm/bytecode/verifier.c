@@ -506,9 +506,18 @@ iree_status_t iree_vm_bytecode_function_verify(
                             "ref register ordinal %u out of range %u",       \
                             (ordinal), verify_state->ref_register_count);    \
   }
-#define IREE_VM_VERIFY_REG_ANY(ordinal)                               \
-  if (IREE_UNLIKELY(((ordinal) & IREE_REF_REGISTER_TYPE_BIT) == 0)) { \
-  } else {                                                            \
+#define IREE_VM_VERIFY_REG_ANY(ordinal)                                       \
+  if (((ordinal) & IREE_REF_REGISTER_TYPE_BIT) != 0) {                        \
+    int32_t ref_ordinal = (ordinal) & IREE_REF_REGISTER_MASK;                 \
+    if (IREE_UNLIKELY(ref_ordinal >= verify_state->ref_register_count)) {     \
+      return iree_make_status(IREE_STATUS_OUT_OF_RANGE,                       \
+                              "ref register ordinal %u out of range %u",      \
+                              ref_ordinal, verify_state->ref_register_count); \
+    }                                                                         \
+  } else if (IREE_UNLIKELY((ordinal) >= verify_state->i32_register_count)) {  \
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,                         \
+                            "i32 register ordinal %u out of range %u",        \
+                            (ordinal), verify_state->i32_register_count);     \
   }
 
 #define VM_VerifyConstI8(name)             \
