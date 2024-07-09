@@ -510,8 +510,6 @@ jobs:
     steps:
       - name: "Checking out repository"
         uses: actions/checkout@v4.1.7
-      - name: "Checking out runtime submodules"
-        run: ./build_tools/scripts/git/update_runtime_submodules.sh
 
       - name: "(Windows) Configuring MSVC"
         if: contains(matrix.name, 'windows')
@@ -520,6 +518,9 @@ jobs:
       - name: "(macOS) Installing requirements"
         if: contains(matrix.name, 'macos')
         run: brew install ninja ccache coreutils bash
+
+      - name: "Checking out runtime submodules"
+        run: ./build_tools/scripts/git/update_runtime_submodules.sh
 
       # Simple case of no Docker container: install deps -> build -> test.
       - name: "(No Docker) Installing Python requirements"
