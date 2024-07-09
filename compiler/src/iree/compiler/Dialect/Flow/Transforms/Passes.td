@@ -187,6 +187,15 @@ def FuseHorizontalContractionsPass:
     "mlir::arith::ArithDialect",
     "mlir::tensor::TensorDialect",
   ];
+  let options = [
+    Option<"fusionLimit", "fusion-limit", "int",
+            /*default=*/"3", "Maximum number of contractions fused into one">
+  ];
+  let statistics = [
+    Statistic<"numFusionGroups", "num-fusion-groups", "Number of fusion groups found">,
+    Statistic<"numSize2FusionGroups", "num-size-2-groups", "Number of fusion groups of size 2">,
+    Statistic<"numSize3FusionGroups", "num-size-3-groups", "Number of fusion groups of size 3">
+  ];
 }
 
 def ConvertDispatchRegionsToWorkgroupsPass :
