@@ -149,14 +149,12 @@ jobs:
             backend: rocm
             runs-on: nodai-amdgpu-mi250-x86-64
           - name: amdgpu_rocm_mi300_gfx942
-            models-config-file: models_gpu_rocm_gfx942.json
-            models-extra-flags-config-file: models_gpu_rocm_gfx942_additional_flags.json
-            sdxl-unet-config-file: sdxl_scheduled_unet_gpu_rocm_gfx942.json
-            sdxl-vae-config-file: sdxl_vae_decode_gpu_rocm_gfx942.json
-            sdxl-clip-config-file: sdxl_prompt_encoder_gpu_rocm_gfx942.json
+            models-config-file: models_gpu_rocm_gfx90a.json
+            backend: rocm
             runs-on: nodai-amdgpu-mi300-x86-64
           - name: amdgpu_vulkan
             models-config-file: models_gpu_vulkan.json
+            backend: vulkan
             runs-on: nodai-amdgpu-w7900-x86-64
 
           # NVIDIA GPU
@@ -175,10 +173,15 @@ jobs:
       MODELS_CONFIG_FILE_PATH: build_tools/pkgci/external_test_suite/${{ matrix.models-config-file }}
       ROCM_CHIP: gfx90a
       VENV_DIR: ${{ github.workspace }}/venv
+<<<<<<< HEAD
       LD_LIBRARY_PATH: /home/esaimana/Python-3.11.9
     steps:
       # TODO(saienduri): Find alternative to this temporary step that manipulates permission of github actions
       # directory to be able to clean after every PR
+=======
+      LD_LIBRARY_PATH: ~/Python-3.11.9
+    steps:
+>>>>>>> e1ce90adc (try adding mi300)
       - name: Pre Checkout MI300 Step
         if: contains(matrix.name, 'gfx942')
         run: |
