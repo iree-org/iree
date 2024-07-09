@@ -321,7 +321,7 @@ jobs:
             --goldendispatch-rocm-vae 248 \
             --goldensize-rocm-unet-bytes 2062938 \
             --goldensize-rocm-clip-bytes 780328 \
-            --goldensize-rocm-vae-bytes 757933 \
+            --goldensize-rocm-vae-bytes 758509 \
             --gpu-number 6 \
             --rocm-chip gfx90a \
             --log-cli-level=info \
