@@ -190,6 +190,9 @@ jobs:
         with:
           # Must match the subset of versions built in pkgci_build_packages.
           python-version: "3.11"
+      - name: "Setup Python MI300"
+        if: contains(matrix.name, 'rocm_mi300_gfx942')
+        run: export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/esaimana/Python-3.11.9
       - uses: actions/download-artifact@v4.1.7
         with:
           name: linux_x86_64_release_packages

@@ -445,6 +445,8 @@ jobs:
       IREE_HIP_TEST_TARGET_CHIP: "gfx942"
     runs-on: nodai-amdgpu-mi300-x86-64
     steps:
+      - name: "Setup Python MI300"
+        run: export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/esaimana/Python-3.11.9
       - name: "Checking out repository"
         uses: actions/checkout@v4.1.7
       - name: "Checking out runtime submodules"
