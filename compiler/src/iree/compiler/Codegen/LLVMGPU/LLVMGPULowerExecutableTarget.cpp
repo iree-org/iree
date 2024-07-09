@@ -92,8 +92,7 @@ getPipelineOptions(FunctionOpInterface funcOp,
       // Get the workgroups reorder config and enable the workgroup reordering.
       Attribute reorderWorkgroupOption =
           config.get(LLVMGPUAttrNames::kReorderWorkgroups);
-      if (llvm::isa<IREE::GPU::WorkgroupReorderOptionsAttr>(
-              reorderWorkgroupOption)) {
+      if (isa<IREE::GPU::WorkgroupReorderOptionsAttr>(reorderWorkgroupOption)) {
         IREE::GPU::WorkgroupReorderOptionsAttr ReorderOption =
             llvm::dyn_cast<IREE::GPU::WorkgroupReorderOptionsAttr>(
                 reorderWorkgroupOption);

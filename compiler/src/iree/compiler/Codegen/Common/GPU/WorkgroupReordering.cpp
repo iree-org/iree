@@ -68,14 +68,37 @@ makeSwizzledIds(Location loc, OpBuilder b, Value workgroupIdX,
   return {swizzledIdX, swizzledIdY};
 }
 
-// reoredering to make workgroup ids move slowly between chiplet groups
+// Reoredering to make workgroup ids move slowly between chiplet groups.
+
+// The following example illustrates the concept behind this function:
+// Currently, the GPU launches workgroups in a round-robin fashion across
+// each XCD partition on the GPU.
+// Assume we have 16 workgroups and XCDPartitionsOnGPU is 4.
+// The default GPU schedule will launch workgroups {0, 1, 2, 3, ..., 15} in
+// the following round-robin fashion:
+// Partition 0: {0, 4, 8, 12}
+// Partition 1: {1, 5, 9, 13}
+// Partition 2: {2, 6, 10, 14}
+// Partition 3: {3, 7, 11, 15}
+
+// After reordering, the workgroup IDs are {0, 4, 8, 12, 1, ..., 15},
+// resulting in the round-robin launching fashion:
+// Partition 0: {0, 1, 2, 3}
+// Partition 1: {4, 5, 6, 7}
+// Partition 2: {8, 9, 10, 11}
+// Partition 3: {12, 13, 14, 15}
+
+// The return value is each workgroup's permuted Id
+// In the above example:
+// linearedId 0's permuted Id is still 0
+// linearedId 1's permiuted Id is 4
 static Value chipletAwareWorkgroupReordering(Location loc, OpBuilder b,
                                              Value linearizedId,
                                              Value workgroupCountX,
                                              Value workgroupCountY,
-                                             int64_t numChipletsPerGroup) {
+                                             int64_t XCDParitionsOnGPU) {
   Value numChipletsVal =
-      b.createOrFold<arith::ConstantIndexOp>(loc, numChipletsPerGroup);
+      b.createOrFold<arith::ConstantIndexOp>(loc, XCDParitionsOnGPU);
   Value workgroupCount =
       b.create<arith::MulIOp>(loc, workgroupCountX, workgroupCountY);
   Value workgroupCountPerChiplet =
@@ -87,8 +110,7 @@ static Value chipletAwareWorkgroupReordering(Location loc, OpBuilder b,
       loc, wgIdWithinChiplet,
       b.create<arith::MulIOp>(loc, chipletId, workgroupCountPerChiplet));
 
-  // The following code is used to handle the remainder part
-
+  // Handle the remainder part.
   Value constOne = b.createOrFold<arith::ConstantIndexOp>(loc, 1);
   Value lastWorkgroupId =
       b.create<arith::SubIOp>(loc, workgroupCount, constOne);
@@ -97,10 +119,10 @@ static Value chipletAwareWorkgroupReordering(Location loc, OpBuilder b,
       b.create<arith::RemUIOp>(loc, workgroupCount, numChipletsVal));
   Value isGreaterThanFinalWorkgroupId = b.create<arith::CmpIOp>(
       loc, arith::CmpIPredicate::ugt, linearizedId, modulatedLastWorkgroupId);
-  linearizedId = b.create<arith::SelectOp>(loc, isGreaterThanFinalWorkgroupId,
-                                           linearizedId, reorderedId);
+  Value finalId = b.create<arith::SelectOp>(loc, isGreaterThanFinalWorkgroupId,
+                                            linearizedId, reorderedId);
 
-  return linearizedId;
+  return finalId;
 }
 
 // Chiplet-aware workgroup reordering strategy: reordering + super-grouping.
@@ -290,7 +312,7 @@ struct ReorderWorkgroupsPass final
     if (failed(Pass::initializeOptions(options, errorHandler))) {
       return failure();
     }
-    reorderWgLogTileSize = logTile;
+
     auto selectedStrategy =
         llvm::StringSwitch<FailureOr<ReorderWorkgroupsStrategy>>(strategy)
             .Case("", ReorderWorkgroupsStrategy::None)
@@ -302,6 +324,11 @@ struct ReorderWorkgroupsPass final
       return failure();
 
     reorderingStrategy = *selectedStrategy;
+    if (reorderingStrategy == ReorderWorkgroupsStrategy::Swizzle)
+      reorderWgLogTileSize = logSwTile;
+    else if (reorderingStrategy == ReorderWorkgroupsStrategy::ChipletGroup)
+      reorderWgLogTileSize = logCgTile;
+
     return success();
   }
 

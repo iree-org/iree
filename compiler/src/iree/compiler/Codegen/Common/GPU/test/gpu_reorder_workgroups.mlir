@@ -1,10 +1,10 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-reorder-workgroups{strategy=swizzle logTile=3}))" \
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-reorder-workgroups{strategy=swizzle logSwTile=3}))" \
 // RUN:   --split-input-file %s | FileCheck --check-prefix=SWIZZLE %s
 
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-reorder-workgroups{strategy=transpose}))" \
 // RUN:   --split-input-file %s | FileCheck --check-prefix=TRANSPOSE %s
 
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-reorder-workgroups{strategy=chipletgroup logTile=3}))" \
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-reorder-workgroups{strategy=chipletgroup logCgTile=3}))" \
 // RUN:   --split-input-file %s | FileCheck --check-prefix=CHIPLETGROUP %s
 
 func.func @matmul() {
