@@ -155,7 +155,7 @@ static void iree_cuda_graph_command_buffer_trace_zone_end(
 #endif  // IREE_TRACING_FEATURES & IREE_TRACING_FEATURE_INSTRUMENTATION_DEVICE
 
 iree_status_t iree_hal_cuda_graph_command_buffer_create(
-    iree_hal_device_t* device,
+    iree_hal_allocator_t* device_allocator,
     const iree_hal_cuda_dynamic_symbols_t* cuda_symbols,
     iree_hal_cuda_tracing_context_t* tracing_context, CUcontext context,
     iree_hal_command_buffer_mode_t mode,
@@ -185,8 +185,8 @@ iree_status_t iree_hal_cuda_graph_command_buffer_create(
                             (void**)&command_buffer));
 
   iree_hal_command_buffer_initialize(
-      device, mode, command_categories, queue_affinity, binding_capacity,
-      (uint8_t*)command_buffer + sizeof(*command_buffer),
+      device_allocator, mode, command_categories, queue_affinity,
+      binding_capacity, (uint8_t*)command_buffer + sizeof(*command_buffer),
       &iree_hal_cuda_graph_command_buffer_vtable, &command_buffer->base);
   command_buffer->host_allocator = host_allocator;
   command_buffer->symbols = cuda_symbols;

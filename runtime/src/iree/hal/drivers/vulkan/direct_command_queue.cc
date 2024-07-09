@@ -27,7 +27,7 @@ DirectCommandQueue::DirectCommandQueue(
 DirectCommandQueue::~DirectCommandQueue() = default;
 
 iree_status_t DirectCommandQueue::TranslateBatchInfo(
-    const iree_hal_submission_batch_t* batch, VkSubmitInfo* submit_info,
+    const iree_hal_vulkan_submission_batch_t* batch, VkSubmitInfo* submit_info,
     VkTimelineSemaphoreSubmitInfo* timeline_submit_info, Arena* arena) {
   // TODO(benvanik): see if we can go to finer-grained stages.
   // For example, if this was just queue ownership transfers then we can use
@@ -92,7 +92,8 @@ iree_status_t DirectCommandQueue::TranslateBatchInfo(
 }
 
 iree_status_t DirectCommandQueue::Submit(
-    iree_host_size_t batch_count, const iree_hal_submission_batch_t* batches) {
+    iree_host_size_t batch_count,
+    const iree_hal_vulkan_submission_batch_t* batches) {
   IREE_TRACE_SCOPE_NAMED("DirectCommandQueue::Submit");
 
   // Map the submission batches to VkSubmitInfos.

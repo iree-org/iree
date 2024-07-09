@@ -58,7 +58,7 @@ iree_hal_cuda_stream_command_buffer_cast(
 }
 
 iree_status_t iree_hal_cuda_stream_command_buffer_create(
-    iree_hal_device_t* device,
+    iree_hal_allocator_t* device_allocator,
     const iree_hal_cuda_dynamic_symbols_t* cuda_symbols,
     const iree_hal_cuda_nccl_dynamic_symbols_t* nccl_symbols,
     iree_hal_cuda_tracing_context_t* tracing_context,
@@ -67,7 +67,7 @@ iree_status_t iree_hal_cuda_stream_command_buffer_create(
     iree_host_size_t binding_capacity, CUstream stream,
     iree_arena_block_pool_t* block_pool, iree_allocator_t host_allocator,
     iree_hal_command_buffer_t** out_command_buffer) {
-  IREE_ASSERT_ARGUMENT(device);
+  IREE_ASSERT_ARGUMENT(device_allocator);
   IREE_ASSERT_ARGUMENT(cuda_symbols);
   IREE_ASSERT_ARGUMENT(nccl_symbols);
   IREE_ASSERT_ARGUMENT(out_command_buffer);
@@ -91,7 +91,7 @@ iree_status_t iree_hal_cuda_stream_command_buffer_create(
                             (void**)&command_buffer));
 
   iree_hal_command_buffer_initialize(
-      device, mode, command_categories, IREE_HAL_QUEUE_AFFINITY_ANY,
+      device_allocator, mode, command_categories, IREE_HAL_QUEUE_AFFINITY_ANY,
       binding_capacity, (uint8_t*)command_buffer + sizeof(*command_buffer),
       &iree_hal_cuda_stream_command_buffer_vtable, &command_buffer->base);
   command_buffer->host_allocator = host_allocator;

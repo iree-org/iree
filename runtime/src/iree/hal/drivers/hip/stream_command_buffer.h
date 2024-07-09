@@ -30,7 +30,7 @@ extern "C" {
 // retained by the source deferred command buffer and as such the |block_pool|
 // and can be NULL to avoid a double copy.
 iree_status_t iree_hal_hip_stream_command_buffer_create(
-    iree_hal_device_t* device,
+    iree_hal_allocator_t* device_allocator,
     const iree_hal_hip_dynamic_symbols_t* hip_symbols,
     const iree_hal_hip_nccl_dynamic_symbols_t* nccl_symbols,
     iree_hal_hip_tracing_context_t* tracing_context,

@@ -235,13 +235,15 @@ static iree_status_t iree_hal_sync_device_create_command_buffer(
   if (iree_all_bits_set(mode,
                         IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION)) {
     return iree_hal_inline_command_buffer_create(
-        base_device, mode, command_categories, queue_affinity, binding_capacity,
+        iree_hal_device_allocator(base_device), mode, command_categories,
+        queue_affinity, binding_capacity,
         iree_hal_device_host_allocator(base_device), out_command_buffer);
   } else {
     iree_hal_sync_device_t* device = iree_hal_sync_device_cast(base_device);
     return iree_hal_deferred_command_buffer_create(
-        base_device, mode, command_categories, binding_capacity,
-        &device->large_block_pool, device->host_allocator, out_command_buffer);
+        iree_hal_device_allocator(base_device), mode, command_categories,
+        binding_capacity, &device->large_block_pool, device->host_allocator,
+        out_command_buffer);
   }
 }
 
@@ -415,7 +417,7 @@ static iree_status_t iree_hal_sync_device_apply_deferred_command_buffers(
       // binding tables and can be validated entirely while recording.
       iree_hal_command_buffer_t* inline_command_buffer = NULL;
       IREE_RETURN_IF_ERROR(iree_hal_inline_command_buffer_initialize(
-          (iree_hal_device_t*)device,
+          device->device_allocator,
           iree_hal_command_buffer_mode(command_buffer) |
               IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION |
               IREE_HAL_COMMAND_BUFFER_MODE_UNVALIDATED,

@@ -29,7 +29,7 @@ iree_host_size_t iree_hal_inline_command_buffer_size(
 // the caller: attempting to use the resulting command buffer as a ref object
 // is invalid.
 iree_status_t iree_hal_inline_command_buffer_initialize(
-    iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,
+    iree_hal_allocator_t* device_allocator, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
     iree_allocator_t host_allocator, iree_byte_span_t storage,
@@ -50,7 +50,7 @@ void iree_hal_inline_command_buffer_deinitialize(
 //
 // Must have IREE_HAL_COMMAND_BUFFER_MODE_ALLOW_INLINE_EXECUTION set.
 iree_status_t iree_hal_inline_command_buffer_create(
-    iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,
+    iree_hal_allocator_t* device_allocator, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
     iree_allocator_t host_allocator,

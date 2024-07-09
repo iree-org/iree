@@ -183,7 +183,7 @@ IREE_API_EXPORT iree_host_size_t iree_hal_command_buffer_validation_state_size(
 }
 
 IREE_API_EXPORT void iree_hal_command_buffer_initialize(
-    iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,
+    iree_hal_allocator_t* device_allocator, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
     void* validation_state, const iree_hal_command_buffer_vtable_t* vtable,
@@ -213,7 +213,7 @@ IREE_API_EXPORT void iree_hal_command_buffer_initialize(
   // implementation.
   IF_VALIDATING(command_buffer, {
     iree_hal_command_buffer_initialize_validation(
-        device, command_buffer, VALIDATION_STATE(command_buffer));
+        device_allocator, command_buffer, VALIDATION_STATE(command_buffer));
   });
 }
 

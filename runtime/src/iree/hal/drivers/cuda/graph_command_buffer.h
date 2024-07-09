@@ -25,7 +25,7 @@ typedef struct iree_hal_cuda_tracing_context_t iree_hal_cuda_tracing_context_t;
 // input data until reset. It must remain live for the lifetime of the command
 // buffers that use it.
 iree_status_t iree_hal_cuda_graph_command_buffer_create(
-    iree_hal_device_t* device,
+    iree_hal_allocator_t* device_allocator,
     const iree_hal_cuda_dynamic_symbols_t* cuda_symbols,
     iree_hal_cuda_tracing_context_t* tracing_context, CUcontext context,
     iree_hal_command_buffer_mode_t mode,
