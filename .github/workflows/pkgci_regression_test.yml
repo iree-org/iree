@@ -173,15 +173,10 @@ jobs:
       MODELS_CONFIG_FILE_PATH: build_tools/pkgci/external_test_suite/${{ matrix.models-config-file }}
       ROCM_CHIP: gfx90a
       VENV_DIR: ${{ github.workspace }}/venv
-<<<<<<< HEAD
       LD_LIBRARY_PATH: /home/esaimana/Python-3.11.9
     steps:
       # TODO(saienduri): Find alternative to this temporary step that manipulates permission of github actions
       # directory to be able to clean after every PR
-=======
-      LD_LIBRARY_PATH: ~/Python-3.11.9
-    steps:
->>>>>>> e1ce90adc (try adding mi300)
       - name: Pre Checkout MI300 Step
         if: contains(matrix.name, 'gfx942')
         run: |
