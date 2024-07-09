@@ -50,7 +50,7 @@ iree_cc_library(
     "FoldUnitExtentDims.cpp"
     "FormDispatchRegions.cpp"
     "FormScalarDispatches.cpp"
-    "FusionOfTensorOps.cpp"
+    "FuseMultiUseElementwiseProducer.cpp"
     "FusionPreprocessing.cpp"
     "FusionUtils.cpp"
     "InitializeEmptyTensors.cpp"

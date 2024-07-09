@@ -33,7 +33,7 @@
 
 namespace mlir::iree_compiler::IREE::Flow {
 
-#define GEN_PASS_DEF_FUSIONOFTENSOROPSPASS
+#define GEN_PASS_DEF_FUSEMULTIUSEELEMENTWISEPRODUCERPASS
 #include "iree/compiler/Dialect/Flow/Transforms/Passes.h.inc"
 
 // TODO: Remove this and the backing code once consteval is beyond being
@@ -247,24 +247,25 @@ namespace {
 
 /// Pass to fuse linalg on tensor operations as well as fusion of hal.interface*
 /// operations with linalg.tensor_reshape operation.
-struct FusionOfTensorOpsPass
-    : public IREE::Flow::impl::FusionOfTensorOpsPassBase<
-          FusionOfTensorOpsPass> {
-  using IREE::Flow::impl::FusionOfTensorOpsPassBase<
-      FusionOfTensorOpsPass>::FusionOfTensorOpsPassBase;
+struct FuseMultiUseElementwiseProducerPass
+    : public IREE::Flow::impl::FuseMultiUseElementwiseProducerPassBase<
+          FuseMultiUseElementwiseProducerPass> {
+  using IREE::Flow::impl::FuseMultiUseElementwiseProducerPassBase<
+      FuseMultiUseElementwiseProducerPass>::
+      FuseMultiUseElementwiseProducerPassBase;
   void runOnOperation() override;
 };
 
 } // namespace
 
-void FusionOfTensorOpsPass::runOnOperation() {
+void FuseMultiUseElementwiseProducerPass::runOnOperation() {
   Operation *funcOp = getOperation();
   MLIRContext *context = funcOp->getContext();
 
   // Run fusion of producer with consumer when producer has multiple uses.
   // For now run this sequence a fixed times (2 by default). Ideally we
   // would run it till no candidates exist.
-  for (auto i : llvm::seq<unsigned>(0, multiUseFusionIteration)) {
+  for (auto i : llvm::seq<unsigned>(0, numIterations)) {
     (void)i;
     auto &dominanceInfo = getAnalysis<DominanceInfo>();
     FailureOr<unsigned> numOfFusableCandidates =
