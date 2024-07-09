@@ -233,6 +233,8 @@ jobs:
         if: "matrix.models-config-file != '' && !cancelled()"
         run: |
           source ${VENV_DIR}/bin/activate
+          rocm-smi
+          iree-run-module --dump_devices=hip
           pytest \
             SHARK-TestSuite/iree_tests/pytorch/models \
             SHARK-TestSuite/iree_tests/sharktank \

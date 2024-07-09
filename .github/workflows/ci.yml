@@ -468,6 +468,8 @@ jobs:
           IREE_CPU_DISABLE: 1
           IREE_HIP_DISABLE: 0
         run: |
+          rocm-smi
+          iree-run-module --dump_devices=hip
           ./build_tools/cmake/ctest_all.sh ${BUILD_DIR}
 
   test_amd_w7900:
