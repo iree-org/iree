@@ -22,7 +22,9 @@
       0) {                                                                   \
     expr;                                                                    \
   }
-#define VALIDATION_STATE(command_buffer) (&(command_buffer)->validation)
+#define VALIDATION_STATE(command_buffer)                          \
+  ((iree_hal_command_buffer_validation_state_t*)((command_buffer) \
+                                                     ->validation_state))
 #else
 #define IF_VALIDATING(command_buffer, expr)
 #define VALIDATION_STATE(command_buffer) \
@@ -167,17 +169,45 @@ IREE_API_EXPORT iree_device_size_t iree_hal_collective_element_byte_count(
 
 IREE_HAL_API_RETAIN_RELEASE(command_buffer);
 
+IREE_API_EXPORT iree_host_size_t iree_hal_command_buffer_validation_state_size(
+    iree_hal_command_buffer_mode_t mode, iree_host_size_t binding_capacity) {
+#if IREE_HAL_COMMAND_BUFFER_VALIDATION_ENABLE
+  return ((mode & IREE_HAL_COMMAND_BUFFER_MODE_UNVALIDATED) == 0)
+             ? sizeof(iree_hal_command_buffer_validation_state_t) +
+                   binding_capacity *
+                       sizeof(iree_hal_buffer_binding_requirements_t)
+             : 0;
+#else
+  return 0;
+#endif  // IREE_HAL_COMMAND_BUFFER_VALIDATION_ENABLE
+}
+
 IREE_API_EXPORT void iree_hal_command_buffer_initialize(
     iree_hal_device_t* device, iree_hal_command_buffer_mode_t mode,
     iree_hal_command_category_t command_categories,
     iree_hal_queue_affinity_t queue_affinity, iree_host_size_t binding_capacity,
-    const iree_hal_command_buffer_vtable_t* vtable,
+    void* validation_state, const iree_hal_command_buffer_vtable_t* vtable,
     iree_hal_command_buffer_t* command_buffer) {
+#if IREE_HAL_COMMAND_BUFFER_VALIDATION_ENABLE
+  // If validation is compiled in and the command buffer requires validation
+  // then check that state was provided.
+  IREE_ASSERT(
+      iree_all_bits_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_UNVALIDATED) ||
+      validation_state);
+#else
+  // If validation is not compiled in then force the disable bit. This helps
+  // prevent issues with dynamic libraries that may be compiled with a different
+  // setting, but we don't really support that kind of shady use anyway.
+  mode &= ~IREE_HAL_COMMAND_BUFFER_MODE_UNVALIDATED;
+#endif  // !IREE_HAL_COMMAND_BUFFER_VALIDATION_ENABLE
+
   iree_hal_resource_initialize(vtable, &command_buffer->resource);
   command_buffer->mode = mode;
   command_buffer->allowed_categories = command_categories;
   command_buffer->queue_affinity = queue_affinity;
   command_buffer->binding_capacity = binding_capacity;
+  command_buffer->binding_count = 0;
+  command_buffer->validation_state = validation_state;
 
   // Perform initialization validation after we allocate/initialize the concrete
   // implementation.
@@ -201,6 +231,10 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_create(
     if (!iree_all_bits_set(mode, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT)) {
       return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
                               "inline command buffers must be one-shot");
+    } else if (binding_capacity > 0) {
+      return iree_make_status(
+          IREE_STATUS_INVALID_ARGUMENT,
+          "inline command buffers cannot have indirect bindings");
     }
   }
 
@@ -372,28 +406,26 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_wait_events(
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_command_buffer_discard_buffer(
-    iree_hal_command_buffer_t* command_buffer, iree_hal_buffer_t* buffer) {
+    iree_hal_command_buffer_t* command_buffer,
+    iree_hal_buffer_ref_t buffer_ref) {
   IREE_ASSERT_ARGUMENT(command_buffer);
-  IREE_ASSERT_ARGUMENT(buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
   IF_VALIDATING(command_buffer, {
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, iree_hal_command_buffer_discard_buffer_validation(
-                command_buffer, VALIDATION_STATE(command_buffer), buffer));
+                command_buffer, VALIDATION_STATE(command_buffer), buffer_ref));
   });
-  iree_status_t status =
-      _VTABLE_DISPATCH(command_buffer, discard_buffer)(command_buffer, buffer);
+  iree_status_t status = _VTABLE_DISPATCH(command_buffer, discard_buffer)(
+      command_buffer, buffer_ref);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_command_buffer_fill_buffer(
-    iree_hal_command_buffer_t* command_buffer, iree_hal_buffer_t* target_buffer,
-    iree_device_size_t target_offset, iree_device_size_t length,
+    iree_hal_command_buffer_t* command_buffer, iree_hal_buffer_ref_t target_ref,
     const void* pattern, iree_host_size_t pattern_length) {
   IREE_ASSERT_ARGUMENT(command_buffer);
-  IREE_ASSERT_ARGUMENT(target_buffer);
-  if (length == 0) {
+  if (target_ref.length == 0) {
     // No-op fill. All other validation is skipped.
     return iree_ok_status();
   }
@@ -401,24 +433,21 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_fill_buffer(
   IF_VALIDATING(command_buffer, {
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, iree_hal_command_buffer_fill_buffer_validation(
-                command_buffer, VALIDATION_STATE(command_buffer), target_buffer,
-                target_offset, length, pattern, pattern_length));
+                command_buffer, VALIDATION_STATE(command_buffer), target_ref,
+                pattern, pattern_length));
   });
   iree_status_t status = _VTABLE_DISPATCH(command_buffer, fill_buffer)(
-      command_buffer, target_buffer, target_offset, length, pattern,
-      pattern_length);
+      command_buffer, target_ref, pattern, pattern_length);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_command_buffer_update_buffer(
     iree_hal_command_buffer_t* command_buffer, const void* source_buffer,
-    iree_host_size_t source_offset, iree_hal_buffer_t* target_buffer,
-    iree_device_size_t target_offset, iree_device_size_t length) {
+    iree_host_size_t source_offset, iree_hal_buffer_ref_t target_ref) {
   IREE_ASSERT_ARGUMENT(command_buffer);
   IREE_ASSERT_ARGUMENT(source_buffer);
-  IREE_ASSERT_ARGUMENT(target_buffer);
-  if (length == 0) {
+  if (target_ref.length == 0) {
     // No-op update. All other validation is skipped.
     return iree_ok_status();
   }
@@ -427,21 +456,19 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_update_buffer(
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, iree_hal_command_buffer_update_buffer_validation(
                 command_buffer, VALIDATION_STATE(command_buffer), source_buffer,
-                source_offset, target_buffer, target_offset, length));
+                source_offset, target_ref));
   });
   iree_status_t status = _VTABLE_DISPATCH(command_buffer, update_buffer)(
-      command_buffer, source_buffer, source_offset, target_buffer,
-      target_offset, length);
+      command_buffer, source_buffer, source_offset, target_ref);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_command_buffer_copy_buffer(
-    iree_hal_command_buffer_t* command_buffer, iree_hal_buffer_t* source_buffer,
-    iree_device_size_t source_offset, iree_hal_buffer_t* target_buffer,
-    iree_device_size_t target_offset, iree_device_size_t length) {
+    iree_hal_command_buffer_t* command_buffer, iree_hal_buffer_ref_t source_ref,
+    iree_hal_buffer_ref_t target_ref) {
   IREE_ASSERT_ARGUMENT(command_buffer);
-  if (length == 0) {
+  if (target_ref.length == 0) {
     // No-op copy. All other validation is skipped.
     return iree_ok_status();
   }
@@ -449,21 +476,19 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_copy_buffer(
   IF_VALIDATING(command_buffer, {
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, iree_hal_command_buffer_copy_buffer_validation(
-                command_buffer, VALIDATION_STATE(command_buffer), source_buffer,
-                source_offset, target_buffer, target_offset, length));
+                command_buffer, VALIDATION_STATE(command_buffer), source_ref,
+                target_ref));
   });
   iree_status_t status = _VTABLE_DISPATCH(command_buffer, copy_buffer)(
-      command_buffer, source_buffer, source_offset, target_buffer,
-      target_offset, length);
+      command_buffer, source_ref, target_ref);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
 
 IREE_API_EXPORT iree_status_t iree_hal_command_buffer_collective(
     iree_hal_command_buffer_t* command_buffer, iree_hal_channel_t* channel,
-    iree_hal_collective_op_t op, uint32_t param,
-    iree_hal_buffer_binding_t send_binding,
-    iree_hal_buffer_binding_t recv_binding, iree_device_size_t element_count) {
+    iree_hal_collective_op_t op, uint32_t param, iree_hal_buffer_ref_t send_ref,
+    iree_hal_buffer_ref_t recv_ref, iree_device_size_t element_count) {
   IREE_ASSERT_ARGUMENT(command_buffer);
   IREE_ASSERT_ARGUMENT(channel);
   IREE_TRACE_ZONE_BEGIN(z0);
@@ -471,7 +496,7 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_collective(
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, iree_hal_command_buffer_collective_validation(
                 command_buffer, VALIDATION_STATE(command_buffer), channel, op,
-                param, send_binding, recv_binding, element_count));
+                param, send_ref, recv_ref, element_count));
   });
 #if IREE_HAL_VERBOSE_TRACING_ENABLE
   IREE_TRACE({
@@ -482,8 +507,7 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_collective(
   });
 #endif  // IREE_HAL_VERBOSE_TRACING_ENABLE
   iree_status_t status = _VTABLE_DISPATCH(command_buffer, collective)(
-      command_buffer, channel, op, param, send_binding, recv_binding,
-      element_count);
+      command_buffer, channel, op, param, send_ref, recv_ref, element_count);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -514,8 +538,7 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_push_constants(
 IREE_API_EXPORT iree_status_t iree_hal_command_buffer_push_descriptor_set(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_pipeline_layout_t* pipeline_layout, uint32_t set,
-    iree_host_size_t binding_count,
-    const iree_hal_descriptor_set_binding_t* bindings) {
+    iree_host_size_t binding_count, const iree_hal_buffer_ref_t* bindings) {
   IREE_ASSERT_ARGUMENT(command_buffer);
   IREE_ASSERT_ARGUMENT(pipeline_layout);
   IREE_ASSERT_ARGUMENT(!binding_count || bindings);
@@ -579,21 +602,18 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch(
 IREE_API_EXPORT iree_status_t iree_hal_command_buffer_dispatch_indirect(
     iree_hal_command_buffer_t* command_buffer,
     iree_hal_executable_t* executable, int32_t entry_point,
-    iree_hal_buffer_t* workgroups_buffer,
-    iree_device_size_t workgroups_offset) {
+    iree_hal_buffer_ref_t workgroups_ref) {
   IREE_ASSERT_ARGUMENT(command_buffer);
   IREE_ASSERT_ARGUMENT(executable);
-  IREE_ASSERT_ARGUMENT(workgroups_buffer);
   IREE_TRACE_ZONE_BEGIN(z0);
   IF_VALIDATING(command_buffer, {
     IREE_RETURN_AND_END_ZONE_IF_ERROR(
         z0, iree_hal_command_buffer_dispatch_indirect_validation(
                 command_buffer, VALIDATION_STATE(command_buffer), executable,
-                entry_point, workgroups_buffer, workgroups_offset));
+                entry_point, workgroups_ref));
   });
   iree_status_t status = _VTABLE_DISPATCH(command_buffer, dispatch_indirect)(
-      command_buffer, executable, entry_point, workgroups_buffer,
-      workgroups_offset);
+      command_buffer, executable, entry_point, workgroups_ref);
   IREE_TRACE_ZONE_END(z0);
   return status;
 }
@@ -606,22 +626,34 @@ IREE_API_EXPORT iree_status_t iree_hal_command_buffer_validate_binding_table(
     iree_hal_command_buffer_t* command_buffer,
     const iree_hal_buffer_binding_table_t* binding_table) {
   IREE_ASSERT_ARGUMENT(command_buffer);
+
+  // Only check binding tables when one is required and otherwise ignore any
+  // bindings provided. Require at least as many bindings in the table as there
+  // are used by the command buffer. This may be less than the total capacity
+  // the command buffer was allocated with.
+  if (command_buffer->binding_count == 0) {
+    return iree_ok_status();
+  } else if (!binding_table) {
+    return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
+                            "indirect command buffer requires at least %u "
+                            "bindings but no binding table was provided",
+                            command_buffer->binding_count);
+  } else if (binding_table->count < command_buffer->binding_count) {
+    return iree_make_status(IREE_STATUS_OUT_OF_RANGE,
+                            "indirect command buffer requires at least %u "
+                            "bindings but only %" PRIhsz " were provided ",
+                            command_buffer->binding_count,
+                            binding_table->count);
+  }
+
+  // Validate the binding table against the commands consuming them.
+  // This is O(binding_count) so something we only do if validation is
+  // requested on the command buffer.
   IF_VALIDATING(command_buffer, {
-    // Only check binding tables when one is required and otherwise ignore any
-    // bindings provided.
-    if (command_buffer->binding_capacity == 0) {
-      return iree_ok_status();
-    } else if (!binding_table ||
-               binding_table->count < command_buffer->binding_capacity) {
-      return iree_make_status(IREE_STATUS_INVALID_ARGUMENT,
-                              "indirect command buffer requires at least %u "
-                              "bindings but only %" PRIhsz " were provided ",
-                              command_buffer->binding_capacity,
-                              binding_table ? binding_table->count : 0);
-    }
-    // TODO(benvanik): validate each binding against the requirements of the
-    // command buffer.
+    IREE_RETURN_IF_ERROR(iree_hal_command_buffer_binding_table_validation(
+        command_buffer, VALIDATION_STATE(command_buffer), *binding_table));
   });
+
   return iree_ok_status();
 }
 
@@ -650,26 +682,30 @@ IREE_API_EXPORT iree_status_t iree_hal_create_transfer_command_buffer(
       switch (transfer_command->type) {
         case IREE_HAL_TRANSFER_COMMAND_TYPE_FILL:
           status = iree_hal_command_buffer_fill_buffer(
-              command_buffer, transfer_command->fill.target_buffer,
-              transfer_command->fill.target_offset,
-              transfer_command->fill.length, transfer_command->fill.pattern,
+              command_buffer,
+              iree_hal_make_buffer_ref(transfer_command->fill.target_buffer,
+                                       transfer_command->fill.target_offset,
+                                       transfer_command->fill.length),
+              transfer_command->fill.pattern,
               transfer_command->fill.pattern_length);
           break;
         case IREE_HAL_TRANSFER_COMMAND_TYPE_COPY:
           status = iree_hal_command_buffer_copy_buffer(
-              command_buffer, transfer_command->copy.source_buffer,
-              transfer_command->copy.source_offset,
-              transfer_command->copy.target_buffer,
-              transfer_command->copy.target_offset,
-              transfer_command->copy.length);
+              command_buffer,
+              iree_hal_make_buffer_ref(transfer_command->copy.source_buffer,
+                                       transfer_command->copy.source_offset,
+                                       transfer_command->copy.length),
+              iree_hal_make_buffer_ref(transfer_command->copy.target_buffer,
+                                       transfer_command->copy.target_offset,
+                                       transfer_command->copy.length));
           break;
         case IREE_HAL_TRANSFER_COMMAND_TYPE_UPDATE:
           status = iree_hal_command_buffer_update_buffer(
               command_buffer, transfer_command->update.source_buffer,
               transfer_command->update.source_offset,
-              transfer_command->update.target_buffer,
-              transfer_command->update.target_offset,
-              transfer_command->update.length);
+              iree_hal_make_buffer_ref(transfer_command->update.target_buffer,
+                                       transfer_command->update.target_offset,
+                                       transfer_command->update.length));
           break;
         default:
           status =

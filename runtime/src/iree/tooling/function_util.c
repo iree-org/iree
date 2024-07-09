@@ -82,8 +82,11 @@ static iree_status_t iree_tooling_setup_buffer_transfer(
               iree_hal_buffer_allocation_size(source_buffer), &target_buffer));
 
   iree_status_t status = iree_hal_command_buffer_copy_buffer(
-      command_buffer, source_buffer, 0, target_buffer, 0,
-      iree_hal_buffer_byte_length(source_buffer));
+      command_buffer,
+      iree_hal_make_buffer_ref(source_buffer, 0,
+                               iree_hal_buffer_byte_length(source_buffer)),
+      iree_hal_make_buffer_ref(target_buffer, 0,
+                               iree_hal_buffer_byte_length(source_buffer)));
 
   if (iree_status_is_ok(status)) {
     *out_target_buffer = target_buffer;

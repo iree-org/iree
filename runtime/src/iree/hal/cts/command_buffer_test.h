@@ -62,8 +62,9 @@ class command_buffer_test : public CtsTestBase {
 
     // Fill the pattern.
     IREE_CHECK_OK(iree_hal_command_buffer_fill_buffer(
-        command_buffer, device_buffer, target_offset, fill_length, pattern,
-        pattern_length));
+        command_buffer,
+        iree_hal_make_buffer_ref(device_buffer, target_offset, fill_length),
+        pattern, pattern_length));
     IREE_CHECK_OK(iree_hal_command_buffer_end(command_buffer));
     IREE_CHECK_OK(SubmitCommandBufferAndWait(command_buffer));
 
@@ -164,9 +165,10 @@ TEST_P(command_buffer_test, CopyWholeBuffer) {
   // Copy the host buffer to the device buffer.
   IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
   IREE_ASSERT_OK(iree_hal_command_buffer_copy_buffer(
-      command_buffer, /*source_buffer=*/host_buffer, /*source_offset=*/0,
-      /*target_buffer=*/device_buffer, /*target_offset=*/0,
-      /*length=*/kDefaultAllocationSize));
+      command_buffer, /*source_ref=*/
+      iree_hal_make_buffer_ref(host_buffer, 0, kDefaultAllocationSize),
+      /*target_ref=*/
+      iree_hal_make_buffer_ref(device_buffer, 0, kDefaultAllocationSize)));
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
 
   IREE_ASSERT_OK(SubmitCommandBufferAndWait(command_buffer));
@@ -230,16 +232,25 @@ TEST_P(command_buffer_test, CopySubBuffer) {
   uint8_t zero_val = 0x0;
   IREE_ASSERT_OK(iree_hal_command_buffer_begin(command_buffer));
   IREE_ASSERT_OK(iree_hal_command_buffer_fill_buffer(
-      command_buffer, device_buffer, /*target_offset=*/0, /*length=*/8,
+      command_buffer,
+      iree_hal_make_buffer_ref(device_buffer, /*target_offset=*/0,
+                               /*length=*/8),
       &zero_val, /*pattern_length=*/sizeof(zero_val)));
   IREE_ASSERT_OK(iree_hal_command_buffer_copy_buffer(
-      command_buffer, /*source_buffer=*/host_buffer, /*source_offset=*/4,
-      /*target_buffer=*/device_buffer, /*target_offset=*/8,
-      /*length=*/kDefaultAllocationSize / 2 - 4));
+      command_buffer,
+      iree_hal_make_buffer_ref(/*source_buffer=*/host_buffer,
+                               /*source_offset=*/4,
+                               /*length=*/kDefaultAllocationSize / 2 - 4),
+      iree_hal_make_buffer_ref(/*target_buffer=*/device_buffer,
+                               /*target_offset=*/8,
+                               /*length=*/kDefaultAllocationSize / 2 - 4)));
   IREE_ASSERT_OK(iree_hal_command_buffer_fill_buffer(
-      command_buffer, device_buffer,
-      /*target_offset=*/8 + kDefaultAllocationSize / 2 - 4,
-      /*length=*/kDefaultAllocationSize - (8 + kDefaultAllocationSize / 2 - 4),
+      command_buffer,
+      iree_hal_make_buffer_ref(
+          device_buffer,
+          /*target_offset=*/8 + kDefaultAllocationSize / 2 - 4,
+          /*length=*/kDefaultAllocationSize -
+              (8 + kDefaultAllocationSize / 2 - 4)),
       &zero_val,
       /*pattern_length=*/sizeof(zero_val)));
   IREE_ASSERT_OK(iree_hal_command_buffer_end(command_buffer));
@@ -477,8 +488,9 @@ TEST_P(command_buffer_test, UpdateBufferWholeBuffer) {
 
   // Issue the update_buffer command.
   IREE_CHECK_OK(iree_hal_command_buffer_update_buffer(
-      command_buffer, source_buffer.data(), /*source_offset=*/0, device_buffer,
-      /*target_offset=*/0, /*length=*/target_buffer_size));
+      command_buffer,
+      /*source_buffer=*/source_buffer.data(), /*source_offset=*/0,
+      iree_hal_make_buffer_ref(device_buffer, 0, target_buffer_size)));
   IREE_CHECK_OK(iree_hal_command_buffer_end(command_buffer));
   IREE_CHECK_OK(SubmitCommandBufferAndWait(command_buffer));
 
@@ -513,8 +525,10 @@ TEST_P(command_buffer_test, UpdateBufferWithOffsets) {
 
   // Issue the update_buffer command.
   IREE_CHECK_OK(iree_hal_command_buffer_update_buffer(
-      command_buffer, source_buffer.data(), /*source_offset=*/4, device_buffer,
-      /*target_offset=*/4, /*length=*/8));
+      command_buffer,
+      /*source_buffer=*/source_buffer.data(), /*source_offset=*/4,
+      iree_hal_make_buffer_ref(device_buffer,
+                               /*target_offset=*/4, /*length=*/8)));
   IREE_CHECK_OK(iree_hal_command_buffer_end(command_buffer));
   IREE_CHECK_OK(SubmitCommandBufferAndWait(command_buffer));
 
@@ -559,8 +573,10 @@ TEST_P(command_buffer_test, UpdateBufferSubspan) {
 
   // Issue the update_buffer command.
   IREE_CHECK_OK(iree_hal_command_buffer_update_buffer(
-      command_buffer, source_buffer.data(), /*source_offset=*/4, buffer_subspan,
-      /*target_offset=*/4, /*length=*/4));
+      command_buffer,
+      /*source_buffer=*/source_buffer.data(), /*source_offset=*/4,
+      iree_hal_make_buffer_ref(buffer_subspan,
+                               /*target_offset=*/4, /*length=*/4)));
   IREE_CHECK_OK(iree_hal_command_buffer_end(command_buffer));
   IREE_CHECK_OK(SubmitCommandBufferAndWait(command_buffer));
 
