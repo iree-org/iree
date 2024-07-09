@@ -1601,6 +1601,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#encodingoptypeattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      EncodingOpTypeAttr
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3748,6 +3757,15 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#encodingoptypeattr" class="md-nav__link">
+    <span class="md-ellipsis">
+      EncodingOpTypeAttr
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
@@ -3792,6 +3810,7 @@ implement data-tiling.</p>
 </li>
 <li><a href="#attributes_1">Attributes</a><ul>
 <li><a href="#encodingattr">EncodingAttr</a></li>
+<li><a href="#encodingoptypeattr">EncodingOpTypeAttr</a></li>
 </ul>
 </li>
 </ul>
@@ -3922,6 +3941,7 @@ MaterializeUpperBoundTileSize pass.</p>
 <p>Syntax:</p>
 <div class="highlight"><pre><span></span><code>#iree_encoding.encoding&lt;
   IntegerAttr,   # operand_index
+  EncodingOpTypeAttr,   # op_type
   ArrayAttr,   # element_types
   TypeAttr,   # original_type
   IntegerAttr,   # matmul_narrow_M
@@ -3954,6 +3974,11 @@ through operations like pack/unpack.</p>
 <td>this tensor operand's index in the parameter list</td>
 </tr>
 <tr>
+<td style="text-align: center;">op_type</td>
+<td style="text-align: center;"><code>EncodingOpTypeAttr</code></td>
+<td>operand type</td>
+</tr>
+<tr>
 <td style="text-align: center;">element_types</td>
 <td style="text-align: center;"><code>ArrayAttr</code></td>
 <td>element types of the user's operands</td>
@@ -3982,6 +4007,33 @@ through operations like pack/unpack.</p>
 <td style="text-align: center;">round_dims_to</td>
 <td style="text-align: center;"><code>DenseArrayAttr</code></td>
 <td>Values for padding M,N,K dimensions</td>
+</tr>
+</tbody>
+</table>
+<h3 id="encodingoptypeattr">EncodingOpTypeAttr<a class="headerlink" href="#encodingoptypeattr" title="Permanent link">link</a></h3>
+<p>Tracks the type of operation of the operand.</p>
+<p>Syntax:</p>
+<div class="highlight"><pre><span></span><code>#iree_encoding.optype&lt;
+  ::mlir::iree_compiler::IREE::Encoding::EncodingOpType   # value
+&gt;
+</code></pre></div>
+<p>Enum cases:
+* matmul (<code>matmul</code>)
+* conv (<code>conv</code>)</p>
+<h5 id="parameters_1">Parameters:<a class="headerlink" href="#parameters_1" title="Permanent link">link</a></h5>
+<table>
+<thead>
+<tr>
+<th style="text-align: center;">Parameter</th>
+<th style="text-align: center;">C++ type</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: center;">value</td>
+<td style="text-align: center;"><code>::mlir::iree_compiler::IREE::Encoding::EncodingOpType</code></td>
+<td>an enum of type EncodingOpType</td>
 </tr>
 </tbody>
 </table>
