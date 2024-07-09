@@ -520,7 +520,7 @@ jobs:
         run: brew install ninja ccache coreutils bash
 
       - name: "Checking out runtime submodules"
-        run: ./build_tools/scripts/git/update_runtime_submodules.sh
+        run: bash ./build_tools/scripts/git/update_runtime_submodules.sh
 
       # Simple case of no Docker container: install deps -> build -> test.
       - name: "(No Docker) Installing Python requirements"
@@ -528,10 +528,10 @@ jobs:
         run: pip install -r ./runtime/bindings/python/iree/runtime/build_requirements.txt
       - name: "(No Docker) Building runtime"
         if: ${{ env.CONTAINER == '' }}
-        run: ./build_tools/cmake/build_runtime.sh "${BUILD_DIR}"
+        run: bash ./build_tools/cmake/build_runtime.sh "${BUILD_DIR}"
       - name: "(No Docker) Testing runtime"
         if: ${{ env.CONTAINER == '' }}
-        run: ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
+        run: bash ./build_tools/cmake/ctest_all.sh "${BUILD_DIR}"
 
       # With a Docker container: build under Docker -> test under Docker.
       - name: "(Docker) Building runtime"
