@@ -447,11 +447,11 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   Type initElemType = getElementTypeOrSelf(init);
 
   if (auto lhsOp = lhs.getDefiningOp<linalg::GenericOp>()) {
-    if (IREE::Flow::isDequantizationLikeOp(lhsOp))
+    if (IREE::Flow::isBitExtendOp(lhsOp))
       lhsElemType = getElementTypeOrSelf(lhsOp.getDpsInputs()[0]);
   }
   if (auto rhsOp = rhs.getDefiningOp<linalg::GenericOp>()) {
-    if (IREE::Flow::isDequantizationLikeOp(rhsOp))
+    if (IREE::Flow::isBitExtendOp(rhsOp))
       rhsElemType = getElementTypeOrSelf(rhsOp.getDpsInputs()[0]);
   }
 

@@ -195,7 +195,7 @@ struct GatherFusionPattern : public OpRewritePattern<tensor::ExtractOp> {
 
     // Check if the producerOp is fusible
     if (producerOp.getNumDpsInputs() != 1 || producerOp.getNumResults() != 1 ||
-        !isElementwise(producerOp) || !isDequantizationLikeOp(producerOp)) {
+        !isElementwise(producerOp) || !isBitExtendOp(producerOp)) {
       return rewriter.notifyMatchFailure(producerOp,
                                          "producer op is not fusible");
     }
