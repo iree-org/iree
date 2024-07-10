@@ -357,20 +357,22 @@ struct ReorderWorkgroupsPass final
       llvm::dbgs() << "\n\n";
     });
 
-    IREE::HAL::ExecutableTargetAttr targetAttr =
-        IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
     uint32_t numXCDs = 1;
-    if (DictionaryAttr config = targetAttr.getConfiguration()) {
-      if (IREE::GPU::TargetAttr attr =
-              config.getAs<IREE::GPU::TargetAttr>("iree.gpu.target")) {
-        IREE::GPU::TargetChipAttr chipAttr = attr.getChip();
-        if (chipAttr)
-          numXCDs = chipAttr.getChipletCount();
+    if (IREE::HAL::ExecutableTargetAttr targetAttr =
+            IREE::HAL::ExecutableTargetAttr::lookup(funcOp)) {
+      if (DictionaryAttr config = targetAttr.getConfiguration()) {
+        if (IREE::GPU::TargetAttr attr =
+                config.getAs<IREE::GPU::TargetAttr>("iree.gpu.target")) {
+          IREE::GPU::TargetChipAttr chipAttr = attr.getChip();
+          if (chipAttr)
+            numXCDs = chipAttr.getChipletCount();
+        }
       }
     }
 
     LLVM_DEBUG(llvm::dbgs() << "Number of XCDs = " << numXCDs << "\n");
-    if (numXCDs == 1)
+    if (numXCDs == 1 &&
+        reorderingStrategy == ReorderWorkgroupsStrategy::ChipletGroup)
       return;
 
     if (failed(reorderWorkgroupsInFunc(funcOp, reorderingStrategy,
