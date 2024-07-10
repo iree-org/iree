@@ -200,11 +200,11 @@ def ReorderWorkgroupsPass :
   let options = [
     Option<"strategy", "strategy", "std::string", /*default=*/"",
            "Workgroup reordering strategy, one of: '' (none),  'transpose', 'swizzle', 'chipletgroup'">,
-    Option<"logSwTile", "logSwTile", "unsigned",
+    Option<"logSwizzleTile", "logSwizzleTile", "unsigned",
             /*default=*/"0",
            "The log2 of the tile size used for swizzling. "
            "(0: swizzling disabled, non-0: swizzling enabled)">,
-    Option<"logCgTile", "logCgTile", "unsigned",
+    Option<"logChipletgroupTile", "logChipletgroupTile", "unsigned",
             /*default=*/"0",
            "The log2 of the tile size used for chipletgroup. "
            "(0: chipletgroup disabled, non-0: chipletgroup enabled)">,

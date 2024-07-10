@@ -135,7 +135,7 @@ makeChipletGroupedIds(Location loc, OpBuilder b, Value workgroupIdX,
                       Value workgroupIdY, Value workgroupCountX,
                       Value workgroupCountY, unsigned chipletGroupTile,
                       unsigned numXCDs) {
-  // Create one dimension ID for workgroup
+  // Create one dimension ID for workgroup.
   Value linearized =
       b.create<arith::MulIOp>(loc, workgroupIdY, workgroupCountX);
   linearized = b.create<arith::AddIOp>(loc, linearized, workgroupIdX);
@@ -152,12 +152,14 @@ makeChipletGroupedIds(Location loc, OpBuilder b, Value workgroupIdX,
   // Detailed explaination about the idea behind the below implementation:
   // the L2 Cache Optimizations subsection in
   // https://triton-lang.org/main/getting-started/tutorials/03-matrix-multiplication.html#
-  // Emphircally, found rowGroupSize=16 for mi300x achieves good performance
   unsigned rowGroupSize = chipletGroupTile;
   Value rowGroupSizeVal =
       b.createOrFold<arith::ConstantIndexOp>(loc, rowGroupSize);
-  // group every 16 workgroups along Y dimension
-  // Number of workgroups in the group
+
+  // Emphircally, found rowGroupSize=16 for mi300x achieves good performance
+  // group every 16 workgroups along Y dimension.
+
+  // Number of workgroups in the group.
   Value numWorkGroupsPerRowBlock =
       b.create<arith::MulIOp>(loc, rowGroupSizeVal, workgroupCountX);
 
@@ -327,10 +329,10 @@ struct ReorderWorkgroupsPass final
     reorderingStrategy = *selectedStrategy;
     if (reorderingStrategy == ReorderWorkgroupsStrategy::Swizzle &&
         reorderWgLogTileSize == 0)
-      reorderWgLogTileSize = logSwTile;
+      reorderWgLogTileSize = logSwizzleTile;
     else if (reorderingStrategy == ReorderWorkgroupsStrategy::ChipletGroup &&
              reorderWgLogTileSize == 0)
-      reorderWgLogTileSize = logCgTile;
+      reorderWgLogTileSize = logChipletgroupTile;
 
     return success();
   }

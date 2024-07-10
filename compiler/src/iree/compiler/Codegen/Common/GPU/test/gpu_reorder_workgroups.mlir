@@ -1,10 +1,10 @@
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-reorder-workgroups{strategy=swizzle logSwTile=3}))" \
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-reorder-workgroups{strategy=swizzle logSwizzleTile=3}))" \
 // RUN:   --split-input-file %s | FileCheck --check-prefix=SWIZZLE %s
 
 // RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-reorder-workgroups{strategy=transpose}))" \
 // RUN:   --split-input-file %s | FileCheck --check-prefix=TRANSPOSE %s
 
-// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-reorder-workgroups{strategy=chipletgroup logCgTile=3}))" \
+// RUN: iree-opt --pass-pipeline="builtin.module(func.func(iree-codegen-reorder-workgroups{strategy=chipletgroup logChipletgroupTile=3}))" \
 // RUN:   --split-input-file %s | FileCheck --check-prefix=CHIPLETGROUP %s
 #executable_target_rocm_hsaco_fb = #hal.executable.target<"rocm", "rocm-hsaco-fb",
 {iree.gpu.target = #iree_gpu.target<arch = "gfx942", features = "", wgp = <compute =  fp64|fp32|fp16|int64|int32|int16|int8,
