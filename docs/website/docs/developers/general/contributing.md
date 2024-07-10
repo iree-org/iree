@@ -19,7 +19,7 @@ We'd love to accept your patches and contributions to this project.
 ### :octicons-code-of-conduct-16: Code of conduct
 
 This project follows the
-[OpenXLA Code of Conduct](https://github.com/openxla/community/blob/main/CODE-OF-CONDUCT.md).
+[LF Projects code of conduct](https://lfprojects.org/policies/code-of-conduct/).
 
 ### :octicons-law-16: Developer Certificate of Origin
 
