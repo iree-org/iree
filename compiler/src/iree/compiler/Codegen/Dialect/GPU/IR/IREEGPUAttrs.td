@@ -356,7 +356,7 @@ def IREEGPU_TargetChipAttr : AttrDef<IREEGPU_Dialect, "TargetChip"> {
 
   let parameters = (ins
     "uint32_t":$wgp_count,
-
+    "uint32_t":$chiplet_count,
     // An optional extra dict
     // This field allows to inject more features/limits not supported in the
     // above list for better flexibility.

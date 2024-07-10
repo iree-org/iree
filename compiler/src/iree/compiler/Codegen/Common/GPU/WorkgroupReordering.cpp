@@ -133,14 +133,14 @@ static Value chipletAwareWorkgroupReordering(Location loc, OpBuilder b,
 static std::pair<Value, Value>
 makeChipletGroupedIds(Location loc, OpBuilder b, Value workgroupIdX,
                       Value workgroupIdY, Value workgroupCountX,
-                      Value workgroupCountY, unsigned chipletGroupTile) {
+                      Value workgroupCountY, unsigned chipletGroupTile,
+                      unsigned numXCDs) {
   // Create one dimension ID for workgroup
   Value linearized =
       b.create<arith::MulIOp>(loc, workgroupIdY, workgroupCountX);
   linearized = b.create<arith::AddIOp>(loc, linearized, workgroupIdX);
 
-  // This value is hardcoded for cdna3(mi300x)
-  int64_t numXCDs = 8;
+  assert(numXCDs > 1);
   // Map chiplets to perform a spatially local tile operation.
   // Reorder the linearized ID such that every consecutive group of chiplets
   // is the slowest-changing dimension in the grid.
@@ -223,7 +223,8 @@ getWorkgroupCountsXY(OpBuilder &builder, FunctionOpInterface funcOp) {
 
 static LogicalResult reorderWorkgroupsInFunc(FunctionOpInterface funcOp,
                                              ReorderWorkgroupsStrategy strategy,
-                                             unsigned logTile) {
+                                             unsigned logTile,
+                                             unsigned numXCDs = 2) {
   assert(strategy != ReorderWorkgroupsStrategy::None &&
          "Expected a concrete strategy");
 
@@ -268,7 +269,7 @@ static LogicalResult reorderWorkgroupsInFunc(FunctionOpInterface funcOp,
   } else if (strategy == ReorderWorkgroupsStrategy::ChipletGroup) {
     std::tie(newWorkgroupIdX, newWorkgroupIdY) = makeChipletGroupedIds(
         funcOp.getLoc(), builder, workgroupIdX, workgroupIdY, workgroupCntX,
-        workgroupCntY, reorderWgTileSize);
+        workgroupCntY, reorderWgTileSize, numXCDs);
   } else {
     assert(strategy == ReorderWorkgroupsStrategy::Transpose &&
            "Unhandled strategy");
@@ -324,9 +325,11 @@ struct ReorderWorkgroupsPass final
       return failure();
 
     reorderingStrategy = *selectedStrategy;
-    if (reorderingStrategy == ReorderWorkgroupsStrategy::Swizzle)
+    if (reorderingStrategy == ReorderWorkgroupsStrategy::Swizzle &&
+        reorderWgLogTileSize == 0)
       reorderWgLogTileSize = logSwTile;
-    else if (reorderingStrategy == ReorderWorkgroupsStrategy::ChipletGroup)
+    else if (reorderingStrategy == ReorderWorkgroupsStrategy::ChipletGroup &&
+             reorderWgLogTileSize == 0)
       reorderWgLogTileSize = logCgTile;
 
     return success();
@@ -354,8 +357,24 @@ struct ReorderWorkgroupsPass final
       llvm::dbgs() << "\n\n";
     });
 
+    IREE::HAL::ExecutableTargetAttr targetAttr =
+        IREE::HAL::ExecutableTargetAttr::lookup(funcOp);
+    uint32_t numXCDs = 1;
+    if (DictionaryAttr config = targetAttr.getConfiguration()) {
+      if (IREE::GPU::TargetAttr attr =
+              config.getAs<IREE::GPU::TargetAttr>("iree.gpu.target")) {
+        IREE::GPU::TargetChipAttr chipAttr = attr.getChip();
+        if (chipAttr)
+          numXCDs = chipAttr.getChipletCount();
+      }
+    }
+
+    LLVM_DEBUG(llvm::dbgs() << "Number of XCDs = " << numXCDs << "\n");
+    if (numXCDs == 1)
+      return;
+
     if (failed(reorderWorkgroupsInFunc(funcOp, reorderingStrategy,
-                                       reorderWgLogTileSize))) {
+                                       reorderWgLogTileSize, numXCDs))) {
       LLVM_DEBUG(llvm::dbgs() << "Failed to reorder workgroups\n");
       return;
     }
@@ -377,9 +396,9 @@ private:
 
 std::unique_ptr<InterfacePass<mlir::FunctionOpInterface>>
 createReorderWorkgroups(
-    ReorderWorkgroupsStrategy strategy, unsigned swizzleLogTile,
+    ReorderWorkgroupsStrategy strategy, unsigned reorderWgLogTile,
     std::function<LogicalResult(mlir::FunctionOpInterface)> filterFn) {
-  return std::make_unique<ReorderWorkgroupsPass>(strategy, swizzleLogTile,
+  return std::make_unique<ReorderWorkgroupsPass>(strategy, reorderWgLogTile,
                                                  filterFn);
 }
 

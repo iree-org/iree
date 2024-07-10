@@ -44,9 +44,10 @@ func.func @test_target_wgp_none() attributes {
 // CHECK-LABEL: func.func @test_target_chip()
 func.func @test_target_chip() attributes {
   // CHECK: #iree_gpu.target_chip<
-  // CHECK-SAME: wgp_count = 304>
+  // CHECK-SAME: wgp_count = 304, chiplet_count = 8>
   chip = #iree_gpu.target_chip<
-    wgp_count = 304
+    wgp_count = 304,
+    chiplet_count = 8
   >
 } { return }
 
@@ -68,6 +69,6 @@ func.func @test_target() attributes {
       max_workgroup_sizes = [1024, 1024, 1024],
       max_thread_count_per_workgroup = 1024,
       max_workgroup_memory_bytes = 65536>,
-    chip = <wgp_count = 304>
+    chip = <wgp_count = 304, chiplet_count = 8>
   >
 } { return }

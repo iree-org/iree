@@ -50,6 +50,7 @@ struct WgpDetails {
 // Chip level feature/limit details
 struct ChipDetails {
   uint32_t wgpCount;
+  uint32_t chipletCount;
 };
 
 // Full target details
@@ -111,7 +112,8 @@ TargetAttr createTargetAttr(const TargetDetails &details, StringRef arch,
   TargetChipAttr targetChip;
   if (details.chip)
     targetChip =
-        TargetChipAttr::get(context, details.chip->wgpCount, DictionaryAttr{});
+        TargetChipAttr::get(context, details.chip->wgpCount,
+                            details.chip->chipletCount, DictionaryAttr{});
 
   return TargetAttr::get(context, arch, features, targetWgp, targetChip);
 }
@@ -198,32 +200,31 @@ std::optional<TargetDetails> getAMDGPUTargetDetails(StringRef target) {
 
   // "AMD Instinct MI300 Series Product Offerings" in Page 23 of
   // https://www.amd.com/content/dam/amd/en/documents/instinct-tech-docs/white-papers/amd-cdna-3-white-paper.pdf
-  static const ChipDetails mi300xChip = {304};
-  static const ChipDetails mi300aChip = {228};
+  static const ChipDetails mi300xChip = {304, 8};
+  static const ChipDetails mi300aChip = {228, 6};
 
   // "AMD Instinct MI200 Series Accelerator Product Offerings" in Page 14 of
   // https://www.amd.com/content/dam/amd/en/documents/instinct-business-docs/white-papers/amd-cdna2-white-paper.pdf
-  static const ChipDetails mi250xChip = {220};
-  static const ChipDetails mi250Chip = {208};
-  static const ChipDetails mi210Chip = {104};
+  static const ChipDetails mi250xChip = {220, 2};
+  static const ChipDetails mi250Chip = {208, 2};
+  static const ChipDetails mi210Chip = {104, 1};
 
   // "AMD CDNA Architecture Compute Units" in Page 5 of
   // https://www.amd.com/content/dam/amd/en/documents/instinct-business-docs/white-papers/amd-cdna-white-paper.pdf
-  static const ChipDetails mi100Chip = {120};
+  static const ChipDetails mi100Chip = {120, 1};
 
-  static const ChipDetails rx7900xtxChip = {96};
-  static const ChipDetails rx7900xtChip = {84};
-  static const ChipDetails rx7800xtChip = {60};
-  static const ChipDetails rx7700xtChip = {54};
+  static const ChipDetails rx7900xtxChip = {96, 1};
+  static const ChipDetails rx7900xtChip = {84, 1};
+  static const ChipDetails rx7800xtChip = {60, 1};
+  static const ChipDetails rx7700xtChip = {54, 1};
 
   // See https://llvm.org/docs/AMDGPUUsage.html#processors for gfxN to
   // cdnaN/rdnaN mapping.
 
   return llvm::StringSwitch<std::optional<TargetDetails>>(target.lower())
-      .Case("mi300x", TargetDetails{cdna3Wgp, &mi300xChip})
+      .Cases("mi300x", "gfx942", TargetDetails{cdna3Wgp, &mi300xChip})
       .Case("mi300a", TargetDetails{cdna3Wgp, &mi300aChip})
-      .Cases("cdna3", "gfx940", "gfx941", "gfx942",
-             TargetDetails{cdna3Wgp, nullptr})
+      .Cases("cdna3", "gfx940", "gfx941", TargetDetails{cdna3Wgp, nullptr})
       .Case("mi250x", TargetDetails{cdna2Wgp, &mi250xChip})
       .Case("mi250", TargetDetails{cdna2Wgp, &mi250Chip})
       .Case("mi210", TargetDetails{cdna2Wgp, &mi210Chip})
