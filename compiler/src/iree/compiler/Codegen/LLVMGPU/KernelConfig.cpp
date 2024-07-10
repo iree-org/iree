@@ -382,7 +382,7 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 [[maybe_unused]] static void
 debugPrintContractionInfo(StringRef label, unsigned numLoops,
                           linalg::ContractionDimensions contractionDims,
-                          ArrayRef<int64_t> workgroupTileSizes) {
+                          ArrayRef<int64_t> sizes) {
   ArrayRef<unsigned> dimVals[] = {contractionDims.batch, contractionDims.m,
                                   contractionDims.n, contractionDims.k};
   std::string dimSymbols(numLoops, '*');
@@ -396,7 +396,7 @@ debugPrintContractionInfo(StringRef label, unsigned numLoops,
   llvm::dbgs() << "]\n";
 
   DBGS() << label << ": [";
-  llvm::interleaveComma(workgroupTileSizes, llvm::dbgs());
+  llvm::interleaveComma(sizes, llvm::dbgs());
   llvm::dbgs() << "]\n";
 }
 
