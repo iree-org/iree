@@ -139,49 +139,6 @@ static Value reduce(OpBuilder &builder, Location loc, AffineMap inputMap,
   return genericOp.getResult(0);
 }
 
-static Value reduceAbsMax(OpBuilder &builder, Location loc, AffineMap inputMap,
-                          AffineMap outputMap, Value input, Value intermediate,
-                          Value output) {
-  FloatType fpTy = cast<FloatType>(getElementTypeOrSelf(input.getType()));
-
-  SmallVector<AffineMap> compressedMaps =
-      compressUnusedDims(SmallVector<AffineMap>{inputMap, outputMap});
-  inputMap = compressedMaps[0];
-  outputMap = compressedMaps[1];
-
-  SmallVector<utils::IteratorType> parallelIterators(
-      inputMap.getNumDims(), utils::IteratorType::parallel);
-  auto absGeneric =
-      builder
-          .create<linalg::GenericOp>(
-              loc, intermediate.getType(), input, intermediate,
-              SmallVector<AffineMap>{inputMap, inputMap}, parallelIterators,
-              [&](OpBuilder &b, Location loc, ValueRange args) {
-                Value in =
-                    convertScalarToDtype(b, loc, args[0], args[1].getType(),
-                                         /*isUnsignedCast=*/false);
-                Value abs = b.create<math::AbsFOp>(loc, in);
-                b.create<linalg::YieldOp>(loc, abs);
-              })
-          .getResult(0);
-
-  Value sEps =
-      builder.create<arith::ConstantOp>(loc, builder.getFloatAttr(fpTy, 1e-9));
-  output = builder.create<linalg::FillOp>(loc, sEps, output).getResult(0);
-
-  // Dims not present in outputMap are reductionDims.
-  SmallVector<utils::IteratorType> iteratorTypes(
-      inputMap.getNumDims(), utils::IteratorType::reduction);
-  for (AffineExpr dim : outputMap.getResults()) {
-    int pos = cast<AffineDimExpr>(dim).getPosition();
-    iteratorTypes[pos] = utils::IteratorType::parallel;
-  }
-
-  Value reduced = reduce<arith::MaximumFOp>(builder, loc, inputMap, outputMap,
-                                            absGeneric, output);
-  return reduced;
-}
-
 static Value computeMatmul(OpBuilder &builder, Location loc, AffineMap lhsMap,
                            AffineMap rhsMap, AffineMap accMap, Value lhs,
                            Value rhs, Value acc) {
@@ -385,11 +342,12 @@ OnlineAttentionOp::decomposeOperation(OpBuilder &b) {
         int dim = cast<AffineDimExpr>(dimExpr).getPosition();
         mSizes.push_back(sizes[dim]);
       }
-      Value absEmpty = b.create<tensor::EmptyOp>(loc, sSizes, elementType);
-      Value maxEmpty = b.create<tensor::EmptyOp>(loc, mSizes, reduceType);
 
       // We rescale `p` to use the full range and pass back the `pScale`.
-      Value absMax = reduceAbsMax(b, loc, pMap, maxMap, p, absEmpty, maxEmpty);
+      Value maxEmpty = b.create<tensor::EmptyOp>(loc, mSizes, reduceType);
+      Value absMax =
+          reduce<arith::MaximumFOp>(b, loc, pMap, maxMap, p, maxEmpty);
+
       auto fpTy = cast<FloatType>(vETy);
       double largestDbl =
           APFloat::getLargest(fpTy.getFloatSemantics(), /*Negative=*/false)
