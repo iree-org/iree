@@ -45,9 +45,8 @@ typedef struct iree_hal_cuda_tracing_context_t iree_hal_cuda_tracing_context_t;
 typedef struct iree_hal_cuda_tracing_context_event_t
     iree_hal_cuda_tracing_context_event_t;
 
-// This is used when tracing is enabled. Calls to dispatch
-// and event related functions will update the pointers to
-// keep the list up to date.
+// This is used when tracing is enabled. Calls to dispatch and event related
+// functions will update the pointers to keep the list up to date.
 typedef struct iree_hal_cuda_tracing_context_event_list_t {
   iree_hal_cuda_tracing_context_event_t* head;
   iree_hal_cuda_tracing_context_event_t* tail;
@@ -77,7 +76,7 @@ void iree_hal_cuda_tracing_notify_submitted(
     iree_hal_cuda_tracing_context_t* context,
     iree_hal_cuda_tracing_context_event_list_t* event_list);
 
-// Frees the events and allow them back into the tracing context.
+// Frees the events and returns them back into the tracing context.
 void iree_hal_cuda_tracing_free(
     iree_hal_cuda_tracing_context_t* context,
     iree_hal_cuda_tracing_context_event_list_t* event_list);

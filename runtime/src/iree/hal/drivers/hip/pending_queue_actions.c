@@ -743,7 +743,7 @@ static iree_status_t iree_hal_hip_pending_queue_actions_issue_execution(
       IREE_HIP_RETURN_AND_END_ZONE_IF_ERROR(
           z0, symbols, hipGraphLaunch(exec, action->dispatch_hip_stream),
           "hipGraphLaunch");
-      iree_hal_hip_graph_notify_submitted_commands(command_buffer);
+      iree_hal_hip_graph_tracing_notify_submitted_commands(command_buffer);
     } else {
       iree_hal_command_buffer_t* stream_command_buffer = NULL;
       iree_hal_command_buffer_mode_t mode =

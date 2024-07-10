@@ -17,23 +17,25 @@
 #define IREE_HAL_HIP_TRACING_DEFAULT_QUERY_CAPACITY (16 * 1024 - 256)
 
 // iree_hal_hip_tracing_context_event_t contains a hipEvent that is used to
-// record timestamps. This event also belongs to 2 linked list.
+// record timestamps for tracing GPU execution. In this struct, there are also
+// two linked lists that the current event may be added to during its lifetime.
 //
 // --------------------->---Submissions--->----------
 // \                     \                    \
 //  \                     \                    \
-// command_list        command_list          command_list
+// command_buffer        command_buffer          command_buffer
 //
-// The higher level list is owned by the tracing context and
-// elements are inserted and removed as commmand_buffers are
-// submitted and when they complete. This is a list of the head
-// elements for each command buffer.
-// The second list is the list of events within a command_buffer
-// they are contained in the command buffer itself.
+// The submission list is owned by the tracing context and elements are
+// inserted and removed as commmand_buffers are submitted and when they
+// complete. This is a list of the head elements for each command buffer.
+// The commnad buffer list is owned by the command buffer. It is the list of
+// events used to trace command buffer dispatches.
 //
-// After a command buffer is destroyed, all contained
-// iree_hal_hip_tracing_context_event_t are returned to the tracing context
-// and added to the front of the freelist to be re-used.
+// When the event is in the freelist, next_submission should be null, and
+// we reuse next_in_command_buffer to track the next free event.
+//
+// When the even is grabbed from the freelist to track GPU executions,
+// it is added to the list in recording command_buffer.
 struct iree_hal_hip_tracing_context_event_t {
   hipEvent_t event;
   iree_hal_hip_tracing_context_event_t* next_in_command_buffer;
@@ -57,7 +59,8 @@ struct iree_hal_hip_tracing_context_t {
   // we need a stable base event.
   hipEvent_t base_event;
 
-  // Unallocated events
+  // Unallocated event list head. next_in_command_buffer points to the next
+  // available event.
   iree_hal_hip_tracing_context_event_t* event_freelist_head;
 
   // Submitted events
@@ -66,20 +69,20 @@ struct iree_hal_hip_tracing_context_t {
   uint32_t query_capacity;
 
   // Event pool reused to capture tracing timestamps.
-  // The lifetime of the Events are as follows.
+  // The lifetime of the events are as follows.
   // 1) All events are allocated when the tracing context is created.
   // 2) When a command_buffer inserts a query via:
-  //     iree_hal_cuda_**_tracing_context_insert_query
+  //    iree_hal_cuda_**_tracing_context_insert_query
   //    an event is pulled from the event freelist and added to the
   //    command buffer.
   // 3) When a command buffer is dispatched and
-  //      iree_hal_cuda_tracing_notify_submittedis called, the events
-  //      for that command buffer are added to the submitted_event_list.
+  //    iree_hal_hip_tracing_notify_submitted is called, the events
+  //    for that command buffer are added to the submitted_event_list.
   // 4) When the command buffer completes iree_hal_cuda_tracing_context_collect
-  //      is called, and the events are removed from submitted_event_list as
-  //      we collect their values.
+  //    is called, and the events are removed from submitted_event_list as
+  //    we collect their values.
   // 5) When the command buffer is destroyed, all events are put at the front
-  //      of event_freelist.
+  //    of event_freelist.
   iree_hal_hip_tracing_context_event_t
       event_pool[IREE_HAL_HIP_TRACING_DEFAULT_QUERY_CAPACITY];
 };
@@ -237,10 +240,9 @@ void iree_hal_hip_tracing_context_collect(
   }
   IREE_TRACE_ZONE_BEGIN(z0);
 
-  // submitted_event_list is a list of the head elements for each
-  // command_buffer that has been submitted. Here we loop over
-  // all of the events, wait for them to complete and gather the results
-  // with hipEventQuery.
+  // submitted_event_list is a list of the head elements for each command
+  // buffer that has been submitted. Here we loop over all of the events,
+  // wait for them to complete and gather the results with hipEventQuery.
   iree_hal_hip_tracing_context_event_t* events =
       context->submitted_event_list.head;
   uint32_t read_query_count = 0;
@@ -283,8 +285,8 @@ void iree_hal_hip_tracing_notify_submitted(
     iree_hal_hip_tracing_context_t* context,
     iree_hal_hip_tracing_context_event_list_t* event_list) {
   if (!context) return;
-  iree_slim_mutex_lock(&context->event_mutex);
   IREE_ASSERT_ARGUMENT(event_list);
+  iree_slim_mutex_lock(&context->event_mutex);
 
   if (!event_list->head) {
     iree_slim_mutex_unlock(&context->event_mutex);

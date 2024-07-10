@@ -268,7 +268,7 @@ CUgraphExec iree_hal_cuda_graph_command_buffer_handle(
   return command_buffer->cu_graph_exec;
 }
 
-void iree_hal_cuda_graph_notify_submitted_commands(
+void iree_hal_cuda_graph_tracing_notify_submitted_commands(
     iree_hal_command_buffer_t* base_command_buffer) {
   iree_hal_cuda_graph_command_buffer_t* command_buffer =
       iree_hal_cuda_graph_command_buffer_cast(base_command_buffer);
