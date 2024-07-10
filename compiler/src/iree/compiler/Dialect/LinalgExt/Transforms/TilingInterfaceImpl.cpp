@@ -1816,8 +1816,30 @@ AttentionOp::getTiledImplementation(OpBuilder &builder,
   tiledOperands.emplace_back(scale);
   tiledOperands.emplace_back(getSlice(builder, loc, getOutput(), outputSlice));
 
+  std::optional<Value> max = getMax();
+  if (max) {
+    SmallVector<Range> maxSlice =
+        getPermutedSlice(*getMaxMap(), offsets, sizes);
+    tiledOperands.emplace_back(getSlice(builder, loc, max.value(), maxSlice));
+  }
+
+  std::optional<Value> sum = getMax();
+  if (sum) {
+    SmallVector<Range> sumSlice =
+        getPermutedSlice(*getSumMap(), offsets, sizes);
+    tiledOperands.emplace_back(getSlice(builder, loc, sum.value(), sumSlice));
+  }
+
   SmallVector<Type> resultTypes;
-  resultTypes.push_back(tiledOperands[4].getType());
+  if (hasPureTensorSemantics()) {
+    resultTypes.push_back(tiledOperands[4].getType());
+    if (max) {
+      resultTypes.push_back(tiledOperands[5].getType());
+    }
+    if (sum) {
+      resultTypes.push_back(tiledOperands[6].getType());
+    }
+  }
 
   Operation *tiledOp =
       mlir::clone(builder, getOperation(), resultTypes, tiledOperands);
@@ -1831,7 +1853,23 @@ LogicalResult AttentionOp::getResultTilePosition(
     SmallVector<OpFoldResult> &resultSizes) {
   resultOffsets.clear();
   resultSizes.clear();
-  for (AffineExpr dimExpr : getOutputMap().getResults()) {
+
+  AffineMap resultIndexingMap;
+  switch (resultNumber) {
+  case 0:
+    resultIndexingMap = getOutputMap();
+    break;
+  case 1:
+    resultIndexingMap = *getMaxMap();
+    break;
+  case 2:
+    resultIndexingMap = *getSumMap();
+    break;
+  default:
+    return failure();
+  }
+
+  for (AffineExpr dimExpr : resultIndexingMap.getResults()) {
     int dim = cast<AffineDimExpr>(dimExpr).getPosition();
     resultOffsets.push_back(offsets[dim]);
     resultSizes.push_back(sizes[dim]);

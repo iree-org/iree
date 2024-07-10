@@ -266,8 +266,9 @@ IREE::LinalgExt::AttentionOp tileAttention(IREE::LinalgExt::AttentionOp attnOp,
   auto tiledAttentionOp = rewriter.create<IREE::LinalgExt::AttentionOp>(
       attnOp.getLoc(),
       SmallVector<Type>{accumulatorF32.getType(), sum.getType(), max.getType()},
-      SmallVector<Value>{querySlice, keySlice, valueSlice, scale},
-      SmallVector<Value>{iterArgResult, iterArgMax, iterArgSum});
+      querySlice, keySlice, valueSlice, scale,
+      SmallVector<Value>{iterArgResult, iterArgMax, iterArgSum},
+      attnOp.getIndexingMaps());
 
   if (attnOp.getTransposeV())
     tiledAttentionOp.setTransposeVAttr(attnOp.getTransposeVAttr());

@@ -1268,6 +1268,13 @@ LogicalResult WinogradOutputTransformOp::reifyResultShapes(
 LogicalResult AttentionOp::verify() {
   AttentionOp attnOp = *this;
 
+  int numOutputs = getNumDpsInits();
+  if (numOutputs != 1 && numOutputs != 3) {
+    return attnOp->emitOpError(
+        "expected 1 or 3 output operands: Output, [Max and Sum]");
+  }
+  bool isTiled = numOutputs == 3;
+
   SmallVector<AffineMap> indexingMaps = attnOp.getIndexingMapsArray();
 
   // Check if indexing maps can represent attention.
@@ -1309,9 +1316,26 @@ LogicalResult AttentionOp::verify() {
       failed(checkShape("Key", getKey().getType().getShape(), getKeyMap())) ||
       failed(checkShape("Value", getValue().getType().getShape(),
                         getValueMap())) ||
-      failed(checkShape("Output", getOutput().getType().getShape(),
-                        getOutputMap()))) {
+      failed(
+          checkShape("Output", getOutputType().getShape(), getOutputMap()))) {
     return failure();
+  }
+
+  if (isTiled) {
+    // Tiled/Flash attention.
+    Type maxElementType = getMaxType()->getElementType();
+    Type sumElementType = getSumType()->getElementType();
+    Type outputElementType = getOutputType().getElementType();
+    if (outputElementType != maxElementType ||
+        maxElementType != sumElementType) {
+      return attnOp->emitOpError(
+          "element types of tiled output, max and sum should be same");
+    }
+
+    if (failed(checkShape("Max", getMaxType()->getShape(), *getMaxMap())) ||
+        failed(checkShape("Sum", getSumType()->getShape(), *getSumMap()))) {
+      return failure();
+    }
   }
 
   return success();

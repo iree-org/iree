@@ -548,8 +548,9 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
                        AnyShaped:$key,
                        AnyShaped:$value,
                        AnyFloat:$scale,
-                       AnyShaped:$output,
-                       AffineMapArrayAttr:$indexing_maps
+                       Variadic<AnyShaped>:$outputs,
+                       AffineMapArrayAttr:$indexing_maps,
+                       DefaultValuedOptionalAttr<BoolAttr, "false">:$transpose_v
   );
 
   let results = (outs Variadic<AnyRankedTensor>:$results);
@@ -558,7 +559,7 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
   let assemblyFormat = [{
     attr-dict
     `ins` `(` $query `,` $key `,` $value `,` $scale `:` type($query) `,` type($key) `,` type($value) `,` type($scale) `)`
-    `outs` `(` $output `:` type($output)`)`
+    `outs` `(` $outputs `:` type($outputs) `)`
     (`->` type($results)^)?
   }];
 
@@ -581,9 +582,83 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
     AffineMap getOutputMap() {
       return cast<AffineMap>(getIndexingMapsArray()[3]);
     }
-
     int64_t getIterationDomainRank() {
       return getQueryMap().getNumDims();
+    }
+
+    // TODO: Remove helper fns below once we move
+    //       to online_attn tile & decomp pipeline.
+    std::optional<AffineMap> getMaxMap() {
+      if (getNumResults() < 2)
+        return std::nullopt;
+      return cast<AffineMap>(getIndexingMapsArray()[4]);
+    }
+    std::optional<AffineMap> getSumMap() {
+      if (getNumResults() < 3)
+        return std::nullopt;
+      return cast<AffineMap>(getIndexingMapsArray()[5]);
+    }
+    Value getOutput() {
+      return getDpsInitOperand(0)->get();
+    }
+    std::optional<Value> getMax() {
+      if (getNumResults() < 2)
+        return std::nullopt;
+      return getDpsInitOperand(1)->get();
+    }
+    std::optional<Value> getSum() {
+      if (getNumResults() < 3)
+        return std::nullopt;
+      return getDpsInitOperand(2)->get();
+    }
+
+    ShapedType getQueryType() {
+      return cast<ShapedType>(getQuery().getType());
+    }
+    ShapedType getKeyType() {
+      return cast<ShapedType>(getKey().getType());
+    }
+    ShapedType getValueType() {
+      return cast<ShapedType>(getValue().getType());
+    }
+    FloatType getScaleType() {
+      return cast<FloatType>(cast<ShapedType>(getScale().getType()));
+    }
+    ShapedType getOutputType() {
+      return cast<ShapedType>(getOutput().getType());
+    }
+    std::optional<ShapedType> getMaxType() {
+      std::optional<Value> maxVal = getMax();
+      if (!maxVal) return std::nullopt;
+      return cast<ShapedType>(maxVal->getType());
+    }
+    std::optional<ShapedType> getSumType() {
+      std::optional<Value> sumVal = getSum();
+      if (!sumVal) return std::nullopt;
+      return cast<ShapedType>(sumVal->getType());
+    }
+
+    int64_t getQueryRank() {
+      return getQueryType().getRank();
+    }
+    int64_t getKeyRank() {
+      return getKeyType().getRank();
+    }
+    int64_t getValueRank() {
+      return getValueType().getRank();
+    }
+    int64_t getOutputRank() {
+      return getOutputType().getRank();
+    }
+    std::optional<int64_t> getMaxRank() {
+      std::optional<ShapedType> maxType = getMaxType();
+      if (!maxType) return std::nullopt;
+      return maxType->getRank();
+    }
+    std::optional<int64_t> getSumRank() {
+      std::optional<ShapedType> sumType = getSumType();
+      if (!sumType) return std::nullopt;
+      return sumType->getRank();
     }
   }];
 }
