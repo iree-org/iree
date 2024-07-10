@@ -70,28 +70,28 @@ makeSwizzledIds(Location loc, OpBuilder b, Value workgroupIdX,
 
 // Reoredering to make workgroup ids move slowly between chiplet groups.
 
-// The following example illustrates the concept behind this function:
+// Example:
 // Currently, the GPU launches workgroups in a round-robin fashion across
 // each XCD partition on the GPU.
 // Assume we have 16 workgroups and XCDPartitionsOnGPU is 4.
 // The default GPU schedule will launch workgroups {0, 1, 2, 3, ..., 15} in
-// the following round-robin fashion:
+// the following order:
 // Partition 0: {0, 4, 8, 12}
 // Partition 1: {1, 5, 9, 13}
 // Partition 2: {2, 6, 10, 14}
 // Partition 3: {3, 7, 11, 15}
 
 // After reordering, the workgroup IDs are {0, 4, 8, 12, 1, ..., 15},
-// resulting in the round-robin launching fashion:
+// resulting in the launch order:
 // Partition 0: {0, 1, 2, 3}
 // Partition 1: {4, 5, 6, 7}
 // Partition 2: {8, 9, 10, 11}
 // Partition 3: {12, 13, 14, 15}
 
-// The return value is each workgroup's permuted Id
+// Returns permuted workgroup id (linearized ID).
 // In the above example:
-// linearedId 0's permuted Id is still 0
-// linearedId 1's permiuted Id is 4
+// linearedId 0's permuted Id is still 0.
+// linearedId 1's permiuted Id is 4.
 static Value chipletAwareWorkgroupReordering(Location loc, OpBuilder b,
                                              Value linearizedId,
                                              Value workgroupCountX,
@@ -144,19 +144,19 @@ makeChipletGroupedIds(Location loc, OpBuilder b, Value workgroupIdX,
   // Map chiplets to perform a spatially local tile operation.
   // Reorder the linearized ID such that every consecutive group of chiplets
   // is the slowest-changing dimension in the grid.
-  // Emphircally found that two chiplets as a group has better locality
+  // Emphirically found that two chiplets as a group has better locality
   // throughout.
   linearized = chipletAwareWorkgroupReordering(
       loc, b, linearized, workgroupCountX, workgroupCountY, numXCDs / 2);
 
-  // Detailed explaination about the idea behind the below implementation:
+  // Detailed explanation about the idea behind the below implementation:
   // the L2 Cache Optimizations subsection in
   // https://triton-lang.org/main/getting-started/tutorials/03-matrix-multiplication.html#
   unsigned rowGroupSize = chipletGroupTile;
   Value rowGroupSizeVal =
       b.createOrFold<arith::ConstantIndexOp>(loc, rowGroupSize);
 
-  // Emphircally, found rowGroupSize=16 for mi300x achieves good performance
+  // Emphirically, found rowGroupSize=16 for MI300X achieves good performance
   // group every 16 workgroups along Y dimension.
 
   // Number of workgroups in the group.

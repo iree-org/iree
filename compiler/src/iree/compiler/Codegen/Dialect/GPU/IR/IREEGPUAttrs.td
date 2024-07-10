@@ -277,8 +277,7 @@ def IREEGPU_WorkGroupReorderAttr: AttrDef<IREEGPU_Dialect, "WorkgroupReorderOpti
   let cppNamespace = "::mlir::iree_compiler::IREE::GPU";
 
   string description = [{
-    Options for workgroup reordering strategies to improve L2 cache hit rate
-    and thus provide performance improvement.
+    Options for workgroup reordering strategies to improve L2 cache hit rate.
   }];
 
   let parameters = (ins
