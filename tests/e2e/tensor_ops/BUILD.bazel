@@ -21,6 +21,7 @@ ALL_SRCS = enforce_glob(
         "extract_slice.mlir",
         "pack.mlir",
         "pack_dynamic_inner_tiles.mlir",
+        "pack_i8.mlir",
         "tensor_cast.mlir",
         "tensor_insert_slice.mlir",
         "unpack.mlir",
@@ -72,6 +73,7 @@ LLVM_GPU_SRCS = enforce_glob(
         "expand_shape.mlir",
         "extract_slice.mlir",
         "pack.mlir",
+        "pack_i8.mlir",
         "tensor_cast.mlir",
         "tensor_insert_slice.mlir",
         "unpack.mlir",
@@ -116,6 +118,7 @@ SPIRV_SRCS = enforce_glob(
     include = ["*.mlir"],
     exclude = [
         "pack.mlir",
+        "pack_i8.mlir",
         "pack_dynamic_inner_tiles.mlir",
         "unpack.mlir",
     ],

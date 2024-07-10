@@ -20,6 +20,7 @@ iree_check_single_backend_test_suite(
     "extract_slice.mlir"
     "pack.mlir"
     "pack_dynamic_inner_tiles.mlir"
+    "pack_i8.mlir"
     "tensor_cast.mlir"
     "tensor_insert_slice.mlir"
     "unpack.mlir"
@@ -39,6 +40,7 @@ iree_check_single_backend_test_suite(
     "extract_slice.mlir"
     "pack.mlir"
     "pack_dynamic_inner_tiles.mlir"
+    "pack_i8.mlir"
     "tensor_cast.mlir"
     "tensor_insert_slice.mlir"
     "unpack.mlir"
@@ -73,6 +75,7 @@ iree_check_single_backend_test_suite(
     "expand_shape.mlir"
     "extract_slice.mlir"
     "pack.mlir"
+    "pack_i8.mlir"
     "tensor_cast.mlir"
     "tensor_insert_slice.mlir"
     "unpack.mlir"
@@ -97,6 +100,7 @@ iree_check_single_backend_test_suite(
     "expand_shape.mlir"
     "extract_slice.mlir"
     "pack.mlir"
+    "pack_i8.mlir"
     "tensor_cast.mlir"
     "tensor_insert_slice.mlir"
     "unpack.mlir"
@@ -139,34 +143,3 @@ iree_check_single_backend_test_suite(
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
-
-if(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx")
-
-unset(IREE_HIP_TEST_COMPILER_FLAGS)
-list(APPEND IREE_HIP_TEST_COMPILER_FLAGS
-  "--iree-rocm-target-chip=${IREE_HIP_TEST_TARGET_CHIP}"
-)
-
-iree_check_single_backend_test_suite(
-  NAME
-    check_hip_stream
-  SRCS
-    "pack.mlir"
-    "pack_i8.mlir"
-  TARGET_BACKEND
-    "rocm"
-  DRIVER
-    "hip"
-  COMPILER_FLAGS
-    ${IREE_HIP_TEST_COMPILER_FLAGS}
-  RUNNER_ARGS
-    "--hip_use_streams=true"
-  LABELS
-    "noasan"
-    "nomsan"
-    "notsan"
-    "noubsan"
-    "requires-gpu-amd"
-)
-
-endif(IREE_HIP_TEST_TARGET_CHIP MATCHES "^gfx")
