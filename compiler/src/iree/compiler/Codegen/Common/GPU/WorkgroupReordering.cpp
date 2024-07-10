@@ -144,7 +144,7 @@ makeChipletGroupedIds(Location loc, OpBuilder b, Value workgroupIdX,
   // Map chiplets to perform a spatially local tile operation.
   // Reorder the linearized ID such that every consecutive group of chiplets
   // is the slowest-changing dimension in the grid.
-  // Emphirically found that two chiplets as a group has better locality
+  // Empirically found that two chiplets as a group has better locality
   // throughout.
   linearized = chipletAwareWorkgroupReordering(
       loc, b, linearized, workgroupCountX, workgroupCountY, numXCDs / 2);
@@ -156,7 +156,7 @@ makeChipletGroupedIds(Location loc, OpBuilder b, Value workgroupIdX,
   Value rowGroupSizeVal =
       b.createOrFold<arith::ConstantIndexOp>(loc, rowGroupSize);
 
-  // Emphirically, found rowGroupSize=16 for MI300X achieves good performance
+  // Empirically, found rowGroupSize=16 for MI300X achieves good performance
   // group every 16 workgroups along Y dimension.
 
   // Number of workgroups in the group.

@@ -219,9 +219,10 @@ static ReorderWorkgroupsStrategy getReorderWorkgroupsStrategy(
 
 // Reconciles log2 of the workgroup reordering tile size based on the pipeline
 // `option` and the CLI flag.
-static unsigned
-getReorderWorkgroupsLogTileSize(const std::optional<int64_t> &option) {
-  return (unsigned)option.value_or(clReorderWorkgroupsLogTile);
+static unsigned getReorderWorkgroupsLogTileSize(std::optional<int64_t> option) {
+  int64_t logTile = option.value_or(clReorderWorkgroupsLogTile);
+  assert(logTile >= 0);
+  return static_cast<unsigned>(logTile);
 }
 //===----------------------------------------------------------------------===//
 // Common Pass Recipes
