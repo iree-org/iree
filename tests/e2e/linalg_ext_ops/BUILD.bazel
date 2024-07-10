@@ -102,33 +102,46 @@ iree_check_single_backend_test_suite(
     target_backend = "rocm",
 )
 
-SPIRV_SRCS = enforce_glob(
-    # keep sorted
-    [
-        "reverse.mlir",
-        "scan.mlir",
-        "scatter.mlir",
-        "sort.mlir",
-        "winograd_input.mlir",
-        "winograd_output.mlir",
-    ],
-    include = ["*.mlir"],
-    exclude = [
-        "attention.mlir",
-        "top-k.mlir",
-    ],
-)
-
 iree_check_single_backend_test_suite(
     name = "check_metal-spirv_vulkan",
-    srcs = SPIRV_SRCS,
+    srcs = enforce_glob(
+        # keep sorted
+        [
+            "reverse.mlir",
+            "scan.mlir",
+            "scatter.mlir",
+            "sort.mlir",
+            "winograd_input.mlir",
+            "winograd_output.mlir",
+        ],
+        include = ["*.mlir"],
+        exclude = [
+            "attention.mlir",
+            "top-k.mlir",
+        ],
+    ),
     driver = "metal",
     target_backend = "metal-spirv",
 )
 
 iree_check_single_backend_test_suite(
     name = "check_vulkan-spirv_vulkan",
-    srcs = SPIRV_SRCS,
+    srcs = enforce_glob(
+        # keep sorted
+        [
+            "scan.mlir",
+            "scatter.mlir",
+            "sort.mlir",
+            "winograd_input.mlir",
+            "winograd_output.mlir",
+        ],
+        include = ["*.mlir"],
+        exclude = [
+            "attention.mlir",
+            "reverse.mlir",  #TODO(#12415): disabled due to miscompilation on Pixel 6.
+            "top-k.mlir",
+        ],
+    ),
     driver = "vulkan",
     target_backend = "vulkan-spirv",
 )
