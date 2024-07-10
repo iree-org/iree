@@ -329,7 +329,6 @@ jobs:
           echo "$(<job_summary.md )" >> $GITHUB_STEP_SUMMARY
           rm job_summary.md
 
-      # TODO(scotttodd): update these golden values, retry count, etc.
       - name: "Running SDXL rocm pipeline benchmark (mi300)"
         if: contains(matrix.name, 'rocm_mi300_gfx942')
         run: |
@@ -342,7 +341,7 @@ jobs:
             --goldendispatch-rocm-unet 1714 \
             --goldendispatch-rocm-clip 1569 \
             --goldendispatch-rocm-vae 248 \
-            --goldensize-rocm-unet-bytes 2062938 \
+            --goldensize-rocm-unet-bytes 2054938 \
             --goldensize-rocm-clip-bytes 780328 \
             --goldensize-rocm-vae-bytes 758509 \
             --gpu-number 0 \
