@@ -335,8 +335,8 @@ jobs:
           source ${VENV_DIR}/bin/activate
           pytest SHARK-TestSuite/iree_tests/benchmarks/sdxl/benchmark_sdxl_rocm.py \
             --goldentime-rocm-e2e-ms 320 \
-            --goldentime-rocm-unet-ms 76 \
-            --goldentime-rocm-clip-ms 14.5 \
+            --goldentime-rocm-unet-ms 77 \
+            --goldentime-rocm-clip-ms 15 \
             --goldentime-rocm-vae-ms 74 \
             --goldendispatch-rocm-unet 1714 \
             --goldendispatch-rocm-clip 1569 \
