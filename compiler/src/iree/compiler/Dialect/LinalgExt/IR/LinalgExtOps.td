@@ -566,7 +566,9 @@ def IREELinalgExt_AttentionOp : IREELinalgExt_PureOp<"attention",
   let extraClassDeclaration = [{
     // Method to implement for specifying output range for
     // DestinationStyleOpInterface
-    MutableOperandRange getDpsInitsMutable();
+    MutableOperandRange getDpsInitsMutable() {
+      return getOutputsMutable();
+    }
 
     SmallVector<AffineMap> getIndexingMapsArray();
 

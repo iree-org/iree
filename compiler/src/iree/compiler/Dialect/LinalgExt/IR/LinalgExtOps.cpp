@@ -1341,10 +1341,6 @@ LogicalResult AttentionOp::verify() {
   return success();
 }
 
-MutableOperandRange AttentionOp::getDpsInitsMutable() {
-  return MutableOperandRange(*this, /*numInputs=*/4, /*numInits=*/1);
-}
-
 LogicalResult AttentionOp::reifyResultShapes(
     OpBuilder &b, ReifiedRankedShapedTypeDims &reifiedReturnShapes) {
   return cast<LinalgExtOp>(getOperation())

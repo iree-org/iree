@@ -134,10 +134,10 @@ struct AttentionOpConversion
     // Add batches to standard attention indexing maps.
     SmallVector<AffineMap> indexingMaps = getStandardAttentionIndexingMaps(ctx);
     int64_t numBatches = op.getQueryType().getRank() - 2;
-    for (AffineMap map : indexingMaps) {
-      map.shiftDims(numBatches);
+    for (AffineMap &map : indexingMaps) {
+      map = map.shiftDims(numBatches);
       for (int batch : llvm::seq<int>(numBatches)) {
-        map.insertResult(rewriter.getAffineDimExpr(batch), batch);
+        map = map.insertResult(rewriter.getAffineDimExpr(batch), batch);
       }
     }
 
