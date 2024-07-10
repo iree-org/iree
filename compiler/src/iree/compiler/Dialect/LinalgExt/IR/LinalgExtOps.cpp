@@ -1275,25 +1275,15 @@ LogicalResult AttentionOp::verify() {
   }
   bool isTiled = numOutputs == 3;
 
-  SmallVector<AffineMap> indexingMaps = attnOp.getIndexingMapsArray();
-
-<<<<<<< HEAD
   // Check if indexing maps can represent attention.
+  SmallVector<AffineMap> indexingMaps = attnOp.getIndexingMapsArray();
   FailureOr<AttentionOpDetail> maybeOpInfo =
       AttentionOpDetail::get(indexingMaps);
-=======
-  ShapedType queryType = getQueryType();
-  ShapedType keyType = getKeyType();
-  ShapedType outputType = getOutputType();
-  Type queryElementType = queryType.getElementType();
-  Type keyElementType = keyType.getElementType();
-  Type outputElementType = outputType.getElementType();
 
   FloatType scaleElementType = dyn_cast<FloatType>(getScale().getType());
   if (!scaleElementType) {
     return op->emitOpError("expected scale to be of floating point type");
   }
->>>>>>> 6e37905473 (Add support for mixed types)
 
   // Check shape compatibility based on indexing maps.
   SmallVector<int64_t> shape(getIterationDomainRank());
@@ -1333,6 +1323,12 @@ LogicalResult AttentionOp::verify() {
     return failure();
   }
 
+<<<<<<< HEAD
+=======
+  if (queryElementType != keyElementType) {
+    return op->emitOpError("element types of (Q)uery and (K)ey should be same");
+  }
+>>>>>>> 3f0179b1bf (git-clang-format)
   if (isTiled) {
     // Tiled/Flash attention.
     Type maxElementType = getMaxType()->getElementType();
