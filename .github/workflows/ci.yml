@@ -430,6 +430,50 @@ jobs:
         run: |
           ./build_tools/cmake/ctest_all.sh ${BUILD_DIR}
 
+  test_amd_mi300:
+    needs: [setup, build_all]
+    if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_amd_mi300')
+    env:
+      BUILD_DIR: build-tests
+      INSTALL_DIR: ${{ needs.build_all.outputs.install-dir }}
+      INSTALL_DIR_ARCHIVE: ${{ needs.build_all.outputs.install-dir-archive }}
+      INSTALL_DIR_GCS_URL: ${{ needs.build_all.outputs.install-dir-gcs-url }}
+      IREE_CPU_DISABLE: 1
+      IREE_VULKAN_DISABLE: 1
+      IREE_CUDA_DISABLE: 1
+      IREE_HIP_DISABLE: 0
+      IREE_HIP_TEST_TARGET_CHIP: "gfx942"
+      LD_LIBRARY_PATH: /home/esaimana/Python-3.11.9
+    runs-on: nodai-amdgpu-mi300-x86-64
+    steps:
+      - name: Pre Checkout MI300 Step
+        if: contains(matrix.name, 'gfx942')
+        run: |
+          sudo chmod -R 777 ~/actions-runner/_work
+      - name: "Checking out repository"
+        uses: actions/checkout@v4.1.7
+      - name: "Checking out runtime submodules"
+        run: ./build_tools/scripts/git/update_runtime_submodules.sh
+      - name: "Downloading install dir archive"
+        run: wget "${INSTALL_DIR_GCS_URL}" -O "${INSTALL_DIR_ARCHIVE}"
+      - name: "Extracting install directory"
+        run: tar -xf "${INSTALL_DIR_ARCHIVE}"
+      - name: "Building tests"
+        run: |
+          ./build_tools/pkgci/build_tests_using_package.sh ${INSTALL_DIR}
+      - name: "Running GPU tests"
+        env:
+          IREE_CTEST_LABEL_REGEX: ^requires-gpu|^driver=hip$
+          IREE_NVIDIA_SM80_TESTS_DISABLE: 1
+          IREE_MULTI_DEVICE_TESTS_DISABLE: 0
+          IREE_AMD_RDNA3_TESTS_DISABLE: 1
+          IREE_NVIDIA_GPU_TESTS_DISABLE: 0
+          IREE_CUDA_DISABLE: 1
+          IREE_CPU_DISABLE: 1
+          IREE_HIP_DISABLE: 0
+        run: |
+          ./build_tools/cmake/ctest_all.sh ${BUILD_DIR}
+
   test_amd_w7900:
     needs: [setup, build_all]
     if: contains(fromJson(needs.setup.outputs.enabled-jobs), 'test_amd_w7900')
@@ -939,6 +983,7 @@ jobs:
       - test_nvidia_gpu
       - test_nvidia_a100
       - test_amd_mi250
+      - test_amd_mi300
       - test_amd_w7900
 
       # Configurations

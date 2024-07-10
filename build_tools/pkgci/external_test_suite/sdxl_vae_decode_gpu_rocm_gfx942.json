@@ -1,0 +1,29 @@
+{
+  "config_name": "gpu_rocm",
+  "iree_compile_flags" : [
+    "--iree-hal-target-backends=rocm",
+    "--iree-rocm-target-chip=gfx942",
+    "--iree-opt-const-eval=false",
+    "--iree-global-opt-propagate-transposes=true",
+    "--iree-opt-outer-dim-concat=true",
+    "--iree-llvmgpu-enable-prefetch=true",
+    "--iree-rocm-waves-per-eu=2",
+    "--iree-flow-enable-aggressive-fusion",
+    "--iree-codegen-llvmgpu-use-vector-distribution=true",
+    "--iree-execution-model=async-external",
+    "--iree-preprocessing-pass-pipeline=builtin.module(iree-preprocessing-transpose-convolution-pipeline, util.func(iree-preprocessing-pad-to-intrinsics))",
+    "--iree-scheduling-dump-statistics-format=json",
+    "--iree-scheduling-dump-statistics-file=compilation_info.json"
+  ],
+  "iree_run_module_flags": [
+    "--device=hip",
+    "--parameters=model=real_weights.irpa",
+    "--input=1x4x128x128xf16=@inference_input.0.bin",
+    "--expected_output=1x3x1024x1024xf16=@inference_output.0.bin",
+    "--expected_f16_threshold=0.4f"
+  ],
+  "skip_compile_tests": [],
+  "skip_run_tests": [],
+  "expected_compile_failures": [],
+  "expected_run_failures": []
+}
