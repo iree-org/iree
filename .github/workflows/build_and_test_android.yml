@@ -114,7 +114,7 @@ jobs:
     strategy:
       matrix:
         target:
-          - device-name: pixel-6-pro
+          - device-name: pixel-8-pro
             label-exclude: "^requires-gpu"
           - device-name: moto-edge-x30
             # Moto Edge X30 supports VK_KHR_16bit_storage for only storage
