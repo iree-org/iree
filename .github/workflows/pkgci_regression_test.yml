@@ -321,7 +321,7 @@ jobs:
             --goldendispatch-rocm-vae 248 \
             --goldensize-rocm-unet-bytes 2062938 \
             --goldensize-rocm-clip-bytes 780328 \
-            --goldensize-rocm-vae-bytes 758509 \
+            --goldensize-rocm-vae-bytes 757933 \
             --gpu-number 6 \
             --rocm-chip gfx90a \
             --log-cli-level=info \
@@ -335,16 +335,16 @@ jobs:
         run: |
           source ${VENV_DIR}/bin/activate
           pytest SHARK-TestSuite/iree_tests/benchmarks/sdxl/benchmark_sdxl_rocm.py \
-            --goldentime-rocm-e2e-ms 1336.0 \
-            --goldentime-rocm-unet-ms 340.0 \
-            --goldentime-rocm-clip-ms 17.0 \
-            --goldentime-rocm-vae-ms 291.0 \
+            --goldentime-rocm-e2e-ms 320 \
+            --goldentime-rocm-unet-ms 76 \
+            --goldentime-rocm-clip-ms 14.5 \
+            --goldentime-rocm-vae-ms 74 \
             --goldendispatch-rocm-unet 1714 \
             --goldendispatch-rocm-clip 1569 \
             --goldendispatch-rocm-vae 248 \
             --goldensize-rocm-unet-bytes 2062938 \
             --goldensize-rocm-clip-bytes 780328 \
-            --goldensize-rocm-vae-bytes 757933 \
+            --goldensize-rocm-vae-bytes 758509 \
             --gpu-number 0 \
             --rocm-chip gfx942 \
             --log-cli-level=info \
