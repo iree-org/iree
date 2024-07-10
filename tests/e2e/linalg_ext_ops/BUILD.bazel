@@ -31,6 +31,11 @@ iree_check_single_backend_test_suite(
     name = "check_llvm-cpu_local-task",
     srcs = ALL_SRCS,
     driver = "local-task",
+    tags = [
+        # attention fails with a wasm target, just disable all tests there for now
+        #   error: Yield operand #2 is not equivalent to the corresponding iter bbArg
+        "nowasm",
+    ],
     target_backend = "llvm-cpu",
 )
 
