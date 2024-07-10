@@ -12,6 +12,41 @@ iree_add_all_subdirs()
 
 iree_check_single_backend_test_suite(
   NAME
+    check_llvm-cpu_local-task
+  SRCS
+    "attention.mlir"
+    "reverse.mlir"
+    "scan.mlir"
+    "scatter.mlir"
+    "sort.mlir"
+    "top-k.mlir"
+    "winograd_input.mlir"
+    "winograd_output.mlir"
+  TARGET_BACKEND
+    "llvm-cpu"
+  DRIVER
+    "local-task"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_vmvx_local-task
+  SRCS
+    "reverse.mlir"
+    "scan.mlir"
+    "scatter.mlir"
+    "sort.mlir"
+    "top-k.mlir"
+    "winograd_input.mlir"
+    "winograd_output.mlir"
+  TARGET_BACKEND
+    "vmvx"
+  DRIVER
+    "local-task"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
     check_cuda
   SRCS
     "reverse.mlir"
@@ -19,6 +54,8 @@ iree_check_single_backend_test_suite(
     "scatter.mlir"
     "sort.mlir"
     "top-k.mlir"
+    "winograd_input.mlir"
+    "winograd_output.mlir"
   TARGET_BACKEND
     "cuda"
   DRIVER
@@ -29,6 +66,55 @@ iree_check_single_backend_test_suite(
     "notsan"
     "noubsan"
     "requires-gpu-nvidia"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_rocm_hip
+  SRCS
+    "reverse.mlir"
+    "scan.mlir"
+    "scatter.mlir"
+    "sort.mlir"
+    "top-k.mlir"
+    "winograd_input.mlir"
+    "winograd_output.mlir"
+  TARGET_BACKEND
+    "rocm"
+  DRIVER
+    "hip"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_metal-spirv_vulkan
+  SRCS
+    "reverse.mlir"
+    "scan.mlir"
+    "scatter.mlir"
+    "sort.mlir"
+    "winograd_input.mlir"
+    "winograd_output.mlir"
+  TARGET_BACKEND
+    "metal-spirv"
+  DRIVER
+    "metal"
+)
+
+iree_check_single_backend_test_suite(
+  NAME
+    check_vulkan-spirv_vulkan
+  SRCS
+    "reverse.mlir"
+    "scan.mlir"
+    "scatter.mlir"
+    "sort.mlir"
+    "winograd_input.mlir"
+    "winograd_output.mlir"
+  TARGET_BACKEND
+    "vulkan-spirv"
+  DRIVER
+    "vulkan"
 )
 
 iree_check_single_backend_test_suite(
@@ -67,58 +153,6 @@ iree_check_single_backend_test_suite(
     "notsan"
     "noubsan"
     "requires-gpu-nvidia"
-)
-
-# Failing on Emscripten: https://github.com/iree-org/iree/issues/12129
-if(NOT EMSCRIPTEN)
-
-iree_check_single_backend_test_suite(
-  NAME
-    check_llvm-cpu_local-task
-  SRCS
-    "attention.mlir"
-    "reverse.mlir"
-    "scan.mlir"
-    "scatter.mlir"
-    "sort.mlir"
-    "top-k.mlir"
-    "winograd_input.mlir"
-    "winograd_output.mlir"
-  TARGET_BACKEND
-    "llvm-cpu"
-  DRIVER
-    "local-task"
-)
-
-endif()
-
-iree_check_single_backend_test_suite(
-  NAME
-    check_vmvx_local-task
-  SRCS
-    "reverse.mlir"
-    "scan.mlir"
-    "scatter.mlir"
-    "sort.mlir"
-    "top-k.mlir"
-  TARGET_BACKEND
-    "vmvx"
-  DRIVER
-    "local-task"
-)
-
-iree_check_single_backend_test_suite(
-  NAME
-    check_vulkan-spirv_vulkan
-  SRCS
-    "scatter.mlir"
-    "sort.mlir"
-    "winograd_input.mlir"
-    "winograd_output.mlir"
-  TARGET_BACKEND
-    "vulkan-spirv"
-  DRIVER
-    "vulkan"
 )
 
 ### BAZEL_TO_CMAKE_PRESERVES_ALL_CONTENT_BELOW_THIS_LINE ###
