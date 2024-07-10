@@ -380,7 +380,7 @@ setConvolutionVectorDistributionConfig(IREE::GPU::TargetAttr target,
 }
 
 [[maybe_unused]] static void
-debugPrintContractionInfo(unsigned numLoops,
+debugPrintContractionInfo(StringRef label, unsigned numLoops,
                           linalg::ContractionDimensions contractionDims,
                           ArrayRef<int64_t> workgroupTileSizes) {
   ArrayRef<unsigned> dimVals[] = {contractionDims.batch, contractionDims.m,
@@ -395,7 +395,7 @@ debugPrintContractionInfo(unsigned numLoops,
   llvm::interleaveComma(dimSymbols, llvm::dbgs());
   llvm::dbgs() << "]\n";
 
-  DBGS() << "Workgroup tile sizes: [";
+  DBGS() << label << ": [";
   llvm::interleaveComma(workgroupTileSizes, llvm::dbgs());
   llvm::dbgs() << "]\n";
 }
@@ -418,6 +418,9 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
       contractionDims->n.size() < 1) {
     return failure();
   }
+
+  LLVM_DEBUG(debugPrintContractionInfo("Problem size", op.getNumLoops(),
+                                       *contractionDims, bounds));
 
   // For now we are not being smart and trying to reshape dimensions to allow
   // for better usage of intrinsics, and instead are tiling all dimensions
@@ -577,8 +580,8 @@ setMatmulVectorDistributionConfig(IREE::GPU::TargetAttr target,
   // Follow the LLVMGPU convention of keeping all of the tile sizes in one list.
   workgroupTileSizes[kDim] = schedule->kTileCount * schedule->kSize;
 
-  LLVM_DEBUG(debugPrintContractionInfo(op.getNumLoops(), *contractionDims,
-                                       workgroupTileSizes));
+  LLVM_DEBUG(debugPrintContractionInfo("Workgroup tile sizes", op.getNumLoops(),
+                                       *contractionDims, workgroupTileSizes));
 
   TileSizesListType tileSizes;
   tileSizes.push_back(workgroupTileSizes);
