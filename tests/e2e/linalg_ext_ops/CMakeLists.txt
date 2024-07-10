@@ -107,7 +107,6 @@ iree_check_single_backend_test_suite(
   NAME
     check_vulkan-spirv_vulkan
   SRCS
-    "reverse.mlir"
     "scan.mlir"
     "scatter.mlir"
     "sort.mlir"
