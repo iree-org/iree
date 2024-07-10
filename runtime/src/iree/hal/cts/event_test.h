@@ -19,15 +19,15 @@ namespace iree {
 namespace hal {
 namespace cts {
 
-class event_test : public CtsTestBase {};
+class event_test : public CTSTestBase<> {};
 
-TEST_P(event_test, Create) {
+TEST_F(event_test, Create) {
   iree_hal_event_t* event = NULL;
   IREE_ASSERT_OK(iree_hal_event_create(device_, &event));
   iree_hal_event_release(event);
 }
 
-TEST_P(event_test, SignalAndReset) {
+TEST_F(event_test, SignalAndReset) {
   iree_hal_event_t* event = NULL;
   IREE_ASSERT_OK(iree_hal_event_create(device_, &event));
 
@@ -50,7 +50,7 @@ TEST_P(event_test, SignalAndReset) {
   iree_hal_command_buffer_release(command_buffer);
 }
 
-TEST_P(event_test, SubmitWithChainedCommandBuffers) {
+TEST_F(event_test, SubmitWithChainedCommandBuffers) {
   iree_hal_event_t* event = NULL;
   IREE_ASSERT_OK(iree_hal_event_create(device_, &event));
 

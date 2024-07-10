@@ -18,7 +18,7 @@ namespace iree {
 namespace hal {
 namespace cts {
 
-class command_buffer_dispatch_test : public CtsTestBase {
+class command_buffer_dispatch_test : public CTSTestBase<> {
  protected:
   void PrepareAbsExecutable() {
     IREE_ASSERT_OK(iree_hal_executable_cache_create(
@@ -76,7 +76,7 @@ class command_buffer_dispatch_test : public CtsTestBase {
   iree_hal_executable_t* executable_ = NULL;
 };
 
-TEST_P(command_buffer_dispatch_test, DispatchAbs) {
+TEST_F(command_buffer_dispatch_test, DispatchAbs) {
   PrepareAbsExecutable();
 
   iree_hal_command_buffer_t* command_buffer = NULL;

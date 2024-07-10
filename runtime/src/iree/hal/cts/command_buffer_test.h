@@ -26,7 +26,7 @@ namespace {
 constexpr iree_device_size_t kDefaultAllocationSize = 1024;
 }  // namespace
 
-class command_buffer_test : public CtsTestBase {
+class command_buffer_test : public CTSTestBase<> {
  protected:
   void CreateZeroedDeviceBuffer(iree_device_size_t buffer_size,
                                 iree_hal_buffer_t** out_buffer) {
@@ -83,7 +83,7 @@ class command_buffer_test : public CtsTestBase {
   }
 };
 
-TEST_P(command_buffer_test, Create) {
+TEST_F(command_buffer_test, Create) {
   iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
@@ -97,7 +97,7 @@ TEST_P(command_buffer_test, Create) {
   iree_hal_command_buffer_release(command_buffer);
 }
 
-TEST_P(command_buffer_test, BeginEnd) {
+TEST_F(command_buffer_test, BeginEnd) {
   iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
@@ -110,7 +110,7 @@ TEST_P(command_buffer_test, BeginEnd) {
   iree_hal_command_buffer_release(command_buffer);
 }
 
-TEST_P(command_buffer_test, SubmitEmpty) {
+TEST_F(command_buffer_test, SubmitEmpty) {
   iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
@@ -125,7 +125,7 @@ TEST_P(command_buffer_test, SubmitEmpty) {
   iree_hal_command_buffer_release(command_buffer);
 }
 
-TEST_P(command_buffer_test, CopyWholeBuffer) {
+TEST_F(command_buffer_test, CopyWholeBuffer) {
   iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
@@ -188,7 +188,7 @@ TEST_P(command_buffer_test, CopyWholeBuffer) {
   iree_hal_buffer_release(host_buffer);
 }
 
-TEST_P(command_buffer_test, CopySubBuffer) {
+TEST_F(command_buffer_test, CopySubBuffer) {
   iree_hal_command_buffer_t* command_buffer = NULL;
   IREE_ASSERT_OK(iree_hal_command_buffer_create(
       device_, IREE_HAL_COMMAND_BUFFER_MODE_ONE_SHOT,
@@ -272,7 +272,7 @@ TEST_P(command_buffer_test, CopySubBuffer) {
   iree_hal_buffer_release(host_buffer);
 }
 
-TEST_P(command_buffer_test, FillBuffer_pattern1_size1_offset0_length1) {
+TEST_F(command_buffer_test, FillBuffer_pattern1_size1_offset0_length1) {
   iree_device_size_t buffer_size = 1;
   iree_device_size_t target_offset = 0;
   iree_device_size_t fill_length = 1;
@@ -284,7 +284,7 @@ TEST_P(command_buffer_test, FillBuffer_pattern1_size1_offset0_length1) {
   EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
 }
 
-TEST_P(command_buffer_test, FillBuffer_pattern1_size5_offset0_length5) {
+TEST_F(command_buffer_test, FillBuffer_pattern1_size5_offset0_length5) {
   iree_device_size_t buffer_size = 5;
   iree_device_size_t target_offset = 0;
   iree_device_size_t fill_length = 5;
@@ -297,7 +297,7 @@ TEST_P(command_buffer_test, FillBuffer_pattern1_size5_offset0_length5) {
   EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
 }
 
-TEST_P(command_buffer_test, FillBuffer_pattern1_size16_offset0_length1) {
+TEST_F(command_buffer_test, FillBuffer_pattern1_size16_offset0_length1) {
   iree_device_size_t buffer_size = 16;
   iree_device_size_t target_offset = 0;
   iree_device_size_t fill_length = 1;
@@ -312,7 +312,7 @@ TEST_P(command_buffer_test, FillBuffer_pattern1_size16_offset0_length1) {
   EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
 }
 
-TEST_P(command_buffer_test, FillBuffer_pattern1_size16_offset0_length3) {
+TEST_F(command_buffer_test, FillBuffer_pattern1_size16_offset0_length3) {
   iree_device_size_t buffer_size = 16;
   iree_device_size_t target_offset = 0;
   iree_device_size_t fill_length = 3;
@@ -327,7 +327,7 @@ TEST_P(command_buffer_test, FillBuffer_pattern1_size16_offset0_length3) {
   EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
 }
 
-TEST_P(command_buffer_test, FillBuffer_pattern1_size16_offset0_length8) {
+TEST_F(command_buffer_test, FillBuffer_pattern1_size16_offset0_length8) {
   iree_device_size_t buffer_size = 16;
   iree_device_size_t target_offset = 0;
   iree_device_size_t fill_length = 8;
@@ -342,7 +342,7 @@ TEST_P(command_buffer_test, FillBuffer_pattern1_size16_offset0_length8) {
   EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
 }
 
-TEST_P(command_buffer_test, FillBuffer_pattern1_size16_offset2_length8) {
+TEST_F(command_buffer_test, FillBuffer_pattern1_size16_offset2_length8) {
   iree_device_size_t buffer_size = 16;
   iree_device_size_t target_offset = 2;
   iree_device_size_t fill_length = 8;
@@ -357,7 +357,7 @@ TEST_P(command_buffer_test, FillBuffer_pattern1_size16_offset2_length8) {
   EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
 }
 
-TEST_P(command_buffer_test, FillBuffer_pattern2_size2_offset0_length2) {
+TEST_F(command_buffer_test, FillBuffer_pattern2_size2_offset0_length2) {
   iree_device_size_t buffer_size = 2;
   iree_device_size_t target_offset = 0;
   iree_device_size_t fill_length = 2;
@@ -369,7 +369,7 @@ TEST_P(command_buffer_test, FillBuffer_pattern2_size2_offset0_length2) {
   EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
 }
 
-TEST_P(command_buffer_test, FillBuffer_pattern2_size16_offset0_length8) {
+TEST_F(command_buffer_test, FillBuffer_pattern2_size16_offset0_length8) {
   iree_device_size_t buffer_size = 16;
   iree_device_size_t target_offset = 0;
   iree_device_size_t fill_length = 8;
@@ -384,7 +384,7 @@ TEST_P(command_buffer_test, FillBuffer_pattern2_size16_offset0_length8) {
   EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
 }
 
-TEST_P(command_buffer_test, FillBuffer_pattern2_size16_offset0_length10) {
+TEST_F(command_buffer_test, FillBuffer_pattern2_size16_offset0_length10) {
   iree_device_size_t buffer_size = 16;
   iree_device_size_t target_offset = 0;
   iree_device_size_t fill_length = 10;
@@ -399,7 +399,7 @@ TEST_P(command_buffer_test, FillBuffer_pattern2_size16_offset0_length10) {
   EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
 }
 
-TEST_P(command_buffer_test, FillBuffer_pattern2_size16_offset2_length8) {
+TEST_F(command_buffer_test, FillBuffer_pattern2_size16_offset2_length8) {
   iree_device_size_t buffer_size = 16;
   iree_device_size_t target_offset = 2;
   iree_device_size_t fill_length = 8;
@@ -414,7 +414,7 @@ TEST_P(command_buffer_test, FillBuffer_pattern2_size16_offset2_length8) {
   EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
 }
 
-TEST_P(command_buffer_test, FillBuffer_pattern4_size4_offset0_length4) {
+TEST_F(command_buffer_test, FillBuffer_pattern4_size4_offset0_length4) {
   iree_device_size_t buffer_size = 4;
   iree_device_size_t target_offset = 0;
   iree_device_size_t fill_length = 4;
@@ -426,7 +426,7 @@ TEST_P(command_buffer_test, FillBuffer_pattern4_size4_offset0_length4) {
   EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
 }
 
-TEST_P(command_buffer_test, FillBuffer_pattern4_size4_offset16_length4) {
+TEST_F(command_buffer_test, FillBuffer_pattern4_size4_offset16_length4) {
   iree_device_size_t buffer_size = 20;
   iree_device_size_t target_offset = 16;
   iree_device_size_t fill_length = 4;
@@ -439,7 +439,7 @@ TEST_P(command_buffer_test, FillBuffer_pattern4_size4_offset16_length4) {
   EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
 }
 
-TEST_P(command_buffer_test, FillBuffer_pattern4_size16_offset0_length8) {
+TEST_F(command_buffer_test, FillBuffer_pattern4_size16_offset0_length8) {
   iree_device_size_t buffer_size = 16;
   iree_device_size_t target_offset = 0;
   iree_device_size_t fill_length = 8;
@@ -454,7 +454,7 @@ TEST_P(command_buffer_test, FillBuffer_pattern4_size16_offset0_length8) {
   EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
 }
 
-TEST_P(command_buffer_test, FillBuffer_pattern4_size16_offset8_length8) {
+TEST_F(command_buffer_test, FillBuffer_pattern4_size16_offset8_length8) {
   iree_device_size_t buffer_size = 16;
   iree_device_size_t target_offset = 8;
   iree_device_size_t fill_length = 8;
@@ -469,7 +469,7 @@ TEST_P(command_buffer_test, FillBuffer_pattern4_size16_offset8_length8) {
   EXPECT_THAT(actual_buffer, ContainerEq(reference_buffer));
 }
 
-TEST_P(command_buffer_test, UpdateBufferWholeBuffer) {
+TEST_F(command_buffer_test, UpdateBufferWholeBuffer) {
   iree_device_size_t target_buffer_size = 16;
   std::vector<uint8_t> source_buffer{0x01, 0x02, 0x03, 0x04,  //
                                      0x05, 0x06, 0x07, 0x08,  //
@@ -506,7 +506,7 @@ TEST_P(command_buffer_test, UpdateBufferWholeBuffer) {
   iree_hal_buffer_release(device_buffer);
 }
 
-TEST_P(command_buffer_test, UpdateBufferWithOffsets) {
+TEST_F(command_buffer_test, UpdateBufferWithOffsets) {
   iree_device_size_t target_buffer_size = 16;
   std::vector<uint8_t> source_buffer{0x01, 0x02, 0x03, 0x04,  //
                                      0x05, 0x06, 0x07, 0x08,  //
@@ -548,7 +548,7 @@ TEST_P(command_buffer_test, UpdateBufferWithOffsets) {
   iree_hal_buffer_release(device_buffer);
 }
 
-TEST_P(command_buffer_test, UpdateBufferSubspan) {
+TEST_F(command_buffer_test, UpdateBufferSubspan) {
   iree_device_size_t target_buffer_size = 16;
   std::vector<uint8_t> source_buffer{0x01, 0x02, 0x03, 0x04,  //
                                      0x05, 0x06, 0x07, 0x08,  //

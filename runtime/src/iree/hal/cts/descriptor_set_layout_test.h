@@ -17,11 +17,11 @@ namespace iree {
 namespace hal {
 namespace cts {
 
-class descriptor_set_layout_test : public CtsTestBase {};
+class descriptor_set_layout_test : public CTSTestBase<> {};
 
 // Note: bindingCount == 0 is valid in VkDescriptorSetLayoutCreateInfo:
 // https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkDescriptorSetLayoutCreateInfo.html
-TEST_P(descriptor_set_layout_test, CreateWithNoBindings) {
+TEST_F(descriptor_set_layout_test, CreateWithNoBindings) {
   iree_hal_descriptor_set_layout_t* descriptor_set_layout = NULL;
   IREE_ASSERT_OK(iree_hal_descriptor_set_layout_create(
       device_, IREE_HAL_DESCRIPTOR_SET_LAYOUT_FLAG_NONE,
@@ -30,7 +30,7 @@ TEST_P(descriptor_set_layout_test, CreateWithNoBindings) {
   iree_hal_descriptor_set_layout_release(descriptor_set_layout);
 }
 
-TEST_P(descriptor_set_layout_test, CreateWithOneBinding) {
+TEST_F(descriptor_set_layout_test, CreateWithOneBinding) {
   iree_hal_descriptor_set_layout_t* descriptor_set_layout = NULL;
   iree_hal_descriptor_set_layout_binding_t descriptor_set_layout_bindings[] = {
       {
@@ -46,7 +46,7 @@ TEST_P(descriptor_set_layout_test, CreateWithOneBinding) {
   iree_hal_descriptor_set_layout_release(descriptor_set_layout);
 }
 
-TEST_P(descriptor_set_layout_test, CreateWithTwoBindings) {
+TEST_F(descriptor_set_layout_test, CreateWithTwoBindings) {
   iree_hal_descriptor_set_layout_t* descriptor_set_layout = NULL;
   iree_hal_descriptor_set_layout_binding_t descriptor_set_layout_bindings[] = {
       {
@@ -67,7 +67,7 @@ TEST_P(descriptor_set_layout_test, CreateWithTwoBindings) {
   iree_hal_descriptor_set_layout_release(descriptor_set_layout);
 }
 
-TEST_P(descriptor_set_layout_test, CreateWithPushDescriptorType) {
+TEST_F(descriptor_set_layout_test, CreateWithPushDescriptorType) {
   iree_hal_descriptor_set_layout_t* descriptor_set_layout = NULL;
   iree_hal_descriptor_set_layout_binding_t descriptor_set_layout_bindings[] = {
       {

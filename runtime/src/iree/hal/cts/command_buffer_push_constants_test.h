@@ -20,7 +20,7 @@ namespace cts {
 
 using ::testing::ContainerEq;
 
-class command_buffer_push_constants_test : public CtsTestBase {
+class command_buffer_push_constants_test : public CTSTestBase<> {
  protected:
   void PrepareExecutable() {
     IREE_ASSERT_OK(iree_hal_executable_cache_create(
@@ -77,7 +77,7 @@ class command_buffer_push_constants_test : public CtsTestBase {
   iree_hal_executable_t* executable_ = NULL;
 };
 
-TEST_P(command_buffer_push_constants_test, DispatchWithPushConstants) {
+TEST_F(command_buffer_push_constants_test, DispatchWithPushConstants) {
   ASSERT_NO_FATAL_FAILURE(PrepareExecutable());
 
   iree_hal_command_buffer_t* command_buffer = NULL;
